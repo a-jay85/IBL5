@@ -12,6 +12,28 @@ class VotingBallotViewTest extends TestCase
 {
     private VotingBallotView $view;
 
+    private const string PINNED_ASG_HTML = '<form name="ASGVote" method="post" action="action.php"><CSRF><div class="voting-form-container"><img src="images/logo/1.jpg" alt="Team Logo" class="team-logo-banner"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button><script>
+function ShowAndHideGM() {
+    var x = document.getElementById(\'GM\');
+    if (x.style.display == \'none\') {
+        x.style.display = \'\';
+    } else {
+        x.style.display = \'none\';
+    }
+}
+</script><div class="voting-category" onclick="ShowAndHideGM()"><h2 class="ibl-title voting-category-title">GM of the Year</h2><p class="voting-category-instruction">Select THREE.</p></div><table id="GM" style="display:none" class="sortable ibl-data-table voting-form-table"><thead><tr><th>Vote</th><th>Name</th><th>Team</th></tr></thead><tbody><tr><td><input type="checkbox" name="GM[]" value="Pat O&apos;Brien, Boston Celtics"></td><td>Pat O&apos;Brien</td><td>Boston Celtics</td></tr><tr><td><input type="checkbox" name="GM[]" value="Jane Roe, Chicago Bulls"></td><td>Jane Roe</td><td>Chicago Bulls</td></tr></tbody></table><input type="hidden" name="teamname" value="Test Team"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button></div></form>';
+
+    private const string PINNED_EOY_HTML = '<form name="EOYVote" method="post" action="action.php"><CSRF><div class="voting-form-container"><img src="images/logo/1.jpg" alt="Team Logo" class="team-logo-banner"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button><script>
+function ShowAndHideGM() {
+    var x = document.getElementById(\'GM\');
+    if (x.style.display == \'none\') {
+        x.style.display = \'\';
+    } else {
+        x.style.display = \'none\';
+    }
+}
+</script><div class="voting-category" onclick="ShowAndHideGM()"><h2 class="ibl-title voting-category-title">GM of the Year</h2><p class="voting-category-instruction">Select THREE.</p></div><table id="GM" style="display:none" class="sortable ibl-data-table voting-form-table"><thead><tr><th>1st</th><th>2nd</th><th>3rd</th><th>Name</th><th>Team</th></tr></thead><tbody><tr><td><input type="radio" name="GM[1]" value="Pat O&apos;Brien, Boston Celtics"></td><td><input type="radio" name="GM[2]" value="Pat O&apos;Brien, Boston Celtics"></td><td><input type="radio" name="GM[3]" value="Pat O&apos;Brien, Boston Celtics"></td><td>Pat O&apos;Brien</td><td>Boston Celtics</td></tr><tr><td><input type="radio" name="GM[1]" value="Jane Roe, Chicago Bulls"></td><td><input type="radio" name="GM[2]" value="Jane Roe, Chicago Bulls"></td><td><input type="radio" name="GM[3]" value="Jane Roe, Chicago Bulls"></td><td>Jane Roe</td><td>Chicago Bulls</td></tr></tbody></table><input type="hidden" name="teamname" value="Test Team"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button></div></form>';
+
     protected function setUp(): void
     {
         $this->view = new VotingBallotView();
@@ -156,6 +178,138 @@ class VotingBallotViewTest extends TestCase
 
         // Should NOT have a radio input for same-team candidate
         $this->assertStringNotContainsString('type="radio"', $html);
+    }
+
+    public function testAsgSelectionChecksOnlyMatchingCandidate(): void
+    {
+        $categories = [[
+            'code' => 'GM',
+            'title' => 'GM of the Year',
+            'instruction' => 'Select THREE.',
+            'candidates' => [
+                ['type' => 'gm', 'name' => 'Ann Lee', 'teamName' => 'Team A'],
+                ['type' => 'gm', 'name' => 'Bob Ray', 'teamName' => 'Team B'],
+            ],
+        ]];
+
+        $html = $this->view->renderBallotForm('action.php', 'Voter Team', 1, 'Regular Season', $categories, ['GM' => ['Ann Lee, Team A']]);
+
+        $this->assertStringContainsString('value="Ann Lee, Team A" checked', $html);
+        $this->assertStringContainsString('value="Bob Ray, Team B">', $html);
+        $this->assertSame(1, substr_count($html, ' checked'));
+    }
+
+    public function testEoyRankSelectionChecksOnlyThatRankRadio(): void
+    {
+        $categories = [[
+            'code' => 'GM',
+            'title' => 'GM of the Year',
+            'instruction' => 'Select THREE.',
+            'candidates' => [
+                ['type' => 'gm', 'name' => 'Ann Lee', 'teamName' => 'Team A'],
+                ['type' => 'gm', 'name' => 'Bob Ray', 'teamName' => 'Team B'],
+            ],
+        ]];
+
+        $html = $this->view->renderBallotForm('action.php', 'Voter Team', 1, 'Playoffs', $categories, ['GM' => [2 => 'Ann Lee, Team A']]);
+
+        $this->assertStringContainsString('name="GM[2]" value="Ann Lee, Team A" checked', $html);
+        $this->assertStringContainsString('name="GM[1]" value="Ann Lee, Team A">', $html);
+        $this->assertStringContainsString('name="GM[3]" value="Ann Lee, Team A">', $html);
+        $this->assertSame(1, substr_count($html, ' checked'));
+    }
+
+    public function testSelectionMatchesRawDbValueNotEscapedValue(): void
+    {
+        $categories = [[
+            'code' => 'GM',
+            'title' => 'GM of the Year',
+            'instruction' => 'Select THREE.',
+            'candidates' => [
+                ['type' => 'gm', 'name' => "O'Brien & Co", 'teamName' => 'Team A'],
+            ],
+        ]];
+
+        $html = $this->view->renderBallotForm('action.php', 'Voter Team', 1, 'Regular Season', $categories, ['GM' => ["O'Brien & Co, Team A"]]);
+
+        $this->assertStringContainsString('value="O&apos;Brien &amp; Co, Team A" checked', $html);
+        $this->assertStringNotContainsString("O'Brien & Co, Team A", $html);
+    }
+
+    public function testUnknownSelectionValueIsNeverWrittenToHtml(): void
+    {
+        $categories = [[
+            'code' => 'GM',
+            'title' => 'GM of the Year',
+            'instruction' => 'Select THREE.',
+            'candidates' => [
+                ['type' => 'gm', 'name' => 'Ann Lee', 'teamName' => 'Team A'],
+                ['type' => 'gm', 'name' => 'Bob Ray', 'teamName' => 'Team B'],
+            ],
+        ]];
+
+        $html = $this->view->renderBallotForm('action.php', 'Voter Team', 1, 'Regular Season', $categories, ['GM' => ['<script>alert(1)</script>, Team A', 'Nobody, Nowhere']]);
+
+        $this->assertStringNotContainsString('<script>alert', $html);
+        $this->assertStringNotContainsString('Nobody', $html);
+        $this->assertSame(0, substr_count($html, ' checked'));
+    }
+
+    public function testSameTeamCandidateIgnoresSelection(): void
+    {
+        $categories = [[
+            'code' => 'GM',
+            'title' => 'GM of the Year',
+            'instruction' => 'Select THREE.',
+            'candidates' => [
+                ['type' => 'gm', 'name' => 'Ann Lee', 'teamName' => 'Team A'],
+            ],
+        ]];
+
+        $html = $this->view->renderBallotForm('action.php', 'Team A', 1, 'Regular Season', $categories, ['GM' => ['Ann Lee, Team A']]);
+
+        $this->assertStringNotContainsString(' checked', $html);
+        $this->assertStringNotContainsString('type="checkbox"', $html);
+    }
+
+    /**
+     * Two GM candidates on non-voter teams so both ASG (checkbox) and EOY
+     * (radio) input rows render. GM rows need no PlayerStats, so the fixture
+     * stays free of Player\Stats construction.
+     *
+     * @return list<array{code: string, title: string, instruction: string, candidates: list<array<string, mixed>>}>
+     */
+    private function twoGmCandidates(): array
+    {
+        return [[
+            'code' => 'GM',
+            'title' => 'GM of the Year',
+            'instruction' => 'Select THREE.',
+            'candidates' => [
+                ['type' => 'gm', 'name' => "Pat O'Brien", 'teamName' => 'Boston Celtics'],
+                ['type' => 'gm', 'name' => 'Jane Roe', 'teamName' => 'Chicago Bulls'],
+            ],
+        ]];
+    }
+
+    /**
+     * Characterization: the token line varies per call, so strip it and pin
+     * the rest. The constants were captured from the pre-redisplay tree.
+     */
+    public function testGetBallotHtmlIsPinnedForAsg(): void
+    {
+        $html = $this->view->renderBallotForm('action.php', 'Test Team', 1, 'Regular Season', $this->twoGmCandidates());
+        $html = (string) preg_replace('/<input type="hidden" name="_csrf_token" value="[^"]*">/', '<CSRF>', $html);
+
+        $this->assertSame(self::PINNED_ASG_HTML, $html);
+    }
+
+    public function testGetBallotHtmlIsPinnedForEoy(): void
+    {
+        $html = $this->view->renderBallotForm('action.php', 'Test Team', 1, 'Playoffs', $this->twoGmCandidates());
+        $html = (string) preg_replace('/<input type="hidden" name="_csrf_token" value="[^"]*">/', '<CSRF>', $html);
+
+        $this->assertSame(self::PINNED_EOY_HTML, $html);
     }
 
     public function testRenderShowsShowHideScript(): void

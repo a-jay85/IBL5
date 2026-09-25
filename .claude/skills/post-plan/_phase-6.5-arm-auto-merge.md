@@ -1,3 +1,8 @@
+---
+description: Per-condition run-and-report blocks for Phase 6.5 auto-merge arming.
+last_verified: 2026-09-25
+---
+
 # Phase 6.5 — Arm Auto-Merge (post-plan reference)
 
 Purpose: the per-condition run-and-report blocks for Phase 6.5 arming.
@@ -26,11 +31,19 @@ elif [ -s "$BRIDGE" ]; then
 fi
 ```
 
-**Condition (4) blocks on the VALUE, not file presence** — the status file is non-empty for `pass` and `skipped` too (it always contains `PHASE5_VERIFY_STATUS=...`), so the `[ -s ... ]` idiom condition (3) uses on its bridge file would wrongly block every `pass`/`skipped`. Block only on the literal `fail` value; **absent file OR `pass` OR `skipped` = PASS (non-blocking)** — a `skipped` status (docs-only / PHP-less PR with no mapped E2E) must NOT block, or every such PR would stop arming, a regression worse than #887:
+Condition (4) is three-state on the value, and an absent status file blocks. `pass` and `skipped` clear; `fail`, an empty value, or any unknown value blocks. An absent or unreadable file means Phase 5 END never wrote it (a crashed or interrupted session), which is indeterminate and blocks (fail-closed), matching the condition (3) done-marker reasoning (backlog #654). Writer and reader run in one skill session; `$PPID` is stable; no re-keying is needed. The harness never reads this file (it passes `phase5_status` in-memory). A `skipped` status (docs-only / PHP-less PR with no mapped E2E) does NOT block, or every such PR would stop arming. `$PHASE5_STATUS_FILE` is overridable only so `bin/test-postplan-arm-conditions` can exercise this block:
 
 ```bash
-# condition (4): fails ONLY when the status is the literal `fail`
-grep -q 'PHASE5_VERIFY_STATUS=fail' /tmp/post-plan-phase5-status-$PPID 2>/dev/null && echo "BLOCKED: Phase 5 deterministic failure"
+# condition (4): three-state on the VALUE. Absent or unreadable status file means
+# Phase 5 END never ran, which is INDETERMINATE, so it blocks (fail-closed).
+# pass and skipped clear; fail, empty, or any unknown value blocks.
+# $PHASE5_STATUS_FILE is overridable only so bin/test-postplan-arm-conditions can exercise this block.
+PHASE5_STATUS_FILE="${PHASE5_STATUS_FILE:-/tmp/post-plan-phase5-status-$PPID}"
+if [ ! -r "$PHASE5_STATUS_FILE" ]; then
+  echo "BLOCKED: Phase 5 never reached its END (status file absent or unreadable) — indeterminate, not clean"
+elif ! grep -qE '^PHASE5_VERIFY_STATUS=(pass|skipped)$' "$PHASE5_STATUS_FILE"; then
+  echo "BLOCKED: Phase 5 deterministic failure (status: $(head -c 200 "$PHASE5_STATUS_FILE" | tr -d '\n'))"
+fi
 ```
 
 **Condition (5) — golden-snapshot safety (headless only).** If `$GOLDEN_CHANGED` is `true` AND `$CLAUDE_HEADLESS` is set, **block** auto-merge: a change to `engine/internal/sim/testdata/golden.json` means the engine's simulation output changed, and a snapshot change with no human present is exactly when not to auto-ship (an agent can turn a red `TestGolden` green by regenerating the snapshot, silently masking a regression). In **interactive** mode (`$CLAUDE_HEADLESS` unset), do **not** block — emit a prominent warning with the same text so the human confirms intent before merging. This condition is independent of `HAS_GO` (a golden-only diff is `HAS_GO=false` but must still trigger it):

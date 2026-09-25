@@ -7,13 +7,18 @@
 # The breaker refunds the attempt and STOPS the loop when a usage/rate limit,
 # auth error, or transient kills the impl agent — leaving the queue intact. The
 # load-bearing negative (the bug this locks): a LEGITIMATE disposition (already-merged
-# → done/, stale-plan/ambiguity/wt-new failure/missing-info → skipped/) exits fast with no handoff
+# → done/, stale-plan/ambiguity/missing-info → skipped/) exits fast with no handoff
 # but moves the plan OUT of queue/ (in_queue=0). It must NOT be misread as
 # environmental, or one fast skip stops the whole run (this happened 2026-06-20:
 # god-class-split-standingsview skipped in 57s → false env-stop → 5 plans stranded).
 #
-# should_impl_env_stop <handoff> <in_queue> <env_err> <stalled> <fast>  (each 0/1)
-#   returns 0 (env-stop) ONLY when: handoff=0 AND in_queue=1 AND (env_err|stalled|fast)
+# A bin/wt-new failure is a THIRD shape: the plan stays in queue/ (in_queue=1),
+# exits fast, and the agent drops a queue/<plan>.wt-fail sentinel (wt_fail=1).
+# It must NOT env-stop (that would refund + halt the loop on every collision);
+# it falls through as a counted attempt bounded by MAX_ATTEMPTS.
+#
+# should_impl_env_stop <handoff> <in_queue> <env_err> <stalled> <fast> [wt_fail]  (each 0/1; wt_fail defaults 0)
+#   returns 0 (env-stop) ONLY when: handoff=0 AND in_queue=1 AND wt_fail=0 AND (env_err|stalled|fast)
 #
 # We extract the predicate from bin/automouse/run rather than copy it, so the test
 # can never drift from the implementation. The function is self-contained (it
@@ -26,11 +31,32 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUNNER="$SCRIPT_DIR/automouse/run"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
 
 if [ ! -f "$RUNNER" ]; then
     echo "FAIL: cannot find $RUNNER"
     exit 1
 fi
+
+ok()            { echo "ok: $1"; }
+fail()          { echo "FAIL: $1"; FAILED=1; }
+assert_eq()     { local d="$1" g="$2" e="$3"
+                  if [ "$g" = "$e" ]; then ok "$d"
+                  else fail "$d — expected [$e], got [$g]"; fi; }
+assert_present(){ local d="$1" p="$2"
+                  if [ -e "$p" ] || [ -L "$p" ]; then ok "$d"
+                  else fail "$d — missing: $p"; fi; }
+assert_absent() { local d="$1" p="$2"
+                  if [ -e "$p" ] || [ -L "$p" ]; then fail "$d — unexpected: $p"
+                  else ok "$d"; fi; }
+want()          { local d="$1" h="$2" n="$3"
+                  case "$h" in *"$n"*) ok "$d" ;;
+                  *) fail "$d — missing token [$n]"; esac; }
+want_absent()   { local d="$1" h="$2" n="$3"
+                  case "$h" in *"$n"*) fail "$d — unexpected token [$n]" ;;
+                  *) ok "$d"; esac; }
 
 # Extract `should_impl_env_stop() { ... }` (from its definition line to the first
 # line that is a lone `}`) and define it in this shell.
@@ -48,16 +74,16 @@ eval "$FN_SRC"
 
 FAILED=0
 
-# assert <name> <handoff> <in_queue> <env_err> <stalled> <fast> <expect: stop|continue>
+# assert <name> <handoff> <in_queue> <env_err> <stalled> <fast> <wt_fail> <expect: stop|continue>
 assert() {
-    name="$1"; h="$2"; q="$3"; e="$4"; s="$5"; f="$6"; want="$7"
-    if should_impl_env_stop "$h" "$q" "$e" "$s" "$f"; then
+    name="$1"; h="$2"; q="$3"; e="$4"; s="$5"; f="$6"; wf="$7"; want="$8"
+    if should_impl_env_stop "$h" "$q" "$e" "$s" "$f" "$wf"; then
         got="stop"
     else
         got="continue"
     fi
     if [ "$got" != "$want" ]; then
-        echo "FAIL: $name — expected '$want', got '$got' (h=$h q=$q e=$e s=$s f=$f)"
+        echo "FAIL: $name — expected '$want', got '$got' (h=$h q=$q e=$e s=$s f=$f wf=$wf)"
         FAILED=1
     else
         echo "ok: $name ($got)"
@@ -66,24 +92,197 @@ assert() {
 
 # --- The bug: legitimate skips left queue/ (in_queue=0) → NEVER env-stop ---
 # A fast skip with no handoff is the exact 2026-06-20 case.
-assert "skip-fast"           0 0 0 0 1 continue
-assert "skip-fast-and-stalled" 0 0 0 1 1 continue
-assert "skip-with-env-sig"   0 0 1 0 0 continue   # even a stray log signature can't stop a deliberate disposition
+assert "skip-fast"           0 0 0 0 1 0 continue
+assert "skip-fast-and-stalled" 0 0 0 1 1 0 continue
+assert "skip-with-env-sig"   0 0 1 0 0 0 continue   # even a stray log signature can't stop a deliberate disposition
 
 # --- Genuine environmental kills: no outcome, plan still in queue/ → STOP ---
-assert "env-signature"       0 1 1 0 0 stop
-assert "stall-kill"          0 1 0 1 0 stop
-assert "sub-minute-exit"     0 1 0 0 1 stop
-assert "all-signals"         0 1 1 1 1 stop
+assert "env-signature"       0 1 1 0 0 0 stop
+assert "stall-kill"          0 1 0 1 0 0 stop
+assert "sub-minute-exit"     0 1 0 0 1 0 stop
+assert "all-signals"         0 1 1 1 1 0 stop
 
 # --- Genuine plan failure: slow, no signature, still queued → NOT env-stop ---
 # (falls through to the genuine-failure path: attempt kept, eventual poison-pill)
-assert "slow-failure"        0 1 0 0 0 continue
+assert "slow-failure"        0 1 0 0 0 0 continue
 
 # --- Success: handoff written → never env-stop, regardless of other signals ---
-assert "handoff-success"     1 1 0 0 0 continue
-assert "handoff-despite-fast" 1 1 0 0 1 continue
-assert "handoff-despite-env" 1 1 1 1 1 continue
+assert "handoff-success"     1 1 0 0 0 0 continue
+assert "handoff-despite-fast" 1 1 0 0 1 0 continue
+assert "handoff-despite-env" 1 1 1 1 1 0 continue
+
+# --- wt-new failure: plan STAYS in queue/, sentinel present → counted attempt, NEVER env-stop ---
+assert "wt-fail-fast"             0 1 0 0 1 1 continue   # the exact post-fix shape (Phase 1b printed stop for this without wf)
+assert "wt-fail-with-env-sig"     0 1 1 0 1 1 continue   # sentinel is authoritative over a stray log signature
+assert "wt-fail-stalled"          0 1 0 1 0 1 continue
+assert "wt-fail-but-handoff"      1 1 0 0 0 1 continue
+# Control: same shape WITHOUT the sentinel is still a genuine env-stop (guard is scoped to wt_fail only)
+assert "no-wt-fail-fast-control"  0 1 0 0 1 0 stop
+
+# --- Backward compatibility: a five-arg call defaults wt_fail=0 ---
+if should_impl_env_stop 0 1 0 0 1; then got="stop"; else got="continue"; fi
+if [ "$got" != "stop" ]; then
+    echo "FAIL: five-arg-default — expected 'stop', got '$got' (wt_fail default must be 0)"
+    FAILED=1
+else
+    echo "ok: five-arg-default ($got)"
+fi
+
+# --- Contract: prompt-impl and run agree on the sentinel, and wt-new failure no longer skips ---
+PROMPT="$SCRIPT_DIR/automouse/prompt-impl"
+if grep -qF 'touch "$NIGHTLY_DIR/queue/$PLAN_FILE.wt-fail"' "$PROMPT"; then
+    echo "ok: contract-prompt-writes-sentinel"
+else
+    echo "FAIL: contract-prompt-writes-sentinel — prompt-impl no longer tells the agent to touch queue/\$PLAN_FILE.wt-fail"; FAILED=1
+fi
+if grep -qF 'WT_FAIL_FILE="$QUEUE_DIR/${PLAN_NAME}.wt-fail"' "$RUNNER"; then
+    echo "ok: contract-runner-reads-sentinel"
+else
+    echo "FAIL: contract-runner-reads-sentinel — run no longer reads queue/\${PLAN_NAME}.wt-fail"; FAILED=1
+fi
+if grep -E 'If bin/wt-new fails' "$PROMPT" | grep -q 'skipped/'; then
+    echo "FAIL: contract-no-skip-on-wt-fail — prompt-impl's wt-new failure line still moves the plan to skipped/"; FAILED=1
+else
+    echo "ok: contract-no-skip-on-wt-fail"
+fi
+
+# ── Section 2: run-loop wt-fail cases (macOS-only — requires caffeinate) ─────
+
+if [ "$(uname)" != "Darwin" ]; then
+    echo ""
+    echo "# Section 2: skipping macOS-only run-loop cases (uname=$(uname))"
+    echo "SKIP: run-loop cases skipped on non-Darwin"
+    echo ""
+    echo "# Results: $FAILED failed"
+    exit "$FAILED"
+fi
+
+echo ""
+echo "# Section 2: run-loop wt-fail cases (macOS-only)"
+
+# ── Runner isolation recipe (from bin/test-automouse-depends-on §4.1) ─────────
+E2_ROOT="$TMP/e2"
+E2_NDIR="$E2_ROOT/automouse"
+E2_PLANS="$E2_ROOT/plans"
+E2_STUB="$E2_ROOT/stub"
+mkdir -p "$E2_NDIR/queue" "$E2_NDIR/handoff" "$E2_NDIR/logs" \
+         "$E2_NDIR/reports" "$E2_NDIR/done" "$E2_NDIR/skipped" \
+         "$E2_PLANS" "$E2_STUB"
+
+# Symlink prompt files so the runner cat succeeds under set -e
+ln -sf "$REPO_ROOT/bin/automouse/prompt-impl"    "$E2_ROOT/prompt-impl"
+ln -sf "$REPO_ROOT/bin/automouse/prompt-postplan" "$E2_ROOT/prompt-postplan"
+
+# Rewritten runner: NIGHTLY_DIR→temp, REPO→worktree root, PATH→stub first
+E2_RUNNER="$E2_ROOT/run"
+sed \
+    -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$E2_NDIR\"#" \
+    -e "s#^REPO=.*#REPO=\"$REPO_ROOT\"#" \
+    -e "s#^export PATH=.*#export PATH=\"$E2_STUB:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
+    "$REPO_ROOT/bin/automouse/run" > "$E2_RUNNER"
+chmod +x "$E2_RUNNER"
+
+E2_TRACE="$E2_ROOT/trace"
+: > "$E2_TRACE"
+
+# Stub claude: keyed on PLAN_FILE= in the prompt text.
+# wtfail.md  — touches the wt-fail sentinel, writes no handoff, exits 0.
+# fastfail.md — writes nothing, exits 0 (a genuine fast-no-outcome shape).
+cat > "$E2_STUB/claude" <<CLAUDE
+#!/usr/bin/env bash
+set -u
+NDIR="$E2_NDIR"
+TRACE="$E2_TRACE"
+plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
+if [ -n "\$plan" ]; then
+    case "\$plan" in
+        wtfail.md)
+            touch "\$NDIR/queue/\$plan.wt-fail"
+            ;;
+        fastfail.md)
+            ;;
+        *)
+            ;;
+    esac
+    printf '%s impl\n' "\$plan" >> "\$TRACE"
+fi
+printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":100,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
+exit 0
+CLAUDE
+chmod +x "$E2_STUB/claude"
+
+write_e2_plan() {
+    local name="$1"
+    { echo '---'; echo 'impl_model: sonnet'; echo '---'; echo "# $name"; } \
+        > "$E2_PLANS/$name.md"
+    ln -sf "$E2_PLANS/$name.md" "$E2_NDIR/queue/$name.md"
+}
+
+E2_LOG="$E2_NDIR/logs/$(date +%Y-%m-%d).log"
+
+reset_e2() {
+    rm -f "$E2_NDIR/queue"/*.md "$E2_NDIR/queue"/*.lock "$E2_NDIR/queue"/*.attempts \
+          "$E2_NDIR/queue"/*.depends-hold "$E2_NDIR/queue"/*.wt-fail \
+          "$E2_NDIR/queue"/*.failure "$E2_NDIR/handoff"/*.json \
+          "$E2_NDIR/done"/*.md "$E2_TRACE"
+    : > "$E2_TRACE"
+    : > "$E2_LOG"
+}
+
+run_e2() {
+    NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
+    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+    timeout 30 "$E2_RUNNER" 2>&1 || true
+}
+
+# ── W1: wt-fail is a counted, kept, deferred attempt ─────────────────────────
+echo ""
+echo "# W1: wt-fail counted, kept, deferred"
+reset_e2
+write_e2_plan "wtfail"
+run_e2 > /dev/null 2>&1
+W1_LOG="$(cat "$E2_LOG" 2>/dev/null || echo '')"
+W1_TRACE="$(cat "$E2_TRACE" 2>/dev/null || echo '')"
+W1_ATTEMPTS="$(cat "$E2_NDIR/queue/wtfail.md.attempts" 2>/dev/null || echo '')"
+assert_present "W1: queue/wtfail.md still in queue/"    "$E2_NDIR/queue/wtfail.md"
+assert_absent  "W1: skipped/wtfail.md absent"           "$E2_NDIR/skipped/wtfail.md"
+assert_eq      "W1: attempts = 1"                        "$W1_ATTEMPTS" "1"
+assert_absent  "W1: queue/wtfail.md.wt-fail absent (cleared by 3d)" \
+                "$E2_NDIR/queue/wtfail.md.wt-fail"
+assert_absent  "W1: queue/wtfail.md.failure absent"     "$E2_NDIR/queue/wtfail.md.failure"
+want           "W1: log has WT-NEW FAILURE"              "$W1_LOG" "WT-NEW FAILURE"
+want_absent    "W1: log has no Environmental failure"    "$W1_LOG" "Environmental failure during impl"
+want           "W1: log has deferred drain message"      "$W1_LOG" \
+               "Deferred to the next run (cap-refunded or wt-new failure): wtfail.md"
+assert_eq      "W1: exactly one impl trace line"         \
+               "$(grep -c 'wtfail.md impl' "$E2_TRACE" 2>/dev/null || echo 0)" "1"
+
+# ── W2: control — fast exit with no sentinel still env-stops ─────────────────
+echo ""
+echo "# W2: fast exit without sentinel → env-stop"
+reset_e2
+write_e2_plan "fastfail"
+run_e2 > /dev/null 2>&1
+W2_LOG="$(cat "$E2_LOG" 2>/dev/null || echo '')"
+want           "W2: log has Environmental failure"       "$W2_LOG" "Environmental failure during impl"
+assert_absent  "W2: queue/fastfail.md.attempts absent (refunded)" \
+               "$E2_NDIR/queue/fastfail.md.attempts"
+want_absent    "W2: log has no WT-NEW FAILURE"           "$W2_LOG" "WT-NEW FAILURE"
+
+# ── W3: stale sentinel does not misclassify ───────────────────────────────────
+echo ""
+echo "# W3: stale pre-seeded wt-fail sentinel does not misclassify fastfail"
+reset_e2
+write_e2_plan "fastfail"
+touch "$E2_NDIR/queue/fastfail.md.wt-fail"
+run_e2 > /dev/null 2>&1
+W3_LOG="$(cat "$E2_LOG" 2>/dev/null || echo '')"
+want           "W3: log has Environmental failure (same as W2)" "$W3_LOG" "Environmental failure during impl"
+assert_absent  "W3: queue/fastfail.md.attempts absent (refunded)" \
+               "$E2_NDIR/queue/fastfail.md.attempts"
+want_absent    "W3: log has no WT-NEW FAILURE"           "$W3_LOG" "WT-NEW FAILURE"
+assert_absent  "W3: stale sentinel cleared by 3b (rm before attempt)" \
+               "$E2_NDIR/queue/fastfail.md.wt-fail"
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

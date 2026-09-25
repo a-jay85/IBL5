@@ -59,6 +59,18 @@ final class VotingSubmissionViewTest extends TestCase
         $this->assertStringContainsString('href="modules.php?name=Voting"', $html);
     }
 
+    public function testRenderErrorsOutputIsPinnedWithRecoveryLink(): void
+    {
+        $html = $this->view->renderErrors(['First <b>error</b>', 'Second']);
+
+        $this->assertSame(
+            '<p class="voting-submission-error">First &lt;b&gt;error&lt;/b&gt;</p>' . "\n"
+            . '<p class="voting-submission-error">Second</p>' . "\n"
+            . '<p class="voting-submission-error__recovery"><a href="modules.php?name=Voting">Return to the ballot</a></p>' . "\n",
+            $html
+        );
+    }
+
     public function testRenderErrorsEscapesHtml(): void
     {
         $html = $this->view->renderErrors(['<script>alert("xss")</script>']);

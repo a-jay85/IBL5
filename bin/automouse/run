@@ -550,7 +550,8 @@ fi
 
 WATCHER_PID=""
 CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
-CAP_DEFERRED=" "  # space-wrapped basenames cap-refunded this run; claim_next_plan skips them
+COST_LOCK_HELD=0  # set to 1 while append_cost_row holds the cost-report mutex
+CAP_DEFERRED=" "  # space-wrapped basenames cap-refunded or wt-new-failed this run; claim_next_plan skips them
 DEPENDS_HELD=" "  # space-wrapped basenames dependency-held this run; claim_next_plan skips them
 cleanup_watcher() {
     if [ -n "$WATCHER_PID" ]; then
@@ -563,6 +564,11 @@ cleanup_watcher() {
     # a time guard or env-failure) so a sibling/next run can resume it.
     if [ -n "$CURRENT_LOCK" ]; then
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+    fi
+    # Release the cost-report mutex if append_cost_row was interrupted mid-RMW.
+    if [ "${COST_LOCK_HELD:-0}" = 1 ]; then
+        COST_LOCK_HELD=0
+        release_cost_lock
     fi
 }
 trap cleanup_watcher EXIT
@@ -621,6 +627,49 @@ model_tier() {
         *haiku*)  echo "Haiku"  ;;
         *)        echo "?"      ;;
     esac
+}
+
+# Acquire an exclusive mutex for the cost-report RMW sequence. Mirrors the
+# claim_next_plan() pattern: mkdir "$lock" is atomic; PID written to "$lock/pid".
+# Stale detection: dead PID (kill -0 fails) OR age > cost_lock_ttl seconds.
+# Steal via rm -rf + re-mkdir, log the steal. Spins up to max_attempts times
+# (0.2s each); on exhaustion returns 1 and logs a warning so the caller can
+# proceed unguarded rather than drop the row.
+acquire_cost_lock() {
+    local lock="$NIGHTLY_DIR/reports/.cost-report.lock"
+    local cost_lock_ttl=60
+    local owner now lock_epoch attempt=0 max_attempts=10
+    mkdir -p "$(dirname "$lock")"
+    while [ "$attempt" -lt "$max_attempts" ]; do
+        if mkdir "$lock" 2>/dev/null; then
+            echo "$$" > "$lock/pid"
+            return 0
+        fi
+        owner=$(cat "$lock/pid" 2>/dev/null) || owner=""
+        now=$(date +%s)
+        lock_epoch=$(stat -f %m "$lock" 2>/dev/null || echo "$now")
+        if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
+           || [ "$(( now - lock_epoch ))" -gt "$cost_lock_ttl" ]; then
+            rm -rf "$lock" 2>/dev/null || true
+            if mkdir "$lock" 2>/dev/null; then
+                echo "$$" > "$lock/pid"
+                printf '[%s] cost-report: stole stale lock (dead/expired owner=%s)\n' \
+                    "$(date +%H:%M:%S)" "${owner:-?}" >> "$LOG"
+                return 0
+            fi
+        fi
+        attempt=$(( attempt + 1 ))
+        sleep 0.2
+    done
+    printf '[%s] cost-report: WARNING: could not acquire lock after %d attempts; writing unguarded\n' \
+        "$(date +%H:%M:%S)" "$max_attempts" >> "$LOG"
+    return 1
+}
+
+# Release the cost-report mutex. Idempotent: rm -rf on a missing lock directory
+# exits 0, so a double-release under set -euo pipefail is safe.
+release_cost_lock() {
+    rm -rf "$NIGHTLY_DIR/reports/.cost-report.lock" 2>/dev/null || true
 }
 
 # Append a per-phase cost row to the night's cost roll-up. Cost is parsed from
@@ -719,6 +768,15 @@ append_cost_row() {
         --arg  logged_cost      "$logged_cost" \
         'def n: tonumber? // null; {date:$date,plan:$plan,phase:$phase,model:$model,tier:$tier,session_id:$session_id,cost:($cost|n),surcharge_low:($surcharge_low|n),surcharge_high:($surcharge_high|n),inp:($inp|n),out:($out|n),cr:($cr|n),w5:($w5|n),w1:($w1|n),peak_ctx:($peak_ctx|n),compactions_main:($compactions_main|n),compactions_sub:($compactions_sub|n),provenance:$provenance,price_asof:$price_asof,logged_cost:($logged_cost|n)}' \
         >> "$sidecar"
+    # Mutex: serialise the create→strip→append→regenerate RMW sequence so that two
+    # concurrent runners (impl + postplan overlap) cannot interleave. Taken before
+    # the existence check: on a fresh day two runners could otherwise both see no
+    # file and the second truncating printf would wipe the first runner's row.
+    # COST_LOCK_HELD is a global so cleanup_watcher can release on unexpected exit
+    # without overwriting the runner's existing trap cleanup_watcher EXIT.
+    if acquire_cost_lock; then
+        COST_LOCK_HELD=1
+    fi
     # Create report with new 13-column header; or strip-then-migrate the old 6-column form.
     if [ ! -f "$report" ]; then
         printf '# Automouse cost roll-up — %s\n\n| Plan | Phase | Model | Tier | Cost ($) | Surcharge est ($) | Peak Ctx (K) | In | Out | Cache-read | CW-5m | CW-1h | Prov |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|\n' \
@@ -751,6 +809,12 @@ append_cost_row() {
         "$plan" "$phase" "$model" "$tier" "$cost" "$surcharge_cell" "$peak_k" \
         "${inp:-—}" "${out:-—}" "${cr:-—}" "${w5:-—}" "${w1:-—}" "$provenance" >> "$report"
     regenerate_weekly_section "$report"
+    # Normal-path release: clear the global flag so cleanup_watcher no-ops on
+    # eventual shell exit, then release the lock directory.
+    if [ "$COST_LOCK_HELD" = 1 ]; then
+        COST_LOCK_HELD=0
+        release_cost_lock
+    fi
 }
 
 # Truncate a costs report back to its per-phase table: drop the weekly-aggregate
@@ -983,7 +1047,7 @@ phase_stalled() {
 #
 # The in_queue guard is the fix for the false positive that stopped the loop on a
 # legitimate disposition: every deliberate impl disposition (already-merged,
-# stale-plan, ambiguity, wt-new failure, missing-info — see bin/automouse/prompt-impl)
+# stale-plan, ambiguity, missing-info — see bin/automouse/prompt-impl)
 # runs `mv queue/$PLAN → done/` (already-merged) or `→ skipped/` (the rest), so the
 # plan leaves queue/ (in_queue=0) and exits
 # fast with no handoff. Without this guard the sub-minute check misreads that
@@ -991,11 +1055,21 @@ phase_stalled() {
 # mid-stream, leaving the plan in queue/ (in_queue=1). This mirrors the postplan
 # breaker, which gates its sub-minute check on the handoff still being present.
 #
+# The wt_fail guard (6th arg, default 0) covers the one fast, no-handoff exit
+# that leaves the plan IN queue/: a bin/wt-new failure at prompt-impl Step 5.
+# The agent drops queue/<plan>.wt-fail instead of skipping the plan, because a
+# skip without a .staleness sidecar is never recovered by self-heal and a
+# transient git-lock collision would lose the plan for good. Without this guard
+# the sub-minute check would read that exit as environmental and halt the run.
+# With it, the exit falls through to the WT-NEW FAILURE branch in the main loop
+# as a counted attempt, bounded by MAX_ATTEMPTS.
+#
 # Safe under `set -e`: only ever called inside an `if` condition.
 should_impl_env_stop() {
-    local handoff=$1 in_queue=$2 env_err=$3 stalled=$4 fast=$5
+    local handoff=$1 in_queue=$2 env_err=$3 stalled=$4 fast=$5 wt_fail=${6:-0}
     [ "$handoff" -eq 1 ] && return 1     # handoff written → impl succeeded
     [ "$in_queue" -eq 0 ] && return 1    # plan left queue/ → deliberate disposition, not environmental
+    [ "$wt_fail" -eq 1 ] && return 1     # agent reported a bin/wt-new failure → counted attempt, not environmental
     [ "$env_err" -eq 1 ] || [ "$stalled" -eq 1 ] || [ "$fast" -eq 1 ]
 }
 
@@ -1090,6 +1164,7 @@ dispose_plan_done() {
     rm -f "$QUEUE_DIR/${plan_name}.attempts" \
           "$QUEUE_DIR/${plan_name}.failure" \
           "$QUEUE_DIR/${plan_name}.cap-refunds" \
+          "$QUEUE_DIR/${plan_name}.wt-fail" \
           "$HANDOFF_DIR/${plan_name}.json"
     if [ ! -f "$report" ]; then
         {
@@ -1550,7 +1625,7 @@ while true; do
         if [ -n "${SINGLE_PLAN:-}" ]; then
             echo "Plan ${SINGLE_PLAN%.md} is being processed by another runner — nothing to do." >> "$LOG"
         elif [ "$CAP_DEFERRED" != " " ]; then
-            echo "No claimable plan left. Cap-refunded and deferred to the next run:${CAP_DEFERRED% } — stopping." >> "$LOG"
+            echo "No claimable plan left. Deferred to the next run (cap-refunded or wt-new failure):${CAP_DEFERRED% } — stopping." >> "$LOG"
         elif [ "$DEPENDS_HELD" != " " ]; then
             echo "No claimable plan left. Dependency-held this run:${DEPENDS_HELD% } — stopping." >> "$LOG"
         else
@@ -1566,6 +1641,7 @@ while true; do
     ATTEMPT_FILE="$QUEUE_DIR/${PLAN_NAME}.attempts"
     FAILURE_FILE="$QUEUE_DIR/${PLAN_NAME}.failure"   # capped tail of the last genuine impl failure (ADR-0085); lifecycle-tied to ATTEMPT_FILE
     CAP_REFUND_FILE="$QUEUE_DIR/${PLAN_NAME}.cap-refunds"   # wall-clock refunds granted to this plan; lifecycle-tied to ATTEMPT_FILE, NOT reset by refund_attempt
+    WT_FAIL_FILE="$QUEUE_DIR/${PLAN_NAME}.wt-fail"   # sentinel prompt-impl Step 5 drops when bin/wt-new fails; cleared before each attempt and after classification
     ATTEMPTS=0
     if [ -f "$ATTEMPT_FILE" ]; then
         ATTEMPTS=$(cat "$ATTEMPT_FILE")
@@ -1673,6 +1749,9 @@ while true; do
             continue
         fi
     fi
+
+    # A sentinel left by a crashed earlier run must not classify THIS attempt.
+    rm -f "$WT_FAIL_FILE"
 
     # Increment attempt counter
     echo $(( ATTEMPTS + 1 )) > "$ATTEMPT_FILE"
@@ -1830,6 +1909,9 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # falls through to continue the loop. A slow no-signature failure that left
         # the plan in queue/ falls through as a genuine plan failure, keeping its
         # incremented attempt → eventual poison-pill skip (unchanged).
+        # A bin/wt-new failure (the agent dropped $WT_FAIL_FILE, plan still in
+        # queue/) is also NOT environmental: it falls through to the WT-NEW
+        # FAILURE branch below as a counted, run-deferred attempt.
         # EXCEPTION, handled just below: a slow failure that was the wall-clock
         # cap itself is refunded by the bounded cap-timeout breaker, up to
         # CAP_REFUND_LIMIT times per plan.
@@ -1838,7 +1920,8 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         IMPL_ENV_ERR=0;  phase_env_error "$IMPL_LOG_BEFORE" && IMPL_ENV_ERR=1
         IMPL_STALLED=0;  phase_stalled "$IMPL_LOG_BEFORE"   && IMPL_STALLED=1
         IMPL_FAST=0;     [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ] && IMPL_FAST=1
-        if should_impl_env_stop "$IMPL_HANDOFF" "$IMPL_IN_QUEUE" "$IMPL_ENV_ERR" "$IMPL_STALLED" "$IMPL_FAST"; then
+        IMPL_WT_FAIL=0;  [ -f "$WT_FAIL_FILE" ]  && IMPL_WT_FAIL=1
+        if should_impl_env_stop "$IMPL_HANDOFF" "$IMPL_IN_QUEUE" "$IMPL_ENV_ERR" "$IMPL_STALLED" "$IMPL_FAST" "$IMPL_WT_FAIL"; then
             REASON="usage/rate limit, auth error, or transient"
             if [ "$IMPL_STALLED" -eq 1 ]; then
                 REASON="phase stalled — no stream events for >$((STALL_KILL_SECS/60))min, force-killed"
@@ -1883,6 +1966,17 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
         elif [ ! -e "$NEXT_PLAN" ]; then
             echo "Impl made a deliberate disposition (plan left queue/, e.g. already-merged → done/ or a stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
+        elif [ "$IMPL_WT_FAIL" -eq 1 ]; then
+            # bin/wt-new failed at prompt-impl Step 5 (e.g. git lock contention
+            # with a concurrent run). The plan stayed in queue/ and the incremented
+            # attempt stays, so MAX_ATTEMPTS still retires a deterministic failure.
+            # No .failure report: the agent's reports/*-error-<slug>.md already
+            # holds the wt-new output, and a worktree-creation error gives the
+            # escalated final retry nothing to learn from. Deferred for the rest
+            # of this run so the retry lands after the colliding run has moved on.
+            echo "WT-NEW FAILURE — bin/wt-new failed for $PLAN_NAME; plan kept in queue/, attempt counted ($(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS), deferred to the next run." >> "$LOG"
+            rm -f "$WT_FAIL_FILE"
+            CAP_DEFERRED="$CAP_DEFERRED$PLAN_NAME "
         elif [ "$IMPL_CAP_REFUNDED" -eq 0 ]; then
             # Genuine (non-environmental) failure: handoff absent, plan STILL in
             # queue/, the env-stop guard did NOT fire (it breaks above), and the

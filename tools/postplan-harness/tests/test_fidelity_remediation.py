@@ -324,6 +324,53 @@ def test_extract_notes_drops_followups_that_say_already_done(tmp_path):
                                             "Guard the empty roster"]
 
 
+def test_extract_notes_drops_followups_that_only_reword_a_comment(tmp_path):
+    """Comment and docstring nits from the 2026-09-24 triage never file; real work does."""
+    notes_fixture = [
+        {"title": "Update stale cadence comment in bin/plan-review-drain:260",
+         "kind": "followup", "detail": "It now runs every 180s, not nightly."},
+        {"title": "Move doc comment back to regenerate_weekly_section", "kind": "followup",
+         "detail": "The docblock drifted above the helper."},
+        {"title": "Remove hard-wrap from Step 5 paragraph in prompt-impl",
+         "kind": "followup", "detail": "One paragraph is wrapped at 80 columns."},
+        {"title": "Fix compose_sticky docstring about output compatibility",
+         "kind": "followup", "detail": "The docstring says the legacy output is identical."},
+        {"title": "Place _ZERO_SHA below its documentation comment", "kind": "followup",
+         "detail": "The constant sits between the comment and _LOCAL_GATE_MARKERS."},
+        {"title": "Clarify _ALREADY_DONE_RE docstring in fidelity.py", "kind": "followup",
+         "detail": "The regex matches any PR number. This causes real followups to be "
+                   "dropped silently."},
+        {"title": "Fix PR comment dedup for re-review rounds", "kind": "followup",
+         "detail": "A second round posts a duplicate review."},
+        {"title": "Update sticky comment to list carried-forward findings",
+         "kind": "followup", "detail": "Carried findings are missing from the comment."},
+        {"title": "Add a comment explaining the lock order in bin/automouse/run",
+         "kind": "followup", "detail": "Two locks are taken with no stated order."},
+    ]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"))
+    assert [n["title"] for n in result] == [
+        "Clarify _ALREADY_DONE_RE docstring in fidelity.py",
+        "Fix PR comment dedup for re-review rounds",
+        "Update sticky comment to list carried-forward findings",
+        "Add a comment explaining the lock order in bin/automouse/run",
+    ]
+
+
+def test_extract_notes_counts_only_the_reviewed_pr_as_already_done(tmp_path):
+    """A note naming an older PR's fix is still owed; one naming this PR is done."""
+    notes_fixture = [
+        {"title": "Re-fix the draft ordering regression", "kind": "followup",
+         "detail": "Regression of the bug fixed in PR #1900. Re-fix it."},
+        {"title": "Guard the empty roster path", "kind": "followup",
+         "detail": "Fixed in PR #2400 by the new early return."},
+    ]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"),
+                                    pr_number=2400)
+    assert [n["title"] for n in result] == ["Re-fix the draft ordering regression"]
+
+
 def test_extract_notes_drops_followups_whose_title_targets_the_plan(tmp_path):
     """Titles from the 2026-09-24 triage that edit the plan never file; real work does."""
     notes_fixture = [

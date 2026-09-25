@@ -319,7 +319,8 @@ class LiveGh(RecordingGh):
     def issue_titles(self, label: str) -> list[str]:
         try:
             out = self._gh("issue", "list", "--repo", "a-jay85/IBL5-backlog",
-                           "--state", "all", "--limit", "3000", "--json", "title")
+                           "--label", label, "--state", "all", "--limit", "3000",
+                           "--json", "title")
             items = json.loads(out)
             return [i.get("title", "") for i in items if i.get("title")]
         except (HarnessError, json.JSONDecodeError):

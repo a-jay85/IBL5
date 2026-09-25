@@ -597,7 +597,7 @@ def _norm_title(t: str) -> str:
 
 _ALREADY_DONE_RE = re.compile(
     r"\b(?:fixed|corrected|remediated|addressed|resolved|recorded)\b[^.]{0,40}?"
-    r"\b(?:in|by|during)\s+(?:this pr|the pr|pr\s*#?\d+|(?:phase\s*)?6\.5|(?:the\s+)?remediation"
+    r"\b(?:in|by|during)\s+(?:this pr|the pr|pr\s*#?(?P<pr>\d+)|(?:phase\s*)?6\.5|(?:the\s+)?remediation"
     r"|(?:the\s+)?(?:pr\s+)?body)\b"
     r"|\balready\s+(?:fixed|corrected|remediated|addressed|resolved)\b"
     r"|\bverify before merge\b",
@@ -627,15 +627,52 @@ def _is_plan_artifact(title: str) -> bool:
     return bool(_PLAN_ARTIFACT_RE.search(title))
 
 
-def _says_already_done(text: str) -> bool:
-    """True when a note's own words say its work landed in the PR under review."""
+# A note whose title only rewords a code comment or docstring is a nit Haiku tagged
+# `followup`. The 2026-09-24 triage closed 26 nits, among them "Update stale cadence
+# comment in bin/plan-review-drain", "Move doc comment back to regenerate_weekly_section"
+# and "Remove hard-wrap from Step 5 paragraph". A PR, sticky, review or issue comment is
+# a feature, so those stay filable. The verb anchor keeps "Add a comment explaining X"
+# out, since that names missing context rather than wording. The comment must sit in
+# the title's first clause, so a list title like "Fix stale artifacts: a test name, a
+# comment, ..." stays filable, and "code-comment agent" names a tool.
+_COMMENT_NIT_RE = re.compile(
+    r"\b(?:docstring|docblock|doc[\s-]?comment|hard[\s-]?wrap)s?\b"
+    r"|^(?:update|fix|rewrite|reword|clarify|correct|move|remove|place|verify)\b[^:,]{0,60}"
+    r"(?<!pr )(?<!sticky )(?<!review )(?<!issue )(?<![-\w])comments?\b(?!-)",
+    re.IGNORECASE)
+
+# A comment-titled note whose detail names a behaviour defect is real work under a
+# cosmetic title. Backlog #1069 was titled "Clarify _ALREADY_DONE_RE docstring" and its
+# detail said the regex drops real followups.
+_BEHAVIOUR_DEFECT_RE = re.compile(
+    r"\b(?:causes?|breaks?|fails?|drops?|dropped|silently|bugs?|regress\w*|crash\w*)\b",
+    re.IGNORECASE)
+
+
+def _is_comment_nit(title: str, detail: str) -> bool:
+    """True when a note only rewords a comment or docstring and names no defect."""
+    return (bool(_COMMENT_NIT_RE.search(title))
+            and not _BEHAVIOUR_DEFECT_RE.search(detail))
+
+
+def _says_already_done(text: str, pr_number: int | None = None) -> bool:
+    """True when a note's own words say its work landed in the PR under review.
+
+    A numbered PR ("fixed in PR #2381") counts only when it is `pr_number`, the PR
+    under review. "Regression of the bug fixed in PR #1900, re-fix it" names an older
+    PR and is still owed. With no `pr_number` every numbered PR counts, as before.
+    """
     for m in _ALREADY_DONE_RE.finditer(text):
+        if (pr_number is not None and m.group("pr")
+                and int(m.group("pr")) != pr_number):
+            continue
         if not _NEGATED_RE.search(text[max(0, m.start() - 20):m.start()]):
             return True
     return False
 
 
-def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
+def extract_notes(llm, verdict_path: str, log=None,
+                  pr_number: int | None = None) -> list[dict]:
     """Extract the filable non-blocking notes from a READY WITH NOTES verdict.
 
     Only `kind == "followup"` survives — a note that names code work outliving the
@@ -650,6 +687,9 @@ def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
 
     A `followup` whose title targets the plan file is dropped the same way. The plan is
     discarded at merge, so "Update Verification Matrix row 11" has nowhere to land.
+
+    A `followup` whose title only rewords a code comment or docstring is dropped unless
+    its detail names a behaviour defect.
     """
     log = log or _noop_log
     try:
@@ -666,12 +706,13 @@ def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
         kept = [d for d in raw if isinstance(d, dict)
                 and d.get("title") and d.get("detail")
                 and d.get("kind") == "followup"
-                and not _says_already_done(f"{d['title']} {d['detail']}")
-                and not _is_plan_artifact(d["title"])]
+                and not _says_already_done(f"{d['title']} {d['detail']}", pr_number)
+                and not _is_plan_artifact(d["title"])
+                and not _is_comment_nit(d["title"], d["detail"])]
         dropped = len([d for d in raw if isinstance(d, dict)]) - len(kept)
         if dropped:
-            log(f"phase5.5 notes: dropped {dropped} non-followup, already-done or "
-                "plan-artifact note(s)")
+            log(f"phase5.5 notes: dropped {dropped} non-followup, already-done, "
+                "plan-artifact or comment-nit note(s)")
         return kept
     except HarnessError:
         return []

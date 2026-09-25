@@ -1650,7 +1650,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     # Notes come from whichever review produced the final verdict: the initial one or
     # a re-review round. current_verdict_path tracks that review's verdict file.
     if final_verdict == "READY WITH NOTES":
-        notes = fidelity.extract_notes(llm, current_verdict_path, log=log)
+        notes = fidelity.extract_notes(llm, current_verdict_path, log=log, pr_number=pr)
         nums = fidelity.file_note_issues(gh, notes, pr, log=log)
         res.fidelity["backlog_issue_numbers"] = nums
         log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")

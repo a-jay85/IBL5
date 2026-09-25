@@ -277,7 +277,7 @@ _BACKLOG_LINE_RE = re.compile(
     rf"^\s*[-*]\s+(closes|refs)\s+{re.escape(BACKLOG_REPO)}#(\d+)\b", re.I)
 
 
-_NO_ADR_RE = re.compile(r"^\s*<!--\s*no-adr:.*?-->", re.DOTALL | re.M)
+_NO_ADR_RE = re.compile(r"^[ \t]*<!--\s*no-adr:.*?-->", re.DOTALL | re.M)
 
 
 def parse_backlog_issues(content: str) -> list[tuple]:

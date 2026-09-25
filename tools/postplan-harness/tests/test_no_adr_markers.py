@@ -107,6 +107,12 @@ def test_marker_in_inline_code_ignored():
     assert parse_no_adr_markers(content) == []
 
 
+def test_marker_after_blank_lines_has_no_leading_newline():
+    """A blank line above the marker (the common plan layout) must not leak into the match."""
+    assert parse_no_adr_markers("# Plan\n\n<!-- no-adr: x -->\n") == ["<!-- no-adr: x -->"]
+    assert parse_no_adr_markers("# Plan\n\n\n<!-- no-adr: x -->\n") == ["<!-- no-adr: x -->"]
+
+
 # ---------------------------------------------------------------------------
 # Phase 2 — _upsert_no_adr_markers
 # ---------------------------------------------------------------------------
@@ -137,6 +143,13 @@ def test_upsert_is_idempotent():
     assert first == second
     assert first.count(M1) == 1
     assert first.count(M2) == 1
+
+
+def test_upsert_skips_marker_already_at_body_offset_zero():
+    """Markers parsed from a blank-line plan layout match a body that starts with the marker."""
+    markers = parse_no_adr_markers("# Plan\n\n" + M1 + "\n")
+    body = M1 + "\n\n" + BODY
+    assert _upsert_no_adr_markers(body, _plan(markers=markers)) == body
 
 
 def test_upsert_adds_only_missing_marker():

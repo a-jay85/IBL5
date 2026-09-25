@@ -633,13 +633,13 @@ parameters:
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
-			count: 5
+			count: 7
 			path: classes/Search/SearchRepository.php
 
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
-			count: 67
+			count: 72
 			path: classes/Search/SearchView.php
 
 		-
@@ -3140,7 +3140,7 @@ parameters:
 			path: modules/Search/index.php
 
 		-
-			rawMessage: 'Parameter #1 $data of method Search\SearchView::render() expects array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: int, ...}, array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: 10, ...} given.'
+			rawMessage: 'Parameter #1 $data of method Search\SearchView::render() expects array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: string, min: int, ...}, array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: ''''|''transactions'', min: int, ...} given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Search/index.php
@@ -3452,7 +3452,7 @@ parameters:
 			path: modules/Topics/index.php
 
 		-
-			rawMessage: 'Parameter #3 $searchFilters of method Topics\TopicsView::render() expects array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, articleComm: bool}, array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: array<int, string>, articleComm: bool} given.'
+			rawMessage: 'Parameter #3 $searchFilters of method Topics\TopicsView::render() expects array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, articleComm: bool, preset?: string}, array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: array<int, string>, articleComm: bool, preset: ''''|''transactions''} given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Topics/index.php
@@ -3690,24 +3690,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/TrainingCampRatingsDiff/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/TransactionHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class TransactionHistory\TransactionHistoryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TransactionHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $queryParams of method TransactionHistory\TransactionHistoryService::getPageData() expects array<string, string>, array<mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TransactionHistory/index.php
 
 		-
 			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'

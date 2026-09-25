@@ -80,6 +80,100 @@ class SearchRepositoryTest extends WideUnitTestCase
         $this->assertCount(10, $result['results']);
     }
 
+    public function testSearchStoriesByPresetReturnsResultsWithEmptyQuery(): void
+    {
+        $this->mockDb->setMockData([
+            [
+                'sid' => 7,
+                'aid' => 'admin',
+                'informant' => 'admin',
+                'title' => 'Waiver claim processed',
+                'time' => '2024-01-15 12:00:00',
+                'hometext' => 'content',
+                'bodytext' => 'body',
+                'comments' => 0,
+                'topic' => 3,
+                'topictext' => 'Trades',
+            ],
+        ]);
+
+        $result = $this->repository->searchStoriesByPreset(SearchRepositoryInterface::PRESET_TRANSACTIONS);
+
+        $this->assertCount(1, $result['results']);
+        $this->assertSame(7, $result['results'][0]['sid']);
+        $this->assertSame('Waiver claim processed', $result['results'][0]['title']);
+    }
+
+    public function testSearchStoriesByPresetQueryRestrictsToTransactionCategories(): void
+    {
+        $this->mockDb->clearQueries();
+
+        $this->repository->searchStoriesByPreset(SearchRepositoryInterface::PRESET_TRANSACTIONS);
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertNotEmpty($queries);
+        $executed = end($queries);
+
+        // The mock interpolates bound params, so the six whitelisted category IDs
+        // appear as literals in the IN list.
+        $this->assertStringContainsString('s.catid IN (1, 2, 3, 8, 10, 14)', $executed);
+        $this->assertStringNotContainsString('LIKE', $executed);
+    }
+
+    public function testSearchStoriesByPresetAddsLikeClauseForLongQuery(): void
+    {
+        $this->mockDb->clearQueries();
+
+        $this->repository->searchStoriesByPreset(SearchRepositoryInterface::PRESET_TRANSACTIONS, 'trade');
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertNotEmpty($queries);
+        $executed = end($queries);
+
+        $this->assertStringContainsString('s.catid IN (', $executed);
+        $this->assertStringContainsString('s.title LIKE', $executed);
+    }
+
+    public function testSearchStoriesByPresetRejectsUnknownPreset(): void
+    {
+        $this->mockDb->clearQueries();
+
+        $unknown = $this->repository->searchStoriesByPreset('bogus');
+        $empty = $this->repository->searchStoriesByPreset('');
+
+        $this->assertSame([], $unknown['results']);
+        $this->assertFalse($unknown['hasMore']);
+        $this->assertSame([], $empty['results']);
+        $this->assertFalse($empty['hasMore']);
+        $this->assertSame([], $this->mockDb->getExecutedQueries());
+    }
+
+    public function testSearchStoriesByPresetDetectsHasMore(): void
+    {
+        // Mock 11 rows (limit default is 10, so 11 means hasMore = true)
+        $rows = [];
+        for ($i = 1; $i <= 11; $i++) {
+            $rows[] = [
+                'sid' => $i,
+                'aid' => 'admin',
+                'informant' => 'admin',
+                'title' => "Transaction {$i}",
+                'time' => '2024-01-15 12:00:00',
+                'hometext' => 'content',
+                'bodytext' => 'body',
+                'comments' => 0,
+                'topic' => 1,
+                'topictext' => 'News',
+            ];
+        }
+        $this->mockDb->setMockData($rows);
+
+        $result = $this->repository->searchStoriesByPreset(SearchRepositoryInterface::PRESET_TRANSACTIONS);
+
+        $this->assertTrue($result['hasMore']);
+        $this->assertCount(10, $result['results']);
+    }
+
     public function testSearchCommentsAlwaysReturnsEmpty(): void
     {
         $result = $this->repository->searchComments('test query');

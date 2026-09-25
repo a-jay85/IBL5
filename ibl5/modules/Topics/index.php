@@ -20,6 +20,7 @@ if (!defined('MODULE_FILE')) {
 
 use Topics\TopicsService;
 use Topics\TopicsView;
+use Search\Contracts\SearchRepositoryInterface;
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -43,6 +44,9 @@ $view = new TopicsView();
 $pageData = $service->getPageData((bool) ($articlecomm ?? false));
 $topics = $pageData['topics'];
 $searchFilters = $pageData['searchFilters'];
+// Whitelist: anything that is not a known preset key collapses to '' (no preset).
+$presetRaw = is_string($_REQUEST['preset'] ?? null) ? $_REQUEST['preset'] : '';
+$searchFilters['preset'] = array_key_exists($presetRaw, SearchRepositoryInterface::PRESET_CATEGORY_IDS) ? $presetRaw : '';
 
 // Render page
 PageLayout\PageLayout::header();

@@ -162,4 +162,66 @@ test.describe('Search flow', () => {
   test('no PHP errors on form page', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Search form page');
   });
+
+  test('preset select offers No Preset and Transactions', async ({ page }) => {
+    const select = page.locator('select[name="preset"]');
+    await expect(select).toBeVisible();
+    const values = await select.locator('option').evaluateAll(
+      (opts: HTMLOptionElement[]) => opts.map((o) => o.value),
+    );
+    expect(values).toEqual(['', 'transactions']);
+  });
+
+  test('transactions preset with no query lists transaction stories', async ({ page }) => {
+    await page.goto('modules.php?name=Search&preset=transactions');
+    await page.waitForLoadState('domcontentloaded');
+    await assertNoPhpErrors(page);
+    await expect(page.locator('.search-results .search-result')).toHaveCount(10);
+    const nextLink = page.locator('.search-pagination__link--next');
+    await expect(nextLink).toBeVisible();
+    await expect(nextLink).toHaveAttribute('href', /preset=transactions/);
+    await expect(page.locator('select[name="preset"]')).toHaveValue('transactions');
+  });
+
+  test('transactions preset narrows a text query', async ({ page }) => {
+    await page.goto('modules.php?name=Search&preset=transactions&query=waive');
+    await page.waitForLoadState('domcontentloaded');
+    await assertNoPhpErrors(page);
+    const results = page.locator('.search-result');
+    expect(await results.count()).toBeGreaterThanOrEqual(3);
+    const titles = await page.locator('.search-result__title').allTextContents();
+    for (const title of titles) {
+      expect(title).toMatch(/waiv/i);
+    }
+  });
+
+  test('transactions preset excludes non-transaction categories', async ({ page }) => {
+    // Control: blockbuster story (catid=0) is visible in a plain query
+    await page.goto('modules.php?name=Search&query=blockbuster');
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('.search-result')).toHaveCount(1);
+
+    // With preset: catid=0 story must be absent
+    await page.goto('modules.php?name=Search&preset=transactions&query=blockbuster');
+    await page.waitForLoadState('domcontentloaded');
+    await assertNoPhpErrors(page);
+    await expect(page.locator('.ibl-empty-state')).toBeVisible();
+    await expect(page.locator('.search-result')).toHaveCount(0);
+  });
+
+  test('unknown preset is ignored', async ({ page }) => {
+    await page.goto('modules.php?name=Search&preset=bogus');
+    await page.waitForLoadState('domcontentloaded');
+    await assertNoPhpErrors(page);
+    await expect(page.locator('.search-results')).toHaveCount(0);
+    await expect(page.locator('select[name="preset"]')).toHaveValue('');
+  });
+
+  test('choosing Transactions in the Search form returns results', async ({ page }) => {
+    await page.locator('select[name="preset"]').selectOption('transactions');
+    await page.locator('.ibl-search__btn').click();
+    await page.waitForLoadState('domcontentloaded');
+    await assertNoPhpErrors(page);
+    await expect(page.locator('.search-results .search-result')).toHaveCount(10);
+  });
 });

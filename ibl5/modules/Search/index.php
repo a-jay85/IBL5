@@ -20,6 +20,7 @@ if (!defined('MODULE_FILE')) {
 
 use Search\SearchRepository;
 use Search\SearchView;
+use Search\Contracts\SearchRepositoryInterface;
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -35,6 +36,9 @@ $author   = is_string($_REQUEST['author']   ?? null) ? $_REQUEST['author']   : '
 $days     = is_numeric($_REQUEST['days']     ?? null) ? (int) $_REQUEST['days']     : 0;
 $min      = is_numeric($_REQUEST['min']      ?? null) ? (int) $_REQUEST['min']      : 0;
 $qlen     = is_numeric($_REQUEST['qlen']     ?? null) ? (int) $_REQUEST['qlen']     : 0;
+$presetRaw = is_string($_REQUEST['preset'] ?? null) ? $_REQUEST['preset'] : '';
+// Whitelist: anything that is not a known preset key collapses to '' (no preset).
+$preset = array_key_exists($presetRaw, SearchRepositoryInterface::PRESET_CATEGORY_IDS) ? $presetRaw : '';
 
 $offset = 10;
 $max = $min + $offset;
@@ -42,7 +46,7 @@ $max = $min + $offset;
 global $prefix, $user_prefix, $mysqli_db, $module_name, $articlecomm;
 
 // Redirect if query is too short
-if ($query !== '' && strlen($query) < 3) {
+if ($preset === '' && $query !== '' && strlen($query) < 3) {
     \Utilities\HtmxHelper::redirect("modules.php?name={$module_name}&qlen=1");
 }
 
@@ -75,7 +79,11 @@ if ($qlen === 1) {
     $error = 'Your query should be at least 3 characters long.';
 }
 
-if ($query !== '' && strlen($query) >= 3) {
+if ($preset !== '' && $type !== 'comments' && $type !== 'users') {
+    $searchResult = $service->searchStoriesByPreset($preset, $query, $topic, $author, $days, $min, $offset);
+    $results = $searchResult['results'];
+    $hasMore = $searchResult['hasMore'];
+} elseif ($query !== '' && strlen($query) >= 3) {
     if ($type === 'comments') {
         $searchResult = $service->searchComments($query, $min, $offset);
     } elseif ($type === 'users') {
@@ -96,6 +104,7 @@ $data = [
     'category' => $category,
     'author' => $author,
     'days' => $days,
+    'preset' => $preset,
     'min' => $min,
     'offset' => $offset,
     'topicText' => $topicText,

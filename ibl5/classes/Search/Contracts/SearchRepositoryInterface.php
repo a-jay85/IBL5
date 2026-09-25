@@ -22,6 +22,18 @@ namespace Search\Contracts;
  */
 interface SearchRepositoryInterface
 {
+    /** Preset name for the transactions view (replaces the retired TransactionHistory module). */
+    public const PRESET_TRANSACTIONS = 'transactions';
+
+    /**
+     * Whitelist of valid preset names mapped to the story category IDs they select.
+     * IDs: 1 Waiver Pool Moves, 2 Trades, 3 Contract Extensions, 8 Free Agency,
+     * 10 Rookie Extension, 14 Position Changes.
+     */
+    public const PRESET_CATEGORY_IDS = [
+        self::PRESET_TRANSACTIONS => [1, 2, 3, 8, 10, 14],
+    ];
+
     /**
      * Search for stories matching the given criteria.
      *
@@ -38,6 +50,32 @@ interface SearchRepositoryInterface
         string $query,
         int $topic = 0,
         int $category = 0,
+        string $author = '',
+        int $days = 0,
+        int $offset = 0,
+        int $limit = 10
+    ): array;
+
+    /**
+     * Search stories restricted to a named category preset.
+     *
+     * Unlike searchStories(), an empty or short $query is allowed: the preset alone
+     * selects rows. When $query is 3+ characters, the same four-column LIKE filter
+     * as searchStories() is applied on top of the preset.
+     *
+     * @param string $preset Preset name; must be a key of PRESET_CATEGORY_IDS
+     * @param string $query Optional text filter (ignored when shorter than 3 characters)
+     * @param int $topic Topic ID filter (0 = all topics)
+     * @param string $author Author ID filter ('' = all authors)
+     * @param int $days Date range filter (0 = all time)
+     * @param int $offset Pagination offset
+     * @param int $limit Results per page
+     * @return StorySearchResult Empty result when $preset is not whitelisted
+     */
+    public function searchStoriesByPreset(
+        string $preset,
+        string $query = '',
+        int $topic = 0,
         string $author = '',
         int $days = 0,
         int $offset = 0,

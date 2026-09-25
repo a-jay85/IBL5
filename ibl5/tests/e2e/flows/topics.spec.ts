@@ -52,6 +52,26 @@ test.describe('Topics flow', () => {
     expect(href).toContain('topic=');
   });
 
+  test('preset select present after the days select', async ({ page }) => {
+    const presetSelect = page.locator('select[name="preset"]');
+    await expect(presetSelect).toBeVisible();
+    // Must be inside .topics-search .search-form__filters
+    await expect(
+      page.locator('.topics-search .search-form__filters select[name="preset"]'),
+    ).toBeVisible();
+    // Must be the last .search-form__select in the filters container
+    const lastSelect = page.locator('.topics-search .search-form__select').last();
+    await expect(lastSelect).toHaveAttribute('name', 'preset');
+  });
+
+  test('choosing Transactions on Topics lands on preset results', async ({ page }) => {
+    await page.locator('.topics-search select[name="preset"]').selectOption('transactions');
+    await page.locator('.topics-search .ibl-search__btn').click();
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('.search-results .search-result')).toHaveCount(10);
+    await expect(page.locator('select[name="preset"]')).toHaveValue('transactions');
+  });
+
   test('no PHP errors', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Topics page');
   });

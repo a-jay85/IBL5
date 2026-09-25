@@ -115,6 +115,19 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
             array_pop($rows);
         }
 
+        return ['results' => $this->mapStoryRows($rows), 'hasMore' => $hasMore];
+    }
+
+    /**
+     * Map raw story rows onto the public StoryResult shape.
+     *
+     * Shared by searchStories() and searchStoriesByPreset() so the two cannot drift.
+     *
+     * @param list<StoryDbRow> $rows
+     * @return list<array{sid: int, aid: string, informant: string, title: string, time: string, comments: int, topicId: int, topicText: string}>
+     */
+    private function mapStoryRows(array $rows): array
+    {
         $results = [];
         foreach ($rows as $row) {
             $results[] = [
@@ -129,7 +142,88 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
             ];
         }
 
-        return ['results' => $results, 'hasMore' => $hasMore];
+        return $results;
+    }
+
+    /**
+     * @see SearchRepositoryInterface::searchStoriesByPreset()
+     * @return StorySearchResult
+     */
+    public function searchStoriesByPreset(
+        string $preset,
+        string $query = '',
+        int $topic = 0,
+        string $author = '',
+        int $days = 0,
+        int $offset = 0,
+        int $limit = 10
+    ): array {
+        // Re-check the whitelist here so an unvalidated caller can never reach query
+        // text: the category IDs are class constants, never user input.
+        if (!array_key_exists($preset, self::PRESET_CATEGORY_IDS)) {
+            return ['results' => [], 'hasMore' => false];
+        }
+
+        $categoryIds = self::PRESET_CATEGORY_IDS[$preset];
+        $placeholders = implode(', ', array_fill(0, count($categoryIds), '?'));
+
+        $sql = "SELECT s.sid, s.aid, s.informant, s.title, s.time,
+                       s.hometext, s.bodytext, s.comments, s.topic,
+                       t.topictext
+                FROM " . $this->prefix . "_stories s
+                LEFT JOIN " . $this->prefix . "_topics t ON s.topic = t.topicid
+                WHERE s.catid IN (" . $placeholders . ")";
+
+        $types = str_repeat('i', count($categoryIds));
+        $params = $categoryIds;
+
+        if (strlen($query) >= 3) {
+            $likeQuery = '%' . $query . '%';
+            $sql .= " AND (s.title LIKE ? OR s.hometext LIKE ? OR s.bodytext LIKE ? OR s.notes LIKE ?)";
+            $types .= 'ssss';
+            $params[] = $likeQuery;
+            $params[] = $likeQuery;
+            $params[] = $likeQuery;
+            $params[] = $likeQuery;
+        }
+
+        if ($topic > 0) {
+            $sql .= " AND s.topic = ?";
+            $types .= 'i';
+            $params[] = $topic;
+        }
+
+        if ($author !== '') {
+            $sql .= " AND s.aid = ?";
+            $types .= 's';
+            $params[] = $author;
+        }
+
+        if ($days > 0) {
+            $sql .= " AND TO_DAYS(NOW()) - TO_DAYS(s.time) <= ?";
+            $types .= 'i';
+            $params[] = $days;
+        }
+
+        // Fetch one extra to detect if there are more results. sid breaks time ties
+        // so the LIMIT window is stable across pages (ADR-0083). sid is the
+        // AUTO_INCREMENT primary key of nuke_stories, so it is genuinely unique; it
+        // is simply absent from the rule's curated allowlist.
+        // @phpstan-ignore ibl.orderByMissingTiebreaker
+        $sql .= " ORDER BY s.time DESC, s.sid DESC LIMIT ?, ?";
+        $types .= 'ii';
+        $params[] = $offset;
+        $params[] = $limit + 1;
+
+        /** @var list<StoryDbRow> $rows */
+        $rows = $this->fetchAll($sql, $types, ...$params);
+        $hasMore = count($rows) > $limit;
+
+        if ($hasMore) {
+            array_pop($rows);
+        }
+
+        return ['results' => $this->mapStoryRows($rows), 'hasMore' => $hasMore];
     }
 
     /**

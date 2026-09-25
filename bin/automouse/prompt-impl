@@ -207,7 +207,17 @@ git pull origin master
 bin/wt-new <slug>
 ```
 
-If bin/wt-new fails, write an error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md, move the plan symlink to $NIGHTLY_DIR/skipped/, and STOP.
+If bin/wt-new fails, do NOT move the plan out of queue/. A wt-new failure is often
+transient (git lock contention with a concurrent run), and a plan moved to skipped/
+is never recovered. Instead:
+
+1. Write an error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md containing the full bin/wt-new output and exit code.
+2. Run `git worktree prune` to drop any half-registered worktree entry, so the next attempt starts clean.
+3. Drop the retry sentinel, leaving the plan symlink where it is:
+   ```bash
+   touch "$NIGHTLY_DIR/queue/$PLAN_FILE.wt-fail"
+   ```
+4. STOP. The bash loop sees the sentinel, counts this as one attempt, and retries the plan on a later run. MAX_ATTEMPTS still retires a plan whose wt-new failure is permanent.
 
 ### Resume (worktree exists)
 

@@ -86,6 +86,8 @@ eval "$(awk '/^release_cost_lock\(\)/,/^}/'      "$REPO_ROOT/bin/automouse/run")
 COST_LOCK_HELD=0  # global read by append_cost_row; set by the driver in bin/automouse/run
 eval "$(awk '/^append_cost_row\(\)/,/^}/'        "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^strip_weekly_section\(\)/,/^}/'   "$REPO_ROOT/bin/automouse/run")"
+eval "$(awk '/^day_logs\(\)/,/^}/'               "$REPO_ROOT/bin/automouse/run")"
+eval "$(awk '/^day_exit_lines\(\)/,/^}/'         "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^regenerate_weekly_section\(\)/,/^}/' "$REPO_ROOT/bin/automouse/run")"
 
 REPORT="$TMPROOT/reports/$(date +%F)-costs.md"

@@ -843,6 +843,27 @@ _date_ago() {
 # (logs/YYYY-MM-DD.costs.jsonl); token totals come from the sidecar with fallback
 # to exit-line tags from the day's .log for days without a sidecar.
 # Three total cost lines are emitted: floor, floor+surcharge-est-low, floor+surcharge-est-high.
+# Every runner log for day $2 under dir $1, one path per line: the legacy
+# shared `$2.log` (days before per-runner logs) first, then each per-runner
+# `$2-<pid>.log`. An unmatched glob stays literal, so each candidate is
+# tested with -f. Prints nothing and succeeds when no log exists.
+day_logs() {
+    local f
+    for f in "$1/$2.log" "$1/$2"-[0-9]*.log; do
+        if [ -f "$f" ]; then printf '%s\n' "$f"; fi
+    done
+    return 0
+}
+
+# The `exit:` lines of every runner log for day $2 under dir $1 (see day_logs),
+# concatenated. Safe under `set -e`: a file with no match does not fail it.
+day_exit_lines() {
+    local x
+    day_logs "$1" "$2" | while IFS= read -r x; do
+        grep -h 'exit:' "$x" 2>/dev/null || true
+    done
+}
+
 regenerate_weekly_section() {
     local report=$1 reports_dir logs_dir d f i lf
     local all_sidecar cost_rows tok_rows tok_stream split_miss unpriced
@@ -868,9 +889,9 @@ regenerate_weekly_section() {
         ' "$all_sidecar")" || true
     fi
     for i in 0 1 2 3 4 5 6; do
-        d=$(_date_ago "$i"); f="$logs_dir/$d.costs.jsonl"; lf="$logs_dir/$d.log"
-        if [ ! -f "$f" ] && [ -f "$lf" ]; then
-            fb=$(grep -hc 'exit:' "$lf" 2>/dev/null) || fb=0
+        d=$(_date_ago "$i"); f="$logs_dir/$d.costs.jsonl"; lf=$(day_logs "$logs_dir" "$d")
+        if [ ! -f "$f" ] && [ -n "$lf" ]; then
+            fb=$(day_exit_lines "$logs_dir" "$d" | wc -l | tr -d ' ') || fb=0
             unpriced=$(( unpriced + ${fb:-0} ))
         fi
     done
@@ -902,9 +923,9 @@ regenerate_weekly_section() {
             for i in 0 1 2 3 4 5 6; do
                 d=$(_date_ago "$i"); f="$logs_dir/$d.costs.jsonl"
                 if [ ! -f "$f" ]; then
-                    lf="$logs_dir/$d.log"
-                    if [ -f "$lf" ]; then
-                        grep -h 'exit:' "$lf" 2>/dev/null | awk '
+                    lf=$(day_logs "$logs_dir" "$d")
+                    if [ -n "$lf" ]; then
+                        day_exit_lines "$logs_dir" "$d" | awk '
                             { ph="?"; n=split($2,a,"/"); if(n>=2) ph=a[n]
                               in_v=0;ou_v=0;cr_v=0;cw_v=0
                               for(j=1;j<=NF;j++){if(split($j,kv,"=")==2){k=kv[1];v=kv[2]
@@ -1536,7 +1557,12 @@ claim_next_plan() {
     return 1
 }
 
-LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
+# One log per runner process ($$). phase_env_error, phase_stalled, and
+# append_cost_row slice $LOG from a line offset, so a shared file let a
+# concurrent runner's lines land in this runner's slice. Day-level readers
+# (regenerate_weekly_section via day_logs, bin/automouse/backfill-costs) merge
+# every runner's file for a date.
+LOG="$LOG_DIR/$(date +%Y-%m-%d)-$$.log"
 
 cd "$REPO"
 

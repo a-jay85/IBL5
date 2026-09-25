@@ -120,7 +120,11 @@ if [ -n "$UNTRACKED" ]; then
 fi
 
 # --- Step 2.4: Name-status gate ----------------------------------------------
-# Every changed file must carry status exactly 'M' and live under ibl5/docs/.
+# Every changed file must carry status exactly 'M' and match the docfix
+# allowlist below: ibl5/docs/** or a depth-one ibl5/classes/*/README.md (the
+# same class README set bin/check-docs audits). Agent-steering files
+# (.claude/**, CLAUDE.md, AGENTS.md) and every other path fall to the
+# catch-all and hold.
 # An empty diff is not a pass — it would make "every file is M" vacuously true
 # with zero rows.
 ROW_COUNT=0
@@ -134,8 +138,9 @@ while IFS=$'\t' read -r status path; do
     fi
     case "$path" in
         ibl5/docs/*) ;;
+        ibl5/classes/*/README.md) ;;
         *)
-            NAME_STATUS_HOLD="path outside ibl5/docs/: '$path'"
+            NAME_STATUS_HOLD="path outside docfix allowlist: '$path'"
             break
             ;;
     esac

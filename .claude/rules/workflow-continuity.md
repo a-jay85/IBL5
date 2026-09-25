@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree (never the main checkout); where plans live (~/claude-plans/<branch-slug>.md, outside the repo); worktree setup (hostname stub → worktree-hostname.md, squash-merge stub → linear-history-squash-merge.md); and post-plan handoff triggers. Engine internals: workflow-continuity-detail.md.
-last_verified: 2026-09-24
+last_verified: 2026-09-25
 ---
 
 # Workflow Continuity Rule
@@ -45,7 +45,7 @@ Never run `/post-plan` **inline** — it re-reads full implementation context ev
 
 **Plan-driven work** (session has a `/plan`): when verified clean, fire `bin/post-plan-now --auto` with no confirmation prompt. The "confirm before outward-facing actions" default is **durably overridden** for plan-driven work. Shipping is pre-authorized.
 
-**Ad-hoc work** (no plan): when verified clean, commit with `/commit-commands:commit` and stop. Do not fire post-plan or suggest shipping. Ships only when the user arms the branch (`touch "$(git rev-parse --absolute-git-dir)/postplan-ready"`) or tells you to ship. Never create the marker yourself. A skill ending in shipping (e.g. `/fix-and-prevent`, `/ship`) is the instruction. When armed or told, fire `bin/post-plan-now --auto` on the dirty tree:
+**Ad-hoc work** (no plan): when verified clean, commit with `/commit-commands:commit` and stop. Don't fire post-plan; end with `cd <abs worktree path> && bin/post-plan-now` to paste. Ships only when the user arms the branch (never arm it or suggest arming; the paste line is the only hint) or says ship. A skill ending in shipping (e.g. `/fix-and-prevent`, `/ship`) is the instruction. When armed or told, fire `bin/post-plan-now --auto` on the dirty tree:
 
 ```bash
 bin/post-plan-now --auto

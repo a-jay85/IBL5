@@ -154,6 +154,12 @@ if [ -n "${STUB_DRAFT:-}" ]; then
     mkdir -p "$(dirname "$STUB_DRAFT")"
     cat "$STUB_DRAFT_SRC" > "$STUB_DRAFT"
 fi
+# A second draft for the precedence case. Written after STUB_DRAFT, so it is
+# already past the one-second sleep above and reads as fresh too.
+if [ -n "${STUB_DRAFT2:-}" ]; then
+    mkdir -p "$(dirname "$STUB_DRAFT2")"
+    cat "$STUB_DRAFT2_SRC" > "$STUB_DRAFT2"
+fi
 # Leg B (marker omitted from a successful run): the stub creates plan files in
 # $PLANS_DIR directly and leaves no draft. No sleep is needed for the first —
 # leg B gates on the plan-dir diff, not mtime — but the SECOND file must be
@@ -224,12 +230,20 @@ ndir_reset() {
 # run_case_recovery <draft-src-or-empty> <draft-slug> [stale] → transcript
 # Fires plan-now with the slug-bearing prompt, no PLAN_FILE: tail, and (unless
 # empty) a draft the stub writes mid-run under $PLANS/.drafts/<slug>.draft.md.
+# Env prefixes: DRAFT_AT=root writes that draft at $PLANS/<slug>.draft.md instead;
+# ALSO_ROOT_SRC=<file> additionally writes a fresh root draft (precedence case).
 run_case_recovery() {
     local src="$1" slug="$2" stale="${3:-}"
     plans_reset
     : > "$DM_LOG"
     local dry runner draft=""
-    [ -n "$src" ] && draft="$PLANS/.drafts/$slug.draft.md"
+    # $DRAFT_AT=root puts the draft at the plans-dir root instead of .drafts/.
+    if [ -n "$src" ]; then
+        case "${DRAFT_AT:-drafts}" in
+            root) draft="$PLANS/$slug.draft.md" ;;
+            *)    draft="$PLANS/.drafts/$slug.draft.md" ;;
+        esac
+    fi
     dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
               PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
               "$PLAN_NOW" "${DISP:---implement}" "$RECOVERY_PROMPT" 2>&1)
@@ -242,6 +256,8 @@ run_case_recovery() {
         STUB_NO_PLAN=1 STUB_TAIL="" bash "$runner" 2>&1
     else
         STUB_NO_PLAN=1 STUB_TAIL="" STUB_DRAFT="$draft" STUB_DRAFT_SRC="$src" \
+            STUB_DRAFT2="${ALSO_ROOT_SRC:+$PLANS/$slug.draft.md}" \
+            STUB_DRAFT2_SRC="${ALSO_ROOT_SRC:-}" \
             QUEUE_FAIL="${QUEUE_FAIL:-}" QUEUE_ALREADY="${QUEUE_ALREADY:-}" bash "$runner" 2>&1
     fi
     rm -f "$runner"
@@ -538,6 +554,56 @@ out=$(run_case_recovery_plan "$RECOVERY_PROMPT" "$PARTIAL_DRAFT" demo-slug.md)
 want    "a failing adopted plan reports an attempt" "$out" "RESULT degraded (recovery attempted)"
 want    "a failing adopted plan is not queued"      "$out" "NOT queued"
 want_no "leg B claims no draft it never had"        "$out" "The draft is kept at"
+
+echo "── root-draft recovery: a draft written at the plans-dir root, not .drafts/ ──"
+RD="$PLANS/demo-slug.draft.md"
+
+# R1. A fresh root draft under this run's slug is recovered.
+out=$(DRAFT_AT=root run_case_recovery "$GOOD_DRAFT" demo-slug)
+want    "root-draft: fresh root draft is recovered"      "$out" "RESULT degraded (recovered)"
+want    "root-draft: recovery names the root source"     "$out" "recovered from: $RD"
+want    "root-draft: promoted plan is announced"         "$out" "plan -> $P"
+want_no "root-draft guard: leg B never adopts a draft"   "$out" "recovery B —"
+[ -f "$P" ] && ok "root-draft: promoted plan exists on disk" \
+    || fail "root-draft: promoted plan missing at $P"
+grep -q '^---$' <(head -1 "$P" 2>/dev/null) \
+    && ok "root-draft: frontmatter hoisted to line 1" \
+    || fail "root-draft: line 1 of $P is not '---'"
+[ -f "$RD" ] && fail "root-draft: root draft should be deleted after a passing check-plan" \
+    || ok "root-draft: root draft removed once check-plan passed"
+
+# R2. Stale root draft: same slug, back-dated. The mtime gate covers the root too.
+out=$(DRAFT_AT=root run_case_recovery "$GOOD_DRAFT" demo-slug stale)
+want    "root-draft guard: stale root draft is not adopted"   "$out" "RESULT unconfirmed"
+want_no "root-draft guard: stale root draft is not recovered" "$out" "degraded (recovered)"
+[ -f "$P" ] && fail "root-draft guard: stale root draft must not be promoted" \
+    || ok "root-draft guard: stale root draft left unpromoted"
+
+# R3. Peer slug at the root: never adopted, but reported like a .drafts/ peer.
+out=$(DRAFT_AT=root run_case_recovery "$GOOD_DRAFT" other-slug)
+want    "root-draft guard: peer root draft is never adopted"  "$out" "RESULT unconfirmed"
+want_no "root-draft guard: peer root draft is not recovered"  "$out" "degraded (recovered)"
+want    "root-draft: peer root draft is reported"             "$out" "cannot be attributed to it"
+want    "root-draft: the report names the root path"          "$out" "$PLANS/other-slug.draft.md"
+[ -f "$PLANS/other-slug.md" ] && fail "root-draft guard: peer root draft must not be promoted" \
+    || ok "root-draft guard: peer root draft left untouched"
+
+# R4. Precedence: fresh drafts in BOTH places. .drafts/ holds the good one, the
+#     root holds the partial one. .drafts/ must win and the root file is untouched.
+out=$(ALSO_ROOT_SRC="$PARTIAL_DRAFT" run_case_recovery "$GOOD_DRAFT" demo-slug)
+want    "root-draft guard: .drafts/ wins over the root"       "$out" "recovered from: $PLANS/.drafts/demo-slug.draft.md"
+want    "root-draft guard: precedence case recovers"          "$out" "RESULT degraded (recovered)"
+want_no "root-draft guard: the root partial is not promoted"  "$out" "recovery attempted"
+[ -f "$RD" ] && ok "root-draft guard: losing root draft is left in place" \
+    || fail "root-draft guard: the root draft was deleted though .drafts/ won"
+
+# R5. Partial root draft: promotion is attempted, check-plan fails, draft kept.
+out=$(DRAFT_AT=root run_case_recovery "$PARTIAL_DRAFT" demo-slug)
+want    "root-draft: partial root draft reports an attempt"   "$out" "RESULT degraded (recovery attempted)"
+want    "root-draft: the kept draft is the root path"         "$out" "The draft is kept at $RD"
+want_no "root-draft guard: a failed root recovery is not recovered" "$out" "RESULT degraded (recovered)"
+[ -f "$RD" ] && ok "root-draft guard: failed root recovery keeps its draft" \
+    || fail "root-draft guard: root draft deleted despite a failing check-plan"
 
 # ── staleness gate: check-plan can pass on a plan whose paths are dead ─────────
 # The guard's other callers live inside the automouse implementation run, which a

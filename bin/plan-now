@@ -504,7 +504,8 @@ DM_REVIEW_PLAN=""     # plan path for the review DM; never aliased from DM_PLAN
 DM_RESUME=""          # "bin/plan-now --resume <TS>" on a failed exit, else empty
 
 # Draft recovery. A run whose plan-architect was backgrounded and cut off leaves
-# a complete draft in $PLANS_DIR/.drafts/ while printing no PLAN_FILE: line.
+# a complete draft in $PLANS_DIR/.drafts/ (or, off-contract, at $PLANS_DIR's
+# root) while printing no PLAN_FILE: line.
 # These helpers let the verdict block below adopt THAT draft — and only that one.
 # $PLANS_DIR (not $HOME/claude-plans) so PLAN_NOW_PLANS_DIR stays the test seam.
 DRAFTS_DIR="$PLANS_DIR/.drafts"
@@ -536,6 +537,8 @@ run_slug() {
 }
 
 # Echo the path of a draft that provably belongs to THIS run, or nothing.
+# Two locations are tried, .drafts/<slug>.draft.md then <plans-dir>/<slug>.draft.md;
+# the three conditions below apply to each one independently.
 # Three independent conditions, ALL required — each rules out one wrong adoption:
 #   1. slug present in the prompt  -> never guess from a directory listing;
 #   2. filename == that slug       -> a peer plan-now run's draft is never taken,
@@ -550,12 +553,20 @@ recovery_candidate() {
     case "$slug" in
         *[!A-Za-z0-9._-]* | .*) return 1 ;;
     esac
-    cand="$DRAFTS_DIR/$slug.draft.md"
-    [ -f "$cand" ] && [ -s "$cand" ] || return 1
-    mt=$(draft_mtime "$cand")
-    [ -n "$mt" ] || return 1
-    [ "$mt" -gt "$started" ] || return 1
-    printf '%s\n' "$cand"
+    # .drafts/ first: it is the path /plan Step 3 prescribes. The plans-dir root
+    # is the off-contract fallback some orchestrator runs write to. The first
+    # path that passes every check wins, so a fresh .drafts/ draft is never
+    # displaced by a root one. Order, not recency: two fresh drafts under one
+    # slug came from one run, and mtime cannot say which of them is complete.
+    for cand in "$DRAFTS_DIR/$slug.draft.md" "$PLANS_DIR/$slug.draft.md"; do
+        [ -f "$cand" ] && [ -s "$cand" ] || continue
+        mt=$(draft_mtime "$cand") || continue
+        [ -n "$mt" ] || continue
+        [ "$mt" -gt "$started" ] || continue
+        printf '%s\n' "$cand"
+        return 0
+    done
+    return 1
 }
 
 # Render draft $1 into plan $2: drop the outline scaffold, then hoist a
@@ -728,7 +739,8 @@ else
     # TWO independent recoveries, tried in order, because this arm is reached two
     # distinct ways:
     #   A. the architect was backgrounded and killed at the wait ceiling, so a
-    #      complete draft is orphaned in .drafts/ and no plan file exists;
+    #      complete draft is orphaned in .drafts/ (or the plans-dir root) and no
+    #      plan file exists;
     #   B. the run SUCCEEDED end to end — plan written, draft consumed, full
     #      completion report printed — and the model merely left `PLAN_FILE:` out
     #      of its FINAL message. Per the rejected-alternatives block at the top of
@@ -767,7 +779,7 @@ else
         # something fresh is nonetheless sitting in .drafts/, say so — but never
         # adopt it: without a slug match a peer run's draft is indistinguishable.
         fresh=""
-        for d in "$DRAFTS_DIR"/*.draft.md; do
+        for d in "$DRAFTS_DIR"/*.draft.md "$PLANS_DIR"/*.draft.md; do
             [ -f "$d" ] || continue
             m=$(draft_mtime "$d") || continue
             [ -n "$m" ] || continue
@@ -776,7 +788,7 @@ else
         if [ -n "$fresh" ]; then
             echo "plan-now: a draft newer than this run exists but cannot be attributed to it:$fresh"
             echo 'plan-now: not promoted — the prompt carried no `Branch slug: `-style line, or the draft slug differs.'
-            echo "plan-now: inspect manually: ls -lt $DRAFTS_DIR/*.draft.md"
+            echo "plan-now: inspect manually: ls -lt $DRAFTS_DIR/*.draft.md $PLANS_DIR/*.draft.md"
         fi
     fi
 

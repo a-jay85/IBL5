@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-09-24
+last_verified: 2026-09-25
 paths: "bin/automouse/**"
 ---
 

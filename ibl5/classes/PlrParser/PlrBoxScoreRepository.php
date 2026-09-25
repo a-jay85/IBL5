@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PlrParser;
 
+use League\League;
 use League\LeagueContext;
 use PlrParser\Contracts\PlrBoxScoreRepositoryInterface;
 
@@ -14,6 +15,19 @@ use PlrParser\Contracts\PlrBoxScoreRepositoryInterface;
  */
 class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScoreRepositoryInterface
 {
+    /**
+     * Excludes the Rookies/Sophomores and All-Star exhibition rows.
+     *
+     * game_type comes from the month alone, so these February games land in the
+     * regular-season bucket. The .plr season stats leave them out, so the
+     * reconstruction sums must too.
+     */
+    private const NOT_EXHIBITION_CONDITION = 'teamid NOT IN ('
+        . League::ROOKIES_TEAMID . ', '
+        . League::SOPHOMORES_TEAMID . ', '
+        . League::ALL_STAR_AWAY_TEAMID . ', '
+        . League::ALL_STAR_HOME_TEAMID . ')';
+
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
@@ -50,6 +64,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
               AND game_type = ?
               AND game_date <= ?
               AND pid IS NOT NULL
+              AND " . self::NOT_EXHIBITION_CONDITION . "
             GROUP BY pid
         ";
 
@@ -115,6 +130,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
               AND game_date <= ?
               AND pid IS NOT NULL
               AND " . $this->playedCondition() . "
+              AND " . self::NOT_EXHIBITION_CONDITION . "
             GROUP BY pid
         ";
 
@@ -180,6 +196,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
                 SUM(game_pf) AS pf
             FROM `ibl_box_scores`
             WHERE pid = ? AND season_year = ? AND game_type = 1
+              AND " . self::NOT_EXHIBITION_CONDITION . "
             GROUP BY game_date
             ORDER BY game_date
         ";

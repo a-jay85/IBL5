@@ -498,6 +498,21 @@ expect_block "(1) cleared sentinel -> NONE" NONE \
     "$(run_isolated "$B1" '{"body":"## Manual Testing\nNo manual testing needed — automated."}' '' '')"
 expect_block "(1) no section (UNKNOWN) -> BLOCK (fail-closed)" BLOCK \
     "$(run_isolated "$B1" '{"body":"hand-made PR, no manual testing heading"}' '' '')"
+# S1: tail names unit, non-test file — predicate holds when files key is present.
+expect_block "S1: tail names unit, non-test file → BLOCK" BLOCK \
+    "$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed — covered by unit tests","files":[{"path":"bin/pr-triage"}]}' '' '')"
+# S2: same sentinel tail, but the changed file is a unit test — clears.
+expect_block "S2: tail names unit, Test.php in diff → NONE" NONE \
+    "$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed — covered by unit tests","files":[{"path":"ibl5/tests/Foo/BarTest.php"}]}' '' '')"
+# S3: no files key; the (.files // [])[].path guard must not jq-error.
+_s3_out="$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed"}' '' '')"
+expect_block "S3: no files key → NONE (null guard)" NONE "$_s3_out"
+if grep -qF 'jq: error' <<< "$_s3_out"; then
+    echo "FAIL: S3 — jq error on missing files key (remove // [] guard)"
+    FAILED=1
+else
+    echo "ok: S3 — no jq error when files key absent"
+fi
 
 # condition (3) — the fail-open this gate closed: an empty bridge file is
 # byte-identical for "5.0 ran clean" and "5.0 died", so only the done-marker
@@ -1013,6 +1028,53 @@ expect_mss "mss: BLOCKED still arms (28/30 PRs live here)" BLOCKED arm
 expect_mss "mss: CLEAN still arms" CLEAN arm
 expect_mss "mss: UNSTABLE still arms (non-required checks only)" UNSTABLE arm
 expect_mss "mss: HAS_HOOKS still arms" HAS_HOOKS arm
+
+# T0–T3: pr-triage clearance extraction.
+# Extract the two lines Phase 2b added and run them in a generated subscript.
+TRIAGE_LINES="$(sed -n \
+    -e '/^    changed_paths="\$(printf/p' \
+    -e '/^    clearance="\$(pr_manual_testing_clearance/p' \
+    "$REPO_ROOT/bin/pr-triage")"
+if grep -qF 'changed_paths=' <<< "$TRIAGE_LINES" && \
+   grep -qF '"$changed_paths"' <<< "$TRIAGE_LINES"; then
+    echo "ok: T0 — pr-triage clearance extraction finds changed_paths pass-through"
+else
+    echo "FAIL: T0 — pr-triage clearance call not found or missing changed_paths argument"
+    FAILED=1
+fi
+run_triage_clearance() { # body  files-json -> clearance verdict on stdout
+    local script="$BASE_TMP/triage_clearance.sh"
+    {
+        echo 'set -euo pipefail'
+        echo "source '$REPO_ROOT/bin/lib/pr-armable.sh'"
+        echo 'body="$1"; files="$2"'
+        printf '%s\n' "$TRIAGE_LINES"
+        echo 'printf "%s\n" "$clearance"'
+    } > "$script"
+    bash "$script" "$1" "$2" 2>&1
+}
+_unit_tail_body="$(printf '## Manual Testing\n\nNo manual testing needed — covered by unit tests\n')"
+if [[ "$(run_triage_clearance "$_unit_tail_body" '[{"path":"bin/pr-triage"}]')" == "HELD" ]]; then
+    echo "ok: T1 — non-test file path → HELD"
+else
+    echo "FAIL: T1 — expected HELD; dropping changed_paths clears the sentinel tail"
+    FAILED=1
+fi
+if [[ "$(run_triage_clearance "$_unit_tail_body" '[{"path":"ibl5/tests/Foo/BarTest.php","additions":1}]')" == "CLEARED" ]]; then
+    echo "ok: T2 — Test.php in diff → CLEARED"
+else
+    echo "FAIL: T2 — expected CLEARED; wrong jq field (e.g. .name) misses the test path"
+    FAILED=1
+fi
+_plain_body="$(printf '## Manual Testing\n\nNo manual testing needed\n')"
+_t3_out="$(run_triage_clearance "$_plain_body" '[]')"
+_t3_rc=$?
+if [[ "$_t3_out" == "CLEARED" ]] && [[ "$_t3_rc" -eq 0 ]]; then
+    echo "ok: T3 — empty array → CLEARED, exit 0"
+else
+    echo "FAIL: T3 — expected CLEARED exit-0, got '$_t3_out' rc=$_t3_rc"
+    FAILED=1
+fi
 
 # The truncation guard itself: a mid-loop `set -e` abort exits BEFORE any check
 # placed after the loop, so only an EXIT trap can report it. Structural, because

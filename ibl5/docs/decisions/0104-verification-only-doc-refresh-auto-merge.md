@@ -1,6 +1,6 @@
 ---
-description: A nightly doc-refresh PR may self-ship only when `bin/docfix-check-veronly` proves its realized diff is exclusively date bumps and same-line numeric corrections on tracked files under `ibl5/docs/`; every other docfix PR keeps ADR-0086's human-merge hold.
-last_verified: 2026-09-02
+description: A nightly doc-refresh PR may self-ship only when `bin/docfix-check-veronly` proves its realized diff is exclusively date bumps and same-line numeric corrections on tracked files under `ibl5/docs/` or at `ibl5/classes/*/README.md` (addendum 2026-09-24); every other docfix PR keeps ADR-0086's human-merge hold.
+last_verified: 2026-09-24
 ---
 
 # ADR-0104: Verification-only doc refreshes may self-ship
@@ -37,6 +37,16 @@ This ADR narrows one clause of one prior decision; it supersedes nothing.
 
 - [ADR-0086](0086-runnerless-mac-poll-for-stale-docs-remediation.md) — its decision 2 (doc-refresh PRs are held for human merge; auto-merging them was considered and rejected) **still governs every docfix PR the predicate does not clear**. Only the verification-only subset defined above is carved out. ADR-0086 remains `Accepted` and is not superseded.
 - [ADR-0079](0079-stale-docs-auto-remediation.md) — the original self-hosted-runner design ADR-0086 replaced. Referenced for lineage only; its status is unchanged by this ADR.
+
+## Addendum 2026-09-24: allowlist widened to class READMEs
+
+Clause 1 of the Decision restricts the grant to changed files under `ibl5/docs/`. As of this addendum the path allowlist in `bin/docfix-check-veronly` has two arms: `ibl5/docs/*` and `ibl5/classes/*/README.md`. The second arm is the same depth-one class README set that `bin/check-docs` audits through `IN_SCOPE_GLOBS`, so a nightly refresh whose only change to one of those READMEs is a verification-only bump can now self-ship. The content predicate is unchanged: status `M` only, no untracked files, exactly one strictly-advancing `last_verified:` pair per file, and same-skeleton numeric pairs only when that file also carries its date bump.
+
+What stays held. Agent-steering files (`.claude/**`, any `CLAUDE.md`, `AGENTS.md`), the repo-root `README.md`, and every other path fall to the catch-all arm and hold with the reason `path outside docfix allowlist`. A mixed diff that pairs one allowed file with one held path holds as a whole, because the name-status loop stops at the first non-allowlisted row. PR #2383 is the motivating case: a nightly run bumped `ibl5/classes/EventLog/README.md` and a `.claude/rules` file together and stayed held. Under the widened allowlist a run touching only the README self-ships, and the same run touching the `.claude/rules` file still holds.
+
+Why one star and no `**`. The arm mirrors the audit glob byte for byte, so the set of files the audit can flag and the set the predicate can arm are the same set. Bash `case` lets `*` match `/`, so a nested README under `ibl5/classes/` would also match if one ever existed; none exists today, and such a file would still face the full content predicate.
+
+Coverage: `bin/test-docfix-run` Cases 66-70 (PASS on the README shape; HOLD on `.claude/rules`, on the mixed diff in both row orders, on `CLAUDE.md`, and on a README outside `ibl5/classes/`).
 
 ## Alternatives Considered
 

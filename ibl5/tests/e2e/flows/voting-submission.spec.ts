@@ -131,7 +131,9 @@ test.describe('ASG Voting: submission', () => {
     const secondToken = await ballotCsrfToken(page, 'ASGVote');
     expect(secondToken, 'redisplayed ballot must mint a new CSRF token').not.toBe(firstToken);
     await assertNoPhpErrors(page, 'after ASG redisplay');
-    await testInfo.attach('asg-redisplay', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+    // Viewport-only: a fullPage screenshot resizes the window, and responsive-tables.js's
+    // resize handler then zeroes the width of every collapsed category's scroll container.
+    await testInfo.attach('asg-redisplay', { body: await page.screenshot(), contentType: 'image/png' });
 
     // (d) fix the short category and resubmit with the new token.
     await expandVotingCategory(page, 'ECB');

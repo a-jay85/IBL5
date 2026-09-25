@@ -166,9 +166,12 @@ def build_work_list(verdict_path: str,
     # UNMET-CONTRACT entries are deliberately excluded: they name evidence the plan
     # declared, and a fixer that "adds" such evidence is the fabrication conformance
     # exists to catch.
+    # MISSING-PHASE is excluded for the same reason: the fix is a whole plan phase, which
+    # is human work, and the item still holds arming through condition (3).
     for entry in (unresolved_conformance or []):
-        if str(entry).startswith("MISSING"):
-            items.append({"hold": "3", "text": str(entry)})
+        text = str(entry)
+        if text.startswith("MISSING") and not text.startswith("MISSING-PHASE"):
+            items.append({"hold": "3", "text": text})
     for fail in (meta_check_failures or []):
         items.append({"hold": "16",
                       "text": f"{fail.get('name', 'unknown')}\n{fail.get('output', '')}"})

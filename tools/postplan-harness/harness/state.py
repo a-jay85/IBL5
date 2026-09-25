@@ -98,6 +98,20 @@ class Classification:
 
 
 @dataclass
+class PhaseInfo:
+    """One `## Phase N:` / `## Step N:` section of a plan, as parsed by planfile.parse_phases.
+
+    `evidence_paths` = backticked path tokens found in the phase section's own body.
+    `bookkeeping` is True when the heading carries `[phases: S]` / `[phases: S/S]` (all-S tier
+    marker), which exempts the phase from the omission check.
+    """
+    number: int = 0
+    heading: str = ""                                          # heading text after `## `, marker included
+    evidence_paths: list[str] = field(default_factory=list)   # repo-relative-looking tokens, deduped, first-seen order
+    bookkeeping: bool = False
+
+
+@dataclass
 class PlanInfo:
     """Phase 1 output — located plan + parsed signals."""
     found: bool = False
@@ -138,6 +152,11 @@ class PlanInfo:
     # by exact name. It does NOT assert that a condition-(13) hold would otherwise have fired —
     # the derivation might equally have found nothing and run plan-blind.
     plan_source: str = ""
+    # Phase 5.0 phase-omission inputs (planfile.parse_phases / parse_deferred_phase_numbers).
+    # Both default empty, so a plan-blind run, a replay fixture, and every pre-existing
+    # PlanInfo(...) literal in tests stay valid and produce zero MISSING-PHASE items.
+    phases: list[PhaseInfo] = field(default_factory=list)
+    deferred_phase_numbers: list[int] = field(default_factory=list)   # numbers named in `## Out of Scope`
 
 
 @dataclass

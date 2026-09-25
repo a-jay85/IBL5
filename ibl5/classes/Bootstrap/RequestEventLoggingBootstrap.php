@@ -9,6 +9,7 @@ use Bootstrap\Contracts\ContainerInterface;
 use EventLog\EventLogger;
 use EventLog\EventLogRepository;
 use EventLog\RouteNameNormalizer;
+use EventLog\SessionIdHasher;
 use EventLog\TrafficClassifier;
 use Logging\LoggerFactory;
 use Repositories\TeamIdentityRepository;
@@ -66,9 +67,7 @@ class RequestEventLoggingBootstrap implements BootstrapStepInterface
             $sessionId = null;
             if (session_status() === \PHP_SESSION_ACTIVE) {
                 $rawSession = session_id();
-                if (is_string($rawSession) && $rawSession !== '') {
-                    $sessionId = hash('sha256', $rawSession);
-                }
+                $sessionId = SessionIdHasher::hash(is_string($rawSession) ? $rawSession : null);
             }
 
             // (3) Resolve effective user + current team.

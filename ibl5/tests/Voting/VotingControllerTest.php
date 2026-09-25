@@ -16,6 +16,12 @@ use Tests\Module\EntryPoints\ModuleEntryPointTestCase;
  */
 class VotingControllerTest extends ModuleEntryPointTestCase
 {
+    /** The boosted PageLayout::header() emits exactly one <title>. */
+    private const string HEADER_MARKER = '<title>';
+
+    /** Number of buffers PageLayout::footer() popped during the last runAction(). */
+    private int $footerCount = 0;
+
     public function testMainRendersResultsExpanderForAdmin(): void
     {
         $this->arrangeSeason();
@@ -65,19 +71,92 @@ class VotingControllerTest extends ModuleEntryPointTestCase
         $this->assertStringNotContainsString('id="Results"', $this->runMain($controller, 'testadmin'));
     }
 
-    /**
-     * PageLayout::footer() calls ob_end_flush(), so main() needs the same double
-     * buffering ModuleEntryPointTestCase::runModule() uses: L1 is sacrificial.
-     */
+    public function testMainEmitsExactlyOneHeaderAndFooter(): void
+    {
+        $this->arrangeSeason();
+        $ballotView = self::createStub(\Voting\Contracts\VotingBallotViewInterface::class);
+        $ballotView->method('renderBallotForm')->willReturn('<form id="ballot"></form>');
+        $controller = $this->makeController($ballotView, isAdmin: false, results: null);
+
+        $out = $this->runMain($controller, 'testgm');
+
+        $this->assertSame(1, substr_count($out, '<form id="ballot"></form>'));
+        $this->assertSame(1, substr_count($out, self::HEADER_MARKER));
+        $this->assertSame(1, $this->footerCount);
+    }
+
+    public function testSubmitAsgVoteOnValidationFailureRendersErrorsNotBallot(): void
+    {
+        $this->arrangeSeason();
+        $ballotView = self::createMock(\Voting\Contracts\VotingBallotViewInterface::class);
+        $ballotView->expects($this->never())->method('renderBallotForm');
+
+        $result = \Voting\SubmissionResult::withErrors(['You cannot select less than FOUR frontcourt players from the Eastern Conference.']);
+        $svc = self::createStub(\Voting\Contracts\VotingSubmissionServiceInterface::class);
+        $svc->method('submitAsgVote')->willReturn($result);
+
+        $view = self::createMock(\Voting\Contracts\VotingSubmissionViewInterface::class);
+        $view->expects($this->once())->method('renderErrors')->willReturn('<p class="voting-submission-error">ERR</p>');
+
+        $controller = $this->makeController($ballotView, isAdmin: false, results: null, submissionService: $svc, submissionView: $view);
+        $this->stubCsrfToken('asg_vote');
+        $_POST['ECF'] = ['Only One, Boston Celtics'];
+
+        $out = $this->runAction($controller, static fn (\Voting\VotingController $c) => $c->submitAsgVote('testgm'));
+
+        $this->assertStringContainsString('voting-submission-error', $out);
+        $this->assertSame(1, substr_count($out, self::HEADER_MARKER));
+        $this->assertSame(1, $this->footerCount);
+    }
+
+    public function testSubmitEoyVoteOnValidationFailureRendersErrorsNotBallot(): void
+    {
+        $this->arrangeSeason();
+        $ballotView = self::createMock(\Voting\Contracts\VotingBallotViewInterface::class);
+        $ballotView->expects($this->never())->method('renderBallotForm');
+
+        $result = \Voting\SubmissionResult::withErrors(['Sorry, you must vote for three different players for MVP.']);
+        $svc = self::createStub(\Voting\Contracts\VotingSubmissionServiceInterface::class);
+        $svc->method('submitEoyVote')->willReturn($result);
+
+        $view = self::createMock(\Voting\Contracts\VotingSubmissionViewInterface::class);
+        $view->expects($this->once())->method('renderErrors')->willReturn('<p class="voting-submission-error">ERR</p>');
+
+        $controller = $this->makeController($ballotView, isAdmin: false, results: null, submissionService: $svc, submissionView: $view);
+        $this->stubCsrfToken('eoy_vote');
+        $_POST['MVP'] = [1 => 'Only One, Boston Celtics'];
+
+        $out = $this->runAction($controller, static fn (\Voting\VotingController $c) => $c->submitEoyVote('testgm'));
+
+        $this->assertStringContainsString('voting-submission-error', $out);
+        $this->assertSame(1, substr_count($out, self::HEADER_MARKER));
+        $this->assertSame(1, $this->footerCount);
+    }
+
     private function runMain(\Voting\VotingController $controller, string $user): string
+    {
+        return $this->runAction($controller, static fn (\Voting\VotingController $c) => $c->main($user));
+    }
+
+    /**
+     * PageLayout::footer() calls ob_end_flush(), so the action needs the same
+     * buffering ModuleEntryPointTestCase::runModule() uses: L1 is sacrificial.
+     * A second sacrificial level (L0) lets a doubled footer pop a spare buffer
+     * instead of the capture one, so footerCount can report it.
+     *
+     * @param callable(\Voting\VotingController): void $action
+     */
+    private function runAction(\Voting\VotingController $controller, callable $action): string
     {
         $baseLevel = ob_get_level();
         ob_start(); // L2 — capture
         ob_start(); // L1 — sacrificial
+        ob_start(); // L0 — sacrificial spare
 
         try {
-            $controller->main($user);
+            $action($controller);
         } finally {
+            $this->footerCount = $baseLevel + 3 - ob_get_level();
             while (ob_get_level() > $baseLevel + 1) {
                 ob_end_flush();
             }
@@ -86,10 +165,17 @@ class VotingControllerTest extends ModuleEntryPointTestCase
         return (string) ob_get_clean();
     }
 
+    private function stubCsrfToken(string $formName): void
+    {
+        $_POST['_csrf_token'] = \Security\CsrfGuard::generateRawToken($formName);
+    }
+
     private function makeController(
         \Voting\Contracts\VotingBallotViewInterface $ballotView,
         bool $isAdmin,
         ?\Voting\Contracts\VotingResultsControllerInterface $results,
+        ?\Voting\Contracts\VotingSubmissionServiceInterface $submissionService = null,
+        ?\Voting\Contracts\VotingSubmissionViewInterface $submissionView = null,
     ): \Voting\VotingController {
         $ballotService = self::createStub(\Voting\Contracts\VotingBallotServiceInterface::class);
         $ballotService->method('getBallotData')->willReturn([]);
@@ -109,8 +195,8 @@ class VotingControllerTest extends ModuleEntryPointTestCase
             $GLOBALS['mysqli_db'],
             $ballotService,
             $ballotView,
-            self::createStub(\Voting\Contracts\VotingSubmissionServiceInterface::class),
-            self::createStub(\Voting\Contracts\VotingSubmissionViewInterface::class),
+            $submissionService ?? self::createStub(\Voting\Contracts\VotingSubmissionServiceInterface::class),
+            $submissionView ?? self::createStub(\Voting\Contracts\VotingSubmissionViewInterface::class),
             $nukeCompat,
             $authService,
             $teamIdentity,

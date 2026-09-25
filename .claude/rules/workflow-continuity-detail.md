@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-09-24
+last_verified: 2026-09-25
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -60,10 +60,18 @@ human signoff.
 
 The per-branch arming marker is `$(git rev-parse --absolute-git-dir)/postplan-ready`. Only
 `~/.claude/hooks/auto-commit-reminder.sh` reads it, using it to decide which nudge to show
-at turn-end: unarmed shows commit-only; armed shows `bin/post-plan-now --auto`. Nothing else
+at turn-end: unarmed shows commit-only (unless the creator-session marker below matches); armed shows `bin/post-plan-now --auto`. Nothing else
 watches the marker or fires post-plan when it appears. The arming requirement was added after
 PR [#2340](https://github.com/a-jay85/IBL5/pull/2340) (2026-09-22), where a post-plan nudge
 caused a model to ship half-done ad-hoc work.
+
+The creator-session marker is `$(git rev-parse --absolute-git-dir)/wt-new-session`. `bin/wt-new`
+writes `$CLAUDE_CODE_SESSION_ID` into it when it creates a new branch. It writes nothing for a
+human run or for `--existing`, whose branch can carry earlier work. The same hook reads it: when
+the marker matches the Stop payload's `session_id`, the nudge says ship with
+`bin/post-plan-now --auto` once the whole task verified clean. Any other session gets the hold
+text. The marker is session-scoped by content, so a later session in the same worktree never
+inherits the ship default the way it would inherit `postplan-ready`. Added 2026-09-25.
 
 ## No deadlock
 

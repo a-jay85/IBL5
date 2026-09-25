@@ -1,6 +1,6 @@
 ---
 description: "PR body authoring rules: version/baseline citations must name their source file; negative-claim bullets must be re-read after every commit; backlog closing keywords come from the plan via the shared normalizer snippet."
-last_verified: 2026-09-23
+last_verified: 2026-09-25
 ---
 
 # PR Body Claims
@@ -69,10 +69,14 @@ Use bare `#N` only for IBL5 PRs and issues.
 
 ### Closing keywords
 
-The plan's `## Backlog issues` section decides which backlog issues this PR closes. A `closes`
-bullet becomes a `Closes a-jay85/IBL5-backlog#N` line in the PR body, and GitHub closes that
-issue when the PR merges into `master`. A `refs` bullet gets a plain `a-jay85/IBL5-backlog#N`
-link with no closing keyword.
+The plan's backlog bullets decide which backlog issues this PR closes. Post-plan collects them
+from the whole plan outside fenced code blocks, so a bullet counts in the `## Backlog issues`
+section or in any phase body, including a bookkeeping-only phase. Only a bullet that starts with
+`closes` or `refs` and names the full `a-jay85/IBL5-backlog` path counts. A mention in prose, an
+inline code span, or a blockquote closes nothing. A `closes` bullet becomes a
+`Closes a-jay85/IBL5-backlog#N` line in the PR body, and GitHub closes that issue when the PR
+merges into `master`. A `refs` bullet gets a plain `a-jay85/IBL5-backlog#N` link with no closing
+keyword. When one issue appears as both kinds, `closes` wins.
 
 Do not hand-write these lines. Write the composed body to a file, then run the snippet below
 before every `gh pr create --body-file` and every `gh pr edit --body-file`. It calls the same
@@ -103,7 +107,7 @@ PY
 
 What the snippet guarantees:
 
-- **No plan record.** With no plan file, or a plan without the section, the body stays byte-for-byte
+- **No plan record.** With no plan file, or a plan with no backlog bullets, the body stays byte-for-byte
   as written. A `Closes a-jay85/IBL5-backlog#N` line already in the body (carried from a commit
   message) stays, and nothing new is added. Close an issue only when something names it.
 - **Partial work.** A closing keyword (`Closes`, `Fixes`, `Resolves`, in any tense) in front of a

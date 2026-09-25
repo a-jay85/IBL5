@@ -11,7 +11,7 @@
 # Sonnet 4.6 /post-plan skill session. POST_PLAN_SKILL=1 forces the skill path.
 # The harness intentionally omits backlog housekeeping, worktree teardown, the
 # E2E verify track, and Phase 10 preview — the skill fallback retains them.
-# The harness runs the Phase 5.5 fidelity review itself; there is no partial-run resume, so any harness exit other than 0 or 3 re-runs the full skill.
+# The harness runs the Phase 5.5 fidelity review itself; there is no partial-run resume, so any harness exit other than 0, 3 or 7 re-runs the full skill.
 #
 # Either way the run is supervised by launchd (RunAtLoad one-shot), so it
 # survives closing Claude Code or the terminal — a plain `nohup … &` launched
@@ -43,6 +43,8 @@
 #                               #   worktree has that branch. Refuses a fork PR.
 #
 # Run from anywhere inside the target worktree.
+# Exit 7: refused because $ROOT is the main checkout (ADR-0062); nothing was fired.
+# Callers key on 7 to tell "wrong tree" apart from a generic failure (exit 1).
 #
 # --pr <n> drives the worktree that has PR <n>'s head branch checked out, instead
 # of the current branch. When no worktree has that branch, --pr creates one via
@@ -64,9 +66,13 @@
 # TREE-EQUIVALENT proof; see ibl5/docs/decisions/0134-harness-conflict-autoresolve.md), and
 # (2) a local pre-commit/pre-push gate denial (missing ADR, stale doc, rules byte budget). Both
 # are deterministic walls a skill re-run cannot climb, so the fallback is suppressed entirely.
+# 7 is this launcher's own main-checkout refusal (the is_in_worktree block further down):
+# nothing ran, and the fix is to cd into the right worktree. The harness never emits 7
+# (runner.py exit_code_for returns only 0, 1 or 3). Listing 7 keeps one no-fallback
+# vocabulary, so a skill re-run can never be spent against the main checkout.
 # This function is embedded verbatim into the launchd plist below via `declare -f`, so the
 # tested logic here is exactly what runs there.
-should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }
+should_fallback() { case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }
 
 # shq <string> — single-quote <string> for the FAR side of the launchd boundary.
 # Everything this script assembles into $CMD is parsed by a shell a SECOND time, when
@@ -310,7 +316,7 @@ esac
 if ! is_in_worktree "$ROOT"; then
     echo "post-plan-now: refusing to run in the main checkout ($ROOT) — ADR-0062." >&2
     echo "  cd into the branch's worktree (or use --pr <n>) and re-run." >&2
-    exit 1
+    exit 7
 fi
 
 # A branch name may contain "/" (a Dependabot branch is

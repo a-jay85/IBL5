@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Usage: bin/digest-dm-build --pr-number N --title TITLE --url URL < verdict-body
+# Usage: bin/digest-dm-build --pr-number N --title TITLE --url URL [--branch BRANCH] < verdict-body
 #   Reads a /pr-ready sticky verdict comment body on STDIN and writes a Discord-sized
-#   merge-digest DM to STDOUT. All three flags are required; an unknown or missing
-#   flag exits 2 with a message on stderr. A missing or unparseable digest is NOT an
+#   merge-digest DM to STDOUT. --pr-number, --title and --url are required; an unknown or
+#   missing flag exits 2 with a message on stderr. --branch is optional; when non-empty it
+#   prints as a code span on the line under the "Merged" header. A missing or unparseable digest is NOT an
 #   error: it degrades the message body and still exits 0.
 #
 # Consumed by .github/workflows/merge-digest-notify.yml, which pipes in the body of the
@@ -18,17 +19,19 @@
 # NOT chunk -- the cap is the caller's responsibility, and this script is the caller.
 #   fixed scaffolding   ~70
 #   "#N: <title>"      <=100   (title truncated at 80)
+#   branch line         <=62   (branch truncated at 60)
 #   URL                 ~70
 #   What changed       <=1000
-#   Watch              <=700
+#   Watch              <=650
 #                      ------
-#                      ~1940
+#                      ~1952
 
 set -euo pipefail
 
 TITLE_MAX=80
 WHAT_MAX=1000
-WATCH_MAX=700
+WATCH_MAX=650
+BRANCH_MAX=60
 
 # Truncation must be CHARACTER-wise, not byte-wise. Repo digests carry `·` (U+00B7) and
 # `…`; a byte-wise cut can split a UTF-8 sequence, and the invalid bytes then reach
@@ -55,11 +58,13 @@ fi
 PR_NUMBER=""
 TITLE=""
 URL=""
+BRANCH=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --pr-number) PR_NUMBER="${2-}"; shift 2 ;;
         --title)     TITLE="${2-}";     shift 2 ;;
         --url)       URL="${2-}";       shift 2 ;;
+        --branch)    BRANCH="${2-}";    shift 2 ;;
         -h|--help)
             sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)
@@ -142,11 +147,19 @@ WHAT="$(_label_value 'What changed')"
 WATCH="$(_label_value 'Watch')"
 TITLE_T="$(_trunc "$TITLE_MAX" "$TITLE")"
 
+# The branch prints inside a code span, and a backtick in it would close the span early.
+# Branch names may legally contain one, so strip it.
+BRANCH="${BRANCH//\`/}"
+BRANCH_LINE=""
+if [ -n "$BRANCH" ]; then
+    BRANCH_LINE="$(printf '\n`%s`' "$(_trunc "$BRANCH_MAX" "$BRANCH")")"
+fi
+
 # A confirmed merge is ALWAYS announced. A missing or unparseable digest degrades the
 # message; it never suppresses it. (Same invariant bin/pr-cycle held for the ledger row.)
 if [ -z "$WHAT" ] && [ -z "$WATCH" ]; then
-    printf '**Merged #%s: %s**\n\n(No /pr-ready digest — armed by triage sweep or no review pass run.)\n\n%s\n' \
-        "$PR_NUMBER" "$TITLE_T" "$URL"
+    printf '**Merged #%s: %s**%s\n\n(No /pr-ready digest — armed by triage sweep or no review pass run.)\n\n%s\n' \
+        "$PR_NUMBER" "$TITLE_T" "$BRANCH_LINE" "$URL"
     exit 0
 fi
 
@@ -155,8 +168,8 @@ fi
 [ -n "$WHAT" ]  || WHAT='(missing)'
 [ -n "$WATCH" ] || WATCH='(missing)'
 
-printf '**Merged #%s: %s**\n\n**What changed:** %s\n\n**Watch:** %s\n\n%s\n' \
-    "$PR_NUMBER" "$TITLE_T" \
+printf '**Merged #%s: %s**%s\n\n**What changed:** %s\n\n**Watch:** %s\n\n%s\n' \
+    "$PR_NUMBER" "$TITLE_T" "$BRANCH_LINE" \
     "$(_trunc "$WHAT_MAX" "$WHAT")" \
     "$(_trunc "$WATCH_MAX" "$WATCH")" \
     "$URL"

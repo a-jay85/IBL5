@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    # Only consumed by config.php.example getenv() in `php bin/migrate`; the
+    # Only consumed when CI writes config.local.php for `php bin/migrate`; the
     # mysql/mysqldump CLI calls below pass creds via explicit flags, so DB_NAME
     # pointing at ibl5_php does not affect them.
     env:
@@ -71,9 +71,12 @@ jobs:
         sed 's/DEFINER=`[^`]*`@`[^`]*`//g' migrations/000_baseline_schema.sql \
           | mysql -h 127.0.0.1 -u root -proot ibl5_php
 
-        # config.php.example reads DB creds from getenv(); job-level DB_* env
-        # vars (DB_NAME=ibl5_php) point the PHP migrate runner at this database.
+        # config.php requires config.local.php for DB creds; write it from the
+        # job-level DB_* env (DB_NAME=ibl5_php) so php bin/migrate hits this database.
         cp config.php.example config.php
+        printf '<?php\n$dbhost = %s;\n$dbuname = %s;\n$dbpass = %s;\n$dbname = %s;\n' \
+          "'${DB_HOST:-127.0.0.1}'" "'${DB_USER:-root}'" "'${DB_PASS:-root}'" \
+          "'${DB_NAME:-ibl5}'" > config.local.php
 
         # Mark only the baseline as applied (batch 0) so migrate-seed guard passes,
         # then let php bin/migrate apply all subsequent migrations (001+).
@@ -133,8 +136,8 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    # config.php.example reads DB creds from getenv(); the job-level DB_* env
-    # vars point it at the CI MariaDB service (ibl5_completeness).
+    # setup-php-env writes config.local.php from the job-level DB_* env, which
+    # points PHP at the CI MariaDB service (ibl5_completeness).
     - name: Setup PHP environment
       uses: ./.github/actions/setup-php-env
 

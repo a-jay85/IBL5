@@ -162,10 +162,12 @@ git -C "$WT_ROOT" config "branch.$BRANCH_NAME.iblBase" "$BASE_BRANCH"
 # config.php: real copy, NOT a symlink. A symlink's absolute host target
 # (/Users/.../IBL5/ibl5/config.php) doesn't resolve inside the worktree's Docker
 # container, so every app request 500s (`Failed to open stream`). config.php is
-# league-agnostic (DB host is env-injected), so a snapshot copy works everywhere.
+# league-agnostic (DB credentials come from config.local.php), so a snapshot copy works everywhere.
 # wt-up materializes the same file for older symlinked worktrees.
 echo "Materializing config.php..."
 materialize_worktree_config "$WT_IBL5/config.php" "$MAIN_IBL5"
+echo "Materializing config.local.php..."
+materialize_worktree_config_local "$WT_IBL5/config.local.php" "$MAIN_IBL5"
 
 # Symlinks
 echo "Setting up symlinks..."

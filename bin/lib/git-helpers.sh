@@ -87,7 +87,7 @@ is_in_worktree() {
 # Materialize a REAL config.php at <dest> from <main_ibl5_dir>.
 # config.php can't be a symlink into a worktree: the absolute host target doesn't
 # resolve inside Docker, so every request 500s (`Failed to open stream`). It's
-# league-agnostic (DB host is env-injected), so a snapshot copy works everywhere.
+# league-agnostic (DB credentials come from config.local.php, materialized alongside), so a snapshot copy works everywhere.
 # Removes any pre-existing symlink first. Prefers the real config.php; falls back
 # to the tracked config.php.example (placeholders) with a warning; returns 1 if
 # neither source exists. Callers pass the CANONICAL main ibl5 dir — never a
@@ -112,6 +112,29 @@ materialize_worktree_config() {
         cp "$main_ibl5/config.php.example" "$dest"
     else
         echo "Error: no config.php or config.php.example in $main_ibl5 — worktree will 500 on every request." >&2
+        return 1
+    fi
+}
+
+# Materialize config.local.php (the gitignored DB-credential file config.php
+# requires) at <dest> from <main_ibl5_dir>. Same shape as
+# materialize_worktree_config: a real copy, never a symlink (the absolute host
+# target does not resolve inside Docker). Prefers the main checkout's
+# config.local.php; falls back to the tracked config.local.php.example, whose
+# values are the docker-compose.yml stack defaults, so the fallback is a working
+# worktree stack and only announces itself. Returns 1 when neither exists:
+# config.php dies on a missing config.local.php, so a worktree without one
+# 500s on every request.
+materialize_worktree_config_local() {
+    local dest="$1" main_ibl5="$2"
+    [ -L "$dest" ] && rm -f "$dest"
+    if [ -s "$main_ibl5/config.local.php" ]; then
+        cp "$main_ibl5/config.local.php" "$dest"
+    elif [ -s "$main_ibl5/config.local.php.example" ]; then
+        echo "config.local.php: none in $main_ibl5 — copying config.local.php.example (Docker stack defaults)." >&2
+        cp "$main_ibl5/config.local.php.example" "$dest"
+    else
+        echo "Error: no config.local.php or config.local.php.example in $main_ibl5 — config.php will die on every request." >&2
         return 1
     fi
 }

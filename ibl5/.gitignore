@@ -23,6 +23,9 @@ vendor
 vendor/
 composer.lock
 
+# DB credentials (config.php requires this file; template: config.local.php.example)
+config.local.php
+
 # E2E test artifacts
 config.e2e.php
 test-results.json

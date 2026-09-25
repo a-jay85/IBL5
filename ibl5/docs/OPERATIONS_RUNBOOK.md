@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook — deploy, rollback, DB restore, sim-file recovery, logs, and running the app without the Claude Code harness.
-last_verified: 2026-09-17
+last_verified: 2026-09-23
 ---
 
 # IBL5 Operations Runbook
@@ -409,7 +409,7 @@ php ibl5/bin/validate-schema   # config in ibl5/config/schema-assertions.php
 
 | Secret | Location | Notes |
 |---|---|---|
-| DB credentials, app key | `ibl5/config.php` | Untracked. Template: `ibl5/config.php.example` |
+| DB credentials, app key | `ibl5/config.php` | Untracked. DB credential vars in gitignored `ibl5/config.local.php`. Template: `ibl5/config.local.php.example` |
 | Logging (Discord webhook) | `ibl5/config/logging.config.php` | Untracked. Template: `ibl5/config/logging.config.example.php` |
 | Discord bot config | `ibl5/config/discord.config.php` | Untracked. Template: `ibl5/config/discord.config.example.php` |
 | Mail (SMTP) | `ibl5/config/mail.config.php` | Untracked. Template: `ibl5/config/mail.config.example.php` |

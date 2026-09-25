@@ -18,7 +18,7 @@ inputs:
     required: false
     default: 'true'
   create-config:
-    description: "Run 'cp config.php.example config.php' in ibl5/ when 'true'."
+    description: "Copy config.php.example to config.php and write config.local.php from DB_* env (defaults 127.0.0.1/root/root/ibl5) in ibl5/ when 'true'."
     required: false
     default: 'true'
   install:
@@ -49,7 +49,14 @@ runs:
       if: inputs.create-config == 'true'
       shell: bash
       working-directory: ibl5
-      run: cp config.php.example config.php
+      run: |
+        cp config.php.example config.php
+        # config.php requires the gitignored config.local.php for DB credentials
+        # (no getenv() fallback). Job-level DB_* env overrides; the defaults match
+        # the step-scoped DB_* blocks in tests.yml and mutation.yml.
+        printf '<?php\n$dbhost = %s;\n$dbuname = %s;\n$dbpass = %s;\n$dbname = %s;\n' \
+          "'${DB_HOST:-127.0.0.1}'" "'${DB_USER:-root}'" "'${DB_PASS:-root}'" \
+          "'${DB_NAME:-ibl5}'" > config.local.php
 
     - name: Install dependencies
       if: inputs.install == 'true'

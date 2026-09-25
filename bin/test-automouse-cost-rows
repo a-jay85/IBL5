@@ -81,6 +81,9 @@ LOG="$TMPROOT/logs/$(date +%F).log"
 # driver, so extract rather than execute it.
 eval "$(awk '/^model_tier\(\)/,/^}/'             "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^_date_ago\(\)/,/^}/'              "$REPO_ROOT/bin/automouse/run")"
+eval "$(awk '/^acquire_cost_lock\(\)/,/^}/'      "$REPO_ROOT/bin/automouse/run")"
+eval "$(awk '/^release_cost_lock\(\)/,/^}/'      "$REPO_ROOT/bin/automouse/run")"
+COST_LOCK_HELD=0  # global read by append_cost_row; set by the driver in bin/automouse/run
 eval "$(awk '/^append_cost_row\(\)/,/^}/'        "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^strip_weekly_section\(\)/,/^}/'   "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^regenerate_weekly_section\(\)/,/^}/' "$REPO_ROOT/bin/automouse/run")"

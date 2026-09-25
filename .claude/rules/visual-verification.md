@@ -5,7 +5,7 @@ paths:
   - "**/design/**/*.css"
   - "**/themes/**/*.php"
   - "**/themes/**/*.html"
-last_verified: 2026-07-27
+last_verified: 2026-09-24
 ---
 
 # Visual Verification Required
@@ -13,6 +13,12 @@ last_verified: 2026-07-27
 Before telling the user a visual change works, you MUST confirm it renders correctly in a browser. Code review, source reading, and PHPUnit tests do not constitute visual verification. If you cannot verify, say so — do not claim the change works.
 
 ## How to Verify (in order of preference)
+
+0. **T3 Code's browser** (`mcp__t3-code__preview_*` tools). Use it first whenever those tools are loaded. It renders the real page in a tab the user can watch.
+   - `preview_open` with `url: http://<slug>.localhost/ibl5/<path>`, then `preview_snapshot` with `save: true`. Embed the returned `screenshotPath` in your reply.
+   - `preview_click`, `preview_type`, and `preview_evaluate` drive and inspect the page.
+   - `No preview automation host is available` means the T3 window lost its server link. Ask the user to quit and reopen T3 Code, then fall back to the options below.
+   - A `preview_snapshot` failure while `preview_evaluate` still works usually means the Mac screen is locked. Use `preview_evaluate` for DOM checks and tell the user the screenshot is pending.
 
 1. **`curl`** — for HTTP status, headers, and non-rendered content checks
    ```bash
@@ -33,7 +39,7 @@ Before telling the user a visual change works, you MUST confirm it renders corre
 
 ## What Counts as Verified
 
-- You ran curl/headless Chrome and **saw** the correct output
+- You ran T3's browser, curl, or headless Chrome and **saw** the correct output
 - You ran an E2E test and it passed
 - If fixing a bug: the bug is visibly gone in the output
 - If adding a feature: the feature is visibly present and correct

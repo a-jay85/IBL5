@@ -27,7 +27,7 @@ class DraftRepositoryTest extends DatabaseTestCase
     {
         $this->insertDraftRow(2099, 1, 1, 1, 'DraftTest Player');
 
-        $result = $this->repo->getCurrentDraftSelection(1, 1);
+        $result = $this->repo->getCurrentDraftSelection(2099, 1, 1);
 
         self::assertSame('DraftTest Player', $result);
     }
@@ -36,7 +36,7 @@ class DraftRepositoryTest extends DatabaseTestCase
     {
         $this->insertDraftRow(2099, 1, 2, 1, '');
 
-        $result = $this->repo->getCurrentDraftSelection(1, 2);
+        $result = $this->repo->getCurrentDraftSelection(2099, 1, 2);
 
         // Method returns the player column value; empty string for undrafted slot
         self::assertSame('', $result);
@@ -44,7 +44,7 @@ class DraftRepositoryTest extends DatabaseTestCase
 
     public function testGetCurrentDraftSelectionReturnsNullWhenNoRow(): void
     {
-        $result = $this->repo->getCurrentDraftSelection(99, 99);
+        $result = $this->repo->getCurrentDraftSelection(2099, 99, 99);
 
         self::assertNull($result);
     }
@@ -53,17 +53,17 @@ class DraftRepositoryTest extends DatabaseTestCase
     {
         $this->insertDraftRow(2099, 2, 1, 1, '');
 
-        $result = $this->repo->updateDraftTable('New Draftee', '2099-06-15 12:00:00', 2, 1);
+        $result = $this->repo->updateDraftTable('New Draftee', '2099-06-15 12:00:00', 2099, 2, 1);
 
         self::assertTrue($result);
 
-        $check = $this->repo->getCurrentDraftSelection(2, 1);
+        $check = $this->repo->getCurrentDraftSelection(2099, 2, 1);
         self::assertSame('New Draftee', $check);
     }
 
     public function testUpdateDraftTableReturnsFalseWhenNoRow(): void
     {
-        $result = $this->repo->updateDraftTable('Nobody', '2099-06-15 12:00:00', 99, 99);
+        $result = $this->repo->updateDraftTable('Nobody', '2099-06-15 12:00:00', 2099, 99, 99);
 
         self::assertFalse($result);
     }
@@ -152,14 +152,13 @@ class DraftRepositoryTest extends DatabaseTestCase
     public function testGetCurrentDraftPickReturnsFirstEmptySlot(): void
     {
         // Clear any existing empty draft slots from production data
-        // getCurrentDraftPick() has no year filter — queries all rows with player=''
         $this->db->query("UPDATE ibl_draft SET player = 'placeholder' WHERE player = ''");
 
         // Insert a taken slot and an empty slot
         $this->insertDraftRow(2099, 1, 1, 1, 'Already Picked');
         $this->insertDraftRow(2099, 1, 2, 2, '', ['team' => 'Enforcers', 'teamid' => 2]);
 
-        $pick = $this->repo->getCurrentDraftPick();
+        $pick = $this->repo->getCurrentDraftPick(2099);
 
         self::assertNotNull($pick);
         self::assertSame(2, $pick['teamid']);
@@ -195,12 +194,82 @@ class DraftRepositoryTest extends DatabaseTestCase
         $this->insertDraftRow(2099, 3, 4, 7, '', ['team' => 'Origin Seven', 'teamid' => 7]);
         $this->insertDraftRow(2099, 3, 5, 8, '', ['team' => 'Origin Eight', 'teamid' => 8]);
 
-        self::assertSame(8, $this->repo->getOriginTeamIdForPick(3, 5));
-        self::assertSame(7, $this->repo->getOriginTeamIdForPick(3, 4));
+        self::assertSame(8, $this->repo->getOriginTeamIdForPick(2099, 3, 5));
+        self::assertSame(7, $this->repo->getOriginTeamIdForPick(2099, 3, 4));
     }
 
     public function testGetOriginTeamIdForPickReturnsNullForUnknownSlot(): void
     {
-        self::assertNull($this->repo->getOriginTeamIdForPick(99, 99));
+        self::assertNull($this->repo->getOriginTeamIdForPick(2099, 99, 99));
+    }
+
+    // ── year-isolation tests (Phase 2) ─────────────────────────
+
+    public function testGetCurrentDraftSelectionReturnsNullWhenOnlyPriorYearRowExists(): void
+    {
+        $this->insertDraftRow(2098, 7, 1, 1, 'Prior Year Player');
+
+        self::assertNull($this->repo->getCurrentDraftSelection(2099, 7, 1));
+        self::assertSame('Prior Year Player', $this->repo->getCurrentDraftSelection(2098, 7, 1));
+    }
+
+    public function testUpdateDraftTableLeavesPriorYearRowUntouched(): void
+    {
+        $this->insertDraftRow(2098, 7, 2, 1, 'Prior Year Player');
+        $this->insertDraftRow(2099, 7, 2, 1, '');
+
+        $result = $this->repo->updateDraftTable('Current Draftee', '2099-06-15 15:30:00', 2099, 7, 2);
+
+        self::assertTrue($result);
+        self::assertSame('Current Draftee', $this->repo->getCurrentDraftSelection(2099, 7, 2));
+        self::assertSame('Prior Year Player', $this->repo->getCurrentDraftSelection(2098, 7, 2));
+    }
+
+    public function testUpdateDraftTableReturnsFalseWhenOnlyPriorYearRowExists(): void
+    {
+        $this->insertDraftRow(2098, 7, 3, 1, '');
+
+        self::assertFalse($this->repo->updateDraftTable('Nobody', '2099-06-15 15:30:00', 2099, 7, 3));
+        self::assertSame('', $this->repo->getCurrentDraftSelection(2098, 7, 3));
+    }
+
+    public function testGetCurrentDraftPickIgnoresPriorYearEmptySlot(): void
+    {
+        $this->db->query("UPDATE ibl_draft SET player = 'placeholder' WHERE player = ''");
+        $this->insertDraftRow(2098, 1, 1, 5, '', ['team' => 'Enforcers', 'teamid' => 5]);
+        $this->insertDraftRow(2099, 1, 1, 1, 'Already Picked');
+        $this->insertDraftRow(2099, 1, 2, 2, '', ['team' => 'Enforcers', 'teamid' => 2]);
+
+        $pick = $this->repo->getCurrentDraftPick(2099);
+
+        self::assertNotNull($pick);
+        self::assertSame(1, $pick['round']);
+        self::assertSame(2, $pick['pick']);
+        self::assertSame(2, $pick['teamid']);
+    }
+
+    public function testGetCurrentDraftPickReturnsNullWhenOnlyPriorYearSlotsAreEmpty(): void
+    {
+        $this->db->query("UPDATE ibl_draft SET player = 'placeholder' WHERE player = ''");
+        $this->insertDraftRow(2098, 1, 1, 1, '');
+        $this->insertDraftRow(2099, 1, 1, 1, 'Already Picked');
+
+        self::assertNull($this->repo->getCurrentDraftPick(2099));
+    }
+
+    public function testGetOriginTeamIdForPickUsesRequestedYear(): void
+    {
+        $this->insertDraftRow(2098, 7, 4, 5, '', ['team' => 'Enforcers', 'teamid' => 5]);
+        $this->insertDraftRow(2099, 7, 4, 8, '', ['team' => 'Enforcers', 'teamid' => 8]);
+
+        self::assertSame(8, $this->repo->getOriginTeamIdForPick(2099, 7, 4));
+        self::assertSame(5, $this->repo->getOriginTeamIdForPick(2098, 7, 4));
+    }
+
+    public function testGetOriginTeamIdForPickReturnsNullWhenOnlyPriorYearRowExists(): void
+    {
+        $this->insertDraftRow(2098, 7, 5, 5, '', ['team' => 'Enforcers', 'teamid' => 5]);
+
+        self::assertNull($this->repo->getOriginTeamIdForPick(2099, 7, 5));
     }
 }

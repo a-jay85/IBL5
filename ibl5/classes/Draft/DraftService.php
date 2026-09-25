@@ -30,7 +30,7 @@ class DraftService implements DraftServiceInterface
         $draftRound = null;
         $draftPick = null;
         $draftTid = 0;
-        $currentPick = $this->repository->getCurrentDraftPick();
+        $currentPick = $this->repository->getCurrentDraftPick($this->season->endingYear);
         if ($currentPick !== null) {
             $draftRound = $currentPick['round'];
             $draftPick = $currentPick['pick'];

@@ -914,6 +914,78 @@ expect_clearance "(1) checked evidence box + sentinel → still CLEARED" "CLEARE
     "$(printf '## Manual Testing\n\nNo manual testing needed - all changes are covered by automated tests.\n\n- [x] bin/test-foo - all cases PASS\n')"
 expect_clearance "shell twin stays sentinel-only: all-ticked body is HELD (harness-only widening)" "HELD" \
     "$(printf '## Manual Testing\n\n- [x] **Row 1** - executed\n')"
+
+# --- (1) clearance tail clause: callers must pass the PR's changed files ------
+# pr_manual_testing_clearance takes <body> [changed_files]. With changed_files
+# empty it returns CLEARED on the bare sentinel and never checks the tail
+# clause, so a body saying "No manual testing needed - e2e and unit tests"
+# clears even when the PR ships no e2e spec and no unit test. Both callers
+# passed only the body until this change. The predicate cases pin the two-arg
+# AND semantics; the wiring cases pin that both callers now pass a second arg.
+# expect_clearance_2arg <name> <CLEARED|HELD|UNKNOWN> <body> <changed_files>
+expect_clearance_2arg() { # name  expected  body  changed_files
+    local script="$BASE_TMP/clearance2.sh" out
+    {
+        echo 'set -euo pipefail'
+        echo "source '$REPO_ROOT/bin/lib/pr-armable.sh'"
+        printf 'pr_manual_testing_clearance "$1" "$2"\n'
+    } > "$script"
+    out="$(PATH="$SHIMD:$PATH" bash "$script" "$3" "$4" 2>&1)"
+    if [[ "$out" == "$2" ]]; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — expected '$2', got '$out'"
+        FAILED=1
+    fi
+}
+
+TAIL_BODY="$(printf '## Manual Testing\n\nNo manual testing needed — e2e and unit tests\n')"
+expect_clearance_2arg "(1) tail names e2e+unit, only a non-test file changed → HELD" "HELD" \
+    "$TAIL_BODY" "ibl5/classes/Foo.php"
+expect_clearance_2arg "(1) tail names e2e+unit, only the e2e spec changed → HELD (AND, not OR)" "HELD" \
+    "$TAIL_BODY" "ibl5/tests/e2e/foo.spec.ts"
+expect_clearance_2arg "(1) tail names e2e+unit, both a spec and a *Test.php changed → CLEARED" "CLEARED" \
+    "$TAIL_BODY" "$(printf 'ibl5/tests/e2e/foo.spec.ts\nibl5/tests/Unit/FooTest.php')"
+expect_clearance_2arg "(1) type-agnostic sentinel + non-test file → CLEARED" "CLEARED" \
+    "$(printf '## Manual Testing\n\nNo manual testing needed - all changes are covered by automated tests.\n')" \
+    "ibl5/classes/Foo.php"
+# Boundary: empty changed_files keeps the one-arg compatibility exit. This is
+# the path that let the callers clear without a tail-clause check.
+expect_clearance_2arg "(1) tail names e2e+unit, EMPTY changed_files → CLEARED (one-arg compat exit)" "CLEARED" \
+    "$TAIL_BODY" ""
+
+# Wiring: both callers must pass a changed-file list as the second argument.
+# Negative half: the exact one-arg call shipped on master must be gone.
+# Positive half: the call must carry two double-quoted arguments. The regex
+# is generic on purpose so Phase 2 may name its variable freely.
+PT="$REPO_ROOT/bin/pr-triage"
+P65="$REPO_ROOT/.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md"
+TWO_ARG_RE='pr_manual_testing_clearance "[^"]+" "[^"]+"'
+if grep -qF 'pr_manual_testing_clearance "$body")' "$PT"; then
+    echo "FAIL: pr-triage still calls pr_manual_testing_clearance with the body only (tail clause never checked)"
+    FAILED=1
+else
+    echo "ok: pr-triage no longer makes the one-arg clearance call"
+fi
+if grep -qE "$TWO_ARG_RE" "$PT"; then
+    echo "ok: pr-triage passes changed files to pr_manual_testing_clearance"
+else
+    echo "FAIL: pr-triage has no two-arg pr_manual_testing_clearance call"
+    FAILED=1
+fi
+if grep -qF "pr_manual_testing_clearance \"\$(gh pr view --json body --jq '.body')\")" "$P65"; then
+    echo "FAIL: phase 6.5 condition (1) still calls pr_manual_testing_clearance with the body only"
+    FAILED=1
+else
+    echo "ok: phase 6.5 condition (1) no longer makes the one-arg clearance call"
+fi
+if grep -qE "$TWO_ARG_RE" "$P65"; then
+    echo "ok: phase 6.5 condition (1) passes changed files to pr_manual_testing_clearance"
+else
+    echo "FAIL: phase 6.5 condition (1) has no two-arg pr_manual_testing_clearance call"
+    FAILED=1
+fi
+
 expect_rc0 "rc0: pr_golden_hold, golden untouched" \
     "pr_golden_hold '[]'"
 expect_rc0 "rc0: pr_feat_hold, non-feat title" \

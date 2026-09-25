@@ -96,6 +96,17 @@ def test_marker_only_in_fenced_block_returns_empty():
     assert parse_no_adr_markers(content) == []
 
 
+def test_marker_in_inline_code_ignored():
+    """A marker quoted inside backticks on a list item or table row must return []."""
+    content = (
+        "# Plan\n"
+        "- Use `<!-- no-adr: reason -->` to bypass the ADR gate.\n"
+        "| col | `<!-- no-adr: table example -->` |\n"
+        "## Phase 1\n"
+    )
+    assert parse_no_adr_markers(content) == []
+
+
 # ---------------------------------------------------------------------------
 # Phase 2 — _upsert_no_adr_markers
 # ---------------------------------------------------------------------------

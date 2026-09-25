@@ -229,7 +229,7 @@ fi
        PLAN_NOADR_MARKERS=$(awk '
          /^[[:space:]]*```/          { fence = !fence; next }
          fence                       { next }
-         /<!--[[:space:]]*no-adr:/   { inc = 1 }
+         /^[[:space:]]*<!--[[:space:]]*no-adr:/   { inc = 1 }
          inc                         { print; if ($0 ~ /-->/) inc = 0 }
        ' "$PLAN_FILE" 2>/dev/null || true)
    fi

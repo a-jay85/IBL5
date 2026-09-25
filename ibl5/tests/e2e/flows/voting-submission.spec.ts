@@ -1,8 +1,30 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { expandVotingCategory } from '../helpers/voting';
 import { submitFormAndAssertEffect } from '../helpers/submit-form';
 import { getVotes, resetVote } from '../helpers/test-state';
+
+/** Value of the ballot form's hidden CSRF input. Scoped to the ballot form so the nav login form's token is never read. */
+async function ballotCsrfToken(page: Page, formName: string): Promise<string> {
+  const token = await page
+    .locator(`form[name="${formName}"] input[name="_csrf_token"]`)
+    .getAttribute('value');
+  expect(token, `${formName} must carry a CSRF token`).toBeTruthy();
+  return token as string;
+}
+
+/** Asserts the first validation error is rendered above the ballot form in DOM order. */
+async function expectErrorsAboveForm(page: Page, formName: string): Promise<void> {
+  const error = page.locator('.voting-submission-error').first();
+  await expect(error).toBeVisible();
+  const above = await page.evaluate((name) => {
+    const err = document.querySelector('.voting-submission-error');
+    const form = document.querySelector(`form[name="${name}"]`);
+    return !!err && !!form && (err.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+  }, formName);
+  expect(above, 'validation errors must precede the ballot form').toBe(true);
+}
 
 // Voting submission tests — ASG and EOY ballot submission + validation.
 // Serial: submission tests mutate server-side vote records.
@@ -60,6 +82,74 @@ test.describe('ASG Voting: submission', () => {
       readBack: async () => {
         const votes = await getVotes(request, 'Metros');
         expect(votes.asg_voted, 'ASG vote should be recorded in DB').toBe(true);
+      },
+    });
+  });
+
+  test('short ASG ballot is redisplayed with picks checked and resubmits with a fresh token', async ({
+    appState,
+    page,
+    request,
+  }, testInfo) => {
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'ASG Voting': 'Yes',
+      'Current Season Ending Year': '2026',
+    });
+    await page.goto('modules.php?name=Voting');
+    const firstToken = await ballotCsrfToken(page, 'ASGVote');
+
+    // Fill ECF, WCF, WCB fully; leave ECB at three picks (needs four).
+    for (const cat of ['ECF', 'WCF', 'WCB']) {
+      await expandVotingCategory(page, cat);
+      const boxes = page.locator(`#${cat} input[type="checkbox"]`);
+      for (let i = 0; i < 4; i++) await boxes.nth(i).check();
+    }
+    await expandVotingCategory(page, 'ECB');
+    const ecbBoxes = page.locator('#ECB input[type="checkbox"]');
+    const picked: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      await ecbBoxes.nth(i).check();
+      picked.push((await ecbBoxes.nth(i).getAttribute('value')) as string);
+    }
+
+    const submitBtn = page.locator('form[name="ASGVote"] button[type="submit"], form[name="ASGVote"] input[type="submit"]');
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('op=submit_asg') && r.request().method() === 'POST'),
+      submitBtn.first().click(),
+    ]);
+
+    // (a) errors above the form, (b) picks pre-checked, (c) fresh token.
+    await expectErrorsAboveForm(page, 'ASGVote');
+    await expect(page.locator('.voting-submission-error').first()).toContainText('less than FOUR');
+    await expect(page.locator('#ECB input[type="checkbox"]:checked')).toHaveCount(3);
+    const checkedValues = await page
+      .locator('#ECB input[type="checkbox"]:checked')
+      .evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value));
+    expect(checkedValues).toEqual(picked);
+    await expect(page.locator('#ECF input[type="checkbox"]:checked')).toHaveCount(4);
+    const secondToken = await ballotCsrfToken(page, 'ASGVote');
+    expect(secondToken, 'redisplayed ballot must mint a new CSRF token').not.toBe(firstToken);
+    await assertNoPhpErrors(page, 'after ASG redisplay');
+    // Viewport-only: a fullPage screenshot resizes the window, and responsive-tables.js's
+    // resize handler then zeroes the width of every collapsed category's scroll container.
+    await testInfo.attach('asg-redisplay', { body: await page.screenshot(), contentType: 'image/png' });
+
+    // (d) fix the short category and resubmit with the new token.
+    await expandVotingCategory(page, 'ECB');
+    await page.locator('#ECB input[type="checkbox"]:not(:checked)').first().check();
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await submitBtn.first().click();
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.voting-submission-success')).toBeVisible();
+        await expect(page.locator('.voting-submission-success')).toContainText('Thank you for voting');
+        await assertNoPhpErrors(page, 'after corrected ASG resubmit');
+      },
+      readBack: async () => {
+        const votes = await getVotes(request, 'Metros');
+        expect(votes.asg_voted, 'corrected ASG vote must be recorded').toBe(true);
       },
     });
   });
@@ -347,6 +437,66 @@ test.describe('EOY Voting: submission', () => {
       readBack: async () => {
         const votes = await getVotes(request, 'Metros');
         expect(votes.eoy_voted, 'EOY vote should be recorded in DB').toBe(true);
+      },
+    });
+  });
+
+  test('partial EOY ballot is redisplayed with picks checked and resubmits with a fresh token', async ({
+    appState,
+    page,
+    request,
+  }) => {
+    await appState({
+      'Current Season Phase': 'Free Agency',
+      'EOY Voting': 'Yes',
+      'Current Season Ending Year': '2026',
+    });
+    await page.goto('modules.php?name=Voting');
+    const firstToken = await ballotCsrfToken(page, 'EOYVote');
+
+    // Six, ROY, GM fully; MVP rank 1 only.
+    for (const cat of ['Six', 'ROY', 'GM']) {
+      await expandVotingCategory(page, cat);
+      for (let slot = 1; slot <= 3; slot++) {
+        await page.locator(`#${cat} input[type="radio"][name="${cat}[${slot}]"]`).nth(slot - 1).check();
+      }
+    }
+    await expandVotingCategory(page, 'MVP');
+    const mvp1 = page.locator('#MVP input[type="radio"][name="MVP[1]"]').first();
+    await mvp1.check();
+    const mvp1Value = (await mvp1.getAttribute('value')) as string;
+
+    const submitBtn = page.locator('form[name="EOYVote"] button[type="submit"], form[name="EOYVote"] input[type="submit"]');
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('op=submit_eoy') && r.request().method() === 'POST'),
+      submitBtn.first().click(),
+    ]);
+
+    await expectErrorsAboveForm(page, 'EOYVote');
+    await expect(page.locator('.voting-submission-error').first()).toContainText(/MVP/);
+    await expect(page.locator('#MVP input[type="radio"]:checked')).toHaveCount(1);
+    await expect(page.locator(`#MVP input[type="radio"][name="MVP[1]"]:checked`)).toHaveAttribute('value', mvp1Value);
+    await expect(page.locator('#Six input[type="radio"]:checked')).toHaveCount(3);
+    await expect(page.locator('#GM input[type="radio"]:checked')).toHaveCount(3);
+    const secondToken = await ballotCsrfToken(page, 'EOYVote');
+    expect(secondToken, 'redisplayed ballot must mint a new CSRF token').not.toBe(firstToken);
+    await assertNoPhpErrors(page, 'after EOY redisplay');
+
+    await expandVotingCategory(page, 'MVP');
+    await page.locator('#MVP input[type="radio"][name="MVP[2]"]').nth(1).check();
+    await page.locator('#MVP input[type="radio"][name="MVP[3]"]').nth(2).check();
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await submitBtn.first().click();
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.voting-submission-success')).toBeVisible();
+        await expect(page.locator('.voting-submission-success')).toContainText('Thank you for voting');
+        await assertNoPhpErrors(page, 'after corrected EOY resubmit');
+      },
+      readBack: async () => {
+        const votes = await getVotes(request, 'Metros');
+        expect(votes.eoy_voted, 'corrected EOY vote must be recorded').toBe(true);
       },
     });
   });

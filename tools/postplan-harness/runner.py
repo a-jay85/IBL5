@@ -369,6 +369,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             log(f"phase2: PR #{pr} exists — updated head to {sha or '(clean)'}")
         else:
             create_body = _apply_backlog_closes(upsert_files_changed(copy["summary_md"], render_files_changed(diff)), plan, log)
+            create_body = _upsert_no_adr_markers(create_body, plan)
             pr = gh.pr_create(copy["title"], create_body, "master")
             log(f"phase2: pr_create intent recorded (title={copy['title']!r})")
         res.pr_number = pr
@@ -494,6 +495,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # PR body's scope can't silently drift from the actual diff.
         body = upsert_files_changed(body, render_files_changed(diff))
         body = _apply_backlog_closes(body, plan, log)
+        body = _upsert_no_adr_markers(body, plan)
         gh.pr_edit_body(pr, body)
         _check_backlog_closes(gh, pr, plan, log)
 
@@ -1185,6 +1187,19 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
             "summary_md": f"## Summary\n- {subject}\n"}, True
 
 
+def _upsert_no_adr_markers(body: str, plan) -> str:
+    """Prepend the plan's no-ADR marker lines to the top of the PR body.
+    Plan-blind (plan None / plan.found False) or no markers => passthrough.
+    Idempotent: a marker already present anywhere in the body is not re-added."""
+    if plan is None or not plan.found:
+        return body
+    markers = getattr(plan, "no_adr_markers", None) or []
+    to_prepend = [m for m in markers if m not in body]
+    if not to_prepend:
+        return body
+    return "\n".join(to_prepend) + "\n\n" + body
+
+
 def _apply_backlog_closes(body: str, plan, log) -> str:
     """Normalize closing keywords from the plan's `## Backlog issues` section.
     Plan-blind (plan.found False) or no section => both lists empty => passthrough."""
@@ -1601,6 +1616,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         # and silently overwrite whatever the remediation agent edited on GitHub.
         live_body = gh.pr_body_fresh() or body
         body = _apply_backlog_closes(upsert_files_changed(live_body, render_files_changed(git.diff_vs_base())), plan, log)
+        body = _upsert_no_adr_markers(body, plan)
         gh.pr_edit_body(pr, body)
         # sha is either a real commit sha or BODY_ONLY_SHA. fidelity.re_review()'s only
         # test of it is `if not remediation_sha: return None, None, None`, so a non-empty

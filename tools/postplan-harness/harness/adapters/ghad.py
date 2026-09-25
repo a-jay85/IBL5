@@ -17,6 +17,7 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
 import time
 
 from pathlib import Path
@@ -46,13 +47,17 @@ class RecordingGh:
         self.fixture = fixture or {}
         os.makedirs(out_dir, exist_ok=True)
         self.actions_path = os.path.join(out_dir, "actions.jsonl")
+        # Review and verification phases run on parallel threads; serialize appends
+        # so two long records never interleave into an unparseable line.
+        self._actions_lock = threading.Lock()
         self._body_override: str | None = None
 
     # -- side-effect intents (recorded, never executed) -----------------
     def record(self, action: str, **payload) -> None:
         assert action in self.MUTATIONS, f"unknown mutation {action}"
-        with open(self.actions_path, "a") as fh:
-            fh.write(json.dumps({"ts": time.time(), "action": action, **payload}) + "\n")
+        line = json.dumps({"ts": time.time(), "action": action, **payload}) + "\n"
+        with self._actions_lock, open(self.actions_path, "a") as fh:
+            fh.write(line)
 
     def pr_create(self, title: str, body: str, base: str) -> int:
         self.record("pr_create", title=title, body=body[:8000], base=base)

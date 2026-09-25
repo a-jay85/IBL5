@@ -226,11 +226,19 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
                               "; ".join(inp.unresolved_conformance)))
 
     p5 = inp.phase5_status
-    p5_blocked = (p5 == "fail") or (p5 not in ("pass", "skipped", "fail", None))
-    # None = no status recorded; the skill treats absent file as non-blocking
-    cs.append(ConditionResult(4, "phase5-verify", p5 == "fail",
-                              "Phase 5 deterministic failure" if p5 == "fail" else ""))
-    del p5_blocked
+    # Three-state on the value, fail-closed (backlog #654): only "pass" and "skipped"
+    # clear. None means no status was recorded (Phase 5 never reached its END),
+    # which is indeterminate and holds, matching the skill block's absent-file arm.
+    p5_blocked = p5 not in ("pass", "skipped")
+    if p5 == "fail":
+        p5_reason = "Phase 5 deterministic failure"
+    elif p5 is None:
+        p5_reason = "Phase 5 status never recorded (indeterminate, not clean)"
+    elif p5_blocked:
+        p5_reason = f"Phase 5 status unrecognised: {p5!r}"
+    else:
+        p5_reason = ""
+    cs.append(ConditionResult(4, "phase5-verify", p5_blocked, p5_reason))
 
     golden = inp.classification.golden_changed
     c5 = ConditionResult(5, "golden-snapshot-headless", golden and inp.headless,

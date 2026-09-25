@@ -92,7 +92,15 @@ def test_findings_below_80_do_not_block():
 
 def test_phase5_skipped_does_not_block():
     assert evaluate(inputs(phase5_status="skipped")).armed
-    assert evaluate(inputs(phase5_status=None)).armed
+
+
+def test_phase5_none_holds():
+    """None (absent status file) is indeterminate — holds (backlog #654)."""
+    d = evaluate(inputs(phase5_status=None))
+    assert not d.armed
+    c4 = next(c for c in d.conditions if c.number == 4)
+    assert c4.blocked
+    assert "indeterminate" in c4.reason.lower() or "never recorded" in c4.reason.lower()
 
 
 def test_render_rows_never_emits_sentinel():

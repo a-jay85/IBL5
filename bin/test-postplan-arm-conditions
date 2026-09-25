@@ -459,6 +459,8 @@ mk_verdict_fixture() {
 
 B1="$(extract_block '# condition (1)')"
 B3="$(extract_block '# condition (3)')"
+B4="$(extract_block '# condition (4)')"
+run_cond4() { PHASE5_STATUS_FILE="${1}" bash -c "$B4" 2>&1; }
 B5="$(extract_block '# condition (5)')"
 B6="$(extract_block '# condition (6)')"
 B8="$(extract_block '# condition (8)')"
@@ -2095,6 +2097,19 @@ expect_block "§5.9f: a clean verdict does not clear the stacked-PR hold" BLOCK 
     "$(run_isolated "$B6" '{"body":"x\nDepends-on: #1100"}' '' '')"
 unset CONFLICT_VERDICT_DIR CONFLICT_VERDICT_KEY
 rm -f "$VOK"
+
+# --- condition (4) ---
+have "§cond4: PHASE5_STATUS_FILE seam is present in block" "$B4" 'PHASE5_STATUS_FILE'
+
+# §cond4 — phase5 status file
+F4_PASS="$BASE_TMP/cond4-pass";  printf 'PHASE5_VERIFY_STATUS=pass\n'    > "$F4_PASS"
+F4_FAIL="$BASE_TMP/cond4-fail";  printf 'PHASE5_VERIFY_STATUS=fail\n'    > "$F4_FAIL"
+F4_SKIP="$BASE_TMP/cond4-skip";  printf 'PHASE5_VERIFY_STATUS=skipped\n' > "$F4_SKIP"
+
+have  "§cond4: fail -> BLOCKED"       "$(run_cond4 "$F4_FAIL")"                    'BLOCKED'
+lacks "§cond4: pass -> no BLOCKED"    "$(run_cond4 "$F4_PASS")"                    'BLOCKED'
+have  "§cond4: absent -> BLOCKED"     "$(run_cond4 "$BASE_TMP/cond4-nonexistent")" 'BLOCKED'
+lacks "§cond4: skipped -> no BLOCKED" "$(run_cond4 "$F4_SKIP")"                   'BLOCKED'
 
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-plan block checks passed."

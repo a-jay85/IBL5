@@ -20,7 +20,7 @@ paths:
 - Database: `iblhoops_ibl5`
 - Credentials: See `ibl5/config.local.php` (`$dbuname`, `$dbpass`)
 
-`ibl5/config.php` (untracked) requires the gitignored `ibl5/config.local.php` for `$dbhost`, `$dbuname`, `$dbpass`, `$dbname`; template at `ibl5/config.local.php.example`. There is no env-var fallback, and a missing file exits 1. A stale local edit in `config.local.php` silently retargets every PHP/`db-query` call. Check the file before believing a surprising result.
+The template `ibl5/config.php.example` (used by CI) requires the gitignored `ibl5/config.local.php` for `$dbhost`, `$dbuname`, `$dbpass`, `$dbname`; template at `ibl5/config.local.php.example`. A config built from that template has no env-var fallback and exits 1 when `config.local.php` is missing. The main checkout's untracked `ibl5/config.php` may still carry the older `getenv('DB_NAME') ?: <fallback>` lines, and `bin/wt-new` copies it into every worktree. In that shape the docker-compose env wins inside the containers, and on a host shell the file's fallback is used. A stale local edit in either file silently retargets every PHP/`db-query` call. Check the file before believing a surprising result.
 
 **Start the database:**
 ```bash

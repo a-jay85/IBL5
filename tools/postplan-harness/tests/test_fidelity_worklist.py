@@ -111,3 +111,24 @@ def test_duplicate_items_are_deduplicated(tmp_path):
         ["MISSING: t (x)", "MISSING: t (x)"],
         [], [])
     assert fidelity.work_list_sizes(items) == {"12": 0, "3": 1, "16": 0, "2": 0}
+
+
+def test_work_list_excludes_missing_phase_items(tmp_path):
+    """MISSING-PHASE items are excluded from the fixer work list.
+
+    Mutation caught: removing the `not text.startswith("MISSING-PHASE")` clause
+    adds the MISSING-PHASE item to the work list.
+    """
+    items = fidelity.build_work_list(
+        str(tmp_path / "nope.md"),
+        [
+            "MISSING: t.php (plan named it)",
+            "MISSING-PHASE: 3 — Foo (phase cites harness/b.py; none appeared in the diff)",
+            "MISSING-FILE: bin/x (plan Critical File never appeared in the diff)",
+        ],
+        [], [],
+    )
+    texts = [i["text"] for i in items]
+    assert any(t.startswith("MISSING:") for t in texts)
+    assert any(t.startswith("MISSING-FILE:") for t in texts)
+    assert not any(t.startswith("MISSING-PHASE") for t in texts)

@@ -12,6 +12,8 @@ from .state import Classification
 
 FILES_CHANGED_BEGIN = "<!-- files-changed:begin -->"
 FILES_CHANGED_END = "<!-- files-changed:end -->"
+RESIDUAL_PHASES_BEGIN = "<!-- residual-phases:begin -->"
+RESIDUAL_PHASES_END = "<!-- residual-phases:end -->"
 MANUAL_CONFIRMATION_BEGIN = "<!-- manual-confirmation:begin -->"
 MANUAL_CONFIRMATION_END = "<!-- manual-confirmation:end -->"
 REVIEWER_VERIFICATION_BEGIN = "<!-- reviewer-verification:begin -->"
@@ -233,6 +235,52 @@ def upsert_files_changed(body: str, block: str) -> str:
         return body[:begin_idx] + block + body[after_end:]
 
     # Neither both present and in order: append fresh, leave any orphan in place.
+    return body.rstrip() + "\n\n" + block + "\n"
+
+
+def render_residual_phases(items: list[str]) -> str:
+    """The `## Residual Phases` block for a PR body, or "" when there are no items.
+
+    `items` are conformance `MISSING-PHASE: N — heading (...)` strings. The block tells
+    the reader which plan phases the diff shows no evidence of and that arming condition
+    (3) holds auto-merge until they ship or the plan's `## Out of Scope` names them.
+    """
+    if not items:
+        return ""
+    parts = [RESIDUAL_PHASES_BEGIN, "## Residual Phases",
+             "The diff carries no evidence for these plan phases. Auto-merge is held "
+             "(arming condition 3) until they ship or the plan's `## Out of Scope` "
+             "section names them as deferred."]
+    for it in items:
+        parts.append(f"- {it.removeprefix('MISSING-PHASE: ').strip()}")
+    parts.append(RESIDUAL_PHASES_END)
+    return "\n".join(parts)
+
+
+def upsert_residual_phases(body: str, block: str) -> str:
+    """Insert, replace, or remove the residual-phases block in a PR body.
+
+    Same contract as upsert_files_changed for a non-empty block. An EMPTY block removes an
+    existing well-formed marker pair (plus one surrounding blank line) so a re-run after the
+    phases ship clears the notice; with no markers and an empty block the body is returned
+    unchanged. An orphan or reversed marker pair is left untouched and a non-empty block is
+    appended after it.
+    """
+    body = body or ""
+    begin_idx = body.find(RESIDUAL_PHASES_BEGIN)
+    end_idx = body.find(RESIDUAL_PHASES_END)
+    well_formed = begin_idx != -1 and end_idx != -1 and begin_idx < end_idx
+    if well_formed:
+        after_end = end_idx + len(RESIDUAL_PHASES_END)
+        if not block:
+            head = body[:begin_idx].rstrip("\n")
+            tail = body[after_end:].lstrip("\n")
+            return head + ("\n\n" + tail if tail else "\n") if head else tail
+        return body[:begin_idx] + block + body[after_end:]
+    if not block:
+        return body
+    if not body.strip():
+        return block
     return body.rstrip() + "\n\n" + block + "\n"
 
 

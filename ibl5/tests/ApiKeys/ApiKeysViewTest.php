@@ -41,6 +41,22 @@ class ApiKeysViewTest extends TestCase
         $this->assertStringContainsString('IMPORTDATA', $html);
     }
 
+    public function testRenderNewKeyStateWarnsThatUrlKeysAreLogged(): void
+    {
+        $html = $this->view->renderNewKeyState('ibl_abcdef1234567890abcdef1234567890');
+
+        $this->assertStringContainsString('Your key is part of this URL.', $html);
+        $this->assertStringContainsString('X-API-Key', $html);
+    }
+
+    public function testRenderExportGuideWarnsThatUrlKeysAreLogged(): void
+    {
+        $html = $this->view->renderExportGuide();
+
+        $this->assertStringContainsString('Your key is part of this URL.', $html);
+        $this->assertStringContainsString('X-API-Key', $html);
+    }
+
     public function testRenderNewKeyStateEscapesKey(): void
     {
         // Key with characters that could be XSS if not escaped

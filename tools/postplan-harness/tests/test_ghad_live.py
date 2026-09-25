@@ -191,6 +191,8 @@ def test_issue_titles_returns_title_list(shim, tmp_path):
     gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
     titles = gh.issue_titles("maintenance")
     assert titles == ["existing issue"]
+    assert any("issue list" in c and "--label maintenance" in c
+               for c in calls(shim))
 
 
 def test_pr_sticky_body_reads_the_marked_comment(shim, tmp_path):

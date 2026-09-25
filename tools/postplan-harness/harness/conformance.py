@@ -60,6 +60,10 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
     tok = tok.strip().strip("/")
     if not tok:
         return None
+    # Strip pytest ::ClassName::method_name suffix before path matching.
+    tok = tok.split("::")[0] if "::" in tok else tok
+    if not tok:
+        return None
     hits = [f for f in changed_files if f == tok or f.endswith("/" + tok)]
     if len(hits) == 1:
         return hits[0]

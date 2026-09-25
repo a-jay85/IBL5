@@ -453,6 +453,8 @@ nowt_sandbox() {
     NEXT_PLAN="$QUEUE_DIR/$PLAN_NAME"
     ATTEMPT_FILE="$QUEUE_DIR/$PLAN_NAME.attempts"; echo 2 > "$ATTEMPT_FILE"
     PP_DUR=2; MIN_VIABLE_SECS=60
+    # The runner sets this before the span; without it the rc=7 arm trips set -u on Linux bash.
+    PP_START_MARKER="$SB/pp-start"; : > "$PP_START_MARKER"
     NOWT_CALLS="$SB/calls"; : > "$NOWT_CALLS"
     NOWT_DISPOSE_RC=$1
 }

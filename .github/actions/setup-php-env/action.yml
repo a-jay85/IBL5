@@ -18,7 +18,7 @@ inputs:
     required: false
     default: 'true'
   create-config:
-    description: "Copy config.php.example to config.php and write config.local.php from DB_* env (defaults 127.0.0.1/root/root/ibl5) in ibl5/ when 'true'."
+    description: "Copy config.php.example to config.php and write config.local.php with getenv() fallbacks (DB_HOST/DB_USER/DB_PASS/DB_NAME, defaults 127.0.0.1/root/root/ibl5) in ibl5/ when 'true'."
     required: false
     default: 'true'
   install:
@@ -51,12 +51,16 @@ runs:
       working-directory: ibl5
       run: |
         cp config.php.example config.php
-        # config.php requires the gitignored config.local.php for DB credentials
-        # (no getenv() fallback). Job-level DB_* env overrides; the defaults match
-        # the step-scoped DB_* blocks in tests.yml and mutation.yml.
-        printf '<?php\n$dbhost = %s;\n$dbuname = %s;\n$dbpass = %s;\n$dbname = %s;\n' \
-          "'${DB_HOST:-127.0.0.1}'" "'${DB_USER:-root}'" "'${DB_PASS:-root}'" \
-          "'${DB_NAME:-ibl5}'" > config.local.php
+        # Write config.local.php with getenv() so PHP reads DB_* at execution
+        # time, not at setup time. Step- and job-level DB_* overrides are both
+        # visible to PHP without re-running setup.
+        cat > config.local.php << 'PHP'
+        <?php
+        $dbhost = getenv('DB_HOST') ?: '127.0.0.1';
+        $dbuname = getenv('DB_USER') ?: 'root';
+        $dbpass = getenv('DB_PASS') ?: 'root';
+        $dbname = getenv('DB_NAME') ?: 'ibl5';
+        PHP
 
     - name: Install dependencies
       if: inputs.install == 'true'

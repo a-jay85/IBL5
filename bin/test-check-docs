@@ -195,6 +195,41 @@ else
     echo "  output: $OUT"
 fi
 
+# ── Test 6b: an uncommitted edit is dated today, not by the branch's last commit ─
+#
+# PR #2405's shape: the branch already committed an edit to the doc on an earlier
+# day (author date == last_verified, so that commit passes), and a new body edit
+# is staged today without a bump. editCommitDate() sees only base..HEAD, so it
+# returned the earlier commit's date and the pre-commit hook passed an edit CI
+# then failed. A dirty doc's edit date is local today.
+
+REPO=$(make_repo)
+write_doc "$REPO" "$STALER" "Original body."
+commit_doc "$REPO"
+BASE=$(git -C "$REPO" rev-parse HEAD)
+write_doc "$REPO" "$STALER" "Branch edit, verified that day."
+git -C "$REPO" add -A
+GIT_AUTHOR_DATE="${STALER}T12:00:00" git -C "$REPO" commit -qm branch-edit
+write_doc "$REPO" "$STALER" "Second edit, staged today without a bump."
+git -C "$REPO" add -A
+OUT=$(cd "$REPO" && CHECK_DOCS_TODAY="$PINNED" bin/check-docs --since="$BASE" --no-staleness 2>&1) || true
+write_doc "$REPO" "$PINNED" "Second edit, staged today without a bump."
+git -C "$REPO" add -A
+OUT_BUMPED=$(cd "$REPO" && CHECK_DOCS_TODAY="$PINNED" bin/check-docs --since="$BASE" --no-staleness 2>&1) || true
+rm -rf "$REPO"
+if bump_present "$OUT"; then
+    pass "dirty edit: unbumped staged edit fails even when the last branch commit was verified"
+else
+    fail "dirty edit: unbumped staged edit should fail (edit date is today, not the last commit's)"
+    echo "  output: $OUT"
+fi
+if bump_absent "$OUT_BUMPED"; then
+    pass "dirty edit: staged edit bumped to local today passes"
+else
+    fail "dirty edit: staged edit bumped to local today should pass"
+    echo "  output: $OUT_BUMPED"
+fi
+
 # ── UTC freshness clock (checkFile / stalenessAgeDays) ───────────────────────
 #
 # The freshness verdict is pinned to UTC on BOTH sides: $today is built with an

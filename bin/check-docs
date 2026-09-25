@@ -899,6 +899,18 @@ function changedDocPaths(string $base, string $escapedRoot, string $escapedBase)
 }
 
 /**
+ * True when $rel differs between HEAD and the working tree (staged or unstaged).
+ * CI checks out a clean tree, so this is always false there.
+ */
+function hasUncommittedChange(string $escapedRoot, string $rel): bool
+{
+    $out = [];
+    $code = 0;
+    exec(sprintf('git -C %s diff --quiet HEAD -- %s 2>/dev/null', $escapedRoot, escapeshellarg($rel)), $out, $code);
+    return $code === 1;
+}
+
+/**
  * Enumerate in-scope docs changed between $base and HEAD, returning the
  * frontmatter facts both the on-touch check and --fix-dates consume. `needsBump`
  * is the SINGLE source of the On-Touch predicate: body changed vs base but
@@ -968,10 +980,13 @@ function iterChangedDocs(string $base, string $repoRoot): array
 
         $headLv = $headFm['last_verified'] ?? null;
         $baseLv = $baseFm['last_verified'] ?? null;
-        $editDate = editCommitDate($repoRoot, $base, $rel);
-        // Fall back to the author machine's local today when editDate is null
+        // An uncommitted edit (staged or unstaged) will be committed today, so its
+        // edit date is local today — never the branch's last commit touching the
+        // doc, which let a pre-commit run pass an unbumped edit CI then failed
+        // (PR #2405). Otherwise fall back to local today when editDate is null
         // (first commit on branch — base..HEAD empty). localToday(), not PHP's
         // UTC default: see localToday().
+        $editDate = hasUncommittedChange($escapedRoot, $rel) ? null : editCommitDate($repoRoot, $base, $rel);
         $effectiveEditDate = $editDate ?? localToday();
         $verifiedAtEdit = $headLv !== null && $headLv >= $effectiveEditDate;
 

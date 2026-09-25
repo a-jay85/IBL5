@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-09-23
+last_verified: 2026-09-24
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -315,3 +315,10 @@ If a network failure kills the architect mid-run, **re-spawn the same tier**. `/
 Step 3 already delivers the plan section-by-section with each section appended to disk
 before the next turn, so a stall costs one section, not the plan — the prompt doesn't
 need to ask for piecewise delivery, and a stall is never a reason to downgrade the tier.
+
+When the finish DM says `RESULT failed` and prints a `resume:` line, run that line
+(`bin/plan-now --resume <TS>`) instead of re-firing the prompt. It continues the same
+claude session under a new launchd job, inherits the run's model and disposition,
+skips the dup and tier gates, and still queues only when the resumed run exits clean
+and passes `bin/check-plan` plus `bin/check-plan-staleness`. It refuses when the run
+is still loaded or when its log ends in anything other than a failed verdict.

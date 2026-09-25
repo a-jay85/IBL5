@@ -324,11 +324,39 @@ def test_extract_notes_drops_followups_that_say_already_done(tmp_path):
                                             "Guard the empty roster"]
 
 
+def test_extract_notes_drops_followups_whose_title_targets_the_plan(tmp_path):
+    """Titles from the 2026-09-24 triage that edit the plan never file; real work does."""
+    notes_fixture = [
+        {"title": "Update Verification Matrix row 11", "kind": "followup",
+         "detail": "Row 11 expects zero verdict_1 in bin/test-post-plan-fleet."},
+        {"title": "Fix Verification Matrix row 5 grep pattern", "kind": "followup",
+         "detail": "Row 5 greps for cost_row_count but the test uses ROW_COUNT."},
+        {"title": "Fix test matrix rows 22-24: reference ADR-0135 not 0134",
+         "kind": "followup", "detail": "The rows cite the wrong ADR."},
+        {"title": "Add the new test to the plan's Critical Files", "kind": "followup",
+         "detail": "test_ciwatch.py changed but is not listed."},
+        {"title": "Reword plan step 3 to match the shipped helper", "kind": "followup",
+         "detail": "Step 3 names bindAndExecute(), which does not exist."},
+        {"title": "Move cost report header write inside lock", "kind": "followup",
+         "detail": "bin/automouse/run writes the header before taking the lock, so two "
+                   "runners can both write it. Verification Matrix row 4 missed this."},
+        {"title": "Fix issue_titles() to respect label argument", "kind": "followup",
+         "detail": "adapters/ghad.py issue_titles(label) ignores its label argument."},
+        {"title": "Fix head-to-head matrix row highlight for gms", "kind": "followup",
+         "detail": "HeadToHeadRecordsView highlights the wrong row for the gms dimension."},
+    ]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"))
+    assert [n["title"] for n in result] == ["Move cost report header write inside lock",
+                                            "Fix issue_titles() to respect label argument",
+                                            "Fix head-to-head matrix row highlight for gms"]
+
+
 def test_fidelity_notes_prompt_types_notes_and_drops_when_torn():
     """The prompt names every kind and tells Haiku which way to fall when unsure."""
     prompt = llm_calls.fidelity_notes_prompt("READY WITH NOTES\n\n### Note 1 — cosmetic")
     for kind in ("followup", "plan-deviation-ok", "pr-copy", "process",
-                 "done-in-pr", "plan-adherence", "nit"):
+                 "done-in-pr", "plan-adherence", "nit", "plan-artifact"):
         assert kind in prompt
     assert "still worth doing" in prompt
     assert "do NOT call it" in prompt          # the drop-when-torn instruction

@@ -39,7 +39,7 @@ PR_STICKY_MARKER = "<!-- pr-ready-verdict -->"
 class RecordingGh:
     MUTATIONS = ("pr_create", "pr_comment", "pr_review_findings", "pr_edit_body",
                  "pr_merge_auto", "label_add", "pr_status_badge",
-                 "pr_sticky_verdict", "issue_create")
+                 "pr_sticky_verdict", "issue_create", "pr_disable_auto_merge")
 
     def __init__(self, out_dir: str, fixture: dict | None = None):
         self.out_dir = out_dir
@@ -171,7 +171,7 @@ class RecordingGh:
 
 
 class LiveGh(RecordingGh):
-    """Installed live adapter. Each of the eight MUTATIONS maps to one fixed `gh`
+    """Installed live adapter. Each of the ten MUTATIONS maps to one fixed `gh`
     invocation built inside its method — the allowlist IS the method set.
     Reads come from live `gh pr view` state. Merge deliberately omits
     --delete-branch: in a multi-worktree clone it errors benignly, and a parent

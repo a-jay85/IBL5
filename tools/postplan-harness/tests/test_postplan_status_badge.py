@@ -542,6 +542,14 @@ def test_runner_badge_env_unset_and_empty(tmp_path, monkeypatch):
 # Test 12: recording_adapter_allowlists_badge
 # ---------------------------------------------------------------------------
 
+def test_recording_adapter_allowlists_disable_auto_merge(tmp_path):
+    """pr_disable_auto_merge records an allowlisted action. It was missing, so the diverged-remote fail-closed path crashed with an AssertionError
+    instead of exiting 3."""
+    gh = RecordingGh(str(tmp_path / "out"))
+    gh.pr_disable_auto_merge(42)
+    assert gh.actions()[-1]["action"] == "pr_disable_auto_merge"
+
+
 def test_recording_adapter_allowlists_badge(tmp_path):
     """RecordingGh.pr_status_badge records the intent without calling gh."""
     assert "pr_status_badge" in RecordingGh.MUTATIONS

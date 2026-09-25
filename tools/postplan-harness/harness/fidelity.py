@@ -609,6 +609,24 @@ _ALREADY_DONE_RE = re.compile(
 _NEGATED_RE = re.compile(r"(?:\bnot|\bnever|n't)(?:\s+\w+)?\s*$", re.IGNORECASE)
 
 
+# A note whose title targets the plan file (a matrix row, a plan step, Critical Files)
+# asks for an edit to a document deleted at merge. Haiku tagged these `followup` before
+# the plan-artifact kind existed, and it kept mislabelling done-in-pr notes after that
+# kind shipped, so this title check backs the prompt up. The 2026-09-24 triage found
+# "Update Verification Matrix row 11" and "Fix test matrix rows 22-24". A bare "matrix
+# row" stays filable because the head-to-head records page is a matrix. Titles only: a
+# real followup's detail often cites the matrix row that exposed it.
+_PLAN_ARTIFACT_RE = re.compile(
+    r"\bverification\s+matrix\b|\btest\s+matrix\s+rows?\b"
+    r"|\bcritical\s+files\b|\bplan\s+(?:step|phase|row)\s+\d",
+    re.IGNORECASE)
+
+
+def _is_plan_artifact(title: str) -> bool:
+    """True when a note's title asks for an edit to the plan document itself."""
+    return bool(_PLAN_ARTIFACT_RE.search(title))
+
+
 def _says_already_done(text: str) -> bool:
     """True when a note's own words say its work landed in the PR under review."""
     for m in _ALREADY_DONE_RE.finditer(text):
@@ -629,6 +647,9 @@ def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
     kept tagging those `followup` after the four-kind prompt shipped; the 2026-09-24
     triage closed issues titled "... (fixed in PR #2381)" and "... corrected in Phase
     6.5 remediation".
+
+    A `followup` whose title targets the plan file is dropped the same way. The plan is
+    discarded at merge, so "Update Verification Matrix row 11" has nowhere to land.
     """
     log = log or _noop_log
     try:
@@ -645,10 +666,12 @@ def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
         kept = [d for d in raw if isinstance(d, dict)
                 and d.get("title") and d.get("detail")
                 and d.get("kind") == "followup"
-                and not _says_already_done(f"{d['title']} {d['detail']}")]
+                and not _says_already_done(f"{d['title']} {d['detail']}")
+                and not _is_plan_artifact(d["title"])]
         dropped = len([d for d in raw if isinstance(d, dict)]) - len(kept)
         if dropped:
-            log(f"phase5.5 notes: dropped {dropped} non-followup or already-done note(s)")
+            log(f"phase5.5 notes: dropped {dropped} non-followup, already-done or "
+                "plan-artifact note(s)")
         return kept
     except HarnessError:
         return []

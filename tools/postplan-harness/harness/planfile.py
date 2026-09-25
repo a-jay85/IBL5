@@ -277,6 +277,9 @@ _BACKLOG_LINE_RE = re.compile(
     rf"^\s*[-*]\s+(closes|refs)\s+{re.escape(BACKLOG_REPO)}#(\d+)\b", re.I)
 
 
+_NO_ADR_RE = re.compile(r"^[ \t]*<!--\s*no-adr:.*?-->", re.DOTALL | re.M)
+
+
 def parse_backlog_issues(content: str) -> list[tuple]:
     """[(kind, number)] from `## Backlog issues`. kind is "closes" or "refs".
 
@@ -326,6 +329,18 @@ def parse_hold_justification(content: str) -> str:
     """
     return _section("\n".join(_strip_fenced(content)),
                     r"Automouse Hold Justification")[:4000]
+
+
+def parse_no_adr_markers(content: str) -> list[str]:
+    """Every `<!-- no-adr: ... -->` HTML comment in the plan, verbatim, in order.
+
+    Fenced blocks are stripped first (same reason as parse_hold_justification):
+    a plan that *documents* the marker syntax inside a fence must not yield a
+    phantom marker that post-plan then carries into the PR body. The whole
+    document is scanned, not just one section, because the marker may sit
+    anywhere in the plan.
+    """
+    return _NO_ADR_RE.findall("\n".join(_strip_fenced(content)))
 
 
 _DECISION_RE = re.compile(r"^ *\*\*Decision:\*\*")
@@ -487,4 +502,5 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
     if info.has_reuse:
         info.reuse_section = _section(content, r"Reuse[^#\n]*")[:2000]
     info.hold_justification = parse_hold_justification(content)
+    info.no_adr_markers = parse_no_adr_markers(content)
     return info

@@ -768,17 +768,19 @@ append_cost_row() {
         --arg  logged_cost      "$logged_cost" \
         'def n: tonumber? // null; {date:$date,plan:$plan,phase:$phase,model:$model,tier:$tier,session_id:$session_id,cost:($cost|n),surcharge_low:($surcharge_low|n),surcharge_high:($surcharge_high|n),inp:($inp|n),out:($out|n),cr:($cr|n),w5:($w5|n),w1:($w1|n),peak_ctx:($peak_ctx|n),compactions_main:($compactions_main|n),compactions_sub:($compactions_sub|n),provenance:$provenance,price_asof:$price_asof,logged_cost:($logged_cost|n)}' \
         >> "$sidecar"
+    # Mutex: serialise the create→strip→append→regenerate RMW sequence so that two
+    # concurrent runners (impl + postplan overlap) cannot interleave. Taken before
+    # the existence check: on a fresh day two runners could otherwise both see no
+    # file and the second truncating printf would wipe the first runner's row.
+    # COST_LOCK_HELD is a global so cleanup_watcher can release on unexpected exit
+    # without overwriting the runner's existing trap cleanup_watcher EXIT.
+    if acquire_cost_lock; then
+        COST_LOCK_HELD=1
+    fi
     # Create report with new 13-column header; or strip-then-migrate the old 6-column form.
     if [ ! -f "$report" ]; then
         printf '# Automouse cost roll-up — %s\n\n| Plan | Phase | Model | Tier | Cost ($) | Surcharge est ($) | Peak Ctx (K) | In | Out | Cache-read | CW-5m | CW-1h | Prov |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|\n' \
             "$(date +%Y-%m-%d)" > "$report"
-    fi
-    # Mutex: serialise the strip→append→regenerate RMW sequence so that two
-    # concurrent runners (impl + postplan overlap) cannot interleave.
-    # COST_LOCK_HELD is a global so cleanup_watcher can release on unexpected exit
-    # without overwriting the runner's existing trap cleanup_watcher EXIT (line 568).
-    if acquire_cost_lock; then
-        COST_LOCK_HELD=1
     fi
     # Strip the weekly section BEFORE migrating (weekly-section pipe rows must not be
     # padded) and BEFORE appending — the bug that ate every row but the day's first.

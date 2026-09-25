@@ -772,3 +772,71 @@ def test_split_hold_justification_matches_shell(tmp_path):
 ])
 def test_qualify_backlog_refs(src, want, n):
     assert qualify_backlog_refs(src) == (want, n)
+
+
+# ---------------------------------------------------------------------------
+# Phase 4a: render_residual_phases / upsert_residual_phases (post-impl)
+# ---------------------------------------------------------------------------
+
+from harness.classify import (render_residual_phases, upsert_residual_phases,
+                               RESIDUAL_PHASES_BEGIN, RESIDUAL_PHASES_END)
+
+
+def test_render_residual_phases_empty_and_nonempty():
+    """render([]) == ""; nonempty output has both markers, heading, and stripped bullets.
+
+    Mutation caught: dropping removeprefix leaves the MISSING-PHASE: prefix in bullets.
+    """
+    assert render_residual_phases([]) == ""
+    items = [
+        "MISSING-PHASE: 2 — Phase 2: B (phase cites harness/b.py; none appeared in the diff)",
+        "MISSING-PHASE: 3 — Phase 3: C (phase cites bin/c; none appeared in the diff)",
+    ]
+    out = render_residual_phases(items)
+    assert out.startswith(RESIDUAL_PHASES_BEGIN)
+    assert out.endswith(RESIDUAL_PHASES_END)
+    assert "## Residual Phases" in out
+    assert "- 2 — Phase 2: B" in out
+    assert "- 3 — Phase 3: C" in out
+    assert "MISSING-PHASE:" not in out
+
+
+def test_upsert_residual_phases_append_replace_remove():
+    """Append, replace, and remove the marker block.
+
+    Mutation caught: dropping the `if not block:` removal branch leaves v1 in place.
+    """
+    body = "## Summary\n- x"
+    block_v1 = render_residual_phases(["MISSING-PHASE: 2 — B (...)"])
+    block_v2 = render_residual_phases(["MISSING-PHASE: 3 — C (...)"])
+
+    # append: body unchanged before the block
+    appended = upsert_residual_phases(body, block_v1)
+    assert body in appended
+    assert RESIDUAL_PHASES_BEGIN in appended
+
+    # replace: surrounding text is byte-identical
+    replaced = upsert_residual_phases(appended, block_v2)
+    assert body in replaced
+    assert "3 — C" in replaced
+    assert "2 — B" not in replaced
+
+    # remove: body equals pre-append body
+    removed = upsert_residual_phases(replaced, "")
+    assert removed.strip() == body.strip()
+
+
+def test_upsert_residual_phases_noop_without_items_or_markers():
+    """Empty block + no markers → body unchanged; orphan END is left, nonempty block appended.
+
+    Mutation caught: treating an orphan as well-formed slices the body.
+    """
+    body = "## Summary\n- x"
+    assert upsert_residual_phases(body, "") == body
+
+    orphan_body = f"## Summary\n{RESIDUAL_PHASES_END}\n- x"
+    block = render_residual_phases(["MISSING-PHASE: 2 — B (...)"])
+    result = upsert_residual_phases(orphan_body, block)
+    assert RESIDUAL_PHASES_END in result
+    assert RESIDUAL_PHASES_BEGIN in result
+    assert "2 — B" in result

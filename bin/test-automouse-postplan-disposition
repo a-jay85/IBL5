@@ -3,7 +3,8 @@
 #
 # bin/test-automouse-postplan-disposition — regression test for the loop-side
 # terminal disposition after post-plan (automouse_pr_state,
-# automouse_branch_for_plan, dispose_plan_done) and the two call sites wired
+# automouse_branch_for_plan, dispose_plan_done,
+# postplan_no_worktree_dispose_if_merged) and the call sites wired
 # in bin/automouse/run.
 #
 # The defect this locks: post-plan agents reading a held-open PR as "not success"
@@ -49,7 +50,7 @@ extract_fn() {
 
 for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done \
           postplan_cap_timeout should_hold_postplan_disposal notify_postplan_hold \
-          postplan_newest_verdict; do
+          postplan_newest_verdict postplan_no_worktree_dispose_if_merged; do
     FN_SRC="$(extract_fn "$fn")"
     if [ -z "$FN_SRC" ]; then
         echo "FAIL: could not extract $fn from $RUNNER"
@@ -830,6 +831,64 @@ if [ "$s3_odd" -eq 0 ]; then
     echo "ok: s3-fences-balanced"
 else
     echo "FAIL: s3-fences-balanced — odd number of fences"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
+# Group f — postplan_no_worktree_dispose_if_merged (stubbed collaborators)
+# ---------------------------------------------------------------------------
+# Each case runs in a subshell under the runner's strict mode (set -euo pipefail)
+# so the stubs never leak into other groups and a non-zero return cannot abort
+# the harness. Side effects are observed through files in the per-case temp dir.
+
+run_f_case() {  # $1 = automouse_pr_state stub mode: merged | open | error
+    local D; D=$(mktemp -d)
+    (
+        set -euo pipefail
+        NIGHTLY_DIR="$D"; QUEUE_DIR="$D/queue"; HANDOFF_DIR="$D/handoff"; LOG="$D/run.log"
+        mkdir -p "$QUEUE_DIR" "$HANDOFF_DIR"; : > "$LOG"
+        automouse_branch_for_plan() { printf '%s\n' "$*" > "$D/branch-args"; printf 'some-branch\n'; }
+        case "$1" in
+            merged) automouse_pr_state() { printf '%s\n' "$1" > "$D/pr-branch"; printf 'MERGED https://github.com/a-jay85/IBL5/pull/9\n'; } ;;
+            open)   automouse_pr_state() { printf '%s\n' "$1" > "$D/pr-branch"; printf 'OPEN https://github.com/a-jay85/IBL5/pull/9\n'; } ;;
+            error)  automouse_pr_state() { printf '%s\n' "$1" > "$D/pr-branch"; return 1; } ;;
+        esac
+        dispose_plan_done() { printf '%s\n' "$*" > "$D/dispose-called"; }
+        rc=0
+        postplan_no_worktree_dispose_if_merged p.md p test-site || rc=$?
+        printf '%s\n' "$rc" > "$D/rc"
+    )
+    echo "$D"
+}
+
+# f1: MERGED PR — rc 0, dispose called with (p.md p MERGED <url> …), branch plumbed through
+D=$(run_f_case merged)
+if [ "$(cat "$D/rc" 2>/dev/null)" = "0" ] \
+   && [ -f "$D/dispose-called" ] \
+   && grep -q '^p\.md p MERGED https://github\.com/a-jay85/IBL5/pull/9' "$D/dispose-called" \
+   && [ "$(cat "$D/branch-args" 2>/dev/null)" = "p.md p" ] \
+   && [ "$(cat "$D/pr-branch" 2>/dev/null)" = "some-branch" ]; then
+    echo "ok: f1-merged-disposes"
+else
+    echo "FAIL: f1-merged-disposes — rc=$(cat "$D/rc" 2>/dev/null || echo missing) dispose=$(cat "$D/dispose-called" 2>/dev/null || echo not-called) branch-args=$(cat "$D/branch-args" 2>/dev/null) pr-branch=$(cat "$D/pr-branch" 2>/dev/null)"
+    FAILED=1
+fi
+
+# f2: OPEN PR — rc 1, dispose NOT called (an open PR is not shipped work)
+D=$(run_f_case open)
+if [ "$(cat "$D/rc" 2>/dev/null)" = "1" ] && [ ! -e "$D/dispose-called" ]; then
+    echo "ok: f2-open-no-dispose"
+else
+    echo "FAIL: f2-open-no-dispose — rc=$(cat "$D/rc" 2>/dev/null || echo missing) dispose=$(cat "$D/dispose-called" 2>/dev/null || echo not-called)"
+    FAILED=1
+fi
+
+# f3: gh error / no PR (automouse_pr_state rc 1) — rc 1, dispose NOT called, no strict-mode abort
+D=$(run_f_case error)
+if [ "$(cat "$D/rc" 2>/dev/null)" = "1" ] && [ ! -e "$D/dispose-called" ]; then
+    echo "ok: f3-gh-error-no-dispose"
+else
+    echo "FAIL: f3-gh-error-no-dispose — rc=$(cat "$D/rc" 2>/dev/null || echo missing; ) dispose=$(cat "$D/dispose-called" 2>/dev/null || echo not-called)"
     FAILED=1
 fi
 

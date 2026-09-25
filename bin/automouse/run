@@ -623,6 +623,49 @@ model_tier() {
     esac
 }
 
+# Acquire an exclusive mutex for the cost-report RMW sequence. Mirrors the
+# claim_next_plan() pattern: mkdir "$lock" is atomic; PID written to "$lock/pid".
+# Stale detection: dead PID (kill -0 fails) OR age > cost_lock_ttl seconds.
+# Steal via rm -rf + re-mkdir, log the steal. Spins up to max_attempts times
+# (0.2s each); on exhaustion returns 1 and logs a warning so the caller can
+# proceed unguarded rather than drop the row.
+acquire_cost_lock() {
+    local lock="$NIGHTLY_DIR/reports/.cost-report.lock"
+    local cost_lock_ttl=60
+    local owner now lock_epoch attempt=0 max_attempts=10
+    mkdir -p "$(dirname "$lock")"
+    while [ "$attempt" -lt "$max_attempts" ]; do
+        if mkdir "$lock" 2>/dev/null; then
+            echo "$$" > "$lock/pid"
+            return 0
+        fi
+        owner=$(cat "$lock/pid" 2>/dev/null) || owner=""
+        now=$(date +%s)
+        lock_epoch=$(stat -f %m "$lock" 2>/dev/null || echo "$now")
+        if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
+           || [ "$(( now - lock_epoch ))" -gt "$cost_lock_ttl" ]; then
+            rm -rf "$lock" 2>/dev/null || true
+            if mkdir "$lock" 2>/dev/null; then
+                echo "$$" > "$lock/pid"
+                printf '[%s] cost-report: stole stale lock (dead/expired owner=%s)\n' \
+                    "$(date +%H:%M:%S)" "${owner:-?}" >> "$LOG"
+                return 0
+            fi
+        fi
+        attempt=$(( attempt + 1 ))
+        sleep 0.2
+    done
+    printf '[%s] cost-report: WARNING: could not acquire lock after %d attempts; writing unguarded\n' \
+        "$(date +%H:%M:%S)" "$max_attempts" >> "$LOG"
+    return 1
+}
+
+# Release the cost-report mutex. Idempotent: rm -rf on a missing lock directory
+# exits 0, so a double-release under set -euo pipefail is safe.
+release_cost_lock() {
+    rm -rf "$NIGHTLY_DIR/reports/.cost-report.lock" 2>/dev/null || true
+}
+
 # Append a per-phase cost row to the night's cost roll-up. Cost is parsed from
 # the phase's `exit:` line (emitted by automouse-stream-filter.sh into the log). One
 # row per phase keeps this robust across split impl/postplan invocations — no
@@ -724,6 +767,16 @@ append_cost_row() {
         printf '# Automouse cost roll-up — %s\n\n| Plan | Phase | Model | Tier | Cost ($) | Surcharge est ($) | Peak Ctx (K) | In | Out | Cache-read | CW-5m | CW-1h | Prov |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|\n' \
             "$(date +%Y-%m-%d)" > "$report"
     fi
+    # Mutex: serialise the strip→append→regenerate RMW sequence so that two
+    # concurrent runners (impl + postplan overlap) cannot interleave.
+    # _lock_acq is local; the EXIT trap captures it by reference — under
+    # set -euo pipefail an unhandled error exits the shell, firing EXIT while
+    # this function is still on the call stack, so the local is still in scope.
+    local _lock_acq=0
+    if acquire_cost_lock; then
+        _lock_acq=1
+        trap '[ "${_lock_acq:-0}" = 1 ] && release_cost_lock' EXIT
+    fi
     # Strip the weekly section BEFORE migrating (weekly-section pipe rows must not be
     # padded) and BEFORE appending — the bug that ate every row but the day's first.
     strip_weekly_section "$report"
@@ -751,6 +804,12 @@ append_cost_row() {
         "$plan" "$phase" "$model" "$tier" "$cost" "$surcharge_cell" "$peak_k" \
         "${inp:-—}" "${out:-—}" "${cr:-—}" "${w5:-—}" "${w1:-—}" "$provenance" >> "$report"
     regenerate_weekly_section "$report"
+    # Normal-path release: clear the flag so the EXIT trap no-ops on eventual
+    # shell exit, then release the lock directory.
+    if [ "$_lock_acq" = 1 ]; then
+        _lock_acq=0
+        release_cost_lock
+    fi
 }
 
 # Truncate a costs report back to its per-phase table: drop the weekly-aggregate

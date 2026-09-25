@@ -285,7 +285,8 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         | sort_by(.completed_at // .started_at) | last]')"
 
     # --- compute signals ---
-    clearance="$(pr_manual_testing_clearance "$body")"
+    changed_paths="$(printf '%s' "$files" | jq -r '.[].path')"
+    clearance="$(pr_manual_testing_clearance "$body" "$changed_paths")"
     golden="$(pr_golden_hold "$files")"
     feat="$(pr_feat_hold "$title" "$labels")"
     # `| tr` like deps/unresolved below: both axes can fire, and the predicate

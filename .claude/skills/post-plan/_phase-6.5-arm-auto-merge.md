@@ -12,7 +12,10 @@ Purpose: the per-condition run-and-report blocks for Phase 6.5 arming.
 ```bash
 # condition (1): block unless the Manual-Testing section is the positive sentinel.
 source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"
-CLEAR=$(pr_manual_testing_clearance "$(gh pr view --json body --jq '.body')")
+# arg 2: PR changed-file paths for the tail-clause AND gate.
+_prbody="$(gh pr view --json body --jq '.body')"
+_prfiles="$(gh pr view --json files --jq '(.files // [])[].path')"
+CLEAR=$(pr_manual_testing_clearance "$_prbody" "$_prfiles")
 [ "$CLEAR" != "CLEARED" ] && echo "BLOCKED: Manual-Testing not cleared (state=$CLEAR) — held for human review"
 ```
 

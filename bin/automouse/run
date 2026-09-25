@@ -550,6 +550,7 @@ fi
 
 WATCHER_PID=""
 CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
+COST_LOCK_HELD=0  # set to 1 while append_cost_row holds the cost-report mutex
 CAP_DEFERRED=" "  # space-wrapped basenames cap-refunded this run; claim_next_plan skips them
 DEPENDS_HELD=" "  # space-wrapped basenames dependency-held this run; claim_next_plan skips them
 cleanup_watcher() {
@@ -563,6 +564,11 @@ cleanup_watcher() {
     # a time guard or env-failure) so a sibling/next run can resume it.
     if [ -n "$CURRENT_LOCK" ]; then
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+    fi
+    # Release the cost-report mutex if append_cost_row was interrupted mid-RMW.
+    if [ "${COST_LOCK_HELD:-0}" = 1 ]; then
+        COST_LOCK_HELD=0
+        release_cost_lock
     fi
 }
 trap cleanup_watcher EXIT
@@ -769,13 +775,10 @@ append_cost_row() {
     fi
     # Mutex: serialise the strip→append→regenerate RMW sequence so that two
     # concurrent runners (impl + postplan overlap) cannot interleave.
-    # _lock_acq is local; the EXIT trap captures it by reference — under
-    # set -euo pipefail an unhandled error exits the shell, firing EXIT while
-    # this function is still on the call stack, so the local is still in scope.
-    local _lock_acq=0
+    # COST_LOCK_HELD is a global so cleanup_watcher can release on unexpected exit
+    # without overwriting the runner's existing trap cleanup_watcher EXIT (line 568).
     if acquire_cost_lock; then
-        _lock_acq=1
-        trap '[ "${_lock_acq:-0}" = 1 ] && release_cost_lock' EXIT
+        COST_LOCK_HELD=1
     fi
     # Strip the weekly section BEFORE migrating (weekly-section pipe rows must not be
     # padded) and BEFORE appending — the bug that ate every row but the day's first.
@@ -804,10 +807,10 @@ append_cost_row() {
         "$plan" "$phase" "$model" "$tier" "$cost" "$surcharge_cell" "$peak_k" \
         "${inp:-—}" "${out:-—}" "${cr:-—}" "${w5:-—}" "${w1:-—}" "$provenance" >> "$report"
     regenerate_weekly_section "$report"
-    # Normal-path release: clear the flag so the EXIT trap no-ops on eventual
-    # shell exit, then release the lock directory.
-    if [ "$_lock_acq" = 1 ]; then
-        _lock_acq=0
+    # Normal-path release: clear the global flag so cleanup_watcher no-ops on
+    # eventual shell exit, then release the lock directory.
+    if [ "$COST_LOCK_HELD" = 1 ]; then
+        COST_LOCK_HELD=0
         release_cost_lock
     fi
 }

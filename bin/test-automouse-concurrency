@@ -19,6 +19,12 @@
 # (the runner uses `caffeinate`, `stat -f`, BSD `date`). On Linux CI it skips.
 #
 # Run: bin/test-automouse-concurrency  (exit 0 = pass/skip, 1 = a safety property failed)
+#
+# Assertions 5 and 6 verify cost-report integrity under concurrency.
+# To demonstrate the bug on master, run this test several times:
+#   for i in $(seq 1 10); do bin/test-automouse-concurrency && echo "run $i OK" || echo "run $i FAIL"; done
+# Expect at least one FAIL across 10 runs on an unpatched tree.
+# The test is intentionally flaky pre-fix; after the mutex lands it must be green on every run.
 
 set -u
 
@@ -35,7 +41,9 @@ NDIR="$ROOT/automouse"
 PLANS="$ROOT/plans"
 STUBDIR="$ROOT/stub"
 TRACE="$ROOT/trace.log"      # stub appends: <epoch_start> <epoch_end> <stub_pid> <plan> <phase>
-mkdir -p "$NDIR/queue" "$NDIR/handoff" "$NDIR/logs" "$NDIR/reports" "$NDIR/done" "$NDIR/skipped" "$PLANS" "$STUBDIR"
+WORKTREE_DIR="$ROOT/worktree"   # fake worktree dir; written into handoff so runner finds it
+mkdir -p "$NDIR/queue" "$NDIR/handoff" "$NDIR/logs" "$NDIR/reports" "$NDIR/done" "$NDIR/skipped" \
+         "$PLANS" "$STUBDIR" "$WORKTREE_DIR"
 
 N_PLANS=4
 for i in $(seq 1 $N_PLANS); do
@@ -47,8 +55,7 @@ done
 # Parses the real PLAN_FILE=<name> the runner appends LAST to the prompt (the
 # prompt body itself contains a literal `PLAN_FILE=<filename>` placeholder, so we
 # take the final match). First call per plan (no handoff yet) = impl: writes
-# handoff JSON. Second call (handoff present) = postplan: moves the queue symlink
-# to done/ and clears the handoff + attempts, mirroring a real post-plan success.
+# handoff JSON including a worktree path so the runner can find it for postplan.
 # Emits one stream-json `result` event so automouse-stream-filter records cost
 # and exits. Sleeps ~2s so two concurrent runners measurably overlap.
 cat > "$STUBDIR/claude" <<STUB
@@ -56,6 +63,7 @@ cat > "$STUBDIR/claude" <<STUB
 set -u
 NDIR="$NDIR"
 TRACE="$TRACE"
+WORKTREE_DIR="$WORKTREE_DIR"
 plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
 start=\$(date +%s)
 sleep 2
@@ -63,30 +71,61 @@ if [ -n "\$plan" ]; then
     hf="\$NDIR/handoff/\$plan.json"
     if [ ! -f "\$hf" ]; then
         phase=impl
-        printf '{"branch":"x","plan":"%s"}\n' "\$plan" > "\$hf"
-    else
-        phase=postplan
-        mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
-        rm -f "\$hf" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
+        printf '{"branch":"x","plan":"%s","worktree":"%s"}\n' "\$plan" "\$WORKTREE_DIR" > "\$hf"
     fi
-    printf '%s %s %s %s %s\n' "\$start" "\$(date +%s)" "\$\$" "\$plan" "\$phase" >> "\$TRACE"
+    printf '%s %s %s %s %s\n' "\$start" "\$(date +%s)" "\$\$" "\$plan" impl >> "\$TRACE"
 fi
 printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":2000,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
 exit 0
 STUB
 chmod +x "$STUBDIR/claude"
 
+# --- Stub `post-plan-now` --------------------------------------------------
+# Simulates a successful postplan: parses the plan name from --plan <path>,
+# moves the queue symlink to done/, removes the handoff, writes a TRACE entry,
+# and exits 0. The runner calls this as "$SELF_DIR/../post-plan-now" — SELF_DIR
+# is $ROOT/automouse/ so the stub lives at $ROOT/post-plan-now.
+cat > "$ROOT/post-plan-now" <<PPSTUB
+#!/usr/bin/env bash
+set -u
+NDIR="$NDIR"
+TRACE="$TRACE"
+plan=""
+while [ "\$#" -gt 0 ]; do
+    case "\$1" in
+        --plan) plan=\$(basename "\${2:-}"); shift 2 ;;
+        *)      shift ;;
+    esac
+done
+start=\$(date +%s)
+sleep 1
+if [ -n "\$plan" ]; then
+    mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
+    rm -f "\$NDIR/handoff/\$plan.json" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
+    printf '%s %s %s %s %s\n' "\$start" "\$(date +%s)" "\$\$" "\$plan" postplan >> "\$TRACE"
+fi
+printf 'RESULT: success\n'
+exit 0
+PPSTUB
+chmod +x "$ROOT/post-plan-now"
+
 # --- Copy the REAL runner; redirect NIGHTLY_DIR + force our stub onto PATH ---
-# Portable (no `sed -i`): transform into a new file. Two substitutions —
+# Portable (no `sed -i`): transform into a new file. Three substitutions —
 #   1. point the hardcoded NIGHTLY_DIR at our temp dir;
 #   2. replace the runner's own `export PATH=` (which re-prepends system bins and
-#      would shadow our stub) with one that puts STUBDIR first.
+#      would shadow our stub) with one that puts STUBDIR first;
+#   3. point PLANS_DIR at the temp plans dir so plan-path args resolve.
 RUNNER="$ROOT/automouse/run"
 sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
     -e "s#^REPO=.*#REPO=\"$REPO\"#" \
     -e "s#^export PATH=.*#export PATH=\"$STUBDIR:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
+    -e "s#^PLANS_DIR=.*#PLANS_DIR=\"$PLANS\"#" \
     "$REPO/bin/automouse/run" > "$RUNNER"
 chmod +x "$RUNNER"
+# The runner reads its impl prompt from $SELF_DIR/prompt-impl (same dir as the
+# run script). Copy the real prompt so `cat "$SELF_DIR/prompt-impl"` succeeds;
+# the stub claude ignores the content and only reads PLAN_FILE= from its args.
+cp "$REPO/bin/automouse/prompt-impl" "$ROOT/automouse/prompt-impl"
 
 echo "Seeded $N_PLANS plans. Launching two concurrent runners..."
 "$RUNNER" > "$ROOT/runA.out" 2>&1 &
@@ -142,6 +181,34 @@ if [ "$done_count" -eq "$N_PLANS" ]; then
     echo "PASS: all $N_PLANS plans in done/."
 else
     echo "FAIL: $done_count in done/ (expected $N_PLANS)."; FAIL=1
+fi
+
+# 5. Cost-report row count: exactly 2 × N_PLANS data rows (one impl + one postplan per plan).
+REPORT="$NDIR/reports/$(date +%Y-%m-%d)-costs.md"
+if [ -f "$REPORT" ]; then
+    # Match data rows only (plan-name | impl/postplan | ...), not weekly-aggregate
+    # phase-summary rows which also contain "| impl |" as the FIRST column.
+    ROW_COUNT=$(grep -cE '^\| .+ \| (impl|postplan) \|' "$REPORT" || true)
+    EXPECTED_ROWS=$(( 2 * N_PLANS ))
+    if [ "$ROW_COUNT" -eq "$EXPECTED_ROWS" ]; then
+        echo "PASS assertion 5: cost-report row count == $EXPECTED_ROWS"
+    else
+        echo "FAIL assertion 5: expected $EXPECTED_ROWS cost-report rows, got $ROW_COUNT"; FAIL=1
+        cat "$REPORT"
+    fi
+else
+    echo "FAIL assertion 5: cost report not found at $REPORT"; FAIL=1
+fi
+
+# 6. Exactly one '## Weekly aggregate' section (concurrent RMW must not duplicate it).
+if [ -f "$REPORT" ]; then
+    WEEKLY_COUNT=$(grep -c '^## Weekly aggregate' "$REPORT" || true)
+    if [ "$WEEKLY_COUNT" -eq 1 ]; then
+        echo "PASS assertion 6: weekly aggregate section count == 1"
+    else
+        echo "FAIL assertion 6: expected exactly 1 '## Weekly aggregate' section, got $WEEKLY_COUNT"; FAIL=1
+        cat "$REPORT"
+    fi
 fi
 
 echo "==============================================================="

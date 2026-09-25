@@ -550,6 +550,7 @@ fi
 
 WATCHER_PID=""
 CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
+COST_LOCK_HELD=0  # set to 1 while append_cost_row holds the cost-report mutex
 CAP_DEFERRED=" "  # space-wrapped basenames cap-refunded this run; claim_next_plan skips them
 DEPENDS_HELD=" "  # space-wrapped basenames dependency-held this run; claim_next_plan skips them
 cleanup_watcher() {
@@ -563,6 +564,11 @@ cleanup_watcher() {
     # a time guard or env-failure) so a sibling/next run can resume it.
     if [ -n "$CURRENT_LOCK" ]; then
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+    fi
+    # Release the cost-report mutex if append_cost_row was interrupted mid-RMW.
+    if [ "${COST_LOCK_HELD:-0}" = 1 ]; then
+        COST_LOCK_HELD=0
+        release_cost_lock
     fi
 }
 trap cleanup_watcher EXIT
@@ -621,6 +627,49 @@ model_tier() {
         *haiku*)  echo "Haiku"  ;;
         *)        echo "?"      ;;
     esac
+}
+
+# Acquire an exclusive mutex for the cost-report RMW sequence. Mirrors the
+# claim_next_plan() pattern: mkdir "$lock" is atomic; PID written to "$lock/pid".
+# Stale detection: dead PID (kill -0 fails) OR age > cost_lock_ttl seconds.
+# Steal via rm -rf + re-mkdir, log the steal. Spins up to max_attempts times
+# (0.2s each); on exhaustion returns 1 and logs a warning so the caller can
+# proceed unguarded rather than drop the row.
+acquire_cost_lock() {
+    local lock="$NIGHTLY_DIR/reports/.cost-report.lock"
+    local cost_lock_ttl=60
+    local owner now lock_epoch attempt=0 max_attempts=10
+    mkdir -p "$(dirname "$lock")"
+    while [ "$attempt" -lt "$max_attempts" ]; do
+        if mkdir "$lock" 2>/dev/null; then
+            echo "$$" > "$lock/pid"
+            return 0
+        fi
+        owner=$(cat "$lock/pid" 2>/dev/null) || owner=""
+        now=$(date +%s)
+        lock_epoch=$(stat -f %m "$lock" 2>/dev/null || echo "$now")
+        if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
+           || [ "$(( now - lock_epoch ))" -gt "$cost_lock_ttl" ]; then
+            rm -rf "$lock" 2>/dev/null || true
+            if mkdir "$lock" 2>/dev/null; then
+                echo "$$" > "$lock/pid"
+                printf '[%s] cost-report: stole stale lock (dead/expired owner=%s)\n' \
+                    "$(date +%H:%M:%S)" "${owner:-?}" >> "$LOG"
+                return 0
+            fi
+        fi
+        attempt=$(( attempt + 1 ))
+        sleep 0.2
+    done
+    printf '[%s] cost-report: WARNING: could not acquire lock after %d attempts; writing unguarded\n' \
+        "$(date +%H:%M:%S)" "$max_attempts" >> "$LOG"
+    return 1
+}
+
+# Release the cost-report mutex. Idempotent: rm -rf on a missing lock directory
+# exits 0, so a double-release under set -euo pipefail is safe.
+release_cost_lock() {
+    rm -rf "$NIGHTLY_DIR/reports/.cost-report.lock" 2>/dev/null || true
 }
 
 # Append a per-phase cost row to the night's cost roll-up. Cost is parsed from
@@ -719,6 +768,15 @@ append_cost_row() {
         --arg  logged_cost      "$logged_cost" \
         'def n: tonumber? // null; {date:$date,plan:$plan,phase:$phase,model:$model,tier:$tier,session_id:$session_id,cost:($cost|n),surcharge_low:($surcharge_low|n),surcharge_high:($surcharge_high|n),inp:($inp|n),out:($out|n),cr:($cr|n),w5:($w5|n),w1:($w1|n),peak_ctx:($peak_ctx|n),compactions_main:($compactions_main|n),compactions_sub:($compactions_sub|n),provenance:$provenance,price_asof:$price_asof,logged_cost:($logged_cost|n)}' \
         >> "$sidecar"
+    # Mutex: serialise the create→strip→append→regenerate RMW sequence so that two
+    # concurrent runners (impl + postplan overlap) cannot interleave. Taken before
+    # the existence check: on a fresh day two runners could otherwise both see no
+    # file and the second truncating printf would wipe the first runner's row.
+    # COST_LOCK_HELD is a global so cleanup_watcher can release on unexpected exit
+    # without overwriting the runner's existing trap cleanup_watcher EXIT.
+    if acquire_cost_lock; then
+        COST_LOCK_HELD=1
+    fi
     # Create report with new 13-column header; or strip-then-migrate the old 6-column form.
     if [ ! -f "$report" ]; then
         printf '# Automouse cost roll-up — %s\n\n| Plan | Phase | Model | Tier | Cost ($) | Surcharge est ($) | Peak Ctx (K) | In | Out | Cache-read | CW-5m | CW-1h | Prov |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|\n' \
@@ -751,6 +809,12 @@ append_cost_row() {
         "$plan" "$phase" "$model" "$tier" "$cost" "$surcharge_cell" "$peak_k" \
         "${inp:-—}" "${out:-—}" "${cr:-—}" "${w5:-—}" "${w1:-—}" "$provenance" >> "$report"
     regenerate_weekly_section "$report"
+    # Normal-path release: clear the global flag so cleanup_watcher no-ops on
+    # eventual shell exit, then release the lock directory.
+    if [ "$COST_LOCK_HELD" = 1 ]; then
+        COST_LOCK_HELD=0
+        release_cost_lock
+    fi
 }
 
 # Truncate a costs report back to its per-phase table: drop the weekly-aggregate

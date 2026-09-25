@@ -260,9 +260,10 @@ c14_lines="$(printf '%s\n' "$c14_armable" | grep -c '.' 2>/dev/null || echo 0)"
 assert_status "C14 exactly one ARMABLE"   1               "$c14_lines"
 assert_absent "C14 no double space in action" "  "        "$(row_action "$OUT" 13)"
 
-# --- C7: --help offline exits 0 and prints "ARMABLE is fail-closed" ---
+# --- C7: --help offline exits 0 and prints "ARMABLE is fail-closed" and "update-branch" ---
 ST=0; OUT="$("$TRIAGE" --help 2>&1)" || ST=$?
-assert_status "C7 --help exit 0"          0                       "$ST"
-assert_match  "C7 ARMABLE is fail-closed" "ARMABLE is fail-closed" "$OUT"
+assert_status "C7 --help exit 0"              0                        "$ST"
+assert_match  "C7 ARMABLE is fail-closed"     "ARMABLE is fail-closed" "$OUT"
+assert_match  "C7 usage mentions update-branch" "update-branch"        "$OUT"
 
 [ "$FAILED" = 0 ] && exit 0 || exit 1

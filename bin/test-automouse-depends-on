@@ -379,17 +379,18 @@ E2_ROOT="$TMP/e2"
 E2_NDIR="$E2_ROOT/automouse"
 E2_PLANS="$E2_ROOT/plans"
 E2_STUB="$E2_ROOT/stub"
+E2_WORKTREE="$E2_ROOT/worktree"  # real dir written into the handoff so postplan finds it
 mkdir -p "$E2_NDIR/queue" "$E2_NDIR/handoff" "$E2_NDIR/logs" \
          "$E2_NDIR/reports" "$E2_NDIR/done" "$E2_NDIR/skipped" \
-         "$E2_PLANS" "$E2_STUB"
+         "$E2_PLANS" "$E2_STUB" "$E2_WORKTREE"
 
-# The runner locates prompt-impl and prompt-postplan via SELF_DIR (the dir
-# containing the runner file). Symlink them so cat succeeds under set -e.
-ln -sf "$REPO_ROOT/bin/automouse/prompt-impl"    "$E2_ROOT/prompt-impl"
-ln -sf "$REPO_ROOT/bin/automouse/prompt-postplan" "$E2_ROOT/prompt-postplan"
+# The runner locates prompt-impl via SELF_DIR (the dir containing the runner
+# file) and calls "$SELF_DIR/../post-plan-now" for postplan. The runner lives
+# in $E2_NDIR, so the post-plan-now stub goes in $E2_ROOT.
+ln -sf "$REPO_ROOT/bin/automouse/prompt-impl" "$E2_NDIR/prompt-impl"
 
 # Rewritten runner: REPO→worktree, NIGHTLY_DIR→temp, PATH→stub first
-E2_RUNNER="$E2_ROOT/run"
+E2_RUNNER="$E2_NDIR/run"
 sed \
     -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$E2_NDIR\"#" \
     -e "s#^REPO=.*#REPO=\"$REPO_ROOT\"#" \
@@ -400,33 +401,50 @@ chmod +x "$E2_RUNNER"
 # TRACE file: the claude stub appends plan names here so tests can assert "never reached impl"
 E2_TRACE="$E2_ROOT/trace"
 
-# Claude stub: mirrors test-automouse-concurrency's two-phase approach.
-# PLAN_FILE=<plan> is embedded in the prompt text passed as the -p arg; grep it out.
-# First call (no handoff) = impl; second call = postplan.
+# Claude stub: impl phase only. PLAN_FILE=<plan> is embedded in the prompt text
+# passed as the -p arg; grep it out. Writes the handoff with a real worktree path
+# so the runner hands postplan to the post-plan-now stub below.
 cat > "$E2_STUB/claude" <<CLAUDE
 #!/usr/bin/env bash
 set -u
 NDIR="$E2_NDIR"
 TRACE="$E2_TRACE"
+WORKTREE="$E2_WORKTREE"
 plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
 if [ -n "\$plan" ]; then
-    hf="\$NDIR/handoff/\$plan.json"
-    if [ ! -f "\$hf" ]; then
-        phase=impl
-        mkdir -p "\$NDIR/handoff"
-        printf '{"slug":"stub","worktree":"/tmp/stub","branch":"stub","plan_file":"%s","plan_title":"stub","completed_at":"2026-01-01T00:00:00Z"}\n' \
-            "\$plan" > "\$hf"
-    else
-        phase=postplan
-        mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
-        rm -f "\$hf" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
-    fi
-    printf '%s %s\n' "\$plan" "\$phase" >> "\$TRACE"
+    mkdir -p "\$NDIR/handoff"
+    printf '{"slug":"stub","worktree":"%s","branch":"stub","plan_file":"%s","plan_title":"stub","completed_at":"2026-01-01T00:00:00Z"}\n' \
+        "\$WORKTREE" "\$plan" > "\$NDIR/handoff/\$plan.json"
+    printf '%s impl\n' "\$plan" >> "\$TRACE"
 fi
 printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":100,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
 exit 0
 CLAUDE
 chmod +x "$E2_STUB/claude"
+
+# post-plan-now stub: simulates a successful postplan. Parses the plan name from
+# --plan <path>, moves the queue symlink to done/, removes the handoff.
+cat > "$E2_ROOT/post-plan-now" <<PPSTUB
+#!/usr/bin/env bash
+set -u
+NDIR="$E2_NDIR"
+TRACE="$E2_TRACE"
+plan=""
+while [ "\$#" -gt 0 ]; do
+    case "\$1" in
+        --plan) plan=\$(basename "\${2:-}"); shift 2 ;;
+        *)      shift ;;
+    esac
+done
+if [ -n "\$plan" ]; then
+    mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
+    rm -f "\$NDIR/handoff/\$plan.json" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
+    printf '%s postplan\n' "\$plan" >> "\$TRACE"
+fi
+printf 'RESULT: success\n'
+exit 0
+PPSTUB
+chmod +x "$E2_ROOT/post-plan-now"
 
 write_e2_plan() {
     local name="$1"; shift

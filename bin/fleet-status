@@ -618,7 +618,11 @@ render_runner_detail() {
             progress="$(last_line "$audit" 64 '^\[[0-9:]+\] phase')"
         fi
     fi
-    log="$(ls -t "$AUTOMOUSE_DIR"/logs/????-??-??.log 2>/dev/null | head -n 1)"
+    # Each runner writes its own logs/<date>-<pid>.log (bin/automouse/run). Read
+    # THIS runner's file: with two runners live, the newest log overall belongs
+    # to the other one, and the slug grep below would come back empty. ls -t
+    # picks the newest when a pid is reused across days.
+    log="$(ls -t "$AUTOMOUSE_DIR"/logs/????-??-??-"$pid".log 2>/dev/null | head -n 1)"
     if [ -z "$progress" ] && [ -n "$log" ]; then
         progress="$(grep -F " $slug/$phase " "$log" 2>/dev/null | tail -n 1)"
         [ -n "$progress" ] && progress="$(clip_field "$progress" 64)"

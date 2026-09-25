@@ -70,6 +70,8 @@ eval "$WT_FN"
 RUN_FILE="$REPO_ROOT/bin/automouse/run"
 PP_TERMINAL_SPAN=$(awk '/# postplan-rc3-terminal: begin/,/# postplan-env-breaker: end/' "$RUN_FILE")
 PP_BREAKER_ONLY=$(awk '/# postplan-env-breaker: begin/,/# postplan-env-breaker: end/' "$RUN_FILE")
+# rc=7 (no worktree) arm from Phase 2. Unique comment anchors delimit it, the same scheme as rc3.
+PP_NOWT_SPAN=$(awk '/# postplan-no-worktree-merged: begin/,/# postplan-no-worktree-merged: end/' "$RUN_FILE")
 BLOCKED_FN=$(awk '/^dispose_plan_postplan_blocked\(\) \{/,/^\}/' "$RUN_FILE")
 REFUND_FN=$(awk '/^refund_attempt\(\) \{/,/^\}/' "$RUN_FILE")
 STALLED_FN=$(awk '/^phase_stalled\(\) \{/,/^\}/' "$RUN_FILE")
@@ -80,7 +82,9 @@ eval "$REFUND_FN"; eval "$STALLED_FN"; eval "$ENVSTOP_FN"; eval "$BLOCKED_FN"
 # If it is duplicated, the range starts at the wrong place.
 for anchor in '# postplan-rc3-terminal: begin' \
               '# postplan-env-breaker: begin' \
-              '# postplan-env-breaker: end'; do
+              '# postplan-env-breaker: end' \
+              '# postplan-no-worktree-merged: begin' \
+              '# postplan-no-worktree-merged: end'; do
     n=$(grep -cF -e "$anchor" "$RUN_FILE" || true)
     assert_eq "$n" "1" "anchor '$anchor' appears exactly once in bin/automouse/run"
 done
@@ -89,6 +93,18 @@ assert_contains "$PP_TERMINAL_SPAN" 'dispose_plan_postplan_blocked' "rc3 span ca
 assert_contains "$PP_BREAKER_ONLY" 'refund_attempt' "breaker span is the environmental breaker"
 assert_contains "$PP_BREAKER_ONLY" '"$PP_TERMINAL" -eq 0' "breaker is guarded by PP_TERMINAL"
 assert_contains "$BLOCKED_FN" 'dispose_plan_postplan_blocked() {' "blocked disposer extracted"
+assert_contains "$PP_NOWT_SPAN" '"$PP_STATUS" -eq 7' "rc7 span tests PP_STATUS against 7"
+assert_contains "$PP_NOWT_SPAN" 'postplan_no_worktree_dispose_if_merged' "rc7 span calls the merged-PR disposer"
+assert_contains "$PP_NOWT_SPAN" 'PP_NOWT_DISPOSED' "rc7 span honors the pre-call disposal flag"
+# Ordering: the rc7 arm must sit BEFORE the env breaker. Otherwise the breaker's
+# fast-exit `break` fires first and the merged PR is refunded instead of disposed.
+NOWT_LN=$(grep -nF -e '# postplan-no-worktree-merged: begin' "$RUN_FILE" | head -1 | cut -d: -f1)
+BRK_LN=$(grep -nF -e '# postplan-env-breaker: begin' "$RUN_FILE" | head -1 | cut -d: -f1)
+if [ -n "$NOWT_LN" ] && [ -n "$BRK_LN" ] && [ "$NOWT_LN" -lt "$BRK_LN" ]; then
+    printf '  ok   rc7 span precedes the env breaker\n'
+else
+    printf '  FAIL rc7 span must precede # postplan-env-breaker: begin (got %s vs %s)\n' "${NOWT_LN:-none}" "${BRK_LN:-none}"; FAILED=1
+fi
 
 # Sanity: confirm extraction captured the right block before evaling anything.
 assert_contains "$PP_BLOCK" 'PP_WORKTREE=$(automouse_worktree_for_plan' "PP block starts with the worktree resolution"
@@ -421,6 +437,88 @@ assert_eq "$(yn test -L "$QUEUE_DIR/$PLAN_NAME")" "yes" "row 12-neg: without arm
 assert_eq "$(count_envstop)" "1" "row 12-neg: without arm, env-stop report written (the defect)"
 assert_eq "$(yn test -e "$CAP_REFUND_FILE")" "yes" "row 12-neg: without arm, .cap-refunds survives"
 assert_eq "$(cat "$ATTEMPT_FILE" 2>/dev/null)" "1" "row 12-neg: without arm, attempt refunded not cleared"
+rm -rf "$SB"
+
+echo
+echo "-- row 13: post-plan-now rc=7 (no worktree) → merged PR is terminal; unmerged/gh-error refunds + breaks --"
+
+# $1 = what the disposer stub returns (0 = PR merged and disposed, 1 = not merged or gh error).
+# Phase 2 contract: postplan_no_worktree_dispose_if_merged returns 0 only after it has disposed the plan.
+# shellcheck disable=SC2034
+nowt_sandbox() {
+    SB=$(mktemp -d)
+    NIGHTLY_DIR="$SB/nightly"; QUEUE_DIR="$NIGHTLY_DIR/queue"; mkdir -p "$QUEUE_DIR"
+    LOG="$SB/log"; : > "$LOG"
+    PLAN_NAME="test-plan.md"; PLAN_SLUG="test-plan"
+    NEXT_PLAN="$QUEUE_DIR/$PLAN_NAME"
+    ATTEMPT_FILE="$QUEUE_DIR/$PLAN_NAME.attempts"; echo 2 > "$ATTEMPT_FILE"
+    PP_DUR=2; MIN_VIABLE_SECS=60
+    NOWT_CALLS="$SB/calls"; : > "$NOWT_CALLS"
+    NOWT_DISPOSE_RC=$1
+}
+
+# Prepends the stubs and the PP_TERMINAL recorder, then hands the text to run_span.
+run_nowt_span() {
+    local prelude
+    prelude=$(cat <<'PRELUDE'
+postplan_no_worktree_dispose_if_merged() { printf 'DISPOSE\n' >> "$NOWT_CALLS"; return "$NOWT_DISPOSE_RC"; }
+refund_attempt() { printf 'REFUND\n' >> "$NOWT_CALLS"; }
+write_env_stop_report() { printf 'ENVSTOP\n' >> "$NOWT_CALLS"; }
+trap 'printf "%s\n" "${PP_TERMINAL:-unset}" > "$SB/terminal"' EXIT
+PRELUDE
+)
+    run_span "$prelude"$'\n'"$PP_NOWT_SPAN"
+}
+calls_of() { grep -c "^$1\$" "$NOWT_CALLS" || true; }
+fell_through() { if grep -qF -e "SPAN-FELL-THROUGH" "$SB/span.out"; then echo yes; else echo no; fi; }
+
+# --- Row 13a: pre-call disposal already happened → terminal, no re-dispose, no refund ---
+nowt_sandbox 0
+PP_NOWT_DISPOSED=1; PP_STATUS=0; PP_TERMINAL=0
+run_nowt_span
+assert_eq "$SPAN_RC" "0" "row 13a: span completes under set -euo pipefail"
+assert_eq "$(cat "$SB/terminal")" "1" "row 13a: PP_NOWT_DISPOSED=1 marks PP_TERMINAL=1"
+assert_eq "$(calls_of DISPOSE)" "0" "row 13a: disposer NOT re-called after pre-call disposal"
+assert_eq "$(calls_of REFUND)" "0" "row 13a: no refund"
+assert_eq "$(fell_through)" "yes" "row 13a: loop not broken"
+rm -rf "$SB"
+
+# --- Row 13b: rc=7 and the PR is merged → dispose, terminal, no refund, no break ---
+nowt_sandbox 0
+PP_NOWT_DISPOSED=0; PP_STATUS=7; PP_TERMINAL=0
+run_nowt_span
+assert_eq "$SPAN_RC" "0" "row 13b: span completes under set -euo pipefail"
+assert_eq "$(cat "$SB/terminal")" "1" "row 13b: merged rc=7 marks PP_TERMINAL=1"
+assert_eq "$(calls_of DISPOSE)" "1" "row 13b: disposer called exactly once"
+assert_eq "$(calls_of REFUND)" "0" "row 13b: merged PR is not refunded"
+assert_eq "$(fell_through)" "yes" "row 13b: merged arm does NOT break the loop"
+rm -rf "$SB"
+
+# --- Row 13c: rc=7, PR not merged or gh errored → terminal, refund, loop stopped ---
+nowt_sandbox 1
+PP_NOWT_DISPOSED=0; PP_STATUS=7; PP_TERMINAL=0
+run_nowt_span
+assert_eq "$SPAN_RC" "0" "row 13c: a disposer rc=1 does not abort under set -e (called in a conditional)"
+assert_eq "$(cat "$SB/terminal")" "1" "row 13c: unmerged rc=7 marks PP_TERMINAL=1 (the breaker must not fire again)"
+assert_eq "$(calls_of DISPOSE)" "1" "row 13c: disposer consulted once"
+assert_eq "$(calls_of REFUND)" "1" "row 13c: attempt refunded exactly once"
+assert_eq "$(fell_through)" "no" "row 13c: loop broken (SPAN-FELL-THROUGH absent)"
+rm -rf "$SB"
+
+# --- Row 13d: baseline rc=0, no pre-call disposal → arm is a no-op ---
+nowt_sandbox 0
+# shellcheck disable=SC2034  # consumed by the eval'd span
+PP_NOWT_DISPOSED=0
+# shellcheck disable=SC2034
+PP_STATUS=0
+# shellcheck disable=SC2034
+PP_TERMINAL=0
+run_nowt_span
+assert_eq "$SPAN_RC" "0" "row 13d: span completes under set -euo pipefail"
+assert_eq "$(cat "$SB/terminal")" "0" "row 13d: PP_TERMINAL untouched on rc=0"
+assert_eq "$(calls_of DISPOSE)" "0" "row 13d: disposer not called on rc=0"
+assert_eq "$(calls_of REFUND)" "0" "row 13d: no refund on rc=0"
+assert_eq "$(fell_through)" "yes" "row 13d: loop not broken on rc=0"
 rm -rf "$SB"
 
 exit "$FAILED"

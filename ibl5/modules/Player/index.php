@@ -217,26 +217,17 @@ function processrookieoption()
     $extensionAmount = isset($_POST['rookieOptionValue']) ? (int) $_POST['rookieOptionValue'] : 0;
     $from = $_POST['from'] ?? '';
 
-    // (3) Ownership — POST team must equal the session user's team.
-    // Reject null / Free Agents so a teamless session cannot exercise options.
+    // (3) Ownership + input validation are enforced by
+    // RookieOptionController::processRookieOption(), which refuses a null / Free Agents /
+    // mismatched session team before any DB access. Refusals take the error redirect below.
     $sessionTeam = $commonRepository->getTeamnameFromUsername($username);
-    if ($sessionTeam === null
-        || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME
-        || $sessionTeam !== $teamName) {
-        \Utilities\HtmxHelper::redirect('modules.php?name=Player&pa=rookieoption&pid=' . $playerID . '&from=' . rawurlencode($from) . '&error=' . rawurlencode('You can only exercise options for your own team.'));
-        return;
-    }
-
-    // Validate input
-    if ($teamName === '' || $playerID === 0 || $extensionAmount === 0) {
-        \Utilities\HtmxHelper::redirect('modules.php?name=Player&pa=rookieoption&pid=' . $playerID . '&from=' . rawurlencode($from) . '&error=' . rawurlencode('Invalid request. Missing required parameters.'));
-    }
+    $sessionTeam = is_string($sessionTeam) ? $sessionTeam : null;
 
     // Process rookie option using controller
     $rookieRepo = new \RookieOption\RookieOptionRepository($mysqli_db);
     $newsService = new \Topics\News\NewsRepository($mysqli_db);
     $controller = new RookieOptionController($mysqli_db, $commonRepository, $rookieRepo, $newsService);
-    $result = $controller->processRookieOption($teamName, $playerID, $extensionAmount);
+    $result = $controller->processRookieOption($teamName, $playerID, $extensionAmount, $sessionTeam);
 
     $resultParam = '';
     if ($result['success']) {

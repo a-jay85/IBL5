@@ -2212,16 +2212,29 @@ grep -qF 'result.json" 2>/dev/null || true)' "$SCRIPT_DIR/../bin/post-plan-fleet
   || fail "6c.4 unparseable: result.json parse not guarded by '|| true' — malformed JSON would abort"
 end_case result-unparseable-holds
 
-# --- 6c.5: --wait timeout prints 'TIMED OUT waiting for' on stderr and exits 0 ------
+# --- wait-timeout-exits-nonzero ----------------------------------------------------------
+# A held slot that never drains drives the wait block to its ceiling, which must:
+#   1. exit 1
+#   2. print TIMED OUT on stderr
+#   3. still write the report (last stdout line is a path that exists)
+#   4. leave the slot held (plist not removed)
 begin_case
-out="$(HOME="$SCRATCH" POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." POST_PLAN_FLEET_GH_USER=a-jay85 \
-    bin/post-plan-fleet --dry-run --pr 9999 --wait --jobs 1 2>&1)"; rc=$?
-[[ $rc -eq 0 ]] || fail "6c.5: want exit 0 on dry-run with --wait, got $rc"
-# When no session is actually running, wait exits immediately. The TIMED OUT path
-# fires only when a slot is held. Test the text exists in the script instead.
-grep -qF 'TIMED OUT waiting for' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.5: bin/post-plan-fleet does not contain 'TIMED OUT waiting for' — the timeout text was removed"
-end_case timed-out-text-present
+clean_slots
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9999.plist"
+set_live_labels "40477	0	com.ibl5.post-plan-fleet-9999"
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" \
+       POST_PLAN_FLEET_CEILING=2 POST_PLAN_FLEET_WAIT_POLL=1 \
+       run_driver --go --wait 2>&1)"; rc=$?
+[[ $rc -eq 1 ]] || fail "wait-timeout-exits-nonzero: exit $rc, want 1 (out: $out)"
+grep -qF 'TIMED OUT waiting for' <<< "$out" || \
+    fail "wait-timeout-exits-nonzero: TIMED OUT text missing (out: $out)"
+_rpath="$(echo "$out" | tail -1)"
+[[ -f "$_rpath" ]] || fail "wait-timeout-exits-nonzero: report not written (last line: $_rpath)"
+[[ "$_rpath" == *pr-firstpass-*.md ]] || fail "wait-timeout-exits-nonzero: last line is not a report path: $_rpath"
+[[ "$(plist_count)" -eq 1 ]] || fail "wait-timeout-exits-nonzero: slot was removed, want 1 plist"
+clear_live_labels; clean_slots
+end_case wait-timeout-exits-nonzero
 
 # --- pr-list-fires-each ------------------------------------------------------------------
 begin_case

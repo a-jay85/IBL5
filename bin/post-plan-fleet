@@ -17,7 +17,7 @@
 #   --wait        After all sessions are fired, poll until every launchd plist is gone
 #                 (all sessions finished). For use inside a detached wrapper only —
 #                 never from an interactive main-thread session (foreground poll loop is
-#                 a spend bug; see .claude/rules/work-triage.md). Times out at 7200s.
+#                 a spend bug; see .claude/rules/work-triage.md). Times out at 7200s and then exits 1 after writing the report.
 #                 A slot is released only when its label is gone AND no process carries it,
 #                 so a run aborted without --stop holds its slot until the ceiling.
 #   --stop N[,N...]   Abort the fired session(s) for these PRs: bootout the launchd label,
@@ -110,6 +110,8 @@ SAW_DRY_RUN=0
 # Single ceiling for BOTH bounded poll loops (wait_for_slot and the --wait block).
 # Two independent literals would drift; one constant cannot.
 CEILING_SECS="${POST_PLAN_FLEET_CEILING:-7200}"
+# Poll interval of the --wait block. Seam exists so the harness can drive a timeout in seconds.
+WAIT_POLL_SECS="${POST_PLAN_FLEET_WAIT_POLL:-20}"
 
 # --- flag parsing ------------------------------------------------------------------------
 usage() { sed -n '2,70p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
@@ -747,6 +749,7 @@ done
 # Active only when --wait and --go are both set. Polls live_slots() (plist count) until all
 # sessions finish. Under POST_PLAN_FLEET_DRY_RUN=1 the block is skipped entirely: fire_pr
 # leaves plists on disk under dry-run, and sleeping on them would hang indefinitely.
+_WAIT_TIMED_OUT=0
 if [[ "$WAIT" -eq 1 && "$GO" -eq 1 ]]; then
     if [[ -z "${POST_PLAN_FLEET_DRY_RUN:-}" ]]; then
         _wait_elapsed=0
@@ -755,11 +758,11 @@ if [[ "$WAIT" -eq 1 && "$GO" -eq 1 ]]; then
             n="$(live_slots)"
             [ "$n" -eq 0 ] && break
             echo "waiting for $n session(s) to finish…"
-            sleep 20
-            _wait_elapsed=$((_wait_elapsed + 20))
+            sleep "$WAIT_POLL_SECS"
+            _wait_elapsed=$((_wait_elapsed + WAIT_POLL_SECS))
             if [[ $_wait_elapsed -ge $CEILING_SECS ]]; then
                 echo "TIMED OUT waiting for $n session(s); leaving them running." >&2
-                exit 1
+                _WAIT_TIMED_OUT=1; break
             fi
         done
     fi
@@ -771,3 +774,4 @@ fi
 if [[ "$GO" -eq 1 ]]; then
     write_report "—" "$_REPORT_MASTER_SHA" "${#FIRE_PRS[@]}" "${#SKIP_LINES[@]}"
 fi
+[[ "$_WAIT_TIMED_OUT" -eq 0 ]] || exit 1

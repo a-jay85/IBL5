@@ -9,7 +9,7 @@
 # Dry-run by default: prints what it would do and exits. Nothing fires without --go.
 #
 # Usage:
-#   bin/pr-cycle [--go] [--dry-run] [--stop] [--no-dm] [--max-merges N]
+#   bin/pr-cycle [--go] [--dry-run] [--stop] [--no-dm] [--max-ready N] [--jobs N]
 #                [--only LIST | --skip LIST] [--help]
 #
 #   --go            Detach a worker via launchd and return. Without it the script only
@@ -19,10 +19,9 @@
 #                   file is never removed by this script; clearing it is the human's
 #                   explicit re-enable.
 #   --no-dm         Suppress the single end-of-run Discord DM.
-#   --max-merges N  Stop starting new work once N merges are confirmed (default 5).
-#                   One `pr-triage --arm` call arms every ARMABLE PR, so a single
-#                   iteration can confirm more than one merge; every confirmed merge
-#                   is still ledgered. This caps work started, not merges caused.
+#   --max-ready N   Cap on PRs handed to post-plan-fleet in Stage 1 (default 10). Ordered
+#                   PRs fill the cap first, then DIRTY rescues. Arming is never capped.
+#   --jobs N        Concurrent readying sessions in Stage 1 (default 3).
 #   --only LIST     Work ONLY these PRs. Comma-separated; a leading # is optional, so
 #                   `--only 2101,2108` and `--only '#2101,#2108'` name the same set.
 #                   The ORDER still comes from bin/pr-attack — this drops rows outside
@@ -34,10 +33,11 @@
 # SCOPE LIMIT of --only/--skip — they scope the WORK ORDER, not the arm call. Arming is
 # exactly one `bin/pr-triage --arm` with no added flags (a hard invariant below), and that
 # single call arms EVERY ARMABLE PR, in-set or not. So an already-green out-of-set PR still
-# lands, and that merge still counts against --max-merges. Documenting this IS the fix:
-# narrowing the arm call would break the one-arm invariant. What these flags actually buy
+# lands, and it appears in neither the ready batch nor the your-turn DM as work this run did.
+# Narrowing the arm call would break the one-arm invariant. What these flags actually buy
 # is that no hour-long `post-plan-fleet --wait` session is ever spent on an out-of-set PR —
 # which is the cost they exist to avoid.
+# Runs once: Stage 1 (ready) -> Stage 2 (arm) -> your-turn DM -> exit. No loop.
 #
 # Env seams (used by bin/test-pr-cycle):
 #   PR_CYCLE_ATTACK_CMD      Path to the ordering tool.       Default: bin/pr-attack
@@ -46,8 +46,6 @@
 #   PR_CYCLE_DM_CMD          Path to the notifier.            Default: bin/discord-dm
 #   PR_CYCLE_GH_CMD          The gh binary.                   Default: gh
 #   PR_CYCLE_MAIN_CHECKOUT   The only tree this may run in.
-#   PR_CYCLE_POLL_INTERVAL   Seconds between merge polls.     Default: 60
-#   PR_CYCLE_POLL_CEILING    Seconds to wait per PR.          Default: 2700
 #   PR_CYCLE_RESCUE          0 disables DIRTY-PR rescue.      Default: 1 (enabled)
 #   PR_CYCLE_SKIP_READY_WHEN_ARMABLE
 #                            0 disables the pr-ready skip. The skip needs BOTH: the ARMABLE
@@ -115,8 +113,6 @@ PR_CYCLE_READY_CMD="${PR_CYCLE_READY_CMD:-$ROOT/bin/post-plan-fleet}"
 PR_CYCLE_DM_CMD="${PR_CYCLE_DM_CMD:-$ROOT/bin/discord-dm}"
 PR_CYCLE_GH_CMD="${PR_CYCLE_GH_CMD:-gh}"
 PR_CYCLE_MAIN_CHECKOUT="${PR_CYCLE_MAIN_CHECKOUT:-/Users/ajaynicolas/GitHub/IBL5}"
-PR_CYCLE_POLL_INTERVAL="${PR_CYCLE_POLL_INTERVAL:-60}"
-PR_CYCLE_POLL_CEILING="${PR_CYCLE_POLL_CEILING:-2700}"
 PR_CYCLE_RESCUE="${PR_CYCLE_RESCUE:-1}"
 PR_CYCLE_SKIP_READY_WHEN_ARMABLE="${PR_CYCLE_SKIP_READY_WHEN_ARMABLE:-1}"
 PR_CYCLE_STOP_FILE="${PR_CYCLE_STOP_FILE:-$HOME/.ibl5-pr-cycle.stop}"
@@ -157,7 +153,8 @@ DRY=0
 STOP=0
 NO_DM=""
 WORKER=0
-MAX_MERGES=5
+MAX_READY=10
+JOBS=3
 ONLY=""
 SKIP=""
 
@@ -169,14 +166,18 @@ while [ $# -gt 0 ]; do
         --no-dm)   NO_DM=1; shift ;;
         # --worker: set by the emitted runner; do not pass by hand.
         --worker)  WORKER=1; shift ;;
-        --max-merges)
+        --max-ready)
             # A `case` glob, not [ "$N" -gt 0 ] and not a grep pipe: the arithmetic test
             # *errors* on `abc` under set -e rather than rejecting it, and any `x | grep -q`
             # form risks the same pipefail/SIGPIPE inversion as the liveness guard below.
             # `0*` rejects both 0 and a leading-zero count; `*[!0-9]*` rejects abc and -1.
             [ $# -ge 2 ] || { usage >&2; exit 2; }
             case "$2" in ''|0*|*[!0-9]*) usage >&2; exit 2 ;; esac
-            MAX_MERGES="$2"; shift 2 ;;
+            MAX_READY="$2"; shift 2 ;;
+        --jobs)
+            [ $# -ge 2 ] || { usage >&2; exit 2; }
+            case "$2" in ''|0*|*[!0-9]*) usage >&2; exit 2 ;; esac
+            JOBS="$2"; shift 2 ;;
         --only)
             [ $# -ge 2 ] || { usage >&2; exit 2; }
             ONLY="$(_normalize_prs "$2")" || { usage >&2; exit 2; }
@@ -981,7 +982,8 @@ _report_dry_run() {
     if [ -n "$ONLY" ]; then      echo "would use scope:      --only $ONLY"
     elif [ -n "$SKIP" ]; then    echo "would use scope:      --skip $SKIP"
     else                         echo "would use scope:      every orderable PR"; fi
-    echo "would use max-merges: $MAX_MERGES"
+    echo "would use max-ready:  $MAX_READY"
+echo "would use jobs:       $JOBS"
     echo "would use stop file:  $PR_CYCLE_STOP_FILE"
     echo "would use rundir:     $RUNDIR"
     return 0
@@ -1019,7 +1021,8 @@ _launch() {
         printf 'PLIST=%q\n'      "$PLIST"
         printf 'LOG=%q\n'        "$LOG"
         printf 'TS=%q\n'         "$TS"
-        printf 'MAX_MERGES=%q\n' "$MAX_MERGES"
+        printf 'MAX_READY=%q\n'  "$MAX_READY"
+        printf 'JOBS=%q\n'       "$JOBS"
         printf 'NO_DM=%q\n'      "$NO_DM"
         printf 'ONLY=%q\n'       "$ONLY"
         printf 'SKIP=%q\n'       "$SKIP"
@@ -1027,7 +1030,6 @@ _launch() {
         printf 'export PR_CYCLE_LOG=%q\n'  "$LOG"
         for _v in PR_CYCLE_ATTACK_CMD PR_CYCLE_TRIAGE_CMD PR_CYCLE_READY_CMD \
                   PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
-                  PR_CYCLE_POLL_INTERVAL PR_CYCLE_POLL_CEILING \
                   PR_CYCLE_RESCUE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
                   PR_CYCLE_STOP_FILE; do
             eval "_val=\${$_v}"
@@ -1043,7 +1045,7 @@ cd "$ROOT" || exit 1
 # only because _normalize_prs guarantees the value is [0-9,]+ with no whitespace; a raw
 # "#2101, #2102" would word-split here into a garbage token. Do not "fix" this by quoting
 # the whole ${VAR:+...} -- that passes an empty argument when the flag is unset.
-"$ROOT/bin/pr-cycle" --worker --max-merges "$MAX_MERGES" ${NO_DM:+--no-dm} ${ONLY:+--only $ONLY} ${SKIP:+--skip $SKIP}
+"$ROOT/bin/pr-cycle" --worker --max-ready "$MAX_READY" --jobs "$JOBS" ${NO_DM:+--no-dm} ${ONLY:+--only $ONLY} ${SKIP:+--skip $SKIP}
 # Release the label so the "already live" guard stops matching.
 rm -f "$PLIST"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true

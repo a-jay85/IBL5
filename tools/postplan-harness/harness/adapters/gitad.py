@@ -53,6 +53,14 @@ _GATE_CLASSES = (
 )
 
 
+# Every harness rebase runs with rerere off. This repo enables rerere + autoupdate, so a
+# recorded resolution can silently stage a conflicted path: the rebase still stops
+# (rc != 0) but `ls-files --unmerged` is empty, inventory_conflicts() reports
+# "no unmerged paths", and the run dies at exit 3 (preseason-stats-retag, 2026-09-26).
+# A replayed resolution is also unreviewed; with rerere off the conflict surfaces as
+# real unmerged paths and goes through the resolver + TREE-EQUIVALENT proof instead.
+_NO_RERERE = ("-c", "rerere.enabled=false")
+
 _STALE_LEASE_MARKERS = ("stale info", "stale-lease:", "cannot lock ref",
                         "fetch first", "non-fast-forward")
 
@@ -430,7 +438,7 @@ class LiveGit:
 
         purge_verdict_artifacts(key)
 
-        proc = subprocess.run(["git", "-C", self.worktree, "rebase", base],
+        proc = subprocess.run(["git", "-C", self.worktree, *_NO_RERERE, "rebase", base],
                               capture_output=True, text=True, errors="replace")
         if proc.returncode != 0:
             conflict_detail = (proc.stderr or proc.stdout).strip()[:400]
@@ -463,7 +471,7 @@ class LiveGit:
 
                 env = {**os.environ, "GIT_EDITOR": "true"}
                 cont_proc = subprocess.run(
-                    ["git", "-C", self.worktree, "rebase", "--continue"],
+                    ["git", "-C", self.worktree, *_NO_RERERE, "rebase", "--continue"],
                     capture_output=True, text=True, errors="replace", env=env,
                 )
                 if cont_proc.returncode != 0:
@@ -609,7 +617,7 @@ class LiveGit:
         purge_verdict_artifacts(key)
 
         rebase_proc = subprocess.run(
-            ["git", "-C", self.worktree, "rebase", "--onto", master_sha, ibl_base, branch],
+            ["git", "-C", self.worktree, *_NO_RERERE, "rebase", "--onto", master_sha, ibl_base, branch],
             capture_output=True, text=True, errors="replace",
         )
         auto_resolved_files: tuple = ()
@@ -645,7 +653,7 @@ class LiveGit:
 
                 env = {**os.environ, "GIT_EDITOR": "true"}
                 cont_proc = subprocess.run(
-                    ["git", "-C", self.worktree, "rebase", "--continue"],
+                    ["git", "-C", self.worktree, *_NO_RERERE, "rebase", "--continue"],
                     capture_output=True, text=True, errors="replace", env=env,
                 )
                 if cont_proc.returncode != 0:

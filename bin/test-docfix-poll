@@ -97,6 +97,8 @@ case "$1 $2" in
         *"--state all"*)
             case "$args" in
               *"--json state"*) printf '%s' "${SHIM_PR_STATE:-NONE}" ;;
+              # health never-ran anchor: newest refresh PR createdAt (post-jq).
+              *createdAt*)      printf '%s' "${SHIM_PR_LAST_CREATED:-}" ;;
               *)                printf '%s' "${SHIM_PR_FOR_BRANCH:-0}" ;;
             esac ;;
         *"--state closed"*) printf '%s' "${SHIM_PR_CLOSED:-[]}" ;;

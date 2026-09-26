@@ -256,7 +256,11 @@ salvage_wedged_branch() {   # $1 = branch name
     changed="$(git -C "$wt" status --porcelain 2>/dev/null)"
     if [ -z "$changed" ]; then
         # Clean worktree — no uncommitted work to preserve, reap directly.
-        if "$MAIN/bin/cleanup" "$branch" >/dev/null 2>&1; then
+        # bin/cleanup exits 0 on a SKIP too (it treats a zero-own-commit branch as
+        # in-progress, not merged), so confirm the ref is actually gone before
+        # claiming a reap — else this logs "reaped" every night while it lingers.
+        if "$MAIN/bin/cleanup" "$branch" >/dev/null 2>&1 \
+            && ! git -C "$MAIN" show-ref --verify --quiet "refs/heads/$branch"; then
             echo "Wedged branch '$branch' was clean; reaped directly."
             return 0
         fi
@@ -341,7 +345,7 @@ issue_episode_epoch() {   # $1 = issue number
 # a report, not a gate, mirroring `check-docs --staleness-report`. The audit
 # workflow appends them to $GITHUB_OUTPUT verbatim.
 health_report() {
-    local alert=false kind="" detail="" report count pr_json pr_num red orphan wedged age_h episode
+    local alert=false kind="" detail="" report count pr_json pr_num red orphan wedged age_h episode last_pr last_pr_epoch
     report="$(mktemp)"; trap 'rm -f "$report"' RETURN
     "$MAIN/bin/check-docs" --staleness-report > "$report" \
         || { printf 'alert=false\nkind=\ndetail=\n'; return 0; }
@@ -382,6 +386,19 @@ health_report() {
             # to "now" (age 0 → no alert) — fail-quiet like every guard above.
             episode="$(issue_episode_epoch "$issue_num")" && [ -n "$episode" ] \
                 || episode="$(date -u +%s)"
+            # The episode anchor alone false-alarms on a healthy poll: the issue
+            # stays open (and its stale-since carries forward) as long as SOME doc
+            # is stale each night, even while the poll opens and merges a refresh
+            # PR daily. So also anchor on the newest refresh PR of any state — a
+            # working poll has opened one within the grace window. -L 100 spans
+            # several days of PR traffic. Fail-quiet: a gh error keeps the episode.
+            last_pr="$(gh pr list --state all -L 100 --json headRefName,createdAt \
+              --jq '[.[] | select(.headRefName | startswith("docs-stale-refresh-")) | .createdAt] | max // empty')" \
+              || last_pr=""
+            if [ -n "$last_pr" ] && last_pr_epoch="$(iso_to_epoch "$last_pr")" \
+                && [ -n "$last_pr_epoch" ] && [ "$last_pr_epoch" -gt "$episode" ]; then
+                episode="$last_pr_epoch"
+            fi
             age_h=$(( ( $(date -u +%s) - episode ) / 3600 ))
             if [ "$age_h" -ge 36 ]; then
                 alert=true; kind="never-ran"

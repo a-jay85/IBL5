@@ -1132,12 +1132,13 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
     while True:
         kind, names = cifix.triage(outcome.failed)
 
-        # Green or indeterminate — done
+        # Indeterminate or green — done; check exit_code first so a timeout with
+        # failed==[] is never washed green by the triage path below.
+        if outcome.exit_code != 8:
+            return sha, outcome
         if kind == "green":
             log("phase7 ci-fix: only human-signoff failed - treating CI as green")
             return sha, ciwatch.CiOutcome(0, [], outcome.evidence + " (human-signoff dropped)")
-        if outcome.exit_code != 8:
-            return sha, outcome
 
         # Probe branch: fires on rollup-only or no-change
         if kind == "rollup-only" or last == "no-change":
@@ -1179,16 +1180,20 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                                                    if probe_outcome.exit_code == 8 else [])
             if probe_outcome.exit_code == 8:
                 probe_result = "still-red"
-            else:
+            elif probe_outcome.exit_code == 0:
                 probe_result = "flaky-green"
+            else:
+                probe_result = "indeterminate"
             log(f"phase7 ci-fix rerun probe: outcome={probe_result} "
                 f"sha={str(sha)[:8]} failed={list(probe_outcome.failed) if probe_outcome.exit_code == 8 else []}")
-            if probe_outcome.exit_code != 8:
+            if probe_outcome.exit_code == 0:
                 try:
                     gh.post_review_summary(pr, cifix.FLAKY_TITLE,
                                            cifix.flaky_comment(all_red_names))
                 except (HarnessError, OSError, subprocess.SubprocessError):
                     pass
+                return sha, probe_outcome
+            if probe_outcome.exit_code != 8:
                 return sha, probe_outcome
             # Probe still red — continue loop
             outcome = probe_outcome

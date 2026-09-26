@@ -194,7 +194,7 @@ class RecordingGh:
 
 
 class LiveGh(RecordingGh):
-    """Installed live adapter. Each of the ten MUTATIONS maps to one fixed `gh`
+    """Installed live adapter. Each of the thirteen MUTATIONS maps to one fixed `gh`
     invocation built inside its method — the allowlist IS the method set.
     Reads come from live `gh pr view` state. Merge deliberately omits
     --delete-branch: in a multi-worktree clone it errors benignly, and a parent

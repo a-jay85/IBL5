@@ -1871,3 +1871,28 @@ def test_phase7_watch_timeout_uses_fresh_remaining(monkeypatch, tmp_path):
 
     assert recorded_timeouts, "watch_or_reuse was not called"
     assert recorded_timeouts[0] <= runner._CI_FIX_WALL_BUDGET_SECS - 600
+
+
+def test_phase7_rewatch_timeout_is_indeterminate_not_green(monkeypatch, tmp_path):
+    """A re-watch timeout (exit -1, failed=[]) must not be washed green.
+
+    The fix: the loop checks outcome.exit_code != 8 before the triage-green path,
+    so a timeout with no failed names returns (sha, outcome) unchanged instead of
+    synthesizing a CiOutcome(0, ...) green.
+    """
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    out = str(tmp_path / "out")
+    fx = _red_fixture(
+        ci_checks=_CHECKS,
+        ci_fix_rewatch=[{"exit": -1, "failed": []}],
+    )
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=fx,
+    )
+    assert res.ci_outcome == "indeterminate"
+    acts = _actions(out)
+    assert not any(a.get("action") == "pr_comment" and a.get("title") == cifix.FLAKY_TITLE
+                   for a in acts), "flaky comment must not be posted on a timeout"

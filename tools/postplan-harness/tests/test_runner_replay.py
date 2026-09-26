@@ -967,7 +967,7 @@ class _FakePopen:
         return self.returncode
 
 
-def _run_live_shaped(monkeypatch, out, canned_extra=None):
+def _run_live_shaped(monkeypatch, out, canned_extra=None, fixture=None):
     """Replay fixtures driven down the live-shaped arm of runner.run.
 
     mode="replay" keeps git/gh fake (no network, no pushes) while live=True turns
@@ -976,13 +976,14 @@ def _run_live_shaped(monkeypatch, out, canned_extra=None):
     """
     from harness.adapters.probe import FixtureProbe
 
+    fx = fixture if fixture is not None else _INLINE_FIXTURE
     monkeypatch.setattr(runner, "ReplayGit", _LiveShapedGit)
     canned = dict(CANNED)
     if canned_extra:
         canned.update(canned_extra)
     llm = FixtureLlm(UsageLedger(), canned)
-    return runner.run(_INLINE_FIXTURE, out, llm, mode="replay", headless=True,
-                      live=True, probe=FixtureProbe(_INLINE_FIXTURE))
+    return runner.run(fx, out, llm, mode="replay", headless=True,
+                      live=True, probe=FixtureProbe(fx))
 
 
 def _ci_files(out):
@@ -1482,3 +1483,95 @@ def test_replay_review_unavailable_append_keeps_phase6_writes(tmp_path):
     final = [a for a in _actions(out) if a["action"] == "pr_edit_body"][-1]["body"]
     assert "No manual testing needed" in final
     assert "## Review Unavailable" in final
+
+
+# ---- Phase 7 CI fix loop ----
+
+_INCIDENT_FAILED = ["Shell harness regression tests", "Tests and Analysis"]
+
+
+def _red_fixture(**extra):
+    fx = json.loads(json.dumps(_INLINE_FIXTURE))   # deep copy
+    fx["checks_outcome"] = {"exit": 8, "failed": list(_INCIDENT_FAILED)}
+    fx.update(extra)
+    return fx
+
+
+def _audit(out):
+    with open(os.path.join(out, "audit.log")) as f:
+        return f.read()
+
+
+def test_phase7_green_ci_makes_no_ci_fix_call(monkeypatch, tmp_path):
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    monkeypatch.setattr(ciwatch, "reap_background_watch", lambda *a, **k: None)
+    out = str(tmp_path / "out")
+    res = _run_live_shaped(monkeypatch, out)
+    audit = _audit(out)
+    assert "phase7 ci-fix" not in audit
+    actions = _actions(out)
+    commit_msgs = [a.get("message", "") for a in actions if a.get("action") == "git_commit"]
+    assert not any(m.startswith("fix: address Phase 7 CI failures") for m in commit_msgs)
+
+
+def test_phase7_red_ci_without_rewatch_script_passes_through(monkeypatch, tmp_path):
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    monkeypatch.setattr(ciwatch, "reap_background_watch", lambda *a, **k: None)
+    out = str(tmp_path / "out")
+    res = _run_live_shaped(monkeypatch, out, fixture=_red_fixture())
+    assert res.ci_outcome == "failed"
+    audit = _audit(out)
+    assert "phase7 ci-fix" not in audit
+
+
+def test_phase7_red_ci_leaves_arming_unchanged(monkeypatch, tmp_path):
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    monkeypatch.setattr(ciwatch, "reap_background_watch", lambda *a, **k: None)
+    out_green = str(tmp_path / "out_green")
+    res_green = _run_live_shaped(monkeypatch, out_green)
+    green_auto_merge_count = [a["action"] for a in _actions(out_green)].count("pr_merge_auto")
+
+    out_red = str(tmp_path / "out_red")
+    res_red = _run_live_shaped(
+        monkeypatch, out_red,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=_red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}]),
+    )
+    red_actions = [a["action"] for a in _actions(out_red)]
+    red_auto_merge_count = red_actions.count("pr_merge_auto")
+    assert red_auto_merge_count == green_auto_merge_count
+    assert "pr_disable_auto_merge" not in red_actions
+
+
+@pytest.mark.xfail(strict=True, reason="Phase 7 fix loop not yet implemented")
+def test_phase7_incident_red_ci_is_fixed_and_rewatched(monkeypatch, tmp_path):
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    monkeypatch.setattr(ciwatch, "reap_background_watch", lambda *a, **k: None)
+
+    class _TwoShaLiveGit(_LiveShapedGit):
+        def commit_all(self, message):
+            super().commit_all(message)
+            return f"fix-sha-{len(self.commit_messages)}"
+
+    def _run_live_shaped_two_sha(monkeypatch, out, canned_extra, fixture):
+        from harness.adapters.probe import FixtureProbe
+        fx = fixture if fixture is not None else _INLINE_FIXTURE
+        monkeypatch.setattr(runner, "ReplayGit", _TwoShaLiveGit)
+        canned = dict(CANNED)
+        if canned_extra:
+            canned.update(canned_extra)
+        llm = FixtureLlm(UsageLedger(), canned)
+        return runner.run(fx, out, llm, mode="replay", headless=True,
+                          live=True, probe=FixtureProbe(fx))
+
+    out = str(tmp_path / "out")
+    fixture = _red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}])
+    res = _run_live_shaped_two_sha(monkeypatch, out,
+                                   canned_extra={"ci-fix": ["edits made"]},
+                                   fixture=fixture)
+    assert res.ci_outcome == "green"
+    assert res.ci_head != _LiveShapedGit.POST_REBASE_SHA
+    audit = _audit(out)
+    assert "phase7 ci-fix attempt 1: model=claude-opus-5-5 outcome=fixed" in audit
+    commit_msgs = [a.get("message", "") for a in _actions(out) if a.get("action") == "git_commit"]
+    assert any(m.startswith("fix: address Phase 7 CI failures (attempt 1)") for m in commit_msgs)

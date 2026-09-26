@@ -233,7 +233,9 @@ class Boxscore
                 if ($seasonPhase === "HEAT") {
                     $this->gameMonth = (string) Season::IBL_HEAT_MONTH;
                 } elseif ($seasonPhase === "Preseason") {
-                    $this->gameMonth = sprintf("%02u", (int)$this->gameMonth - 2);
+                    // Every preseason game (JSB Nov days 2-30, Dec day 1) lands in September;
+                    // the day is preserved, so the two source months never share a date.
+                    $this->gameMonth = sprintf("%02u", Season::IBL_PRESEASON_MONTH);
                 }
             }
         }

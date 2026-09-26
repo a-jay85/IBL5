@@ -958,7 +958,7 @@ class BoxscoreProcessorTest extends TestCase
         $this->assertSame(0, $result['gamesUpdated']);
         $this->assertSame(2, $result['gamesRejected']);
         $this->assertSame('2007-09-20', $result['rejectedGames'][0]->gameDate);
-        $this->assertSame('2007-10-15', $result['rejectedGames'][1]->gameDate);
+        $this->assertSame('2007-09-15', $result['rejectedGames'][1]->gameDate);
         $this->assertSame(RejectedGame::REASON_PRESEASON_SHIFT_NOT_IN_SCHEDULE, $result['rejectedGames'][0]->reason);
         $this->assertSame(RejectedGame::REASON_PRESEASON_SHIFT_NOT_IN_SCHEDULE, $result['rejectedGames'][1]->reason);
         $this->assertSame(2, $result['outOfWindowGames']);

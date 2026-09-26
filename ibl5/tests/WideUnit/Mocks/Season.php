@@ -31,6 +31,8 @@ class Season
     const IBL_OLYMPICS_MONTH = 8;
     const IBL_PRESEASON_MONTH = 9;
     const IBL_HEAT_MONTH = 10;
+    /** ibl_box_scores[_teams].game_type for September (preseason) rows; migration 188. */
+    const IBL_PRESEASON_GAME_TYPE = 4;
     const IBL_REGULAR_SEASON_STARTING_MONTH = 11;
     const IBL_ALL_STAR_MONTH = 2;
     const IBL_REGULAR_SEASON_ENDING_MONTH = 5;

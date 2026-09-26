@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TeamOffDefStats;
 
 use League\League;
+use Season\Season;
 use TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface;
 
 /**
@@ -37,7 +38,8 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
     public static function gameTypesForPhase(string $phase): array
     {
         return match ($phase) {
-            'Preseason', 'HEAT' => [3],
+            'Preseason' => [Season::IBL_PRESEASON_GAME_TYPE],
+            'HEAT' => [3],
             'Regular Season' => [1],
             'Playoffs', 'Free Agency', 'Draft' => [1, 2],
             default => [1],

@@ -148,6 +148,42 @@ def test_llm_path_snapshot_survives_unresolvable_inventory(repo_with_origin):
     assert _no_rebase_in_progress(d)
 
 
+def test_recorded_rerere_resolution_does_not_hide_the_conflict(repo_with_origin):
+    """rerere + autoupdate (this repo's config) must not pre-stage a conflicted path.
+
+    A replayed resolution leaves the rebase stopped with an empty unmerged set, which
+    inventory_conflicts() reports as "no unmerged paths" and the run dies at exit 3
+    (preseason-stats-retag, 2026-09-26). Mutation caught: drop _NO_RERERE from the
+    rebase argv -> detail ends in 'conflicted: ?' and last_conflict_files == ().
+    """
+    d = repo_with_origin
+    sh(d, "config", "rerere.enabled", "true")
+    sh(d, "config", "rerere.autoupdate", "true")
+    _commit(d, "x.txt", "shared\n", "X0")
+    x0 = _sha(d)
+    sh(d, "update-ref", "refs/remotes/origin/master", x0)
+    sh(d, "checkout", "-b", "feat")
+    f1 = _commit(d, "x.txt", "feat side\n", "F1")
+    _publish_as_origin_master(d, x0, "x.txt", "trunk side\n", "T1")
+
+    # Record a resolution the way a human rebase would, then put feat back.
+    assert sh(d, "rebase", "origin/master", check=False).returncode != 0
+    open(os.path.join(d, "x.txt"), "w").write("resolved\n")
+    sh(d, "add", "x.txt")
+    subprocess.run(["git", "-C", d, "rebase", "--continue"], check=True,
+                   capture_output=True, env={**os.environ, "GIT_EDITOR": "true"})
+    sh(d, "reset", "--hard", f1)
+
+    g = LiveGit(d)                       # llm=None
+    with pytest.raises(HarnessError) as ei:
+        g.rebase_onto("origin/master")
+    assert ei.value.kind == "rebase-conflict"
+    assert "conflicted: x.txt" in ei.value.detail
+    assert g.last_conflict_files == ("x.txt",)
+    assert _sha(d) == f1
+    assert _no_rebase_in_progress(d)
+
+
 def test_clean_rebase_resets_stale_snapshot(repo_with_origin):
     """Negative path: a rebase that succeeds leaves last_conflict_files empty.
 

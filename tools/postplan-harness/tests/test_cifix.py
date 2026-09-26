@@ -199,3 +199,37 @@ class TestRecordingGhRerun:
             a.get("action") == "run_rerun_failed" and a.get("run_id") == "111"
             for a in actions
         )
+
+
+class TestSkillAndCompanionPhase7AreOpusOnly:
+    def test_skill_and_companion_phase7_are_opus_only(self):
+        test_dir = pathlib.Path(__file__).resolve().parent
+        repo_root = test_dir
+        for _ in range(10):
+            if (repo_root / ".claude" / "skills" / "post-plan" / "SKILL.md").exists():
+                break
+            repo_root = repo_root.parent
+        else:
+            pytest.fail("Could not locate .claude/skills/post-plan/SKILL.md")
+
+        skill_path = repo_root / ".claude" / "skills" / "post-plan" / "SKILL.md"
+        companion_path = repo_root / ".claude" / "skills" / "post-plan" / "_phase-7-ci-monitoring.md"
+
+        skill_full = skill_path.read_text()
+        # Slice Phase 7 section only
+        start = skill_full.find("## Phase 7: CI Monitoring")
+        end = skill_full.find("## Phase 8", start)
+        skill_slice = skill_full[start:end] if start >= 0 and end >= 0 else skill_full[start:]
+
+        companion_text = companion_path.read_text()
+
+        assert "Sonnet" not in skill_slice, "skill Phase 7 section still mentions Sonnet"
+        assert "Sonnet" not in companion_text, "_phase-7-ci-monitoring.md still mentions Sonnet"
+        assert "mutation|MSI" not in skill_slice
+        assert "mutation|MSI" not in companion_text
+        assert "Opus 5.5" in skill_slice, "skill Phase 7 section missing Opus 5.5"
+        assert "Opus 5.5" in companion_text, "_phase-7-ci-monitoring.md missing Opus 5.5"
+        assert "gh run rerun" in skill_slice
+        assert "gh run rerun" in companion_text
+        assert f"{cifix.MAX_CI_FIX_ATTEMPTS} attempts" in skill_slice
+        assert "Tests and Analysis" in skill_slice

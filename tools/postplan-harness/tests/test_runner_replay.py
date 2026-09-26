@@ -6,6 +6,8 @@ import subprocess
 import sys
 import tempfile
 import types
+import pathlib
+import time as time_mod
 
 import pytest
 
@@ -14,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runner
 from harness.adapters.llm import FixtureLlm, extract_json
 from harness.state import HarnessError, TerminalState, UsageLedger
-from harness import ciwatch, schemas
+from harness import cifix, ciwatch, schemas
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -1488,6 +1490,9 @@ def test_replay_review_unavailable_append_keeps_phase6_writes(tmp_path):
 # ---- Phase 7 CI fix loop ----
 
 _INCIDENT_FAILED = ["Shell harness regression tests", "Tests and Analysis"]
+_CHECKS = [{"name": n, "state": "FAILURE",
+            "link": f"https://github.com/o/r/actions/runs/9{i}/job/8{i}"}
+           for i, n in enumerate(_INCIDENT_FAILED)]
 
 
 def _red_fixture(**extra):
@@ -1510,23 +1515,35 @@ class _TwoShaLiveGit(_LiveShapedGit):
         _TwoShaLiveGit.instances.append(self)
 
     def commit_all(self, message):
-        runner.ReplayGit.commit_all(self, message)
+        super(_LiveShapedGit, self).commit_all(message)
         return f"replay-sha-{len(self.commit_messages)}"
 
 
-def _run_live_shaped_two_sha(monkeypatch, out, canned_extra, fixture):
-    from harness.adapters.probe import FixtureProbe
+class _NoEditLiveGit(_LiveShapedGit):
+    """_LiveShapedGit whose fix-commit path records the message but returns '' (no change)."""
 
-    _TwoShaLiveGit.instances.clear()
-    monkeypatch.setattr(runner, "ReplayGit", _TwoShaLiveGit)
+    def commit_all(self, message):
+        if message.startswith("fix: address Phase 7 CI failures"):
+            self.commit_messages.append(message)
+            return ""
+        return super(_LiveShapedGit, self).commit_all(message)
+
+
+def _run_live_shaped_with(monkeypatch, out, *, git_cls, fixture, canned_extra=None, llm=None):
+    from harness.adapters.probe import FixtureProbe
+    if hasattr(git_cls, "instances"):
+        git_cls.instances.clear()
+    monkeypatch.setattr(runner, "ReplayGit", git_cls)
     monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
     canned = dict(CANNED)
     if canned_extra:
         canned.update(canned_extra)
+    if llm is None:
+        llm = FixtureLlm(UsageLedger(), canned)
     fx = fixture if fixture is not None else _INLINE_FIXTURE
-    llm = FixtureLlm(UsageLedger(), canned)
-    return runner.run(fx, out, llm, mode="replay", headless=True,
-                      live=True, probe=FixtureProbe(fx))
+    res = runner.run(fx, out, llm, mode="replay", headless=True,
+                     live=True, probe=FixtureProbe(fx))
+    return res, llm
 
 
 def test_phase7_green_ci_makes_no_ci_fix_call(monkeypatch, tmp_path):
@@ -1560,18 +1577,297 @@ def test_phase7_red_ci_leaves_arming_unchanged(monkeypatch, tmp_path):
     assert "pr_disable_auto_merge" not in [a["action"] for a in _actions(out_red)]
 
 
-@pytest.mark.xfail(strict=True, reason="Phase 7 fix loop not yet implemented")
 def test_phase7_incident_red_ci_is_fixed_and_rewatched(monkeypatch, tmp_path):
     out = str(tmp_path / "out")
-    res = _run_live_shaped_two_sha(
+    res, _ = _run_live_shaped_with(
         monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
         canned_extra={"ci-fix": ["edits made"]},
         fixture=_red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}]),
     )
     assert res.ci_outcome == "green"
-    assert res.ci_head == "replay-sha-1"
+    assert res.ci_head == "replay-sha-2"
     audit = _audit(out)
     assert "phase7 ci-fix attempt 1: model=claude-opus-5-5 outcome=fixed" in audit
     git = _TwoShaLiveGit.instances[-1]
     assert any(m.startswith("fix: address Phase 7 CI failures (attempt 1)")
                for m in git.commit_messages)
+
+
+def test_phase7_signoff_only_red_is_green(monkeypatch, tmp_path):
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    out = str(tmp_path / "out")
+    fx = _red_fixture(
+        checks_outcome={"exit": 8, "failed": ["human-signoff"]},
+        ci_fix_rewatch=[],
+    )
+    res = _run_live_shaped(monkeypatch, out, fixture=fx)
+    assert res.ci_outcome == "green"
+    audit = _audit(out)
+    assert "only human-signoff failed" in audit
+    assert "ci-fix attempt" not in audit
+
+
+def test_phase7_exit8_without_names_is_not_washed_green(monkeypatch, tmp_path):
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    out = str(tmp_path / "out")
+    fx = _red_fixture(
+        checks_outcome={"exit": 8, "failed": []},
+        ci_fix_rewatch=[],
+    )
+    res = _run_live_shaped(monkeypatch, out, fixture=fx)
+    assert res.ci_outcome == "failed"
+
+
+def test_phase7_rollup_only_never_calls_fixer(monkeypatch, tmp_path):
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    out = str(tmp_path / "out")
+    fx = _red_fixture(
+        checks_outcome={"exit": 8, "failed": ["Tests and Analysis"]},
+        ci_checks=_CHECKS,
+        ci_fix_rewatch=[{"exit": 8, "failed": ["Tests and Analysis"]}],
+    )
+    res = _run_live_shaped(monkeypatch, out, fixture=fx)
+    acts = _actions(out)
+    assert sum(1 for a in acts if a.get("action") == "run_rerun_failed") == 1
+    audit = _audit(out)
+    assert "ci-fix attempt" not in audit
+    assert any(a.get("action") == "pr_comment" and a.get("title") == cifix.SURVIVOR_TITLE
+               for a in acts)
+
+
+def test_phase7_ceiling_is_three_attempts_then_survivor_comment(monkeypatch, tmp_path):
+    out = str(tmp_path / "out")
+    incident_red = {"exit": 8, "failed": list(_INCIDENT_FAILED)}
+    fx = _red_fixture(ci_checks=_CHECKS,
+                      ci_fix_rewatch=[incident_red, incident_red, incident_red])
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=fx,
+    )
+    audit = _audit(out)
+    assert "ci-fix attempt 1:" in audit and "outcome=still-red" in audit
+    assert "ci-fix attempt 2:" in audit
+    assert "ci-fix attempt 3:" in audit
+    assert "ci-fix attempt 4:" not in audit
+    acts = _actions(out)
+    survivor_acts = [a for a in acts if a.get("action") == "pr_comment"
+                     and a.get("title") == cifix.SURVIVOR_TITLE]
+    assert len(survivor_acts) == 1
+    assert "Shell harness regression tests" in survivor_acts[0].get("body", "")
+    assert res.ci_outcome == "failed"
+
+
+def test_phase7_no_change_probes_rerun_and_clears_flaky(monkeypatch, tmp_path):
+    out = str(tmp_path / "out")
+    fx = _red_fixture(
+        ci_checks=_CHECKS,
+        ci_fix_rewatch=[{"exit": 0, "failed": []}],
+    )
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_NoEditLiveGit,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=fx,
+    )
+    audit = _audit(out)
+    assert "attempt 1: model=claude-opus-5-5 outcome=no-change" in audit
+    assert "rerun probe: outcome=flaky-green" in audit
+    acts = _actions(out)
+    rerun_ids = {a.get("run_id") for a in acts if a.get("action") == "run_rerun_failed"}
+    assert rerun_ids == {"90", "91"}
+    assert any(a.get("action") == "pr_comment" and a.get("title") == cifix.FLAKY_TITLE
+               for a in acts)
+    assert res.ci_outcome == "green"
+
+
+def test_phase7_rerun_probe_runs_at_most_once(monkeypatch, tmp_path):
+    out = str(tmp_path / "out")
+    incident_red = {"exit": 8, "failed": list(_INCIDENT_FAILED)}
+    fx = _red_fixture(ci_checks=_CHECKS, ci_fix_rewatch=[incident_red])
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_NoEditLiveGit,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=fx,
+    )
+    audit = _audit(out)
+    assert audit.count("rerun probe") == 1
+    acts = _actions(out)
+    rerun_count = sum(1 for a in acts if a.get("action") == "run_rerun_failed")
+    assert rerun_count == 2
+    assert any(a.get("action") == "pr_comment" and a.get("title") == cifix.SURVIVOR_TITLE
+               for a in acts)
+
+
+def test_phase7_fix_call_uses_opus_5_5(monkeypatch, tmp_path):
+    out = str(tmp_path / "out")
+    llm = FixtureLlm(UsageLedger(), dict(CANNED, **{"ci-fix": ["edits made"]}))
+    _, llm_out = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
+        fixture=_red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}]),
+        llm=llm,
+    )
+    ci_fix_argvs = [argv for purpose, argv in llm_out.tooled_argvs if purpose == "ci-fix"]
+    assert ci_fix_argvs, "no ci-fix call was made"
+    for argv in ci_fix_argvs:
+        assert "claude-opus-5-5" in argv
+        assert all("claude-sonnet" not in a for a in argv)
+
+
+def test_phase7_fix_push_is_fast_forward_only(monkeypatch, tmp_path):
+    green_out = str(tmp_path / "green")
+    red_out = str(tmp_path / "red")
+    _run_live_shaped_with(
+        monkeypatch, green_out,
+        git_cls=_TwoShaLiveGit,
+        fixture=_INLINE_FIXTURE,
+    )
+    green_git = _TwoShaLiveGit.instances[-1]
+    _run_live_shaped_with(
+        monkeypatch, red_out,
+        git_cls=_TwoShaLiveGit,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=_red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}]),
+    )
+    incident_git = _TwoShaLiveGit.instances[-1]
+    assert incident_git.ff_pushes == 1
+    assert incident_git.pushes == green_git.pushes
+
+
+def test_phase7_fix_loop_error_does_not_fail_run(monkeypatch, tmp_path):
+    from harness.state import TerminalState as TS
+    out = str(tmp_path / "out")
+
+    def _boom_push_ff(self):
+        raise HarnessError("local-gate", "pre-push denied")
+
+    monkeypatch.setattr(_TwoShaLiveGit, "push_ff", _boom_push_ff)
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
+        canned_extra={"ci-fix": ["edits made"]},
+        fixture=_red_fixture(ci_checks=_CHECKS,
+                             ci_fix_rewatch=[{"exit": 0, "failed": []}]),
+    )
+    assert res.terminal != TS.FAILED
+    audit = _audit(out)
+    assert "outcome=error:local-gate" in audit
+    assert "ci-fix commit is LOCAL and unpushed" in audit
+    acts = _actions(out)
+    assert any(a.get("action") == "pr_comment" and a.get("title") == cifix.SURVIVOR_TITLE
+               for a in acts)
+
+
+def test_phase7_budget_exhausted_makes_no_attempt(monkeypatch, tmp_path):
+    out = str(tmp_path / "out")
+    monkeypatch.setattr(runner, "_CI_FIX_WALL_BUDGET_SECS", 0)
+    res, _ = _run_live_shaped_with(
+        monkeypatch, out,
+        git_cls=_TwoShaLiveGit,
+        fixture=_red_fixture(ci_checks=_CHECKS,
+                             ci_fix_rewatch=[{"exit": 0, "failed": []}]),
+    )
+    audit = _audit(out)
+    assert "wall-clock budget exhausted" in audit
+    assert "ci-fix attempt" not in audit
+    acts = _actions(out)
+    assert any(a.get("action") == "pr_comment" and a.get("title") == cifix.SURVIVOR_TITLE
+               for a in acts)
+
+
+def test_ci_fix_budget_below_max_pp_secs():
+    test_dir = pathlib.Path(__file__).resolve().parent
+    repo_root = test_dir
+    for _ in range(10):
+        candidate = repo_root / "bin" / "automouse" / "run"
+        if candidate.exists():
+            break
+        repo_root = repo_root.parent
+    else:
+        pytest.fail("Could not locate bin/automouse/run from test file location")
+    import re as _re
+    text = candidate.read_text()
+    m = _re.search(r"^MAX_PP_SECS=(\d+)", text, _re.MULTILINE)
+    assert m, "MAX_PP_SECS not found in bin/automouse/run"
+    max_pp = int(m.group(1))
+    assert runner._CI_FIX_WALL_BUDGET_SECS < max_pp
+    assert max_pp - runner._CI_FIX_WALL_BUDGET_SECS >= 600
+
+
+def test_phase7_fix_loop_divergence_fails_closed(monkeypatch, tmp_path):
+    from harness.adapters.ghad import RecordingGh
+    out = str(tmp_path / "out")
+    os.makedirs(out, exist_ok=True)
+    monkeypatch.setattr(
+        runner.gitutil, "reconcile_remote_head",
+        lambda *a, **k: types.SimpleNamespace(action="diverged",
+                                               evidence="remote moved", remote_sha=""),
+    )
+    _TwoShaLiveGit.instances.clear()
+    git = _TwoShaLiveGit(_INLINE_FIXTURE)
+    gh = RecordingGh(out)
+    llm = FixtureLlm(UsageLedger(), dict(CANNED, **{"ci-fix": ["edits made"]}))
+    res = types.SimpleNamespace(ci_head=None)
+    with pytest.raises(HarnessError) as exc_info:
+        runner._ci_fix_loop(
+            git, gh, llm, lambda *a: None, res,
+            worktree=".", pr=_INLINE_FIXTURE["pr_number"],
+            sha="sha0",
+            outcome=ciwatch.CiOutcome(8, list(_INCIDENT_FAILED), "t"),
+            out_dir=out, mode="live", fixture=_INLINE_FIXTURE,
+            run_started=time_mod.time(),
+        )
+    assert exc_info.value.kind == "remote-head-diverged"
+    acts = gh.actions()
+    assert any(a.get("action") == "pr_disable_auto_merge" for a in acts)
+
+
+def test_phase7_watch_timeout_uses_fresh_remaining(monkeypatch, tmp_path):
+    from harness.adapters.ghad import RecordingGh
+    out = str(tmp_path / "out")
+    os.makedirs(out, exist_ok=True)
+    monkeypatch.setattr(
+        runner.gitutil, "reconcile_remote_head",
+        lambda *a, **k: types.SimpleNamespace(action="ok"),
+    )
+    recorded_timeouts = []
+
+    def fake_watch_or_reuse(*a, timeout=0, **k):
+        recorded_timeouts.append(timeout)
+        return ciwatch.CiOutcome(0, [], "stub")
+
+    monkeypatch.setattr(ciwatch, "watch_or_reuse", fake_watch_or_reuse)
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    monkeypatch.setattr(ciwatch, "reap_background_watch", lambda *a, **k: None)
+
+    call_count = [0]
+    fake_time_values = [0.0, 0.0, 0.0, 600.0, 600.0, 600.0]
+
+    def fake_time():
+        idx = min(call_count[0], len(fake_time_values) - 1)
+        call_count[0] += 1
+        return fake_time_values[idx]
+
+    monkeypatch.setattr(runner.time, "time", fake_time)
+
+    _TwoShaLiveGit.instances.clear()
+    git = _TwoShaLiveGit(_INLINE_FIXTURE)
+    gh = RecordingGh(out)
+    llm = FixtureLlm(UsageLedger(), dict(CANNED, **{"ci-fix": ["edits made"]}))
+    res = types.SimpleNamespace(ci_head=None)
+
+    runner._ci_fix_loop(
+        git, gh, llm, lambda *a: None, res,
+        worktree=".", pr=_INLINE_FIXTURE["pr_number"],
+        sha="sha0",
+        outcome=ciwatch.CiOutcome(8, list(_INCIDENT_FAILED), "t"),
+        out_dir=out, mode="live", fixture=None,
+        run_started=0.0,
+    )
+
+    assert recorded_timeouts, "watch_or_reuse was not called"
+    assert recorded_timeouts[0] <= runner._CI_FIX_WALL_BUDGET_SECS - 600

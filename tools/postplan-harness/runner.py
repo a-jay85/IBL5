@@ -711,6 +711,22 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.final_pr_state = gh.pr_state() if (mode == "replay" or live) else "N/A"
         log(f"phase7 ci: exit={outcome.exit_code} failed={outcome.failed} ({outcome.evidence})")
 
+        # Phase 7 fix loop: runs after Phase 6.5 arming has executed and never reads or
+        # writes `decision`. Replay enters only when the fixture scripts the re-watches,
+        # so every legacy red-CI fixture keeps its pass-through.
+        fix_enabled = ("ci_fix_rewatch" in (fixture or {}) if mode == "replay"
+                       else bool(live and pr))
+        if fix_enabled and outcome.exit_code == 8:
+            sha, outcome = _ci_fix_loop(git, gh, llm, log, res, worktree=worktree, pr=pr,
+                                        sha=sha, outcome=outcome, out_dir=out_dir,
+                                        mode=mode, fixture=fixture,
+                                        run_started=run_started)
+            res.ci_head = sha or None
+            res.ci_outcome = {0: "green", 8: "failed"}.get(outcome.exit_code,
+                                                           "indeterminate")
+            log(f"phase7 ci(after fix loop): exit={outcome.exit_code} "
+                f"failed={outcome.failed}")
+
         if _should_resolve_behind(live, pr, decision, outcome):
             sha, outcome = _resolve_behind(git, gh, log, res, worktree, pr, sha,
                                            outcome, out_dir)
@@ -1251,7 +1267,18 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 break
             else:
                 remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
-                sha = git.push_ff() or new
+                try:
+                    sha = git.push_ff() or new
+                except HarnessError as push_err:
+                    if push_err.kind == "remote-head-diverged":
+                        raise
+                    last = f"error:{push_err.kind}"
+                    log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} "
+                        f"outcome={last} sha={str(sha)[:8]}")
+                    trail.append(f"attempt {attempt}: {last}")
+                    log("ci-fix commit is LOCAL and unpushed; "
+                        "the next bin/post-plan-now run ships it")
+                    break
                 res.ci_head = sha
                 # Re-watch
                 if mode != "replay":

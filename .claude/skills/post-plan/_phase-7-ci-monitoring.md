@@ -1,30 +1,30 @@
 ---
-description: /post-plan Phase 7 — the Opus-escalation procedure for CI fixes, the BEHIND re-rebase loop, and the harness background-CI-outcome short-circuit.
-last_verified: 2026-09-18
+description: /post-plan Phase 7: the all-Opus CI fix procedure, the BEHIND re-rebase loop, and the harness background-CI-outcome short-circuit.
+last_verified: 2026-09-26
 ---
 
 # Phase 7 — CI Monitoring (post-plan reference)
 
-Purpose: the Opus-escalation procedure for Phase 7 CI fixes.
+This file holds the Phase 7 CI fix procedure. Every attempt runs on Opus 5.5.
 
 **Outcome already known.** If `$HARNESS_RUN_DIR/ci-<head-sha>.json` exists for the current head
 (SKILL.md Phase 7.0), its `failed_checks` and `evidence` replace the first `gh pr checks --watch`
-call — start the escalation procedure below from its failure list instead of re-measuring. The
-escalation procedure itself, the BEHIND re-rebase loop, and the MERGED early exit are unchanged
-and still apply to every re-watch after a fix commit.
+call. Start the fix procedure below from its failure list instead of re-measuring. The fix
+procedure itself, the BEHIND re-rebase loop, and the MERGED early exit are unchanged and still
+apply to every re-watch after a fix commit.
 
 Headless safety is preserved: reading the file is a foreground `cat`, not a background job.
 
-   **Escalate to Opus when out of depth.** Failures in the Opus row of agent-tiering — failing-check `name` matching `mutation|MSI|engine|golden|migration` (case-insensitive), or any FK-ordering / cross-track failure you can't localize from the log in one read. Triggers: category match → Opus on attempt 1; otherwise Sonnet does attempts 1–2, Opus takes attempt 3 instead of giving up.
+   **All attempts run on Opus 5.5.** Make up to 3 attempts, each a fresh Opus agent. The failing check's name does not change the model.
 
    Capture context to temp files and pass the **paths** — the agent `Read`s them; never summarize the log/diff into the prompt (summarizing → garbage fix, per the Phase 4 review-agent rule):
    ```bash
    gh run view <id> --log-failed > /tmp/post-plan-ci-fail-$PPID.log
    git -C <worktree> diff origin/master...HEAD > /tmp/post-plan-diff-$PPID.patch
    ```
-   Spawn **one** `Agent(model: "opus")` with: the two paths, PR number, worktree path, plan path, failing check names, what Sonnet tried. It fixes, runs the relevant track locally if it can, **commits and pushes itself**, returns a one-line summary. Don't forward CLAUDE.md (auto-loaded). Loop back to step 1.
+   Spawn **one** `Agent(model: "opus")` with: the two paths, PR number, worktree path, plan path, failing check names, what earlier attempts tried. Tell it master is green, so this diff caused the failure, and that it must not edit a test's expected value or hardcoded count to match new output unless the PR meant to change that count. It fixes, runs the relevant track locally if it can, **commits and pushes itself**, returns a one-line summary. Don't forward CLAUDE.md (auto-loaded). Loop back to step 1.
 
-   The Opus attempt **counts toward** the 3-iteration ceiling; after 3 total, report surviving failures in a PR comment and continue to Phase 8. Keep it inside the Phase 7 budget — one bounded Opus attempt fits.
+   Every attempt counts toward the 3-iteration ceiling. When an attempt makes no code change, run `gh run rerun <run-id> --failed` once and re-watch. A green re-run means a flaky check; say so in a PR comment and go to Phase 8. The re-run does not count as an attempt. After 3 attempts, report the surviving failures in a PR comment and continue to Phase 8. Stay inside the Phase 7 budget.
 
 ---
 

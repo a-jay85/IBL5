@@ -59,4 +59,13 @@ class SeasonLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
         $this->assertNotEmpty($output);
         $this->assertStringContainsString('Season Leaders', $output);
     }
+
+    public function testEmptyPostRendersSeasonFilterFormMarkup(): void
+    {
+        $output = $this->runModule('SeasonLeaderboards', [], [], $this->dbGlobals());
+
+        $this->assertStringContainsString('<form name="Leaderboards"', $output);
+        $this->assertStringContainsString('class="ibl-filter-form"', $output);
+        $this->assertStringContainsString('name="sortby"', $output);
+    }
 }

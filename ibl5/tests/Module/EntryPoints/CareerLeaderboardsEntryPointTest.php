@@ -63,4 +63,13 @@ class CareerLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
         $this->assertNotEmpty($output);
         $this->assertStringContainsString('Career Leaderboards', $output);
     }
+
+    public function testEmptyPostRendersCareerFilterFormMarkup(): void
+    {
+        $output = $this->runModule('CareerLeaderboards', [], [], $this->dbGlobals());
+
+        $this->assertStringContainsString('<form name="CareerLeaderboards"', $output);
+        $this->assertStringContainsString('name="boards_type"', $output);
+        $this->assertStringContainsString('name="sort_cat"', $output);
+    }
 }

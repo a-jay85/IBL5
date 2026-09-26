@@ -26,4 +26,10 @@ class ModuleRedirectTest extends TestCase
         // Lookup is case-sensitive: a case-insensitive map would resolve this.
         $this->assertNull(ModuleRedirect::targetFor('votingresults'));
     }
+
+    public function testTargetForNeverRedirectsTheLeaderboardsHost(): void
+    {
+        // The host module mapping to itself would loop the browser forever.
+        $this->assertNull(ModuleRedirect::targetFor('Leaderboards'));
+    }
 }

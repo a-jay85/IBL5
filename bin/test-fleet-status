@@ -881,6 +881,26 @@ write_session_sidecar "$TMP/ws-test.log" 'not-a-uuid' \
     && pass "write_session_sidecar: no file written on invalid uuid" \
     || fail "write_session_sidecar: no file written on invalid uuid"
 
+# Case 22 — --watch: first frame is written in one buffered printf, not streamed.
+# Run --watch 999 under timeout so the test exits cleanly when the sleep leg starts
+# (after the first frame write). timeout exit 124 is the normal outcome; `|| true`
+# keeps the subshell from propagating it. \[H\[2J\[3J in the ERE matches the
+# literal bracket sequences that appear inside the \033[H\033[2J\033[3J bytes.
+OUTPUT_WATCH="$(timeout 5 env PATH="$STUBBIN:$PATH" \
+    FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
+    FLEET_STATUS_HARNESS_OUT="$OUT" \
+    FLEET_STATUS_LOG_DIR="$LOGS" \
+    FLEET_STATUS_TRANSCRIPT_ROOT="$TX" \
+    FLEET_STATUS_JQ=jq \
+    FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
+    FLEET_STATUS_REORDER_APP_DIR="$TMP/apps" \
+    FLEET_STATUS_OSACOMPILE="$STUBBIN/osacompile" \
+    "$FLEET" --watch 999 2>&1 || true)"
+assert_has "watch: frame-swap clear-screen escape in first frame" \
+    "$OUTPUT_WATCH" '\[2J'
+assert_has "watch: refresh footer in first frame" \
+    "$OUTPUT_WATCH" 'refreshing every 999s'
+
 # Case 11 — --help window intact: line count must not have changed. 46 while this
 # branch was off master; the rebase onto master picked up 18 more help lines that
 # this branch never wrote, and the § PROGRESS rewrite is line-for-line even. 75

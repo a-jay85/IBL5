@@ -40,13 +40,15 @@ from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
 from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
-                              classify, files_from_diff, modified_files_from_diff,
-                              name_status_text, numstat_text,
+                              backlog_closes_mismatch, classify, files_from_diff,
+                              modified_files_from_diff,
+                              name_status_text, normalize_backlog_closes, numstat_text,
                               qualify_backlog_refs,
                               render_files_changed, render_manual_confirmation,
-                              render_reviewer_verification, strip_manual_testing_section,
+                              render_residual_phases, render_reviewer_verification,
+                              strip_manual_testing_section,
                               upsert_files_changed, upsert_manual_confirmation,
-                              upsert_reviewer_verification)
+                              upsert_residual_phases, upsert_reviewer_verification)
 from harness.planfile import locate_plan, split_hold_justification
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
@@ -266,6 +268,29 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.classification = cls
         log("phase3 classify:\n" + cls.summary())
 
+        # Conflict probe: predict a rebase conflict before the LLM body check spends a call.
+        # A git error here means "no prediction", so the run falls through and the real
+        # rebase_onto() below stays authoritative. A predicted conflict propagates to the
+        # outer `except HarnessError`, which sets error_kind="rebase-conflict" (exit 3 via
+        # _FAIL_CLOSED_KINDS). This is the same terminal the post-commit rebase arm reaches.
+        if live:
+            try:
+                conflict_files = git.predict_rebase_conflict()
+            except HarnessError as e:
+                conflict_files = ()
+                log(f"phase2: conflict probe git error -- {e.detail}; falling through")
+            if conflict_files:
+                log(f"phase2: merge-tree probe predicted a rebase conflict on {git.branch()}")
+                log("phase2: conflicted paths (probe) = "
+                    f"{', '.join(conflict_files) or '-'}")
+                if getattr(git, 'llm', None) is None:
+                    log("phase2: no LLM resolver -- stopping before body check (exit 3)")
+                    raise HarnessError(
+                        "rebase-conflict",
+                        f"predicted by merge-tree probe vs origin/master: "
+                        f"{', '.join(conflict_files)}")
+                log("phase2: LLM resolver active -- probe is advisory, falling through to rebase_onto()")
+
         copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)
         summary, stripped = strip_manual_testing_section(copy["summary_md"])
         if stripped:
@@ -281,6 +306,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             copy["summary_md"] = check["corrected_body"]
             for f in check.get("findings", []):
                 log(f"phase2 body-check finding: {f}")
+        _inject_residual_phases(copy, plan, files, log)
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
         sha = _commit_with_gate_remediation(
@@ -344,7 +370,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pr = gh.pr_number()
             log(f"phase2: PR #{pr} exists — updated head to {sha or '(clean)'}")
         else:
-            create_body = upsert_files_changed(copy["summary_md"], render_files_changed(diff))
+            create_body = _apply_backlog_closes(upsert_files_changed(copy["summary_md"], render_files_changed(diff)), plan, log)
+            create_body = _upsert_no_adr_markers(create_body, plan)
             pr = gh.pr_create(copy["title"], create_body, "master")
             log(f"phase2: pr_create intent recorded (title={copy['title']!r})")
         res.pr_number = pr
@@ -469,7 +496,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # files-changed block is machine-generated: refresh it on every run so the
         # PR body's scope can't silently drift from the actual diff.
         body = upsert_files_changed(body, render_files_changed(diff))
+        body = _apply_backlog_closes(body, plan, log)
+        body = _upsert_no_adr_markers(body, plan)
         gh.pr_edit_body(pr, body)
+        _check_backlog_closes(gh, pr, plan, log)
 
         # ---- Phase 5.5: plan-intent fidelity review --------------------
         # Pinned BEFORE the call: condition (12) compares the tree the reviewer saw
@@ -484,9 +514,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _join_review()
         # A remediation loop moved the head, up to MAX_FIDELITY_ROUNDS times. Phase 7
         # must watch CI for the last commit, which is what remediation_sha aliases after
-        # the loop.
-        if res.fidelity.get("remediation_sha"):
-            sha = res.fidelity["remediation_sha"]
+        # the loop. A body-only round moved no head, so it never replaces sha.
+        if rsha := _last_remediation_commit(res.fidelity):
+            sha = rsha
             # Phase 5.0 re-run: the loop above moved the head, so the diff the first
             # pass saw is stale. A remediation that authored the planned file must
             # clear condition (3) on the SAME run, or the hold never releases.
@@ -615,7 +645,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             vpath = fid.get("verdict_path") or fidelity.verdict_path(pr)
             digest = fidelity.digest_lines(worktree, master_sha, vpath, out_dir,
                                            fid.get("verdict_1") is not None)
-            rsha = fid.get("remediation_sha")
+            rsha = _last_remediation_commit(fid)
             ci_line = ("CI: local verification "
                        f"{getattr(res.phase5, 'value', res.phase5)}; "
                        "GitHub checks are watched after this comment")
@@ -624,7 +654,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             sticky = fidelity.compose_sticky(
                 rebase_line, ci_line, fid, decision, digest,
                 fidelity.findings_excerpt(vpath, fid.get("verdict_1") is not None),
-                fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"), rsha,
+                fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"),
+                                       fid.get("remediation_sha"),
                                        fid.get("verdict_2"), fid.get("reviewed_tree_2"),
                                        fid.get("rounds_completed", 0)),
                 diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""),
@@ -761,6 +792,24 @@ _MAX_ROUND_RETRIES = 1
 # finding it has already answered in the body just re-answers it.
 BODY_ONLY_SHA = "body-only"
 BODY_FETCH_FAILED_REASON = "body-fetch-failed"
+
+
+def _last_remediation_commit(fid: dict) -> str | None:
+    """The last commit a remediation round actually authored, or None.
+
+    fid["remediation_sha"] is a round label: it reads BODY_ONLY_SHA after a body-only
+    round. Anything that treats it as a git object -- the Phase 6.5 remote-head check,
+    the Phase 7 CI watch -- must use this instead, or it compares the PR head against
+    the literal string "body-only" and fails closed as remote-head-diverged.
+    """
+    sha = fid.get("remediation_sha")
+    if sha != BODY_ONLY_SHA:
+        return sha or None
+    for r in reversed(fid.get("rounds") or []):
+        s = r.get("remediation_sha")
+        if s and s != BODY_ONLY_SHA:
+            return s
+    return None
 
 
 def _body_signature(body: str | None) -> str:
@@ -1140,6 +1189,63 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
             "summary_md": f"## Summary\n- {subject}\n"}, True
 
 
+def _upsert_no_adr_markers(body: str, plan) -> str:
+    """Prepend the plan's no-ADR marker lines to the top of the PR body.
+    Plan-blind (plan None / plan.found False) or no markers => passthrough.
+    Idempotent: a marker already present anywhere in the body is not re-added."""
+    if plan is None or not plan.found:
+        return body
+    markers = getattr(plan, "no_adr_markers", None) or []
+    to_prepend = [m for m in markers if m not in body]
+    if not to_prepend:
+        return body
+    return "\n".join(to_prepend) + "\n\n" + body
+
+
+def _apply_backlog_closes(body: str, plan, log) -> str:
+    """Normalize closing keywords from the plan's `## Backlog issues` section.
+    Plan-blind (plan.found False) or no section => both lists empty => passthrough."""
+    issues = plan.backlog_issues if (plan and plan.found) else []
+    closes = [n for k, n in issues if k == "closes"]
+    refs = [n for k, n in issues if k == "refs"]
+    new = normalize_backlog_closes(body, closes, refs)
+    if new != body:
+        log(f"phase2: backlog closes normalized (closes={closes} refs={refs})")
+    return new
+
+
+def _check_backlog_closes(gh, pr, plan, log) -> None:
+    """Lever-3 self-check: ask GitHub which issues this PR will close and log a
+    loud WARN on disagreement. Never raises; never blocks arming."""
+    closes = [n for k, n in (plan.backlog_issues if plan and plan.found else [])
+              if k == "closes"]
+    if not closes:
+        return
+    try:
+        base, refs = gh.pr_closing_refs(pr)
+    except Exception as e:
+        log(f"phase2: backlog-closes self-check skipped ({str(e)[:120]})")
+        return
+    msg = backlog_closes_mismatch(closes, base, refs)
+    log(msg)
+
+
+def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str]:
+    """Phase 2: upsert `## Residual Phases` into copy["summary_md"] from phase-omission items.
+
+    Runs AFTER _body_check so an LLM-corrected body cannot drop the block, and BEFORE the
+    commit so the commit body and the PR body carry it. Idempotent: an empty item list
+    removes a stale block. Never raises on a plan-blind run (phase_omission_items returns
+    [] when plan.found is False). Returns the items for the caller's log line.
+    """
+    items = conformance.phase_omission_items(plan, files)
+    copy["summary_md"] = upsert_residual_phases(copy["summary_md"],
+                                                render_residual_phases(items))
+    for it in items:
+        log(f"phase2 residual-phase: {it}")
+    return items
+
+
 def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool]:
     """Phase 2 body-vs-diff verification: (result, body_check_degraded).
 
@@ -1307,14 +1413,6 @@ def _master_sha(worktree: str | None) -> str:
     proc = subprocess.run(["git", "-C", worktree, "rev-parse", "origin/master"],
                           capture_output=True, text=True)
     return proc.stdout.strip() or "origin/master"
-
-
-def _read_text(path: str) -> str:
-    try:
-        with open(path) as fh:
-            return fh.read()
-    except OSError:
-        return ""
 
 
 def _plan_hash(plan) -> str:
@@ -1535,7 +1633,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         # _body_override set, so pr_body() here would hand back the harness's own copy
         # and silently overwrite whatever the remediation agent edited on GitHub.
         live_body = gh.pr_body_fresh() or body
-        body = upsert_files_changed(live_body, render_files_changed(git.diff_vs_base()))
+        body = _apply_backlog_closes(upsert_files_changed(live_body, render_files_changed(git.diff_vs_base())), plan, log)
+        body = _upsert_no_adr_markers(body, plan)
         gh.pr_edit_body(pr, body)
         # sha is either a real commit sha or BODY_ONLY_SHA. fidelity.re_review()'s only
         # test of it is `if not remediation_sha: return None, None, None`, so a non-empty
@@ -1585,9 +1684,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     # Notes come from whichever review produced the final verdict: the initial one or
     # a re-review round. current_verdict_path tracks that review's verdict file.
     if final_verdict == "READY WITH NOTES":
-        notes = fidelity.extract_notes(llm, current_verdict_path, log=log)
-        nums = fidelity.file_note_issues(gh, notes, pr, _read_text(current_verdict_path),
-                                         log=log)
+        notes = fidelity.extract_notes(llm, current_verdict_path, log=log, pr_number=pr)
+        nums = fidelity.file_note_issues(gh, notes, pr, log=log)
         res.fidelity["backlog_issue_numbers"] = nums
         log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
     return final_verdict, final_err
@@ -1733,9 +1831,13 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
 
     if rc == 3:
         if res.error_kind == "rebase-conflict":
-            return ("RESULT: post-plan BLOCKED — rebase conflict on a stacked branch, "
-                    "human required; ERROR terminal=failed, no PR opened. "
-                    "Resolve the rebase, then re-run bin/post-plan-now.")
+            # Name the conflicted path. Any branch can hit this arm (a plain branch whose
+            # file master edited and the branch deleted, too), so "stacked" would mislead.
+            detail = _flat(res.error)
+            detail = f" {detail}" if detail else ""
+            return ("RESULT: post-plan BLOCKED — rebase conflict, "
+                    "human required; ERROR terminal=failed, no PR opened."
+                    f"{detail} Resolve the rebase, then re-run bin/post-plan-now.")
         if res.error_kind == "local-gate":
             detail = _flat(res.error) or "see gate output"
             # Classify on the FULL res.error, never on `detail`: _flat truncates at 300

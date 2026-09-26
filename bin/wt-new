@@ -153,6 +153,15 @@ else
     # Create worktree + branch in one step
     echo "Creating worktree '$NAME' from $BASE_BRANCH..."
     git -C "$REPO_ROOT" worktree add "$WT_ROOT" -b "$NAME" "$BASE_BRANCH"
+
+    # Record which Claude session created this branch. ~/.claude/hooks/auto-commit-reminder.sh
+    # compares it to the Stop payload's session_id: the creating session owns the whole
+    # tree, so its ad-hoc work ships by default; any later session holds. Skipped for a
+    # human run (var unset) and for --existing, whose branch can carry earlier work.
+    if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
+        printf '%s\n' "$CLAUDE_CODE_SESSION_ID" \
+            > "$(git -C "$WT_ROOT" rev-parse --absolute-git-dir)/wt-new-session"
+    fi
 fi
 
 # Persist the base so the pre-push ADR gate and bin/wt-rebase can later resolve this
@@ -162,10 +171,12 @@ git -C "$WT_ROOT" config "branch.$BRANCH_NAME.iblBase" "$BASE_BRANCH"
 # config.php: real copy, NOT a symlink. A symlink's absolute host target
 # (/Users/.../IBL5/ibl5/config.php) doesn't resolve inside the worktree's Docker
 # container, so every app request 500s (`Failed to open stream`). config.php is
-# league-agnostic (DB host is env-injected), so a snapshot copy works everywhere.
+# league-agnostic (DB credentials come from config.local.php), so a snapshot copy works everywhere.
 # wt-up materializes the same file for older symlinked worktrees.
 echo "Materializing config.php..."
 materialize_worktree_config "$WT_IBL5/config.php" "$MAIN_IBL5"
+echo "Materializing config.local.php..."
+materialize_worktree_config_local "$WT_IBL5/config.local.php" "$MAIN_IBL5"
 
 # Symlinks
 echo "Setting up symlinks..."

@@ -41,12 +41,12 @@ _shl_full() {
     tmp_list="$(mktemp)"
     # .sh files pass (extension alone is sufficient)
     find "$repo_root/bin" "$repo_root/ibl5/bin" \
-         "$repo_root/.claude/skills/pr-ready/scripts" \
+         "$repo_root/.claude/review-shared/scripts" \
          -type f -name '*.sh' 2>/dev/null >> "$tmp_list" || true
     # non-.sh files pass (shebang check)
     local f
     find "$repo_root/bin" "$repo_root/ibl5/bin" \
-         "$repo_root/.claude/skills/pr-ready/scripts" \
+         "$repo_root/.claude/review-shared/scripts" \
          -type f -not -name '*.sh' 2>/dev/null \
     | while IFS= read -r f; do
         if head -c 40 "$f" 2>/dev/null \

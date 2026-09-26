@@ -96,6 +96,32 @@ class PlrParserRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $row2['retired'], 'Re-upsert must not clobber retired = 1');
     }
 
+    // ── getSnapshotsByPhase ─────────────────────────────────────
+
+    public function testGetSnapshotsByPhaseReturnsRowsKeyedByPid(): void
+    {
+        $this->insertSnapshotRow(900001, 'Snap Player One', 2099, 'preseason');
+        $this->insertSnapshotRow(900002, 'Snap Player Two', 2099, 'preseason');
+        $this->insertSnapshotRow(900003, 'Snap Player Three', 2099, 'mid-season');
+        $this->insertSnapshotRow(900004, 'Snap Player Four', 2098, 'preseason');
+
+        $result = $this->repo->getSnapshotsByPhase(2099, 'preseason');
+
+        $keys = array_keys($result);
+        sort($keys);
+        self::assertSame([900001, 900002], $keys);
+        self::assertSame('preseason', $result[900001]['snapshot_phase']);
+        self::assertTrue(array_key_exists('oo', $result[900001]));
+        self::assertTrue(array_key_exists('rl_gp', $result[900001]));
+    }
+
+    public function testGetSnapshotsByPhaseReturnsEmptyArrayWhenNoRows(): void
+    {
+        $result = $this->repo->getSnapshotsByPhase(2099, 'preseason');
+
+        self::assertSame([], $result);
+    }
+
     // ── Data builders ───────────────────────────────────────────
 
     /**
@@ -153,6 +179,23 @@ class PlrParserRepositoryTest extends DatabaseTestCase
         ];
 
         return array_merge($defaults, $overrides);
+    }
+
+    private function insertSnapshotRow(
+        int $pid,
+        string $name,
+        int $seasonYear,
+        string $snapshotPhase,
+        int $ordinal = 1,
+    ): void {
+        $this->insertRow('ibl_plr_snapshots', [
+            'pid'            => $pid,
+            'name'           => $name,
+            'season_year'    => $seasonYear,
+            'snapshot_phase' => $snapshotPhase,
+            'source_archive' => 'test-archive.zip',
+            'ordinal'        => $ordinal,
+        ]);
     }
 
 }

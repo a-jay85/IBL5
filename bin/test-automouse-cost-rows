@@ -81,8 +81,13 @@ LOG="$TMPROOT/logs/$(date +%F).log"
 # driver, so extract rather than execute it.
 eval "$(awk '/^model_tier\(\)/,/^}/'             "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^_date_ago\(\)/,/^}/'              "$REPO_ROOT/bin/automouse/run")"
+eval "$(awk '/^acquire_cost_lock\(\)/,/^}/'      "$REPO_ROOT/bin/automouse/run")"
+eval "$(awk '/^release_cost_lock\(\)/,/^}/'      "$REPO_ROOT/bin/automouse/run")"
+COST_LOCK_HELD=0  # global read by append_cost_row; set by the driver in bin/automouse/run
 eval "$(awk '/^append_cost_row\(\)/,/^}/'        "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^strip_weekly_section\(\)/,/^}/'   "$REPO_ROOT/bin/automouse/run")"
+eval "$(awk '/^day_logs\(\)/,/^}/'               "$REPO_ROOT/bin/automouse/run")"
+eval "$(awk '/^day_exit_lines\(\)/,/^}/'         "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^regenerate_weekly_section\(\)/,/^}/' "$REPO_ROOT/bin/automouse/run")"
 
 REPORT="$TMPROOT/reports/$(date +%F)-costs.md"
@@ -250,7 +255,7 @@ printf '\n-- pricer: price staleness is loud --\n'
 
 # 20/21. Past price_expiry the pricer must WARN on stderr and flag price_stale,
 #        so a silently-wrong price table cannot survive a release cycle.
-stale_err=$(AUTOMOUSE_PRICER_TODAY=2026-09-01 "$PRICER" --session-id "$POST_SID" \
+stale_err=$(AUTOMOUSE_PRICER_TODAY=2027-01-01 "$PRICER" --session-id "$POST_SID" \
     --proj-dir "$FIXPROJ" 2>&1 >"$TMPROOT/stale.json")
 assert_eq "$(printf '%s' "$stale_err" | grep -c '^WARN:')" 1 "stale price table warns on stderr"
 assert_eq "$(pj "$TMPROOT/stale.json" price_stale)" "True" "stale price table sets price_stale"
@@ -603,6 +608,28 @@ assert_eq "$(grep -c '^| postplan |' "$S4_REPORT")" "1" \
     "legacy log's second phase gets its own row"
 
 rm -rf "$S4"
+
+printf '\n-- pricer: fable-5-1 key and cache-read rate --\n'
+
+# fable-5-1's cache_read rate ($0.25/M) is 4x cheaper than generic fable ($1.00/M).
+# Using 4M cache_read tokens gives $1.00 for the correct key and $4.00 for the
+# wrong one — far enough apart that a prefix-match regression fails loudly.
+FDIR="$TMPROOT/fable51proj/proj"
+mkdir -p "$FDIR"
+cat > "$FDIR/fable51-session.jsonl" <<'JSONL'
+{"type":"assistant","timestamp":"2026-09-23T00:00:01.000Z","message":{"id":"msg_f1","model":"claude-fable-5-1","usage":{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":4000000,"cache_creation_input_tokens":0}}}
+JSONL
+
+"$PRICER" --session-id fable51-session --proj-dir "$FDIR" > "$TMPROOT/fable51.json"
+fable51_cost=$(pj "$TMPROOT/fable51.json" cost)
+
+# longest-prefix match picks fable-5-1 (len 9) over fable (len 5), so the
+# $0.25/M cache_read rate applies: 4M * $0.25/M = $1.00.
+assert_near "$fable51_cost" 1.0000 0.0001 \
+    "fable-5-1 key() resolves to fable-5-1, cache_read at \$0.25/M"
+# Without the fable-5-1 row (or with wrong prefix match), generic fable gives $4.00.
+assert_ne "$fable51_cost" "4.0" \
+    "fable-5-1 is not priced as generic fable (\$1.00/M cache_read)"
 
 
 exit "$FAILED"

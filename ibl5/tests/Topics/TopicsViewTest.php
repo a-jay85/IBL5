@@ -180,6 +180,53 @@ class TopicsViewTest extends TestCase
         $this->assertStringContainsString('commissioner', $html);
     }
 
+    public function testRenderSearchFormContainsPresetSelect(): void
+    {
+        $html = $this->view->render([self::createTopic()], 'themes/IBL/images/topics/', $this->searchFilters);
+
+        $this->assertStringContainsString('name="preset"', $html);
+        $this->assertStringContainsString('aria-label="Preset"', $html);
+        $this->assertStringContainsString('<option value="" selected>No Preset</option>', $html);
+        $this->assertStringContainsString('<option value="transactions">Transactions</option>', $html);
+    }
+
+    public function testRenderSearchFormPlacesPresetAfterDays(): void
+    {
+        $html = $this->view->render([self::createTopic()], 'themes/IBL/images/topics/', $this->searchFilters);
+
+        $daysPos = strpos($html, 'name="days"');
+        $presetPos = strpos($html, 'name="preset"');
+        $typesPos = strpos($html, 'search-form__types');
+
+        $this->assertIsInt($daysPos);
+        $this->assertIsInt($presetPos);
+        $this->assertIsInt($typesPos);
+        $this->assertGreaterThan($daysPos, $presetPos);
+        $this->assertGreaterThan($presetPos, $typesPos);
+    }
+
+    public function testRenderSearchFormMarksSelectedPreset(): void
+    {
+        $filters = $this->searchFilters;
+        $filters['preset'] = 'transactions';
+
+        $html = $this->view->render([self::createTopic()], 'themes/IBL/images/topics/', $filters);
+
+        $this->assertStringContainsString('<option value="transactions" selected>Transactions</option>', $html);
+        $this->assertStringNotContainsString('<option value="" selected>', $html);
+    }
+
+    public function testRenderSearchFormDefaultsToNoPresetForUnknownValue(): void
+    {
+        $filters = $this->searchFilters;
+        $filters['preset'] = 'bogus';
+
+        $html = $this->view->render([self::createTopic()], 'themes/IBL/images/topics/', $filters);
+
+        $this->assertStringNotContainsString('bogus', $html);
+        $this->assertStringContainsString('<option value="transactions">Transactions</option>', $html);
+    }
+
     /**
      * @param array<string, mixed> $overrides
      * @return array{topicId: int, topicName: string, topicImage: string, topicText: string, storyCount: int, totalReads: int, recentArticles: array<int, array{sid: int, title: string, catId: int, catTitle: string}>}

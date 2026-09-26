@@ -92,7 +92,15 @@ def test_findings_below_80_do_not_block():
 
 def test_phase5_skipped_does_not_block():
     assert evaluate(inputs(phase5_status="skipped")).armed
-    assert evaluate(inputs(phase5_status=None)).armed
+
+
+def test_phase5_none_holds():
+    """None (absent status file) is indeterminate — holds (backlog #654)."""
+    d = evaluate(inputs(phase5_status=None))
+    assert not d.armed
+    c4 = next(c for c in d.conditions if c.number == 4)
+    assert c4.blocked
+    assert "indeterminate" in c4.reason.lower() or "never recorded" in c4.reason.lower()
 
 
 def test_render_rows_never_emits_sentinel():
@@ -429,3 +437,75 @@ def test_auto_merge_false_plan_with_clean_loop_still_holds():
                         plan_auto_merge_false=True))
     assert d.armed is False
     assert any(c.number == 7 for c in d.holds)
+
+
+def _sentinel_body(tail: str) -> str:
+    return f"## Summary\nx\n\n## Manual Testing\n\nNo manual testing needed — {tail}\n"
+
+
+def test_manual_testing_clearance_keyword_clears_with_file():
+    body = _sentinel_body("covered by the Playwright e2e spec.")
+    assert manual_testing_clearance(body, ["ibl5/tests/e2e/trade.spec.ts"]) == "CLEARED"
+
+
+def test_manual_testing_clearance_keyword_held_without_file():
+    body = _sentinel_body("covered by the Playwright e2e spec.")
+    assert manual_testing_clearance(body, ["ibl5/classes/Trade/TradeService.php"]) == "HELD"
+    # boundary: a spec path outside tests/e2e/ does not satisfy the pattern
+    assert manual_testing_clearance(body, ["ibl5/e2e/trade.spec.ts"]) == "HELD"  # (example)
+
+
+def test_manual_testing_clearance_no_keyword_always_clears():
+    body = _sentinel_body("internal refactor, behavior pinned elsewhere.")
+    assert manual_testing_clearance(body, []) == "CLEARED"
+    assert manual_testing_clearance(body) == "CLEARED"
+    # no keyword + non-empty files still clears
+    assert manual_testing_clearance(body, ["ibl5/classes/Foo.php"]) == "CLEARED"
+    # empty list skips the tail check even when a keyword is present
+    assert manual_testing_clearance(_sentinel_body("covered by e2e."), []) == "CLEARED"
+
+
+def test_manual_testing_clearance_and_semantics_and_word_boundary():
+    body = _sentinel_body("covered by unit and integration tests.")
+    assert manual_testing_clearance(body, ["ibl5/tests/Trade/TradeServiceTest.php"]) == "HELD"
+    assert manual_testing_clearance(body, [
+        "ibl5/tests/Trade/TradeServiceTest.php",
+        "ibl5/tests/DatabaseIntegration/TradeRepoTest.php",
+    ]) == "CLEARED"
+    # `community` must not match the `unit` keyword
+    assert manual_testing_clearance(_sentinel_body("community page copy only."),
+                                    ["ibl5/classes/Foo.php"]) == "CLEARED"
+
+
+def test_evaluate_passes_files_to_clearance():
+    body = _sentinel_body("covered by the e2e spec.")
+    d = evaluate(inputs(pr_body=body,
+                        classification=Classification(files=["ibl5/classes/Foo.php"])))
+    assert not d.armed and any(c.number == 1 for c in d.holds)
+    ok = evaluate(inputs(pr_body=body,
+                         classification=Classification(files=["ibl5/tests/e2e/foo.spec.ts"])))
+    assert ok.armed and not ok.holds
+
+
+def test_condition_3_blocks_on_missing_phase_item():
+    """MISSING-PHASE: entry in unresolved_conformance → condition (3) blocked.
+
+    Mutation caught: a future filter that only counts MISSING:/MISSING-FILE: prefixes
+    fails the block assertion.
+    """
+    # Build a minimal ArmInputs with a MISSING-PHASE entry — copy keyword pattern from a
+    # neighbouring condition-(3) test, changing only unresolved_conformance.
+    blocked_inputs = inputs(
+        unresolved_conformance=[
+            "MISSING-PHASE: 2 — B (phase cites harness/b.py; none appeared in the diff)"
+        ],
+    )
+    result_blocked = evaluate(blocked_inputs)
+    cond3 = next(c for c in result_blocked.conditions if c.number == 3)
+    assert cond3.blocked is True
+    assert "MISSING-PHASE: 2" in cond3.reason
+
+    clean_inputs = inputs(unresolved_conformance=[])
+    result_clean = evaluate(clean_inputs)
+    cond3_clean = next(c for c in result_clean.conditions if c.number == 3)
+    assert cond3_clean.blocked is False

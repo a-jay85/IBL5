@@ -17,6 +17,7 @@ class VotingController implements VotingControllerInterface
         private \Utilities\NukeCompat $nukeCompat,
         private \Auth\Contracts\AuthServiceInterface $authService,
         private \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepository,
+        private ?\Voting\Contracts\VotingResultsControllerInterface $resultsController = null,
     ) {}
 
     public function main(mixed $user): void
@@ -26,7 +27,9 @@ class VotingController implements VotingControllerInterface
             return;
         }
         $this->nukeCompat->cookieDecode($user);
+        \PageLayout\PageLayout::header();
         $this->showBallot($this->authService->getUsername() ?? '');
+        \PageLayout\PageLayout::footer();
     }
 
     public function submitAsgVote(mixed $user): void
@@ -92,7 +95,7 @@ class VotingController implements VotingControllerInterface
         $result = $this->submissionService->submitAsgVote($teamName, $ballot, $rawPostCategories);
 
         if ($result->hasErrors()) {
-            $responder->html($this->submissionView->renderErrors($result->errors));
+            $this->showBallot($username, $result->errors, $rawPostCategories);
         } else {
             \EventLog\EventLogger::setAction('asg_vote_submitted');
             $responder->html($this->submissionView->renderAsgConfirmation($teamName, $ballot));
@@ -152,7 +155,14 @@ class VotingController implements VotingControllerInterface
         $result = $this->submissionService->submitEoyVote($teamName, $ballot);
 
         if ($result->hasErrors()) {
-            $responder->html($this->submissionView->renderErrors($result->errors));
+            /** @var array<string, array<int, string>> $selections */
+            $selections = [
+                'MVP' => [1 => $ballot['mvp_1'], 2 => $ballot['mvp_2'], 3 => $ballot['mvp_3']],
+                'Six' => [1 => $ballot['six_1'], 2 => $ballot['six_2'], 3 => $ballot['six_3']],
+                'ROY' => [1 => $ballot['roy_1'], 2 => $ballot['roy_2'], 3 => $ballot['roy_3']],
+                'GM'  => [1 => $ballot['gm_1'],  2 => $ballot['gm_2'],  3 => $ballot['gm_3']],
+            ];
+            $this->showBallot($username, $result->errors, $selections);
         } else {
             \EventLog\EventLogger::setAction('eoy_vote_submitted');
             $responder->html($this->submissionView->renderEoyConfirmation($teamName, $ballot));
@@ -161,7 +171,13 @@ class VotingController implements VotingControllerInterface
         \PageLayout\PageLayout::footer();
     }
 
-    private function showBallot(string $username): void
+    /**
+     * Render the ballot page body (no header/footer; the caller owns the frame).
+     *
+     * @param list<string> $errors Validation messages to show between the title and the form
+     * @param array<string, array<int, string>> $selections Previously submitted picks keyed by category code
+     */
+    private function showBallot(string $username, array $errors = [], array $selections = []): void
     {
         $commonRepository = $this->teamIdentityRepository;
         $season = new \Season\Season($this->db);
@@ -176,13 +192,16 @@ class VotingController implements VotingControllerInterface
 
         $categories = $this->ballotService->getBallotData($voterTeamName, $season, $league);
 
-        \PageLayout\PageLayout::header();
-
         $responder = new \Api\Response\HtmlResponder();
         $responder->html(($season->phase === 'Regular Season')
             ? '<h1 class="ibl-title">All-Star Game Ballot</h1>'
             : '<h1 class="ibl-title">End-of-Year Awards Ballot</h1>');
-        $responder->html($this->ballotView->renderBallotForm($formAction, $voterTeamName, $teamid, $season->phase, $categories));
-        \PageLayout\PageLayout::footer();
+        foreach ($errors as $error) {
+            $responder->html('<p class="voting-submission-error">' . \Security\HtmlSanitizer::e($error) . '</p>');
+        }
+        $responder->html($this->ballotView->renderBallotForm($formAction, $voterTeamName, $teamid, $season->phase, $categories, $selections));
+        if ($this->resultsController !== null && $this->authService->isAdmin()) {
+            $responder->html($this->ballotView->renderResultsExpander($this->resultsController->render()));
+        }
     }
 }

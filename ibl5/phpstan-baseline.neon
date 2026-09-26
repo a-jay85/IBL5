@@ -199,12 +199,6 @@ parameters:
 			path: classes/DepthChartEntry/DepthChartEntryView.php
 
 		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/Draft/DraftController.php
-
-		-
 			rawMessage: 'Parameter #3 $pickOwner of method Draft\Contracts\DraftViewInterface::renderDraftInterface() expects string, string|null given.'
 			identifier: argument.type
 			count: 1
@@ -395,6 +389,12 @@ parameters:
 			identifier: ibl.sqlStringConcatenation
 			count: 1
 			path: classes/Migration/SchemaValidator.php
+
+		-
+			rawMessage: 'header() is banned outside Bootstrap classes, Responders, and HTMX ApiHandlers. Route response headers through a Responder (composed by the Controller/ApiHandler).'
+			identifier: ibl.directHeader
+			count: 1
+			path: classes/Module/ModuleRedirect.php
 
 		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "team_city" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
@@ -627,13 +627,13 @@ parameters:
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
-			count: 5
+			count: 7
 			path: classes/Search/SearchRepository.php
 
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
-			count: 67
+			count: 72
 			path: classes/Search/SearchView.php
 
 		-
@@ -1289,6 +1289,18 @@ parameters:
 			path: classes/Updater/Steps/AutoSeedOlympicsTeamInfoStep.php
 
 		-
+			rawMessage: Deprecated HTML tag `<i>` found in string literal. Use <em> instead.
+			identifier: ibl.deprecatedHtmlTag
+			count: 1
+			path: classes/Voting/VotingBallotView.php
+
+		-
+			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
+			identifier: ibl.inlineCss
+			count: 1
+			path: classes/Voting/VotingBallotView.php
+
+		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 4
@@ -1335,18 +1347,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/ActivityTracker/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/AllStarAppearances/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class AllStarAppearances\AllStarAppearancesRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/AllStarAppearances/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class ApiKeys\ApiKeysRepository constructor expects mysqli, mixed given.'
@@ -2489,12 +2489,6 @@ parameters:
 			path: modules/OneOnOneGame/index.php
 
 		-
-			rawMessage: Binary operation "." between '%%' and mixed results in an error.
-			identifier: binaryOp.invalid
-			count: 1
-			path: modules/Player/articles.php
-
-		-
 			rawMessage: Cannot access offset 'sid' on mixed.
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 1
@@ -2544,12 +2538,6 @@ parameters:
 
 		-
 			rawMessage: 'Cannot call method prepare() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method real_escape_string() on mixed.'
 			identifier: method.nonObject
 			count: 1
 			path: modules/Player/articles.php
@@ -3002,12 +2990,6 @@ parameters:
 			path: modules/PlayerDatabase/index.php
 
 		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/PlayerExportGuide/index.php
-
-		-
 			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1
@@ -3058,6 +3040,12 @@ parameters:
 		-
 			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/RecordHolders/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class AllStarAppearances\AllStarAppearancesRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
 			count: 1
 			path: modules/RecordHolders/index.php
 
@@ -3146,7 +3134,7 @@ parameters:
 			path: modules/Search/index.php
 
 		-
-			rawMessage: 'Parameter #1 $data of method Search\SearchView::render() expects array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: int, ...}, array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: 10, ...} given.'
+			rawMessage: 'Parameter #1 $data of method Search\SearchView::render() expects array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: string, min: int, ...}, array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: ''''|''transactions'', min: int, ...} given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Search/index.php
@@ -3458,7 +3446,7 @@ parameters:
 			path: modules/Topics/index.php
 
 		-
-			rawMessage: 'Parameter #3 $searchFilters of method Topics\TopicsView::render() expects array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, articleComm: bool}, array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: array<int, string>, articleComm: bool} given.'
+			rawMessage: 'Parameter #3 $searchFilters of method Topics\TopicsView::render() expects array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, articleComm: bool, preset?: string}, array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: array<int, string>, articleComm: bool, preset: ''''|''transactions''} given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Topics/index.php
@@ -3701,28 +3689,16 @@ parameters:
 			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1
-			path: modules/TransactionHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class TransactionHistory\TransactionHistoryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TransactionHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $queryParams of method TransactionHistory\TransactionHistoryService::getPageData() expects array<string, string>, array<mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TransactionHistory/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
 			path: modules/Voting/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Voting/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Voting/index.php
@@ -3756,30 +3732,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/VotingResults/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/VotingResults/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Voting\VotingRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/VotingResults/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/VotingResults/index.php
 
 		-
 			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'

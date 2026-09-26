@@ -12,8 +12,9 @@ from harness import conformance
 from harness.planfile import (EXEMPT_RE, _strip_fenced, frontmatter_auto_merge_false,
                               frontmatter_autonomy_contract, locate_plan,
                               parse_critical_files, parse_matrix,
+                              parse_deferred_phase_numbers, parse_phases,
                               parse_required_test_methods)
-from harness.state import PlanInfo, RunResult
+from harness.state import PhaseInfo, PlanInfo, RunResult
 
 PLAN = """---
 status: ready
@@ -1121,3 +1122,149 @@ def test_conformance_malformed_contract_single_item():
     assert items[0].startswith("UNMET-CONTRACT: malformed")
     # Pin that the evidence loop did not execute alongside the malformed item.
     assert not any("never appeared in the diff" in i for i in items)
+
+
+def test_parse_phases_extracts_numbers_headings_and_backtick_paths():
+    plan = """
+## Phase 1: Foo
+
+Edit `harness/a.py` and add `tests/test_a.py::test_x`.
+
+## Phase 2: Bar
+
+Update `bin/b` accordingly.
+"""
+    phases = parse_phases(plan)
+    assert len(phases) == 2
+    assert [p.number for p in phases] == [1, 2]
+    assert phases[0].evidence_paths == ["harness/a.py", "tests/test_a.py"]
+    assert phases[1].evidence_paths == ["bin/b"]
+
+
+def test_parse_phases_skips_fenced_blocks_and_example_tokens():
+    plan = """
+## Phase 1: Real
+
+No paths here except `(example)` one: `tools/fake.py` (example).
+
+```
+## Phase 9: Phantom inside fence
+
+Edit `harness/phantom.py`.
+```
+"""
+    phases = parse_phases(plan)
+    assert len(phases) == 1
+    assert phases[0].number == 1
+    assert phases[0].evidence_paths == []
+
+
+def test_parse_phases_marks_all_s_marker_bookkeeping():
+    plan = """
+## Phase 3: X [phases: S]
+
+Close backlog issue.
+
+## Phase 4: Y [phases: S/S]
+
+Bump doc date.
+
+## Phase 5: Z [phases: S/B]
+
+Mixed work.
+
+## Phase 6: W [phases: B]
+
+Build-only.
+"""
+    phases = parse_phases(plan)
+    by_num = {p.number: p for p in phases}
+    assert by_num[3].bookkeeping is True
+    assert by_num[4].bookkeeping is True
+    assert by_num[5].bookkeeping is False
+    assert by_num[6].bookkeeping is False
+
+
+def test_parse_phases_ignores_subphase_and_h3_headings():
+    plan = """
+## Phase 5: Main
+
+Edit `harness/main.py`.
+
+### Delegate — part of phase 5
+
+Scope: `tests/test_delegate.py`.
+
+## Phase 5.5: fidelity
+
+Edit `harness/fidelity.py`.
+
+## Phase 2: Dup first
+
+Edit `harness/dup.py`.
+
+## Phase 2: Dup second
+
+Also `harness/dup2.py`.
+"""
+    phases = parse_phases(plan)
+    numbers = [p.number for p in phases]
+    assert 5 in numbers
+    # Phase 5.5 heading must not produce a separate entry (sub-phase rejected by (?!\.\d))
+    assert len([p for p in phases if p.number == 5]) == 1
+    # ### Delegate paths accrue to the enclosing h2 phase (5)
+    phase5 = next(p for p in phases if p.number == 5)
+    assert "tests/test_delegate.py" in phase5.evidence_paths
+    # Duplicate Phase 2 merges into one entry
+    assert len([p for p in phases if p.number == 2]) == 1
+    phase2 = next(p for p in phases if p.number == 2)
+    assert "harness/dup.py" in phase2.evidence_paths
+    assert "harness/dup2.py" in phase2.evidence_paths
+
+
+def test_parse_deferred_phase_numbers_from_out_of_scope():
+    plan = """
+## Approach
+
+Phase 3 is handled elsewhere.
+
+## Out of Scope
+
+- Phase 5 (deferred to a follow-up PR)
+- phase 7 and Step 7 again
+"""
+    result = parse_deferred_phase_numbers(plan)
+    assert result == [5, 7]
+
+
+def test_parse_deferred_phase_numbers_absent_section_is_empty():
+    plan = """
+## Phase 1: Foo
+
+No out of scope section.
+"""
+    assert parse_deferred_phase_numbers(plan) == []
+
+
+def test_locate_plan_populates_phases(tmp_path):
+    plan_text = """---
+auto_merge: true
+---
+
+# My Plan
+
+## Phase 1: Do the thing
+
+Edit `harness/x.py`.
+
+## Out of Scope
+
+- Phase 2 (future work)
+"""
+    plan_file = tmp_path / "my-plan.md"
+    plan_file.write_text(plan_text)
+    info = locate_plan("my-plan", plans_dir=str(tmp_path))
+    assert info.found
+    assert len(info.phases) >= 1
+    assert info.phases[0].number == 1
+    assert info.deferred_phase_numbers == [2]

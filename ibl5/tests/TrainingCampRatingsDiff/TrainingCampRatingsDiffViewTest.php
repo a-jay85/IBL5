@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\TrainingCampRatingsDiff;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use TrainingCampRatingsDiff\RatingDelta;
 use TrainingCampRatingsDiff\RatingRow;
@@ -111,7 +112,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
 
     public function test_it_renders_empty_state_block_when_baseline_year_is_null(): void
     {
-        $html = $this->view->render(null, []);
+        $html = $this->view->render(null, null, []);
 
         self::assertStringContainsString('ibl-card', $html);
         self::assertStringContainsString('No prior-season baseline found', $html);
@@ -119,7 +120,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
 
     public function test_it_renders_empty_state_block_when_rows_is_empty(): void
     {
-        $html = $this->view->render(2025, []);
+        $html = $this->view->render(2025, 'playoffs', []);
 
         self::assertStringContainsString('ibl-card', $html);
         self::assertStringContainsString('No prior-season baseline found', $html);
@@ -127,7 +128,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
 
     public function test_it_renders_h1_title_in_empty_state(): void
     {
-        $html = $this->view->render(null, []);
+        $html = $this->view->render(null, null, []);
 
         self::assertStringContainsString('<h1 class="ibl-title">Training Camp Ratings Diff</h1>', $html);
     }
@@ -139,7 +140,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
     public function test_it_renders_h1_title_and_intro_paragraph_including_the_baseline_year(): void
     {
         $row  = $this->buildRatingRow(1, 'Player A', 5);
-        $html = $this->view->render(2025, [$row]);
+        $html = $this->view->render(2025, 'playoffs', [$row]);
 
         self::assertStringContainsString('<h1', $html);
         self::assertStringContainsString('Training Camp Ratings Diff', $html);
@@ -147,10 +148,40 @@ class TrainingCampRatingsDiffViewTest extends TestCase
         self::assertStringContainsString('2025', $html);
     }
 
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function baselinePhaseLabelProvider(): array
+    {
+        return [
+            'finals'        => ['finals', 'last playoffs ratings'],
+            'playoffs'      => ['playoffs', 'last playoffs ratings'],
+            'rd1 archive'   => ['playoffs-rd1-gm1-3', 'last playoffs ratings'],
+            'end-of-season' => ['end-of-season', 'end-of-season ratings'],
+            'mid-season'    => ['mid-season', 'mid-season ratings'],
+        ];
+    }
+
+    #[DataProvider('baselinePhaseLabelProvider')]
+    public function test_intro_paragraph_labels_the_baseline_phase(string $phase, string $expectedLabel): void
+    {
+        $row  = $this->buildRatingRow(1, 'Player A', 5);
+        $html = $this->view->render(2025, $phase, [$row]);
+
+        self::assertStringContainsString('Live player ratings vs their ' . $expectedLabel . ' from 2025', $html);
+    }
+
+    public function test_empty_state_mentions_every_fallback_phase(): void
+    {
+        $html = $this->view->render(null, null, []);
+
+        self::assertStringContainsString('playoffs, end-of-season, or mid-season snapshot', $html);
+    }
+
     public function test_it_renders_the_sortable_ibl_data_table_sticky_table_ratings_diff_table_classes(): void
     {
         $row  = $this->buildRatingRow(1, 'Player A', 5);
-        $html = $this->view->render(2025, [$row]);
+        $html = $this->view->render(2025, 'playoffs', [$row]);
 
         self::assertStringContainsString('sortable', $html);
         self::assertStringContainsString('ibl-data-table', $html);
@@ -167,7 +198,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
     public function test_it_wraps_dynamic_text_in_escaped_output(): void
     {
         $row  = $this->buildRatingRow(1, '<script>alert(1)</script>', 5);
-        $html = $this->view->render(2025, [$row]);
+        $html = $this->view->render(2025, 'playoffs', [$row]);
 
         self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
@@ -180,7 +211,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
     public function test_it_renders_a_delta_up_span_for_positive_deltas(): void
     {
         $row  = $this->buildRatingRowWithOoDelta(1, 'Player A', 5); // delta=+5
-        $html = $this->view->render(2025, [$row]);
+        $html = $this->view->render(2025, 'playoffs', [$row]);
 
         self::assertStringContainsString('delta-up', $html);
         self::assertStringContainsString('(+5)', $html);
@@ -189,7 +220,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
     public function test_it_renders_a_delta_down_span_for_negative_deltas(): void
     {
         $row  = $this->buildRatingRowWithOoDelta(1, 'Player A', -8); // delta=-8
-        $html = $this->view->render(2025, [$row]);
+        $html = $this->view->render(2025, 'playoffs', [$row]);
 
         self::assertStringContainsString('delta-down', $html);
         self::assertStringContainsString('(-8)', $html);
@@ -198,7 +229,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
     public function test_it_renders_no_delta_span_for_zero_deltas(): void
     {
         $row  = $this->buildRatingRow(1, 'Player A', 0);
-        $html = $this->view->render(2025, [$row]);
+        $html = $this->view->render(2025, 'playoffs', [$row]);
 
         self::assertStringNotContainsString('delta-zero', $html);
         self::assertStringNotContainsString('delta-up', $html);
@@ -212,7 +243,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
     public function test_it_renders_new_badge_for_rookie_rows(): void
     {
         $rookie = $this->buildRatingRow(99, 'Rookie Player', 0, true);
-        $html   = $this->view->render(2025, [$rookie]);
+        $html   = $this->view->render(2025, 'playoffs', [$rookie]);
 
         self::assertStringContainsString('badge-new', $html);
         self::assertStringContainsString('NEW', $html);
@@ -228,7 +259,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
         $rookie = $this->buildRatingRow(2, 'Rookie Player', 0, true);
 
         // Service would have already sorted: real rows first, then new rows
-        $html = $this->view->render(2025, [$real, $rookie]);
+        $html = $this->view->render(2025, 'playoffs', [$real, $rookie]);
 
         self::assertStringContainsString('ratings-separator', $html);
     }
@@ -236,7 +267,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
     public function test_it_does_not_render_separator_when_only_real_rows_are_present(): void
     {
         $row  = $this->buildRatingRow(1, 'Veteran', 5, false);
-        $html = $this->view->render(2025, [$row]);
+        $html = $this->view->render(2025, 'playoffs', [$row]);
 
         self::assertStringNotContainsString('ratings-separator', $html);
     }
@@ -244,7 +275,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
     public function test_it_does_not_render_separator_when_only_new_rows_are_present(): void
     {
         $rookie = $this->buildRatingRow(1, 'Rookie', 0, true);
-        $html   = $this->view->render(2025, [$rookie]);
+        $html   = $this->view->render(2025, 'playoffs', [$rookie]);
 
         self::assertStringNotContainsString('ratings-separator', $html);
     }
@@ -256,7 +287,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
     public function test_it_renders_sorttable_customkey_attributes_on_rating_cells(): void
     {
         $row  = $this->buildRatingRowWithOoDelta(1, 'Player A', 3);
-        $html = $this->view->render(2025, [$row]);
+        $html = $this->view->render(2025, 'playoffs', [$row]);
 
         self::assertStringContainsString('sorttable_customkey=', $html);
     }
@@ -268,7 +299,7 @@ class TrainingCampRatingsDiffViewTest extends TestCase
     public function test_it_does_not_contain_inline_style_attributes_except_allowed_patterns(): void
     {
         $row  = $this->buildRatingRow(1, 'Player A', 5);
-        $html = $this->view->render(2025, [$row]);
+        $html = $this->view->render(2025, 'playoffs', [$row]);
 
         // Allow: CSS custom properties (--), team cell colors (background-color/color from TeamCellHelper)
         $forbidden = (bool) preg_match('/style="(?!--|background-color: #|color: #)/', $html);

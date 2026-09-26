@@ -18,7 +18,7 @@ git rev-list --count <MASTER_SHA>..HEAD   # commit count drives the squash decis
 **Then record the pre-rebase tip.** This is the input to the Phase 1.4 prior-collapse guard on the *next* run, so it must be written after the pre-rebase diff and still before any history is rewritten:
 
 ```bash
-git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/collapse-guard.sh > /tmp/pr-ready-collapse-<N>.sh && test -s /tmp/pr-ready-collapse-<N>.sh && bash /tmp/pr-ready-collapse-<N>.sh record <N> <BRANCH>
+git show <MASTER_SHA>:.claude/review-shared/scripts/collapse-guard.sh > /tmp/pr-ready-collapse-<N>.sh && test -s /tmp/pr-ready-collapse-<N>.sh && bash /tmp/pr-ready-collapse-<N>.sh record <N> <BRANCH>
 ```
 
 The recorded tip is a convenience, not a dependency: the guard's reflog arm works without it. If this command fails, note it and continue — a failed `record` is never a reason to stop a run.
@@ -33,7 +33,7 @@ The recorded tip is a convenience, not a dependency: the guard's reflog arm work
 - **First returned line, before any other work:** `pwd` and `git rev-parse --show-toplevel`. A mismatch against the expected worktree means the session is not in the PR's tree — the Phase 0.4 `EnterWorktree` did not take and its `ALREADY-IN-TARGET` re-check was skipped, or a `WRONG-WORKTREE` run was let through 0.3b — and everything after it would rebase the wrong tree.
 - **Inputs:** the pinned `<MASTER_SHA>` (use this literal SHA; do NOT resolve `origin/master` yourself, and do NOT reference it as a shell variable), the branch name, the commit count from 2a.
 - **Recipe:** squash (best-effort) then rebase, per 2c/2d below.
-- **Hard limits:** you may run `git rebase`, `git rebase --continue`, `git rebase --abort`, `git merge`, `git cherry`, `git diff`, `git show`. You may NOT run `git commit` or `git push` — `~/.claude/hooks/plan-gate-commit.sh` denies both for sub-agents and will hard-fail the call. Stop at the FIRST conflict; do not attempt to resolve it.
+- **Hard limits:** you may run `git rebase`, `git rebase --continue`, `git rebase --abort`, `git merge`, `git cherry`, `git diff`, `git show`. You may NOT run `git commit` or `git push`. The `plan-gate-commit` hook in `~/.claude/hooks/` denies both for sub-agents and will hard-fail the call. Stop at the FIRST conflict; do not attempt to resolve it.
 - **Report back (thin — pointers only, never pasted diffs or file bodies):** line 1 = `pwd` + toplevel; line 2 = the master SHA you rebased onto; line 3 = `clean` or a newline-separated list of conflicted paths from `git diff --name-only --diff-filter=U`; line 4 = `squashed` / `squash-skipped` / `squash-failed`.
 ````
 

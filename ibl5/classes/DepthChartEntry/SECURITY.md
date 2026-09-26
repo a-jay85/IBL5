@@ -211,7 +211,7 @@ $teamName = $this->sanitizeInput($sessionTeam);
 All methods use type hints for parameters and return values:
 
 ```php
-public function updatePlayerDepthChart(string $playerName, array $depthChartValues): bool
+public function updatePlayerDepthChart(int $pid, int $teamid, array $depthChartValues): bool
 public function getOffenseSet(string $teamName, int $setNumber): array
 private function sanitizeDepthValue($value): int
 ```
@@ -287,8 +287,8 @@ Implement rate limiting to prevent abuse:
 ### Database Prepared Statements
 If the database layer is upgraded to support prepared statements:
 ```php
-$stmt = $mysqli->prepare("UPDATE ibl_plr SET dc_PGDepth = ? WHERE name = ?");
-$stmt->bind_param("is", $depthValue, $playerName);
+$stmt = $mysqli->prepare("UPDATE ibl_plr SET dc_PGDepth = ? WHERE pid = ? AND teamid = ?");
+$stmt->bind_param("iii", $depthValue, $pid, $teamid);
 $stmt->execute();
 ```
 

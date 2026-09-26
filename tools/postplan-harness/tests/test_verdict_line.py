@@ -325,10 +325,10 @@ def test_verdict_unknown_class_keeps_the_original_tail():
     assert line.rstrip().endswith("Clear the gate then re-run bin/post-plan-now.")
 
 def test_rebase_conflict_verbatim():
-    """The rebase-conflict message must be unchanged from before the fix."""
+    """With no error detail, the rebase-conflict message is the bare fixed text."""
     r = _res(TerminalState.FAILED, error_kind="rebase-conflict")
     line = runner.verdict_line(r, 3)
-    assert line == ("RESULT: post-plan BLOCKED — rebase conflict on a stacked branch, "
+    assert line == ("RESULT: post-plan BLOCKED — rebase conflict, "
                     "human required; ERROR terminal=failed, no PR opened. "
                     "Resolve the rebase, then re-run bin/post-plan-now.")
 
@@ -338,11 +338,24 @@ def test_rebase_conflict_line_unchanged():
     Pinned as a literal so any reword of the blocked arm fails here."""
     r = _res(TerminalState.FAILED, error_kind="rebase-conflict")
     line = runner.verdict_line(r, 3)
-    assert line == ("RESULT: post-plan BLOCKED — rebase conflict on a stacked branch, "
+    assert line == ("RESULT: post-plan BLOCKED — rebase conflict, "
                     "human required; ERROR terminal=failed, no PR opened. "
                     "Resolve the rebase, then re-run bin/post-plan-now.")
     assert "auto-resolved" not in line
     assert "CONFLICT-REVIEW" not in line
+
+
+def test_rebase_conflict_names_the_conflicted_path():
+    """The exit-3 line is what the DM and the PR badge quote. It must name the path;
+    the generic "stacked branch" text sent a human hunting on a plain branch."""
+    err = ("rebase-conflict: incomplete merge stages (delete/add vs modify): "
+           ".claude/skills/pr-ready/SKILL.md (stages [1, 2])")
+    r = _res(TerminalState.FAILED, error_kind="rebase-conflict", error=err)
+    line = runner.verdict_line(r, 3)
+    assert ".claude/skills/pr-ready/SKILL.md (stages [1, 2])" in line
+    assert "stacked branch" not in line
+    assert line.endswith("Resolve the rebase, then re-run bin/post-plan-now.")
+    assert "\n" not in line
 
 
 def test_rebase_conflict_is_single_line():

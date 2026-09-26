@@ -260,17 +260,25 @@ mkdir -p "$AM/queue/nightly-plan.md.lock"
 printf '%s\n' "$NIGHTLY_PID" > "$AM/queue/nightly-plan.md.lock/pid"
 printf '3\n' > "$AM/queue/nightly-plan.md.attempts"
 
-# Runner progress. Impl lines come from the automouse day log, filtered to the
-# runner's own slug and phase: the nodotmd line is written LAST, so a missing
-# filter would show it under live-plan. launchd-rearm.log is written after the
-# day log, so it is the newest file in logs/; the dated-name glob must skip it.
+# Runner progress. Impl lines come from each runner's own per-pid log, filtered
+# to that runner's slug and phase. With per-pid logs each runner only sees its
+# own file; the old concern about the nodotmd line leaking into live-plan is now
+# structurally impossible. launchd-rearm.log is skipped by the dated-name glob.
 mkdir -p "$AM/logs"
-cat > "$AM/logs/2026-09-10.log" <<'AMLOG'
+cat > "$AM/logs/2026-09-10-$LIVE_AUTOMOUSE_PID.log" <<'AMLOG'
 [00:03:39] live-plan/impl tool: Bash (#28, turn 28)
+AMLOG
+touch -t 202609100100 "$AM/logs/2026-09-10-$LIVE_AUTOMOUSE_PID.log"
+# The nodotmd runner has its own per-pid log.
+cat > "$AM/logs/2026-09-10-$NODOTMD_PID.log" <<'AMLOG'
 [00:03:40] nodotmd-plan/impl tool: Read (#5, turn 5)
 AMLOG
-touch -t 202609100100 "$AM/logs/2026-09-10.log"
+touch -t 202609100100 "$AM/logs/2026-09-10-$NODOTMD_PID.log"
 printf 'REARM-NOISE live-plan/impl \n' > "$AM/logs/launchd-rearm.log"
+# A concurrent runner's newer log. fleet-status must read the live runner's
+# own per-pid file, never the newest file in logs/.
+printf 'DECOY-OTHER-RUNNER live-plan/impl \n' > "$AM/logs/2026-09-10-1.log"
+touch -t 202609100200 "$AM/logs/2026-09-10-1.log"
 # A post-plan runner reads its harness audit.log instead, phase line only.
 mkdir -p "$OUT/live-nightly-plan-20260910-140000-99"
 cat > "$OUT/live-nightly-plan-20260910-140000-99/audit.log" <<'AUDIT'
@@ -569,12 +577,14 @@ assert_has "queue: live runner's phase and pid follow its plan row" \
 assert_has "queue: impl progress is the runner's own last tool call" \
     "$LIVE_BLOCK" 'live-plan/impl tool: Bash \(#28, turn 28\)'
 assert_has "queue: impl detail ends its pid line in the day log" \
-    "$LIVE_BLOCK" "pid $LIVE_AUTOMOUSE_PID .*attempt 2  log: .*/automouse/logs/2026-09-10\\.log"
+    "$LIVE_BLOCK" "pid $LIVE_AUTOMOUSE_PID .*attempt 2  log: .*/automouse/logs/2026-09-10-$LIVE_AUTOMOUSE_PID\\.log"
 # The same tail in a terminal is the bare word, with the path only in the link.
 assert_has "queue: impl detail's linked tail is the word alone" \
     "$OUTPUT_STRIPPED" 'attempt 2  log$'
 assert_lacks "queue: rearm log is never read as the day log" \
     "$OUTPUT" 'REARM-NOISE'
+assert_lacks "queue: another runner's newer per-pid log is never read" \
+    "$OUTPUT" 'DECOY-OTHER-RUNNER'
 IDLE_NEXT="$(grep -EA2 'idle-plan\.md +sonnet' <<< "$OUTPUT" | tail -n 2)"
 assert_lacks "queue: a queued plan has no details under it" \
     "$IDLE_NEXT" '●|pid |  log: |  audit: '
@@ -695,7 +705,7 @@ assert_has "links: post-plan audit word links its audit.log" \
 assert_has "links: fallback log word links the /tmp log" \
     "$OUTPUT_LINKS" 'last-exit-col 0  [^ ]*8;;vscode://file/[^ ]*post-plan-now-noaudit-slug-20260910-130000-4343\.log[^ ]*log'
 assert_has "links: runner detail links the automouse day log" \
-    "$OUTPUT_LINKS" 'attempt 2  [^ ]*8;;vscode://file/[^ ]*automouse/logs/2026-09-10\.log[^ ]*log'
+    "$OUTPUT_LINKS" "attempt 2  [^ ]*8;;vscode://file/[^ ]*automouse/logs/2026-09-10-$LIVE_AUTOMOUSE_PID\\.log[^ ]*log"
 # Scoped to the FORCED-LINK render: there the word carries the reference and the
 # path belongs in the URI only. A non-TTY capture keeps printing the path — the
 # assertions in case 19 pin that half — so this is the compactness win, not a

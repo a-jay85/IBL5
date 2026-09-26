@@ -1,6 +1,6 @@
 ---
 description: Class registry for /post-plan Phase 9 retrospective routing — one row per defect class, written by /post-plan, never edited by hand.
-last_verified: 2026-09-18
+last_verified: 2026-09-23
 ---
 
 # Retrospective Class Registry
@@ -120,7 +120,7 @@ not add backticks or markdown links to a row.
 
 Landing rung: 1 (extend Phase 2a capture to detect and correct post-rebase stale artifacts).
 
-**artifact destination:** `.claude/skills/pr-ready/scripts/` (Phase 2a capture logic, in-repo)
+**artifact destination:** `.claude/skills/pr-ready/scripts/` (example) (Phase 2a capture logic, moved to `.claude/review-shared/scripts/` in PR retiring /pr-ready)
 
 **provenance:** (discovered 2026-09-02 during #1789)
 
@@ -140,7 +140,7 @@ Landing rung: 1 (extend Phase 2a capture to detect and correct post-rebase stale
 
 | # | File:line | Same class? | Live? | Status |
 |---|-----------|-------------|-------|--------|
-| 1 | `.claude/skills/pr-ready/_rebase-and-conflicts.md` — Phase 2 delegate squash rule fires unconditionally regardless of `auto_merge` plan flag | yes (Check 2) | yes | fixed this pass (restored pre-squash stack; 11 commits rebased `--onto` new master; V-2c/V-4a verified) |
+| 1 | `.claude/skills/pr-ready/_rebase-and-conflicts.md` (example) — Phase 2 delegate squash rule fires unconditionally regardless of `auto_merge` plan flag | yes (Check 2) | yes | fixed this pass (restored pre-squash stack; 11 commits rebased `--onto` new master; V-2c/V-4a verified) | <!-- slop-ok -->
 | 2 | PR body of #1797 — SHA citations pointed at `5bd71bc12` / `14b363829`, both unreachable from pushed head | yes (Check 4) | yes | fixed this pass (updated 3 SHA citations to `acbfff148a` / `09ee61e054`) |
 
 **prevention_ladder:**
@@ -155,8 +155,8 @@ Landing rung: 1 (extend Phase 2a capture to detect and correct post-rebase stale
 Landing rung: 1 for Check 2 (extend `_rebase-and-conflicts.md`); rung 0 for Check 4 (Phase 6.5 already handles it). Check 3 and Check 5: `prevention_ladder: no gate warranted`.
 
 **artifact destination:**
-- Check 2: `.claude/skills/pr-ready/_rebase-and-conflicts.md` (in-repo)
-- Check 4: `.claude/skills/pr-ready/SKILL.md` Phase 6.5 (already present; no new artifact)
+- Check 2: `.claude/skills/pr-ready/_rebase-and-conflicts.md` (example) (in-repo)
+- Check 4: `.claude/skills/pr-ready/SKILL.md` (example) Phase 6.5 (already present; no new artifact)
 - Check 3/5: `n/a — no gate`
 
 **provenance:** (discovered 2026-09-02 during #1797)
@@ -245,7 +245,7 @@ The static-guard case in `bin/test-pr-cycle` should pin whichever wording lands,
 
 Landing rung: **2** — add a sentence to the plan template's Phase 5 dry-run section stating that the measured count must be reflected in the PR body in the same phase, before CI is re-watched.
 
-**artifact destination:** plan template or `.claude/skills/pr-ready/SKILL.md` Phase 5 prose (in-repo)
+**artifact destination:** plan template or `.claude/skills/pr-ready/SKILL.md` (example) Phase 5 prose (in-repo)
 
 **provenance:** (discovered 2026-09-05 during #2108)
 
@@ -310,7 +310,7 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 - rung 0 — already covered: `/pr-ready` Phase 6 check 5 (Verification Matrix realisation) catches absent declared automated test paths, as demonstrated by finding F3 in this very run. Landing rung is **0 — already covered by existing gate.**
 - rungs 1-5 — superseded by rung 0.
 
-**artifact destination:** `.claude/skills/pr-ready/SKILL.md` Phase 6 (the gate that caught this)
+**artifact destination:** `.claude/skills/pr-ready/SKILL.md` (example) Phase 6 (the gate that caught this)
 
 **provenance:** (discovered 2026-09-06 during #2141)
 
@@ -409,7 +409,7 @@ Landing rung: **1** — extend the existing `ibl5/tests/Cli/PrArmableLibCliTest.
 
 ### L58 Reconcile `~/claude-plans/pr-ready-dm-and-push-retry.md` — §6.1 scoped, Phase 6.6/8.3 `push.sh` shasum stale
 
-**class:** A plan-doc (`~/claude-plans/pr-ready-dm-and-push-retry.md`) whose §6.1 prose claim (`PUSH FAILED` is genuinely non-retriable) and Phase 6.6/8.3 `shasum` pin for `.claude/skills/pr-ready/scripts/push.sh` both become stale when `push.sh` is edited in a sibling PR — non-discoverable at diff time because the plan file lives outside the repo.
+**class:** A plan-doc (`~/claude-plans/pr-ready-dm-and-push-retry.md`) whose §6.1 prose claim (`PUSH FAILED` is genuinely non-retriable) and Phase 6.6/8.3 `shasum` pin for `.claude/skills/pr-ready/scripts/push.sh` (example) both become stale when `push.sh` is edited in a sibling PR. It is non-discoverable at diff time because the plan file lives outside the repo.
 
 **occurrence table:**
 
@@ -417,7 +417,7 @@ Landing rung: **1** — extend the existing `ibl5/tests/Cli/PrArmableLibCliTest.
 |---|-----------|-------------|-------|--------|
 | 1 | `~/claude-plans/pr-ready-dm-and-push-retry.md` — §6.1 claim and Phase 6.6/8.3 `push.sh` shasum pin | yes | live | not fixed — filed (this entry) |
 
-**prevention_ladder:** no gate warranted — the stale shasum pin fails closed (loud mismatch at run time, not silent loss); plan files live outside the repo at `~/claude-plans/` and are unreachable by CI or `bin/check-docs`. The durable fix is documented here: re-record the `.claude/skills/pr-ready/scripts/push.sh` digest before executing `pr-ready-dm-and-push-retry.md` Phase 6.6/8.3.
+**prevention_ladder:** no gate warranted. The stale shasum pin fails closed (loud mismatch at run time, not silent loss); plan files live outside the repo at `~/claude-plans/` and are unreachable by CI or `bin/check-docs`. The durable fix is documented here: re-record the `.claude/skills/pr-ready/scripts/push.sh` (example) digest before executing `pr-ready-dm-and-push-retry.md` Phase 6.6/8.3.
 
 **artifact destination:** n/a — no gate
 

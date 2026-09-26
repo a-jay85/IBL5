@@ -3,7 +3,6 @@
 
 User-agent: *
 Crawl-delay: 10
-Disallow: /admin/
 Disallow: /admin.php
 Disallow: /ibl/
 Disallow: /iblforum/

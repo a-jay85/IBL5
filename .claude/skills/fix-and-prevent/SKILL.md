@@ -1,7 +1,7 @@
 ---
 name: fix-and-prevent
 description: "Fix a reported bug/breakage AND land the prevention for its whole defect class in one pass — use whenever the user says something is broken, wrong, failing, or asks to fix a bug; the fix alone is never the finished unit of work."
-last_verified: 2026-08-24
+last_verified: 2026-09-24
 ---
 
 # /fix-and-prevent — Fix it, then make it not happen again
@@ -102,7 +102,7 @@ fires yet.
 Only when **both** phases verified clean.
 
 - **Do NOT commit.** Leave the worktree **dirty** — `/post-plan` Phase 2 commits the tree and opens the PR.
-- Fire it, **no confirmation prompt** (shipping verified-complete worktree work is pre-authorized per `.claude/rules/workflow-continuity.md`):
+- Fire it, **no confirmation prompt** (invoking `/fix-and-prevent` is the user's instruction to ship, per `.claude/rules/workflow-continuity.md` § Post-Plan):
   ```bash
   bin/post-plan-now --auto
   ```

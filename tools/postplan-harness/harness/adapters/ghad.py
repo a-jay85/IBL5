@@ -17,6 +17,7 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
 import time
 
 from pathlib import Path
@@ -39,20 +40,24 @@ PR_STICKY_MARKER = "<!-- pr-ready-verdict -->"
 class RecordingGh:
     MUTATIONS = ("pr_create", "pr_comment", "pr_review_findings", "pr_edit_body",
                  "pr_merge_auto", "label_add", "pr_status_badge",
-                 "pr_sticky_verdict", "issue_create")
+                 "pr_sticky_verdict", "issue_create", "pr_disable_auto_merge")
 
     def __init__(self, out_dir: str, fixture: dict | None = None):
         self.out_dir = out_dir
         self.fixture = fixture or {}
         os.makedirs(out_dir, exist_ok=True)
         self.actions_path = os.path.join(out_dir, "actions.jsonl")
+        # Review and verification phases run on parallel threads; serialize appends
+        # so two long records never interleave into an unparseable line.
+        self._actions_lock = threading.Lock()
         self._body_override: str | None = None
 
     # -- side-effect intents (recorded, never executed) -----------------
     def record(self, action: str, **payload) -> None:
         assert action in self.MUTATIONS, f"unknown mutation {action}"
-        with open(self.actions_path, "a") as fh:
-            fh.write(json.dumps({"ts": time.time(), "action": action, **payload}) + "\n")
+        line = json.dumps({"ts": time.time(), "action": action, **payload}) + "\n"
+        with self._actions_lock, open(self.actions_path, "a") as fh:
+            fh.write(line)
 
     def pr_create(self, title: str, body: str, base: str) -> int:
         self.record("pr_create", title=title, body=body[:8000], base=base)
@@ -108,6 +113,12 @@ class RecordingGh:
 
     def pr_meta(self) -> dict:
         return dict(self.fixture.get("pr_meta") or {})
+
+    def pr_closing_refs(self, pr: int) -> tuple[str, list[tuple[str, int]]]:
+        """(baseRefName, [(owner/repo, number)]) GitHub will close on merge."""
+        cr = self.fixture.get("closing_refs") or {}
+        return (cr.get("base", "master"),
+                [(r["repo"], int(r["number"])) for r in cr.get("refs", [])])
 
     def pr_title(self) -> str:
         return (self.fixture.get("pr_meta") or {}).get("title") or self.fixture.get("title", "")
@@ -165,7 +176,7 @@ class RecordingGh:
 
 
 class LiveGh(RecordingGh):
-    """Installed live adapter. Each of the eight MUTATIONS maps to one fixed `gh`
+    """Installed live adapter. Each of the ten MUTATIONS maps to one fixed `gh`
     invocation built inside its method — the allowlist IS the method set.
     Reads come from live `gh pr view` state. Merge deliberately omits
     --delete-branch: in a multi-worktree clone it errors benignly, and a parent
@@ -308,7 +319,8 @@ class LiveGh(RecordingGh):
     def issue_titles(self, label: str) -> list[str]:
         try:
             out = self._gh("issue", "list", "--repo", "a-jay85/IBL5-backlog",
-                           "--state", "all", "--limit", "200", "--json", "title")
+                           "--label", label, "--state", "all", "--limit", "3000",
+                           "--json", "title")
             items = json.loads(out)
             return [i.get("title", "") for i in items if i.get("title")]
         except (HarnessError, json.JSONDecodeError):
@@ -411,6 +423,16 @@ class LiveGh(RecordingGh):
 
     def pr_meta(self) -> dict:
         return dict(self._fetch_meta())
+
+    def pr_closing_refs(self, pr: int) -> tuple[str, list[tuple[str, int]]]:
+        data = json.loads(self._gh("pr", "view", str(pr), "--json",
+                                   "baseRefName,closingIssuesReferences") or "{}")
+        refs = []
+        for it in data.get("closingIssuesReferences") or []:
+            m = re.search(r"github\.com/([^/]+/[^/]+)/issues/(\d+)", it.get("url", ""))
+            if m:
+                refs.append((m.group(1), int(m.group(2))))
+        return data.get("baseRefName", ""), refs
 
     def pr_title(self) -> str:
         return self._fetch_meta().get("title", "")

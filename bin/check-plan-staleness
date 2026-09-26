@@ -276,7 +276,7 @@ while IFS= read -r token; do
     # exists to catch. (The inverse — a plan claiming absence for a path that
     # DOES exist — resolves on disk and never reaches here, so no verdict is
     # lost.) FP that motivated this: pr-ready-autorefresh-files-block cited
-    # `.claude/skills/pr-ready/_remediation.md` (example) in prose stating it does not
+    # `.claude/review-shared/_remediation.md` (example) in prose stating it does not
     # exist; because the path never would exist, self-heal could never recover
     # the plan and it was stuck in skipped/ permanently. The `**` alternations
     # below absorb bold emphasis around the negation (`does **not** exist`).

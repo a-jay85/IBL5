@@ -11,7 +11,7 @@
 # Sonnet 4.6 /post-plan skill session. POST_PLAN_SKILL=1 forces the skill path.
 # The harness intentionally omits backlog housekeeping, worktree teardown, the
 # E2E verify track, and Phase 10 preview — the skill fallback retains them.
-# The harness runs the Phase 5.5 fidelity review itself; there is no partial-run resume, so any harness exit other than 0 or 3 re-runs the full skill.
+# The harness runs the Phase 5.5 fidelity review itself; there is no partial-run resume, so any harness exit other than 0, 3 or 7 re-runs the full skill.
 #
 # Either way the run is supervised by launchd (RunAtLoad one-shot), so it
 # survives closing Claude Code or the terminal — a plain `nohup … &` launched
@@ -43,6 +43,8 @@
 #                               #   worktree has that branch. Refuses a fork PR.
 #
 # Run from anywhere inside the target worktree.
+# Exit 7: refused because $ROOT is the main checkout (ADR-0062); nothing was fired.
+# Callers key on 7 to tell "wrong tree" apart from a generic failure (exit 1).
 #
 # --pr <n> drives the worktree that has PR <n>'s head branch checked out, instead
 # of the current branch. When no worktree has that branch, --pr creates one via
@@ -64,9 +66,13 @@
 # TREE-EQUIVALENT proof; see ibl5/docs/decisions/0134-harness-conflict-autoresolve.md), and
 # (2) a local pre-commit/pre-push gate denial (missing ADR, stale doc, rules byte budget). Both
 # are deterministic walls a skill re-run cannot climb, so the fallback is suppressed entirely.
+# 7 is this launcher's own main-checkout refusal (the is_in_worktree block further down):
+# nothing ran, and the fix is to cd into the right worktree. The harness never emits 7
+# (runner.py exit_code_for returns only 0, 1 or 3). Listing 7 keeps one no-fallback
+# vocabulary, so a skill re-run can never be spent against the main checkout.
 # This function is embedded verbatim into the launchd plist below via `declare -f`, so the
 # tested logic here is exactly what runs there.
-should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }
+should_fallback() { case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }
 
 # shq <string> — single-quote <string> for the FAR side of the launchd boundary.
 # Everything this script assembles into $CMD is parsed by a shell a SECOND time, when
@@ -310,7 +316,7 @@ esac
 if ! is_in_worktree "$ROOT"; then
     echo "post-plan-now: refusing to run in the main checkout ($ROOT) — ADR-0062." >&2
     echo "  cd into the branch's worktree (or use --pr <n>) and re-run." >&2
-    exit 1
+    exit 7
 fi
 
 # A branch name may contain "/" (a Dependabot branch is
@@ -474,15 +480,21 @@ if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
     PLAN_ARG="${PLAN_OVERRIDE:+ --plan $(shq "$PLAN_OVERRIDE")}"
     HARNESS_RUN_DIR="$HARNESS/out/live-$SAFE_SLUG-$TS"
     HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}; rc=\$?; "
+    # Foreground has no plist, so nothing points stdout at $LOG. Without the tee, $LOG
+    # never exists: the RESULT capture below comes back empty and the rc=3 message falls
+    # back to generic text plus a "See $LOG" pointing at a missing file. Foreground only:
+    # under launchd, stdout already IS $LOG, and a tee there would write every line twice.
+    [ "$FOREGROUND" -eq 1 ] \
+        && HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG} 2>&1 | tee \"$LOG\"; rc=\${PIPESTATUS[0]}; "
     GATE_OPEN="if should_fallback \"\$rc\"; then "
-    # The harness has already exited and flushed by the time HARNESS_SEG's `rc=$?` runs,
+    # The harness has already exited and flushed by the time HARNESS_SEG's `rc=` runs,
     # so $LOG holds its final RESULT: line. Bounded at capture, not at use: bash has no
     # nested ${${V:-x}:0:N}, and truncate-then-default keeps an empty capture empty so
     # the ${HARNESS_RESULT:-...} fallback in GATE_CLOSE still fires. At 1400, fixed text
     # plus a worst-case $SLUG and $LOG stays under bin/discord-dm's 1900-char truncation
     # point, so "See $LOG." survives.
     POST_HARNESS_SEG="HARNESS_RESULT=\$(grep -m1 '^RESULT:' \"$LOG\" 2>/dev/null || true); HARNESS_RESULT=\${HARNESS_RESULT:0:1400}; "
-    GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then msg=\"post-plan-now: harness exited 3 (fail-closed sentinel) on branch $SLUG. SKIPPING the /post-plan skill fallback. Cause: \${HARNESS_RESULT:-the RESULT line above names it -- either a stacked-branch rebase conflict, or a local pre-commit/pre-push gate denial such as a missing ADR, a stale doc, or the rules byte budget}. A human must clear it, then re-run bin/post-plan-now. See $LOG.\"; echo \"\$msg\"; \"$ROOT/bin/discord-dm\" --quiet --attempts 2 \"\$msg\" >/dev/null 2>&1 || true; fi"
+    GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then msg=\"post-plan-now: harness exited 3 (fail-closed sentinel) on branch $SLUG. SKIPPING the /post-plan skill fallback. Cause: \${HARNESS_RESULT:-the RESULT line above names it -- either a rebase conflict, or a local pre-commit/pre-push gate denial such as a missing ADR, a stale doc, or the rules byte budget}. A human must clear it, then re-run bin/post-plan-now. See $LOG.\"; echo \"\$msg\"; \"$ROOT/bin/discord-dm\" --quiet --attempts 2 \"\$msg\" >/dev/null 2>&1 || true; fi"
     ENGINE="compiled post-plan harness (fails CLOSED on a rebase conflict or a local gate denial; falls back to the skill on other failures)"
 fi
 

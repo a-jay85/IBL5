@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # pr-cycle — serial, unattended driver that readies and arms one open PR at a time.
 #
-# Drives the hand-equivalent sequence: bin/pr-attack picks the order, bin/pr-ready-now
+# Drives the hand-equivalent sequence: bin/pr-attack picks the order, bin/post-plan-fleet
 # rebases and greens one PR, bin/pr-triage arms whatever is genuinely ARMABLE. Because
 # every merge re-BEHINDs every other open PR, that sequence has to be repeated after each
 # merge — this script is the loop that repeats it, detached, so a human need not sit in it.
@@ -15,7 +15,7 @@
 #   --go            Detach a worker via launchd and return. Without it the script only
 #                   reports (default).
 #   --dry-run       Explicit alias for the default. Useful in scripts that state intent.
-#   --stop          Create the stop file, then call bin/pr-ready-now --stop-all. The stop
+#   --stop          Create the stop file, then call bin/post-plan-fleet --stop-all. The stop
 #                   file is never removed by this script; clearing it is the human's
 #                   explicit re-enable.
 #   --no-dm         Suppress the single end-of-run Discord DM.
@@ -36,13 +36,13 @@
 # single call arms EVERY ARMABLE PR, in-set or not. So an already-green out-of-set PR still
 # lands, and that merge still counts against --max-merges. Documenting this IS the fix:
 # narrowing the arm call would break the one-arm invariant. What these flags actually buy
-# is that no hour-long `pr-ready-now --wait` session is ever spent on an out-of-set PR —
+# is that no hour-long `post-plan-fleet --wait` session is ever spent on an out-of-set PR —
 # which is the cost they exist to avoid.
 #
 # Env seams (used by bin/test-pr-cycle):
 #   PR_CYCLE_ATTACK_CMD      Path to the ordering tool.       Default: bin/pr-attack
 #   PR_CYCLE_TRIAGE_CMD      Path to the triage tool.         Default: bin/pr-triage
-#   PR_CYCLE_READY_CMD       Path to the ready tool.          Default: bin/pr-ready-now
+#   PR_CYCLE_READY_CMD       Path to the ready tool.          Default: bin/post-plan-fleet
 #   PR_CYCLE_DM_CMD          Path to the notifier.            Default: bin/discord-dm
 #   PR_CYCLE_GH_CMD          The gh binary.                   Default: gh
 #   PR_CYCLE_MAIN_CHECKOUT   The only tree this may run in.
@@ -111,7 +111,7 @@ ROOT="$(dirname "$GIT_COMMON")"
 # All :- (not -) so an EMPTY value falls back to the default exactly as an unset one does.
 PR_CYCLE_ATTACK_CMD="${PR_CYCLE_ATTACK_CMD:-$ROOT/bin/pr-attack}"
 PR_CYCLE_TRIAGE_CMD="${PR_CYCLE_TRIAGE_CMD:-$ROOT/bin/pr-triage}"
-PR_CYCLE_READY_CMD="${PR_CYCLE_READY_CMD:-$ROOT/bin/pr-ready-now}"
+PR_CYCLE_READY_CMD="${PR_CYCLE_READY_CMD:-$ROOT/bin/post-plan-fleet}"
 PR_CYCLE_DM_CMD="${PR_CYCLE_DM_CMD:-$ROOT/bin/discord-dm}"
 PR_CYCLE_GH_CMD="${PR_CYCLE_GH_CMD:-gh}"
 PR_CYCLE_MAIN_CHECKOUT="${PR_CYCLE_MAIN_CHECKOUT:-/Users/ajaynicolas/GitHub/IBL5}"
@@ -230,13 +230,13 @@ fi
 # wrong in the direction that disables the guard: grep -q exits on the first match, the
 # writer takes SIGPIPE on its remaining thousands of lines, pipefail promotes that 141 to
 # the pipeline's status, and the `if` concludes "no match" precisely BECAUSE a match was
-# found. bin/pr-ready-now documents the same trap at its own call site.
+# found. bin/post-plan-fleet documents the same trap at its own call site.
 # `|| true` also covers Linux CI, which has no launchctl at all.
 if [ "$WORKER" = "0" ]; then
     LAUNCHCTL_LIST="$(launchctl list 2>/dev/null || true)"
     case "$LAUNCHCTL_LIST" in
-        *com.ibl5.pr-ready-now-*|*com.ibl5.pr-cycle-*)
-            echo "ERROR: a pr-ready-now or pr-cycle session is already live; refusing to start another." >&2
+        *com.ibl5.post-plan-fleet-*|*com.ibl5.pr-cycle-*)
+            echo "ERROR: a post-plan-fleet or pr-cycle session is already live; refusing to start another." >&2
             exit 1 ;;
     esac
 fi
@@ -448,8 +448,8 @@ _excluded_dirty_rows() {
     ' "$RUNDIR/attack.md"
 }
 
-# True when launchd already holds a pr-ready-now slot for this PR. The plist IS the slot
-# token (bin/pr-ready-now:214), so firing a rescue against a PR whose session is already in
+# True when launchd already holds a post-plan-fleet slot for this PR. The plist IS the slot
+# token (bin/post-plan-fleet:688), so firing a rescue against a PR whose session is already in
 # flight would put two sessions on one PR.
 #
 # The list is snapshotted into a VARIABLE and matched with a `case` glob. NEVER
@@ -458,11 +458,11 @@ _excluded_dirty_rows() {
 # concludes "no match" precisely BECAUSE a match was found. Same trap the live-session guard
 # above documents -- this is the same idiom, not a second one.
 #
-# The pattern is END-ANCHORED with a trailing newline. bin/pr-ready-now:194 spells out why:
-# an unanchored `com.ibl5.pr-ready-now-190` also matches the label for PR #1901, which would
+# The pattern is END-ANCHORED with a trailing newline. bin/post-plan-fleet:178 spells out why:
+# an unanchored `com.ibl5.post-plan-fleet-190` also matches the label for PR #1901, which would
 # make a live session for #1901 silently veto every rescue of #190.
 _slot_held() {
-    _sh_label="com.ibl5.pr-ready-now-$1"
+    _sh_label="com.ibl5.post-plan-fleet-$1"
     _sh_list="$(launchctl list 2>/dev/null || true)"
     _sh_nl='
 '
@@ -535,7 +535,7 @@ _precheck_verdict() {
     printf '%s\n' "$_vbody" | tr -d '\r' > "$RUNDIR/verdict-body-$_vn.md"
 
     # Line 1 only, exactly 40 lowercase hex, nothing else on the line — the identical
-    # anchored shape .claude/skills/pr-ready/scripts/skip-review.sh matches, so this skip
+    # anchored shape .claude/review-shared/scripts/skip-review.sh matches, so this skip
     # and /pr-ready's own Phase 6 skip agree by construction rather than by coincidence.
     # A verdict written before that contract line existed simply has no match here, which
     # is the safe direction.
@@ -593,24 +593,24 @@ _ready_pr() {
     cat "$RUNDIR/ready-$_n.out" || true
     cat "$RUNDIR/ready-$_n.err" >&2 || true
 
-    # Timeout is detected from stderr TEXT, not from the exit code: bin/pr-ready-now exits
+    # Timeout is detected from stderr TEXT, not from the exit code: bin/post-plan-fleet exits
     # 0 on timeout as well as on success, and the only signal is this line. A timed-out
     # session is still alive and still holds the concurrency slot, so continuing would make
     # the next iteration block in wait_for_slot for its full 7200s ceiling — one timeout
     # would stall the whole queue while looking like progress. Halting hands the session
     # to the human intact, matching the tool's own "leaving them running" posture.
     if grep -qF 'TIMED OUT waiting for' "$RUNDIR/ready-$_n.err"; then
-        HALT="pr-ready-now --wait timed out on #$_n; session left running"
+        HALT="post-plan-fleet --wait timed out on #$_n; session left running"
         return 1
     fi
     if [ "$_rc" -ne 0 ]; then
-        HALT="pr-ready-now exit $_rc on #$_n"
+        HALT="post-plan-fleet exit $_rc on #$_n"
         return 1
     fi
     return 0
 }
 
-# _rescue_one — hand at most ONE excluded-DIRTY PR to bin/pr-ready-now.
+# _rescue_one — hand at most ONE excluded-DIRTY PR to bin/post-plan-fleet.
 #   0  a rescue was fired and its session completed
 #   1  no eligible candidate; the caller carries on unchanged
 #   2  HALT is set (stop file, or _ready_pr failed / timed out); the caller must break
@@ -628,12 +628,12 @@ _rescue_one() {
     while IFS= read -r _rc_n; do
         [ -n "$_rc_n" ] || continue
         # The rescue path honours --only/--skip too. Without this, `--only 2101` would still
-        # spend an hour-long pr-ready-now --wait session rebasing an out-of-set DIRTY PR --
+        # spend an hour-long post-plan-fleet --wait session rebasing an out-of-set DIRTY PR --
         # exactly the cost the flag exists to avoid.
         if ! _pr_allowed "$_rc_n"; then continue; fi
         if grep -qxF "$_rc_n" "$RUNDIR/rescued.txt" 2>/dev/null; then continue; fi
         if _slot_held "$_rc_n"; then
-            echo "pr-cycle: rescue skipped for #$_rc_n — a pr-ready-now slot is already live"
+            echo "pr-cycle: rescue skipped for #$_rc_n — a post-plan-fleet slot is already live"
             continue
         fi
         _rc_pick="$_rc_n"
@@ -659,16 +659,16 @@ EOF
     # per-run scratch on purpose — once a human resolves the conflict, the next run must be
     # free to try again, which a durable ledger would suppress forever.
     echo "$_rc_pick" >> "$RUNDIR/rescued.txt"
-    echo "pr-cycle: rescuing DIRTY #$_rc_pick via pr-ready-now"
+    echo "pr-cycle: rescuing DIRTY #$_rc_pick via post-plan-fleet"
 
     # Delegates to _ready_pr: identical `--pr N --jobs 1 --go --wait` argv, identical
-    # stderr-TEXT timeout detection (pr-ready-now exits 0 on timeout), identical HALT
+    # stderr-TEXT timeout detection (post-plan-fleet exits 0 on timeout), identical HALT
     # protocol, identical output surfacing.
     #
     # A rescue is NOT a merge and is not accounted as one: MERGES is untouched, armed.txt and
     # ledgered.txt are not written, _arm_and_classify and _poll_merge are never called. So a
     # rescue can never count against --max-merges. PR_CYCLE_POLL_CEILING is not consulted
-    # either — it belongs to _poll_merge; the bound here is pr-ready-now's own --wait
+    # either — it belongs to _poll_merge; the bound here is post-plan-fleet's own --wait
     # timeout, surfaced through _ready_pr's existing TIMED OUT branch.
     if ! _ready_pr "$_rc_pick"; then
         return 2
@@ -941,7 +941,7 @@ _report_dry_run() {
     echo ""
     # Report-only. The dry run is what a human reads before deciding to --go, so it must not
     # stay silent about the rescue path: "next PR: none" alone would read as "this run is a
-    # no-op" while --go would in fact hand a DIRTY PR to pr-ready-now. This block reads
+    # no-op" while --go would in fact hand a DIRTY PR to post-plan-fleet. This block reads
     # (attack.md, launchctl list) and never calls _rescue_one or _ready_pr.
     if [ "$PR_CYCLE_RESCUE" = "0" ]; then
         echo "DIRTY rescue: disabled (PR_CYCLE_RESCUE=0) — excluded PRs stay unreachable."
@@ -962,7 +962,7 @@ _report_dry_run() {
                 elif grep -qxF "$_dr_p" "$RUNDIR/rescued.txt" 2>/dev/null; then
                     echo "  #$_dr_p — already attempted this run; would be skipped"
                 elif _slot_held "$_dr_p"; then
-                    echo "  #$_dr_p — a pr-ready-now slot is already live; would be skipped"
+                    echo "  #$_dr_p — a post-plan-fleet slot is already live; would be skipped"
                 elif [ -z "$_dr_first" ]; then
                     _dr_first="$_dr_p"
                     echo "  #$_dr_p — would be rescued FIRST (exactly one per loop iteration)"

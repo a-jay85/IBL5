@@ -19,11 +19,91 @@
 # (the runner uses `caffeinate`, `stat -f`, BSD `date`). On Linux CI it skips.
 #
 # Run: bin/test-automouse-concurrency  (exit 0 = pass/skip, 1 = a safety property failed)
+#
+# Assertions 5 and 6 verify cost-report integrity under concurrency.
+# To demonstrate the bug on master, run this test several times:
+#   for i in $(seq 1 10); do bin/test-automouse-concurrency && echo "run $i OK" || echo "run $i FAIL"; done
+# Expect at least one FAIL across 10 runs on an unpatched tree.
+# The test is intentionally flaky pre-fix; after the mutex lands it must be green on every run.
 
 set -u
 
+RUN_SRC="${AUTOMOUSE_RUN_SRC:-$(cd "$(dirname "$0")/.." && pwd)/bin/automouse/run}"
+
+# --- Per-runner log isolation (portable: runs on Linux CI too) --------------
+# Two probe processes each eval the REAL runner's `LOG=` line (distinct $$),
+# plus the real phase_stalled / phase_env_error bodies. Runner B writes a
+# stall-kill and a limit error to ITS log. Runner A must not see them, then
+# must see its own. On a shared-day-log runner, A reads B's lines and fails.
+ISO="$(mktemp -d)"; ISO_FAIL=0
+iso_fail() { echo "FAIL: log isolation: $*" >&2; ISO_FAIL=1; }  # stderr: iso_region runs inside the probe.sh redirect
+iso_region() { # $1 = function name; prints `name() {` through the first `}` line.
+    # Literal index() match: awk -v strips regex backslashes on GNU awk (CI).
+    local n; n=$(awk -v f="$1" 'index($0, f "() {")==1 {c++} END {print c+0}' "$RUN_SRC")
+    [ "$n" -eq 1 ] || { iso_fail "anchor '$1() {' matched $n times in $RUN_SRC (want 1)"; return 0; }
+    awk -v f="$1" 'index($0, f "() {")==1 {on=1} on {print} on && /^\}/ {exit}' "$RUN_SRC"
+}
+n=$(grep -cE '^LOG="\$LOG_DIR/' "$RUN_SRC")
+[ "$n" -eq 1 ] || iso_fail "anchor /^LOG=\"\$LOG_DIR\// matched $n times (want 1)"
+{
+    echo 'set -u'; echo 'LOG_DIR="$1"'
+    grep -E '^LOG="\$LOG_DIR/' "$RUN_SRC"
+    iso_region phase_stalled
+    iso_region phase_env_error
+    cat <<'PROBE'
+type phase_stalled >/dev/null 2>&1 && type phase_env_error >/dev/null 2>&1 \
+    || { echo PROBE-MISSING-FN; exit 3; }
+mkdir -p "$LOG_DIR"
+case "$2" in
+  b) printf '[00:00:01] STALL-KILL (runner B)\n[00:00:02] API Error: 429 (runner B)\n' >> "$LOG" ;;
+  a) phase_stalled 0 && echo "STALL-BEFORE hit" || echo "STALL-BEFORE clean"
+     phase_env_error 0 && echo "ENV-BEFORE hit" || echo "ENV-BEFORE clean"
+     printf '[00:00:03] STALL-KILL (runner A)\n[00:00:04] API Error: 429 (runner A)\n' >> "$LOG"
+     phase_stalled 0 && echo "STALL-AFTER hit" || echo "STALL-AFTER clean"
+     phase_env_error 0 && echo "ENV-AFTER hit" || echo "ENV-AFTER clean" ;;
+esac
+echo "PATH $LOG"
+PROBE
+} > "$ISO/probe.sh"
+B_OUT=$(bash "$ISO/probe.sh" "$ISO/logs" b 2>&1)
+A_OUT=$(bash "$ISO/probe.sh" "$ISO/logs" a 2>&1)
+A_PATH=$(sed -n 's/^PATH //p' <<< "$A_OUT"); B_PATH=$(sed -n 's/^PATH //p' <<< "$B_OUT")
+pid_re='/[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]+\.log$'
+grep -q PROBE-MISSING-FN <<< "$A_OUT$B_OUT" && iso_fail "probe could not load phase_stalled/phase_env_error"
+if [ -n "$A_PATH" ] && [ "$A_PATH" != "$B_PATH" ] && grep -qE "$pid_re" <<< "$A_PATH" && grep -qE "$pid_re" <<< "$B_PATH"; then
+    echo "PASS: log isolation: each runner gets its own <date>-<pid>.log"
+else iso_fail "runners share a log or path is not <date>-<pid>.log (A=$A_PATH B=$B_PATH)"; fi
+grep -qx 'STALL-BEFORE clean' <<< "$A_OUT" && echo "PASS: log isolation: B's STALL-KILL invisible to A" \
+    || iso_fail "phase_stalled in runner A saw runner B's STALL-KILL"
+grep -qx 'ENV-BEFORE clean' <<< "$A_OUT" && echo "PASS: log isolation: B's API error invisible to A" \
+    || iso_fail "phase_env_error in runner A saw runner B's API error"
+grep -qx 'STALL-AFTER hit' <<< "$A_OUT" && grep -qx 'ENV-AFTER hit' <<< "$A_OUT" \
+    && echo "PASS: log isolation: A's own STALL-KILL and API error are seen" \
+    || iso_fail "runner A missed its own STALL-KILL or API error"
+
+# day_logs / day_exit_lines: the day-level readers merge legacy + per-pid files.
+eval "$(iso_region day_logs)"; eval "$(iso_region day_exit_lines)"
+type day_logs >/dev/null 2>&1 && type day_exit_lines >/dev/null 2>&1 \
+    || iso_fail "day_logs/day_exit_lines not loaded from $RUN_SRC"
+DL="$ISO/day"; mkdir -p "$DL"
+printf 'a/impl exit: 0\nnoise\n' > "$DL/2026-09-10.log"
+printf 'b/impl exit: 0\nc/impl exit: 0\n' > "$DL/2026-09-10-111.log"
+printf 'd/impl exit: 0\n' > "$DL/2026-09-10-222.log"
+printf 'e/impl exit: 0\n' > "$DL/2026-09-11-333.log"
+printf 'f/impl exit: 0\n' > "$DL/2026-09-12.log"
+c=$(day_exit_lines "$DL" 2026-09-10 | wc -l | tr -d ' '); f=$(day_logs "$DL" 2026-09-10 | wc -l | tr -d ' ')
+[ "$c" = 4 ] && [ "$f" = 3 ] && echo "PASS: day readers merge legacy + per-pid logs" \
+    || iso_fail "day readers: want 4 exit lines / 3 files for 2026-09-10, got $c / $f"
+c=$(day_exit_lines "$DL" 2026-09-12 | wc -l | tr -d ' ')
+[ "$c" = 1 ] && echo "PASS: day readers keep legacy-only days" || iso_fail "legacy-only day: want 1, got $c"
+out=$(day_logs "$DL" 2026-09-13); rc=$?
+[ -z "$out" ] && [ "$rc" -eq 0 ] && echo "PASS: day readers: empty day is empty + rc 0" \
+    || iso_fail "empty day: out='$out' rc=$rc"
+rm -rf "$ISO"
+if [ "$ISO_FAIL" -ne 0 ]; then echo "RESULT: FAILED (log isolation)"; exit 1; fi
+
 if [ "$(uname)" != "Darwin" ]; then
-    echo "SKIP: test-automouse-concurrency is macOS-only (automouse-run depends on launchd/BSD tools)."
+    echo "SKIP: test-automouse-concurrency is macOS-only (automouse-run depends on launchd/BSD tools). On Linux CI only the portable log-isolation block below runs."
     exit 0
 fi
 
@@ -35,7 +115,9 @@ NDIR="$ROOT/automouse"
 PLANS="$ROOT/plans"
 STUBDIR="$ROOT/stub"
 TRACE="$ROOT/trace.log"      # stub appends: <epoch_start> <epoch_end> <stub_pid> <plan> <phase>
-mkdir -p "$NDIR/queue" "$NDIR/handoff" "$NDIR/logs" "$NDIR/reports" "$NDIR/done" "$NDIR/skipped" "$PLANS" "$STUBDIR"
+WORKTREE_DIR="$ROOT/worktree"   # fake worktree dir; written into handoff so runner finds it
+mkdir -p "$NDIR/queue" "$NDIR/handoff" "$NDIR/logs" "$NDIR/reports" "$NDIR/done" "$NDIR/skipped" \
+         "$PLANS" "$STUBDIR" "$WORKTREE_DIR"
 
 N_PLANS=4
 for i in $(seq 1 $N_PLANS); do
@@ -47,8 +129,7 @@ done
 # Parses the real PLAN_FILE=<name> the runner appends LAST to the prompt (the
 # prompt body itself contains a literal `PLAN_FILE=<filename>` placeholder, so we
 # take the final match). First call per plan (no handoff yet) = impl: writes
-# handoff JSON. Second call (handoff present) = postplan: moves the queue symlink
-# to done/ and clears the handoff + attempts, mirroring a real post-plan success.
+# handoff JSON including a worktree path so the runner can find it for postplan.
 # Emits one stream-json `result` event so automouse-stream-filter records cost
 # and exits. Sleeps ~2s so two concurrent runners measurably overlap.
 cat > "$STUBDIR/claude" <<STUB
@@ -56,6 +137,7 @@ cat > "$STUBDIR/claude" <<STUB
 set -u
 NDIR="$NDIR"
 TRACE="$TRACE"
+WORKTREE_DIR="$WORKTREE_DIR"
 plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
 start=\$(date +%s)
 sleep 2
@@ -63,31 +145,63 @@ if [ -n "\$plan" ]; then
     hf="\$NDIR/handoff/\$plan.json"
     if [ ! -f "\$hf" ]; then
         phase=impl
-        printf '{"branch":"x","plan":"%s"}\n' "\$plan" > "\$hf"
-    else
-        phase=postplan
-        mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
-        rm -f "\$hf" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
+        printf '{"branch":"x","plan":"%s","worktree":"%s"}\n' "\$plan" "\$WORKTREE_DIR" > "\$hf"
     fi
-    printf '%s %s %s %s %s\n' "\$start" "\$(date +%s)" "\$\$" "\$plan" "\$phase" >> "\$TRACE"
+    printf '%s %s %s %s %s\n' "\$start" "\$(date +%s)" "\$\$" "\$plan" impl >> "\$TRACE"
 fi
 printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":2000,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
 exit 0
 STUB
 chmod +x "$STUBDIR/claude"
 
+# --- Stub `post-plan-now` --------------------------------------------------
+# Simulates a successful postplan: parses the plan name from --plan <path>,
+# moves the queue symlink to done/, removes the handoff, writes a TRACE entry,
+# and exits 0. The runner calls this as "$SELF_DIR/../post-plan-now" — SELF_DIR
+# is $ROOT/automouse/ so the stub lives at $ROOT/post-plan-now.
+cat > "$ROOT/post-plan-now" <<PPSTUB
+#!/usr/bin/env bash
+set -u
+NDIR="$NDIR"
+TRACE="$TRACE"
+plan=""
+while [ "\$#" -gt 0 ]; do
+    case "\$1" in
+        --plan) plan=\$(basename "\${2:-}"); shift 2 ;;
+        *)      shift ;;
+    esac
+done
+start=\$(date +%s)
+sleep 1
+if [ -n "\$plan" ]; then
+    mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
+    rm -f "\$NDIR/handoff/\$plan.json" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
+    printf '%s %s %s %s %s\n' "\$start" "\$(date +%s)" "\$\$" "\$plan" postplan >> "\$TRACE"
+fi
+printf 'RESULT: success\n'
+exit 0
+PPSTUB
+chmod +x "$ROOT/post-plan-now"
+
 # --- Copy the REAL runner; redirect NIGHTLY_DIR + force our stub onto PATH ---
-# Portable (no `sed -i`): transform into a new file. Two substitutions —
+# Portable (no `sed -i`): transform into a new file. Three substitutions —
 #   1. point the hardcoded NIGHTLY_DIR at our temp dir;
 #   2. replace the runner's own `export PATH=` (which re-prepends system bins and
-#      would shadow our stub) with one that puts STUBDIR first.
+#      would shadow our stub) with one that puts STUBDIR first;
+#   3. point PLANS_DIR at the temp plans dir so plan-path args resolve.
 RUNNER="$ROOT/automouse/run"
 sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
     -e "s#^REPO=.*#REPO=\"$REPO\"#" \
     -e "s#^export PATH=.*#export PATH=\"$STUBDIR:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
-    "$REPO/bin/automouse/run" > "$RUNNER"
+    -e "s#^PLANS_DIR=.*#PLANS_DIR=\"$PLANS\"#" \
+    "$RUN_SRC" > "$RUNNER"
 chmod +x "$RUNNER"
+# The runner reads its impl prompt from $SELF_DIR/prompt-impl (same dir as the
+# run script). Copy the real prompt so `cat "$SELF_DIR/prompt-impl"` succeeds;
+# the stub claude ignores the content and only reads PLAN_FILE= from its args.
+cp "$REPO/bin/automouse/prompt-impl" "$ROOT/automouse/prompt-impl"
 
+RUN_DAY=$(date +%Y-%m-%d)
 echo "Seeded $N_PLANS plans. Launching two concurrent runners..."
 "$RUNNER" > "$ROOT/runA.out" 2>&1 &
 A=$!
@@ -142,6 +256,54 @@ if [ "$done_count" -eq "$N_PLANS" ]; then
     echo "PASS: all $N_PLANS plans in done/."
 else
     echo "FAIL: $done_count in done/ (expected $N_PLANS)."; FAIL=1
+fi
+
+# 5. Cost-report row count: exactly 2 × N_PLANS data rows (one impl + one postplan per plan).
+REPORT="$NDIR/reports/$(date +%Y-%m-%d)-costs.md"
+if [ -f "$REPORT" ]; then
+    # Match data rows only (plan-name | impl/postplan | ...), not weekly-aggregate
+    # phase-summary rows which also contain "| impl |" as the FIRST column.
+    ROW_COUNT=$(grep -cE '^\| .+ \| (impl|postplan) \|' "$REPORT" || true)
+    EXPECTED_ROWS=$(( 2 * N_PLANS ))
+    if [ "$ROW_COUNT" -eq "$EXPECTED_ROWS" ]; then
+        echo "PASS assertion 5: cost-report row count == $EXPECTED_ROWS"
+    else
+        echo "FAIL assertion 5: expected $EXPECTED_ROWS cost-report rows, got $ROW_COUNT"; FAIL=1
+        cat "$REPORT"
+    fi
+else
+    echo "FAIL assertion 5: cost report not found at $REPORT"; FAIL=1
+fi
+
+# 6. Exactly one '## Weekly aggregate' section (concurrent RMW must not duplicate it).
+if [ -f "$REPORT" ]; then
+    WEEKLY_COUNT=$(grep -c '^## Weekly aggregate' "$REPORT" || true)
+    if [ "$WEEKLY_COUNT" -eq 1 ]; then
+        echo "PASS assertion 6: weekly aggregate section count == 1"
+    else
+        echo "FAIL assertion 6: expected exactly 1 '## Weekly aggregate' section, got $WEEKLY_COUNT"; FAIL=1
+        cat "$REPORT"
+    fi
+fi
+
+# 7. Each runner wrote its own per-pid log, and no shared day log exists.
+LA="$NDIR/logs/$RUN_DAY-$A.log"; LB="$NDIR/logs/$RUN_DAY-$B.log"
+if [ -f "$LA" ] && [ -f "$LB" ] && [ ! -e "$NDIR/logs/$RUN_DAY.log" ]; then
+    echo "PASS: each runner wrote its own logs/$RUN_DAY-<pid>.log."
+else
+    echo "FAIL: per-runner logs missing or a shared day log exists:"; ls -1 "$NDIR/logs"; FAIL=1
+fi
+
+# 8. Those logs are disjoint: no plan's impl exit line lands in both, and
+#    together they cover every plan (guards a vacuous pass on empty sets).
+a_set=$(grep -ohE 'fake-plan-[0-9]+/impl exit:' "$LA" 2>/dev/null | sort -u)
+b_set=$(grep -ohE 'fake-plan-[0-9]+/impl exit:' "$LB" 2>/dev/null | sort -u)
+both=$(comm -12 <(printf '%s\n' "$a_set") <(printf '%s\n' "$b_set") | grep -c . || true)
+union=$(printf '%s\n%s\n' "$a_set" "$b_set" | grep . | sort -u | wc -l | tr -d ' ')
+if [ "$both" -eq 0 ] && [ "$union" -eq "$N_PLANS" ]; then
+    echo "PASS: runner logs are disjoint and cover all $N_PLANS plans."
+else
+    echo "FAIL: log overlap=$both union=$union (want 0 / $N_PLANS)."; FAIL=1
 fi
 
 echo "==============================================================="

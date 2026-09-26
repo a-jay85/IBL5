@@ -14,15 +14,12 @@ from harness.adapters import probe as probe_mod
 
 BRINGUP_SCRIPT_PATHS = (
     ".claude/review-shared/scripts/wt-bring-up.sh",
-    ".claude/skills/pr-ready/scripts/wt-bring-up.sh",
 )
 ROWS_SCRIPT_PATHS = (
     ".claude/review-shared/scripts/manual-rows.sh",
-    ".claude/skills/pr-ready/scripts/manual-rows.sh",
 )
 TICK_SCRIPT_PATHS = (
     ".claude/review-shared/scripts/tick-rows.sh",
-    ".claude/skills/pr-ready/scripts/tick-rows.sh",
 )
 
 WORKTREES_ROOT = "/Users/ajaynicolas/GitHub/IBL5-worktrees"
@@ -282,7 +279,12 @@ def confirm(
     errors: list[str],
 ) -> tuple[list[str], bool]:
     """Re-fetch PR body and confirm ticks landed. Returns (confirmed_ids, all_ticked)."""
-    refetched = gh.pr_body() or ""
+    # pr_body_fresh, never pr_body: runner.py:497 leaves LiveGh._body_override set to the
+    # harness's own Phase 6 write, and tick-rows.sh edits GitHub out of band. pr_body()
+    # here would replay the pre-tick copy and report every tick as unconfirmed. The fresh
+    # read also clears the override and refills _meta, which is what lets runner.py:585
+    # and :674 keep calling pr_body() and still see the ticked body.
+    refetched = gh.pr_body_fresh() or ""
     if not refetched:
         errors.append("tick-unconfirmed:empty-body")
         return [], False
@@ -432,6 +434,28 @@ def run(
     return result
 
 
+class _GhShim:
+    """gh adapter for the CLI entry (`python3 -m harness.manual_testing`).
+
+    Every read shells out to `gh pr view`, so nothing is cached and pr_body_fresh() is
+    the same read. Both names exist so confirm() sees one adapter contract across
+    LiveGh, RecordingGh and this shim.
+    """
+
+    def __init__(self, pr: int):
+        self._pr = pr
+
+    def pr_body(self) -> str:
+        proc = subprocess.run(
+            ["gh", "pr", "view", str(self._pr), "--json", "body", "--jq", ".body"],
+            capture_output=True, text=True,
+        )
+        return proc.stdout.strip() if proc.returncode == 0 else ""
+
+    def pr_body_fresh(self) -> str:
+        return self.pr_body()
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
     import sys as _sys
@@ -442,17 +466,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--worktree", required=True)
     parser.add_argument("--tick", action="store_true", default=False)
     args = parser.parse_args(argv)
-
-    class _GhShim:
-        def __init__(self, pr: int):
-            self._pr = pr
-        def pr_body(self) -> str:
-            import subprocess as _sp
-            proc = _sp.run(
-                ["gh", "pr", "view", str(self._pr), "--json", "body", "--jq", ".body"],
-                capture_output=True, text=True,
-            )
-            return proc.stdout.strip() if proc.returncode == 0 else ""
 
     gh = _GhShim(args.pr)
     body = gh.pr_body()

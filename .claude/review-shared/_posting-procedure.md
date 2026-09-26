@@ -1,6 +1,6 @@
 ---
 description: Shared posting procedure — re-check eligibility, the never-hand-write rule, dispositioning open threads, and link format rules — used by /pr-review and /security-audit.
-last_verified: 2026-09-04
+last_verified: 2026-09-22
 ---
 
 # Review Posting Procedure (shared)
@@ -24,7 +24,7 @@ If the result is not `"OPEN"`, do not post a comment. Tell the user the PR is no
 Every review artifact is emitted by `post_review_findings` or `post_review_summary` — never by a
 freehand `gh pr comment`. The helper's envelope (`### Code review` / `### Security audit` heading,
 `<details>` wrapper, `<!-- score: N -->` markers, `PRF_FOOTER`) is **machine-parsed downstream** by
-`.claude/skills/pr-ready/scripts/4b-probe.sh` (matches `^#{1,6} +Code review` to set
+`.claude/review-shared/scripts/4b-probe.sh` (matches `^#{1,6} +Code review` to set
 `PHASE_4B_RAN`), by the dispositioning calls below, and by the `unresolved-findings-hold` gate.
 
 A hand-written comment performs a real review whose artifact is invisible to all three: `/pr-ready`

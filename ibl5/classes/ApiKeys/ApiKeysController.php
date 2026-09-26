@@ -66,6 +66,8 @@ class ApiKeysController implements ApiKeysControllerInterface
                 break;
         }
 
+        $responder->html($this->view->renderExportGuide());
+
         \PageLayout\PageLayout::footer();
     }
 

@@ -113,6 +113,61 @@ class DraftControllerTest extends TestCase
         }
     }
 
+    /**
+     * Route the two ownership-lookup queries the controller issues at check (4):
+     * the slot's origin teamid and that origin team's current pick owner for the
+     * stub season's endingYear (2025).
+     */
+    private function routeOwnershipQueries(?int $originTeamId, ?string $ownerOfPick): void
+    {
+        $this->mockDb->onQuery('SELECT teamid FROM', $originTeamId === null ? [] : [['teamid' => $originTeamId]]);
+        $this->mockDb->onQuery("SELECT ownerofpick.*year = '?2025'?", $ownerOfPick === null ? [] : [['ownerofpick' => $ownerOfPick]]);
+    }
+
+    /**
+     * Assert the submission was refused at check (4): no draft-class lookup (the
+     * first query handleDraftSelection() issues for a named player) and no write.
+     */
+    private function assertRejectedBeforeSelectionProcessing(): void
+    {
+        foreach ($this->mockDb->getExecutedQueries() as $query) {
+            $this->assertStringNotContainsStringIgnoringCase('ibl_draft_class', $query);
+            $this->assertStringNotContainsStringIgnoringCase('INSERT', $query);
+            $this->assertStringNotContainsStringIgnoringCase('UPDATE', $query);
+        }
+    }
+
+    /** Assert handleDraftSelection() was reached: the draft-class lookup was issued. */
+    private function assertReachedSelectionProcessing(): void
+    {
+        $reached = false;
+        foreach ($this->mockDb->getExecutedQueries() as $query) {
+            if (stripos($query, 'ibl_draft_class') !== false) {
+                $reached = true;
+                break;
+            }
+        }
+        $this->assertTrue($reached, 'Submission should pass the ownership check and reach the draft-class lookup.');
+    }
+
+    /** Build a controller for a logged-in GM whose session resolves to Metros. */
+    private function metrosController(): DraftController
+    {
+        return new DraftController(
+            $this->mockDb,
+            $this->repoWithSessionTeam('Metros'),
+            $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService,
+            null,
+            null,
+            $this->authedNukeCompat()
+        );
+    }
+
     // ============================================
     // CONSTRUCTOR TESTS
     // ============================================
@@ -184,6 +239,7 @@ class DraftControllerTest extends TestCase
     public function testSubmitSelectionWithoutPlayerKeyReturnsValidationError(): void
     {
         $this->withValidCsrfToken();
+        $this->routeOwnershipQueries(1, 'Test Team');
         $controller = new DraftController(
             $this->mockDb,
             $this->repoWithSessionTeam('Test Team'),
@@ -345,6 +401,7 @@ class DraftControllerTest extends TestCase
     public function testAuthorizedSubmissionReachesDraftProcessing(): void
     {
         $this->withValidCsrfToken();
+        $this->routeOwnershipQueries(1, 'Metros');
         $controller = new DraftController(
             $this->mockDb,
             $this->repoWithSessionTeam('Metros'),
@@ -364,14 +421,89 @@ class DraftControllerTest extends TestCase
             'user-cookie'
         );
 
-        $issuedDraftQuery = false;
+        $this->assertReachedSelectionProcessing();
+    }
+
+    // ============================================
+    // PICK-SLOT OWNERSHIP (check 4)
+    // ============================================
+
+    /** Slot originated with team 2 and is still owned by another team: Metros is refused. */
+    public function testAnotherTeamsSlotIsRejectedWithoutDraftMutation(): void
+    {
+        $this->withValidCsrfToken();
+        $this->routeOwnershipQueries(2, 'Enforcers');
+
+        $result = $this->metrosController()->submitSelection(
+            ['teamname' => 'Metros', 'player' => 'Some Prospect', 'draft_round' => '1', 'draft_pick' => '3'],
+            'user-cookie'
+        );
+
+        $this->assertStringContainsString('You do not own this draft pick.', $result);
+        $this->assertRejectedBeforeSelectionProcessing();
+    }
+
+    /** Traded pick: originated with team 2, current owner Metros. Metros is accepted. */
+    public function testTradedPickCurrentOwnerIsAccepted(): void
+    {
+        $this->withValidCsrfToken();
+        $this->routeOwnershipQueries(2, 'Metros');
+
+        $result = $this->metrosController()->submitSelection(
+            ['teamname' => 'Metros', 'player' => 'Some Prospect', 'draft_round' => '1', 'draft_pick' => '3'],
+            'user-cookie'
+        );
+
+        $this->assertStringNotContainsString('You do not own this draft pick.', $result);
+        $this->assertReachedSelectionProcessing();
+    }
+
+    /** Traded pick: originated with Metros (team 1) but now owned elsewhere. Metros is refused. */
+    public function testTradedPickOriginalTeamIsRejected(): void
+    {
+        $this->withValidCsrfToken();
+        $this->routeOwnershipQueries(1, 'Enforcers');
+
+        $result = $this->metrosController()->submitSelection(
+            ['teamname' => 'Metros', 'player' => 'Some Prospect', 'draft_round' => '1', 'draft_pick' => '1'],
+            'user-cookie'
+        );
+
+        $this->assertStringContainsString('You do not own this draft pick.', $result);
+        $this->assertRejectedBeforeSelectionProcessing();
+    }
+
+    /** No ibl_draft row for the slot: refused before the owner lookup is even issued. */
+    public function testUnknownSlotIsRejectedBeforeOwnerLookup(): void
+    {
+        $this->withValidCsrfToken();
+        $this->routeOwnershipQueries(null, 'Metros');
+
+        $result = $this->metrosController()->submitSelection(
+            ['teamname' => 'Metros', 'player' => 'Some Prospect', 'draft_round' => '9', 'draft_pick' => '99'],
+            'user-cookie'
+        );
+
+        $this->assertStringContainsString('That draft slot does not exist.', $result);
         foreach ($this->mockDb->getExecutedQueries() as $query) {
-            if (stripos($query, 'ibl_draft') !== false) {
-                $issuedDraftQuery = true;
-                break;
-            }
+            $this->assertStringNotContainsStringIgnoringCase('ownerofpick', $query);
         }
-        $this->assertTrue($issuedDraftQuery, 'Authorized submission should reach the draft-selection query.');
+        $this->assertRejectedBeforeSelectionProcessing();
+    }
+
+    /** Origin team known but no ibl_draft_picks row for this year: refused. */
+    public function testMissingOwnerRowIsRejected(): void
+    {
+        $this->withValidCsrfToken();
+        $this->routeOwnershipQueries(1, null);
+
+        $result = $this->metrosController()->submitSelection(
+            ['teamname' => 'Metros', 'player' => 'Some Prospect', 'draft_round' => '1', 'draft_pick' => '1'],
+            'user-cookie'
+        );
+
+        $this->assertStringContainsString('You do not own this draft pick.', $result);
+        $this->assertRejectedBeforeSelectionProcessing();
     }
 
     // ============================================

@@ -41,6 +41,22 @@ class ApiKeysViewTest extends TestCase
         $this->assertStringContainsString('IMPORTDATA', $html);
     }
 
+    public function testRenderNewKeyStateWarnsThatUrlKeysAreLogged(): void
+    {
+        $html = $this->view->renderNewKeyState('ibl_abcdef1234567890abcdef1234567890');
+
+        $this->assertStringContainsString('Your key is part of this URL.', $html);
+        $this->assertStringContainsString('X-API-Key', $html);
+    }
+
+    public function testRenderExportGuideWarnsThatUrlKeysAreLogged(): void
+    {
+        $html = $this->view->renderExportGuide();
+
+        $this->assertStringContainsString('Your key is part of this URL.', $html);
+        $this->assertStringContainsString('X-API-Key', $html);
+    }
+
     public function testRenderNewKeyStateEscapesKey(): void
     {
         // Key with characters that could be XSS if not escaped
@@ -96,7 +112,7 @@ class ApiKeysViewTest extends TestCase
         $this->assertStringContainsString('Never', $html);
     }
 
-    public function testRenderActiveKeyStateLinksToExportGuide(): void
+    public function testRenderActiveKeyStateHasNoRetiredGuideLink(): void
     {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
@@ -113,6 +129,22 @@ class ApiKeysViewTest extends TestCase
 
         $html = $this->view->renderActiveKeyState($keyStatus);
 
-        $this->assertStringContainsString('PlayerExportGuide', $html);
+        // The guide now renders below this card, so the old cross-module button is gone.
+        $this->assertStringNotContainsString('PlayerExportGuide', $html);
+    }
+
+    public function testRenderExportGuideContainsColumnReferenceTable(): void
+    {
+        $html = $this->view->renderExportGuide();
+
+        $this->assertStringContainsString('Column Reference', $html);
+        $this->assertStringContainsString('<table', $html);
+    }
+
+    public function testRenderExportGuideHasNoSelfLinkToApiKeys(): void
+    {
+        $html = $this->view->renderExportGuide();
+
+        $this->assertStringNotContainsString('name=ApiKeys', $html);
     }
 }

@@ -1,6 +1,6 @@
 ---
 description: Companion to headless-marker-contract.md — attaches only when bin/plan-now or bin/test-plan-now is touched, never on a general bin/ edit. Contains the historical rationale for the headless marker rule and bin/plan-now draft-recovery fallback internals (Leg A and Leg B). Read when debugging a missing-marker failure or modifying bin/plan-now recovery logic.
-last_verified: 2026-08-09
+last_verified: 2026-09-25
 paths:
   - "bin/plan-now"
   - "bin/test-plan-now"
@@ -48,7 +48,8 @@ independent legs, because the arm is reached two distinct ways:
 
 Leg A, in detail. When the model exits 0 and no usable `PLAN_FILE:` line was printed, the runner reads
 this run's slug back out of its own prompt (the `- Branch slug: ` line the drafting
-session writes) and looks for exactly one file: `<plans-dir>/.drafts/<slug>.draft.md`,
+session writes) and looks for `<plans-dir>/.drafts/<slug>.draft.md` first and the
+off-contract root path `<plans-dir>/<slug>.draft.md` second, taking the first one
 modified after the run started. Both conditions are required — the slug match keeps a
 concurrent `plan-now` run's draft out, and the mtime keeps an abandoned draft from a
 previous run of the *same* slug out. If either fails, nothing is adopted; the run
@@ -85,9 +86,9 @@ supplies only the *identification* leg of the queue gate; clean exit and a passi
 
 This is a net, not a licence. The prompt coda tells the run never to background a
 sub-agent in the first place, and deliberately does not mention that this net exists.
-`bin/test-plan-now` pins all eleven branches — five on leg A, five on leg B, plus the
+`bin/test-plan-now` pins sixteen branches: ten on leg A (five of them root-draft cases), five on leg B, plus the
 regression that a valid marker still wins outright and never enters recovery at all
-(that one belongs to neither leg, which is the point of it). Five of the eleven are
+(that one belongs to neither leg, which is the point of it). Several are
 negatives, and the most important is a slugless prompt: both legs no-op for it, that is
 the *majority* of real prompts, and its verdict must stay byte-identical to the
 pre-recovery one.

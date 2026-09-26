@@ -113,8 +113,10 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertNull($builder->getMyTeamMenu());
     }
 
-    public function testVotingResultsLinkVisibleForAdminAndPositionedAfterVoting(): void
+    public function testVotingResultsLinkAbsentForAdmins(): void
     {
+        // Results are an admin-only expander on the Voting page this menu already
+        // links, so a second entry to the same destination was removed.
         $builder = new NavigationMenuBuilder($this->createConfig(isLoggedIn: true, teamId: 5, isAdmin: true));
         $menu = $builder->getMyTeamMenu();
         $this->assertNotNull($menu);
@@ -124,26 +126,8 @@ class NavigationMenuBuilderTest extends TestCase
             $menu['links']
         );
 
-        $votingResults = array_filter(
-            $menu['links'],
-            static fn (array $link): bool => ($link['label'] ?? '') === 'Voting Results'
-        );
-        $this->assertCount(1, $votingResults, 'Voting Results link should be present for admins');
-        $this->assertSame(
-            'modules.php?name=VotingResults',
-            array_values($votingResults)[0]['url'] ?? null
-        );
-
-        // Relative-position assertion: the Draft/Free Agency branches array_unshift()
-        // (prepend), so absolute indices shift — only the relative ordering is invariant.
-        $votingIdx = array_search('Voting', $labels, true);
-        $votingResultsIdx = array_search('Voting Results', $labels, true);
-        $draftHistoryIdx = array_search('Draft History', $labels, true);
-        $this->assertIsInt($votingIdx);
-        $this->assertIsInt($votingResultsIdx);
-        $this->assertIsInt($draftHistoryIdx);
-        $this->assertSame($votingIdx + 1, $votingResultsIdx, 'Voting Results should sit directly after Voting');
-        $this->assertSame($votingResultsIdx + 1, $draftHistoryIdx, 'Voting Results should sit directly before Draft History');
+        $this->assertContains('Voting', $labels);
+        $this->assertNotContains('Voting Results', $labels);
     }
 
     public function testVotingResultsLinkHiddenForNonAdmin(): void
@@ -424,6 +408,40 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertNotNull($draftOrderLink);
         $this->assertSame('Draft Order', $draftOrderLink['label']);
         $this->assertNull($draftOrderLink['badge'] ?? null);
+    }
+
+    public function testAllStarAppearancesLinkPointsToRecordHoldersSubView(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig());
+        $menus = $builder->getMenuStructure();
+
+        $allStarLink = null;
+        foreach ($menus['History']['links'] as $link) {
+            if (($link['label'] ?? '') === 'All-Star Appearances') {
+                $allStarLink = $link;
+                break;
+            }
+        }
+
+        $this->assertNotNull($allStarLink, 'History menu should contain an All-Star Appearances link');
+        $this->assertSame('modules.php?name=RecordHolders&op=allstar', $allStarLink['url']);
+    }
+
+    public function testPlayerExportLinkPointsToApiKeys(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig());
+        $menus = $builder->getMenuStructure();
+
+        $playerExportLink = null;
+        foreach ($menus['Season']['links'] as $link) {
+            if (($link['label'] ?? '') === 'Player Export') {
+                $playerExportLink = $link;
+                break;
+            }
+        }
+
+        $this->assertNotNull($playerExportLink, 'Season menu should contain a Player Export link');
+        $this->assertSame('modules.php?name=ApiKeys', $playerExportLink['url']);
     }
 
     // --- Account Menu Tests ---

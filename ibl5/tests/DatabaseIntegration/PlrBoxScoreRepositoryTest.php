@@ -217,6 +217,26 @@ class PlrBoxScoreRepositoryTest extends DatabaseTestCase
         self::assertArrayNotHasKey(1, $result, 'DNP row must not appear in single-game maximums');
     }
 
+    public function testRegularSeasonQueriesExcludeExhibitionRows(): void
+    {
+        $this->insertPlayerBoxscoreRow('2025-01-15', 1, 'P1', 'PG', 2, 1, 1, minutes: 30, points2m: 5, points2a: 10, ast: 4);
+        // Rookies/Sophomores and All-Star games: February dates, so game_type = 1.
+        $this->insertPlayerBoxscoreRow('2025-02-02', 1, 'P1', 'PG', 40, 41, 41, minutes: 25, points2m: 15, points2a: 20, ast: 12);
+        $this->insertPlayerBoxscoreRow('2025-02-03', 1, 'P1', 'PG', 50, 51, 51, minutes: 25, points2m: 15, points2a: 20, ast: 12);
+
+        $sums = $this->repo->sumStatsByGameTypeThroughDate(2025, 1, '2025-02-28');
+        self::assertSame(1, $sums[1]['gp']);
+        self::assertSame(30, $sums[1]['min']);
+        self::assertSame(5, $sums[1]['two_gm']);
+
+        $highs = $this->repo->getSingleGameMaximumsThroughDate(2025, 1, '2025-02-28');
+        self::assertSame(4, $highs[1]['high_ast']);
+
+        $cumulative = $this->repo->cumulativeRegularSeasonStatsByDate(1, 2025);
+        self::assertCount(1, $cumulative);
+        self::assertSame('2025-01-15', $cumulative[0]['date']);
+    }
+
     public function testCumulativeRegularSeasonStatsByDateExcludesDnpFromGp(): void
     {
         // Played row (game_min > 0) — counts as 1 GP

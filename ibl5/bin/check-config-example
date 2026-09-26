@@ -9,6 +9,9 @@ set -euo pipefail
 # constant's behavior: PR #1008 shipped define('IBL6_BASE_URL', '') and broke
 # BoxScoreUrlBuilderTest in CI. A getenv() fallback that defaults to '' is
 # fine (the env var supplies the value; fail-closed constants rely on this).
+# DB credentials are the exception: they come only from the gitignored
+# config.local.php (template config.local.php.example), and this script also
+# probes that config.php dies when that file is absent.
 #
 # Run from ibl5/: bin/check-config-example
 
@@ -22,6 +25,63 @@ if [ -n "$bad" ]; then
   echo "what every CI test runs against (PR #1008 broke BoxScoreUrlBuilderTest" >&2
   echo "this way). Use a realistic non-empty placeholder, or an env fallback:" >&2
   echo "  define('MY_CONST', getenv('MY_CONST') ?: 'realistic-default');" >&2
+  exit 1
+fi
+
+# --- config.local.php contract (PR for IBL5-backlog #179) -------------------
+# config.php.example requires the gitignored config.local.php for the four DB
+# credential variables and must die with a clear message when it is missing.
+# The tracked template config.local.php.example is what CI and worktrees copy,
+# so its four assignments must be plain non-empty string literals.
+fail=0
+
+if [ ! -f config.local.php.example ]; then
+  echo "✗ config.local.php.example missing (template for the gitignored config.local.php)" >&2
+  fail=1
+else
+  for var in dbhost dbuname dbpass dbname; do
+    if ! grep -qE "^\\\$${var} = '[^']+';\$" config.local.php.example; then
+      echo "✗ config.local.php.example: \$${var} must be a non-empty single-quoted literal" >&2
+      fail=1
+    fi
+  done
+fi
+
+if grep -nE "getenv\('DB_(HOST|USER|PASS|NAME)'\)" config.php.example >&2; then
+  echo "✗ config.php.example still reads DB credentials from getenv(); they belong in config.local.php" >&2
+  fail=1
+fi
+
+if ! grep -qF "require_once __DIR__ . '/config.local.php';" config.php.example; then
+  echo "✗ config.php.example must require_once __DIR__ . '/config.local.php'" >&2
+  fail=1
+fi
+
+if ! command -v php >/dev/null 2>&1; then
+  echo "✗ php not on PATH; cannot run the config.local.php fail-closed probe" >&2
+  fail=1
+else
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' EXIT
+  cp config.php.example "$tmp/config.php"
+  # Missing config.local.php must exit non-zero AND name the template to copy.
+  if out=$(cd "$tmp" && php -r 'require "config.php";' 2>&1); then
+    echo "✗ config.php loaded without config.local.php (must die, never connect with a blank password)" >&2
+    fail=1
+  elif ! grep -qF 'config.local.php.example' <<< "$out"; then
+    echo "✗ missing config.local.php died without naming config.local.php.example:" >&2
+    printf '%s\n' "$out" >&2
+    fail=1
+  fi
+  # Present config.local.php (copied from the template) must load and expose $dbpass.
+  cp config.local.php.example "$tmp/config.local.php"
+  if ! got=$(cd "$tmp" && php -r 'require "config.php"; echo $dbpass;' 2>&1) || [ "$got" != "root" ]; then
+    echo "✗ config.php + config.local.php.example did not yield \$dbpass = root; got: $got" >&2
+    fail=1
+  fi
+fi
+
+if [ "$fail" -ne 0 ]; then
   exit 1
 fi
 

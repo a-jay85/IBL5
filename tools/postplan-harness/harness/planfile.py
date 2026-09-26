@@ -1,4 +1,4 @@
-"""Phase 1 — plan location + parsing (frontmatter, matrix, critical files).
+"""Phase 1 — plan location + parsing (frontmatter, matrix, critical files, backlog issues).
 
 Deterministic port of post-plan SKILL.md Phase 1, Phase 6.5 condition (7)'s
 frontmatter awk, and _phase-5-final-verification.md's matrix/Critical-Files parsing.
@@ -12,7 +12,8 @@ import re
 import sys
 
 from . import manual_rows
-from .state import PlanInfo
+from .classify import BACKLOG_REPO
+from .state import PhaseInfo, PlanInfo
 
 # Paren-scoped canonical exempt marker. MUST stay behaviorally identical to
 # CF_EXEMPT_PATTERN in bin/lib/critical-files.sh — that shell lib is the single
@@ -272,6 +273,118 @@ def parse_critical_files(content: str) -> list[tuple]:
     return out
 
 
+_BACKLOG_LINE_RE = re.compile(
+    rf"^\s*[-*]\s+(closes|refs)\s+{re.escape(BACKLOG_REPO)}#(\d+)\b", re.I)
+
+
+_NO_ADR_RE = re.compile(r"^[ \t]*<!--\s*no-adr:.*?-->", re.DOTALL | re.M)
+
+
+def parse_backlog_issues(content: str) -> list[tuple]:
+    """[(kind, number)] from backlog bullets anywhere in the plan. kind is "closes" or "refs".
+
+    Scans the whole plan, not only `## Backlog issues`, so a closes bullet in a
+    bookkeeping-only phase body still reaches the PR body. Only lines matching
+    _BACKLOG_LINE_RE count: a bullet naming the full a-jay85/IBL5-backlog path.
+    Fenced blocks are stripped first so a grammar example inside a fence never
+    yields a phantom close. Bullets that do not match the grammar are skipped
+    silently; bin/check-plan rejects them at plan time. Deduped by number in
+    first-seen order; when one number appears as both kinds, "closes" wins.
+    """
+    kinds: dict[int, str] = {}
+    for line in _strip_fenced(content):
+        m = _BACKLOG_LINE_RE.match(line)
+        if not m:
+            continue
+        kind, num = m.group(1).lower(), int(m.group(2))
+        if kinds.get(num) != "closes":
+            kinds[num] = kind
+    return [(k, n) for n, k in kinds.items()]
+
+
+_PHASE_HEADING_RE = re.compile(r"^##\s+(?:Phase|Step)\s*(\d+)(?!\.\d)\b\s*[:.\-—–]?\s*(.*)$")
+# All-S tier marker = bookkeeping-only phase (close a backlog issue, bump a doc date).
+_BOOKKEEPING_MARKER_RE = re.compile(r"\[phases:\s*S(\s*/\s*S)*\s*\]")
+_EXAMPLE_SUFFIX_RE = re.compile(r"^\s*\(example\)")
+
+
+def _phase_evidence_paths(body: str) -> list[str]:
+    """Backticked tokens in a phase body that look like repo paths, deduped, first-seen order.
+
+    A token followed by ` (example)` is an intentionally-absent path (staleness-guard idiom)
+    and is skipped. A `path::test_fn` pytest node id contributes its file part only. Glob
+    tokens are skipped because _resolve cannot match them.
+    """
+    out: list[str] = []
+    for m in re.finditer(r"`([^`\n]+)`", body):
+        if _EXAMPLE_SUFFIX_RE.match(body[m.end():m.end() + 12]):
+            continue
+        tok = m.group(1).split("::", 1)[0].strip()
+        if not _is_test_path(tok) or re.search(r"[*?\[\]]", tok):
+            continue
+        if tok not in out:
+            out.append(tok)
+    return out
+
+
+def parse_phases(content: str) -> list[PhaseInfo]:
+    """One PhaseInfo per `## Phase N:` / `## Step N:` h2 heading, in document order.
+
+    The body runs to the next h2 (`## `), so `### Delegate` packets inside a phase are part
+    of that phase and their Scope/Recipe paths count as evidence. Fenced blocks are
+    stripped first. Sub-numbered headings (`## Phase 5.5:`) and h3 headings never open a
+    phase. A repeated phase number merges into the first occurrence (evidence unioned) so
+    a plan with a duplicated heading yields one entry per number.
+    """
+    lines = _strip_fenced(content)
+    phases: list[PhaseInfo] = []
+    by_number: dict[int, PhaseInfo] = {}
+    current: PhaseInfo | None = None
+    buf: list[str] = []
+
+    def _flush() -> None:
+        if current is not None:
+            for p in _phase_evidence_paths("\n".join(buf)):
+                if p not in current.evidence_paths:
+                    current.evidence_paths.append(p)
+
+    for line in lines:
+        if re.match(r"^##\s", line):
+            _flush()
+            buf = []
+            hm = _PHASE_HEADING_RE.match(line)
+            if not hm:
+                current = None
+                continue
+            num = int(hm.group(1))
+            heading = line[3:].strip()
+            if num in by_number:
+                current = by_number[num]
+            else:
+                current = PhaseInfo(number=num, heading=heading,
+                                    bookkeeping=bool(_BOOKKEEPING_MARKER_RE.search(heading)))
+                by_number[num] = current
+                phases.append(current)
+            continue
+        if current is not None:
+            buf.append(line)
+    _flush()
+    return phases
+
+
+def parse_deferred_phase_numbers(content: str) -> list[int]:
+    """Sorted, deduped phase numbers the `## Out of Scope` section names as `Phase N`.
+
+    Only an explicit `Phase N` / `Step N` mention counts; a range (`Phases 5-7`) or prose
+    (`the last phase`) does not. Precision over recall: an unparsed deferral at worst
+    produces a hold a human clears, while a false exemption hides a real omission.
+    Absent section -> [].
+    """
+    section = _section("\n".join(_strip_fenced(content)), r"Out of Scope")
+    nums = {int(n) for n in re.findall(r"\b(?:Phase|Step)\s*(\d+)\b", section, re.I)}
+    return sorted(nums)
+
+
 def parse_required_test_methods(content: str) -> list[str]:
     """List of bare method names from `## Required Test Methods` (fenced blocks stripped).
 
@@ -301,6 +414,18 @@ def parse_hold_justification(content: str) -> str:
     """
     return _section("\n".join(_strip_fenced(content)),
                     r"Automouse Hold Justification")[:4000]
+
+
+def parse_no_adr_markers(content: str) -> list[str]:
+    """Every `<!-- no-adr: ... -->` HTML comment in the plan, verbatim, in order.
+
+    Fenced blocks are stripped first (same reason as parse_hold_justification):
+    a plan that *documents* the marker syntax inside a fence must not yield a
+    phantom marker that post-plan then carries into the PR body. The whole
+    document is scanned, not just one section, because the marker may sit
+    anywhere in the plan.
+    """
+    return _NO_ADR_RE.findall("\n".join(_strip_fenced(content)))
 
 
 _DECISION_RE = re.compile(r"^ *\*\*Decision:\*\*")
@@ -456,9 +581,13 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
         info.planned_test_paths, info.truly_manual_rows = parse_matrix(content)
     info.critical_files = parse_critical_files(content)
     info.required_test_methods = parse_required_test_methods(content)
+    info.backlog_issues = parse_backlog_issues(content)
+    info.phases = parse_phases(content)
+    info.deferred_phase_numbers = parse_deferred_phase_numbers(content)
     if info.has_security:
         info.security_section = _section(content, "Security")[:4000]
     if info.has_reuse:
         info.reuse_section = _section(content, r"Reuse[^#\n]*")[:2000]
     info.hold_justification = parse_hold_justification(content)
+    info.no_adr_markers = parse_no_adr_markers(content)
     return info

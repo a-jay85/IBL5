@@ -654,3 +654,213 @@ def test_reconcile_gh_lag_resolved_by_ls_remote(tmp_path):
         gh_cmd=gh_cmd, run_git=run_git
     )
     assert r.action == "match"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 fail-closed unit tests — patch-series equivalence arm
+# ---------------------------------------------------------------------------
+
+_S_LOCAL = "aaa" + "0" * 37
+_S_REMOTE = "bbb" + "0" * 37
+_S_BL = "b10" + "0" * 37
+_S_BR = "b20" + "0" * 37
+_S_RANGE_DIFF_OK = (
+    "1:  1111111 = 1:  aaaaaaa c1\n"
+    "2:  2222222 = 2:  bbbbbbb c2\n"
+    "3:  3333333 = 3:  ccccccc c3\n"
+)
+
+
+def _series_map(range_diff=_S_RANGE_DIFF_OK, n_local="3", n_remote="3"):
+    """Happy-path FakeRunGit mapping: trees differ, patch series equivalent."""
+    return {
+        ("fetch", "origin"): (0, ""),
+        ("rev-parse", "--verify", f"{_S_LOCAL}^{{tree}}"): (0, "TL" + "0" * 38 + "\n"),
+        ("rev-parse", "--verify", f"{_S_REMOTE}^{{tree}}"): (0, "TR" + "0" * 38 + "\n"),
+        ("ls-remote", "origin", "refs/heads/feat-x"): (1, ""),
+        ("rev-parse", "--abbrev-ref", "HEAD"): (0, "feat-x\n"),
+        ("merge-base", _S_LOCAL, "origin/master"): (0, _S_BL + "\n"),
+        ("merge-base", _S_REMOTE, "origin/master"): (0, _S_BR + "\n"),
+        ("merge-base", "--is-ancestor", _S_BL, "origin/master"): (0, ""),
+        ("merge-base", "--is-ancestor", _S_BR, "origin/master"): (0, ""),
+        ("merge-base", "--is-ancestor", _S_BL, _S_BR): (0, ""),
+        ("rev-list", "--count", f"{_S_BL}..{_S_LOCAL}"): (0, n_local + "\n"),
+        ("rev-list", "--count", f"{_S_BR}..{_S_REMOTE}"): (0, n_remote + "\n"),
+        ("range-diff", "--no-color", f"{_S_BL}..{_S_LOCAL}", f"{_S_BR}..{_S_REMOTE}"): (0, range_diff),
+        ("reset", "--hard", "origin/feat-x"): (0, ""),
+        ("rev-parse", "HEAD"): (0, _S_REMOTE + "\n"),
+    }
+
+
+_S_ARM_KEYS = [k for k in _series_map() if k[0] in ("merge-base", "rev-list", "range-diff")]
+# 8 keys: 2 merge-base, 3 is-ancestor, 2 rev-list, 1 range-diff
+
+
+def _reconcile_series(tmp_path, run_git):
+    gh_cmd = fake_gh(tmp_path, [_S_REMOTE])
+    return gitutil.reconcile_remote_head(42, _S_LOCAL, _S_LOCAL, "feat-x", str(tmp_path),
+                                         gh_cmd=gh_cmd, run_git=run_git)
+
+
+def _reset_issued(run_git):
+    return any(c[:2] == ["reset", "--hard"] for c in run_git.calls)
+
+
+_TEXT1 = (
+    "1:  1111111 ! 1:  aaaaaaa c1\n"
+    "    @@ -1 +1 @@\n"
+    "    -b\n"
+    "    +b-edited\n"
+    "2:  2222222 = 2:  bbbbbbb c2\n"
+    "3:  3333333 = 3:  ccccccc c3\n"
+)
+_TEXT2 = (
+    "1:  1111111 = 1:  aaaaaaa c1\n"
+    "2:  2222222 = 2:  bbbbbbb c2\n"
+    "3:  3333333 < -:  ------- c3\n"
+)
+_TEXT3 = (
+    "1:  1111111 = 1:  aaaaaaa c1\n"
+    "2:  2222222 = 2:  bbbbbbb c2\n"
+    "-:  ------- > 4:  ddddddd d\n"
+)
+_TEXT4 = (
+    "1:  1111111 = 2:  bbbbbbb c2\n"
+    "2:  2222222 = 1:  aaaaaaa c1\n"
+    "3:  3333333 = 3:  ccccccc c3\n"
+)
+_TEXT5 = (
+    "1:  1111111 = 1:  aaaaaaa c1\n"
+    "2:  2222222 = 2:  bbbbbbb c2\n"
+)
+_TEXT6 = ""
+
+
+def test_patch_series_mock_happy_path_syncs(tmp_path):
+    run_git = FakeRunGit(_series_map())
+    r = _reconcile_series(tmp_path, run_git)
+    assert r.action == "synced"
+    assert r.remote_sha == _S_REMOTE
+    assert "patch-series-equivalent (rebased onto newer master)" in r.evidence
+    assert _reset_issued(run_git)
+    assert any(c[0] == "range-diff" for c in run_git.calls)
+
+
+@pytest.mark.parametrize("key", _S_ARM_KEYS, ids=lambda k: " ".join(k)[:40])
+def test_patch_series_fails_closed_when_any_git_step_fails(tmp_path, key):
+    m = _series_map()
+    m[key] = (1, "")
+    run_git = FakeRunGit(m)
+    r = _reconcile_series(tmp_path, run_git)
+    assert r.action == "diverged"
+    assert not _reset_issued(run_git)
+
+
+def test_patch_series_fails_closed_on_timeout(tmp_path):
+    class TimeoutOnRangeDiff(FakeRunGit):
+        def __call__(self, args, cwd):
+            if args[0] == "range-diff":
+                raise subprocess.TimeoutExpired(cmd="git", timeout=1)
+            return super().__call__(args, cwd)
+
+    run_git = TimeoutOnRangeDiff(_series_map())
+    r = _reconcile_series(tmp_path, run_git)
+    assert r.action == "diverged"
+    assert not _reset_issued(run_git)
+
+
+def test_patch_series_fails_closed_on_oserror(tmp_path):
+    class OSErrorOnMergeBase(FakeRunGit):
+        def __call__(self, args, cwd):
+            if args[0] == "merge-base":
+                raise OSError("injected oserror")
+            return super().__call__(args, cwd)
+
+    run_git = OSErrorOnMergeBase(_series_map())
+    r = _reconcile_series(tmp_path, run_git)
+    assert r.action == "diverged"
+    assert not _reset_issued(run_git)
+
+
+@pytest.mark.parametrize("n_local,n_remote", [("3", "4"), ("3", "2"), ("0", "0"), ("x", "3")])
+def test_patch_series_count_mismatch_stays_diverged(tmp_path, n_local, n_remote):
+    run_git = FakeRunGit(_series_map(n_local=n_local, n_remote=n_remote))
+    r = _reconcile_series(tmp_path, run_git)
+    assert r.action == "diverged"
+    assert not _reset_issued(run_git)
+
+
+@pytest.mark.parametrize("text", [_TEXT1, _TEXT2, _TEXT3, _TEXT4, _TEXT5, _TEXT6])
+def test_patch_series_range_diff_markers_stay_diverged(tmp_path, text):
+    run_git = FakeRunGit(_series_map(range_diff=text))
+    r = _reconcile_series(tmp_path, run_git)
+    assert r.action == "diverged"
+    assert not _reset_issued(run_git)
+
+
+def test_parse_range_diff_skips_interdiff_body():
+    result = gitutil._parse_range_diff(_TEXT1)
+    assert len(result) == 3
+    assert result[0] == ("1", "!", "1")
+    assert result[1] == ("2", "=", "2")
+    assert result[2] == ("3", "=", "3")
+
+
+def test_series_all_equal_rules():
+    assert gitutil._series_all_equal([("1", "=", "1"), ("2", "=", "2")], 2) is True
+    assert gitutil._series_all_equal([("1", "=", "1"), ("2", "=", "2")], 3) is False
+    assert gitutil._series_all_equal([("1", "=", "2"), ("2", "=", "1")], 2) is False
+    assert gitutil._series_all_equal([("1", "!", "1")], 1) is False
+    assert gitutil._series_all_equal([], 0) is False
+    assert gitutil._series_all_equal([("1", "=", "1"), ("2", "<", "-")], 2) is False
+
+
+def test_patch_series_rejects_empty_shas(tmp_path):
+    run_git = FakeRunGit(_series_map())
+    result1 = gitutil.patch_series_equivalent("", _S_REMOTE, str(tmp_path), run_git=run_git)
+    result2 = gitutil.patch_series_equivalent(_S_LOCAL, "", str(tmp_path), run_git=run_git)
+    assert result1 is False
+    assert result2 is False
+    assert run_git.calls == []
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: Caller CI re-key proof (Phase 6.5 _reconcile_before_arm)
+# ---------------------------------------------------------------------------
+
+
+def test_reconcile_before_arm_synced_restarts_ci_on_remote_sha(tmp_path, monkeypatch):
+    """Phase 6.5: a patch-series 'synced' reaps the old watch and re-keys CI to the remote sha."""
+    old_sha, new_sha = "aaa" + "0" * 37, "bbb" + "0" * 37
+    reaped, started = [], []
+    monkeypatch.setattr(runner.gitutil, "reconcile_remote_head",
+                        lambda *a, **k: gitutil.Reconcile(
+                            "synced", new_sha,
+                            f"remote head moved {old_sha[:8]} -> {new_sha[:8]}; "
+                            "patch-series-equivalent (rebased onto newer master); synced"))
+    monkeypatch.setattr(runner.ciwatch, "reap_background_watch", lambda bg: reaped.append(bg))
+    monkeypatch.setattr(runner.ciwatch, "start_background_watch",
+                        lambda wt, pr, sha, out, **kw: started.append((wt, pr, sha, out)) or "NEW-BG")
+    sha, bg = runner._reconcile_before_arm(FakePushGit(head_sha=old_sha), _noop_log, FakeGh(),
+                                           str(tmp_path), 42, old_sha, "OLD-BG",
+                                           str(tmp_path / "out"))
+    assert sha == new_sha and bg == "NEW-BG"
+    assert reaped == ["OLD-BG"]
+    assert started == [(str(tmp_path), 42, new_sha, str(tmp_path / "out"))]
+
+
+def test_reconcile_before_arm_diverged_reaps_and_raises(tmp_path, monkeypatch):
+    """Phase 6.5: 'diverged' reaps the watch, never starts a new one, raises remote-head-diverged."""
+    old_sha, new_sha = "aaa" + "0" * 37, "bbb" + "0" * 37
+    reaped, started = [], []
+    monkeypatch.setattr(runner.gitutil, "reconcile_remote_head",
+                        lambda *a, **k: gitutil.Reconcile("diverged", new_sha, "different content"))
+    monkeypatch.setattr(runner.ciwatch, "reap_background_watch", lambda bg: reaped.append(bg))
+    monkeypatch.setattr(runner.ciwatch, "start_background_watch",
+                        lambda *a, **kw: started.append(a))
+    with pytest.raises(HarnessError) as ei:
+        runner._reconcile_before_arm(FakePushGit(head_sha=old_sha), _noop_log, FakeGh(),
+                                     str(tmp_path), 42, old_sha, "OLD-BG",
+                                     str(tmp_path / "out"))
+    assert ei.value.kind == "remote-head-diverged"
+    assert reaped == ["OLD-BG"] and started == []

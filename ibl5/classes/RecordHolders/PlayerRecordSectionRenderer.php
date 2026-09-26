@@ -236,7 +236,9 @@ final class PlayerRecordSectionRenderer
         $output .= '<td colspan="2">' . $years . '</td>';
         $output .= '</tr>';
 
-        $output .= '</tbody></table></div>';
+        $output .= '</tbody></table>';
+        $output .= '<p><a href="modules.php?name=RecordHolders&amp;op=allstar">See all All-Star appearances</a></p>';
+        $output .= '</div>';
 
         return $output;
     }

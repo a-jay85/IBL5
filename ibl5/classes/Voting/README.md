@@ -1,11 +1,11 @@
 ---
 description: All-Star ballot submission and results display with duplicate-vote prevention.
-last_verified: 2026-09-22
+last_verified: 2026-09-26
 ---
 
 # Voting
 
-Manages the IBL All-Star ballot: GMs vote for All-Star representatives, and results are displayed after voting closes. `VotingBallotService` assembles ballot candidate data from the League, Player, and Season modules. `VotingSubmissionService` processes ballot submissions with duplicate-vote prevention. `VotingResultsController` composes `VotingResultsService` and `VotingResultsView` for the results page. Entry point: `ibl5/modules/Voting/index.php`.
+Manages the IBL All-Star ballot: GMs vote for All-Star representatives, and results are displayed after voting closes. `VotingBallotService` assembles ballot candidate data from the League, Player, and Season modules. `VotingSubmissionService` processes ballot submissions with duplicate-vote prevention. `VotingResultsController` composes `VotingResultsService` and `VotingResultsView` into an admin-only expander on the Voting page (`VotingController::showBallot()`). Entry point: `ibl5/modules/Voting/index.php`.
 
 | Class | Role |
 |---|---|
@@ -15,5 +15,5 @@ Manages the IBL All-Star ballot: GMs vote for All-Star representatives, and resu
 | `VotingSubmissionView` | Renders submission confirmation |
 | `VotingResultsController` | Composes results service + view |
 | `VotingResultsService` | Aggregates vote tallies |
-| `VotingResultsView` | Renders the results page |
+| `VotingResultsView` | Renders the results tables inside the admin expander |
 | `VotingRepository` | Database access for ballots and results |

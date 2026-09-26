@@ -85,8 +85,36 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             ];
         }
 
+        // Session-derived team id keys every write below; an unresolvable id is refused
+        // before any read of ibl_plr so a misconfigured team cannot reach the roster query.
+        $teamid = $this->commonRepo->getTidFromTeamname($teamName) ?? 0;
+        if ($teamid === 0) {
+            return [
+                'success' => false,
+                'fileOk' => false,
+                'errorsHtml' => '<strong class="ibl-form-error">Error: Missing required team information.</strong>',
+                'postData' => $postData,
+            ];
+        }
+
+        $rosterPlayers = $this->repository->getPlayersOnTeam($teamid);
+        /** @var list<int> $rosterPids */
+        $rosterPids = array_column($rosterPlayers, 'pid');
+
+        // The form emits one row per roster player, so the roster size is the row cap.
         /** @var ProcessedSubmission $processedData */
-        $processedData = $this->processor->processSubmission($postData);
+        $processedData = $this->processor->processSubmission($postData, count($rosterPlayers));
+        /** @var list<int> $submittedPids */
+        $submittedPids = array_column($processedData['playerData'], 'pid');
+
+        if (!$this->validator->validateRoster($submittedPids, $rosterPids)) {
+            return [
+                'success' => false,
+                'fileOk' => false,
+                'errorsHtml' => $this->validator->getErrorMessagesHtml(),
+                'postData' => $postData,
+            ];
+        }
 
         if (!$this->validator->validate($processedData, $season->phase)) {
             return [
@@ -97,11 +125,11 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             ];
         }
 
-        $this->saveDepthChart($processedData['playerData'], $teamName);
+        $this->saveDepthChart($processedData['playerData'], $teamName, $teamid);
 
         $fileOk = $this->saveDepthChartFile($teamName, $processedData['playerData']);
 
-        $this->saveDepthChartSnapshot($teamName, $postData, $season);
+        $this->saveDepthChartSnapshot($teamName, $postData, $season, $teamid);
 
         $this->auditLogger->info('depth_chart_submitted', [
             'action' => 'depth_chart_submitted',
@@ -124,10 +152,10 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
     /**
      * @param list<ProcessedPlayerData> $playerData
      */
-    private function saveDepthChart(array $playerData, string $teamName): void
+    private function saveDepthChart(array $playerData, string $teamName, int $teamid): void
     {
         foreach ($playerData as $player) {
-            $this->repository->updatePlayerDepthChart($player['name'], $player);
+            $this->repository->updatePlayerDepthChart($player['pid'], $teamid, $player);
         }
 
         $this->repository->updateTeamHistory($teamName);
@@ -138,14 +166,9 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
      *
      * @param array<string, mixed> $postData
      */
-    private function saveDepthChartSnapshot(string $teamName, array $postData, Season $season): void
+    private function saveDepthChartSnapshot(string $teamName, array $postData, Season $season, int $teamid): void
     {
         try {
-            $teamid = $this->commonRepo->getTidFromTeamname($teamName) ?? 0;
-            if ($teamid === 0) {
-                return;
-            }
-
             // Resolve username from team name
             $username = $this->commonRepo->getUsernameFromTeamname($teamName) ?? '';
             if ($username === '') {

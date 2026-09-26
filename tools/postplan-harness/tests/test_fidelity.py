@@ -133,7 +133,6 @@ def git_shim(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("ok_path", [
-    ".claude/skills/pr-ready/_plan-fidelity-review.md",
     ".claude/review-shared/_plan-fidelity-review.md",
 ])
 def test_procedure_either_location(tmp_path, git_shim, ok_path):
@@ -158,7 +157,7 @@ def test_procedure_missing_from_both_locations(tmp_path, git_shim):
 # --- plan-blind ---------------------------------------------------------------
 
 def test_plan_blind_marker_never_synthesises_a_verdict(tmp_path, git_shim):
-    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/skills/pr-ready/_plan-fidelity-review.md")
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
     out = tmp_path / "out"
     out.mkdir()
     packet = fidelity.build_packet(str(out), "deadbeef", TREE, _plan(found=False),
@@ -171,8 +170,72 @@ def test_plan_blind_marker_never_synthesises_a_verdict(tmp_path, git_shim):
         assert "NOT READY" not in open(os.path.join(packet, name)).read(), name
 
 
+def _fake_plan_index(worktree, body):
+    script = worktree / "bin" / "plan-index"
+    script.parent.mkdir(exist_ok=True)
+    script.write_text(body)
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+
+
+@pytest.mark.parametrize("packet_name", ["fidelity-packet", "fidelity-packet-2"])
+def test_packet_carries_plan_index(tmp_path, git_shim, packet_name):
+    """The reviewer has no Bash, so the harness indexes the plan into the packet."""
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
+    _fake_plan_index(tmp_path, '#!/usr/bin/env bash\nprintf "1\\t9\\tPhase 1 of %s\\n" "$1"\n')
+    plan = tmp_path / "plan-src.md"
+    plan.write_text("## Phase 1\n")
+    out = tmp_path / "out"
+    out.mkdir()
+    packet = fidelity.build_packet(str(out), "deadbeef", TREE, _plan(path=str(plan)),
+                                   "d", "b", 42, False, worktree=str(tmp_path),
+                                   packet_name=packet_name)
+    index = open(os.path.join(packet, "plan-index.txt")).read()
+    assert index == f"1\t9\tPhase 1 of {os.path.join(packet, 'plan.md')}\n"
+
+
+def test_plan_index_failure_is_a_marker_not_an_abort(tmp_path, git_shim):
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
+    _fake_plan_index(tmp_path, "#!/usr/bin/env bash\necho boom >&2\nexit 2\n")
+    plan = tmp_path / "plan-src.md"
+    plan.write_text("no headings\n")
+    out = tmp_path / "out"
+    out.mkdir()
+    packet = fidelity.build_packet(str(out), "deadbeef", TREE, _plan(path=str(plan)),
+                                   "d", "b", 42, False, worktree=str(tmp_path))
+    index = open(os.path.join(packet, "plan-index.txt")).read()
+    assert "exited 2: boom" in index
+    assert "Grep plan.md" in index
+    assert open(os.path.join(packet, "plan.md")).read() == "no headings\n"
+
+
+def test_plan_index_missing_script_is_a_marker(tmp_path, git_shim):
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
+    plan = tmp_path / "plan-src.md"
+    plan.write_text("## Phase 1\n")
+    out = tmp_path / "out"
+    out.mkdir()
+    packet = fidelity.build_packet(str(out), "deadbeef", TREE, _plan(path=str(plan)),
+                                   "d", "b", 42, False, worktree=str(tmp_path))
+    assert "unavailable" in open(os.path.join(packet, "plan-index.txt")).read()
+
+
+def test_plan_blind_packet_has_blind_index(tmp_path, git_shim):
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
+    out = tmp_path / "out"
+    out.mkdir()
+    packet = fidelity.build_packet(str(out), "deadbeef", TREE, _plan(found=False),
+                                   "d", "b", 42, False, worktree=str(tmp_path))
+    assert open(os.path.join(packet, "plan-index.txt")).read() == fidelity.PLAN_INDEX_BLIND
+
+
+def test_pointer_prompt_and_override_name_the_plan_index():
+    assert "plan-index.txt" in fidelity._pointer_prompt("/p", 42)
+    assert "plan-index.txt" in fidelity.OVERRIDE
+    assert "Couldn't do" in fidelity.OVERRIDE
+
+
 def test_packet_context_carries_the_reviewed_tree(tmp_path, git_shim):
-    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/skills/pr-ready/_plan-fidelity-review.md")
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
     out = tmp_path / "out"
     out.mkdir()
     packet = fidelity.build_packet(str(out), "deadbeef", TREE, _plan(found=False),

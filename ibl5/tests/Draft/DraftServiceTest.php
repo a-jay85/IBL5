@@ -38,7 +38,7 @@ class DraftServiceTest extends TestCase
         $this->mockCommonRepository->method('getTidFromTeamname')->willReturn(5);
 
         // Route current pick query first (most specific), then owner, then draft class
-        $this->mockDb->onQuery("WHERE player = ''", [
+        $this->mockDb->onQuery("AND player = ''", [
             ['team' => 'X', 'teamid' => 3, 'round' => 1, 'pick' => 5],
         ]);
         $this->mockDb->onQuery('ibl_draft_picks', [
@@ -60,7 +60,7 @@ class DraftServiceTest extends TestCase
         $this->mockCommonRepository->method('getTeamnameFromUsername')->willReturn('Test Team');
         $this->mockCommonRepository->method('getTidFromTeamname')->willReturn(3);
 
-        $this->mockDb->onQuery("WHERE player = ''", [
+        $this->mockDb->onQuery("AND player = ''", [
             ['team' => 'X', 'teamid' => 0, 'round' => 2, 'pick' => 8],
         ]);
         $this->mockDb->onQuery('ibl_draft_class', []);
@@ -78,7 +78,7 @@ class DraftServiceTest extends TestCase
         $this->mockCommonRepository->method('getTeamnameFromUsername')->willReturn('Test Team');
         $this->mockCommonRepository->method('getTidFromTeamname')->willReturn(3);
 
-        $this->mockDb->onQuery("WHERE player = ''", []);
+        $this->mockDb->onQuery("AND player = ''", []);
         $this->mockDb->onQuery('ibl_draft_class', []);
 
         $service = new DraftService($this->mockDb, $this->mockCommonRepository, $this->mockSeason);
@@ -94,12 +94,35 @@ class DraftServiceTest extends TestCase
         $this->mockCommonRepository->method('getTeamnameFromUsername')->willReturn('Test Team');
         $this->mockCommonRepository->method('getTidFromTeamname')->willReturn(null);
 
-        $this->mockDb->onQuery("WHERE player = ''", []);
+        $this->mockDb->onQuery("AND player = ''", []);
         $this->mockDb->onQuery('ibl_draft_class', []);
 
         $service = new DraftService($this->mockDb, $this->mockCommonRepository, $this->mockSeason);
         $data = $service->getDraftBoardData('testgm');
 
         $this->assertSame(0, $data->teamId);
+    }
+
+    public function testGetDraftBoardDataPassesSeasonEndingYearToCurrentPickLookup(): void
+    {
+        $this->mockCommonRepository->method('getTeamnameFromUsername')->willReturn('Test Team');
+        $this->mockCommonRepository->method('getTidFromTeamname')->willReturn(1);
+
+        $this->mockDb->onQuery("AND player = ''", []);
+        $this->mockDb->onQuery('ibl_draft_class', []);
+
+        $service = new DraftService($this->mockDb, $this->mockCommonRepository, $this->mockSeason);
+        $service->getDraftBoardData('testuser');
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $pickQuery = '';
+        foreach ($queries as $q) {
+            if (str_contains($q, "player = ''")) {
+                $pickQuery = $q;
+                break;
+            }
+        }
+        self::assertNotEmpty($pickQuery, 'getCurrentDraftPick query must be executed');
+        self::assertStringContainsString('2025', $pickQuery, 'getCurrentDraftPick must use Season::endingYear (2025)');
     }
 }

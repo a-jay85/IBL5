@@ -34,7 +34,7 @@ fail() { printf '  FAIL %s\n' "$1"; FAILS=$((FAILS + 1)); }
 # A full template, not `mktemp -d -t <prefix>`: GNU mktemp rejects a -t argument
 # with too few X's, so the BSD spelling would fail on the Linux CI runner.
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-plan-now.XXXXXX")
-trap 'rm -rf "$TMP"' EXIT
+trap 'rm -rf "$TMP"; rm -f /tmp/plan-now-19700101-000000-$$.*' EXIT
 
 PLANS="$TMP/plans"
 mkdir -p "$PLANS"
@@ -134,6 +134,7 @@ printf '/plan a throwaway task for bin/test-plan-now with no slug line\n' > "$NO
 STUB="$TMP/claude-stub"
 cat > "$STUB" <<'STUB_EOF'
 #!/usr/bin/env bash
+[ -n "${STUB_ARGV:-}" ] && printf '%s\n' "$@" > "$STUB_ARGV"
 if [ -n "${STUB_PLAN:-}" ] && [ -z "${STUB_NO_PLAN:-}" ]; then
     # $STUB_PLAN_SRC writes a plan that PASSES check-plan; the one-liner fails it.
     # Both are needed — the notify cases below turn on which side of the gate the
@@ -152,6 +153,12 @@ if [ -n "${STUB_DRAFT:-}" ]; then
     sleep 1
     mkdir -p "$(dirname "$STUB_DRAFT")"
     cat "$STUB_DRAFT_SRC" > "$STUB_DRAFT"
+fi
+# A second draft for the precedence case. Written after STUB_DRAFT, so it is
+# already past the one-second sleep above and reads as fresh too.
+if [ -n "${STUB_DRAFT2:-}" ]; then
+    mkdir -p "$(dirname "$STUB_DRAFT2")"
+    cat "$STUB_DRAFT2_SRC" > "$STUB_DRAFT2"
 fi
 # Leg B (marker omitted from a successful run): the stub creates plan files in
 # $PLANS_DIR directly and leaves no draft. No sleep is needed for the first —
@@ -223,12 +230,20 @@ ndir_reset() {
 # run_case_recovery <draft-src-or-empty> <draft-slug> [stale] → transcript
 # Fires plan-now with the slug-bearing prompt, no PLAN_FILE: tail, and (unless
 # empty) a draft the stub writes mid-run under $PLANS/.drafts/<slug>.draft.md.
+# Env prefixes: DRAFT_AT=root writes that draft at $PLANS/<slug>.draft.md instead;
+# ALSO_ROOT_SRC=<file> additionally writes a fresh root draft (precedence case).
 run_case_recovery() {
     local src="$1" slug="$2" stale="${3:-}"
     plans_reset
     : > "$DM_LOG"
     local dry runner draft=""
-    [ -n "$src" ] && draft="$PLANS/.drafts/$slug.draft.md"
+    # $DRAFT_AT=root puts the draft at the plans-dir root instead of .drafts/.
+    if [ -n "$src" ]; then
+        case "${DRAFT_AT:-drafts}" in
+            root) draft="$PLANS/$slug.draft.md" ;;
+            *)    draft="$PLANS/.drafts/$slug.draft.md" ;;
+        esac
+    fi
     dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
               PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
               "$PLAN_NOW" "${DISP:---implement}" "$RECOVERY_PROMPT" 2>&1)
@@ -241,6 +256,8 @@ run_case_recovery() {
         STUB_NO_PLAN=1 STUB_TAIL="" bash "$runner" 2>&1
     else
         STUB_NO_PLAN=1 STUB_TAIL="" STUB_DRAFT="$draft" STUB_DRAFT_SRC="$src" \
+            STUB_DRAFT2="${ALSO_ROOT_SRC:+$PLANS/$slug.draft.md}" \
+            STUB_DRAFT2_SRC="${ALSO_ROOT_SRC:-}" \
             QUEUE_FAIL="${QUEUE_FAIL:-}" QUEUE_ALREADY="${QUEUE_ALREADY:-}" bash "$runner" 2>&1
     fi
     rm -f "$runner"
@@ -252,7 +269,8 @@ run_case_recovery() {
 # pointing at deleted /tmp runners. $1 is the captured stdout from plan-now.
 preflight_cleanup() {
     rm -f "$(printf '%s\n' "$1" | sed -n 's/^  plist:  //p')" \
-          "$(printf '%s\n' "$1" | sed -n 's/^  runner: //p')"
+          "$(printf '%s\n' "$1" | sed -n 's/^  runner: //p')" \
+          "$(printf '%s\n' "$1" | sed -n 's/^  runner: //p' | sed 's/\.sh$/.session/')"
 }
 
 # run_preflight <prompt-file> [--queue|--implement] [--no-dm]
@@ -292,6 +310,42 @@ run_case_recovery_plan() {
 
 want()    { case "$2" in *"$3"*) ok "$1" ;; *) fail "$1 — expected to see: $3" ;; esac; }
 want_no() { case "$2" in *"$3"*) fail "$1 — should NOT have seen: $3" ;; *) ok "$1" ;; esac; }
+
+# ── --resume fixtures ────────────────────────────────────────────────────────
+# A fake failed run's /tmp artifacts, under a TS no real run can collide with.
+# bin/plan-now hard-codes /tmp for its artifacts, so the fixture lives there too.
+RES_TS="19700101-000000-$$"
+RES_UUID="0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f"
+resume_fixture() {   # resume_fixture [nosession|norunner|nolog|oklog|noverdict]
+    rm -f /tmp/plan-now-"$RES_TS".*
+    printf 'MODEL=claude-opus-4-1\nDISPOSITION=implement\n' > "/tmp/plan-now-$RES_TS.sh"
+    printf '%s\n' "$RES_UUID" > "/tmp/plan-now-$RES_TS.session"
+    printf -- '- Branch slug: `demo-slug`. Base: `master`.\n' > "/tmp/plan-now-$RES_TS.prompt"
+    printf 'transcript line\nplan-now: claude exited 1 after 5s\nplan-now: RESULT failed — the run did not exit cleanly.\n' \
+        > "/tmp/plan-now-$RES_TS.log"
+    case "${1:-}" in
+        nosession) rm -f "/tmp/plan-now-$RES_TS.session" ;;
+        norunner)  rm -f "/tmp/plan-now-$RES_TS.sh" ;;
+        nolog)     rm -f "/tmp/plan-now-$RES_TS.log" ;;
+        oklog)     printf 'plan-now: RESULT ok — plan written and check-plan PASSED.\n' > "/tmp/plan-now-$RES_TS.log" ;;
+        noverdict) printf 'transcript only\n' > "/tmp/plan-now-$RES_TS.log" ;;
+    esac
+}
+# run_resume <plan-now args...> → RES_RC, RES_OUT, RES_RUNNER (dry run; nothing launched)
+run_resume() {
+    : > "$DM_LOG"; RES_RC=0
+    RES_OUT=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" \
+        PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+        "$PLAN_NOW" "$@" 2>&1) || RES_RC=$?
+    RES_RUNNER=$(printf '%s\n' "$RES_OUT" | sed -n 's/^  runner: //p')
+}
+# launchctl stand-ins: one says "loaded" (exit 0), one says "not loaded" (113,
+# the real launchctl's code). Prepended to PATH for R-7 only.
+LCTL_LOADED="$TMP/lctl-loaded"; LCTL_GONE="$TMP/lctl-gone"
+mkdir -p "$LCTL_LOADED" "$LCTL_GONE"
+printf '#!/usr/bin/env bash\nexit 0\n'   > "$LCTL_LOADED/launchctl"
+printf '#!/usr/bin/env bash\nexit 113\n' > "$LCTL_GONE/launchctl"
+chmod +x "$LCTL_LOADED/launchctl" "$LCTL_GONE/launchctl"
 
 P="$PLANS/demo-slug.md"
 
@@ -501,6 +555,56 @@ want    "a failing adopted plan reports an attempt" "$out" "RESULT degraded (rec
 want    "a failing adopted plan is not queued"      "$out" "NOT queued"
 want_no "leg B claims no draft it never had"        "$out" "The draft is kept at"
 
+echo "── root-draft recovery: a draft written at the plans-dir root, not .drafts/ ──"
+RD="$PLANS/demo-slug.draft.md"
+
+# R1. A fresh root draft under this run's slug is recovered.
+out=$(DRAFT_AT=root run_case_recovery "$GOOD_DRAFT" demo-slug)
+want    "root-draft: fresh root draft is recovered"      "$out" "RESULT degraded (recovered)"
+want    "root-draft: recovery names the root source"     "$out" "recovered from: $RD"
+want    "root-draft: promoted plan is announced"         "$out" "plan -> $P"
+want_no "root-draft guard: leg B never adopts a draft"   "$out" "recovery B —"
+[ -f "$P" ] && ok "root-draft: promoted plan exists on disk" \
+    || fail "root-draft: promoted plan missing at $P"
+grep -q '^---$' <(head -1 "$P" 2>/dev/null) \
+    && ok "root-draft: frontmatter hoisted to line 1" \
+    || fail "root-draft: line 1 of $P is not '---'"
+[ -f "$RD" ] && fail "root-draft: root draft should be deleted after a passing check-plan" \
+    || ok "root-draft: root draft removed once check-plan passed"
+
+# R2. Stale root draft: same slug, back-dated. The mtime gate covers the root too.
+out=$(DRAFT_AT=root run_case_recovery "$GOOD_DRAFT" demo-slug stale)
+want    "root-draft guard: stale root draft is not adopted"   "$out" "RESULT unconfirmed"
+want_no "root-draft guard: stale root draft is not recovered" "$out" "degraded (recovered)"
+[ -f "$P" ] && fail "root-draft guard: stale root draft must not be promoted" \
+    || ok "root-draft guard: stale root draft left unpromoted"
+
+# R3. Peer slug at the root: never adopted, but reported like a .drafts/ peer.
+out=$(DRAFT_AT=root run_case_recovery "$GOOD_DRAFT" other-slug)
+want    "root-draft guard: peer root draft is never adopted"  "$out" "RESULT unconfirmed"
+want_no "root-draft guard: peer root draft is not recovered"  "$out" "degraded (recovered)"
+want    "root-draft: peer root draft is reported"             "$out" "cannot be attributed to it"
+want    "root-draft: the report names the root path"          "$out" "$PLANS/other-slug.draft.md"
+[ -f "$PLANS/other-slug.md" ] && fail "root-draft guard: peer root draft must not be promoted" \
+    || ok "root-draft guard: peer root draft left untouched"
+
+# R4. Precedence: fresh drafts in BOTH places. .drafts/ holds the good one, the
+#     root holds the partial one. .drafts/ must win and the root file is untouched.
+out=$(ALSO_ROOT_SRC="$PARTIAL_DRAFT" run_case_recovery "$GOOD_DRAFT" demo-slug)
+want    "root-draft guard: .drafts/ wins over the root"       "$out" "recovered from: $PLANS/.drafts/demo-slug.draft.md"
+want    "root-draft guard: precedence case recovers"          "$out" "RESULT degraded (recovered)"
+want_no "root-draft guard: the root partial is not promoted"  "$out" "recovery attempted"
+[ -f "$RD" ] && ok "root-draft guard: losing root draft is left in place" \
+    || fail "root-draft guard: the root draft was deleted though .drafts/ won"
+
+# R5. Partial root draft: promotion is attempted, check-plan fails, draft kept.
+out=$(DRAFT_AT=root run_case_recovery "$PARTIAL_DRAFT" demo-slug)
+want    "root-draft: partial root draft reports an attempt"   "$out" "RESULT degraded (recovery attempted)"
+want    "root-draft: the kept draft is the root path"         "$out" "The draft is kept at $RD"
+want_no "root-draft guard: a failed root recovery is not recovered" "$out" "RESULT degraded (recovered)"
+[ -f "$RD" ] && ok "root-draft guard: failed root recovery keeps its draft" \
+    || fail "root-draft guard: root draft deleted despite a failing check-plan"
+
 # ── staleness gate: check-plan can pass on a plan whose paths are dead ─────────
 # The guard's other callers live inside the automouse implementation run, which a
 # queued plan reaches only AFTER queueing — so the job must refuse it here.
@@ -661,8 +765,8 @@ rm -f "$runner1" "$sidecar1" "$runner2" "$sidecar2"
 # from a normal invocation and dies only when the script is called by absolute path
 # with a foreign cwd -- bin/plan-now and bin/post-plan-now both shipped that way and
 # the failure surfaced solely in a live smoke, which is far too late and far too
-# expensive a place to catch it. Static, so it costs nothing and covers all four.
-for _producer in plan-now post-plan-now pr-ready-now docfix-run; do
+# expensive a place to catch it. Static, so it costs nothing and covers all three.
+for _producer in plan-now post-plan-now docfix-run; do
     _p="$ROOT/bin/$_producer"
     if grep -qE '^\s*\.\s+"\$(ROOT|[A-Z_]*ROOT)[^"]*/lib/session-id\.sh"' "$_p"; then
         fail "bin/$_producer sources lib/session-id.sh via a cwd-derived root — breaks under a foreign cwd"
@@ -1127,6 +1231,230 @@ want "coda explains why an earlier print is discarded" "$coda" "discarded"
 want "coda forbids backgrounding sub-agents"  "$coda" "run_in_background"
 want "coda demands foreground sub-agents"     "$coda" "FOREGROUND"
 want "coda keeps Agent backticked" "$coda" '`Agent`'
+
+printf '\n--resume\n'
+
+# R-1 happy path — fixture has MODEL=claude-opus-4-1, DISPOSITION=implement.
+resume_fixture
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 0 ] && ok "R-1 rc 0" || fail "R-1 rc 0 (got $RES_RC)"
+want "R-1 dry output names the resumed run" "$RES_OUT" "resume: $RES_TS"
+R1_RUNNER_CONTENT=$(cat "$RES_RUNNER" 2>/dev/null)
+want    "R-1 runner has RESUME_FROM"         "$R1_RUNNER_CONTENT" "RESUME_FROM=$RES_TS"
+want    "R-1 runner has MODEL"               "$R1_RUNNER_CONTENT" "MODEL=claude-opus-4-1"
+want    "R-1 runner has DISPOSITION"         "$R1_RUNNER_CONTENT" "DISPOSITION=implement"
+CNT=$(grep -c '^CONTINUE_MSG=.\{20,\}' "$RES_RUNNER" 2>/dev/null || printf '0')
+[ "$CNT" = 1 ] && ok "R-1 CONTINUE_MSG is non-empty" || fail "R-1 CONTINUE_MSG is non-empty (count=$CNT)"
+R1_SIDECAR="${RES_RUNNER%.sh}.session"
+R1_SIDECAR_CONTENT=$(cat "$R1_SIDECAR" 2>/dev/null | tr -d '[:space:]')
+[ "$R1_SIDECAR_CONTENT" = "$RES_UUID" ] && ok "R-1 sidecar has RES_UUID" || \
+    fail "R-1 sidecar has RES_UUID (got: $R1_SIDECAR_CONTENT)"
+want_no "R-1 no DECLINED" "$RES_OUT" "DECLINED"
+want_no "R-1 no TIER MISMATCH" "$RES_OUT" "TIER MISMATCH"
+preflight_cleanup "$RES_OUT"
+
+# R-2 label form — com.ibl5.plan-now-<TS> is stripped to bare TS.
+resume_fixture
+run_resume --resume "com.ibl5.plan-now-$RES_TS"
+[ "$RES_RC" = 0 ] && ok "R-2 rc 0" || fail "R-2 rc 0 (got $RES_RC)"
+want "R-2 runner has RESUME_FROM" "$(cat "$RES_RUNNER" 2>/dev/null)" "RESUME_FROM=$RES_TS"
+preflight_cleanup "$RES_OUT"
+
+# R-3 explicit overrides win; then omitted flags restore inheritance.
+resume_fixture
+run_resume --resume "$RES_TS" --model stub-model --queue
+R3A_CONTENT=$(cat "$RES_RUNNER" 2>/dev/null)
+want    "R-3 override: MODEL=stub-model"       "$R3A_CONTENT" "MODEL=stub-model"
+want    "R-3 override: DISPOSITION=queue"      "$R3A_CONTENT" "DISPOSITION=queue"
+preflight_cleanup "$RES_OUT"
+run_resume --resume "$RES_TS"
+want    "R-3 no-override: DISPOSITION=implement" "$(cat "$RES_RUNNER" 2>/dev/null)" "DISPOSITION=implement"
+preflight_cleanup "$RES_OUT"
+
+# R-4 missing session sidecar refused.
+resume_fixture nosession
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 2 ] && ok "R-4 rc 2" || fail "R-4 rc 2 (got $RES_RC)"
+want    "R-4 no session sidecar message" "$RES_OUT" "no session sidecar"
+[ -z "$RES_RUNNER" ] && ok "R-4 no runner generated" || fail "R-4 no runner generated (got $RES_RUNNER)"
+
+# R-5 missing runner refused.
+resume_fixture norunner
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 2 ] && ok "R-5 rc 2" || fail "R-5 rc 2 (got $RES_RC)"
+want    "R-5 no runner message" "$RES_OUT" "no runner at"
+
+# R-6 wrong verdict refused.
+resume_fixture oklog
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 2 ] && ok "R-6 oklog rc 2" || fail "R-6 oklog rc 2 (got $RES_RC)"
+want    "R-6 oklog: only failed is resumable" "$RES_OUT" "only a failed run is resumable"
+
+resume_fixture noverdict
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 2 ] && ok "R-6 noverdict rc 2" || fail "R-6 noverdict rc 2 (got $RES_RC)"
+want    "R-6 noverdict: carries no RESULT verdict" "$RES_OUT" "carries no RESULT verdict"
+
+resume_fixture nolog
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 2 ] && ok "R-6 nolog rc 2" || fail "R-6 nolog rc 2 (got $RES_RC)"
+want    "R-6 nolog: no log at" "$RES_OUT" "no log at"
+
+# R-7 loaded label refused (exit-status keyed, not presence keyed).
+resume_fixture
+PATH="$LCTL_LOADED:$PATH" run_resume --resume "$RES_TS"
+[ "$RES_RC" = 2 ] && ok "R-7 loaded: rc 2" || fail "R-7 loaded: rc 2 (got $RES_RC)"
+want    "R-7 loaded: still loaded in launchd" "$RES_OUT" "still loaded in launchd"
+
+resume_fixture
+PATH="$LCTL_GONE:$PATH" run_resume --resume "$RES_TS"
+[ "$RES_RC" = 0 ] && ok "R-7 gone: rc 0" || fail "R-7 gone: rc 0 (got $RES_RC)"
+preflight_cleanup "$RES_OUT"
+
+# R-8 malformed invocations.
+run_resume --resume
+[ "$RES_RC" = 2 ] && ok "R-8 bare --resume: rc 2" || fail "R-8 bare --resume: rc 2 (got $RES_RC)"
+want    "R-8 bare --resume: needs a run id" "$RES_OUT" "needs a run id"
+
+run_resume --resume not-an-id
+[ "$RES_RC" = 2 ] && ok "R-8 not-an-id: rc 2" || fail "R-8 not-an-id: rc 2 (got $RES_RC)"
+want    "R-8 not-an-id: not a plan-now run id" "$RES_OUT" "not a plan-now run id"
+
+run_resume --resume "$RES_TS" "$PROMPT"
+[ "$RES_RC" = 2 ] && ok "R-8 with prompt file: rc 2" || fail "R-8 with prompt file: rc 2 (got $RES_RC)"
+want    "R-8 with prompt file: takes no prompt file" "$RES_OUT" "takes no prompt file"
+
+run_resume --resume "20260101-000000-12x"
+[ "$RES_RC" = 2 ] && ok "R-8 bad pid suffix: rc 2" || fail "R-8 bad pid suffix: rc 2 (got $RES_RC)"
+want    "R-8 bad pid suffix: not a plan-now run id" "$RES_OUT" "not a plan-now run id"
+
+# R-9 gates skipped only under --resume.
+# Dup-check gate: PLAN_NOW_DUP_CHECK="$DUP_LIVE" declines normally, but --resume bypasses it.
+resume_fixture
+PLAN_NOW_DUP_CHECK="$DUP_LIVE" run_resume --resume "$RES_TS" --queue
+[ "$RES_RC" = 0 ] && ok "R-9 dup gate skipped on resume: rc 0" || fail "R-9 dup gate skipped on resume: rc 0 (got $RES_RC)"
+want_no "R-9 dup gate skipped: no DECLINED" "$RES_OUT" "DECLINED"
+preflight_cleanup "$RES_OUT"
+# Tier gate: hint stub is not called on --resume.
+TIER_MARK="$TMP/tier-called"
+TIER_HINT_STUB="$TMP/tier-hint-skip-test"
+cat > "$TIER_HINT_STUB" <<EOF
+#!/usr/bin/env bash
+touch $TIER_MARK
+printf 'xhigh\tstub\n'
+EOF
+chmod +x "$TIER_HINT_STUB"
+rm -f "$TIER_MARK"
+resume_fixture
+PLAN_NOW_TIER_HINT="$TIER_HINT_STUB" run_resume --resume "$RES_TS"
+[ "$RES_RC" = 0 ] && ok "R-9 tier gate skipped on resume: rc 0" || fail "R-9 tier gate skipped on resume: rc 0 (got $RES_RC)"
+[ ! -e "$TIER_MARK" ] && ok "R-9 tier hint not called on resume" || fail "R-9 tier hint not called on resume (TIER_MARK exists)"
+preflight_cleanup "$RES_OUT"
+# Negative twin: fresh --implement does call the tier hint (stub is live).
+TWIN_PROMPT="$TMP/twin-prompt.md"
+{ cat "$PROMPT"; printf '\nStep 3 MUST route to `plan-architect`.\n'; } > "$TWIN_PROMPT"
+rm -f "$TIER_MARK"
+PLAN_NOW_TIER_HINT="$TIER_HINT_STUB" run_resume --implement "$TWIN_PROMPT"
+[ -e "$TIER_MARK" ] && ok "R-9 tier hint called on fresh run (stub is live)" || fail "R-9 tier hint called on fresh run"
+preflight_cleanup "$RES_OUT"
+
+# R-10 resumed runner argv.
+resume_fixture
+run_resume --resume "$RES_TS"
+: > "$DM_LOG"
+STUB_ARGV="$TMP/r10_argv.txt" STUB_NO_PLAN=1 STUB_TAIL="" \
+    bash "$RES_RUNNER" > "$TMP/r10.out" 2>&1
+R10_ARGV=$(cat "$TMP/r10_argv.txt" 2>/dev/null)
+R10_OUT=$(cat "$TMP/r10.out" 2>/dev/null)
+# --resume is in argv, followed by the session uuid
+want    "R-10 argv has --resume"          "$R10_ARGV" "--resume"
+R10_RESUME_NEXT=$(grep -A1 -x -- '--resume' "$TMP/r10_argv.txt" 2>/dev/null | tail -1)
+[ "$R10_RESUME_NEXT" = "$RES_UUID" ] && ok "R-10 --resume UUID is RES_UUID" || \
+    fail "R-10 --resume UUID is RES_UUID (got: $R10_RESUME_NEXT)"
+want_no "R-10 argv no --session-id"       "$R10_ARGV" "--session-id"
+# -p value contains the continue-msg phrase, not the fresh-run coda
+R10_P_LINE=$(grep -A1 -x -- '-p' "$TMP/r10_argv.txt" 2>/dev/null | tail -1)
+want    "R-10 -p has cut off before it finished" "$R10_P_LINE" "cut off before it finished"
+want_no "R-10 -p no Headless run constraints"    "$R10_P_LINE" "Headless run constraints"
+# runner stdout confirms session/run identity
+want    "R-10 runner out: resuming session" "$R10_OUT" "resuming session $RES_UUID from run $RES_TS"
+rm -f "$RES_RUNNER" "$TMP/r10_argv.txt" "$TMP/r10.out"
+# also remove the plist and sidecar the dry-run wrote
+preflight_cleanup "$RES_OUT"
+
+# R-11 fresh runner argv unchanged + R-15 fresh fire prints no resume line.
+run_resume --implement "$PROMPT"
+[ "$RES_RC" = 0 ] && ok "R-11 fresh run rc 0" || fail "R-11 fresh run rc 0 (got $RES_RC)"
+R11_DRY="$RES_OUT"
+R11_RUNNER="$RES_RUNNER"
+: > "$DM_LOG"
+STUB_ARGV="$TMP/r11_argv.txt" STUB_NO_PLAN=1 STUB_TAIL="" STUB_RC=0 \
+    bash "$R11_RUNNER" > "$TMP/r11.out" 2>&1
+R11_ARGV=$(cat "$TMP/r11_argv.txt" 2>/dev/null)
+R11_OUT=$(cat "$TMP/r11.out" 2>/dev/null)
+want    "R-11 argv has --session-id"       "$R11_ARGV" "--session-id"
+want_no "R-11 argv no --resume"            "$R11_ARGV" "--resume"
+want    "R-11 argv includes Headless run constraints" "$R11_ARGV" "Headless run constraints"
+# R-15: no resume line in fresh dry output or runner output
+want_no "R-15 fresh dry output: no resume:" "$R11_DRY" "resume:"
+want_no "R-15 fresh runner output: no bin/plan-now --resume" "$R11_OUT" "bin/plan-now --resume"
+rm -f "$R11_RUNNER" "$TMP/r11_argv.txt" "$TMP/r11.out"
+preflight_cleanup "$R11_DRY"
+
+# R-12 failure hint then a real chain.
+run_resume --implement "$RECOVERY_PROMPT"
+[ "$RES_RC" = 0 ] && ok "R-12 fresh runner written" || fail "R-12 fresh runner written (got $RES_RC)"
+RUNNER1="$RES_RUNNER"
+TS1=$(basename "${RUNNER1%.sh}"); TS1="${TS1#plan-now-}"
+: > "$DM_LOG"
+STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER1" > "/tmp/plan-now-$TS1.log" 2>&1
+R12_LOG1=$(cat "/tmp/plan-now-$TS1.log" 2>/dev/null)
+want    "R-12 failure log has resume hint for TS1"  "$R12_LOG1"  "bin/plan-now --resume $TS1"
+want    "R-12 DM has resume hint for TS1"           "$(dm)"      "resume: bin/plan-now --resume $TS1"
+# Now resume TS1
+run_resume --resume "$TS1"
+[ "$RES_RC" = 0 ] && ok "R-12 resume TS1 rc 0" || fail "R-12 resume TS1 rc 0 (got $RES_RC)"
+RUNNER2="$RES_RUNNER"
+TS2=$(basename "${RUNNER2%.sh}"); TS2="${TS2#plan-now-}"
+TS1_SESSION=$(cat "/tmp/plan-now-$TS1.session" 2>/dev/null | tr -d '[:space:]')
+R2_SIDECAR=$(cat "${RUNNER2%.sh}.session" 2>/dev/null | tr -d '[:space:]')
+[ "$TS1_SESSION" = "$R2_SIDECAR" ] && ok "R-12 RUNNER2 sidecar matches TS1 session" || \
+    fail "R-12 RUNNER2 sidecar matches TS1 session (ts1=$TS1_SESSION, r2=$R2_SIDECAR)"
+RUNNER2_CONTENT=$(cat "$RUNNER2" 2>/dev/null)
+want    "R-12 RUNNER2 has RESUME_FROM TS1"  "$RUNNER2_CONTENT"  "RESUME_FROM=$TS1"
+want    "R-12 RUNNER2 has DISPOSITION implement" "$RUNNER2_CONTENT" "DISPOSITION=implement"
+# Run RUNNER2 with failure → resume hint mentions TS2, not TS1
+: > "$DM_LOG"
+STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER2" > "/tmp/plan-now-$TS2.log" 2>&1
+R12_LOG2=$(cat "/tmp/plan-now-$TS2.log" 2>/dev/null)
+want    "R-12 chain: second log mentions TS2"        "$R12_LOG2"  "bin/plan-now --resume $TS2"
+want_no "R-12 chain: second log omits TS1"           "$R12_LOG2"  "--resume $TS1"
+rm -f /tmp/plan-now-"$TS1".* /tmp/plan-now-"$TS2".*
+
+# R-13 unknown flag still loud.
+run_resume --resum "$RES_TS"
+[ "$RES_RC" = 2 ] && ok "R-13 typo flag: rc 2" || fail "R-13 typo flag: rc 2 (got $RES_RC)"
+want    "R-13 unknown flag named" "$RES_OUT" "unknown flag '--resum'"
+
+# R-14 resumed success reaches the queue gate unchanged.
+resume_fixture
+run_resume --resume "$RES_TS" --queue
+R14_RUNNER="$RES_RUNNER"
+# Passing plan case
+plans_reset
+: > "$DM_LOG"
+R14_OUT=$(STUB_PLAN="$P" STUB_PLAN_SRC="$GOOD_PLAN" STUB_TAIL="PLAN_FILE: $P" \
+    STUB_RC=0 STUB_NO_PLAN="" bash "$R14_RUNNER" 2>&1)
+want    "R-14 passing plan: RESULT ok"         "$R14_OUT" "RESULT ok"
+want    "R-14 passing plan: queued"            "$R14_OUT" "queued for automouse"
+# Failing plan case
+plans_reset
+: > "$DM_LOG"
+R14_OUT2=$(STUB_PLAN="$P" STUB_TAIL="PLAN_FILE: $P" \
+    STUB_RC=0 STUB_NO_PLAN="" bash "$R14_RUNNER" 2>&1)
+want    "R-14 failing plan: RESULT degraded"   "$R14_OUT2" "RESULT degraded"
+want    "R-14 failing plan: NOT queued"        "$R14_OUT2" "NOT queued"
+preflight_cleanup "$RES_OUT"
 
 echo
 if [ "$FAILS" -eq 0 ]; then

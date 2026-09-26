@@ -105,6 +105,8 @@ case "$1 $2" in
             # Distinguish them so both callers get the right post-jq value.
             case "$args" in
               *"--json state"*) printf '%s' "${SHIM_PR_STATE:-NONE}" ;;
+              # health never-ran anchor: newest refresh PR createdAt (post-jq).
+              *createdAt*)      printf '%s' "${SHIM_PR_LAST_CREATED:-}" ;;
               *)                printf '%s' "${SHIM_PR_FOR_BRANCH:-0}" ;;
             esac ;;
         *"--state closed"*) printf '%s' "${SHIM_PR_CLOSED:-[]}" ;;
@@ -400,6 +402,26 @@ OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
 { echo "$OUT" | grep -q 'alert=false'; } \
   && ok "(17e) health: no alert within 36h grace (20h marker)" \
   || bad "(17e) health grace"
+
+# Case 17f: NEGATIVE — 40h episode but a refresh PR opened 20h ago → healthy poll
+# (the 2026-09-26 false alarm: issue open 48h while the poll merged a PR daily).
+SB="$(build_sandbox)"
+BODY="<!-- stale-since: $TS_40H -->"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
+    SHIM_LS_REMOTE="" SHIM_ISSUE_BODY="$BODY" SHIM_PR_LAST_CREATED="$TS_20H" \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=false'; } \
+  && ok "(17f) health: recent refresh PR (20h) beats 40h episode — no false never-ran" \
+  || bad "(17f) health last-PR anchor"
+
+# Case 17g: ALERT — 40h episode and the newest refresh PR is older (40h+) → still fires
+SB="$(build_sandbox)"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
+    SHIM_LS_REMOTE="" SHIM_ISSUE_BODY="$BODY" SHIM_PR_LAST_CREATED="$TS_30D" \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=true' && echo "$OUT" | grep -q 'kind=never-ran'; } \
+  && ok "(17g) health: ALERT never-ran when newest refresh PR predates the episode" \
+  || bad "(17g) health old last-PR must not mask"
 
 # --- Cases 18a-18d: false-alarm negatives -------------------------------------
 
@@ -997,8 +1019,9 @@ RC23=$?
 { grep -qF 'DECISION RECORDS ARE APPEND-ONLY' "$REAL_DOCFIX" \
     && grep -qF 'NEVER SWAP A FIGURE WITHOUT RE-READING ITS SENTENCE' "$REAL_DOCFIX" \
     && grep -qF '## Addendum' "$REAL_DOCFIX" \
-    && grep -qF '## Content rewritten' "$REAL_DOCFIX"; } \
-  && ok "(48) prompt: ADR append-only + figure-resubstitution + content-rewrite disclosure clauses present" \
+    && grep -qF '## Content rewritten' "$REAL_DOCFIX" \
+    && grep -qF 'ibl5/classes/*/README.md' "$REAL_DOCFIX"; } \
+  && ok "(48) prompt: ADR append-only + figure-resubstitution + content-rewrite disclosure + allowlist clauses present" \
   || bad "(48) prompt: an append-only/disclosure clause was dropped from \$PROMPT"
 
 # --- Cases 49-64: bin/docfix-check-veronly numeric-pass + boundary cases ------
@@ -1177,7 +1200,7 @@ VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
   && ok "(57) veronly: numeric edit with equal date holds (rc 1)" \
   || bad "(57) veronly: numeric edit with equal date should HOLD"
 
-# Case 58: M change to .github/workflows/gitleaks.yml (@v2→@v3) → HOLD, path outside ibl5/docs/
+# Case 58: M change to .github/workflows/gitleaks.yml (@v2→@v3) → HOLD, path outside docfix allowlist
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
@@ -1192,10 +1215,10 @@ printf '%s\n' 'uses: gitleaks/gitleaks-action@v3' > "$R/.github/workflows/gitlea
 VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
 { [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
-    && printf '%s' "$VOUT" | grep -qF 'path outside ibl5/docs/' \
+    && printf '%s' "$VOUT" | grep -qF 'path outside docfix allowlist' \
     && printf '%s' "$VOUT" | grep -qF '.github/workflows/gitleaks.yml'; } \
-  && ok "(58) veronly: M change outside ibl5/docs/ holds (rc 1, path guard fires)" \
-  || bad "(58) veronly: path outside ibl5/docs/ should HOLD"
+  && ok "(58) veronly: M change outside the docfix allowlist holds (rc 1, path guard fires)" \
+  || bad "(58) veronly: path outside docfix allowlist should HOLD"
 
 # Case 59: 2R/1A hunk (two removed, one added) → HOLD unpaired change lines
 SB2="$(build_veronly_repo)"
@@ -1298,6 +1321,99 @@ printf '%s\n' 'last_verified: 2026-09-16' > "$R/ibl5/docs/x.md"
     && ! grep -q '## Automouse Hold Justification' "$PLAN_V"; } \
   && ok "(65) veronly: hold section with hold-check sub-lines deletes correctly, matrix survives (rc 0)" \
   || bad "(65) veronly: hold-check sub-lines and matrix range"
+
+# --- Cases 66-70: docfix allowlist widened to ibl5/classes/*/README.md --------
+
+# Case 66: ibl5/classes/EventLog/README.md date bump + 157→159 same-line swap → PASS, plan armed
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R" "ibl5/classes/EventLog/README.md" \
+    'last_verified: 2026-01-01' 'Logged from 157 call sites.'
+printf '%s\n' 'last_verified: 2026-09-24' 'Logged from 159 call sites.' \
+    > "$R/ibl5/classes/EventLog/README.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 0 ] \
+    && printf '%s' "$VOUT" | grep -qF 'PASS — armed' \
+    && grep -q '^auto_merge: true$' "$PLAN_V" \
+    && ! grep -q '## Automouse Hold Justification' "$PLAN_V"; } \
+  && ok "(66) veronly: class README date bump + numeric swap arms the plan (rc 0)" \
+  || bad "(66) veronly: ibl5/classes/*/README.md should PASS and arm"
+
+# Case 67: .claude/rules/x.md date-bump-only → HOLD, path outside docfix allowlist
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R" ".claude/rules/x.md" 'last_verified: 2026-01-01'
+printf 'last_verified: 2026-09-24\n' > "$R/.claude/rules/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && grep -q '## Automouse Hold Justification' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'path outside docfix allowlist' \
+    && printf '%s' "$VOUT" | grep -qF '.claude/rules/x.md'; } \
+  && ok "(67) veronly: .claude/rules date-only bump holds (rc 1, path guard fires)" \
+  || bad "(67) veronly: .claude/rules/x.md should HOLD"
+
+# Case 68a: mixed diff — allowed class README + .claude/rules/x.md (PR #2383 shape) → HOLD
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R" "ibl5/classes/EventLog/README.md" 'last_verified: 2026-01-01'
+veronly_add_master "$R" ".claude/rules/x.md" 'last_verified: 2026-01-01'
+printf 'last_verified: 2026-09-24\n' > "$R/ibl5/classes/EventLog/README.md"
+printf 'last_verified: 2026-09-24\n' > "$R/.claude/rules/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'path outside docfix allowlist' \
+    && printf '%s' "$VOUT" | grep -qF '.claude/rules/x.md'; } \
+  && ok "(68a) veronly: mixed allowed README + .claude/rules diff holds (rc 1)" \
+  || bad "(68a) veronly: mixed diff should HOLD"
+
+# Case 68b: same mixed shape with the disallowed path sorting AFTER the allowed one
+# (git name-status is path-sorted; 'R' < 'n' so README.md is row 1) → still HOLD.
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R" "ibl5/classes/EventLog/README.md" 'last_verified: 2026-01-01'
+veronly_add_master "$R" "ibl5/classes/EventLog/notes.md" 'last_verified: 2026-01-01'
+printf 'last_verified: 2026-09-24\n' > "$R/ibl5/classes/EventLog/README.md"
+printf 'last_verified: 2026-09-24\n' > "$R/ibl5/classes/EventLog/notes.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'path outside docfix allowlist' \
+    && printf '%s' "$VOUT" | grep -qF 'ibl5/classes/EventLog/notes.md'; } \
+  && ok "(68b) veronly: mixed diff holds when the allowed path is row 1 (rc 1)" \
+  || bad "(68b) veronly: mixed diff (allowed first) should HOLD"
+
+# Case 69: repo-root CLAUDE.md date-bump-only → HOLD
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R" "CLAUDE.md" 'last_verified: 2026-01-01'
+printf 'last_verified: 2026-09-24\n' > "$R/CLAUDE.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF "path outside docfix allowlist: 'CLAUDE.md'"; } \
+  && ok "(69) veronly: CLAUDE.md date-only bump holds (rc 1)" \
+  || bad "(69) veronly: CLAUDE.md should HOLD"
+
+# Case 70: ibl5/foo/README.md date-bump-only (README outside the allowlist) → HOLD
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R" "ibl5/foo/README.md" 'last_verified: 2026-01-01'
+printf 'last_verified: 2026-09-24\n' > "$R/ibl5/foo/README.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF "path outside docfix allowlist: 'ibl5/foo/README.md'"; } \
+  && ok "(70) veronly: README outside ibl5/classes/*/ holds (rc 1)" \
+  || bad "(70) veronly: ibl5/foo/README.md should HOLD"
 
 if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
 exit "$FAILED"

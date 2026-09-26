@@ -6,6 +6,7 @@ namespace Topics;
 
 use Topics\Contracts\TopicsViewInterface;
 use Security\HtmlSanitizer;
+use Search\Contracts\SearchViewInterface;
 
 // PHP-Nuke language constants - defined at runtime by the CMS
 if (!defined('_ACTIVETOPICS')) {
@@ -135,6 +136,7 @@ class TopicsView implements TopicsViewInterface
         $output .= $this->renderCategorySelect($searchFilters['categories']);
         $output .= $this->renderAuthorSelect($searchFilters['authors']);
         $output .= $this->renderDaysSelect();
+        $output .= $this->renderPresetSelect($searchFilters['preset'] ?? '');
         $output .= '</div>';
 
         // Search type radio buttons
@@ -254,6 +256,24 @@ class TopicsView implements TopicsViewInterface
         foreach ($options as $value => $label) {
             $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
             $output .= '<option value="' . $value . '">' . $safeLabel . '</option>';
+        }
+
+        $output .= '</select>';
+        return $output;
+    }
+
+    /**
+     * Render the preset filter dropdown (shared options with the Search form).
+     */
+    private function renderPresetSelect(string $selectedPreset): string
+    {
+        $output = '<select name="preset" aria-label="Preset" class="search-form__select">';
+
+        foreach (SearchViewInterface::PRESET_OPTIONS as $value => $label) {
+            $safeValue = HtmlSanitizer::safeHtmlOutput($value);
+            $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
+            $selected = ($value === $selectedPreset) ? ' selected' : '';
+            $output .= '<option value="' . $safeValue . '"' . $selected . '>' . $safeLabel . '</option>';
         }
 
         $output .= '</select>';

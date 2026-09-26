@@ -208,11 +208,6 @@ def test_phase4b_contains_diff_bounds():
     assert "git diff --name-only origin/master...HEAD" in audit
 
 
-def test_pr_ready_skill_contains_diff_bounds():
-    skill = (REPO_ROOT / ".claude/skills/pr-ready/SKILL.md").read_text()
-    assert "Diff bounds" in skill
-    assert "/tmp/pr-ready-diff-pre-" in skill
-
 
 def test_runner_contains_upsert_manual_confirmation():
     """Pin the runner.py wiring — pure-function tests pass even without it."""

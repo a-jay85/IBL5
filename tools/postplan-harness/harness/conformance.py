@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import PurePosixPath
 
-from .state import PlanInfo
+from .state import PhaseInfo, PlanInfo
 
 
 def _contract_items(plan: PlanInfo, changed_files: list[str],
@@ -77,11 +77,58 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
     return cands.pop() if len(cands) == 1 else None
 
 
+def _touched(tok: str, changed_files: list[str]) -> bool:
+    """True when ANY changed path matches `tok` exactly, by path suffix, or by basename.
+
+    Deliberately looser than _resolve: an ambiguous 2+ candidate set means the diff DID
+    touch something the phase named, which is evidence the phase shipped. Precision over
+    recall for a hold-only check: a false "shipped" costs nothing new, while a false
+    "missing" holds a PR a human then has to clear.
+    """
+    tok = tok.strip().strip("/")
+    if not tok:
+        return False
+    if any(f == tok or f.endswith("/" + tok) for f in changed_files):
+        return True
+    base = PurePosixPath(tok).name
+    for f in changed_files:
+        p = PurePosixPath(f)
+        if p.name == base or any(parent.name == base for parent in p.parents):
+            return True
+    return False
+
+
+def phase_omission_items(plan: PlanInfo, changed_files: list[str]) -> list[str]:
+    """`MISSING-PHASE:` items for plan phases with evidence paths none of which the diff touched.
+
+    Exempt, in order: a phase whose heading carries an all-S `[phases: S]` marker
+    (bookkeeping), a phase number named in `## Out of Scope` (declared deferred), and a
+    phase whose body cites no path at all (no evidence = cannot verify = skip). Empty when
+    the plan was not found or has no parsed phases, so a plan-blind run and every
+    pre-existing PlanInfo literal produce nothing. Hold-only: the items flow into arming
+    condition (3) via check(); fidelity.build_work_list excludes them from the fixer loop.
+    """
+    if not plan.found or not plan.phases:
+        return []
+    deferred = set(plan.deferred_phase_numbers)
+    items: list[str] = []
+    for ph in plan.phases:
+        if ph.bookkeeping or ph.number in deferred or not ph.evidence_paths:
+            continue
+        if any(_touched(p, changed_files) for p in ph.evidence_paths):
+            continue
+        sample = ", ".join(ph.evidence_paths[:3])
+        more = f" (+{len(ph.evidence_paths) - 3} more)" if len(ph.evidence_paths) > 3 else ""
+        items.append(f"MISSING-PHASE: {ph.number} — {ph.heading[:80]} "
+                     f"(phase cites {sample}{more}; none appeared in the diff)")
+    return items
+
+
 def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
           phase5_status: str | None = None,
           resolutions: dict[str, str] | None = None) -> list[str]:
     """Returns unresolved `MISSING:` / `MISSING-FILE:` / `MISSING-METHOD:` /
-    `UNMET-CONTRACT:` items (empty = clean).
+    `UNMET-CONTRACT:` / `MISSING-PHASE:` items (empty = clean).
 
     `UNMET-CONTRACT:` items are produced even when the plan has no Verification
     Matrix — a matrix-less doc/tooling plan is exactly what `evidence-present`
@@ -100,6 +147,9 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     if not plan.found:
         return []
     items: list[str] = _contract_items(plan, changed_files, phase5_status)
+    # Runs before the has_matrix gate on purpose: a matrix-less doc/tooling plan still
+    # has phases, and a phase that shipped nothing is the same defect either way.
+    items.extend(phase_omission_items(plan, changed_files))
     if not plan.has_matrix:
         return items
     for t in plan.planned_test_paths:

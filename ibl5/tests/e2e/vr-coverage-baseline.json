@@ -8,10 +8,7 @@
   "franchise-record-book": [
     "htmx-tabs"
   ],
-  "next-sim": [
-    "htmx-tabs"
-  ],
-  "voting-results": [
+  "record-holders-see-all": [
     "mobile"
   ],
   "error-invalid-module": [
@@ -20,7 +17,13 @@
   "error-nonexistent-file": [
     "mobile"
   ],
-  "player-export-guide": [
+  "block-fa-admin": [
+    "mobile"
+  ],
+  "api-keys-guide": [
+    "mobile"
+  ],
+  "voting-admin-results": [
     "mobile"
   ],
   "team-non-admin": [

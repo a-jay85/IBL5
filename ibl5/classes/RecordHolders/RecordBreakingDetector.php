@@ -50,6 +50,13 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
      */
     public function detectAndAnnounce(array $gameDates): array
     {
+        // Preseason box scores are wiped before the regular season, so a
+        // preseason game can never hold a record. Skip those dates entirely.
+        $gameDates = array_values(array_filter(
+            $gameDates,
+            static fn (string $date): bool => IblSeasonDateHelper::getGameTypeFromDate($date) !== 'preseason'
+        ));
+
         if ($gameDates === []) {
             return [];
         }

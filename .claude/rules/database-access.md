@@ -1,6 +1,6 @@
 ---
 description: Docker MariaDB connection details, query patterns, schema verification, and migration authoring rules.
-last_verified: 2026-09-16
+last_verified: 2026-09-24
 paths:
   - "**/*Repository.php"
   - "**/migrations/000_baseline_schema.sql"
@@ -18,9 +18,9 @@ paths:
 - Host: `127.0.0.1`
 - Port: `3306` — published by the **main** stack's `ibl5-mariadb` only
 - Database: `iblhoops_ibl5`
-- Credentials: See `ibl5/config.php` (`$dbuname`, `$dbpass`)
+- Credentials: See `ibl5/config.local.php` (`$dbuname`, `$dbpass`)
 
-`ibl5/config.php` is untracked and env-driven (`getenv('DB_NAME') ?: <fallback>`, template at `ibl5/config.php.example`). Inside the containers docker-compose injects `DB_NAME=iblhoops_ibl5`, so the env wins; on a **host** shell there is no `DB_NAME`, so whatever fallback that local file happens to carry is what gets used. A stale local edit there silently retargets every PHP/`db-query` call — check the file before believing a surprising result.
+The template `ibl5/config.php.example` (used by CI) requires the gitignored `ibl5/config.local.php` for `$dbhost`, `$dbuname`, `$dbpass`, `$dbname`; template at `ibl5/config.local.php.example`. A config built from that template has no env-var fallback and exits 1 when `config.local.php` is missing. The main checkout's untracked `ibl5/config.php` may still carry the older `getenv('DB_NAME') ?: <fallback>` lines, and `bin/wt-new` copies it into every worktree. In that shape the docker-compose env wins inside the containers, and on a host shell the file's fallback is used. A stale local edit in either file silently retargets every PHP/`db-query` call. Check the file before believing a surprising result.
 
 **Start the database:**
 ```bash

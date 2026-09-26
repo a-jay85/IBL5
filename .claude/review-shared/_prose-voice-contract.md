@@ -1,6 +1,6 @@
 ---
 description: The written-voice contract for machine-authored merge-digest lines and PR-body prose — five rules, the sentence-tokenizing definition bin/check-digest-prose implements, and two annotated failure samples.
-last_verified: 2026-09-18
+last_verified: 2026-09-22
 ---
 
 # Prose Voice Contract
@@ -14,7 +14,7 @@ This contract governs **machine-authored prose** in two places:
 
 It is **read on demand**, never auto-attached. Both callers carry an explicit `Read` instruction pointing here.
 
-It **adds nothing to the digest's structural contract**. The digest stays exactly five lines, one per label, labels unchanged, no blank lines between them. That structure is owned by `.claude/agents/pr-ready-phase6.md` and `.claude/skills/pr-ready/scripts/digest.sh`; this file governs only how the sentence reads, never how many lines there are.
+It **adds nothing to the digest's structural contract**. The digest stays exactly five lines, one per label, labels unchanged, no blank lines between them. That structure is owned by `.claude/agents/pr-ready-phase6.md` and `.claude/review-shared/scripts/digest.sh`; this file governs only how the sentence reads, never how many lines there are.
 
 **Why sentence length matters here.** `bin/digest-dm-build` truncates `**Watch:**` at `WATCH_MAX=700` characters and `**What changed:**` at `WHAT_MAX=1000` characters for the Discord DM. A long sentence's tail can be the part that vanishes. <!-- slop-ok -->
 
@@ -52,7 +52,7 @@ One em-dash sets off an aside. A second one is a comma splice wearing a costume.
 
 **Active voice with a concrete actor.** Not "the X path cannot execute." <!-- slop-ok -->
 
-Name the actor that acts. "`bin/pr-ready-now` pins the main-checkout copy" not "the launcher pins"; "no result is written" not "the first real-world confirmation is".
+Name the actor that acts. "`bin/post-plan-fleet` pins the main-checkout copy" not "the launcher pins"; "no result is written" not "the first real-world confirmation is".
 
 ### Non-goal
 
@@ -72,7 +72,7 @@ This is the normative definition `bin/check-digest-prose` implements. The linter
 
 4. **Word count** is whitespace-separated tokens of the backtick-stripped sentence.
 
-Every one of these exclusions has a must-pass fixture in `bin/test-pr-ready-now`; a change to this definition that drops an exclusion turns a green fixture red.
+Every one of these exclusions has a must-pass fixture in `bin/test-post-plan-fleet`; a change to this definition that drops an exclusion turns a green fixture red.
 
 ## Two failure samples
 
@@ -98,7 +98,7 @@ Fails:
 - **Rule 4** — the em-dash appends a new subject ("the fail-closed direction ... is"). <!-- slop-ok -->
 - **Rule 5** — nominalized subject, "the first real-world confirmation is". <!-- slop-ok -->
 
-Rewrite: `bin/pr-ready-now` pins the main-checkout copy, so this branch never runs the write-then-read path. The next automated run confirms it. Re-check the fail-closed direction there: no result written must still hold the PR.
+Rewrite: `bin/post-plan-fleet` pins the main-checkout copy, so this branch never runs the write-then-read path. The next automated run confirms it. Re-check the fail-closed direction there: no result written must still hold the PR.
 
 ## Enforcement
 

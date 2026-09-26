@@ -433,6 +433,31 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
     }
 
     /**
+     * @see PlrParserRepositoryInterface::getSnapshotsByPhase()
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getSnapshotsByPhase(int $seasonYear, string $phase): array
+    {
+        $columns = implode(', ', array_map(
+            static fn (string $column): string => '`' . $column . '`',
+            self::SNAPSHOT_COLUMNS,
+        ));
+        // $columns is built from the validated SNAPSHOT_COLUMNS constant, not user input
+        $sql = "SELECT {$columns} FROM ibl_plr_snapshots WHERE season_year = ? AND snapshot_phase = ?"; // @phpstan-ignore ibl.sqlStringInterpolation
+        $rows = $this->fetchAll($sql, 'is', $seasonYear, $phase);
+
+        $byPid = [];
+        foreach ($rows as $row) {
+            if (is_numeric($row['pid'])) {
+                $byPid[(int) $row['pid']] = $row;
+            }
+        }
+
+        return $byPid;
+    }
+
+    /**
      * Column names for ibl_plr_snapshots upsert, in insertion order.
      *
      * @var list<string>

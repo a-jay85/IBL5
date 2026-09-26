@@ -163,6 +163,12 @@ CONFIG_PHP="$WORKTREE_PATH/ibl5/config.php"
 if [ ! -s "$CONFIG_PHP" ] || [ -L "$CONFIG_PHP" ]; then
     materialize_worktree_config "$CONFIG_PHP" "$REPO_ROOT/ibl5" || exit 1
 fi
+# config.local.php: same safety net. Fires for every worktree created before
+# the credential extraction, which has config.php but no config.local.php.
+CONFIG_LOCAL_PHP="$WORKTREE_PATH/ibl5/config.local.php"
+if [ ! -s "$CONFIG_LOCAL_PHP" ] || [ -L "$CONFIG_LOCAL_PHP" ]; then
+    materialize_worktree_config_local "$CONFIG_LOCAL_PHP" "$REPO_ROOT/ibl5" || exit 1
+fi
 
 # Copy .env.test into worktree (absolute symlink target doesn't exist inside Docker)
 ENV_TEST="$WORKTREE_PATH/ibl5/.env.test"

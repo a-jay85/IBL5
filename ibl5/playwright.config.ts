@@ -58,7 +58,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/],
+      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/, /faprep-xss-escape\.spec\.ts$/],
     },
     {
       // Destructive full-season updater specs mutate GLOBAL DB rows (schedules,
@@ -106,7 +106,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/],
+      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/, /faprep-xss-escape\.spec\.ts$/],
     },
   ],
 });

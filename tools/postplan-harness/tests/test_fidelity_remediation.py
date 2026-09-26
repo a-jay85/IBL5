@@ -298,14 +298,117 @@ def test_extract_notes_keeps_only_followup_kind(tmp_path):
     assert [n["title"] for n in result] == ["Assert the parsed value, not itself"]
 
 
+def test_extract_notes_drops_followups_that_say_already_done(tmp_path):
+    """A followup whose own text says the PR already did the work never files."""
+    notes_fixture = [
+        {"title": "Add fable-5-1 key assertions (fixed in PR #2381)", "kind": "followup",
+         "detail": "bin/test-automouse-cost-rows lacks the key."},
+        {"title": "Assert sorted id-lists in backup tests", "kind": "followup",
+         "detail": "Row counts only. Fixed in 6.5 remediation, file as pattern."},
+        {"title": "Correct the robots.txt scope claim", "kind": "followup",
+         "detail": "The body over-stated it; corrected in Phase 6.5 remediation."},
+        {"title": "Check the VR baseline", "kind": "followup",
+         "detail": "The baseline swept in drift. Verify before merge."},
+        {"title": "Fix the off-by-one in RosterParser", "kind": "followup",
+         "detail": "RosterParser::parse() skips the last row. The PR fixed a sibling bug "
+                   "in DepthChart but this one remains."},
+        {"title": "Skip the last row correctly", "kind": "followup",
+         "detail": "Occurrence 2 was not fixed in this PR; RosterParser still skips it."},
+        {"title": "Guard the empty roster", "kind": "followup",
+         "detail": "This wasn't yet addressed by the remediation. Add the guard."},
+    ]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"))
+    assert [n["title"] for n in result] == ["Fix the off-by-one in RosterParser",
+                                            "Skip the last row correctly",
+                                            "Guard the empty roster"]
+
+
+def test_extract_notes_drops_followups_that_only_reword_a_comment(tmp_path):
+    """Comment and docstring nits from the 2026-09-24 triage never file; real work does."""
+    notes_fixture = [
+        {"title": "Update stale cadence comment in bin/plan-review-drain:260",
+         "kind": "followup", "detail": "It now runs every 180s, not nightly."},
+        {"title": "Move doc comment back to regenerate_weekly_section", "kind": "followup",
+         "detail": "The docblock drifted above the helper."},
+        {"title": "Remove hard-wrap from Step 5 paragraph in prompt-impl",
+         "kind": "followup", "detail": "One paragraph is wrapped at 80 columns."},
+        {"title": "Fix compose_sticky docstring about output compatibility",
+         "kind": "followup", "detail": "The docstring says the legacy output is identical."},
+        {"title": "Place _ZERO_SHA below its documentation comment", "kind": "followup",
+         "detail": "The constant sits between the comment and _LOCAL_GATE_MARKERS."},
+        {"title": "Clarify _ALREADY_DONE_RE docstring in fidelity.py", "kind": "followup",
+         "detail": "The regex matches any PR number. This causes real followups to be "
+                   "dropped silently."},
+        {"title": "Fix PR comment dedup for re-review rounds", "kind": "followup",
+         "detail": "A second round posts a duplicate review."},
+        {"title": "Update sticky comment to list carried-forward findings",
+         "kind": "followup", "detail": "Carried findings are missing from the comment."},
+        {"title": "Add a comment explaining the lock order in bin/automouse/run",
+         "kind": "followup", "detail": "Two locks are taken with no stated order."},
+    ]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"))
+    assert [n["title"] for n in result] == [
+        "Clarify _ALREADY_DONE_RE docstring in fidelity.py",
+        "Fix PR comment dedup for re-review rounds",
+        "Update sticky comment to list carried-forward findings",
+        "Add a comment explaining the lock order in bin/automouse/run",
+    ]
+
+
+def test_extract_notes_counts_only_the_reviewed_pr_as_already_done(tmp_path):
+    """A note naming an older PR's fix is still owed; one naming this PR is done."""
+    notes_fixture = [
+        {"title": "Re-fix the draft ordering regression", "kind": "followup",
+         "detail": "Regression of the bug fixed in PR #1900. Re-fix it."},
+        {"title": "Guard the empty roster path", "kind": "followup",
+         "detail": "Fixed in PR #2400 by the new early return."},
+    ]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"),
+                                    pr_number=2400)
+    assert [n["title"] for n in result] == ["Re-fix the draft ordering regression"]
+
+
+def test_extract_notes_drops_followups_whose_title_targets_the_plan(tmp_path):
+    """Titles from the 2026-09-24 triage that edit the plan never file; real work does."""
+    notes_fixture = [
+        {"title": "Update Verification Matrix row 11", "kind": "followup",
+         "detail": "Row 11 expects zero verdict_1 in bin/test-post-plan-fleet."},
+        {"title": "Fix Verification Matrix row 5 grep pattern", "kind": "followup",
+         "detail": "Row 5 greps for cost_row_count but the test uses ROW_COUNT."},
+        {"title": "Fix test matrix rows 22-24: reference ADR-0135 not 0134",
+         "kind": "followup", "detail": "The rows cite the wrong ADR."},
+        {"title": "Add the new test to the plan's Critical Files", "kind": "followup",
+         "detail": "test_ciwatch.py changed but is not listed."},
+        {"title": "Reword plan step 3 to match the shipped helper", "kind": "followup",
+         "detail": "Step 3 names bindAndExecute(), which does not exist."},
+        {"title": "Move cost report header write inside lock", "kind": "followup",
+         "detail": "bin/automouse/run writes the header before taking the lock, so two "
+                   "runners can both write it. Verification Matrix row 4 missed this."},
+        {"title": "Fix issue_titles() to respect label argument", "kind": "followup",
+         "detail": "adapters/ghad.py issue_titles(label) ignores its label argument."},
+        {"title": "Fix head-to-head matrix row highlight for gms", "kind": "followup",
+         "detail": "HeadToHeadRecordsView highlights the wrong row for the gms dimension."},
+    ]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"))
+    assert [n["title"] for n in result] == ["Move cost report header write inside lock",
+                                            "Fix issue_titles() to respect label argument",
+                                            "Fix head-to-head matrix row highlight for gms"]
+
+
 def test_fidelity_notes_prompt_types_notes_and_drops_when_torn():
-    """The prompt names all four kinds and tells Haiku which way to fall when unsure."""
+    """The prompt names every kind and tells Haiku which way to fall when unsure."""
     prompt = llm_calls.fidelity_notes_prompt("READY WITH NOTES\n\n### Note 1 — cosmetic")
-    for kind in ("followup", "plan-deviation-ok", "pr-copy", "process"):
+    for kind in ("followup", "plan-deviation-ok", "pr-copy", "process",
+                 "done-in-pr", "plan-adherence", "nit", "plan-artifact"):
         assert kind in prompt
     assert "still worth doing" in prompt
     assert "do NOT call it" in prompt          # the drop-when-torn instruction
     assert '"kind": "followup"' in prompt      # the shape Haiku must return
+    assert "name the file" in prompt           # detail must stand alone in the issue
 
 
 def test_extract_notes_returns_empty_on_llm_failure(tmp_path):
@@ -332,10 +435,26 @@ def test_file_note_issues_dedupes_by_normalized_title(tmp_path):
         {"title": "Add index on email", "detail": "Needs an index."},
         {"title": "Add Index On Email!", "detail": "Same thing."},
     ]
-    nums = fidelity.file_note_issues(gh, notes, 99, "verdict text")
+    nums = fidelity.file_note_issues(gh, notes, 99)
     assert len(nums) == 1
     acts = [a for a in gh.actions() if a["action"] == "issue_create"]
     assert len(acts) == 1
+
+
+def test_file_note_issues_body_is_link_plus_detail_only(tmp_path):
+    """The body is the PR link and the note's detail, with no verdict excerpt tail."""
+
+    bodies = []
+
+    class _Gh(RecordingGh):
+        def issue_create(self, title, body, label):
+            bodies.append(body)
+            return super().issue_create(title, body, label)
+
+    gh = _Gh(str(tmp_path))
+    detail = "harness/x.py asserts on the echo. Stub the DM and assert on its argument."
+    fidelity.file_note_issues(gh, [{"title": "Stub the DM", "detail": detail}], 99)
+    assert bodies == [f"https://github.com/a-jay85/IBL5/pull/99\n\n{detail}"]
 
 
 def test_file_note_issues_skips_existing_titles(tmp_path):
@@ -347,7 +466,7 @@ def test_file_note_issues_skips_existing_titles(tmp_path):
 
     gh = _Gh(str(tmp_path))
     notes = [{"title": "Add index on email", "detail": "Needs an index."}]
-    nums = fidelity.file_note_issues(gh, notes, 99, "verdict")
+    nums = fidelity.file_note_issues(gh, notes, 99)
     assert nums == []
     assert not [a for a in gh.actions() if a["action"] == "issue_create"]
 
@@ -645,7 +764,7 @@ def test_notes_dedupe_run_twice(tmp_path, git_shim):
         {"title": "ADD INDEX ON EMAIL!", "detail": "Same."},
     ]
     gh2 = RecordingGh(str(tmp_path))
-    nums2 = fidelity.file_note_issues(gh2, notes_case, 9960, "verdict")
+    nums2 = fidelity.file_note_issues(gh2, notes_case, 9960)
     assert len(nums2) == 1
     creates2 = [a for a in gh2.actions() if a["action"] == "issue_create"]
     assert len(creates2) == 1
@@ -712,7 +831,7 @@ def test_file_note_issues_continues_after_failed_create(tmp_path):
         {"title": "First note", "detail": "Detail one."},
         {"title": "Second note", "detail": "Detail two."},
     ]
-    nums = fidelity.file_note_issues(gh, notes, 99, "verdict")
+    nums = fidelity.file_note_issues(gh, notes, 99)
     assert len(nums) == 1
 
 

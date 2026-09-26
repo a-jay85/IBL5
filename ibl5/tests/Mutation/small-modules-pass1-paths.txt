@@ -4,3 +4,4 @@ classes/Cache/PageCache.php
 classes/Cache/DatabaseCache.php
 classes/Discord/Discord.php
 classes/Scripts/MaintenanceRepository.php
+classes/Module/ModuleRedirect.php

@@ -37,12 +37,10 @@ REVIEW_ALLOWED_TOOLS = ("Read", "Grep", "Glob")
 REVIEW_DENIED_TOOLS = ("Bash", "Write", "Edit", "NotebookEdit", "Agent")
 
 PROCEDURE_PATHS = (
-    ".claude/skills/pr-ready/_plan-fidelity-review.md",
     ".claude/review-shared/_plan-fidelity-review.md",
 )
 
 REMEDIATION_PATHS = (
-    ".claude/skills/pr-ready/_phase65-remediation.md",
     ".claude/review-shared/_phase65-remediation.md",
 )
 
@@ -168,9 +166,12 @@ def build_work_list(verdict_path: str,
     # UNMET-CONTRACT entries are deliberately excluded: they name evidence the plan
     # declared, and a fixer that "adds" such evidence is the fabrication conformance
     # exists to catch.
+    # MISSING-PHASE is excluded for the same reason: the fix is a whole plan phase, which
+    # is human work, and the item still holds arming through condition (3).
     for entry in (unresolved_conformance or []):
-        if str(entry).startswith("MISSING"):
-            items.append({"hold": "3", "text": str(entry)})
+        text = str(entry)
+        if text.startswith("MISSING") and not text.startswith("MISSING-PHASE"):
+            items.append({"hold": "3", "text": text})
     for fail in (meta_check_failures or []):
         items.append({"hold": "16",
                       "text": f"{fail.get('name', 'unknown')}\n{fail.get('output', '')}"})
@@ -221,7 +222,13 @@ OVERRIDE = (
     "Emit the COMPLETE verdict document as your final message: the full 6d checks, the "
     "6e verdict word on a line of its own (exactly one of `READY`, `READY WITH NOTES`, "
     "or `NOT READY`), and the 6e(b) digest below a `## DIGEST` line. Read your inputs "
-    "from the packet files named in the prompt."
+    "from the packet files named in the prompt. `plan-index.txt` in the packet is the "
+    "`bin/plan-index` output for the plan; use it as the authoritative phase roster and "
+    "read `plan.md` by those line ranges. `bin/check-digest-prose` does not run on this "
+    "path, so apply `.claude/review-shared/_prose-voice-contract.md` to the digest by "
+    "hand. These are the designed tool budget, not gaps: never list the missing Write "
+    "or Bash tools, the verdict-file save, plan indexing, or the digest linter under a "
+    "\"Couldn't do\" heading or anywhere else in the verdict."
 )
 
 PLAN_BLIND_MARKER = (
@@ -306,6 +313,28 @@ def _find_procedure(worktree: str, master_sha: str, paths, kind: str) -> str:
     raise HarnessError(kind, f"{master_sha}: none of {', '.join(paths)}")
 
 
+PLAN_INDEX_BLIND = "(plan-blind run: no plan, so no index)\n"
+
+
+def _plan_index(worktree: str, plan_path: str) -> str:
+    """`bin/plan-index` output for the packet's plan copy.
+
+    The reviewer has no Bash, so the harness runs the index for it. Any failure becomes a
+    marker telling the reviewer to find `## ` headings with Grep instead; it never
+    aborts the packet.
+    """
+    script = os.path.join(worktree, "bin", "plan-index")
+    try:
+        proc = subprocess.run([script, plan_path], cwd=worktree,
+                              capture_output=True, text=True)
+    except OSError as e:
+        return f"(bin/plan-index unavailable: {e}; Grep plan.md for '^## ' instead)\n"
+    if proc.returncode != 0:
+        return (f"(bin/plan-index exited {proc.returncode}: {proc.stderr.strip()}; "
+                "Grep plan.md for '^## ' instead)\n")
+    return proc.stdout
+
+
 def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: str,
                  pr_body: str, pr_number: int | str, phase4b_ran: bool, *,
                  worktree: str = ".", packet_name: str = "fidelity-packet",
@@ -327,10 +356,13 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
         try:
             with open(plan.path) as fh:
                 _write("plan.md", fh.read())
+            _write("plan-index.txt", _plan_index(worktree, os.path.join(packet, "plan.md")))
         except OSError:
             _write("plan.md", PLAN_BLIND_MARKER)
+            _write("plan-index.txt", PLAN_INDEX_BLIND)
     else:
         _write("plan.md", PLAN_BLIND_MARKER)
+        _write("plan-index.txt", PLAN_INDEX_BLIND)
 
     _write("diff.patch", diff or "")
     _write("pr-body.md", pr_body or "")
@@ -355,6 +387,7 @@ def _pointer_prompt(packet_dir: str, pr_number: int | str) -> str:
         "Every input is already on disk. Read these files:\n"
         f"  - {os.path.join(packet_dir, 'procedure.md')}  — the 6b-6e procedure; follow it exactly\n"
         f"  - {os.path.join(packet_dir, 'plan.md')}       — the plan (or a plan-blind marker)\n"
+        f"  - {os.path.join(packet_dir, 'plan-index.txt')} — `bin/plan-index` output for plan.md\n"
         f"  - {os.path.join(packet_dir, 'diff.patch')}    — the post-rebase diff under review\n"
         f"  - {os.path.join(packet_dir, 'pr-body.md')}    — the PR body\n"
         f"  - {os.path.join(packet_dir, 'context.md')}    — run context\n\n"
@@ -597,13 +630,101 @@ def _norm_title(t: str) -> str:
     return t[:60]
 
 
-def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
+_ALREADY_DONE_RE = re.compile(
+    r"\b(?:fixed|corrected|remediated|addressed|resolved|recorded)\b[^.]{0,40}?"
+    r"\b(?:in|by|during)\s+(?:this pr|the pr|pr\s*#?(?P<pr>\d+)|(?:phase\s*)?6\.5|(?:the\s+)?remediation"
+    r"|(?:the\s+)?(?:pr\s+)?body)\b"
+    r"|\balready\s+(?:fixed|corrected|remediated|addressed|resolved)\b"
+    r"|\bverify before merge\b",
+    re.IGNORECASE)
+
+
+# "not fixed in this PR" / "wasn't yet corrected" names work still owed, so a negation
+# in the few words before the verb cancels the match.
+_NEGATED_RE = re.compile(r"(?:\bnot|\bnever|n't)(?:\s+\w+)?\s*$", re.IGNORECASE)
+
+
+# A note whose title targets the plan file (a matrix row, a plan step, Critical Files)
+# asks for an edit to a document deleted at merge. Haiku tagged these `followup` before
+# the plan-artifact kind existed, and it kept mislabelling done-in-pr notes after that
+# kind shipped, so this title check backs the prompt up. The 2026-09-24 triage found
+# "Update Verification Matrix row 11" and "Fix test matrix rows 22-24". A bare "matrix
+# row" stays filable because the head-to-head records page is a matrix. Titles only: a
+# real followup's detail often cites the matrix row that exposed it.
+_PLAN_ARTIFACT_RE = re.compile(
+    r"\bverification\s+matrix\b|\btest\s+matrix\s+rows?\b"
+    r"|\bcritical\s+files\b|\bplan\s+(?:step|phase|row)\s+\d",
+    re.IGNORECASE)
+
+
+def _is_plan_artifact(title: str) -> bool:
+    """True when a note's title asks for an edit to the plan document itself."""
+    return bool(_PLAN_ARTIFACT_RE.search(title))
+
+
+# A note whose title only rewords a code comment or docstring is a nit Haiku tagged
+# `followup`. The 2026-09-24 triage closed 26 nits, among them "Update stale cadence
+# comment in bin/plan-review-drain", "Move doc comment back to regenerate_weekly_section"
+# and "Remove hard-wrap from Step 5 paragraph". A PR, sticky, review or issue comment is
+# a feature, so those stay filable. The verb anchor keeps "Add a comment explaining X"
+# out, since that names missing context rather than wording. The comment must sit in
+# the title's first clause, so a list title like "Fix stale artifacts: a test name, a
+# comment, ..." stays filable, and "code-comment agent" names a tool.
+_COMMENT_NIT_RE = re.compile(
+    r"\b(?:docstring|docblock|doc[\s-]?comment|hard[\s-]?wrap)s?\b"
+    r"|^(?:update|fix|rewrite|reword|clarify|correct|move|remove|place|verify)\b[^:,]{0,60}"
+    r"(?<!pr )(?<!sticky )(?<!review )(?<!issue )(?<![-\w])comments?\b(?!-)",
+    re.IGNORECASE)
+
+# A comment-titled note whose detail names a behaviour defect is real work under a
+# cosmetic title. Backlog #1069 was titled "Clarify _ALREADY_DONE_RE docstring" and its
+# detail said the regex drops real followups.
+_BEHAVIOUR_DEFECT_RE = re.compile(
+    r"\b(?:causes?|breaks?|fails?|drops?|dropped|silently|bugs?|regress\w*|crash\w*)\b",
+    re.IGNORECASE)
+
+
+def _is_comment_nit(title: str, detail: str) -> bool:
+    """True when a note only rewords a comment or docstring and names no defect."""
+    return (bool(_COMMENT_NIT_RE.search(title))
+            and not _BEHAVIOUR_DEFECT_RE.search(detail))
+
+
+def _says_already_done(text: str, pr_number: int | None = None) -> bool:
+    """True when a note's own words say its work landed in the PR under review.
+
+    A numbered PR ("fixed in PR #2381") counts only when it is `pr_number`, the PR
+    under review. "Regression of the bug fixed in PR #1900, re-fix it" names an older
+    PR and is still owed. With no `pr_number` every numbered PR counts, as before.
+    """
+    for m in _ALREADY_DONE_RE.finditer(text):
+        if (pr_number is not None and m.group("pr")
+                and int(m.group("pr")) != pr_number):
+            continue
+        if not _NEGATED_RE.search(text[max(0, m.start() - 20):m.start()]):
+            return True
+    return False
+
+
+def extract_notes(llm, verdict_path: str, log=None,
+                  pr_number: int | None = None) -> list[dict]:
     """Extract the filable non-blocking notes from a READY WITH NOTES verdict.
 
     Only `kind == "followup"` survives — a note that names code work outliving the
     merge. Anything else (a blessed plan deviation, a PR-copy nit, the reviewer's own
     bookkeeping) is dropped, including a missing or unrecognized kind: dropping is
     fail-closed and matches how this function already handles an LLM failure.
+
+    A `followup` whose own text says the work already happened is dropped too. Haiku
+    kept tagging those `followup` after the four-kind prompt shipped; the 2026-09-24
+    triage closed issues titled "... (fixed in PR #2381)" and "... corrected in Phase
+    6.5 remediation".
+
+    A `followup` whose title targets the plan file is dropped the same way. The plan is
+    discarded at merge, so "Update Verification Matrix row 11" has nowhere to land.
+
+    A `followup` whose title only rewords a code comment or docstring is dropped unless
+    its detail names a behaviour defect.
     """
     log = log or _noop_log
     try:
@@ -619,18 +740,27 @@ def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
             return []
         kept = [d for d in raw if isinstance(d, dict)
                 and d.get("title") and d.get("detail")
-                and d.get("kind") == "followup"]
+                and d.get("kind") == "followup"
+                and not _says_already_done(f"{d['title']} {d['detail']}", pr_number)
+                and not _is_plan_artifact(d["title"])
+                and not _is_comment_nit(d["title"], d["detail"])]
         dropped = len([d for d in raw if isinstance(d, dict)]) - len(kept)
         if dropped:
-            log(f"phase5.5 notes: dropped {dropped} non-followup note(s)")
+            log(f"phase5.5 notes: dropped {dropped} non-followup, already-done, "
+                "plan-artifact or comment-nit note(s)")
         return kept
     except HarnessError:
         return []
 
 
-def file_note_issues(gh, notes: list[dict], pr_number: int,
-                     verdict_text: str, log=None) -> list[int]:
-    """File deduped backlog issues for READY WITH NOTES notes."""
+def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[int]:
+    """File deduped backlog issues for READY WITH NOTES notes.
+
+    The body is the PR link plus the note's own detail. It carries no verdict excerpt:
+    the verdict opens with the reviewer's process narration, so a fixed-length cut of it
+    was always off-topic and ended mid-sentence. The full verdict is the PR's sticky
+    comment, one click from the link.
+    """
     log = log or _noop_log
     if not notes:
         return []
@@ -640,9 +770,6 @@ def file_note_issues(gh, notes: list[dict], pr_number: int,
         existing = []
     seen = {_norm_title(t) for t in existing}
     nums = []
-    excerpt = verdict_text[:200]
-    if len(verdict_text) > 200:
-        excerpt += "…"
     pr_link = f"https://github.com/a-jay85/IBL5/pull/{pr_number}"
     for note in notes:
         title = note.get("title", "")
@@ -651,7 +778,7 @@ def file_note_issues(gh, notes: list[dict], pr_number: int,
         if key in seen:
             log(f"phase5.5 notes: skipping duplicate '{title[:50]}'")
             continue
-        body = f"{pr_link}\n\n{detail}\n\n{excerpt}"
+        body = f"{pr_link}\n\n{detail}"
         try:
             n = gh.issue_create(title, body, "maintenance")
             if n is not None:
@@ -665,7 +792,7 @@ def file_note_issues(gh, notes: list[dict], pr_number: int,
 
 # --- Phase 5: sticky verdict comment composers -------------------------------
 
-# Byte-for-byte from .claude/skills/pr-ready/scripts/digest.sh. bin/digest-dm-build
+# Byte-for-byte from .claude/review-shared/scripts/digest.sh. bin/digest-dm-build
 # reads these five labels out of the posted comment, so a drift here silently empties
 # the merge DM.
 LABELS = (
@@ -677,7 +804,6 @@ LABELS = (
 )
 
 DIGEST_SCRIPT_PATHS = (
-    ".claude/skills/pr-ready/scripts/digest.sh",
     ".claude/review-shared/scripts/digest.sh",
 )
 

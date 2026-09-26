@@ -92,11 +92,15 @@ jobs:
         working-directory: ibl5
         run: composer install --no-dev --no-interaction --optimize-autoloader
 
-      # config.php.example reads DB creds from getenv() with fallbacks; the
-      # job-level DB_* env vars point it at the CI MariaDB service.
+      # config.php requires config.local.php for DB creds; write it from the
+      # job-level DB_* env so PHP points at the CI MariaDB service.
       - name: Configure ibl5 to point at CI MariaDB
         working-directory: ibl5
-        run: cp config.php.example config.php
+        run: |
+          cp config.php.example config.php
+          printf '<?php\n$dbhost = %s;\n$dbuname = %s;\n$dbpass = %s;\n$dbname = %s;\n' \
+            "'${DB_HOST:-127.0.0.1}'" "'${DB_USER:-root}'" "'${DB_PASS:-root}'" \
+            "'${DB_NAME:-ibl5}'" > config.local.php
 
       # Clone production into the CI MariaDB instead of applying the stale
       # 000_baseline_schema.sql snapshot. The clone carries prod's real schema, real

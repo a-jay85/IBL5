@@ -47,7 +47,8 @@ class ApiKeyAuthenticator implements AuthenticatorInterface
      * send custom HTTP headers.
      *
      * Security note: Keys in query params appear in server access logs. This is an
-     * acceptable trade-off for read-only export endpoints.
+     * acceptable trade-off for read-only export endpoints. The API key page warns users
+     * (ApiKeysView::URL_KEY_NOTICE), and gitleaks flags a raw key in the repo.
      */
     private function getApiKeyFromRequest(): ?string
     {

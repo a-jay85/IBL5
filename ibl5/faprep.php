@@ -26,7 +26,7 @@ $result = $mysqli_db->query($query);
 $rows = $result instanceof mysqli_result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 
 ?>
-<html>
+<html lang="en">
 <head>
     <title>Free Agent Prep</title>
 </head>

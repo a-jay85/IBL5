@@ -23,13 +23,16 @@ class VotingBallotView implements VotingBallotViewInterface
      * @see VotingBallotViewInterface::renderBallotForm()
      *
      * @param list<BallotCategory> $categories
+     * @param array<string, array<int, string>> $selections Previously submitted picks keyed by category code
+     *        (ASG: 0-indexed list per checkbox group; EOY: keys 1/2/3 = rank). Empty on a fresh GET.
      */
     public function renderBallotForm(
         string $formAction,
         string $voterTeamName,
         int $teamid,
         string $phase,
-        array $categories
+        array $categories,
+        array $selections = []
     ): string {
         $isASG = ($phase === 'Regular Season');
         $formName = $isASG ? 'ASGVote' : 'EOYVote';
@@ -47,13 +50,31 @@ class VotingBallotView implements VotingBallotViewInterface
         foreach ($categories as $category) {
             $html .= $this->renderShowHideScript($category['code']);
             $html .= $this->renderCategoryHeader($category['code'], $category['title'], $category['instruction']);
-            $html .= $this->renderCandidateTable($category['code'], $category['candidates'], $voterTeamName, $phase);
+            $html .= $this->renderCandidateTable($category['code'], $category['candidates'], $voterTeamName, $phase, $selections[$category['code']] ?? []);
         }
 
         $html .= "<input type=\"hidden\" name=\"teamname\" value=\"{$safeVoterTeam}\">";
         $html .= '<button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button>';
         $html .= '</div>';
         $html .= '</form>';
+
+        return $html;
+    }
+
+    /**
+     * @see VotingBallotViewInterface::renderResultsExpander()
+     *
+     * Mirrors renderCategoryHeader()'s markup rather than calling it: the hint is
+     * italicised, and that private method escapes its instruction argument.
+     */
+    public function renderResultsExpander(string $resultsHtml): string
+    {
+        $html = $this->renderShowHideScript('Results');
+        $html .= '<div class="voting-category" onclick="ShowAndHideResults()">';
+        $html .= '<h2 class="ibl-title voting-category-title">Voting Results</h2>';
+        $html .= '<p class="voting-category-instruction"><i>Tap/click to reveal/hide results.</i></p>';
+        $html .= '</div>';
+        $html .= '<div id="Results" style="display:none">' . $resultsHtml . '</div>';
 
         return $html;
     }
@@ -96,12 +117,14 @@ function ShowAndHide{$categoryCode}() {
      * @param list<array<string, mixed>> $candidates Candidate data
      * @param string $voterTeamName Voter's team name (to disable self-voting)
      * @param string $phase Season phase
+     * @param array<int, string> $selections Previously submitted picks for this category
      */
     private function renderCandidateTable(
         string $categoryCode,
         array $candidates,
         string $voterTeamName,
-        string $phase
+        string $phase,
+        array $selections = []
     ): string {
         $isASG = ($phase === 'Regular Season');
         $isGM = ($categoryCode === 'GM');
@@ -112,7 +135,7 @@ function ShowAndHide{$categoryCode}() {
         $html .= '</tr></thead><tbody>';
 
         foreach ($candidates as $candidate) {
-            $html .= $this->renderCandidateRow($categoryCode, $candidate, $voterTeamName, $isASG, $isGM);
+            $html .= $this->renderCandidateRow($categoryCode, $candidate, $voterTeamName, $isASG, $isGM, $selections);
         }
 
         $html .= '</tbody></table>';
@@ -152,13 +175,15 @@ function ShowAndHide{$categoryCode}() {
      * Render a single candidate row
      *
      * @param array<string, mixed> $candidate
+     * @param array<int, string> $selections Previously submitted picks for this category
      */
     private function renderCandidateRow(
         string $categoryCode,
         array $candidate,
         string $voterTeamName,
         bool $isASG,
-        bool $isGM
+        bool $isGM,
+        array $selections = []
     ): string {
         /** @var string $name */
         $name = $candidate['name'] ?? '';
@@ -168,13 +193,14 @@ function ShowAndHide{$categoryCode}() {
         $safeName = HtmlSanitizer::safeHtmlOutput($name);
         $safeTeamName = HtmlSanitizer::safeHtmlOutput($teamName);
         $safeValue = $safeName . ', ' . $safeTeamName;
+        $rawValue = $name . ', ' . $teamName;
 
         $isSameTeam = str_contains($teamName, $voterTeamName);
 
         $html = '<tr>';
 
         // Vote input columns
-        $html .= $this->renderVoteInputs($categoryCode, $safeValue, $isSameTeam, $isASG);
+        $html .= $this->renderVoteInputs($categoryCode, $safeValue, $rawValue, $isSameTeam, $isASG, $selections);
 
         // Data columns
         if ($isGM) {
@@ -219,23 +245,31 @@ function ShowAndHide{$categoryCode}() {
 
     /**
      * Render vote input columns (checkbox for ASG, radio buttons for EOY)
+     *
+     * @param array<int, string> $selections Previously submitted picks for this category
      */
     private function renderVoteInputs(
         string $categoryCode,
         string $safeValue,
+        string $rawValue,
         bool $isSameTeam,
-        bool $isASG
+        bool $isASG,
+        array $selections
     ): string {
         if ($isSameTeam) {
             return $isASG ? '<td></td>' : '<td></td><td></td><td></td>';
         }
 
         if ($isASG) {
-            return "<td><input type=\"checkbox\" name=\"{$categoryCode}[]\" value=\"{$safeValue}\"></td>";
+            $checked = in_array($rawValue, $selections, true) ? ' checked' : '';
+            return "<td><input type=\"checkbox\" name=\"{$categoryCode}[]\" value=\"{$safeValue}\"{$checked}></td>";
         }
 
-        return "<td><input type=\"radio\" name=\"{$categoryCode}[1]\" value=\"{$safeValue}\"></td>"
-            . "<td><input type=\"radio\" name=\"{$categoryCode}[2]\" value=\"{$safeValue}\"></td>"
-            . "<td><input type=\"radio\" name=\"{$categoryCode}[3]\" value=\"{$safeValue}\"></td>";
+        $html = '';
+        foreach ([1, 2, 3] as $rank) {
+            $checked = (($selections[$rank] ?? '') === $rawValue) ? ' checked' : '';
+            $html .= "<td><input type=\"radio\" name=\"{$categoryCode}[{$rank}]\" value=\"{$safeValue}\"{$checked}></td>";
+        }
+        return $html;
     }
 }

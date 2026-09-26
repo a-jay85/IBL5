@@ -31,7 +31,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         $this->insertTeamBoxscoreRow('2098-01-15', 'Metros', 1, 2, 1);
 
         $result = $this->repo->getSeasonHighs(
-            'bs.calc_points',
+            '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)',
             'Points',
             '',
             '2098-01-01',
@@ -46,7 +46,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('pid', $first);
         self::assertArrayHasKey('gameOfThatDay', $first);
         self::assertSame('SeasonHighs Test', $first['name']);
-        // calc_points = 10*2 + 6 + 4*3 = 38
+        // points = 10*2 + 6 + 4*3 = 38
         self::assertSame(38, $first['value']);
         self::assertSame(1, $first['gameOfThatDay']);
     }
@@ -56,7 +56,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         $this->insertTeamBoxscoreRow('2098-01-15', 'Metros', 1, 2, 1);
 
         $result = $this->repo->getSeasonHighs(
-            'bs.game_ast',
+            '`game_ast`',
             'Assists',
             '_teams',
             '2098-01-01',
@@ -81,7 +81,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         );
 
         $result = $this->repo->getSeasonHighs(
-            'bs.calc_points',
+            '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)',
             'Points',
             '',
             '2098-01-01',
@@ -110,7 +110,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         );
 
         $result = $this->repo->getSeasonHighs(
-            'bs.calc_points',
+            '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)',
             'Points',
             '',
             '2098-01-01',
@@ -132,7 +132,7 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
     public function testGetSeasonHighsReturnsEmptyForNoData(): void
     {
         $result = $this->repo->getSeasonHighs(
-            'bs.calc_points',
+            '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)',
             'Points',
             '',
             '2099-01-01',

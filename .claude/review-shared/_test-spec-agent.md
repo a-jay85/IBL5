@@ -1,6 +1,6 @@
 ---
 description: Shared E2E spec reviewer agent used by /post-plan Phase 4B Agent D.
-last_verified: 2026-07-20
+last_verified: 2026-09-23
 ---
 
 # Agent D: E2E Spec Reviewer (Sonnet 4.6 — `subagent_type: "sonnet-4-6"`, omit `model`)
@@ -87,4 +87,4 @@ When `ibl5/tests/e2e/vr-manifest.ts` exists, also confirm manifest rows were add
 
 ## Output format
 
-Return issues with the specific anti-pattern matched (Section/Pattern name). For each section with no issues, return a 1-2 sentence evidence summary citing what was checked (e.g., "Scanned 3 *-submission.spec.ts files; all happy-path tests use cross-page navigation + destination assertion.").
+Return one entry per issue: `file:line`, the anti-pattern matched (Section/Pattern name), and the concrete regression the test would let through. For each section with no issues, return a 1-2 sentence evidence summary citing what was checked (e.g., "Scanned 3 *-submission.spec.ts files; all happy-path tests use cross-page navigation + destination assertion.").

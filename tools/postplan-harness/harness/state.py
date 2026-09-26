@@ -98,6 +98,20 @@ class Classification:
 
 
 @dataclass
+class PhaseInfo:
+    """One `## Phase N:` / `## Step N:` section of a plan, as parsed by planfile.parse_phases.
+
+    `evidence_paths` = backticked path tokens found in the phase section's own body.
+    `bookkeeping` is True when the heading carries `[phases: S]` / `[phases: S/S]` (all-S tier
+    marker), which exempts the phase from the omission check.
+    """
+    number: int = 0
+    heading: str = ""                                          # heading text after `## `, marker included
+    evidence_paths: list[str] = field(default_factory=list)   # repo-relative-looking tokens, deduped, first-seen order
+    bookkeeping: bool = False
+
+
+@dataclass
 class PlanInfo:
     """Phase 1 output — located plan + parsed signals."""
     found: bool = False
@@ -109,10 +123,12 @@ class PlanInfo:
     planned_test_paths: list[str] = field(default_factory=list)
     critical_files: list[tuple] = field(default_factory=list)  # (path, annotation, exempt)
     required_test_methods: list[str] = field(default_factory=list)
+    backlog_issues: list[tuple] = field(default_factory=list)  # (kind, number); kind in {"closes", "refs"}
     truly_manual_rows: list[ManualRow] = field(default_factory=list)
     security_section: str = ""
     reuse_section: str = ""
     hold_justification: str = ""
+    no_adr_markers: list[str] = field(default_factory=list)  # raw `<!-- no-adr: ... -->` comments, in plan order
     variant_selection: Optional[str] = None            # "highest" when multi-variant selection ran
     rejected: list[str] = field(default_factory=list)  # basenames of non-selected candidates
     stop_condition: str = ""                                  # "" = absent
@@ -136,6 +152,11 @@ class PlanInfo:
     # by exact name. It does NOT assert that a condition-(13) hold would otherwise have fired —
     # the derivation might equally have found nothing and run plan-blind.
     plan_source: str = ""
+    # Phase 5.0 phase-omission inputs (planfile.parse_phases / parse_deferred_phase_numbers).
+    # Both default empty, so a plan-blind run, a replay fixture, and every pre-existing
+    # PlanInfo(...) literal in tests stay valid and produce zero MISSING-PHASE items.
+    phases: list[PhaseInfo] = field(default_factory=list)
+    deferred_phase_numbers: list[int] = field(default_factory=list)   # numbers named in `## Out of Scope`
 
 
 @dataclass
@@ -266,6 +287,10 @@ class RunResult:
                 d["plan"].pop("rejected", None)
             if not d["plan"].get("required_test_methods"):
                 d["plan"].pop("required_test_methods", None)
+            if not d["plan"].get("backlog_issues"):
+                d["plan"].pop("backlog_issues", None)
+            if not d["plan"].get("no_adr_markers"):
+                d["plan"].pop("no_adr_markers", None)
             if not d["plan"].get("slug_drift"):
                 d["plan"].pop("slug_drift", None)
             if not d["plan"].get("plan_source"):

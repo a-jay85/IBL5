@@ -1021,6 +1021,9 @@ run_hunt_ladder() { # claimed hunt_id wt_appdir
             obs="$(printf '%s' "$result" | jq -r '.observed_before // empty' 2>/dev/null)"
             if [ -n "$rep" ] && [ "$obs" != "$rep" ]; then
                 log "hunt $hunt_id ($model): 'fixed' REJECTED — reported=$rep observed_before=${obs:-<missing>} (not reproduced); escalating"
+                # A rejected 'fixed' is the hunter's error, not its "a stronger tier is
+                # pointless" judgment, so its terminal flag is ignored: climb to the next tier.
+                continue
             else
                 rm -f "$rendered"; LADDER_STATE="fixed"; return 0
             fi

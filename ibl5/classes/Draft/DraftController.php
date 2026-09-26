@@ -33,6 +33,7 @@ class DraftController implements DraftControllerInterface
     private \Psr\Log\LoggerInterface $draftLogger;
     private DraftServiceInterface $service;
     private \Utilities\NukeCompat $nukeCompat;
+    private \Clock\ClockInterface $clock;
 
     public function __construct(
         \mysqli $db,
@@ -45,7 +46,8 @@ class DraftController implements DraftControllerInterface
         DraftServiceInterface $service,
         ?\Psr\Log\LoggerInterface $auditLogger = null,
         ?\Psr\Log\LoggerInterface $draftLogger = null,
-        ?\Utilities\NukeCompat $nukeCompat = null
+        ?\Utilities\NukeCompat $nukeCompat = null,
+        ?\Clock\ClockInterface $clock = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
@@ -58,6 +60,7 @@ class DraftController implements DraftControllerInterface
         $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->draftLogger = $draftLogger ?? \Logging\LoggerFactory::getChannel('draft');
         $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
+        $this->clock = $clock ?? new \Clock\SystemClock();
     }
 
     public function main(mixed $user): void
@@ -116,6 +119,19 @@ class DraftController implements DraftControllerInterface
         $rawPick    = $post['draft_pick'] ?? null;
         $draftRound = is_numeric($rawRound) ? (int) $rawRound : 0;
         $draftPick  = is_numeric($rawPick) ? (int) $rawPick : 0;
+
+        // (4) Pick-slot ownership — the session team must currently own this slot.
+        // Slot -> origin team (ibl_draft.teamid) -> current owner (ibl_draft_picks.ownerofpick),
+        // so a traded pick is checked against the team holding it today.
+        $originTeamId = $this->repository->getOriginTeamIdForPick($this->season->endingYear, $draftRound, $draftPick);
+        if ($originTeamId === null) {
+            return $this->view->renderValidationError('That draft slot does not exist.');
+        }
+        $currentOwner = $this->repository->getCurrentOwnerOfDraftPick($this->season->endingYear, $draftRound, $originTeamId);
+        if ($currentOwner !== $sessionTeam) {
+            return $this->view->renderValidationError('You do not own this draft pick.');
+        }
+
         return $this->handleDraftSelection($teamName, $playerName, $draftRound, $draftPick);
     }
 
@@ -124,7 +140,7 @@ class DraftController implements DraftControllerInterface
      */
     public function handleDraftSelection(string $teamName, ?string $playerName, int $draftRound, int $draftPick): string
     {
-        $currentDraftSelection = $this->repository->getCurrentDraftSelection($draftRound, $draftPick);
+        $currentDraftSelection = $this->repository->getCurrentDraftSelection($this->season->endingYear, $draftRound, $draftPick);
         $isPlayerAlreadyDrafted = false;
         if ($playerName !== null && $playerName !== '') {
             $isPlayerAlreadyDrafted = $this->repository->isPlayerAlreadyDrafted($playerName);
@@ -141,11 +157,11 @@ class DraftController implements DraftControllerInterface
 
     private function processDraftSelection(string $teamName, string $playerName, int $draftRound, int $draftPick): string
     {
-        $date = date('Y-m-d h:i:s');
+        $date = date('Y-m-d H:i:s', $this->clock->now());
 
         $this->db->begin_transaction();
         try {
-            $draftTableUpdated = $this->repository->updateDraftTable($playerName, $date, $draftRound, $draftPick);
+            $draftTableUpdated = $this->repository->updateDraftTable($playerName, $date, $this->season->endingYear, $draftRound, $draftPick);
             $rookieTableUpdated = $this->repository->updateRookieTable($playerName, $teamName);
             $playerCreated = $this->repository->createPlayerFromDraftClass($playerName, $teamName);
 
@@ -187,7 +203,7 @@ class DraftController implements DraftControllerInterface
         // Wrapped in try-catch so a lookup failure can't prevent webhooks from firing.
         $discordIdOfTeamOnTheClock = null;
         try {
-            $nextPick = $this->repository->getCurrentDraftPick();
+            $nextPick = $this->repository->getCurrentDraftPick($this->season->endingYear);
             if ($nextPick !== null) {
                 $teamOnTheClock = $this->repository->getCurrentOwnerOfDraftPick(
                     $this->season->endingYear,

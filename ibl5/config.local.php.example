@@ -1,0 +1,21 @@
+<?php
+// config.local.php.example — template for the gitignored config.local.php.
+//
+// config.php requires config.local.php for the four DB credential variables
+// and dies with a clear message when the file is missing (fail-closed; never a
+// blank password). Copy this file to config.local.php and edit the values:
+//
+//   cp config.local.php.example config.local.php
+//
+// The values below are the docker-compose.yml stack defaults (service
+// `mariadb`, root/root, database iblhoops_ibl5), so a plain copy is correct for
+// a worktree Docker stack. CI writes its own config.local.php from the job's
+// DB_* env (see .github/actions/setup-php-env/action.yml). Production keeps a
+// hand-placed config.local.php with the real credentials next to config.php.
+//
+// config.local.php is listed in ibl5/.gitignore. Never commit it.
+
+$dbhost = 'mariadb';
+$dbuname = 'root';
+$dbpass = 'root';
+$dbname = 'iblhoops_ibl5';

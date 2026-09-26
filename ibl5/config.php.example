@@ -24,6 +24,7 @@ if (stristr(htmlentities($_SERVER['PHP_SELF']), "config.php")) {
 # dbuname:      SQL Username
 # dbpass:       SQL Password
 # dbname:       SQL Database Name
+#               (the four above are set in config.local.php, see config.local.php.example)
 # $prefix:      Your Database table's prefix
 # $user_prefix: Your Users' Database table's prefix (To share it)
 # $dbtype:      Your Database Server type. Supported servers are:
@@ -38,10 +39,20 @@ if (stristr(htmlentities($_SERVER['PHP_SELF']), "config.php")) {
 #                    email if set.
 ######################################################################
 
-$dbhost = getenv('DB_HOST') ?: 'localhost';
-$dbuname = getenv('DB_USER') ?: 'iblhoops_';
-$dbpass = getenv('DB_PASS') ?: 'password';
-$dbname = getenv('DB_NAME') ?: 'iblhoops_';
+# DB credentials live in the gitignored config.local.php (template:
+# config.local.php.example). No env-var fallback and no default password: a
+# missing file stops the request instead of connecting with a blank password.
+if (!is_file(__DIR__ . '/config.local.php')) {
+    http_response_code(500);
+    # echo + exit(1), not die('...'): die() with a string exits 0, so CLI
+    # callers (cron, bin/ scripts) would see success. STDERR is undefined
+    # under web SAPIs, so echo is the portable channel.
+    echo 'config.local.php is missing. Copy config.local.php.example to '
+        . 'config.local.php next to config.php and set $dbhost, $dbuname, '
+        . '$dbpass, $dbname.' . PHP_EOL;
+    exit(1);
+}
+require_once __DIR__ . '/config.local.php';
 $prefix = "nuke";
 $user_prefix = "nuke";
 $dbtype = "MySQL";

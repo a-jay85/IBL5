@@ -30,12 +30,13 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
     /**
      * @see DraftRepositoryInterface::getCurrentDraftSelection()
      */
-    public function getCurrentDraftSelection(int $draftRound, int $draftPick): ?string
+    public function getCurrentDraftSelection(int $draftYear, int $draftRound, int $draftPick): ?string
     {
         /** @var array{player: string}|null $row */
         $row = $this->fetchOne(
-            "SELECT `player` FROM `ibl_draft` WHERE `round` = ? AND `pick` = ?",
-            "ii",
+            "SELECT `player` FROM `ibl_draft` WHERE `year` = ? AND `round` = ? AND `pick` = ?",
+            "iii",
+            $draftYear,
             $draftRound,
             $draftPick
         );
@@ -46,13 +47,14 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
     /**
      * @see DraftRepositoryInterface::updateDraftTable()
      */
-    public function updateDraftTable(string $playerName, string $date, int $draftRound, int $draftPick): bool
+    public function updateDraftTable(string $playerName, string $date, int $draftYear, int $draftRound, int $draftPick): bool
     {
         $affected = $this->execute(
-            "UPDATE `ibl_draft` SET `player` = ?, `date` = ? WHERE `round` = ? AND `pick` = ?",
-            "ssii",
+            "UPDATE `ibl_draft` SET `player` = ?, `date` = ? WHERE `year` = ? AND `round` = ? AND `pick` = ?",
+            "ssiii",
             $playerName,
             $date,
+            $draftYear,
             $draftRound,
             $draftPick
         );
@@ -192,11 +194,13 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
     /**
      * @see DraftRepositoryInterface::getCurrentDraftPick()
      */
-    public function getCurrentDraftPick(): ?array
+    public function getCurrentDraftPick(int $draftYear): ?array
     {
         /** @var array{team: string, teamid: int, round: int, pick: int, player: string}|null $row */
         $row = $this->fetchOne(
-            "SELECT * FROM `ibl_draft` WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1"
+            "SELECT * FROM `ibl_draft` WHERE `year` = ? AND player = '' ORDER BY round ASC, pick ASC LIMIT 1",
+            "i",
+            $draftYear
         );
 
         if ($row !== null) {
@@ -226,5 +230,22 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
         );
 
         return $result !== null ? $result['ownerofpick'] : null;
+    }
+
+    /**
+     * @see DraftRepositoryInterface::getOriginTeamIdForPick()
+     */
+    public function getOriginTeamIdForPick(int $draftYear, int $draftRound, int $draftPick): ?int
+    {
+        /** @var array{teamid: int}|null $result */
+        $result = $this->fetchOne(
+            "SELECT teamid FROM `ibl_draft` WHERE year = ? AND round = ? AND pick = ? LIMIT 1",
+            "iii",
+            $draftYear,
+            $draftRound,
+            $draftPick
+        );
+
+        return $result !== null ? $result['teamid'] : null;
     }
 }

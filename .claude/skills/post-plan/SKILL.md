@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-21
+last_verified: 2026-09-25
 ---
 
 # Post-Plan Orchestrator
@@ -205,7 +205,7 @@ fi
    > **Files-changed block:** the PR body must carry a machine-generated scope block, so the hand-written Scope prose can never silently disagree with the diff. Build it from `git diff --name-status origin/master...HEAD` and include it in the body at creation, delimited exactly by `<!-- files-changed:begin -->` / `<!-- files-changed:end -->`, one `- \`<status>\` \`<path>\`` bullet per file. On any later body write (including Phase 6 below), regenerate the block and **replace what sits between the two markers** rather than appending a second copy; if only one marker is present, append a fresh block and leave the orphan alone. Generated data cannot drift — the prose Scope line then carries *why*, not *what*.
    > **Voice check, once.** After writing the Scope why-paragraph, pipe it through `bin/check-digest-prose` (`printf '%s\n' "$SCOPE_PROSE" | bin/check-digest-prose`). If it reports a violation, rewrite that paragraph **once** to address the named rule, then continue. Do not loop twice and do not abort: `bin/check-digest-prose` always exits 0 and never blocks the PR — ship whatever the single rewrite produces. <!-- slop-ok -->
 
-   > **Scope-expansion justification:** when the diff touches production module code under `ibl5/modules/`, the files-changed block records *what* changed but never *why* a production file was in a non-feature PR. The body must then carry a short `**Scope expansion:**` paragraph naming each such file and the reason it changed. Place it **immediately above** the `<!-- files-changed:begin -->` marker — **outside** the marker pair, never between the markers. Anything between the markers is destroyed on the next regeneration (Phase 6 here, and `/pr-ready` Phase 5.9), so a justification written inside them silently disappears on the next body write. Norm and per-title-type expectations: `.claude/rules/scope-expansion-justification.md` — NEW in this PR.
+   > **Scope-expansion justification:** when the diff touches production module code under `ibl5/modules/`, the files-changed block records *what* changed but never *why* a production file was in a non-feature PR. The body must then carry a short `**Scope expansion:**` paragraph naming each such file and the reason it changed. Place it **immediately above** the `<!-- files-changed:begin -->` marker — **outside** the marker pair, never between the markers. Anything between the markers is destroyed on the next regeneration (Phase 6 here), so a justification written inside them silently disappears on the next body write. Norm and per-title-type expectations: `.claude/rules/scope-expansion-justification.md` — NEW in this PR.
    > Run the same one-shot `bin/check-digest-prose` voice check on this paragraph and rewrite once on a violation.
 
    > **Retrospective-origin block:** if `git diff origin/master...HEAD` **adds** a row to the `## Class registry` table in `ibl5/docs/retrospective-class-registry.md`, this branch is a Phase 9 retrospective routing that got materialized as its own PR — usually because the origin PR had already merged. The body must then carry a `## Why this PR exists` section immediately above `## Manual Testing`. Without it the PR reads as an unexplained doc edit: the files-changed block shows *what* row was added, never why the class exists. Derive the section from the **added row alone** — it is self-sufficient (`#<origin PR>`, `class:`, `routed to: Rung <n>`, `prior:`), so this works on a plan-blind run, or a run months later that never saw the retrospective. Four required elements:
@@ -219,6 +219,25 @@ fi
    > Run the same one-shot `bin/check-digest-prose` voice check over the four elements above and rewrite once on a violation. All four are narrative prose and are the most rule-1-prone text in the body.
 
    **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`. Skip if a PR already exists. **Merge-order dependency:** When this PR shares files with, or must merge after, a sibling PR that is also based on `master` (so stacking via `--base` is unavailable / fragile under squash-merge), add a `Depends-on: #<n>[, #<n>...]` line to the PR body — **on its own line** (the parser anchors to start-of-line, so an inline prose mention of the marker is ignored). Phase 6.5 condition (6) reads it and refuses to arm auto-merge until every named PR is `MERGED`, so the series cannot ship out of order. Use this rather than stacking when the repo squash-merges (a squash collapses the parent's commits, leaving a stacked child's branch carrying the pre-squash commits → conflict on auto-retarget).
+
+   **ADR bypass markers from plan:** On first create only (this step), carry any `<!-- no-adr: ... -->` marker the plan declares into the new PR body, so the ADR gate sees the same bypass the plan author wrote. Skip this entirely when `$PLAN_FILE` is empty or unreadable (a plan-blind run). The body is then composed exactly as it is today. Extract the markers outside fenced code blocks, so a marker quoted inside a plan's example fence is never carried:
+
+   ```bash
+   # phase 2 plan no-adr marker carry-over (first create only)
+   PLAN_NOADR_MARKERS=""
+   if [ -n "$PLAN_FILE" ] && [ -r "$PLAN_FILE" ]; then
+       PLAN_NOADR_MARKERS=$(awk '
+         /^[[:space:]]*```/          { fence = !fence; next }
+         fence                       { next }
+         /^[[:space:]]*<!--[[:space:]]*no-adr:/   { inc = 1 }
+         inc                         { print; if ($0 ~ /-->/) inc = 0 }
+       ' "$PLAN_FILE" 2>/dev/null || true)
+   fi
+   echo "PLAN_NOADR_MARKERS=$(printf '%s' "$PLAN_NOADR_MARKERS" | grep -c 'no-adr:' || true)"
+   printf '%s\n' "$PLAN_NOADR_MARKERS"
+   ```
+
+   Treat the printed marker lines as literal text. Put each one verbatim at the very top of the PR body, before the first `## ` heading and outside the `<!-- files-changed:begin -->` / `<!-- files-changed:end -->` block. Do not reword, merge, or dedent them. When the count is `0`, add nothing. This complements Phase 6's body-marker capture, which re-emits markers already in the body on later edits; this step is what puts them there on first create. The awk matcher uses the same multi-line `inc` shape as that capture block, so a marker that spans lines survives both.
 
 Post an in-flight status badge so the PR shows the run is active (best-effort — never blocks Phase 2 if it fails):
 
@@ -470,7 +489,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 1. Manual testing cleared — the PR body carries the `No manual testing needed` sentinel Phase 6 writes.
 2. No review/audit finding scored `>= 80` (scored in Phase 4).
-3. No unresolved `MISSING:` planned-test, `MISSING-FILE:` planned-file, `UNPLANNED-FILE:` unplanned-path **or** `UNMET-CONTRACT:` autonomy-contract items from Phase 5.0, **and Phase 5.0 provably finished:** the done-marker `/tmp/post-plan-conformance-done-$PPID` exists AND the bridge `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Marker absent = indeterminate = BLOCKED (an empty bridge file alone means nothing; 5.0 truncates it at START).
+3. No unresolved `MISSING:` planned-test, `MISSING-FILE:` planned-file, `MISSING-PHASE:` phase-omission, `UNPLANNED-FILE:` unplanned-path **or** `UNMET-CONTRACT:` autonomy-contract items from Phase 5.0, **and Phase 5.0 provably finished:** the done-marker `/tmp/post-plan-conformance-done-$PPID` exists AND the bridge `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Marker absent = indeterminate = BLOCKED (an empty bridge file alone means nothing; 5.0 truncates it at START).
 4. Phase 5 did not deterministically fail — `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`.
 5. Golden-snapshot safety — a change to `engine/internal/sim/testdata/golden.json` does NOT auto-ship unattended (headless-only block).
 6. Merge-order — every PR named in a `Depends-on:` line is already `MERGED`.
@@ -524,9 +543,7 @@ To post it:
    PATCH it with `-F body=@<file>` if found, else `gh pr comment <PR> --body-file <file>`.
    The marker is `<!-- post-plan-conflict-hold -->` and **never** `<!-- pr-fast-canary -->` or
    `<!-- pr-ready-verdict -->` — reuse the shape, not the string, or the conflict hold
-   overwrites an unrelated verdict on the same PR. Do **not** call `/pr-ready`'s
-   `scripts/post-verdict.sh`: it is keyed to the PR-number `/tmp/pr-ready-verdict-` namespace a
-   concurrent `/pr-ready` run would collide on.
+   overwrites an unrelated verdict on the same PR.
 
 The Phase 7 re-rebase loop can hit a *second* conflict after auto-merge is already armed; that
 path disarms and posts through this same marker, so the existing comment is updated in place

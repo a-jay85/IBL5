@@ -550,7 +550,8 @@ fi
 
 WATCHER_PID=""
 CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
-CAP_DEFERRED=" "  # space-wrapped basenames cap-refunded this run; claim_next_plan skips them
+COST_LOCK_HELD=0  # set to 1 while append_cost_row holds the cost-report mutex
+CAP_DEFERRED=" "  # space-wrapped basenames cap-refunded or wt-new-failed this run; claim_next_plan skips them
 DEPENDS_HELD=" "  # space-wrapped basenames dependency-held this run; claim_next_plan skips them
 cleanup_watcher() {
     if [ -n "$WATCHER_PID" ]; then
@@ -563,6 +564,11 @@ cleanup_watcher() {
     # a time guard or env-failure) so a sibling/next run can resume it.
     if [ -n "$CURRENT_LOCK" ]; then
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+    fi
+    # Release the cost-report mutex if append_cost_row was interrupted mid-RMW.
+    if [ "${COST_LOCK_HELD:-0}" = 1 ]; then
+        COST_LOCK_HELD=0
+        release_cost_lock
     fi
 }
 trap cleanup_watcher EXIT
@@ -621,6 +627,49 @@ model_tier() {
         *haiku*)  echo "Haiku"  ;;
         *)        echo "?"      ;;
     esac
+}
+
+# Acquire an exclusive mutex for the cost-report RMW sequence. Mirrors the
+# claim_next_plan() pattern: mkdir "$lock" is atomic; PID written to "$lock/pid".
+# Stale detection: dead PID (kill -0 fails) OR age > cost_lock_ttl seconds.
+# Steal via rm -rf + re-mkdir, log the steal. Spins up to max_attempts times
+# (0.2s each); on exhaustion returns 1 and logs a warning so the caller can
+# proceed unguarded rather than drop the row.
+acquire_cost_lock() {
+    local lock="$NIGHTLY_DIR/reports/.cost-report.lock"
+    local cost_lock_ttl=60
+    local owner now lock_epoch attempt=0 max_attempts=10
+    mkdir -p "$(dirname "$lock")"
+    while [ "$attempt" -lt "$max_attempts" ]; do
+        if mkdir "$lock" 2>/dev/null; then
+            echo "$$" > "$lock/pid"
+            return 0
+        fi
+        owner=$(cat "$lock/pid" 2>/dev/null) || owner=""
+        now=$(date +%s)
+        lock_epoch=$(stat -f %m "$lock" 2>/dev/null || echo "$now")
+        if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
+           || [ "$(( now - lock_epoch ))" -gt "$cost_lock_ttl" ]; then
+            rm -rf "$lock" 2>/dev/null || true
+            if mkdir "$lock" 2>/dev/null; then
+                echo "$$" > "$lock/pid"
+                printf '[%s] cost-report: stole stale lock (dead/expired owner=%s)\n' \
+                    "$(date +%H:%M:%S)" "${owner:-?}" >> "$LOG"
+                return 0
+            fi
+        fi
+        attempt=$(( attempt + 1 ))
+        sleep 0.2
+    done
+    printf '[%s] cost-report: WARNING: could not acquire lock after %d attempts; writing unguarded\n' \
+        "$(date +%H:%M:%S)" "$max_attempts" >> "$LOG"
+    return 1
+}
+
+# Release the cost-report mutex. Idempotent: rm -rf on a missing lock directory
+# exits 0, so a double-release under set -euo pipefail is safe.
+release_cost_lock() {
+    rm -rf "$NIGHTLY_DIR/reports/.cost-report.lock" 2>/dev/null || true
 }
 
 # Append a per-phase cost row to the night's cost roll-up. Cost is parsed from
@@ -719,6 +768,15 @@ append_cost_row() {
         --arg  logged_cost      "$logged_cost" \
         'def n: tonumber? // null; {date:$date,plan:$plan,phase:$phase,model:$model,tier:$tier,session_id:$session_id,cost:($cost|n),surcharge_low:($surcharge_low|n),surcharge_high:($surcharge_high|n),inp:($inp|n),out:($out|n),cr:($cr|n),w5:($w5|n),w1:($w1|n),peak_ctx:($peak_ctx|n),compactions_main:($compactions_main|n),compactions_sub:($compactions_sub|n),provenance:$provenance,price_asof:$price_asof,logged_cost:($logged_cost|n)}' \
         >> "$sidecar"
+    # Mutex: serialise the create→strip→append→regenerate RMW sequence so that two
+    # concurrent runners (impl + postplan overlap) cannot interleave. Taken before
+    # the existence check: on a fresh day two runners could otherwise both see no
+    # file and the second truncating printf would wipe the first runner's row.
+    # COST_LOCK_HELD is a global so cleanup_watcher can release on unexpected exit
+    # without overwriting the runner's existing trap cleanup_watcher EXIT.
+    if acquire_cost_lock; then
+        COST_LOCK_HELD=1
+    fi
     # Create report with new 13-column header; or strip-then-migrate the old 6-column form.
     if [ ! -f "$report" ]; then
         printf '# Automouse cost roll-up — %s\n\n| Plan | Phase | Model | Tier | Cost ($) | Surcharge est ($) | Peak Ctx (K) | In | Out | Cache-read | CW-5m | CW-1h | Prov |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|\n' \
@@ -751,6 +809,12 @@ append_cost_row() {
         "$plan" "$phase" "$model" "$tier" "$cost" "$surcharge_cell" "$peak_k" \
         "${inp:-—}" "${out:-—}" "${cr:-—}" "${w5:-—}" "${w1:-—}" "$provenance" >> "$report"
     regenerate_weekly_section "$report"
+    # Normal-path release: clear the global flag so cleanup_watcher no-ops on
+    # eventual shell exit, then release the lock directory.
+    if [ "$COST_LOCK_HELD" = 1 ]; then
+        COST_LOCK_HELD=0
+        release_cost_lock
+    fi
 }
 
 # Truncate a costs report back to its per-phase table: drop the weekly-aggregate
@@ -779,6 +843,27 @@ _date_ago() {
 # (logs/YYYY-MM-DD.costs.jsonl); token totals come from the sidecar with fallback
 # to exit-line tags from the day's .log for days without a sidecar.
 # Three total cost lines are emitted: floor, floor+surcharge-est-low, floor+surcharge-est-high.
+# Every runner log for day $2 under dir $1, one path per line: the legacy
+# shared `$2.log` (days before per-runner logs) first, then each per-runner
+# `$2-<pid>.log`. An unmatched glob stays literal, so each candidate is
+# tested with -f. Prints nothing and succeeds when no log exists.
+day_logs() {
+    local f
+    for f in "$1/$2.log" "$1/$2"-[0-9]*.log; do
+        if [ -f "$f" ]; then printf '%s\n' "$f"; fi
+    done
+    return 0
+}
+
+# The `exit:` lines of every runner log for day $2 under dir $1 (see day_logs),
+# concatenated. Safe under `set -e`: a file with no match does not fail it.
+day_exit_lines() {
+    local x
+    day_logs "$1" "$2" | while IFS= read -r x; do
+        grep -h 'exit:' "$x" 2>/dev/null || true
+    done
+}
+
 regenerate_weekly_section() {
     local report=$1 reports_dir logs_dir d f i lf
     local all_sidecar cost_rows tok_rows tok_stream split_miss unpriced
@@ -804,9 +889,9 @@ regenerate_weekly_section() {
         ' "$all_sidecar")" || true
     fi
     for i in 0 1 2 3 4 5 6; do
-        d=$(_date_ago "$i"); f="$logs_dir/$d.costs.jsonl"; lf="$logs_dir/$d.log"
-        if [ ! -f "$f" ] && [ -f "$lf" ]; then
-            fb=$(grep -hc 'exit:' "$lf" 2>/dev/null) || fb=0
+        d=$(_date_ago "$i"); f="$logs_dir/$d.costs.jsonl"; lf=$(day_logs "$logs_dir" "$d")
+        if [ ! -f "$f" ] && [ -n "$lf" ]; then
+            fb=$(day_exit_lines "$logs_dir" "$d" | wc -l | tr -d ' ') || fb=0
             unpriced=$(( unpriced + ${fb:-0} ))
         fi
     done
@@ -838,9 +923,9 @@ regenerate_weekly_section() {
             for i in 0 1 2 3 4 5 6; do
                 d=$(_date_ago "$i"); f="$logs_dir/$d.costs.jsonl"
                 if [ ! -f "$f" ]; then
-                    lf="$logs_dir/$d.log"
-                    if [ -f "$lf" ]; then
-                        grep -h 'exit:' "$lf" 2>/dev/null | awk '
+                    lf=$(day_logs "$logs_dir" "$d")
+                    if [ -n "$lf" ]; then
+                        day_exit_lines "$logs_dir" "$d" | awk '
                             { ph="?"; n=split($2,a,"/"); if(n>=2) ph=a[n]
                               in_v=0;ou_v=0;cr_v=0;cw_v=0
                               for(j=1;j<=NF;j++){if(split($j,kv,"=")==2){k=kv[1];v=kv[2]
@@ -909,6 +994,46 @@ refund_attempt() {
     fi
 }
 
+# Disposition for a post-plan-now exit 3 (harness fail-closed sentinel: a rebase
+# conflict the auto-resolver refused, or a local pre-commit/pre-push gate denial;
+# see bin/post-plan-now's exit-code header). Retrying never clears either cause.
+# Parks the plan in skipped/, writes a report quoting the harness's own RESULT:
+# line, and returns normally so the loop continues with the next plan.
+# post-plan-now already DM'd on rc=3, so no second DM is sent here.
+# $HANDOFF_DIR/${plan_name}.json is removed: the worktree named by the handoff
+# is where a human must fix the cause. Args: plan_name plan_slug log_before.
+dispose_plan_postplan_blocked() {
+    local plan_name="$1" plan_slug="$2" log_before="$3"
+    local pp_seg_start pp_result_line reports_dir
+    pp_seg_start=$(( log_before + 1 ))
+    pp_result_line=$(sed -n "${pp_seg_start},\$p" "$LOG" 2>/dev/null | grep -m1 '^RESULT:' || true)
+    [ -n "$pp_result_line" ] \
+        || pp_result_line="(post-plan-now printed no RESULT: line — see the run log)"
+    printf '[%s] %s postplan terminal (rc=3) — moving to skipped/\n' \
+        "$(date +%H:%M:%S)" "$plan_slug" >> "$LOG"
+    mkdir -p "$NIGHTLY_DIR/skipped" "$NIGHTLY_DIR/reports"
+    mv -f "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+    touch -h -- "$NIGHTLY_DIR/skipped/${plan_name}" 2>/dev/null || true
+    rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" \
+          "$HANDOFF_DIR/${plan_name}.json"
+    reports_dir="$NIGHTLY_DIR/reports"
+    {
+        printf 'Plan "%s" skipped: post-plan-now exited 3 (harness fail-closed sentinel). A retry cannot clear this; a human must.\n\n' \
+            "$plan_slug"
+        printf '%s\n\n' "$pp_result_line"
+        printf 'Worktree: %s\n\n' "${PP_WORKTREE:-unknown}"
+        printf 'Clear the cause in that worktree, then re-run bin/post-plan-now there.\n\n'
+        printf '## Post-plan log tail\n\n```\n'
+        sed -n "${pp_seg_start},\$p" "$LOG" 2>/dev/null | tail -30
+        printf '\n```\n'
+    } > "$reports_dir/$(date +%Y-%m-%d)-skipped-${plan_slug}.md"
+    rm -f "${PP_START_MARKER:-}"
+    if [ -n "${CURRENT_LOCK:-}" ]; then
+        rm -rf "${CURRENT_LOCK}" 2>/dev/null || true
+        CURRENT_LOCK=""
+    fi
+}
+
 # Scan this phase's slice of the log for a known environmental-failure signature:
 # a Claude usage/rate limit or an Anthropic API auth error, in any phrasing these
 # surface in (the legacy single-string checks missed "weekly limit" and the plain
@@ -943,7 +1068,7 @@ phase_stalled() {
 #
 # The in_queue guard is the fix for the false positive that stopped the loop on a
 # legitimate disposition: every deliberate impl disposition (already-merged,
-# stale-plan, ambiguity, wt-new failure, missing-info — see bin/automouse/prompt-impl)
+# stale-plan, ambiguity, missing-info — see bin/automouse/prompt-impl)
 # runs `mv queue/$PLAN → done/` (already-merged) or `→ skipped/` (the rest), so the
 # plan leaves queue/ (in_queue=0) and exits
 # fast with no handoff. Without this guard the sub-minute check misreads that
@@ -951,11 +1076,21 @@ phase_stalled() {
 # mid-stream, leaving the plan in queue/ (in_queue=1). This mirrors the postplan
 # breaker, which gates its sub-minute check on the handoff still being present.
 #
+# The wt_fail guard (6th arg, default 0) covers the one fast, no-handoff exit
+# that leaves the plan IN queue/: a bin/wt-new failure at prompt-impl Step 5.
+# The agent drops queue/<plan>.wt-fail instead of skipping the plan, because a
+# skip without a .staleness sidecar is never recovered by self-heal and a
+# transient git-lock collision would lose the plan for good. Without this guard
+# the sub-minute check would read that exit as environmental and halt the run.
+# With it, the exit falls through to the WT-NEW FAILURE branch in the main loop
+# as a counted attempt, bounded by MAX_ATTEMPTS.
+#
 # Safe under `set -e`: only ever called inside an `if` condition.
 should_impl_env_stop() {
-    local handoff=$1 in_queue=$2 env_err=$3 stalled=$4 fast=$5
+    local handoff=$1 in_queue=$2 env_err=$3 stalled=$4 fast=$5 wt_fail=${6:-0}
     [ "$handoff" -eq 1 ] && return 1     # handoff written → impl succeeded
     [ "$in_queue" -eq 0 ] && return 1    # plan left queue/ → deliberate disposition, not environmental
+    [ "$wt_fail" -eq 1 ] && return 1     # agent reported a bin/wt-new failure → counted attempt, not environmental
     [ "$env_err" -eq 1 ] || [ "$stalled" -eq 1 ] || [ "$fast" -eq 1 ]
 }
 
@@ -1050,6 +1185,7 @@ dispose_plan_done() {
     rm -f "$QUEUE_DIR/${plan_name}.attempts" \
           "$QUEUE_DIR/${plan_name}.failure" \
           "$QUEUE_DIR/${plan_name}.cap-refunds" \
+          "$QUEUE_DIR/${plan_name}.wt-fail" \
           "$HANDOFF_DIR/${plan_name}.json"
     if [ ! -f "$report" ]; then
         {
@@ -1061,6 +1197,23 @@ dispose_plan_done() {
         } > "$report"
     fi
     echo "Loop-side disposition ($site): PR $pr_state ($pr_url) — moved $plan_name to done/." >> "$LOG"
+}
+
+# Postplan no-worktree disposition. Called when the postplan phase has no worktree
+# to run in: the pre-call resolver found none, or post-plan-now exited 7. A plan
+# whose branch PR is already MERGED has shipped, and its worktree was reaped after
+# merge, so the missing tree is expected and the plan is done. Disposes it through
+# dispose_plan_done and returns 0. Every other outcome returns 1 and touches
+# nothing: an OPEN PR (the tree should still exist, so a human must look), a
+# CLOSED-only or absent PR, or a gh failure (automouse_pr_state is fail-closed).
+# Args: plan_name slug site. Caller owns control flow and lock release.
+postplan_no_worktree_dispose_if_merged() {
+    local plan_name=$1 slug=$2 site=$3 branch pr
+    branch=$(automouse_branch_for_plan "$plan_name" "$slug")
+    pr=$(automouse_pr_state "$branch") || return 1
+    [ "${pr%% *}" = "MERGED" ] || return 1
+    dispose_plan_done "$plan_name" "$slug" MERGED "${pr#* }" "$site"
+    return 0
 }
 
 # Print the newest Phase 5.5 fidelity verdict file for PR $1 (empty when none exist).
@@ -1421,7 +1574,12 @@ claim_next_plan() {
     return 1
 }
 
-LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
+# One log per runner process ($$). phase_env_error, phase_stalled, and
+# append_cost_row slice $LOG from a line offset, so a shared file let a
+# concurrent runner's lines land in this runner's slice. Day-level readers
+# (regenerate_weekly_section via day_logs, bin/automouse/backfill-costs) merge
+# every runner's file for a date.
+LOG="$LOG_DIR/$(date +%Y-%m-%d)-$$.log"
 
 cd "$REPO"
 
@@ -1510,7 +1668,7 @@ while true; do
         if [ -n "${SINGLE_PLAN:-}" ]; then
             echo "Plan ${SINGLE_PLAN%.md} is being processed by another runner — nothing to do." >> "$LOG"
         elif [ "$CAP_DEFERRED" != " " ]; then
-            echo "No claimable plan left. Cap-refunded and deferred to the next run:${CAP_DEFERRED% } — stopping." >> "$LOG"
+            echo "No claimable plan left. Deferred to the next run (cap-refunded or wt-new failure):${CAP_DEFERRED% } — stopping." >> "$LOG"
         elif [ "$DEPENDS_HELD" != " " ]; then
             echo "No claimable plan left. Dependency-held this run:${DEPENDS_HELD% } — stopping." >> "$LOG"
         else
@@ -1526,6 +1684,7 @@ while true; do
     ATTEMPT_FILE="$QUEUE_DIR/${PLAN_NAME}.attempts"
     FAILURE_FILE="$QUEUE_DIR/${PLAN_NAME}.failure"   # capped tail of the last genuine impl failure (ADR-0085); lifecycle-tied to ATTEMPT_FILE
     CAP_REFUND_FILE="$QUEUE_DIR/${PLAN_NAME}.cap-refunds"   # wall-clock refunds granted to this plan; lifecycle-tied to ATTEMPT_FILE, NOT reset by refund_attempt
+    WT_FAIL_FILE="$QUEUE_DIR/${PLAN_NAME}.wt-fail"   # sentinel prompt-impl Step 5 drops when bin/wt-new fails; cleared before each attempt and after classification
     ATTEMPTS=0
     if [ -f "$ATTEMPT_FILE" ]; then
         ATTEMPTS=$(cat "$ATTEMPT_FILE")
@@ -1633,6 +1792,9 @@ while true; do
             continue
         fi
     fi
+
+    # A sentinel left by a crashed earlier run must not classify THIS attempt.
+    rm -f "$WT_FAIL_FILE"
 
     # Increment attempt counter
     echo $(( ATTEMPTS + 1 )) > "$ATTEMPT_FILE"
@@ -1790,6 +1952,9 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # falls through to continue the loop. A slow no-signature failure that left
         # the plan in queue/ falls through as a genuine plan failure, keeping its
         # incremented attempt → eventual poison-pill skip (unchanged).
+        # A bin/wt-new failure (the agent dropped $WT_FAIL_FILE, plan still in
+        # queue/) is also NOT environmental: it falls through to the WT-NEW
+        # FAILURE branch below as a counted, run-deferred attempt.
         # EXCEPTION, handled just below: a slow failure that was the wall-clock
         # cap itself is refunded by the bounded cap-timeout breaker, up to
         # CAP_REFUND_LIMIT times per plan.
@@ -1798,7 +1963,8 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         IMPL_ENV_ERR=0;  phase_env_error "$IMPL_LOG_BEFORE" && IMPL_ENV_ERR=1
         IMPL_STALLED=0;  phase_stalled "$IMPL_LOG_BEFORE"   && IMPL_STALLED=1
         IMPL_FAST=0;     [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ] && IMPL_FAST=1
-        if should_impl_env_stop "$IMPL_HANDOFF" "$IMPL_IN_QUEUE" "$IMPL_ENV_ERR" "$IMPL_STALLED" "$IMPL_FAST"; then
+        IMPL_WT_FAIL=0;  [ -f "$WT_FAIL_FILE" ]  && IMPL_WT_FAIL=1
+        if should_impl_env_stop "$IMPL_HANDOFF" "$IMPL_IN_QUEUE" "$IMPL_ENV_ERR" "$IMPL_STALLED" "$IMPL_FAST" "$IMPL_WT_FAIL"; then
             REASON="usage/rate limit, auth error, or transient"
             if [ "$IMPL_STALLED" -eq 1 ]; then
                 REASON="phase stalled — no stream events for >$((STALL_KILL_SECS/60))min, force-killed"
@@ -1843,6 +2009,17 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
         elif [ ! -e "$NEXT_PLAN" ]; then
             echo "Impl made a deliberate disposition (plan left queue/, e.g. already-merged → done/ or a stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
+        elif [ "$IMPL_WT_FAIL" -eq 1 ]; then
+            # bin/wt-new failed at prompt-impl Step 5 (e.g. git lock contention
+            # with a concurrent run). The plan stayed in queue/ and the incremented
+            # attempt stays, so MAX_ATTEMPTS still retires a deterministic failure.
+            # No .failure report: the agent's reports/*-error-<slug>.md already
+            # holds the wt-new output, and a worktree-creation error gives the
+            # escalated final retry nothing to learn from. Deferred for the rest
+            # of this run so the retry lands after the colliding run has moved on.
+            echo "WT-NEW FAILURE — bin/wt-new failed for $PLAN_NAME; plan kept in queue/, attempt counted ($(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS), deferred to the next run." >> "$LOG"
+            rm -f "$WT_FAIL_FILE"
+            CAP_DEFERRED="$CAP_DEFERRED$PLAN_NAME "
         elif [ "$IMPL_CAP_REFUNDED" -eq 0 ]; then
             # Genuine (non-environmental) failure: handoff absent, plan STILL in
             # queue/, the env-stop guard did NOT fire (it breaks above), and the
@@ -1907,11 +2084,17 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # checkout's post-plan-now, matching append_cost_row's pricer resolution. HARNESS is
         # deliberately NOT exported — post-plan-now's own default pins the MAIN checkout
         # (ADR-0092) and a worktree harness must never judge its own change.
+        PP_NOWT_DISPOSED=0
         PP_WORKTREE=$(automouse_worktree_for_plan "$PLAN_NAME" "$PLAN_SLUG") || PP_WORKTREE=""
         if [ -z "$PP_WORKTREE" ]; then
             printf '[%s] %s postplan: no usable worktree — %s has none and %s/%s does not exist — skipping\n' \
                 "$(date +%H:%M:%S)" "$PLAN_SLUG" "$HANDOFF_FILE" "$WORKTREES_ROOT" "$PLAN_SLUG" >> "$LOG"
-            PP_STATUS=1
+            if postplan_no_worktree_dispose_if_merged "$PLAN_NAME" "$PLAN_SLUG" \
+                   postplan-no-worktree; then
+                PP_NOWT_DISPOSED=1
+            else
+                PP_STATUS=1
+            fi
         else
             CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
             NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
@@ -1935,14 +2118,45 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
 
         PP_DUR=$(( $(date +%s) - PP_START ))
 
+        # postplan-rc3-terminal: begin
+        PP_TERMINAL=0
+        if [ "$PP_STATUS" -eq 3 ]; then
+            PP_TERMINAL=1
+            dispose_plan_postplan_blocked "$PLAN_NAME" "$PLAN_SLUG" "$PP_LOG_BEFORE"
+        fi
+        # postplan-no-worktree-merged: begin
+        # A no-worktree postplan exit (pre-call resolver miss, or post-plan-now rc=7)
+        # whose branch PR is MERGED already went to done/ via
+        # postplan_no_worktree_dispose_if_merged. Mark it terminal so the env-breaker
+        # below cannot refund-and-stop the night. The plan left queue/, so the
+        # terminal-disposition block is skipped and the loop-bottom attempt sweep and
+        # lock release run as usual.
+        if [ "${PP_NOWT_DISPOSED:-0}" -eq 1 ]; then
+            PP_TERMINAL=1
+        elif [ "$PP_STATUS" -eq 7 ]; then
+            PP_TERMINAL=1
+            if ! postplan_no_worktree_dispose_if_merged "$PLAN_NAME" "$PLAN_SLUG" \
+                     postplan-rc7; then
+                printf '[%s] %s postplan terminal (rc=7) — no worktree and branch PR not MERGED — refunding, stopping loop\n' \
+                    "$(date +%H:%M:%S)" "$PLAN_SLUG" >> "$LOG"
+                refund_attempt
+                write_env_stop_report "$PLAN_NAME" postplan \
+                    "post-plan-now exited 7 (no worktree) and the branch PR is not MERGED" \
+                    "$PP_LOG_BEFORE"
+                rm -f "$PP_START_MARKER"
+                break
+            fi
+        fi
+        # postplan-no-worktree-merged: end
+        # postplan-env-breaker: begin
         # Environmental-failure breaker (mirrors impl). A successful post-plan
         # removes the handoff (the agent moves the plan to done/ and deletes it),
         # so a handoff still present after a sub-minute exit means the agent never
         # ran — environmental. A known limit/auth signature stops regardless, so a
         # dead budget doesn't burn a postplan retry. Refund + stop; queue intact.
-        if phase_env_error "$PP_LOG_BEFORE" \
+        if [ "$PP_TERMINAL" -eq 0 ] && { phase_env_error "$PP_LOG_BEFORE" \
            || phase_stalled "$PP_LOG_BEFORE" \
-           || { [ -f "$HANDOFF_FILE" ] && [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; }; then
+           || { [ -f "$HANDOFF_FILE" ] && [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; }; }; then
             REASON="usage/rate limit, auth error, or transient"
             if phase_stalled "$PP_LOG_BEFORE"; then
                 REASON="phase stalled — no stream events for >$((STALL_KILL_SECS/60))min, force-killed"
@@ -1954,6 +2168,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             write_env_stop_report "$PLAN_NAME" postplan "$REASON" "$PP_LOG_BEFORE"
             break
         fi
+        # postplan-env-breaker: end
 
         # Terminal-disposition: the environmental breaker did not trip, so the
         # post-plan agent exited on its own terms. If it left the plan in queue/

@@ -2873,6 +2873,64 @@ if [ "$_canon_failed" -eq 0 ]; then
   echo "ok: regex_canon_divergence"
 fi
 
+# ---------------------------------------------------------------------------
+# Gate [U]: ## Backlog issues bullet grammar
+# ---------------------------------------------------------------------------
+# Shared matrix body used as a clean base so only [U] can fire.
+_U_BASE='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | cap rejects over-cap trade | E2E | pre-impl | `tests/e2e/trade.spec.ts` |
+| 2 | form submits and redirects | E2E | post-impl | `tests/e2e/trade.spec.ts` |
+'
+
+assert_viol "gate-U-valid-clean" 0 "[U]" "$FM$_U_BASE"'
+## Backlog issues
+
+- closes a-jay85/IBL5-backlog#11 — fixes it
+- refs a-jay85/IBL5-backlog#12 - partial
+'
+
+assert_viol "gate-U-absent-section-clean" 0 "[U]" "$FM$_U_BASE"
+
+assert_viol "gate-U-fenced-example-clean" 0 "[U]" "$FM$_U_BASE"'
+```
+## Backlog issues
+
+- closes #12
+```
+'
+
+assert_viol "gate-U-bare-hash" 1 "[U]" "$FM$_U_BASE"'
+## Backlog issues
+
+- closes #12 — x
+'
+
+assert_viol "gate-U-wrong-keyword" 1 "[U]" "$FM$_U_BASE"'
+## Backlog issues
+
+- fixes a-jay85/IBL5-backlog#12 — x
+'
+
+assert_viol "gate-U-wrong-repo" 1 "[U]" "$FM$_U_BASE"'
+## Backlog issues
+
+- closes a-jay85/IBL5#12 — x
+'
+
+assert_viol "gate-U-missing-description" 1 "[U]" "$FM$_U_BASE"'
+## Backlog issues
+
+- closes a-jay85/IBL5-backlog#12
+'
+
+assert_viol "gate-U-prose-hash-line" 1 "[U]" "$FM$_U_BASE"'
+## Backlog issues
+
+Closes a-jay85/IBL5-backlog#12
+'
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

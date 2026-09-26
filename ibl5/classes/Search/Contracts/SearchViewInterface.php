@@ -23,6 +23,7 @@ namespace Search\Contracts;
  *     category: int,
  *     author: string,
  *     days: int,
+ *     preset: string,
  *     min: int,
  *     offset: int,
  *     topicText: string,
@@ -37,6 +38,16 @@ namespace Search\Contracts;
  */
 interface SearchViewInterface
 {
+    /**
+     * Preset dropdown options, value => label. '' means no preset.
+     * Keys other than '' must be keys of SearchRepositoryInterface::PRESET_CATEGORY_IDS.
+     * Shared by SearchView and Topics\TopicsView so both forms render identical options.
+     */
+    public const PRESET_OPTIONS = [
+        '' => 'No Preset',
+        SearchRepositoryInterface::PRESET_TRANSACTIONS => 'Transactions',
+    ];
+
     /**
      * Render the complete search page.
      *

@@ -1,6 +1,6 @@
 ---
 description: Full Phase 5 how-to for plan-to-test, plan-to-file, and diff-to-plan conformance checks run during post-plan.
-last_verified: 2026-09-21
+last_verified: 2026-09-22
 ---
 
 # Phase 5 — Final Verification (post-plan reference)
@@ -137,7 +137,7 @@ For each `UNPLANNED-FILE:`, an edit landed on the governance surface outside the
 
 On a first `/post-plan` run the PR does not exist yet, so `gh pr view` fails and the declared set is empty. That is fail-closed by design. Path (b) is a re-run clearance; a first run sees only the plan's own `## Critical Files` section, and path (c) works there.
 
-This check does not replace check 3 of the fidelity reviewer in `.claude/skills/pr-ready/_plan-fidelity-review.md`. That check reads intent across the whole diff at judgment level; this one is a mechanical path-set comparison scoped to `.claude/`. They run side by side.
+This check does not replace check 3 of the fidelity reviewer in `.claude/review-shared/_plan-fidelity-review.md`. That check reads intent across the whole diff at judgment level; this one is a mechanical path-set comparison scoped to `.claude/`. They run side by side.
 
 **Plan→method conformance.** The path check above proves the *file* landed; this confirms the plan's named methods landed. For each name the plan lists under `## Required Test Methods` (fenced examples stripped width-aware), grep the diff *body* — `git diff --name-only` cannot see declarations:
 

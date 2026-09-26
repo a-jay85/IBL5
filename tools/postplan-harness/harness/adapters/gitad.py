@@ -266,11 +266,58 @@ class LiveGit:
                              check=False).strip()
         return resolved or None
 
+    def _merge_tree_conflicts(self, merge_base: str, base: str, tree: str) -> tuple[str, ...]:
+        """One `git merge-tree --write-tree` probe. Returns the conflicted paths, sorted and
+        deduplicated; () means a clean merge. Exit 1 is git's only "conflicts" code, so any
+        other non-zero exit raises HarnessError("git") and the caller fails open."""
+        proc = subprocess.run(
+            ["git", "-C", self.worktree, "merge-tree", "--write-tree", "--name-only",
+             "--no-messages", f"--merge-base={merge_base}", base, tree],
+            capture_output=True, text=True, errors="replace")
+        if proc.returncode == 0:
+            return ()
+        if proc.returncode != 1:
+            raise HarnessError(
+                "git", f"git merge-tree (rc={proc.returncode}): {proc.stderr.strip()[:400]}")
+        # stdout: line 1 = merged tree OID; each later non-empty line = a conflicted path
+        # (repeated once per index stage under --name-only).
+        paths = {p for p in proc.stdout.splitlines()[1:] if p.strip()}
+        return tuple(sorted(paths))
+
+    def predict_rebase_conflict(self, base: str = "origin/master") -> tuple[str, ...]:
+        """Predict, without touching refs, index, or worktree, whether a rebase onto `base`
+        will stop on a conflict. Returns the conflicted paths as a sorted tuple, or () if clean.
+
+        Merges the INDEX tree (staged diff), not HEAD. Uses a plain merge-base probe first;
+        if that conflicts and branch.<name>.iblBase is set, retries with the iblBase.
+        Returns () unless every applicable probe conflicts.
+
+        Raises HarnessError("git") on any git error; the caller treats that as "no prediction"
+        and falls through. Does not raise HarnessError("rebase-conflict") — gating on a
+        predicted conflict is the caller's responsibility."""
+        self.last_conflict_files = ()
+        tree = self._run("write-tree").strip()
+        fork_point = self._run("merge-base", "HEAD", base).strip()
+        if not tree or not fork_point:
+            raise HarnessError("git", f"conflict probe: empty write-tree/merge-base output "
+                                      f"(tree={tree!r}, fork_point={fork_point!r})")
+        conflicted = self._merge_tree_conflicts(fork_point, base, tree)
+        if not conflicted:
+            return ()
+        ibl_base = self.branch_base()
+        if ibl_base is not None and ibl_base != fork_point:
+            onto_conflicted = self._merge_tree_conflicts(ibl_base, base, tree)
+            if not onto_conflicted:
+                return ()
+            conflicted = onto_conflicted
+        self.last_conflict_files = conflicted
+        return conflicted
+
     def _load_lostwork(self, master_sha: str, key: str) -> Optional[Path]:
         """Load lostwork.sh from a pinned master SHA. Returns the path, or None if absent."""
         lostwork_path = Path(f"/tmp/postplan-lostwork-{key}.sh")
         lostwork_content = self._run(
-            "show", f"{master_sha}:.claude/skills/pr-ready/scripts/lostwork.sh",
+            "show", f"{master_sha}:.claude/review-shared/scripts/lostwork.sh",
             check=False,
         )
         if not lostwork_content.strip():
@@ -518,7 +565,7 @@ class LiveGit:
 
         collapse_guard_path = Path(f"/tmp/postplan-collapse-guard-{key}.sh")
         collapse_content = self._run(
-            "show", f"{master_sha}:.claude/skills/pr-ready/scripts/collapse-guard.sh",
+            "show", f"{master_sha}:.claude/review-shared/scripts/collapse-guard.sh",
             check=False,
         )
         if not collapse_content.strip():
@@ -687,7 +734,7 @@ class LiveGit:
     def prove_lostwork(self, key: str) -> tuple[bool, str]:
         master_sha = self._run("rev-parse", "origin/master").strip()
         content = self._run(
-            "show", f"{master_sha}:.claude/skills/pr-ready/scripts/lostwork.sh",
+            "show", f"{master_sha}:.claude/review-shared/scripts/lostwork.sh",
             check=False)
         if not content.strip():
             return False, "lostwork.sh not found at pinned master SHA"
@@ -787,3 +834,7 @@ class ReplayGit:
     def push(self) -> None:  # replay: recorded as a count; ghad records PR intents
         self.pushes += 1
         return
+
+    def predict_rebase_conflict(self, base: str = "origin/master") -> tuple:
+        # Replay mode has no live repo to probe; report clean so the probe is a no-op.
+        return ()

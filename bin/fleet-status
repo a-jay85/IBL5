@@ -4,7 +4,7 @@
 # bin/fleet-status — one-page view of every background headless Claude run.
 #
 # WHY THIS EXISTS. Several bin/ producers fire detached headless `claude -p`
-# sessions (bin/post-plan-now, bin/plan-now, bin/pr-ready-now, bin/docfix-run via
+# sessions (bin/post-plan-now, bin/plan-now, bin/post-plan-fleet, bin/docfix-run via
 # launchd one-shots; bin/automouse/run via its own runner). Each leaves state in a
 # different place, so answering "what is running and how far along is it?" meant
 # three or four ad-hoc commands. This prints the answer and exits.
@@ -480,7 +480,7 @@ render_launchd() {
                     ident_note="  ${DIM}${suffix#plan-now-}${R}"
                 fi
                 ;;
-            pr-ready-now-*) producer="pr-ready"; log="$LOG_DIR/${suffix}.log" ;;
+            post-plan-fleet-*) producer="fleet"; log="$LOG_DIR/${suffix}.log" ;;
             docfix-*)       producer="docfix";   log="$LOG_DIR/${suffix}.log" ;;
         esac
 
@@ -618,7 +618,11 @@ render_runner_detail() {
             progress="$(last_line "$audit" 64 '^\[[0-9:]+\] phase')"
         fi
     fi
-    log="$(ls -t "$AUTOMOUSE_DIR"/logs/????-??-??.log 2>/dev/null | head -n 1)"
+    # Each runner writes its own logs/<date>-<pid>.log (bin/automouse/run). Read
+    # THIS runner's file: with two runners live, the newest log overall belongs
+    # to the other one, and the slug grep below would come back empty. ls -t
+    # picks the newest when a pid is reused across days.
+    log="$(ls -t "$AUTOMOUSE_DIR"/logs/????-??-??-"$pid".log 2>/dev/null | head -n 1)"
     if [ -z "$progress" ] && [ -n "$log" ]; then
         progress="$(grep -F " $slug/$phase " "$log" 2>/dev/null | tail -n 1)"
         [ -n "$progress" ] && progress="$(clip_field "$progress" 64)"

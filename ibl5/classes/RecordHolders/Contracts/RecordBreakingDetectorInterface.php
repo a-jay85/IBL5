@@ -15,6 +15,7 @@ interface RecordBreakingDetectorInterface
      * Detect and announce any broken or tied records from the given game dates.
      *
      * Checks player single-game records, team single-game records, and quadruple doubles.
+     * Preseason (September) dates are ignored; they never produce an announcement.
      *
      * @param list<string> $gameDates Dates to check for broken/tied records (YYYY-MM-DD)
      * @return list<string> List of record announcement messages (broken and tied)

@@ -72,7 +72,7 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
             'bh' => 0,
         ];
 
-        $result = $this->repo->updatePlayerDepthChart('DC Update Plyr', $depthChartValues);
+        $result = $this->repo->updatePlayerDepthChart(200080005, 1, $depthChartValues);
 
         self::assertTrue($result);
 
@@ -108,13 +108,29 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200080006, 'DC Success Plyr', ['teamid' => 1]);
 
-        $result = $this->repo->updatePlayerDepthChart('DC Success Plyr', [
+        $result = $this->repo->updatePlayerDepthChart(200080006, 1, [
             'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0,
             'canPlayInGame' => 1, 'min' => 20,
             'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0,
         ]);
 
         self::assertTrue($result);
+    }
+
+    public function testUpdatePlayerDepthChartWithMismatchedTeamidLeavesRowUntouched(): void
+    {
+        $this->insertTestPlayer(200080007, 'DC Victim', ['teamid' => 1, 'dc_pg_depth' => 4, 'dc_minutes' => 33]);
+        $values = [
+            'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0,
+            'canPlayInGame' => 1, 'min' => 5,
+            'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0,
+        ];
+        $result = $this->repo->updatePlayerDepthChart(200080007, 2, $values);
+        $this->assertTrue($result);
+        $row = $this->db->query("SELECT dc_pg_depth, dc_minutes FROM ibl_plr WHERE pid = 200080007")->fetch_assoc();
+        $this->assertNotNull($row);
+        $this->assertEquals(4, $row['dc_pg_depth']);
+        $this->assertEquals(33, $row['dc_minutes']);
     }
 
     // ── updateTeamHistory ───────────────────────────────────────

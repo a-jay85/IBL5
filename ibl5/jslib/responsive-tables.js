@@ -30,11 +30,22 @@
     }
 
     /**
+     * True when an element (or an ancestor) is display:none, so it has no layout box.
+     */
+    function isHidden(el) {
+        return !el || el.getClientRects().length === 0;
+    }
+
+    /**
      * Determine if a table overflows and apply/remove responsive features.
      */
     function processTable(table) {
         // Skip tables inside sticky-scroll-wrapper — they handle their own scrolling
         if (table.closest(".sticky-scroll-wrapper")) return;
+
+        // Skip hidden tables (e.g. collapsed ballot sections) — they measure
+        // 0 wide, which would strip their responsive state and zero out widths
+        if (isHidden(table)) return;
 
         // Mark tables that already have hardcoded responsive-table class on first run
         if (table.dataset.responsiveInit === undefined) {
@@ -316,7 +327,7 @@
         var containers = document.querySelectorAll(".table-scroll-container");
         for (var i = 0; i < containers.length; i++) {
             var wrapper = containers[i].closest(".table-scroll-wrapper");
-            if (wrapper) {
+            if (wrapper && !isHidden(containers[i].querySelector("table"))) {
                 var availableWidth = wrapper.clientWidth;
                 containers[i].style.width = availableWidth + "px";
                 containers[i].style.maxWidth = availableWidth + "px";

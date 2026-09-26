@@ -1,4 +1,5 @@
-import os, pathlib, re, shlex, shutil, subprocess
+import glob, os, pathlib, re, shlex, shutil, subprocess
+import pytest
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 PPN = os.path.join(REPO, "bin", "post-plan-now")
@@ -12,6 +13,30 @@ _LAUNCHCTL_OTHER_SLUG = (
     'printf "%s\\t%s\\t%s\\n" 12345 0 com.ibl5.postplan-now-wt-feature-extra-20260916-144924-99\n'
 )
 
+_TMP_SIDECAR_GLOBS = [
+    "/tmp/post-plan-now-wt-feature-*.session",
+    "/tmp/post-plan-now-wt-feature-*.log",
+]
+
+
+def _tmp_sidecars() -> set[str]:
+    found: set[str] = set()
+    for pattern in _TMP_SIDECAR_GLOBS:
+        found.update(glob.glob(pattern))
+    return found
+
+
+@pytest.fixture(autouse=True)
+def _reap_tmp_sidecars():
+    before = _tmp_sidecars()
+    yield
+    for path in _tmp_sidecars() - before:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
 def _fb(code):
     r = subprocess.run(
         ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; should_fallback {code}; echo $?'],
@@ -21,6 +46,7 @@ def _fb(code):
 def test_success_and_sentinel_do_not_fall_back():
     assert _fb(0) == "1"   # success → should_fallback returns 1 (false) → no skill fallback
     assert _fb(3) == "1"   # rebase-conflict sentinel → NO fallback (the fix)
+    assert _fb(7) == "1"   # main-checkout refusal → NO fallback (nothing ran)
 
 def test_generic_failures_fall_back():            # negative path: real failures still degrade
     assert _fb(1) == "0"
@@ -526,8 +552,10 @@ def test_prompt_assignment_count_is_still_two():
 
 def test_should_fallback_body_unchanged():
     src = open(PPN).read()
-    assert 'should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }' in src
+    assert 'should_fallback() { case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }' in src
     assert _fb(4) == "0"     # 4 escalates to the full skill like any other non-0/3 code
+    assert _fb(6) == "0"     # neighbours of 7 still escalate: the arm is exact, not a range
+    assert _fb(8) == "0"
 
 def test_bare_invocation_cmd_has_no_plan_slug_export(tmp_path):
     """Bare invocation (no --pr) must not inject PLAN_SLUG into $CMD."""
@@ -545,6 +573,44 @@ def test_bare_invocation_cmd_has_no_plan_slug_export(tmp_path):
     tmp3.mkdir()
     cmd3 = _generate_cmd(tmp3, extra_env={"PLAN_SLUG": "SOME-OTHER-BRANCH"})
     assert "PLAN_SLUG" not in cmd3, f"ambient PLAN_SLUG must not be injected on bare path; got {cmd3!r}"
+
+
+def test_foreground_exit3_message_quotes_the_harness_result(tmp_path):
+    """--foreground (the automouse path) runs with no plist, so nothing sent the harness's
+    stdout to $LOG. The RESULT capture then read a file that never existed, and the rc=3
+    DM said only "the RESULT line above names it" plus "See <missing file>". Runs the real
+    foreground chain end to end with a stub harness that exits 3."""
+    result = ("RESULT: post-plan BLOCKED — rebase conflict, human required; "
+              "rebase-conflict: incomplete merge stages: a/SKILL.md (stages [1, 2])")
+    home = tmp_path / "home"; home.mkdir()
+    shim = tmp_path / "shim"; shim.mkdir()
+    for name, body in (("launchctl", "exit 0"), ("gh", "exit 1"),
+                       ("caffeinate", 'shift; exec "$@"')):
+        (shim / name).write_text(f"#!/bin/sh\n{body}\n")
+        (shim / name).chmod(0o755)
+    harness = tmp_path / "fake-harness"; harness.mkdir()
+    (harness / "run").write_text(
+        f"#!/bin/sh\necho 'harness: starting'\necho '{result}'\nexit 3\n")
+    (harness / "run").chmod(0o755)
+    plan = tmp_path / "plan.md"; plan.write_text("# plan\n")
+    env = dict(os.environ, HOME=str(home), HARNESS=str(harness),
+               GH_CMD=str(shim / "gh"), PATH=f"{shim}:{os.environ['PATH']}")
+    env.pop("POST_PLAN_SKILL", None)
+    repo = _fixture_repo(tmp_path)
+    r = subprocess.run(["bash", PPN, "--foreground", "--plan", str(plan)], cwd=repo,
+                       env=env, capture_output=True, text=True, timeout=120)
+    log = re.search(r"See (/tmp/post-plan-now-\S+\.log)\.", r.stdout)
+    try:
+        assert r.returncode == 3, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+        assert "fail-closed sentinel" in r.stdout
+        assert f"Cause: {result}." in r.stdout, r.stdout
+        assert "the RESULT line above names it" not in r.stdout
+        assert log, f"no 'See <log>.' pointer: {r.stdout!r}"
+        assert result in pathlib.Path(log.group(1)).read_text(), "the named log lacks RESULT"
+    finally:
+        if log:
+            for suffix in (".log", ".session"):
+                pathlib.Path(log.group(1)[:-4] + suffix).unlink(missing_ok=True)
 
 
 def test_harness_default_is_the_main_checkout(tmp_path):
@@ -927,7 +993,7 @@ def test_pr_flag_plan_blind_when_no_plan_file_exists(tmp_path):
 
 
 def test_refuses_to_run_in_the_main_checkout(tmp_path):
-    """post-plan-now exits 1 with ADR-0062 message when run from main checkout."""
+    """post-plan-now exits 7 with ADR-0062 message when run from main checkout."""
     main_root, _ = _fixture_worktree(tmp_path, "some-branch")
     home = tmp_path / "home"
     (home / "Library" / "LaunchAgents").mkdir(parents=True)
@@ -941,11 +1007,13 @@ def test_refuses_to_run_in_the_main_checkout(tmp_path):
     r = subprocess.run(["bash", PPN],
                        capture_output=True, text=True,
                        cwd=str(main_root), env=env)
-    assert r.returncode == 1
+    assert r.returncode == 7
     assert "refusing to run in the main checkout" in r.stderr
     assert "ADR-0062" in r.stderr
     plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
     assert plists == [], "no plist should be written when refusing"
+    src = open(PPN).read()
+    assert len(re.findall(r'^\s*exit 7\b', src, re.M)) == 1
 
 
 # ---------------------------------------------------------------------------

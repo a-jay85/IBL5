@@ -42,6 +42,7 @@ class MockPreparedStatement
         foreach ($params as $index => $param) {
             $this->boundParams[$index] = $param;
         }
+        $this->mockDb->recordBoundParams(array_values($this->boundParams));
         return true;
     }
 

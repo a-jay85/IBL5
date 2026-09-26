@@ -155,12 +155,26 @@ pr_line() {
         | jq -r '.[0] | select(.) | "PR #\(.number) [\(.state)] \(.title)\n\(.url)"') || true
 }
 
+# The newest per-runner log (logs/<date>-<pid>.log) that mentions this plan's
+# phase, so the DM links the runner that actually ran it. Falls back to the
+# logs dir when no per-runner log names the slug yet. Portable: no xargs,
+# which runs a bare `ls` on empty input under BSD.
+slug_log() {
+    local f newest=''
+    for f in "$LOG_DIR"/????-??-??-*.log; do
+        [ -f "$f" ] || continue
+        grep -qF -- "$SLUG/$PHASE" "$f" 2>/dev/null || continue
+        if [ -z "$newest" ] || [ "$f" -nt "$newest" ]; then newest="$f"; fi
+    done
+    printf '%s' "${newest:-$LOG_DIR/}"
+}
+
 fire() { # verdict-line
     local msg pr dm_args=()
     pr=$(pr_line)
     msg="$1"
     [ -n "$pr" ] && msg="$msg"$'\n\n'"$pr"
-    msg="$msg"$'\n\n'"log: $LOG_DIR/$(date +%F).log"
+    msg="$msg"$'\n\n'"log: $(slug_log)"
     [ -n "$TO" ] && dm_args=(--to "$TO")
 
     # ${a[@]+"${a[@]}"} — macOS ships bash 3.2, where `set -u` treats an empty

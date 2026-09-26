@@ -99,6 +99,23 @@ final class RecordBreakingDetectorTest extends TestCase
         $this->assertStringContainsString('playoff', $result[0]);
     }
 
+    public function testIgnoresPreseasonDates(): void
+    {
+        $newPlayer = $this->makePlayerRecord(['name' => 'Preseason Star', 'date' => '2008-09-15', 'value' => 70]);
+        $oldPlayer = $this->makePlayerRecord(['name' => 'Michael Jordan', 'date' => '2003-01-21', 'value' => 65]);
+        $newTeam = $this->makeTeamRecord(['team_name' => 'Grizzlies', 'date' => '2008-09-15', 'value' => 92]);
+        $oldTeam = $this->makeTeamRecord(['team_name' => 'Celtics', 'date' => '2000-03-10', 'value' => 89]);
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($this->buildPlayerBatchResult([$newPlayer, $oldPlayer]));
+        $this->mockRepository->method('getTopTeamSingleGameBatch')
+            ->willReturn($this->buildTeamBatchResult([$newTeam, $oldTeam]));
+
+        $result = $this->detector->detectAndAnnounce(['2008-09-15', '2008-09-29']);
+
+        $this->assertSame([], $result);
+    }
+
     public function testDetectsHeatPlayerRecord(): void
     {
         $newRecord = $this->makePlayerRecord(['name' => 'HEAT Star', 'date' => '2006-10-10', 'value' => 70]);

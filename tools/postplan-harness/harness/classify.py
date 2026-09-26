@@ -12,6 +12,8 @@ from .state import Classification
 
 FILES_CHANGED_BEGIN = "<!-- files-changed:begin -->"
 FILES_CHANGED_END = "<!-- files-changed:end -->"
+RESIDUAL_PHASES_BEGIN = "<!-- residual-phases:begin -->"
+RESIDUAL_PHASES_END = "<!-- residual-phases:end -->"
 MANUAL_CONFIRMATION_BEGIN = "<!-- manual-confirmation:begin -->"
 MANUAL_CONFIRMATION_END = "<!-- manual-confirmation:end -->"
 REVIEWER_VERIFICATION_BEGIN = "<!-- reviewer-verification:begin -->"
@@ -233,6 +235,52 @@ def upsert_files_changed(body: str, block: str) -> str:
         return body[:begin_idx] + block + body[after_end:]
 
     # Neither both present and in order: append fresh, leave any orphan in place.
+    return body.rstrip() + "\n\n" + block + "\n"
+
+
+def render_residual_phases(items: list[str]) -> str:
+    """The `## Residual Phases` block for a PR body, or "" when there are no items.
+
+    `items` are conformance `MISSING-PHASE: N — heading (...)` strings. The block tells
+    the reader which plan phases the diff shows no evidence of and that arming condition
+    (3) holds auto-merge until they ship or the plan's `## Out of Scope` names them.
+    """
+    if not items:
+        return ""
+    parts = [RESIDUAL_PHASES_BEGIN, "## Residual Phases",
+             "The diff carries no evidence for these plan phases. Auto-merge is held "
+             "(arming condition 3) until they ship or the plan's `## Out of Scope` "
+             "section names them as deferred."]
+    for it in items:
+        parts.append(f"- {it.removeprefix('MISSING-PHASE: ').strip()}")
+    parts.append(RESIDUAL_PHASES_END)
+    return "\n".join(parts)
+
+
+def upsert_residual_phases(body: str, block: str) -> str:
+    """Insert, replace, or remove the residual-phases block in a PR body.
+
+    Same contract as upsert_files_changed for a non-empty block. An EMPTY block removes an
+    existing well-formed marker pair (plus one surrounding blank line) so a re-run after the
+    phases ship clears the notice; with no markers and an empty block the body is returned
+    unchanged. An orphan or reversed marker pair is left untouched and a non-empty block is
+    appended after it.
+    """
+    body = body or ""
+    begin_idx = body.find(RESIDUAL_PHASES_BEGIN)
+    end_idx = body.find(RESIDUAL_PHASES_END)
+    well_formed = begin_idx != -1 and end_idx != -1 and begin_idx < end_idx
+    if well_formed:
+        after_end = end_idx + len(RESIDUAL_PHASES_END)
+        if not block:
+            head = body[:begin_idx].rstrip("\n")
+            tail = body[after_end:].lstrip("\n")
+            return head + ("\n\n" + tail if tail else "\n") if head else tail
+        return body[:begin_idx] + block + body[after_end:]
+    if not block:
+        return body
+    if not body.strip():
+        return block
     return body.rstrip() + "\n\n" + block + "\n"
 
 
@@ -576,6 +624,65 @@ def qualify_backlog_refs(body: str) -> tuple[str, int]:
         return m.group(1) + refs
 
     return _BACKLOG_REF_RE.sub(_sub, body or ""), count
+
+
+# GitHub closing keywords (docs: "Linking a pull request to an issue").
+_CLOSE_KW = r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)"
+BACKLOG_CLOSES_START = "<!-- backlog-closes:start -->"
+BACKLOG_CLOSES_END = "<!-- backlog-closes:end -->"
+_BACKLOG_CLOSES_BLOCK_RE = re.compile(
+    re.escape(BACKLOG_CLOSES_START) + r".*?" + re.escape(BACKLOG_CLOSES_END) + r"\n?",
+    re.S)
+
+
+def _closing_ref_re(n: int) -> re.Pattern:
+    """Matches a closing keyword + the qualified ref for backlog issue n.
+    `(?!\\d)` keeps #1 from matching inside #12."""
+    return re.compile(
+        rf"\b{_CLOSE_KW}\s*:?\s+({re.escape(BACKLOG_REPO)}#{n})(?!\d)", re.I)
+
+
+def normalize_backlog_closes(body: str, closes_issues: list[int],
+                             refs_issues: list[int]) -> str:
+    """Make the PR body close exactly the plan's closes-kind backlog issues.
+
+    Both lists empty (plan-blind run, or plan without `## Backlog issues`) =>
+    body returned unchanged. Otherwise: rebuild the marker block with a
+    `Closes a-jay85/IBL5-backlog#N` line for each closes-kind issue the body
+    does not already close, and strip any closing keyword in front of a
+    refs-kind issue. Idempotent; never writes a bare `#N`.
+    """
+    body = body or ""
+    if not closes_issues and not refs_issues:
+        return body
+    closes = list(dict.fromkeys(closes_issues))
+    closes_set = set(closes)
+    refs = [n for n in dict.fromkeys(refs_issues) if n not in closes_set]
+    out = _BACKLOG_CLOSES_BLOCK_RE.sub("", body).rstrip("\n")
+    for n in refs:
+        out = _closing_ref_re(n).sub(r"\1", out)
+    missing = [n for n in closes if not _closing_ref_re(n).search(out)]
+    if missing:
+        lines = "\n".join(f"Closes {BACKLOG_REPO}#{n}" for n in missing)
+        out = f"{out}\n\n{BACKLOG_CLOSES_START}\n{lines}\n{BACKLOG_CLOSES_END}"
+    return out + "\n"
+
+
+def backlog_closes_mismatch(expected: list[int], base: str,
+                            refs: list[tuple[str, int]]) -> str:
+    """One log line comparing plan closes-kind issues with GitHub's
+    closingIssuesReferences. GitHub links closing keywords only for PRs whose
+    base is the default branch; a stacked PR is linked when GitHub retargets
+    it to master after its parent merges, so a non-master base is a SKIP."""
+    if base != "master":
+        return (f"phase2: backlog-closes self-check SKIP (base={base}; "
+                "GitHub links closing keywords after retarget to master)")
+    got = {n for repo, n in refs if repo.lower() == BACKLOG_REPO.lower()}
+    missing = sorted(set(expected) - got)
+    if missing:
+        return (f"phase2: WARN backlog-closes MISMATCH: GitHub will not close "
+                f"{', '.join(f'{BACKLOG_REPO}#{n}' for n in missing)}")
+    return f"phase2: backlog-closes self-check OK ({len(expected)} issue(s) linked)"
 
 
 def slice_spec_diffs(filtered_diff: str, e2e_spec_modules: list[str]) -> tuple[str, str]:

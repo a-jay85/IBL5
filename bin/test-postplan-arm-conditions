@@ -151,6 +151,7 @@ run_cond3() {
         empty) : > "$bridge" ;;
         items) echo 'MISSING: ibl5/tests/FooTest.php (matrix planned a test the diff never wrote)' > "$bridge" ;;
         fileitems) echo 'MISSING-FILE: bin/check-plan (plan Critical File never appeared in the diff)' > "$bridge" ;;
+        phaseitems) echo 'MISSING-PHASE: 2 — Foo (phase cites harness/b.py; none appeared in the diff)' > "$bridge" ;;
     esac
     DONE_MARK="$mark" BRIDGE="$bridge" bash -c "$1" 2>&1
 }
@@ -459,6 +460,8 @@ mk_verdict_fixture() {
 
 B1="$(extract_block '# condition (1)')"
 B3="$(extract_block '# condition (3)')"
+B4="$(extract_block '# condition (4)')"
+run_cond4() { PHASE5_STATUS_FILE="${1}" bash -c "$B4" 2>&1; }
 B5="$(extract_block '# condition (5)')"
 B6="$(extract_block '# condition (6)')"
 B8="$(extract_block '# condition (8)')"
@@ -498,6 +501,21 @@ expect_block "(1) cleared sentinel -> NONE" NONE \
     "$(run_isolated "$B1" '{"body":"## Manual Testing\nNo manual testing needed — automated."}' '' '')"
 expect_block "(1) no section (UNKNOWN) -> BLOCK (fail-closed)" BLOCK \
     "$(run_isolated "$B1" '{"body":"hand-made PR, no manual testing heading"}' '' '')"
+# S1: tail names unit, non-test file — predicate holds when files key is present.
+expect_block "S1: tail names unit, non-test file → BLOCK" BLOCK \
+    "$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed — covered by unit tests","files":[{"path":"bin/pr-triage"}]}' '' '')"
+# S2: same sentinel tail, but the changed file is a unit test — clears.
+expect_block "S2: tail names unit, Test.php in diff → NONE" NONE \
+    "$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed — covered by unit tests","files":[{"path":"ibl5/tests/Foo/BarTest.php"}]}' '' '')"
+# S3: no files key; the (.files // [])[].path guard must not jq-error.
+_s3_out="$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed"}' '' '')"
+expect_block "S3: no files key → NONE (null guard)" NONE "$_s3_out"
+if grep -qF 'jq: error' <<< "$_s3_out"; then
+    echo "FAIL: S3 — jq error on missing files key (remove // [] guard)"
+    FAILED=1
+else
+    echo "ok: S3 — no jq error when files key absent"
+fi
 
 # condition (3) — the fail-open this gate closed: an empty bridge file is
 # byte-identical for "5.0 ran clean" and "5.0 died", so only the done-marker
@@ -516,6 +534,8 @@ expect_block "(3) marker + absent bridge -> NONE (5.0 skipped, plan-blind)" NONE
 # arming exactly as a MISSING: test item does. Requirement 5.
 expect_block "(3) marker + unresolved MISSING-FILE -> BLOCK" BLOCK \
     "$(run_cond3 "$B3" yes fileitems)"
+expect_block "(3) marker + unresolved MISSING-PHASE -> BLOCK" BLOCK \
+    "$(run_cond3 "$B3" yes phaseitems)"
 
 # --- condition (3) on the COMPILED-HARNESS path (run-dir-keyed handoff) ---
 # Same block, same three states, but driven through the real filenames
@@ -914,6 +934,78 @@ expect_clearance "(1) checked evidence box + sentinel → still CLEARED" "CLEARE
     "$(printf '## Manual Testing\n\nNo manual testing needed - all changes are covered by automated tests.\n\n- [x] bin/test-foo - all cases PASS\n')"
 expect_clearance "shell twin stays sentinel-only: all-ticked body is HELD (harness-only widening)" "HELD" \
     "$(printf '## Manual Testing\n\n- [x] **Row 1** - executed\n')"
+
+# --- (1) clearance tail clause: callers must pass the PR's changed files ------
+# pr_manual_testing_clearance takes <body> [changed_files]. With changed_files
+# empty it returns CLEARED on the bare sentinel and never checks the tail
+# clause, so a body saying "No manual testing needed - e2e and unit tests"
+# clears even when the PR ships no e2e spec and no unit test. Both callers
+# passed only the body until this change. The predicate cases pin the two-arg
+# AND semantics; the wiring cases pin that both callers now pass a second arg.
+# expect_clearance_2arg <name> <CLEARED|HELD|UNKNOWN> <body> <changed_files>
+expect_clearance_2arg() { # name  expected  body  changed_files
+    local script="$BASE_TMP/clearance2.sh" out
+    {
+        echo 'set -euo pipefail'
+        echo "source '$REPO_ROOT/bin/lib/pr-armable.sh'"
+        printf 'pr_manual_testing_clearance "$1" "$2"\n'
+    } > "$script"
+    out="$(PATH="$SHIMD:$PATH" bash "$script" "$3" "$4" 2>&1)"
+    if [[ "$out" == "$2" ]]; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — expected '$2', got '$out'"
+        FAILED=1
+    fi
+}
+
+TAIL_BODY="$(printf '## Manual Testing\n\nNo manual testing needed — e2e and unit tests\n')"
+expect_clearance_2arg "(1) tail names e2e+unit, only a non-test file changed → HELD" "HELD" \
+    "$TAIL_BODY" "ibl5/classes/Foo.php"
+expect_clearance_2arg "(1) tail names e2e+unit, only the e2e spec changed → HELD (AND, not OR)" "HELD" \
+    "$TAIL_BODY" "ibl5/tests/e2e/foo.spec.ts"
+expect_clearance_2arg "(1) tail names e2e+unit, both a spec and a *Test.php changed → CLEARED" "CLEARED" \
+    "$TAIL_BODY" "$(printf 'ibl5/tests/e2e/foo.spec.ts\nibl5/tests/Unit/FooTest.php')"
+expect_clearance_2arg "(1) type-agnostic sentinel + non-test file → CLEARED" "CLEARED" \
+    "$(printf '## Manual Testing\n\nNo manual testing needed - all changes are covered by automated tests.\n')" \
+    "ibl5/classes/Foo.php"
+# Boundary: empty changed_files keeps the one-arg compatibility exit. This is
+# the path that let the callers clear without a tail-clause check.
+expect_clearance_2arg "(1) tail names e2e+unit, EMPTY changed_files → CLEARED (one-arg compat exit)" "CLEARED" \
+    "$TAIL_BODY" ""
+
+# Wiring: both callers must pass a changed-file list as the second argument.
+# Negative half: the exact one-arg call shipped on master must be gone.
+# Positive half: the call must carry two double-quoted arguments. The regex
+# is generic on purpose so Phase 2 may name its variable freely.
+PT="$REPO_ROOT/bin/pr-triage"
+P65="$REPO_ROOT/.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md"
+TWO_ARG_RE='pr_manual_testing_clearance "[^"]+" "[^"]+"'
+if grep -qF 'pr_manual_testing_clearance "$body")' "$PT"; then
+    echo "FAIL: pr-triage still calls pr_manual_testing_clearance with the body only (tail clause never checked)"
+    FAILED=1
+else
+    echo "ok: pr-triage no longer makes the one-arg clearance call"
+fi
+if grep -qE "$TWO_ARG_RE" "$PT"; then
+    echo "ok: pr-triage passes changed files to pr_manual_testing_clearance"
+else
+    echo "FAIL: pr-triage has no two-arg pr_manual_testing_clearance call"
+    FAILED=1
+fi
+if grep -qF "pr_manual_testing_clearance \"\$(gh pr view --json body --jq '.body')\")" "$P65"; then
+    echo "FAIL: phase 6.5 condition (1) still calls pr_manual_testing_clearance with the body only"
+    FAILED=1
+else
+    echo "ok: phase 6.5 condition (1) no longer makes the one-arg clearance call"
+fi
+if grep -qE "$TWO_ARG_RE" "$P65"; then
+    echo "ok: phase 6.5 condition (1) passes changed files to pr_manual_testing_clearance"
+else
+    echo "FAIL: phase 6.5 condition (1) has no two-arg pr_manual_testing_clearance call"
+    FAILED=1
+fi
+
 expect_rc0 "rc0: pr_golden_hold, golden untouched" \
     "pr_golden_hold '[]'"
 expect_rc0 "rc0: pr_feat_hold, non-feat title" \
@@ -941,6 +1033,53 @@ expect_mss "mss: BLOCKED still arms (28/30 PRs live here)" BLOCKED arm
 expect_mss "mss: CLEAN still arms" CLEAN arm
 expect_mss "mss: UNSTABLE still arms (non-required checks only)" UNSTABLE arm
 expect_mss "mss: HAS_HOOKS still arms" HAS_HOOKS arm
+
+# T0–T3: pr-triage clearance extraction.
+# Extract the two lines Phase 2b added and run them in a generated subscript.
+TRIAGE_LINES="$(sed -n \
+    -e '/^    changed_paths="\$(printf/p' \
+    -e '/^    clearance="\$(pr_manual_testing_clearance/p' \
+    "$REPO_ROOT/bin/pr-triage")"
+if grep -qF 'changed_paths=' <<< "$TRIAGE_LINES" && \
+   grep -qF '"$changed_paths"' <<< "$TRIAGE_LINES"; then
+    echo "ok: T0 — pr-triage clearance extraction finds changed_paths pass-through"
+else
+    echo "FAIL: T0 — pr-triage clearance call not found or missing changed_paths argument"
+    FAILED=1
+fi
+run_triage_clearance() { # body  files-json -> clearance verdict on stdout
+    local script="$BASE_TMP/triage_clearance.sh"
+    {
+        echo 'set -euo pipefail'
+        echo "source '$REPO_ROOT/bin/lib/pr-armable.sh'"
+        echo 'body="$1"; files="$2"'
+        printf '%s\n' "$TRIAGE_LINES"
+        echo 'printf "%s\n" "$clearance"'
+    } > "$script"
+    bash "$script" "$1" "$2" 2>&1
+}
+_unit_tail_body="$(printf '## Manual Testing\n\nNo manual testing needed — covered by unit tests\n')"
+if [[ "$(run_triage_clearance "$_unit_tail_body" '[{"path":"bin/pr-triage"}]')" == "HELD" ]]; then
+    echo "ok: T1 — non-test file path → HELD"
+else
+    echo "FAIL: T1 — expected HELD; dropping changed_paths clears the sentinel tail"
+    FAILED=1
+fi
+if [[ "$(run_triage_clearance "$_unit_tail_body" '[{"path":"ibl5/tests/Foo/BarTest.php","additions":1}]')" == "CLEARED" ]]; then
+    echo "ok: T2 — Test.php in diff → CLEARED"
+else
+    echo "FAIL: T2 — expected CLEARED; wrong jq field (e.g. .name) misses the test path"
+    FAILED=1
+fi
+_plain_body="$(printf '## Manual Testing\n\nNo manual testing needed\n')"
+_t3_out="$(run_triage_clearance "$_plain_body" '[]')"
+_t3_rc=$?
+if [[ "$_t3_out" == "CLEARED" ]] && [[ "$_t3_rc" -eq 0 ]]; then
+    echo "ok: T3 — empty array → CLEARED, exit 0"
+else
+    echo "FAIL: T3 — expected CLEARED exit-0, got '$_t3_out' rc=$_t3_rc"
+    FAILED=1
+fi
 
 # The truncation guard itself: a mid-loop `set -e` abort exits BEFORE any check
 # placed after the loop, so only an EXIT trap can report it. Structural, because
@@ -1794,7 +1933,7 @@ have   "§5.9f: the squash-trap rule is cited"                "$CRES_TXT" '.clau
 # The fixtures need a real refs/remotes/origin/master — the script hardcodes
 # `git diff origin/master...HEAD` and ignores every seam, so without the ref its
 # post-diff is empty and a DIVERGED case would pass for the wrong reason.
-LW="$REPO_ROOT/.claude/skills/pr-ready/scripts/lostwork.sh"
+LW="$REPO_ROOT/.claude/review-shared/scripts/lostwork.sh"
 mk_lostwork_repo() {
     local d; d="$(mktemp -d "$BASE_TMP/lw-XXXXXX")"
     git -C "$d" init --quiet -b main
@@ -1961,6 +2100,19 @@ expect_block "§5.9f: a clean verdict does not clear the stacked-PR hold" BLOCK 
     "$(run_isolated "$B6" '{"body":"x\nDepends-on: #1100"}' '' '')"
 unset CONFLICT_VERDICT_DIR CONFLICT_VERDICT_KEY
 rm -f "$VOK"
+
+# --- condition (4) ---
+have "§cond4: PHASE5_STATUS_FILE seam is present in block" "$B4" 'PHASE5_STATUS_FILE'
+
+# §cond4 — phase5 status file
+F4_PASS="$BASE_TMP/cond4-pass";  printf 'PHASE5_VERIFY_STATUS=pass\n'    > "$F4_PASS"
+F4_FAIL="$BASE_TMP/cond4-fail";  printf 'PHASE5_VERIFY_STATUS=fail\n'    > "$F4_FAIL"
+F4_SKIP="$BASE_TMP/cond4-skip";  printf 'PHASE5_VERIFY_STATUS=skipped\n' > "$F4_SKIP"
+
+have  "§cond4: fail -> BLOCKED"       "$(run_cond4 "$F4_FAIL")"                    'BLOCKED'
+lacks "§cond4: pass -> no BLOCKED"    "$(run_cond4 "$F4_PASS")"                    'BLOCKED'
+have  "§cond4: absent -> BLOCKED"     "$(run_cond4 "$BASE_TMP/cond4-nonexistent")" 'BLOCKED'
+lacks "§cond4: skipped -> no BLOCKED" "$(run_cond4 "$F4_SKIP")"                   'BLOCKED'
 
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-plan block checks passed."

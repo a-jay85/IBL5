@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# test-pr-ready-skip — unit tests for .claude/skills/pr-ready/scripts/skip-review.sh.
+# test-review-shared-skip — unit tests for .claude/review-shared/scripts/skip-review.sh.
 #
-# Usage: bin/test-pr-ready-skip
+# Usage: bin/test-review-shared-skip
 #   Run all skip-predicate unit cases.
 #   Each case: exits 0, line-1 starts CURRENT-TREE:, last line = expected verdict.
 #
@@ -11,7 +11,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-SKIP_SCRIPT="$SCRIPT_DIR/../.claude/skills/pr-ready/scripts/skip-review.sh"
+SKIP_SCRIPT="$SCRIPT_DIR/../.claude/review-shared/scripts/skip-review.sh"
 test -s "$SKIP_SCRIPT" || { echo "FAIL: skip-review.sh not found at $SKIP_SCRIPT"; exit 1; }
 test -x "$SKIP_SCRIPT" || { echo "FAIL: skip-review.sh not executable"; exit 1; }
 
@@ -494,7 +494,7 @@ fi
 
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then
-    echo "test-pr-ready-skip: FAILED ($FAILED assertion failure(s))" >&2
+    echo "test-review-shared-skip: FAILED ($FAILED assertion failure(s))" >&2
     exit 1
 fi
-echo "test-pr-ready-skip: all cases passed"
+echo "test-review-shared-skip: all cases passed"

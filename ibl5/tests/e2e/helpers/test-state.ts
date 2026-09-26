@@ -100,6 +100,23 @@ export async function setAward(
   }
 }
 
+export async function setPlayerName(
+  request: APIRequestContext,
+  pid: number,
+  name: string,
+): Promise<string> {
+  const response = await request.delete(
+    `test-state.php?action=set-player-name&pid=${pid}&name=${encodeURIComponent(name)}`,
+  );
+  if (!response.ok()) {
+    throw new Error(
+      `test-state.php set-player-name failed: ${response.status()} ${await response.text()}`,
+    );
+  }
+  const body = (await response.json()) as { previous: string };
+  return body.previous;
+}
+
 export interface TeamVoteStatus {
   asg_vote: string;
   eoy_vote: string;

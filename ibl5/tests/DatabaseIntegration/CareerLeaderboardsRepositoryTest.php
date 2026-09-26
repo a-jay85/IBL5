@@ -298,6 +298,37 @@ class CareerLeaderboardsRepositoryTest extends DatabaseTestCase
         self::assertEquals(6.00, $row['reb']);
     }
 
+    public function testSeasonAvgsExcludesExhibitionRows(): void
+    {
+        $pid = 200000091;
+        $this->insertTestPlayer($pid, 'DB Exhib Season');
+
+        // Club game in January: 8 pts (2*4), 6 reb (2+4), 30 min.
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-15', $pid, 'DB Exhib Season', 'PG', 2, 1, 1,
+            minutes: 30, points2m: 4, points2a: 8, ftm: 0, fta: 0,
+            points3m: 0, points3a: 0, orb: 2, drb: 4
+        );
+        // Rookies/Sophomores and All-Star games: February dates, so game_type = 1.
+        $this->insertPlayerBoxscoreRow(
+            '2098-02-02', $pid, 'DB Exhib Season', 'PG', 40, 41, 40,
+            minutes: 20, points2m: 10, points2a: 12
+        );
+        $this->insertPlayerBoxscoreRow(
+            '2098-02-03', $pid, 'DB Exhib Season', 'PG', 50, 51, 50,
+            minutes: 20, points2m: 10, points2a: 12
+        );
+
+        $result = $this->repo->getLeaderboards('ibl_season_career_avgs', 'pts', 0, 5000);
+        $row = $this->findRowByPid($result['results'], $pid);
+
+        self::assertNotNull($row);
+        self::assertSame(1, (int) $row['games']);
+        self::assertEquals(30.00, $row['minutes']);
+        self::assertEquals(8.00, $row['pts']);
+        self::assertEquals(6.00, $row['reb']);
+    }
+
     public function testPlayoffTotalsGamesExcludesDnpRows(): void
     {
         $pid = 200000091;

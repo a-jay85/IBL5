@@ -1,6 +1,6 @@
 ---
-description: PR body authoring rules — version/baseline citations must name their source file; negative-claim bullets must be re-read after every commit.
-last_verified: 2026-09-21
+description: "PR body authoring rules: version/baseline citations must name their source file; negative-claim bullets must be re-read after every commit; backlog closing keywords come from the plan via the shared normalizer snippet."
+last_verified: 2026-09-25
 ---
 
 # PR Body Claims
@@ -64,8 +64,59 @@ re-read; there is no human in the loop to catch the stale bullet later.
 ## Backlog issue references
 
 A bare `#N` autolinks to IBL5's own PR or issue N. Backlog issues live in a different repo,
-so cite them as `a-jay85/IBL5-backlog#N`. Write `backlog issue a-jay85/IBL5-backlog#160`,
-never `backlog issue #160`. Use bare `#N` only for IBL5 PRs and issues.
+so cite them as `a-jay85/IBL5-backlog#N`. In prose, write `backlog issue a-jay85/IBL5-backlog#160`.
+Use bare `#N` only for IBL5 PRs and issues.
+
+### Closing keywords
+
+The plan's backlog bullets decide which backlog issues this PR closes. Post-plan collects them
+from the whole plan outside fenced code blocks, so a bullet counts in the `## Backlog issues`
+section or in any phase body, including a bookkeeping-only phase. Only a bullet that starts with
+`closes` or `refs` and names the full `a-jay85/IBL5-backlog` path counts. A mention in prose, an
+inline code span, or a blockquote closes nothing. A `closes` bullet becomes a
+`Closes a-jay85/IBL5-backlog#N` line in the PR body, and GitHub closes that issue when the PR
+merges into `master`. A `refs` bullet gets a plain `a-jay85/IBL5-backlog#N` link with no closing
+keyword. When one issue appears as both kinds, `closes` wins.
+
+Do not hand-write these lines. Write the composed body to a file, then run the snippet below
+before every `gh pr create --body-file` and every `gh pr edit --body-file`. It calls the same
+functions the post-plan harness runs (`parse_backlog_issues` and `normalize_backlog_closes`
+under `tools/postplan-harness/harness/`), so both engines emit identical lines.
+
+<!-- backlog-closes-snippet:start -->
+```bash
+BODY_FILE="${BODY_FILE:?set BODY_FILE to the composed PR body file}"
+PLAN="${PLAN:-$HOME/claude-plans/$(git rev-parse --abbrev-ref HEAD).md}"
+PYTHONPATH="$(git rev-parse --show-toplevel)/tools/postplan-harness" \
+  python3 - "$PLAN" "$BODY_FILE" <<'PY'
+import os, sys
+from harness.planfile import parse_backlog_issues
+from harness.classify import normalize_backlog_closes
+plan, body_path = sys.argv[1], sys.argv[2]
+content = open(plan).read() if os.path.exists(plan) else ""
+issues = parse_backlog_issues(content)
+with open(body_path) as fh:
+    body = fh.read()
+out = normalize_backlog_closes(body, [n for k, n in issues if k == "closes"],
+                               [n for k, n in issues if k == "refs"])
+with open(body_path, "w") as fh:
+    fh.write(out)
+PY
+```
+<!-- backlog-closes-snippet:end -->
+
+What the snippet guarantees:
+
+- **No plan record.** With no plan file, or a plan with no backlog bullets, the body stays byte-for-byte
+  as written. A `Closes a-jay85/IBL5-backlog#N` line already in the body (carried from a commit
+  message) stays, and nothing new is added. Close an issue only when something names it.
+- **Partial work.** A closing keyword (`Closes`, `Fixes`, `Resolves`, in any tense) in front of a
+  `refs` issue is removed, leaving the plain link.
+- **Full repo path.** Every line it writes carries `a-jay85/IBL5-backlog`. A hand-written `Closes #N`
+  would target IBL5 issue N, so never write one.
+- **Stacked PRs.** GitHub ignores closing keywords while a PR's base is a parent branch. When the
+  parent merges, GitHub retargets the child to `master`, and the keywords fire when the child
+  merges. Keep the lines as they are.
 
 ## Declared scope
 

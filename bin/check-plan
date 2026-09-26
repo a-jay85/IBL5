@@ -1467,6 +1467,24 @@ if [ "${_j_new_class:-0}" -gt 0 ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Gate [U]: ## Backlog issues bullet grammar (hard-fail).
+# ---------------------------------------------------------------------------
+# The post-plan harness (tools/postplan-harness/harness/planfile.py,
+# parse_backlog_issues) turns each bullet into a PR-body closing keyword. A
+# bullet it cannot parse is dropped silently and the issue never closes, so
+# reject it here. Fence-stripped via cf_section_named; silent when the section
+# is absent. Checks every bullet plus any prose line carrying #<digits>.
+_u_re='^[[:space:]]*[-*][[:space:]]+(closes|refs)[[:space:]]+a-jay85/IBL5-backlog#[0-9]+[[:space:]]+(—|–|-)[[:space:]]+[^[:space:]]'
+_u_bad=$(cf_section_named "$PLAN_FILE" "Backlog issues" \
+    | grep -E '^[[:space:]]*[-*][[:space:]]+|#[0-9]' \
+    | grep -vE "$_u_re" || true)
+if [ -n "$_u_bad" ]; then
+    while IFS= read -r _u_line; do
+        viol "[U] ## Backlog issues line must read '- closes|refs a-jay85/IBL5-backlog#N — <what>' (lowercase tag, full repo path, a description): \"${_u_line}\""
+    done <<< "$_u_bad"
+fi
+
+# ---------------------------------------------------------------------------
 # Report.
 # ---------------------------------------------------------------------------
 if [ -s "$VIOL_FILE" ]; then

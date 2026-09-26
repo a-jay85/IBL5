@@ -20,13 +20,22 @@ import os
 
 import re
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 from .state import ArmDecision, Classification, ConditionResult, Finding
 
 FEAT_RE = re.compile(r"^feat(\([^)]*\))?!?:", re.IGNORECASE)
 GOLDEN_PATH = "engine/internal/sim/testdata/golden.json"
 SENTINEL_RE = re.compile(r"^\s*No manual testing needed", re.IGNORECASE)
+# Tail-clause AND gate (pr_manual_testing_clearance parity, bin/lib/pr-armable.sh).
+# Strips the sentinel prefix plus any hyphen / en-dash / em-dash run to isolate the tail.
+SENTINEL_PREFIX_RE = re.compile(r"^\s*No manual testing needed\s*[—–-]*\s*", re.IGNORECASE)
+# (tail keyword, required changed-file pattern). Each named type needs one matching file.
+TAIL_TYPE_RULES = (
+    (re.compile(r"\b(e2e|playwright)\b", re.IGNORECASE), re.compile(r"^ibl5/tests/e2e/.*\.spec\.ts$")),
+    (re.compile(r"\b(unit|phpunit)\b", re.IGNORECASE), re.compile(r"^ibl5/tests/.*Test\.php$")),
+    (re.compile(r"\bintegration\b", re.IGNORECASE), re.compile(r"^ibl5/tests/DatabaseIntegration/")),
+)
 DEP_LINE = re.compile(r"^\s*depends-on:", re.IGNORECASE)
 
 # The harness's own row shape, shared with manual_rows.render_rows
@@ -61,7 +70,7 @@ def _manual_section(body: str) -> list[str] | None:
     return section
 
 
-def manual_testing_clearance(body: str) -> str:
+def manual_testing_clearance(body: str, changed_files: Sequence[str] = ()) -> str:
     """pr_manual_testing_clearance port: CLEARED / HELD / UNKNOWN.
 
     Scan window: from `^## Manual Testing` to the next `^## ` line. Any body
@@ -69,14 +78,25 @@ def manual_testing_clearance(body: str) -> str:
     emit no `^#`-anchored line; classify.upsert_manual_confirmation does the
     former and classify._neutralize_headings the latter. Pinned by
     tests/test_hold_justification.py.
+
+    Tail clause: when `changed_files` is non-empty, the FIRST sentinel line's
+    tail is scanned for e2e/playwright, unit/phpunit, integration keywords;
+    every named type needs a matching changed file or the result is HELD.
+    Empty `changed_files` skips the check (callers that cannot supply a list).
     """
     section = _manual_section(body)
     if section is None:
         return "UNKNOWN"
-    for l in section:
-        if SENTINEL_RE.match(l):
-            return "CLEARED"
-    return "HELD"
+    sentinel = next((l for l in section if SENTINEL_RE.match(l)), None)
+    if sentinel is None:
+        return "HELD"
+    if not changed_files:
+        return "CLEARED"
+    tail = SENTINEL_PREFIX_RE.sub("", sentinel, count=1)
+    for keyword_re, file_re in TAIL_TYPE_RULES:
+        if keyword_re.search(tail) and not any(file_re.search(f) for f in changed_files):
+            return "HELD"
+    return "CLEARED"
 
 
 def meta_checks_clearance(flag_path: str, post_pr_rc: int) -> str:
@@ -189,7 +209,7 @@ def conflict_verdict_for(branch: str, tmp_dir: str = "/tmp") -> Optional[str]:
 def evaluate(inp: ArmInputs) -> ArmDecision:
     cs: list[ConditionResult] = []
 
-    clearance = manual_testing_clearance(inp.pr_body)
+    clearance = manual_testing_clearance(inp.pr_body, inp.classification.files)
     # Widened for the harness's deterministic tick pass: a section whose every
     # harness-shaped row is ticked clears, alongside the sentinel. Gated on HELD
     # so UNKNOWN (no `## Manual Testing` heading at all) still holds.
@@ -206,11 +226,19 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
                               "; ".join(inp.unresolved_conformance)))
 
     p5 = inp.phase5_status
-    p5_blocked = (p5 == "fail") or (p5 not in ("pass", "skipped", "fail", None))
-    # None = no status recorded; the skill treats absent file as non-blocking
-    cs.append(ConditionResult(4, "phase5-verify", p5 == "fail",
-                              "Phase 5 deterministic failure" if p5 == "fail" else ""))
-    del p5_blocked
+    # Three-state on the value, fail-closed (backlog #654): only "pass" and "skipped"
+    # clear. None means no status was recorded (Phase 5 never reached its END),
+    # which is indeterminate and holds, matching the skill block's absent-file arm.
+    p5_blocked = p5 not in ("pass", "skipped")
+    if p5 == "fail":
+        p5_reason = "Phase 5 deterministic failure"
+    elif p5 is None:
+        p5_reason = "Phase 5 status never recorded (indeterminate, not clean)"
+    elif p5_blocked:
+        p5_reason = f"Phase 5 status unrecognised: {p5!r}"
+    else:
+        p5_reason = ""
+    cs.append(ConditionResult(4, "phase5-verify", p5_blocked, p5_reason))
 
     golden = inp.classification.golden_changed
     c5 = ConditionResult(5, "golden-snapshot-headless", golden and inp.headless,

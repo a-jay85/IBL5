@@ -981,6 +981,8 @@ jobs:
         run: bin/test-digest-dm-build
       - name: bin/test-pr-review-now
         run: bin/test-pr-review-now
+      - name: bin/test-launchd-job
+        run: bin/test-launchd-job
       - name: bin/test-check-phpunit-hygiene
         run: bin/test-check-phpunit-hygiene
       - name: bin/test-test

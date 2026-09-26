@@ -1239,3 +1239,85 @@ def test_live_gh_pr_body_fresh_refetches_after_an_edit(tmp_path, monkeypatch):
     assert len(views) == 1                       # served from the override, no refetch
     assert gh.pr_body_fresh() == "live-2"
     assert len(views) == 2
+
+
+# ---------------------------------------------------------------------------
+# _PLAN_ARTIFACT_RE regression: #1091 — "critical files" alone was too broad
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("title", [
+    # Still filtered: references to the plan document's Critical Files section
+    "Add the new test to the plan's Critical Files",
+    "Update plan's Critical Files list with new helper",
+    "Remove stale entry from Critical Files section",
+    # Still filtered: other pre-existing plan-artifact forms
+    "Update Verification Matrix row 11",
+    "Fix test matrix rows 22-24",
+    "Reword plan step 3 to match the shipped helper",
+])
+def test_plan_artifact_re_drops_plan_document_titles(title):
+    """Titles referencing the plan artifact are still filtered."""
+    assert fidelity._is_plan_artifact(title), (
+        f"Expected _is_plan_artifact to return True for: {title!r}"
+    )
+
+
+@pytest.mark.parametrize("title", [
+    # Not filtered: "critical files" used to describe real code work, not the plan doc
+    "Add tests for critical files in the auth module",
+    "Fix permission checks for critical files in bin/",
+    "Guard critical files against concurrent writes",
+    # Not filtered: "matrix" alone is the head-to-head records page
+    "Fix head-to-head matrix row highlight for gms",
+])
+def test_plan_artifact_re_keeps_real_followup_titles(title):
+    """Titles describing real code work that mention 'critical files' are not filtered."""
+    assert not fidelity._is_plan_artifact(title), (
+        f"Expected _is_plan_artifact to return False for: {title!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# _COMMENT_NIT_RE regression: #1099 — docstring branch lacked a verb anchor
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("title,detail", [
+    # Still filtered: verb-anchored docstring/docblock rewording nits
+    ("Fix compose_sticky docstring about output compatibility",
+     "The docstring says the legacy output is identical."),
+    ("Clarify _ALREADY_DONE_RE docstring in fidelity.py",
+     "The docstring is misleading about scope."),
+    ("Move doc comment back to regenerate_weekly_section",
+     "The docblock drifted above the helper."),
+    ("Remove hard-wrap from Step 5 paragraph in prompt-impl",
+     "One paragraph is wrapped at 80 columns."),
+    ("Update stale cadence comment in bin/plan-review-drain",
+     "It now runs every 180s, not nightly."),
+    # Still filtered: "Reword docblock" with no defect detail
+    ("Reword docblock on _verdict_findings for clarity",
+     "The wording is slightly ambiguous."),
+])
+def test_comment_nit_re_drops_verb_anchored_rewording_nits(title, detail):
+    """Verb-anchored docstring/comment rewording nits are still filtered."""
+    assert fidelity._is_comment_nit(title, detail), (
+        f"Expected _is_comment_nit to return True for title: {title!r}"
+    )
+
+
+@pytest.mark.parametrize("title,detail", [
+    # Not filtered: additive notes — "Add" is absent from the verb set by design
+    ("Add a docstring to _verdict_findings explaining the body slice",
+     "The function has no docstring."),
+    ("Write a docblock for the new GitAd helper",
+     "The helper is undocumented."),
+    ("Add a docstring explaining the lock order in bin/automouse/run",
+     "Two locks are taken with no stated order."),
+    # Not filtered: defect in detail overrides the nit classification
+    ("Clarify _ALREADY_DONE_RE docstring in fidelity.py",
+     "The regex drops real followups silently when they name an old PR."),
+])
+def test_comment_nit_re_keeps_additive_and_defect_notes(title, detail):
+    """Additive docstring notes and notes with defect details are not filtered."""
+    assert not fidelity._is_comment_nit(title, detail), (
+        f"Expected _is_comment_nit to return False for title: {title!r}"
+    )

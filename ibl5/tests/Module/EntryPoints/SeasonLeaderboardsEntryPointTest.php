@@ -4,68 +4,21 @@ declare(strict_types=1);
 
 namespace Tests\Module\EntryPoints;
 
+/**
+ * SeasonLeaderboards is now a redirect stub; the board lives at
+ * Leaderboards?tab=season. The 302 header itself is asserted by curl
+ * (Verification Matrix row V20) since CLI PHPUnit cannot read response headers.
+ */
 class SeasonLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
 {
-    protected function setUp(): void
+    public function testStubEmitsNoBody(): void
     {
-        parent::setUp();
         $this->mockDb->setMockData([]);
         $this->mockDb->onQuery('cache', []);
-    }
 
-    public function testEmptyPostRendersFilterFormAndDefaultLeaderboard(): void
-    {
-        $output = $this->runModule('SeasonLeaderboards', [], [], $this->dbGlobals());
+        $output = $this->runModule('SeasonLeaderboards', [], ['year' => '2024'], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
-        $this->assertStringContainsString('Season Leaders', $output);
-        $this->assertQueryExecuted('ibl_hist');
-    }
-
-    public function testPostWithFiltersRunsLeaderboardQuery(): void
-    {
-        $output = $this->runModule('SeasonLeaderboards', [], [
-            'year' => '2024',
-            'team' => '1',
-            'sortby' => 'PPG',
-            'limit' => '50',
-        ], $this->dbGlobals());
-
-        $this->assertNotEmpty($output);
-        $this->assertQueryExecuted('ibl_hist');
-    }
-
-    public function testPostWithStringTeamCastsToInt(): void
-    {
-        $output = $this->runModule('SeasonLeaderboards', [], [
-            'year' => '2024',
-            'team' => 'garbage',
-            'sortby' => 'PPG',
-            'limit' => '50',
-        ], $this->dbGlobals());
-
-        $this->assertNotEmpty($output);
-        $this->assertQueryExecuted('ibl_hist');
-    }
-
-    public function testPostWithDefaultSortby(): void
-    {
-        $output = $this->runModule('SeasonLeaderboards', [], [
-            'year' => '2024',
-            'team' => '0',
-            'limit' => '25',
-        ], $this->dbGlobals());
-
-        $this->assertNotEmpty($output);
-        $this->assertStringContainsString('Season Leaders', $output);
-    }
-
-    public function testEmptyPostRendersSeasonFilterFormMarkup(): void
-    {
-        $output = $this->runModule('SeasonLeaderboards', [], [], $this->dbGlobals());
-
-        $this->assertStringContainsString('<form name="Leaderboards"', $output);
-        $this->assertStringContainsString('class="ibl-filter-form"', $output);
-        $this->assertStringContainsString('name="sortby"', $output);
+        $this->assertSame('', $output);
+        $this->assertQueryNotExecuted('ibl_hist');
     }
 }

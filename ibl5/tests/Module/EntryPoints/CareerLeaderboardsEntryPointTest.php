@@ -4,72 +4,24 @@ declare(strict_types=1);
 
 namespace Tests\Module\EntryPoints;
 
+/**
+ * CareerLeaderboards is now a redirect stub; the board lives at
+ * Leaderboards?tab=career. The 302 header itself is asserted by curl
+ * (Verification Matrix row V20) since CLI PHPUnit cannot read response headers.
+ */
 class CareerLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
 {
-    protected function setUp(): void
+    public function testStubEmitsNoBody(): void
     {
-        parent::setUp();
         $this->mockDb->setMockData([]);
         $this->mockDb->onQuery('cache', []);
-    }
 
-    public function testNotSubmittedRendersFilterForm(): void
-    {
-        $output = $this->runModule('CareerLeaderboards', [], [], $this->dbGlobals());
+        $output = $this->runModule('CareerLeaderboards', [], [
+            'submitted' => '1',
+            'boards_type' => 'Regular Season Totals',
+        ], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
-        $this->assertStringContainsString('Career Leaderboards', $output);
+        $this->assertSame('', $output);
         $this->assertQueryNotExecuted('ibl_hist');
-    }
-
-    public function testSubmittedRunsLeaderboardQuery(): void
-    {
-        $output = $this->runModule('CareerLeaderboards', [], [
-            'submitted' => '1',
-            'boards_type' => 'Regular Season Totals',
-            'sort_cat' => 'Points',
-            'active' => '0',
-            'display' => '50',
-        ], $this->dbGlobals());
-
-        $this->assertNotEmpty($output);
-        $this->assertQueryExecuted('ibl_hist');
-    }
-
-    public function testActiveOnlyFilterApplied(): void
-    {
-        $output = $this->runModule('CareerLeaderboards', [], [
-            'submitted' => '1',
-            'boards_type' => 'Regular Season Totals',
-            'sort_cat' => 'Points',
-            'active' => '1',
-            'display' => '50',
-        ], $this->dbGlobals());
-
-        $this->assertNotEmpty($output);
-        $this->assertQueryExecuted('ibl_hist');
-    }
-
-    public function testInvalidBoardsTypeFallsBackGracefully(): void
-    {
-        $output = $this->runModule('CareerLeaderboards', [], [
-            'submitted' => '1',
-            'boards_type' => 'garbage',
-            'sort_cat' => 'Points',
-            'active' => '0',
-            'display' => '50',
-        ], $this->dbGlobals());
-
-        $this->assertNotEmpty($output);
-        $this->assertStringContainsString('Career Leaderboards', $output);
-    }
-
-    public function testEmptyPostRendersCareerFilterFormMarkup(): void
-    {
-        $output = $this->runModule('CareerLeaderboards', [], [], $this->dbGlobals());
-
-        $this->assertStringContainsString('<form name="CareerLeaderboards"', $output);
-        $this->assertStringContainsString('name="boards_type"', $output);
-        $this->assertStringContainsString('name="sort_cat"', $output);
     }
 }

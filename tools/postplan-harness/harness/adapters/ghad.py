@@ -30,6 +30,7 @@ STICKY_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "pr-sticky.sh
 # bin/lib/pr-armable.sh, pinned the same way: condition (11) must never read the helper
 # from the worktree it is judging, or a branch could edit it to clear its own hold.
 ARMABLE_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "pr-armable.sh"
+PRF_LIB = ARMABLE_LIB.parent / "post-review-findings.sh"
 
 POSTPLAN_BADGE_MARKER = "<!-- postplan-status -->"
 # Duplicated from fidelity.STICKY_MARKER on purpose: adapters must not import the core
@@ -40,7 +41,8 @@ PR_STICKY_MARKER = "<!-- pr-ready-verdict -->"
 class RecordingGh:
     MUTATIONS = ("pr_create", "pr_comment", "pr_review_findings", "pr_edit_body",
                  "pr_merge_auto", "label_add", "pr_status_badge",
-                 "pr_sticky_verdict", "issue_create", "pr_disable_auto_merge")
+                 "pr_sticky_verdict", "issue_create", "pr_disable_auto_merge",
+                 "pr_resolve_thread")
 
     def __init__(self, out_dir: str, fixture: dict | None = None):
         self.out_dir = out_dir
@@ -65,6 +67,15 @@ class RecordingGh:
 
     def unresolved_findings(self, pr: int) -> list[str]:
         return []
+
+    def pr_thread_ids(self, pr: int) -> set[int]:
+        return {int(x) for x in self.fixture.get("thread_ids", [])}
+
+    def trusted_open_threads(self, pr: int) -> list[dict] | None:
+        return self.fixture.get("trusted_threads", [])
+
+    def resolve_review_thread(self, pr: int, comment_id: int, body: str) -> None:
+        self.record("pr_resolve_thread", pr=pr, comment_id=int(comment_id), body=body[:2000])
 
     def pr_sticky_body(self, pr: int) -> str | None:
         """Prior Phase 5.5 sticky body from the replay fixture, or None.
@@ -219,7 +230,7 @@ class LiveGh(RecordingGh):
         return int(m.group(1))
 
     def unresolved_findings(self, pr: int) -> list[str]:
-        """Condition (11) — unresolved review threads scored >= 80.
+        """Condition (11) — every unresolved review thread (scored or `-`).
 
         GH_CMD and REPO_SLUG are STRIPPED from the child env so bin/lib/pr-armable.sh
         falls back to its own defaults (`gh` and the repo slug). env=None would INHERIT
@@ -247,6 +258,68 @@ class LiveGh(RecordingGh):
         if proc.returncode != 0:
             return ["unresolved-findings-api-error"]
         return proc.stdout.split()
+
+    def pr_thread_ids(self, pr: int) -> set[int]:
+        from .llm import _run_reaped
+        if not PRF_LIB.exists():
+            return set()
+        argv = ["bash", "-c", "source \"$1\"; prf_review_threads \"$2\" | jq -r '.commentId // empty'", "_",
+                str(PRF_LIB), str(pr)]
+        env = {k: v for k, v in os.environ.items() if k not in ("GH_CMD", "REPO_SLUG")}
+        try:
+            proc = _run_reaped(argv, None, self.timeout, self.worktree, env)
+        except Exception:
+            return set()
+        if proc.returncode != 0:
+            return set()
+        result: set[int] = set()
+        for line in proc.stdout.splitlines():
+            line = line.strip()
+            if line:
+                try:
+                    result.add(int(line))
+                except ValueError:
+                    pass
+        return result
+
+    def trusted_open_threads(self, pr: int) -> list[dict] | None:
+        from .llm import _run_reaped
+        if not PRF_LIB.exists():
+            return None
+        argv = ["bash", "-c", 'source "$1"; list_trusted_open_threads "$2"', "_",
+                str(PRF_LIB), str(pr)]
+        env = {k: v for k, v in os.environ.items() if k not in ("GH_CMD", "REPO_SLUG")}
+        try:
+            proc = _run_reaped(argv, None, self.timeout, self.worktree, env)
+        except Exception:
+            return None
+        if proc.returncode != 0:
+            return None
+        rows = []
+        for line in proc.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                pass
+        return rows
+
+    def resolve_review_thread(self, pr: int, comment_id: int, body: str) -> None:
+        from .llm import _run_reaped
+        if not PRF_LIB.exists():
+            raise HarnessError("thread-resolve-failed", "PRF_LIB missing")
+        argv = ["bash", "-c", 'source "$1"; resolve_review_finding "$2" "$3" "$4"', "_",
+                str(PRF_LIB), str(pr), str(comment_id), body[:2000]]
+        env = {k: v for k, v in os.environ.items() if k not in ("GH_CMD", "REPO_SLUG")}
+        try:
+            proc = _run_reaped(argv, None, self.timeout, self.worktree, env)
+        except Exception as e:
+            raise HarnessError("thread-resolve-failed", str(e))
+        if proc.returncode != 0:
+            raise HarnessError("thread-resolve-failed", proc.stderr.strip()[-400:])
+        self.record("pr_resolve_thread", pr=pr, comment_id=int(comment_id), body=body[:2000])
 
     def pr_edit_body(self, pr: int, body: str) -> None:
         self._gh("pr", "edit", str(pr), "--body", body)

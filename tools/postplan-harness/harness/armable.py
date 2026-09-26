@@ -276,8 +276,13 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     cs.append(ConditionResult(10, "pipeline-authored-floor", pipe,
                               "pipeline-authored label present" if pipe else ""))
 
-    # Condition (11) — unresolved review-thread findings scored >= 80. The shell-out
-    # lives in adapters/ghad.py::unresolved_findings; this grades its output.
+    # Condition (11) — any unresolved review thread. The shell-out lives in
+    # adapters/ghad.py::unresolved_findings and returns one `unresolved-finding:N`
+    # entry per scored open thread and `unresolved-finding:-` per unscored one
+    # (human prose, bot note, outdated anchor, deleted root comment). Every entry
+    # holds; the split below is for the reason text only. Trust and authorship are
+    # never consulted here: thread_ingestion.py decides what a run may ACT on,
+    # this decides whether the PR may merge. None / api-error / cap stay fail-closed.
     uf = inp.unresolved_findings
     if uf is None:
         r = "unresolved review-thread state not consulted — fail-closed"
@@ -286,10 +291,13 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     elif "unresolved-findings-cap" in uf:
         r = "review-thread list hit the 100-thread page cap — fail-closed"
     elif uf:
-        r = f"{len(uf)} unresolved review finding(s) scored >= 80: " + " ".join(uf)
+        unscored = sum(1 for x in uf if x == "unresolved-finding:-")
+        scored = len(uf) - unscored
+        r = (f"{len(uf)} unresolved review thread(s) ({scored} scored, {unscored} unscored): "
+             + " ".join(uf))
     else:
         r = ""
-    cs.append(ConditionResult(11, "unresolved-scored-findings", bool(r), r))
+    cs.append(ConditionResult(11, "unresolved-review-threads", bool(r), r))
 
     # Condition (13). The number tracks the skill's condition number, not this list's
     # position: (11) now lives directly above and (12) is plan-intent fidelity. Do not

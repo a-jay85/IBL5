@@ -344,14 +344,9 @@ state_calls() { grep -c -- '--json state' "$SCRATCH/gh.argv" || true; }
 # Count of triage invocations that actually ARM. The read-only pre-read shares this shim,
 # so a bare `calls triage` no longer distinguishes "did not arm" from "did not run".
 arm_calls() { grep -c -- '--arm' "$SCRATCH/triage.argv" 2>/dev/null || true; }
-# Confirmed-merge count for the run just made. The ledger file this used to read is gone;
-# `ledgered.txt` in the rundir is the same bookkeeping the driver counts $MERGES from, and
-# `reset_state` already clears /tmp/pr-cycle-$TSBASE* between cases. `_worker` creates the
-# file with `: >`, so "no file" is genuinely zero merges and not a masked error.
-merges() {
-    grep -oE 'armed [0-9]+' <<< "$OUT" | tail -1 | grep -oE '[0-9]+' || echo 0
-}
-
+# Path to the per-run scratch directory. Mirrors the driver: PR_CYCLE_TS resolves to
+# ${TSPIN:-$TSBASE}, so cases that set TSPIN (e.g. case 21/22/23) use their own subdir.
+rundir() { echo "/tmp/pr-cycle-${TSPIN:-$TSBASE}"; }
 # ==========================================================================================
 # 1 — flag validation
 # ==========================================================================================
@@ -536,12 +531,21 @@ begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"   # 102 and 103 absent entirely
-echo MERGED > "$SCRATCH/state-101"
 run --worker
 [[ $RC -eq 0 ]] || fail "non-armable run exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "run stopped early or batched wrong: $(calls ready) ready calls"
 [[ "$(state_calls)" == "0" ]] || fail "polled despite no ARMABLE row: $(state_calls) state calls"
 grep -qE 'armed 0[^0-9]' <<< "$OUT" || fail "absent PRs were counted as armed"
+[[ "$(arm_calls)" == "1" ]] || fail "case 11: want 1 arm call, got $(arm_calls)"
+_rd11="$(rundir)"
+[[ -f "$_rd11/armed.txt" && ! -s "$_rd11/armed.txt" ]] \
+    || fail "case 11: armed.txt should exist and be empty"
+grep -qF '101 — NEEDS-WORK — rebase' "$SCRATCH/dm.argv" \
+    || fail "case 11: DM should contain '#101 — NEEDS-WORK — rebase'"
+grep -qF '#102' "$SCRATCH/dm.argv" \
+    && fail "case 11: DM should not mention absent #102"
+grep -qF '#103' "$SCRATCH/dm.argv" \
+    && fail "case 11: DM should not mention absent #103"
 end_case "case 11 non-armable and absent"
 
 # --- rescue: baseline characterization -----------------------------------------------------
@@ -686,6 +690,9 @@ run --worker
 [[ $RC -eq 0 ]] || fail "triage exit 1 should continue, got $RC"
 # The your-turn list is still built: 102 and 103 land in your-turn.txt
 grep -qE 'your turn [1-9]' <<< "$OUT" || fail "triage exit 1: your-turn count should be nonzero"
+# The ARMABLE row is still written to armed.txt even when triage exits 1
+grep -qx '101' "$(rundir)/armed.txt" \
+    || fail "triage exit 1: ARMABLE 101 should be in armed.txt"
 end_case "case 12 triage exit codes"
 
 
@@ -794,18 +801,21 @@ end_case "case 36 your-turn DM degrades"
 # ==========================================================================================
 begin_case
 reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
 run
 [[ $RC -eq 0 ]] || fail "dry run exit $RC, want 0"
 BARE="$OUT"
-grep -qF -- '--go' "$SCRATCH/ready.argv" && fail "dry run passed --go to the ready tool"
-grep -qF -- '--arm' "$SCRATCH/triage.argv" && fail "dry run armed"
+[[ "$(calls ready)" == "0" ]] || fail "dry run made $(calls ready) ready calls, want 0"
+[[ "$(arm_calls)" == "0" ]] || fail "dry run made $(arm_calls) arm calls, want 0"
 grep -qF 'bootstrap' "$SCRATCH/launchctl.argv" && fail "dry run bootstrapped a job"
-grep -qF 'stage 1 would ready' <<< "$BARE" || fail "dry run did not report stage 1 list"
+grep -qF 'stage 1 would ready (1): #101' <<< "$BARE" \
+    || fail "dry run did not report 'stage 1 would ready (1): #101'"
+grep -qF 'would run: post-plan-fleet --pr-list 101 --jobs 3 --go --wait' <<< "$BARE" \
+    || fail "dry run did not print the would-run post-plan-fleet argv"
 
 reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
 run --dry-run
 [[ "$OUT" == "$BARE" ]] || fail "--dry-run output differs from the bare form"
@@ -1178,7 +1188,8 @@ run --worker
 grep -qF '#101 — already ARMABLE with a current READY verdict, skipping pr-ready' <<< "$OUT" \
     || fail "ARMABLE+READY skip: the skip log line is missing"
 [[ "$(arm_calls)" == "1" ]] || fail "ARMABLE+READY skip: want 1 arm, got $(arm_calls)"
-[[ "$(merges)" == "1" ]] || fail "ARMABLE+READY skip: the skipped PR was not counted as merged"
+grep -qx '101' "$(rundir)/armed.txt" \
+    || fail "ARMABLE+READY skip: 101 should be in armed.txt"
 
 # 27b (Case B) — THE REGRESSION THIS CASE EXISTS FOR. ARMABLE with NO verdict comment at
 # all must still run pr-ready. This is the modal path, not a corner: ARMABLE is reachable
@@ -1225,6 +1236,10 @@ for p in 101 102 103; do
 done
 [[ "$(arm_calls)" == "1" ]] || fail "three skips: want 1 arm, got $(arm_calls)"
 grep -qE 'armed 3[^0-9]' <<< "$OUT" || fail "three skips: want armed count 3 in summary"
+# Precheck is cached: 3 ARMABLE+READY PRs produce exactly 1 plain triage call (cached
+# precheck) + 1 --arm call = 2 total. Without the cache, 3 plain calls + 1 arm = 4.
+[[ "$(calls triage)" == "2" ]] \
+    || fail "three skips: want 2 triage calls (1 cached precheck + 1 arm), got $(calls triage)"
 end_case "case 27 skip requires ARMABLE and a current READY verdict"
 
 # ==========================================================================================
@@ -1545,6 +1560,45 @@ _dm_len="$(wc -c < "$SCRATCH/dm.argv" | tr -d ' ')"
 [[ "$_dm_len" -le 2000 ]] || fail "case 38: DM exceeds 2000 chars ($_dm_len)"
 grep -qF 'more:' "$SCRATCH/dm.argv" || fail "case 38: DM did not use the overflow line"
 end_case "case 38 your-turn DM length cap"
+
+# ==========================================================================================
+# 39 — PR-number pattern in _arm_and_classify: accepts #12, rejects #12abc
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+# Write triage output directly with two-space columns (as case 35 does).
+# #12 should pass the ^#[0-9]+$ guard; #12abc must be rejected.
+{   printf '#12  ARMABLE  arm\n'
+    printf '#12abc  ARMABLE  arm\n'
+} > "$SCRATCH/triage-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "case 39 exit $RC, want 0"
+_rd39="$(rundir)"
+[[ "$(cat "$_rd39/armed.txt" 2>/dev/null)" == "12" ]] \
+    || fail "case 39: armed.txt should be exactly '12', got: $(cat "$_rd39/armed.txt" 2>/dev/null)"
+end_case "case 39 PR-number pattern rejects #12abc, accepts #12"
+
+# ==========================================================================================
+# 40 — _precheck_bucket cache: triage plain call happens exactly once per run
+# ==========================================================================================
+# With three orderable PRs and SKIP_READY_WHEN_ARMABLE active, _stage1_list calls
+# _precheck_bucket for each PR. The cache means triage runs once (on the first call)
+# and subsequent calls read from the cached precheck.txt. If the cache were removed,
+# each PR would trigger its own triage call and the assertion below would see 4 calls
+# (3 plain + 1 arm) rather than 2 (1 plain + 1 arm).
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "case 40 exit $RC, want 0"
+# plain calls = total triage calls - arm calls. Must be exactly 1 (the cached precheck).
+_plain40="$(( $(calls triage) - $(arm_calls) ))"
+[[ "$_plain40" == "1" ]] \
+    || fail "case 40: want 1 plain triage call (cache hit for PR 2+3), got $_plain40 ($(calls triage) total, $(arm_calls) arm)"
+end_case "case 40 precheck-bucket cache fires triage exactly once"
 
 # --- summary --------------------------------------------------------------------------------
 if [[ $FAILED -eq 0 ]]; then

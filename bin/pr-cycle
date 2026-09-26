@@ -670,7 +670,7 @@ _arm_and_classify() {
     : > "$RUNDIR/your-turn.txt"
     while IFS="$(printf '\t')" read -r _ac_pr _ac_bkt _ac_act; do
         [ -n "$_ac_pr" ] || continue
-        case "$_ac_pr" in '#'[0-9]*) ;; *) continue ;; esac
+        [[ "$_ac_pr" =~ ^#[0-9]+$ ]] || continue
         _ac_n="${_ac_pr#\#}"
         if [ "$_ac_bkt" = "ARMABLE" ]; then
             echo "$_ac_n" >> "$RUNDIR/armed.txt"

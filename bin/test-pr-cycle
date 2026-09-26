@@ -300,8 +300,6 @@ run_in() {
         PR_CYCLE_DM_CMD="$BIN/dm" \
         PR_CYCLE_GH_CMD="$BIN/gh" \
         PR_CYCLE_MAIN_CHECKOUT="${MAIN_OVERRIDE-$MAIN}" \
-        PR_CYCLE_POLL_INTERVAL="${IVAL:-0}" \
-        PR_CYCLE_POLL_CEILING="${CEIL:-0}" \
         PR_CYCLE_STOP_FILE="$SCRATCH/.ibl5-pr-cycle.stop" \
         PR_CYCLE_TS="${TSPIN:-$TSBASE}" \
         "$DRIVER" "$@" 2>"$ERR")"
@@ -336,7 +334,7 @@ begin_case
 reset_state
 run --help
 [[ $RC -eq 0 ]] || fail "--help exit $RC"
-for f in -- --go --dry-run --stop --no-dm --max-merges --only --skip --help; do
+for f in -- --go --dry-run --stop --no-dm --max-ready --jobs --only --skip --help; do
     [[ "$f" == "--" ]] && continue
     grep -qF -- "$f" <<< "$OUT" || fail "--help omits $f"
 done
@@ -346,7 +344,8 @@ grep -qF 'PR_CYCLE_LOG' <<< "$OUT" \
     || fail "--help truncated: the trailing PR_CYCLE_LOG seam line is missing"
 grep -qF 'judged-empty form' <<< "$OUT" \
     || fail "--help omits the gate-nominee handling note"
-for bad in "--nope" "--max-merges 0" "--max-merges -1" "--max-merges abc" "--max-merges" "--go --stop" \
+for bad in "--nope" "--max-ready 0" "--max-ready -1" "--max-ready abc" "--max-ready" \
+           "--jobs 0" "--jobs abc" "--jobs" "--max-merges 5" "--go --stop" \
            "--only" "--only abc" "--only 0" "--only 007" "--only -1" "--only 101 --skip 102" \
            "--skip" "--skip abc" "--skip 1,x"; do
     # shellcheck disable=SC2086
@@ -923,6 +922,18 @@ grep -qF -- '--worker' "$RUNNER" || fail "runner does not carry --worker"
 grep -qF "NO_DM=''" "$RUNNER" || fail "runner NO_DM not empty by default"
 grep -qE '^export PR_CYCLE_SKIP_READY_WHEN_ARMABLE=' "$RUNNER" \
     || fail "runner does not export the ARMABLE-skip seam"
+_rv_maxready="$(bash -c "$(grep -m1 '^MAX_READY=' "$RUNNER"); printf '%s' \"\$MAX_READY\"")"
+[[ "$_rv_maxready" == "10" ]] || fail "runner MAX_READY='$_rv_maxready', want 10"
+_rv_jobs="$(bash -c "$(grep -m1 '^JOBS=' "$RUNNER"); printf '%s' \"\$JOBS\"")"
+[[ "$_rv_jobs" == "3" ]] || fail "runner JOBS='$_rv_jobs', want 3"
+! grep -q 'PR_CYCLE_POLL_' "$RUNNER" || fail "runner still exports PR_CYCLE_POLL_ vars"
+
+rm -f "$RUNNER" "$PLIST"
+PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go --max-ready 4 --jobs 2
+_rv_mr4="$(bash -c "$(grep -m1 '^MAX_READY=' "$RUNNER"); printf '%s' \"\$MAX_READY\"")"
+_rv_j2="$(bash -c "$(grep -m1 '^JOBS=' "$RUNNER"); printf '%s' \"\$JOBS\"")"
+[[ "$_rv_mr4" == "4" ]] || fail "--max-ready 4: runner MAX_READY='$_rv_mr4', want 4"
+[[ "$_rv_j2" == "2" ]] || fail "--jobs 2: runner JOBS='$_rv_j2', want 2"
 
 rm -f "$RUNNER" "$PLIST"
 PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go --no-dm

@@ -150,8 +150,8 @@ function getA11yOptions(
 const publicPages: Array<{ name: string; url: string }> = [
   { name: 'homepage', url: 'index.php' },
   { name: 'standings', url: 'modules.php?name=Standings' },
-  { name: 'season leaderboards', url: 'modules.php?name=SeasonLeaderboards' },
-  { name: 'career leaderboards', url: 'modules.php?name=CareerLeaderboards' },
+  { name: 'season leaderboards', url: 'modules.php?name=Leaderboards&tab=season' },
+  { name: 'career leaderboards', url: 'modules.php?name=Leaderboards&tab=career' },
   { name: 'draft history', url: 'modules.php?name=DraftHistory' },
   { name: 'cap space', url: 'modules.php?name=CapSpace' },
   { name: 'player page', url: 'modules.php?name=Player&pa=showpage&pid=1' },

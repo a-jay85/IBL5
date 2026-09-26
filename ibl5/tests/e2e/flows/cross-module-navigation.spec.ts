@@ -47,7 +47,7 @@ test.describe('Cross-module navigation', () => {
   });
 
   test('season leaderboard → click leader → player page loads', async ({ page }) => {
-    await page.goto('modules.php?name=SeasonLeaderboards');
+    await page.goto('modules.php?name=Leaderboards&tab=season');
     await assertNoPhpErrors(page, 'on Season Leaderboards');
 
     const playerLink = page.locator('a[href*="name=Player"][href*="pid="]').first();

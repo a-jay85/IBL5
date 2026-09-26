@@ -68,7 +68,7 @@ class NavigationMenuBuilderTest extends TestCase
 
         $urls = array_column($menus['History']['links'], 'url');
 
-        $this->assertSame(1, count(array_keys($urls, 'modules.php?name=Leaderboards', true)));
+        $this->assertCount(1, array_keys($urls, 'modules.php?name=Leaderboards', true));
         foreach ($urls as $url) {
             $this->assertStringNotContainsString('name=SeasonLeaderboards', (string) $url);
             $this->assertStringNotContainsString('name=CareerLeaderboards', (string) $url);

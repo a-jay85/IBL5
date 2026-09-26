@@ -1,12 +1,16 @@
 import os
 import pathlib
 import sys
+import tempfile
 
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import cifix, fidelity
+from harness.adapters.ghad import RecordingGh
+from harness.adapters.gitad import LiveGit
+from harness.state import HarnessError
 
 
 class TestTriage:
@@ -142,3 +146,56 @@ class TestRollupNamesInWorkflows:
                 f"ROLLUP_CHECKS name {name!r} not found as 'name: {name}' "
                 f"in any file under {workflows_dir}"
             )
+
+
+# ---- Phase 3a: adapter seam tests ----
+
+class TestPushFf:
+    def test_push_ff_never_forces(self, monkeypatch, tmp_path):
+        captured_argv = []
+
+        def fake_run_out(self, *args):
+            captured_argv.extend(args)
+            return (0, "")
+
+        git = LiveGit.__new__(LiveGit)
+        git.push_remote = "origin"
+        git.worktree = str(tmp_path)
+        monkeypatch.setattr(LiveGit, "branch", lambda self: "test-branch")
+        monkeypatch.setattr(LiveGit, "head", lambda self: "abc123")
+        monkeypatch.setattr(LiveGit, "_run_out", fake_run_out)
+
+        git.push_ff()
+
+        assert not any(arg.startswith("--force") for arg in captured_argv)
+
+    def test_push_ff_maps_hook_denial_to_local_gate(self, monkeypatch, tmp_path):
+        from harness.adapters.gitad import _LOCAL_GATE_MARKERS
+
+        marker = next(iter(_LOCAL_GATE_MARKERS))
+
+        def fake_run_out(self, *args):
+            return (1, f"pre-push hook denied: {marker}")
+
+        git = LiveGit.__new__(LiveGit)
+        git.push_remote = "origin"
+        git.worktree = str(tmp_path)
+        monkeypatch.setattr(LiveGit, "branch", lambda self: "test-branch")
+        monkeypatch.setattr(LiveGit, "head", lambda self: "abc123")
+        monkeypatch.setattr(LiveGit, "_run_out", fake_run_out)
+
+        with pytest.raises(HarnessError) as exc_info:
+            git.push_ff()
+        assert exc_info.value.kind == "local-gate"
+
+
+class TestRecordingGhRerun:
+    def test_recording_gh_rerun_records_action(self, tmp_path):
+        gh = RecordingGh(str(tmp_path))
+        gh.run_rerun_failed("111")
+
+        actions = gh.actions()
+        assert any(
+            a.get("action") == "run_rerun_failed" and a.get("run_id") == "111"
+            for a in actions
+        )

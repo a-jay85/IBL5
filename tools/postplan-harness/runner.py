@@ -402,10 +402,22 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # order. The join happens before anything moves the head (fidelity remediation),
         # so the review still posts against the head it read.
         # Phase 4.5 snapshot: thread ids that exist BEFORE this run posts anything.
-        # Taken on this thread, ahead of the review submit, so the worker's posts can
-        # never race into it. Empty on any failure = Phase 4.5 acts on nothing.
+        # Taken before the review worker is submitted, so nothing this run posts can
+        # enter it. Empty on any failure = Phase 4.5 acts on nothing.
         pre_posting_ids = gh.pr_thread_ids(pr)
         log(f"phase4.5 snapshot: {len(pre_posting_ids)} pre-existing thread(s)")
+
+        # ---- Phase 4.5: pre-existing trusted review threads --------------
+        # Runs before the review worker starts, so a fix commit can never move the head
+        # under the worker's posts, and Phase 4, 5, 5.0 and 5.5 all read the fixed tree.
+        # Never blocks the run: only gate-path-edit and push-failed propagate.
+        res.thread_ingestion = _run_thread_ingestion_phase(
+            gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log, res)
+        if res.thread_ingestion.get("fixed"):
+            sha = git.head()
+            files = git.changed_files()
+            diff = git.diff_vs_base()
+            meta = gh.pr_meta() or meta
         review_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         review_future = review_pool.submit(ReviewPhase(llm, gh).run, meta, cls, plan)
         review_pool.shutdown(wait=False)
@@ -506,30 +518,6 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         body = _upsert_no_adr_markers(body, plan)
         gh.pr_edit_body(pr, body)
         _check_backlog_closes(gh, pr, plan, log)
-
-        # ---- Phase 4.5: pre-existing trusted review threads --------------
-        # After the review join (4D is complete on the worker) and before the fidelity
-        # review (fixes land in the diff it judges). Never blocks Phase 5.5: only the
-        # two errors fidelity itself refuses to swallow propagate.
-        _join_review()
-        res.thread_ingestion = _run_thread_ingestion_phase(
-            gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log, res)
-        if res.thread_ingestion.get("fixed"):
-            sha = git.head()
-            tracks = verifier.run(cls)
-            phase5 = aggregate(tracks)
-            res.phase5 = phase5
-            log("phase5 tracks (post-thread-fix): "
-                + ", ".join(f"{t.name}={t.status}" for t in tracks)
-                + f" -> PHASE5_VERIFY_STATUS={phase5}")
-            files = git.changed_files()
-            diff = git.diff_vs_base()
-            resolutions = {}
-            unresolved = conformance.check(plan, files, diff, phase5_status=phase5,
-                                           resolutions=resolutions)
-            res.unresolved_conformance = unresolved
-            _write_conformance_handoff(out_dir, unresolved)
-            log(f"phase5.0 conformance (post-thread-fix): {unresolved or 'clean'}")
 
         # ---- Phase 5.5: plan-intent fidelity review --------------------
         # Pinned BEFORE the call: condition (12) compares the tree the reviewer saw
@@ -901,7 +889,8 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
                 git, worktree, msg, log, phase="phase4.5"),
             push=lambda: _push_with_adr_draft(git, log, "phase4.5", llm=llm,
                                               worktree=worktree, out_dir=out_dir,
-                                              res=res))
+                                              res=res,
+                                              pr=(pr if isinstance(git, LiveGit) else None)))
     except HarnessError as e:
         if e.kind in ("gate-path-edit", "push-failed"):
             raise
@@ -909,7 +898,7 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
             "condition (11) keeps the hold")
         out = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None,
                "error": f"{e.kind}: {e.detail}"}
-    except Exception as e:  # noqa: BLE001 - never block Phase 5.5 on this step
+    except Exception as e:  # noqa: BLE001 - never block the run on this step
         log(f"phase4.5: thread ingestion failed ({e!r}); continuing")
         out = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None,
                "error": repr(e)}

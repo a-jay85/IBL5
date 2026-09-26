@@ -71,53 +71,49 @@ def test_snapshot_is_taken_before_the_review_is_submitted():
     )
 
 
-def test_ingestion_runs_after_join_and_before_fidelity():
-    """Phase 4.5 call must be after the join assignment and before _run_fidelity.
+def test_ingestion_runs_after_snapshot_and_before_review_submit():
+    """Phase 4.5 must run after the snapshot and before the review worker starts.
 
-    Mutation caught: placing the call above the join (head moves under the
-    worker's post) or below _run_fidelity (fixes miss the review).
+    Mutation caught: moving the call below the submit (the head could move under
+    the worker's posts) or above the snapshot (the snapshot would miss nothing
+    and ingestion would act on an empty id set).
     """
     src = _src()
-    ingestion_pos = src.index("res.thread_ingestion = _run_thread_ingestion_phase(")
-    # The join assignment must appear before the ingestion call
-    join_assign_pos = src.index("join_review = _join_review")
-    assert join_assign_pos < ingestion_pos, (
-        "_run_thread_ingestion_phase must be called after join_review = _join_review"
-    )
-    # The last _join_review() call BEFORE the ingestion must exist
-    join_call_pos = src.rfind("_join_review()", 0, ingestion_pos)
-    assert join_call_pos > join_assign_pos, (
-        "_join_review() must be called before _run_thread_ingestion_phase"
-    )
-    # Ingestion must precede _run_fidelity
-    fidelity_pos = src.index("_run_fidelity(llm, out_dir")
-    assert ingestion_pos < fidelity_pos, (
-        "_run_thread_ingestion_phase must be called before _run_fidelity"
+    s = src.index("pre_posting_ids = gh.pr_thread_ids(pr)")
+    i = src.index("res.thread_ingestion = _run_thread_ingestion_phase(")
+    r = src.index("review_future = review_pool.submit(")
+    assert s < i < r, (
+        "order must be snapshot, then _run_thread_ingestion_phase, then review_pool.submit"
     )
 
 
-def test_fix_triggers_verify_and_conformance_rerun_before_fidelity():
-    """When a thread fix lands, verify + conformance must re-run before fidelity.
+def test_fix_refreshes_head_and_meta_before_review_submit():
+    """A thread fix must refresh sha and PR meta before the review worker starts.
 
-    Mutation caught: dropping the re-run — condition (3) would never clear on
-    a thread fix that authored a planned file.
+    Mutation caught: dropping the meta refresh; the review would checkpoint the
+    pre-fix head as reviewed_head.
     """
     src = _src()
-    fixed_check_pos = src.index('if res.thread_ingestion.get("fixed")')
-    fidelity_pos = src.index("_run_fidelity(llm, out_dir")
-    assert fixed_check_pos < fidelity_pos, (
-        "thread fix re-run block must appear before _run_fidelity"
-    )
-    # The slice between the fixed check and _run_fidelity must contain re-run calls
-    slice_text = src[fixed_check_pos:fidelity_pos]
-    assert "verifier.run(cls)" in slice_text, (
-        "verifier.run(cls) must appear in the post-thread-fix re-run block"
-    )
-    assert "conformance.check(" in slice_text, (
-        "conformance.check must appear in the post-thread-fix re-run block"
-    )
-    assert "_write_conformance_handoff(" in slice_text, (
-        "_write_conformance_handoff must appear in the post-thread-fix re-run block"
+    i = src.index("res.thread_ingestion = _run_thread_ingestion_phase(")
+    j = src.index('if res.thread_ingestion.get("fixed")')
+    r = src.index("review_future = review_pool.submit(")
+    assert i < j < r, "the fixed-refresh block must sit between Phase 4.5 and the submit"
+    refresh = src[j:r]
+    assert "sha = git.head()" in refresh, "a thread fix must refresh sha"
+    assert "gh.pr_meta()" in refresh, "a thread fix must refresh PR meta"
+    assert "post-thread-fix" not in src, "the old post-thread-fix re-run block must be gone"
+
+
+def test_no_join_before_review_submit():
+    """No _join_review() call may precede the review submit.
+
+    Mutation caught: re-adding a join ahead of the worker, which serialises
+    Phase 4 and breaks the review/fidelity overlap.
+    """
+    src = _src()
+    r = src.index("review_future = review_pool.submit(")
+    assert src.find("_join_review()", 0, r) == -1, (
+        "_join_review() must not be called before review_pool.submit"
     )
 
 

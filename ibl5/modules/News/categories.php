@@ -18,7 +18,7 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-// English UI strings formerly loaded by get_lang('News').
+// English UI strings defined in this file.
 if (!defined('_READMORE')) {
     define('_READMORE', 'Read More...');
 }

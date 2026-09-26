@@ -6,7 +6,7 @@ namespace Topics\News;
 
 use Topics\News\Contracts\NewsControllerInterface;
 
-// English UI strings (formerly loaded at runtime by mainfile.php).
+// English UI strings defined in this file.
 if (!defined('_READMORE')) {
     define('_READMORE', 'Read More...');
 }

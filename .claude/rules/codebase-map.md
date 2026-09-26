@@ -164,7 +164,7 @@ PlrParser -> League Season
 ProjectedDraftOrder -> League Security UI
 RecordHolders -> Cache Discord League Player Security UI Utilities
 Repositories -> League
-RookieOption -> BasketballStats Discord Player Repositories Season Security Topics Validation
+RookieOption -> BasketballStats Discord League Player Repositories Season Security Topics Validation
 SavedDepthChart -> Repositories Season Security Team
 Schedule -> LeagueSchedule Repositories Standings TeamSchedule
 Search -> BaseMysqliRepository Security

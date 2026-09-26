@@ -9,6 +9,7 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use BasketballStats\SalaryConverter;
 use RookieOption\Contracts\RookieOptionControllerInterface;
 use RookieOption\Contracts\RookieOptionRepositoryInterface;
+use League\League;
 use Season\Season;
 use Discord\Discord;
 use Topics\News\Contracts\NewsRepositoryInterface;
@@ -23,6 +24,8 @@ class RookieOptionController implements RookieOptionControllerInterface
     private const NOTIFICATION_EMAIL_SENDER = 'rookieoption@iblhoops.net';
     private const DISCORD_CHANNEL = '#rookie-options';
     private const ROOKIE_EXTENSION_CATEGORY = 'Rookie Extension';
+    private const OWNERSHIP_ERROR_MESSAGE = 'You can only exercise options for your own team.';
+    private const MISSING_PARAMS_MESSAGE = 'Invalid request. Missing required parameters.';
 
     private \mysqli $db;
     private RookieOptionRepositoryInterface $repository;
@@ -58,8 +61,22 @@ class RookieOptionController implements RookieOptionControllerInterface
     /**
      * @see RookieOptionControllerInterface::processRookieOption()
      */
-    public function processRookieOption(string $teamName, int $playerID, int $extensionAmount): array
+    public function processRookieOption(string $teamName, int $playerID, int $extensionAmount, ?string $sessionTeam): array
     {
+        // Ownership gate. Runs before any DB read so a teamless (null) or Free Agents
+        // session, or a POSTed team that is not the caller's, never reaches a query.
+        if ($sessionTeam === null
+            || $sessionTeam === League::FREE_AGENTS_TEAM_NAME
+            || $sessionTeam !== $teamName) {
+            return ['success' => false, 'type' => 'ownership_error', 'message' => self::OWNERSHIP_ERROR_MESSAGE, 'playerID' => $playerID];
+        }
+
+        // Input validation. Moved from the module; stays after the ownership gate to keep
+        // the module's original precedence (ownership refusal wins on a malformed teamless POST).
+        if ($teamName === '' || $playerID === 0 || $extensionAmount === 0) {
+            return ['success' => false, 'type' => 'validation_error', 'message' => self::MISSING_PARAMS_MESSAGE, 'playerID' => $playerID];
+        }
+
         $season = $this->season ?? new Season($this->db);
         $player = Player::withPlayerID($this->db, $playerID);
 

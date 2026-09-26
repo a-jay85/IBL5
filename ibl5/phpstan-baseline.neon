@@ -2836,7 +2836,7 @@ parameters:
 		-
 			rawMessage: 'Parameter #1 $string of function rawurlencode expects string, mixed given.'
 			identifier: argument.type
-			count: 3
+			count: 1
 			path: modules/Player/index.php
 
 		-
@@ -2956,7 +2956,7 @@ parameters:
 		-
 			rawMessage: Unreachable statement - code above always terminates.
 			identifier: deadCode.unreachable
-			count: 2
+			count: 1
 			path: modules/Player/index.php
 
 		-

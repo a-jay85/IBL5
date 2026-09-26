@@ -61,7 +61,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
 
         ob_start();
         ?>
-<form name="Leaderboards" method="post" action="modules.php?name=SeasonLeaderboards" class="ibl-filter-form">
+<form name="Leaderboards" method="post" action="modules.php?name=Leaderboards&amp;tab=season" class="ibl-filter-form">
     <div class="ibl-filter-form__row">
         <div class="ibl-filter-form__group">
             <label for="sl-team" class="ibl-filter-form__label">Team:</label>

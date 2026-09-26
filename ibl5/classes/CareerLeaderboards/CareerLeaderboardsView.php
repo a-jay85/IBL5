@@ -61,7 +61,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
 
         ob_start();
         ?>
-<form name="CareerLeaderboards" method="post" action="modules.php?name=CareerLeaderboards" class="ibl-filter-form">
+<form name="CareerLeaderboards" method="post" action="modules.php?name=Leaderboards&amp;tab=career" class="ibl-filter-form">
     <div class="ibl-filter-form__row">
         <div class="ibl-filter-form__group">
             <label for="cl-type" class="ibl-filter-form__label">Type:</label>

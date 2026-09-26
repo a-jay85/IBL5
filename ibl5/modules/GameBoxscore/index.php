@@ -20,7 +20,6 @@ use GameBoxscore\GameBoxscoreService;
 use GameBoxscore\GameBoxscoreView;
 
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
 
 global $mysqli_db, $leagueContext;
 

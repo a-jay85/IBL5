@@ -24,7 +24,6 @@ use ContractList\ContractListService;
 use ContractList\ContractListView;
 
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
 
 $pagetitle = "- Master Contract List";
 

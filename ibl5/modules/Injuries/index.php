@@ -22,7 +22,6 @@ use Injuries\InjuriesService;
 use Injuries\InjuriesView;
 
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
 
 $pagetitle = "- Injured Players";
 

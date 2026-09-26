@@ -26,7 +26,6 @@ use OneOnOneGame\OneOnOneGameEngine;
 use OneOnOneGame\OneOnOneGameView;
 
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
 
 $pagetitle = "- $module_name";
 

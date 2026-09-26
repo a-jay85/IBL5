@@ -32,24 +32,6 @@ function include_secure($file_name)
     \Bootstrap\SecurityBootstrap::includeSafe($file_name);
 }
 
-function get_lang($module)
-{
-    global $currentlang, $language;
-    if ($module == "admin" and $module != "Forums") {
-        if (file_exists("admin/language/lang-" . $currentlang . ".php")) {
-            include_secure("admin/language/lang-" . $currentlang . ".php");
-        } elseif (file_exists("admin/language/lang-" . $language . ".php")) {
-            include_secure("admin/language/lang-" . $language . ".php");
-        }
-    } else {
-        if (file_exists("modules/$module/language/lang-" . $currentlang . ".php")) {
-            include_secure("modules/$module/language/lang-" . $currentlang . ".php");
-        } elseif (file_exists("modules/$module/language/lang-" . $language . ".php")) {
-            include_secure("modules/$module/language/lang-" . $language . ".php");
-        }
-    }
-}
-
 function is_admin($admin = null)
 {
     global $authService;

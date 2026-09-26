@@ -18,6 +18,20 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
+// English UI strings formerly loaded by get_lang('News').
+if (!defined('_READMORE')) {
+    define('_READMORE', 'Read More...');
+}
+if (!defined('_BYTESMORE')) {
+    define('_BYTESMORE', 'bytes more');
+}
+if (!defined('_COMMENTSQ')) {
+    define('_COMMENTSQ', 'comments?');
+}
+if (!defined('_COMMENT')) {
+    define('_COMMENT', 'comment');
+}
+
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 

@@ -6,6 +6,35 @@ namespace Topics\News;
 
 use Topics\News\Contracts\NewsControllerInterface;
 
+// English UI strings formerly loaded by get_lang('News').
+if (!defined('_READMORE')) {
+    define('_READMORE', 'Read More...');
+}
+if (!defined('_BYTESMORE')) {
+    define('_BYTESMORE', 'bytes more');
+}
+if (!defined('_COMMENTSQ')) {
+    define('_COMMENTSQ', 'comments?');
+}
+if (!defined('_COMMENT')) {
+    define('_COMMENT', 'comment');
+}
+if (!defined('_NOINFO4TOPIC')) {
+    define('_NOINFO4TOPIC', "Sorry, there isn't information for the selected topic.");
+}
+if (!defined('_GOTONEWSINDEX')) {
+    define('_GOTONEWSINDEX', 'Go to News Index');
+}
+if (!defined('_SELECTNEWTOPIC')) {
+    define('_SELECTNEWTOPIC', 'Select a New Topic');
+}
+if (!defined('_SEARCHONTOPIC')) {
+    define('_SEARCHONTOPIC', 'Search on This Topic');
+}
+if (!defined('_GOTOHOME')) {
+    define('_GOTOHOME', 'Go to Home');
+}
+
 class NewsController implements NewsControllerInterface
 {
     public function main(mixed $new_topic): void

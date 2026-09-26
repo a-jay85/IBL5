@@ -226,3 +226,28 @@ ljob_dm_send() {
 # ---------------------------------------------------------------------------
 xml_escape() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 shq() { local q="'\\''"; printf "'%s'" "${1//\'/$q}"; }
+
+# ---------------------------------------------------------------------------
+# ljob_reap_idle <label_prefix> <alive_fn> <min_age_min> <snapshot>
+# Reaps <agents_dir>/<prefix>*.plist whose job is provably idle:
+#   - plist mtime older than <min_age_min> minutes (guards the bootstrap->spawn window);
+#   - the snapshot row whose 3rd tab field EQUALS the label is absent, or its PID is "-";
+#   - <alive_fn> <label> returns 1 (no process carries the label).
+# A loaded-idle label is booted out before its plist is removed. LJOB_REAP_DRY=1 prints
+# "would reap <label>" and changes nothing. Always returns 0.
+ljob_reap_idle() {
+    local prefix="$1" alive_fn="$2" age="$3" snap="$4" f label row pid
+    for f in "$(ljob_agents_dir)/${prefix}"*.plist; do
+        [[ -e "$f" ]] || continue
+        label="$(basename "$f" .plist)"
+        [[ -n "$(find "$f" -mmin "-${age}" 2>/dev/null)" ]] && continue   # too young
+        row="$(awk -F'\t' -v l="$label" '$3 == l {print; exit}' <<< "$snap")"
+        pid="${row%%$'\t'*}"
+        [[ -n "$row" && "$pid" != "-" ]] && continue                      # running
+        "$alive_fn" "$label" && continue                                   # live process
+        if [[ -n "${LJOB_REAP_DRY:-}" ]]; then echo "would reap $label"; continue; fi
+        [[ -n "$row" ]] && { launchctl bootout "gui/$(id -u)/${label}" 2>/dev/null || true; }
+        rm -f "$f"; echo "reaped stale job $label"
+    done
+    return 0
+}

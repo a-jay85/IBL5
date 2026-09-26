@@ -17,12 +17,14 @@
 #
 # Bucket precedence (first match wins):
 #   1. DIRTY                  merge conflict (mergeStateStatus == DIRTY)
-#   2. NOT-MERGEABLE          GitHub will not merge this head as-is —
-#                             mergeStateStatus is BEHIND / DRAFT / UNKNOWN (or an
-#                             unrecognised value). BEHIND is the load-bearing one:
-#                             master's protection is strict, so a behind PR's green
-#                             checks ran on a SHA GitHub will not merge — green but
-#                             NOT current, which must never arm
+#   2. NOT-MERGEABLE          DRAFT / UNKNOWN (or an unrecognised or empty value) —
+#                             GitHub will not merge this head and no update fixes
+#                             that. BEHIND is NOT in this bucket since 2026-09: it
+#                             falls through, and when every lower bucket clears it
+#                             lands in ARMABLE with action "arm auto-merge (update
+#                             branch first)"; --arm then arms AND calls
+#                             update-branch, so the green checks are re-run on the
+#                             updated head before auto-merge can fire
 #   3. BLOCKED-CHECK          a required Tests/E2E check is failing/pending/
 #                             cancelled/absent, or body declares an expected-red
 #   4. HELD                   Manual-Testing real rows, golden touched, or a
@@ -33,10 +35,11 @@
 #                             clears it, so it is never armed
 #   7. FEAT-AWAITING-SIGNOFF  feat: title without the human-approved label
 #   8. UNCLEARED              no Manual-Testing section (fail-closed; never armed)
-#   9. ARMABLE                CLEARED + a mergeable merge-state + all required
-#                             checks green-and-current
+#   9. ARMABLE                CLEARED + an armable merge-state (mergeable, or
+#                             BEHIND) + all required checks green on the current
+#                             head
 #
-# Exit codes: 0 = report generated; 1 = an attempted --arm merge failed;
+# Exit codes: 0 = report generated; 1 = an attempted --arm merge or update-branch failed;
 #             2 = usage error or gh not authenticated.
 
 set -euo pipefail
@@ -56,7 +59,10 @@ Classifies every OPEN PR into one bucket (first-match-wins) and prints a report.
 
 Options:
   --arm        Arm `gh pr merge --squash --auto` on ONLY the ARMABLE bucket.
-               Without it, the tool is read-only (report only).
+               Without it, the tool is read-only (report only). A BEHIND PR is
+               armed and then updated onto master in the same pass
+               (gh api PUT pulls/N/update-branch); an update failure is reported
+               and exits 1.
   --help, -h   Show this message.
 
 Environment (test seams):
@@ -65,12 +71,12 @@ Environment (test seams):
 
 ARMABLE is fail-closed: a PR is armed only with a positive Manual-Testing
 clearance ("No manual testing needed"), all required checks green-and-current,
-no merge-state hold (DIRTY/BEHIND/DRAFT/UNKNOWN — BEHIND is what enforces
-"current", since master requires branches to be up to date), and no
-HELD/dep/feat hold. A PR with no `## Manual Testing` section is
+no merge-state hold (DIRTY/DRAFT/UNKNOWN; BEHIND arms, paired with an immediate
+update-branch, since master's strict protection re-runs checks on the updated
+head), and no HELD/dep/feat hold. A PR with no `## Manual Testing` section is
 UNCLEARED and routed to a human. Reads one page (200 PRs / 100 check-runs).
 
-Exit codes: 0 = report generated; 1 = an attempted --arm merge failed;
+Exit codes: 0 = report generated; 1 = an attempted --arm merge or update-branch failed;
             2 = usage error / gh not authenticated.
 EOF
 }
@@ -169,10 +175,10 @@ PR_COUNT="$(echo "$PRS_JSON" | jq 'length')"
 # consumers to anchor on `clearance=` instead.)
 #
 # Widths are >= the longest value each CLOSED enum can emit, so nothing overflows
-# in practice: BUCKET <= 21 ("FEAT-AWAITING-SIGNOFF"), NEXT-ACTION <= 31
-# ("human review (checks not green)"), MSS <= 9 ("HAS_HOOKS"), CLEARANCE <= 7
+# in practice: BUCKET <= 21 ("FEAT-AWAITING-SIGNOFF"), NEXT-ACTION <= 36
+# ("arm auto-merge (update branch first)"), MSS <= 9 ("HAS_HOOKS"), CLEARANCE <= 7
 # ("CLEARED"), a check state <= 9 ("cancelled"). HOLDS is last and unbounded.
-W_PR=7; W_BUCKET=22; W_ACTION=32; W_MSS=9; W_CLEAR=9; W_CHECK=9
+W_PR=7; W_BUCKET=22; W_ACTION=37; W_MSS=9; W_CLEAR=9; W_CHECK=9
 
 # ctx_header <required-check-context> -> its short column header. REQUIRED comes
 # from the live branch-protection API, so an unrecognised context must still get
@@ -230,10 +236,23 @@ mss_blocks_merge() {
     esac
 }
 
+# mss_armable <mergeStateStatus> -> 0 (true) when auto-merge may be ARMED on this
+# head: the four states mss_blocks_merge allows, plus BEHIND. A BEHIND head still
+# cannot merge as-is (master's protection is strict), so arming it is safe ONLY
+# because --arm pairs the arm with an immediate update-branch (see the --arm
+# block) and GitHub re-runs the required checks on the updated head before the
+# armed auto-merge fires. DRAFT, UNKNOWN and every unrecognised value stay
+# blocked: those are not "green but stale", they are "not a mergeable PR".
+mss_armable() {
+    case "$1" in
+        BEHIND) return 0 ;;
+        *) ! mss_blocks_merge "$1" ;;
+    esac
+}
+
 # mss_action <mergeStateStatus> -> the NEXT-ACTION text for a NOT-MERGEABLE row.
 mss_action() {
     case "$1" in
-        BEHIND)  echo "update branch onto master" ;;
         DRAFT)   echo "mark ready for review" ;;
         UNKNOWN) echo "re-check (state unknown)" ;;
         *)       echo "re-check merge state" ;;
@@ -324,10 +343,10 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     action=""
     if [ "$mss" = "DIRTY" ]; then
         bucket="DIRTY"; action="rebase onto master"
-    elif mss_blocks_merge "$mss"; then
-        # Ranked here, beside DIRTY, because it is the same fact: GitHub will not
-        # merge this head. The per-check columns still print every required check's
-        # state, so nothing a lower bucket would have said is lost.
+    elif ! mss_armable "$mss"; then
+        # Ranked beside DIRTY: GitHub will not merge this head and no update fixes that.
+        # BEHIND is NOT here since 2026-09: it falls through and, if every lower bucket
+        # clears, arms together with an update-branch.
         bucket="NOT-MERGEABLE"; action="$(mss_action "$mss")"
     elif [ "$blocked_check" = "1" ]; then
         bucket="BLOCKED-CHECK"; action="fix / re-run CI"
@@ -349,8 +368,13 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         bucket="FEAT-AWAITING-SIGNOFF"; action="human sign-off + label"
     elif [ "$clearance" = "UNKNOWN" ]; then
         bucket="UNCLEARED"; action="human review (no clearance)"
-    elif [ "$clearance" = "CLEARED" ] && ! mss_blocks_merge "$mss" && [ "$armable_checks_green" = "1" ]; then
-        bucket="ARMABLE"; action="arm auto-merge"
+    elif [ "$clearance" = "CLEARED" ] && mss_armable "$mss" && [ "$armable_checks_green" = "1" ]; then
+        bucket="ARMABLE"
+        if [ "$mss" = "BEHIND" ]; then
+            action="arm auto-merge (update branch first)"
+        else
+            action="arm auto-merge"
+        fi
     else
         # Defensive: cleared but a check is not green yet (race) -> not armable.
         bucket="UNCLEARED"; action="human review (checks not green)"
@@ -378,6 +402,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     ROWS=$((ROWS + 1))
 
     # --- --arm side-effect: ONLY the ARMABLE bucket ---
+    # A BEHIND row additionally gets an immediate update-branch (see inside).
     # No --delete-branch, deliberately: the repo already sets deleteBranchOnMerge,
     # so GitHub deletes the head branch itself. Carrying the flag only added harm —
     # the local delete fails in a multi-worktree clone (gh can exit non-zero and
@@ -387,6 +412,18 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     if [ "$ARM" = "1" ] && [ "$bucket" = "ARMABLE" ]; then
         if "$GH_CMD" pr merge "$num" --squash --auto >/dev/null 2>&1; then
             echo "  armed auto-merge on #$num"
+            # BEHIND arms only because this update follows in the same pass. Without
+            # it the armed PR would wait on update-behind-prs.yml's schedule (measured
+            # 6-12h under GHA load, 2026-08-27/28). PUT update-branch returns 202 and
+            # GitHub re-runs the required checks on the new head before auto-merge fires.
+            if [ "$mss" = "BEHIND" ]; then
+                if $GH_API_CMD -X PUT "repos/$SLUG/pulls/$num/update-branch" >/dev/null 2>&1; then
+                    echo "  updated branch on #$num (was BEHIND)"
+                else
+                    echo "  UPDATE-BRANCH FAILED on #$num (gh api exited non-zero; PR stays armed, update-behind-prs.yml will retry on the next master push)" >&2
+                    EXIT=1
+                fi
+            fi
         else
             echo "  ARM FAILED on #$num (gh pr merge exited non-zero)" >&2
             EXIT=1

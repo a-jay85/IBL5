@@ -6,6 +6,9 @@ import pytest
 
 from harness import cifix
 from harness import fidelity
+from harness.adapters.gitad import LiveGit, _LOCAL_GATE_MARKERS
+from harness.adapters.ghad import RecordingGh
+from harness.state import HarnessError
 
 
 class TestTriage:
@@ -137,3 +140,59 @@ class TestWorkflowValidation:
                 f"{workflows_dir} contains the line 'name: {rollup_name}'. "
                 "Update ROLLUP_CHECKS to match the current job name."
             )
+
+
+# ---- Phase 3a adapter seam tests ----
+
+class TestPushFf:
+    def test_push_ff_never_forces(self, tmp_path, monkeypatch):
+        """push_ff must not pass --force or --force-with-lease."""
+        captured = []
+
+        def fake_run_out(self, *args):
+            captured.extend(args)
+            return (0, "")
+
+        monkeypatch.setattr(LiveGit, "_run_out", fake_run_out)
+        monkeypatch.setattr(LiveGit, "branch", lambda self: "my-branch")
+        monkeypatch.setattr(LiveGit, "head", lambda self: "abc123")
+
+        git = LiveGit.__new__(LiveGit)
+        git.worktree = str(tmp_path)
+        git.push_remote = "origin"
+
+        git.push_ff()
+
+        assert not any(a.startswith("--force") for a in captured)
+
+    def test_push_ff_maps_hook_denial_to_local_gate(self, tmp_path, monkeypatch):
+        """A push rejected with a _LOCAL_GATE_MARKERS text raises HarnessError local-gate."""
+        marker = next(iter(_LOCAL_GATE_MARKERS))
+
+        def fake_run_out(self, *args):
+            return (1, f"pre-push hook: {marker}")
+
+        monkeypatch.setattr(LiveGit, "_run_out", fake_run_out)
+        monkeypatch.setattr(LiveGit, "branch", lambda self: "my-branch")
+        monkeypatch.setattr(LiveGit, "head", lambda self: "abc123")
+
+        git = LiveGit.__new__(LiveGit)
+        git.worktree = str(tmp_path)
+        git.push_remote = "origin"
+
+        with pytest.raises(HarnessError) as exc_info:
+            git.push_ff()
+        assert exc_info.value.kind == "local-gate"
+
+
+class TestRecordingGhRerun:
+    def test_recording_gh_rerun_records_action(self, tmp_path):
+        """RecordingGh.run_rerun_failed records run_rerun_failed action with run_id."""
+        gh = RecordingGh(str(tmp_path))
+        result = gh.run_rerun_failed("111")
+        assert result is True
+        actions = gh.actions()
+        assert any(
+            a.get("action") == "run_rerun_failed" and str(a.get("run_id")) == "111"
+            for a in actions
+        )

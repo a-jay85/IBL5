@@ -40,7 +40,8 @@ PR_STICKY_MARKER = "<!-- pr-ready-verdict -->"
 class RecordingGh:
     MUTATIONS = ("pr_create", "pr_comment", "pr_review_findings", "pr_edit_body",
                  "pr_merge_auto", "label_add", "pr_status_badge",
-                 "pr_sticky_verdict", "issue_create", "pr_disable_auto_merge")
+                 "pr_sticky_verdict", "issue_create", "pr_disable_auto_merge",
+                 "pr_checks_json", "run_log_failed", "run_rerun_failed")
 
     def __init__(self, out_dir: str, fixture: dict | None = None):
         self.out_dir = out_dir
@@ -157,6 +158,20 @@ class RecordingGh:
 
     def merge_state_status(self, pr: int | None = None) -> str:
         return str((self.fixture or {}).get("merge_state_status", "CLEAN"))
+
+    def pr_checks_json(self, pr) -> list[dict]:
+        self.record("pr_checks_json", pr=pr)
+        return list(self.fixture.get("ci_checks") or [])
+
+    def run_log_failed(self, run_id, job_id, dest) -> bool:
+        self.record("run_log_failed", run_id=run_id, job_id=job_id)
+        with open(dest, "w") as fh:
+            fh.write("(replay log)\n")
+        return True
+
+    def run_rerun_failed(self, run_id) -> bool:
+        self.record("run_rerun_failed", run_id=run_id)
+        return True
 
     def pr_disable_auto_merge(self, pr: int) -> None:
         self.record("pr_disable_auto_merge", pr=pr)
@@ -396,6 +411,39 @@ class LiveGh(RecordingGh):
         except (HarnessError, OSError, subprocess.SubprocessError):
             return ""
         return (out or "").strip()
+
+    def pr_checks_json(self, pr) -> list[dict]:
+        try:
+            proc = subprocess.run(
+                ["gh", "pr", "checks", str(pr), "--json", "name,state,link"],
+                cwd=self.worktree, capture_output=True, text=True, timeout=self.timeout,
+            )
+            if proc.returncode not in (0, 8):
+                return []
+            return json.loads(proc.stdout)
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            return []
+
+    def run_log_failed(self, run_id, job_id, dest) -> bool:
+        try:
+            proc = subprocess.run(
+                ["gh", "run", "view", str(run_id), "--job", str(job_id), "--log-failed"],
+                cwd=self.worktree, capture_output=True, text=True, timeout=self.timeout,
+            )
+            with open(dest, "w") as fh:
+                fh.write(proc.stdout if proc.returncode == 0 else proc.stderr)
+            return proc.returncode == 0
+        except (OSError, subprocess.TimeoutExpired) as e:
+            with open(dest, "w") as fh:
+                fh.write(str(e))
+            return False
+
+    def run_rerun_failed(self, run_id) -> bool:
+        try:
+            self._gh("run", "rerun", str(run_id), "--failed")
+            return True
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            return False
 
     def pr_disable_auto_merge(self, pr: int) -> None:
         try:

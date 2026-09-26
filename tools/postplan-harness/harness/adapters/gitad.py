@@ -775,6 +775,21 @@ class LiveGit:
                 raise HarnessError("local-gate", f"git push: {out[:600]}")
             raise HarnessError("push-failed", out[:600])
 
+    def push_ff(self) -> str:
+        if not self.push_remote:
+            raise HarnessError("push-disabled",
+                               "no isolated push remote configured; live push requires install approval")
+        branch = self.branch()
+        if branch == "HEAD":
+            raise HarnessError("push-failed", "detached HEAD: refusing to push without a branch name")
+        remote = self.push_remote
+        rc, out = self._run_out("push", remote, f"HEAD:refs/heads/{branch}")
+        if rc != 0:
+            if any(m in out for m in _LOCAL_GATE_MARKERS):
+                raise HarnessError("local-gate", f"git push: {out[:600]}")
+            raise HarnessError("push-failed", out[:600])
+        return self.head()
+
 
 class ReplayGit:
     """Point-in-time state reconstructed from a historical trace fixture."""
@@ -783,6 +798,7 @@ class ReplayGit:
         self.fx = fixture
         self.commit_messages: list[str] = []
         self.pushes = 0
+        self.ff_pushes = 0
         self.meta_checks_calls: list[tuple[str, int]] = []
 
     def branch(self) -> str:
@@ -834,6 +850,10 @@ class ReplayGit:
     def push(self) -> None:  # replay: recorded as a count; ghad records PR intents
         self.pushes += 1
         return
+
+    def push_ff(self) -> str:
+        self.ff_pushes += 1
+        return ""
 
     def predict_rebase_conflict(self, base: str = "origin/master") -> tuple:
         # Replay mode has no live repo to probe; report clean so the probe is a no-op.

@@ -34,7 +34,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from harness import (adr_draft, body_numbers, ciwatch, conformance, fidelity, gitutil, llm_calls,
+from harness import (adr_draft, body_numbers, cifix, ciwatch, conformance, fidelity, gitutil, llm_calls,
                      manual_rows, manual_testing, schemas, statefile)
 from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
@@ -55,7 +55,7 @@ from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
 from harness.adapters.ghad import LiveGh, RecordingGh
 from harness.adapters.gitad import (LiveGit, ReplayGit, classify_local_gate_denial,
                                     is_stale_base, is_stale_lease)
-from harness.adapters.llm import ClaudeCli, FixtureLlm
+from harness.adapters.llm import ClaudeCli, FixtureLlm, TOOLED_TIMEOUT
 from harness.adapters.probe import FixtureProbe, LiveProbe
 from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate
 
@@ -192,6 +192,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         explicit_path: str | None = None,
         probe=None, state_dir: str | None = None) -> RunResult:
     os.makedirs(out_dir, exist_ok=True)
+    run_started = time.time()
     ledger = llm.ledger
     audit: list[str] = []
 
@@ -1064,6 +1065,222 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
             "disarming auto-merge")
         gh.pr_disable_auto_merge(pr)
     return sha, outcome
+
+
+# bin/automouse/run caps the whole post-plan at MAX_PP_SECS=5400. Leave 600s for
+# Phase 9/10 and teardown; test_ci_fix_budget_below_max_pp_secs pins the relation.
+_CI_FIX_WALL_BUDGET_SECS = 4800
+_CI_FIX_MIN_ITER_SECS = 1200   # one Opus fix plus one CI cycle; less than this, stop
+
+
+def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
+                 mode, fixture, run_started) -> tuple[str, "ciwatch.CiOutcome"]:
+    """Phase 7 CI fix loop. Returns (sha, outcome) after attempting fixes."""
+    # 1. Entry guards
+    if outcome.exit_code != 8:
+        return sha, outcome
+    if not outcome.failed:
+        log("phase7 ci-fix: exit 8 with no failed-check names - nothing to target")
+        return sha, outcome
+
+    # 2. Signoff-only check
+    kind, names = cifix.triage(outcome.failed)
+    if kind == "green":
+        log("phase7 ci-fix: only human-signoff failed - treating CI as green")
+        return sha, ciwatch.CiOutcome(0, [], outcome.evidence + " (human-signoff dropped)")
+
+    # 3. Dirty tree check
+    if git.is_dirty():
+        log("phase7 ci-fix: skipped - dirty worktree")
+        survivors = cifix.triage(outcome.failed)[1] or list(outcome.failed)
+        _try_post_survivor_comment(gh, pr, survivors, [], False, log)
+        return sha, outcome
+
+    # 4. Replay rewatch queue
+    queue: list[dict] = []
+    if mode == "replay":
+        queue = list((fixture or {}).get("ci_fix_rewatch") or [])
+
+    # 5. Loop state
+    attempt = 0
+    probed = False
+    last: str | None = None
+    trail: list[str] = []
+
+    while True:
+        kind, names = cifix.triage(outcome.failed)
+
+        if kind == "green":
+            return sha, ciwatch.CiOutcome(0, [], outcome.evidence + " (human-signoff dropped)")
+        if outcome.exit_code != 8:
+            return sha, outcome
+
+        # Probe branch: fires when rollup-only or last attempt made no change
+        if kind == "rollup-only" or last == "no-change":
+            remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+            if remaining < _CI_FIX_MIN_ITER_SECS:
+                log(f"phase7 ci-fix: wall-clock budget exhausted ({int(remaining)}s left)")
+                break
+            if probed:
+                break
+            probed = True
+            all_names = list(outcome.failed)
+            refs = cifix.failed_job_refs(gh.pr_checks_json(pr), all_names)
+            distinct_runs: set[str] = set()
+            for run_id, _job_id in refs.values():
+                if run_id not in distinct_runs:
+                    distinct_runs.add(run_id)
+                    gh.run_rerun_failed(run_id)
+            if mode != "replay":
+                for _ in range(10):
+                    time.sleep(15)
+                    current = gh.pr_checks_json(pr)
+                    if any(c.get("name") in all_names and c.get("state") != "FAILURE"
+                           for c in current):
+                        break
+                probe_outcome = ciwatch.watch_live(
+                    worktree, pr,
+                    timeout=max(300, int(remaining - 120))
+                )
+            else:
+                if queue:
+                    entry = queue.pop(0)
+                    probe_outcome = ciwatch.CiOutcome(
+                        entry["exit"], entry.get("failed", []), "replay rewatch"
+                    )
+                else:
+                    probe_outcome = ciwatch.CiOutcome(-1, [], "replay: ci_fix_rewatch exhausted")
+
+            probe_kind, _ = cifix.triage(probe_outcome.failed or []) if probe_outcome.exit_code == 0 else ("still-red", [])
+            probe_result = "flaky-green" if probe_outcome.exit_code == 0 else "still-red"
+            log(f"phase7 ci-fix rerun probe: outcome={probe_result} sha={str(sha)[:8]} failed={probe_outcome.failed}")
+
+            if probe_outcome.exit_code == 0:
+                try:
+                    gh.post_review_summary(pr, cifix.FLAKY_TITLE, cifix.flaky_comment(all_names))
+                except Exception:
+                    pass
+                outcome = probe_outcome
+                return sha, outcome
+            else:
+                outcome = probe_outcome
+                last = None
+                continue
+
+        # Ceiling and budget check
+        if attempt >= cifix.MAX_CI_FIX_ATTEMPTS:
+            break
+        remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+        if remaining < _CI_FIX_MIN_ITER_SECS:
+            log(f"phase7 ci-fix: wall-clock budget exhausted ({int(remaining)}s left)")
+            break
+
+        # Sync to remote head (live only)
+        if mode != "replay":
+            r = gitutil.reconcile_remote_head(pr, sha, git.head(), git.branch(), worktree)
+            if r.action == "diverged":
+                _fail_closed_on_divergence(gh, log, pr, "phase7", r.evidence, disarm=True)
+            if r.action == "synced":
+                sha = r.remote_sha
+
+        # Fix attempt
+        attempt += 1
+        fix_dir = os.path.join(out_dir, f"ci-fix-{attempt}")
+        os.makedirs(fix_dir, exist_ok=True)
+        diff_path = os.path.join(fix_dir, "diff.patch")
+        with open(diff_path, "w") as fh:
+            fh.write(git.diff_vs_base())
+
+        log_paths: dict[str, str] = {}
+        refs = cifix.failed_job_refs(gh.pr_checks_json(pr), names)
+        for name, (run_id, job_id) in refs.items():
+            import re as _re
+            log_file = os.path.join(fix_dir, _re.sub(r"[^A-Za-z0-9]+", "-", name) + ".log")
+            gh.run_log_failed(run_id, job_id, log_file)
+            log_paths[name] = log_file
+
+        try:
+            remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+            llm.call_tooled("ci-fix", cifix.CI_FIX_MODEL,
+                            cifix.ci_fix_prompt(pr, attempt, names, log_paths, diff_path, trail),
+                            cwd=worktree or ".", allowed_tools=cifix.CI_FIX_ALLOWED_TOOLS,
+                            denied_tools=cifix.CI_FIX_DENIED_TOOLS, add_dirs=(fix_dir,),
+                            timeout=int(min(TOOLED_TIMEOUT, remaining / 2)))
+            new = _commit_with_gate_remediation(git, worktree,
+                    cifix.CI_FIX_COMMIT_MSG.format(n=attempt), log, phase="phase7")
+        except HarnessError as e:
+            if e.kind == "remote-head-diverged":
+                raise
+            last = f"error:{e.kind}"
+            log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} outcome={last} sha={str(sha)[:8]}")
+            trail.append(f"attempt {attempt}: {last}")
+            if "LOCAL" not in last:
+                log(f"ci-fix commit is LOCAL and unpushed; the next bin/post-plan-now run ships it")
+            break
+
+        if not new:
+            last = "no-change"
+        else:
+            hits = fidelity.denied_gate_edits(git.changed_files(f"{new}^"))
+            if hits:
+                last = "error:gate-path-edit"
+                log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} outcome={last} sha={str(sha)[:8]}")
+                log(f"ci-fix commit {new[:12]} is LOCAL and unpushed; the next bin/post-plan-now run ships it")
+                trail.append(f"attempt {attempt}: {last}")
+                break
+            else:
+                sha = git.push_ff() or new
+                res.ci_head = sha
+
+                # Re-watch
+                if mode != "replay":
+                    remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+                    bg = ciwatch.start_background_watch(worktree, pr, sha, out_dir,
+                                                        timeout=int(remaining - 120),
+                                                        verify_head=True)
+                    try:
+                        remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+                        outcome = ciwatch.watch_or_reuse(worktree, pr, sha, out_dir, bg,
+                                                         timeout=int(remaining - 120),
+                                                         verify_head=True)
+                        if outcome.diverged:
+                            ciwatch.reap_background_watch(bg)
+                            _fail_closed_on_divergence(gh, log, pr, "phase7", outcome.evidence, disarm=True)
+                        if outcome.head_sha and outcome.head_sha != sha:
+                            sha = outcome.head_sha
+                            res.ci_head = sha
+                    finally:
+                        ciwatch.reap_background_watch(bg)
+                else:
+                    if queue:
+                        entry = queue.pop(0)
+                        outcome = ciwatch.CiOutcome(entry["exit"], entry.get("failed", []), "replay rewatch")
+                    else:
+                        outcome = ciwatch.CiOutcome(-1, [], "replay: ci_fix_rewatch exhausted")
+
+                kind2, _ = cifix.triage(outcome.failed or [])
+                last = "fixed" if outcome.exit_code == 0 else "still-red"
+
+        log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} outcome={last} sha={str(sha)[:8]}")
+        trail.append(f"attempt {attempt}: {last}")
+
+    # Survivors
+    kind_final, survivors = cifix.triage(outcome.failed or [])
+    if not survivors:
+        survivors = list(outcome.failed or [])
+    _try_post_survivor_comment(gh, pr, survivors, trail, probed, log)
+    log(f"phase7 ci-fix: ceiling reached - {len(trail)} attempt(s), survivors={survivors}")
+    return sha, outcome
+
+
+def _try_post_survivor_comment(gh, pr, survivors, trail, probed, log):
+    if not survivors:
+        return
+    try:
+        gh.post_review_summary(pr, cifix.SURVIVOR_TITLE,
+                               cifix.survivor_comment(survivors, trail, probed))
+    except Exception:
+        log("phase7 ci-fix: survivor comment not posted")
 
 
 def _should_resolve_behind(live: bool, pr, decision, outcome) -> bool:

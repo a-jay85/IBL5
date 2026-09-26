@@ -874,10 +874,13 @@ render_all() {
 }
 
 if [ "$WATCH" -eq 1 ]; then
+    # Build the whole frame first, then swap it in with one write. Rendering
+    # straight to the screen after `clear` painted the page line by line as each
+    # probe finished; this way the old frame stays up until the new one is ready.
     while :; do
-        clear
-        render_all
-        printf '%srefreshing every %ss — ctrl-c to stop%s\n' "$DIM" "$WATCH_SECS" "$R"
+        frame=$(render_all)
+        printf '\033[H\033[2J\033[3J%s\n\n%srefreshing every %ss — ctrl-c to stop%s\n' \
+            "$frame" "$DIM" "$WATCH_SECS" "$R"
         sleep "$WATCH_SECS"
     done
 else

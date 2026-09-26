@@ -149,6 +149,13 @@ try {
             );
             $rolloverApplier->apply($rolloverResult);
 
+            $cashCyAdvancer = new Updater\SeasonRollover\CashConsiderationsYearAdvancer(
+                new Trading\BuyoutLedgerRepository($mysqli_db),
+                new LeagueControlPanel\LeagueControlPanelRepository($mysqli_db, $leagueContext),
+            );
+            $cashCyAdvanced = $cashCyAdvancer->advance((int) $rolloverResult->targetYear);
+            echo $view->renderInitStatus('Cash considerations advanced: ' . $cashCyAdvanced . ' row(s)');
+
             // Rebuild so every downstream step, backup dir and label reads the new season.
             $season = new \Season\Season($mysqli_db);
         }

@@ -7,6 +7,86 @@ namespace Search;
 use Search\Contracts\SearchViewInterface;
 use Security\HtmlSanitizer;
 
+// PHP-Nuke Search language constants used by this view (formerly loaded via get_lang('Search'))
+if (!defined('_ALLTOPICS')) {
+    define('_ALLTOPICS', 'All Topics');
+}
+if (!defined('_NOCOMMENTS')) {
+    define('_NOCOMMENTS', 'No Comments');
+}
+if (!defined('_UCOMMENT')) {
+    define('_UCOMMENT', 'Comment');
+}
+if (!defined('_SEARCHUSERS')) {
+    define('_SEARCHUSERS', "Search in User's Database");
+}
+if (!defined('_SEARCHIN')) {
+    define('_SEARCHIN', 'Search in');
+}
+if (!defined('_ARTICLES')) {
+    define('_ARTICLES', 'Articles');
+}
+if (!defined('_ALLAUTHORS')) {
+    define('_ALLAUTHORS', 'All Authors');
+}
+if (!defined('_ALL')) {
+    define('_ALL', 'All');
+}
+if (!defined('_WEEK')) {
+    define('_WEEK', 'week');
+}
+if (!defined('_WEEKS')) {
+    define('_WEEKS', 'weeks');
+}
+if (!defined('_MONTH')) {
+    define('_MONTH', 'month');
+}
+if (!defined('_MONTHS')) {
+    define('_MONTHS', 'months');
+}
+if (!defined('_SEARCHON')) {
+    define('_SEARCHON', 'Search on:');
+}
+if (!defined('_SSTORIES')) {
+    define('_SSTORIES', 'Stories');
+}
+if (!defined('_SUSERS')) {
+    define('_SUSERS', 'Users');
+}
+if (!defined('_NOMATCHES')) {
+    define('_NOMATCHES', 'No matches found to your query');
+}
+if (!defined('_PREVMATCHES')) {
+    define('_PREVMATCHES', 'previous matches');
+}
+if (!defined('_NEXTMATCHES')) {
+    define('_NEXTMATCHES', 'next matches');
+}
+if (!defined('_NONAME')) {
+    define('_NONAME', 'No name entered');
+}
+if (!defined('_SCOMMENTS')) {
+    define('_SCOMMENTS', 'Comments');
+}
+if (!defined('_SEARCHRESULTS')) {
+    define('_SEARCHRESULTS', 'Search Results');
+}
+if (!defined('_CONTRIBUTEDBY')) {
+    define('_CONTRIBUTEDBY', 'Contributed by');
+}
+if (!defined('_UCOMMENTS')) {
+    define('_UCOMMENTS', 'Comments');
+}
+if (!defined('_SREPLY')) {
+    define('_SREPLY', 'Reply');
+}
+if (!defined('_SREPLIES')) {
+    define('_SREPLIES', 'Replies');
+}
+if (!defined('_ATTACHART')) {
+    define('_ATTACHART', 'Attached to Article');
+}
+
 /**
  * View class for rendering the Search page.
  *

@@ -651,9 +651,14 @@ _NEGATED_RE = re.compile(r"(?:\bnot|\bnever|n't)(?:\s+\w+)?\s*$", re.IGNORECASE)
 # "Update Verification Matrix row 11" and "Fix test matrix rows 22-24". A bare "matrix
 # row" stays filable because the head-to-head records page is a matrix. Titles only: a
 # real followup's detail often cites the matrix row that exposed it.
+#
+# "Critical Files" alone is too broad: "Add tests for critical files in X" is real work.
+# Only the plan-document forms are dropped: "plan's Critical Files", "Critical Files
+# list/section" (the section heading in the plan template), and bare "plan Critical Files".
 _PLAN_ARTIFACT_RE = re.compile(
     r"\bverification\s+matrix\b|\btest\s+matrix\s+rows?\b"
-    r"|\bcritical\s+files\b|\bplan\s+(?:step|phase|row)\s+\d",
+    r"|\bplan'?s?\s+critical\s+files\b|\bcritical\s+files\s+(?:list|section)\b"
+    r"|\bplan\s+(?:step|phase|row)\s+\d",
     re.IGNORECASE)
 
 
@@ -667,11 +672,16 @@ def _is_plan_artifact(title: str) -> bool:
 # comment in bin/plan-review-drain", "Move doc comment back to regenerate_weekly_section"
 # and "Remove hard-wrap from Step 5 paragraph". A PR, sticky, review or issue comment is
 # a feature, so those stay filable. The verb anchor keeps "Add a comment explaining X"
-# out, since that names missing context rather than wording. The comment must sit in
-# the title's first clause, so a list title like "Fix stale artifacts: a test name, a
-# comment, ..." stays filable, and "code-comment agent" names a tool.
+# and "Add a docstring to X" out, since those name missing context rather than wording.
+# The comment/docstring word must sit in the title's first clause, so a list title like
+# "Fix stale artifacts: a test name, a comment, ..." stays filable, and
+# "code-comment agent" names a tool.
+#
+# Both branches share the same verb set so that additive notes ("Add a docstring to X",
+# "Write a docblock for Y") are never filtered — "add" and "write" are absent by design.
 _COMMENT_NIT_RE = re.compile(
-    r"\b(?:docstring|docblock|doc[\s-]?comment|hard[\s-]?wrap)s?\b"
+    r"^(?:update|fix|rewrite|reword|clarify|correct|move|remove|place|verify)\b[^:,]{0,60}"
+    r"(?:docstring|docblock|doc[\s-]?comment|hard[\s-]?wrap)s?\b"
     r"|^(?:update|fix|rewrite|reword|clarify|correct|move|remove|place|verify)\b[^:,]{0,60}"
     r"(?<!pr )(?<!sticky )(?<!review )(?<!issue )(?<![-\w])comments?\b(?!-)",
     re.IGNORECASE)

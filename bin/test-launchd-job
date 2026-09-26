@@ -720,6 +720,207 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Case: reap_idle_loaded_not_running
+# Old plist; snapshot row "-<TAB>78<TAB><label>" (loaded, no PID); alive_fn dead.
+# Expect: bootout recorded, plist gone, stdout "reaped stale job <label>".
+# ---------------------------------------------------------------------------
+reset_ctl
+RI1_DIR="$T/home/Library/LaunchAgents"
+RI1_LABEL="com.ibl5.ppn-ri1-test"
+RI1_PLIST="$RI1_DIR/${RI1_LABEL}.plist"
+touch "$RI1_PLIST"
+touch -t 202601010000 "$RI1_PLIST"
+RI1_SNAP="$(printf '%s\t%s\t%s\n' '-' '78' "$RI1_LABEL")"
+
+RI1_OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_reap_idle "com.ibl5.ppn-ri1-" "always_dead" 10 "$RI1_SNAP"
+)"
+
+RI1_BOOTOUT="$(grep -cF "launchctl bootout gui/12345/${RI1_LABEL}" "$T/ctl/launchctl_calls" 2>/dev/null || echo 0)"
+RI1_GONE=0; [[ ! -f "$RI1_PLIST" ]] && RI1_GONE=1
+RI1_MSG=0; grep -qF "reaped stale job $RI1_LABEL" <<< "$RI1_OUT" && RI1_MSG=1
+
+if [[ "$RI1_BOOTOUT" -ge 1 && $RI1_GONE -eq 1 && $RI1_MSG -eq 1 ]]; then
+    pass "reap_idle_loaded_not_running"
+else
+    fail "reap_idle_loaded_not_running" "bootout=$RI1_BOOTOUT plist_gone=$RI1_GONE msg=$RI1_MSG out='$RI1_OUT'"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: reap_idle_unlisted
+# Old plist; label absent from snapshot (empty snap); alive_fn dead.
+# Expect: plist removed, NO bootout recorded.
+# ---------------------------------------------------------------------------
+reset_ctl
+RI2_LABEL="com.ibl5.ppn-ri2-test"
+RI2_PLIST="$T/home/Library/LaunchAgents/${RI2_LABEL}.plist"
+touch "$RI2_PLIST"
+touch -t 202601010000 "$RI2_PLIST"
+
+RI2_OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_reap_idle "com.ibl5.ppn-ri2-" "always_dead" 10 ""
+)"
+
+RI2_BOOTOUT="$(grep -cF "bootout" "$T/ctl/launchctl_calls" 2>/dev/null || echo 0)"
+RI2_GONE=0; [[ ! -f "$RI2_PLIST" ]] && RI2_GONE=1
+
+if [[ $RI2_GONE -eq 1 && "$RI2_BOOTOUT" -eq 0 ]]; then
+    pass "reap_idle_unlisted"
+else
+    fail "reap_idle_unlisted" "plist_gone=$RI2_GONE bootout_count=$RI2_BOOTOUT"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: reap_idle_keeps_running_pid
+# Old plist; snapshot row "4242<TAB>0<TAB><label>" (PID 4242, running); alive_fn dead.
+# Expect: plist KEPT, no bootout.
+# ---------------------------------------------------------------------------
+reset_ctl
+RI3_LABEL="com.ibl5.ppn-ri3-test"
+RI3_PLIST="$T/home/Library/LaunchAgents/${RI3_LABEL}.plist"
+touch "$RI3_PLIST"
+touch -t 202601010000 "$RI3_PLIST"
+RI3_SNAP="$(printf '%s\t%s\t%s\n' '4242' '0' "$RI3_LABEL")"
+
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_reap_idle "com.ibl5.ppn-ri3-" "always_dead" 10 "$RI3_SNAP"
+) >/dev/null 2>&1
+
+RI3_KEPT=0; [[ -f "$RI3_PLIST" ]] && RI3_KEPT=1
+RI3_BOOTOUT="$(grep -cF "bootout" "$T/ctl/launchctl_calls" 2>/dev/null || echo 0)"
+
+if [[ $RI3_KEPT -eq 1 && "$RI3_BOOTOUT" -eq 0 ]]; then
+    pass "reap_idle_keeps_running_pid"
+else
+    fail "reap_idle_keeps_running_pid" "plist_kept=$RI3_KEPT bootout=$RI3_BOOTOUT"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: reap_idle_keeps_young
+# Fresh plist (mtime = now); snapshot has idle row; alive_fn dead.
+# Expect: plist KEPT (too young).
+# ---------------------------------------------------------------------------
+reset_ctl
+RI4_LABEL="com.ibl5.ppn-ri4-test"
+RI4_PLIST="$T/home/Library/LaunchAgents/${RI4_LABEL}.plist"
+touch "$RI4_PLIST"   # mtime = now (< 10 min ago)
+RI4_SNAP="$(printf '%s\t%s\t%s\n' '-' '78' "$RI4_LABEL")"
+
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_reap_idle "com.ibl5.ppn-ri4-" "always_dead" 10 "$RI4_SNAP"
+) >/dev/null 2>&1
+
+RI4_KEPT=0; [[ -f "$RI4_PLIST" ]] && RI4_KEPT=1
+
+if [[ $RI4_KEPT -eq 1 ]]; then
+    pass "reap_idle_keeps_young"
+else
+    fail "reap_idle_keeps_young" "plist_kept=$RI4_KEPT (expected 1)"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: reap_idle_keeps_live_process
+# Old plist; snapshot has idle row; alive_fn returns 0 (process alive).
+# Expect: plist KEPT.
+# ---------------------------------------------------------------------------
+reset_ctl
+RI5_LABEL="com.ibl5.ppn-ri5-test"
+RI5_PLIST="$T/home/Library/LaunchAgents/${RI5_LABEL}.plist"
+touch "$RI5_PLIST"
+touch -t 202601010000 "$RI5_PLIST"
+RI5_SNAP="$(printf '%s\t%s\t%s\n' '-' '78' "$RI5_LABEL")"
+
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_alive() { return 0; }
+    ljob_reap_idle "com.ibl5.ppn-ri5-" "always_alive" 10 "$RI5_SNAP"
+) >/dev/null 2>&1
+
+RI5_KEPT=0; [[ -f "$RI5_PLIST" ]] && RI5_KEPT=1
+
+if [[ $RI5_KEPT -eq 1 ]]; then
+    pass "reap_idle_keeps_live_process"
+else
+    fail "reap_idle_keeps_live_process" "plist_kept=$RI5_KEPT (expected 1)"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: reap_idle_exact_label_and_dry
+# Sub-test A: plist com.ibl5.ppn-ri6a-1 is idle while snapshot has a RUNNING
+#   row for com.ibl5.ppn-ri6a-12 (exact-field match, not substring).
+#   Expect: com.ibl5.ppn-ri6a-1 reaped, no bootout (absent from snapshot).
+# Sub-test B: LJOB_REAP_DRY=1; idle plist prints "would reap <label>",
+#   plist survives, no bootout.
+# ---------------------------------------------------------------------------
+reset_ctl
+
+# Sub-test A setup
+RI6A_LABEL="com.ibl5.ppn-ri6a-1"
+RI6A_PLIST="$T/home/Library/LaunchAgents/${RI6A_LABEL}.plist"
+touch "$RI6A_PLIST"
+touch -t 202601010000 "$RI6A_PLIST"
+# Snapshot has a RUNNING row only for the -12 label (not -1)
+RI6A_SNAP="$(printf '%s\t%s\t%s\n' '4242' '0' 'com.ibl5.ppn-ri6a-12')"
+
+RI6A_OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_reap_idle "com.ibl5.ppn-ri6a-" "always_dead" 10 "$RI6A_SNAP"
+)"
+
+RI6A_GONE=0; [[ ! -f "$RI6A_PLIST" ]] && RI6A_GONE=1
+RI6A_BOOTOUT="$(grep -cF "bootout" "$T/ctl/launchctl_calls" 2>/dev/null || echo 0)"
+
+# Sub-test B setup
+reset_ctl
+RI6B_LABEL="com.ibl5.ppn-ri6b-dry"
+RI6B_PLIST="$T/home/Library/LaunchAgents/${RI6B_LABEL}.plist"
+touch "$RI6B_PLIST"
+touch -t 202601010000 "$RI6B_PLIST"
+RI6B_SNAP="$(printf '%s\t%s\t%s\n' '-' '78' "$RI6B_LABEL")"
+
+RI6B_OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    LJOB_REAP_DRY=1
+    always_dead() { return 1; }
+    ljob_reap_idle "com.ibl5.ppn-ri6b-" "always_dead" 10 "$RI6B_SNAP"
+)"
+
+RI6B_KEPT=0; [[ -f "$RI6B_PLIST" ]] && RI6B_KEPT=1
+RI6B_BOOTOUT="$(grep -cF "bootout" "$T/ctl/launchctl_calls" 2>/dev/null || echo 0)"
+RI6B_MSG=0; grep -qF "would reap $RI6B_LABEL" <<< "$RI6B_OUT" && RI6B_MSG=1
+
+if [[ $RI6A_GONE -eq 1 && "$RI6A_BOOTOUT" -eq 0 \
+   && $RI6B_KEPT -eq 1 && "$RI6B_BOOTOUT" -eq 0 && $RI6B_MSG -eq 1 ]]; then
+    pass "reap_idle_exact_label_and_dry"
+else
+    fail "reap_idle_exact_label_and_dry" \
+        "6a_gone=$RI6A_GONE 6a_bootout=$RI6A_BOOTOUT 6b_kept=$RI6B_KEPT 6b_bootout=$RI6B_BOOTOUT 6b_msg=$RI6B_MSG"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 TOTAL=$((PASSED + FAILED))

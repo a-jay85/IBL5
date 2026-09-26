@@ -82,8 +82,10 @@ should_fallback() { case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }
 # run, bash logged `line 10: slug: No such file or directory`, and the backticked span was
 # SILENTLY DELETED from the prompt the model received — the plan-disambiguation
 # instruction never arrived. Single quotes close the whole class for any future wording.
-# Defined above the sourced-guard so the unit test can source and exercise it.
-shq() { local q="'\\''"; printf "'%s'" "${1//\'/$q}"; }
+# Defined in bin/lib/launchd-job.sh (with xml_escape), sourced here above the
+# sourced-guard so the unit test can source this script and exercise it.
+# shellcheck source=lib/launchd-job.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/launchd-job.sh"
 
 POSTPLAN_BADGE_MARKER="<!-- postplan-status -->"
 POSTPLAN_STICKY_LIB="${POSTPLAN_STICKY_LIB:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/pr-sticky.sh}"
@@ -347,6 +349,14 @@ if [ "$AUTO" -eq 1 ]; then
     fi
 fi
 
+# Reap abandoned post-plan-now jobs (loaded but idle, or unloaded, with no live
+# process) before adding another. Skipped under the test-only root overrides so a
+# test run can never touch the real LaunchAgents dir. Never fatal.
+if [ "$FOREGROUND" -eq 0 ] && [ -z "${POST_PLAN_MAIN_ROOT:-}${POST_PLAN_SELF_BIN:-}" ]; then
+    _pp_alive() { ljob_pgrep_alive "$1"; }
+    ljob_reap_idle com.ibl5.postplan-now- _pp_alive 10 "$(ljob_snapshot)" || true
+fi
+
 # In-flight duplicate-run guard. The launchd job for this slug is still loaded, so a peer
 # post-plan-now is mid-flight; a second one would race it on the same worktree, the same
 # branch and the same PR badge. Exit 6 (the caller-side namespace; see the exit-code table
@@ -529,8 +539,6 @@ fi
 # the same `<slug>-N.md` string break a second way — as command substitution that
 # silently deleted itself from the prompt. Both hazards, one string, different fixes:
 # do not "simplify" either one away.
-xml_escape() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
-
 # $CMD's tail is launch-mechanism-specific. The launchd form is byte-identical to what
 # this script has always emitted — do not "unify" the two. The foreground form is the
 # only place the exit status and the cost marker can escape: launchctl bootout swallows
@@ -599,8 +607,7 @@ cat > "$PLIST" <<PLIST_EOF
 </plist>
 PLIST_EOF
 
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" "$PLIST"
+ljob_bootstrap "$LABEL" "$PLIST"
 
 echo "post-plan-now: fired a detached post-plan on branch '$SLUG'."
 echo "  engine: $ENGINE"

@@ -39,6 +39,7 @@ final class ModuleRegistry
         'PlayerMovement',
         'ProjectedDraftOrder',
         'RecordHolders',
+        'Records',
         'Schedule',
         'Search',
         'SeasonArchive',

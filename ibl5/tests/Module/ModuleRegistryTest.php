@@ -57,6 +57,13 @@ final class ModuleRegistryTest extends TestCase
         self::assertNotContains('SeriesRecords', ModuleRegistry::getAllModules());
     }
 
+    public function testRecordsIsRegistered(): void
+    {
+        self::assertTrue(ModuleRegistry::isValid('Records'));
+        self::assertContains('Records', ModuleRegistry::getAllModules());
+        self::assertFalse(ModuleRegistry::isValid('records'));
+    }
+
     public function testEveryModuleDirectoryIsRegistered(): void
     {
         $modulesDir = __DIR__ . '/../../modules';

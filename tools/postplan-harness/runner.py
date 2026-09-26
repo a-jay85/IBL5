@@ -411,9 +411,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # Runs before the review worker starts, so a fix commit can never move the head
         # under the worker's posts, and Phase 4, 5, 5.0 and 5.5 all read the fixed tree.
         # Never blocks the run: only gate-path-edit and push-failed propagate.
+        head_before_45 = git.head()
         res.thread_ingestion = _run_thread_ingestion_phase(
             gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log, res)
-        if res.thread_ingestion.get("fixed"):
+        if git.head() != head_before_45:
             sha = git.head()
             files = git.changed_files()
             diff = git.diff_vs_base()
@@ -903,7 +904,7 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
         out = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None,
                "error": repr(e)}
     log(f"phase4.5: {out.get('found', 0)} trusted thread(s) found, {out.get('fixed', 0)} fixed, "
-        f"{out.get('declined', 0)} declined, {out.get('skipped', 0)} skipped (untrusted/outdated/error)")
+        f"{out.get('declined', 0)} declined, {out.get('skipped', 0)} skipped (error)")
     return out
 
 

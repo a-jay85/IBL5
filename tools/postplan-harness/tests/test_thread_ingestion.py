@@ -124,6 +124,7 @@ def test_run_fix_commits_pushes_and_resolves(tmp_path):
         push=lambda: "def456",
     )
 
+    assert result["found"] == 1
     assert result["fixed"] == 1
     assert result["last_sha"] == "def456"
 
@@ -255,6 +256,44 @@ def test_run_cap_skips_llm_entirely(tmp_path):
 
     assert result["reason"] == "cap-or-api-error"
     assert llm.tooled_argvs == []
+
+
+def test_resolve_failure_after_fix_counts_as_skipped_and_loop_continues(tmp_path):
+    """thread-resolve-failed after a pushed fix must count as skipped and not abort the loop.
+
+    Mutation caught: letting the exception propagate — a resolve failure would abort
+    run_thread_ingestion and write fixed:0, hiding that HEAD moved.
+    """
+    thread_a = dict(THREAD_2340, commentId=100)
+    thread_b = dict(THREAD_2340, commentId=200)
+    resolve_calls: list[int] = []
+
+    class _FailOnceGh:
+        def trusted_open_threads(self, pr):
+            return [thread_a, thread_b]
+
+        def resolve_review_thread(self, pr, cid, body):
+            resolve_calls.append(cid)
+            if len(resolve_calls) == 1:
+                raise HarnessError("thread-resolve-failed", "graphql error")
+
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"Fixed it"}'})
+    git = ReplayGit({})
+
+    result = run_thread_ingestion(
+        _FailOnceGh(), llm, git, str(tmp_path), PR,
+        pre_posting_ids={100, 200},
+        out_dir=str(tmp_path),
+        log=lambda msg: None,
+        commit=lambda m: "abc123",
+        push=lambda: "def456",
+    )
+
+    assert result["found"] == 2
+    assert result["fixed"] == 1
+    assert result["skipped"] == 1
+    assert result["last_sha"] == "def456"
+    assert os.path.exists(os.path.join(str(tmp_path), "thread-ingestion.json"))
 
 
 def test_module_docstring_carries_trust_warning_verbatim():

@@ -95,9 +95,9 @@ def test_fix_refreshes_head_and_meta_before_review_submit():
     """
     src = _src()
     i = src.index("res.thread_ingestion = _run_thread_ingestion_phase(")
-    j = src.index('if res.thread_ingestion.get("fixed")')
+    j = src.index("if git.head() != head_before_45:")
     r = src.index("review_future = review_pool.submit(")
-    assert i < j < r, "the fixed-refresh block must sit between Phase 4.5 and the submit"
+    assert i < j < r, "the head-refresh block must sit between Phase 4.5 and the submit"
     refresh = src[j:r]
     assert "sha = git.head()" in refresh, "a thread fix must refresh sha"
     assert "gh.pr_meta()" in refresh, "a thread fix must refresh PR meta"
@@ -203,7 +203,7 @@ def test_phase45_passes_snapshot_and_injected_commit_push(tmp_path, monkeypatch)
     assert callable(captured["push"]), "push argument must be callable"
 
     # Verify the summary log line
-    expected_log = "phase4.5: 2 trusted thread(s) found, 1 fixed, 1 declined, 0 skipped (untrusted/outdated/error)"
+    expected_log = "phase4.5: 2 trusted thread(s) found, 1 fixed, 1 declined, 0 skipped (error)"
     assert any(line == expected_log for line in log.lines), (
         f"Expected summary log line {expected_log!r}, got: {log.lines}"
     )

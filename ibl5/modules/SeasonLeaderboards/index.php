@@ -2,78 +2,10 @@
 
 declare(strict_types=1);
 
-use SeasonLeaderboards\CachedSeasonLeaderboardsRepository;
-use SeasonLeaderboards\SeasonLeaderboardsRepository;
-use SeasonLeaderboards\SeasonLeaderboardsService;
-use SeasonLeaderboards\SeasonLeaderboardsView;
-
+// Retired module: redirects to its new home. See Module\ModuleRedirect::TARGETS.
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-$module_name = basename(dirname(__FILE__));
-get_lang($module_name);
-
-global $leagueContext;
-
-$pagetitle = "Season Stats";
-
-// Initialize classes
-$dbCache = new \Cache\DatabaseCache($mysqli_db);
-$innerRepository = new SeasonLeaderboardsRepository($mysqli_db, $leagueContext);
-$repository = new CachedSeasonLeaderboardsRepository($innerRepository, $dbCache);
-$service = new SeasonLeaderboardsService($repository);
-$view = new SeasonLeaderboardsView($service);
-
-// Get filter parameters from POST
-$filters = [
-    'year' => $_POST['year'] ?? '',
-    'team' => (int)($_POST['team'] ?? 0),
-    'sortby' => $_POST['sortby'] ?? 'PPG',
-    'limit' => $_POST['limit'] ?? ''
-];
-
-// Determine limit: use POST value if provided, otherwise default to 50 on first load
-$isFirstLoad = empty($_POST);
-$limit = 0;
-if ($isFirstLoad) {
-    $limit = 50; // Default limit on first load
-} elseif (is_numeric($filters['limit']) && (int)$filters['limit'] > 0) {
-    $limit = (int)$filters['limit'];
-}
-
-// Render page
-PageLayout\PageLayout::header();
-
-echo '<h1 class="ibl-title">Season Leaders</h1>';
-
-// Get data for dropdowns
-$teams = $repository->getTeams();
-$years = $repository->getYears();
-
-// Render filter form
-echo $view->renderFilterForm($teams, $years, $filters);
-
-// Get and render season leaders
-$leadersData = $service->getFilteredLeaderboard($filters, $limit);
-$rows = $leadersData['results'];
-$numRows = $leadersData['count'];
-
-// Set active sort column for highlighting
-$view->setSortBy($filters['sortby']);
-
-// Render table header
-echo $view->renderTableHeader();
-
-// Render player rows
-$rank = 0;
-foreach ($rows as $row) {
-    $stats = $service->processPlayerRow($row);
-    $rank++;
-    echo $view->renderPlayerRow($stats, $rank);
-}
-
-// Render table footer
-echo $view->renderTableFooter();
-
-PageLayout\PageLayout::footer();
+\Module\ModuleRedirect::send('SeasonLeaderboards');
+return;

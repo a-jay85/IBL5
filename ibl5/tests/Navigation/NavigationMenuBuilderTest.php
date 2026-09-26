@@ -61,6 +61,20 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertNotContains('modules.php?name=SeriesRecords', $urls);
     }
 
+    public function testHistoryMenuHasSingleLeaderboardsEntry(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig());
+        $menus = $builder->getMenuStructure();
+
+        $urls = array_column($menus['History']['links'], 'url');
+
+        $this->assertCount(1, array_keys($urls, 'modules.php?name=Leaderboards', true));
+        foreach ($urls as $url) {
+            $this->assertStringNotContainsString('name=SeasonLeaderboards', (string) $url);
+            $this->assertStringNotContainsString('name=CareerLeaderboards', (string) $url);
+        }
+    }
+
     public function testMenuStructureHasIconsAndLinks(): void
     {
         $builder = new NavigationMenuBuilder($this->createConfig());

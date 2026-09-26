@@ -65,9 +65,9 @@ test.describe('Parameter edge cases', () => {
     await expect(table.first()).toBeVisible();
   });
 
-  test('SeasonLeaderboards with invalid season phase shows no PHP errors', async ({ page }) => {
-    await page.goto('modules.php?name=SeasonLeaderboards&seasonPhase=InvalidPhase');
-    await assertNoPhpErrors(page, 'on SeasonLeaderboards with invalid phase');
+  test('Leaderboards season tab with invalid season phase shows no PHP errors', async ({ page }) => {
+    await page.goto('modules.php?name=Leaderboards&tab=season&seasonPhase=InvalidPhase');
+    await assertNoPhpErrors(page, 'on Leaderboards season tab with invalid phase');
   });
 
   test('empty name parameter shows no PHP errors', async ({ page }) => {

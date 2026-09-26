@@ -14,8 +14,8 @@ const PAGES = [
   { name: 'standings', url: 'modules.php?name=Standings', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'player page', url: 'modules.php?name=Player&pa=showpage&pid=1', selector: '.stats-grid', hasWideTables: false },
   { name: 'team page', url: 'modules.php?name=Team&op=team&teamid=1', selector: '.team-page-layout', hasWideTables: true },
-  { name: 'season leaderboards', url: 'modules.php?name=SeasonLeaderboards', selector: '.ibl-data-table', hasWideTables: true },
-  { name: 'career leaderboards', url: 'modules.php?name=CareerLeaderboards', selector: 'form[name="CareerLeaderboards"]', hasWideTables: false },
+  { name: 'season leaderboards', url: 'modules.php?name=Leaderboards&tab=season', selector: '.ibl-data-table', hasWideTables: true },
+  { name: 'career leaderboards', url: 'modules.php?name=Leaderboards&tab=career', selector: 'form[name="CareerLeaderboards"]', hasWideTables: false },
   { name: 'draft history', url: 'modules.php?name=DraftHistory', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'cap space', url: 'modules.php?name=CapSpace', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'schedule', url: 'modules.php?name=Schedule', selector: '.schedule-header', hasWideTables: false },
@@ -147,8 +147,8 @@ test.describe('Responsive scroll container tests', () => {
 
   test('season leaderboards — scroll container is scrollable on mobile', async ({ page }) => {
     test.setTimeout(60_000);
-    await gotoWithRetry(page, 'modules.php?name=SeasonLeaderboards');
-    await assertNoPhpErrors(page, 'on modules.php?name=SeasonLeaderboards (mobile)');
+    await gotoWithRetry(page, 'modules.php?name=Leaderboards&tab=season');
+    await assertNoPhpErrors(page, 'on modules.php?name=Leaderboards&tab=season (mobile)');
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     await assertScrollContainerIsScrollable(page, page.locator('.table-scroll-container').first(), 'on season leaderboards');
   });
@@ -188,16 +188,16 @@ test.describe('Responsive scroll container tests', () => {
 
   test('season leaderboards — scroll shadow indicator present on load', async ({ page }) => {
     test.setTimeout(60_000);
-    await gotoWithRetry(page, 'modules.php?name=SeasonLeaderboards');
-    await assertNoPhpErrors(page, 'on modules.php?name=SeasonLeaderboards (mobile)');
+    await gotoWithRetry(page, 'modules.php?name=Leaderboards&tab=season');
+    await assertNoPhpErrors(page, 'on modules.php?name=Leaderboards&tab=season (mobile)');
     await expect(page.locator('.table-scroll-wrapper').first()).toBeAttached();
     await expect(page.locator('.table-scroll-wrapper').first()).not.toHaveClass(/scrolled-end/);
   });
 
   test('season leaderboards — scroll shadow disappears after scrolling to end', async ({ page }) => {
     test.setTimeout(60_000);
-    await gotoWithRetry(page, 'modules.php?name=SeasonLeaderboards');
-    await assertNoPhpErrors(page, 'on modules.php?name=SeasonLeaderboards (mobile)');
+    await gotoWithRetry(page, 'modules.php?name=Leaderboards&tab=season');
+    await assertNoPhpErrors(page, 'on modules.php?name=Leaderboards&tab=season (mobile)');
     await expect(page.locator('.table-scroll-container').first()).toBeAttached();
     await page.locator('.table-scroll-container').first().evaluate((el: Element) => {
       const container = el as HTMLElement;

@@ -33,7 +33,7 @@ final class CareerLeaderboardsViewTest extends TestCase
         // Check that form is rendered
         $this->assertStringContainsString('<form', $html);
         $this->assertStringContainsString('name="CareerLeaderboards"', $html);
-        $this->assertStringContainsString('action="modules.php?name=CareerLeaderboards"', $html);
+        $this->assertStringContainsString('action="modules.php?name=Leaderboards&amp;tab=career"', $html);
         
         // Check that all form fields are present
         $this->assertStringContainsString('name="boards_type"', $html);
@@ -213,5 +213,19 @@ final class CareerLeaderboardsViewTest extends TestCase
 
         // Check that asterisk is displayed for retired player
         $this->assertStringContainsString('Retired Legend*', $html);
+    }
+
+    public function testFilterFormPostsToLeaderboardsCareerTab(): void
+    {
+        $html = $this->view->renderFilterForm([
+            'boards_type' => 'Regular Season Totals',
+            'sort_cat' => 'Points',
+            'active' => '0',
+            'display' => '50',
+        ]);
+
+        $this->assertStringContainsString('action="modules.php?name=Leaderboards&amp;tab=career"', $html);
+        // A form posting to the retired name would hit the 302 stub and lose its POST body.
+        $this->assertStringNotContainsString('name=CareerLeaderboards"', $html);
     }
 }

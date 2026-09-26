@@ -7,7 +7,7 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 test.describe('Career Leaderboards flow', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Trivia Mode': 'Off' });
-    await page.goto('modules.php?name=CareerLeaderboards');
+    await page.goto('modules.php?name=Leaderboards&tab=career');
   });
 
   test('page loads with filter form', async ({ page }) => {
@@ -49,7 +49,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('select[name="boards_type"]').selectOption('Regular Season Totals');
     await page.locator('select[name="sort_cat"]').selectOption('Points');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
@@ -58,7 +58,7 @@ test.describe('Career Leaderboards flow', () => {
 
     await page.locator('select[name="sort_cat"]').selectOption('Total Rebounds');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
@@ -71,7 +71,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('select[name="boards_type"]').selectOption('Regular Season Totals');
     await page.locator('input[name="display"]').fill('3');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
@@ -83,7 +83,7 @@ test.describe('Career Leaderboards flow', () => {
   test('board type drives query: Regular Season returns more rows than Playoff Totals', async ({ page }) => {
     await page.locator('select[name="boards_type"]').selectOption('Regular Season Totals');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table tbody tr').first()).toBeVisible();
@@ -91,7 +91,7 @@ test.describe('Career Leaderboards flow', () => {
 
     await page.locator('select[name="boards_type"]').selectOption('Playoff Totals');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table tbody tr').first()).toBeVisible();
@@ -111,7 +111,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('input[name="display"]').fill('500');
     await page.locator('select[name="active"]').selectOption('0');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
@@ -120,7 +120,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('input[name="display"]').fill('500');
     await page.locator('select[name="active"]').selectOption('1');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
@@ -152,7 +152,7 @@ test.describe('Career Leaderboards flow', () => {
 test.describe('Career Leaderboards: trivia mode', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Trivia Mode': 'On' });
-    await page.goto('modules.php?name=CareerLeaderboards');
+    await page.goto('modules.php?name=Leaderboards&tab=career');
   });
 
   test('module shows inactive message when trivia mode is on', async ({ page }) => {

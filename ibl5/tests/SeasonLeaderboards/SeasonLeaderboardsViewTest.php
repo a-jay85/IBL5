@@ -121,4 +121,13 @@ final class SeasonLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('</table>', $html);
         $this->assertStringContainsString('</div>', $html);
     }
+
+    public function testFilterFormPostsToLeaderboardsSeasonTab(): void
+    {
+        $html = $this->view->renderFilterForm([], [], ['year' => '', 'team' => 0, 'sortby' => 'PPG', 'limit' => '']);
+
+        $this->assertStringContainsString('action="modules.php?name=Leaderboards&amp;tab=season"', $html);
+        // A form posting to the retired name would hit the 302 stub and lose its POST body.
+        $this->assertStringNotContainsString('name=SeasonLeaderboards"', $html);
+    }
 }

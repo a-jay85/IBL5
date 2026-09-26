@@ -138,7 +138,7 @@ final class LighthouseUrlsTest extends TestCase
                 self::BASE . '/ibl5/modules.php?name=Standings',
                 self::BASE . '/ibl5/modules.php?name=Team&op=team&teamid=1',
                 self::BASE . '/ibl5/modules.php?name=Player&pa=showpage&pid=1',
-                self::BASE . '/ibl5/modules.php?name=SeasonLeaderboards',
+                self::BASE . '/ibl5/modules.php?name=Leaderboards',
             ],
             LighthouseUrls::representativeUrls(self::BASE)
         );

@@ -6,7 +6,7 @@
         "http://localhost:8080/ibl5/modules.php?name=Standings",
         "http://localhost:8080/ibl5/modules.php?name=Team&op=team&teamid=1",
         "http://localhost:8080/ibl5/modules.php?name=Player&pa=showpage&pid=1",
-        "http://localhost:8080/ibl5/modules.php?name=SeasonLeaderboards"
+        "http://localhost:8080/ibl5/modules.php?name=Leaderboards"
       ],
       "numberOfRuns": 3,
       "settings": {

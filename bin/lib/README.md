@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-09-16
+last_verified: 2026-09-26
 ---
 
 # bin/lib — Shared Library Files
@@ -20,6 +20,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `docfix-dm.sh` | Compose the docs-refreshed Discord DM for a docfix PR; holds the numeric-input, OPEN-state, and `docs-stale-refresh-` head-ref guards lifted out of `docs-refreshed-notify.yml` so they are exercisable by `bin/test-docfix-run` |
 | `git-helpers.sh` | Shared git-layout helpers: canonical repo root resolution and related utilities |
 | `human-signoff-classifier.sh` | Single source of truth for the feature-PR human sign-off classifier (ADR-0062), sourced by both the workflow and its regression harness |
+| `launchd-job.sh` | Shared launchd background-job plumbing: one-shot `launchctl list` snapshot and label lookup, fail-closed pgrep liveness probe, TERM-then-KILL stop and slot release, compact runner plist emission, bootout/bootstrap, slot count / stale reap / wait-for-slot, the loaded-idle job reaper, runner-embeddable finish-DM helpers, and `xml_escape` / `shq`. Sourced by `bin/post-plan-fleet`, `bin/pr-review-now`, `bin/post-plan-now` and `bin/pr-cycle`; tested by `bin/test-launchd-job` |
 | `pr-sticky.sh` | Canonical find-by-HTML-marker sticky PR comment helpers (upsert / delete); sourced by `bin/pr-canary-check`, `bin/check-pr-collisions`, and `bin/post-plan-now` |
 | `session-id.sh` | Mint, validate and persist the `claude -p --session-id` uuid for detached headless runs; writes the `${LOG%.log}.session` sidecar that `bin/fleet-status` reads to locate a live run's transcript. Sourced by `bin/plan-now`, `bin/docfix-run`, `bin/post-plan-now` and `bin/fleet-status` |
 | `plan-autonomy-contract` | Shared `stop_condition:` / `evidence:` frontmatter validator; invoked by `bin/check-plan` gate `[K]` and the `/post-plan` Phase 5.0d skill path |

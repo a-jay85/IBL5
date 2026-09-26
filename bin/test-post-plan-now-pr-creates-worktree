@@ -237,6 +237,63 @@ fi
 [ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "wt-new --existing with no value exits with usage"
 
 # ==========================================================================
+# Case 6 — loaded-idle phantom is reaped before the inflight check
+# ==========================================================================
+# A previous run left a loaded-idle plist for feat-x.  Without the reaper it
+# would make postplan_inflight_label report an in-flight run → exit 6.  The
+# reaper fires here because POST_PLAN_MAIN_ROOT and POST_PLAN_SELF_BIN are
+# NOT set, and HOME=$TMP keeps the LaunchAgents dir under $TMP (not real ~/Library).
+# The stateful launchctl stub clears the loaded-idle row when bootout is called,
+# so the inflight check finds nothing and post-plan-now proceeds (exit != 6).
+WT6="$WT_PARENT/feat-x"
+[ -d "$WT6" ] || git -C "$MAIN" worktree add "$WT6" feat-x >/dev/null 2>&1
+
+PHANTOM_LABEL="com.ibl5.postplan-now-feat-x-20260101-000000-12345"
+PHANTOM_PLIST="$TMP/Library/LaunchAgents/${PHANTOM_LABEL}.plist"
+LAUNCHCTL_LIST_STATE="$TMP/launchctl_list_state"
+export LAUNCHCTL_LIST_STATE
+
+# Old phantom plist (will be reaped)
+touch "$PHANTOM_PLIST"
+touch -t 202601010000 "$PHANTOM_PLIST"
+
+# Loaded-idle row for the phantom label
+printf '%s\t%s\t%s\n' '-' '78' "$PHANTOM_LABEL" > "$LAUNCHCTL_LIST_STATE"
+
+# Stateful launchctl stub: list returns the state file; bootout clears it
+cat > "$SHIMS/launchctl" << 'SHIM_EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${LAUNCHCTL_LOG:-/dev/null}"
+case "${1:-}" in
+    list)    [ -f "${LAUNCHCTL_LIST_STATE:-}" ] && cat "${LAUNCHCTL_LIST_STATE}" ;;
+    bootout) rm -f "${LAUNCHCTL_LIST_STATE:-}" ;;
+esac
+exit 0
+SHIM_EOF
+chmod +x "$SHIMS/launchctl"
+
+RC6=0
+set +e
+# Run from within the feat-x worktree without the test-only overrides
+ERR6="$(cd "$WT6" && POST_PLAN_SKILL=1 HOME="$TMP" "$REPO/bin/post-plan-now" 2>&1)"
+RC6=$?
+set -e
+
+FAIL_BEFORE=$FAIL
+if [ "$RC6" -eq 6 ]; then
+    fail "loaded-idle-reap-before-inflight: exited 6 (phantom in-flight not reaped)"
+fi
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "loaded-idle-reap-before-inflight"
+
+# Restore simple launchctl stub for any future tests
+cat > "$SHIMS/launchctl" << 'SHIM_EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${LAUNCHCTL_LOG:-/dev/null}"
+exit 0
+SHIM_EOF
+chmod +x "$SHIMS/launchctl"
+
+# ==========================================================================
 # Summary
 # ==========================================================================
 echo ""

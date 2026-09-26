@@ -1,0 +1,928 @@
+#!/usr/bin/env bash
+# bin/test-launchd-job — unit tests for bin/lib/launchd-job.sh
+#
+# Usage: bin/test-launchd-job
+#
+# Self-contained: creates a temp dir, builds stub binaries, never touches
+# ~/Library/LaunchAgents.  Runs on macOS and Linux CI.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+LIB="$SCRIPT_DIR/lib/launchd-job.sh"
+
+[[ -f "$LIB" ]] || { printf 'FATAL: %s: No such file\n' "$LIB" >&2; exit 1; }
+
+# ---------------------------------------------------------------------------
+# Temp dir — asserted to be under $T to guard against real LaunchAgents writes
+# ---------------------------------------------------------------------------
+T="$(mktemp -d)"
+export T
+_cleanup() { rm -rf "$T"; }
+trap _cleanup EXIT
+
+# Verify HOME never points outside T (safety assertion enforced per case below)
+
+# ---------------------------------------------------------------------------
+# Resolve real paths for the minimal-PATH shim dir before we alter PATH
+# ---------------------------------------------------------------------------
+_REAL_GREP="$(command -v grep)"
+_REAL_SED="$(command -v sed)"
+_REAL_RM="$(command -v rm)"
+_REAL_MV="$(command -v mv)"
+_REAL_MKTEMP="$(command -v mktemp)"
+_REAL_BASENAME="$(command -v basename)"
+_REAL_DIRNAME="$(command -v dirname)"
+_REAL_CAT="$(command -v cat)"
+_REAL_ID="$(command -v id)"
+_REAL_PRINTF="$(command -v printf 2>/dev/null || true)"
+
+# ---------------------------------------------------------------------------
+# Shim dir — stubs for launchctl, pgrep, pkill, sleep, id
+# ---------------------------------------------------------------------------
+mkdir -p "$T/shim" "$T/min" "$T/ctl" "$T/home/Library/LaunchAgents"
+
+# launchctl stub
+cat > "$T/shim/launchctl" <<'STUB'
+#!/bin/bash
+echo "launchctl $*" >> "${T}/ctl/launchctl_calls"
+subcommand="${1:-}"
+case "$subcommand" in
+    list)
+        out_file="${T}/ctl/launchctl_list_output"
+        [ -f "$out_file" ] && cat "$out_file"
+        rc_file="${T}/ctl/launchctl_list_rc"
+        ;;
+    bootstrap)
+        rc_file="${T}/ctl/launchctl_bootstrap_rc"
+        ;;
+    bootout)
+        rc_file="${T}/ctl/launchctl_bootout_rc"
+        ;;
+    *)
+        rc_file=""
+        ;;
+esac
+[ -n "${rc_file:-}" ] && [ -f "${rc_file:-}" ] && exit "$(cat "$rc_file")"
+exit 0
+STUB
+chmod +x "$T/shim/launchctl"
+
+# pgrep stub — exit code driven by $T/ctl/pgrep_rc (one exit code per line,
+# consumed in call order).  Default exit code: 1 (no match).
+cat > "$T/shim/pgrep" <<'STUB'
+#!/bin/bash
+echo "pgrep $*" >> "${T}/ctl/pgrep_calls"
+count_file="${T}/ctl/pgrep_call_count"
+count=$(($(cat "$count_file" 2>/dev/null || echo 0) + 1))
+printf '%s\n' "$count" > "$count_file"
+rc_file="${T}/ctl/pgrep_rc"
+rc=$(sed -n "${count}p" "$rc_file" 2>/dev/null)
+exit "${rc:-1}"
+STUB
+chmod +x "$T/shim/pgrep"
+
+# pkill stub — records calls, always succeeds
+cat > "$T/shim/pkill" <<'STUB'
+#!/bin/bash
+echo "pkill $*" >> "${T}/ctl/pkill_calls"
+exit 0
+STUB
+chmod +x "$T/shim/pkill"
+
+# sleep stub — records calls, no-op
+cat > "$T/shim/sleep" <<'STUB'
+#!/bin/bash
+echo "sleep $*" >> "${T}/ctl/sleep_calls"
+exit 0
+STUB
+chmod +x "$T/shim/sleep"
+
+# id stub — returns fixed UID 12345
+cat > "$T/shim/id" <<'STUB'
+#!/bin/bash
+if [ "${1:-}" = "-u" ]; then
+    printf '12345\n'
+else
+    printf 'uid=12345(test) gid=12345(test)\n'
+fi
+STUB
+chmod +x "$T/shim/id"
+
+# ---------------------------------------------------------------------------
+# Minimal PATH shim dir — only basic tools, no pgrep/launchctl
+# ---------------------------------------------------------------------------
+for _bin in grep sed rm mv mktemp basename dirname cat; do
+    _real="$(command -v "$_bin")"
+    ln -sf "$_real" "$T/min/$_bin"
+done
+ln -sf "$T/shim/id" "$T/min/id"
+
+# Full shim PATH (has launchctl, pgrep, pkill, sleep, id stubs + system tools)
+SHIM_PATH="$T/shim:/usr/bin:/bin:/usr/sbin:/sbin"
+# Minimal PATH (no pgrep, no launchctl)
+MIN_PATH="$T/min:/usr/bin:/bin:/usr/sbin:/sbin"
+
+# ---------------------------------------------------------------------------
+# Test framework
+# ---------------------------------------------------------------------------
+PASSED=0
+FAILED=0
+
+pass() { printf 'PASS %s\n' "$1"; PASSED=$((PASSED + 1)); }
+fail() { printf 'FAIL %s: %s\n' "$1" "$2" >&2; FAILED=$((FAILED + 1)); }
+
+# reset_ctl — clear per-test control state
+reset_ctl() {
+    rm -rf "$T/ctl"
+    mkdir -p "$T/ctl"
+    # Reset pgrep call counter
+    printf '0\n' > "$T/ctl/pgrep_call_count"
+}
+
+# ---------------------------------------------------------------------------
+# Helper: source the lib into a subshell and run a test body.
+# Each test must be in a subshell so set/shopt changes don't bleed.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Case: snapshot_no_launchctl
+# No launchctl on PATH, under set -e: ljob_snapshot returns rc 0 and prints nothing.
+# ---------------------------------------------------------------------------
+reset_ctl
+OUT="$(
+    HOME="$T/home"
+    # shellcheck disable=SC2123
+    PATH="$T/min"
+    set -e
+    # shellcheck source=/dev/null
+    . "$LIB"
+    ljob_snapshot
+)"
+RC=$?
+if [[ $RC -eq 0 && -z "$OUT" ]]; then
+    pass "snapshot_no_launchctl"
+else
+    fail "snapshot_no_launchctl" "rc=$RC output='$OUT'"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: listed_large_snapshot_pipefail
+# stub launchctl prints 50000 lines with com.ibl5.t-7 on line 10;
+# under set -o pipefail, ljob_listed matches and returns 0.
+# ---------------------------------------------------------------------------
+reset_ctl
+{
+    for i in $(seq 1 9);     do printf 'line%s\n' "$i"; done
+    printf 'com.ibl5.t-7\n'
+    for i in $(seq 11 50000); do printf 'line%s\n' "$i"; done
+} > "$T/ctl/launchctl_list_output"
+
+OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    set -o pipefail
+    . "$LIB"
+    SNAP="$(ljob_snapshot)"
+    ljob_listed 'com\.ibl5\.t-7$' "$SNAP" && echo "matched"
+)"
+RC=$?
+if [[ $RC -eq 0 ]] && grep -qF "matched" <<< "$OUT"; then
+    pass "listed_large_snapshot_pipefail"
+else
+    fail "listed_large_snapshot_pipefail" "rc=$RC out='$OUT'"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: listed_anchor
+# snapshot contains only com.ibl5.t-1892; anchored ERE com\.ibl5\.t-189$ returns 1.
+# ---------------------------------------------------------------------------
+reset_ctl
+RC=0
+(
+    HOME="$T/home"
+    PATH="$MIN_PATH"
+    . "$LIB"
+    SNAP="com.ibl5.t-1892"
+    ljob_listed 'com\.ibl5\.t-189$' "$SNAP"
+) && RC=0 || RC=$?
+if [[ $RC -ne 0 ]]; then
+    pass "listed_anchor"
+else
+    fail "listed_anchor" "expected nonzero, got $RC"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: alive_missing_pgrep
+# No pgrep on PATH; ljob_pgrep_alive returns 0 (alive/undecidable).
+# ---------------------------------------------------------------------------
+reset_ctl
+RC=99
+(
+    HOME="$T/home"
+    # shellcheck disable=SC2123
+    PATH="$T/min"
+    . "$LIB"
+    ljob_pgrep_alive "some-pattern"
+)
+RC=$?
+if [[ $RC -eq 0 ]]; then
+    pass "alive_missing_pgrep"
+else
+    fail "alive_missing_pgrep" "expected 0, got $RC"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: alive_no_match_dead
+# stub pgrep exits 1 for every pattern; ljob_pgrep_alive returns 1 (dead).
+# ---------------------------------------------------------------------------
+reset_ctl
+printf '1\n1\n' > "$T/ctl/pgrep_rc"
+RC=0
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_pgrep_alive "pat-a" "pat-b"
+)
+RC=$?
+if [[ $RC -eq 1 ]]; then
+    pass "alive_no_match_dead"
+else
+    fail "alive_no_match_dead" "expected 1, got $RC"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: alive_error_is_alive
+# stub pgrep exits 2; ljob_pgrep_alive returns 0 (alive/undecidable).
+# ---------------------------------------------------------------------------
+reset_ctl
+printf '2\n' > "$T/ctl/pgrep_rc"
+RC=99
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_pgrep_alive "pat-a"
+)
+RC=$?
+if [[ $RC -eq 0 ]]; then
+    pass "alive_error_is_alive"
+else
+    fail "alive_error_is_alive" "expected 0, got $RC"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: alive_second_pattern
+# first pgrep exits 1, second exits 0; returns 0.
+# ---------------------------------------------------------------------------
+reset_ctl
+printf '1\n0\n' > "$T/ctl/pgrep_rc"
+RC=99
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_pgrep_alive "pat-dead" "pat-alive"
+)
+RC=$?
+if [[ $RC -eq 0 ]]; then
+    pass "alive_second_pattern"
+else
+    fail "alive_second_pattern" "expected 0, got $RC"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: reap_keeps_loaded_label
+# plist on disk, launchctl list exits 0 (label loaded); plist survives, no output.
+# ---------------------------------------------------------------------------
+reset_ctl
+PLIST_DIR="$T/home/Library/LaunchAgents"
+mkdir -p "$PLIST_DIR"
+touch "$PLIST_DIR/com.ibl5.test-42.plist"
+printf '0\n' > "$T/ctl/launchctl_list_rc"
+
+OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_reap_stale "com.ibl5.test-" "always_dead"
+)"
+if [[ -f "$PLIST_DIR/com.ibl5.test-42.plist" && -z "$OUT" ]]; then
+    pass "reap_keeps_loaded_label"
+else
+    fail "reap_keeps_loaded_label" "plist_exists=$([ -f "$PLIST_DIR/com.ibl5.test-42.plist" ] && echo y || echo n) out='$OUT'"
+fi
+rm -f "$PLIST_DIR/com.ibl5.test-42.plist"
+
+# ---------------------------------------------------------------------------
+# Case: reap_keeps_live_process
+# label not loaded (list rc 1), alive_fn returns 0; plist survives.
+# ---------------------------------------------------------------------------
+reset_ctl
+touch "$PLIST_DIR/com.ibl5.test-42.plist"
+printf '1\n' > "$T/ctl/launchctl_list_rc"
+
+OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_alive() { return 0; }
+    ljob_reap_stale "com.ibl5.test-" "always_alive"
+)"
+if [[ -f "$PLIST_DIR/com.ibl5.test-42.plist" && -z "$OUT" ]]; then
+    pass "reap_keeps_live_process"
+else
+    fail "reap_keeps_live_process" "plist_exists=$([ -f "$PLIST_DIR/com.ibl5.test-42.plist" ] && echo y || echo n) out='$OUT'"
+fi
+rm -f "$PLIST_DIR/com.ibl5.test-42.plist"
+
+# ---------------------------------------------------------------------------
+# Case: reap_removes_dead
+# label not loaded, alive_fn returns 1; plist removed, stdout="reaped stale slot <label>", rc 0.
+# ---------------------------------------------------------------------------
+reset_ctl
+touch "$PLIST_DIR/com.ibl5.test-42.plist"
+printf '1\n' > "$T/ctl/launchctl_list_rc"
+
+OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    set -e
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_reap_stale "com.ibl5.test-" "always_dead"
+)"
+RC=$?
+WANT_OUT="reaped stale slot com.ibl5.test-42"
+if [[ $RC -eq 0 && ! -f "$PLIST_DIR/com.ibl5.test-42.plist" && "$OUT" == "$WANT_OUT" ]]; then
+    pass "reap_removes_dead"
+else
+    fail "reap_removes_dead" "rc=$RC plist=$([ -f "$PLIST_DIR/com.ibl5.test-42.plist" ] && echo exists || echo gone) out='$OUT'"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: reap_prefix_scoped
+# A plist with a different prefix is left untouched.
+# ---------------------------------------------------------------------------
+reset_ctl
+touch "$PLIST_DIR/com.ibl5.other-99.plist"
+printf '1\n' > "$T/ctl/launchctl_list_rc"
+
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_reap_stale "com.ibl5.test-" "always_dead"
+) >/dev/null 2>&1
+if [[ -f "$PLIST_DIR/com.ibl5.other-99.plist" ]]; then
+    pass "reap_prefix_scoped"
+else
+    fail "reap_prefix_scoped" "other-prefix plist was unexpectedly removed"
+fi
+rm -f "$PLIST_DIR/com.ibl5.other-99.plist"
+
+# ---------------------------------------------------------------------------
+# Case: count_plists_empty_and_two
+# 0 with empty dir; 2 with two matching plists + one non-matching.
+# ---------------------------------------------------------------------------
+reset_ctl
+# Remove any residual plists
+rm -f "$PLIST_DIR"/*.plist
+
+COUNT_EMPTY="$(
+    HOME="$T/home"
+    PATH="$MIN_PATH"
+    . "$LIB"
+    ljob_count_plists "com.ibl5.test-"
+)"
+touch "$PLIST_DIR/com.ibl5.test-1.plist"
+touch "$PLIST_DIR/com.ibl5.test-2.plist"
+touch "$PLIST_DIR/com.ibl5.other-3.plist"
+
+COUNT_TWO="$(
+    HOME="$T/home"
+    PATH="$MIN_PATH"
+    . "$LIB"
+    ljob_count_plists "com.ibl5.test-"
+)"
+rm -f "$PLIST_DIR"/com.ibl5.test-1.plist "$PLIST_DIR"/com.ibl5.test-2.plist "$PLIST_DIR"/com.ibl5.other-3.plist
+
+if [[ "$COUNT_EMPTY" -eq 0 && "$COUNT_TWO" -eq 2 ]]; then
+    pass "count_plists_empty_and_two"
+else
+    fail "count_plists_empty_and_two" "empty=$COUNT_EMPTY two=$COUNT_TWO"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: write_runner_plist_golden
+# Output equals fixture copied verbatim from fleet's heredoc with fixed inputs.
+# ---------------------------------------------------------------------------
+reset_ctl
+GOLDEN_HOME="/test-home"
+GOLDEN_LABEL="com.ibl5.post-plan-fleet-42"
+GOLDEN_RUNNER="/tmp/post-plan-fleet-runner-42.sh"
+GOLDEN_ROOT="/test/root"
+GOLDEN_LOG="/tmp/post-plan-fleet-42.log"
+GOLDEN_PLIST="$T/golden.plist"
+
+(
+    HOME="$GOLDEN_HOME"
+    PATH="$MIN_PATH"
+    . "$LIB"
+    ljob_write_runner_plist "$GOLDEN_PLIST" "$GOLDEN_LABEL" "$GOLDEN_RUNNER" "$GOLDEN_ROOT" "$GOLDEN_LOG"
+)
+
+EXPECTED_PLIST="$T/expected.plist"
+cat > "$EXPECTED_PLIST" <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>${GOLDEN_LABEL}</string>
+  <key>ProgramArguments</key><array>
+    <string>/bin/bash</string><string>-lc</string><string>exec ${GOLDEN_RUNNER}</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><false/>
+  <key>WorkingDirectory</key><string>${GOLDEN_ROOT}</string>
+  <key>StandardOutPath</key><string>${GOLDEN_LOG}</string>
+  <key>StandardErrorPath</key><string>${GOLDEN_LOG}</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:${GOLDEN_HOME}/.bun/bin:${GOLDEN_HOME}/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+</dict></plist>
+PLIST_EOF
+
+if diff -q "$GOLDEN_PLIST" "$EXPECTED_PLIST" >/dev/null 2>&1; then
+    # plutil lint if available
+    if command -v plutil >/dev/null 2>&1; then
+        if plutil -lint "$GOLDEN_PLIST" >/dev/null 2>&1; then
+            pass "write_runner_plist_golden"
+        else
+            fail "write_runner_plist_golden" "plutil -lint failed"
+        fi
+    else
+        pass "write_runner_plist_golden"
+    fi
+else
+    fail "write_runner_plist_golden" "plist mismatch:$(diff "$GOLDEN_PLIST" "$EXPECTED_PLIST")"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: bootstrap_order_and_rc
+# recorder shows bootout gui/12345/<label> then bootstrap gui/12345 <plist>;
+# bootout exiting 5 is ignored; bootstrap exiting 5 propagates.
+# ---------------------------------------------------------------------------
+reset_ctl
+TEST_PLIST="$T/test.plist"
+touch "$TEST_PLIST"
+printf '5\n' > "$T/ctl/launchctl_bootout_rc"
+printf '5\n' > "$T/ctl/launchctl_bootstrap_rc"
+
+RC=0
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_bootstrap "com.ibl5.test-99" "$TEST_PLIST"
+)
+RC=$?
+
+CALLS="$(cat "$T/ctl/launchctl_calls" 2>/dev/null || true)"
+BOOTOUT_LINE="launchctl bootout gui/12345/com.ibl5.test-99"
+BOOTSTRAP_LINE="launchctl bootstrap gui/12345 $TEST_PLIST"
+
+# Check order: bootout first, bootstrap second
+LINE1="$(sed -n '1p' "$T/ctl/launchctl_calls" 2>/dev/null || true)"
+LINE2="$(sed -n '2p' "$T/ctl/launchctl_calls" 2>/dev/null || true)"
+
+if [[ $RC -eq 5 && "$LINE1" == "$BOOTOUT_LINE" && "$LINE2" == "$BOOTSTRAP_LINE" ]]; then
+    pass "bootstrap_order_and_rc"
+else
+    fail "bootstrap_order_and_rc" "rc=$RC line1='$LINE1' line2='$LINE2'"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: kill_label_order
+# pkill recorder: -TERM A, -TERM B, -KILL A, -KILL B; preceded by one bootout.
+# alive_fn returns dead (1) immediately so no sleep-1 iterations.
+# ---------------------------------------------------------------------------
+reset_ctl
+
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_kill_label "com.ibl5.test-1" "always_dead" "pat-A" "pat-B"
+) >/dev/null 2>&1
+
+LC_LINE1="$(sed -n '1p' "$T/ctl/launchctl_calls" 2>/dev/null || true)"
+PK1="$(sed -n '1p' "$T/ctl/pkill_calls" 2>/dev/null || true)"
+PK2="$(sed -n '2p' "$T/ctl/pkill_calls" 2>/dev/null || true)"
+PK3="$(sed -n '3p' "$T/ctl/pkill_calls" 2>/dev/null || true)"
+PK4="$(sed -n '4p' "$T/ctl/pkill_calls" 2>/dev/null || true)"
+
+if [[ "$LC_LINE1" == "launchctl bootout gui/12345/com.ibl5.test-1" \
+   && "$PK1" == "pkill -TERM -f pat-A" \
+   && "$PK2" == "pkill -TERM -f pat-B" \
+   && "$PK3" == "pkill -KILL -f pat-A" \
+   && "$PK4" == "pkill -KILL -f pat-B" ]]; then
+    pass "kill_label_order"
+else
+    fail "kill_label_order" "lc='$LC_LINE1' pk1='$PK1' pk2='$PK2' pk3='$PK3' pk4='$PK4'"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: kill_label_survivor
+# alive_fn always returns 0; ljob_kill_label returns 1 after exactly 5 wait
+# iterations (sleep recorder count: 1 sleep 2 + 5 sleep 1 = 6 total).
+# ---------------------------------------------------------------------------
+reset_ctl
+
+RC=0
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_alive() { return 0; }
+    ljob_kill_label "com.ibl5.test-1" "always_alive" "pat-A"
+)
+RC=$?
+
+SLEEP_COUNT="$(wc -l < "$T/ctl/sleep_calls" 2>/dev/null | tr -d ' ')"
+
+if [[ $RC -eq 1 && "$SLEEP_COUNT" -eq 6 ]]; then
+    pass "kill_label_survivor"
+else
+    fail "kill_label_survivor" "rc=$RC sleep_count=$SLEEP_COUNT (want rc=1 count=6)"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: release_slot_preserves_log
+# log -> log.aborted; plist gone; scratch files removed; .aborted survives.
+# ---------------------------------------------------------------------------
+reset_ctl
+REL_DIR="$T/release"
+mkdir -p "$REL_DIR"
+REL_PLIST="$REL_DIR/rel.plist"
+REL_LOG="$REL_DIR/rel.log"
+REL_SCRATCH1="$REL_DIR/rel.scratch1"
+REL_SCRATCH2="$REL_DIR/rel.scratch2"
+
+touch "$REL_PLIST" "$REL_LOG" "$REL_SCRATCH1" "$REL_SCRATCH2"
+
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_release_slot "$REL_PLIST" "$REL_LOG" "$REL_DIR/rel.*"
+)
+
+PLIST_GONE=0; [[ ! -f "$REL_PLIST" ]]      && PLIST_GONE=1
+LOG_GONE=0;   [[ ! -f "$REL_LOG" ]]        && LOG_GONE=1
+S1_GONE=0;    [[ ! -f "$REL_SCRATCH1" ]]   && S1_GONE=1
+S2_GONE=0;    [[ ! -f "$REL_SCRATCH2" ]]   && S2_GONE=1
+ABORTED=0;    [[ -f "${REL_LOG}.aborted" ]] && ABORTED=1
+
+if [[ $PLIST_GONE -eq 1 && $LOG_GONE -eq 1 && $S1_GONE -eq 1 && $S2_GONE -eq 1 && $ABORTED -eq 1 ]]; then
+    pass "release_slot_preserves_log"
+else
+    fail "release_slot_preserves_log" \
+        "plist_gone=$PLIST_GONE log_gone=$LOG_GONE s1_gone=$S1_GONE s2_gone=$S2_GONE aborted=$ABORTED"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: wait_for_slot_dry_exits
+# count_fn returns 3, jobs=3, FAKE_DRY=1 → subshell exits 0, stderr names FAKE_DRY.
+# ---------------------------------------------------------------------------
+reset_ctl
+STDERR_OUT="$T/wait_stderr"
+
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    FAKE_DRY=1
+    export FAKE_DRY
+    . "$LIB"
+    my_count() { printf '3\n'; }
+    my_reap()  { :; }
+    ljob_wait_for_slot "my_count" "my_reap" 3 7200 "FAKE_DRY"
+) 2>"$STDERR_OUT"
+RC=$?
+
+STDERR_CONTENT="$(cat "$STDERR_OUT" 2>/dev/null || true)"
+if [[ $RC -eq 0 ]] && grep -qF "FAKE_DRY" "$STDERR_OUT"; then
+    pass "wait_for_slot_dry_exits"
+else
+    fail "wait_for_slot_dry_exits" "rc=$RC stderr='$STDERR_CONTENT'"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: dm_helpers_standalone
+# Three sub-cases run via env -i /bin/bash with declare -f injected.
+# ---------------------------------------------------------------------------
+reset_ctl
+
+# Sub-case 1: NOTIFY=1, DISCORD_DM=<failing stub> → prints UNDELIVERED line.
+FAILING_DM="$T/ctl/failing_dm"
+printf '#!/bin/bash\nexit 1\n' > "$FAILING_DM"
+chmod +x "$FAILING_DM"
+
+DM_OUT1="$(env -i HOME="$T/home" /bin/bash -c "
+$(declare -f ljob_dm_ready ljob_dm_send 2>/dev/null || (. "$LIB" && declare -f ljob_dm_ready ljob_dm_send))
+NOTIFY=1
+DISCORD_DM='$FAILING_DM'
+ljob_dm_ready mytool && ljob_dm_send mytool 'hello'
+" 2>&1)"
+
+# Sub-case 2: NOTIFY=0 → ljob_dm_ready returns 1 silently (no output)
+DM_OUT2="$(env -i HOME="$T/home" /bin/bash -c "
+$(. "$LIB" && declare -f ljob_dm_ready)
+NOTIFY=0
+DISCORD_DM='$FAILING_DM'
+ljob_dm_ready mytool && echo SHOULD_NOT_PRINT
+" 2>&1)"
+
+# Sub-case 3: NOTIFY=1 but DISCORD_DM is not executable → prints "no executable discord-dm" line
+NON_EXEC_DM="$T/ctl/non_exec_dm"
+printf 'not executable\n' > "$NON_EXEC_DM"
+# do NOT chmod +x
+
+DM_OUT3="$(env -i HOME="$T/home" /bin/bash -c "
+$(. "$LIB" && declare -f ljob_dm_ready)
+NOTIFY=1
+DISCORD_DM='$NON_EXEC_DM'
+ljob_dm_ready mytool
+" 2>&1)"
+
+DM_OK=1
+[[ "$DM_OUT1" == *"DM UNDELIVERED"* ]]              || { DM_OK=0; fail "dm_helpers_standalone" "sub1 UNDELIVERED not in output: '$DM_OUT1'"; }
+[[ -z "$DM_OUT2" ]]                                  || { DM_OK=0; fail "dm_helpers_standalone" "sub2 should be silent, got: '$DM_OUT2'"; }
+[[ "$DM_OUT3" == *"no executable discord-dm"* ]]     || { DM_OK=0; fail "dm_helpers_standalone" "sub3 no-exec line not in output: '$DM_OUT3'"; }
+[[ $DM_OK -eq 1 ]] && pass "dm_helpers_standalone"
+
+# ---------------------------------------------------------------------------
+# Case: escape_and_quote
+# xml_escape and shq correctness.
+# ---------------------------------------------------------------------------
+reset_ctl
+(
+    . "$LIB"
+    RESULT_ESC="$(xml_escape 'a&b<c>d')"
+    WANT_ESC='a&amp;b&lt;c&gt;d'
+    [[ "$RESULT_ESC" == "$WANT_ESC" ]] || { printf 'xml_escape mismatch: got %s\n' "$RESULT_ESC" >&2; exit 1; }
+    eval "x=$(shq "it's \$HOME")"
+    # shellcheck disable=SC2154
+    [[ "$x" == "it's \$HOME" ]] || { printf "shq roundtrip mismatch: got %s\n" "$x" >&2; exit 1; }
+)
+RC=$?
+if [[ $RC -eq 0 ]]; then
+    pass "escape_and_quote"
+else
+    fail "escape_and_quote" "subshell exited $RC"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: source_is_inert
+# Sourcing twice in a shell with set +euo pipefail leaves $- and pipefail unchanged;
+# launchctl recorder empty.
+# ---------------------------------------------------------------------------
+reset_ctl
+# Capture $- and pipefail state before sourcing
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    set +euo pipefail  2>/dev/null || true
+    BEFORE_FLAGS="$-"
+    BEFORE_PIPE="$(set -o | grep pipefail | awk '{print $2}')"
+
+    . "$LIB"
+    . "$LIB"  # double-source
+
+    AFTER_FLAGS="$-"
+    AFTER_PIPE="$(set -o | grep pipefail | awk '{print $2}')"
+
+    [[ "$BEFORE_FLAGS" == "$AFTER_FLAGS" ]] || { printf 'flags changed: %s -> %s\n' "$BEFORE_FLAGS" "$AFTER_FLAGS" >&2; exit 1; }
+    [[ "$BEFORE_PIPE"  == "$AFTER_PIPE"  ]] || { printf 'pipefail changed: %s -> %s\n' "$BEFORE_PIPE" "$AFTER_PIPE" >&2; exit 1; }
+    exit 0
+)
+RC=$?
+LAUNCHCTL_CALLS_COUNT=0
+[[ -f "$T/ctl/launchctl_calls" ]] && LAUNCHCTL_CALLS_COUNT="$(wc -l < "$T/ctl/launchctl_calls" | tr -d ' ')"
+
+if [[ $RC -eq 0 && "$LAUNCHCTL_CALLS_COUNT" -eq 0 ]]; then
+    pass "source_is_inert"
+else
+    fail "source_is_inert" "subshell_rc=$RC launchctl_calls=$LAUNCHCTL_CALLS_COUNT"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: reap_idle_loaded_not_running
+# Old plist; snapshot row "-<TAB>78<TAB><label>" (loaded, no PID); alive_fn dead.
+# Expect: bootout recorded, plist gone, stdout "reaped stale job <label>".
+# ---------------------------------------------------------------------------
+reset_ctl
+RI1_DIR="$T/home/Library/LaunchAgents"
+RI1_LABEL="com.ibl5.ppn-ri1-test"
+RI1_PLIST="$RI1_DIR/${RI1_LABEL}.plist"
+touch "$RI1_PLIST"
+touch -t 202601010000 "$RI1_PLIST"
+RI1_SNAP="$(printf '%s\t%s\t%s\n' '-' '78' "$RI1_LABEL")"
+
+RI1_OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_reap_idle "com.ibl5.ppn-ri1-" "always_dead" 10 "$RI1_SNAP"
+)"
+
+RI1_BOOTOUT="$(grep -cF "launchctl bootout gui/12345/${RI1_LABEL}" "$T/ctl/launchctl_calls" 2>/dev/null || echo 0)"
+RI1_GONE=0; [[ ! -f "$RI1_PLIST" ]] && RI1_GONE=1
+RI1_MSG=0; grep -qF "reaped stale job $RI1_LABEL" <<< "$RI1_OUT" && RI1_MSG=1
+
+if [[ "$RI1_BOOTOUT" -ge 1 && $RI1_GONE -eq 1 && $RI1_MSG -eq 1 ]]; then
+    pass "reap_idle_loaded_not_running"
+else
+    fail "reap_idle_loaded_not_running" "bootout=$RI1_BOOTOUT plist_gone=$RI1_GONE msg=$RI1_MSG out='$RI1_OUT'"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: reap_idle_unlisted
+# Old plist; label absent from snapshot (empty snap); alive_fn dead.
+# Expect: plist removed, NO bootout recorded.
+# ---------------------------------------------------------------------------
+reset_ctl
+RI2_LABEL="com.ibl5.ppn-ri2-test"
+RI2_PLIST="$T/home/Library/LaunchAgents/${RI2_LABEL}.plist"
+touch "$RI2_PLIST"
+touch -t 202601010000 "$RI2_PLIST"
+
+RI2_OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_reap_idle "com.ibl5.ppn-ri2-" "always_dead" 10 ""
+)"
+
+RI2_BOOTOUT="$(grep -cF "bootout" "$T/ctl/launchctl_calls" 2>/dev/null || echo 0)"
+RI2_GONE=0; [[ ! -f "$RI2_PLIST" ]] && RI2_GONE=1
+
+if [[ $RI2_GONE -eq 1 && "$RI2_BOOTOUT" -eq 0 ]]; then
+    pass "reap_idle_unlisted"
+else
+    fail "reap_idle_unlisted" "plist_gone=$RI2_GONE bootout_count=$RI2_BOOTOUT"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: reap_idle_keeps_running_pid
+# Old plist; snapshot row "4242<TAB>0<TAB><label>" (PID 4242, running); alive_fn dead.
+# Expect: plist KEPT, no bootout.
+# ---------------------------------------------------------------------------
+reset_ctl
+RI3_LABEL="com.ibl5.ppn-ri3-test"
+RI3_PLIST="$T/home/Library/LaunchAgents/${RI3_LABEL}.plist"
+touch "$RI3_PLIST"
+touch -t 202601010000 "$RI3_PLIST"
+RI3_SNAP="$(printf '%s\t%s\t%s\n' '4242' '0' "$RI3_LABEL")"
+
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_reap_idle "com.ibl5.ppn-ri3-" "always_dead" 10 "$RI3_SNAP"
+) >/dev/null 2>&1
+
+RI3_KEPT=0; [[ -f "$RI3_PLIST" ]] && RI3_KEPT=1
+RI3_BOOTOUT="$(grep -cF "bootout" "$T/ctl/launchctl_calls" 2>/dev/null || echo 0)"
+
+if [[ $RI3_KEPT -eq 1 && "$RI3_BOOTOUT" -eq 0 ]]; then
+    pass "reap_idle_keeps_running_pid"
+else
+    fail "reap_idle_keeps_running_pid" "plist_kept=$RI3_KEPT bootout=$RI3_BOOTOUT"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: reap_idle_keeps_young
+# Fresh plist (mtime = now); snapshot has idle row; alive_fn dead.
+# Expect: plist KEPT (too young).
+# ---------------------------------------------------------------------------
+reset_ctl
+RI4_LABEL="com.ibl5.ppn-ri4-test"
+RI4_PLIST="$T/home/Library/LaunchAgents/${RI4_LABEL}.plist"
+touch "$RI4_PLIST"   # mtime = now (< 10 min ago)
+RI4_SNAP="$(printf '%s\t%s\t%s\n' '-' '78' "$RI4_LABEL")"
+
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_reap_idle "com.ibl5.ppn-ri4-" "always_dead" 10 "$RI4_SNAP"
+) >/dev/null 2>&1
+
+RI4_KEPT=0; [[ -f "$RI4_PLIST" ]] && RI4_KEPT=1
+
+if [[ $RI4_KEPT -eq 1 ]]; then
+    pass "reap_idle_keeps_young"
+else
+    fail "reap_idle_keeps_young" "plist_kept=$RI4_KEPT (expected 1)"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: reap_idle_keeps_live_process
+# Old plist; snapshot has idle row; alive_fn returns 0 (process alive).
+# Expect: plist KEPT.
+# ---------------------------------------------------------------------------
+reset_ctl
+RI5_LABEL="com.ibl5.ppn-ri5-test"
+RI5_PLIST="$T/home/Library/LaunchAgents/${RI5_LABEL}.plist"
+touch "$RI5_PLIST"
+touch -t 202601010000 "$RI5_PLIST"
+RI5_SNAP="$(printf '%s\t%s\t%s\n' '-' '78' "$RI5_LABEL")"
+
+(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_alive() { return 0; }
+    ljob_reap_idle "com.ibl5.ppn-ri5-" "always_alive" 10 "$RI5_SNAP"
+) >/dev/null 2>&1
+
+RI5_KEPT=0; [[ -f "$RI5_PLIST" ]] && RI5_KEPT=1
+
+if [[ $RI5_KEPT -eq 1 ]]; then
+    pass "reap_idle_keeps_live_process"
+else
+    fail "reap_idle_keeps_live_process" "plist_kept=$RI5_KEPT (expected 1)"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: reap_idle_exact_label_and_dry
+# Sub-test A: plist com.ibl5.ppn-ri6a-1 is idle while snapshot has a RUNNING
+#   row for com.ibl5.ppn-ri6a-12 (exact-field match, not substring).
+#   Expect: com.ibl5.ppn-ri6a-1 reaped, no bootout (absent from snapshot).
+# Sub-test B: LJOB_REAP_DRY=1; idle plist prints "would reap <label>",
+#   plist survives, no bootout.
+# ---------------------------------------------------------------------------
+reset_ctl
+
+# Sub-test A setup
+RI6A_LABEL="com.ibl5.ppn-ri6a-1"
+RI6A_PLIST="$T/home/Library/LaunchAgents/${RI6A_LABEL}.plist"
+touch "$RI6A_PLIST"
+touch -t 202601010000 "$RI6A_PLIST"
+# Snapshot has a RUNNING row only for the -12 label (not -1)
+RI6A_SNAP="$(printf '%s\t%s\t%s\n' '4242' '0' 'com.ibl5.ppn-ri6a-12')"
+
+RI6A_OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    always_dead() { return 1; }
+    ljob_reap_idle "com.ibl5.ppn-ri6a-" "always_dead" 10 "$RI6A_SNAP"
+)"
+
+RI6A_GONE=0; [[ ! -f "$RI6A_PLIST" ]] && RI6A_GONE=1
+RI6A_BOOTOUT="$(grep -cF "bootout" "$T/ctl/launchctl_calls" 2>/dev/null || echo 0)"
+
+# Sub-test B setup
+reset_ctl
+RI6B_LABEL="com.ibl5.ppn-ri6b-dry"
+RI6B_PLIST="$T/home/Library/LaunchAgents/${RI6B_LABEL}.plist"
+touch "$RI6B_PLIST"
+touch -t 202601010000 "$RI6B_PLIST"
+RI6B_SNAP="$(printf '%s\t%s\t%s\n' '-' '78' "$RI6B_LABEL")"
+
+RI6B_OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    LJOB_REAP_DRY=1
+    always_dead() { return 1; }
+    ljob_reap_idle "com.ibl5.ppn-ri6b-" "always_dead" 10 "$RI6B_SNAP"
+)"
+
+RI6B_KEPT=0; [[ -f "$RI6B_PLIST" ]] && RI6B_KEPT=1
+RI6B_BOOTOUT="$(grep -cF "bootout" "$T/ctl/launchctl_calls" 2>/dev/null || echo 0)"
+RI6B_MSG=0; grep -qF "would reap $RI6B_LABEL" <<< "$RI6B_OUT" && RI6B_MSG=1
+
+if [[ $RI6A_GONE -eq 1 && "$RI6A_BOOTOUT" -eq 0 \
+   && $RI6B_KEPT -eq 1 && "$RI6B_BOOTOUT" -eq 0 && $RI6B_MSG -eq 1 ]]; then
+    pass "reap_idle_exact_label_and_dry"
+else
+    fail "reap_idle_exact_label_and_dry" \
+        "6a_gone=$RI6A_GONE 6a_bootout=$RI6A_BOOTOUT 6b_kept=$RI6B_KEPT 6b_bootout=$RI6B_BOOTOUT 6b_msg=$RI6B_MSG"
+fi
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+TOTAL=$((PASSED + FAILED))
+printf 'launchd-job: %d passed, %d failed\n' "$PASSED" "$FAILED"
+[[ $FAILED -eq 0 ]] && exit 0 || exit 1

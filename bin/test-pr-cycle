@@ -101,6 +101,9 @@ printf '%s\n' "\$*" >> "\$S/gh.argv"
 num=""
 for a in "\$@"; do case "\$a" in [0-9]*) num="\$a"; break ;; esac; done
 case "\$*" in
+    *"pr list"*"--json number,url,title,state"*)
+        [[ -f "\$S/gh-fail-prlist" ]] && exit 5
+        [[ -f "\$S/prlist.tsv" ]] && cat "\$S/prlist.tsv" ;;
     *"--json state"*)
         if [[ -f "\$S/state-\$num" ]]; then cat "\$S/state-\$num"; else echo OPEN; fi ;;
     *"--json comments,headRefOid"*)
@@ -202,6 +205,31 @@ ATTACK_EXCLUDED_ONLY='# Plan of attack
 |---|----|-----------|------------|
 '"${ATTACK_EXCLUDED#*| 1 | #101 first-slug | none | no |}"
 
+# Two ordered rows plus DIRTY/DRAFT excluded entries (2xxx PR numbers).
+ATTACK_2PR_EXCLUDED='# Plan of attack
+
+| # | PR | Constraint | Needs you? |
+|---|----|-----------|------------|
+| 1 | #2101 alpha-slug | none | no |
+| 2 | #2102 beta-slug | none | no |
+
+## Excluded
+
+- #2201 dirty-slug — DIRTY (merge conflict; rebase before it can be ordered)
+- #2202 draft-slug — DRAFT
+'
+
+# Four ordered rows (2101-2104) with no excluded section.
+ATTACK_4PR='# Plan of attack
+
+| # | PR | Constraint | Needs you? |
+|---|----|-----------|------------|
+| 1 | #2101 alpha-slug | none | no |
+| 2 | #2102 beta-slug | none | no |
+| 3 | #2103 gamma-slug | none | no |
+| 4 | #2104 delta-slug | none | no |
+'
+
 triage_report() {  # $@ = "PR BUCKET ACTION" triples, one per argument
     printf '%-8s %-18s %-24s\n' "PR#" "BUCKET" "NEXT-ACTION"
     printf -- '-------- ------------------ ------------------------\n'
@@ -272,7 +300,8 @@ install_verdict() {
 reset_state() {
     rm -f "$SCRATCH"/*.argv "$SCRATCH"/attack-* "$SCRATCH"/ready-* "$SCRATCH"/triage-* \
           "$SCRATCH"/dm-* "$SCRATCH"/state-* \
-          "$SCRATCH"/verdictview-*.json "$SCRATCH"/tree-* "$SCRATCH"/gh-fail-verdict
+          "$SCRATCH"/verdictview-*.json "$SCRATCH"/tree-* "$SCRATCH"/gh-fail-verdict \
+          "$SCRATCH"/prlist.tsv "$SCRATCH"/gh-fail-prlist
     rm -f "$SCRATCH/.ibl5-pr-cycle.stop"
     rm -rf "/tmp/pr-cycle-$TSBASE"* 2>/dev/null
     rm -f "/tmp/pr-cycle-$TSBASE"*.sh "/tmp/pr-cycle-$TSBASE"*.log 2>/dev/null
@@ -300,8 +329,6 @@ run_in() {
         PR_CYCLE_DM_CMD="$BIN/dm" \
         PR_CYCLE_GH_CMD="$BIN/gh" \
         PR_CYCLE_MAIN_CHECKOUT="${MAIN_OVERRIDE-$MAIN}" \
-        PR_CYCLE_POLL_INTERVAL="${IVAL:-0}" \
-        PR_CYCLE_POLL_CEILING="${CEIL:-0}" \
         PR_CYCLE_STOP_FILE="$SCRATCH/.ibl5-pr-cycle.stop" \
         PR_CYCLE_TS="${TSPIN:-$TSBASE}" \
         "$DRIVER" "$@" 2>"$ERR")"
@@ -322,11 +349,7 @@ arm_calls() { grep -c -- '--arm' "$SCRATCH/triage.argv" 2>/dev/null || true; }
 # `reset_state` already clears /tmp/pr-cycle-$TSBASE* between cases. `_worker` creates the
 # file with `: >`, so "no file" is genuinely zero merges and not a masked error.
 merges() {
-    if [[ -f "/tmp/pr-cycle-$TSBASE/ledgered.txt" ]]; then
-        wc -l < "/tmp/pr-cycle-$TSBASE/ledgered.txt" | tr -d ' '
-    else
-        echo 0
-    fi
+    grep -oE 'armed [0-9]+' <<< "$OUT" | tail -1 | grep -oE '[0-9]+' || echo 0
 }
 
 # ==========================================================================================
@@ -336,7 +359,7 @@ begin_case
 reset_state
 run --help
 [[ $RC -eq 0 ]] || fail "--help exit $RC"
-for f in -- --go --dry-run --stop --no-dm --max-merges --only --skip --help; do
+for f in -- --go --dry-run --stop --no-dm --max-ready --jobs --only --skip --help; do
     [[ "$f" == "--" ]] && continue
     grep -qF -- "$f" <<< "$OUT" || fail "--help omits $f"
 done
@@ -346,7 +369,8 @@ grep -qF 'PR_CYCLE_LOG' <<< "$OUT" \
     || fail "--help truncated: the trailing PR_CYCLE_LOG seam line is missing"
 grep -qF 'judged-empty form' <<< "$OUT" \
     || fail "--help omits the gate-nominee handling note"
-for bad in "--nope" "--max-merges 0" "--max-merges -1" "--max-merges abc" "--max-merges" "--go --stop" \
+for bad in "--nope" "--max-ready 0" "--max-ready -1" "--max-ready abc" "--max-ready" \
+           "--jobs 0" "--jobs abc" "--jobs" "--max-merges 5" "--go --stop" \
            "--only" "--only abc" "--only 0" "--only 007" "--only -1" "--only 101 --skip 102" \
            "--skip" "--skip abc" "--skip 1,x"; do
     # shellcheck disable=SC2086
@@ -429,26 +453,6 @@ run --stop
 grep -qx -- '--stop-all' "$SCRATCH/ready.argv" || fail "--stop did not call the ready tool with --stop-all"
 end_case "case 4 stop"
 
-# ==========================================================================================
-# 5 / 8 — serial selection order and the ready argv
-# ==========================================================================================
-begin_case
-reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-run --worker
-[[ $RC -eq 0 ]] || fail "drained run exit $RC, want 0"
-[[ "$(calls ready)" == "3" ]] || fail "want 3 ready calls, got $(calls ready)"
-[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr 101 --jobs 1 --go --wait" ]] \
-    || fail "ready argv 1: $(sed -n '1p' "$SCRATCH/ready.argv")"
-[[ "$(sed -n '2p' "$SCRATCH/ready.argv")" == "--pr 102 --jobs 1 --go --wait" ]] \
-    || fail "ready argv 2: $(sed -n '2p' "$SCRATCH/ready.argv")"
-[[ "$(sed -n '3p' "$SCRATCH/ready.argv")" == "--pr 103 --jobs 1 --go --wait" ]] \
-    || fail "ready argv 3: $(sed -n '3p' "$SCRATCH/ready.argv")"
-[[ "$(merges)" == "0" ]] || fail "non-armable run counted $(merges) merges, want 0"
-grep -qF 'queue drained' <<< "$OUT" || fail "drained run did not report draining"
-end_case "case 5/8 serial order and ready argv"
 
 # ==========================================================================================
 # 6 — gate nominees force a second, exactly-shaped pr-attack call
@@ -474,7 +478,9 @@ grep -qF '#999 dangling-gate — ordered with no gate edges (gate nominee, judge
     || fail "gate nominee log line missing or misworded: $(grep -F '#999' <<< "$OUT")"
 ! grep -qF 'excluded this run' <<< "$OUT" \
     || fail "driver still claims nominees are excluded; --gate-edges /dev/null re-admits every one"
-[[ "$(calls ready)" == "3" ]] || fail "want 3 ready calls after nominee re-admission, got $(calls ready)"
+[[ "$(calls ready)" == "1" ]] || fail "want 1 fleet call after nominee re-admission, got $(calls ready)"
+_a6="$(sed -n '1p' "$SCRATCH/ready.argv")"
+[[ "$_a6" == *'101'*'102'*'103'* ]] || fail "case 6: all 3 PRs not in --pr-list: $_a6"
 end_case "case 6 gate nominees"
 
 # ==========================================================================================
@@ -501,19 +507,6 @@ run --worker
 grep -qF 'stale' <<< "$OUT" || fail "stale retry was not reported"
 end_case "case 7 attack failures"
 
-# ==========================================================================================
-# 9 — a --wait timeout halts before arming
-# ==========================================================================================
-begin_case
-reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-echo 'TIMED OUT waiting for 1 session(s) after 7200s; leaving them running' > "$SCRATCH/ready-err"
-echo 0 > "$SCRATCH/ready-rc"
-run --worker
-[[ $RC -eq 1 ]] || fail "timeout should halt with 1, got $RC"
-[[ "$(calls ready)" == "1" ]] || fail "timeout should stop after one ready, got $(calls ready)"
-[[ "$(arm_calls)" == "0" ]] || fail "timeout still armed"
-end_case "case 9 wait timeout"
 
 # ==========================================================================================
 # 10 — a stop file created during readying blocks the arm in that same iteration
@@ -521,11 +514,19 @@ end_case "case 9 wait timeout"
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-echo ': > "$S/.ibl5-pr-cycle.stop"' > "$SCRATCH/ready-hook"
+echo ': > "$S/.ibl5-pr-cycle.stop"' > "$SCRATCH/ready-hook-1"
 run --worker
 [[ $RC -eq 0 ]] || fail "a stop is an intended termination, want 0, got $RC"
 [[ "$(calls ready)" == "1" ]] || fail "want 1 ready before the stop, got $(calls ready)"
 [[ "$(arm_calls)" == "0" ]] || fail "arm ran despite the stop file"
+
+# stop-before-fire: triage-hook-1 creates stop during precheck => fleet never called
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+echo ': > "$S/.ibl5-pr-cycle.stop"' > "$SCRATCH/triage-hook-1"
+run --worker
+[[ $RC -eq 0 ]] || fail "stop-before-fire: want 0, got $RC"
+[[ "$(calls ready)" == "0" ]] || fail "stop-before-fire: fleet called despite stop, got $(calls ready)"
 end_case "case 10 stop during readying"
 
 # ==========================================================================================
@@ -538,10 +539,9 @@ triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"   # 102 and 103 ab
 echo MERGED > "$SCRATCH/state-101"
 run --worker
 [[ $RC -eq 0 ]] || fail "non-armable run exit $RC, want 0"
-[[ "$(calls ready)" == "3" ]] || fail "run stopped early: $(calls ready) ready calls"
-[[ "$(calls gh)" == "0" ]] || fail "polled despite no ARMABLE row: $(calls gh) gh calls"
-[[ "$(merges)" == "0" ]] || fail "counted $(merges) merges without an ARMABLE row"
-grep -qF 'absent' <<< "$OUT" || fail "a PR missing from the report was not reported as absent"
+[[ "$(calls ready)" == "1" ]] || fail "run stopped early or batched wrong: $(calls ready) ready calls"
+[[ "$(state_calls)" == "0" ]] || fail "polled despite no ARMABLE row: $(state_calls) state calls"
+grep -qE 'armed 0[^0-9]' <<< "$OUT" || fail "absent PRs were counted as armed"
 end_case "case 11 non-armable and absent"
 
 # --- rescue: baseline characterization -----------------------------------------------------
@@ -554,77 +554,65 @@ triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 RESCUE=0 run --worker
 [[ $RC -eq 0 ]] || fail "rescue-off run exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "rescue-off run made $(calls ready) ready calls, want 1"
-grep -qF -- '--pr 101' "$SCRATCH/ready.argv" || fail "the one orderable PR was not readied"
+grep -qF '101' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" || fail "the one orderable PR was not in --pr-list"
 for n in 201 202 203 204 205; do
-    grep -qF -- "--pr $n" "$SCRATCH/ready.argv" \
-        && fail "excluded #$n was handed to pr-ready-now with rescue off"
+    grep -qF "$n" <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" \
+        && fail "excluded #$n appeared in --pr-list with rescue off"
 done
-[[ "$(calls gh)" == "0" ]] || fail "polled with no ARMABLE row: $(calls gh) gh calls"
+[[ "$(state_calls)" == "0" ]] || fail "polled with no ARMABLE row: $(state_calls) state calls"
 end_case "case 11a rescue off leaves excluded PRs untouched"
-# --- 11b: exactly ONE rescue per iteration, never a batch ------------------------------------
-# Iter 1: #101 readied normally, then site B rescues #201. Iter 2: nothing orderable, site A
-# rescues #202 and continues. Iter 3: site A rescues #205. Iter 4: no candidate left, drained.
-# 4 attack calls + 4 ready calls. A BATCHING implementation produces the same 4 ready calls but
-# only 2 attack calls -- that is why the attack count is asserted, not just the ready count.
-begin_case
-reset_state
-printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
-triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
-run --worker
-[[ $RC -eq 0 ]] || fail "rescue run exit $RC, want 0"
-[[ "$(calls ready)" == "4" ]] || fail "want 4 ready calls, got $(calls ready)"
-[[ "$(calls attack)" == "4" ]] || fail "want 4 attack calls (one per iteration), got $(calls attack)"
-grep -qF -- '--pr 101' <<< "$(sed -n 1p "$SCRATCH/ready.argv")" || fail "iter 1 did not ready #101 first"
-grep -qF -- '--pr 201' <<< "$(sed -n 2p "$SCRATCH/ready.argv")" || fail "iter 1 did not rescue #201"
-grep -qF -- '--pr 202' <<< "$(sed -n 3p "$SCRATCH/ready.argv")" || fail "iter 2 did not rescue #202"
-grep -qF -- '--pr 205' <<< "$(sed -n 4p "$SCRATCH/ready.argv")" || fail "iter 3 did not rescue #205"
-grep -qF -- '--go' "$SCRATCH/ready.argv" || fail "rescue did not pass --go to pr-ready-now"
-grep -qF -- '--wait' "$SCRATCH/ready.argv" || fail "rescue did not pass --wait (the completion signal)"
-grep -qF 'rescuing DIRTY #201' <<< "$OUT" || fail "rescue was not announced in the log"
-[[ "$(calls gh)" == "0" ]] || fail "rescue polled gh: $(calls gh) calls"
-end_case "case 11b one rescue per iteration"
 
-# --- 11c: an attempted PR is never re-attempted, and a still-DIRTY PR cannot spin the loop ---
-# The attack document is IDENTICAL on every call: #201/#202/#205 stay DIRTY throughout, exactly
-# as they would if pr-ready-now failed to resolve the conflict. rescued.txt is what stops the
-# loop re-picking #201 forever.
+# ==========================================================================================
+# 33 — DIRTY PRs join the stage-1 batch; rescue honours scope and slot guard
+# ==========================================================================================
 begin_case
 reset_state
-printf '%s' "$ATTACK_EXCLUDED_ONLY" > "$SCRATCH/attack-out"
-grep -qF '#201' <<< "$ATTACK_EXCLUDED_ONLY" || fail "fixture ATTACK_EXCLUDED_ONLY lost its Excluded section"
-grep -qF '#101' <<< "$ATTACK_EXCLUDED_ONLY" && fail "fixture ATTACK_EXCLUDED_ONLY still has an orderable row"
+printf '%s' "$ATTACK_2PR_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker
-[[ $RC -eq 0 ]] || fail "excluded-only run exit $RC, want 0"
-[[ "$(calls ready)" == "3" ]] || fail "want 3 rescues (201,202,205), got $(calls ready)"
-[[ "$(calls attack)" == "4" ]] || fail "want 4 attack calls, got $(calls attack)"
-[[ "$(sort "$SCRATCH/ready.argv" | uniq | wc -l | tr -d ' ')" == "3" ]] \
-    || fail "a PR was rescued twice in one run"
-[[ "$(grep -cF -- '--pr 201' "$SCRATCH/ready.argv")" == "1" ]] \
-    || fail "still-DIRTY #201 was re-attempted: the loop can spin"
-grep -qF 'queue drained' <<< "$OUT" || fail "run did not terminate as drained"
-end_case "case 11c attempted set prevents re-attempt and spin"
+[[ $RC -eq 0 ]] || fail "case 33 baseline exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "case 33: want 1 fleet call, got $(calls ready)"
+# 2101 and 2102 (ordered) + 2201 (DIRTY rescue) — in that order. 2202 (DRAFT) is absent.
+grep -qF '2101' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" || fail "case 33: 2101 missing from --pr-list"
+grep -qF '2102' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" || fail "case 33: 2102 missing from --pr-list"
+grep -qF '2201' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" || fail "case 33: 2201 (DIRTY) missing from --pr-list"
+grep -qF '2202' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" && fail "case 33: 2202 (DRAFT) must not appear"
+# Ordered PRs come first in the list; DIRTY rescue appended after.
+_a1="$(sed -n '1p' "$SCRATCH/ready.argv")"
+[[ "$_a1" == *'2101'*'2102'* ]] || fail "case 33: ordered 2101,2102 must precede 2201"
 
-# --- 11d: pr-cycle never merges, and the merge cap does not starve rescue --------------------
-# #101 is ARMABLE and lands, so MERGES hits the cap of 1 and iteration 2 breaks at the TOP of
-# the loop -- before the drain point. Site B has nonetheless already rescued once. Under a
-# drain-point-ONLY wiring this run rescues nothing, which is the regression this case pins.
-begin_case
+# With RESCUE=0: only ordered rows.
 reset_state
-printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
-triage_report "101 ARMABLE merge" > "$SCRATCH/triage-out"
-# Call 1 is the read-only pre-read for #101; keep it non-ARMABLE so the ready run this
-# case counts still happens. Call 2 (the arm) falls back to the ARMABLE report above.
-triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out-1"
-echo MERGED > "$SCRATCH/state-101"
-run --worker --max-merges 1
-[[ $RC -eq 0 ]] || fail "capped run exit $RC, want 0"
-[[ "$(calls ready)" == "2" ]] || fail "capped run made $(calls ready) ready calls, want 2 (#101 + one rescue)"
-grep -qF -- '--pr 201' "$SCRATCH/ready.argv" || fail "merge cap starved the rescue path"
-grep -qE '(^| )merge( |$)' "$SCRATCH/gh.argv" && fail "pr-cycle invoked a gh merge subcommand"
-grep -vE '^[[:space:]]*#' "$DRIVER" | grep -qE 'pr +merge|merge +--auto' \
-    && fail "a gh merge / auto-merge call appeared in the driver source"
-grep -qF 'merge cap' <<< "$OUT" || fail "capped run did not report the cap"
-end_case "case 11d never merges; cap does not starve rescue"
+printf '%s' "$ATTACK_2PR_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+RESCUE=0 run --worker
+grep -qF '2201' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" && fail "case 33 RESCUE=0: 2201 appeared despite rescue off"
+_a1r0="$(sed -n '1p' "$SCRATCH/ready.argv")"
+grep -qF '2101' <<< "$_a1r0" || fail "case 33 RESCUE=0: 2101 missing"
+grep -qF '2102' <<< "$_a1r0" || fail "case 33 RESCUE=0: 2102 missing"
+
+# With 2201 slot live: 2201 absent from the batch; worker logs the slot skip.
+# Dry-run is skipped here: the live-session guard blocks non-worker runs when any
+# post-plan-fleet slot is active (case 3 tests that property).
+reset_state
+printf '%s' "$ATTACK_2PR_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+set_live_labels "-	0	com.ibl5.post-plan-fleet-2201"
+run --worker
+grep -qF '2201' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" && fail "case 33 slot: 2201 appeared despite live slot"
+grep -qF 'slot already live' <<< "$OUT" || fail "case 33 slot: slot skip not logged in worker output"
+clear_live_labels
+
+# With --max-ready 2: 2201 capped out; ordered PRs win.
+reset_state
+printf '%s' "$ATTACK_2PR_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker --max-ready 2
+_a1cap="$(sed -n '1p' "$SCRATCH/ready.argv")"
+grep -qF '2101' <<< "$_a1cap" || fail "case 33 cap: 2101 missing"
+grep -qF '2102' <<< "$_a1cap" || fail "case 33 cap: 2102 missing"
+grep -qF '2201' <<< "$_a1cap" && fail "case 33 cap: 2201 should be capped out with --max-ready 2"
+end_case "case 33 DIRTY joins the batch"
 
 # --- 11e: only DIRTY is eligible; unset and empty seam values BOTH mean enabled ---------------
 begin_case
@@ -632,10 +620,10 @@ reset_state
 printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker                                   # PR_CYCLE_RESCUE genuinely UNSET
-[[ "$(calls ready)" == "4" ]] || fail "unset seam did not enable rescue: $(calls ready) ready calls"
-grep -qF -- '--pr 203' "$SCRATCH/ready.argv" && fail "the DRAFT-excluded #203 was rescued"
-grep -qF -- '--pr 204' "$SCRATCH/ready.argv" \
-    && fail "#204 from '## Hand-resolutions needed' was rescued: the parse is not section-scoped"
+[[ "$(calls ready)" == "1" ]] || fail "unset seam: want 1 fleet call, got $(calls ready)"
+grep -qF '203' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" && fail "the DRAFT-excluded #203 was in --pr-list"
+grep -qF '204' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" \
+    && fail "#204 from '## Hand-resolutions needed' was in --pr-list: the parse is not section-scoped"
 UNSET_ARGV="$(cat "$SCRATCH/ready.argv")"
 reset_state
 printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
@@ -651,16 +639,16 @@ reset_state
 printf '%s' "$ATTACK_EXCLUDED_ONLY" > "$SCRATCH/attack-out"
 set_live_labels "-	0	com.ibl5.post-plan-fleet-201"
 run --worker
-grep -qF -- '--pr 201' "$SCRATCH/ready.argv" && fail "rescued #201 while its launchd slot was live"
-grep -qF -- '--pr 202' <<< "$(sed -n 1p "$SCRATCH/ready.argv")" \
+grep -qF '201' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" && fail "rescued #201 while its launchd slot was live"
+grep -qF '202' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" \
     || fail "did not fall through to the next unheld candidate"
-grep -qF 'slot is already live' <<< "$OUT" || fail "the slot skip was not logged"
+grep -qF 'slot already live' <<< "$OUT" || fail "the slot skip was not logged"
 clear_live_labels
 reset_state
 printf '%s' "$ATTACK_EXCLUDED_ONLY" > "$SCRATCH/attack-out"
 set_live_labels "-	0	com.ibl5.post-plan-fleet-2011"  # longer label: must NOT match #201
 run --worker
-grep -qF -- '--pr 201' "$SCRATCH/ready.argv" \
+grep -qF '201' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" \
     || fail "an unanchored label match let #2011 veto the rescue of #201"
 clear_live_labels
 reset_state
@@ -668,14 +656,12 @@ printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
 run --dry-run
 [[ $RC -eq 0 ]] || fail "dry run exit $RC, want 0"
 [[ "$(calls ready)" == "0" ]] || fail "dry run fired $(calls ready) ready calls"
-grep -qF 'DIRTY rescue candidates (3)' <<< "$OUT" || fail "dry run did not count the candidates"
-[[ "$(grep -c 'would be rescued FIRST' <<< "$OUT")" == "1" ]] \
-    || fail "dry run marked more than one candidate as first: it implies a batch"
+grep -qF 'stage 1 would ready' <<< "$OUT" || fail "dry run did not report stage 1 list"
+grep -qF '#201' <<< "$OUT" || fail "dry run did not name a DIRTY rescue candidate"
 grep -qF '#203' <<< "$OUT" && fail "dry run listed the DRAFT PR as a rescue candidate"
 grep -qF '#204' <<< "$OUT" && fail "dry run listed the out-of-section decoy as a candidate"
 RESCUE=0 run --dry-run
 grep -qF 'DIRTY rescue: disabled' <<< "$OUT" || fail "dry run did not report the kill switch"
-grep -qF 'would be rescued FIRST' <<< "$OUT" && fail "dry run promised a rescue with rescue off"
 end_case "case 11f slot guard and dry-run report"
 
 
@@ -689,189 +675,119 @@ triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 echo 2 > "$SCRATCH/triage-rc"
 run --worker
 [[ $RC -eq 1 ]] || fail "triage exit 2 should halt with 1, got $RC"
-[[ "$(calls ready)" == "1" ]] || fail "triage exit 2 did not halt the loop"
+grep -qF 'pr-triage exit 2' "$SCRATCH/dm.argv" || fail "DM did not name the pr-triage exit 2"
 
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE auto-merge armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
     > "$SCRATCH/triage-out"
 echo 1 > "$SCRATCH/triage-rc"
-echo MERGED > "$SCRATCH/state-101"
 run --worker
 [[ $RC -eq 0 ]] || fail "triage exit 1 should continue, got $RC"
-[[ "$(merges)" == "1" ]] || fail "triage exit 1 lost the confirmed merge: $(merges)"
+# The your-turn list is still built: 102 and 103 land in your-turn.txt
+grep -qE 'your turn [1-9]' <<< "$OUT" || fail "triage exit 1: your-turn count should be nonzero"
 end_case "case 12 triage exit codes"
 
+
 # ==========================================================================================
-# 13 — a confirmed merge appends exactly one six-line row, byte-identical
+# 35 — your-turn DM links armed and non-armed PRs correctly
 # ==========================================================================================
 begin_case
 reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 ARMABLE auto-merge armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-echo MERGED > "$SCRATCH/state-101"
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+# Write triage output with 2-space separators so multi-word actions survive awk -F"  +"
+{   printf '#2101  ARMABLE  arm\n'
+    printf '#2102  FEAT-AWAITING-SIGNOFF  human sign-off\n'
+    printf '#2103  UNCLEARED  run manual tests\n'
+} > "$SCRATCH/triage-out"
+# prlist for 2102 and 2103 (2101 is ARMABLE, not your-turn)
+{   printf '2102\thttps://github.com/a-jay85/IBL5/pull/2102\tAlpha PR title\n'
+    printf '2103\thttps://github.com/a-jay85/IBL5/pull/2103\tBeta PR title\n'
+} > "$SCRATCH/prlist.tsv"
 run --worker
-[[ $RC -eq 0 ]] || fail "merge run exit $RC, want 0"
-[[ "$(merges)" == "1" ]] || fail "want 1 confirmed merge, got $(merges)"
-grep -qF 'merged 1' <<< "$OUT" || fail "run summary did not report 1 merge"
-end_case "case 13 confirmed merge is counted"
-
-# ==========================================================================================
-# 14 — OPEN to the ceiling and CLOSED both write no row; ceiling 0 polls exactly once
-# ==========================================================================================
-begin_case
-reset_state
-printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
-triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
-IVAL=30 CEIL=0 run --worker    # a second poll would sleep 30s; the run must not
-[[ $RC -eq 0 ]] || fail "ceiling hit should not halt, got $RC"
-[[ "$(merges)" == "0" ]] || fail "unconfirmed merge counted $(merges)"
-# 2 gh state calls: one poll, then one reconcile check. A retry loop would show more.
-[[ "$(state_calls)" == "2" ]] \
-    || fail "want exactly 1 poll + 1 reconcile, got $(state_calls) state calls"
-grep -qF 'not confirmed' <<< "$OUT" || fail "ceiling hit was not reported"
-unset IVAL CEIL
+[[ $RC -eq 0 ]] || fail "case 35 exit $RC, want 0"
+[[ "$(calls dm)" == "1" ]] || fail "case 35: want 1 DM, got $(calls dm)"
+grep -qF 'armed 1, your turn 2' "$SCRATCH/dm.argv" || fail "case 35: summary wrong: $(cat "$SCRATCH/dm.argv")"
+grep -qF '[#2102: Alpha PR title](https://github.com/a-jay85/IBL5/pull/2102) — FEAT-AWAITING-SIGNOFF — human sign-off' \
+    "$SCRATCH/dm.argv" || fail "case 35: 2102 link missing or misformatted"
+grep -qF '[#2103: Beta PR title](https://github.com/a-jay85/IBL5/pull/2103) — UNCLEARED — run manual tests' \
+    "$SCRATCH/dm.argv" || fail "case 35: 2103 link missing or misformatted"
+grep -qF '#2101' "$SCRATCH/dm.argv" && fail "case 35: armed #2101 must not appear in your-turn list"
 
 reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out-1"
-echo CLOSED > "$SCRATCH/state-101"
-run --worker
-[[ $RC -eq 0 ]] || fail "CLOSED should not halt, got $RC"
-[[ "$(merges)" == "0" ]] || fail "CLOSED counted $(merges)"
-[[ "$(calls ready)" == "3" ]] || fail "CLOSED stopped the run early"
-end_case "case 14 unconfirmed merges"
-
-# ==========================================================================================
-# 15 — degraded digests still produce a row
-# ==========================================================================================
-begin_case
-for variant in nodigest nocomments partial; do
-    reset_state
-    printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-    triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-        > "$SCRATCH/triage-out"
-    echo MERGED > "$SCRATCH/state-101"
-    case "$variant" in
-        nodigest)   VBODY='<!-- pr-ready-verdict -->
-Verdict: green. No digest block here.' ;;
-        nocomments) VBODY='' ;;
-        partial)    VBODY='<!-- pr-ready-verdict -->
-
-### Merge digest
-- **What changed:** partial
-- **Why:** partial
-- **Watch:** partial
-- **Touches:** partial' ;;
-    esac
-    # The comment body now reaches the driver through the verdict pre-read only -- the
-    # `--json title,url,comments` fetch _digest_row used is gone. headRefOid is left empty
-    # so no tree lookup fires; none of these bodies carries a `**Reviewed tree:**` line, so
-    # none of them authorises the pr-ready skip either way.
-    printf '{"comments":[{"body":%s}],"headRefOid":""}' "$(printf '%s' "$VBODY" | jq -Rs .)" \
-        > "$SCRATCH/verdictview-101.json"
-    run --worker
-    [[ "$(merges)" == "1" ]] || fail "$variant: want 1 merge, got $(merges)"
-done
-unset VBODY
-
-# 15e — no ready file and no verdict file → reason names triage-sweep arming
-reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 ARMABLE armed" "102 ARMABLE armed" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-echo MERGED > "$SCRATCH/state-101"
-echo MERGED > "$SCRATCH/state-102"
-run --worker
-[[ "$(merges)" == "2" ]] || fail "no_ready: want 2 merges, got $(merges)"
-
-end_case "case 15 degraded digests"
-
-# ==========================================================================================
-# 16 / 17 — cap semantics
-# ==========================================================================================
-begin_case
-reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 ARMABLE armed" "102 ARMABLE armed" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out-1"
-echo MERGED > "$SCRATCH/state-101"
-echo MERGED > "$SCRATCH/state-102"
-run --worker --max-merges 1
-[[ $RC -eq 0 ]] || fail "cap run exit $RC, want 0"
-# The cap stops further WORK; it never uncounts an already-confirmed merge.
-[[ "$(merges)" == "2" ]] || fail "cap 1 with two confirmed merges: want 2, got $(merges)"
-[[ "$(calls ready)" == "1" ]] || fail "cap 1: want 1 ready call, got $(calls ready)"
-grep -qF 'merge cap' <<< "$OUT" || fail "cap termination not reported"
-
-reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-# One PR becomes ARMABLE per iteration, so the cap has to survive two full rounds.
-# Two triage calls per iteration now: odd = the read-only pre-read, even = the arm.
-triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out-1"
-triage_report "101 ARMABLE armed"     > "$SCRATCH/triage-out-2"
-triage_report "102 NEEDS-WORK rebase" > "$SCRATCH/triage-out-3"
-triage_report "102 ARMABLE armed"     > "$SCRATCH/triage-out-4"
-triage_report "103 ARMABLE armed"     > "$SCRATCH/triage-out"
-echo MERGED > "$SCRATCH/state-101"
-echo MERGED > "$SCRATCH/state-102"
-echo MERGED > "$SCRATCH/state-103"
-run --worker --max-merges 2
-[[ "$(calls ready)" == "2" ]] || fail "cap 2: want 2 ready calls, got $(calls ready)"
-[[ "$(merges)" == "2" ]] || fail "cap 2: want 2 merges, got $(merges)"
-end_case "case 16/17 cap semantics"
-
-# ==========================================================================================
-# 18 — a stop between iterations halts before the next selection
-# ==========================================================================================
-begin_case
-reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-# hook-2, not hook-1: call 1 is now the read-only pre-read. The stop must be created
-# during the ARM, so the halt is caught at the top of the next iteration.
-echo ': > "$S/.ibl5-pr-cycle.stop"' > "$SCRATCH/triage-hook-2"
-run --worker
-[[ $RC -eq 0 ]] || fail "stop between iterations exit $RC, want 0"
-[[ "$(calls ready)" == "1" ]] || fail "want 1 ready before the stop, got $(calls ready)"
-grep -qF 'stopped by' "$SCRATCH/dm.argv" || fail "the DM did not name the stop"
-end_case "case 18 stop between iterations"
-
-# ==========================================================================================
-# 19 — the end-of-run DM
-# ==========================================================================================
-begin_case
-reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-run --worker
-[[ "$(calls dm)" == "1" ]] || fail "want exactly 1 DM, got $(calls dm)"
-grep -qF 'merged 0' "$SCRATCH/dm.argv" || fail "DM lacks the merged count"
-grep -qF 'left for human 3' "$SCRATCH/dm.argv" || fail "DM lacks the left-for-human count"
-
-reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-run --worker --no-dm
-[[ "$(calls dm)" == "0" ]] || fail "--no-dm still sent $(calls dm) DMs"
-
-reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-echo MERGED > "$SCRATCH/state-101"
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+{   printf '#2101  ARMABLE  arm\n'
+    printf '#2102  FEAT-AWAITING-SIGNOFF  human sign-off\n'
+    printf '#2103  UNCLEARED  run manual tests\n'
+} > "$SCRATCH/triage-out"
+{   printf '2102\thttps://github.com/a-jay85/IBL5/pull/2102\tAlpha PR title\n'
+    printf '2103\thttps://github.com/a-jay85/IBL5/pull/2103\tBeta PR title\n'
+} > "$SCRATCH/prlist.tsv"
 echo 1 > "$SCRATCH/dm-rc"
 run --worker
-[[ $RC -eq 0 ]] || fail "a failed DM changed the run exit status to $RC"
-[[ "$(merges)" == "1" ]] || fail "a failed DM cost a confirmed merge"
-end_case "case 19 end-of-run DM"
+[[ $RC -eq 0 ]] || fail "case 35: a failed DM changed exit status to $RC"
+
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+{   printf '#2101  ARMABLE  arm\n'
+    printf '#2102  FEAT-AWAITING-SIGNOFF  human sign-off\n'
+} > "$SCRATCH/triage-out"
+run --worker --no-dm
+[[ "$(calls dm)" == "0" ]] || fail "case 35: --no-dm still sent $(calls dm) DMs"
+end_case "case 35 your-turn DM links"
+
+# ==========================================================================================
+# 36 — your-turn DM degrades gracefully
+# ==========================================================================================
+begin_case
+# (a) gh-fail-prlist: bare lines, no links
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+{   printf '#2102  FEAT-AWAITING-SIGNOFF  human sign-off\n'
+} > "$SCRATCH/triage-out"
+: > "$SCRATCH/gh-fail-prlist"
+run --worker
+[[ $RC -eq 0 ]] || fail "case 36a: gh failure changed exit status to $RC"
+grep -qF '#2102 — FEAT-AWAITING-SIGNOFF — human sign-off' "$SCRATCH/dm.argv" \
+    || fail "case 36a: bare fallback line missing when gh fails"
+
+# (b) title with brackets: sanitized to parens
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+{   printf '#2102  FEAT-AWAITING-SIGNOFF  human sign-off\n'
+} > "$SCRATCH/triage-out"
+printf '2102\thttps://github.com/a-jay85/IBL5/pull/2102\t[WIP] fix\n' > "$SCRATCH/prlist.tsv"
+run --worker
+grep -qF '(WIP) fix' "$SCRATCH/dm.argv" || fail "case 36b: brackets not sanitized to parens"
+grep -qF 'https://github.com/a-jay85/IBL5/pull/2102' "$SCRATCH/dm.argv" \
+    || fail "case 36b: link not present after bracket sanitize"
+
+# (c) --no-dm: no dm call, no gh pr list
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+{   printf '#2102  FEAT-AWAITING-SIGNOFF  human sign-off\n'
+} > "$SCRATCH/triage-out"
+run --worker --no-dm
+[[ "$(calls dm)" == "0" ]] || fail "case 36c: --no-dm sent $(calls dm) DMs"
+grep -qF 'pr list' "$SCRATCH/gh.argv" && fail "case 36c: --no-dm still fetched pr list"
+
+# (d) dm-rc 1: RC still 0
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+{   printf '#2102  FEAT-AWAITING-SIGNOFF  human sign-off\n'
+} > "$SCRATCH/triage-out"
+echo 1 > "$SCRATCH/dm-rc"
+run --worker
+[[ $RC -eq 0 ]] || fail "case 36d: dm failure changed exit status to $RC"
+
+# (e) stage 1 failure: DM says stage 2 did not run
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+echo 1 > "$SCRATCH/ready-rc"
+run --worker
+[[ $RC -eq 1 ]] || fail "case 36e: fleet failure should exit 1, got $RC"
+grep -qF 'stage 2 did not run' "$SCRATCH/dm.argv" || fail "case 36e: DM did not say stage 2 did not run"
+end_case "case 36 your-turn DM degrades"
 
 # ==========================================================================================
 # 20 — the dry-run default fires nothing
@@ -886,8 +802,7 @@ BARE="$OUT"
 grep -qF -- '--go' "$SCRATCH/ready.argv" && fail "dry run passed --go to the ready tool"
 grep -qF -- '--arm' "$SCRATCH/triage.argv" && fail "dry run armed"
 grep -qF 'bootstrap' "$SCRATCH/launchctl.argv" && fail "dry run bootstrapped a job"
-[[ "$(merges)" == "0" ]] || fail "dry run counted $(merges) merges"
-grep -qF 'next PR: #101' <<< "$BARE" || fail "dry run did not name the next PR"
+grep -qF 'stage 1 would ready' <<< "$BARE" || fail "dry run did not report stage 1 list"
 
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -923,6 +838,18 @@ grep -qF -- '--worker' "$RUNNER" || fail "runner does not carry --worker"
 grep -qF "NO_DM=''" "$RUNNER" || fail "runner NO_DM not empty by default"
 grep -qE '^export PR_CYCLE_SKIP_READY_WHEN_ARMABLE=' "$RUNNER" \
     || fail "runner does not export the ARMABLE-skip seam"
+_rv_maxready="$(bash -c "$(grep -m1 '^MAX_READY=' "$RUNNER"); printf '%s' \"\$MAX_READY\"")"
+[[ "$_rv_maxready" == "10" ]] || fail "runner MAX_READY='$_rv_maxready', want 10"
+_rv_jobs="$(bash -c "$(grep -m1 '^JOBS=' "$RUNNER"); printf '%s' \"\$JOBS\"")"
+[[ "$_rv_jobs" == "3" ]] || fail "runner JOBS='$_rv_jobs', want 3"
+! grep -q 'PR_CYCLE_POLL_' "$RUNNER" || fail "runner still exports PR_CYCLE_POLL_ vars"
+
+rm -f "$RUNNER" "$PLIST"
+PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go --max-ready 4 --jobs 2
+_rv_mr4="$(bash -c "$(grep -m1 '^MAX_READY=' "$RUNNER"); printf '%s' \"\$MAX_READY\"")"
+_rv_j2="$(bash -c "$(grep -m1 '^JOBS=' "$RUNNER"); printf '%s' \"\$JOBS\"")"
+[[ "$_rv_mr4" == "4" ]] || fail "--max-ready 4: runner MAX_READY='$_rv_mr4', want 4"
+[[ "$_rv_j2" == "2" ]] || fail "--jobs 2: runner JOBS='$_rv_j2', want 2"
 
 rm -f "$RUNNER" "$PLIST"
 PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go --no-dm
@@ -969,9 +896,9 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker --only 102
 [[ $RC -eq 0 ]] || fail "--only run exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "--only 102 made $(calls ready) ready calls, want 1"
-[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr 102 --jobs 1 --go --wait" ]] \
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait" ]] \
     || fail "--only 102 readied: $(sed -n 1p "$SCRATCH/ready.argv")"
-grep -qF 'queue drained' <<< "$OUT" || fail "--only run did not drain"
+grep -qF 'done' <<< "$OUT" || fail "--only run did not finish normally"
 grep -qF -- '--only 102' <<< "$OUT" || fail "worker did not announce its scope"
 
 # The hash form is the same set: normalization happens at parse time, not at match time.
@@ -980,7 +907,7 @@ printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
     > "$SCRATCH/triage-out"
 run --worker --only '#102'
-[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr 102 --jobs 1 --go --wait" ]] \
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait" ]] \
     || fail "--only '#102' readied: $(sed -n 1p "$SCRATCH/ready.argv")"
 
 # Two of three, in pr-attack's order — the filter drops rows, it never reorders them.
@@ -989,9 +916,10 @@ printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
     > "$SCRATCH/triage-out"
 run --worker --only 103,101
-[[ "$(calls ready)" == "2" ]] || fail "--only 103,101 made $(calls ready) ready calls, want 2"
-grep -qF -- '--pr 101' <<< "$(sed -n 1p "$SCRATCH/ready.argv")" || fail "--only did not keep pr-attack order"
-grep -qF -- '--pr 103' <<< "$(sed -n 2p "$SCRATCH/ready.argv")" || fail "--only second pick wrong"
+[[ "$(calls ready)" == "1" ]] || fail "--only 103,101 made $(calls ready) ready calls, want 1"
+_a27a="$(sed -n 1p "$SCRATCH/ready.argv")"
+[[ "$_a27a" == "--pr-list 101,103 --jobs 3 --go --wait" ]] \
+    || fail "--only 103,101 argv: $_a27a"
 end_case "case 27a --only selects and preserves order"
 
 # --- 27b: --skip is the inverse ----------------------------------------------------------
@@ -1003,7 +931,7 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker --skip 101,103
 [[ $RC -eq 0 ]] || fail "--skip run exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "--skip 101,103 made $(calls ready) ready calls, want 1"
-[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr 102 --jobs 1 --go --wait" ]] \
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait" ]] \
     || fail "--skip readied: $(sed -n 1p "$SCRATCH/ready.argv")"
 grep -qF -- '--skip 101,103' <<< "$OUT" || fail "worker did not announce its --skip scope"
 # No flag at all is the unfiltered baseline — the predicate must be a no-op by default.
@@ -1012,7 +940,10 @@ printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
     > "$SCRATCH/triage-out"
 run --worker
-[[ "$(calls ready)" == "3" ]] || fail "unfiltered run made $(calls ready) ready calls, want 3"
+[[ "$(calls ready)" == "1" ]] || fail "unfiltered run made $(calls ready) ready calls, want 1"
+_a27b="$(sed -n 1p "$SCRATCH/ready.argv")"
+[[ "$_a27b" == "--pr-list 101,102,103 --jobs 3 --go --wait" ]] \
+    || fail "unfiltered batch argv: $_a27b"
 end_case "case 27b --skip and the unfiltered baseline"
 
 # --- 27c: an --only PR the plan never mentions is announced, not silently drained --------
@@ -1046,16 +977,16 @@ triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker --only 101
 [[ $RC -eq 0 ]] || fail "scoped rescue run exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "--only 101 made $(calls ready) ready calls, want 1 (no rescue)"
-grep -qF 'rescuing DIRTY' <<< "$OUT" && fail "--only 101 rescued an out-of-scope DIRTY PR"
+grep -qF '201' <<< "$(sed -n 1p "$SCRATCH/ready.argv")" && fail "--only 101 included out-of-scope DIRTY #201"
 
 # An in-scope DIRTY PR is still rescued: the filter narrows the path, it does not disable it.
 reset_state
 printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker --only 101,201
-[[ "$(calls ready)" == "2" ]] || fail "--only 101,201 made $(calls ready) ready calls, want 2"
-grep -qF -- '--pr 201' <<< "$(sed -n 2p "$SCRATCH/ready.argv")" || fail "in-scope DIRTY #201 was not rescued"
-grep -qF 'rescuing DIRTY #201' <<< "$OUT" || fail "in-scope rescue was not announced"
+[[ "$(calls ready)" == "1" ]] || fail "--only 101,201 made $(calls ready) ready calls, want 1"
+_a27d="$(sed -n 1p "$SCRATCH/ready.argv")"
+grep -qF '201' <<< "$_a27d" || fail "in-scope DIRTY #201 was not in --pr-list: $_a27d"
 end_case "case 27d rescue honours the scope"
 
 # --- 27e: the dry run reports the scope, including the rescues it would skip -------------
@@ -1066,17 +997,16 @@ triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --only 101
 [[ $RC -eq 0 ]] || fail "dry run with --only exit $RC, want 0"
 grep -qF 'would use scope:      --only 101' <<< "$OUT" || fail "dry run does not report the --only scope"
-grep -qF '#201 — outside the --only/--skip scope' <<< "$OUT" \
-    || fail "dry run does not report the rescue it would skip"
 grep -qF 'would be rescued FIRST' <<< "$OUT" && fail "dry run promised an out-of-scope rescue"
 [[ "$(calls ready)" == "0" ]] || fail "dry run fired pr-ready-now"
+grep -qF 'stage 1 would ready' <<< "$OUT" || fail "dry run did not show stage 1 list"
 
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --skip 101
 grep -qF 'would use scope:      --skip 101' <<< "$OUT" || fail "dry run does not report the --skip scope"
-grep -qF 'next PR: #102' <<< "$OUT" || fail "dry run next-PR ignored --skip"
+grep -qF '#102' <<< "$OUT" || fail "dry run stage 1 list ignored --skip"
 run
 grep -qF 'would use scope:      every orderable PR' <<< "$OUT" || fail "unfiltered dry run mislabels its scope"
 end_case "case 27e dry run reports the scope"
@@ -1144,19 +1074,11 @@ g_one_arm() {
 g_no_bucket_cond() {
     ! noncomment "$1" | grep -qE 'FEAT-AWAITING-SIGNOFF|PIPELINE-HELD|UNCLEARED|[^-A-Z]HELD[^-A-Z]'
 }
-g_sleep_in_poll() {
-    local start end bad
-    start="$(grep -n '^_poll_merge()' "$1" | cut -d: -f1)"
-    # END anchor: the first function definition after _poll_merge. This was _digest_labels()
-    # until that parser moved to bin/digest-dm-build; _reconcile() is now the next one down.
-    # If a new function is ever inserted between the two, move this anchor with it -- a stale
-    # anchor makes the guard vacuous, not loud.
-    end="$(grep -n '^_reconcile()' "$1" | cut -d: -f1)"
-    [[ -n "$start" && -n "$end" ]] || return 1
-    bad="$(grep -nE '(^|[^A-Za-z_])sleep[[:space:]]' "$1" | cut -d: -f1 \
-        | awk -v s="$start" -v e="$end" '$1 < s || $1 > e')"
-    [[ -z "$bad" ]]
-}
+g_no_sleep()       { ! noncomment "$1" | grep -qE '(^|[^A-Za-z_])sleep[[:space:]]'; }
+g_no_poll()        { ! noncomment "$1" | grep -qE -- '--json state|_poll_merge|_reconcile'; }
+g_one_ready()      { [[ "$(noncomment "$1" | grep -cE '"\$PR_CYCLE_READY_CMD" --pr-list ')" == 1 ]] \
+                       && ! noncomment "$1" | grep -qE '"\$PR_CYCLE_READY_CMD" --pr[[:space:]]'; }
+g_no_timeout_grep(){ ! noncomment "$1" | grep -qF 'TIMED OUT waiting for'; }
 g_cmd_prefix() {
     ! noncomment "$1" | grep -E '^[A-Z_]+_CMD=' | grep -qv '^PR_CYCLE_'
 }
@@ -1187,7 +1109,8 @@ g_scope_selection_only() {
 
 begin_case
 for g in g_no_merge g_no_armable_lib g_triage_pin g_one_arm g_no_bucket_cond \
-         g_sleep_in_poll g_cmd_prefix g_no_digest_fetch g_scope_selection_only; do
+         g_no_sleep g_no_poll g_one_ready g_no_timeout_grep \
+         g_cmd_prefix g_no_digest_fetch g_scope_selection_only; do
     "$g" "$DRIVER" || fail "static guard $g fails against the real bin/pr-cycle"
 done
 # Guard 7 — both new files are executable and parse.
@@ -1213,8 +1136,16 @@ mutant; sed -i.bak 's/" --arm >/" --arm --force >/' "$SCRATCH/mutant"
 g_one_arm "$SCRATCH/mutant" && fail "vacuous: g_one_arm passed an arm call with an extra flag"
 mutant; echo 'if [ "$BUCKET" = "FEAT-AWAITING-SIGNOFF" ]; then :; fi' >> "$SCRATCH/mutant"
 g_no_bucket_cond "$SCRATCH/mutant" && fail "vacuous: g_no_bucket_cond passed a sign-off conditional"
-mutant; echo 'sleep 5' >> "$SCRATCH/mutant"
-g_sleep_in_poll "$SCRATCH/mutant" && fail "vacuous: g_sleep_in_poll passed a sleep outside _poll_merge"
+mutant; echo 'sleep 1' >> "$SCRATCH/mutant"
+g_no_sleep "$SCRATCH/mutant" && fail "vacuous: g_no_sleep passed a driver with sleep"
+mutant; echo '_poll_merge 1' >> "$SCRATCH/mutant"
+g_no_poll "$SCRATCH/mutant" && fail "vacuous: g_no_poll passed a driver with _poll_merge"
+mutant; echo '"$PR_CYCLE_READY_CMD" --pr-list 1 --go' >> "$SCRATCH/mutant"
+g_one_ready "$SCRATCH/mutant" && fail "vacuous: g_one_ready passed a driver with two --pr-list calls"
+mutant; echo '"$PR_CYCLE_READY_CMD" --pr 1 --go' >> "$SCRATCH/mutant"
+g_one_ready "$SCRATCH/mutant" && fail "vacuous: g_one_ready passed a driver with --pr call"
+mutant; echo "grep -qF 'TIMED OUT waiting for' x" >> "$SCRATCH/mutant"
+g_no_timeout_grep "$SCRATCH/mutant" && fail "vacuous: g_no_timeout_grep passed a driver with TIMED OUT grep"
 mutant; echo 'TRIAGE_CMD="${TRIAGE_CMD:-x}"' >> "$SCRATCH/mutant"
 g_cmd_prefix "$SCRATCH/mutant" && fail "vacuous: g_cmd_prefix passed an unprefixed *_CMD seam"
 mutant; echo '# --json title,url,comments' >> "$SCRATCH/mutant"
@@ -1289,11 +1220,11 @@ run --worker
 [[ $RC -eq 0 ]] || fail "three skips: exit $RC, want 0"
 [[ "$(calls ready)" == "0" ]] || fail "three skips: pr-ready ran $(calls ready) time(s), want 0"
 for p in 101 102 103; do
-    grep -qF -- "--- #$p" <<< "$OUT" || fail "three skips: the loop never reached #$p"
     grep -qF "#$p — already ARMABLE with a current READY verdict, skipping pr-ready" <<< "$OUT" \
         || fail "three skips: no skip line for #$p"
 done
-[[ "$(arm_calls)" == "3" ]] || fail "three skips: want 3 arms, got $(arm_calls)"
+[[ "$(arm_calls)" == "1" ]] || fail "three skips: want 1 arm, got $(arm_calls)"
+grep -qE 'armed 3[^0-9]' <<< "$OUT" || fail "three skips: want armed count 3 in summary"
 end_case "case 27 skip requires ARMABLE and a current READY verdict"
 
 # ==========================================================================================
@@ -1482,6 +1413,138 @@ else
     fail "workflow file not found at $WF"
 fi
 end_case "case 29 CI wiring"
+
+# ==========================================================================================
+# 30 — stage-1 batch argv
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" "2103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "case 30 exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "case 30: want 1 fleet call, got $(calls ready)"
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait" ]] \
+    || fail "case 30: argv line 1: $(sed -n '1p' "$SCRATCH/ready.argv")"
+
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker --jobs 2
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 2 --go --wait" ]] \
+    || fail "case 30 --jobs 2: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
+end_case "case 30 stage-1 batch argv"
+
+# ==========================================================================================
+# 31 — stage-1 halts on fleet failure; text grep gone
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+echo 1 > "$SCRATCH/ready-rc"
+run --worker
+[[ $RC -eq 1 ]] || fail "case 31: fleet exit 1 should halt with 1, got $RC"
+[[ "$(arm_calls)" == "0" ]] || fail "case 31: arm ran after fleet failure"
+grep -qF 'stage 1' "$SCRATCH/dm.argv" || fail "case 31: DM does not mention stage 1"
+
+# Negative twin: TIMED OUT text in stderr with exit 0 must NOT halt.
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+triage_report "2101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+echo 'TIMED OUT waiting for 1 session(s) after 7200s; leaving them running' > "$SCRATCH/ready-err"
+echo 0 > "$SCRATCH/ready-rc"
+run --worker
+[[ $RC -eq 0 ]] || fail "case 31 negative twin: TIMED OUT text with rc 0 should not halt, got $RC"
+[[ "$(arm_calls)" == "1" ]] || fail "case 31 negative twin: arm did not run"
+end_case "case 31 stage-1 halts on fleet failure"
+
+# ==========================================================================================
+# 32 — --max-ready cap
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker --max-ready 2
+[[ $RC -eq 0 ]] || fail "case 32 exit $RC, want 0"
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102 --jobs 3 --go --wait" ]] \
+    || fail "case 32 cap 2: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
+run --dry-run --max-ready 2
+grep -qF '2103' <<< "$OUT" && grep -qF 'max-ready cap' <<< "$OUT" \
+    || fail "case 32: dry run did not list 2103 as over the cap"
+grep -qF '2104' <<< "$OUT" && grep -qF 'max-ready cap' <<< "$OUT" \
+    || fail "case 32: dry run did not list 2104 as over the cap"
+
+# Boundary: --max-ready 10 with 4 rows keeps all 4.
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+triage_report "2101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker --max-ready 10
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait" ]] \
+    || fail "case 32 no-cap: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
+end_case "case 32 max-ready cap"
+
+# ==========================================================================================
+# 34 — single arm, no poll
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+triage_report "2101 ARMABLE auto-merge" "2102 UNCLEARED run-tests" > "$SCRATCH/triage-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "case 34 exit $RC, want 0"
+[[ "$(arm_calls)" == "1" ]] || fail "case 34: want 1 arm, got $(arm_calls)"
+_state_cnt="$(grep -c -- '--json state' "$SCRATCH/gh.argv" 2>/dev/null)"
+[[ "${_state_cnt:-0}" == "0" ]] || fail "case 34: state poll found; $_state_cnt calls"
+[[ $RC -eq 0 ]] || fail "case 34: want RC 0, got $RC"
+end_case "case 34 single arm, no poll"
+
+# ==========================================================================================
+# 37 — empty stage 1 still arms
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A"
+run --worker
+[[ $RC -eq 0 ]] || fail "case 37 exit $RC, want 0"
+[[ "$(calls ready)" == "0" ]] || fail "case 37: fleet called despite empty stage 1, got $(calls ready)"
+[[ "$(arm_calls)" == "1" ]] || fail "case 37: arm did not run, got $(arm_calls)"
+end_case "case 37 empty stage 1 still arms"
+
+# ==========================================================================================
+# 38 — your-turn DM length cap
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+# Build triage output with 40 UNCLEARED rows and long titles
+_triage_tmp="$SCRATCH/triage-gen.tmp"
+: > "$_triage_tmp"
+i=1
+while [[ $i -le 40 ]]; do
+    printf '#%d  UNCLEARED  run manual tests for this very long title PR number %d\n' \
+        "$((2100 + i))" "$i" >> "$_triage_tmp"
+    i=$((i + 1))
+done
+cp "$_triage_tmp" "$SCRATCH/triage-out"
+# Build prlist.tsv with long titles for each
+i=1
+while [[ $i -le 40 ]]; do
+    printf '%d\thttps://github.com/a-jay85/IBL5/pull/%d\tThis is a very long title for pull request number %d that eats characters\n' \
+        "$((2100 + i))" "$((2100 + i))" "$i"
+    i=$((i + 1))
+done > "$SCRATCH/prlist.tsv"
+# Use a large attack plan for the fleet call
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "case 38 exit $RC, want 0"
+_dm_len="$(wc -c < "$SCRATCH/dm.argv" | tr -d ' ')"
+[[ "$_dm_len" -le 2000 ]] || fail "case 38: DM exceeds 2000 chars ($_dm_len)"
+grep -qF 'more:' "$SCRATCH/dm.argv" || fail "case 38: DM did not use the overflow line"
+end_case "case 38 your-turn DM length cap"
 
 # --- summary --------------------------------------------------------------------------------
 if [[ $FAILED -eq 0 ]]; then

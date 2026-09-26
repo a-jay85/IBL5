@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\RookieOption;
 
+use League\League;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
@@ -66,6 +68,137 @@ class RookieOptionControllerTest extends TestCase
         self::assertFalse($result['success']);
         self::assertSame('validation_error', $result['type']);
         self::assertSame(self::ELIGIBILITY_MESSAGE, $result['message']);
+    }
+
+    // ============================================
+    // OWNERSHIP GATE TESTS
+    // ============================================
+
+    public function testNullSessionTeamIsRefusedWithoutWrite(): void
+    {
+        $repository = $this->createMock(RookieOptionRepositoryInterface::class);
+        $repository->expects(self::never())->method('updatePlayerRookieOption');
+
+        $teams = $this->createMock(TeamIdentityRepositoryInterface::class);
+        $teams->expects(self::never())->method('getTidFromTeamname');
+
+        $result = $this->makeController($repository, $teams)->processRookieOption('Test Team', 1, 500, null);
+
+        self::assertFalse($result['success']);
+        self::assertSame('ownership_error', $result['type']);
+        self::assertSame('You can only exercise options for your own team.', $result['message']);
+        self::assertSame(1, $result['playerID']);
+        self::assertCount(0, $this->mockDb->getExecutedQueries());
+    }
+
+    public function testFreeAgentsSessionTeamIsRefusedWithoutWrite(): void
+    {
+        $repository = $this->createMock(RookieOptionRepositoryInterface::class);
+        $repository->expects(self::never())->method('updatePlayerRookieOption');
+
+        $teams = $this->createMock(TeamIdentityRepositoryInterface::class);
+        $teams->expects(self::never())->method('getTidFromTeamname');
+
+        $result = $this->makeController($repository, $teams)->processRookieOption(
+            League::FREE_AGENTS_TEAM_NAME,
+            1,
+            500,
+            League::FREE_AGENTS_TEAM_NAME,
+        );
+
+        self::assertFalse($result['success']);
+        self::assertSame('ownership_error', $result['type']);
+        self::assertSame('You can only exercise options for your own team.', $result['message']);
+        self::assertSame(1, $result['playerID']);
+        self::assertCount(0, $this->mockDb->getExecutedQueries());
+    }
+
+    public function testMismatchedSessionTeamIsRefusedWithoutWrite(): void
+    {
+        $repository = $this->createMock(RookieOptionRepositoryInterface::class);
+        $repository->expects(self::never())->method('updatePlayerRookieOption');
+
+        $teams = $this->createMock(TeamIdentityRepositoryInterface::class);
+        $teams->expects(self::never())->method('getTidFromTeamname');
+
+        $result = $this->makeController($repository, $teams)->processRookieOption('Test Team', 1, 500, 'Other Team');
+
+        self::assertFalse($result['success']);
+        self::assertSame('ownership_error', $result['type']);
+        self::assertSame('You can only exercise options for your own team.', $result['message']);
+        self::assertSame(1, $result['playerID']);
+        self::assertCount(0, $this->mockDb->getExecutedQueries());
+    }
+
+    public function testTeamlessSessionWithMissingParamsGetsOwnershipRefusal(): void
+    {
+        $repository = $this->createMock(RookieOptionRepositoryInterface::class);
+        $repository->expects(self::never())->method('updatePlayerRookieOption');
+
+        $teams = $this->createMock(TeamIdentityRepositoryInterface::class);
+        $teams->expects(self::never())->method('getTidFromTeamname');
+
+        $result = $this->makeController($repository, $teams)->processRookieOption('', 0, 0, null);
+
+        self::assertFalse($result['success']);
+        self::assertSame('ownership_error', $result['type']);
+        self::assertSame('You can only exercise options for your own team.', $result['message']);
+        self::assertSame(0, $result['playerID']);
+        self::assertCount(0, $this->mockDb->getExecutedQueries());
+    }
+
+    /**
+     * @return array<string, array{string, int, int, string}>
+     */
+    public static function missingParamsProvider(): array
+    {
+        return [
+            'zero playerID'         => ['Test Team', 0, 500, 'Test Team'],
+            'zero extensionAmount'  => ['Test Team', 1, 0, 'Test Team'],
+            'empty team name'       => ['', 1, 500, ''],
+        ];
+    }
+
+    #[DataProvider('missingParamsProvider')]
+    public function testOwnTeamWithMissingParamsReturnsInvalidRequestWithoutQuery(
+        string $teamName,
+        int $playerID,
+        int $extensionAmount,
+        string $sessionTeam,
+    ): void {
+        $repository = $this->createMock(RookieOptionRepositoryInterface::class);
+        $repository->expects(self::never())->method('updatePlayerRookieOption');
+
+        $teams = $this->createMock(TeamIdentityRepositoryInterface::class);
+        $teams->expects(self::never())->method('getTidFromTeamname');
+
+        $result = $this->makeController($repository, $teams)->processRookieOption(
+            $teamName,
+            $playerID,
+            $extensionAmount,
+            $sessionTeam,
+        );
+
+        self::assertFalse($result['success']);
+        self::assertSame('validation_error', $result['type']);
+        self::assertSame('Invalid request. Missing required parameters.', $result['message']);
+        self::assertSame($playerID, $result['playerID']);
+        self::assertCount(0, $this->mockDb->getExecutedQueries());
+    }
+
+    public function testSessionTeamParameterIsRequiredNullableString(): void
+    {
+        foreach ([RookieOptionController::class, RookieOptionControllerInterface::class] as $class) {
+            $params = (new \ReflectionMethod($class, 'processRookieOption'))->getParameters();
+            self::assertCount(4, $params);
+            $sessionTeam = $params[3];
+            self::assertSame('sessionTeam', $sessionTeam->getName());
+            $type = $sessionTeam->getType();
+            self::assertInstanceOf(\ReflectionNamedType::class, $type);
+            self::assertSame('string', $type->getName());
+            self::assertTrue($type->allowsNull());
+            self::assertFalse($sessionTeam->isOptional());
+        }
     }
 
 }

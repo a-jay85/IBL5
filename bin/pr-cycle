@@ -78,11 +78,11 @@
 #   * Arming is exactly one call to the triage tool, with no added flags. This script never
 #     judges eligibility, never widens a bucket, never relaxes a human sign-off, and never
 #     sources or reimplements the armable library.
-#   * A merge is counted if and only if `gh pr view N --json state` reported MERGED.
-#     Not a green --wait, not a successful arm, not a CI conclusion. The per-merge digest
-#     DM is no longer this script's job — .github/workflows/merge-digest-notify.yml fires
-#     on the merge event itself, so it also covers merges no live session witnessed.
-#   * The merge poll loop lives exclusively inside the detached worker, never in the parent.
+#   * This script never polls for merges and never sleeps. .github/workflows/update-behind-prs.yml
+#     re-BEHINDs open PRs after each merge, and merge-digest-notify.yml sends the per-merge
+#     digest DM. This script's only DM is the your-turn summary at the end of a run.
+#   * Stage 1 is exactly one post-plan-fleet --pr-list call. Its exit code is the only
+#     readiness signal; no stderr text match of any kind.
 
 set -euo pipefail
 
@@ -131,7 +131,7 @@ usage() {
 # whitespace. Storing raw argv ("#2101, #2102") would hand the worker one space-broken
 # garbage token that %q would faithfully preserve.
 #
-# Each token is validated with the same `case` glob idiom --max-merges uses: never an
+# Each token is validated with the same `case` glob idiom --max-ready uses: never an
 # arithmetic test (which *errors* under set -e on `abc` rather than rejecting it) and never
 # a grep pipe (which inverts under pipefail/SIGPIPE -- the trap this file documents three
 # times). `0*` rejects both 0 and a leading-zero number; `*[!0-9]*` rejects abc and -1.
@@ -246,13 +246,9 @@ fi
 TS="${PR_CYCLE_TS:-$(date +%Y%m%d-%H%M%S)-$$}"
 RUNDIR="/tmp/pr-cycle-$TS"
 HALT=""
-DRAINED=0
-MERGES=0
+ARMED=0
+READIED=0
 LEFT=0
-BUCKET=""
-ACTION=""
-NEXT_PR=""
-ATTACK_NEEDS=""
 WARNED_ONLY=0
 
 # ==========================================================================================
@@ -389,34 +385,6 @@ _warn_unmatched_only() {
     return 0
 }
 
-# _next_pr — set NEXT_PR to the first orderable PR not already in tried.txt; non-zero when
-# drained. Draining is the loop's normal termination, not a halt.
-#
-# Answers through globals rather than stdout on purpose: the callers need ATTACK_NEEDS too,
-# and `$(_next_pr)` would run the whole thing in a subshell where that assignment dies.
-# The read loop is fed by a heredoc, not a pipe, so it stays in the current shell.
-_next_pr() {
-    _found=""
-    NEXT_PR=""
-    ATTACK_NEEDS=""
-    while IFS="$(printf '\t')" read -r _n _needs; do
-        [ -n "$_n" ] || continue
-        # Scope filter sits beside the tried.txt check because it is the same kind of skip:
-        # the row is real and correctly ordered, it is just not this run's business. The
-        # pr-attack ordering is never touched, so dependency order among the kept PRs holds.
-        if ! _pr_allowed "$_n"; then continue; fi
-        if grep -qxF "$_n" "$RUNDIR/tried.txt" 2>/dev/null; then continue; fi
-        _found="$_n"
-        ATTACK_NEEDS="$_needs"
-        break
-    done <<EOF
-$(_attack_rows)
-EOF
-    [ -n "$_found" ] || return 1
-    NEXT_PR="$_found"
-    return 0
-}
-
 # Rescue candidates: PR numbers under the attack document's `## Excluded` section carrying a
 # DIRTY classification, in document order. Read from $RUNDIR/attack.md, which _attack_plan has
 # already written -- no extra gh call, no access to pr-attack's private work directory.
@@ -481,16 +449,26 @@ _slot_held() {
 # Read-only: this invocation deliberately omits --arm, so it reports and changes nothing.
 # Never sets HALT and never returns non-zero: an unknown bucket must fall through to the
 # normal readying path, so every failure mode here degrades to "" (= do not skip).
+# The plain triage report is run once per run into $RUNDIR/precheck.txt; later calls
+# only awk it. On a nonzero exit, precheck.failed is touched and every call echoes "".
 _precheck_bucket() {
     _pn="$1"
-    set +e
-    "$PR_CYCLE_TRIAGE_CMD" > "$RUNDIR/precheck-$_pn.txt" 2> "$RUNDIR/precheck-$_pn.err"
-    _prc=$?
-    set -e
-    [ "$_prc" -ne 0 ] && { echo ""; return 0; }
+    if [ -f "$RUNDIR/precheck.failed" ]; then
+        echo ""; return 0
+    fi
+    if [ ! -f "$RUNDIR/precheck.txt" ]; then
+        set +e
+        "$PR_CYCLE_TRIAGE_CMD" > "$RUNDIR/precheck.txt" 2> "$RUNDIR/precheck.err"
+        _prc=$?
+        set -e
+        if [ "$_prc" -ne 0 ]; then
+            touch "$RUNDIR/precheck.failed"
+            echo ""; return 0
+        fi
+    fi
     # Fixed-width columns separated by 2+ spaces — the consumer contract documented in
     # bin/pr-triage. exit after the first match: one row per PR.
-    awk -F"  +" -v pr="#$_pn" '$1 == pr { print $2; exit }' "$RUNDIR/precheck-$_pn.txt"
+    awk -F"  +" -v pr="#$_pn" '$1 == pr { print $2; exit }' "$RUNDIR/precheck.txt"
     return 0
 }
 
@@ -580,112 +558,93 @@ _precheck_verdict() {
     return 0
 }
 
-# _ready_pr N — run one readying session to completion. Returns non-zero (with HALT set)
-# on failure OR on a --wait timeout.
-_ready_pr() {
-    _n="$1"
-    # --jobs 1 is hard-coded, never plumbed from a flag: every merge re-BEHINDs every other
-    # open PR, so a second concurrent session would burn its rebase immediately.
-    set +e
-    "$PR_CYCLE_READY_CMD" --pr "$_n" --jobs 1 --go --wait \
-        > "$RUNDIR/ready-$_n.out" 2> "$RUNDIR/ready-$_n.err"
-    _rc=$?
-    set -e
-    cat "$RUNDIR/ready-$_n.out" || true
-    cat "$RUNDIR/ready-$_n.err" >&2 || true
 
-    # Timeout is detected from stderr TEXT, not from the exit code: bin/post-plan-fleet exits
-    # 0 on timeout as well as on success, and the only signal is this line. A timed-out
-    # session is still alive and still holds the concurrency slot, so continuing would make
-    # the next iteration block in wait_for_slot for its full 7200s ceiling — one timeout
-    # would stall the whole queue while looking like progress. Halting hands the session
-    # to the human intact, matching the tool's own "leaving them running" posture.
-    if grep -qF 'TIMED OUT waiting for' "$RUNDIR/ready-$_n.err"; then
-        HALT="post-plan-fleet --wait timed out on #$_n; session left running"
-        return 1
-    fi
-    if [ "$_rc" -ne 0 ]; then
-        HALT="post-plan-fleet exit $_rc on #$_n"
-        return 1
-    fi
-    return 0
-}
-
-# _rescue_one — hand at most ONE excluded-DIRTY PR to bin/post-plan-fleet.
-#   0  a rescue was fired and its session completed
-#   1  no eligible candidate; the caller carries on unchanged
-#   2  HALT is set (stop file, or _ready_pr failed / timed out); the caller must break
-#
-# EXACTLY ONE per call. The two call sites in _worker are mutually exclusive within an
-# iteration, so "one rescue per loop iteration, never a batch" is structural rather than a
-# convention. That bound is the defense against a rebase storm — do NOT turn this into a
-# loop, and do NOT add a second call site without re-deriving the mutual exclusion.
-_rescue_one() {
-    if [ "$PR_CYCLE_RESCUE" = "0" ]; then
-        return 1
-    fi
-
-    _rc_pick=""
-    while IFS= read -r _rc_n; do
-        [ -n "$_rc_n" ] || continue
-        # The rescue path honours --only/--skip too. Without this, `--only 2101` would still
-        # spend an hour-long post-plan-fleet --wait session rebasing an out-of-set DIRTY PR --
-        # exactly the cost the flag exists to avoid.
-        if ! _pr_allowed "$_rc_n"; then continue; fi
-        if grep -qxF "$_rc_n" "$RUNDIR/rescued.txt" 2>/dev/null; then continue; fi
-        if _slot_held "$_rc_n"; then
-            echo "pr-cycle: rescue skipped for #$_rc_n — a post-plan-fleet slot is already live"
-            continue
+# _stage1_list — build $RUNDIR/stage1.txt (one PR per line, final order) and
+# $RUNDIR/stage1-skipped.txt (#N — reason lines). Side-effect free: reads only.
+_stage1_list() {
+    : > "$RUNDIR/stage1.txt"
+    : > "$RUNDIR/stage1-skipped.txt"
+    while IFS=$'\t' read -r _sl_n _sl_needs; do
+        [ -n "$_sl_n" ] || continue
+        if ! _pr_allowed "$_sl_n"; then continue; fi
+        if [ "$PR_CYCLE_SKIP_READY_WHEN_ARMABLE" != "0" ]; then
+            _sl_bkt="$(_precheck_bucket "$_sl_n")"
+            if [ "$_sl_bkt" = "ARMABLE" ]; then
+                _sl_vrd="$(_precheck_verdict "$_sl_n")"
+                if [ "$_sl_vrd" = "READY" ]; then
+                    echo "#$_sl_n — already ARMABLE with a current READY verdict, skipping pr-ready" >> "$RUNDIR/stage1-skipped.txt"
+                    continue
+                fi
+                echo "#$_sl_n — ARMABLE but no current READY verdict, running pr-ready"
+            fi
         fi
-        _rc_pick="$_rc_n"
-        break
+        echo "$_sl_n" >> "$RUNDIR/stage1.txt"
     done <<EOF
-$(_excluded_dirty_rows)
+$(_attack_rows)
 EOF
 
-    [ -n "$_rc_pick" ] || return 1
+    if [ "${PR_CYCLE_RESCUE:-1}" != "0" ]; then
+        while IFS= read -r _sl_dn; do
+            [ -n "$_sl_dn" ] || continue
+            if ! _pr_allowed "$_sl_dn"; then continue; fi
+            if _slot_held "$_sl_dn"; then
+                echo "#$_sl_dn — post-plan-fleet slot already live" >> "$RUNDIR/stage1-skipped.txt"
+                continue
+            fi
+            if grep -qxF "$_sl_dn" "$RUNDIR/stage1.txt" 2>/dev/null; then continue; fi
+            echo "$_sl_dn" >> "$RUNDIR/stage1.txt"
+        done <<EOF
+$(_excluded_dirty_rows)
+EOF
+    fi
 
-    # A second, separate stop check, exactly as _arm_and_classify does: the ready session
-    # that preceded this call can take an hour, so the top-of-loop check is far too stale to
-    # gate the hour-long session that follows.
+    # Apply the cap: keep first MAX_READY lines.
+    if [ -s "$RUNDIR/stage1.txt" ]; then
+        local _total
+        _total="$(wc -l < "$RUNDIR/stage1.txt" | tr -d ' ')"
+        if [ "$_total" -gt "$MAX_READY" ]; then
+            local _overflow
+            _overflow="$(tail -n +"$((MAX_READY + 1))" "$RUNDIR/stage1.txt")"
+            head -n "$MAX_READY" "$RUNDIR/stage1.txt" > "$RUNDIR/stage1.tmp" && mv "$RUNDIR/stage1.tmp" "$RUNDIR/stage1.txt"
+            while IFS= read -r _ov_n; do
+                [ -n "$_ov_n" ] || continue
+                echo "#$_ov_n — over --max-ready cap" >> "$RUNDIR/stage1-skipped.txt"
+            done <<EOF
+$_overflow
+EOF
+        fi
+    fi
+}
+
+# _stage1_fire — run post-plan-fleet with the stage1.txt list. Returns 0 on empty or
+# fleet exit 0; sets HALT and returns 1 on failure.
+_stage1_fire() {
+    if [ ! -s "$RUNDIR/stage1.txt" ]; then
+        echo "stage 1: nothing to ready"
+        return 0
+    fi
     if [ -e "$PR_CYCLE_STOP_FILE" ]; then
         HALT="stopped by $PR_CYCLE_STOP_FILE"
-        return 2
+        return 1
     fi
-
-    # Written BEFORE the side effect, exactly as tried.txt is. That is what makes "attempted
-    # at most once per run" hold even when the session halts partway through, and it is what
-    # stops a PR that is STILL DIRTY afterwards from being retried forever inside one run:
-    # the next _attack_plan re-lists it under ## Excluded and this grep skips it. The set is
-    # per-run scratch on purpose — once a human resolves the conflict, the next run must be
-    # free to try again, which a durable ledger would suppress forever.
-    echo "$_rc_pick" >> "$RUNDIR/rescued.txt"
-    echo "pr-cycle: rescuing DIRTY #$_rc_pick via post-plan-fleet"
-
-    # Delegates to _ready_pr: identical `--pr N --jobs 1 --go --wait` argv, identical
-    # stderr-TEXT timeout detection (post-plan-fleet exits 0 on timeout), identical HALT
-    # protocol, identical output surfacing.
-    #
-    # A rescue is NOT a merge and is not accounted as one: MERGES is untouched, armed.txt and
-    # ledgered.txt are not written, _arm_and_classify and _poll_merge are never called. So a
-    # rescue can never count against --max-merges. PR_CYCLE_POLL_CEILING is not consulted
-    # either — it belongs to _poll_merge; the bound here is post-plan-fleet's own --wait
-    # timeout, surfaced through _ready_pr's existing TIMED OUT branch.
-    if ! _ready_pr "$_rc_pick"; then
-        return 2
+    _csv="$(paste -sd, "$RUNDIR/stage1.txt")"
+    set +e
+    "$PR_CYCLE_READY_CMD" --pr-list "$_csv" --jobs "$JOBS" --go --wait \
+        > "$RUNDIR/ready.out" 2> "$RUNDIR/ready.err"
+    _rc=$?
+    set -e
+    cat "$RUNDIR/ready.out" || true
+    cat "$RUNDIR/ready.err" >&2 || true
+    if [ "$_rc" -ne 0 ]; then
+        HALT="post-plan-fleet exit $_rc in stage 1 (failure or --wait timeout; sessions may still be running)"
+        return 1
     fi
-
-    # NOTE: a successfully rescued PR consumes a SECOND --wait session on a later iteration.
-    # It was never in tried.txt, so once it is mergeable the ordered table lists it, _next_pr
-    # selects it, and it is readied through the normal path. Intended: rescue restores
-    # orderability, it does not substitute for the ready cycle.
     return 0
 }
 
-# _arm_and_classify N — the one arming call, then read PR N's bucket out of the report.
-# Sets BUCKET and ACTION. Returns non-zero (with HALT set) only on an unusable report.
+# _arm_and_classify — the one arming call, then parse every PR's bucket from the report.
+# Sets ARMED and LEFT. Returns non-zero (with HALT set) only on an unusable report.
 _arm_and_classify() {
-    _n="$1"
 
     # A second, separate stop check: readying can take an hour, so the top-of-loop check
     # is far too stale to gate the side effect that follows.
@@ -695,14 +654,14 @@ _arm_and_classify() {
     fi
 
     set +e
-    "$PR_CYCLE_TRIAGE_CMD" --arm > "$RUNDIR/triage-$_n.txt" 2> "$RUNDIR/triage-$_n.err"
+    "$PR_CYCLE_TRIAGE_CMD" --arm > "$RUNDIR/triage.txt" 2> "$RUNDIR/triage.err"
     _rc=$?
     set -e
-    cat "$RUNDIR/triage-$_n.err" >&2 || true
+    cat "$RUNDIR/triage.err" >&2 || true
 
     # Exit 2 is usage/auth: every later classification would be garbage, so halt. Exit 1
-    # means an attempted arm failed — that failure may belong to another PR, and the merge
-    # poll is the authority anyway, so log it and carry on with the report.
+    # means an attempted arm failed — that failure may belong to another PR, and the report
+    # still tells us the bucket, so log it and carry on.
     if [ "$_rc" -eq 2 ]; then
         HALT="pr-triage exit 2 (usage or auth)"
         return 1
@@ -711,76 +670,63 @@ _arm_and_classify() {
         echo "  pr-triage exit $_rc — an arm attempt failed; continuing with the report"
     fi
 
-    BUCKET="$(awk -v pr="#$_n" '$1 == pr { print $2; exit }' "$RUNDIR/triage-$_n.txt")"
-    ACTION="$(awk -v pr="#$_n" '$1 == pr { print $3; exit }' "$RUNDIR/triage-$_n.txt")"
+    # Parse all rows. Two-space column separator (the pr-triage contract).
+    # NEVER filter by _pr_allowed: --only/--skip scope SELECTION, not ACCOUNTING.
+    : > "$RUNDIR/armed.txt"
+    : > "$RUNDIR/your-turn.txt"
+    while IFS="$(printf '\t')" read -r _ac_pr _ac_bkt _ac_act; do
+        [ -n "$_ac_pr" ] || continue
+        case "$_ac_pr" in '#'[0-9]*) ;; *) continue ;; esac
+        _ac_n="${_ac_pr#\#}"
+        if [ "$_ac_bkt" = "ARMABLE" ]; then
+            echo "$_ac_n" >> "$RUNDIR/armed.txt"
+        else
+            printf '%s\t%s\t%s\n' "$_ac_n" "$_ac_bkt" "${_ac_act:-see pr-triage}" >> "$RUNDIR/your-turn.txt"
+        fi
+    done < <(awk -F"  +" 'NF>=2 { printf "%s\t%s\t%s\n", $1, $2, $3 }' "$RUNDIR/triage.txt")
 
-    # Record EVERY ARMABLE row, not just PR N: one --arm call arms all of them, so a cap
-    # that counted only the readied PR would let --max-merges 5 cause more than five
-    # merges. The ^#[0-9]+$ anchor excludes the dashed separator row.
-    #
-    # NEVER filter this by _pr_allowed. --only/--skip scope SELECTION, not ACCOUNTING, and
-    # the arm call above is unscoped by construction (one call, no flags -- a hard invariant
-    # in the header). Filtering here would break two things at once: --max-merges would stop
-    # capping the merges that actually happen, and the digest ledger would lose rows for PRs
-    # that really did merge, violating "a ledger row iff gh pr view said MERGED".
-    awk '$1 ~ /^#[0-9]+$/ && $2 == "ARMABLE" { print substr($1, 2) }' \
-        "$RUNDIR/triage-$_n.txt" >> "$RUNDIR/armed.txt"
+    ARMED="$(wc -l < "$RUNDIR/armed.txt" | tr -d ' ')"
+    LEFT="$(wc -l < "$RUNDIR/your-turn.txt" | tr -d ' ')"
 
     return 0
 }
 
-# ==========================================================================================
-# Phase 4 — confirm, ledger
-# ==========================================================================================
+# _your_turn_lines — print one markdown line per your-turn.txt row, linked via gh pr list.
+# Called only from inside the DM block; never sets HALT, never returns non-zero.
+_your_turn_lines() {
+    [ -s "$RUNDIR/your-turn.txt" ] || return 0
 
-# _gh_state N — the ONE merge predicate. MERGED from this call is the only thing that
-# counts as a merge: not a green --wait, not a successful arm, not a CI conclusion.
-_gh_state() {
-    "$PR_CYCLE_GH_CMD" pr view "$1" --json state --jq .state 2>/dev/null || true
-}
+    set +e
+    "$PR_CYCLE_GH_CMD" pr list --state open --limit 200 \
+        --json number,url,title,state \
+        --jq '.[] | [(.number|tostring), .url, .title] | @tsv' \
+        > "$RUNDIR/prlist.tsv" 2>/dev/null
+    _yl_rc=$?
+    set -e
+    [ "$_yl_rc" -ne 0 ] && : > "$RUNDIR/prlist.tsv"
 
-# _poll_merge N — 0 merged, 1 not confirmed (ceiling or closed), 2 stop file.
-# Poll FIRST, then test the deadline, so a ceiling of 0 yields exactly one poll.
-# A ceiling hit is NOT a halt: it logs, writes no row, and the run moves on — the armed PR
-# usually lands shortly after and _reconcile picks it up on a later iteration.
-_poll_merge() {
-    _n="$1"
-    _deadline=$(( $(date +%s) + PR_CYCLE_POLL_CEILING ))
-    while :; do
-        if [ -e "$PR_CYCLE_STOP_FILE" ]; then
-            HALT="stopped by $PR_CYCLE_STOP_FILE"
-            return 2
+    _yt_total="$(wc -l < "$RUNDIR/your-turn.txt" | tr -d ' ')"
+    _yt_shown=0
+    _yt_running=0
+    while IFS="$(printf '\t')" read -r _yn _ybkt _yact; do
+        [ -n "$_yn" ] || continue
+        _yact="${_yact:-see pr-triage}"
+        _row="$(awk -F'\t' -v n="$_yn" '$1 == n { print; exit }' "$RUNDIR/prlist.tsv" 2>/dev/null || true)"
+        if [ -n "$_row" ]; then
+            _yurl="$(printf '%s\n' "$_row" | cut -f2)"
+            _ytitle="$(printf '%s\n' "$_row" | cut -f3 | tr '[]' '()')"
+            _yl_line="- [#$_yn: $_ytitle]($_yurl) — $_ybkt — $_yact"
+        else
+            _yl_line="- #$_yn — $_ybkt — $_yact"
         fi
-        _st="$(_gh_state "$_n")"
-        [ "$_st" = "MERGED" ] && return 0
-        if [ "$_st" = "CLOSED" ]; then
-            echo "  #$_n closed without merging"
-            return 1
+        if [ "$((_yt_running + ${#_yl_line} + 1))" -gt 1800 ]; then
+            echo "- …and $((_yt_total - _yt_shown)) more: $RUNDIR/your-turn.txt"
+            return 0
         fi
-        if [ "$(date +%s)" -ge "$_deadline" ]; then
-            echo "  #$_n: merge not confirmed within ${PR_CYCLE_POLL_CEILING}s"
-            return 1
-        fi
-        # The only sleep in this file, and it lives inside the detached worker.
-        sleep "$PR_CYCLE_POLL_INTERVAL"
-    done
-}
-
-# _reconcile — record every merge this run caused in ledgered.txt, then recompute MERGES.
-# The per-merge digest DM is sent by .github/workflows/merge-digest-notify.yml, on the
-# merge event — not from here, which only runs while a session is alive.
-_reconcile() {
-    [ -s "$RUNDIR/armed.txt" ] || { MERGES="$(wc -l < "$RUNDIR/ledgered.txt" | tr -d ' ')"; return 0; }
-    # Bodyless subshell: a `while` after a pipe runs in a subshell in bash 3.2, so results
-    # go to files, never to a counter variable that would not survive the pipeline.
-    sort -u "$RUNDIR/armed.txt" | while read -r _p; do
-        [ -n "$_p" ] || continue
-        grep -qxF "$_p" "$RUNDIR/ledgered.txt" 2>/dev/null && continue
-        [ "$(_gh_state "$_p")" = "MERGED" ] || continue
-        echo "$_p" >> "$RUNDIR/ledgered.txt"
-        echo "  ledgered #$_p (merge confirmed)"
-    done
-    MERGES="$(wc -l < "$RUNDIR/ledgered.txt" | tr -d ' ')"
+        echo "$_yl_line"
+        _yt_running=$((_yt_running + ${#_yl_line} + 1))
+        _yt_shown=$((_yt_shown + 1))
+    done < "$RUNDIR/your-turn.txt"
 }
 
 # ==========================================================================================
@@ -789,133 +735,53 @@ _reconcile() {
 
 _worker() {
     mkdir -p "$RUNDIR"
-    : > "$RUNDIR/tried.txt"
     : > "$RUNDIR/armed.txt"
-    : > "$RUNDIR/ledgered.txt"
-    : > "$RUNDIR/rescued.txt"
+    : > "$RUNDIR/your-turn.txt"
 
-    echo "pr-cycle worker starting — max-merges $MAX_MERGES, rundir $RUNDIR"
+    echo "pr-cycle worker starting — max-ready $MAX_READY, jobs $JOBS, rundir $RUNDIR"
     if [ -n "$ONLY" ]; then echo "pr-cycle scope: --only $ONLY"; fi
     if [ -n "$SKIP" ]; then echo "pr-cycle scope: --skip $SKIP"; fi
 
-    while :; do
-        if [ -e "$PR_CYCLE_STOP_FILE" ]; then
-            HALT="stopped by $PR_CYCLE_STOP_FILE"
-            break
-        fi
-        # Checked BEFORE selecting a PR, so hitting the cap costs no wasted ready.
-        if [ "$MERGES" -ge "$MAX_MERGES" ]; then
-            HALT="merge cap ($MAX_MERGES) reached"
-            break
-        fi
-
-        _attack_plan 0 || break
-
-        # Once per run, against the first real plan: attack.md does not exist before this.
-        if [ "$WARNED_ONLY" = "0" ]; then
-            WARNED_ONLY=1
-            _warn_unmatched_only
-        fi
-
-        if ! _next_pr; then
-            # Nothing orderable is left. Before declaring the queue drained, try ONE excluded
-            # DIRTY PR -- that is the only path by which a conflicted PR can re-enter the
-            # ordered table at all. On success `continue`, so the next iteration re-runs
-            # _attack_plan and picks the now-clean PR up through the NORMAL path; _rescue_one
-            # restores orderability, it does not substitute for the ready cycle.
-            set +e
-            _rescue_one
-            _rrc=$?
-            set -e
-            [ "$_rrc" -eq 2 ] && break
-            if [ "$_rrc" -eq 0 ]; then
-                continue
-            fi
-            DRAINED=1
-            break
-        fi
-        _n="$NEXT_PR"
-
-        # Written BEFORE any side effect: that is what makes "readied at most once per run"
-        # hold even when the iteration halts partway through.
-        echo "$_n" >> "$RUNDIR/tried.txt"
-        echo "--- #$_n (needs you? ${ATTACK_NEEDS:-?})"
-
-        # Decline the 20-40 minute readying session only when BOTH hold: the PR is in the
-        # terminal bucket, and /pr-ready has already returned READY over this exact tree.
-        # Neither alone is sufficient — see _precheck_verdict for why ARMABLE does not
-        # imply a READY verdict, and why a READY verdict does not imply it is current.
-        # Fails toward running pr-ready: any unknown bucket, non-zero triage exit, closed
-        # PR, absent or stale verdict reads as "" and the session runs as before.
-        _skip_ready=0
-        if [ "$PR_CYCLE_SKIP_READY_WHEN_ARMABLE" != "0" ]; then
-            _pre="$(_precheck_bucket "$_n")"
-            if [ "$_pre" = "ARMABLE" ]; then
-                _vpre="$(_precheck_verdict "$_n")"
-                if [ "$_vpre" = "READY" ]; then
-                    _skip_ready=1
-                    echo "#$_n — already ARMABLE with a current READY verdict, skipping pr-ready"
-                else
-                    echo "#$_n — ARMABLE but no current READY verdict, running pr-ready"
-                fi
-            fi
-        fi
-        if [ "$_skip_ready" -eq 0 ]; then
-            _ready_pr "$_n" || break
-        fi
-        _arm_and_classify "$_n" || break
-
-        if [ "$BUCKET" = "ARMABLE" ]; then
-            set +e
-            _poll_merge "$_n"
-            _prc=$?
-            set -e
-            if [ "$_prc" -eq 2 ]; then _reconcile; break; fi
-            [ "$_prc" -ne 0 ] && LEFT=$((LEFT + 1))
-        else
-            LEFT=$((LEFT + 1))
-            echo "  #$_n: ${BUCKET:-absent} — ${ACTION:-left for a human}"
-        fi
-
-        # Runs on EVERY completed iteration, including non-armable ones, so a PR armed in
-        # an earlier iteration that lands later is still ledgered and still counted.
-        _reconcile
-
-        # ONE rescue attempt per completed iteration. Placed after _reconcile so that a run
-        # which eventually hits the merge cap has already rescued once per iteration: the cap
-        # check sits at the TOP of the loop body, so a drain-point-only rescue would never
-        # fire on exactly the runs that manufacture the most DIRTY state.
-        #
-        # Mutually exclusive with site A: the drain block above always continues or breaks,
-        # so at most ONE _rescue_one call runs per iteration. That is what makes "exactly one
-        # rescue per loop iteration, never a batch" structural rather than a convention.
-        set +e
-        _rescue_one
-        _rrc=$?
-        set -e
-        [ "$_rrc" -eq 2 ] && break
-    done
-
-    if [ -s "$RUNDIR/ledgered.txt" ]; then
-        MERGES="$(wc -l < "$RUNDIR/ledgered.txt" | tr -d ' ')"
+    if [ -e "$PR_CYCLE_STOP_FILE" ]; then
+        HALT="stopped by $PR_CYCLE_STOP_FILE"
     fi
 
-    _reason="queue drained"
-    [ -n "$HALT" ] && _reason="$HALT"
-    [ "$DRAINED" = "1" ] && _reason="queue drained"
+    if [ -z "$HALT" ]; then
+        _attack_plan 0 || true
+        _warn_unmatched_only
+    fi
 
-    echo "pr-cycle finished — merged $MERGES, left for human $LEFT — $_reason"
+    if [ -z "$HALT" ]; then
+        _stage1_list
+        [ -s "$RUNDIR/stage1-skipped.txt" ] && cat "$RUNDIR/stage1-skipped.txt" || true
+        READIED="$(wc -l < "$RUNDIR/stage1.txt" | tr -d ' ')"
+        _stage1_fire || true
+    fi
+
+    if [ -z "$HALT" ]; then
+        _arm_and_classify || true
+    fi
+
+    _reason="${HALT:-done}"
+    echo "pr-cycle finished — readied $READIED, armed $ARMED, your turn $LEFT — $_reason"
 
     if [ -z "$NO_DM" ]; then
-        _msg="pr-cycle finished — merged $MERGES, left for human $LEFT — $_reason
-log: ${PR_CYCLE_LOG:-<foreground>}"
-        # A failed notification must never change the run's exit status.
+        if [ -n "$HALT" ]; then
+            _yt_block="Your turn: unknown — stage 2 did not run"
+        elif [ "$LEFT" -eq 0 ]; then
+            _yt_block="Your turn: nothing"
+        else
+            _yt_block="Your turn:
+$(_your_turn_lines)"
+        fi
+        _msg="pr-cycle finished — readied $READIED, armed $ARMED, your turn $LEFT — $_reason
+log: ${PR_CYCLE_LOG:-<foreground>}
+$_yt_block"
         "$PR_CYCLE_DM_CMD" "$_msg" || true
     fi
 
-    # 0 for every intended termination — drained, capped, or stopped. 1 for an error halt.
     case "$_reason" in
-        "queue drained"|"merge cap "*|"stopped by "*) return 0 ;;
+        "done"|"stopped by "*) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -926,52 +792,30 @@ log: ${PR_CYCLE_LOG:-<foreground>}"
 
 _report_dry_run() {
     mkdir -p "$RUNDIR"
-    : > "$RUNDIR/tried.txt"
-    : > "$RUNDIR/rescued.txt"
 
     echo "pr-cycle DRY RUN — nothing fires. Re-run with --go to detach a worker."
     echo ""
     _attack_plan 0 || { echo "ERROR: $HALT" >&2; return 1; }
     _warn_unmatched_only
 
-    if _next_pr; then
-        echo "next PR: #$NEXT_PR (needs you? ${ATTACK_NEEDS:-?})"
+    _stage1_list
+    _s1_cnt="$(wc -l < "$RUNDIR/stage1.txt" | tr -d ' ')"
+    if [ "$_s1_cnt" -eq 0 ]; then
+        echo "stage 1 would ready: none"
     else
-        echo "next PR: none — no orderable PRs in the plan of attack."
+        echo "stage 1 would ready ($_s1_cnt): $(awk '{printf "#%s ", $0}' "$RUNDIR/stage1.txt")"
     fi
-    echo ""
-    # Report-only. The dry run is what a human reads before deciding to --go, so it must not
-    # stay silent about the rescue path: "next PR: none" alone would read as "this run is a
-    # no-op" while --go would in fact hand a DIRTY PR to post-plan-fleet. This block reads
-    # (attack.md, launchctl list) and never calls _rescue_one or _ready_pr.
+    if [ -s "$RUNDIR/stage1-skipped.txt" ]; then
+        while IFS= read -r _sk; do
+            echo "  $_sk"
+        done < "$RUNDIR/stage1-skipped.txt"
+    fi
+    if [ "$_s1_cnt" -gt 0 ]; then
+        _s1_csv="$(paste -sd, "$RUNDIR/stage1.txt")"
+        echo "would run: post-plan-fleet --pr-list $_s1_csv --jobs $JOBS --go --wait"
+    fi
     if [ "$PR_CYCLE_RESCUE" = "0" ]; then
         echo "DIRTY rescue: disabled (PR_CYCLE_RESCUE=0) — excluded PRs stay unreachable."
-    else
-        _dr_all="$(_excluded_dirty_rows)"
-        if [ -z "$_dr_all" ]; then
-            echo "DIRTY rescue candidates: none — no DIRTY entries under ## Excluded."
-        else
-            _dr_n="$(printf '%s\n' "$_dr_all" | wc -l | tr -d ' ')"
-            # shellcheck disable=SC2086  # PR numbers from a digit-only parse; splitting is intended
-            echo "DIRTY rescue candidates ($_dr_n): $(printf '#%s ' $_dr_all)"
-            _dr_first=""
-            for _dr_p in $_dr_all; do
-                if ! _pr_allowed "$_dr_p"; then
-                    # Must be reported, not silently dropped: the dry run is what a human
-                    # reads before --go, so it must not promise a rescue the worker skips.
-                    echo "  #$_dr_p — outside the --only/--skip scope; would be skipped"
-                elif grep -qxF "$_dr_p" "$RUNDIR/rescued.txt" 2>/dev/null; then
-                    echo "  #$_dr_p — already attempted this run; would be skipped"
-                elif _slot_held "$_dr_p"; then
-                    echo "  #$_dr_p — a post-plan-fleet slot is already live; would be skipped"
-                elif [ -z "$_dr_first" ]; then
-                    _dr_first="$_dr_p"
-                    echo "  #$_dr_p — would be rescued FIRST (exactly one per loop iteration)"
-                else
-                    echo "  #$_dr_p — eligible; would wait for a later iteration"
-                fi
-            done
-        fi
     fi
     echo ""
     echo "Triage report (read-only — this run arms nothing):"
@@ -983,7 +827,7 @@ _report_dry_run() {
     elif [ -n "$SKIP" ]; then    echo "would use scope:      --skip $SKIP"
     else                         echo "would use scope:      every orderable PR"; fi
     echo "would use max-ready:  $MAX_READY"
-echo "would use jobs:       $JOBS"
+    echo "would use jobs:       $JOBS"
     echo "would use stop file:  $PR_CYCLE_STOP_FILE"
     echo "would use rundir:     $RUNDIR"
     return 0

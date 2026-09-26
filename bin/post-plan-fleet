@@ -4,7 +4,7 @@
 # Dry-run by default: prints the PRs it would process and exits. Nothing fires without --go.
 #
 # Usage:
-#   bin/post-plan-fleet [--go] [--jobs N] [--pr N[,N...]] [--pr-attack FILE] [--top-n N] [--dry-run] [--wait] [--no-dm] [--stop N[,N...]] [--stop-all] [--help]
+#   bin/post-plan-fleet [--go] [--jobs N] [--pr N[,N...]] [--pr-list N[,N...]] [--dry-run] [--wait] [--no-dm] [--stop N[,N...]] [--stop-all] [--help]
 #
 #   --go          Actually fire. Without it the script only reports (default).
 #   --jobs N      Max concurrent sessions (default 5). Positive integer.
@@ -12,8 +12,8 @@
 #   --dry-run     Print the resolved per-PR invocation line and the generated plist XML for
 #                 each selected PR, then exit 0 without loading anything into launchd.
 #   --help, -h    Print this usage and exit 0.
-#   --pr-attack FILE  Read ranked PR list from a /pr-attack output file; selects top --top-n.
-#   --top-n N         How many top-ranked PRs to select (default 5). Positive integer.
+#   --pr-list N[,N...]  Batch form of --pr: fire every listed PR, in the given order,
+#                       at most --jobs at a time. Used by bin/pr-cycle Stage 1.
 #   --wait        After all sessions are fired, poll until every launchd plist is gone
 #                 (all sessions finished). For use inside a detached wrapper only —
 #                 never from an interactive main-thread session (foreground poll loop is
@@ -33,9 +33,7 @@
 #   bin/post-plan-fleet --go                  # fire all open non-draft PRs, 5 at a time
 #   bin/post-plan-fleet --pr 1899,1900 --go   # fire exactly two
 #   bin/post-plan-fleet --jobs 1 --go         # serialize
-#   bin/post-plan-fleet --pr-attack ~/pr-attack.md --go         # fire top 5 from rank file
-#   bin/post-plan-fleet --pr-attack ~/pr-attack.md --top-n 3 --go  # fire top 3
-#   bin/post-plan-fleet --pr-attack ~/pr-attack.md --go --wait      # fire, then wait for all to finish
+#   bin/post-plan-fleet --pr-list 1899,1900,1901 --jobs 3 --go --wait  # fire 3 in parallel, wait
 #
 # WARNING: Never run with --go from inside a worktree. The launched sessions must start from
 # the main checkout so bin/post-plan-now resolves the target PR's own worktree correctly.
@@ -104,8 +102,6 @@ ROOT="$(dirname "$GIT_COMMON")"
 GO=0
 JOBS=5
 EXPLICIT_PRS=()
-PR_ATTACK_FILE=""
-TOP_N=5
 WAIT=0
 NOTIFY=1
 MODE=fire          # fire | stop | stop-all
@@ -116,7 +112,7 @@ SAW_DRY_RUN=0
 CEILING_SECS="${POST_PLAN_FLEET_CEILING:-7200}"
 
 # --- flag parsing ------------------------------------------------------------------------
-usage() { sed -n '2,72p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,70p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -126,19 +122,16 @@ while [[ $# -gt 0 ]]; do
             [[ $# -ge 2 ]] || { echo "ERROR: --jobs requires a value" >&2; exit 1; }
             [[ "$2" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: --jobs must be a positive integer, got: $2" >&2; exit 1; }
             JOBS="$2"; shift 2 ;;
-        --pr-attack) [[ -n "${2:-}" ]] || { echo "ERROR: --pr-attack requires a value" >&2; exit 2; }
-             PR_ATTACK_FILE="$2"; shift 2 ;;
-        --top-n)     [[ "${2:-}" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: --top-n must be a positive integer, got: ${2:-}" >&2; exit 2; }
-             TOP_N="$2"; shift 2 ;;
         --wait)    WAIT=1; shift ;;
         --no-dm)   NOTIFY=0; shift ;;
-        --pr)
-            [[ $# -ge 2 ]] || { echo "ERROR: --pr requires a value" >&2; exit 1; }
+        --pr|--pr-list)
+            [[ $# -ge 2 ]] || { echo "ERROR: $1 requires a value" >&2; exit 1; }
             IFS=',' read -r -a _prs <<< "$2"
-            for _p in "${_prs[@]}"; do
-                [[ "$_p" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: --pr expects positive integers, got: $_p" >&2; exit 1; }
+            for _p in ${_prs[@]+"${_prs[@]}"}; do
+                [[ "$_p" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: $1 expects positive integers, got: $_p" >&2; exit 1; }
                 EXPLICIT_PRS+=("$_p")
             done
+            [[ ${#EXPLICIT_PRS[@]} -gt 0 ]] || { echo "ERROR: $1 requires at least one PR number" >&2; exit 1; }
             shift 2 ;;
         --stop)
             [[ "$MODE" != "stop-all" ]] || { echo "ERROR: --stop and --stop-all are mutually exclusive" >&2; exit 2; }
@@ -173,19 +166,13 @@ done
     exit 1
 }
 
-# --pr-attack and --pr are mutually exclusive: one picks from a ranked file, the other
-# hard-pins numbers. Letting one silently win is the failure mode a first-pass loop cannot afford.
-if [[ -n "$PR_ATTACK_FILE" && ${#EXPLICIT_PRS[@]} -gt 0 ]]; then
-    echo "ERROR: --pr-attack and --pr are mutually exclusive" >&2; exit 2
-fi
-
 # The stop verbs are a distinct mode, not a modifier: combining them with a firing flag is
 # always a mistake, and silently ignoring one of the two is how a "stop" turns into a fire.
 if [[ "$MODE" != "fire" ]]; then
     [[ "$GO" -eq 0 && "$SAW_DRY_RUN" -eq 0 ]] \
         || { echo "ERROR: --stop/--stop-all cannot be combined with --go or --dry-run" >&2; exit 2; }
-    [[ -z "$PR_ATTACK_FILE" && ${#EXPLICIT_PRS[@]} -eq 0 && "$WAIT" -eq 0 ]] \
-        || { echo "ERROR: --stop/--stop-all cannot be combined with --pr, --pr-attack or --wait" >&2; exit 2; }
+    [[ ${#EXPLICIT_PRS[@]} -eq 0 && "$WAIT" -eq 0 ]] \
+        || { echo "ERROR: --stop/--stop-all cannot be combined with --pr, --pr-list or --wait" >&2; exit 2; }
     # `--stop ""` parses cleanly and would otherwise reach the dispatch with an empty list,
     # exiting 0 having stopped nothing — the operator believes the run is dead when it is not.
     [[ "$MODE" != "stop" || ${#STOP_PRS[@]} -gt 0 ]] \
@@ -289,22 +276,12 @@ if [[ "$MODE" != "fire" ]]; then
     exit "$_stop_rc"
 fi
 
-# --- attack_sha: extract master SHA from a /pr-attack output file -----------------------
-# The Base: header has one of two forms:
-#   Base: `master` @ abc1234 · ...
-#   Base: `master` @ abc1234567890 · ...
-# The backticks around `master` may be present or absent; tolerate both.
-attack_sha() { grep -m1 '^Base:' "$1" | sed -E 's/.*@[[:space:]]*`?([0-9a-f]{7,40})`?.*/\1/'; }
-
-# --- parallel arrays (declared early so write_report can be called from the STALE path) --
+# --- parallel arrays ---------------------------------------------------------------------------
 # FIRE_PRS, FIRE_BRANCHES, and FIRE_PRE are parallel indexed arrays, not one associative
 # array: macOS ships bash 3.2 at /bin/bash, which has no `declare -A`.
-# Declared here (above the staleness gate) so write_report sees naturally-empty arrays on
-# the STALE path and produces a zero-row report. The population loop below fills them.
 FIRE_PRS=(); FIRE_BRANCHES=(); FIRE_PRE=(); SKIP_LINES=()
 
-# _REPORT_MASTER_SHA is set inside the staleness gate (when --pr-attack is used) and
-# auto-resolved lazily inside write_report for runs without --pr-attack.
+# _REPORT_MASTER_SHA is always resolved lazily inside write_report when empty.
 _REPORT_MASTER_SHA=""
 
 # derive_status <log-path>
@@ -347,7 +324,6 @@ derive_status() {
 # $HOME/pr-firstpass-YYYY-MM-DD.md (overwrites on same-day re-run), and prints the path
 # to stdout as the last line (headless-marker-contract: last stdout line = report path).
 # master-sha may be empty; if so, auto-resolved here to avoid a git call on dry-run paths.
-# attack-src should be "—" when --pr-attack is not in use.
 write_report() {
     [[ "${SAW_DRY_RUN:-0}" != "1" ]] || return 0
     local attack_src="$1" master_sha="$2" fired_n="$3" skip_n="$4"
@@ -390,34 +366,6 @@ write_report() {
     printf '%s\n' "$rpath"
 }
 
-# --- staleness gate ----------------------------------------------------------------------
-# Runs OUTSIDE select_prs() so its exit 1 genuinely terminates the script and no plist
-# is ever written. Must be called before PR_LIST="$(select_prs)".
-if [[ -n "$PR_ATTACK_FILE" ]]; then
-    [[ -f "$PR_ATTACK_FILE" ]] || {
-        echo "ERROR: --pr-attack file not found: $PR_ATTACK_FILE" >&2
-        exit 1
-    }
-    _old_sha="$(attack_sha "$PR_ATTACK_FILE" || true)"
-    # A missing or unparseable Base: header must fail LOUDLY. Without this, the command
-    # substitution above fails under set -e and the script exits 1 with no message at all.
-    [[ "$_old_sha" =~ ^[0-9a-f]{7,40}$ ]] || {
-        echo "ERROR: --pr-attack file has no parseable 'Base: \`master\` @ <sha>' header: $PR_ATTACK_FILE" >&2
-        exit 1
-    }
-    _cur_sha="${POST_PLAN_FLEET_MASTER_SHA:-$(git -C "$ROOT" rev-parse --short origin/master 2>/dev/null || echo unknown)}"
-    _REPORT_MASTER_SHA="$_cur_sha"
-    # Compare on the shorter of the two lengths so a 7-vs-8-char abbreviation is not a false STALE.
-    _min="${#_old_sha}"; [[ "${#_cur_sha}" -lt "$_min" ]] && _min="${#_cur_sha}"
-    if [[ "${_old_sha:0:$_min}" != "${_cur_sha:0:$_min}" ]]; then
-        if [[ "$GO" -eq 1 ]]; then
-            write_report "$PR_ATTACK_FILE" "$_cur_sha (stale — attack pinned $_old_sha)" 0 0
-        fi
-        echo "STALE: /pr-attack file is from master@${_old_sha}, current is ${_cur_sha}. Re-run /pr-attack first." >&2
-        exit 1
-    fi
-fi
-
 # --- gh identity -------------------------------------------------------------------------
 # Resolved, never hardcoded: the local-part of the git email is NOT the GitHub login.
 GH_USER="${POST_PLAN_FLEET_GH_USER:-$(gh api user --jq .login 2>/dev/null || true)}"
@@ -442,34 +390,7 @@ pr_json() {
 }
 
 select_prs() {
-    # --- pr-attack branch: pick top N from a ranked /pr-attack output file ---
-    if [[ -n "$PR_ATTACK_FILE" ]]; then
-        local f="$PR_ATTACK_FILE"
-        # Extract excluded PR numbers from the ## Excluded section only.
-        # awk section-scopes so a "- #NNNN" elsewhere in the file is not treated as excluded.
-        local excluded
-        excluded="$(awk '/^## /{inx=($0 ~ /^## Excluded/)} inx && /^- #[0-9]+/{sub(/^- #/,""); print $1}' "$f" || true)"
-        # Extract ranked PR numbers from table rows (table format: | rank | #NNNN | ...).
-        # Capture to a variable before piping to head so pipefail does not fire on SIGPIPE.
-        local ranked
-        ranked="$(grep -E '^\|[[:space:]]*[0-9]+[[:space:]]*\|[[:space:]]*#[0-9]+' "$f" \
-            | sed -E 's/^\|[^|]*\|[[:space:]]*#([0-9]+).*/\1/' || true)"
-        if [[ -z "$ranked" ]]; then
-            echo "ERROR: --pr-attack file has no orderable PRs: $f" >&2
-            exit 1
-        fi
-        # Filter excluded entries. Use grep -vxF for exact-line matching (no prefix collisions).
-        local selected
-        if [[ -n "$excluded" ]]; then
-            selected="$(echo "$ranked" | grep -vxF -f <(echo "$excluded") || true)"
-        else
-            selected="$ranked"
-        fi
-        # Take top N. Use awk instead of head -n so no SIGPIPE under set -o pipefail.
-        echo "$selected" | awk -v n="$TOP_N" 'NR<=n'
-        return
-    fi
-    # --- explicit --pr branch ---
+    # --- explicit --pr / --pr-list branch ---
     if [[ ${#EXPLICIT_PRS[@]} -gt 0 ]]; then
         printf '%s\n' "${EXPLICIT_PRS[@]}"
         return
@@ -501,7 +422,6 @@ validate_explicit() {
 # --- fire list ---------------------------------------------------------------------------
 # FIRE_PRS, FIRE_BRANCHES, and FIRE_PRE are parallel indexed arrays, not one associative
 # array: macOS ships bash 3.2 at /bin/bash, which has no `declare -A`.
-# (Declared above the staleness gate so write_report can be called from the STALE path.)
 
 # Capture the selector into a variable rather than feeding the loop from < <(select_prs).
 # A failure inside a process substitution exits only that subshell, so an unreadable
@@ -583,7 +503,7 @@ done
 if [[ ${#FIRE_PRS[@]} -eq 0 ]]; then
     echo "no PRs selected — nothing to do."
     if [[ "$GO" -eq 1 ]]; then
-        write_report "${PR_ATTACK_FILE:-—}" "$_REPORT_MASTER_SHA" 0 "${#SKIP_LINES[@]}"
+        write_report "—" "$_REPORT_MASTER_SHA" 0 "${#SKIP_LINES[@]}"
     fi
     exit 0
 fi
@@ -849,5 +769,5 @@ fi
 # Written after the wait block. Without --wait the sessions are still running here, so
 # most status rows will read NOT READY (no log) — expected (see header comment).
 if [[ "$GO" -eq 1 ]]; then
-    write_report "${PR_ATTACK_FILE:-—}" "$_REPORT_MASTER_SHA" "${#FIRE_PRS[@]}" "${#SKIP_LINES[@]}"
+    write_report "—" "$_REPORT_MASTER_SHA" "${#FIRE_PRS[@]}" "${#SKIP_LINES[@]}"
 fi

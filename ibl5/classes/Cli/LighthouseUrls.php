@@ -43,7 +43,7 @@ final class LighthouseUrls
         '/ibl5/modules.php?name=Standings',
         '/ibl5/modules.php?name=Team&op=team&teamid=1',
         '/ibl5/modules.php?name=Player&pa=showpage&pid=1',
-        '/ibl5/modules.php?name=SeasonLeaderboards',
+        '/ibl5/modules.php?name=Leaderboards',
     ];
 
     /**

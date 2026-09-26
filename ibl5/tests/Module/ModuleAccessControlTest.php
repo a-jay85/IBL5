@@ -128,6 +128,20 @@ class ModuleAccessControlTest extends TestCase
         $this->assertFalse($control->isModuleAccessible('SeasonLeaderboards'));
     }
 
+    public function testLeaderboardsHiddenWhenTriviaModeOn(): void
+    {
+        $control = $this->createAccessControl('Regular Season', 'On');
+
+        $this->assertFalse($control->isModuleAccessible('Leaderboards'));
+    }
+
+    public function testLeaderboardsAccessibleWhenTriviaModeOff(): void
+    {
+        $control = $this->createAccessControl('Regular Season', 'Off');
+
+        $this->assertTrue($control->isModuleAccessible('Leaderboards'));
+    }
+
     public function testPlayerModuleVisibleWhenTriviaModeOff(): void
     {
         $control = $this->createAccessControl('Regular Season', 'Off');

@@ -105,6 +105,8 @@ case "$1 $2" in
             # Distinguish them so both callers get the right post-jq value.
             case "$args" in
               *"--json state"*) printf '%s' "${SHIM_PR_STATE:-NONE}" ;;
+              # health never-ran anchor: newest refresh PR createdAt (post-jq).
+              *createdAt*)      printf '%s' "${SHIM_PR_LAST_CREATED:-}" ;;
               *)                printf '%s' "${SHIM_PR_FOR_BRANCH:-0}" ;;
             esac ;;
         *"--state closed"*) printf '%s' "${SHIM_PR_CLOSED:-[]}" ;;
@@ -400,6 +402,26 @@ OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
 { echo "$OUT" | grep -q 'alert=false'; } \
   && ok "(17e) health: no alert within 36h grace (20h marker)" \
   || bad "(17e) health grace"
+
+# Case 17f: NEGATIVE — 40h episode but a refresh PR opened 20h ago → healthy poll
+# (the 2026-09-26 false alarm: issue open 48h while the poll merged a PR daily).
+SB="$(build_sandbox)"
+BODY="<!-- stale-since: $TS_40H -->"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
+    SHIM_LS_REMOTE="" SHIM_ISSUE_BODY="$BODY" SHIM_PR_LAST_CREATED="$TS_20H" \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=false'; } \
+  && ok "(17f) health: recent refresh PR (20h) beats 40h episode — no false never-ran" \
+  || bad "(17f) health last-PR anchor"
+
+# Case 17g: ALERT — 40h episode and the newest refresh PR is older (40h+) → still fires
+SB="$(build_sandbox)"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
+    SHIM_LS_REMOTE="" SHIM_ISSUE_BODY="$BODY" SHIM_PR_LAST_CREATED="$TS_30D" \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=true' && echo "$OUT" | grep -q 'kind=never-ran'; } \
+  && ok "(17g) health: ALERT never-ran when newest refresh PR predates the episode" \
+  || bad "(17g) health old last-PR must not mask"
 
 # --- Cases 18a-18d: false-alarm negatives -------------------------------------
 

@@ -1,7 +1,7 @@
 ---
 description: Auto-generated module map of ibl5/classes/ with file counts, roles, and cross-module dependencies.
 paths: ibl5/classes/**/*.php
-last_verified: 2026-09-25
+last_verified: 2026-09-26
 ---
 
 # Codebase Module Map
@@ -151,7 +151,7 @@ LeagueSchedule -> BasketballStats League Season Security
 LeagueStarters -> Auth League Player Repositories Season Security Team UI
 Logging -> Bootstrap
 Maintenance -> League
-Module -> League Season
+Module -> League Season Utilities
 Navigation -> League Security
 Negotiation -> BaseMysqliRepository BasketballStats League Player Repositories Security Validation
 NextSim -> BasketballStats LeagueSchedule Player Season Security Standings Team TeamSchedule UI

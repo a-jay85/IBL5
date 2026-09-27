@@ -492,8 +492,11 @@ _armed_skip() {
         "$RUNDIR/armed-state.json" 2>/dev/null || true)"
     [ "$_as_mss" = "DIRTY" ] && return 1
 
-    # BLOCKED-CHECK: CI is red; arming will fail → don't skip
-    [ "$(_precheck_bucket "$_asn")" = "BLOCKED-CHECK" ] && return 1
+    # BLOCKED-CHECK: CI is red; arming will fail → don't skip.
+    # Empty bucket means triage failed or bucket unknown — fail open (do not skip).
+    _as_bucket="$(_precheck_bucket "$_asn")"
+    [ -z "$_as_bucket" ] && return 1
+    [ "$_as_bucket" = "BLOCKED-CHECK" ] && return 1
 
     return 0  # safe to skip
 }
@@ -716,15 +719,16 @@ _precheck_verdict() {
     # Fetch the last sticky verdict comment; cached if already done (e.g. by _check_held_unchanged).
     _sticky_body "$_vn" || { echo ""; return 0; }
 
-    # Two accepted paths — either can authorise the skip:
+    # Two accepted paths — Path 2 runs only when line 1 has no tree anchor:
     #
     #   Path 1 (legacy): body LINE 1 is `**Reviewed tree:** <sha>` and the head's current
     #     tree sha equals it. Identical anchor to .claude/review-shared/scripts/skip-review.sh.
-    #     Verdicts written before the compiled harness used this form.
+    #     Verdicts written before the compiled harness used this form. When line 1 carries a
+    #     tree sha that does not match, the function echoes "" — Path 2 is never tried.
     #
-    #   Path 2 (harness format): body has an anchored `**Reviewed diff:** <sha>` line
-    #     (last match) whose sha equals the PR's current git patch-id. The compiled harness
-    #     writes this line; line 1 in that format is the LATEST VERDICT header.
+    #   Path 2 (harness format): tried only when line 1 has no tree anchor. Body has an
+    #     anchored `**Reviewed diff:** <sha>` line (last match) whose sha equals the PR's
+    #     current git patch-id. The compiled harness writes this line.
     #
     # Fail-open: any error in either path → echo "".
     _vmatched=0

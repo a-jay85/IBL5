@@ -1749,6 +1749,17 @@ triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker
 [[ "$(calls ready)" == "1" ]] || fail "fix1 gh-fail-armed: fleet should have run, got $(calls ready) calls"
 grep -qF 'auto-merge already armed' <<< "$OUT" && fail "fix1 gh-fail-armed: armed-skip fired despite gh failure"
+
+# armed + plain triage exits nonzero → empty bucket → fail open (must NOT skip)
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+printf '[{"number":101,"headRefName":"first-slug","autoMergeRequest":{"mergeMethod":"SQUASH"},"mergeStateStatus":"CLEAN"}]' \
+    > "$SCRATCH/armed-state.json"
+echo 1 > "$SCRATCH/triage-rc"
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "fix1 triage-rc-1: fleet should have run (empty bucket = fail open), got $(calls ready) calls"
+grep -qF 'auto-merge already armed' <<< "$OUT" && fail "fix1 triage-rc-1: armed-skip fired despite empty bucket"
 end_case "case fix1 armed-skip"
 
 # ==========================================================================================

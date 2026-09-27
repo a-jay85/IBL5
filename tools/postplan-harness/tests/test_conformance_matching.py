@@ -245,6 +245,30 @@ def test_check_not_found_plan_yields_nothing():
     assert check(plan, []) == []
 
 
+def test_pytest_node_id_token_resolves_to_file():
+    """A `path/to/file.py::test_name` pytest node-id token resolves when the file is in the diff.
+
+    Mutation caught: removing the `::` split in _resolve makes the token unmatchable against
+    real filesystem paths and produces a spurious MISSING item for a test that was shipped.
+    """
+    tok = "tools/postplan-harness/tests/test_armable.py::test_manual_testing_clearance_keyword_clears_with_file"
+    plan = _plan_with_test(tok)
+    items = check(plan, ["tools/postplan-harness/tests/test_armable.py"])
+    assert items == [], f"expected no MISSING, got: {items}"
+
+
+def test_pytest_node_id_token_missing_when_file_absent():
+    """A `path/to/file.py::test_name` token still reports MISSING when the file is not in the diff.
+
+    Mutation caught: stripping `::` unconditionally and then matching against an empty
+    changed_files list would mask a missing test rather than surface it.
+    """
+    tok = "tools/postplan-harness/tests/test_armable.py::test_some_new_test"
+    plan = _plan_with_test(tok)
+    items = check(plan, [])
+    assert any(i.startswith("MISSING:") for i in items)
+
+
 def test_phase_omission_end_to_end_positive_and_negative():
     """locate_plan + check: exactly one MISSING-PHASE: 2 on negative diff, zero on positive.
 

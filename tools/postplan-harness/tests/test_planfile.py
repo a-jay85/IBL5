@@ -1215,6 +1215,8 @@ Also `harness/dup2.py`.
     # ### Delegate paths accrue to the enclosing h2 phase (5)
     phase5 = next(p for p in phases if p.number == 5)
     assert "tests/test_delegate.py" in phase5.evidence_paths
+    # Phase 5.5 paths must not leak into phase 5 (catches a dropped (?!\.\d))
+    assert "harness/fidelity.py" not in phase5.evidence_paths
     # Duplicate Phase 2 merges into one entry
     assert len([p for p in phases if p.number == 2]) == 1
     phase2 = next(p for p in phases if p.number == 2)

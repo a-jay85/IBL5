@@ -298,7 +298,7 @@ final class HeadToHeadRecordsView
             $inner = '<span class="ibl-team-cell__name">' . $inner . '</span>';
         }
 
-        return '<td class="' . $classes . '"' . $styleAttr . '>' . $inner . '</td>';
+        return '<th scope="row" class="' . $classes . '"' . $styleAttr . '>' . $inner . '</th>';
     }
 
     /**

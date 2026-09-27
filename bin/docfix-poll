@@ -400,9 +400,15 @@ health_report() {
                 episode="$last_pr_epoch"
             fi
             age_h=$(( ( $(date -u +%s) - episode ) / 3600 ))
+            # This arm cannot tell "poll not installed" from "run died before
+            # pushing" (e.g. a Claude usage limit). In production it runs on a
+            # GitHub runner, which has no local refresh branches and no launchctl,
+            # so the `wedged` arm above never fires there and a pre-push death
+            # lands here. Name both causes and the Mac check that splits them.
+            # Keep it ONE line: the workflow appends it to $GITHUB_OUTPUT.
             if [ "$age_h" -ge 36 ]; then
                 alert=true; kind="never-ran"
-                detail="No refresh PR has been opened in ${age_h}h. The Mac poll is probably not installed: cd ~/GitHub/IBL5 && git pull && bin/docfix-poll --install-schedule"
+                detail="No refresh PR has been opened in ${age_h}h. Either the Mac poll is not installed or the last doc-fix run died before pushing (e.g. a Claude usage limit). On the Mac, check: ls -t /tmp/docfix-run-*.log | head -1 — tail that log for the cause; if there is no log, install the poll: cd ~/GitHub/IBL5 && git pull && bin/docfix-poll --install-schedule"
             fi
         fi
     fi

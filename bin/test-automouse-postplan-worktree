@@ -26,12 +26,19 @@
 # never drift from the implementation. It reads only its positional args and the
 # harness-settable globals HANDOFF_DIR, WORKTREES_ROOT, LOG.
 #
+# Group e locks the PRODUCER side of the same incident: prompt-impl Step 7 must
+# reject a handoff missing any of slug/worktree/branch/plan_file (or carrying one as
+# null, empty, or a non-string). The jq filter is EXTRACTED from
+# bin/automouse/prompt-impl, not copied, so editing or deleting the Step 7 check
+# fails e0. PROMPT_IMPL may be overridden to point at another copy (A/B check).
+#
 # Run: bin/test-automouse-postplan-worktree (exit 0 = all pass, 1 = a case failed)
 
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUNNER="$SCRIPT_DIR/automouse/run"
+PROMPT_IMPL="${PROMPT_IMPL:-$SCRIPT_DIR/automouse/prompt-impl}"
 FAILED=0
 
 if [ ! -f "$RUNNER" ]; then
@@ -216,6 +223,79 @@ if grep -q 'WORKTREES_ROOT="${WORKTREES_ROOT:-' "$RUNNER"; then
 else
     fail "d2 WORKTREES_ROOT must be defined with an env override"
 fi
+
+
+# ==========================================================================
+# Group e — prompt-impl Step 7 rejects a wrong-schema handoff (producer side)
+# ==========================================================================
+
+HANDOFF_FILTER=""
+if [ -f "$PROMPT_IMPL" ]; then
+    HANDOFF_FILTER="$(perl -0777 -ne \
+        "print \$1 if /jq -e '(\\[\\.slug, \\.worktree, \\.branch, \\.plan_file\\][^']*)'/" \
+        "$PROMPT_IMPL")"
+fi
+
+# e0: the Step 7 required-key filter exists in prompt-impl and was extracted.
+if [ -n "$HANDOFF_FILTER" ]; then
+    pass "e0 extracted the Step 7 required-key jq filter from prompt-impl"
+else
+    fail "e0 prompt-impl must carry the Step 7 jq -e '[.slug, .worktree, .branch, .plan_file] ...' check ($PROMPT_IMPL)"
+fi
+
+handoff_valid() { jq -e "$HANDOFF_FILTER" "$1" >/dev/null 2>&1; }
+
+expect_reject() {
+    local label=$1 body=$2 f="$TMP/e-handoff.json"
+    printf '%s' "$body" > "$f"
+    if [ -n "$HANDOFF_FILTER" ] && handoff_valid "$f"; then
+        fail "$label — filter accepted a handoff it must reject"
+    elif [ -z "$HANDOFF_FILTER" ]; then
+        fail "$label — skipped: no filter extracted (see e0)"
+    else
+        pass "$label"
+    fi
+}
+
+expect_accept() {
+    local label=$1 body=$2 f="$TMP/e-handoff.json"
+    printf '%s' "$body" > "$f"
+    if [ -n "$HANDOFF_FILTER" ] && handoff_valid "$f"; then
+        pass "$label"
+    elif [ -z "$HANDOFF_FILTER" ]; then
+        fail "$label — skipped: no filter extracted (see e0)"
+    else
+        fail "$label — filter rejected a well-formed handoff"
+    fi
+}
+
+# e1: THE LIVE DEFECT — the 2026-09-17 agent-invented schema (no slug/worktree/plan_file).
+expect_reject "e1 incident schema (no slug/worktree/plan_file) is rejected" \
+    '{"branch":"b","status":"verified-clean","tests":"578 passed","commits":["abc"],"dirty_files":8}'
+
+# e2: well-formed — all four keys, non-empty strings.
+expect_accept "e2 well-formed handoff is accepted" \
+    '{"slug":"s","worktree":"/tmp/w","branch":"b","plan_file":"s.md"}'
+
+# e3: extra keys (status, tests, commits...) must not trip the check.
+expect_accept "e3 well-formed handoff with extra keys is accepted" \
+    '{"slug":"s","worktree":"/tmp/w","branch":"b","plan_file":"s.md","status":"verified-clean","commits":["abc"]}'
+
+# e4: boundary — a required key present but empty.
+expect_reject "e4 empty-string slug is rejected" \
+    '{"slug":"","worktree":"/tmp/w","branch":"b","plan_file":"s.md"}'
+
+# e5: boundary — explicit JSON null (the a6 shape on the consumer side).
+expect_reject "e5 null worktree is rejected" \
+    '{"slug":"s","worktree":null,"branch":"b","plan_file":"s.md"}'
+
+# e6: wrong type — a number where a string is required.
+expect_reject "e6 non-string plan_file is rejected" \
+    '{"slug":"s","worktree":"/tmp/w","branch":"b","plan_file":7}'
+
+# e7: syntactically invalid JSON (jq parse error exits non-zero).
+expect_reject "e7 unparseable handoff is rejected" \
+    '{ this is not json'
 
 # ==========================================================================
 if [ "$FAILED" -eq 0 ]; then

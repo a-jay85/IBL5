@@ -347,12 +347,26 @@ HANDOFF_EOF
 
 Replace all `<placeholder>` values with actual values. The `plan_file` field must match the filename in $NIGHTLY_DIR/queue/ exactly (including .md extension).
 
-After writing the handoff file, verify it exists and contains valid JSON:
+After writing the handoff file, verify it parses AND carries every field the bash loop reads. A syntactically valid file with the wrong keys is a failure: the loop cannot resolve the worktree or branch from it.
 
 ```bash
-cat "$NIGHTLY_DIR/handoff/<plan-filename>.json" | python3 -m json.tool > /dev/null
-echo "Handoff file written successfully"
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+HF="$NIGHTLY_DIR/handoff/<plan-filename>.json"
+jq -e '[.slug, .worktree, .branch, .plan_file]
+       | all(type == "string" and length > 0)' "$HF" > /dev/null \
+  || { echo "ERROR: handoff $HF is missing required keys or has empty values" \
+            "(slug, worktree, branch, plan_file must be non-empty strings)." \
+            "Rewrite it from the Step 7 template with all 6 fields" \
+            "(slug, worktree, branch, plan_file, plan_title, completed_at)" \
+            "and rerun this check. Manual recovery from the worktree:" \
+            "cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>" \
+            "&& bin/post-plan-now --foreground" >&2; exit 1; }
+echo "Handoff file written and validated"
 ```
+
+If this check exits non-zero, rewrite the handoff file from the template above with every `<placeholder>` replaced, then rerun the check. Do not STOP on a failed check.
+
+If a second attempt still fails, delete the handoff file (`rm -f "$HF"`) and follow the Error Handling section below. Your checkpoints are already committed and pushed, so the worktree and branch survive for morning recovery.
 
 STOP after writing and verifying the handoff file. The bash loop will fire the post-plan agent next.
 

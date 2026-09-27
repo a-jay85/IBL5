@@ -16,16 +16,15 @@ Parse the JSON to extract: slug, worktree path, branch name, plan title, plan fi
 
 If the handoff file does not exist or is invalid JSON, write an error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-unknown.md and STOP.
 
-## Step 2: Enter Worktree
+## Step 2: Confirm Worktree
 
-Change into the worktree directory from the handoff file:
+The runner (`bin/automouse/run`) already cds into the worktree directory before it calls `post-plan-now --foreground`, so your cwd is the worktree. Do not `cd` to a path taken from the handoff JSON. Confirm the branch state from the current directory:
 
 ```bash
-cd <worktree-path>
 git log --oneline origin/master..HEAD
 ```
 
-Verify the worktree exists and the branch has commits ahead of master. If not, write an error report and STOP — the implementation agent may have failed silently.
+Verify the branch has commits ahead of master. If not, write an error report and STOP. The implementation agent may have failed silently.
 
 ## Step 3: Run /post-plan
 

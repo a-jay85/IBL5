@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree (never the main checkout); where plans live (~/claude-plans/<branch-slug>.md, outside the repo); worktree setup (hostname stub → worktree-hostname.md, squash-merge stub → linear-history-squash-merge.md); and post-plan handoff triggers. Engine internals: workflow-continuity-detail.md.
-last_verified: 2026-09-25
+last_verified: 2026-09-26
 ---
 
 # Workflow Continuity Rule
@@ -45,13 +45,14 @@ Never run `/post-plan` **inline** — it re-reads full implementation context ev
 
 **Plan-driven work** (session has a `/plan`): when verified clean, fire `bin/post-plan-now --auto` with no confirmation prompt. The "confirm before outward-facing actions" default is **durably overridden** for plan-driven work. Shipping is pre-authorized.
 
-**Ad-hoc work** (no plan): if this session created the worktree, shipping is pre-authorized. If it already existed, hold: when verified clean, commit with `/commit-commands:commit`, don't fire post-plan, and end with `cd <abs worktree path> && bin/post-plan-now` to paste. It ships only when the user arms the branch (never arm it or suggest arming) or says ship. A skill ending in shipping is the instruction. To ship, fire `bin/post-plan-now --auto` on the dirty tree:
+**Ad-hoc work** (no plan): if this session created the worktree, shipping is pre-authorized. If it already existed, hold: when verified clean, commit with `/commit-commands:commit`, don't fire post-plan, and end with `cd <abs worktree path> && bin/post-plan-now` to paste. It ships only when the user arms the branch (never arm it or suggest arming) or says ship. A skill ending in shipping is the instruction. To ship, fire `bin/post-plan-now --auto`:
 
 ```bash
 bin/post-plan-now --auto
 ```
 
-- **Do NOT commit first.** Leave the worktree **dirty**. `/post-plan` commits the uncommitted tree in Phase 2 and opens the PR. Committing here changes what it ships.
+- **Do NOT commit first** when shipping plan-driven work or a fresh ad-hoc branch. Leave it **dirty**.
+- **A held branch ships with its hold commit.** `bin/post-plan-now` runs with commits ahead of master.
 - **Only fire when verification passed.** If implementation did **not** verify clean (failing tests, unresolved blocker, you stopped to ask the user something), do **not** fire. Leave the worktree dirty and hand off in prose. Turn-end is not done; that judgment is yours.
 
 Engine (harness vs. Sonnet skill fallback), what `--auto`'s skip gate does, plan-blind ad-hoc runs, and where auto-merge is armed: `.claude/rules/workflow-continuity-detail.md`.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Boxscore;
 
 use Boxscore\Contracts\BoxscoreRepositoryInterface;
+use Season\Season;
 
 /**
  * Validates incoming decoded boxscore games against the season schedule.
@@ -21,14 +22,13 @@ final class ScheduleMembershipGuard
     /** Months with no ibl_schedule rows by design: 8 Olympics, 9 Preseason, 10 HEAT. */
     public const OFF_SCHEDULE_MONTHS = [8, 9, 10];
 
-    /** The season-phase literal Boxscore::fillGameInfo() keys its -2 month shift on. */
+    /** The season-phase literal Boxscore::fillGameInfo() keys its September pin on. */
     public const PRESEASON_PHASE = 'Preseason';
 
     /**
-     * Off-schedule months that a Preseason-phase import can produce by shifting a real
-     * Nov/Dec date back two months. Under that phase these months get no exemption.
+     * Off-schedule month a Preseason-phase import can produce by pinning a real Nov/Dec date to September. Under that phase this month gets no exemption.
      */
-    public const PRESEASON_SHIFTED_MONTHS = [9, 10];
+    public const PRESEASON_SHIFTED_MONTHS = [Season::IBL_PRESEASON_MONTH];
 
     /** Rising Stars (40/41) and All-Star (50/51) pseudo-teams are never scheduled. */
     public const EXEMPT_TEAMIDS = [40, 41, 50, 51];
@@ -135,7 +135,7 @@ final class ScheduleMembershipGuard
      * Rules, in this exact order:
      *  1. Fail open when guard is disabled (empty schedule index).
      *  2. Exempt All-Star and Rising Stars pseudo-teams (teamids 40/41/50/51).
-     *  3. Exempt off-schedule months (8 Olympics, 9 Preseason, 10 HEAT), except months 9/10 when the import phase is Preseason.
+     *  3. Exempt off-schedule months (8 Olympics, 9 Preseason, 10 HEAT), except month 9 when the import phase is Preseason.
      *  4. Reject if the (date, visitor, home) triple is absent from the schedule.
      *  5. Reject if the triple already exists at a different game_of_that_day.
      *  6. Register and accept.
@@ -158,8 +158,8 @@ final class ScheduleMembershipGuard
         // Rule 3: Olympics, Preseason, and HEAT months have no ibl_schedule rows by design.
         // Narrowed for Preseason-phase imports (see exemptsOffScheduleMonth()).
         // Read from $game->gameMonth (zero-padded string); never from game_type.
-        // A Preseason-phase import gets no exemption for months 9/10: those dates may be
-        // real Nov/Dec regular-season games shifted back two months by fillGameInfo().
+        // A Preseason-phase import gets no exemption for month 9: those dates may be
+        // real Nov/Dec regular-season games pinned to September by fillGameInfo().
         $month = (int) $game->gameMonth;
         if ($this->exemptsOffScheduleMonth($month)) {
             return null;

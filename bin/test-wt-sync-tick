@@ -555,7 +555,10 @@ if [ -z "$PLIST_PATH_VAL" ]; then
     failcase "plist-path: could not extract PATH from --print-schedule"
 else
     pass "plist-path: extracted PATH from plist"
-    for _bin in git lsof ioreg; do
+    # ioreg is macOS-only; the Linux CI runner cannot resolve it anywhere.
+    _plist_bins="git lsof"
+    [ "$(uname)" = "Darwin" ] && _plist_bins="$_plist_bins ioreg"
+    for _bin in $_plist_bins; do
         if PATH="$PLIST_PATH_VAL" command -v "$_bin" >/dev/null 2>&1; then
             pass "plist-path: '$_bin' resolves under the launchd PATH"
         else
@@ -565,7 +568,9 @@ else
 fi
 # The seam default must itself be an existing executable on this machine.
 _IOREG_DEFAULT="$(awk -F'"' '/^WT_SYNC_IOREG=/ { print $0; exit }' "$TICK" | sed 's/.*:-//; s/}.*//')"
-if [ -x "$_IOREG_DEFAULT" ]; then
+if [ "$(uname)" != "Darwin" ]; then
+    echo "SKIP: plist-path: WT_SYNC_IOREG default check skipped on non-Darwin"
+elif [ -x "$_IOREG_DEFAULT" ]; then
     pass "plist-path: WT_SYNC_IOREG default ($_IOREG_DEFAULT) is executable"
 else
     failcase "plist-path: WT_SYNC_IOREG default ('$_IOREG_DEFAULT') is not an executable"

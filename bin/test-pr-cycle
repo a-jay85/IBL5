@@ -101,6 +101,11 @@ printf '%s\n' "\$*" >> "\$S/gh.argv"
 num=""
 for a in "\$@"; do case "\$a" in [0-9]*) num="\$a"; break ;; esac; done
 case "\$*" in
+    *"--json number,headRefName,autoMergeRequest,mergeStateStatus"*)
+        # Fix 1: armed-state fetch. gh-fail-armed forces non-zero exit.
+        [[ -f "\$S/gh-fail-armed" ]] && exit 5
+        if [[ -f "\$S/armed-state.json" ]]; then cat "\$S/armed-state.json"
+        else echo '[]'; fi ;;
     *"pr list"*"--json number,url,title,state"*)
         [[ -f "\$S/gh-fail-prlist" ]] && exit 5
         [[ -f "\$S/prlist.tsv" ]] && cat "\$S/prlist.tsv" ;;
@@ -151,6 +156,18 @@ fi
 exit 0
 LC_EOF
 chmod +x "$BIN/launchctl"
+
+# patchid shim — returns the patch-id for PR N, read from $SCRATCH/patchid-N.txt.
+# Tests that exercise _pr_patch_id write the fixture; tests that don't need it write nothing
+# (the shim exits 1 so _pr_patch_id returns "", which is the correct fail-open path).
+cat > "$BIN/patchid" <<PATCHID_EOF
+#!/usr/bin/env bash
+n="\$1"
+f="$SCRATCH/patchid-\$n.txt"
+[[ -f "\$f" ]] || exit 1
+tr -d '\n' < "\$f"
+PATCHID_EOF
+chmod +x "$BIN/patchid"
 
 set_live_labels() { printf '%s\n' "$@" > "$SCRATCH/launchctl-list.txt"; }
 clear_live_labels() { : > "$SCRATCH/launchctl-list.txt"; }
@@ -301,7 +318,10 @@ reset_state() {
     rm -f "$SCRATCH"/*.argv "$SCRATCH"/attack-* "$SCRATCH"/ready-* "$SCRATCH"/triage-* \
           "$SCRATCH"/dm-* "$SCRATCH"/state-* \
           "$SCRATCH"/verdictview-*.json "$SCRATCH"/tree-* "$SCRATCH"/gh-fail-verdict \
-          "$SCRATCH"/prlist.tsv "$SCRATCH"/gh-fail-prlist
+          "$SCRATCH"/prlist.tsv "$SCRATCH"/gh-fail-prlist \
+          "$SCRATCH"/armed-state.json "$SCRATCH"/gh-fail-armed \
+          "$SCRATCH"/patchid-*.txt
+    rm -rf "$SCRATCH/harness-out"
     rm -f "$SCRATCH/.ibl5-pr-cycle.stop"
     rm -rf "/tmp/pr-cycle-$TSBASE"* 2>/dev/null
     rm -f "/tmp/pr-cycle-$TSBASE"*.sh "/tmp/pr-cycle-$TSBASE"*.log 2>/dev/null
@@ -319,8 +339,10 @@ run_in() {
     # PR_CYCLE_RESCUE is passed through ONLY when the caller set it, so a test can distinguish
     # unset (seam absent) from empty (seam present but blank) — `env VAR=$X` cannot express that.
     local -a extra=()
-    [[ -n "${RESCUE+x}" ]] && extra+=("PR_CYCLE_RESCUE=$RESCUE")
-    [[ -n "${SKIPARM+x}" ]] && extra+=("PR_CYCLE_SKIP_READY_WHEN_ARMABLE=$SKIPARM")
+    [[ -n "${RESCUE+x}" ]]    && extra+=("PR_CYCLE_RESCUE=$RESCUE")
+    [[ -n "${SKIPARM+x}" ]]   && extra+=("PR_CYCLE_SKIP_READY_WHEN_ARMABLE=$SKIPARM")
+    [[ -n "${AUTHPROBE+x}" ]] && extra+=("PR_CYCLE_AUTH_PROBE_CMD=$AUTHPROBE")
+    [[ -n "${SKIPHELD+x}" ]]  && extra+=("PR_CYCLE_SKIP_HELD_UNCHANGED=$SKIPHELD")
     ERR="$SCRATCH/last.err"
     OUT="$(cd "$cwd" && env HOME="$SCRATCH" PATH="$BIN:$PATH" "${extra[@]+"${extra[@]}"}" \
         PR_CYCLE_ATTACK_CMD="$BIN/attack" \
@@ -331,6 +353,9 @@ run_in() {
         PR_CYCLE_MAIN_CHECKOUT="${MAIN_OVERRIDE-$MAIN}" \
         PR_CYCLE_STOP_FILE="$SCRATCH/.ibl5-pr-cycle.stop" \
         PR_CYCLE_TS="${TSPIN:-$TSBASE}" \
+        PR_CYCLE_AUTH_PROBE_CMD="${AUTHPROBE:-true}" \
+        PR_CYCLE_PATCH_ID_CMD="$BIN/patchid" \
+        PR_CYCLE_HARNESS_OUT="$SCRATCH/harness-out" \
         "$DRIVER" "$@" 2>"$ERR")"
     RC=$?
     return 0
@@ -769,14 +794,14 @@ grep -qF '(WIP) fix' "$SCRATCH/dm.argv" || fail "case 36b: brackets not sanitize
 grep -qF 'https://github.com/a-jay85/IBL5/pull/2102' "$SCRATCH/dm.argv" \
     || fail "case 36b: link not present after bracket sanitize"
 
-# (c) --no-dm: no dm call, no gh pr list
+# (c) --no-dm: no dm call, no gh pr list (your-turn fetch with number,url,title)
 reset_state
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
 {   printf '#2102  FEAT-AWAITING-SIGNOFF  human sign-off\n'
 } > "$SCRATCH/triage-out"
 run --worker --no-dm
 [[ "$(calls dm)" == "0" ]] || fail "case 36c: --no-dm sent $(calls dm) DMs"
-grep -qF 'pr list' "$SCRATCH/gh.argv" && fail "case 36c: --no-dm still fetched pr list"
+grep -qF 'number,url,title' "$SCRATCH/gh.argv" && fail "case 36c: --no-dm still fetched pr list"
 
 # (d) dm-rc 1: RC still 0
 reset_state
@@ -848,6 +873,8 @@ grep -qF -- '--worker' "$RUNNER" || fail "runner does not carry --worker"
 grep -qF "NO_DM=''" "$RUNNER" || fail "runner NO_DM not empty by default"
 grep -qE '^export PR_CYCLE_SKIP_READY_WHEN_ARMABLE=' "$RUNNER" \
     || fail "runner does not export the ARMABLE-skip seam"
+grep -qE '^export PR_CYCLE_SKIP_HELD_UNCHANGED=' "$RUNNER" \
+    || fail "runner does not export the SKIP_HELD_UNCHANGED seam"
 _rv_maxready="$(bash -c "$(grep -m1 '^MAX_READY=' "$RUNNER"); printf '%s' \"\$MAX_READY\"")"
 [[ "$_rv_maxready" == "10" ]] || fail "runner MAX_READY='$_rv_maxready', want 10"
 _rv_jobs="$(bash -c "$(grep -m1 '^JOBS=' "$RUNNER"); printf '%s' \"\$JOBS\"")"
@@ -1082,7 +1109,7 @@ g_one_arm() {
     [[ "$line" == '"$PR_CYCLE_TRIAGE_CMD" --arm' ]]
 }
 g_no_bucket_cond() {
-    ! noncomment "$1" | grep -qE 'FEAT-AWAITING-SIGNOFF|PIPELINE-HELD|UNCLEARED|[^-A-Z]HELD[^-A-Z]'
+    ! noncomment "$1" | grep -qE 'FEAT-AWAITING-SIGNOFF|PIPELINE-HELD|UNCLEARED|[^-A-Z_]HELD[^-A-Z_]'
 }
 g_no_sleep()       { ! noncomment "$1" | grep -qE '(^|[^A-Za-z_])sleep[[:space:]]'; }
 g_no_poll()        { ! noncomment "$1" | grep -qE -- '--json state|_poll_merge|_reconcile'; }
@@ -1146,6 +1173,8 @@ mutant; sed -i.bak 's/" --arm >/" --arm --force >/' "$SCRATCH/mutant"
 g_one_arm "$SCRATCH/mutant" && fail "vacuous: g_one_arm passed an arm call with an extra flag"
 mutant; echo 'if [ "$BUCKET" = "FEAT-AWAITING-SIGNOFF" ]; then :; fi' >> "$SCRATCH/mutant"
 g_no_bucket_cond "$SCRATCH/mutant" && fail "vacuous: g_no_bucket_cond passed a sign-off conditional"
+mutant; echo 'if [ "$B" = "HELD" ]; then :; fi' >> "$SCRATCH/mutant"
+g_no_bucket_cond "$SCRATCH/mutant" && fail "vacuous: g_no_bucket_cond passed a bare HELD conditional"
 mutant; echo 'sleep 1' >> "$SCRATCH/mutant"
 g_no_sleep "$SCRATCH/mutant" && fail "vacuous: g_no_sleep passed a driver with sleep"
 mutant; echo '_poll_merge 1' >> "$SCRATCH/mutant"
@@ -1599,6 +1628,248 @@ _plain40="$(( $(calls triage) - $(arm_calls) ))"
 [[ "$_plain40" == "1" ]] \
     || fail "case 40: want 1 plain triage call (cache hit for PR 2+3), got $_plain40 ($(calls triage) total, $(arm_calls) arm)"
 end_case "case 40 precheck-bucket cache fires triage exactly once"
+
+# ==========================================================================================
+# Helpers for Fix 3/4 harness fixtures
+# ==========================================================================================
+# harness_verdict_comment: build a verdict sticky body in the harness format.
+#   $1 = reviewed diff (40-hex patch-id recorded in the body)
+#   $2 = verdict line (default "**READY**")
+harness_verdict_comment() {
+    local diff="$1" line="${2:-**READY**}"
+    cat <<HVC_EOF
+**LATEST VERDICT:** see below
+
+\`covers head e583673dbf0a · master ffb6d1995a95 · written 2026-09-07T22:30Z\`
+
+### Rebase
+onto master, no conflicts.
+
+**Reviewed diff:** $diff
+
+$line
+
+<!-- pr-ready-verdict -->
+HVC_EOF
+}
+
+# install_harness_verdict: stage harness-format sticky for PR $1.
+#   $2 = diff sha in comment
+#   $3 = actual patch-id (patchid fixture, default equal to $2)
+#   $4 = verdict line (default "**READY**")
+install_harness_verdict() {
+    local n="$1" cdiff="$2" adiff="${3:-$2}" line="${4:-**READY**}" body oid
+    oid="deadbeefcafe$(printf '%028d' "$n")"
+    body="$(harness_verdict_comment "$cdiff" "$line")"
+    printf '{"comments":[{"body":%s}],"headRefOid":"%s"}' \
+        "$(printf '%s' "$body" | jq -Rs .)" "$oid" > "$SCRATCH/verdictview-$n.json"
+    # patchid fixture
+    printf '%s\n' "$adiff" > "$SCRATCH/patchid-$n.txt"
+    # tree fixture (not used by harness path but avoids a gh exit-4)
+    printf '%s\n' "$TREE_A" > "$SCRATCH/tree-$oid"
+}
+
+# install_harness_result: write a harness result.json for PR $1 under harness-out/.
+#   $2 = branch name
+#   $3 = terminal status  (default: shipped-held)
+#   $4 = blocked conditions CSV (e.g. "3" or "3,7")
+#   $5 = mergeStateStatus for armed-state (default: CLEAN)
+install_harness_result() {
+    local n="$1" branch="$2" terminal="${3:-shipped-held}" \
+          conds="${4:-3}" mss="${5:-CLEAN}"
+    local ts="20260901-120000-99999"
+    local dir="$SCRATCH/harness-out/live-$branch-$ts"
+    mkdir -p "$dir"
+    # Build conditions JSON array
+    local cjson="[]"
+    if [[ -n "$conds" ]]; then
+        cjson="["
+        local first=1
+        local IFS=","
+        for c in $conds; do
+            [[ $first -eq 0 ]] && cjson+=","
+            cjson+="{\"number\":$c,\"blocked\":true}"
+            first=0
+        done
+        cjson+="]"
+    fi
+    printf '{"terminal":"%s","pr_number":%d,"arm":{"conditions":%s}}\n' \
+        "$terminal" "$n" "$cjson" > "$dir/result.json"
+    # Populate armed-state.json entry for this PR (mergeStateStatus from $5)
+    local entry
+    entry="$(printf '[{"number":%d,"headRefName":"%s","autoMergeRequest":null,"mergeStateStatus":"%s"}]' \
+        "$n" "$branch" "$mss")"
+    printf '%s\n' "$entry" > "$SCRATCH/armed-state.json"
+}
+
+# ==========================================================================================
+# Fix 1 — armed-skip
+# ==========================================================================================
+begin_case
+reset_state
+# armed+CLEAN (not DIRTY), not BLOCKED-CHECK → should be skipped
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+printf '[{"number":101,"headRefName":"first-slug","autoMergeRequest":{"mergeMethod":"SQUASH"},"mergeStateStatus":"BEHIND"}]' \
+    > "$SCRATCH/armed-state.json"
+run --worker
+[[ $RC -eq 0 ]] || fail "fix1 armed BEHIND: exit $RC, want 0"
+[[ "$(calls ready)" == "0" ]] || fail "fix1 armed BEHIND: fleet ran $(calls ready) time(s), want 0"
+grep -qF 'auto-merge already armed' <<< "$OUT" || fail "fix1 armed BEHIND: armed-skip log line missing"
+
+# armed+DIRTY → must NOT skip (DIRTY means conflicts: update-behind-prs can't help)
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+printf '[{"number":101,"headRefName":"first-slug","autoMergeRequest":{"mergeMethod":"SQUASH"},"mergeStateStatus":"DIRTY"}]' \
+    > "$SCRATCH/armed-state.json"
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "fix1 armed DIRTY: fleet skipped; want 1 ready call, got $(calls ready)"
+grep -qF 'auto-merge already armed' <<< "$OUT" && fail "fix1 armed DIRTY: armed-skip fired for DIRTY PR"
+
+# armed but precheck returns BLOCKED-CHECK → must NOT skip
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+# Precheck (plain triage) returns BLOCKED-CHECK for PR 101; arm call still needs ARMABLE output.
+# The first triage call is the precheck (plain); the second is the --arm call.
+# We write two output fixtures: precheck (call 1) says BLOCKED-CHECK; --arm call sees ARMABLE.
+triage_report "101 BLOCKED-CHECK run-checks" > "$SCRATCH/triage-out-1"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+printf '[{"number":101,"headRefName":"first-slug","autoMergeRequest":{"mergeMethod":"SQUASH"},"mergeStateStatus":"CLEAN"}]' \
+    > "$SCRATCH/armed-state.json"
+install_verdict 101 "$TREE_A"
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "fix1 armed BLOCKED-CHECK: fleet should have run, got $(calls ready) calls"
+
+# gh armed-state fetch fails → fail-open (PR fires as normal)
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+: > "$SCRATCH/gh-fail-armed"
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "fix1 gh-fail-armed: fleet should have run, got $(calls ready) calls"
+grep -qF 'auto-merge already armed' <<< "$OUT" && fail "fix1 gh-fail-armed: armed-skip fired despite gh failure"
+end_case "case fix1 armed-skip"
+
+# ==========================================================================================
+# Fix 2 — auth probe
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+AUTHPROBE=false run --worker
+[[ $RC -ne 0 ]] || fail "fix2 probe false: want nonzero exit, got 0"
+[[ "$(calls ready)" == "0" ]] || fail "fix2 probe false: fleet ran $(calls ready) time(s), want 0"
+grep -qi 'auth' <<< "$OUT" || fail "fix2 probe false: no auth message in output (got: $OUT)"
+end_case "case fix2 auth probe false halts before fleet"
+
+# ==========================================================================================
+# Fix 3 — harness-format sticky verdict (Reviewed diff path)
+# ==========================================================================================
+# DIFF_A / DIFF_B: two distinct 40-hex patch-ids.
+DIFF_A="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+DIFF_B="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+begin_case
+# Case A: harness sticky with matching diff → skip pr-ready
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_harness_verdict 101 "$DIFF_A"
+run --worker
+[[ $RC -eq 0 ]] || fail "fix3 harness READY: exit $RC, want 0"
+[[ "$(calls ready)" == "0" ]] || fail "fix3 harness READY: fleet ran $(calls ready) time(s), want 0"
+grep -qF 'skipping pr-ready' <<< "$OUT" || fail "fix3 harness READY: skip line missing"
+
+# Case B: harness sticky but diff is stale (different patch-id) → must run pr-ready
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_harness_verdict 101 "$DIFF_A" "$DIFF_B"   # comment says DIFF_A, actual is DIFF_B
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "fix3 harness stale diff: fleet skipped; want 1 ready call, got $(calls ready)"
+
+# Case C: harness sticky NOT READY → must run pr-ready
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_harness_verdict 101 "$DIFF_A" "$DIFF_A" '**NOT READY** — CI is red'
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "fix3 harness NOT READY: fleet skipped; want 1 ready call, got $(calls ready)"
+
+# Case D: legacy tree-format verdict still works (regression guard)
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A"
+run --worker
+[[ "$(calls ready)" == "0" ]] || fail "fix3 legacy tree: fleet ran $(calls ready) time(s), want 0"
+grep -qF 'skipping pr-ready' <<< "$OUT" || fail "fix3 legacy tree: skip line missing"
+end_case "case fix3 harness-format sticky verdict"
+
+# ==========================================================================================
+# Fix 4 — held-unchanged skip
+# ==========================================================================================
+begin_case
+# Case A: held for {3}, diff unchanged → skip
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+install_harness_verdict 101 "$DIFF_A"
+install_harness_result 101 "first-slug" "shipped-held" "3" "CLEAN"
+run --worker
+[[ $RC -eq 0 ]] || fail "fix4 held-cond3: exit $RC, want 0"
+[[ "$(calls ready)" == "0" ]] || fail "fix4 held-cond3: fleet ran $(calls ready) time(s), want 0"
+grep -qF 'held it for' <<< "$OUT" || fail "fix4 held-cond3: held-skip log line missing"
+grep -qF 'unchanged' <<< "$OUT" || fail "fix4 held-cond3: 'unchanged' not in log line"
+
+# Case B: held for {3,12} — 12 is not in {3,7} → must NOT skip
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+install_harness_verdict 101 "$DIFF_A"
+install_harness_result 101 "first-slug" "shipped-held" "3,12" "CLEAN"
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "fix4 held-cond3,12: fleet skipped; want 1 ready call, got $(calls ready)"
+
+# Case C: held for {3} but diff has changed → must NOT skip
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+install_harness_verdict 101 "$DIFF_A" "$DIFF_B"   # actual diff differs from harness record
+install_harness_result 101 "first-slug" "shipped-held" "3" "CLEAN"
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "fix4 diff-changed: fleet skipped; want 1 ready call, got $(calls ready)"
+
+# Case D: terminal=failed (not shipped-held) → must NOT skip
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+install_harness_verdict 101 "$DIFF_A"
+install_harness_result 101 "first-slug" "failed" "3" "CLEAN"
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "fix4 terminal-failed: fleet skipped; want 1 ready call, got $(calls ready)"
+
+# Case E: mergeStateStatus=DIRTY → must NOT skip
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+install_harness_verdict 101 "$DIFF_A"
+install_harness_result 101 "first-slug" "shipped-held" "3" "DIRTY"
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "fix4 DIRTY: fleet skipped; want 1 ready call, got $(calls ready)"
+
+# Case F: PR_CYCLE_SKIP_HELD_UNCHANGED=0 → skip disabled, fleet runs
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+install_harness_verdict 101 "$DIFF_A"
+install_harness_result 101 "first-slug" "shipped-held" "3" "CLEAN"
+SKIPHELD=0 run --worker
+[[ "$(calls ready)" == "1" ]] || fail "fix4 SKIPHELD=0: fleet skipped despite kill switch; want 1 ready call"
+unset SKIPHELD
+end_case "case fix4 held-unchanged skip"
 
 # --- summary --------------------------------------------------------------------------------
 if [[ $FAILED -eq 0 ]]; then

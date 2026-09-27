@@ -127,6 +127,7 @@ run_driver() {
         POST_PLAN_FLEET_GH_USER=a-jay85 \
         POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." \
         POST_PLAN_FLEET_WTL="${POST_PLAN_FLEET_WTL-$WTL_FIXTURE}" \
+        POST_PLAN_FLEET_AUTH_PROBE_CMD="${POST_PLAN_FLEET_AUTH_PROBE_CMD:-true}" \
         "$DRIVER" "$@"
 }
 
@@ -827,6 +828,7 @@ run_dm_driver() {
         POST_PLAN_FLEET_GH_USER=a-jay85 \
         POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." \
         POST_PLAN_FLEET_WTL="$WTL_FIXTURE" \
+        POST_PLAN_FLEET_AUTH_PROBE_CMD="${POST_PLAN_FLEET_AUTH_PROBE_CMD:-true}" \
         "$DRIVER" "$@"
 }
 
@@ -2441,6 +2443,26 @@ err_stop="$(run_driver --stop 1910 --pr-list 1911 2>&1)"; rc_stop=$?
 grep -q 'cannot be combined with --pr, --pr-list or --wait' <<< "$err_stop" || \
     fail "stop-rejects-pr-list: wrong error message (out: $err_stop)"
 end_case stop-rejects-pr-list
+
+# --- auth-probe-false --------------------------------------------------------------------
+# When the auth probe fails, the driver must exit nonzero, fire no session, and print
+# a message naming the auth failure. Tests must NEVER hit the real claude: the global
+# run_driver sets POST_PLAN_FLEET_AUTH_PROBE_CMD=true; this case overrides it to false.
+begin_case
+_apf_pr="$SCRATCH/one-for-probe.json"
+printf '[{"number":301,"title":"probe-test","url":"https://github.com/a-jay85/IBL5/pull/301","state":"OPEN","headRefName":"probe-branch","isDraft":false,"baseRefName":"master"}]' \
+    > "$_apf_pr"
+_apf_e="$(mktemp)"
+POST_PLAN_FLEET_AUTH_PROBE_CMD=false \
+    POST_PLAN_FLEET_PR_JSON="$_apf_pr" \
+    run_driver --go --wait > /dev/null 2>"$_apf_e"; _apf_rc=$?
+[[ $_apf_rc -ne 0 ]] || fail "auth-probe-false: want nonzero exit, got 0"
+grep -qi 'auth' "$_apf_e" || fail "auth-probe-false: no auth error in stderr (got: $(cat "$_apf_e"))"
+# No plist should have been written for PR 301
+_plist_301="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-301.plist"
+[[ ! -e "$_plist_301" ]] || fail "auth-probe-false: plist was written despite probe failure"
+rm -f "$_apf_e" "$_apf_pr" "$_plist_301"
+end_case auth-probe-false
 
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then

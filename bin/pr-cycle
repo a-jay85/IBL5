@@ -51,10 +51,23 @@
 #                            0 disables the pr-ready skip. The skip needs BOTH: the ARMABLE
 #                            bucket AND a /pr-ready READY verdict over the head's current
 #                            tree. Default: 1 (enabled)
+#   PR_CYCLE_SKIP_HELD_UNCHANGED
+#                            0 disables the held-unchanged skip. When 1, PRs whose last
+#                            post-plan run held for conditions {3,7} only and whose diff
+#                            matches the sticky **Reviewed diff:** are skipped.
+#                            Default: 1 (enabled)
 #   PR_CYCLE_STOP_FILE       Stop file path.                  Default: $HOME/.ibl5-pr-cycle.stop
 #   PR_CYCLE_DRY_LAUNCH      With --go: emit runner + plist but skip launchctl bootstrap.
 #   PR_CYCLE_TS              Timestamp token for runner/log/plist paths (tests). Unset = date+PID at launch.
 #   PR_CYCLE_LOG             Detached-worker log path; set by --go, read by the worker. Derived from TS.
+#   PR_CYCLE_AUTH_PROBE_CMD  Command to verify Claude auth. Must exit 0 and print OK. Default:
+#                            runs a real `claude -p 'Reply with the single word OK.'` call.
+#                            Set to `true` in tests to skip the real probe.
+#   PR_CYCLE_PATCH_ID_CMD    Command invoked as `<cmd> N` to get the patch-id for PR N (40
+#                            lowercase hex). Default: git fetch + diff + patch-id. Set to a
+#                            shim in tests.
+#   PR_CYCLE_HARNESS_OUT     Path to the postplan-harness out/ directory. Default:
+#                            $ROOT/tools/postplan-harness/out.
 #
 #   Every seam is PR_CYCLE_-prefixed on purpose. bin/pr-attack reads a bare PR_TRIAGE_CMD
 #   itself, and this script spawns the real bin/pr-attack as a child — an unprefixed export
@@ -118,6 +131,10 @@ PR_CYCLE_RESCUE="${PR_CYCLE_RESCUE:-1}"
 PR_CYCLE_SKIP_READY_WHEN_ARMABLE="${PR_CYCLE_SKIP_READY_WHEN_ARMABLE:-1}"
 PR_CYCLE_STOP_FILE="${PR_CYCLE_STOP_FILE:-$HOME/.ibl5-pr-cycle.stop}"
 PR_CYCLE_DRY_LAUNCH="${PR_CYCLE_DRY_LAUNCH:-}"
+PR_CYCLE_AUTH_PROBE_CMD="${PR_CYCLE_AUTH_PROBE_CMD:-}"
+PR_CYCLE_PATCH_ID_CMD="${PR_CYCLE_PATCH_ID_CMD:-}"
+PR_CYCLE_HARNESS_OUT="${PR_CYCLE_HARNESS_OUT:-$ROOT/tools/postplan-harness/out}"
+PR_CYCLE_SKIP_HELD_UNCHANGED="${PR_CYCLE_SKIP_HELD_UNCHANGED:-1}"
 
 # Print the usage header above: every comment line from the shebang to `set -euo pipefail`.
 usage() {
@@ -439,6 +456,209 @@ _slot_held() {
 # Phase 3 — ready, then arm
 # ==========================================================================================
 
+# _ensure_armed_state — fetch the open-PR list with autoMergeRequest + mergeStateStatus once
+# per run into $RUNDIR/armed-state.json. On failure: touch armed-state.failed; never skip.
+_ensure_armed_state() {
+    [ -f "$RUNDIR/armed-state.failed" ] && return 0
+    [ -f "$RUNDIR/armed-state.json" ]   && return 0
+    set +e
+    "$PR_CYCLE_GH_CMD" pr list --state open --limit 200 \
+        --json number,headRefName,autoMergeRequest,mergeStateStatus \
+        > "$RUNDIR/armed-state.json" 2> "$RUNDIR/armed-state.err"
+    _easrc=$?
+    set -e
+    if [ "$_easrc" -ne 0 ]; then
+        touch "$RUNDIR/armed-state.failed"
+        rm -f "$RUNDIR/armed-state.json"
+    fi
+}
+
+# _armed_skip N — return 0 (skip) when PR N is armed for auto-merge, not DIRTY, and not in
+# the BLOCKED-CHECK bucket. Fails open on any error: returns 1 (do not skip).
+_armed_skip() {
+    _asn="$1"
+    _ensure_armed_state
+    [ -f "$RUNDIR/armed-state.json" ] || return 1
+
+    # autoMergeRequest non-null = armed
+    _as_armed="$(jq -r --argjson n "$_asn" \
+        '.[] | select(.number == $n) | if .autoMergeRequest != null then "armed" else "not-armed" end' \
+        "$RUNDIR/armed-state.json" 2>/dev/null || true)"
+    [ "$_as_armed" = "armed" ] || return 1
+
+    # DIRTY: the branch has conflicts; update-behind-prs cannot rebase → don't skip
+    _as_mss="$(jq -r --argjson n "$_asn" \
+        '.[] | select(.number == $n) | .mergeStateStatus // ""' \
+        "$RUNDIR/armed-state.json" 2>/dev/null || true)"
+    [ "$_as_mss" = "DIRTY" ] && return 1
+
+    # BLOCKED-CHECK: CI is red; arming will fail → don't skip
+    [ "$(_precheck_bucket "$_asn")" = "BLOCKED-CHECK" ] && return 1
+
+    return 0  # safe to skip
+}
+
+# _auth_probe — verify that Claude OAuth is live by making a real model call.
+# Uses PR_CYCLE_AUTH_PROBE_CMD seam (set to `true` in tests). Fails closed.
+_auth_probe() {
+    if [ -n "${PR_CYCLE_AUTH_PROBE_CMD:-}" ]; then
+        "$PR_CYCLE_AUTH_PROBE_CMD"
+        return $?
+    fi
+    set +e
+    # Run from /tmp with no tools, settings or MCP: in a repo cwd the model picks up project
+    # context and may not answer OK. --max-turns 1 is wrong here: it errors on a plain reply.
+    _ap_out="$(cd /tmp && timeout 90 claude -p 'Reply with the single word OK.' \
+        --model claude-haiku-4-5-20251001 --tools "" --setting-sources "" \
+        --strict-mcp-config --system-prompt 'You reply with exactly the word OK.' 2>/dev/null)"
+    _ap_rc=$?
+    set -e
+    [ "$_ap_rc" -ne 0 ] && return 1
+    case "$_ap_out" in *OK*) return 0 ;; esac
+    return 1
+}
+
+# _pr_patch_id N — echo the patch-id (40 lowercase hex) for PR N, or "" on any error.
+# Cached per run in $RUNDIR/patchid-N.txt.
+# Uses PR_CYCLE_PATCH_ID_CMD seam when set; otherwise does a git fetch + diff + patch-id.
+# Note: this may write refs/pr-cycle/N into ROOT; call _cleanup_fetch_refs at run end.
+_pr_patch_id() {
+    _ppn="$1"
+    _ppf="$RUNDIR/patchid-$_ppn.txt"
+    [ -f "$_ppf" ] && { tr -d '\n' < "$_ppf"; return 0; }
+
+    local _pid=""
+    if [ -n "${PR_CYCLE_PATCH_ID_CMD:-}" ]; then
+        set +e
+        _pid="$("$PR_CYCLE_PATCH_ID_CMD" "$_ppn" 2>/dev/null)"
+        set -e
+    else
+        set +e
+        git -C "$ROOT" fetch --quiet origin master \
+            "+refs/pull/$_ppn/head:refs/pr-cycle/$_ppn" 2>/dev/null
+        _pid="$(git -C "$ROOT" diff \
+            "$(git -C "$ROOT" merge-base origin/master "refs/pr-cycle/$_ppn" 2>/dev/null)" \
+            "refs/pr-cycle/$_ppn" 2>/dev/null \
+            | git -C "$ROOT" patch-id --verbatim 2>/dev/null \
+            | awk '{print $1; exit}')"
+        set -e
+    fi
+
+    # Validate: must be exactly 40 lowercase hex characters.
+    if [[ "${_pid:-}" =~ ^[0-9a-f]{40}$ ]]; then
+        printf '%s\n' "$_pid" > "$_ppf"
+        printf '%s' "$_pid"
+    else
+        echo ""
+    fi
+    return 0
+}
+
+# _cleanup_fetch_refs — best-effort deletion of refs written by _pr_patch_id.
+# Called at the end of both _worker and _report_dry_run.
+_cleanup_fetch_refs() {
+    git -C "$ROOT" for-each-ref --format='delete %(refname)' 'refs/pr-cycle' 2>/dev/null \
+        | git -C "$ROOT" update-ref --stdin 2>/dev/null || true
+}
+
+# _sticky_body N — ensure $RUNDIR/verdict-body-N.md exists by fetching the last
+# <!-- pr-ready-verdict --> comment from GitHub. Writes $RUNDIR/verdict-N.json as a
+# side file (also used by the legacy tree path in _precheck_verdict).
+# Returns 0 on success, 1 on any error. Cached: returns 0 immediately if already written.
+_sticky_body() {
+    _sb_n="$1"
+    [ -f "$RUNDIR/verdict-body-$_sb_n.md" ] && return 0
+    set +e
+    "$PR_CYCLE_GH_CMD" pr view "$_sb_n" --json comments,headRefOid \
+        > "$RUNDIR/verdict-$_sb_n.json" 2> "$RUNDIR/verdict-$_sb_n.err"
+    _sbrc=$?
+    set -e
+    [ "$_sbrc" -ne 0 ] && return 1
+    _sbody="$(jq -r \
+        '[.comments[]? | select((.body // "") | contains("<!-- pr-ready-verdict -->"))] | last | .body // ""' \
+        "$RUNDIR/verdict-$_sb_n.json" 2>/dev/null || true)"
+    [ -n "$_sbody" ] || return 1
+    printf '%s\n' "$_sbody" | tr -d '\r' > "$RUNDIR/verdict-body-$_sb_n.md"
+    return 0
+}
+
+# _check_held_unchanged N — echo the blocked condition numbers (e.g. "3" or "3,7") when PR N
+# should be skipped by Fix 4, or echo "" when it should not. Fails open on any error.
+# Skip only when ALL hold: last harness run terminal=shipped-held; blocked conditions are a
+# non-empty subset of {3,7}; mergeStateStatus != DIRTY; sticky **Reviewed diff:** matches
+# the current patch-id.
+_check_held_unchanged() {
+    _chn="$1"
+
+    _ensure_armed_state
+    [ -f "$RUNDIR/armed-state.json" ] || { echo ""; return 0; }
+
+    # Fail open if DIRTY: new commit or rebase may fix it.
+    _ch_mss="$(jq -r --argjson n "$_chn" \
+        '.[] | select(.number == $n) | .mergeStateStatus // ""' \
+        "$RUNDIR/armed-state.json" 2>/dev/null || true)"
+    [ "$_ch_mss" = "DIRTY" ] && { echo ""; return 0; }
+
+    # headRefName is needed to locate the harness out directory.
+    _ch_ref="$(jq -r --argjson n "$_chn" \
+        '.[] | select(.number == $n) | .headRefName // ""' \
+        "$RUNDIR/armed-state.json" 2>/dev/null || true)"
+    [ -n "$_ch_ref" ] || { echo ""; return 0; }
+
+    # Find the newest live-<branch>-YYYYMMDD-HHMMSS-PID result.json for this PR.
+    _ch_out="${PR_CYCLE_HARNESS_OUT:-$ROOT/tools/postplan-harness/out}"
+    [ -d "$_ch_out" ] || { echo ""; return 0; }
+    _ch_prefix="live-${_ch_ref}-"
+    _ch_best_json="" _ch_best_suf=""
+    for _ch_d in "$_ch_out/${_ch_prefix}"*/; do
+        [ -d "$_ch_d" ] || continue
+        _ch_dname="$(basename "$_ch_d")"
+        _ch_suf="${_ch_dname#"$_ch_prefix"}"
+        # Validate suffix: exactly YYYYMMDD-HHMMSS-PID to reject branch-name prefix collisions.
+        case "$_ch_suf" in
+            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9]*) ;;
+            *) continue ;;
+        esac
+        _ch_j="$_ch_d/result.json"
+        [ -f "$_ch_j" ] || continue
+        # Match pr_number exactly.
+        _ch_pn="$(jq -r '.pr_number // ""' "$_ch_j" 2>/dev/null || true)"
+        [ "$_ch_pn" = "$_chn" ] || continue
+        # Take lexically greatest suffix (= most recent).
+        if [ -z "$_ch_best_suf" ] || [[ "$_ch_suf" > "$_ch_best_suf" ]]; then
+            _ch_best_json="$_ch_j"; _ch_best_suf="$_ch_suf"
+        fi
+    done
+    [ -n "$_ch_best_json" ] || { echo ""; return 0; }
+
+    # terminal must be shipped-held.
+    _ch_term="$(jq -r '.terminal // ""' "$_ch_best_json" 2>/dev/null || true)"
+    [ "$_ch_term" = "shipped-held" ] || { echo ""; return 0; }
+
+    # Blocked conditions must be a non-empty subset of {3, 7}.
+    _ch_blocked="$(jq -r \
+        '[.arm.conditions[]? | select(.blocked == true) | .number] | sort | join(",")' \
+        "$_ch_best_json" 2>/dev/null || true)"
+    [ -n "$_ch_blocked" ] || { echo ""; return 0; }
+    case "$_ch_blocked" in
+        "3"|"7"|"3,7") ;;
+        *) echo ""; return 0 ;;
+    esac
+
+    # Sticky body **Reviewed diff:** must match current patch-id.
+    _sticky_body "$_chn" || { echo ""; return 0; }
+    _ch_diff="$(sed -n 's/^\*\*Reviewed diff:\*\* \([0-9a-f]\{40\}\)$/\1/p' \
+        "$RUNDIR/verdict-body-$_chn.md" 2>/dev/null | tail -1 || true)"
+    [ -n "$_ch_diff" ] || { echo ""; return 0; }
+
+    _ch_pid="$(_pr_patch_id "$_chn")"
+    [ -n "$_ch_pid" ] || { echo ""; return 0; }
+    [ "$_ch_pid" = "$_ch_diff" ] || { echo ""; return 0; }
+
+    echo "$_ch_blocked"
+    return 0
+}
+
 # _precheck_bucket N — echo PR N's current bucket, or "" when it cannot be determined.
 # Read-only: this invocation deliberately omits --arm, so it reports and changes nothing.
 # Never sets HALT and never returns non-zero: an unknown bucket must fall through to the
@@ -493,53 +713,61 @@ _precheck_bucket() {
 _precheck_verdict() {
     _vn="$1"
 
-    set +e
-    "$PR_CYCLE_GH_CMD" pr view "$_vn" --json comments,headRefOid \
-        > "$RUNDIR/verdict-$_vn.json" 2> "$RUNDIR/verdict-$_vn.err"
-    _vrc=$?
-    set -e
-    [ "$_vrc" -ne 0 ] && { echo ""; return 0; }
+    # Fetch the last sticky verdict comment; cached if already done (e.g. by _check_held_unchanged).
+    _sticky_body "$_vn" || { echo ""; return 0; }
 
-    # The LAST sticky comment wins — the same rule .github/workflows/merge-digest-notify.yml
-    # applies, and for the same reason: /pr-ready rewrites the comment across phases.
-    _vbody="$(jq -r '[.comments[]? | select((.body // "") | contains("<!-- pr-ready-verdict -->"))] | last | .body // ""' \
-        "$RUNDIR/verdict-$_vn.json" 2>/dev/null || true)"
-    [ -n "$_vbody" ] || { echo ""; return 0; }
-    printf '%s\n' "$_vbody" | tr -d '\r' > "$RUNDIR/verdict-body-$_vn.md"
+    # Two accepted paths — either can authorise the skip:
+    #
+    #   Path 1 (legacy): body LINE 1 is `**Reviewed tree:** <sha>` and the head's current
+    #     tree sha equals it. Identical anchor to .claude/review-shared/scripts/skip-review.sh.
+    #     Verdicts written before the compiled harness used this form.
+    #
+    #   Path 2 (harness format): body has an anchored `**Reviewed diff:** <sha>` line
+    #     (last match) whose sha equals the PR's current git patch-id. The compiled harness
+    #     writes this line; line 1 in that format is the LATEST VERDICT header.
+    #
+    # Fail-open: any error in either path → echo "".
+    _vmatched=0
 
-    # Line 1 only, exactly 40 lowercase hex, nothing else on the line — the identical
-    # anchored shape .claude/review-shared/scripts/skip-review.sh matches, so this skip
-    # and /pr-ready's own Phase 6 skip agree by construction rather than by coincidence.
-    # A verdict written before that contract line existed simply has no match here, which
-    # is the safe direction.
+    # --- Path 1 ---
     _vtree="$(sed -n '1s/^\*\*Reviewed tree:\*\* \([0-9a-f]\{40\}\)$/\1/p' \
         "$RUNDIR/verdict-body-$_vn.md")"
-    [ -n "$_vtree" ] || { echo ""; return 0; }
+    if [ -n "$_vtree" ]; then
+        _void="$(jq -r '.headRefOid // ""' "$RUNDIR/verdict-$_vn.json" 2>/dev/null || true)"
+        [ -n "$_void" ] || { echo ""; return 0; }
+        # The head's TREE, not its commit: a rebase that changes no content leaves the tree
+        # equal, and that is exactly the case the skip is for.
+        set +e
+        "$PR_CYCLE_GH_CMD" api "repos/{owner}/{repo}/git/commits/$_void" --jq .tree.sha \
+            > "$RUNDIR/verdict-tree-$_vn.txt" 2> "$RUNDIR/verdict-tree-$_vn.err"
+        _vtrc=$?
+        set -e
+        [ "$_vtrc" -ne 0 ] && { echo ""; return 0; }
+        _vcur="$(tr -d ' \r\n' < "$RUNDIR/verdict-tree-$_vn.txt")"
+        [ -n "$_vcur" ] || { echo ""; return 0; }
+        [ "$_vcur" = "$_vtree" ] || { echo ""; return 0; }
+        _vmatched=1
+    fi
 
-    _void="$(jq -r '.headRefOid // ""' "$RUNDIR/verdict-$_vn.json" 2>/dev/null || true)"
-    [ -n "$_void" ] || { echo ""; return 0; }
+    # --- Path 2 (only tried when Path 1 did not match) ---
+    if [ "$_vmatched" -eq 0 ]; then
+        _vdiff="$(sed -n 's/^\*\*Reviewed diff:\*\* \([0-9a-f]\{40\}\)$/\1/p' \
+            "$RUNDIR/verdict-body-$_vn.md" | tail -1)"
+        [ -n "$_vdiff" ] || { echo ""; return 0; }
+        _vpid="$(_pr_patch_id "$_vn")"
+        [ -n "$_vpid" ] || { echo ""; return 0; }
+        [ "$_vpid" = "$_vdiff" ] || { echo ""; return 0; }
+        _vmatched=1
+    fi
 
-    # The head's TREE, not its commit: a rebase that changes no content leaves the tree
-    # equal, and that is exactly the case the skip is for.
-    set +e
-    "$PR_CYCLE_GH_CMD" api "repos/{owner}/{repo}/git/commits/$_void" --jq .tree.sha \
-        > "$RUNDIR/verdict-tree-$_vn.txt" 2> "$RUNDIR/verdict-tree-$_vn.err"
-    _vrc=$?
-    set -e
-    [ "$_vrc" -ne 0 ] && { echo ""; return 0; }
-    _vcur="$(tr -d ' \r\n' < "$RUNDIR/verdict-tree-$_vn.txt")"
-    [ -n "$_vcur" ] || { echo ""; return 0; }
-    [ "$_vcur" = "$_vtree" ] || { echo ""; return 0; }
-
-    # The verdict line, matched ANCHORED and taking the LAST match. /pr-ready's own body
+    # Shared verdict-line check, reached only when a current review was confirmed above.
+    # The verdict line is matched ANCHORED and takes the LAST match. /pr-ready's own body
     # narrates its Phase 6 findings in prose, so a body-wide grep is wrong in both
     # directions: real READY verdicts carry lines like "Phase 6 returned **NOT READY**"
     # (PR #2144) and "**Initial verdict: NOT READY**" (PR #2160) describing findings that
     # remediation then fixed. Only a line whose entire content — after stripping markdown
     # emphasis, heading hashes and backticks — begins with the bare word READY or NOT
-    # READY is the verdict itself. Verified against the three live shapes: `READY`
-    # (#2160), `**READY** (after Phase 6.5 remediation; ...)` (#2144), `### READY`
-    # (#2141), and against the narrating lines above, which this excludes.
+    # READY is the verdict itself.
     _vline="$(sed 's/[*`#]//g; s/^[[:space:]]*//; s/[[:space:]]*$//' \
         "$RUNDIR/verdict-body-$_vn.md" \
         | grep -E '^(NOT )?READY([[:space:]]|$)' | tail -1)"
@@ -554,13 +782,22 @@ _precheck_verdict() {
 
 
 # _stage1_list — build $RUNDIR/stage1.txt (one PR per line, final order) and
-# $RUNDIR/stage1-skipped.txt (#N — reason lines). Side-effect free: reads only.
+# $RUNDIR/stage1-skipped.txt (#N — reason lines).
+# Note: _pr_patch_id may fetch git refs into ROOT; call _cleanup_fetch_refs afterwards.
 _stage1_list() {
     : > "$RUNDIR/stage1.txt"
     : > "$RUNDIR/stage1-skipped.txt"
     while IFS=$'\t' read -r _sl_n _sl_needs; do
         [ -n "$_sl_n" ] || continue
         if ! _pr_allowed "$_sl_n"; then continue; fi
+
+        # Fix 1: skip PRs already armed for auto-merge (update-behind-prs keeps them current).
+        # Fails open: on any gh/jq error, _armed_skip returns 1 and we proceed normally.
+        if _armed_skip "$_sl_n"; then
+            echo "#$_sl_n — auto-merge already armed (update-behind-prs keeps it current), skipping" >> "$RUNDIR/stage1-skipped.txt"
+            continue
+        fi
+
         if [ "$PR_CYCLE_SKIP_READY_WHEN_ARMABLE" != "0" ]; then
             _sl_bkt="$(_precheck_bucket "$_sl_n")"
             if [ "$_sl_bkt" = "ARMABLE" ]; then
@@ -572,6 +809,17 @@ _stage1_list() {
                 echo "#$_sl_n — ARMABLE but no current READY verdict, running pr-ready"
             fi
         fi
+
+        # Fix 4: skip PRs held for conditions {3,7} with unchanged diff — re-running would
+        # produce the same hold. Seam PR_CYCLE_SKIP_HELD_UNCHANGED=0 disables this.
+        if [ "${PR_CYCLE_SKIP_HELD_UNCHANGED:-1}" != "0" ]; then
+            _sl_held="$(_check_held_unchanged "$_sl_n")"
+            if [ -n "$_sl_held" ]; then
+                echo "#$_sl_n — last post-plan run held it for ($_sl_held) and the diff is unchanged, skipping (needs a human or a new commit)" >> "$RUNDIR/stage1-skipped.txt"
+                continue
+            fi
+        fi
+
         echo "$_sl_n" >> "$RUNDIR/stage1.txt"
     done <<EOF
 $(_attack_rows)
@@ -623,7 +871,9 @@ _stage1_fire() {
     fi
     _csv="$(paste -sd, "$RUNDIR/stage1.txt")"
     set +e
-    "$PR_CYCLE_READY_CMD" --pr-list "$_csv" --jobs "$JOBS" --go --wait \
+    # pr-cycle's own auth probe already passed — bypass the duplicate probe in post-plan-fleet.
+    env POST_PLAN_FLEET_AUTH_PROBE_CMD=true \
+        "$PR_CYCLE_READY_CMD" --pr-list "$_csv" --jobs "$JOBS" --go --wait \
         > "$RUNDIR/ready.out" 2> "$RUNDIR/ready.err"
     _rc=$?
     set -e
@@ -740,6 +990,15 @@ _worker() {
         HALT="stopped by $PR_CYCLE_STOP_FILE"
     fi
 
+    # Fix 2: verify Claude auth before firing any sessions. Fails closed: on probe failure
+    # set HALT so the DM path still runs, but Stage 1 and Stage 2 are never reached.
+    if [ -z "$HALT" ]; then
+        if ! _auth_probe; then
+            echo "pr-cycle: Claude auth probe failed — not firing (run \`claude\` to re-login)"
+            HALT="Claude auth probe failed"
+        fi
+    fi
+
     if [ -z "$HALT" ]; then
         _attack_plan 0 || true
         _warn_unmatched_only
@@ -755,6 +1014,9 @@ _worker() {
     if [ -z "$HALT" ]; then
         _arm_and_classify || true
     fi
+
+    # Clean up any refs/pr-cycle/* written by _pr_patch_id during stage1.
+    _cleanup_fetch_refs
 
     _reason="${HALT:-done}"
     echo "pr-cycle finished — readied $READIED, armed $ARMED, your turn $LEFT — $_reason"
@@ -824,6 +1086,8 @@ _report_dry_run() {
     echo "would use jobs:       $JOBS"
     echo "would use stop file:  $PR_CYCLE_STOP_FILE"
     echo "would use rundir:     $RUNDIR"
+    # Clean up any refs/pr-cycle/* written by _pr_patch_id during stage1.
+    _cleanup_fetch_refs
     return 0
 }
 
@@ -869,6 +1133,8 @@ _launch() {
         for _v in PR_CYCLE_ATTACK_CMD PR_CYCLE_TRIAGE_CMD PR_CYCLE_READY_CMD \
                   PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
                   PR_CYCLE_RESCUE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
+                  PR_CYCLE_SKIP_HELD_UNCHANGED PR_CYCLE_HARNESS_OUT \
+                  PR_CYCLE_AUTH_PROBE_CMD PR_CYCLE_PATCH_ID_CMD \
                   PR_CYCLE_STOP_FILE; do
             eval "_val=\${$_v}"
             # shellcheck disable=SC2154  # _val is assigned by the eval above

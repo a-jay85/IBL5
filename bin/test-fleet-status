@@ -341,6 +341,7 @@ cat <<'ROWS'
 6002	0	com.ibl5.plan-now-20260910-200000-60002
 6003	0	com.ibl5.plan-now-20260910-200000-60003
 6004	0	com.ibl5.plan-now-20260910-200000-60004
+6005	0	com.ibl5.plan-now-20260910-200000-60005
 99999	0	com.apple.something.unrelated
 ROWS
 [ -n "\${STUB_NO_AUTOMOUSE:-}" ] || printf -- '-\t0\tcom.ibl5.automouse\n'
@@ -446,6 +447,13 @@ plant_tx "eeeeeeee-1111-2222-3333-444444444444.jsonl" \
     "$(tx_tool Read file_path '/Users/somebody/GitHub/IBL5/ibl5/classes/Foo.php')"
 plant_sidecar plan-now-20260910-200000-60004 'eeeeeeee-1111-2222-3333-444444444444'
 
+# Case 13: slugless prompt, but the run has since seeded its draft. The user
+# record names a peer's draft and must lose to the assistant's own tool call.
+plant_tx "12121212-1111-2222-3333-444444444444.jsonl" \
+    '{"type":"user","message":{"content":[{"type":"text","text":"see ~/claude-plans/.drafts/peer-plan.draft.md"}]}}' \
+    "$(tx_tool Bash command 'mkdir -p ~/claude-plans/.drafts && cat > /Users/x/claude-plans/.drafts/tab-helper-prep.draft.md')"
+plant_sidecar plan-now-20260910-200000-60005 '12121212-1111-2222-3333-444444444444'
+
 # ── run ────────────────────────────────────────────────────────────────────────
 
 printf 'test-fleet-status\n'
@@ -531,6 +539,13 @@ assert_has   "plan-now: falls back to the bare label" \
 # on reboot, so the file the slug lives in is gone while the job is still listed.
 assert_has   "plan-now: missing prompt file falls back to the label" \
     "$OUTPUT" 'plan +plan-now-20260910-090000-77000'
+
+# 13 — slugless prompt: the slug the run chose is appended after the label,
+# read from the draft path its own tool call names. A prompt's mention of a
+# peer draft never counts.
+assert_has   "plan-now: chosen slug follows the label" \
+    "$OUTPUT" 'plan +plan-now-20260910-200000-60005 +tab-helper-prep'
+assert_lacks "plan-now: user-record draft path ignored" "$OUTPUT" 'peer-plan'
 
 # 8 — progress uses the phase line, not the `outputs:` trailer.
 assert_has   "progress: phase line wins"      "$OUTPUT" 'phase7: watching CI'

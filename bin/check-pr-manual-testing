@@ -4,8 +4,8 @@
 # bin/check-pr-manual-testing — Blocking gate: rejects a drifted ## Manual Testing section.
 #
 # A prose-only ## Manual Testing section is invisible to pr_manual_testing_clearance
-# in bin/lib/pr-armable.sh: it returns HELD and bin/pr-attack / bin/pr-cycle silently
-# skip the PR for human merge even when no human testing is actually required.
+# in bin/lib/pr-armable.sh: it returns HELD and bin/pr-attack / bin/pr-cycle leave it
+# unarmed even when no human testing is actually required.
 # This gate catches the drift at PR time so the predicate and the body can never disagree.
 #
 # Modes:
@@ -157,9 +157,9 @@ Offending section content:
 $(printf '%s\n' "$content" | sed 's/^/    /')
 
 This prose section is invisible to pr_manual_testing_clearance in
-bin/lib/pr-armable.sh: the predicate returns HELD, and bin/pr-attack /
-bin/pr-cycle will silently skip this PR for human merge even if no manual
-testing is required.
+bin/lib/pr-armable.sh: the predicate returns HELD, and bin/pr-cycle will
+leave this PR unarmed and list it in its your-turn DM with the manual-testing
+action even if no manual testing is required.
 
 To fix, choose one of:
 

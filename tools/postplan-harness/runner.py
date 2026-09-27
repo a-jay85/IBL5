@@ -4,7 +4,7 @@
 Code owns: sequencing, classification, conformance, verification aggregation,
 all fifteen arming conditions, numbered 1–15 as in the skill ((11) unresolved review-thread
 findings via bin/lib/pr-armable.sh, (12) the Phase 5.5 plan-fidelity verdict, (13) the
-plan-slug-drift hold, (14) the conflict-resolved flag, (15) already-red CI checks), the Phase 5.5 sticky verdict comment,
+plan-slug-drift hold, (14) the conflict-resolved flag, (15) already-red CI checks), the Phase 5.5 sticky verdict comment, the review-owed decision that follows it,
 CI-watch interpretation, terminal states,
 side-effect gating, and the audit log. Bounded LLM calls own: PR copy, review/security
 judgment, finding scoring, plan-blind manual-step classification, the add-only
@@ -671,6 +671,21 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 # `|| true`, and a new hold here would change condition semantics.
                 res.sticky_error = "sticky-post-failed"
                 log("phase6.5: sticky verdict comment not confirmed")
+            # Review-owed decision: AFTER the sticky post (the script reads the body this
+            # run composed and the tree it ends on) and BEFORE arming (a launched
+            # /pr-review races an `--auto` merge no worse than the skill path does).
+            # Fire-and-log: arming never reads the result, the sticky-post-failed contract.
+            canned_ro = (fixture or {}).get("review_owed") if not live else None
+            if isinstance(canned_ro, dict) and canned_ro.get("verdict"):
+                # replay-only seam, the checks_outcome pattern: live mode never reads it
+                ro = dict(canned_ro)
+            else:
+                ro = fidelity.fire_review_owed(worktree, master_sha, pr, sticky,
+                                               inputs.current_tree, out_dir,
+                                               live=live, log=log)
+            fid["review_owed"] = ro
+            log(f"phase6.5 review-owed: {ro.get('verdict')} ({ro.get('reason')})"
+                + (f"; {ro['command']}" if ro.get("command") else ""))
         if decision.armed:
             gh.pr_merge_auto(pr)
         state.checkpoint("arm", res)

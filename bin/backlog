@@ -6,7 +6,11 @@
 # Usage:
 #   bin/backlog search <term>            gh issue list --search "<term>"
 #   bin/backlog open [<label>]           gh issue list --state open [--label <label>]
-#   bin/backlog new <label> <title>      gh issue create --label <label> --title "<title>" --body ""
+#   bin/backlog new <label> <title> <body>
+#                                        gh issue create --label <label> --title "<title>" --body "<body>"
+#                                        <body> must start with the origin PR URL, cite a
+#                                        file:line, and exceed 100 characters.
+#   bin/backlog for-pr <pr-url>          open issues whose body starts with <pr-url>
 #   bin/backlog close <n> <reason>       gh issue close <n> -c "<reason>"
 #
 # Flags (must precede subcommand):
@@ -17,6 +21,36 @@
 set -uo pipefail
 
 REPO="a-jay85/IBL5-backlog"
+GH="${BACKLOG_GH:-gh}"   # test seam: bin/test-backlog Case 9 points this at a stub
+
+# Origin-PR anchor shared by `new` body validation and `for-pr` lookup.
+PR_URL_RE='^https://github\.com/a-jay85/IBL5/pull/[0-9]+'
+PR_URL_EXACT_RE='^https://github\.com/a-jay85/IBL5/pull/[0-9]+$'
+FILE_LINE_RE='[a-zA-Z0-9_./-]+:[0-9]+'
+BODY_MIN_LEN=101
+
+# validate_body <body>: print the first failed rule to stderr and return 1.
+validate_body() {
+    local body="$1" first
+    if [ -z "${body//[[:space:]]/}" ]; then
+        printf 'new: body is empty; pass <origin PR URL> + file:line + failure scenario\n' >&2
+        return 1
+    fi
+    first="${body%%$'\n'*}"
+    if ! [[ "$first" =~ $PR_URL_RE ]]; then
+        printf 'new: body must start with an origin PR URL (https://github.com/a-jay85/IBL5/pull/N)\n' >&2
+        return 1
+    fi
+    if ! grep -qE -- "$FILE_LINE_RE" <<< "$body"; then
+        printf 'new: body needs a file:line location (e.g. bin/backlog:83)\n' >&2
+        return 1
+    fi
+    if [ "${#body}" -lt "$BODY_MIN_LEN" ]; then
+        printf 'new: body is too short (%d chars; need >100 with a failure scenario)\n' "${#body}" >&2
+        return 1
+    fi
+    return 0
+}
 
 usage() {
     cat <<'USAGE'
@@ -24,7 +58,11 @@ Usage: bin/backlog [--dry-run] <subcommand> [args...]
 
   search <term>         List open issues matching <term>
   open [<label>]        List open issues (optionally filtered by label)
-  new <label> <title>   Create an issue with the given label and title
+  new <label> <title> <body>
+                        Create an issue. <body> must start with the origin PR
+                        URL (https://github.com/a-jay85/IBL5/pull/N), cite a
+                        file:line, state a failure scenario, and exceed 100 chars
+  for-pr <pr-url>       List open issues filed from <pr-url> (body starts with it)
   close <n> <reason>    Close issue #<n> with a comment
 
 Flags:
@@ -66,25 +104,38 @@ case "$CMD" in
         if [ $# -eq 0 ]; then
             printf 'search requires a <term>\n' >&2; exit 2
         fi
-        run gh issue list --repo "$REPO" --state open --search "$*"
+        run "$GH" issue list --repo "$REPO" --state open --search "$*"
         ;;
     open)
         if [ $# -eq 0 ]; then
-            run gh issue list --repo "$REPO" --state open
+            run "$GH" issue list --repo "$REPO" --state open
         else
-            run gh issue list --repo "$REPO" --state open --label "$1"
+            run "$GH" issue list --repo "$REPO" --state open --label "$1"
         fi
         ;;
     new)
-        if [ $# -lt 2 ]; then
-            printf 'new requires <label> <title>\n' >&2; exit 2
+        if [ $# -ne 3 ]; then
+            printf 'new requires <label> <title> <body> (quote the title and body)\n' >&2; exit 2
         fi
-        LABEL="$1"; shift
-        TITLE="$*"
-        # --body is mandatory for a non-interactive `gh issue create`; without it
-        # gh aborts with "must provide `--title` and `--body`". The title carries the
-        # finding, so an empty body is the right default.
-        run gh issue create --repo "$REPO" --label "$LABEL" --title "$TITLE" --body ""
+        LABEL="$1"; TITLE="$2"; BODY="$3"
+        validate_body "$BODY" || exit 2
+        run "$GH" issue create --repo "$REPO" --label "$LABEL" --title "$TITLE" --body "$BODY"
+        ;;
+    for-pr)
+        if [ $# -ne 1 ]; then
+            printf 'for-pr requires <pr-url>\n' >&2; exit 2
+        fi
+        PR_URL="$1"
+        if ! [[ "$PR_URL" =~ $PR_URL_EXACT_RE ]]; then
+            printf 'for-pr requires a PR URL (https://github.com/a-jay85/IBL5/pull/N)\n' >&2; exit 2
+        fi
+        # startswith alone lets pull/12 match a pull/123 body; the second select
+        # drops a match whose next character is another digit.
+        JQ_FILTER=".[] | select(.body | startswith(\"$PR_URL\"))"
+        JQ_FILTER+=" | select(.body | ltrimstr(\"$PR_URL\") | test(\"^[0-9]\") | not)"
+        JQ_FILTER+=" | \"#\\(.number) \\(.title)\""
+        run "$GH" issue list --repo "$REPO" --state open --limit 1000 \
+            --json number,title,body --jq "$JQ_FILTER"
         ;;
     close)
         if [ $# -lt 2 ]; then
@@ -92,7 +143,7 @@ case "$CMD" in
         fi
         NUM="$1"; shift
         REASON="$*"
-        run gh issue close "$NUM" --repo "$REPO" -c "$REASON"
+        run "$GH" issue close "$NUM" --repo "$REPO" -c "$REASON"
         ;;
     *)
         printf 'Unknown subcommand: %s\n' "$CMD" >&2

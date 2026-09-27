@@ -66,14 +66,14 @@ a second backlog item for the remainder.
 
 Deterministic. Select by the defect class's surface:
 
-- App code / game logic / data model → label: `maintenance`; command: `bin/backlog new maintenance "<title>"`
-- CI or GitHub Actions → label: `ci`; command: `bin/backlog new ci "<title>"`
-- E2E test quality → label: `e2e`; command: `bin/backlog new e2e "<title>"`
-- Accessibility (non-contrast) → label: `a11y`; command: `bin/backlog new a11y "<title>"`
-- Accessibility contrast → label: `a11y-contrast`; command: `bin/backlog new a11y-contrast "<title>"`
-- Token spend / Claude context economy → label: `token-spend`; command: `bin/backlog new token-spend "<title>"`
-- Developer tooling (inner loop, scripts, worktree) → label: `dev-efficiency`; command: `bin/backlog new dev-efficiency "<title>"`
-- Autonomous-loop or harness behavior → label: `loop-engineering`; command: `bin/backlog new loop-engineering "<title>"`
+- App code / game logic / data model → label: `maintenance`; command: `bin/backlog new maintenance "<title>" "<body>"`
+- CI or GitHub Actions → label: `ci`; command: `bin/backlog new ci "<title>" "<body>"`
+- E2E test quality → label: `e2e`; command: `bin/backlog new e2e "<title>" "<body>"`
+- Accessibility (non-contrast) → label: `a11y`; command: `bin/backlog new a11y "<title>" "<body>"`
+- Accessibility contrast → label: `a11y-contrast`; command: `bin/backlog new a11y-contrast "<title>" "<body>"`
+- Token spend / Claude context economy → label: `token-spend`; command: `bin/backlog new token-spend "<title>" "<body>"`
+- Developer tooling (inner loop, scripts, worktree) → label: `dev-efficiency`; command: `bin/backlog new dev-efficiency "<title>" "<body>"`
+- Autonomous-loop or harness behavior → label: `loop-engineering`; command: `bin/backlog new loop-engineering "<title>" "<body>"`
 
 **Consolidate.** When one invocation produces two or more findings sharing a
 surface, file ONE issue with a combined body, not N issues. In
@@ -82,11 +82,29 @@ step 5 lets through.
 
 ## Step 4 — File the backlog issue
 
-Run `bin/backlog search <keywords>` first — search before filing. If no
-matching open issue exists, run the `bin/backlog new <label> "<title>"` command
-from Step 3. Legacy markdown IDs survive as title prefixes (e.g. `E46: <title>`).
+Dedup before filing. When the finding came from a PR, run
+`bin/backlog for-pr <pr-url>` first to see issues already filed from it.
+Then run `bin/backlog search <keywords>` for older issues. When an open issue
+covers the same surface, comment on it and file nothing new. Otherwise run the
+`bin/backlog new <label> "<title>" "<body>"` command from Step 3. Legacy
+markdown IDs survive as title prefixes (e.g. `E46: <title>`).
 
-The issue body must carry the five fields:
+Filing rules. A finding whose only location is a file the PR deletes or renames
+away gets no issue. A finding with no nameable failure scenario gets no issue.
+A cosmetic-only finding (wording, formatting, comment style, naming with no
+behavior change) is fixed now or dropped. It is never filed. In `Mode: in-PR`,
+also apply the file-after-the-last-fix rule in
+`.claude/review-shared/_phase65-remediation.md` step 3.
+
+`bin/backlog new` rejects a body that breaks the first two lines below, so write
+them first. Line 1 is the origin PR URL alone
+(`https://github.com/a-jay85/IBL5/pull/N`). In `Mode: in-PR` that is the current
+PR from `gh pr view --json url -q .url`. In `Mode: standalone` it is the PR
+that introduced the cited line: run `git blame -L <line>,<line> -- <file>`, and
+the squash-merge subject of that commit ends in `(#N)`. Line 2 cites the
+occurrence as `path/to/file.ext:LINE`. The failure scenario (concrete input or
+state, then the wrong output, crash, or cost) follows. After those lines the
+body carries the five fields:
 
 1. **class** — the step 1 sentence, verbatim. Where no class was nameable this
    line reads `class: n/a — <one-line reason>`.

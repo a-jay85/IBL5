@@ -213,6 +213,7 @@ echo "== case 4: --existing, no local ref — creates worktree with origin tip"
 # Delete the local ref so only origin/feature-a remains.
 ENV4="$(new_env_base_branch)"
 ORIGIN_FEATURE_A_TIP4="$(sha "$ENV4/IBL5" origin/feature-a)"
+MASTER_TIP4="$(sha "$ENV4/IBL5" master)"
 git_q -C "$ENV4/IBL5" branch -D feature-a >/dev/null 2>&1
 OUT4="$("$ENV4/IBL5/bin/wt-new" --existing feature-a 2>&1)"
 assert_match "case 4: output mentions origin/feature-a" "origin/feature-a" "$OUT4"
@@ -228,7 +229,6 @@ UPSTREAM4="$(git -C "$ENV4/IBL5-worktrees/feature-a" rev-parse --abbrev-ref '@{u
 assert_eq "case 4: upstream is origin/feature-a" "origin/feature-a" "$UPSTREAM4"
 IBLBASE4="$(git -C "$ENV4/IBL5-worktrees/feature-a" config "branch.feature-a.iblBase" 2>/dev/null)" && true
 assert_eq "case 4: iblBase recorded as master" "master" "$IBLBASE4"
-MASTER_TIP4="$(sha "$ENV4/IBL5" master)"
 assert_eq "case 4: master untouched" "$(sha "$ENV4/IBL5" master)" "$MASTER_TIP4"
 
 echo "== case 5: --existing, stale local ref — fast-forwarded to origin tip"

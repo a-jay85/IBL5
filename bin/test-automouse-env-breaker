@@ -218,7 +218,9 @@ write_e2_plan() {
     ln -sf "$E2_PLANS/$name.md" "$E2_NDIR/queue/$name.md"
 }
 
-E2_LOG="$E2_NDIR/logs/$(date +%Y-%m-%d).log"
+# bin/automouse/run writes one logs/<date>-<pid>.log per process, and each
+# run_e2 call is a new process, so read today's per-runner logs together.
+e2_logtxt() { cat "$E2_NDIR/logs/$(date +%Y-%m-%d)"-*.log 2>/dev/null || true; }
 
 reset_e2() {
     rm -f "$E2_NDIR/queue"/*.md "$E2_NDIR/queue"/*.lock "$E2_NDIR/queue"/*.attempts \
@@ -226,7 +228,7 @@ reset_e2() {
           "$E2_NDIR/queue"/*.failure "$E2_NDIR/handoff"/*.json \
           "$E2_NDIR/done"/*.md "$E2_TRACE"
     : > "$E2_TRACE"
-    : > "$E2_LOG"
+    rm -f "$E2_NDIR/logs"/*.log
 }
 
 run_e2() {
@@ -241,8 +243,7 @@ echo "# W1: wt-fail counted, kept, deferred"
 reset_e2
 write_e2_plan "wtfail"
 run_e2 > /dev/null 2>&1
-W1_LOG="$(cat "$E2_LOG" 2>/dev/null || echo '')"
-W1_TRACE="$(cat "$E2_TRACE" 2>/dev/null || echo '')"
+W1_LOG="$(e2_logtxt)"
 W1_ATTEMPTS="$(cat "$E2_NDIR/queue/wtfail.md.attempts" 2>/dev/null || echo '')"
 assert_present "W1: queue/wtfail.md still in queue/"    "$E2_NDIR/queue/wtfail.md"
 assert_absent  "W1: skipped/wtfail.md absent"           "$E2_NDIR/skipped/wtfail.md"
@@ -263,7 +264,7 @@ echo "# W2: fast exit without sentinel → env-stop"
 reset_e2
 write_e2_plan "fastfail"
 run_e2 > /dev/null 2>&1
-W2_LOG="$(cat "$E2_LOG" 2>/dev/null || echo '')"
+W2_LOG="$(e2_logtxt)"
 want           "W2: log has Environmental failure"       "$W2_LOG" "Environmental failure during impl"
 assert_absent  "W2: queue/fastfail.md.attempts absent (refunded)" \
                "$E2_NDIR/queue/fastfail.md.attempts"
@@ -276,7 +277,7 @@ reset_e2
 write_e2_plan "fastfail"
 touch "$E2_NDIR/queue/fastfail.md.wt-fail"
 run_e2 > /dev/null 2>&1
-W3_LOG="$(cat "$E2_LOG" 2>/dev/null || echo '')"
+W3_LOG="$(e2_logtxt)"
 want           "W3: log has Environmental failure (same as W2)" "$W3_LOG" "Environmental failure during impl"
 assert_absent  "W3: queue/fastfail.md.attempts absent (refunded)" \
                "$E2_NDIR/queue/fastfail.md.attempts"

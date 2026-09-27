@@ -65,6 +65,13 @@
     border-bottom-color: var(--team-tab-active-color);
 }
 
+/* Tab panels: shared hook for content switched by .ibl-tabs.
+   Inactive panels carry the hidden attribute; this keeps them hidden
+   even when a component class on the same element sets display. */
+.ibl-tab-panel[hidden] {
+    display: none;
+}
+
 /* Team banner row: logo centered with action links flanking */
 .team-banner-row {
     display: flex;

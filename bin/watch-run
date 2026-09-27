@@ -58,7 +58,7 @@ ALL=0
 
 # Lines worth surfacing as Monitor events. Deliberately broad on the FAILURE side:
 # a filter that matches only success is indistinguishable from a crash.
-# `RESULT` is unanchored so bin/plan-now's `RESULT ok|degraded|unconfirmed` verdict
+# `RESULT` is unanchored so bin/plan-now's `RESULT ok|degraded|no-plan|unconfirmed` verdict
 # is surfaced too, even though only `RESULT:` can ever terminate.
 SIGNAL='RESULT|^post-plan-now:|^plan-now:|^docfix-run:|PR #|pull/|ERROR|Error|error:|FAIL|Fail|failed|conflict|Traceback|terminal=|Killed|OOM|command not found|No such file'
 

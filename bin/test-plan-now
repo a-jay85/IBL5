@@ -255,7 +255,7 @@ run_case_recovery() {
         touch -t 202001010000 "$draft"
         STUB_NO_PLAN=1 STUB_TAIL="" bash "$runner" 2>&1
     else
-        STUB_NO_PLAN=1 STUB_TAIL="" STUB_DRAFT="$draft" STUB_DRAFT_SRC="$src" \
+        STUB_NO_PLAN=1 STUB_TAIL="${REC_TAIL:-}" STUB_DRAFT="$draft" STUB_DRAFT_SRC="$src" \
             STUB_DRAFT2="${ALSO_ROOT_SRC:+$PLANS/$slug.draft.md}" \
             STUB_DRAFT2_SRC="${ALSO_ROOT_SRC:-}" \
             QUEUE_FAIL="${QUEUE_FAIL:-}" QUEUE_ALREADY="${QUEUE_ALREADY:-}" bash "$runner" 2>&1
@@ -446,6 +446,53 @@ want "marker outside \$PLANS_DIR → unconfirmed" "$out" "RESULT unconfirmed"
 out=$(STUB_NO_PLAN=1 run_case "$P" "PLAN_FILE: $P")
 want "marker naming a nonexistent file is rejected" "$out" "named a file that does not exist"
 want "marker naming a nonexistent file → unconfirmed" "$out" "RESULT unconfirmed"
+
+echo "── NO_PLAN: a run that halts by design (work already done) is not 'unconfirmed' ──"
+
+# ★ THE REGRESSION (2026-09-26, trading-reject-verdict-shim). /plan Step 2.1 found
+# the work already merged and halted, correctly. The coda offered no legal last line
+# for that outcome, so the DM read ❓ unconfirmed and named an unrelated peer plan
+# as its "best-effort guess".
+out=$(STUB_ARGV="$TMP/noplan_argv.txt" STUB_NO_PLAN=1 run_case "$P" "NO_PLAN: already merged as #1957 and #1958")
+want    "NO_PLAN marker → no-plan verdict"            "$out" "RESULT no-plan"
+want    "NO_PLAN verdict carries the run's reason"    "$out" "RESULT no-plan — already merged as #1957 and #1958"
+want_no "NO_PLAN is not reported unconfirmed"         "$out" "RESULT unconfirmed"
+# The prompt half of the contract: without the coda offering NO_PLAN:, a halting
+# model never prints it and the bug returns with every runner-side test green.
+want    "the coda offers NO_PLAN: as a legal last line" "$(cat "$TMP/noplan_argv.txt")" "NO_PLAN: <one line"
+want    "NO_PLAN DMs the halt icon"                   "$(dm)" "⏹️ plan-now:"
+want    "NO_PLAN DMs its verdict"                     "$(dm)" "RESULT no-plan — "
+want    "NO_PLAN DM carries the reason"               "$(dm)" "already merged as #1957 and #1958"
+want_no "NO_PLAN DM offers no review buttons"         "$(dm)" "--route"
+
+# The real bug's guess named a PEER's plan that appeared mid-run. The slugless
+# prompt keeps both recovery legs out, so only the guess branch could name it.
+out=$(run_case "$PLANS/peer-plan.md" "NO_PLAN: already done")
+want_no "NO_PLAN never names a best-effort guess"   "$out" "best-effort guess"
+want_no "NO_PLAN never names a peer's fresh plan"   "$out" "peer-plan.md"
+
+out=$(STUB_NO_PLAN=1 run_case "$P" "**NO_PLAN:** \`already done\`")
+want "bold-wrapped NO_PLAN is still recognised" "$out" "RESULT no-plan"
+want "decoration is stripped from the reason"   "$out" "no-plan — already done"
+
+out=$(STUB_NO_PLAN=1 DISP=--queue run_case "$P" "NO_PLAN: already done")
+want_no "NO_PLAN under --queue never queues" "$out" "automouse-queue (stub): queued"
+
+out=$(STUB_NO_PLAN=1 STUB_RC=1 run_case "$P" "NO_PLAN: already done")
+want "NO_PLAN on a nonzero exit is still RESULT failed" "$out" "RESULT failed"
+
+# A real plan wins over a halt marker: the plan exists and must reach check-plan.
+out=$(run_case "$P" "NO_PLAN: already done
+PLAN_FILE: $P")
+want    "PLAN_FILE beats NO_PLAN"          "$out" "plan-now: new plan -> $P"
+want_no "PLAN_FILE beats NO_PLAN (verdict)" "$out" "RESULT no-plan"
+
+# A halted run must never have a slug-matched fresh draft adopted and queued behind
+# its back — NO_PLAN sits before recovery in the verdict chain.
+out=$(REC_TAIL="NO_PLAN: already done" DISP=--queue run_case_recovery "$GOOD_DRAFT" demo-slug)
+want    "NO_PLAN skips draft recovery"          "$out" "RESULT no-plan"
+want_no "NO_PLAN never promotes a fresh draft"  "$out" "recovery A"
+want_no "NO_PLAN + fresh draft never queues"    "$out" "automouse-queue (stub): queued"
 
 echo "── draft recovery: a backgrounded architect must not cost the whole run ──"
 
@@ -1376,6 +1423,7 @@ want_no "R-10 argv no --session-id"       "$R10_ARGV" "--session-id"
 R10_P_LINE=$(grep -A1 -x -- '-p' "$TMP/r10_argv.txt" 2>/dev/null | tail -1)
 want    "R-10 -p has cut off before it finished" "$R10_P_LINE" "cut off before it finished"
 want_no "R-10 -p no Headless run constraints"    "$R10_P_LINE" "Headless run constraints"
+want    "R-10 -p still offers the NO_PLAN: ending" "$R10_P_LINE" "exactly: NO_PLAN:"
 # runner stdout confirms session/run identity
 want    "R-10 runner out: resuming session" "$R10_OUT" "resuming session $RES_UUID from run $RES_TS"
 rm -f "$RES_RUNNER" "$TMP/r10_argv.txt" "$TMP/r10.out"

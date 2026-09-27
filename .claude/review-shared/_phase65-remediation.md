@@ -1,6 +1,6 @@
 ---
 description: Phase 6.5 remediation procedure for the post-plan harness. Fixes every Phase 6 finding in-PR; harness commits and pushes after exit.
-last_verified: 2026-09-23
+last_verified: 2026-09-26
 ---
 
 # Phase 6.5 in-PR remediation
@@ -23,7 +23,13 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 "Never zero entries" binds the findings Phase 6 actually emitted. A Phase 5.9 outcome of `REPLACED`, `APPENDED` or `UNCHANGED` is a routine refresh. It produces no remediation entry, no backlog row, and no `last_verified:` bump. Only `AMBIGUOUS` reaches this phase, as the 6d.4 finding it is, and that one does get an entry.
 
    - **Worktree:** this PR's existing one. Do not run `bin/wt-new`, do not create a second worktree, do not tear down the existing one.
-   - **Backlog:** run `bin/backlog new <label> "<title>"` only for a finding with work left after this pass: a `not fixed — filed` row or a prevention rung 1-5 (`_remediation.md` step 5, `Mode: in-PR`). A finding fixed here with no gate warranted gets its entry in the Phase 7 verdict and no issue. Search before filing with `bin/backlog search`. Do not run the full `/backlog` chain. Consolidate findings sharing a surface into one issue.
+   - **Backlog:** file an issue only for a finding with work left after this pass: a `not fixed — filed` row or a prevention rung 1-5 (`_remediation.md` step 5, `Mode: in-PR`). A finding fixed here with no gate warranted gets its entry in the Phase 7 verdict and no issue. Do not run the full `/backlog` chain. Consolidate findings sharing a surface into one issue. Apply these filing rules in order:
+     - **File after the last fix.** Write issues only once every step 3 fix for this pass is in the tree. Any issue filed earlier in this run gets re-checked against `git diff HEAD` now. Close each one the final diff resolved with `bin/backlog close <n> "resolved in-PR by <pr-url>"`.
+     - **Dedup against this PR first.** Run `bin/backlog for-pr <pr-url>`, taking the URL from `gh pr view --json url -q .url`. When a listed issue covers the same surface, add a comment to it with `gh issue comment <n> --repo a-jay85/IBL5-backlog` and file nothing new. Then run `bin/backlog search <keywords>` for older issues from other PRs.
+     - **Skip retired files.** A finding whose only location is a file this PR deletes or renames away gets no issue. `git diff --name-status master...HEAD` shows those as `D` rows and the old path of `R` rows.
+     - **Require a failure scenario.** The body names a concrete input or state and the wrong output, crash, or cost that follows. A finding with no nameable failure scenario gets no issue.
+     - **No cosmetic-only issues.** Wording, formatting, comment style, or naming with no behavior change is fixed in this pass or dropped. It is never filed.
+     - **Command.** `bin/backlog new <label> "<title>" "<body>"`. Line 1 of the body is the PR URL alone. Line 2 cites `path/to/file.ext:LINE`. The rest states the failure scenario. `bin/backlog` exits 2 and names the failed rule when the body misses any of these. Fix the body and re-run.
    - **Fifth-file gate.** `~/.claude/hooks/plan-gate-edit.sh` Check 1 denies the 5th distinct repo file edited on the main thread in one turn. When the Agent tool is available, route remaining fixes to one `subagent_type: "sonnet-4-6"` sub-agent (omit `model`). Before spawning, state the delegate boundary: remaining code fixes and backlog-row appends only. The delegate does not commit, push, arm auto-merge, change worktrees, or spawn further delegates. When the Agent tool is absent (harness context), apply the overflow rule instead.
    - **Overflow rule.** Fix what is clearly in scope of this PR; file the remainder as backlog rows marked `not fixed — filed`; say so in the Phase 7 verdict. A remediation run never expands into a sweep.
 

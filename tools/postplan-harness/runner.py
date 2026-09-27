@@ -477,7 +477,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
         resolutions: dict[str, str] = {}
         unresolved = conformance.check(plan, files, diff, phase5_status=phase5,
-                                       resolutions=resolutions)
+                                       resolutions=resolutions,
+                                       pr_body=gh.pr_body() or meta.get("body", ""))
         res.unresolved_conformance = unresolved
         _write_conformance_handoff(out_dir, unresolved)
         log(f"phase5.0 conformance: {unresolved or 'clean'}"
@@ -568,7 +569,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             diff = git.diff_vs_base()
             resolutions = {}
             unresolved = conformance.check(plan, files, diff, phase5_status=phase5,
-                                           resolutions=resolutions)
+                                           resolutions=resolutions,
+                                           pr_body=gh.pr_body() or body)
             res.unresolved_conformance = unresolved
             _write_conformance_handoff(out_dir, unresolved)
             log(f"phase5.0 conformance (post-remediation): {unresolved or 'clean'}"

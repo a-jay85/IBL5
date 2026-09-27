@@ -21,7 +21,7 @@
         "function.nameCase": 2,
         "function.strict": 1,
         "ibl.bannedAddslashes": 4,
-        "ibl.bannedNukeGlobal": 61,
+        "ibl.bannedNukeGlobal": 25,
         "ibl.castFunction": 1,
         "ibl.deprecatedHtmlTag": 1,
         "ibl.directHeader": 2,

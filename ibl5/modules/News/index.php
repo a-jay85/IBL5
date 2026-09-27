@@ -22,7 +22,6 @@ if (!defined('INDEX_FILE')) {
     define('INDEX_FILE', true);
 }
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
 
 $controller = new \Topics\News\NewsController();
 

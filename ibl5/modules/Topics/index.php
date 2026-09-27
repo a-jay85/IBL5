@@ -23,9 +23,6 @@ use Topics\TopicsView;
 use Search\Contracts\SearchRepositoryInterface;
 
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
-
-$pagetitle = "- " . _ACTIVETOPICS;
 
 global $mysqli_db, $prefix, $user_prefix, $tipath, $articlecomm;
 
@@ -39,6 +36,7 @@ $themePath = (is_dir("themes/{$ThemeSel}/images/topics/"))
 // Initialize service (owns the Topics + Search repositories)
 $service = new TopicsService($mysqli_db, $prefix);
 $view = new TopicsView();
+$pagetitle = "- " . _ACTIVETOPICS;
 
 // Assemble page data (topics + search filters)
 $pageData = $service->getPageData((bool) ($articlecomm ?? false));

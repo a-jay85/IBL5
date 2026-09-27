@@ -4,7 +4,7 @@
 Code owns: sequencing, classification, conformance, verification aggregation,
 all fifteen arming conditions, numbered 1–15 as in the skill ((11) unresolved review-thread
 findings via bin/lib/pr-armable.sh, (12) the Phase 5.5 plan-fidelity verdict, (13) the
-plan-slug-drift hold, (14) the conflict-resolved flag, (15) already-red CI checks), the Phase 5.5 sticky verdict comment,
+plan-slug-drift hold, (14) the conflict-resolved flag, (15) already-red CI checks), the Phase 5.5 sticky verdict comment, the review-owed decision that follows it,
 CI-watch interpretation, terminal states,
 side-effect gating, and the audit log. Bounded LLM calls own: PR copy, review/security
 judgment, finding scoring, plan-blind manual-step classification, the add-only
@@ -52,6 +52,7 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
 from harness.planfile import locate_plan, split_hold_justification
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
+from harness.thread_ingestion import run_thread_ingestion
 from harness.adapters.ghad import LiveGh, RecordingGh
 from harness.adapters.gitad import (LiveGit, ReplayGit, classify_local_gate_denial,
                                     is_stale_base, is_stale_lease)
@@ -401,6 +402,24 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # this thread, in _join_review, so audit.log and the state file keep their serial
         # order. The join happens before anything moves the head (fidelity remediation),
         # so the review still posts against the head it read.
+        # Phase 4.5 snapshot: thread ids that exist BEFORE this run posts anything.
+        # Taken before the review worker is submitted, so nothing this run posts can
+        # enter it. Empty on any failure = Phase 4.5 acts on nothing.
+        pre_posting_ids = gh.pr_thread_ids(pr)
+        log(f"phase4.5 snapshot: {len(pre_posting_ids)} pre-existing thread(s)")
+
+        # ---- Phase 4.5: pre-existing trusted review threads --------------
+        # Runs before the review worker starts, so a fix commit can never move the head
+        # under the worker's posts, and Phase 4, 5, 5.0 and 5.5 all read the fixed tree.
+        # Never blocks the run: only gate-path-edit and push-failed propagate.
+        head_before_45 = git.head()
+        res.thread_ingestion = _run_thread_ingestion_phase(
+            gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log, res)
+        if git.head() != head_before_45:
+            sha = git.head()
+            files = git.changed_files()
+            diff = git.diff_vs_base()
+            meta = gh.pr_meta() or meta
         review_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         review_future = review_pool.submit(ReviewPhase(llm, gh).run, meta, cls, plan)
         review_pool.shutdown(wait=False)
@@ -671,6 +690,21 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 # `|| true`, and a new hold here would change condition semantics.
                 res.sticky_error = "sticky-post-failed"
                 log("phase6.5: sticky verdict comment not confirmed")
+            # Review-owed decision: AFTER the sticky post (the script reads the body this
+            # run composed and the tree it ends on) and BEFORE arming (a launched
+            # /pr-review races an `--auto` merge no worse than the skill path does).
+            # Fire-and-log: arming never reads the result, the sticky-post-failed contract.
+            canned_ro = (fixture or {}).get("review_owed") if not live else None
+            if isinstance(canned_ro, dict) and canned_ro.get("verdict"):
+                # replay-only seam, the checks_outcome pattern: live mode never reads it
+                ro = dict(canned_ro)
+            else:
+                ro = fidelity.fire_review_owed(worktree, master_sha, pr, sticky,
+                                               inputs.current_tree, out_dir,
+                                               live=live, log=log)
+            fid["review_owed"] = ro
+            log(f"phase6.5 review-owed: {ro.get('verdict')} ({ro.get('reason')})"
+                + (f"; {ro['command']}" if ro.get("command") else ""))
         if decision.armed:
             gh.pr_merge_auto(pr)
         state.checkpoint("arm", res)
@@ -873,6 +907,37 @@ def _refresh_and_reprove(git, log, phase: str, attempt: int) -> None:
         raise HarnessError("lostwork-unproved",
                            f"{phase}: lost-work proof failed after re-rebase {attempt}: {evidence}")
     log(f"{phase}: re-rebase {attempt} TREE-EQUIVALENT at {git.head()[:8]}")
+
+
+def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out_dir,
+                                log, res) -> dict:
+    """Phase 4.5 wrapper: same commit/push injection as the Phase 5.5 remediation.
+    Swallows everything except gate-path-edit (a local commit touched a gate-owning
+    path; shipping it later would bypass the gate) and push-failed (the tree and origin
+    disagree; nothing downstream can reason about the head)."""
+    try:
+        out = run_thread_ingestion(
+            gh, llm, git, worktree or ".", pr, pre_posting_ids, out_dir, log,
+            commit=lambda msg: _commit_with_gate_remediation(
+                git, worktree, msg, log, phase="phase4.5"),
+            push=lambda: _push_with_adr_draft(git, log, "phase4.5", llm=llm,
+                                              worktree=worktree, out_dir=out_dir,
+                                              res=res,
+                                              pr=(pr if isinstance(git, LiveGit) else None)))
+    except HarnessError as e:
+        if e.kind in ("gate-path-edit", "push-failed"):
+            raise
+        log(f"phase4.5: thread ingestion failed ({e.kind}: {e.detail}); continuing, "
+            "condition (11) keeps the hold")
+        out = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None,
+               "error": f"{e.kind}: {e.detail}"}
+    except Exception as e:  # noqa: BLE001 - never block the run on this step
+        log(f"phase4.5: thread ingestion failed ({e!r}); continuing")
+        out = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None,
+               "error": repr(e)}
+    log(f"phase4.5: {out.get('found', 0)} trusted thread(s) found, {out.get('fixed', 0)} fixed, "
+        f"{out.get('declined', 0)} declined, {out.get('skipped', 0)} skipped (error)")
+    return out
 
 
 def _push_with_lease_retry(git, log, phase: str, *, pr=None, worktree=None,

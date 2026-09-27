@@ -127,6 +127,7 @@ run_driver() {
         POST_PLAN_FLEET_GH_USER=a-jay85 \
         POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." \
         POST_PLAN_FLEET_WTL="${POST_PLAN_FLEET_WTL-$WTL_FIXTURE}" \
+        POST_PLAN_FLEET_AUTH_PROBE_CMD="${POST_PLAN_FLEET_AUTH_PROBE_CMD:-true}" \
         "$DRIVER" "$@"
 }
 
@@ -827,6 +828,7 @@ run_dm_driver() {
         POST_PLAN_FLEET_GH_USER=a-jay85 \
         POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." \
         POST_PLAN_FLEET_WTL="$WTL_FIXTURE" \
+        POST_PLAN_FLEET_AUTH_PROBE_CMD="${POST_PLAN_FLEET_AUTH_PROBE_CMD:-true}" \
         "$DRIVER" "$@"
 }
 
@@ -1360,6 +1362,15 @@ grep -qF '`EXPECTED` constant array' "$SCRIPT_DIR/../.claude/review-shared/_plan
 # coupling statements and makes this fail.
 grep -qF 'all six 6d checks' "$SCRIPT_DIR/../.claude/review-shared/_plan-fidelity-review.md" \
   || fail "27e: _plan-fidelity-review.md lost 'all six 6d checks' — coupling that forbids a 7th 6d class item removed"
+# 27f: backlog #669 author side — _phase65-remediation.md step 4 binds every factual body
+# assertion to a named proof command or explicit uncertainty. Removing the widened self-check
+# makes this fail.
+grep -qF 'names the proof command that was run in this step' "$SCRIPT_DIR/../.claude/review-shared/_phase65-remediation.md" \
+  || fail "27f: _phase65-remediation.md lost 'names the proof command that was run in this step' — #669 author-side self-check removed"
+# 27g: backlog #669 reader side — _plan-fidelity-review.md 6d.4c external-state carve-out.
+# Removing the 4c sub-clause makes this fail.
+grep -qF 'not decidable from the diff' "$SCRIPT_DIR/../.claude/review-shared/_plan-fidelity-review.md" \
+  || fail "27g: _plan-fidelity-review.md lost 'not decidable from the diff' — #669 reader-side 4c carve-out removed"
 end_case e22-e23-prevention-prose-pins
 
 # --- case 28 (pr-ready skill block): merge-digest extraction + body shape ---
@@ -2106,6 +2117,140 @@ grep -qF '**Reviewed tree:**' ".claude/review-shared/_phase7-verdict.md" \
     || fail "_phase7-verdict.md missing Reviewed-tree contract line (skip-review.sh match target)"
 end_case "skip-review-delta-row 30"
 
+# --- case: review-owed.sh decision ladder ------------------------------------------------
+# Exercises .claude/review-shared/scripts/review-owed.sh through its --sticky-file and
+# --current-tree seams, with a logging stub standing in for bin/pr-review-now.
+RO="$SCRIPT_DIR/../.claude/review-shared/scripts/review-owed.sh"
+ROD="$SCRATCH/ro"; mkdir -p "$ROD/bin"
+T1="$(printf 'a%.0s' $(seq 40))"; T2="$(printf 'b%.0s' $(seq 40))"
+cat > "$ROD/bin/prn" <<'PRN_EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${PRN_LOG:?}"
+exit "${PRN_RC:-0}"
+PRN_EOF
+chmod +x "$ROD/bin/prn"
+ro_sticky() {  # $1 = tree token, $2 = marker line (may be empty); prints a sticky body
+  printf '**Reviewed tree:** %s\n<!-- pr-ready-verdict -->\n### Plan-fidelity verdict\nprose\n%s\nREADY\n' "$1" "$2"
+}
+ro_run() {  # $1 = sticky body, rest = argv; sets RO_OUT, RO_RC, RO_LAST; asserts one verdict line
+  printf '%s\n' "$1" > "$ROD/sticky.md"
+  : > "$ROD/fired.log"
+  RO_OUT="$(PRN_LOG="$ROD/fired.log" PRN_RC="${PRN_RC:-0}" REVIEW_OWED_PR_REVIEW_NOW="$ROD/bin/prn" \
+      bash "$RO" "${@:2}" --sticky-file "$ROD/sticky.md" 2>/dev/null)"; RO_RC=$?
+  RO_LAST="$(tail -1 <<<"$RO_OUT")"
+  [ "$(grep -cE '^(REVIEW-OWED [a-z-]+|REVIEW-CURRENT [0-9a-f]{40})$' <<<"$RO_OUT")" -eq 1 ] \
+    || fail "review-owed: expected exactly one verdict line, got: $RO_OUT"
+}
+
+begin_case
+ro_run "$(ro_sticky "$T1" 'REVIEW-COVERAGE: CURRENT')" 123 --current-tree "$T1"
+[ "$RO_RC" -eq 0 ] || fail "review-owed current: rc=$RO_RC"
+[ "$RO_LAST" = "REVIEW-CURRENT $T1" ] || fail "review-owed current: last line '$RO_LAST'"
+grep -qF 'COVERAGE: CURRENT' <<<"$RO_OUT" || fail "review-owed current: COVERAGE line missing"
+grep -qE '^(FIRED|DRY-RUN|FIRE-FAILED):' <<<"$RO_OUT" && fail "review-owed current: fire line on no-op path"
+[ ! -s "$ROD/fired.log" ] || fail "review-owed current: pr-review-now fired on a current tree"
+end_case review-owed-current-noop
+
+begin_case
+# The backlog #682 shape: marker says CURRENT, but remediation moved HEAD after the review.
+ro_run "$(ro_sticky "$T1" 'REVIEW-COVERAGE: CURRENT')" 123 --current-tree "$T2"
+[ "$RO_LAST" = "REVIEW-OWED tree-changed" ] || fail "review-owed tree-changed: last line '$RO_LAST'"
+grep -qF "FIRED: $ROD/bin/prn 123" <<<"$RO_OUT" || fail "review-owed tree-changed: FIRED line missing"
+[ "$(cat "$ROD/fired.log")" = "123" ] || fail "review-owed tree-changed: stub argv '$(cat "$ROD/fired.log")'"
+grep -qF "REVIEWED-TREE: $T1" <<<"$RO_OUT" || fail "review-owed tree-changed: REVIEWED-TREE fact missing"
+grep -qF "CURRENT-TREE: $T2" <<<"$RO_OUT" || fail "review-owed tree-changed: CURRENT-TREE fact missing"
+end_case review-owed-tree-changed-fires
+
+begin_case
+ro_run "$(ro_sticky "$T1" 'REVIEW-COVERAGE: NONE')" 123 --current-tree "$T1"
+[ "$RO_LAST" = "REVIEW-OWED coverage-none" ] || fail "review-owed NONE: last line '$RO_LAST'"
+[ "$(cat "$ROD/fired.log")" = "123" ] || fail "review-owed NONE: did not fire"
+ro_run "$(ro_sticky "$T1" 'REVIEW-COVERAGE: STALE')" 123 --current-tree "$T1"
+[ "$RO_LAST" = "REVIEW-OWED coverage-stale" ] || fail "review-owed STALE: last line '$RO_LAST'"
+ro_run "$(ro_sticky "$T1" 'REVIEW-COVERAGE: UNKNOWN')" 123 --current-tree "$T1"
+[ "$RO_LAST" = "REVIEW-OWED coverage-unknown" ] || fail "review-owed UNKNOWN: last line '$RO_LAST'"
+ro_run "$(ro_sticky "$T1" '')" 123 --current-tree "$T1"
+[ "$RO_LAST" = "REVIEW-OWED coverage-unknown" ] || fail "review-owed absent marker: last line '$RO_LAST'"
+grep -qF 'COVERAGE: UNKNOWN' <<<"$RO_OUT" || fail "review-owed absent marker: COVERAGE must read UNKNOWN"
+ro_run "$(ro_sticky "$T1" 'REVIEW-COVERAGE: BOGUS')" 123 --current-tree "$T1"
+[ "$RO_LAST" = "REVIEW-OWED coverage-unknown" ] || fail "review-owed BOGUS marker: last line '$RO_LAST'"
+end_case review-owed-coverage-markers
+
+begin_case
+ro_run "$(ro_sticky unavailable 'REVIEW-COVERAGE: CURRENT')" 123 --current-tree "$T1"
+[ "$RO_LAST" = "REVIEW-OWED no-tree-line" ] || fail "review-owed unavailable tree: last line '$RO_LAST'"
+grep -qF 'REVIEWED-TREE: unavailable' <<<"$RO_OUT" || fail "review-owed unavailable tree: fact line"
+# A decorated SHA on line 1 is not a tree line (parity with skip-review.sh Step 8).
+ro_run "$(ro_sticky "\`$T1\`" 'REVIEW-COVERAGE: CURRENT')" 123 --current-tree "$T1"
+[ "$RO_LAST" = "REVIEW-OWED no-tree-line" ] || fail "review-owed decorated tree: last line '$RO_LAST'"
+end_case review-owed-no-tree-line
+
+begin_case
+ro_run "$(ro_sticky "$T1" 'REVIEW-COVERAGE: CURRENT')" 123 --current-tree "$T2" --dry-run
+[ "$RO_LAST" = "REVIEW-OWED tree-changed" ] || fail "review-owed dry-run: last line '$RO_LAST'"
+grep -qF "DRY-RUN: $ROD/bin/prn 123" <<<"$RO_OUT" || fail "review-owed dry-run: DRY-RUN line missing"
+[ ! -s "$ROD/fired.log" ] || fail "review-owed dry-run: stub was executed"
+end_case review-owed-dry-run
+
+begin_case
+PRN_RC=7
+ro_run "$(ro_sticky "$T1" 'REVIEW-COVERAGE: NONE')" 123 --current-tree "$T1"
+unset PRN_RC
+[ "$RO_RC" -eq 0 ] || fail "review-owed fire-failed: rc=$RO_RC (fire failure must keep exit 0)"
+grep -qF 'FIRE-FAILED: rc=7' <<<"$RO_OUT" || fail "review-owed fire-failed: FIRE-FAILED line missing"
+[ "$RO_LAST" = "REVIEW-OWED coverage-none" ] || fail "review-owed fire-failed: verdict still owed"
+RO_OUT="$(REVIEW_OWED_PR_REVIEW_NOW="$ROD/bin/nope" bash "$RO" 123 --sticky-file "$ROD/sticky.md" --current-tree "$T1" 2>/dev/null)"
+grep -qF 'FIRE-FAILED: missing-pr-review-now' <<<"$RO_OUT" || fail "review-owed missing binary: FIRE-FAILED reason"
+end_case review-owed-fire-failed
+
+begin_case
+: > "$ROD/fired.log"
+PRN_LOG="$ROD/fired.log" REVIEW_OWED_PR_REVIEW_NOW="$ROD/bin/prn" bash "$RO" >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 2 ] || fail "review-owed usage: no PR arg rc=$rc (want 2)"
+PRN_LOG="$ROD/fired.log" REVIEW_OWED_PR_REVIEW_NOW="$ROD/bin/prn" bash "$RO" abc --sticky-file "$ROD/sticky.md" >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 2 ] || fail "review-owed usage: non-numeric PR rc=$rc (want 2)"
+PRN_LOG="$ROD/fired.log" REVIEW_OWED_PR_REVIEW_NOW="$ROD/bin/prn" bash "$RO" 123 --bogus >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 2 ] || fail "review-owed usage: unknown flag rc=$rc (want 2)"
+[ ! -s "$ROD/fired.log" ] || fail "review-owed usage: a usage error fired the stub"
+end_case review-owed-usage-errors
+
+begin_case
+RREPO="$ROD/repo"; mkdir -p "$RREPO"; g -C "$RREPO" init -q
+ro_commit() { echo "$2" > "$1/f-$2.txt"; g -C "$1" add -A >/dev/null 2>&1; g -C "$1" commit -qm "$2" >/dev/null 2>&1; }
+ro_commit "$RREPO" one
+RT="$(g -C "$RREPO" rev-parse 'HEAD^{tree}')"
+printf '%s\n' "$(ro_sticky "$RT" 'REVIEW-COVERAGE: CURRENT')" > "$ROD/sticky.md"
+RO_OUT="$(cd "$RREPO" && PRN_LOG="$ROD/fired.log" REVIEW_OWED_PR_REVIEW_NOW="$ROD/bin/prn" bash "$RO" 123 --sticky-file "$ROD/sticky.md" 2>/dev/null)"
+[ "$(tail -1 <<<"$RO_OUT")" = "REVIEW-CURRENT $RT" ] || fail "review-owed default tree: expected current, got '$(tail -1 <<<"$RO_OUT")'"
+ro_commit "$RREPO" two
+RO_OUT="$(cd "$RREPO" && PRN_LOG="$ROD/fired.log" REVIEW_OWED_PR_REVIEW_NOW="$ROD/bin/prn" bash "$RO" 123 --sticky-file "$ROD/sticky.md" 2>/dev/null)"
+[ "$(tail -1 <<<"$RO_OUT")" = "REVIEW-OWED tree-changed" ] || fail "review-owed default tree after commit: '$(tail -1 <<<"$RO_OUT")'"
+RO_OUT="$(cd "$ROD" && PRN_LOG="$ROD/fired.log" REVIEW_OWED_PR_REVIEW_NOW="$ROD/bin/prn" bash "$RO" 123 --sticky-file "$ROD/sticky.md" 2>/dev/null)"
+[ "$(tail -1 <<<"$RO_OUT")" = "REVIEW-OWED current-tree-unavailable" ] || fail "review-owed outside git: '$(tail -1 <<<"$RO_OUT")'"
+end_case review-owed-default-current-tree
+
+begin_case
+cat > "$ROD/bin/gh" <<'GH_EOF'
+#!/usr/bin/env bash
+[ "${1:-}" = "pr" ] && [ "${2:-}" = "view" ] || { echo "gh stub: unexpected $*" >&2; exit 1; }
+[ -n "${RO_GH_RC:-}" ] && exit "$RO_GH_RC"
+cat "${RO_GH_JSON:?}"
+GH_EOF
+chmod +x "$ROD/bin/gh"
+ro_json() { jq -n --arg a "${1:-}" --arg b "${2:-}" '{comments: ([$a,$b] | map(select(. != "")) | map({body: .}))}' > "$ROD/gh.json"; }
+ro_gh() { PATH="$ROD/bin:$PATH" RO_GH_JSON="$ROD/gh.json" PRN_LOG="$ROD/fired.log" REVIEW_OWED_PR_REVIEW_NOW="$ROD/bin/prn" bash "$RO" 123 --current-tree "$T1" 2>/dev/null | tail -1; }
+ro_json "$(ro_sticky "$T1" 'REVIEW-COVERAGE: CURRENT')" "an unrelated comment"
+[ "$(ro_gh)" = "REVIEW-CURRENT $T1" ] || fail "review-owed gh path: one sticky should read current"
+ro_json "$(ro_sticky "$T1" 'REVIEW-COVERAGE: CURRENT')" "$(ro_sticky "$T1" 'REVIEW-COVERAGE: CURRENT')"
+[ "$(ro_gh)" = "REVIEW-OWED multiple-sticky-comments" ] || fail "review-owed gh path: two stickies"
+ro_json "plain comment"
+[ "$(ro_gh)" = "REVIEW-OWED no-verdict-comment" ] || fail "review-owed gh path: zero stickies"
+[ "$(RO_GH_RC=1 ro_gh)" = "REVIEW-OWED gh-failed" ] || fail "review-owed gh path: gh exit 1"
+printf '**Reviewed tree:** %s\r\n<!-- pr-ready-verdict -->\r\nREVIEW-COVERAGE: CURRENT\r\n' "$T1" > "$ROD/sticky.md"
+RO_OUT="$(PRN_LOG="$ROD/fired.log" REVIEW_OWED_PR_REVIEW_NOW="$ROD/bin/prn" bash "$RO" 123 --sticky-file "$ROD/sticky.md" --current-tree "$T1" 2>/dev/null)"
+[ "$(tail -1 <<<"$RO_OUT")" = "REVIEW-CURRENT $T1" ] || fail "review-owed CRLF sticky must parse as current"
+end_case review-owed-gh-path-and-crlf
+
 # --- case: bin/check-digest-prose voice linter -------------------------------------------
 begin_case
 CDP="$SCRIPT_DIR/check-digest-prose"
@@ -2298,6 +2443,26 @@ err_stop="$(run_driver --stop 1910 --pr-list 1911 2>&1)"; rc_stop=$?
 grep -q 'cannot be combined with --pr, --pr-list or --wait' <<< "$err_stop" || \
     fail "stop-rejects-pr-list: wrong error message (out: $err_stop)"
 end_case stop-rejects-pr-list
+
+# --- auth-probe-false --------------------------------------------------------------------
+# When the auth probe fails, the driver must exit nonzero, fire no session, and print
+# a message naming the auth failure. Tests must NEVER hit the real claude: the global
+# run_driver sets POST_PLAN_FLEET_AUTH_PROBE_CMD=true; this case overrides it to false.
+begin_case
+_apf_pr="$SCRATCH/one-for-probe.json"
+printf '[{"number":301,"title":"probe-test","url":"https://github.com/a-jay85/IBL5/pull/301","state":"OPEN","headRefName":"probe-branch","isDraft":false,"baseRefName":"master"}]' \
+    > "$_apf_pr"
+_apf_e="$(mktemp)"
+POST_PLAN_FLEET_AUTH_PROBE_CMD=false \
+    POST_PLAN_FLEET_PR_JSON="$_apf_pr" \
+    run_driver --go --wait > /dev/null 2>"$_apf_e"; _apf_rc=$?
+[[ $_apf_rc -ne 0 ]] || fail "auth-probe-false: want nonzero exit, got 0"
+grep -qi 'auth' "$_apf_e" || fail "auth-probe-false: no auth error in stderr (got: $(cat "$_apf_e"))"
+# No plist should have been written for PR 301
+_plist_301="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-301.plist"
+[[ ! -e "$_plist_301" ]] || fail "auth-probe-false: plist was written despite probe failure"
+rm -f "$_apf_e" "$_apf_pr" "$_plist_301"
+end_case auth-probe-false
 
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then

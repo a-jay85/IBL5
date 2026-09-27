@@ -269,6 +269,7 @@ class RunResult:
     # backlog_issue_numbers carry the full history.
     # An empty verdict_1 means INDETERMINATE, which holds condition (12).
     fidelity: dict = field(default_factory=dict)
+    thread_ingestion: dict = field(default_factory=dict)  # Phase 4.5 tallies, see harness/thread_ingestion.py
     degraded_agents: list[str] = field(default_factory=list)  # purposes whose reply was unparseable
     ledger: Optional[UsageLedger] = None
     scored_findings: list[dict] = field(default_factory=list)

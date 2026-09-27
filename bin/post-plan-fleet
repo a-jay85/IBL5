@@ -55,6 +55,10 @@
 #                           at the worktree so review-shared assets resolve correctly.
 #   POST_PLAN_FLEET_DISCORD_DM Override the notifier binary (a recorder stub for tests).
 #                           Unset or empty = $ROOT/bin/discord-dm.
+#   POST_PLAN_FLEET_AUTH_PROBE_CMD  Command to verify Claude auth before firing any session.
+#                           Must exit 0 to proceed. Default: runs a real claude haiku call.
+#                           Set to `true` in tests. When pr-cycle has already probed, it
+#                           sets this to `true` via env to avoid a duplicate probe.
 #
 # Report output (written under --go only):
 #   $HOME/claude-plans/_reports/ibl5/firstpass/pr-firstpass-YYYY-MM-DD.md — one Markdown row per PR (fired or skipped),
@@ -115,7 +119,7 @@ CEILING_SECS="${POST_PLAN_FLEET_CEILING:-7200}"
 WAIT_POLL_SECS="${POST_PLAN_FLEET_WAIT_POLL:-20}"
 
 # --- flag parsing ------------------------------------------------------------------------
-usage() { sed -n '2,70p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,74p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -249,6 +253,36 @@ if [[ "$MODE" != "fire" ]]; then
         for _p in "${STOP_PRS[@]}"; do stop_one_pr "$_p" || _stop_rc=1; done
     fi
     exit "$_stop_rc"
+fi
+
+# --- Claude auth probe -----------------------------------------------------------------------
+# Fix 2: verify that Claude OAuth is live before firing any sessions. Uses the
+# POST_PLAN_FLEET_AUTH_PROBE_CMD seam (set to `true` in tests, or by pr-cycle which already
+# probed). Only runs when actually firing sessions (--go, not --dry-run or --stop paths).
+_fleet_auth_probe() {
+    local _cmd="${POST_PLAN_FLEET_AUTH_PROBE_CMD:-}"
+    if [[ -n "$_cmd" ]]; then
+        "$_cmd"
+        return $?
+    fi
+    local _out _rc
+    set +e
+    # Same isolated probe as bin/pr-cycle's _auth_probe (see the comment there).
+    _out="$(cd /tmp && timeout 90 claude -p 'Reply with the single word OK.' \
+        --model claude-haiku-4-5-20251001 --tools "" --setting-sources "" \
+        --strict-mcp-config --system-prompt 'You reply with exactly the word OK.' 2>/dev/null)"
+    _rc=$?
+    set -e
+    [[ $_rc -ne 0 ]] && return 1
+    [[ "$_out" == *OK* ]] && return 0
+    return 1
+}
+
+if [[ "$GO" -eq 1 && "$SAW_DRY_RUN" -eq 0 ]]; then
+    if ! _fleet_auth_probe; then
+        echo "post-plan-fleet: Claude auth probe failed — not firing (run \`claude\` to re-login)" >&2
+        exit 1
+    fi
 fi
 
 # --- parallel arrays ---------------------------------------------------------------------------

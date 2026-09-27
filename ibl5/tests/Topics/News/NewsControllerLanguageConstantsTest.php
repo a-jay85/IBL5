@@ -50,7 +50,7 @@ final class NewsControllerLanguageConstantsTest extends TestCase
 
         $this->assertSame(
             "Sorry, there isn't information for the selected topic.Go to News IndexSelect a New Topic",
-            _NOINFO4TOPIC . _GOTONEWSINDEX . _SELECTNEWTOPIC
+            constant('_NOINFO4TOPIC') . constant('_GOTONEWSINDEX') . constant('_SELECTNEWTOPIC')
         );
     }
 
@@ -70,7 +70,7 @@ final class NewsControllerLanguageConstantsTest extends TestCase
 
         restore_error_handler();
 
-        $this->assertSame('sentinel', _READMORE);
+        $this->assertSame('sentinel', constant('_READMORE'));
         $this->assertEmpty($warnings, 'Unexpected warnings: ' . implode(', ', $warnings));
     }
 }

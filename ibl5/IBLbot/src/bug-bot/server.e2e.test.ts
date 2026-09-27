@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 
 // Opt-in E2E smoke against the RUNNING pm2 bug-bot-test instance (port 50002).
 // Everything in server.test.ts runs against a mocked discord.js — it proves
@@ -36,7 +36,13 @@ async function post(path: string, body: unknown) {
     return { status: res.status, text: await res.text() };
 }
 
-describe.runIf(E2E && SEED !== '')('E2E bug-bot smoke (opt-in, port 50002)', () => {
+describe.runIf(E2E)('E2E bug-bot smoke (opt-in, port 50002)', () => {
+    beforeAll(() => {
+        if (SEED === '') {
+            throw new Error('BUG_BOT_E2E_MESSAGE_ID is required when BUG_BOT_E2E=1');
+        }
+    });
+
     // Unique per-run marker so /get-thread-messages can assert the text is present
     // without relying on channel history from previous runs.
     const MARKER = `e2e-smoke-${Date.now()}`;
@@ -117,7 +123,7 @@ describe.runIf(E2E && SEED !== '')('E2E bug-bot smoke (opt-in, port 50002)', () 
     });
 });
 
-describe.skipIf(E2E && SEED !== '')('E2E bug-bot smoke (opt-in, port 50002)', () => {
+describe.skipIf(E2E)('E2E bug-bot smoke (opt-in, port 50002)', () => {
     it.skip(
         'SKIP: set BUG_BOT_E2E=1 + BUG_BOT_E2E_MESSAGE_ID=<snowflake> and run bin/bug-pipeline-test-env first',
         () => {},

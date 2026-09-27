@@ -153,7 +153,9 @@ class ApiKeysViewTest extends TestCase
         $html = $this->view->renderExportGuide();
 
         self::assertStringContainsString('Apps Script (header auth)', $html);
-        self::assertStringContainsString("'X-API-Key': 'YOUR_KEY'", html_entity_decode($html, ENT_QUOTES | ENT_HTML5));
+        self::assertStringContainsString('setIblApiKey', $html);
+        self::assertStringContainsString('IBL_PLAYERS', $html);
+        self::assertStringContainsString('PropertiesService.getUserProperties', $html);
         self::assertStringContainsString('UrlFetchApp.fetch', $html);
         self::assertStringContainsString('https://iblhoops.net/ibl5/api/v1/players/export\'', html_entity_decode($html, ENT_QUOTES | ENT_HTML5));
     }

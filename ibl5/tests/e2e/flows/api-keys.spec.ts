@@ -22,7 +22,9 @@ test.describe('API Keys flow', () => {
     await expect(codeBlocks).toHaveCount(2);
     await expect(codeBlocks.nth(0)).toContainText('=IMPORTDATA(');
     await expect(codeBlocks.nth(0)).toContainText('?key=YOUR_KEY');
-    await expect(codeBlocks.nth(1)).toContainText("'X-API-Key': 'YOUR_KEY'");
+    await expect(codeBlocks.nth(1)).toContainText('setIblApiKey');
+    await expect(codeBlocks.nth(1)).toContainText('IBL_PLAYERS');
+    await expect(codeBlocks.nth(1)).toContainText('PropertiesService.getUserProperties');
     await expect(codeBlocks.nth(1)).toContainText('UrlFetchApp.fetch');
     await expect(codeBlocks.nth(1)).not.toContainText('?key=');
 

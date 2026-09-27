@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-matrix-assertion-check — regression test for bin/lib/plan-matrix-assertions.
+#
+# Run: bin/test-matrix-assertion-check [case-name|all]
+#   exit 0 = all selected cases pass, 1 = at least one failed
+
+set -euo pipefail
+
+HELPER="$(cd "$(dirname "$0")/.." && pwd)/bin/lib/plan-matrix-assertions"
+
+FAILED=0
+
+ok() { printf 'PASS %s\n' "$1"; }
+fail() { printf 'FAIL %s\n' "$1"; FAILED=1; }
+
+# Print the standard Verification Matrix header + separator + given rows.
+plan_fixture() {
+    printf '| # | What to verify | Test type | Timing | Test file / location |\n'
+    printf '|---|---------------|-----------|--------|---------------------|\n'
+    printf '%s\n' "$@"
+}
+
+# --- run a single case ---
+
+run_case() {
+local case="$1"
+local root
+root=$(mktemp -d)
+git -C "$root" init -q
+
+case "$case" in
+
+absent-new-token)
+    plan_fixture '| 7 | `FIXTURE_NEW_SYMBOL` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    printf '+some unrelated added line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    lines=$(printf '%s\n' "$out" | grep -c 'UNREALISED-ASSERTION' || true)
+    if [ "$rc" -eq 0 ] && [ "$lines" -eq 1 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 7'; then
+        ok "absent-new-token"
+    else
+        fail "absent-new-token (rc=$rc, lines=$lines, out=$out)"
+    fi
+    ;;
+
+present-in-plus)
+    plan_fixture '| 7 | `FIXTURE_NEW_SYMBOL` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    # feed diff on stdin via "-"
+    out=$(printf '+FIXTURE_NEW_SYMBOL=1\n' | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "present-in-plus"
+    else
+        fail "present-in-plus (rc=$rc, out=$out)"
+    fi
+    ;;
+
+no-single-word-tokens)
+    plan_fixture '| 5 | `two words here` and plain prose only | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    printf '+nothing relevant\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "no-single-word-tokens"
+    else
+        fail "no-single-word-tokens (rc=$rc, out=$out)"
+    fi
+    ;;
+
+waived)
+    plan_fixture \
+        '| 3 | `FIXTURE_WAIVE_ME` should appear | CLI-executable | post-impl | `bin/test-it` |' \
+        '| 4 | `FIXTURE_WAIVE_ME` should also appear | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    printf 'WAIVE-MATRIX-ROW: 3\n' > "$root/body.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" "$root/body.txt" 2>/dev/null)
+    rc=$?
+    row3=$(printf '%s' "$out" | grep -c 'row 3' || true)
+    row4=$(printf '%s' "$out" | grep -c 'row 4' || true)
+    if [ "$rc" -eq 0 ] && [ "$row3" -eq 0 ] && [ "$row4" -eq 1 ]; then
+        ok "waived"
+    else
+        fail "waived (rc=$rc, row3=$row3, row4=$row4, out=$out)"
+    fi
+    ;;
+
+fenced)
+    # Row 8 inside a fence, row 9 outside — only 9 should fire
+    {
+        printf '| # | What to verify | Test type | Timing | Test file / location |\n'
+        printf '|---|---|---|---|---|\n'
+        printf '| 9 | `FIXTURE_FENCE_SYMBOL` outside fence | CLI-executable | post-impl | `bin/t` |\n'
+        printf '\n'
+        printf '```\n'
+        printf '| # | What to verify | Test type | Timing | Test file / location |\n'
+        printf '|---|---|---|---|---|\n'
+        printf '| 8 | `FIXTURE_FENCE_SYMBOL` inside fence | CLI-executable | post-impl | `bin/t` |\n'
+        printf '```\n'
+    } > "$root/plan.md"
+    printf '+unrelated\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    row8=$(printf '%s' "$out" | grep -c 'row 8' || true)
+    row9=$(printf '%s' "$out" | grep -c 'row 9' || true)
+    if [ "$rc" -eq 0 ] && [ "$row8" -eq 0 ] && [ "$row9" -eq 1 ]; then
+        ok "fenced"
+    else
+        fail "fenced (rc=$rc, row8=$row8, row9=$row9, out=$out)"
+    fi
+    ;;
+
+preexisting-tree-token)
+    plan_fixture '| 6 | `FIXTURE_OLD_SYMBOL` should still be here | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    # Put the token in a tracked file in the root
+    printf 'FIXTURE_OLD_SYMBOL=legacy\n' > "$root/existing.sh"
+    git -C "$root" add existing.sh
+    git -C "$root" -c user.email=t@t.com -c user.name=T commit -qm "add"
+    # Diff that doesn't mention the token at all
+    printf '+something_else\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "preexisting-tree-token"
+    else
+        fail "preexisting-tree-token (rc=$rc, out=$out)"
+    fi
+    ;;
+
+context-line-token)
+    plan_fixture '| 11 | `FIXTURE_CTX_SYMBOL` is checked | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    # Token appears only on a context line (leading space), root lacks it
+    printf ' FIXTURE_CTX_SYMBOL=old\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "context-line-token"
+    else
+        fail "context-line-token (rc=$rc, out=$out)"
+    fi
+    ;;
+
+dup-guard-regression)
+    plan_fixture '| 8 | `bin/plan-now` and `PLAN_NOW_DUP_CHECK` added | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    # Diff modifies bin/plan-now (path appears in + lines) but NEVER adds PLAN_NOW_DUP_CHECK
+    printf '+#!/bin/bash\n+# bin/plan-now: main script\n+echo running bin/plan-now\n' > "$root/diff.txt"
+    err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -qF 'UNREALISED-ASSERTION: row 8' \
+        && printf '%s' "$err" | grep -qF 'PLAN_NOW_DUP_CHECK'; then
+        ok "dup-guard-regression"
+    else
+        fail "dup-guard-regression (rc=$rc, out=$out, err=$err)"
+    fi
+    ;;
+
+empty-env)
+    # Build the absent-new-token fixture
+    plan_fixture '| 7 | `FIXTURE_NEW_SYMBOL` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    printf '+some unrelated added line\n' > "$root/diff.txt"
+    # Reference output from normal run
+    ref=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    # Empty-env run (rely on cwd for tree root)
+    got=$( (cd "$root" && env -i PATH=/usr/bin:/bin "$HELPER" plan.md diff.txt) 2>/dev/null)
+    if [ "$ref" = "$got" ]; then
+        ok "empty-env"
+    else
+        fail "empty-env (ref=$ref, got=$got)"
+    fi
+    ;;
+
+usage)
+    # Sub-test 1: missing plan path -> exit 2
+    "$HELPER" /nonexistent/plan.md 2>/dev/null && rc1=0 || rc1=$?
+    # Sub-test 2: valid plan but non-existent body file -> exit 2
+    plan_fixture '| 1 | `FIXTURE_X` | CLI | post | `f` |' > "$root/plan.md"
+    printf '+FIXTURE_X\n' > "$root/diff.txt"
+    "$HELPER" "$root/plan.md" "$root/diff.txt" /nonexistent/body.md 2>/dev/null && rc2=0 || rc2=$?
+    if [ "$rc1" -eq 2 ] && [ "$rc2" -eq 2 ]; then
+        ok "usage"
+    else
+        fail "usage (rc1=$rc1, rc2=$rc2)"
+    fi
+    ;;
+
+bad-flags)
+    # Sub-test 1: unknown flag as $1 (not a readable file) -> exit 2
+    "$HELPER" --bad-flag 2>/dev/null && rc1=0 || rc1=$?
+    # Sub-test 2: valid plan, diff, but non-existent body file -> exit 2
+    plan_fixture '| 1 | `FIXTURE_Y` | CLI | post | `f` |' > "$root/plan.md"
+    printf '+FIXTURE_Y\n' > "$root/diff.txt"
+    "$HELPER" "$root/plan.md" "$root/diff.txt" /nonexistent/body.txt 2>/dev/null && rc2=0 || rc2=$?
+    if [ "$rc1" -eq 2 ] && [ "$rc2" -eq 2 ]; then
+        ok "bad-flags"
+    else
+        fail "bad-flags (rc1=$rc1, rc2=$rc2)"
+    fi
+    ;;
+
+empty-range)
+    # An empty diff still reports an absent token as unrealised
+    plan_fixture '| 12 | `FIXTURE_EMPTY_RANGE_SYM` is expected | CLI-executable | post-impl | `bin/t` |' \
+        > "$root/plan.md"
+    printf '' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -qF 'UNREALISED-ASSERTION: row 12'; then
+        ok "empty-range"
+    else
+        fail "empty-range (rc=$rc, out=$out)"
+    fi
+    ;;
+
+*)
+    printf 'Unknown case: %s\n' "$case" >&2
+    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range all\n' >&2
+    exit 2
+    ;;
+esac
+
+rm -rf "$root"
+}
+
+# --- dispatch ---
+
+ARG="${1:-all}"
+
+CASES="absent-new-token present-in-plus no-single-word-tokens waived fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range"
+
+if [ "$ARG" = "all" ]; then
+    for c in $CASES; do
+        run_case "$c"
+    done
+else
+    run_case "$ARG"
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+    exit 1
+fi

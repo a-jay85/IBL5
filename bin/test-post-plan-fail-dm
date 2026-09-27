@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-post-plan-fail-dm — cases for bin/post-plan-fail-dm (the exit-3 DM hold).
+#
+#   1. No live session in the worktree: DM now, no launchd job.
+#   2. Live session in the worktree: no DM now, one held job scheduled.
+#   3. Live session in a different worktree: DM now.
+#   4. Registry unreadable: DM now (fail open).
+#   5. launchctl bootstrap fails: DM now.
+#   6. Held job, newer log for the branch: no DM.
+#   7. Held job, no newer log: DM, prefixed so you know nobody re-ran it.
+#   8. Held job, newer log for a longer branch name ("foo-bar" vs "foo"): still DMs.
+#
+# launchctl and discord-dm are stubbed; nothing leaves the machine.
+# Run: bin/test-post-plan-fail-dm  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+SUT="$ROOT/bin/post-plan-fail-dm"
+
+FAILS=0
+ok()   { printf '  ok   %s\n' "$1"; }
+fail() { printf '  FAIL %s\n' "$1"; FAILS=$(( FAILS + 1 )); }
+
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-post-plan-fail-dm.XXXXXX")
+trap 'rm -rf "$TMP"' EXIT
+
+WT="$TMP/wt"; OTHER="$TMP/other"; LOGS="$TMP/logs"; PLISTS="$TMP/plists"
+mkdir -p "$WT" "$OTHER" "$LOGS" "$TMP/bin"
+DM_OUT="$TMP/dm.out"; LC_OUT="$TMP/lc.out"
+
+cat > "$TMP/bin/dm" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\${*: -1}" >> "$DM_OUT"
+EOF
+cat > "$TMP/bin/lc-ok" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$LC_OUT"
+EOF
+printf '#!/usr/bin/env bash\nexit 5\n' > "$TMP/bin/lc-bad"
+chmod +x "$TMP/bin/"*
+
+registry() {   # registry <repo> <pid>
+    printf '{"x":{"repo":"%s","pid":%s}}\n' "$1" "$2" > "$TMP/reg.json"
+}
+
+LOG="$LOGS/post-plan-now-foo-20260926-182719-111.log"
+
+reset() {
+    rm -f "$DM_OUT" "$LC_OUT" "$LOGS"/* "$TMP/reg.json"
+    rm -rf "$PLISTS"
+    : > "$LOG"
+}
+
+run() {   # run [--deferred]
+    FAILDM_REGISTRY="$TMP/reg.json" FAILDM_DM_CMD="$TMP/bin/dm" \
+    FAILDM_LAUNCHCTL="${LC:-$TMP/bin/lc-ok}" FAILDM_PLIST_DIR="$PLISTS" \
+    FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY=900 \
+        "$SUT" "$@" "$WT" foo "$LOG" "the-msg" >/dev/null 2>&1
+}
+
+dm_count() { [ -f "$DM_OUT" ] && wc -l < "$DM_OUT" | tr -d ' ' || echo 0; }
+lc_count() { [ -f "$LC_OUT" ] && wc -l < "$LC_OUT" | tr -d ' ' || echo 0; }
+
+echo "post-plan-fail-dm:"
+
+reset; registry "$WT" 999999
+run
+[ "$(dm_count)" = 1 ] && [ "$(lc_count)" = 0 ] && ok "1 dead session: DM now" || fail "1 dead session: DM now"
+
+reset; registry "$WT" $$
+run
+[ "$(dm_count)" = 0 ] && [ "$(lc_count)" = 1 ] && [ -f "$LOG.faildm-stamp" ] \
+    && ls "$PLISTS"/*.plist >/dev/null 2>&1 \
+    && ok "2 live session: DM held" || fail "2 live session: DM held"
+
+reset; registry "$OTHER" $$
+run
+[ "$(dm_count)" = 1 ] && [ "$(lc_count)" = 0 ] && ok "3 other worktree: DM now" || fail "3 other worktree: DM now"
+
+reset
+run
+[ "$(dm_count)" = 1 ] && ok "4 no registry: DM now" || fail "4 no registry: DM now"
+
+reset; registry "$WT" $$
+LC="$TMP/bin/lc-bad" run
+[ "$(dm_count)" = 1 ] && [ ! -f "$LOG.faildm-stamp" ] && ok "5 bootstrap fails: DM now" || fail "5 bootstrap fails: DM now"
+
+reset; touch -t 202609261800 "$LOG.faildm-stamp"
+: > "$LOGS/post-plan-now-foo-20260926-183043-222.log"
+run --deferred
+[ "$(dm_count)" = 0 ] && [ ! -f "$LOG.faildm-stamp" ] && ok "6 re-fired: no DM" || fail "6 re-fired: no DM"
+
+reset; touch -t 202609261800 "$LOG.faildm-stamp"
+touch -t 202609261800 "$LOG"
+run --deferred
+if [ "$(dm_count)" = 1 ] && grep -q '^Nobody re-ran it within 15 min.*the-msg$' "$DM_OUT"; then
+    ok "7 not re-fired: prefixed DM"
+else
+    fail "7 not re-fired: prefixed DM"
+fi
+
+reset; touch -t 202609261800 "$LOG.faildm-stamp"
+: > "$LOGS/post-plan-now-foo-bar-20260926-183043-333.log"
+run --deferred
+[ "$(dm_count)" = 1 ] && ok "8 other branch log ignored" || fail "8 other branch log ignored"
+
+if [ "$FAILS" -gt 0 ]; then
+    echo "test-post-plan-fail-dm: $FAILS case(s) failed"
+    exit 1
+fi
+echo "test-post-plan-fail-dm: all cases passed"

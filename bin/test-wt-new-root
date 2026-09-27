@@ -215,7 +215,6 @@ ENV4="$(new_env_base_branch)"
 ORIGIN_FEATURE_A_TIP4="$(sha "$ENV4/IBL5" origin/feature-a)"
 MASTER_TIP4="$(sha "$ENV4/IBL5" master)"
 git_q -C "$ENV4/IBL5" branch -D feature-a >/dev/null 2>&1
-MASTER_TIP4="$(sha "$ENV4/IBL5" master)"
 OUT4="$("$ENV4/IBL5/bin/wt-new" --existing feature-a 2>&1)"
 assert_match "case 4: output mentions origin/feature-a" "origin/feature-a" "$OUT4"
 if [ -d "$ENV4/IBL5-worktrees/feature-a" ]; then

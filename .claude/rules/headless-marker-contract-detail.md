@@ -1,6 +1,6 @@
 ---
 description: Companion to headless-marker-contract.md — attaches only when bin/plan-now or bin/test-plan-now is touched, never on a general bin/ edit. Contains the historical rationale for the headless marker rule and bin/plan-now draft-recovery fallback internals (Leg A and Leg B). Read when debugging a missing-marker failure or modifying bin/plan-now recovery logic.
-last_verified: 2026-09-25
+last_verified: 2026-09-26
 paths:
   - "bin/plan-now"
   - "bin/test-plan-now"
@@ -92,3 +92,14 @@ regression that a valid marker still wins outright and never enters recovery at 
 negatives, and the most important is a slugless prompt: both legs no-op for it, that is
 the *majority* of real prompts, and its verdict must stay byte-identical to the
 pre-recovery one.
+
+## Halting with no plan: `NO_PLAN:`
+
+A run can finish correctly with nothing to plan: `/plan` Step 2.1 finds the work already
+merged and halts. Until 2026-09-26 the coda had no legal last line for that, so the
+halt read `RESULT unconfirmed` and the DM named an unrelated peer plan as its guess.
+The coda now accepts `NO_PLAN: <reason>` as the only alternative last line. It gets the
+same tolerant decoration parse as `PLAN_FILE:`. A valid `PLAN_FILE:` wins when both
+appear. The `RESULT no-plan` branch sits before recovery in the verdict chain, so a
+halted run never has a draft adopted or queued, and it never runs `check-plan`.
+`bin/test-plan-now` pins it in its `NO_PLAN:` section.

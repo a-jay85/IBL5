@@ -385,8 +385,8 @@ cat >> "$PROMPT" <<CODA
 **Headless run constraints (appended by \`bin/plan-now\` — these override any
 conflicting default in the skill):**
 
-- **Announce your plan's path — in your FINAL message.** The **last line** of your
-  final message must be exactly this line, on its own, with nothing after it and no
+- **Announce your plan's path — in your FINAL message.** Unless you halt with no
+  plan (next bullet), the **last line** of your final message must be exactly this line, on its own, with nothing after it and no
   backticks, bullet, bold or fence around it:
   \`\`\`
   PLAN_FILE: $PLANS_DIR/<slug>.md
@@ -401,6 +401,14 @@ conflicting default in the skill):**
   Step 5.5 and Step 6: skip the queue step, write the Step 6 report, then end with
   this line. Runs that followed Step 6 ended on a queue-status sentence
   ("Queued at position N", "Automouse will pick it up") and lost the line.
+- **Halting with no plan is legal — end it with \`NO_PLAN:\` instead.** If you stop
+  without writing any plan (the skill's Step 2.1 found the work fully done), the
+  last line of your final message must be exactly this, bare, on its own:
+  \`\`\`
+  NO_PLAN: <one line: why, with the evidence — PR #, commit SHA or file path>
+  \`\`\`
+  Use it only when no plan file was written. A run that wrote a plan always ends
+  with \`PLAN_FILE:\`. Without either line the run is reported \`unconfirmed\`.
 - **No human is present.** Never call \`AskUserQuestion\`, never pause for input,
   never end a turn waiting for an answer. The forks a human could answer were
   already resolved by the session that drafted this prompt; they appear above as
@@ -432,7 +440,7 @@ fi
 # turn loses: where it was, what is already on disk, and the marker contract.
 CONTINUE_MSG=""
 if [ -n "$RESUME_ID" ]; then
-    CONTINUE_MSG="Your previous turn was cut off before it finished (a usage limit or the run timeout). Continue exactly where you stopped. Do not restart exploration and do not re-plan from scratch: any file under $PLANS_DIR (including $PLANS_DIR/.drafts/) that belongs to this task is your own partial work; index it with bin/plan-index, read it by range, and finish it. Every headless run constraint from the original prompt still applies: never ask a question, run every sub-agent in the foreground, never run bin/automouse/queue yourself, and run bin/check-plan then bin/check-plan-staleness on the finished plan before you stop. The last line of your final message must be exactly: PLAN_FILE: $PLANS_DIR/<slug>.md"
+    CONTINUE_MSG="Your previous turn was cut off before it finished (a usage limit or the run timeout). Continue exactly where you stopped. Do not restart exploration and do not re-plan from scratch: any file under $PLANS_DIR (including $PLANS_DIR/.drafts/) that belongs to this task is your own partial work; index it with bin/plan-index, read it by range, and finish it. Every headless run constraint from the original prompt still applies: never ask a question, run every sub-agent in the foreground, never run bin/automouse/queue yourself, and run bin/check-plan then bin/check-plan-staleness on the finished plan before you stop. The last line of your final message must be exactly: PLAN_FILE: $PLANS_DIR/<slug>.md — or, only if you halt having written no plan at all (the work is already done), exactly: NO_PLAN: <one-line reason with the evidence>"
 fi
 
 # ---------------------------------------------------------------------------
@@ -495,7 +503,7 @@ started=$(date +%s)
 # because the echo strings are byte-exact fixtures in bin/test-plan-now (and the
 # unconfirmed verdict is two echoes, not one) — an assignment cannot break an
 # assertion the way a rewrapped echo can.
-DM_ICON=""      # ✅ ok · ⚠️ degraded · ❌ failed · ❓ unconfirmed
+DM_ICON=""      # ✅ ok · ⚠️ degraded · ❌ failed · ⏹️ no-plan · ❓ unconfirmed
 DM_VERDICT=""   # the RESULT line, trimmed to what fits a phone notification
 DM_NEXT=""      # what happens next: queued, or waiting on you
 DM_PLAN=""      # the plan this run produced, when it is known
@@ -664,6 +672,18 @@ case "$plan" in
     *)    echo "plan-now: ignoring PLAN_FILE outside $PLANS_DIR: $plan"; plan="" ;;
 esac
 
+# The coda's second legal last line: `NO_PLAN: <reason>`, for a run that halted by
+# design with nothing to plan (/plan Step 2.1 found the work already done). Without
+# it that correct outcome landed as `unconfirmed`, beside a "best-effort guess" that
+# named a concurrent run's plan. Same tolerant decoration parse as PLAN_FILE:. It is
+# consulted only when no valid PLAN_FILE was found, and it can never queue.
+no_plan=""
+if grep -qE '^[-*>`[:space:]]*NO_PLAN:' "$OUT" 2>/dev/null; then
+    no_plan=$(grep -E '^[-*>`[:space:]]*NO_PLAN:' "$OUT" | tail -1 \
+              | sed -E 's/^.*NO_PLAN:[[:space:]*`]*//; s/[[:space:]*`]+$//')
+    no_plan="${no_plan:-no reason given}"
+fi
+
 after=$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)
 newfiles=$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep -E '\.md$')
 
@@ -730,6 +750,14 @@ elif [ -n "$plan" ]; then
         DM_REVIEW_PLAN="$plan"
         echo "plan-now: NOT queued. A human must fix $plan before it is queued or implemented."
     fi
+elif [ -n "$no_plan" ]; then
+    # Before recovery on purpose: a run that says it wrote nothing must never have a
+    # slug-matched draft adopted and queued behind its back.
+    echo "plan-now: RESULT no-plan — $no_plan"
+    echo "plan-now: the run halted by design and wrote no plan. check-plan was NOT run and nothing was queued."
+    DM_ICON="⏹️"; DM_VERDICT="no-plan — $no_plan"
+    DM_NEXT="nothing queued — act on the reason above"
+    DM_REVIEW_BUTTONS=""; DM_REVIEW_PLAN=""
 else
     # Recovery. Reached only when rc == 0 (the chain's first arm owns nonzero),
     # so "clean exit" — leg 1 of the queue gate — is already structural here.
@@ -918,7 +946,7 @@ notify() {
     fi
     [ -n "$title" ] || title="(unidentified)"
 
-    # A verdict this runner never set means someone added a seventh terminal
+    # A verdict this runner never set means someone added an eighth terminal
     # branch and missed it. Say so in the DM rather than sending a blank line.
     msg="${DM_ICON:-❓} plan-now: $title
 RESULT ${DM_VERDICT:-unknown — the runner set no verdict}

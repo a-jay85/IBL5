@@ -24,9 +24,15 @@ interface RookieOptionControllerInterface
      * @param string $teamName Team name exercising the option
      * @param int $playerID Player ID of the rookie
      * @param int $extensionAmount Rookie option salary amount in thousands
+     * @param string|null $sessionTeam Team name resolved from the logged-in user's session
+     *                                 (TeamIdentityRepositoryInterface::getTeamnameFromUsername()); null when unresolved
      * @return array{success: bool, type: string, message: string, playerID: int, teamid?: int, emailSuccess?: bool}
      *
      * **Validation:**
+     * - Ownership: $sessionTeam must be non-null, must not be League::FREE_AGENTS_TEAM_NAME,
+     *   and must equal $teamName; otherwise type=ownership_error, no DB access
+     * - $teamName, $playerID and $extensionAmount must be non-empty/non-zero; otherwise
+     *   type=validation_error "Invalid request. Missing required parameters.", no DB access
      * - Player must pass canRookieOption() check
      * - Player must be a first or second round draft pick
      *
@@ -43,5 +49,5 @@ interface RookieOptionControllerInterface
      * - success=true: Option exercised, includes teamid and emailSuccess
      * - success=false: Validation or database error, includes error message
      */
-    public function processRookieOption(string $teamName, int $playerID, int $extensionAmount): array;
+    public function processRookieOption(string $teamName, int $playerID, int $extensionAmount, ?string $sessionTeam): array;
 }

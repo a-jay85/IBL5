@@ -143,7 +143,13 @@ def _matrix_assertion_items(plan: PlanInfo, diff_body: str, pr_body: str,
 
     Fail-CLOSED on an unrunnable script (OSError, exit >= 2): a gate that reports
     clean when it could not run is the silent pass this check exists to remove.
+
+    An empty `plan.path` means the plan came from `content_override` (replay
+    fixtures, hand-built PlanInfo in tests): there is no file for the script to
+    read, so the check does not apply. A live plan always carries its disk path.
     """
+    if not plan.path:
+        return []
     script = script or _MATRIX_ASSERTIONS_SCRIPT
     with tempfile.TemporaryDirectory(prefix="matrix-assert-") as td:
         diff_path = os.path.join(td, "diff.patch")

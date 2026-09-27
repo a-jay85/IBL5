@@ -177,7 +177,7 @@ Settings -> Season
 SimRecap -> JsbParser LastSimRecap League PageLayout Security
 Standings -> League Security UI
 Team -> Auth BasketballStats Discord Http League Player Repositories Season Security Trading UI
-TeamOffDefStats -> BasketballStats League Security UI
+TeamOffDefStats -> BasketballStats League Season Security UI
 TeamSchedule -> BasketballStats League LeagueSchedule Season Security Team
 Topics -> BaseMysqliRepository Search Security
 Trading -> Auth BaseMysqliRepository Discord EventLog League Player Repositories Season Security Team UI

@@ -99,12 +99,45 @@ class BoxscoreTest extends TestCase
         $this->assertSame(2025, $box->gameYear);
     }
 
-    public function testPreseasonPhaseRemapsDecemberToOctober(): void
+    public function testPreseasonPhaseRemapsDecemberToSeptember(): void
     {
-        $line = $this->makeGameInfoLine(monthCode: '02', dayCode: '10');
+        // dayCode '00' → +1 = day 1; monthCode '02' → +10 = 12 (December)
+        $line = $this->makeGameInfoLine(monthCode: '02', dayCode: '00');
         $box = Boxscore::withGameInfoLine($line, 2026, 'Preseason');
 
+        $this->assertSame('09', $box->gameMonth);
+        $this->assertSame(2025, $box->gameYear);
+        $this->assertSame('2025-09-01', $box->gameDate);
+    }
+
+    public function testPreseasonDecemberFirstAndNovemberSecondLandOnDistinctSeptemberDates(): void
+    {
+        // Dec day 1: dayCode '00' → day 1; Nov day 2: dayCode '01' → day 2
+        $decLine = $this->makeGameInfoLine(monthCode: '02', dayCode: '00');
+        $novLine = $this->makeGameInfoLine(monthCode: '01', dayCode: '01');
+        $decBox = Boxscore::withGameInfoLine($decLine, 2026, 'Preseason');
+        $novBox = Boxscore::withGameInfoLine($novLine, 2026, 'Preseason');
+
+        $this->assertSame('2025-09-01', $decBox->gameDate);
+        $this->assertSame('2025-09-02', $novBox->gameDate);
+        $this->assertNotSame($decBox->gameDate, $novBox->gameDate);
+    }
+
+    public function testHeatPhaseStillPinsDecemberToOctober(): void
+    {
+        $line = $this->makeGameInfoLine(monthCode: '02', dayCode: '10');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'HEAT');
+
         $this->assertSame('10', $box->gameMonth);
+        $this->assertStringStartsWith('2025-10-', $box->gameDate);
+    }
+
+    public function testRegularSeasonPhaseLeavesNovemberInNovember(): void
+    {
+        $line = $this->makeGameInfoLine(monthCode: '01', dayCode: '15');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season');
+
+        $this->assertSame('11', $box->gameMonth);
         $this->assertSame(2025, $box->gameYear);
     }
 

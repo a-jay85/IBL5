@@ -313,11 +313,9 @@ clear_live_labels
 end_case label-anchor
 
 # --- Phase 8 fixture setup ---------------------------------------------------------------
-# Shared fixtures for cases 11-30.
+# Shared fixtures for preflight/report cases.
 
-ATTACK_SHA="abc1234"   # 7 valid hex digits — matched against the attack-fresh.md Base: line
-
-# Extended WTL: covers attack-path branches (branch-r1..r8, branch-s1..s3), preflight
+# Extended WTL: covers preflight-path branches, preflight
 # combos (wt-and-plan, wt-only), report-status branches (branch-ready, branch-notready,
 # branch-mmtf, branch-nolog), and grep-form branches (foo, foo-bar).
 WTL8="$SCRATCH/wtl8.txt"
@@ -343,87 +341,6 @@ cat > "$WTL8" <<EOF
 /Users/x/IBL5-worktrees/foo/ibl5             4567890 [foo]
 /Users/x/IBL5-worktrees/foo-bar/ibl5         5678901 [foo-bar]
 EOF
-
-# attack-fresh.md: 8 ranked PRs (1910-1917), 1 excluded (1912), sha=ATTACK_SHA.
-cat > "$SCRATCH/attack-fresh.md" <<EOF
-# /pr-attack output fixture
-
-Base: \`master\` @ ${ATTACK_SHA} · 8 open · 8 orderable · 1 excluded
-
-| rank | PR | title |
-|------|----|----|
-| 1 | #1910 | r1 |
-| 2 | #1911 | r2 |
-| 3 | #1912 | r3 |
-| 4 | #1913 | r4 |
-| 5 | #1914 | r5 |
-| 6 | #1915 | r6 |
-| 7 | #1916 | r7 |
-| 8 | #1917 | r8 |
-
-## Excluded
-- #1912
-EOF
-
-# attack-stale.md: same structure but sha=aaaaaaa (mismatches ATTACK_SHA → STALE).
-cat > "$SCRATCH/attack-stale.md" <<EOF
-# /pr-attack output fixture
-
-Base: \`master\` @ aaaaaaa · 8 open · 8 orderable · 1 excluded
-
-| rank | PR | title |
-|------|----|----|
-| 1 | #1910 | r1 |
-| 2 | #1911 | r2 |
-| 3 | #1912 | r3 |
-
-## Excluded
-- #1912
-EOF
-
-# attack-empty.md: valid Base: sha but no ranked table rows → select_prs errors out.
-cat > "$SCRATCH/attack-empty.md" <<EOF
-# /pr-attack output fixture
-
-Base: \`master\` @ ${ATTACK_SHA} · 0 open · 0 orderable · 0 excluded
-
-## Excluded
-(none)
-EOF
-
-# attack-short.md: 3 ranked PRs (1920-1922), no excluded, sha=ATTACK_SHA.
-cat > "$SCRATCH/attack-short.md" <<EOF
-# /pr-attack output fixture
-
-Base: \`master\` @ ${ATTACK_SHA} · 3 open · 3 orderable · 0 excluded
-
-| rank | PR | title |
-|------|----|----|
-| 1 | #1920 | s1 |
-| 2 | #1921 | s2 |
-| 3 | #1922 | s3 |
-
-## Excluded
-(none)
-EOF
-
-# JSON for the 1910-1922 PR universe (used so the fire loop can resolve headRefName
-# for each PR number when --pr-attack is in effect).
-cat > "$SCRATCH/attack-8prs.json" <<'JSON'
-[
-  {"number": 1910, "title": "r1",      "isDraft": false, "headRefName": "branch-r1", "author": {"login": "a-jay85"}},
-  {"number": 1911, "title": "r2",      "isDraft": false, "headRefName": "branch-r2", "author": {"login": "a-jay85"}},
-  {"number": 1912, "title": "r3-excl", "isDraft": false, "headRefName": "branch-r3", "author": {"login": "a-jay85"}},
-  {"number": 1913, "title": "r4",      "isDraft": false, "headRefName": "branch-r4", "author": {"login": "a-jay85"}},
-  {"number": 1914, "title": "r5",      "isDraft": false, "headRefName": "branch-r5", "author": {"login": "a-jay85"}},
-  {"number": 1915, "title": "r6",      "isDraft": false, "headRefName": "branch-r6", "author": {"login": "a-jay85"}},
-  {"number": 1916, "title": "r7",      "isDraft": false, "headRefName": "branch-r7", "author": {"login": "a-jay85"}},
-  {"number": 1917, "title": "r8",      "isDraft": false, "headRefName": "branch-r8", "author": {"login": "a-jay85"}},
-  {"number": 1920, "title": "s1",      "isDraft": false, "headRefName": "branch-s1", "author": {"login": "a-jay85"}},
-  {"number": 1921, "title": "s2",      "isDraft": false, "headRefName": "branch-s2", "author": {"login": "a-jay85"}},
-  {"number": 1922, "title": "s3",      "isDraft": false, "headRefName": "branch-s3", "author": {"login": "a-jay85"}}
-]
-JSON
 
 # four-combo.json: 4 PRs for the preflight-matrix case.
 cat > "$SCRATCH/four-combo.json" <<'JSON'
@@ -467,98 +384,6 @@ EOF
 mkdir -p "$SCRATCH/claude-plans"
 touch "$SCRATCH/claude-plans/wt-and-plan.md"
 touch "$SCRATCH/claude-plans/plan-only.md"
-
-# --- case 11: attack-selection -----------------------------------------------------------
-# select_prs() from a /pr-attack file: top-5 after exclusion. Excluded PR 1912 absent.
-# PRs beyond the top-5 cut (1916, 1917) absent.
-begin_case
-clean_slots
-out="$(POST_PLAN_FLEET_MASTER_SHA="$ATTACK_SHA" \
-       POST_PLAN_FLEET_WTL="$WTL8" \
-       POST_PLAN_FLEET_PR_JSON="$SCRATCH/attack-8prs.json" \
-       run_driver --pr-attack "$SCRATCH/attack-fresh.md" --top-n 5 2>&1)"; rc=$?
-[[ $rc -eq 0 ]] || fail "attack-selection: exit $rc (out: $out)"
-for pr in 1910 1911 1913 1914 1915; do
-    grep -q "$pr" <<< "$out" || fail "attack-selection: PR $pr missing (out: $out)"
-done
-grep -q '1912' <<< "$out" && fail "attack-selection: excluded PR 1912 appeared in output"
-grep -q '1916' <<< "$out" && fail "attack-selection: beyond-top PR 1916 appeared in output"
-grep -q '1917' <<< "$out" && fail "attack-selection: beyond-top PR 1917 appeared in output"
-end_case attack-selection
-
-# --- case 12: attack-excluded ------------------------------------------------------------
-# Excluded PR 1912 never appears, even when --top-n 99 would otherwise include it.
-begin_case
-clean_slots
-out="$(POST_PLAN_FLEET_MASTER_SHA="$ATTACK_SHA" \
-       POST_PLAN_FLEET_WTL="$WTL8" \
-       POST_PLAN_FLEET_PR_JSON="$SCRATCH/attack-8prs.json" \
-       run_driver --pr-attack "$SCRATCH/attack-fresh.md" --top-n 99 2>&1)"
-grep -q '1912' <<< "$out" && fail "attack-excluded: PR 1912 appeared with --top-n 99 (out: $out)"
-end_case attack-excluded
-
-# --- case 13: attack-staleness -----------------------------------------------------------
-# Fresh fixture + matching SHA → exit 0.
-# Stale fixture (sha=aaaaaaa, ATTACK_SHA=abc1234) → STALE message + exit 1.
-begin_case
-clean_slots
-POST_PLAN_FLEET_MASTER_SHA="$ATTACK_SHA" \
-    POST_PLAN_FLEET_WTL="$WTL8" \
-    POST_PLAN_FLEET_PR_JSON="$SCRATCH/attack-8prs.json" \
-    run_driver --pr-attack "$SCRATCH/attack-fresh.md" --top-n 1 >/dev/null 2>&1
-fresh_rc=$?
-[[ $fresh_rc -eq 0 ]] || fail "attack-staleness: fresh arm exited $fresh_rc, want 0"
-stale_err="$(POST_PLAN_FLEET_MASTER_SHA="$ATTACK_SHA" \
-    run_driver --pr-attack "$SCRATCH/attack-stale.md" 2>&1)"; stale_rc=$?
-[[ $stale_rc -ne 0 ]] || fail "attack-staleness: stale arm exited 0, want non-zero"
-grep -qi 'STALE' <<< "$stale_err" || fail "attack-staleness: stale arm lacks STALE keyword (out: $stale_err)"
-end_case attack-staleness
-
-# --- case 14: attack-empty-table ---------------------------------------------------------
-# A /pr-attack file with a valid Base: but no ranked rows triggers an error exit.
-# No plists must be created.
-begin_case
-clean_slots
-err="$(POST_PLAN_FLEET_MASTER_SHA="$ATTACK_SHA" \
-    run_driver --pr-attack "$SCRATCH/attack-empty.md" 2>&1)"; rc=$?
-[[ $rc -ne 0 ]] || fail "attack-empty-table: exited 0, want non-zero"
-grep -qi 'no orderable' <<< "$err" || fail "attack-empty-table: error lacks 'no orderable' (out: $err)"
-[[ "$(plist_count)" -eq 0 ]] || fail "attack-empty-table: $(plist_count) plist(s) written, want 0"
-end_case attack-empty-table
-
-# --- case 15: top-n-bounds ---------------------------------------------------------------
-# --top-n 99 on a 3-row file selects all 3; --top-n 2 selects exactly 2;
-# --top-n 0 and --top-n abc are rejected before any selection runs.
-begin_case
-clean_slots
-out99="$(POST_PLAN_FLEET_MASTER_SHA="$ATTACK_SHA" \
-         POST_PLAN_FLEET_WTL="$WTL8" \
-         POST_PLAN_FLEET_PR_JSON="$SCRATCH/attack-8prs.json" \
-         run_driver --pr-attack "$SCRATCH/attack-short.md" --top-n 99 2>&1)"; rc=$?
-[[ $rc -eq 0 ]] || fail "top-n-bounds: top-n 99 exited $rc"
-fire99="$(grep -c 'WOULD FIRE' <<< "$out99" || echo 0)"
-[[ $fire99 -eq 3 ]] || fail "top-n-bounds: top-n 99 on 3 rows → $fire99 WOULD FIRE lines, want 3"
-out2="$(POST_PLAN_FLEET_MASTER_SHA="$ATTACK_SHA" \
-        POST_PLAN_FLEET_WTL="$WTL8" \
-        POST_PLAN_FLEET_PR_JSON="$SCRATCH/attack-8prs.json" \
-        run_driver --pr-attack "$SCRATCH/attack-short.md" --top-n 2 2>&1)"
-fire2="$(grep -c 'WOULD FIRE' <<< "$out2" || echo 0)"
-[[ $fire2 -eq 2 ]] || fail "top-n-bounds: top-n 2 on 3 rows → $fire2 WOULD FIRE lines, want 2"
-e0="$(run_driver --pr-attack "$SCRATCH/attack-fresh.md" --top-n 0 2>&1)"; rc0=$?
-[[ $rc0 -ne 0 ]] || fail "top-n-bounds: --top-n 0 exited 0, want non-zero"
-grep -q 'positive integer' <<< "$e0" || fail "top-n-bounds: --top-n 0 lacks 'positive integer' (out: $e0)"
-eabc="$(run_driver --pr-attack "$SCRATCH/attack-fresh.md" --top-n abc 2>&1)"; rcabc=$?
-[[ $rcabc -ne 0 ]] || fail "top-n-bounds: --top-n abc exited 0, want non-zero"
-end_case top-n-bounds
-
-# --- case 16: pr-attack-vs-pr-exclusive --------------------------------------------------
-# --pr-attack and --pr are mutually exclusive; combining them errors immediately.
-begin_case
-err="$(run_driver --pr-attack "$SCRATCH/attack-fresh.md" --pr 1910 2>&1)"; rc=$?
-[[ $rc -ne 0 ]] || fail "pr-attack-vs-pr-exclusive: combined flags exited 0, want non-zero"
-grep -qi 'mutually exclusive' <<< "$err" || \
-    fail "pr-attack-vs-pr-exclusive: error lacks 'mutually exclusive' (out: $err)"
-end_case pr-attack-vs-pr-exclusive
 
 # --- case 17: preflight-matrix -----------------------------------------------------------
 # All four worktree+plan combinations produce the expected PRE and status columns:
@@ -756,12 +581,13 @@ out="$(POST_PLAN_FLEET_DRY_RUN=1 run_driver --go 2>&1)"; rc=$?
 end_case report-no-mutation
 
 # --- case 27: usage-not-truncated --------------------------------------------------------
-# --help output documents all three Phase 8 flags (--pr-attack, --top-n, --wait).
+# --help output documents --pr-list and --wait; retired --pr-attack and --top-n absent.
 begin_case
 out="$(run_driver --help 2>&1)"; rc=$?
 [[ $rc -eq 0 ]] || fail "usage-not-truncated: --help exited $rc, want 0"
-grep -q -- '--pr-attack' <<< "$out" || fail "usage-not-truncated: --help omits --pr-attack"
-grep -q -- '--top-n' <<< "$out" || fail "usage-not-truncated: --help omits --top-n"
+grep -q -- '--pr-list' <<< "$out" || fail "usage-not-truncated: --help omits --pr-list"
+! grep -q -- '--pr-attack' <<< "$out" || fail "usage-not-truncated: --help still lists retired --pr-attack"
+! grep -q -- '--top-n' <<< "$out" || fail "usage-not-truncated: --help still lists retired --top-n"
 grep -q -- '--wait' <<< "$out" || fail "usage-not-truncated: --help omits --wait"
 # --stop-all is the last-added header line, so it is the truncation canary. --stop is matched
 # with the trailing ` N` because a bare `--stop` would also be satisfied by `--stop-all`.
@@ -772,28 +598,6 @@ _help_tail="$(run_driver --help 2>&1 | tail -1)"
 [[ "$_help_tail" == "on a real run until it does." ]] \
     || fail "usage-not-truncated: --help tail-1='$_help_tail', want 'on a real run until it does.'"
 end_case usage-not-truncated
-
-# --- case 28: seam-master-sha-unset-vs-empty ---------------------------------------------
-# Both unset and empty POST_PLAN_FLEET_MASTER_SHA trigger the git rev-parse fallback.
-# The real master SHA differs from the fixture abc1234, so the staleness gate fires on both.
-begin_case
-# Unset arm: run_driver does not set POST_PLAN_FLEET_MASTER_SHA → driver uses git → STALE.
-err_unset="$(env -u POST_PLAN_FLEET_MASTER_SHA \
-    env HOME="$SCRATCH" PATH="$SCRATCH/.local/bin:$PATH" \
-        POST_PLAN_FLEET_CLAUDE="$CLAUDE_STUB" \
-        POST_PLAN_FLEET_GH_USER=a-jay85 \
-        POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." \
-        "$DRIVER" --pr-attack "$SCRATCH/attack-fresh.md" 2>&1)"; rc_unset=$?
-[[ $rc_unset -ne 0 ]] || fail "seam-master-sha-unset-vs-empty: unset arm exited 0, want STALE exit"
-grep -qi 'STALE' <<< "$err_unset" || \
-    fail "seam-master-sha-unset-vs-empty: unset arm lacks STALE keyword (out: $err_unset)"
-# Empty arm: same fallback via :- operator.
-err_empty="$(POST_PLAN_FLEET_MASTER_SHA="" \
-    run_driver --pr-attack "$SCRATCH/attack-fresh.md" 2>&1)"; rc_empty=$?
-[[ $rc_empty -ne 0 ]] || fail "seam-master-sha-unset-vs-empty: empty arm exited 0, want STALE exit"
-grep -qi 'STALE' <<< "$err_empty" || \
-    fail "seam-master-sha-unset-vs-empty: empty arm lacks STALE keyword (out: $err_empty)"
-end_case seam-master-sha-unset-vs-empty
 
 # --- case 29: seam-wtl-unset-vs-empty ---------------------------------------------------
 # Unset POST_PLAN_FLEET_WTL → run_driver's single-dash expansion uses WTL_FIXTURE → WOULD FIRE.
@@ -812,30 +616,6 @@ out_empty="$(POST_PLAN_FLEET_WTL="" POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.j
 grep -q 'WOULD FIRE' <<< "$out_empty" && \
     fail "seam-wtl-unset-vs-empty: empty arm shows WOULD FIRE (git WTL should skip all)"
 end_case seam-wtl-unset-vs-empty
-
-# --- case 30: plist-shape-under-attack-selection -----------------------------------------
-# When a PR is selected via --pr-attack, fire_pr writes the same plist structure as
-# the default path. field() verifies Label and StandardOutPath are PR-number-keyed.
-begin_case
-clean_slots
-POST_PLAN_FLEET_MASTER_SHA="$ATTACK_SHA" \
-    POST_PLAN_FLEET_WTL="$WTL8" \
-    POST_PLAN_FLEET_PR_JSON="$SCRATCH/attack-8prs.json" \
-    POST_PLAN_FLEET_DRY_RUN=1 \
-    run_driver --go --pr-attack "$SCRATCH/attack-fresh.md" --top-n 1 >/dev/null 2>&1
-rc=$?
-[[ $rc -eq 0 ]] || fail "plist-shape-under-attack-selection: driver exited $rc"
-P1910="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-1910.plist"
-[[ -f "$P1910" ]] || fail "plist-shape-under-attack-selection: plist for PR 1910 not created"
-v="$(field "$P1910" "Label")"
-[[ "$v" == "com.ibl5.post-plan-fleet-1910" ]] || \
-    fail "plist-shape-under-attack-selection: Label '$v' != com.ibl5.post-plan-fleet-1910"
-v="$(field "$P1910" "StandardOutPath")"
-[[ "$v" == "/tmp/post-plan-fleet-1910.log" ]] || \
-    fail "plist-shape-under-attack-selection: StandardOutPath '$v' != /tmp/post-plan-fleet-1910.log"
-grep -qE '\$\{?HOME|\$\{?ROOT|\$\{?LABEL' "$P1910" && \
-    fail "plist-shape-under-attack-selection: plist contains unexpanded shell variable"
-end_case plist-shape-under-attack-selection
 
 # (case 31 was the L34 characterization: it asserted the buggy reaper freeing a live slot.
 #  Deleted with the fix — case 32 is its inverse and is the permanent regression guard.)
@@ -2432,16 +2212,92 @@ grep -qF 'result.json" 2>/dev/null || true)' "$SCRIPT_DIR/../bin/post-plan-fleet
   || fail "6c.4 unparseable: result.json parse not guarded by '|| true' — malformed JSON would abort"
 end_case result-unparseable-holds
 
-# --- 6c.5: --wait timeout prints 'TIMED OUT waiting for' on stderr and exits 0 ------
+# --- wait-timeout-exits-nonzero ----------------------------------------------------------
+# A held slot that never drains drives the wait block to its ceiling, which must:
+#   1. exit 1
+#   2. print TIMED OUT on stderr
+#   3. still write the report (last stdout line is a path that exists)
+#   4. leave the slot held (plist not removed)
 begin_case
-out="$(HOME="$SCRATCH" POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." POST_PLAN_FLEET_GH_USER=a-jay85 \
-    bin/post-plan-fleet --dry-run --pr 9999 --wait --jobs 1 2>&1)"; rc=$?
-[[ $rc -eq 0 ]] || fail "6c.5: want exit 0 on dry-run with --wait, got $rc"
-# When no session is actually running, wait exits immediately. The TIMED OUT path
-# fires only when a slot is held. Test the text exists in the script instead.
-grep -qF 'TIMED OUT waiting for' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.5: bin/post-plan-fleet does not contain 'TIMED OUT waiting for' — the timeout text was removed"
-end_case timed-out-text-present
+clean_slots
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9999.plist"
+set_live_labels "40477	0	com.ibl5.post-plan-fleet-9999"
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" \
+       POST_PLAN_FLEET_CEILING=2 POST_PLAN_FLEET_WAIT_POLL=1 \
+       run_driver --go --wait 2>&1)"; rc=$?
+[[ $rc -eq 1 ]] || fail "wait-timeout-exits-nonzero: exit $rc, want 1 (out: $out)"
+grep -qF 'TIMED OUT waiting for' <<< "$out" || \
+    fail "wait-timeout-exits-nonzero: TIMED OUT text missing (out: $out)"
+_rpath="$(echo "$out" | tail -1)"
+[[ -f "$_rpath" ]] || fail "wait-timeout-exits-nonzero: report not written (last line: $_rpath)"
+[[ "$_rpath" == *pr-firstpass-*.md ]] || fail "wait-timeout-exits-nonzero: last line is not a report path: $_rpath"
+[[ "$(plist_count)" -eq 1 ]] || fail "wait-timeout-exits-nonzero: slot was removed, want 1 plist"
+clear_live_labels; clean_slots
+end_case wait-timeout-exits-nonzero
+
+# --- pr-list-fires-each ------------------------------------------------------------------
+begin_case
+clean_slots
+out="$(POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr-list 1911,1910 --jobs 3 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "pr-list-fires-each: exit $rc (out: $out)"
+P1910="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-1910.plist"
+P1911="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-1911.plist"
+[[ -f "$P1910" ]] || fail "pr-list-fires-each: plist for 1910 not created"
+[[ -f "$P1911" ]] || fail "pr-list-fires-each: plist for 1911 not created"
+[[ "$(plist_count)" -eq 2 ]] || fail "pr-list-fires-each: plist_count=$(plist_count), want 2"
+end_case pr-list-fires-each
+
+# --- pr-list-order-preserved -------------------------------------------------------------
+begin_case
+clean_slots
+out="$(run_driver --dry-run --pr-list 1911,1910 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "pr-list-order-preserved: exit $rc (out: $out)"
+line_1911="$(grep -n '1911' <<< "$out" | head -1 | cut -d: -f1)"
+line_1910="$(grep -n '1910' <<< "$out" | head -1 | cut -d: -f1)"
+[[ -n "$line_1911" && -n "$line_1910" ]] || fail "pr-list-order-preserved: 1911 or 1910 not in output (out: $out)"
+[[ "$line_1911" -lt "$line_1910" ]] || fail "pr-list-order-preserved: 1911 (line $line_1911) not before 1910 (line $line_1910)"
+end_case pr-list-order-preserved
+
+# --- pr-list-validation ------------------------------------------------------------------
+begin_case
+err_abc="$(run_driver --pr-list 12,abc 2>&1)"; rc_abc=$?
+[[ $rc_abc -ne 0 ]] || fail "pr-list-validation: --pr-list 12,abc exited 0, want nonzero"
+grep -q -- '--pr-list expects positive integers, got: abc' <<< "$err_abc" || \
+    fail "pr-list-validation: --pr-list 12,abc wrong message (out: $err_abc)"
+err_noarg="$(run_driver --pr-list 2>&1)"; rc_noarg=$?
+[[ $rc_noarg -ne 0 ]] || fail "pr-list-validation: --pr-list with no value exited 0"
+grep -q -- '--pr-list requires a value' <<< "$err_noarg" || \
+    fail "pr-list-validation: --pr-list no-value wrong message (out: $err_noarg)"
+err_empty="$(run_driver --pr-list "" 2>&1)"; rc_empty=$?
+[[ $rc_empty -ne 0 ]] || fail "pr-list-validation: --pr-list \"\" exited 0"
+grep -q 'requires at least one PR number' <<< "$err_empty" || \
+    fail "pr-list-validation: --pr-list empty wrong message (out: $err_empty)"
+err_pr="$(run_driver --pr 12,abc 2>&1)"; rc_pr=$?
+[[ $rc_pr -ne 0 ]] || fail "pr-list-validation: --pr 12,abc exited 0"
+grep -q -- '--pr expects positive integers, got: abc' <<< "$err_pr" || \
+    fail "pr-list-validation: --pr 12,abc wrong message (out: $err_pr)"
+end_case pr-list-validation
+
+# --- pr-attack-retired -------------------------------------------------------------------
+begin_case
+err_attack="$(run_driver --pr-attack /tmp/x.md 2>&1)"; rc_attack=$?
+[[ $rc_attack -eq 2 ]] || fail "pr-attack-retired: --pr-attack exited $rc_attack, want 2"
+grep -q 'unknown flag: --pr-attack' <<< "$err_attack" || \
+    fail "pr-attack-retired: --pr-attack missing 'unknown flag: --pr-attack' (out: $err_attack)"
+err_topn="$(run_driver --top-n 3 2>&1)"; rc_topn=$?
+[[ $rc_topn -eq 2 ]] || fail "pr-attack-retired: --top-n exited $rc_topn, want 2"
+grep -q 'unknown flag: --top-n' <<< "$err_topn" || \
+    fail "pr-attack-retired: --top-n missing 'unknown flag: --top-n' (out: $err_topn)"
+end_case pr-attack-retired
+
+# --- stop-rejects-pr-list ----------------------------------------------------------------
+begin_case
+err_stop="$(run_driver --stop 1910 --pr-list 1911 2>&1)"; rc_stop=$?
+[[ $rc_stop -eq 2 ]] || fail "stop-rejects-pr-list: exited $rc_stop, want 2"
+grep -q 'cannot be combined with --pr, --pr-list or --wait' <<< "$err_stop" || \
+    fail "stop-rejects-pr-list: wrong error message (out: $err_stop)"
+end_case stop-rejects-pr-list
 
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then

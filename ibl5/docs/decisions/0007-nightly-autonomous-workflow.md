@@ -1,6 +1,6 @@
 ---
 description: ADR for the automouse autonomous workflow (formerly "nightly") — headless Claude executes queued plans via launchd on a recurring schedule.
-last_verified: 2026-07-27
+last_verified: 2026-09-27
 ---
 
 # ADR-0007: Nightly Autonomous Workflow

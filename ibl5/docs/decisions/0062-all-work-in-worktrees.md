@@ -1,6 +1,6 @@
 ---
 description: All work happens in a git worktree; the main checkout (master) is reference/read-only and is never edited directly. Generalizes the automouse agent's "never modify files on master" rule to every session — interactive and headless, code and repo-meta (rules, docs, config, ADRs).
-last_verified: 2026-07-27
+last_verified: 2026-09-27
 ---
 
 # ADR-0062: All work happens in a worktree; the main checkout is reference-only

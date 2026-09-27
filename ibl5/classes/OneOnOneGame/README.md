@@ -1,6 +1,6 @@
 ---
 description: Fan-created one-on-one basketball mini-game (first to 21) with simulation engine, Discord result posting, and game replay support.
-last_verified: 2026-07-27
+last_verified: 2026-09-27
 ---
 
 # One-on-One Module
@@ -92,7 +92,11 @@ Tests are located in `tests/OneOnOneGame/`:
 - `OneOnOneGamePlayerStatsTest.php` - DTO tests
 - `OneOnOneGameResultTest.php` - DTO tests
 - `OneOnOneGameTextGeneratorTest.php` - Text generation tests
+- `OneOnOneGameEngineCharacterizationTest.php` - Characterization tests for engine behavior
 - `OneOnOneGameEngineTest.php` - Game mechanics tests
+- `OneOnOneGamePossessionResolverTest.php` - Possession resolution tests
+- `OneOnOneGameShotResultResolverTest.php` - Shot resolution tests
+- `OneOnOneGameRepositoryTest.php` - Repository tests
 - `OneOnOneGameServiceTest.php` - Service layer tests
 - `OneOnOneGameViewTest.php` - View rendering tests
 

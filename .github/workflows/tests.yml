@@ -967,6 +967,8 @@ jobs:
         run: bin/test-pr-overlap
       - name: bin/test-pr-attack
         run: bin/test-pr-attack
+      - name: bin/test-pr-triage
+        run: bin/test-pr-triage
       - name: bin/test-post-plan-fleet
         run: bin/test-post-plan-fleet
       - name: bin/test-plan-index

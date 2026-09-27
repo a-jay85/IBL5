@@ -427,6 +427,31 @@ def test_autoresolved_files_surfaced(tmp_path):
             os.unlink(autoresolved_path)
 
 
+def test_autoresolved_files_surfaced_slashed_branch():
+    """A slashed branch (feat/x) writes its sidecar under the dash-flattened key that
+    gitad uses (branch.replace("/", "-")). verdict_line must read that same key, or the
+    RESULT line silently drops the auto-resolved file names."""
+    slug = "foo/bar"
+    flattened = slug.replace("/", "-")
+    autoresolved_path = f"/tmp/postplan-conflict-files-{flattened}-autoresolved.txt"
+    raw_slug_path = f"/tmp/postplan-conflict-files-{slug}-autoresolved.txt"
+    try:
+        with open(autoresolved_path, "w") as fh:
+            fh.write("harness/conflict.py\nharness/adapters/gitad.py\n")
+        # The raw-slug path must not exist, or the test would pass for the wrong reason.
+        assert not os.path.exists(raw_slug_path)
+        r = _res(TerminalState.SHIPPED_ARMED, pr_number=101, arm=_arm(True))
+        r.slug = slug
+        line = runner.verdict_line(r, 0)
+        assert "auto-resolved conflict in" in line
+        assert "harness/conflict.py" in line
+        assert "harness/adapters/gitad.py" in line
+        assert "\n" not in line
+    finally:
+        if os.path.exists(autoresolved_path):
+            os.unlink(autoresolved_path)
+
+
 def test_behind_retry_cap_line_carries_autoresolved_files():
     """The BEHIND-cap BLOCKED line embeds `tail`, so an auto-resolved conflict must
     still reach the operator on the blocked path — not only the complete path."""

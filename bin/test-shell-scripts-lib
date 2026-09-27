@@ -100,13 +100,14 @@ fi
 # added 2 (251); retiring .claude/skills/pr-ready removed 7 scripts (251);
 # bin/test-automouse-measure-delegate-cost added 1 (252); bin/test-pr-triage added 1 (253);
 # bin/lib/launchd-job.sh and bin/test-launchd-job added 2 (255);
-# bin/post-plan-fail-dm and bin/test-post-plan-fail-dm added 2 (257).
+# bin/post-plan-fail-dm and bin/test-post-plan-fail-dm added 2 (257);
+# .claude/review-shared/scripts/review-owed.sh added 1 (258).
 count=$("$HELPER" --full | wc -l | tr -d ' ')
-if [ "$count" = "257" ]; then
-    pass "case 7: full-corpus count is 257"
+if [ "$count" = "258" ]; then
+    pass "case 7: full-corpus count is 258"
 else
-    fail "case 7: full-corpus count is 257" \
-         "got $count (expected 257)"
+    fail "case 7: full-corpus count is 258" \
+         "got $count (expected 258)"
 fi
 
 # ── case 8: unknown flag exits non-zero and prints to stderr ─────────────────
@@ -127,11 +128,11 @@ fi
 system_bash="/bin/bash"
 if [ -x "$system_bash" ]; then
     compat_count=$(BASH="$system_bash" "$system_bash" "$HELPER" --full | wc -l | tr -d ' ')
-    if [ "$compat_count" = "257" ]; then
+    if [ "$compat_count" = "258" ]; then
         pass "case 9: bash 3.2 compat — count matches ($compat_count)"
     else
         fail "case 9: bash 3.2 compat" \
-             "got $compat_count under /bin/bash (expected 257)"
+             "got $compat_count under /bin/bash (expected 258)"
     fi
 else
     pass "case 9: /bin/bash not available — skipped"

@@ -2147,7 +2147,7 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
     if res.final_pr_state:
         tail += f" pr-state={res.final_pr_state}"
     # Surface auto-resolved files when present
-    autoresolved_file = f"/tmp/postplan-conflict-files-{res.slug}-autoresolved.txt"
+    autoresolved_file = f"/tmp/postplan-conflict-files-{res.slug.replace('/', '-')}-autoresolved.txt"
     if os.path.exists(autoresolved_file):
         try:
             files = [l.strip() for l in open(autoresolved_file).read().splitlines() if l.strip()]

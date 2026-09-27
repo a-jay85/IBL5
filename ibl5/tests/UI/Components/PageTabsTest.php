@@ -322,6 +322,16 @@ final class PageTabsTest extends TestCase
         $this->assertContains('db', $violations, 'Helper must detect $db on the fixture class');
     }
 
+    public function testRenderTabBarEscapesScriptTagInLabel(): void
+    {
+        $tabs = new PageTabs(['evil' => '<script>alert(1)</script>'], 'evil');
+        $this->assertSame(
+            '<div class="ibl-tabs"><a class="ibl-tab ibl-tab--active" href="modules.php?name=Test&amp;tab=evil"'
+            . ' data-tab="evil" aria-current="page">&lt;script&gt;alert(1)&lt;/script&gt;</a></div>',
+            $tabs->renderTabBar('evil', 'modules.php?name=Test')
+        );
+    }
+
     public function testSecurityLabelIsHtmlEscaped(): void
     {
         /** PageTabs passes every user-visible value (key, label, href segment) through HtmlSanitizer::safeHtmlOutput before inserting into HTML. */

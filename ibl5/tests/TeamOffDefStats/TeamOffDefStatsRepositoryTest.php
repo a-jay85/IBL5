@@ -230,7 +230,7 @@ class TeamOffDefStatsRepositoryTest extends TestCase
     public static function phaseGameTypesProvider(): array
     {
         return [
-            'Preseason' => ['Preseason', [3]],
+            'Preseason' => ['Preseason', [4]],
             'HEAT' => ['HEAT', [3]],
             'Regular Season' => ['Regular Season', [1]],
             'Playoffs' => ['Playoffs', [1, 2]],

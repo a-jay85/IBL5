@@ -1,5 +1,5 @@
 ---
-description: Shared posting procedure — re-check eligibility, the never-hand-write rule, dispositioning open threads, and link format rules — used by /pr-review and /security-audit.
+description: Shared posting procedure — re-check eligibility, the never-hand-write rule, dispositioning open threads, remediating pre-existing trusted threads, and link format rules — used by /pr-review and /security-audit.
 last_verified: 2026-09-22
 ---
 
@@ -43,6 +43,10 @@ resolve_review_finding "$PR_NUMBER" <COMMENT_ID> "Fixed in <sha> — <what chang
 ```
 
 The same call applies when declining a finding — the body says why, and the thread still closes. A finding is dispositioned when it is fixed *or* explicitly declined; silence is not a disposition.
+
+## Remediating pre-existing trusted threads
+
+A run that posts findings also inherits the threads already open on the PR. `list_trusted_open_threads "$PR_NUMBER"` lists the subset a run may act on: still open, still anchored to a live diff hunk, root comment authored by `a-jay85`, a GitHub `Bot`, or a `[bot]` login. Snapshot `prf_review_threads` ids before posting and act only on ids in that snapshot, so a run never dispositions its own fresh findings. Each candidate is fixed (commit, push, then `resolve_review_finding` with `Fixed in <sha> — <what changed>`) or declined (`resolve_review_finding` with `Declined: <reason>`). A decline with no reason leaves the thread open. Threads outside the trusted subset are never touched; the Phase 6.5 unresolved-thread hold keeps them for a human. The runnable blocks live in `.claude/skills/post-plan/_phase-4-review-audit.md` § 4.5.
 
 ## Link format rules
 

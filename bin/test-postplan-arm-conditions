@@ -490,6 +490,26 @@ assert_self_contained '# condition (6)' "condition (6)"
 assert_self_contained '# condition (8)' "condition (8)"
 assert_self_contained '# condition (10)' "condition (10)"
 assert_self_contained '# condition (11)' "condition (11)"
+
+# condition (11) prose + block agree on the widened rule (PR: thread remediation)
+if grep -qF '**(11) Unresolved review thread.**' "$SKILL" \
+   && ! grep -qF '**(11) Unresolved scored review finding**' "$SKILL"; then
+    echo "ok: c11_doc_widened_heading"
+else
+    echo "FAIL: c11_doc_widened_heading — condition (11) prose still describes the >= 80 floor"; FAILED=1
+fi
+if grep -qF 'BLOCKED: unresolved review thread(s) [$UNRESOLVED_HOLD]' "$SKILL" \
+   && ! grep -qF 'scored >= 80 [$UNRESOLVED_HOLD]' "$SKILL"; then
+    echo "ok: c11_block_message_widened"
+else
+    echo "FAIL: c11_block_message_widened — condition (11) block still reports the >= 80 floor"; FAILED=1
+fi
+if grep -qE '^#   thread holds auto-merge: scored' "$REPO_ROOT/bin/lib/pr-armable.sh" \
+   && ! grep -qF 'Human (unscored) threads, scores < 80, and resolved threads NEVER block' "$REPO_ROOT/bin/lib/pr-armable.sh"; then
+    echo "ok: c11_lib_header_widened"
+else
+    echo "FAIL: c11_lib_header_widened — pr-armable.sh header still promises unscored threads never block"; FAILED=1
+fi
 assert_self_contained '# condition (15)' "condition (15)"
 assert_block_sources '# condition (7)' "condition (7)" "plan-resolve.sh" "$SKILL"
 assert_block_sources '# condition (13)' "condition (13)" "plan-resolve.sh" "$SKILL"

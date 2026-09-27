@@ -11,7 +11,7 @@
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
 #   (8) feat: floor                -> pr_feat_hold <title> <labels_json>
 #   (10) pipeline-authored floor   -> pr_pipeline_authored_hold <labels_json> [head_ref]
-#   (11) unresolved scored finding -> pr_unresolved_findings_hold <pr_number>
+#   (11) unresolved review thread  -> pr_unresolved_findings_hold <pr_number>
 #   (15) already-red CI checks     -> pr_red_check_hold <pr_number>
 #
 # Conditions (2) review>=80, (3) MISSING-tests, (4) Phase-5 local verify, (7)
@@ -220,13 +220,18 @@ pr_pipeline_authored_hold() {
 }
 
 # pr_unresolved_findings_hold <pr_number>
-#   Phase 6.5 condition (11), the unresolved-scored-finding floor. An UNRESOLVED review
-#   thread whose first comment embeds `<!-- score: N -->` with N >= 80 holds auto-merge.
-#   Complements (2), which sees only THIS run's scores: (11) reads live GitHub thread
-#   state, so a finding from an earlier run or a standalone /pr-review or /security-audit
-#   still blocks. Human (unscored) threads, scores < 80, and resolved threads NEVER block.
+#   Phase 6.5 condition (11), the unresolved-thread floor. EVERY unresolved review
+#   thread holds auto-merge: scored (`<!-- score: N -->`, any N), unscored (human or
+#   bot prose), outdated, or root-comment-deleted. Author and trust are NOT consulted
+#   here; list_trusted_open_threads decides which threads a run may action, and
+#   this predicate decides whether the PR may merge. Complements (2), which sees only
+#   THIS run's scores: (11) reads live GitHub thread state, so a thread from an
+#   earlier run, a standalone /pr-review or /security-audit, or a human question
+#   still blocks. Resolved threads NEVER block.
 #   FAIL-CLOSED on every error path. Echoes one `unresolved-finding:SCORE` line per
-#   qualifying thread, or one of `unresolved-findings-cap` / `-api-error`, or nothing.
+#   scored unresolved thread, `unresolved-finding:-` per unscored one, or one of
+#   `unresolved-findings-cap` / `-api-error`, or nothing.
+#   History: until 2026-09 only N >= 80 held; the widening is additive.
 pr_unresolved_findings_hold() {
     local pr="$1"
     local owner="${REPO_SLUG%%/*}" repo="${REPO_SLUG##*/}"
@@ -267,14 +272,10 @@ pr_unresolved_findings_hold() {
     findings=$(printf '%s' "$raw" | jq -r '
         .data.repository.pullRequest.reviewThreads.nodes[]
         | select(.isResolved == false)
-        | select(
-            (.comments.nodes[0].body // "")
-            | capture("<!-- score: (?<s>[0-9]+) -->")
-            | .s | tonumber >= 80
-          )
         | "unresolved-finding:" +
-          ((.comments.nodes[0].body // "")
-           | capture("<!-- score: (?<s>[0-9]+) -->") | .s)
+          (((.comments.nodes[0].body // "")
+            | capture("<!-- score: (?<s>[0-9]+) -->") // null)
+           | if . == null then "-" else .s end)
     ' 2>/dev/null) || { echo "unresolved-findings-api-error"; return 0; }
     [ -n "$findings" ] && printf '%s\n' "$findings"
     # REQUIRED: without it the clear path returns 1 and aborts bin/pr-triage

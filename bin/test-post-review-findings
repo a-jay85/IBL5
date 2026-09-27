@@ -119,7 +119,7 @@ DIFF
 # Four threads on PR 42, mirroring the real GraphQL shape:
 #   111 — UNRESOLVED, score 85, on-line     → must be listed, must be resolvable
 #   222 — RESOLVED,   score 90              → must NOT be listed
-#   333 — UNRESOLVED, no score marker (human-authored), line null (outdated)
+#   333 — UNRESOLVED, no score marker (human-authored), line null (outdated), author null (deleted account)
 #   ——— UNRESOLVED, comments.nodes EMPTY (sole comment deleted) → must not abort
 #       the whole query: `null | capture(...)` is a hard jq error, so the library
 #       guards with `// ""`.  Deleting this node hides that regression.
@@ -128,13 +128,13 @@ cat > "$GH_THREADS_FIXTURE" <<'THREADS'
 {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
   {"id":"PRRT_open85","isResolved":false,"isOutdated":false,
    "path":"classes/Foo.php","line":12,
-   "comments":{"nodes":[{"databaseId":111,"body":"Bug X — first line\nmore detail\n\n<!-- score: 85 -->"}]}},
+   "comments":{"nodes":[{"databaseId":111,"body":"Bug X — first line\nmore detail\n\n<!-- score: 85 -->","author":{"login":"a-jay85","__typename":"User"}}]}},
   {"id":"PRRT_done90","isResolved":true,"isOutdated":false,
    "path":"classes/Foo.php","line":13,
-   "comments":{"nodes":[{"databaseId":222,"body":"Bug Y already handled\n\n<!-- score: 90 -->"}]}},
+   "comments":{"nodes":[{"databaseId":222,"body":"Bug Y already handled\n\n<!-- score: 90 -->","author":{"login":"claude[bot]","__typename":"Bot"}}]}},
   {"id":"PRRT_human","isResolved":false,"isOutdated":true,
    "path":"classes/Bar.php","line":null,
-   "comments":{"nodes":[{"databaseId":333,"body":"A human asked a question"}]}},
+   "comments":{"nodes":[{"databaseId":333,"body":"A human asked a question","author":null}]}},
   {"id":"PRRT_ghost","isResolved":false,"isOutdated":false,
    "path":null,"line":null,
    "comments":{"nodes":[]}}
@@ -438,6 +438,11 @@ pr_unresolved_findings_hold 42 > "$out14"
 assert_contains "case14: unresolved scored 85 emitted" "$out14" "unresolved-finding:85"
 assert_not_contains "case14: resolved 90 excluded" "$out14" "unresolved-finding:90"
 assert_not_contains "case14: unscored thread excluded" "$out14" "unresolved-finding:333"
+if [ "$(grep -c '^unresolved-finding:-$' "$out14")" -eq 2 ]; then
+    ok "case14: unscored 333 and comment-less ghost each emit unresolved-finding:-"
+else
+    fail "case14: expected 2 '-' lines (333 + ghost), got: $(tr '\n' ' ' < "$out14")"
+fi
 
 # ── case 15: two unresolved threads scored 92 and 80 ─────────────────────────
 fix15="$BASE_TMP/threads15.json"
@@ -454,7 +459,7 @@ assert_contains "case15: score-92 emitted" "$out15" "unresolved-finding:92"
 assert_contains "case15: score-80 emitted (boundary >= 80)" "$out15" "unresolved-finding:80"
 GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
 
-# ── case 16: one unresolved scored 79 — below threshold → empty ──────────────
+# ── case 16: one unresolved scored 79 — below the old floor, now holds ───────
 fix16="$BASE_TMP/threads16.json"
 cat > "$fix16" <<'THREADS16'
 {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
@@ -464,10 +469,10 @@ THREADS16
 GH_THREADS_FIXTURE="$fix16"
 out16="$BASE_TMP/case16.txt"
 pr_unresolved_findings_hold 42 > "$out16"
-if [ ! -s "$out16" ]; then
-    ok "case16: score-79 below threshold → empty output"
+if [ "$(cat "$out16")" = "unresolved-finding:79" ]; then
+    ok "case16: score 79 emits unresolved-finding:79 (widened 2026-09)"
 else
-    fail "case16: expected empty for score 79, got: $(cat "$out16")"
+    fail "case16: expected 'unresolved-finding:79', got: $(tr '\n' ' ' < "$out16")"
 fi
 GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
 
@@ -489,7 +494,7 @@ else
 fi
 GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
 
-# ── case 18: only unscored human threads → empty ──────────────────────────────
+# ── case 18: only unscored human threads → hold on each ───────────────────────
 fix18="$BASE_TMP/threads18.json"
 cat > "$fix18" <<'THREADS18'
 {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
@@ -500,10 +505,10 @@ THREADS18
 GH_THREADS_FIXTURE="$fix18"
 out18="$BASE_TMP/case18.txt"
 pr_unresolved_findings_hold 42 > "$out18"
-if [ ! -s "$out18" ]; then
-    ok "case18: only unscored human threads → empty output"
+if [ "$(grep -c '^unresolved-finding:-$' "$out18")" -eq 2 ] && [ "$(wc -l < "$out18")" -eq 2 ]; then
+    ok "case18: two unscored unresolved threads → two unresolved-finding:- lines (widened 2026-09)"
 else
-    fail "case18: expected empty for unscored threads, got: $(cat "$out18")"
+    fail "case18: expected exactly two 'unresolved-finding:-', got: $(tr '\n' ' ' < "$out18")"
 fi
 GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
 
@@ -721,6 +726,237 @@ MKTEMP
 else
     ok "case26: zsh not installed — skipped"
 fi
+
+# ── pin-A: prf_review_threads emits one object per thread with the 8 base keys ─
+# Characterization: Phase 2 ADDS authorLogin/authorType; every key here must
+# survive that edit unchanged (superset assertion, so the pin stays green-green).
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+PIN_A="$BASE_TMP/pin-a.jsonl"
+prf_review_threads 42 > "$PIN_A"
+if [ "$(wc -l < "$PIN_A")" -eq 4 ]; then
+    ok "pin-A: 4 thread objects from the 4-node fixture"
+else
+    fail "pin-A: expected 4 objects, got $(wc -l < "$PIN_A")"
+fi
+if jq -e 'has("id") and has("isResolved") and has("isOutdated") and has("path")
+          and has("line") and has("commentId") and has("score") and has("body")' \
+      "$PIN_A" >/dev/null 2>&1; then
+    ok "pin-A: every object carries the 8 base keys"
+else
+    fail "pin-A: a thread object lost a base key"
+fi
+if jq -s -e '.[0].score == 85 and .[2].score == null and .[3].commentId == null
+             and .[2].isOutdated == true' "$PIN_A" >/dev/null 2>&1; then
+    ok "pin-A: score parse, null score, ghost commentId, isOutdated preserved"
+else
+    fail "pin-A: per-thread derived fields drifted"
+fi
+
+# ── pin-B: list_open_review_findings TSV is exactly 4 tab-separated columns ───
+PIN_B="$BASE_TMP/pin-b.tsv"
+list_open_review_findings 42 > "$PIN_B"
+if [ -z "$(awk -F'\t' 'NF != 4' "$PIN_B")" ] && [ -s "$PIN_B" ]; then
+    ok "pin-B: every row has 4 columns"
+else
+    fail "pin-B: column drift in list_open_review_findings"
+fi
+
+# ── pin-D: authorLogin / authorType come from the ROOT comment, null-safe ──────
+PIN_D="$BASE_TMP/pin-d.jsonl"
+prf_review_threads 42 > "$PIN_D"
+if jq -s -e '.[0].authorLogin == "a-jay85" and .[0].authorType == "User"
+             and .[1].authorLogin == "claude[bot]" and .[1].authorType == "Bot"' \
+      "$PIN_D" >/dev/null 2>&1; then
+    ok "pin-D: User and Bot authors projected from the first comment"
+else
+    fail "pin-D: author projection wrong: $(jq -c '{authorLogin,authorType}' "$PIN_D" | tr '\n' ' ')"
+fi
+if jq -s -e '.[2].authorLogin == "" and .[2].authorType == ""
+             and .[3].authorLogin == "" and .[3].authorType == ""' \
+      "$PIN_D" >/dev/null 2>&1; then
+    ok "pin-D: null author and comment-less thread both yield empty strings"
+else
+    fail "pin-D: null-author guard missing (would break list_trusted_open_threads)"
+fi
+if [ "$(wc -l < "$PIN_D")" -eq 4 ]; then
+    ok "pin-D: author field did not abort the ghost thread"
+else
+    fail "pin-D: expected 4 objects, got $(wc -l < "$PIN_D")"
+fi
+
+# ── pin-E: the GraphQL selection requests author { login __typename } ─────────
+if grep -qE 'comments\(first:1\) \{ nodes \{ databaseId body author \{ login __typename \} \} \}' "$LIB"; then
+    ok "pin-E: prf_review_threads query selects author.login and author.__typename"
+else
+    fail "pin-E: author selection missing from prf_review_threads GraphQL query"
+fi
+
+# ── trust-1..: list_trusted_open_threads ──────────────────────────────────────
+# t1 a-jay85 User, unscored        → listed (owner login)
+# t2 "claude" Bot, scored 90       → listed (typename Bot)
+# t3 "github-actions[bot]" User    → listed ([bot] suffix alone is enough)
+# t4 "stranger" User               → excluded (untrusted)
+# t5 a-jay85, isOutdated true      → excluded (outdated never actioned)
+# t6 a-jay85, isResolved true      → excluded (already dispositioned)
+# t7 "a-jay85-evil" User           → excluded (login is equality, not prefix)
+# t8 author null                   → excluded (deleted account is untrusted)
+# t9 "bot" User                    → excluded (suffix must be literal "[bot]")
+# t10 comments empty (ghost)       → excluded (no commentId), must not abort
+fixT="$BASE_TMP/threads-trust.json"
+cat > "$fixT" <<'THREADST'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"id":"PRRT_t1","isResolved":false,"isOutdated":false,"path":"classes/A.php","line":5,
+   "comments":{"nodes":[{"databaseId":601,"body":"Unscored from the owner","author":{"login":"a-jay85","__typename":"User"}}]}},
+  {"id":"PRRT_t2","isResolved":false,"isOutdated":false,"path":"classes/B.php","line":6,
+   "comments":{"nodes":[{"databaseId":602,"body":"Scored bot\n\n<!-- score: 90 -->","author":{"login":"claude","__typename":"Bot"}}]}},
+  {"id":"PRRT_t3","isResolved":false,"isOutdated":false,"path":"classes/C.php","line":7,
+   "comments":{"nodes":[{"databaseId":603,"body":"Suffix bot","author":{"login":"github-actions[bot]","__typename":"User"}}]}},
+  {"id":"PRRT_t4","isResolved":false,"isOutdated":false,"path":"classes/D.php","line":8,
+   "comments":{"nodes":[{"databaseId":604,"body":"Stranger","author":{"login":"stranger","__typename":"User"}}]}},
+  {"id":"PRRT_t5","isResolved":false,"isOutdated":true,"path":"classes/E.php","line":null,
+   "comments":{"nodes":[{"databaseId":605,"body":"Old from the owner","author":{"login":"a-jay85","__typename":"User"}}]}},
+  {"id":"PRRT_t6","isResolved":true,"isOutdated":false,"path":"classes/F.php","line":9,
+   "comments":{"nodes":[{"databaseId":606,"body":"Done","author":{"login":"a-jay85","__typename":"User"}}]}},
+  {"id":"PRRT_t7","isResolved":false,"isOutdated":false,"path":"classes/G.php","line":10,
+   "comments":{"nodes":[{"databaseId":607,"body":"Imposter","author":{"login":"a-jay85-evil","__typename":"User"}}]}},
+  {"id":"PRRT_t8","isResolved":false,"isOutdated":false,"path":"classes/H.php","line":11,
+   "comments":{"nodes":[{"databaseId":608,"body":"No author","author":null}]}},
+  {"id":"PRRT_t9","isResolved":false,"isOutdated":false,"path":"classes/I.php","line":12,
+   "comments":{"nodes":[{"databaseId":609,"body":"Bare bot","author":{"login":"bot","__typename":"User"}}]}},
+  {"id":"PRRT_t10","isResolved":false,"isOutdated":false,"path":null,"line":null,
+   "comments":{"nodes":[]}}
+]}}}}}
+THREADST
+GH_THREADS_FIXTURE="$fixT"
+TRUST_OUT="$BASE_TMP/trust.jsonl"
+list_trusted_open_threads 42 > "$TRUST_OUT"; rcT=$?
+[ "$rcT" -eq 0 ] && ok "trust: rc 0 under the cap" || fail "trust: rc $rcT, expected 0"
+got=$(jq -r '.commentId' "$TRUST_OUT" | sort | tr '\n' ' ')
+if [ "$got" = "601 602 603 " ]; then
+    ok "trust: exactly 601 602 603 listed (owner, Bot typename, [bot] suffix)"
+else
+    fail "trust: expected '601 602 603 ', got '$got'"
+fi
+assert_not_contains "trust: untrusted user 604 excluded"        "$TRUST_OUT" '"commentId":604'
+assert_not_contains "trust: outdated trusted 605 excluded"      "$TRUST_OUT" '"commentId":605'
+assert_not_contains "trust: resolved trusted 606 excluded"      "$TRUST_OUT" '"commentId":606'
+assert_not_contains "trust: login prefix imposter 607 excluded" "$TRUST_OUT" '"commentId":607'
+assert_not_contains "trust: null author 608 excluded"           "$TRUST_OUT" '"commentId":608'
+assert_not_contains "trust: bare 'bot' login 609 excluded"      "$TRUST_OUT" '"commentId":609'
+assert_not_contains "trust: ghost thread never listed as null"  "$TRUST_OUT" '"commentId":null'
+if jq -e 'has("id") and has("path") and has("line") and has("body") and has("score")' \
+      "$TRUST_OUT" >/dev/null 2>&1; then
+    ok "trust: full thread objects (id/path/line/body/score) pass through"
+else
+    fail "trust: output lost fields callers need for fix-or-decline"
+fi
+
+# ── trust-cap: 100 nodes → nothing on stdout, rc 2 ────────────────────────────
+fixTcap="$BASE_TMP/threads-trust-cap.json"
+jq -n '{data:{repository:{pullRequest:{reviewThreads:{nodes:
+        [range(100) | {id:("PRRT_c"+tostring), isResolved:false, isOutdated:false,
+                       path:"classes/Cap.php", line:1,
+                       comments:{nodes:[{databaseId:(700+.), body:"cap",
+                                         author:{login:"a-jay85", __typename:"User"}}]}}]}}}}}' \
+   > "$fixTcap"
+GH_THREADS_FIXTURE="$fixTcap"
+CAP_OUT="$BASE_TMP/trust-cap.jsonl"
+list_trusted_open_threads 42 > "$CAP_OUT" 2>"$BASE_TMP/trust-cap.err"; rcC=$?
+if [ "$rcC" -eq 2 ] && [ ! -s "$CAP_OUT" ]; then
+    ok "trust-cap: 100 nodes → empty stdout, rc 2 (skip ingestion)"
+else
+    fail "trust-cap: rc $rcC, stdout $(wc -l < "$CAP_OUT") lines; expected rc 2 and empty"
+fi
+assert_contains "trust-cap: stderr names the cap" "$BASE_TMP/trust-cap.err" "100-thread page cap"
+
+# ── trust-default: the default fixture yields only thread 111 ─────────────────
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+DEF_OUT="$BASE_TMP/trust-default.jsonl"
+list_trusted_open_threads 42 > "$DEF_OUT"
+if [ "$(jq -r '.commentId' "$DEF_OUT" | tr '\n' ' ')" = "111 " ]; then
+    ok "trust-default: only 111 (333 is outdated + null author, 222 resolved)"
+else
+    fail "trust-default: got $(jq -r '.commentId' "$DEF_OUT" | tr '\n' ' ')"
+fi
+
+# ── hold-1: score 50 (below the old floor) now holds with its score ───────────
+fixH1="$BASE_TMP/threads-hold1.json"
+cat > "$fixH1" <<'H1'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"isResolved":false,"isOutdated":false,"comments":{"nodes":[{"databaseId":801,"body":"Minor\n\n<!-- score: 50 -->"}]}}
+]}}}}}
+H1
+GH_THREADS_FIXTURE="$fixH1"; outH1="$BASE_TMP/hold1.txt"
+pr_unresolved_findings_hold 42 > "$outH1"
+[ "$(cat "$outH1")" = "unresolved-finding:50" ] \
+    && ok "hold-1: score 50 emits unresolved-finding:50" \
+    || fail "hold-1: got '$(cat "$outH1")'"
+
+# ── hold-2: unresolved + isOutdated → holds (never actioned, still blocks) ────
+fixH2="$BASE_TMP/threads-hold2.json"
+cat > "$fixH2" <<'H2'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"isResolved":false,"isOutdated":true,"comments":{"nodes":[{"databaseId":802,"body":"Stale anchor","author":{"login":"a-jay85","__typename":"User"}}]}}
+]}}}}}
+H2
+GH_THREADS_FIXTURE="$fixH2"; outH2="$BASE_TMP/hold2.txt"
+pr_unresolved_findings_hold 42 > "$outH2"
+[ "$(cat "$outH2")" = "unresolved-finding:-" ] \
+    && ok "hold-2: outdated unresolved thread emits unresolved-finding:-" \
+    || fail "hold-2: got '$(cat "$outH2")'"
+
+# ── hold-3: trusted author does NOT exempt the hold ───────────────────────────
+fixH3="$BASE_TMP/threads-hold3.json"
+cat > "$fixH3" <<'H3'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"isResolved":false,"isOutdated":false,"comments":{"nodes":[{"databaseId":803,"body":"From a bot","author":{"login":"claude[bot]","__typename":"Bot"}}]}},
+  {"isResolved":true,"isOutdated":false,"comments":{"nodes":[{"databaseId":804,"body":"Resolved\n\n<!-- score: 100 -->"}]}}
+]}}}}}
+H3
+GH_THREADS_FIXTURE="$fixH3"; outH3="$BASE_TMP/hold3.txt"
+pr_unresolved_findings_hold 42 > "$outH3"
+[ "$(cat "$outH3")" = "unresolved-finding:-" ] \
+    && ok "hold-3: bot-authored unresolved holds; resolved score-100 does not" \
+    || fail "hold-3: got '$(tr '\n' ' ' < "$outH3")'"
+
+# ── hold-4: rc stays 0 under set -e when every thread holds ───────────────────
+( set -euo pipefail; GH_THREADS_FIXTURE="$fixH3"; source "$LIB_ARM"; pr_unresolved_findings_hold 42 >/dev/null ) \
+    && ok "hold-4: predicate returns 0 with findings present" \
+    || fail "hold-4: non-zero exit with findings present"
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# ── p45: Phase 4.5 doc blocks exist once, parse, and sit in the right order ────
+P4DOC="$REPO_ROOT/.claude/skills/post-plan/_phase-4-review-audit.md"
+PPDOC="$REPO_ROOT/.claude/review-shared/_posting-procedure.md"
+p45_block() { awk -v m="$1" '$0==m{f=1} f&&/^```$/{exit} f' "$P4DOC"; }
+for m in '# phase 4.5 snapshot' '# phase 4.5 remediate' '# phase 4.5 commit-and-resolve'; do
+    [ "$(grep -cF "$m" "$P4DOC")" -eq 1 ] && ok "p45: marker '$m' once" || fail "p45: marker '$m' count != 1"
+    p45_block "$m" | bash -n 2>/dev/null && ok "p45: block '$m' parses" || fail "p45: block '$m' does not parse"
+done
+snap_ln=$(grep -nF '# phase 4.5 snapshot' "$P4DOC" | cut -d: -f1)
+post_ln=$(grep -nF 'post_review_findings "$PR" "$FULL_SHA" "Code review"' "$P4DOC" | head -1 | cut -d: -f1)
+[ "$snap_ln" -lt "$post_ln" ] && ok "p45: snapshot precedes the first posting call" \
+    || fail "p45: snapshot ($snap_ln) is not before the first post_review_findings ($post_ln)"
+for f in "$P4DOC" "$PPDOC"; do
+    assert_contains "p45: $(basename "$f") names list_trusted_open_threads" "$f" "list_trusted_open_threads"
+    assert_contains "p45: $(basename "$f") states the decline convention"  "$f" "Declined: "
+done
+assert_contains "p45: SKILL.md routes 4D -> 4.5 -> 5" "$REPO_ROOT/.claude/skills/post-plan/SKILL.md" "then 4.5, in order"
+
+# ── p45-filter: the remediate block honors the pre-4D snapshot ────────────────
+# Default fixture: 111 is trusted+open. Snapshot {111} → 1 work item; snapshot {999} → 0.
+run_p45_remediate() { # snapshot-ids-newline-separated
+    ( export PR=42; PPID_FAKE=$$; printf '%s\n' "$1" > "/tmp/post-plan-pre4d-thread-ids-$PPID_FAKE.txt"
+      p45_block '# phase 4.5 remediate' | sed "s/\$PPID/$PPID_FAKE/g" | bash
+      wc -l < "/tmp/post-plan-p45-work-$PPID_FAKE.jsonl" | tr -d ' '
+      rm -f /tmp/post-plan-pre4d-thread-ids-$PPID_FAKE.txt /tmp/post-plan-p45-*-$PPID_FAKE.jsonl )
+}
+[ "$(run_p45_remediate 111 | tail -1)" = "1" ] && ok "p45-filter: pre-existing 111 selected" \
+    || fail "p45-filter: expected 1 work item for snapshot {111}"
+[ "$(run_p45_remediate 999 | tail -1)" = "0" ] && ok "p45-filter: fresh thread (not in snapshot) skipped" \
+    || fail "p45-filter: expected 0 work items for snapshot {999}"
+[ "$(run_p45_remediate '' | tail -1)" = "0" ] && ok "p45-filter: empty snapshot acts on nothing" \
+    || fail "p45-filter: expected 0 work items for an empty snapshot"
 
 # ── summary ───────────────────────────────────────────────────────────────────
 if [ "$FAILED" -eq 0 ]; then

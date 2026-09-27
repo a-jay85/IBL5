@@ -147,4 +147,27 @@ class ApiKeysViewTest extends TestCase
 
         $this->assertStringNotContainsString('name=ApiKeys', $html);
     }
+
+    public function testExportGuideRendersAppsScriptSectionWithHeaderAuth(): void
+    {
+        $html = $this->view->renderExportGuide();
+
+        self::assertStringContainsString('Apps Script (header auth)', $html);
+        self::assertStringContainsString("'X-API-Key': 'YOUR_KEY'", html_entity_decode($html, ENT_QUOTES | ENT_HTML5));
+        self::assertStringContainsString('UrlFetchApp.fetch', $html);
+        self::assertStringContainsString('https://iblhoops.net/ibl5/api/v1/players/export\'', html_entity_decode($html, ENT_QUOTES | ENT_HTML5));
+    }
+
+    public function testExportGuideKeepsImportdataFormulaAndOrdersItFirst(): void
+    {
+        $html = $this->view->renderExportGuide();
+
+        $importdataPos = strpos($html, '=IMPORTDATA("https://iblhoops.net/ibl5/api/v1/players/export?key=YOUR_KEY")');
+        $scriptPos = strpos($html, 'Apps Script (header auth)');
+
+        self::assertNotFalse($importdataPos, 'IMPORTDATA example must survive (additive change)');
+        self::assertNotFalse($scriptPos);
+        self::assertLessThan($scriptPos, $importdataPos, 'IMPORTDATA block renders before the Apps Script block');
+        self::assertSame(2, substr_count($html, 'ibl-code-block'));
+    }
 }

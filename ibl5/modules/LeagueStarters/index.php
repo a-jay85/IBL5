@@ -34,7 +34,6 @@ if ($op === 'api') {
 $season = new \Season\Season($mysqli_db);
 
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
 $pagetitle = "- $module_name";
 
 $league = new \League\League($mysqli_db);

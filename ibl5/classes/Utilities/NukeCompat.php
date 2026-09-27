@@ -158,14 +158,6 @@ class NukeCompat
     }
 
     /**
-     * Load language file for a module.
-     */
-    public function getLang(string $module): void
-    {
-        get_lang($module);
-    }
-
-    /**
      * Display block content for a position (e.g., "Center", "Down").
      */
     public function blocks(string $position): void

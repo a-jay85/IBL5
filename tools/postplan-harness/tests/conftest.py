@@ -1,8 +1,9 @@
 """Shared fixtures for the harness test suite.
 
 Opt in per module with `pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")`.
-Nothing here is autouse: `test_fidelity.py` and `test_fidelity_remediation.py` exercise the
-real `_git_show` through a `git` shim on PATH, and a repo-wide patch would defeat them.
+`stub_ambient_git_show` is not autouse: `test_fidelity.py` and `test_fidelity_remediation.py`
+exercise the real `_git_show` through a `git` shim on PATH, and a repo-wide patch would
+defeat them. `no_real_pr_review_now` is the one autouse fixture.
 """
 from __future__ import annotations
 
@@ -36,3 +37,16 @@ def stub_ambient_git_show(monkeypatch):
         return bodies.get(ref_path.split(":", 1)[-1])
 
     monkeypatch.setattr(fidelity, "_git_show", _show)
+
+
+@pytest.fixture(autouse=True)
+def no_real_pr_review_now(monkeypatch):
+    """Keep every test away from the real `bin/pr-review-now`.
+
+    Any `runner.run(..., live=True)` that reaches Phase 6.5 runs review-owed.sh, which
+    fires `bin/pr-review-now <pr>` unless REVIEW_OWED_PR_REVIEW_NOW names another binary.
+    The real one registers a launchd job against the main checkout and DMs the owner, so
+    the replay suites' fixture PR (#999) sent a real DM on every local run. Tests that
+    assert on the fire still set their own logging stub, which overrides this default.
+    """
+    monkeypatch.setenv("REVIEW_OWED_PR_REVIEW_NOW", "/usr/bin/true")

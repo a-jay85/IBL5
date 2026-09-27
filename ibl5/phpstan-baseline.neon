@@ -1331,12 +1331,6 @@ parameters:
 			path: classes/YourAccount/LoginView.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/ActivityTracker/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class ActivityTracker\ActivityTrackerRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -1367,12 +1361,6 @@ parameters:
 			path: modules/ApiKeys/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/AwardHistory/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class AwardHistory\AwardHistoryRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -1383,12 +1371,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/AwardHistory/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/CapSpace/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class CapSpace\CapSpaceRepository constructor expects mysqli, mixed given.'
@@ -1421,12 +1403,6 @@ parameters:
 			path: modules/CareerLeaderboards/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/CareerLeaderboards/index.php
-
-		-
 			rawMessage: 'Loose comparison via "!=" between mixed and null is not allowed.'
 			identifier: notEqual.notAllowed
 			count: 1
@@ -1451,12 +1427,6 @@ parameters:
 			path: modules/CareerLeaderboards/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/ComparePlayers/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class ComparePlayers\ComparePlayersRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -1467,12 +1437,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/ComparePlayers/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/ContractList/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class ContractList\ContractListRepository constructor expects mysqli, mixed given.'
@@ -1514,12 +1478,6 @@ parameters:
 			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 3
-			path: modules/DepthChartEntry/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
 			path: modules/DepthChartEntry/index.php
 
 		-
@@ -1745,12 +1703,6 @@ parameters:
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Draft/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class Draft\DraftController constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -1805,12 +1757,6 @@ parameters:
 			path: modules/DraftHistory/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class DraftHistory\DraftHistoryApiHandler constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -1853,12 +1799,6 @@ parameters:
 			path: modules/DraftHistory/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/DraftPickLocator/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class DraftPickLocator\DraftPickLocatorRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -1893,12 +1833,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/FranchiseRecordBook/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/FreeAgency/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class FreeAgency\FreeAgencyController constructor expects mysqli, mixed given.'
@@ -1961,12 +1895,6 @@ parameters:
 			path: modules/FreeAgency/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/FreeAgencyPreview/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class FreeAgencyPreview\FreeAgencyPreviewRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -1979,22 +1907,10 @@ parameters:
 			path: modules/FreeAgencyPreview/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/GMContactList/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class GMContactList\GMContactListRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/GMContactList/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/GameBoxscore/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class GameBoxscore\GameBoxscoreRepository constructor expects mysqli, mixed given.'
@@ -2009,12 +1925,6 @@ parameters:
 			path: modules/GameBoxscore/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Injuries/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class Injuries\InjuriesService constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -2023,12 +1933,6 @@ parameters:
 		-
 			rawMessage: 'Cannot call method getUsername() on mixed.'
 			identifier: method.nonObject
-			count: 1
-			path: modules/LeagueStarters/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
 			count: 1
 			path: modules/LeagueStarters/index.php
 
@@ -2130,12 +2034,6 @@ parameters:
 
 		-
 			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/News/article.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1
 			path: modules/News/article.php
@@ -2279,12 +2177,6 @@ parameters:
 			path: modules/News/categories.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/News/categories.php
-
-		-
 			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1
@@ -2369,20 +2261,8 @@ parameters:
 			path: modules/News/categories.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/News/index.php
-
-		-
 			rawMessage: 'Cannot call method getUsername() on mixed.'
 			identifier: method.nonObject
-			count: 1
-			path: modules/NextSim/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
 			count: 1
 			path: modules/NextSim/index.php
 
@@ -2466,12 +2346,6 @@ parameters:
 
 		-
 			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/OneOnOneGame/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1
 			path: modules/OneOnOneGame/index.php
@@ -2661,12 +2535,6 @@ parameters:
 
 		-
 			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Player/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1
 			path: modules/Player/index.php
@@ -2966,12 +2834,6 @@ parameters:
 			path: modules/PlayerDatabase/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/PlayerDatabase/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class PlayerDatabase\PlayerDatabaseRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -2990,12 +2852,6 @@ parameters:
 			path: modules/PlayerDatabase/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/PlayerMovement/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class PlayerMovement\PlayerMovementRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -3006,12 +2862,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/PlayerMovement/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/ProjectedDraftOrder/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class Auth\AuthRepository constructor expects mysqli, mixed given.'
@@ -3036,12 +2886,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/ProjectedDraftOrder/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/RecordHolders/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class AllStarAppearances\AllStarAppearancesRepository constructor expects mysqli, mixed given.'
@@ -3128,12 +2972,6 @@ parameters:
 			path: modules/Schedule/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Search/index.php
-
-		-
 			rawMessage: 'Parameter #1 $data of method Search\SearchView::render() expects array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: string, min: int, ...}, array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: ''''|''transactions'', min: int, ...} given.'
 			identifier: argument.type
 			count: 1
@@ -3178,12 +3016,6 @@ parameters:
 		-
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
 			identifier: empty.notAllowed
-			count: 1
-			path: modules/SeasonHighs/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
 			count: 1
 			path: modules/SeasonHighs/index.php
 
@@ -3250,12 +3082,6 @@ parameters:
 		-
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
 			identifier: empty.notAllowed
-			count: 1
-			path: modules/SeasonLeaderboards/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
 			count: 1
 			path: modules/SeasonLeaderboards/index.php
 
@@ -3350,12 +3176,6 @@ parameters:
 			path: modules/Standings/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Team/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -3404,12 +3224,6 @@ parameters:
 			path: modules/Team/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/TeamOffDefStats/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -3424,12 +3238,6 @@ parameters:
 		-
 			rawMessage: Cannot cast mixed to string.
 			identifier: cast.string
-			count: 1
-			path: modules/Topics/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
 			count: 1
 			path: modules/Topics/index.php
 
@@ -3480,12 +3288,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/Trading/accepttradeoffer.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Trading/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class Repositories\SalaryCapRepository constructor expects mysqli, mixed given.'
@@ -3686,12 +3488,6 @@ parameters:
 			path: modules/TrainingCampRatingsDiff/index.php
 
 		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Voting/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -3735,12 +3531,6 @@ parameters:
 
 		-
 			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/Waivers/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1
 			path: modules/Waivers/index.php
@@ -3825,12 +3615,6 @@ parameters:
 
 		-
 			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/YourAccount/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1
 			path: modules/YourAccount/index.php

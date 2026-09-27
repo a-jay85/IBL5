@@ -450,8 +450,8 @@ plant_sidecar plan-now-20260910-200000-60004 'eeeeeeee-1111-2222-3333-4444444444
 # Case 13: slugless prompt, but the run has since seeded its draft. The user
 # record names a peer's draft and must lose to the assistant's own tool call.
 plant_tx "12121212-1111-2222-3333-444444444444.jsonl" \
-    '{"type":"user","message":{"content":[{"type":"text","text":"see ~/claude-plans/.drafts/peer-plan.draft.md"}]}}' \
-    "$(tx_tool Bash command 'mkdir -p ~/claude-plans/.drafts && cat > /Users/x/claude-plans/.drafts/tab-helper-prep.draft.md')"
+    "$(tx_tool Bash command 'mkdir -p ~/claude-plans/.drafts && cat > /Users/x/claude-plans/.drafts/tab-helper-prep.draft.md')" \
+    '{"type":"user","message":{"content":[{"type":"text","text":"see ~/claude-plans/.drafts/peer-plan.draft.md"}]}}'
 plant_sidecar plan-now-20260910-200000-60005 '12121212-1111-2222-3333-444444444444'
 
 # ── run ────────────────────────────────────────────────────────────────────────

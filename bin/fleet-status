@@ -413,12 +413,11 @@ prompt_slug() {
 # The slug a plan-now run CHOSE, for prompts that never declared one.
 #
 # /plan picks its slug mid-run and seeds ~/claude-plans/.drafts/<slug>.draft.md
-# (plan SKILL.md Step 3 item 5), so the first assistant tool call that names that
-# path is the earliest durable sign of the choice. Only assistant records count:
-# the prompt (a user record) can mention a peer plan's draft. The parent
-# transcript is read first because the orchestrator seeds the draft; subagent
-# transcripts cover a run whose architect wrote it first. The LAST match wins, so
-# a multi-PR split shows the unit it is on now.
+# (plan SKILL.md Step 3 item 5). Only assistant records count: the prompt (a
+# user record) can mention a peer plan's draft. The parent transcript is read
+# first because the orchestrator seeds the draft; subagent transcripts cover a
+# run whose architect wrote it first. The LAST match wins, so a multi-PR split
+# shows the unit it is on now.
 transcript_plan_slug() {
     local log="$1" sc uuid f slug=''
     sc="$(session_sidecar_path "$log")"

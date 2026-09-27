@@ -165,7 +165,6 @@ class ScheduleMembershipGuardTest extends TestCase
     {
         return [
             'Sep (shifted Nov)' => ['2007-09-20'],
-            'Oct (shifted Dec)' => ['2007-10-15'],
         ];
     }
 
@@ -183,6 +182,15 @@ class ScheduleMembershipGuardTest extends TestCase
         $scheduleIndex = ['2008-01-10' => [2 => [1 => true]]];
         $guard = new ScheduleMembershipGuard(2008, $scheduleIndex, [], 'Preseason');
         $result = $guard->evaluate($this->makeBoxscore('2008-08-05', 3, 7, 1));
+
+        $this->assertNull($result);
+    }
+
+    public function testExemptsOctoberDuringPreseasonImport(): void
+    {
+        $scheduleIndex = ['2008-01-10' => [2 => [1 => true]]];
+        $guard = new ScheduleMembershipGuard(2008, $scheduleIndex, [], 'Preseason');
+        $result = $guard->evaluate($this->makeBoxscore('2007-10-15', 3, 7, 1));
 
         $this->assertNull($result);
     }
@@ -245,7 +253,7 @@ class ScheduleMembershipGuardTest extends TestCase
         return [
             'Preseason month 8 (Olympics)'   => ['Preseason', 8, true],
             'Preseason month 9'              => ['Preseason', 9, false],
-            'Preseason month 10'             => ['Preseason', 10, false],
+            'Preseason month 10'             => ['Preseason', 10, true],
             'Preseason month 11'             => ['Preseason', 11, false],
             'HEAT month 9'                   => ['HEAT', 9, true],
             'HEAT month 10'                  => ['HEAT', 10, true],

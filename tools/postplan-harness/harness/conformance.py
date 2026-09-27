@@ -58,6 +58,10 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
     never the same string, and any total of 2+ is ambiguous either way.
     """
     tok = tok.strip().strip("/")
+    # pytest node-id form `path/to/file.py::test_name` — strip the test-name
+    # suffix so the token resolves to the file path the diff actually contains.
+    if "::" in tok:
+        tok = tok.split("::", 1)[0].strip("/")
     if not tok:
         return None
     hits = [f for f in changed_files if f == tok or f.endswith("/" + tok)]

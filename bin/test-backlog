@@ -107,50 +107,36 @@ OUT="$("$SCRIPT" --help 2>&1)"
 want "--help lists new body arg" "$OUT" "new <label> <title> <body>"
 want "--help lists for-pr" "$OUT" "for-pr <pr-url>"
 
-# Case 9: for-pr filter semantics via BACKLOG_GH stub
-JQ_FIXTURE='[
-  {"number":1,"title":"issue one","body":"https://github.com/a-jay85/IBL5/pull/1234\nsome text"},
-  {"number":2,"title":"issue two","body":"https://github.com/a-jay85/IBL5/pull/12345\nother"},
-  {"number":3,"title":"issue three","body":"see https://github.com/a-jay85/IBL5/pull/1234 mid"},
-  {"number":4,"title":"issue four","body":"https://github.com/a-jay85/IBL5/pull/9999\nother"}
-]'
-STUB_DIR="$(mktemp -d)"
-cat > "$STUB_DIR/gh" <<'STUB'
+# Case 9: for-pr filter semantics against fixture JSON via a gh stub.
+if command -v jq >/dev/null 2>&1; then
+    STUB_DIR="$(mktemp -d)"; trap 'rm -rf "$STUB_DIR"' EXIT
+    cat > "$STUB_DIR/gh" <<'STUB'
 #!/usr/bin/env bash
-# Stub: intercept `gh issue list --json ... --jq ...`; return fixture
-JQ_ARG=""
+filter=""
 while [ $# -gt 0 ]; do
-    case "$1" in
-        --jq) JQ_ARG="$2"; shift 2 ;;
-        *) shift ;;
-    esac
+    if [ "$1" = "--jq" ]; then filter="$2"; shift 2; else shift; fi
 done
-printf '%s' "$JQ_FIXTURE_JSON" | jq -r "$JQ_ARG"
+jq -r "$filter" <<'JSON'
+[{"number":1,"title":"same pr","body":"https://github.com/a-jay85/IBL5/pull/1234\nbin/a.sh:1 x"},
+ {"number":2,"title":"longer pr","body":"https://github.com/a-jay85/IBL5/pull/12345\nbin/b.sh:2 y"},
+ {"number":3,"title":"mid-body url","body":"See https://github.com/a-jay85/IBL5/pull/1234\nbin/c.sh:3 z"},
+ {"number":4,"title":"other pr","body":"https://github.com/a-jay85/IBL5/pull/99\nbin/d.sh:4 w"}]
+JSON
 STUB
-chmod +x "$STUB_DIR/gh"
-CASE9_OUT="$(BACKLOG_GH="$STUB_DIR/gh" JQ_FIXTURE_JSON="$JQ_FIXTURE" "$SCRIPT" for-pr "$PR" 2>&1)"; CASE9_RC=$?
-[ "$CASE9_RC" -eq 0 ] && ok "for-pr (live jq): exits 0" || fail "for-pr (live jq): exits 0 (got $CASE9_RC)"
-if grep -qF -- "#1" <<< "$CASE9_OUT"; then
-    ok "for-pr (live jq): lists issue #1 (exact match)"
+    chmod +x "$STUB_DIR/gh"
+    OUT="$(BACKLOG_GH="$STUB_DIR/gh" "$SCRIPT" for-pr "$PR" 2>&1)"; RC=$?
+    [ "$RC" -eq 0 ] && ok "for-pr stub run exits 0" || fail "for-pr stub run exits 0 (got $RC)"
+    want "for-pr lists the same-PR issue" "$OUT" "#1 same pr"
+    for n in 2 3 4; do
+        if grep -qF -- "#$n " <<< "$OUT"; then
+            fail "for-pr excludes #$n"
+        else
+            ok "for-pr excludes #$n"
+        fi
+    done
 else
-    fail "for-pr (live jq): lists issue #1 (exact match) — output: $CASE9_OUT"
+    printf '[SKIP] Case 9 for-pr filter (jq not installed)\n'
 fi
-if grep -qF -- "#2" <<< "$CASE9_OUT"; then
-    fail "for-pr (live jq): excludes pull/12345 prefix (#2)"
-else
-    ok "for-pr (live jq): excludes pull/12345 prefix (#2)"
-fi
-if grep -qF -- "#3" <<< "$CASE9_OUT"; then
-    fail "for-pr (live jq): excludes mid-body URL (#3)"
-else
-    ok "for-pr (live jq): excludes mid-body URL (#3)"
-fi
-if grep -qF -- "#4" <<< "$CASE9_OUT"; then
-    fail "for-pr (live jq): excludes other-PR issue (#4)"
-else
-    ok "for-pr (live jq): excludes other-PR issue (#4)"
-fi
-rm -rf "$STUB_DIR"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

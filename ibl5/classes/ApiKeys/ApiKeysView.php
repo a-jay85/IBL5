@@ -28,6 +28,21 @@ class ApiKeysView implements ApiKeysViewInterface
         . '</div>';
 
     /**
+     * Header-auth alternative to IMPORTDATA. Mirrors the script Phase 2 ships
+     * in the repo; keep the two in sync when the endpoint or header changes.
+     */
+    private const APPS_SCRIPT_SNIPPET = <<<'GS'
+function importIblPlayers() {
+  const url = 'https://iblhoops.net/ibl5/api/v1/players/export';
+  const response = UrlFetchApp.fetch(url, { headers: { 'X-API-Key': 'YOUR_KEY' } });
+  const rows = Utilities.parseCsv(response.getContentText());
+  const sheet = SpreadsheetApp.getActiveSheet();
+  sheet.clearContents();
+  sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+}
+GS;
+
+    /**
      * @see ApiKeysViewInterface::renderNoKeyState()
      */
     public function renderNoKeyState(): string
@@ -164,6 +179,10 @@ class ApiKeysView implements ApiKeysViewInterface
         <pre class="ibl-code-block mb-4">=IMPORTDATA("https://iblhoops.net/ibl5/api/v1/players/export?key=YOUR_KEY")</pre>
         <?= self::URL_KEY_NOTICE ?>
 
+        <h3 class="mb-2">Apps Script (header auth)</h3>
+        <p class="mb-4">To keep the key out of the URL, use a Google Apps Script instead of <code>IMPORTDATA</code>. In your sheet open <strong>Extensions &gt; Apps Script</strong>, paste this function (replace <code>YOUR_KEY</code> with your actual key), save, and run <code>importIblPlayers</code>. The key travels in the <code>X-API-Key</code> header, so the web server does not log it. Add a time-driven trigger in Apps Script if you want it to refresh on a schedule.</p>
+        <pre class="ibl-code-block mb-4"><?= HtmlSanitizer::e(self::APPS_SCRIPT_SNIPPET) ?></pre>
+
         <h3 class="mb-2">Column Reference</h3>
         <table class="ibl-data-table mb-6">
             <thead>
@@ -201,7 +220,7 @@ class ApiKeysView implements ApiKeysViewInterface
 
         <h3 class="mb-2">Tips</h3>
         <ul class="mb-6">
-            <li class="mb-1">Data refreshes each time Google Sheets recalculates (approximately every hour).</li>
+            <li class="mb-1">Data refreshes each time Google Sheets recalculates (approximately every hour) for IMPORTDATA; the Apps Script refreshes when you run it or on its trigger.</li>
             <li class="mb-1">Use Google Sheets' built-in FILTER, SORT, and QUERY functions to slice the data.</li>
             <li class="mb-1">Salary values are in thousands (e.g., 1500 = $1,500K).</li>
             <li class="mb-1">Stats columns (GP, MIN, FGM, etc.) are season totals. Divide by GP for per-game averages.</li>

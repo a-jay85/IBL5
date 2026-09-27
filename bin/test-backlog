@@ -12,7 +12,7 @@ ok()   { printf '[PASS] %s\n' "$1"; PASS=$((PASS + 1)); }
 fail() { printf '[FAIL] %s\n' "$1"; FAIL=$((FAIL + 1)); FAILURES+=("$1"); }
 want() {
     local label="$1" output="$2" token="$3"
-    if echo "$output" | grep -qF -- "$token"; then
+    if grep -qF -- "$token" <<< "$output"; then
         ok "$label"
     else
         fail "$label (missing: $token)"
@@ -27,7 +27,10 @@ OUT="$("$SCRIPT" --help 2>&1)"; RC=$?
 want "--help names the repo" "$OUT" "a-jay85/IBL5-backlog"
 
 # Case 2: --dry-run new prints gh issue create with correct flags
-OUT="$("$SCRIPT" --dry-run new ci "x" 2>&1)"; RC=$?
+VALID_BODY='https://github.com/a-jay85/IBL5/pull/1234
+bin/backlog:83 passes an empty --body, so every filed issue carries no origin.
+Failure scenario: a Phase 6.5 writer files a finding and triage cannot locate it.'
+OUT="$("$SCRIPT" --dry-run new ci "x" "$VALID_BODY" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && ok "--dry-run new exits 0" || fail "--dry-run new exits 0 (got $RC)"
 want "--dry-run new: gh issue create" "$OUT" "gh issue create"
 want "--dry-run new: repo flag" "$OUT" "--repo a-jay85/IBL5-backlog"
@@ -35,10 +38,119 @@ want "--dry-run new: label flag" "$OUT" "--label ci"
 # `gh issue create` aborts non-interactively unless --body is passed alongside
 # --title, so headless callers (/pr-ready Phase 6.5, /fix-and-prevent) need it present.
 want "--dry-run new: body flag present (headless-safe)" "$OUT" "--body"
+want "--dry-run new: body forwarded, not empty" "$OUT" \
+    "--body https://github.com/a-jay85/IBL5/pull/1234"
 
 # Case 3: unknown subcommand exits non-zero
 "$SCRIPT" bogus-subcommand >/dev/null 2>&1; RC=$?
 [ "$RC" -ne 0 ] && ok "unknown subcommand exits non-zero" || fail "unknown subcommand exits non-zero (got $RC)"
+
+# reject <label> <stderr-token> <args...>: expects exit 2, the named rule
+# on stderr, and no composed gh command (validation runs before run()).
+reject() {
+    local label="$1" token="$2"; shift 2
+    local out rc
+    out="$("$SCRIPT" --dry-run "$@" 2>&1)"; rc=$?
+    [ "$rc" -eq 2 ] && ok "$label exits 2" || fail "$label exits 2 (got $rc)"
+    want "$label names the rule" "$out" "$token"
+    if grep -qF -- "gh issue" <<< "$out"; then
+        fail "$label composed a gh command"
+    else
+        ok "$label composed no gh command"
+    fi
+}
+
+PR='https://github.com/a-jay85/IBL5/pull/1234'
+LONG_TAIL='Failure scenario: the writer files an issue with no location and triage stalls on it for weeks.'
+
+# Case 4: body arity
+reject "new with no body" "new requires <label> <title> <body>" new ci "t"
+reject "new with 4 args" "new requires <label> <title> <body>" new ci "t" "$VALID_BODY" extra
+
+# Case 5: body content rules (checked in this order: empty, URL, file:line, length)
+reject "empty body" "body is empty" new ci "t" ""
+reject "whitespace-only body" "body is empty" new ci "t" "
+	"
+reject "URL-only body" "body needs a file:line location" new ci "t" "$PR"
+reject "URL not on first line" "body must start with an origin PR URL" \
+    new ci "t" "Found in review.
+$PR
+bin/backlog:83 $LONG_TAIL"
+reject "wrong-repo URL" "body must start with an origin PR URL" \
+    new ci "t" "https://github.com/a-jay85/IBL5-backlog/pull/1
+bin/backlog:83 $LONG_TAIL"
+reject "no file:line" "body needs a file:line location" \
+    new ci "t" "$PR
+bin/backlog has no location here. $LONG_TAIL"
+reject "body at 100 chars or less" "body is too short" \
+    new ci "t" "$PR
+bin/backlog:83 empty body"
+
+# Case 6: for-pr composes a startswith lookup
+OUT="$("$SCRIPT" --dry-run for-pr "$PR" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "for-pr exits 0" || fail "for-pr exits 0 (got $RC)"
+want "for-pr: gh issue list" "$OUT" "gh issue list"
+want "for-pr: repo flag" "$OUT" "--repo a-jay85/IBL5-backlog"
+want "for-pr: open only" "$OUT" "--state open"
+want "for-pr: json fields" "$OUT" "--json number,title,body"
+want "for-pr: startswith filter" "$OUT" "startswith(\"$PR\")"
+want "for-pr: --limit 1000" "$OUT" "--limit 1000"
+
+# Case 7: for-pr argument rejection
+reject "for-pr with no URL" "for-pr requires <pr-url>" for-pr
+reject "for-pr with 2 args" "for-pr requires <pr-url>" for-pr "$PR" extra
+reject "for-pr non-PR arg" "for-pr requires a PR URL" for-pr 1234
+reject "for-pr URL with quote" "for-pr requires a PR URL" for-pr "$PR\""
+
+# Case 8: --help documents the new surface
+OUT="$("$SCRIPT" --help 2>&1)"
+want "--help lists new body arg" "$OUT" "new <label> <title> <body>"
+want "--help lists for-pr" "$OUT" "for-pr <pr-url>"
+
+# Case 9: for-pr filter semantics via BACKLOG_GH stub
+JQ_FIXTURE='[
+  {"number":1,"title":"issue one","body":"https://github.com/a-jay85/IBL5/pull/1234\nsome text"},
+  {"number":2,"title":"issue two","body":"https://github.com/a-jay85/IBL5/pull/12345\nother"},
+  {"number":3,"title":"issue three","body":"see https://github.com/a-jay85/IBL5/pull/1234 mid"},
+  {"number":4,"title":"issue four","body":"https://github.com/a-jay85/IBL5/pull/9999\nother"}
+]'
+STUB_DIR="$(mktemp -d)"
+cat > "$STUB_DIR/gh" <<'STUB'
+#!/usr/bin/env bash
+# Stub: intercept `gh issue list --json ... --jq ...`; return fixture
+JQ_ARG=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --jq) JQ_ARG="$2"; shift 2 ;;
+        *) shift ;;
+    esac
+done
+printf '%s' "$JQ_FIXTURE_JSON" | jq -r "$JQ_ARG"
+STUB
+chmod +x "$STUB_DIR/gh"
+CASE9_OUT="$(BACKLOG_GH="$STUB_DIR/gh" JQ_FIXTURE_JSON="$JQ_FIXTURE" "$SCRIPT" for-pr "$PR" 2>&1)"; CASE9_RC=$?
+[ "$CASE9_RC" -eq 0 ] && ok "for-pr (live jq): exits 0" || fail "for-pr (live jq): exits 0 (got $CASE9_RC)"
+if grep -qF -- "#1" <<< "$CASE9_OUT"; then
+    ok "for-pr (live jq): lists issue #1 (exact match)"
+else
+    fail "for-pr (live jq): lists issue #1 (exact match) — output: $CASE9_OUT"
+fi
+if grep -qF -- "#2" <<< "$CASE9_OUT"; then
+    fail "for-pr (live jq): excludes pull/12345 prefix (#2)"
+else
+    ok "for-pr (live jq): excludes pull/12345 prefix (#2)"
+fi
+if grep -qF -- "#3" <<< "$CASE9_OUT"; then
+    fail "for-pr (live jq): excludes mid-body URL (#3)"
+else
+    ok "for-pr (live jq): excludes mid-body URL (#3)"
+fi
+if grep -qF -- "#4" <<< "$CASE9_OUT"; then
+    fail "for-pr (live jq): excludes other-PR issue (#4)"
+else
+    ok "for-pr (live jq): excludes other-PR issue (#4)"
+fi
+rm -rf "$STUB_DIR"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

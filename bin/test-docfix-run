@@ -381,7 +381,11 @@ OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
   && ok "(17c) health: ALERT died on orphan branch with no PR" \
   || bad "(17c) health died"
 
-# Case 17d: ALERT never-ran — no PR, no branch, stale-since 40h ago
+# Case 17d: ALERT never-ran — no PR, no branch, stale-since 40h ago.
+# This is also the CI shape of a pre-push death: the runner has no local
+# refresh branches and no launchctl, so the `wedged` arm can never fire there.
+# The detail must name both causes (not installed / died before pushing) and
+# stay one line, since the workflow appends it to $GITHUB_OUTPUT as key=value.
 SB="$(build_sandbox)"
 BODY="<!-- stale-since: $TS_40H -->"
 OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
@@ -389,7 +393,10 @@ OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
     run_health "$SB" 77)"
 { echo "$OUT" | grep -q 'alert=true' \
     && echo "$OUT" | grep -q 'kind=never-ran' \
-    && echo "$OUT" | grep -q 'install-schedule'; } \
+    && echo "$OUT" | grep -q 'install-schedule' \
+    && echo "$OUT" | grep -q 'died before pushing' \
+    && echo "$OUT" | grep -q 'docfix-run-\*\.log' \
+    && [ "$(echo "$OUT" | wc -l | tr -d ' ')" -eq 3 ]; } \
   && ok "(17d) health: ALERT never-ran after 36h grace (40h marker)" \
   || bad "(17d) health never-ran"
 

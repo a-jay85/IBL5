@@ -410,6 +410,33 @@ prompt_slug() {
     printf '%s' "$slug"
 }
 
+# The slug a plan-now run CHOSE, for prompts that never declared one.
+#
+# /plan picks its slug mid-run and seeds ~/claude-plans/.drafts/<slug>.draft.md
+# (plan SKILL.md Step 3 item 5). Only assistant records count: the prompt (a
+# user record) can mention a peer plan's draft. The parent transcript is read
+# first because the orchestrator seeds the draft; subagent transcripts cover a
+# run whose architect wrote it first. The LAST match wins, so a multi-PR split
+# shows the unit it is on now.
+transcript_plan_slug() {
+    local log="$1" sc uuid f slug=''
+    sc="$(session_sidecar_path "$log")"
+    [ -f "$sc" ] || return 1
+    uuid="$(head -n 1 "$sc" | tr -d '[:space:]')"
+    is_session_id "$uuid" || return 1     # never let an unvalidated value reach a glob
+    for f in "$TRANSCRIPT_ROOT"/*/"$uuid".jsonl \
+             "$TRANSCRIPT_ROOT"/*/"$uuid"/subagents/agent-*.jsonl; do
+        [ -f "$f" ] || continue
+        slug="$(grep '"assistant"' "$f" 2>/dev/null \
+            | grep -oE 'claude-plans/\.drafts/[A-Za-z0-9._-]+\.draft\.md' | tail -n 1)"
+        [ -n "$slug" ] && break
+    done
+    slug="${slug#claude-plans/.drafts/}"; slug="${slug%.draft.md}"
+    case "$slug" in ''|.*|*[!a-zA-Z0-9._-]*) return 1 ;; esac
+    [ "${#slug}" -gt 64 ] && return 1
+    printf '%s' "$slug"
+}
+
 section() { printf '\n%s%s%s\n' "$B" "$1" "$R"; }
 note()    { printf '  %s%s%s\n' "$DIM" "$1" "$R"; }
 
@@ -478,6 +505,11 @@ render_launchd() {
                 if [ -n "$slug" ]; then
                     ident="$slug"
                     ident_note="  ${DIM}${suffix#plan-now-}${R}"
+                else
+                    # No slug in the prompt: keep the label (the row's only
+                    # identity until now) and append the slug once the run picks it.
+                    slug="$(transcript_plan_slug "$log")" || slug=''
+                    [ -n "$slug" ] && ident_note="  ${B}${slug}${R}"
                 fi
                 ;;
             post-plan-fleet-*) producer="fleet"; log="$LOG_DIR/${suffix}.log" ;;

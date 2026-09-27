@@ -54,7 +54,7 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
         // and PageLayout::footer() skips themeheader/footer.
         $_SERVER['HTTP_HX_BOOSTED'] = 'true';
 
-        // Ensure LegacyFunctions are loaded (get_lang, cookiedecode, is_user, etc.)
+        // Ensure LegacyFunctions are loaded (cookiedecode, is_user, etc.)
         $legacyPath = dirname(__DIR__, 3) . '/classes/Bootstrap/LegacyFunctions.php';
         require_once $legacyPath;
 

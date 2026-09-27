@@ -7,7 +7,6 @@ if (!defined('MODULE_FILE')) {
 }
 
 $module_name = basename(dirname(__FILE__));
-get_lang($module_name);
 
 global $mysqli_db, $user, $authService;
 

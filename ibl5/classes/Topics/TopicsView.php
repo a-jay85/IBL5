@@ -10,25 +10,25 @@ use Search\Contracts\SearchViewInterface;
 
 // PHP-Nuke language constants - defined at runtime by the CMS
 if (!defined('_ACTIVETOPICS')) {
-    define('_ACTIVETOPICS', 'Active Topics');
+    define('_ACTIVETOPICS', 'Current Active Topics');
 }
 if (!defined('_CLICK2LIST')) {
-    define('_CLICK2LIST', 'Click on a topic to list associated articles');
+    define('_CLICK2LIST', 'Click to list all articles in this topic');
 }
 if (!defined('_SEARCH')) {
     define('_SEARCH', 'Search');
 }
 if (!defined('_TOTNEWS')) {
-    define('_TOTNEWS', 'articles');
+    define('_TOTNEWS', 'Total News');
 }
 if (!defined('_TOTREADS')) {
-    define('_TOTREADS', 'reads');
+    define('_TOTREADS', 'Total Reads');
 }
 if (!defined('_MORE')) {
     define('_MORE', 'More');
 }
 if (!defined('_NONEWSYET')) {
-    define('_NONEWSYET', 'No news yet');
+    define('_NONEWSYET', "...There aren't any news yet for this topic...");
 }
 if (!defined('_ALLTOPICS')) {
     define('_ALLTOPICS', 'All Topics');

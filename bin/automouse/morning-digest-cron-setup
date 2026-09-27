@@ -56,6 +56,7 @@ fi
 
 PLIST_LABEL="com.ibl5.automouse-morning-digest"
 PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
+LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs"
 PROGRAM="$MAIN_WT/bin/automouse/morning-digest"
 
 # Single source of truth for the plist — used by both --print-schedule and
@@ -103,9 +104,9 @@ build_plist() {
 ${discord_block}
 	</dict>
 	<key>StandardOutPath</key>
-	<string>${MAIN_WT}/../automouse-digest.log</string>
+	<string>${LOG_DIR}/morning-digest-stdout.log</string>
 	<key>StandardErrorPath</key>
-	<string>${MAIN_WT}/../automouse-digest-err.log</string>
+	<string>${LOG_DIR}/morning-digest-stderr.log</string>
 </dict>
 </plist>
 PLIST
@@ -130,7 +131,7 @@ case "$ACTION" in
       echo "Error: HOME is unset — cannot generate a valid plist (HOME is interpolated into PATH)." >&2
       exit 1
     fi
-    mkdir -p "$HOME/Library/LaunchAgents"
+    mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
     launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent: ignore "not loaded"
     build_plist > "$PLIST_PATH"
     launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"

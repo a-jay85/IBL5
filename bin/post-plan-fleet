@@ -33,9 +33,9 @@
 #   bin/post-plan-fleet --go                  # fire all open non-draft PRs, 5 at a time
 #   bin/post-plan-fleet --pr 1899,1900 --go   # fire exactly two
 #   bin/post-plan-fleet --jobs 1 --go         # serialize
-#   bin/post-plan-fleet --pr-attack ~/pr-attack.md --go         # fire top 5 from rank file
-#   bin/post-plan-fleet --pr-attack ~/pr-attack.md --top-n 3 --go  # fire top 3
-#   bin/post-plan-fleet --pr-attack ~/pr-attack.md --go --wait      # fire, then wait for all to finish
+#   bin/post-plan-fleet --pr-attack ~/claude-plans/_reports/ibl5/pr-attack/IBL5-pr-attack-<date>.md --go         # fire top 5 from rank file
+#   bin/post-plan-fleet --pr-attack ~/claude-plans/_reports/ibl5/pr-attack/IBL5-pr-attack-<date>.md --top-n 3 --go  # fire top 3
+#   bin/post-plan-fleet --pr-attack ~/claude-plans/_reports/ibl5/pr-attack/IBL5-pr-attack-<date>.md --go --wait      # fire, then wait for all to finish
 #
 # WARNING: Never run with --go from inside a worktree. The launched sessions must start from
 # the main checkout so bin/post-plan-now resolves the target PR's own worktree correctly.
@@ -59,7 +59,7 @@
 #                           Unset or empty = $ROOT/bin/discord-dm.
 #
 # Report output (written under --go only):
-#   $HOME/pr-firstpass-YYYY-MM-DD.md — one Markdown row per PR (fired or skipped),
+#   $HOME/claude-plans/_reports/ibl5/firstpass/pr-firstpass-YYYY-MM-DD.md — one Markdown row per PR (fired or skipped),
 #   a Findings section (diffs from FINDING[...] markers in PR logs), and a Security notes section.
 #   Same-day re-runs overwrite. The report path is printed as the last stdout line.
 #   Without --wait the sessions are still running when the report is written, so most
@@ -344,7 +344,7 @@ derive_status() {
 
 # write_report <attack-src> <master-sha> <fired-n> <skip-n>
 # Builds the Markdown report from the global FIRE_PRS/SKIP_LINES arrays, writes it to
-# $HOME/pr-firstpass-YYYY-MM-DD.md (overwrites on same-day re-run), and prints the path
+# $HOME/claude-plans/_reports/ibl5/firstpass/pr-firstpass-YYYY-MM-DD.md (overwrites on same-day re-run), and prints the path
 # to stdout as the last line (headless-marker-contract: last stdout line = report path).
 # master-sha may be empty; if so, auto-resolved here to avoid a git call on dry-run paths.
 # attack-src should be "—" when --pr-attack is not in use.
@@ -356,7 +356,8 @@ write_report() {
         master_sha="${POST_PLAN_FLEET_MASTER_SHA:-$(git -C "$ROOT" rev-parse --short origin/master 2>/dev/null || echo unknown)}"
     fi
     rdate="$(date +%F)"
-    rpath="${HOME}/pr-firstpass-${rdate}.md"
+    rpath="${HOME}/claude-plans/_reports/ibl5/firstpass/pr-firstpass-${rdate}.md"
+    mkdir -p "$(dirname "$rpath")"
 
     {
         printf '# PR first pass — %s\n\n' "$rdate"

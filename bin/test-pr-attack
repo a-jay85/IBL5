@@ -839,7 +839,7 @@ run_attack --work "$W20" --gate-edges /dev/null
 assert_status "20 write-path exits 0" 0 "$ST"
 
 # File should exist under $TMP/home
-WRITTEN_FILE="$(find "$TMP/home" -maxdepth 1 -name 'IBL5-pr-attack-*.md' 2>/dev/null | head -1 || true)"
+WRITTEN_FILE="$(find "$TMP/home/claude-plans/_reports/ibl5/pr-attack" -maxdepth 1 -name 'IBL5-pr-attack-*.md' 2>/dev/null | head -1 || true)"
 if [ -n "$WRITTEN_FILE" ]; then
     pass "20 written file exists under HOME"
     case "$WRITTEN_FILE" in
@@ -851,7 +851,7 @@ if [ -n "$WRITTEN_FILE" ]; then
         *) pass "20 written file is outside repo root" ;;
     esac
 else
-    failcase "20 no IBL5-pr-attack-*.md found under TMP/home"
+    failcase "20 no IBL5-pr-attack-*.md found under TMP/home/claude-plans/_reports/ibl5/pr-attack"
 fi
 
 # ============================================================

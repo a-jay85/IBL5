@@ -46,14 +46,14 @@ final class ModuleRedirect
      * $target must already carry a `?`; kept params are joined with `&`.
      *
      * @param array<int, string> $whitelist param names allowed through
-     * @param array<string, callable(string): bool>|null $validators per-param predicates
      * @param array<array-key, mixed> $request the request params to filter
+     * @param array<string, callable(string): bool>|null $validators per-param predicates
      */
     public static function passthroughUrl(
         string $target,
         array $whitelist,
-        ?array $validators = null,
-        array $request = []
+        array $request,
+        ?array $validators = null
     ): string {
         $params = [];
         foreach ($whitelist as $param) {
@@ -83,17 +83,17 @@ final class ModuleRedirect
      * Caller must `return` immediately after.
      *
      * @param array<int, string> $whitelist
-     * @param array<string, callable(string): bool>|null $validators
      * @param array<array-key, mixed> $request merged request params (e.g. $_GET + $_POST)
+     * @param array<string, callable(string): bool>|null $validators
      */
     public static function sendWithPassthrough(
         string $target,
         array $whitelist,
+        array $request,
         ?array $validators = null,
-        int $status = 302,
-        array $request = []
+        int $status = 302
     ): void {
-        $url = self::passthroughUrl($target, $whitelist, $validators, $request);
+        $url = self::passthroughUrl($target, $whitelist, $request, $validators);
 
         if (HtmxHelper::isHtmxRequest()) {
             header('HX-Redirect: ' . $url);

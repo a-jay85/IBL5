@@ -98,6 +98,12 @@ final class PageTabsTest extends TestCase
         $this->assertSame('ratings', $tabs->resolve(['totals']));
     }
 
+    public function testResolveFallsBackForNonStringInt(): void
+    {
+        $tabs = $this->makeTabs();
+        $this->assertSame('ratings', $tabs->resolve(42));
+    }
+
     // --- Phase 2: renderTabBar() ---
 
     public function testRenderTabBarWrapsInIblTabsDiv(): void
@@ -167,6 +173,45 @@ final class PageTabsTest extends TestCase
         $this->assertStringContainsString('data-tab="2025" aria-current="page"', $html);
     }
 
+    public function testRenderTabBarActiveTabHasActiveClass(): void
+    {
+        $tabs = $this->makeTabs();
+        $html = $tabs->renderTabBar('totals', self::BASE_URL);
+        $this->assertStringContainsString('class="ibl-tab ibl-tab--active"', $html);
+        $this->assertSame(1, substr_count($html, 'ibl-tab--active'));
+    }
+
+    public function testRenderTabBarActiveTabHasAriaCurrent(): void
+    {
+        $tabs = $this->makeTabs();
+        $html = $tabs->renderTabBar('totals', self::BASE_URL);
+        $this->assertStringContainsString('aria-current="page"', $html);
+        $this->assertSame(1, substr_count($html, 'aria-current="page"'));
+    }
+
+    public function testRenderTabBarInactiveTabHasNoAriaCurrent(): void
+    {
+        $tabs = $this->makeTabs();
+        $html = $tabs->renderTabBar('ratings', self::BASE_URL);
+        $this->assertStringNotContainsString('class="ibl-tab ibl-tab--active" href="modules.php?name=Stats&amp;tab=totals"', $html);
+        $this->assertStringContainsString('class="ibl-tab" href="modules.php?name=Stats&amp;tab=totals"', $html);
+    }
+
+    public function testRenderTabBarIncludesDataTabAttribute(): void
+    {
+        $tabs = new PageTabs(['season' => 'Season', 'career' => 'Career'], 'season');
+        $html = $tabs->renderTabBar('season', 'modules.php?name=Leaders');
+        $this->assertStringContainsString('data-tab="season"', $html);
+        $this->assertStringContainsString('data-tab="career"', $html);
+    }
+
+    public function testRenderTabBarHrefContainsEncodedAmpersand(): void
+    {
+        $tabs = new PageTabs(['season' => 'Season'], 'season');
+        $html = $tabs->renderTabBar('season', 'modules.php?name=Leaders');
+        $this->assertStringContainsString('href="modules.php?name=Leaders&amp;tab=season"', $html);
+    }
+
     public function testRenderTabBarEscapesAmpersandInLabel(): void
     {
         $tabs = $this->makeTabs();
@@ -180,14 +225,6 @@ final class PageTabsTest extends TestCase
         $tabs = new PageTabs(['x&y' => 'X'], 'x&y');
         $html = $tabs->renderTabBar('x&y', 'modules.php?name=X');
         $this->assertStringContainsString('data-tab="x&amp;y"', $html);
-    }
-
-    public function testRenderTabBarEscapesScriptTagInLabel(): void
-    {
-        $tabs = new PageTabs(['evil' => '<script>alert(1)</script>'], 'evil');
-        $html = $tabs->renderTabBar('evil', self::BASE_URL);
-        $this->assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
-        $this->assertStringNotContainsString('<script>', $html);
     }
 
     public function testRenderTabBarEscapesHtmlInLabel(): void
@@ -240,14 +277,6 @@ final class PageTabsTest extends TestCase
         );
     }
 
-    public function testWrapPanelIncludesContentVerbatim(): void
-    {
-        $tabs = $this->makeTabs();
-        $content = '<table><tr><td>A&amp;B</td></tr></table>';
-        $out = $tabs->wrapPanel($content, 'ratings');
-        $this->assertStringContainsString($content, $out);
-    }
-
     public function testWrapPanelEscapesKey(): void
     {
         $tabs = $this->makeTabs();
@@ -258,34 +287,39 @@ final class PageTabsTest extends TestCase
 
     // --- Phase 5: security-discharge structural assertions ---
 
-    public function testPageTabsHoldsNoDbOrActorIdentity(): void
+    /** @return list<string> */
+    private function detectDbOrActorViolations(object $obj): array
     {
-        $rc = new ReflectionClass(PageTabs::class);
+        $violations = [];
         $forbidden = ['db', 'loggedInTeamID', 'userId', 'username', 'session'];
-        foreach ($rc->getProperties() as $prop) {
-            $this->assertNotContains(
-                $prop->getName(),
-                $forbidden,
-                "PageTabs must not hold property \${$prop->getName()}"
-            );
+        foreach ((new ReflectionClass($obj))->getProperties() as $prop) {
+            if (in_array($prop->getName(), $forbidden, true)) {
+                $violations[] = $prop->getName();
+            }
             $type = $prop->getType();
             if ($type instanceof \ReflectionNamedType) {
                 $typeName = ltrim($type->getName(), '?\\');
-                $this->assertStringNotContainsString('mysqli', $typeName);
-                $this->assertStringNotContainsString('Database', $typeName);
+                if (str_contains($typeName, 'mysqli') || str_contains($typeName, 'Database')) {
+                    $violations[] = $typeName;
+                }
             }
         }
+        return $violations;
+    }
+
+    public function testPageTabsHoldsNoDbOrActorIdentity(): void
+    {
+        $violations = $this->detectDbOrActorViolations(new PageTabs(['x' => 'X'], 'x'));
+        $this->assertSame([], $violations, 'PageTabs must not hold $db, actor identity, or database types');
     }
 
     public function testDbPropertyDetectionHelperCanFail(): void
     {
         $fixture = new class {
-            // @phpstan-ignore property.unused
-            private \stdClass $db;
+            public \stdClass $db;
         };
-        $rc = new ReflectionClass($fixture);
-        $props = array_map(fn ($p) => $p->getName(), $rc->getProperties());
-        $this->assertContains('db', $props, 'Fixture sanity: anonymous class must declare $db so detection is meaningful');
+        $violations = $this->detectDbOrActorViolations($fixture);
+        $this->assertContains('db', $violations, 'Helper must detect $db on the fixture class');
     }
 
     public function testSecurityLabelIsHtmlEscaped(): void

@@ -29,49 +29,49 @@ class ModuleRedirectTest extends TestCase
         $this->assertNull(ModuleRedirect::targetFor('votingresults'));
     }
 
-    public function testPassthroughUrlIncludesWhitelistedStringParam(): void
+    public function testPassthroughUrlIncludesWhitelistedParam(): void
     {
-        $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], null, ['teamid' => '5']);
+        $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], ['teamid' => '5']);
         $this->assertSame(self::BASE . '&teamid=5', $url);
     }
 
     public function testPassthroughUrlDropsUnlistedParam(): void
     {
-        $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], null, ['teamid' => '5', 'unlisted' => 'x']);
+        $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], ['teamid' => '5', 'unlisted' => 'x']);
         $this->assertSame(self::BASE . '&teamid=5', $url);
         $this->assertStringNotContainsString('unlisted', $url);
     }
 
     public function testPassthroughUrlDropsNonStringValue(): void
     {
-        $url1 = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], null, ['teamid' => 5]);
+        $url1 = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], ['teamid' => 5]);
         $this->assertSame(self::BASE, $url1);
-        $url2 = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], null, ['teamid' => ['5']]);
+        $url2 = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], ['teamid' => ['5']]);
         $this->assertSame(self::BASE, $url2);
     }
 
     public function testPassthroughUrlDropsEmptyValue(): void
     {
-        $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], null, ['teamid' => '']);
+        $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], ['teamid' => '']);
         $this->assertSame(self::BASE, $url);
     }
 
     public function testPassthroughUrlValidatorRejectsNonDigits(): void
     {
-        $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], ['teamid' => 'ctype_digit'], ['teamid' => 'abc']);
+        $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], ['teamid' => 'abc'], ['teamid' => 'ctype_digit']);
         $this->assertSame(self::BASE, $url);
     }
 
     public function testPassthroughUrlValidatorPassesDigits(): void
     {
-        $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid', 'year'], ['teamid' => 'ctype_digit'], ['teamid' => '12', 'year' => '2024x']);
+        $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid', 'year'], ['teamid' => '12', 'year' => '2024x'], ['teamid' => 'ctype_digit']);
         $this->assertSame(self::BASE . '&teamid=12&year=2024x', $url);
     }
 
-    public function testSecurityCrlfInWhitelistedParamIsPercentEncoded(): void
+    public function testPassthroughUrlCrlfInValueIsPercentEncoded(): void
     {
         /** passthroughUrl() builds the URL exclusively via http_build_query with RFC3986 encoding; param values from the request never appear unencoded in the output. */
-        $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], null, ['teamid' => "5\r\nLocation: https://evil.example"]);
+        $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], ['teamid' => "5\r\nLocation: https://evil.example"]);
         $this->assertStringNotContainsString("\r", $url);
         $this->assertStringNotContainsString("\n", $url);
         $this->assertStringContainsString('%0D%0A', $url);
@@ -79,10 +79,10 @@ class ModuleRedirectTest extends TestCase
         $this->assertStringNotContainsString('+https', $url);
     }
 
-    public function testSecurityAbsoluteUrlInWhitelistedParamIsPercentEncoded(): void
+    public function testPassthroughUrlAbsoluteUrlInValueIsPercentEncoded(): void
     {
         /** passthroughUrl() builds the URL exclusively via http_build_query with RFC3986 encoding; param values from the request never appear unencoded in the output. */
-        $url = ModuleRedirect::passthroughUrl(self::BASE, ['ref'], null, ['ref' => 'https://evil.example/x']);
+        $url = ModuleRedirect::passthroughUrl(self::BASE, ['ref'], ['ref' => 'https://evil.example/x']);
         $this->assertStringContainsString('https%3A%2F%2Fevil.example%2Fx', $url);
         $this->assertStringNotContainsString('https://evil', $url);
         $this->assertStringNotContainsString('//evil', $url);
@@ -91,10 +91,17 @@ class ModuleRedirectTest extends TestCase
 
     public function testPassthroughUrlNoParamsReturnsBaseTarget(): void
     {
-        $url1 = ModuleRedirect::passthroughUrl(self::BASE, [], null, ['teamid' => '5']);
+        $url1 = ModuleRedirect::passthroughUrl(self::BASE, [], ['teamid' => '5']);
         $this->assertSame(self::BASE, $url1);
-        $url2 = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], null, []);
+        $url2 = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], []);
         $this->assertSame(self::BASE, $url2);
+    }
+
+    public function testPassthroughUrlNoMatchingParamsReturnsBaseTarget(): void
+    {
+        $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], ['teamid' => 'abc'], ['teamid' => 'ctype_digit']);
+        $this->assertSame(self::BASE, $url);
+        $this->assertStringNotContainsString('teamid', $url);
     }
 
     public function testPassthroughUrlIsStatelessFunction(): void

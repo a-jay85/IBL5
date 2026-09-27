@@ -5,7 +5,7 @@ disable-model-invocation: true
 model: claude-sonnet-4-6
 context: fork
 agent: sonnet-4-6
-last_verified: 2026-09-02
+last_verified: 2026-09-26
 allowed-tools: Bash(bin/pr-attack --gate-candidates), Bash(bin/pr-attack --work:*), Read
 ---
 
@@ -79,7 +79,7 @@ bin/pr-attack --work <WORK> \
 
 Ingests the gate-edge judgments from Step 3b, runs Kahn's topological sort (with
 hub-last, Needs-you? rank, and ascending-PR# tie-breaks), and emits the ordered
-plan to stdout and to `$HOME/IBL5-pr-attack-<date>.md`.
+plan to stdout and to `$HOME/claude-plans/_reports/ibl5/pr-attack/IBL5-pr-attack-<date>.md`.
 
 If there are no gate nominees this normally happens automatically (see the stop
 condition above), so you should not reach here. The explicit judged-empty form is

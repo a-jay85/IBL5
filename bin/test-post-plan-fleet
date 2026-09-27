@@ -676,7 +676,7 @@ out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/four-fire.json" \
        POST_PLAN_FLEET_DRY_RUN=1 \
        run_driver --go --jobs 4 2>&1)"; rc=$?
 [[ $rc -eq 0 ]] || fail "report-statuses: exit $rc (out: $out)"
-rp="$SCRATCH/pr-firstpass-${_rdate}.md"
+rp="$SCRATCH/claude-plans/_reports/ibl5/firstpass/pr-firstpass-${_rdate}.md"
 [[ -f "$rp" ]] || fail "report-statuses: report not found at $rp"
 grep -qF '| READY |' "$rp" || fail "report-statuses: READY status missing from report"
 grep -qF '| NOT READY |' "$rp" || fail "report-statuses: NOT READY status missing from report"
@@ -714,7 +714,7 @@ out2="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/hookrej-fire.json" \
         POST_PLAN_FLEET_DRY_RUN=1 \
         run_driver --go --jobs 3 2>&1)"; rc2=$?
 [[ $rc2 -eq 0 ]] || fail "report-statuses hookrej: exit $rc2 (out: $out2)"
-rp2="$SCRATCH/pr-firstpass-${_rdate}.md"
+rp2="$SCRATCH/claude-plans/_reports/ibl5/firstpass/pr-firstpass-${_rdate}.md"
 [[ -f "$rp2" ]] || fail "report-statuses hookrej: report not found at $rp2"
 # Assertions scoped to each PR's own row to prevent vacuous passes.
 grep '3005' "$rp2" | grep -qF '| READY |' \
@@ -738,7 +738,7 @@ out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/four-combo.json" \
        POST_PLAN_FLEET_DRY_RUN=1 \
        run_driver --go 2>&1)"; rc=$?
 [[ $rc -eq 0 ]] || fail "report-skip-reason: exit $rc (out: $out)"
-rp="$SCRATCH/pr-firstpass-${_rdate}.md"
+rp="$SCRATCH/claude-plans/_reports/ibl5/firstpass/pr-firstpass-${_rdate}.md"
 [[ -f "$rp" ]] || fail "report-skip-reason: report not found at $rp"
 grep -qF 'SKIPPED (no worktree)' "$rp" || \
     fail "report-skip-reason: 'SKIPPED (no worktree)' not in report (head: $(head -20 "$rp"))"
@@ -2387,7 +2387,7 @@ end_case "check-digest-prose voice linter"
 
 # --- 6c.1: --dry-run prints the per-PR invocation and exits 0 ------------------------
 begin_case
-rm -f "$SCRATCH/pr-firstpass-$(date +%F).md"
+rm -f "$SCRATCH/claude-plans/_reports/ibl5/firstpass/pr-firstpass-$(date +%F).md"
 out="$(HOME="$SCRATCH" POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." POST_PLAN_FLEET_GH_USER=a-jay85 \
     bin/post-plan-fleet --dry-run --pr 9999 2>&1)"; rc=$?
 [[ $rc -eq 0 ]] || fail "6c.1: --dry-run exited $rc, want 0 (out: $out)"
@@ -2395,7 +2395,7 @@ grep -qF 'bin/post-plan-now --pr 9999 --foreground' <<< "$out" \
   || fail "6c.1: --dry-run output does not contain 'bin/post-plan-now --pr 9999 --foreground'"
 [[ ! -e "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9999.plist" ]] \
   || fail "6c.1: --dry-run left plist in LaunchAgents"
-[[ ! -e "$SCRATCH/pr-firstpass-$(date +%F).md" ]] \
+[[ ! -e "$SCRATCH/claude-plans/_reports/ibl5/firstpass/pr-firstpass-$(date +%F).md" ]] \
   || fail "6c.1: --dry-run wrote pr-firstpass report"
 end_case dry-run-prints-invocation
 

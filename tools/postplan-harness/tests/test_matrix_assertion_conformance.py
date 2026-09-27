@@ -117,12 +117,14 @@ def test_waiver_for_other_row_does_not_clear(tmp_path, monkeypatch):
 
 def test_empty_diff_body_skips_check(tmp_path, monkeypatch):
     """diff_body="" — no UNREALISED-ASSERTION; script is never invoked."""
+    git_root = _make_git_root(tmp_path)
+    monkeypatch.setenv("MATRIX_ASSERT_ROOT", git_root)
     plan = _make_plan(tmp_path)
 
     def _fail_if_called(argv, **kwargs):
-        if argv and argv[0] == _MATRIX_ASSERTIONS_SCRIPT:
-            raise AssertionError("script must not be called when diff_body is empty")
-        return subprocess.run.__wrapped__(argv, **kwargs) if hasattr(subprocess.run, "__wrapped__") else None
+        raise AssertionError(f"script must not be called when diff_body is empty: {argv}")
+
+    monkeypatch.setattr("harness.conformance.subprocess.run", _fail_if_called)
 
     # Use check() so we exercise the if diff_body: guard
     items = check(plan, [], diff_body="", pr_body="any")

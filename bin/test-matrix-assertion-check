@@ -90,6 +90,25 @@ waived)
     fi
     ;;
 
+waived-exact)
+    # Waiving 2.10 must NOT silence row 2.1 (exact match, not substring)
+    plan_fixture \
+        '| 2.1  | `FIXTURE_EXACT_A` fires | CLI-executable | post-impl | `bin/test-it` |' \
+        '| 2.10 | `FIXTURE_EXACT_B` fires | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    printf 'WAIVE-MATRIX-ROW: 2.10\n' > "$root/body.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" "$root/body.txt" 2>/dev/null)
+    rc=$?
+    row21=$(printf '%s' "$out" | grep -c 'row 2\.1 ' || true)
+    row210=$(printf '%s' "$out" | grep -c 'row 2\.10' || true)
+    if [ "$rc" -eq 0 ] && [ "$row21" -eq 1 ] && [ "$row210" -eq 0 ]; then
+        ok "waived-exact"
+    else
+        fail "waived-exact (rc=$rc, row21=$row21, row210=$row210, out=$out)"
+    fi
+    ;;
+
 fenced)
     # Row 8 inside a fence, row 9 outside — only 9 should fire
     {
@@ -172,10 +191,11 @@ empty-env)
     ref=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
     # Empty-env run (rely on cwd for tree root)
     got=$( (cd "$root" && env -i PATH=/usr/bin:/bin "$HELPER" plan.md diff.txt) 2>/dev/null)
-    if [ "$ref" = "$got" ]; then
+    got_rc=$?
+    if [ "$ref" = "$got" ] && [ "$got_rc" -eq 0 ]; then
         ok "empty-env"
     else
-        fail "empty-env (ref=$ref, got=$got)"
+        fail "empty-env (rc=$got_rc, ref=$ref, got=$got)"
     fi
     ;;
 
@@ -223,7 +243,7 @@ empty-range)
 
 *)
     printf 'Unknown case: %s\n' "$case" >&2
-    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range all\n' >&2
+    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range all\n' >&2
     exit 2
     ;;
 esac
@@ -235,7 +255,7 @@ rm -rf "$root"
 
 ARG="${1:-all}"
 
-CASES="absent-new-token present-in-plus no-single-word-tokens waived fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range"
+CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range"
 
 if [ "$ARG" = "all" ]; then
     for c in $CASES; do

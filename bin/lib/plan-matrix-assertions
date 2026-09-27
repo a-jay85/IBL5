@@ -21,11 +21,11 @@
 #   A single-word backtick token from the "What to verify" cell is evaluated as:
 #   1. present in a diff `+` line (excluding `+++` headers)  -> realised
 #   2. present in a diff context line (leading space or `-`)  -> pre-existing, skip
-#   3. present in the tree via `git grep -F --untracked`      -> pre-existing, skip
+#   3. present in a tracked file via `git grep -F`            -> pre-existing, skip
 #   4. otherwise                                               -> missing
 #   A row is flagged UNREALISED-ASSERTION when any qualifying token is missing.
 #   Qualifying tokens: single-word (no whitespace), no `...` or `<word>` spans,
-#   absent from the base tree (arm 3 above — tokens present in the tree are pre-existing).
+#   not already in a tracked file (arm 3 above — tokens found in the tree are pre-existing).
 #   A row with zero qualifying tokens is skipped entirely.
 #
 # Waiver format: `WAIVE-MATRIX-ROW: <id>` on any line in the PR body file.
@@ -75,7 +75,7 @@ grep -E '^[ -]' "$TMP/diff" | grep -vE '^---' | sed 's/^[ -]//' > "$TMP/ctx" || 
 
 # --- WAIVERS ---
 if [ -n "$BODY_ARG" ]; then
-    grep -oE 'WAIVE-MATRIX-ROW:[[:space:]]*[0-9A-Za-z.]+' "$BODY_ARG" \
+    grep -oE 'WAIVE-MATRIX-ROW:[[:space:]]*[0-9A-Za-z.-]+' "$BODY_ARG" \
         | sed -E 's/^WAIVE-MATRIX-ROW:[[:space:]]*//' > "$TMP/waived" || true
 else
     : > "$TMP/waived"
@@ -137,7 +137,7 @@ inm && !/^[[:space:]]*\|/ { inm=0; }
 # --- per-row check ---
 while IFS=$'\t' read -r id cell toks; do
     # check waiver
-    if grep -qF -e "$id" "$TMP/waived" 2>/dev/null; then
+    if grep -qxF -e "$id" "$TMP/waived" 2>/dev/null; then
         continue
     fi
 

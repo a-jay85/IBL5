@@ -817,6 +817,15 @@ DIGEST_SCRIPT_PATHS = (
     ".claude/review-shared/scripts/digest.sh",
 )
 
+REVIEW_OWED_SCRIPT_PATHS = (
+    ".claude/review-shared/scripts/review-owed.sh",
+)
+# bin/pr-review-now may wait_for_slot before it returns; the launch itself is sub-second.
+REVIEW_OWED_TIMEOUT = 300
+# The script's last stdout line. Exactly one verdict token, reason or tree after it.
+REVIEW_OWED_VERDICT_RE = re.compile(r"^(REVIEW-OWED|REVIEW-CURRENT) (\S+)$")
+_HEX40_RE = re.compile(r"^[0-9a-f]{40}$")
+
 DIGEST_UNAVAILABLE = "digest script did not produce output"
 MAX_FIDELITY_ROUNDS = 3  # round 1 is the historical single remediation
 STICKY_MARKER = "<!-- pr-ready-verdict -->"
@@ -1116,9 +1125,11 @@ def _digest_degraded(reason: str = DIGEST_UNAVAILABLE) -> list:
     return [f"{lbl} unavailable — {reason}" for lbl in LABELS]
 
 
-def _digest_source(worktree, master_sha: str) -> str | None:
-    """First either-location path that yields a non-empty script body."""
-    for rel in DIGEST_SCRIPT_PATHS:
+def _script_source(worktree, master_sha: str, paths) -> str | None:
+    """First path in `paths` with a non-empty body: `master_sha`'s copy when a worktree is
+    given (the harness runs master's scripts, never the branch's), else the harness's own
+    checkout (replay and pytest, where there is no worktree)."""
+    for rel in paths:
         if worktree:
             body = _git_show(worktree, f"{master_sha}:{rel}")
         else:
@@ -1131,6 +1142,11 @@ def _digest_source(worktree, master_sha: str) -> str | None:
         if body:
             return body
     return None
+
+
+def _digest_source(worktree, master_sha: str) -> str | None:
+    """First either-location path that yields a non-empty script body."""
+    return _script_source(worktree, master_sha, DIGEST_SCRIPT_PATHS)
 
 
 def digest_lines(worktree, master_sha: str, verdict_path: str, out_dir: str,
@@ -1168,3 +1184,62 @@ def digest_lines(worktree, master_sha: str, verdict_path: str, out_dir: str,
     # used verbatim, exactly as the skill pastes them. The tree-line strip runs AFTER the
     # shape test, so a label reduced to just its label still degrades the same way.
     return [_REVIEWED_TREE_TAIL_RE.sub("", ln) for ln in lines]
+
+
+def _review_owed_result(verdict: str, reason: str, *, fired: bool = False,
+                        command: str = "") -> dict:
+    return {"verdict": verdict, "reason": reason, "fired": fired, "command": command}
+
+
+def fire_review_owed(worktree, master_sha: str, pr_number, sticky_body: str,
+                     current_tree, out_dir: str, *, live: bool = True,
+                     log=_noop_log) -> dict:
+    """Run review-owed.sh against the sticky the harness just posted. Never raises.
+
+    Returns {"verdict": "REVIEW-OWED" | "REVIEW-CURRENT" | "unavailable" | "skipped",
+             "reason": <token>, "fired": bool, "command": <FIRED/DRY-RUN/FIRE-FAILED line>}.
+    `fired` is True only on a literal `FIRED:` line: a FIRE-FAILED run still reports
+    REVIEW-OWED so the log says the review is owed and was not launched. `live=False`
+    passes --dry-run: the decision runs, nothing launches. "unavailable" means the script
+    could not decide; nothing was fired and the caller only logs it. Arming is unchanged
+    on every path, the same contract as sticky-post-failed.
+    """
+    if not pr_number:
+        return _review_owed_result("skipped", "no-pr")
+    body = _script_source(worktree, master_sha, REVIEW_OWED_SCRIPT_PATHS)
+    if not body:
+        log("phase6.5 review-owed: script unavailable at master; nothing fired")
+        return _review_owed_result("unavailable", "script-unavailable")
+    script = os.path.join(out_dir, "review-owed.sh")
+    sticky_path = os.path.join(out_dir, "review-owed-sticky.md")
+    try:
+        with open(script, "w") as fh:
+            fh.write(body)
+        with open(sticky_path, "w") as fh:
+            fh.write(sticky_body or "")
+    except OSError as e:
+        return _review_owed_result("unavailable", f"write-failed:{e.__class__.__name__}")
+    argv = ["bash", script, str(pr_number), "--sticky-file", sticky_path]
+    if current_tree and _HEX40_RE.match(str(current_tree)):
+        argv += ["--current-tree", str(current_tree)]
+    if not live:
+        argv.append("--dry-run")
+    from .adapters.llm import _run_reaped
+    try:
+        proc = _run_reaped(argv, None, REVIEW_OWED_TIMEOUT, worktree, os.environ)
+    except subprocess.TimeoutExpired:
+        log("phase6.5 review-owed: timed out; nothing confirmed fired")
+        return _review_owed_result("unavailable", "timeout")
+    except Exception as e:
+        return _review_owed_result("unavailable", f"exec-failed:{e.__class__.__name__}")
+    if proc.returncode == 2:
+        return _review_owed_result("unavailable", "usage-error")
+    lines = [ln for ln in (proc.stdout or "").splitlines() if ln.strip()]
+    m = REVIEW_OWED_VERDICT_RE.match(lines[-1]) if lines else None
+    if proc.returncode != 0 or not m:
+        return _review_owed_result("unavailable", f"no-verdict-line:rc={proc.returncode}")
+    command = next((ln for ln in lines
+                    if ln.startswith(("FIRED: ", "DRY-RUN: ", "FIRE-FAILED: "))), "")
+    log(f"phase6.5 review-owed: {lines[-1]}" + (f" ({command})" if command else ""))
+    return _review_owed_result(m.group(1), m.group(2),
+                               fired=command.startswith("FIRED: "), command=command)

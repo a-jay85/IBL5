@@ -358,9 +358,12 @@ jobs:
       # retry a complete fix, not a mitigation. Actions has no native step-level retry,
       # so the attempts are spelled out; the assert step below keeps an exhausted chain
       # a hard job failure, so this does not weaken the gate.
+      # Same-repo PRs only. A fork PR's GITHUB_TOKEN is read-only, so its push can never
+      # land; the head.repo guard (repeated on both retries and the assert) makes a fork
+      # PR skip the whole chain instead of failing the job on the assert.
       - name: Deploy VR gallery to per-SHA GitHub Pages
         id: vr-pages
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && github.event.pull_request.head.repo.full_name == github.repository
         continue-on-error: true
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
@@ -376,7 +379,7 @@ jobs:
       # `skipped` outcome — fork PR, update-baselines run — never triggers one).
       - name: Deploy VR gallery to per-SHA GitHub Pages (retry 1)
         id: vr-pages-retry-1
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure'
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && github.event.pull_request.head.repo.full_name == github.repository
         continue-on-error: true
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
@@ -387,7 +390,7 @@ jobs:
 
       - name: Deploy VR gallery to per-SHA GitHub Pages (retry 2)
         id: vr-pages-retry-2
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && steps.vr-pages-retry-1.outcome == 'failure'
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && steps.vr-pages-retry-1.outcome == 'failure' && github.event.pull_request.head.repo.full_name == github.repository
         continue-on-error: true
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
@@ -399,7 +402,7 @@ jobs:
       # Restores the pre-retry failure semantics: three exhausted attempts is not a
       # lock collision, it is a real deploy break (bad token, Pages misconfigured).
       - name: Assert VR gallery deploy succeeded
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && steps.vr-pages-retry-1.outcome == 'failure' && steps.vr-pages-retry-2.outcome == 'failure'
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && steps.vr-pages-retry-1.outcome == 'failure' && steps.vr-pages-retry-2.outcome == 'failure' && github.event.pull_request.head.repo.full_name == github.repository
         run: |
           echo "::error::Deploying the VR gallery to gh-pages failed on all 3 attempts — see the deploy step logs above."
           exit 1

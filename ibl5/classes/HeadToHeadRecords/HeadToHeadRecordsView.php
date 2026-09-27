@@ -261,6 +261,11 @@ final class HeadToHeadRecordsView
     /**
      * Render the row label cell for one axis entry.
      *
+     * Emits a <th scope="row"> so screen readers announce the team name for
+     * every data cell in the row. head-to-head-records.css restores the td
+     * sticky-shadow, zebra-fill, and team-background styling that the shared
+     * td-keyed rules in tables.css no longer match after the tag swap.
+     *
      * Mirrors TeamCellHelper::renderTeamCell() markup so the shared
      * .ibl-team-cell--colored / .sticky-col styles apply. Entries with no
      * color1 skip the colored modifier and fall back to the zebra background.

@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-09-25
+last_verified: 2026-09-26
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -32,7 +32,9 @@ branch; it survives you closing Claude Code. Engine selection:
   Three kinds reach it: a rebase conflict, a **diverged remote head** (the PR branch was
   rewritten on GitHub with different content), and a **local gate denial** (a `bin/pre-commit-hook`
   or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget). All three are
-  deterministic, so a skill re-run would hit the same wall; the run DMs you and stops for a human.
+  deterministic, so a skill re-run would hit the same wall; the run stops for a human.
+  `bin/post-plan-fail-dm` sends the DM. With no live Claude session in the worktree it DMs
+  at once. With one, it holds the DM 15 min and sends it only if nobody re-fired the branch.
 
 On the commit path that detection is structural: any non-zero `git commit` is treated as a
 gate denial, so a hook message nobody enumerated in `_LOCAL_GATE_MARKERS` is still caught.

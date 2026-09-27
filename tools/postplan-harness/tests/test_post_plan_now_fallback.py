@@ -1346,14 +1346,15 @@ def test_badge_banner_rc3_names_both_fail_closed_causes():
 
 
 def test_exit3_dm_and_echo_send_the_same_single_string():
-    """Pins the single-string invariant: echo and discord-dm both receive the same $msg,
-    assigned exactly once. Tests 3-6 rely on stdout as a valid proxy for the DM text."""
+    """Pins the single-string invariant: echo and post-plan-fail-dm (which owns the DM)
+    both receive the same $msg, assigned exactly once. Tests 3-6 rely on stdout as a
+    valid proxy for the DM text."""
     src = open(PPN).read()
     line = [l for l in src.splitlines() if l.strip().startswith("GATE_CLOSE=\"; elif")]
     assert len(line) == 1, f"expected one populated GATE_CLOSE, got {len(line)}"
     body = line[0]
     assert 'echo \\"\\$msg\\"' in body
-    assert '--quiet --attempts 2 \\"\\$msg\\"' in body
+    assert 'bin/post-plan-fail-dm\\" ' in body and body.rstrip('"').endswith('\\"\\$msg\\" || true; fi')
     assert body.count("msg=") == 1
 
 

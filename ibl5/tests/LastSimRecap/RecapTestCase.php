@@ -123,11 +123,12 @@ abstract class RecapTestCase extends TestCase
         string $worstLabel = '−13 @ HEA',
         int $netMargin = -11,
         array $games = [],
+        string $teamName = 'Cavaliers',
     ): RecapSlate {
         return new RecapSlate(
             teamTid: 1,
             teamCity: 'Cleveland',
-            teamName: 'Cavaliers',
+            teamName: $teamName,
             simNumber: 42,
             startDate: '2026-05-01',
             endDate: '2026-05-13',

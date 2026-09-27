@@ -1360,6 +1360,15 @@ grep -qF '`EXPECTED` constant array' "$SCRIPT_DIR/../.claude/review-shared/_plan
 # coupling statements and makes this fail.
 grep -qF 'all six 6d checks' "$SCRIPT_DIR/../.claude/review-shared/_plan-fidelity-review.md" \
   || fail "27e: _plan-fidelity-review.md lost 'all six 6d checks' — coupling that forbids a 7th 6d class item removed"
+# 27f: backlog #669 author side — _phase65-remediation.md step 4 binds every factual body
+# assertion to a named proof command or explicit uncertainty. Removing the widened self-check
+# makes this fail.
+grep -qF 'names the proof command that was run in this step' "$SCRIPT_DIR/../.claude/review-shared/_phase65-remediation.md" \
+  || fail "27f: _phase65-remediation.md lost 'names the proof command that was run in this step' — #669 author-side self-check removed"
+# 27g: backlog #669 reader side — _plan-fidelity-review.md 6d.4c external-state carve-out.
+# Removing the 4c sub-clause makes this fail.
+grep -qF 'not decidable from the diff' "$SCRIPT_DIR/../.claude/review-shared/_plan-fidelity-review.md" \
+  || fail "27g: _plan-fidelity-review.md lost 'not decidable from the diff' — #669 reader-side 4c carve-out removed"
 end_case e22-e23-prevention-prose-pins
 
 # --- case 28 (pr-ready skill block): merge-digest extraction + body shape ---

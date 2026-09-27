@@ -222,15 +222,31 @@
      * Accounts for the wrapper's left offset (e.g. PHP-Nuke layout table
      * padding/cellspacing) so the wrapper's right edge doesn't exceed
      * the viewport, which would cause a horizontal page "wiggle".
+     * Also stops at the parent's content edges, so a padded parent (e.g. a
+     * .ibl-tab-panel card) keeps the table inside its padding.
      */
     function constrainWrapper(wrapper) {
-        // Temporarily clear max-width so getBoundingClientRect reflects
-        // the natural position (important during resize)
-        wrapper.style.maxWidth = "none";
+        // Clear the container's width from a previous run so the wrapper
+        // fits the table again and setContainerWidth reads a fresh width
+        var container = wrapper.querySelector(".table-scroll-container");
+        if (container) {
+            container.style.width = "";
+            container.style.maxWidth = "";
+        }
 
         var viewportWidth = document.documentElement.clientWidth;
-        var leftOffset = wrapper.getBoundingClientRect().left;
-        var availableWidth = viewportWidth - Math.max(0, leftOffset);
+        var parent = wrapper.parentElement;
+        var parentRect = parent.getBoundingClientRect();
+        var parentStyle = window.getComputedStyle(parent);
+        var contentLeft = parentRect.left
+            + parseFloat(parentStyle.borderLeftWidth)
+            + parseFloat(parentStyle.paddingLeft);
+        var contentRight = parentRect.right
+            - parseFloat(parentStyle.borderRightWidth)
+            - parseFloat(parentStyle.paddingRight);
+        var availableWidth = Math.floor(
+            Math.min(viewportWidth, contentRight) - Math.max(0, contentLeft)
+        );
         wrapper.style.maxWidth = availableWidth + "px";
         wrapper.style.overflow = "hidden";
     }

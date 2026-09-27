@@ -1,6 +1,6 @@
 ---
 description: Full Phase 5 how-to for plan-to-test, plan-to-file, diff-to-plan, and assertion-footprint conformance checks run during post-plan.
-last_verified: 2026-09-26
+last_verified: 2026-09-27
 ---
 
 # Phase 5 — Final Verification (post-plan reference)
@@ -203,7 +203,7 @@ if [ "${PLAN_FOUND:-none}" != "none" ]; then
   gh pr view --json body --jq '.body' > "$BODY" 2>/dev/null || : > "$BODY"
   OUT=$("$ROOT/bin/lib/plan-matrix-assertions" "$PLAN_FILE" "$DIFF" "$BODY" 2>&1)
   rc=$?
-  printf '%s\n' "$OUT" | grep '^UNREALISED-ASSERTION:'
+  printf '%s\n' "$OUT" | grep '^UNREALISED-ASSERTION:' || true
   if [ "$rc" -ge 2 ]; then
     # A parse or usage error is indeterminate. Surface it as an unresolved item
     # so condition (3) holds; a silent skip would fail OPEN.

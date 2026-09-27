@@ -287,4 +287,32 @@ final class PageTabsTest extends TestCase
         $props = array_map(fn ($p) => $p->getName(), $rc->getProperties());
         $this->assertContains('db', $props, 'Fixture sanity: anonymous class must declare $db so detection is meaningful');
     }
+
+    public function testSecurityLabelIsHtmlEscaped(): void
+    {
+        /** PageTabs passes every user-visible value (key, label, href segment) through HtmlSanitizer::safeHtmlOutput before inserting into HTML. */
+        $tabs = new PageTabs(['evil' => '<script>alert(1)</script>'], 'evil');
+        $html = $tabs->renderTabBar('evil', 'modules.php?name=Test');
+        $this->assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
+        $this->assertStringNotContainsString('<script>', $html);
+    }
+
+    public function testSecurityTabKeyCannotInjectAttribute(): void
+    {
+        /** PageTabs passes every user-visible value (key, label, href segment) through HtmlSanitizer::safeHtmlOutput before inserting into HTML. */
+        $tabs = new PageTabs(['"onclick="' => 'Evil'], '"onclick="');
+        $html = $tabs->renderTabBar('"onclick="', 'modules.php?name=Test');
+        $this->assertStringNotContainsString('"onclick="', $html);
+        $this->assertMatchesRegularExpression('/&quot;onclick=&quot;|%22onclick%3D%22/', $html);
+    }
+
+    public function testSecurityBaseUrlIsEscapedInHref(): void
+    {
+        /** PageTabs passes every user-visible value (key, label, href segment) through HtmlSanitizer::safeHtmlOutput before inserting into HTML. */
+        $tabs = new PageTabs(['tab' => 'Tab'], 'tab');
+        $html = $tabs->renderTabBar('tab', 'modules.php?name=Test&foo=<bar>');
+        $this->assertStringContainsString('&amp;foo=&lt;bar&gt;', $html);
+        $this->assertStringNotContainsString('<bar>', $html);
+        $this->assertStringNotContainsString('&amp;amp;', $html);
+    }
 }

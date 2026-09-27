@@ -32,7 +32,7 @@ interface CareerLeaderboardsViewInterface
      * - submitted: Hidden field set to "1"
      *
      * **Behaviors:**
-     * - Form submits to modules.php?name=CareerLeaderboards
+     * - Form submits to modules.php?name=Leaderboards&tab=career
      * - Pre-selects current filter values
      * - HTML-escapes all values for XSS protection
      * - Board types and sort categories from CareerLeaderboardsService

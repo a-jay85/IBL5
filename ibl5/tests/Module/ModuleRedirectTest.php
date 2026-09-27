@@ -29,6 +29,12 @@ class ModuleRedirectTest extends TestCase
         $this->assertNull(ModuleRedirect::targetFor('votingresults'));
     }
 
+    public function testTargetForNeverRedirectsTheLeaderboardsHost(): void
+    {
+        // The host module mapping to itself would loop the browser forever.
+        $this->assertNull(ModuleRedirect::targetFor('Leaderboards'));
+    }
+
     public function testPassthroughUrlIncludesWhitelistedParam(): void
     {
         $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], ['teamid' => '5']);

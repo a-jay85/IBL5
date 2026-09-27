@@ -7,7 +7,7 @@ import type { Page } from '@playwright/test';
 // assertions in each test cover the gap between response and DOM swap.
 async function submitFilters(page: Page): Promise<void> {
   await Promise.all([
-    page.waitForResponse((r) => r.url().includes('SeasonLeaderboards') && r.request().method() === 'POST'),
+    page.waitForResponse((r) => r.url().includes('tab=season') && r.request().method() === 'POST'),
     page.locator('.ibl-filter-form__submit').click(),
   ]);
 }
@@ -18,7 +18,7 @@ async function submitFilters(page: Page): Promise<void> {
 test.describe('Season Leaderboards flow', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Trivia Mode': 'Off' });
-    await page.goto('modules.php?name=SeasonLeaderboards');
+    await page.goto('modules.php?name=Leaderboards&tab=season');
   });
 
   test('page loads with filter form', async ({ page }) => {
@@ -113,7 +113,7 @@ test.describe('Season Leaderboards flow', () => {
 test.describe('Season Leaderboards: trivia mode', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Trivia Mode': 'On' });
-    await page.goto('modules.php?name=SeasonLeaderboards');
+    await page.goto('modules.php?name=Leaderboards&tab=season');
   });
 
   test('module shows inactive message when trivia mode is on', async ({ page }) => {

@@ -194,23 +194,23 @@ test.describe('Trivia-mode hidden modules: non-admin sees notice', () => {
     expect(body).toContain(MODULE_NOT_ACTIVE);
   });
 
-  test('CareerLeaderboards hidden when Trivia Mode is On', async ({
+  test('Leaderboards career tab hidden when Trivia Mode is On', async ({
     appState,
     page,
   }) => {
     await appState({ 'Trivia Mode': 'On' });
-    await page.goto('modules.php?name=CareerLeaderboards');
+    await page.goto('modules.php?name=Leaderboards&tab=career');
 
     const body = await page.locator('body').textContent();
     expect(body).toContain(MODULE_NOT_ACTIVE);
   });
 
-  test('SeasonLeaderboards hidden when Trivia Mode is On', async ({
+  test('Leaderboards season tab hidden when Trivia Mode is On', async ({
     appState,
     page,
   }) => {
     await appState({ 'Trivia Mode': 'On' });
-    await page.goto('modules.php?name=SeasonLeaderboards');
+    await page.goto('modules.php?name=Leaderboards&tab=season');
 
     const body = await page.locator('body').textContent();
     expect(body).toContain(MODULE_NOT_ACTIVE);

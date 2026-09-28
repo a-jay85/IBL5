@@ -95,20 +95,16 @@ else
          "expected '$ENV_SH_FILE', got '$out'"
 fi
 
-# ── case 7: full-corpus count ────────────────────────────────────────────────
-# Baseline was 256; bin/lib/shell-scripts.sh and bin/test-shell-scripts-lib
-# added 2 (251); retiring .claude/skills/pr-ready removed 7 scripts (251);
-# bin/test-automouse-measure-delegate-cost added 1 (252); bin/test-pr-triage added 1 (253);
-# bin/lib/launchd-job.sh and bin/test-launchd-job added 2 (255);
-# bin/post-plan-fail-dm and bin/test-post-plan-fail-dm added 2 (257);
-# .claude/review-shared/scripts/review-owed.sh added 1 (258);
-# bin/lib/plan-matrix-assertions and bin/test-matrix-assertion-check added 2 (260).
+# ── case 7: full-corpus floor ────────────────────────────────────────────────
+# A floor, not an exact count: adding a script must not break CI. The floor
+# catches a discovery regression that silently drops most of the corpus
+# (260 scripts when this became a floor).
 count=$("$HELPER" --full | wc -l | tr -d ' ')
-if [ "$count" = "260" ]; then
-    pass "case 7: full-corpus count is 260"
+if [ "$count" -ge 200 ] 2>/dev/null; then
+    pass "case 7: full-corpus count >= 200 (got $count)"
 else
-    fail "case 7: full-corpus count is 260" \
-         "got $count (expected 260)"
+    fail "case 7: full-corpus count >= 200" \
+         "got $count (expected >= 200)"
 fi
 
 # ── case 8: unknown flag exits non-zero and prints to stderr ─────────────────
@@ -129,11 +125,11 @@ fi
 system_bash="/bin/bash"
 if [ -x "$system_bash" ]; then
     compat_count=$(BASH="$system_bash" "$system_bash" "$HELPER" --full | wc -l | tr -d ' ')
-    if [ "$compat_count" = "260" ]; then
+    if [ "$compat_count" = "$count" ]; then
         pass "case 9: bash 3.2 compat — count matches ($compat_count)"
     else
         fail "case 9: bash 3.2 compat" \
-             "got $compat_count under /bin/bash (expected 260)"
+             "got $compat_count under /bin/bash (expected $count)"
     fi
 else
     pass "case 9: /bin/bash not available — skipped"

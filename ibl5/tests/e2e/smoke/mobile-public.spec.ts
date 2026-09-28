@@ -28,14 +28,14 @@ const PAGES = [
   { name: 'player movement', url: 'modules.php?name=PlayerMovement', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'league starters', url: 'modules.php?name=LeagueStarters', selector: '#league-starters-tables', hasWideTables: true },
   { name: 'compare players', url: 'modules.php?name=ComparePlayers', selector: 'form[action*="ComparePlayers"]', hasWideTables: false },
-  { name: 'season highs', url: 'modules.php?name=SeasonHighs', selector: '.ibl-data-table', hasWideTables: false },
+  { name: 'season highs', url: 'modules.php?name=Records&tab=thisseason', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'head-to-head records', url: 'modules.php?name=HeadToHeadRecords', selector: '.h2h-matrix', hasWideTables: true },
   { name: 'franchise history', url: 'modules.php?name=FranchiseHistory', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'activity tracker', url: 'modules.php?name=ActivityTracker', selector: '.ibl-data-table', hasWideTables: true },
-  { name: 'record holders', url: 'modules.php?name=RecordHolders', selector: '.record-section', hasWideTables: false },
-  { name: 'all-star appearances', url: 'modules.php?name=RecordHolders&op=allstar', selector: '.ibl-data-table', hasWideTables: false },
+  { name: 'record holders', url: 'modules.php?name=Records&tab=alltime', selector: '.record-section', hasWideTables: false },
+  { name: 'all-star appearances', url: 'modules.php?name=AllStarAppearances', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'award history', url: 'modules.php?name=AwardHistory', selector: '.ibl-data-table', hasWideTables: false },
-  { name: 'franchise record book', url: 'modules.php?name=FranchiseRecordBook', selector: '.ibl-data-table', hasWideTables: false },
+  { name: 'franchise record book', url: 'modules.php?name=Records&tab=byfranchise', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'team off/def stats', url: 'modules.php?name=TeamOffDefStats', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'search transactions preset', url: 'modules.php?name=Search&preset=transactions', selector: '.search-results', hasWideTables: false },
   { name: 'search', url: 'modules.php?name=Search', selector: '.search-page', hasWideTables: false },
@@ -102,8 +102,8 @@ test.describe('Mobile public page smoke tests', () => {
 
   test('franchise record book team view — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
-    await gotoWithRetry(page, 'modules.php?name=FranchiseRecordBook&teamid=1');
-    await assertNoPhpErrors(page, 'on modules.php?name=FranchiseRecordBook&teamid=1 (mobile)');
+    await gotoWithRetry(page, 'modules.php?name=Records&tab=byfranchise&teamid=1');
+    await assertNoPhpErrors(page, 'on modules.php?name=Records&tab=byfranchise&teamid=1 (mobile)');
     await expect(page.locator('.ibl-title, .ibl-data-table, table').first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on franchise record book team view');
   });

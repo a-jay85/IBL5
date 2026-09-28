@@ -516,10 +516,24 @@ class LeagueContextTest extends TestCase
             'CareerLeaderboards',
             'SeasonLeaderboards',
             'RecordHolders',
+            'Records',
+            'AllStarAppearances',
         ];
 
         foreach ($disabledModules as $module) {
             $this->assertFalse($context->isModuleEnabled($module), "$module should be disabled in Olympics");
+        }
+    }
+
+    public function testSeasonHighsStaysEnabledInOlympics(): void
+    {
+        $_GET['league'] = 'olympics';
+        try {
+            $context = new LeagueContext();
+
+            $this->assertTrue($context->isModuleEnabled('SeasonHighs'));
+        } finally {
+            unset($_GET['league']);
         }
     }
 

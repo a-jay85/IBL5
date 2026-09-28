@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Module\EntryPoints;
 
+use Module\ModuleRedirect;
+use Records\RecordsController;
+
 /**
  * Integration tests for modules/FranchiseRecordBook/index.php entry point.
  *
- * Exercises the `is_string($_GET['teamid'] ?? null)` guard and
- * `League::isRealFranchise()` branching (1-28 = team, else league).
+ * op=api serves the HTMX fragment; every other request is a body-less
+ * redirect to the Records page's By Franchise tab.
  */
 class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
 {
@@ -20,94 +23,29 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->onQuery('ibl_rcb_alltime_records', []);
     }
 
-    public function testMissingTeamidShowsLeagueRecords(): void
+    /**
+     * @param array<string, mixed> $query
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('redirectQueryProvider')]
+    public function testRedirectStubEmitsNoBody(array $query): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('FranchiseRecordBook');
+        $output = $this->runModule('FranchiseRecordBook', $query);
 
-        $this->assertNotEmpty($output);
-        $this->assertQueryExecuted('ibl_rcb');
+        $this->assertSame('', $output);
+        $this->assertQueryNotExecuted('ibl_rcb');
     }
 
-    public function testValidTeamidShowsTeamRecords(): void
+    /**
+     * @return array<string, array{array<string, mixed>}>
+     */
+    public static function redirectQueryProvider(): array
     {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('FranchiseRecordBook', ['teamid' => '5']);
-
-        $this->assertNotEmpty($output);
-        // isRealFranchise(5) === true → team record book path
-        $this->assertQueryExecuted('ibl_rcb');
-    }
-
-    public function testTeamidZeroShowsLeagueRecords(): void
-    {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('FranchiseRecordBook', ['teamid' => '0']);
-
-        $this->assertNotEmpty($output);
-        // isRealFranchise(0) === false → league path
-        $this->assertQueryExecuted('ibl_rcb');
-    }
-
-    public function testTeamidOutOfRangeShowsLeagueRecords(): void
-    {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('FranchiseRecordBook', ['teamid' => '99']);
-
-        $this->assertNotEmpty($output);
-        // isRealFranchise(99) === false (max is 28) → league path
-        $this->assertQueryExecuted('ibl_rcb');
-    }
-
-    public function testNonNumericTeamidCastsToZero(): void
-    {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('FranchiseRecordBook', ['teamid' => 'abc']);
-
-        $this->assertNotEmpty($output);
-        // (int)'abc' === 0, isRealFranchise(0) === false → league path
-        $this->assertQueryExecuted('ibl_rcb');
-    }
-
-    public function testTeamidAsArrayBypassedByIsStringGuard(): void
-    {
-        // The is_string() guard protects against array injection.
-        // $_GET['teamid'] = ['1','2'] → is_string(array) === false → $teamId stays 0
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('FranchiseRecordBook', ['teamid' => ['1', '2']]);
-
-        $this->assertNotEmpty($output);
-        $this->assertQueryExecuted('ibl_rcb');
-    }
-
-    public function testNegativeTeamidShowsLeagueRecords(): void
-    {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('FranchiseRecordBook', ['teamid' => '-1']);
-
-        $this->assertNotEmpty($output);
-        // (int)'-1' === -1, isRealFranchise(-1) === false → league path
-        $this->assertQueryExecuted('ibl_rcb');
-    }
-
-    public function testMaxValidTeamidShowsTeamRecords(): void
-    {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('FranchiseRecordBook', ['teamid' => '28']);
-
-        $this->assertNotEmpty($output);
-        // isRealFranchise(28) === true (MAX_REAL_TEAMID = 28)
-        $this->assertQueryExecuted('ibl_rcb');
-    }
-
-    public function testTeamidJustAboveMaxShowsLeagueRecords(): void
-    {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('FranchiseRecordBook', ['teamid' => '29']);
-
-        $this->assertNotEmpty($output);
-        // isRealFranchise(29) === false → league path
-        $this->assertQueryExecuted('ibl_rcb');
+        return [
+            'no query' => [[]],
+            'numeric teamid' => [['teamid' => '1']],
+            'non-numeric teamid' => [['teamid' => '5abc']],
+        ];
     }
 
     public function testOpApiWithValidTeamidReturnsContent(): void
@@ -126,5 +64,38 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_rcb');
+    }
+
+    public function testRedirectUrlWithNumericTeamidIncludesTeamid(): void
+    {
+        $url = ModuleRedirect::passthroughUrl(
+            'modules.php?name=Records&tab=' . RecordsController::TAB_BYFRANCHISE,
+            ['teamid'],
+            ['teamid' => '5'],
+            ['teamid' => 'ctype_digit']
+        );
+        $this->assertSame('modules.php?name=Records&tab=byfranchise&teamid=5', $url);
+    }
+
+    public function testRedirectUrlDropsNonNumericTeamid(): void
+    {
+        $url = ModuleRedirect::passthroughUrl(
+            'modules.php?name=Records&tab=' . RecordsController::TAB_BYFRANCHISE,
+            ['teamid'],
+            ['teamid' => '5abc'],
+            ['teamid' => 'ctype_digit']
+        );
+        $this->assertSame('modules.php?name=Records&tab=byfranchise', $url);
+    }
+
+    public function testRedirectUrlWithoutTeamidOmitsParam(): void
+    {
+        $url = ModuleRedirect::passthroughUrl(
+            'modules.php?name=Records&tab=' . RecordsController::TAB_BYFRANCHISE,
+            ['teamid'],
+            [],
+            ['teamid' => 'ctype_digit']
+        );
+        $this->assertSame('modules.php?name=Records&tab=byfranchise', $url);
     }
 }

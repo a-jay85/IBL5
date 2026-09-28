@@ -3,23 +3,17 @@
 declare(strict_types=1);
 
 /**
- * FranchiseRecordBook Module - Per-team and league-wide all-time records
+ * FranchiseRecordBook Module - HTMX fragment API for the Records page's By Franchise tab
  *
- * Displays single-season and career records parsed from the JSB engine's .rcb file.
- * Supports team-specific views (best performances by franchise) and league-wide records.
+ * op=api serves the team-switch fragment. Every other request redirects to
+ * the Records page.
  *
- * @see FranchiseRecordBook\FranchiseRecordBookRepository For database operations
- * @see FranchiseRecordBook\FranchiseRecordBookService For business logic
- * @see FranchiseRecordBook\FranchiseRecordBookView For HTML rendering
+ * @see FranchiseRecordBook\FranchiseRecordBookApiHandler For the HTMX fragment
  */
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
-
-use FranchiseRecordBook\FranchiseRecordBookRepository;
-use FranchiseRecordBook\FranchiseRecordBookService;
-use FranchiseRecordBook\FranchiseRecordBookView;
 
 global $mysqli_db;
 
@@ -31,27 +25,10 @@ if ($op === 'api') {
     return;
 }
 
-PageLayout\PageLayout::header();
-
-// Initialize services
-$repository = new FranchiseRecordBookRepository($mysqli_db);
-$service = new FranchiseRecordBookService($repository);
-$view = new FranchiseRecordBookView();
-
-// Determine which team to show (0 or missing = league-wide)
-$teamId = 0;
-if (is_string($_GET['teamid'] ?? null)) {
-    $teamId = (int) $_GET['teamid'];
-}
-
-// Get record book data
-if (\League\League::isRealFranchise($teamId)) {
-    $data = $service->getTeamRecordBook($teamId);
-} else {
-    $data = $service->getLeagueRecordBook();
-}
-
-// Render output
-echo $view->render($data);
-
-PageLayout\PageLayout::footer();
+\Module\ModuleRedirect::sendWithPassthrough(
+    'modules.php?name=Records&tab=' . \Records\RecordsController::TAB_BYFRANCHISE,
+    ['teamid'],
+    $_GET + $_POST,
+    ['teamid' => 'ctype_digit']
+);
+return;

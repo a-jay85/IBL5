@@ -1829,12 +1829,6 @@ parameters:
 			path: modules/FranchiseRecordBook/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class FranchiseRecordBook\FranchiseRecordBookRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/FranchiseRecordBook/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class FreeAgency\FreeAgencyController constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -2888,30 +2882,6 @@ parameters:
 			path: modules/ProjectedDraftOrder/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class AllStarAppearances\AllStarAppearancesRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/RecordHolders/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Cache\DatabaseCache constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/RecordHolders/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class RecordHolders\RecordHoldersRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/RecordHolders/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class RecordHolders\RecordHoldersRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/RecordHolders/index.php
-
-		-
 			rawMessage: Cannot cast mixed to int.
 			identifier: cast.int
 			count: 1
@@ -3051,18 +3021,6 @@ parameters:
 
 		-
 			rawMessage: 'Parameter #1 $seasonPhase of method SeasonHighs\SeasonHighsView::renderHomeAwayHighs() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonHighs/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class SeasonHighs\SeasonHighsRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeasonHighs/index.php
-
-		-
-			rawMessage: 'Parameter #2 $leagueContext of class Season\Season constructor expects League\LeagueContext|null, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/SeasonHighs/index.php

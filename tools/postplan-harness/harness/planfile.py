@@ -393,11 +393,60 @@ def parse_required_test_methods(content: str) -> list[str]:
     _strip_fenced before the section is extracted, so illustrative bullets inside a
     fence never yield phantom entries (the failure `critical-files-parser-unification`
     hit on the old naive parse).
+
+    Two false-positive classes are excluded (backlog#1133):
+
+    (a) Path/class bullets — a backtick-wrapped token whose content is a path
+        (e.g. '- `ibl5/tests/SearchViewTest.php`') or a class reference
+        (e.g. '- `CheckDocsCliTest::testFoo()`') used to yield a prefix
+        ('ibl5', 'CheckDocsCliTest') because the old regex stopped at '/' or
+        '::'.  Pass 1 uses a negative lookahead '(?![/: ])' after the
+        identifier so that any of those follow-on characters disqualify the
+        match.  The lookahead also rejects backtick-wrapped prose phrases
+        where a space follows the first word ('- `short ASG ballot...`').
+        Real method declarations like '`testFoo()`', '`testFoo(): void`', and
+        '`testFoo(string $x, ...)`' are accepted because the first char after
+        the identifier is '(' not '/', ':', or ' '.
+
+    (b) Label phrases — a prose label like '- Static guards in ...' or
+        '- Ported from ...' used to yield the first word ('Static', 'Ported')
+        because any bullet was accepted.  Pass 2 now requires the identifier
+        to be followed only by optional '()', then end-of-line, a colon ':',
+        or a dash separator ' — ' / ' – ' (U+2014 / U+2013 em/en-dash).
+        Plain prose words after a space are still rejected.
     """
     section = _section("\n".join(_strip_fenced(content)), "Required Test Methods")
     methods = []
     for line in section.splitlines():
-        m = re.match(r"^[*\-]\s+`?([A-Za-z_][A-Za-z0-9_]*)`?", line.strip())
+        stripped = line.strip()
+        # Pass 1: backtick-wrapped identifier.  Extract the longest identifier
+        # greedily, then check the character immediately after it:
+        #   '/'  → path bullet     (e.g. `ibl5/tests/...`)          → reject
+        #   ':'  → class::method   (e.g. `CheckDocsCliTest::testFoo`)→ reject
+        #   ' '  → prose-in-ticks  (e.g. `short ASG ballot...`)     → reject
+        # Any other char (opening paren, closing backtick, etc.) means the
+        # identifier IS the method name.  A negative lookahead cannot be used
+        # here because Python's re engine backtracks greedy quantifiers to
+        # satisfy lookaheads (e.g. `ibl5/` would backtrack to `ibl`, then `5`
+        # passes `(?![/: ])` — a false pass).  The explicit position check
+        # after a plain greedy match avoids that trap entirely.
+        _bt = re.match(r"^[*\-]\s+`([A-Za-z_][A-Za-z0-9_]*)", stripped)
+        if _bt:
+            _after = stripped[_bt.end()] if _bt.end() < len(stripped) else ""
+            m = _bt if _after not in ('/', ':', ' ') else None
+        else:
+            m = None
+        if not m:
+            # Pass 2: bare identifier (no opening backtick).  Accept if followed
+            # by optional '()' then end-of-line, ':', or a dash separator
+            # (U+2014 em-dash or U+2013 en-dash).  Rejects label phrases where
+            # a plain prose word follows the identifier after whitespace
+            # (e.g. '- Static guards in ...' or '- Ported from ...').
+            m = re.match(
+                r"^[*\-]\s+([A-Za-z_][A-Za-z0-9_]*)(?:\(\))?"
+                r"(?:\s*(?::|[—–])|\s*$)",
+                stripped,
+            )
         if m:
             methods.append(m.group(1))
     return methods

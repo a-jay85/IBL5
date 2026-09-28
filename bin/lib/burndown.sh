@@ -341,7 +341,8 @@ bd_cmd_burndown() {
     touch "$held_file"
     local processed_file="$BD_TMP/processed.txt"
     touch "$processed_file"
-    local picked_rows=""   # accumulate for picked.tsv (Phase 4)
+    local picked_rows=""   # accumulate for ledger items
+    local skipped_rows=""  # accumulate for ledger skipped
 
     while IFS=$'\t' read -r num rank _rawline; do
         # Skip if already handled (second pair member)
@@ -454,6 +455,7 @@ bd_cmd_burndown() {
         # Handle skip
         if [ -n "$skip_reason" ]; then
             printf '%-5s #%-5s %-3s %-4s %s\n' "SKIP" "$num" "$rank" "" "$skip_reason"
+            skipped_rows="${skipped_rows}${num}	${skip_reason}"$'\n'
             continue
         fi
 
@@ -470,6 +472,7 @@ bd_cmd_burndown() {
         if [ "$((used + cost))" -gt "$BD_BUDGET" ]; then
             printf '%-5s #%-5s %-3s %-4s %s\n' "SKIP" "$num" "$rank" "$cost" \
                 "over budget (cost $cost, $rem left)"
+            skipped_rows="${skipped_rows}${num}	over budget (cost $cost, $rem left)"$'\n'
             continue
         fi
 
@@ -495,8 +498,9 @@ bd_cmd_burndown() {
                 printf '%s\t%s\n' "$_hp" "$partner" >> "$held_file"
             done <<< "$p_paths"
         fi
-        # Accumulate for picked.tsv (Phase 4)
-        local also_c="${partner:-}"
+        # Accumulate for picked.tsv (Phase 4); use 0 as sentinel for no partner
+        # (consecutive TABs collapse under IFS=$'\t', so empty field must be avoided)
+        local also_c="${partner:-0}"
         picked_rows="${picked_rows}${num}	${also_c}	${rank}	${cost}	${tier}	${title}	${paths//$'\n'/|}"$'\n'
 
         [ "$used" -lt "$BD_BUDGET" ] || done_flag=1
@@ -517,12 +521,271 @@ bd_cmd_burndown() {
     printf 'units: %d/%d\n' "$used" "$BD_BUDGET"
     [ "$notreached" -eq 0 ] || printf 'not reached: %d candidate(s)\n' "$notreached"
 
-    # Write picked.tsv for Phase 4 (ledger writing)
     printf '%s' "$picked_rows" > "$BD_TMP/picked.tsv"
+
+    if [ "$used" -eq 0 ]; then
+        printf 'LEDGER: none\n'
+        return 0
+    fi
+
+    # Build items JSON array
+    local items_json=""
+    while IFS=$'\t' read -r _n _ac _rk _co _ti _tl _ps; do
+        [ -n "$_n" ] || continue
+        local _ac_arr="[]"
+        [ "$_ac" = "0" ] || _ac_arr="[$_ac]"
+        local _ps_arr
+        _ps_arr="$(printf '%s\n' "${_ps//|/$'\n'}" | \
+            jq -Rsc 'split("\n") | map(select(. != ""))')"
+        items_json="${items_json}$(jq -n \
+            --argjson n "$_n" --argjson ac "$_ac_arr" --arg tl "$_tl" \
+            --arg rk "$_rk" --arg ti "$_ti" --argjson co "$_co" --argjson ps "$_ps_arr" \
+            '{issue_num:$n,also_closes:$ac,issue_title:$tl,rank:$rk,tier:$ti,cost:$co,paths:$ps,route:"",slug:"",pr_url:"",status:"picked"}')"$'\n'
+    done <<< "$picked_rows"
+    local items_arr
+    items_arr="$(printf '%s' "$items_json" | jq -sc '.')"
+
+    # Build skipped JSON array
+    local skipped_arr="[]"
+    if [ -n "$skipped_rows" ]; then
+        local skipped_json=""
+        while IFS=$'\t' read -r _sn _sr; do
+            [ -n "$_sn" ] || continue
+            skipped_json="${skipped_json}$(jq -n \
+                --argjson n "$_sn" --arg r "$_sr" '{issue_num:$n,reason:$r}')"$'\n'
+        done <<< "$skipped_rows"
+        [ -z "$skipped_json" ] || \
+            skipped_arr="$(printf '%s' "$skipped_json" | jq -sc '.')"
+    fi
+
+    local created ledger_base
+    created="$(date +%Y-%m-%dT%H:%M:%S)"
+    ledger_base="$(date +%Y%m%dT%H%M%S)"
+    local ledger_path="$BD_REPORTS_DIR/burndown-batch-${ledger_base}.json"
+    [ ! -e "$ledger_path" ] || bd_die 3 "ledger $ledger_path exists; refusing to overwrite"
+
+    local doc_json
+    doc_json="$(jq -n \
+        --argjson schema 1 \
+        --arg created "$created" \
+        --arg report "$BD_REPORT" \
+        --argjson budget "$BD_BUDGET" \
+        --argjson used "$used" \
+        --argjson items "$items_arr" \
+        --argjson skipped "$skipped_arr" \
+        '{schema:$schema,created:$created,report:$report,budget:$budget,units_used:$used,items:$items,skipped:$skipped}')"
+
+    local tmp_path="${ledger_path}.tmp.$$"
+    printf '%s\n' "$doc_json" > "$tmp_path"
+    if ! jq -e '.items | length > 0' "$tmp_path" >/dev/null 2>&1; then
+        rm -f "$tmp_path"
+        bd_die 3 "ledger read-back failed for $ledger_path"
+    fi
+    mv "$tmp_path" "$ledger_path"
+    printf 'LEDGER: %s\n' "$ledger_path"
 }
 
-bd_cmd_refresh()      { bd_die 2 "burndown-refresh: not implemented"; }
-bd_cmd_record()       { bd_die 2 "burndown-record: not implemented"; }
+# bd_delta_numbers <issues_file> — sets _bd_delta_nums array
+# Requires: BD_RANKED_NUMS, BD_SINCE (from bd_parse_report + bd_report_since)
+bd_delta_numbers() {
+    local issues_file="$1"
+    local ranked_json
+    ranked_json="$(printf '[%s]' "$(IFS=,; printf '%s' "${BD_RANKED_NUMS[*]:-}")")"
+    _bd_delta_nums=()
+    while IFS= read -r _n; do
+        [ -n "$_n" ] || continue
+        _bd_delta_nums+=("$_n")
+    done < <(jq -r --arg since "$BD_SINCE" --argjson ranked "$ranked_json" \
+        '[.[] | select(.updatedAt > $since or ([.number] | inside($ranked) | not))]
+         | sort_by(.number) | .[].number' \
+        "$issues_file")
+}
+
+bd_cmd_record() {
+    if [ $# -lt 3 ]; then
+        bd_die 2 "burndown-record wants <ledger> <issue> key=value..."
+    fi
+    local ledger="$1" issue_num="$2"; shift 2
+    { [ -f "$ledger" ] && jq -e '.items | type=="array"' "$ledger" >/dev/null 2>&1; } \
+        || bd_die 3 "malformed or missing ledger $ledger"
+    jq -e --argjson n "$issue_num" 'any(.items[]; .issue_num == $n)' "$ledger" \
+        >/dev/null 2>&1 || bd_die 2 "no item #$issue_num in $ledger"
+
+    local kv route="" slug="" status="" pr_url="" applied_keys=""
+    while [ $# -gt 0 ]; do
+        kv="$1"; shift
+        local k="${kv%%=*}" v="${kv#*=}"
+        case "$k" in
+            route)
+                [[ "$v" =~ ^(ad-hoc|plan)$ ]] \
+                    || bd_die 2 "route=$v rejected: must be ad-hoc or plan"
+                route="$v" ;;
+            slug)
+                [[ "$v" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]] \
+                    || bd_die 2 "slug=$v rejected: must match ^[a-z0-9][a-z0-9-]{0,62}\$"
+                jq -e --arg s "$v" --argjson n "$issue_num" \
+                    'any(.items[]; .slug == $s and .issue_num != $n)' \
+                    "$ledger" >/dev/null 2>&1 \
+                    && bd_die 2 "slug=$v rejected: already used by another item"
+                slug="$v" ;;
+            status)
+                [[ "$v" =~ ^(picked|queued|shipped|merged|closed-fixed|skipped)$ ]] \
+                    || bd_die 2 "status=$v rejected: not an allowed status"
+                status="$v" ;;
+            pr_url)
+                [[ "$v" =~ $PR_URL_EXACT_RE ]] \
+                    || bd_die 2 "pr_url=$v rejected: must match PR URL pattern"
+                pr_url="$v" ;;
+            *)
+                bd_die 2 "$k=$v rejected: unknown key $k" ;;
+        esac
+        applied_keys="${applied_keys} ${kv}"
+    done
+
+    # Build patch object
+    local patch="{}"
+    [ -z "$route" ]   || patch="$(jq -n --argjson p "$patch" --arg v "$route"   '$p+{route:$v}')"
+    [ -z "$slug" ]    || patch="$(jq -n --argjson p "$patch" --arg v "$slug"    '$p+{slug:$v}')"
+    [ -z "$status" ]  || patch="$(jq -n --argjson p "$patch" --arg v "$status"  '$p+{status:$v}')"
+    [ -z "$pr_url" ]  || patch="$(jq -n --argjson p "$patch" --arg v "$pr_url"  '$p+{pr_url:$v}')"
+
+    local updated
+    updated="$(jq --argjson n "$issue_num" --argjson patch "$patch" \
+        '.items = [.items[] | if .issue_num == $n then . + $patch else . end]' \
+        "$ledger")"
+
+    # Cross-field rules
+    local new_status new_route
+    new_status="$(jq -r --argjson n "$issue_num" \
+        '.items[] | select(.issue_num==$n) | .status' <<< "$updated")"
+    new_route="$(jq -r --argjson n "$issue_num" \
+        '.items[] | select(.issue_num==$n) | .route' <<< "$updated")"
+    [ "$new_status" != "queued" ] || [ "$new_route" = "plan" ] \
+        || bd_die 2 "status=queued requires route=plan"
+    [ "$new_status" != "shipped" ] || [ "$new_route" = "ad-hoc" ] \
+        || bd_die 2 "status=shipped requires route=ad-hoc"
+    if [ "$new_status" = "closed-fixed" ]; then
+        updated="$(jq --argjson n "$issue_num" \
+            '.items = [.items[] | if .issue_num == $n then .+{cost:0} else . end]' \
+            <<< "$updated")"
+    fi
+
+    updated="$(jq '.units_used = ([.items[].cost] | add // 0)' <<< "$updated")"
+
+    local tmp_path="${ledger}.tmp.$$"
+    printf '%s\n' "$updated" > "$tmp_path"
+    if ! jq -e '.items | type=="array"' "$tmp_path" >/dev/null 2>&1; then
+        rm -f "$tmp_path"
+        bd_die 3 "record read-back failed for $ledger"
+    fi
+    mv "$tmp_path" "$ledger"
+    printf 'recorded #%s:%s\n' "$issue_num" "$applied_keys"
+}
+
+bd_cmd_refresh() {
+    if [ $# -ne 1 ]; then bd_die 2 "burndown-refresh wants <ranks-file>"; fi
+    local ranks_file="$1"
+    [ -f "$ranks_file" ] || bd_die 2 "burndown-refresh wants <ranks-file>"
+
+    bd_latest_report
+    bd_parse_report "$BD_REPORT"
+    bd_report_since "$BD_REPORT"
+    local issues_file
+    issues_file="$(mktemp)" || bd_die 3 "mktemp failed"
+    bd_fetch_issues "$issues_file"
+
+    # Parse ranks file manually (avoid overwriting BD_REPORT_TSV/BD_RANKED_NUMS)
+    local ranks_tsv
+    ranks_tsv="$(awk '
+        /^## / { rank = ""; if (match($0, /^## P[1-4]( |$)/)) rank = substr($0, 4, 2); next }
+        rank != "" && /^- \[#[0-9]+\]/ {
+            n = $0; sub(/^- \[#/, "", n); sub(/\].*/, "", n)
+            print n "\t" rank "\t" $0
+        }
+    ' "$ranks_file")"
+    [ -n "$ranks_tsv" ] || bd_die 2 "ranks file has no ranked lines"
+
+    local rdups
+    rdups="$(cut -f1 <<< "$ranks_tsv" | sort | uniq -d)"
+    [ -z "$rdups" ] || bd_die 3 "ranks file ranks #$rdups twice"
+
+    bd_delta_numbers "$issues_file"
+
+    # Validate: every delta num must appear in ranks file
+    local dn
+    for dn in "${_bd_delta_nums[@]:-}"; do
+        [ -n "$dn" ] || continue
+        awk -F'\t' -v n="$dn" '$1==n{found=1;exit} END{exit !found}' <<< "$ranks_tsv" \
+            || bd_die 2 "ranks file omits delta issue #$dn"
+    done
+
+    # Validate: every ranks file num must be open
+    while IFS=$'\t' read -r rn _rrank _rline; do
+        [ -n "$rn" ] || continue
+        bd_issue_is_open "$rn" "$issues_file" \
+            || bd_die 2 "ranks file ranks #$rn, which is not open"
+    done <<< "$ranks_tsv"
+
+    # Build set of re-ranked nums (pipe-delimited for fast membership test)
+    local reranked_set="|"
+    while IFS=$'\t' read -r rn _rrank _rline; do
+        [ -n "$rn" ] || continue
+        reranked_set="${reranked_set}${rn}|"
+    done <<< "$ranks_tsv"
+
+    # Count re-ranked and dropped for the header line
+    local reranked_count=0 dropped_count=0
+    while IFS=$'\t' read -r rn _rr _rl; do
+        [ -n "$rn" ] || continue
+        reranked_count=$((reranked_count + 1))
+    done <<< "$ranks_tsv"
+    while IFS=$'\t' read -r on _or _ol; do
+        [ -n "$on" ] || continue
+        bd_issue_is_open "$on" "$issues_file" || dropped_count=$((dropped_count + 1))
+    done <<< "$BD_REPORT_TSV"
+
+    # Merge sections P1-P4
+    local merged_sections=""
+    local p
+    for p in P1 P2 P3 P4; do
+        local section_lines=""
+        # Keep old lines: same rank, still open, not re-ranked
+        while IFS=$'\t' read -r on orank oline; do
+            [ -n "$on" ] || continue
+            [ "$orank" = "$p" ] || continue
+            bd_issue_is_open "$on" "$issues_file" || continue
+            [[ "$reranked_set" == *"|${on}|"* ]] && continue
+            section_lines="${section_lines}${oline}"$'\n'
+        done <<< "$BD_REPORT_TSV"
+        # Append re-ranked lines for this rank (ranks-file order)
+        while IFS=$'\t' read -r rn rrank rline; do
+            [ -n "$rn" ] || continue
+            [ "$rrank" = "$p" ] || continue
+            section_lines="${section_lines}${rline}"$'\n'
+        done <<< "$ranks_tsv"
+        if [ -n "$section_lines" ]; then
+            local count
+            count="$(grep -c '^- ' <<< "$section_lines" || true)"
+            merged_sections="${merged_sections}## ${p} (${count})"$'\n'"${section_lines}"$'\n'
+        fi
+    done
+
+    local out_date old_basename
+    out_date="$(date +%F)"
+    old_basename="$(basename "$BD_REPORT")"
+    local report_path="$BD_REPORTS_DIR/backlog-triage-${out_date}.md"
+    local tmp_path="${report_path}.tmp.$$"
+    {
+        printf '# Backlog triage %s — ranked open issues\n' "$out_date"
+        printf 'Refreshed by bin/backlog burndown-refresh from %s: %d re-ranked, %d dropped.\n\n' \
+            "$old_basename" "$reranked_count" "$dropped_count"
+        printf '%s' "$merged_sections"
+    } > "$tmp_path"
+    mv "$tmp_path" "$report_path"
+
+    rm -f "$issues_file"
+    printf 'REPORT: %s\n' "$report_path"
+}
 bd_cmd_status()       { bd_die 2 "burndown-status: not implemented"; }
 bd_cmd_close_merged() { bd_die 2 "burndown-close-merged: not implemented"; }
 

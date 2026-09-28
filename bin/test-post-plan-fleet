@@ -2464,6 +2464,34 @@ _plist_301="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-301.plist"
 rm -f "$_apf_e" "$_apf_pr" "$_plist_301"
 end_case auth-probe-false
 
+# --- case: fleet-outcome-line ------------------------------------------------------------
+# Each run writes one `post-plan-fleet: outcome=<word>` line that bin/pr-cycle counts.
+# shipped-armed -> shipped, shipped-held -> held, anything else -> blocked, rc 124 -> timed-out.
+begin_case
+_outcome_of() { grep -m1 '^post-plan-fleet: outcome=' "$_DM_LOG" 2>/dev/null | cut -d= -f2; }
+_dm_result_case 91 'RESULT: terminal=shipped-armed' <<< '{"terminal": "shipped-armed"}'
+[[ "$(_outcome_of)" == shipped ]] || fail "fleet-outcome-line: shipped-armed gave '$(_outcome_of)'"
+_dm_result_case 92 'RESULT: terminal=shipped-held' <<< '{"terminal": "shipped-held"}'
+[[ "$(_outcome_of)" == held ]] || fail "fleet-outcome-line: shipped-held gave '$(_outcome_of)'"
+_dm_result_case 93 'RESULT: post-plan BLOCKED terminal=failed' <<< '{"terminal": "failed"}'
+[[ "$(_outcome_of)" == blocked ]] || fail "fleet-outcome-line: failed gave '$(_outcome_of)'"
+# An unparseable result.json falls back to the RESULT: line.
+_dm_result_case 94 'RESULT: post-plan complete terminal=shipped-held' <<< 'not json'
+[[ "$(_outcome_of)" == held ]] || fail "fleet-outcome-line: RESULT-line fallback gave '$(_outcome_of)'"
+# rc 124 is what `timeout` returns on expiry.
+_to_stub="$SCRATCH/.local/bin/dm-cs-timeout"
+printf '#!/usr/bin/env bash\nexit 124\n' > "$_to_stub"; chmod +x "$_to_stub"
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+    POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_to_stub" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+[[ "$(_outcome_of)" == timed-out ]] || fail "fleet-outcome-line: rc 124 gave '$(_outcome_of)'"
+grep -q 'TIMED OUT after 90m' "$_DM_LOG" || fail "fleet-outcome-line: rc 124 log lacks TIMED OUT"
+grep -q 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "fleet-outcome-line: rc 124 DM lacks TIMED OUT ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+end_case fleet-outcome-line
+
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then
     echo "test-post-plan-fleet: FAILED ($FAILED assertion failure(s))" >&2

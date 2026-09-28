@@ -496,7 +496,7 @@ if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
     # under launchd, stdout already IS $LOG, and a tee there would write every line twice.
     [ "$FOREGROUND" -eq 1 ] \
         && HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG} 2>&1 | tee \"$LOG\"; rc=\${PIPESTATUS[0]}; "
-    GATE_OPEN="if should_fallback \"\$rc\"; then "
+    GATE_OPEN="if [ \"\${_sigterm_received:-0}\" -eq 0 ] && should_fallback \"\$rc\"; then "
     # The harness has already exited and flushed by the time HARNESS_SEG's `rc=` runs,
     # so $LOG holds its final RESULT: line. Bounded at capture, not at use: bash has no
     # nested ${${V:-x}:0:N}, and truncate-then-default keeps an empty capture empty so
@@ -566,7 +566,7 @@ case "$PP_VERDICT" in
     *) echo "post-plan-now: wt-sync --only: $PP_VERDICT" ;;
 esac
 
-CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT TERM HUP; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --session-id $(shq "$SESSION_ID") --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; ${CMD_TAIL}"
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; _sigterm_received=0; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT HUP; trap '_sigterm_received=1; conclude_status_badge \"\${pp_rc:-1}\"' TERM; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --session-id $(shq "$SESSION_ID") --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${_sigterm_received:-0}\" -eq 1 ]; then pp_rc=143; fi; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; ${CMD_TAIL}"
 
 if [ "$FOREGROUND" -eq 1 ]; then
     echo "post-plan-now: foreground mode on branch '$SLUG' — engine: $ENGINE"

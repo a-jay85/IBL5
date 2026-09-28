@@ -578,6 +578,7 @@ STARTED=$(date +%s)
 RC=0
 timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground > "$LOG" 2>&1 || RC=$?
 ELAPSED=$(( $(date +%s) - STARTED ))
+[ "$RC" = 124 ] && echo "post-plan-now: TIMED OUT after 90m (rc=124)" >> "$LOG"
 notify() {
     ljob_dm_ready post-plan-fleet || return 0
     local DM_ICON="" DM_VERDICT="" DM_NEXT="" msg stop_text=""
@@ -653,6 +654,31 @@ ${ELAPSED}s · ${DM_NEXT}
 log: $LOG"
     ljob_dm_send post-plan-fleet "$msg"
 }
+# Derive outcome word for pr-cycle summary and write to LOG BEFORE releasing the
+# slot. pr-cycle --wait returns when the plist disappears; the LOG must be fully
+# written before that happens so _stage1_outcome_summary() can read it.
+_ppf_outcome=""
+if [ "$RC" = 124 ]; then
+    _ppf_outcome="timed-out"
+else
+    _ppf_run_dir=$(grep -m1 'harness-run-dir=' "$LOG" 2>/dev/null \
+        | grep -o 'harness-run-dir=[^[:space:]]*' | cut -d= -f2 || true)
+    _ppf_terminal=""
+    if [ -n "$_ppf_run_dir" ] && [ -f "$_ppf_run_dir/result.json" ]; then
+        _ppf_terminal=$(python3 -c \
+            'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("terminal",""))' \
+            "$_ppf_run_dir/result.json" 2>/dev/null || true)
+    fi
+    # result.json is authoritative; the RESULT: line is the fallback when it is absent.
+    [ -n "$_ppf_terminal" ] || _ppf_terminal=$(grep -m1 '^RESULT:' "$LOG" 2>/dev/null \
+        | grep -o 'terminal=[a-z-]*' | cut -d= -f2 || true)
+    case "$_ppf_terminal" in
+        shipped-armed) _ppf_outcome="shipped" ;;
+        shipped-held)  _ppf_outcome="held" ;;
+        *)             _ppf_outcome="blocked" ;;
+    esac
+fi
+echo "post-plan-fleet: outcome=$_ppf_outcome" >> "$LOG"
 # Releasing the slot is the FIRST post-run action: "plist present" == "job live"
 # is what the concurrency cap counts.
 rm -f "$PLIST"

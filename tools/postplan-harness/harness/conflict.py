@@ -9,6 +9,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, NoReturn
 
+# ── Conflict marker pattern (exact: 7-char leader + space or EOL, not >=7) ───
+import re as _re
+_CONFLICT_MARKER_PAT = _re.compile(
+    r"^(<{7}( |$)|={7}$|>{7}( |$)|\|{7}( |$))", _re.MULTILINE
+)
+
 # ── Unresolvable class labels ─────────────────────────────────────────────────
 UNRESOLVABLE_MIGRATION = "migration file"
 UNRESOLVABLE_LOCKFILE  = "lockfile"
@@ -154,7 +160,7 @@ def resolve_one(
             content = fh.read()
         marker_lines = [
             l for l in content.splitlines()
-            if l.startswith("<<<<<<<") or l.startswith("=======") or l.startswith(">>>>>>>")
+            if _CONFLICT_MARKER_PAT.match(l)
         ]
         if marker_lines:
             last_error = f"conflict markers remain: {marker_lines[0]!r}"

@@ -66,6 +66,25 @@ _BADGE_FALLBACK = (
     "<!-- postplan-label:  -->\n"
 )
 
+# ── SIGTERM handler — abort any in-progress rebase before the process dies ───
+_active_git: "LiveGit | None" = None  # set once in run() for the isolated/live path
+
+
+def _install_sigterm_handler() -> None:
+    """Install a SIGTERM handler that cleans up any in-progress rebase."""
+    import signal
+
+    def _sigterm_handler(signum: int, frame: object) -> None:  # type: ignore[type-arg]
+        git = _active_git
+        if git is not None:
+            try:
+                git.emergency_abort()
+            except Exception:
+                pass
+        os._exit(128 + signum)
+
+    signal.signal(signal.SIGTERM, _sigterm_handler)
+
 
 def _post_status_badge(gh, pr):
     if not pr:
@@ -237,6 +256,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
     else:
         assert worktree
         git = LiveGit(worktree, push_remote="origin" if live else None, llm=llm)
+        global _active_git
+        _active_git = git
         slug = git.branch()
         gh = LiveGh(out_dir, worktree, slug) if live else RecordingGh(out_dir)
         verifier = LiveVerify(worktree)
@@ -2257,6 +2278,7 @@ def main() -> int:
     elif not args.worktree:
         ap.error("--worktree required in isolated mode")
 
+    _install_sigterm_handler()
     ledger = UsageLedger()
     if args.canned:
         with open(args.canned) as fh:

@@ -36,7 +36,6 @@ You have the `Agent` tool for exactly one purpose: a question that surfaces **mi
 - **Read first.** A direct `Read` or `Grep` costs less than a spawn. Clear `.claude/rules/agent-tiering-detail.md` § Skip the Agent before spawning: if you can name the file, read it.
 - **Tier it.** `model: "haiku"` for enumeration, single-file lookup, or grep-and-list; omit `model` (pinned Sonnet 4.6) for a multi-hop or cross-module trace. `~/.claude/hooks/explore-model-gate.sh` blocks every other model on an `Explore` spawn.
 
-
 ## Your read budget
 
 Your context is the scarcest thing in this run. Compacting mid-plan costs you the contract text and the exploration findings you were given, and a plan composed after that loss is worse than one composed before it. Four bounds hold for the whole run:

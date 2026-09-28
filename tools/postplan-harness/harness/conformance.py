@@ -216,7 +216,18 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
             resolutions[path] = hit
     if diff_body:
         for m in plan.required_test_methods:
-            if not re.search(rf"(function|def)\s+{re.escape(m)}\b", diff_body):
+            # Match PHP/Python-style declarations ('function name' / 'def name') and
+            # bash-style bare declarations ('name() {') that appear without a keyword.
+            # The second branch anchors to start-of-line (with optional diff '+' prefix
+            # and indentation) so call-sites like '$this->name()' are not mistaken for
+            # declarations (backlog#1133 — present-method false-positive fix).
+            _found = re.search(
+                rf"(function|def)\s+{re.escape(m)}\b"
+                rf"|^[+\s]*{re.escape(m)}\s*\(\s*\)",
+                diff_body,
+                re.MULTILINE,
+            )
+            if not _found:
                 items.append(f"MISSING-METHOD: {m} (plan required a test method the diff never wrote)")
         items.extend(_matrix_assertion_items(plan, diff_body, pr_body))
     return items

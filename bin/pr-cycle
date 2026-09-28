@@ -68,6 +68,8 @@
 #                            shim in tests.
 #   PR_CYCLE_HARNESS_OUT     Path to the postplan-harness out/ directory. Default:
 #                            $ROOT/tools/postplan-harness/out.
+#   PR_CYCLE_FLEET_LOG_DIR   Where post-plan-fleet writes post-plan-fleet-<PR>.log. Read for
+#                            the end-of-run outcome counts. Default: /tmp.
 #
 #   Every seam is PR_CYCLE_-prefixed on purpose. bin/pr-attack reads a bare PR_TRIAGE_CMD
 #   itself, and this script spawns the real bin/pr-attack as a child — an unprefixed export
@@ -134,6 +136,7 @@ PR_CYCLE_DRY_LAUNCH="${PR_CYCLE_DRY_LAUNCH:-}"
 PR_CYCLE_AUTH_PROBE_CMD="${PR_CYCLE_AUTH_PROBE_CMD:-}"
 PR_CYCLE_PATCH_ID_CMD="${PR_CYCLE_PATCH_ID_CMD:-}"
 PR_CYCLE_HARNESS_OUT="${PR_CYCLE_HARNESS_OUT:-$ROOT/tools/postplan-harness/out}"
+PR_CYCLE_FLEET_LOG_DIR="${PR_CYCLE_FLEET_LOG_DIR:-/tmp}"
 PR_CYCLE_SKIP_HELD_UNCHANGED="${PR_CYCLE_SKIP_HELD_UNCHANGED:-1}"
 
 # Print the usage header above: every comment line from the shebang to `set -euo pipefail`.
@@ -862,6 +865,27 @@ EOF
     fi
 }
 
+# _stage1_outcome_summary — read per-PR outcome lines from post-plan-fleet logs and
+# return a summary, e.g. "shipped 1, held 2, blocked 4, timed out 1". A PR with no
+# outcome line counts as blocked. Reads $PR_CYCLE_FLEET_LOG_DIR/post-plan-fleet-<PR>.log.
+_stage1_outcome_summary() {
+    [ -s "$RUNDIR/stage1.txt" ] || return 0
+    local _s_shipped=0 _s_held=0 _s_blocked=0 _s_timed=0 _s_pr _s_log _s_outcome
+    while IFS= read -r _s_pr; do
+        _s_log="${PR_CYCLE_FLEET_LOG_DIR}/post-plan-fleet-${_s_pr}.log"
+        _s_outcome=$(grep -m1 '^post-plan-fleet: outcome=' "$_s_log" 2>/dev/null \
+            | sed 's/post-plan-fleet: outcome=//' || true)
+        case "${_s_outcome:-blocked}" in
+            shipped)   _s_shipped=$(( _s_shipped + 1 )) ;;
+            held)      _s_held=$(( _s_held + 1 )) ;;
+            timed-out) _s_timed=$(( _s_timed + 1 )) ;;
+            *)         _s_blocked=$(( _s_blocked + 1 )) ;;
+        esac
+    done < "$RUNDIR/stage1.txt"
+    printf 'shipped %d, held %d, blocked %d, timed out %d' \
+        "$_s_shipped" "$_s_held" "$_s_blocked" "$_s_timed"
+}
+
 # _stage1_fire — run post-plan-fleet with the stage1.txt list. Returns 0 on empty or
 # fleet exit 0; sets HALT and returns 1 on failure.
 _stage1_fire() {
@@ -1023,7 +1047,10 @@ _worker() {
     _cleanup_fetch_refs
 
     _reason="${HALT:-done}"
-    echo "pr-cycle finished — readied $READIED, armed $ARMED, your turn $LEFT — $_reason"
+    _OUTCOME_SUMMARY="$(_stage1_outcome_summary)"
+    _FIRED_SUMMARY="${READIED:+fired $READIED (${_OUTCOME_SUMMARY})}"
+    _FIRED_SUMMARY="${_FIRED_SUMMARY:-fired 0}"
+    echo "pr-cycle finished — $_FIRED_SUMMARY, armed $ARMED, your turn $LEFT — $_reason"
 
     if [ -z "$NO_DM" ]; then
         if [ -n "$HALT" ]; then
@@ -1034,7 +1061,7 @@ _worker() {
             _yt_block="Your turn:
 $(_your_turn_lines)"
         fi
-        _msg="pr-cycle finished — readied $READIED, armed $ARMED, your turn $LEFT — $_reason
+        _msg="pr-cycle finished — $_FIRED_SUMMARY, armed $ARMED, your turn $LEFT — $_reason
 log: ${PR_CYCLE_LOG:-<foreground>}
 $_yt_block"
         "$PR_CYCLE_DM_CMD" "$_msg" || true
@@ -1137,7 +1164,7 @@ _launch() {
         for _v in PR_CYCLE_ATTACK_CMD PR_CYCLE_TRIAGE_CMD PR_CYCLE_READY_CMD \
                   PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
                   PR_CYCLE_RESCUE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
-                  PR_CYCLE_SKIP_HELD_UNCHANGED PR_CYCLE_HARNESS_OUT \
+                  PR_CYCLE_SKIP_HELD_UNCHANGED PR_CYCLE_HARNESS_OUT PR_CYCLE_FLEET_LOG_DIR \
                   PR_CYCLE_AUTH_PROBE_CMD PR_CYCLE_PATCH_ID_CMD \
                   PR_CYCLE_STOP_FILE; do
             eval "_val=\${$_v}"

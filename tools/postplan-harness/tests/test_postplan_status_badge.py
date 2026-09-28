@@ -381,14 +381,25 @@ def test_generated_plist_wiring(tmp_path):
     assert "POSTPLAN_BADGE_MARKER='" in cmd, "POSTPLAN_BADGE_MARKER not single-quoted"
     assert "POSTPLAN_BADGE_BODY=" in cmd, "POSTPLAN_BADGE_BODY not in cmd"
 
-    # trap names all four signals
+    # Bug 2 fix: SIGTERM now gets its own trap body that sets _sigterm_received=1 AND
+    # calls conclude_status_badge for cleanup. EXIT/INT/HUP share the original combined
+    # trap. TERM is no longer in the combined trap but is handled separately — this is
+    # the intentional design change for the SIGTERM-reported-as-success fix.
     assert "trap" in cmd
-    assert "EXIT INT TERM HUP" in cmd
+    assert "EXIT INT HUP" in cmd, "combined cleanup trap must cover EXIT INT HUP"
+    assert "_sigterm_received=1" in cmd, "TERM-specific trap must set _sigterm_received flag"
+    # TERM must still call conclude_status_badge (cleanup) — not just set a flag.
+    term_trap_idx = cmd.index("_sigterm_received=1")
+    assert "conclude_status_badge" in cmd[term_trap_idx:term_trap_idx + 80], (
+        "TERM trap body must call conclude_status_badge for cleanup"
+    )
 
-    # conclude_status_badge appears exactly three times: once in the trap, once in the
-    # tail, and once inside the declare -f function body text
-    assert cmd.count("conclude_status_badge") == 3, (
-        f"expected conclude_status_badge exactly three times, got {cmd.count('conclude_status_badge')}"
+    # conclude_status_badge appears exactly four times: once in the combined EXIT/INT/HUP
+    # trap, once in the TERM-specific trap body, once in the tail, and once inside the
+    # declare -f function body text (count increased from 3 because TERM now has its own
+    # trap body that also runs cleanup — this is load-bearing for the SIGTERM fix)
+    assert cmd.count("conclude_status_badge") == 4, (
+        f"expected conclude_status_badge exactly four times, got {cmd.count('conclude_status_badge')}"
     )
 
     # postplan_sweep_stale_badge appears in the function body (declare -f) AND as a call site;

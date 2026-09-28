@@ -1373,24 +1373,6 @@ parameters:
 			path: modules/AwardHistory/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class CapSpace\CapSpaceRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/CapSpace/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/CapSpace/index.php
-
-		-
-			rawMessage: 'Parameter #2 $db of class CapSpace\CapSpaceService constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/CapSpace/index.php
-
-		-
 			rawMessage: 'Call to function array_search() requires parameter #3 to be set.'
 			identifier: function.strict
 			count: 2
@@ -1437,12 +1419,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/ComparePlayers/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class ContractList\ContractListRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ContractList/index.php
 
 		-
 			rawMessage: 'Parameter #1 $authService of class Debug\DebugController constructor expects Auth\AuthService, mixed given.'

@@ -17,6 +17,9 @@ function ShowAndHideGM() {
     var x = document.getElementById(\'GM\');
     if (x.style.display == \'none\') {
         x.style.display = \'\';
+        if (typeof window.IBL_refreshResponsiveTables === \'function\') {
+            window.IBL_refreshResponsiveTables();
+        }
     } else {
         x.style.display = \'none\';
     }
@@ -28,6 +31,9 @@ function ShowAndHideGM() {
     var x = document.getElementById(\'GM\');
     if (x.style.display == \'none\') {
         x.style.display = \'\';
+        if (typeof window.IBL_refreshResponsiveTables === \'function\') {
+            window.IBL_refreshResponsiveTables();
+        }
     } else {
         x.style.display = \'none\';
     }
@@ -326,6 +332,24 @@ function ShowAndHideGM() {
         $html = $this->view->renderBallotForm('action.php', 'Test', 1, 'Playoffs', $categories);
 
         $this->assertStringContainsString('ShowAndHideMVP', $html);
+    }
+
+    public function testShowHideScriptCallsRefreshResponsiveTables(): void
+    {
+        $categories = [
+            [
+                'code' => 'MVP',
+                'title' => 'Most Valuable Player',
+                'instruction' => 'Select THREE.',
+                'candidates' => [],
+            ],
+        ];
+
+        $html = $this->view->renderBallotForm('action.php', 'Test', 1, 'Playoffs', $categories);
+
+        $this->assertStringContainsString('IBL_refreshResponsiveTables', $html);
+        $this->assertStringContainsString("typeof window.IBL_refreshResponsiveTables === 'function'", $html);
+        $this->assertStringContainsString('window.IBL_refreshResponsiveTables();', $html);
     }
 
     public function testRenderResultsExpanderEmitsToggleAndHint(): void

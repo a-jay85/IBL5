@@ -323,7 +323,7 @@ Each Bash tool call runs in a fresh shell, so the classification flags are **not
 
 ## Phase 5: Final Verification
 
-### Phase 5.0: Plan→test, Plan→file, diff→plan & autonomy-contract conformance. Skip if `PLAN_FOUND=none`; the matrix-derived sub-checks additionally skip if `! $HAS_MATRIX`
+### Phase 5.0: Plan→test, Plan→file, diff→plan, assertion-footprint & autonomy-contract conformance. Skip if `PLAN_FOUND=none`; the matrix-derived sub-checks additionally skip if `! $HAS_MATRIX`
 
 **Autonomy-contract sub-check (5.0d):** when the plan declares the optional line-1 `stop_condition:` / `evidence:` pair, each unmet part emits an `UNMET-CONTRACT:` item into the same UNRESOLVED bridge file the four labels above use, so it blocks Phase 6.5 arming through existing condition (3). No new gate condition is added. This sub-check is gated on `$PLAN_FOUND` alone and runs **even when `! $HAS_MATRIX`**, because a docs/tooling plan declaring `stop_condition: evidence-present` is precisely the case the matrix-derived checks skip. A malformed contract holds rather than being skipped.
 
@@ -489,7 +489,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 1. Manual testing cleared — the PR body carries the `No manual testing needed` sentinel Phase 6 writes.
 2. No review/audit finding scored `>= 80` (scored in Phase 4).
-3. No unresolved `MISSING:` planned-test, `MISSING-FILE:` planned-file, `MISSING-PHASE:` phase-omission, `UNPLANNED-FILE:` unplanned-path **or** `UNMET-CONTRACT:` autonomy-contract items from Phase 5.0, **and Phase 5.0 provably finished:** the done-marker `/tmp/post-plan-conformance-done-$PPID` exists AND the bridge `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Marker absent = indeterminate = BLOCKED (an empty bridge file alone means nothing; 5.0 truncates it at START).
+3. No unresolved `MISSING:` planned-test, `MISSING-FILE:` planned-file, `MISSING-PHASE:` phase-omission, `UNPLANNED-FILE:` unplanned-path, `UNREALISED-ASSERTION:` assertion-footprint **or** `UNMET-CONTRACT:` autonomy-contract items from Phase 5.0, **and Phase 5.0 provably finished:** the done-marker `/tmp/post-plan-conformance-done-$PPID` exists AND the bridge `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Marker absent = indeterminate = BLOCKED (an empty bridge file alone means nothing; 5.0 truncates it at START).
 4. Phase 5 did not deterministically fail — `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`.
 5. Golden-snapshot safety — a change to `engine/internal/sim/testdata/golden.json` does NOT auto-ship unattended (headless-only block).
 6. Merge-order — every PR named in a `Depends-on:` line is already `MERGED`.

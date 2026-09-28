@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-burndown — offline harness for bin/backlog burndown* subcommands.
+set -uo pipefail
+
+PASS=0
+FAIL=0
+FAILURES=()
+
+ok()   { printf '[PASS] %s\n' "$1"; PASS=$((PASS + 1)); }
+fail() { printf '[FAIL] %s\n' "$1"; FAIL=$((FAIL + 1)); FAILURES+=("$1"); }
+want() {
+    local label="$1" output="$2" token="$3"
+    if grep -qF -- "$token" <<< "$output"; then
+        ok "$label"
+    else
+        fail "$label (missing: $token)"
+    fi
+}
+
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/backlog"
+
+T="$(mktemp -d)"
+trap 'rm -rf "$T"' EXIT
+
+mkdir -p "$T/home" "$T/fx"
+
+# gh stub: dispatches by args
+cat > "$T/gh" <<'STUB'
+#!/usr/bin/env bash
+set -uo pipefail
+# Log the invocation (every test can inspect $T/gh.log)
+printf '%s\n' "$*" >> "${GH_LOG:-/dev/null}"
+if [ -n "${GH_FAIL_ON:-}" ]; then
+    if grep -qF -- "$GH_FAIL_ON" <<< "$*"; then
+        exit 1
+    fi
+fi
+# Dispatch
+case "$*" in
+    *"issue list"*) cat "${GH_FX_DIR:-/dev/null}/issues.json" 2>/dev/null || echo '[]' ;;
+    *"pr list"*"--state open"*) cat "${GH_FX_DIR:-/dev/null}/prs-open.json" 2>/dev/null || echo '[]' ;;
+    *"pr list"*"--head "*)
+        SLUG=$(printf '%s' "$*" | sed 's/.*--head //' | awk '{print $1}')
+        cat "${GH_FX_DIR:-/dev/null}/pr-${SLUG}.json" 2>/dev/null || echo '[]'
+        ;;
+    *"issue view"*)
+        NUM=$(printf '%s' "$*" | awk '{for(i=1;i<=NF;i++) if($i=="view") print $(i+1)}')
+        cat "${GH_FX_DIR:-/dev/null}/issue-${NUM}.json" 2>/dev/null || echo '{}'
+        ;;
+    *"issue close"*) exit 0 ;;
+    *) exit 0 ;;
+esac
+STUB
+chmod +x "$T/gh"
+
+# git stub: porcelain worktree list
+cat > "$T/git" <<'STUB'
+#!/usr/bin/env bash
+case "$*" in
+    *"worktree list --porcelain"*)
+        cat "${GH_FX_DIR:-/dev/null}/worktrees.txt" 2>/dev/null || true
+        ;;
+    *) exec git "$@" ;;
+esac
+STUB
+chmod +x "$T/git"
+
+# tier stub: xhigh for XHIGH, exit 1 for TIERFAIL, else default
+cat > "$T/tier" <<'STUB'
+#!/usr/bin/env bash
+case "$*" in
+    *XHIGH*) echo "xhigh" ;;
+    *TIERFAIL*) exit 1 ;;
+    *) echo "default" ;;
+esac
+STUB
+chmod +x "$T/tier"
+
+# Helper: run bin/backlog burndown* with all stubs and HOME pointing at $T/home
+bd() {
+    GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" \
+    "$SCRIPT" "$@"
+}
+
+# ── C1: --help lists new subcommands ──────────────────────────────────────────
+OUT="$("$SCRIPT" --help 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "--help exits 0" || fail "--help exits 0 (got $RC)"
+want "--help: burndown-status listed" "$OUT" "burndown-status"
+want "--help: burndown-close-merged listed" "$OUT" "burndown-close-merged"
+
+# ── C2: unknown burndown subcommand rejected ──────────────────────────────────
+OUT="$(bd burndown-bogus 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "unknown subcommand exits 2" || fail "unknown subcommand exits 2 (got $RC)"
+want "unknown subcommand: message" "$OUT" "unknown burndown subcommand"
+
+# ── C3: --dry-run rejected for burndown ──────────────────────────────────────
+OUT="$(bd --dry-run burndown 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "--dry-run rejected exits 2" || fail "--dry-run rejected exits 2 (got $RC)"
+want "--dry-run rejected: message" "$OUT" "--dry-run is not supported"
+# gh must not have been called
+if [ ! -f "$T/gh.log" ] || [ ! -s "$T/gh.log" ]; then
+    ok "--dry-run: no gh call"
+else
+    fail "--dry-run: no gh call (gh.log non-empty)"
+fi
+
+# ── C4: missing HOME fails closed ─────────────────────────────────────────────
+OUT="$(env -u HOME BACKLOG_GH="$T/gh" "$SCRIPT" burndown-status 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "missing HOME exits 3" || fail "missing HOME exits 3 (got $RC)"
+want "missing HOME: message" "$OUT" "HOME is unset"
+# gh must not have been called when HOME unset
+GH_LOG_EMPTY=0
+if [ ! -f "$T/gh.log" ] || [ ! -s "$T/gh.log" ]; then GH_LOG_EMPTY=1; fi
+[ "$GH_LOG_EMPTY" -eq 1 ] && ok "missing HOME: no gh call" || fail "missing HOME: no gh call (gh.log non-empty)"
+
+echo ""
+echo "Results: $PASS passed, $FAIL failed"
+if [ "$FAIL" -gt 0 ]; then
+    for f in "${FAILURES[@]}"; do printf '  FAIL: %s\n' "$f"; done
+    exit 1
+fi
+exit 0

@@ -294,7 +294,7 @@ step67-routing() {
 
     # Step 6.6 section must have zero occurrences of "proceed to Step 7" or "proceeding to Step 7"
     local section66
-    section66=$(awk "NR==$line66,/^## /{if(NR>$line66 && /^## /)exit; print}" "$prompt_file")
+    section66=$(awk "NR==$line66{found=1} found && NR>$line66 && /^## /{exit} found{print}" "$prompt_file")
     if echo "$section66" | grep -q 'proceed to Step 7\|proceeding to Step 7'; then
         echo "FAIL: step67-routing — Step 6.6 still routes to Step 7"
         return 1
@@ -307,12 +307,9 @@ step67-routing() {
         echo "FAIL: step67-routing — Step 6.7 missing 'Do NOT write the handoff file'"
         return 1
     fi
-    if ! echo "$section67" | grep -q 'never proceeds to Step 7\|no handoff.*no post-plan\|No handoff means no post-plan'; then
-        # Also accept the variant from the plan text
-        if ! echo "$section67" | grep -q 'no handoff\|No handoff'; then
-            echo "FAIL: step67-routing — Step 6.7 missing no-handoff language"
-            return 1
-        fi
+    if ! echo "$section67" | grep -q 'never proceeds to Step 7'; then
+        echo "FAIL: step67-routing — Step 6.7 missing 'never proceeds to Step 7'"
+        return 1
     fi
 
     echo "PASS: step67-routing"

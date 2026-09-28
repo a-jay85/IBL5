@@ -878,3 +878,122 @@ def test_upsert_residual_phases_noop_without_items_or_markers():
     assert RESIDUAL_PHASES_END in result
     assert RESIDUAL_PHASES_BEGIN in result
     assert "2 — B" in result
+
+
+from harness.classify import (FILES_CHANGED_BEGIN, FILES_CHANGED_END,
+                              TESTS_CHANGED_BEGIN, TESTS_CHANGED_END,
+                              render_files_changed, render_tests_changed,
+                              upsert_files_changed, upsert_tests_changed)
+
+
+def _make_diff_entry(path: str, status: str) -> str:
+    """Build a minimal diff --git block for the given path and A/M/D status."""
+    if status == "A":
+        return (f"diff --git a/{path} b/{path}\n"
+                f"new file mode 100644\n"
+                f"--- /dev/null\n"
+                f"+++ b/{path}\n"
+                f"@@ -0,0 +1,1 @@\n"
+                f"+x\n")
+    elif status == "D":
+        return (f"diff --git a/{path} b/{path}\n"
+                f"deleted file mode 100644\n"
+                f"--- a/{path}\n"
+                f"+++ /dev/null\n"
+                f"@@ -1,1 +0,0 @@\n"
+                f"-x\n")
+    else:
+        return (f"diff --git a/{path} b/{path}\n"
+                f"index aaa..bbb 100644\n"
+                f"--- a/{path}\n"
+                f"+++ b/{path}\n"
+                f"@@ -1,1 +1,2 @@\n"
+                f"+x\n")
+
+
+def test_render_tests_changed_filters_to_test_paths():
+    diff = (
+        _make_diff_entry("ibl5/classes/Foo.php", "M")
+        + _make_diff_entry("ibl5/tests/Unit/FooTest.php", "A")
+        + _make_diff_entry("ibl5/tests/e2e/roster.spec.ts", "M")
+        + _make_diff_entry("tools/postplan-harness/tests/test_classify.py", "M")
+        + _make_diff_entry("engine/internal/sim/rng_test.go", "A")
+        + _make_diff_entry("bin/test-plan-now", "M")
+    )
+    block = render_tests_changed(diff)
+    assert "- `A` `ibl5/tests/Unit/FooTest.php`" in block
+    assert "- `M` `ibl5/tests/e2e/roster.spec.ts`" in block
+    assert "- `M` `tools/postplan-harness/tests/test_classify.py`" in block
+    assert "- `A` `engine/internal/sim/rng_test.go`" in block
+    assert "- `M` `bin/test-plan-now`" in block
+    assert "ibl5/classes/Foo.php" not in block
+
+
+def test_render_tests_changed_reports_none_when_no_tests():
+    diff = (
+        _make_diff_entry("ibl5/classes/Foo.php", "M")
+        + _make_diff_entry("README.md", "M")
+    )
+    block = render_tests_changed(diff)
+    header = ("**Tests changed** (generated from "
+              "`git diff --name-status origin/master...HEAD` — do not edit by hand):")
+    expected = (TESTS_CHANGED_BEGIN + "\n" + header + "\n\n"
+                "- _(no test files changed)_\n" + TESTS_CHANGED_END)
+    assert block == expected
+
+
+def test_render_tests_changed_empty_diff():
+    block = render_tests_changed("")
+    assert block.startswith(TESTS_CHANGED_BEGIN)
+    assert block.endswith(TESTS_CHANGED_END)
+    assert "_(no test files changed)_" in block
+
+
+def test_upsert_tests_changed_replace():
+    old_block = (TESTS_CHANGED_BEGIN + "\nold header\n\n- `M` `old.py`\n" + TESTS_CHANGED_END)
+    body = "## Before\n\n" + old_block + "\n\n## After\n"
+    new_block = (TESTS_CHANGED_BEGIN + "\nnew header\n\n- `A` `new.py`\n" + TESTS_CHANGED_END)
+    result = upsert_tests_changed(body, new_block)
+    assert "old.py" not in result
+    assert "- `A` `new.py`" in result
+    assert result.count(TESTS_CHANGED_BEGIN) == 1
+    assert "## Before\n\n" in result
+    assert "\n\n## After\n" in result
+
+
+def test_upsert_tests_changed_append_when_absent_and_empty_body():
+    block = render_tests_changed("")
+    body = "## Summary\n- x"
+    result = upsert_tests_changed(body, block)
+    assert result == body.rstrip() + "\n\n" + block + "\n"
+
+    assert upsert_tests_changed("", block) == block
+    assert upsert_tests_changed(None, block) == block
+
+
+def test_upsert_tests_changed_orphan_marker_appends():
+    orphan_body = f"## Orphan\n{TESTS_CHANGED_END}\n- lone begin: {TESTS_CHANGED_BEGIN}\n"
+    block = render_tests_changed("")
+    result = upsert_tests_changed(orphan_body, block)
+    assert orphan_body.rstrip() in result
+    assert result.count(TESTS_CHANGED_BEGIN) >= 2
+    assert result.endswith(block + "\n")
+
+
+def test_upsert_tests_changed_preserves_files_changed_block():
+    diff = _make_diff_entry("ibl5/tests/Unit/FooTest.php", "A")
+    files_block = render_files_changed(diff)
+    tests_block = render_tests_changed(diff)
+    body_with_files = upsert_files_changed("## Summary\n", files_block)
+    files_snapshot = body_with_files[
+        body_with_files.find(FILES_CHANGED_BEGIN):
+        body_with_files.find(FILES_CHANGED_END) + len(FILES_CHANGED_END)
+    ]
+
+    result_1 = upsert_tests_changed(body_with_files, tests_block)
+    result_2 = upsert_tests_changed(result_1, tests_block)
+
+    assert files_snapshot in result_1
+    assert files_snapshot in result_2
+    assert result_1.count(TESTS_CHANGED_BEGIN) == 1
+    assert result_1 == result_2

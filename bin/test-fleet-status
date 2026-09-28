@@ -345,6 +345,10 @@ cat <<'ROWS'
 99999	0	com.apple.something.unrelated
 ROWS
 [ -n "\${STUB_NO_AUTOMOUSE:-}" ] || printf -- '-\t0\tcom.ibl5.automouse\n'
+# Case 19: space-separated epochs, one loaded-but-idle one-shot label each.
+for e in \${STUB_ONESHOT_EPOCHS:-}; do
+    printf -- '-\t0\tcom.ibl5.automouse-oneshot-%s\n' "\$e"
+done
 LAUNCHCTL
 chmod +x "$STUBBIN/launchctl"
 
@@ -395,6 +399,20 @@ PLIST_EOF
 PLIST_MIDNIGHT="$TMP/com.ibl5.automouse.midnight.plist"
 sed 's|<integer>4</integer>|<integer>0</integer>|; s|<integer>30</integer>|<integer>0</integer>|' \
     "$PLIST" > "$PLIST_MIDNIGHT"
+
+# Case 19 fixtures. The daily fire sits 12 hours from now, so a one-shot two
+# minutes out always beats it and one two days out always loses, whatever time
+# the suite runs. The expected one-shot HH:MM comes from the same epoch the stub
+# hands out. BSD `date -r` first, GNU `date -d @` second.
+NOW_EPOCH="$(date +%s)"
+ONESHOT_SOON=$(( NOW_EPOCH + 120 ))
+ONESHOT_LATE=$(( NOW_EPOCH + 2 * 86400 ))
+ONESHOT_PAST=$(( NOW_EPOCH - 3600 ))
+ONESHOT_SOON_HM="$(date -r "$ONESHOT_SOON" +%H:%M 2>/dev/null \
+    || date -d "@$ONESHOT_SOON" +%H:%M)"
+FAR_HOUR=$(( (10#$(date +%H) + 12) % 24 ))
+PLIST_FAR="$TMP/com.ibl5.automouse.far.plist"
+sed "s|<integer>4</integer>|<integer>$FAR_HOUR</integer>|" "$PLIST" > "$PLIST_FAR"
 
 # Transcript root for Phase 6 transcript fixture cases.
 TX="$TMP/projects"; SLUG="-Users-somebody-GitHub-IBL5"; mkdir -p "$TX/$SLUG"
@@ -513,6 +531,15 @@ OUTPUT_NOOSA="$(run_fleet FLEET_STATUS_FORCE_LINKS=1 \
 OUTPUT_STRIPPED="$(printf '%s\n' "$OUTPUT_LINKS" | perl -pe 's/\e\]8;;[^\e]*\e\\//g')"
 
 OUTPUT_MIDNIGHT="$(run_fleet FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST_MIDNIGHT")"
+
+OUTPUT_ONESHOT_SOON="$(run_fleet FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST_FAR" \
+    STUB_ONESHOT_EPOCHS="$ONESHOT_LATE $ONESHOT_SOON $ONESHOT_PAST")"
+OUTPUT_ONESHOT_LATE="$(run_fleet FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST_FAR" \
+    STUB_ONESHOT_EPOCHS="$ONESHOT_LATE")"
+OUTPUT_ONESHOT_ONLY="$(run_fleet STUB_NO_AUTOMOUSE=1 \
+    STUB_ONESHOT_EPOCHS="$ONESHOT_SOON")"
+OUTPUT_ONESHOT_PAST="$(run_fleet STUB_NO_AUTOMOUSE=1 \
+    STUB_ONESHOT_EPOCHS="$ONESHOT_PAST")"
 
 if [ "$RC" -eq 0 ]; then pass "exits 0"; else fail "exits 0 (got $RC)"; fi
 
@@ -650,6 +677,20 @@ assert_lacks "queue: missing plist prints no next run" \
 # empty, automouse_next_run bails, and this assert is what catches it.
 assert_has "queue: a 00:00 schedule rolls to the next day" \
     "$OUTPUT_MIDNIGHT" 'AUTOMOUSE QUEUE.*next run [A-Z][a-z]{2} [0-9]{4}-[0-9]{2}-[0-9]{2} 00:00'
+
+# 19 — one-shots from `bin/automouse/run schedule` count as runs too. The
+# soonest pending one wins over a later daily fire. A past epoch (firing now, or
+# missed) is skipped, and a one-shot later than the daily fire loses to it.
+assert_has "queue: a sooner one-shot beats the daily fire" \
+    "$OUTPUT_ONESHOT_SOON" "AUTOMOUSE QUEUE.*next run [A-Z][a-z]{2} [0-9-]{10} $ONESHOT_SOON_HM \\(one-shot\\)"
+assert_has "queue: a later one-shot loses to the daily fire" \
+    "$OUTPUT_ONESHOT_LATE" "AUTOMOUSE QUEUE.*next run [A-Z][a-z]{2} [0-9-]{10} $(printf '%02d' "$FAR_HOUR"):30"
+assert_lacks "queue: a losing one-shot is not labelled" \
+    "$OUTPUT_ONESHOT_LATE" 'one-shot'
+assert_has "queue: a one-shot shows with the daily job unloaded" \
+    "$OUTPUT_ONESHOT_ONLY" "AUTOMOUSE QUEUE.*next run [A-Z][a-z]{2} [0-9-]{10} $ONESHOT_SOON_HM \\(one-shot\\)"
+assert_lacks "queue: a past one-shot is not a next run" \
+    "$OUTPUT_ONESHOT_PAST" 'next run'
 
 # 6b — lock-dir slug resolution for documented forms (no .md / no plan arg).
 # Neither plan has a queue file, so each runner gets its own row above the queue.

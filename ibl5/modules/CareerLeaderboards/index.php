@@ -7,5 +7,5 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-\Module\ModuleRedirect::sendWithPassthrough('modules.php?name=Leaderboards&tab=career', [], $_GET + $_POST);
+\Module\ModuleRedirect::send('CareerLeaderboards');
 return;

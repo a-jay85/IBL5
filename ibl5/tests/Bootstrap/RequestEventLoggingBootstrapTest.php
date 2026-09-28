@@ -7,6 +7,7 @@ namespace Tests\Bootstrap;
 use Bootstrap\Container;
 use Bootstrap\RequestEventLoggingBootstrap;
 use PHPUnit\Framework\TestCase;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 final class RequestEventLoggingBootstrapTest extends TestCase
 {
@@ -29,22 +30,27 @@ final class RequestEventLoggingBootstrapTest extends TestCase
     public function testNoOpUnderCliSapi(): void
     {
         // PHP_SAPI is 'cli' in the PHPUnit process — no REQUEST_URI needed.
-        // Even with a DB set, the step must return without writing.
-        unset($GLOBALS['mysqli_db']);
+        // Inject a real MockDatabase so we can assert that no DB write was attempted.
+        $mockDb = new MockDatabase();
+        $GLOBALS['mysqli_db'] = $mockDb;
 
         $this->step->boot($this->container);
 
-        $this->expectNotToPerformAssertions();
+        // CLI guard must fire before any DB access
+        self::assertSame([], $mockDb->getPreparedQueries(), 'CLI guard must prevent any DB access');
     }
 
     public function testNoOpWhenRequestUriUnset(): void
     {
         // Under CLI, REQUEST_URI is not set — guard fires before any DB access.
         unset($_SERVER['REQUEST_URI']);
+        $mockDb = new MockDatabase();
+        $GLOBALS['mysqli_db'] = $mockDb;
 
         $this->step->boot($this->container);
 
-        $this->expectNotToPerformAssertions();
+        // REQUEST_URI guard must fire before any DB access
+        self::assertSame([], $mockDb->getPreparedQueries(), 'Missing REQUEST_URI must prevent any DB access');
     }
 
     public function testSwallowsDependencyErrorWithoutThrowing(): void
@@ -61,9 +67,12 @@ final class RequestEventLoggingBootstrapTest extends TestCase
 
         // Inline anonymous double (per feedback_phpstan_anon_test_double_inline.md):
         // do NOT extract to a typed helper — keeps analyse:tests green.
-        $GLOBALS['authService'] = new class {
+        $authSpy = new class {
+            public bool $called = false;
+
             public function isAuthenticated(): bool
             {
+                $this->called = true;
                 throw new \RuntimeException('boom');
             }
 
@@ -72,10 +81,16 @@ final class RequestEventLoggingBootstrapTest extends TestCase
                 return null;
             }
         };
+        $GLOBALS['authService'] = $authSpy;
+        $obLevel = ob_get_level();
 
         // Must not throw — either CLI guard fires first or the catch swallows it.
         $this->step->boot($this->container);
 
-        $this->expectNotToPerformAssertions();
+        // Under CLI the early return fires before isAuthenticated() is reached;
+        // under a web SAPI it would be called but caught. Either way, no exception escapes.
+        self::assertSame($obLevel, ob_get_level(), 'boot() must not alter output buffer state');
+        // Verify the method was not called (CLI guard short-circuits before auth resolution)
+        self::assertFalse($authSpy->called, 'CLI guard must prevent auth service from being called');
     }
 }

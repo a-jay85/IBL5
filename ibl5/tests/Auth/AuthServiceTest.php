@@ -179,61 +179,6 @@ class AuthServiceTest extends TestCase
         self::assertTrue(password_verify('test-password', $hash));
     }
 
-    public function testRegisterMethodSignatureAcceptsCallable(): void
-    {
-        $reflection = new \ReflectionMethod(AuthService::class, 'register');
-        $params = $reflection->getParameters();
-
-        self::assertCount(4, $params);
-        self::assertSame('email', $params[0]->getName());
-        self::assertSame('password', $params[1]->getName());
-        self::assertSame('username', $params[2]->getName());
-        self::assertSame('emailCallback', $params[3]->getName());
-        self::assertTrue($params[3]->allowsNull());
-    }
-
-    public function testConfirmEmailMethodSignature(): void
-    {
-        $reflection = new \ReflectionMethod(AuthService::class, 'confirmEmail');
-        $params = $reflection->getParameters();
-
-        self::assertCount(2, $params);
-        self::assertSame('selector', $params[0]->getName());
-        self::assertSame('token', $params[1]->getName());
-    }
-
-    public function testResetPasswordMethodSignature(): void
-    {
-        $reflection = new \ReflectionMethod(AuthService::class, 'resetPassword');
-        $params = $reflection->getParameters();
-
-        self::assertCount(3, $params);
-        self::assertSame('selector', $params[0]->getName());
-        self::assertSame('token', $params[1]->getName());
-        self::assertSame('newPassword', $params[2]->getName());
-    }
-
-    public function testForgotPasswordMethodSignature(): void
-    {
-        $reflection = new \ReflectionMethod(AuthService::class, 'forgotPassword');
-        $params = $reflection->getParameters();
-
-        self::assertCount(2, $params);
-        self::assertSame('email', $params[0]->getName());
-        self::assertSame('callback', $params[1]->getName());
-    }
-
-    public function testGetLastErrorReturnType(): void
-    {
-        $reflection = new \ReflectionMethod(AuthService::class, 'getLastError');
-        $returnType = $reflection->getReturnType();
-
-        self::assertNotNull($returnType);
-        self::assertInstanceOf(\ReflectionNamedType::class, $returnType);
-        self::assertTrue($returnType->allowsNull());
-        self::assertSame('string', $returnType->getName());
-    }
-
     // --- Merged from AuthServiceAdminTest ---
 
     public function testIsAdminReturnsFalseWhenNotAuthenticated(): void

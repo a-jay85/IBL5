@@ -123,7 +123,45 @@ new_env() {
     (cd "$base/main" && pwd -P)
 }
 
-# add_worktree <main> <name> [ahead|behind|current|diverged]
+# _make_stale_copy <main> <name> <wt>
+# Reproduces the post-pipeline stale copy. The worktree commits A,B and pushes
+# them. Then origin/<name> is force-pushed to A',B': the same patches with new
+# SHAs, as the squash/rebase pipeline leaves it. Local ends ahead=2 behind=2,
+# and `git cherry origin/<name> HEAD` prints only '-' lines.
+# Writes nothing to stdout (add_worktree's stdout is the returned path).
+_make_stale_copy() {
+    local main="$1" name="$2" wt="$3" i url clone a b
+    printf '%s\n' "$name" > "$main/$name.txt"
+    git -C "$main" add "$name.txt"
+    git -C "$main" commit -qm "$name initial"
+    git -C "$main" push -q origin "$name"
+    git -C "$main" checkout -q master
+    git -C "$main" worktree add -q "$wt" "$name"
+    for i in 1 2; do
+        printf 'work %s\n' "$i" > "$wt/work$i.txt"
+        git -C "$wt" add "work$i.txt"
+        git -C "$wt" -c user.email=t@example.com -c user.name=tester \
+            -c commit.gpgsign=false commit -qm "work $i"
+    done
+    git -C "$wt" push -q origin "$name"
+    url="$(git -C "$main" remote get-url origin)"
+    clone="$(mktemp -d "$TMP/clone_stale.XXXXXX")"
+    git clone -q "$url" "$clone" 2>/dev/null
+    git -C "$clone" config user.email t@example.com
+    git -C "$clone" config user.name tester
+    git -C "$clone" config commit.gpgsign false
+    git -C "$clone" checkout -q "$name"
+    a="$(git -C "$clone" rev-parse HEAD~1)"; b="$(git -C "$clone" rev-parse HEAD)"
+    git -C "$clone" reset -q --hard HEAD~2
+    # A distinct committer forces new SHAs even within the same second.
+    GIT_COMMITTER_NAME=pipeline-bot GIT_COMMITTER_EMAIL=bot@example.com \
+        git -C "$clone" cherry-pick "$a" "$b" >/dev/null 2>&1
+    git -C "$clone" push -q -f origin "$name" 2>/dev/null
+    # refs/remotes are shared across worktrees, so this updates main's origin/<name>.
+    git -C "$wt" fetch -q origin "$name" 2>/dev/null
+}
+
+# add_worktree <main> <name> [ahead|behind|current|diverged|stale-copy|stale-copy-plus-unique]
 # Sets up a worktree branch in various states relative to origin.
 add_worktree() {
     local main="$1" name="$2" state="${3:-current}"
@@ -279,6 +317,17 @@ add_worktree() {
             git -C "$main" fetch -q origin
             # Untracked new.txt already in the worktree
             printf 'local-untracked\n' > "$wt/new.txt"
+            ;;
+        stale-copy)
+            _make_stale_copy "$main" "$name" "$wt"
+            ;;
+        stale-copy-plus-unique)
+            # Stale copy plus one real commit C that origin lacks, so `git cherry` shows '+ C'.
+            _make_stale_copy "$main" "$name" "$wt"
+            printf 'unique\n' > "$wt/unique.txt"
+            git -C "$wt" add unique.txt
+            git -C "$wt" -c user.email=t@example.com -c user.name=tester \
+                -c commit.gpgsign=false commit -qm "real unique commit"
             ;;
         diverged)
             # Both local and origin have new commits (non-conflicting files).
@@ -807,6 +856,109 @@ else
     failcase "only: lock file was removed by on-demand mode (must not take the lock)"
 fi
 rm -f "$_TICK_LOCK31"
+
+# ── Test 32: fleet: stale copy (all ahead commits cherry-equivalent) → RESET-STALE ─
+MAIN32="$(new_env)"
+WT32="$(add_worktree "$MAIN32" "wt-stale32" stale-copy)"
+LOG32="$(fresh_log t32)"; LOCKD32="$(fresh_lockd t32)"
+HEAD32_BEFORE="$(git -C "$WT32" rev-parse HEAD)"
+ORIGIN32="$(git -C "$MAIN32" rev-parse origin/wt-stale32)"
+# Fixture self-check: prove the fixture is a stale copy before judging the tick.
+if [ "$HEAD32_BEFORE" != "$ORIGIN32" ]; then
+    pass "stale-fixture: local tip differs from rewritten origin tip"
+else
+    failcase "stale-fixture: cherry-pick produced identical SHAs (fixture broken)"
+fi
+assert_eq    "stale-fixture: ahead=2 behind=2" "2	2" \
+    "$(git -C "$WT32" rev-list --left-right --count "origin/wt-stale32...HEAD")"
+assert_absent "stale-fixture: no unique ('+') commits" '^\+' \
+    "$(git -C "$WT32" cherry origin/wt-stale32 HEAD)"
+run_with_repo "$MAIN32" "$LOG32" "$LOCKD32" -- --force
+assert_eq     "stale-fleet: exit 0" "0" "$ST"
+assert_match  "stale-fleet: RESET-STALE emitted" "RESET-STALE.*wt-stale32" "$OUT"
+assert_absent "stale-fleet: no STRAGGLER for the reset branch" \
+    "STRAGGLER branch=wt-stale32" "$(cat "$LOG32" 2>/dev/null)"
+assert_eq     "stale-fleet: HEAD moved to origin tip" "$ORIGIN32" \
+    "$(git -C "$WT32" rev-parse HEAD)"
+assert_eq     "stale-fleet: worktree clean after reset" "" \
+    "$(git -C "$WT32" status --porcelain)"
+assert_eq     "stale-fleet: patch content preserved" "work 2" "$(cat "$WT32/work2.txt")"
+
+# ── Test 33: fleet: backup ref records the pre-reset HEAD ─────────────────────
+# Reuses Test 32's post-reset state; refs/ is shared across worktrees.
+assert_eq "stale-backup: refs/wt-sync-backup/<branch> = pre-reset HEAD" \
+    "$HEAD32_BEFORE" \
+    "$(git -C "$WT32" rev-parse --verify -q refs/wt-sync-backup/wt-stale32 2>/dev/null)"
+
+# ── Test 34: fleet: real unique commit → STRAGGLER, never RESET-STALE ─────────
+MAIN34="$(new_env)"
+WT34="$(add_worktree "$MAIN34" "wt-uniq34" stale-copy-plus-unique)"
+LOG34="$(fresh_log t34)"; LOCKD34="$(fresh_lockd t34)"
+HEAD34_BEFORE="$(git -C "$WT34" rev-parse HEAD)"
+run_with_repo "$MAIN34" "$LOG34" "$LOCKD34" -- --force
+assert_eq     "stale-unique: exit 0" "0" "$ST"
+assert_absent "stale-unique: no RESET-STALE" "RESET-STALE" "$OUT"
+assert_match  "stale-unique: STRAGGLER in log" "STRAGGLER branch=wt-uniq34" \
+    "$(cat "$LOG34" 2>/dev/null)"
+assert_eq     "stale-unique: HEAD unchanged" "$HEAD34_BEFORE" "$(git -C "$WT34" rev-parse HEAD)"
+if git -C "$WT34" rev-parse --verify -q refs/wt-sync-backup/wt-uniq34 >/dev/null 2>&1; then
+    failcase "stale-unique: backup ref written for an untouched branch"
+else
+    pass "stale-unique: no backup ref"
+fi
+
+# ── Test 35: fleet: dirty stale copy → DIRTY, never RESET-STALE ───────────────
+MAIN35="$(new_env)"
+WT35="$(add_worktree "$MAIN35" "wt-sdirty35" stale-copy)"
+printf 'dirty\n' >> "$WT35/README.md"          # unstaged tracked edit
+LOG35="$(fresh_log t35)"; LOCKD35="$(fresh_lockd t35)"
+HEAD35_BEFORE="$(git -C "$WT35" rev-parse HEAD)"
+CONTENT35_BEFORE="$(cat "$WT35/README.md")"
+run_with_repo "$MAIN35" "$LOG35" "$LOCKD35" -- --force
+assert_eq     "stale-dirty: exit 0" "0" "$ST"
+assert_match  "stale-dirty: DIRTY logged" "DIRTY.*wt-sdirty35" "$OUT"
+assert_absent "stale-dirty: no RESET-STALE" "RESET-STALE" "$OUT"
+assert_eq     "stale-dirty: HEAD unchanged" "$HEAD35_BEFORE" "$(git -C "$WT35" rev-parse HEAD)"
+assert_eq     "stale-dirty: edit preserved" "$CONTENT35_BEFORE" "$(cat "$WT35/README.md")"
+
+# ── Test 36: fleet: in-use stale copy → IN-USE, never RESET-STALE ─────────────
+MAIN36="$(new_env)"
+WT36="$(add_worktree "$MAIN36" "wt-sinuse36" stale-copy)"
+WT36_REAL="$(cd "$WT36" && pwd -P)"
+LOG36="$(fresh_log t36)"; LOCKD36="$(fresh_lockd t36)"
+HEAD36_BEFORE="$(git -C "$WT36" rev-parse HEAD)"
+run_with_repo "$MAIN36" "$LOG36" "$LOCKD36" \
+    STUB_LSOF_LINE="lsof    999 user   3   DIR   $WT36_REAL" -- --force
+assert_eq     "stale-inuse: exit 0" "0" "$ST"
+assert_match  "stale-inuse: IN-USE logged" "IN-USE.*wt-sinuse36" "$OUT"
+assert_absent "stale-inuse: no RESET-STALE" "RESET-STALE" "$OUT"
+assert_eq     "stale-inuse: HEAD unchanged" "$HEAD36_BEFORE" "$(git -C "$WT36" rev-parse HEAD)"
+
+# ── Test 37: only: stale copy → RESET-STALE, HEAD at origin, backup written ───
+MAIN37="$(new_env)"
+WT37="$(add_worktree "$MAIN37" "wt-stale37" stale-copy)"
+HEAD37_BEFORE="$(git -C "$WT37" rev-parse HEAD)"
+ORIGIN37="$(git -C "$MAIN37" rev-parse origin/wt-stale37)"
+run_only "$WT37"
+assert_eq "only: RESET-STALE stdout" "RESET-STALE" "$ONLY_OUT"
+assert_eq "only: RESET-STALE exit 0" "0" "$ONLY_ST"
+assert_eq "only: RESET-STALE HEAD at origin" "$ORIGIN37" "$(git -C "$WT37" rev-parse HEAD)"
+assert_eq "only: RESET-STALE backup ref" "$HEAD37_BEFORE" \
+    "$(git -C "$WT37" rev-parse --verify -q refs/wt-sync-backup/wt-stale37 2>/dev/null)"
+
+# ── Test 38: only: --dry-run on stale copy reports, writes nothing ────────────
+MAIN38="$(new_env)"
+WT38="$(add_worktree "$MAIN38" "wt-stale38" stale-copy)"
+HEAD38_BEFORE="$(git -C "$WT38" rev-parse HEAD)"
+run_only "$WT38" --dry-run
+assert_match "only-dry: stale state reported" "RESET-STALE" "$ONLY_OUT"
+assert_eq    "only-dry: exit 0" "0" "$ONLY_ST"
+assert_eq    "only-dry: HEAD unchanged" "$HEAD38_BEFORE" "$(git -C "$WT38" rev-parse HEAD)"
+if git -C "$WT38" rev-parse --verify -q refs/wt-sync-backup/wt-stale38 >/dev/null 2>&1; then
+    failcase "only-dry: backup ref written under --dry-run"
+else
+    pass "only-dry: no backup ref"
+fi
 
 # ── Hook wrapper tests ────────────────────────────────────────────────────────
 HOOK="$SCRIPT_DIR/hooks/wt-sync-session-start.sh"

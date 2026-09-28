@@ -44,14 +44,36 @@ final class SecurityBootstrapTest extends TestCase
 
     public function testIncludeSafeBlocksNonPhpExtension(): void
     {
-        $this->expectNotToPerformAssertions();
-        SecurityBootstrap::includeSafe('malicious.sh');
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir . '/malicious.sh';
+        file_put_contents($tempFile, '<?php $GLOBALS["ext_block_test"] = true;');
+        $originalCwd = getcwd();
+        chdir($tempDir);
+
+        try {
+            SecurityBootstrap::includeSafe('malicious.sh');
+            self::assertArrayNotHasKey('ext_block_test', $GLOBALS, 'Non-.php extension must be blocked by includeSafe');
+        } finally {
+            chdir((string) $originalCwd);
+            unlink($tempFile);
+        }
     }
 
     public function testIncludeSafeBlocksSpecialCharactersInFilename(): void
     {
-        $this->expectNotToPerformAssertions();
-        SecurityBootstrap::includeSafe('file;rm -rf.php');
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir . '/file;rm -rf.php';
+        file_put_contents($tempFile, '<?php $GLOBALS["special_chars_block_test"] = true;');
+        $originalCwd = getcwd();
+        chdir($tempDir);
+
+        try {
+            SecurityBootstrap::includeSafe('file;rm -rf.php');
+            self::assertArrayNotHasKey('special_chars_block_test', $GLOBALS, 'Filenames with special chars must be blocked by includeSafe');
+        } finally {
+            chdir((string) $originalCwd);
+            unlink($tempFile);
+        }
     }
 
     public function testIncludeSafeAllowsValidPhpFile(): void
@@ -80,13 +102,19 @@ final class SecurityBootstrapTest extends TestCase
 
     public function testIncludeSafeHandlesEmptyString(): void
     {
-        $this->expectNotToPerformAssertions();
+        $level = ob_get_level();
         SecurityBootstrap::includeSafe('');
+        self::assertSame($level, ob_get_level(), 'includeSafe with empty string must not alter output buffer state');
     }
 
     public function testIncludeSafeStripsNullBytes(): void
     {
-        $this->expectNotToPerformAssertions();
-        SecurityBootstrap::includeSafe("dir\0/../test.php");
+        // PHP 8 throws ValueError from file_exists() when a path contains a null byte.
+        // The str_replace("\0", '', $dir) guard in includeSafe must strip the null byte
+        // before the file_exists() call, or the call would throw.
+        // If the guard is removed, this test fails because the ValueError propagates.
+        $level = ob_get_level();
+        SecurityBootstrap::includeSafe("subdir\0/test.php");
+        self::assertSame($level, ob_get_level(), 'includeSafe with null-byte path must not alter output buffer state');
     }
 }

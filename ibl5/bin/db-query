@@ -79,6 +79,13 @@ if [ "$DB_TARGET" != "main" ] && ! db_container_running "$DB_TARGET"; then
 fi
 # --- end target routing -----------------------------------------------------
 
+# Homebrew leaves mariadb unlinked when mysql is also installed (they ship the
+# same binaries), so launchd jobs with a minimal PATH cannot find the host client.
+# db-sync-nightly failed its post-restore assertion every night for this reason.
+if ! command -v mariadb >/dev/null 2>&1 && [ -x /opt/homebrew/opt/mariadb/bin/mariadb ]; then
+    PATH="/opt/homebrew/opt/mariadb/bin:$PATH"
+fi
+
 if [ ! -f "$CONFIG" ]; then
     echo "Error: config.php not found at $CONFIG" >&2
     exit 1

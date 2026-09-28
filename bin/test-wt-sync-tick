@@ -413,10 +413,22 @@ run_with_repo() {
 
 # ── Check 0: source-level safety grep ────────────────────────────────────────
 # A future edit breaking the non-destructive contract should fail here first.
-if grep -qE '\bgit\b.*(push|rebase|reset\s+--hard)' "$TICK"; then
+if grep -E '\bgit\b.*(push|rebase|reset\s+--hard)' "$TICK" | grep -v '# stale-copy-reset$' | grep -q .; then
     failcase "source-level: wt-sync-tick contains git push / rebase / reset --hard"
 else
     pass "source-level: no git push/rebase/reset --hard in wt-sync-tick"
+fi
+
+# ── Check 0b: the stale-copy exemption covers exactly one, exact line ────────
+# The marker lets the source greps skip the intentional reset. Pin it to one
+# line whose target is origin's copy of the branch, so the marker can't be
+# reused to smuggle in another destructive git call.
+STALE_MARKED="$(grep -c '# stale-copy-reset$' "$TICK")"
+assert_eq "source-level: exactly one stale-copy exempt line" "1" "$STALE_MARKED"
+if grep '# stale-copy-reset$' "$TICK" | grep -qE '^[[:space:]]*git -C "\$wt" reset --hard --quiet "refs/remotes/origin/\$branch" '; then
+    pass "source-level: stale-copy exempt line resets only to refs/remotes/origin/\$branch"
+else
+    failcase "source-level: stale-copy exempt line is not the expected reset-to-origin call"
 fi
 
 # ── Test 1: operator present → exit 0, nothing synced ────────────────────────
@@ -1004,7 +1016,7 @@ assert_eq "hook: non-executable tick exits 0" "0" "$HOOK_ST3b"
 chmod +x "$MAIN_HOOK/bin/wt-sync-tick"   # restore
 
 # ── Source-level anti-pattern row ─────────────────────────────────────────────
-if grep -nE '(reset[[:space:]]+--hard|[[:space:]]stash[[:space:]]|[[:space:]]rebase[[:space:]]|push[[:space:]]+origin|git[[:space:]].*--force)' "$TICK" | grep -vE '^[0-9]+:[[:space:]]*#'; then
+if grep -nE '(reset[[:space:]]+--hard|[[:space:]]stash[[:space:]]|[[:space:]]rebase[[:space:]]|push[[:space:]]+origin|git[[:space:]].*--force)' "$TICK" | grep -vE '^[0-9]+:[[:space:]]*#' | grep -v '# stale-copy-reset$'; then
     failcase "source-level: wt-sync-tick contains a forbidden git write verb"
 else
     pass "source-level: no reset --hard / stash / rebase / push in the tick"

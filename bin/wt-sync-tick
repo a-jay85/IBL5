@@ -11,7 +11,10 @@
 # are wrapped in `if` (mirrors bin/bug-pipeline-tick's discipline).
 #
 # NEVER pushes, never force-pushes, never calls gh, never rebases, never
-# resets --hard, never creates or deletes worktrees. Fast-forward only.
+# creates or deletes worktrees. Fast-forward only, with one exception: a
+# stale-copy branch (every local-only commit already on origin as a
+# patch-equivalent) is backed up to refs/wt-sync-backup/<branch> and then
+# hard-reset to origin by backup_and_reset. That is the only hard reset.
 # See ADR-0106 and ADR-0133 for the design rationale.
 #
 # Usage: bin/wt-sync-tick [--dry-run] [--force] [--help] [--only <path>]
@@ -108,6 +111,44 @@ _bounded_fetch() {   # <wt> <branch> — 0 = fetched, 1 = failed or timed out
         waited=$(( waited + 1 ))
     done
     wait "$pid" 2>/dev/null || return 1
+    return 0
+}
+
+# ── Stale-copy helpers ────────────────────────────────────────────────────────
+# A stale copy is a local branch whose every local-only commit has a
+# patch-equivalent (cherry-pick-equal) twin already on origin. It is the
+# leftover of a remote squash/rebase. It carries no unique work, so backing up
+# HEAD and resetting to origin loses nothing. Every failure path returns
+# "not stale" / "did nothing". For a destructive action, fail-closed is the
+# only safe default.
+
+is_stale_copy() {   # <wt> <branch> — 0 = every ahead commit has an origin twin
+    local wt="$1" branch="$2" ahead unique
+    git -C "$wt" rev-parse --verify --quiet "refs/remotes/origin/$branch" >/dev/null 2>&1 || return 1
+    git -C "$wt" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null 2>&1 || return 1
+    ahead="$(git -C "$wt" rev-list --count "refs/remotes/origin/$branch..refs/heads/$branch" 2>/dev/null)" || return 1
+    [ -n "$ahead" ] && [ "$ahead" -gt 0 ] 2>/dev/null || return 1
+    # Exit status is captured separately. A failed rev-list prints nothing, and
+    # empty output must never read as "all stale".
+    unique="$(git -C "$wt" rev-list --cherry-pick --right-only \
+        "refs/remotes/origin/$branch...refs/heads/$branch" 2>/dev/null)" || return 1
+    [ -z "$unique" ]
+}
+
+backup_and_reset() {   # <wt> <branch> — 0 = backed up + reset; 1 = nothing changed
+    local wt="$1" branch="$2" cur old_sha backup_sha
+    cur="$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null)" || return 1
+    [ "$cur" = "$branch" ] || return 1
+    if has_uncommitted_changes "$wt" || has_untracked_files "$wt"; then
+        return 1
+    fi
+    old_sha="$(git -C "$wt" rev-parse --verify --quiet HEAD 2>/dev/null)" || return 1
+    [ -n "$old_sha" ] || return 1
+    git -C "$wt" update-ref --create-reflog -m "wt-sync-tick: stale-copy backup" \
+        "refs/wt-sync-backup/$branch" "$old_sha" >/dev/null 2>&1 || return 1
+    backup_sha="$(git -C "$wt" rev-parse --verify --quiet "refs/wt-sync-backup/$branch" 2>/dev/null)" || return 1
+    [ "$backup_sha" = "$old_sha" ] || return 1
+    git -C "$wt" reset --hard --quiet "refs/remotes/origin/$branch" >/dev/null 2>&1 || return 1   # stale-copy-reset
     return 0
 }
 

@@ -17,6 +17,25 @@
 # This runs two full PHPStan passes (~2-3 min total) plus a drift-snapshot update.
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/regen-baselines
+
+Regenerate the PHPStan baselines and their count snapshot. Run this after a
+merge or rebase that touched ibl5/phpstan-baseline.neon,
+ibl5/phpstan-tests-baseline.neon, or ibl5/phpstan-baseline-counts.json.
+
+No arguments accepted. Runs two full PHPStan passes (~2-3 min total) then
+updates phpstan-baseline-counts.json.
+
+Generated files (review and commit after running):
+  ibl5/phpstan-baseline.neon
+  ibl5/phpstan-tests-baseline.neon
+  ibl5/phpstan-baseline-counts.json
+EOF
+    exit 0
+fi
+
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT/ibl5"
 

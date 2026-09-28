@@ -39,6 +39,11 @@ export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:${HOME:-}/.bun/bin:${HOME:-}
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+    exit 0
+fi
+
 # --- MAIN checkout derivation (Divergence 1 from backups-sync-setup template) ---
 # IBL5_MAIN lets bin/test-docfix-run sandbox this script without touching the real
 # checkout. Falls back to the worktree-list awk (mirrors bin/docfix-run:31).

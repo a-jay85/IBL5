@@ -77,6 +77,14 @@ script, or relocate the script to its correct home (`bin/` vs `ibl5/bin/` vs
 `ibl5/scripts/`). A `.symlinks` manifest is intentionally **not** maintained —
 one tracked symlink does not warrant one.
 
+## Every script answers `--help`
+
+Run `bin/<script> --help` to see its arguments. Help goes to stdout and exits
+0. The check sits at the top of the script, before any `source`, `git`, `cd`,
+or network call, so asking for help never does anything else. Add it to every
+new script. `bin/test-bin-help` enforces this in CI for every script in `bin/`
+and `bin/automouse/` except `test-*` harnesses.
+
 ## Check-script conventions
 
 Applies to `bin/check-*` (Bash) and `ibl5/bin/check-*` (PHP) — both sets follow

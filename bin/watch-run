@@ -47,6 +47,11 @@
 # Exit 4 — --startup-grace elapsed and the launchd label was never seen alive:
 #          the job never registered. Nothing was killed.
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    awk 'NR>=3 && /^#/ { sub(/^# ?/, ""); print; next } NR>=3 { exit }' "$0"
+    exit 0
+fi
+
 set -uo pipefail
 
 LOG=""

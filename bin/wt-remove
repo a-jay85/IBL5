@@ -8,6 +8,23 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/wt-remove <worktree-name> [--force] [--volumes]
+
+Remove a git worktree and its Docker environment. Tears down Docker containers
+first (if running), then removes the worktree directory and git tracking.
+
+Arguments:
+  worktree-name   Name of the worktree to remove.
+
+Options:
+  --force     Remove even if the worktree is actively in use or has uncommitted changes.
+  --volumes   Also remove Docker volumes when tearing down the environment.
+EOF
+    exit 0
+fi
+
 source "$(dirname "$0")/lib/wt-guards.sh"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

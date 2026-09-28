@@ -3,6 +3,22 @@
 # Usage: bin/e2e-for-file <php-file-path>
 # Output: One E2E test path per line (relative to ibl5/), or nothing if no mapping.
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/e2e-for-file <php-file-path>
+
+Resolve a PHP file path to matching E2E test file(s).
+Prints one E2E test path per line (relative to ibl5/), or nothing if no mapping.
+The file must contain classes/<ModuleName>/ in its path; non-.php paths exit silently.
+
+  php-file-path  Path to a PHP source file under ibl5/classes/<ModuleName>/
+
+Exit codes:
+  0  Always (no mapping is a silent exit 0, not an error)
+EOF
+    exit 0
+fi
+
 set -euo pipefail
 
 FILE="${1:-}"

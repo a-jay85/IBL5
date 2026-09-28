@@ -37,6 +37,11 @@ set -euo pipefail
 # because launchd hands it a minimal PATH with no caller preference to respect.
 export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin"
 
+if [[ "${1:-}" = "--help" || "${1:-}" = "-h" ]]; then
+    sed -n '2,28p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    exit 0
+fi
+
 CLAUDE_BIN="${PR_REVIEW_NOW_CLAUDE:-$(command -v claude || true)}"
 
 # --- ROOT pin ---------------------------------------------------------------------------

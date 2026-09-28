@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# bin/test-bin-help — every user-facing bin/ script answers --help.
+#
+# Scope: executable files with a shebang in bin/ and bin/automouse/.
+# Skipped: bin/test-* (harnesses, no args), bin/lib/ and bin/hooks/ (sourced
+# or stdin-driven internals), and files without a shebang (prompt text).
+#
+# Each script runs as `<copy>/bin/<script> --help` inside a throwaway copy of
+# bin/, with HOME in a temp dir, stdin from /dev/null, and a PATH whose first
+# entry stubs every tool that could touch the network, the repo, or a paid
+# session (git gh docker mysql ssh rsync curl launchctl osascript claude ...).
+# A stub logs its name and exits 1.
+#
+# Per script it asserts:
+#   - exit 0
+#   - non-empty stdout
+#   - no stub was called (the handler runs before any side effect)
+#
+# Run: bin/test-bin-help [script-name ...]   (default: every script in scope)
+# Exit 0 when all pass, 1 on any failure.
+
+set -uo pipefail
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+    exit 0
+fi
+
+SRC_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+cp -R "$SRC_BIN" "$TMP/bin"
+# Bun scripts import TS modules from ibl5/ at load time, so --help needs them
+# reachable. A symlink is safe because the handler must exit before any write.
+ln -s "$SRC_BIN/../ibl5" "$TMP/ibl5"
+mkdir -p "$TMP/home" "$TMP/stubs"
+STUB_LOG="$TMP/stub.log"
+
+for tool in git gh docker docker-compose mysql mysqldump mariadb ssh scp rsync \
+            curl wget launchctl osascript open claude crontab sqlite3 npx; do
+    cat > "$TMP/stubs/$tool" <<EOF
+#!/bin/sh
+echo "$tool \$*" >> "$STUB_LOG"
+exit 1
+EOF
+    chmod +x "$TMP/stubs/$tool"
+done
+
+TIMEOUT_BIN=""
+if command -v gtimeout >/dev/null 2>&1; then TIMEOUT_BIN=gtimeout
+elif command -v timeout >/dev/null 2>&1; then TIMEOUT_BIN=timeout
+fi
+
+in_scope() {
+    local f="$1" base
+    base="$(basename "$f")"
+    [ -f "$f" ] && [ -x "$f" ] || return 1
+    case "$base" in test-*|*.md|*.txt) return 1 ;; esac
+    [ "$(head -c 2 "$f")" = "#!" ] || return 1
+    return 0
+}
+
+targets=()
+if [ "$#" -gt 0 ]; then
+    for name in "$@"; do targets+=("$name"); done
+else
+    for f in "$SRC_BIN"/* "$SRC_BIN"/automouse/*; do
+        in_scope "$f" || continue
+        targets+=("${f#"$SRC_BIN"/}")
+    done
+fi
+
+PASS=0
+FAIL=0
+SKIP=0
+for rel in "${targets[@]}"; do
+    # CI's harness job has no bun. Skip a script whose `env` interpreter is
+    # missing instead of failing on exit 127.
+    interp="$(head -1 "$SRC_BIN/$rel" | sed -n 's|^#!/usr/bin/env \([^ ]*\).*|\1|p')"
+    if [ -n "$interp" ] && ! command -v "$interp" >/dev/null 2>&1; then
+        SKIP=$((SKIP + 1))
+        echo "  skip $rel ($interp not installed)"
+        continue
+    fi
+    : > "$STUB_LOG"
+    out="$TMP/out"
+    err="$TMP/err"
+    (
+        cd "$TMP/home" || exit 99
+        env -i HOME="$TMP/home" PATH="$TMP/stubs:$PATH" TERM=dumb \
+            ${TIMEOUT_BIN:+$TIMEOUT_BIN 15} "$TMP/bin/$rel" --help </dev/null >"$out" 2>"$err"
+    )
+    rc=$?
+    problems=""
+    [ "$rc" -eq 0 ] || problems="exit $rc"
+    [ -s "$out" ] || problems="${problems:+$problems; }empty stdout"
+    if [ -s "$STUB_LOG" ]; then
+        problems="${problems:+$problems; }called $(tr '\n' ',' < "$STUB_LOG" | cut -c1-120)"
+    fi
+    if [ -z "$problems" ]; then
+        PASS=$((PASS + 1))
+        echo "  ok   $rel"
+    else
+        FAIL=$((FAIL + 1))
+        echo "  FAIL $rel ($problems)"
+        [ -s "$err" ] && head -3 "$err" | sed 's/^/       /'
+    fi
+done
+
+echo
+echo "test-bin-help: $PASS passed, $FAIL failed, $SKIP skipped"
+[ "$FAIL" -eq 0 ]

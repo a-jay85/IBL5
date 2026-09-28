@@ -5,6 +5,24 @@
 
 set -u
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/plan-review-digest [--max-chars=N] <plan-file>
+
+Reads a plan at <plan-file> and emits to stdout only the content requiring
+human judgement: the ## Automouse Hold Justification body and any Truly-manual
+Verification Matrix rows.
+
+Options:
+  --max-chars=N   Override the character budget (default 1500, minimum 200).
+                  Also reads PLAN_REVIEW_DIGEST_MAX_CHARS env var (flag wins).
+  --help, -h      Show this message and exit 0.
+
+Exit codes: 0 success, 1 runtime error, 2 usage error.
+EOF
+    exit 0
+fi
+
 DEFAULT_MAX_CHARS=1500  # 1900 (bin/discord-dm CAP) minus 400 reserved for a caller prefix
 MIN_MAX_CHARS=200
 

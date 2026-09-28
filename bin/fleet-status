@@ -91,6 +91,11 @@
 
 set -u
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    sed -n '4,79p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # MAIN CHECKOUT, not "wherever this script was invoked from". bin/post-plan-now

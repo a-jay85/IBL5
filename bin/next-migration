@@ -3,6 +3,22 @@
 # Checks the main repo (not the current worktree) to avoid collisions
 # with migrations added by other branches after the worktree was created.
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/next-migration
+
+Print the next available migration number (zero-padded 3-digit integer).
+Scans the main checkout, canonical root, all origin refs, and sibling
+worktrees to avoid collisions.
+
+Must be run from a worktree, not the main checkout.
+
+Arguments: none
+Exit codes: 0 = number printed, 1 = no migrations found or run from main checkout
+EOF
+    exit 0
+fi
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$(dirname "$0")/lib/git-helpers.sh"
 

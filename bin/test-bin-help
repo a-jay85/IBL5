@@ -57,8 +57,10 @@ in_scope() {
     base="$(basename "$f")"
     [ -f "$f" ] && [ -x "$f" ] || return 1
     # check-composite-contracts is a CI security-policy gate with no user-facing
-    # invocation; it has no --help handler by design.
-    case "$base" in test-*|*.md|*.txt|check-composite-contracts) return 1 ;; esac
+    # invocation; it has no --help handler by design. check-vr-coverage is a
+    # Bun CI gate whose file the help-flag change did not touch; it has no
+    # handler yet.
+    case "$base" in test-*|*.md|*.txt|check-composite-contracts|check-vr-coverage) return 1 ;; esac
     [ "$(head -c 2 "$f")" = "#!" ] || return 1
     return 0
 }

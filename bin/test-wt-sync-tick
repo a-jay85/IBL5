@@ -1112,6 +1112,23 @@ else
     pass "only-backup-fail: no in-progress merge"
 fi
 
+# ── Test 45: only: existing reflog-less backup ref → DIVERGED-CONFLICT ────────
+# Simulates the six live hand-made refs/wt-sync-backup/* that have no reflog.
+# backup_and_reset must refuse; the existing backup SHA must stay unchanged.
+MAIN45="$(new_env)"
+WT45="$(add_worktree "$MAIN45" "wt-stale45" stale-copy)"
+HEAD45_BEFORE="$(git -C "$WT45" rev-parse HEAD)"
+SAVED45="$(git -C "$WT45" rev-parse refs/remotes/origin/wt-stale45)"
+# Write a reflog-less backup ref: no --create-reflog, namespace not in
+# core.logAllRefUpdates=true's auto-set (branches/remotes/notes only).
+git -C "$WT45" update-ref "refs/wt-sync-backup/wt-stale45" "$SAVED45" >/dev/null 2>&1 || true
+run_only "$WT45"
+assert_eq "reflog-guard: DIVERGED-CONFLICT stdout" "DIVERGED-CONFLICT" "$ONLY_OUT"
+assert_eq "reflog-guard: exit 0" "0" "$ONLY_ST"
+assert_eq "reflog-guard: HEAD unchanged" "$HEAD45_BEFORE" "$(git -C "$WT45" rev-parse HEAD)"
+assert_eq "reflog-guard: backup ref preserved" "$SAVED45" \
+    "$(git -C "$WT45" rev-parse --verify -q refs/wt-sync-backup/wt-stale45 2>/dev/null)"
+
 # ── Hook wrapper tests ────────────────────────────────────────────────────────
 HOOK="$SCRIPT_DIR/hooks/wt-sync-session-start.sh"
 # Create a synthetic git env with a linked worktree and a fake tick.

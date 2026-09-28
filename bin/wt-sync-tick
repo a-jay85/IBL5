@@ -144,6 +144,11 @@ backup_and_reset() {   # <wt> <branch> — 0 = backed up + reset; 1 = nothing ch
     fi
     old_sha="$(git -C "$wt" rev-parse --verify --quiet HEAD 2>/dev/null)" || return 1
     [ -n "$old_sha" ] || return 1
+    # Refuse to overwrite an existing backup ref that has no reflog. Without a
+    # reflog the current SHA would be unrecoverable once overwritten.
+    if git -C "$wt" rev-parse --verify --quiet "refs/wt-sync-backup/$branch" >/dev/null 2>&1; then
+        git -C "$wt" reflog exists "refs/wt-sync-backup/$branch" 2>/dev/null || return 1
+    fi
     git -C "$wt" update-ref --create-reflog -m "wt-sync-tick: stale-copy backup" \
         "refs/wt-sync-backup/$branch" "$old_sha" >/dev/null 2>&1 || return 1
     backup_sha="$(git -C "$wt" rev-parse --verify --quiet "refs/wt-sync-backup/$branch" 2>/dev/null)" || return 1

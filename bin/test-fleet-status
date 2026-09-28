@@ -922,7 +922,8 @@ assert_has "watch: refresh footer in first frame" \
 # once the VS Code and tmux paragraphs landed and the sed window in fleet-status
 # grew to match — that window is a hardcoded line range, so a paragraph added to
 # the header silently pushes the tail of --help off the end unless both move.
-HELP_LINES_BASELINE=75
+# 78 once the --watch alternate-screen note landed.
+HELP_LINES_BASELINE=78
 HELP_LINES="$(printf '%s\n' "$HELP" | wc -l | tr -d ' ')"
 [ "$HELP_LINES" -eq "$HELP_LINES_BASELINE" ] \
     && pass "--help line count unchanged" \

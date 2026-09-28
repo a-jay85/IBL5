@@ -142,10 +142,4 @@
     font-weight: bold;
 }
 
-.rookie-option-img {
-    max-width: 120px;
-    border-radius: var(--radius-md);
-    margin: 0 auto 0.75rem;
-}
-
 } /* end @layer components */

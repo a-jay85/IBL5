@@ -1894,6 +1894,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                "verdict": None, "reviewed_tree": None, "verdict_path": None}
         log(f"phase5.5 round {round_num}: model={model} work={rec['work_list_sizes']}")
         sha, terminal = None, False
+        raw_before_round = ""  # pinned to attempt 0; used for the per-round restore
         # The retry lives INSIDE the iteration, so a retry can never advance round_num
         # and the fixer spawn count stays bounded at 2 * MAX_FIDELITY_ROUNDS.
         for attempt in range(_MAX_ROUND_RETRIES + 1):
@@ -1905,6 +1906,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             # every PR whose body was edited by anything else since Phase 4 wrote it.
             raw_before = gh.pr_body_fresh()
             sig_before = _body_signature(raw_before)
+            if attempt == 0:
+                raw_before_round = raw_before
             try:
                 sha = fidelity.remediate(
                     llm, git, out_dir, worktree or ".", packet, current_verdict_path,
@@ -1921,6 +1924,13 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                                                       pr=(pr if isinstance(git, LiveGit) else None)),
                     pr_number=pr, model=model, work_list=work, outcome=outcome)
             except HarnessError as e:
+                if raw_before_round and "## Manual Testing" in raw_before_round:
+                    _live = gh.pr_body_fresh()
+                    if _live:
+                        _fixed, _rev = restore_manual_testing_section(_live, raw_before_round)
+                        if _rev:
+                            gh.pr_edit_body(pr, _fixed)
+                            log(f"phase5.5 round {round_num}: reverted fixer edit to ## Manual Testing")
                 if e.kind == "push-failed":
                     raise
                 # Keep the hook's own words: "local-gate" alone does not say which hook
@@ -1981,6 +1991,13 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             break
         rounds.append(rec)
         res.fidelity["rounds"] = rounds
+        if not sha and raw_before_round and "## Manual Testing" in raw_before_round:
+            _live = gh.pr_body_fresh()
+            if _live:
+                _fixed, _rev = restore_manual_testing_section(_live, raw_before_round)
+                if _rev:
+                    gh.pr_edit_body(pr, _fixed)
+                    log(f"phase5.5 round {round_num}: reverted fixer edit to ## Manual Testing")
         if terminal:
             break
         if not sha:
@@ -1993,7 +2010,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         live_body = gh.pr_body_fresh() or body
         # The Manual Testing section is runner-owned and is the arming gate's input.
         # A fixer that rewords or drops it gets reverted here (#2489).
-        live_body, restored = restore_manual_testing_section(live_body, raw_before)
+        live_body, restored = restore_manual_testing_section(live_body, raw_before_round)
         if restored:
             log(f"phase5.5 round {round_num}: reverted fixer edit to ## Manual Testing")
         body = _apply_backlog_closes(upsert_files_changed(live_body, render_files_changed(git.diff_vs_base())), plan, log)

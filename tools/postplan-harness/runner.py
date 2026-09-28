@@ -2103,8 +2103,9 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
     return res
 
 
-# All three are deterministic walls a full skill re-run cannot climb — see exit_code_for.
-_FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged")
+# All four are deterministic walls a full skill re-run cannot climb — see exit_code_for.
+_FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
+                      "llm-usage-limit")
 
 # Per-class remedy for a local-gate denial. Every arm is still exit 3 -- naming the
 # class only shortens the human's search, it never changes the verdict. "doc-staleness"
@@ -2129,12 +2130,14 @@ _GATE_REMEDY = {
 def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
     3 = fail-closed sentinel: bin/post-plan-now MUST NOT escalate to the /post-plan
-        skill session. Three kinds land here. `rebase-conflict` — a stacked-branch
+        skill session. Four kinds land here. `rebase-conflict` — a stacked-branch
         rebase a human must judge. `local-gate` — a pre-commit/pre-push hook denial
         (ADR trigger, stale doc, rules byte budget). `remote-head-diverged`: the PR
         branch was rewritten on GitHub with content the harness did not produce; a
-        skill re-run would re-rebase and push over it. All three are deterministic,
-        so the ~1M-token skill re-run would hit the identical wall and buy nothing.
+        skill re-run would re-rebase and push over it. `llm-usage-limit`: the Claude
+        CLI returned a session/rate/API limit message; a skill re-run would hit the
+        same wall immediately. All four are deterministic walls the ~1M-token skill
+        re-run cannot climb.
     1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
     0 = shipped (armed or held), nothing to ship, or degraded.
     There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm."""
@@ -2209,10 +2212,16 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             return (f"RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied "
                     f"the commit [class={gate_class}]; ERROR terminal=failed, no PR "
                     f"opened. {detail}{drafted} {_GATE_REMEDY[gate_class]}")
-        # Unknown or None error_kind — name both possible causes so the human knows where to look
-        return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict or local-gate), "
-                "cause unknown; ERROR terminal=failed, no PR opened. "
-                "Resolve the rebase or clear the local gate, then re-run bin/post-plan-now.")
+        if res.error_kind == "llm-usage-limit":
+            detail = _flat(res.error or "")
+            return (f"RESULT: post-plan BLOCKED — Claude usage limit reached (environmental); "
+                    f"ERROR terminal=failed kind=llm-usage-limit. "
+                    + (f"{detail} " if detail else "")
+                    + "Re-run bin/post-plan-now after the limit resets.")
+        # Unknown or None error_kind — name all possible fail-closed causes
+        return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict, local-gate, or "
+                "llm-usage-limit), cause unknown; ERROR terminal=failed, no PR opened. "
+                "Resolve the cause, then re-run bin/post-plan-now.")
     if res.error_kind in ("push-retry-cap", "lostwork-unproved"):
         cause = ("push retry cap reached (stale lease after 3 attempts)"
                  if res.error_kind == "push-retry-cap"

@@ -11,6 +11,9 @@ set -euo pipefail
 HELPER="$(cd "$(dirname "$0")/.." && pwd)/bin/lib/plan-matrix-assertions"
 MATRIX_ASSERTIONS_SCRIPT="$HELPER"
 
+# Scratch-repo commits need an identity; CI runners have none configured.
+export GIT_AUTHOR_NAME=T GIT_AUTHOR_EMAIL=t@t.com GIT_COMMITTER_NAME=T GIT_COMMITTER_EMAIL=t@t.com
+
 FAILED=0
 
 ok() { printf 'PASS %s\n' "$1"; }

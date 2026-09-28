@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/lib/plan-matrix-assertions — Verification Matrix assertion-footprint checker.
+#
+# Usage:
+#   bin/lib/plan-matrix-assertions <plan-file> [<diff-file>|-] [<pr-body-file>]
+#     $2 absent or "-"   -> read the unified diff from stdin
+#     $3 absent or ""    -> no waivers
+#     env MATRIX_ASSERT_ROOT (optional) -> tree root for the tree-grep arm;
+#         set-but-empty disables the arm; unset -> `git rev-parse --show-toplevel`
+#         of the cwd, or no tree arm when that fails or git is not on PATH
+#   stdout: one `UNREALISED-ASSERTION: row <id> -- <What-to-verify cell>` line per unresolved row
+#   stderr: one `  missing: <tok> <tok>...` line after each stdout report line
+#   exit 0 -> ran (with or without report lines; the caller decides severity)
+#   exit 2 -> usage error: $1 empty or unreadable, $2 not "-" and unreadable,
+#             $3 non-empty and unreadable
+#   no Verification Matrix header in the plan -> exit 0, no output
+#
+# Token classification (four arms, checked in order):
+#   A single-word backtick token from the "What to verify" cell is evaluated as:
+#   1. present in a diff `+` line (excluding `+++` headers)  -> realised
+#   2. present in a diff context line (leading space or `-`)  -> pre-existing, skip
+#   3. present in a tracked file via `git grep -F`            -> pre-existing, skip
+#   4. otherwise                                               -> missing
+#   A row is flagged UNREALISED-ASSERTION when any qualifying token is missing.
+#   Qualifying tokens: single-word (no whitespace), no `...` or `<word>` spans,
+#   not already in a tracked file (arm 3 above — tokens found in the tree are pre-existing).
+#   A row with zero qualifying tokens is skipped entirely.
+#
+# Waiver format: `WAIVE-MATRIX-ROW: <id>` on any line in the PR body file.
+
+set -euo pipefail
+set -f
+# Force the C locale — deterministic byte-wise matching across locales.
+export LC_ALL=C
+
+# --- argument checks (exit 2 on usage error) ---
+PLAN_FILE="${1:-}"
+DIFF_ARG="${2:-}"
+BODY_ARG="${3:-}"
+
+if [ -z "$PLAN_FILE" ] || [ ! -r "$PLAN_FILE" ]; then
+    echo "Usage: bin/lib/plan-matrix-assertions <plan-file> [<diff-file>|-] [<pr-body-file>]" >&2
+    exit 2
+fi
+if [ -n "$DIFF_ARG" ] && [ "$DIFF_ARG" != "-" ] && [ ! -r "$DIFF_ARG" ]; then
+    echo "plan-matrix-assertions: diff file not readable: $DIFF_ARG" >&2
+    exit 2
+fi
+if [ -n "$BODY_ARG" ] && [ ! -r "$BODY_ARG" ]; then
+    echo "plan-matrix-assertions: body file not readable: $BODY_ARG" >&2
+    exit 2
+fi
+
+# --- check for Verification Matrix header ---
+grep -qiE '\|[[:space:]]*What to verify[[:space:]]*\|' "$PLAN_FILE" || exit 0
+
+# --- working directory ---
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+# --- diff -> $TMP/diff ---
+if [ -z "$DIFF_ARG" ] || [ "$DIFF_ARG" = "-" ]; then
+    cat > "$TMP/diff"
+else
+    cp "$DIFF_ARG" "$TMP/diff"
+fi
+
+# --- PLUS set: added lines (strip leading +, exclude +++ headers) ---
+grep -E '^\+' "$TMP/diff" | grep -vE '^\+\+\+' | sed 's/^+//' > "$TMP/plus" || true
+
+# --- CTX set: context/removed lines (strip leading space or -, exclude --- headers) ---
+grep -E '^[ -]' "$TMP/diff" | grep -vE '^---' | sed 's/^[ -]//' > "$TMP/ctx" || true
+
+# --- WAIVERS ---
+if [ -n "$BODY_ARG" ]; then
+    grep -oE 'WAIVE-MATRIX-ROW:[[:space:]]*[0-9A-Za-z.-]+' "$BODY_ARG" \
+        | sed -E 's/^WAIVE-MATRIX-ROW:[[:space:]]*//' > "$TMP/waived" || true
+else
+    : > "$TMP/waived"
+fi
+
+# --- tree-grep root ---
+if [ "${MATRIX_ASSERT_ROOT+set}" = "set" ]; then
+    # Variable is set (possibly empty): use as-is; empty disables the arm
+    ROOT="$MATRIX_ASSERT_ROOT"
+else
+    # Variable unset: try to resolve from cwd
+    ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || ROOT=""
+fi
+
+# --- extract rows from the Verification Matrix (awk, BSD-awk safe) ---
+# Skips rows inside fenced blocks (``` or ~~~).
+# Skips duplicate row ids (same row can appear multiple times in the plan).
+# Output: id TAB cell TAB space-joined qualifying tokens
+# Rows with zero qualifying tokens are not printed.
+awk -F'|' '
+BEGIN { fence=0; inm=0; }
+/^[[:space:]]*(```|~~~)/ {
+    fence = !fence;
+    inm = 0;
+    next;
+}
+fence { next; }
+/\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
+inm && /^[[:space:]]*\|/ {
+    # escape literal \| so it does not split a cell
+    line = $0;
+    gsub(/\\\|/, "\001", line);
+    n = split(line, f, "|");
+    if (n < 3) { next; }
+    id = f[2]; gsub(/^[[:space:]]+|[[:space:]]+$/, "", id);
+    cell = f[3]; gsub(/\001/, "|", cell); gsub(/\t/, " ", cell);
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", cell);
+    # skip separator row
+    if (cell ~ /^[[:space:]:-]*$/) next;
+    # skip already-seen id
+    if (seen[id]) next;
+    seen[id] = 1;
+    # extract closed single-word backtick tokens
+    toks = "";
+    n2 = split(cell, parts, "`");
+    for (i = 2; i < n2; i += 2) {
+        t = parts[i];
+        if (t == "") continue;
+        # single-word: no whitespace
+        if (t ~ /[[:space:]]/) continue;
+        toks = (toks == "") ? t : toks " " t;
+    }
+    if (toks != "") print id "\t" cell "\t" toks;
+    next;
+}
+inm && !/^[[:space:]]*\|/ { inm=0; }
+' "$PLAN_FILE" > "$TMP/rows"
+
+# --- per-row check ---
+while IFS=$'\t' read -r id cell toks; do
+    # check waiver
+    if grep -qxF -e "$id" "$TMP/waived" 2>/dev/null; then
+        continue
+    fi
+
+    missing=""
+    for tok in $toks; do
+        # filter: drop tokens with placeholder chars (... or <word>)
+        case "$tok" in
+            *...* | *\<*\>* ) continue ;;
+        esac
+
+        # arm 1: present in a plus line -> realised
+        if grep -qF -e "$tok" "$TMP/plus" 2>/dev/null; then
+            continue
+        fi
+
+        # arm 2: present in a context line -> pre-existing
+        if grep -qF -e "$tok" "$TMP/ctx" 2>/dev/null; then
+            continue
+        fi
+
+        # arm 3: tree-grep -> pre-existing if found
+        if [ -n "$ROOT" ]; then
+            if git -C "$ROOT" grep -qF -e "$tok" -- 2>/dev/null; then
+                continue
+            fi
+        fi
+
+        # arm 4: missing
+        missing="$missing $tok"
+    done
+
+    if [ -n "$missing" ]; then
+        printf $'UNREALISED-ASSERTION: row %s \xe2\x80\x94 %s\n' "$id" "$cell"
+        printf '  missing:%s\n' "$missing" >&2
+    fi
+done < "$TMP/rows"

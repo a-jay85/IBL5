@@ -1,13 +1,13 @@
 ---
-description: Full Phase 5 how-to for plan-to-test, plan-to-file, and diff-to-plan conformance checks run during post-plan.
-last_verified: 2026-09-22
+description: Full Phase 5 how-to for plan-to-test, plan-to-file, diff-to-plan, and assertion-footprint conformance checks run during post-plan.
+last_verified: 2026-09-27
 ---
 
 # Phase 5 — Final Verification (post-plan reference)
 
 Purpose: the full Phase 5 final-verification how-to (all prose steps + all bash blocks).
 
-### Phase 5.0: Plan→test, Plan→file & autonomy-contract conformance — skip if `PLAN_FOUND=none`; the matrix-derived sub-checks additionally skip if `! $HAS_MATRIX`
+### Phase 5.0: Plan→test, Plan→file, diff→plan, assertion-footprint & autonomy-contract conformance. Skip if `PLAN_FOUND=none`; the matrix-derived sub-checks additionally skip if `! $HAS_MATRIX`
 
 At Phase 5.0 START, clear the conformance bridge file AND remove the done-marker, so each run begins from a clean slate. An empty bridge file alone is **not** enough to mean "nothing unresolved" — it is byte-identical to "5.0 died before writing anything", which is why the separate done-marker exists (Phase 6.5 condition (3) treats a missing marker as indeterminate → BLOCKED):
 
@@ -189,7 +189,35 @@ if [ "$PLAN_FOUND" != "none" ]; then
 fi
 ```
 
-At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:`, `MISSING-FILE:`, `UNPLANNED-FILE:`, `MISSING-METHOD:` and `UNMET-CONTRACT:` item (label + path-or-method-name + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
+**Assertion-footprint conformance (Phase 5.0e).** The test-path check above proves a planned test file landed. It cannot tell whether that file asserts what the matrix row promised. A delegate can write the file with one property where the row named four. This check hands the plan, the diff body and the PR body to `bin/lib/plan-matrix-assertions`. The helper reads each behavioral Verification Matrix row's assertion tokens, looks for each one in the diff body, and prints one `UNREALISED-ASSERTION:` line per token the diff never wrote. It drops any row the PR body waives. Token extraction and the waiver format are defined in the helper's header comment. This block only wires the helper in.
+
+```bash
+# Phase 5.0e: assertion footprint. Isolated shell: regenerate every input here.
+if [ "${PLAN_FOUND:-none}" != "none" ]; then
+  ROOT="$(git rev-parse --show-toplevel)"
+  DIFF="/tmp/post-plan-diff-$PPID"
+  BODY="/tmp/post-plan-pr-body-$PPID"
+  # Regenerate: a fix made earlier in 5.0 may have moved HEAD since 5.0 wrote it.
+  git diff origin/master...HEAD > "$DIFF"
+  # No PR yet on a first run -> empty body -> no waiver applies (fail-closed).
+  gh pr view --json body --jq '.body' > "$BODY" 2>/dev/null || : > "$BODY"
+  OUT=$("$ROOT/bin/lib/plan-matrix-assertions" "$PLAN_FILE" "$DIFF" "$BODY" 2>&1)
+  rc=$?
+  printf '%s\n' "$OUT" | grep '^UNREALISED-ASSERTION:' || true
+  if [ "$rc" -ge 2 ]; then
+    # A parse or usage error is indeterminate. Surface it as an unresolved item
+    # so condition (3) holds; a silent skip would fail OPEN.
+    echo "UNREALISED-ASSERTION: helper exited $rc (indeterminate): $(printf '%s\n' "$OUT" | tail -n 1)"
+  fi
+  rm -f "$BODY"
+fi
+```
+
+For each `UNREALISED-ASSERTION:`, the diff never wrote an assertion a matrix row planned. Resolve it one of three ways: (a) author the missing assertion, run it green, and checkpoint; (b) when the row's behavior was cut from the implementation, add a waiver for that row to the PR body in the format the helper's header comment gives, then re-run `/post-plan`; (c) when the item reads `helper exited`, fix the cause it prints and re-run. An item resolved by (a), (b) or (c) is **resolved**. Anything else is **unresolved** and reaches the bridge at 5.0 END through the append step below. Do not write the bridge file inline here, for the same reason given under Diff→plan conformance above.
+
+On a first run no PR exists, so the body file is empty and no waiver applies. Path (b) is a re-run clearance, the same as `## Declared scope` above. Scope: skill path only. `tools/postplan-harness` computes conformance in-process and does not run this block.
+
+At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:`, `MISSING-FILE:`, `UNPLANNED-FILE:`, `MISSING-METHOD:`, `UNREALISED-ASSERTION:` and `UNMET-CONTRACT:` item (label + path-or-method-name + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
 
 Then — **last action of Phase 5.0, after the appends above** — write the done-marker:
 

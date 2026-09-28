@@ -6,9 +6,13 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import PurePosixPath
 
 from .state import PhaseInfo, PlanInfo
+
+_MATRIX_ASSERTIONS_SCRIPT = str(
+    PurePosixPath(os.path.abspath(__file__)).parents[3] / "bin" / "lib" / "plan-matrix-assertions")
 
 
 def _contract_items(plan: PlanInfo, changed_files: list[str],
@@ -128,11 +132,51 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str]) -> list[str]:
     return items
 
 
+def _matrix_assertion_argv(script: str, plan_path: str, diff_path: str,
+                           body_path: str) -> list[str]:
+    return [script, plan_path, diff_path, body_path]
+
+
+def _matrix_assertion_items(plan: PlanInfo, diff_body: str, pr_body: str,
+                            script: str | None = None) -> list[str]:
+    """`UNREALISED-ASSERTION:` items from bin/lib/plan-matrix-assertions.
+
+    Fail-CLOSED on an unrunnable script (OSError, exit >= 2): a gate that reports
+    clean when it could not run is the silent pass this check exists to remove.
+
+    An empty `plan.path` means the plan came from `content_override` (replay
+    fixtures, hand-built PlanInfo in tests): there is no file for the script to
+    read, so the check does not apply. A live plan always carries its disk path.
+    """
+    if not plan.path:
+        return []
+    script = script or _MATRIX_ASSERTIONS_SCRIPT
+    with tempfile.TemporaryDirectory(prefix="matrix-assert-") as td:
+        diff_path = os.path.join(td, "diff.patch")
+        body_path = os.path.join(td, "pr-body.md")
+        with open(diff_path, "w") as fh:
+            fh.write(diff_body)
+        with open(body_path, "w") as fh:
+            fh.write(pr_body or "")
+        try:
+            proc = subprocess.run(
+                _matrix_assertion_argv(script, plan.path, diff_path, body_path),
+                capture_output=True, text=True, check=False)
+        except OSError as e:
+            return [f"UNREALISED-ASSERTION: matrix-assertion check unavailable ({e.__class__.__name__})"]
+    if proc.returncode >= 2 or proc.returncode < 0:
+        first = (proc.stderr.strip().splitlines() or ["no stderr"])[0][:120]
+        return [f"UNREALISED-ASSERTION: matrix-assertion check unavailable (exit {proc.returncode}: {first})"]
+    return [ln.strip() for ln in proc.stdout.splitlines()
+            if ln.strip().startswith("UNREALISED-ASSERTION:")]
+
+
 def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
           phase5_status: str | None = None,
-          resolutions: dict[str, str] | None = None) -> list[str]:
+          resolutions: dict[str, str] | None = None,
+          pr_body: str = "") -> list[str]:
     """Returns unresolved `MISSING:` / `MISSING-FILE:` / `MISSING-METHOD:` /
-    `UNMET-CONTRACT:` / `MISSING-PHASE:` items (empty = clean).
+    `UNMET-CONTRACT:` / `MISSING-PHASE:` / `UNREALISED-ASSERTION:` items (empty = clean).
 
     `UNMET-CONTRACT:` items are produced even when the plan has no Verification
     Matrix — a matrix-less doc/tooling plan is exactly what `evidence-present`
@@ -174,6 +218,7 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
         for m in plan.required_test_methods:
             if not re.search(rf"(function|def)\s+{re.escape(m)}\b", diff_body):
                 items.append(f"MISSING-METHOD: {m} (plan required a test method the diff never wrote)")
+        items.extend(_matrix_assertion_items(plan, diff_body, pr_body))
     return items
 
 

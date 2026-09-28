@@ -43,6 +43,19 @@ ON DUPLICATE KEY UPDATE team_name = VALUES(team_name), team_city = VALUES(team_c
 -- consumed by the enqueue-endpoint authz DB-integration test (isKnownDiscordID true-path).
 UPDATE ibl_team_info SET discord_id = '100000000000000001' WHERE teamid = 1;
 
+-- Retired franchise branding (ADR-0136). Migration 182 ships these same rows, but CI
+-- applies migrations before importing this seed, so ibl_team_info is empty at that
+-- point and fk_era_franchise rejects every row of the migration's INSERT IGNORE.
+-- Re-insert them here, after ibl_team_info is populated. uk_era makes this idempotent.
+INSERT INTO ibl_franchise_era_branding (franchise_id, team_city, team_name, color1, color2) VALUES
+  ( 4, 'Brooklyn',      'Nets',        '000000', 'FFFFFF'),
+  (10, 'Charlotte',     'Hornets',     '00788C', '1D1160'),
+  (16, 'Oklahoma City', 'Thunder',     '007AC1', 'EF6F31'),
+  (16, 'Las Vegas',     'Thunder',     '1C1C1C', 'F5C518'),
+  (17, 'San Antonio',   'Spurs',       'C4CED4', '000000'),
+  (22, 'Seattle',       'Supersonics', '00653A', 'FFC200')
+ON DUPLICATE KEY UPDATE color1 = VALUES(color1), color2 = VALUES(color2);
+
 -- Players: PID 1 (rostered on Metros), PID 2 (free agent)
 INSERT INTO ibl_plr (pid, name, age, teamid, pos, stamina, exp, bird, cy, cyt, salary_yr1, salary_yr2, retired, ordinal, droptime, uuid)
 VALUES (1, 'Test Player One', 27, 1, 'PG', 80, 5, 3, 1, 3, 1500, 1600, 0, 1, 0, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')

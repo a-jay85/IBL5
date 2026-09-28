@@ -315,7 +315,7 @@ printf '%s\n' "$CONF_OUT"
 **Exit 0 (clean):** proceed to Step 7.
 
 **Exit 1 (unresolved items found):** the check printed one `MISSING:` or `MISSING-FILE:` line per unresolved item. Fix each one now:
-- `MISSING-FILE: <path>` means a Critical File listed in the plan was never written. Write it, checkpoint, and re-run the check.
+- `MISSING-FILE: <path>` means a Critical File listed in the plan was never written. Write it, checkpoint, and re-run the check. **Exception:** if the path is a migration or ADR that was renumbered per Step 6 (the plan named `123_x.sql` but you created `125_x.sql`), the conformance check matches by the plan's original name and will always report it missing — the file exists under the new number. Do not write the file under the stale number. Note the renumber in your handoff instead.
 - `MISSING: <path>` means a matrix-declared test path was never written. Write it, checkpoint, and re-run the check.
 
 After fixing, re-run the block above and confirm exit 0 before proceeding to Step 7.

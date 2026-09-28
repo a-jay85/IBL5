@@ -505,6 +505,8 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
                      "offset/limit if a finding points past this cut]\n")
     pr_note = (f"\nPR body findings: when a blocking finding is about the PR body, "
                f"fix it with `gh pr edit {pr_number} --body-file <path>`.\n"
+               "Never edit the `## Manual Testing` section. The runner owns it and reverts\n"
+               "any change to it.\n"
                if pr_number is not None else "")
     prompt = (
         "Remediate the blocking findings from the plan-intent fidelity review.\n\n"

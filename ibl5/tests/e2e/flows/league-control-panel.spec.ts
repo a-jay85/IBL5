@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { setAward } from '../helpers/test-state';
+import { publicStorageState } from '../helpers/public-storage-state';
 
 // Finals MVP flow — sets Finals MVP for the current season year.
 // Uses auth fixture (admin access required for leagueControlPanel.php).
@@ -171,11 +172,83 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
     ]);
   });
 
-  test('export endpoint returns 403 without a CSRF token', async ({ page }) => {
+  test('export endpoint returns 403 without a CSRF token and issues a fresh one', async ({ page }) => {
     const response = await page.request.post('leagueControlPanel.php', {
       form: { export: 'active_players' },
     });
     expect(response.status()).toBe(403);
+    const json = (await response.json()) as { error?: string; csrfToken?: string };
+    expect(json.error).toContain('Invalid or expired');
+    // The reply must carry a session-bound replacement so the admin can retry
+    // without reloading the page (backlog #789).
+    expect(typeof json.csrfToken).toBe('string');
+    expect((json.csrfToken ?? '').length).toBeGreaterThan(0);
+
+    // page.request shares the page context's cookie jar, so the token issued to
+    // this session validates on the very next POST from the same context.
+    const retry = await page.request.post('leagueControlPanel.php', {
+      form: { export: 'active_players', _csrf_token: json.csrfToken ?? '' },
+    });
+    expect(retry.status()).toBe(200);
+    const retryJson = (await retry.json()) as { url?: string; csrfToken?: string };
+    expect(retryJson.url).toContain('download=');
+    expect(typeof retryJson.csrfToken).toBe('string');
+  });
+
+  test('unauthenticated export POST is refused and never receives a CSRF token', async ({ browser }) => {
+    const anon = await browser.newContext({ storageState: publicStorageState() });
+    const response = await anon.request.post('leagueControlPanel.php', {
+      form: { export: 'active_players' },
+      maxRedirects: 0,
+    });
+    // is_user() fails first: the auth guard redirects to the login page before
+    // any export or CSRF code runs, so nothing JSON-shaped comes back.
+    expect(response.status()).toBeGreaterThanOrEqual(300);
+    expect(response.status()).toBeLessThan(400);
+    expect(response.headers()['content-type'] ?? '').not.toContain('application/json');
+    expect(await response.text()).not.toContain('csrfToken');
+    await anon.close();
+  });
+
+  test('a stale button token yields a 403 whose fresh token lets the next click succeed without a reload', async ({ page }) => {
+    await page.goto('leagueControlPanel.php');
+    await assertNoPhpErrors(page, 'on LCP before stale-token retry');
+    const button = page.locator('#lcp-active-players-export button');
+    await expect(button).toBeEnabled();
+
+    // Mark the live document; a full reload would drop this attribute.
+    await page.evaluate(() => {
+      document.body.dataset.lcpNoReloadMarker = '1';
+      const b = document.querySelector<HTMLButtonElement>('#lcp-active-players-export button');
+      b!.dataset.csrfToken = 'stale-token-from-an-old-tab';
+    });
+
+    const [first] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('leagueControlPanel.php') && r.request().method() === 'POST',
+      ),
+      button.click(),
+    ]);
+    expect(first.status()).toBe(403);
+    const firstJson = (await first.json()) as { error?: string; csrfToken?: string };
+    expect((firstJson.csrfToken ?? '').length).toBeGreaterThan(0);
+
+    // The inline script stores data.csrfToken from every response, error or not.
+    await expect(button).toHaveAttribute('data-csrf-token', firstJson.csrfToken ?? '');
+    await expect(page.locator('#lcp-active-players-export .lcp-export-result')).toContainText('Invalid or expired');
+    await expect(button).toBeEnabled();
+
+    const [second] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('leagueControlPanel.php') && r.request().method() === 'POST',
+      ),
+      button.click(),
+    ]);
+    expect(second.status()).toBe(200);
+    const secondJson = (await second.json()) as { url?: string };
+    expect(secondJson.url).toContain('download=');
+
+    expect(await page.evaluate(() => document.body.dataset.lcpNoReloadMarker)).toBe('1');
   });
 
   test('export endpoint rejects GET', async ({ page }) => {

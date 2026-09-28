@@ -30,7 +30,8 @@ $csvExporter = new LeagueControlPanel\ActivePlayersCsvExporter($repository);
 
 // POST export=active_players → write CSV to temp dir, reply with its download URL (JSON).
 // Writes a file, so it is POST + CSRF like every other LCP action; the reply carries a
-// fresh token because tokens are single-use and the button can be clicked again.
+// fresh token on every JSON reply (success, 500, and CSRF 403) because tokens are
+// single-use and the button can be clicked again without a page reload.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['export'] ?? null) === 'active_players') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
@@ -43,7 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['export'] ?? null) === 'act
 
     if (!\Security\CsrfGuard::validateSubmittedToken('lcp_export_active_players')) {
         http_response_code(403);
-        echo json_encode(['error' => 'Invalid or expired form submission. Please reload and try again.']);
+        echo json_encode([
+            'error' => 'Invalid or expired form submission. Please try again.',
+            'csrfToken' => \Security\CsrfGuard::generateRawToken('lcp_export_active_players'),
+        ]);
         exit;
     }
 

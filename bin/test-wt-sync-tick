@@ -1056,6 +1056,62 @@ else
     pass "stale-dry: no backup ref written"
 fi
 
+# ── Test 42: only: dirty stale copy → DIVERGED-DIRTY, HEAD/edit preserved ─────
+MAIN42="$(new_env)"
+WT42="$(add_worktree "$MAIN42" "wt-stale42" stale-copy)"
+HEAD42_BEFORE="$(git -C "$WT42" rev-parse HEAD)"
+printf 'dirty\n' >> "$WT42/README.md"
+CONTENT42_BEFORE="$(cat "$WT42/README.md")"
+run_only "$WT42"
+assert_eq "only-dirty-stale: DIVERGED-DIRTY stdout" "DIVERGED-DIRTY" "$ONLY_OUT"
+assert_eq "only-dirty-stale: exit 0" "0" "$ONLY_ST"
+assert_eq "only-dirty-stale: HEAD unchanged" "$HEAD42_BEFORE" "$(git -C "$WT42" rev-parse HEAD)"
+assert_eq "only-dirty-stale: tracked edit preserved" "$CONTENT42_BEFORE" "$(cat "$WT42/README.md")"
+if git -C "$WT42" rev-parse --verify -q refs/wt-sync-backup/wt-stale42 >/dev/null 2>&1; then
+    failcase "only-dirty-stale: backup ref written on dirty stale"
+else
+    pass "only-dirty-stale: no backup ref"
+fi
+
+# ── Test 43: only: untracked-file stale copy → DIVERGED-DIRTY ─────────────────
+MAIN43="$(new_env)"
+WT43="$(add_worktree "$MAIN43" "wt-stale43" stale-copy)"
+HEAD43_BEFORE="$(git -C "$WT43" rev-parse HEAD)"
+printf 'untracked\n' > "$WT43/untracked.txt"
+run_only "$WT43"
+assert_eq "only-untracked-stale: DIVERGED-DIRTY stdout" "DIVERGED-DIRTY" "$ONLY_OUT"
+assert_eq "only-untracked-stale: exit 0" "0" "$ONLY_ST"
+assert_eq "only-untracked-stale: HEAD unchanged" "$HEAD43_BEFORE" "$(git -C "$WT43" rev-parse HEAD)"
+if [ -f "$WT43/untracked.txt" ]; then
+    pass "only-untracked-stale: untracked file preserved"
+else
+    failcase "only-untracked-stale: untracked file removed"
+fi
+if git -C "$WT43" rev-parse --verify -q refs/wt-sync-backup/wt-stale43 >/dev/null 2>&1; then
+    failcase "only-untracked-stale: backup ref written on untracked stale"
+else
+    pass "only-untracked-stale: no backup ref"
+fi
+
+# ── Test 44: only: backup failure → DIVERGED-CONFLICT, HEAD unchanged ────────
+# Force a D/F collision: create a ref with the branch name as a directory
+# component so refs/wt-sync-backup/<branch> can't be created as a file ref.
+MAIN44="$(new_env)"
+WT44="$(add_worktree "$MAIN44" "wt-stale44" stale-copy)"
+HEAD44_BEFORE="$(git -C "$WT44" rev-parse HEAD)"
+# Pre-create wt-stale44/child so wt-stale44 becomes a directory in the ref namespace
+git -C "$WT44" update-ref "refs/wt-sync-backup/wt-stale44/child" HEAD >/dev/null 2>&1 || true
+run_only "$WT44"
+assert_eq "only-backup-fail: DIVERGED-CONFLICT stdout" "DIVERGED-CONFLICT" "$ONLY_OUT"
+assert_eq "only-backup-fail: exit 0" "0" "$ONLY_ST"
+assert_eq "only-backup-fail: HEAD unchanged" "$HEAD44_BEFORE" "$(git -C "$WT44" rev-parse HEAD)"
+# Confirm no in-progress merge was left
+if git -C "$WT44" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+    failcase "only-backup-fail: in-progress merge left"
+else
+    pass "only-backup-fail: no in-progress merge"
+fi
+
 # ── Hook wrapper tests ────────────────────────────────────────────────────────
 HOOK="$SCRIPT_DIR/hooks/wt-sync-session-start.sh"
 # Create a synthetic git env with a linked worktree and a fake tick.

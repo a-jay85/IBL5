@@ -214,6 +214,23 @@ on_demand_sync() {
     if has_uncommitted_changes "$wt" || has_untracked_files "$wt"; then
         _only_emit "$wt" "$branch" "DIVERGED-DIRTY"; return 0
     fi
+    # Stale copy: every local-only commit is already on origin by content
+    # (a squash-merged parent). Back up HEAD, then hard-reset to origin.
+    # This runs after the dirty gate on purpose: a reset must never touch
+    # uncommitted or untracked work.
+    if is_stale_copy "$wt" "$branch"; then
+        if [ "$DRY_RUN" = true ]; then
+            _only_emit "$wt" "$branch" "RESET-STALE"
+            printf '[dry-run] no git write performed\n' >&2
+            return 0
+        fi
+        if backup_and_reset "$wt" "$branch" >/dev/null 2>&1; then
+            _only_emit "$wt" "$branch" "RESET-STALE"
+        else
+            _only_emit "$wt" "$branch" "DIVERGED-CONFLICT"
+        fi
+        return 0
+    fi
     if [ "$DRY_RUN" = true ]; then
         if git -C "$wt" merge-tree --write-tree "HEAD" "origin/$branch" >/dev/null 2>&1; then
             _only_emit "$wt" "$branch" "MERGED"

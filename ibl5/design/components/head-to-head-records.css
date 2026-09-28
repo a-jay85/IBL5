@@ -50,6 +50,55 @@
     opacity: 0.8;
 }
 
+/* Row labels are <th scope="row"> for screen readers. Undo the shared
+   .ibl-data-table th header look and re-apply the td-keyed sticky-column
+   rules from tables.css (sticky shadow, zebra fill, team background) that
+   no longer match a th. Specificity (0,2,2) beats .ibl-data-table th (0,1,1)
+   and stays below .h2h-user-row th[scope="row"] (0,3,1), so the user-row
+   bold still wins. */
+.h2h-matrix tbody th[scope="row"] {
+    color: var(--gray-800);
+    font-family: inherit;
+    font-weight: inherit;
+    text-transform: none;
+    letter-spacing: normal;
+    line-height: inherit;
+    text-align: center;
+    box-shadow: var(--shadow-sticky-col);
+    border-right: 1px solid var(--gray-100);
+}
+
+.h2h-matrix tbody tr:nth-child(odd) th[scope="row"]:not(.ibl-team-cell--colored) {
+    background-color: white;
+}
+
+.h2h-matrix tbody tr:nth-child(even) th[scope="row"]:not(.ibl-team-cell--colored) {
+    background-color: var(--gray-50);
+}
+
+.h2h-matrix tbody tr:hover th[scope="row"]:not(.ibl-team-cell--colored) {
+    background-color: var(--gray-100);
+}
+
+.h2h-matrix tbody th[scope="row"].ibl-team-cell--colored {
+    text-align: left;
+    background-color: var(--team-cell-bg);
+}
+
+/* tables.css gives mobile th a larger font and more padding than td, and
+   centres logo-only team cells. Match the td row label: (0,3,2) beats the
+   mobile .ibl-data-table:not(…):not(…) th (0,3,1). */
+@media (max-width: 768px) {
+    .ibl-data-table.h2h-matrix tbody th[scope="row"] {
+        font-size: 0.85rem;
+        padding-block: 0.375rem;
+    }
+
+    .ibl-data-table.h2h-matrix tbody th[scope="row"].ibl-team-cell--colored {
+        text-align: center;
+    }
+}
+
 /* The shared .ibl-team-cell--colored rule paints the label text in the team's
    secondary colour, which on this page lands green-on-purple, blue-on-red and
    pink-on-cyan. White reads on every primary. Scoped to the row-label cell so
@@ -155,6 +204,7 @@
    h2h-col-hover). An overlay gradient works on top of any cell colour,
    which a plain background-color swap could not. */
 .h2h-matrix tbody tr:hover td,
+.h2h-matrix tbody tr:hover th[scope="row"],
 .h2h-matrix .h2h-col-hover {
     background-image: linear-gradient(rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.12));
 }
@@ -165,11 +215,13 @@
 
 /* Logged-in user's own row and column: bold plus an accent bar */
 .h2h-matrix .h2h-user-row td,
+.h2h-matrix .h2h-user-row th[scope="row"],
 .h2h-matrix .h2h-user-col {
     font-weight: 700;
 }
 
-.h2h-matrix .h2h-user-row td.sticky-col {
+.h2h-matrix .h2h-user-row td.sticky-col,
+.h2h-matrix .h2h-user-row th[scope="row"].sticky-col {
     box-shadow: inset 4px 0 0 var(--accent-500), var(--shadow-sticky-col);
 }
 

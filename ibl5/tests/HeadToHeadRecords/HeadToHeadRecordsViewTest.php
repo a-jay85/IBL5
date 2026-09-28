@@ -119,6 +119,24 @@ class HeadToHeadRecordsViewTest extends TestCase
         self::assertStringNotContainsString('href="modules.php?name=Team', $html);
     }
 
+    public function testRowLabelIsARowHeaderCell(): void
+    {
+        $html = $this->view->renderMatrix($this->makePlayedPayload(), []);
+
+        self::assertStringContainsString('<th scope="row" class="sticky-col h2h-row-label', $html);
+        self::assertStringNotContainsString('<td class="sticky-col h2h-row-label', $html);
+        self::assertSame(
+            substr_count($html, 'h2h-row-label'),
+            substr_count($html, '<th scope="row"'),
+        );
+
+        $start = strpos($html, '<th scope="row"');
+        self::assertIsInt($start);
+        $next = strpos($html, '<td', $start);
+        self::assertIsInt($next);
+        self::assertStringEndsWith('</th>', trim(substr($html, $start, $next - $start)));
+    }
+
     // ---------------------------------------------------------------------------
     // Table shell: sticky pattern + corner cell
     // ---------------------------------------------------------------------------

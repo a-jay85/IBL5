@@ -177,6 +177,8 @@ The pressure runs one way only. A *reducible* hold (one a buildable check would 
 
 The final clause (that every settleable sentence of a justification is an unwritten matrix row) exists because hold justifications drift into instructions. A justification that tells the human to go run something has not identified an irreducible judgment; it has deferred an observable claim. `bin/check-plan` gate `[H]` catches the ask-shaped phrasing, but the gate is a narrow pattern check and passing it is the floor.
 
+**Incident record.** Gate 15's second arm exists because PR #1753 held on 14(b), so arm 1 never ran, and a roster-blind recap could have no-op'd in prod indefinitely with CI green. The decision-only rule for hold justifications exists because `~/claude-plans/maint-2-13-freeagency-admin-split.md` verified a namespace move with matrix rows 9, 10, 14, 30 and 43, then asked the human to confirm those same properties again at the merge button.
+
 ## Delegation packets: the `Rules:` field
 
 ### Rules field: worked examples

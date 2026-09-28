@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-09-24
+last_verified: 2026-09-28
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -201,11 +201,8 @@ with `AskUserQuestion` now, while the human is still in the room to answer.
 
 ## Step 5 — Fire, then report
 
-**Do not print the block in the conversation.** It runs to a hundred lines or more and
-nobody reads it there — it exists to reach a headless Sonnet session, not your output.
-If it misreads the intent, that surfaces at the PR, which is the cheaper place to catch
-it. Printing it also manufactures this step's characteristic failure: a long emitted
-artifact *feels* like the work landed, and a fire gets reported that never happened.
+**Do not print the block in the conversation.** It exists to reach a headless Sonnet
+session, and a long printed artifact reads as if the fire happened when it did not.
 The block goes to a file and to `bin/plan-now`; the conversation gets the report in
 step 3.
 
@@ -262,11 +259,9 @@ step 3.
    for f in "$f1" "$f2" "$f3"; do bin/plan-now "$f"; done
    ```
 
-   No spacing between the calls is needed. Each `bin/plan-now` is its own process and
-   its launchd label carries that process's PID, so same-second fires cannot collide
-   (fixed 2026-08-30 — `TS=$(date +%Y%m%d-%H%M%S)-$$` in `bin/plan-now`). Any older
-   advice to `sleep` between fires is stale. Then confirm the count — one live label
-   per block, and report the log path each call printed:
+   No spacing between the calls is needed: each `bin/plan-now` launchd label carries
+   its own process's PID, so same-second fires cannot collide. Then confirm the count
+   (one live label per block) and report the log path each call printed:
 
    ```bash
    launchctl list | grep -c 'com\.ibl5\.plan-now-'
@@ -299,13 +294,9 @@ step 3.
      name it **only when `--implement`**, and then only because it means the plan is
      waiting on them to read it.
 
-   **Never re-explain the mechanism.** No "detached headless run", no "it writes a plan
-   then a robot implements it", no "Sonnet orchestrator designing with an Opus
-   architect", no "it DMs you on Discord", no "don't tail the log — `claude -p` doesn't
-   stream", no explanation of what `queue` means or that no human reads the plan first.
-   Every one of those is invariant across runs, and the user designed the pipeline that
-   makes them true. **When there is nothing for the user to do, say that in one line and
-   stop** — do not pad the ending with reassurance about how the default path works.
+   Report only what differs from the default path. The user designed this pipeline,
+   so a sentence that is true on every run tells them nothing. When there is nothing
+   for the user to do, say that in one line and stop.
 
 Then stop. The plan is being written in another process; do not wait on it, tail its
 log on a loop, or start implementing. The user picks it up from

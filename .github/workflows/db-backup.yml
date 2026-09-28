@@ -278,15 +278,18 @@ jobs:
           private-key: ${{ secrets.PRIVATE_KEY }}
 
       - name: Build Discord message
+        continue-on-error: true
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           MSG=$(printf 'Production DB backup job FAILED (%s trigger).\n\nThe dump, its restore verification, or the boxscore duplicate invariant did not pass. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
           printf '%s' "$MSG" > /tmp/discord-msg.txt
 
       - name: Send Discord DM
+        continue-on-error: true
         uses: ./.github/actions/notify-discord
         with:
           discord-id: ${{ secrets.OWNER_DISCORD_ID }}
           port: ${{ secrets.PORT }}
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
+          fail-on-delivery: 'false'

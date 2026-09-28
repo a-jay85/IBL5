@@ -255,6 +255,8 @@ The packet's `**Assertions:**` list is binding on the sub-agent. A returned summ
 
 The plan's tiering is **exhaustive and pre-resolved** — there is no tier decision left for you to make at runtime. Every phase assigned a tier **below the run model** (`impl_model`) is authored as exactly one of two forms, and you act on the form present, never on a bare label: (1) a `### Delegate` packet → delegate it per the paragraph above; (2) a `**Tier:** <Haiku|Sonnet> (inline — <reason>)` marker → the label is a *record of a decision already made* that this small phase stays inline, so implement it yourself directly, do NOT spawn a sub-agent for it (a one/two-edit phase is below a sub-agent's ~15K startup — spawning would cost more than it saves). A below-run-model phase should never reach you as a bare `**Tier:** Haiku`/`Sonnet` with neither a packet nor an `(inline — …)` marker — `bin/check-plan` gate `[T]` rejects that at author time — so treat any such bare label as a plan defect, not a delegation instruction: implement it inline and note it in your report.
 
+Treat migration and ADR numbers in the plan as hints. Other branches merge while a plan sits in the queue, so a number the plan names may already be taken. Create every new migration with `bin/next-migration` and every new ADR with `bin/next-adr`, and use the number they give you. Then update every reference the plan tells you to write (tests, docs, the ADR index row) to that number. This overrides any plan line that says to stop, skip, or report when the number differs. A changed number is never ambiguity. Note the renumber in your handoff.
+
 ### Incremental Commits
 
 Commit and push after each major milestone to checkpoint progress. This ensures work survives if the session ends unexpectedly. Use conventional commit messages — squash-merge erases the history anyway.
@@ -386,6 +388,6 @@ If ANY step fails after worktree creation (Step 5):
 - NEVER use the AskUserQuestion tool — it will block waiting for a human who is not there
 - NEVER use the ExitPlanMode tool — you are not in plan mode
 - NEVER invoke /post-plan — a separate agent handles that
-- If you encounter ANY ambiguity about requirements, skip and report — do not guess
+- If you encounter ANY ambiguity about requirements, skip and report. Do not guess. A taken migration or ADR number is not ambiguity: renumber per Step 6
 - All CLAUDE.md project rules apply at all times
 - Work only in worktrees, never modify files on the master branch directly

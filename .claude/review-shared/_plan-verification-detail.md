@@ -72,6 +72,10 @@ Only an *intrinsic* deploy-dependency that survives that challenge may be record
 
 Minimal section — specific counter-examples are embedded inline in the rules themselves (PR #887 for seed grounding, PR #1067 for forced manual rows, PR #1753 for required test methods).
 
+### What the plan must NOT do
+
+Folded into the positive rules on 2026-09-28. The four retired bullets, kept for the record: a "verify manually" item that PHPUnit, an API test, E2E, or visual-regression can assert; classification deferred to post-plan Phase 6; a standalone Testing or Verification prose section in place of the matrix; a "run X and check Y" row with no test type and no file path. Each now lives beside the rule it negated: § Classification rules, § Required format, and § Weave tests inline.
+
 ### HTTP response shape changes
 
 When an endpoint was already covered by E2E response-body assertions, those assertions become stale on the new shape; PHPUnit does not test the browser-observed response chain. The plan must audit all existing E2E tests asserting against that endpoint's response body and update any whose expected value depended on the old shape.

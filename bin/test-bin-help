@@ -56,7 +56,9 @@ in_scope() {
     local f="$1" base
     base="$(basename "$f")"
     [ -f "$f" ] && [ -x "$f" ] || return 1
-    case "$base" in test-*|*.md|*.txt) return 1 ;; esac
+    # check-composite-contracts is a CI security-policy gate with no user-facing
+    # invocation; it has no --help handler by design.
+    case "$base" in test-*|*.md|*.txt|check-composite-contracts) return 1 ;; esac
     [ "$(head -c 2 "$f")" = "#!" ] || return 1
     return 0
 }
@@ -95,6 +97,7 @@ for rel in "${targets[@]}"; do
     problems=""
     [ "$rc" -eq 0 ] || problems="exit $rc"
     [ -s "$out" ] || problems="${problems:+$problems; }empty stdout"
+    grep -qi 'usage' "$out" 2>/dev/null || problems="${problems:+$problems; }no Usage line in output"
     if [ -s "$STUB_LOG" ]; then
         problems="${problems:+$problems; }called $(tr '\n' ',' < "$STUB_LOG" | cut -c1-120)"
     fi

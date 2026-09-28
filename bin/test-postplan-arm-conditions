@@ -1970,10 +1970,10 @@ else
 fi
 
 # --- /plan SKILL.md gate 15 arm 2 + gate 16 shape (d) prose assertions -------
-if grep -qF 'Second arm — unconditional, keyed on the diff rather than on the hold'\''s justification.' "$PLAN_SKILL"; then
+if grep -qF 'Arm 2 fires regardless of why the hold exists' "$PLAN_SKILL"; then
     echo "ok: plan SKILL.md gate 15 arm 2 prose present"
 else
-    echo "FAIL: plan SKILL.md gate 15 arm 2 prose missing (expected 'Second arm — unconditional, keyed on the diff rather than on the hold'\''s justification.')"
+    echo "FAIL: plan SKILL.md gate 15 arm 2 prose missing (expected 'Arm 2 fires regardless of why the hold exists')"
     FAILED=1
 fi
 
@@ -1983,6 +1983,83 @@ else
     echo "FAIL: plan SKILL.md gate 16 shape (d) prose missing (expected 'A row whose CI check the PR'\''s own diff never triggers.')"
     FAILED=1
 fi
+
+# --- /plan SKILL.md gates 13-16 + Step 4.5 hold-trigger pins -----------------
+# Each literal is a hold trigger, a release condition, or an example class from
+# the auto-merge hold criteria. A prose trim that drops one fails here, before
+# it reaches a reviewer. Literals are chosen to be stable across rewrites: no
+# em-dash, no leading/trailing markdown that a reflow would change.
+while IFS= read -r needle; do
+    [ -n "$needle" ] || continue
+    if grep -qF -- "$needle" "$PLAN_SKILL"; then
+        echo "ok: plan SKILL.md hold-trigger pin present ($needle)"
+    else
+        echo "FAIL: plan SKILL.md hold-trigger pin missing ('$needle')"
+        FAILED=1
+    fi
+done <<'PINS'
+impl_model criterion
+a `Truly-manual` row both strips `impl_model: sonnet` **and** sets `auto_merge: false`
+(or otherwise subjective) row
+touched security surface
+state-free extraction
+pure-function move
+validator that never sees actor identity
+Security-surface mechanization
+stays held
+$loggedInTeamID
+new POST/form endpoint
+new SQL construction site
+new user-facing output rendering
+has no release path under this gate
+DROP / lossy backfill / in-place data mutation
+column-rename sweep
+FK-ordering migration
+reversible schema tightening
+NOT NULL
+Schema-safety mechanization phase
+guard-abort test
+new or redesigned user-visible UI/UX
+Phase 6.5 condition (1)
+A genuine design fork is **not** a hold trigger
+verification gap
+state concretely why one cannot be built
+fails this gate
+design-data-blocked
+proven by its guard-abort test
+-independent erroring idiom
+Arm 2 fires regardless of why the hold exists
+requires a loud failure signal
+is not a signal
+pre-prod-exercisable
+(a) No row at all.
+an absent row **is** the violation
+(b) Stub-only coverage.
+A stub proves your code called the stub.
+UNCOVERED
+crosses the real boundary pre-prod
+(c) A correctly-authored manual row that covers something else.
+A row whose CI check the PR's own diff never triggers.
+add the path to that job's filter or move the check to an always-run job
+Reducible — build the path.
+Intrinsic — narrow
+Split the behavior
+pre-prod-exception:
+Pre-prod Exception Justification
+never licenses dropping a forced UI/UX row
+coverage and hold are independent verdicts
+Reducible holds — dissolve or prove infeasible.
+Intrinsic holds — name the category and stand.
+(a) **Dissolve it.**
+(b) **Confirm it, with cause.**
+self-gating / bootstrap hazard
+ambiguity resolves to intrinsic
+A hold justification carries a decision
+accepts or refuses
+claiming too much
+never a whole-plan escape
+Which slice of this is intrinsic
+PINS
 
 # --- §5.5 condition (12): fidelity verdict gate behavioural cases ----------------
 expect_block "(12) no verdict file -> BLOCK (indeterminate, fail-closed)" BLOCK \

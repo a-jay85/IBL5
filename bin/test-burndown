@@ -275,6 +275,286 @@ OUT="$(bd burndown-delta extra 2>&1)"; RC=$?
 [ "$RC" -eq 2 ] && ok "C13: arity exits 2" || fail "C13: arity exits 2 (got $RC)"
 want "C13: arity message" "$OUT" "takes no arguments"
 
+# ── Phase 3: in-flight filter, cost, and selection (burndown) ─────────────────
+
+# Phase 3 report (newer than Phase 2, picked by bd_latest_report)
+cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md" <<'REPORT'
+# Phase 3 triage
+
+## P1 (1)
+
+- [#70](u70) P1 issue seventy — p1 reason
+
+## P2 (many)
+
+- [#21](u21) Twenty-one — ref
+- [#22](u22) Twenty-two — ref
+- [#23](u23) Twenty-three — ref
+- [#24](u24) Twenty-four — ref
+- [#25](u25) Twenty-five — ref
+- [#26](u26) Twenty-six — ref
+- [#30](u30) Thirty — ref
+- [#31](u31) Thirty-one — ref
+- [#35](u35) Thirty-five noref — ref
+- [#40](u40) Forty stale — ref
+- [#50](u50) Fifty — ref
+- [#51](u51) Fifty-one — ref
+- [#60](u60) XHIGH a sixty — ref
+- [#61](u61) Sixty-one — ref
+- [#62](u62) Sixty-two — ref
+- [#63](u63) XHIGH b sixty-three — ref
+- [#64](u64) Sixty-four — ref
+- [#16](u16) TIERFAIL issue sixteen — ref
+- [#100](u100) Hundred — ref
+- [#101](u101) Hundred-one — ref
+- [#102](u102) Hundred-two — ref
+- [#103](u103) Hundred-three — ref
+- [#104](u104) Hundred-four — ref
+- [#105](u105) Hundred-five — ref
+REPORT
+touch -t 202609280000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md"
+
+# Default fixtures: empty PRs and worktrees for burndown tests
+echo '[]' > "$T/fx/prs-open.json"
+touch "$T/fx/worktrees.txt"
+
+# Helper: run burndown (not delta)
+# shellcheck disable=SC2120
+bd_b() { bd burndown "$@"; }
+
+# ── C14: budget fill ──────────────────────────────────────────────────────────
+# 6 P2 issues with distinct paths; 5 fit, 6th is over budget
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"bin/a:1 title thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"bin/b:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":102,"title":"Hundred-two","body":"bin/c:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":103,"title":"Hundred-three","body":"bin/d:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":104,"title":"Hundred-four","body":"bin/e:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":105,"title":"Hundred-five","body":"bin/f:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C14: fill exits 0" || fail "C14: fill exits 0 (got $RC)"
+PICK_COUNT=$(grep -cE '^PICK' <<< "$OUT" || true)
+[ "$PICK_COUNT" -eq 5 ] && ok "C14: 5 PICK rows" || fail "C14: 5 PICK rows (got $PICK_COUNT)"
+want "C14: units 5/5" "$OUT" "units: 5/5"
+
+# ── C15: xhigh + skip-continue ───────────────────────────────────────────────
+# P2 order: XHIGH #60(cost2), #61(1), #62(1), XHIGH #63(cost2 skip), #64(1 fits)
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":60,"title":"XHIGH a sixty","body":"bin/aa:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":61,"title":"Sixty-one","body":"bin/bb:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":62,"title":"Sixty-two","body":"bin/cc:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":63,"title":"XHIGH b sixty-three","body":"bin/dd:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":64,"title":"Sixty-four","body":"bin/ee:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C15: xhigh exits 0" || fail "C15: xhigh exits 0 (got $RC)"
+# #60 picked, #63 skipped over budget, #64 picked (continue not break)
+want "C15: #60 PICK" "$OUT" "PICK  #60"
+want "C15: #63 SKIP over budget" "$OUT" "over budget"
+want "C15: #64 PICK" "$OUT" "PICK  #64"
+# Mutation guard: #64 must be present (continue, not break)
+grep -qE 'PICK\s+#64' <<< "$OUT" && ok "C15: #64 reached (continue)" || fail "C15: #64 reached (continue)"
+
+# ── C16: tier failure costs 1 ─────────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[{"number":16,"title":"TIERFAIL issue sixteen","body":"bin/tierfail:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C16: tier fail exits 0" || fail "C16: tier fail exits 0 (got $RC)"
+want "C16: tier=error in detail" "$OUT" "tier=error"
+grep -qE 'PICK\s+#16\s+\S+\s+1' <<< "$OUT" && ok "C16: cost=1 on tier fail" || fail "C16: cost=1 on tier fail"
+
+# ── C17: in-flight, one per source ────────────────────────────────────────────
+# Six issues #21-#26; #21-#25 each blocked by a different source; #26 PICK
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":21,"title":"Twenty-one","body":"bin/s1:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":22,"title":"Twenty-two","body":"bin/s2:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":23,"title":"Twenty-three","body":"bin/s3:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":24,"title":"Twenty-four","body":"bin/s4:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":25,"title":"Twenty-five","body":"bin/s5:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":26,"title":"Twenty-six","body":"bin/s6:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+# Source 1: PR body names #21
+cat > "$T/fx/prs-open.json" <<'JSON'
+[{"number":901,"body":"Closes a-jay85/IBL5-backlog#21 bin/foo:1"}]
+JSON
+# Source 2: plan file names #22 (put in BD_PLANS_DIR = $T/home/claude-plans)
+cat > "$T/home/claude-plans/some-feature.md" <<'PLAN'
+# Some feature plan
+IBL5-backlog#22 is the tracking issue
+PLAN
+# Source 3: queue symlink → file naming #23
+mkdir -p "$T/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue"
+cat > "$T/home/elsewhere.md" <<'QF'
+# Queue plan
+IBL5-backlog#23 needs doing
+QF
+ln -sf "$T/home/elsewhere.md" "$T/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/some-task.md"
+# Source 4: ledger with #24 status=queued (in-flight)
+cat > "$T/home/claude-plans/_reports/burndown-batch-test.json" <<'LEDGER'
+{"items":[
+  {"issue_num":24,"also_closes":[],"slug":"wt-24","status":"queued","route":"plan","pr_url":"","units_used":1}
+]}
+LEDGER
+# Source 5: ledger item #25 slug=wt-25, status=skipped; worktree branch wt-25 exists
+cat >> "$T/home/claude-plans/_reports/burndown-batch-test.json" 'NOT_VALID' || true
+# Rewrite ledger to include both items
+cat > "$T/home/claude-plans/_reports/burndown-batch-test.json" <<'LEDGER'
+{"items":[
+  {"issue_num":24,"also_closes":[],"slug":"wt-24","status":"queued","route":"plan","pr_url":"","units_used":1},
+  {"issue_num":25,"also_closes":[],"slug":"wt-25","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1}
+]}
+LEDGER
+# Worktree fixture has branch wt-25
+cat > "$T/fx/worktrees.txt" <<'WT'
+worktree /some/path
+HEAD abc123
+branch refs/heads/wt-25
+
+WT
+# Boundary: plan names #260 (NOT #26)
+cat > "$T/home/claude-plans/boundary-plan.md" <<'BPLAN'
+# Boundary
+IBL5-backlog#260 is the issue
+BPLAN
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C17: in-flight exits 0" || fail "C17: in-flight exits 0 (got $RC)"
+want "C17: #21 SKIP open PR" "$OUT" "open PR"
+want "C17: #22 SKIP plan" "$OUT" "plan some-feature.md"
+want "C17: #23 SKIP queue" "$OUT" "automouse queue some-task.md"
+want "C17: #24 SKIP ledger" "$OUT" "ledger burndown-batch-test.json (queued)"
+want "C17: #25 SKIP worktree" "$OUT" "worktree wt-25"
+grep -qE 'PICK\s+#26' <<< "$OUT" && ok "C17: #26 PICK (boundary)" || fail "C17: #26 PICK (boundary)"
+# Cleanup
+rm -f "$T/home/claude-plans/some-feature.md" "$T/home/claude-plans/boundary-plan.md" \
+      "$T/home/claude-plans/_reports/burndown-batch-test.json"
+echo '[]' > "$T/fx/prs-open.json"
+cat > "$T/fx/worktrees.txt" <<'WT'
+WT
+
+# ── C18: source failures abort ────────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[{"number":100,"title":"Hundred","body":"bin/x:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}]
+JSON
+
+# C18a: gh pr list fails
+OUT="$(GH_FAIL_ON="pr list" GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C18a: pr list fail exits 3" || fail "C18a: pr list fail exits 3 (got $RC)"
+want "C18a: pr list fail message" "$OUT" "gh pr list failed"
+grep -qF "LEDGER:" <<< "$OUT" && fail "C18a: no LEDGER on failure" || ok "C18a: no LEDGER on failure"
+
+# C18b: malformed ledger
+cat > "$T/home/claude-plans/_reports/burndown-batch-bad.json" <<'EOF'
+{"not_items": "wrong"}
+EOF
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C18b: malformed ledger exits 3" || fail "C18b: malformed ledger exits 3 (got $RC)"
+want "C18b: malformed ledger message" "$OUT" "malformed ledger"
+rm -f "$T/home/claude-plans/_reports/burndown-batch-bad.json"
+
+# C18c: git stub exits 1
+cat > "$T/git-fail" <<'STUB'
+#!/usr/bin/env bash
+exit 1
+STUB
+chmod +x "$T/git-fail"
+OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git-fail" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C18c: git fail exits 3" || fail "C18c: git fail exits 3 (got $RC)"
+want "C18c: git fail message" "$OUT" "git worktree list failed"
+
+# ── C19: path overlap ─────────────────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":30,"title":"Thirty","body":"bin/foo:10 overlap test","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":31,"title":"Thirty-one","body":"bin/foo:99 overlap test","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C19: overlap exits 0" || fail "C19: overlap exits 0 (got $RC)"
+want "C19: #31 overlap with #30 on bin/foo" "$OUT" "overlap"
+grep -qE 'SKIP\s+#31.*overlap.*#30' <<< "$OUT" && ok "C19: #31 cites #30" || fail "C19: #31 cites #30"
+
+# ── C20: no file:line refs ────────────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[{"number":35,"title":"Thirty-five noref","body":"This issue has no code refs","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C20: no refs exits 0" || fail "C20: no refs exits 0 (got $RC)"
+want "C20: SKIP no file:line refs" "$OUT" "no file:line refs"
+
+# ── C21: stale-rank and unranked ──────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":40,"title":"Forty stale","body":"bin/stale:1 stale issue","url":"u","updatedAt":"2026-09-29T00:00:00Z","labels":[]},
+  {"number":999,"title":"Unranked open","body":"bin/unranked:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C21: stale+unranked exits 0" || fail "C21: stale+unranked exits 0 (got $RC)"
+want "C21: #40 stale-rank" "$OUT" "stale-rank"
+want "C21: #999 unranked" "$OUT" "unranked"
+
+# ── C22: pair semantics ───────────────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":50,"title":"Fifty","body":"bin/p1:1 pair test","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":51,"title":"Fifty-one","body":"bin/p2:1 pair test","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd burndown --pair 50,51 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C22: pair exits 0" || fail "C22: pair exits 0 (got $RC)"
+grep -qE 'PICK\s+#50.*\+#51' <<< "$OUT" && ok "C22: #50 PICK with +#51" || fail "C22: #50 PICK with +#51"
+want "C22: #51 SKIP paired with #50" "$OUT" "paired with #50"
+
+# C22b: pair with #51 in-flight
+cat > "$T/fx/prs-open.json" <<'JSON'
+[{"number":902,"body":"refs a-jay85/IBL5-backlog#51"}]
+JSON
+OUT="$(bd burndown --pair 50,51 2>&1)"; RC=$?
+want "C22b: both SKIP pair" "$OUT" "pair:"
+echo '[]' > "$T/fx/prs-open.json"
+
+# ── C23: rejected flag forms ──────────────────────────────────────────────────
+rm -f "$T/gh.log"
+for flag_args in "--pair 50" "--pair 50,50" "--pair a,b" "--bogus"; do
+    OUT="$(bd burndown $flag_args 2>&1)"; RC=$?
+    [ "$RC" -eq 2 ] && ok "C23: '$flag_args' exits 2" || fail "C23: '$flag_args' exits 2 (got $RC)"
+done
+OUT="$(bd burndown --pair 50,51 --pair 51,52 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C23: duplicate pair exits 2" || fail "C23: duplicate pair exits 2 (got $RC)"
+want "C23: duplicate pair message" "$OUT" "appears in two --pair"
+# No gh calls made
+if [ ! -s "$T/gh.log" ]; then ok "C23: no gh call on flag error"; else fail "C23: no gh call on flag error"; fi
+
+# ── C24: rank order P1 first ──────────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":70,"title":"P1 issue seventy","body":"bin/p1only:1 p1","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":100,"title":"Hundred","body":"bin/a:1 title thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C24: rank order exits 0" || fail "C24: rank order exits 0 (got $RC)"
+# #70 is P1, #100 is P2 — P1 must appear first
+P1_LINE=$(grep -n 'PICK.*#70' <<< "$OUT" | head -1 | cut -d: -f1)
+P2_LINE=$(grep -n 'PICK.*#100' <<< "$OUT" | head -1 | cut -d: -f1)
+if [ -n "$P1_LINE" ] && [ -n "$P2_LINE" ] && [ "$P1_LINE" -lt "$P2_LINE" ]; then
+    ok "C24: P1 picked before P2"
+else
+    fail "C24: P1 picked before P2 (P1=$P1_LINE, P2=$P2_LINE)"
+fi
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

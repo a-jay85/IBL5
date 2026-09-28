@@ -50,6 +50,9 @@
 # Usage: bin/fleet-status [--watch [SECS]]
 #
 # --watch [SECS]   re-render every SECS seconds (default 15) until interrupted.
+#                  On a terminal it draws on the alternate screen, like top, so a
+#                  mouse scroll under tmux can't drop the pane into copy mode and
+#                  freeze an old frame. A frame taller than the pane is clipped.
 #
 # CLICKABLE PATHS. File paths this page names — each run's log, each queued plan,
 # and the plan a live runner is on — are emitted as OSC 8 terminal hyperlinks, so
@@ -127,7 +130,7 @@ while [ $# -gt 0 ]; do
                 *) WATCH_SECS="$2"; shift ;;
             esac
             ;;
-        -h|--help) sed -n '4,79p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '4,82p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) printf 'fleet-status: unknown option %s\n' "$1" >&2; exit 2 ;;
     esac
     shift
@@ -909,8 +912,35 @@ if [ "$WATCH" -eq 1 ]; then
     # Build the whole frame first, then swap it in with one write. Rendering
     # straight to the screen after `clear` painted the page line by line as each
     # probe finished; this way the old frame stays up until the new one is ready.
+    #
+    # On a terminal, draw on the alternate screen. Under tmux with `mouse on`, a
+    # wheel scroll over a normal-screen pane enters copy mode, and copy mode shows
+    # a frozen snapshot while the frames keep landing underneath. The page looks
+    # stale until something cancels copy mode (C-c does). On the alternate screen
+    # tmux hands the wheel to the program instead. The alternate screen has no
+    # scrollback, so a frame taller than the pane is clipped from the bottom,
+    # keeping the top sections, and autowrap is off so one row is one line.
+    alt=0
+    if [ -t 1 ]; then
+        alt=1
+        printf '\033[?1049h\033[?7l'
+        trap 'printf "\033[?7h\033[?1049l"' EXIT
+        trap 'exit 130' INT TERM
+    fi
     while :; do
         frame=$(render_all)
+        if [ "$alt" -eq 1 ]; then
+            rows="$(stty size </dev/tty 2>/dev/null)"; rows="${rows%% *}"
+            case "$rows" in ''|*[!0-9]*) rows=0 ;; esac
+            # Three rows below the frame: the blank line, the "refreshing"
+            # line, and the empty row its trailing newline moves the cursor to.
+            max=$(( rows - 3 ))
+            total="$(printf '%s\n' "$frame" | wc -l | tr -d ' ')"
+            if [ "$max" -gt 1 ] && [ "$total" -gt "$max" ]; then
+                frame="$(printf '%s\n' "$frame" | head -n $(( max - 1 )))
+${DIM}… $(( total - max + 1 )) more lines (make the pane taller, or run without --watch)${R}"
+            fi
+        fi
         printf '\033[H\033[2J\033[3J%s\n\n%srefreshing every %ss — ctrl-c to stop%s\n' \
             "$frame" "$DIM" "$WATCH_SECS" "$R"
         sleep "$WATCH_SECS"

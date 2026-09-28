@@ -243,12 +243,39 @@ def _strip_fenced(content: str) -> list[str]:
     return out
 
 
+# Regex that strips a leading absolute prefix up to the repo or worktree root.
+# Matches /<anything>/IBL5/ or /<anything>/IBL5-worktrees/<slug>/ and removes
+# everything up to and including that root. Case-sensitive: IBL5 is always caps.
+# Used in parse_critical_files to normalise absolute paths from in-flight plans.
+_ABS_PREFIX_RE = re.compile(r"^.*/IBL5(?:-worktrees/[^/]+)?/")
+
+
+def _normalise_cf_path(path: str) -> str:
+    """Strip an absolute /…/IBL5/… or /…/IBL5-worktrees/<slug>/… prefix.
+
+    Plans already in flight may carry absolute paths authored before
+    bin/check-plan gate [F] enforced repo-relative form. Normalise them so
+    Phase 5.0 conformance matching still works. Relative paths are returned
+    unchanged.
+    """
+    if not path.startswith("/"):
+        return path
+    m = _ABS_PREFIX_RE.match(path)
+    if m:
+        return path[m.end():]
+    return path
+
+
 def parse_critical_files(content: str) -> list[tuple]:
     """[(path, annotation, exempt)] from `## Critical Files` — the Phase 5.0 awk port:
     primary backticked path per bullet; exempt iff the annotation (backticks stripped)
     contains a parenthesized group holding a canonical marker. Fenced code blocks are
     skipped (width-aware fence state machine, see _strip_fenced). Single source of
-    truth for the exemption rule: bin/lib/critical-files.sh."""
+    truth for the exemption rule: bin/lib/critical-files.sh.
+
+    Absolute paths of the form /…/IBL5/… or /…/IBL5-worktrees/<slug>/… are
+    normalised to repo-relative form so in-flight plans authored before gate [F]
+    enforced relative paths still match `git diff --name-only` output."""
     lines = _strip_fenced(content)
     in_section = False
     out: list[tuple] = []
@@ -266,7 +293,7 @@ def parse_critical_files(content: str) -> list[tuple]:
         pm = re.search(r"`([^`]+)`", line)
         if not pm:
             continue
-        path = pm.group(1)
+        path = _normalise_cf_path(pm.group(1))
         rest = re.sub(r"`[^`]*`", "", line)
         exempt = bool(EXEMPT_RE.search(rest))
         out.append((path, rest.strip(" -—"), exempt))

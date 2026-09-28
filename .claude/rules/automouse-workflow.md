@@ -76,9 +76,9 @@ entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into a 
 absolute targets keep resolving after the move. `queue/` (pending work) and `handoff/`
 (transient) are never touched. The step is non-fatal: an archival error never aborts the run.
 
-**macOS sorts by the symlink TARGET's mtime** — BSD `ls -1tr` dereferences operands, so
-order follows the plan file in `~/claude-plans/`; GNU `ls` does not. `queue`/`queue reorder`
-stamp both. Diagnose with `stat -L`.
+**Run order is the queue symlink's mtime** (lstat, via `queue_entries_ordered` in
+`bin/automouse/lib-queue-order`) on macOS and Linux. Editing the plan file does not
+move it. `queue`/`queue reorder` stamp the link (`touch -h`).
 
 ### Self-heal
 

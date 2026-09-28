@@ -155,6 +155,21 @@ TELLS: list[Tell] = [
         "State what the section does, without inviting the reader along.",
         scope="doc",
     ),
+    _t(
+        "bare-hash-ref",
+        # A bare #N reference not written as a markdown link. Chat only.
+        # Exclusions (via lookbehind):
+        #   [/\[&\w] — URL fragments, markdown link text ([#N]), HTML entities (&#N)
+        #              and backlog#N inline in text (word char before #)
+        #   Common noun prefixes — "check #N", "gate #N", etc. are not hyperlink
+        #              obligations; flag only unambiguous prose issue/PR refs.
+        # Note: "Docker Hub" aside, prose_lines replaces link targets with ]()
+        # so [#123](url) → [#123]() and the [ preceding # blocks the match.
+        r"(?<![/\[&\w])(?<!check )(?<!gate )(?<!step )(?<!item )(?<!phase )(?<!no\. )(?<!number )(?<!condition )#\d+\b"
+        r"|(?<![/\[\w-])(?:IBL5-)?backlog#\d+\b",
+        "Link it: PR `[#123](https://github.com/a-jay85/IBL5/pull/123)` or backlog issue `[backlog#45](https://github.com/a-jay85/IBL5-backlog/issues/45)`.",
+        scope="chat",
+    ),
 ]
 
 
@@ -392,7 +407,11 @@ def mode_self_test() -> int:
         ("Let's walk through the setup.", {"lets-opener"}),
         ("Not a hook. Not a gate. Just a doc.", {"not-x-not-y-just-z"}),
         ("Cache – then rebuild.", {"em-dash"}),
+        ("see #1234 for context", {"bare-hash-ref"}),
     ]
+    _BARE_HASH_POS = "see #1234 for context"
+    _BARE_HASH_POS2 = "closed by PR #99"
+    # bare-hash-ref is chat-only; add it to positive with chat=True via chat_scope below.
     negative = [
         "Run `bin/check-docs --since=master` before pushing.",
         "```\nfoo — bar, not baz\n```",
@@ -418,6 +437,23 @@ def mode_self_test() -> int:
     ]
     chat_scope = [
         ("Let's start with the hook.", True, False),  # (text, hits_in_doc, hits_in_chat)
+        # bare-hash-ref: fires in chat, NOT in doc.
+        (_BARE_HASH_POS, False, True),
+        (_BARE_HASH_POS2, False, True),
+        # These must NOT fire in either scope (doc or chat):
+        # Link text [#123]() after _LINK_TARGET strips the url — [ before # blocks it.
+        ("[#123](https://github.com/a-jay85/IBL5/pull/123)", False, False),
+        # Unlinked backlog#N fires in chat; linked [backlog#45](url) does not.
+        ("see backlog#45 for details", False, True),
+        ("see [backlog#45](https://github.com/a-jay85/IBL5-backlog/issues/45)", False, False),
+        # HTML entity — & before # blocks it.
+        ("&#8203; zero-width space", False, False),
+        # URL fragment — / before # (or word char) blocks it.
+        ("https://example.com/page#section", False, False),
+        # Exempt word prefixes — check, gate, step, etc.
+        ("check #19 in the list", False, False),
+        ("gate #3 fires here", False, False),
+        ("step #2 is next", False, False),
     ]
     fails = 0
     for text, expected in positive:

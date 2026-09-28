@@ -29,7 +29,10 @@ _cleanup() {
           /tmp/pr-review-now-1901.log \
           /tmp/pr-review-now-1901.log.aborted \
           /tmp/pr-review-now-1902.log \
-          /tmp/pr-review-now-1902.log.aborted
+          /tmp/pr-review-now-1902.log.aborted \
+          /tmp/pr-review-now-runner-1903.sh \
+          /tmp/pr-review-now-prompt-1903.md \
+          /tmp/pr-review-now-1903.log
     rm -f /tmp/prn-keep.*
     [[ ${#TMP_LOGS[@]} -gt 0 ]] && rm -f "${TMP_LOGS[@]}"
 }
@@ -340,6 +343,63 @@ count_env="$(grep -cF 'PR_READY_NOW_' "$DRIVER" || true)"
 [[ "$count_env" -eq 0 ]] \
     || fail "no-shared-machinery: found $count_env 'PR_READY_NOW_' token(s) in $DRIVER"
 end_case pr-review-now-no-shared-machinery
+
+# --- case 10: pr-review-now-runner-dm-content -------------------------------------------
+# Verify the generated runner's notify() structure matches the new DM format:
+# success (rc=0): no RESULT line; timeout (rc=124): Fix: re-run; non-zero: Fix: log hint.
+begin_case
+PR_REVIEW_NOW_DRY_RUN=1 run_driver 1901 >/dev/null 2>&1
+RUNNER=/tmp/pr-review-now-runner-1901.sh
+[[ -f "$RUNNER" ]] || fail "runner-dm-content: runner not generated"
+# Success branch (rc=0): the msg= block must not contain RESULT
+_success_msg="$(awk '/if \[ "\$rc" -eq 0 \]/{p=1} p && /^[[:space:]]*msg=/{found=1} found && /log:/{print; exit} found{print}' "$RUNNER")"
+grep -qF 'RESULT' <<< "$_success_msg" \
+    && fail "runner-dm-content: success branch msg contains RESULT line" || true
+# elapsed variable must be gone
+! grep -qF 'elapsed=' "$RUNNER" \
+    || fail "runner-dm-content: elapsed= still present in runner"
+# Timeout branch must include Fix: re-run
+grep -qF 'Fix: re-run' "$RUNNER" \
+    || fail "runner-dm-content: timeout branch missing Fix: re-run"
+# Non-zero branch must reference pr-review-now invocation
+grep -qF 'bin/pr-review-now' "$RUNNER" \
+    || fail "runner-dm-content: non-zero branch missing bin/pr-review-now hint"
+rm -f "$RUNNER" /tmp/pr-review-now-prompt-1901.md /tmp/pr-review-now-1901.log
+clean_slots
+end_case pr-review-now-runner-dm-content
+
+# --- case 11: pr-review-now-prior-review-no-dm -------------------------------------------
+# Executes the generated runner end to end. A PR that already carries our own
+# `## Code review` finishes rc=0 with NO DM; a PR without one still gets the ✅ DM.
+# caffeinate is shimmed to drop its `-s timeout 3600` prefix, so this runs on Linux too.
+begin_case
+printf '#!/usr/bin/env bash\nshift 3\nexec "$@"\n' > "$SCRATCH/.local/bin/caffeinate"
+chmod +x "$SCRATCH/.local/bin/caffeinate"
+cat > "$SCRATCH/gh-review" <<GHR_EOF
+#!/usr/bin/env bash
+[[ "\$1 \$2" == "api user" ]] && { echo me; exit 0; }
+cat "$SCRATCH/gh-view.json" | jq "\${@: -1}"
+GHR_EOF
+chmod +x "$SCRATCH/gh-review"
+printf '#!/usr/bin/env bash\ncat >> "%s"\n' "$SCRATCH/dm-sent.txt" > "$SCRATCH/dm-stub"
+chmod +x "$SCRATCH/dm-stub"
+_run_runner() {  # $1 = gh pr view JSON fixture
+    printf '%s' "$1" > "$SCRATCH/gh-view.json"
+    : > "$SCRATCH/dm-sent.txt"
+    PR_REVIEW_NOW_DRY_RUN=1 PR_REVIEW_NOW_GH="$SCRATCH/gh-review" \
+        PR_REVIEW_NOW_DISCORD_DM="$SCRATCH/dm-stub" run_driver 1903 >/dev/null 2>&1
+    env HOME="$SCRATCH" PATH="$SCRATCH/.local/bin:$PATH" \
+        bash /tmp/pr-review-now-runner-1903.sh >/dev/null 2>&1
+    clean_slots
+}
+_run_runner '{"comments":[{"author":{"login":"me"},"body":"## Code review\nNo issues found."}],"reviews":[]}'
+[[ -s "$SCRATCH/dm-sent.txt" ]] \
+    && fail "prior-review-no-dm: DM sent for an already-reviewed PR: $(cat "$SCRATCH/dm-sent.txt")"
+_run_runner '{"comments":[{"author":{"login":"me"},"body":"verdict quoting > ## Code review"},{"author":{"login":"other"},"body":"## Code review"}],"reviews":[]}'
+grep -qF '✅ pr-review-now: PR #1903' "$SCRATCH/dm-sent.txt" \
+    || fail "prior-review-no-dm: fresh PR got no ✅ DM (got: $(cat "$SCRATCH/dm-sent.txt"))"
+rm -f /tmp/pr-review-now-runner-1903.sh /tmp/pr-review-now-prompt-1903.md /tmp/pr-review-now-1903.log
+end_case pr-review-now-prior-review-no-dm
 
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then

@@ -89,6 +89,9 @@ function ShowAndHide{$categoryCode}() {
     var x = document.getElementById('{$categoryCode}');
     if (x.style.display == 'none') {
         x.style.display = '';
+        if (typeof window.IBL_refreshResponsiveTables === 'function') {
+            window.IBL_refreshResponsiveTables();
+        }
     } else {
         x.style.display = 'none';
     }

@@ -147,7 +147,10 @@ def test_arming_is_unchanged_by_every_review_owed_outcome(tmp_path, monkeypatch,
     res, out = _run(_fixture(review_owed=canned))
     assert (res.arm.armed, [c.name for c in res.arm.holds]) == \
         (base.arm.armed, [c.name for c in base.arm.holds])
-    assert [a["action"] for a in _actions(out)] == [a["action"] for a in _actions(base_out)]
+    # Sorted: ReviewPhase runs on a worker thread, so its pr_comment can land before or
+    # after the main thread's pr_edit_body. Order between the two is not the invariant.
+    assert sorted(a["action"] for a in _actions(out)) == \
+        sorted(a["action"] for a in _actions(base_out))
     assert res.terminal == base.terminal
 
 

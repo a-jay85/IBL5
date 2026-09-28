@@ -22,9 +22,6 @@ use SeasonLeaderboards\SeasonLeaderboardsRepository;
 use SeasonLeaderboards\SeasonLeaderboardsService;
 use SeasonLeaderboards\SeasonLeaderboardsView;
 
-$module_name = basename(dirname(__FILE__));
-(new \Utilities\NukeCompat())->getLang($module_name);
-
 $tabs = new \UI\Components\PageTabs(['season' => 'Season', 'career' => 'Career'], 'season');
 $tab = $tabs->resolve($_GET['tab'] ?? null);
 

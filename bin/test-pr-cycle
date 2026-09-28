@@ -356,6 +356,7 @@ run_in() {
         PR_CYCLE_AUTH_PROBE_CMD="${AUTHPROBE:-true}" \
         PR_CYCLE_PATCH_ID_CMD="$BIN/patchid" \
         PR_CYCLE_HARNESS_OUT="$SCRATCH/harness-out" \
+        PR_CYCLE_FLEET_LOG_DIR="$SCRATCH/fleetlogs" \
         "$DRIVER" "$@" 2>"$ERR")"
     RC=$?
     return 0
@@ -572,6 +573,25 @@ grep -qF '#102' "$SCRATCH/dm.argv" \
 grep -qF '#103' "$SCRATCH/dm.argv" \
     && fail "case 11: DM should not mention absent #103"
 end_case "case 11 non-armable and absent"
+
+# ==========================================================================================
+# 11b — the finish line counts each fired PR's outcome from its post-plan-fleet log
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+rm -rf "$SCRATCH/fleetlogs"; mkdir -p "$SCRATCH/fleetlogs"
+echo 'post-plan-fleet: outcome=shipped' > "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
+echo 'post-plan-fleet: outcome=held'    > "$SCRATCH/fleetlogs/post-plan-fleet-102.log"
+# 103 has no log at all: it counts as blocked.
+run --worker
+[[ $RC -eq 0 ]] || fail "case 11b: exit $RC, want 0"
+_want11b='fired 3 (shipped 1, held 1, blocked 1, timed out 0)'
+grep -qF "$_want11b" <<< "$OUT" || fail "case 11b: finish line lacks '$_want11b'"
+grep -qF "$_want11b" "$SCRATCH/dm.argv" || fail "case 11b: DM lacks '$_want11b'"
+grep -qF 'readied' <<< "$OUT" && fail "case 11b: finish line still says readied"
+end_case "case 11b outcome counts"
 
 # --- rescue: baseline characterization -----------------------------------------------------
 # Passes BEFORE the rescue path exists (the driver ignores an unknown seam) and AFTER it

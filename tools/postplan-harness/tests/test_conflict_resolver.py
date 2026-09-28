@@ -589,3 +589,60 @@ def test_purge_spares_flag(tmp_path):
     assert not os.path.exists(verdict_file)
     assert os.path.exists(flag)
     os.unlink(flag)
+
+
+# ── Bug 1: _CONFLICT_MARKER_PAT tightness ─────────────────────────────────────
+
+def test_conflict_marker_pat_rejects_80char_separator():
+    """80-char === separator (sim-recap-exemplar.txt) must NOT be detected as a marker.
+
+    The old `l.startswith("=======")` check was True for any line STARTING WITH 7+
+    = signs, so the 80-char separator falsely flagged resolved files as still conflicted.
+    """
+    from harness.conflict import _CONFLICT_MARKER_PAT
+    separator = "=" * 80
+    assert _CONFLICT_MARKER_PAT.match(separator) is None, (
+        f"_CONFLICT_MARKER_PAT should not match 80-char separator: {separator!r}"
+    )
+
+
+def test_conflict_marker_pat_matches_real_conflict_markers():
+    """Real git conflict markers must still be detected as unresolved."""
+    from harness.conflict import _CONFLICT_MARKER_PAT
+    real_markers = [
+        "<<<<<<< HEAD",
+        "<<<<<<< ",
+        "=======",
+        ">>>>>>> branch-name",
+        ">>>>>>> ",
+        "||||||| base",
+    ]
+    for line in real_markers:
+        assert _CONFLICT_MARKER_PAT.match(line) is not None, (
+            f"_CONFLICT_MARKER_PAT should match real marker: {line!r}"
+        )
+
+
+def test_conflict_marker_pat_rejects_long_equals_lines():
+    """Lines with more than 7 = signs are NOT conflict markers (they are separators)."""
+    from harness.conflict import _CONFLICT_MARKER_PAT
+    non_markers = ["=" * 8, "=" * 20, "=" * 79, "=" * 80]
+    for line in non_markers:
+        assert _CONFLICT_MARKER_PAT.match(line) is None, (
+            f"_CONFLICT_MARKER_PAT should not match separator line: {line!r}"
+        )
+
+
+def test_resolve_one_does_not_false_positive_on_separator_line(tmp_path):
+    """After resolution, a file containing an 80-char === separator line must pass
+    the marker check and count as resolved, not as still-conflicted."""
+    from harness.conflict import _CONFLICT_MARKER_PAT
+    # Simulate a resolved file that contains a separator (e.g. sim-recap-exemplar.txt style)
+    content_with_separator = "header\n" + "=" * 80 + "\nfooter\n"
+    marker_lines = [
+        l for l in content_with_separator.splitlines()
+        if _CONFLICT_MARKER_PAT.match(l)
+    ]
+    assert marker_lines == [], (
+        f"Separator line should not be treated as conflict marker, got: {marker_lines}"
+    )

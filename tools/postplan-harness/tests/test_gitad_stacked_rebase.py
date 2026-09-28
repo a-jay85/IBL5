@@ -11,7 +11,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.adapters.gitad import LiveGit
+from harness.adapters.gitad import LiveGit, _CONFLICT_MARKER_RE
 from harness.state import HarnessError
 
 _REPO_ROOT = os.path.dirname(
@@ -860,5 +860,105 @@ def test_rebase_onto_marker_sweep_rc_failure_fails_closed(monkeypatch):
         assert _rev(d, "HEAD") == pre_head
         assert _sh(d, "status", "--porcelain").stdout.strip() == ""
         assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+# ── Bug 1: conflict marker regex tightness ────────────────────────────────────
+
+def test_conflict_marker_re_rejects_80char_equals_separator():
+    """80-char === separator (sim-recap-exemplar.txt) must NOT be a conflict marker.
+
+    The old pattern ^={7} matched any line starting with 7+ = signs, so the
+    80-char separator fired a false-positive that blocked PRs #2453 and #2465.
+    """
+    separator = "=" * 80
+    assert re.search(_CONFLICT_MARKER_RE, separator, re.MULTILINE) is None, (
+        f"_CONFLICT_MARKER_RE should not match 80-char separator: {separator!r}"
+    )
+
+
+def test_conflict_marker_re_matches_real_markers():
+    """Real git conflict markers must still be detected."""
+    real_markers = [
+        "<<<<<<< HEAD",
+        "<<<<<<< ",
+        "=======",
+        ">>>>>>> branch-name",
+        ">>>>>>> ",
+        "||||||| base",
+    ]
+    for line in real_markers:
+        assert re.search(_CONFLICT_MARKER_RE, line, re.MULTILINE) is not None, (
+            f"_CONFLICT_MARKER_RE should match real conflict marker: {line!r}"
+        )
+
+
+def test_conflict_marker_re_rejects_non_marker_equals_prefixed():
+    """Lines with more than 7 = signs that are not exactly 7 should not match."""
+    non_markers = [
+        "=" * 8,    # 8 = signs (too many for exact-7)
+        "=" * 20,   # 20 = signs
+        "=" * 79,   # 79 = signs
+        "=" * 80,   # 80 = signs (the separator from sim-recap-exemplar.txt)
+        "======= with text",  # 7 = followed by space then text (not an exact-7-alone line)
+    ]
+    for line in non_markers:
+        assert re.search(_CONFLICT_MARKER_RE, line, re.MULTILINE) is None, (
+            f"_CONFLICT_MARKER_RE should not match non-marker line: {line!r}"
+        )
+
+
+# ── emergency_abort: SIGTERM restore of a stopped rebase ─────────────────────
+
+def _stopped_rebase_repo():
+    """A branch stopped mid-rebase on a modify/modify conflict.
+    Returns (d, branch, pre_sha)."""
+    d, _base, _master, _key, branch = _make_simple_conflict_repo()
+    pre = _rev(d, "HEAD")
+    r = _sh(d, "rebase", "origin/master", check=False)
+    assert r.returncode != 0, "fixture must stop on a conflict"
+    return d, branch, pre
+
+
+def _rebase_in_progress(d):
+    for name in ("rebase-merge", "rebase-apply"):
+        p = _sh(d, "rev-parse", "--git-path", name).stdout.strip()
+        if os.path.exists(os.path.join(d, p)):
+            return True
+    return False
+
+
+def test_emergency_abort_restores_stopped_rebase():
+    d, branch, pre = _stopped_rebase_repo()
+    try:
+        g = LiveGit(d)
+        g._pre_rebase_sha = pre
+        g.emergency_abort()
+        assert not _rebase_in_progress(d)
+        assert _sh(d, "symbolic-ref", "--short", "HEAD").stdout.strip() == branch
+        assert _rev(d, "HEAD") == pre
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_emergency_abort_is_noop_when_not_armed():
+    d, _branch, _pre = _stopped_rebase_repo()
+    try:
+        LiveGit(d).emergency_abort()
+        assert _rebase_in_progress(d), "an unarmed abort must not touch the tree"
+    finally:
+        _sh(d, "rebase", "--abort", check=False)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_rebase_onto_disarms_after_a_raise():
+    d, _base, _master, key, branch = _make_simple_conflict_repo(
+        lostwork_script="#!/usr/bin/env bash\nexit 1\n")
+    try:
+        g = LiveGit(d)
+        with pytest.raises(HarnessError):
+            g.rebase_onto()
+        assert g._pre_rebase_sha is None
     finally:
         _cleanup_full(key, branch, d)

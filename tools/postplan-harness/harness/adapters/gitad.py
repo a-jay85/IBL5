@@ -21,6 +21,14 @@ from ..state import HarnessError
 # bin/check-rules-byte-budget's summary line.
 _ZERO_SHA = "0" * 40
 
+# ERE passed to `git grep -E` for the whole-tree conflict-marker sweep.
+# Tightened to avoid false positives from separator lines like 80-char `====`:
+#   `<<<<<<<` and `>>>>>>>` must be followed by a space or EOL (they always
+#   precede a branch name or nothing).
+#   `=======` must stand alone on the line (no heading or trailing text).
+#   `|||||||` (diff3 base) follows the same space-or-EOL rule.
+_CONFLICT_MARKER_RE = r"^(<{7}( |$)|={7}$|>{7}( |$)|\|{7}( |$))"
+
 # bin/pre-push-adr-hook's FIRST arm: the branch does not contain origin/master. It fires
 # before the ADR check and shares the hook's prefix, so without its own discriminator it
 # reads as an ADR denial -- which is exactly how PR #2314's remediation push was
@@ -123,6 +131,42 @@ class LiveGit:
         # the index. Reset at the start of each rebase method; read by runner.py for the
         # audit log so a fail-closed exit 3 names the files that conflicted.
         self.last_conflict_files: tuple[str, ...] = ()
+        # HEAD before the current rebase; None outside one. The public rebase methods
+        # clear it in `finally`. The SIGTERM handler reads it to abort and restore.
+        self._pre_rebase_sha: Optional[str] = None
+
+    def emergency_abort(self) -> None:
+        """Called from the SIGTERM signal handler.
+
+        Aborts any in-progress rebase and hard-resets to the pre-rebase HEAD. Acts only
+        when `_pre_rebase_sha` is set AND a rebase directory is present; otherwise it is
+        a no-op to avoid destroying committed work during unrelated phases.
+        """
+        pre = self._pre_rebase_sha
+        if pre is None:
+            return
+        # Only act when git has a stopped rebase (the directory that marks mid-rebase state).
+        # --git-path can print a path relative to the worktree, so join it (a no-op
+        # when git already printed an absolute one).
+        def _git_path(name: str) -> str:
+            out = subprocess.run(
+                ["git", "-C", self.worktree, "rev-parse", "--git-path", name],
+                capture_output=True, text=True,
+            ).stdout.strip()
+            return os.path.join(self.worktree, out) if out else ""
+        if not any(p and os.path.exists(p)
+                   for p in (_git_path("rebase-merge"), _git_path("rebase-apply"))):
+            return
+        subprocess.run(["git", "-C", self.worktree, "rebase", "--abort"],
+                       capture_output=True)
+        subprocess.run(["git", "-C", self.worktree, "reset", "--hard", pre],
+                       capture_output=True)
+        import sys as _sys
+        _sys.stderr.write(
+            f"post-plan harness: SIGTERM — aborted rebase in {self.worktree},"
+            f" restored to {pre[:12]}\n"
+        )
+        _sys.stderr.flush()
 
     def _run(self, *args: str, check: bool = True) -> str:
         proc = subprocess.run(["git", "-C", self.worktree, *args],
@@ -416,6 +460,13 @@ class LiveGit:
         return manifest_path, notes_path
 
     def rebase_onto(self, base: str = "origin/master") -> None:
+        # Every exit (return or raise) disarms the SIGTERM restore point.
+        try:
+            self._rebase_onto(base)
+        finally:
+            self._pre_rebase_sha = None
+
+    def _rebase_onto(self, base: str) -> None:
         """Repo pre-push policy (pre-push-adr-hook) rejects branches not rebased
         onto origin/master. Conflict → attempt auto-resolution; if that fails or is
         not applicable, abort, restore the tree, and raise HarnessError.
@@ -432,6 +483,7 @@ class LiveGit:
         master_sha = self._run("rev-parse", base).strip()
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
+        self._pre_rebase_sha = pre_rebase_sha  # arm SIGTERM handler
         pre_patch = self._run("diff", f"{master_sha}...HEAD")
         if pre_patch.strip():
             Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_text(pre_patch)
@@ -483,7 +535,7 @@ class LiveGit:
                 # and >=2 on its own failure, so branch on rc: reading stdout alone would
                 # let a rejected argv pass as "no markers found".
                 sweep_rc, sweep_out = self._run_out(
-                    "grep", "-n", "-E", "^(<{7}|={7}|>{7})", "HEAD", "--", ".")
+                    "grep", "-n", "-E", _CONFLICT_MARKER_RE, "HEAD", "--", ".")
                 if sweep_rc == 0:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,
@@ -541,6 +593,12 @@ class LiveGit:
                                   reason=f"unexpected error during auto-resolve: {exc}")
 
     def autoresolve_stacked_rebase(self) -> "StackedRebaseResult":
+        try:
+            return self._autoresolve_stacked_rebase()
+        finally:
+            self._pre_rebase_sha = None
+
+    def _autoresolve_stacked_rebase(self) -> "StackedRebaseResult":
         """Resolve a squash-trap stacked-branch conflict via `git rebase --onto`.
         Returns a StackedRebaseResult; never raises on a decline — the caller owns
         the single decision about exit 3."""
@@ -614,6 +672,7 @@ class LiveGit:
         )
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
+        self._pre_rebase_sha = pre_rebase_sha  # arm SIGTERM handler
         purge_verdict_artifacts(key)
 
         rebase_proc = subprocess.run(
@@ -665,7 +724,7 @@ class LiveGit:
                 # and >=2 on its own failure, so branch on rc: reading stdout alone would
                 # let a rejected argv pass as "no markers found".
                 sweep_rc, sweep_out = self._run_out(
-                    "grep", "-n", "-E", "^(<{7}|={7}|>{7})", "HEAD", "--", ".")
+                    "grep", "-n", "-E", _CONFLICT_MARKER_RE, "HEAD", "--", ".")
                 if sweep_rc == 0:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,

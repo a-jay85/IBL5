@@ -250,3 +250,54 @@ def test_every_local_gate_subclass_still_exits_3(detail):
     /post-plan skill fallback against a hook that already said no."""
     assert runner.exit_code_for(
         _res(TerminalState.FAILED, "local-gate", error=detail)) == 3
+
+
+# ── Bug 3: SIGTERM handler wiring ─────────────────────────────────────────────
+
+def test_active_git_module_variable_exists():
+    """runner._active_git must exist at module level (set to None before any run)."""
+    assert hasattr(runner, "_active_git"), "_active_git module variable not found"
+    # Before any run it should be None (or a LiveGit if tests ran in isolation)
+    # We only assert it's accessible without AttributeError.
+
+
+def test_install_sigterm_handler_is_callable():
+    """_install_sigterm_handler must be defined and callable."""
+    assert callable(getattr(runner, "_install_sigterm_handler", None)), (
+        "_install_sigterm_handler must be a callable in runner"
+    )
+
+
+def test_sigterm_handler_installed_in_main_source():
+    """main() must call _install_sigterm_handler() so SIGTERM triggers cleanup."""
+    import inspect
+    src = inspect.getsource(runner.main)
+    assert "_install_sigterm_handler()" in src, (
+        "main() must call _install_sigterm_handler() before starting the run"
+    )
+
+
+def test_active_git_set_in_run_source():
+    """run() must set _active_git = git when creating a LiveGit in isolated mode."""
+    import inspect
+    src = inspect.getsource(runner.run)
+    assert "_active_git = git" in src or "_active_git=git" in src, (
+        "run() must assign the LiveGit instance to _active_git for SIGTERM cleanup"
+    )
+
+
+def test_sigterm_handler_calls_emergency_abort():
+    """The installed SIGTERM handler must call git.emergency_abort() on _active_git."""
+    import inspect
+    src = inspect.getsource(runner._install_sigterm_handler)
+    assert "emergency_abort()" in src, (
+        "_install_sigterm_handler must call emergency_abort() on the active git"
+    )
+
+
+def test_emergency_abort_exists_on_live_git():
+    """LiveGit must have an emergency_abort() method for the SIGTERM handler to call."""
+    from harness.adapters.gitad import LiveGit
+    assert callable(getattr(LiveGit, "emergency_abort", None)), (
+        "LiveGit.emergency_abort() must be defined for SIGTERM cleanup"
+    )

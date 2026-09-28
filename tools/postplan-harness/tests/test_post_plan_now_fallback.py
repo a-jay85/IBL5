@@ -373,7 +373,7 @@ def _generate_cmd(tmp_path, extra_env=None):
 def test_generated_cmd_has_no_rc4_arm(tmp_path):
     cmd = _generate_cmd(tmp_path)
     assert '[ "$rc" = 4 ]' not in cmd, "rc=4 arm must be gone after the full-port"
-    assert cmd.index('if should_fallback "$rc"; then') < cmd.index('elif [ "$rc" = 3 ]; then')
+    assert cmd.index('should_fallback "$rc"; then') < cmd.index('elif [ "$rc" = 3 ]; then')
 
 def test_generated_cmd_carries_one_claude_invocation(tmp_path):
     cmd = _generate_cmd(tmp_path)
@@ -436,7 +436,7 @@ def test_generated_cmd_captures_the_harness_result_line(tmp_path):
     assert "HARNESS_RESULT=$(grep -m1 '^RESULT:'" in cmd
     assert "HARNESS_RESULT=${HARNESS_RESULT:0:1400}" in cmd
     assert (cmd.index("rc=$?; ") < cmd.index("HARNESS_RESULT=$(grep")
-            < cmd.index('if should_fallback "$rc"; then'))
+            < cmd.index('should_fallback "$rc"; then'))
 
 
 def test_skill_only_cmd_has_no_harness_result_capture(tmp_path):
@@ -1460,3 +1460,36 @@ def test_gate_denial_fails_closed_then_allows_a_refire(tmp_path):
     r2 = _run_ppn(tmp_path / "leg2")  # default launchctl stub: silent, no live job
     assert r2.returncode != 6, r2.stdout
     assert "already in flight" not in r2.stdout
+
+
+# ── Bug 2: SIGTERM reported as success ────────────────────────────────────────
+
+def test_generated_cmd_guards_gate_open_with_sigterm_flag(tmp_path):
+    """GATE_OPEN must check _sigterm_received so a SIGTERM'd run cannot launch claude.
+
+    Without the guard, a harness that exits non-zero (e.g. rc=1) after SIGTERM would
+    satisfy should_fallback(), spawning a full /post-plan skill session on a killed run.
+    """
+    cmd = _generate_cmd(tmp_path)
+    # The guard appears before should_fallback in the gate expression
+    gate_pos = cmd.index('should_fallback "$rc"; then')
+    sigterm_guard = '_sigterm_received'
+    assert sigterm_guard in cmd[:gate_pos], (
+        "GATE_OPEN must check _sigterm_received BEFORE calling should_fallback"
+    )
+
+
+def test_generated_cmd_overrides_pp_rc_to_143_on_sigterm(tmp_path):
+    """After the compound command, the pp_rc line must override to 143 when the flag is set.
+
+    Without this, a run where the harness exits 0 then SIGTERM fires would report
+    postplan-rc=0 (success) instead of the correct 143 (killed).
+    """
+    cmd = _generate_cmd(tmp_path)
+    assert "pp_rc=143" in cmd, (
+        "CMD must override pp_rc to 143 when _sigterm_received flag is set"
+    )
+    # The override must come AFTER the compound command exits (after pp_rc=$?)
+    pp_rc_pos = cmd.index("pp_rc=$?")
+    override_pos = cmd.index("pp_rc=143")
+    assert override_pos > pp_rc_pos, "pp_rc=143 override must appear after pp_rc=$?"

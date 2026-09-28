@@ -318,6 +318,35 @@ add_worktree() {
             # Untracked new.txt already in the worktree
             printf 'local-untracked\n' > "$wt/new.txt"
             ;;
+        stale)
+            # Minimal stale copy: one commit on local and one patch-identical commit
+            # pushed via a second clone, leaving ahead=1 behind=1 with no unique work.
+            printf '%s\n' "$name" > "$main/$name.txt"
+            git -C "$main" add "$name.txt"
+            git -C "$main" commit -qm "$name initial"
+            git -C "$main" push -q origin "$name"
+            git -C "$main" checkout -q master
+            git -C "$main" worktree add -q "$wt" "$name"
+            printf 'stale\n' > "$wt/stale.txt"
+            git -C "$wt" add stale.txt
+            git -C "$wt" -c user.email=t@example.com -c user.name=tester \
+                -c commit.gpgsign=false commit -qm "stale local"
+            local orig_st; orig_st="$(git -C "$main" remote get-url origin)"
+            local clone_st; clone_st="$(mktemp -d "$TMP/clone_st.XXXXXX")"
+            git clone -q "$orig_st" "$clone_st" 2>/dev/null
+            git -C "$clone_st" config user.email t@example.com
+            git -C "$clone_st" config user.name tester
+            git -C "$clone_st" config commit.gpgsign false
+            git -C "$clone_st" checkout -q "$name"
+            printf 'stale\n' > "$clone_st/stale.txt"
+            git -C "$clone_st" add stale.txt
+            # Different committer identity ensures distinct SHA from local commit
+            # while keeping the patch-id (diff content) identical.
+            GIT_COMMITTER_NAME=pipeline-bot GIT_COMMITTER_EMAIL=bot@example.com \
+                git -C "$clone_st" commit -qm "stale local"
+            git -C "$clone_st" push -q origin "$name"
+            git -C "$main" fetch -q origin
+            ;;
         stale-copy)
             _make_stale_copy "$main" "$name" "$wt"
             ;;
@@ -489,6 +518,7 @@ assert_eq "ahead: HEAD not changed" "$HEAD_BEFORE" "$HEAD_AFTER"
 assert_match "ahead: STRAGGLER in log" "STRAGGLER.*wt-fwd|STRAGGLER.*reason=ahead" \
     "$(cat "$LOG4" 2>/dev/null)"
 assert_match "ahead: counted in summary" "ahead=" "$(cat "$LOG4" 2>/dev/null)"
+assert_match "ahead: reset-stale=0" "reset-stale=0" "$(cat "$LOG4" 2>/dev/null)"
 
 # ── Test 5: dirty worktree → skipped, working tree byte-identical after ───────
 MAIN5="$(new_env)"
@@ -970,6 +1000,60 @@ if git -C "$WT38" rev-parse --verify -q refs/wt-sync-backup/wt-stale38 >/dev/nul
     failcase "only-dry: backup ref written under --dry-run"
 else
     pass "only-dry: no backup ref"
+fi
+
+# ── Test 39: fleet: stale copy (minimal fixture) → RESET-STALE, backup preserved ─
+MAIN39="$(new_env)"
+WT39="$(add_worktree "$MAIN39" "wt-stale39" stale)"
+LOG39="$(fresh_log t39)"; LOCKD39="$(fresh_lockd t39)"
+L_SHA39="$(git -C "$WT39" rev-parse HEAD)"
+ORIGIN39="$(git -C "$MAIN39" rev-parse origin/wt-stale39)"
+run_with_repo "$MAIN39" "$LOG39" "$LOCKD39" -- --force
+assert_eq    "reset-stale: exit 0" "0" "$ST"
+assert_eq    "reset-stale: HEAD at origin tip" "$ORIGIN39" "$(git -C "$WT39" rev-parse HEAD)"
+assert_match "reset-stale: log has reset-stale=1" "reset-stale=1" "$(cat "$LOG39" 2>/dev/null)"
+assert_match "reset-stale: RESET-STALE branch in log" "RESET-STALE branch=wt-stale39" \
+    "$(cat "$LOG39" 2>/dev/null)"
+assert_match "reset-stale: stdout has reset-stale" "reset-stale" "$OUT"
+if git -C "$MAIN39" for-each-ref --contains "$L_SHA39" 2>/dev/null | grep -q .; then
+    pass "reset-stale: backup ref reachable from pre-reset commit"
+else
+    failcase "reset-stale: backup ref not found for pre-reset commit"
+fi
+
+# ── Test 40: fleet: untracked file blocks stale reset → STRAGGLER ────────────
+MAIN40="$(new_env)"
+WT40="$(add_worktree "$MAIN40" "wt-stale40" stale)"
+HEAD40_BEFORE="$(git -C "$WT40" rev-parse HEAD)"
+printf 'x\n' > "$WT40/scratch.txt"
+LOG40="$(fresh_log t40)"; LOCKD40="$(fresh_lockd t40)"
+run_with_repo "$MAIN40" "$LOG40" "$LOCKD40" -- --force
+assert_eq    "stale-untracked: exit 0" "0" "$ST"
+assert_eq    "stale-untracked: HEAD unchanged" "$HEAD40_BEFORE" "$(git -C "$WT40" rev-parse HEAD)"
+assert_match "stale-untracked: STRAGGLER reason=ahead in log" \
+    "STRAGGLER branch=wt-stale40.*reason=ahead" "$(cat "$LOG40" 2>/dev/null)"
+assert_match "stale-untracked: reset-stale=0" "reset-stale=0" "$(cat "$LOG40" 2>/dev/null)"
+if [ -f "$WT40/scratch.txt" ]; then
+    pass "stale-untracked: scratch.txt preserved"
+else
+    failcase "stale-untracked: scratch.txt removed"
+fi
+
+# ── Test 41: fleet: --dry-run on stale copy reports, writes nothing ──────────
+MAIN41="$(new_env)"
+WT41="$(add_worktree "$MAIN41" "wt-stale41" stale)"
+HEAD41_BEFORE="$(git -C "$WT41" rev-parse HEAD)"
+L_SHA41="$(git -C "$WT41" rev-parse HEAD)"
+LOG41="$(fresh_log t41)"; LOCKD41="$(fresh_lockd t41)"
+run_with_repo "$MAIN41" "$LOG41" "$LOCKD41" -- --force --dry-run
+assert_eq    "stale-dry: exit 0" "0" "$ST"
+assert_eq    "stale-dry: HEAD unchanged" "$HEAD41_BEFORE" "$(git -C "$WT41" rev-parse HEAD)"
+assert_match "stale-dry: WOULD-RESET-STALE in stdout" "WOULD-RESET-STALE" "$OUT"
+assert_match "stale-dry: 1 reset-stale in stdout" "1 reset-stale" "$OUT"
+if git -C "$MAIN41" for-each-ref --contains "$L_SHA41" 2>/dev/null | grep -qF "refs/wt-sync-backup/"; then
+    failcase "stale-dry: backup ref written under --dry-run"
+else
+    pass "stale-dry: no backup ref written"
 fi
 
 # ── Hook wrapper tests ────────────────────────────────────────────────────────

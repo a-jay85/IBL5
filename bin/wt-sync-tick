@@ -11,10 +11,10 @@
 # are wrapped in `if` (mirrors bin/bug-pipeline-tick's discipline).
 #
 # NEVER pushes, never force-pushes, never calls gh, never rebases, never
-# creates or deletes worktrees. Fast-forward only, with one exception: a
-# stale-copy branch (every local-only commit already on origin as a
-# patch-equivalent) is backed up to refs/wt-sync-backup/<branch> and then
-# hard-reset to origin by backup_and_reset. That is the only hard reset.
+# resets --hard (one exception: the stale-copy reset in backup_and_reset,
+# which writes refs/wt-sync-backup/<branch> first and logs RESET-STALE),
+# never creates or deletes worktrees. Otherwise fast-forward only, plus the
+# --only diverged-clean merge (ADR-0133).
 # See ADR-0106 and ADR-0133 for the design rationale.
 #
 # Usage: bin/wt-sync-tick [--dry-run] [--force] [--help] [--only <path>]

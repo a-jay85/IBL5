@@ -1,6 +1,6 @@
 ---
 description: Derive the Playwright Docker image tag from each package's package.json at runtime so the image and the installed client cannot drift; the drift guard becomes a no-hardcoded-literal regression guard.
-last_verified: 2026-07-27
+last_verified: 2026-09-27
 ---
 
 # ADR-0070: Single-source the Playwright version from each package.json

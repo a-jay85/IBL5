@@ -1,6 +1,6 @@
 ---
 description: Feature PRs (conventional-commit `feat:`) cannot merge until a human applies the `human-approved` label — a required CI check, not a convention, blocks auto-merge.
-last_verified: 2026-07-27
+last_verified: 2026-09-27
 ---
 
 # ADR-0062: Human sign-off gate for feature PRs

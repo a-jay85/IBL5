@@ -1,6 +1,6 @@
 ---
 description: Unifies the deployment funnel so every PR-opening path flows through /post-plan; triage is a loaded rule, /plan auto-queues, /ship drops merge-intent tokens.
-last_verified: 2026-07-27
+last_verified: 2026-09-27
 ---
 
 # ADR-0067: Unified deployment funnel — one pipeline through /post-plan

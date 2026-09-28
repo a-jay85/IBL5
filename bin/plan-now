@@ -391,16 +391,13 @@ conflicting default in the skill):**
   \`\`\`
   PLAN_FILE: $PLANS_DIR/<slug>.md
   \`\`\`
-  (absolute path). This job identifies your plan by that line; without it the
-  check-plan verdict cannot be attributed to your run, because a directory scan is
-  ambiguous whenever another \`plan-now\` run overlaps yours. **The final message is
-  the only placement that works**: this job runs you under \`claude -p\`, which emits
-  only your final assistant message, so a marker printed at any earlier point is
-  discarded before this job can read it. Printing it earlier as well is harmless —
-  the last occurrence wins — but never a substitute. This overrides the skill's
-  Step 5.5 and Step 6: skip the queue step, write the Step 6 report, then end with
-  this line. Runs that followed Step 6 ended on a queue-status sentence
-  ("Queued at position N", "Automouse will pick it up") and lost the line.
+  (absolute path). This job attributes the check-plan verdict to your run by that
+  line, since a directory scan is ambiguous whenever another \`plan-now\` run
+  overlaps yours. **The final message is the only placement that works**: under
+  \`claude -p\` only your final message reaches this job, so an earlier print is
+  discarded (printing it earlier as well is harmless; the last one wins). This
+  overrides the skill's Step 5.5 and Step 6: skip the queue step, write the Step 6
+  report, then end with this line.
 - **Halting with no plan is legal — end it with \`NO_PLAN:\` instead.** If you stop
   without writing any plan (the skill's Step 2.1 found the work fully done), the
   last line of your final message must be exactly this, bare, on its own:
@@ -424,13 +421,9 @@ conflicting default in the skill):**
   either one is never queued. Step 5 of the skill has the remediation table.
 - **Run every sub-agent in the FOREGROUND.** Never spawn the plan-architect (or any
   other \`Agent\`) with \`run_in_background: true\`, and never start a long task, end
-  your turn, and expect to collect it afterwards. Under \`claude -p\` there is no
-  afterwards: print mode is a single shot, so the turn you end IS the run, and a
-  background task's completion notification has no next turn to arrive on — its
-  result is discarded exactly the way an early-printed \`PLAN_FILE:\` line is. This
-  job disables the harness's background-task sweep, which stops such a task being
-  killed mid-run; it cannot create a turn for the result to land on. If you have
-  already started one, collect it before you finish.
+  your turn, and expect to collect it afterwards. Under \`claude -p\` the turn you
+  end is the run, so a background result has no next turn to land on and is
+  discarded. If you have already started one, collect it before you finish.
 - $DISPOSITION_LINE
 CODA
 fi

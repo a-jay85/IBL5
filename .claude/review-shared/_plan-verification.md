@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time; no deferred manual items; E2E assertions must be seed- and DOM-grounded.
-last_verified: 2026-09-16
+last_verified: 2026-09-28
 ---
 
 # Plan Verification Matrix
@@ -69,7 +69,7 @@ Pre-implementation tests go **before** their implementation step. Post-implement
 
 ## Required Test Methods
 
-A plan whose Verification Matrix carries **≥1 PHPUnit row** MUST also carry a `## Required Test Methods` section — a markdown list of the exact test-method names the implementation must ship, one bare name per list item:
+A plan whose Verification Matrix carries at least one PHPUnit row must also carry a `## Required Test Methods` section. The section is a markdown list of the exact test-method names the implementation must ship, one bare name per list item:
 
 ```
 ## Required Test Methods
@@ -77,9 +77,9 @@ A plan whose Verification Matrix carries **≥1 PHPUnit row** MUST also carry a 
 - `test_required_methods_ignores_fenced_example`
 ```
 
-- **The name must match the shipped declaration exactly.** Write the bare method name. Leave out any class prefix, `()`, or `::`. <!-- slop-ok -->
-- **Fenced examples do not count.** Both parsers strip fenced blocks before reading the section, so an illustrative list inside a fence yields zero entries.
-- **Escape hatch.** When every PHPUnit row genuinely names no new method, write `<!-- no-test-methods: <reason ≥15 chars> -->` instead. `bin/check-plan` gate `[M]` accepts the section or the marker.
+- The name must match the shipped declaration exactly. Write the bare method name. Leave out any class prefix, `()`, or `::`. <!-- slop-ok -->
+- Fenced examples do not count. Both parsers strip fenced blocks before reading the section, so an illustrative list inside a fence yields zero entries.
+- Escape hatch. When every PHPUnit row genuinely names no new method, write `<!-- no-test-methods: <reason ≥15 chars> -->` instead. `bin/check-plan` gate `[M]` accepts the section or the marker.
 
 ## Forced E2E triggers
 
@@ -105,7 +105,7 @@ Any E2E verification-matrix row that asserts a **seed-** or **DOM-dependent** va
 The source must be one of:
 
 - A specific row or count from `ibl5/tests/e2e/fixtures/ci-seed.sql` (cite the table and the rows that produce the expected value), or
-- The rendered form DOM, fetched live from the worktree stack: `curl --cookie "_auto_login=1" http://<slug>.localhost/ibl5/modules.php?name=X` (cite the element the assertion targets). The `_auto_login=1` cookie is required because localhost is logged-out by default (see `.claude/rules/browser-login.md`).
+- The rendered form DOM, fetched live from the worktree stack: `curl --cookie "_auto_login=1" http://<slug>.localhost/ibl5/modules.php?name=X` (cite the element the assertion targets). The cookie logs the request in, per `.claude/rules/browser-login.md`.
 
 - **Sort direction is not "ascending by default."** `ibl5/jslib/sorttable.js` sorts **descending** on first click. See memory `reference_sorttable_descending_first`.
 - **Seed cardinality is small.** Counts must be grounded in what the CI seed actually contains. See memory `feedback_e2e_seed_grounding`.
@@ -114,7 +114,7 @@ Why: _plan-verification-detail.md § Why E2E assertions must be seed- and DOM-gr
 
 ## Forced manual-verification trigger (new or redesigned UI/UX)
 
-When a plan introduces **new or redesigned user-visible UI/UX**, the matrix MUST include at least one **Truly-manual** row for the subjective look-and-feel + flow check — *in addition to* (never instead of) any E2E and Visual-regression rows.
+When a plan introduces new or redesigned user-visible UI/UX, the matrix must include at least one Truly-manual row for the subjective look-and-feel and flow check. That row sits alongside any E2E and Visual-regression rows and never replaces them.
 
 A plan trips this trigger when it adds or restyles any of:
 
@@ -122,7 +122,7 @@ A plan trips this trigger when it adds or restyles any of:
 |---------|----------------|
 | New or restyled CSS component / stylesheet | a file under `ibl5/design/`, a new `*.css`, a new component class |
 | New rendered page or module | a new `ibl5/modules/*/index.php` route a user navigates to |
-| New nav/menu entry, indicator, or badge | the nav bell + unread badge from #1067 |
+| New nav/menu entry, indicator, or badge | the nav bell and its unread-count badge |
 | New multi-step or stateful user flow | mark-read / mark-all-read, a what-if sandbox, a wizard |
 
 **Does NOT trip:** a non-visual refactor, a one-line CSS bugfix with no design change, a JSON/POST endpoint with no visual surface, or any change where **nothing the user sees is new or redesigned**. An *unchanged* UI is covered by Visual-regression alone.

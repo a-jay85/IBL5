@@ -199,6 +199,84 @@ step67-unavailable() {
     fi
 }
 
+extract_prefire_command() {
+    # Extract the backtick-quoted command from the **Matrix check first.** line in workflow-continuity.md
+    local rule_file
+    rule_file="$(dirname "$0")/../.claude/rules/workflow-continuity.md"
+    grep '\*\*Matrix check first\.\*\*' "$rule_file" | grep -o '`bin/lib/plan-matrix-assertions[^`]*`' | tr -d '`'
+}
+
+prefire-rule-staged-new-file-realised() {
+    local span
+    span=$(extract_prefire_command)
+    [ -n "$span" ] || { echo "FAIL: prefire-rule-staged-new-file-realised — extracted span is empty"; return 1; }
+
+    local repo
+    repo=$(mktemp -d)
+    git -C "$repo" init -q
+    git -C "$repo" commit --allow-empty -m "base" -q
+    BASE=$(git -C "$repo" rev-parse HEAD)
+    git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
+
+    local plan
+    plan=$(plan_fixture "$repo" "frobnicate_prefire_case")
+
+    # New uncommitted file staged with the token
+    echo "frobnicate_prefire_case" > "$repo/test_prefire.py"
+    git -C "$repo" add test_prefire.py
+
+    # Build the command: substitute <plan> with the real plan path, and prefix bin/lib/plan-matrix-assertions with the real script path
+    local cmd
+    cmd=$(echo "$span" | sed "s|<plan>|$plan|g" | sed "s|bin/lib/plan-matrix-assertions|$MATRIX_ASSERTIONS_SCRIPT|g")
+
+    local out
+    out=$(cd "$repo" && eval "$cmd" 2>&1)
+    local rc=$?
+
+    if [ $rc -eq 0 ] && ! echo "$out" | grep -q 'UNREALISED-ASSERTION'; then
+        echo "PASS: prefire-rule-staged-new-file-realised"
+    else
+        echo "FAIL: prefire-rule-staged-new-file-realised — expected no UNREALISED-ASSERTION and exit 0, got rc=$rc out=$out"
+        return 1
+    fi
+}
+
+prefire-rule-missing-token-unrealised() {
+    local span
+    span=$(extract_prefire_command)
+    [ -n "$span" ] || { echo "FAIL: prefire-rule-missing-token-unrealised — extracted span is empty"; return 1; }
+
+    local repo
+    repo=$(mktemp -d)
+    git -C "$repo" init -q
+    git -C "$repo" commit --allow-empty -m "base" -q
+    BASE=$(git -C "$repo" rev-parse HEAD)
+    git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
+
+    local plan
+    plan=$(plan_fixture "$repo" "frobnicate_prefire_case")
+
+    # Staged file does NOT contain the token
+    echo "nothing relevant" > "$repo/test_prefire.py"
+    git -C "$repo" add test_prefire.py
+
+    local cmd
+    cmd=$(echo "$span" | sed "s|<plan>|$plan|g" | sed "s|bin/lib/plan-matrix-assertions|$MATRIX_ASSERTIONS_SCRIPT|g")
+
+    local out
+    out=$(cd "$repo" && eval "$cmd" 2>&1)
+
+    local unrealised_count
+    unrealised_count=$(echo "$out" | grep -c 'UNREALISED-ASSERTION: row' || true)
+
+    if [ "$unrealised_count" -eq 1 ]; then
+        echo "PASS: prefire-rule-missing-token-unrealised"
+    else
+        echo "FAIL: prefire-rule-missing-token-unrealised — expected exactly 1 UNREALISED-ASSERTION line, got $unrealised_count in: $out"
+        return 1
+    fi
+}
+
 step67-routing() {
     local prompt_file
     prompt_file="$(dirname "$0")/automouse/prompt-impl"
@@ -480,7 +558,7 @@ rm -rf "$root"
 
 ARG="${1:-all}"
 
-CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing"
+CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised"
 
 if [ "$ARG" = "all" ]; then
     for c in $CASES; do

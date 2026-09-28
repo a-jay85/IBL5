@@ -24,7 +24,7 @@ class ApiKeysRepository extends BaseMysqliRepository implements ApiKeysRepositor
             'SELECT key_prefix, permission_level, rate_limit_tier, is_active, created_at, last_used_at
              FROM `ibl_api_keys`
              WHERE user_id = ?
-             ORDER BY created_at DESC
+             ORDER BY created_at DESC, id DESC
              LIMIT 1',
             'i',
             $userId

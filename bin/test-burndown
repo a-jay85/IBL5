@@ -117,6 +117,164 @@ GH_LOG_EMPTY=0
 if [ ! -f "$T/gh.log" ] || [ ! -s "$T/gh.log" ]; then GH_LOG_EMPTY=1; fi
 [ "$GH_LOG_EMPTY" -eq 1 ] && ok "missing HOME: no gh call" || fail "missing HOME: no gh call (gh.log non-empty)"
 
+# ── Phase 2: report loading and delta extraction ──────────────────────────────
+mkdir -p "$T/home/claude-plans/_reports"
+
+# ── C5: missing report aborts before gh call (run BEFORE fixture exists) ──────
+rm -f "$T/gh.log"
+OUT="$(bd burndown-delta 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C5: missing report exits 3" || fail "C5: missing report exits 3 (got $RC)"
+want "C5: missing report: message" "$OUT" "no triage report"
+if ! grep -q "issue list" "$T/gh.log" 2>/dev/null; then
+    ok "C5: missing report: no gh issue list call"
+else
+    fail "C5: missing report: no gh issue list call (called anyway)"
+fi
+
+# Fixture report — used by C6-C13
+cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-26.md" <<'REPORT'
+# Backlog triage 2026-09-26
+
+## P2 (2)
+
+- [#10](https://github.com/a-jay85/IBL5-backlog/issues/10) Issue ten — rationale ten
+- [#11](https://github.com/a-jay85/IBL5-backlog/issues/11) Issue eleven — rationale eleven
+
+## P3 (1)
+
+- [#12](https://github.com/a-jay85/IBL5-backlog/issues/12) Issue twelve — rationale twelve
+
+## Notes
+
+- [#99](https://github.com/a-jay85/IBL5-backlog/issues/99) unranked note — should not rank
+
+## P5 (0)
+
+REPORT
+touch -t 202609260000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-26.md"
+
+# Fixture open issues
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":10,"title":"Issue ten","body":"","url":"u10","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":11,"title":"Issue eleven","body":"","url":"u11","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":12,"title":"Issue twelve","body":"","url":"u12","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":13,"title":"Issue thirteen","body":"","url":"u13","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":99,"title":"Unranked note","body":"","url":"u99","updatedAt":"2026-09-01T00:00:00Z","labels":[]}
+]
+JSON
+
+# ── C6: delta happy path (stdout only — stderr carries the debug line) ────────
+rm -f "$T/gh.log"
+OUT="$(bd burndown-delta 2>/dev/null)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C6: delta exits 0" || fail "C6: delta exits 0 (got $RC)"
+NUMS="$(jq -c '[.issues[].number]' <<< "$OUT" 2>/dev/null)"
+[ "$NUMS" = "[11,13,99]" ] && ok "C6: delta issues [11,13,99]" || fail "C6: delta issues [11,13,99] (got $NUMS)"
+DROPPED="$(jq -c '.dropped' <<< "$OUT" 2>/dev/null)"
+[ "$DROPPED" = "[]" ] && ok "C6: delta dropped []" || fail "C6: delta dropped [] (got $DROPPED)"
+
+# ── C7: awk boundaries and dropped ────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":10,"title":"Issue ten","body":"","url":"u10","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":11,"title":"Issue eleven","body":"","url":"u11","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":13,"title":"Issue thirteen","body":"","url":"u13","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":99,"title":"Unranked note","body":"","url":"u99","updatedAt":"2026-09-01T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd burndown-delta 2>/dev/null)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C7: delta with dropped exits 0" || fail "C7: delta with dropped exits 0 (got $RC)"
+DROPPED="$(jq -c '.dropped' <<< "$OUT" 2>/dev/null)"
+[ "$DROPPED" = "[12]" ] && ok "C7: dropped=[12]" || fail "C7: dropped=[12] (got $DROPPED)"
+# Restore issues
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":10,"title":"Issue ten","body":"","url":"u10","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":11,"title":"Issue eleven","body":"","url":"u11","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":12,"title":"Issue twelve","body":"","url":"u12","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":13,"title":"Issue thirteen","body":"","url":"u13","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":99,"title":"Unranked note","body":"","url":"u99","updatedAt":"2026-09-01T00:00:00Z","labels":[]}
+]
+JSON
+
+# ── C8: gh failure aborts ─────────────────────────────────────────────────────
+OUT="$(GH_FAIL_ON="issue list" GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown-delta 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C8: gh failure exits 3" || fail "C8: gh failure exits 3 (got $RC)"
+want "C8: gh failure message" "$OUT" "gh issue list failed"
+
+# ── C9: malformed report (headings only) ──────────────────────────────────────
+cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-27.md" <<'REPORT'
+# Backlog triage
+
+## P2 (0)
+
+## P3 (0)
+REPORT
+touch -t 202609270000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-27.md"
+OUT="$(bd burndown-delta 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C9: malformed report exits 3" || fail "C9: malformed report exits 3 (got $RC)"
+want "C9: malformed report message" "$OUT" "no ranked lines"
+rm -f "$T/home/claude-plans/_reports/backlog-triage-2026-09-27.md"
+
+# ── C10: duplicate rank aborts ────────────────────────────────────────────────
+cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-27.md" <<'REPORT'
+# Backlog triage
+
+## P2 (2)
+
+- [#10](https://github.com/a-jay85/IBL5-backlog/issues/10) Issue ten — dup
+- [#10](https://github.com/a-jay85/IBL5-backlog/issues/10) Issue ten again — dup
+
+## P3 (1)
+
+- [#12](https://github.com/a-jay85/IBL5-backlog/issues/12) Issue twelve — ok
+REPORT
+touch -t 202609270000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-27.md"
+OUT="$(bd burndown-delta 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C10: duplicate rank exits 3" || fail "C10: duplicate rank exits 3 (got $RC)"
+want "C10: duplicate rank message" "$OUT" "ranks #10 twice"
+rm -f "$T/home/claude-plans/_reports/backlog-triage-2026-09-27.md"
+
+# ── C11: newest report wins ────────────────────────────────────────────────────
+cp "$T/home/claude-plans/_reports/backlog-triage-2026-09-26.md" \
+   "$T/home/claude-plans/_reports/backlog-triage-2026-09-20.md"
+touch -t 202609200000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-20.md"
+echo "# notes" > "$T/home/claude-plans/_reports/backlog-triage-notes.md"
+OUT="$(bd burndown-delta 2>/dev/null)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C11: newest report exits 0" || fail "C11: newest report exits 0 (got $RC)"
+REPORT_PATH="$(jq -r '.report' <<< "$OUT" 2>/dev/null)"
+if grep -qF "backlog-triage-2026-09-26.md" <<< "$REPORT_PATH"; then
+    ok "C11: newest report selected"
+else
+    fail "C11: newest report selected (got $REPORT_PATH)"
+fi
+rm -f "$T/home/claude-plans/_reports/backlog-triage-2026-09-20.md" \
+      "$T/home/claude-plans/_reports/backlog-triage-notes.md"
+
+# ── C12: truncation guard ─────────────────────────────────────────────────────
+jq -n '[range(1000) | {number: ., title: "t", body: "", url: "u", updatedAt: "2026-09-27T00:00:00Z", labels: []}]' \
+    > "$T/fx/issues.json"
+OUT="$(bd burndown-delta 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C12: truncation guard exits 3" || fail "C12: truncation guard exits 3 (got $RC)"
+want "C12: truncation guard message" "$OUT" "may be truncated"
+# Restore issues
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":10,"title":"Issue ten","body":"","url":"u10","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":11,"title":"Issue eleven","body":"","url":"u11","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":12,"title":"Issue twelve","body":"","url":"u12","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":13,"title":"Issue thirteen","body":"","url":"u13","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":99,"title":"Unranked note","body":"","url":"u99","updatedAt":"2026-09-01T00:00:00Z","labels":[]}
+]
+JSON
+
+# ── C13: arity check ─────────────────────────────────────────────────────────
+OUT="$(bd burndown-delta extra 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C13: arity exits 2" || fail "C13: arity exits 2 (got $RC)"
+want "C13: arity message" "$OUT" "takes no arguments"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

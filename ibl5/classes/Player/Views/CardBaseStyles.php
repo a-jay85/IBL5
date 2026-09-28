@@ -119,7 +119,7 @@ class CardBaseStyles
     <!-- Draft Info -->
     <div class="draft-info">
         Drafted by {$draftTeam} · Rd {$draftRound}, Pick #{$draftPick} · 
-        <a href="/ibl5/modules.php?name=DraftHistory&year={$draftYear}">{$draftYear}</a>
+        <a href="/ibl5/modules.php?name=DraftInfo&tab=history&year={$draftYear}">{$draftYear}</a>
     </div>
 HTML;
     }

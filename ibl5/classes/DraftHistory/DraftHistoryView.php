@@ -87,12 +87,12 @@ class DraftHistoryView implements DraftHistoryViewInterface
     {
         $output = '<h1 class="ibl-title">';
         $output .= '<select id="draft-year-select" name="year" class="draft-year-select" aria-label="Draft year"'
-            . ' hx-get="modules.php?name=DraftHistory&amp;op=api"'
+            . ' hx-get="modules.php?name=DraftInfo&amp;op=api"'
             . ' hx-target="#draft-history-content"'
             . ' hx-swap="innerHTML"'
             . ' hx-trigger="change"'
             . ' hx-include="this"'
-            . ' onchange="if(window.htmx)return;window.location.href=\'./modules.php?name=DraftHistory&amp;year=\'+this.value">';
+            . ' onchange="if(window.htmx)return;window.location.href=\'./modules.php?name=DraftInfo&amp;tab=history&amp;year=\'+this.value">';
 
         for ($year = $endYear; $year >= $startYear; $year--) {
             $selected = ($year === $selectedYear) ? ' selected' : '';

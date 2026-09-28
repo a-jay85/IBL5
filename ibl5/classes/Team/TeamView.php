@@ -170,7 +170,7 @@ class TeamView implements TeamViewInterface
     <div class="team-banner-logo">
         <h1><img src="./<?= HtmlSanitizer::trusted($imagesPath) ?>logo/<?= HtmlSanitizer::e($teamid) ?>.jpg" alt="<?= HtmlSanitizer::e($team->name ?? '') ?>"></h1>
     </div>
-    <a href="modules.php?name=DraftHistory&amp;teamid=<?= HtmlSanitizer::e($teamid) ?>" class="team-action-link"><?= HtmlSanitizer::trusted($draftHistoryInner) ?></a>
+    <a href="modules.php?name=DraftInfo&amp;tab=history&amp;teamid=<?= HtmlSanitizer::e($teamid) ?>" class="team-action-link"><?= HtmlSanitizer::trusted($draftHistoryInner) ?></a>
     <?= HtmlSanitizer::trusted($discordButton) ?>
 </div>
         <?php

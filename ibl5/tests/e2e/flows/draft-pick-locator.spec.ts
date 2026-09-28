@@ -7,7 +7,7 @@ test.use({ storageState: publicStorageState() });
 
 test.describe('Draft Pick Locator flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=DraftPickLocator');
+    await page.goto('modules.php?name=DraftInfo&tab=picks');
   });
 
   test('has at least 28 team rows', async ({ page }) => {

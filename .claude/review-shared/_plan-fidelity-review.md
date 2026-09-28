@@ -23,6 +23,24 @@ Purpose: the criteria and verdict shape for the semantic judgment this skill exi
   If it **did** run, give its date and link, then **bound how much of today's head it actually covers** — a long-lived branch is typically dozens of force-push rebases past the head that was reviewed, and reporting "review ran, no issues" without that bound endorses code the review never saw. Recover the reviewed head from the branch reflog (`git reflog show <branch>` — the pre-rebase entries survive locally) or, failing that, from the earliest `head_ref_force_pushed` entry after the review timestamp in `gh api "repos/{owner}/{repo}/issues/<N>/timeline" --paginate`. With both SHAs, compare **net changed lines** rather than whole patches: strip context and hunk headers from each side (`grep -E '^[+-]' <patch> | grep -v -E '^(\+\+\+|---)'`) and diff the results, so pure rebase churn — shifted `@@` offsets, new surrounding context from master — does not read as a change to this PR. Report the surviving delta line-by-line; if it is empty, say the review covers the current head verbatim. If the reviewed head is unrecoverable, **say that** rather than implying coverage. **Then emit the coverage marker**, on its own line inside this 6c(a) statement — never as the file's last line, because `SKILL.md` Phase 6 step 3 requires the verdict file to end in the verdict word and prints `STOP: Phase 6 verdict mismatch` otherwise. Write exactly one of: `REVIEW-COVERAGE: NONE` (Phase 4B never ran), `REVIEW-COVERAGE: STALE` (it ran but the surviving delta against today's head is non-empty), `REVIEW-COVERAGE: CURRENT` (it ran and the delta is empty), `REVIEW-COVERAGE: UNKNOWN` (the reviewed head is unrecoverable). A reader that cannot parse the line treats it as `UNKNOWN`. A false "already covered" is the worse failure, so ambiguity resolves toward `UNKNOWN`.
 - **(b) That Phase 4B, when it ran, reviewed the PRE-REBASE diff.** Therefore every line produced by runtime Phase 3 conflict resolution is code no structured review has ever covered, and this fidelity review is its only coverage. **Name each conflict-resolved path** in the statement — do not summarise them as a count.
 
+**Writing style.** These rules apply to all prose in this review. They cover finding bodies, numbered check lines, `## FINDINGS` bullets, and the five `## DIGEST` label values. They do not apply to machine-parsed tokens: the terminal verdict word (`READY` / `READY WITH NOTES` / `NOT READY`), `REVIEWED_TREE=` and `Mode:` lines, the `## DIGEST` heading and label names. Finding titles are copied verbatim into backlog issue titles and the terminal line; keep them short imperative lines under 70 characters.
+
+For DIGEST label values, `.claude/review-shared/_prose-voice-contract.md` adds five further rules. Those rules apply alongside this list.
+
+Avoid these shapes in all prose you write:
+
+- **Start with the action.** Lead with one sentence a tired reader can act on. Paths and symbol names follow.
+- **No announcing openers.** Delete `The problem:`, `Here's the verdict:`, `Why this matters:`, or any label that precedes the sentence.
+- **One idea per sentence.** No clause hung off an em-dash.
+- **Write only the true half.** When about to write `X, not Y`, keep X and drop the rest.
+- **No padded lists.** Two items is enough. A third for rhythm is padding.
+- **No bolded thesis sentences.** If a sentence is the point, put it first. Do not bold it.
+- **No punchy closing fragments.** Cut `Done.`, `Full stop.`, `Every time.`
+- **Say it once.** Do not restate the same finding as a metaphor.
+- **Cut filler.** Delete `it's worth noting`, `in other words`, `at its core`, `that said`.
+
+These shapes are enumerated in `.claude/rules/prose-style.md`.
+
 **6d. The fidelity checks.** Each produces an explicit finding or an explicit "matches" — never silence. Each check names what makes its finding **blocking** (`NOT READY`) rather than a note (`READY WITH NOTES`); when a finding is blocking, say which clause below made it so:
 
 1. **Intent coverage** — for each of the plan's implementation phases, does a corresponding change exist in the diff? Name any phase with no diff footprint. **Blocking** unless the omission is *declared* — the plan, the PR body, or a posted comment says that phase was descoped, deferred, or split to a follow-up. An undeclared missing phase is `NOT READY`; a declared one is a note.

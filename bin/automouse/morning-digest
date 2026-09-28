@@ -16,6 +16,8 @@
 # Spend is the sum of per-plan rows in reports/YYYY-MM-DD-costs.md for both the
 # digest date and the prior date; the weekly-aggregate block is never read.
 # A zero-run night sends a coherent "no plans ran" line rather than silencing.
+# Plan slugs link to their PR through one `gh pr list`. MORNING_DIGEST_GH overrides
+# the gh binary (tests stub it). A failed lookup renders bare slugs.
 
 set -uo pipefail
 
@@ -265,8 +267,8 @@ if [ $total -eq 0 ]; then
   BODY="🌙 Automouse — no plans ran last night (${D})."
 else
   # Build counts line (omit zero counts)
+  # Completed plans carry no count: each one is its own ✅ line below.
   counts_line=""
-  [ $n_completed -gt 0 ] && counts_line+="✅ Completed ${n_completed}"
   if [ $n_skipped -gt 0 ]; then
     [ -n "$counts_line" ] && counts_line+=" · "
     counts_line+="⏭ Skipped ${n_skipped}"
@@ -299,37 +301,50 @@ else
     while IFS= read -r line; do sorted_parked+=("$line"); done < <(printf '%s\n' "${PARKED[@]}" | sort)
   fi
 
+  # Link each slug to its PR. One `gh pr list` for the whole digest, matched on the
+  # exact head branch (the slug is the branch bin/wt-new creates). A gh failure or a
+  # slug with no PR renders the bare slug. URLs sit in <> so Discord shows no embed.
+  PR_TSV="$("${MORNING_DIGEST_GH:-gh}" pr list --repo a-jay85/IBL5 --state all --limit 300 \
+    --json headRefName,url --jq '.[] | [.headRefName, .url] | @tsv' 2>/dev/null || true)"
+  plan_link() {
+    local url
+    url="$(awk -F'\t' -v b="$1" '$1 == b { print $2; exit }' <<< "$PR_TSV")"
+    if [ -n "$url" ]; then
+      printf '[%s](<%s>)' "$1" "$url"
+    else
+      printf '%s' "$1"
+    fi
+  }
+
   # Build plan lines
   plan_lines=""
   for p in "${sorted_completed[@]:-}"; do
     [ -z "$p" ] && continue
-    plan_lines+=$'\n'"✅ ${p%.md}"
+    plan_lines+=$'\n'"✅ $(plan_link "${p%.md}")"
   done
   for p in "${sorted_skipped[@]:-}"; do
     [ -z "$p" ] && continue
-    plan_lines+=$'\n'"⏭ ${p%.md}"
+    plan_lines+=$'\n'"⏭ $(plan_link "${p%.md}")"
   done
   for entry in "${sorted_failed[@]:-}"; do
     [ -z "$entry" ] && continue
     plan_file="${entry%|*}"
     attempts="${entry#*|}"
-    plan_lines+=$'\n'"❌ ${plan_file%.md} (${attempts} attempt$([ "$attempts" -eq 1 ] || echo 's'))"
+    plan_lines+=$'\n'"❌ $(plan_link "${plan_file%.md}") (${attempts} attempt$([ "$attempts" -eq 1 ] || echo 's'))"
   done
   for entry in "${sorted_parked[@]:-}"; do
     [ -z "$entry" ] && continue
     plan_file="${entry%|*}"
     attempts="${entry#*|}"
-    plan_lines+=$'\n'"🅿️ ${plan_file%.md} (${attempts} attempt$([ "$attempts" -eq 1 ] || echo 's'))"
+    plan_lines+=$'\n'"🅿️ $(plan_link "${plan_file%.md}") (${attempts} attempt$([ "$attempts" -eq 1 ] || echo 's'))"
   done
 
-  BODY="🌙 Automouse digest — ${D}
+  BODY="🌙 Automouse digest — ${D}${counts_line:+
 
-${counts_line}
+${counts_line}}
 ${plan_lines}
 
-${SPEND_LINE}
-Next: review held PRs, then \`gh pr list --search \"is:open label:automouse\"\`
-Reports: ${NIGHTLY_DIR}/reports/"
+${SPEND_LINE}"
 fi
 
 # --- Send or dry-run ----------------------------------------------------------

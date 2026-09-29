@@ -6,7 +6,8 @@
 # skip/active behavior. Verifies the logic even while the live composites are absent
 # on master (the check is dormant there, but its logic must already be correct so it
 # is sound the moment the composites land). Also covers the mutation-pr.yml
-# invariants (M1-M4) with throwaway workflow + ADR fixtures.
+# invariants (M1-M4) with throwaway workflow + ADR fixtures, and the read-only
+# --protection-readback mode (R0-R4) with generated protection JSON fixtures.
 #
 # Run: bin/test-check-composite-contracts  (exit 0 = all pass, 1 = a case failed)
 set -u
@@ -543,6 +544,84 @@ if printf '%s' "$out" | grep -q 'mutation-pr absent — skipped'; then
 else
   echo "FAIL: mut-absent-skips — no skip line in output; output: $out"; FAILED=1
 fi
+
+# ---------------------------------------------------------------------------
+# --protection-readback mode (R0-R4) — fixtures shaped like the live
+# `gh api .../branches/master/protection` response.
+# ---------------------------------------------------------------------------
+
+RB_PRE="$TMP/rb-pre4.json"
+cat > "$RB_PRE" << 'RBEOF'
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": ["Tests and Analysis", "E2E Tests", "human-signoff", "Meta checks"],
+    "checks": [
+      {"context": "Tests and Analysis", "app_id": null},
+      {"context": "E2E Tests", "app_id": null},
+      {"context": "human-signoff", "app_id": 15368},
+      {"context": "Meta checks", "app_id": 15368}
+    ]
+  },
+  "enforce_admins": {"enabled": false},
+  "required_linear_history": {"enabled": false}
+}
+RBEOF
+
+# rb_post <name> <jq-filter> — writes $TMP/rb-<name>.json = pre4 with one jq edit.
+rb_post() {
+  jq --arg m "$MUT_LITERAL" "$2" "$RB_PRE" > "$TMP/rb-$1.json"
+}
+
+RB_PASS_FILTER='.required_status_checks.contexts += [$m] | .required_status_checks.checks += [{"context": $m, "app_id": 15368}]'
+rb_post pass5 "$RB_PASS_FILTER"
+rb_post swapped "$RB_PASS_FILTER | .required_status_checks.contexts |= map(if . == \"Meta checks\" then \"Some other check\" else . end)"
+rb_post replaceput '.required_status_checks.contexts = ["Tests and Analysis", "E2E Tests", "human-signoff", $m] | .required_status_checks.checks = (.required_status_checks.checks | map(select(.context != "Meta checks")) + [{"context": $m, "app_id": 15368}])'
+rb_post strictfalse "$RB_PASS_FILTER | .required_status_checks.strict = false"
+rb_post otherkey "$RB_PASS_FILTER | .enforce_admins.enabled = true"
+rb_post appid "$RB_PASS_FILTER | .required_status_checks.checks |= map(if .context == \"human-signoff\" then .app_id = null else . end)"
+
+# rb-pass-5: exit 0, output names the count the operator reads on the live run
+out="$("$CHECK" "--protection-readback=$TMP/rb-pass5.json" "--pre-image=$RB_PRE" 2>&1)"; rc=$?
+expect "rb-pass-5" 0 "$rc"
+if printf '%s' "$out" | grep -qF 'protection-readback: OK — 5 contexts'; then
+  echo "ok: rb-pass-5-count-visible"
+else
+  echo "FAIL: rb-pass-5 — no 'OK — 5 contexts' line; output: $out"; FAILED=1
+fi
+
+# rb-fail-4-unchanged: post == pre (the POST never landed) → exit 1 via R1
+out="$("$CHECK" "--protection-readback=$RB_PRE" "--pre-image=$RB_PRE" 2>&1)"; rc=$?
+expect "rb-fail-4-unchanged" 1 "$rc"
+if printf '%s' "$out" | grep -qF '(R1)'; then
+  echo "ok: rb-fail-4-unchanged-names-R1"
+else
+  echo "FAIL: rb-fail-4-unchanged — output lacks (R1): $out"; FAILED=1
+fi
+
+"$CHECK" "--protection-readback=$TMP/rb-swapped.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-fail-swapped" 1 $?
+"$CHECK" "--protection-readback=$TMP/rb-replaceput.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-fail-replace-put" 1 $?
+"$CHECK" "--protection-readback=$TMP/rb-strictfalse.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-fail-strict-false" 1 $?
+"$CHECK" "--protection-readback=$TMP/rb-otherkey.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-fail-other-key" 1 $?
+"$CHECK" "--protection-readback=$TMP/rb-appid.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-fail-appid-changed" 1 $?
+"$CHECK" "--protection-readback=$TMP/rb-pass5.json" "--pre-image=$TMP/rb-pass5.json" >/dev/null 2>&1
+expect "rb-fail-pre-has-it" 1 $?
+
+# usage errors and unreadable input → exit 2
+"$CHECK" --protection-readback "$TMP/rb-pass5.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-usage-space-form" 2 $?
+"$CHECK" "--protection-readback=$TMP/rb-pass5.json" >/dev/null 2>&1
+expect "rb-usage-missing-pre" 2 $?
+"$CHECK" "--readback=$TMP/rb-pass5.json" >/dev/null 2>&1
+expect "rb-usage-unknown-flag" 2 $?
+printf 'not json\n' > "$TMP/rb-badjson.json"
+"$CHECK" "--protection-readback=$TMP/rb-badjson.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
+expect "rb-bad-json" 2 $?
 
 if [ "$FAILED" -ne 0 ]; then
   echo "RESULT: FAILED"

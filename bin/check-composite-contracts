@@ -34,7 +34,103 @@
 # Usage: bin/check-composite-contracts [actions-dir] [workflows-dir] [merge-script] [promote-script] [decisions-dir]
 #   defaults: .github/actions, .github/workflows, bin/merge-master-to-prod,
 #             bin/promote-master-to-production, ibl5/docs/decisions
+#
+# Second mode (read-only, no token, no network):
+#        bin/check-composite-contracts --protection-readback=<post.json> --pre-image=<pre.json>
+#   Compares two saved `gh api repos/<owner>/<repo>/branches/master/protection`
+#   responses (R0-R4) to prove the manual activation POST added exactly the
+#   `Infection PHP (per-PR diff)` context and changed nothing else. Exit 0 = OK,
+#   1 = an R check failed, 2 = bad usage or unreadable input.
 set -eu
+
+# Required status-check context emitted by mutation-pr.yml (ADR-0145). The ONE
+# machine-checked copy of this literal; M2 compares the workflow and the ADR to it,
+# and --protection-readback compares branch protection to it.
+MUT_CONTEXT='Infection PHP (per-PR diff)'
+
+# protection_readback <post.json> <pre.json>
+# Read-only proof that the manual append-only POST to branch protection added
+# exactly $MUT_CONTEXT and changed nothing else. Both files are saved
+# `gh api repos/<owner>/<repo>/branches/master/protection` responses. Runs every
+# R check before returning so the operator sees all problems at once.
+# Exit 0 = OK, 1 = an R check failed, 2 = could not evaluate.
+protection_readback() {
+  local post="$1" pre="$2" bad=0 f
+  command -v jq >/dev/null 2>&1 || { echo "protection-readback: jq not found on PATH" >&2; exit 2; }
+  for f in "$post" "$pre"; do
+    [ -f "$f" ] || { echo "protection-readback: $f not found" >&2; exit 2; }
+    jq -e . "$f" >/dev/null 2>&1 || { echo "protection-readback: $f is not valid JSON" >&2; exit 2; }
+    jq -e '.required_status_checks.contexts | type == "array"' "$f" >/dev/null 2>&1 \
+      || { echo "protection-readback: $f has no .required_status_checks.contexts array" >&2; exit 2; }
+  done
+
+  # R0: the pre-image must not already carry the context.
+  if jq -e --arg m "$MUT_CONTEXT" '.required_status_checks.contexts | any(. == $m)' "$pre" >/dev/null; then
+    echo "protection-readback: FAIL (R0) — pre-image already contains '$MUT_CONTEXT'; the activation was a no-op or ran twice ($pre)" >&2
+    bad=1
+  fi
+
+  # R1: the post state carries the context.
+  if ! jq -e --arg m "$MUT_CONTEXT" '.required_status_checks.contexts | any(. == $m)' "$post" >/dev/null; then
+    echo "protection-readback: FAIL (R1) — '$MUT_CONTEXT' is absent from the post state; the POST never landed ($post)" >&2
+    bad=1
+  fi
+
+  # R2: post contexts == pre contexts + the new one (catches a dropped context, a
+  # swapped context, and a full-replace PUT), and no existing check changed app_id.
+  local want_ctx got_ctx want_chk got_chk
+  want_ctx="$(jq -c --arg m "$MUT_CONTEXT" '.required_status_checks.contexts + [$m] | sort' "$pre")"
+  got_ctx="$(jq -c '.required_status_checks.contexts | sort' "$post")"
+  if [ "$want_ctx" != "$got_ctx" ]; then
+    echo "protection-readback: FAIL (R2) — post contexts $got_ctx, expected pre plus the new context $want_ctx" >&2
+    bad=1
+  fi
+  want_chk="$(jq -c --arg m "$MUT_CONTEXT" '(.required_status_checks.checks // []) | map(select(.context != $m)) | sort_by(.context)' "$pre")"
+  got_chk="$(jq -c --arg m "$MUT_CONTEXT" '(.required_status_checks.checks // []) | map(select(.context != $m)) | sort_by(.context)' "$post")"
+  if [ "$want_chk" != "$got_chk" ]; then
+    echo "protection-readback: FAIL (R2) — an existing check changed or was dropped: pre $want_chk, post $got_chk" >&2
+    bad=1
+  fi
+
+  # R3: strict stays on.
+  if ! jq -e '.required_status_checks.strict == true' "$post" >/dev/null; then
+    echo "protection-readback: FAIL (R3) — required_status_checks.strict is not true in the post state ($post)" >&2
+    bad=1
+  fi
+
+  # R4: everything except contexts/checks is identical.
+  local pre_rest post_rest
+  pre_rest="$(jq -S 'del(.required_status_checks.contexts, .required_status_checks.checks)' "$pre")"
+  post_rest="$(jq -S 'del(.required_status_checks.contexts, .required_status_checks.checks)' "$post")"
+  if [ "$pre_rest" != "$post_rest" ]; then
+    echo "protection-readback: FAIL (R4) — a protection setting other than contexts/checks changed between pre and post" >&2
+    bad=1
+  fi
+
+  if [ "$bad" -ne 0 ]; then
+    return 1
+  fi
+  local n
+  n="$(jq '.required_status_checks.contexts | length' "$post")"
+  echo "protection-readback: OK — $n contexts (pre $((n - 1)) + \"$MUT_CONTEXT\"), strict=true, nothing else changed"
+  return 0
+}
+
+case "${1:-}" in
+  --protection-readback=*)
+    post="${1#--protection-readback=}"
+    case "${2:-}" in
+      --pre-image=?*) pre="${2#--pre-image=}" ;;
+      *) echo "usage: $0 --protection-readback=<post.json> --pre-image=<pre.json>" >&2; exit 2 ;;
+    esac
+    [ $# -eq 2 ] || { echo "composite-contracts: unexpected extra args" >&2; exit 2; }
+    rb_rc=0
+    protection_readback "$post" "$pre" || rb_rc=$?
+    exit "$rb_rc" ;;
+  --*)
+    echo "composite-contracts: unknown or malformed flag '$1' (use --protection-readback=<file> --pre-image=<file>)" >&2
+    exit 2 ;;
+esac
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ACTIONS="${1:-$ROOT/.github/actions}"
@@ -42,9 +138,6 @@ WORKFLOWS="${2:-$ROOT/.github/workflows}"
 MERGE_SCRIPT="${3:-$ROOT/bin/merge-master-to-prod}"
 PROMOTE_SCRIPT="${4:-$ROOT/bin/promote-master-to-production}"
 DECISIONS="${5:-$ROOT/ibl5/docs/decisions}"
-# Required status-check context emitted by mutation-pr.yml (ADR-0145). The ONE
-# machine-checked copy of this literal; M2 compares the workflow and the ADR to it.
-MUT_CONTEXT='Infection PHP (per-PR diff)'
 
 fail=0
 

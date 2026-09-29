@@ -112,11 +112,14 @@ bd_cmd_delta() {
         --arg report "$BD_REPORT" \
         --arg since "$BD_SINCE" \
         --argjson ranked "$ranked_json" \
-        '{
+        --argjson skip "$BD_SKIP_LABELS_JSON" \
+        'def skiplabeled($s): any((.labels // [])[]; .name as $l | any($s[]; . == $l));
+        {
             report: $report,
             since: $since,
             issues: (
-                [.[] | select(.updatedAt > $since or ([.number] | inside($ranked) | not))]
+                [.[] | select((.updatedAt > $since or ([.number] | inside($ranked) | not))
+                              and (skiplabeled($skip) | not))]
                 | sort_by(.number)
                 | [.[] | {number: .number, title: .title, url: .url, updatedAt: .updatedAt, body: (.body // "" | .[0:1500])}]
             ),
@@ -687,7 +690,10 @@ bd_delta_numbers() {
         [ -n "$_n" ] || continue
         _bd_delta_nums+=("$_n")
     done < <(jq -r --arg since "$BD_SINCE" --argjson ranked "$ranked_json" \
-        '[.[] | select(.updatedAt > $since or ([.number] | inside($ranked) | not))]
+        --argjson skip "$BD_SKIP_LABELS_JSON" \
+        'def skiplabeled($s): any((.labels // [])[]; .name as $l | any($s[]; . == $l));
+         [.[] | select((.updatedAt > $since or ([.number] | inside($ranked) | not))
+                       and (skiplabeled($skip) | not))]
          | sort_by(.number) | .[].number' \
         "$issues_file")
 }

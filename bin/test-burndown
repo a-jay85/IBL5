@@ -1615,6 +1615,32 @@ ROW46="$(grep -E '^SKIP +#46 ' <<< "$OUT")"
 want "L6: #46 skip-label row" "$ROW46" "skip-label: out-of-repo"
 if grep -qF "unranked (run burndown-delta" <<< "$ROW46"; then fail "L6: #46 must not get unranked advice"; else ok "L6: #46 no unranked advice"; fi
 
+# ── L7: delta drops skip-labeled issues (updated #40, unranked #46) ───────────
+lbl_issues '[{"name":"blocked"}]' '[]' '2026-09-28T00:00:00Z'
+jq '. + [{"number":46,"title":"Forty-six","body":"bin/g.sh:1","url":"u46","updatedAt":"2026-09-20T00:00:00Z","labels":[{"name":"out-of-repo"}]},
+         {"number":47,"title":"Forty-seven","body":"bin/h.sh:1","url":"u47","updatedAt":"2026-09-20T00:00:00Z","labels":[]}]' \
+    "$T/lbl/fx/issues.json" > "$T/lbl/fx/issues.tmp" && mv "$T/lbl/fx/issues.tmp" "$T/lbl/fx/issues.json"
+OUT="$(bdl burndown-delta 2>/dev/null)"; RC=$?
+NUMS="$(jq -r '.issues[].number' <<< "$OUT" 2>/dev/null | tr '\n' ' ')"
+if grep -qwF 40 <<< "$NUMS"; then fail "L7: delta must omit labeled #40 (got $NUMS)"; else ok "L7: delta omits labeled #40"; fi
+if grep -qwF 46 <<< "$NUMS"; then fail "L7: delta must omit labeled #46 (got $NUMS)"; else ok "L7: delta omits labeled #46"; fi
+grep -qwF 45 <<< "$NUMS" && ok "L7: delta keeps #45" || fail "L7: delta keeps #45 (got $NUMS)"
+grep -qwF 47 <<< "$NUMS" && ok "L7: delta keeps #47" || fail "L7: delta keeps #47 (got $NUMS)"
+
+# ── L8: refresh demands only what delta lists (#45, #47) ──────────────────────
+RANKS_L8="$T/lbl/ranks.md"
+cat > "$RANKS_L8" <<'RANKS'
+## P2 (2)
+- [#45](https://github.com/a-jay85/IBL5-backlog/issues/45) Forty-five — re-ranked
+- [#47](https://github.com/a-jay85/IBL5-backlog/issues/47) Forty-seven — now ranked
+RANKS
+OUT="$(bdl burndown-refresh "$RANKS_L8" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L8: refresh exits 0" || fail "L8: refresh exits 0 (got $RC)"
+if grep -qF "omits delta issue #40" <<< "$OUT"; then fail "L8: refresh must not demand labeled #40"; else ok "L8: refresh does not demand #40"; fi
+# refresh wrote a dated report into the isolated HOME; drop it so the fixture report stays newest-by-name
+L8_REPORT="$(tail -1 <<< "$OUT")"; L8_REPORT="${L8_REPORT#REPORT: }"
+[ ! -f "$L8_REPORT" ] || unlink "$L8_REPORT"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

@@ -48,7 +48,7 @@
     text-transform: uppercase;
 }
 .last-sim-recap__record-w { color: var(--accent-400) }
-.last-sim-recap__record-sep { color: rgba(255, 255, 255, .3); margin: 0 4px }
+.last-sim-recap__record-sep { color: var(--white-alpha-30); margin: 0 4px }
 .last-sim-recap__meta {
     justify-self: end;
     display: flex;

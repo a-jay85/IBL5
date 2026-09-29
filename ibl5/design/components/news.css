@@ -51,9 +51,9 @@
 }
 
 .news-article__header .ibl-badge {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--white-alpha-15);
     color: var(--accent-400);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid var(--white-alpha-20);
 }
 
 .news-article__meta {

@@ -48,12 +48,12 @@
     text-decoration: none;
     border-radius: var(--radius-full);
     transition: all var(--transition-fast);
-    box-shadow: 0 2px 6px rgb(249 115 22 / 0.3);
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--accent-500) 30%, transparent);
 }
 
 .schedule-container a.schedule-jump-btn:hover {
     background: var(--accent-800);
-    box-shadow: 0 3px 10px rgb(249 115 22 / 0.4);
+    box-shadow: 0 3px 10px color-mix(in srgb, var(--accent-500) 40%, transparent);
 }
 
 /* Month Navigation — base styles provided by .ibl-jump-menu (navigation.css).

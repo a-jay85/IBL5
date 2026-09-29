@@ -46,7 +46,7 @@
 
 /* In thead, the sep border must contrast against the dark header background */
 .team-table th.sep-r-team {
-    border-right: 2px solid rgba(255, 255, 255, 0.3);
+    border-right: 2px solid var(--white-alpha-30);
 }
 
 .team-table th.sep-r-weak,

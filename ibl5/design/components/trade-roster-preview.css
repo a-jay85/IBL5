@@ -101,7 +101,7 @@
 
 .trade-roster-preview__logo--active {
     opacity: 1;
-    box-shadow: 0 0 12px 4px rgba(249, 115, 22, 0.6);
+    box-shadow: 0 0 12px 4px color-mix(in srgb, var(--accent-500) 60%, transparent);
 }
 
 /* ==========================================================================

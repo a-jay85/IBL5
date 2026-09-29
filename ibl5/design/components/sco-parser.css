@@ -55,7 +55,7 @@
     line-height: 1.7; /* off-scale: no --leading-* token */
     margin: 0;
     padding: var(--space-1) 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--white-alpha-5);
 }
 
 .sco-log__message:last-child {
@@ -130,7 +130,7 @@
 .all-star-rename__input:focus {
     outline: none;
     border-color: var(--accent-500);
-    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.15);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-500) 15%, transparent);
 }
 
 .all-star-rename__status {

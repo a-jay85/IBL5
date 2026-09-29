@@ -1110,7 +1110,7 @@ td.ibl-team-cell--colored {
 
 /* Starter Indicator - orange glow on photo + accent name (matches nav basketball icon) */
 .is-starter .ibl-player-photo {
-    box-shadow: 0 0 8px 2px rgb(249 115 22 / 0.4);
+    box-shadow: 0 0 8px 2px color-mix(in srgb, var(--accent-500) 40%, transparent);
 }
 
 .is-starter a {

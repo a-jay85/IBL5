@@ -37,12 +37,12 @@
 
 .ibl-tab:hover {
     color: white;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--white-alpha-5);
 }
 
 .ibl-tab--active {
     color: white;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--white-alpha-10);
     border-bottom-color: var(--accent-500);
 }
 
@@ -276,16 +276,16 @@
 }
 
 .mobile-menu-scroll::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--white-alpha-5);
 }
 
 .mobile-menu-scroll::-webkit-scrollbar-thumb {
-    background: rgba(249, 115, 22, 0.4);
+    background: color-mix(in srgb, var(--accent-500) 40%, transparent);
     border-radius: var(--radius-sm);
 }
 
 .mobile-menu-scroll::-webkit-scrollbar-thumb:hover {
-    background: rgba(249, 115, 22, 0.6);
+    background: color-mix(in srgb, var(--accent-500) 60%, transparent);
 }
 
 /* Mobile menu section animation */
@@ -339,7 +339,7 @@
 
 .nav-dropdown-item--team:hover {
     color: white;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--white-alpha-5);
 }
 
 .group:hover .nav-dropdown-item {
@@ -417,7 +417,7 @@ nav .group > a:hover {
 
 .nav-dropdown-item:hover {
     color: white;
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: var(--white-alpha-5);
     border-left-color: var(--color-accent-500);
 }
 
@@ -465,7 +465,7 @@ span.nav-dropdown-item a:hover {
 
 .mobile-dropdown-link:hover {
     color: white;
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: var(--white-alpha-5);
     border-left-color: var(--color-accent-500);
 }
 
@@ -481,7 +481,7 @@ span.nav-dropdown-item a:hover {
 }
 
 .mobile-dropdown-btn:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--white-alpha-5);
 }
 
 /* Mobile home link */
@@ -726,7 +726,7 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-icon-btn:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--white-alpha-10);
 }
 
 .nav-trigger {
@@ -777,7 +777,7 @@ span.nav-dropdown-item a:hover {
     border-bottom-left-radius: 0.5rem;
     border-bottom-right-radius: 0.5rem;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--white-alpha-10);
     overflow: hidden;
 }
 
@@ -796,11 +796,11 @@ span.nav-dropdown-item a:hover {
 .nav-select {
     width: 100%;
     appearance: none;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--white-alpha-10);
     color: white;
     font-size: var(--text-sm);
     font-weight: var(--font-weight-medium);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid var(--white-alpha-20);
     border-radius: var(--radius-xl);
     padding: 0.625rem 2rem 0.625rem 0.75rem;
     cursor: pointer;
@@ -808,8 +808,8 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-select:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
+    background: var(--white-alpha-15);
+    border-color: var(--white-alpha-30);
 }
 
 .nav-select:focus {
@@ -830,11 +830,11 @@ span.nav-dropdown-item a:hover {
     display: block;
     width: 100%;
     text-align: center;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--white-alpha-10);
     color: white;
     font-size: var(--text-sm);
     font-weight: var(--font-weight-medium);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid var(--white-alpha-20);
     border-radius: var(--radius-xl);
     padding: 0.625rem 0.75rem;
     cursor: pointer;
@@ -842,8 +842,8 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-logout-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
+    background: var(--white-alpha-15);
+    border-color: var(--white-alpha-30);
 }
 
 @media (min-width: 1024px) {
@@ -869,8 +869,8 @@ span.nav-dropdown-item a:hover {
 
 .nav-login-input {
     width: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--white-alpha-5);
+    border: 1px solid var(--white-alpha-10);
     border-radius: var(--radius-xl);
     padding: 0.75rem 1rem 0.75rem 2.75rem;
     font-size: 1rem;
@@ -885,7 +885,7 @@ span.nav-dropdown-item a:hover {
 .nav-login-input:focus {
     outline: none;
     border-color: var(--accent-500);
-    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.3);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-500) 30%, transparent);
 }
 
 @media (min-width: 1024px) {
@@ -896,7 +896,7 @@ span.nav-dropdown-item a:hover {
     }
 
     .nav-login-input:focus {
-        box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.5);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-500) 50%, transparent);
     }
 }
 
@@ -937,8 +937,8 @@ span.nav-dropdown-item a:hover {
 
 .nav-login-checkbox {
     appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--white-alpha-20);
+    background: var(--white-alpha-5);
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: all var(--transition-fast);
@@ -1002,7 +1002,7 @@ span.nav-dropdown-item a:hover {
     width: 2.5rem;
     height: 2.5rem;
     border-radius: var(--radius-full);
-    background: rgba(249, 115, 22, 0.2);
+    background: color-mix(in srgb, var(--accent-500) 20%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;

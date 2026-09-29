@@ -171,7 +171,7 @@
 
 /* Against the navy header gradient, as .team-table th.sep-r-team does. */
 .csv-import .ibl-data-table th.sep-r-team {
-    border-right: 2px solid rgba(255, 255, 255, 0.3);
+    border-right: 2px solid var(--white-alpha-30);
 }
 
 .csv-import .ibl-data-table td.sep-r-weak {

@@ -712,7 +712,7 @@
     right: 12px;
     width: 32px;
     height: 32px;
-    background: rgba(212, 175, 55, 0.9);
+    background: color-mix(in srgb, var(--gold) 90%, transparent);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -736,9 +736,9 @@
 }
 
 .flip-icon:hover {
-    background: rgba(212, 175, 55, 1);
+    background: var(--gold);
     transform: scale(1.1) rotate(180deg);
-    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.5);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--gold) 50%, transparent);
 }
 
 .flip-icon svg {
@@ -752,7 +752,7 @@
         box-shadow: var(--pc-shadow-sm);
     }
     50% {
-        box-shadow: 0 2px 16px rgba(212, 175, 55, 0.7);
+        box-shadow: 0 2px 16px color-mix(in srgb, var(--gold) 70%, transparent);
     }
 }
 

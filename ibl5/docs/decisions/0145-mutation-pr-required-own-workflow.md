@@ -55,10 +55,12 @@ Apply:
 ```bash
 PRE=~/claude-plans/_backups/master-protection-pre-$(date +%F).json
 gh api repos/a-jay85/IBL5/branches/master/protection > "$PRE"
-gh api -X POST \
+echo '["Infection PHP (per-PR diff)"]' | gh api -X POST \
   repos/a-jay85/IBL5/branches/master/protection/required_status_checks/contexts \
-  -f 'contexts[]=Infection PHP (per-PR diff)'
+  --input -
 ```
+
+Send the body as a bare JSON array. The `-f 'contexts[]=...'` form sends `{"contexts": [...]}`, and on 2026-09-29 GitHub answered it with an empty HTTP 500 that `gh` reports as `unexpected end of JSON input`. Protection did not change.
 
 Use only the `POST .../required_status_checks/contexts` endpoint, which appends. Never use the protection `PUT`: it replaces the whole object, and the ADR-0065 recipe built on it would now drop `Meta checks`.
 
@@ -75,9 +77,9 @@ Expected output: `protection-readback: OK — 5 contexts ...`. The mode asserts 
 ## Rollback
 
 ```bash
-gh api -X DELETE \
+echo '["Infection PHP (per-PR diff)"]' | gh api -X DELETE \
   repos/a-jay85/IBL5/branches/master/protection/required_status_checks/contexts \
-  -f 'contexts[]=Infection PHP (per-PR diff)'
+  --input -
 diff <(jq -S . "$PRE") \
   <(gh api repos/a-jay85/IBL5/branches/master/protection | jq -S .)
 ```
@@ -99,3 +101,7 @@ The `diff` prints nothing when protection matches the saved pre-image.
 ## Lineage
 
 Supersedes the mechanism and the Activation block of ADR-0065. Precedent for the manual flip with a checked read-back: ADR-0120.
+
+## Addendum: activation body format (2026-09-29)
+
+The Activation and Rollback commands first used `-f 'contexts[]=Infection PHP (per-PR diff)'`. The POST returned an empty HTTP 500 twice and left protection unchanged. The same POST with a bare-array body through `--input -` returned 200, and the read-back printed `protection-readback: OK — 5 contexts`. Both blocks now use the bare-array form. The DELETE form is untested because the rollback was never needed.

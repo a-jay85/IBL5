@@ -1,5 +1,5 @@
 #!/bin/bash
-# discord-dm — send a Discord DM through IBLbot from the host, with retries.
+# discord-dm — send an owner notice to the #dev webhook, or a Discord DM through IBLbot, with retries.
 #
 # The host-side sibling of .github/actions/notify-discord: the bot binds
 # 127.0.0.1:50000 on prod, so every sender has to tunnel in over ssh and POST to

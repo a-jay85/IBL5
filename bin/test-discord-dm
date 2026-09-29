@@ -813,6 +813,16 @@ grep -qF -- "main.yml::build-and-deploy" <<< "$G5_GOT" \
     && ok "G5: the flagged job is main.yml::build-and-deploy" \
     || fail "G5: expected main.yml::build-and-deploy, got: $(tr '\n' ' ' <<< "$G5_GOT")"
 
+# G6: --ping (the @-mention) is allowed only in the three PING host callers. Tests, the
+# README and discord-dm itself mention it and are excluded; any other bin/ caller is QUIET.
+G6_GOT=$(grep -rlF -- '--ping' "$ROOT/bin" 2>/dev/null \
+    | grep -v -e '/bin/discord-dm$' -e '/bin/test-' -e '/bin/README.md$' \
+    | sed "s|^$ROOT/||" | sort || true)
+G6_WANT=$(printf '%s\n' bin/launchd-health-check bin/post-plan-fail-dm bin/pr-cycle)
+[ "$G6_GOT" = "$G6_WANT" ] \
+    && ok "G6: only the three PING callers contain --ping" \
+    || fail "G6: --ping callers differ from the PING set; got: $(tr '\n' ' ' <<< "$G6_GOT")"
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 printf '\n'
 if [ "$FAILS" -eq 0 ]; then

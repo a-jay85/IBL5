@@ -982,7 +982,31 @@ span.nav-dropdown-item a:hover {
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     z-index: 40;
+    opacity: 0;
     transition: opacity var(--transition-slow);
+}
+
+.nav-overlay.nav-overlay--visible {
+    opacity: 1;
+}
+
+/* Hamburger bars to X. State source is aria-expanded, set by
+   jslib/navigation.js; the team-logo variant keys on the same attribute.
+   0.4375rem = 7px at a 16px root; the bars sit in an h-4 (1rem) box. */
+#nav-hamburger[aria-expanded="true"] #hamburger-top {
+    transform: translateY(0.4375rem) rotate(45deg);
+}
+
+#nav-hamburger[aria-expanded="true"] #hamburger-middle {
+    opacity: 0;
+}
+
+#nav-hamburger[aria-expanded="true"] #hamburger-bottom {
+    transform: translateY(-0.4375rem) rotate(-45deg);
+}
+
+body.menu-open {
+    overflow: hidden;
 }
 
 .nav-desktop {

@@ -363,7 +363,7 @@
 }
 
 @media (max-width: 480px) {
-    .trading-card .rating-label { font-size: 8px; }
+    .trading-card .rating-label { font-size: var(--pc-text-2xs); }
     .trading-card .rating-value { font-size: var(--pc-text-md); }
 }
 
@@ -482,7 +482,7 @@
     width: 100%;
     border-collapse: collapse;
     table-layout: auto;
-    font-size: 13px;
+    font-size: var(--pc-text-md);
     border: none;
     background: transparent;
     margin: 0;

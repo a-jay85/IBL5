@@ -96,15 +96,20 @@ def frontmatter_autonomy_contract(content: str) -> tuple[str, list[str], str]:
     # validate stop_condition enum
     if sc_norm not in _LEGAL_STOP_CONDITIONS:
         return ("", [], f"stop_condition: '{sc_norm}' is not a legal value")
-    # split evidence on comma, drop empty tokens
-    tokens = [t for t in ev_norm.split(",") if t]
-    if not tokens:
+    # split evidence on comma the way bash IFS=',' does: one trailing empty
+    # field is dropped ("a," is fine); any other empty field is rejected
+    if not ev_norm:
+        return ("", [], "evidence: is empty")
+    tokens = ev_norm.split(",")
+    if tokens[-1] == "":
+        tokens.pop()
+    if not tokens or any(t == "" for t in tokens):
         return ("", [], "evidence: is empty")
     # validate each token
     for t in tokens:
         if t.startswith("/") or t.startswith("-"):
             return ("", [], f"evidence: token '{t}' is not a repo-relative path")
-        if ".." in t.split("/"):
+        if ".." in t:
             return ("", [], f"evidence: token '{t}' is not a repo-relative path")
         if not _EVIDENCE_TOKEN.match(t):
             return ("", [], f"evidence: token '{t}' is not a repo-relative path")

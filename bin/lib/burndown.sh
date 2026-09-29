@@ -164,7 +164,7 @@ bd_inflight() {
     if [ -d "$BD_QUEUE_DIR" ]; then
         local entry
         for entry in "$BD_QUEUE_DIR"/*; do
-            [ -e "$entry" ] || continue
+            [ -f "$entry" ] || continue
             local target qrc=0 qout=""
             target="$(readlink -f "$entry" 2>/dev/null || printf '%s' "$entry")"
             qout="$(grep -oE 'IBL5-backlog#[0-9]+' "$target" 2>/dev/null)" || qrc=$?

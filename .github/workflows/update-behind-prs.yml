@@ -3,18 +3,17 @@ name: Update BEHIND PRs
 on:
   push:
     branches: [master]
-    # A master merge is the exact moment every open PR goes BEHIND, and push events are NOT
+    # A master merge is the exact moment every armed PR goes BEHIND, and push events are NOT
     # subject to the schedule-event delay that has been dropping this repo's crons by 6-12h
     # (measured 2026-08-27/28 across all 11 scheduled workflows; repo Actions volume was at
     # its LOWEST on those two days — 950/1054 runs vs 2907 on 08-24 when crons were on time —
     # so our own load is not the cause. The delay is GitHub-side and unreachable from here).
     # Push is therefore the only trigger this workflow can actually rely on.
     #
-    # The push pass is deliberately scoped to auto-merge-ARMED PRs only (see step 1). The
-    # retired rebase-prs.yml (#1949) push-triggered ALL open PRs and was removed precisely
-    # because one merge set off a rebase storm across the whole PR set. Armed-only prevents
-    # a recurrence: ~3 armed PRs x ~11 workflows = ~33 CI runs per merge, versus ~330 for
-    # the full open-PR set.
+    # Each pass updates at most ONE PR: the head of the merge line, which is the oldest
+    # auto-merge-armed PR that is not conflicted and not red on a required check. Native
+    # auto-merge lands the head, and its merge push starts the next pass. That is why one
+    # merge no longer fans out across every armed PR. See the ADR-0081 Addendum.
     paths-ignore:
       - '**.md'                      # all markdown docs (covers .claude/rules, ibl5/docs, README, ADRs)
       - '.claude/**'                 # agent rules/skills/commands/memory — never affects app build/test
@@ -29,9 +28,9 @@ on:
       - 'ibl5/phpstan-baseline-counts.json'
       - 'ibl5/coverage-baseline.json'
   schedule:
-    # Best-effort ONLY. GitHub drops and delays these (see the push block above), so nothing
-    # latency-sensitive may depend on them. Their job is the freshness sweep over the full
-    # open-PR set, which the push trigger deliberately does not cover.
+    # Head-of-line backstop ONLY. GitHub drops and delays these (see the push block above), so
+    # nothing latency-sensitive may depend on them. This tick re-checks the head in case a push
+    # pass was cancelled or lost. The all-open-PR freshness sweep is gone.
     #
     # Deliberately OFF the quarter-hour. Do NOT "tidy" this back to '*/15 * * * *' — the odd
     # minutes are load-bearing. GitHub names the top of the hour as the worst window:
@@ -41,250 +40,159 @@ on:
     # of delay, schedule your workflow to run at a different time of the hour."
     #   https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows
     - cron: '7,22,37,52 * * * *'
-    # Daily overnight full sweep at a fixed, known local time. 11:30 UTC is 04:30 PDT AND
-    # 03:30 PST — the same instant in both, because GitHub cron is UTC-only and never
-    # observes DST, so this one entry covers the whole year with no seasonal edit.
-    #
-    # Honest scope: this is an ADDITIONAL draw on the same unreliable schedule lottery as the
-    # line above, not a guarantee — if the 15-min ticks are being dropped, this one can be
-    # dropped too. It is a backstop for the overnight quiet hours, NOT the fix. The fix is
-    # the push trigger.
-    - cron: '30 11 * * *'
-  workflow_dispatch:          # manual trigger for on-demand runs + the dispatch smoke test
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'Update this one PR number. Leave blank to run the head-of-line pass.'
+        required: false
+        default: ''
+        type: string
+      dry_run:
+        description: 'Print the head, skips, and queue length. Call neither update-branch nor the comment upsert.'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write        # update-branch writes a merge commit onto the PR head branch
   pull-requests: write   # enumerate PRs and invoke the update-branch endpoint
 
 concurrency:
-  group: update-behind-prs
+  # A dry-run dispatch gets its own group so it never cancels a live push pass in flight.
+  # A named-PR dispatch gets its own group so a manual one-PR update never cancels the
+  # head-of-line pass. On push and schedule both inputs are null, so the group is the plain
+  # name and a second master merge still cancels the first pass during its coalesce wait.
+  group: update-behind-prs${{ inputs.dry_run == true && '-dryrun' || '' }}${{ inputs.pr && '-pr' || '' }}
   cancel-in-progress: true
 
 jobs:
   update-behind:
-    name: Update open PRs stuck BEHIND master
+    name: Keep the merge-line head current
     runs-on: ubuntu-latest
     timeout-minutes: 30   # coalesce wait + mergeability retries only; no CI wait remains
     steps:
-      - name: Update BEHIND PRs
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # A master merge starts a run. A second merge inside the wait starts a new run, and
+      # cancel-in-progress kills this one. A burst of merges coalesces into one pass at the end.
+      - name: Coalesce a burst of master merges
+        if: github.event_name == 'push'
+        run: sleep 300
+
+      - name: Select the head of the merge line
+        id: select
         env:
           GH_TOKEN: ${{ secrets.CI_PAT }}
           REPO: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_PR: ${{ inputs.pr }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
 
-          OWNER="${REPO%/*}"
-          NAME="${REPO#*/}"
+          # A push pass fires while GitHub is still recomputing mergeability for the open-PR
+          # set, and it has no next tick: the run after a push is the next master merge. So it
+          # gets a longer settle window than the scheduled backstop.
+          if [ "$EVENT_NAME" = "push" ]; then UNKNOWN_ATTEMPTS=20; else UNKNOWN_ATTEMPTS=5; fi
 
-          # 0. Debounce on master quiet time.
-          #
-          #    A master merge is what puts every open PR BEHIND, and updating a PR pushes a
-          #    merge commit that fans out the full ~11-workflow CI matrix. With the all-open-PRs
-          #    scope (#1936) the first tick after any merge therefore updates ~30 PRs at once —
-          #    one merge becomes ~300 CI runs, and a merge-heavy afternoon becomes several such
-          #    storms. Nothing about that is load-bearing: BEHIND is not urgent, because this
-          #    workflow never merges and never arms auto-merge.
-          #
-          #    So wait until master has been quiet for DEBOUNCE_SECONDS before acting. A burst
-          #    of merges coalesces into a single update pass once the burst ends, instead of one
-          #    pass per merge. Cost: on a day where master moves more often than the window,
-          #    PRs go un-updated until the run rate drops — acceptable, since a stale-but-clean
-          #    PR blocks nothing.
-          #
-          #    workflow_dispatch bypasses the wait, so on-demand unsticking and the dispatch
-          #    smoke test still work immediately.
-          DEBOUNCE_SECONDS=3600
-          PUSH_COALESCE_SECONDS=300
-
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            echo "Manual dispatch — bypassing the master-quiet debounce."
-          elif [ "$EVENT_NAME" = "push" ]; then
-            # A push means master moved ~0s ago, so the master-quiet debounce would skip
-            # EVERY push run — it must be bypassed here or the trigger is a silent no-op.
-            # Storm control for pushes is different and twofold: the armed-only scope in
-            # step 1, and this short wait. During the wait a second merge starts a new run
-            # and `concurrency: cancel-in-progress` kills this one, so a burst of
-            # back-to-back merges coalesces into one update pass at the end of the burst.
-            echo "Push to master — coalescing for ${PUSH_COALESCE_SECONDS}s before acting."
-            sleep "$PUSH_COALESCE_SECONDS"
-          else
-            master_date=$(gh api "repos/$REPO/commits/master" --jq '.commit.committer.date' || true)
-
-            if [ -z "$master_date" ]; then
-              # Fail open: a transient API error must not silently park PR updates forever.
-              # Proceeding costs a storm at worst; skipping on every tick would be invisible.
-              echo "::warning::Could not read master's last commit date — proceeding without debounce."
-            else
-              master_epoch=$(date -u -d "$master_date" +%s)
-              quiet_for=$(( $(date -u +%s) - master_epoch ))
-
-              if [ "$quiet_for" -lt "$DEBOUNCE_SECONDS" ]; then
-                echo "master last moved ${quiet_for}s ago (< ${DEBOUNCE_SECONDS}s) — debouncing."
-                {
-                  echo "## Update BEHIND PRs"
-                  echo "- Skipped: master moved ${quiet_for}s ago, within the ${DEBOUNCE_SECONDS}s debounce window."
-                } >> "$GITHUB_STEP_SUMMARY"
-                exit 0
-              fi
-
-              echo "master quiet for ${quiet_for}s (>= ${DEBOUNCE_SECONDS}s) — proceeding."
-            fi
+          OUT="$RUNNER_TEMP/merge-line.out"
+          SUM="$RUNNER_TEMP/merge-line.md"
+          args=(--live --repo "$REPO")
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          if [ -n "$DISPATCH_PR" ]; then
+            case "$DISPATCH_PR" in
+              *[!0-9]*) echo "::error::pr input must be a PR number, got '$DISPATCH_PR'"; exit 1 ;;
+            esac
+            args+=(--pr "$DISPATCH_PR")
           fi
 
-          # 1. Enumerate the open, non-draft PRs targeting master that THIS pass should
-          #    consider, with their merge state and head SHA. Categorization happens in the
-          #    loop below so the step summary can report conflict / already-current counts.
-          #
-          #    Scope is event-dependent, and the split is load-bearing:
-          #
-          #    - push -> auto-merge-ARMED PRs only. These are the PRs where BEHIND actually
-          #      blocks something: they are approved and ready, waiting on nothing but
-          #      freshness (dependabot bumps especially). Restricting the per-merge pass to
-          #      them is what keeps the push trigger from re-creating the rebase-prs.yml
-          #      storm that got that workflow retired (#1949).
-          #    - schedule / workflow_dispatch -> ALL open non-draft PRs (#1936), so long-lived
-          #      branches stay fresh against master instead of drifting until someone rebases
-          #      by hand. This is the expensive pass (~30 PRs, ~330 CI runs), so it stays on
-          #      the infrequent triggers.
-          #
-          #    Updating a branch is NOT merging it: this workflow never arms auto-merge and
-          #    never merges anything, so the human review bottleneck is unchanged (ADR-0081).
-          #    Retry budgets are event-dependent for the same reason. Every timing constant
-          #    below was originally calibrated for a SCHEDULED tick, where master last moved
-          #    at least an hour ago, GitHub has long since settled mergeability, and a PR
-          #    skipped this tick is simply retried on the next one. A push pass has neither
-          #    property: it fires while GitHub is still recomputing mergeability for the whole
-          #    open-PR set and while the runner pool is busy with the merge that just landed,
-          #    AND it has no next tick — the run after a push is the next master merge. A
-          #    single skip there is therefore not a deferral, it is a silent permanent miss
-          #    for the exact PRs this trigger exists to unstick. So the push path only needs a
-          #    longer mergeability settle window; there is no CI gate left to wait on.
-          if [ "$EVENT_NAME" = "push" ]; then
-            SCOPE_FILTER='| select(.autoMergeRequest != null)'
-            UNKNOWN_ATTEMPTS=20   # x 3s  = up to 60s for GitHub to settle mergeStateStatus
-            echo "Scope: auto-merge-armed PRs only (push event)."
-          else
-            SCOPE_FILTER=''
-            UNKNOWN_ATTEMPTS=5    # a dropped/slow scheduled tick is retried by the next tick
-            echo "Scope: all open non-draft PRs ($EVENT_NAME event)."
-          fi
+          select_line() {
+            : > "$SUM"
+            bin/merge-line-select "${args[@]}" --summary "$SUM" > "$OUT"
+            action=$(sed -n 's/^action=//p' "$OUT")
+            head=$(sed -n 's/^head=//p' "$OUT")
+          }
+          select_line
 
-          candidates=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -f query='
-            query($owner:String!, $name:String!) {
-              repository(owner:$owner, name:$name) {
-                pullRequests(states:OPEN, baseRefName:"master", first:100) {
-                  nodes {
-                    number
-                    headRefOid
-                    mergeable
-                    mergeStateStatus
-                    isDraft
-                    autoMergeRequest { enabledAt }
-                  }
+          # GitHub computes mergeStateStatus/mergeable LAZILY: the batch query often returns
+          # UNKNOWN while GitHub recomputes in the background, then a later query returns the
+          # real value. Re-query the head until it resolves, so a genuinely BEHIND head that
+          # merely got caught mid-compute is not skipped. An UNKNOWN head holds the line: the
+          # pass never moves on to a later PR.
+          attempt=0
+          while [ "$action" = "unknown" ] && [ "$attempt" -lt "$UNKNOWN_ATTEMPTS" ]; do
+            attempt=$((attempt + 1))
+            sleep 3
+            state=$(gh api graphql -f owner="${REPO%/*}" -f name="${REPO#*/}" -F number="$head" -f query='
+              query($owner:String!, $name:String!, $number:Int!) {
+                repository(owner:$owner, name:$name) {
+                  pullRequest(number:$number) { mergeStateStatus }
                 }
-              }
-            }' --jq "
-              .data.repository.pullRequests.nodes[]
-              | select(.isDraft | not)
-              $SCOPE_FILTER
-              | \"\\(.number) \\(.headRefOid) \\(.mergeStateStatus) \\(.mergeable)\"")
-
-          updated=0
-          skipped_conflict=0
-          already_current=0
-          still_unknown=0
-
-          if [ -z "$candidates" ]; then
-            echo "No PRs in scope for this $EVENT_NAME pass."
+              }' --jq '.data.repository.pullRequest.mergeStateStatus' || true)
+            if [ -n "$state" ] && [ "$state" != "UNKNOWN" ]; then select_line; fi
+          done
+          if [ "$action" = "unknown" ]; then
+            echo "- Head #$head mergeability still UNKNOWN after $attempt polls. Left for the next tick." >> "$SUM"
           fi
 
-          while IFS=' ' read -r number sha state mergeable; do
-            [ -z "$number" ] && continue
+          cat "$OUT"
+          cat "$OUT" >> "$GITHUB_OUTPUT"
+          cat "$SUM" >> "$GITHUB_STEP_SUMMARY"
 
-            # GitHub computes mergeStateStatus/mergeable LAZILY: the batch query above
-            # often returns UNKNOWN while GitHub recomputes in the background, then a
-            # later query returns the real value. Re-query this single PR until it
-            # resolves, so we don't skip a genuinely-BEHIND PR that merely got caught
-            # mid-compute — the defect that left armed PRs (dependabot bumps especially)
-            # stuck BEHIND across ticks, because every cold tick re-drew UNKNOWN.
-            attempt=0
-            while [ "$state" = "UNKNOWN" ] && [ "$attempt" -lt "$UNKNOWN_ATTEMPTS" ]; do
-              attempt=$((attempt + 1))
-              sleep 3
-              resolved=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -F number="$number" -f query='
-                query($owner:String!, $name:String!, $number:Int!) {
-                  repository(owner:$owner, name:$name) {
-                    pullRequest(number:$number) {
-                      headRefOid
-                      mergeStateStatus
-                      mergeable
-                    }
-                  }
-                }' --jq '.data.repository.pullRequest | "\(.headRefOid) \(.mergeStateStatus) \(.mergeable)"' || true)
-              if [ -n "$resolved" ]; then
-                IFS=' ' read -r sha state mergeable <<< "$resolved"
-              fi
-            done
+      - name: Update the head PR onto master
+        if: steps.select.outputs.action == 'update' && inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ secrets.CI_PAT }}
+          REPO: ${{ github.repository }}
+          HEAD_PR: ${{ steps.select.outputs.head }}
+        run: |
+          set -euo pipefail
 
-            echo "::group::PR #$number (state=$state mergeable=$mergeable)"
+          # Update the branch via merge commit from master. Authenticated as CI_PAT so the
+          # resulting push triggers CI on the refreshed branch (GITHUB_TOKEN would not).
+          #
+          # We do NOT check whether CI is currently in flight on the head. master enforces
+          # strict required checks, so a BEHIND PR's running checks cannot satisfy the
+          # merge gate no matter how they finish — they are doomed before we look. This
+          # push IS the canceller: every required check workflow (tests.yml,
+          # e2e-tests.yml, pr-meta-checks.yml, human-signoff.yml) carries
+          # cancel-in-progress: true on a ref-keyed concurrency group, so the new head
+          # cancels the stale run and starts the only run that can actually merge.
+          if gh api -X PUT "repos/$REPO/pulls/$HEAD_PR/update-branch"; then
+            echo "- update-branch: PR #$HEAD_PR updated onto master" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::update-branch failed for PR #$HEAD_PR"
+            echo "- update-branch: FAILED for PR #$HEAD_PR" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-            # Negative path: a conflicting PR (DIRTY / CONFLICTING) cannot be auto-updated —
-            # skip and log; a human must resolve the conflict. Never call update-branch here.
-            if [ "$state" = "DIRTY" ] || [ "$mergeable" = "CONFLICTING" ]; then
-              echo "Merge conflict — skipping (needs manual resolution)"
-              skipped_conflict=$((skipped_conflict + 1))
-              echo "::endgroup::"
-              continue
-            fi
-
-            # Only BEHIND PRs need updating. CLEAN/BLOCKED/UNSTABLE/HAS_HOOKS are not out of
-            # date w.r.t. master, so treat as already-current. UNKNOWN here means the poll
-            # above exhausted its retries without GitHub settling the state — rare; leave it
-            # for the next tick rather than blindly calling update-branch on an unknown state.
-            # Poll exhausted without GitHub settling the state — surface it in the summary
-            # instead of silently folding into already_current (the skip that hid this bug).
-            if [ "$state" = "UNKNOWN" ]; then
-              echo "Still UNKNOWN after poll — leaving for next tick"
-              still_unknown=$((still_unknown + 1))
-              echo "::endgroup::"
-              continue
-            fi
-
-            if [ "$state" != "BEHIND" ]; then
-              echo "Not BEHIND (state=$state) — nothing to update"
-              already_current=$((already_current + 1))
-              echo "::endgroup::"
-              continue
-            fi
-
-            # 2. Update the branch via merge commit from master. Authenticated as CI_PAT so the
-            #    resulting push triggers CI on the refreshed branch (GITHUB_TOKEN would not).
-            #
-            #    We do NOT check whether CI is currently in flight on $sha. master enforces
-            #    strict required checks, so a BEHIND PR's running checks cannot satisfy the
-            #    merge gate no matter how they finish — they are doomed before we look. This
-            #    push IS the canceller: every required check workflow (tests.yml,
-            #    e2e-tests.yml, pr-meta-checks.yml, human-signoff.yml) carries
-            #    cancel-in-progress: true on a ref-keyed concurrency group, so the new head
-            #    cancels the stale run and starts the only run that can actually merge.
-            if gh api -X PUT "repos/$REPO/pulls/$number/update-branch"; then
-              echo "Updated PR #$number onto master"
-              updated=$((updated + 1))
-            else
-              echo "::warning::update-branch failed for PR #$number"
-            fi
-            echo "::endgroup::"
-          done <<< "$candidates"
-
-          # 3. Step summary counts.
-          {
-            echo "## Update BEHIND PRs"
-            echo "- Updated: $updated"
-            echo "- Skipped (merge conflict): $skipped_conflict"
-            echo "- Already current (not BEHIND): $already_current"
-            echo "- Still UNKNOWN after poll: $still_unknown"
-            echo ""
-            echo "_Updates are unconditional: an updated PR's in-flight CI is cancelled by the"
-            echo "update push via cancel-in-progress. Cancelled runs on these PRs are expected._"
-          } >> "$GITHUB_STEP_SUMMARY"
+      # GITHUB_TOKEN, not CI_PAT: editing the notice then fires no issue_comment workflow.
+      - name: Post or clear merge-line skip notices
+        if: inputs.dry_run != true && !inputs.pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKIPPED: ${{ steps.select.outputs.skipped }}
+          CLEAR: ${{ steps.select.outputs.clear }}
+        run: |
+          set -euo pipefail
+          source bin/lib/pr-sticky.sh
+          MARKER='<!-- merge-line-skip -->'
+          for entry in $SKIPPED; do
+            n="${entry%%:*}"; reason="${entry#*:}"
+            case "$reason" in
+              red)   why="a required check is failing on the current head commit"
+                     fix="the required checks pass on a new head commit" ;;
+              dirty) why="the branch has a merge conflict with master"
+                     fix="the conflict is resolved" ;;
+              *)     echo "::warning::unknown skip reason '$reason' for #$n"; continue ;;
+            esac
+            body="$MARKER
+          **Merge line: skipped.** This PR is armed for auto-merge, and the merge line passed over it because ${why}.
+          It stays armed and keeps its place by arm time. The line picks it up again on the first pass after ${fix}."
+            pr_sticky_upsert "$n" "$MARKER" "$body" || echo "::warning::could not post skip notice on #$n"
+          done
+          for n in $CLEAR; do
+            pr_sticky_delete "$n" "$MARKER" || echo "::warning::could not clear skip notice on #$n"
+          done

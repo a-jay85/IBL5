@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-09-24
+last_verified: 2026-09-29
 ---
 
 # IBL5 Architecture Decision Records
@@ -54,6 +54,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0112](0112-auto-promote-master-to-production.md) | Auto-promote master to production on green CI | Accepted | `workflow_run` promoter fast-forwards `master` to `production` when the SHA is all-green; paused by the `AUTO_PROMOTE_PAUSED` repo variable, pushed FF-only with `CI_PAT`, announced by Discord DM. |
 | [0131](0131-ci-tree-hash-memoization.md) | CI tree-hash memoization of heavy jobs | Accepted | Heavy jobs in `Tests and Analysis` and `E2E Tests` skip when the HEAD tree over a declared input path set already passed; key from `bin/ci-memo`, sentinel in `actions/cache`, written only by a clean `gate`; PR-only, with the GHCR image manifest folded into the e2e key. |
 | [0138](0138-adr-draft-at-commit-site.md) | ADR auto-draft fires at the Phase 2 commit site | Accepted | `bin/adr-check` gains a `--commit` mode scoped to this branch's commits since the merge-base union the index; `bin/pre-commit-hook` runs it as a hard gate printing `pre-commit-adr-gate:`; the harness drafts a missing ADR before `commit_all()` and stages it into the Phase 2 commit, with the push-site arm kept as the Phase 5.5 backstop. |
+| [0144](0144-baseline-drift-merge-base-gate.md) | Baseline drift gate compares against the merge-base | Accepted | `ibl5/bin/check-baseline-drift` fails when a PR's count exceeds `ceiling = min(snap, baseNeon + max(0, snap - baseSnap))`, so the gate only tightens versus ADR-0018. `--update` only raises the counts JSON, so shrink PRs leave it untouched, and only master's `update-baselines` job lowers it with `--sync`. The `phpstan` job fetches full history and passes `--base`. |
 
 ## When an ADR is Required
 

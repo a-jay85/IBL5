@@ -8,7 +8,9 @@ Do NOT invoke /post-plan, /simplify, /commit, /code-review, or /security-audit. 
 
 You have **{{IMPL_BUDGET_MINUTES}} minutes** of wall-clock time for this phase. The outer loop runs you under `timeout`, so at that mark your process is SIGTERM'd mid-sentence — no cleanup turn, no chance to write anything afterward. An unfinished phase that left a handoff is recoverable; one that left nothing is not.
 
-So: commit a checkpoint after each phase of the plan rather than batching, and treat roughly 90% of the budget as your real deadline. If you reach that point with work outstanding, STOP implementing and write the handoff file describing what landed, what did not, and the exact next step. Budget for asynchronous `Agent` delegates too — they can block you for tens of minutes while emitting nothing.
+So: commit a checkpoint after each phase of the plan rather than batching, and treat roughly 90% of the budget as your real deadline. If you reach that point with work outstanding, STOP implementing and write the handoff file describing what landed, what did not, and the exact next step. Run Step 6.7 before that handoff; when Step 6.7 blocks, its no-handoff STOP path wins. Budget for asynchronous `Agent` delegates too — they can block you for tens of minutes while emitting nothing.
+
+After every tool call you will see a line like `elapsed 123s / 1800s`. That is your clock. Once it says you are past 90%, stop implementing and write the handoff.
 
 ## Step 1: Read the Assigned Plan
 
@@ -240,7 +242,7 @@ Work in /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>/ibl5/. CLAUDE.md is auto
 
 When a plan phase carries a `### Delegate` packet, do NOT implement that phase inline: fire **one** Agent/Task call per packet at the packet's declared tier, and pass the packet **verbatim** as the sub-agent prompt. Spawn at the declared tier exactly as follows:
 
-- **Sonnet** → `subagent_type: "automouse-delegate"` (byte-match the def's `name:`) and **omit the `model` param**. The def (`.claude/agents/automouse-delegate.md`) pins `claude-sonnet-4-6`; passing `model: "sonnet"` resolves to Sonnet 5 and overrides the pin, spending ~30% more of the weekly token budget on identical work.
+- **Sonnet** → `subagent_type: "automouse-delegate"` (byte-match the def's `name:`) and **omit the `model` param**. The def (`.claude/agents/automouse-delegate.md`) pins `claude-sonnet-5-5`. Omit `model` so the def's pin is the single source of truth for the delegate tier.
 - **Haiku** → `subagent_type: "general-purpose"` with `model: "haiku"`. No def is needed — the `haiku` alias already resolves to the only Haiku. The packet is self-verifying — the sub-agent runs the packet's self-verify command before returning — and CI plus post-plan review remain the backstop. This keeps your own context flat across the run; inlining a verbose packet's tool output defeats its purpose.
 
 The packet's `**Assertions:**` list is binding on the sub-agent. A returned summary that reports fewer assertions checked than the packet lists is a phase failure to re-run, not a pass.
@@ -312,21 +314,69 @@ CONF_RC=$?
 printf '%s\n' "$CONF_OUT"
 ```
 
-**Exit 0 (clean):** proceed to Step 7.
+**Exit 0 (clean):** proceed to Step 6.7.
 
 **Exit 1 (unresolved items found):** the check printed one `MISSING:` or `MISSING-FILE:` line per unresolved item. Fix each one now:
 - `MISSING-FILE: <path>` means a Critical File listed in the plan was never written. Write it, checkpoint, and re-run the check. **Exception:** if the path is a migration or ADR that was renumbered per Step 6 (the plan named `123_x.sql` but you created `125_x.sql`), the conformance check matches by the plan's original name and will always report it missing — the file exists under the new number. Do not write the file under the stale number. Note the renumber in your handoff instead.
 - `MISSING: <path>` means a matrix-declared test path was never written. Write it, checkpoint, and re-run the check.
 
-After fixing, re-run the block above and confirm exit 0 before proceeding to Step 7.
+After fixing, re-run the block above and confirm exit 0 before proceeding to Step 6.7.
 
-**Budget-wall fallback:** if you are close to the time budget (roughly 90% elapsed) and cannot resolve all items in time, proceed to Step 7 ANYWAY. Write the handoff file and include an `"unresolved_conformance_items"` field listing each unresolved item string. Post-plan Phase 5.0 holds arming at condition (3) exactly as it does today. Do NOT use the Error Handling path; write the handoff.
+**Budget-wall fallback:** if you are close to the time budget (roughly 90% elapsed) and cannot resolve all items in time, proceed to Step 6.7 ANYWAY. If Step 6.7 comes back clean, write the handoff file in Step 7 and include an `"unresolved_conformance_items"` field listing each unresolved item string. Post-plan Phase 5.0 holds arming at condition (3) exactly as it does today. Do NOT use the Error Handling path; write the handoff.
 
-**Exit 2 (could not evaluate):** the harness seam was unavailable or the plan path was unreadable. Print the contents of `$CONF_ERR` and proceed to Step 7. Do NOT block.
+**Exit 2 (could not evaluate):** the harness seam was unavailable or the plan path was unreadable. Print the contents of `$CONF_ERR` and proceed to Step 6.7. Do NOT block.
 
-Every exit code from this step ends at Step 7. A conformance miss is not an implementation failure and never routes to the Error Handling path in Step 8.
+Every exit code from this step ends at Step 6.7. A conformance miss is not an implementation failure and never routes to the Error Handling path in Step 8.
 
 Then `rm -f "$CONF_ERR"` once the code has been read, so no scratch file survives the run.
+
+## Step 6.7: Matrix Realisation Check
+
+Step 6.6 does not evaluate Verification Matrix assertions. This step does, so a matrix row whose test the diff never wrote gets fixed here, before post-plan opens a PR.
+
+Commit a checkpoint first. The check reads the committed branch diff and refuses a dirty tree.
+
+```bash
+MAIN_CHECKOUT=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
+MATRIX_SCRIPT="${MATRIX_SCRIPT:-$MAIN_CHECKOUT/bin/lib/plan-matrix-assertions}"
+if [ -z "${PLAN_PATH:-}" ] || [ ! -f "$PLAN_PATH" ]; then
+    MATRIX_VERDICT=skipped
+elif [ -n "$(git status --porcelain)" ]; then
+    MATRIX_VERDICT=uncommitted
+else
+    MATRIX_DIFF=$(mktemp "${TMPDIR:-/tmp}/matrix-diff.XXXXXX")
+    git diff origin/master...HEAD >"$MATRIX_DIFF"
+    MATRIX_OUT=$("$MATRIX_SCRIPT" "$PLAN_PATH" "$MATRIX_DIFF" 2>&1)
+    MATRIX_RC=$?
+    rm -f "$MATRIX_DIFF"
+    printf '%s\n' "$MATRIX_OUT"
+    if [ "$MATRIX_RC" -ne 0 ]; then
+        MATRIX_VERDICT=unavailable
+    elif printf '%s\n' "$MATRIX_OUT" | grep -q '^UNREALISED-ASSERTION:'; then
+        MATRIX_VERDICT=unrealised
+    else
+        MATRIX_VERDICT=clean
+    fi
+fi
+echo "MATRIX_VERDICT=$MATRIX_VERDICT"
+```
+
+Act on the verdict line:
+
+- `skipped`: there is no plan file. Proceed to Step 7.
+- `clean`: proceed to Step 7.
+- `uncommitted`: commit a checkpoint and re-run the block.
+- `unrealised`: each `UNREALISED-ASSERTION: row <id> -- <cell>` line is followed by a `missing:` line naming the backtick tokens the diff never added. For each row, write the missing test (method, assertion, or fixture) in the file that matrix row names, run it until it passes, commit a checkpoint, and re-run the block. Repeat until the verdict is `clean`.
+- `unavailable`: the checker could not run. The printed output says why. Treat it as unresolved.
+
+When the verdict is still `unrealised` or `unavailable` after your fix attempts, or you are near the time budget with rows still open:
+
+1. Do NOT write the handoff file. No handoff means no post-plan run, no PR, and no merge.
+2. Leave the worktree as it is. Do not revert, reset, or discard any work.
+3. Write `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-error-<slug>.md` (derive `<slug>` from the plan title) with the title `Matrix realisation failed: <plan title>`. List every `UNREALISED-ASSERTION:` line, its `missing:` tokens, and what you tried.
+4. STOP.
+
+This step has no budget-wall fallback and no waiver. An unresolved row never proceeds to Step 7. Never add a `WAIVE-MATRIX-ROW:` line, and never edit the plan's Verification Matrix to make this check pass.
 
 ## Step 7: Write Handoff File
 

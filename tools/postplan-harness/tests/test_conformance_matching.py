@@ -269,6 +269,90 @@ def test_pytest_node_id_token_missing_when_file_absent():
     assert any(i.startswith("MISSING:") for i in items)
 
 
+# ---------------------------------------------------------------------------
+# Migration renumber tolerance (backlog#937) — Tier 3 of _resolve
+# ---------------------------------------------------------------------------
+
+def test_migration_renumber_resolves_when_suffix_unique():
+    """Plan names 179_<suffix>; diff carries 180_<suffix> and nothing else with
+    that suffix → resolves, no MISSING-FILE, and the resolution is logged.
+
+    Mutation caught: delete Tier 3 (or its return) and the token falls through
+    basename matching — `179_x.sql` != `180_x.sql` — producing MISSING-FILE.
+    """
+    tok = "ibl5/migrations/179_create_season1993_phantom_backup_tables.sql"
+    hit = "ibl5/migrations/180_create_season1993_phantom_backup_tables.sql"
+    plan = _plan_with_critical(tok)
+    resolutions: dict[str, str] = {}
+    items = check(plan, [hit], resolutions=resolutions)
+    assert items == [], f"expected no MISSING-FILE, got: {items}"
+    assert resolutions.get(tok) == hit
+
+
+def test_migration_missing_when_no_suffix_match():
+    """Plan names 179_<suffix>; diff carries a migration with a DIFFERENT
+    suffix → MISSING-FILE survives.
+
+    Mutation caught: match Tier 3 on the `ibl5/migrations/\\d+_` prefix alone
+    (drop the suffix equality) and any added migration would discharge any
+    planned migration, clearing the item.
+    """
+    tok = "ibl5/migrations/179_create_season1993_phantom_backup_tables.sql"
+    plan = _plan_with_critical(tok)
+    items = check(plan, ["ibl5/migrations/180_add_unrelated_column.sql"])
+    assert any("MISSING-FILE" in i and "179_create_season1993" in i for i in items)
+
+
+def test_migration_two_suffix_matches_stay_missing():
+    """Two added migrations share the planned suffix → ambiguous → MISSING-FILE.
+
+    Mutation caught: return the first suffix hit (`cands[0]`) instead of
+    requiring exactly one, and the item is cleared on an ambiguous diff.
+    """
+    tok = "ibl5/migrations/179_create_season1993_phantom_backup_tables.sql"
+    plan = _plan_with_critical(tok)
+    items = check(plan, [
+        "ibl5/migrations/180_create_season1993_phantom_backup_tables.sql",
+        "ibl5/migrations/181_create_season1993_phantom_backup_tables.sql",
+    ])
+    assert any("MISSING-FILE" in i and "179_create_season1993" in i for i in items)
+
+
+def test_non_migration_renumber_gets_no_tolerance():
+    """Same NNN_<suffix> shape OUTSIDE ibl5/migrations/ → no Tier 3 → MISSING-FILE.
+
+    Mutation caught: anchor the Tier 3 regex on the basename only (drop the
+    `ibl5/migrations/` directory prefix) and a renumbered fixture file would
+    resolve, widening the tolerance beyond migrations.
+    """
+    tok = "tools/postplan-harness/fixtures/179_sample_plan.md"
+    plan = _plan_with_critical(tok)
+    items = check(plan, ["tools/postplan-harness/fixtures/180_sample_plan.md"])
+    assert any("MISSING-FILE" in i and "179_sample_plan.md" in i for i in items)
+
+
+def test_migration_exact_match_wins_over_renumber():
+    """Diff carries BOTH the planned 179_<suffix> and a 180_<suffix> sibling →
+    Tier 1 exact match resolves to 179; Tier 3 never runs, so the sibling does
+    not make the set ambiguous.
+
+    Mutation caught: run Tier 3 before Tier 1 (or unconditionally) and the two
+    suffix hits produce None, emitting a MISSING-FILE for a file that IS in
+    the diff.
+    """
+    tok = "ibl5/migrations/179_create_season1993_phantom_backup_tables.sql"
+    plan = _plan_with_critical(tok)
+    resolutions: dict[str, str] = {}
+    items = check(plan, [
+        tok,
+        "ibl5/migrations/180_create_season1993_phantom_backup_tables.sql",
+    ], resolutions=resolutions)
+    assert items == []
+    # Exact match (Tier 1) does not write to resolutions; key absent confirms
+    # Tier 3 was never consulted and did not make the two suffix hits ambiguous.
+    assert resolutions.get(tok) is None
+
+
 def test_phase_omission_end_to_end_positive_and_negative():
     """locate_plan + check: exactly one MISSING-PHASE: 2 on negative diff, zero on positive.
 

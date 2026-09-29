@@ -159,8 +159,59 @@ def patch_series_equivalent(local_sha, remote_sha, worktree, *, run_git=None,
         return False
 
 
+def update_branch_merge_equivalent(expected_sha, remote_sha, worktree, *, run_git=None,
+                                   master_ref="origin/master") -> bool:
+    """True iff remote_sha is a GitHub "Update branch" merge of master into expected_sha
+    (what .github/workflows/update-behind-prs.yml and the PR-page button produce).
+    Every arm fails closed: any git rc != 0, unparseable output, timeout or OSError
+    returns False.
+
+    Arms, in order:
+      1. git fetch origin succeeds (remote_sha and master_ref must be local).
+      2. remote_sha has exactly two parents (rev-list --parents -n 1).
+      3. parents[0] == expected_sha — the merge sits directly on the sha the harness
+         pushed. A second update-branch merge stacked on a first one has parents[0] ==
+         the first merge, so it stays diverged (one level only, by design).
+      4. parents[1] is an ancestor of master_ref — the merged-in side is master, not an
+         arbitrary branch.
+      5. git merge-tree --write-tree parents[0] parents[1] exits 0 (clean merge) and the
+         tree it prints equals remote_sha^{tree} — the merge commit carries exactly the
+         mechanical merge result and nothing else (no evil merge, no conflict resolution).
+    """
+    if not expected_sha or not remote_sha:
+        return False
+    _run = run_git or _default_run_git
+
+    def _text(r):
+        return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else ""
+
+    try:
+        if _run(["fetch", "origin"], worktree).returncode != 0:
+            log.warning("update_branch_merge_equivalent: git fetch failed — treating as not equivalent")
+            return False
+        parents_line = _text(_run(["rev-list", "--parents", "-n", "1", remote_sha], worktree))
+        parts = parents_line.split()
+        if len(parts) != 3:
+            return False
+        _, p1, p2 = parts
+        if p1 != expected_sha:
+            return False
+        if _run(["merge-base", "--is-ancestor", p2, master_ref], worktree).returncode != 0:
+            return False
+        mt = _run(["merge-tree", "--write-tree", p1, p2], worktree)
+        if mt.returncode != 0:
+            return False
+        merged_tree = mt.stdout.strip().splitlines()[0].strip() if mt.stdout.strip() else ""
+        remote_tree = _text(_run(["rev-parse", f"{remote_sha}^{{tree}}"], worktree))
+        if not merged_tree or not remote_tree:
+            return False
+        return merged_tree == remote_tree
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
 def sync_to_remote(branch, worktree, *, run_git=None) -> str:
-    """Reset the worktree HEAD to origin/<branch>. Precondition: content_equivalent or patch_series_equivalent is True."""
+    """Reset the worktree HEAD to origin/<branch>. Precondition: content_equivalent, patch_series_equivalent or update_branch_merge_equivalent is True."""
     _run = run_git or _default_run_git
     try:
         _run(["fetch", "origin"], worktree)
@@ -202,7 +253,7 @@ def reconcile_remote_head(pr, expected_sha, local_sha, branch, worktree, *,
     """Single decision function. Every guarded site calls this one function.
 
     match   — remote head equals expected_sha; no mutation.
-    synced  — remote moved but is tree-equivalent, or is the same patch series rebased onto newer master; worktree reset to remote head.
+    synced  — remote moved but is tree-equivalent, is the same patch series rebased onto newer master, or is a GitHub "Update branch" merge of master onto expected_sha; worktree reset to remote head.
     diverged — remote head has different content; caller must fail closed.
     """
     ok, remote = remote_head_matches(pr, expected_sha, gh_cmd=gh_cmd, sleep=sleep)
@@ -244,6 +295,10 @@ def reconcile_remote_head(pr, expected_sha, local_sha, branch, worktree, *,
         log.info("reconcile_remote_head: remote %s is the same patch series as %s rebased "
                  "onto newer master; adopting", remote[:8], local_sha[:8])
         return _adopt("patch-series-equivalent (rebased onto newer master)")
+    if update_branch_merge_equivalent(expected_sha, remote, worktree, run_git=run_git):
+        log.info("reconcile_remote_head: remote %s is an update-branch merge of master onto "
+                 "%s; adopting", remote[:8], expected_sha[:8])
+        return _adopt("update-branch merge of master")
     log.error(
         "reconcile_remote_head: remote head %s diverged from %s with different content",
         remote[:8] if remote else "?", expected_sha[:8] if expected_sha else "?"

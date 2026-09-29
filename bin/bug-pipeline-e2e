@@ -190,7 +190,7 @@ expect 'Phase6 row untouched' 'fixed' \
 
 # CLI boundary: invalid status must exit 1
 (cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test \
-    php scripts/bug-pipeline/transition.php "$ID2" awaiting_ajay not_a_status 2>/dev/null) \
+    php scripts/bug-pipeline/transition.php "$ID2" not_a_status 2>/dev/null) \
     && { echo 'FAIL: invalid status should exit 1' >&2; RC=1; } \
     || echo 'ok: invalid status rejected'
 

@@ -1,6 +1,6 @@
 ---
 description: Act on the nightly stale-docs audit automatically — on a NEW/CHANGED stale set, a self-hosted macOS runner fires a headless Claude run that refreshes exactly the flagged docs (stale last_verified dates and dead paths: globs) and opens a PR (held for human merge) that Closes the tracker issue.
-last_verified: 2026-07-29
+last_verified: 2026-09-29
 ---
 
 # ADR-0079: Autonomous stale-docs remediation via a self-hosted macOS runner

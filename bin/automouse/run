@@ -1755,7 +1755,7 @@ while true; do
         {
             printf 'Plan "%s" skipped: unusable `impl_model:` frontmatter. Needs human review.\n\n' "$SLUG"
             printf '%s\n\n' "$BASE_MODEL"
-            printf 'Fix the line-1 frontmatter to one of: opus, sonnet, haiku, claude-opus-5-5, claude-sonnet-4-6, claude-haiku-4-5 — then `bin/automouse/queue add %s`.\n' "$SLUG"
+            printf 'Fix the line-1 frontmatter to one of: opus, sonnet, haiku, claude-opus-5-5, claude-sonnet-5-5, claude-sonnet-4-6, claude-haiku-4-5 — then `bin/automouse/queue add %s`.\n' "$SLUG"
         } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
         CURRENT_LOCK=""
@@ -1933,8 +1933,13 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # gates and its handoff to exactly this path. The guard is upstream, not here:
         # bin/automouse/prompt-impl forbids backgrounded Bash, and ~/.claude/hooks/bash-guard.sh
         # check 17 denies `run_in_background: true` whenever CLAUDE_HEADLESS is set.
+        # The impl agent has no clock — bin/lib/headless-elapsed-hook.sh reads
+        # these two vars and appends an elapsed-clock line after every tool call
+        # so the agent can track the 90% deadline and write a handoff in time.
         CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
+        IBL5_BUDGET_START_EPOCH="$(date +%s)" \
+        IBL5_BUDGET_SECS="$REMAINING_SECS" \
         timeout "$REMAINING_SECS" \
             claude -p "$IMPL_PROMPT" \
                 --dangerously-skip-permissions \
@@ -2139,7 +2144,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         fi
 
         echo "--- Plan #$PLANS_RUN postplan finished at $(date) ---" >> "$LOG"
-        append_cost_row "$PLAN_NAME" postplan "$PP_LOG_BEFORE" claude-sonnet-4-6
+        append_cost_row "$PLAN_NAME" postplan "$PP_LOG_BEFORE" claude-sonnet-5-5
 
         PP_DUR=$(( $(date +%s) - PP_START ))
 

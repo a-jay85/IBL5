@@ -8,7 +8,7 @@
 # --live` — the deterministic phase sequencer with bounded LLM calls (~65-100x
 # fewer gross tokens than a skill session). If the harness exits nonzero, or is
 # absent on this machine, the same launchd job falls back to the original
-# Sonnet 4.6 /post-plan skill session. POST_PLAN_SKILL=1 forces the skill path.
+# Sonnet 5.5 /post-plan skill session. POST_PLAN_SKILL=1 forces the skill path.
 # The harness intentionally omits backlog housekeeping, worktree teardown, the
 # E2E verify track, and Phase 10 preview — the skill fallback retains them.
 # The harness runs the Phase 5.5 fidelity review itself; there is no partial-run resume, so any harness exit other than 0, 3 or 7 re-runs the full skill.
@@ -507,7 +507,7 @@ HARNESS_RUN_DIR=""
 GATE_OPEN=""
 POST_HARNESS_SEG=""
 GATE_CLOSE=""
-ENGINE="Sonnet 4.6 /post-plan skill session"
+ENGINE="Sonnet 5.5 /post-plan skill session"
 if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
     FALLBACK_FN="$(declare -f should_fallback); "
     PLAN_ARG="${PLAN_OVERRIDE:+ --plan $(shq "$PLAN_OVERRIDE")}"
@@ -594,7 +594,7 @@ esac
 # $fail_tail is read into a variable, so log text is data and never re-parsed as shell.
 FAILDM_SEG="if [ \"\$pp_rc\" != 0 ] && [ \"\$pp_rc\" != 3 ] && [ \"\$pp_rc\" != 143 ]; then fail_tail=\$(tail -n 3 \"$LOG\" 2>/dev/null | tr '\n' ' ' | cut -c1-600); msg=\"post-plan-now: run FAILED on branch $SLUG (exit \$pp_rc). Last log lines: \${fail_tail:-none}. Re-run: cd $ROOT && bin/post-plan-now. See $LOG.\"; echo \"\$msg\"; \"$ROOT/bin/post-plan-fail-dm\" \"$ROOT\" \"$SAFE_SLUG\" \"$LOG\" \"\$msg\" || true; fi; "
 
-CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; _sigterm_received=0; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT HUP; trap '_sigterm_received=1; conclude_status_badge \"\${pp_rc:-1}\"' TERM; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --session-id $(shq "$SESSION_ID") --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${_sigterm_received:-0}\" -eq 1 ]; then pp_rc=143; fi; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; ${FAILDM_SEG}${CMD_TAIL}"
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; _sigterm_received=0; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT HUP; trap '_sigterm_received=1; conclude_status_badge \"\${pp_rc:-1}\"' TERM; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-5-5 --session-id $(shq "$SESSION_ID") --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${_sigterm_received:-0}\" -eq 1 ]; then pp_rc=143; fi; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; ${FAILDM_SEG}${CMD_TAIL}"
 
 if [ "$FOREGROUND" -eq 1 ]; then
     echo "post-plan-now: foreground mode on branch '$SLUG' — engine: $ENGINE"

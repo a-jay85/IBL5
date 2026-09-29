@@ -96,7 +96,7 @@ FORM {
 INPUT,
 TEXTAREA,
 SELECT {
-    border: 1px solid #000000;
+    border: 1px solid var(--black);
     font-size: 1rem;
     font-family: var(--font-sans);
 }
@@ -125,16 +125,16 @@ A:hover {
 
 .title {
     background: none;
-    color: #000000;
+    color: var(--black);
     font-size: 1.5rem;
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
     font-family: var(--font-display);
     text-decoration: none;
 }
 
 .content {
     background: none;
-    color: #000000;
+    color: var(--black);
     font-size: 1rem;
     font-family: var(--font-sans);
 }
@@ -143,7 +143,7 @@ A:hover {
     background: none;
     color: var(--gray-700);
     font-size: 1.5rem;
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
     font-family: var(--font-display);
     text-decoration: none;
 }
@@ -152,16 +152,16 @@ A:hover {
     background: none;
     color: var(--gray-700);
     font-size: 1rem;
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
     font-family: var(--font-display);
     text-decoration: underline;
 }
 
 .option {
     background: none;
-    color: #000000;
+    color: var(--black);
     font-size: 1rem;
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
     font-family: var(--font-sans);
     text-decoration: none;
 }

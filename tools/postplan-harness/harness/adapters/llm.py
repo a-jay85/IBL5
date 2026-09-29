@@ -31,6 +31,18 @@ TOOLED_TIMEOUT = 2400             # a repo-reading reviewer needs many turns of 
 TOOLED_MAX_TURNS = 60             # NEVER 1: a tool-enabled call must be able to iterate
 ENVELOPE_ERROR_TEXT_CAP = 600     # bound result text in error details for diagnosis
 
+# Twin of bin/automouse/run:1047 — same runtime-error signature set.  Keep the two
+# in sync when extending either.  Patterns are anchored to Claude-runtime error
+# vocabulary so a review that discusses rate-limiting in source code does NOT match.
+_USAGE_LIMIT_RE = re.compile(
+    r"hit your [a-z0-9 -]*limit"
+    r"|usage limit reached"
+    r"|api error:\s*(401|403|429|529)"
+    r"|overloaded_error"
+    r"|rate_limit_error",
+    re.IGNORECASE,
+)
+
 MODEL_MAP = {
     "haiku": "claude-haiku-4-5-20251001",
     "sonnet": "claude-sonnet-4-6",     # matches the historical review-agent tier
@@ -184,6 +196,13 @@ class ClaudeCli:
             try:
                 envelope = json.loads(proc.stdout)
             except json.JSONDecodeError:
+                raw = f"{proc.stdout} {proc.stderr}"
+                if _USAGE_LIMIT_RE.search(raw):
+                    rec.ok = False
+                    rec.retries = attempt
+                    self.ledger.add(rec)
+                    raise HarnessError("llm-usage-limit",
+                                       f"{purpose}: {raw[:200].strip()}")
                 last_err = f"CLI non-JSON output (rc={proc.returncode}): {proc.stdout[:200]} {proc.stderr[:200]}"
                 rec.retries = attempt
                 continue
@@ -205,6 +224,17 @@ class ClaudeCli:
                 self.ledger.add(rec)
                 return data
             except (ValueError, HarnessError) as e:
+                # When extract_json/validate fails, check whether the model
+                # returned a usage-limit message rather than a JSON reply.
+                # Only raise here (inside the retry loop) — valid JSON that
+                # happens to mention "rate_limit_error" in a field value will
+                # have already returned above, so no false-positive risk.
+                if _USAGE_LIMIT_RE.search(result_text):
+                    rec.ok = False
+                    rec.retries = attempt
+                    self.ledger.add(rec)
+                    raise HarnessError("llm-usage-limit",
+                                       f"{purpose}: {result_text[:200].strip()}")
                 last_err = str(e)
                 attempt_prompt = (prompt + "\n\nYour previous reply was not valid per the "
                                   f"required JSON schema ({e}). Reply with ONLY the JSON.")
@@ -252,6 +282,13 @@ class ClaudeCli:
             try:
                 envelope = json.loads(proc.stdout)
             except json.JSONDecodeError:
+                raw = f"{proc.stdout} {proc.stderr}"
+                if _USAGE_LIMIT_RE.search(raw):
+                    rec.ok = False
+                    rec.retries = attempt
+                    self.ledger.add(rec)
+                    raise HarnessError("llm-usage-limit",
+                                       f"{purpose}: {raw[:200].strip()}")
                 last_err = (f"CLI non-JSON output (rc={proc.returncode}): "
                             f"{proc.stdout[:200]} {proc.stderr[:200]}")
                 rec.retries = attempt
@@ -266,6 +303,18 @@ class ClaudeCli:
             result_text = envelope.get("result", "") or ""
             self._persist_raw(purpose, attempt, result_text)
             rec.retries = attempt
+            # Detect usage limits before any other classification.
+            # Error envelopes: result_text is the CLI's own error explanation (always
+            # short — match unconditionally).  Success envelopes: only match when the
+            # whole reply is short; a multi-page verdict quoting the pattern in passing
+            # must never be misclassified (genuine verdict documents are ≥ 1 KB).
+            _is_error_env = (bool(envelope.get("is_error"))
+                             or envelope.get("subtype") not in (None, "success"))
+            if (_is_error_env or len(result_text.strip()) < 400) and _USAGE_LIMIT_RE.search(result_text):
+                rec.ok = False
+                self.ledger.add(rec)
+                raise HarnessError("llm-usage-limit",
+                                   f"{purpose}: {result_text[:200].strip()}")
             # Content failures are never re-asked: a reviewer that errored out mid-review
             # would only error again, and its partial text must not escape as a verdict.
             subtype = envelope.get("subtype")

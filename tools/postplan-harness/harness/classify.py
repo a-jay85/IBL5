@@ -629,6 +629,12 @@ def classify(files: list[str], diff_text: str, modified_files: list[str] | None 
 
 _MANUAL_HEADING_RE = re.compile(r"^#{2,6}\s*Manual\s+Testing\b", re.I | re.M)
 _NEXT_HEADING_RE = re.compile(r"^#{1,6}\s", re.M)
+# Gate parity. armable._manual_section, bin/lib/pr-armable.sh and
+# bin/check-pr-manual-testing end the `## Manual Testing` window at the next
+# `^## ` line only; a `###` line is inside the window. The restore protects
+# exactly that window (backlog#1188), so its end regex is this one, never
+# _NEXT_HEADING_RE.
+_NEXT_SECTION_RE = re.compile(r"^## ", re.M)
 
 
 def strip_manual_testing_section(body: str) -> tuple[str, bool]:
@@ -662,11 +668,45 @@ MANUAL_TESTING_SENTINEL = (
 
 
 def _manual_testing_span(body: str) -> tuple[int, int] | None:
+    """`(start, end)` of the arming gate's window: the first `_MANUAL_HEADING_RE`
+    line to the next `^## ` line or EOF. Restore-only; strip_manual_testing_section
+    keeps its own `_NEXT_HEADING_RE` end.
+    """
     m = _MANUAL_HEADING_RE.search(body)
     if not m:
         return None
-    next_m = _NEXT_HEADING_RE.search(body[m.end():])
-    return m.start(), (m.end() + next_m.start() if next_m else len(body))
+    next_m = _NEXT_SECTION_RE.search(body, m.end())
+    return m.start(), (next_m.start() if next_m else len(body))
+
+
+_GATE_HEADING_RE = re.compile(r"^## Manual Testing")
+
+
+def _drop_gate_heading_sections(rest: str, snapshot_rest: str) -> str:
+    """Drop `## Manual Testing` sections a fixer added after the protected span.
+
+    armable._manual_section does not end its window at a second
+    `^## Manual Testing` line, so a duplicate heading plus a sentinel line would
+    read as clearance. When the snapshot's own remainder carries no such
+    heading, every one in `rest` is counterfeit and its section (heading down to
+    the next other `^## ` line) is removed.
+    """
+    lines = rest.splitlines(keepends=True)
+    if not any(_GATE_HEADING_RE.match(l) for l in lines):
+        return rest
+    if any(_GATE_HEADING_RE.match(l) for l in snapshot_rest.splitlines()):
+        return rest
+    kept: list[str] = []
+    dropping = False
+    for l in lines:
+        if _GATE_HEADING_RE.match(l):
+            dropping = True
+            continue
+        if dropping and l.startswith("## "):
+            dropping = False
+        if not dropping:
+            kept.append(l)
+    return "".join(kept)
 
 
 def restore_manual_testing_section(after: str, before: str) -> tuple[str, bool]:
@@ -674,7 +714,17 @@ def restore_manual_testing_section(after: str, before: str) -> tuple[str, bool]:
 
     `before` is the body snapshot taken just ahead of the fixer; `after` is the live
     body it left. The section is the arming gate's input, so no model edit to it
-    survives. A section the fixer deleted is re-appended. Returns `(body, restored)`.
+    survives: the gate window of the returned body equals the snapshot's byte for
+    byte. A section the fixer deleted is re-appended.
+
+    When the section was the LAST section of the snapshot, bytes the fixer added
+    after it (a 4c evidence line, a `Closes` trailer) sit inside the live window.
+    They are moved ABOVE the heading, the same placement upsert_manual_confirmation
+    uses, so they survive without becoming gate input. A tail that carries any
+    heading-shaped line is dropped instead: relocated, a `##Manual Testing`
+    counterfeit would be the first span match on the next round, and a `###` line
+    plus sentinel would read as clearance. Any other edit inside the window, and
+    any edit-plus-append, is reverted whole. Returns `(body, restored)`.
     """
     b = _manual_testing_span(before)
     if b is None:
@@ -683,9 +733,25 @@ def restore_manual_testing_section(after: str, before: str) -> tuple[str, bool]:
     a = _manual_testing_span(after)
     if a is None:
         return after.rstrip("\n") + "\n\n" + section.rstrip("\n") + "\n", True
-    if after[a[0]:a[1]] == section:
+    live = after[a[0]:a[1]]
+    rest = after[a[1]:]
+    clean_rest = _drop_gate_heading_sections(rest, before[b[1]:])
+    if live == section and clean_rest == rest:
         return after, False
-    return after[:a[0]] + section + after[a[1]:], True
+    rest = clean_rest
+    if rest and not section.endswith("\n"):
+        # A snapshot that ended without a newline must not glue the next
+        # `## ` heading onto the sentinel line (the gate would miss the break).
+        rest = "\n" + rest
+    if b[1] == len(before) and live.startswith(section):
+        tail = live[len(section):]
+        if tail.strip() and not (_MANUAL_HEADING_RE.search(tail)
+                                 or _NEXT_HEADING_RE.search(tail)):
+            head = after[:a[0]].rstrip("\n")
+            moved = tail.strip("\n")
+            lead = (head + "\n\n" if head else "") + moved + "\n\n"
+            return lead + section + rest, True
+    return after[:a[0]] + section + rest, True
 
 
 BACKLOG_REPO = "a-jay85/IBL5-backlog"

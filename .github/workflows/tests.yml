@@ -494,6 +494,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: 0  # check-baseline-drift needs the merge-base (ADR 0144-baseline-drift-merge-base-gate)
 
     # create-config defaults to 'true': scripts/ require_once __DIR__ . '/../config.php',
     # which is gitignored. Without it PHPStan reports requireOnce.fileNotFound for every
@@ -561,7 +563,9 @@ jobs:
 
     - name: Check baseline drift
       working-directory: ibl5
-      run: php bin/check-baseline-drift
+      env:
+        DRIFT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+      run: php bin/check-baseline-drift --base="$DRIFT_BASE"
 
   phpunit-hygiene:
     name: PHPUnit hygiene gate
@@ -783,7 +787,7 @@ jobs:
 
     - name: Update PHPStan baseline counts
       working-directory: ibl5
-      run: php bin/check-baseline-drift --update
+      run: php bin/check-baseline-drift --sync
 
     - name: Commit updated baselines
       working-directory: ibl5
@@ -1059,6 +1063,9 @@ jobs:
         run: bin/test-playwright-version
       - name: bin/test-pr-canary-check
         run: bin/test-pr-canary-check
+
+      - name: bin/test-merge-line-select
+        run: bin/test-merge-line-select
       - name: bin/test-check-workflow-checkout
         run: bin/test-check-workflow-checkout
       - name: bin/test-check-composite-contracts

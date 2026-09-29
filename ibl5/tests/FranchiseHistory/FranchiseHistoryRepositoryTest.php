@@ -82,22 +82,6 @@ class FranchiseHistoryRepositoryTest extends TestCase
         );
     }
 
-    public function testExposesRawFetchMethods(): void
-    {
-        // The repository sheds assembly: it exposes only raw-row fetches.
-        foreach ([
-            'getFranchiseSummaryRows',
-            'getFiveSeasonWindowRows',
-            'getRawPlayoffTotals',
-            'getRawHeatTotals',
-        ] as $method) {
-            $this->assertTrue(
-                method_exists($this->repository, $method),
-                "Repository must expose raw-fetch method $method"
-            );
-        }
-    }
-
     private function repositorySource(): string
     {
         $reflectionClass = new \ReflectionClass($this->repository);

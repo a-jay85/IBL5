@@ -600,6 +600,40 @@ def strip_manual_testing_section(body: str) -> tuple[str, bool]:
     return new_body, True
 
 
+# The runner's CLEARED sentinel. "covered by", never "verified by": the fidelity
+# reviewer's check 4c reads "verified by" as an unevidenced claim that a test run
+# happened, and its remediator then rewrote the line and dropped the sentinel (#2489).
+MANUAL_TESTING_SENTINEL = (
+    "No manual testing needed — all changes are covered by automated tests.")
+
+
+def _manual_testing_span(body: str) -> tuple[int, int] | None:
+    m = _MANUAL_HEADING_RE.search(body)
+    if not m:
+        return None
+    next_m = _NEXT_HEADING_RE.search(body[m.end():])
+    return m.start(), (m.end() + next_m.start() if next_m else len(body))
+
+
+def restore_manual_testing_section(after: str, before: str) -> tuple[str, bool]:
+    """Put back the runner-owned `## Manual Testing` section an LLM fixer rewrote.
+
+    `before` is the body snapshot taken just ahead of the fixer; `after` is the live
+    body it left. The section is the arming gate's input, so no model edit to it
+    survives. A section the fixer deleted is re-appended. Returns `(body, restored)`.
+    """
+    b = _manual_testing_span(before)
+    if b is None:
+        return after, False
+    section = before[b[0]:b[1]]
+    a = _manual_testing_span(after)
+    if a is None:
+        return after.rstrip("\n") + "\n\n" + section.rstrip("\n") + "\n", True
+    if after[a[0]:a[1]] == section:
+        return after, False
+    return after[:a[0]] + section + after[a[1]:], True
+
+
 BACKLOG_REPO = "a-jay85/IBL5-backlog"
 
 # "backlog issue #160", "backlog items #12 and #13", "Backlog #7, #8". A bare `#N`

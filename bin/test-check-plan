@@ -256,7 +256,7 @@ M='
 # Gate 8: a new `bin/foo` plus an ADR-step path resolves the trigger (exit 0).
 assert "gate8-bin-with-adr" 0 "$FM$M"'
 Phase 1 — Create `bin/foo` to do the thing.
-Phase 2 — author the ADR `ibl5/docs/decisions/0099-x.md`.
+Phase 2 — author the ADR `ibl5/docs/decisions/NNNN-x.md`.
 '
 
 # Gate 8: a new `.claude/rules/x.md` plus a `no-adr:` bypass marker resolves (exit 0).
@@ -337,7 +337,19 @@ See ibl5/docs/decisions/0062-worktrees-outside-repo.md for context on the layout
 # verb on the ADR line) must pass (exit 0) — confirms creation-verb check.
 assert "gate8-authored-adr-resolves" 0 "$FM$M"'
 Phase 1 — Create `bin/foo` for the new tool.
-Phase 2 — Create ibl5/docs/decisions/0099-x.md documenting the decision.
+Phase 2 — Create ibl5/docs/decisions/NNNN-x.md documenting the decision.
+'
+
+# Gate 8: NNNN- placeholder with a creation cue resolves gate 8 (exit 0).
+assert "gate-8-nnnn-placeholder-resolves" 0 "$FM$M"'
+Phase 1 — Create `bin/foo` for the new tool.
+Phase 2 — Create ibl5/docs/decisions/NNNN-x.md documenting the decision.
+'
+
+# Gate 8: NNNN- placeholder with NO creation cue leaves gate 8 unresolved (exit 1, [8]).
+assert_viol "gate-8-nnnn-placeholder-no-cue-fires" 1 '[8]' "$FM$M"'
+Phase 1 — Create `bin/foo` for the new tool.
+See ibl5/docs/decisions/NNNN-x.md for the decision.
 '
 
 # Gate H: a plan whose line-1 frontmatter declares `auto_merge: false` but has NO
@@ -2347,37 +2359,128 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Gate [A] — migration-number literal
+# Gate [A] — new-number detector (migrations and ADRs)
 # ---------------------------------------------------------------------------
 
-assert_viol gate-A-literal-fires 1 '[A]' "$FM
+# Phase headings for the fixtures below.
+_A_P1='## Phase 1'
+_A_P2='## Phase 2'
 
-## Phase 1
+# 1. creation cue + numbered migration absent from the ref tree
+assert_viol gate-A-new-migration-fires 1 '[A]' "$FM
+
+${_A_P1}
+
+Create \`ibl5/migrations/9901_fixture_new_table.sql\` — NEW.
+
+$CF_MATRIX"
+
+# 2. same line with the NNN_ placeholder
+assert_viol gate-A-migration-placeholder-clean 0 '[A]' "$FM
+sonnet-recipe: gate-A placeholder fixture; anchor signal not under test.
+
+${_A_P1}
+
+Create \`ibl5/migrations/NNN_fixture_new_table.sql\` — NEW.
+Tell the builder to use whatever bin/next-migration prints and continue.
+
+$CF_MATRIX"
+
+# 3. existing migration cited with no creation cue
+assert_viol gate-A-migration-citation-no-cue-clean 0 '[A]' "$FM
+sonnet-recipe: gate-A citation fixture; anchor signal not under test.
+
+${_A_P1}
 
 Plan calls for migration 171_dedup_key.sql to be applied first.
 
 $CF_MATRIX"
 
-assert_viol gate-A-escape-phrase-clears 0 '[A]' "$FM
-sonnet-recipe: gate-A escape-phrase fixture; anchor signal not under test.
+# 4. the retired escape phrase no longer clears a new numbered migration
+assert_viol gate-A-escape-phrase-no-longer-clears 1 '[A]' "$FM
 
-## Phase 1
+${_A_P1}
 
+Create \`ibl5/migrations/9901_fixture_new_table.sql\` — NEW.
 run bin/next-migration at impl time to get the number.
 
 $CF_MATRIX"
 
+# 5. a numbered migration inside a fence is never flagged, even with a cue
 assert_viol gate-A-fenced-clean 0 '[A]' "$FM
 sonnet-recipe: gate-A fence-aware fixture; anchor signal not under test.
 
-## Phase 1
+${_A_P1}
 
 \`\`\`sql
--- migration 171_dedup_key.sql
+-- Create migration 9901_fixture_new_table.sql
 INSERT INTO ibl_dedup VALUES (1);
 \`\`\`
 
 $CF_MATRIX"
+
+# 6. author cue (GATE8_AUTHOR_CUE_RE, absent from gate8_is_created) + numbered ADR
+assert_viol gate-A-new-adr-fires 1 '[A]' "$FM
+
+${_A_P2}
+
+Phase 2 — author the ADR \`ibl5/docs/decisions/9901-fixture-new-adr.md\`.
+
+$CF_MATRIX"
+
+# 7. same line with the NNNN- placeholder
+assert_viol gate-A-adr-placeholder-clean 0 '[A]' "$FM
+sonnet-recipe: gate-A ADR placeholder fixture; anchor signal not under test.
+
+${_A_P2}
+
+Phase 2 — author the ADR \`ibl5/docs/decisions/NNNN-fixture-new-adr.md\`.
+Tell the builder to use whatever bin/next-adr prints and continue.
+
+$CF_MATRIX"
+
+# 8. existing ADR cited with no creation cue
+assert_viol gate-A-adr-citation-no-cue-clean 0 '[A]' "$FM
+sonnet-recipe: gate-A ADR citation fixture; anchor signal not under test.
+
+${_A_P1}
+
+See ibl5/docs/decisions/0062-worktrees-outside-repo.md for context on the layout.
+
+$CF_MATRIX"
+
+# 9. escape phrase + new numbered ADR still fails
+assert_viol gate-A-adr-escape-phrase-fires 1 '[A]' "$FM
+
+${_A_P2}
+
+Create \`ibl5/docs/decisions/9901-fixture-new-adr.md\` — NEW.
+run bin/next-migration at impl time to get the number.
+
+$CF_MATRIX"
+
+# 12. creation cue on a path PRESENT in the ref tree is a citation, not a new file
+export CHECK_PLAN_MASTER_REF=HEAD
+assert_viol gate-A-existing-migration-with-cue-clean 0 '[A]' "$FM
+sonnet-recipe: gate-A present-on-ref fixture; anchor signal not under test.
+
+${_A_P1}
+
+Create a follow-up step that re-reads \`ibl5/migrations/187_exclude_exhibitions_from_season_career_avgs.sql\`.
+
+$CF_MATRIX"
+
+# 13. an unresolvable reference ref fails OPEN (same body as case 1)
+export CHECK_PLAN_MASTER_REF=refs/heads/gate-a-no-such-ref-fixture
+assert_viol gate-A-no-ref-fails-open 0 '[A]' "$FM
+sonnet-recipe: gate-A fail-open fixture; anchor signal not under test.
+
+${_A_P1}
+
+Create \`ibl5/migrations/9901_fixture_new_table.sql\` — NEW.
+
+$CF_MATRIX"
+unset CHECK_PLAN_MASTER_REF
 
 # ---------------------------------------------------------------------------
 # Gate [V] extensions — main.localhost and /path/to

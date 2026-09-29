@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-27
+last_verified: 2026-09-28
 ---
 
 # Post-Plan Orchestrator
@@ -418,7 +418,7 @@ Using the Sonnet agent's classifications:
 1. **CLI-executable:** Run directly in the worktree. Fix failures, commit.
 2. **PHPUnit/API-test/E2E-replaceable:** Write the appropriate test type. Fix until green. Do not reclassify as truly manual — if the test is hard to write, that's a reason to spend more effort, not less. After 3 failed attempts, keep the item in the PR description as-is (not reclassified) and note what was tried.
 3. **Truly manual:** Keep in PR description.
-4. **Update PR:** Remove verified/automated steps. If none remain, replace section with: `No manual testing needed — remaining steps were verified by automated checks in Phase 6; <derived clause from Phase 2: either "verification is automated: <comma-separated classes>" or "verification is static; the plan's Verification Matrix has no executable rows">` — use the same class list derived in Phase 2 step 3; do not invent a class absent from the Verification Matrix.
+4. **Update PR:** Remove verified/automated steps. If none remain, replace section with: `No manual testing needed — remaining steps are covered by automated checks run in Phase 6; <derived clause from Phase 2: either "verification is automated: <comma-separated classes>" or "verification is static; the plan's Verification Matrix has no executable rows">`. Use the same class list derived in Phase 2 step 3. Do not invent a class absent from the Verification Matrix.
 
    **Capture preserved markers FIRST.** Earlier phases write body lines that later gates read; composing a fresh body drops them. Run this block before composing, and treat its stdout as literal text to re-emit:
 

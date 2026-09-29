@@ -50,6 +50,9 @@
 # Usage: bin/fleet-status [--watch [SECS]]
 #
 # --watch [SECS]   re-render every SECS seconds (default 15) until interrupted.
+#                  On a terminal it draws on the alternate screen, like top, so a
+#                  mouse scroll under tmux can't drop the pane into copy mode and
+#                  freeze an old frame. A frame taller than the pane is clipped.
 #
 # CLICKABLE PATHS. File paths this page names — each run's log, each queued plan,
 # and the plan a live runner is on — are emitted as OSC 8 terminal hyperlinks, so
@@ -127,7 +130,7 @@ while [ $# -gt 0 ]; do
                 *) WATCH_SECS="$2"; shift ;;
             esac
             ;;
-        -h|--help) sed -n '4,79p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '4,82p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) printf 'fleet-status: unknown option %s\n' "$1" >&2; exit 2 ;;
     esac
     shift
@@ -674,6 +677,29 @@ render_runner_detail() {
 # 03:00". Empty on anything unexpected — the header degrades to the bare title
 # rather than print a guess.
 #
+# Two kinds of fire count: the recurring daily job and any one-shot armed with
+# `bin/automouse/run schedule`. Each helper below prints one candidate as
+# "YYYY-MM-DD HH:MM<TAB>Www YYYY-MM-DD HH:MM" (sort key, then display text). The
+# earliest key wins. The key is zero-padded and fixed-width, so a plain string
+# compare orders it.
+automouse_next_run() {
+    local listing daily oneshot best
+    listing="$(launchctl list 2>/dev/null)"
+    daily="$(automouse_daily_next "$listing")"
+    oneshot="$(automouse_oneshot_next "$listing")"
+
+    best="$daily"
+    if [ -n "$oneshot" ]; then
+        if [ -z "$best" ] || [[ "${oneshot%%$'\t'*}" < "${best%%$'\t'*}" ]]; then
+            best="$oneshot (one-shot)"
+        fi
+    fi
+    [ -n "$best" ] || return 0
+    printf 'next run %s' "${best#*$'\t'}"
+}
+
+# The recurring job's next fire.
+#
 # TWO SOURCES, BOTH REQUIRED, for the reason every other row here is a
 # conjunction. The plist is the schedule of record (bin/automouse/run rewrites it
 # in burst mode, so a hardcoded 03:00 would go stale), but a plist on disk is
@@ -691,14 +717,15 @@ render_runner_detail() {
 # ARRAY of intervals has no single fire time and is likewise refused, exactly as
 # daily_fire_hhmm() refuses it — the `<array>` in bin/automouse/run's one-shot
 # template is ProgramArguments, so no plist this repo writes takes that shape.
-automouse_next_run() {
-    local loaded flat sci h m now_min at_min day
+automouse_daily_next() {
+    local listing=$1 loaded flat sci h m now_min at_min day
     [ -f "$AUTOMOUSE_PLIST" ] || return 0
 
-    # Anchored — com.ibl5.automouse-morning-digest is a different job. Not
-    # `grep -q`: it exits early and SIGPIPEs the writer, which reports 141 on a
-    # SUCCESSFUL match under pipefail (.claude/rules/shell-pipefail-grep.md).
-    loaded="$(launchctl list 2>/dev/null | grep 'com\.ibl5\.automouse$')"
+    # Anchored — com.ibl5.automouse-morning-digest and the -oneshot-* labels are
+    # different jobs. Not `grep -q`: it exits early and SIGPIPEs the writer, which
+    # reports 141 on a SUCCESSFUL match under pipefail
+    # (.claude/rules/shell-pipefail-grep.md).
+    loaded="$(grep 'com\.ibl5\.automouse$' <<< "$listing")"
     [ -n "$loaded" ] || return 0
 
     flat="$(tr -d ' \t\r\n' < "$AUTOMOUSE_PLIST" 2>/dev/null)"
@@ -730,7 +757,33 @@ automouse_next_run() {
     fi
     [ -n "$day" ] || return 0
 
-    printf 'next run %s %02d:%02d' "$day" "$(( 10#$h ))" "$(( 10#$m ))"
+    printf '%s %02d:%02d\t%s %02d:%02d' "${day#* }" "$(( 10#$h ))" "$(( 10#$m ))" \
+        "$day" "$(( 10#$h ))" "$(( 10#$m ))"
+}
+
+# The soonest pending one-shot. `bin/automouse/run schedule` names each label
+# com.ibl5.automouse-oneshot-<epoch>, where <epoch> is the resolved fire time. So
+# the label alone says WHEN, and its presence in `launchctl list` says WHETHER.
+# No plist read: the job deletes its own plist once it fires. A loaded label
+# whose epoch is already past is firing right now, or a sleeping Mac missed it.
+# Either way it is no longer "next".
+automouse_oneshot_next() {
+    local listing=$1 now label epoch min=''
+    now="$(date +%s)"
+    while IFS= read -r label; do
+        case "$label" in com.ibl5.automouse-oneshot-*) ;; *) continue ;; esac
+        epoch="${label#com.ibl5.automouse-oneshot-}"
+        case "$epoch" in ''|*[!0-9]*) continue ;; esac
+        [ "$epoch" -gt "$now" ] || continue
+        if [ -z "$min" ] || [ "$epoch" -lt "$min" ]; then min="$epoch"; fi
+    done < <(awk '{print $3}' <<< "$listing")
+    [ -n "$min" ] || return 0
+
+    # BSD first, GNU (CI) second. GNU reads `-r` as a reference FILE, which fails
+    # on a bare number and falls through.
+    date -r "$min" +'%Y-%m-%d %H:%M	%a %Y-%m-%d %H:%M' 2>/dev/null \
+        || date -d "@$min" +'%Y-%m-%d %H:%M	%a %Y-%m-%d %H:%M' 2>/dev/null \
+        || true
 }
 
 render_queue() {
@@ -909,8 +962,35 @@ if [ "$WATCH" -eq 1 ]; then
     # Build the whole frame first, then swap it in with one write. Rendering
     # straight to the screen after `clear` painted the page line by line as each
     # probe finished; this way the old frame stays up until the new one is ready.
+    #
+    # On a terminal, draw on the alternate screen. Under tmux with `mouse on`, a
+    # wheel scroll over a normal-screen pane enters copy mode, and copy mode shows
+    # a frozen snapshot while the frames keep landing underneath. The page looks
+    # stale until something cancels copy mode (C-c does). On the alternate screen
+    # tmux hands the wheel to the program instead. The alternate screen has no
+    # scrollback, so a frame taller than the pane is clipped from the bottom,
+    # keeping the top sections, and autowrap is off so one row is one line.
+    alt=0
+    if [ -t 1 ]; then
+        alt=1
+        printf '\033[?1049h\033[?7l'
+        trap 'printf "\033[?7h\033[?1049l"' EXIT
+        trap 'exit 130' INT TERM
+    fi
     while :; do
         frame=$(render_all)
+        if [ "$alt" -eq 1 ]; then
+            rows="$(stty size </dev/tty 2>/dev/null)"; rows="${rows%% *}"
+            case "$rows" in ''|*[!0-9]*) rows=0 ;; esac
+            # Three rows below the frame: the blank line, the "refreshing"
+            # line, and the empty row its trailing newline moves the cursor to.
+            max=$(( rows - 3 ))
+            total="$(printf '%s\n' "$frame" | wc -l | tr -d ' ')"
+            if [ "$max" -gt 1 ] && [ "$total" -gt "$max" ]; then
+                frame="$(printf '%s\n' "$frame" | head -n $(( max - 1 )))
+${DIM}… $(( total - max + 1 )) more lines (make the pane taller, or run without --watch)${R}"
+            fi
+        fi
         printf '\033[H\033[2J\033[3J%s\n\n%srefreshing every %ss — ctrl-c to stop%s\n' \
             "$frame" "$DIM" "$WATCH_SECS" "$R"
         sleep "$WATCH_SECS"

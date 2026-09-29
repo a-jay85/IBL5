@@ -431,10 +431,45 @@ def test_gate_selects_the_right_arm_per_rc(tmp_path):
             assert "fail-closed sentinel" in r.stdout, "rc=3 lost its notice"
 
 
+def test_every_other_failure_dms_with_the_rerun_command(tmp_path):
+    """A failed run DMs on any exit but 0, 3 (already DM'd) and 143 (deliberate SIGTERM).
+
+    Runs the GENERATED segment with post-plan-fail-dm and $LOG repointed at fixtures.
+    The usage-limit line in the log fixture is the case that sent no DM before.
+    """
+    cmd = _generate_cmd(tmp_path)
+    seg = cmd.split("pp_rc=3; fi; ", 1)[1].split("conclude_status_badge", 1)[0]
+    real_dm = re.search(r'"([^"]+/bin/post-plan-fail-dm)"', seg).group(1)
+    real_log = re.search(r'tail -n 3 "([^"]+)"', seg).group(1)
+    root = real_dm[: -len("/bin/post-plan-fail-dm")]
+    log = tmp_path / "run.log"
+    log.write_text("harness: failed\n$(touch pwned) `id`\nYou've hit your session limit\n")
+    calls = tmp_path / "dm-calls.txt"
+    stub = tmp_path / "fail-dm-stub"
+    stub.write_text(f'#!/bin/sh\nprintf "%s\\n" "$4" >> "{calls}"\n')
+    stub.chmod(0o755)
+    seg = seg.replace(real_dm, str(stub)).replace(real_log, str(log))
+
+    for pp_rc, dms in ((1, True), (2, True), (0, False), (3, False), (143, False)):
+        if calls.exists():
+            calls.unlink()
+        r = subprocess.run(["bash", "-c", f"pp_rc={pp_rc}; {seg}"],
+                           cwd=tmp_path, capture_output=True, text=True)
+        assert r.returncode == 0, f"pp_rc={pp_rc}: {r.stderr!r}"
+        assert calls.exists() == dms, f"pp_rc={pp_rc}: dm sent={calls.exists()}"
+        if dms:
+            msg = calls.read_text()
+            assert f"exit {pp_rc}" in msg
+            assert "You've hit your session limit" in msg
+            assert f"Re-run: cd {root} && bin/post-plan-now." in msg
+            assert "$(touch pwned)" in msg      # log text stays inert data
+    assert not (tmp_path / "pwned").exists()
+
+
 def test_generated_cmd_captures_the_harness_result_line(tmp_path):
     cmd = _generate_cmd(tmp_path)
     assert "HARNESS_RESULT=$(grep -m1 '^RESULT:'" in cmd
-    assert "HARNESS_RESULT=${HARNESS_RESULT:0:1400}" in cmd
+    assert "HARNESS_RESULT=${HARNESS_RESULT:0:1200}" in cmd
     assert (cmd.index("rc=$?; ") < cmd.index("HARNESS_RESULT=$(grep")
             < cmd.index('should_fallback "$rc"; then'))
 
@@ -501,11 +536,12 @@ def test_exit3_message_stays_under_the_discord_cap_worst_case(tmp_path):
     r = _run_gate(gate)
     assert r.returncode == 0, r.stderr
     msg = r.stdout.rstrip("\n")
-    assert "x" * 1300 in msg and "x" * 1450 not in msg      # the 1400 cap fired
+    assert "x" * 1100 in msg and "x" * 1250 not in msg      # the 1200 cap fired
     slug = re.search(r"on branch (.*?)\. SKIPPING", gate).group(1)
-    fixed = len(msg) - 1400 - len(slug) - len(str(fixture))
-    WORST_SLUG, WORST_LOG = 80, 120
-    assert fixed + 1400 + WORST_SLUG + WORST_LOG < 1900, (
+    root = re.search(r"re-run: cd (.*?) && bin/post-plan-now", gate).group(1)
+    fixed = len(msg) - 1200 - len(slug) - len(root) - len(str(fixture))
+    WORST_SLUG, WORST_ROOT, WORST_LOG = 80, 120, 120
+    assert fixed + 1200 + WORST_SLUG + WORST_ROOT + WORST_LOG < 1900, (
         "assembled rc=3 msg can exceed bin/discord-dm's 1900-char cap; "
         f"fixed={fixed}")
 

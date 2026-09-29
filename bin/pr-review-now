@@ -26,6 +26,7 @@
 #   PR_REVIEW_NOW_MODEL      Model for the fired session (default: sonnet — lets the
 #                            /pr-review skill's own frontmatter pin win).
 #   PR_REVIEW_NOW_DISCORD_DM Override the discord-dm binary path for the finish DM.
+#   PR_REVIEW_NOW_GH         Override the gh binary the runner uses for the prior-review check.
 
 set -euo pipefail
 
@@ -226,17 +227,27 @@ fire_pr() {
         printf 'EFFORT=%q\n'     "$EFFORT"
         printf 'CLAUDE_BIN=%q\n' "$CLAUDE_BIN"
         printf 'DISCORD_DM=%q\n' "${PR_REVIEW_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
+        printf 'GH_BIN=%q\n'   "${PR_REVIEW_NOW_GH:-gh}"
         printf 'NOTIFY=1\n'
         declare -f ljob_dm_ready ljob_dm_send
         cat <<'RUNNER_EOF'
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 cd "$ROOT" || exit 1
-started=$(date +%s)
 
-# The finish DM's fields. Every terminal branch sets them; notify() at the tail sends once.
-DM_ICON=""      # ✅ completed · ❌ failed
-DM_VERDICT=""   # the RESULT line
-DM_NEXT=""      # what happens next
+# /pr-review skips a PR that already carries its own `Code review` heading (SKILL.md
+# Step 1 (d)). That skip exits 0 and tells the human nothing new, so the finish DM is
+# suppressed for it. Same test as the skill: a comment or review body whose own heading
+# matches ^#{1,6} +Code review, authored by the gh identity. Snapshotted BEFORE claude
+# runs, so the review this run posts never counts as a prior one. Any gh failure
+# leaves PRIOR_REVIEW=0 and the DM goes out as usual.
+PRIOR_REVIEW=0
+_me="$("$GH_BIN" api user --jq .login 2>/dev/null || true)"
+if [ -n "$_me" ] && "$GH_BIN" pr view "$PR" --json comments,reviews \
+        --jq "[(.comments[]?, .reviews[]?) | select(.author.login == \"$_me\") | .body // \"\"
+               | select(test(\"(^|\\n)#{1,6} +Code review\"))] | length" 2>/dev/null \
+        | grep -qv '^0$'; then
+    PRIOR_REVIEW=1
+fi
 
 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 \
     caffeinate -s timeout 3600 "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
@@ -244,15 +255,6 @@ CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 \
     --model "$MODEL" --effort "$EFFORT" \
     --name "$LABEL" > "$LOG" 2>&1
 rc=$?
-elapsed=$(( $(date +%s) - started ))
-
-if [ "$rc" -eq 0 ]; then
-    DM_ICON="✅"; DM_VERDICT="completed — exit 0"; DM_NEXT="read the log"
-elif [ "$rc" -eq 124 ]; then
-    DM_ICON="❌"; DM_VERDICT="failed — killed by the 3600s timeout"; DM_NEXT="read the log"
-else
-    DM_ICON="❌"; DM_VERDICT="failed — claude exited $rc"; DM_NEXT="read the log"
-fi
 
 # The whole reason this job exists in the background: tell the human it finished.
 # `claude -p` does not stream, so $LOG is empty until this point and there is no
@@ -265,14 +267,33 @@ fi
 # prod is bouncing.
 notify() {
     ljob_dm_ready pr-review-now || return 0
+    if [ "$rc" -eq 0 ] && [ "$PRIOR_REVIEW" = 1 ]; then
+        printf '%s\n' "pr-review-now: PR #${PR} already had a code review — not notifying."
+        return 0
+    fi
 
-    # A verdict this runner never set means someone added a branch and missed it.
-    # Say so in the DM rather than sending a blank line.
-    local msg
-    msg="${DM_ICON:-❓} pr-review-now: PR #${PR}
-RESULT ${DM_VERDICT:-unknown — the runner set no verdict}
-${elapsed}s · ${DM_NEXT:-read the log}
+    # Build msg per outcome. rc=0: just the header and log line (no RESULT).
+    local msg _log_hint _last_line
+    if [ "$rc" -eq 0 ]; then
+        msg="✅ pr-review-now: PR #${PR}
 log: $LOG"
+    elif [ "$rc" -eq 124 ]; then
+        msg="❌ pr-review-now: PR #${PR}
+RESULT failed — killed by the 3600s timeout
+Fix: re-run with \`bin/pr-review-now ${PR}\`
+log: $LOG"
+    else
+        _last_line="$(grep -v '^[[:space:]]*$' "$LOG" 2>/dev/null | tail -1 | cut -c1-200 || true)"
+        if [ -n "$_last_line" ]; then
+            _log_hint="${_last_line}; then re-run \`bin/pr-review-now ${PR}\`"
+        else
+            _log_hint="re-run \`bin/pr-review-now ${PR}\`"
+        fi
+        msg="❌ pr-review-now: PR #${PR}
+RESULT failed — claude exited $rc
+Fix: ${_log_hint}
+log: $LOG"
+    fi
 
     # discord-dm already spooled it and raised a macOS notification. The
     # verdict is in $LOG regardless, so an undeliverable DM is never fatal.

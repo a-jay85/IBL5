@@ -3,8 +3,9 @@
 #   Reads a /pr-ready sticky verdict comment body on STDIN and writes a Discord-sized
 #   merge-digest DM to STDOUT. --pr-number, --title and --url are required; an unknown or
 #   missing flag exits 2 with a message on stderr. --branch is optional; when non-empty it
-#   prints as a code span on the line under the "Merged" header. A missing or unparseable digest is NOT an
-#   error: it degrades the message body and still exits 0.
+#   prints as a link to --url on the line under the "Merged" header, otherwise the
+#   header's #N is that link. The URL is never printed bare. A missing or unparseable
+#   digest is NOT an error: it degrades the message body and still exits 0.
 #
 # Consumed by .github/workflows/merge-digest-notify.yml, which pipes in the body of the
 # LAST comment carrying `<!-- pr-ready-verdict -->`.
@@ -19,12 +20,11 @@
 # NOT chunk -- the cap is the caller's responsibility, and this script is the caller.
 #   fixed scaffolding   ~70
 #   "#N: <title>"      <=100   (title truncated at 80)
-#   branch line         <=62   (branch truncated at 60)
-#   URL                 ~70
+#   branch link        <=135   (branch truncated at 60, plus the <URL>)
 #   What changed       <=1000
 #   Watch              <=650
 #                      ------
-#                      ~1952
+#                      ~1955
 
 set -euo pipefail
 
@@ -147,29 +147,31 @@ WHAT="$(_label_value 'What changed')"
 WATCH="$(_label_value 'Watch')"
 TITLE_T="$(_trunc "$TITLE_MAX" "$TITLE")"
 
-# The branch prints inside a code span, and a backtick in it would close the span early.
-# Branch names may legally contain one, so strip it.
+# The branch is the link text for the PR URL, so the brackets that would close the
+# link early are stripped, along with backticks. Without a branch, `#N` in the header
+# carries the link instead. Every URL is wrapped in <> -- Discord's embed-suppression
+# syntax, which also works inside a masked link.
 BRANCH="${BRANCH//\`/}"
+BRANCH="${BRANCH//[/}"
+BRANCH="${BRANCH//]/}"
 BRANCH_LINE=""
+PR_REF="[#$PR_NUMBER](<$URL>)"
 if [ -n "$BRANCH" ]; then
-    BRANCH_LINE="$(printf '\n`%s`' "$(_trunc "$BRANCH_MAX" "$BRANCH")")"
+    BRANCH_LINE="$(printf '\n[%s](<%s>)' "$(_trunc "$BRANCH_MAX" "$BRANCH")" "$URL")"
+    PR_REF="#$PR_NUMBER"
 fi
-
 # A confirmed merge is ALWAYS announced. A missing or unparseable digest degrades the
 # message; it never suppresses it. (Same invariant bin/pr-cycle held for the ledger row.)
 if [ -z "$WHAT" ] && [ -z "$WATCH" ]; then
-    printf '**Merged #%s: %s**%s\n\n(No /pr-ready digest — armed by triage sweep or no review pass run.)\n\n%s\n' \
-        "$PR_NUMBER" "$TITLE_T" "$BRANCH_LINE" "$URL"
+    printf '**Merged %s: %s**%s\n\n(No /pr-ready digest — armed by triage sweep or no review pass run.)\n' \
+        "$PR_REF" "$TITLE_T" "$BRANCH_LINE"
     exit 0
 fi
-
 # One label present and the other absent is a malformed-but-present digest: name the gap
 # per field rather than discarding the half that parsed.
 [ -n "$WHAT" ]  || WHAT='(missing)'
 [ -n "$WATCH" ] || WATCH='(missing)'
-
-printf '**Merged #%s: %s**%s\n\n**What changed:** %s\n\n**Watch:** %s\n\n%s\n' \
-    "$PR_NUMBER" "$TITLE_T" "$BRANCH_LINE" \
+printf '**Merged %s: %s**%s\n\n**What changed:** %s\n\n**Watch:** %s\n' \
+    "$PR_REF" "$TITLE_T" "$BRANCH_LINE" \
     "$(_trunc "$WHAT_MAX" "$WHAT")" \
-    "$(_trunc "$WATCH_MAX" "$WATCH")" \
-    "$URL"
+    "$(_trunc "$WATCH_MAX" "$WATCH")"

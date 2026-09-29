@@ -21,7 +21,9 @@ test.describe('API Keys flow', () => {
       // Accept the confirmation dialog
       page.once('dialog', (dialog) => dialog.accept());
       await revokeButton.click();
-      await page.waitForURL(/name=ApiKeys/);
+      // The URL already matches before the revoke POST lands, so wait for
+      // the no-key state instead of the URL.
+      await expect(page.getByRole('button', { name: /Generate API Key/i })).toBeVisible();
     }
 
     // Now should see the generate state
@@ -81,7 +83,6 @@ test.describe('API Keys flow', () => {
     await page.getByRole('button', { name: /Revoke Key/i }).click();
 
     // Should redirect back to ApiKeys showing the no-key state
-    await page.waitForURL(/name=ApiKeys/);
     await expect(page.getByRole('button', { name: /Generate API Key/i })).toBeVisible();
   });
 
@@ -104,10 +105,16 @@ test.describe('API Keys flow', () => {
 async function revokeIfPresent(page: import('@playwright/test').Page): Promise<void> {
   await page.goto('modules.php?name=ApiKeys');
   const revokeButton = page.getByRole('button', { name: /Revoke Key/i });
-  if (await revokeButton.isVisible({ timeout: 1000 }).catch(() => false)) { // e2e-hygiene-allow: cleanup precondition — revoke button presence depends on prior test state
+  const generateButton = page.getByRole('button', { name: /Generate API Key/i });
+  // Wait for one of the two key states before branching, so an early
+  // isVisible() check can't skip the revoke.
+  await expect(revokeButton.or(generateButton)).toBeVisible();
+  if (await revokeButton.isVisible()) { // e2e-hygiene-allow: cleanup precondition — key state already rendered above; branch depends on prior test state
     page.once('dialog', (dialog) => dialog.accept());
     await revokeButton.click();
-    await page.waitForLoadState('load');
+    // waitForLoadState resolves on the already-loaded page, so a following
+    // goto could abort the revoke POST. Wait for the no-key state instead.
+    await expect(generateButton).toBeVisible();
   }
 }
 
@@ -160,16 +167,11 @@ test.describe('API Keys direct POST submission', () => {
   test('revoke POST removes key from list', async ({ page, request }) => {
     await revokeIfPresent(page);
 
-    await page.goto('modules.php?name=ApiKeys');
-    const generateBtn = page.getByRole('button', {
-      name: /Generate API Key/i,
-    });
-    if (await generateBtn.isVisible({ timeout: 1000 }).catch(() => false)) { // e2e-hygiene-allow: setup precondition — generate if no active key exists
-      await generateBtn.click();
-      await expect(page.locator('.ibl-card__title').first()).toContainText(
-        /Generated/i,
-      );
-    }
+    // revokeIfPresent leaves the no-key state, so generate unconditionally.
+    await page.getByRole('button', { name: /Generate API Key/i }).click();
+    await expect(page.locator('.ibl-card__title').first()).toContainText(
+      /Generated/i,
+    );
 
     await page.goto('modules.php?name=ApiKeys');
     await expect(page.locator('form[action*="op=revoke"]')).toBeVisible();

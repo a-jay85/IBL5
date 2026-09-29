@@ -858,6 +858,133 @@ def test_conformance_empty_diff_body_is_noop():
 
 
 # ---------------------------------------------------------------------------
+# Phase 7b — false-positive MISSING-METHOD guards (backlog#1133)
+# ---------------------------------------------------------------------------
+
+def test_required_test_methods_accepts_backtick_with_parens():
+    """A backtick-wrapped method with '()' before the closing backtick is accepted.
+
+    Reproduces the regression introduced by the first pass-1 fix: plans write
+    entries like '- `testSumsSalariesAcrossPlayersForEachFutureYear()` — two rows'
+    and the pure-identifier-only match dropped them (backlog#1133, corpus fix).
+    """
+    content = """
+## Required Test Methods
+
+- `testSumsSalariesAcrossPlayersForEachFutureYear()` — two rows at `cy: 1`
+- `testCountsHoldsOnlyForNonZeroSalaries()` — mixed zero/non-zero
+- `testValidateAddCapOutcomeFollowsSalaryBasis(): void` — cap branch
+"""
+    methods = parse_required_test_methods(content)
+    assert "testSumsSalariesAcrossPlayersForEachFutureYear" in methods
+    assert "testCountsHoldsOnlyForNonZeroSalaries" in methods
+    assert "testValidateAddCapOutcomeFollowsSalaryBasis" in methods
+
+
+def test_required_test_methods_accepts_bare_identifier_with_emdash():
+    """A bare identifier followed by an em-dash description is accepted.
+
+    Reproduces the regression introduced by the first pass-2 fix: plans write
+    entries like '- testBuildDiscordChunksShortTextProducesOneChunk — three signing
+    lines...' and the colon/EOL-only check dropped them (backlog#1133, corpus fix).
+    """
+    content = """
+## Required Test Methods
+
+- testBuildDiscordChunksShortTextProducesOneChunk — three signing lines produce one message
+- testBuildDiscordChunksLongTextSplitsOnLineBoundaries — text over 2000 chars yields two
+- testInsertNewsStoryReturnsZeroWhenNoRowsAffected — against MockDatabase returns 0
+"""
+    methods = parse_required_test_methods(content)
+    assert "testBuildDiscordChunksShortTextProducesOneChunk" in methods
+    assert "testBuildDiscordChunksLongTextSplitsOnLineBoundaries" in methods
+    assert "testInsertNewsStoryReturnsZeroWhenNoRowsAffected" in methods
+
+
+def test_required_test_methods_skips_path_bullet():
+    """A backtick-wrapped path bullet (containing /) is not captured as a method name.
+
+    Reproduces MISSING-METHOD: ibl5 / MISSING-METHOD: bin from real PRs
+    (#2441, #2432): the plan's Required Test Methods section uses file-path
+    bullets like '- `ibl5/tests/SearchViewTest.php` (extend existing class)'
+    as context lines, and the old regex captured the first identifier before
+    the slash ('ibl5') as a required method name.
+
+    After the fix the path bullet is silently skipped and only the real
+    method on the indented sub-bullet is returned.
+    """
+    content = """
+## Required Test Methods
+
+- `ibl5/tests/Search/SearchViewTest.php` (extend existing class)
+  - `testRenderLabels`
+- `bin/test-harness` — test script
+  - `testHarnessBoots`
+"""
+    methods = parse_required_test_methods(content)
+    assert "ibl5" not in methods, (
+        f"path prefix 'ibl5' must not be captured as a method name; got {methods!r}"
+    )
+    assert "bin" not in methods, (
+        f"path prefix 'bin' must not be captured as a method name; got {methods!r}"
+    )
+    assert "testRenderLabels" in methods
+    assert "testHarnessBoots" in methods
+
+
+def test_required_test_methods_skips_label_phrase():
+    """A bullet starting with a prose label phrase is not captured as a method name.
+
+    Reproduces MISSING-METHOD: Static from PR #2432: the plan entry
+    '- Static guards in `bin/test-pr-cycle`: `g_no_merge`, ...' caused
+    'Static' to be captured as a required method because the regex grabbed
+    the first identifier on any bullet line regardless of context.
+    """
+    content = """
+## Required Test Methods
+
+- Static guards in `bin/test-pr-cycle`: `g_no_merge`, `g_one_arm`
+- `testRealMethod`
+"""
+    methods = parse_required_test_methods(content)
+    assert "Static" not in methods, (
+        f"category label 'Static' must not be a method name; got {methods!r}"
+    )
+    assert "testRealMethod" in methods
+
+
+def test_conformance_accepts_bash_function_declaration():
+    """No MISSING-METHOD: when the diff uses bare 'name() {' bash function syntax.
+
+    Reproduces the false-positive for 'present methods' (backlog#1133): a shell
+    guard like 'g_no_merge() {' exists in the diff but the conformance check only
+    matched '(function|def) name', missing the bash declaration form.
+    """
+    plan = PlanInfo(found=True, has_matrix=True, required_test_methods=["g_no_merge"])
+    diff_body = "+g_no_merge() {\n+    return 1\n+}\n"
+    items = conformance.check(plan, [], diff_body=diff_body)
+    method_items = [i for i in items if i.startswith("MISSING-METHOD:")]
+    assert method_items == [], (
+        f"g_no_merge declared as 'g_no_merge() {{' must not be flagged missing; got {method_items!r}"
+    )
+
+
+def test_conformance_still_flags_truly_absent_method():
+    """A method genuinely absent from the diff is still reported as MISSING-METHOD:.
+
+    Regression guard: the false-positive fixes must not suppress detection of
+    methods the diff never wrote.
+    """
+    plan = PlanInfo(found=True, has_matrix=True, required_test_methods=["testAbsent"])
+    diff_body = "function testPresent() {}\ng_other() {\n    return 0\n}\n"
+    items = conformance.check(plan, [], diff_body=diff_body)
+    missing = [i for i in items if i.startswith("MISSING-METHOD:") and "testAbsent" in i]
+    assert missing, (
+        f"Expected MISSING-METHOD: testAbsent in items; got {items!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Phase 5 - D5: shell-command token rejection in parse_matrix
 # ---------------------------------------------------------------------------
 

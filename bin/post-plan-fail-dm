@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/post-plan-fail-dm — send (or hold) the Discord DM for a post-plan harness exit 3.
+# bin/post-plan-fail-dm — send (or hold) the Discord DM for a failed post-plan run.
 #
-# Exit 3 means a human-shaped wall: a rebase conflict or a local gate denial. Often the
+# Any failed run lands here. The common one is exit 3, a human-shaped wall: a rebase
+# conflict or a local gate denial. A usage-limit kill is another. Often the
 # Claude session that fired the run is still open in that worktree, reads the same
 # message on stdout, fixes it, and re-fires within minutes. A DM for that case asks
 # nothing of you. So:

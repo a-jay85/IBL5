@@ -45,10 +45,21 @@ case "$*" in
         SLUG=$(printf '%s' "$*" | sed 's/.*--head //' | awk '{print $1}')
         cat "${GH_FX_DIR:-/dev/null}/pr-${SLUG}.json" 2>/dev/null || echo '[]'
         ;;
+    *"issue view"*"--json comments"*)
+        NUM=$(printf '%s' "$*" | awk '{for(i=1;i<=NF;i++) if($i=="view") print $(i+1)}')
+        cat "${GH_FX_DIR:-/dev/null}/issue-${NUM}-comments.json" 2>/dev/null || echo '{"comments":[]}'
+        ;;
+    *"pr view"*)
+        NUM=$(printf '%s' "$*" | awk '{for(i=1;i<=NF;i++) if($i=="view") print $(i+1)}')
+        cat "${GH_FX_DIR:-/dev/null}/pr-view-${NUM}.json" 2>/dev/null || echo '{}'
+        ;;
     *"issue view"*)
         NUM=$(printf '%s' "$*" | awk '{for(i=1;i<=NF;i++) if($i=="view") print $(i+1)}')
         cat "${GH_FX_DIR:-/dev/null}/issue-${NUM}.json" 2>/dev/null || echo '{}'
         ;;
+    *"label create"*) exit 0 ;;
+    *"issue edit"*) exit 0 ;;
+    *"issue comment"*) exit 0 ;;
     *"issue close"*) exit 0 ;;
     *) exit 0 ;;
 esac
@@ -93,6 +104,14 @@ bd_home() {
     GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
     BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
     HOME="$h" TZ=UTC \
+    "$SCRIPT" "$@"
+}
+
+# Helper: same stubs as bd(), isolated HOME + fixtures for the skip-label tests
+bdl() {
+    GH_LOG="$T/lbl/gh.log" GH_FX_DIR="$T/lbl/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/lbl/home" \
     "$SCRIPT" "$@"
 }
 
@@ -1498,6 +1517,69 @@ if [ -f "$SKILL_FILE" ]; then
 else
     fail "C46: SKILL.md not found at $SKILL_FILE"
 fi
+
+# ══ Skip-label region: isolated HOME + fixtures ($T/lbl) ══════════════════════
+mkdir -p "$T/lbl/home/claude-plans/_reports" "$T/lbl/fx"
+echo '[]' > "$T/lbl/fx/prs-open.json"
+touch "$T/lbl/fx/worktrees.txt"
+cat > "$T/lbl/home/claude-plans/_reports/backlog-triage-2026-09-26.md" <<'REPORT'
+# Backlog triage 2026-09-26
+
+## P2 (6)
+
+- [#40](u40) Forty — r40
+- [#41](u41) Forty-one — r41
+- [#42](u42) Forty-two — r42
+- [#43](u43) Forty-three — r43
+- [#44](u44) Forty-four — r44
+- [#45](u45) Forty-five — r45
+
+## Notes
+
+- [#99](u99) unranked note — should not rank
+REPORT
+touch -t 202609260000 "$T/lbl/home/claude-plans/_reports/backlog-triage-2026-09-26.md"
+
+# lbl_issues <labels40> <labels41> [upd40] [labels44] — writes five open issues
+# #40-#44 plus #45 (ranked, updated after the report).
+lbl_issues() {
+    local l40="$1" l41="$2" u40="${3:-2026-09-20T00:00:00Z}" l44="${4:-[]}"
+    [ -n "$u40" ] || u40="2026-09-20T00:00:00Z"
+    [ -n "$l44" ] || l44="[]"
+    cat > "$T/lbl/fx/issues.json" <<JSON
+[
+  {"number":40,"title":"Forty","body":"bin/a.sh:1","url":"u40","updatedAt":"$u40","labels":$l40},
+  {"number":41,"title":"Forty-one","body":"bin/b.sh:1","url":"u41","updatedAt":"2026-09-20T00:00:00Z","labels":$l41},
+  {"number":42,"title":"Forty-two","body":"bin/c.sh:1","url":"u42","updatedAt":"2026-09-20T00:00:00Z","labels":[]},
+  {"number":43,"title":"Forty-three","body":"bin/d.sh:1","url":"u43","updatedAt":"2026-09-20T00:00:00Z","labels":[]},
+  {"number":44,"title":"Forty-four","body":"bin/e.sh:1","url":"u44","updatedAt":"2026-09-20T00:00:00Z","labels":$l44},
+  {"number":45,"title":"Forty-five","body":"bin/f.sh:1","url":"u45","updatedAt":"2026-09-28T00:00:00Z","labels":[]}
+]
+JSON
+}
+
+# bdl_b [args] — burndown with any prior ledger removed (a queued ledger would
+# make its items in-flight on the next run)
+# shellcheck disable=SC2120
+bdl_b() {
+    rm -f "$T/lbl/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+    bdl burndown "$@"
+}
+
+# ── L1: characterization — unlabeled issues are picked (must stay green) ──────
+lbl_issues '[]' '[]'
+OUT="$(bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L1: unlabeled run exits 0" || fail "L1: unlabeled run exits 0 (got $RC)"
+grep -qE '^PICK +#40 ' <<< "$OUT" && ok "L1: #40 PICK" || fail "L1: #40 PICK (got: $OUT)"
+grep -qE '^PICK +#41 ' <<< "$OUT" && ok "L1: #41 PICK" || fail "L1: #41 PICK"
+grep -qE '^PICK +#42 ' <<< "$OUT" && ok "L1: #42 PICK" || fail "L1: #42 PICK"
+want "L1: units count the picks" "$OUT" "units: 5/5"
+
+# ── L2: characterization — delta lists updated #45, omits ranked #40 ──────────
+OUT="$(bdl burndown-delta 2>/dev/null)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L2: delta exits 0" || fail "L2: delta exits 0 (got $RC)"
+NUMS="$(jq -c '[.issues[].number]' <<< "$OUT" 2>/dev/null)"
+[ "$NUMS" = "[45]" ] && ok "L2: delta issues are [45]" || fail "L2: delta issues are [45] (got $NUMS)"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

@@ -2099,8 +2099,16 @@ assert_viol "gateG-wired-script-ok" 0 '[G]' "$FM"'
 | 1 | run script | CLI-executable | post-impl | `bin/test-check-plan` |
 '
 
-# (one-shot) annotation exempts the unwired script — must pass.
+# (one-shot) annotation as shell comment inside backticks exempts the unwired script — must pass.
 assert_viol "gateG-unwired-oneshot-ok" 0 '[G]' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | run script | CLI-executable | post-impl | `bin/test-nonexistent-thing # (one-shot)` |
+'
+
+# Legacy annotation form: a note after the closing backtick leaves a stray
+# backtick after Phase 5.0's strip, so gate [V] must reject it (Option A).
+assert_viol "gateG-legacy-oneshot-suffix-fails-V" 1 '[V]' "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | run script | CLI-executable | post-impl | `bin/test-nonexistent-thing` (one-shot) |
@@ -2205,7 +2213,7 @@ assert "v-go-wildcard-arg-elision" 1 "$FM"'
 # Message-content check (not just an exit code): gate V must name the offending
 # cell text so an author knows which row to fix. Copies the `2>&1 | grep -q`
 # idiom used for the [W] check above. Named without a `v-` prefix so the
-# `grep -c '^ok: v-'` count stays at the 9 assert cases.
+# `grep -c '^ok: v-'` count stays at the 11 assert cases.
 _f="$TMP/v-msg.md"
 printf '%s\n' "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
@@ -2231,6 +2239,43 @@ if "$GUARD" "$_f" 2>&1 | grep -qF 'must be written \|'; then
     echo "ok: [V]-pipe-message-confirmed"
 else
     echo "FAIL: [V] unescaped-pipe fixture must fire the pipe-escaping message"
+    FAILED=1
+fi
+
+# 10. Unbalanced backtick: a cell that opens a code span, closes it, then has
+# trailing prose. The opening backtick is stripped by matrix_split only when the
+# cell ALSO ends with a backtick; here it ends with prose so MC_LOC keeps the raw
+# text and all existing pattern arms miss. Must fire (exit 1) after Phase 2 lands.
+# On master this case FAILS (exit 0) — that is the regression this plan closes.
+assert "v-backtick-unbalanced-prose" 1 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean | CLI-executable | post-impl | `bin/check-docs` — runs in the worktree |
+'
+
+# 11. Survivor guard for case 10: a cleanly backtick-wrapped command with no
+# trailing prose is balanced (even backtick count after strip) and must STILL
+# pass (exit 0). An over-broad Phase 2 arm that fires on ANY backtick, or that
+# miscounts the balanced pair, trips here and nowhere else.
+assert "v-backtick-balanced-backtick-only" 0 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean | CLI-executable | post-impl | `bin/check-docs` |
+'
+
+# Message-content check for case 10: the unbalanced-backtick violation must carry
+# the [V] tag and quote the cell text. Uses the same idiom as [V]-message-names-row.
+_f="$TMP/v-unbal-msg.md"
+printf '%s\n' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean | CLI-executable | post-impl | `bin/check-docs` — runs in the worktree |
+' > "$_f"
+_out=$("$GUARD" "$_f" 2>&1)
+if printf '%s' "$_out" | grep -q '\[V\]' && printf '%s' "$_out" | grep -qF 'runs in the worktree'; then
+    echo "ok: [V]-unbalanced-message-names-row"
+else
+    echo "FAIL: [V] unbalanced-backtick message must contain '[V]' and the cell text 'runs in the worktree'"
     FAILED=1
 fi
 
@@ -2272,6 +2317,35 @@ ${NMIN_HDR}
 | 13.7c | bad |
 "
 
+# Helper: returns 0 when a corpus plan is a pass or only has downgradeable
+# violations. Downgradeable set: [E] (packet assertion binding, a true positive
+# on historical plans), and [V] lines for the backtick-parity arm added in this
+# PR (also a true positive on historical plans). Never edit the corpus plans
+# themselves — that mutates historical artifacts and disarms the gate permanently.
+_corpus_guard_ok() {
+    _cgo_out="$("$GUARD" "$1" 2>&1)"; _cgo_rc=$?
+    [ "$_cgo_rc" -eq 0 ] && return 0
+    # Exit code stays PRIMARY. The line filter only ever DOWNGRADES a non-zero
+    # exit, and only when the failure is provably all-downgradeable. Read ONLY
+    # the violations block: [W] advisories and the [N] coverage line print on a
+    # clean run too, so a bare '^\[' match would flag passing plans.
+    _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
+        /^check-plan: violations in /{v=1; next}
+        /^check-plan: /{v=0}
+        v && /^\[/ && !/^\[E\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ {print}')"
+    _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
+        /^check-plan: violations in /{v=1; next}
+        /^check-plan: /{v=0}
+        v && (/^\[E\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/) {print}' | head -1)"
+    # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
+    # least one downgradeable line actually explains the failure. A non-zero exit
+    # with no visible violation line still fails loudly instead of passing silently.
+    if [ -z "$_cgo_other" ] && [ -n "$_cgo_dvio" ]; then
+        return 0
+    fi
+    return 1
+}
+
 # Corpus regression: all 20 queued plans still pass with gate N
 # Plans removed because they trigger new gates added in this PR (all true positives):
 # conference-champions-playoff-semantics, bug-pipeline-survive-db-sync,
@@ -2292,28 +2366,7 @@ for _n_slug in \
     autoresearch-oreb-arming-share-lever retire-rebase-prs-workflow; do
     _n_pf="$HOME/claude-plans/$_n_slug.md"
     [ -f "$_n_pf" ] || continue
-    # These are real, already-merged plans, pinned as a gate-N false-positive
-    # corpus. [E] (packet assertion binding) is a legitimate TRUE positive on
-    # any plan authored before that field existed, so drop [E] lines before
-    # judging. Never silence [E] by editing the corpus plans themselves — that
-    # mutates historical artifacts and disarms the gate on them permanently.
-    _n_out="$("$GUARD" "$_n_pf" 2>&1)"; _n_rc=$?
-    # Exit code stays PRIMARY. The line filter only ever DOWNGRADES a non-zero
-    # exit, and only when the failure is provably all-[E]. Read ONLY the
-    # violations block: [W] advisories and the [N] coverage line print on a
-    # clean run too, so a bare '^\[' match would flag passing plans.
-    _n_other="$(printf '%s\n' "$_n_out" | awk '
-        /^check-plan: violations in /{v=1; next}
-        /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ {print}')"
-    _n_evio="$(printf '%s\n' "$_n_out" | awk '
-        /^check-plan: violations in /{v=1; next}
-        /^check-plan: /{v=0}
-        v && /^\[E\]/ {print}' | head -1)"
-    # Downgrade ONLY when: non-zero exit, zero non-[E] violation lines, and at
-    # least one [E] line actually explains the failure. A non-zero exit with no
-    # visible violation line still fails loudly instead of passing silently.
-    if [ "$_n_rc" -ne 0 ] && { [ -n "$_n_other" ] || [ -z "$_n_evio" ]; }; then
+    if ! _corpus_guard_ok "$_n_pf"; then
         echo "FAIL: n_corpus — $_n_slug failed (gate N false positive)"
         _n_corpus_pass=0; FAILED=1
     fi
@@ -2350,7 +2403,7 @@ _n_atfile="$HOME/claude-plans/agent-tiering-detail-trim.md"
 if [ ! -f "$_n_atfile" ]; then
     echo "ok: n_agent_tiering_pass (skip — plan absent)"
 else
-    if "$GUARD" "$_n_atfile" >/dev/null 2>&1; then
+    if _corpus_guard_ok "$_n_atfile"; then
         echo "ok: n_agent_tiering_pass"
     else
         echo "FAIL: n_agent_tiering_pass — agent-tiering-detail-trim.md failed (false positive)"

@@ -865,6 +865,20 @@ span.nav-dropdown-item a:hover {
     letter-spacing: var(--tracking-display);
 }
 
+/* Section label in nav dropdown footers (league switcher, username).
+   Replaces the utility string: block text-base font-semibold
+   tracking-widest uppercase text-gray-500 mb-2. */
+.nav-section-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: var(--text-base);
+    line-height: 1.5;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-gray-500);
+}
+
 .nav-login-input {
     width: 100%;
     background: rgba(255, 255, 255, 0.05);

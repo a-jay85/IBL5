@@ -233,7 +233,7 @@ class DesktopNavView implements DesktopNavViewInterface
         ob_start();
         ?>
         <div class="px-4 py-3 border-t border-white/10 bg-black/20">
-            <label for="desktop-league-select" class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>
+            <label for="desktop-league-select" class="nav-section-label">League</label>
             <div class="relative">
                 <select id="desktop-league-select" name="league" onchange="window.location.href=this.value" class="nav-select">
                     <option value="index.php?league=ibl"<?= HtmlSanitizer::e($iblSelected) ?> class="bg-navy-800 text-white">IBL</option>
@@ -258,7 +258,7 @@ class DesktopNavView implements DesktopNavViewInterface
         ob_start();
         ?>
         <div class="px-4 py-3 border-t border-white/10 bg-black/20">
-            <div class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2"><?= HtmlSanitizer::e($username) ?></div>
+            <div class="nav-section-label"><?= HtmlSanitizer::e($username) ?></div>
             <a href="modules.php?name=YourAccount&amp;op=logout" hx-boost="false" class="nav-logout-btn">Logout</a>
         </div>
         <?php

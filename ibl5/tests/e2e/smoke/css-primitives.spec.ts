@@ -160,7 +160,7 @@ test.describe('CSS shared primitives', () => {
     const actual = await probe(
       page,
       'nav',
-      '<div class="px-4 py-3 border-t border-white/10 bg-black/20"><label data-probe class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label></div>',
+      '<div class="px-4 py-3 border-t border-white/10 bg-black/20"><label data-probe class="nav-section-label">League</label></div>',
       LABEL_PROPS,
     );
     expect(actual).toEqual(EXPECTED_LABEL);

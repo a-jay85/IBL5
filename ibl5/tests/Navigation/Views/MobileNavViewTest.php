@@ -146,6 +146,19 @@ class MobileNavViewTest extends TestCase
         $this->assertStringContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
     }
 
+    public function testSectionLabelsUseNavSectionLabelClass(): void
+    {
+        $view = $this->createView(isLoggedIn: true, username: 'A-Jay');
+        $html = $view->render(
+            [],
+            $this->sampleMyTeamMenu(),
+            [['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout', 'noBoost' => true]],
+        );
+
+        $this->assertStringContainsString('<div class="nav-section-label">A-Jay</div>', $html);
+        $this->assertStringNotContainsString('tracking-widest uppercase text-gray-500', $html);
+    }
+
     public function testAccountAccordionSuppressedWhenMyTeamMenuPresent(): void
     {
         $view = $this->createView(isLoggedIn: true, username: 'A-Jay');

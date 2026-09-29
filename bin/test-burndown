@@ -1641,6 +1641,53 @@ if grep -qF "omits delta issue #40" <<< "$OUT"; then fail "L8: refresh must not 
 L8_REPORT="$(tail -1 <<< "$OUT")"; L8_REPORT="${L8_REPORT#REPORT: }"
 [ ! -f "$L8_REPORT" ] || unlink "$L8_REPORT"
 
+# ── L9: burndown-record reason= / blocked_by= ─────────────────────────────────
+lbl_issues '[]' '[]'
+OUT="$(bdl_b 2>&1)"
+L="$(grep '^LEDGER: ' <<< "$OUT" | sed 's/^LEDGER: //')"
+if [ -f "$L" ]; then ok "L9: ledger created"; else fail "L9: ledger created (got: $OUT)"; fi
+SNAP="$T/lbl/ledger.snap"
+cp "$L" "$SNAP"
+: > "$T/lbl/gh.log"
+OUT="$(bdl burndown-record "$L" 42 status=skipped reason=blocked blocked_by=77 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L9: reason=blocked record exits 0" || fail "L9: reason=blocked record exits 0 (got $RC: $OUT)"
+[ "$(jq -r '.items[] | select(.issue_num==42) | .skip_label' "$L")" = "blocked" ] \
+    && ok "L9: #42 skip_label=blocked" || fail "L9: #42 skip_label=blocked"
+[ "$(jq -r '.items[] | select(.issue_num==42) | .blocked_by' "$L")" = "77" ] \
+    && ok "L9: #42 blocked_by=77" || fail "L9: #42 blocked_by=77"
+OUT="$(bdl burndown-record "$L" 43 status=skipped reason=out-of-repo 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L9: reason=out-of-repo record exits 0" || fail "L9: reason=out-of-repo record exits 0 (got $RC: $OUT)"
+[ "$(jq -r '.items[] | select(.issue_num==43) | .skip_label' "$L")" = "out-of-repo" ] \
+    && ok "L9: #43 skip_label=out-of-repo" || fail "L9: #43 skip_label=out-of-repo"
+[ "$(jq '.items[] | select(.issue_num==43) | has("blocked_by")' "$L")" = "false" ] \
+    && ok "L9: #43 has no blocked_by" || fail "L9: #43 has no blocked_by"
+
+# ── L10: rejected forms leave the ledger byte-identical and make no tag call ──
+cp "$SNAP" "$L"
+: > "$T/lbl/gh.log"
+l10_reject() {
+    local label="$1"; shift
+    local out rc
+    out="$(bdl burndown-record "$L" "$@" 2>&1)"; rc=$?
+    [ "$rc" -eq 2 ] && ok "L10: $label exits 2" || fail "L10: $label exits 2 (got $rc: $out)"
+    cmp -s "$L" "$SNAP" && ok "L10: $label ledger unchanged" || fail "L10: $label ledger unchanged"
+}
+l10_reject "blocked without blocked_by" 42 status=skipped reason=blocked
+l10_reject "out-of-repo with blocked_by" 42 status=skipped reason=out-of-repo blocked_by=77
+l10_reject "blocked_by alone" 42 status=skipped blocked_by=77
+l10_reject "bogus reason" 42 status=skipped reason=bogus
+l10_reject "non-numeric blocked_by" 42 status=skipped reason=blocked blocked_by=abc
+l10_reject "reason on a picked item" 42 reason=out-of-repo
+OUT="$(bdl burndown-record "$L" 999 status=skipped reason=out-of-repo 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "L10: unknown item exits 2" || fail "L10: unknown item exits 2 (got $RC)"
+want "L10: unknown item message" "$OUT" "no item #999"
+cmp -s "$L" "$SNAP" && ok "L10: unknown item ledger unchanged" || fail "L10: unknown item ledger unchanged"
+if grep -qE 'label create|issue edit|issue comment' "$T/lbl/gh.log"; then
+    fail "L10: rejected forms made a tag gh call"
+else
+    ok "L10: rejected forms made no tag gh call"
+fi
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

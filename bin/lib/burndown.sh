@@ -716,6 +716,18 @@ bd_record_apply() {
     mv "$tmp_path" "$ledger"
 }
 
+# bd_validate_skip_args <reason> <blocked_by> — cross-field rules shared by
+# burndown-record and burndown-tag; dies 2 on violation.
+bd_validate_skip_args() {
+    local reason="$1" blocked_by="$2"
+    if [ "$reason" = "$BD_LABEL_BLOCKED" ] && [ -z "$blocked_by" ]; then
+        bd_die 2 "reason=blocked requires blocked_by=<PR>"
+    fi
+    if [ -n "$blocked_by" ] && [ "$reason" != "$BD_LABEL_BLOCKED" ]; then
+        bd_die 2 "blocked_by requires reason=blocked"
+    fi
+}
+
 bd_cmd_record() {
     if [ $# -lt 3 ]; then
         bd_die 2 "burndown-record wants <ledger> <issue> key=value..."
@@ -726,7 +738,7 @@ bd_cmd_record() {
     jq -e --argjson n "$issue_num" 'any(.items[]; .issue_num == $n)' "$ledger" \
         >/dev/null 2>&1 || bd_die 2 "no item #$issue_num in $ledger"
 
-    local kv route="" slug="" status="" pr_url="" applied_keys=""
+    local kv route="" slug="" status="" pr_url="" reason="" blocked_by="" applied_keys=""
     while [ $# -gt 0 ]; do
         kv="$1"; shift
         local k="${kv%%=*}" v="${kv#*=}"
@@ -751,11 +763,20 @@ bd_cmd_record() {
                 [[ "$v" =~ $PR_URL_EXACT_RE ]] \
                     || bd_die 2 "pr_url=$v rejected: must match PR URL pattern"
                 pr_url="$v" ;;
+            reason)
+                [[ "$v" =~ ^(blocked|out-of-repo)$ ]] \
+                    || bd_die 2 "reason=$v rejected: must be blocked or out-of-repo"
+                reason="$v" ;;
+            blocked_by)
+                [[ "$v" =~ ^[1-9][0-9]{0,6}$ ]] \
+                    || bd_die 2 "blocked_by=$v rejected: must be a PR number"
+                blocked_by="$v" ;;
             *)
                 bd_die 2 "$k=$v rejected: unknown key $k" ;;
         esac
         applied_keys="${applied_keys} ${kv}"
     done
+    bd_validate_skip_args "$reason" "$blocked_by"
 
     # Build patch object
     local patch="{}"
@@ -763,6 +784,8 @@ bd_cmd_record() {
     [ -z "$slug" ]    || patch="$(jq -n --argjson p "$patch" --arg v "$slug"    '$p+{slug:$v}')"
     [ -z "$status" ]  || patch="$(jq -n --argjson p "$patch" --arg v "$status"  '$p+{status:$v}')"
     [ -z "$pr_url" ]  || patch="$(jq -n --argjson p "$patch" --arg v "$pr_url"  '$p+{pr_url:$v}')"
+    [ -z "$reason" ]  || patch="$(jq -n --argjson p "$patch" --arg v "$reason"  '$p+{skip_label:$v}')"
+    [ -z "$blocked_by" ] || patch="$(jq -n --argjson p "$patch" --argjson v "$blocked_by" '$p+{blocked_by:$v}')"
 
     # Cross-field rules (preview the patched item without writing)
     local preview_item new_status new_route
@@ -774,6 +797,7 @@ bd_cmd_record() {
         || bd_die 2 "status=queued requires route=plan"
     [ "$new_status" != "shipped" ] || [ "$new_route" = "ad-hoc" ] \
         || bd_die 2 "status=shipped requires route=ad-hoc"
+    [ -z "$reason" ] || [ "$new_status" = "skipped" ] || bd_die 2 "reason requires status=skipped"
     if [ "$new_status" = "closed-fixed" ]; then
         patch="$(jq -n --argjson p "$patch" '$p+{cost:0}')"
     fi

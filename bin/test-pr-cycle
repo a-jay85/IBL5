@@ -760,10 +760,12 @@ run --worker
 [[ $RC -eq 0 ]] || fail "case 35 exit $RC, want 0"
 [[ "$(calls dm)" == "1" ]] || fail "case 35: want 1 DM, got $(calls dm)"
 grep -qF 'armed 1, your turn 2' "$SCRATCH/dm.argv" || fail "case 35: summary wrong: $(cat "$SCRATCH/dm.argv")"
-grep -qF '[#2102: Alpha PR title](https://github.com/a-jay85/IBL5/pull/2102) — FEAT-AWAITING-SIGNOFF — human sign-off' \
+grep -qF '[#2102: Alpha PR title](<https://github.com/a-jay85/IBL5/pull/2102>) — FEAT-AWAITING-SIGNOFF — human sign-off' \
     "$SCRATCH/dm.argv" || fail "case 35: 2102 link missing or misformatted"
-grep -qF '[#2103: Beta PR title](https://github.com/a-jay85/IBL5/pull/2103) — UNCLEARED — run manual tests' \
+grep -qF -- '- ✍️ [#2102:' "$SCRATCH/dm.argv" || fail "case 35: 2102 emoji (✍️) missing after the bullet"
+grep -qF '[#2103: Beta PR title](<https://github.com/a-jay85/IBL5/pull/2103>) — UNCLEARED — run manual tests' \
     "$SCRATCH/dm.argv" || fail "case 35: 2103 link missing or misformatted"
+grep -qF -- '- ⚠️ [#2103:' "$SCRATCH/dm.argv" || fail "case 35: 2103 emoji (⚠️) missing after the bullet"
 grep -qF '#2101' "$SCRATCH/dm.argv" && fail "case 35: armed #2101 must not appear in your-turn list"
 
 reset_state
@@ -1129,7 +1131,11 @@ g_one_arm() {
     [[ "$line" == '"$PR_CYCLE_TRIAGE_CMD" --arm' ]]
 }
 g_no_bucket_cond() {
-    ! noncomment "$1" | grep -qE 'FEAT-AWAITING-SIGNOFF|PIPELINE-HELD|UNCLEARED|[^-A-Z_]HELD[^-A-Z_]'
+    # _bucket_emoji is a display-mapping function; exclude its body from the guard.
+    # The guard still catches bucket-conditional logic outside that function.
+    ! noncomment "$1" \
+        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} {print}' \
+        | grep -qE 'FEAT-AWAITING-SIGNOFF|PIPELINE-HELD|UNCLEARED|[^-A-Z_]HELD[^-A-Z_]'
 }
 g_no_sleep()       { ! noncomment "$1" | grep -qE '(^|[^A-Za-z_])sleep[[:space:]]'; }
 g_no_poll()        { ! noncomment "$1" | grep -qE -- '--json state|_poll_merge|_reconcile'; }
@@ -1605,7 +1611,9 @@ done > "$SCRATCH/prlist.tsv"
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
 run --worker
 [[ $RC -eq 0 ]] || fail "case 38 exit $RC, want 0"
-_dm_len="$(wc -c < "$SCRATCH/dm.argv" | tr -d ' ')"
+# Use wc -m (character count) not wc -c (byte count): Discord's 2000-char cap is
+# characters, not bytes, and state-emoji characters are multi-byte in UTF-8.
+_dm_len="$(wc -m < "$SCRATCH/dm.argv" | tr -d ' ')"
 [[ "$_dm_len" -le 2000 ]] || fail "case 38: DM exceeds 2000 chars ($_dm_len)"
 grep -qF 'more:' "$SCRATCH/dm.argv" || fail "case 38: DM did not use the overflow line"
 end_case "case 38 your-turn DM length cap"

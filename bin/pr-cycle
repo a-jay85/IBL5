@@ -963,6 +963,21 @@ _arm_and_classify() {
     return 0
 }
 
+# _bucket_emoji BUCKET — map a pr-triage bucket name to a state emoji.
+_bucket_emoji() {
+    case "$1" in
+        DIRTY)                  printf '🔀' ;;
+        NOT-MERGEABLE)          printf '🚫' ;;
+        BLOCKED-CHECK)          printf '❌' ;;
+        HELD)                   printf '⏸' ;;
+        BLOCKED-DEP)            printf '🔗' ;;
+        PIPELINE-HELD)          printf '🤖' ;;
+        FEAT-AWAITING-SIGNOFF)  printf '✍️' ;;
+        UNCLEARED)              printf '⚠️' ;;
+        *)                      printf '❓' ;;
+    esac
+}
+
 # _your_turn_lines — print one markdown line per your-turn.txt row, linked via gh pr list.
 # Called only from inside the DM block; never sets HALT, never returns non-zero.
 _your_turn_lines() {
@@ -987,9 +1002,9 @@ _your_turn_lines() {
         if [ -n "$_row" ]; then
             _yurl="$(printf '%s\n' "$_row" | cut -f2)"
             _ytitle="$(printf '%s\n' "$_row" | cut -f3 | tr '[]' '()')"
-            _yl_line="- [#$_yn: $_ytitle]($_yurl) — $_ybkt — $_yact"
+            _yl_line="- $(_bucket_emoji "$_ybkt") [#$_yn: $_ytitle](<$_yurl>) — $_ybkt — $_yact"
         else
-            _yl_line="- #$_yn — $_ybkt — $_yact"
+            _yl_line="- $(_bucket_emoji "$_ybkt") #$_yn — $_ybkt — $_yact"
         fi
         if [ "$((_yt_running + ${#_yl_line} + 1))" -gt 1800 ]; then
             echo "- …and $((_yt_total - _yt_shown)) more: $RUNDIR/your-turn.txt"

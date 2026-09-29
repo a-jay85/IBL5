@@ -54,7 +54,7 @@ final class AwardHistoryRepositoryTest extends TestCase
         ]);
 
         $repository = new AwardHistoryRepository($this->mockDb);
-        
+
         $result = $repository->searchAwards([
             'name' => 'Johnson',
             'award' => null,
@@ -64,6 +64,9 @@ final class AwardHistoryRepositoryTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertSame(1, $result['count']);
+
+        // Assert the filter value was bound to the query
+        $this->assertContains('%Johnson%', $this->mockDb->getLastBoundParams());
     }
 
     public function testSearchAwardsWithAwardFilter(): void
@@ -74,7 +77,7 @@ final class AwardHistoryRepositoryTest extends TestCase
         ]);
 
         $repository = new AwardHistoryRepository($this->mockDb);
-        
+
         $result = $repository->searchAwards([
             'name' => null,
             'award' => 'MVP',
@@ -84,6 +87,9 @@ final class AwardHistoryRepositoryTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertSame(2, $result['count']);
+
+        // Assert the award filter value was bound to the query
+        $this->assertContains('%MVP%', $this->mockDb->getLastBoundParams());
     }
 
     public function testSearchAwardsWithYearFilter(): void
@@ -93,7 +99,7 @@ final class AwardHistoryRepositoryTest extends TestCase
         ]);
 
         $repository = new AwardHistoryRepository($this->mockDb);
-        
+
         $result = $repository->searchAwards([
             'name' => null,
             'award' => null,
@@ -103,6 +109,9 @@ final class AwardHistoryRepositoryTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertSame(1, $result['count']);
+
+        // Assert the year filter value was bound to the query
+        $this->assertContains(2025, $this->mockDb->getLastBoundParams());
     }
 
     public function testSearchAwardsWithMultipleFilters(): void
@@ -112,7 +121,7 @@ final class AwardHistoryRepositoryTest extends TestCase
         ]);
 
         $repository = new AwardHistoryRepository($this->mockDb);
-        
+
         $result = $repository->searchAwards([
             'name' => 'Johnson',
             'award' => 'MVP',
@@ -122,6 +131,12 @@ final class AwardHistoryRepositoryTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('count', $result);
+
+        // Assert all three filter values were bound to the query
+        $params = $this->mockDb->getLastBoundParams();
+        $this->assertContains('%Johnson%', $params);
+        $this->assertContains('%MVP%', $params);
+        $this->assertContains(2025, $params);
     }
 
     public function testSearchAwardsWithNoResults(): void

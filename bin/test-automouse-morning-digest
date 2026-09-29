@@ -14,7 +14,11 @@ assert_not_contains() { local desc="$1" needle="$2" hay="$3"; case "$hay" in *"$
 mkdir -p "$BINSTUB"
 printf '#!/bin/sh\necho "CALLED $*" >> "%s/dm-calls.log"\n' "$TMP" > "$BINSTUB/discord-dm"
 chmod +x "$BINSTUB/discord-dm"
-run_digest() { NIGHTLY_DIR="$NDIR" DISCORD_DM_BIN="$BINSTUB/discord-dm" "$SCRIPT" "$@"; }
+# gh stub: plan-a has a PR, every other slug does not. Ignores its args, the way
+# `gh pr list --jq ... @tsv` output looks is all the digest reads.
+printf '#!/bin/sh\nprintf "plan-a\\thttps://github.com/o/r/pull/7\\n"\n' > "$BINSTUB/gh"
+chmod +x "$BINSTUB/gh"
+run_digest() { NIGHTLY_DIR="$NDIR" DISCORD_DM_BIN="$BINSTUB/discord-dm" MORNING_DIGEST_GH="$BINSTUB/gh" "$SCRIPT" "$@"; }
 
 TODAY="$(date +%F)"
 
@@ -54,7 +58,12 @@ body=$(run_digest --dry-run)
 assert_contains     "row1: plan-a in body"   "plan-a"        "$body"
 assert_contains     "row1: plan-b in body"   "plan-b"        "$body"
 assert_contains     "row1: plan-c in body"   "plan-c"        "$body"
-assert_contains     "row1: Completed 3"      "✅ Completed 3" "$body"
+assert_not_contains "row1: no Completed count" "Completed"     "$body"
+assert_contains     "row1: plan-a links its PR" "✅ [plan-a](<https://github.com/o/r/pull/7>)" "$body"
+assert_contains     "row1: plan-b has no PR, bare" "✅ plan-b"  "$body"
+assert_not_contains "row1: no Next line"     "Next:"          "$body"
+assert_not_contains "row1: no Reports line"  "Reports:"       "$body"
+assert_not_contains "row1: no automouse label" "label:automouse" "$body"
 assert_contains     "row1: Skipped 1"        "⏭ Skipped 1"   "$body"
 assert_contains     "row1: spend total"      "8.9241"         "$body"
 echo "ok: row1 — dry-run body"
@@ -314,8 +323,8 @@ cat > "$NDIR/reports/${TODAY}-costs.md" <<'COSTS'
 | dup-plan.md | impl | claude-sonnet-4-6 | Sonnet | 2.5000 | — | 50 | 100 | 200 | 300 | — | — | real |
 COSTS
 out=$(run_digest --dry-run)
-assert_contains     "row22: Completed 1 (dedup collapses two shapes)" "Completed 1" "$out"
-assert_not_contains "row22: not Completed 2"                          "Completed 2" "$out"
+assert_contains     "row22: one ✅ dup-plan line (dedup collapses two shapes)" "✅ dup-plan" "$out"
+[ "$(grep -c '✅ dup-plan' <<< "$out")" = 1 ] || { echo "FAIL: row22 — dup-plan listed more than once"; FAILED=1; }
 assert_contains     "row22: cost appears in output (normalization join)"           "2.5000"      "$out"
 echo "ok: row22 — duplicate done/ shapes collapse; cost appears via normalization join"
 

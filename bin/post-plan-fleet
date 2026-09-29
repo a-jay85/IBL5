@@ -55,6 +55,8 @@
 #                           at the worktree so review-shared assets resolve correctly.
 #   POST_PLAN_FLEET_DISCORD_DM Override the notifier binary (a recorder stub for tests).
 #                           Unset or empty = $ROOT/bin/discord-dm.
+#   POST_PLAN_FLEET_GH        Override the gh binary the runner uses to fetch the PR title
+#                           and URL for the finish DM. Unset or empty = gh.
 #   POST_PLAN_FLEET_AUTH_PROBE_CMD  Command to verify Claude auth before firing any session.
 #                           Must exit 0 to proceed. Default: runs a real claude haiku call.
 #                           Set to `true` in tests. When pr-cycle has already probed, it
@@ -119,7 +121,7 @@ CEILING_SECS="${POST_PLAN_FLEET_CEILING:-7200}"
 WAIT_POLL_SECS="${POST_PLAN_FLEET_WAIT_POLL:-20}"
 
 # --- flag parsing ------------------------------------------------------------------------
-usage() { sed -n '2,74p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,76p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -569,20 +571,19 @@ fire_pr() {
         printf 'NOTIFY=%q\n'     "$NOTIFY"
         printf 'SESSION_ID=%q\n' "$SESSION_ID"
         printf 'DISCORD_DM=%q\n' "${POST_PLAN_FLEET_DISCORD_DM:-$ROOT/bin/discord-dm}"
+        printf 'GH_BIN=%q\n'     "${POST_PLAN_FLEET_GH:-gh}"
         printf 'POST_PLAN_NOW_BIN=%q\n' "${POST_PLAN_FLEET_CLAUDE:-$ROOT/bin/post-plan-now}"
         declare -f ljob_dm_ready ljob_dm_send
         cat <<'RUNNER_EOF'
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 cd "$ROOT" || exit 1
-STARTED=$(date +%s)
 RC=0
 timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground > "$LOG" 2>&1 || RC=$?
-ELAPSED=$(( $(date +%s) - STARTED ))
 [ "$RC" = 124 ] && echo "post-plan-now: TIMED OUT after 90m (rc=124)" >> "$LOG"
 notify() {
     ljob_dm_ready post-plan-fleet || return 0
     local DM_ICON="" DM_VERDICT="" DM_NEXT="" msg stop_text=""
-    local verdict="" parsed="" terminal="" latest_unconfirmed=""
+    local verdict="" parsed="" terminal="" latest_unconfirmed="" holds="" sticky=""
     # STOP: lines take priority (same rule as derive_status)
     local stop_line=""
     stop_line=$(grep -m1 '^[[:space:]>*_`-]*STOP:' "$LOG" 2>/dev/null || true)
@@ -602,6 +603,7 @@ notify() {
             # Latest round wins: rounds non-empty -> verdict_2 (null = unconfirmed,
             # never verdict_1). No rounds -> verdict_1 (null -> empty, falls through
             # to the RESULT: line exactly as before). Any parse error -> empty.
+            # hold= lines turn each blocked Phase 6.5 arm condition into a fix hint.
             parsed=$(python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
@@ -613,9 +615,37 @@ else:
     v = f.get("verdict_1") or ""
 print("terminal=%s" % (d.get("terminal") or ""))
 print("verdict=%s" % v)
-' "$run_dir/result.json" 2>/dev/null || true)
+sticky = d.get("sticky_comment_id") or ""
+print("sticky=%s" % sticky)
+pr = sys.argv[2]
+for c in (d.get("arm") or {}).get("conditions") or []:
+    if not c.get("blocked"):
+        continue
+    name, reason = c.get("name") or "", (c.get("reason") or "")[:150]
+    if name == "plan-auto-merge-hold":
+        h = "plan says auto_merge: false — review and merge by hand"
+    elif name == "feat-commit-type-floor":
+        h = "feat: PR — check it, then add the `human-approved` label"
+    elif name == "manual-testing-clearance":
+        rows = [r.get("id", "") for r in (d.get("manual_testing") or {}).get("rows") or []
+                if str(r.get("verdict", "")).startswith("SKIP")]
+        h = "manual tests need you" + (": " + ", ".join(rows) if rows else "")
+    elif name == "meta-checks":
+        h = "meta checks failed: " + "; ".join(map(str, d.get("meta_check_failures") or []))[:150]
+    elif name == "plan-fidelity-verdict":
+        h = "fidelity review not READY: " + reason
+        if sticky:
+            h += " — <https://github.com/a-jay85/IBL5/pull/%s#issuecomment-%s>" % (pr, sticky)
+    elif name == "red-ci-check":
+        h = "red CI: %s — fix, then re-run" % reason
+    else:
+        h = "%s: %s" % (name, reason)
+    print("hold=" + h.replace("\n", " "))
+' "$run_dir/result.json" "$PR" 2>/dev/null || true)
             terminal=$(printf '%s\n' "$parsed" | sed -n 's/^terminal=//p')
             verdict=$(printf '%s\n' "$parsed" | sed -n 's/^verdict=//p')
+            sticky=$(printf '%s\n' "$parsed" | sed -n 's/^sticky=//p')
+            holds=$(printf '%s\n' "$parsed" | sed -n 's/^hold=/• /p')
             if [ "$verdict" = null ]; then
                 verdict=""; latest_unconfirmed=1
             fi
@@ -634,23 +664,52 @@ print("verdict=%s" % v)
             esac
         fi
     fi
+    # DM_NEXT is an actionable fix, or empty. An empty one prints no line at all.
+    # The bail-out hints are post-plan-now's own lines, minus its two bookkeeping lines.
+    local bail_lines="" verdict_link="read the verdict comment on the PR"
+    bail_lines=$(grep '^post-plan-now: ' "$LOG" 2>/dev/null \
+        | grep -v -e 'postplan-rc=' -e 'harness-run-dir=' | head -3 | cut -c1-200 || true)
+    [ -n "$sticky" ] \
+        && verdict_link="read the verdict comment: <https://github.com/a-jay85/IBL5/pull/${PR}#issuecomment-${sticky}>"
     case "$verdict" in
         READY)              DM_ICON="✅"; DM_VERDICT="READY";           DM_NEXT="merge when you're ready" ;;
-        HELD)               DM_ICON="⏸";  DM_VERDICT="HELD";            DM_NEXT="check the holds" ;;
-        "READY WITH NOTES") DM_ICON="⚠️"; DM_VERDICT="READY WITH NOTES"; DM_NEXT="check the holds" ;;
-        "NOT READY")        DM_ICON="❌"; DM_VERDICT="NOT READY";        DM_NEXT="read the verdict comment" ;;
-        STOPPED)            DM_ICON="🛑"; DM_VERDICT="STOPPED";          DM_NEXT="${stop_text:-read the log}" ;;
-        "TIMED OUT")        DM_ICON="⏱";  DM_VERDICT="TIMED OUT";        DM_NEXT="read the log" ;;
+        HELD)               DM_ICON="⏸";  DM_VERDICT="HELD";            DM_NEXT="$holds" ;;
+        "READY WITH NOTES") DM_ICON="⚠️"; DM_VERDICT="READY WITH NOTES"; DM_NEXT="$holds" ;;
+        "NOT READY")        DM_ICON="❌"; DM_VERDICT="NOT READY";        DM_NEXT="$verdict_link" ;;
+        STOPPED)            DM_ICON="🛑"; DM_VERDICT="STOPPED";          DM_NEXT="$stop_text" ;;
+        "TIMED OUT")        DM_ICON="⏱";  DM_VERDICT="TIMED OUT"
+                            DM_NEXT="re-run with \`bin/post-plan-fleet --pr ${PR} --go\`" ;;
         *)
             if [ "$RC" != 0 ]; then
-                DM_ICON="💥"; DM_VERDICT="runner exited rc=${RC}"; DM_NEXT="read the log"
+                DM_ICON="💥"; DM_VERDICT="runner exited rc=${RC}"; DM_NEXT="$bail_lines"
             else
-                DM_ICON="❓"; DM_VERDICT="unconfirmed — no verdict marker"; DM_NEXT="read the log"
+                DM_ICON="❓"; DM_VERDICT="unconfirmed — no verdict marker"; DM_NEXT="$bail_lines"
             fi ;;
     esac
-    msg="${DM_ICON} post-plan-fleet: PR #${PR}
-RESULT ${DM_VERDICT}
-${ELAPSED}s · ${DM_NEXT}
+    # PR number and title both link to the PR. URLs sit in <> so Discord shows no embed.
+    # A failed lookup falls back to the bare number with no title line.
+    local pr_row="" pr_title="" pr_url="" head="PR #${PR}" title_line=""
+    pr_row=$("$GH_BIN" pr view "$PR" --json title,url --jq '[.title, .url] | @tsv' 2>/dev/null || true)
+    pr_title=$(printf '%s' "$pr_row" | cut -f1 | tr '[]' '()')
+    pr_url=$(printf '%s' "$pr_row" | cut -f2)
+    if [ -n "$pr_url" ]; then
+        head="[PR #${PR}](<${pr_url}>)"
+        [ -n "$pr_title" ] && title_line="
+[${pr_title}](<${pr_url}>)"
+    fi
+    # One fix goes on the Fix: line. Several (holds, bail-out lines) go one per line under it.
+    local fix_block=""
+    case "$DM_NEXT" in
+        "")               ;;
+        *"
+"*|"• "*)            fix_block="
+Fix:
+${DM_NEXT}" ;;
+        *)                fix_block="
+Fix: ${DM_NEXT}" ;;
+    esac
+    msg="${DM_ICON} post-plan-fleet: ${head}${title_line}
+RESULT ${DM_VERDICT}${fix_block}
 log: $LOG"
     ljob_dm_send post-plan-fleet "$msg"
 }

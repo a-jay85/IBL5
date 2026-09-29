@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for work-triage — NO auto-attach trigger (its `paths:` entries are all out-of-repo and never match); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, the numeric hard-trigger rule and gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the /plan-verdict routing rationale and gate properties, the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
-last_verified: 2026-09-23
+last_verified: 2026-09-28
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
   - "~/.claude/hooks/plan-gate-skill.sh"
@@ -20,7 +20,7 @@ The user should never have to ask "is this big enough for a `/plan`?" — that j
 
 ## Hard trigger
 
-**The numeric rule:** the fifth distinct repo file you edit on the main thread within one user turn is the handoff point. Four files is a change; five is a sweep. Route the remainder to one `subagent_type: "sonnet-4-6"` sub-agent (omit `model`) before making that fifth edit — don't wait to be stopped.
+**The numeric rule:** the fifth distinct repo file you edit on the main thread within one user turn is the handoff point. Four files is a change; five is a sweep. Route the remainder to one `subagent_type: "sonnet-5-5"` sub-agent (omit `model`) before making that fifth edit. Don't wait to be stopped.
 
 ### Why a numeric rule
 
@@ -46,7 +46,7 @@ Self-test: `bash ~/.claude/hooks/test-plan-gate-edit.sh`
 **Its remedy is not one thing — the deny message prints a four-rung ladder, and the right rung depends on the direction.** Take the first that fits; don't skip to the override:
 
 1. **`git show <ref>:<path>` from your own tree** when you only need to READ the file. The object store is shared across the repo family, so no foreign path is touched and nothing new loads. The gate probes first and prints the exact command **only** when the path is committed on that tree's branch *and* unmodified there; otherwise it says why rung 1 is unavailable and routes you on (a `git show` of a locally-modified file returns pre-edit bytes silently, which is worse than an error).
-2. **A gate-exempt sub-agent** (`Agent(subagent_type: "sonnet-4-6")`, omit `model`) for bounded work in that tree. Its rules load in ITS context and are discarded on return. **This is the default for cross-tree edits** — delegation, not re-rooting.
+2. **A gate-exempt sub-agent** (`Agent(subagent_type: "sonnet-5-5")`, omit `model`) for bounded work in that tree. Its rules load in ITS context and are discarded on return. **This is the default for cross-tree edits.** Use delegation rather than re-rooting.
 3. **Relocate or hand off**, direction-dependent: `EnterWorktree` when the session is in the **main checkout** and the target is a worktree; a **fresh session** rooted in the target when the session is already in a worktree (`ExitWorktree` no-ops for a session *launched* in a worktree, and a direct worktree→worktree `EnterWorktree` is rejected — leave the tree dirty and hand off in prose). Never relocate INTO the main checkout: it is read-only reference (ADR-0062).
 4. **The escape hatch** — `touch /tmp/claude-tree-override-<session_id>` (example), keyed per **session**, not per turn like Check 1's — for the genuine both-trees-at-once case (diffing two worktrees).
 
@@ -92,7 +92,7 @@ The ≥5-file hard trigger in `work-triage.md` still names **one** sub-agent, an
 
 ## /plan verdict routing
 
-**The routing rule:** never execute a `/plan` verdict as inline `Skill(plan)` — it burns the whole orchestrator through every `/plan` phase. Route via `/plan-prompt` → `bin/plan-now` (detached Sonnet 4.6); `~/.claude/hooks/plan-gate-skill.sh` denies it.
+**The routing rule:** never execute a `/plan` verdict as inline `Skill(plan)`. It burns the whole orchestrator through every `/plan` phase. Route via `/plan-prompt` → `bin/plan-now` (detached Sonnet 5.5); `~/.claude/hooks/plan-gate-skill.sh` denies it.
 
 Why prose alone fails and a hook is required: on 2026-07-28, with `work-triage.md` fully resident, a `/plan` verdict on the `bin/wt-rebase` task was executed as an inline `Skill(plan)` call on Opus. It burned the orchestrator through all of Step 3 (one `plan-architect` spawn + section append) before being killed. A warning you can read past is not a control.
 

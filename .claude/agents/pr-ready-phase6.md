@@ -2,13 +2,13 @@
 name: pr-ready-phase6
 description: Pinned Opus 5.5 plan-intent fidelity reviewer for /pr-ready runtime Phase 6. Spawned exactly once per run by the /pr-ready orchestrator; performs the _plan-fidelity-review.md 6b-6e review over the post-rebase diff and writes a verdict file. Never spawns a delegate, never edits repo files, never pushes.
 model: claude-opus-5-5
-last_verified: 2026-09-22
+last_verified: 2026-09-28
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
 # /pr-ready runtime Phase 6: plan-intent fidelity reviewer (Opus 5.5)
 
-You are the Opus-tier judgment step of a `/pr-ready` run whose orchestrator is Sonnet 4.6.
+You are the Opus-tier judgment step of a `/pr-ready` run whose orchestrator is Sonnet 5.5.
 The orchestrator handles the mechanical phases; you produce the single semantic deliverable:
 does the implementation do what its plan *intended*, not merely what its tests assert?
 

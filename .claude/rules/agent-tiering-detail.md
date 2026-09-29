@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, flat-fan-out (nested sub-agent) rationale, boundary keys on task type, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), the measured evidence behind the offload-`/plan`-by-default rule, and per-tier prompt style. Fable approval gate moved to `agent-tiering-fable-gate.md`; bounded-checklist diff-triage rationale moved to `agent-tiering-bounded-checklist.md`. Attaches only on `.claude/agents/*.md`; elsewhere Read-on-demand, cited by name from the resident agent-tiering.md. Skills glob dropped 2026-09-17 on measured attach cost.
-last_verified: 2026-09-17
+last_verified: 2026-09-28
 paths:
   - ".claude/agents/*.md"
 ---
@@ -31,7 +31,7 @@ Each sub-agent costs ~17–23K tokens (system prompt + rules + memory, loaded be
 
 **This gives the "~50 lines" threshold below a measured basis.** ~50 lines of output lands right around the measured p50 of 194 tokens — roughly 90× cheaper than the 17–23K a spawn costs before it does any work. The figure stands exactly as written; it was an estimate and is now an estimate the data agrees with.
 
-**The fat-tail batching rule names *which* calls are worth a spawn at all** — not how few spawns to make. `agent-tiering.md` § Fat-tail delegation lets two fat calls per turn through and denies the 3rd, routing it and the rest into a `sonnet-4-6` spawn. It identifies the tail worth delegating (the 5.2% carrying 43.6% of the residue). **One spawn is the default there for a wall-clock reason, not a token one:** those calls are cheap to *run*, so serializing them in one agent costs almost no wall-clock. When a batched item is genuinely long-running and independent (a full Playwright run beside an unbounded log dump), fan out instead — § Fan out by independence.
+**The fat-tail batching rule names *which* calls are worth a spawn at all.** Not how few spawns to make. `agent-tiering.md` § Fat-tail delegation lets two fat calls per turn through and denies the 3rd, routing it and the rest into a `sonnet-5-5` spawn. It identifies the tail worth delegating (the 5.2% carrying 43.6% of the residue). **One spawn is the default for wall-clock, not token, reasons:** those calls are cheap to *run*, so serializing them in one agent costs almost no wall-clock. When a batched item is genuinely long-running and independent (a full Playwright run beside an unbounded log dump), fan out instead. See § Fan out by independence.
 
 **Read this as headroom, not as savings.** Break-even for this corpus is roughly 353 spawns; the same 139 sessions produced 135. We sit about 2.5× *below* break-even, so the finding is **unused delegation headroom** — room to route more of the fat tail through a sub-agent — not a token saving already banked and not cost pressure to relieve.
 
@@ -75,7 +75,7 @@ higher per-task capability score.
 
 ## Nested Sub-Agents — One Carve-Out, Otherwise Unused
 
-Sub-agents can spawn sub-agents — `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is **3** in `~/.claude/settings.json`, not the 5 this rule claimed — but we keep **flat fan-out**: the orchestrator session owns every fan-out and absorbs every agent's output. Do not nest in `/pr-review`, `/security-audit`, `/post-plan`, or automouse. **One carve-out, in `/plan` only:** `plan-architect` and `plan-architect-xhigh` may spawn at most **one** `Explore` for a question that surfaces mid-design (`.claude/skills/plan/_architect-contract.md` § Mid-design exploration). That subtree terminates — `Explore` denies `Agent` — so it adds a depth, not a tree. Every other in-repo def (`plan-architect-sonnet`, `sonnet-4-6`, `automouse-delegate`) and `~/.claude/agents/Explore.md` denies `Agent` outright, which is what keeps the carve-out a carve-out rather than a general loosening. Budget: ≤1 `Explore` per architect invocation, on top of the `/plan` Step-2 cap of 2 — run-wide ceiling **3**. Why — **the orchestrator owns triage**: the pipelines keep review/triage **in the orchestrator session** by design, whatever tier that session runs at (the review→score→filter step *is* triage — a coordinator would blind the orchestrator to the findings it filtered, and delegated judgment degrades — see `feedback_sonnet_proving_negatives`, `feedback_review_agent_full_diff`); and `/post-plan` is a single-context state machine whose Phase 3/5/6.5 gates read from main-session context, where nesting could only hide the filtered-out findings, not the survivor list the orchestrator still needs.
+Sub-agents can spawn sub-agents. `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is **3** in `~/.claude/settings.json` (the rule previously claimed 5). We keep **flat fan-out**: the orchestrator session owns every fan-out and absorbs every agent's output. Do not nest in `/pr-review`, `/security-audit`, `/post-plan`, or automouse. **One carve-out, in `/plan` only:** `plan-architect` and `plan-architect-xhigh` may spawn at most **one** `Explore` for a question that surfaces mid-design (`.claude/skills/plan/_architect-contract.md` § Mid-design exploration). That subtree terminates. `Explore` denies `Agent`, adding a depth rather than a tree. Every other in-repo def (`plan-architect-sonnet`, `sonnet-5-5`, `automouse-delegate`) and `~/.claude/agents/Explore.md` denies `Agent` outright, which is what keeps the carve-out a carve-out rather than a general loosening. Budget: ≤1 `Explore` per architect invocation, on top of the `/plan` Step-2 cap of 2. Run-wide ceiling: **3**. The orchestrator owns triage. The pipelines keep review/triage **in the orchestrator session** by design, whatever tier that session runs at. The review→score→filter step is triage itself. A coordinator would blind the orchestrator to the findings it filtered, and delegated judgment degrades. See `feedback_sonnet_proving_negatives`, `feedback_review_agent_full_diff`. `/post-plan` is a single-context state machine whose Phase 3/5/6.5 gates read from main-session context, where nesting could only hide the filtered-out findings. The survivor list is what the orchestrator still needs.
 
 **Depth, not width.** This constrains *nesting*, not how many agents one level runs at once — § Fan out by independence governs width and leaves this untouched. The old "our fan-out is narrow (1–4 agents/phase)" justification is dropped, not defended: width is now explicitly allowed. The load-bearing reason is orchestrator-owns-triage, which is width-independent.
 
@@ -119,11 +119,11 @@ Tier the orchestrator by the judgment **it** retains:
 
 ## Explore Agent Tiering
 
-Two actors spawn Explore in a `/plan` run: the orchestrator at Step 2 (≤2) and the Opus `plan-architect` defs mid-design (≤1 each). Tier per prompt — don't default all Explore agents to one tier. Explore itself is pinned to Sonnet 4.6 (see agent-tiering.md § Sonnet 4.6 pins); the choice below is Haiku-vs-Sonnet-4.6 for the Explore *task*.
+Two actors spawn Explore in a `/plan` run: the orchestrator at Step 2 (≤2) and the Opus `plan-architect` defs mid-design (≤1 each). Tier per prompt. Don't default all Explore agents to one tier. Explore itself is pinned to Sonnet 5.5 (see agent-tiering.md § Sonnet 5.5 pins); the choice below is Haiku-vs-Sonnet-5.5 for the Explore *task*.
 
 | Tier | Model param | Use for Explore | Examples |
 |------|-------------|-----------------|---------|
 | **Haiku** | `model: "haiku"` | Enumeration, single-file lookups, grep-and-list | "find all callers of getTeamByName", "does column X exist in migration Y" |
-| **Sonnet 4.6** | *omit `model`* | Multi-hop traces, cross-module synthesis, open-ended investigation | "trace the encoding pipeline from .plr read to Team page" |
+| **Sonnet 5.5** | *omit `model`* | Multi-hop traces, cross-module synthesis, open-ended investigation | "trace the encoding pipeline from .plr read to Team page" |
 
-**Heuristic:** notice connections / judge relevance / trace data flow → omit `model` (Sonnet 4.6). Answerable by grep + format → `model: "haiku"`.
+**Heuristic:** notice connections / judge relevance / trace data flow → omit `model` (Sonnet 5.5). Answerable by grep + format → `model: "haiku"`.

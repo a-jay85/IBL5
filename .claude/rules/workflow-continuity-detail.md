@@ -22,7 +22,7 @@ branch; it survives you closing Claude Code. Engine selection:
 - **Compiled post-plan harness** (`tools/postplan-harness`) when present — a
   deterministic sequencer with bounded LLM calls. `bin/post-plan-now` pins the MAIN-CHECKOUT
   copy, never the worktree's (ADR-0092).
-- **Fallback:** a fresh **Sonnet 4.6** `/post-plan` skill session, used if the harness
+- **Fallback:** a fresh **Sonnet 5.5** `/post-plan` skill session, used if the harness
   fails or is absent. `POST_PLAN_SKILL=1` forces the skill path.
 - **No partial resume.** The harness runs Phase 5.5's plan-intent review itself
   (`harness/fidelity.py`), posts the sticky `<!-- pr-ready-verdict -->` comment, and feeds the

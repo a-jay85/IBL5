@@ -1,15 +1,30 @@
-body {
-    color: #444;
-    margin: 0;
-    font: normal 14px/20px Arial, Helvetica, sans-serif;
+/* Token values copied from ibl5/design/input.css (@theme). Error pages must
+   render when the app is down, so they never link the compiled style.css and
+   carry their own copy. Update these by hand when those tokens change. */
+:root {
+    --color-gray-300: #d1d5db;
+    --color-gray-700: #374151;
+    --color-white: #ffffff;
+    --color-black: #000000;
+    --font-sans: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+html.full-height {
     height: 100%;
-    background-color: #fff;
+}
+
+body {
+    color: var(--color-gray-700);
+    margin: 0;
+    font: normal 14px/20px var(--font-sans);
+    height: 100%;
+    background-color: var(--color-white);
 }
 
 @media (prefers-color-scheme: dark) {
     body {
-        background-color: #000;
-        color: #ccc;
+        background-color: var(--color-black);
+        color: var(--color-gray-300);
     }
 }
 

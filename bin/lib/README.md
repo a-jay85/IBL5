@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-09-26
+last_verified: 2026-09-28
 ---
 
 # bin/lib — Shared Library Files
@@ -12,6 +12,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `automouse-escalate-model` | Resolve the automouse impl model for the current attempt, escalating to Opus on the final retry |
 | `automouse-reorder-router.php` | PHP router spawned by `bin/automouse/queue-reorder-ui`; serves the drag-and-drop queue reorder UI and applies reorders via `bin/automouse/queue reorder` |
 | `automouse-stream-filter.sh` | Filter for `claude -p --output-format stream-json` NDJSON; emits per-phase log lines (tool:/exit:/COMPACTION:) and maintains heartbeat |
+| `headless-elapsed-hook.sh` | PostToolUse hook that appends an elapsed-clock line (`elapsed <E>s / <B>s`) after every tool call in opt-in runs; activated by `IBL5_BUDGET_START_EPOCH` and `IBL5_BUDGET_SECS` set by `bin/automouse/run` on the impl invocation; exits 0 with no output in all other sessions |
 | `bug-pipeline-gh.sh` | Best-effort GitHub issue-tracking seam for the autonomous bug pipeline (§3f) |
 | `bug-pipeline-test-stubs.sh` | Shared stub scaffolding for `bin/test-bug-pipeline-*` harnesses |
 | `db-helpers.sh` | Shared database helper functions for Docker MariaDB interactions (password-warning suppression, exec wrappers, and `db_resolve_target` / `db_container_running` — the main-stack-vs-worktree-container routing used by `ibl5/bin/db-query`) |

@@ -783,6 +783,36 @@ G4_LEFT=$(notify_scan "$ROOT/.github/workflows" lines | grep -E $'\t(discord-id|
 [ -z "$G4_LEFT" ] && ok "G4: no discord-id/port/host/username in a notify block" \
     || fail "G4: removed inputs remain: $(tr '\n' ' ' <<< "$G4_LEFT")"
 
+# G5: a job that still runs ssh/scp must keep its setup-ssh step. Jobs split on
+# `^  <name>:$`; lines before the first header (file comments) belong to no job.
+ssh_scan() { # <wf-dir>: prints "<file>::<job>" for each job with ssh use but no setup-ssh
+    local f
+    for f in "$1"/*.yml; do
+        awk -v file="$(basename "$f")" '
+            function flush() {
+                if (job != "" && uses_ssh && !has_setup) print file "::" job
+            }
+            { sub(/\r$/, "") }
+            /^  [A-Za-z0-9_-]+:$/ { flush(); job = $0; sub(/^ +/, "", job); sub(/:$/, "", job); uses_ssh = 0; has_setup = 0; next }
+            /actions\/setup-ssh/ { has_setup = 1 }
+            /id_deploy|ssh -|scp -|--ssh-key/ { uses_ssh = 1 }
+            END { flush() }' "$f"
+    done | LC_ALL=C sort
+}
+G5_BAD=$(ssh_scan "$ROOT/.github/workflows")
+[ -z "$G5_BAD" ] && ok "G5: every job that runs ssh/scp keeps its setup-ssh step" \
+    || fail "G5: ssh/scp without setup-ssh in: $(tr '\n' ' ' <<< "$G5_BAD")"
+
+# G5 self-test: dropping main.yml's setup-ssh line must be flagged.
+rm -rf "$TMP/wf"; mkdir -p "$TMP/wf"; cp "$ROOT"/.github/workflows/*.yml "$TMP/wf/"
+perl -ni -e 'print unless m{uses: \./\.github/actions/setup-ssh}' "$TMP/wf/main.yml"
+G5_GOT=$(ssh_scan "$TMP/wf")
+[ -n "$G5_GOT" ] && ok "G5: a dropped setup-ssh step in main.yml is flagged" \
+    || fail "G5: a dropped setup-ssh step in main.yml went unnoticed"
+grep -qF -- "main.yml::build-and-deploy" <<< "$G5_GOT" \
+    && ok "G5: the flagged job is main.yml::build-and-deploy" \
+    || fail "G5: expected main.yml::build-and-deploy, got: $(tr '\n' ' ' <<< "$G5_GOT")"
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 printf '\n'
 if [ "$FAILS" -eq 0 ]; then

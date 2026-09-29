@@ -66,6 +66,23 @@ test.describe('Career Leaderboards flow', () => {
     await expect(page.locator('.ibl-data-table th.sorted-col').first()).toHaveText('PTS');
   });
 
+  test('names shorten only when the table is too wide for the page', async ({ page }) => {
+    const url = 'modules.php?name=Leaderboards&tab=career&phase=regular&submitted=1';
+    const names = page.locator('.ibl-data-table a[data-full-name]');
+    const countShortened = () => names.evaluateAll((links) =>
+      links.filter((a) => a.textContent?.trim() !== (a as HTMLElement).dataset.fullName).length);
+
+    await page.setViewportSize({ width: 2560, height: 900 });
+    await page.goto(url);
+    await expect(names.first()).toBeAttached();
+    expect(await countShortened()).toBe(0);
+
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await page.goto(url);
+    await expect(names.first()).toBeAttached();
+    await expect.poll(countShortened).toBeGreaterThan(0);
+  });
+
   test('selecting Rookie Game while on Averages falls back to Totals', async ({ page }) => {
     await page.locator('input[name="mode"][value="averages"]').check();
     await page.locator('select[name="phase"]').selectOption('sophomore');

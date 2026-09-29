@@ -78,8 +78,8 @@ define("_RSSPROBLEM", "Currently there is a problem with headlines from this sit
 define("_SELECTLANGUAGE", "Select Language");
 define("_SELECTGUILANG", "Select Interface Language:");
 define("_NONE", "None");
-define("_BLOCKPROBLEM", "<center>There is a problem right now with this block.</center>");
-define("_BLOCKPROBLEM2", "<center>There isn't content right now for this block.</center>");
+define("_BLOCKPROBLEM", "<div class=\"text-center\">There is a problem right now with this block.</div>");
+define("_BLOCKPROBLEM2", "<div class=\"text-center\">There isn't content right now for this block.</div>");
 define("_MODULENOTACTIVE", "Sorry, this Module isn't active!");
 define("_NOACTIVEMODULES", "Inactive Modules");
 define("_FORADMINTESTS", "(for Admin tests)");

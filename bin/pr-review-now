@@ -38,7 +38,7 @@ set -euo pipefail
 export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin"
 
 if [[ "${1:-}" = "--help" || "${1:-}" = "-h" ]]; then
-    sed -n '2,28p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '2,29p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
     exit 0
 fi
 
@@ -80,7 +80,7 @@ STOP_PRS=()
 TARGET_PR=""
 
 # --- flag parsing -----------------------------------------------------------------------
-usage() { sed -n '2,28p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,29p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in

@@ -14,7 +14,7 @@ Nine long-lived `com.ibl5.*` jobs run the league's unattended plumbing: `automou
 
 ## Decision
 
-`bin/launchd-health-check` compares `launchctl list` against the expected-job list in `bin/lib/launchd-expected-jobs.sh`, which is the single source that both the checker and `bin/test-launchd-health-check` read. It checks `bug-bot` for a non-empty PID and checks Docker Desktop plus the three main-stack containers. It exempts `sim-recap-poll` from the not-loaded check only when `bin/db-query` confirms `Current Season Phase` is something other than `Regular Season`. A failed phase query counts as Regular Season, so the alert fires. Problems go to `bin/discord-dm`, deduplicated to once per problem key per day through stamp files under the `launchd-health/logs/stamps/` dir. Stale one-shots are logged and never DM'd. `bin/launchd-health-cron-setup` (example) installs a `com.ibl5.launchd-health-login` plist that fires at load with `--startup-delay 180` and a `com.ibl5.launchd-health-daily` plist that fires at 08:45. Both harnesses run as steps in `.github/workflows/tests.yml`.
+`bin/launchd-health-check` compares `launchctl list` against the expected-job list in `bin/lib/launchd-expected-jobs.sh`, which is the single source that both the checker and `bin/test-launchd-health-check` read. It checks `bug-bot` for a non-empty PID and checks Docker Desktop plus the three main-stack containers. It exempts `sim-recap-poll` from the not-loaded check only when `bin/db-query` confirms `Current Season Phase` is something other than `Regular Season`. A failed phase query counts as Regular Season, so the alert fires. Problems go to `bin/discord-dm`, deduplicated to once per problem key per day through stamp files under the `launchd-health/logs/stamps/` dir. Stale one-shots are logged and never DM'd. `bin/launchd-health-cron-setup` installs a `com.ibl5.launchd-health-login` plist that fires at load with `--startup-delay 180` and a `com.ibl5.launchd-health-daily` plist that fires at 08:45. Both harnesses run as steps in `.github/workflows/tests.yml`.
 
 ## Alternatives Considered
 
@@ -31,8 +31,8 @@ Nine long-lived `com.ibl5.*` jobs run the league's unattended plumbing: `automou
 ## References
 
 - `bin/launchd-health-check` (the checker)
-- `bin/launchd-health-cron-setup` (example) (plist installer)
+- `bin/launchd-health-cron-setup` (plist installer)
 - `bin/lib/launchd-expected-jobs.sh` (single source of truth for expected jobs)
 - `bin/test-launchd-health-check` (stubbed harness)
-- `bin/test-launchd-health-cron-setup` (example) (plist-generation harness)
+- `bin/test-launchd-health-cron-setup` (plist-generation harness)
 - `.github/workflows/tests.yml` (CI wiring)

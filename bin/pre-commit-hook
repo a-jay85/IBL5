@@ -8,20 +8,11 @@
 # repo means the gate is editable from any worktree and travels with a clone,
 # instead of being a machine-local untracked hook one developer happens to have.
 #
-# Six independent blocks. Only the codebase-map regen is advisory; the rest fail the
-# commit. The first five are gated on what is staged; the ADR gate is scoped to this
+# Five independent blocks, all of which fail the commit. The first four are gated on what is staged; the ADR gate is scoped to this
 # branch's commits UNION the index, so it runs whenever origin/master resolves.
+# codebase-map.md is regenerated on master by the regen-codebase-map job in tests.yml, never here.
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-
-# Auto-regenerate codebase map when classes/ files are staged.
-# Never fails the commit — map freshness is a convenience, not a gate.
-if git diff --cached --name-only | grep -q '^ibl5/classes/.*\.php$'; then
-    if [ -x "$REPO_ROOT/bin/generate-codebase-map" ]; then
-        "$REPO_ROOT/bin/generate-codebase-map" 2>/dev/null
-        git add "$REPO_ROOT/.claude/rules/codebase-map.md" 2>/dev/null
-    fi
-fi
 
 # Enforce gofmt on staged Go files.
 staged_go=$(git diff --cached --name-only | grep '\.go$')

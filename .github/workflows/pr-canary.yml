@@ -19,6 +19,8 @@ on:
       - '.gitignore'
       - '**/.gitignore'
       - '.gitattributes'
+      - 'ibl5/phpstan-baseline-counts.json'
+      - 'ibl5/coverage-baseline.json'
   workflow_dispatch:
 
 permissions:

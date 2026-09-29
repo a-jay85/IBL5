@@ -170,7 +170,10 @@ def build_work_list(verdict_path: str,
     # is human work, and the item still holds arming through condition (3).
     for entry in (unresolved_conformance or []):
         text = str(entry)
-        if text.startswith("MISSING") and not text.startswith("MISSING-PHASE"):
+        # UNPLANNED-FILE / UNEXPLAINED-GAP clear through a PR-body bullet under
+        # `## Declared scope` / `## Plan gaps`, which the body-only round can write.
+        if (text.startswith("MISSING") and not text.startswith("MISSING-PHASE")) \
+                or text.startswith(("UNPLANNED-FILE:", "UNEXPLAINED-GAP:")):
             items.append({"hold": "3", "text": text})
     for fail in (meta_check_failures or []):
         items.append({"hold": "16",

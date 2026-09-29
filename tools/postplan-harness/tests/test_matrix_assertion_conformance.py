@@ -125,6 +125,8 @@ def test_empty_diff_body_skips_check(tmp_path, monkeypatch):
         raise AssertionError(f"script must not be called when diff_body is empty: {argv}")
 
     monkeypatch.setattr("harness.conformance.subprocess.run", _fail_if_called)
+    # The scope helper runs on every check(); this test guards only the matrix script.
+    monkeypatch.setattr("harness.conformance.scope_items", lambda *a, **k: [])
 
     # Use check() so we exercise the if diff_body: guard
     items = check(plan, [], diff_body="", pr_body="any")

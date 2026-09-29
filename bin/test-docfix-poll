@@ -575,8 +575,9 @@ bash -n "$REPO_ROOT/bin/docfix-poll" >/dev/null 2>&1 \
 shellcheck --severity=warning --shell=bash \
     "$REPO_ROOT/bin/docfix-poll" \
     "$REPO_ROOT/bin/docfix-run" \
+    "$REPO_ROOT/bin/lib/docfix-health.sh" \
     "$REPO_ROOT/bin/test-docfix-poll" >/dev/null 2>&1 \
-  && ok "(19b) shellcheck passes for docfix-poll, docfix-run, test-docfix-poll" \
+  && ok "(19b) shellcheck passes for docfix-poll, docfix-run, test-docfix-poll, lib/docfix-health.sh" \
   || bad "(19b) shellcheck failures"
 
 # Test 20: CLOSED+OPEN array order → OPEN wins (jq liveness-priority expression).

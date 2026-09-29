@@ -871,6 +871,97 @@ SHIM_GH_CALLS="$CALLS40" run_dm_compose "$SB" '12; rm -rf /' "$OUTF40" && DRC=0 
   && ok "(40) lib: non-numeric PR refused (rc 1, no gh call)" \
   || bad "(40) lib: non-numeric PR should be refused"
 
+# --- Cases H1-H8: bin/lib/docfix-health.sh -----------------------------------
+HEALTH_LIB="$REPO_ROOT/bin/lib/docfix-health.sh"
+
+# _hl <function> [args...]: run one lib function in a subshell (no set -e leak).
+_hl() {
+    (
+        # shellcheck source=bin/lib/docfix-health.sh
+        source "$HEALTH_LIB"
+        "$@"
+    )
+}
+
+# (H1) validate: only true+known-kind and false+empty-kind pass.
+H1OK=1
+_hl docfix_health_validate true never-ran 2>/dev/null || H1OK=0
+_hl docfix_health_validate false '' 2>/dev/null || H1OK=0
+_hl docfix_health_validate true '' 2>/dev/null && H1OK=0
+_hl docfix_health_validate false never-ran 2>/dev/null && H1OK=0
+_hl docfix_health_validate maybe '' 2>/dev/null && H1OK=0
+_hl docfix_health_validate true 'never-ran;x' 2>/dev/null && H1OK=0
+[ "$H1OK" -eq 1 ] \
+  && ok "(H1) health lib: validate accepts only valid alert/kind pairs" \
+  || bad "(H1) health lib: validate allow-list"
+
+# (H2) compose: 2 lines; heading names the kind; embedded newline collapsed.
+SBH="$(mktemp -d)"
+_hl docfix_health_compose never-ran $'part one\npart two' "$SBH/out2" && HRC=0 || HRC=$?
+{ [ "$HRC" -eq 0 ] && [ "$(grep -c '^' "$SBH/out2")" -eq 2 ] \
+    && sed -n 1p "$SBH/out2" | grep -qF '(never-ran)' \
+    && sed -n 2p "$SBH/out2" | grep -qF 'part one' \
+    && sed -n 2p "$SBH/out2" | grep -qF 'part two'; } \
+  && ok "(H2) health lib: compose writes 2 lines, kind in heading, detail collapsed" \
+  || bad "(H2) health lib: compose shape"
+
+# (H3) compose refusals: unknown kind, empty detail → rc 1, no out-file.
+_hl docfix_health_compose evil 'detail' "$SBH/out3a" && HRC3A=0 || HRC3A=$?
+_hl docfix_health_compose never-ran '' "$SBH/out3b" && HRC3B=0 || HRC3B=$?
+{ [ "$HRC3A" -eq 1 ] && [ ! -e "$SBH/out3a" ] && [ "$HRC3B" -eq 1 ] && [ ! -e "$SBH/out3b" ]; } \
+  && ok "(H3) health lib: compose refuses unknown kind and empty detail (rc 1, no out-file)" \
+  || bad "(H3) health lib: compose refusals"
+
+# (H4) compose truncates a 3000-char detail to at most 1500 chars.
+LONG="$(head -c 3000 /dev/zero | tr '\0' 'x')"
+_hl docfix_health_compose died "$LONG" "$SBH/out4" && HRC=0 || HRC=$?
+L2LEN="$(sed -n 2p "$SBH/out4" | tr -d '\n' | wc -c | tr -d ' ')"
+{ [ "$HRC" -eq 0 ] && [ "$L2LEN" -le 1500 ] && [ "$L2LEN" -gt 0 ]; } \
+  && ok "(H4) health lib: compose cuts detail to <=1500 chars" \
+  || bad "(H4) health lib: compose truncation (line 2 = $L2LEN chars)"
+
+# (H5) poll_detail: names both launchd logs and the newest run log; none when empty.
+RUNDIR="$SBH/runlogs"; mkdir -p "$RUNDIR"
+touch -t 202609270000 "$RUNDIR/docfix-run-a.log"
+touch -t 202609280000 "$RUNDIR/docfix-run-b.log"
+H5A="$(_hl docfix_health_poll_detail 'base detail' '/logs' "$RUNDIR")"; H5ARC=$?
+mkdir -p "$SBH/emptyrun"
+H5B="$(_hl docfix_health_poll_detail 'base detail' '/logs' "$SBH/emptyrun")"; H5BRC=$?
+{ [ "$H5ARC" -eq 0 ] && [ "$H5BRC" -eq 0 ] \
+    && printf '%s' "$H5A" | grep -qF '/logs/launchd-stdout.log' \
+    && printf '%s' "$H5A" | grep -qF '/logs/launchd-stderr.log' \
+    && printf '%s' "$H5A" | grep -qF 'docfix-run-b.log' \
+    && ! printf '%s' "$H5A" | grep -qF 'docfix-run-a.log' \
+    && printf '%s' "$H5B" | grep -qF 'Run log: none'; } \
+  && ok "(H5) health lib: poll_detail names launchd logs + newest run log; none when empty" \
+  || bad "(H5) health lib: poll_detail"
+
+# (H6) verdict boundaries.
+_epoch() { jq -rn --arg t "$1" '$t | fromdateiso8601'; }
+V6A="$(_hl docfix_health_heartbeat_verdict 2026-09-29T04:05:00Z "$(_epoch 2026-09-29T21:47:00Z)")"
+V6B="$(_hl docfix_health_heartbeat_verdict 2026-09-28T06:15:00Z "$(_epoch 2026-09-29T12:00:00Z)")"
+BASE6="$(_epoch 2026-09-28T00:00:00Z)"
+V6C="$(_hl docfix_health_heartbeat_verdict 2026-09-28T00:00:00Z $(( BASE6 + 86400 )))"
+V6D="$(_hl docfix_health_heartbeat_verdict 2026-09-28T00:00:00Z $(( BASE6 + 86399 )))"
+{ [ "$V6A" = "fresh 17" ] && [ "$V6B" = "stale 29" ] && [ "$V6C" = "stale 24" ] && [ "$V6D" = "fresh 23" ]; } \
+  && ok "(H6) health lib: verdict boundaries (fresh 17, stale 29, stale 24, fresh 23)" \
+  || bad "(H6) health lib: verdict got [$V6A] [$V6B] [$V6C] [$V6D]"
+
+# (H7) verdict prints none for empty / unparseable input and exits 0.
+V7A="$(_hl docfix_health_heartbeat_verdict '' 1000)"; V7ARC=$?
+V7B="$(_hl docfix_health_heartbeat_verdict 'not-a-date' 1000)"; V7BRC=$?
+{ [ "$V7A" = "none" ] && [ "$V7B" = "none" ] && [ "$V7ARC" -eq 0 ] && [ "$V7BRC" -eq 0 ]; } \
+  && ok "(H7) health lib: verdict none for empty/unparseable timestamp, exit 0" \
+  || bad "(H7) health lib: verdict none got [$V7A] [$V7B]"
+
+# (H8) empty-env source: the lib works under env -i with a minimal PATH.
+V8="$(env -i PATH="/usr/bin:/bin:$(dirname "$(command -v jq)")" REPO_ROOT="$REPO_ROOT" \
+    bash -c 'source "$REPO_ROOT/bin/lib/docfix-health.sh" && docfix_health_heartbeat_verdict "" 0')"; V8RC=$?
+{ [ "$V8" = "none" ] && [ "$V8RC" -eq 0 ]; } \
+  && ok "(H8) health lib: sources and runs under env -i (empty environment)" \
+  || bad "(H8) health lib: empty-env got [$V8]"
+rm -rf "$SBH"
+
 # --- Cases 41-47: bin/docfix-check-veronly boundaries ------------------------
 # Verification Matrix rows 11-14, 18, 19: the fail-open holes the predicate is
 # the sole defense against. Each asserts the verdict LINE, not just the exit

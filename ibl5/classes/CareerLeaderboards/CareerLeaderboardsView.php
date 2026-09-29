@@ -136,12 +136,12 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
 <table class="sortable ibl-data-table responsive-table">
     <thead>
         <tr>
-            <th class="sticky-col-1">Rank</th>
+            <th class="sticky-col-1">#</th>
             <th class="sticky-col-2">Name</th>
             <?php if ($this->showGames): ?>
-            <th<?= HtmlSanitizer::trusted($this->sortAttr('games')) ?>>Games</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('games')) ?>>G</th>
             <?php endif; ?>
-            <th<?= HtmlSanitizer::trusted($this->sortAttr('minutes')) ?>>Minutes</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('minutes')) ?>>MIN</th>
             <th<?= HtmlSanitizer::trusted($this->sortAttr('fgm')) ?>>FGM</th>
             <th<?= HtmlSanitizer::trusted($this->sortAttr('fga')) ?>>FGA</th>
             <th<?= HtmlSanitizer::trusted($this->sortAttr('fgp')) ?>>FG%</th>

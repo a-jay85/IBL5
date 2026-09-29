@@ -50,12 +50,12 @@ test.describe('Career Leaderboards flow', () => {
     const header = page.locator('.ibl-data-table thead th');
 
     await page.goto('modules.php?name=Leaderboards&tab=career&phase=regular&submitted=1');
-    await expect(header.filter({ hasText: /^Games$/ })).toHaveCount(1);
+    await expect(header.filter({ hasText: /^G$/ })).toHaveCount(1);
 
     for (const phase of ['rookie', 'sophomore']) {
       await page.goto(`modules.php?name=Leaderboards&tab=career&phase=${phase}&submitted=1`);
-      await expect(header.filter({ hasText: /^Minutes$/ })).toHaveCount(1);
-      await expect(header.filter({ hasText: /^Games$/ })).toHaveCount(0);
+      await expect(header.filter({ hasText: /^MIN$/ })).toHaveCount(1);
+      await expect(header.filter({ hasText: /^G$/ })).toHaveCount(0);
       await expect(page.locator('select[name="sortby"] option[value="GAMES"]')).toBeDisabled();
     }
   });

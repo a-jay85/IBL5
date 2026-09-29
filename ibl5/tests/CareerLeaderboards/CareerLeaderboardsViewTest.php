@@ -74,10 +74,10 @@ final class CareerLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('sortable', $html);
 
         // Check that all stat columns are present
-        $this->assertStringContainsString('>Rank<', $html);
+        $this->assertStringContainsString('>#<', $html);
         $this->assertStringContainsString('>Name<', $html);
-        $this->assertStringContainsString('>Games<', $html);
-        $this->assertStringContainsString('>Minutes<', $html);
+        $this->assertStringContainsString('>G<', $html);
+        $this->assertStringContainsString('>MIN<', $html);
         $this->assertStringContainsString('>FGM<', $html);
         $this->assertStringContainsString('>FGA<', $html);
         $this->assertStringContainsString('>FG%<', $html);
@@ -109,8 +109,8 @@ final class CareerLeaderboardsViewTest extends TestCase
         $header = $this->view->renderTableHeader();
         $row = $this->view->renderPlayerRow($stats, 1);
 
-        $this->assertStringNotContainsString('>Games<', $header);
-        $this->assertStringContainsString('>Minutes<', $header);
+        $this->assertStringNotContainsString('>G<', $header);
+        $this->assertStringContainsString('>MIN<', $header);
         $this->assertStringNotContainsString('777', $row);
         $this->assertSame(preg_match_all('/<th[ >]/', $header), preg_match_all('/<td[ >]/', $row));
     }

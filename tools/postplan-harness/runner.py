@@ -465,6 +465,13 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             res.findings = findings
             res.scored_findings = scored
             res.degraded_agents = degraded_agents
+            code_review_purposes = {"review-agent-a", "review-agent-b", "review-agent-d"}
+            expected_code = [p for p in ("review-agent-a", "review-agent-b", "review-agent-d")
+                             if gates.get({"review-agent-a": "A", "review-agent-b": "B",
+                                           "review-agent-d": "D"}[p])]
+            code_degraded = [p for p in degraded_agents if p in code_review_purposes]
+            res.phase4b_code_ran = bool(expected_code) and len(code_degraded) < len(expected_code)
+            res.phase4b_reviewed_head = meta.get("headRefOid") or ""
             state.checkpoint("review", res, review_gates=gates, reviewed_head=meta.get("headRefOid") or "")
             log(f"phase4 gates={ {k: v for k, v in gates.items()} } findings: raw={len(scored)} surviving={len(findings)} scores={[s['score'] for s in scored]}")
             if degraded_agents:
@@ -1800,8 +1807,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                   unresolved_conformance=(), meta_check_failures=(), scored_findings=()):
     """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
 
-    `before_remediation` runs once, just before the first remediation commit, so the
-    background Phase 4 review finishes before the head moves.
+    `before_remediation` runs once, before `build_packet()`, so Phase 4 results are
+    available when the fidelity packet is built. It is set to None after the call.
 
     Replay fixtures that carry no canned `plan-fidelity-review` keep the historical
     synthetic READY, so the pre-Phase-5.5 trace corpus stays green; a fixture opts into
@@ -1851,10 +1858,23 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "carried_forward": True}
         return carried, ""
     log(f"phase5.5 fidelity: review: full (carry-forward declined: {decline_reason})")
+    # Join Phase 4 before building the fidelity packet so phase4b_ran is truthful.
+    if before_remediation is not None:
+        before_remediation()
+        before_remediation = None  # prevent double-call in the NOT READY guard below
+    phase4b_ran = getattr(res, "phase4b_code_ran", False)
+    _reviewed_head = getattr(res, "phase4b_reviewed_head", "")
+    _findings = getattr(res, "findings", ()) or ()
+    _lines = [f"- {f.path}:{f.line} (score {f.score or 0}) -- {(f.body or '')[:160]}"
+              for f in _findings]
+    if _reviewed_head:
+        _lines.insert(0, f"reviewed_head: {_reviewed_head}")
+    review_findings = "\n".join(_lines)
     try:
         packet = fidelity.build_packet(
             out_dir, master_sha, reviewed_tree, plan, diff, body, pr,
-            phase4b_ran=False, worktree=worktree or ".")
+            phase4b_ran=phase4b_ran, worktree=worktree or ".",
+            review_findings=review_findings)
     except HarnessError as e:
         log(f"phase5.5 fidelity: packet failed ({e.kind}) - verdict indeterminate")
         res.fidelity = {"verdict_1": None, "error_kind": e.kind,
@@ -1883,8 +1903,6 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     rounds = []
     current_verdict_path = fidelity.verdict_path(pr)
     final_verdict, final_err = verdict, err
-    if final_verdict == "NOT READY" and before_remediation is not None:
-        before_remediation()
     for round_num in range(1, fidelity.MAX_FIDELITY_ROUNDS + 1):
         if final_verdict != "NOT READY":
             break

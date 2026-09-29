@@ -47,7 +47,7 @@ Read `.claude/review-shared/_plan-verification.md` and use its full content as `
 Tier per `.claude/rules/agent-tiering.md`:
 
 - Single-module change → 0 agents (direct tools suffice) or 1 Haiku for enumeration
-- Spans 2+ modules → up to 2 agents (Explore for cross-module traces — already pinned Sonnet 4.6, use `subagent_type: "Explore"` omit `model`; Haiku for file/grep lookups)
+- Spans 2+ modules → up to 2 agents (Explore for cross-module traces, already pinned Sonnet 5.5, use `subagent_type: "Explore"` omit `model`; Haiku for file/grep lookups)
 - Never spawn 3 agents — this cap governs **your** Step-2 fan-out only. The `plan-architect` you spawn at Step 3 carries its own separate budget (≤1 `Explore`, for a question that surfaces mid-design), so the run-wide ceiling is 3: 2 here + 1 there. Do not pre-spend the architect's spawn by fanning out wider here on its behalf.
 
 Provide each agent a single concrete question, pre-resolved paths, and a response cap (under 150 lines). An agent spawned purely for byte isolation must return **distilled pointers** (`path:line` + the load-bearing fact), not pasted file bodies — pasting the contents back defeats the isolation.
@@ -239,7 +239,7 @@ Launch a **single Plan agent** with a prompt containing ALL of the items listed 
    For a mechanical second opinion before you decide, run `bin/plan-tier-hint --desc "<task description>"` (add `--files a,b,c` when Step 2 named the files). It prints `xhigh`, `default`, or `sonnet` and exits 0; `--explain` prints the matching reason. **The hint is advisory — this checklist is authoritative and you own the final call.**
 
    If any trigger applies, stop here: the high-stakes escalation OUTRANKS the recipe-backed downgrade below, so a plan that is both high-stakes and recipe-backed goes to xhigh, never to Sonnet.
-2. **`plan-architect-sonnet` (`model: claude-sonnet-4-6`)** — otherwise, when **no** check-1 trigger applies **AND** the source task/backlog entry is *recipe-backed*: it carries an explicit recipe **plus** a named existing pattern to copy (the marker-swap / mechanical-sweep class). Composing a plan from a pre-resolved recipe is mechanical composition, not novel design, so the cheaper Sonnet architect suffices. Pass `subagent_type: "plan-architect-sonnet"` (exactly — it must byte-match the def's `name:`).
+2. **`plan-architect-sonnet` (`model: claude-sonnet-5-5`):** otherwise, when **no** check-1 trigger applies **AND** the source task/backlog entry is *recipe-backed*: it carries an explicit recipe **plus** a named existing pattern to copy (the marker-swap / mechanical-sweep class). Composing a plan from a pre-resolved recipe is mechanical composition, not novel design, so the cheaper Sonnet architect suffices. Pass `subagent_type: "plan-architect-sonnet"` (exactly; it must byte-match the def's `name:`).
 3. **`plan-architect` (`model: opus`, `effort: high`)** — the default when neither check 1 nor check 2 matches.
 
 For **every** tier, pass only the `subagent_type` and do **NOT** pass an inline `model` override — each def owns its own `model`/`effort`.
@@ -449,7 +449,7 @@ impl_model: sonnet
 ---
 ```
 
-The implementation then runs at Sonnet (cheaper, verified-equivalent quality on uniformly-mechanical plans). The `impl_model:` marker is parsed by `bin/lib/plan-impl-model`. For any plan carrying a `Truly-manual` or subjective row, declare an explicit `impl_model: opus` instead, with a one-line reason in the plan body. The full model ids `claude-opus-5-5`, `claude-sonnet-4-6` and `claude-haiku-4-5` are equally accepted alongside the bare `opus`/`sonnet`/`haiku` aliases. Only the first frontmatter block is parsed, so documenting this syntax inside a plan body never mis-selects a model. Failure modes are bounded: a garbled marker → gate `[13]` rejects it at plan time, and if one somehow reaches the runner the resolver exits nonzero and the plan is disposed to `skipped/` rather than guessed at, and gate `[13]` catches absence before the plan ships; a wrongly-applied `sonnet` marker → the plan's objective matrix goes red under Sonnet → caught by CI / post-plan.
+The implementation then runs at Sonnet (cheaper, verified-equivalent quality on uniformly-mechanical plans). The `impl_model:` marker is parsed by `bin/lib/plan-impl-model`. For any plan carrying a `Truly-manual` or subjective row, declare an explicit `impl_model: opus` instead, with a one-line reason in the plan body. The full model ids `claude-opus-5-5`, `claude-sonnet-5-5` (or legacy `claude-sonnet-4-6`) and `claude-haiku-4-5` are equally accepted alongside the bare `opus`/`sonnet`/`haiku` aliases. Only the first frontmatter block is parsed, so documenting this syntax inside a plan body never mis-selects a model. Failure modes are bounded: a garbled marker → gate `[13]` rejects it at plan time, and if one somehow reaches the runner the resolver exits nonzero and the plan is disposed to `skipped/` rather than guessed at, and gate `[13]` catches absence before the plan ships; a wrongly-applied `sonnet` marker → the plan's objective matrix goes red under Sonnet → caught by CI / post-plan.
 
 ### Holding auto-merge (optional)
 

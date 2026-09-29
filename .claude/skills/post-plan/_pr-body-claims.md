@@ -1,6 +1,6 @@
 ---
 description: "PR body authoring rules: version/baseline citations must name their source file; negative-claim bullets must be re-read after every commit; backlog closing keywords come from the plan via the shared normalizer snippet."
-last_verified: 2026-09-25
+last_verified: 2026-09-28
 ---
 
 # PR Body Claims
@@ -126,7 +126,7 @@ A `## Declared scope` section lists `.claude/` paths this PR edits on purpose th
 ## Declared scope
 
 - `.claude/rules/doc-freshness.md` (frontmatter bump forced by the on-touch rule)
-- `.claude/agents/sonnet-4-6.md` (tool list corrected while adjacent)
+- `.claude/agents/sonnet-5-5.md` (tool list corrected while adjacent)
 ```
 
 The extraction is section-bounded. It starts at the `## Declared scope` heading and stops at the next `## ` heading, so a `.claude/` path mentioned elsewhere in the PR body dismisses nothing. Write a reason on each bullet for the reviewer; the check reads only the path.

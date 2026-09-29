@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# bin/plan-now — fire a detached headless Sonnet 4.6 session that RUNS a drafted
+# bin/plan-now — fire a detached headless Sonnet 5.5 session that RUNS a drafted
 # /plan handoff prompt, replacing the manual "paste this into a fresh session" step
 # at the end of the /plan-prompt skill.
 #
@@ -9,7 +9,7 @@
 #                                           #   run exits clean AND check-plan passes
 #   bin/plan-now --implement <prompt-file>  # ... but leave the plan on disk, unqueued
 #   bin/plan-now --queue <prompt-file>      # explicit form of the default
-#   bin/plan-now --model opus <prompt-file> # orchestrator model (default claude-sonnet-4-6)
+#   bin/plan-now --model opus <prompt-file> # orchestrator model (default claude-sonnet-5-5)
 #   bin/plan-now --no-dm <prompt-file>      # ... and skip the finish DM
 #   bin/plan-now --tier-ok "reason" ...     # suppress the tier mismatch gate with a reason
 #   bin/plan-now --resume <run-id>          # continue a FAILED run's own claude session
@@ -60,7 +60,7 @@
 #     `nohup … &` fired from Claude Code's Bash tool shares the tool-shell's
 #     process group and dies with it, so launchd is load-bearing here too.
 #   - headless /plan: the invocation bin/bug-pipeline-tick drive_ready_for_plan()
-#     already runs in production (claude -p "/plan …" --model claude-sonnet-4-6
+#     already runs in production (claude -p "/plan …" --model claude-sonnet-5-5
 #     --dangerously-skip-permissions).
 #
 # The run IDENTIFIES ITS OWN PLAN: the coda tells it to end its FINAL message with
@@ -117,7 +117,7 @@ set -euo pipefail
 # value's rationale live at the timeout call site.
 RUN_TIMEOUT=10800
 
-MODEL="claude-sonnet-4-6"
+MODEL="claude-sonnet-5-5"
 DISPOSITION="queue"
 NOTIFY=1
 PROMPT_SRC=""

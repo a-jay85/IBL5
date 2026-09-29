@@ -743,12 +743,12 @@ assert "gate13-manual-explicit-opus-ok" 0 '---
 impl_model: opus
 ---'"$M_MANUAL"
 
-# (g) Full-id claude-sonnet-4-6 with a Truly-manual row is forbidden (exit 1) —
+# (g) Full-id claude-sonnet-5-5 with a Truly-manual row is forbidden (exit 1) —
 # regression pin for the closed hole: previously the full-id form slipped past a
 # literal `[ "$RAW" = "sonnet" ]` guard and ran as an opus-tier fallback.
 _f="$TMP/gate13-sonnet46-manual.md"
 printf '%s\n' '---
-impl_model: claude-sonnet-4-6
+impl_model: claude-sonnet-5-5
 ---'"$M_MANUAL" > "$_f"
 "$GUARD" "$_f" >/dev/null 2>&1; _ec=$?
 if [ "$_ec" -eq 0 ]; then
@@ -756,10 +756,10 @@ if [ "$_ec" -eq 0 ]; then
 else
     echo "ok: gate13-sonnet46-manual (exit $_ec)"
 fi
-if "$GUARD" "$_f" 2>&1 | grep -qF 'Truly-manual row forbids impl_model: claude-sonnet-4-6'; then
+if "$GUARD" "$_f" 2>&1 | grep -qF 'Truly-manual row forbids impl_model: claude-sonnet-5-5'; then
     echo "ok: gate13-sonnet46-manual (substring confirmed)"
 else
-    echo "FAIL: gate13-sonnet46-manual — expected 'Truly-manual row forbids impl_model: claude-sonnet-4-6'"; FAILED=1
+    echo "FAIL: gate13-sonnet46-manual — expected 'Truly-manual row forbids impl_model: claude-sonnet-5-5'"; FAILED=1
 fi
 
 # (h) Full-id claude-haiku-4-5 with a Truly-manual row is forbidden (exit 1).
@@ -991,7 +991,7 @@ _gT_body='
 
 Do the mechanical thing.
 '
-for _gT_pair in "opus:claude-opus-5-5" "sonnet:claude-sonnet-4-6" "haiku:claude-haiku-4-5"; do
+for _gT_pair in "opus:claude-opus-5-5" "sonnet:claude-sonnet-5-5" "haiku:claude-haiku-4-5"; do
     _gT_bare="${_gT_pair%%:*}"; _gT_full="${_gT_pair##*:}"
     _fb="$TMP/gateT-alias-${_gT_bare}.md"
     _ff="$TMP/gateT-alias-${_gT_full}.md"

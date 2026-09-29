@@ -51,20 +51,17 @@ Each implementation phase that changes behavior must have a corresponding row (o
 
 ### Visual-regression rows that expect no baseline change
 
-A Visual-regression row can plan an untouched baseline. A CSS refactor whose pass condition is that every screenshot under the smoke snapshots directory stays byte-identical is the live case (backlog#1222). The post-plan harness reads the backticked test token of every PHPUnit, API-test, E2E and Visual-regression row as a file the diff must touch, so such a row would hold arming condition (3) with `MISSING:` forever. Mark it `(no-change)` directly after the token's closing backtick:
+The post-plan harness treats each test row's backticked token as a file the diff must touch. A row planning an untouched baseline (backlog#1222) would hold arming condition (3) with `MISSING:` forever. Mark it `(no-change)` right after the token's closing backtick:
 
 ```
 | 4 | CSS split leaves every smoke baseline byte-identical | Visual-regression | post-impl | `ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots` (no-change) |
 ```
 
-Rules the harness applies (`parse_no_change_test_paths` in `tools/postplan-harness/harness/planfile.py`):
+Harness rules (`parse_no_change_test_paths` in `tools/postplan-harness/harness/planfile.py`):
 
-- Honored only on a row with a cell whose whole text reads `Visual-regression`. On a PHPUnit, API-test or E2E row a `(no-change)` marker is ignored and the row keeps planning its test. `bin/check-plan` gate `[X]` rejects that shape at authoring time, and it also rejects a marker that is anywhere other than directly after the token.
-- Exempts only that row's own token. Every other planned test in the matrix is still checked.
-- When any other row plans the same token without the marker, the unmarked row wins and the token stays `MISSING:` until the diff touches it.
-- Fenced examples never count, the same as for every other matrix parser.
-
-Use it only when the planned outcome is that the file does not change. A test the diff should write never carries it.
+- Honored only on a row with a cell reading exactly `Visual-regression`. Elsewhere the marker is ignored. `bin/check-plan` gate `[X]` rejects it on other row types and anywhere but directly after the token.
+- Exempts only that row's token. If another row plans the same token unmarked, the unmarked row wins.
+- Fenced examples never count.
 
 ### Pre-prod exercise paths
 

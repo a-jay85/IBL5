@@ -1,0 +1,343 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-merge-line-select — regression harness for bin/merge-line-select and
+# the two workflows that call it (update-behind-prs.yml, pr-canary.yml).
+#
+# Every decision rule runs against synthetic GraphQL snapshots piped in on
+# --input. The live-GraphQL path runs against a stub gh (GH_CMD / PATH). No
+# network, no credentials. One recorded real snapshot (bin/fixtures/merge-line/)
+# guards the query/response shape.
+#
+# Run: bin/test-merge-line-select  (exit 0 = all pass, exit 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SEL="$SCRIPT_DIR/merge-line-select"
+FIXTURES="$SCRIPT_DIR/fixtures/merge-line"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+# Herestrings, not printf|grep: no SIGPIPE under pipefail (shell-pipefail-grep rule).
+assert_match() {
+    if grep -qE -- "$2" <<< "$3"; then
+        pass "$1"
+    else
+        failcase "$1 — expected to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    fi
+}
+
+assert_absent() {
+    if grep -qE -- "$2" <<< "$3"; then
+        failcase "$1 — expected NOT to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    else
+        pass "$1"
+    fi
+}
+
+assert_eq() {
+    if [ "$2" = "$3" ]; then
+        pass "$1"
+    else
+        failcase "$1 — expected '$3', got '$2'"
+    fi
+}
+
+# --- Snapshot builders ---
+
+# cr <name> <status> <conclusion|null> — one CheckRun context.
+cr() {
+    jq -cn --arg name "$1" --arg status "$2" --arg concl "$3" \
+        '{__typename:"CheckRun", name:$name, status:$status,
+          conclusion:(if $concl == "null" then null else $concl end)}'
+}
+
+# sc <context> <state> — one StatusContext.
+sc() {
+    jq -cn --arg context "$1" --arg state "$2" \
+        '{__typename:"StatusContext", context:$context, state:$state}'
+}
+
+# ctxs <context-json>... — wrap contexts into a JSON array.
+ctxs() {
+    if [ $# -eq 0 ]; then
+        echo '[]'
+    else
+        printf '%s\n' "$@" | jq -cs '.'
+    fi
+}
+
+# pr_node <number> <draft:true|false> <base> <enabledAt|null> <mergeStateStatus> <mergeable> <contexts-json>
+pr_node() {
+    jq -cn --argjson number "$1" --argjson draft "$2" --arg base "$3" --arg en "$4" \
+        --arg mss "$5" --arg mg "$6" --argjson ctx "$7" '
+        { number: $number, isDraft: $draft, baseRefName: $base, headRefOid: "abc123",
+          mergeable: $mg, mergeStateStatus: $mss,
+          autoMergeRequest: (if $en == "null" then null else {enabledAt: $en} end),
+          commits: {nodes: [{commit: {oid: "abc123",
+            statusCheckRollup: {state: "PENDING", contexts: {nodes: $ctx}}}}]} }'
+}
+
+# snapshot <node-json>... — wrap nodes into the pullRequests GraphQL response.
+snapshot() {
+    if [ $# -eq 0 ]; then
+        echo '[]'
+    else
+        printf '%s\n' "$@" | jq -cs '.'
+    fi | jq -c '{data:{repository:{pullRequests:{pageInfo:{hasNextPage:false},nodes:.}}}}'
+}
+
+T6="2026-01-01T06:00:00Z"
+T7="2026-01-01T07:00:00Z"
+T8="2026-01-01T08:00:00Z"
+NOCTX="$(ctxs)"
+
+# run_sel <snapshot-json> [flags...] — sets OUT (stdout), ERR (stderr), RC.
+run_sel() {
+    local snap="$1"
+    shift
+    OUT=$(printf '%s' "$snap" | "$SEL" --input - "$@" 2>"$TMP/err")
+    RC=$?
+    ERR=$(cat "$TMP/err")
+}
+
+# --- C: head-of-line selection ---
+
+run_sel "$(snapshot \
+    "$(pr_node 10 false master "$T7" BEHIND MERGEABLE "$NOCTX")" \
+    "$(pr_node 20 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "C1-fifo-pick" '^head=20$' "$OUT"
+assert_match "C1-fifo-pick action" '^action=update$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(pr_node 12 false master "$T6" BEHIND MERGEABLE "$NOCTX")" \
+    "$(pr_node 11 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "C2-tie-break" '^head=11$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(pr_node 1 false master "$T6" DIRTY CONFLICTING "$NOCTX")" \
+    "$(pr_node 2 false master "$T7" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "C3-skip-dirty head" '^head=2$' "$OUT"
+assert_match "C3-skip-dirty skipped" '^skipped=1:dirty$' "$OUT"
+run_sel "$(snapshot \
+    "$(pr_node 1 false master "$T6" UNKNOWN CONFLICTING "$NOCTX")" \
+    "$(pr_node 2 false master "$T7" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "C3-skip-dirty variant UNKNOWN+CONFLICTING head" '^head=2$' "$OUT"
+assert_match "C3-skip-dirty variant UNKNOWN+CONFLICTING skipped" '^skipped=1:dirty$' "$OUT"
+
+for red_ctx in \
+    "$(cr 'Tests and Analysis' COMPLETED FAILURE)" \
+    "$(cr 'E2E Tests' COMPLETED TIMED_OUT)" \
+    "$(sc human-signoff ERROR)"; do
+    run_sel "$(snapshot \
+        "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$(ctxs "$red_ctx")")" \
+        "$(pr_node 2 false master "$T7" BEHIND MERGEABLE "$NOCTX")")"
+    assert_match "C4-skip-red head ($red_ctx)" '^head=2$' "$OUT"
+    assert_match "C4-skip-red skipped ($red_ctx)" '^skipped=1:red$' "$OUT"
+done
+
+run_sel "$(snapshot \
+    "$(pr_node 1 false master "$T6" DIRTY CONFLICTING "$NOCTX")" \
+    "$(pr_node 2 false master "$T7" BEHIND MERGEABLE "$(ctxs "$(cr 'Meta checks' COMPLETED FAILURE)")")" \
+    "$(pr_node 3 false master "$T8" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "C5-advance-past-skips head" '^head=3$' "$OUT"
+assert_match "C5-advance-past-skips action" '^action=update$' "$OUT"
+assert_match "C5-advance-past-skips skipped" '^skipped=1:dirty 2:red$' "$OUT"
+assert_match "C5-advance-past-skips clear" '^clear=3$' "$OUT"
+C5_SNAP="$(snapshot \
+    "$(pr_node 1 false master "$T6" DIRTY CONFLICTING "$NOCTX")" \
+    "$(pr_node 2 false master "$T7" BEHIND MERGEABLE "$(ctxs "$(cr 'Meta checks' COMPLETED FAILURE)")")" \
+    "$(pr_node 3 false master "$T8" BEHIND MERGEABLE "$NOCTX")")"
+printf '%s' "$C5_SNAP" > "$TMP/c5.json"
+
+run_sel "$(snapshot)"
+assert_match "C6-empty-queue queue_len" '^queue_len=0$' "$OUT"
+assert_match "C6-empty-queue head" '^head=$' "$OUT"
+assert_match "C6-empty-queue action" '^action=none$' "$OUT"
+run_sel "$(snapshot "$(pr_node 1 false master null BEHIND MERGEABLE "$NOCTX")")"
+assert_match "C6-empty-queue variant unarmed-only queue_len" '^queue_len=0$' "$OUT"
+assert_match "C6-empty-queue variant unarmed-only action" '^action=none$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(pr_node 1 false master "$T6" UNKNOWN MERGEABLE "$NOCTX")" \
+    "$(pr_node 2 false master "$T7" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "C7-unknown-holds head" '^head=1$' "$OUT"
+assert_match "C7-unknown-holds action" '^action=unknown$' "$OUT"
+assert_absent "C7-unknown-holds never advances" '^head=2$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(pr_node 1 false master "$T6" BLOCKED MERGEABLE "$NOCTX")" \
+    "$(pr_node 2 false master "$T7" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "C8-wait-holds head" '^head=1$' "$OUT"
+assert_match "C8-wait-holds action" '^action=wait$' "$OUT"
+
+# --- N: negative cases ---
+
+run_sel "$(snapshot "$(pr_node 1 false master "$T6" BEHIND MERGEABLE \
+    "$(ctxs "$(cr 'PR Fast-Canary' COMPLETED FAILURE)" "$(cr 'Tests and Analysis' COMPLETED SUCCESS)")")")"
+assert_match "N1-nonrequired-red head" '^head=1$' "$OUT"
+assert_match "N1-nonrequired-red action" '^action=update$' "$OUT"
+assert_match "N1-nonrequired-red skipped empty" '^skipped=$' "$OUT"
+
+for pending_ctx in \
+    "$(cr 'Tests and Analysis' IN_PROGRESS null)" \
+    "$(cr 'E2E Tests' COMPLETED CANCELLED)" \
+    "$(sc 'Meta checks' PENDING)"; do
+    run_sel "$(snapshot "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$(ctxs "$pending_ctx")")")"
+    assert_match "N2-pending-not-red head ($pending_ctx)" '^head=1$' "$OUT"
+    assert_match "N2-pending-not-red skipped empty ($pending_ctx)" '^skipped=$' "$OUT"
+done
+
+N3_SNAP="$(snapshot \
+    "$(pr_node 1 true master "$T6" BEHIND MERGEABLE "$NOCTX")" \
+    "$(pr_node 2 false feature-x "$T7" BEHIND MERGEABLE "$NOCTX")" \
+    "$(pr_node 3 false master "$T8" BEHIND MERGEABLE "$NOCTX")")"
+run_sel "$N3_SNAP"
+assert_match "N3-draft-base-excluded queue_len" '^queue_len=1$' "$OUT"
+assert_match "N3-draft-base-excluded head" '^head=3$' "$OUT"
+run_sel "$N3_SNAP" --list
+assert_eq "N3-draft-base-excluded --list" "$OUT" "[3]"
+
+run_sel "$(snapshot \
+    "$(pr_node 1 false master null BEHIND MERGEABLE "$NOCTX")" \
+    "$(pr_node 2 false master "$T7" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "N4-unarmed-excluded queue_len" '^queue_len=1$' "$OUT"
+assert_match "N4-unarmed-excluded head" '^head=2$' "$OUT"
+
+# --- F: flag parsing ---
+
+run_sel "$C5_SNAP" --bogus
+assert_eq "F1-unknown-flag exit" "$RC" "2"
+assert_match "F1-unknown-flag message" 'unknown flag: --bogus' "$ERR"
+
+f2_check() {
+    local label="$1"
+    shift
+    OUT=$("$SEL" "$@" 2>/dev/null </dev/null)
+    RC=$?
+    if [ "$RC" = 2 ] && [ -z "$OUT" ]; then
+        pass "F2-usage-errors: $label"
+    else
+        failcase "F2-usage-errors: $label — exit=$RC stdout='$OUT'"
+    fi
+}
+f2_check "--input with --live" --input - --live --repo a-jay85/IBL5
+f2_check "no source"
+f2_check "--live without --repo" --live
+f2_check "--list with --pr" --input - --list --pr 1
+f2_check "--pr not a number" --input - --pr abc
+f2_check "--input missing value" --input
+
+# --- P: --pr mode ---
+
+P1_SNAP="$(snapshot \
+    "$(pr_node 1 false master "$T6" DIRTY CONFLICTING "$NOCTX")" \
+    "$(pr_node 2 false master null BEHIND MERGEABLE "$(ctxs "$(cr 'Tests and Analysis' COMPLETED FAILURE)")")")"
+run_sel "$P1_SNAP" --pr 2
+assert_match "P1-pr-mode unarmed red head" '^head=2$' "$OUT"
+assert_match "P1-pr-mode unarmed red action" '^action=update$' "$OUT"
+run_sel "$P1_SNAP" --pr 1
+assert_match "P1-pr-mode dirty action" '^action=none$' "$OUT"
+assert_match "P1-pr-mode dirty skipped" '^skipped=1:dirty$' "$OUT"
+run_sel "$P1_SNAP" --pr 99
+assert_eq "P1-pr-mode absent exit" "$RC" "1"
+assert_match "P1-pr-mode absent message" 'is not open against master' "$ERR"
+
+# --- L: --list and --summary ---
+
+run_sel "$C5_SNAP" --list
+assert_eq "L1-list-and-summary --list" "$OUT" "[1,2,3]"
+run_sel "$C5_SNAP" --dry-run --summary "$TMP/s.md"
+SUMMARY_TEXT=$(cat "$TMP/s.md")
+assert_match "L1-list-and-summary dry-run banner" 'Dry run: no branch updated' "$SUMMARY_TEXT"
+assert_match "L1-list-and-summary dirty reason" 'Skipped #1: merge conflict with master' "$SUMMARY_TEXT"
+assert_match "L1-list-and-summary red reason" 'Skipped #2: required check failing on current head' "$SUMMARY_TEXT"
+assert_match "L1-list-and-summary stdout dry_run" '^dry_run=true$' "$OUT"
+
+# --- E: GH_CMD seam ---
+
+STUBBIN="$TMP/stubbin"
+mkdir -p "$STUBBIN"
+cat > "$STUBBIN/gh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$GH_ARGV_LOG"
+cat "$GH_SNAPSHOT_FILE"
+STUB
+chmod +x "$STUBBIN/gh"
+cat > "$TMP/failgh" <<'STUB'
+#!/usr/bin/env bash
+exit 1
+STUB
+chmod +x "$TMP/failgh"
+GH_ARGV_LOG="$TMP/argv.log"
+GH_SNAPSHOT_FILE="$TMP/c5.json"
+export GH_ARGV_LOG GH_SNAPSHOT_FILE
+
+: > "$GH_ARGV_LOG"
+OUT=$(env -u GH_CMD PATH="$STUBBIN:$PATH" "$SEL" --live --repo a-jay85/IBL5 2>/dev/null)
+assert_match "E1-gh-cmd-env unset reaches PATH gh" '^head=3$' "$OUT"
+ARGV=$(cat "$GH_ARGV_LOG")
+assert_match "E1-gh-cmd-env unset argv graphql" 'graphql' "$ARGV"
+assert_match "E1-gh-cmd-env unset argv owner" 'owner=a-jay85' "$ARGV"
+: > "$GH_ARGV_LOG"
+OUT=$(GH_CMD='' PATH="$STUBBIN:$PATH" "$SEL" --live --repo a-jay85/IBL5 2>/dev/null)
+assert_match "E1-gh-cmd-env empty reaches PATH gh" '^head=3$' "$OUT"
+ARGV=$(cat "$GH_ARGV_LOG")
+assert_match "E1-gh-cmd-env empty argv graphql" 'graphql' "$ARGV"
+assert_match "E1-gh-cmd-env empty argv owner" 'owner=a-jay85' "$ARGV"
+OUT=$(GH_CMD="$TMP/failgh" "$SEL" --live --repo a-jay85/IBL5 2>"$TMP/err")
+RC=$?
+ERR=$(cat "$TMP/err")
+assert_eq "E1-gh-cmd-env failing exit" "$RC" "1"
+assert_match "E1-gh-cmd-env failing message" 'GraphQL fetch failed' "$ERR"
+
+# --- R: snapshot validation and record-and-replay ---
+
+r1_check() {
+    local label="$1" body="$2"
+    OUT=$(printf '%s' "$body" | "$SEL" --input - 2>"$TMP/err")
+    RC=$?
+    ERR=$(cat "$TMP/err")
+    if [ "$RC" = 1 ] && grep -q 'is not a pullRequests GraphQL response' <<< "$ERR"; then
+        pass "R1-bad-snapshot: $label"
+    else
+        failcase "R1-bad-snapshot: $label — exit=$RC stderr='$ERR'"
+    fi
+}
+r1_check "empty object" '{}'
+r1_check "graphql errors" '{"errors":[{"message":"x"}],"data":null}'
+r1_check "non-JSON" 'this is not json'
+
+OUT=$("$SEL" --input "$FIXTURES/live-snapshot.json" 2>/dev/null)
+if [ "$OUT" = "$(cat "$FIXTURES/live-snapshot.expected")" ]; then
+    pass "R2-live-replay"
+else
+    failcase "R2-live-replay — output differs from live-snapshot.expected"
+    diff <(printf '%s\n' "$OUT") "$FIXTURES/live-snapshot.expected" | sed 's/^/    /'
+fi
+
+# --- G17: empty environment, strict mode, macOS system bash ---
+
+OUT=$(cd "$REPO_ROOT" && env -i PATH=/usr/bin:/bin /bin/bash -c \
+    'set -euo pipefail; bin/merge-line-select --input - < bin/fixtures/merge-line/live-snapshot.json' 2>&1)
+RC=$?
+if [ "$RC" = 0 ] && grep -q '^action=' <<< "$OUT"; then
+    pass "G17-empty-env"
+else
+    failcase "G17-empty-env — exit=$RC"
+    printf '%s\n' "$OUT" | sed 's/^/    /'
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+    exit 1
+fi
+exit 0

@@ -1059,6 +1059,9 @@ jobs:
         run: bin/test-playwright-version
       - name: bin/test-pr-canary-check
         run: bin/test-pr-canary-check
+
+      - name: bin/test-merge-line-select
+        run: bin/test-merge-line-select
       - name: bin/test-check-workflow-checkout
         run: bin/test-check-workflow-checkout
       - name: bin/test-check-composite-contracts

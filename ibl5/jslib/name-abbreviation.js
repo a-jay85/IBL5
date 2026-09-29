@@ -310,6 +310,13 @@
         processTeamNames();
         processScheduleTeamNames();
         processLeaderRunnerNames();
+
+        // Shorter names shrink the table, so resize its scroll box to match;
+        // otherwise the box keeps its old width and the right-edge shadow
+        // floats past the table
+        if (typeof window.IBL_refreshResponsiveTables === 'function') {
+            window.IBL_refreshResponsiveTables();
+        }
     }
 
     // Debounce resize handling

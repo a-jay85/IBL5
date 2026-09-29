@@ -86,7 +86,7 @@ function negotiate($playerID)
     $userTeamName = $commonRepository->getTeamnameFromUsername($authService->getUsername() ?? '');
     if ($userTeamName === null) {
         echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::safeHtmlOutput('You do not have a team assigned.') . '</div>';
-        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
+        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary mt-2 inline-block">Go Back</a>';
         PageLayout\PageLayout::footer();
         return;
     }
@@ -129,7 +129,7 @@ function rookieoption($pid)
     $userTeamName = $commonRepository->getTeamnameFromUsername($authService->getUsername() ?? '');
     if ($userTeamName === null) {
         echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::safeHtmlOutput('You do not have a team assigned.') . '</div>';
-        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
+        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary mt-2 inline-block">Go Back</a>';
         PageLayout\PageLayout::footer();
         return;
     }
@@ -138,7 +138,7 @@ function rookieoption($pid)
     $ownershipValidation = $validator->validatePlayerOwnership($player, $userTeamName);
     if (!$ownershipValidation->isValid()) {
         echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::safeHtmlOutput($ownershipValidation->getError()) . '</div>';
-        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
+        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary mt-2 inline-block">Go Back</a>';
         PageLayout\PageLayout::footer();
         return;
     }
@@ -147,7 +147,7 @@ function rookieoption($pid)
     $eligibilityValidation = $validator->validateEligibilityAndGetSalary($player, $season->phase);
     if (!$eligibilityValidation['valid']) {
         echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::safeHtmlOutput($eligibilityValidation['error']) . '</div>';
-        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
+        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary mt-2 inline-block">Go Back</a>';
         PageLayout\PageLayout::footer();
         return;
     }
@@ -269,7 +269,7 @@ switch ($pa) {
         // body fails Lighthouse with NO_FCP. Render page chrome with a notice.
         PageLayout\PageLayout::header();
         echo '<div class="ibl-alert ibl-alert--info">No player selected. Choose a player from a roster, leaderboard, or search to view their archives.</div>';
-        echo '<a href="index.php" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Return to Home</a>';
+        echo '<a href="index.php" class="ibl-btn ibl-btn--primary mt-2 inline-block">Return to Home</a>';
         PageLayout\PageLayout::footer();
         break;
 }

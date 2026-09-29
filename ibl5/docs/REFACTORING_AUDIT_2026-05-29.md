@@ -1,11 +1,11 @@
 ---
 description: Ranked refactoring audit of ibl5/classes — dead code, duplication, ADR-boundary findings (2026-05-29).
-last_verified: 2026-07-29
+last_verified: 2026-09-29
 ---
 
 # Refactoring Audit — `ibl5/classes/` (2026-05-29)
 
-Audited all 84 modules / ~99K LOC *(88 modules as of 2026-07-29)*. Findings respect ADR-0001 (Repo/Service/View),
+Audited all 84 modules / ~99K LOC *(90 modules as of 2026-09-29)*. Findings respect ADR-0001 (Repo/Service/View),
 ADR-0026 (hot files advisory — **size alone is not a finding**), ADR-0028 (no generic
 Services/Shared buckets), ADR-0014 (centralized contract formulas).
 
@@ -46,7 +46,7 @@ Read-direction CP1252→UTF-8 is done **6 ways**: `iconv('CP1252','UTF-8//IGNORE
 
 ### 1.6 Three confirmed defects found incidentally
 - **`TeamOffDefStatsView:49`** — `<h2 ...>League-wide Statistics</h1>` — tag mismatch. **Verified.** One-char fix. *(Fixed 2026-07-29.)*
-- **`OneOnOneGameEngine:35`** — `$currentPossession` is a mutable instance property never reset between `simulateGame()` calls; second call on the same instance starts with stale possession. Latent (engine is new'd per request). Make it a local threaded through `runPossession()`. *(Still open 2026-07-29; line corrected from :135.)*
+- **`OneOnOneGameEngine:35`** — `$currentPossession` is a mutable instance property never reset between `simulateGame()` calls; second call on the same instance starts with stale possession. Latent (engine is new'd per request). Make it a local threaded through `runPossession()`. *(Fixed 2026-09-29: `simulateGame()` resets `$currentPossession` at entry. Module moved from `OneOnOne/` to `OneOnOneGame/`.)*
 - **`PlrParserService:189`** — `computeDerivedFields()` does a `getTeamnameFromTeamID()` DB lookup per player (~450/import) and the resulting `'teamName'` key is **never consumed** by `upsertPlayer`/`buildSnapshotData`. Real N+1 producing a discarded value. Delete it. *(Fixed 2026-07-29: `computeDerivedFields()` now contains no DB calls.)*
 
 ---
@@ -97,7 +97,7 @@ _(2.3–2.7 were not individually re-verified during the 2026-07-29 pass; findin
 - `ProjectedDraftOrderService::applyTiebreakers` `$direction` param — never read, single hard-coded `'better_wins'` caller. Remove. *(Done 2026-07-29: `applyTiebreakers` moved to `PlayoffSeedingCalculator:103` with no `$direction` param; `ProjectedDraftOrderService` no longer has the method.)*
 - `PlayerDatabaseView` ctor — injected `$service` never used (suppressed w/ phpstan-ignore). Remove param. *(Removed 2026-07-29: constructor no longer exists.)*
 - `PlayerStats::withPlayerObject` — no production callers, does a redundant `loadByID` round-trip on an already-hydrated Player. *(Removed 2026-07-29.)*
-- `PlayerStats` `season/careerPlayoffDouble/TripleDoubles` — 4 props hardcoded `0`, no DB column, rendered as `0` in trading-card back. Remove or wire.
+- `PlayerStats` `season/careerPlayoffDouble/TripleDoubles` — 4 props hardcoded `0`, no DB column, rendered as `0` in trading-card back. Remove or wire. *(Removed 2026-09-29.)*
 
 ---
 
@@ -105,7 +105,7 @@ _(2.3–2.7 were not individually re-verified during the 2026-07-29 pass; findin
 
 _(Most Tier 3 items were not individually re-verified in the 2026-07-29 pass; items with an explicit status note were checked.)_
 
-- **`safeHtmlOutput()` vs `e()` drift** — 299 long-form calls across 54 files; `e()` is the documented View alias (71 files). Standardize Views on `::e()`. Real noise but ~300-site churn → batch into one mechanical PR, not piecemeal. *Priority: readability.*
+- **`safeHtmlOutput()` vs `e()` drift** — At audit time (2026-05-29): 299 long-form calls across 54 files; `e()` is the documented View alias (71 files). Standardize Views on `::e()`. *Priority: readability.* *(Down to 13 calls as of 2026-09-29.)*
 - **Magic `82` (games/season)** in `StandingsUpdater:285,353,412,463` → add `League::GAMES_PER_SEASON`. *(Done 2026-07-29: constant is `League::REGULAR_SEASON_GAMES`; all four sites use it.)*
 - **Magic `1440` (max player ordinal)** in PlrParser declared 3×; `PlrLineParser:26` uses a bare literal. Reference `PlrFileWriter::MAX_PLAYER_ORDINAL` everywhere.
 - **`+1` JSB-year decode** duplicated in `RcbFileParser:343,428`, `TrnFileParser:119`, `HisFileParser:102` → `decodeJsbYear(int): int`.

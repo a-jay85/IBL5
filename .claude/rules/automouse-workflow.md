@@ -63,18 +63,9 @@ Each phase's cost is recorded in two places: the markdown row in `reports/YYYY-M
 
 **Recomputed vs. harness cost.** The harness `result` event undercounts: it sums only the top-level `usage` of the main transcript, missing `usage.iterations[]` entries and all subagent transcripts. `bin/lib/automouse-pricer` recomputes from transcripts after the phase exits — subagent transcripts are still flushing when `result` fires.
 
-**Prov column.** Each cost row carries a `Prov` (provenance) value:
+**Prov column:** `recomputed` (agrees with harness), `recomputed-anomalous` (>$0.01 below harness or duration mismatch), `unknown` (no transcript; harness figure kept), `harness-ledger` (harness-only run, no Sonnet session).
 
-| Value | Meaning |
-|-------|---------|
-| `recomputed` | Transcript recomputation succeeded and agrees with expectations. |
-| `recomputed-anomalous` | Recomputation succeeded but diverges from the harness figure in a way the mechanical check flags: recomputed cost falls more than $0.01 below the harness figure, or the joined transcript spans materially longer than the logged phase duration. |
-| `unknown` | No transcript could be joined to this row — the harness figure is left as-is (transcripts age out after ~30 days). |
-| `harness-ledger` | Cost row from the harness's own `result.json` usage ledger (harness-only runs — exit 0 or 3; no Sonnet skill session ran). |
-
-**`peak_ctx` semantics.** Maximum context occupancy of the **main** transcript only, taken over `usage.iterations[]` when present (the top-level `usage` is their sum, not a single occupancy) and excluding `advisor_message` iterations. Sub-agent occupancy is excluded. Rows before 2026-08-26 carry the older summed figure and read high.
-
-**Reported cost is a floor.** Compaction cost is not in any transcript record — carried separately as `low–high` in "Surcharge est ($)" (cache-read of pre-boundary context → full re-read plus summary output). Not folded into the cost column.
+**`peak_ctx`:** main transcript occupancy over `usage.iterations[]`; sub-agents excluded; pre-2026-08-26 rows read high. Reported cost is a floor: compaction surcharge is separate ("Surcharge est ($)").
 
 ### Startup archival
 
@@ -157,11 +148,13 @@ A plan can declare prerequisites in its YAML frontmatter. When a plan is picked 
 ---
 depends_on:
   - 2099          # PR number — held until merged
-  - other-plan    # plan slug — held until other-plan.md appears in done/
+  - other-plan    # plan slug: held until other-plan.md is in done/ and branch other-plan has a merged PR
 ---
 ```
 
 Inline scalar form also works: `depends_on: 2099`.
+
+A slug dependency is checked in two steps. First, `<slug>.md` must be in `done/`. If it is absent the verdict is `unmet` and no `gh` call is made. Second, the most recent PR whose head branch is `<slug>` must be `MERGED`, because a plan reaches `done/` when post-plan finishes, which can be before its PR merges. An `OPEN` PR keeps the verdict `unmet`. A PR closed without merging (`closed-unmerged`), no PR for the branch (`no-pr`), or a failed `gh` query (`gh-error`) makes the verdict `unresolvable`, since each case needs a human to decide whether the dependent plan should still run.
 
 **Three-state verdict** (from `bin/lib/plan-depends-on`):
 
@@ -169,12 +162,13 @@ Inline scalar form also works: `depends_on: 2099`.
 |---------|---------|
 | `met` | All deps satisfied (or key absent). Proceed to impl. |
 | `unmet:<dep>` | Dep resolved cleanly but not yet merged/done. Hold. |
-| `unresolvable:<dep>:<reason>` | Dep cannot be evaluated. Hold. Reasons: `gh-error`, `bad-value`, `empty-value`, `no-done-dir`. |
+| `unresolvable:<dep>:<reason>` | Dep cannot be evaluated. Hold. Reasons: `gh-error`, `bad-value`, `empty-value`, `no-done-dir`, `unreadable-plan`, `closed-unmerged`, `no-pr`. |
 
 **Hold lifecycle:**
 
 - A held plan stays in `queue/` with a `.depends-hold` sidecar and is skipped every pick cycle (zero attempt cost — the counter never increments).
 - `bin/automouse/self-heal` scans `queue/*.depends-hold` on every run and removes the sidecar when the dep is now `met`, re-enabling the plan for the next pick.
+- An `unresolvable` verdict is never cleared automatically. `self-heal` logs a warning and keeps the hold until a human fixes the dependency (reopens and merges the PR, or edits `depends_on:`).
 - An orphan sidecar (plan left `queue/`) is reaped by `self-heal`. `bin/automouse/queue remove` never touches `.depends-hold`, so that reap is the only cleanup path.
 
 **Run-scoped dedup:** once a plan is held within a run, it is skipped for the rest of that run (space-padded `DEPENDS_HELD` string). When every plan in the queue is held, the run terminates cleanly rather than spinning.

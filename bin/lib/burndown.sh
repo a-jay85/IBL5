@@ -345,6 +345,67 @@ bd_skip_label_reason() {
     fi
 }
 
+# bd_autoclear_blocked <issues_file> — for each blocked-labeled issue read the
+# blocking PR from its marker comment. MERGED or CLOSED removes the label (and
+# drops it from <issues_file> so the issue is eligible this run). Any doubt keeps
+# the tag: a gh failure, an unrecognized state, or a missing marker. Rows for
+# kept issues land in $BD_TMP/blocked.tsv (num<TAB>pr) for bd_skip_label_reason.
+# Sets BD_LIVE_UNKNOWN=1 when a live state could not be read.
+bd_autoclear_blocked() {
+    local issues_file="$1" n raw pr st_raw st tmp
+    local nums
+    nums="$(jq -r --arg b "$BD_LABEL_BLOCKED" \
+        '.[] | select(any((.labels // [])[]; .name == $b)) | .number' "$issues_file")" \
+        || bd_die 3 "cannot read labels from issues file"
+    while IFS= read -r n; do
+        [ -n "$n" ] || continue
+        if ! raw="$("$GH" issue view "$n" --repo "$REPO" --json comments 2>/dev/null)"; then
+            printf 'burndown: WARN #%s: cannot read comments; keeping blocked\n' "$n" >&2
+            BD_LIVE_UNKNOWN=1
+            continue
+        fi
+        pr="$(bd_last_blocked_marker "$raw")"
+        if [ -z "$pr" ]; then
+            printf 'burndown: WARN #%s: no burndown-blocked-by marker; keeping blocked\n' "$n" >&2
+            continue
+        fi
+        if ! st_raw="$("$GH" pr view "$pr" --repo "$BD_CODE_REPO" --json state 2>/dev/null)"; then
+            printf 'burndown: WARN #%s: cannot read %s#%s state; keeping blocked\n' "$n" "$BD_CODE_REPO" "$pr" >&2
+            BD_LIVE_UNKNOWN=1
+            printf '%s\t%s\n' "$n" "$pr" >> "$BD_TMP/blocked.tsv"
+            continue
+        fi
+        st="$(jq -r '.state // empty' <<< "$st_raw" 2>/dev/null)" || st=""
+        case "$st" in
+            MERGED|CLOSED)
+                if "$GH" issue edit "$n" --repo "$REPO" --remove-label "$BD_LABEL_BLOCKED" >/dev/null 2>&1; then
+                    tmp="$BD_TMP/issues.cleared.json"
+                    if jq --argjson n "$n" --arg b "$BD_LABEL_BLOCKED" \
+                        'map(if .number == $n then .labels |= map(select(.name != $b)) else . end)' \
+                        "$issues_file" > "$tmp"; then
+                        mv "$tmp" "$issues_file"
+                    else
+                        bd_die 3 "cannot update issues file after clearing #$n"
+                    fi
+                    printf 'burndown: cleared blocked on #%s (%s#%s %s)\n' "$n" "$BD_CODE_REPO" "$pr" "$st" >&2
+                else
+                    printf 'burndown: WARN #%s: cannot remove blocked label; keeping blocked\n' "$n" >&2
+                    BD_LIVE_UNKNOWN=1
+                    printf '%s\t%s\n' "$n" "$pr" >> "$BD_TMP/blocked.tsv"
+                fi
+                ;;
+            OPEN)
+                printf '%s\t%s\n' "$n" "$pr" >> "$BD_TMP/blocked.tsv"
+                ;;
+            *)
+                printf "burndown: WARN #%s: unrecognized PR state '%s'; keeping blocked\n" "$n" "$st" >&2
+                BD_LIVE_UNKNOWN=1
+                printf '%s\t%s\n' "$n" "$pr" >> "$BD_TMP/blocked.tsv"
+                ;;
+        esac
+    done <<< "$nums"
+}
+
 bd_cmd_burndown() {
     # 1. Argument parsing — only --pair A,B accepted
     local pairs=""   # newline-sep "A,B" strings
@@ -381,6 +442,8 @@ bd_cmd_burndown() {
     bd_report_since "$BD_REPORT"
     local issues_file="$BD_TMP/issues.json"
     bd_fetch_issues "$issues_file"
+    BD_LIVE_UNKNOWN=0
+    bd_autoclear_blocked "$issues_file"
     local inflight_file="$BD_TMP/inflight.tsv"
     touch "$inflight_file"
     bd_inflight "$inflight_file"
@@ -619,6 +682,7 @@ bd_cmd_burndown() {
 
     if [ "$used" -eq 0 ]; then
         printf 'LEDGER: none\n'
+        [ "$BD_LIVE_UNKNOWN" -eq 0 ] || return 1
         return 0
     fi
 
@@ -677,6 +741,7 @@ bd_cmd_burndown() {
     fi
     mv "$tmp_path" "$ledger_path"
     printf 'LEDGER: %s\n' "$ledger_path"
+    [ "$BD_LIVE_UNKNOWN" -eq 0 ] || return 1
 }
 
 # bd_delta_numbers <issues_file> — sets _bd_delta_nums array

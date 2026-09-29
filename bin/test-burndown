@@ -1768,6 +1768,73 @@ l14_reject "non-numeric issue" abc reason=out-of-repo
 l14_reject "blocked without PR" 1233 reason=blocked
 l14_reject "unknown key" 1 foo=bar
 
+# ── L15-L19: auto-clear of blocked labels at selection time ───────────────────
+l15_setup() {
+    lbl_issues '[{"name":"blocked"}]' '[{"name":"out-of-repo"}]'
+    printf '%s' '{"comments":[{"body":"<!-- burndown-blocked-by: 900 -->"}]}' > "$T/lbl/fx/issue-40-comments.json"
+    rm -f "$T/lbl/fx/pr-view-900.json"
+    : > "$T/lbl/gh.log"
+}
+l15_pr_state() { printf '{"state":"%s"}' "$1" > "$T/lbl/fx/pr-view-900.json"; }
+l15_count() { grep -cF -e "$1" "$T/lbl/gh.log" || true; }
+
+for ST in MERGED CLOSED; do
+    l15_setup; l15_pr_state "$ST"
+    OUT="$(bdl_b 2>&1)"; RC=$?
+    GHLOG="$(cat "$T/lbl/gh.log")"
+    [ "$RC" -eq 0 ] && ok "L15: $ST exits 0" || fail "L15: $ST exits 0 (got $RC: $OUT)"
+    want "L15: $ST pr view call" "$GHLOG" "pr view 900 --repo a-jay85/IBL5"
+    want "L15: $ST --remove-label" "$GHLOG" "--remove-label blocked"
+    want "L15: $ST cleared line" "$OUT" "cleared blocked on #40"
+    want "L15: $ST #40 PICK" "$OUT" "PICK  #40"
+done
+
+l15_setup; l15_pr_state OPEN
+OUT="$(bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L17: OPEN exits 0" || fail "L17: OPEN exits 0 (got $RC: $OUT)"
+want "L17: OPEN row names the PR" "$OUT" "skip-label: blocked (PR #900)"
+[ "$(l15_count '--remove-label')" -eq 0 ] && ok "L17: OPEN keeps the tag" || fail "L17: OPEN keeps the tag"
+
+l15_setup; l15_pr_state OPEN
+OUT="$(GH_FAIL_ON="pr view" bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "L18: pr view failure exits 1" || fail "L18: pr view failure exits 1 (got $RC: $OUT)"
+want "L18: pr view failure WARN" "$OUT" "WARN"
+want "L18: pr view failure keeps PR in row" "$OUT" "skip-label: blocked (PR #900)"
+[ "$(l15_count '--remove-label')" -eq 0 ] && ok "L18: pr view failure keeps the tag" || fail "L18: pr view failure keeps the tag"
+
+l15_setup; l15_pr_state MERGED
+OUT="$(GH_FAIL_ON="--remove-label" bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "L18: remove-label failure exits 1" || fail "L18: remove-label failure exits 1 (got $RC: $OUT)"
+want "L18: remove-label failure WARN" "$OUT" "WARN"
+if grep -qF "PICK  #40" <<< "$OUT"; then fail "L18: remove-label failure must not PICK #40"; else ok "L18: remove-label failure keeps #40 skipped"; fi
+
+l15_setup; l15_pr_state OPEN
+OUT="$(GH_FAIL_ON="--json comments" bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "L18: comments failure exits 1" || fail "L18: comments failure exits 1 (got $RC: $OUT)"
+want "L18: comments failure row" "$OUT" "skip-label: blocked (PR unknown)"
+
+l15_setup; l15_pr_state OPEN
+printf '%s' '{"comments":[{"body":"hand-applied, no marker"}]}' > "$T/lbl/fx/issue-40-comments.json"
+OUT="$(bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L18: missing marker exits 0" || fail "L18: missing marker exits 0 (got $RC: $OUT)"
+want "L18: missing marker WARN" "$OUT" "no burndown-blocked-by marker"
+[ "$(l15_count 'pr view')" -eq 0 ] && ok "L18: missing marker makes no pr view call" || fail "L18: missing marker makes no pr view call"
+if grep -qF "PICK  #40" <<< "$OUT"; then fail "L18: missing marker must not PICK #40"; else ok "L18: missing marker keeps #40 skipped"; fi
+
+l15_setup
+printf '{}' > "$T/lbl/fx/pr-view-900.json"
+OUT="$(bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "L18: unrecognized state exits 1" || fail "L18: unrecognized state exits 1 (got $RC: $OUT)"
+want "L18: unrecognized state message" "$OUT" "unrecognized PR state"
+[ "$(l15_count '--remove-label')" -eq 0 ] && ok "L18: unrecognized state keeps the tag" || fail "L18: unrecognized state keeps the tag"
+
+lbl_issues '[]' '[{"name":"out-of-repo"}]'
+: > "$T/lbl/gh.log"
+OUT="$(bdl_b 2>&1)"; RC=$?
+[ "$(l15_count 'pr view')" -eq 0 ] && ok "L19: out-of-repo never triggers pr view" || fail "L19: out-of-repo never triggers pr view"
+want "L19: #41 still skipped" "$OUT" "skip-label: out-of-repo"
+rm -f "$T/lbl/fx/issue-40-comments.json" "$T/lbl/fx/pr-view-900.json"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

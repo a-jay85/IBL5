@@ -16,6 +16,10 @@
 #                   fast-forward push path — force-push flags, permissions, PAT
 #                   credential, kill-switch count, walkback setting, fork guard,
 #                   SKIP_CHECKS/job-name sync, and merge-script parity.
+#   required PR workflows (R1): tests.yml, e2e-tests.yml, human-signoff.yml,
+#                   pr-meta-checks.yml and mutation.yml must keep a block-style
+#                   `on: pull_request:` trigger with no `paths:` or
+#                   `paths-ignore:` under it. push.paths stays legal.
 #
 # Conditional by design: each check is SKIPPED (visibly) when its target file is
 # absent, so this no-ops on a branch without the file and auto-activates the
@@ -187,5 +191,44 @@ else
   fi
 
 fi  # end pp_file present
+
+# R1: required PR workflows must not carry a workflow-level pull_request path
+# filter. Branch protection requires "Tests and Analysis", "E2E Tests",
+# "human-signoff" and "Meta checks" (strict=true, no rulesets). A workflow that
+# on.pull_request.paths skips never reports its check, so the PR sits on
+# "Expected" forever. mutation.yml is listed because the sibling plan
+# mutation-required-check makes its check required. push.paths is legal:
+# tests.yml and e2e-tests.yml scope master pushes that way. A file with no
+# block-style pull_request key also fails, so a flow-style rewrite cannot turn
+# this check into a vacuous pass.
+for wf_name in tests.yml e2e-tests.yml human-signoff.yml pr-meta-checks.yml mutation.yml; do
+  wf_file="$WORKFLOWS/$wf_name"
+  if [ ! -f "$wf_file" ]; then
+    echo "composite-contracts: $wf_name absent — R1 skipped"
+    continue
+  fi
+  r1_rc=0
+  r1_hits="$(awk '
+    /^on:[[:space:]]*(#.*)?$/ { inon=1; next }
+    inon && /^[^[:space:]#]/ { inon=0; inpr=0 }
+    inon && /^  pull_request:[[:space:]]*(#.*)?$/ { inpr=1; found=1; next }
+    inpr && /^  [^[:space:]#]/ { inpr=0 }
+    inpr && /^[[:space:]]+(paths|paths-ignore)[[:space:]]*:/ { print NR; bad=1 }
+    END { if (bad) exit 1; if (!found) exit 2 }
+  ' "$wf_file")" || r1_rc=$?
+  case "$r1_rc" in
+    0)
+      echo "composite-contracts: $wf_name pull_request has no workflow-level path filter (R1)"
+      ;;
+    1)
+      echo "composite-contracts: $wf_name (R1) — on.pull_request carries paths/paths-ignore at line(s) $(printf '%s' "$r1_hits" | tr '\n' ','); a required check skipped by a path filter never reports and blocks the PR. Scope with a job-level changes filter instead ($wf_file)" >&2
+      fail=1
+      ;;
+    *)
+      echo "composite-contracts: $wf_name (R1) — no block-style 'on: pull_request:' key found; either the required check no longer runs on PRs or a flow-style trigger hid it from this parser ($wf_file)" >&2
+      fail=1
+      ;;
+  esac
+done
 
 exit "$fail"

@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 #
 # bin/test-check-composite-contracts — regression test for the composite-contract
-# gate. Builds throwaway .github/actions trees and asserts the check's exit code and
+# gate. Builds throwaway .github/actions and .github/workflows trees and asserts the check's exit code and
 # skip/active behavior. Verifies the logic even while the live composites are absent
 # on master (the check is dormant there, but its logic must already be correct so it
 # is sound the moment the composites land).
@@ -322,6 +322,94 @@ if printf '%s' "$out" | grep -q 'P8 skipped'; then
 else
   echo "FAIL: pp-merge-script-absent — no visible P8 skipped line; output: $out"; FAILED=1
 fi
+
+# put_required_wf <dir> <file> <variant>
+# Writes a minimal workflow under <dir>/<file>. Variants:
+#   push-paths           push.paths before pull_request (tests.yml shape)
+#   pr-first-push-paths  pull_request first, push.paths after (e2e-tests.yml shape)
+#   pr-paths             paths: under pull_request
+#   pr-ignore            paths-ignore: under pull_request
+#   no-pr                no pull_request trigger
+put_required_wf() {
+  local f="$1/$2"
+  {
+    echo "name: fixture"
+    echo "on:"
+    case "$3" in
+      push-paths)
+        printf "  push:\n    branches: [master]\n    paths:\n      - '**.php'\n  pull_request:\n    branches: [master]\n    types: [opened, synchronize]\n" ;;
+      pr-first-push-paths)
+        printf "  pull_request:\n    branches: [master]\n  push:\n    branches: [master]\n    paths:\n      - '**.php'\n" ;;
+      pr-paths)
+        printf "  pull_request:\n    branches: [master]\n    paths:\n      - '**.php'\n" ;;
+      pr-ignore)
+        printf "  pull_request:\n    branches: [master]\n    paths-ignore:\n      - 'docs/**'\n" ;;
+      no-pr)
+        printf "  push:\n    branches: [master]\n" ;;
+    esac
+    printf "jobs:\n  noop:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n"
+  } > "$f"
+}
+
+# r1-push-paths-passes: push.paths ahead of pull_request is legal → exit 0
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_required_wf "$d_wf" tests.yml push-paths
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "r1-push-paths-passes" 0 $?
+
+# r1-pr-first-push-paths-passes: push.paths after pull_request is legal → exit 0
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_required_wf "$d_wf" e2e-tests.yml pr-first-push-paths
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "r1-pr-first-push-paths-passes" 0 $?
+
+# r1-pr-paths-fails: paths under pull_request → exit 1, message names R1
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_required_wf "$d_wf" tests.yml pr-paths
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "r1-pr-paths-fails" 1 "$rc"
+if printf '%s' "$out" | grep -q 'tests.yml (R1)'; then
+  echo "ok: r1-pr-paths-fails-names-file"
+else
+  echo "FAIL: r1-pr-paths-fails — no 'tests.yml (R1)' line; output: $out"; FAILED=1
+fi
+
+# r1-pr-ignore-fails: paths-ignore under pull_request → exit 1
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_required_wf "$d_wf" human-signoff.yml pr-ignore
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "r1-pr-ignore-fails" 1 $?
+
+# r1-no-pr-fails: required workflow lost its pull_request trigger → exit 1
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_required_wf "$d_wf" pr-meta-checks.yml no-pr
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "r1-no-pr-fails" 1 $?
+
+# r1-absent-skips: no required workflows present → exit 0 with visible skip lines
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "r1-absent-skips" 0 "$rc"
+if printf '%s' "$out" | grep -q 'mutation.yml absent — R1 skipped'; then
+  echo "ok: r1-absent-skips-skip-visible"
+else
+  echo "FAIL: r1-absent-skips — no visible R1 skip line; output: $out"; FAILED=1
+fi
+
+# r1-real-files-pass: the five real required workflows pass R1 → exit 0
+REAL_WF="$SCRIPT_DIR/../.github/workflows"
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"
+for n in tests.yml e2e-tests.yml human-signoff.yml pr-meta-checks.yml mutation.yml; do
+  cp "$REAL_WF/$n" "$d_wf/$n"
+done
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "r1-real-files-pass" 0 $?
+
+# r1-real-tests-yml-mutant-fails: inject paths: under the real tests.yml
+# pull_request key → exit 1. cmp proves the injection anchor hit.
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"
+awk '{ print } /^  pull_request:/ { print "    paths:"; print "      - \"**.php\"" }' \
+  "$REAL_WF/tests.yml" > "$d_wf/tests.yml"
+if cmp -s "$d_wf/tests.yml" "$REAL_WF/tests.yml"; then
+  echo "FAIL: r1-real-tests-yml-mutant — injection anchor missed (mutant identical)"; FAILED=1
+fi
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "r1-real-tests-yml-mutant-fails" 1 $?
 
 if [ "$FAILED" -ne 0 ]; then
   echo "RESULT: FAILED"

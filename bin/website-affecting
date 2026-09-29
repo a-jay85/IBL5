@@ -18,9 +18,10 @@
 #   1  Does NOT affect website — callers may skip.
 #
 # Consumers (all run this predicate on the diff, PR-only): e2e-tests.yml `changes`
-# job (→ VR/E2E/api-e2e/mutators), lighthouse.yml's own `changes` job (→ PR
-# Lighthouse), and bin/wt-up (→ local Docker preview build). The exempt criterion
-# below therefore means "cannot alter a VR / E2E / Lighthouse / preview render."
+# job (→ VR/E2E/api-e2e/mutators) and bin/wt-up (→ local Docker preview build).
+# The exempt criterion below therefore means "cannot alter a VR / E2E /
+# Lighthouse / preview render." Lighthouse stays in that list because the
+# master-push baseline and weekly audit render the same pages.
 #
 # Deny-set (a file is non-website if it matches ALL of the following):
 #   - matches the deny regex: (\.md$|^docs/|^ibl5/docs/|^\.claude/|^bin/|^engine/|^ibl5/tests/)
@@ -32,7 +33,7 @@
 #
 # Most naturally website-side files (they do NOT match the deny regex) always
 # count website — INCLUDING E2E/Lighthouse drivers like
-# .github/workflows/e2e-tests.yml and .github/workflows/lighthouse.yml.
+# .github/workflows/e2e-tests.yml and .github/workflows/lighthouse-baseline.yml.
 #
 # CI-meta exempt set (the INVERSE of the carve-out): a curated denylist of
 # workflow files that do NOT match the deny regex but PROVABLY cannot affect a
@@ -113,11 +114,10 @@ is_carveout() {
 # — never a silent E2E skip. Each entry is a deliberate assertion "this file can't
 # break E2E or the app." Match is EXACT (full repo-relative path), so a sibling
 # workflow is never accidentally swept in.
-# NEVER add: .github/workflows/e2e-tests.yml, .github/workflows/lighthouse.yml,
+# NEVER add: .github/workflows/e2e-tests.yml,
 # .github/workflows/lighthouse-baseline.yml, .github/workflows/lighthouse-audit.yml,
-# .github/actions/setup-docker-e2e/**, docker-compose.ci.yml, docker/Dockerfile*
-# — those drive E2E/Lighthouse (lighthouse-baseline uploads the manifest the PR
-# Lighthouse compares against) and MUST stay website-side.
+# .github/actions/setup-docker-e2e/**, docker-compose.ci.yml, docker/Dockerfile*.
+# Those drive E2E/Lighthouse renders and MUST stay website-side.
 is_ci_meta_exempt() {
     case "$1" in
         .github/workflows/pages-deploy.yml)          return 0 ;;  # workflow_run after E2E; checks out gh-pages + deploys Pages — no app code, consumes E2E output (can't change it)

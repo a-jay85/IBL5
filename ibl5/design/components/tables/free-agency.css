@@ -159,7 +159,7 @@
 
 /* Ratings table headers */
 table.sortable thead th {
-    font-size: 1rem;
+    font-size: var(--text-base);
 }
 
 .table-empty-message {

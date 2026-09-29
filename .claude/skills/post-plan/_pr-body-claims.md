@@ -151,13 +151,24 @@ What the snippet guarantees:
 
 ## Declared scope
 
-A `## Declared scope` section lists `.claude/` paths this PR edits on purpose that the plan's `## Critical Files` section does not name. Phase 5.0's diff→plan conformance check reads this section and dismisses any path it finds there. One path per bullet, backticked or bare, repo-root-relative:
+A `## Declared scope` section lists paths this PR edits on purpose that the plan names nowhere: in neither its `## Critical Files` section nor a Verification Matrix test path. Any directory counts. Phase 5.0's diff→plan conformance check (`bin/lib/plan-scope-conformance`) reads this section and dismisses every path it finds there. One path per bullet, backticked or bare, repo-root-relative. A token of two or more segments ending in `/` (for example `ibl5/classes/Foo/` (example)) declares every path below it; a one-segment token such as `ibl5/` declares nothing.
 
 ```markdown
 ## Declared scope
 
 - `.claude/rules/doc-freshness.md` (frontmatter bump forced by the on-touch rule)
 - `.claude/agents/sonnet-5-5.md` (tool list corrected while adjacent)
+- `ibl5/classes/Updater/ScheduleUpdater.php` (Playoffs-phase guard added while fixing the schedule import)
 ```
 
-The extraction is section-bounded. It starts at the `## Declared scope` heading and stops at the next `## ` heading, so a `.claude/` path mentioned elsewhere in the PR body dismisses nothing. Write a reason on each bullet for the reviewer; the check reads only the path.
+The extraction is section-bounded. It starts at the `## Declared scope` heading and stops at the next `## ` heading, so a path mentioned elsewhere in the PR body dismisses nothing. Generated marker spans (`<!-- files-changed:begin -->` through `<!-- files-changed:end -->`, and every other `<!-- name:begin -->` / `<!-- name:end -->` pair) are stripped before the section is read, so the generated block never declares anything, even when it sits under this heading. Write a reason on each bullet for the reviewer; the check reads only the path.
+
+## Plan gaps
+
+A `## Plan gaps` section lists must-appear `## Critical Files` paths the diff does not touch. Write one bullet per path with the reason: cut from scope, deferred to a named follow-up, or already shipped before the branch was cut (cite the PR). A bullet clears only the `UNEXPLAINED-GAP:` item for that path. The `MISSING-FILE:` item keeps its own resolution rule in `_phase-5-final-verification.md`.
+
+```markdown
+## Plan gaps
+
+- `ibl5/docs/decisions/0074-example.md` (already refreshed by #2036 before this branch was cut)
+```

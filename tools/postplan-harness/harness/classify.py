@@ -12,6 +12,8 @@ from .state import Classification
 
 FILES_CHANGED_BEGIN = "<!-- files-changed:begin -->"
 FILES_CHANGED_END = "<!-- files-changed:end -->"
+TESTS_CHANGED_BEGIN = "<!-- tests-changed:begin -->"
+TESTS_CHANGED_END = "<!-- tests-changed:end -->"
 RESIDUAL_PHASES_BEGIN = "<!-- residual-phases:begin -->"
 RESIDUAL_PHASES_END = "<!-- residual-phases:end -->"
 MANUAL_CONFIRMATION_BEGIN = "<!-- manual-confirmation:begin -->"
@@ -25,6 +27,16 @@ _CSS = re.compile(r"\.css$|^ibl5/design/")
 _MD = re.compile(r"\.md$")
 _MIGRATION = re.compile(r"^ibl5/migrations/.*\.sql$")
 _TEST = re.compile(r"^ibl5/tests/|\.test\.(ts|js|php)$|\.spec\.(ts|js)$")
+# Test files outside ibl5/ that _TEST does not cover: Go engine tests,
+# the harness's own pytest files, and bin/ shell test harnesses.
+_TEST_EXTRA = re.compile(r"_test\.go$|(^|/)test_[^/]*\.py$|^bin/test-")
+
+
+def is_test_path(p: str) -> bool:
+    """True when ``p`` is a test file for the tests-changed PR-body block."""
+    return bool(_TEST.search(p)) or bool(_TEST_EXTRA.search(p))
+
+
 _E2E = re.compile(r"^ibl5/tests/e2e/.*\.ts$")
 _LOCK = re.compile(r"(composer|package|bun)\.lock$")
 _SNAP = re.compile(r"__snapshots__/|\.snap$")
@@ -207,6 +219,48 @@ def render_files_changed(diff_text: str) -> str:
             parts.append(f"- `{status}` `{path}`")
     parts.append(FILES_CHANGED_END)
     return "\n".join(parts)
+
+
+def render_tests_changed(diff_text: str) -> str:
+    """Marker-delimited tests-changed block derived from diff text.
+
+    Same shape as render_files_changed, filtered through is_test_path. When the
+    diff touches no test file, the block states that explicitly, so a reviewer
+    reads a positive "none" and not a missing section.
+    """
+    pairs = [(s, p) for s, p in name_status_from_diff(diff_text) if is_test_path(p)]
+    header = ("**Tests changed** (generated from "
+              "`git diff --name-status origin/master...HEAD` — do not edit by hand):")
+    parts: list[str] = [TESTS_CHANGED_BEGIN, header, ""]
+    if pairs:
+        for status, path in pairs:
+            parts.append(f"- `{status}` `{path}`")
+    else:
+        parts.append("- _(no test files changed)_")
+    parts.append(TESTS_CHANGED_END)
+    return "\n".join(parts)
+
+
+def upsert_tests_changed(body: str, block: str) -> str:
+    """Insert or replace the tests-changed block in a PR body.
+
+    Contract identical to upsert_files_changed, keyed on TESTS_CHANGED_BEGIN /
+    TESTS_CHANGED_END. Both markers in order: replace BEGIN..END inclusive.
+    Neither, one, or END before BEGIN: append a fresh block and leave any orphan.
+    Empty/None body: return ``block`` alone.
+    """
+    body = body or ""
+    if not body.strip():
+        return block
+
+    begin_idx = body.find(TESTS_CHANGED_BEGIN)
+    end_idx = body.find(TESTS_CHANGED_END)
+
+    if begin_idx != -1 and end_idx != -1 and begin_idx < end_idx:
+        after_end = end_idx + len(TESTS_CHANGED_END)
+        return body[:begin_idx] + block + body[after_end:]
+
+    return body.rstrip() + "\n\n" + block + "\n"
 
 
 def upsert_files_changed(body: str, block: str) -> str:

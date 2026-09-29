@@ -1,5 +1,5 @@
 ---
-description: "PR body authoring rules: version/baseline citations must name their source file; negative-claim bullets must be re-read after every commit; backlog closing keywords come from the plan via the shared normalizer snippet."
+description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; backlog closing keywords come from the plan via the shared normalizer snippet."
 last_verified: 2026-09-28
 ---
 
@@ -60,6 +60,19 @@ the literal string "What is NOT in this PR".
 
 **Headless:** applies — an automouse or `/post-plan` run authoring a PR body performs the same
 re-read; there is no human in the loop to catch the stale bullet later.
+
+## External-state evidence rule
+
+Some PR-body claims describe the world outside the diff. A service is running. A launchd job is registered. A cron entry is scheduled. A GitHub Actions run passed. A migration is applied on prod. The diff cannot prove any of these, so the reviewer has only your word for them.
+
+Every such claim carries its evidence inline, in one of two forms:
+
+- **Link.** A URL the reviewer can open: the Actions run, the deploy log, the PR check.
+- **Command output.** The command you ran and the output line that shows the state, in a code span or fenced block. For example, `launchctl list | grep <label>` followed by the line it printed.
+
+If you cannot produce the evidence, drop the claim. Describe what the PR changes, and name the command a reviewer runs after merge to confirm the state: "After merge, `launchctl list | grep <label>` shows the job." A present-tense external-state claim with no evidence is a fabricated claim, and the reviewer treats it as one.
+
+This rule has no mechanical check. The claims it covers are free-form prose, and the same phrases appear in design descriptions and quoted plans, so a pattern match would flag too many honest lines. Facts derivable from the diff are generated for you: the `**Files changed**` and `**Tests changed**` blocks come from `git diff`, so never restate them by hand.
 
 ## Backlog issue references
 

@@ -306,3 +306,23 @@ def test_emergency_abort_exists_on_live_git():
     assert callable(getattr(LiveGit, "emergency_abort", None)), (
         "LiveGit.emergency_abort() must be defined for SIGTERM cleanup"
     )
+
+
+def test_every_files_changed_upsert_is_paired_with_tests_changed():
+    """Every upsert_files_changed( call site in runner.py must be followed within two lines
+    by upsert_tests_changed(, so the tests block can never be left stale.
+
+    Mutation caught: deleting any one of the three wire lines from 2b, 2c, or 2d.
+    """
+    src_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            "runner.py")
+    lines = open(src_path).readlines()
+    sites = [i for i, ln in enumerate(lines)
+             if "upsert_files_changed(" in ln and not ln.lstrip().startswith("#")]
+    assert len(sites) >= 3, f"Expected at least 3 upsert_files_changed( sites, found {len(sites)}"
+    for idx in sites:
+        window = lines[idx + 1: idx + 3]
+        assert any("upsert_tests_changed(" in ln for ln in window), (
+            f"Line {idx + 1}: upsert_files_changed( not followed by upsert_tests_changed( "
+            f"within two lines"
+        )

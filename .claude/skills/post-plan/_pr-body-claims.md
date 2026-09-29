@@ -1,6 +1,6 @@
 ---
-description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; backlog closing keywords come from the plan via the shared normalizer snippet."
-last_verified: 2026-09-28
+description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; backlog closing keywords come from the plan via the shared normalizer snippet."
+last_verified: 2026-09-29
 ---
 
 # PR Body Claims
@@ -58,8 +58,26 @@ fine and normal — say so accurately. The defect is a stale absence assertion, 
 Applies to any residual / out-of-scope / follow-up list under any heading wording, not only
 the literal string "What is NOT in this PR".
 
-**Headless:** applies — an automouse or `/post-plan` run authoring a PR body performs the same
+**Headless.** Applies: an automouse or `/post-plan` run authoring a PR body performs the same
 re-read; there is no human in the loop to catch the stale bullet later.
+
+## Coordinate-citation re-check rule
+
+A PR body that cites a coordinate points at a spot that later commits can move. Coordinates are a `path:line` or `path:start-end` reference and a backlog row or entry ID such as `(see L51)`. A commit that adds or removes lines above the cited spot shifts the line numbers. A commit that renumbers backlog rows changes the IDs. Nothing recomputes the body, so it keeps the stale number.
+
+After every commit pushed to an open PR, re-verify each coordinate the body cites in a file that commit touched. Open the file at the PR head and confirm the cited line still holds what the prose says it holds. Update the number, or replace it with a symbol or heading anchor that does not drift.
+
+| What the commit did | What to do |
+|---|---|
+| Touched a file the body cites by line | Re-read each cited line at the new head; fix any that moved |
+| Renumbered or renamed backlog rows | Re-check every row ID the body and any archive cross-reference cite |
+| Touched no cited file | Nothing to do |
+
+Prefer a function name or heading over a line number when the prose allows it. A symbol survives a rebase and a line number does not.
+
+This rule has no mechanical check. Prose numbers are free-form, and a scan for `:<N>` would flag too many honest lines. Trigger: L59, PR #2083 (row IDs `L51`/`L52` and `push.sh:55` cited after a later commit moved them).
+
+**Headless.** Applies: an automouse or `/post-plan` remediation commit re-verifies the body's coordinates before the push is done.
 
 ## External-state evidence rule
 

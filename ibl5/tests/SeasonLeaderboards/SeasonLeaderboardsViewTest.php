@@ -89,7 +89,7 @@ final class SeasonLeaderboardsViewTest extends TestCase
         $html = $this->view->renderPlayerRow($stats, 1);
 
         // Check rank (with class attribute)
-        $this->assertStringContainsString('>1.</td>', $html);
+        $this->assertStringContainsString('>1</td>', $html);
 
         // Check player link (& properly encoded as &amp; in HTML)
         $this->assertStringContainsString('modules.php?name=Player&amp;pa=showpage&amp;pid=123', $html);

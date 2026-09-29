@@ -158,7 +158,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
         ob_start();
         ?>
 <tr data-team-id="<?= (int)$stats['teamid'] ?>">
-    <td class="rank-cell sticky-col-1"><?= HtmlSanitizer::e($rank) ?>.</td>
+    <td class="rank-cell sticky-col-1"><?= HtmlSanitizer::e($rank) ?></td>
     <td><?= (int)$stats['year'] ?></td>
     <?= PlayerImageHelper::renderFlexiblePlayerCell((int)$stats['pid'], $stats['name'], 'sticky-col-2') ?>
     <?= TeamCellHelper::renderTeamCellOrFreeAgent((int)$stats['teamid'], $stats['teamname'], $stats['color1'], $stats['color2']) ?>

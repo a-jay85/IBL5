@@ -401,6 +401,9 @@ cat > "$T/home/elsewhere.md" <<'QF'
 IBL5-backlog#23 needs doing
 QF
 ln -sf "$T/home/elsewhere.md" "$T/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/some-task.md"
+# Live queues hold subdirectories (done/, <entry>.lock/); they are not entries
+mkdir -p "$T/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/done" \
+    "$T/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/some-task.md.lock"
 # Source 4: ledger with #24 status=queued (in-flight)
 cat > "$T/home/claude-plans/_reports/burndown-batch-test.json" <<'LEDGER'
 {"items":[

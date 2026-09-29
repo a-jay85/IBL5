@@ -6,6 +6,26 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/cleanup <worktree-name> [--dry-run] [--discard-generated]
+                   [--discard-closed] [--drop-merged-stashes]
+       bin/cleanup --all [--dry-run] [--discard-generated]
+                   [--discard-closed] [--drop-merged-stashes]
+
+Clean up worktrees, branches, and Docker containers.
+
+Arguments:
+  <worktree-name>      Tear down a specific worktree.
+  --all                Tear down all eligible worktrees.
+  --dry-run            Print what would be done without making changes.
+  --discard-generated  Remove generated files before teardown.
+  --discard-closed     Remove worktrees whose PR is closed (not merged).
+  --drop-merged-stashes  Drop stash entries belonging to merged branches.
+EOF
+    exit 0
+fi
+
 source "$(dirname "$0")/lib/wt-guards.sh"
 
 # Resolve to the main repo root, even when run from a worktree.

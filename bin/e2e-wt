@@ -13,6 +13,28 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/e2e-wt <worktree-name> [playwright-args...]
+
+Run Playwright E2E tests against a worktree's Docker environment.
+
+Arguments:
+  worktree-name     Name of the worktree to test against.
+  playwright-args   Any additional arguments passed through to Playwright.
+
+Examples:
+  bin/e2e-wt my-feature
+  bin/e2e-wt my-feature --headed
+  bin/e2e-wt my-feature --grep "trading"
+
+Prerequisites:
+  1. Worktree exists at IBL5-worktrees/<name>
+  2. Docker env running via: bin/wt-up <name> --seed
+EOF
+    exit 0
+fi
+
 # Always resolve to the main repo root, even when run from a worktree.
 REPO_ROOT="$(cd "$(dirname "$0")/.." && dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"

@@ -1,6 +1,25 @@
 #!/bin/bash
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/docfix-check-veronly [<slug>]
+
+Decides whether the worktree's diff is verification-only (date bumps only);
+if so, arms the plan file for auto-merge.
+
+Arguments:
+  <slug>   worktree branch slug (default: current branch)
+
+Env vars:
+  PLAN_FILE        absolute path to the plan file (default: ~/claude-plans/<slug>.md)
+  DOCFIX_BASE_REF  base branch for merge-base diff (default: master)
+
+Exit codes: 0 = PASS (plan armed), 1 = HOLD (predicate not met), 2 = usage/env error
+EOF
+    exit 0
+fi
+
 # bin/docfix-check-veronly [<slug>]
 #
 # Decides whether the worktree's realized diff is verification-only — every

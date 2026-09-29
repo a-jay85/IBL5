@@ -11,6 +11,21 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/bug-pipeline-test-env [--teardown | --help]
+
+Provision and tear down the bug-pipeline test environment.
+
+  (no flag)    bring up: scratch DB, migrations, stubs, test bot
+  --teardown   tear down: stop bot, drop DB, remove /tmp artifacts
+  --help       print this and exit 0
+
+After a successful bring-up: source /tmp/bug-pipeline-test-env.sh
+EOF
+    exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 

@@ -11,6 +11,25 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/automouse/queue-reorder-ui
+
+Open a local drag-and-drop page to reorder the automouse plan queue.
+
+Spawns an ephemeral php -S server bound to 127.0.0.1, opens the browser,
+and waits for a Save action (which calls bin/automouse/queue reorder) or
+for Ctrl-C / a timeout. The server is torn down on exit.
+
+Requirements:
+  php must be on PATH.
+
+Arguments: none
+Exit codes: 0 success, 1 php not found or router missing
+EOF
+    exit 0
+fi
+
 : "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
 : "${PLANS_DIR:=$HOME/claude-plans}"
 QUEUE_DIR="$NIGHTLY_DIR/queue"

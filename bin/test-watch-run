@@ -109,9 +109,9 @@ echo "$OUT" | grep -q "run complete (launchd label gone)" \
 # ---------------------------------------------------------------------------
 OUT="$("$SCRIPT_DIR/watch-run" --help 2>&1)"
 RC=$?
-[ "$RC" -eq 3 ] \
-    && pass "D: RC is 3" \
-    || fail "D: RC is 3 (got $RC)"
+[ "$RC" -eq 0 ] \
+    && pass "D: RC is 0" \
+    || fail "D: RC is 0 (got $RC)"
 echo "$OUT" | grep -q -- "--startup-grace" \
     && pass "D: output contains '--startup-grace'" \
     || fail "D: output missing '--startup-grace'"

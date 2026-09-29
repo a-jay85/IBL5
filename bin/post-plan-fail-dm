@@ -26,6 +26,35 @@
 # Env (tests): FAILDM_DELAY, FAILDM_REGISTRY, FAILDM_DM_CMD, FAILDM_LAUNCHCTL,
 # FAILDM_PLIST_DIR, FAILDM_LOG_DIR.
 
+if [ "${1:-}" = "--help" ]; then
+    cat <<'EOF'
+Usage: bin/post-plan-fail-dm [--deferred] <root> <safe-slug> <log> <message>
+
+Send (or hold) the Discord DM for a post-plan harness exit 3.
+If a live Claude session is detected in the worktree, holds the DM for
+FAILDM_DELAY seconds via a detached launchd job; sends immediately otherwise.
+
+  --deferred   Run as the held launchd job (wakes after FAILDM_DELAY seconds)
+  root         Worktree root directory
+  safe-slug    Branch slug (safe for filenames)
+  log          Path to the post-plan-now log file
+  message      DM message text
+
+Env:
+  FAILDM_DELAY     Hold delay in seconds (default: 900)
+  FAILDM_REGISTRY  Session registry path
+  FAILDM_DM_CMD    Override discord-dm binary path
+  FAILDM_LAUNCHCTL Override launchctl binary path
+  FAILDM_PLIST_DIR Override LaunchAgents directory
+  FAILDM_LOG_DIR   Override log directory
+
+Exit codes:
+  0  DM sent or hold job scheduled
+  2  Usage error
+EOF
+    exit 0
+fi
+
 set -u
 
 DEFERRED=0

@@ -13,6 +13,24 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/wt-migrate-layout [--dry-run]
+
+Relocate existing in-repo worktrees (legacy $REPO_ROOT/worktrees/<name>)
+to the external canonical-case root ($WT_PARENT/<name>). Idempotent:
+only legacy in-repo worktrees are considered; re-running is a no-op.
+
+Safe by default: skips any worktree that is actively in use or has
+uncommitted or untracked work. Tears down its Docker stack first, then
+uses git worktree move. See ibl5/docs/decisions/0046-worktrees-outside-repo.md.
+
+Options:
+  --dry-run  Print what would be moved without making changes.
+EOF
+    exit 0
+fi
+
 source "$(dirname "$0")/lib/wt-guards.sh"
 source "$(dirname "$0")/lib/git-helpers.sh"
 

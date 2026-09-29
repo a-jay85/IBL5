@@ -235,6 +235,24 @@
 # state. `shell=bash` keeps shellcheck's SC3xxx (sh-dialect) warnings quiet on
 # the intentional bashisms.
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-plan [--print-critical-files] [--draft] <plan-file>
+
+Mechanical lint for /plan output (the Step-4 deterministic gates).
+
+  --print-critical-files  Print the parsed critical-files section and exit
+  --draft                 Run only gate [D] (phase-count drift) against a draft plan
+  <plan-file>             Path to the plan file to check
+
+Exit codes:
+  0  All gates passed
+  1  One or more gate violations found
+  2  Usage error (missing or non-existent plan file)
+EOF
+    exit 0
+fi
+
 set -u
 
 # Force the C locale so every range/char-class glob and grep below is byte-wise

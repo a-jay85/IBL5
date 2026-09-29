@@ -37,14 +37,35 @@ final class RecordTableRendererTest extends TestCase
         self::assertStringContainsString('Most Points', $html);
     }
 
-    public function testGetStatColumnLabelReturnsAbbreviationForKnownCategory(): void
+    public function testGetStatColumnLabelMatchesCategoryPrefix(): void
     {
         self::assertSame('Pts', $this->renderer->getStatColumnLabel('Most Points in a Single Game'));
+        self::assertSame('Reb', $this->renderer->getStatColumnLabel('Most Rebounds'));
+        self::assertSame('Ast', $this->renderer->getStatColumnLabel('Most Assists'));
     }
 
-    public function testGetStatColumnLabelReturnsAmountForUnknownCategory(): void
+    public function testGetStatColumnLabelFallsBackToAmount(): void
     {
         self::assertSame('Amount', $this->renderer->getStatColumnLabel('Unknown Category'));
+        self::assertSame('Amount', $this->renderer->getStatColumnLabel(''));
+    }
+
+    public function testRenderCategoryTableEscapesCategoryButKeepsPrebuiltFragments(): void
+    {
+        $categoryPayload = '<script>cat()</script>';
+
+        $html = $this->renderer->renderCategoryTable(
+            $categoryPayload,
+            'record-table--4col',
+            '<col>',
+            '<th>Team</th>',
+            '<tr><td>prebuilt-row</td></tr>',
+        );
+
+        self::assertStringNotContainsString('<script>cat()</script>', $html);
+        self::assertStringContainsString('&lt;script&gt;', $html);
+        self::assertStringContainsString('<tr><td>prebuilt-row</td></tr>', $html);
+        self::assertStringContainsString('<th>Team</th>', $html);
     }
 
     public function testRenderCategoryTableContainsHeadingAndRows(): void

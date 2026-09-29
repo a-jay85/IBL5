@@ -67,9 +67,11 @@ final class TeamRecordSectionRendererTest extends TestCase
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
     }
 
-    public function testGameRowEscapesDateAndAmount(): void
+    public function testTeamGameRowEscapesDateOpponentAndAmount(): void
     {
-        $payload = '<script>alert(1)</script>';
+        $datePayload = '<script>date()</script>';
+        $oppPayload = '<script>opp()</script>';
+        $amountPayload = '<script>amount()</script>';
         $records = $this->minimalRecords();
         $records['teamGameRecords'] = [
             'Most Points' => [[
@@ -77,37 +79,97 @@ final class TeamRecordSectionRendererTest extends TestCase
                 'teamTid' => 1,
                 'teamYr' => '2026',
                 'boxScoreUrl' => '',
-                'dateDisplay' => $payload,
+                'dateDisplay' => $datePayload,
+                'oppAbbr' => $oppPayload,
+                'oppTid' => 2,
+                'oppYr' => '2026',
+                'amount' => $amountPayload,
+            ]],
+        ];
+
+        $html = $this->renderer->renderTeamRecords($records);
+
+        self::assertStringContainsString('&lt;script&gt;', $html);
+        self::assertStringNotContainsString('<script>date()</script>', $html);
+        self::assertStringNotContainsString('<script>opp()</script>', $html);
+        self::assertStringNotContainsString('<script>amount()</script>', $html);
+    }
+
+    public function testTeamGameRowLinksBoxScoreOnlyWhenUrlPresent(): void
+    {
+        $url = 'box-score.php?game=42';
+        $date = 'April 5, 2026';
+
+        $records = $this->minimalRecords();
+        $records['teamGameRecords'] = [
+            'Most Points' => [[
+                'teamAbbr' => 'tst',
+                'teamTid' => 1,
+                'teamYr' => '2026',
+                'boxScoreUrl' => $url,
+                'dateDisplay' => $date,
                 'oppAbbr' => 'opp',
                 'oppTid' => 2,
                 'oppYr' => '2026',
-                'amount' => $payload,
+                'amount' => '120',
             ]],
         ];
 
         $html = $this->renderer->renderTeamRecords($records);
+        self::assertStringContainsString('<a href="' . $url . '">', $html);
+        self::assertStringContainsString($date, $html);
 
-        self::assertStringContainsString('&lt;script&gt;', $html);
-        self::assertStringNotContainsString('<script>alert(1)</script>', $html);
+        $recordsNoUrl = $this->minimalRecords();
+        $recordsNoUrl['teamGameRecords'] = [
+            'Most Points' => [[
+                'teamAbbr' => 'tst',
+                'teamTid' => 1,
+                'teamYr' => '2026',
+                'boxScoreUrl' => '',
+                'dateDisplay' => $date,
+                'oppAbbr' => 'opp',
+                'oppTid' => 2,
+                'oppYr' => '2026',
+                'amount' => '120',
+            ]],
+        ];
+
+        $htmlNoUrl = $this->renderer->renderTeamRecords($recordsNoUrl);
+        self::assertStringNotContainsString('>' . $date . '</a>', $htmlNoUrl);
+        self::assertStringContainsString($date, $htmlNoUrl);
     }
 
-    public function testSeasonRowEscapesTeamAndAmount(): void
+    public function testTeamSeasonRowEscapesSeasonAndAmount(): void
     {
-        $payload = '<script>alert(1)</script>';
+        $seasonPayload = '<script>season()</script>';
+        $amountPayload = '<script>amount()</script>';
         $records = $this->minimalRecords();
         $records['teamSeasonRecords'] = [
             'Most Points' => [[
-                'teamAbbr' => $payload,
+                'teamAbbr' => 'tst',
                 'teamTid' => 1,
                 'teamYr' => '2026',
-                'season' => '2026',
-                'amount' => $payload,
+                'season' => $seasonPayload,
+                'amount' => $amountPayload,
             ]],
         ];
 
         $html = $this->renderer->renderTeamRecords($records);
 
+        self::assertStringNotContainsString('<script>season()</script>', $html);
+        self::assertStringNotContainsString('<script>amount()</script>', $html);
         self::assertStringContainsString('&lt;script&gt;', $html);
-        self::assertStringNotContainsString('<script>alert(1)</script>', $html);
+    }
+
+    public function testEmptyRecordsRenderNoCategoryBlocks(): void
+    {
+        $records = $this->minimalRecords();
+
+        $html = $this->renderer->renderTeamRecords($records);
+
+        self::assertStringNotContainsString('record-category', $html);
+        self::assertStringNotContainsString('Game Records', $html);
+        self::assertStringNotContainsString('Season Records', $html);
+        self::assertStringNotContainsString('Franchise Records', $html);
     }
 }

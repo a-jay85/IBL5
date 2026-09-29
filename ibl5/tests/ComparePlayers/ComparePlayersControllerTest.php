@@ -48,8 +48,8 @@ final class ComparePlayersControllerTest extends WideUnitTestCase
         $this->stubRepository->method('getAllPlayerNames')->willReturn([]);
 
         $this->stubView = self::createStub(ComparePlayersViewInterface::class);
-        $this->stubView->method('renderSearchForm')->willReturn('');
-        $this->stubView->method('renderComparisonResults')->willReturn('');
+        $this->stubView->method('renderSearchForm')->willReturn('SEARCH-FORM');
+        $this->stubView->method('renderComparisonResults')->willReturn('COMPARISON-RESULTS');
     }
 
     protected function tearDown(): void
@@ -64,13 +64,14 @@ final class ComparePlayersControllerTest extends WideUnitTestCase
      * Double-buffer wrapper for main().
      *
      * PageLayout::footer() calls ob_end_flush() in HTMX-boosted mode,
-     * consuming L1 into L2. We clean up L2 afterward.
+     * consuming L1 into L2. We collect from L2 afterward.
      */
-    private function runMain(ComparePlayersController $controller, mixed $user = null): void
+    private function runMain(ComparePlayersController $controller, mixed $user = null): string
     {
         $baseLevel = ob_get_level();
-        ob_start(); // L2 outer capture
-        ob_start(); // L1 sacrificial
+        ob_start();
+        ob_start();
+        $output = '';
         try {
             $controller->main($user);
         } catch (\Throwable $e) {
@@ -80,8 +81,9 @@ final class ComparePlayersControllerTest extends WideUnitTestCase
             throw $e;
         }
         while (ob_get_level() > $baseLevel) {
-            ob_end_clean();
+            $output = (string) ob_get_clean() . $output;
         }
+        return $output;
     }
 
     private function buildController(
@@ -98,6 +100,22 @@ final class ComparePlayersControllerTest extends WideUnitTestCase
     }
 
     // -----------------------------------------------------------------------
+    // Search-form rendering
+    // -----------------------------------------------------------------------
+
+    public function testRendersSearchFormWhenNoPlayerPosted(): void
+    {
+        unset($_POST['Player1']);
+
+        $stubService = self::createStub(ComparePlayersServiceInterface::class);
+
+        $controller = $this->buildController($stubService);
+        $output = $this->runMain($controller);
+
+        self::assertStringContainsString('SEARCH-FORM', $output);
+    }
+
+    // -----------------------------------------------------------------------
     // Length-guard tests
     // -----------------------------------------------------------------------
 
@@ -110,7 +128,10 @@ final class ComparePlayersControllerTest extends WideUnitTestCase
         $mockService->expects(self::never())->method('comparePlayers');
 
         $controller = $this->buildController($mockService);
-        $this->runMain($controller);
+        $output = $this->runMain($controller);
+
+        self::assertStringContainsString('100 characters or less', $output);
+        self::assertStringContainsString('SEARCH-FORM', $output);
     }
 
     public function testAcceptsPlayerNameOfExactlyOneHundredCharacters(): void
@@ -121,13 +142,16 @@ final class ComparePlayersControllerTest extends WideUnitTestCase
         $mockService = self::createMock(ComparePlayersServiceInterface::class);
         $mockService->expects(self::once())
             ->method('comparePlayers')
+            ->with(str_repeat('a', 100), '')
             ->willReturn(null);
 
         $controller = $this->buildController($mockService);
-        $this->runMain($controller);
+        $output = $this->runMain($controller);
+
+        self::assertStringContainsString('SEARCH-FORM', $output);
     }
 
-    public function testRejectsPlayerNameOverOneHundredCharactersOnPlayer2Side(): void
+    public function testRejectsSecondPlayerNameOverOneHundredCharacters(): void
     {
         $_POST['Player1'] = 'ValidName';
         $_POST['Player2'] = str_repeat('a', 101);
@@ -136,29 +160,79 @@ final class ComparePlayersControllerTest extends WideUnitTestCase
         $mockService->expects(self::never())->method('comparePlayers');
 
         $controller = $this->buildController($mockService);
-        $this->runMain($controller);
+        $output = $this->runMain($controller);
+
+        self::assertStringContainsString('100 characters or less', $output);
+        self::assertStringContainsString('SEARCH-FORM', $output);
     }
 
     // -----------------------------------------------------------------------
-    // Absent Player1 test
+    // Trim test
     // -----------------------------------------------------------------------
 
-    public function testAbsentPlayer1NeverCallsService(): void
+    public function testTrimsPostedPlayerNamesBeforeComparing(): void
     {
-        unset($_POST['Player1']);
+        $_POST['Player1'] = '  Jordan  ';
+        $_POST['Player2'] = '  Bird  ';
 
         $mockService = self::createMock(ComparePlayersServiceInterface::class);
-        $mockService->expects(self::never())->method('comparePlayers');
+        $mockService->expects(self::once())
+            ->method('comparePlayers')
+            ->with('Jordan', 'Bird')
+            ->willReturn(null);
 
         $controller = $this->buildController($mockService);
-        $this->runMain($controller);
+        $output = $this->runMain($controller);
+
+        self::assertStringContainsString('SEARCH-FORM', $output);
     }
 
     // -----------------------------------------------------------------------
-    // Anonymous-user test
+    // Comparison result rendering
     // -----------------------------------------------------------------------
 
-    public function testAnonymousUserSeesPage(): void
+    public function testRendersNotFoundWhenComparisonIsNull(): void
+    {
+        $_POST['Player1'] = 'Unknown Player';
+        unset($_POST['Player2']);
+
+        $mockService = self::createMock(ComparePlayersServiceInterface::class);
+        $mockService->expects(self::once())
+            ->method('comparePlayers')
+            ->with('Unknown Player', '')
+            ->willReturn(null);
+
+        $controller = $this->buildController($mockService);
+        $output = $this->runMain($controller);
+
+        self::assertStringContainsString('not found', $output);
+        self::assertStringContainsString('SEARCH-FORM', $output);
+        self::assertStringNotContainsString('COMPARISON-RESULTS', $output);
+    }
+
+    public function testRendersComparisonResultsForValidPlayers(): void
+    {
+        $_POST['Player1'] = 'Jordan';
+        $_POST['Player2'] = 'Bird';
+
+        $mockService = self::createMock(ComparePlayersServiceInterface::class);
+        $mockService->expects(self::once())
+            ->method('comparePlayers')
+            ->with('Jordan', 'Bird')
+            ->willReturn(['player1' => [], 'player2' => []]);
+
+        $controller = $this->buildController($mockService);
+        $output = $this->runMain($controller);
+
+        self::assertStringContainsString('SEARCH-FORM', $output);
+        self::assertStringContainsString('COMPARISON-RESULTS', $output);
+    }
+
+    // -----------------------------------------------------------------------
+    // Cookie decode tests
+    // -----------------------------------------------------------------------
+
+    public function testSkipsCookieDecodeForAnonymousUser(): void
     {
         unset($_POST['Player1']);
 
@@ -169,6 +243,22 @@ final class ComparePlayersControllerTest extends WideUnitTestCase
         $mockNuke->expects(self::never())->method('cookieDecode');
 
         $controller = $this->buildController($stubService, $mockNuke);
-        $this->runMain($controller, null);
+        $output = $this->runMain($controller, null);
+
+        self::assertStringContainsString('SEARCH-FORM', $output);
+    }
+
+    public function testDecodesCookieForAuthenticatedUser(): void
+    {
+        unset($_POST['Player1']);
+
+        $stubService = self::createStub(ComparePlayersServiceInterface::class);
+
+        $mockNuke = self::createMock(NukeCompat::class);
+        $mockNuke->method('isUser')->willReturn(true);
+        $mockNuke->expects(self::once())->method('cookieDecode')->with('testgm');
+
+        $controller = $this->buildController($stubService, $mockNuke);
+        $this->runMain($controller, 'testgm');
     }
 }

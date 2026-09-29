@@ -12,6 +12,11 @@ use Team\Contracts\TeamCapCalculatorInterface;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 use Season\Season;
+use Team\TeamCapCalculator;
+use Trading\Contracts\BuyoutLedgerRepositoryInterface;
+use League\League;
+use Tests\WideUnit\Mocks\TestDataFactory;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Testable subclass that exposes protected methods for testing
@@ -219,6 +224,114 @@ class CapSpaceServiceTest extends TestCase
     }
 
     /**
+     * Pins the intentional basis split between the cap-space columns.
+     * availableSalary and getDisplayYears() shift on isOffseasonPhase() (Draft|FA).
+     * positionSalaries comes from getNextSeasonSalary(), which shifts on
+     * advancesContractYears() (Playoffs|Draft|FA). With cy = raw contract year:
+     *   Regular Season: year1 = cy,   position = cy+1 -> year2 column
+     *   Playoffs:       year1 = cy,   position = cy+2 -> year3 column
+     *   Draft / FA:     year1 = cy+1, position = cy+2 -> year2 column
+     * The Playoffs row is the only phase where the two predicates disagree.
+     */
+    #[DataProvider('phaseBasisProvider')]
+    public function testPositionSalaryBasisMatchesAvailableSalaryColumnPerPhase(
+        string $phase,
+        string $column,
+        int $pgSalary,
+        int $displayBeginningYear,
+    ): void {
+        $season = $this->phaseSeason($phase);
+        $service = $this->buildRealCalculatorService($season);
+
+        $result = $service->publicProcessTeamCapData($this->createMockTeamWithMleLle(1, 1), $season);
+
+        $this->assertSame($pgSalary, $result['positionSalaries']['PG']);
+        $this->assertSame(
+            League::HARD_CAP_MAX - $result['positionSalaries']['PG'],
+            $result['availableSalary'][$column]
+        );
+        $this->assertSame($displayBeginningYear, $service->getDisplayYears($season)['beginningYear']);
+        $this->assertSame(0, $result['positionSalaries']['SG']);
+        $this->assertSame(0, $result['positionSalaries']['C']);
+    }
+
+    public function testPlayoffsPositionSalaryDoesNotUseRegularSeasonBasis(): void
+    {
+        $season = $this->phaseSeason('Playoffs');
+        $service = $this->buildRealCalculatorService($season);
+
+        $result = $service->publicProcessTeamCapData($this->createMockTeamWithMleLle(1, 1), $season);
+
+        $this->assertNotSame(
+            League::HARD_CAP_MAX - $result['positionSalaries']['PG'],
+            $result['availableSalary']['year2']
+        );
+        $this->assertSame(League::HARD_CAP_MAX - 1100, $result['availableSalary']['year1']);
+    }
+
+    /**
+     * @return array<string, array{string, string, int, int}>
+     */
+    public static function phaseBasisProvider(): array
+    {
+        return [
+            'Regular Season' => ['Regular Season', 'year2', 1200, 2024],
+            'Playoffs' => ['Playoffs', 'year3', 1300, 2024],
+            'Draft' => ['Draft', 'year2', 1300, 2025],
+            'Free Agency' => ['Free Agency', 'year2', 1300, 2025],
+        ];
+    }
+
+    private function phaseSeason(string $phase): Season
+    {
+        return $this->createMockSeason($phase, 2024, 2025);
+    }
+
+    /**
+     * Build a service wired to a real TeamCapCalculator over one PG player, so the
+     * phase-aware cap math runs for real. The same Season is injected into the
+     * calculator here and passed to processTeamCapData(), as production does.
+     */
+    private function buildRealCalculatorService(Season $season): TestableCapSpaceService
+    {
+        $row = TestDataFactory::createPlayer([
+            'pos' => 'PG',
+            'cy' => 1,
+            'cyt' => 6,
+            'salary_yr1' => 1100,
+            'salary_yr2' => 1200,
+            'salary_yr3' => 1300,
+            'salary_yr4' => 1400,
+            'salary_yr5' => 1500,
+            'salary_yr6' => 1600,
+        ]);
+
+        $teamRepo = self::createStub(TeamQueryRepositoryInterface::class);
+        $teamRepo->method('getRosterUnderContractOrderedByName')->willReturn([$row]);
+        $teamRepo->method('getAllPlayersUnderContract')->willReturn([$row]);
+
+        $cash = self::createStub(BuyoutLedgerRepositoryInterface::class);
+        // A zero-salary cash row makes getSalaryCapArray() emit all six year keys in every
+        // phase: the player alone reaches only year5 once the offseason shifts cy by +1.
+        $cash->method('getTeamCashForSalary')->willReturn([[
+            'cy' => $season->isOffseasonPhase() ? 0 : 1,
+            'salary_yr1' => 0,
+            'salary_yr2' => 0,
+            'salary_yr3' => 0,
+            'salary_yr4' => 0,
+            'salary_yr5' => 0,
+            'salary_yr6' => 0,
+        ]]);
+
+        $db = self::createStub(\mysqli::class);
+        $calc = new TeamCapCalculator($db, $teamRepo, $cash, $season);
+
+        $this->mockRepository->method('getPlayersUnderContractAfterSeason')->willReturn([]);
+
+        return new TestableCapSpaceService($this->mockRepository, $db, $teamRepo, $calc);
+    }
+
+    /**
      * Create a mock Team object with specific MLE/LLE values
      *
      * @param int $hasMLE MLE flag (0 or 1)
@@ -255,6 +368,11 @@ class CapSpaceServiceTest extends TestCase
         $mockSeason->endingYear = $endingYear;
         $mockSeason->method('isOffseasonPhase')->willReturn(
             $phase === 'Draft' || $phase === 'Free Agency'
+        );
+        // advancesContractYears() is deliberately wider than isOffseasonPhase():
+        // it also covers Playoffs (see Season::advancesContractYears docblock).
+        $mockSeason->method('advancesContractYears')->willReturn(
+            $phase === 'Playoffs' || $phase === 'Draft' || $phase === 'Free Agency'
         );
         return $mockSeason;
     }

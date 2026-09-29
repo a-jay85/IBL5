@@ -344,6 +344,23 @@ issue_episode_epoch() {   # $1 = issue number
 # Emits three `key=value` lines on stdout (alert/kind/detail); always exits 0 —
 # a report, not a gate, mirroring `check-docs --staleness-report`. The audit
 # workflow appends them to $GITHUB_OUTPUT verbatim.
+
+# Set to 1 by the poll tail right after bin/docfix-run launches a run (Phase 4).
+# Reset at load so an inherited environment value can never suppress an alert.
+HEALTH_RUN_JUST_LAUNCHED=""
+
+# In-flight interlock for the never-ran arm. True when this poll just launched a
+# run, or when a com.ibl5.docfix-run-* launchd job is loaded WITH a live PID.
+# `launchctl list` prints "PID Status Label"; PID is "-" for a loaded job that
+# is not running (a one-shot killed before its trailing bootout). Keying on the
+# live PID keeps such a leftover from silencing never-ran forever. On a machine
+# without launchctl the pipeline yields no match, so the arm behaves as before.
+docfix_run_in_flight() {   # returns 0 = in flight; never prints
+    [ "${HEALTH_RUN_JUST_LAUNCHED:-}" = 1 ] && return 0
+    launchctl list 2>/dev/null \
+      | awk '$3 ~ /^com\.ibl5\.docfix-run-/ && $1 ~ /^[0-9]+$/ {f=1} END {exit !f}'
+}
+
 health_report() {
     local alert=false kind="" detail="" report count pr_json pr_num red orphan wedged age_h episode last_pr last_pr_epoch
     report="$(mktemp)"; trap 'rm -f "$report"' RETURN
@@ -401,12 +418,12 @@ health_report() {
             fi
             age_h=$(( ( $(date -u +%s) - episode ) / 3600 ))
             # This arm cannot tell "poll not installed" from "run died before
-            # pushing" (e.g. a Claude usage limit). In production it runs on a
-            # GitHub runner, which has no local refresh branches and no launchctl,
-            # so the `wedged` arm above never fires there and a pre-push death
-            # lands here. Name both causes and the Mac check that splits them.
-            # Keep it ONE line: the workflow appends it to $GITHUB_OUTPUT.
-            if [ "$age_h" -ge 36 ]; then
+            # pushing" (e.g. a Claude usage limit). In production it now runs on the
+            # Mac right after the poll, so the `wedged` arm above and the in-flight
+            # interlock both see local state. Name both causes and the Mac check
+            # that splits them.
+            # Keep it ONE line: health output is parsed as key=value lines.
+            if [ "$age_h" -ge 36 ] && ! docfix_run_in_flight; then
                 alert=true; kind="never-ran"
                 detail="No refresh PR has been opened in ${age_h}h. Either the Mac poll is not installed or the last doc-fix run died before pushing (e.g. a Claude usage limit). On the Mac, check: ls -t /tmp/docfix-run-*.log | head -1 — tail that log for the cause; if there is no log, install the poll: cd ~/GitHub/IBL5 && git pull && bin/docfix-poll --install-schedule"
             fi

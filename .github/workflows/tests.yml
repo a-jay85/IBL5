@@ -732,6 +732,8 @@ jobs:
         run: bin/test-automouse-impl-model
       - name: Run automouse env-breaker regression test
         run: bin/test-automouse-env-breaker
+      - name: Run headless elapsed-clock hook regression test
+        run: bin/test-headless-elapsed-hook
       - name: Run automouse impl cap-timeout regression test
         run: bin/test-automouse-impl-cap-timeout
       - name: Run automouse postplan terminal-disposition regression test

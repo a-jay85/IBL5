@@ -1908,8 +1908,13 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # gates and its handoff to exactly this path. The guard is upstream, not here:
         # bin/automouse/prompt-impl forbids backgrounded Bash, and ~/.claude/hooks/bash-guard.sh
         # check 17 denies `run_in_background: true` whenever CLAUDE_HEADLESS is set.
+        # The impl agent has no clock — bin/lib/headless-elapsed-hook.sh reads
+        # these two vars and appends an elapsed-clock line after every tool call
+        # so the agent can track the 90% deadline and write a handoff in time.
         CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
+        IBL5_BUDGET_START_EPOCH="$(date +%s)" \
+        IBL5_BUDGET_SECS="$REMAINING_SECS" \
         timeout "$REMAINING_SECS" \
             claude -p "$IMPL_PROMPT" \
                 --dangerously-skip-permissions \

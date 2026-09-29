@@ -64,6 +64,17 @@ printf '%s\n' "$1" >> "$CASE_DIR/sleep.log"
 STUB
     chmod +x "$CASE/bin/sleep"
 
+    # fake-dm stub: append stdin + separator to dm.log; exit dm-rc (default 0)
+    cat > "$CASE/bin/fake-dm" <<'STUB'
+#!/bin/sh
+CASE_DIR="$(dirname "$0")/.."
+cat >> "$CASE_DIR/dm.log"
+printf '%s\n' '---' >> "$CASE_DIR/dm.log"
+exit "$(cat "$CASE_DIR/dm-rc" 2>/dev/null || echo 0)"
+STUB
+    chmod +x "$CASE/bin/fake-dm"
+    printf '0\n' > "$CASE/dm-rc"
+
     # launchctl output: all 9 expected jobs loaded; bug-bot has PID 4242
     {
         while read -r label; do
@@ -113,7 +124,7 @@ run_checker() {
 # ---------------------------------------------------------------------------
 healthy_fixture T1
 run_checker
-if [ "$RC" -eq 0 ] && grep -q '^OK$' <<< "$OUT" && ! grep -q '^PROBLEM' <<< "$OUT"; then
+if [ "$RC" -eq 0 ] && grep -q 'launchd-health: OK' <<< "$OUT" && ! grep -q '^FAIL: ' <<< "$OUT"; then
     ok T1
 else
     fail T1 "rc=$RC out=$(printf '%s' "$OUT" | head -5)"
@@ -127,7 +138,7 @@ grep -v 'com.ibl5.db-sync-nightly' "$CASE/launchctl.out" > "$CASE/launchctl.out.
 mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
 run_checker
 if [ "$RC" -eq 1 ] \
-    && grep -q 'PROBLEM missing:com.ibl5.db-sync-nightly' <<< "$OUT" \
+    && grep -q 'FAIL: missing:com.ibl5.db-sync-nightly' <<< "$OUT" \
     && grep -q 'not loaded' <<< "$OUT"; then
     ok T2
 else
@@ -143,7 +154,7 @@ mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
 rm -f "$CASE/home/Library/LaunchAgents/com.ibl5.db-sync-nightly.plist"
 run_checker
 if [ "$RC" -eq 1 ] \
-    && grep -q 'PROBLEM missing:com.ibl5.db-sync-nightly' <<< "$OUT" \
+    && grep -q 'FAIL: missing:com.ibl5.db-sync-nightly' <<< "$OUT" \
     && grep -q 'plist missing' <<< "$OUT"; then
     ok T3
 else
@@ -158,7 +169,7 @@ healthy_fixture T4
 sed 's/^4242\(.*com\.ibl5\.bug-bot\)/-\1/' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
 mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
 run_checker
-if [ "$RC" -eq 1 ] && grep -q 'PROBLEM not-running:com.ibl5.bug-bot' <<< "$OUT"; then
+if [ "$RC" -eq 1 ] && grep -q 'FAIL: not-running:com.ibl5.bug-bot' <<< "$OUT"; then
     ok T4
 else
     fail T4 "rc=$RC out=$(printf '%s' "$OUT")"
@@ -173,8 +184,8 @@ grep -v $'\tcom\.ibl5\.automouse$' "$CASE/launchctl.out" > "$CASE/launchctl.out.
 mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
 run_checker
 if [ "$RC" -eq 1 ] \
-    && grep -q 'PROBLEM missing:com.ibl5.automouse' <<< "$OUT" \
-    && ! grep -q 'PROBLEM missing:com.ibl5.automouse-morning-digest' <<< "$OUT"; then
+    && grep -q 'FAIL: missing:com.ibl5.automouse' <<< "$OUT" \
+    && ! grep -q 'FAIL: missing:com.ibl5.automouse-morning-digest' <<< "$OUT"; then
     ok T5
 else
     fail T5 "rc=$RC out=$(printf '%s' "$OUT")"
@@ -195,7 +206,7 @@ cat > "$CASE/phase.txt" <<'PHASE'
 PHASE
 run_checker
 if [ "$RC" -eq 0 ] \
-    && ! grep -q 'PROBLEM missing:com.ibl5.sim-recap-poll' <<< "$OUT" \
+    && ! grep -q 'FAIL: missing:com.ibl5.sim-recap-poll' <<< "$OUT" \
     && grep -q 'INFO.*exempt:com.ibl5.sim-recap-poll' <<< "$OUT" \
     && grep -q 'Free Agency' <<< "$OUT"; then
     ok T6
@@ -211,7 +222,7 @@ grep -v 'com.ibl5.sim-recap-poll' "$CASE/launchctl.out" > "$CASE/launchctl.out.t
 mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
 # phase.txt already has Regular Season from healthy_fixture
 run_checker
-if [ "$RC" -eq 1 ] && grep -q 'PROBLEM missing:com.ibl5.sim-recap-poll' <<< "$OUT"; then
+if [ "$RC" -eq 1 ] && grep -q 'FAIL: missing:com.ibl5.sim-recap-poll' <<< "$OUT"; then
     ok T7
 else
     fail T7 "rc=$RC out=$(printf '%s' "$OUT")"
@@ -227,7 +238,7 @@ printf '' > "$CASE/phase.txt"
 printf '3\n' > "$CASE/db-rc"
 run_checker
 if [ "$RC" -eq 1 ] \
-    && grep -q 'PROBLEM missing:com.ibl5.sim-recap-poll' <<< "$OUT" \
+    && grep -q 'FAIL: missing:com.ibl5.sim-recap-poll' <<< "$OUT" \
     && grep -q 'phase unknown' <<< "$OUT"; then
     ok T8
 else
@@ -249,7 +260,7 @@ cat > "$CASE/phase.txt" <<'PHASE'
 PHASE
 run_checker
 if [ "$RC" -eq 1 ] \
-    && grep -q 'PROBLEM missing:com.ibl5.sim-recap-poll' <<< "$OUT" \
+    && grep -q 'FAIL: missing:com.ibl5.sim-recap-poll' <<< "$OUT" \
     && grep -q 'phase unknown' <<< "$OUT"; then
     ok T9
 else
@@ -276,7 +287,7 @@ touch "$CASE/home/Library/LaunchAgents/com.ibl5.plan-now-20260101-000000.plist"
 run_checker
 if [ "$RC" -eq 0 ] \
     && grep -q 'INFO.*stale-oneshot:com.ibl5.plan-now-20260101-000000' <<< "$OUT" \
-    && ! grep -q '^PROBLEM' <<< "$OUT"; then
+    && ! grep -q '^FAIL: ' <<< "$OUT"; then
     ok T11
 else
     fail T11 "rc=$RC out=$(printf '%s' "$OUT")"
@@ -302,8 +313,8 @@ healthy_fixture T13
 printf '1\n' > "$CASE/docker-info-rc"
 run_checker
 if [ "$RC" -eq 1 ] \
-    && grep -q 'PROBLEM docker:daemon-down' <<< "$OUT" \
-    && ! grep -q 'PROBLEM container:' <<< "$OUT"; then
+    && grep -q 'FAIL: docker:daemon-down' <<< "$OUT" \
+    && ! grep -q 'FAIL: container:' <<< "$OUT"; then
     ok T13
 else
     fail T13 "rc=$RC out=$(printf '%s' "$OUT")"
@@ -321,7 +332,7 @@ OUT="$(HOME="$CASE/home" PATH="$CASE/bin:$PATH" \
       LAUNCHD_HEALTH_LOG_DIR="$CASE/logs" \
       bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
 RC=$?
-if [ "$RC" -eq 1 ] && grep -q 'PROBLEM docker:cli-missing' <<< "$OUT"; then
+if [ "$RC" -eq 1 ] && grep -q 'FAIL: docker:cli-missing' <<< "$OUT"; then
     ok T14
 else
     fail T14 "rc=$RC out=$(printf '%s' "$OUT")"
@@ -333,7 +344,7 @@ fi
 healthy_fixture T15
 printf '%s\n' ibl5-php ibl5-traefik > "$CASE/docker-ps.txt"
 run_checker
-if [ "$RC" -eq 1 ] && grep -q 'PROBLEM container:ibl5-mariadb' <<< "$OUT"; then
+if [ "$RC" -eq 1 ] && grep -q 'FAIL: container:ibl5-mariadb' <<< "$OUT"; then
     ok T15
 else
     fail T15 "rc=$RC out=$(printf '%s' "$OUT")"
@@ -345,11 +356,11 @@ fi
 healthy_fixture T16
 printf '' > "$CASE/launchctl.out"
 run_checker
-NPROB="$(grep -c '^PROBLEM ' <<< "$OUT" || true)"
+NPROB="$(grep -c '^FAIL: ' <<< "$OUT" || true)"
 if [ "$RC" -eq 1 ] \
     && [ "$NPROB" -eq 1 ] \
-    && grep -q 'PROBLEM launchctl:unavailable' <<< "$OUT" \
-    && ! grep -q 'PROBLEM missing:' <<< "$OUT"; then
+    && grep -q 'FAIL: launchctl:unavailable' <<< "$OUT" \
+    && ! grep -q 'FAIL: missing:' <<< "$OUT"; then
     ok T16
 else
     fail T16 "rc=$RC nprob=$NPROB out=$(printf '%s' "$OUT")"
@@ -416,6 +427,238 @@ if [ "$_RC" -eq 2 ]; then
     ok T20
 else
     fail T20 "expected exit 2, got $_RC"
+fi
+
+# ---------------------------------------------------------------------------
+# D1: healthy fixture → exit 0, launchd-health: OK, no DM, no stamp files
+# ---------------------------------------------------------------------------
+healthy_fixture D1
+OUT="$(HOME="$CASE/home" PATH="$CASE/bin:$PATH" \
+      DOCKER_BIN="$CASE/bin/docker" \
+      DB_QUERY_BIN="$CASE/bin/db-query" \
+      DISCORD_DM_BIN="$CASE/bin/fake-dm" \
+      LAUNCHD_HEALTH_LOG_DIR="$CASE/logs" \
+      LAUNCHD_HEALTH_TODAY=2026-09-28 \
+      bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
+RC=$?
+_STAMPS=""
+[ -d "$CASE/logs/stamps" ] && _STAMPS="$(ls "$CASE/logs/stamps" 2>/dev/null)"
+if [ "$RC" -eq 0 ] \
+    && grep -q 'launchd-health: OK' <<< "$OUT" \
+    && [ ! -f "$CASE/dm.log" ] \
+    && [ -z "$_STAMPS" ]; then
+    ok D1
+else
+    fail D1 "rc=$RC stamps=$_STAMPS dm=$([ -f "$CASE/dm.log" ] && echo present || echo absent)"
+fi
+
+# ---------------------------------------------------------------------------
+# D2: db-sync-nightly missing → DM sent, stamp written, new=1
+# D3: re-run same state → DM suppressed, new=0 suppressed=1
+# D4: re-run with next day → DM sent again, stamp updated
+# D2/D3/D4 share CASE so stamp state carries over
+# ---------------------------------------------------------------------------
+healthy_fixture D234
+grep -v 'com.ibl5.db-sync-nightly' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
+mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
+
+_run_d234() {
+    OUT="$(HOME="$CASE/home" PATH="$CASE/bin:$PATH" \
+          DOCKER_BIN="$CASE/bin/docker" \
+          DB_QUERY_BIN="$CASE/bin/db-query" \
+          DISCORD_DM_BIN="$CASE/bin/fake-dm" \
+          LAUNCHD_HEALTH_LOG_DIR="$CASE/logs" \
+          LAUNCHD_HEALTH_TODAY="${1:-2026-09-28}" \
+          bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
+    RC=$?
+}
+
+_run_d234 2026-09-28
+_STAMP="$CASE/logs/stamps/missing_com.ibl5.db-sync-nightly"
+_DMBLOCKS="$(grep -c '^---$' "$CASE/dm.log" 2>/dev/null || echo 0)"
+if [ "$RC" -eq 1 ] \
+    && grep -q 'dm=sent' <<< "$OUT" \
+    && grep -q 'new=1' <<< "$OUT" \
+    && [ -f "$_STAMP" ] \
+    && grep -q '2026-09-28' "$_STAMP" \
+    && [ "$_DMBLOCKS" -eq 1 ] \
+    && grep -q 'com.ibl5.db-sync-nightly' "$CASE/dm.log"; then
+    ok D2
+else
+    fail D2 "rc=$RC stamp=$([ -f "$_STAMP" ] && cat "$_STAMP" || echo absent) dm_blocks=$_DMBLOCKS out=$OUT"
+fi
+
+_run_d234 2026-09-28
+_DMBLOCKS="$(grep -c '^---$' "$CASE/dm.log" 2>/dev/null || echo 0)"
+if [ "$RC" -eq 1 ] \
+    && grep -q 'dm=suppressed' <<< "$OUT" \
+    && grep -q 'new=0' <<< "$OUT" \
+    && grep -q 'suppressed=1' <<< "$OUT" \
+    && grep -q 'FAIL: missing:com.ibl5.db-sync-nightly' <<< "$OUT" \
+    && [ "$_DMBLOCKS" -eq 1 ]; then
+    ok D3
+else
+    fail D3 "rc=$RC dm_blocks=$_DMBLOCKS out=$OUT"
+fi
+
+_run_d234 2026-09-29
+_DMBLOCKS="$(grep -c '^---$' "$CASE/dm.log" 2>/dev/null || echo 0)"
+_STAMP_DATE="$(head -1 "$_STAMP" 2>/dev/null)"
+if [ "$RC" -eq 1 ] \
+    && grep -q 'dm=sent' <<< "$OUT" \
+    && [ "$_DMBLOCKS" -eq 2 ] \
+    && [ "$_STAMP_DATE" = "2026-09-29" ]; then
+    ok D4
+else
+    fail D4 "rc=$RC dm_blocks=$_DMBLOCKS stamp_date=$_STAMP_DATE out=$OUT"
+fi
+
+# ---------------------------------------------------------------------------
+# D5: failed DM → dm=failed, no stamp written; rerun with success → dm=sent
+# ---------------------------------------------------------------------------
+healthy_fixture D5
+grep -v 'com.ibl5.db-sync-nightly' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
+mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
+printf '1\n' > "$CASE/dm-rc"
+OUT="$(HOME="$CASE/home" PATH="$CASE/bin:$PATH" \
+      DOCKER_BIN="$CASE/bin/docker" \
+      DB_QUERY_BIN="$CASE/bin/db-query" \
+      DISCORD_DM_BIN="$CASE/bin/fake-dm" \
+      LAUNCHD_HEALTH_LOG_DIR="$CASE/logs" \
+      LAUNCHD_HEALTH_TODAY=2026-09-28 \
+      bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
+RC=$?
+_STAMP5="$CASE/logs/stamps/missing_com.ibl5.db-sync-nightly"
+if [ "$RC" -eq 1 ] \
+    && grep -q 'dm=failed' <<< "$OUT" \
+    && [ ! -f "$_STAMP5" ]; then
+    # Retry with DM fixed → stamp now written
+    printf '0\n' > "$CASE/dm-rc"
+    OUT2="$(HOME="$CASE/home" PATH="$CASE/bin:$PATH" \
+           DOCKER_BIN="$CASE/bin/docker" \
+           DB_QUERY_BIN="$CASE/bin/db-query" \
+           DISCORD_DM_BIN="$CASE/bin/fake-dm" \
+           LAUNCHD_HEALTH_LOG_DIR="$CASE/logs" \
+           LAUNCHD_HEALTH_TODAY=2026-09-28 \
+           bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
+    if grep -q 'dm=sent' <<< "$OUT2" && [ -f "$_STAMP5" ]; then
+        ok D5
+    else
+        fail D5 "retry: stamp=$([ -f "$_STAMP5" ] && echo present || echo absent) out2=$OUT2"
+    fi
+else
+    fail D5 "first run: rc=$RC stamp=$([ -f "$_STAMP5" ] && echo present || echo absent) out=$OUT"
+fi
+
+# ---------------------------------------------------------------------------
+# D6: rotate_stamps removes stamps older than 2 days; keeps yesterday
+# ---------------------------------------------------------------------------
+healthy_fixture D6
+mkdir -p "$CASE/logs/stamps"
+printf '2026-09-25\n' > "$CASE/logs/stamps/old"
+printf '2026-09-27\n' > "$CASE/logs/stamps/keep"
+printf 'garbage\n'    > "$CASE/logs/stamps/junk"
+OUT="$(HOME="$CASE/home" PATH="$CASE/bin:$PATH" \
+      DOCKER_BIN="$CASE/bin/docker" \
+      DB_QUERY_BIN="$CASE/bin/db-query" \
+      DISCORD_DM_BIN="$CASE/bin/fake-dm" \
+      LAUNCHD_HEALTH_LOG_DIR="$CASE/logs" \
+      LAUNCHD_HEALTH_TODAY=2026-09-28 \
+      bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
+RC=$?
+if [ "$RC" -eq 0 ] \
+    && [ ! -f "$CASE/logs/stamps/old" ] \
+    && [ -f "$CASE/logs/stamps/keep" ] \
+    && [ ! -f "$CASE/logs/stamps/junk" ]; then
+    ok D6
+else
+    fail D6 "rc=$RC old=$([ -f "$CASE/logs/stamps/old" ] && echo present || echo absent) keep=$([ -f "$CASE/logs/stamps/keep" ] && echo present || echo absent) junk=$([ -f "$CASE/logs/stamps/junk" ] && echo present || echo absent)"
+fi
+
+# ---------------------------------------------------------------------------
+# D7: stale one-shot only → INFO line, no DM, exit 0
+# ---------------------------------------------------------------------------
+healthy_fixture D7
+touch "$CASE/home/Library/LaunchAgents/com.ibl5.plan-now-20260101-000000.plist"
+OUT="$(HOME="$CASE/home" PATH="$CASE/bin:$PATH" \
+      DOCKER_BIN="$CASE/bin/docker" \
+      DB_QUERY_BIN="$CASE/bin/db-query" \
+      DISCORD_DM_BIN="$CASE/bin/fake-dm" \
+      LAUNCHD_HEALTH_LOG_DIR="$CASE/logs" \
+      LAUNCHD_HEALTH_TODAY=2026-09-28 \
+      bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
+RC=$?
+if [ "$RC" -eq 0 ] \
+    && grep -q 'INFO.*stale-oneshot' <<< "$OUT" \
+    && [ ! -f "$CASE/dm.log" ]; then
+    ok D7
+else
+    fail D7 "rc=$RC dm=$([ -f "$CASE/dm.log" ] && echo present || echo absent) out=$OUT"
+fi
+
+# ---------------------------------------------------------------------------
+# D8: two problems; one pre-stamped → new=1 suppressed=1
+# ---------------------------------------------------------------------------
+healthy_fixture D8
+grep -v -E 'com\.ibl5\.(db-sync-nightly|docfix-poll)' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
+mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
+rm -f "$CASE/home/Library/LaunchAgents/com.ibl5.db-sync-nightly.plist" \
+      "$CASE/home/Library/LaunchAgents/com.ibl5.docfix-poll.plist"
+mkdir -p "$CASE/logs/stamps"
+# Pre-stamp one of the two problems
+printf '2026-09-28\n' > "$CASE/logs/stamps/missing_com.ibl5.db-sync-nightly"
+OUT="$(HOME="$CASE/home" PATH="$CASE/bin:$PATH" \
+      DOCKER_BIN="$CASE/bin/docker" \
+      DB_QUERY_BIN="$CASE/bin/db-query" \
+      DISCORD_DM_BIN="$CASE/bin/fake-dm" \
+      LAUNCHD_HEALTH_LOG_DIR="$CASE/logs" \
+      LAUNCHD_HEALTH_TODAY=2026-09-28 \
+      bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
+RC=$?
+_DM8="$(cat "$CASE/dm.log" 2>/dev/null)"
+if [ "$RC" -eq 1 ] \
+    && grep -q 'new=1' <<< "$OUT" \
+    && grep -q 'suppressed=1' <<< "$OUT" \
+    && grep -q 'dm=sent' <<< "$OUT" \
+    && grep -q 'com.ibl5.docfix-poll' <<< "$_DM8" \
+    && grep -q 'already reported today' <<< "$_DM8" \
+    && ! grep -q 'com.ibl5.db-sync-nightly' <<< "$_DM8"; then
+    ok D8
+else
+    fail D8 "rc=$RC out=$OUT dm_body=$_DM8"
+fi
+
+# ---------------------------------------------------------------------------
+# D9: unwritable stamp dir → DM still sent, stderr has WARN:, script does not abort
+# ---------------------------------------------------------------------------
+healthy_fixture D9
+grep -v 'com.ibl5.db-sync-nightly' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
+mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
+# Create unwritable parent dir
+mkdir -p "$CASE/logs"
+chmod 500 "$CASE/logs"
+_STDERR9="$(HOME="$CASE/home" PATH="$CASE/bin:$PATH" \
+      DOCKER_BIN="$CASE/bin/docker" \
+      DB_QUERY_BIN="$CASE/bin/db-query" \
+      DISCORD_DM_BIN="$CASE/bin/fake-dm" \
+      LAUNCHD_HEALTH_LOG_DIR="$CASE/logs" \
+      LAUNCHD_HEALTH_TODAY=2026-09-28 \
+      bash "$SCRIPT_DIR/launchd-health-check" 2>&1 1>/dev/null)"
+OUT="$(HOME="$CASE/home" PATH="$CASE/bin:$PATH" \
+      DOCKER_BIN="$CASE/bin/docker" \
+      DB_QUERY_BIN="$CASE/bin/db-query" \
+      DISCORD_DM_BIN="$CASE/bin/fake-dm" \
+      LAUNCHD_HEALTH_LOG_DIR="$CASE/logs" \
+      LAUNCHD_HEALTH_TODAY=2026-09-28 \
+      bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
+RC=$?
+chmod 700 "$CASE/logs"
+if [ "$RC" -eq 1 ] \
+    && grep -q 'WARN:' <<< "$_STDERR9" \
+    && grep -q 'launchd-health: FAIL' <<< "$OUT"; then
+    ok D9
+else
+    fail D9 "rc=$RC stderr=$_STDERR9 out=$OUT"
 fi
 
 # ---------------------------------------------------------------------------

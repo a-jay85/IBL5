@@ -2,9 +2,12 @@
 # bin/launchd-health-check — daily and at-login check for com.ibl5.* launchd jobs.
 #
 # Test seams (env overrides; production never sets these):
-#   DOCKER_BIN              override the docker binary
-#   DB_QUERY_BIN            override bin/db-query for the phase lookup
-#   LAUNCHD_HEALTH_JOBS_LIB override bin/lib/launchd-expected-jobs.sh
+#   DOCKER_BIN                override the docker binary
+#   DB_QUERY_BIN              override bin/db-query for the phase lookup
+#   DISCORD_DM_BIN            override bin/discord-dm for DM sends
+#   LAUNCHD_HEALTH_JOBS_LIB   override bin/lib/launchd-expected-jobs.sh
+#   LAUNCHD_HEALTH_LOG_DIR    override the log/stamp directory root
+#   LAUNCHD_HEALTH_TODAY      override today's date (YYYY-MM-DD)
 #
 # Exit codes: 0 = healthy  1 = >=1 problem  2 = usage error
 #
@@ -12,6 +15,10 @@
 # shellcheck shell=bash
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="${LAUNCHD_HEALTH_LOG_DIR:-$HOME/Library/Logs/ibl5/launchd-health}"
+STAMP_DIR="$LOG_DIR/stamps"
+TODAY="${LAUNCHD_HEALTH_TODAY:-$(date +%Y-%m-%d)}"
+DISCORD_DM="${DISCORD_DM_BIN:-$SCRIPT_DIR/discord-dm}"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 . "$SCRIPT_DIR/lib/launchd-job.sh"
 # shellcheck source=bin/lib/launchd-expected-jobs.sh
@@ -29,6 +36,73 @@ INFO_LINES=()
 
 add_problem() { PROBLEM_KEYS+=("$1"); PROBLEM_MSGS+=("$2"); }
 add_info()    { INFO_LINES+=("$1"); }
+
+# _lhc_date_sub2 <YYYY-MM-DD> — print the date 2 days before the argument.
+# Tries BSD date first (macOS), falls back to GNU date (Linux CI).
+_lhc_date_sub2() {
+    date -j -v-2d -f "%Y-%m-%d" "$1" +"%Y-%m-%d" 2>/dev/null \
+        || date -d "$1 - 2 days" +"%Y-%m-%d" 2>/dev/null
+}
+
+# stamp_path <key> — print the path for this problem key's stamp file.
+stamp_path() {
+    printf '%s/%s\n' "$STAMP_DIR" "$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_')"
+}
+
+# rotate_stamps — delete stamp files older than 2 days or with corrupt content.
+rotate_stamps() {
+    [ -d "$STAMP_DIR" ] || return 0
+    local cutoff f content
+    cutoff="$(_lhc_date_sub2 "$TODAY")" || cutoff=""
+    for f in "$STAMP_DIR"/*; do
+        [ -f "$f" ] || continue
+        content="$(head -1 "$f" 2>/dev/null)"
+        if [[ "$content" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            [ -n "$cutoff" ] && [[ "$content" < "$cutoff" ]] && rm -f "$f"
+        else
+            rm -f "$f"
+        fi
+    done
+}
+
+# is_stamped_today <key> — 0 when the stamp file exists and holds today's date.
+is_stamped_today() {
+    local f; f="$(stamp_path "$1")"
+    [ -f "$f" ] && [ "$(head -1 "$f" 2>/dev/null)" = "$TODAY" ]
+}
+
+# write_stamp <key> — atomically write today's date to the stamp file.
+write_stamp() {
+    local f; f="$(stamp_path "$1")"
+    local tmp="$f.tmp.$$"
+    if printf '%s\n' "$TODAY" > "$tmp" && mv -f "$tmp" "$f" 2>/dev/null; then
+        return 0
+    fi
+    rm -f "$tmp" 2>/dev/null
+    printf 'WARN: could not write stamp for %s\n' "$1" >&2
+    return 0
+}
+
+# send_dm — build and send a DM for problems in NEW_KEYS/NEW_MSGS.
+# Sets DM_STATUS=sent and writes stamps on success, DM_STATUS=failed otherwise.
+send_dm() {
+    local hostname body i
+    hostname="$(hostname -s 2>/dev/null || hostname)"
+    body="launchd health check: ${#NEW_KEYS[@]} new problem(s) on $hostname, $TODAY"
+    for ((i=0; i<${#NEW_MSGS[@]}; i++)); do
+        body="$body
+- ${NEW_MSGS[$i]}"
+    done
+    [ "$SUPPRESSED" -gt 0 ] && body="$body
+($SUPPRESSED more already reported today)"
+    DM_STATUS=failed
+    if printf '%s\n' "$body" | "$DISCORD_DM" --chunk -; then
+        DM_STATUS=sent
+        for ((i=0; i<${#NEW_KEYS[@]}; i++)); do
+            write_stamp "${NEW_KEYS[$i]}"
+        done
+    fi
+}
 
 parse_args() {
     while [ $# -gt 0 ]; do
@@ -161,13 +235,15 @@ print_verdict() {
         printf 'INFO: %s\n' "${INFO_LINES[$i]}"
     done
     for ((i=0; i<${#PROBLEM_KEYS[@]}; i++)); do
-        printf 'PROBLEM %s: %s\n' "${PROBLEM_KEYS[$i]}" "${PROBLEM_MSGS[$i]}"
+        printf 'FAIL: %s: %s\n' "${PROBLEM_KEYS[$i]}" "${PROBLEM_MSGS[$i]}"
     done
     local n=${#PROBLEM_KEYS[@]}
+    local ts; ts="$(date '+%Y-%m-%dT%H:%M:%S')"
     if [ "$n" -eq 0 ]; then
-        printf 'OK\n'
+        printf '%s launchd-health: OK\n' "$ts"
     else
-        printf 'PROBLEMS: %d\n' "$n"
+        printf '%s launchd-health: FAIL problems=%d new=%d suppressed=%d dm=%s\n' \
+            "$ts" "$n" "${#NEW_KEYS[@]}" "$SUPPRESSED" "$DM_STATUS"
     fi
 }
 
@@ -178,6 +254,23 @@ main() {
     check_launchd
     check_oneshots
     check_docker
+    mkdir -p "$STAMP_DIR" 2>/dev/null || printf 'WARN: stamp dir unavailable: %s\n' "$STAMP_DIR" >&2
+    rotate_stamps
+    NEW_KEYS=(); NEW_MSGS=(); SUPPRESSED=0; DM_STATUS=none
+    local i
+    for ((i=0; i<${#PROBLEM_KEYS[@]}; i++)); do
+        if is_stamped_today "${PROBLEM_KEYS[$i]}"; then
+            SUPPRESSED=$((SUPPRESSED+1))
+        else
+            NEW_KEYS+=("${PROBLEM_KEYS[$i]}")
+            NEW_MSGS+=("${PROBLEM_MSGS[$i]}")
+        fi
+    done
+    if [ "${#NEW_KEYS[@]}" -gt 0 ]; then
+        send_dm
+    elif [ "$SUPPRESSED" -gt 0 ]; then
+        DM_STATUS=suppressed
+    fi
     print_verdict
     [ ${#PROBLEM_KEYS[@]} -eq 0 ]
 }

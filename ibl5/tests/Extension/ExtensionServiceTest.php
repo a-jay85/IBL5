@@ -14,6 +14,11 @@ use Team\Contracts\TeamCapCalculatorInterface;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 use Tests\WideUnit\Mocks\MockDatabase;
+use Extension\ExtensionOfferEvaluator;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Season\Season;
+use Team\TeamCapCalculator;
+use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 
 /**
  * ExtensionServiceTest - Tests for ExtensionService
@@ -298,6 +303,84 @@ class ExtensionServiceTest extends TestCase
         $capturedPids = array_map(static fn(array $row): int => (int) $row['pid'], $capturedRows);
         $this->assertNotContains($extendedPlayerPid, $capturedPids, 'Extended player should be excluded from position salary calculation');
         $this->assertContains($teammatePid, $capturedPids, 'Teammate should remain in position salary calculation');
+    }
+
+    /**
+     * @return array<string, array{bool, bool, int}>
+     */
+    public static function moneyCommittedPhaseProvider(): array
+    {
+        return [
+            'Regular Season' => [false, false, 800],
+            'Playoffs' => [true, false, 1100],
+            'Free Agency' => [true, true, 1100],
+        ];
+    }
+
+    /**
+     * Pins PR #2140: extension pricing reads the next-season basis through
+     * advancesContractYears(), so Playoffs already prices teammates at cy+2 like
+     * the offseason. The extended player (pid 1) is excluded before summing.
+     */
+    #[DataProvider('moneyCommittedPhaseProvider')]
+    public function testMoneyCommittedAtPositionUsesPhaseAwareNextSeasonBasis(bool $advances, bool $offseason, int $expected): void
+    {
+        $mockData = $this->getFullMockData([
+            'pid' => 1,
+            'loyalty' => 5,
+            'contract_wins' => 60,
+            'contract_losses' => 22,
+        ]);
+        $this->mockDb->setMockData([$mockData]);
+
+        $extendedRow = array_merge($mockData, ['pid' => 1, 'cy' => 1, 'cyt' => 5, 'salary_yr2' => 900, 'salary_yr3' => 950]);
+        $teammateA = array_merge($mockData, ['pid' => 2, 'name' => 'Teammate A', 'cy' => 1, 'cyt' => 5, 'salary_yr2' => 500, 'salary_yr3' => 700]);
+        $teammateB = array_merge($mockData, ['pid' => 3, 'name' => 'Teammate B', 'cy' => 1, 'cyt' => 5, 'salary_yr2' => 300, 'salary_yr3' => 400]);
+
+        $stubTeamQueryRepo = self::createStub(TeamQueryRepositoryInterface::class);
+        $stubTeamQueryRepo->method('getPlayersUnderContractByPosition')
+            ->willReturn([$extendedRow, $teammateA, $teammateB]);
+
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn($advances);
+        $season->method('isOffseasonPhase')->willReturn($offseason);
+
+        $calculator = new TeamCapCalculator(
+            $this->mockDb,
+            $stubTeamQueryRepo,
+            self::createStub(BuyoutLedgerRepositoryInterface::class),
+            $season
+        );
+
+        /** @var array<string, mixed>|null $captured */
+        $captured = null;
+        $evaluator = self::createStub(ExtensionOfferEvaluatorInterface::class);
+        $evaluator->method('evaluateOffer')
+            ->willReturnCallback(function (array $offer, array $demands, array $teamFactors, array $prefs) use (&$captured): array {
+                $captured = $teamFactors;
+                return (new ExtensionOfferEvaluator())->evaluateOffer($offer, $demands, $teamFactors, $prefs);
+            });
+
+        $service = new ExtensionService(
+            $this->mockDb,
+            'localhost',
+            null,
+            null,
+            $evaluator,
+            $stubTeamQueryRepo,
+            $calculator
+        );
+
+        $result = $service->processExtension([
+            'teamName' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offer' => ['year1' => 1000, 'year2' => 1100, 'year3' => 1200, 'year4' => 0, 'year5' => 0],
+            'demands' => null,
+        ]);
+
+        $this->assertTrue($result['success']);
+        $this->assertIsArray($captured);
+        $this->assertSame($expected, $captured['money_committed_at_position']);
     }
 
     /**

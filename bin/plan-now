@@ -927,7 +927,7 @@ if [ "$rc" -eq 0 ] && [ -n "$newfiles" ]; then
     while IFS= read -r f; do
         [ -n "$f" ] && [ "$f" != "$identified" ] || continue
         case "$(basename "$f")" in *-shared-context.md | README.md) continue ;; esac
-        grep -qF "$(basename "$f")" "$OUT" 2>/dev/null || continue
+        grep -qF "$f" "$OUT" 2>/dev/null || continue
         split_siblings="$split_siblings $(basename "$f")"
     done <<< "$newfiles"
     if [ -n "$split_siblings" ]; then

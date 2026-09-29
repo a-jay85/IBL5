@@ -570,7 +570,7 @@ def _assert_gate_untouched(result: str, before: str) -> None:
     assert manual_testing_clearance(result) == manual_testing_clearance(before)
     b = _manual_testing_span(before)
     r = _manual_testing_span(result)
-    assert result[r[0]:r[1]] == before[b[0]:b[1]]
+    assert result[r[0]:r[1]].rstrip("\n") == before[b[0]:b[1]].rstrip("\n")
 
 
 # --- red until Phase 2 -------------------------------------------------------

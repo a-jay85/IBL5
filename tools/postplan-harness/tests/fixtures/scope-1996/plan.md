@@ -1,0 +1,75 @@
+# Plan: boxscore schedule guard (PR #1996 replay fixture)
+
+## Critical Files
+
+- `ibl5/classes/Boxscore/ScheduleMembershipGuard.php` (new — the accept/reject decision; rule order and the exemption constants are the whole feature)
+- `ibl5/classes/Boxscore/BoxscoreProcessor.php` (wire the guard into `processScoData()` as skip-and-record; the never-abort contract lives here)
+- `ibl5/classes/Boxscore/BoxscoreRepository.php` (schedule-key and existing-triple preload, `recordRejectedGames()`, and the two gotd-widened WHERE clauses)
+- `ibl5/classes/Boxscore/ScheduleReconciliationAudit.php` (new — the two-sided audit; orphan direction strict, missing direction warning-only)
+- `ibl5/classes/Boxscore/RejectSummary.php` (new — composes the count, date span, triple sample, source archive and audit note for both output surfaces)
+- `ibl5/classes/Boxscore/BoxscoreView.php` (reject block in `renderParseLog()` — the user-visible half of Part 2)
+- `ibl5/classes/Boxscore/Contracts/BoxscoreProcessorInterface.php` (signature and return-shape change that binds every caller)
+- `ibl5/classes/Updater/Steps/ProcessBoxscoresStep.php` (never-abort wiring, Discord post, audit note, selection warnings)
+- `ibl5/classes/Updater/SourceProvenance.php` (new — carries the selected archive and its warnings from the resolver to the processor)
+- `ibl5/classes/Updater/JsbSourceResolver.php` (surfaces the selection and its warnings; `findLatestArchive()` re-runs per `getContents()` call)
+- `ibl5/classes/BulkImport/BackupArchiveLocator.php` (archive-selection logging and the sequence/size regression detectors — Part 4)
+- `ibl5/classes/BulkImport/ArchiveSelection.php` (new — the ranked selection value object extracted from the locator)
+- `ibl5/classes/BulkImport/Contracts/BackupArchiveLocatorInterface.php` (adds `describeSelection`)
+- `ibl5/classes/JsbParser/JsbImportResult.php` (carries the rejected count through the import result)
+- `ibl5/scripts/updateAllTheThings.php` (composition root — construction order and the boxscore repository injection)
+- `ibl5/scripts/reconstruct_2007_asg_boxscores.php` (fourth caller of `deletePlayerBoxscoresByGame()`; a 3-arg survivor is a hard static-analysis error at level max)
+- `bin/check-boxscore-schedule` (new — bash wrapper for the audit and replay CLI)
+- `ibl5/bin/check-boxscore-schedule-run` (new — PHP entry point; must be added to `ibl5/phpstan.neon` in the same commit)
+- `ibl5/migrations/163_create_schedule_guard_rejects.sql` (new — the reject audit table; forward-only, no destructive DDL)
+- `ibl5/phpstan.neon` (registers the new PHP entry point; omission fails the bin-coverage gate)
+- `ibl5/docs/decisions/0104-boxscore-schedule-reconciliation-severity.md` (new ADR — create it with the number `bin/next-adr` assigns, then add its index row)
+- `ibl5/tests/Boxscore/ScheduleMembershipGuardTest.php` (new — rows 4, 5, 6)
+- `ibl5/tests/Boxscore/BoxscoreProcessorTest.php` (characterization row 17 and its inversion; also owns the `.sco` fixture builders)
+- `ibl5/tests/DatabaseIntegration/BoxscoreRepositoryTest.php` (characterization rows 18–19 and their inversions; row 12)
+- `ibl5/tests/DatabaseIntegration/ScheduleReconciliationAuditTest.php` (new — rows 8, 9, 10)
+- `ibl5/tests/DatabaseIntegration/ScheduleGuardRejectsTest.php` (new — row 21)
+- `ibl5/tests/Cli/CheckBoxscoreScheduleCliTest.php` (new — row 24, host-run `#[Group('cli')]`)
+- `ibl5/tests/Updater/ProcessBoxscoresStepTest.php` (row 7 — the never-abort contract)
+- `ibl5/tests/Boxscore/RejectSummaryTest.php` (new — row 13)
+- `ibl5/tests/Unit/BulkImport/BackupArchiveLocatorTest.php` (row 14)
+- `ibl5/tests/DatabaseIntegration/AllStarScoReconstructionTest.php` (four call sites broken by the widened delete signature; must be fixed in the same run as Phase 5)
+- `ibl5/classes/Updater/Steps/RefreshPlayoffSeriesResultsStep.php` (read-only reference — owned by a concurrent session, do not edit)
+
+## Verification Matrix
+
+**How to read the matrix.** Rows **1–14** are the acceptance criteria named in the task, in the task's own order. Every cross-reference elsewhere in this plan (`matrix row 8`, `matrix rows 1 and 2`, and so on) points at that numbering, so those numbers are frozen: do not renumber them when adding rows. Rows **15–27** are this plan's own additions — the two human-judgment rows, the four pre-impl characterization rows that Phase 1 writes and Phases 4/5 invert, and the standing hygiene gates.
+
+Baseline discipline, restated because it decides three rows' expected values: rows 1, 2, 3 and 5 are measured on **Baseline B** (the remediated scratch snapshot, Phase 11 §11.5); rows 8–11 are measured on **Baseline A** (the untouched `bin/db-sync-prod` snapshot). A Baseline A number in a Baseline B row is a real bug in rule 5's index seeding, not a transcription slip — Phase 11 §11.1 explains why both readings are correct.
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Playoffs archive replay on Baseline B rejects all 565 of its games — 562 `REASON_NOT_IN_SCHEDULE` plus 3 `REASON_DUPLICATE_TRIPLE`, 0 accepted, and the two reasons partition the file with no remainder | CLI-executable | post-impl | `cd /Users/ajaynicolas/GitHub/IBL5-worktrees/boxscore-schedule-guard && bin/check-boxscore-schedule --replay=/Users/ajaynicolas/GitHub/IBL5/ibl5/backups/07-08/07-08_36_playoffs.zip --season=2008 --phase=Playoffs --json` (one-shot) |
+| 2 | HEAT archive replay rejects all 139 of its games by membership alone — 139 `REASON_NOT_IN_SCHEDULE` and **0** `REASON_DUPLICATE_TRIPLE`, proving rule 5 contributes nothing there and the month-10 exemption does not rescue Feb–Jun decoded dates | CLI-executable | post-impl | `cd /Users/ajaynicolas/GitHub/IBL5-worktrees/boxscore-schedule-guard && bin/check-boxscore-schedule --replay=/Users/ajaynicolas/GitHub/IBL5/ibl5/backups/07-08/07-08_08_heat.zip --season=2008 --phase=HEAT --json` (one-shot) |
+| 3 | Zero false rejects: replaying a clean regular-season archive on Baseline B reports `rejected = 0`, corroborating the persisted-set reading that all 1,234 real 2008 games pass rule 4 (identity 1235 played − 1 without a boxscore = 1234) | CLI-executable | post-impl | `cd /Users/ajaynicolas/GitHub/IBL5-worktrees/boxscore-schedule-guard && bin/check-boxscore-schedule --replay=/Users/ajaynicolas/GitHub/IBL5/ibl5/backups/07-08/07-08_34_reg-sim23.zip --season=2008 --phase=Regular --json` (one-shot) |
+| 4 | Quadruple anti-regression: `2008-06-14` visitor 19 @ home 21 is ACCEPTED even though its boxscore `game_of_that_day` is 4 while its schedule row ranks 2nd that date — `game_of_that_day` is a sim-assigned per-date ordinal and is never part of the membership key | PHPUnit | post-impl | `ibl5/tests/Boxscore/ScheduleMembershipGuardTest.php` |
+| 5 | All-Star exemption: teams 40/41 on `2008-02-02` and 50/51 on `2008-02-03` are ACCEPTED with no `ibl_schedule` row, and are not registered in the `game_of_that_day` index, so a re-import of the same weekend also accepts | PHPUnit | post-impl | `ibl5/tests/Boxscore/ScheduleMembershipGuardTest.php` |
+| 6 | Off-schedule months: preseason and HEAT games in decoded months 8, 9 and 10 are ACCEPTED with no schedule row — including the month-**9** case a literal `game_type = 3` test would miss, since `game_type` is a STORED expression over `MONTH(game_date)` yielding 3 for month 10 only | PHPUnit | post-impl | `ibl5/tests/Boxscore/ScheduleMembershipGuardTest.php` |
+| 7 | Never-abort contract: with 565 rejects in hand `ProcessBoxscoresStep::execute()` still returns `StepResult::success(...)`, throws nothing, leaves `errorCount` unincremented by rejects, inserts 0 rows, and leaves both boxscore tables' `COUNT(*)` identical either side of the run | PHPUnit | post-impl | `ibl5/tests/Updater/ProcessBoxscoresStepTest.php` |
+| 8 | Audit orphan direction is strict: a boxscore whose triple has no `ibl_schedule` row is an error-severity finding and raises the process exit code to 1 | PHPUnit | post-impl | `ibl5/tests/DatabaseIntegration/ScheduleReconciliationAuditTest.php` |
+| 9 | Audit missing direction is warning-only: the live `2008-06-25` visitor 3 @ home 19 played-but-unboxscored game is reported as a warning and does **not** on its own raise the exit code above 0 | PHPUnit | post-impl | `ibl5/tests/DatabaseIntegration/ScheduleReconciliationAuditTest.php` |
+| 10 | Audit benign case: the 15 scheduled-but-unplayed 2008 rows (`visitor_score = 0 AND home_score = 0`) produce zero findings of any severity, because the missing direction filters on played-ness | PHPUnit | post-impl | `ibl5/tests/DatabaseIntegration/ScheduleReconciliationAuditTest.php` |
+| 11 | Prod anchor: on the untouched Baseline A snapshot the audit reproduces the incident exactly — 618 orphan findings + 3 duplicate-triple findings = 621, exit code 1 | CLI-executable | post-impl | `cd /Users/ajaynicolas/GitHub/IBL5-worktrees/boxscore-schedule-guard && bin/check-boxscore-schedule --season=2008 --json` (one-shot) |
+| 12 | `deletePlayerBoxscoresByGame()` with the same `(game_date, visitor_teamid, home_teamid)` triple but a different `game_of_that_day` removes only the matching-gotd rows and leaves the sibling game intact; `hasNullTeamIdPlayerBoxscores()` is scoped the same way | PHPUnit | post-impl | `ibl5/tests/DatabaseIntegration/BoxscoreRepositoryTest.php` |
+| 13 | Reject reporting carries all four required facts — count 565, date span `2008-02-05` to `2008-06-06`, a sample of offending triples, and the source archive `07-08_36_playoffs.zip` — in both the rendered updater output and the composed Discord payload, captured at the `postToDiscord()` seam and staying under the 1,900-character cap at 565 rejects | PHPUnit | post-impl | `ibl5/tests/Boxscore/RejectSummaryTest.php` |
+| 14 | Provenance: the selected archive is logged by name once per selection, and out-of-season `.sco` contents raise a warning naming the phase mismatch and a sample date — on the HEAT archive detector (A) stays quiet (parsed ending year 2008 matches the operating season) while detector (B) fires on the Feb–Jun decoded dates | PHPUnit | post-impl | `ibl5/tests/Unit/BulkImport/BackupArchiveLocatorTest.php` |
+| 15 | A human loads the updater output page after a rejecting run and reads the new reject block — the badge count, date span, triple list and source-archive line render legibly, are HTML-escaped, and are not truncated mid-row | Truly-manual | post-impl | `http://boxscore-schedule-guard.localhost/ibl5/scripts/updateAllTheThings.php` (human reads the rendered page) |
+| 16 | A human applies the Phase 11 §11.8 scratch mutation that adds `game_of_that_day` to rule 4's membership key, re-runs the playoffs replay, reads that `2008-06-14 19@21` flips to rejected and the accepted counts move, then reverts the mutation and leaves `git status` clean | Truly-manual | post-impl | Plan Phase 11 §11.8 (scratch mutation, applied and reverted by hand) |
+| 17 | Characterization: today `processScoData()` inserts a game whose triple is absent from `ibl_schedule` — the 621-phantom defect, pinned as a passing assertion that Phase 4 inverts | PHPUnit | pre-impl | `ibl5/tests/Boxscore/BoxscoreProcessorTest.php` |
+| 18 | Characterization: today `deletePlayerBoxscoresByGame()` ignores `game_of_that_day` and removes sibling-gotd rows sharing the triple — pinned as a passing assertion that Phase 5 inverts | PHPUnit | pre-impl | `ibl5/tests/DatabaseIntegration/BoxscoreRepositoryTest.php` |
+| 19 | Characterization: today `hasNullTeamIdPlayerBoxscores()` leaks across `game_of_that_day` and reports true for a sibling game's null-teamid rows — pinned as a passing assertion that Phase 5 inverts | PHPUnit | pre-impl | `ibl5/tests/DatabaseIntegration/BoxscoreRepositoryTest.php` |
+| 20 | Baseline A anchors match the incident database before any number below is trusted: 1250 `ibl_schedule` rows for `season_year = 2008`, of which 1235 played and 15 unplayed | CLI-executable | pre-impl | `cd /Users/ajaynicolas/GitHub/IBL5-worktrees/boxscore-schedule-guard && bin/db-query "SELECT COUNT(*) AS sched_total, SUM(NOT (visitor_score=0 AND home_score=0)) AS sched_played FROM ibl_schedule WHERE season_year=2008"` |
+| 21 | Migration 163 applies forward-only and creates `schedule_guard_rejects` with the planned columns and the `idx_season_rejected` index | PHPUnit | post-impl | `ibl5/tests/DatabaseIntegration/ScheduleGuardRejectsTest.php` |
+| 22 | Migration 163 carries no destructive DDL and passes the repo's migration-safety scan | CLI-executable | post-impl | `cd /Users/ajaynicolas/GitHub/IBL5-worktrees/boxscore-schedule-guard && bin/check-destructive-migrations` |
+| 23 | The read path closes the loop: after the never-abort run on Baseline B, listing the 5 most recent rejects shows 5 of the 565, each carrying `source_archive = 07-08_36_playoffs.zip` and a reason of `not-in-schedule` or `duplicate-triple`, and exits 0 | CLI-executable | post-impl | `cd /Users/ajaynicolas/GitHub/IBL5-worktrees/boxscore-schedule-guard && bin/check-boxscore-schedule --season=2008 --rejects=5` (one-shot) |
+| 24 | The CLI wrapper's negative paths hold: `--help` exits 0 printing usage including the new flags, an unknown flag exits 2 with usage on stderr, a non-numeric `--rejects` value exits 2, and a `--replay` path outside the checkout exits 2 | PHPUnit | post-impl | `ibl5/tests/Cli/CheckBoxscoreScheduleCliTest.php` |
+| 25 | Static analysis is clean under both configurations — `classes/`, `scripts/` and the newly registered `ibl5/bin/check-boxscore-schedule-run` at level max, and `tests/` at level 6 with branch `classes/` signatures resolving from this checkout | CLI-executable | post-impl | `cd /Users/ajaynicolas/GitHub/IBL5-worktrees/boxscore-schedule-guard/ibl5 && composer run analyse && composer run analyse:tests` |
+| 26 | The new bash wrapper is shellcheck-clean and executable | CLI-executable | post-impl | `cd /Users/ajaynicolas/GitHub/IBL5-worktrees/boxscore-schedule-guard && shellcheck bin/check-boxscore-schedule && test -x bin/check-boxscore-schedule` (one-shot) |
+| 27 | Both parallel `ProcessBoxscoresStepTest` suites and the full unit and database groups are green against a restored Baseline A snapshot | CLI-executable | post-impl | `cd /Users/ajaynicolas/GitHub/IBL5-worktrees/boxscore-schedule-guard/ibl5 && bin/test unit && bin/test db` |
+
+**Negative-path coverage, row by row** (the matrix's own unhappy paths, so no phase ships a happy-path-only assertion): row 2 is the negative half of row 1 (a reject reason that must contribute **zero**); row 3 is the negative of rows 1–2 (the guard must reject **nothing** real); rows 4, 5 and 6 are three independent over-rejection negatives; row 7 is the negative of every reject path (rejecting must not become failing); row 9 is the negative of row 8 (a finding that must **not** gate); row 10 is the benign-input negative; row 12's assertion is that a delete must **not** reach the sibling row; row 16 is a mutation check whose whole purpose is to prove row 4 can fail; row 24 collects the CLI's four error exits.
+

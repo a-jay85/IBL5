@@ -49,6 +49,9 @@ DONE_DIR="$NIGHTLY_DIR/done"
 
 mkdir -p "$QUEUE_DIR"
 
+# shellcheck source=bin/automouse/lib-queue-order
+source "$(cd "$(dirname "$0")" && pwd)/lib-queue-order"
+
 # Evict any stale same-basename disposition symlink (and its sidecar counters)
 # from skipped/ and done/ before (re)queuing. queue/ is the cut vertex: a plan
 # can land in two disposition folders only if a stale sibling survives queue
@@ -60,29 +63,25 @@ evict_dispositions() {
 }
 
 # --- Run-order stamping -----------------------------------------------------
-# lstat mtime (epoch) of $1 — never dereferences: GNU `stat` and BSD `stat` both
-# default to lstat, so a symlink reports its OWN mtime. GNU (-c %Y) first for
-# Linux CI, BSD (-f %m) fallback for the macOS automouse host.
-lstat_mtime() {
-    stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
-}
+# lstat_mtime and queue_entries_ordered are provided by lib-queue-order (sourced
+# above). Run order is the symlink's own lstat mtime (oldest-first), computed by
+# queue_entries_ordered — which is portable across BSD and GNU stat without
+# dereferences. Editing a queued plan's TARGET file no longer changes its
+# position: only touch -h on the queue symlink itself affects order.
 
 # Stamp a just-queued entry to the BACK of the run order.
 #
-# Run order is `ls -1tr "$QUEUE_DIR"/*.md` (oldest-first), and the glob hands
-# `ls` the symlinks as command-line OPERANDS, which BSD `ls` dereferences — so
-# on the macOS host the sort key is the readlink TARGET's mtime, while GNU `ls`
-# uses the symlink's own lstat mtime. Either way, an entry created by a bare
-# `ln -s` / `mv` inherits its queue position from whenever the plan file
-# happened to be authored. That is not "the back": `reorder` writes its ladder
-# into the PAST (now - N*60), so any plan authored before the last reorder
-# jumps to the FRONT and runs next. Stamp explicitly instead.
+# Run order is oldest symlink lstat mtime first (queue_entries_ordered). An
+# entry created by a bare `ln -s` / `mv` inherits its queue position from
+# whenever the plan file happened to be authored. That is not "the back":
+# `reorder` writes its ladder into the PAST (now - N*60), so any plan authored
+# before the last reorder jumps to the FRONT and runs next. Stamp explicitly.
 #
-# Stamp = max(now, newest existing entry + 60s) — the +60 mirrors `reorder`'s
-# spacing so a same-second tie can never let `ls` fall back to filename order,
+# Stamp = max(now, newest existing SYMLINK lstat mtime + 60s) — the +60 mirrors
+# `reorder`'s spacing so a same-second tie can never produce ambiguous order,
 # and the max() keeps us behind a ladder already stamped at or past now.
-# Both the symlink (GNU sort key) and its target (BSD sort key) are touched,
-# exactly as `reorder` does, so the two platforms agree.
+# The symlink (sort key) is touched with -h; the target is also touched for
+# dev-inspection parity (harmless — it no longer affects ordering).
 stamp_back_of_queue() {
     local name=$1
     local newest=0 f m t epoch stamp
@@ -93,13 +92,10 @@ stamp_back_of_queue() {
         # statement status on a NON-match, which `set -e` would treat as a fatal
         # error and abort the stamp mid-scan.
         if [ "$(basename "$f")" = "$name" ]; then continue; fi
+        # Sort key is the SYMLINK's own lstat mtime only — target mtime is no
+        # longer the sort key, so we skip scanning it here.
         m=$(lstat_mtime "$f") || m=""
         if [ -n "$m" ] && [ "$m" -gt "$newest" ]; then newest=$m; fi
-        t=$(readlink "$f" 2>/dev/null) || t=""
-        if [ -n "$t" ] && [ -e "$t" ]; then
-            m=$(lstat_mtime "$t") || m=""
-            if [ -n "$m" ] && [ "$m" -gt "$newest" ]; then newest=$m; fi
-        fi
     done
 
     epoch=$(date +%s)
@@ -139,7 +135,7 @@ show_queue() {
         auto_merge=${auto_merge:-true}
         printf "  %4d. %-44s %-17s %-6s  %s\n" "$i" "$name" "$impl_model" "$auto_merge" "$title"
         i=$((i + 1))
-    done < <(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null)
+    done < <(queue_entries_ordered)
     if [ "$found" -eq 0 ]; then
         echo "  (empty)"
     fi
@@ -202,12 +198,13 @@ if [ "$1" = "requeue" ]; then
     exit 0
 fi
 
-# Reorder the queue by re-touching the TARGET plan files with ascending mtimes.
-# automouse-run claims the oldest-mtime plan first (`ls -1tr`, which dereferences
-# the queue symlinks), so first arg = oldest = runs first. The argument list must
-# be an EXACT permutation of the current queue: every arg queued, none repeated,
-# counts equal. Validation is a full first pass — no mtime is touched unless it
-# passes, so a rejected reorder leaves the queue untouched.
+# Reorder the queue by re-touching both the queue SYMLINKS (the sort key) and
+# their target plan files with ascending mtimes. Run order is oldest symlink
+# lstat mtime first (queue_entries_ordered), so first arg = oldest = runs first.
+# The argument list must be an EXACT permutation of the current queue: every arg
+# queued, none repeated, counts equal. Validation is a full first pass — no
+# mtime is touched unless it passes, so a rejected reorder leaves the queue
+# untouched.
 if [ "$1" = "reorder" ]; then
     shift
     if [ $# -lt 1 ]; then
@@ -222,7 +219,7 @@ if [ "$1" = "reorder" ]; then
     while IFS= read -r f; do
         queued="$queued$(basename "$f") "
         queued_count=$((queued_count + 1))
-    done < <(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null)
+    done < <(queue_entries_ordered)
 
     if [ "$queued_count" -eq 0 ]; then
         echo "Error: the queue is empty; nothing to reorder." >&2
@@ -277,8 +274,9 @@ if [ "$1" = "reorder" ]; then
         # BSD (-r epoch) fallback for the macOS automouse host.
         epoch=$(( base + i * 60 ))
         stamp=$(date -d "@$epoch" +%Y%m%d%H%M.%S 2>/dev/null || date -r "$epoch" +%Y%m%d%H%M.%S)
-        # GNU ls -1tr sorts by symlink lstat mtime; BSD ls sorts by target stat mtime.
-        # Touch both so the reorder is visible on both Linux CI and macOS dev.
+        # Run order = symlink lstat mtime (queue_entries_ordered). Touch the symlink
+        # first (sort key, -h so the symlink itself is stamped, not its target);
+        # target touch keeps it in sync for dev inspection and is harmless.
         touch -h -t "$stamp" "$QUEUE_DIR/$name"
         touch    -t "$stamp" "$target"
         i=$((i + 1))

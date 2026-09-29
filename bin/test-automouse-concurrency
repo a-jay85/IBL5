@@ -200,6 +200,8 @@ chmod +x "$RUNNER"
 # run script). Copy the real prompt so `cat "$SELF_DIR/prompt-impl"` succeeds;
 # the stub claude ignores the content and only reads PLAN_FILE= from its args.
 cp "$REPO/bin/automouse/prompt-impl" "$ROOT/automouse/prompt-impl"
+# The runner also sources $SELF_DIR/lib-queue-order (queue_entries_ordered).
+cp "$REPO/bin/automouse/lib-queue-order" "$ROOT/automouse/lib-queue-order"
 
 RUN_DAY=$(date +%Y-%m-%d)
 echo "Seeded $N_PLANS plans. Launching two concurrent runners..."

@@ -52,6 +52,19 @@ test.describe('Mobile nav interaction tests', () => {
     expect(overflow).toBe('hidden');
   });
 
+  test('hamburger bars animate to X on open and reset on close', async ({ page }) => {
+    await openMobileMenu(page);
+    await expect(page.locator('#hamburger-top')).not.toHaveCSS('transform', 'none');
+    await expect(page.locator('#hamburger-bottom')).not.toHaveCSS('transform', 'none');
+    await expect(page.locator('#hamburger-middle')).toHaveCSS('opacity', '0');
+    await expect(page.locator('#nav-overlay')).toHaveCSS('opacity', '1');
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#hamburger-top')).toHaveCSS('transform', 'none');
+    await expect(page.locator('#hamburger-middle')).toHaveCSS('opacity', '1');
+    await expect(page.locator('#nav-overlay')).toHaveClass(/\bhidden\b/);
+  });
+
   test('league switcher present in mobile menu', async ({ page }) => {
     await openMobileMenu(page);
     await page.getByRole('button', { name: /season/i }).click();

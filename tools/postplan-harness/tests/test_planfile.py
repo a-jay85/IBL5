@@ -185,6 +185,7 @@ def test_executable_count_none_without_matrix():
     assert count_executable_matrix_rows(_NO_MATRIX) is None
 
 
+# Committed corpus: tests/fixtures/matrix_count/ (one .plan.txt per counter shape).
 _FIXTURE_DIR = pathlib.Path(__file__).parent / "fixtures" / "matrix_count"
 
 

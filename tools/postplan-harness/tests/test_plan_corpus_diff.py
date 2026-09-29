@@ -20,6 +20,8 @@ EXPECTED_FLIPS = {
     "repos-7-6-fetchallinlist-migration",
     "retire-pr-ready",
 }
+# Cell-scoped matching would flip two more plans (bug-pipeline-tick-utc-epoch-skew,
+# lastsimrecap-1-29-extract-subviews); both have real executable rows, so they must stay out of EXPECTED_FLIPS.
 UNBALANCED_FENCE_PLAN = "sonnet-recipe-completeness-lint"
 
 

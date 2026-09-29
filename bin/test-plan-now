@@ -195,6 +195,7 @@ run_case() {
     [ -x "$runner" ] || { printf 'could not get a runner out of plan-now:\n%s\n' "$dry"; return 1; }
     STUB_PLAN="$plan_path" STUB_TAIL="$tail_line" STUB_NO_PLAN="${STUB_NO_PLAN:-}" \
         STUB_PLAN_SRC="${STUB_PLAN_SRC:-}" STUB_RC="${STUB_RC:-0}" \
+        STUB_PLANFILE="${STUB_PLANFILE:-}" STUB_PLANFILE_SRC="${STUB_PLANFILE_SRC:-}" \
         QUEUE_FAIL="${QUEUE_FAIL:-}" QUEUE_ALREADY="${QUEUE_ALREADY:-}" DM_FAIL="${DM_FAIL:-}" \
         bash "$runner" 2>&1
     rm -f "$runner"
@@ -664,6 +665,22 @@ out=$(STUB_PLAN_SRC="$STALE_PLAN" DISP=--queue run_case "$P" "PLAN_FILE: $P")
 want    "a stale-path plan is named in the log"   "$out" "check-plan-staleness FAILED"
 want    "a stale-path plan is not queued"         "$out" "NOT queued"
 want_no "a stale-path plan never reaches queue"   "$out" "queued for automouse"
+
+# ── split siblings: a run that writes two plans queues one and names the other ──
+# The 2026-09-28 css-tokens-sweep run wrote parts 1 and 2 and printed PLAN_FILE:
+# for part 2 only. Part 1 was never queued, and nothing said so.
+SIB="$PLANS/demo-slug-1-base.md"
+out=$(DISP=--queue STUB_PLAN_SRC="$GOOD_PLAN" STUB_PLANFILE="$SIB" STUB_PLANFILE_SRC="$GOOD_PLAN" \
+          run_case "$P" "Also wrote $SIB
+PLAN_FILE: $P")
+want    "split: the named plan still queues"        "$out" "queued for automouse"
+want    "split: the sibling is reported unqueued"   "$out" "did NOT queue: demo-slug-1-base.md"
+want    "split: the DM names the sibling"           "$(dm)" "ALSO wrote, NOT queued: demo-slug-1-base.md"
+want    "split: the DM downgrades the ok icon"      "$(dm)" "⚠️ plan-now"
+# A new plan the transcript never names is a concurrent run's, not a sibling.
+out=$(DISP=--queue STUB_PLAN_SRC="$GOOD_PLAN" STUB_PLANFILE="$SIB" STUB_PLANFILE_SRC="$GOOD_PLAN" \
+          run_case "$P" "PLAN_FILE: $P")
+want_no "split: an unnamed new plan is not a sibling" "$out" "did NOT queue"
 
 echo "── the finish DM: every terminal outcome pings, and says what to do next ──"
 

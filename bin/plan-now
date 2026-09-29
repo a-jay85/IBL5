@@ -915,6 +915,29 @@ else
     fi
 fi
 
+# Split siblings. /plan Step 2.5 can split one task into stacked PR-sized plans, but
+# the coda asks for ONE PLAN_FILE: line, so only that plan can reach the queue above.
+# Any other new plan this run wrote AND named in its transcript is reported here.
+# Report-only, never queued: a sibling usually depends on the named plan, and
+# queueing it without depends_on: would let automouse run it first. The transcript
+# match keeps a concurrent run's new plan (same $PLANS_DIR diff) out of the list.
+if [ "$rc" -eq 0 ] && [ -n "$newfiles" ]; then
+    identified="${plan:-${recovered:-}}"
+    split_siblings=""
+    while IFS= read -r f; do
+        [ -n "$f" ] && [ "$f" != "$identified" ] || continue
+        case "$(basename "$f")" in *-shared-context.md | README.md) continue ;; esac
+        grep -qF "$f" "$OUT" 2>/dev/null || continue
+        split_siblings="$split_siblings $(basename "$f")"
+    done <<< "$newfiles"
+    if [ -n "$split_siblings" ]; then
+        echo "plan-now: WARNING — this run also wrote plan(s) this job did NOT queue:$split_siblings"
+        echo "plan-now: likely a stacked split. Add depends_on: to each dependent plan, then queue each: bin/automouse/queue $PLANS_DIR/<name>.md"
+        [ "$DM_ICON" = "✅" ] && DM_ICON="⚠️"
+        DM_NEXT="${DM_NEXT:-read the log} · ALSO wrote, NOT queued:$split_siblings"
+    fi
+fi
+
 # The whole reason this job exists in the background: tell the human it finished.
 # `claude -p` does not stream, so $LOG is empty until this point and there is no
 # earlier moment worth watching — which is what made `tail -f` the only way to

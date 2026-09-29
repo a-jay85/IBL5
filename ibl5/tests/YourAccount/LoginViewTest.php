@@ -22,30 +22,30 @@ final class LoginViewTest extends TestCase
         }
     }
 
-    public function testLoginErrorIsEscaped(): void
+    public function testLoginPageEscapesErrorMessage(): void
     {
         $payload = '<script>alert(1)</script>';
 
         $html = $this->view->renderLoginPage($payload);
 
-        self::assertStringContainsString('&lt;script&gt;', $html);
-        self::assertStringNotContainsString('<script>alert(1)</script>', $html);
+        self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
+        self::assertStringNotContainsStringIgnoringCase($payload, $html);
+        self::assertStringContainsString('ibl-alert--error', $html);
     }
 
-    public function testNullErrorOmitsAlertBlock(): void
+    public function testLoginPageOmitsErrorBlockWhenErrorIsNull(): void
     {
         $html = $this->view->renderLoginPage(null);
 
         self::assertStringNotContainsString('ibl-alert--error', $html);
     }
 
-    public function testCsrfTokenPresentInForm(): void
+    public function testLoginPageIncludesCsrfToken(): void
     {
         $html = $this->view->renderLoginPage(null);
 
-        // CsrfGuard::generateToken() renders a hidden input for the CSRF token
-        self::assertStringContainsString('type="hidden"', $html);
-        self::assertStringContainsString('_csrf_token', $html);
+        self::assertStringContainsString('name="_csrf_token"', $html);
+        self::assertStringContainsString('name="op" value="login"', $html);
     }
 
     public function testLoginFormContainsUsernameAndPasswordFields(): void
@@ -56,10 +56,10 @@ final class LoginViewTest extends TestCase
         self::assertStringContainsString('name="user_password"', $html);
     }
 
-    public function testLoginErrorAppliesNl2br(): void
+    public function testLoginPageConvertsErrorNewlinesToBreaks(): void
     {
-        $html = $this->view->renderLoginPage("line one\nline two");
+        $html = $this->view->renderLoginPage("Line one\nLine two");
 
-        self::assertStringContainsString('<br />', $html);
+        self::assertStringContainsString('Line one<br />', $html);
     }
 }

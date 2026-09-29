@@ -107,12 +107,14 @@ final class ComparePlayersControllerTest extends WideUnitTestCase
     {
         unset($_POST['Player1']);
 
-        $stubService = self::createStub(ComparePlayersServiceInterface::class);
+        $mockService = self::createMock(ComparePlayersServiceInterface::class);
+        $mockService->expects(self::never())->method('comparePlayers');
 
-        $controller = $this->buildController($stubService);
+        $controller = $this->buildController($mockService);
         $output = $this->runMain($controller);
 
         self::assertStringContainsString('SEARCH-FORM', $output);
+        self::assertStringNotContainsString('COMPARISON-RESULTS', $output);
     }
 
     // -----------------------------------------------------------------------

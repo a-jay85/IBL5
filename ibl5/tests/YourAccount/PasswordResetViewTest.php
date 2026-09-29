@@ -53,11 +53,28 @@ final class PasswordResetViewTest extends TestCase
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
     }
 
-    public function testResetPasswordPageContainsCsrfToken(): void
+    public function testResetPasswordErrorPageEscapesError(): void
     {
-        $html = $this->view->renderResetPasswordPage('sel', 'tok');
+        $payload = '<script>alert(1)</script>';
 
-        self::assertStringContainsString('_csrf_token', $html);
+        $html = $this->view->renderPasswordResetErrorPage($payload);
+
+        self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
+        self::assertStringNotContainsStringIgnoringCase($payload, $html);
+    }
+
+    public function testForgotPasswordPageIncludesCsrfToken(): void
+    {
+        $html = $this->view->renderForgotPasswordPage();
+
+        self::assertStringContainsString('name="_csrf_token"', $html);
+    }
+
+    public function testResetPasswordPageIncludesCsrfToken(): void
+    {
+        $html = $this->view->renderResetPasswordPage('sel123', 'tok123');
+
+        self::assertStringContainsString('name="_csrf_token"', $html);
     }
 
     public function testResetPasswordPageContainsSelectorAndTokenFields(): void

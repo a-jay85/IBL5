@@ -40,18 +40,23 @@ final class ActivationViewTest extends TestCase
         self::assertStringContainsString('activated successfully', $html);
     }
 
-    public function testErrorPageShowsMismatchMessage(): void
+    public function testErrorPageMismatchShowsMismatchMessage(): void
     {
         $html = $this->view->renderActivationErrorPage('mismatch');
 
-        self::assertStringContainsString('activation code does not match', $html);
+        self::assertStringContainsString('The activation code does not match.', $html);
+        self::assertStringNotContainsString('has expired or is invalid', $html);
     }
 
-    public function testErrorPageShowsExpiredMessageForOtherErrorType(): void
+    public function testErrorPageUnknownTypeShowsExpiredMessageWithoutEchoingInput(): void
     {
-        $html = $this->view->renderActivationErrorPage('expired');
+        $payload = '<script>alert(1)</script>';
 
-        self::assertStringContainsString('expired or is invalid', $html);
+        $html = $this->view->renderActivationErrorPage($payload);
+
+        self::assertStringContainsString('has expired or is invalid', $html);
+        self::assertStringNotContainsStringIgnoringCase($payload, $html);
+        self::assertStringNotContainsString('&lt;script&gt;', $html);
     }
 
     public function testSuccessPageAttributeBreakoutPrevented(): void

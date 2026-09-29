@@ -30,6 +30,7 @@ final class RegistrationViewTest extends TestCase
 
         self::assertStringContainsString('&lt;script&gt;', $html);
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
+        self::assertStringContainsString('Account Created', $html);
     }
 
     public function testRegistrationCompletePageContainsSiteName(): void
@@ -48,6 +49,7 @@ final class RegistrationViewTest extends TestCase
 
         self::assertStringContainsString('&lt;script&gt;', $html);
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
+        self::assertStringContainsString('ibl-alert--error', $html);
     }
 
     public function testRegistrationErrorPageAttributeBreakoutPrevented(): void
@@ -65,5 +67,13 @@ final class RegistrationViewTest extends TestCase
 
         self::assertStringContainsString('name="username"', $html);
         self::assertStringContainsString('name="user_email"', $html);
+    }
+
+    public function testRegisterPageIncludesCsrfTokenAndFinishOp(): void
+    {
+        $html = $this->view->renderRegisterPage();
+
+        self::assertStringContainsString('name="_csrf_token"', $html);
+        self::assertStringContainsString('name="op" value="finish"', $html);
     }
 }

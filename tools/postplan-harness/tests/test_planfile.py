@@ -2,6 +2,7 @@ import contextlib
 import io
 import itertools
 import os
+import pathlib
 import pytest
 import re
 import subprocess
@@ -11,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import conformance
 from harness.planfile import (EXEMPT_RE, _normalise_cf_path, _strip_fenced,
+                              count_executable_matrix_rows,
                               frontmatter_auto_merge_false,
                               frontmatter_autonomy_contract, locate_plan,
                               parse_critical_files, parse_matrix,
@@ -103,6 +105,111 @@ def test_matrix_ignores_fenced_rows():
     assert len(manual) == len(parse_matrix(PLAN)[1])
     assert "tests/X.php" not in planned
     assert not any("eyeball it" in row.raw for row in manual)
+
+
+_MATRIX_HEAD = (
+    "| # | What to verify | Test type | Timing | Test file / location |\n"
+    "|---|----------------|-----------|--------|----------------------|\n"
+)
+
+_DOCS_ONLY_MATRIX = (
+    "# Docs only\n\n## Verification Matrix\n\n" + _MATRIX_HEAD
+    + "| 1 | Wording reads correctly | Doc review | post-impl | `docs/x.md` |\n"
+    "| 2 | Links resolve | Static | post-impl | `bin/check-links` |\n"
+)
+
+_MIXED_MATRIX = (
+    "# Mixed\n\n## Verification Matrix\n\n" + _MATRIX_HEAD
+    + "| 1 | Service returns the row | PHPUnit | pre-impl "
+    "| `ibl5/tests/Foo/FooServiceTest.php` |\n"
+    "| 2 | Page renders the row | E2E | post-impl "
+    "| `ibl5/tests/e2e/tests/foo.spec.ts` |\n"
+    "| 3 | Lint stays clean | CLI-executable | post-impl | `grep -c x f \\| wc -l` |\n"
+    "| 4 | Layout feels right | Truly-manual | post-impl | open the page and look |\n"
+    "| 5 | Wording reads correctly | Doc review | post-impl | `docs/x.md` |\n"
+    "\n## Notes\n\n"
+    "| Item | Detail |\n|------|--------|\n"
+    "| Coverage | E2E is deferred to a later plan |\n"
+)
+
+_NO_MATRIX = (
+    "# No matrix\n\n## Critical Files\n\n- `ibl5/classes/Foo/FooService.php`\n\n"
+    "## Notes\n\n| Item | Detail |\n|------|--------|\n| Scope | One service |\n"
+)
+
+
+def test_executable_count_docs_only_matrix_is_zero():
+    # A real matrix with only non-taxonomy types is 0, never None.
+    count = count_executable_matrix_rows(_DOCS_ONLY_MATRIX)
+    assert count == 0
+    assert count is not None
+
+
+def test_executable_count_ignores_critical_files_table():
+    content = (
+        _DOCS_ONLY_MATRIX
+        + "\n## Critical Files\n\n"
+        "| File | Why |\n|------|-----|\n"
+        "| `ibl5/tests/Foo/FooTest.php` | PHPUnit coverage for Foo |\n"
+    )
+    assert count_executable_matrix_rows(content) == 0
+
+
+def test_executable_count_ignores_fenced_matrix():
+    fenced_block = (
+        "\n## Appendix\n\n```markdown\n" + _MATRIX_HEAD
+        + "| 1 | Thing works | PHPUnit | pre-impl | `ibl5/tests/Foo/FooTest.php` |\n```\n"
+    )
+    assert count_executable_matrix_rows(_DOCS_ONLY_MATRIX + fenced_block) == 0
+    # Only header is inside a fence: no real matrix at all.
+    fenced_only = "# Plan\n" + fenced_block
+    assert count_executable_matrix_rows(fenced_only) is None
+
+
+def test_executable_count_mixed_matrix():
+    # PHPUnit + E2E + CLI-executable (escaped-pipe location) = 3; Truly-manual and
+    # Doc review add nothing, and the later Notes table naming E2E is out of scope.
+    assert count_executable_matrix_rows(_MIXED_MATRIX) == 3
+
+
+def test_executable_count_visual_regression_counts():
+    content = (
+        "# Visual\n\n## Verification Matrix\n\n" + _MATRIX_HEAD
+        + "| 1 | Roster page pixels unchanged | Visual-regression | post-impl "
+        "| `ibl5/tests/e2e/visual/roster.spec.ts` |\n"
+    )
+    assert count_executable_matrix_rows(content) == 1
+
+
+def test_executable_count_none_without_matrix():
+    assert count_executable_matrix_rows(_NO_MATRIX) is None
+
+
+_FIXTURE_DIR = pathlib.Path(__file__).parent / "fixtures" / "matrix_count"
+
+
+@pytest.mark.parametrize("name,expected", [
+    ("docs_only.plan.txt", 0),
+    ("critical_files_phpunit.plan.txt", 0),
+    ("fenced_matrix.plan.txt", 0),
+    ("fenced_only.plan.txt", None),
+    ("mixed.plan.txt", 3),
+    ("visual_regression_only.plan.txt", 1),
+    ("misaligned_columns.plan.txt", 1),
+    ("no_matrix.plan.txt", None),
+])
+def test_executable_count_fixture_corpus(name, expected):
+    content = (_FIXTURE_DIR / name).read_text(encoding="utf-8")
+    assert count_executable_matrix_rows(content) == expected
+
+
+def test_locate_plan_sets_executable_row_count():
+    info = locate_plan("x", content_override=_MIXED_MATRIX)
+    assert info.has_matrix is True
+    assert info.executable_row_count == 3
+    blind = locate_plan("x", content_override=_NO_MATRIX)
+    assert blind.has_matrix is False
+    assert blind.executable_row_count is None
 
 
 def test_matrix_fence_width_awareness():

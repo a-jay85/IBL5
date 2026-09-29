@@ -1,29 +1,55 @@
+import type { JSHandle, Page } from '@playwright/test';
 import { test, expect } from '../fixtures/base';
 import { gotoWithRetry } from '../helpers/navigation';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 import { publicStorageState } from '../helpers/public-storage-state';
 
 test.use({ storageState: publicStorageState() });
 
+// Hits the file_exists() else-branch in modules.php, which always wraps the
+// notice in OpenTable().
 const MISSING_FILE_URL = 'modules.php?name=Player&file=zzzmissing';
 
-test.describe('Legacy PHP-Nuke scaffold styling', () => {
-  test('OpenTable scaffold computed styles on missing-file page', async ({ page }) => {
-    await gotoWithRetry(page, MISSING_FILE_URL);
+type Scaffold = { outer: HTMLTableElement; inner: HTMLTableElement } | null;
 
-    const props = await page.evaluate(() => {
-      const root = document.getElementById('site-content');
-      if (!root) return null;
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      let textNode: Node | null = null;
-      while (walker.nextNode()) {
-        if ((walker.currentNode.textContent ?? '').includes("Sorry, such file doesn't exist")) {
-          textNode = walker.currentNode;
-          break;
-        }
+/**
+ * Locate the OpenTable() outer/inner tables around the missing-file notice.
+ * The lookup walks text nodes instead of class names so it works on the
+ * legacy attribute markup and on the nuke-block class markup alike.
+ */
+async function scaffoldTables(page: Page): Promise<JSHandle<Scaffold>> {
+  return page.evaluateHandle((): Scaffold => {
+    const root = document.getElementById('site-content');
+    if (!root) return null;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let textNode: Node | null = null;
+    while (walker.nextNode()) {
+      if ((walker.currentNode.textContent ?? '').includes("Sorry, such file doesn't exist")) {
+        textNode = walker.currentNode;
+        break;
       }
-      const inner = textNode?.parentElement?.closest('table') ?? null;
-      const outer = inner?.parentElement?.closest('table') ?? null;
-      if (!inner || !outer) return null;
+    }
+    const inner = textNode?.parentElement?.closest('table') ?? null;
+    const outer = inner?.parentElement?.closest('table') ?? null;
+    if (!inner || !outer) return null;
+    return { outer, inner };
+  });
+}
+
+test.describe('Legacy PHP-Nuke scaffold styling', () => {
+  test.beforeEach(async ({ page }) => {
+    await gotoWithRetry(page, MISSING_FILE_URL);
+  });
+
+  test('missing-file page renders without PHP errors', async ({ page }) => {
+    await assertNoPhpErrors(page, MISSING_FILE_URL);
+  });
+
+  test('OpenTable scaffold computed styles on missing-file page', async ({ page }) => {
+    const tables = await scaffoldTables(page);
+    const props = await tables.evaluate((t) => {
+      if (!t) return null;
+      const { outer, inner } = t;
 
       const probe = document.createElement('div');
       probe.style.backgroundColor = 'var(--page-bg)';
@@ -71,5 +97,40 @@ test.describe('Legacy PHP-Nuke scaffold styling', () => {
     expect(props!.innerSpacing).toBe('1px');
     expect(props!.outerTdPad).toBe('0px');
     expect(props!.innerTdPad).toBe('0px');
+  });
+
+  test('scaffold tables carry nuke-block classes and no presentational attributes', async ({ page }) => {
+    const tables = await scaffoldTables(page);
+    const props = await tables.evaluate((t) => {
+      if (!t) return null;
+      const { outer, inner } = t;
+      const attrs = ['bgcolor', 'cellspacing', 'cellpadding', 'border', 'width', 'align'];
+      return {
+        outerClass: outer.className,
+        innerClass: inner.className,
+        outerAttrs: attrs.filter((a) => outer.hasAttribute(a)),
+        innerAttrs: attrs.filter((a) => inner.hasAttribute(a)),
+        bodyBgcolor: document.body.hasAttribute('bgcolor'),
+      };
+    });
+
+    expect(props).not.toBeNull();
+    expect(props!.outerClass).toContain('nuke-block-outer');
+    expect(props!.outerClass).toContain('nuke-block--full');
+    expect(props!.innerClass).toContain('nuke-block-inner');
+    expect(props!.outerAttrs).toEqual([]);
+    expect(props!.innerAttrs).toEqual([]);
+    expect(props!.bodyBgcolor).toBe(false);
+  });
+
+  test('inner block fill follows --page-bg', async ({ page }) => {
+    const tables = await scaffoldTables(page);
+    const innerBg = await tables.evaluate((t) => {
+      if (!t) return null;
+      document.body.style.setProperty('--page-bg', 'rgb(1, 2, 3)');
+      return getComputedStyle(t.inner).backgroundColor;
+    });
+
+    expect(innerBg).toBe('rgb(1, 2, 3)');
   });
 });

@@ -716,6 +716,82 @@ bd_record_apply() {
     mv "$tmp_path" "$ledger"
 }
 
+# bd_last_blocked_marker <comments-json> — print N from the last
+# "<!-- burndown-blocked-by: N -->" across all comments, or nothing.
+bd_last_blocked_marker() {
+    jq -r '[.comments[]?.body // "" | capture("<!-- burndown-blocked-by: (?<n>[0-9]+) -->"; "g") | .n] | last // empty' <<< "$1"
+}
+
+# bd_apply_skip_label <issue> <reason> [<blocked_by>] — create the label
+# idempotently, tag the issue, and post one reason comment unless an equivalent
+# marker is already there. Every gh failure is a fail-closed exit 3.
+bd_apply_skip_label() {
+    local n="$1" reason="$2" blocked_by="${3:-}" color desc
+    if [ "$reason" = "$BD_LABEL_BLOCKED" ]; then
+        color="B60205"; desc="burndown skips this: waiting on an open PR"
+    else
+        color="BFD4F2"; desc="burndown skips this: target lives outside the repo"
+    fi
+    "$GH" label create "$reason" --repo "$REPO" --force --color "$color" \
+        --description "$desc" >/dev/null 2>&1 \
+        || bd_die 3 "gh label create $reason failed"
+    "$GH" issue edit "$n" --repo "$REPO" --add-label "$reason" >/dev/null 2>&1 \
+        || bd_die 3 "gh issue edit #$n --add-label $reason failed"
+    local comments
+    comments="$("$GH" issue view "$n" --repo "$REPO" --json comments 2>/dev/null)" \
+        || bd_die 3 "gh issue view #$n --json comments failed"
+    jq -e '.comments | type=="array"' <<< "$comments" >/dev/null 2>&1 \
+        || bd_die 3 "gh issue view #$n returned no comments array"
+    local present=0
+    if [ "$reason" = "$BD_LABEL_BLOCKED" ]; then
+        [ "$(bd_last_blocked_marker "$comments")" != "$blocked_by" ] || present=1
+    else
+        jq -e 'any(.comments[]?; (.body // "") | contains("<!-- burndown-out-of-repo -->"))' \
+            <<< "$comments" >/dev/null 2>&1 && present=1
+    fi
+    if [ "$present" -eq 0 ]; then
+        local body
+        if [ "$reason" = "$BD_LABEL_BLOCKED" ]; then
+            body="Skipped by /burndown: blocked on ${BD_CODE_REPO}#${blocked_by}. The blocked label clears itself once that PR merges or closes."$'\n\n'"<!-- burndown-blocked-by: ${blocked_by} -->"
+        else
+            body="Skipped by /burndown: the target files live outside the IBL5 repo, so no PR can change them. Remove the out-of-repo label if that changes."$'\n\n'"<!-- burndown-out-of-repo -->"
+        fi
+        "$GH" issue comment "$n" --repo "$REPO" --body "$body" >/dev/null 2>&1 \
+            || bd_die 3 "gh issue comment #$n failed"
+        printf 'tagged #%s: %s (comment posted)\n' "$n" "$reason"
+    else
+        printf 'tagged #%s: %s (comment already present)\n' "$n" "$reason"
+    fi
+}
+
+# bd_cmd_tag <issue> reason=<blocked|out-of-repo> [blocked_by=<N>] — tag an
+# issue with no ledger involved (backfill, or items outside any batch).
+bd_cmd_tag() {
+    [ $# -ge 1 ] || bd_die 2 "burndown-tag wants <issue> reason=<blocked|out-of-repo> [blocked_by=<PR>]"
+    local issue_num="$1"; shift
+    [[ "$issue_num" =~ ^[1-9][0-9]*$ ]] || bd_die 2 "burndown-tag: issue must be a number, got $issue_num"
+    local kv reason="" blocked_by=""
+    while [ $# -gt 0 ]; do
+        kv="$1"; shift
+        local k="${kv%%=*}" v="${kv#*=}"
+        case "$k" in
+            reason)
+                [[ "$v" =~ ^(blocked|out-of-repo)$ ]] \
+                    || bd_die 2 "reason=$v rejected: must be blocked or out-of-repo"
+                reason="$v" ;;
+            blocked_by)
+                [[ "$v" =~ ^[1-9][0-9]{0,6}$ ]] \
+                    || bd_die 2 "blocked_by=$v rejected: must be a PR number"
+                blocked_by="$v" ;;
+            *)
+                bd_die 2 "$k=$v rejected: unknown key $k" ;;
+        esac
+    done
+    [ -n "$reason" ] || bd_die 2 "burndown-tag wants reason="
+    bd_validate_skip_args "$reason" "$blocked_by"
+    bd_apply_skip_label "$issue_num" "$reason" "$blocked_by"
+}
+
 # bd_validate_skip_args <reason> <blocked_by> — cross-field rules shared by
 # burndown-record and burndown-tag; dies 2 on violation.
 bd_validate_skip_args() {
@@ -804,6 +880,7 @@ bd_cmd_record() {
 
     bd_record_apply "$ledger" "$issue_num" "$patch"
     printf 'recorded #%s:%s\n' "$issue_num" "$applied_keys"
+    [ -z "$reason" ] || bd_apply_skip_label "$issue_num" "$reason" "$blocked_by"
 }
 
 bd_cmd_refresh() {
@@ -1232,6 +1309,7 @@ bd_main() {
         burndown-refresh)      bd_cmd_refresh      "$@" ;;
         burndown)              bd_cmd_burndown     "$@" ;;
         burndown-record)       bd_cmd_record       "$@" ;;
+        burndown-tag)          bd_cmd_tag          "$@" ;;
         burndown-status)       bd_cmd_status       "$@" ;;
         burndown-close-merged) bd_cmd_close_merged "$@" ;;
         burndown-sweep)        bd_cmd_sweep        "$@" ;;

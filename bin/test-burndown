@@ -1688,6 +1688,86 @@ else
     ok "L10: rejected forms made no tag gh call"
 fi
 
+# ── L11: record with reason= tags the issue and posts one marker comment ──────
+cp "$SNAP" "$L"
+: > "$T/lbl/gh.log"
+OUT="$(bdl burndown-record "$L" 42 status=skipped reason=blocked blocked_by=77 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L11: tag record exits 0" || fail "L11: tag record exits 0 (got $RC: $OUT)"
+GHLOG="$(cat "$T/lbl/gh.log")"
+want "L11: label create blocked" "$GHLOG" "label create blocked"
+want "L11: label create --force" "$GHLOG" "--force"
+want "L11: --add-label blocked" "$GHLOG" "--add-label blocked"
+want "L11: marker in comment" "$GHLOG" "<!-- burndown-blocked-by: 77 -->"
+[ "$(grep -c 'issue comment' "$T/lbl/gh.log")" -eq 1 ] && ok "L11: exactly one comment" || fail "L11: exactly one comment"
+want "L11: stdout says comment posted" "$OUT" "comment posted"
+
+# ── L12: idempotency — an equivalent marker means no new comment ──────────────
+l12_case() {
+    local label="$1" want_n="$2"; shift 2
+    cp "$SNAP" "$L"
+    : > "$T/lbl/gh.log"
+    local out rc n
+    out="$(bdl burndown-record "$L" "$@" 2>&1)"; rc=$?
+    n="$(grep -c 'issue comment' "$T/lbl/gh.log")"
+    [ "$rc" -eq 0 ] && [ "$n" -eq "$want_n" ] && ok "L12: $label" || fail "L12: $label (rc=$rc comments=$n want=$want_n: $out)"
+}
+printf '%s' '{"comments":[{"body":"x\n\n<!-- burndown-blocked-by: 77 -->"}]}' > "$T/lbl/fx/issue-42-comments.json"
+l12_case "same PR marker posts nothing" 0 42 status=skipped reason=blocked blocked_by=77
+l12_case "different PR posts one" 1 42 status=skipped reason=blocked blocked_by=78
+printf '%s' '{"comments":[{"body":"<!-- burndown-blocked-by: 78 -->"},{"body":"<!-- burndown-blocked-by: 77 -->"}]}' > "$T/lbl/fx/issue-42-comments.json"
+l12_case "last marker wins (77)" 0 42 status=skipped reason=blocked blocked_by=77
+l12_case "last marker wins (78 re-posts)" 1 42 status=skipped reason=blocked blocked_by=78
+rm -f "$T/lbl/fx/issue-42-comments.json"
+printf '%s' '{"comments":[{"body":"x\n\n<!-- burndown-out-of-repo -->"}]}' > "$T/lbl/fx/issue-43-comments.json"
+l12_case "out-of-repo marker posts nothing" 0 43 status=skipped reason=out-of-repo
+rm -f "$T/lbl/fx/issue-43-comments.json"
+
+# ── L13: gh failures exit 3 and the ledger keeps its record ───────────────────
+l13_case() {
+    local fail_on="$1"
+    cp "$SNAP" "$L"
+    : > "$T/lbl/gh.log"
+    local out rc n st
+    out="$(GH_FAIL_ON="$fail_on" bdl burndown-record "$L" 42 status=skipped reason=blocked blocked_by=77 2>&1)"; rc=$?
+    n="$(grep -c 'issue comment' "$T/lbl/gh.log")"
+    st="$(jq -r '.items[] | select(.issue_num==42) | .status' "$L")"
+    [ "$rc" -eq 3 ] && ok "L13: $fail_on failure exits 3" || fail "L13: $fail_on failure exits 3 (got $rc: $out)"
+    [ "$st" = "skipped" ] && ok "L13: $fail_on failure keeps status=skipped" || fail "L13: $fail_on failure keeps status=skipped (got $st)"
+    L13_N="$n"
+}
+l13_case "label create"
+[ "$L13_N" -eq 0 ] && ok "L13: label create failure posts no comment" || fail "L13: label create failure posts no comment"
+l13_case "--json comments"
+[ "$L13_N" -eq 0 ] && ok "L13: comments read failure posts no comment" || fail "L13: comments read failure posts no comment"
+l13_case "issue comment"
+
+# ── L14: burndown-tag needs no ledger; rejected forms make no gh call ─────────
+rm -f "$T/lbl/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+: > "$T/lbl/gh.log"
+OUT="$(bdl burndown-tag 268 reason=out-of-repo 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L14: burndown-tag exits 0" || fail "L14: burndown-tag exits 0 (got $RC: $OUT)"
+GHLOG="$(cat "$T/lbl/gh.log")"
+want "L14: --add-label out-of-repo" "$GHLOG" "--add-label out-of-repo"
+want "L14: out-of-repo marker" "$GHLOG" "<!-- burndown-out-of-repo -->"
+if ls "$T/lbl/home/claude-plans/_reports"/burndown-batch-*.json >/dev/null 2>&1; then
+    fail "L14: burndown-tag must not create a ledger"
+else
+    ok "L14: burndown-tag creates no ledger"
+fi
+l14_reject() {
+    local label="$1"; shift
+    : > "$T/lbl/gh.log"
+    local out rc
+    out="$(bdl burndown-tag "$@" 2>&1)"; rc=$?
+    [ "$rc" -eq 2 ] && ok "L14: $label exits 2" || fail "L14: $label exits 2 (got $rc: $out)"
+    [ ! -s "$T/lbl/gh.log" ] && ok "L14: $label makes no gh call" || fail "L14: $label makes no gh call"
+}
+l14_reject "no args"
+l14_reject "issue alone" 268
+l14_reject "non-numeric issue" abc reason=out-of-repo
+l14_reject "blocked without PR" 1233 reason=blocked
+l14_reject "unknown key" 1 foo=bar
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

@@ -1,0 +1,1123 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-burndown — offline harness for bin/backlog burndown* subcommands.
+set -uo pipefail
+
+PASS=0
+FAIL=0
+FAILURES=()
+
+ok()   { printf '[PASS] %s\n' "$1"; PASS=$((PASS + 1)); }
+fail() { printf '[FAIL] %s\n' "$1"; FAIL=$((FAIL + 1)); FAILURES+=("$1"); }
+want() {
+    local label="$1" output="$2" token="$3"
+    if grep -qF -- "$token" <<< "$output"; then
+        ok "$label"
+    else
+        fail "$label (missing: $token)"
+    fi
+}
+
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/backlog"
+
+T="$(mktemp -d)"
+trap 'rm -rf "$T"' EXIT
+
+mkdir -p "$T/home" "$T/fx"
+
+# gh stub: dispatches by args
+cat > "$T/gh" <<'STUB'
+#!/usr/bin/env bash
+set -uo pipefail
+# Log the invocation (every test can inspect $T/gh.log)
+printf '%s\n' "$*" >> "${GH_LOG:-/dev/null}"
+if [ -n "${GH_FAIL_ON:-}" ]; then
+    if grep -qF -- "$GH_FAIL_ON" <<< "$*"; then
+        exit 1
+    fi
+fi
+# Dispatch
+case "$*" in
+    *"issue list"*) cat "${GH_FX_DIR:-/dev/null}/issues.json" 2>/dev/null || echo '[]' ;;
+    *"pr list"*"--state open"*) cat "${GH_FX_DIR:-/dev/null}/prs-open.json" 2>/dev/null || echo '[]' ;;
+    *"pr list"*"--head "*)
+        SLUG=$(printf '%s' "$*" | sed 's/.*--head //' | awk '{print $1}')
+        cat "${GH_FX_DIR:-/dev/null}/pr-${SLUG}.json" 2>/dev/null || echo '[]'
+        ;;
+    *"issue view"*)
+        NUM=$(printf '%s' "$*" | awk '{for(i=1;i<=NF;i++) if($i=="view") print $(i+1)}')
+        cat "${GH_FX_DIR:-/dev/null}/issue-${NUM}.json" 2>/dev/null || echo '{}'
+        ;;
+    *"issue close"*) exit 0 ;;
+    *) exit 0 ;;
+esac
+STUB
+chmod +x "$T/gh"
+
+# git stub: porcelain worktree list
+cat > "$T/git" <<'STUB'
+#!/usr/bin/env bash
+case "$*" in
+    *"worktree list --porcelain"*)
+        cat "${GH_FX_DIR:-/dev/null}/worktrees.txt" 2>/dev/null || true
+        ;;
+    *) exec git "$@" ;;
+esac
+STUB
+chmod +x "$T/git"
+
+# tier stub: xhigh for XHIGH, exit 1 for TIERFAIL, else default
+cat > "$T/tier" <<'STUB'
+#!/usr/bin/env bash
+case "$*" in
+    *XHIGH*) echo "xhigh" ;;
+    *TIERFAIL*) exit 1 ;;
+    *) echo "default" ;;
+esac
+STUB
+chmod +x "$T/tier"
+
+# Helper: run bin/backlog burndown* with all stubs and HOME pointing at $T/home
+bd() {
+    GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" \
+    "$SCRIPT" "$@"
+}
+
+# ── C1: --help lists new subcommands ──────────────────────────────────────────
+OUT="$("$SCRIPT" --help 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "--help exits 0" || fail "--help exits 0 (got $RC)"
+want "--help: burndown-status listed" "$OUT" "burndown-status"
+want "--help: burndown-close-merged listed" "$OUT" "burndown-close-merged"
+
+# ── C2: unknown burndown subcommand rejected ──────────────────────────────────
+OUT="$(bd burndown-bogus 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "unknown subcommand exits 2" || fail "unknown subcommand exits 2 (got $RC)"
+want "unknown subcommand: message" "$OUT" "unknown burndown subcommand"
+
+# ── C3: --dry-run rejected for burndown ──────────────────────────────────────
+OUT="$(bd --dry-run burndown 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "--dry-run rejected exits 2" || fail "--dry-run rejected exits 2 (got $RC)"
+want "--dry-run rejected: message" "$OUT" "--dry-run is not supported"
+# gh must not have been called
+if [ ! -f "$T/gh.log" ] || [ ! -s "$T/gh.log" ]; then
+    ok "--dry-run: no gh call"
+else
+    fail "--dry-run: no gh call (gh.log non-empty)"
+fi
+
+# ── C4: missing HOME fails closed ─────────────────────────────────────────────
+OUT="$(env -u HOME BACKLOG_GH="$T/gh" "$SCRIPT" burndown-status 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "missing HOME exits 3" || fail "missing HOME exits 3 (got $RC)"
+want "missing HOME: message" "$OUT" "HOME is unset"
+# gh must not have been called when HOME unset
+GH_LOG_EMPTY=0
+if [ ! -f "$T/gh.log" ] || [ ! -s "$T/gh.log" ]; then GH_LOG_EMPTY=1; fi
+[ "$GH_LOG_EMPTY" -eq 1 ] && ok "missing HOME: no gh call" || fail "missing HOME: no gh call (gh.log non-empty)"
+
+# ── Phase 2: report loading and delta extraction ──────────────────────────────
+mkdir -p "$T/home/claude-plans/_reports"
+
+# ── C5: missing report aborts before gh call (run BEFORE fixture exists) ──────
+rm -f "$T/gh.log"
+OUT="$(bd burndown-delta 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C5: missing report exits 3" || fail "C5: missing report exits 3 (got $RC)"
+want "C5: missing report: message" "$OUT" "no triage report"
+if ! grep -q "issue list" "$T/gh.log" 2>/dev/null; then
+    ok "C5: missing report: no gh issue list call"
+else
+    fail "C5: missing report: no gh issue list call (called anyway)"
+fi
+
+# Fixture report — used by C6-C13
+cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-26.md" <<'REPORT'
+# Backlog triage 2026-09-26
+
+## P2 (2)
+
+- [#10](https://github.com/a-jay85/IBL5-backlog/issues/10) Issue ten — rationale ten
+- [#11](https://github.com/a-jay85/IBL5-backlog/issues/11) Issue eleven — rationale eleven
+
+## P3 (1)
+
+- [#12](https://github.com/a-jay85/IBL5-backlog/issues/12) Issue twelve — rationale twelve
+
+## Notes
+
+- [#99](https://github.com/a-jay85/IBL5-backlog/issues/99) unranked note — should not rank
+
+## P5 (0)
+
+REPORT
+touch -t 202609260000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-26.md"
+
+# Fixture open issues
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":10,"title":"Issue ten","body":"","url":"u10","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":11,"title":"Issue eleven","body":"","url":"u11","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":12,"title":"Issue twelve","body":"","url":"u12","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":13,"title":"Issue thirteen","body":"","url":"u13","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":99,"title":"Unranked note","body":"","url":"u99","updatedAt":"2026-09-01T00:00:00Z","labels":[]}
+]
+JSON
+
+# ── C6: delta happy path (stdout only — stderr carries the debug line) ────────
+rm -f "$T/gh.log"
+OUT="$(bd burndown-delta 2>/dev/null)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C6: delta exits 0" || fail "C6: delta exits 0 (got $RC)"
+NUMS="$(jq -c '[.issues[].number]' <<< "$OUT" 2>/dev/null)"
+[ "$NUMS" = "[11,13,99]" ] && ok "C6: delta issues [11,13,99]" || fail "C6: delta issues [11,13,99] (got $NUMS)"
+DROPPED="$(jq -c '.dropped' <<< "$OUT" 2>/dev/null)"
+[ "$DROPPED" = "[]" ] && ok "C6: delta dropped []" || fail "C6: delta dropped [] (got $DROPPED)"
+
+# ── C7: awk boundaries and dropped ────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":10,"title":"Issue ten","body":"","url":"u10","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":11,"title":"Issue eleven","body":"","url":"u11","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":13,"title":"Issue thirteen","body":"","url":"u13","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":99,"title":"Unranked note","body":"","url":"u99","updatedAt":"2026-09-01T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd burndown-delta 2>/dev/null)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C7: delta with dropped exits 0" || fail "C7: delta with dropped exits 0 (got $RC)"
+DROPPED="$(jq -c '.dropped' <<< "$OUT" 2>/dev/null)"
+[ "$DROPPED" = "[12]" ] && ok "C7: dropped=[12]" || fail "C7: dropped=[12] (got $DROPPED)"
+# Restore issues
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":10,"title":"Issue ten","body":"","url":"u10","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":11,"title":"Issue eleven","body":"","url":"u11","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":12,"title":"Issue twelve","body":"","url":"u12","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":13,"title":"Issue thirteen","body":"","url":"u13","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":99,"title":"Unranked note","body":"","url":"u99","updatedAt":"2026-09-01T00:00:00Z","labels":[]}
+]
+JSON
+
+# ── C8: gh failure aborts ─────────────────────────────────────────────────────
+OUT="$(GH_FAIL_ON="issue list" GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown-delta 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C8: gh failure exits 3" || fail "C8: gh failure exits 3 (got $RC)"
+want "C8: gh failure message" "$OUT" "gh issue list failed"
+
+# ── C9: malformed report (headings only) ──────────────────────────────────────
+cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-27.md" <<'REPORT'
+# Backlog triage
+
+## P2 (0)
+
+## P3 (0)
+REPORT
+touch -t 202609270000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-27.md"
+OUT="$(bd burndown-delta 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C9: malformed report exits 3" || fail "C9: malformed report exits 3 (got $RC)"
+want "C9: malformed report message" "$OUT" "no ranked lines"
+rm -f "$T/home/claude-plans/_reports/backlog-triage-2026-09-27.md"
+
+# ── C10: duplicate rank aborts ────────────────────────────────────────────────
+cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-27.md" <<'REPORT'
+# Backlog triage
+
+## P2 (2)
+
+- [#10](https://github.com/a-jay85/IBL5-backlog/issues/10) Issue ten — dup
+- [#10](https://github.com/a-jay85/IBL5-backlog/issues/10) Issue ten again — dup
+
+## P3 (1)
+
+- [#12](https://github.com/a-jay85/IBL5-backlog/issues/12) Issue twelve — ok
+REPORT
+touch -t 202609270000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-27.md"
+OUT="$(bd burndown-delta 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C10: duplicate rank exits 3" || fail "C10: duplicate rank exits 3 (got $RC)"
+want "C10: duplicate rank message" "$OUT" "ranks #10 twice"
+rm -f "$T/home/claude-plans/_reports/backlog-triage-2026-09-27.md"
+
+# ── C11: newest report wins ────────────────────────────────────────────────────
+cp "$T/home/claude-plans/_reports/backlog-triage-2026-09-26.md" \
+   "$T/home/claude-plans/_reports/backlog-triage-2026-09-20.md"
+touch -t 202609200000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-20.md"
+echo "# notes" > "$T/home/claude-plans/_reports/backlog-triage-notes.md"
+OUT="$(bd burndown-delta 2>/dev/null)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C11: newest report exits 0" || fail "C11: newest report exits 0 (got $RC)"
+REPORT_PATH="$(jq -r '.report' <<< "$OUT" 2>/dev/null)"
+if grep -qF "backlog-triage-2026-09-26.md" <<< "$REPORT_PATH"; then
+    ok "C11: newest report selected"
+else
+    fail "C11: newest report selected (got $REPORT_PATH)"
+fi
+rm -f "$T/home/claude-plans/_reports/backlog-triage-2026-09-20.md" \
+      "$T/home/claude-plans/_reports/backlog-triage-notes.md"
+
+# ── C12: truncation guard ─────────────────────────────────────────────────────
+jq -n '[range(1000) | {number: ., title: "t", body: "", url: "u", updatedAt: "2026-09-27T00:00:00Z", labels: []}]' \
+    > "$T/fx/issues.json"
+OUT="$(bd burndown-delta 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C12: truncation guard exits 3" || fail "C12: truncation guard exits 3 (got $RC)"
+want "C12: truncation guard message" "$OUT" "may be truncated"
+# Restore issues
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":10,"title":"Issue ten","body":"","url":"u10","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":11,"title":"Issue eleven","body":"","url":"u11","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":12,"title":"Issue twelve","body":"","url":"u12","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":13,"title":"Issue thirteen","body":"","url":"u13","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":99,"title":"Unranked note","body":"","url":"u99","updatedAt":"2026-09-01T00:00:00Z","labels":[]}
+]
+JSON
+
+# ── C13: arity check ─────────────────────────────────────────────────────────
+OUT="$(bd burndown-delta extra 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C13: arity exits 2" || fail "C13: arity exits 2 (got $RC)"
+want "C13: arity message" "$OUT" "takes no arguments"
+
+# ── Phase 3: in-flight filter, cost, and selection (burndown) ─────────────────
+
+# Phase 3 report (newer than Phase 2, picked by bd_latest_report)
+cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md" <<'REPORT'
+# Phase 3 triage
+
+## P2 (many)
+
+- [#21](u21) Twenty-one — ref
+- [#22](u22) Twenty-two — ref
+- [#23](u23) Twenty-three — ref
+- [#24](u24) Twenty-four — ref
+- [#25](u25) Twenty-five — ref
+- [#26](u26) Twenty-six — ref
+- [#30](u30) Thirty — ref
+- [#31](u31) Thirty-one — ref
+- [#35](u35) Thirty-five noref — ref
+- [#40](u40) Forty stale — ref
+- [#50](u50) Fifty — ref
+- [#51](u51) Fifty-one — ref
+- [#60](u60) XHIGH a sixty — ref
+- [#61](u61) Sixty-one — ref
+- [#62](u62) Sixty-two — ref
+- [#63](u63) XHIGH b sixty-three — ref
+- [#64](u64) Sixty-four — ref
+- [#16](u16) TIERFAIL issue sixteen — ref
+- [#100](u100) Hundred — ref
+- [#101](u101) Hundred-one — ref
+- [#102](u102) Hundred-two — ref
+- [#103](u103) Hundred-three — ref
+- [#104](u104) Hundred-four — ref
+- [#105](u105) Hundred-five — ref
+
+## P1 (1)
+
+- [#70](u70) P1 issue seventy — p1 reason
+REPORT
+touch -t 202609280000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md"
+
+# Default fixtures: empty PRs and worktrees for burndown tests
+echo '[]' > "$T/fx/prs-open.json"
+touch "$T/fx/worktrees.txt"
+
+# Helper: run burndown (not delta) — cleans up any ledger from a prior call
+# shellcheck disable=SC2120
+bd_b() {
+    # Only remove timestamp ledgers (20XXXXXXTXXXXXX.json), not named fixtures
+    rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+    bd burndown "$@"
+}
+
+# ── C14: budget fill ──────────────────────────────────────────────────────────
+# 6 P2 issues with distinct paths; 5 fit, 6th is over budget
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"bin/a:1 title thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"bin/b:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":102,"title":"Hundred-two","body":"bin/c:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":103,"title":"Hundred-three","body":"bin/d:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":104,"title":"Hundred-four","body":"bin/e:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":105,"title":"Hundred-five","body":"bin/f:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C14: fill exits 0" || fail "C14: fill exits 0 (got $RC)"
+PICK_COUNT=$(grep -cE '^PICK' <<< "$OUT" || true)
+[ "$PICK_COUNT" -eq 5 ] && ok "C14: 5 PICK rows" || fail "C14: 5 PICK rows (got $PICK_COUNT)"
+want "C14: units 5/5" "$OUT" "units: 5/5"
+
+# ── C15: xhigh + skip-continue ───────────────────────────────────────────────
+# P2 order: XHIGH #60(cost2), #61(1), #62(1), XHIGH #63(cost2 skip), #64(1 fits)
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":60,"title":"XHIGH a sixty","body":"bin/aa:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":61,"title":"Sixty-one","body":"bin/bb:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":62,"title":"Sixty-two","body":"bin/cc:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":63,"title":"XHIGH b sixty-three","body":"bin/dd:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":64,"title":"Sixty-four","body":"bin/ee:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C15: xhigh exits 0" || fail "C15: xhigh exits 0 (got $RC)"
+# #60 picked, #63 skipped over budget, #64 picked (continue not break)
+want "C15: #60 PICK" "$OUT" "PICK  #60"
+want "C15: #63 SKIP over budget" "$OUT" "over budget"
+want "C15: #64 PICK" "$OUT" "PICK  #64"
+# Mutation guard: #64 must be present (continue, not break)
+grep -qE 'PICK\s+#64' <<< "$OUT" && ok "C15: #64 reached (continue)" || fail "C15: #64 reached (continue)"
+
+# ── C16: tier failure costs 1 ─────────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[{"number":16,"title":"TIERFAIL issue sixteen","body":"bin/tierfail:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C16: tier fail exits 0" || fail "C16: tier fail exits 0 (got $RC)"
+want "C16: tier=error in detail" "$OUT" "tier=error"
+grep -qE 'PICK\s+#16\s+\S+\s+1' <<< "$OUT" && ok "C16: cost=1 on tier fail" || fail "C16: cost=1 on tier fail"
+
+# ── C17: in-flight, one per source ────────────────────────────────────────────
+# Six issues #21-#26; #21-#25 each blocked by a different source; #26 PICK
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":21,"title":"Twenty-one","body":"bin/s1:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":22,"title":"Twenty-two","body":"bin/s2:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":23,"title":"Twenty-three","body":"bin/s3:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":24,"title":"Twenty-four","body":"bin/s4:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":25,"title":"Twenty-five","body":"bin/s5:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":26,"title":"Twenty-six","body":"bin/s6:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+# Source 1: PR body names #21
+cat > "$T/fx/prs-open.json" <<'JSON'
+[{"number":901,"body":"Closes a-jay85/IBL5-backlog#21 bin/foo:1"}]
+JSON
+# Source 2: plan file names #22 (put in BD_PLANS_DIR = $T/home/claude-plans)
+cat > "$T/home/claude-plans/some-feature.md" <<'PLAN'
+# Some feature plan
+IBL5-backlog#22 is the tracking issue
+PLAN
+# Source 3: queue symlink → file naming #23
+mkdir -p "$T/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue"
+cat > "$T/home/elsewhere.md" <<'QF'
+# Queue plan
+IBL5-backlog#23 needs doing
+QF
+ln -sf "$T/home/elsewhere.md" "$T/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/some-task.md"
+# Source 4: ledger with #24 status=queued (in-flight)
+cat > "$T/home/claude-plans/_reports/burndown-batch-test.json" <<'LEDGER'
+{"items":[
+  {"issue_num":24,"also_closes":[],"slug":"wt-24","status":"queued","route":"plan","pr_url":"","units_used":1}
+]}
+LEDGER
+# Source 5: ledger item #25 slug=wt-25, status=skipped; worktree branch wt-25 exists
+# Rewrite ledger to include both items
+cat > "$T/home/claude-plans/_reports/burndown-batch-test.json" <<'LEDGER'
+{"items":[
+  {"issue_num":24,"also_closes":[],"slug":"wt-24","status":"queued","route":"plan","pr_url":"","units_used":1},
+  {"issue_num":25,"also_closes":[],"slug":"wt-25","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1}
+]}
+LEDGER
+# Worktree fixture has branch wt-25
+cat > "$T/fx/worktrees.txt" <<'WT'
+worktree /some/path
+HEAD abc123
+branch refs/heads/wt-25
+
+WT
+# Boundary: plan names #260 (NOT #26)
+cat > "$T/home/claude-plans/boundary-plan.md" <<'BPLAN'
+# Boundary
+IBL5-backlog#260 is the issue
+BPLAN
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C17: in-flight exits 0" || fail "C17: in-flight exits 0 (got $RC)"
+want "C17: #21 SKIP open PR" "$OUT" "open PR"
+want "C17: #22 SKIP plan" "$OUT" "plan some-feature.md"
+want "C17: #23 SKIP queue" "$OUT" "automouse queue some-task.md"
+want "C17: #24 SKIP ledger" "$OUT" "ledger burndown-batch-test.json (queued)"
+want "C17: #25 SKIP worktree" "$OUT" "worktree wt-25"
+grep -qE 'PICK\s+#26' <<< "$OUT" && ok "C17: #26 PICK (boundary)" || fail "C17: #26 PICK (boundary)"
+# Cleanup
+rm -f "$T/home/claude-plans/some-feature.md" "$T/home/claude-plans/boundary-plan.md" \
+      "$T/home/claude-plans/_reports/burndown-batch-test.json"
+echo '[]' > "$T/fx/prs-open.json"
+cat > "$T/fx/worktrees.txt" <<'WT'
+WT
+
+# ── C18: source failures abort ────────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[{"number":100,"title":"Hundred","body":"bin/x:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}]
+JSON
+
+# C18a: gh pr list fails
+OUT="$(GH_FAIL_ON="pr list" GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C18a: pr list fail exits 3" || fail "C18a: pr list fail exits 3 (got $RC)"
+want "C18a: pr list fail message" "$OUT" "gh pr list failed"
+grep -qF "LEDGER:" <<< "$OUT" && fail "C18a: no LEDGER on failure" || ok "C18a: no LEDGER on failure"
+
+# C18b: malformed ledger
+cat > "$T/home/claude-plans/_reports/burndown-batch-bad.json" <<'EOF'
+{"not_items": "wrong"}
+EOF
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C18b: malformed ledger exits 3" || fail "C18b: malformed ledger exits 3 (got $RC)"
+want "C18b: malformed ledger message" "$OUT" "malformed ledger"
+rm -f "$T/home/claude-plans/_reports/burndown-batch-bad.json"
+
+# C18c: git stub exits 1
+cat > "$T/git-fail" <<'STUB'
+#!/usr/bin/env bash
+exit 1
+STUB
+chmod +x "$T/git-fail"
+OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git-fail" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C18c: git fail exits 3" || fail "C18c: git fail exits 3 (got $RC)"
+want "C18c: git fail message" "$OUT" "git worktree list failed"
+
+# ── C19: path overlap ─────────────────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":30,"title":"Thirty","body":"bin/foo:10 overlap test","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":31,"title":"Thirty-one","body":"bin/foo:99 overlap test","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C19: overlap exits 0" || fail "C19: overlap exits 0 (got $RC)"
+want "C19: #31 overlap with #30 on bin/foo" "$OUT" "overlap"
+grep -qE 'SKIP\s+#31.*overlap.*#30' <<< "$OUT" && ok "C19: #31 cites #30" || fail "C19: #31 cites #30"
+
+# ── C20: no file:line refs ────────────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[{"number":35,"title":"Thirty-five noref","body":"This issue has no code refs","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C20: no refs exits 0" || fail "C20: no refs exits 0 (got $RC)"
+want "C20: SKIP no file:line refs" "$OUT" "no file:line refs"
+
+# ── C21: stale-rank and unranked ──────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":40,"title":"Forty stale","body":"bin/stale:1 stale issue","url":"u","updatedAt":"2026-09-29T00:00:00Z","labels":[]},
+  {"number":999,"title":"Unranked open","body":"bin/unranked:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C21: stale+unranked exits 0" || fail "C21: stale+unranked exits 0 (got $RC)"
+want "C21: #40 stale-rank" "$OUT" "stale-rank"
+want "C21: #999 unranked" "$OUT" "unranked"
+
+# ── C22: pair semantics ───────────────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":50,"title":"Fifty","body":"bin/p1:1 pair test","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":51,"title":"Fifty-one","body":"bin/p2:1 pair test","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+OUT="$(bd burndown --pair 50,51 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C22: pair exits 0" || fail "C22: pair exits 0 (got $RC)"
+grep -qE 'PICK\s+#50.*\+#51' <<< "$OUT" && ok "C22: #50 PICK with +#51" || fail "C22: #50 PICK with +#51"
+want "C22: #51 SKIP paired with #50" "$OUT" "paired with #50"
+C22_LEDGER="$(grep '^LEDGER:' <<< "$OUT" | tail -1 | sed 's/^LEDGER: //')"
+C22_PATHS="$(jq -c '.items[0].paths' "$C22_LEDGER" 2>/dev/null)"
+[ "$C22_PATHS" = '["bin/p1","bin/p2"]' ] \
+    && ok "C22: ledger item[0].paths has both members" \
+    || fail "C22: ledger item[0].paths has both members (got: $C22_PATHS)"
+
+# C22b: pair with #51 in-flight
+cat > "$T/fx/prs-open.json" <<'JSON'
+[{"number":902,"body":"refs a-jay85/IBL5-backlog#51"}]
+JSON
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+OUT="$(bd burndown --pair 50,51 2>&1)"; RC=$?
+grep -qE '^SKIP +#50 .*pair:' <<< "$OUT" && ok "C22b: #50 SKIP with pair:" || fail "C22b: #50 SKIP with pair: (got: $OUT)"
+grep -qE '^SKIP +#51 .*pair:' <<< "$OUT" && ok "C22b: #51 SKIP with pair:" || fail "C22b: #51 SKIP with pair: (got: $OUT)"
+echo '[]' > "$T/fx/prs-open.json"
+
+# ── C23: rejected flag forms ──────────────────────────────────────────────────
+rm -f "$T/gh.log"
+for flag_args in "--pair 50" "--pair 50,50" "--pair a,b" "--bogus"; do
+    OUT="$(bd burndown $flag_args 2>&1)"; RC=$?
+    [ "$RC" -eq 2 ] && ok "C23: '$flag_args' exits 2" || fail "C23: '$flag_args' exits 2 (got $RC)"
+done
+OUT="$(bd burndown --pair 50,51 --pair 51,52 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C23: duplicate pair exits 2" || fail "C23: duplicate pair exits 2 (got $RC)"
+want "C23: duplicate pair message" "$OUT" "appears in two --pair"
+# No gh calls made
+if [ ! -s "$T/gh.log" ]; then ok "C23: no gh call on flag error"; else fail "C23: no gh call on flag error"; fi
+
+# ── C24: rank order P1 first ──────────────────────────────────────────────────
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":70,"title":"P1 issue seventy","body":"bin/p1only:1 p1","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":100,"title":"Hundred","body":"bin/a:1 title thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C24: rank order exits 0" || fail "C24: rank order exits 0 (got $RC)"
+# #70 is P1, #100 is P2 — P1 must appear first
+P1_LINE=$(grep -n 'PICK.*#70' <<< "$OUT" | head -1 | cut -d: -f1)
+P2_LINE=$(grep -n 'PICK.*#100' <<< "$OUT" | head -1 | cut -d: -f1)
+if [ -n "$P1_LINE" ] && [ -n "$P2_LINE" ] && [ "$P1_LINE" -lt "$P2_LINE" ]; then
+    ok "C24: P1 picked before P2"
+else
+    fail "C24: P1 picked before P2 (P1=$P1_LINE, P2=$P2_LINE)"
+fi
+
+# ── Phase 4: ledger write, record, and refresh ────────────────────────────────
+
+# ── C25: ledger written ───────────────────────────────────────────────────────
+# Restore C14 fixture: 6 P2 issues #100-#105, 5 fit in budget
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"bin/a:1 title thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"bin/b:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":102,"title":"Hundred-two","body":"bin/c:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":103,"title":"Hundred-three","body":"bin/d:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":104,"title":"Hundred-four","body":"bin/e:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":105,"title":"Hundred-five","body":"bin/f:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+echo '[]' > "$T/fx/prs-open.json"
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C25: ledger write exits 0" || fail "C25: ledger write exits 0 (got $RC)"
+C25_LAST=$(tail -1 <<< "$OUT")
+[[ "$C25_LAST" =~ ^LEDGER:\ /.*/burndown-batch-[0-9]{8}T[0-9]{6}\.json$ ]] \
+    && ok "C25: LEDGER: path format" || fail "C25: LEDGER: path format (got $C25_LAST)"
+C25_LEDGER_PATH="${C25_LAST#LEDGER: }"
+[ "$(jq '.units_used' "$C25_LEDGER_PATH" 2>/dev/null)" = "5" ] \
+    && ok "C25: units_used=5" || fail "C25: units_used=5"
+[ "$(jq '.items | length' "$C25_LEDGER_PATH" 2>/dev/null)" = "5" ] \
+    && ok "C25: items length=5" || fail "C25: items length=5"
+jq -e '[.items[].status] | all(. == "picked")' "$C25_LEDGER_PATH" >/dev/null 2>&1 \
+    && ok "C25: all status=picked" || fail "C25: all status=picked"
+jq -e '[.items[].route] | all(. == "")' "$C25_LEDGER_PATH" >/dev/null 2>&1 \
+    && ok "C25: all route empty" || fail "C25: all route empty"
+
+# ── C26: zero picks ───────────────────────────────────────────────────────────
+# All 6 issues in-flight via an open PR; expect LEDGER: none
+cat > "$T/fx/prs-open.json" <<'JSON'
+[{"number":901,"body":"IBL5-backlog#100 IBL5-backlog#101 IBL5-backlog#102 IBL5-backlog#103 IBL5-backlog#104 IBL5-backlog#105"}]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C26: zero picks exits 0" || fail "C26: zero picks exits 0 (got $RC)"
+C26_LAST=$(tail -1 <<< "$OUT")
+[ "$C26_LAST" = "LEDGER: none" ] && ok "C26: LEDGER: none" || fail "C26: LEDGER: none (got $C26_LAST)"
+C26_FILES=$(ls "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json 2>/dev/null || true)
+[ -z "$C26_FILES" ] && ok "C26: no ledger file created" || fail "C26: no ledger file created"
+echo '[]' > "$T/fx/prs-open.json"
+
+# ── C27: record happy path ────────────────────────────────────────────────────
+# Create ledger directly (4 items: #60 cost=2, #61-#62-#64 cost=1 each; units_used=5)
+LEDGER27="$T/home/claude-plans/_reports/burndown-batch-test27.json"
+cat > "$LEDGER27" <<'JSON'
+{
+  "schema": 1,
+  "items": [
+    {"issue_num":60,"also_closes":[],"issue_title":"XHIGH a sixty","rank":"P2","tier":"xhigh","cost":2,"paths":["bin/aa"],"route":"","slug":"","pr_url":"","status":"picked"},
+    {"issue_num":61,"also_closes":[],"issue_title":"Sixty-one","rank":"P2","tier":"default","cost":1,"paths":["bin/bb"],"route":"","slug":"","pr_url":"","status":"picked"},
+    {"issue_num":62,"also_closes":[],"issue_title":"Sixty-two","rank":"P2","tier":"default","cost":1,"paths":["bin/cc"],"route":"","slug":"","pr_url":"","status":"picked"},
+    {"issue_num":64,"also_closes":[],"issue_title":"Sixty-four","rank":"P2","tier":"default","cost":1,"paths":["bin/ee"],"route":"","slug":"","pr_url":"","status":"picked"}
+  ],
+  "skipped": [],
+  "units_used": 5,
+  "budget": 5
+}
+JSON
+OUT="$(bd burndown-record "$LEDGER27" 60 route=plan slug=fix-60 status=queued 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C27: record #60 exits 0" || fail "C27: record #60 exits 0 (got $RC)"
+want "C27: output recorded #60" "$OUT" "recorded #60"
+[ "$(jq -r '.items[] | select(.issue_num==60) | .route' "$LEDGER27")" = "plan" ] \
+    && ok "C27: #60 route=plan" || fail "C27: #60 route=plan"
+[ "$(jq -r '.items[] | select(.issue_num==60) | .slug' "$LEDGER27")" = "fix-60" ] \
+    && ok "C27: #60 slug=fix-60" || fail "C27: #60 slug=fix-60"
+[ "$(jq -r '.items[] | select(.issue_num==60) | .status' "$LEDGER27")" = "queued" ] \
+    && ok "C27: #60 status=queued" || fail "C27: #60 status=queued"
+OUT="$(bd burndown-record "$LEDGER27" 61 status=closed-fixed 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C27: record #61 exits 0" || fail "C27: record #61 exits 0 (got $RC)"
+[ "$(jq '.items[] | select(.issue_num==61) | .cost' "$LEDGER27")" = "0" ] \
+    && ok "C27: #61 cost=0" || fail "C27: #61 cost=0"
+[ "$(jq '.units_used' "$LEDGER27")" = "4" ] \
+    && ok "C27: units_used=4 after closed-fixed" || fail "C27: units_used=4 after closed-fixed"
+
+# ── C28: record rejects, ledger unchanged ────────────────────────────────────
+cp "$LEDGER27" "$T/ledger27-before.json"
+OUT="$(bd burndown-record "$LEDGER27" 60 route=maybe 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C28: route=maybe exits 2" || fail "C28: route=maybe exits 2 (got $RC)"
+OUT="$(bd burndown-record "$LEDGER27" 60 status=done 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C28: status=done exits 2" || fail "C28: status=done exits 2 (got $RC)"
+OUT="$(bd burndown-record "$LEDGER27" 60 slug=Bad_Slug 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C28: slug=Bad_Slug exits 2" || fail "C28: slug=Bad_Slug exits 2 (got $RC)"
+OUT="$(bd burndown-record "$LEDGER27" 60 pr_url=https://example.com/x 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C28: pr_url=bad exits 2" || fail "C28: pr_url=bad exits 2 (got $RC)"
+OUT="$(bd burndown-record "$LEDGER27" 60 color=red 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C28: unknown key exits 2" || fail "C28: unknown key exits 2 (got $RC)"
+OUT="$(bd burndown-record "$LEDGER27" 999 route=plan 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C28: unknown issue exits 2" || fail "C28: unknown issue exits 2 (got $RC)"
+# #60 now has route=plan; status=shipped requires route=ad-hoc
+OUT="$(bd burndown-record "$LEDGER27" 60 status=shipped 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C28: shipped+plan exits 2" || fail "C28: shipped+plan exits 2 (got $RC)"
+cmp -s "$T/ledger27-before.json" "$LEDGER27" \
+    && ok "C28: ledger unchanged (byte-identical)" \
+    || fail "C28: ledger unchanged (byte-identical)"
+rm -f "$T/ledger27-before.json"
+
+# ── C29: record on malformed ledger ──────────────────────────────────────────
+BAD29="$T/home/claude-plans/_reports/burndown-batch-bad29.json"
+printf '%s\n' '{}' > "$BAD29"
+OUT="$(bd burndown-record "$BAD29" 60 route=plan 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C29: malformed ledger exits 3" || fail "C29: malformed ledger exits 3 (got $RC)"
+want "C29: malformed ledger message" "$OUT" "malformed or missing ledger"
+rm -f "$BAD29"
+
+# ── C30: refresh round trip ───────────────────────────────────────────────────
+# Use Phase 2 as latest (remove Phase 3 report)
+rm -f "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md"
+# Restore Phase 2 issues: #10-#13, #99 all open
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":10,"title":"Issue ten","body":"","url":"u10","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":11,"title":"Issue eleven","body":"","url":"u11","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":12,"title":"Issue twelve","body":"","url":"u12","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":13,"title":"Issue thirteen","body":"","url":"u13","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":99,"title":"Unranked note","body":"","url":"u99","updatedAt":"2026-09-01T00:00:00Z","labels":[]}
+]
+JSON
+# Ranks file: delta issues #11 (P2), #13 (P3), #99 (P2)
+RANKS30="$T/ranks30.md"
+cat > "$RANKS30" <<'RANKS'
+## P2 (2)
+- [#11](https://github.com/a-jay85/IBL5-backlog/issues/11) Issue eleven — updated
+- [#99](https://github.com/a-jay85/IBL5-backlog/issues/99) Unranked note — now ranked
+
+## P3 (1)
+- [#13](https://github.com/a-jay85/IBL5-backlog/issues/13) Issue thirteen — now ranked
+RANKS
+OUT="$(bd burndown-refresh "$RANKS30" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C30: refresh exits 0" || fail "C30: refresh exits 0 (got $RC)"
+C30_LAST=$(tail -1 <<< "$OUT")
+[[ "$C30_LAST" =~ ^REPORT:\ / ]] && ok "C30: REPORT: path" || fail "C30: REPORT: path (got $C30_LAST)"
+C30_REPORT="${C30_LAST#REPORT: }"
+[ -f "$C30_REPORT" ] && ok "C30: report file exists" || fail "C30: report file exists ($C30_REPORT)"
+grep -qE '^## P[1-4] \([0-9]+\)' "$C30_REPORT" \
+    && ok "C30: report has P section" || fail "C30: report has P section"
+C30_P2_HEADER_COUNT="$(grep '^## P2' "$C30_REPORT" | head -1 | sed 's/.*(\([0-9]*\)).*/\1/')"
+C30_P2_LINE_COUNT="$(awk '/^## P2/{found=1;next} found && /^## /{found=0} found && /^- /{c++} END{print c+0}' "$C30_REPORT")"
+[ "$C30_P2_HEADER_COUNT" = "$C30_P2_LINE_COUNT" ] \
+    && ok "C30: P2 header count matches line count" \
+    || fail "C30: P2 header count matches line count ($C30_P2_HEADER_COUNT vs $C30_P2_LINE_COUNT)"
+grep -qxF -- '- [#10](https://github.com/a-jay85/IBL5-backlog/issues/10) Issue ten — rationale ten' "$C30_REPORT" \
+    && ok "C30: unchanged #10 line byte-identical" \
+    || fail "C30: unchanged #10 line byte-identical"
+DOUT="$(bd burndown-delta 2>/dev/null)"
+C30_DELTA="$(jq -c '.issues' <<< "$DOUT" 2>/dev/null)"
+[ "$C30_DELTA" = "[]" ] && ok "C30: delta empty after refresh" || fail "C30: delta empty after refresh (got $C30_DELTA)"
+
+# ── C31: refresh merge semantics ─────────────────────────────────────────────
+# Remove C30 output; Phase 2 is latest again
+rm -f "$T/home/claude-plans/_reports/backlog-triage-$(date +%F).md"
+# Issues without #12 (closed/absent); #10, #11, #13, #99 open
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":10,"title":"Issue ten","body":"","url":"u10","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":11,"title":"Issue eleven","body":"","url":"u11","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":13,"title":"Issue thirteen","body":"","url":"u13","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":99,"title":"Unranked note","body":"","url":"u99","updatedAt":"2026-09-01T00:00:00Z","labels":[]}
+]
+JSON
+# Re-rank #10 from P2 to P4; also include delta #11 (P2), #13 (P3), #99 (P4)
+RANKS31="$T/ranks31.md"
+cat > "$RANKS31" <<'RANKS'
+## P2 (1)
+- [#11](https://github.com/a-jay85/IBL5-backlog/issues/11) Issue eleven — updated
+
+## P3 (1)
+- [#13](https://github.com/a-jay85/IBL5-backlog/issues/13) Issue thirteen — ranked
+
+## P4 (2)
+- [#10](https://github.com/a-jay85/IBL5-backlog/issues/10) Issue ten — moved to P4
+- [#99](https://github.com/a-jay85/IBL5-backlog/issues/99) Unranked note — ranked
+RANKS
+OUT="$(bd burndown-refresh "$RANKS31" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C31: refresh exits 0" || fail "C31: refresh exits 0 (got $RC)"
+C31_LAST=$(tail -1 <<< "$OUT")
+C31_REPORT="${C31_LAST#REPORT: }"
+[ -f "$C31_REPORT" ] && ok "C31: report file exists" || fail "C31: report file exists"
+C31_COUNT10=$(grep -cF '[#10]' "$C31_REPORT" || true)
+[ "$C31_COUNT10" = "1" ] && ok "C31: #10 appears once" || fail "C31: #10 appears once (got $C31_COUNT10)"
+C31_SEC10=$(awk '/^## P/{sec=$0} /\[#10\]/{print sec; exit}' "$C31_REPORT")
+grep -q "P4" <<< "$C31_SEC10" && ok "C31: #10 under P4" || fail "C31: #10 under P4 (sec: $C31_SEC10)"
+grep -qF '[#12]' "$C31_REPORT" \
+    && fail "C31: #12 absent" || ok "C31: #12 absent"
+
+# ── C32: refresh rejects ─────────────────────────────────────────────────────
+# Remove C31 output; Phase 2 is latest; restore full issues fixture
+rm -f "$T/home/claude-plans/_reports/backlog-triage-$(date +%F).md"
+C32_DIR_BEFORE="$(ls "$T/home/claude-plans/_reports/" 2>/dev/null)"
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":10,"title":"Issue ten","body":"","url":"u10","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":11,"title":"Issue eleven","body":"","url":"u11","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":12,"title":"Issue twelve","body":"","url":"u12","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":13,"title":"Issue thirteen","body":"","url":"u13","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
+  {"number":99,"title":"Unranked note","body":"","url":"u99","updatedAt":"2026-09-01T00:00:00Z","labels":[]}
+]
+JSON
+# Test 1: ranks file omitting delta #13 (delta = #11, #13, #99)
+RANKS32A="$T/ranks32a.md"
+cat > "$RANKS32A" <<'RANKS'
+## P2 (2)
+- [#11](https://github.com/a-jay85/IBL5-backlog/issues/11) Issue eleven
+- [#99](https://github.com/a-jay85/IBL5-backlog/issues/99) Unranked note
+RANKS
+OUT="$(bd burndown-refresh "$RANKS32A" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C32: omits delta exits 2" || fail "C32: omits delta exits 2 (got $RC)"
+want "C32: omits delta message" "$OUT" "omits delta issue"
+# Test 2: ranks file with closed #500 (not present in issues.json)
+RANKS32B="$T/ranks32b.md"
+cat > "$RANKS32B" <<'RANKS'
+## P2 (4)
+- [#11](https://github.com/a-jay85/IBL5-backlog/issues/11) Issue eleven
+- [#13](https://github.com/a-jay85/IBL5-backlog/issues/13) Issue thirteen
+- [#99](https://github.com/a-jay85/IBL5-backlog/issues/99) Unranked note
+- [#500](https://github.com/a-jay85/IBL5-backlog/issues/500) Closed issue
+RANKS
+OUT="$(bd burndown-refresh "$RANKS32B" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C32: closed issue exits 2" || fail "C32: closed issue exits 2 (got $RC)"
+want "C32: closed issue message" "$OUT" "not open"
+# Test 3: empty ranks file (no P-section lines)
+RANKS32C="$T/ranks32c.md"
+printf '# empty\n' > "$RANKS32C"
+OUT="$(bd burndown-refresh "$RANKS32C" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C32: empty ranks exits 2" || fail "C32: empty ranks exits 2 (got $RC)"
+want "C32: empty ranks message" "$OUT" "ranked lines"
+# No new report written in any of the three failing cases
+C32_DIR_AFTER="$(ls "$T/home/claude-plans/_reports/" 2>/dev/null)"
+[ "$C32_DIR_BEFORE" = "$C32_DIR_AFTER" ] \
+    && ok "C32: no new report on any reject" \
+    || fail "C32: no new report on any reject"
+
+# Restore Phase 3 report and issues for any further use
+rm -f "$LEDGER27"
+cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md" <<'REPORT'
+# Phase 3 triage
+
+## P2 (many)
+
+- [#21](u21) Twenty-one — ref
+- [#22](u22) Twenty-two — ref
+- [#23](u23) Twenty-three — ref
+- [#24](u24) Twenty-four — ref
+- [#25](u25) Twenty-five — ref
+- [#26](u26) Twenty-six — ref
+- [#30](u30) Thirty — ref
+- [#31](u31) Thirty-one — ref
+- [#35](u35) Thirty-five noref — ref
+- [#40](u40) Forty stale — ref
+- [#50](u50) Fifty — ref
+- [#51](u51) Fifty-one — ref
+- [#60](u60) XHIGH a sixty — ref
+- [#61](u61) Sixty-one — ref
+- [#62](u62) Sixty-two — ref
+- [#63](u63) XHIGH b sixty-three — ref
+- [#64](u64) Sixty-four — ref
+- [#16](u16) TIERFAIL issue sixteen — ref
+- [#100](u100) Hundred — ref
+- [#101](u101) Hundred-one — ref
+- [#102](u102) Hundred-two — ref
+- [#103](u103) Hundred-three — ref
+- [#104](u104) Hundred-four — ref
+- [#105](u105) Hundred-five — ref
+
+## P1 (1)
+
+- [#70](u70) P1 issue seventy — p1 reason
+REPORT
+touch -t 202609280000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md"
+
+# ── Phase 5: status and close-merged ─────────────────────────────────────────
+
+# Shared ledger fixture for C33-C40 (5 items: #80 ad-hoc, #82 plan, #83 ad-hoc, #84 plan, #85 ad-hoc)
+LEDGER_C33="$T/home/claude-plans/_reports/burndown-batch-20260927T120000.json"
+cat > "$LEDGER_C33" <<'JSON'
+{
+  "schema": 1,
+  "items": [
+    {"issue_num":80,"also_closes":[81],"issue_title":"Fix eighty","rank":"P1","tier":"default","cost":1,"paths":["bin/fix80"],"route":"ad-hoc","slug":"fix-80","pr_url":"","status":"shipped"},
+    {"issue_num":82,"also_closes":[],"issue_title":"Plan eighty-two","rank":"P2","tier":"default","cost":1,"paths":["bin/fix82"],"route":"plan","slug":"plan-82","pr_url":"","status":"queued"},
+    {"issue_num":83,"also_closes":[],"issue_title":"Fix eighty-three","rank":"P2","tier":"default","cost":1,"paths":["bin/fix83"],"route":"ad-hoc","slug":"fix-83","pr_url":"","status":"shipped"},
+    {"issue_num":84,"also_closes":[],"issue_title":"Plan eighty-four","rank":"P2","tier":"default","cost":1,"paths":["bin/fix84"],"route":"plan","slug":"plan-84","pr_url":"","status":"queued"},
+    {"issue_num":85,"also_closes":[],"issue_title":"Fix eighty-five","rank":"P2","tier":"default","cost":1,"paths":["bin/fix85"],"route":"ad-hoc","slug":"fix-85","pr_url":"","status":"shipped"}
+  ],
+  "skipped": [],
+  "units_used": 5,
+  "budget": 5
+}
+JSON
+
+# PR fixtures for status/close-merged tests
+printf '[{"url":"https://github.com/a-jay85/IBL5/pull/880","state":"MERGED"}]\n' \
+    > "$T/fx/pr-fix-80.json"
+printf '[{"url":"https://github.com/a-jay85/IBL5/pull/882","state":"MERGED"}]\n' \
+    > "$T/fx/pr-plan-82.json"
+printf '[{"url":"https://github.com/a-jay85/IBL5/pull/883","state":"OPEN"}]\n' \
+    > "$T/fx/pr-fix-83.json"
+printf '[]\n' > "$T/fx/pr-plan-84.json"
+printf '[{"url":"https://github.com/a-jay85/IBL5/pull/885a","state":"MERGED"},{"url":"https://github.com/a-jay85/IBL5/pull/885b","state":"OPEN"}]\n' \
+    > "$T/fx/pr-fix-85.json"
+# Queue entry for plan-84 (so live_state = queued for that item)
+mkdir -p "$T/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue"
+touch "$T/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/plan-84.md"
+# Issue view fixtures for close-merged
+printf '{"state":"OPEN"}\n' > "$T/fx/issue-80.json"
+printf '{"state":"OPEN"}\n' > "$T/fx/issue-81.json"
+
+# ── C33: status rows ──────────────────────────────────────────────────────────
+rm -f "$T/gh.log"
+OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown-status "$LEDGER_C33" 2>&1)"; RC=$?
+# Expected: #80 merged, #82 merged, #83 open, #84 queued, #85 unknown(2 PRs)
+grep -qE '#80.*merged' <<< "$OUT" && ok "C33: #80 merged" || fail "C33: #80 merged (out: $OUT)"
+grep -qE '#82.*merged' <<< "$OUT" && ok "C33: #82 merged" || fail "C33: #82 merged"
+grep -qE '#83.*open' <<< "$OUT" && ok "C33: #83 open" || fail "C33: #83 open"
+grep -qE '#84.*queued' <<< "$OUT" && ok "C33: #84 queued" || fail "C33: #84 queued"
+grep -qE '#85.*unknown.*2 PRs' <<< "$OUT" && ok "C33: #85 unknown 2 PRs" || fail "C33: #85 unknown 2 PRs"
+[ "$RC" -eq 1 ] && ok "C33: exit 1 (unknown present)" || fail "C33: exit 1 (unknown present, got $RC)"
+
+# ── C34: status is read-only ──────────────────────────────────────────────────
+LEDGER_BEFORE34="$(jq -c . "$LEDGER_C33")"
+REPORTS_BEFORE34="$(ls -la "$T/home/claude-plans/_reports/" 2>/dev/null)"
+rm -f "$T/gh.log"
+GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown-status "$LEDGER_C33" >/dev/null 2>&1
+LEDGER_AFTER34="$(jq -c . "$LEDGER_C33")"
+REPORTS_AFTER34="$(ls -la "$T/home/claude-plans/_reports/" 2>/dev/null)"
+[ "$LEDGER_BEFORE34" = "$LEDGER_AFTER34" ] && ok "C34: ledger unchanged" || fail "C34: ledger unchanged"
+[ "$REPORTS_BEFORE34" = "$REPORTS_AFTER34" ] && ok "C34: reports dir unchanged" || fail "C34: reports dir unchanged"
+if grep -qv 'pr list' "$T/gh.log" 2>/dev/null; then
+    NONPR=$(grep -v 'pr list' "$T/gh.log" | head -1)
+    fail "C34: only pr list calls (got: $NONPR)"
+else
+    ok "C34: only pr list calls"
+fi
+
+# ── C35: status picks newest ledger ──────────────────────────────────────────
+LEDGER_OLDER="$T/home/claude-plans/_reports/burndown-batch-20260901T000000.json"
+cp "$LEDGER_C33" "$LEDGER_OLDER"
+OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown-status 2>&1)"
+grep -qF 'burndown-batch-20260927T120000.json' <<< "$OUT" \
+    && ok "C35: newest ledger selected" || fail "C35: newest ledger selected (out: $OUT)"
+rm -f "$LEDGER_OLDER"
+
+# ── C36: status fail-closed paths ────────────────────────────────────────────
+OUT="$(GH_FAIL_ON="pr list" GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown-status "$LEDGER_C33" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "C36: gh fail → exit 1" || fail "C36: gh fail → exit 1 (got $RC)"
+grep -qE 'unknown.*gh failed' <<< "$OUT" && ok "C36: unknown (gh failed) rows" \
+    || fail "C36: unknown (gh failed) rows"
+# Use an empty HOME (no batch ledgers) for the no-ledger test
+C36_HOME="$(mktemp -d)"
+mkdir -p "$C36_HOME/claude-plans/_reports"
+OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$C36_HOME" "$SCRIPT" burndown-status 2>&1)"; RC=$?
+rm -rf "$C36_HOME"
+[ "$RC" -eq 3 ] && ok "C36: no ledger → exit 3" || fail "C36: no ledger → exit 3 (got $RC)"
+want "C36: no ledger message" "$OUT" "no burndown ledger"
+BAD36="$T/bad36.json"
+printf '{}\n' > "$BAD36"
+OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown-status "$BAD36" 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C36: bad ledger → exit 3" || fail "C36: bad ledger → exit 3 (got $RC)"
+want "C36: bad ledger message" "$OUT" "malformed or missing ledger"
+rm -f "$BAD36"
+
+# ── C37: close-merged happy path ─────────────────────────────────────────────
+LEDGER37="$T/home/claude-plans/_reports/burndown-batch-20260927T130000.json"
+cp "$LEDGER_C33" "$LEDGER37"
+rm -f "$T/gh.log"
+OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown-close-merged "$LEDGER37" 2>&1)"; RC=$?
+# Issue close calls: 80 and 81 (also_closes), NOT 82 (plan), NOT 83 (open), NOT 85 (unknown)
+grep -qF 'issue close 80' "$T/gh.log" && ok "C37: closes #80" || fail "C37: closes #80"
+grep -qF 'issue close 81' "$T/gh.log" && ok "C37: closes #81" || fail "C37: closes #81"
+grep -qF 'issue close 82' "$T/gh.log" && fail "C37: no close #82" || ok "C37: no close #82"
+grep -qF 'issue close 83' "$T/gh.log" && fail "C37: no close #83" || ok "C37: no close #83"
+grep -qF 'issue close 85' "$T/gh.log" && fail "C37: no close #85" || ok "C37: no close #85"
+# #80 and #82 should have status=merged in ledger
+[ "$(jq -r '.items[] | select(.issue_num==80) | .status' "$LEDGER37")" = "merged" ] \
+    && ok "C37: #80 status=merged" || fail "C37: #80 status=merged"
+[ "$(jq -r '.items[] | select(.issue_num==82) | .status' "$LEDGER37")" = "merged" ] \
+    && ok "C37: #82 status=merged" || fail "C37: #82 status=merged"
+[ "$(jq -r '.items[] | select(.issue_num==83) | .status' "$LEDGER37")" = "shipped" ] \
+    && ok "C37: #83 stays shipped" || fail "C37: #83 stays shipped"
+# #85 is unknown → SKIP → exit 1
+[ "$RC" -eq 1 ] && ok "C37: exit 1 (SKIP present)" || fail "C37: exit 1 (SKIP present, got $RC)"
+grep -qE 'SKIP #85' <<< "$OUT" && ok "C37: SKIP #85 row" || fail "C37: SKIP #85 row"
+
+# ── C38: idempotent re-run ────────────────────────────────────────────────────
+rm -f "$T/gh.log"
+OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown-close-merged "$LEDGER37" 2>&1)"
+CLOSE_COUNT="$(grep 'issue close' "$T/gh.log" 2>/dev/null | wc -l | tr -d ' ')"
+[ "$CLOSE_COUNT" -eq 0 ] && ok "C38: idempotent (zero close calls)" \
+    || fail "C38: idempotent (zero close calls, got $CLOSE_COUNT)"
+rm -f "$LEDGER37"
+
+# ── C39: already-closed issue ────────────────────────────────────────────────
+LEDGER39="$T/home/claude-plans/_reports/burndown-batch-20260927T140000.json"
+cp "$LEDGER_C33" "$LEDGER39"
+# Make issue 81 already CLOSED
+printf '{"state":"CLOSED"}\n' > "$T/fx/issue-81.json"
+rm -f "$T/gh.log"
+OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown-close-merged "$LEDGER39" 2>&1)"
+grep -qF 'issue close 81' "$T/gh.log" && fail "C39: no close #81 (already CLOSED)" \
+    || ok "C39: no close #81 (already CLOSED)"
+[ "$(jq -r '.items[] | select(.issue_num==80) | .status' "$LEDGER39")" = "merged" ] \
+    && ok "C39: #80 still reaches merged" || fail "C39: #80 still reaches merged"
+# Restore issue-81 to OPEN for any further tests
+printf '{"state":"OPEN"}\n' > "$T/fx/issue-81.json"
+rm -f "$LEDGER39"
+
+# ── C40: partial close failure ────────────────────────────────────────────────
+LEDGER40="$T/home/claude-plans/_reports/burndown-batch-20260927T150000.json"
+cp "$LEDGER_C33" "$LEDGER40"
+rm -f "$T/gh.log"
+OUT="$(GH_FAIL_ON="issue close 81" GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown-close-merged "$LEDGER40" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "C40: partial fail exits 1" || fail "C40: partial fail exits 1 (got $RC)"
+grep -qE 'FAIL #80' <<< "$OUT" && ok "C40: FAIL #80 row" || fail "C40: FAIL #80 row"
+[ "$(jq -r '.items[] | select(.issue_num==80) | .status' "$LEDGER40")" != "merged" ] \
+    && ok "C40: #80 ledger unchanged on failure" || fail "C40: #80 ledger unchanged on failure"
+rm -f "$LEDGER40"
+
+# ── Phase 6: env-seam cases ───────────────────────────────────────────────────
+
+# Restore C14 fixture for C41/C42
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"bin/a:1 title thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"bin/b:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":102,"title":"Hundred-two","body":"bin/c:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":103,"title":"Hundred-three","body":"bin/d:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":104,"title":"Hundred-four","body":"bin/e:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":105,"title":"Hundred-five","body":"bin/f:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+echo '[]' > "$T/fx/prs-open.json"
+touch "$T/fx/worktrees.txt"
+
+# ── C41: BURNDOWN_TIER_HINT unset — real bin/plan-tier-hint runs ──────────────
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+OUT="$(env -u BURNDOWN_TIER_HINT GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" \
+    HOME="$T/home" "$SCRIPT" burndown 2>&1)"; RC=$?
+C41_LEDGER_LINE="$(grep '^LEDGER: ' <<< "$OUT" | tail -1)"
+C41_LEDGER="${C41_LEDGER_LINE#LEDGER: }"
+if [ -n "$C41_LEDGER" ] && [ -f "$C41_LEDGER" ]; then
+    C41_BAD="$(jq -r '.items[].tier' "$C41_LEDGER" \
+        | grep -vE '^(default|sonnet|xhigh)$' || true)"
+    [ -z "$C41_BAD" ] && ok "C41: BURNDOWN_TIER_HINT unset: no error tiers" \
+        || fail "C41: BURNDOWN_TIER_HINT unset: error tier(s): $C41_BAD"
+else
+    [ "$RC" -ne 0 ] && fail "C41: BURNDOWN_TIER_HINT unset: rc=$RC out=$OUT" \
+        || fail "C41: BURNDOWN_TIER_HINT unset: no ledger found"
+fi
+
+# ── C42: BURNDOWN_TIER_HINT="" — empty string falls back to real hint ──────────
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="" \
+    HOME="$T/home" "$SCRIPT" burndown 2>&1)"; RC=$?
+C42_LEDGER_LINE="$(grep '^LEDGER: ' <<< "$OUT" | tail -1)"
+C42_LEDGER="${C42_LEDGER_LINE#LEDGER: }"
+if [ -n "$C42_LEDGER" ] && [ -f "$C42_LEDGER" ]; then
+    C42_BAD="$(jq -r '.items[].tier' "$C42_LEDGER" \
+        | grep -vE '^(default|sonnet|xhigh)$' || true)"
+    [ -z "$C42_BAD" ] && ok "C42: BURNDOWN_TIER_HINT empty: no error tiers" \
+        || fail "C42: BURNDOWN_TIER_HINT empty: error tier(s): $C42_BAD"
+else
+    [ "$RC" -ne 0 ] && fail "C42: BURNDOWN_TIER_HINT empty: rc=$RC out=$OUT" \
+        || fail "C42: BURNDOWN_TIER_HINT empty: no ledger found"
+fi
+
+# ── C43: BURNDOWN_GIT unset — real git worktree list runs ────────────────────
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+OUT="$(env -u BURNDOWN_GIT GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/home" "$SCRIPT" burndown 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C43: BURNDOWN_GIT unset: exits 0" || fail "C43: BURNDOWN_GIT unset: exits 0 (got $RC, out: $OUT)"
+grep -qF "git worktree list failed" <<< "$OUT" \
+    && fail "C43: no git worktree list failed" || ok "C43: no git worktree list failed"
+
+# ── C44: BURNDOWN_GIT="" — empty string falls back to real git ───────────────
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_TIER_HINT="$T/tier" BURNDOWN_GIT="" \
+    HOME="$T/home" "$SCRIPT" burndown 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C44: BURNDOWN_GIT empty: exits 0" || fail "C44: BURNDOWN_GIT empty: exits 0 (got $RC, out: $OUT)"
+grep -qF "git worktree list failed" <<< "$OUT" \
+    && fail "C44: no git worktree list failed" || ok "C44: no git worktree list failed"
+
+# ── Phase 7: drift guards ─────────────────────────────────────────────────────
+
+SKILL_FILE="$(cd "$(dirname "$0")/.." && pwd)/.claude/skills/burndown/SKILL.md"
+
+# ── C45: subcommand drift guard ───────────────────────────────────────────────
+if [ -f "$SKILL_FILE" ]; then
+    LIB_FILE="$(cd "$(dirname "$0")" && pwd)/lib/burndown.sh"
+    SKILL_SUBCMDS="$(grep -oE 'bin/backlog burndown[a-z-]*' "$SKILL_FILE" \
+        | sed 's/bin\/backlog //' | sort -u)"
+    C45_FAIL=0
+    while IFS= read -r subcmd; do
+        [ -n "$subcmd" ] || continue
+        grep -qE "^ *${subcmd}\)" "$LIB_FILE" \
+            || { fail "C45: $subcmd in skill but not in bd_main case"; C45_FAIL=1; }
+    done <<< "$SKILL_SUBCMDS"
+    [ "$C45_FAIL" -eq 0 ] && ok "C45: skill subcommands match bd_main case"
+else
+    fail "C45: SKILL.md not found at $SKILL_FILE"
+fi
+
+# ── C46: post-plan boundary ───────────────────────────────────────────────────
+if [ -f "$SKILL_FILE" ]; then
+    HAS_ALLOWED=0
+    HAS_NEVER=0
+    while IFS= read -r line; do
+        grep -qF 'post-plan-now' <<< "$line" || continue
+        if grep -qE 'cd .+ && bin/post-plan-now --auto' <<< "$line"; then
+            HAS_ALLOWED=1
+        elif grep -qF 'Never run' <<< "$line"; then
+            HAS_NEVER=1
+        else
+            fail "C46: post-plan-now line not in allowed form: $line"
+        fi
+    done < "$SKILL_FILE"
+    [ "$HAS_ALLOWED" -eq 1 ] && ok "C46: has allowed post-plan-now line" \
+        || fail "C46: no allowed post-plan-now line found"
+    [ "$HAS_NEVER" -eq 1 ] && ok "C46: has Never run line" \
+        || fail "C46: no Never run line found"
+else
+    fail "C46: SKILL.md not found at $SKILL_FILE"
+fi
+
+echo ""
+echo "Results: $PASS passed, $FAIL failed"
+if [ "$FAIL" -gt 0 ]; then
+    for f in "${FAILURES[@]}"; do printf '  FAIL: %s\n' "$f"; done
+    exit 1
+fi
+exit 0

@@ -1031,6 +1031,8 @@ jobs:
         run: bin/test-plan-tier-hint
       - name: bin/test-backlog
         run: bin/test-backlog
+      - name: bin/test-burndown
+        run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-burndown'
       - name: bin/test-adr-check
         run: bin/test-adr-check
       - name: bin/test-check-docs

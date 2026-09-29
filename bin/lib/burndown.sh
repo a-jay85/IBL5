@@ -601,6 +601,24 @@ bd_delta_numbers() {
         "$issues_file")
 }
 
+# bd_record_apply <ledger> <issue_num> <patch-json>
+# Apply a JSON patch to one ledger item, recompute units_used, and write atomically.
+bd_record_apply() {
+    local ledger="$1" issue_num="$2" patch="$3"
+    local updated
+    updated="$(jq --argjson n "$issue_num" --argjson patch "$patch" \
+        '.items = [.items[] | if .issue_num == $n then . + $patch else . end]' \
+        "$ledger")"
+    updated="$(jq '.units_used = ([.items[].cost] | add // 0)' <<< "$updated")"
+    local tmp_path="${ledger}.tmp.$$"
+    printf '%s\n' "$updated" > "$tmp_path"
+    if ! jq -e '.items | type=="array"' "$tmp_path" >/dev/null 2>&1; then
+        rm -f "$tmp_path"
+        bd_die 3 "record read-back failed for $ledger"
+    fi
+    mv "$tmp_path" "$ledger"
+}
+
 bd_cmd_record() {
     if [ $# -lt 3 ]; then
         bd_die 2 "burndown-record wants <ledger> <issue> key=value..."
@@ -649,36 +667,21 @@ bd_cmd_record() {
     [ -z "$status" ]  || patch="$(jq -n --argjson p "$patch" --arg v "$status"  '$p+{status:$v}')"
     [ -z "$pr_url" ]  || patch="$(jq -n --argjson p "$patch" --arg v "$pr_url"  '$p+{pr_url:$v}')"
 
-    local updated
-    updated="$(jq --argjson n "$issue_num" --argjson patch "$patch" \
-        '.items = [.items[] | if .issue_num == $n then . + $patch else . end]' \
-        "$ledger")"
-
-    # Cross-field rules
-    local new_status new_route
-    new_status="$(jq -r --argjson n "$issue_num" \
-        '.items[] | select(.issue_num==$n) | .status' <<< "$updated")"
-    new_route="$(jq -r --argjson n "$issue_num" \
-        '.items[] | select(.issue_num==$n) | .route' <<< "$updated")"
+    # Cross-field rules (preview the patched item without writing)
+    local preview_item new_status new_route
+    preview_item="$(jq --argjson n "$issue_num" --argjson patch "$patch" \
+        '.items[] | select(.issue_num==$n) | . + $patch' "$ledger")"
+    new_status="$(jq -r '.status' <<< "$preview_item")"
+    new_route="$(jq -r '.route' <<< "$preview_item")"
     [ "$new_status" != "queued" ] || [ "$new_route" = "plan" ] \
         || bd_die 2 "status=queued requires route=plan"
     [ "$new_status" != "shipped" ] || [ "$new_route" = "ad-hoc" ] \
         || bd_die 2 "status=shipped requires route=ad-hoc"
     if [ "$new_status" = "closed-fixed" ]; then
-        updated="$(jq --argjson n "$issue_num" \
-            '.items = [.items[] | if .issue_num == $n then .+{cost:0} else . end]' \
-            <<< "$updated")"
+        patch="$(jq -n --argjson p "$patch" '$p+{cost:0}')"
     fi
 
-    updated="$(jq '.units_used = ([.items[].cost] | add // 0)' <<< "$updated")"
-
-    local tmp_path="${ledger}.tmp.$$"
-    printf '%s\n' "$updated" > "$tmp_path"
-    if ! jq -e '.items | type=="array"' "$tmp_path" >/dev/null 2>&1; then
-        rm -f "$tmp_path"
-        bd_die 3 "record read-back failed for $ledger"
-    fi
-    mv "$tmp_path" "$ledger"
+    bd_record_apply "$ledger" "$issue_num" "$patch"
     printf 'recorded #%s:%s\n' "$issue_num" "$applied_keys"
 }
 
@@ -786,8 +789,227 @@ bd_cmd_refresh() {
     rm -f "$issues_file"
     printf 'REPORT: %s\n' "$report_path"
 }
-bd_cmd_status()       { bd_die 2 "burndown-status: not implemented"; }
-bd_cmd_close_merged() { bd_die 2 "burndown-close-merged: not implemented"; }
+# bd_pick_ledger [<ledger>] — sets BD_LEDGER to the chosen ledger path.
+bd_pick_ledger() {
+    if [ $# -gt 1 ]; then bd_die 2 "too many arguments; want at most one ledger path"; fi
+    if [ $# -eq 1 ] && [ -n "${1:-}" ]; then
+        local explicit="$1"
+        { [ -f "$explicit" ] && jq -e '.items | type=="array"' "$explicit" >/dev/null 2>&1; } \
+            || bd_die 3 "malformed or missing ledger $explicit"
+        BD_LEDGER="$explicit"
+        return
+    fi
+    local best="" f name
+    for f in "$BD_REPORTS_DIR"/burndown-batch-*.json; do
+        [ -f "$f" ] || continue
+        name="$(basename "$f")"
+        if [ -z "$best" ] || [[ "$name" > "$(basename "$best")" ]]; then
+            best="$f"
+        fi
+    done
+    [ -n "$best" ] \
+        || bd_die 3 "no burndown ledger in $BD_REPORTS_DIR; run bin/backlog burndown first"
+    BD_LEDGER="$best"
+}
+
+# bd_live_state <item-json> — prints "<state>\t<pr_url_or_empty>"
+bd_live_state() {
+    local item="$1"
+    local slug status route
+    slug="$(jq -r '.slug // ""' <<< "$item")"
+    status="$(jq -r '.status' <<< "$item")"
+    route="$(jq -r '.route // ""' <<< "$item")"
+
+    if [ -z "$slug" ]; then
+        if [ "$status" = "picked" ]; then
+            printf 'unrouted\t\n'
+        else
+            printf '%s\t\n' "$status"
+        fi
+        return
+    fi
+
+    local pr_raw pr_rc=0
+    pr_raw="$("$GH" pr list --repo "$BD_CODE_REPO" --head "$slug" --state all \
+        --limit 5 --json url,state 2>/dev/null)" || pr_rc=$?
+    if [ "$pr_rc" -ne 0 ] || ! jq -e 'type=="array"' <<< "$pr_raw" >/dev/null 2>&1; then
+        printf 'unknown (gh failed)\t\n'
+        return
+    fi
+
+    local pr_count
+    pr_count="$(jq 'length' <<< "$pr_raw")"
+    if [ "$pr_count" -gt 1 ]; then
+        printf 'unknown (%s PRs for head %s)\t\n' "$pr_count" "$slug"
+        return
+    fi
+
+    if [ "$pr_count" -eq 1 ]; then
+        local pr_state pr_url
+        pr_state="$(jq -r '.[0].state' <<< "$pr_raw")"
+        pr_url="$(jq -r '.[0].url' <<< "$pr_raw")"
+        case "$pr_state" in
+            MERGED) printf 'merged\t%s\n' "$pr_url" ;;
+            OPEN)   printf 'open\t%s\n' "$pr_url" ;;
+            CLOSED) printf 'pr-closed\t%s\n' "$pr_url" ;;
+            *)      printf 'unknown (state %s)\t%s\n' "$pr_state" "$pr_url" ;;
+        esac
+        return
+    fi
+
+    # Zero PRs
+    if [ "$route" = "plan" ] && [ -f "$BD_QUEUE_DIR/${slug}.md" ]; then
+        printf 'queued\t\n'
+    else
+        printf '%s\t\n' "$status"
+    fi
+}
+
+bd_cmd_status() {
+    if [ $# -gt 1 ]; then bd_die 2 "burndown-status wants at most one argument"; fi
+    bd_pick_ledger "${1:-}"
+    local ledger="$BD_LEDGER"
+
+    local basename units_used budget
+    basename="$(basename "$ledger")"
+    units_used="$(jq '.units_used' "$ledger")"
+    budget="$(jq '.budget' "$ledger")"
+    printf 'batch %s  units %s/%s\n' "$basename" "$units_used" "$budget"
+
+    local n=0 merged_count=0 open_count=0 queued_count=0 unknown_count=0
+    local item_count
+    item_count="$(jq '.items | length' "$ledger")"
+    while [ "$n" -lt "$item_count" ]; do
+        local item issue_num route ledger_status slug also_str
+        item="$(jq ".items[$n]" "$ledger")"
+        issue_num="$(jq -r '.issue_num' <<< "$item")"
+        route="$(jq -r '.route // ""' <<< "$item")"
+        ledger_status="$(jq -r '.status' <<< "$item")"
+        also_str="$(jq -r '.also_closes // [] | map("+#"+tostring) | join("")' <<< "$item")"
+        slug="$(jq -r '.slug // ""' <<< "$item")"
+
+        local live_line live_state live_pr
+        live_line="$(bd_live_state "$item")"
+        live_state="$(printf '%s' "$live_line" | cut -f1)"
+        live_pr="$(printf '%s' "$live_line" | cut -f2)"
+
+        local display_id display_loc
+        display_id="#${issue_num}${also_str}"
+        display_loc="${live_pr:-$slug}"
+
+        printf '%-8s %-7s %-12s %-26s %s\n' \
+            "$display_id" "$route" "$ledger_status" "$live_state" "$display_loc"
+
+        case "$live_state" in
+            merged)    merged_count=$((merged_count + 1)) ;;
+            open)      open_count=$((open_count + 1)) ;;
+            queued)    queued_count=$((queued_count + 1)) ;;
+            unknown*)  unknown_count=$((unknown_count + 1)) ;;
+        esac
+        n=$((n + 1))
+    done
+
+    printf 'merged %d  open %d  queued %d  unknown %d\n' \
+        "$merged_count" "$open_count" "$queued_count" "$unknown_count"
+    [ "$unknown_count" -eq 0 ]
+}
+
+bd_cmd_close_merged() {
+    if [ $# -gt 1 ]; then bd_die 2 "burndown-close-merged wants at most one argument"; fi
+    bd_pick_ledger "${1:-}"
+    local ledger="$BD_LEDGER"
+
+    local n=0 item_count any_fail=0
+    item_count="$(jq '.items | length' "$ledger")"
+    while [ "$n" -lt "$item_count" ]; do
+        local item issue_num ledger_status route
+        item="$(jq ".items[$n]" "$ledger")"
+        issue_num="$(jq -r '.issue_num' <<< "$item")"
+        ledger_status="$(jq -r '.status' <<< "$item")"
+        route="$(jq -r '.route // ""' <<< "$item")"
+        n=$((n + 1))
+
+        case "$ledger_status" in merged|closed-fixed|skipped) continue ;; esac
+
+        local live_line live_state live_pr
+        live_line="$(bd_live_state "$item")"
+        live_state="$(printf '%s' "$live_line" | cut -f1)"
+        live_pr="$(printf '%s' "$live_line" | cut -f2)"
+
+        case "$live_state" in
+            unknown*)
+                printf 'SKIP #%s %s\n' "$issue_num" "$live_state"
+                any_fail=1
+                continue
+                ;;
+        esac
+
+        if [ "$live_state" != "merged" ]; then
+            printf 'WAIT #%s %s\n' "$issue_num" "$live_state"
+            continue
+        fi
+
+        if [ "$route" = "plan" ]; then
+            local patch
+            patch="$(jq -n --arg s "merged" --arg u "$live_pr" '{status:$s,pr_url:$u}')"
+            bd_record_apply "$ledger" "$issue_num" "$patch"
+            printf 'DONE #%s plan PR merged\n' "$issue_num"
+            continue
+        fi
+
+        local issue_list_file
+        issue_list_file="$(mktemp)"
+        printf '%s\n' "$issue_num" > "$issue_list_file"
+        jq -r '.also_closes // [] | .[]' <<< "$item" >> "$issue_list_file"
+
+        local item_ok=1
+        while IFS= read -r inum; do
+            [ -n "$inum" ] || continue
+            local view_raw="" view_rc=0
+            view_raw="$("$GH" issue view "$inum" --repo "$REPO" \
+                --json state 2>/dev/null)" || view_rc=$?
+            if [ "$view_rc" -ne 0 ]; then
+                printf 'FAIL #%s issue view %s failed\n' "$issue_num" "$inum"
+                item_ok=0
+                break
+            fi
+            local istate
+            istate="$(jq -r '.state // ""' <<< "$view_raw")"
+            case "$istate" in
+                CLOSED) continue ;;
+                OPEN)
+                    local close_rc=0
+                    "$GH" issue close "$inum" --repo "$REPO" \
+                        -c "Fixed by ${live_pr} (merged). Closed by bin/backlog burndown-close-merged from $(basename "$ledger")." \
+                        >/dev/null 2>&1 || close_rc=$?
+                    if [ "$close_rc" -ne 0 ]; then
+                        printf 'FAIL #%s issue close %s failed\n' "$issue_num" "$inum"
+                        item_ok=0
+                        break
+                    fi
+                    ;;
+                *)
+                    printf 'FAIL #%s issue view %s returned state %s\n' \
+                        "$issue_num" "$inum" "$istate"
+                    item_ok=0
+                    break
+                    ;;
+            esac
+        done < "$issue_list_file"
+        rm -f "$issue_list_file"
+
+        if [ "$item_ok" -eq 1 ]; then
+            local patch
+            patch="$(jq -n --arg s "merged" --arg u "$live_pr" '{status:$s,pr_url:$u}')"
+            bd_record_apply "$ledger" "$issue_num" "$patch"
+            printf 'DONE #%s closed\n' "$issue_num"
+        else
+            any_fail=1
+        fi
+    done
+
+    [ "$any_fail" -eq 0 ]
+}
 
 bd_main() {
     local cmd="$1"; shift

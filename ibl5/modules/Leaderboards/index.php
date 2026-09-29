@@ -48,6 +48,11 @@ if ($tab === 'career') {
     $phase = $service->resolvePhase($getString('phase', 'regular'));
     $mode = $service->resolveMode($phase, $getString('mode', 'totals'));
     $sortKey = $service->resolveSortKey($getString('sortby', 'PPG'), $mode);
+    $showsGames = $service->phaseShowsGames($phase);
+    // One-game phases hide the games column, so a games sort falls back to points
+    if ($sortKey === 'GAMES' && !$showsGames) {
+        $sortKey = 'PPG';
+    }
     // An unchecked switch sends nothing, so `submitted` tells "switch off" from first load (ON).
     $retirees = $submitted ? isset($_GET['retirees']) : true;
     $display = $getString('display', '');
@@ -71,6 +76,7 @@ if ($tab === 'career') {
 
         // Set active sort column for highlighting
         $view->setSortColumn($sortColumn);
+        $view->setShowGames($showsGames);
 
         // Render table header
         echo $view->renderTableHeader();

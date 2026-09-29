@@ -5,6 +5,7 @@
  * the controls consistent while the user edits them:
  *  - phases without an averages table (rookie, sophomore) disable Averages
  *  - the PPG option reads "PTS" on Totals and "PPG" on Averages
+ *  - one-game phases (rookie, sophomore) disable the Games sort
  */
 (function () {
     'use strict';
@@ -20,12 +21,20 @@
 
     function syncSortOptions() {
         var isTotals = !averages.checked;
+        var chosen = phase.options[phase.selectedIndex];
+        var showsGames = !chosen || chosen.getAttribute('data-shows-games') !== '0';
 
         for (var i = 0; i < sortby.options.length; i++) {
             var option = sortby.options[i];
 
             if (option.value === 'PPG') {
                 option.textContent = isTotals ? 'PTS' : 'PPG';
+            }
+            if (option.value === 'GAMES') {
+                option.disabled = !showsGames;
+                if (!showsGames && option.selected) {
+                    sortby.value = 'PPG';
+                }
             }
         }
     }

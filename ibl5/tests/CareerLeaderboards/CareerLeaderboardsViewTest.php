@@ -95,6 +95,36 @@ final class CareerLeaderboardsViewTest extends TestCase
         $this->assertGreaterThan($drbPos, $rebPos);
     }
 
+    public function testGamesColumnHiddenWhenShowGamesIsOff(): void
+    {
+        $stats = [
+            'pid' => 123, 'name' => 'Test Player', 'games' => '777', 'minutes' => '30',
+            'fgm' => '5', 'fga' => '10', 'fgp' => '0.500', 'ftm' => '2', 'fta' => '2',
+            'ftp' => '1.000', 'tgm' => '1', 'tga' => '3', 'tgp' => '0.333', 'orb' => '1',
+            'drb' => '4', 'reb' => '5', 'ast' => '3', 'stl' => '1', 'tvr' => '2',
+            'blk' => '0', 'pf' => '2', 'pts' => '13',
+        ];
+
+        $this->view->setShowGames(false);
+        $header = $this->view->renderTableHeader();
+        $row = $this->view->renderPlayerRow($stats, 1);
+
+        $this->assertStringNotContainsString('>Games<', $header);
+        $this->assertStringContainsString('>Minutes<', $header);
+        $this->assertStringNotContainsString('777', $row);
+        $this->assertSame(preg_match_all('/<th[ >]/', $header), preg_match_all('/<td[ >]/', $row));
+    }
+
+    public function testGamesSortDisabledForOneGamePhase(): void
+    {
+        $rookie = $this->view->renderFilterForm(['phase' => 'rookie']);
+        $regular = $this->view->renderFilterForm(['phase' => 'regular']);
+
+        $this->assertMatchesRegularExpression('/<option value="GAMES"[^>]* disabled>/', $rookie);
+        $this->assertDoesNotMatchRegularExpression('/<option value="GAMES"[^>]* disabled>/', $regular);
+        $this->assertStringContainsString('value="sophomore" data-has-averages="0" data-shows-games="0"', $rookie);
+    }
+
     public function testRenderPlayerRowCreatesValidHtml(): void
     {
         $stats = [

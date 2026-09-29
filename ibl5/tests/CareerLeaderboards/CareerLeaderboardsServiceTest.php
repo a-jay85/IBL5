@@ -236,6 +236,15 @@ final class CareerLeaderboardsServiceTest extends TestCase
         $this->assertTrue($this->service->phaseHasAverages('bogus'));
     }
 
+    public function testPhaseShowsGames(): void
+    {
+        $this->assertTrue($this->service->phaseShowsGames('regular'));
+        $this->assertTrue($this->service->phaseShowsGames('allstar'));
+        $this->assertFalse($this->service->phaseShowsGames('rookie'));
+        $this->assertFalse($this->service->phaseShowsGames('sophomore'));
+        $this->assertTrue($this->service->phaseShowsGames('bogus'));
+    }
+
     public function testResolveMode(): void
     {
         $this->assertSame('averages', $this->service->resolveMode('regular', 'averages'));

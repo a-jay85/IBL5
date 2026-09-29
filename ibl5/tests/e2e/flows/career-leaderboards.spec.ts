@@ -46,6 +46,26 @@ test.describe('Career Leaderboards flow', () => {
     await expect(averages).toBeEnabled();
   });
 
+  test('Games column shows for Regular Season but not Rookie or Sophomore', async ({ page }) => {
+    const header = page.locator('.ibl-data-table thead th');
+
+    await page.goto('modules.php?name=Leaderboards&tab=career&phase=regular&submitted=1');
+    await expect(header.filter({ hasText: /^Games$/ })).toHaveCount(1);
+
+    for (const phase of ['rookie', 'sophomore']) {
+      await page.goto(`modules.php?name=Leaderboards&tab=career&phase=${phase}&submitted=1`);
+      await expect(header.filter({ hasText: /^Minutes$/ })).toHaveCount(1);
+      await expect(header.filter({ hasText: /^Games$/ })).toHaveCount(0);
+      await expect(page.locator('select[name="sortby"] option[value="GAMES"]')).toBeDisabled();
+    }
+  });
+
+  test('a Games sort on Rookie Game falls back to PTS', async ({ page }) => {
+    await page.goto('modules.php?name=Leaderboards&tab=career&phase=rookie&sortby=GAMES&submitted=1');
+    await expect(page.locator('select[name="sortby"]')).toHaveValue('PPG');
+    await expect(page.locator('.ibl-data-table th.sorted-col').first()).toHaveText('PTS');
+  });
+
   test('selecting Rookie Game while on Averages falls back to Totals', async ({ page }) => {
     await page.locator('input[name="mode"][value="averages"]').check();
     await page.locator('select[name="phase"]').selectOption('sophomore');

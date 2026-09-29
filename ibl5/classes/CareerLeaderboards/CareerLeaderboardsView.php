@@ -18,6 +18,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
 {
     private CareerLeaderboardsService $service;
     private string $activeSortColumn = '';
+    private bool $showGames = true;
 
     private const SORT_TO_COLUMN = [
         'pts' => 'pts',     'games' => 'games',   'minutes' => 'minutes',
@@ -37,6 +38,11 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
     public function setSortColumn(string $sortColumn): void
     {
         $this->activeSortColumn = self::SORT_TO_COLUMN[$sortColumn] ?? '';
+    }
+
+    public function setShowGames(bool $showGames): void
+    {
+        $this->showGames = $showGames;
     }
 
     private function sortAttr(string $statKey): string
@@ -59,6 +65,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
         $retirees = $currentFilters['retirees'] ?? true;
         $display = (string) ($currentFilters['display'] ?? '');
         $hasAverages = $this->service->phaseHasAverages($phase);
+        $showsGames = $this->service->phaseShowsGames($phase);
 
         ob_start();
         ?>
@@ -70,7 +77,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
             <label for="cl-phase" class="ibl-filter-form__label">Phase:</label>
             <select id="cl-phase" name="phase">
                 <?php foreach ($phases as $key => $label): ?>
-                    <option value="<?= HtmlSanitizer::e($key) ?>" data-has-averages="<?= $this->service->phaseHasAverages($key) ? '1' : '0' ?>"<?= ($phase === $key) ? ' selected' : '' ?>><?= HtmlSanitizer::e($label) ?></option>
+                    <option value="<?= HtmlSanitizer::e($key) ?>" data-has-averages="<?= $this->service->phaseHasAverages($key) ? '1' : '0' ?>" data-shows-games="<?= $this->service->phaseShowsGames($key) ? '1' : '0' ?>"<?= ($phase === $key) ? ' selected' : '' ?>><?= HtmlSanitizer::e($label) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -92,7 +99,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
             <label for="cl-sortby" class="ibl-filter-form__label">Sort By:</label>
             <select id="cl-sortby" name="sortby">
                 <?php foreach ($sortOptions as $key => $label): ?>
-                    <option value="<?= HtmlSanitizer::e($key) ?>"<?= ($sortKey === $key) ? ' selected' : '' ?>><?= HtmlSanitizer::e($label) ?></option>
+                    <option value="<?= HtmlSanitizer::e($key) ?>"<?= ($sortKey === $key) ? ' selected' : '' ?><?= ($key === 'GAMES' && !$showsGames) ? ' disabled' : '' ?>><?= HtmlSanitizer::e($label) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -131,7 +138,9 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
         <tr>
             <th class="sticky-col-1">Rank</th>
             <th class="sticky-col-2">Name</th>
+            <?php if ($this->showGames): ?>
             <th<?= HtmlSanitizer::trusted($this->sortAttr('games')) ?>>Games</th>
+            <?php endif; ?>
             <th<?= HtmlSanitizer::trusted($this->sortAttr('minutes')) ?>>Minutes</th>
             <th<?= HtmlSanitizer::trusted($this->sortAttr('fgm')) ?>>FGM</th>
             <th<?= HtmlSanitizer::trusted($this->sortAttr('fga')) ?>>FGA</th>
@@ -170,7 +179,9 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
 <tr>
     <td class="rank-cell sticky-col-1"><?= HtmlSanitizer::e($rank) ?></td>
     <?= PlayerImageHelper::renderFlexiblePlayerCell($stats['pid'], $stats['name'], 'sticky-col-2') ?>
+    <?php if ($this->showGames): ?>
     <td<?= HtmlSanitizer::trusted($this->sortAttr('games')) ?>><?= HtmlSanitizer::e((string) $stats['games']) ?></td>
+    <?php endif; ?>
     <td<?= HtmlSanitizer::trusted($this->sortAttr('minutes')) ?>><?= HtmlSanitizer::e($stats['minutes']) ?></td>
     <td<?= HtmlSanitizer::trusted($this->sortAttr('fgm')) ?>><?= HtmlSanitizer::e($stats['fgm']) ?></td>
     <td<?= HtmlSanitizer::trusted($this->sortAttr('fga')) ?>><?= HtmlSanitizer::e($stats['fga']) ?></td>

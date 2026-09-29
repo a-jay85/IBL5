@@ -51,6 +51,11 @@ interface CareerLeaderboardsServiceInterface
     public function phaseHasAverages(string $phase): bool;
 
     /**
+     * Whether the phase shows a games column (rookie and sophomore are one game each)
+     */
+    public function phaseShowsGames(string $phase): bool;
+
+    /**
      * Allowlist a phase key; unknown values become 'regular'
      */
     public function resolvePhase(string $phase): string;

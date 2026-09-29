@@ -26,6 +26,9 @@ class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
         'allstar' => ['totals' => 'ibl_allstar_career_totals', 'averages' => 'ibl_allstar_career_avgs'],
     ];
 
+    /** One-game phases: every player has played exactly one, so games is not shown */
+    private const SINGLE_GAME_PHASES = ['rookie', 'sophomore'];
+
     /**
      * Season-tab sort keys and order (minus QA), mapped to career columns.
      * PPG is labelled PTS on totals. On totals tables the repository derives the
@@ -165,6 +168,14 @@ class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
     public function phaseHasAverages(string $phase): bool
     {
         return self::PHASE_TABLES[$this->resolvePhase($phase)]['averages'] !== null;
+    }
+
+    /**
+     * @see CareerLeaderboardsServiceInterface::phaseShowsGames()
+     */
+    public function phaseShowsGames(string $phase): bool
+    {
+        return !in_array($this->resolvePhase($phase), self::SINGLE_GAME_PHASES, true);
     }
 
     /**

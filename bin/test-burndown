@@ -281,10 +281,6 @@ want "C13: arity message" "$OUT" "takes no arguments"
 cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md" <<'REPORT'
 # Phase 3 triage
 
-## P1 (1)
-
-- [#70](u70) P1 issue seventy — p1 reason
-
 ## P2 (many)
 
 - [#21](u21) Twenty-one — ref
@@ -311,6 +307,10 @@ cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md" <<'REPORT'
 - [#103](u103) Hundred-three — ref
 - [#104](u104) Hundred-four — ref
 - [#105](u105) Hundred-five — ref
+
+## P1 (1)
+
+- [#70](u70) P1 issue seventy — p1 reason
 REPORT
 touch -t 202609280000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md"
 
@@ -408,7 +408,6 @@ cat > "$T/home/claude-plans/_reports/burndown-batch-test.json" <<'LEDGER'
 ]}
 LEDGER
 # Source 5: ledger item #25 slug=wt-25, status=skipped; worktree branch wt-25 exists
-cat >> "$T/home/claude-plans/_reports/burndown-batch-test.json" 'NOT_VALID' || true
 # Rewrite ledger to include both items
 cat > "$T/home/claude-plans/_reports/burndown-batch-test.json" <<'LEDGER'
 {"items":[
@@ -521,6 +520,11 @@ OUT="$(bd burndown --pair 50,51 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && ok "C22: pair exits 0" || fail "C22: pair exits 0 (got $RC)"
 grep -qE 'PICK\s+#50.*\+#51' <<< "$OUT" && ok "C22: #50 PICK with +#51" || fail "C22: #50 PICK with +#51"
 want "C22: #51 SKIP paired with #50" "$OUT" "paired with #50"
+C22_LEDGER="$(grep '^LEDGER:' <<< "$OUT" | tail -1 | sed 's/^LEDGER: //')"
+C22_PATHS="$(jq -c '.items[0].paths' "$C22_LEDGER" 2>/dev/null)"
+[ "$C22_PATHS" = '["bin/p1","bin/p2"]' ] \
+    && ok "C22: ledger item[0].paths has both members" \
+    || fail "C22: ledger item[0].paths has both members (got: $C22_PATHS)"
 
 # C22b: pair with #51 in-flight
 cat > "$T/fx/prs-open.json" <<'JSON'
@@ -528,7 +532,8 @@ cat > "$T/fx/prs-open.json" <<'JSON'
 JSON
 rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
 OUT="$(bd burndown --pair 50,51 2>&1)"; RC=$?
-want "C22b: both SKIP pair" "$OUT" "pair:"
+grep -qE '^SKIP +#50 .*pair:' <<< "$OUT" && ok "C22b: #50 SKIP with pair:" || fail "C22b: #50 SKIP with pair: (got: $OUT)"
+grep -qE '^SKIP +#51 .*pair:' <<< "$OUT" && ok "C22b: #51 SKIP with pair:" || fail "C22b: #51 SKIP with pair: (got: $OUT)"
 echo '[]' > "$T/fx/prs-open.json"
 
 # ── C23: rejected flag forms ──────────────────────────────────────────────────
@@ -638,7 +643,7 @@ OUT="$(bd burndown-record "$LEDGER27" 61 status=closed-fixed 2>&1)"; RC=$?
     && ok "C27: units_used=4 after closed-fixed" || fail "C27: units_used=4 after closed-fixed"
 
 # ── C28: record rejects, ledger unchanged ────────────────────────────────────
-JSON_BEFORE28=$(jq -c . "$LEDGER27" 2>/dev/null)
+cp "$LEDGER27" "$T/ledger27-before.json"
 OUT="$(bd burndown-record "$LEDGER27" 60 route=maybe 2>&1)"; RC=$?
 [ "$RC" -eq 2 ] && ok "C28: route=maybe exits 2" || fail "C28: route=maybe exits 2 (got $RC)"
 OUT="$(bd burndown-record "$LEDGER27" 60 status=done 2>&1)"; RC=$?
@@ -654,8 +659,10 @@ OUT="$(bd burndown-record "$LEDGER27" 999 route=plan 2>&1)"; RC=$?
 # #60 now has route=plan; status=shipped requires route=ad-hoc
 OUT="$(bd burndown-record "$LEDGER27" 60 status=shipped 2>&1)"; RC=$?
 [ "$RC" -eq 2 ] && ok "C28: shipped+plan exits 2" || fail "C28: shipped+plan exits 2 (got $RC)"
-JSON_AFTER28=$(jq -c . "$LEDGER27" 2>/dev/null)
-[ "$JSON_BEFORE28" = "$JSON_AFTER28" ] && ok "C28: ledger unchanged" || fail "C28: ledger unchanged"
+cmp -s "$T/ledger27-before.json" "$LEDGER27" \
+    && ok "C28: ledger unchanged (byte-identical)" \
+    || fail "C28: ledger unchanged (byte-identical)"
+rm -f "$T/ledger27-before.json"
 
 # ── C29: record on malformed ledger ──────────────────────────────────────────
 BAD29="$T/home/claude-plans/_reports/burndown-batch-bad29.json"
@@ -696,6 +703,14 @@ C30_REPORT="${C30_LAST#REPORT: }"
 [ -f "$C30_REPORT" ] && ok "C30: report file exists" || fail "C30: report file exists ($C30_REPORT)"
 grep -qE '^## P[1-4] \([0-9]+\)' "$C30_REPORT" \
     && ok "C30: report has P section" || fail "C30: report has P section"
+C30_P2_HEADER_COUNT="$(grep '^## P2' "$C30_REPORT" | head -1 | sed 's/.*(\([0-9]*\)).*/\1/')"
+C30_P2_LINE_COUNT="$(awk '/^## P2/{found=1;next} found && /^## /{found=0} found && /^- /{c++} END{print c+0}' "$C30_REPORT")"
+[ "$C30_P2_HEADER_COUNT" = "$C30_P2_LINE_COUNT" ] \
+    && ok "C30: P2 header count matches line count" \
+    || fail "C30: P2 header count matches line count ($C30_P2_HEADER_COUNT vs $C30_P2_LINE_COUNT)"
+grep -qxF -- '- [#10](https://github.com/a-jay85/IBL5-backlog/issues/10) Issue ten — rationale ten' "$C30_REPORT" \
+    && ok "C30: unchanged #10 line byte-identical" \
+    || fail "C30: unchanged #10 line byte-identical"
 DOUT="$(bd burndown-delta 2>/dev/null)"
 C30_DELTA="$(jq -c '.issues' <<< "$DOUT" 2>/dev/null)"
 [ "$C30_DELTA" = "[]" ] && ok "C30: delta empty after refresh" || fail "C30: delta empty after refresh (got $C30_DELTA)"
@@ -740,6 +755,7 @@ grep -qF '[#12]' "$C31_REPORT" \
 # ── C32: refresh rejects ─────────────────────────────────────────────────────
 # Remove C31 output; Phase 2 is latest; restore full issues fixture
 rm -f "$T/home/claude-plans/_reports/backlog-triage-$(date +%F).md"
+C32_DIR_BEFORE="$(ls "$T/home/claude-plans/_reports/" 2>/dev/null)"
 cat > "$T/fx/issues.json" <<'JSON'
 [
   {"number":10,"title":"Issue ten","body":"","url":"u10","updatedAt":"2026-09-01T00:00:00Z","labels":[]},
@@ -778,17 +794,15 @@ OUT="$(bd burndown-refresh "$RANKS32C" 2>&1)"; RC=$?
 [ "$RC" -eq 2 ] && ok "C32: empty ranks exits 2" || fail "C32: empty ranks exits 2 (got $RC)"
 want "C32: empty ranks message" "$OUT" "ranked lines"
 # No new report written in any of the three failing cases
-C32_REPORT_PATH="$T/home/claude-plans/_reports/backlog-triage-$(date +%F).md"
-[ ! -f "$C32_REPORT_PATH" ] && ok "C32: no report on reject" || fail "C32: no report on reject"
+C32_DIR_AFTER="$(ls "$T/home/claude-plans/_reports/" 2>/dev/null)"
+[ "$C32_DIR_BEFORE" = "$C32_DIR_AFTER" ] \
+    && ok "C32: no new report on any reject" \
+    || fail "C32: no new report on any reject"
 
 # Restore Phase 3 report and issues for any further use
 rm -f "$LEDGER27"
 cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md" <<'REPORT'
 # Phase 3 triage
-
-## P1 (1)
-
-- [#70](u70) P1 issue seventy — p1 reason
 
 ## P2 (many)
 
@@ -816,6 +830,10 @@ cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md" <<'REPORT'
 - [#103](u103) Hundred-three — ref
 - [#104](u104) Hundred-four — ref
 - [#105](u105) Hundred-five — ref
+
+## P1 (1)
+
+- [#70](u70) P1 issue seventy — p1 reason
 REPORT
 touch -t 202609280000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md"
 

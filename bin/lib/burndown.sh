@@ -335,7 +335,9 @@ bd_cmd_burndown() {
     touch "$inflight_file"
     bd_inflight "$inflight_file"
 
-    # 3. Main selection loop — walk BD_REPORT_TSV in rank order
+    # 3. Main selection loop — sorted by rank so P1 is always before P2-P4
+    local sorted_tsv
+    sorted_tsv="$(sort -s -t$'\t' -k2,2 <<< "$BD_REPORT_TSV")"
     local used=0 done_flag=0 notreached=0
     local held_file="$BD_TMP/held.tsv"
     touch "$held_file"
@@ -456,6 +458,12 @@ bd_cmd_burndown() {
         if [ -n "$skip_reason" ]; then
             printf '%-5s #%-5s %-3s %-4s %s\n' "SKIP" "$num" "$rank" "" "$skip_reason"
             skipped_rows="${skipped_rows}${num}	${skip_reason}"$'\n'
+            if [ "$is_pair" -eq 1 ]; then
+                local p_rank_skip
+                p_rank_skip="$(awk -F'\t' -v n="$partner" '$1==n{print $2;exit}' <<< "$BD_REPORT_TSV")"
+                printf '%-5s #%-5s %-3s %-4s %s\n' "SKIP" "$partner" "${p_rank_skip:-?}" "" "pair: with #$num"
+                skipped_rows="${skipped_rows}${partner}	pair: with #${num}"$'\n'
+            fi
             continue
         fi
 
@@ -473,6 +481,12 @@ bd_cmd_burndown() {
             printf '%-5s #%-5s %-3s %-4s %s\n' "SKIP" "$num" "$rank" "$cost" \
                 "over budget (cost $cost, $rem left)"
             skipped_rows="${skipped_rows}${num}	over budget (cost $cost, $rem left)"$'\n'
+            if [ "$is_pair" -eq 1 ]; then
+                local p_rank_budget
+                p_rank_budget="$(awk -F'\t' -v n="$partner" '$1==n{print $2;exit}' <<< "$BD_REPORT_TSV")"
+                printf '%-5s #%-5s %-3s %-4s %s\n' "SKIP" "$partner" "${p_rank_budget:-?}" "" "pair: with #$num (over budget)"
+                skipped_rows="${skipped_rows}${partner}	pair: with #${num} (over budget)"$'\n'
+            fi
             continue
         fi
 
@@ -501,10 +515,14 @@ bd_cmd_burndown() {
         # Accumulate for picked.tsv (Phase 4); use 0 as sentinel for no partner
         # (consecutive TABs collapse under IFS=$'\t', so empty field must be avoided)
         local also_c="${partner:-0}"
-        picked_rows="${picked_rows}${num}	${also_c}	${rank}	${cost}	${tier}	${title}	${paths//$'\n'/|}"$'\n'
+        local all_paths="${paths}"
+        if [ "$is_pair" -eq 1 ] && [ -n "${p_paths:-}" ]; then
+            all_paths="$(printf '%s\n%s' "$paths" "${p_paths}" | sort -u)"
+        fi
+        picked_rows="${picked_rows}${num}	${also_c}	${rank}	${cost}	${tier}	${title}	${all_paths//$'\n'/|}"$'\n'
 
         [ "$used" -lt "$BD_BUDGET" ] || done_flag=1
-    done <<< "$BD_REPORT_TSV"
+    done <<< "$sorted_tsv"
 
     # Unranked open issues
     jq -r '.[].number' "$issues_file" | while IFS= read -r unum; do
@@ -766,11 +784,9 @@ bd_cmd_refresh() {
             [ "$rrank" = "$p" ] || continue
             section_lines="${section_lines}${rline}"$'\n'
         done <<< "$ranks_tsv"
-        if [ -n "$section_lines" ]; then
-            local count
-            count="$(grep -c '^- ' <<< "$section_lines" || true)"
-            merged_sections="${merged_sections}## ${p} (${count})"$'\n'"${section_lines}"$'\n'
-        fi
+        local count=0
+        [ -n "$section_lines" ] && count="$(grep -c '^- ' <<< "$section_lines" || true)"
+        merged_sections="${merged_sections}## ${p} (${count})"$'\n'"${section_lines}"$'\n'
     done
 
     local out_date old_basename
@@ -948,6 +964,9 @@ bd_cmd_close_merged() {
             printf 'WAIT #%s %s\n' "$issue_num" "$live_state"
             continue
         fi
+
+        [[ "$live_pr" =~ $PR_URL_EXACT_RE ]] \
+            || bd_die 3 "close-merged: invalid PR URL for #$issue_num: ${live_pr:-empty}"
 
         if [ "$route" = "plan" ]; then
             local patch

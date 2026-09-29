@@ -14,7 +14,7 @@ highest-priority delta issues, routes each item, and starts implementation.
 | Code | Meaning |
 |------|---------|
 | 0 | success |
-| 1 | completed but at least one item's live state was unknown |
+| 1 | completed but at least one item's live state was unknown (reported, never guessed) <!-- slop-ok --> |
 | 2 | usage error (bad subcommand, flag, or argument) |
 | 3 | fail-closed abort (missing report, gh/git/jq failure, HOME unset, missing or malformed ledger) |
 
@@ -34,8 +34,9 @@ mkdir -p "$W"
 bin/backlog burndown-delta > "$W/delta.json"
 ```
 
-Exit 3 means no triage report exists. Tell the user to run a full backlog triage first,
-then re-run `/burndown`. Never guess ranks.
+Exit 3 means the delta fetch failed (missing report, `gh` failure, or `HOME` unset). Stop
+and show the stderr output to the user. If the error names a missing report, tell them to
+run a full backlog triage first, then re-run `/burndown`. Never guess ranks.
 
 **2. Rank (judgment).** Read `$W/delta.json`. If `.issues` is empty, skip to step 3.
 
@@ -114,8 +115,13 @@ test. Only when that passes:
 bin/backlog burndown-record <ledger> <n> route=ad-hoc slug=<slug> status=shipped
 ```
 
-A failed item gets `status=skipped`. Its worktree stays dirty and keeps the issue in
-flight through the Phase 3c worktree check.
+A failed item:
+
+```bash
+bin/backlog burndown-record <ledger> <n> route=ad-hoc slug=<slug> status=skipped
+```
+
+Its worktree stays dirty and keeps the issue in flight through the Phase 3c worktree check.
 
 **6. Report.** Show the full status:
 

@@ -38,10 +38,6 @@
         }
         mobileMenu = replaceWithClone(mobileMenu);
 
-        var hamburgerTop = document.getElementById('hamburger-top');
-        var hamburgerMiddle = document.getElementById('hamburger-middle');
-        var hamburgerBottom = document.getElementById('hamburger-bottom');
-
         // Toggle mobile menu
         hamburger.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -85,23 +81,14 @@
             // Show overlay with fade
             if (menuOverlay) {
                 menuOverlay.classList.remove('hidden');
-                menuOverlay.style.opacity = '0';
                 setTimeout(function() {
-                    menuOverlay.style.opacity = '1';
+                    menuOverlay.classList.add('nav-overlay--visible');
                 }, 10);
             }
 
-            // Animate hamburger to X
-            // Use rem units so translation scales with container size (h-4 = 1rem)
-            // 0.4375rem = 7px at 16px root font, scales proportionally
-            if (hamburgerTop && hamburgerMiddle && hamburgerBottom) {
-                hamburgerTop.style.transform = 'translateY(0.4375rem) rotate(45deg)';
-                hamburgerMiddle.style.opacity = '0';
-                hamburgerBottom.style.transform = 'translateY(-0.4375rem) rotate(-45deg)';
-            }
-
+            // aria-expanded also drives the hamburger-to-X transform in navigation.css
             hamburger.setAttribute('aria-expanded', 'true');
-            document.body.style.overflow = 'hidden';
+            document.body.classList.add('menu-open');
         }
 
         function closeMenu() {
@@ -117,21 +104,14 @@
 
             // Fade out and hide overlay
             if (menuOverlay) {
-                menuOverlay.style.opacity = '0';
+                menuOverlay.classList.remove('nav-overlay--visible');
                 overlayHideTimer = setTimeout(function() {
                     menuOverlay.classList.add('hidden');
                 }, 300);
             }
 
-            // Animate hamburger back to lines
-            if (hamburgerTop && hamburgerMiddle && hamburgerBottom) {
-                hamburgerTop.style.transform = '';
-                hamburgerMiddle.style.opacity = '1';
-                hamburgerBottom.style.transform = '';
-            }
-
             hamburger.setAttribute('aria-expanded', 'false');
-            document.body.style.overflow = '';
+            document.body.classList.remove('menu-open');
         }
 
         // Desktop dropdown click-to-pin

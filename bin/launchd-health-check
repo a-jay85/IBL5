@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# bin/launchd-health-check — daily and at-login check for com.ibl5.* launchd jobs.
+#
+# Test seams (env overrides; production never sets these):
+#   DOCKER_BIN              override the docker binary
+#   DB_QUERY_BIN            override bin/db-query for the phase lookup
+#   LAUNCHD_HEALTH_JOBS_LIB override bin/lib/launchd-expected-jobs.sh
+#
+# Exit codes: 0 = healthy  1 = >=1 problem  2 = usage error
+#
+# Run: bin/launchd-health-check [--startup-delay N]
+# shellcheck shell=bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+. "$SCRIPT_DIR/lib/launchd-job.sh"
+# shellcheck source=bin/lib/launchd-expected-jobs.sh
+. "${LAUNCHD_HEALTH_JOBS_LIB:-$SCRIPT_DIR/lib/launchd-expected-jobs.sh}"
+# launchd hands jobs a minimal PATH. APPEND (never prepend) the tool dirs so
+# test stubs placed first on PATH still win.
+PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/opt/mariadb/bin"
+DOCKER_BIN="${DOCKER_BIN:-docker}"
+DB_QUERY_BIN="${DB_QUERY_BIN:-$ROOT/bin/db-query}"
+
+STARTUP_DELAY=0
+PROBLEM_KEYS=()
+PROBLEM_MSGS=()
+INFO_LINES=()
+
+add_problem() { PROBLEM_KEYS+=("$1"); PROBLEM_MSGS+=("$2"); }
+add_info()    { INFO_LINES+=("$1"); }
+
+parse_args() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --startup-delay)
+                [[ "${2:-}" =~ ^[0-9]+$ ]] || {
+                    printf 'launchd-health-check: --startup-delay needs a non-negative integer\n' >&2
+                    exit 2
+                }
+                STARTUP_DELAY="$2"; shift 2 ;;
+            --startup-delay=*)
+                local _val="${1#--startup-delay=}"
+                [[ "$_val" =~ ^[0-9]+$ ]] || {
+                    printf 'launchd-health-check: --startup-delay needs a non-negative integer\n' >&2
+                    exit 2
+                }
+                STARTUP_DELAY="$_val"; shift ;;
+            --help|-h)
+                printf 'Usage: %s [--startup-delay N]\n' "$(basename "$0")"; exit 0 ;;
+            *)
+                printf 'launchd-health-check: unknown option: %s\n' "$1" >&2; exit 2 ;;
+        esac
+    done
+}
+
+# job_pid <label> — print the PID column from $LAUNCHCTL_LIST; exit 1 if absent.
+# Uses exact third-column match so com.ibl5.automouse cannot satisfy
+# com.ibl5.automouse-morning-digest.
+job_pid() {
+    awk -F'\t' -v l="$1" '$3==l {print $1; f=1} END {exit !f}' <<< "$LAUNCHCTL_LIST"
+}
+
+# league_phase — print the Current Season Phase from the main-stack DB.
+# Runs only when a phase-gated job is missing. Returns 1 on failure or unknown value.
+league_phase() {
+    local out rc val
+    out="$(DB_QUERY_TARGET=main "$DB_QUERY_BIN" \
+        "SELECT value FROM ibl_settings WHERE setting_key = 'Current Season Phase' AND league = 'ibl'" \
+        2>/dev/null)"
+    rc=$?
+    [ $rc -ne 0 ] && return 1
+    # Parse --table output: take the second line starting with '| ', strip padding.
+    val="$(printf '%s\n' "$out" | awk '/^\| /{n++; if(n==2){sub(/^\| /,""); sub(/ *\| *$/,""); print}}')"
+    case "$val" in
+        Preseason|HEAT|"Regular Season"|Playoffs|Draft|"Free Agency")
+            printf '%s\n' "$val"; return 0 ;;
+    esac
+    return 1
+}
+
+check_launchd() {
+    if [ -z "$LAUNCHCTL_LIST" ]; then
+        add_problem "launchctl:unavailable" "launchctl list returned nothing — cannot check launchd jobs"
+        return
+    fi
+    local label mode pid plist_path phase phase_msg
+    while read -r label; do
+        [ -n "$label" ] || continue
+        mode="$(lej_job_mode "$label")"
+        if ! pid="$(job_pid "$label")"; then
+            plist_path="$(ljob_agents_dir)/$label.plist"
+            if [ "$mode" = "phase-gated" ]; then
+                phase="$(league_phase)" || phase=""
+                if [ -n "$phase" ] && [ "$phase" != "$LEJ_ACTIVE_PHASE" ]; then
+                    add_info "exempt:$label (phase: $phase — self-unloads outside Regular Season)"
+                    continue
+                fi
+                phase_msg=""
+                [ -z "$phase" ] && phase_msg=" (league phase unknown — assuming Regular Season)"
+                if [ -f "$plist_path" ]; then
+                    add_problem "missing:$label" \
+                        "$label not loaded — launchctl bootstrap gui/$(id -u) $plist_path${phase_msg}"
+                else
+                    add_problem "missing:$label" \
+                        "$label plist missing — re-run its *-cron-setup script${phase_msg}"
+                fi
+            else
+                if [ -f "$plist_path" ]; then
+                    add_problem "missing:$label" \
+                        "$label not loaded — launchctl bootstrap gui/$(id -u) $plist_path"
+                else
+                    add_problem "missing:$label" \
+                        "$label plist missing — re-run its *-cron-setup script"
+                fi
+            fi
+        else
+            if [ "$mode" = "keepalive" ] && [ "$pid" = "-" ]; then
+                add_problem "not-running:$label" "$label is loaded but has no PID (KeepAlive job is down)"
+            fi
+        fi
+    done <<< "$(lej_expected_labels)"
+}
+
+check_oneshots() {
+    local prefix label pid f
+    while read -r prefix; do
+        [ -n "$prefix" ] || continue
+        for f in "$(ljob_agents_dir)/${prefix}"*.plist; do
+            [[ -e "$f" ]] || continue
+            label="$(basename "$f" .plist)"
+            if ! pid="$(job_pid "$label")" || [ "$pid" = "-" ]; then
+                add_info "stale-oneshot:$label (plist left behind — safe to rm after confirming no run is active)"
+            fi
+        done
+    done <<< "$LEJ_TRANSIENT_PREFIXES"
+}
+
+check_docker() {
+    if ! command -v "$DOCKER_BIN" >/dev/null 2>&1; then
+        add_problem "docker:cli-missing" "docker CLI not found on PATH"
+        return
+    fi
+    if ! "$DOCKER_BIN" info >/dev/null 2>&1; then
+        add_problem "docker:daemon-down" "Docker Desktop is not running (docker info failed)"
+        return
+    fi
+    local names c
+    names="$("$DOCKER_BIN" ps --format '{{.Names}}' 2>/dev/null)"
+    while read -r c; do
+        [ -n "$c" ] || continue
+        if ! grep -qxF -- "$c" <<< "$names"; then
+            add_problem "container:$c" "container $c is not running"
+        fi
+    done <<< "$LEJ_REQUIRED_CONTAINERS"
+}
+
+print_verdict() {
+    local i
+    for ((i=0; i<${#INFO_LINES[@]}; i++)); do
+        printf 'INFO: %s\n' "${INFO_LINES[$i]}"
+    done
+    for ((i=0; i<${#PROBLEM_KEYS[@]}; i++)); do
+        printf 'PROBLEM %s: %s\n' "${PROBLEM_KEYS[$i]}" "${PROBLEM_MSGS[$i]}"
+    done
+    local n=${#PROBLEM_KEYS[@]}
+    if [ "$n" -eq 0 ]; then
+        printf 'OK\n'
+    else
+        printf 'PROBLEMS: %d\n' "$n"
+    fi
+}
+
+main() {
+    parse_args "$@"
+    [ "$STARTUP_DELAY" -gt 0 ] && sleep "$STARTUP_DELAY"
+    LAUNCHCTL_LIST="$(ljob_snapshot)"
+    check_launchd
+    check_oneshots
+    check_docker
+    print_verdict
+    [ ${#PROBLEM_KEYS[@]} -eq 0 ]
+}
+
+[[ "${BASH_SOURCE[0]}" == "$0" ]] && main "$@"

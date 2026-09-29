@@ -371,6 +371,8 @@ class CapSpaceServiceTest extends TestCase
         );
         // advancesContractYears() is deliberately wider than isOffseasonPhase():
         // it also covers Playoffs (see Season::advancesContractYears docblock).
+        // Both predicates are stubbed so testGetDisplayYearsForPlayoffs fails if
+        // CapSpaceService::getDisplayYears() keys off the wrong one.
         $mockSeason->method('advancesContractYears')->willReturn(
             $phase === 'Playoffs' || $phase === 'Draft' || $phase === 'Free Agency'
         );

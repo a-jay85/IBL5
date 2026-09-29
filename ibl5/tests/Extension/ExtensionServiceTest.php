@@ -320,7 +320,8 @@ class ExtensionServiceTest extends TestCase
     /**
      * Pins PR #2140: extension pricing reads the next-season basis through
      * advancesContractYears(), so Playoffs already prices teammates at cy+2 like
-     * the offseason. The extended player (pid 1) is excluded before summing.
+     * the offseason. The extended player (pid 1) is excluded before summing by
+     * ExtensionService::buildEvaluationContext().
      */
     #[DataProvider('moneyCommittedPhaseProvider')]
     public function testMoneyCommittedAtPositionUsesPhaseAwareNextSeasonBasis(bool $advances, bool $offseason, int $expected): void

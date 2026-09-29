@@ -59,7 +59,7 @@ A Visual-regression row can plan an untouched baseline. A CSS refactor whose pas
 
 Rules the harness applies (`parse_no_change_test_paths` in `tools/postplan-harness/harness/planfile.py`):
 
-- Honored only on a row whose Test type cell reads `Visual-regression`. On a PHPUnit, API-test or E2E row a `(no-change)` marker is ignored and the row keeps planning its test. `bin/check-plan` gate `[X]` rejects that shape at authoring time, and it also rejects a marker that is anywhere other than directly after the token.
+- Honored only on a row with a cell whose whole text reads `Visual-regression`. On a PHPUnit, API-test or E2E row a `(no-change)` marker is ignored and the row keeps planning its test. `bin/check-plan` gate `[X]` rejects that shape at authoring time, and it also rejects a marker that is anywhere other than directly after the token.
 - Exempts only that row's own token. Every other planned test in the matrix is still checked.
 - When any other row plans the same token without the marker, the unmarked row wins and the token stays `MISSING:` until the diff touches it.
 - Fenced examples never count, the same as for every other matrix parser.

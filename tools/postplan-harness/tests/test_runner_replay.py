@@ -17,6 +17,8 @@ import runner
 from harness.adapters.llm import FixtureLlm, extract_json
 from harness.state import HarnessError, TerminalState, UsageLedger
 from harness import cifix, ciwatch, schemas
+from harness.armable import manual_testing_clearance
+from harness.classify import MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -479,6 +481,26 @@ _INLINE_PLAN = """\
 | 2 | Confirm the page loads | Truly-manual | post-impl | none |
 """
 
+_AUTOMATED_PLAN = """\
+## Verification Matrix
+
+| # | What | Test type | Timing | Location |
+|---|------|-----------|--------|----------|
+| 1 | Unit behaviour | PHPUnit | pre-impl | tests/FooTest.php |
+| 2 | Command output | CLI-executable | post-impl | bin/test-foo |
+"""
+
+_STATIC_PLAN = """\
+## Verification Matrix
+
+| # | What | Test type | Timing | Location |
+|---|------|-----------|--------|----------|
+| 1 | Read the doc | Doc review | post-impl | docs/foo.md |
+| 2 | Wording check | Static | post-impl | docs/bar.md |
+"""
+
+_NO_MATRIX_PLAN = "## Phase 1: edit a doc\n\nBody text.\n"
+
 _INLINE_FIXTURE = {
     "slug": "inline-phase6-test",
     "diff": _INLINE_DIFF,
@@ -527,10 +549,12 @@ def test_replay_commit_subject_is_not_the_pr_title(monkeypatch):
         assert creates[-1].get("title") == CANNED["pr-copy"]["title"]
 
 
-def _run_inline(canned_extra=None, probes=None):
+def _run_inline(canned_extra=None, probes=None, plan_content=None):
     fixture = dict(_INLINE_FIXTURE)
     if probes is not None:
         fixture = dict(fixture, probes=probes)
+    if plan_content is not None:
+        fixture = dict(fixture, plan_content=plan_content)
     canned = dict(CANNED)
     if canned_extra:
         canned.update(canned_extra)
@@ -540,6 +564,18 @@ def _run_inline(canned_extra=None, probes=None):
     llm = FixtureLlm(UsageLedger(), canned)
     res = runner.run(fixture, out, llm, mode="replay", headless=True, probe=probe)
     return res, out
+
+
+def _phase6_body(out):
+    """Body of the last pr_edit_body action; asserts one exists (no vacuous pass)."""
+    body_edits = [a for a in _actions(out) if a.get("action") == "pr_edit_body"]
+    assert body_edits, "no pr_edit_body action was recorded"
+    return body_edits[-1]["body"]
+
+
+def _audit(out):
+    with open(os.path.join(out, "audit.log")) as fh:
+        return fh.read()
 
 
 def test_phase6_all_rows_demoted_clears():
@@ -571,6 +607,47 @@ def test_phase6_all_rows_demoted_clears():
         body = body_edits[-1].get("body", "")
         assert "No manual testing needed" in body
         assert "- [ ]" not in body
+        # Zero executable rows here, but demoted rows keep the covered-by sentinel.
+        assert MANUAL_TESTING_SENTINEL in body
+        assert MANUAL_TESTING_SENTINEL_STATIC not in body
+
+
+def test_phase6_all_automated_keeps_covered_sentinel():
+    """Row 12: a matrix with executable rows keeps the covered-by sentinel."""
+    res, out = _run_inline(plan_content=_AUTOMATED_PLAN)
+    body = _phase6_body(out)
+    assert MANUAL_TESTING_SENTINEL in body
+    assert MANUAL_TESTING_SENTINEL_STATIC not in body
+    assert "plan matrix fully automated" in _audit(out)
+
+
+def test_phase6_no_matrix_plan_keeps_covered_sentinel():
+    """Row 13: a found plan with no matrix must not claim a matrix exists."""
+    res, out = _run_inline(plan_content=_NO_MATRIX_PLAN)
+    body = _phase6_body(out)
+    assert MANUAL_TESTING_SENTINEL in body
+    assert MANUAL_TESTING_SENTINEL_STATIC not in body
+
+
+def test_phase6_plan_blind_keeps_covered_sentinel(monkeypatch, tmp_path):
+    """Row 14: plan-blind run with no manual items keeps the covered-by sentinel."""
+    monkeypatch.setenv("PLANS_DIR", str(tmp_path))
+    res, out = _run_inline(plan_content="")
+    body = _phase6_body(out)
+    assert MANUAL_TESTING_SENTINEL in body
+    assert MANUAL_TESTING_SENTINEL_STATIC not in body
+    assert "phase6 (plan-blind)" in _audit(out)
+
+
+def test_phase6_zero_executable_rows_writes_static_wording():
+    """Row 11: zero executable rows -> static wording, one heading, CLEARED, audit line."""
+    res, out = _run_inline(plan_content=_STATIC_PLAN)
+    body = _phase6_body(out)
+    assert MANUAL_TESTING_SENTINEL_STATIC in body
+    assert MANUAL_TESTING_SENTINEL not in body
+    assert body.count("## Manual Testing") == 1
+    assert manual_testing_clearance(body) == "CLEARED"
+    assert "zero executable rows" in _audit(out)
 
 
 def test_phase6_one_hold_stays_held():

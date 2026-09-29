@@ -322,8 +322,19 @@ OUT=$("$SEL" --input "$FIXTURES/live-snapshot.json" 2>/dev/null)
 if [ "$OUT" = "$(cat "$FIXTURES/live-snapshot.expected")" ]; then
     pass "R2-live-replay"
 else
-    failcase "R2-live-replay — output differs from live-snapshot.expected"
+    failcase "R2-live-replay — output differs from bin/fixtures/merge-line/live-snapshot.expected"
     diff <(printf '%s\n' "$OUT") "$FIXTURES/live-snapshot.expected" | sed 's/^/    /'
+fi
+
+# The recorded live dry run (bin/fixtures/merge-line/live-dry-run.txt) has the
+# same decision as the replay, with dry_run=true. Its key=value lines are the
+# seven-line contract.
+R3_KV=$(grep -E '^[a-z_]+=' "$FIXTURES/live-dry-run.txt" || true)
+R3_EXPECT=$(sed 's/^dry_run=false$/dry_run=true/' "$FIXTURES/live-snapshot.expected")
+if [ "$(printf '%s\n' "$R3_KV" | wc -l | tr -d ' ')" = 7 ] && [ "$R3_KV" = "$R3_EXPECT" ]; then
+    pass "R3-live-dry-run-record"
+else
+    failcase "R3-live-dry-run-record — bin/fixtures/merge-line/live-dry-run.txt does not match the recorded decision"
 fi
 
 # --- G17: empty environment, strict mode, macOS system bash ---

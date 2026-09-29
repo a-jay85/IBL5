@@ -18,6 +18,8 @@
 
 set -euo pipefail
 
+# The colon form treats an empty GH_CMD like an unset one. Plain ${GH_CMD-gh}
+# would run an empty command and fail the fetch.
 GH_CMD="${GH_CMD:-gh}"
 
 usage() {

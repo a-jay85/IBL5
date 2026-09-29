@@ -1730,7 +1730,7 @@ while true; do
         {
             printf 'Plan "%s" skipped: unusable `impl_model:` frontmatter. Needs human review.\n\n' "$SLUG"
             printf '%s\n\n' "$BASE_MODEL"
-            printf 'Fix the line-1 frontmatter to one of: opus, sonnet, haiku, claude-opus-5-5, claude-sonnet-4-6, claude-haiku-4-5 — then `bin/automouse/queue add %s`.\n' "$SLUG"
+            printf 'Fix the line-1 frontmatter to one of: opus, sonnet, haiku, claude-opus-5-5, claude-sonnet-5-5, claude-sonnet-4-6, claude-haiku-4-5 — then `bin/automouse/queue add %s`.\n' "$SLUG"
         } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
         CURRENT_LOCK=""
@@ -2114,7 +2114,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         fi
 
         echo "--- Plan #$PLANS_RUN postplan finished at $(date) ---" >> "$LOG"
-        append_cost_row "$PLAN_NAME" postplan "$PP_LOG_BEFORE" claude-sonnet-4-6
+        append_cost_row "$PLAN_NAME" postplan "$PP_LOG_BEFORE" claude-sonnet-5-5
 
         PP_DUR=$(( $(date +%s) - PP_START ))
 

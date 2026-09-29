@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-09-23
+last_verified: 2026-09-28
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -159,7 +159,7 @@ A discharge never replaces a defense — the **Security** bullet (SQL prepared s
 
 **Budget — per actor, not per run.** The `/plan` Step-2 cap (≤2 orchestrator agents; never 3) is unchanged. The architect gets **≤1 `Explore` spawn per architect invocation**, on top of it. Run-wide ceiling: **3** (2 orchestrator + 1 architect). A per-actor cap needs no shared counter and no cross-actor bookkeeping, and 1 rather than 2 keeps the ceiling one above today's rather than doubling it — the grant's justification is *a* question that surfaced mid-design, singular.
 
-**The bound is advisory.** Claude Code agent frontmatter offers `disallowedTools` (a denylist) and no positive allowlist, so "`Explore` only" cannot be expressed in the def. A `PreToolUse` hook on `Agent` sees only `tool_input.subagent_type` and `tool_input.model` — never the spawner's identity — so it cannot scope a rule to architect-initiated spawns. One component *is* mechanically enforced: `~/.claude/hooks/explore-model-gate.sh` pins any `Explore` spawn to `haiku`-or-omitted regardless of spawner. Everything else — `Explore` only, ≤1, foreground — rests on the def body and **is enforced by code review**. Treat a diff that widens it as a security-surface change.
+**The bound is advisory.** Claude Code agent frontmatter offers `disallowedTools` (a denylist) and no positive allowlist, so "`Explore` only" cannot be expressed in the def. A `PreToolUse` hook on `Agent` sees only `tool_input.subagent_type` and `tool_input.model`. The spawner's identity is invisible to it, so the hook cannot scope a rule to architect-initiated spawns. Everything (`Explore` only, ≤1, foreground) rests on the def body and **is enforced by code review**. Treat a diff that widens it as a security-surface change.
 
 ## Delegation packets — delegation economics
 

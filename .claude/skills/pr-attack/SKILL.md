@@ -2,10 +2,10 @@
 name: pr-attack
 description: Compute an optimal merge order for all open PRs — ordered table, excluded set, and hand-resolution forecast — printed to chat and written to a dated file under the home directory.
 disable-model-invocation: true
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
 context: fork
-agent: sonnet-4-6
-last_verified: 2026-09-26
+agent: sonnet-5-5
+last_verified: 2026-09-28
 allowed-tools: Bash(bin/pr-attack --gate-candidates), Bash(bin/pr-attack --work:*), Read
 ---
 

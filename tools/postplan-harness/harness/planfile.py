@@ -148,6 +148,62 @@ def _is_test_path(tok: str) -> bool:
     return True
 
 
+_NO_CHANGE_MARKER = r"\(no-change\)"
+
+
+def _planned_token(row: str) -> str | None:
+    """The row's planned test token, or None when the row plans nothing.
+
+    Single source of truth for "this matrix row plans a test": parse_matrix and
+    parse_no_change_test_paths must agree on it, or a token could be exempted by
+    one parser and planned by the other.
+    """
+    if not re.search(r"\b(PHPUnit|API.?test|E2E|Visual.?regression)\b", row, re.I):
+        return None
+    m = re.search(r"`([^`]*(?:test|spec|Test)[^`]*)`", row)
+    if m and _is_test_path(m.group(1)):
+        return m.group(1)
+    return None
+
+
+def _is_visual_regression_row(cells: list[str]) -> bool:
+    """True only when a WHOLE cell reads Visual-regression (bold allowed).
+
+    A PHPUnit row whose description mentions "visual regression" has no such cell,
+    so the `(no-change)` marker is ignored there; conformance then holds as before.
+    """
+    return any(re.fullmatch(r"visual.?regression", c.strip().strip("*").strip(), re.I)
+               for c in cells)
+
+
+def parse_no_change_test_paths(content: str) -> list[str]:
+    """Planned tokens whose EVERY unfenced planning row is a Visual-regression row
+    carrying `(no-change)` immediately after the token's closing backtick.
+
+    A token also planned by any unmarked row (any type) is NOT returned: the
+    unannotated row wins, so a plan cannot dodge a real MISSING by relabelling one
+    of two rows. Fenced rows are stripped before matching (same _strip_fenced walk
+    as parse_matrix), so an illustrative marker in a fixture block exempts nothing.
+    """
+    marked: list[str] = []
+    unmarked: set[str] = set()
+    for line in _strip_fenced(content):
+        if not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        row = " | ".join(cells)
+        p = _planned_token(row)
+        if p is None:
+            continue
+        has_marker = re.search(r"`" + re.escape(p) + r"`\s*" + _NO_CHANGE_MARKER, row, re.I)
+        if has_marker and _is_visual_regression_row(cells):
+            if p not in marked:
+                marked.append(p)
+        else:
+            unmarked.add(p)
+    return [p for p in marked if p not in unmarked]
+
+
 def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
     """Returns (planned_test_paths, truly_manual_rows) from the Verification Matrix.
 
@@ -184,12 +240,9 @@ def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
         row = " | ".join(cells)
         if re.search(r"truly.?manual", row, re.I):
             manual.append(manual_rows.row_from_cells(cells, len(manual) + 1))
-        if re.search(r"\b(PHPUnit|API.?test|E2E|Visual.?regression)\b", row, re.I):
-            m = re.search(r"`([^`]*(?:test|spec|Test)[^`]*)`", row)
-            if m and _is_test_path(m.group(1)):
-                p = m.group(1)
-                if p not in planned:
-                    planned.append(p)
+        p = _planned_token(row)
+        if p is not None and p not in planned:
+            planned.append(p)
     return planned, manual
 
 
@@ -704,6 +757,7 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
     if info.has_matrix:
         info.planned_test_paths, info.truly_manual_rows = parse_matrix(content)
         info.executable_row_count = count_executable_matrix_rows(content)
+        info.no_change_test_paths = parse_no_change_test_paths(content)
     info.critical_files = parse_critical_files(content)
     info.required_test_methods = parse_required_test_methods(content)
     info.backlog_issues = parse_backlog_issues(content)

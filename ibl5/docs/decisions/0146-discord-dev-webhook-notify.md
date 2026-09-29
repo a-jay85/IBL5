@@ -33,7 +33,7 @@ need prompt action ping: db-backup failures, smoke-prod failure,
 promote-to-production failure, launchd-health-check problems, post-plan
 failures (immediate and ADR-0139's deferred send, whose 15-minute hold is
 unchanged), and the merge digest (merge-digest-notify.yml and bin/pr-cycle's
-end-of-run summary). Success notices never ping.
+end-of-run summary).
 
 Any 2xx from the webhook counts as delivered. HTTP 429 retries after
 `retry_after`. Other 4xx fail fast. The retry, spool and macOS fallback from

@@ -2379,6 +2379,22 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     return block
 
 
+BLOCKED_SHIP_FILE = "blocked-ship.txt"
+
+
+def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> None:
+    """Write the human block for bin/post-plan-now to read. rc != 3 writes nothing.
+    Best effort: an OSError is swallowed so this text never changes the exit code."""
+    if rc != 3:
+        return
+    block = human_block(res, rc, worktree or "", os.environ.get("POSTPLAN_LOG_PATH", ""))
+    try:
+        with open(os.path.join(out_dir, BLOCKED_SHIP_FILE), "w") as fh:
+            fh.write(block + "\n")
+    except OSError:
+        pass
+
+
 def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
     """The one line a watcher greps for — printed FIRST, before the stats lines.
 
@@ -2513,6 +2529,7 @@ def main() -> int:
     # First line, so `head -1 <log>` is the whole verdict and bin/watch-run can
     # terminate on it without waiting for the launchd label to disappear.
     print(verdict_line(res, rc, _pull_url_base(args.worktree)))
+    write_blocked_ship(args.out, res, rc, args.worktree)
     print(f"terminal={res.terminal.value} phase5={res.phase5} "
           f"armed={bool(res.arm and res.arm.armed)} findings={len(res.findings)}")
     print(f"llm: {t['llm_invocations']} calls, {t['gross_tokens']} gross tok, "

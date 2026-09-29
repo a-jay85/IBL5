@@ -3,6 +3,8 @@ import os
 import subprocess
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
@@ -470,3 +472,71 @@ def test_behind_retry_cap_line_carries_autoresolved_files():
     finally:
         if os.path.exists(autoresolved_path):
             os.unlink(autoresolved_path)
+
+
+# ---------------------------------------------------------------------------
+# rc=3 RESULT lines are byte-frozen. The human block lives beside verdict_line and
+# must never move these strings. Literals are pasted, not computed from _GATE_REMEDY,
+# so a later edit to a remedy fails the test instead of following it.
+# ---------------------------------------------------------------------------
+
+_ADR_ERR = ("pre-push-adr-hook: Decision-trigger surfaces detected:\n"
+            "  - [bin-script] bin/foo — Tool script")
+
+_RC3_CASES = [
+    ("rebase", "rebase-conflict",
+     "predicted by merge-tree probe vs origin/master: a.php, b.php", {},
+     "RESULT: post-plan BLOCKED — rebase conflict, human required; ERROR terminal=failed, "
+     "no PR opened. predicted by merge-tree probe vs origin/master: a.php, b.php "
+     "Resolve the rebase, then re-run bin/post-plan-now."),
+    ("gate-adr", "local-gate", _ADR_ERR, {},
+     "RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit "
+     "[class=adr]; ERROR terminal=failed, no PR opened. pre-push-adr-hook: "
+     "Decision-trigger surfaces detected: - [bin-script] bin/foo — Tool script "
+     "The harness's one ADR draft attempt did not clear the hook: write or fix the ADR "
+     "for the decision-trigger surface by hand, then re-run bin/post-plan-now."),
+    ("gate-adr-drafted", "local-gate", _ADR_ERR,
+     {"adr_drafted": True, "adr_path": "ibl5/docs/decisions/0999-x.md",
+      "adr_draft_model": "sonnet"},
+     "RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit "
+     "[class=adr]; ERROR terminal=failed, no PR opened. pre-push-adr-hook: "
+     "Decision-trigger surfaces detected: - [bin-script] bin/foo — Tool script "
+     "The harness drafted ibl5/docs/decisions/0999-x.md (sonnet) and the hook still "
+     "denied; the draft is committed locally on the branch for review. "
+     "The harness's one ADR draft attempt did not clear the hook: write or fix the ADR "
+     "for the decision-trigger surface by hand, then re-run bin/post-plan-now."),
+    ("gate-unknown", "local-gate", "One or more checks failed:", {},
+     "RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit "
+     "[class=unknown]; ERROR terminal=failed, no PR opened. One or more checks failed: "
+     "Clear the gate then re-run bin/post-plan-now."),
+    ("usage", "llm-usage-limit", "Claude usage limit reached", {},
+     "RESULT: post-plan BLOCKED — Claude usage limit reached (environmental); ERROR "
+     "terminal=failed kind=llm-usage-limit. Claude usage limit reached "
+     "Re-run bin/post-plan-now after the limit resets."),
+    ("diverged", "remote-head-diverged", "phase4: head moved", {},
+     "RESULT: post-plan BLOCKED — rc=3 (rebase-conflict, local-gate, or "
+     "llm-usage-limit), cause unknown; ERROR terminal=failed, no PR opened. "
+     "Resolve the cause, then re-run bin/post-plan-now."),
+    ("none", None, "", {},
+     "RESULT: post-plan BLOCKED — rc=3 (rebase-conflict, local-gate, or "
+     "llm-usage-limit), cause unknown; ERROR terminal=failed, no PR opened. "
+     "Resolve the cause, then re-run bin/post-plan-now."),
+]
+
+
+def _rc3_res(kind, error, extra):
+    return _res(TerminalState.FAILED, error_kind=kind, error=error, **extra)
+
+
+@pytest.mark.parametrize("case_id,kind,error,extra,expected", _RC3_CASES,
+                         ids=[c[0] for c in _RC3_CASES])
+def test_rc3_result_lines_are_frozen(case_id, kind, error, extra, expected):
+    assert runner.verdict_line(_rc3_res(kind, error, extra), 3, "") == expected
+
+
+@pytest.mark.parametrize("case_id,kind,error,extra,expected", _RC3_CASES,
+                         ids=[c[0] for c in _RC3_CASES])
+def test_rc3_result_line_stays_one_line(case_id, kind, error, extra, expected):
+    line = runner.verdict_line(_rc3_res(kind, error, extra), 3, "")
+    assert "\n" not in line
+    assert line.startswith("RESULT: post-plan BLOCKED")

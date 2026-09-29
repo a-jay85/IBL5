@@ -3,20 +3,6 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../ibl5/vendor/autoload.php';
-
-// In worktrees, vendor/ is symlinked — the autoloader resolves classes/ from
-// the main repo. Register a fallback so worktree-local classes are found.
-$worktreeClasses = realpath(__DIR__ . '/../ibl5/classes');
-if ($worktreeClasses !== false && is_link(__DIR__ . '/../ibl5/vendor')) {
-    spl_autoload_register(static function (string $class) use ($worktreeClasses): void {
-        $file = $worktreeClasses . '/' . str_replace('\\', '/', $class) . '.php';
-        if (file_exists($file)) {
-            require $file;
-        }
-    }, true, true);
-}
-
 use Cli\LighthouseCommentFormatter;
 
 $manifestPath = null;
@@ -44,6 +30,20 @@ foreach ($argv as $i => $arg) {
         fwrite(STDERR, "Usage: bin/lighthouse-comment --manifest=PATH [--links=PATH] [--baseline=PATH] [--out=PATH]\n");
         exit(2);
     }
+}
+
+require_once __DIR__ . '/../ibl5/vendor/autoload.php';
+
+// In worktrees, vendor/ is symlinked — the autoloader resolves classes/ from
+// the main repo. Register a fallback so worktree-local classes are found.
+$worktreeClasses = realpath(__DIR__ . '/../ibl5/classes');
+if ($worktreeClasses !== false && is_link(__DIR__ . '/../ibl5/vendor')) {
+    spl_autoload_register(static function (string $class) use ($worktreeClasses): void {
+        $file = $worktreeClasses . '/' . str_replace('\\', '/', $class) . '.php';
+        if (file_exists($file)) {
+            require $file;
+        }
+    }, true, true);
 }
 
 if ($manifestPath === null) {

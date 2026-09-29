@@ -8,8 +8,6 @@ on:
       - '**/*.js'
       - '**/*.jsx'
       - '.github/workflows/*.yml'
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -19,35 +17,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Change-detection strategy: dorny/paths-filter with a static glob list.
-  # CodeQL only needs to run when JS/TS source (or a workflow) changes, so a
-  # language-scoped glob is exactly right here. bin/website-affecting is
-  # deliberately NOT used: it answers "does this touch app rendering?" and would
-  # green-light PHP-only PRs that CodeQL's JS/TS analysis has no reason to scan.
-  changes:
-    name: Detect changes
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    permissions:
-      pull-requests: read
-    outputs:
-      src: ${{ github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
-    steps:
-      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
-        id: filter
-        with:
-          filters: |
-            src:
-              - '**/*.ts'
-              - '**/*.tsx'
-              - '**/*.js'
-              - '**/*.jsx'
-              - '.github/workflows/*.yml'
+  # Runs on master push only. Findings surface after merge; PRs no longer
+  # spend runner slots on CodeQL. The push.paths list scopes it to JS/TS
+  # source and workflow files. bin/website-affecting is not used: it models
+  # PHP app-rendering impact, which CodeQL's JS/TS analysis does not scan.
 
   analyze:
     name: Analyze
-    needs: [changes]
-    if: always() && (github.event_name == 'push' || needs.changes.outputs.src == 'true')
     runs-on: ubuntu-latest
     permissions:
       security-events: write

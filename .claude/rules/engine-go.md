@@ -1,7 +1,7 @@
 ---
 description: Go engine workflow — run the CI-pinned golangci-lint locally before merging (auto-merge races ahead of engine.yml), the two lint rules it enforces, and the real measured runtime of an archive A/B walk.
 paths: "engine/**"
-last_verified: 2026-09-16
+last_verified: 2026-09-29
 ---
 
 # Engine (Go) Workflow
@@ -19,6 +19,10 @@ contexts are `Tests and Analysis`, `E2E Tests`, `human-signoff`, and `Meta check
 pass — before `engine.yml` has run lint. Deferring lint to CI therefore lands failures
 on **master** (that is the PR9b / #933 red-master incident: errcheck flagged unchecked
 `io.Writer` `Fprint*`/`Close` returns and needed a follow-up fix PR).
+
+On a PR, `engine.yml` runs only when `engine/**` or the workflow file changes (a
+workflow-level `on.pull_request.paths` filter). A PR that touches no engine file
+gets no "Engine" check at all. Master pushes keep their own `push.paths` filter.
 
 So for any engine PR, install and run the CI-pinned linter yourself first:
 

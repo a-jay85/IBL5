@@ -8,6 +8,22 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/wt-db-test <worktree-name> [--no-run]
+
+Run database integration tests in a worktree using the sibling ibl5_test database.
+The worktree's Docker environment must already be running (bin/wt-up).
+
+Arguments:
+  <worktree-name>   name of the worktree to test
+  --no-run          set up the test database without running tests
+
+Exit codes: delegates to bin/db-test-up
+EOF
+    exit 0
+fi
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"

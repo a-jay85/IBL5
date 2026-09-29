@@ -2,6 +2,26 @@
 # Start a Docker environment for a worktree with its own PHP-Apache + MariaDB.
 # Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data] [--snapshot <file.sql.gz>]
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data] [--snapshot <file.sql.gz>] [--force]
+
+Start a Docker environment for a worktree with its own PHP-Apache + MariaDB.
+
+  worktree-name   Name of an existing worktree (created with bin/wt-new)
+  --pr            Use PR number as URL slug (e.g., pr-42.localhost)
+  --seed          Import ci-seed.sql for test data (schema + CI seed)
+  --prod          Sync live production DB via bin/db-sync-prod (requires .env REMOTE_* creds)
+  --no-data       Schema only, no seed data
+  --snapshot      Load a local .sql.gz snapshot instead of live prod data
+  --force         Build the stack even if no website-affecting changes vs master
+
+Default data source is --prod. Without prod creds use --seed or --no-data.
+The DB volume is always purged to ensure a clean database.
+EOF
+    exit 0
+fi
+
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

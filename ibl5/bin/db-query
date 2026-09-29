@@ -14,6 +14,24 @@
 # (history expansion). If running manually, use <> instead of != in SQL,
 # or use single quotes: ./bin/db-query 'SELECT * FROM t WHERE col != ""'
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/db-query "SQL QUERY"
+
+Run a SQL query against the local Docker MariaDB database.
+
+Arguments:
+  SQL QUERY   SQL query string to execute
+
+Env vars:
+  DB_QUERY_TARGET   'main' to force the main stack (default: route by location)
+
+Exit codes: 0 = success, 1 = missing query or config error,
+            2 = invalid DB_QUERY_TARGET, 3 = worktree container not running
+EOF
+    exit 0
+fi
+
 if [ -z "$1" ]; then
     echo "Usage: $0 \"SQL QUERY\"" >&2
     exit 1

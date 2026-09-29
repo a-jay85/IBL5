@@ -340,21 +340,6 @@
     box-shadow: var(--shadow-md);
 }
 
-/* ==========================================================================
-   Generic Link
-   ========================================================================== */
-
-.ibl-link {
-    color: var(--navy-700);
-    text-decoration: none;
-    font-weight: 500;
-    transition: color var(--transition-fast);
-}
-
-.ibl-link:hover {
-    color: var(--accent-500);
-}
-
 .ibl-filter-fieldset {
     margin-bottom: 1rem;
     border: 1px solid var(--gray-200);

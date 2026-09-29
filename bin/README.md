@@ -82,8 +82,10 @@ one tracked symlink does not warrant one.
 Run `bin/<script> --help` to see its arguments. Help goes to stdout and exits
 0. The check sits at the top of the script, before any `source`, `git`, `cd`,
 or network call, so asking for help never does anything else. Add it to every
-new script. `bin/test-bin-help` enforces this in CI for every script in `bin/`
-and `bin/automouse/` except `test-*` harnesses.
+new script. `bin/test-bin-help` enforces this in CI. It skips `test-*` harnesses,
+two scripts in its built-in skip list (`bin/check-composite-contracts`
+and `bin/check-vr-coverage`), and any script whose interpreter is
+absent on the runner.
 
 ## Check-script conventions
 

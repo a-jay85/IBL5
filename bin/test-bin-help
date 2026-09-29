@@ -14,6 +14,7 @@
 # Per script it asserts:
 #   - exit 0
 #   - non-empty stdout
+#   - stdout contains a 'Usage' line (case-insensitive)
 #   - no stub was called (the handler runs before any side effect)
 #
 # Run: bin/test-bin-help [script-name ...]   (default: every script in scope)

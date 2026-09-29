@@ -50,7 +50,7 @@
     margin-top: 10px;
     border-radius: 5px;
     cursor: pointer;
-    font-size: var(--text-xs);
+    font-size: var(--text-sm, 0.875rem);
 }
 .action-button:hover {
     background: #0056b3;
@@ -63,7 +63,7 @@
     margin-top: 10px;
     border-radius: 5px;
     cursor: pointer;
-    font-size: var(--text-xs);
+    font-size: var(--text-sm, 0.875rem);
 }
 .action-button-red:hover {
     background: #c82333;
@@ -97,5 +97,5 @@ td, th {
     color: var(--discord);
 }
 .block-fa-discord-textarea {
-    font-size: var(--text-xl);
+    font-size: var(--text-2xl, 1.5rem);
 }

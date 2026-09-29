@@ -22,6 +22,11 @@ def test_local_gate_denial_exits_3():
     """A pre-commit/pre-push hook denial is deterministic — no ~1M skill fallback."""
     assert runner.exit_code_for(_res(TerminalState.FAILED, "local-gate")) == 3
 
+def test_usage_limit_exits_3():
+    """A Claude usage/rate limit is environmental — re-running the skill immediately
+    would hit the same wall, so the harness stops for a human to retry later."""
+    assert runner.exit_code_for(_res(TerminalState.FAILED, "llm-usage-limit")) == 3
+
 def test_other_typed_failure_exits_1():          # negative path: not everything is 3
     assert runner.exit_code_for(_res(TerminalState.FAILED, "push-disabled")) == 1
     assert runner.exit_code_for(_res(TerminalState.FAILED, None)) == 1

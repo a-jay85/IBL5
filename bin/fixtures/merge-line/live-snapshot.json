@@ -1,0 +1,2088 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "pageInfo": {
+          "hasNextPage": false
+        },
+        "nodes": [
+          {
+            "number": 1742,
+            "isDraft": true,
+            "baseRefName": "master",
+            "headRefOid": "09edc663a17211fdadcbf4d8d223a9244a847145",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "09edc663a17211fdadcbf4d8d223a9244a847145",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2437,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "bc8feef7d4cdcde8ca59e7dba00fb0b53b231b55",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "bc8feef7d4cdcde8ca59e7dba00fb0b53b231b55",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2438,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "a31e235e854d4a4887884f0ebacfc589478682ac",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "a31e235e854d4a4887884f0ebacfc589478682ac",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "FAILURE"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2442,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "c12f2a0db260c4c58f572f7164997599a5f4b9f0",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "c12f2a0db260c4c58f572f7164997599a5f4b9f0",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "FAILURE"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2443,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "b7680e0f3daddb39f44b447a03a4705e1b8c3905",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "b7680e0f3daddb39f44b447a03a4705e1b8c3905",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "FAILURE"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2446,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "bc8e4bff98a341ceb3d9bbc23250c191cc9047e8",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "bc8e4bff98a341ceb3d9bbc23250c191cc9047e8",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "FAILURE"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2453,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "ba8306df6d8fc4b8148ccb0198d6bd1c39fece92",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BLOCKED",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "ba8306df6d8fc4b8148ccb0198d6bd1c39fece92",
+                    "statusCheckRollup": {
+                      "state": "PENDING",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2459,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "ba530f0777a39740bcb0adc3bca25477429b8dcc",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "ba530f0777a39740bcb0adc3bca25477429b8dcc",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "FAILURE"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "FAILURE"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2485,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "e07877a92a43cf963889a228ad325303a4dbce90",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "e07877a92a43cf963889a228ad325303a4dbce90",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "FAILURE"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2490,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "a26ddf2f16ea3998e5dec14b3126b1e20c001148",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "a26ddf2f16ea3998e5dec14b3126b1e20c001148",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2496,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "2a6a4029c1305c8f1de79bf987e6df2ef04d7724",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "2a6a4029c1305c8f1de79bf987e6df2ef04d7724",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2498,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "9f40bbae0d675a92d66aa58eeb0650e92311a54b",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "9f40bbae0d675a92d66aa58eeb0650e92311a54b",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2505,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "c136c6664b71efb267f54c3f913e38b0a09c4fd0",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "c136c6664b71efb267f54c3f913e38b0a09c4fd0",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "FAILURE"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2507,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "67da4d416d29a906beede42e895d918a816fb4dd",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BLOCKED",
+            "autoMergeRequest": {
+              "enabledAt": "2026-09-29T06:55:54Z"
+            },
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "67da4d416d29a906beede42e895d918a816fb4dd",
+                    "statusCheckRollup": {
+                      "state": "PENDING",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "IN_PROGRESS",
+                            "conclusion": null
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "QUEUED",
+                            "conclusion": null
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Scan for committed secrets",
+                            "status": "IN_PROGRESS",
+                            "conclusion": null
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2508,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "8627001b5ee8640c19ebe9612fbe0a2416cd7142",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "8627001b5ee8640c19ebe9612fbe0a2416cd7142",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2509,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "e7538cfb2e79fad1a7dd62bf56e8a37e368a861a",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "e7538cfb2e79fad1a7dd62bf56e8a37e368a861a",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2510,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "c59199056ae526e0df703dab46e430b8e3adbaba",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": {
+              "enabledAt": "2026-09-29T06:56:48Z"
+            },
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "c59199056ae526e0df703dab46e430b8e3adbaba",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2511,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "a6ae8a42cfb12f304077f0eaf2cc964e52005317",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "a6ae8a42cfb12f304077f0eaf2cc964e52005317",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2512,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "9c7df85c6e2959eafb317b0f5c0afe68209c28b3",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "9c7df85c6e2959eafb317b0f5c0afe68209c28b3",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2513,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "d2a56679ab1a93374647aa805def738e4555917c",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "d2a56679ab1a93374647aa805def738e4555917c",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2515,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "6ed1f1358259e8c4e552d3ae495f34bea9a76f4a",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "6ed1f1358259e8c4e552d3ae495f34bea9a76f4a",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2516,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "de9490164bfcaecaf9c0427c0697800bc4e0deaa",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "de9490164bfcaecaf9c0427c0697800bc4e0deaa",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2517,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "3cc2fe35afb60a7c4bb18d6ddf35edfe99810bcd",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "3cc2fe35afb60a7c4bb18d6ddf35edfe99810bcd",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2518,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "c11d9285bdab38a751d06dda1aa74207de745d11",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "c11d9285bdab38a751d06dda1aa74207de745d11",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "FAILURE"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2520,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "fae35d34b681df290fbb0d8627f466d86dc68b01",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": {
+              "enabledAt": "2026-09-29T05:36:57Z"
+            },
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "fae35d34b681df290fbb0d8627f466d86dc68b01",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2521,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "93c0dc681a993019ad92df7cac98f1d20317612c",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "93c0dc681a993019ad92df7cac98f1d20317612c",
+                    "statusCheckRollup": {
+                      "state": "SUCCESS",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2522,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "620400aeebc24cd6dd225023020d7dbe4b91ee65",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "620400aeebc24cd6dd225023020d7dbe4b91ee65",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "CANCELLED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 2526,
+            "isDraft": false,
+            "baseRefName": "master",
+            "headRefOid": "2b78b6d631fcbab5d6fb80e330e3308fdfae0217",
+            "mergeable": "MERGEABLE",
+            "mergeStateStatus": "BEHIND",
+            "autoMergeRequest": null,
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "oid": "2b78b6d631fcbab5d6fb80e330e3308fdfae0217",
+                    "statusCheckRollup": {
+                      "state": "FAILURE",
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typename": "CheckRun",
+                            "name": "human-signoff",
+                            "status": "COMPLETED",
+                            "conclusion": "FAILURE"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Meta checks",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "E2E Tests",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Tests and Analysis",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Enable auto-merge",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Infection PHP",
+                            "status": "COMPLETED",
+                            "conclusion": "SKIPPED"
+                          },
+                          {
+                            "__typename": "CheckRun",
+                            "name": "Detect changes",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "_captured": "2026-09-29"
+}

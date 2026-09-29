@@ -1,0 +1,12 @@
+# captured 2026-09-29 by bin/merge-line-select --live --dry-run
+## Merge line (head-of-line)
+Dry run: no branch updated, no comment posted.
+- Queue length: 3
+- Head: #2520 (state BEHIND, action update)
+queue_len=3
+head=2520
+head_state=BEHIND
+action=update
+skipped=
+clear=2520 2507 2510
+dry_run=true

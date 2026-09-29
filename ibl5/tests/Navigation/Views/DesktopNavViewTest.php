@@ -82,6 +82,7 @@ class DesktopNavViewTest extends TestCase
 
         $this->assertStringContainsString('LIVE', $html);
         $this->assertStringContainsString('nav-badge', $html);
+        $this->assertStringContainsString('<span class="ibl-chip nav-badge">LIVE</span>', $html);
     }
 
     public function testExternalLinkIcon(): void

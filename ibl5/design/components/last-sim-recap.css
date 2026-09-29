@@ -600,10 +600,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     margin-bottom: .45rem;
 }
 .last-sim-recap__pos-chip {
-    background: var(--navy-800);
-    color: var(--white);
     padding: 1px 6px;
-    border-radius: var(--radius-sm);
     letter-spacing: .1em;
     font-size: .667rem;
 }

@@ -30,7 +30,7 @@ final class RecapBattlesRenderer
     {
         $h  = '<div class="last-sim-recap__battle">';
         $h .= '  <div class="last-sim-recap__poslbl">';
-        $h .= '    <span class="last-sim-recap__pos-chip">' . HtmlSanitizer::e($s->pos) . '</span>';
+        $h .= '    <span class="ibl-chip ibl-chip--navy last-sim-recap__pos-chip">' . HtmlSanitizer::e($s->pos) . '</span>';
         $h .= '  </div>';
         $h .= $this->renderPlayerRow(
             isYou: true,

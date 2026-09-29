@@ -164,7 +164,7 @@ class MobileNavView implements MobileNavViewInterface
                         $htmxAttrs = ($external || $noBoost) ? '' : ' hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content"';
                         $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
                         $badgeHtml = $badge !== null
-                            ? '<span class="nav-badge">' . HtmlSanitizer::e($badge) . '</span>'
+                            ? '<span class="ibl-chip nav-badge">' . HtmlSanitizer::e($badge) . '</span>'
                             : '';
                         ?>
                         <a href="<?= HtmlSanitizer::trusted($url) ?>"<?= HtmlSanitizer::trusted($target) ?><?= HtmlSanitizer::trusted($htmxAttrs) ?> class="mobile-dropdown-link flex items-center justify-between">

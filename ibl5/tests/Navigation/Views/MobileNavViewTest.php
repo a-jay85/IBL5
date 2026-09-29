@@ -35,6 +35,24 @@ class MobileNavViewTest extends TestCase
         return new MobileNavView($config, new LoginFormView(), new TeamsDropdownView());
     }
 
+    public function testBadgeCarriesChipClass(): void
+    {
+        $view = $this->createView();
+        $menuData = [
+            'icon' => '',
+            'links' => [
+                ['label' => 'Draft', 'url' => 'modules.php?name=Draft', 'badge' => 'LIVE'],
+            ],
+        ];
+        $html = $view->render(
+            ['My Team' => $menuData],
+            null,
+            [['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout']],
+        );
+
+        $this->assertStringContainsString('<span class="ibl-chip nav-badge">LIVE</span>', $html);
+    }
+
     public function testAccordionButtonRendered(): void
     {
         $view = $this->createView();

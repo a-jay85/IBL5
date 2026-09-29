@@ -345,12 +345,8 @@
 
 .dc-card__pos-badge {
     font-size: var(--text-2xs);
-    font-weight: 700;
     text-transform: uppercase;
-    background: var(--navy-800);
-    color: white;
     padding: 2px 6px;
-    border-radius: var(--radius-sm);
     min-width: 26px;
     text-align: center;
     flex-shrink: 0;

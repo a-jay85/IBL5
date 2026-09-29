@@ -7,8 +7,8 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.armable import manual_testing_clearance
-from harness.classify import (classify, files_from_diff, filter_diff,
+from harness.armable import _manual_section, all_rows_ticked, manual_testing_clearance
+from harness.classify import (_manual_testing_span, classify, files_from_diff, filter_diff,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END, MANUAL_TESTING_SENTINEL,
                                name_status_from_diff, qualify_backlog_refs,
                                render_files_changed,
@@ -552,6 +552,146 @@ def test_sentinel_passes_the_ci_checker():
     # bin/check-pr-manual-testing and pr-armable.sh key on this prefix.
     assert MANUAL_TESTING_SENTINEL.startswith("No manual testing needed")
     assert "verified" not in MANUAL_TESTING_SENTINEL
+
+
+# ---------------------------------------------------------------------------
+# restore_manual_testing_section when ## Manual Testing is the LAST section
+# (backlog#1188). Invariant for every case: the arming gate's window
+# (armable._manual_section) and verdict after restore equal the snapshot's.
+# ---------------------------------------------------------------------------
+
+_MT_LAST = ("## Summary\n\nOld bullet.\n\n## Manual Testing\n\n"
+            f"{MANUAL_TESTING_SENTINEL}\n")
+_MT_LAST_HELD = "## Summary\n\nOld bullet.\n\n## Manual Testing\n\n- [ ] **Row 1** — foo\n"
+
+
+def _assert_gate_untouched(result: str, before: str) -> None:
+    assert _manual_section(result) == _manual_section(before)
+    assert manual_testing_clearance(result) == manual_testing_clearance(before)
+    b = _manual_testing_span(before)
+    r = _manual_testing_span(result)
+    assert result[r[0]:r[1]] == before[b[0]:b[1]]
+
+
+# --- red until Phase 2 -------------------------------------------------------
+
+def test_restore_keeps_evidence_line_appended_after_last_section():
+    after = _MT_LAST + "\nEvidence: `bin/test-pr-cycle` ran green.\n"
+    body, restored = restore_manual_testing_section(after, _MT_LAST)
+    assert restored is True
+    assert "Evidence: `bin/test-pr-cycle` ran green." in body
+    assert body.index("Evidence:") < body.index("## Manual Testing")
+    _assert_gate_untouched(body, _MT_LAST)
+
+
+def test_restore_keeps_closes_trailer_appended_after_last_section():
+    after = _MT_LAST + "\nCloses a-jay85/IBL5-backlog#1188\n"
+    body, restored = restore_manual_testing_section(after, _MT_LAST)
+    assert restored is True
+    assert "Closes a-jay85/IBL5-backlog#1188" in body
+    assert body.index("Closes ") < body.index("## Manual Testing")
+    _assert_gate_untouched(body, _MT_LAST)
+
+
+def test_restore_relocation_is_idempotent():
+    after = _MT_LAST + "\nEvidence line.\n"
+    once, _ = restore_manual_testing_section(after, _MT_LAST)
+    assert "Evidence line." in once
+    assert restore_manual_testing_section(once, _MT_LAST) == (once, False)
+
+
+def test_restore_keeps_append_and_a_following_new_section():
+    after = _MT_LAST + "\nEvidence line.\n\n## Notes\n\nfoo\n"
+    body, restored = restore_manual_testing_section(after, _MT_LAST)
+    assert restored is True
+    assert body.index("Evidence line.") < body.index("## Manual Testing")
+    assert "\n## Notes\n\nfoo\n" in body
+    _assert_gate_untouched(body, _MT_LAST)
+
+
+def test_restore_snapshot_without_trailing_newline_never_glues_next_heading():
+    before = _MT_LAST.rstrip("\n")
+    after = before + "\n\nEvidence line.\n\n## Notes\n\nfoo"
+    body, restored = restore_manual_testing_section(after, before)
+    assert restored is True
+    assert "Evidence line." in body
+    assert "\n## Notes\n" in body
+    _assert_gate_untouched(body, before)
+
+
+def test_restore_counterfeit_level3_heading_with_sentinel_stays_held():
+    # `### ` does not break the gate window (armable._manual_section breaks on
+    # `^## ` only), so the appended sentinel would be gate input if it survived.
+    after = _MT_LAST_HELD + f"\n### Manual Testing\n\n{MANUAL_TESTING_SENTINEL}\n"
+    assert manual_testing_clearance(_MT_LAST_HELD) == "HELD"
+    body, _ = restore_manual_testing_section(after, _MT_LAST_HELD)
+    assert manual_testing_clearance(body) == "HELD"
+    assert "### Manual Testing" not in body
+    _assert_gate_untouched(body, _MT_LAST_HELD)
+
+
+def test_span_ends_at_next_level2_heading_only():
+    body = ("## Manual Testing\n\n- [ ] **R** — x\n\n### Sub\n\nmore\n\n"
+            "## Files changed\n\nx\n")
+    assert _manual_testing_span(body) == (0, body.index("## Files changed"))
+    edited = body.replace("more", "changed")
+    assert restore_manual_testing_section(edited, body) == (body, True)
+
+
+# --- characterization: green before and after Phase 2 ------------------------
+
+def test_restore_drops_edit_plus_append_in_last_section():
+    after = ("## Summary\n\nOld bullet.\n\n## Manual Testing\n\n"
+             "Covered by x.\n\nCloses a-jay85/IBL5-backlog#1188\n")
+    body, restored = restore_manual_testing_section(after, _MT_LAST)
+    assert restored is True
+    assert body == _MT_LAST
+
+
+def test_restore_held_section_plus_appended_sentinel_stays_held():
+    after = _MT_LAST_HELD + f"\n{MANUAL_TESTING_SENTINEL}\n"
+    assert manual_testing_clearance(_MT_LAST_HELD) == "HELD"
+    body, _ = restore_manual_testing_section(after, _MT_LAST_HELD)
+    assert manual_testing_clearance(body) == "HELD"
+    _assert_gate_untouched(body, _MT_LAST_HELD)
+
+
+def test_restore_held_section_plus_appended_ticked_row_stays_held():
+    after = _MT_LAST_HELD + "\n- [x] **Row 2** — bar\n"
+    body, _ = restore_manual_testing_section(after, _MT_LAST_HELD)
+    assert manual_testing_clearance(body) == "HELD"
+    assert all_rows_ticked(body) is False
+    _assert_gate_untouched(body, _MT_LAST_HELD)
+
+
+def test_restore_counterfeit_nospace_heading_in_append_is_dropped():
+    # `##Manual Testing` matches classify._MANUAL_HEADING_RE (`\s*`) but is not a
+    # `_NEXT_HEADING_RE` line; relocated above the real heading it would become
+    # the FIRST span match on the next round. It must be dropped, never moved.
+    after = _MT_LAST_HELD + f"\n##Manual Testing\n\n{MANUAL_TESTING_SENTINEL}\n"
+    body, _ = restore_manual_testing_section(after, _MT_LAST_HELD)
+    assert body == _MT_LAST_HELD
+    assert _manual_testing_span(body)[0] == _MT_LAST_HELD.index("## Manual Testing")
+    _assert_gate_untouched(body, _MT_LAST_HELD)
+
+
+def test_restore_duplicate_level2_heading_after_section_is_outside_gate():
+    after = _MT_LAST_HELD + f"\n## Manual Testing\n\n{MANUAL_TESTING_SENTINEL}\n"
+    body, _ = restore_manual_testing_section(after, _MT_LAST_HELD)
+    assert manual_testing_clearance(body) == "HELD"
+    _assert_gate_untouched(body, _MT_LAST_HELD)
+
+
+def test_restore_whitespace_only_append_collapses_to_snapshot():
+    body, restored = restore_manual_testing_section(_MT_LAST + "\n\n\n", _MT_LAST)
+    assert (body, restored) == (_MT_LAST, True)
+
+
+def test_restore_in_section_insert_when_not_last_is_reverted():
+    after = _MT_BEFORE.replace("## Files changed", "Extra line.\n\n## Files changed")
+    body, restored = restore_manual_testing_section(after, _MT_BEFORE)
+    assert restored is True
+    assert body == _MT_BEFORE
 
 
 # ---------------------------------------------------------------------------

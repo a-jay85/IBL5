@@ -480,6 +480,8 @@ REPO="/Users/ajaynicolas/GitHub/IBL5"
 # cannot be exercised until after it merges. $REPO stays main-pinned deliberately:
 # it is the bin/wt-new base and the target of the git ops.
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/automouse/lib-queue-order
+source "$SELF_DIR/lib-queue-order"
 NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
 LOG_DIR="$NIGHTLY_DIR/logs"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
@@ -1595,7 +1597,7 @@ claim_next_plan() {
             fi
         fi
         # Live lock held by a sibling — skip to the next-oldest plan.
-    done < <(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null)
+    done < <(queue_entries_ordered)
     return 1
 }
 

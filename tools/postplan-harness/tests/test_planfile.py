@@ -10,7 +10,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import conformance
-from harness.planfile import (EXEMPT_RE, _strip_fenced, frontmatter_auto_merge_false,
+from harness.planfile import (EXEMPT_RE, _normalise_cf_path, _strip_fenced,
+                              frontmatter_auto_merge_false,
                               frontmatter_autonomy_contract, locate_plan,
                               parse_critical_files, parse_matrix,
                               parse_deferred_phase_numbers, parse_phases,
@@ -1483,3 +1484,50 @@ Edit `harness/x.py`.
     assert len(info.phases) >= 1
     assert info.phases[0].number == 1
     assert info.deferred_phase_numbers == [2]
+
+
+# ---------------------------------------------------------------------------
+# Tests for _normalise_cf_path and parse_critical_files absolute-path handling
+# ---------------------------------------------------------------------------
+
+def test_normalise_cf_path_relative_unchanged():
+    assert _normalise_cf_path("ibl5/classes/Foo.php") == "ibl5/classes/Foo.php"
+    assert _normalise_cf_path("bin/check-plan") == "bin/check-plan"
+
+
+def test_normalise_cf_path_ibL5_prefix_stripped():
+    p = "/Users/ajaynicolas/GitHub/IBL5/ibl5/classes/Foo.php"
+    assert _normalise_cf_path(p) == "ibl5/classes/Foo.php"
+
+
+def test_normalise_cf_path_worktree_prefix_stripped():
+    p = "/Users/ajaynicolas/GitHub/IBL5-worktrees/my-branch/ibl5/classes/Foo.php"
+    assert _normalise_cf_path(p) == "ibl5/classes/Foo.php"
+
+
+def test_normalise_cf_path_case_sensitive_no_strip():
+    # IBL5 is always uppercase; lowercase does not match.
+    p = "/Users/ajaynicolas/GitHub/ibl5/ibl5/classes/Foo.php"
+    assert _normalise_cf_path(p) == p
+
+
+def test_parse_critical_files_normalises_absolute_path():
+    plan = (
+        "## Critical Files\n\n"
+        "- `/Users/ajaynicolas/GitHub/IBL5/ibl5/classes/Foo.php`\n"
+        "- `/Users/ajaynicolas/GitHub/IBL5-worktrees/slug/bin/check-plan`\n"
+    )
+    cf = parse_critical_files(plan)
+    paths = [p for p, _ann, _ex in cf]
+    assert paths == ["ibl5/classes/Foo.php", "bin/check-plan"]
+
+
+def test_parse_critical_files_relative_paths_unchanged():
+    plan = (
+        "## Critical Files\n\n"
+        "- `ibl5/classes/Foo.php`\n"
+        "- `bin/check-plan`\n"
+    )
+    cf = parse_critical_files(plan)
+    paths = [p for p, _ann, _ex in cf]
+    assert paths == ["ibl5/classes/Foo.php", "bin/check-plan"]

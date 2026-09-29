@@ -12,6 +12,8 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$SCRIPT_DIR/automouse/queue"
+# shellcheck source=bin/automouse/lib-queue-order
+source "$SCRIPT_DIR/automouse/lib-queue-order"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -647,6 +649,31 @@ setup
 printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$MANUAL_MATRIX" > "$PDIR/plan-q.md"
 expect_reject row26 plan-q "Truly-manual row forbids impl_model: sonnet"
 echo "ok: row26 — consistency backstop still fires under the new gate"
+
+# ---------------------------------------------------------------------------
+# Row 27 — queue_entries_ordered is unaffected by editing a queued plan's TARGET.
+# queue_entries_ordered sorts by the SYMLINK's own lstat mtime (not the target's
+# mtime), so touching the target never shifts its run position.
+#
+# Sequence: queue a then b, reorder so a is first (the reorder ladder stamps
+# symlinks into the past with a clear gap), then touch a's TARGET to a far-future
+# time. Assert queue_entries_ordered still returns a before b.
+setup
+mkplan plan-lstat-a.md plan-lstat-b.md
+run_queue plan-lstat-a >/dev/null 2>&1
+run_queue plan-lstat-b >/dev/null 2>&1
+# Reorder: a first, b second — stamps symlinks into the past with a clear gap.
+run_queue reorder plan-lstat-a plan-lstat-b >/dev/null 2>&1
+# Edit plan-a's TARGET to a far-future time (simulates authoring/editing the plan).
+touch -t 209912312359.59 "$PDIR/plan-lstat-a.md"
+# queue_entries_ordered must still return a then b (oldest symlink lstat first).
+_r27_order=$(queue_entries_ordered "$NDIR/queue" | xargs -n1 basename | tr '\n' ' ')
+if [ "$_r27_order" = "plan-lstat-a.md plan-lstat-b.md " ]; then
+    echo "ok: row27 — queue_entries_ordered unaffected by target edit"
+else
+    echo "FAIL: row27 — wrong order after target edit (got: $_r27_order)"
+    FAILED=1
+fi
 
 # ---------------------------------------------------------------------------
 if [ "$FAILED" -ne 0 ]; then

@@ -57,6 +57,11 @@ extract_fn() {
     ' "$RUNNER"
 }
 
+# claim_next_plan calls queue_entries_ordered, which the runner sources from
+# lib-queue-order at top level (not extracted above).
+# shellcheck source=bin/automouse/lib-queue-order
+source "$SCRIPT_DIR/automouse/lib-queue-order"
+
 for fn in impl_cap_timeout should_refund_cap_timeout cap_refunds_granted record_cap_refund claim_next_plan; do
     FN_SRC="$(extract_fn "$fn")"
     if [ -z "$FN_SRC" ]; then

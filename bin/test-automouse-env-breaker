@@ -172,6 +172,8 @@ mkdir -p "$E2_NDIR/queue" "$E2_NDIR/handoff" "$E2_NDIR/logs" \
 # Symlink prompt files so the runner cat succeeds under set -e
 ln -sf "$REPO_ROOT/bin/automouse/prompt-impl"    "$E2_ROOT/prompt-impl"
 ln -sf "$REPO_ROOT/bin/automouse/prompt-postplan" "$E2_ROOT/prompt-postplan"
+# The runner also sources $SELF_DIR/lib-queue-order (queue_entries_ordered).
+ln -sf "$REPO_ROOT/bin/automouse/lib-queue-order" "$E2_ROOT/lib-queue-order"
 
 # Rewritten runner: NIGHTLY_DIR→temp, REPO→worktree root, PATH→stub first
 E2_RUNNER="$E2_ROOT/run"

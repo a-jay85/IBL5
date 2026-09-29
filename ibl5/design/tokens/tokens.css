@@ -208,3 +208,17 @@
 }
 
 } /* end @layer components */
+
+/* ========================================================================
+   Breakpoints (@custom-media)
+   Resolved by Lightning CSS only on the --minify / --optimize build path.
+   Non-minified dev builds (css:watch, bin/wt-up, bin/rebuild-css-if-source-changed)
+   leave bp-* media queries unresolved, so nothing may consume these until the
+   dev builds pass --optimize. One-off queries (480px, 540px, 1200px, ranges,
+   hover) stay raw.
+   ======================================================================== */
+@custom-media --bp-sm-down (max-width: 640px);
+@custom-media --bp-md-down (max-width: 768px);
+@custom-media --bp-md-up (min-width: 769px);
+@custom-media --bp-lg-down (max-width: 1023px);
+@custom-media --bp-lg-up (min-width: 1024px);

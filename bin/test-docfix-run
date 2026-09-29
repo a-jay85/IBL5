@@ -1031,6 +1031,12 @@ RC23=$?
   && ok "(48) prompt: ADR append-only + figure-resubstitution + content-rewrite disclosure + allowlist clauses present" \
   || bad "(48) prompt: an append-only/disclosure clause was dropped from \$PROMPT"
 
+# --- Case 48b: static — launch keeps --effort low and the prompt demands a real check
+{ grep -qF -- '--effort low' "$REAL_DOCFIX" \
+    && grep -qF 'run a real check that exercises it' "$REAL_DOCFIX"; } \
+  && ok "(48b) launch passes --effort low and prompt requires a real verification check" \
+  || bad "(48b) --effort low or the real-check verification paragraph missing from bin/docfix-run"
+
 # --- Cases 49-64: bin/docfix-check-veronly numeric-pass + boundary cases ------
 
 # Helper: seed a file in master, re-point the feature branch, check it out.

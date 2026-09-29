@@ -1581,6 +1581,40 @@ OUT="$(bdl burndown-delta 2>/dev/null)"; RC=$?
 NUMS="$(jq -c '[.issues[].number]' <<< "$OUT" 2>/dev/null)"
 [ "$NUMS" = "[45]" ] && ok "L2: delta issues are [45]" || fail "L2: delta issues are [45] (got $NUMS)"
 
+# ── L3: labeled primaries are skipped, unlabeled #42 still picked ─────────────
+lbl_issues '[{"name":"blocked"}]' '[{"name":"out-of-repo"}]'
+OUT="$(bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L3: labeled run exits 0" || fail "L3: labeled run exits 0 (got $RC)"
+want "L3: #40 blocked row" "$OUT" "skip-label: blocked (PR unknown)"
+want "L3: #41 out-of-repo row" "$OUT" "skip-label: out-of-repo"
+want "L3: #42 PICK" "$OUT" "PICK  #42"
+if grep -qF "PICK  #40" <<< "$OUT"; then fail "L3: #40 must not PICK"; else ok "L3: #40 not PICKed"; fi
+if grep -qF "PICK  #41" <<< "$OUT"; then fail "L3: #41 must not PICK"; else ok "L3: #41 not PICKed"; fi
+want "L3: units 3/5" "$OUT" "units: 3/5"
+
+# ── L4: boundary — label check beats stale-rank ───────────────────────────────
+lbl_issues '[{"name":"blocked"}]' '[]' '2026-09-28T00:00:00Z'
+OUT="$(bdl_b 2>&1)"; RC=$?
+ROW40="$(grep -E '^SKIP +#40 ' <<< "$OUT")"
+want "L4: #40 shows skip-label" "$ROW40" "skip-label: blocked"
+if grep -qF "stale-rank" <<< "$ROW40"; then fail "L4: #40 row must not say stale-rank"; else ok "L4: #40 row not stale-rank"; fi
+
+# ── L5: labeled pair partner ──────────────────────────────────────────────────
+lbl_issues '[]' '[]' '' '[{"name":"out-of-repo"}]'
+OUT="$(bdl_b --pair 43,44 2>&1)"; RC=$?
+want "L5: partner row" "$OUT" "pair: #44 skip-label: out-of-repo"
+want "L5: primary row" "$OUT" "pair: with #43"
+if grep -qF "PICK  #43" <<< "$OUT"; then fail "L5: #43 must not PICK"; else ok "L5: #43 not PICKed"; fi
+
+# ── L6: unranked labeled issue ────────────────────────────────────────────────
+lbl_issues '[]' '[]'
+jq '. + [{"number":46,"title":"Forty-six","body":"bin/g.sh:1","url":"u46","updatedAt":"2026-09-20T00:00:00Z","labels":[{"name":"out-of-repo"}]}]' \
+    "$T/lbl/fx/issues.json" > "$T/lbl/fx/issues.tmp" && mv "$T/lbl/fx/issues.tmp" "$T/lbl/fx/issues.json"
+OUT="$(bdl_b 2>&1)"; RC=$?
+ROW46="$(grep -E '^SKIP +#46 ' <<< "$OUT")"
+want "L6: #46 skip-label row" "$ROW46" "skip-label: out-of-repo"
+if grep -qF "unranked (run burndown-delta" <<< "$ROW46"; then fail "L6: #46 must not get unranked advice"; else ok "L6: #46 no unranked advice"; fi
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

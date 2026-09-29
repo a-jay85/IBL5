@@ -11,6 +11,9 @@
 # shellcheck disable=SC2034  # used in later phases sourced from this file
 BD_BUDGET=5
 BD_CODE_REPO="a-jay85/IBL5"
+BD_LABEL_BLOCKED="blocked"
+BD_LABEL_OUT_OF_REPO="out-of-repo"
+BD_SKIP_LABELS_JSON='["blocked","out-of-repo"]'
 BD_RANKS='^P[1-4]$'
 
 bd_die() {
@@ -316,6 +319,29 @@ bd_pair_find() {
     return 1
 }
 
+# bd_issue_skip_label <num> <issues_file> — print the first skip label the issue
+# carries (list order, so "blocked" wins over "out-of-repo"), or nothing.
+bd_issue_skip_label() {
+    jq -r --argjson n "$1" --argjson s "$BD_SKIP_LABELS_JSON" \
+        'first(.[] | select(.number == $n) | [(.labels // [])[].name] as $l
+               | $s[] | select(. as $x | any($l[]; . == $x))) // empty' "$2"
+}
+
+# bd_skip_label_reason <num> <label> — the SKIP-row reason text for a skip label.
+# Reads the blocking PR from $BD_TMP/blocked.tsv (num<TAB>pr), written by
+# bd_autoclear_blocked; a missing file or row prints "PR unknown".
+bd_skip_label_reason() {
+    local n="$1" label="$2" pr=""
+    if [ "$label" = "$BD_LABEL_BLOCKED" ]; then
+        [ ! -f "$BD_TMP/blocked.tsv" ] || \
+            pr="$(awk -F'\t' -v n="$n" '$1==n{print $2; exit}' "$BD_TMP/blocked.tsv")"
+        if [ -n "$pr" ]; then pr="#$pr"; else pr="unknown"; fi
+        printf 'skip-label: blocked (PR %s)' "$pr"
+    else
+        printf 'skip-label: %s' "$label"
+    fi
+}
+
 bd_cmd_burndown() {
     # 1. Argument parsing — only --pair A,B accepted
     local pairs=""   # newline-sep "A,B" strings
@@ -404,12 +430,16 @@ bd_cmd_burndown() {
         local p_skip_reason=""  # partner's skip reason
         local solo=0
 
-        # Check primary: stale?
-        local upd title body
+        # Check primary: skip label, then stale?
+        local upd title body slabel
         upd="$(bd_issue_field "$num" "updatedAt" "$issues_file")"
         title="$(bd_issue_field "$num" "title" "$issues_file")"
         body="$(bd_issue_field "$num" "body" "$issues_file")"
-        if [ "$upd" \> "$BD_SINCE" ]; then
+        # Skip label comes first: the tag's own comment bumps updatedAt, and
+        # stale-rank would otherwise mask the real reason.
+        slabel="$(bd_issue_skip_label "$num" "$issues_file")"
+        [ -z "$slabel" ] || skip_reason="$(bd_skip_label_reason "$num" "$slabel")"
+        if [ -z "$skip_reason" ] && [ "$upd" \> "$BD_SINCE" ]; then
             skip_reason="stale-rank (updated after report; run burndown-delta + burndown-refresh)"
         fi
 
@@ -459,7 +489,11 @@ bd_cmd_burndown() {
                 p_upd="$(bd_issue_field "$partner" "updatedAt" "$issues_file")"
                 p_title="$(bd_issue_field "$partner" "title" "$issues_file")"
                 p_body="$(bd_issue_field "$partner" "body" "$issues_file")"
-                if [ "$p_upd" \> "$BD_SINCE" ]; then
+                local p_slabel
+                p_slabel="$(bd_issue_skip_label "$partner" "$issues_file")"
+                [ -z "$p_slabel" ] || \
+                    p_skip_reason="pair: #$partner $(bd_skip_label_reason "$partner" "$p_slabel")"
+                if [ -z "$p_skip_reason" ] && [ "$p_upd" \> "$BD_SINCE" ]; then
                     p_skip_reason="pair: #$partner stale-rank"
                 fi
                 if [ -z "$p_skip_reason" ]; then
@@ -562,8 +596,15 @@ bd_cmd_burndown() {
             local urank
             urank="$(awk -F'\t' -v n="$unum" '$1==n{print $2;exit}' <<< "$BD_REPORT_TSV")"
             if [ -z "$urank" ]; then
-                printf '%-5s #%-5s %-3s %-4s %s\n' "SKIP" "$unum" "" "" \
-                    "unranked (run burndown-delta + burndown-refresh)"
+                local ulabel
+                ulabel="$(bd_issue_skip_label "$unum" "$issues_file")"
+                if [ -n "$ulabel" ]; then
+                    printf '%-5s #%-5s %-3s %-4s %s\n' "SKIP" "$unum" "" "" \
+                        "$(bd_skip_label_reason "$unum" "$ulabel")"
+                else
+                    printf '%-5s #%-5s %-3s %-4s %s\n' "SKIP" "$unum" "" "" \
+                        "unranked (run burndown-delta + burndown-refresh)"
+                fi
             fi
         fi
     done

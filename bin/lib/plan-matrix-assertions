@@ -25,8 +25,18 @@
 #   4. otherwise                                               -> missing
 #   A row is flagged UNREALISED-ASSERTION when any qualifying token is missing.
 #   Qualifying tokens: single-word (no whitespace), no `...` or `<word>` spans,
-#   not already in a tracked file (arm 3 above — tokens found in the tree are pre-existing).
-#   A row with zero qualifying tokens is skipped entirely.
+#   no `=` (scenario notation such as `current_tree=T2` or `VAR=1` is never
+#   extracted), not already in a tracked file (arm 3 above — tokens found in the
+#   tree are pre-existing). A row with zero qualifying tokens is skipped entirely.
+#
+#   Prefix fallbacks (same three arms, run on a prefix of the token):
+#   - glob token `name_*`     -> prefix is the text before the first `*`;
+#                                realised/pre-existing when the prefix is found,
+#                                missing otherwise (checked before arm 1)
+#   - call token `name(a)`    -> after arms 1-3 miss, retry with the trailing `)`
+#                                stripped, so `name(a, b)` in the code realises it
+#   - expansion `${VAR}`      -> after arms 1-3 miss, retry with the trailing `}`
+#                                stripped, so `${VAR:-}` in the code realises it
 #
 # Waiver format: `WAIVE-MATRIX-ROW: <id>` on any line in the PR body file.
 
@@ -126,6 +136,8 @@ inm && /^[[:space:]]*\|/ {
         if (t == "") continue;
         # single-word: no whitespace
         if (t ~ /[[:space:]]/) continue;
+        # scenario notation (var=value) is never extracted
+        if (t ~ /=/) continue;
         toks = (toks == "") ? t : toks " " t;
     }
     if (toks != "") print id "\t" cell "\t" toks;
@@ -133,6 +145,18 @@ inm && /^[[:space:]]*\|/ {
 }
 inm && !/^[[:space:]]*\|/ { inm=0; }
 ' "$PLAN_FILE" > "$TMP/rows"
+
+# --- prefix ladder: the same three arms, run on a prefix of a token ---
+# File operands and git-grep only: no pipe into grep -q, so no SIGPIPE under pipefail.
+_prefix_realised() {
+    local p="$1"
+    if grep -qF -e "$p" "$TMP/plus" 2>/dev/null; then return 0; fi
+    if grep -qF -e "$p" "$TMP/ctx" 2>/dev/null; then return 0; fi
+    if [ -n "$ROOT" ]; then
+        if git -C "$ROOT" grep -qF -e "$p" -- 2>/dev/null; then return 0; fi
+    fi
+    return 1
+}
 
 # --- per-row check ---
 while IFS=$'\t' read -r id cell toks; do
@@ -146,6 +170,19 @@ while IFS=$'\t' read -r id cell toks; do
         # filter: drop tokens with placeholder chars (... or <word>)
         case "$tok" in
             *...* | *\<*\>* ) continue ;;
+        esac
+
+        # class 3: glob token. Prefix-match the text before the first `*`;
+        # grep -F cannot match a glob, so the whole-token arms never fire here.
+        case "$tok" in
+            *\** )
+                tok_prefix="${tok%%\**}"
+                if [ -n "$tok_prefix" ] && _prefix_realised "$tok_prefix"; then
+                    continue
+                fi
+                missing="$missing $tok"
+                continue
+                ;;
         esac
 
         # arm 1: present in a plus line -> realised
@@ -164,6 +201,26 @@ while IFS=$'\t' read -r id cell toks; do
                 continue
             fi
         fi
+
+        # class 1: multi-arg call. `name(a)` is realised by `name(a, b)`;
+        # retry the three arms with the trailing `)` stripped.
+        case "$tok" in
+            ?*\(*\) )
+                if _prefix_realised "${tok%\)}"; then
+                    continue
+                fi
+                ;;
+        esac
+
+        # class 2: shell default operator. `${VAR}` is realised by `${VAR:-}`;
+        # retry the three arms with the trailing `}` stripped.
+        case "$tok" in
+            \$\{*\} )
+                if _prefix_realised "${tok%\}}"; then
+                    continue
+                fi
+                ;;
+        esac
 
         # arm 4: missing
         missing="$missing $tok"

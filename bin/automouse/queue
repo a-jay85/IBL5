@@ -20,6 +20,27 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage:
+  bin/automouse/queue <plan-slug-or-filename>   queue a plan for automouse
+  bin/automouse/queue                           show current queue
+  bin/automouse/queue requeue                   move all skipped plans back to queue
+  bin/automouse/queue remove <plan-slug>        remove a plan from the queue
+  bin/automouse/queue reorder <slug1> ...       reorder the full queue
+
+Arguments:
+  <plan-slug-or-filename>   plan slug or filename (with or without .md), or path
+
+Env vars:
+  NIGHTLY_DIR   automouse state directory (default: ~/.claude/projects/.../automouse)
+  PLANS_DIR     plan files directory (default: ~/claude-plans)
+
+Exit codes: 0 = success, 1 = error
+EOF
+    exit 0
+fi
+
 : "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
 : "${PLANS_DIR:=$HOME/claude-plans}"
 QUEUE_DIR="$NIGHTLY_DIR/queue"

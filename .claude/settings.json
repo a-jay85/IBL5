@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/bin/lib/headless-elapsed-hook.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

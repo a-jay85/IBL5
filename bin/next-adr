@@ -7,6 +7,24 @@
 # numbering collisions when multiple worktrees are adding ADRs concurrently
 # (same defense bin/next-migration uses).
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/next-adr <kebab-title>
+
+Create the next ADR file by number, copying ibl5/docs/decisions/0000-template.md.
+Checks the current worktree, canonical main repo, pushed branches, and sibling
+worktrees to avoid numbering collisions. Must not be run from the main checkout.
+
+  kebab-title  Lowercase kebab-case title (letters, digits, hyphens; e.g. my-decision)
+
+Exit codes:
+  0  ADR file created; absolute path printed to stdout
+  1  Must not be run from the main checkout
+  2  Usage error (missing/invalid slug, or slug already exists, or template missing)
+EOF
+    exit 0
+fi
+
 set -euo pipefail
 
 source "$(dirname "$0")/lib/git-helpers.sh"

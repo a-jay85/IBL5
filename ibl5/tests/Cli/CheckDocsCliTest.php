@@ -348,6 +348,28 @@ final class CheckDocsCliTest extends TestCase
         $this->assertStringContainsString('missing frontmatter block', $output);
     }
 
+    #[Test]
+    public function duplicateLastVerifiedKeyExitsOne(): void
+    {
+        $d = $this->freshDate();
+        $content = "---\ndescription: Sample doc.\nlast_verified: {$d}\nlast_verified: {$d}\n---\n\n# Sample\n\nBody.\n";
+        $this->commitFile('ibl5/docs/sample.md', $content, 'dup key');
+
+        [$code, $output] = $this->runScript();
+        $this->assertSame(1, $code, $output);
+        $this->assertStringContainsString('duplicate `last_verified` key (2 occurrences)', $output);
+    }
+
+    #[Test]
+    public function singleLastVerifiedKeyIsNotReportedDuplicate(): void
+    {
+        $this->commitFile('ibl5/docs/sample.md', $this->doc($this->freshDate()), 'ok doc');
+
+        [$code, $output] = $this->runScript();
+        $this->assertSame(0, $code, $output);
+        $this->assertStringNotContainsString('duplicate', $output);
+    }
+
     // --- Phase 4: --staleness-report (nightly audit data source) ---
 
     #[Test]

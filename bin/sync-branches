@@ -1,6 +1,21 @@
 #!/bin/bash
 set -e
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/sync-branches
+
+Sync all local tracking branches with their origin counterparts.
+
+Stashes any uncommitted changes before syncing and restores them after.
+For each tracking branch: hard-resets to origin, syncing from within
+the worktree for worktree-checked-out branches. Skips branches that are
+actively in use or have uncommitted changes. After sync, merges
+origin/master into all active worktree branches via bin/wt-rebase.
+EOF
+    exit 0
+fi
+
 # Sync all local tracking branches with their origin counterparts.
 #
 # Safety: stashes any uncommitted changes before syncing, then restores

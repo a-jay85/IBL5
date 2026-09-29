@@ -35,6 +35,29 @@
 
 set -u
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/sim-recap-tick [--dry-run] [--sim=<id>]
+
+Poll-only sim-recap pipeline driver (ADR-0092). Fired every 300s by the
+launchd LaunchAgent (bin/sim-recap-cron-setup).
+
+Options:
+  --dry-run      Regenerate a recap for tuning without touching the queue,
+                 writing to the DB, or self-unloading. Requires --sim=<id>.
+  --sim=<id>     Specify the sim ID to process (used with --dry-run, or to
+                 force-process a particular sim on a live tick).
+
+Key environment overrides (all have production defaults):
+  SIM_RECAP_CLAUDE_BIN   Path to the claude binary.
+  SIM_RECAP_SSH_HOST     SSH host for queue access.
+  SIM_RECAP_MODEL        Model to use for generation.
+
+Exit codes: 0 success, 1 tick failure, 2 unknown argument.
+EOF
+    exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 

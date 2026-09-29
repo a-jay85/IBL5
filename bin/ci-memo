@@ -45,6 +45,42 @@
 set -euo pipefail
 export LC_ALL=C
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/ci-memo hash   <scope> [--manifest P] [--extra k=v]... [--fail-open]
+       bin/ci-memo key    <scope> [--manifest P] [--extra k=v]... [--fail-open]
+       bin/ci-memo paths  <scope> [--manifest P]
+       bin/ci-memo record <scope> <hash> <sentinel-file>
+       bin/ci-memo report <scope> <hash> <hit|miss> <sentinel-file>
+
+Content-hash memoization key for heavy CI jobs (ADR-0131). Digests tracked
+files from the HEAD tree for a declared scope; optionally appends extra key=v
+pairs. On a pull_request run HEAD is the PR-into-base merge commit.
+
+Subcommands:
+  hash    Print 40-hex digest to stdout.
+  key     Print hash=<hex> and key=ci-memo-<scope>-v1-<hex>; also appends to
+          $GITHUB_OUTPUT when set.
+  paths   Print the manifest pathspecs for <scope>, one per line.
+  record  Write the sentinel stored under the key after a clean run.
+  report  Print a greppable CI_MEMO line; append to $GITHUB_STEP_SUMMARY.
+
+Options:
+  --manifest P    Override manifest directory (default: .github/ci-memo).
+  --extra k=v     Fold extra key=value pairs into the digest.
+  --fail-open     On errors 3/4: print empty hash= and key=, exit 0.
+
+Environment:
+  CI_MEMO_REPO           Repo to hash (default: repo containing cwd).
+  CI_MEMO_MANIFEST_DIR   Manifest directory override.
+  CI_MEMO_BYPASS         Non-empty: key prints empty hash= and key=.
+  CI_MEMO_DIGEST_CMD     Command printing the image manifest (tests stub it).
+
+Exit codes: 0 success, 2 usage error, 3 pathspec matched nothing, 4 git error.
+EOF
+    exit 0
+fi
+
 FORMAT_VERSION="v1"
 GHCR_IMAGE="ghcr.io/a-jay85/ibl5/php-apache:latest"
 

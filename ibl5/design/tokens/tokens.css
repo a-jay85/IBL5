@@ -98,10 +98,32 @@
     --gold: var(--color-gold);
     --gold-dark: var(--color-gold-dark);
 
+    /* White alpha overlays (dark-surface tints; navigation.css is the main consumer) */
+    --white-alpha-5: rgba(255, 255, 255, 0.05);
+    --white-alpha-10: rgba(255, 255, 255, 0.1);
+    --white-alpha-15: rgba(255, 255, 255, 0.15);
+    --white-alpha-20: rgba(255, 255, 255, 0.2);
+    --white-alpha-30: rgba(255, 255, 255, 0.3);
+
     /* ========================================================================
        Typography
        ======================================================================== */
     --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+    /* Font weights (values equal Tailwind 4 defaults; see trade-offs) */
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-weight-extrabold: 800;
+
+    /* Line heights (project scale; overrides Tailwind leading-* defaults) */
+    --leading-none: 1;
+    --leading-tight: 1.2;
+    --leading-snug: 1.3;
+    --leading-normal: 1.4;
+    --leading-relaxed: 1.5;
+    --leading-loose: 1.6;
 
     /* ========================================================================
        Spacing Scale
@@ -146,6 +168,23 @@
     --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 
     /* ========================================================================
+       Z-Index Scale
+       Every value is an integer already used in design/components/, so a
+       swap is 1:1. Order matches today's stacking; do not renumber.
+       ======================================================================== */
+    --z-base: 0;            /* free-agency contract-hint link reset */
+    --z-raised: 1;          /* lift over sibling rows/cells (mobile sticky col, cap-exceeded glow) */
+    --z-raised-2: 2;        /* active-tab underline, second local layer */
+    --z-raised-3: 3;        /* mobile sticky corner cell */
+    --z-sticky-col: 5;      /* sticky first column, card overlay toggles */
+    --z-sticky: 10;         /* sticky thead, sticky header cells, flip icon, inline submit bars */
+    --z-sticky-corner: 15;  /* thead x sticky-column intersection */
+    --z-fixed: 40;          /* fixed page chrome: sticky header clone, nav overlay, draft submit bar */
+    --z-dropdown: 50;       /* nav dropdown menus, above the nav overlay */
+    --z-tooltip: 100;       /* .ibl-tooltip ::before/::after */
+    --z-modal: 1000;        /* .modal-overlay (block-fa-admin) */
+
+    /* ========================================================================
        Gradients (computed from color aliases)
        ======================================================================== */
     --gradient-navy-header: linear-gradient(135deg, var(--navy-800), var(--navy-900));
@@ -169,3 +208,17 @@
 }
 
 } /* end @layer components */
+
+/* ========================================================================
+   Breakpoints (@custom-media)
+   Resolved by Lightning CSS only on the --minify / --optimize build path.
+   Non-minified dev builds (css:watch, bin/wt-up, bin/rebuild-css-if-source-changed)
+   leave bp-* media queries unresolved, so nothing may consume these until the
+   dev builds pass --optimize. One-off queries (480px, 540px, 1200px, ranges,
+   hover) stay raw.
+   ======================================================================== */
+@custom-media --bp-sm-down (max-width: 640px);
+@custom-media --bp-md-down (max-width: 768px);
+@custom-media --bp-md-up (min-width: 769px);
+@custom-media --bp-lg-down (max-width: 1023px);
+@custom-media --bp-lg-up (min-width: 1024px);

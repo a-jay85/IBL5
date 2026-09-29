@@ -25,6 +25,22 @@
 # Usage:
 #   bin/check-skill-arguments              gate mode — exit 1 on any violation
 #   bin/check-skill-arguments --self-test  verify the gate catches a violation
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-skill-arguments [--self-test]
+
+CI gate: ensures no SKILL.md uses $ARGUMENTS more than its allowed count,
+preventing injected-size blowup when the harness substitutes the caller's text.
+
+  --self-test  Run the built-in self-test and exit
+
+Exit codes:
+  0  All SKILL.md files within their allowed $ARGUMENTS count (or self-test passed)
+  1  One or more SKILL.md files exceed their allowed count (or self-test failed)
+EOF
+    exit 0
+fi
+
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

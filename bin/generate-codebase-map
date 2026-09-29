@@ -3,6 +3,20 @@
 # Run: bin/generate-codebase-map
 # Auto-run: SessionStart hook + git pre-commit hook + master-push CI job in .github/workflows/tests.yml
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/generate-codebase-map
+
+Generate .claude/rules/codebase-map.md from ibl5/classes/ structure.
+No-op if content (excluding the last_verified date) is unchanged.
+Run automatically by the SessionStart hook, git pre-commit hook, and CI.
+
+Exit codes:
+  0  Map written (or already up to date)
+EOF
+    exit 0
+fi
+
 set -euo pipefail
 
 # Deterministic output: force byte-order sort regardless of user locale

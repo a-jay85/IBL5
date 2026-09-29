@@ -149,6 +149,8 @@ if [ "${1:-}" = "--help" ]; then
     cat <<'HELP'
 bin/website-affecting — classify changed files as website-affecting or not.
 
+Usage: git diff --name-only master...HEAD | bin/website-affecting
+
 Reads newline-separated repo-relative paths from stdin (git diff --name-only).
 Exit 0 = affects website (RUN/BUILD). Exit 1 = does not affect website (SKIP).
 Fail-safe: empty or unexpected input → exit 0 (BUILD).

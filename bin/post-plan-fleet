@@ -77,6 +77,11 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    sed -n '2,76p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+fi
+
 # --- PATH prelude ------------------------------------------------------------------------
 # A safety net for invocation from a restricted context (cron, a hook) that lacks the
 # usual tool dirs. Appended, not prepended: an interactive caller's own PATH — and the

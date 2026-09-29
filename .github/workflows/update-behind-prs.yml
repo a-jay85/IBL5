@@ -25,6 +25,8 @@ on:
       - '.gitignore'
       - '**/.gitignore'
       - '.gitattributes'
+      - 'ibl5/phpstan-baseline-counts.json'
+      - 'ibl5/coverage-baseline.json'
   schedule:
     # Head-of-line backstop ONLY. GitHub drops and delays these (see the push block above), so
     # nothing latency-sensitive may depend on them. This tick re-checks the head in case a push

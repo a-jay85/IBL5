@@ -954,11 +954,7 @@ def test_upsert_tests_changed_replace():
     body = "## Before\n\n" + old_block + "\n\n## After\n"
     new_block = (TESTS_CHANGED_BEGIN + "\nnew header\n\n- `A` `new.py`\n" + TESTS_CHANGED_END)
     result = upsert_tests_changed(body, new_block)
-    assert "old.py" not in result
-    assert "- `A` `new.py`" in result
-    assert result.count(TESTS_CHANGED_BEGIN) == 1
-    assert "## Before\n\n" in result
-    assert "\n\n## After\n" in result
+    assert result == "## Before\n\n" + new_block + "\n\n## After\n"
 
 
 def test_upsert_tests_changed_append_when_absent_and_empty_body():

@@ -1,6 +1,6 @@
 ---
 name: plan-prompt
-description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
+description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 5.5 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
 last_verified: 2026-09-28
 ---
 
@@ -8,7 +8,7 @@ last_verified: 2026-09-28
 
 Compose a prompt that a **fresh Sonnet session** runs as `/plan`, carrying everything
 this conversation figured out — then hand it to `bin/plan-now`, which runs it in a
-detached headless Sonnet 4.6 session (Step 5). The clipboard copy stays, as the
+detached headless Sonnet 5.5 session (Step 5). The clipboard copy stays, as the
 fallback for running it by hand.
 
 **Why this exists.** A `/plan` run costs mostly orchestration, not design: the design
@@ -67,7 +67,7 @@ triaging from *here*:
 
 **On an ad-hoc verdict: stop here.** Do not compose a block, do not fire, do not start
 implementing. Say what the work is, that it clears the bar, and which clause carried the
-call. Execution still routes per `work-triage.md` § Execution routing — a `sonnet-4-6`
+call. Execution still routes per `work-triage.md` § Execution routing. A `sonnet-5-5`
 delegate, not inline on this session. The verdict retracts the `/plan` run, never the
 offload; offloading is why you invoked this skill.
 
@@ -229,7 +229,7 @@ step 3.
    bin/plan-now --model opus "$f"       # when Step 4 said the ORCHESTRATOR wants Opus
    ```
 
-   This runs `/plan` in a **detached headless Sonnet 4.6 session** (launchd — it
+   This runs `/plan` in a **detached headless Sonnet 5.5 session** (launchd; it
    survives closing Claude Code), then runs `bin/check-plan` on the produced plan and
    logs the verdict. Report the log path it prints; don't poll it.
 

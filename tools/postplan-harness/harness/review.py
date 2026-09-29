@@ -241,14 +241,17 @@ class ReviewPhase:
 
         def _call_agent(task: tuple[str, str, str, str, str]):
             agent, source, purpose, model, prompt = task
-            try:
-                data = self.llm.call(purpose, model, prompt, schemas.validate_findings,
-                                     normalizer=schemas.unwrap_findings_envelope)
-                return (agent, source, purpose, data, None)
-            except HarnessError as e:
-                if e.kind != "llm-invalid-output":
-                    raise                      # llm-fixture-missing, gh, etc. stay terminal
-                return (agent, source, purpose, [], purpose)  # degraded
+            for attempt in range(2):
+                try:
+                    data = self.llm.call(purpose, model, prompt, schemas.validate_findings,
+                                         normalizer=schemas.unwrap_findings_envelope)
+                    return (agent, source, purpose, data, None)
+                except HarnessError as e:
+                    if e.kind != "llm-invalid-output":
+                        raise                      # llm-fixture-missing, gh, etc. stay terminal
+                    if attempt == 0:
+                        continue  # retry once
+            return (agent, source, purpose, [], purpose)  # degraded after both attempts
 
         # Run all independent agents concurrently; futures list preserves submission order.
         max_workers = max(len(tasks), 1)

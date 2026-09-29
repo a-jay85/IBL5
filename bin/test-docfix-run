@@ -13,6 +13,7 @@ REAL_DOCFIX="$REPO_ROOT/bin/docfix-run"
 REAL_POLL="$REPO_ROOT/bin/docfix-poll"
 WORKFLOW="$REPO_ROOT/.github/workflows/doc-freshness-audit.yml"
 NOTIFY_WORKFLOW="$REPO_ROOT/.github/workflows/docs-refreshed-notify.yml"
+HEALTH_WORKFLOW="$REPO_ROOT/.github/workflows/docfix-health.yml"
 REAL_VERONLY="$REPO_ROOT/bin/docfix-check-veronly"
 FAILED=0
 ok()   { echo "ok: $1"; }
@@ -42,7 +43,8 @@ W
     printf '#!/usr/bin/env bash\necho "$1" >> "%s/cleanup-calls"\nexit "${SHIM_CLEANUP_RC:-0}"\n' \
         "$SB" > "$SB/bin/cleanup"
     # docfix-run: logs "issue|sig" to docfix-calls.
-    printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\n' \
+    # Exits SHIM_DOCFIX_RUN_RC (default 0) so the poll's exit-code passthrough is testable.
+    printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\nexit "${SHIM_DOCFIX_RUN_RC:-0}"\n' \
         "$SB" > "$SB/bin/docfix-run"
     chmod +x "$SB/bin/check-docs" "$SB/bin/cleanup" "$SB/bin/docfix-run"
 
@@ -154,6 +156,14 @@ run_poll() {
       "$REAL_POLL" >/dev/null 2>&1 ) || true
 }
 
+# run_poll_rc: like run_poll but prints the poll's exit code as "rc=N".
+run_poll_rc() {
+    local SB="$1" RC=0
+    ( IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$SB/bin:$PATH" \
+      "$REAL_POLL" >/dev/null 2>&1 ) || RC=$?
+    echo "rc=$RC"
+}
+
 # run_health: drives bin/docfix-poll --health-report <issue>; prints output.
 run_health() {
     local SB="$1" ISSUE="${2:-}"
@@ -171,7 +181,7 @@ P="$(plist_of "$SB")"; PLAN="$(plan_of "$SB")"
 { [ -n "$P" ] && grep -q 'cd "'"$SB"'/wts/docs-stale-refresh-[^/]*"' "$P" \
     && grep -q 'Closes #4242' "$P" \
     && grep -q 'ibl5/docs/foo.md,README.md' "$P" \
-    && grep -q 'claude-sonnet-4-6' "$P"; } \
+    && grep -q 'claude-sonnet-5-5' "$P"; } \
   && ok "(1) plist carries cd-to-worktree + doc-fix prompt + SIG + Closes #N" \
   || bad "(1) plist composition"
 { [ -n "$PLAN" ] && head -1 "$PLAN" | grep -q '^---$' \
@@ -201,10 +211,11 @@ SB="$(build_sandbox)"
     && ! grep -q 'docfix:' "$WORKFLOW" \
     && ! grep -qF 'bin/docfix-run' "$WORKFLOW" \
     && grep -q 'pull-requests: read' "$WORKFLOW" \
-    && grep -qF "steps.health.outputs.alert == 'true'" "$WORKFLOW" \
+    && ! grep -qF 'steps.health.outputs' "$WORKFLOW" \
+    && ! grep -qF -- '--health-report' "$WORKFLOW" \
     && ! grep -qF "notify == 'true'" "$WORKFLOW" \
     && ! grep -q "fail-on-delivery" "$WORKFLOW"; } \
-  && ok "(6) audit: no self-hosted/docfix/docfix-run; health.alert gate; pull-requests:read; no fail-on-delivery" \
+  && ok "(6) audit: no self-hosted/docfix/docfix-run; no health steps; pull-requests:read; no fail-on-delivery" \
   || bad "(6) audit static assertions"
 
 # --- Case 7: docs-refreshed-notify.yml static assertion -----------------------
@@ -214,6 +225,27 @@ SB="$(build_sandbox)"
     && [ -f "$REPO_ROOT/bin/lib/docfix-dm.sh" ]; } \
   && ok "(7) docs-refreshed-notify: workflow_dispatch+pr_number; guard moved to docfix-dm.sh" \
   || bad "(7) docs-refreshed-notify static assertion"
+
+# --- Cases H9-H10: docfix-health.yml static assertions ------------------------
+{ grep -qF 'workflow_dispatch' "$HEALTH_WORKFLOW" \
+    && grep -qE '^      alert:' "$HEALTH_WORKFLOW" \
+    && grep -qE '^      kind:' "$HEALTH_WORKFLOW" \
+    && grep -qE '^      detail:' "$HEALTH_WORKFLOW" \
+    && grep -qF "cron: '0 12 * * *'" "$HEALTH_WORKFLOW" \
+    && grep -qF -e '--event workflow_dispatch' "$HEALTH_WORKFLOW" \
+    && grep -qF 'actions: read' "$HEALTH_WORKFLOW" \
+    && grep -qF 'issues: read' "$HEALTH_WORKFLOW" \
+    && grep -qF 'source bin/lib/docfix-health.sh' "$HEALTH_WORKFLOW" \
+    && grep -qF "if: steps.build.outputs.alert == 'true'" "$HEALTH_WORKFLOW" \
+    && grep -qF "if: steps.check.outputs.alert == 'true'" "$HEALTH_WORKFLOW"; } \
+  && ok "(H9) docfix-health.yml: dispatch inputs, 12:00Z cron, dispatch-only heartbeat, perms, lib, alert gates" \
+  || bad "(H9) docfix-health.yml static structure"
+
+H10_ALL="$(grep -nE '\$\{\{ *inputs\.' "$HEALTH_WORKFLOW")"
+H10_BAD="$(grep -vE '^[0-9]+: +[A-Z_]+: \$\{\{ *inputs\.[a-z_]+ *\}\}$' <<<"$H10_ALL")"
+{ [ -n "$H10_ALL" ] && [ -z "$H10_BAD" ]; } \
+  && ok "(H10) docfix-health.yml: every inputs.* reference is an env: entry (no run: interpolation)" \
+  || bad "(H10) docfix-health.yml: inputs interpolated outside env: [$H10_BAD]"
 
 # --- Case 8: carry-forward — bin/docfix-run still has auto_merge:false --------
 { grep -q '^auto_merge: false$' "$REAL_DOCFIX" \
@@ -792,7 +824,7 @@ SB="$(build_sandbox)"
 CALLS33="$SB/gh-calls"
 SHIM_PR_DM="" SHIM_GH_CALLS="$CALLS33" SHIM_STALE_JSON='[]' run_poll "$SB"
 MARKER33="$(dm_marker_of "$SB" 4242)"
-{ [ ! -e "$MARKER33" ] && { [ ! -e "$CALLS33" ] || [ ! -s "$CALLS33" ]; }; } \
+{ [ ! -e "$MARKER33" ] && ! grep -qF 'workflow run docs-refreshed-notify.yml' "$CALLS33" 2>/dev/null; } \
   && ok "(33) poll: no DM when no unarmed PRs" \
   || bad "(33) poll: DM should not fire for empty PR_DM"
 
@@ -803,7 +835,7 @@ MARKER34="$(dm_marker_of "$SB" 4242)"
 mkdir -p "$(dirname "$MARKER34")"
 : > "$MARKER34"
 SHIM_PR_DM="4242" SHIM_GH_CALLS="$CALLS34" SHIM_STALE_JSON='[]' run_poll "$SB"
-{ [ ! -e "$CALLS34" ] || [ ! -s "$CALLS34" ]; } \
+{ ! grep -qF 'workflow run docs-refreshed-notify.yml' "$CALLS34" 2>/dev/null; } \
   && ok "(34) poll: no DM re-dispatch when marker pre-exists" \
   || bad "(34) poll: DM re-dispatch with existing marker"
 
@@ -825,6 +857,56 @@ MARKER36="$(dm_marker_of "$SB" 4242)"
     && [ -e "$MARKER36" ]; } \
   && ok "(36) poll: DM fires before stale-count exit (proves Step 6.1 placement)" \
   || bad "(36) poll: DM should fire even on empty stale set"
+
+# --- Cases H11-H16: poll health heartbeat dispatch ---------------------------
+_hcount() { if [ -f "$1" ]; then grep -cF 'workflow run docfix-health.yml' "$1" || true; else echo 0; fi; }
+
+# (H11) no stale docs: exactly one alert=false heartbeat, rc 0.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON='[]' run_poll_rc "$SB")"
+{ [ "$RC" = "rc=0" ] && [ "$(_hcount "$C")" -eq 1 ] \
+    && grep -qF 'workflow run docfix-health.yml -f alert=false -f kind= -f detail=' "$C"; } \
+  && ok "(H11) poll: no-stale exit dispatches exactly one alert=false heartbeat, rc 0" \
+  || bad "(H11) poll: no-stale heartbeat ($RC, $(_hcount "$C") dispatches)"
+
+# (H12) stale docs, no open issue: exactly one alert=false heartbeat, rc 0.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="" SHIM_PR_CLOSED='[]' \
+    run_poll_rc "$SB")"
+{ [ "$RC" = "rc=0" ] && [ "$(_hcount "$C")" -eq 1 ] \
+    && grep -qF 'docfix-health.yml -f alert=false' "$C"; } \
+  && ok "(H12) poll: no-issue exit dispatches exactly one alert=false heartbeat, rc 0" \
+  || bad "(H12) poll: no-issue heartbeat ($RC, $(_hcount "$C") dispatches)"
+
+# (H13) tail path, docfix-run rc 0: exactly one dispatch, rc 0.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='[]' \
+    SHIM_DOCFIX_RUN_RC=0 run_poll_rc "$SB")"
+{ [ "$RC" = "rc=0" ] && [ "$(_hcount "$C")" -eq 1 ] && [ -f "$SB/docfix-calls" ]; } \
+  && ok "(H13) poll: tail path dispatches exactly once after docfix-run, rc 0" \
+  || bad "(H13) poll: tail heartbeat ($RC, $(_hcount "$C") dispatches)"
+
+# (H14) tail path, docfix-run rc 3: poll rc is 3, still exactly one dispatch.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='[]' \
+    SHIM_DOCFIX_RUN_RC=3 run_poll_rc "$SB")"
+{ [ "$RC" = "rc=3" ] && [ "$(_hcount "$C")" -eq 1 ]; } \
+  && ok "(H14) poll: docfix-run rc 3 becomes poll rc 3, one dispatch still sent" \
+  || bad "(H14) poll: docfix-run rc passthrough ($RC, $(_hcount "$C") dispatches)"
+
+# (H15) failed dispatch is fail-quiet: rc 0.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON='[]' SHIM_WFRUN_RC=1 run_poll_rc "$SB")"
+{ [ "$RC" = "rc=0" ] && [ "$(_hcount "$C")" -eq 1 ]; } \
+  && ok "(H15) poll: failed gh workflow run stays fail-quiet (rc 0)" \
+  || bad "(H15) poll: dispatch failure should not fail the poll ($RC)"
+
+# (H16) crash path: check-docs failing leaves NO heartbeat (no EXIT-trap dispatch).
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_CHECKDOCS_RC=1 run_poll_rc "$SB")"
+{ [ "$RC" != "rc=0" ] && [ "$(_hcount "$C")" -eq 0 ]; } \
+  && ok "(H16) poll: crashed poll exits nonzero and sends zero heartbeats" \
+  || bad "(H16) poll: crash must not heartbeat ($RC, $(_hcount "$C") dispatches)"
 
 # --- Cases 37-40: bin/lib/docfix-dm.sh compose function ----------------------
 
@@ -870,6 +952,97 @@ SHIM_GH_CALLS="$CALLS40" run_dm_compose "$SB" '12; rm -rf /' "$OUTF40" && DRC=0 
     && { [ ! -e "$CALLS40" ] || [ ! -s "$CALLS40" ]; }; } \
   && ok "(40) lib: non-numeric PR refused (rc 1, no gh call)" \
   || bad "(40) lib: non-numeric PR should be refused"
+
+# --- Cases H1-H8: bin/lib/docfix-health.sh -----------------------------------
+HEALTH_LIB="$REPO_ROOT/bin/lib/docfix-health.sh"
+
+# _hl <function> [args...]: run one lib function in a subshell (no set -e leak).
+_hl() {
+    (
+        # shellcheck source=bin/lib/docfix-health.sh
+        source "$HEALTH_LIB"
+        "$@"
+    )
+}
+
+# (H1) validate: only true+known-kind and false+empty-kind pass.
+H1OK=1
+_hl docfix_health_validate true never-ran 2>/dev/null || H1OK=0
+_hl docfix_health_validate false '' 2>/dev/null || H1OK=0
+_hl docfix_health_validate true '' 2>/dev/null && H1OK=0
+_hl docfix_health_validate false never-ran 2>/dev/null && H1OK=0
+_hl docfix_health_validate maybe '' 2>/dev/null && H1OK=0
+_hl docfix_health_validate true 'never-ran;x' 2>/dev/null && H1OK=0
+[ "$H1OK" -eq 1 ] \
+  && ok "(H1) health lib: validate accepts only valid alert/kind pairs" \
+  || bad "(H1) health lib: validate allow-list"
+
+# (H2) compose: 2 lines; heading names the kind; embedded newline collapsed.
+SBH="$(mktemp -d)"
+_hl docfix_health_compose never-ran $'part one\npart two' "$SBH/out2" && HRC=0 || HRC=$?
+{ [ "$HRC" -eq 0 ] && [ "$(grep -c '^' "$SBH/out2")" -eq 2 ] \
+    && sed -n 1p "$SBH/out2" | grep -qF '(never-ran)' \
+    && sed -n 2p "$SBH/out2" | grep -qF 'part one' \
+    && sed -n 2p "$SBH/out2" | grep -qF 'part two'; } \
+  && ok "(H2) health lib: compose writes 2 lines, kind in heading, detail collapsed" \
+  || bad "(H2) health lib: compose shape"
+
+# (H3) compose refusals: unknown kind, empty detail → rc 1, no out-file.
+_hl docfix_health_compose evil 'detail' "$SBH/out3a" && HRC3A=0 || HRC3A=$?
+_hl docfix_health_compose never-ran '' "$SBH/out3b" && HRC3B=0 || HRC3B=$?
+{ [ "$HRC3A" -eq 1 ] && [ ! -e "$SBH/out3a" ] && [ "$HRC3B" -eq 1 ] && [ ! -e "$SBH/out3b" ]; } \
+  && ok "(H3) health lib: compose refuses unknown kind and empty detail (rc 1, no out-file)" \
+  || bad "(H3) health lib: compose refusals"
+
+# (H4) compose truncates a 3000-char detail to at most 1500 chars.
+LONG="$(head -c 3000 /dev/zero | tr '\0' 'x')"
+_hl docfix_health_compose died "$LONG" "$SBH/out4" && HRC=0 || HRC=$?
+L2LEN="$(sed -n 2p "$SBH/out4" | tr -d '\n' | wc -c | tr -d ' ')"
+{ [ "$HRC" -eq 0 ] && [ "$L2LEN" -le 1500 ] && [ "$L2LEN" -gt 0 ]; } \
+  && ok "(H4) health lib: compose cuts detail to <=1500 chars" \
+  || bad "(H4) health lib: compose truncation (line 2 = $L2LEN chars)"
+
+# (H5) poll_detail: names both launchd logs and the newest run log; none when empty.
+RUNDIR="$SBH/runlogs"; mkdir -p "$RUNDIR"
+touch -t 202609270000 "$RUNDIR/docfix-run-a.log"
+touch -t 202609280000 "$RUNDIR/docfix-run-b.log"
+H5A="$(_hl docfix_health_poll_detail 'base detail' '/logs' "$RUNDIR")"; H5ARC=$?
+mkdir -p "$SBH/emptyrun"
+H5B="$(_hl docfix_health_poll_detail 'base detail' '/logs' "$SBH/emptyrun")"; H5BRC=$?
+{ [ "$H5ARC" -eq 0 ] && [ "$H5BRC" -eq 0 ] \
+    && printf '%s' "$H5A" | grep -qF '/logs/launchd-stdout.log' \
+    && printf '%s' "$H5A" | grep -qF '/logs/launchd-stderr.log' \
+    && printf '%s' "$H5A" | grep -qF 'docfix-run-b.log' \
+    && ! printf '%s' "$H5A" | grep -qF 'docfix-run-a.log' \
+    && printf '%s' "$H5B" | grep -qF 'Run log: none'; } \
+  && ok "(H5) health lib: poll_detail names launchd logs + newest run log; none when empty" \
+  || bad "(H5) health lib: poll_detail"
+
+# (H6) verdict boundaries.
+_epoch() { jq -rn --arg t "$1" '$t | fromdateiso8601'; }
+V6A="$(_hl docfix_health_heartbeat_verdict 2026-09-29T04:05:00Z "$(_epoch 2026-09-29T21:47:00Z)")"
+V6B="$(_hl docfix_health_heartbeat_verdict 2026-09-28T06:15:00Z "$(_epoch 2026-09-29T12:00:00Z)")"
+BASE6="$(_epoch 2026-09-28T00:00:00Z)"
+V6C="$(_hl docfix_health_heartbeat_verdict 2026-09-28T00:00:00Z $(( BASE6 + 86400 )))"
+V6D="$(_hl docfix_health_heartbeat_verdict 2026-09-28T00:00:00Z $(( BASE6 + 86399 )))"
+{ [ "$V6A" = "fresh 17" ] && [ "$V6B" = "stale 29" ] && [ "$V6C" = "stale 24" ] && [ "$V6D" = "fresh 23" ]; } \
+  && ok "(H6) health lib: verdict boundaries (fresh 17, stale 29, stale 24, fresh 23)" \
+  || bad "(H6) health lib: verdict got [$V6A] [$V6B] [$V6C] [$V6D]"
+
+# (H7) verdict prints none for empty / unparseable input and exits 0.
+V7A="$(_hl docfix_health_heartbeat_verdict '' 1000)"; V7ARC=$?
+V7B="$(_hl docfix_health_heartbeat_verdict 'not-a-date' 1000)"; V7BRC=$?
+{ [ "$V7A" = "none" ] && [ "$V7B" = "none" ] && [ "$V7ARC" -eq 0 ] && [ "$V7BRC" -eq 0 ]; } \
+  && ok "(H7) health lib: verdict none for empty/unparseable timestamp, exit 0" \
+  || bad "(H7) health lib: verdict none got [$V7A] [$V7B]"
+
+# (H8) empty-env source: the lib works under env -i with a minimal PATH.
+V8="$(env -i PATH="/usr/bin:/bin:$(dirname "$(command -v jq)")" REPO_ROOT="$REPO_ROOT" \
+    bash -c 'source "$REPO_ROOT/bin/lib/docfix-health.sh" && docfix_health_heartbeat_verdict "" 0')"; V8RC=$?
+{ [ "$V8" = "none" ] && [ "$V8RC" -eq 0 ]; } \
+  && ok "(H8) health lib: sources and runs under env -i (empty environment)" \
+  || bad "(H8) health lib: empty-env got [$V8]"
+rm -rf "$SBH"
 
 # --- Cases 41-47: bin/docfix-check-veronly boundaries ------------------------
 # Verification Matrix rows 11-14, 18, 19: the fail-open holes the predicate is
@@ -1030,6 +1203,12 @@ RC23=$?
     && grep -qF 'ibl5/classes/*/README.md' "$REAL_DOCFIX"; } \
   && ok "(48) prompt: ADR append-only + figure-resubstitution + content-rewrite disclosure + allowlist clauses present" \
   || bad "(48) prompt: an append-only/disclosure clause was dropped from \$PROMPT"
+
+# --- Case 48b: static — launch keeps --effort low and the prompt demands a real check
+{ grep -qF -- '--effort low' "$REAL_DOCFIX" \
+    && grep -qF 'run a real check that exercises it' "$REAL_DOCFIX"; } \
+  && ok "(48b) launch passes --effort low and prompt requires a real verification check" \
+  || bad "(48b) --effort low or the real-check verification paragraph missing from bin/docfix-run"
 
 # --- Cases 49-64: bin/docfix-check-veronly numeric-pass + boundary cases ------
 

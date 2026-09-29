@@ -24,7 +24,9 @@
 #                              /post-plan Phase 5.0 now executes every post-impl
 #                              one unattended. A phase pointer, an ellipsis, an
 #                              unbound <placeholder>, a bare file path, bare SQL,
-#                              or "same …"/"re-run …" prose is not runnable.
+#                              or "same …"/"re-run …" prose is not runnable,
+#                              or a cell whose backtick count is odd after
+#                              stripping the outermost pair.
 #                              Silent when the plan has no CLI-executable row.
 #   7  No unresolved decisions — any table row carrying DECIDE / TBD /
 #                              "subject to validation" / "subject to review" is a
@@ -466,6 +468,12 @@ while IFS= read -r row; do
         _probe=$(printf '%s' "$MC_LOC" \
             | sed -E 's#[A-Za-z0-9_/@^~.-]+\.\.\.[A-Za-z0-9_/@^~-]+#RANGE#g' \
             | sed -E 's#(^|[[:space:]])[A-Za-z0-9_./@-]*/\.\.\.#\1WILD#g')
+        # Phase 5.0 strips ONE leading and ONE trailing backtick before `bash -c`.
+        # Mirror that strip, count what is left: an odd count means a stray
+        # backtick survives into the command (`cmd` trailing prose → cmd` trailing
+        # prose → bash exits 2 "unexpected EOF") and Phase 5.0 reports a false MISSING.
+        _stripped=$(printf '%s' "$MC_LOC" | sed -E 's/^[[:space:]]*`?//; s/`?[[:space:]]*$//')
+        _bt_ct=$(printf '%s' "$_stripped" | tr -cd '`' | wc -c | tr -d ' ')
         if printf '%s' "$MC_LOC" | grep -qiE '^(phase|step|row)[[:space:]]+[0-9]'; then
             _bad="a phase/step pointer, not a command"
         elif printf '%s' "$_probe" | grep -q '…' || printf '%s' "$_probe" | grep -qF '...'; then
@@ -480,6 +488,8 @@ while IFS= read -r row; do
             _bad="prose referring to another row, not a command"
         elif printf '%s' "$MC_LOC" | grep -qE '(^|[[:space:]])/path/to[/[:space:]]'; then
             _bad="a /path/to placeholder — bind the real path with \$(git rev-parse --show-toplevel) or a \$VAR that has a stated default"
+        elif [ "$(( _bt_ct % 2 ))" -ne 0 ]; then
+            _bad="unbalanced backtick after Phase 5.0 strip — prose after the closing backtick causes bash -c to exit 2 (unexpected EOF); move description outside the backticks or into a shell comment inside them: \`cmd # description\`"
         fi
         if [ -n "$_bad" ]; then
             viol "[V] CLI-executable row (row ${MC_NUM:-?}) has a non-runnable location cell: \"${MC_LOC}\" — ${_bad}. It must be a single shell command. Not accepted: 'Phase N' pointers, '...' ellipsis, '<placeholder>' tokens, bare file paths, bare SQL. Valid examples: bin/check-docs / grep -c 'FunctionName' ibl5/classes/Foo.php / python3 -c \"import sys; sys.exit(0)\""
@@ -901,7 +911,7 @@ while IFS= read -r row; do
     case "$cell" in *'(one-shot)'*|*'(wired in this PR)'*) continue ;; esac
     for n in $(printf '%s' "$cell" | grep -oE 'bin/(test|check)-[A-Za-z0-9_.-]+'); do
         grep -rqF "$n" "$GH_WF" 2>/dev/null && continue
-        viol "[G] matrix row names $n but no .github/workflows/*.yml runs it — wire it (and list that workflow in ## Critical Files), or annotate the cell (one-shot) or (wired in this PR)"
+        viol "[G] matrix row names $n but no .github/workflows/*.yml runs it — wire it (and list that workflow in ## Critical Files), or annotate it as a shell comment inside the backticks: \`cmd # (one-shot)\` or \`cmd # (wired in this PR)\` (a note after the closing backtick fails gate [V])"
     done
 done < "$MATRIX_FILE"
 
@@ -1454,7 +1464,7 @@ fi
 # Scope: location cell ($MC_LOC) only — full-row scan has >20% FP rate.
 # Implementation: uses matrix_split() to handle escaped-pipe rows correctly.
 # Excludes: tilde-prefixed approximations (~line N), ranges (line N-M /
-# lines N-M), and rows already annotated (one-shot) or (wired in this PR).
+# lines N-M), and rows already annotated "# (one-shot)" or "# (wired in this PR)".
 while IFS= read -r row; do
     if ! matrix_split "$row"; then continue; fi
     case "$MC_LOC" in *'(one-shot)'*|*'(wired in this PR)'*) continue ;; esac

@@ -1,0 +1,422 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/test-launchd-health-cron-setup — test harness for bin/launchd-health-cron-setup.
+# 14 cases.
+#
+# No set -e (constraint a). Cleanup via trap EXIT (constraint g).
+# Does NOT require launchctl, does NOT write to ~/Library/LaunchAgents.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SETUP_BIN="$SCRIPT_DIR/launchd-health-cron-setup"
+
+PASSED=0
+FAILED=0
+
+lht_ok()   { echo "ok: $1";   PASSED=$(( PASSED + 1 )); }
+lht_fail() { echo "FAIL: $1"; FAILED=$(( FAILED + 1 )); }
+lht_expect_eq() {
+    if [ "$2" = "$3" ]; then lht_ok "$1"
+    else lht_fail "$1 — want [$2] got [$3]"
+    fi
+}
+
+STUB="$(mktemp -d)"
+_cleanup() { rm -rf "$STUB"; }
+trap '_cleanup' EXIT
+
+# Create launchctl stub that logs args and exits 0.
+mkdir -p "$STUB/sbin"
+export STUB
+cat > "$STUB/sbin/launchctl" <<'LAUNCHCTL_SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$STUB/launchctl.log"
+exit 0
+LAUNCHCTL_SH
+chmod +x "$STUB/sbin/launchctl"
+
+# Set fake HOME before any invocation so no side effects hit the real home dir.
+export HOME="$STUB/home"
+
+# Helper: extract first <string> inside ProgramArguments array from plist on stdin
+_first_prog_str() {
+    local _in_pa=0 _in_arr=0
+    while IFS= read -r _ln; do
+        _stripped="$(printf '%s' "$_ln" | sed 's/^[[:space:]]*//')"
+        if [ "$_in_pa" -eq 1 ] && [ "$_stripped" = "<array>" ]; then
+            _in_arr=1; _in_pa=0; continue
+        fi
+        if [ "$_stripped" = "<key>ProgramArguments</key>" ]; then
+            _in_pa=1; continue
+        fi
+        if [ "$_in_arr" -eq 1 ]; then
+            case "$_stripped" in
+                "</array>") return ;;
+                "<string>"*"</string>")
+                    printf '%s\n' "$_stripped" | sed -e 's#.*<string>##' -e 's#</string>.*##'
+                    return
+                    ;;
+            esac
+        fi
+    done
+}
+
+# Helper: extract PATH value from EnvironmentVariables on stdin
+_get_path_value() {
+    local _in_env=0 _in_path_key=0
+    while IFS= read -r _ln; do
+        _stripped="$(printf '%s' "$_ln" | sed 's/^[[:space:]]*//')"
+        if [ "$_stripped" = "<key>EnvironmentVariables</key>" ]; then _in_env=1; continue; fi
+        if [ "$_in_env" -eq 1 ] && [ "$_stripped" = "<key>PATH</key>" ]; then _in_path_key=1; continue; fi
+        if [ "$_in_path_key" -eq 1 ]; then
+            printf '%s\n' "$_stripped" | sed -e 's#.*<string>##' -e 's#</string>.*##'
+            return
+        fi
+    done
+}
+
+# Helper: extract StandardOutPath value from plist on stdin
+_get_stdout_path() {
+    local _in_out=0
+    while IFS= read -r _ln; do
+        _stripped="$(printf '%s' "$_ln" | sed 's/^[[:space:]]*//')"
+        if [ "$_stripped" = "<key>StandardOutPath</key>" ]; then _in_out=1; continue; fi
+        if [ "$_in_out" -eq 1 ]; then
+            printf '%s\n' "$_stripped" | sed -e 's#.*<string>##' -e 's#</string>.*##'
+            return
+        fi
+    done
+}
+
+# Capture initial print outputs (side-effect-free).
+LOGIN_OUT="$(PATH="$STUB/sbin:$PATH" "$SETUP_BIN" --print-schedule login 2>/dev/null)"
+LOGIN_RC=$?
+DAILY_OUT="$(PATH="$STUB/sbin:$PATH" "$SETUP_BIN" --print-schedule daily 2>/dev/null)"
+DAILY_RC=$?
+
+# ── Case 1: --print-schedule login rc=0; first line <?xml, last line </plist> ──
+lht_expect_eq "1: --print-schedule login rc=0" "0" "$LOGIN_RC"
+_first_line="$(printf '%s\n' "$LOGIN_OUT" | head -n 1)"
+_last_line="$(printf '%s\n' "$LOGIN_OUT" | tail -n 1)"
+case "$_first_line" in
+    '<?xml'*) lht_ok "1: first line starts with <?xml" ;;
+    *) lht_fail "1: first line should start with <?xml — got [$_first_line]" ;;
+esac
+lht_expect_eq "1: last line is </plist>" "</plist>" "$_last_line"
+
+# ── Case 2: login-specific content ────────────────────────────────────────────
+if printf '%s\n' "$LOGIN_OUT" | grep -qF '<string>com.ibl5.launchd-health-login</string>'; then
+    lht_ok "2: login contains label <string>com.ibl5.launchd-health-login</string>"
+else
+    lht_fail "2: login should contain <string>com.ibl5.launchd-health-login</string>"
+fi
+if printf '%s\n' "$LOGIN_OUT" | grep -qF '<key>RunAtLoad</key>'; then
+    lht_ok "2: login contains <key>RunAtLoad</key>"
+else
+    lht_fail "2: login should contain <key>RunAtLoad</key>"
+fi
+# --startup-delay immediately followed by 180 (adjacent-line logic)
+_delay_ok=0
+_prev=""
+while IFS= read -r _line; do
+    _ls="$(printf '%s' "$_line" | sed 's/^[[:space:]]*//')"
+    if [ "$_prev" = "<string>--startup-delay</string>" ] && [ "$_ls" = "<string>180</string>" ]; then
+        _delay_ok=1
+    fi
+    _prev="$_ls"
+done <<EOF
+$(printf '%s\n' "$LOGIN_OUT")
+EOF
+if [ "$_delay_ok" -eq 1 ]; then
+    lht_ok "2: <string>--startup-delay</string> immediately followed by <string>180</string>"
+else
+    lht_fail "2: <string>--startup-delay</string> not immediately followed by <string>180</string>"
+fi
+if printf '%s\n' "$LOGIN_OUT" | grep -qF 'StartCalendarInterval'; then
+    lht_fail "2: login should NOT contain StartCalendarInterval"
+else
+    lht_ok "2: login does not contain StartCalendarInterval"
+fi
+
+# ── Case 3: --print-schedule daily rc=0 and daily-specific content ────────────
+lht_expect_eq "3: --print-schedule daily rc=0" "0" "$DAILY_RC"
+if printf '%s\n' "$DAILY_OUT" | grep -qF 'com.ibl5.launchd-health-daily'; then
+    lht_ok "3: daily contains label com.ibl5.launchd-health-daily"
+else
+    lht_fail "3: daily should contain com.ibl5.launchd-health-daily"
+fi
+if printf '%s\n' "$DAILY_OUT" | grep -qF 'StartCalendarInterval'; then
+    lht_ok "3: daily contains StartCalendarInterval"
+else
+    lht_fail "3: daily should contain StartCalendarInterval"
+fi
+if printf '%s\n' "$DAILY_OUT" | grep -qF '<integer>8</integer>'; then
+    lht_ok "3: daily contains <integer>8</integer>"
+else
+    lht_fail "3: daily should contain <integer>8</integer>"
+fi
+if printf '%s\n' "$DAILY_OUT" | grep -qF '<integer>45</integer>'; then
+    lht_ok "3: daily contains <integer>45</integer>"
+else
+    lht_fail "3: daily should contain <integer>45</integer>"
+fi
+if printf '%s\n' "$DAILY_OUT" | grep -qF 'RunAtLoad'; then
+    lht_fail "3: daily should NOT contain RunAtLoad"
+else
+    lht_ok "3: daily does not contain RunAtLoad"
+fi
+if printf '%s\n' "$DAILY_OUT" | grep -qF -- '--startup-delay'; then
+    lht_fail "3: daily should NOT contain --startup-delay"
+else
+    lht_ok "3: daily does not contain --startup-delay"
+fi
+
+# ── Case 4: first ProgramArguments string — no worktrees in either variant ────
+_login_prog="$(printf '%s\n' "$LOGIN_OUT" | _first_prog_str)"
+_daily_prog="$(printf '%s\n' "$DAILY_OUT" | _first_prog_str)"
+for _vl_prog in "login:$_login_prog" "daily:$_daily_prog"; do
+    _vl="${_vl_prog%%:*}"
+    _prog="${_vl_prog#*:}"
+    case "$_prog" in
+        */bin/launchd-health-check) lht_ok "4: $_vl first ProgramArguments ends with /bin/launchd-health-check" ;;
+        *) lht_fail "4: $_vl first ProgramArguments should end with /bin/launchd-health-check — got [$_prog]" ;;
+    esac
+    case "$_prog" in
+        *worktrees*) lht_fail "4: $_vl first ProgramArguments must not contain worktrees — got [$_prog]" ;;
+        *) lht_ok "4: $_vl first ProgramArguments does not contain worktrees" ;;
+    esac
+done
+
+# ── Case 5: PATH value — required dirs present, no literal \$HOME ─────────────
+_login_path="$(printf '%s\n' "$LOGIN_OUT" | _get_path_value)"
+_daily_path="$(printf '%s\n' "$DAILY_OUT" | _get_path_value)"
+for _vl_path in "login:$_login_path" "daily:$_daily_path"; do
+    _vl="${_vl_path%%:*}"
+    _pval="${_vl_path#*:}"
+    case "$_pval" in
+        */opt/homebrew/bin*) lht_ok "5: $_vl PATH contains /opt/homebrew/bin" ;;
+        *) lht_fail "5: $_vl PATH should contain /opt/homebrew/bin — got [$_pval]" ;;
+    esac
+    case "$_pval" in
+        */opt/homebrew/opt/mariadb/bin*) lht_ok "5: $_vl PATH contains /opt/homebrew/opt/mariadb/bin" ;;
+        *) lht_fail "5: $_vl PATH should contain /opt/homebrew/opt/mariadb/bin — got [$_pval]" ;;
+    esac
+    case "$_pval" in
+        *'$HOME'*) lht_fail "5: $_vl PATH must not contain literal \$HOME — got [$_pval]" ;;
+        *) lht_ok "5: $_vl PATH does not contain literal \$HOME" ;;
+    esac
+done
+
+# ── Case 6: StandardOutPath contains /launchd-health/logs/ ───────────────────
+_login_stdout="$(printf '%s\n' "$LOGIN_OUT" | _get_stdout_path)"
+_daily_stdout="$(printf '%s\n' "$DAILY_OUT" | _get_stdout_path)"
+for _vl_stdout in "login:$_login_stdout" "daily:$_daily_stdout"; do
+    _vl="${_vl_stdout%%:*}"
+    _sval="${_vl_stdout#*:}"
+    case "$_sval" in
+        */launchd-health/logs/*) lht_ok "6: $_vl StandardOutPath contains /launchd-health/logs/" ;;
+        *) lht_fail "6: $_vl StandardOutPath should contain /launchd-health/logs/ — got [$_sval]" ;;
+    esac
+done
+
+# ── Case 7: determinism — two daily runs are byte-identical ───────────────────
+_daily_run1="$(PATH="$STUB/sbin:$PATH" "$SETUP_BIN" --print-schedule daily 2>/dev/null)"
+_daily_run2="$(PATH="$STUB/sbin:$PATH" "$SETUP_BIN" --print-schedule daily 2>/dev/null)"
+if diff <(printf '%s\n' "$_daily_run1") <(printf '%s\n' "$_daily_run2") >/dev/null 2>&1; then
+    lht_ok "7: two --print-schedule daily runs are byte-identical"
+else
+    lht_fail "7: two --print-schedule daily runs differ"
+fi
+
+# ── Case 8: no side effects from print runs ───────────────────────────────────
+if [ ! -d "$HOME/Library/LaunchAgents" ]; then
+    lht_ok "8: $HOME/Library/LaunchAgents does not exist after print runs"
+else
+    lht_fail "8: $HOME/Library/LaunchAgents should not exist after print runs"
+fi
+if [ ! -f "$STUB/launchctl.log" ]; then
+    lht_ok "8: launchctl.log does not exist after print runs"
+else
+    lht_fail "8: launchctl.log should not exist after print runs"
+fi
+
+# ── Case 9: plutil -lint validation (skip if not available) ───────────────────
+if command -v plutil >/dev/null 2>&1; then
+    _login_plutil_rc=0
+    _daily_plutil_rc=0
+    printf '%s\n' "$LOGIN_OUT" | plutil -lint - >/dev/null 2>&1 || _login_plutil_rc=$?
+    printf '%s\n' "$DAILY_OUT" | plutil -lint - >/dev/null 2>&1 || _daily_plutil_rc=$?
+    if [ "$_login_plutil_rc" -eq 0 ] && [ "$_daily_plutil_rc" -eq 0 ]; then
+        lht_ok "9: plutil -lint passes for both variants"
+    else
+        lht_fail "9: plutil -lint failed — login rc=$_login_plutil_rc, daily rc=$_daily_plutil_rc"
+    fi
+else
+    lht_ok "9: plutil not available (skip)"
+fi
+
+# ── Case 10: --print-schedule validation errors ───────────────────────────────
+PATH="$STUB/sbin:$PATH" "$SETUP_BIN" --print-schedule \
+    >"$STUB/ps-noarg-out.txt" 2>"$STUB/ps-noarg-err.txt"
+_ps_noarg_rc=$?
+if [ "$_ps_noarg_rc" -eq 1 ]; then
+    lht_ok "10: --print-schedule (no arg) exits 1"
+else
+    lht_fail "10: --print-schedule (no arg) should exit 1 — got $_ps_noarg_rc"
+fi
+
+PATH="$STUB/sbin:$PATH" "$SETUP_BIN" --print-schedule weekly \
+    >"$STUB/ps-weekly-out.txt" 2>"$STUB/ps-weekly-err.txt"
+_ps_weekly_rc=$?
+if [ "$_ps_weekly_rc" -eq 1 ]; then
+    lht_ok "10: --print-schedule weekly exits 1"
+else
+    lht_fail "10: --print-schedule weekly should exit 1 — got $_ps_weekly_rc"
+fi
+if grep -qE "login|daily" "$STUB/ps-weekly-err.txt"; then
+    lht_ok "10: --print-schedule weekly stderr mentions login or daily"
+else
+    lht_fail "10: --print-schedule weekly stderr should mention login or daily — got [$(cat "$STUB/ps-weekly-err.txt")]"
+fi
+
+# ── Case 11: Refusal 1 — bad CHECK_BIN exits 1, no launchctl call ─────────────
+rm -f "$STUB/launchctl.log"
+LAUNCHD_HEALTH_CHECK_BIN=/nonexistent/launchd-health-check \
+    PATH="$STUB/sbin:$PATH" \
+    "$SETUP_BIN" --install-schedule \
+    >"$STUB/ref1-out.txt" 2>"$STUB/ref1-err.txt"
+_ref1_rc=$?
+if [ "$_ref1_rc" -eq 1 ]; then
+    lht_ok "11: Refusal 1 exits 1"
+else
+    lht_fail "11: Refusal 1 should exit 1 — got $_ref1_rc"
+fi
+if grep -q "not found" "$STUB/ref1-err.txt"; then
+    lht_ok "11: Refusal 1 stderr contains 'not found'"
+else
+    lht_fail "11: Refusal 1 stderr should contain 'not found' — got [$(cat "$STUB/ref1-err.txt")]"
+fi
+if [ ! -f "$STUB/launchctl.log" ]; then
+    lht_ok "11: launchctl not called on Refusal 1"
+else
+    lht_fail "11: launchctl should not be called on Refusal 1"
+fi
+
+# ── Case 12: install path — branches on worktree vs main checkout / CI ────────
+mkdir -p "$STUB/fake-bin"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB/fake-bin/fake-check"
+chmod +x "$STUB/fake-bin/fake-check"
+rm -f "$STUB/launchctl.log"
+rm -rf "$HOME/Library/LaunchAgents"
+
+# Mirror the installer's REPO_ROOT/MAIN_WT derivation exactly.
+_chk_repo="$(cd "$SCRIPT_DIR/.." && pwd)"
+_chk_main_wt="$(git -C "$_chk_repo" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+[ -n "$_chk_main_wt" ] || _chk_main_wt="$_chk_repo"
+
+if [ "$_chk_repo" != "$_chk_main_wt" ]; then
+    # Running from a worktree: installer hits Refusal 2.
+    LAUNCHD_HEALTH_CHECK_BIN="$STUB/fake-bin/fake-check" \
+        PATH="$STUB/sbin:$PATH" \
+        "$SETUP_BIN" --install-schedule \
+        >"$STUB/inst-out.txt" 2>"$STUB/inst-err.txt"
+    _inst_rc=$?
+    if [ "$_inst_rc" -eq 1 ]; then
+        lht_ok "12: worktree install exits 1 (Refusal 2)"
+    else
+        lht_fail "12: worktree install should exit 1 — got $_inst_rc"
+    fi
+    if grep -q "main checkout" "$STUB/inst-err.txt"; then
+        lht_ok "12: Refusal 2 stderr mentions 'main checkout'"
+    else
+        lht_fail "12: Refusal 2 stderr should mention 'main checkout' — got [$(cat "$STUB/inst-err.txt")]"
+    fi
+    _plist_found=0
+    for _pv in login daily; do
+        [ -f "$HOME/Library/LaunchAgents/com.ibl5.launchd-health-${_pv}.plist" ] \
+            && _plist_found=$(( _plist_found + 1 )) || true
+    done
+    if [ "$_plist_found" -eq 0 ]; then
+        lht_ok "12: no plists written on Refusal 2"
+    else
+        lht_fail "12: plists should not be written on Refusal 2 — found $_plist_found"
+    fi
+else
+    # Running from main checkout or CI plain clone: install succeeds.
+    LAUNCHD_HEALTH_CHECK_BIN="$STUB/fake-bin/fake-check" \
+        PATH="$STUB/sbin:$PATH" \
+        "$SETUP_BIN" --install-schedule \
+        >"$STUB/inst-out.txt" 2>"$STUB/inst-err.txt"
+    _inst_rc=$?
+    if [ "$_inst_rc" -eq 0 ]; then
+        lht_ok "12: main-checkout install exits 0"
+    else
+        lht_fail "12: main-checkout install should exit 0 — got $_inst_rc ($(cat "$STUB/inst-err.txt"))"
+    fi
+    _plist_found=0
+    for _pv in login daily; do
+        [ -f "$HOME/Library/LaunchAgents/com.ibl5.launchd-health-${_pv}.plist" ] \
+            && _plist_found=$(( _plist_found + 1 )) || true
+    done
+    if [ "$_plist_found" -eq 2 ]; then
+        lht_ok "12: both plists written on main-checkout install"
+    else
+        lht_fail "12: should have written 2 plists on main-checkout install — found $_plist_found"
+    fi
+    if grep -q "bootstrap" "$STUB/launchctl.log" 2>/dev/null; then
+        lht_ok "12: launchctl bootstrap was called"
+    else
+        lht_fail "12: launchctl should have been called with bootstrap"
+    fi
+fi
+
+# ── Case 13: --uninstall-schedule is idempotent ───────────────────────────────
+PATH="$STUB/sbin:$PATH" "$SETUP_BIN" --uninstall-schedule \
+    >"$STUB/uninst-out1.txt" 2>&1
+_uninst_rc1=$?
+PATH="$STUB/sbin:$PATH" "$SETUP_BIN" --uninstall-schedule \
+    >"$STUB/uninst-out2.txt" 2>&1
+_uninst_rc2=$?
+if [ "$_uninst_rc1" -eq 0 ] && [ "$_uninst_rc2" -eq 0 ]; then
+    lht_ok "13: --uninstall-schedule rc=0 on both runs (idempotent)"
+else
+    lht_fail "13: --uninstall-schedule should be rc=0 — got $_uninst_rc1 and $_uninst_rc2"
+fi
+_plist_remaining=0
+for _pv in login daily; do
+    [ -f "$HOME/Library/LaunchAgents/com.ibl5.launchd-health-${_pv}.plist" ] \
+        && _plist_remaining=$(( _plist_remaining + 1 )) || true
+done
+if [ "$_plist_remaining" -eq 0 ]; then
+    lht_ok "13: no plists remain after --uninstall-schedule"
+else
+    lht_fail "13: plists should be removed — found $_plist_remaining"
+fi
+
+# ── Case 14: unknown option exits 1; --help exits 0 and mentions --print-schedule
+PATH="$STUB/sbin:$PATH" "$SETUP_BIN" --bogus \
+    >"$STUB/bogus-out.txt" 2>&1
+_bogus_rc=$?
+if [ "$_bogus_rc" -eq 1 ]; then
+    lht_ok "14: --bogus exits 1"
+else
+    lht_fail "14: --bogus should exit 1 — got $_bogus_rc"
+fi
+
+_help_out="$(PATH="$STUB/sbin:$PATH" "$SETUP_BIN" --help 2>/dev/null)"
+_help_rc=$?
+if [ "$_help_rc" -eq 0 ]; then
+    lht_ok "14: --help exits 0"
+else
+    lht_fail "14: --help should exit 0 — got $_help_rc"
+fi
+if printf '%s\n' "$_help_out" | grep -q -- '--print-schedule'; then
+    lht_ok "14: --help mentions --print-schedule"
+else
+    lht_fail "14: --help should mention --print-schedule"
+fi
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+echo "Results: $PASSED passed, $FAILED failed"
+[ "$FAILED" -eq 0 ]

@@ -421,8 +421,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
 
         # ---- Phase 4: review + security (gated bounded calls) ---------
-        # Runs in the background under Phase 5 → 5.0 → 6 → the Phase 5.5 review call; none
-        # of those read Phase 4's output. Only the LLM calls and the PR posts run on the
+        # Runs in the background through Phase 5 → 5.0 → 6; joined before Phase 5.5
+        # builds its fidelity packet so phase4b_ran is truthful. Only the LLM calls and
+        # the PR posts run on the
         # worker: log(), state.checkpoint() and the pr-copy degradation merge stay on
         # this thread, in _join_review, so audit.log and the state file keep their serial
         # order. The join happens before anything moves the head (fidelity remediation),

@@ -47,7 +47,7 @@ def _overlap_run(tmp_path, pr, scripts):
     return res, out, llm
 
 
-def test_fidelity_review_overlaps_code_review(tmp_path, sticky_tmp):
+def test_phase4_completes_before_fidelity_packet(tmp_path, sticky_tmp):
     """Phase 4 completes before fidelity builds its packet (early join, not inline Phase 4)."""
     pr = sticky_tmp(7301)
     res, out, llm = _overlap_run(tmp_path, pr,

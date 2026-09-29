@@ -116,7 +116,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
 <table class="sortable ibl-data-table responsive-table">
     <thead>
         <tr>
-            <th class="sticky-col-1">Rank</th>
+            <th class="sticky-col-1">#</th>
             <th>Year</th>
             <th class="sticky-col-2">Name</th>
             <th>Team</th>

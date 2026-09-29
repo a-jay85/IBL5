@@ -27,7 +27,7 @@ final class SeasonLeaderboardsViewTest extends TestCase
         $html = $this->view->renderTableHeader();
 
         // Check for essential column headers (modern <th> tags)
-        $this->assertStringContainsString('>Rank<', $html);
+        $this->assertStringContainsString('>#<', $html);
         $this->assertStringContainsString('>Year<', $html);
         $this->assertStringContainsString('>Name<', $html);
         $this->assertStringContainsString('>Team<', $html);

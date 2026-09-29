@@ -1,4 +1,7 @@
 /* FA-admin block (block.php) styles */
+/* Standalone <link> — block.php does not load the main bundle (or tokens.css), so this file is
+   NOT imported via design/input.css. Bare selectors (table, td, th) are intentional
+   and scoped to this admin-only page. Every var() needs a literal fallback. */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -36,7 +39,7 @@
 .btn-cancel {
     background: white;
     color: black;
-    border: 1px solid var(--gray-300);
+    border: 1px solid var(--gray-300, #d1d5db);
     padding: 10px 20px;
     margin: 0 10px;
     border-radius: 5px;
@@ -73,7 +76,7 @@ table {
     margin: 10px 0;
 }
 td, th {
-    border: 1px solid var(--black);
+    border: 1px solid var(--black, #000000);
     padding: 5px;
 }
 .message-success {
@@ -94,7 +97,7 @@ td, th {
     color: red;
 }
 .block-fa-discord-header {
-    color: var(--discord);
+    color: var(--discord, #5865f2);
 }
 .block-fa-discord-textarea {
     font-size: 24px;

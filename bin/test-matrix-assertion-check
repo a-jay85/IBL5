@@ -645,15 +645,16 @@ glob-prefix-mutation)
     ;;
 
 skip-equals-class4)
+    # `name=value` is cut to `name`; the name realised in the diff clears the row.
     plan_fixture '| 1 | scenario: `current_tree=T2` | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
         > "$root/plan.md"
-    out=$(printf '+some unrelated added line\n' \
+    out=$(printf '+    run(current_tree="$T2")\n' \
         | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
     rc=$?
-    # A second, genuinely unrealised token on the same row still flags.
-    plan_fixture '| 2 | scenario: `current_tree=T2` and `FIXTURE_ABSENT_SYMBOL` | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+    # Mutation: a name found nowhere still flags.
+    plan_fixture '| 2 | scenario: `fixture_absent_name=T2` | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
         > "$root/plan2.md"
-    out2=$(printf '+some unrelated added line\n' \
+    out2=$(printf '+    run(current_tree="$T2")\n' \
         | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan2.md" - 2>/dev/null)
     if [ "$rc" -eq 0 ] && [ -z "$out" ] && printf '%s\n' "$out2" | grep -qF 'UNREALISED-ASSERTION: row 2'; then
         ok "skip-equals-class4"
@@ -663,15 +664,21 @@ skip-equals-class4)
     ;;
 
 skip-equals-class5)
+    # `VAR=1` is cut to `VAR`; a monkeypatch of the same name realises it.
     plan_fixture '| 1 | env var: `REVIEW_OWED_TIMEOUT=1` | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
         > "$root/plan.md"
-    out=$(printf '+some unrelated added line\n' \
+    out=$(printf '+    monkeypatch.setattr(fidelity, "REVIEW_OWED_TIMEOUT", 1)\n' \
         | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
     rc=$?
-    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+    # Mutation: an env name found nowhere still flags.
+    plan_fixture '| 2 | env var: `FIXTURE_ABSENT_TIMEOUT=1` | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan2.md"
+    out2=$(printf '+    monkeypatch.setattr(fidelity, "REVIEW_OWED_TIMEOUT", 1)\n' \
+        | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan2.md" - 2>/dev/null)
+    if [ "$rc" -eq 0 ] && [ -z "$out" ] && printf '%s\n' "$out2" | grep -qF 'UNREALISED-ASSERTION: row 2'; then
         ok "skip-equals-class5"
     else
-        fail "skip-equals-class5 (rc=$rc, out=$out)"
+        fail "skip-equals-class5 (rc=$rc, out=$out, out2=$out2)"
     fi
     ;;
 

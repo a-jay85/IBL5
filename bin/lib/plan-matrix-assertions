@@ -25,9 +25,10 @@
 #   4. otherwise                                               -> missing
 #   A row is flagged UNREALISED-ASSERTION when any qualifying token is missing.
 #   Qualifying tokens: single-word (no whitespace), no `...` or `<word>` spans,
-#   no `=` (scenario notation such as `current_tree=T2` or `VAR=1` is never
-#   extracted), not already in a tracked file (arm 3 above — tokens found in the
-#   tree are pre-existing). A row with zero qualifying tokens is skipped entirely.
+#   not already in a tracked file (arm 3 above — tokens found in the tree are
+#   pre-existing). A row with zero qualifying tokens is skipped entirely.
+#   Scenario notation `name=value` (`current_tree=T2`, `VAR=1`) is cut at the
+#   first `=` and only `name` is checked; a token starting with `=` is dropped.
 #
 #   Prefix fallbacks (same three arms, run on a prefix of the token):
 #   - glob token `name_*`     -> prefix is the text before the first `*`;
@@ -136,8 +137,9 @@ inm && /^[[:space:]]*\|/ {
         if (t == "") continue;
         # single-word: no whitespace
         if (t ~ /[[:space:]]/) continue;
-        # scenario notation (var=value) is never extracted
-        if (t ~ /=/) continue;
+        # scenario notation (name=value): check only the name
+        sub(/=.*/, "", t);
+        if (t == "") continue;
         toks = (toks == "") ? t : toks " " t;
     }
     if (toks != "") print id "\t" cell "\t" toks;

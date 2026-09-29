@@ -243,17 +243,26 @@ def test_glob_prefix_realised(tmp_path, monkeypatch):
     assert _unrealised(items) == []
 
 
-def test_equals_class4_row_skipped(tmp_path, monkeypatch):
-    """`current_tree=T2` alone is scenario notation: the row is skipped, not flagged."""
+def test_equals_class4_name_realised(tmp_path, monkeypatch):
+    """`current_tree=T2` is cut to `current_tree`; the name in the diff realises it."""
     monkeypatch.setenv("MATRIX_ASSERT_ROOT", _make_git_root(tmp_path))
     plan = _plan_with_row(tmp_path, "scenario: `current_tree=T2`")
-    items = _matrix_assertion_items(plan, "+unrelated\n", "")
+    items = _matrix_assertion_items(plan, '+    run(current_tree="$T2")\n', "")
     assert _unrealised(items) == []
 
 
-def test_equals_class5_row_skipped(tmp_path, monkeypatch):
-    """`REVIEW_OWED_TIMEOUT=1` alone is env notation: the row is skipped, not flagged."""
+def test_equals_class5_name_realised(tmp_path, monkeypatch):
+    """`REVIEW_OWED_TIMEOUT=1` is realised by a monkeypatch of the same name."""
     monkeypatch.setenv("MATRIX_ASSERT_ROOT", _make_git_root(tmp_path))
     plan = _plan_with_row(tmp_path, "env var: `REVIEW_OWED_TIMEOUT=1`")
-    items = _matrix_assertion_items(plan, "+unrelated\n", "")
+    diff = '+    monkeypatch.setattr(fidelity, "REVIEW_OWED_TIMEOUT", 1)\n'
+    items = _matrix_assertion_items(plan, diff, "")
     assert _unrealised(items) == []
+
+
+def test_equals_name_absent_still_flags(tmp_path, monkeypatch):
+    """An `name=value` token whose name appears nowhere is still flagged."""
+    monkeypatch.setenv("MATRIX_ASSERT_ROOT", _make_git_root(tmp_path))
+    plan = _plan_with_row(tmp_path, "env var: `FIXTURE_ABSENT_TIMEOUT=1`")
+    items = _matrix_assertion_items(plan, "+unrelated\n", "")
+    assert len(_unrealised(items)) == 1

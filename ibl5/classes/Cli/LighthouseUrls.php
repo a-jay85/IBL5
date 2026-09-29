@@ -19,6 +19,7 @@ final class LighthouseUrls
         'Injuries'            => '&teamid=1',
         'OneOnOneGame'        => '&gameid=1',
         'GameBoxscore'        => '&date=2026-02-20&game=1',
+        'Leaderboards'        => '&tab=season&submitted=1',
     ];
 
     /**
@@ -43,7 +44,7 @@ final class LighthouseUrls
         '/ibl5/modules.php?name=Standings',
         '/ibl5/modules.php?name=Team&op=team&teamid=1',
         '/ibl5/modules.php?name=Player&pa=showpage&pid=1',
-        '/ibl5/modules.php?name=Leaderboards',
+        '/ibl5/modules.php?name=Leaderboards&tab=season&submitted=1',
     ];
 
     /**

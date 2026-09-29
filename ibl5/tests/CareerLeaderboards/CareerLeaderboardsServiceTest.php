@@ -263,14 +263,24 @@ final class CareerLeaderboardsServiceTest extends TestCase
         $this->assertSame('PPG', $this->service->getSortOptions('averages')['PPG']);
     }
 
-    public function testIsSortAvailableGatesPercentagesOnTotals(): void
+    public function testIsSortAvailableAllowsPercentagesOnTotalsAndAverages(): void
     {
         foreach (['FGP', 'FTP', 'TGP'] as $key) {
-            $this->assertFalse($this->service->isSortAvailable($key, 'totals'));
+            $this->assertTrue($this->service->isSortAvailable($key, 'totals'));
             $this->assertTrue($this->service->isSortAvailable($key, 'averages'));
         }
         $this->assertTrue($this->service->isSortAvailable('PPG', 'totals'));
         $this->assertFalse($this->service->isSortAvailable('QA', 'averages'));
+        $this->assertFalse($this->service->isSortAvailable('QA', 'totals'));
+    }
+
+    public function testResolveSortKeyKeepsPercentagesOnTotalsAndFallsBackOnlyForUnknown(): void
+    {
+        foreach (['FGP', 'FTP', 'TGP'] as $key) {
+            $this->assertSame($key, $this->service->resolveSortKey($key, 'totals'));
+            $this->assertSame($key, $this->service->resolveSortKey($key, 'averages'));
+        }
+        $this->assertSame('PPG', $this->service->resolveSortKey('bogus', 'totals'));
     }
 
     /**
@@ -299,8 +309,8 @@ final class CareerLeaderboardsServiceTest extends TestCase
             'TGP averages' => ['TGP', 'averages', 'tpct'],
             'GAMES' => ['GAMES', 'totals', 'games'],
             'MIN' => ['MIN', 'totals', 'minutes'],
-            'FGP totals falls back to PPG' => ['FGP', 'totals', 'pts'],
-            'TGP totals falls back to PPG' => ['TGP', 'totals', 'pts'],
+            'FGP totals uses derived fgpct' => ['FGP', 'totals', 'fgpct'],
+            'TGP totals uses derived tpct' => ['TGP', 'totals', 'tpct'],
             'unknown falls back to PPG' => ['bogus', 'averages', 'pts'],
             'QA is not a career sort' => ['QA', 'averages', 'pts'],
         ];

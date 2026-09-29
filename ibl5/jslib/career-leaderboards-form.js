@@ -5,7 +5,6 @@
  * the controls consistent while the user edits them:
  *  - phases without an averages table (rookie, sophomore) disable Averages
  *  - the PPG option reads "PTS" on Totals and "PPG" on Averages
- *  - FG% / FT% / TG% only exist on averages tables, so they are disabled on Totals
  */
 (function () {
     'use strict';
@@ -19,8 +18,6 @@
     var averages = form.querySelector('input[name="mode"][value="averages"]');
     if (!phase || !sortby || !totals || !averages) return;
 
-    var PERCENT_KEYS = ['FGP', 'FTP', 'TGP'];
-
     function syncSortOptions() {
         var isTotals = !averages.checked;
 
@@ -30,14 +27,6 @@
             if (option.value === 'PPG') {
                 option.textContent = isTotals ? 'PTS' : 'PPG';
             }
-            if (PERCENT_KEYS.indexOf(option.value) !== -1) {
-                option.disabled = isTotals;
-            }
-        }
-
-        var selected = sortby.options[sortby.selectedIndex];
-        if (selected && selected.disabled) {
-            sortby.value = 'PPG';
         }
     }
 

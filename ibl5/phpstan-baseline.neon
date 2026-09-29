@@ -1895,18 +1895,6 @@ parameters:
 			path: modules/Injuries/index.php
 
 		-
-			rawMessage: Cannot cast mixed to int.
-			identifier: cast.int
-			count: 1
-			path: modules/Leaderboards/index.php
-
-		-
-			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
-			identifier: empty.notAllowed
-			count: 1
-			path: modules/Leaderboards/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class Cache\DatabaseCache constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 2
@@ -1925,25 +1913,7 @@ parameters:
 			path: modules/Leaderboards/index.php
 
 		-
-			rawMessage: 'Parameter #1 $filters of method SeasonLeaderboards\SeasonLeaderboardsService::getFilteredLeaderboard() expects array{year?: string, team?: int|string, sortby?: string, limit?: int|string}, array{year: mixed, team: int, sortby: mixed, limit: mixed} given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Leaderboards/index.php
-
-		-
-			rawMessage: 'Parameter #1 $sortBy of method SeasonLeaderboards\SeasonLeaderboardsView::setSortBy() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Leaderboards/index.php
-
-		-
 			rawMessage: 'Parameter #2 $leagueContext of class SeasonLeaderboards\SeasonLeaderboardsRepository constructor expects League\LeagueContext|null, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/Leaderboards/index.php
-
-		-
-			rawMessage: 'Parameter #3 $currentFilters of method SeasonLeaderboards\SeasonLeaderboardsView::renderFilterForm() expects array{year?: string, team?: int|string, sortby?: string, limit?: int|string}, array{year: mixed, team: int, sortby: mixed, limit: mixed} given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Leaderboards/index.php

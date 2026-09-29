@@ -34,8 +34,10 @@ final class CareerLeaderboardsViewTest extends TestCase
         // Check that form is rendered
         $this->assertStringContainsString('<form', $html);
         $this->assertStringContainsString('name="CareerLeaderboards"', $html);
-        $this->assertStringContainsString('action="modules.php?name=Leaderboards&amp;tab=career"', $html);
-        
+        $this->assertStringContainsString('method="get" action="modules.php"', $html);
+        $this->assertStringContainsString('<input type="hidden" name="name" value="Leaderboards">', $html);
+        $this->assertStringContainsString('<input type="hidden" name="tab" value="career">', $html);
+
         // Check that all form fields are present
         $this->assertStringContainsString('name="phase"', $html);
         $this->assertStringContainsString('name="mode"', $html);
@@ -217,7 +219,7 @@ final class CareerLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('Retired Legend*', $html);
     }
 
-    public function testFilterFormPostsToLeaderboardsCareerTab(): void
+    public function testFilterFormSubmitsViaGetToLeaderboardsCareerTab(): void
     {
         $html = $this->view->renderFilterForm([
             'phase' => 'regular',
@@ -227,8 +229,12 @@ final class CareerLeaderboardsViewTest extends TestCase
             'display' => '50',
         ]);
 
-        $this->assertStringContainsString('action="modules.php?name=Leaderboards&amp;tab=career"', $html);
-        // A form posting to the retired name would hit the 302 stub and lose its POST body.
+        $this->assertStringContainsString('method="get" action="modules.php"', $html);
+        $this->assertStringNotContainsString('method="post"', $html);
+        $this->assertStringContainsString('<input type="hidden" name="name" value="Leaderboards">', $html);
+        $this->assertStringContainsString('<input type="hidden" name="tab" value="career">', $html);
+        $this->assertStringContainsString('<input type="hidden" name="submitted" value="1">', $html);
+        // The retired module name would hit the 302 stub and lose the query string.
         $this->assertStringNotContainsString('name=CareerLeaderboards"', $html);
     }
 
@@ -287,13 +293,14 @@ final class CareerLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('value="averages" checked', $html);
     }
 
-    public function testFilterFormDisablesPercentageSortOptionsOnTotals(): void
+    public function testFilterFormKeepsPercentageSortOptionsEnabledOnTotals(): void
     {
-        $html = $this->view->renderFilterForm(['mode' => 'totals']);
+        $html = $this->view->renderFilterForm(['mode' => 'totals', 'sortby' => 'FGP']);
 
-        foreach (['FGP', 'FTP', 'TGP'] as $key) {
-            $this->assertStringContainsString('value="' . $key . '" disabled>', $html);
-        }
+        $this->assertStringContainsString('value="FGP" selected>FG%</option>', $html);
+        $this->assertStringContainsString('value="FTP">FT%</option>', $html);
+        $this->assertStringContainsString('value="TGP">TG%</option>', $html);
+        $this->assertDoesNotMatchRegularExpression('/<option[^>]*value="(FGP|FTP|TGP)"[^>]*disabled/', $html);
     }
 
     public function testFilterFormEnablesPercentageSortOptionsOnAverages(): void

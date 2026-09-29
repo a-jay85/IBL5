@@ -64,14 +64,14 @@ test.describe('Leaderboards flow', () => {
 
   test('season filter submit stays on season tab', async ({ appState, page }) => {
     await appState({ 'Trivia Mode': 'Off' });
-    await page.goto('modules.php?name=Leaderboards&tab=season');
+    await page.goto('modules.php?name=Leaderboards&tab=season&submitted=1');
 
     const table = page.locator('.ibl-data-table').first();
     await expect(table).toBeVisible();
 
     await page.locator('select[name="sortby"]').selectOption('REB');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('tab=season') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=season') && r.request().method() === 'GET'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
 
@@ -84,7 +84,7 @@ test.describe('Leaderboards flow', () => {
     await page.goto('modules.php?name=Leaderboards&tab=career');
 
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
 
@@ -92,6 +92,45 @@ test.describe('Leaderboards flow', () => {
     await expect(page.locator('form[name="CareerLeaderboards"]')).toBeVisible();
     const rows = page.locator('.ibl-data-table').first().locator('tbody tr');
     await expect(rows.first()).toBeVisible();
+  });
+
+  test('first visit shows the filter form and no results table on both tabs', async ({ appState, page }) => {
+    await appState({ 'Trivia Mode': 'Off' });
+
+    await page.goto('modules.php?name=Leaderboards&tab=season');
+    await expect(page.locator('form[name="Leaderboards"]')).toBeVisible();
+    await expect(page.locator('.ibl-data-table')).toHaveCount(0);
+
+    await page.goto('modules.php?name=Leaderboards&tab=career');
+    await expect(page.locator('form[name="CareerLeaderboards"]')).toBeVisible();
+    await expect(page.locator('.ibl-data-table')).toHaveCount(0);
+  });
+
+  test('back button restores the previous search results', async ({ appState, page }) => {
+    await appState({ 'Trivia Mode': 'Off' });
+    await page.goto('modules.php?name=Leaderboards&tab=season');
+
+    await page.locator('select[name="sortby"]').selectOption('REB');
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('tab=season') && r.request().method() === 'GET'),
+      page.locator('.ibl-filter-form__submit').click(),
+    ]);
+    await expect(page).toHaveURL(/sortby=REB/);
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+
+    await page.locator('select[name="sortby"]').selectOption('AST');
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('tab=season') && r.request().method() === 'GET'),
+      page.locator('.ibl-filter-form__submit').click(),
+    ]);
+    await expect(page).toHaveURL(/sortby=AST/);
+
+    await page.goBack();
+
+    await expect(page).toHaveURL(/sortby=REB/);
+    await expect(page.locator('select[name="sortby"]')).toHaveValue('REB');
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await expect(page.locator('.ibl-data-table th.sorted-col').first()).toHaveText('reb');
   });
 
   test('nav menu links to leaderboards', async ({ appState, page }) => {

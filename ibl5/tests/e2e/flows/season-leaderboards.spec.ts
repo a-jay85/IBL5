@@ -3,11 +3,11 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 import type { Page } from '@playwright/test';
 
 // The filter form sits inside hx-boost, so a submit swaps content in place
-// instead of navigating. Wait for the POST response, then let the retrying
+// instead of navigating. Wait for the GET response, then let the retrying
 // assertions in each test cover the gap between response and DOM swap.
 async function submitFilters(page: Page): Promise<void> {
   await Promise.all([
-    page.waitForResponse((r) => r.url().includes('tab=season') && r.request().method() === 'POST'),
+    page.waitForResponse((r) => r.url().includes('tab=season') && r.request().method() === 'GET'),
     page.locator('.ibl-filter-form__submit').click(),
   ]);
 }
@@ -18,7 +18,7 @@ async function submitFilters(page: Page): Promise<void> {
 test.describe('Season Leaderboards flow', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Trivia Mode': 'Off' });
-    await page.goto('modules.php?name=Leaderboards&tab=season');
+    await page.goto('modules.php?name=Leaderboards&tab=season&submitted=1');
   });
 
   test('page loads with filter form', async ({ page }) => {
@@ -32,6 +32,12 @@ test.describe('Season Leaderboards flow', () => {
     await expect(page.locator('.ibl-filter-form__submit')).toHaveText('Search');
     await expect(page.locator('.ibl-filter-form')).not.toContainText('Records');
     await expect(page.locator('label[for="sl-limit"]')).toHaveText('Results Limit:');
+  });
+
+  test('first visit shows the form without running a search', async ({ page }) => {
+    await page.goto('modules.php?name=Leaderboards&tab=season');
+    await expect(page.locator('.ibl-filter-form')).toBeVisible();
+    await expect(page.locator('.ibl-data-table')).toHaveCount(0);
   });
 
   test('default results table present', async ({ page }) => {

@@ -41,16 +41,16 @@ if ($tab === 'career') {
     $service = new CareerLeaderboards\CareerLeaderboardsService();
     $view = new \CareerLeaderboards\CareerLeaderboardsView($service);
 
-    // Read filter parameters from POST (allowlisted by the service)
-    $postString = static fn (string $key, string $default): string => is_string($_POST[$key] ?? null) ? $_POST[$key] : $default;
-    $submitted = isset($_POST['submitted']);
+    // Read filter parameters from the query string (allowlisted by the service)
+    $getString = static fn (string $key, string $default): string => is_string($_GET[$key] ?? null) ? $_GET[$key] : $default;
+    $submitted = isset($_GET['submitted']);
 
-    $phase = $service->resolvePhase($postString('phase', 'regular'));
-    $mode = $service->resolveMode($phase, $postString('mode', 'totals'));
-    $sortKey = $service->resolveSortKey($postString('sortby', 'PPG'), $mode);
-    // An unchecked switch posts nothing, so `submitted` tells "switch off" from first load (ON).
-    $retirees = $submitted ? isset($_POST['retirees']) : true;
-    $display = $postString('display', '');
+    $phase = $service->resolvePhase($getString('phase', 'regular'));
+    $mode = $service->resolveMode($phase, $getString('mode', 'totals'));
+    $sortKey = $service->resolveSortKey($getString('sortby', 'PPG'), $mode);
+    // An unchecked switch sends nothing, so `submitted` tells "switch off" from first load (ON).
+    $retirees = $submitted ? isset($_GET['retirees']) : true;
+    $display = $getString('display', '');
     $limit = is_numeric($display) && (int) $display > 0 ? (int) $display : 50;
 
     // Render filter form
@@ -62,28 +62,30 @@ if ($tab === 'career') {
         'display' => $display,
     ]);
 
-    // Run the default search on first load, like the Season tab
-    $tableKey = $service->resolveTableKey($phase, $mode);
-    $sortColumn = $service->resolveSortColumn($sortKey, $mode);
-    $tableType = $repository->getTableType($tableKey);
-    $leadersData = $repository->getLeaderboards($tableKey, $sortColumn, $retirees ? 0 : 1, $limit);
+    // First visit shows only the form; a search runs once the form is submitted
+    if ($submitted) {
+        $tableKey = $service->resolveTableKey($phase, $mode);
+        $sortColumn = $service->resolveSortColumn($sortKey, $mode);
+        $tableType = $repository->getTableType($tableKey);
+        $leadersData = $repository->getLeaderboards($tableKey, $sortColumn, $retirees ? 0 : 1, $limit);
 
-    // Set active sort column for highlighting
-    $view->setSortColumn($sortColumn);
+        // Set active sort column for highlighting
+        $view->setSortColumn($sortColumn);
 
-    // Render table header
-    echo $view->renderTableHeader();
+        // Render table header
+        echo $view->renderTableHeader();
 
-    // Render player rows
-    $rank = 1;
-    foreach ($leadersData['results'] as $row) {
-        $stats = $service->processPlayerRow($row, $tableType);
-        echo $view->renderPlayerRow($stats, $rank);
-        $rank++;
+        // Render player rows
+        $rank = 1;
+        foreach ($leadersData['results'] as $row) {
+            $stats = $service->processPlayerRow($row, $tableType);
+            echo $view->renderPlayerRow($stats, $rank);
+            $rank++;
+        }
+
+        // Render table footer
+        echo $view->renderTableFooter();
     }
-
-    // Render table footer
-    echo $view->renderTableFooter();
 } else {
     // Initialize classes
     $dbCache = new \Cache\DatabaseCache($mysqli_db);
@@ -92,22 +94,15 @@ if ($tab === 'career') {
     $service = new SeasonLeaderboardsService($repository);
     $view = new SeasonLeaderboardsView($service);
 
-    // Get filter parameters from POST
+    // Read filter parameters from the query string
+    $getString = static fn (string $key): string => is_string($_GET[$key] ?? null) ? $_GET[$key] : '';
     $filters = [
-        'year' => $_POST['year'] ?? '',
-        'team' => (int)($_POST['team'] ?? 0),
-        'sortby' => $_POST['sortby'] ?? 'PPG',
-        'limit' => $_POST['limit'] ?? ''
+        'year' => $getString('year'),
+        'team' => (int) $getString('team'),
+        'sortby' => $getString('sortby') !== '' ? $getString('sortby') : 'PPG',
+        'limit' => $getString('limit'),
     ];
-
-    // Determine limit: use POST value if provided, otherwise default to 50 on first load
-    $isFirstLoad = empty($_POST);
-    $limit = 0;
-    if ($isFirstLoad) {
-        $limit = 50; // Default limit on first load
-    } elseif (is_numeric($filters['limit']) && (int)$filters['limit'] > 0) {
-        $limit = (int)$filters['limit'];
-    }
+    $limit = is_numeric($filters['limit']) && (int) $filters['limit'] > 0 ? (int) $filters['limit'] : 50;
 
     // Get data for dropdowns
     $teams = $repository->getTeams();
@@ -116,33 +111,35 @@ if ($tab === 'career') {
     // Render filter form
     echo $view->renderFilterForm($teams, $years, $filters);
 
-    // Get and render season leaders
-    $leadersData = $service->getFilteredLeaderboard($filters, $limit);
-    $rows = $leadersData['results'];
-    $numRows = $leadersData['count'];
+    // First visit shows only the form; a search runs once the form is submitted
+    if (isset($_GET['submitted'])) {
+        // Get and render season leaders
+        $leadersData = $service->getFilteredLeaderboard($filters, $limit);
+        $rows = $leadersData['results'];
 
-    // Set active sort column for highlighting
-    $view->setSortBy($filters['sortby']);
+        // Set active sort column for highlighting
+        $view->setSortBy($filters['sortby']);
 
-    // Render table header
-    echo $view->renderTableHeader();
+        // Render table header
+        echo $view->renderTableHeader();
 
-    // Render player rows
-    $rank = 0;
-    foreach ($rows as $row) {
-        $stats = $service->processPlayerRow($row);
-        $rank++;
-        echo $view->renderPlayerRow($stats, $rank);
+        // Render player rows
+        $rank = 0;
+        foreach ($rows as $row) {
+            $stats = $service->processPlayerRow($row);
+            $rank++;
+            echo $view->renderPlayerRow($stats, $rank);
+        }
+
+        // Render table footer
+        echo $view->renderTableFooter();
     }
-
-    // Render table footer
-    echo $view->renderTableFooter();
 }
 
 $rawBody = ob_get_clean();
 $tabBody = $rawBody === false ? '' : $rawBody;
 
-echo '<h1 class="ibl-title">Leaderboards</h1>'
-    . $tabs->renderTabBar($tab, 'modules.php?name=Leaderboards') . $tabs->wrapPanel($tabBody, $tab);
+echo '<div class="leaderboards-page"><h1 class="ibl-title">Leaderboards</h1>'
+    . $tabs->renderTabBar($tab, 'modules.php?name=Leaderboards') . $tabs->wrapPanel($tabBody, $tab) . '</div>';
 
 PageLayout\PageLayout::footer();

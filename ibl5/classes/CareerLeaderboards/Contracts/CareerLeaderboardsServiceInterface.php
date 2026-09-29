@@ -78,7 +78,7 @@ interface CareerLeaderboardsServiceInterface
     public function getSortOptions(string $mode): array;
 
     /**
-     * Whether a sort key is usable in the mode (percentage keys need averages)
+     * Whether a sort key is a known option (every key works in both modes)
      */
     public function isSortAvailable(string $key, string $mode): bool;
 

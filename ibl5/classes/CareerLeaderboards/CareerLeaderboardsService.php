@@ -28,31 +28,32 @@ class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
 
     /**
      * Season-tab sort keys and order (minus QA), mapped to career columns.
-     * PPG is labelled PTS on totals; the percentage keys exist only on averages tables.
+     * PPG is labelled PTS on totals. On totals tables the repository derives the
+     * percentage columns from made/attempted totals.
      *
-     * @var array<string, array{label: string, column: string, avgsOnly: bool}>
+     * @var array<string, array{label: string, column: string}>
      */
     private const SORT_OPTIONS = [
-        'PPG' => ['label' => 'PPG', 'column' => 'pts', 'avgsOnly' => false],
-        'REB' => ['label' => 'REB', 'column' => 'reb', 'avgsOnly' => false],
-        'OREB' => ['label' => 'OREB', 'column' => 'orb', 'avgsOnly' => false],
-        'DREB' => ['label' => 'DREB', 'column' => 'drb', 'avgsOnly' => false],
-        'AST' => ['label' => 'AST', 'column' => 'ast', 'avgsOnly' => false],
-        'STL' => ['label' => 'STL', 'column' => 'stl', 'avgsOnly' => false],
-        'BLK' => ['label' => 'BLK', 'column' => 'blk', 'avgsOnly' => false],
-        'TO' => ['label' => 'TO', 'column' => 'tvr', 'avgsOnly' => false],
-        'FOUL' => ['label' => 'FOUL', 'column' => 'pf', 'avgsOnly' => false],
-        'FGM' => ['label' => 'FGM', 'column' => 'fgm', 'avgsOnly' => false],
-        'FGA' => ['label' => 'FGA', 'column' => 'fga', 'avgsOnly' => false],
-        'FGP' => ['label' => 'FG%', 'column' => 'fgpct', 'avgsOnly' => true],
-        'FTM' => ['label' => 'FTM', 'column' => 'ftm', 'avgsOnly' => false],
-        'FTA' => ['label' => 'FTA', 'column' => 'fta', 'avgsOnly' => false],
-        'FTP' => ['label' => 'FT%', 'column' => 'ftpct', 'avgsOnly' => true],
-        'TGM' => ['label' => 'TGM', 'column' => 'tgm', 'avgsOnly' => false],
-        'TGA' => ['label' => 'TGA', 'column' => 'tga', 'avgsOnly' => false],
-        'TGP' => ['label' => 'TG%', 'column' => 'tpct', 'avgsOnly' => true],
-        'GAMES' => ['label' => 'GAMES', 'column' => 'games', 'avgsOnly' => false],
-        'MIN' => ['label' => 'MIN', 'column' => 'minutes', 'avgsOnly' => false],
+        'PPG' => ['label' => 'PPG', 'column' => 'pts'],
+        'REB' => ['label' => 'REB', 'column' => 'reb'],
+        'OREB' => ['label' => 'OREB', 'column' => 'orb'],
+        'DREB' => ['label' => 'DREB', 'column' => 'drb'],
+        'AST' => ['label' => 'AST', 'column' => 'ast'],
+        'STL' => ['label' => 'STL', 'column' => 'stl'],
+        'BLK' => ['label' => 'BLK', 'column' => 'blk'],
+        'TO' => ['label' => 'TO', 'column' => 'tvr'],
+        'FOUL' => ['label' => 'FOUL', 'column' => 'pf'],
+        'FGM' => ['label' => 'FGM', 'column' => 'fgm'],
+        'FGA' => ['label' => 'FGA', 'column' => 'fga'],
+        'FGP' => ['label' => 'FG%', 'column' => 'fgpct'],
+        'FTM' => ['label' => 'FTM', 'column' => 'ftm'],
+        'FTA' => ['label' => 'FTA', 'column' => 'fta'],
+        'FTP' => ['label' => 'FT%', 'column' => 'ftpct'],
+        'TGM' => ['label' => 'TGM', 'column' => 'tgm'],
+        'TGA' => ['label' => 'TGA', 'column' => 'tga'],
+        'TGP' => ['label' => 'TG%', 'column' => 'tpct'],
+        'GAMES' => ['label' => 'GAMES', 'column' => 'games'],
+        'MIN' => ['label' => 'MIN', 'column' => 'minutes'],
     ];
 
     /**
@@ -216,11 +217,7 @@ class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
      */
     public function isSortAvailable(string $key, string $mode): bool
     {
-        if (!isset(self::SORT_OPTIONS[$key])) {
-            return false;
-        }
-
-        return $mode === 'averages' || !self::SORT_OPTIONS[$key]['avgsOnly'];
+        return isset(self::SORT_OPTIONS[$key]);
     }
 
     /**

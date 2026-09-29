@@ -62,7 +62,9 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
 
         ob_start();
         ?>
-<form name="CareerLeaderboards" method="post" action="modules.php?name=Leaderboards&amp;tab=career" class="ibl-filter-form ibl-filter-form--stacked">
+<form name="CareerLeaderboards" method="get" action="modules.php" class="ibl-filter-form ibl-filter-form--stacked">
+    <input type="hidden" name="name" value="Leaderboards">
+    <input type="hidden" name="tab" value="career">
     <div class="ibl-filter-form__row">
         <div class="ibl-filter-form__group">
             <label for="cl-phase" class="ibl-filter-form__label">Phase:</label>
@@ -90,7 +92,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
             <label for="cl-sortby" class="ibl-filter-form__label">Sort By:</label>
             <select id="cl-sortby" name="sortby">
                 <?php foreach ($sortOptions as $key => $label): ?>
-                    <option value="<?= HtmlSanitizer::e($key) ?>"<?= ($sortKey === $key) ? ' selected' : '' ?><?= $this->service->isSortAvailable($key, $mode) ? '' : ' disabled' ?>><?= HtmlSanitizer::e($label) ?></option>
+                    <option value="<?= HtmlSanitizer::e($key) ?>"<?= ($sortKey === $key) ? ' selected' : '' ?>><?= HtmlSanitizer::e($label) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>

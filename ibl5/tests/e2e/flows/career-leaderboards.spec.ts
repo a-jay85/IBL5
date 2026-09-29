@@ -23,8 +23,14 @@ test.describe('Career Leaderboards flow', () => {
     await expect(page.locator('.ibl-filter-form__submit')).toHaveText('Search');
   });
 
-  test('first load auto-runs the default search', async ({ page }) => {
-    // No submit: the default (Regular Season, Totals, PTS, retirees on, limit 50) renders already.
+  test('first visit shows the form without running a search', async ({ page }) => {
+    await expect(page.locator('.ibl-filter-form')).toBeVisible();
+    await expect(page.locator('.ibl-data-table')).toHaveCount(0);
+  });
+
+  test('submitted URL runs the default search', async ({ page }) => {
+    // Regular Season, Totals, PTS, retirees on, limit 50 are the defaults once submitted.
+    await page.goto('modules.php?name=Leaderboards&tab=career&submitted=1');
     const rows = page.locator('.ibl-data-table').first().locator('tbody tr');
     await expect(rows.first()).toBeVisible();
     await expect(page.locator('.ibl-data-table th.sorted-col').first()).toHaveText('PTS');
@@ -47,12 +53,12 @@ test.describe('Career Leaderboards flow', () => {
     await expect(page.locator('input[name="mode"][value="totals"]')).toBeChecked();
   });
 
-  test('toggling Averages swaps the PTS label to PPG and gates the percentage options', async ({ page }) => {
+  test('toggling Averages swaps the PTS label to PPG and keeps the percentage options enabled', async ({ page }) => {
     const ppg = page.locator('select[name="sortby"] option[value="PPG"]');
     const fgp = page.locator('select[name="sortby"] option[value="FGP"]');
 
     await expect(ppg).toHaveText('PTS');
-    await expect(fgp).toBeDisabled();
+    await expect(fgp).toBeEnabled();
 
     await page.locator('input[name="mode"][value="averages"]').check();
     await expect(ppg).toHaveText('PPG');
@@ -60,14 +66,30 @@ test.describe('Career Leaderboards flow', () => {
 
     await page.locator('input[name="mode"][value="totals"]').check();
     await expect(ppg).toHaveText('PTS');
-    await expect(fgp).toBeDisabled();
+    await expect(fgp).toBeEnabled();
   });
 
-  test('switching back to Totals moves a selected percentage sort to PPG', async ({ page }) => {
+  test('switching back to Totals keeps a selected percentage sort', async ({ page }) => {
     await page.locator('input[name="mode"][value="averages"]').check();
     await page.locator('select[name="sortby"]').selectOption('FGP');
     await page.locator('input[name="mode"][value="totals"]').check();
-    await expect(page.locator('select[name="sortby"]')).toHaveValue('PPG');
+    await expect(page.locator('select[name="sortby"]')).toHaveValue('FGP');
+  });
+
+  test('Totals + FG% is selectable and sorts by FG%', async ({ page }) => {
+    await page.locator('input[name="mode"][value="totals"]').check();
+    const fgp = page.locator('select[name="sortby"] option[value="FGP"]');
+    await expect(fgp).toBeEnabled();
+    await page.locator('select[name="sortby"]').selectOption('FGP');
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
+      page.locator('.ibl-filter-form__submit').click(),
+    ]);
+
+    await expect(page).toHaveURL(/sortby=FGP/);
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await expect(page.locator('.ibl-data-table th.sorted-col').first()).toHaveText('FG%');
+    await expect(page.locator('select[name="sortby"]')).toHaveValue('FGP');
   });
 
   test('form submission shows results', async ({ page }) => {
@@ -99,7 +121,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('select[name="phase"]').selectOption('regular');
     await page.locator('select[name="sortby"]').selectOption('PPG');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
@@ -108,7 +130,7 @@ test.describe('Career Leaderboards flow', () => {
 
     await page.locator('select[name="sortby"]').selectOption('REB');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
@@ -121,7 +143,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('select[name="phase"]').selectOption('regular');
     await page.locator('input[name="display"]').fill('3');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
@@ -133,7 +155,7 @@ test.describe('Career Leaderboards flow', () => {
   test('phase drives query: Regular Season returns more rows than Playoffs', async ({ page }) => {
     await page.locator('select[name="phase"]').selectOption('regular');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table tbody tr').first()).toBeVisible();
@@ -141,7 +163,7 @@ test.describe('Career Leaderboards flow', () => {
 
     await page.locator('select[name="phase"]').selectOption('playoffs');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table tbody tr').first()).toBeVisible();
@@ -156,12 +178,12 @@ test.describe('Career Leaderboards flow', () => {
   test('retired switch toggles results', async ({ page }) => {
     // Raise display limit so the single seeded retiree is not truncated below
     // the default top-N cutoff (default ranks would leave both counts equal).
-    // Wait for the HTMX-boosted POST response between submissions — otherwise
+    // Wait for the HTMX-boosted GET response between submissions — otherwise
     // the row count reads the previous render.
     await page.locator('input[name="display"]').fill('500');
     await page.locator('input[name="retirees"]').setChecked(true);
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
@@ -170,7 +192,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('input[name="display"]').fill('500');
     await page.locator('input[name="retirees"]').setChecked(false);
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
@@ -192,7 +214,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('select[name="phase"]').selectOption('playoffs');
     await page.locator('input[name="mode"][value="averages"]').check();
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
 

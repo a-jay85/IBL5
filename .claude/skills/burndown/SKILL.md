@@ -1,7 +1,7 @@
 ---
 name: burndown
 description: Run one automatic backlog burn-down batch: rank new issues, pick 5 units, route each item to a plan or an ad-hoc worktree, and start it.
-last_verified: 2026-09-28
+last_verified: 2026-09-29
 ---
 
 # /burndown
@@ -101,7 +101,7 @@ bin/backlog burndown-record <ledger> <n> route=plan slug=<slug> status=queued
 ```
 
 **Ad-hoc route.** `bin/wt-new <slug>` (base master). Spawn one
-`Agent(subagent_type: "sonnet-4-6")` per ad-hoc item with `model` omitted. Items hold
+`Agent(subagent_type: "sonnet-5-5")` per ad-hoc item with `model` omitted. Items hold
 disjoint paths, so spawn them in one message. The helper prompt carries: the absolute
 worktree path, the issue body, the liveness evidence, the paths it may touch, and these
 rules. Edit only inside the worktree. Run the relevant tests. Leave the tree dirty. Do

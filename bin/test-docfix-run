@@ -211,10 +211,11 @@ SB="$(build_sandbox)"
     && ! grep -q 'docfix:' "$WORKFLOW" \
     && ! grep -qF 'bin/docfix-run' "$WORKFLOW" \
     && grep -q 'pull-requests: read' "$WORKFLOW" \
-    && grep -qF "steps.health.outputs.alert == 'true'" "$WORKFLOW" \
+    && ! grep -qF 'steps.health.outputs' "$WORKFLOW" \
+    && ! grep -qF -- '--health-report' "$WORKFLOW" \
     && ! grep -qF "notify == 'true'" "$WORKFLOW" \
     && ! grep -q "fail-on-delivery" "$WORKFLOW"; } \
-  && ok "(6) audit: no self-hosted/docfix/docfix-run; health.alert gate; pull-requests:read; no fail-on-delivery" \
+  && ok "(6) audit: no self-hosted/docfix/docfix-run; no health steps; pull-requests:read; no fail-on-delivery" \
   || bad "(6) audit static assertions"
 
 # --- Case 7: docs-refreshed-notify.yml static assertion -----------------------

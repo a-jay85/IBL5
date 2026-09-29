@@ -48,6 +48,7 @@ CLAUDE_TIMEOUT="${BUG_PIPELINE_CLAUDE_TIMEOUT:-120}"
 PLAN_TIMEOUT="${BUG_PIPELINE_PLAN_TIMEOUT:-1800}"
 CLASSIFY_PROMPT_FILE="${BUG_PIPELINE_CLASSIFY_PROMPT:-$SCRIPT_DIR/bug-pipeline-classify-prompt}"
 GATHER_PROMPT_FILE="${BUG_PIPELINE_GATHER_PROMPT:-$SCRIPT_DIR/bug-pipeline-gather-prompt}"
+STRUCTURED_THINK_LINE='Think the problem through before you answer.'
 
 # Posted in-channel when a report classifies as roster_error: a player's ratings, contract,
 # or team assignment being wrong in the league data. Those values live in the JSB files, so
@@ -281,8 +282,14 @@ GATHER_SCHEMA='{"type":"object","additionalProperties":false,"required":["enough
 run_structured_call() {
     local errf; errf="$(mktemp)"
     # NO --dangerously-skip-permissions; empty --allowedTools = deny-all (capability starvation).
+    # --effort high is pinned so the call never inherits the interactive /effort setting.
+    # The appended think-first line follows Anthropic's Sonnet 5.5 guidance for
+    # schema-constrained answers that need a few steps of reasoning: at lower effort the
+    # model often answers with no thinking at all.
     CJ_OUT="$(timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" -p "$1" \
         --model "$CLASSIFY_MODEL" \
+        --effort high \
+        --append-system-prompt "$STRUCTURED_THINK_LINE" \
         --output-format json \
         --json-schema "$2" \
         --allowedTools '' 2>"$errf")"
@@ -291,8 +298,9 @@ run_structured_call() {
 }
 
 # Extract the schema-constrained result object from the envelope, or empty on any defect.
+# A max_tokens stop counts as a defect even when .result parses: the reply was cut off.
 envelope_result() { # raw_envelope
-    printf '%s' "$1" | jq -rc 'if (.is_error // false) == true then empty else (.result // empty) end' 2>/dev/null
+    printf '%s' "$1" | jq -rc 'if (.is_error // false) == true or .stop_reason == "max_tokens" then empty else (.result // empty) end' 2>/dev/null
 }
 
 # Render a row's DB attachments (Phase 6 .attachments enrichment) as sanitized, data-only
@@ -644,6 +652,7 @@ drive_ready_for_plan() { # row id thread_id original_text issue_number clear_opt
     # --implement keeps the plan on disk, NOT auto-queued (§5 rule 1) — #5a must not implement.
     timeout "$PLAN_TIMEOUT" "$CLAUDE_BIN" -p "/plan ${summary} --implement" \
         --model "$PLAN_MODEL" \
+        --effort high \
         --dangerously-skip-permissions \
         --output-format stream-json \
         --verbose \

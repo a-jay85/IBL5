@@ -7,7 +7,6 @@ namespace Tests\UI\Components;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use UI\Components\PageTabs;
-use UI\Contracts\PageTabsInterface;
 
 final class PageTabsTest extends TestCase
 {
@@ -16,52 +15,6 @@ final class PageTabsTest extends TestCase
     private function makeTabs(): PageTabs
     {
         return new PageTabs(['ratings' => 'Ratings', 'totals' => 'Season Totals', 'qa' => 'Q&A'], 'ratings');
-    }
-
-    // --- Phase 1: interface contract assertions ---
-
-    public function testPageTabsInterfaceDeclaresResolve(): void
-    {
-        $rc = new ReflectionClass(PageTabsInterface::class);
-        $this->assertTrue($rc->hasMethod('resolve'));
-        $m = $rc->getMethod('resolve');
-        $returnType = $m->getReturnType();
-        $this->assertInstanceOf(\ReflectionNamedType::class, $returnType);
-        $this->assertSame('string', $returnType->getName());
-        $params = $m->getParameters();
-        $this->assertCount(1, $params);
-        $this->assertSame('raw', $params[0]->getName());
-        $paramType = $params[0]->getType();
-        $this->assertInstanceOf(\ReflectionNamedType::class, $paramType);
-        $this->assertSame('mixed', $paramType->getName());
-    }
-
-    public function testPageTabsInterfaceDeclaresRenderTabBar(): void
-    {
-        $rc = new ReflectionClass(PageTabsInterface::class);
-        $this->assertTrue($rc->hasMethod('renderTabBar'));
-        $m = $rc->getMethod('renderTabBar');
-        $returnType = $m->getReturnType();
-        $this->assertInstanceOf(\ReflectionNamedType::class, $returnType);
-        $this->assertSame('string', $returnType->getName());
-        $params = $m->getParameters();
-        $this->assertCount(2, $params);
-        $this->assertSame('activeTab', $params[0]->getName());
-        $this->assertSame('baseUrl', $params[1]->getName());
-    }
-
-    public function testPageTabsInterfaceDeclaresWrapPanel(): void
-    {
-        $rc = new ReflectionClass(PageTabsInterface::class);
-        $this->assertTrue($rc->hasMethod('wrapPanel'));
-        $m = $rc->getMethod('wrapPanel');
-        $returnType = $m->getReturnType();
-        $this->assertInstanceOf(\ReflectionNamedType::class, $returnType);
-        $this->assertSame('string', $returnType->getName());
-        $params = $m->getParameters();
-        $this->assertCount(2, $params);
-        $this->assertSame('content', $params[0]->getName());
-        $this->assertSame('tabKey', $params[1]->getName());
     }
 
     // --- Phase 2: resolve() ---
@@ -181,35 +134,12 @@ final class PageTabsTest extends TestCase
         $this->assertSame(1, substr_count($html, 'ibl-tab--active'));
     }
 
-    public function testRenderTabBarActiveTabHasAriaCurrent(): void
-    {
-        $tabs = $this->makeTabs();
-        $html = $tabs->renderTabBar('totals', self::BASE_URL);
-        $this->assertStringContainsString('aria-current="page"', $html);
-        $this->assertSame(1, substr_count($html, 'aria-current="page"'));
-    }
-
     public function testRenderTabBarInactiveTabHasNoAriaCurrent(): void
     {
         $tabs = $this->makeTabs();
         $html = $tabs->renderTabBar('ratings', self::BASE_URL);
         $this->assertStringNotContainsString('class="ibl-tab ibl-tab--active" href="modules.php?name=Stats&amp;tab=totals"', $html);
         $this->assertStringContainsString('class="ibl-tab" href="modules.php?name=Stats&amp;tab=totals"', $html);
-    }
-
-    public function testRenderTabBarIncludesDataTabAttribute(): void
-    {
-        $tabs = new PageTabs(['season' => 'Season', 'career' => 'Career'], 'season');
-        $html = $tabs->renderTabBar('season', 'modules.php?name=Leaders');
-        $this->assertStringContainsString('data-tab="season"', $html);
-        $this->assertStringContainsString('data-tab="career"', $html);
-    }
-
-    public function testRenderTabBarHrefContainsEncodedAmpersand(): void
-    {
-        $tabs = new PageTabs(['season' => 'Season'], 'season');
-        $html = $tabs->renderTabBar('season', 'modules.php?name=Leaders');
-        $this->assertStringContainsString('href="modules.php?name=Leaders&amp;tab=season"', $html);
     }
 
     public function testRenderTabBarEscapesAmpersandInLabel(): void

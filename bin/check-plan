@@ -539,22 +539,25 @@ done < <(grep -E '^[[:space:]]*\|' "$PLAN_FILE")
 # path ibl5/docs/decisions/NNNN-*.md (NNNN != 0000, mirror hasAddedAdr() — a new ADR
 # is ADDED, not merely cited for context) OR a literal `no-adr:` marker (mirror
 # BYPASS_REGEX intent — the substring suffices at plan-lint granularity).
+# The literal placeholder ibl5/docs/decisions/NNNN-slug.md (example) on a creation-cue line also
+# resolves: plans leave the ADR number to bin/next-adr at impl time (see gate [A]).
 #
 # "Authoring" means the ADR path appears on a line that also carries a creation cue
 # (same regex as gate8_is_created). A bare citation like "per ADR-0062, see
 # ibl5/docs/decisions/0062-x.md" does NOT resolve the gate; a plan step like
 # "author ibl5/docs/decisions/0099-x.md" does. This mirrors hasAddedAdr()'s
 # diff-filter=A intent at plan-lint granularity.
+GATE8_AUTHOR_CUE_RE='([Cc]reate|[Aa]uthor|[Ww]rite|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold)'
 GATE8_RESOLVED=0
 while IFS= read -r _adr_path; do
     [ -n "$_adr_path" ] || continue
     printf '%s\n' "$_adr_path" | grep -qvE '/decisions/0000-' || continue
     if grep -F -- "$_adr_path" "$PLAN_FILE" \
-        | grep -qE '([Cc]reate|[Aa]uthor|[Ww]rite|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold)'; then
+        | grep -qE "$GATE8_AUTHOR_CUE_RE"; then
         GATE8_RESOLVED=1
         break
     fi
-done < <(grep -oE 'ibl5/docs/decisions/[0-9]{4}-[A-Za-z0-9._/-]*\.md' "$PLAN_FILE" 2>/dev/null)
+done < <(grep -oE 'ibl5/docs/decisions/([0-9]{4}|NNNN)-[A-Za-z0-9._/-]*\.md' "$PLAN_FILE" 2>/dev/null)
 if grep -qF 'no-adr:' "$PLAN_FILE"; then
     GATE8_RESOLVED=1
 fi
@@ -1358,24 +1361,78 @@ if [ "$GATEP_MARKER" -eq 0 ] && [ -s "$GATEP_MATRIX" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Gate [A]: Migration-number literal detector (hard-fail).
+# Gate [A]: New-number detector for migrations and ADRs (hard-fail).
 # ---------------------------------------------------------------------------
-# A plan that names a specific migration number (e.g. "migration 171",
-# "171_dedup_key.sql") will break when the actual assigned number differs.
-# Migration numbers are not known at planning time — they are assigned by
-# bin/next-migration at implementation time.
-# Escape: include the phrase "run bin/next-migration at impl time" anywhere
-# in the plan (mirrors no-adr: / context-budget: pattern).
-# Fence-aware: skips lines inside ```...``` and ````...```` blocks.
-if ! grep -qF 'run bin/next-migration at impl time' "$PLAN_FILE"; then
-    _a_hits=$(awk '
+# A plan that CREATES a migration or ADR under a hardcoded number breaks when a
+# parallel branch claims that number first. Numbers are assigned at impl time by
+# bin/next-migration and bin/next-adr, so a new file is written as the placeholder
+# ibl5/migrations/NNN_slug.sql (example) or ibl5/docs/decisions/NNNN-slug.md (example).
+# A placeholder carries no digits, so the token regex below never matches it.
+#
+# A numbered token is "new" when BOTH hold:
+#   1. it sits on a line with a creation cue (gate8_is_created, or the gate 8
+#      author cues in GATE8_AUTHOR_CUE_RE, which add Author/Write);
+#   2. it is absent from the reference tree.
+# Citing an existing migration or ADR by its real number passes.
+#
+# Reference tree: $CHECK_PLAN_MASTER_REF when set (test seam), else the first of
+# origin/master, master, HEAD that resolves. HEAD keeps the gate live in the
+# default-depth CI checkout, which has no origin/master. No resolvable ref, or a
+# failing ls-tree, fails OPEN: the gate reports nothing.
+#
+# There is no escape phrase. Fence-aware: skips lines inside ```...``` and
+# ````...```` blocks.
+_a_ref=""
+if [ -n "${CHECK_PLAN_MASTER_REF:-}" ]; then
+    _a_cands="$CHECK_PLAN_MASTER_REF"
+else
+    _a_cands="origin/master master HEAD"
+fi
+for _a_c in $_a_cands; do
+    if git -C "$REPO_ROOT" rev-parse --verify -q "${_a_c}^{commit}" >/dev/null 2>&1; then
+        _a_ref="$_a_c"
+        break
+    fi
+done
+_a_tree=""
+if [ -n "$_a_ref" ]; then
+    if ! _a_tree="$(git -C "$REPO_ROOT" ls-tree -r --name-only "$_a_ref" \
+            -- ibl5/migrations ibl5/docs/decisions 2>/dev/null)"; then
+        _a_ref=""
+    fi
+fi
+if [ -n "$_a_ref" ]; then
+    _a_mig=""
+    _a_adr=""
+    while IFS= read -r _a_tok; do
+        [ -n "$_a_tok" ] || continue
+        # Present in the reference tree => an existing file being cited, not a new one.
+        case "$_a_tok" in
+            decisions/*)
+                if printf '%s\n' "$_a_tree" | grep -qxF "ibl5/docs/$_a_tok"; then continue; fi ;;
+            *.sql)
+                if printf '%s\n' "$_a_tree" | grep -qxF "ibl5/migrations/$_a_tok"; then continue; fi ;;
+            *)
+                _a_num="$(printf '%s' "$_a_tok" | grep -oE '[0-9]+$')"
+                if printf '%s\n' "$_a_tree" | grep -qE "^ibl5/migrations/${_a_num}_"; then continue; fi ;;
+        esac
+        # Creation context only.
+        if ! gate8_is_created "$_a_tok" \
+            && ! { grep -F -- "$_a_tok" "$PLAN_FILE" | grep -qE "$GATE8_AUTHOR_CUE_RE"; }; then
+            continue
+        fi
+        case "$_a_tok" in
+            decisions/*) _a_adr="${_a_adr:+$_a_adr, }ibl5/docs/$_a_tok" ;;
+            *)           _a_mig="${_a_mig:+$_a_mig, }$_a_tok" ;;
+        esac
+    done < <(awk '
         function fence_ticks(s,   t) {
             if (match(s, /^[ \t]*`+/)) {
                 t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
             }
             return 0
         }
-        BEGIN { infence=0; fence_len=0; count=0 }
+        BEGIN { infence=0; fence_len=0 }
         {
             nt = fence_ticks($0)
             if (infence) {
@@ -1383,12 +1440,18 @@ if ! grep -qF 'run bin/next-migration at impl time' "$PLAN_FILE"; then
                 next
             }
             if (nt >= 3) { infence=1; fence_len=nt; next }
-            if (/migration[_ -]*[0-9]{3,}|[0-9]{3,}[_-][a-zA-Z][A-Za-z0-9_-]*\.sql/) count++
+            line = $0
+            while (match(line, /migration[_ -]*[0-9][0-9][0-9]+|[0-9][0-9][0-9]+[_-][a-zA-Z][A-Za-z0-9_-]*\.sql|decisions\/[0-9][0-9][0-9][0-9]-[A-Za-z0-9._\/-]*\.md/)) {
+                print substr(line, RSTART, RLENGTH)
+                line = substr(line, RSTART + RLENGTH)
+            }
         }
-        END { print count+0 }
-    ' "$PLAN_FILE")
-    if [ "${_a_hits:-0}" -gt 0 ]; then
-        viol "[A] plan names ${_a_hits} migration-number literal(s) outside fences — migration numbers are assigned at impl time and conflict when parallel branches claim the same number; use bin/next-migration at impl time, or add the phrase 'run bin/next-migration at impl time' anywhere in the plan to acknowledge this"
+    ' "$PLAN_FILE" | sort -u)
+    if [ -n "$_a_mig" ]; then
+        viol "[A] plan creates a new migration with a hardcoded number (${_a_mig}) — migration numbers are assigned at impl time; use ibl5/migrations/NNN_slug.sql as a placeholder and tell the builder to use whatever bin/next-migration prints and continue"
+    fi
+    if [ -n "$_a_adr" ]; then
+        viol "[A] plan creates a new ADR with a hardcoded number (${_a_adr}) — ADR numbers are assigned at impl time; use ibl5/docs/decisions/NNNN-slug.md as a placeholder and tell the builder to use whatever bin/next-adr prints and continue"
     fi
 fi
 

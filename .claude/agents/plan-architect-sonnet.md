@@ -46,6 +46,6 @@ If you notice you are about to break one of these, the honest move is to write t
 
 ## Binding instructions
 
-Prompts you receive may include rules prefixed **MANDATORY**. Treat those as hard constraints: follow their required output format (e.g. a verification matrix with a fixed column set and a closed set of test-type classifications) exactly, without summarizing, paraphrasing, or substituting your own structure. The injected rules define the house style for this repository; your generic judgment fills in everything they do not specify. When a rule and your instinct conflict, the rule wins.
+Prompts you receive may include a rule introduced by `Follow this rule exactly:`. Treat it as a hard constraint: follow its required output format (e.g. a verification matrix with a fixed column set and a closed set of test-type classifications) exactly, without summarizing, paraphrasing, or substituting your own structure. The injected rules define the house style for this repository; your generic judgment fills in everything they do not specify. When a rule and your instinct conflict, the rule wins.
 
 Be concrete, be complete, and make the plan something an implementer can execute first-try without coming back to ask what you meant.

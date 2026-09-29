@@ -75,10 +75,11 @@ Nothing.
 FIX
 run "$SCRATCH/f1"
 eq "exit 0" "$RC" "0"
-want "header"       "$OUT" '**Merged #2200: Fix the thing**'
+want "header"       "$OUT" '**Merged [#2200](<https://github.com/o/r/pull/2200>): Fix the thing**'
 want "what changed" "$OUT" '**What changed:** Replaced the ledger with a DM.'
 want "watch"        "$OUT" '**Watch:** The first real DM after merge.'
-want "url"          "$OUT" 'https://github.com/o/r/pull/2200'
+want "url"          "$OUT" '(<https://github.com/o/r/pull/2200>)'
+wantnot "no bare url line" "$(printf '%s\n' "$OUT" | grep -x 'https://github.com/o/r/pull/2200' || true)" 'https'
 wantnot "no Why"        "$OUT" '**Why:**'
 wantnot "no Touches"    "$OUT" '**Touches:**'
 wantnot "no tree line"  "$OUT" 'Reviewed tree'
@@ -172,8 +173,9 @@ FIX
 run "$SCRATCH/f7"
 eq "exit 0" "$RC" "0"
 want "fallback"  "$OUT" '(No /pr-ready digest — armed by triage sweep or no review pass run.)'
-want "header"    "$OUT" '**Merged #2200: Fix the thing**'
-want "url"       "$OUT" 'https://github.com/o/r/pull/2200'
+want "header"    "$OUT" '**Merged [#2200](<https://github.com/o/r/pull/2200>): Fix the thing**'
+want "url"       "$OUT" '(<https://github.com/o/r/pull/2200>)'
+wantnot "no bare url line" "$(printf '%s\n' "$OUT" | grep -x 'https://github.com/o/r/pull/2200' || true)" 'https'
 
 # ---------------------------------------------------------------------------
 # 8 — empty stdin (no sticky comment found at all) -> the same fallback.
@@ -214,7 +216,7 @@ OUT="$(bash "$DRIVER" --pr-number 2200 --title "$BIGTITLE" \
 _w="$(printf '%s\n' "$OUT" | sed -n 's/^\*\*What changed:\*\* //p')"
 _t="$(printf '%s\n' "$OUT" | sed -n 's/^\*\*Watch:\*\* //p')"
 _h="$(printf '%s\n' "$OUT" | sed -n 's/^\*\*Merged #2200: \(.*\)\*\*$/\1/p')"
-_b="$(printf '%s\n' "$OUT" | sed -n 's/^`\(b.*\)`$/\1/p')"
+_b="$(printf '%s\n' "$OUT" | sed -n 's/^\[\(b.*\)\](<.*>)$/\1/p')"
 eq "what changed is 1000 chars" "${#_w}" "1000"
 eq "watch is 650 chars"         "${#_t}" "650"
 eq "title is 80 chars"          "${#_h}" "80"
@@ -245,17 +247,17 @@ jq -n --arg m "$_m" '{content:{message:$m}}' >/dev/null 2>&1 \
     && ok || fail "jq --arg rejected the truncated value"
 
 # ---------------------------------------------------------------------------
-# 11b — --branch prints as a code span directly under the header, on both the
+# 11b — --branch prints as a link to the PR directly under the header, on both the
 #       digest and the fallback paths; absent or empty means no line at all.
 # ---------------------------------------------------------------------------
 begin_case "11b branch line"
 run "$SCRATCH/f1" --branch 'fix-the-thing'
 eq "exit 0" "$RC" "0"
-eq "line 2 is the branch" "$(printf '%s\n' "$OUT" | sed -n 2p)" '`fix-the-thing`'
+eq "line 2 is the branch" "$(printf '%s\n' "$OUT" | sed -n 2p)" '[fix-the-thing](<https://github.com/o/r/pull/2200>)'
 eq "line 1 is still the header" "$(printf '%s\n' "$OUT" | sed -n 1p)" '**Merged #2200: Fix the thing**'
 
 run "$SCRATCH/f7" --branch 'fix-the-thing'
-eq "fallback line 2 is the branch" "$(printf '%s\n' "$OUT" | sed -n 2p)" '`fix-the-thing`'
+eq "fallback line 2 is the branch" "$(printf '%s\n' "$OUT" | sed -n 2p)" '[fix-the-thing](<https://github.com/o/r/pull/2200>)'
 want "fallback still carried" "$OUT" '(No /pr-ready digest'
 
 run "$SCRATCH/f1"
@@ -265,7 +267,10 @@ run "$SCRATCH/f1" --branch ''
 eq "empty --branch: line 2 blank" "$(printf '%s\n' "$OUT" | sed -n 2p)" ''
 
 run "$SCRATCH/f1" --branch 'a`b'
-eq "backtick stripped" "$(printf '%s\n' "$OUT" | sed -n 2p)" '`ab`'
+eq "backtick stripped" "$(printf '%s\n' "$OUT" | sed -n 2p)" '[ab](<https://github.com/o/r/pull/2200>)'
+
+run "$SCRATCH/f1" --branch 'a[b]c'
+eq "brackets stripped" "$(printf '%s\n' "$OUT" | sed -n 2p)" '[abc](<https://github.com/o/r/pull/2200>)'
 
 WF_NOTIFY="$ROOT/.github/workflows/merge-digest-notify.yml"
 eq "workflow passes --branch" "$(grep -c -- '--branch "$PR_BRANCH"' "$WF_NOTIFY")" "1"

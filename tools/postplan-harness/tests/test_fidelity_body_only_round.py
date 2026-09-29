@@ -10,7 +10,8 @@ import runner
 from harness import fidelity
 from harness.adapters.ghad import RecordingGh
 from harness.adapters.llm import FixtureLlm
-from harness.classify import FILES_CHANGED_BEGIN, FILES_CHANGED_END
+from harness.armable import manual_testing_clearance
+from harness.classify import FILES_CHANGED_BEGIN, FILES_CHANGED_END, MANUAL_TESTING_SENTINEL
 from harness.state import UsageLedger
 
 from test_fidelity_rounds import (NOT_READY, TREE_1, TREE_2, _ScriptedLlm,  # noqa: F401
@@ -119,6 +120,33 @@ def test_body_only_round_records_the_sentinel_and_counts(tmp_path, git_shim):
         assert res.fidelity["rounds_completed"] == 1
     finally:
         _cleanup(9930, "9930-2")
+
+
+def test_body_only_round_reverts_a_fixer_edit_to_manual_testing(tmp_path, git_shim):
+    # #2489: the fixer fixed a Summary bullet and swapped the sentinel for prose.
+    before = ("## Summary\n\nOld bullet.\n\n## Manual Testing\n\n"
+              f"{MANUAL_TESTING_SENTINEL}\n")
+    after = ("## Summary\n\nNew bullet.\n\n## Manual Testing\n\n"
+             "Covered by `bin/test-pr-cycle`.\n")
+    gh = _BodySeqGh(str(tmp_path), [before, after, after], fixture={"pr_number": 9937})
+    git = _counting_git(commit_returns=[""])
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [NOT_READY],
+        "fidelity-remediation": ["answered in the body"],
+        "plan-fidelity-re-review-2": ["READY\n"],
+    })
+    lines: list[str] = []
+    try:
+        runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh, _plan(),
+                             "diff", before, 9937, "dead" * 10, TREE_1, False,
+                             lines.append, _Res())
+        written = gh._body_override
+        assert "New bullet." in written
+        assert "Covered by" not in written
+        assert manual_testing_clearance(written) == "CLEARED"
+        assert any("reverted fixer edit to ## Manual Testing" in ln for ln in lines)
+    finally:
+        _cleanup(9937, "9937-2")
 
 
 def test_body_only_round_logs_a_distinct_outcome_line(tmp_path, git_shim):

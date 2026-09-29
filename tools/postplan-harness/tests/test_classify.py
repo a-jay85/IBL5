@@ -9,14 +9,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.armable import manual_testing_clearance
 from harness.classify import (classify, files_from_diff, filter_diff,
-                               FILES_CHANGED_BEGIN, FILES_CHANGED_END,
+                               FILES_CHANGED_BEGIN, FILES_CHANGED_END, MANUAL_TESTING_SENTINEL,
                                name_status_from_diff, qualify_backlog_refs,
                                render_files_changed,
                                render_reviewer_verification,
                                retro_registry_row_from_diff,
                                REVIEWER_VERIFICATION_BEGIN, REVIEWER_VERIFICATION_END,
                                slice_agent_e_diff,
-                               strip_manual_testing_section,
+                               restore_manual_testing_section, strip_manual_testing_section,
                                upsert_files_changed,
                                upsert_reviewer_verification)
 from harness.planfile import parse_hold_justification, split_hold_justification
@@ -380,7 +380,7 @@ def test_predicate_safety():
     # CLEARED body: manual_testing_clearance unchanged by block
     cleared_body = (
         "## Summary\n\nSome changes.\n\n"
-        "## Manual Testing\n\nNo manual testing needed — verified by automated tests.\n"
+        "## Manual Testing\n\nNo manual testing needed — all changes are covered by automated tests.\n"
     )
     assert manual_testing_clearance(cleared_body) == "CLEARED"
     assert manual_testing_clearance(cleared_body + "\n\n" + block + "\n") == "CLEARED"
@@ -402,7 +402,7 @@ def test_predicate_safety():
     # written at PR creation; the sentinel is appended in Phase 6). Cover that too.
     assert manual_testing_clearance(
         upsert_files_changed(unknown_body, block)
-        + "\n\n## Manual Testing\n\nNo manual testing needed — verified by automated tests.\n"
+        + "\n\n## Manual Testing\n\nNo manual testing needed — all changes are covered by automated tests.\n"
     ) == "CLEARED"
     assert manual_testing_clearance(
         upsert_files_changed(unknown_body, block)
@@ -514,6 +514,44 @@ def test_strip_manual_testing_subsection_strips_only_up_to_next_heading():
     assert stripped is True
     assert "some steps" not in new_body
     assert "Conclusion" in new_body
+
+
+# ---------------------------------------------------------------------------
+# restore_manual_testing_section: a fidelity fixer never keeps an edit to it
+# ---------------------------------------------------------------------------
+
+_MT_BEFORE = ("## Summary\n\nOld bullet.\n\n## Manual Testing\n\n"
+              f"{MANUAL_TESTING_SENTINEL}\n\n## Files changed\n\nx\n")
+
+
+def test_restore_reverts_2489_reword():
+    # The #2489 fixer swapped the sentinel for prose and fixed a Summary bullet.
+    after = ("## Summary\n\nNew bullet.\n\n## Manual Testing\n\n"
+             "Covered by `bin/test-pr-cycle`.\n\n## Files changed\n\nx\n")
+    body, restored = restore_manual_testing_section(after, _MT_BEFORE)
+    assert restored is True
+    assert "New bullet." in body
+    assert "Covered by" not in body
+    assert manual_testing_clearance(body) == "CLEARED"
+
+
+def test_restore_reappends_deleted_section():
+    after = "## Summary\n\nNew bullet.\n\n## Files changed\n\nx\n"
+    body, restored = restore_manual_testing_section(after, _MT_BEFORE)
+    assert restored is True
+    assert manual_testing_clearance(body) == "CLEARED"
+
+
+def test_restore_noop_when_untouched_or_absent_before():
+    assert restore_manual_testing_section(_MT_BEFORE, _MT_BEFORE) == (_MT_BEFORE, False)
+    plain = "## Summary\n\nx\n"
+    assert restore_manual_testing_section(plain, plain) == (plain, False)
+
+
+def test_sentinel_passes_the_ci_checker():
+    # bin/check-pr-manual-testing and pr-armable.sh key on this prefix.
+    assert MANUAL_TESTING_SENTINEL.startswith("No manual testing needed")
+    assert "verified" not in MANUAL_TESTING_SENTINEL
 
 
 # ---------------------------------------------------------------------------

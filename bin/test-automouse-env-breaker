@@ -219,8 +219,10 @@ write_e2_plan() {
 }
 
 # bin/automouse/run writes one logs/<date>-<pid>.log per process, and each
-# run_e2 call is a new process, so read today's per-runner logs together.
-e2_logtxt() { cat "$E2_NDIR/logs/$(date +%Y-%m-%d)"-*.log 2>/dev/null || true; }
+# run_e2 call is a new process, so read every per-runner log together. The
+# log dir is private to this test; globbing all dates keeps a run that
+# crosses local midnight from missing the logs written after it.
+e2_logtxt() { cat "$E2_NDIR/logs/"*.log 2>/dev/null || true; }
 
 reset_e2() {
     rm -f "$E2_NDIR/queue"/*.md "$E2_NDIR/queue"/*.lock "$E2_NDIR/queue"/*.attempts \

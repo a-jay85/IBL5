@@ -1,6 +1,6 @@
 ---
 description: An unattended agent is given a production-reaching credential safely by starving it to one SELECT-only MySQL user over an SSH tunnel while every privileged write happens prod-side behind a CLI guard.
-last_verified: 2026-07-30
+last_verified: 2026-09-29
 ---
 
 # ADR-0093: An autonomous agent holding a production read-only credential

@@ -91,44 +91,31 @@ $hasIncrease = false;
 $staleWarning = false;
 $exitCode = 0;
 
+/** @var array<string, array<string, int>> $snapshotCounts */
+$snapshotCounts = [];
 foreach ($currentCounts as $file => $counts) {
     if (!is_array($counts)) {
         continue;
     }
-
-    /** @var array<string, int> $snapshotCounts */
-    $snapshotCounts = [];
     if (isset($snapshot[$file]) && is_array($snapshot[$file])) {
-        /** @var array<string, int> $snapshotCounts */
-        $snapshotCounts = $snapshot[$file];
-    }
-
-    $allIdentifiers = array_unique(array_merge(array_keys($counts), array_keys($snapshotCounts)));
-    sort($allIdentifiers);
-
-    foreach ($allIdentifiers as $identifier) {
-        if (!is_string($identifier)) {
-            continue;
-        }
-        $current = $counts[$identifier] ?? 0;
-        $previous = $snapshotCounts[$identifier] ?? 0;
-
-        if ($current > $previous) {
-            if ($previous === 0) {
-                echo "INCREASE: [{$file}] {$identifier}: new ({$current} entries)\n";
-            } else {
-                echo "INCREASE: [{$file}] {$identifier}: {$previous} → {$current}\n";
-            }
-            $hasIncrease = true;
-        } elseif ($current < $previous) {
-            $decrease = $previous - $current;
-            if ($decrease > 5) {
-                fwrite(STDERR, "WARNING: [{$file}] {$identifier}: {$previous} → {$current} (decreased by {$decrease} — snapshot may be stale, consider --update)\n");
-                $staleWarning = true;
-            }
-        }
+        /** @var array<string, int> $fileSnapshot */
+        $fileSnapshot = $snapshot[$file];
+        $snapshotCounts[$file] = $fileSnapshot;
     }
 }
+
+$result = (new \Maintenance\BaselineDriftChecker())->compare($currentCounts, $snapshotCounts);
+
+foreach ($result['increases'] as $line) {
+    echo $line . "\n";
+}
+foreach ($result['warnings'] as $line) {
+    fwrite(STDERR, $line . "\n");
+}
+
+$hasIncrease = $result['increases'] !== [];
+$staleWarning = $result['warnings'] !== [];
+$exitCode = 0;
 
 $mainBaseline = $baselineFiles['phpstan-baseline.neon'] ?? '';
 $floorFailed = false;

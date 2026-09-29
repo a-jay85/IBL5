@@ -5,7 +5,6 @@ if ($_SERVER['SERVER_NAME'] != "localhost") {
 } else {
     $bgcolor1 = "#BBBBBB";
 }
-$bgcolor2 = "#CCCCCC";
 $bgcolor3 = "#AAAAAA";
 $textcolor1 = "#000000";
 $textcolor2 = "#000000";
@@ -17,9 +16,8 @@ $textcolor2 = "#000000";
  */
 function OpenTable()
 {
-    global $bgcolor1, $bgcolor2;
-    echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$bgcolor2\"><tr><td>\n";
-    echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"8\" bgcolor=\"$bgcolor1\"><tr><td>\n";
+    echo "<table class=\"nuke-block-outer nuke-block--full\"><tr><td>\n";
+    echo "<table class=\"nuke-block-inner nuke-block--full\"><tr><td>\n";
 }
 
 /**
@@ -28,9 +26,8 @@ function OpenTable()
  */
 function OpenTable2()
 {
-    global $bgcolor1, $bgcolor2;
-    echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$bgcolor2\" align=\"center\"><tr><td>\n";
-    echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"8\" bgcolor=\"$bgcolor1\"><tr><td>\n";
+    echo "<table class=\"nuke-block-outer nuke-block--centered\"><tr><td>\n";
+    echo "<table class=\"nuke-block-inner\"><tr><td>\n";
 }
 
 /**
@@ -115,7 +112,7 @@ function themeheader()
     $navView = new \Navigation\NavigationView($navConfig);
     echo $navView->render();
 
-    echo "<body bgcolor=\"$bgcolor1\" style=\"--page-bg: $bgcolor1;\"" . ($teamId ? " data-user-team-id=\"$teamId\"" : '') . ">";
+    echo "<body style=\"--page-bg: $bgcolor1;\"" . ($teamId ? " data-user-team-id=\"$teamId\"" : '') . ">";
     echo "<div class=\"site-content\" id=\"site-content\" role=\"main\" hx-boost=\"true\" hx-target=\"#site-content\" hx-swap=\"innerHTML show:window:top\" hx-indicator=\"#site-content\">\n";
 }
 

@@ -189,6 +189,43 @@ img {
     overflow: hidden;
 }
 
+/* PHP-Nuke block wrappers emitted by OpenTable()/OpenTable2() in
+   themes/IBL/theme.php. These rules replace the former bgcolor, cellspacing,
+   cellpadding, border, width and align attributes. The inner fill tracks
+   --page-bg, which theme.php sets on <body> from $bgcolor1 (host-dependent).
+   Collapse and zero cell padding match what master rendered: Tailwind
+   preflight already overrode the cellspacing/cellpadding attributes. */
+.nuke-block-outer {
+    /* Former $bgcolor2. No palette token matches (gray-300 is #d1d5db). */
+    --nuke-block-frame: #cccccc;
+    background-color: var(--nuke-block-frame);
+    border-collapse: collapse;
+    border-spacing: 1px;
+}
+
+.nuke-block-inner {
+    background-color: var(--page-bg);
+    border-collapse: collapse;
+    border-spacing: 1px;
+}
+
+.nuke-block-outer > tbody > tr > td,
+.nuke-block-inner > tbody > tr > td {
+    padding: 0;
+}
+
+.nuke-block--full {
+    width: 100%;
+}
+
+.nuke-block--centered {
+    margin-inline: auto;
+}
+
+body {
+    background-color: var(--page-bg);
+}
+
 } /* end @layer base (legacy) */
 
 /* ==========================================================================

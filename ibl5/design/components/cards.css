@@ -9,7 +9,7 @@
 .ibl-centerbox,
 .team-card {
     font-family: var(--font-sans);
-    background: white;
+    background: var(--white);
     overflow: hidden;
     box-shadow: var(--shadow-md);
     border: 1px solid var(--gray-100);

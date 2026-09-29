@@ -240,13 +240,13 @@
 }
 
 .ibl-jump-menu__link:hover {
-    background: white;
+    background: var(--white);
     color: var(--navy-900);
     box-shadow: var(--shadow-sm);
 }
 
 .ibl-jump-menu__link--active {
-    background: white;
+    background: var(--white);
     color: var(--accent-500);
     box-shadow: var(--shadow-sm);
 }
@@ -558,7 +558,7 @@ span.nav-dropdown-item a:hover {
 
 .plr-nav__pill:hover {
     color: var(--navy-800);
-    background: white;
+    background: var(--white);
     box-shadow: var(--shadow-sm);
 }
 
@@ -596,7 +596,7 @@ span.nav-dropdown-item a:hover {
         font-size: 1rem;
         font-weight: var(--font-weight-semibold);
         color: var(--navy-800);
-        background: white;
+        background: var(--white);
         border: 2px solid var(--gray-200);
         border-radius: var(--radius-lg);
         appearance: none;

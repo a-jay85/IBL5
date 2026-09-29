@@ -5,7 +5,7 @@
    ========================================================================== */
 
 .news-article {
-    background: white;
+    background: var(--white);
     border-radius: var(--radius-xl);
     overflow: hidden;
     box-shadow: var(--shadow-md);

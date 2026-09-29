@@ -124,7 +124,7 @@
 .schedule-day {
     display: flex;
     border-bottom: 2px solid var(--gray-100);
-    background: white;
+    background: var(--white);
 }
 
 .schedule-day:last-child {

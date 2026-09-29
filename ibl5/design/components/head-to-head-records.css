@@ -69,7 +69,7 @@
 }
 
 .h2h-matrix tbody tr:nth-child(odd) th[scope="row"]:not(.ibl-team-cell--colored) {
-    background-color: white;
+    background-color: var(--white);
 }
 
 .h2h-matrix tbody tr:nth-child(even) th[scope="row"]:not(.ibl-team-cell--colored) {
@@ -104,7 +104,7 @@
    pink-on-cyan. White reads on every primary. Scoped to the row-label cell so
    standings, free agency, trading and the draft tables keep the team colour. */
 .h2h-matrix .h2h-row-label.ibl-team-cell--colored .ibl-team-cell__name {
-    color: #fff;
+    color: var(--white);
 }
 
 /* Corner cell: reading-direction hint (arrows point at columns, up at rows) */
@@ -143,7 +143,7 @@
    into the dark header band. Entries with no team page have no anchor and read
    white off the th, so the labelled row came out half legible. Force white. */
 .h2h-matrix .h2h-col-header a {
-    color: #fff;
+    color: var(--white);
 }
 
 .h2h-matrix .series-logo-img {

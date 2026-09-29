@@ -120,7 +120,7 @@
     padding: 1rem;
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
-    background: white;
+    background: var(--white);
     box-shadow: var(--shadow-sm);
 }
 
@@ -248,7 +248,7 @@
     background: linear-gradient(90deg,
         var(--team-color-primary),
         color-mix(in srgb, var(--team-color-primary) 70%, black));
-    color: var(--team-color-secondary, white);
+    color: var(--team-color-secondary, var(--white));
     font-family: var(--font-display);
     font-weight: var(--font-weight-bold);
     font-size: 1rem;

@@ -15,7 +15,7 @@
     display: flex;
 }
 .modal-content {
-    background: white;
+    background: var(--white);
     padding: 20px;
     border-radius: 5px;
     text-align: center;
@@ -34,7 +34,7 @@
     cursor: pointer;
 }
 .btn-cancel {
-    background: white;
+    background: var(--white);
     color: black;
     border: 1px solid var(--gray-300);
     padding: 10px 20px;

@@ -300,7 +300,7 @@
 /* === Individual Card === */
 
 .dc-card {
-    background: white;
+    background: var(--white);
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-lg);
     margin-bottom: var(--space-2);
@@ -435,7 +435,7 @@
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-sm);
     overflow: hidden;
-    background: white;
+    background: var(--white);
 }
 
 .dc-card__stepper-arrow {
@@ -486,7 +486,7 @@
     font-size: var(--text-sm);
     font-weight: var(--font-weight-semibold);
     color: var(--navy-900);
-    background: white;
+    background: var(--white);
     border-top: 1px solid var(--gray-200);
     border-bottom: 1px solid var(--gray-200);
     -webkit-user-select: none;
@@ -510,7 +510,7 @@
     border-top: 1px solid var(--gray-200);
     border-bottom: 1px solid var(--gray-200);
     border-radius: 0;
-    background: white;
+    background: var(--white);
     font-size: var(--text-sm);
     font-weight: var(--font-weight-semibold);
     color: var(--navy-900);
@@ -615,7 +615,7 @@
 
    Highlights form fields whose values differ from the live database values.
    Five intensity levels scale with the magnitude of the change, using the
-   design system's accent orange (--color-accent-500: #f97316).
+   design system's accent orange (var(--accent-500)).
    ========================================================================== */
 
 

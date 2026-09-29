@@ -43,7 +43,7 @@
 
 /* Topic Card */
 .topic-card {
-    background: white;
+    background: var(--white);
     border-radius: var(--radius-xl);
     overflow: hidden;
     box-shadow: var(--shadow-sm);

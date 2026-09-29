@@ -92,7 +92,7 @@
 .dc-help-section__content {
     padding: 0 var(--space-3) var(--space-3);
     font-size: var(--text-sm);
-    line-height: 1.5;
+    line-height: var(--leading-relaxed);
     color: var(--gray-700);
 }
 
@@ -808,7 +808,7 @@
     padding: 0.2rem 0.4rem;
     cursor: pointer;
     font-size: var(--text-sm);
-    line-height: 1;
+    line-height: var(--leading-none);
     color: var(--gray-600);
     transition: color 0.15s, border-color 0.15s;
 }

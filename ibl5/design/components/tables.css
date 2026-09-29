@@ -370,12 +370,12 @@
     .ibl-data-table.responsive-table td.sticky-col {
         position: sticky;
         left: 0;
-        z-index: 1;
+        z-index: var(--z-raised);
     }
 
     .ibl-data-table.responsive-table thead th.sticky-col {
         background: var(--team-header-bg, var(--gradient-navy-header));
-        z-index: 3;
+        z-index: var(--z-raised-3);
     }
 
     /* Sticky column backgrounds - consolidated for all variants */
@@ -400,7 +400,7 @@
     .ibl-data-table.responsive-table td.sticky-col-1 {
         position: sticky;
         left: 0;
-        z-index: 1;
+        z-index: var(--z-raised);
         min-width: 36px;
     }
 
@@ -408,14 +408,14 @@
     .ibl-data-table.responsive-table td.sticky-col-2 {
         position: sticky;
         left: 36px;
-        z-index: 1;
+        z-index: var(--z-raised);
         min-width: 36px;
     }
 
     .ibl-data-table.responsive-table thead th.sticky-col-1,
     .ibl-data-table.responsive-table thead th.sticky-col-2 {
         background: var(--team-header-bg, var(--gradient-navy-header));
-        z-index: 3;
+        z-index: var(--z-raised-3);
     }
 
     /* Background colors now handled by consolidated rules above */
@@ -630,7 +630,7 @@
     opacity: 1;
     transition: opacity var(--transition-slow);
     border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
-    z-index: 2;
+    z-index: var(--z-raised-2);
 }
 
 /* Hide scroll indicator when scrolled to the end */
@@ -717,7 +717,7 @@
 .sticky-table thead {
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: var(--z-sticky);
     box-shadow: var(--shadow-sticky-header);
 }
 
@@ -729,19 +729,19 @@
 .sticky-table .sticky-col {
     position: sticky;
     left: 0;
-    z-index: 5;
+    z-index: var(--z-sticky-col);
 }
 
 /* Second sticky column (e.g. Draft table: radio + name) */
 .sticky-table .sticky-col-2 {
     position: sticky;
     left: 36px;
-    z-index: 5;
+    z-index: var(--z-sticky-col);
 }
 
 /* Corner cell — intersection of sticky header and sticky column */
 .sticky-table .sticky-corner {
-    z-index: 15;
+    z-index: var(--z-sticky-corner);
     background: var(--navy-800);
 }
 
@@ -829,7 +829,7 @@
 .page-sticky-header-clone {
     position: fixed;
     top: 72px;
-    z-index: 40;
+    z-index: var(--z-fixed);
     pointer-events: none;
     filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.15));
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
@@ -849,7 +849,7 @@
     top: 0;
     width: var(--radius-lg);
     height: var(--radius-lg);
-    z-index: 1;
+    z-index: var(--z-raised);
     pointer-events: none;
 }
 
@@ -894,7 +894,7 @@
 .sticky-header thead th {
     position: sticky;
     top: 72px; /* Below fixed nav (72px tall) */
-    z-index: 10;
+    z-index: var(--z-sticky);
     background: var(--gradient-navy-header);
 }
 
@@ -1175,7 +1175,7 @@ td.ibl-team-cell--colored {
     opacity: 0;
     visibility: hidden;
     transition: opacity var(--transition-fast), visibility var(--transition-fast);
-    z-index: 100;
+    z-index: var(--z-tooltip);
     pointer-events: none;
     margin-right: 8px;
     box-shadow: var(--shadow-md);
@@ -1193,7 +1193,7 @@ td.ibl-team-cell--colored {
     opacity: 0;
     visibility: hidden;
     transition: opacity var(--transition-fast), visibility var(--transition-fast);
-    z-index: 100;
+    z-index: var(--z-tooltip);
     margin-right: -2px;
 }
 

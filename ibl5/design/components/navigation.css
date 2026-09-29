@@ -88,7 +88,7 @@
 .team-banner-logo h1 {
     margin: 0;
     padding: 0;
-    line-height: 0;
+    line-height: 0; /* off-scale: no --leading-* token */
     border: 0;
 }
 
@@ -149,7 +149,7 @@
     .team-action-link {
         padding: var(--space-3);
         justify-content: center;
-        line-height: 0;
+        line-height: 0; /* off-scale: no --leading-* token */
         background: var(--team-tab-bg-color);
         border-color: color-mix(in srgb, var(--team-tab-bg-color) 60%, black);
     }
@@ -752,7 +752,7 @@ span.nav-dropdown-item a:hover {
     opacity: 0;
     visibility: hidden;
     transition: all var(--transition-base);
-    z-index: 50;
+    z-index: var(--z-dropdown);
 }
 
 .group:hover > .nav-dropdown,
@@ -981,7 +981,7 @@ span.nav-dropdown-item a:hover {
     background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
-    z-index: 40;
+    z-index: var(--z-fixed);
     transition: opacity var(--transition-slow);
 }
 

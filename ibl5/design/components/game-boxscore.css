@@ -74,7 +74,7 @@
     font-family: var(--font-display);
     font-weight: var(--font-weight-extrabold);
     font-size: 2rem;
-    line-height: 1;
+    line-height: var(--leading-none);
 }
 
 .game-boxscore__at {

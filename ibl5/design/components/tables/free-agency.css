@@ -167,7 +167,7 @@ table.sortable thead th {
     top: 0;
     bottom: 0;
     left: 0;
-    z-index: 0;
+    z-index: var(--z-base);
     background-color: inherit;
     color: var(--accent-700);
     text-decoration-line: none;
@@ -193,7 +193,7 @@ table.sortable thead th {
         display: flex;
     }
     tr:has(.contract-hint-cell):hover .contract-hint-cell:has(.contract-hint-link) {
-        z-index: 1;
+        z-index: var(--z-raised);
     }
     tr:has(.contract-hint-cell):hover .contract-hint-cell {
         color: transparent;
@@ -206,7 +206,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-link {
     display: flex;
 }
 tr:has(.contract-hint-cell):focus-within .contract-hint-cell:has(.contract-hint-link) {
-    z-index: 1;
+    z-index: var(--z-raised);
 }
 tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     color: transparent;

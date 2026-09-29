@@ -263,7 +263,7 @@
     background-color: var(--color-error-50);
     box-shadow: 0 0 10px 3px rgba(220, 38, 38, 0.5);
     position: relative;
-    z-index: 1;
+    z-index: var(--z-raised);
 }
 
 /* Hide per-team dropdowns injected by API responses */

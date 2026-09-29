@@ -149,7 +149,7 @@
     font-size: var(--text-lg);
     font-weight: var(--font-weight-bold);
     color: var(--navy-800);
-    line-height: 1;
+    line-height: var(--leading-none);
 }
 
 /* Games within a day */

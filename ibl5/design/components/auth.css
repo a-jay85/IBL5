@@ -180,7 +180,7 @@
     font-family: var(--font-sans);
     font-size: var(--text-lg);
     color: var(--gray-600);
-    line-height: 1.6;
+    line-height: var(--leading-loose);
     margin-bottom: var(--space-4);
 }
 
@@ -235,7 +235,7 @@
 .auth-info-text {
     font-size: 1rem;
     color: var(--gray-500);
-    line-height: 1.5;
+    line-height: var(--leading-relaxed);
     text-align: center;
 }
 

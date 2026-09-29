@@ -7,7 +7,7 @@
 .projected-draft-order-description {
     color: var(--gray-600);
     font-size: var(--text-sm);
-    line-height: 1.5;
+    line-height: var(--leading-relaxed);
     margin-bottom: var(--space-4);
 }
 
@@ -60,7 +60,7 @@
 /* Raise team cell above adjacent cells so tooltip renders on top */
 .projected-draft-order-table td.ibl-team-cell--colored {
     position: relative;
-    z-index: 1;
+    z-index: var(--z-raised);
 }
 
 /* Position tooltip to the right (default is left) — stays within table bounds */
@@ -101,7 +101,7 @@
     transform: translateY(-50%);
     color: var(--gray-400);
     font-size: 1rem;
-    line-height: 1;
+    line-height: var(--leading-none);
     pointer-events: none;
 }
 

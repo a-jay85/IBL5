@@ -35,7 +35,7 @@
     font-family: var(--font-display);
     font-weight: var(--font-weight-extrabold);
     font-size: 1.6rem;
-    line-height: 1;
+    line-height: var(--leading-none);
     letter-spacing: .04em;
     text-transform: uppercase;
 }
@@ -132,7 +132,7 @@
     background: inherit;
     border-right: 1px solid var(--gray-200);
     border-bottom: 1px solid var(--gray-200);
-    z-index: 2;
+    z-index: var(--z-raised-2);
 }
 
 /* Tab row 1: vs/@ + opponent + date pulled right */
@@ -157,7 +157,7 @@
     text-transform: uppercase;
     letter-spacing: .02em;
     color: var(--navy-800);
-    line-height: 1;
+    line-height: var(--leading-none);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -189,7 +189,7 @@
     font-family: var(--font-display);
     font-weight: var(--font-weight-bold);
     font-size: 1.35rem;
-    line-height: 1;
+    line-height: var(--leading-none);
     color: var(--navy-900);
     font-variant-numeric: tabular-nums;
     letter-spacing: .01em;
@@ -199,7 +199,7 @@
     font-family: var(--font-display);
     font-weight: var(--font-weight-extrabold);
     font-size: 1.35rem;
-    line-height: 1;
+    line-height: var(--leading-none);
     color: var(--success-600);
     letter-spacing: .04em;
 }
@@ -224,7 +224,7 @@
     font-family: var(--font-mono);
     font-size: 9px;
     font-weight: var(--font-weight-extrabold);
-    line-height: 1;
+    line-height: var(--leading-none);
 }
 
 /* ============================================================
@@ -254,7 +254,7 @@
     font-size: 1.15rem;
     letter-spacing: .06em;
     text-transform: uppercase;
-    line-height: 1;
+    line-height: var(--leading-none);
 }
 .last-sim-recap__vs {
     font-family: var(--font-mono);
@@ -263,7 +263,7 @@
     color: rgba(255, 255, 255, .85);
     letter-spacing: .06em;
     text-transform: uppercase;
-    line-height: 1;
+    line-height: var(--leading-none);
 }
 .last-sim-recap__strip-right {
     margin-left: auto;
@@ -351,7 +351,7 @@
     text-transform: uppercase;
     letter-spacing: .02em;
     color: var(--navy-800);
-    line-height: 1;
+    line-height: var(--leading-none);
     text-align: center;
 }
 .last-sim-recap__final-rec {
@@ -370,7 +370,7 @@
     font-weight: var(--font-weight-bold);
     font-size: 1.75rem;
     color: var(--gray-400);
-    line-height: .95;
+    line-height: .95; /* off-scale: no --leading-* token */
     font-variant-numeric: tabular-nums;
     justify-self: end;
     text-align: right;
@@ -512,7 +512,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     font-weight: var(--font-weight-semibold);
     font-size: .86rem;
     color: var(--navy-800);
-    line-height: 1.15;
+    line-height: 1.15; /* off-scale: no --leading-* token */
 }
 .last-sim-recap__inj-pos {
     display: inline-block;
@@ -540,7 +540,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     font-size: 9px;
     font-weight: var(--font-weight-extrabold);
     margin-left: 5px;
-    line-height: 1;
+    line-height: var(--leading-none);
     vertical-align: 3px;
 }
 .last-sim-recap__inj-why {
@@ -655,13 +655,13 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     font-family: var(--font-mono);
     font-size: 7px;
     font-weight: var(--font-weight-extrabold);
-    line-height: 1;
+    line-height: var(--leading-none);
 }
 .last-sim-recap__player-name {
     font-size: .86rem;
     font-weight: var(--font-weight-semibold);
     color: var(--navy-800);
-    line-height: 1.1;
+    line-height: 1.1; /* off-scale: no --leading-* token */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

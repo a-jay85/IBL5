@@ -110,7 +110,7 @@
 /* Corner cell: reading-direction hint (arrows point at columns, up at rows) */
 .h2h-matrix .h2h-corner {
     vertical-align: bottom;
-    line-height: 1.1;
+    line-height: 1.1; /* off-scale: no --leading-* token */
     width: var(--h2h-corner-width);
 }
 
@@ -173,7 +173,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     font-size: 0.75rem;
-    line-height: 1;
+    line-height: var(--leading-none);
     letter-spacing: 0.03em;
 }
 
@@ -249,7 +249,7 @@
     font-weight: var(--font-weight-normal);
     white-space: nowrap;
     pointer-events: none;
-    z-index: 10;
+    z-index: var(--z-sticky);
 }
 
 .h2h-matrix .series-record-cell.h2h-tip-open::after {

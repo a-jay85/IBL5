@@ -1,7 +1,7 @@
 ---
-name: sonnet-4-6
-description: Pinned Sonnet 4.6 general-purpose agent. Use `subagent_type: "sonnet-4-6"` (omit model) wherever a skill or plan needs a Sonnet subagent pinned to 4.6 — avoids the `sonnet` alias resolving to Sonnet 5. Full tool access except `Agent` — it cannot spawn sub-agents; delegation stays one level deep. Appropriate for review agents, backlog housekeeping, manual-test classification, and other judgment tasks that need Edit/Write.
-model: claude-sonnet-4-6
+name: sonnet-5-5
+description: Pinned Sonnet 5.5 general-purpose agent. Use `subagent_type: "sonnet-5-5"` (omit model) wherever a skill or plan needs a Sonnet subagent pinned to 5.5; the explicit id keeps the tier fixed when the `sonnet` alias moves. Full tool access except `Agent`. It cannot spawn sub-agents; delegation stays one level deep. Appropriate for review agents, backlog housekeeping, manual-test classification, and other judgment tasks that need Edit/Write.
+model: claude-sonnet-5-5
 disallowedTools: Agent
 ---
 

@@ -42,8 +42,8 @@ DISCORD_DM_BIN="${BUG_PIPELINE_DM_BIN:-$SCRIPT_DIR/discord-dm}"
 PLANS_DIR="${BUG_PIPELINE_PLANS_DIR:-$HOME/claude-plans}"
 IDLE_SECS="${BUG_PIPELINE_IDLE_SECS:-3600}"
 BACKOFF_SECS="${BUG_PIPELINE_BACKOFF_SECS:-1800}"
-CLASSIFY_MODEL="${BUG_PIPELINE_CLASSIFY_MODEL:-claude-sonnet-4-6}"
-PLAN_MODEL="${BUG_PIPELINE_PLAN_MODEL:-claude-sonnet-4-6}"
+CLASSIFY_MODEL="${BUG_PIPELINE_CLASSIFY_MODEL:-claude-sonnet-5-5}"
+PLAN_MODEL="${BUG_PIPELINE_PLAN_MODEL:-claude-sonnet-5-5}"
 CLAUDE_TIMEOUT="${BUG_PIPELINE_CLAUDE_TIMEOUT:-120}"
 PLAN_TIMEOUT="${BUG_PIPELINE_PLAN_TIMEOUT:-1800}"
 CLASSIFY_PROMPT_FILE="${BUG_PIPELINE_CLASSIFY_PROMPT:-$SCRIPT_DIR/bug-pipeline-classify-prompt}"
@@ -116,7 +116,7 @@ file_and_close_row() { # row_json
 
 # ── Hunter seams (#5b) — all default to production; tests override ─────────────
 HUNT_PROMPT_FILE="${BUG_PIPELINE_HUNT_PROMPT:-$SCRIPT_DIR/bug-pipeline-hunter-prompt}"
-HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-sonnet-4-6 claude-opus-5-5}"  # cheap→dear, Opus last; no Haiku tier
+HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-sonnet-5-5 claude-opus-5-5}"  # cheap→dear, Opus last; no Haiku tier
 HUNTER_TIMEOUT_SECS="${BUG_PIPELINE_HUNTER_TIMEOUT:-1800}"
 HUNT_LOG="${BUG_PIPELINE_HUNT_LOG:-$HOME/.claude/logs/bug-pipeline-hunt.log}"
 # Liveness heartbeat: epoch of the last tick START (bin/bug-pipeline-check reads it).
@@ -140,7 +140,7 @@ CI_AUTOFIX_LEDGER="${BUG_PIPELINE_CI_AUTOFIX_LEDGER:-$HOME/.claude/logs/ci-autof
 CI_AUTOFIX_LOG="${BUG_PIPELINE_CI_AUTOFIX_LOG:-$HOME/.claude/logs/ci-autofix.log}"
 CI_AUTOFIX_LOCK="${BUG_PIPELINE_CI_AUTOFIX_LOCK:-$HOME/.claude/logs/ci-autofix.lock}"
 CI_AUTOFIX_TIMEOUT_SECS="${BUG_PIPELINE_CI_AUTOFIX_TIMEOUT:-1800}"
-CI_AUTOFIX_SONNET_MODEL="${BUG_PIPELINE_CI_AUTOFIX_SONNET_MODEL:-claude-sonnet-4-6}"
+CI_AUTOFIX_SONNET_MODEL="${BUG_PIPELINE_CI_AUTOFIX_SONNET_MODEL:-claude-sonnet-5-5}"
 CI_AUTOFIX_OPUS_MODEL="${BUG_PIPELINE_CI_AUTOFIX_OPUS_MODEL:-claude-opus-5-5}"
 CI_AUTOFIX_LOG_MAX_BYTES="${BUG_PIPELINE_CI_AUTOFIX_LOG_MAX_BYTES:-40000}"  # tail cap on the fetched CI job log
 CI_AUTOFIX_PROMPT_FILE="${BUG_PIPELINE_CI_AUTOFIX_PROMPT:-$SCRIPT_DIR/bug-pipeline-ci-autofix-prompt}"

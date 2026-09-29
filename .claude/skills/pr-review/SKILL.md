@@ -5,8 +5,8 @@ allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
 name: pr-review
 description: Token-efficient code review for pull requests
 disable-model-invocation: true
-model: claude-sonnet-4-6
-last_verified: 2026-09-23
+model: claude-sonnet-5-5
+last_verified: 2026-09-28
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.

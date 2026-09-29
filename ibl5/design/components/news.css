@@ -60,7 +60,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-3);
-    font-size: 1rem;
+    font-size: var(--text-base);
     color: var(--gray-300);
 }
 

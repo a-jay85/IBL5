@@ -5,7 +5,8 @@
 # gate. Builds throwaway .github/actions and .github/workflows trees and asserts the check's exit code and
 # skip/active behavior. Verifies the logic even while the live composites are absent
 # on master (the check is dormant there, but its logic must already be correct so it
-# is sound the moment the composites land).
+# is sound the moment the composites land). Also covers the mutation-pr.yml
+# invariants (M1-M4) with throwaway workflow + ADR fixtures.
 #
 # Run: bin/test-check-composite-contracts  (exit 0 = all pass, 1 = a case failed)
 set -u
@@ -26,6 +27,10 @@ fresh_actions() {
 
 fresh_workflows() {
   mktemp -d "$TMP/workflows.XXXXXX"
+}
+
+fresh_decisions() {
+  mktemp -d "$TMP/decisions.XXXXXX"
 }
 
 put_ssh() { # dir, guarded(1|0)
@@ -156,6 +161,85 @@ PPEOF
 put_merge() {
   # shellcheck disable=SC2016
   printf 'SKIP_CHECKS="%s" \\\n    bin/check-master-ci-green "$SHA"\n' "$2" > "$1"
+}
+
+# put_mutation_pr <wf-dir> <variant>
+# Writes a minimal mutation-pr.yml to <wf-dir>. The base ("good") satisfies M1-M4
+# and deliberately carries a step-level `if:` and a sticky-step `continue-on-error`,
+# so M3/M4 are shown not to over-match. Each variant mutates exactly one invariant.
+put_mutation_pr() {
+  mkdir -p "$1"
+  local f="$1/mutation-pr.yml"
+  local tmp
+  # shellcheck disable=SC2016
+  cat > "$f" << 'MPEOF'
+name: Mutation Testing (per-PR diff)
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  mutation-pr:
+    name: Infection PHP (per-PR diff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - name: Detect covered changes
+      id: changes
+      if: github.event_name == 'pull_request'
+      run: echo skip=false
+    - name: Run Infection on diff
+      run: |
+        vendor/bin/infection \
+          --min-msi=100 \
+          --ignore-msi-with-no-mutations
+    - name: Post sticky mutation comment
+      uses: marocchino/sticky-pull-request-comment@abc
+      continue-on-error: true
+MPEOF
+  case "${2:-good}" in
+    good) ;;
+    m1-paths)
+      tmp="$(mktemp)"
+      awk '{print} /^  pull_request:$/{print "    paths: [\047ibl5/**\047]"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m1-branches-ignore)
+      tmp="$(mktemp)"
+      awk '{print} /^  pull_request:$/{print "    branches-ignore: [production]"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m1-labeled)
+      tmp="$(mktemp)"
+      sed 's/types: \[opened, synchronize, reopened\]/types: [opened, synchronize, reopened, labeled]/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m2-name-drift)
+      tmp="$(mktemp)"
+      sed 's/^    name: Infection PHP (per-PR diff)$/    name: Infection PHP (per-PR)/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m3-job-if)
+      tmp="$(mktemp)"
+      awk '{print} /^    runs-on:/{print "    if: github.event.action != \047labeled\047"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m3-job-coe)
+      tmp="$(mktemp)"
+      awk '{print} /^    runs-on:/{print "    continue-on-error: true"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m4-msi-99)
+      tmp="$(mktemp)"
+      sed 's/--min-msi=100/--min-msi=99/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m4-msi-extra)
+      tmp="$(mktemp)"
+      awk '{print} /--min-msi=100/{print "          --min-msi=90 \\"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m4-msi-missing)
+      tmp="$(mktemp)"
+      sed '/--min-msi=100/d' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m4-coe-infection)
+      tmp="$(mktemp)"
+      awk '{print} /^    - name: Run Infection on diff$/{print "      continue-on-error: true"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    *)
+      echo "put_mutation_pr: unknown variant '${2:-}'" >&2; return 1 ;;
+  esac
+}
+
+# put_mut_adr <dir> <literal>
+# Writes the ADR fixture M2 resolves by glob; <literal> is the context it carries.
+put_mut_adr() {
+  mkdir -p "$1"
+  printf '# ADR-0999\n\n## Activation\n\nRequired context: %s\n' "$2" > "$1/0999-mutation-pr-required-own-workflow.md"
 }
 
 expect() { # name want got
@@ -410,6 +494,55 @@ if cmp -s "$d_wf/tests.yml" "$REAL_WF/tests.yml"; then
 fi
 "$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
 expect "r1-real-tests-yml-mutant-fails" 1 $?
+
+# ---------------------------------------------------------------------------
+# mutation-pr invariants (M1-M4)
+# ---------------------------------------------------------------------------
+
+MUT_LITERAL='Infection PHP (per-PR diff)'
+
+# run_mut <case-name> <want-exit> <variant> [adr-literal|-none-]
+# Fresh actions/workflows/decisions dirs, one mutation-pr.yml variant, one ADR.
+run_mut() {
+  local name="$1" want="$2" variant="$3" adr="${4:-$MUT_LITERAL}"
+  local d_a d_wf d_dec
+  d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+  put_mutation_pr "$d_wf" "$variant"
+  if [ "$adr" != "-none-" ]; then put_mut_adr "$d_dec" "$adr"; fi
+  "$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+  expect "$name" "$want" $?
+}
+
+run_mut "mut-good" 0 good
+run_mut "mut-m1-paths" 1 m1-paths
+run_mut "mut-m1-branches-ignore" 1 m1-branches-ignore
+run_mut "mut-m1-labeled" 1 m1-labeled
+run_mut "mut-m2-name-drift" 1 m2-name-drift
+run_mut "mut-m2-adr-drift" 1 good 'Infection PHP (per PR diff)'
+run_mut "mut-m2-adr-absent" 1 good -none-
+run_mut "mut-m3-job-if" 1 m3-job-if
+run_mut "mut-m3-job-coe" 1 m3-job-coe
+run_mut "mut-m4-msi-99" 1 m4-msi-99
+run_mut "mut-m4-msi-extra" 1 m4-msi-extra
+run_mut "mut-m4-msi-missing" 1 m4-msi-missing
+run_mut "mut-m4-coe-infection" 1 m4-coe-infection
+
+# mut-m2-duplicate-name: a second workflow names a job with the same context
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+put_mutation_pr "$d_wf" good; put_mut_adr "$d_dec" "$MUT_LITERAL"
+printf 'name: Mutation Testing\njobs:\n  mutation:\n    name: Infection PHP (per-PR diff)\n' > "$d_wf/mutation.yml"
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+expect "mut-m2-duplicate-name" 1 $?
+
+# mut-absent-skips: no mutation-pr.yml → exit 0 with a visible skip line
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" 2>&1)"; rc=$?
+expect "mut-absent-skips" 0 "$rc"
+if printf '%s' "$out" | grep -q 'mutation-pr absent — skipped'; then
+  echo "ok: mut-absent-skips-skip-visible"
+else
+  echo "FAIL: mut-absent-skips — no skip line in output; output: $out"; FAILED=1
+fi
 
 if [ "$FAILED" -ne 0 ]; then
   echo "RESULT: FAILED"

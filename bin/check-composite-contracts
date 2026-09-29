@@ -20,15 +20,20 @@
 #                   pr-meta-checks.yml and mutation.yml must keep a block-style
 #                   `on: pull_request:` trigger with no `paths:` or
 #                   `paths-ignore:` under it. push.paths stays legal.
+#   mutation-pr:    four invariants (M1-M4) that keep the required check
+#                   `Infection PHP (per-PR diff)` reporting on every PR: M1 always
+#                   starts (no filters, no `labeled`), M2 exact context shared with
+#                   the ADR and unique, M3 never job-skipped (no job-level `if:` or
+#                   `continue-on-error`), M4 the --min-msi=100 threshold intact.
 #
 # Conditional by design: each check is SKIPPED (visibly) when its target file is
 # absent, so this no-ops on a branch without the file and auto-activates the
 # moment it lands. The visible "skipped" line means a path typo can't silently
 # turn the gate into a vacuous pass.
 #
-# Usage: bin/check-composite-contracts [actions-dir] [workflows-dir] [merge-script] [promote-script]
+# Usage: bin/check-composite-contracts [actions-dir] [workflows-dir] [merge-script] [promote-script] [decisions-dir]
 #   defaults: .github/actions, .github/workflows, bin/merge-master-to-prod,
-#             bin/promote-master-to-production
+#             bin/promote-master-to-production, ibl5/docs/decisions
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,6 +41,10 @@ ACTIONS="${1:-$ROOT/.github/actions}"
 WORKFLOWS="${2:-$ROOT/.github/workflows}"
 MERGE_SCRIPT="${3:-$ROOT/bin/merge-master-to-prod}"
 PROMOTE_SCRIPT="${4:-$ROOT/bin/promote-master-to-production}"
+DECISIONS="${5:-$ROOT/ibl5/docs/decisions}"
+# Required status-check context emitted by mutation-pr.yml (ADR-0145). The ONE
+# machine-checked copy of this literal; M2 compares the workflow and the ADR to it.
+MUT_CONTEXT='Infection PHP (per-PR diff)'
 
 fail=0
 
@@ -230,5 +239,127 @@ for wf_name in tests.yml e2e-tests.yml human-signoff.yml pr-meta-checks.yml muta
       ;;
   esac
 done
+
+mp_file="$WORKFLOWS/mutation-pr.yml"
+if [ ! -f "$mp_file" ]; then
+  echo "composite-contracts: mutation-pr absent — skipped"
+else
+
+  # on_blk: the `on:` block up to the next top-level key. job_blk: the
+  # mutation-pr job up to the next 2-space job key (or end of file).
+  on_blk="$(awk '
+    { sub(/\r$/, "") }
+    /^on:/ { inblk=1; print; next }
+    inblk && /^[A-Za-z]/ { exit }
+    inblk { print }
+  ' "$mp_file")"
+  job_blk="$(awk '
+    { sub(/\r$/, "") }
+    /^  mutation-pr:[[:space:]]*$/ { inblk=1; print; next }
+    inblk && /^  [A-Za-z0-9_-]+:[[:space:]]*$/ { exit }
+    inblk { print }
+  ' "$mp_file")"
+
+  # M1: always starts. A required check that never starts leaves the PR pending
+  # forever, so the trigger must include pull_request, carry no path/branch
+  # filter, and never list `labeled` (a labeled run shares the concurrency group
+  # and would cancel the real per-PR run).
+  _m1_bad=""
+  if ! grep -q 'pull_request' <<< "$on_blk"; then
+    _m1_bad="on: has no pull_request trigger"
+  elif grep -qE '^[[:space:]]+(paths|paths-ignore|branches|branches-ignore):' <<< "$on_blk"; then
+    _m1_bad="on: carries a paths/branches filter"
+  elif grep -Eq '(^|[^a-z_])labeled([^a-z_]|$)' <<< "$on_blk"; then
+    _m1_bad="on: lists the labeled type"
+  fi
+  if [ -n "$_m1_bad" ]; then
+    echo "composite-contracts: mutation-pr (M1) — $_m1_bad; the required check would not start on every PR event, leaving the PR pending forever ($mp_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: mutation-pr starts on every PR event, no filters, no labeled (M1)"
+  fi
+
+  # M2: the job name must equal the required context, the ADR must carry the same
+  # literal, and no other workflow may emit a second check run under that name.
+  _m2_bad=""
+  if [ -z "$job_blk" ]; then
+    _m2_bad="job mutation-pr is missing or renamed"
+  else
+    job_name="$(sed -n 's/^    name:[[:space:]]*//p' <<< "$job_blk" | head -1 | sed "s/[[:space:]]*\$//; s/^[\"']//; s/[\"']\$//")"
+    if [ "$job_name" != "$MUT_CONTEXT" ]; then
+      _m2_bad="job name is '${job_name:-<unset>}', expected '$MUT_CONTEXT'"
+    fi
+  fi
+  if [ -z "$_m2_bad" ]; then
+    _adr_files=()
+    for _f in "$DECISIONS"/*-mutation-pr-required-own-workflow.md; do
+      [ -f "$_f" ] && _adr_files+=("$_f")
+    done
+    if [ "${#_adr_files[@]}" -ne 1 ]; then
+      _m2_bad="expected exactly one ADR $DECISIONS/*-mutation-pr-required-own-workflow.md, found ${#_adr_files[@]}"
+    elif ! grep -qF -- "$MUT_CONTEXT" "${_adr_files[0]}"; then
+      _m2_bad="ADR ${_adr_files[0]} does not carry the literal '$MUT_CONTEXT'"
+    fi
+  fi
+  if [ -z "$_m2_bad" ]; then
+    for _wf in "$WORKFLOWS"/*.yml; do
+      [ -f "$_wf" ] || continue
+      [ "$_wf" = "$mp_file" ] && continue
+      if awk -v ctx="$MUT_CONTEXT" '
+        { sub(/\r$/, "") }
+        /^[[:space:]]*(- )?name:/ {
+          v=$0; sub(/^[^:]*:[[:space:]]*/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]+$/, "", v)
+          if (v == ctx) found=1
+        }
+        END { exit !found }
+      ' "$_wf"; then
+        _m2_bad="$_wf also names a job '$MUT_CONTEXT'; two check runs would share one required context"
+        break
+      fi
+    done
+  fi
+  if [ -n "$_m2_bad" ]; then
+    echo "composite-contracts: mutation-pr (M2) — $_m2_bad; the required context would not resolve to a single check run ($mp_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: mutation-pr job name matches the ADR and is unique (M2)"
+  fi
+
+  # M3: never job-skipped. A job-level `if:` can skip the job, and a skipped run
+  # may not satisfy the required context; job-level `continue-on-error` would let
+  # a failing job report green. Step-level keys sit at 6 spaces and stay legal.
+  if grep -qE '^    (if|continue-on-error):' <<< "$job_blk"; then
+    echo "composite-contracts: mutation-pr (M3) — job-level 'if:' or 'continue-on-error:' present; the job could be skipped or fail green, so the required check would not gate ($mp_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: mutation-pr has no job-level if/continue-on-error (M3)"
+  fi
+
+  # M4: threshold intact. Every --min-msi token must be exactly --min-msi=100, at
+  # least one must exist, and the step that runs it must not carry
+  # continue-on-error (which would turn an MSI miss into a green run).
+  _m4_bad=""
+  msi_tokens="$(grep -oE -- '--min-msi[= ][^ \\]*' "$mp_file" | tr -d '\r' || true)"
+  if [ -z "$msi_tokens" ]; then
+    _m4_bad="no --min-msi threshold found"
+  elif [ "$(grep -vcx -- '--min-msi=100' <<< "$msi_tokens" || true)" -ne 0 ]; then
+    _m4_bad="a --min-msi token is not exactly --min-msi=100"
+  elif awk '
+    { sub(/\r$/, "") }
+    function flush() { if (step ~ /--min-msi/ && step ~ /continue-on-error/) bad=1; step="" }
+    /^    - / { flush() }
+    { step = step "\n" $0 }
+    END { flush(); exit !bad }
+  ' <<< "$job_blk"; then
+    _m4_bad="the step running --min-msi carries continue-on-error"
+  fi
+  if [ -n "$_m4_bad" ]; then
+    echo "composite-contracts: mutation-pr (M4) — $_m4_bad; the 100% MSI gate would be weakened ($mp_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: mutation-pr keeps --min-msi=100 with no continue-on-error on that step (M4)"
+  fi
+
+fi  # end mp_file present
 
 exit "$fail"

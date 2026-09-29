@@ -85,17 +85,17 @@ body {
    legacy PHP-Nuke code. They ensure consistent font rendering across
    the old codebase while we transition to modern HTML/CSS. */
 
-FONT,
-TD,
-P,
-FORM {
+font,
+td,
+p,
+form {
     font-family: var(--font-sans);
     font-size: 1rem;
 }
 
-INPUT,
-TEXTAREA,
-SELECT {
+input,
+textarea,
+select {
     border: 1px solid var(--black);
     font-size: 1rem;
     font-family: var(--font-sans);
@@ -235,6 +235,7 @@ body {
    stack vertically on mobile devices. Uses @layer components so they
    beat base styles without needing !important. Higher specificity +
    later source order ensures they override other component rules.
+   Theme pages nest tables under div.site-content; these selectors serve standalone pages that emit <body><table> directly.
    ========================================================================== */
 
 @layer components {

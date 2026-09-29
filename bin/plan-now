@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# bin/plan-now — fire a detached headless Sonnet 4.6 session that RUNS a drafted
+# bin/plan-now — fire a detached headless Sonnet 5.5 session that RUNS a drafted
 # /plan handoff prompt, replacing the manual "paste this into a fresh session" step
 # at the end of the /plan-prompt skill.
 #

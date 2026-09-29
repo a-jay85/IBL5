@@ -15,6 +15,46 @@ use CareerLeaderboards\Contracts\CareerLeaderboardsServiceInterface;
  */
 class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
 {
+    /** @var array<string, array{totals: string, averages: string|null}> */
+    private const PHASE_TABLES = [
+        'regular' => ['totals' => 'ibl_hist', 'averages' => 'ibl_season_career_avgs'],
+        'playoffs' => ['totals' => 'ibl_playoff_career_totals', 'averages' => 'ibl_playoff_career_avgs'],
+        'heat' => ['totals' => 'ibl_heat_career_totals', 'averages' => 'ibl_heat_career_avgs'],
+        'olympics' => ['totals' => 'ibl_olympics_career_totals', 'averages' => 'ibl_olympics_career_avgs'],
+        'rookie' => ['totals' => 'ibl_rookie_career_totals', 'averages' => null],
+        'sophomore' => ['totals' => 'ibl_sophomore_career_totals', 'averages' => null],
+        'allstar' => ['totals' => 'ibl_allstar_career_totals', 'averages' => 'ibl_allstar_career_avgs'],
+    ];
+
+    /**
+     * Season-tab sort keys and order (minus QA), mapped to career columns.
+     * PPG is labelled PTS on totals; the percentage keys exist only on averages tables.
+     *
+     * @var array<string, array{label: string, column: string, avgsOnly: bool}>
+     */
+    private const SORT_OPTIONS = [
+        'PPG' => ['label' => 'PPG', 'column' => 'pts', 'avgsOnly' => false],
+        'REB' => ['label' => 'REB', 'column' => 'reb', 'avgsOnly' => false],
+        'OREB' => ['label' => 'OREB', 'column' => 'orb', 'avgsOnly' => false],
+        'DREB' => ['label' => 'DREB', 'column' => 'drb', 'avgsOnly' => false],
+        'AST' => ['label' => 'AST', 'column' => 'ast', 'avgsOnly' => false],
+        'STL' => ['label' => 'STL', 'column' => 'stl', 'avgsOnly' => false],
+        'BLK' => ['label' => 'BLK', 'column' => 'blk', 'avgsOnly' => false],
+        'TO' => ['label' => 'TO', 'column' => 'tvr', 'avgsOnly' => false],
+        'FOUL' => ['label' => 'FOUL', 'column' => 'pf', 'avgsOnly' => false],
+        'FGM' => ['label' => 'FGM', 'column' => 'fgm', 'avgsOnly' => false],
+        'FGA' => ['label' => 'FGA', 'column' => 'fga', 'avgsOnly' => false],
+        'FGP' => ['label' => 'FG%', 'column' => 'fgpct', 'avgsOnly' => true],
+        'FTM' => ['label' => 'FTM', 'column' => 'ftm', 'avgsOnly' => false],
+        'FTA' => ['label' => 'FTA', 'column' => 'fta', 'avgsOnly' => false],
+        'FTP' => ['label' => 'FT%', 'column' => 'ftpct', 'avgsOnly' => true],
+        'TGM' => ['label' => 'TGM', 'column' => 'tgm', 'avgsOnly' => false],
+        'TGA' => ['label' => 'TGA', 'column' => 'tga', 'avgsOnly' => false],
+        'TGP' => ['label' => 'TG%', 'column' => 'tpct', 'avgsOnly' => true],
+        'GAMES' => ['label' => 'GAMES', 'column' => 'games', 'avgsOnly' => false],
+        'MIN' => ['label' => 'MIN', 'column' => 'minutes', 'avgsOnly' => false],
+    ];
+
     /**
      * @see CareerLeaderboardsServiceInterface::processPlayerRow()
      *
@@ -101,56 +141,101 @@ class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
     }
 
     /**
-     * @see CareerLeaderboardsServiceInterface::getBoardTypes()
+     * @see CareerLeaderboardsServiceInterface::getPhases()
      *
      * @return array<string, string>
      */
-    public function getBoardTypes(): array
+    public function getPhases(): array
     {
         return [
-            'ibl_hist' => 'Regular Season Totals',
-            'ibl_season_career_avgs' => 'Regular Season Averages',
-            'ibl_playoff_career_totals' => 'Playoff Totals',
-            'ibl_playoff_career_avgs' => 'Playoff Averages',
-            'ibl_heat_career_totals' => 'H.E.A.T. Totals',
-            'ibl_heat_career_avgs' => 'H.E.A.T. Averages',
-            'ibl_olympics_career_totals' => 'Olympic Totals',
-            'ibl_olympics_career_avgs' => 'Olympic Averages',
-            'ibl_rookie_career_totals' => 'Rookie Game Totals',
-            'ibl_sophomore_career_totals' => 'Sophomore Game Totals',
-            'ibl_allstar_career_totals' => 'All-Star Game Totals',
-            'ibl_allstar_career_avgs' => 'All-Star Game Averages',
+            'regular' => 'Regular Season',
+            'playoffs' => 'Playoffs',
+            'heat' => 'H.E.A.T.',
+            'olympics' => 'Olympics',
+            'rookie' => 'Rookie Game',
+            'sophomore' => 'Sophomore Game',
+            'allstar' => 'All-Star Game',
         ];
     }
 
     /**
-     * @see CareerLeaderboardsServiceInterface::getSortCategories()
+     * @see CareerLeaderboardsServiceInterface::phaseHasAverages()
+     */
+    public function phaseHasAverages(string $phase): bool
+    {
+        return self::PHASE_TABLES[$this->resolvePhase($phase)]['averages'] !== null;
+    }
+
+    /**
+     * @see CareerLeaderboardsServiceInterface::resolvePhase()
+     */
+    public function resolvePhase(string $phase): string
+    {
+        return isset(self::PHASE_TABLES[$phase]) ? $phase : 'regular';
+    }
+
+    /**
+     * @see CareerLeaderboardsServiceInterface::resolveMode()
+     */
+    public function resolveMode(string $phase, string $mode): string
+    {
+        return ($mode === 'averages' && $this->phaseHasAverages($phase)) ? 'averages' : 'totals';
+    }
+
+    /**
+     * @see CareerLeaderboardsServiceInterface::resolveTableKey()
+     */
+    public function resolveTableKey(string $phase, string $mode): string
+    {
+        $tables = self::PHASE_TABLES[$this->resolvePhase($phase)];
+
+        if ($this->resolveMode($phase, $mode) === 'averages' && $tables['averages'] !== null) {
+            return $tables['averages'];
+        }
+
+        return $tables['totals'];
+    }
+
+    /**
+     * @see CareerLeaderboardsServiceInterface::getSortOptions()
      *
      * @return array<string, string>
      */
-    public function getSortCategories(): array
+    public function getSortOptions(string $mode): array
     {
-        return [
-            'pts' => 'Points',
-            'games' => 'Games',
-            'minutes' => 'Minutes',
-            'fgm' => 'Field Goals Made',
-            'fga' => 'Field Goals Attempted',
-            'fgpct' => 'FG Percentage (avgs only)',
-            'ftm' => 'Free Throws Made',
-            'fta' => 'Free Throws Attempted',
-            'ftpct' => 'FT Percentage (avgs only)',
-            'tgm' => 'Three-Pointers Made',
-            'tga' => 'Three-Pointers Attempted',
-            'tpct' => '3P Percentage (avgs only)',
-            'orb' => 'Offensive Rebounds',
-            'drb' => 'Defensive Rebounds',
-            'reb' => 'Total Rebounds',
-            'ast' => 'Assists',
-            'stl' => 'Steals',
-            'tvr' => 'Turnovers',
-            'blk' => 'Blocked Shots',
-            'pf' => 'Personal Fouls',
-        ];
+        $options = [];
+        foreach (self::SORT_OPTIONS as $key => $option) {
+            $options[$key] = ($key === 'PPG' && $mode !== 'averages') ? 'PTS' : $option['label'];
+        }
+
+        return $options;
+    }
+
+    /**
+     * @see CareerLeaderboardsServiceInterface::isSortAvailable()
+     */
+    public function isSortAvailable(string $key, string $mode): bool
+    {
+        if (!isset(self::SORT_OPTIONS[$key])) {
+            return false;
+        }
+
+        return $mode === 'averages' || !self::SORT_OPTIONS[$key]['avgsOnly'];
+    }
+
+    /**
+     * @see CareerLeaderboardsServiceInterface::resolveSortKey()
+     */
+    public function resolveSortKey(string $key, string $mode): string
+    {
+        return $this->isSortAvailable($key, $mode) ? $key : 'PPG';
+    }
+
+    /**
+     * @see CareerLeaderboardsServiceInterface::resolveSortColumn()
+     */
+    public function resolveSortColumn(string $key, string $mode): string
+    {
+        return self::SORT_OPTIONS[$this->resolveSortKey($key, $mode)]['column'];
     }
 }

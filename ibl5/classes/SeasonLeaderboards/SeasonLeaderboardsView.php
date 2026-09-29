@@ -61,7 +61,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
 
         ob_start();
         ?>
-<form name="Leaderboards" method="post" action="modules.php?name=Leaderboards&amp;tab=season" class="ibl-filter-form">
+<form name="Leaderboards" method="post" action="modules.php?name=Leaderboards&amp;tab=season" class="ibl-filter-form ibl-filter-form--stacked">
     <div class="ibl-filter-form__row">
         <div class="ibl-filter-form__group">
             <label for="sl-team" class="ibl-filter-form__label">Team:</label>
@@ -90,11 +90,12 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
             </select>
         </div>
         <div class="ibl-filter-form__group">
-            <label for="sl-limit" class="ibl-filter-form__label">Limit:</label>
+            <label for="sl-limit" class="ibl-filter-form__label">Results Limit:</label>
             <input id="sl-limit" type="number" name="limit" value="<?= HtmlSanitizer::e($limitValue) ?>" min="1" placeholder="50">
-            <span class="ibl-filter-form__label">Records</span>
         </div>
-        <button type="submit" class="ibl-filter-form__submit">Search Season Data</button>
+    </div>
+    <div class="ibl-filter-form__actions">
+        <button type="submit" class="ibl-filter-form__submit">Search</button>
     </div>
 </form>
         <?php

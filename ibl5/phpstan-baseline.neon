@@ -1895,32 +1895,14 @@ parameters:
 			path: modules/Injuries/index.php
 
 		-
-			rawMessage: 'Call to function array_search() requires parameter #3 to be set.'
-			identifier: function.strict
-			count: 2
-			path: modules/Leaderboards/index.php
-
-		-
 			rawMessage: Cannot cast mixed to int.
 			identifier: cast.int
-			count: 2
+			count: 1
 			path: modules/Leaderboards/index.php
 
 		-
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
 			identifier: empty.notAllowed
-			count: 1
-			path: modules/Leaderboards/index.php
-
-		-
-			rawMessage: 'Loose comparison via "!=" between mixed and null is not allowed.'
-			identifier: notEqual.notAllowed
-			count: 1
-			path: modules/Leaderboards/index.php
-
-		-
-			rawMessage: 'Parameter #1 $currentFilters of method CareerLeaderboards\CareerLeaderboardsView::renderFilterForm() expects array{boards_type?: string, sort_cat?: string, active?: string, display?: int|string}, array{boards_type: mixed, sort_cat: mixed, active: mixed, display: mixed, submitted: mixed} given.'
-			identifier: argument.type
 			count: 1
 			path: modules/Leaderboards/index.php
 

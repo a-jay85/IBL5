@@ -130,4 +130,16 @@ final class SeasonLeaderboardsViewTest extends TestCase
         // A form posting to the retired name would hit the 302 stub and lose its POST body.
         $this->assertStringNotContainsString('name=SeasonLeaderboards"', $html);
     }
+
+    public function testFilterFormUsesSearchButtonAndResultsLimitLabel(): void
+    {
+        $html = $this->view->renderFilterForm([], [], ['year' => '', 'team' => 0, 'sortby' => 'PPG', 'limit' => '']);
+
+        $this->assertStringContainsString('>Search</button>', $html);
+        $this->assertStringContainsString('>Results Limit:</label>', $html);
+        $this->assertStringNotContainsString('Records', $html);
+        $this->assertStringNotContainsString('Search Season Data', $html);
+        $this->assertStringContainsString('ibl-filter-form--stacked', $html);
+        $this->assertStringContainsString('ibl-filter-form__actions', $html);
+    }
 }

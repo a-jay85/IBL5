@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\CareerLeaderboards;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use CareerLeaderboards\CareerLeaderboardsService;
 
@@ -171,37 +172,156 @@ final class CareerLeaderboardsServiceTest extends TestCase
         $this->assertSame('Retired Legend*', $stats['name']);
     }
 
-    public function testGetBoardTypes(): void
+    /**
+     * @return array<string, array{string, string, string}>
+     */
+    public static function tableKeyProvider(): array
     {
-        $boardTypes = $this->service->getBoardTypes();
-
-        $this->assertIsArray($boardTypes);
-        $this->assertCount(12, $boardTypes);
-        $this->assertArrayHasKey('ibl_hist', $boardTypes);
-        $this->assertSame('Regular Season Totals', $boardTypes['ibl_hist']);
-        $this->assertArrayHasKey('ibl_season_career_avgs', $boardTypes);
-        $this->assertSame('Regular Season Averages', $boardTypes['ibl_season_career_avgs']);
-        $this->assertArrayHasKey('ibl_rookie_career_totals', $boardTypes);
-        $this->assertSame('Rookie Game Totals', $boardTypes['ibl_rookie_career_totals']);
-        $this->assertArrayHasKey('ibl_sophomore_career_totals', $boardTypes);
-        $this->assertSame('Sophomore Game Totals', $boardTypes['ibl_sophomore_career_totals']);
-        $this->assertArrayHasKey('ibl_allstar_career_totals', $boardTypes);
-        $this->assertSame('All-Star Game Totals', $boardTypes['ibl_allstar_career_totals']);
-        $this->assertArrayHasKey('ibl_allstar_career_avgs', $boardTypes);
-        $this->assertSame('All-Star Game Averages', $boardTypes['ibl_allstar_career_avgs']);
+        return [
+            'regular totals' => ['regular', 'totals', 'ibl_hist'],
+            'regular averages' => ['regular', 'averages', 'ibl_season_career_avgs'],
+            'playoffs totals' => ['playoffs', 'totals', 'ibl_playoff_career_totals'],
+            'playoffs averages' => ['playoffs', 'averages', 'ibl_playoff_career_avgs'],
+            'heat totals' => ['heat', 'totals', 'ibl_heat_career_totals'],
+            'heat averages' => ['heat', 'averages', 'ibl_heat_career_avgs'],
+            'olympics totals' => ['olympics', 'totals', 'ibl_olympics_career_totals'],
+            'olympics averages' => ['olympics', 'averages', 'ibl_olympics_career_avgs'],
+            'rookie totals' => ['rookie', 'totals', 'ibl_rookie_career_totals'],
+            'rookie averages falls back' => ['rookie', 'averages', 'ibl_rookie_career_totals'],
+            'sophomore totals' => ['sophomore', 'totals', 'ibl_sophomore_career_totals'],
+            'sophomore averages falls back' => ['sophomore', 'averages', 'ibl_sophomore_career_totals'],
+            'allstar totals' => ['allstar', 'totals', 'ibl_allstar_career_totals'],
+            'allstar averages' => ['allstar', 'averages', 'ibl_allstar_career_avgs'],
+            'unknown phase falls back to regular' => ['bogus', 'totals', 'ibl_hist'],
+            'unknown mode falls back to totals' => ['playoffs', 'bogus', 'ibl_playoff_career_totals'],
+            'unknown both' => ['', '', 'ibl_hist'],
+        ];
     }
 
-    public function testGetSortCategories(): void
+    #[DataProvider('tableKeyProvider')]
+    public function testResolveTableKey(string $phase, string $mode, string $expected): void
     {
-        $sortCategories = $this->service->getSortCategories();
+        $this->assertSame($expected, $this->service->resolveTableKey($phase, $mode));
+    }
 
-        $this->assertIsArray($sortCategories);
-        $this->assertCount(20, $sortCategories);
-        $this->assertArrayHasKey('drb', $sortCategories);
-        $this->assertSame('Defensive Rebounds', $sortCategories['drb']);
-        $this->assertArrayHasKey('pts', $sortCategories);
-        $this->assertSame('Points', $sortCategories['pts']);
-        $this->assertArrayHasKey('fgpct', $sortCategories);
-        $this->assertSame('FG Percentage (avgs only)', $sortCategories['fgpct']);
+    public function testResolvedTableKeysAreAllValidRepositoryTables(): void
+    {
+        $repo = new \ReflectionClass(\CareerLeaderboards\CareerLeaderboardsRepository::class);
+        /** @var list<string> $valid */
+        $valid = $repo->getConstant('VALID_TABLES');
+
+        foreach (array_keys($this->service->getPhases()) as $phase) {
+            foreach (['totals', 'averages'] as $mode) {
+                $this->assertContains($this->service->resolveTableKey($phase, $mode), $valid);
+            }
+        }
+    }
+
+    public function testGetPhases(): void
+    {
+        $this->assertSame(
+            ['regular', 'playoffs', 'heat', 'olympics', 'rookie', 'sophomore', 'allstar'],
+            array_keys($this->service->getPhases())
+        );
+        $this->assertSame('Rookie Game', $this->service->getPhases()['rookie']);
+        $this->assertSame('H.E.A.T.', $this->service->getPhases()['heat']);
+    }
+
+    public function testPhaseHasAverages(): void
+    {
+        $this->assertTrue($this->service->phaseHasAverages('regular'));
+        $this->assertTrue($this->service->phaseHasAverages('allstar'));
+        $this->assertFalse($this->service->phaseHasAverages('rookie'));
+        $this->assertFalse($this->service->phaseHasAverages('sophomore'));
+        $this->assertTrue($this->service->phaseHasAverages('bogus'));
+    }
+
+    public function testResolveMode(): void
+    {
+        $this->assertSame('averages', $this->service->resolveMode('regular', 'averages'));
+        $this->assertSame('totals', $this->service->resolveMode('rookie', 'averages'));
+        $this->assertSame('totals', $this->service->resolveMode('regular', 'bogus'));
+    }
+
+    public function testGetSortOptionsOrderAndLabelsOnTotals(): void
+    {
+        $options = $this->service->getSortOptions('totals');
+
+        $this->assertSame(
+            ['PPG', 'REB', 'OREB', 'DREB', 'AST', 'STL', 'BLK', 'TO', 'FOUL', 'FGM', 'FGA', 'FGP', 'FTM', 'FTA', 'FTP', 'TGM', 'TGA', 'TGP', 'GAMES', 'MIN'],
+            array_keys($options)
+        );
+        $this->assertArrayNotHasKey('QA', $options);
+        $this->assertSame('PTS', $options['PPG']);
+        $this->assertSame('FG%', $options['FGP']);
+        $this->assertSame('FT%', $options['FTP']);
+        $this->assertSame('TG%', $options['TGP']);
+    }
+
+    public function testGetSortOptionsLabelsPpgOnAverages(): void
+    {
+        $this->assertSame('PPG', $this->service->getSortOptions('averages')['PPG']);
+    }
+
+    public function testIsSortAvailableGatesPercentagesOnTotals(): void
+    {
+        foreach (['FGP', 'FTP', 'TGP'] as $key) {
+            $this->assertFalse($this->service->isSortAvailable($key, 'totals'));
+            $this->assertTrue($this->service->isSortAvailable($key, 'averages'));
+        }
+        $this->assertTrue($this->service->isSortAvailable('PPG', 'totals'));
+        $this->assertFalse($this->service->isSortAvailable('QA', 'averages'));
+    }
+
+    /**
+     * @return array<string, array{string, string, string}>
+     */
+    public static function sortColumnProvider(): array
+    {
+        return [
+            'PPG' => ['PPG', 'totals', 'pts'],
+            'REB' => ['REB', 'totals', 'reb'],
+            'OREB' => ['OREB', 'totals', 'orb'],
+            'DREB' => ['DREB', 'totals', 'drb'],
+            'AST' => ['AST', 'totals', 'ast'],
+            'STL' => ['STL', 'totals', 'stl'],
+            'BLK' => ['BLK', 'totals', 'blk'],
+            'TO' => ['TO', 'totals', 'tvr'],
+            'FOUL' => ['FOUL', 'totals', 'pf'],
+            'FGM' => ['FGM', 'totals', 'fgm'],
+            'FGA' => ['FGA', 'totals', 'fga'],
+            'FGP averages' => ['FGP', 'averages', 'fgpct'],
+            'FTM' => ['FTM', 'totals', 'ftm'],
+            'FTA' => ['FTA', 'totals', 'fta'],
+            'FTP averages' => ['FTP', 'averages', 'ftpct'],
+            'TGM' => ['TGM', 'totals', 'tgm'],
+            'TGA' => ['TGA', 'totals', 'tga'],
+            'TGP averages' => ['TGP', 'averages', 'tpct'],
+            'GAMES' => ['GAMES', 'totals', 'games'],
+            'MIN' => ['MIN', 'totals', 'minutes'],
+            'FGP totals falls back to PPG' => ['FGP', 'totals', 'pts'],
+            'TGP totals falls back to PPG' => ['TGP', 'totals', 'pts'],
+            'unknown falls back to PPG' => ['bogus', 'averages', 'pts'],
+            'QA is not a career sort' => ['QA', 'averages', 'pts'],
+        ];
+    }
+
+    #[DataProvider('sortColumnProvider')]
+    public function testResolveSortColumn(string $key, string $mode, string $expected): void
+    {
+        $this->assertSame($expected, $this->service->resolveSortColumn($key, $mode));
+    }
+
+    public function testResolvedSortColumnsAreAllValidRepositoryColumns(): void
+    {
+        $repo = new \ReflectionClass(\CareerLeaderboards\CareerLeaderboardsRepository::class);
+        /** @var list<string> $valid */
+        $valid = $repo->getConstant('VALID_SORT_COLUMNS');
+
+        foreach (['totals', 'averages'] as $mode) {
+            foreach (array_keys($this->service->getSortOptions($mode)) as $key) {
+                $this->assertContains($this->service->resolveSortColumn($key, $mode), $valid);
+            }
+        }
     }
 }

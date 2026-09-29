@@ -29,6 +29,9 @@ test.describe('Season Leaderboards flow', () => {
     await expect(page.locator('select[name="year"]')).toBeVisible();
     await expect(page.locator('select[name="sortby"]')).toBeVisible();
     await expect(page.locator('input[name="limit"]')).toBeVisible();
+    await expect(page.locator('.ibl-filter-form__submit')).toHaveText('Search');
+    await expect(page.locator('.ibl-filter-form')).not.toContainText('Records');
+    await expect(page.locator('label[for="sl-limit"]')).toHaveText('Results Limit:');
   });
 
   test('default results table present', async ({ page }) => {

@@ -51,50 +51,67 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
      */
     public function renderFilterForm(array $currentFilters): string
     {
-        $boardTypes = $this->service->getBoardTypes();
-        $sortCategories = $this->service->getSortCategories();
-
-        $boardsType = $currentFilters['boards_type'] ?? '';
-        $sortCat = $currentFilters['sort_cat'] ?? '';
-        $active = $currentFilters['active'] ?? '0';
+        $phases = $this->service->getPhases();
+        $phase = $this->service->resolvePhase($currentFilters['phase'] ?? 'regular');
+        $mode = $this->service->resolveMode($phase, $currentFilters['mode'] ?? 'totals');
+        $sortKey = $this->service->resolveSortKey($currentFilters['sortby'] ?? 'PPG', $mode);
+        $sortOptions = $this->service->getSortOptions($mode);
+        $retirees = $currentFilters['retirees'] ?? true;
         $display = (string) ($currentFilters['display'] ?? '');
+        $hasAverages = $this->service->phaseHasAverages($phase);
 
         ob_start();
         ?>
-<form name="CareerLeaderboards" method="post" action="modules.php?name=Leaderboards&amp;tab=career" class="ibl-filter-form">
+<form name="CareerLeaderboards" method="post" action="modules.php?name=Leaderboards&amp;tab=career" class="ibl-filter-form ibl-filter-form--stacked">
     <div class="ibl-filter-form__row">
         <div class="ibl-filter-form__group">
-            <label for="cl-type" class="ibl-filter-form__label">Type:</label>
-            <select id="cl-type" name="boards_type">
-                <?php foreach ($boardTypes as $value): ?>
-                    <option value="<?= HtmlSanitizer::e($value) ?>"<?= ($boardsType === $value) ? ' selected' : '' ?>><?= HtmlSanitizer::e($value) ?></option>
+            <label for="cl-phase" class="ibl-filter-form__label">Phase:</label>
+            <select id="cl-phase" name="phase">
+                <?php foreach ($phases as $key => $label): ?>
+                    <option value="<?= HtmlSanitizer::e($key) ?>" data-has-averages="<?= $this->service->phaseHasAverages($key) ? '1' : '0' ?>"<?= ($phase === $key) ? ' selected' : '' ?>><?= HtmlSanitizer::e($label) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
         <div class="ibl-filter-form__group">
-            <label for="cl-category" class="ibl-filter-form__label">Category:</label>
-            <select id="cl-category" name="sort_cat">
-                <?php foreach ($sortCategories as $value): ?>
-                    <option value="<?= HtmlSanitizer::e($value) ?>"<?= ($sortCat === $value) ? ' selected' : '' ?>><?= HtmlSanitizer::e($value) ?></option>
+            <span class="ibl-filter-form__label" aria-hidden="true">Stats:</span>
+            <fieldset class="ibl-segmented">
+                <legend class="ibl-segmented__legend">Stats</legend>
+                <label class="ibl-segmented__option">
+                    <input type="radio" name="mode" value="totals"<?= ($mode === 'totals') ? ' checked' : '' ?>>
+                    <span class="ibl-segmented__text">Totals</span>
+                </label>
+                <label class="ibl-segmented__option">
+                    <input type="radio" name="mode" value="averages"<?= ($mode === 'averages') ? ' checked' : '' ?><?= $hasAverages ? '' : ' disabled' ?>>
+                    <span class="ibl-segmented__text">Averages</span>
+                </label>
+            </fieldset>
+        </div>
+        <div class="ibl-filter-form__group">
+            <label for="cl-sortby" class="ibl-filter-form__label">Sort By:</label>
+            <select id="cl-sortby" name="sortby">
+                <?php foreach ($sortOptions as $key => $label): ?>
+                    <option value="<?= HtmlSanitizer::e($key) ?>"<?= ($sortKey === $key) ? ' selected' : '' ?><?= $this->service->isSortAvailable($key, $mode) ? '' : ' disabled' ?>><?= HtmlSanitizer::e($label) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
         <div class="ibl-filter-form__group">
-            <label for="cl-retirees" class="ibl-filter-form__label">Include Retirees:</label>
-            <select id="cl-retirees" name="active">
-                <option value="0"<?= ($active === '0') ? ' selected' : '' ?>>Yes</option>
-                <option value="1"<?= ($active === '1') ? ' selected' : '' ?>>No</option>
-            </select>
+            <label for="cl-retirees" class="ibl-filter-form__label">Retired?</label>
+            <span class="ibl-switch">
+                <input type="checkbox" role="switch" name="retirees" value="1" id="cl-retirees" class="ibl-switch__input"<?= $retirees ? ' checked' : '' ?>>
+                <span class="ibl-switch__track" aria-hidden="true"></span>
+            </span>
         </div>
         <div class="ibl-filter-form__group">
-            <label for="cl-limit" class="ibl-filter-form__label">Limit:</label>
-            <input id="cl-limit" type="number" name="display" value="<?= HtmlSanitizer::e($display) ?>">
-            <span class="ibl-filter-form__label">Records</span>
+            <label for="cl-limit" class="ibl-filter-form__label">Results Limit:</label>
+            <input id="cl-limit" type="number" name="display" value="<?= HtmlSanitizer::e($display) ?>" min="1" placeholder="50">
         </div>
-        <input type="hidden" name="submitted" value="1">
-        <button type="submit" class="ibl-filter-form__submit">Display Career Leaderboards</button>
+    </div>
+    <input type="hidden" name="submitted" value="1">
+    <div class="ibl-filter-form__actions">
+        <button type="submit" class="ibl-filter-form__submit">Search</button>
     </div>
 </form>
+<script src="jslib/career-leaderboards-form.js" defer></script>
         <?php
         return (string) ob_get_clean();
     }

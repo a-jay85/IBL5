@@ -22,9 +22,10 @@ final class CareerLeaderboardsViewTest extends TestCase
     public function testRenderFilterFormCreatesValidHtml(): void
     {
         $filters = [
-            'boards_type' => 'Regular Season Totals',
-            'sort_cat' => 'Points',
-            'active' => '1',
+            'phase' => 'regular',
+            'mode' => 'totals',
+            'sortby' => 'PPG',
+            'retirees' => false,
             'display' => '50'
         ];
 
@@ -36,9 +37,10 @@ final class CareerLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('action="modules.php?name=Leaderboards&amp;tab=career"', $html);
         
         // Check that all form fields are present
-        $this->assertStringContainsString('name="boards_type"', $html);
-        $this->assertStringContainsString('name="sort_cat"', $html);
-        $this->assertStringContainsString('name="active"', $html);
+        $this->assertStringContainsString('name="phase"', $html);
+        $this->assertStringContainsString('name="mode"', $html);
+        $this->assertStringContainsString('name="sortby"', $html);
+        $this->assertStringContainsString('name="retirees"', $html);
         $this->assertStringContainsString('name="display"', $html);
         $this->assertStringContainsString('name="submitted"', $html);
         
@@ -218,14 +220,125 @@ final class CareerLeaderboardsViewTest extends TestCase
     public function testFilterFormPostsToLeaderboardsCareerTab(): void
     {
         $html = $this->view->renderFilterForm([
-            'boards_type' => 'Regular Season Totals',
-            'sort_cat' => 'Points',
-            'active' => '0',
+            'phase' => 'regular',
+            'mode' => 'totals',
+            'sortby' => 'PPG',
+            'retirees' => true,
             'display' => '50',
         ]);
 
         $this->assertStringContainsString('action="modules.php?name=Leaderboards&amp;tab=career"', $html);
         // A form posting to the retired name would hit the 302 stub and lose its POST body.
         $this->assertStringNotContainsString('name=CareerLeaderboards"', $html);
+    }
+
+    public function testFilterFormRendersPhaseSelectWithAllPhases(): void
+    {
+        $html = $this->view->renderFilterForm([]);
+
+        $this->assertStringContainsString('id="cl-phase" name="phase"', $html);
+        foreach (['Regular Season', 'Playoffs', 'H.E.A.T.', 'Olympics', 'Rookie Game', 'Sophomore Game', 'All-Star Game'] as $label) {
+            $this->assertStringContainsString('>' . $label . '</option>', $html);
+        }
+        $this->assertStringNotContainsString('boards_type', $html);
+        $this->assertStringNotContainsString('sort_cat', $html);
+    }
+
+    public function testFilterFormRendersSegmentedModeRadios(): void
+    {
+        $html = $this->view->renderFilterForm([]);
+
+        $this->assertStringContainsString('<fieldset class="ibl-segmented">', $html);
+        $this->assertStringContainsString('<legend class="ibl-segmented__legend">', $html);
+        $this->assertStringContainsString('type="radio" name="mode" value="totals" checked', $html);
+        $this->assertMatchesRegularExpression('/value="averages"(?![^>]*disabled)/', $html);
+    }
+
+    public function testFilterFormDisablesAveragesRadioForRookie(): void
+    {
+        $html = $this->view->renderFilterForm(['phase' => 'rookie', 'mode' => 'averages']);
+
+        $this->assertMatchesRegularExpression('/value="averages"[^>]*disabled/', $html);
+        $this->assertStringContainsString('value="totals" checked', $html);
+    }
+
+    public function testFilterFormDisablesAveragesRadioForSophomore(): void
+    {
+        $html = $this->view->renderFilterForm(['phase' => 'sophomore']);
+
+        $this->assertMatchesRegularExpression('/value="averages"[^>]*disabled/', $html);
+    }
+
+    public function testFilterFormSortByOptionsExcludeQaAndLabelPts(): void
+    {
+        $html = $this->view->renderFilterForm([]);
+
+        $this->assertStringContainsString('id="cl-sortby" name="sortby"', $html);
+        $this->assertStringContainsString('value="PPG" selected>PTS</option>', $html);
+        $this->assertStringNotContainsString('value="QA"', $html);
+        $this->assertStringNotContainsString('Category:', $html);
+    }
+
+    public function testFilterFormLabelsPpgOnAverages(): void
+    {
+        $html = $this->view->renderFilterForm(['mode' => 'averages']);
+
+        $this->assertStringContainsString('value="PPG" selected>PPG</option>', $html);
+        $this->assertStringContainsString('value="averages" checked', $html);
+    }
+
+    public function testFilterFormDisablesPercentageSortOptionsOnTotals(): void
+    {
+        $html = $this->view->renderFilterForm(['mode' => 'totals']);
+
+        foreach (['FGP', 'FTP', 'TGP'] as $key) {
+            $this->assertStringContainsString('value="' . $key . '" disabled>', $html);
+        }
+    }
+
+    public function testFilterFormEnablesPercentageSortOptionsOnAverages(): void
+    {
+        $html = $this->view->renderFilterForm(['mode' => 'averages', 'sortby' => 'FGP']);
+
+        $this->assertStringContainsString('value="FGP" selected>FG%</option>', $html);
+        $this->assertStringContainsString('value="FTP">FT%</option>', $html);
+        $this->assertStringContainsString('value="TGP">TG%</option>', $html);
+    }
+
+    public function testFilterFormRendersRetireesSwitchCheckedByDefault(): void
+    {
+        $html = $this->view->renderFilterForm([]);
+
+        $this->assertStringContainsString('type="checkbox" role="switch" name="retirees" value="1" id="cl-retirees"', $html);
+        $this->assertMatchesRegularExpression('/id="cl-retirees"[^>]*checked/', $html);
+        $this->assertStringContainsString('>Retired?</label>', $html);
+    }
+
+    public function testFilterFormRendersRetireesSwitchOffWhenFalse(): void
+    {
+        $html = $this->view->renderFilterForm(['retirees' => false]);
+
+        $this->assertDoesNotMatchRegularExpression('/id="cl-retirees"[^>]*checked/', $html);
+        $this->assertStringContainsString('name="submitted" value="1"', $html);
+    }
+
+    public function testFilterFormUsesResultsLimitAndSearchButton(): void
+    {
+        $html = $this->view->renderFilterForm([]);
+
+        $this->assertStringContainsString('>Results Limit:</label>', $html);
+        $this->assertStringContainsString('placeholder="50"', $html);
+        $this->assertStringNotContainsString('Records', $html);
+        $this->assertStringContainsString('>Search</button>', $html);
+        $this->assertStringNotContainsString('Display Career Leaderboards', $html);
+    }
+
+    public function testFilterFormIsStackedAndLoadsEnhancementScript(): void
+    {
+        $html = $this->view->renderFilterForm([]);
+
+        $this->assertStringContainsString('ibl-filter-form ibl-filter-form--stacked', $html);
+        $this->assertStringContainsString('ibl-filter-form__actions', $html);
+        $this->assertStringContainsString('<script src="jslib/career-leaderboards-form.js" defer></script>', $html);
     }
 }

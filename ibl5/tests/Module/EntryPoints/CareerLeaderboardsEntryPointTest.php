@@ -18,7 +18,7 @@ class CareerLeaderboardsEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('CareerLeaderboards', [], [
             'submitted' => '1',
-            'boards_type' => 'Regular Season Totals',
+            'phase' => 'regular',
         ], $this->dbGlobals());
 
         $this->assertSame('', $output);

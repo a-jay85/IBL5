@@ -83,9 +83,13 @@ test.describe('Leaderboards flow', () => {
     await appState({ 'Trivia Mode': 'Off' });
     await page.goto('modules.php?name=Leaderboards&tab=career');
 
-    await page.locator('.ibl-filter-form__submit').click();
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'POST'),
+      page.locator('.ibl-filter-form__submit').click(),
+    ]);
 
     await expect(page).toHaveURL(/tab=career/);
+    await expect(page.locator('form[name="CareerLeaderboards"]')).toBeVisible();
     const rows = page.locator('.ibl-data-table').first().locator('tbody tr');
     await expect(rows.first()).toBeVisible();
   });

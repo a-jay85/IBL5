@@ -78,3 +78,4 @@ The CI workflow `pr-meta-checks.yml` runs `bin/adr-check` (the `adr-check` step)
 - [`bin/adr-check`](../../../bin/adr-check): the CI gate. Locally, `--staged` judges the index alone, and `--commit` judges the commit-time view: this branch's commits since the merge-base, union the index. `--commit` is the mode `bin/pre-commit-hook` runs on every commit.
 - [`bin/check-docs`](../../../bin/check-docs) — enforces frontmatter freshness on every ADR and verifies bidirectional `Supersedes` integrity.
 - [`.claude/rules/doc-freshness.md`](../../../.claude/rules/doc-freshness.md) — the frontmatter schema every ADR must satisfy.
+| [0147](0147-auto-mergeable-label.md) | Advisory `auto-mergeable` PR label | Accepted | `.github/workflows/auto-mergeable-label.yml` adds the label when auto-merge is armed and `hs_pr_cleared` passes, and removes it otherwise; it reuses `bin/lib/human-signoff-classifier.sh` so it cannot drift from the gate; no gate reads the label. |

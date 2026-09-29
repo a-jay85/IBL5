@@ -25,9 +25,29 @@ $baselineFiles = [
     'phpstan-tests-baseline.neon' => __DIR__ . '/../phpstan-tests-baseline.neon',
 ];
 
-$updateMode = in_array('--update', $argv, true);
+$usage = "Usage: check-baseline-drift [--update|--sync] [--base=<ref>]\n";
+$updateMode = false;
+$syncMode = false;
+$flagBase = null;
+foreach (array_slice($argv, 1) as $arg) {
+    if ($arg === '--update') {
+        $updateMode = true;
+    } elseif ($arg === '--sync') {
+        $syncMode = true;
+    } elseif (str_starts_with($arg, '--base=') && strlen($arg) > strlen('--base=')) {
+        $flagBase = substr($arg, strlen('--base='));
+    } else {
+        fwrite(STDERR, $usage);
+        exit(2);
+    }
+}
+if ($updateMode && $syncMode) {
+    fwrite(STDERR, $usage);
+    exit(2);
+}
 
 $counter = new \Maintenance\PhpstanBaselineCounter();
+$checker = new \Maintenance\BaselineDriftChecker();
 
 $zeroFloorFiles = [
     'classes/Trading/TradingView.php',
@@ -45,7 +65,7 @@ foreach ($baselineFiles as $key => $path) {
     $currentCounts[$key] = $counter->countByIdentifier($path);
 }
 
-if ($updateMode) {
+$enforceZeroFloorBeforeWrite = static function () use ($baselineFiles, $counter, $zeroFloorFiles): void {
     $mainBaseline = $baselineFiles['phpstan-baseline.neon'] ?? '';
     if (file_exists($mainBaseline)) {
         $floorViolations = $counter->countByPathForIdentifier($mainBaseline, 'ibl.unescapedOutput');
@@ -58,13 +78,126 @@ if ($updateMode) {
             }
         }
     }
-    $json = json_encode($currentCounts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+};
+
+$encodeSnapshot = static function (array $counts): string {
+    $json = json_encode($counts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     if ($json === false) {
         fwrite(STDERR, "Error encoding JSON\n");
         exit(1);
     }
-    file_put_contents($snapshotFile, $json . "\n");
-    echo "Updated {$snapshotFile}\n";
+
+    return $json . "\n";
+};
+
+// --sync: master-only rewrite of the snapshot to live counts, up and down. Runs before
+// any base resolution so the master job needs no git history.
+if ($syncMode) {
+    $enforceZeroFloorBeforeWrite();
+    file_put_contents($snapshotFile, $encodeSnapshot($currentCounts));
+    echo "Synced {$snapshotFile}\n";
+    exit(0);
+}
+
+$repoRoot = dirname(__DIR__, 2);
+
+$runGit = static function (string ...$args) use ($repoRoot): ?string {
+    $cmd = 'git -C ' . escapeshellarg($repoRoot);
+    foreach ($args as $arg) {
+        $cmd .= ' ' . escapeshellarg($arg);
+    }
+    $output = [];
+    $code = 1;
+    exec($cmd . ' 2>/dev/null', $output, $code);
+
+    return $code === 0 ? implode("\n", $output) : null;
+};
+
+$branch = $runGit('rev-parse', '--abbrev-ref', 'HEAD');
+$declaredBase = $branch !== null ? ($runGit('config', '--get', "branch.{$branch}.iblBase") ?? '') : '';
+$baseRef = $checker->resolveBaseRef($flagBase, $declaredBase);
+$mergeBase = str_starts_with($baseRef, '-') ? null : $runGit('merge-base', 'HEAD', $baseRef);
+
+$baseNeonCounts = null;
+$baseSnapshotCounts = null;
+if ($mergeBase === null || $mergeBase === '') {
+    if (getenv('GITHUB_ACTIONS') === 'true') {
+        fwrite(STDERR, "BASE-REF UNAVAILABLE: cannot resolve merge-base with {$baseRef}; CI must fetch full history\n");
+        exit(2);
+    }
+    fwrite(STDERR, "WARNING: BASE-REF UNAVAILABLE ({$baseRef}); merge-base comparison SKIPPED, snapshot rule only. CI enforces the full check.\n");
+} else {
+    $baseNeonCounts = [];
+    foreach (array_keys($baselineFiles) as $key) {
+        $content = $runGit('show', "{$mergeBase}:ibl5/{$key}");
+        if ($content === null) {
+            $baseNeonCounts[$key] = [];
+            continue;
+        }
+        $tmp = tempnam(sys_get_temp_dir(), 'drift-base-');
+        if ($tmp === false) {
+            fwrite(STDERR, "Error creating temp file for base baseline\n");
+            exit(1);
+        }
+        file_put_contents($tmp, $content . "\n");
+        $baseNeonCounts[$key] = $counter->countByIdentifier($tmp);
+        unlink($tmp);
+    }
+
+    $baseSnapshotCounts = [];
+    $baseSnapshotJson = $runGit('show', "{$mergeBase}:ibl5/phpstan-baseline-counts.json");
+    if ($baseSnapshotJson !== null) {
+        $decodedBase = json_decode($baseSnapshotJson, true);
+        if (is_array($decodedBase)) {
+            foreach ($decodedBase as $file => $fileCounts) {
+                if (is_string($file) && is_array($fileCounts)) {
+                    /** @var array<string, int> $fileCounts */
+                    $baseSnapshotCounts[$file] = $fileCounts;
+                }
+            }
+        }
+    }
+}
+
+// Reads the committed snapshot into the per-file shape compare()/raiseOnly() take.
+$decodeSnapshot = static function (string $json) use ($snapshotFile): array {
+    /** @var array<string, mixed>|null $decoded */
+    $decoded = json_decode($json, true);
+    if (!is_array($decoded)) {
+        fwrite(STDERR, "Invalid JSON in snapshot file: {$snapshotFile}\n");
+        exit(1);
+    }
+    /** @var array<string, array<string, int>> $perFile */
+    $perFile = [];
+    foreach ($decoded as $file => $fileCounts) {
+        if (is_array($fileCounts)) {
+            /** @var array<string, int> $fileCounts */
+            $perFile[$file] = $fileCounts;
+        }
+    }
+
+    return $perFile;
+};
+
+// --update: raise-only. Never lowers a value, so a shrink-only PR leaves the JSON untouched.
+if ($updateMode) {
+    $enforceZeroFloorBeforeWrite();
+    $existingSnapshot = [];
+    if (file_exists($snapshotFile)) {
+        $existingJson = file_get_contents($snapshotFile);
+        if ($existingJson === false) {
+            fwrite(STDERR, "Error reading snapshot file: {$snapshotFile}\n");
+            exit(1);
+        }
+        $existingSnapshot = $decodeSnapshot($existingJson);
+    }
+    $raised = $checker->raiseOnly($currentCounts, $existingSnapshot, $baseNeonCounts, $baseSnapshotCounts);
+    if ($raised === $existingSnapshot) {
+        echo "No raise needed; snapshot unchanged.\n";
+        exit(0);
+    }
+    file_put_contents($snapshotFile, $encodeSnapshot($raised));
+    echo "Raised {$snapshotFile}\n";
     exit(0);
 }
 
@@ -80,31 +213,19 @@ if ($snapshotJson === false) {
     exit(1);
 }
 
-/** @var array<string, mixed> $snapshot */
-$snapshot = json_decode($snapshotJson, true);
-if (!is_array($snapshot)) {
-    fwrite(STDERR, "Invalid JSON in snapshot file: {$snapshotFile}\n");
-    exit(1);
+$snapshotCounts = $decodeSnapshot($snapshotJson);
+
+foreach ($currentCounts as $file => $counts) {
+    if (!is_array($counts)) {
+        unset($currentCounts[$file]);
+    }
 }
 
 $hasIncrease = false;
 $staleWarning = false;
 $exitCode = 0;
 
-/** @var array<string, array<string, int>> $snapshotCounts */
-$snapshotCounts = [];
-foreach ($currentCounts as $file => $counts) {
-    if (!is_array($counts)) {
-        continue;
-    }
-    if (isset($snapshot[$file]) && is_array($snapshot[$file])) {
-        /** @var array<string, int> $fileSnapshot */
-        $fileSnapshot = $snapshot[$file];
-        $snapshotCounts[$file] = $fileSnapshot;
-    }
-}
-
-$result = (new \Maintenance\BaselineDriftChecker())->compare($currentCounts, $snapshotCounts);
+$result = $checker->compare($currentCounts, $snapshotCounts, $baseNeonCounts, $baseSnapshotCounts);
 
 foreach ($result['increases'] as $line) {
     echo $line . "\n";
@@ -145,7 +266,7 @@ if ($hasIncrease || $floorFailed) {
     }
     $exitCode = 1;
 } elseif ($staleWarning) {
-    echo "\nPASSED (with stale-snapshot warnings — consider running --update)\n";
+    echo "\nPASSED (with stale-snapshot warnings — master's update-baselines job will sync it)\n";
 } else {
     echo "PASSED: no baseline drift detected.\n";
 }

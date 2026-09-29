@@ -191,3 +191,69 @@ def test_fidelity_work_list_excludes_unrealised_assertion(tmp_path):
     bad = [item for item in work_list
            if item.get("hold") == "3" and item.get("text", "").startswith("UNREALISED-ASSERTION")]
     assert bad == []
+
+
+# ---------------------------------------------------------------------------
+# Token-notation false-positive fixes (multi-arg call, ${VAR:-}, glob, `=`)
+# ---------------------------------------------------------------------------
+
+def _plan_with_row(tmp_path, cell: str) -> PlanInfo:
+    """PlanInfo whose matrix has one row (id 1) with the given 'What to verify' cell."""
+    plan_file = tmp_path / "notation-plan.md"
+    plan_file.write_text(
+        "# Test plan\n\n## Verification Matrix\n\n"
+        "| # | What to verify | Test type | Timing | Test file / location |\n"
+        "|---|---------------|-----------|--------|---------------------|\n"
+        f"| 1 | {cell} | CLI-executable | post-impl | `bin/test-it` |\n"
+    )
+    return PlanInfo(found=True, has_matrix=True, path=str(plan_file),
+                    planned_test_paths=[])
+
+
+def _unrealised(items: list[str]) -> list[str]:
+    return [i for i in items if i.startswith("UNREALISED-ASSERTION:")]
+
+
+def test_multi_arg_call_realised(tmp_path, monkeypatch):
+    """`assertCount(3)` is realised by `assertCount(3, extra)` in the diff."""
+    monkeypatch.setenv("MATRIX_ASSERT_ROOT", _make_git_root(tmp_path))
+    plan = _plan_with_row(tmp_path, "method call: `assertCount(3)` present")
+    items = _matrix_assertion_items(plan, "+    self.assertCount(3, extra)\n", "")
+    assert _unrealised(items) == []
+
+
+def test_shell_var_with_default_realised(tmp_path, monkeypatch):
+    """`${MY_CONF_VAR}` is realised by `${MY_CONF_VAR:-}` in the diff."""
+    monkeypatch.setenv("MATRIX_ASSERT_ROOT", _make_git_root(tmp_path))
+    plan = _plan_with_row(tmp_path, "shell var: `${MY_CONF_VAR}` set")
+    items = _matrix_assertion_items(plan, '+  local x="${MY_CONF_VAR:-}"\n', "")
+    assert _unrealised(items) == []
+
+
+def test_glob_prefix_realised(tmp_path, monkeypatch):
+    """`test_something_*` is realised when a tracked file holds `test_something_impl`."""
+    git_root = _make_git_root(tmp_path)
+    with open(os.path.join(git_root, "fixture.txt"), "w") as fh:
+        fh.write("test_something_impl\n")
+    subprocess.run(["git", "-C", git_root, "add", "fixture.txt"],
+                   capture_output=True, check=True)
+    monkeypatch.setenv("MATRIX_ASSERT_ROOT", git_root)
+    plan = _plan_with_row(tmp_path, "glob match: `test_something_*` present")
+    items = _matrix_assertion_items(plan, "+unrelated\n", "")
+    assert _unrealised(items) == []
+
+
+def test_equals_class4_row_skipped(tmp_path, monkeypatch):
+    """`current_tree=T2` alone is scenario notation: the row is skipped, not flagged."""
+    monkeypatch.setenv("MATRIX_ASSERT_ROOT", _make_git_root(tmp_path))
+    plan = _plan_with_row(tmp_path, "scenario: `current_tree=T2`")
+    items = _matrix_assertion_items(plan, "+unrelated\n", "")
+    assert _unrealised(items) == []
+
+
+def test_equals_class5_row_skipped(tmp_path, monkeypatch):
+    """`REVIEW_OWED_TIMEOUT=1` alone is env notation: the row is skipped, not flagged."""
+    monkeypatch.setenv("MATRIX_ASSERT_ROOT", _make_git_root(tmp_path))
+    plan = _plan_with_row(tmp_path, "env var: `REVIEW_OWED_TIMEOUT=1`")
+    items = _matrix_assertion_items(plan, "+unrelated\n", "")
+    assert _unrealised(items) == []

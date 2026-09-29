@@ -562,9 +562,122 @@ empty-range)
     fi
     ;;
 
+multi-arg-call)
+    plan_fixture '| 1 | method call: `assertCount(3)` present | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    out=$(printf '+        self::assertCount(3, $this->locate($source)[%s]);\n' "'tokens'" \
+        | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "multi-arg-call"
+    else
+        fail "multi-arg-call (rc=$rc, out=$out)"
+    fi
+    ;;
+
+multi-arg-call-mutation)
+    plan_fixture '| 1 | method call: `assertCount(3)` present | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    out=$(printf '+        self::assertCount(99, $something);\n' \
+        | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1'; then
+        ok "multi-arg-call-mutation"
+    else
+        fail "multi-arg-call-mutation (rc=$rc, out=$out)"
+    fi
+    ;;
+
+shell-var-default)
+    plan_fixture '| 1 | shell var: `${MY_TEST_VAR}` set | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    out=$(printf '+  local x="${MY_TEST_VAR:-}" root\n' \
+        | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "shell-var-default"
+    else
+        fail "shell-var-default (rc=$rc, out=$out)"
+    fi
+    ;;
+
+shell-var-default-mutation)
+    plan_fixture '| 1 | shell var: `${COMPLETELY_ABSENT_XYZ_VAR}` set | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    out=$(printf '+some unrelated added line\n' \
+        | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1'; then
+        ok "shell-var-default-mutation"
+    else
+        fail "shell-var-default-mutation (rc=$rc, out=$out)"
+    fi
+    ;;
+
+glob-prefix)
+    plan_fixture '| 1 | glob match: `test_digest_xyzzy_*` present | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    printf 'test_digest_xyzzy_something\n' > "$root/fixture.txt"
+    git -C "$root" add fixture.txt
+    out=$(printf '+some unrelated added line\n' \
+        | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "glob-prefix"
+    else
+        fail "glob-prefix (rc=$rc, out=$out)"
+    fi
+    ;;
+
+glob-prefix-mutation)
+    plan_fixture '| 1 | glob match: `test_xyzzy_missing_*` present | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    printf 'test_digest_xyzzy_something\n' > "$root/fixture.txt"
+    git -C "$root" add fixture.txt
+    out=$(printf '+some unrelated added line\n' \
+        | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1'; then
+        ok "glob-prefix-mutation"
+    else
+        fail "glob-prefix-mutation (rc=$rc, out=$out)"
+    fi
+    ;;
+
+skip-equals-class4)
+    plan_fixture '| 1 | scenario: `current_tree=T2` | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    out=$(printf '+some unrelated added line\n' \
+        | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
+    rc=$?
+    # A second, genuinely unrealised token on the same row still flags.
+    plan_fixture '| 2 | scenario: `current_tree=T2` and `FIXTURE_ABSENT_SYMBOL` | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan2.md"
+    out2=$(printf '+some unrelated added line\n' \
+        | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan2.md" - 2>/dev/null)
+    if [ "$rc" -eq 0 ] && [ -z "$out" ] && printf '%s\n' "$out2" | grep -qF 'UNREALISED-ASSERTION: row 2'; then
+        ok "skip-equals-class4"
+    else
+        fail "skip-equals-class4 (rc=$rc, out=$out, out2=$out2)"
+    fi
+    ;;
+
+skip-equals-class5)
+    plan_fixture '| 1 | env var: `REVIEW_OWED_TIMEOUT=1` | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+        > "$root/plan.md"
+    out=$(printf '+some unrelated added line\n' \
+        | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "skip-equals-class5"
+    else
+        fail "skip-equals-class5 (rc=$rc, out=$out)"
+    fi
+    ;;
+
 *)
     printf 'Unknown case: %s\n' "$case" >&2
-    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire all\n' >&2
+    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire all\n' >&2
     exit 2
     ;;
 esac
@@ -576,7 +689,7 @@ rm -rf "$root"
 
 ARG="${1:-all}"
 
-CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire"
+CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire"
 
 if [ "$ARG" = "all" ]; then
     for c in $CASES; do

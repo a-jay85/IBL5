@@ -338,7 +338,7 @@ def _plan_index(worktree: str, plan_path: str) -> str:
 def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: str,
                  pr_body: str, pr_number: int | str, phase4b_ran: bool, *,
                  worktree: str = ".", packet_name: str = "fidelity-packet",
-                 extra_context: str = "") -> str:
+                 extra_context: str = "", review_findings: str = "") -> str:
     """Write the seven `_phase-5.5-fidelity.md` Step-2 inputs as files. Returns the dir."""
     packet = os.path.join(out_dir, packet_name)
     os.makedirs(packet, exist_ok=True)
@@ -366,12 +366,16 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
 
     _write("diff.patch", diff or "")
     _write("pr-body.md", pr_body or "")
+    findings_block = (
+        f"PHASE_4B_FINDINGS:\n{review_findings}\n" if review_findings else ""
+    )
     _write("context.md",
            "# Context\n\n"
            "CONFLICT_RESOLVED_PATHS: (none — the harness path rebases cleanly or fails "
            "closed before reaching Phase 5.5)\n"
            f"PHASE_4B_RAN: {'yes' if phase4b_ran else 'no'}\n"
-           f"REVIEW_TIMESTAMP: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
+           + findings_block
+           + f"REVIEW_TIMESTAMP: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
            f"MASTER_SHA: {master_sha}\n"
            f"REVIEWED_TREE: {reviewed_tree}\n"
            f"PR_NUMBER: {pr_number}\n"

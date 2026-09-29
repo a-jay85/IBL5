@@ -45,9 +45,11 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               name_status_text, normalize_backlog_closes, numstat_text,
                               qualify_backlog_refs,
                               render_files_changed, render_manual_confirmation,
+                              render_tests_changed,
                               render_residual_phases, render_reviewer_verification,
                               restore_manual_testing_section, strip_manual_testing_section,
                               upsert_files_changed, upsert_manual_confirmation,
+                              upsert_tests_changed,
                               upsert_residual_phases, upsert_reviewer_verification)
 from harness.planfile import locate_plan, split_hold_justification
 from harness.review import ReviewPhase
@@ -393,7 +395,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pr = gh.pr_number()
             log(f"phase2: PR #{pr} exists — updated head to {sha or '(clean)'}")
         else:
-            create_body = _apply_backlog_closes(upsert_files_changed(copy["summary_md"], render_files_changed(diff)), plan, log)
+            create_body = upsert_files_changed(copy["summary_md"], render_files_changed(diff))
+            create_body = upsert_tests_changed(create_body, render_tests_changed(diff))
+            create_body = _apply_backlog_closes(create_body, plan, log)
             create_body = _upsert_no_adr_markers(create_body, plan)
             pr = gh.pr_create(copy["title"], create_body, "master")
             log(f"phase2: pr_create intent recorded (title={copy['title']!r})")
@@ -417,8 +421,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
 
         # ---- Phase 4: review + security (gated bounded calls) ---------
-        # Runs in the background under Phase 5 → 5.0 → 6 → the Phase 5.5 review call; none
-        # of those read Phase 4's output. Only the LLM calls and the PR posts run on the
+        # Runs in the background through Phase 5 → 5.0 → 6; joined before Phase 5.5
+        # builds its fidelity packet so phase4b_ran is truthful. Only the LLM calls and
+        # the PR posts run on the
         # worker: log(), state.checkpoint() and the pr-copy degradation merge stay on
         # this thread, in _join_review, so audit.log and the state file keep their serial
         # order. The join happens before anything moves the head (fidelity remediation),
@@ -461,6 +466,13 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             res.findings = findings
             res.scored_findings = scored
             res.degraded_agents = degraded_agents
+            code_review_purposes = {"review-agent-a", "review-agent-b", "review-agent-d"}
+            expected_code = [p for p in ("review-agent-a", "review-agent-b", "review-agent-d")
+                             if gates.get({"review-agent-a": "A", "review-agent-b": "B",
+                                           "review-agent-d": "D"}[p])]
+            code_degraded = [p for p in degraded_agents if p in code_review_purposes]
+            res.phase4b_code_ran = bool(expected_code) and len(code_degraded) < len(expected_code)
+            res.phase4b_reviewed_head = meta.get("headRefOid") or ""
             state.checkpoint("review", res, review_gates=gates, reviewed_head=meta.get("headRefOid") or "")
             log(f"phase4 gates={ {k: v for k, v in gates.items()} } findings: raw={len(scored)} surviving={len(findings)} scores={[s['score'] for s in scored]}")
             if degraded_agents:
@@ -528,7 +540,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # Discharged sentences get a separate `## Reviewer verification` block
         # positioned after Manual Testing.  Order of the three upserts is load-
         # bearing: manual_confirmation first, reviewer_verification second,
-        # files_changed last; exactly one pr_edit_body call.
+        # files_changed then tests_changed last; exactly one pr_edit_body call.
         residual, discharged = _discharge_hold_sentences(
             llm, probe, plan.hold_justification, log)
         body = upsert_manual_confirmation(
@@ -538,6 +550,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # files-changed block is machine-generated: refresh it on every run so the
         # PR body's scope can't silently drift from the actual diff.
         body = upsert_files_changed(body, render_files_changed(diff))
+        body = upsert_tests_changed(body, render_tests_changed(diff))
         body = _apply_backlog_closes(body, plan, log)
         body = _upsert_no_adr_markers(body, plan)
         gh.pr_edit_body(pr, body)
@@ -1795,8 +1808,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                   unresolved_conformance=(), meta_check_failures=(), scored_findings=()):
     """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
 
-    `before_remediation` runs once, just before the first remediation commit, so the
-    background Phase 4 review finishes before the head moves.
+    `before_remediation` runs once, before `build_packet()`, so Phase 4 results are
+    available when the fidelity packet is built. It is set to None after the call.
 
     Replay fixtures that carry no canned `plan-fidelity-review` keep the historical
     synthetic READY, so the pre-Phase-5.5 trace corpus stays green; a fixture opts into
@@ -1846,10 +1859,23 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "carried_forward": True}
         return carried, ""
     log(f"phase5.5 fidelity: review: full (carry-forward declined: {decline_reason})")
+    # Join Phase 4 before building the fidelity packet so phase4b_ran is truthful.
+    if before_remediation is not None:
+        before_remediation()
+        before_remediation = None  # prevent double-call in the NOT READY guard below
+    phase4b_ran = getattr(res, "phase4b_code_ran", False)
+    _reviewed_head = getattr(res, "phase4b_reviewed_head", "")
+    _findings = getattr(res, "findings", ()) or ()
+    _lines = [f"- {f.path}:{f.line} (score {f.score or 0}) -- {(f.body or '')[:160]}"
+              for f in _findings]
+    if _reviewed_head:
+        _lines.insert(0, f"reviewed_head: {_reviewed_head}")
+    review_findings = "\n".join(_lines)
     try:
         packet = fidelity.build_packet(
             out_dir, master_sha, reviewed_tree, plan, diff, body, pr,
-            phase4b_ran=False, worktree=worktree or ".")
+            phase4b_ran=phase4b_ran, worktree=worktree or ".",
+            review_findings=review_findings)
     except HarnessError as e:
         log(f"phase5.5 fidelity: packet failed ({e.kind}) - verdict indeterminate")
         res.fidelity = {"verdict_1": None, "error_kind": e.kind,
@@ -1878,8 +1904,6 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     rounds = []
     current_verdict_path = fidelity.verdict_path(pr)
     final_verdict, final_err = verdict, err
-    if final_verdict == "NOT READY" and before_remediation is not None:
-        before_remediation()
     for round_num in range(1, fidelity.MAX_FIDELITY_ROUNDS + 1):
         if final_verdict != "NOT READY":
             break
@@ -2013,7 +2037,10 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         live_body, restored = restore_manual_testing_section(live_body, raw_before_round)
         if restored:
             log(f"phase5.5 round {round_num}: reverted fixer edit to ## Manual Testing")
-        body = _apply_backlog_closes(upsert_files_changed(live_body, render_files_changed(git.diff_vs_base())), plan, log)
+        refreshed_diff = git.diff_vs_base()
+        body = upsert_files_changed(live_body, render_files_changed(refreshed_diff))
+        body = upsert_tests_changed(body, render_tests_changed(refreshed_diff))
+        body = _apply_backlog_closes(body, plan, log)
         body = _upsert_no_adr_markers(body, plan)
         gh.pr_edit_body(pr, body)
         # sha is either a real commit sha or BODY_ONLY_SHA. fidelity.re_review()'s only
@@ -2125,8 +2152,9 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
     return res
 
 
-# All three are deterministic walls a full skill re-run cannot climb — see exit_code_for.
-_FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged")
+# All four are deterministic walls a full skill re-run cannot climb — see exit_code_for.
+_FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
+                      "llm-usage-limit")
 
 # Per-class remedy for a local-gate denial. Every arm is still exit 3 -- naming the
 # class only shortens the human's search, it never changes the verdict. "doc-staleness"
@@ -2151,12 +2179,14 @@ _GATE_REMEDY = {
 def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
     3 = fail-closed sentinel: bin/post-plan-now MUST NOT escalate to the /post-plan
-        skill session. Three kinds land here. `rebase-conflict` — a stacked-branch
+        skill session. Four kinds land here. `rebase-conflict` — a stacked-branch
         rebase a human must judge. `local-gate` — a pre-commit/pre-push hook denial
         (ADR trigger, stale doc, rules byte budget). `remote-head-diverged`: the PR
         branch was rewritten on GitHub with content the harness did not produce; a
-        skill re-run would re-rebase and push over it. All three are deterministic,
-        so the ~1M-token skill re-run would hit the identical wall and buy nothing.
+        skill re-run would re-rebase and push over it. `llm-usage-limit`: the Claude
+        CLI returned a session/rate/API limit message; a skill re-run would hit the
+        same wall immediately. All four are deterministic walls the ~1M-token skill
+        re-run cannot climb.
     1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
     0 = shipped (armed or held), nothing to ship, or degraded.
     There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm."""
@@ -2231,10 +2261,16 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             return (f"RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied "
                     f"the commit [class={gate_class}]; ERROR terminal=failed, no PR "
                     f"opened. {detail}{drafted} {_GATE_REMEDY[gate_class]}")
-        # Unknown or None error_kind — name both possible causes so the human knows where to look
-        return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict or local-gate), "
-                "cause unknown; ERROR terminal=failed, no PR opened. "
-                "Resolve the rebase or clear the local gate, then re-run bin/post-plan-now.")
+        if res.error_kind == "llm-usage-limit":
+            detail = _flat(res.error or "")
+            return (f"RESULT: post-plan BLOCKED — Claude usage limit reached (environmental); "
+                    f"ERROR terminal=failed kind=llm-usage-limit. "
+                    + (f"{detail} " if detail else "")
+                    + "Re-run bin/post-plan-now after the limit resets.")
+        # Unknown or None error_kind — name all possible fail-closed causes
+        return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict, local-gate, or "
+                "llm-usage-limit), cause unknown; ERROR terminal=failed, no PR opened. "
+                "Resolve the cause, then re-run bin/post-plan-now.")
     if res.error_kind in ("push-retry-cap", "lostwork-unproved"):
         cause = ("push retry cap reached (stale lease after 3 attempts)"
                  if res.error_kind == "push-retry-cap"

@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 2 — resolve a rebase conflict, prove no work was lost, and arm the conflict hold. Loaded only when the Phase 2 rebase block prints STOP-AND-RESOLVE.
-last_verified: 2026-09-22
+last_verified: 2026-09-28
 paths:
   - .claude/skills/post-plan/SKILL.md
   - .claude/review-shared/_rebase-and-conflicts.md
@@ -202,7 +202,7 @@ If any precondition is missing, halt with a `STOP:` line and do not spawn.
 
 The lost-work proof in step 6 answers whether anything was dropped. This step answers a separate question: whether the resolution that survived is semantically correct.
 
-Spawn exactly one sub-agent: `subagent_type: "sonnet-4-6"`, `model` omitted (the in-repo def pins Sonnet 4.6), `run_in_background: false`. One spawn, no retry loop.
+Spawn exactly one sub-agent: `subagent_type: "sonnet-5-5"`, `model` omitted (the in-repo def pins Sonnet 5.5), `run_in_background: false`. One spawn, no retry loop.
 
 The reviewer's inputs are limited to:
 

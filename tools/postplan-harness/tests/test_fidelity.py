@@ -10,7 +10,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import fidelity
 from harness.adapters.llm import FixtureLlm
+from harness.adapters.gitad import ReplayGit
+from harness.adapters.ghad import RecordingGh
 from harness.state import HarnessError, UsageLedger
+
+import runner
 
 TREE = "a" * 40
 
@@ -287,3 +291,73 @@ def test_reviewer_tool_budget_is_narrowed(tmp_path):
         assert t in denied
     assert argv[argv.index("--agent") + 1] == "pr-ready-phase6"
     assert "--model" not in argv
+
+
+# --- phase4b_ran propagation from res.phase4b_code_ran -------------------------
+
+_TREE_1 = "a" * 40
+_TREE_2 = "b" * 40
+
+
+def _fidelity_git():
+    return ReplayGit({
+        "slug": "demo",
+        "worktree_diff": "diff --git a/x b/x\n",
+        "diff": "diff --git a/x b/x\n",
+        "head_trees": [_TREE_1, _TREE_2],
+    })
+
+
+class _FidelityRes:
+    def __init__(self):
+        self.fidelity = {}
+
+
+def test_phase4b_ran_true_when_phase4b_code_ran_set(tmp_path, git_shim, monkeypatch):
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
+    captured = {}
+    orig = runner.fidelity.build_packet
+
+    def _spy(*args, **kwargs):
+        captured["phase4b_ran"] = kwargs.get("phase4b_ran")
+        return orig(*args, **kwargs)
+
+    monkeypatch.setattr(runner.fidelity, "build_packet", _spy)
+
+    res = _FidelityRes()
+    res.phase4b_code_ran = True
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-review": "6d checks\n\nREADY\n"})
+    gh = RecordingGh(str(tmp_path))
+    plan = types.SimpleNamespace(found=False, path="", auto_merge_false=False)
+
+    runner._run_fidelity(
+        llm, str(tmp_path), str(tmp_path), _fidelity_git(), gh, plan,
+        "diff", "body", 99, "dead" * 10, _TREE_1, False, lambda m: None, res,
+    )
+    assert captured.get("phase4b_ran") is True
+    os.unlink(fidelity.verdict_path(99))
+
+
+def test_phase4b_ran_false_when_phase4b_code_ran_absent(tmp_path, git_shim, monkeypatch):
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
+    captured = {}
+    orig = runner.fidelity.build_packet
+
+    def _spy(*args, **kwargs):
+        captured["phase4b_ran"] = kwargs.get("phase4b_ran")
+        return orig(*args, **kwargs)
+
+    monkeypatch.setattr(runner.fidelity, "build_packet", _spy)
+
+    res = _FidelityRes()
+    # res has no phase4b_code_ran attribute — getattr should fall back to False
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-review": "6d checks\n\nREADY\n"})
+    gh = RecordingGh(str(tmp_path))
+    plan = types.SimpleNamespace(found=False, path="", auto_merge_false=False)
+
+    runner._run_fidelity(
+        llm, str(tmp_path), str(tmp_path), _fidelity_git(), gh, plan,
+        "diff", "body", 99, "dead" * 10, _TREE_1, False, lambda m: None, res,
+    )
+    assert captured.get("phase4b_ran") is False
+    os.unlink(fidelity.verdict_path(99))

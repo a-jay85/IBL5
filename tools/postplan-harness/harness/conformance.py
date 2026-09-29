@@ -14,6 +14,12 @@ from .state import PhaseInfo, PlanInfo
 _MATRIX_ASSERTIONS_SCRIPT = str(
     PurePosixPath(os.path.abspath(__file__)).parents[3] / "bin" / "lib" / "plan-matrix-assertions")
 
+# Tier 3 of _resolve: a plan-named migration whose number shifted at implementation
+# time because a parallel branch claimed the same number first (backlog#937). The
+# directory prefix is part of the pattern on purpose — the tolerance is for
+# `ibl5/migrations/NNN_<suffix>` only, never for any other numbered filename.
+_MIGRATION_RENUMBER = re.compile(r"^ibl5/migrations/\d+_(?P<suffix>.+)$")
+
 
 def _contract_items(plan: PlanInfo, changed_files: list[str],
                     phase5_status: str | None) -> list[str]:
@@ -45,10 +51,30 @@ def _contract_items(plan: PlanInfo, changed_files: list[str],
     return items
 
 
+def _renumbered_migration(tok: str, changed_files: list[str]) -> str | None:
+    """The single changed migration sharing `tok`'s suffix under a different number.
+
+    None unless `tok` is `ibl5/migrations/NNN_<suffix>` AND exactly one changed path
+    is `ibl5/migrations/MMM_<suffix>` with the identical suffix. Two such paths is
+    ambiguous and returns None, so a MISSING-FILE still fires; the caller has already
+    established that no exact, suffix, or basename match exists.
+    """
+    m = _MIGRATION_RENUMBER.match(tok)
+    if not m:
+        return None
+    suffix = m.group("suffix")
+    hits: list[str] = []
+    for f in changed_files:
+        n = _MIGRATION_RENUMBER.match(f)
+        if n and n.group("suffix") == suffix:
+            hits.append(f)
+    return hits[0] if len(hits) == 1 else None
+
+
 def _resolve(tok: str, changed_files: list[str]) -> str | None:
     """The single changed path a plan token names, or None when 0 or 2+ candidates.
 
-    Two ordered tiers. Tier 1 is exact-or-path-suffix, which covers a plan that named
+    Three ordered tiers. Tier 1 is exact-or-path-suffix, which covers a plan that named
     a repo-relative path while the diff carries a longer prefix (`tests/test_foo.py`
     vs `tools/postplan-harness/tests/test_foo.py`). Tier 2 is a basename match whose
     candidate set is the UNION of (a) matching file paths and (b) the DISTINCT ancestor
@@ -60,6 +86,12 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
     one file under each of two same-named directories is two candidates, so it does not.
     The union needs no token-shape test, because a file path and a directory path are
     never the same string, and any total of 2+ is ambiguous either way.
+
+    Tier 3 runs only when Tiers 1 and 2 found nothing: a token of the form
+    `ibl5/migrations/NNN_<suffix>` resolves to the one changed path
+    `ibl5/migrations/MMM_<suffix>` with the identical suffix, which is the shape a
+    plan-authorized renumber produces when `bin/next-migration` prints a different
+    number than the plan quoted. Zero or 2+ same-suffix paths still return None.
     """
     tok = tok.strip().strip("/")
     # pytest node-id form `path/to/file.py::test_name` — strip the test-name
@@ -82,7 +114,11 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
         for parent in p.parents:
             if parent.name == base:
                 cands.add(str(parent))
-    return cands.pop() if len(cands) == 1 else None
+    if len(cands) == 1:
+        return cands.pop()
+    if cands:
+        return None
+    return _renumbered_migration(tok, changed_files)
 
 
 def _touched(tok: str, changed_files: list[str]) -> bool:

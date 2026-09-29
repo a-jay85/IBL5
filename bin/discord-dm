@@ -31,11 +31,18 @@
 #                      verbatim, with no {content:{...}} envelope, no recipient
 #                      and no chunking/truncation. Implies a caller that knows
 #                      the route's schema. Requires --route.
+#   --ping             owner webhook only: @mention the owner on the first chunk.
+#                      No effect on the DM fallback (a DM already notifies);
+#                      a usage error with --raw.
 #   --chunk            split an over-cap message into ordered messages instead of
 #                      truncating it. Opt-in: the short verdict pings sent by
 #                      bin/plan-now and bin/watch-automouse-plan want truncation,
 #                      and splitting one ping into three DMs would be worse.
 #                      With --chunk, exit 0 means EVERY chunk was delivered.
+#
+# Routing: owner recipient + no --raw + readable webhook file → the #dev channel
+# webhook; anything else → the IBLbot DM path. Test seams: DISCORD_DM_SSH_BIN,
+# DISCORD_DM_CURL_BIN, DISCORD_DM_WEBHOOK_FILE (default ~/.iblbot-dev-webhook-url).
 #
 # Exit: 0 delivered · 1 undeliverable (spooled) · 2 usage/config error.
 
@@ -53,6 +60,12 @@ ROUTE="/discordDM"
 RAW=0
 # Transport seam: tests point this at a stub. Production always uses the real ssh.
 SSH_BIN="${DISCORD_DM_SSH_BIN:-ssh}"
+# Webhook seams (unset and empty both mean the default). The URL lives in a chmod-600
+# host file, never an env var: launchd jobs do not inherit the shell environment.
+CURL_BIN="${DISCORD_DM_CURL_BIN:-curl}"
+WEBHOOK_FILE="${DISCORD_DM_WEBHOOK_FILE:-$HOME/.iblbot-dev-webhook-url}"
+OWNER_ID="283183467804491776"
+PING=0
 SPOOL="${DISCORD_DM_SPOOL:-$HOME/.claude/discord-dm-spool.log}"
 ID_FILE="$HOME/.iblbot-dm-id"
 
@@ -72,7 +85,8 @@ while [ $# -gt 0 ]; do
         --chunk)       CHUNK=1; shift ;;
         --route)       ROUTE="${2:-}"; shift 2 ;;
         --raw)         RAW=1; shift ;;
-        -h|--help)     sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --ping)        PING=1; shift ;;
+        -h|--help)     sed -n '2,47p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -)             MSG=$(cat); shift ;;
         --)            shift; MSG="$*"; break ;;
         -*)            echo "discord-dm: unknown option $1" >&2; exit 2 ;;
@@ -101,6 +115,7 @@ if [ "$RAW" = 1 ]; then
     # a raw body from being POSTed at /discordDM, which would 400 confusingly.
     [ "$ROUTE" != "/discordDM" ] || { echo "discord-dm: --raw requires --route" >&2; exit 2; }
     [ "$CHUNK" = 0 ] || { echo "discord-dm: --raw and --chunk are mutually exclusive" >&2; exit 2; }
+    [ "$PING" = 0 ] || { echo "discord-dm: --raw and --ping are mutually exclusive" >&2; exit 2; }
     jq -e . >/dev/null 2>&1 <<< "$MSG" || { echo "discord-dm: --raw payload is not valid JSON" >&2; exit 2; }
 fi
 
@@ -115,6 +130,20 @@ discord-dm: no recipient. Set one of:
   $ID_FILE   persistent default (one snowflake, no quotes)
 EOF
     exit 2
+fi
+
+# Route decision. The owner's own notices go to the #dev channel webhook; every
+# other recipient and every --raw body (plan-review buttons need the bot) stays on
+# the IBLbot DM path. A missing or malformed webhook file falls back to the DM.
+USE_WEBHOOK=0; WEBHOOK_URL=""
+if [ "$RAW" = 0 ] && [ "$TO" = "$OWNER_ID" ] && [ -s "$WEBHOOK_FILE" ]; then
+    WEBHOOK_URL=$(tr -d '[:space:]' < "$WEBHOOK_FILE")
+    case "$WEBHOOK_URL" in
+        https://*) case "$WEBHOOK_URL" in *[!A-Za-z0-9:/._-]*) WEBHOOK_URL="" ;; esac ;;
+        *) WEBHOOK_URL="" ;;
+    esac
+    if [ -n "$WEBHOOK_URL" ]; then USE_WEBHOOK=1
+    else echo "discord-dm: webhook file malformed; using the DM path" >&2; fi
 fi
 
 say() { [ "$QUIET" = 1 ] || printf 'discord-dm: %s\n' "$1" >&2; }
@@ -222,6 +251,65 @@ send_one() { # message
     return 1
 }
 
+WH_PAYLOAD=""
+trap 'rm -f "$WH_PAYLOAD"' EXIT
+
+# Deliver ONE message to the #dev webhook. Same contract as send_one (0 = delivered,
+# 1 = not; `http` and LAST_ATTEMPTS stay global for the spool line). Differences:
+# any 2xx is success (a bare webhook POST answers 204), and 429 retries after the
+# server's retry_after instead of being treated as a permanent 4xx.
+send_webhook_one() { # message chunk-index
+    local msg="$1" idx="$2" content am out curl_rc n=1 ra
+    if [ "$PING" = 1 ] && [ "$idx" = 1 ]; then
+        content="<@$OWNER_ID> $msg"
+        am=$(jq -nc --arg id "$OWNER_ID" '{users: [$id]}')
+    else
+        content="$msg"
+        am='{"parse":[]}'
+    fi
+    [ -n "$WH_PAYLOAD" ] || WH_PAYLOAD=$(mktemp "${TMPDIR:-/tmp}/discord-dm-wh.XXXXXX")
+    jq -n --arg c "$content" --argjson am "$am" \
+        '{content: $c, flags: 4, allowed_mentions: $am}' > "$WH_PAYLOAD" || exit 2
+    while [ "$n" -le "$ATTEMPTS" ]; do
+        LAST_ATTEMPTS="$n"
+        # The URL goes in on stdin as a curl config line so it never enters argv.
+        out=$(printf 'url = "%s?wait=true"\n' "$WEBHOOK_URL" | "$CURL_BIN" -s -m 20 -K - \
+            -X POST -H 'Content-Type: application/json' --data-binary "@$WH_PAYLOAD" \
+            -w '\nHTTP=%{http_code}' 2>&1)
+        curl_rc=$?
+        http=$(printf '%s' "$out" | sed -n 's/.*HTTP=\([0-9][0-9]*\).*/\1/p' | tail -1)
+
+        case "${http:-}" in
+            2??)
+                say "delivered via webhook on attempt $n (HTTP $http)"
+                return 0 ;;
+            429)
+                say "attempt $n/$ATTEMPTS rate limited (HTTP 429)"
+                ra=$(sed '$d' <<< "$out" | jq -r '.retry_after // 1' 2>/dev/null)
+                ra=$(awk -v r="$ra" 'BEGIN {
+                    if (r !~ /^[0-9]+(\.[0-9]+)?$/) { print 5; exit }
+                    c = int(r); if (c < r) c++
+                    if (c < 1) c = 1; if (c > 60) c = 60
+                    print c }')
+                if [ "$n" -lt "$ATTEMPTS" ]; then sleep "$ra"; fi
+                n=$(( n + 1 ))
+                continue ;;
+        esac
+
+        say "attempt $n/$ATTEMPTS failed via webhook — curl_rc=$curl_rc http=${http:-none}"
+
+        case "${http:-}" in
+            4??) say "permanent failure (HTTP $http) — not retrying"; return 1 ;;
+        esac
+
+        if [ "$n" -lt "$ATTEMPTS" ]; then
+            sleep "${BACKOFF[$(( n - 1 ))]:-120}"
+        fi
+        n=$(( n + 1 ))
+    done
+    return 1
+}
+
 # All-or-nothing (§ decision 6 / 11c): the caller gates a public "a fix is on the way"
 # post on this exit code, so a half-delivered remedy MUST NOT report success. On the
 # first failed chunk we stop and fall through to the spool, which writes the whole
@@ -232,7 +320,9 @@ DELIVERED=1
 IDX=0
 for chunk in "${CHUNKS[@]}"; do
     IDX=$(( IDX + 1 ))
-    if ! send_one "$chunk"; then
+    if [ "$USE_WEBHOOK" = 1 ]; then send_webhook_one "$chunk" "$IDX"; else send_one "$chunk"; fi
+    rc=$?
+    if [ "$rc" != 0 ]; then
         DELIVERED=0
         [ "$TOTAL" -gt 1 ] && say "chunk $IDX/$TOTAL undeliverable — abandoning the rest"
         break

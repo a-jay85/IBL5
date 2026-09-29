@@ -481,6 +481,127 @@ DM_CAPTURE="$R_CAP" DISCORD_DM_SSH_BIN="$SSH_CODE" DISCORD_DM_SPOOL="$SPOOL" \
 want "C6: recipient defaults from the id file" "$(cat "$R_CAP")" "\"receivingUserDiscordID\": \"$FAKE_TO\""
 rm -f "$HOME/.iblbot-dm-id"
 
+# -- Webhook path: owner notices go to the #dev channel webhook ----------------
+CURL_STUB="$TMP/curl-stub"; CURL_N="$TMP/curl-n"; export CURL_N
+cat > "$CURL_STUB" <<'STUB_EOF'
+#!/bin/bash
+n=$(( $(cat "$CURL_N" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$CURL_N"
+printf 'ARGV:%s\n' "$*" >> "$CURL_CAP"; printf 'CONF:%s\n' "$(cat)" >> "$CURL_CAP"
+for a in "$@"; do case "$a" in @*) printf 'BODY:%s\n' "$(jq -c . "${a#@}")" >> "$CURL_CAP" ;; esac; done
+code=$(cut -d, -f"$n" <<< "$CURL_STATUSES"); code=${code:-200}
+[ "$code" = 429 ] && printf '{"retry_after":0.2}'
+printf '\nHTTP=%s' "$code"
+STUB_EOF
+chmod +x "$CURL_STUB"
+run_wh() { # <statuses> ...dm-args  -> W_OUT / W_RC
+    local st="$1"; shift; : > "$CURL_CAP"; rm -f "$CURL_N"; : > "$SPOOL"; : > "$R_CAP"
+    W_OUT=$(CURL_STATUSES="$st" DM_CAPTURE="$R_CAP" DISCORD_DM_TO="$OWNER_ID" \
+        DISCORD_DM_CURL_BIN="$CURL_STUB" DISCORD_DM_SSH_BIN="$SSH_CODE" \
+        DISCORD_DM_WEBHOOK_FILE="${WH_FILE:-$FAKE_WEBHOOK_FILE}" DISCORD_DM_SPOOL="$SPOOL" \
+        "$DM" --attempts 3 "$@" 2>&1); W_RC=$?
+}
+curl_calls() { grep -c '^ARGV:' "$CURL_CAP"; }
+body() { sed -n 's/^BODY://p' "$CURL_CAP" | sed -n "${1}p"; }
+
+printf '\n-- Webhook path --\n'
+
+# W1/W2: 200 and 204 both deliver on one call; no spool; ssh never runs.
+run_wh 200 "hi"
+[ "$W_RC" = 0 ] && ok "W1: webhook 200 exits 0" || fail "W1: exit $W_RC"
+[ "$(curl_calls)" = 1 ] && ok "W1: one curl call" || fail "W1: $(curl_calls) curl calls"
+[ ! -s "$SPOOL" ] && ok "W1: nothing spooled" || fail "W1: spooled a delivered message"
+[ ! -s "$R_CAP" ] && ok "W1: ssh never ran" || fail "W1: webhook send also ran ssh"
+run_wh 204 "hi"
+[ "$W_RC" = 0 ] && ok "W2: webhook 204 exits 0" || fail "W2: 204 exit $W_RC"
+[ "$(curl_calls)" = 1 ] && ok "W2: 204 is one curl call" || fail "W2: $(curl_calls) curl calls"
+[ ! -s "$SPOOL" ] && ok "W2: 204 not spooled" || fail "W2: 204 spooled"
+
+# W3: 429 waits retry_after (0.2 rounds up to 1s), not the 15s backoff.
+SECONDS=0; run_wh 429,200 "hi"; W3_SECS=$SECONDS
+[ "$W_RC" = 0 ] && ok "W3: 429 then 200 exits 0" || fail "W3: exit $W_RC"
+[ "$(curl_calls)" = 2 ] && ok "W3: 429 retried once" || fail "W3: $(curl_calls) curl calls"
+[ "$W3_SECS" -lt 10 ] && ok "W3: waited retry_after, not the backoff" || fail "W3: took ${W3_SECS}s"
+
+# W4: other 4xx is permanent: one call, exit 1, spooled.
+run_wh 400,200 "hi"
+[ "$W_RC" = 1 ] && ok "W4: webhook 400 exits 1" || fail "W4: exit $W_RC"
+[ "$(curl_calls)" = 1 ] && ok "W4: 400 is not retried" || fail "W4: $(curl_calls) curl calls"
+want "W4: spool names recipient + status" "$(cat "$SPOOL")" "UNDELIVERED (to=$OWNER_ID http=400)"
+W4_LEAK="$W_OUT$(cat "$SPOOL")"
+
+# W5: default payload cannot mention anyone.
+run_wh 200 "@everyone <@1> x"
+[ "$(body 1 | jq -r '.allowed_mentions.parse | length')" = 0 ] \
+    && ok "W5: allowed_mentions.parse is empty" || fail "W5: allowed_mentions.parse not empty"
+[ "$(body 1 | jq -r '.content | startswith("<@")')" = false ] \
+    && ok "W5: no ping prefix by default" || fail "W5: content starts with a mention"
+
+# W6/W7: --ping mentions the owner on chunk 1 only; every body suppresses embeds.
+run_wh 200,200,200,200 --ping --chunk - < "$FIXTURE"
+[ "$(body 1 | jq -r '.content | startswith("<@283183467804491776> ")')" = true ] \
+    && ok "W6: chunk 1 carries the owner mention" || fail "W6: chunk 1 has no mention"
+[ "$(body 1 | jq -c '.allowed_mentions.users')" = '["283183467804491776"]' ] \
+    && ok "W6: chunk 1 allows only the owner ID (string)" || fail "W6: chunk 1 allowed_mentions.users wrong"
+[ "$(body 2 | jq -r '.content | startswith("(2/")')" = true ] \
+    && ok "W6: chunk 2 has no mention prefix" || fail "W6: chunk 2 content wrong"
+[ "$(body 2 | jq -c '.allowed_mentions.parse')" = '[]' ] \
+    && ok "W6: chunk 2 allows no mentions" || fail "W6: chunk 2 allowed_mentions wrong"
+W7_BAD=0
+while IFS= read -r line; do
+    jq -e '.flags == 4' <<< "$line" >/dev/null 2>&1 || W7_BAD=$(( W7_BAD + 1 ))
+done < <(sed -n 's/^BODY://p' "$CURL_CAP")
+[ "$W7_BAD" = 0 ] && ok "W7: every webhook body sets flags=4" || fail "W7: $W7_BAD bodies missing flags=4"
+
+# W8: the URL reaches curl only through the stdin config, never argv, never output.
+run_wh 200 "hi"
+want_not "W8: URL is not in curl argv" "$(grep '^ARGV:' "$CURL_CAP")" "example.invalid"
+want "W8: URL arrives via the -K - config" "$(grep '^CONF:' "$CURL_CAP")" "url = \"$FAKE_WEBHOOK_URL?wait=true\""
+want_not "W8: a failed send never echoes the URL" "$W4_LEAK" "example.invalid"
+
+# W9: --ping is rejected with --raw and in --flag=value form, before any send.
+run_wh 200 --ping --raw --route /discordPlanReviewDM - <<< '{}'
+[ "$W_RC" = 2 ] && [ "$(curl_calls)" = 0 ] && ok "W9: --ping --raw exits 2, no curl" || fail "W9: --ping --raw rc=$W_RC curl=$(curl_calls)"
+run_wh 200 --ping=1 "x"
+[ "$W_RC" = 2 ] && [ "$(curl_calls)" = 0 ] && ok "W9: --ping=1 exits 2, no curl" || fail "W9: --ping=1 rc=$W_RC curl=$(curl_calls)"
+
+# W10: a malformed webhook file falls back to the DM without echoing the URL.
+printf '%s\n' 'https://ex.invalid/a"b' > "$TMP/bad-webhook-url"
+WH_FILE="$TMP/bad-webhook-url" run_wh 200 "hi"
+[ "$W_RC" = 0 ] && ok "W10: malformed file still delivers" || fail "W10: exit $W_RC"
+want "W10: malformed file falls back to ssh" "$(cat "$R_CAP")" "http://localhost:50000/discordDM"
+[ "$(curl_calls)" = 0 ] && ok "W10: malformed file never ran curl" || fail "W10: curl ran"
+want_not "W10: warning omits the URL" "$W_OUT" "ex.invalid"
+want "W10: warning names the DM fallback" "$W_OUT" "using the DM path"
+
+# W11: unset and empty DISCORD_DM_WEBHOOK_FILE both use the $HOME default.
+printf '%s\n' "$FAKE_WEBHOOK_URL" > "$HOME/.iblbot-dev-webhook-url"
+: > "$CURL_CAP"; rm -f "$CURL_N"
+DISCORD_DM_WEBHOOK_FILE="" DISCORD_DM_TO="$OWNER_ID" DISCORD_DM_CURL_BIN="$CURL_STUB" \
+    DISCORD_DM_SSH_BIN="$SSH_CODE" DISCORD_DM_SPOOL="$SPOOL" DM_CAPTURE="$R_CAP" \
+    "$DM" --quiet "hi" >/dev/null 2>&1
+[ "$(curl_calls)" = 1 ] && ok "W11: empty webhook-file var uses the default path" || fail "W11: empty var made $(curl_calls) curl calls"
+: > "$CURL_CAP"; rm -f "$CURL_N"
+env -u DISCORD_DM_WEBHOOK_FILE DISCORD_DM_TO="$OWNER_ID" DISCORD_DM_CURL_BIN="$CURL_STUB" \
+    DISCORD_DM_SSH_BIN="$SSH_CODE" DISCORD_DM_SPOOL="$SPOOL" DM_CAPTURE="$R_CAP" \
+    "$DM" --quiet "hi" >/dev/null 2>&1
+[ "$(curl_calls)" = 1 ] && ok "W11: unset webhook-file var uses the default path" || fail "W11: unset var made $(curl_calls) curl calls"
+
+# W11b: an empty curl seam falls back to the real curl (which cannot resolve
+# example.invalid) instead of "command not found".
+: > "$SPOOL"
+W11B_OUT=$(DISCORD_DM_CURL_BIN="" DISCORD_DM_TO="$OWNER_ID" DISCORD_DM_WEBHOOK_FILE="$FAKE_WEBHOOK_FILE" \
+    DISCORD_DM_SSH_BIN="$SSH_CODE" DISCORD_DM_SPOOL="$SPOOL" DM_CAPTURE="$R_CAP" \
+    "$DM" --quiet --attempts 1 "hi" 2>&1); W11B_RC=$?
+[ "$W11B_RC" = 1 ] && ok "W11b: empty curl seam runs real curl and fails" || fail "W11b: exit $W11B_RC"
+want "W11b: spool records the failed status" "$(cat "$SPOOL")" "http=000"
+want_not "W11b: no command-not-found" "$W11B_OUT" "command not found"
+rm -f "$HOME/.iblbot-dev-webhook-url"
+
+# W12: --ping adds nothing on the ssh fallback.
+WH_FILE="$TMP/absent-webhook-url" run_wh 200 --ping "hi"
+want_not "W12: ssh body carries no mention" "$(cat "$R_CAP")" "<@"
+[ "$(curl_calls)" = 0 ] && ok "W12: fallback never ran curl" || fail "W12: curl ran"
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 printf '\n'
 if [ "$FAILS" -eq 0 ]; then

@@ -8,11 +8,13 @@
 #   ibl5/phpstan-tests-baseline.neon
 #   ibl5/phpstan-baseline-counts.json
 #
-# These three are GENERATED artifacts, not hand-authored. On a merge/rebase
-# conflict, do NOT edit the conflict markers by hand: take either side to clear
-# them, then run this script so the baselines reflect the actual merged code.
-# The check-baseline-drift CI gate is the backstop — it fails the PR if these
-# files are stale, so a forgotten regen is caught at PR time, not silently shipped.
+# The two .neon files are GENERATED artifacts and stay PR-side: a fixing PR must
+# shrink them, because ignore.unmatched is on. The counts JSON is a growth
+# allowance. This script only raises it, and only when the PR grew an identifier.
+# Master's update-baselines job lowers it. On a counts-JSON conflict, take the base
+# branch's side, then rerun this script. On a neon conflict, take either side, then
+# rerun this script. The check-baseline-drift CI gate is the backstop: it fails the
+# PR if these files are stale, so a forgotten regen is caught at PR time.
 #
 # This runs two full PHPStan passes (~2-3 min total) plus a drift-snapshot update.
 set -euo pipefail
@@ -26,7 +28,7 @@ composer run analyse:baseline
 echo "==> Regenerating phpstan-tests-baseline.neon (tests)"
 composer run analyse:tests:baseline
 
-echo "==> Updating phpstan-baseline-counts.json"
+echo "==> Raising phpstan-baseline-counts.json where this branch grew the baseline (raise-only)"
 php bin/check-baseline-drift --update
 
 echo

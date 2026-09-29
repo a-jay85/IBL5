@@ -17,8 +17,9 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('Leaderboards', [], [], $this->dbGlobals());
 
-        $this->assertStringContainsString('Season Leaders', $output);
+        $this->assertStringContainsString('<div class="ibl-tab-panel" data-tab="season"', $output);
         $this->assertStringContainsString('class="ibl-tabs"', $output);
+        $this->assertStringContainsString('<h1 class="ibl-title">Leaderboards</h1><div class="ibl-tabs">', $output);
         $this->assertQueryExecuted('ibl_hist');
     }
 
@@ -27,7 +28,7 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
         $output = $this->runModule('Leaderboards', ['tab' => 'season'], [], $this->dbGlobals());
 
         $this->assertNotEmpty($output);
-        $this->assertStringContainsString('Season Leaders', $output);
+        $this->assertStringContainsString('<div class="ibl-tab-panel" data-tab="season"', $output);
         $this->assertQueryExecuted('ibl_hist');
     }
 
@@ -75,7 +76,7 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
         ], $this->dbGlobals());
 
         $this->assertNotEmpty($output);
-        $this->assertStringContainsString('Season Leaders', $output);
+        $this->assertStringContainsString('<div class="ibl-tab-panel" data-tab="season"', $output);
     }
 
     public function testCareerTabNotSubmittedRendersFilterForm(): void
@@ -83,7 +84,7 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
         $output = $this->runModule('Leaderboards', ['tab' => 'career'], [], $this->dbGlobals());
 
         $this->assertNotEmpty($output);
-        $this->assertStringContainsString('Career Leaderboards', $output);
+        $this->assertStringContainsString('<div class="ibl-tab-panel" data-tab="career"', $output);
         $this->assertQueryNotExecuted('ibl_hist');
     }
 
@@ -135,14 +136,14 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
         ], $this->dbGlobals());
 
         $this->assertNotEmpty($output);
-        $this->assertStringContainsString('Career Leaderboards', $output);
+        $this->assertStringContainsString('<div class="ibl-tab-panel" data-tab="career"', $output);
     }
 
     public function testCareerTabDoesNotRenderSeasonBoard(): void
     {
         $output = $this->runModule('Leaderboards', ['tab' => 'career'], [], $this->dbGlobals());
 
-        $this->assertStringNotContainsString('Season Leaders', $output);
+        $this->assertStringNotContainsString('<form name="Leaderboards"', $output);
     }
 
     public function testTabBarRendersOnCareerTab(): void
@@ -167,15 +168,15 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('Leaderboards', ['tab' => 'bogus'], [], $this->dbGlobals());
 
-        $this->assertStringContainsString('Season Leaders', $output);
-        $this->assertStringNotContainsString('Career Leaderboards', $output);
+        $this->assertStringContainsString('<div class="ibl-tab-panel" data-tab="season"', $output);
+        $this->assertStringNotContainsString('<form name="CareerLeaderboards"', $output);
     }
 
     public function testArrayTabParamFallsBackToSeason(): void
     {
         $output = $this->runModule('Leaderboards', ['tab' => ['career']], [], $this->dbGlobals());
 
-        $this->assertStringContainsString('Season Leaders', $output);
-        $this->assertStringNotContainsString('Career Leaderboards', $output);
+        $this->assertStringContainsString('<div class="ibl-tab-panel" data-tab="season"', $output);
+        $this->assertStringNotContainsString('<form name="CareerLeaderboards"', $output);
     }
 }

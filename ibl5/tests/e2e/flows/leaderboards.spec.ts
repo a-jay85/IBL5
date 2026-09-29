@@ -10,7 +10,7 @@ test.describe('Leaderboards flow', () => {
     await page.goto('modules.php?name=Leaderboards');
     await assertNoPhpErrors(page, 'on Leaderboards default tab');
 
-    await expect(page.locator('h1.ibl-title')).toHaveText('Season Leaders');
+    await expect(page.locator('h1.ibl-title')).toHaveText('Leaderboards');
     await expect(page.locator('.ibl-tabs .ibl-tab--active')).toHaveText('Season');
     await expect(page.locator('form[name="Leaderboards"]')).toBeVisible();
   });
@@ -20,6 +20,7 @@ test.describe('Leaderboards flow', () => {
     await page.goto('modules.php?name=Leaderboards&tab=career');
     await assertNoPhpErrors(page, 'on Leaderboards career tab');
 
+    await expect(page.locator('h1.ibl-title')).toHaveText('Leaderboards');
     await expect(page.locator('form[name="CareerLeaderboards"]')).toBeVisible();
     await expect(page.locator('form[name="Leaderboards"]')).toHaveCount(0);
   });
@@ -42,7 +43,7 @@ test.describe('Leaderboards flow', () => {
     await page.goto('modules.php?name=Leaderboards&tab=bogus');
     await assertNoPhpErrors(page, 'on Leaderboards bogus tab');
 
-    await expect(page.locator('h1.ibl-title')).toHaveText('Season Leaders');
+    await expect(page.locator('form[name="Leaderboards"]')).toBeVisible();
   });
 
   test('old season URL redirects to season tab', async ({ appState, page }) => {
@@ -50,7 +51,7 @@ test.describe('Leaderboards flow', () => {
     await page.goto('modules.php?name=SeasonLeaderboards');
 
     await expect(page).toHaveURL(/name=Leaderboards&tab=season/);
-    await expect(page.locator('h1.ibl-title')).toHaveText('Season Leaders');
+    await expect(page.locator('form[name="Leaderboards"]')).toBeVisible();
   });
 
   test('old career URL redirects to career tab', async ({ appState, page }) => {

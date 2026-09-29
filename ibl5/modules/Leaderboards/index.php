@@ -50,8 +50,6 @@ if ($tab === 'career') {
         'submitted' => $_POST['submitted'] ?? null
     ];
 
-    echo '<h1 class="ibl-title">Career Leaderboards</h1>';
-
     // Render filter form
     echo $view->renderFilterForm($filters);
 
@@ -117,8 +115,6 @@ if ($tab === 'career') {
         $limit = (int)$filters['limit'];
     }
 
-    echo '<h1 class="ibl-title">Season Leaders</h1>';
-
     // Get data for dropdowns
     $teams = $repository->getTeams();
     $years = $repository->getYears();
@@ -152,6 +148,7 @@ if ($tab === 'career') {
 $rawBody = ob_get_clean();
 $tabBody = $rawBody === false ? '' : $rawBody;
 
-echo $tabs->renderTabBar($tab, 'modules.php?name=Leaderboards') . $tabs->wrapPanel($tabBody, $tab);
+echo '<h1 class="ibl-title">Leaderboards</h1>'
+    . $tabs->renderTabBar($tab, 'modules.php?name=Leaderboards') . $tabs->wrapPanel($tabBody, $tab);
 
 PageLayout\PageLayout::footer();

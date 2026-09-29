@@ -8,6 +8,8 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_PATH="$PATH"
+BASE_HOME="$HOME"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -20,13 +22,14 @@ PASS_COUNT=0
 ok() { echo "PASS $1"; PASS_COUNT=$((PASS_COUNT+1)); }
 fail() { echo "FAIL $1: $2"; FAILED=$((FAILED+1)); }
 
-# --- healthy_fixture <case_dir> ------------------------------------------------
-# Writes all stubs and fixtures for a fully-healthy state.
+# --- setup_case <case_dir> -----------------------------------------------------
+# Creates the case dir, all stubs, exports all env seams, and aborts (exit 3)
+# if the harness is not hermetic (stub not first on PATH).
 # Sets CASE= for callers.
 # ------------------------------------------------------------------------------
-healthy_fixture() {
+setup_case() {
     CASE="$TMP/$1"
-    mkdir -p "$CASE/home/Library/LaunchAgents" "$CASE/bin"
+    mkdir -p "$CASE/home/Library/LaunchAgents" "$CASE/bin" "$CASE/logs"
 
     # launchctl stub: 'list' cats the fixture; anything else is logged.
     cat > "$CASE/bin/launchctl" <<'STUB'
@@ -37,11 +40,11 @@ printf '%s\n' "$*" >> "$CASE_DIR/launchctl-mutations.log"
 STUB
     chmod +x "$CASE/bin/launchctl"
 
-    # docker stub
+    # docker stub: info exits docker-info-rc; ps cats docker-ps.txt
     cat > "$CASE/bin/docker" <<'STUB'
 #!/bin/sh
 CASE_DIR="$(dirname "$0")/.."
-if [ "$1" = "info" ]; then exit "$(cat "$CASE_DIR/docker-info-rc")"; fi
+if [ "$1" = "info" ]; then exit "$(cat "$CASE_DIR/docker-info-rc" 2>/dev/null || echo 0)"; fi
 if [ "$1" = "ps"   ]; then cat "$CASE_DIR/docker-ps.txt"; exit 0; fi
 STUB
     chmod +x "$CASE/bin/docker"
@@ -52,7 +55,7 @@ STUB
 CASE_DIR="$(dirname "$0")/.."
 echo ran > "$CASE_DIR/db-ran"
 cat "$CASE_DIR/phase.txt"
-exit "$(cat "$CASE_DIR/db-rc")"
+exit "$(cat "$CASE_DIR/db-rc" 2>/dev/null || echo 0)"
 STUB
     chmod +x "$CASE/bin/db-query"
 
@@ -75,15 +78,37 @@ STUB
     chmod +x "$CASE/bin/fake-dm"
     printf '0\n' > "$CASE/dm-rc"
 
-    # launchctl output: all 9 expected jobs loaded; bug-bot has PID 4242
+    # Export all test seams so run_checker and direct invocations pick them up
+    export HOME="$CASE/home"
+    export PATH="$CASE/bin:$BASE_PATH"
+    export DOCKER_BIN="$CASE/bin/docker"
+    export DB_QUERY_BIN="$CASE/bin/db-query"
+    export DISCORD_DM_BIN="$CASE/bin/fake-dm"
+    export LAUNCHD_HEALTH_LOG_DIR="$CASE/logs"
+    export LAUNCHD_HEALTH_TODAY=2026-09-28
+
+    # Hermeticity abort: stubs must shadow the real binaries
+    [ "$(command -v launchctl)" = "$CASE/bin/launchctl" ] || {
+        printf 'HARNESS NOT HERMETIC: launchctl resolves to %s\n' "$(command -v launchctl)"
+        exit 3
+    }
+    [ "$(command -v sleep)" = "$CASE/bin/sleep" ] || {
+        printf 'HARNESS NOT HERMETIC: sleep resolves to %s\n' "$(command -v sleep)"
+        exit 3
+    }
+}
+
+# --- healthy_fixture <case_dir> ------------------------------------------------
+# Calls setup_case and then writes fully-healthy fixture data.
+# ------------------------------------------------------------------------------
+healthy_fixture() {
+    setup_case "$1"
+
+    # launchctl output: all 9 expected jobs loaded with PID 4242
     {
         while read -r label; do
             [ -n "$label" ] || continue
-            if [ "$label" = "com.ibl5.bug-bot" ]; then
-                printf '4242\t0\t%s\n' "$label"
-            else
-                printf '4242\t0\t%s\n' "$label"
-            fi
+            printf '4242\t0\t%s\n' "$label"
         done <<< "$(lej_expected_labels)"
     } > "$CASE/launchctl.out"
 
@@ -108,15 +133,21 @@ PHASE
     printf '0\n' > "$CASE/db-rc"
 }
 
-# run_checker → sets OUT and RC; runs checker with all test seams pointed at $CASE
+# --- teardown_case -------------------------------------------------------------
+# Fails if the checker mutated launchd (wrote to launchctl-mutations.log).
+# Called after every checker run to enforce the read-only contract.
+# ------------------------------------------------------------------------------
+teardown_case() {
+    if [ -s "$CASE/launchctl-mutations.log" ]; then
+        fail "H1 ($CASE)" "checker mutated launchd: $(cat "$CASE/launchctl-mutations.log")"
+    fi
+}
+
+# run_checker → sets OUT and RC; runs checker using the seams exported by setup_case
 run_checker() {
-    OUT="$(HOME="$CASE/home" PATH="$CASE/bin:$PATH" \
-          DOCKER_BIN="$CASE/bin/docker" \
-          DB_QUERY_BIN="$CASE/bin/db-query" \
-          DISCORD_DM_BIN="$CASE/bin/fake-dm" \
-          LAUNCHD_HEALTH_LOG_DIR="$CASE/logs" \
-          bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
+    OUT="$(bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
     RC=$?
+    teardown_case
 }
 
 # ---------------------------------------------------------------------------
@@ -659,6 +690,129 @@ if [ "$RC" -eq 1 ] \
     ok D9
 else
     fail D9 "rc=$RC stderr=$_STDERR9 out=$OUT"
+fi
+
+# ---------------------------------------------------------------------------
+# H1: clean run → no launchd mutations, no DM, exit 0
+# ---------------------------------------------------------------------------
+healthy_fixture H1
+run_checker
+if [ "$RC" -eq 0 ] \
+    && [ ! -f "$CASE/launchctl-mutations.log" ] \
+    && [ ! -f "$CASE/dm.log" ]; then
+    ok H1
+else
+    fail H1 "rc=$RC mutations=$([ -f "$CASE/launchctl-mutations.log" ] && cat "$CASE/launchctl-mutations.log" || echo none) dm=$([ -f "$CASE/dm.log" ] && echo present || echo absent)"
+fi
+
+# ---------------------------------------------------------------------------
+# H2: unset LAUNCHD_HEALTH_LOG_DIR → default path under $HOME/.claude/...
+#     stamp must land in the case's fake HOME, not the real HOME
+# ---------------------------------------------------------------------------
+healthy_fixture H2
+grep -v 'com.ibl5.db-sync-nightly' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
+mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
+rm -f "$CASE/home/Library/LaunchAgents/com.ibl5.db-sync-nightly.plist"
+_BEFORE="$(ls "$BASE_HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/launchd-health/" 2>/dev/null | sort | md5 2>/dev/null || echo none)"
+# Unset the seam so the checker uses the $HOME-relative default
+unset LAUNCHD_HEALTH_LOG_DIR
+OUT="$(LAUNCHD_HEALTH_TODAY=2026-09-28 \
+      bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
+RC=$?
+_AFTER="$(ls "$BASE_HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/launchd-health/" 2>/dev/null | sort | md5 2>/dev/null || echo none)"
+_DEFAULT_STAMPS="$CASE/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/launchd-health/logs/stamps"
+_STAMP_H2=''
+for _f in "$_DEFAULT_STAMPS"/*db-sync-nightly*; do [ -e "$_f" ] && _STAMP_H2="$_f" && break; done
+teardown_case
+if [ "$RC" -eq 1 ] \
+    && [ -n "$_STAMP_H2" ] \
+    && [ "$_BEFORE" = "$_AFTER" ]; then
+    ok H2
+else
+    fail H2 "rc=$RC stamp=$_STAMP_H2 real_dir_changed=$([ "$_BEFORE" = "$_AFTER" ] && echo no || echo yes)"
+fi
+
+# ---------------------------------------------------------------------------
+# H3a: override LAUNCHD_HEALTH_JOBS_LIB with extra label → checker reports it missing
+# H3b: without the override → extra label unknown, exit 0
+# ---------------------------------------------------------------------------
+healthy_fixture H3
+mkdir -p "$CASE/lib"
+cp "$SCRIPT_DIR/lib/launchd-expected-jobs.sh" "$CASE/lib/launchd-expected-jobs.sh"
+printf '\ncom.ibl5.fixture-extra standard\n' >> "$CASE/lib/LEJ_EXPECTED_JOBS_append"
+# Append to the LEJ_EXPECTED_JOBS variable in the copy
+_EXTRA_LIB="$CASE/lib/launchd-expected-jobs.sh"
+# Re-write: append to the quoted block right before the closing quote
+sed -i.bak "s/^com.ibl5.wt-sync standard'/com.ibl5.wt-sync standard\\ncom.ibl5.fixture-extra standard'/" "$_EXTRA_LIB"
+
+OUT="$(LAUNCHD_HEALTH_JOBS_LIB="$_EXTRA_LIB" bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
+RC=$?
+_DM_H3a="$(cat "$CASE/dm.log" 2>/dev/null || echo '')"
+teardown_case
+if [ "$RC" -eq 1 ] \
+    && grep -q 'com.ibl5.fixture-extra' <<< "$OUT" \
+    && grep -q 'com.ibl5.fixture-extra' <<< "$_DM_H3a"; then
+    ok H3a
+else
+    fail H3a "rc=$RC out=$OUT dm=$_DM_H3a"
+fi
+
+# H3b: no LAUNCHD_HEALTH_JOBS_LIB override → extra label not in real lib → exit 0
+rm -f "$CASE/dm.log"
+OUT="$(bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
+RC=$?
+teardown_case
+if [ "$RC" -eq 0 ] && [ ! -f "$CASE/dm.log" ]; then
+    ok H3b
+else
+    fail H3b "rc=$RC dm=$([ -f "$CASE/dm.log" ] && echo present || echo absent) out=$OUT"
+fi
+
+# ---------------------------------------------------------------------------
+# H4: no hardcoded com.ibl5.* label in executable lines of the checker
+# ---------------------------------------------------------------------------
+_LITERALS="$(grep -vE '^[[:space:]]*#' "$SCRIPT_DIR/launchd-health-check" \
+    | grep -oE 'com\.ibl5\.[a-z0-9-]+' | sort -u \
+    | grep -vxF 'com.ibl5.launchd-health-check' || true)"
+if [ -z "$_LITERALS" ]; then
+    ok H4
+else
+    fail H4 "hardcoded labels found: $_LITERALS"
+fi
+
+# ---------------------------------------------------------------------------
+# H5a: --startup-delay 180 → sleep log records 180, exit 0
+# H5b: --startup-delay abc → exit 2, no sleep, no DM
+# H5c: --startup-delay (no value) → exit 2, no sleep
+# ---------------------------------------------------------------------------
+healthy_fixture H5
+OUT="$(bash "$SCRIPT_DIR/launchd-health-check" --startup-delay 180 2>/dev/null)"
+RC=$?
+teardown_case
+if [ "$RC" -eq 0 ] && grep -q '180' "$CASE/sleep.log" 2>/dev/null; then
+    ok H5a
+else
+    fail H5a "rc=$RC sleep=$(cat "$CASE/sleep.log" 2>/dev/null || echo absent)"
+fi
+
+healthy_fixture H5b
+bash "$SCRIPT_DIR/launchd-health-check" --startup-delay abc >/dev/null 2>&1
+_RC=$?
+teardown_case
+if [ "$_RC" -eq 2 ] && [ ! -f "$CASE/sleep.log" ] && [ ! -f "$CASE/dm.log" ]; then
+    ok H5b
+else
+    fail H5b "rc=$_RC sleep=$([ -f "$CASE/sleep.log" ] && echo present || echo absent)"
+fi
+
+healthy_fixture H5c
+bash "$SCRIPT_DIR/launchd-health-check" --startup-delay >/dev/null 2>&1
+_RC=$?
+teardown_case
+if [ "$_RC" -eq 2 ] && [ ! -f "$CASE/sleep.log" ]; then
+    ok H5c
+else
+    fail H5c "rc=$_RC sleep=$([ -f "$CASE/sleep.log" ] && echo present || echo absent)"
 fi
 
 # ---------------------------------------------------------------------------

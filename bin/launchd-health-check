@@ -15,7 +15,7 @@
 # shellcheck shell=bash
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_DIR="${LAUNCHD_HEALTH_LOG_DIR:-$HOME/Library/Logs/ibl5/launchd-health}"
+LOG_DIR="${LAUNCHD_HEALTH_LOG_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/launchd-health/logs}"
 STAMP_DIR="$LOG_DIR/stamps"
 TODAY="${LAUNCHD_HEALTH_TODAY:-$(date +%Y-%m-%d)}"
 DISCORD_DM="${DISCORD_DM_BIN:-$SCRIPT_DIR/discord-dm}"

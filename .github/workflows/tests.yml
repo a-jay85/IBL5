@@ -1055,6 +1055,8 @@ jobs:
         run: bin/test-phase-snapshot-detect
       - name: bin/test-docfix-poll
         run: bin/test-docfix-poll
+      - name: bin/test-launchd-health-check
+        run: bin/test-launchd-health-check
       - name: bin/test-post-review-findings
         run: bin/test-post-review-findings
       - name: bin/test-human-signoff-classifier

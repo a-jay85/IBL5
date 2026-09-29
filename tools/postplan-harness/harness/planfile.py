@@ -193,6 +193,43 @@ def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
     return planned, manual
 
 
+_EXECUTABLE_TYPE = re.compile(
+    r"\b(PHPUnit|API.?test|E2E|Visual.?regression|CLI.?executable)\b", re.IGNORECASE)
+_TABLE_SEP = re.compile(r"^\s*\|[\s:|-]+\|?\s*$")
+
+
+def count_executable_matrix_rows(content: str) -> int | None:
+    """Count Verification Matrix rows that name an executable test type.
+
+    Scoped to the table rows that follow a `_MATRIX_HEADER` line, outside fenced
+    blocks (`_strip_fenced`), so a Critical Files table naming PHPUnit or a fenced
+    illustrative matrix never counts; parse_matrix's whole-plan scan cannot tell
+    these apart. Within a matrix row the match is WHOLE-ROW, never the Test type
+    cell alone: the 2026-09-29 corpus has matrices with shifted columns (the type
+    in the What cell) and non-taxonomy types (`Automated` on a PHPUnit-suite row),
+    and a cell-scoped match would write the static claim over real executable rows.
+    Whole-row errs toward counting, which keeps the covered-by sentinel.
+    Visual-regression counts as executable so the static wording is never written
+    over a screenshot-diff row. Returns None when no unfenced matrix header exists,
+    so a caller cannot mistake "no matrix" for "zero rows".
+    """
+    count = 0
+    seen_header = False
+    in_matrix = False
+    for line in _strip_fenced(content):
+        if not line.strip().startswith("|"):
+            in_matrix = False
+            continue
+        if _MATRIX_HEADER.match(line):
+            seen_header = in_matrix = True
+            continue
+        if not in_matrix or _TABLE_SEP.match(line):
+            continue
+        if _EXECUTABLE_TYPE.search(line):
+            count += 1
+    return count if seen_header else None
+
+
 def _strip_fenced(content: str) -> list[str]:
     """Lines outside fenced code blocks — literal port of cf_section()'s awk state
     machine in bin/lib/critical-files.sh. Width-aware: per CommonMark a closing fence
@@ -666,6 +703,7 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
     info.has_reuse = bool(_REUSE.search(content))
     if info.has_matrix:
         info.planned_test_paths, info.truly_manual_rows = parse_matrix(content)
+        info.executable_row_count = count_executable_matrix_rows(content)
     info.critical_files = parse_critical_files(content)
     info.required_test_methods = parse_required_test_methods(content)
     info.backlog_issues = parse_backlog_issues(content)

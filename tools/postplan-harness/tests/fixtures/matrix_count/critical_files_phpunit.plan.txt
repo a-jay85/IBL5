@@ -1,0 +1,14 @@
+# Docs only plan with a Critical Files table
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|----------------|-----------|--------|----------------------|
+| 1 | Wording reads correctly | Doc review | post-impl | `docs/x.md` |
+| 2 | Links resolve | Static | post-impl | `bin/check-links` |
+
+## Critical Files
+
+| File | Note |
+|------|------|
+| `ibl5/tests/Foo/FooTest.php` | PHPUnit suite touched by the change |

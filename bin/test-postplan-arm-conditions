@@ -1275,6 +1275,27 @@ expect_clearance_2arg "(1) type-agnostic sentinel + non-test file → CLEARED" "
 expect_clearance_2arg "(1) tail names e2e+unit, EMPTY changed_files → CLEARED (one-arg compat exit)" "CLEARED" \
     "$TAIL_BODY" ""
 
+# --- (1) static wording (backlog#877) -------------------------------------------
+# The runner writes MANUAL_TESTING_SENTINEL_STATIC when the plan's Verification
+# Matrix has zero executable rows. Read it from the harness so this fixture tracks
+# the real constant. It must stay CLEARED in both the one-arg and two-arg forms: a
+# non-test changed file makes the two-arg form run the tail keyword scan, which the
+# static tail must not trip.
+STATIC_SENTINEL="$(PYTHONPATH="$REPO_ROOT/tools/postplan-harness" python3 -c \
+    'from harness.classify import MANUAL_TESTING_SENTINEL_STATIC as s; print(s)' 2>&1)" || true
+if [[ "$STATIC_SENTINEL" != "No manual testing needed"* ]]; then
+    echo "FAIL: could not read MANUAL_TESTING_SENTINEL_STATIC from harness.classify: $STATIC_SENTINEL"
+    FAILED=1
+fi
+STATIC_BODY="$(printf '## Manual Testing\n\n%s\n' "$STATIC_SENTINEL")"
+expect_clearance "(1) static wording → CLEARED" "CLEARED" "$STATIC_BODY"
+expect_clearance_2arg "(1) static wording + non-test file → CLEARED (tail has no test keyword)" "CLEARED" \
+    "$STATIC_BODY" "ibl5/classes/Foo.php"
+# Control: the same body with a test keyword appended to the tail HOLDS on the same
+# non-test file, so the CLEARED case above is exercising the tail scan, not skipping it.
+expect_clearance_2arg "(1) static wording + appended unit-test tail, non-test file → HELD (control)" "HELD" \
+    "$(printf '## Manual Testing\n\n%s covered by unit tests\n' "$STATIC_SENTINEL")" "ibl5/classes/Foo.php"
+
 # Wiring: both callers must pass a changed-file list as the second argument.
 # Negative half: the exact one-arg call shipped on master must be gone.
 # Positive half: the call must carry two double-quoted arguments. The regex

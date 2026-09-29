@@ -123,7 +123,10 @@ section "Declared scope" > "$TMP/declared"
 section "Plan gaps" > "$TMP/gaps"
 
 # --- directory tokens: two or more segments before the trailing slash ---
-grep -oE '[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)+/' "$TMP/declared" > "$TMP/dirs" || true
+# The slash must END the token. Without the terminator, a declared file bullet
+# `a/b/c.md` would yield `a/b/` and silently declare every sibling of c.md.
+grep -oE '[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)+/([^A-Za-z0-9._/-]|$)' "$TMP/declared" \
+    | sed -E 's#[^/]$##' > "$TMP/dirs" || true
 
 # --- exempt patterns (ADDED paths only, never .claude/) ---
 : > "$TMP/exempt"

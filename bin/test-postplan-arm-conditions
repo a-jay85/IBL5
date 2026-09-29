@@ -539,10 +539,10 @@ expect_block "S2: tail names unit, Test.php in diff → NONE" NONE \
 _s3_out="$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed"}' '' '')"
 expect_block "S3: no files key → NONE (null guard)" NONE "$_s3_out"
 if grep -qF 'jq: error' <<< "$_s3_out"; then
-    echo "FAIL: S3 — jq error on missing files key (remove // [] guard)"
+    echo "FAIL: S3: jq error on missing files key (remove // [] guard)"
     FAILED=1
 else
-    echo "ok: S3 — no jq error when files key absent"
+    echo "ok: S3: no jq error when files key absent"
 fi
 
 # condition (3) — the fail-open this gate closed: an empty bridge file is
@@ -689,13 +689,22 @@ rm -f "/tmp/post-plan-changed-$PPID"' 2>&1 )
 }
 UB="$(extract_block '# Diff→plan conformance' "$P5_SKILL")"
 
-assert_block_sources '# Diff→plan conformance' "phase 5.0 diff->plan" \
-    'bin/lib/critical-files.sh' "$P5_SKILL"
-_ub_no_comments="$(printf '%s\n' "$UB" | grep -v '^[[:space:]]*#')"
-if grep -qF 'cf_is_exempt' <<< "$_ub_no_comments"; then
-    echo "FAIL: diff->plan block filters on cf_is_exempt (polarity inversion)"; FAILED=1
+if grep -qF 'bin/lib/plan-scope-conformance' <<< "$UB"; then
+    echo "ok: phase 5.0 diff->plan block invokes bin/lib/plan-scope-conformance"
 else
-    echo "ok: phase 5.0 diff->plan block does not call cf_is_exempt (polarity correct)"
+    echo "FAIL: phase 5.0 diff->plan block does not invoke bin/lib/plan-scope-conformance"; FAILED=1
+fi
+if grep -v '^[[:space:]]*#' "$REPO_ROOT/bin/lib/plan-scope-conformance" \
+        | grep -qE '^[[:space:]]*(source|\.)[[:space:]].*critical-files\.sh'; then
+    echo "ok: plan-scope-conformance helper sources bin/lib/critical-files.sh"
+else
+    echo "FAIL: plan-scope-conformance helper does not source bin/lib/critical-files.sh"; FAILED=1
+fi
+_ub_no_comments="$(grep -v '^[[:space:]]*#' "$REPO_ROOT/bin/lib/plan-scope-conformance")"
+if grep -qF 'cf_is_exempt' <<< "$_ub_no_comments"; then
+    echo "FAIL: plan-scope-conformance helper filters on cf_is_exempt (polarity inversion)"; FAILED=1
+else
+    echo "ok: plan-scope-conformance helper does not call cf_is_exempt (polarity correct)"
 fi
 
 # Case U1 — both verdicts count as planned (MUST_APPEAR and EXEMPT both dismiss).
@@ -714,10 +723,14 @@ printf '%s\n' \
     'ibl5/index.php' > "$_u1_changed"
 _u1_out="$(run_p50u "$UB" "$_u1_plan" "$_u1_changed" 'found' '{"body":"no scope section"}')"
 _u1_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u1_out")"
-if [ "$_u1_count" -eq 1 ] && grep -qF 'rogue.md' <<< "$_u1_out"; then
+if [ "$_u1_count" -eq 2 ] \
+        && grep -qF 'rogue.md' <<< "$_u1_out" \
+        && grep -qF 'ibl5/index.php' <<< "$_u1_out" \
+        && ! grep -qF 'SKILL.md' <<< "$_u1_out" \
+        && ! grep -qF 'doc-freshness.md' <<< "$_u1_out"; then
     echo "ok: U1 both parse verdicts count as planned"
 else
-    echo "FAIL: U1 — expected 1 UNPLANNED-FILE: naming rogue.md, got: '$_u1_out'"
+    echo "FAIL: U1 — expected 2 UNPLANNED-FILE: lines naming rogue.md and ibl5/index.php, got: '$_u1_out'"
     FAILED=1
 fi
 
@@ -773,6 +786,31 @@ if [ "$_u4_count" -eq 1 ] \
     echo "ok: U4 declared-scope dismissal is section-bounded"
 else
     echo "FAIL: U4 — expected 1 UNPLANNED-FILE: naming elsewhere.md (declared.md absent); got: '$_u4_out'"
+    FAILED=1
+fi
+
+# Case U5 — live block wiring: the gh body reaches the helper, a real bullet
+# clears, and a path only inside the generated files-changed span stays flagged.
+_u5_plan="$BASE_TMP/u5-plan.md"
+_u5_changed="$BASE_TMP/u5-changed.txt"
+printf '%s\n' '## Critical Files' '' '- `ibl5/planned.php` — edit' > "$_u5_plan"
+printf '%s\n' 'ibl5/planned.php' 'ibl5/decl.php' 'ibl5/undecl.php' > "$_u5_changed"
+_u5_body='{"body":"## Declared scope\n\n- ibl5/decl.php (intended)\n\n<!-- files-changed:begin -->\n- `A` `ibl5/undecl.php`\n<!-- files-changed:end -->\n"}'
+_u5_out="$(run_p50u "$UB" "$_u5_plan" "$_u5_changed" 'found' "$_u5_body")"
+_u5_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u5_out" || true)"
+if [ "$_u5_count" -eq 1 ] && grep -qF 'UNPLANNED-FILE: ibl5/undecl.php' <<< "$_u5_out"; then
+    echo "ok: U5 block passes the gh body to the helper; generated span stays flagged"
+else
+    echo "FAIL: U5 — expected 1 UNPLANNED-FILE: naming ibl5/undecl.php, got: '$_u5_out'"
+    FAILED=1
+fi
+
+# Case U6 — a helper usage error surfaces as an indeterminate finding (fail-closed).
+_u6_out="$(run_p50u "$UB" "$BASE_TMP/does-not-exist.md" "$_u5_changed" 'found' '{"body":""}')"
+if grep -qF 'UNPLANNED-FILE: helper exited 2 (indeterminate)' <<< "$_u6_out"; then
+    echo "ok: U6 helper exit 2 surfaces as an indeterminate UNPLANNED-FILE: line"
+else
+    echo "FAIL: U6 — expected 'UNPLANNED-FILE: helper exited 2 (indeterminate)', got: '$_u6_out'"
     FAILED=1
 fi
 
@@ -868,14 +906,18 @@ _s4_plan="$BASE_TMP/s4-plan.md"
 _s4_changed="$BASE_TMP/s4-changed.txt"
 _s4_body="$BASE_TMP/s4-body.md"
 printf '%s\n' '## Critical Files' '' '- `bin/unrelated` — edit' > "$_s4_plan"
-printf '%s\n' 'bin/unrelated' 'ibl5/classes/Foo/Bar.php' 'ibl5/classes/Baz.php' > "$_s4_changed"
-printf '%s\n' '## Declared scope' '' '- `ibl5/classes/Foo/` (whole module)' '- `ibl5/` (too broad)' > "$_s4_body"
+printf '%s\n' 'bin/unrelated' 'ibl5/classes/Foo/Bar.php' 'ibl5/classes/Baz.php' \
+    'ibl5/classes/Qux/One.php' 'ibl5/classes/Qux/Two.php' > "$_s4_changed"
+printf '%s\n' '## Declared scope' '' '- `ibl5/classes/Foo/` (whole module)' '- `ibl5/` (too broad)' \
+    '- `ibl5/classes/Qux/One.php` (a file bullet declares no sibling)' > "$_s4_body"
 _s4_out="$("$PSC" "$_s4_plan" "$_s4_changed" "$_s4_body" "$_s_empty" 2>&1)"
 _s4_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_s4_out" || true)"
-if [ "$_s4_count" -eq 1 ] && grep -qF 'UNPLANNED-FILE: ibl5/classes/Baz.php' <<< "$_s4_out"; then
-    echo "ok: S4 two-segment directory token declares its subtree; ibl5/ declares nothing"
+if [ "$_s4_count" -eq 2 ] \
+        && grep -qF 'UNPLANNED-FILE: ibl5/classes/Baz.php' <<< "$_s4_out" \
+        && grep -qF 'UNPLANNED-FILE: ibl5/classes/Qux/Two.php' <<< "$_s4_out"; then
+    echo "ok: S4 two-segment directory token declares its subtree; ibl5/ and a file bullet's parent declare nothing"
 else
-    echo "FAIL: S4 — expected only ibl5/classes/Baz.php flagged, got: '$_s4_out'"
+    echo "FAIL: S4 — expected ibl5/classes/Baz.php and ibl5/classes/Qux/Two.php flagged, got: '$_s4_out'"
     FAILED=1
 fi
 

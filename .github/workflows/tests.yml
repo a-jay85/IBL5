@@ -1055,6 +1055,8 @@ jobs:
         run: bin/test-phase-snapshot-detect
       - name: bin/test-docfix-poll
         run: bin/test-docfix-poll
+      - name: bin/test-launchd-health-check
+        run: bin/test-launchd-health-check
       - name: bin/test-post-review-findings
         run: bin/test-post-review-findings
       - name: bin/test-human-signoff-classifier
@@ -1094,6 +1096,8 @@ jobs:
         run: bin/test-bug-pipeline-check
       - name: bin/test-bug-pipeline-cron-setup
         run: bin/test-bug-pipeline-cron-setup
+      - name: bin/test-launchd-health-cron-setup
+        run: bin/test-launchd-health-cron-setup
       - name: bin/test-bug-pipeline-ci-autofix
         run: bin/test-bug-pipeline-ci-autofix
       - name: bin/test-sim-recap-tick

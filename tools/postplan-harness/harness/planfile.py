@@ -67,8 +67,14 @@ def frontmatter_autonomy_contract(content: str) -> tuple[str, list[str], str]:
     (a body documenting the syntax can't self-select).
 
     error == "" means well-formed OR entirely absent. Mirror of the shell single
-    source of truth, bin/lib/plan-autonomy-contract; pinned by
-    tests/test_planfile.py::test_contract_lib_sync.
+    source of truth, bin/lib/plan-autonomy-contract, including its bash
+    IFS=',' splitting (one trailing comma tolerated, any other empty token
+    rejected) and its `..`-anywhere rejection. Accept/reject parity is pinned by
+    tests/test_planfile.py::test_contract_lib_sync and
+    test_contract_token_grammar_sweep. Semantic parity of the UNMET-CONTRACT
+    lines against the post-plan Phase 5.0d block is pinned by the "Phase 5.0d
+    TWO-WAY AGREEMENT" section of bin/test-postplan-arm-conditions. Change the
+    shell lib first, then this mirror, and run both.
     """
     lines = content.splitlines()
     if not lines or not re.match(r"^---\s*$", lines[0]):
@@ -96,15 +102,20 @@ def frontmatter_autonomy_contract(content: str) -> tuple[str, list[str], str]:
     # validate stop_condition enum
     if sc_norm not in _LEGAL_STOP_CONDITIONS:
         return ("", [], f"stop_condition: '{sc_norm}' is not a legal value")
-    # split evidence on comma, drop empty tokens
-    tokens = [t for t in ev_norm.split(",") if t]
-    if not tokens:
+    # split evidence on comma the way bash IFS=',' does: one trailing empty
+    # field is dropped ("a," is fine); any other empty field is rejected
+    if not ev_norm:
+        return ("", [], "evidence: is empty")
+    tokens = ev_norm.split(",")
+    if tokens[-1] == "":
+        tokens.pop()
+    if not tokens or any(t == "" for t in tokens):
         return ("", [], "evidence: is empty")
     # validate each token
     for t in tokens:
         if t.startswith("/") or t.startswith("-"):
             return ("", [], f"evidence: token '{t}' is not a repo-relative path")
-        if ".." in t.split("/"):
+        if ".." in t:
             return ("", [], f"evidence: token '{t}' is not a repo-relative path")
         if not _EVIDENCE_TOKEN.match(t):
             return ("", [], f"evidence: token '{t}' is not a repo-relative path")

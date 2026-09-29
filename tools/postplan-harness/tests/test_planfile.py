@@ -1,5 +1,6 @@
 import contextlib
 import io
+import itertools
 import os
 import pytest
 import re
@@ -1073,6 +1074,35 @@ _CONTRACT_SYNC_FIXTURES = [
      "empty-evidence", "", "empty"),
 ]
 
+# Evidence-token grammar cases: (evidence value, label, expect_reject).
+# The first block diverged between shell and Python before this fix; the
+# second block always agreed and pins the edges the fix must not move.
+_TOKEN_GRAMMAR_CASES = [
+    ("a,,b", "interior-empty", True),
+    (",a", "leading-empty", True),
+    ("a,  ,b", "whitespace-only-token", True),
+    ("a..b", "dotdot-inside-token", True),
+    ("...", "triple-dot", True),
+    ("a,", "single-trailing-comma", False),
+    ("a,b,", "list-trailing-comma", False),
+    (".", "single-dot", False),
+    ("./a", "dot-slash", False),
+    ("a/", "trailing-slash", False),
+    ("a/../b", "dotdot-segment", True),
+    ("..", "bare-dotdot", True),
+]
+
+
+def _grammar_plan(ev):
+    return f"---\nstop_condition: evidence-present\nevidence: {ev}\n---\n# Plan\n"
+
+
+_CONTRACT_SYNC_FIXTURES += [
+    (_grammar_plan(ev), f"grammar-{label}",
+     "" if rej else "evidence-present", "rejected" if rej else None)
+    for ev, label, rej in _TOKEN_GRAMMAR_CASES
+]
+
 
 # sect-7a -- Parser unit tests
 
@@ -1144,7 +1174,13 @@ def test_contract_malformed_evidence_token_flagged(content, label):
 
 
 def test_contract_lib_sync(tmp_path):
-    """Python parser and bin/lib/plan-autonomy-contract classify identically."""
+    """Python parser and bin/lib/plan-autonomy-contract classify every fixture
+    identically (accept vs reject).
+
+    _TOKEN_GRAMMAR_CASES and test_contract_token_grammar_sweep cover the token
+    grammar. The sibling semantic pin is the "Phase 5.0d TWO-WAY AGREEMENT"
+    section of bin/test-postplan-arm-conditions.
+    """
     if not os.path.isfile(AUTONOMY_CONTRACT_LIB):
         pytest.skip("plan-autonomy-contract lib not found: " + AUTONOMY_CONTRACT_LIB)
     if not os.access(AUTONOMY_CONTRACT_LIB, os.X_OK):
@@ -1164,6 +1200,56 @@ def test_contract_lib_sync(tmp_path):
         py_ok = py_err == ""
         assert shell_ok == py_ok, (
             f"classification divergence on '{label}': "
+            f"shell rc={proc.returncode}, python err={py_err!r}")
+
+
+def _skip_without_contract_lib():
+    if not os.path.isfile(AUTONOMY_CONTRACT_LIB):
+        pytest.skip("plan-autonomy-contract lib not found: " + AUTONOMY_CONTRACT_LIB)
+    if not os.access(AUTONOMY_CONTRACT_LIB, os.X_OK):
+        pytest.skip("plan-autonomy-contract not executable: " + AUTONOMY_CONTRACT_LIB)
+
+
+@pytest.mark.parametrize("ev,label,expect_reject", _TOKEN_GRAMMAR_CASES)
+def test_contract_token_grammar_direction(tmp_path, ev, label, expect_reject):
+    """Both parsers reject/accept each grammar case in the stated direction.
+
+    Parity alone would pass if both sides drifted to accept together.
+    """
+    _skip_without_contract_lib()
+    content = _grammar_plan(ev)
+    f = tmp_path / f"{label}.md"
+    f.write_text(content)
+    proc = subprocess.run(
+        [AUTONOMY_CONTRACT_LIB, str(f)], capture_output=True, text=True)
+    assert proc.returncode == (1 if expect_reject else 0), (
+        f"shell rc={proc.returncode} for '{label}' ({ev!r}): stderr={proc.stderr!r}")
+    _, _, py_err = frontmatter_autonomy_contract(content)
+    assert (py_err != "") == expect_reject, (
+        f"python err={py_err!r} for '{label}' ({ev!r}), expect_reject={expect_reject}")
+
+
+def test_contract_token_grammar_sweep(tmp_path):
+    """Every 1-3 field comma list over a small alphabet classifies identically."""
+    _skip_without_contract_lib()
+    alphabet = ["a", "", "..", "a..b"]
+    values = [
+        ",".join(combo)
+        for n in (1, 2, 3)
+        for combo in itertools.product(alphabet, repeat=n)
+    ]
+    assert len(values) == 84, f"sweep generator produced {len(values)} values"
+    for i, value in enumerate(values):
+        content = _grammar_plan(value)
+        f = tmp_path / f"sweep-{i}.md"
+        f.write_text(content)
+        proc = subprocess.run(
+            [AUTONOMY_CONTRACT_LIB, str(f)], capture_output=True, text=True)
+        assert proc.returncode in (0, 1), (
+            f"unexpected rc={proc.returncode} for {value!r}: stderr={proc.stderr!r}")
+        _, _, py_err = frontmatter_autonomy_contract(content)
+        assert (proc.returncode == 0) == (py_err == ""), (
+            f"classification divergence on evidence {value!r}: "
             f"shell rc={proc.returncode}, python err={py_err!r}")
 
 

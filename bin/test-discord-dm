@@ -602,6 +602,187 @@ WH_FILE="$TMP/absent-webhook-url" run_wh 200 --ping "hi"
 want_not "W12: ssh body carries no mention" "$(cat "$R_CAP")" "<@"
 [ "$(curl_calls)" = 0 ] && ok "W12: fallback never ran curl" || fail "W12: curl ran"
 
+# -- notify-discord action: send.sh with a stub curl ---------------------------
+SEND="$ROOT/.github/actions/notify-discord/send.sh"
+ACT_CAP="$TMP/act-cap.txt"; ACT_N="$TMP/act-n"; export ACT_CAP ACT_N
+cat > "$TMP/curl-act" <<'STUB_EOF'
+#!/bin/bash
+n=$(( $(cat "$ACT_N" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$ACT_N"
+printf 'ARGV:%s\n' "$*" >> "$ACT_CAP"; printf 'CONF:%s\n' "$(cat)" >> "$ACT_CAP"
+out=""; prev=""
+for a in "$@"; do
+    [ "$prev" = "-o" ] && out="$a"
+    case "$a" in @*) printf 'BODY:%s\n' "$(jq -c . "${a#@}")" >> "$ACT_CAP" ;; esac
+    prev="$a"
+done
+code=$(cut -d, -f"$n" <<< "$ACT_STATUSES"); code=${code:-200}
+if [ "$code" = 429 ]; then printf '{"retry_after":0.2}' > "$out"; else printf '{}' > "$out"; fi
+printf '%s' "$code"
+STUB_EOF
+chmod +x "$TMP/curl-act"
+ACT_MSG="$TMP/act-msg.txt"; printf 'deploy failed on prod\n' > "$ACT_MSG"
+run_act() { # <statuses> <fail-on-delivery> <ping> <msg-file> -> A_OUT / A_RC
+    : > "$ACT_CAP"; rm -f "$ACT_N"
+    A_OUT=$(ACT_STATUSES="$1" WEBHOOK_URL="${ACT_URL-$FAKE_WEBHOOK_URL}" MSG_FILE="$4" \
+        PING="$3" FAIL_ON_DELIVERY="$2" NOTIFY_CURL_BIN="$TMP/curl-act" bash "$SEND" 2>&1)
+    A_RC=$?
+}
+act_calls() { grep -c '^ARGV:' "$ACT_CAP"; }
+act_body() { sed -n 's/^BODY://p' "$ACT_CAP" | sed -n "${1}p"; }
+
+printf '\n-- notify-discord action (send.sh) --\n'
+
+# A1/A2: 200 and 204 both deliver on one call.
+run_act 200 true false "$ACT_MSG"
+[ "$A_RC" = 0 ] && [ "$(act_calls)" = 1 ] && ok "A1: 200 delivers on one call" || fail "A1: rc=$A_RC calls=$(act_calls)"
+want "A1: reports delivered" "$A_OUT" "delivered"
+run_act 204 true false "$ACT_MSG"
+[ "$A_RC" = 0 ] && [ "$(act_calls)" = 1 ] && ok "A2: 204 delivers on one call" || fail "A2: rc=$A_RC calls=$(act_calls)"
+want "A2: reports delivered" "$A_OUT" "delivered"
+
+# A3: 429 retries once retry_after has passed.
+run_act 429,200 true false "$ACT_MSG"
+[ "$A_RC" = 0 ] && [ "$(act_calls)" = 2 ] && ok "A3: 429 then 200 delivers on the retry" || fail "A3: rc=$A_RC calls=$(act_calls)"
+
+# A4/A5: other 4xx is not retried; loud reds the step, soft warns and exits 0.
+run_act 400,200 true false "$ACT_MSG"
+[ "$A_RC" = 1 ] && [ "$(act_calls)" = 1 ] && ok "A4: 400 loud exits 1, one call" || fail "A4: rc=$A_RC calls=$(act_calls)"
+want "A4: loud failure is an ::error::" "$A_OUT" "::error::Discord webhook POST failed (HTTP 400)"
+run_act 400,200 false false "$ACT_MSG"
+[ "$A_RC" = 0 ] && ok "A5: 400 soft exits 0" || fail "A5: soft rc=$A_RC"
+want "A5: soft failure is a ::warning::" "$A_OUT" "::warning::"
+
+# A6: an empty URL (unset secret, fork PR) makes no call.
+ACT_URL="" run_act 200 true false "$ACT_MSG"
+[ "$A_RC" = 1 ] && [ "$(act_calls)" = 0 ] && ok "A6: empty URL loud exits 1, no call" || fail "A6: loud rc=$A_RC calls=$(act_calls)"
+want "A6: names the empty URL" "$A_OUT" "::error::webhook-url is empty"
+ACT_URL="" run_act 200 false false "$ACT_MSG"
+[ "$A_RC" = 0 ] && [ "$(act_calls)" = 0 ] && ok "A6: empty URL soft exits 0, no call" || fail "A6: soft rc=$A_RC calls=$(act_calls)"
+want "A6: soft empty URL is a ::warning::" "$A_OUT" "::warning::"
+
+# A7: a malformed URL makes no call and is never echoed.
+ACT_URL='https://ex.invalid/a"b' run_act 200 true false "$ACT_MSG"
+[ "$A_RC" = 1 ] && [ "$(act_calls)" = 0 ] && ok "A7: malformed URL exits 1, no call" || fail "A7: rc=$A_RC calls=$(act_calls)"
+want_not "A7: malformed URL is not echoed" "$(grep -v '^::add-mask::' <<< "$A_OUT")" "ex.invalid"
+
+# A8: ping mentions the owner; no ping cannot mention anyone. Both suppress embeds.
+run_act 200 true true "$ACT_MSG"
+[ "$(act_body 1 | jq -r '.content | startswith("<@283183467804491776> ")')" = true ] \
+    && ok "A8: ping content carries the owner mention" || fail "A8: ping content wrong"
+[ "$(act_body 1 | jq -c '.allowed_mentions.users')" = '["283183467804491776"]' ] \
+    && ok "A8: ping allows only the owner ID (string)" || fail "A8: ping allowed_mentions wrong"
+[ "$(act_body 1 | jq '.flags')" = 4 ] && ok "A8: ping body sets flags=4" || fail "A8: ping body flags wrong"
+run_act 200 true false "$ACT_MSG"
+[ "$(act_body 1 | jq -c '.allowed_mentions.parse')" = '[]' ] \
+    && ok "A8: no-ping allows no mentions" || fail "A8: no-ping allowed_mentions wrong"
+[ "$(act_body 1 | jq -r '.content | startswith("<@")')" = false ] \
+    && ok "A8: no-ping content has no mention" || fail "A8: no-ping content has a mention"
+[ "$(act_body 1 | jq '.flags')" = 4 ] && ok "A8: no-ping body sets flags=4" || fail "A8: no-ping body flags wrong"
+
+# A9: a ping typo is an error, not a silent "false".
+run_act 200 true yes "$ACT_MSG"
+[ "$A_RC" = 1 ] && [ "$(act_calls)" = 0 ] && ok "A9: ping=yes exits 1, no call" || fail "A9: rc=$A_RC calls=$(act_calls)"
+want "A9: names the ping error" "$A_OUT" "::error::ping must be true or false"
+
+# A10: the URL reaches curl only through the stdin config; the log masks it.
+run_act 200 true false "$ACT_MSG"
+want_not "A10: URL is not in curl argv" "$(grep '^ARGV:' "$ACT_CAP")" "example.invalid"
+want "A10: config carries ?wait=true" "$(grep '^CONF:' "$ACT_CAP")" "?wait=true"
+A10_LEAKS=$(grep -F "$FAKE_WEBHOOK_URL" <<< "$A_OUT" | grep -vc '^::add-mask::')
+[ "$A10_LEAKS" = 0 ] && ok "A10: URL appears only in ::add-mask::" || fail "A10: URL echoed outside ::add-mask::"
+
+# A11: the 1900-char cap applies.
+printf 'x%.0s' $(seq 1 2500) > "$TMP/act-big.txt"
+run_act 200 true false "$TMP/act-big.txt"
+[ "$(act_body 1 | jq '.content | length')" -le 1915 ] && ok "A11: content is capped" || fail "A11: content not capped"
+[ "$(act_body 1 | jq -r '.content | endswith("(truncated)")')" = true ] \
+    && ok "A11: capped content ends with the marker" || fail "A11: no truncation marker"
+
+# -- notify-discord call sites: webhook-url everywhere, ping only where chosen -
+# Scans every `uses: ./.github/actions/notify-discord` step in <wf-dir>/*.yml
+# until the next step or a line indented 4 or fewer spaces. mode=sites prints one
+# summary per site; mode=lines prints every scanned line (trimmed).
+notify_scan() { # <wf-dir> <mode>
+    local f
+    for f in "$1"/*.yml; do
+        awk -v file="$(basename "$f")" -v mode="$2" '
+            function emit() {
+                if (active && mode == "sites")
+                    printf "%s#%d webhook=%d ping=%s\n", file, ord, wh, ping
+                active = 0
+            }
+            /uses: \.\/\.github\/actions\/notify-discord/ { emit(); ord++; wh = 0; ping = "-"; active = 1; next }
+            active {
+                if ($0 ~ /^[[:space:]]*- /) { emit(); next }
+                if ($0 !~ /^[[:space:]]*$/) {
+                    match($0, /^ */)
+                    if (RLENGTH <= 4) { emit(); next }
+                }
+                line = $0; sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
+                if (mode == "lines") printf "%s#%d\t%s\n", file, ord, line
+                if (line == "webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}") wh = 1
+                if (line ~ /^ping: /) ping = substr(line, 7)
+            }
+            END { emit() }' "$f"
+    done | LC_ALL=C sort
+}
+notify_sites() { notify_scan "$1" sites; }
+
+NOTIFY_SITES_WANT=$(cat <<'EXPECT_EOF'
+db-backup.yml#1 webhook=1 ping='true'
+db-backup.yml#2 webhook=1 ping='true'
+db-backup.yml#3 webhook=1 ping='true'
+docfix-health.yml#1 webhook=1 ping=-
+docfix-health.yml#2 webhook=1 ping=-
+docs-refreshed-notify.yml#1 webhook=1 ping=-
+flake-report.yml#1 webhook=1 ping=-
+log-review.yml#1 webhook=1 ping=-
+main.yml#1 webhook=1 ping=-
+merge-digest-notify.yml#1 webhook=1 ping='true'
+mutation.yml#1 webhook=1 ping=-
+promote-to-production.yml#1 webhook=1 ping=${{ job.status == 'failure' }}
+promote-to-production.yml#2 webhook=1 ping=-
+smoke-prod.yml#1 webhook=1 ping='true'
+smoke-prod.yml#2 webhook=1 ping='true'
+EXPECT_EOF
+)
+
+printf '\n-- notify-discord call sites --\n'
+
+# G1: the live workflows match the table.
+G1_GOT=$(notify_sites "$ROOT/.github/workflows")
+if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
+    ok "G1: 15 sites pass webhook-url; ping only on the chosen sites"
+else
+    fail "G1: call sites differ from the table"
+    diff <(printf '%s\n' "$NOTIFY_SITES_WANT") <(printf '%s\n' "$G1_GOT") | sed 's/^/       /'
+fi
+
+# G2: an injected stray ping line must show up in the scan.
+rm -rf "$TMP/wf"; mkdir -p "$TMP/wf"; cp "$ROOT"/.github/workflows/*.yml "$TMP/wf/"
+perl -pi -e 's/^(\s*webhook-url:.*)$/$1\n          ping: \x27true\x27/' "$TMP/wf/flake-report.yml"
+G2_GOT=$(notify_sites "$TMP/wf")
+[ "$G2_GOT" != "$NOTIFY_SITES_WANT" ] && ok "G2: an injected ping line changes the scan" \
+    || fail "G2: an injected ping line went unnoticed"
+if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
+    want "G2: the injected ping is what differs" "$G2_GOT" "flake-report.yml#1 webhook=1 ping='true'"
+fi
+
+# G3: a deleted webhook-url line must show up in the scan.
+rm -rf "$TMP/wf"; mkdir -p "$TMP/wf"; cp "$ROOT"/.github/workflows/*.yml "$TMP/wf/"
+perl -ni -e 'print unless /^\s*webhook-url:/' "$TMP/wf/log-review.yml"
+G3_GOT=$(notify_sites "$TMP/wf")
+[ "$G3_GOT" != "$NOTIFY_SITES_WANT" ] && ok "G3: a deleted webhook-url line changes the scan" \
+    || fail "G3: a deleted webhook-url line went unnoticed"
+if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
+    want "G3: the deleted line is what differs" "$G3_GOT" "log-review.yml#1 webhook=0"
+fi
+
+# G4: the removed SSH inputs are gone from every site.
+G4_LEFT=$(notify_scan "$ROOT/.github/workflows" lines | grep -E $'\t(discord-id|port|host|username):')
+[ -z "$G4_LEFT" ] && ok "G4: no discord-id/port/host/username in a notify block" \
+    || fail "G4: removed inputs remain: $(tr '\n' ' ' <<< "$G4_LEFT")"
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 printf '\n'
 if [ "$FAILS" -eq 0 ]; then

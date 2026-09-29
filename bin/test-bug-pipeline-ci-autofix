@@ -291,7 +291,7 @@ unset STUB_CI_AUTOFIX_MODE STUB_CI_AUTOFIX_RESULT
 bpt_expect_eq "r-apply-1: exit 0" 0 "$BPT_RC"
 bpt_log_has "$STUB" ci-autofix.log "no_change at attempt 1" "r-apply-1: no_change logged"
 bpt_log_has "$STUB" gh.log "pr comment" "r-apply-1: gh comment posted"
-bpt_log_has "$STUB" claude.log "--model claude-sonnet-4-6" "r-apply-1: Sonnet used on attempt 1"
+bpt_log_has "$STUB" claude.log "--model claude-sonnet-5-5" "r-apply-1: Sonnet used on attempt 1"
 
 # r-apply-2 — no result file (agent crash/timeout) → abort path, comment posted
 bpt_reset

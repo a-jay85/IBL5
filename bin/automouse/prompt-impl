@@ -240,7 +240,7 @@ Work in /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>/ibl5/. CLAUDE.md is auto
 
 When a plan phase carries a `### Delegate` packet, do NOT implement that phase inline: fire **one** Agent/Task call per packet at the packet's declared tier, and pass the packet **verbatim** as the sub-agent prompt. Spawn at the declared tier exactly as follows:
 
-- **Sonnet** → `subagent_type: "automouse-delegate"` (byte-match the def's `name:`) and **omit the `model` param**. The def (`.claude/agents/automouse-delegate.md`) pins `claude-sonnet-4-6`; passing `model: "sonnet"` resolves to Sonnet 5 and overrides the pin, spending ~30% more of the weekly token budget on identical work.
+- **Sonnet** → `subagent_type: "automouse-delegate"` (byte-match the def's `name:`) and **omit the `model` param**. The def (`.claude/agents/automouse-delegate.md`) pins `claude-sonnet-5-5`. Omit `model` so the def's pin is the single source of truth for the delegate tier.
 - **Haiku** → `subagent_type: "general-purpose"` with `model: "haiku"`. No def is needed — the `haiku` alias already resolves to the only Haiku. The packet is self-verifying — the sub-agent runs the packet's self-verify command before returning — and CI plus post-plan review remain the backstop. This keeps your own context flat across the run; inlining a verbose packet's tool output defeats its purpose.
 
 The packet's `**Assertions:**` list is binding on the sub-agent. A returned summary that reports fewer assertions checked than the packet lists is a phase failure to re-run, not a pass.

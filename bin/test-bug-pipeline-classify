@@ -263,7 +263,7 @@ else
         p="${_TMPL//\{\{original_text\}\}/$report}"
         p="${p//\{\{transcript\}\}/(no replies yet)}"
         p="${p//\{\{attachments_text\}\}/}"
-        out="$(timeout 120 "$CLASSIFY_CLAUDE" -p "$p" --model claude-sonnet-4-6 \
+        out="$(timeout 120 "$CLASSIFY_CLAUDE" -p "$p" --model claude-sonnet-5-5 \
             --output-format json --json-schema "$_SCHEMA" --allowedTools '' 2>/dev/null)"
         # The exact two-step extraction bin/bug-pipeline-tick uses (envelope_result + .class).
         res="$(printf '%s' "$out" | jq -rc 'if (.is_error // false) == true then empty else (.result // empty) end' 2>/dev/null)"

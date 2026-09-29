@@ -74,7 +74,7 @@ PLIST_DIR=${FAILDM_PLIST_DIR:-$HOME/Library/LaunchAgents}
 LOG_DIR=${FAILDM_LOG_DIR:-$(dirname "$LOG")}
 
 send_dm() {
-    "$DM_CMD" --quiet --attempts 2 "$1" >/dev/null 2>&1 || true
+    "$DM_CMD" --ping --quiet --attempts 2 "$1" >/dev/null 2>&1 || true
 }
 
 # Prints 1 when a live session's repo is $ROOT, else nothing.

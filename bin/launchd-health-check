@@ -96,7 +96,7 @@ send_dm() {
     [ "$SUPPRESSED" -gt 0 ] && body="$body
 ($SUPPRESSED more already reported today)"
     DM_STATUS=failed
-    if printf '%s\n' "$body" | "$DISCORD_DM" --chunk -; then
+    if printf '%s\n' "$body" | "$DISCORD_DM" --ping --chunk -; then
         DM_STATUS=sent
         for ((i=0; i<${#NEW_KEYS[@]}; i++)); do
             write_stamp "${NEW_KEYS[$i]}"

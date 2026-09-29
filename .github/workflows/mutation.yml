@@ -119,14 +119,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup SSH
-        # Real prod host — the IBLbot Discord-DM endpoint is reachable only there.
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
       - name: Build Discord message
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
@@ -136,7 +128,4 @@ jobs:
       - name: Send Discord DM
         uses: ./.github/actions/notify-discord
         with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}

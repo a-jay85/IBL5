@@ -1061,6 +1061,124 @@ else
     echo "FAIL: p5d D2 did not detect M2 (unconditional regeneration)"; FAILED=1
 fi
 
+# --- Phase 5.0d TWO-WAY AGREEMENT: 5.0d block vs harness.conformance.check ---
+# The block and conformance.check both enforce the autonomy contract. This
+# section feeds them the same plan and the same changed list and requires the
+# same ordered UNMET-CONTRACT lines. The parse half (lib vs planfile.py) is
+# pinned by test_contract_lib_sync in the harness pytest job. The malformed
+# line is compared by prefix only: the two sides word it differently by design.
+
+P5D_REPO="$BASE_TMP/p5d-agree-repo"
+mkdir -p "$P5D_REPO"
+(
+    cd "$P5D_REPO" || exit 1
+    git init -q
+    git config user.name t
+    git config user.email t@example.invalid
+    git config commit.gpgsign false
+    echo base > base.txt
+    git add base.txt
+    git commit -q -m base
+    git update-ref refs/remotes/origin/master HEAD
+    mkdir -p docs x/deep/tools/z aXb bin
+    echo a > docs/exact.md
+    echo b > x/deep/tools/z/check.sh
+    echo c > aXb/c
+    echo d > bin/xylophone
+    echo e > plain.txt
+    git add docs x aXb bin plain.txt
+    git commit -q -m feature
+    ln -s "$REPO_ROOT/bin/lib" bin/lib
+    git diff --name-only origin/master...HEAD > "$BASE_TMP/p5d-agree-changed.txt"
+)
+
+P5D_AGREE_EV='docs/exact.md,tools/z/check.sh,check.sh,z/check.sh,exact.md,a.b/c,aXb/c,bin/x,bin/xylophone,./plain.txt,plain.txt/,plain.txt,docs/missing.md'
+
+# py_p5d <planfile> <status-or-empty> — UNMET-CONTRACT lines from conformance.check
+py_p5d() {
+    ( cd "$REPO_ROOT/tools/postplan-harness" && python3 -c '
+import sys
+from harness import conformance
+from harness.planfile import frontmatter_autonomy_contract
+from harness.state import PlanInfo
+sc, ev, err = frontmatter_autonomy_contract(open(sys.argv[1]).read())
+changed = open(sys.argv[2]).read().split()
+plan = PlanInfo(found=True, stop_condition=sc, evidence=ev, contract_error=err)
+for item in conformance.check(plan, changed, phase5_status=(sys.argv[3] or None)):
+    if item.startswith("UNMET-CONTRACT:"):
+        print(item)
+' "$1" "$BASE_TMP/p5d-agree-changed.txt" "$2" )
+}
+
+# p5d_norm — keep UNMET-CONTRACT lines; collapse the malformed line to its prefix.
+p5d_norm() {
+    grep '^UNMET-CONTRACT:' | sed 's/^\(UNMET-CONTRACT: malformed autonomy contract\).*/\1/'
+}
+
+_agree_n=0
+_agree_bad=0
+# p5d_agree <label> <planfile> <status-or-empty>
+p5d_agree() {
+    _agree_n=$((_agree_n + 1))
+    _sh="$(run_p50d "$P5D_AGREE_BLOCK" "$2" x "$3" | p5d_norm)"
+    _py="$(py_p5d "$2" "$3" | p5d_norm)"
+    if [ "$_sh" != "$_py" ]; then
+        _agree_bad=$((_agree_bad + 1))
+        echo "FAIL: p5d two-way disagreement on $1"
+        echo "  block: $(printf '%s' "$_sh" | tr '\n' '|')"
+        echo "  py:    $(printf '%s' "$_py" | tr '\n' '|')"
+    fi
+}
+
+P5D_AGREE_BLOCK="$P5D"
+for _sc in evidence-present tests-green; do
+    _plan="$(mk_p5d_plan "p5d-agree-$_sc" "$_sc" "$P5D_AGREE_EV")"
+    for _st in "" pass fail skipped; do
+        p5d_agree "$_sc/${_st:-unset}" "$_plan" "$_st"
+    done
+done
+p5d_agree "malformed a,,b" "$(mk_p5d_plan p5d-agree-m1 evidence-present 'a,,b')" fail
+p5d_agree "malformed a..b" "$(mk_p5d_plan p5d-agree-m2 evidence-present 'a..b')" fail
+p5d_agree "malformed ,a" "$(mk_p5d_plan p5d-agree-m3 evidence-present ',a')" fail
+p5d_agree "malformed /etc/x" "$(mk_p5d_plan p5d-agree-m4 evidence-present '/etc/x')" fail
+p5d_agree "malformed bogus stop_condition" "$(mk_p5d_plan p5d-agree-m5 bogus 'docs/exact.md')" fail
+p5d_agree "malformed stop_condition alone" "$(mk_p5d_plan p5d-agree-m6 tests-green '')" fail
+p5d_agree "no contract" "$P5D_PLAN_NONE" fail
+
+if [ "$_agree_n" -ne 15 ]; then
+    echo "FAIL: p5d two-way agreement ran $_agree_n cases (expected 15)"; FAILED=1
+elif [ "$_agree_bad" -ne 0 ]; then
+    echo "FAIL: p5d two-way agreement: $_agree_bad of 15 cases disagree"; FAILED=1
+else
+    echo "ok: p5d two-way agreement (15 cases)"
+fi
+
+# Agreed-but-wrong negative half: pin three agreed outputs to literal strings.
+P5D_FIVE="$(printf 'UNMET-CONTRACT: evidence a.b/c declared but never appeared in the diff\nUNMET-CONTRACT: evidence bin/x declared but never appeared in the diff\nUNMET-CONTRACT: evidence ./plain.txt declared but never appeared in the diff\nUNMET-CONTRACT: evidence plain.txt/ declared but never appeared in the diff\nUNMET-CONTRACT: evidence docs/missing.md declared but never appeared in the diff')"
+p5d_expect "p5d agreed output pinned" "$P5D_FIVE" \
+    "$(run_p50d "$P5D" "$BASE_TMP/p5d-agree-evidence-present.md" x pass | p5d_norm)"
+p5d_expect "p5d agreed output pinned" \
+    "$(printf 'UNMET-CONTRACT: stop_condition tests-green declared but PHASE5_VERIFY_STATUS=none\n%s' "$P5D_FIVE")" \
+    "$(run_p50d "$P5D" "$BASE_TMP/p5d-agree-tests-green.md" x '' | p5d_norm)"
+p5d_expect "p5d agreed output pinned" "UNMET-CONTRACT: malformed autonomy contract" \
+    "$(run_p50d "$P5D" "$BASE_TMP/p5d-agree-m2.md" x fail | p5d_norm)"
+
+# M3: disable the block's suffix arm. The comparator must see the divergence.
+_m3_pat='! grep -qE "/$('
+_m3_rep='! false "/$('
+P5D_M3="${P5D/"$_m3_pat"/"$_m3_rep"}"
+if [ "$P5D_M3" = "$P5D" ]; then
+    echo "FAIL: p5d mutant M3 identical to original (anchor drifted)"; FAILED=1
+else
+    _m3_sh="$(run_p50d "$P5D_M3" "$BASE_TMP/p5d-agree-evidence-present.md" x pass | p5d_norm)"
+    _m3_py="$(py_p5d "$BASE_TMP/p5d-agree-evidence-present.md" pass | p5d_norm)"
+    if [ "$_m3_sh" != "$_m3_py" ]; then
+        echo "ok: p5d agreement detects a one-sided suffix-match break (M3)"
+    else
+        echo "FAIL: p5d agreement did not detect M3 (suffix arm disabled)"; FAILED=1
+    fi
+fi
+
 # --- predicate exit-status invariant (the truncation bug) -------------------
 # The shim answers OPEN for #1100 and MERGED for every other number, so #1071 is
 # the merged predecessor that made pr_dep_holds return 1. `gh api graphql` is not

@@ -814,6 +814,30 @@ else
     FAILED=1
 fi
 
+# Case U7 — label plumbing: condition (3) and the Phase 5.0 END list both name
+# the two scope labels, and SKILL.md points at the helper and the Plan gaps heading.
+_u7_bad=0
+_u7_cond3="$(grep -m1 '^3\. No unresolved' "$P25_SKILL" || true)"
+_u7_end="$(grep -m1 '^At Phase 5.0 END, append each remaining' "$P5_SKILL" || true)"
+for _u7_label in 'UNPLANNED-FILE:' 'UNEXPLAINED-GAP:'; do
+    if ! grep -qF -- "$_u7_label" <<< "$_u7_cond3"; then
+        echo "FAIL: U7 — SKILL.md condition (3) does not name $_u7_label"; _u7_bad=1
+    fi
+    if ! grep -qF -- "$_u7_label" <<< "$_u7_end"; then
+        echo "FAIL: U7 — Phase 5.0 END list does not name $_u7_label"; _u7_bad=1
+    fi
+done
+for _u7_tok in 'bin/lib/plan-scope-conformance' '## Plan gaps'; do
+    if ! grep -qF -- "$_u7_tok" "$P25_SKILL"; then
+        echo "FAIL: U7 — SKILL.md does not name $_u7_tok"; _u7_bad=1
+    fi
+done
+if [ "$_u7_bad" -eq 0 ]; then
+    echo "ok: U7 both scope labels reach condition (3) and the Phase 5.0 END list"
+else
+    FAILED=1
+fi
+
 # ── plan-scope-conformance helper ──
 # S1..S9 call bin/lib/plan-scope-conformance directly. The Phase 5.0 block and
 # harness/scope_conformance.py both delegate to it, so these cases pin the

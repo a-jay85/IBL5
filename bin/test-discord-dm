@@ -40,6 +40,32 @@ SHIM_EOF
 chmod +x "$SHIM/osascript"
 export PATH="$SHIM:$PATH"
 
+# Never let a case read the real ~/.iblbot-dev-webhook-url or ~/.iblbot-dm-id.
+# HOME points into $TMP for the whole run; the webhook seam defaults to an
+# absent file. Cases that want the webhook path opt in per call.
+export HOME="$TMP/home"
+mkdir -p "$HOME"
+export DISCORD_DM_WEBHOOK_FILE="$TMP/no-webhook-url"
+case "$HOME" in
+    "$TMP"/*) : ;;
+    *) echo "test-discord-dm: HOME isolation failed ($HOME)"; exit 1 ;;
+esac
+OWNER_ID="283183467804491776"
+FAKE_WEBHOOK_URL="https://example.invalid/api/webhooks/0/test"
+FAKE_WEBHOOK_FILE="$TMP/webhook-url"
+printf '%s\n' "$FAKE_WEBHOOK_URL" > "$FAKE_WEBHOOK_FILE"
+# curl seam stub: records that it ran. Phase 2 wires DISCORD_DM_CURL_BIN; before
+# that it is ignored, so "curl stub never ran" holds trivially pre-impl.
+CURL_CAP="$TMP/curl-cap.txt"
+CURL_NEVER="$TMP/curl-never"
+cat > "$CURL_NEVER" <<'STUB_EOF'
+#!/bin/bash
+printf 'CURL-RAN\n' >> "$CURL_CAP"
+printf '\nHTTP=200\n'
+STUB_EOF
+chmod +x "$CURL_NEVER"
+export CURL_CAP
+
 FAKE_TO="123456789012345678"
 CAP="$TMP/cap.txt"
 SPOOL="$TMP/spool.log"
@@ -391,6 +417,69 @@ if sed -n 's/^BODY: //p' "$R_CAP" | jq -e . >/dev/null 2>&1; then
 else
     fail "row 5: over-cap raw body arrived as invalid JSON"
 fi
+
+# -- Characterization: SSH path invariants the webhook change must not move ----
+SSH_CODE="$TMP/ssh-code"
+cat > "$SSH_CODE" <<'STUB_EOF'
+#!/bin/bash
+for a in "$@"; do last="$a"; done
+printf 'CMD: %s\n' "$last" >> "$DM_CAPTURE"
+printf 'BODY: ' >> "$DM_CAPTURE"; cat >> "$DM_CAPTURE"; printf '\n' >> "$DM_CAPTURE"
+printf '\nHTTP=%s curl_rc=0\n' "${STUB_HTTP:-200}"
+STUB_EOF
+chmod +x "$SSH_CODE"
+
+run_ssh() { # <http> <webhook-file> ...dm-args -- captures S_OUT / S_RC, resets caps
+    local code="$1" wh="$2"; shift 2
+    : > "$R_CAP"; : > "$CURL_CAP"; : > "$SPOOL"
+    S_OUT=$(DM_CAPTURE="$R_CAP" STUB_HTTP="$code" DISCORD_DM_SSH_BIN="$SSH_CODE" \
+        DISCORD_DM_CURL_BIN="$CURL_NEVER" DISCORD_DM_WEBHOOK_FILE="$wh" \
+        DISCORD_DM_SPOOL="$SPOOL" "$DM" --quiet --attempts 1 "$@" 2>&1)
+    S_RC=$?
+}
+ssh_calls() { grep -c '^CMD:' "$R_CAP"; }
+
+printf '\n-- Characterization: SSH path --\n'
+
+# C1: another recipient stays on SSH even when a webhook file exists.
+run_ssh 200 "$FAKE_WEBHOOK_FILE" --to "$FAKE_TO" "approver note"
+[ "$S_RC" = 0 ] && ok "C1: --to other exits 0" || fail "C1: --to other exit $S_RC"
+want "C1: --to other POSTs /discordDM over ssh" "$(cat "$R_CAP")" "http://localhost:50000/discordDM"
+want "C1: --to other keeps its recipient" "$(cat "$R_CAP")" "\"receivingUserDiscordID\": \"$FAKE_TO\""
+[ -s "$CURL_CAP" ] && fail "C1: --to other reached the webhook curl" || ok "C1: --to other never ran curl"
+
+# C2: the owner with NO webhook file falls back to the SSH DM.
+run_ssh 200 "$TMP/absent-webhook-url" --to "$OWNER_ID" "owner note"
+[ "$S_RC" = 0 ] && ok "C2: owner, no webhook file exits 0" || fail "C2: exit $S_RC"
+want "C2: owner, no webhook file uses ssh" "$(cat "$R_CAP")" "\"receivingUserDiscordID\": \"$OWNER_ID\""
+[ -s "$CURL_CAP" ] && fail "C2: missing webhook file still ran curl" || ok "C2: never ran curl"
+
+# C3: --raw --route stays on SSH even for the owner with a webhook file present.
+run_ssh 200 "$FAKE_WEBHOOK_FILE" --to "$OWNER_ID" --route /discordPlanReviewDM --raw - <<< '{"slug":"s"}'
+[ "$S_RC" = 0 ] && ok "C3: raw+route exits 0" || fail "C3: exit $S_RC"
+want "C3: raw+route POSTs its route over ssh" "$(cat "$R_CAP")" "http://localhost:50000/discordPlanReviewDM"
+[ -s "$CURL_CAP" ] && fail "C3: raw+route reached the webhook curl" || ok "C3: raw+route never ran curl"
+
+# C4: SSH path 4xx stays permanent: one attempt, exit 1, spool names the status.
+# --attempts 2 (overrides run_ssh's 1): a passing run returns on the 400 with no
+# sleep; a regressed run would retry, so the call count is non-vacuous.
+run_ssh 400 "$TMP/absent-webhook-url" --no-fallback --attempts 2 --to "$FAKE_TO" "bad"
+[ "$S_RC" = 1 ] && ok "C4: ssh 400 exits 1" || fail "C4: ssh 400 exit $S_RC"
+[ "$(ssh_calls)" = 1 ] && ok "C4: ssh 400 is not retried" || fail "C4: ssh 400 made $(ssh_calls) calls"
+run_ssh 400 "$TMP/absent-webhook-url" --to "$FAKE_TO" "bad"
+want "C4: spool header names recipient + status" "$(cat "$SPOOL")" "UNDELIVERED (to=$FAKE_TO http=400)"
+
+# C5: SSH path stays 200-only. The 2xx widening in Phase 2 is webhook-scoped.
+run_ssh 204 "$TMP/absent-webhook-url" --no-fallback --to "$FAKE_TO" "odd status"
+[ "$S_RC" = 1 ] && ok "C5: ssh 204 is not success" || fail "C5: ssh 204 exit $S_RC (expected 1)"
+
+# C6: default recipient still comes from ~/.iblbot-dm-id (inside the isolated HOME).
+printf '%s\n' "$FAKE_TO" > "$HOME/.iblbot-dm-id"
+: > "$R_CAP"
+DM_CAPTURE="$R_CAP" DISCORD_DM_SSH_BIN="$SSH_CODE" DISCORD_DM_SPOOL="$SPOOL" \
+    "$DM" --quiet --attempts 1 "from id file" >/dev/null 2>&1
+want "C6: recipient defaults from the id file" "$(cat "$R_CAP")" "\"receivingUserDiscordID\": \"$FAKE_TO\""
+rm -f "$HOME/.iblbot-dm-id"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 printf '\n'

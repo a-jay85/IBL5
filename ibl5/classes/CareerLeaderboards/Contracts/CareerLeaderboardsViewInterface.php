@@ -49,7 +49,7 @@ interface CareerLeaderboardsViewInterface
      *
      * **Columns:**
      * Rank, Name, Games, Minutes, FGM, FGA, FG%, FTM, FTA, FT%,
-     * 3GM, 3GA, 3P%, ORB, DRB, REB, AST, STL, TVR, BLK, FOULS, PTS
+     * 3GM, 3GA, 3P%, ORB, DRB, REB, AST, STL, TVR, BLK, PF, PTS
      *
      * **Styling:**
      * - Class: sortable (for JavaScript table sorting)

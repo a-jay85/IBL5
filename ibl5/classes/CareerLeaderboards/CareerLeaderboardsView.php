@@ -158,7 +158,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
             <th<?= HtmlSanitizer::trusted($this->sortAttr('stl')) ?>>STL</th>
             <th<?= HtmlSanitizer::trusted($this->sortAttr('tvr')) ?>>TVR</th>
             <th<?= HtmlSanitizer::trusted($this->sortAttr('blk')) ?>>BLK</th>
-            <th<?= HtmlSanitizer::trusted($this->sortAttr('pf')) ?>>FOULS</th>
+            <th<?= HtmlSanitizer::trusted($this->sortAttr('pf')) ?>>PF</th>
             <th<?= HtmlSanitizer::trusted($this->sortAttr('pts')) ?>>PTS</th>
         </tr>
     </thead>

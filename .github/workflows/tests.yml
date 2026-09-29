@@ -1096,6 +1096,8 @@ jobs:
         run: bin/test-bug-pipeline-check
       - name: bin/test-bug-pipeline-cron-setup
         run: bin/test-bug-pipeline-cron-setup
+      - name: bin/test-launchd-health-cron-setup
+        run: bin/test-launchd-health-cron-setup
       - name: bin/test-bug-pipeline-ci-autofix
         run: bin/test-bug-pipeline-ci-autofix
       - name: bin/test-sim-recap-tick

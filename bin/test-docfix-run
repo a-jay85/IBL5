@@ -13,6 +13,7 @@ REAL_DOCFIX="$REPO_ROOT/bin/docfix-run"
 REAL_POLL="$REPO_ROOT/bin/docfix-poll"
 WORKFLOW="$REPO_ROOT/.github/workflows/doc-freshness-audit.yml"
 NOTIFY_WORKFLOW="$REPO_ROOT/.github/workflows/docs-refreshed-notify.yml"
+HEALTH_WORKFLOW="$REPO_ROOT/.github/workflows/docfix-health.yml"
 REAL_VERONLY="$REPO_ROOT/bin/docfix-check-veronly"
 FAILED=0
 ok()   { echo "ok: $1"; }
@@ -214,6 +215,27 @@ SB="$(build_sandbox)"
     && [ -f "$REPO_ROOT/bin/lib/docfix-dm.sh" ]; } \
   && ok "(7) docs-refreshed-notify: workflow_dispatch+pr_number; guard moved to docfix-dm.sh" \
   || bad "(7) docs-refreshed-notify static assertion"
+
+# --- Cases H9-H10: docfix-health.yml static assertions ------------------------
+{ grep -qF 'workflow_dispatch' "$HEALTH_WORKFLOW" \
+    && grep -qE '^      alert:' "$HEALTH_WORKFLOW" \
+    && grep -qE '^      kind:' "$HEALTH_WORKFLOW" \
+    && grep -qE '^      detail:' "$HEALTH_WORKFLOW" \
+    && grep -qF "cron: '0 12 * * *'" "$HEALTH_WORKFLOW" \
+    && grep -qF -e '--event workflow_dispatch' "$HEALTH_WORKFLOW" \
+    && grep -qF 'actions: read' "$HEALTH_WORKFLOW" \
+    && grep -qF 'issues: read' "$HEALTH_WORKFLOW" \
+    && grep -qF 'source bin/lib/docfix-health.sh' "$HEALTH_WORKFLOW" \
+    && grep -qF "if: steps.build.outputs.alert == 'true'" "$HEALTH_WORKFLOW" \
+    && grep -qF "if: steps.check.outputs.alert == 'true'" "$HEALTH_WORKFLOW"; } \
+  && ok "(H9) docfix-health.yml: dispatch inputs, 12:00Z cron, dispatch-only heartbeat, perms, lib, alert gates" \
+  || bad "(H9) docfix-health.yml static structure"
+
+H10_ALL="$(grep -nE '\$\{\{ *inputs\.' "$HEALTH_WORKFLOW")"
+H10_BAD="$(grep -vE '^[0-9]+: +[A-Z_]+: \$\{\{ *inputs\.[a-z_]+ *\}\}$' <<<"$H10_ALL")"
+{ [ -n "$H10_ALL" ] && [ -z "$H10_BAD" ]; } \
+  && ok "(H10) docfix-health.yml: every inputs.* reference is an env: entry (no run: interpolation)" \
+  || bad "(H10) docfix-health.yml: inputs interpolated outside env: [$H10_BAD]"
 
 # --- Case 8: carry-forward — bin/docfix-run still has auto_merge:false --------
 { grep -q '^auto_merge: false$' "$REAL_DOCFIX" \

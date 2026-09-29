@@ -37,6 +37,16 @@ class LastSimRecapViewTest extends TestCase
         self::assertStringContainsString('May 13', $html);
     }
 
+    public function testRootSectionCarriesIblCardClass(): void
+    {
+        $html = (new LastSimRecapView())->render($this->makeSlate(games: []));
+
+        self::assertStringContainsString(
+            '<section class="ibl-card last-sim-recap" data-component="last-sim-recap">',
+            $html
+        );
+    }
+
     public function testHtmlHasTablistAriaRoles(): void
     {
         $html = (new LastSimRecapView())->render($this->makeSlate(games: [$this->makeGame()]));

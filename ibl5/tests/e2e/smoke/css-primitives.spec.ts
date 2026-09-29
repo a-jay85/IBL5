@@ -131,6 +131,30 @@ test.describe('CSS shared primitives', () => {
     expect(differsFromControl(EXPECTED_TABLE, control)).toBe(true);
   });
 
+  test('playoffs month header keeps its accent background', async ({ page }) => {
+    const reference = await probe(page, 'body', '<div style="background-color: var(--accent-700)">x</div>', ['backgroundColor']);
+    const actual = await probe(
+      page,
+      'body',
+      '<div class="schedule-month"><div data-probe class="ibl-card__header schedule-month__header schedule-month__header--playoffs">P</div></div>',
+      ['backgroundImage', 'backgroundColor'],
+    );
+    expect(actual.backgroundImage).toBe('none');
+    expect(actual.backgroundColor).toBe(reference.backgroundColor);
+  });
+
+  test('month header adopts the card gradient and keeps compact padding', async ({ page }) => {
+    const actual = await probe(
+      page,
+      'body',
+      '<div class="schedule-month"><div data-probe class="ibl-card__header schedule-month__header">M</div></div>',
+      ['backgroundImage', 'paddingTop', 'paddingLeft'],
+    );
+    expect(actual.backgroundImage).toContain('linear-gradient');
+    expect(actual.paddingTop).toBe('4px');
+    expect(actual.paddingLeft).toBe('8px');
+  });
+
   test('nav section label matches its utility string', async ({ page }) => {
     const control = await probe(page, 'nav', '<div><span data-probe>x</span></div>', LABEL_PROPS);
     const actual = await probe(

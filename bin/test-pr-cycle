@@ -572,6 +572,7 @@ grep -qF '#102' "$SCRATCH/dm.argv" \
     && fail "case 11: DM should not mention absent #102"
 grep -qF '#103' "$SCRATCH/dm.argv" \
     && fail "case 11: DM should not mention absent #103"
+# Mutation check: dropping --ping from the send at bin/pr-cycle:1087 fails this line.
 grep -qF -- '--ping' <<< "$(cat "$SCRATCH/dm.argv")" \
     || fail "case 11: end-of-run DM lacks --ping"
 end_case "case 11 non-armable and absent"

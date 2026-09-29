@@ -574,6 +574,7 @@ want_not "W10: warning omits the URL" "$W_OUT" "ex.invalid"
 want "W10: warning names the DM fallback" "$W_OUT" "using the DM path"
 
 # W11: unset and empty DISCORD_DM_WEBHOOK_FILE both use the $HOME default.
+# Mutation check: switching the default to ${VAR-…} (no colon) makes the empty case fail.
 printf '%s\n' "$FAKE_WEBHOOK_URL" > "$HOME/.iblbot-dev-webhook-url"
 : > "$CURL_CAP"; rm -f "$CURL_N"
 DISCORD_DM_WEBHOOK_FILE="" DISCORD_DM_TO="$OWNER_ID" DISCORD_DM_CURL_BIN="$CURL_STUB" \
@@ -588,6 +589,7 @@ env -u DISCORD_DM_WEBHOOK_FILE DISCORD_DM_TO="$OWNER_ID" DISCORD_DM_CURL_BIN="$C
 
 # W11b: an empty curl seam falls back to the real curl (which cannot resolve
 # example.invalid) instead of "command not found".
+# Mutation check: a ${VAR-curl} default (no colon) keeps the empty value and fails here.
 : > "$SPOOL"
 W11B_OUT=$(DISCORD_DM_CURL_BIN="" DISCORD_DM_TO="$OWNER_ID" DISCORD_DM_WEBHOOK_FILE="$FAKE_WEBHOOK_FILE" \
     DISCORD_DM_SSH_BIN="$SSH_CODE" DISCORD_DM_SPOOL="$SPOOL" DM_CAPTURE="$R_CAP" \

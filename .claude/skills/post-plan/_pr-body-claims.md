@@ -139,7 +139,7 @@ A `## Declared scope` section lists `.claude/` paths this PR edits on purpose th
 ## Declared scope
 
 - `.claude/rules/doc-freshness.md` (frontmatter bump forced by the on-touch rule)
-- `.claude/agents/sonnet-4-6.md` (tool list corrected while adjacent)
+- `.claude/agents/sonnet-5-5.md` (tool list corrected while adjacent)
 ```
 
 The extraction is section-bounded. It starts at the `## Declared scope` heading and stops at the next `## ` heading, so a `.claude/` path mentioned elsewhere in the PR body dismisses nothing. Write a reason on each bullet for the reviewer; the check reads only the path.

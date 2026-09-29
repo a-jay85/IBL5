@@ -69,7 +69,7 @@ assert_tier() {
 }
 
 # c1 — line-1 frontmatter selects sonnet
-assert "c1-sonnet" "claude-sonnet-4-6" '---
+assert "c1-sonnet" "claude-sonnet-5-5" '---
 impl_model: sonnet
 ---
 # Plan
@@ -101,7 +101,7 @@ impl_model: opus
 # Plan'
 
 # c5 — leading/trailing whitespace around the value is tolerated
-assert "c5-whitespace" "claude-sonnet-4-6" '---
+assert "c5-whitespace" "claude-sonnet-5-5" '---
 impl_model:   sonnet
 ---
 # Plan'
@@ -111,9 +111,14 @@ assert "c6-full-opus" "claude-opus-5-5" '---
 impl_model: claude-opus-5-5
 ---'
 
-# c7 — full sonnet id accepted and resolves to claude-sonnet-4-6
-assert "c7-full-sonnet" "claude-sonnet-4-6" '---
+# c7 — legacy full id claude-sonnet-4-6 is still accepted and resolves to claude-sonnet-5-5
+assert "c7-full-sonnet-legacy" "claude-sonnet-5-5" '---
 impl_model: claude-sonnet-4-6
+---'
+
+# c7b — full sonnet 5.5 id accepted and resolves to itself
+assert "c7b-full-sonnet-5-5" "claude-sonnet-5-5" '---
+impl_model: claude-sonnet-5-5
 ---'
 
 # c8 — full haiku id accepted and resolves to claude-haiku-4-5
@@ -152,6 +157,7 @@ assert_tier "opus"           "opus-tier"
 assert_tier "claude-opus-5-5"  "opus-tier"
 assert_tier "sonnet"         "sonnet-tier"
 assert_tier "claude-sonnet-4-6" "sonnet-tier"
+assert_tier "claude-sonnet-5-5" "sonnet-tier"
 assert_tier "haiku"          "haiku-tier"
 assert_tier "claude-haiku-4-5"  "haiku-tier"
 

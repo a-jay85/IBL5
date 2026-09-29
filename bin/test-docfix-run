@@ -171,7 +171,7 @@ P="$(plist_of "$SB")"; PLAN="$(plan_of "$SB")"
 { [ -n "$P" ] && grep -q 'cd "'"$SB"'/wts/docs-stale-refresh-[^/]*"' "$P" \
     && grep -q 'Closes #4242' "$P" \
     && grep -q 'ibl5/docs/foo.md,README.md' "$P" \
-    && grep -q 'claude-sonnet-4-6' "$P"; } \
+    && grep -q 'claude-sonnet-5-5' "$P"; } \
   && ok "(1) plist carries cd-to-worktree + doc-fix prompt + SIG + Closes #N" \
   || bad "(1) plist composition"
 { [ -n "$PLAN" ] && head -1 "$PLAN" | grep -q '^---$' \

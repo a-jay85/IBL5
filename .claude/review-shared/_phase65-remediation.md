@@ -1,6 +1,6 @@
 ---
 description: Phase 6.5 remediation procedure for the post-plan harness. Fixes every Phase 6 finding in-PR; harness commits and pushes after exit.
-last_verified: 2026-09-26
+last_verified: 2026-09-28
 ---
 
 # Phase 6.5 in-PR remediation
@@ -30,7 +30,7 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
      - **Require a failure scenario.** The body names a concrete input or state and the wrong output, crash, or cost that follows. A finding with no nameable failure scenario gets no issue.
      - **No cosmetic-only issues.** Wording, formatting, comment style, or naming with no behavior change is fixed in this pass or dropped. It is never filed.
      - **Command.** `bin/backlog new <label> "<title>" "<body>"`. Line 1 of the body is the PR URL alone. Line 2 cites `path/to/file.ext:LINE`. The rest states the failure scenario. `bin/backlog` exits 2 and names the failed rule when the body misses any of these. Fix the body and re-run.
-   - **Fifth-file gate.** `~/.claude/hooks/plan-gate-edit.sh` Check 1 denies the 5th distinct repo file edited on the main thread in one turn. When the Agent tool is available, route remaining fixes to one `subagent_type: "sonnet-4-6"` sub-agent (omit `model`). Before spawning, state the delegate boundary: remaining code fixes and backlog-row appends only. The delegate does not commit, push, arm auto-merge, change worktrees, or spawn further delegates. When the Agent tool is absent (harness context), apply the overflow rule instead.
+   - **Fifth-file gate.** `~/.claude/hooks/plan-gate-edit.sh` Check 1 denies the 5th distinct repo file edited on the main thread in one turn. When the Agent tool is available, route remaining fixes to one `subagent_type: "sonnet-5-5"` sub-agent (omit `model`). Before spawning, state the delegate boundary: remaining code fixes and backlog-row appends only. The delegate does not commit, push, arm auto-merge, change worktrees, or spawn further delegates. When the Agent tool is absent (harness context), apply the overflow rule instead.
    - **Overflow rule.** Fix what is clearly in scope of this PR; file the remainder as backlog rows marked `not fixed — filed`; say so in the Phase 7 verdict. A remediation run never expands into a sweep.
 
 4. **Scope reconciliation.** Step 2 already proved the tree carried nothing but this phase's own edits.

@@ -67,8 +67,14 @@ def frontmatter_autonomy_contract(content: str) -> tuple[str, list[str], str]:
     (a body documenting the syntax can't self-select).
 
     error == "" means well-formed OR entirely absent. Mirror of the shell single
-    source of truth, bin/lib/plan-autonomy-contract; pinned by
-    tests/test_planfile.py::test_contract_lib_sync.
+    source of truth, bin/lib/plan-autonomy-contract, including its bash
+    IFS=',' splitting (one trailing comma tolerated, any other empty token
+    rejected) and its `..`-anywhere rejection. Accept/reject parity is pinned by
+    tests/test_planfile.py::test_contract_lib_sync and
+    test_contract_token_grammar_sweep. Semantic parity of the UNMET-CONTRACT
+    lines against the post-plan Phase 5.0d block is pinned by the "Phase 5.0d
+    TWO-WAY AGREEMENT" section of bin/test-postplan-arm-conditions. Change the
+    shell lib first, then this mirror, and run both.
     """
     lines = content.splitlines()
     if not lines or not re.match(r"^---\s*$", lines[0]):

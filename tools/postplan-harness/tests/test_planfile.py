@@ -1173,7 +1173,13 @@ def test_contract_malformed_evidence_token_flagged(content, label):
 
 
 def test_contract_lib_sync(tmp_path):
-    """Python parser and bin/lib/plan-autonomy-contract classify identically."""
+    """Python parser and bin/lib/plan-autonomy-contract classify every fixture
+    identically (accept vs reject).
+
+    _TOKEN_GRAMMAR_CASES and test_contract_token_grammar_sweep cover the token
+    grammar. The sibling semantic pin is the "Phase 5.0d TWO-WAY AGREEMENT"
+    section of bin/test-postplan-arm-conditions.
+    """
     if not os.path.isfile(AUTONOMY_CONTRACT_LIB):
         pytest.skip("plan-autonomy-contract lib not found: " + AUTONOMY_CONTRACT_LIB)
     if not os.access(AUTONOMY_CONTRACT_LIB, os.X_OK):

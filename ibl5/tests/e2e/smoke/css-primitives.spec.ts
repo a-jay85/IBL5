@@ -8,6 +8,12 @@ test.use({ storageState: publicStorageState() });
 
 type Styles = Record<string, string>;
 
+// Chrome versions disagree on how they serialize the BlinkMacSystemFont alias
+// (some print it as "system-ui"), so compare font stacks in their source form.
+function normalizeFontFamily(value: string): string {
+  return value.replace(/"system-ui"/g, 'BlinkMacSystemFont');
+}
+
 async function probe(page: Page, parentSelector: string, html: string, props: string[]): Promise<Styles> {
   return page.evaluate(
     ({ parentSelector, html, props }) => {
@@ -26,7 +32,12 @@ async function probe(page: Page, parentSelector: string, html: string, props: st
       return out;
     },
     { parentSelector, html, props },
-  );
+  ).then((out) => {
+    if (out.fontFamily !== undefined) {
+      out.fontFamily = normalizeFontFamily(out.fontFamily);
+    }
+    return out;
+  });
 }
 
 function differsFromControl(actual: Styles, control: Styles): boolean {
@@ -47,7 +58,7 @@ const CHIP_CASES: Record<string, string> = {
   allstar: '<span class="ibl-chip ibl-chip--navy all-star-rename__chip">Name</span>',
 };
 
-const BARLOW = 'Barlow, -apple-system, "system-ui", "Segoe UI", Roboto, sans-serif';
+const BARLOW = 'Barlow, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 
 const EXPECTED_CHIPS: Record<string, Styles> = {
   txn: {
@@ -64,7 +75,7 @@ const EXPECTED_CHIPS: Record<string, Styles> = {
     display: 'inline-flex', borderTopLeftRadius: '6.75px', fontWeight: '700', whiteSpace: 'normal',
     textTransform: 'uppercase', paddingTop: '4.5px', paddingLeft: '13.5px', backgroundColor: 'rgb(17, 24, 39)',
     color: 'rgb(255, 255, 255)', fontSize: '15.75px', letterSpacing: '1.26px',
-    fontFamily: '"Barlow Condensed", -apple-system, "system-ui", "Segoe UI", sans-serif',
+    fontFamily: '"Barlow Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
   nav: {
     display: 'inline-flex', borderTopLeftRadius: '4.5px', fontWeight: '700', whiteSpace: 'normal',

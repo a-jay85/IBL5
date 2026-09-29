@@ -43,7 +43,8 @@ W
     printf '#!/usr/bin/env bash\necho "$1" >> "%s/cleanup-calls"\nexit "${SHIM_CLEANUP_RC:-0}"\n' \
         "$SB" > "$SB/bin/cleanup"
     # docfix-run: logs "issue|sig" to docfix-calls.
-    printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\n' \
+    # Exits SHIM_DOCFIX_RUN_RC (default 0) so the poll's exit-code passthrough is testable.
+    printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\nexit "${SHIM_DOCFIX_RUN_RC:-0}"\n' \
         "$SB" > "$SB/bin/docfix-run"
     chmod +x "$SB/bin/check-docs" "$SB/bin/cleanup" "$SB/bin/docfix-run"
 
@@ -153,6 +154,14 @@ run_poll() {
     local SB="$1"
     ( IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$SB/bin:$PATH" \
       "$REAL_POLL" >/dev/null 2>&1 ) || true
+}
+
+# run_poll_rc: like run_poll but prints the poll's exit code as "rc=N".
+run_poll_rc() {
+    local SB="$1" RC=0
+    ( IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$SB/bin:$PATH" \
+      "$REAL_POLL" >/dev/null 2>&1 ) || RC=$?
+    echo "rc=$RC"
 }
 
 # run_health: drives bin/docfix-poll --health-report <issue>; prints output.
@@ -814,7 +823,7 @@ SB="$(build_sandbox)"
 CALLS33="$SB/gh-calls"
 SHIM_PR_DM="" SHIM_GH_CALLS="$CALLS33" SHIM_STALE_JSON='[]' run_poll "$SB"
 MARKER33="$(dm_marker_of "$SB" 4242)"
-{ [ ! -e "$MARKER33" ] && { [ ! -e "$CALLS33" ] || [ ! -s "$CALLS33" ]; }; } \
+{ [ ! -e "$MARKER33" ] && ! grep -qF 'workflow run docs-refreshed-notify.yml' "$CALLS33" 2>/dev/null; } \
   && ok "(33) poll: no DM when no unarmed PRs" \
   || bad "(33) poll: DM should not fire for empty PR_DM"
 
@@ -825,7 +834,7 @@ MARKER34="$(dm_marker_of "$SB" 4242)"
 mkdir -p "$(dirname "$MARKER34")"
 : > "$MARKER34"
 SHIM_PR_DM="4242" SHIM_GH_CALLS="$CALLS34" SHIM_STALE_JSON='[]' run_poll "$SB"
-{ [ ! -e "$CALLS34" ] || [ ! -s "$CALLS34" ]; } \
+{ ! grep -qF 'workflow run docs-refreshed-notify.yml' "$CALLS34" 2>/dev/null; } \
   && ok "(34) poll: no DM re-dispatch when marker pre-exists" \
   || bad "(34) poll: DM re-dispatch with existing marker"
 
@@ -847,6 +856,56 @@ MARKER36="$(dm_marker_of "$SB" 4242)"
     && [ -e "$MARKER36" ]; } \
   && ok "(36) poll: DM fires before stale-count exit (proves Step 6.1 placement)" \
   || bad "(36) poll: DM should fire even on empty stale set"
+
+# --- Cases H11-H16: poll health heartbeat dispatch ---------------------------
+_hcount() { if [ -f "$1" ]; then grep -cF 'workflow run docfix-health.yml' "$1" || true; else echo 0; fi; }
+
+# (H11) no stale docs: exactly one alert=false heartbeat, rc 0.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON='[]' run_poll_rc "$SB")"
+{ [ "$RC" = "rc=0" ] && [ "$(_hcount "$C")" -eq 1 ] \
+    && grep -qF 'workflow run docfix-health.yml -f alert=false -f kind= -f detail=' "$C"; } \
+  && ok "(H11) poll: no-stale exit dispatches exactly one alert=false heartbeat, rc 0" \
+  || bad "(H11) poll: no-stale heartbeat ($RC, $(_hcount "$C") dispatches)"
+
+# (H12) stale docs, no open issue: exactly one alert=false heartbeat, rc 0.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="" SHIM_PR_CLOSED='[]' \
+    run_poll_rc "$SB")"
+{ [ "$RC" = "rc=0" ] && [ "$(_hcount "$C")" -eq 1 ] \
+    && grep -qF 'docfix-health.yml -f alert=false' "$C"; } \
+  && ok "(H12) poll: no-issue exit dispatches exactly one alert=false heartbeat, rc 0" \
+  || bad "(H12) poll: no-issue heartbeat ($RC, $(_hcount "$C") dispatches)"
+
+# (H13) tail path, docfix-run rc 0: exactly one dispatch, rc 0.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='[]' \
+    SHIM_DOCFIX_RUN_RC=0 run_poll_rc "$SB")"
+{ [ "$RC" = "rc=0" ] && [ "$(_hcount "$C")" -eq 1 ] && [ -f "$SB/docfix-calls" ]; } \
+  && ok "(H13) poll: tail path dispatches exactly once after docfix-run, rc 0" \
+  || bad "(H13) poll: tail heartbeat ($RC, $(_hcount "$C") dispatches)"
+
+# (H14) tail path, docfix-run rc 3: poll rc is 3, still exactly one dispatch.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='[]' \
+    SHIM_DOCFIX_RUN_RC=3 run_poll_rc "$SB")"
+{ [ "$RC" = "rc=3" ] && [ "$(_hcount "$C")" -eq 1 ]; } \
+  && ok "(H14) poll: docfix-run rc 3 becomes poll rc 3, one dispatch still sent" \
+  || bad "(H14) poll: docfix-run rc passthrough ($RC, $(_hcount "$C") dispatches)"
+
+# (H15) failed dispatch is fail-quiet: rc 0.
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_STALE_JSON='[]' SHIM_WFRUN_RC=1 run_poll_rc "$SB")"
+{ [ "$RC" = "rc=0" ] && [ "$(_hcount "$C")" -eq 1 ]; } \
+  && ok "(H15) poll: failed gh workflow run stays fail-quiet (rc 0)" \
+  || bad "(H15) poll: dispatch failure should not fail the poll ($RC)"
+
+# (H16) crash path: check-docs failing leaves NO heartbeat (no EXIT-trap dispatch).
+SB="$(build_sandbox)"; C="$SB/gh-calls"
+RC="$(SHIM_GH_CALLS="$C" SHIM_CHECKDOCS_RC=1 run_poll_rc "$SB")"
+{ [ "$RC" != "rc=0" ] && [ "$(_hcount "$C")" -eq 0 ]; } \
+  && ok "(H16) poll: crashed poll exits nonzero and sends zero heartbeats" \
+  || bad "(H16) poll: crash must not heartbeat ($RC, $(_hcount "$C") dispatches)"
 
 # --- Cases 37-40: bin/lib/docfix-dm.sh compose function ----------------------
 

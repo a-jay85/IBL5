@@ -38,7 +38,8 @@ build_sandbox() {
     printf '#!/usr/bin/env bash\necho "$1" >> "%s/cleanup-calls"\nexit "${SHIM_CLEANUP_RC:-0}"\n' \
         "$SB" > "$SB/bin/cleanup"
     # docfix-run stub: logs "issue|sig" to docfix-calls.
-    printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\n' \
+    # Exits SHIM_DOCFIX_RUN_RC (default 0).
+    printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\nexit "${SHIM_DOCFIX_RUN_RC:-0}"\n' \
         "$SB" > "$SB/bin/docfix-run"
     chmod +x "$SB/bin/check-docs" "$SB/bin/cleanup" "$SB/bin/docfix-run"
 
@@ -109,6 +110,8 @@ case "$1 $2" in
         *statusCheckRollup*) printf '%s' "${SHIM_PR_ROLLUP:-0}" ;;
         *)                   printf '%s' "${SHIM_PR_STATE:-}" ;;
       esac ;;
+  "workflow run") printf '%s\n' "$args" >> "${SHIM_GH_CALLS:-/dev/null}"
+                  exit "${SHIM_WFRUN_RC:-0}" ;;
 esac
 exit 0
 H
@@ -425,6 +428,31 @@ OUT="$(HEALTH_RUN_JUST_LAUNCHED=1 SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" S
     SHIM_BRANCH_OUT="" SHIM_REFLOG_OUT="" SHIM_LAUNCHCTL_OUT="" \
     run_health "$SB" 77)"; RC=$?
 _if_case "IF-f" true "never-ran" "exported HEALTH_RUN_JUST_LAUNCHED=1 does not suppress (load-time reset)"
+
+# (IF-g) poll tail with a successful docfix-run: the just-launched run suppresses never-ran.
+SB="$(build_sandbox)"; CALLS_G="$SB/gh-calls"
+SHIM_GH_CALLS="$CALLS_G" SHIM_DOCFIX_RUN_RC=0 SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_PR_OPEN="" SHIM_LS_REMOTE="" SHIM_PR_CLOSED='[]' SHIM_PR_LAST_CREATED="$TS_47H" \
+    SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" SHIM_BRANCH_OUT="" SHIM_REFLOG_OUT="" \
+    SHIM_LAUNCHCTL_OUT="" run_poll "$SB"
+{ [ "$(grep -cF 'workflow run docfix-health.yml' "$CALLS_G")" -eq 1 ] \
+    && grep -qF -e '-f alert=false' "$CALLS_G"; } \
+  && ok "(IF-g) poll tail: launched run suppresses never-ran (dispatch alert=false)" \
+  || bad "(IF-g) poll tail: expected one alert=false dispatch, got: $(cat "$CALLS_G" 2>/dev/null)"
+
+# (IF-h) poll tail with a failed docfix-run: never-ran fires, detail carries log paths.
+SB="$(build_sandbox)"; CALLS_H="$SB/gh-calls"
+SHIM_GH_CALLS="$CALLS_H" SHIM_DOCFIX_RUN_RC=1 SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_PR_OPEN="" SHIM_LS_REMOTE="" SHIM_PR_CLOSED='[]' SHIM_PR_LAST_CREATED="$TS_47H" \
+    SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" SHIM_BRANCH_OUT="" SHIM_REFLOG_OUT="" \
+    SHIM_LAUNCHCTL_OUT="" run_poll "$SB"
+{ [ "$(grep -cF 'workflow run docfix-health.yml' "$CALLS_H")" -eq 1 ] \
+    && grep -qF -e '-f alert=true -f kind=never-ran' "$CALLS_H" \
+    && grep -qF 'Poll logs:' "$CALLS_H" \
+    && grep -qF 'launchd-stderr.log' "$CALLS_H" \
+    && grep -qF 'Run log:' "$CALLS_H"; } \
+  && ok "(IF-h) poll tail: failed launch does not suppress never-ran (alert=true, log paths in detail)" \
+  || bad "(IF-h) poll tail: expected alert=true never-ran dispatch, got: $(cat "$CALLS_H" 2>/dev/null)"
 
 # ---------------------------------------------------------------------------
 # Tests 10-12: stale-since logic (workflow "File or update" step)

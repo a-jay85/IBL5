@@ -8,6 +8,9 @@
 # day that bin/check-docs decides staleness on, offset far enough past the
 # doc-freshness-audit cron (00:00 UTC) that the `stale-docs` issue the poll depends
 # on has almost certainly landed. See build_plist below for how 04:05 was derived.
+# After every completed poll it evaluates --health-report and dispatches
+# .github/workflows/docfix-health.yml (the heartbeat, alert=true|false). That
+# workflow's daily 12:00 UTC backstop DMs when the heartbeat goes quiet.
 #
 # Install AFTER this PR lands on master: the launchd Program points at the MAIN
 # checkout's copy of this file, so a pre-merge install silently runs a stale version.
@@ -69,6 +72,8 @@ PLIST_LABEL="com.ibl5.docfix-poll"
 PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
 PROGRAM="$MAIN/bin/docfix-poll"
 LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/docfix-poll/logs"
+# shellcheck source=bin/lib/docfix-health.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/docfix-health.sh"
 
 # Single source of truth for the plist — shared by --print-schedule and
 # --install-schedule, so the MAIN-checkout derivation is exercised by tests.
@@ -84,8 +89,11 @@ LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/docfix-poll/logs"
 # 04:05 UTC clears p95 with four minutes to spare. It deliberately does NOT clear
 # the max: covering 9h47m would push the poll to 09:52 UTC to buy the ~5% tail,
 # and losing that tail costs only a one-day delay, because a poll that finds no
-# issue simply retries tomorrow and --health-report's `never-ran` arm (36h) catches
-# a genuine stall. Re-measure before moving this; the numbers are GitHub-side.
+# issue simply retries tomorrow. A genuine stall is caught by the post-poll health
+# dispatch (never-ran arm, 36h), and a poll that stops running entirely is caught
+# by the docfix-health.yml 12:00 UTC backstop, whose threshold is derived from
+# these same lag numbers in bin/lib/docfix-health.sh. Re-measure before moving
+# this; the numbers are GitHub-side.
 #
 # launchd evaluates StartCalendarInterval in SYSTEM LOCAL TIME and has no UTC mode —
 # an EnvironmentVariables TZ key does not reach the scheduler — so Hour 21 / Minute 5
@@ -342,8 +350,8 @@ issue_episode_epoch() {   # $1 = issue number
 
 # --- --health-report: is the refresh pipeline broken? -------------------------
 # Emits three `key=value` lines on stdout (alert/kind/detail); always exits 0 —
-# a report, not a gate, mirroring `check-docs --staleness-report`. The audit
-# workflow appends them to $GITHUB_OUTPUT verbatim.
+# a report, not a gate, mirroring `check-docs --staleness-report`. The poll
+# parses them after every completed run (poll_health_dispatch).
 
 # Set to 1 by the poll tail right after bin/docfix-run launches a run (Phase 4).
 # Reset at load so an inherited environment value can never suppress an alert.
@@ -437,6 +445,32 @@ if [ "$SCHEDULE_ACTION" = "health" ]; then
     exit 0
 fi
 
+# --- Health heartbeat (completed poll paths only) ---------------------------
+# Called explicitly before every completed exit, never from an EXIT trap: a poll
+# that dies under set -e must leave NO dispatch so the daily backstop in
+# .github/workflows/docfix-health.yml reports it. Every dispatch (alert=false
+# too) is the heartbeat. Fail-quiet: a failed dispatch is logged and the poll
+# continues; the backstop covers a missing heartbeat.
+poll_health_dispatch() {   # $1 = stale-docs issue number or empty; always returns 0
+    local out alert kind detail
+    out="$(health_report "${1:-}")" || out=""
+    alert="$(sed -n 's/^alert=//p' <<<"$out")"
+    kind="$(sed -n 's/^kind=//p' <<<"$out")"
+    detail="$(sed -n 's/^detail=//p' <<<"$out")"
+    if [ "$alert" = true ]; then
+        detail="$(docfix_health_poll_detail "$detail" "$LOG_DIR" /tmp)"
+    else
+        alert=false; kind=""; detail=""
+    fi
+    if gh workflow run docfix-health.yml -f alert="$alert" -f kind="$kind" \
+         -f detail="$detail" 2>/dev/null; then
+        echo "docfix-poll: health dispatched (alert=$alert${kind:+, kind=$kind})."
+    else
+        echo "docfix-poll: health dispatch failed; the docfix-health backstop will cover it." >&2
+    fi
+    return 0
+}
+
 # --- The poll -----------------------------------------------------------------
 cd "$MAIN"
 
@@ -472,7 +506,7 @@ trap 'rm -f "$REPORT"' EXIT
 "$MAIN/bin/check-docs" --staleness-report > "$REPORT"
 COUNT="$(jq 'length' "$REPORT")"
 SIG="$(jq -r '.[].path' "$REPORT" | sort -u | paste -sd, -)"
-[ "$COUNT" -eq 0 ] && { echo "docfix-poll: no stale docs — nothing to do."; exit 0; }
+[ "$COUNT" -eq 0 ] && { echo "docfix-poll: no stale docs — nothing to do."; poll_health_dispatch ""; exit 0; }
 
 # Reap leftovers whose PR is finished (merged or declined). An OPEN PR's branch
 # stays: it is waiting on the user's review, which is the designed steady state.
@@ -542,6 +576,9 @@ done < <(git -C "$MAIN" branch --list 'docs-stale-refresh-*' --format='%(refname
 UNCOVERED="$(uncovered_count "$REPORT")"
 if [ "$UNCOVERED" -eq 0 ]; then
     echo "docfix-poll: a human declined a refresh covering all $COUNT stale doc(s) — staying quiet."
+    DECLINED_ISSUE="$(gh issue list --label stale-docs --state open --json number \
+                       --jq '.[0].number // empty' 2>/dev/null)" || DECLINED_ISSUE=""
+    poll_health_dispatch "$DECLINED_ISSUE"
     exit 0
 fi
 
@@ -549,8 +586,14 @@ ISSUE_NUM="$(gh issue list --label stale-docs --state open --json number \
               --jq '.[0].number // empty')"
 if [ -z "$ISSUE_NUM" ]; then
     echo "docfix-poll: $COUNT stale doc(s) but no open stale-docs issue — the audit owns issue creation; skipping."
+    poll_health_dispatch ""
     exit 0
 fi
 
 echo "docfix-poll: $COUNT stale doc(s), issue #$ISSUE_NUM — firing bin/docfix-run."
-"$MAIN/bin/docfix-run" "$ISSUE_NUM" "$SIG"   # no `exec`: it would skip the EXIT trap
+RUN_RC=0
+"$MAIN/bin/docfix-run" "$ISSUE_NUM" "$SIG" || RUN_RC=$?   # no `exec`: it would skip the EXIT trap
+# A launched run has not opened its PR yet; tell never-ran it is in flight.
+[ "$RUN_RC" -eq 0 ] && HEALTH_RUN_JUST_LAUNCHED=1
+poll_health_dispatch "$ISSUE_NUM"
+exit "$RUN_RC"

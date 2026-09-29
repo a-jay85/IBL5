@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
+# shellcheck disable=SC2016  # W-case patterns are literal workflow text, not shell expansions
 #
 # bin/test-merge-line-select — regression harness for bin/merge-line-select and
 # the two workflows that call it (update-behind-prs.yml, pr-canary.yml).
@@ -335,6 +336,45 @@ if [ "$RC" = 0 ] && grep -q '^action=' <<< "$OUT"; then
 else
     failcase "G17-empty-env — exit=$RC"
     printf '%s\n' "$OUT" | sed 's/^/    /'
+fi
+
+# --- W: static shape of the two workflows that call the selector ---
+
+UPDATE_WF="$REPO_ROOT/.github/workflows/update-behind-prs.yml"
+CANARY_WF="$REPO_ROOT/.github/workflows/pr-canary.yml"
+
+# count_lines <fixed-string> <file> — number of lines containing the string.
+count_lines() { grep -cF -- "$1" "$2" || true; }
+
+W1_CALLS=$(grep -c '/update-branch"' "$UPDATE_WF" || true)
+W1_KEYED=$(count_lines 'pulls/$HEAD_PR/update-branch' "$UPDATE_WF")
+W1_FORBIDDEN=$(grep -cE 'disable-auto|disablePullRequestAutoMerge|gh pr close|gh pr merge' "$UPDATE_WF" || true)
+if [ "$W1_CALLS" = 1 ] && [ "$W1_KEYED" = 1 ] && [ "$W1_FORBIDDEN" = 0 ]; then
+    pass "W1-workflow-shape"
+else
+    failcase "W1-workflow-shape — update-branch calls=$W1_CALLS keyed-on-HEAD_PR=$W1_KEYED forbidden=$W1_FORBIDDEN"
+fi
+
+W2_GROUP=$(count_lines "inputs.dry_run == true && '-dryrun'" "$UPDATE_WF")
+W2_GUARDS=$(grep -cE '^ +if: .*inputs\.dry_run != true' "$UPDATE_WF" || true)
+W2_DAILY=$(count_lines "cron: '30 11" "$UPDATE_WF")
+W2_SCOPE=$(count_lines 'SCOPE_FILTER' "$UPDATE_WF")
+W2_PR=$(count_lines '[ -n "$DISPATCH_PR" ]' "$UPDATE_WF")
+W2_DRY=$(count_lines '"$DRY_RUN" = "true"' "$UPDATE_WF")
+if [ "$W2_GROUP" = 1 ] && [ "$W2_GUARDS" = 2 ] && [ "$W2_DAILY" = 0 ] \
+    && [ "$W2_SCOPE" = 0 ] && [ "$W2_PR" -ge 1 ] && [ "$W2_DRY" -ge 1 ]; then
+    pass "W2-dryrun-guards"
+else
+    failcase "W2-dryrun-guards — group=$W2_GROUP guards=$W2_GUARDS daily=$W2_DAILY scope=$W2_SCOPE dispatch_pr=$W2_PR dry_run=$W2_DRY"
+fi
+
+W3_SELECTOR=$(grep -E 'bin/merge-line-select' "$CANARY_WF" | grep -cF -- '--list' || true)
+W3_OLD=$(count_lines 'gh pr list' "$CANARY_WF")
+W3_GUARD=$(count_lines "if: needs.enumerate.outputs.count != '0'" "$CANARY_WF")
+if [ "$W3_SELECTOR" -ge 1 ] && [ "$W3_OLD" = 0 ] && [ "$W3_GUARD" = 1 ]; then
+    pass "W3-canary-uses-selector"
+else
+    failcase "W3-canary-uses-selector — selector-list=$W3_SELECTOR gh-pr-list=$W3_OLD count-guard=$W3_GUARD"
 fi
 
 if [ "$FAILED" -ne 0 ]; then

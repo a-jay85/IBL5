@@ -133,4 +133,11 @@ test.describe('Legacy PHP-Nuke scaffold styling', () => {
 
     expect(innerBg).toBe('rgb(1, 2, 3)');
   });
+
+  test('missing-file notice is centered via text-center', async ({ page }) => {
+    await expect(
+      page.locator('#site-content div.text-center', { hasText: "Sorry, such file doesn't exist" }),
+    ).toHaveCSS('text-align', 'center');
+    await expect(page.locator('#site-content center')).toHaveCount(0);
+  });
 });

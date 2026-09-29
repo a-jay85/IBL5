@@ -239,3 +239,29 @@ def test_no_remediation_leaves_the_source_on_verdict_1(tmp_path, git_shim):
         assert res.fidelity["verdict_path"] == fidelity.verdict_path(99)
     finally:
         _cleanup(99)
+
+
+def test_before_remediation_called_once_not_twice(tmp_path, git_shim):
+    """Early join sets before_remediation=None; the old NOT READY guard is a no-op."""
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "READY\n",
+    }
+    call_count = [0]
+
+    def _before():
+        call_count[0] += 1
+
+    llm = FixtureLlm(UsageLedger(), canned)
+    gh = RecordingGh(str(tmp_path))
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), _git(), gh, _plan(),
+            "diff", "body", 99, "dead" * 10, TREE_1, False, lambda m: None, res,
+            before_remediation=_before,
+        )
+    finally:
+        _cleanup(99, "99-2")
+    assert call_count[0] == 1

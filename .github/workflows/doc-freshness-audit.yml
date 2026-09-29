@@ -156,38 +156,3 @@ jobs:
           else
             echo "No doc issues — every in-scope doc is within the 60-day window and every paths: glob resolves." >> "$GITHUB_STEP_SUMMARY"
           fi
-
-      - name: Evaluate refresh-pipeline health
-        id: health
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUM: ${{ steps.issue.outputs.issue-num }}
-        run: |
-          bin/docfix-poll --health-report "$ISSUE_NUM" | tee -a "$GITHUB_OUTPUT"
-
-      - name: Setup SSH
-        if: steps.health.outputs.alert == 'true'
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
-      - name: Build Discord message
-        if: steps.health.outputs.alert == 'true'
-        env:
-          COUNT: ${{ steps.report.outputs.count }}
-          DETAIL: ${{ steps.health.outputs.detail }}
-        run: |
-          MSG=$(printf 'Doc refresh needs you: %s doc issue(s) (stale dates or dead paths: globs) and the pipeline could not clear them on its own.\n%s\nRun: https://github.com/%s/actions/runs/%s' \
-            "$COUNT" "$DETAIL" "${{ github.repository }}" "${{ github.run_id }}")
-          printf '%s' "$MSG" > /tmp/discord-msg.txt
-
-      - name: Send Discord DM
-        if: steps.health.outputs.alert == 'true'
-        uses: ./.github/actions/notify-discord
-        with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}

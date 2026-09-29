@@ -38,7 +38,8 @@ build_sandbox() {
     printf '#!/usr/bin/env bash\necho "$1" >> "%s/cleanup-calls"\nexit "${SHIM_CLEANUP_RC:-0}"\n' \
         "$SB" > "$SB/bin/cleanup"
     # docfix-run stub: logs "issue|sig" to docfix-calls.
-    printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\n' \
+    # Exits SHIM_DOCFIX_RUN_RC (default 0).
+    printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\nexit "${SHIM_DOCFIX_RUN_RC:-0}"\n' \
         "$SB" > "$SB/bin/docfix-run"
     chmod +x "$SB/bin/check-docs" "$SB/bin/cleanup" "$SB/bin/docfix-run"
 
@@ -109,6 +110,8 @@ case "$1 $2" in
         *statusCheckRollup*) printf '%s' "${SHIM_PR_ROLLUP:-0}" ;;
         *)                   printf '%s' "${SHIM_PR_STATE:-}" ;;
       esac ;;
+  "workflow run") printf '%s\n' "$args" >> "${SHIM_GH_CALLS:-/dev/null}"
+                  exit "${SHIM_WFRUN_RC:-0}" ;;
 esac
 exit 0
 H
@@ -358,6 +361,100 @@ OUT9D="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
   || bad "(9d) health_report never-ran 3-line contract"
 
 # ---------------------------------------------------------------------------
+# Tests IF-a..IF-f: never-ran arm vs. open PR (fix b) and the in-flight interlock
+# ---------------------------------------------------------------------------
+TS_47H="$(_ts_ago $(( 47*3600 )))"
+OPEN_PR_JSON='{"number":5,"headRefName":"docs-stale-refresh-x","url":"https://example.test/pr/5"}'
+
+# _if_case LABEL WANT_ALERT WANT_KIND DESC — reads $OUT/$RC; asserts exit 0,
+# exactly 3 key=value lines, and the alert/kind values.
+_if_case() {
+    local label="$1" want_alert="$2" want_kind="$3" desc="$4"
+    { [ "$RC" -eq 0 ] \
+        && [ "$(printf '%s\n' "$OUT" | grep -c '^')" -eq 3 ] \
+        && [ "$(printf '%s\n' "$OUT" | grep -cE '^(alert|kind|detail)=')" -eq 3 ] \
+        && printf '%s\n' "$OUT" | grep -qx "alert=$want_alert" \
+        && printf '%s\n' "$OUT" | grep -qx "kind=$want_kind"; } \
+      && ok "($label) $desc" \
+      || bad "($label) $desc"
+}
+
+# (IF-a) open refresh PR, newest refresh PR 47h old, no launchctl job → quiet.
+SB="$(build_sandbox)"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="$OPEN_PR_JSON" \
+    SHIM_PR_LAST_CREATED="$TS_47H" SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" \
+    SHIM_LAUNCHCTL_OUT="" run_health "$SB" 77)"; RC=$?
+_if_case "IF-a" false "" "open refresh PR + 47h-old newest PR: alert=false (never-ran unreachable)"
+
+# (IF-b) no open PR, newest refresh PR 47h old, no launchctl job → never-ran.
+SB="$(build_sandbox)"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_LS_REMOTE="" \
+    SHIM_PR_LAST_CREATED="$TS_47H" SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" \
+    SHIM_BRANCH_OUT="" SHIM_REFLOG_OUT="" SHIM_LAUNCHCTL_OUT="" \
+    run_health "$SB" 77)"; RC=$?
+_if_case "IF-b" true "never-ran" "no open PR + 47h-old newest PR: alert=true kind=never-ran"
+
+# (IF-c) live-PID docfix-run job → suppressed.
+SB="$(build_sandbox)"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_LS_REMOTE="" \
+    SHIM_PR_LAST_CREATED="$TS_47H" SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" \
+    SHIM_BRANCH_OUT="" SHIM_REFLOG_OUT="" \
+    SHIM_LAUNCHCTL_OUT="$(printf '4242\t0\tcom.ibl5.docfix-run-docs-stale-refresh-x-1')" \
+    run_health "$SB" 77)"; RC=$?
+_if_case "IF-c" false "" "live-PID docfix-run job suppresses never-ran"
+
+# (IF-d) loaded job with PID "-" → does NOT suppress.
+SB="$(build_sandbox)"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_LS_REMOTE="" \
+    SHIM_PR_LAST_CREATED="$TS_47H" SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" \
+    SHIM_BRANCH_OUT="" SHIM_REFLOG_OUT="" \
+    SHIM_LAUNCHCTL_OUT="$(printf -- '-\t0\tcom.ibl5.docfix-run-docs-stale-refresh-x-1')" \
+    run_health "$SB" 77)"; RC=$?
+_if_case "IF-d" true "never-ran" "loaded job with PID '-' does not suppress never-ran"
+
+# (IF-e) live but unrelated label → does NOT suppress.
+SB="$(build_sandbox)"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_LS_REMOTE="" \
+    SHIM_PR_LAST_CREATED="$TS_47H" SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" \
+    SHIM_BRANCH_OUT="" SHIM_REFLOG_OUT="" \
+    SHIM_LAUNCHCTL_OUT="$(printf '4242\t0\tcom.ibl5.other-job')" \
+    run_health "$SB" 77)"; RC=$?
+_if_case "IF-e" true "never-ran" "live unrelated launchd label does not suppress never-ran"
+
+# (IF-f) inherited HEALTH_RUN_JUST_LAUNCHED=1 must not suppress (load-time reset).
+SB="$(build_sandbox)"
+OUT="$(HEALTH_RUN_JUST_LAUNCHED=1 SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_LS_REMOTE="" \
+    SHIM_PR_LAST_CREATED="$TS_47H" SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" \
+    SHIM_BRANCH_OUT="" SHIM_REFLOG_OUT="" SHIM_LAUNCHCTL_OUT="" \
+    run_health "$SB" 77)"; RC=$?
+_if_case "IF-f" true "never-ran" "exported HEALTH_RUN_JUST_LAUNCHED=1 does not suppress (load-time reset)"
+
+# (IF-g) poll tail with a successful docfix-run: the just-launched run suppresses never-ran.
+SB="$(build_sandbox)"; CALLS_G="$SB/gh-calls"
+SHIM_GH_CALLS="$CALLS_G" SHIM_DOCFIX_RUN_RC=0 SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_PR_OPEN="" SHIM_LS_REMOTE="" SHIM_PR_CLOSED='[]' SHIM_PR_LAST_CREATED="$TS_47H" \
+    SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" SHIM_BRANCH_OUT="" SHIM_REFLOG_OUT="" \
+    SHIM_LAUNCHCTL_OUT="" run_poll "$SB"
+{ [ "$(grep -cF 'workflow run docfix-health.yml' "$CALLS_G")" -eq 1 ] \
+    && grep -qF -e '-f alert=false' "$CALLS_G"; } \
+  && ok "(IF-g) poll tail: launched run suppresses never-ran (dispatch alert=false)" \
+  || bad "(IF-g) poll tail: expected one alert=false dispatch, got: $(cat "$CALLS_G" 2>/dev/null)"
+
+# (IF-h) poll tail with a failed docfix-run: never-ran fires, detail carries log paths.
+SB="$(build_sandbox)"; CALLS_H="$SB/gh-calls"
+SHIM_GH_CALLS="$CALLS_H" SHIM_DOCFIX_RUN_RC=1 SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_PR_OPEN="" SHIM_LS_REMOTE="" SHIM_PR_CLOSED='[]' SHIM_PR_LAST_CREATED="$TS_47H" \
+    SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" SHIM_BRANCH_OUT="" SHIM_REFLOG_OUT="" \
+    SHIM_LAUNCHCTL_OUT="" run_poll "$SB"
+{ [ "$(grep -cF 'workflow run docfix-health.yml' "$CALLS_H")" -eq 1 ] \
+    && grep -qF -e '-f alert=true -f kind=never-ran' "$CALLS_H" \
+    && grep -qF 'Poll logs:' "$CALLS_H" \
+    && grep -qF 'launchd-stderr.log' "$CALLS_H" \
+    && grep -qF 'Run log:' "$CALLS_H"; } \
+  && ok "(IF-h) poll tail: failed launch does not suppress never-ran (alert=true, log paths in detail)" \
+  || bad "(IF-h) poll tail: expected alert=true never-ran dispatch, got: $(cat "$CALLS_H" 2>/dev/null)"
+
+# ---------------------------------------------------------------------------
 # Tests 10-12: stale-since logic (workflow "File or update" step)
 # ---------------------------------------------------------------------------
 
@@ -506,8 +603,9 @@ bash -n "$REPO_ROOT/bin/docfix-poll" >/dev/null 2>&1 \
 shellcheck --severity=warning --shell=bash \
     "$REPO_ROOT/bin/docfix-poll" \
     "$REPO_ROOT/bin/docfix-run" \
+    "$REPO_ROOT/bin/lib/docfix-health.sh" \
     "$REPO_ROOT/bin/test-docfix-poll" >/dev/null 2>&1 \
-  && ok "(19b) shellcheck passes for docfix-poll, docfix-run, test-docfix-poll" \
+  && ok "(19b) shellcheck passes for docfix-poll, docfix-run, test-docfix-poll, lib/docfix-health.sh" \
   || bad "(19b) shellcheck failures"
 
 # Test 20: CLOSED+OPEN array order → OPEN wins (jq liveness-priority expression).

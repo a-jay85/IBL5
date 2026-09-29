@@ -1,6 +1,6 @@
 # /pr-ready runtime Phases 2–3 — rebase onto pinned master, then resolve conflicts
 
-Purpose: the Phase 2 delegation packet (one `sonnet-4-6` sub-agent does the rebase chore against a pinned master SHA) and the Phase 3 three-way conflict-resolution procedure the orchestrator performs itself.
+Purpose: the Phase 2 delegation packet (one `sonnet-5-5` sub-agent does the rebase chore against a pinned master SHA) and the Phase 3 three-way conflict-resolution procedure the orchestrator performs itself.
 
 Read this file at runtime Phase 2 and follow it end-to-end before returning to the spine. Nothing in this file re-resolves `origin/master`.
 
@@ -28,7 +28,7 @@ The recorded tip is a convenience, not a dependency: the guard's reflog arm work
 ````
 ### Delegate — rebase onto pinned master
 - **Tier:** Sonnet
-- **Spawn:** `subagent_type: "sonnet-4-6"`, **omit `model`** — never `model: "sonnet"` (that alias resolves to Sonnet 5). Flat fan-out: this delegate must NOT spawn a sub-agent of its own.
+- **Spawn:** `subagent_type: "sonnet-5-5"`, **omit `model`**. Flat fan-out: this delegate must NOT spawn a sub-agent of its own.
 - **Rules:** run `git show <MASTER_SHA>:.claude/rules/linear-history-squash-merge.md` first and read the printed file. It is path-scoped and its `paths:` list does NOT cover this skill's files, so it will not auto-attach. Load it from the pin, not by path — the tree you are in is behind master by construction (that is why you are rebasing), so a path read can miss it or read a stale copy. If `git show` errors, `Read` it by path and say so in your report line 1.
 - **First returned line, before any other work:** `pwd` and `git rev-parse --show-toplevel`. A mismatch against the expected worktree means the session is not in the PR's tree — the Phase 0.4 `EnterWorktree` did not take and its `ALREADY-IN-TARGET` re-check was skipped, or a `WRONG-WORKTREE` run was let through 0.3b — and everything after it would rebase the wrong tree.
 - **Inputs:** the pinned `<MASTER_SHA>` (use this literal SHA; do NOT resolve `origin/master` yourself, and do NOT reference it as a shell variable), the branch name, the commit count from 2a.

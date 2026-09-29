@@ -36,7 +36,8 @@ bpt_log_has "$STUB" transition.log "awaiting_ajay --approval-message-id=14200987
 bpt_reset; bpt_set_actionable "$READY"
 STUB_MAKE_PLAN=1 bpt_run
 bpt_log_has  "$STUB" claude.log "/plan" "ready-for-plan drives /plan"
-bpt_log_has  "$STUB" claude.log "claude-sonnet-4-6" "/plan uses the sonnet-4-6 autonomous pin"
+bpt_log_has  "$STUB" claude.log "claude-sonnet-5-5" "/plan uses the sonnet-5-5 autonomous pin"
+bpt_log_has  "$STUB" claude.log "--effort high" "/plan pins --effort high"
 bpt_log_has  "$STUB" transition.log " 9 planned" "new plan file → transition planned"
 bpt_log_lacks "$STUB" claude.log "post-plan-now" "no post-plan spawned"
 if grep -q -- '--implement' "$STUB/claude.log" && ! grep -q 'post-plan' "$STUB/claude.log"; then

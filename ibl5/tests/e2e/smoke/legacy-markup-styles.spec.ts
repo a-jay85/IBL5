@@ -141,3 +141,29 @@ test.describe('Legacy PHP-Nuke scaffold styling', () => {
     await expect(page.locator('#site-content center')).toHaveCount(0);
   });
 });
+
+// The Player and FreeAgencyPreview error paths are unreachable anonymously, so
+// this proves the compiled-stylesheet contract with injected probe elements.
+test('utility classes replacing module inline styles win the cascade', async ({ page }) => {
+  await gotoWithRetry(page, 'index.php');
+  await page.evaluate(() => {
+    const root = document.getElementById('site-content');
+    if (!root) return;
+    const btn = document.createElement('a');
+    btn.className = 'ibl-btn ibl-btn--primary mt-2 inline-block';
+    btn.id = 'vr-probe-btn';
+    btn.textContent = 'Go Back';
+    const p = document.createElement('p');
+    p.className = 'text-center p-8';
+    p.id = 'vr-probe-p';
+    p.textContent = 'x';
+    root.append(btn, p);
+  });
+
+  // base.css sets the root font size to 18px, so mt-2 (0.5rem) is 9px and
+  // p-8 (2rem) is 36px, the same as the inline rem values they replace.
+  await expect(page.locator('#vr-probe-btn')).toHaveCSS('display', 'inline-block');
+  await expect(page.locator('#vr-probe-btn')).toHaveCSS('margin-top', '9px');
+  await expect(page.locator('#vr-probe-p')).toHaveCSS('text-align', 'center');
+  await expect(page.locator('#vr-probe-p')).toHaveCSS('padding-top', '36px');
+});

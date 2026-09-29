@@ -167,3 +167,25 @@ test('utility classes replacing module inline styles win the cascade', async ({ 
   await expect(page.locator('#vr-probe-p')).toHaveCSS('text-align', 'center');
   await expect(page.locator('#vr-probe-p')).toHaveCSS('padding-top', '36px');
 });
+
+test.describe('Standalone error pages', () => {
+  test('error page fills viewport via full-height class and uses copied tokens', async ({ page }) => {
+    await page.goto('error-pages/404.html');
+    await expect(page.locator('html')).toHaveClass(/full-height/);
+    const geometry = await page.evaluate(() => ({
+      hasStyle: document.documentElement.hasAttribute('style'),
+      fillsViewport:
+        Math.abs(document.documentElement.getBoundingClientRect().height - window.innerHeight) < 1,
+    }));
+    expect(geometry.hasStyle).toBe(false);
+    expect(geometry.fillsViewport).toBe(true);
+    await expect(page.locator('body')).toHaveCSS('color', 'rgb(55, 65, 81)');
+  });
+
+  test('error page dark scheme uses copied tokens', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.goto('error-pages/404.html');
+    await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(0, 0, 0)');
+    await expect(page.locator('body')).toHaveCSS('color', 'rgb(209, 213, 219)');
+  });
+});

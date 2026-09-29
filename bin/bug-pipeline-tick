@@ -1275,8 +1275,9 @@ ci_log() {
 ci_lock_acquire() {
     if [ -d "$CI_AUTOFIX_LOCK" ]; then
         local lock_mtime now
-        lock_mtime="$(stat -f '%m' "$CI_AUTOFIX_LOCK" 2>/dev/null || \
-                      stat -c '%Y' "$CI_AUTOFIX_LOCK" 2>/dev/null || echo 0)"
+        # GNU stat -c %Y runs first: GNU `stat -f` succeeds on a file (filesystem status), so BSD-first never falls back.
+        lock_mtime="$(stat -c '%Y' "$CI_AUTOFIX_LOCK" 2>/dev/null || \
+                      stat -f '%m' "$CI_AUTOFIX_LOCK" 2>/dev/null || echo 0)"
         now="$(date +%s)"
         if [ $(( now - lock_mtime )) -gt "$CI_AUTOFIX_TIMEOUT_SECS" ]; then
             ci_log "ci_lock_acquire: stale lock (age $(( now - lock_mtime ))s) — cleaning"

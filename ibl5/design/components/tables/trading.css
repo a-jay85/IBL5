@@ -169,7 +169,7 @@
 .ibl-link {
     color: var(--navy-700);
     text-decoration: none;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     transition: color var(--transition-fast);
 }
 
@@ -250,7 +250,7 @@
         color-mix(in srgb, var(--team-color-primary) 70%, black));
     color: var(--team-color-secondary, white);
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: 1rem;
     letter-spacing: var(--tracking-display);
     cursor: pointer;

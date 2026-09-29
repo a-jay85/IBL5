@@ -33,7 +33,7 @@ body:has(> .updater) {
 .updater__title {
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-eyebrow);
     color: var(--gray-800);
@@ -53,7 +53,7 @@ body:has(> .updater) {
 .updater-section__label {
     font-family: var(--font-display);
     font-size: var(--text-2xs);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-eyebrow);
     color: var(--gray-400);
@@ -72,7 +72,7 @@ body:has(> .updater) {
 
 .updater-init__check {
     color: var(--success-500);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: var(--text-xs);
 }
 
@@ -87,7 +87,7 @@ body:has(> .updater) {
     gap: var(--space-2);
     padding: var(--space-1) 0;
     font-size: 1rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--gray-700);
 }
 
@@ -95,7 +95,7 @@ body:has(> .updater) {
 
 .updater-step--running {
     color: var(--gray-400);
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
 }
 
 /* Hide running indicator once its step completes (progressive output keeps both in DOM) */
@@ -109,7 +109,7 @@ body:has(> .updater) {
     flex-shrink: 0;
     width: 0.875rem;
     text-align: center;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: var(--text-sm);
     line-height: 1;
 }
@@ -148,7 +148,7 @@ body:has(> .updater) {
 
 .updater-step__detail {
     font-size: var(--text-sm);
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
     color: var(--gray-400);
 }
 
@@ -163,7 +163,7 @@ body:has(> .updater) {
 .updater-step__error {
     flex-basis: 100%;
     font-size: var(--text-sm);
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
     color: var(--error-600);
     padding: var(--space-1) 0 var(--space-1) calc(0.875rem + var(--space-2));
 }
@@ -187,7 +187,7 @@ body:has(> .updater) {
 .updater-log b,
 .updater-log strong {
     color: var(--gray-600);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .updater-log font[color="red"],
@@ -208,7 +208,7 @@ body:has(> .updater) {
 
 .updater-details__summary {
     cursor: pointer;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--gray-500);
     user-select: none;
     list-style: none;
@@ -258,7 +258,7 @@ body:has(> .updater) {
 .updater-summary__status {
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-eyebrow);
 }

@@ -33,7 +33,7 @@
     align-items: baseline;
     gap: .35rem;
     font-family: var(--font-display);
-    font-weight: 800;
+    font-weight: var(--font-weight-extrabold);
     font-size: 1.6rem;
     line-height: 1;
     letter-spacing: .04em;
@@ -42,7 +42,7 @@
 .last-sim-recap__sub {
     font-family: var(--font-mono);
     font-size: .667rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: rgba(255, 255, 255, .55);
     letter-spacing: .12em;
     text-transform: uppercase;
@@ -60,7 +60,7 @@
     text-transform: uppercase;
     letter-spacing: .1em;
 }
-.last-sim-recap__meta-value { color: var(--white); font-weight: 700 }
+.last-sim-recap__meta-value { color: var(--white); font-weight: var(--font-weight-bold) }
 .last-sim-recap__meta-bw {
     display: flex;
     flex-direction: column;
@@ -145,14 +145,14 @@
 .last-sim-recap__tab-where {
     font-family: var(--font-mono);
     font-size: .667rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--gray-400);
     letter-spacing: .1em;
     text-transform: uppercase;
 }
 .last-sim-recap__tab-opp {
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: .95rem;
     text-transform: uppercase;
     letter-spacing: .02em;
@@ -174,7 +174,7 @@
     margin-left: auto;
     font-family: var(--font-mono);
     font-size: .667rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--gray-500);
     text-transform: uppercase;
     letter-spacing: .08em;
@@ -187,7 +187,7 @@
     align-items: baseline;
     gap: 6px;
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: 1.35rem;
     line-height: 1;
     color: var(--navy-900);
@@ -197,7 +197,7 @@
 .last-sim-recap__tab-num-top::after { content: "\2013" }
 .last-sim-recap__tab-wl {
     font-family: var(--font-display);
-    font-weight: 800;
+    font-weight: var(--font-weight-extrabold);
     font-size: 1.35rem;
     line-height: 1;
     color: var(--success-600);
@@ -223,7 +223,7 @@
     color: var(--white);
     font-family: var(--font-mono);
     font-size: 9px;
-    font-weight: 800;
+    font-weight: var(--font-weight-extrabold);
     line-height: 1;
 }
 
@@ -250,7 +250,7 @@
 }
 .last-sim-recap__verdict {
     font-family: var(--font-display);
-    font-weight: 800;
+    font-weight: var(--font-weight-extrabold);
     font-size: 1.15rem;
     letter-spacing: .06em;
     text-transform: uppercase;
@@ -259,7 +259,7 @@
 .last-sim-recap__vs {
     font-family: var(--font-mono);
     font-size: .74rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: rgba(255, 255, 255, .85);
     letter-spacing: .06em;
     text-transform: uppercase;
@@ -305,7 +305,7 @@
     margin: 0;
     padding: 0 0 .5rem;
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: .78rem;
     text-transform: uppercase;
     letter-spacing: .08em;
@@ -319,7 +319,7 @@
 .last-sim-recap__box-link {
     font-family: var(--font-mono);
     font-size: .65rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: .1em;
     color: var(--accent-500);
@@ -346,7 +346,7 @@
 }
 .last-sim-recap__final-name {
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: 1.05rem;
     text-transform: uppercase;
     letter-spacing: .02em;
@@ -359,7 +359,7 @@
     margin-top: 3px;
     font-family: var(--font-mono);
     font-size: .667rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--gray-500);
     letter-spacing: .06em;
     text-transform: uppercase;
@@ -367,7 +367,7 @@
 .last-sim-recap__final-pts {
     position: relative;
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: 1.75rem;
     color: var(--gray-400);
     line-height: .95;
@@ -459,7 +459,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     text-align: center;
     font-family: var(--font-mono);
     font-size: .667rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--navy-900);
 }
 .last-sim-recap__mom-bar-val--pos { bottom: calc(50% + var(--last-sim-recap-bar-h, 0px) + 2px) }
@@ -492,7 +492,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     gap: .45rem;
     font-family: var(--font-mono);
     font-size: .667rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: .1em;
     color: var(--gray-500);
@@ -509,7 +509,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     padding: .18rem 0;
 }
 .last-sim-recap__inj-pname {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-size: .86rem;
     color: var(--navy-800);
     line-height: 1.15;
@@ -519,7 +519,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     margin-right: 6px;
     font-family: var(--font-mono);
     font-size: .667rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--gray-500);
     background: var(--gray-100);
     padding: 1px 5px;
@@ -538,7 +538,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     color: var(--white);
     font-family: var(--font-mono);
     font-size: 9px;
-    font-weight: 800;
+    font-weight: var(--font-weight-extrabold);
     margin-left: 5px;
     line-height: 1;
     vertical-align: 3px;
@@ -551,20 +551,20 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     color: var(--gray-500);
     text-transform: uppercase;
     letter-spacing: .06em;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 .last-sim-recap__inj-row--new .last-sim-recap__inj-why { color: var(--error-600) }
 .last-sim-recap__inj-eta {
     font-family: var(--font-mono);
     font-size: .72rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--gray-700);
     text-align: right;
     letter-spacing: .04em;
     white-space: nowrap;
 }
 .last-sim-recap__inj-row--new .last-sim-recap__inj-eta { color: var(--error-600) }
-.last-sim-recap__eta-num { color: var(--navy-900); font-weight: 800 }
+.last-sim-recap__eta-num { color: var(--navy-900); font-weight: var(--font-weight-extrabold) }
 .last-sim-recap__inj-row--new .last-sim-recap__eta-num { color: var(--error-600) }
 .last-sim-recap__inj-divider { display: none }
 .last-sim-recap__inj-group + .last-sim-recap__inj-divider + .last-sim-recap__inj-group {
@@ -580,7 +580,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
 .last-sim-recap__inj-healthy {
     margin-left: auto;
     color: var(--gray-500);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     font-style: italic;
 }
 
@@ -602,7 +602,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     justify-content: center;
     font-family: var(--font-mono);
     font-size: .667rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--gray-500);
     text-transform: uppercase;
     letter-spacing: .12em;
@@ -654,12 +654,12 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     justify-content: center;
     font-family: var(--font-mono);
     font-size: 7px;
-    font-weight: 800;
+    font-weight: var(--font-weight-extrabold);
     line-height: 1;
 }
 .last-sim-recap__player-name {
     font-size: .86rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--navy-800);
     line-height: 1.1;
     white-space: nowrap;
@@ -670,7 +670,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
 }
 .last-sim-recap__player-statline {
     font-size: .75rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--navy-900);
     text-align: right;
     white-space: nowrap;

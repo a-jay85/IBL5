@@ -84,7 +84,7 @@
 /* Cap space footer */
 .ibl-data-table td.cap-footer-label {
     text-align: right;
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
 }
 .cap-footer-spacer {
     background-color: var(--team-row-highlight-bg);
@@ -138,7 +138,7 @@ table.sortable thead th {
 
 /* Career/total row bold styling */
 .career-row {
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
 }
 
 /* Salary year columns — right-aligned (shared between Contracts and Free Agency) */
@@ -171,7 +171,7 @@ table.sortable thead th {
     background-color: inherit;
     color: var(--accent-700);
     text-decoration-line: none;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     white-space: nowrap;
     align-items: center;
     justify-content: center;

@@ -43,7 +43,7 @@
  * are unaffected.
  */
 .csv-import form label:not(.ibl-btn) {
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
     white-space: nowrap;
 }
 
@@ -136,7 +136,7 @@
 }
 
 .csv-import .skipped-table th {
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
 }
 
 /*

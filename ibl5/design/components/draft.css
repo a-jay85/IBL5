@@ -20,7 +20,7 @@
 
 .draft-error a {
     color: var(--error-600);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .draft-table input[type="radio"] {

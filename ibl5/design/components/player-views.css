@@ -33,27 +33,27 @@
 .player-table-header {
     background-color: var(--player-legacy-header);
     color: white;
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
     text-align: center;
 }
 
 /* Bold row for career/total summaries */
 .player-table-row-bold {
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
 }
 
 .player-table th {
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
 }
 
 .content-header {
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
     text-align: center;
 }
 
 .player-table ~ .section-title {
     font-size: 2em;
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
     text-align: center;
     margin: 1em 0;
 }
@@ -76,7 +76,7 @@
 
 .allstar-table th {
     text-align: center;
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
     padding: 4px 8px;
 }
 
@@ -129,7 +129,7 @@
 .renegotiation-button a {
     color: white;
     text-decoration: none;
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
 }
 
 .rookie-option-button {
@@ -139,7 +139,7 @@
 .rookie-option-button a {
     color: var(--black);
     text-decoration: none;
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
 }
 
 .rookie-option-img {

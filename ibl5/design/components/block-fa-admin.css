@@ -78,17 +78,17 @@ td, th {
 }
 .message-success {
     color: #007bff;
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
 }
 .message-error {
     color: #dc3545;
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
 }
 .block-fa-day-banner {
     color: red;
 }
 .block-fa-row-bold {
-    font-weight: bold;
+    font-weight: var(--font-weight-bold);
 }
 .block-fa-reject-header {
     color: red;

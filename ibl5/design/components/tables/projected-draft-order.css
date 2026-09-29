@@ -161,7 +161,7 @@
 /* +/- spots moved relative to the projected order (finalized picks only) */
 .draft-movement {
     font-size: var(--text-xs);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     margin-left: 0.25rem;
 }
 

@@ -353,14 +353,16 @@ class ExtensionServiceTest extends TestCase
             $season
         );
 
-        /** @var array<string, mixed>|null $captured */
-        $captured = null;
-        $evaluator = self::createStub(ExtensionOfferEvaluatorInterface::class);
-        $evaluator->method('evaluateOffer')
-            ->willReturnCallback(function (array $offer, array $demands, array $teamFactors, array $prefs) use (&$captured): array {
-                $captured = $teamFactors;
-                return (new ExtensionOfferEvaluator())->evaluateOffer($offer, $demands, $teamFactors, $prefs);
-            });
+        $evaluator = new class extends ExtensionOfferEvaluator {
+            /** @var array<string, mixed>|null */
+            public ?array $captured = null;
+
+            public function evaluateOffer(array $offer, array $demands, array $teamFactors, array $playerPreferences): array
+            {
+                $this->captured = $teamFactors;
+                return parent::evaluateOffer($offer, $demands, $teamFactors, $playerPreferences);
+            }
+        };
 
         $service = new ExtensionService(
             $this->mockDb,
@@ -380,8 +382,8 @@ class ExtensionServiceTest extends TestCase
         ]);
 
         $this->assertTrue($result['success']);
-        $this->assertIsArray($captured);
-        $this->assertSame($expected, $captured['money_committed_at_position']);
+        $this->assertIsArray($evaluator->captured);
+        $this->assertSame($expected, $evaluator->captured['money_committed_at_position']);
     }
 
     /**

@@ -262,9 +262,30 @@ bd_cost_for() {
     fi
 }
 
+# bd_load_repo_files — one `git ls-files` per run into a C-sorted list at $BD_REPO_FILES
+bd_load_repo_files() {
+    BD_REPO_FILES="$BD_TMP/repo-files.txt"
+    local raw="$BD_TMP/repo-files.raw" rc=0
+    "$BD_GIT" -C "$BD_REPO_ROOT" ls-files > "$raw" 2>/dev/null || rc=$?
+    [ "$rc" -eq 0 ] || bd_die 3 "git ls-files failed (exit $rc)"
+    LC_ALL=C sort -u "$raw" > "$BD_REPO_FILES"
+    [ -s "$BD_REPO_FILES" ] || bd_die 3 "git ls-files listed no files"
+}
+
 # bd_paths_for <body> — sets _bd_paths (newline-sep file paths, sorted -u)
 bd_paths_for() {
-    _bd_paths="$(grep -oE "$FILE_LINE_RE" <<< "$1" | sed 's/:[0-9]*$//' | sort -u)"
+    [ -n "${BD_REPO_FILES:-}" ] || bd_die 3 "bd_paths_for called before bd_load_repo_files"
+    local fl bare
+    fl="$(grep -oE "$FILE_LINE_RE" <<< "$1" | sed 's/:[0-9]*$//')" || true
+    bare="$(grep -oE '[A-Za-z0-9_./-]*/[A-Za-z0-9_./-]*' <<< "$1" \
+        | sed -e 's#^\./##' -e 's/[.,;]*$//' | LC_ALL=C sort -u \
+        | LC_ALL=C comm -12 - "$BD_REPO_FILES")" || true
+    _bd_paths="$(printf '%s\n%s\n' "$fl" "$bare" | grep -v '^$' | LC_ALL=C sort -u)" || true
+}
+
+# bd_batch_holders <picked_rows> — "#A #B+#C" in pick order (col 2 = partner, 0 = none)
+bd_batch_holders() {
+    awk -F'\t' 'NF { printf "%s#%s%s", sep, $1, ($2 != "0" ? "+#" $2 : ""); sep = " " }' <<< "$1"
 }
 
 # bd_has_overlap <paths> <held_tsv_file> — print "path<TAB>holder_num"; exit 1 if none
@@ -334,6 +355,7 @@ bd_cmd_burndown() {
     local inflight_file="$BD_TMP/inflight.tsv"
     touch "$inflight_file"
     bd_inflight "$inflight_file"
+    bd_load_repo_files
 
     # 3. Main selection loop — sorted by rank so P1 is always before P2-P4
     local sorted_tsv
@@ -380,6 +402,7 @@ bd_cmd_burndown() {
         # --- Verdicts for primary candidate (and partner if pair) ---
         local skip_reason=""
         local p_skip_reason=""  # partner's skip reason
+        local solo=0
 
         # Check primary: stale?
         local upd title body
@@ -402,7 +425,15 @@ bd_cmd_burndown() {
         if [ -z "$skip_reason" ]; then
             bd_paths_for "$body"
             paths="$_bd_paths"
-            [ -n "$paths" ] || skip_reason="no file:line refs (overlap unknowable)"
+            if [ -z "$paths" ]; then
+                if [ "$is_pair" -eq 1 ]; then
+                    skip_reason="solo slot: pairs cannot take it (#$num has no path refs)"
+                elif [ -n "$picked_rows" ]; then
+                    skip_reason="solo slot: no path refs; batch already holds $(bd_batch_holders "$picked_rows")"
+                else
+                    solo=1
+                fi
+            fi
         fi
 
         # Check primary: overlap?
@@ -439,7 +470,7 @@ bd_cmd_burndown() {
                 if [ -z "$p_skip_reason" ]; then
                     bd_paths_for "$p_body"
                     local p_paths="$_bd_paths"
-                    [ -n "$p_paths" ] || p_skip_reason="pair: #$partner no file:line refs"
+                    [ -n "$p_paths" ] || p_skip_reason="pair: #$partner solo slot: no path refs (pairs cannot take it)"
                 fi
                 if [ -z "$p_skip_reason" ]; then
                     local p_conflict=""
@@ -492,7 +523,7 @@ bd_cmd_burndown() {
 
         # PICK
         printf '%-5s #%-5s %-3s %-4s %s\n' "PICK" "$num" "$rank" "$cost" \
-            "tier=${tier}${partner:+ +#$partner}"
+            "tier=${tier}${partner:+ +#$partner}$([ "$solo" -eq 1 ] && printf ' solo')"
         if [ "$is_pair" -eq 1 ]; then
             local p_rank
             p_rank="$(awk -F'\t' -v n="$partner" '$1==n{print $2;exit}' <<< "$BD_REPORT_TSV")"
@@ -522,6 +553,7 @@ bd_cmd_burndown() {
         picked_rows="${picked_rows}${num}	${also_c}	${rank}	${cost}	${tier}	${title}	${all_paths//$'\n'/|}"$'\n'
 
         [ "$used" -lt "$BD_BUDGET" ] || done_flag=1
+        [ "$solo" -eq 0 ] || done_flag=1
     done <<< "$sorted_tsv"
 
     # Unranked open issues

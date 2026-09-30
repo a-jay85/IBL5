@@ -501,13 +501,19 @@ OUT="$(bd_b 2>&1)"; RC=$?
 want "C19: #31 overlap with #30 on bin/foo" "$OUT" "overlap"
 grep -qE 'SKIP\s+#31.*overlap.*#30' <<< "$OUT" && ok "C19: #31 cites #30" || fail "C19: #31 cites #30"
 
-# ── C20: no file:line refs ────────────────────────────────────────────────────
+# ── C20: lone no-path issue takes the solo slot ───────────────────────────────
 cat > "$T/fx/issues.json" <<'JSON'
 [{"number":35,"title":"Thirty-five noref","body":"This issue has no code refs","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}]
 JSON
 OUT="$(bd_b 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && ok "C20: no refs exits 0" || fail "C20: no refs exits 0 (got $RC)"
-want "C20: SKIP no file:line refs" "$OUT" "no file:line refs"
+grep -qE 'PICK +#35 .*solo' <<< "$OUT" && ok "C20: PICK #35 solo" \
+    || fail "C20: PICK #35 solo (got: $OUT)"
+want "C20: units 1/5" "$OUT" "units: 1/5"
+C20_LEDGER="$(grep '^LEDGER:' <<< "$OUT" | tail -1 | sed 's/^LEDGER: //')"
+[ "$(jq -c '.items[0].paths' "$C20_LEDGER" 2>/dev/null)" = "[]" ] \
+    && ok "C20: solo ledger item paths empty" || fail "C20: solo ledger item paths empty"
+C49_ALL="$OUT"
 
 # ── C21: stale-rank and unranked ──────────────────────────────────────────────
 cat > "$T/fx/issues.json" <<'JSON'
@@ -548,6 +554,163 @@ OUT="$(bd burndown --pair 50,51 2>&1)"; RC=$?
 grep -qE '^SKIP +#50 .*pair:' <<< "$OUT" && ok "C22b: #50 SKIP with pair:" || fail "C22b: #50 SKIP with pair: (got: $OUT)"
 grep -qE '^SKIP +#51 .*pair:' <<< "$OUT" && ok "C22b: #51 SKIP with pair:" || fail "C22b: #51 SKIP with pair: (got: $OUT)"
 echo '[]' > "$T/fx/prs-open.json"
+
+# ── C48: bare repo paths join the overlap key set ─────────────────────────────
+# Unit seam: run bd_load_repo_files + bd_paths_for in a subshell, print _bd_paths.
+bd_paths_probe() (
+    eval "$(grep -E '^FILE_LINE_RE=' "$SCRIPT")"
+    # shellcheck source=/dev/null
+    . "$(dirname "$SCRIPT")/lib/burndown.sh"
+    BD_TMP="$(mktemp -d)"
+    trap 'rm -rf "$BD_TMP"' EXIT
+    # shellcheck disable=SC2034  # read by bd_load_repo_files
+    BD_GIT=git
+    # shellcheck disable=SC2034
+    BD_REPO_ROOT="$(cd "$(dirname "$SCRIPT")/.." && pwd)"
+    bd_load_repo_files
+    bd_paths_for "$1"
+    # shellcheck disable=SC2154  # _bd_paths is set by bd_paths_for
+    printf '%s' "$_bd_paths"
+)
+[ "$(bd_paths_probe "see bin/lib/burndown.sh.")" = "bin/lib/burndown.sh" ] \
+    && ok "C48a: bare tracked path counted, period stripped" \
+    || fail "C48a: bare tracked path counted, period stripped"
+[ -z "$(bd_paths_probe "and/or https://github.com/a-jay85/IBL5/pull/12 bin/no-such-dir/x.sh")" ] \
+    && ok "C48b: nonexistent slash tokens ignored" \
+    || fail "C48b: nonexistent slash tokens ignored"
+[ "$(bd_paths_probe "bin/a:1 only")" = "bin/a" ] \
+    && ok "C48c: path:line of a nonexistent file still counts" \
+    || fail "C48c: path:line of a nonexistent file still counts"
+[ "$(bd_paths_probe "bin/backlog:12 and ./bin/backlog")" = "bin/backlog" ] \
+    && ok "C48d: bare plus path:line dedupe, ./ stripped" \
+    || fail "C48d: bare plus path:line dedupe, ./ stripped"
+
+# C48e: bare path creates overlap between two issues
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"touches bin/lib/burndown.sh","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"bin/lib/burndown.sh:5 fix","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+grep -qE 'SKIP +#101 .*overlap with #100 on bin/lib/burndown.sh' <<< "$OUT" \
+    && grep -qE 'PICK +#100' <<< "$OUT" \
+    && ok "C48e: bare path creates overlap" || fail "C48e: bare path creates overlap (got: $OUT)"
+
+# C48f: pair partner's bare path lands in the ledger paths
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"bin/p1:1","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"see bin/backlog","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+OUT="$(bd burndown --pair 100,101 2>&1)"; RC=$?
+C48F_LEDGER="$(grep '^LEDGER:' <<< "$OUT" | tail -1 | sed 's/^LEDGER: //')"
+[ "$(jq -c '.items[0].paths' "$C48F_LEDGER" 2>/dev/null)" = '["bin/backlog","bin/p1"]' ] \
+    && ok "C48f: pair partner bare path in ledger" \
+    || fail "C48f: pair partner bare path in ledger (got: $OUT)"
+
+# C48g / C48h: git ls-files failure and empty list die 3
+for kind in lsfail lsempty; do
+    cat > "$T/git-$kind" <<STUB
+#!/usr/bin/env bash
+case "\$*" in
+    *"worktree list --porcelain"*)
+        cat "\${GH_FX_DIR:-/dev/null}/worktrees.txt" 2>/dev/null || true
+        ;;
+    *) $([ "$kind" = lsfail ] && echo 'exit 1' || echo 'exit 0') ;;
+esac
+STUB
+    chmod +x "$T/git-$kind"
+    OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+        BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git-$kind" BURNDOWN_TIER_HINT="$T/tier" \
+        HOME="$T/home" "$SCRIPT" burndown 2>&1)"; RC=$?
+    if [ "$kind" = lsfail ]; then
+        [ "$RC" -eq 3 ] && grep -qF 'git ls-files failed' <<< "$OUT" \
+            && ok "C48g: git ls-files failure exits 3" \
+            || fail "C48g: git ls-files failure exits 3 (got $RC: $OUT)"
+    else
+        [ "$RC" -eq 3 ] && grep -qF 'git ls-files listed no files' <<< "$OUT" \
+            && ok "C48h: empty file list exits 3" \
+            || fail "C48h: empty file list exits 3 (got $RC: $OUT)"
+    fi
+done
+
+# ── C49: solo batch slot for no-path issues ───────────────────────────────────
+# C49a: empty-batch no-path issue is picked alone and closes the batch
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"no refs here","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"bin/lib/burndown.sh:1","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":102,"title":"Hundred-two","body":"bin/backlog:1","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+C49_ALL="$C49_ALL"$'\n'"$OUT"
+grep -qE 'PICK +#100 .*solo' <<< "$OUT" && ok "C49a: PICK #100 solo" || fail "C49a: PICK #100 solo (got: $OUT)"
+want "C49a: units 1/5" "$OUT" "units: 1/5"
+want "C49a: later candidates not reached" "$OUT" "not reached: 2 candidate(s)"
+grep -qE 'PICK +#101' <<< "$OUT" && fail "C49a: no PICK #101" || ok "C49a: no PICK #101"
+C49E_LEDGER="$(grep '^LEDGER:' <<< "$OUT" | tail -1 | sed 's/^LEDGER: //')"
+# C49e: solo ledger item has paths [] and the batch holds one item
+[ "$(jq -c '.items[0].paths' "$C49E_LEDGER" 2>/dev/null)" = "[]" ] \
+    && [ "$(jq '.items | length' "$C49E_LEDGER" 2>/dev/null)" = "1" ] \
+    && ok "C49e: solo ledger item paths [] and batch length 1" \
+    || fail "C49e: solo ledger item paths [] and batch length 1"
+
+# C49b: no-path issue after a pick is skipped naming the holders
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"bin/backlog:1","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"nothing concrete","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+C49_ALL="$C49_ALL"$'\n'"$OUT"
+grep -qE 'PICK +#100' <<< "$OUT" && ok "C49b: PICK #100" || fail "C49b: PICK #100 (got: $OUT)"
+grep -qE 'SKIP +#101 .*solo slot: no path refs; batch already holds #100' <<< "$OUT" \
+    && ok "C49b: #101 skipped naming holders" || fail "C49b: #101 skipped naming holders (got: $OUT)"
+
+# C49c: a second no-path issue after a solo pick is not picked
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"nothing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"also nothing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+C49_ALL="$C49_ALL"$'\n'"$OUT"
+grep -qE 'PICK +#100 .*solo' <<< "$OUT" && ok "C49c: PICK #100 solo" || fail "C49c: PICK #100 solo (got: $OUT)"
+want "C49c: second no-path not reached" "$OUT" "not reached: 1 candidate(s)"
+grep -qE 'PICK +#101' <<< "$OUT" && fail "C49c: no PICK #101" || ok "C49c: no PICK #101"
+
+# C49d: pairs never take the solo slot
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"bin/backlog:1","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"no path here","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":102,"title":"Hundred-two","body":"no path either","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":103,"title":"Hundred-three","body":"bin/test-burndown:1","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+OUT="$(bd burndown --pair 100,101 2>&1)"; RC=$?
+C49_ALL="$C49_ALL"$'\n'"$OUT"
+grep -qE 'SKIP +#100 .*pair: #101 solo slot' <<< "$OUT" && grep -qE 'SKIP +#101 .*pair: with #100' <<< "$OUT" \
+    && ok "C49d: partner without paths blocks the pair" \
+    || fail "C49d: partner without paths blocks the pair (got: $OUT)"
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+OUT="$(bd burndown --pair 102,103 2>&1)"; RC=$?
+C49_ALL="$C49_ALL"$'\n'"$OUT"
+grep -qE 'SKIP +#102 .*solo slot: pairs cannot take it' <<< "$OUT" \
+    && ok "C49d: path-free primary cannot pair" \
+    || fail "C49d: path-free primary cannot pair (got: $OUT)"
+
+# C49f: the old reason string is gone
+[ "$(grep -c 'no file:line refs' <<< "$C49_ALL")" -eq 0 ] \
+    && ok "C49f: old no-file:line-refs reason never printed" \
+    || fail "C49f: old no-file:line-refs reason never printed"
 
 # ── C23: rejected flag forms ──────────────────────────────────────────────────
 rm -f "$T/gh.log"

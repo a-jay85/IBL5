@@ -333,6 +333,9 @@ rc3_sandbox() {
     NIGHTLY_DIR="$SB/nightly"; QUEUE_DIR="$NIGHTLY_DIR/queue"
     mkdir -p "$SB/run-dir/bin" "$SB/worktree" "$SB/plans" "$SB/handoff" "$QUEUE_DIR"
     LOG="$SB/log"; : > "$LOG"
+    # Optional: PRE_LOG lands in the log BEFORE the phase starts (a stale block);
+    # STUB_EXTRA is printed by the stub in the phase (a fresh block).
+    if [ -n "${PRE_LOG:-}" ]; then printf '%s\n' "$PRE_LOG" >> "$LOG"; fi
     HANDOFF_DIR="$SB/handoff"
     PLAN_NAME="test-plan.md"; PLAN_SLUG="test-plan"
     HANDOFF_FILE="$HANDOFF_DIR/$PLAN_NAME.json"
@@ -350,9 +353,12 @@ rc3_sandbox() {
     MIN_VIABLE_SECS=60; STALL_KILL_SECS=1800
     printf '{"worktree": "%s"}\n' "$SB/worktree" > "$HANDOFF_FILE"
     STUB_RECORD="$SB/stub-record"; : > "$STUB_RECORD"
+    : > "$SB/stub-extra"
+    if [ -n "${STUB_EXTRA:-}" ]; then printf '%s\n' "$STUB_EXTRA" > "$SB/stub-extra"; fi
     cat > "$SB/run-dir/post-plan-now" <<STUBEOF
 #!/bin/sh
 printf 'STUB-INVOKED\n' >> "$STUB_RECORD"
+cat "$SB/stub-extra"
 [ "$print_result" = yes ] && printf '%s\n' '$RC3_RESULT_LINE'
 exit $stub_rc
 STUBEOF
@@ -390,6 +396,7 @@ assert_eq "$(yn test -L "$QUEUE_DIR/$PLAN_NAME")" "no" "row 12: plan no longer i
 RPT=$(skipped_report)
 assert_eq "$(yn test -n "$RPT")" "yes" "row 12: skipped report written"
 assert_contains "$(cat "$RPT" 2>/dev/null)" "$RC3_RESULT_LINE" "row 12: report quotes the RESULT: line"
+assert_contains "$(cat "$RPT" 2>/dev/null)" "was skipped. It did not ship" "row 12: report opens in plain words"
 assert_eq "$(yn test -e "$CAP_REFUND_FILE")" "no" "row 12: no .cap-refunds left in QUEUE_DIR"
 assert_eq "$(count_envstop)" "0" "row 12: no env-stop report"
 assert_eq "$(yn test -e "$ATTEMPT_FILE")" "no" "row 12: attempt file removed (not refunded)"
@@ -409,6 +416,64 @@ run_span "$PP_TERMINAL_SPAN"
 assert_eq "$SPAN_RC" "0" "row 12b: no-RESULT grep miss does not abort under set -e"
 assert_eq "$(yn test -L "$NIGHTLY_DIR/skipped/$PLAN_NAME")" "yes" "row 12b: plan still dispositioned to skipped/"
 assert_contains "$(cat "$(skipped_report)" 2>/dev/null)" "printed no RESULT: line" "row 12b: report carries fallback text"
+rm -rf "$SB"
+
+# --- Row 12d: the block post-plan-now printed is lifted into the report, markers dropped ---
+STUB_EXTRA='=== post-plan blocked ship ===
+test-plan did not ship. No PR opened.
+
+Why: BLOCKMARK-D reason line.
+
+Fix:
+  1. cd /wt
+  2. bin/post-plan-now
+
+Log: /tmp/x.log
+=== end blocked ship ==='
+rc3_sandbox 3 yes
+unset STUB_EXTRA
+run_span "$PP_TERMINAL_SPAN"
+RPT=$(skipped_report)
+assert_contains "$(cat "$RPT" 2>/dev/null)" "Why: BLOCKMARK-D reason line." "row 12d: report carries the block text"
+assert_contains "$(cat "$RPT" 2>/dev/null)" "Result line: $RC3_RESULT_LINE" "row 12d: report keeps the RESULT: line"
+# The log tail below still shows the raw markers; only the block section must be marker-free.
+assert_eq "$(sed -n '1,/^## Post-plan log tail/p' "$RPT" | grep -c '^=== ')" "0" "row 12d: no marker lines above the log tail"
+rm -rf "$SB"
+
+# --- Row 12e: no block in the log -> plain fallback block, not an empty gap ---
+rc3_sandbox 3 yes
+run_span "$PP_TERMINAL_SPAN"
+RPT=$(skipped_report)
+assert_contains "$(cat "$RPT" 2>/dev/null)" "test-plan did not ship. No PR opened." "row 12e: fallback block names the plan"
+assert_contains "$(cat "$RPT" 2>/dev/null)" "  3. bin/post-plan-now" "row 12e: fallback block has the re-run step"
+assert_contains "$(cat "$RPT" 2>/dev/null)" "Log: $LOG" "row 12e: fallback block names the log"
+rm -rf "$SB"
+
+# --- Row 12f: a stale block from before this phase is ignored ---
+PRE_LOG='=== post-plan blocked ship ===
+STALEMARK old block from an earlier run
+=== end blocked ship ==='
+rc3_sandbox 3 yes
+unset PRE_LOG
+run_span "$PP_TERMINAL_SPAN"
+RPT=$(skipped_report)
+assert_eq "$(grep -c 'STALEMARK' "$RPT")" "0" "row 12f: stale block is not in the report"
+assert_contains "$(cat "$RPT" 2>/dev/null)" "test-plan did not ship. No PR opened." "row 12f: fallback block used instead"
+rm -rf "$SB"
+
+# --- Row 12g: only the first marker pair in the phase is used ---
+STUB_EXTRA='=== post-plan blocked ship ===
+FIRSTMARK block
+=== end blocked ship ===
+=== post-plan blocked ship ===
+SECONDMARK block
+=== end blocked ship ==='
+rc3_sandbox 3 yes
+unset STUB_EXTRA
+run_span "$PP_TERMINAL_SPAN"
+RPT=$(skipped_report)
+assert_eq "$(sed -n '1,/^## Post-plan log tail/p' "$RPT" | grep -c 'FIRSTMARK')" "1" "row 12g: first block is in the report"
+assert_eq "$(sed -n '1,/^## Post-plan log tail/p' "$RPT" | grep -c 'SECONDMARK')" "0" "row 12g: second block is not in the report body"
 rm -rf "$SB"
 
 # --- Row 12c (negative path): rc=1 fast exit → breaker unchanged ---

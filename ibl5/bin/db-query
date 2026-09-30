@@ -100,8 +100,14 @@ fi
 # Homebrew leaves mariadb unlinked when mysql is also installed (they ship the
 # same binaries), so launchd jobs with a minimal PATH cannot find the host client.
 # db-sync-nightly failed its post-restore assertion every night for this reason.
-if ! command -v mariadb >/dev/null 2>&1 && [ -x /opt/homebrew/opt/mariadb/bin/mariadb ]; then
-    PATH="/opt/homebrew/opt/mariadb/bin:$PATH"
+# Apple Silicon installs under /opt/homebrew, Intel under /usr/local.
+if ! command -v mariadb >/dev/null 2>&1; then
+    for _brew_mariadb in /opt/homebrew/opt/mariadb/bin /usr/local/opt/mariadb/bin; do
+        if [ -x "$_brew_mariadb/mariadb" ]; then
+            PATH="$_brew_mariadb:$PATH"
+            break
+        fi
+    done
 fi
 
 if [ ! -f "$CONFIG" ]; then

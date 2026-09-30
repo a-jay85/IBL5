@@ -28,7 +28,16 @@ W="${TMPDIR:-/tmp}/burndown-run"
 mkdir -p "$W"
 ```
 
-**1. Delta.** Fetch the delta from the last triage report:
+**1. Sweep, then delta.** Sweep every ledger first, then fetch the delta from the last triage report:
+
+```bash
+W="${TMPDIR:-/tmp}/burndown-run"
+bin/backlog burndown-sweep > "$W/sweep.txt"
+```
+
+Exit 0 and exit 1 both continue, and `$W/sweep.txt` goes into the step 6 report. Exit 1
+means at least one item's live state was unknown; the sweep closed nothing for that item.
+Exit 3 stops the run with stderr shown to the user.
 
 ```bash
 bin/backlog burndown-delta > "$W/delta.json"
@@ -65,6 +74,10 @@ bin/backlog burndown [--pair A,B]... | tee "$W/select.txt"
 Parse only the final `LEDGER:` line. `LEDGER: none` means all delta issues are in
 flight or over budget. Show the SKIP rows and stop.
 
+A `SKIP ... skip-label: <label>` row is a tagged item. It consumes no unit. A
+`cleared blocked on #N` line on stderr means the blocking PR closed and the item is
+eligible again.
+
 **5. Per picked item** (read items with `jq .items[]` from the ledger path), in ledger
 order:
 
@@ -81,8 +94,17 @@ bin/backlog burndown-record <ledger> <n> status=closed-fixed
 Freed units are not backfilled; one batch per call.
 
 **Route.** Apply `.claude/rules/work-triage.md` (cite it; do not restate its bar). An
-item you cannot classify: `bin/backlog burndown-record <ledger> <n> status=skipped`
-and report why.
+item you cannot do gets one of three skip forms, then report why:
+
+- Blocked on an open IBL5 PR: `bin/backlog burndown-record <ledger> <n> status=skipped reason=blocked blocked_by=<PR>`.
+  This adds the `blocked` label and posts one comment with the PR number. The label
+  clears itself on a later run once that PR merges or closes.
+- The target files live outside the repo: `bin/backlog burndown-record <ledger> <n> status=skipped reason=out-of-repo`.
+  The `out-of-repo` label stays until a human removes it.
+- Any other reason you cannot classify: plain `status=skipped`.
+
+A `reason=` record that exits 3 means the ledger kept the skip but the tag failed.
+Check `gh auth status`, then rerun `bin/backlog burndown-tag <n> reason=...`.
 
 **Plan route.** Pick a kebab slug. Compose the prompt exactly as
 `.claude/skills/plan-prompt/SKILL.md` does, adding this fixed constraints block:
@@ -92,6 +114,9 @@ and report why.
 > by other batch items: `<paths from every other ledger item>`. Emit `## Backlog
 > issues` with `closes a-jay85/IBL5-backlog#<n>` (plus each `also_closes`). A parser
 > or gate change carries a corpus diff in its verification.
+
+An item with empty `.paths` took the batch's solo slot and is the only item in it, so the
+`Do not touch` list is empty.
 
 Fire `bin/plan-now` in its default queue mode through the plan-prompt skill's fire
 step. Never start automouse early. Then:
@@ -107,6 +132,9 @@ worktree path, the issue body, the liveness evidence, the paths it may touch, an
 rules. Edit only inside the worktree. Run the relevant tests. Leave the tree dirty. Do
 not commit. Never run `bin/post-plan-now`. Reply in one line.
 
+A solo item (empty `.paths`) carries no path list, so the helper prompt says to keep the
+change to the files the issue body names.
+
 When a helper returns, read `git -C <wt> diff --stat` and re-run the helper's named
 test. Only when that passes:
 
@@ -114,6 +142,8 @@ test. Only when that passes:
 (cd <wt> && bin/post-plan-now --auto)
 bin/backlog burndown-record <ledger> <n> route=ad-hoc slug=<slug> status=shipped
 ```
+
+The record omits `pr_url=` because the PR may not exist yet, and the next sweep records it.
 
 A failed item:
 
@@ -129,13 +159,14 @@ Its worktree stays dirty and keeps the issue in flight through the Phase 3c work
 bin/backlog burndown-status <ledger>
 ```
 
-Show this verbatim, plus one line per closed-fixed or skipped item. Tell the user two
-things: run `/burndown` again for the next batch, and run
-`bin/backlog burndown-close-merged` after ad-hoc PRs merge. Ad-hoc PRs carry no
-`Closes` line, so issues stay open until that command runs.
+Show this verbatim, plus one line per closed-fixed or skipped item. Show `$W/sweep.txt`
+above the status table. Tell the user to run `/burndown` again for the next batch.
+Ad-hoc PRs carry no `Closes` line, so their issues close when the next run's sweep sees
+the merge.
 
-`burndown-status` is read-only and safe to re-run anywhere. `burndown-close-merged`
-is the only command that closes issues after merge.
+`burndown-status` is read-only and safe to re-run anywhere. `burndown-sweep` (every
+ledger, run by step 1) and `burndown-close-merged` (one ledger) are the only commands
+that close issues after merge.
 
 ```bash
 rm -rf "$W"

@@ -2229,6 +2229,172 @@ def _pull_url_base(worktree: str | None) -> str:
     return f"https://github.com/{m.group(1)}/pull"
 
 
+_BLOCK_BUDGET = 1800          # bin/discord-dm cuts at 1900; the deferred DM adds a ~55-char prefix
+_BLOCK_MAX_PATHS = 5
+_BLOCK_MAX_PATH_LEN = 120
+
+
+def _dedupe(items: list[str]) -> list[str]:
+    seen: dict[str, None] = {}
+    for it in items:
+        if it and it not in seen:
+            seen[it] = None
+    return list(seen)
+
+
+def _adr_trigger_paths(error: str | None) -> list[str]:
+    """Files from bin/adr-check's `Decision-trigger surfaces detected:` list."""
+    return _dedupe(re.findall(r"(?m)^\s*- \[[^\]]+\] (\S+) —", error or ""))
+
+
+def _conflict_paths(error: str | None) -> list[str]:
+    """Conflicted files: `Merge conflict in <path>` and the merge-tree probe form."""
+    text = error or ""
+    paths = re.findall(r"Merge conflict in (\S+)", text)
+    for m in re.finditer(r"vs origin/master: ([^\n|]*)", text):
+        paths.extend(p.strip() for p in m.group(1).split(","))
+    return _dedupe(paths)
+
+
+def _over_budget_paths(error: str | None) -> list[str]:
+    """Per-file `FAIL  <path>  N bytes` lines; the `aggregate` line has no byte count after the path."""
+    return _dedupe(re.findall(r"(?m)^FAIL  (\S+)  \d+ bytes", error or ""))
+
+
+def _stale_doc_paths(error: str | None) -> list[str]:
+    """Any `.md` path on a line that also mentions last_verified."""
+    paths: list[str] = []
+    for line in (error or "").splitlines():
+        if "last_verified" in line:
+            paths.extend(re.findall(r"[\w./-]+\.md", line))
+    return _dedupe(paths)
+
+
+def _path_lines(paths: list[str], limit: int) -> list[str]:
+    """At most `limit` indented path lines, each cut to _BLOCK_MAX_PATH_LEN, plus `+N more`."""
+    if limit <= 0:
+        return []
+    out = []
+    for p in paths[:limit]:
+        if len(p) > _BLOCK_MAX_PATH_LEN:
+            p = p[:_BLOCK_MAX_PATH_LEN - 1] + "…"
+        out.append(f"  {p}")
+    if len(paths) > limit:
+        out.append(f"  +{len(paths) - limit} more")
+    return out
+
+
+def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
+    """Plain-language message for an exit-3 stop: what broke, the exact fix, where the log is.
+
+    Text only. `verdict_line` stays the one-line machine verdict; this is what a person
+    reads. Paths come from the FULL res.error, never the 300-char `_flat` form. Returns
+    "" for any rc but 3."""
+    if rc != 3:
+        return ""
+    branch = res.slug or "This branch"
+    leaf = (res.slug or "branch").rsplit("/", 1)[-1]
+    wt = worktree or "(the worktree folder)"
+    log = log_path or "(see the run log)"
+    if res.error_kind in ("rebase-conflict", "remote-head-diverged", "llm-usage-limit"):
+        key = res.error_kind
+    elif res.error_kind == "local-gate":
+        key = "gate-" + classify_local_gate_denial(res.error or "")
+    else:
+        key = "unknown"
+    if key == "gate-adr" and res.adr_drafted:
+        key = "gate-adr-drafted"
+
+    err = res.error or ""
+    paths: list[str] = []
+    read_log = "Read the log named on the Log line below and fix what it reports"
+    if key == "gate-adr":
+        why = "This change adds a file that needs a decision record (ADR) before it can ship."
+        paths = _adr_trigger_paths(err)
+        steps = [f'bin/next-adr "{leaf}"',
+                 "Fill in the file it prints, then add its row to the bottom of "
+                 "ibl5/docs/decisions/README.md",
+                 "bin/adr-check --commit"]
+    elif key == "gate-adr-drafted":
+        why = ("This change adds a file that needs a decision record (ADR). A draft is at "
+               f"{res.adr_path}, but it did not pass the check yet.")
+        paths = _adr_trigger_paths(err)
+        steps = [f"Finish the draft at {res.adr_path} and make sure its row is at the "
+                 "bottom of ibl5/docs/decisions/README.md",
+                 "bin/adr-check --commit"]
+    elif key == "gate-stale-base":
+        why = "master moved on GitHub and this branch is behind it."
+        steps = ["git fetch origin master", "git rebase origin/master"]
+    elif key == "gate-byte-budget":
+        why = "A rule file under .claude/rules is over its size limit."
+        paths = _over_budget_paths(err)
+        steps = ["Trim the file(s) above, or move detail into a *-detail.md file next to it",
+                 "bin/check-rules-byte-budget"]
+    elif key == "gate-doc-staleness":
+        why = "A doc changed but its last_verified date was not updated."
+        paths = _stale_doc_paths(err)
+        steps = ["Set last_verified: to today's date in each doc above",
+                 "bin/check-docs --since=master --no-staleness"]
+    elif key == "gate-unknown":
+        why = "A pre-commit or pre-push check refused the commit. The log shows which one."
+        steps = [read_log]
+    elif key == "rebase-conflict":
+        why = "This branch and master both changed the same lines, so the rebase stopped."
+        paths = _conflict_paths(err)
+        steps = ["git fetch origin master", "git rebase origin/master",
+                 "Fix each conflicted file, then run: git add <file> && git rebase --continue"]
+    elif key == "remote-head-diverged":
+        why = ("Someone pushed to this branch on GitHub, so GitHub's copy no longer "
+               "matches this folder.")
+        b = res.slug or "<branch>"
+        steps = ["git fetch origin", f"git log --oneline HEAD..origin/{b}  (shows what was pushed)",
+                 f"git rebase origin/{b}  (keeps their commits; to take GitHub's copy as is "
+                 f"instead, run: git reset --hard origin/{b})"]
+    elif key == "llm-usage-limit":
+        why = "The Claude usage limit was reached before the ship step finished."
+        steps = ["Wait for the limit to reset (the log shows the reset time)"]
+    else:
+        why = "The ship step stopped and the log has the reason."
+        steps = [read_log]
+
+    outcome = (f"PR #{res.pr_number} was not updated." if res.pr_number
+               else "No PR opened.")
+
+    def render(limit: int) -> str:
+        lines = [f"{branch} did not ship. {outcome}", "", f"Why: {why}"]
+        lines.extend(_path_lines(paths, limit))
+        lines += ["", "Fix:", f"  1. cd {wt}"]
+        n = 1
+        for s in steps:
+            n += 1
+            lines.append(f"  {n}. {s}")
+        lines += [f"  {n + 1}. bin/post-plan-now", "",
+                  "Or open Claude in that folder and ask it to fix the ship block.",
+                  f"Log: {log}"]
+        return "\n".join(lines)
+
+    block = render(_BLOCK_MAX_PATHS)
+    if len(block) > _BLOCK_BUDGET:
+        block = render(0)
+    return block
+
+
+BLOCKED_SHIP_FILE = "blocked-ship.txt"
+
+
+def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> None:
+    """Write the human block for bin/post-plan-now to read. rc != 3 writes nothing.
+    Best effort: an OSError is swallowed so this text never changes the exit code."""
+    if rc != 3:
+        return
+    block = human_block(res, rc, worktree or "", os.environ.get("POSTPLAN_LOG_PATH", ""))
+    try:
+        with open(os.path.join(out_dir, BLOCKED_SHIP_FILE), "w") as fh:
+            fh.write(block + "\n")
+    except OSError:
+        pass
+
+
 def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
     """The one line a watcher greps for — printed FIRST, before the stats lines.
 
@@ -2363,6 +2529,7 @@ def main() -> int:
     # First line, so `head -1 <log>` is the whole verdict and bin/watch-run can
     # terminate on it without waiting for the launchd label to disappear.
     print(verdict_line(res, rc, _pull_url_base(args.worktree)))
+    write_blocked_ship(args.out, res, rc, args.worktree)
     print(f"terminal={res.terminal.value} phase5={res.phase5} "
           f"armed={bool(res.arm and res.arm.armed)} findings={len(res.findings)}")
     print(f"llm: {t['llm_invocations']} calls, {t['gross_tokens']} gross tok, "

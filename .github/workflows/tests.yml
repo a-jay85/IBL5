@@ -961,6 +961,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       - name: bin/test-bin-help
         run: bin/test-bin-help
       - name: bin/test-cleanup-safety
@@ -1005,6 +1007,8 @@ jobs:
         run: bin/test-automouse-self-heal
       - name: bin/test-automouse-depends-on
         run: bin/test-automouse-depends-on
+      - name: bin/test-automouse-single
+        run: bin/test-automouse-single
       - name: bin/test-automouse-concurrency
         run: bin/test-automouse-concurrency
       - name: bin/test-automouse-stream-filter
@@ -1072,6 +1076,8 @@ jobs:
 
       - name: bin/test-merge-line-select
         run: bin/test-merge-line-select
+      - name: bin/test-merge-line-watch
+        run: bin/test-merge-line-watch
       - name: bin/test-check-workflow-checkout
         run: bin/test-check-workflow-checkout
       - name: bin/test-check-composite-contracts

@@ -261,6 +261,7 @@ jobs:
             -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
             -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
             -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
+            -e "CI=true" \
             -e "HOME=/tmp" \
             "$PW_IMAGE" \
             npx playwright test --config=playwright.visual.config.ts
@@ -523,6 +524,7 @@ jobs:
             -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
             -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
             -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
+            -e "CI=true" \
             -e "HOME=/tmp" \
             "$PW_IMAGE" \
             npx playwright test --config=playwright.visual.config.ts --update-snapshots

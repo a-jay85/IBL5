@@ -97,6 +97,7 @@ assert_eq "F: exit 1" 1 "$RC"
 # G: update-branch failure is surfaced with the error text.
 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' run "$WATCH" --once
 assert_match "G: failure surfaced" 'update-branch FAILED for #3: boom' "$OUT"
+assert_eq "G: exit 1" 1 "$RC"
 
 # I: skipped PRs print with readable reasons; unknown reasons pass through.
 SEL_OUT=$'action=update\nhead=8\nskipped=12:dirty 13:red 14:weird' run "$WATCH" --once

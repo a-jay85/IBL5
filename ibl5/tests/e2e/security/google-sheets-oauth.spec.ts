@@ -13,6 +13,8 @@ import type { APIRequestContext, Page } from '@playwright/test';
  */
 
 const API_KEYS = 'modules.php?name=ApiKeys';
+// The PHP container has no IBL_TEST_USER_REGULAR, so name the user per request.
+const USER = `username=${encodeURIComponent(process.env.IBL_TEST_USER_REGULAR ?? '')}`;
 
 async function isConfigured(request: APIRequestContext): Promise<boolean> {
   const html = await (await request.get(API_KEYS)).text();
@@ -42,7 +44,7 @@ regularTest.describe('Google sign-in (regular user)', () => {
   regularTest.beforeEach(async ({ page }) => {
     expect(await isConfigured(page.request), 'set GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_TOKEN_KEY for the PHP server').toBe(true);
     // The connect button only renders with no row for this user.
-    await page.request.delete('test-state.php?action=delete-google-sheet-connection');
+    await page.request.delete(`test-state.php?action=delete-google-sheet-connection&${USER}`);
   });
 
   regularTest('google_start with a valid token redirects to Google with state, drive.file scope, consent', async ({ page }) => {
@@ -88,7 +90,7 @@ regularTest.describe('Google sign-in (regular user)', () => {
 
     await expect(page).toHaveURL(/modules\.php\?name=ApiKeys$/);
     await expect(page.locator('#apikeys-flash.ibl-alert--error')).toContainText('expired or invalid');
-    const conn = await page.request.get('test-state.php?action=get-google-sheet-connection');
+    const conn = await page.request.get(`test-state.php?action=get-google-sheet-connection&${USER}`);
     expect(conn.status()).toBe(404);
     expect(google.count).toBe(0);
   });
@@ -108,7 +110,8 @@ publicTest.describe('Google sign-in (anonymous)', () => {
   publicTest('anonymous google_callback renders the login box and no alert', async ({ page }) => {
     await page.goto(`${API_KEYS}&op=google_callback&state=x&code=y`);
 
-    await expect(page.locator('input[type="password"]').first()).toBeVisible();
+    // loginBox() sends anonymous users to the YourAccount login form.
+    await expect(page.locator('#login-username')).toBeVisible();
     await expect(page.locator('#apikeys-flash')).toHaveCount(0);
     await expect(page.locator('#google-sheet-card')).toHaveCount(0);
   });

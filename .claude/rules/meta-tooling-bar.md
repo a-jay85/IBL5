@@ -1,6 +1,6 @@
 ---
 description: Before adding a new hook, CI gate, workflow, or bin/ script, first ask whether an existing one can be extended; quarterly cull retires dead meta-tooling.
-last_verified: 2026-08-08
+last_verified: 2026-09-29
 paths:
   - "bin/**"
   - ".github/workflows/**"
@@ -38,7 +38,7 @@ The teeth are documented hand-run greps, not a maintained script (a `bin/cull-au
 
 - **Orphaned `test-*`** — a `test-*` whose target no longer exists: list `bin/`'s `test-*`, derive each target, confirm it still exists.
 - **Unreferenced gate** — a `check-*` referenced by no `.github/workflows/*.yml`: grep the workflows dir for each `check-*` name; zero hits ⇒ candidate.
-- **Unwired `test-*`** — target still exists, but **no workflow ever runs it**: `for t in bin/test-*; do n=$(basename "$t"); grep -rqF "$n" .github/workflows/ || echo "UNWIRED $n"; done`, then check each hit for an invoking wrapper (a wrapper counts as wired). Such a test passes locally forever and protects nothing — how `bin/test-plan-now` went unrun until 2026-07-28. Disposition: **wire it or retire it**; a test that self-skips off-platform (`bin/test-automouse-single`, macOS-only) is a legitimate stay-unwired, since wiring it to a Linux runner buys a SKIP line. This is the *inverse* of the trap below — it never mandates a new `test-*`, only asks whether an existing one runs.
+- **Unwired `test-*`.** The target still exists, but no workflow ever runs it: `for t in bin/test-*; do n=$(basename "$t"); grep -rqF "$n" .github/workflows/ || echo "UNWIRED $n"; done`. Check each hit for an invoking wrapper (a wrapper counts as wired). Such a test passes locally forever and protects nothing, which is how `bin/test-plan-now` went unrun until 2026-07-28. Disposition: **wire it or retire it**. A test that self-skips off-platform may stay unwired only when every one of its cases needs that platform, so a Linux runner would buy nothing but a SKIP line. When some cases are portable, run those everywhere, print a loud `SKIP:` line for the rest, and wire it: `bin/test-automouse-single` runs cases 4 and 6 on Linux and skips its macOS run-loop cases. This check is the inverse of the trap below. It never mandates a new `test-*` and only asks whether an existing one runs.
 - **Buggy gate/hook** — bugs recorded in memory: still earning its keep, or has its cost outgrown its value?
 - **Dead rule / silent hook** — a rule superseded by another, or a hook that never fires: confirm against recent logs/PRs.
 

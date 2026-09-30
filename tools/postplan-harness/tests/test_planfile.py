@@ -11,7 +11,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import conformance
-from harness.planfile import (EXEMPT_RE, _normalise_cf_path, _strip_fenced,
+from harness.planfile import (EXEMPT_RE, _ABS_PREFIX_RE, _normalise_cf_path,
+                              _strip_fenced,
                               count_executable_matrix_rows,
                               frontmatter_auto_merge_false,
                               frontmatter_autonomy_contract, locate_plan,
@@ -361,6 +362,77 @@ def test_lib_sync(tmp_path):
         "parser divergence\n python: %s\n shell:  %s" % (_classify(AGREEMENT_PLAN), shell))
     assert sum(1 for ln in shell if ln.startswith("EXEMPT:")) == 17
     assert sum(1 for ln in shell if ln.startswith("MUST_APPEAR:")) == 11
+
+
+# backlog#1211: absolute-path parity. Each entry is (path-as-written, expected
+# repo-relative form). The shell lib and _normalise_cf_path must agree on every
+# one. Relative paths are covered by AGREEMENT_PLAN / test_lib_sync.
+ABS_PARITY_CASES = [
+    ("/Users/x/GitHub/IBL5/ibl5/classes/Foo.php", "ibl5/classes/Foo.php"),
+    ("/Users/x/GitHub/IBL5-worktrees/my-slug/bin/check-plan", "bin/check-plan"),
+    ("/a/IBL5/b/IBL5/c", "c"),                      # greedy: LAST root wins
+    ("/a/IBL5-worktrees/slug/IBL5/d", "d"),         # worktree then plain root
+    ("/a/IBL5/IBL5-worktrees/slug/e", "e"),         # plain root then worktree
+    ("/a/IBL5-worktrees/x", "/a/IBL5-worktrees/x"),  # no slash after slug
+    ("/a/IBL5", "/a/IBL5"),                         # no trailing slash
+    ("/a/ibl5/y", "/a/ibl5/y"),                     # case-sensitive
+    ("/Users/x/claude-plans/z.md", "/Users/x/claude-plans/z.md"),  # out-of-repo
+    ("docs/IBL5/rel.md", "docs/IBL5/rel.md"),       # relative: untouched
+]
+
+
+def _abs_plan(cases):
+    body = "".join("- `%s`%s\n" % (p, " (reference)" if i % 2 else "")
+                   for i, (p, _e) in enumerate(cases))
+    return "## Critical Files\n\n" + body
+
+
+def _shell_parse(planfile_path, fn="cf_parse_section"):
+    proc = subprocess.run(
+        ["bash", "-c", 'source "$1" && %s "$2"' % fn, "_", LIB, str(planfile_path)],
+        capture_output=True, text=True, check=True)
+    return [ln for ln in proc.stdout.splitlines() if ln.strip()]
+
+
+def test_lib_sync_absolute_paths(tmp_path):
+    """backlog#1211: shell cf_parse_section strips the same IBL5 prefix _normalise_cf_path does."""
+    plan = _abs_plan(ABS_PARITY_CASES)
+    f = tmp_path / "abs.md"
+    f.write_text(plan)
+    shell = _shell_parse(f)
+    python = _classify(plan)
+    assert python == shell, "parser divergence\n python: %s\n shell:  %s" % (python, shell)
+    # Agreement on the RIGHT answer, not merely mutual agreement.
+    want = [("EXEMPT:" if i % 2 else "MUST_APPEAR:") + e
+            for i, (_p, e) in enumerate(ABS_PARITY_CASES)]
+    assert shell == want
+    for p, e in ABS_PARITY_CASES:
+        assert _normalise_cf_path(p) == e
+    # The raw entry point is the pre-#1211 parser: paths exactly as written.
+    raw = _shell_parse(f, "cf_parse_section_raw")
+    assert raw == [("EXEMPT:" if i % 2 else "MUST_APPEAR:") + p
+                   for i, (p, _e) in enumerate(ABS_PARITY_CASES)]
+
+
+def test_lib_empty_normalisation_divergence_pinned(tmp_path):
+    """A bare root entry: Python yields "", the shell keeps the path as written.
+
+    Deliberate and confined to a plan-authoring defect that gate [F] rejects at
+    plan time. An empty MUST_APPEAR row would be skipped by Phase 5.0 (dropping a
+    hold), so the shell fails closed by leaving the entry unchanged.
+    """
+    root = "/Users/x/GitHub/IBL5/"
+    assert _normalise_cf_path(root) == ""
+    f = tmp_path / "root.md"
+    f.write_text("## Critical Files\n\n- `%s`\n" % root)
+    assert _shell_parse(f) == ["MUST_APPEAR:" + root]
+
+
+def test_lib_abs_prefix_pattern_sync():
+    """Byte-level drift guard for the prefix regex, sibling of test_lib_pattern_sync."""
+    m = re.search(r"^CF_ABS_PREFIX_ERE='([^']+)'", open(LIB).read(), re.M)
+    assert m, "CF_ABS_PREFIX_ERE not found in " + LIB
+    assert _ABS_PREFIX_RE.pattern.replace("(?:", "(") == m.group(1)
 
 
 def test_lib_pattern_sync():

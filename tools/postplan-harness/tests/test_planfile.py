@@ -1617,6 +1617,21 @@ More.
     assert conformance.phase_omission_items(info,["tools/postplan-harness/tests/test_planfile.py"]) == []
 
 
+def test_parse_phases_strips_line_suffix_from_evidence_paths():
+    plan = """
+## Phase 1: Foo
+
+See `bin/check-prose:438-457` and `harness/a.py:120`, also `docs/x.md#L12-L20`.
+
+## Phase 2: Bar
+
+Edit `harness/c.py:10-20` then `harness/c.py:300` again.
+"""
+    phases = parse_phases(plan)
+    assert phases[0].evidence_paths == ["bin/check-prose", "harness/a.py", "docs/x.md"]
+    assert phases[1].evidence_paths == ["harness/c.py"]
+
+
 def test_parse_phases_skips_fenced_blocks_and_example_tokens():
     plan = """
 ## Phase 1: Real

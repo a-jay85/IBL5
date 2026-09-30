@@ -8,6 +8,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.conformance import check, phase_omission_items
+from harness.planfile import parse_phases
 from harness.state import PhaseInfo, PlanInfo
 
 
@@ -530,3 +531,13 @@ No backticked path here.
     # positive: both phases shipped → no MISSING-PHASE items
     items_pos = check(plan_info, ["harness/a.py", "harness/b.py"])
     assert not any(i.startswith("MISSING-PHASE:") for i in items_pos)
+
+
+def test_line_suffixed_evidence_citation_matches_changed_file():
+    """A plan citing `bin/check-prose:438-457` must not yield MISSING-PHASE when the file changed.
+
+    Mutation caught: dropping the line-suffix strip in _phase_evidence_paths.
+    """
+    phases = parse_phases("## Phase 1: Foo\n\nEdit `bin/check-prose:438-457`.\n")
+    plan = _plan_with_phases(phases)
+    assert phase_omission_items(plan, ["bin/check-prose"]) == []

@@ -122,10 +122,12 @@ $knownActions = [
     'count-demands',
     'count-fa-stories',
     'count-shadow-rows',
+    'delete-google-sheet-connection',
     'delete-test-user',
     'engine-binary-ready',
     'get-allstar-ids',
     'get-allstar-name',
+    'get-google-sheet-connection',
     'get-votes',
     'reset-allstar-names',
     'reset-demands',
@@ -140,6 +142,7 @@ $knownActions = [
     'reset-vote',
     'reset-waiver-player',
     'seed-confirm-user',
+    'seed-google-sheet-connection',
     'seed-reset-user',
     'set-award',
     'set-champion',
@@ -161,6 +164,61 @@ if ($action !== '' && !in_array($action, $knownActions, true)) {
     echo json_encode(['error' => 'Unknown action: ' . $action]);
     $db->close();
     exit;
+}
+
+// Google Sheets card fixtures, all scoped to the E2E regular user. The seeded
+// token is a fixed fake encrypted with GOOGLE_TOKEN_KEY; nothing here calls Google.
+if (in_array($action, ['seed-google-sheet-connection', 'get-google-sheet-connection', 'delete-google-sheet-connection'], true)) {
+    $regularName = getenv('IBL_TEST_USER_REGULAR');
+    $regular = is_string($regularName) && $regularName !== ''
+        ? (new \Repositories\TeamIdentityRepository($db))->getUserByUsername($regularName)
+        : null;
+    if ($regular === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'IBL_TEST_USER_REGULAR is unset or unknown']);
+        $db->close();
+        exit;
+    }
+    $regularId = (int) $regular['user_id'];
+    $googleRepo = new \GoogleSheets\GoogleSheetConnectionRepository($db);
+
+    // POST ?action=seed-google-sheet-connection&status=active|broken&reason=<REASON_*>
+    if ($method === 'POST' && $action === 'seed-google-sheet-connection') {
+        $googleRepo->upsert(
+            $regularId,
+            \Security\SecretBox::fromEnv()->encrypt('e2e-fake-refresh-token'),
+            'e2e-sheet-id',
+            'https://docs.google.com/spreadsheets/d/e2e-sheet-id/edit'
+        );
+        if (($_GET['status'] ?? '') === 'broken') {
+            $reason = is_string($_GET['reason'] ?? null) ? $_GET['reason'] : 'invalid_grant';
+            $googleRepo->markBroken($regularId, $reason);
+        }
+        echo json_encode(['seeded' => $regularId]);
+        $db->close();
+        exit;
+    }
+
+    // GET ?action=get-google-sheet-connection — {status, broken_reason} or 404
+    if ($method === 'GET' && $action === 'get-google-sheet-connection') {
+        $row = $googleRepo->findByUserId($regularId);
+        if ($row === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'no connection']);
+        } else {
+            echo json_encode(['status' => $row['status'], 'broken_reason' => $row['broken_reason']]);
+        }
+        $db->close();
+        exit;
+    }
+
+    // DELETE ?action=delete-google-sheet-connection
+    if ($method === 'DELETE' && $action === 'delete-google-sheet-connection') {
+        $googleRepo->deleteByUserId($regularId);
+        echo json_encode(['deleted' => true]);
+        $db->close();
+        exit;
+    }
 }
 
 // DELETE ?action=clear-throttle — clear auth throttling for E2E login

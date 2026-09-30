@@ -67,6 +67,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0158](0158-j27-fta-undershoot-attribution.md) | Record the J27 FTA undershoot decomposition and its ruled-out levers | Accepted | `TestRealArchive_FTADecomp` splits the FTA gap into foul volume and yield per foul. The gap is volume: JSB's non-shooting fouls, team-foul bonus, and 3-shot trips need new engine state, so no lever ships. |
 | [0174](0174-lostwork-change-level-proof.md) | Lost-work proof compares branch changes against the post-rebase tree | Accepted | `lostwork.sh` checks every significant line the branch added or deleted against `HEAD` instead of comparing numstat rows. Master edits to the same file and absorbed hunks pass. A line both sides edited still blocks. |
 | [0177](0177-wt-new-warm-standby-pool.md) | Warm-standby worktree pool for bin/wt-new | Accepted | `bin/wt-new` claims a ready `_pool-N` spare by branch rename and `git worktree move`, falls back to a cold create on any failed check, and refills the spare through a launchd one-shot. |
+| [0151](0151-google-sheets-server-push.md) | Google Sheets export pushes from the server | Accepted | Five Google endpoints go through `ext-curl` behind `GoogleHttpClientInterface`; refresh tokens are `ext-sodium` encrypted under `GOOGLE_TOKEN_KEY`; refresh is queued and drained by the `googleSheetRefreshTick.php` cron worker, never inline in the sim pipeline. |
 
 ## When an ADR is Required
 

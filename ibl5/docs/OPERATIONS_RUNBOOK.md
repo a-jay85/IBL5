@@ -474,6 +474,10 @@ Once a few sims have recapped from Actions, remove the Mac backup with `bin/sim-
 
 The sim recap poller is a macOS LaunchAgent (`com.ibl5.sim-recap-poll`, label managed by `bin/sim-recap-cron-setup`) that fires `bin/sim-recap-tick` every 300 s.
 
+### Google Sheets refresh cron
+
+The Google Sheets player export has its own prod crontab worker, `ibl5/scripts/googleSheetRefreshTick.php`, separate from the sim recap LaunchAgent. Install, verify, exit codes, key rotation, and the `broken` reasons are in `ibl5/docs/GOOGLE_SHEETS_SETUP.md` section 5. `php ibl5/scripts/googleSheetRefreshTick.php --dry-run` shows the pending queue without calling Google.
+
 ### Phase gate — when the poller stops itself
 
 Recap generation is gated to **HEAT and Regular Season** (`RecapPhasePolicy::ENABLED_PHASES`). When the season phase is advanced via the League Control Panel admin, `setSeasonPhase()` posts a notice to `#admin-chat` if the new phase is enabled. When the phase changes to a disabled phase (Preseason, or Playoffs onward), the next tick that finds no pending sim and `recaps_enabled: false` will self-unload the LaunchAgent via `launchctl bootout`. The poller logs the reason before unloading.

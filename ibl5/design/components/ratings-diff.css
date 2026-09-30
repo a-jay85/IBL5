@@ -27,9 +27,6 @@
   .ratings-diff-table .delta-down {
     color: var(--error-900);
   }
-  .ratings-diff-table .delta-zero {
-    color: var(--gray-500);
-  }
   .ratings-diff-table .rating-cell--up {
     background-color: rgba(40, 167, 69, var(--di, 0.15));
   }

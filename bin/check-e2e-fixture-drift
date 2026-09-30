@@ -22,6 +22,28 @@
 # Subcommands: `snapshot <outfile>` (dump curated rows) and `diff <before> <after>`.
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-e2e-fixture-drift snapshot <outfile>
+       bin/check-e2e-fixture-drift diff <before> <after>
+
+Runtime fixture-drift gate (ADR-0052): snapshots shared seed rows before/after
+the Playwright chromium run and diffs them. Any net mutation fails with
+row-level attribution.
+
+Subcommands:
+  snapshot <outfile>       Dump curated shared-seed rows to <outfile>.
+  diff <before> <after>    Compare two snapshot files; exits 1 on drift.
+
+Environment:
+  FIXTURE_DRIFT_MANIFEST   Path to shared-fixture-manifest.txt
+  FIXTURE_DRIFT_MYSQL      MySQL command to use (default: docker compose exec)
+
+Exit codes: 0 no drift / success, 1 drift detected or error, 2 usage error.
+EOF
+    exit 0
+fi
+
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
 MANIFEST="${FIXTURE_DRIFT_MANIFEST:-$ROOT/ibl5/tests/e2e/fixtures/shared-fixture-manifest.txt}"
 MYSQL="${FIXTURE_DRIFT_MYSQL:-docker compose -f docker-compose.ci.yml exec -T mariadb mariadb -u root -proot ibl5 -N}"

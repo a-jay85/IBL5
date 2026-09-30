@@ -13,6 +13,25 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/docfix-run <issue-num> <sig>
+
+Mac-side headless doc remediation launcher. Fired by bin/docfix-poll
+(launchd, daily) when the nightly audit has flagged stale docs or dead
+paths: globs. Creates a worktree, seeds an auto_merge:false hold plan,
+and launches a detached headless Claude run that fixes flagged docs and
+opens a held PR that closes the stale-docs issue.
+
+Arguments:
+  <issue-num>  GitHub issue number of the stale-docs audit issue.
+  <sig>        Comma-separated repo-relative paths to fix (work list).
+
+Both arguments are required.
+EOF
+    exit 0
+fi
+
 # shq <string> — single-quote for the FAR side of the launchd boundary; xml_escape —
 # entity-escape for the plist <string> element. Both are needed, and for different
 # hazards: the plist text is parsed as XML by launchd AND as shell by `/bin/bash -lc`.

@@ -28,6 +28,20 @@
 # Usage: bin/lint-workflows [file ...]   (no args = every workflow in the repo)
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/lint-workflows [file ...]
+
+Run actionlint over GitHub Actions workflow files, with shellcheck on run: blocks.
+
+Arguments:
+  [file ...]   workflow files to lint (default: all .github/workflows/*.yml)
+
+Exit codes: 0 = clean, 1 = actionlint not found, shellcheck not found, or violations found
+EOF
+    exit 0
+fi
+
 cd "$(git rev-parse --show-toplevel)"
 
 # CI installs actionlint with `go install`, which lands it in GOPATH/bin — not

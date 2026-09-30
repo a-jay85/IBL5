@@ -67,8 +67,14 @@ def frontmatter_autonomy_contract(content: str) -> tuple[str, list[str], str]:
     (a body documenting the syntax can't self-select).
 
     error == "" means well-formed OR entirely absent. Mirror of the shell single
-    source of truth, bin/lib/plan-autonomy-contract; pinned by
-    tests/test_planfile.py::test_contract_lib_sync.
+    source of truth, bin/lib/plan-autonomy-contract, including its bash
+    IFS=',' splitting (one trailing comma tolerated, any other empty token
+    rejected) and its `..`-anywhere rejection. Accept/reject parity is pinned by
+    tests/test_planfile.py::test_contract_lib_sync and
+    test_contract_token_grammar_sweep. Semantic parity of the UNMET-CONTRACT
+    lines against the post-plan Phase 5.0d block is pinned by the "Phase 5.0d
+    TWO-WAY AGREEMENT" section of bin/test-postplan-arm-conditions. Change the
+    shell lib first, then this mirror, and run both.
     """
     lines = content.splitlines()
     if not lines or not re.match(r"^---\s*$", lines[0]):
@@ -96,15 +102,20 @@ def frontmatter_autonomy_contract(content: str) -> tuple[str, list[str], str]:
     # validate stop_condition enum
     if sc_norm not in _LEGAL_STOP_CONDITIONS:
         return ("", [], f"stop_condition: '{sc_norm}' is not a legal value")
-    # split evidence on comma, drop empty tokens
-    tokens = [t for t in ev_norm.split(",") if t]
-    if not tokens:
+    # split evidence on comma the way bash IFS=',' does: one trailing empty
+    # field is dropped ("a," is fine); any other empty field is rejected
+    if not ev_norm:
+        return ("", [], "evidence: is empty")
+    tokens = ev_norm.split(",")
+    if tokens[-1] == "":
+        tokens.pop()
+    if not tokens or any(t == "" for t in tokens):
         return ("", [], "evidence: is empty")
     # validate each token
     for t in tokens:
         if t.startswith("/") or t.startswith("-"):
             return ("", [], f"evidence: token '{t}' is not a repo-relative path")
-        if ".." in t.split("/"):
+        if ".." in t:
             return ("", [], f"evidence: token '{t}' is not a repo-relative path")
         if not _EVIDENCE_TOKEN.match(t):
             return ("", [], f"evidence: token '{t}' is not a repo-relative path")
@@ -182,6 +193,43 @@ def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
     return planned, manual
 
 
+_EXECUTABLE_TYPE = re.compile(
+    r"\b(PHPUnit|API.?test|E2E|Visual.?regression|CLI.?executable)\b", re.IGNORECASE)
+_TABLE_SEP = re.compile(r"^\s*\|[\s:|-]+\|?\s*$")
+
+
+def count_executable_matrix_rows(content: str) -> int | None:
+    """Count Verification Matrix rows that name an executable test type.
+
+    Scoped to the table rows that follow a `_MATRIX_HEADER` line, outside fenced
+    blocks (`_strip_fenced`), so a Critical Files table naming PHPUnit or a fenced
+    illustrative matrix never counts; parse_matrix's whole-plan scan cannot tell
+    these apart. Within a matrix row the match is WHOLE-ROW, never the Test type
+    cell alone: the 2026-09-29 corpus has matrices with shifted columns (the type
+    in the What cell) and non-taxonomy types (`Automated` on a PHPUnit-suite row),
+    and a cell-scoped match would write the static claim over real executable rows.
+    Whole-row errs toward counting, which keeps the covered-by sentinel.
+    Visual-regression counts as executable so the static wording is never written
+    over a screenshot-diff row. Returns None when no unfenced matrix header exists,
+    so a caller cannot mistake "no matrix" for "zero rows".
+    """
+    count = 0
+    seen_header = False
+    in_matrix = False
+    for line in _strip_fenced(content):
+        if not line.strip().startswith("|"):
+            in_matrix = False
+            continue
+        if _MATRIX_HEADER.match(line):
+            seen_header = in_matrix = True
+            continue
+        if not in_matrix or _TABLE_SEP.match(line):
+            continue
+        if _EXECUTABLE_TYPE.search(line):
+            count += 1
+    return count if seen_header else None
+
+
 def _strip_fenced(content: str) -> list[str]:
     """Lines outside fenced code blocks — literal port of cf_section()'s awk state
     machine in bin/lib/critical-files.sh. Width-aware: per CommonMark a closing fence
@@ -243,12 +291,39 @@ def _strip_fenced(content: str) -> list[str]:
     return out
 
 
+# Regex that strips a leading absolute prefix up to the repo or worktree root.
+# Matches /<anything>/IBL5/ or /<anything>/IBL5-worktrees/<slug>/ and removes
+# everything up to and including that root. Case-sensitive: IBL5 is always caps.
+# Used in parse_critical_files to normalise absolute paths from in-flight plans.
+_ABS_PREFIX_RE = re.compile(r"^.*/IBL5(?:-worktrees/[^/]+)?/")
+
+
+def _normalise_cf_path(path: str) -> str:
+    """Strip an absolute /…/IBL5/… or /…/IBL5-worktrees/<slug>/… prefix.
+
+    Plans already in flight may carry absolute paths authored before
+    bin/check-plan gate [F] enforced repo-relative form. Normalise them so
+    Phase 5.0 conformance matching still works. Relative paths are returned
+    unchanged.
+    """
+    if not path.startswith("/"):
+        return path
+    m = _ABS_PREFIX_RE.match(path)
+    if m:
+        return path[m.end():]
+    return path
+
+
 def parse_critical_files(content: str) -> list[tuple]:
     """[(path, annotation, exempt)] from `## Critical Files` — the Phase 5.0 awk port:
     primary backticked path per bullet; exempt iff the annotation (backticks stripped)
     contains a parenthesized group holding a canonical marker. Fenced code blocks are
     skipped (width-aware fence state machine, see _strip_fenced). Single source of
-    truth for the exemption rule: bin/lib/critical-files.sh."""
+    truth for the exemption rule: bin/lib/critical-files.sh.
+
+    Absolute paths of the form /…/IBL5/… or /…/IBL5-worktrees/<slug>/… are
+    normalised to repo-relative form so in-flight plans authored before gate [F]
+    enforced relative paths still match `git diff --name-only` output."""
     lines = _strip_fenced(content)
     in_section = False
     out: list[tuple] = []
@@ -266,7 +341,7 @@ def parse_critical_files(content: str) -> list[tuple]:
         pm = re.search(r"`([^`]+)`", line)
         if not pm:
             continue
-        path = pm.group(1)
+        path = _normalise_cf_path(pm.group(1))
         rest = re.sub(r"`[^`]*`", "", line)
         exempt = bool(EXEMPT_RE.search(rest))
         out.append((path, rest.strip(" -—"), exempt))
@@ -628,6 +703,7 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
     info.has_reuse = bool(_REUSE.search(content))
     if info.has_matrix:
         info.planned_test_paths, info.truly_manual_rows = parse_matrix(content)
+        info.executable_row_count = count_executable_matrix_rows(content)
     info.critical_files = parse_critical_files(content)
     info.required_test_methods = parse_required_test_methods(content)
     info.backlog_issues = parse_backlog_issues(content)

@@ -572,6 +572,9 @@ grep -qF '#102' "$SCRATCH/dm.argv" \
     && fail "case 11: DM should not mention absent #102"
 grep -qF '#103' "$SCRATCH/dm.argv" \
     && fail "case 11: DM should not mention absent #103"
+# Mutation check: dropping --ping from the send at bin/pr-cycle:1087 fails this line.
+grep -qF -- '--ping' <<< "$(cat "$SCRATCH/dm.argv")" \
+    || fail "case 11: end-of-run DM lacks --ping"
 end_case "case 11 non-armable and absent"
 
 # ==========================================================================================
@@ -788,6 +791,7 @@ printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
 } > "$SCRATCH/triage-out"
 run --worker --no-dm
 [[ "$(calls dm)" == "0" ]] || fail "case 35: --no-dm still sent $(calls dm) DMs"
+[[ ! -s "$SCRATCH/dm.argv" ]] || fail "case 35: --no-dm left a dm argv record"
 end_case "case 35 your-turn DM links"
 
 # ==========================================================================================

@@ -77,6 +77,11 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    sed -n '2,76p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+fi
+
 # --- PATH prelude ------------------------------------------------------------------------
 # A safety net for invocation from a restricted context (cron, a hook) that lacks the
 # usual tool dirs. Appended, not prepended: an interactive caller's own PATH — and the
@@ -314,7 +319,7 @@ derive_status() {
     # STOP: and PUSH FAILED are hard-stop markers; match them as line prefixes to avoid
     # false-positives from quoted instruction text. (Phase 8 tests this predicate; do not
     # weaken the anchor.)
-    if grep -qE '^[[:space:]>*_`-]*STOP:' "$log" || grep -qF 'PUSH FAILED' "$log"; then
+    if grep -qE '^[[:space:]>*_`-]*STOP:' "$log" || grep -qE '^[[:space:]>*_`-]*PUSH FAILED' "$log"; then
         printf 'NOT READY'
         return
     fi

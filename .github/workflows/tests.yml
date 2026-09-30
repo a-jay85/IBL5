@@ -732,6 +732,8 @@ jobs:
         run: bin/test-automouse-impl-model
       - name: Run automouse env-breaker regression test
         run: bin/test-automouse-env-breaker
+      - name: Run headless elapsed-clock hook regression test
+        run: bin/test-headless-elapsed-hook
       - name: Run automouse impl cap-timeout regression test
         run: bin/test-automouse-impl-cap-timeout
       - name: Run automouse postplan terminal-disposition regression test
@@ -959,6 +961,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: bin/test-bin-help
+        run: bin/test-bin-help
       - name: bin/test-cleanup-safety
         run: bin/test-cleanup-safety
       - name: bin/test-check-pr-collisions
@@ -1055,6 +1061,8 @@ jobs:
         run: bin/test-phase-snapshot-detect
       - name: bin/test-docfix-poll
         run: bin/test-docfix-poll
+      - name: bin/test-launchd-health-check
+        run: bin/test-launchd-health-check
       - name: bin/test-post-review-findings
         run: bin/test-post-review-findings
       - name: bin/test-human-signoff-classifier
@@ -1094,6 +1102,8 @@ jobs:
         run: bin/test-bug-pipeline-check
       - name: bin/test-bug-pipeline-cron-setup
         run: bin/test-bug-pipeline-cron-setup
+      - name: bin/test-launchd-health-cron-setup
+        run: bin/test-launchd-health-cron-setup
       - name: bin/test-bug-pipeline-ci-autofix
         run: bin/test-bug-pipeline-ci-autofix
       - name: bin/test-sim-recap-tick

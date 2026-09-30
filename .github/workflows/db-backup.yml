@@ -210,10 +210,8 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/notify-discord
         with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
+          ping: 'true'
 
       - name: Ship phase-snapshot tooling to prod
         if: ${{ !cancelled() }}
@@ -253,10 +251,8 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/notify-discord
         with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
+          ping: 'true'
           fail-on-delivery: 'false'
 
   notify-backup-failure:
@@ -269,14 +265,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup SSH
-        # Always the real prod host — a forced-bad backup host must still alert.
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
       - name: Build Discord message
         continue-on-error: true
         run: |
@@ -288,8 +276,6 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/notify-discord
         with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
+          ping: 'true'
           fail-on-delivery: 'false'

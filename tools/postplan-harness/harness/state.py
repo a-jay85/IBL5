@@ -125,6 +125,12 @@ class PlanInfo:
     required_test_methods: list[str] = field(default_factory=list)
     backlog_issues: list[tuple] = field(default_factory=list)  # (kind, number); kind in {"closes", "refs"}
     truly_manual_rows: list[ManualRow] = field(default_factory=list)
+    # Verification Matrix rows whose Test type is PHPUnit / API-test / E2E /
+    # Visual-regression / CLI-executable (planfile.count_executable_matrix_rows).
+    # None = not parsed: plan-blind run, no matrix, or a PlanInfo(...) literal in a test.
+    # Only an explicit 0 lets the runner write MANUAL_TESTING_SENTINEL_STATIC, so every
+    # pre-existing literal keeps the covered-by sentinel.
+    executable_row_count: Optional[int] = None
     security_section: str = ""
     reuse_section: str = ""
     hold_justification: str = ""

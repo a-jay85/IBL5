@@ -1,5 +1,8 @@
+import ast
 import json
 import os
+import pathlib
+import re
 import subprocess
 import sys
 
@@ -7,9 +10,11 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.armable import _manual_section, all_rows_ticked, manual_testing_clearance
+from harness.armable import (SENTINEL_RE, _manual_section, all_rows_ticked,
+                             manual_testing_clearance)
 from harness.classify import (_manual_testing_span, classify, files_from_diff, filter_diff,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END, MANUAL_TESTING_SENTINEL,
+                               MANUAL_TESTING_SENTINEL_STATIC,
                                name_status_from_diff, qualify_backlog_refs,
                                render_files_changed,
                                render_reviewer_verification,
@@ -552,6 +557,42 @@ def test_sentinel_passes_the_ci_checker():
     # bin/check-pr-manual-testing and pr-armable.sh key on this prefix.
     assert MANUAL_TESTING_SENTINEL.startswith("No manual testing needed")
     assert "verified" not in MANUAL_TESTING_SENTINEL
+
+
+def test_static_sentinel_passes_the_ci_checker():
+    # Same prefix contract as MANUAL_TESTING_SENTINEL: SENTINEL_RE and the shell twins
+    # read it as CLEARED, and the tail carries no test-type keyword for the diff scan.
+    prefix = "No manual testing needed"
+    assert MANUAL_TESTING_SENTINEL_STATIC == (
+        "No manual testing needed — verification is static; "
+        "the plan's Verification Matrix has no executable rows.")
+    assert MANUAL_TESTING_SENTINEL_STATIC.startswith(prefix)
+    assert "verified" not in MANUAL_TESTING_SENTINEL_STATIC.lower()
+    assert SENTINEL_RE.match(MANUAL_TESTING_SENTINEL_STATIC)
+    tail = MANUAL_TESTING_SENTINEL_STATIC[len(prefix):]
+    assert not re.search(r"e2e|playwright|unit|phpunit|integration", tail, re.I)
+    assert MANUAL_TESTING_SENTINEL_STATIC != MANUAL_TESTING_SENTINEL
+
+
+def test_no_harness_code_compares_sentinel_by_equality():
+    # restore/strip key on the `## Manual Testing` heading, so a second wording must
+    # never be compared by text equality anywhere in the harness.
+    harness_root = pathlib.Path(__file__).resolve().parents[1]
+    files = sorted((harness_root / "harness").glob("*.py")) + [harness_root / "runner.py"]
+    names = {"MANUAL_TESTING_SENTINEL", "MANUAL_TESTING_SENTINEL_STATIC"}
+
+    def _is_sentinel(node: ast.AST) -> bool:
+        return ((isinstance(node, ast.Name) and node.id in names)
+                or (isinstance(node, ast.Attribute) and node.attr in names))
+
+    hits = []
+    for path in files:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Compare) and (
+                    _is_sentinel(node.left) or any(_is_sentinel(c) for c in node.comparators)):
+                hits.append(f"{path.name}:{node.lineno}")
+    assert hits == [], f"sentinel compared by equality at: {hits}"
 
 
 # ---------------------------------------------------------------------------

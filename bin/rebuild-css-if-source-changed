@@ -21,6 +21,20 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/rebuild-css-if-source-changed
+
+Rebuild the compiled Tailwind stylesheet when a CSS source file under design/
+is newer than the compiled output. No-op if sources are already fresh.
+
+Wired into post-checkout, post-merge, and post-rewrite git hooks.
+
+Arguments: none
+EOF
+    exit 0
+fi
+
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 IBL5="$REPO_ROOT/ibl5"
 INPUT="$IBL5/design/input.css"

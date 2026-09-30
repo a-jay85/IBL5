@@ -40,7 +40,8 @@ from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
 from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
-                              MANUAL_TESTING_SENTINEL, backlog_closes_mismatch, classify, files_from_diff,
+                              MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC,
+                              backlog_closes_mismatch, classify, files_from_diff,
                               modified_files_from_diff,
                               name_status_text, normalize_backlog_closes, numstat_text,
                               qualify_backlog_refs,
@@ -501,9 +502,18 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         clearance = manual_testing_clearance(body)
         if clearance == "UNKNOWN":
             if plan.found and not plan.truly_manual_rows:
-                body += f"\n\n## Manual Testing\n\n{MANUAL_TESTING_SENTINEL}\n"
+                # Zero executable rows is a static-only plan: claiming automated coverage
+                # would be false (.claude/rules/pr-body-test-claim.md). `== 0`, never
+                # falsiness: None means no matrix was parsed, and that keeps the covered
+                # sentinel because the static text asserts a matrix exists.
+                static = plan.has_matrix and plan.executable_row_count == 0
+                sentinel = MANUAL_TESTING_SENTINEL_STATIC if static else MANUAL_TESTING_SENTINEL
+                body += f"\n\n## Manual Testing\n\n{sentinel}\n"
                 clearance = "CLEARED"
-                log("phase6: plan matrix fully automated — sentinel appended (CLEARED)")
+                if static:
+                    log("phase6: plan matrix has zero executable rows — static sentinel appended (CLEARED)")
+                else:
+                    log("phase6: plan matrix fully automated — sentinel appended (CLEARED)")
             elif plan.found:
                 surviving_rows = _recheck_manual_rows(llm, probe, plan, cls, log, res)
                 if not surviving_rows:

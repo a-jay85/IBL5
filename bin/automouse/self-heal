@@ -16,6 +16,25 @@
 
 set -u
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/automouse/self-heal [--dry-run]
+
+Requeue automouse plans that were skipped by the staleness gate and now pass it.
+Also reaps orphan skipped-dir entries whose plan file has left ~/claude-plans/.
+
+Options:
+  --dry-run   Preview healed / still-stale / reaped counts without making changes.
+
+Only plans with a .staleness sidecar are eligible for recovery. Ambiguity and
+poison-pill skips are never requeued. Tombstone reaping runs first and is
+independent of the staleness marker.
+
+Exit codes: 0 always (non-fatal; errors are printed but do not abort the run)
+EOF
+    exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 : "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"

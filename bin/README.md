@@ -11,7 +11,7 @@ container.
 |-------|---------|
 | Worktrees | `wt-new`, `wt-up`, `wt-down`, `wt-list`, `wt-rebase`, `wt-remove`, `wt-db-test`, `e2e-wt` |
 | Automouse automation | `automouse/run`, `automouse/queue`, `automouse/queue-reorder-ui`, `automouse/self-heal`, `automouse/prompt-impl`, `automouse/prompt-postplan`, `watch-automouse-plan` (wait for a queued plan's phase to finish, then DM) |
-| Notifications | `discord-dm` (host-side IBLbot DM with retries + spool; the sibling of `.github/actions/notify-discord`) |
+| Notifications | `discord-dm` (owner notices post to the #dev webhook (opt-in `--ping` for failures); other recipients and `--raw --route` stay on the IBLbot DM; retries + spool; the sibling of `.github/actions/notify-discord`) |
 | CI / quality gates | `adr-check`, `check-docs`, `check-prose`, `check-hot-files`, `check-master-ci-green`, `check-plan`, `check-plan-staleness`, `check-vr-coverage`, `check-e2e-hygiene`, `check-e2e-fa-offers-owner`, `check-e2e-mutator-isolation`, `check-e2e-fixture-drift`, `check-destructive-migrations`, `refactor-flag` |
 | Prod ops | `db-sync-prod`, `log-fetch-prod`, `promote-master-to-production` (the promotion primitive CI runs; `--dry-run` to rehearse), `merge-master-to-prod` (manual/emergency promotion), `smoke-prod` (SSH from host); `iblbot-healthcheck` (pm2 cron watchdog, runs on the prod box) |
 | Dev / Docker env | `dev-up`, `db-test-up`, `db-migrate` |
@@ -76,6 +76,16 @@ be reachable from two paths, add a short wrapper that `exec`s the canonical
 script, or relocate the script to its correct home (`bin/` vs `ibl5/bin/` vs
 `ibl5/scripts/`). A `.symlinks` manifest is intentionally **not** maintained —
 one tracked symlink does not warrant one.
+
+## Every script answers `--help`
+
+Run `bin/<script> --help` to see its arguments. Help goes to stdout and exits
+0. The check sits at the top of the script, before any `source`, `git`, `cd`,
+or network call, so asking for help never does anything else. Add it to every
+new script. `bin/test-bin-help` enforces this in CI. It skips `test-*` harnesses,
+two scripts in its built-in skip list (`bin/check-composite-contracts`
+and `bin/check-vr-coverage`), and any script whose interpreter is
+absent on the runner.
 
 ## Check-script conventions
 

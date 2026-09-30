@@ -165,10 +165,6 @@ TELLS: list[Tell] = [
         #              obligations; flag only unambiguous prose issue/PR refs.
         #   Rankings (lookahead) — a one- or two-digit #N followed by seed/pick/
         #              overall/ranked/"in the <conference>" is league prose, not a ref.
-        # Re-verify any change to this pattern on the real corpus: load the
-        # origin/master regex and this one, diff finditer hits over PR bodies and
-        # transcripts. Pass means appeared>0 never happens and synth_new equals
-        # the keep-firing control count (plan check-prose-hash-rank-1213, Phase 4).
         # Note: "Docker Hub" aside, prose_lines replaces link targets with ]()
         # so [#123](url) → [#123]() and the [ preceding # blocks the match.
         r"(?<![/\[&\w])(?<!check )(?<!gate )(?<!step )(?<!item )(?<!phase )(?<!no\. )(?<!number )(?<!condition )"
@@ -462,9 +458,6 @@ def mode_self_test() -> int:
         ("check #19 in the list", False, False),
         ("gate #3 fires here", False, False),
         ("step #2 is next", False, False),
-        # Ranking prose: a one- or two-digit #N followed by a ranking word is
-        # league talk, not a PR/issue ref. Passes in both scopes. These lines
-        # carry no other tell: a hanging dash would add [em-dash] to the doc hits.
         ("He was the #1 seed and the #1 pick.", False, False),
         ("the #3 overall pick in the 2019 draft", False, False),
         ("they finished #2 in the West", False, False),

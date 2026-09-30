@@ -521,6 +521,27 @@ _RC3_CASES = [
      "RESULT: post-plan BLOCKED — rc=3 (rebase-conflict, local-gate, or "
      "llm-usage-limit), cause unknown; ERROR terminal=failed, no PR opened. "
      "Resolve the cause, then re-run bin/post-plan-now."),
+    ("gate-stale-base", "local-gate", "does not contain origin/master", {},
+     "RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit "
+     "[class=stale-base]; ERROR terminal=failed, no PR opened. "
+     "does not contain origin/master "
+     "origin/master moved and the bounded refetch + re-rebase did not catch up: "
+     "run `git fetch origin master && git rebase origin/master`, "
+     "then re-run bin/post-plan-now."),
+    ("gate-byte-budget", "local-gate",
+     "FAIL  .claude/rules/x.md  9000 bytes  cap 8000\nTrim the rule(s) above", {},
+     "RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit "
+     "[class=byte-budget]; ERROR terminal=failed, no PR opened. "
+     "FAIL .claude/rules/x.md 9000 bytes cap 8000 Trim the rule(s) above "
+     "The .claude/rules byte budget is over cap and check-rules-byte-budget "
+     "has no --fix flag: trim a rule (or move detail into a path-scoped "
+     "*-detail.md companion), then re-run bin/post-plan-now."),
+    ("gate-doc-staleness", "local-gate", "Bump last_verified on the doc(s) above", {},
+     "RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit "
+     "[class=doc-staleness]; ERROR terminal=failed, no PR opened. "
+     "Bump last_verified on the doc(s) above "
+     "Auto-remediation ran and the gate still denied the commit: "
+     "bump last_verified by hand, then re-run bin/post-plan-now."),
 ]
 
 

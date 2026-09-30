@@ -98,6 +98,7 @@ class GoogleSheetsClientTest extends TestCase
 
         self::assertCount(2, $this->http->requests);
         self::assertStringEndsWith('/values/' . rawurlencode("'Players'") . ':clear', $this->http->requests[0]['url']);
+        self::assertSame('{}', $this->http->requests[0]['body']);
         self::assertStringEndsWith('/values:batchUpdate', $this->http->requests[1]['url']);
         $body = $this->body(1);
         self::assertSame('RAW', $body['valueInputOption']);

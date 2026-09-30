@@ -28,6 +28,9 @@ services:
       # the run is detached/non-blocking, idempotent (per-game dedupe), and
       # flock-guarded against overlap; only the spawn E2E hits the update endpoint.
       ENGINE_SHADOW_ENABLED: "1"
+      GOOGLE_OAUTH_CLIENT_ID: e2e-placeholder.apps.googleusercontent.com
+      GOOGLE_OAUTH_CLIENT_SECRET: e2e-placeholder-secret
+      GOOGLE_TOKEN_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
     volumes:
       - ./ibl5:/var/www/html/ibl5
     ports:

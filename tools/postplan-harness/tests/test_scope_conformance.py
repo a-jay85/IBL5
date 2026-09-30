@@ -1,4 +1,4 @@
-"""scope_conformance.scope_items: the harness side of bin/lib/plan-scope-conformance.
+"""scope_conformance.scope_notes: the harness side of bin/lib/plan-scope-conformance.
 
 Every test runs the real helper script. Plans are files under tmp_path, because the
 helper reads the plan from disk.
@@ -8,8 +8,10 @@ import os
 import re
 from pathlib import Path
 
-from harness import conformance, fidelity
-from harness.scope_conformance import _added_paths, scope_items
+from harness import conformance
+from harness.classify import (SCOPE_NOTES_BEGIN, SCOPE_NOTES_END, render_scope_notes,
+                              upsert_scope_notes)
+from harness.scope_conformance import _added_paths, scope_notes
 from harness.state import PlanInfo
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -35,42 +37,55 @@ def _diff(modified: list[str], added: list[str]) -> str:
     return "\n".join(out) + "\n"
 
 
-def _unplanned(items):
-    return [i for i in items if i.startswith("UNPLANNED-FILE:")]
+def _unplanned(notes):
+    return [n for n in notes if n.startswith("unplanned ")]
 
 
-def _gaps(items):
-    return [i for i in items if i.startswith("UNEXPLAINED-GAP:")]
+def _gaps(notes):
+    return [n for n in notes if n.startswith("gap ")]
 
 
-def test_scope_items_flags_unplanned_path(tmp_path):
+def test_scope_notes_flags_unplanned_path(tmp_path):
     plan = _plan(tmp_path, ["ibl5/a.php"])
-    items = scope_items(plan, ["ibl5/a.php", "ibl5/rogue.php"], "", "")
-    unplanned = _unplanned(items)
+    notes = scope_notes(plan, ["ibl5/a.php", "ibl5/rogue.php"], "", "")
+    unplanned = _unplanned(notes)
     assert len(unplanned) == 1
-    assert unplanned[0].startswith("UNPLANNED-FILE: ibl5/rogue.php (")
+    assert unplanned[0].startswith("unplanned ibl5/rogue.php (")
 
 
-def test_scope_items_empty_plan_path_returns_empty(tmp_path):
+def test_scope_notes_renders_claude_path_as_unplanned(tmp_path):
+    plan = _plan(tmp_path, ["ibl5/a.php"])
+    notes = scope_notes(plan, ["ibl5/a.php", ".claude/rules/new.md"], "", "")
+    assert len(notes) == 1
+    assert notes[0].startswith("unplanned .claude/rules/new.md (")
+
+
+def test_scope_notes_reports_gap(tmp_path):
+    plan = _plan(tmp_path, ["ibl5/a.php", "ibl5/b.php"])
+    notes = scope_notes(plan, ["ibl5/a.php"], "", "")
+    assert len(_gaps(notes)) == 1
+    assert _gaps(notes)[0].startswith("gap ibl5/b.php (")
+
+
+def test_scope_notes_empty_plan_path_returns_empty(tmp_path):
     plan = PlanInfo(found=True, path="")
-    assert scope_items(plan, ["ibl5/rogue.php"], "", "") == []
+    assert scope_notes(plan, ["ibl5/rogue.php"], "", "") == []
 
 
-def test_scope_items_fails_closed_on_usage_exit(tmp_path):
+def test_scope_notes_unavailable_on_usage_exit(tmp_path):
     plan = _plan(tmp_path, ["ibl5/a.php"])
     script = tmp_path / "usage-exit"
     script.write_text("#!/bin/sh\necho 'Usage: nope' >&2\nexit 2\n")
     os.chmod(script, 0o755)
-    items = scope_items(plan, ["ibl5/a.php"], "", "", script=str(script))
-    assert len(items) == 1
-    assert "scope check unavailable (exit 2" in items[0]
-    assert items[0].startswith("UNPLANNED-FILE:")
+    notes = scope_notes(plan, ["ibl5/a.php"], "", "", script=str(script))
+    assert len(notes) == 1
+    assert notes[0].startswith("scope check unavailable (exit 2")
 
 
-def test_scope_items_fails_closed_on_missing_script(tmp_path):
+def test_scope_notes_unavailable_on_missing_script(tmp_path):
     plan = _plan(tmp_path, ["ibl5/a.php"])
-    items = scope_items(plan, ["ibl5/a.php"], "", "", script=str(tmp_path / "absent"))
-    assert items == ["UNPLANNED-FILE: scope check unavailable (FileNotFoundError)"]
+    notes = scope_notes(plan, ["ibl5/a.php"], "", "", script=str(tmp_path / "absent"))
+    assert notes == ["scope check unavailable (FileNotFoundError)"]
 
 
 def test_added_paths_parses_new_file_mode():
@@ -78,32 +93,22 @@ def test_added_paths_parses_new_file_mode():
     assert _added_paths(body) == ["ibl5/new.php"]
 
 
-def test_scope_items_exempts_added_test_via_diff_body(tmp_path):
+def test_scope_notes_exempts_added_test_via_diff_body(tmp_path):
     plan = _plan(tmp_path, ["ibl5/a.php"])
     test_path = "ibl5/tests/X/NewTest.php"
     changed = ["ibl5/a.php", test_path]
-    added = scope_items(plan, changed, _diff(["ibl5/a.php"], [test_path]), "")
+    added = scope_notes(plan, changed, _diff(["ibl5/a.php"], [test_path]), "")
     assert _unplanned(added) == []
-    modified = scope_items(plan, changed, _diff(["ibl5/a.php", test_path], []), "")
+    modified = scope_notes(plan, changed, _diff(["ibl5/a.php", test_path], []), "")
     assert len(_unplanned(modified)) == 1
     assert test_path in _unplanned(modified)[0]
 
 
-def test_gap_dropped_when_resolver_matches(tmp_path):
-    plan = _plan(tmp_path, ["ibl5/migrations/100_foo.sql"])
-    changed = ["ibl5/migrations/101_foo.sql"]
-    resolved = scope_items(plan, changed, "", "", resolve=conformance._resolve)
-    assert _gaps(resolved) == []
-    raw = scope_items(plan, changed, "", "", resolve=None)
-    assert len(_gaps(raw)) == 1
-    assert raw and "ibl5/migrations/100_foo.sql" in _gaps(raw)[0]
-
-
-def test_check_includes_scope_items_without_matrix(tmp_path):
+def test_check_emits_no_scope_items(tmp_path):
     plan = _plan(tmp_path, ["ibl5/a.php"])
     assert plan.has_matrix is False
     items = conformance.check(plan, ["ibl5/a.php", "ibl5/rogue.php"], diff_body="", pr_body="")
-    assert any(i.startswith("UNPLANNED-FILE: ibl5/rogue.php (") for i in items)
+    assert not any(i.startswith(("UNPLANNED-FILE:", "SCOPE-NOTE")) for i in items)
 
 
 def _replay_inputs():
@@ -116,15 +121,15 @@ def _replay_inputs():
 
 def test_replay_1996_flags_schedule_updater():
     plan, changed, diff_body = _replay_inputs()
-    unplanned = _unplanned(scope_items(plan, changed, diff_body, ""))
-    assert any(u.startswith("UNPLANNED-FILE: ibl5/classes/Updater/ScheduleUpdater.php (")
+    unplanned = _unplanned(scope_notes(plan, changed, diff_body, ""))
+    assert any(u.startswith("unplanned ibl5/classes/Updater/ScheduleUpdater.php (")
                for u in unplanned)
 
 
 def test_replay_1996_declared_body_clears():
     plan, changed, diff_body = _replay_inputs()
     body = (SCOPE_1996 / "body-declared.md").read_text()
-    items = scope_items(plan, changed, diff_body, body)
+    items = scope_notes(plan, changed, diff_body, body)
     assert _unplanned(items) == []
     assert _gaps(items) == []
 
@@ -151,30 +156,34 @@ def test_corpus_generated_block_never_declares(tmp_path):
                         for p in tok.split(" → ")})
         if not paths:
             continue
-        flagged = {u.split(" ", 2)[1] for u in _unplanned(scope_items(plan, paths, "", body))}
+        flagged = {u.split(" ", 2)[1] for u in _unplanned(scope_notes(plan, paths, "", body))}
         assert flagged == set(paths), f"PR #{entry['number']}: {set(paths) - flagged}"
         checked += 1
     assert checked > 0
 
 
-def test_work_list_forwards_scope_labels(tmp_path):
-    verdict = tmp_path / "verdict.md"
-    verdict.write_text("")
-    items = fidelity.build_work_list(
-        verdict_path=str(verdict),
-        unresolved_conformance=["UNPLANNED-FILE: a", "UNEXPLAINED-GAP: b"])
-    assert {"hold": "3", "text": "UNPLANNED-FILE: a"} in items
-    assert {"hold": "3", "text": "UNEXPLAINED-GAP: b"} in items
+def test_render_scope_notes_empty_and_nonempty():
+    assert render_scope_notes([]) == ""
+    out = render_scope_notes(["unplanned ibl5/a.php (changed path)", "gap ibl5/b.php (absent)"])
+    assert out.startswith(SCOPE_NOTES_BEGIN)
+    assert out.endswith(SCOPE_NOTES_END)
+    assert "## Unplanned changes" in out
+    assert "Auto-merge is not held on them." in out
+    assert "- unplanned `ibl5/a.php` (changed path)" in out
+    assert "- gap `ibl5/b.php` (absent)" in out
 
 
-def test_work_list_still_excludes_missing_phase_and_contract(tmp_path):
-    verdict = tmp_path / "verdict.md"
-    verdict.write_text("")
-    items = fidelity.build_work_list(
-        verdict_path=str(verdict),
-        unresolved_conformance=["MISSING-PHASE: Phase 2", "UNMET-CONTRACT: evidence",
-                                "UNPLANNED-FILE: a"])
-    texts = [i["text"] for i in items]
-    assert "MISSING-PHASE: Phase 2" not in texts
-    assert "UNMET-CONTRACT: evidence" not in texts
-    assert "UNPLANNED-FILE: a" in texts
+def test_upsert_scope_notes_insert_replace_remove():
+    body = "## Summary\n- x"
+    v1 = render_scope_notes(["unplanned ibl5/a.php (...)"])
+    v2 = render_scope_notes(["gap ibl5/b.php (...)"])
+    appended = upsert_scope_notes(body, v1)
+    assert body in appended
+    assert SCOPE_NOTES_BEGIN in appended
+    replaced = upsert_scope_notes(appended, v2)
+    assert body in replaced
+    assert "ibl5/b.php" in replaced
+    assert "ibl5/a.php" not in replaced
+    removed = upsert_scope_notes(replaced, "")
+    assert removed.strip() == body.strip()
+    assert upsert_scope_notes(body, "") == body

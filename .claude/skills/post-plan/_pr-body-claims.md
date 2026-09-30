@@ -165,7 +165,7 @@ The extraction is section-bounded. It starts at the `## Declared scope` heading 
 
 ## Plan gaps
 
-A `## Plan gaps` section lists must-appear `## Critical Files` paths the diff does not touch. Write one bullet per path with the reason: cut from scope, deferred to a named follow-up, or already shipped before the branch was cut (cite the PR). A bullet clears only the `UNEXPLAINED-GAP:` item for that path. The `MISSING-FILE:` item keeps its own resolution rule in `_phase-5-final-verification.md`.
+A `## Plan gaps` section lists must-appear `## Critical Files` paths the diff does not touch. Write one bullet per path with the reason: cut from scope, deferred to a named follow-up, or already shipped before the branch was cut (cite the PR). A bullet answers the advisory `SCOPE-NOTE: gap` line for that path. The `MISSING-FILE:` item keeps its own resolution rule in `_phase-5-final-verification.md`.
 
 ```markdown
 ## Plan gaps

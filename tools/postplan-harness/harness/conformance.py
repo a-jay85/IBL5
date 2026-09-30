@@ -10,7 +10,6 @@ import tempfile
 from pathlib import PurePosixPath
 
 from .state import PhaseInfo, PlanInfo
-from .scope_conformance import scope_items
 
 _MATRIX_ASSERTIONS_SCRIPT = str(
     PurePosixPath(os.path.abspath(__file__)).parents[3] / "bin" / "lib" / "plan-matrix-assertions")
@@ -238,7 +237,6 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     # Runs before the has_matrix gate on purpose: a matrix-less doc/tooling plan still
     # has phases, and a phase that shipped nothing is the same defect either way.
     items.extend(phase_omission_items(plan, changed_files))
-    items.extend(scope_items(plan, changed_files, diff_body, pr_body, resolve=_resolve))
     if not plan.has_matrix:
         return items
     for t in plan.planned_test_paths:

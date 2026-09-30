@@ -723,14 +723,15 @@ printf '%s\n' \
     'ibl5/index.php' > "$_u1_changed"
 _u1_out="$(run_p50u "$UB" "$_u1_plan" "$_u1_changed" 'found' '{"body":"no scope section"}')"
 _u1_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u1_out")"
-if [ "$_u1_count" -eq 2 ] \
-        && grep -qF 'rogue.md' <<< "$_u1_out" \
-        && grep -qF 'ibl5/index.php' <<< "$_u1_out" \
+if [ "$_u1_count" -eq 1 ] \
+        && grep -qF 'UNPLANNED-FILE: .claude/rules/rogue.md' <<< "$_u1_out" \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/index.php' <<< "$_u1_out" \
+        && ! grep -q '^UNPLANNED-FILE:.*ibl5/index.php' <<< "$_u1_out" \
         && ! grep -qF 'SKILL.md' <<< "$_u1_out" \
         && ! grep -qF 'doc-freshness.md' <<< "$_u1_out"; then
     echo "ok: U1 both parse verdicts count as planned"
 else
-    echo "FAIL: U1 — expected 2 UNPLANNED-FILE: lines naming rogue.md and ibl5/index.php, got: '$_u1_out'"
+    echo "FAIL: U1 — expected 1 UNPLANNED-FILE: naming rogue.md plus SCOPE-NOTE: unplanned ibl5/index.php, got: '$_u1_out'"
     FAILED=1
 fi
 
@@ -798,10 +799,12 @@ printf '%s\n' 'ibl5/planned.php' 'ibl5/decl.php' 'ibl5/undecl.php' > "$_u5_chang
 _u5_body='{"body":"## Declared scope\n\n- ibl5/decl.php (intended)\n\n<!-- files-changed:begin -->\n- `A` `ibl5/undecl.php`\n<!-- files-changed:end -->\n"}'
 _u5_out="$(run_p50u "$UB" "$_u5_plan" "$_u5_changed" 'found' "$_u5_body")"
 _u5_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u5_out" || true)"
-if [ "$_u5_count" -eq 1 ] && grep -qF 'UNPLANNED-FILE: ibl5/undecl.php' <<< "$_u5_out"; then
+if [ "$_u5_count" -eq 0 ] \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/undecl.php' <<< "$_u5_out" \
+        && ! grep -qF 'ibl5/decl.php' <<< "$_u5_out"; then
     echo "ok: U5 block passes the gh body to the helper; generated span stays flagged"
 else
-    echo "FAIL: U5 — expected 1 UNPLANNED-FILE: naming ibl5/undecl.php, got: '$_u5_out'"
+    echo "FAIL: U5 — expected SCOPE-NOTE: unplanned ibl5/undecl.php only (no UNPLANNED-FILE:), got: '$_u5_out'"
     FAILED=1
 fi
 
@@ -814,17 +817,27 @@ else
     FAILED=1
 fi
 
-# Case U7 — label plumbing: condition (3) and the Phase 5.0 END list both name
-# the two scope labels, and SKILL.md points at the helper and the Plan gaps heading.
+# Case U7 — label plumbing: condition (3) and the Phase 5.0 END list name
+# UNPLANNED-FILE: and neither names SCOPE-NOTE or the retired gap label, so
+# advisory notes can never gate. SKILL.md points at the helper and the Plan gaps heading.
 _u7_bad=0
 _u7_cond3="$(grep -m1 '^3\. No unresolved' "$P25_SKILL" || true)"
 _u7_end="$(grep -m1 '^At Phase 5.0 END, append each remaining' "$P5_SKILL" || true)"
-for _u7_label in 'UNPLANNED-FILE:' 'UNEXPLAINED-GAP:'; do
-    if ! grep -qF -- "$_u7_label" <<< "$_u7_cond3"; then
-        echo "FAIL: U7 — SKILL.md condition (3) does not name $_u7_label"; _u7_bad=1
+if ! grep -qF -- 'UNPLANNED-FILE:' <<< "$_u7_cond3"; then
+    echo "FAIL: U7 — SKILL.md condition (3) does not name UNPLANNED-FILE:"; _u7_bad=1
+fi
+if ! grep -qF -- 'UNPLANNED-FILE:' <<< "$_u7_end"; then
+    echo "FAIL: U7 — Phase 5.0 END list does not name UNPLANNED-FILE:"; _u7_bad=1
+fi
+if [ -z "$_u7_cond3" ] || [ -z "$_u7_end" ]; then
+    echo "FAIL: U7 — could not locate condition (3) or the Phase 5.0 END line"; _u7_bad=1
+fi
+for _u7_label in 'SCOPE-NOTE' 'UNEXPLAINED''-GAP'; do
+    if grep -qF -- "$_u7_label" <<< "$_u7_cond3"; then
+        echo "FAIL: U7 — SKILL.md condition (3) names $_u7_label"; _u7_bad=1
     fi
-    if ! grep -qF -- "$_u7_label" <<< "$_u7_end"; then
-        echo "FAIL: U7 — Phase 5.0 END list does not name $_u7_label"; _u7_bad=1
+    if grep -qF -- "$_u7_label" <<< "$_u7_end"; then
+        echo "FAIL: U7 — Phase 5.0 END list names $_u7_label"; _u7_bad=1
     fi
 done
 for _u7_tok in 'bin/lib/plan-scope-conformance' '## Plan gaps'; do
@@ -833,7 +846,7 @@ for _u7_tok in 'bin/lib/plan-scope-conformance' '## Plan gaps'; do
     fi
 done
 if [ "$_u7_bad" -eq 0 ]; then
-    echo "ok: U7 both scope labels reach condition (3) and the Phase 5.0 END list"
+    echo "ok: U7 UNPLANNED-FILE: reaches condition (3) and the END list; SCOPE-NOTE never does"
 else
     FAILED=1
 fi
@@ -859,10 +872,12 @@ S1PLANEOF
 printf '%s\n' '.claude/skills/post-plan/SKILL.md' 'ibl5/classes/Foo.php' > "$_s1_changed"
 _s1_out="$("$PSC" "$_s1_plan" "$_s1_changed" "" "$_s_empty" 2>&1)"
 _s1_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_s1_out" || true)"
-if [ "$_s1_count" -eq 1 ] && grep -qF 'UNPLANNED-FILE: ibl5/classes/Foo.php' <<< "$_s1_out"; then
-    echo "ok: S1 an undeclared non-.claude path is flagged"
+if [ "$_s1_count" -eq 0 ] \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/classes/Foo.php' <<< "$_s1_out" \
+        && ! grep -q '^UNPLANNED-FILE:.*Foo.php' <<< "$_s1_out"; then
+    echo "ok: S1 an undeclared non-.claude path is an advisory SCOPE-NOTE"
 else
-    echo "FAIL: S1 — expected 1 UNPLANNED-FILE: naming ibl5/classes/Foo.php, got: '$_s1_out'"
+    echo "FAIL: S1 — expected SCOPE-NOTE: unplanned ibl5/classes/Foo.php and no UNPLANNED-FILE:, got: '$_s1_out'"
     FAILED=1
 fi
 
@@ -886,9 +901,10 @@ cat > "$_s2_plan" <<'S2PLANEOF'
 S2PLANEOF
 printf '%s\n' 'ibl5/classes/Foo/Foo.php' 'ibl5/tests/Foo/FooTest.php' 'ibl5/tests/Foo/FencedTest.php' > "$_s2_changed"
 _s2_out="$("$PSC" "$_s2_plan" "$_s2_changed" "" "$_s_empty" 2>&1)"
-_s2_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_s2_out" || true)"
+_s2_count="$(grep -c '^SCOPE-NOTE: unplanned' <<< "$_s2_out" || true)"
 if [ "$_s2_count" -eq 1 ] \
-        && grep -qF 'UNPLANNED-FILE: ibl5/tests/Foo/FencedTest.php' <<< "$_s2_out" \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/tests/Foo/FencedTest.php' <<< "$_s2_out" \
+        && ! grep -q '^UNPLANNED-FILE:' <<< "$_s2_out" \
         && ! grep -qF 'FooTest.php' <<< "$_s2_out"; then
     echo "ok: S2 matrix test path declares; fenced matrix row declares nothing"
 else
@@ -917,7 +933,9 @@ cat > "$_s3_body_real" <<'S3REALEOF'
 S3REALEOF
 _s3_gen="$("$PSC" "$_s3_plan" "$_s3_changed" "$_s3_body_gen" "$_s_empty" 2>&1)"
 _s3_real="$("$PSC" "$_s3_plan" "$_s3_changed" "$_s3_body_real" "$_s_empty" 2>&1)"
-if grep -qF 'UNPLANNED-FILE: ibl5/x.php' <<< "$_s3_gen" \
+if grep -qF 'SCOPE-NOTE: unplanned ibl5/x.php' <<< "$_s3_gen" \
+        && ! grep -q '^UNPLANNED-FILE:' <<< "$_s3_gen" \
+        && ! grep -q '^SCOPE-NOTE: unplanned' <<< "$_s3_real" \
         && ! grep -q '^UNPLANNED-FILE:' <<< "$_s3_real"; then
     echo "ok: S3 generated span never declares; a plain bullet clears"
 else
@@ -935,10 +953,11 @@ printf '%s\n' 'bin/unrelated' 'ibl5/classes/Foo/Bar.php' 'ibl5/classes/Baz.php' 
 printf '%s\n' '## Declared scope' '' '- `ibl5/classes/Foo/` (whole module)' '- `ibl5/` (too broad)' \
     '- `ibl5/classes/Qux/One.php` (a file bullet declares no sibling)' > "$_s4_body"
 _s4_out="$("$PSC" "$_s4_plan" "$_s4_changed" "$_s4_body" "$_s_empty" 2>&1)"
-_s4_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_s4_out" || true)"
+_s4_count="$(grep -c '^SCOPE-NOTE: unplanned' <<< "$_s4_out" || true)"
 if [ "$_s4_count" -eq 2 ] \
-        && grep -qF 'UNPLANNED-FILE: ibl5/classes/Baz.php' <<< "$_s4_out" \
-        && grep -qF 'UNPLANNED-FILE: ibl5/classes/Qux/Two.php' <<< "$_s4_out"; then
+        && ! grep -q '^UNPLANNED-FILE:' <<< "$_s4_out" \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/classes/Baz.php' <<< "$_s4_out" \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/classes/Qux/Two.php' <<< "$_s4_out"; then
     echo "ok: S4 two-segment directory token declares its subtree; ibl5/ and a file bullet's parent declare nothing"
 else
     echo "FAIL: S4 — expected ibl5/classes/Baz.php and ibl5/classes/Qux/Two.php flagged, got: '$_s4_out'"
@@ -954,13 +973,14 @@ printf '%s\n' 'bin/unrelated' 'ibl5/tests/New/NewTest.php' 'ibl5/tests/Old/OldTe
 printf '%s\n' 'ibl5/tests/New/NewTest.php' '.claude/rules/new.md' > "$_s5_added"
 _s5_out="$("$PSC" "$_s5_plan" "$_s5_changed" "" "$_s5_added" 2>&1)"
 _s5_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_s5_out" || true)"
-if [ "$_s5_count" -eq 2 ] \
+if [ "$_s5_count" -eq 1 ] \
         && ! grep -qF 'NewTest.php' <<< "$_s5_out" \
-        && grep -qF 'UNPLANNED-FILE: ibl5/tests/Old/OldTest.php' <<< "$_s5_out" \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/tests/Old/OldTest.php' <<< "$_s5_out" \
+        && ! grep -q '^UNPLANNED-FILE:.*OldTest.php' <<< "$_s5_out" \
         && grep -qF 'UNPLANNED-FILE: .claude/rules/new.md' <<< "$_s5_out"; then
-    echo "ok: S5 added test exempt; modified test and added .claude path flagged"
+    echo "ok: S5 added test exempt; modified test is a note; added .claude path holds"
 else
-    echo "FAIL: S5 — expected OldTest.php and .claude/rules/new.md flagged only, got: '$_s5_out'"
+    echo "FAIL: S5 — expected OldTest.php as SCOPE-NOTE and .claude/rules/new.md as UNPLANNED-FILE: only, got: '$_s5_out'"
     FAILED=1
 fi
 
@@ -1005,13 +1025,13 @@ _s7_none="$("$PSC" "$_s7_plan" "$_s7_changed" "" "$_s_empty" 2>&1)"
 _s7_ok="$("$PSC" "$_s7_plan" "$_s7_changed" "$_s7_gap_ok" "$_s_empty" 2>&1)"
 _s7_notes="$("$PSC" "$_s7_plan" "$_s7_changed" "$_s7_gap_notes" "$_s_empty" 2>&1)"
 _s7_decl="$("$PSC" "$_s7_plan" "$_s7_changed" "$_s7_gap_decl" "$_s_empty" 2>&1)"
-_s7_count="$(grep -c '^UNEXPLAINED-GAP:' <<< "$_s7_none" || true)"
+_s7_count="$(grep -c '^SCOPE-NOTE: gap' <<< "$_s7_none" || true)"
 if [ "$_s7_count" -eq 1 ] \
-        && grep -qF 'UNEXPLAINED-GAP: ibl5/a.php' <<< "$_s7_none" \
-        && ! grep -q '^UNEXPLAINED-GAP:' <<< "$_s7_ok" \
-        && grep -qF 'UNEXPLAINED-GAP: ibl5/a.php' <<< "$_s7_notes" \
-        && grep -qF 'UNEXPLAINED-GAP: ibl5/a.php' <<< "$_s7_decl"; then
-    echo "ok: S7 only must-appear gaps flag; only a Plan gaps bullet clears"
+        && grep -qF 'SCOPE-NOTE: gap ibl5/a.php' <<< "$_s7_none" \
+        && ! grep -q '^SCOPE-NOTE: gap' <<< "$_s7_ok" \
+        && grep -qF 'SCOPE-NOTE: gap ibl5/a.php' <<< "$_s7_notes" \
+        && grep -qF 'SCOPE-NOTE: gap ibl5/a.php' <<< "$_s7_decl"; then
+    echo "ok: S7 only must-appear gaps are noted; only a Plan gaps bullet clears"
 else
     echo "FAIL: S7 — none: '$_s7_none'; plan-gaps: '$_s7_ok'; notes: '$_s7_notes'; declared: '$_s7_decl'"
     FAILED=1
@@ -1043,11 +1063,13 @@ fi
 # Case S9 — PR #1996 replay: ScheduleUpdater.php flagged, cleared by the declaring body.
 _s9_bare="$("$PSC" "$PSC_FX/plan.md" "$PSC_FX/changed.txt" "" "$PSC_FX/added.txt" 2>&1)"
 _s9_decl="$("$PSC" "$PSC_FX/plan.md" "$PSC_FX/changed.txt" "$PSC_FX/body-declared.md" "$PSC_FX/added.txt" 2>&1)"
-if grep -qF 'UNPLANNED-FILE: ibl5/classes/Updater/ScheduleUpdater.php' <<< "$_s9_bare" \
+if grep -qF 'SCOPE-NOTE: unplanned ibl5/classes/Updater/ScheduleUpdater.php' <<< "$_s9_bare" \
+        && ! grep -q '^UNPLANNED-FILE:.*ScheduleUpdater.php' <<< "$_s9_bare" \
+        && ! grep -q '^SCOPE-NOTE: unplanned' <<< "$_s9_decl" \
         && ! grep -q '^UNPLANNED-FILE:' <<< "$_s9_decl"; then
-    echo "ok: S9 #1996 replay flags ScheduleUpdater.php; declaring body clears it"
+    echo "ok: S9 #1996 replay notes ScheduleUpdater.php; declaring body clears it"
 else
-    echo "FAIL: S9 — bare: '$(grep -c '^UNPLANNED-FILE:' <<< "$_s9_bare" || true)' lines; declared out: '$_s9_decl'"
+    echo "FAIL: S9 — bare: '$(grep -c '^SCOPE-NOTE:' <<< "$_s9_bare" || true)' notes; declared out: '$_s9_decl'"
     FAILED=1
 fi
 

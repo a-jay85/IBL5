@@ -8,7 +8,11 @@
 #     <changed-file>  one repo-relative changed path per line (git diff --name-only)
 #     <pr-body-file>  absent or "" -> no declarations and no gap explanations (fail-closed)
 #     <added-file>    absent or "" -> no path counts as added, so nothing is exempt
-#   stdout: `UNPLANNED-FILE: <path> (...)` and `UNEXPLAINED-GAP: <path> (...)` lines
+#   stdout: `UNPLANNED-FILE: <path> (...)` for an unaccounted `.claude/` path (holds),
+#           `SCOPE-NOTE: unplanned <path> (...)` for any other unaccounted path, and
+#           `SCOPE-NOTE: gap <path> (...)` for an unexplained must-appear gap.
+#           SCOPE-NOTE lines are advisory and never hold. A missing must-appear
+#           file already holds through `MISSING-FILE:`.
 #   exit 0 -> ran (with or without report lines; the caller decides severity)
 #   exit 2 -> usage error: $1 empty or unreadable, $2 empty or unreadable,
 #             $3 or $4 non-empty and unreadable
@@ -17,10 +21,11 @@
 # under EITHER parse verdict, a Verification Matrix test path, or a PR-body
 # `## Declared scope` bullet (a two-segment `dir/sub/` token declares its
 # subtree). A path the diff ADDED that matches bin/lib/plan-scope-exempt.txt is
-# exempt, except under `.claude/`. Anything else prints UNPLANNED-FILE:.
+# exempt, except under `.claude/`. An unaccounted `.claude/` path prints
+# UNPLANNED-FILE:. Any other unaccounted path prints SCOPE-NOTE: unplanned.
 #
 # Plan to diff: a MUST_APPEAR Critical File absent from the changed list prints
-# UNEXPLAINED-GAP: unless a PR-body `## Plan gaps` bullet names it. A
+# SCOPE-NOTE: gap unless a PR-body `## Plan gaps` bullet names it. A
 # `## Plan gaps` bullet clears only that label, never MISSING-FILE:.
 #
 # Generated `<!-- name:begin -->` .. `<!-- name:end -->` spans are stripped from
@@ -150,15 +155,17 @@ while IFS= read -r D; do
     done < "$TMP/dirs"
     [ "$covered" -eq 1 ] && continue
     case "$D" in
-        .claude/*) ;;
+        .claude/*)
+            echo "UNPLANNED-FILE: $D (changed path that no plan Critical File, no matrix test path and no PR-body '## Declared scope' bullet accounts for)"
+            ;;
         *)
             if [ -s "$TMP/exempt" ] && grep -qxF -- "$D" "$TMP/added"; then
                 printf '%s\n' "$D" > "$TMP/probe"
                 grep -qEf "$TMP/exempt" "$TMP/probe" && continue
             fi
+            echo "SCOPE-NOTE: unplanned $D (changed path that no plan Critical File, no matrix test path and no PR-body '## Declared scope' bullet accounts for)"
             ;;
     esac
-    echo "UNPLANNED-FILE: $D (changed path that no plan Critical File, no matrix test path and no PR-body '## Declared scope' bullet accounts for)"
 done < "$TMP/changed"
 
 # --- plan to diff: must-appear entries only ---
@@ -167,5 +174,5 @@ while IFS= read -r CF; do
     [ -z "$CF" ] && continue
     grep -qF -- "$CF" "$CHANGED_ARG" && continue
     grep -qF -- "$CF" "$TMP/gaps" && continue
-    echo "UNEXPLAINED-GAP: $CF (must-appear plan Critical File absent from the diff, and no PR-body '## Plan gaps' bullet explains why)"
+    echo "SCOPE-NOTE: gap $CF (must-appear plan Critical File absent from the diff, and no PR-body '## Plan gaps' bullet explains why)"
 done < "$TMP/must"

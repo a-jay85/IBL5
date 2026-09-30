@@ -35,7 +35,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import (adr_draft, body_numbers, cifix, ciwatch, conformance, fidelity, gitutil, llm_calls,
-                     manual_rows, manual_testing, schemas, statefile)
+                     manual_rows, manual_testing, schemas, scope_conformance, statefile)
 from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
@@ -48,10 +48,12 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               render_files_changed, render_manual_confirmation,
                               render_tests_changed,
                               render_residual_phases, render_reviewer_verification,
+                              render_scope_notes,
                               restore_manual_testing_section, strip_manual_testing_section,
                               upsert_files_changed, upsert_manual_confirmation,
                               upsert_tests_changed,
-                              upsert_residual_phases, upsert_reviewer_verification)
+                              upsert_residual_phases, upsert_reviewer_verification,
+                              upsert_scope_notes)
 from harness.planfile import locate_plan, split_hold_justification
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
@@ -333,6 +335,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             for f in check.get("findings", []):
                 log(f"phase2 body-check finding: {f}")
         _inject_residual_phases(copy, plan, files, log)
+        _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
         sha = _commit_with_gate_remediation(
@@ -1625,6 +1628,23 @@ def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str
     for it in items:
         log(f"phase2 residual-phase: {it}")
     return items
+
+
+def _inject_scope_notes(copy: dict, plan, files: list[str], diff_body: str, pr_body: str,
+                        log) -> list[str]:
+    """Phase 2: upsert `## Unplanned changes` into copy["summary_md"] from scope notes.
+
+    Runs right after _inject_residual_phases. Advisory only: no hold, no fail-closed
+    path. `pr_body` is the body being authored, so a `## Declared scope` or
+    `## Plan gaps` section in it clears its own note; the helper strips generated
+    marker spans first, so this block never declares itself. Idempotent: an empty note
+    list removes a stale block. Returns the notes for the caller's log line.
+    """
+    notes = scope_conformance.scope_notes(plan, files, diff_body, pr_body)
+    copy["summary_md"] = upsert_scope_notes(copy["summary_md"], render_scope_notes(notes))
+    for n in notes:
+        log(f"phase2 scope-note: {n}")
+    return notes
 
 
 def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool]:

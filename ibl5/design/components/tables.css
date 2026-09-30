@@ -600,6 +600,26 @@
     }
 }
 
+/* Desktop: the wrappers shrink to fit here, so container units would
+   collapse them. Instead, sticky offsets are a percent of the scroll area:
+   left and right at 50% conflict, left wins, so the title's left edge
+   sits at the visible center and the transform centers it. */
+@media (min-width: 769px) {
+    /* clip (not hidden): .ibl-data-table's overflow: hidden would make the
+       table the sticky title's scroll box */
+    .table-scroll-container .fa-table {
+        overflow: clip;
+    }
+
+    .fa-table__title {
+        display: inline-block;
+        position: sticky;
+        left: 50%;
+        right: 50%;
+        transform: translateX(-50%);
+    }
+}
+
 /* Scroll container for wide tables on mobile */
 .table-scroll-container {
     overflow-x: auto;
@@ -759,19 +779,6 @@
     position: sticky;
     left: 0;
     z-index: 5;
-}
-
-/* FA tables pin the Player column on phones only, matching the
-   .responsive-table FA tables above it on the same page */
-@media (min-width: 769px) {
-    .fa-table.sticky-table .sticky-col {
-        position: static;
-    }
-
-    .fa-table.sticky-table tbody td.sticky-col {
-        box-shadow: none;
-        border-right: none;
-    }
 }
 
 /* Second sticky column (e.g. Draft table: radio + name) */

@@ -319,7 +319,7 @@ derive_status() {
     # STOP: and PUSH FAILED are hard-stop markers; match them as line prefixes to avoid
     # false-positives from quoted instruction text. (Phase 8 tests this predicate; do not
     # weaken the anchor.)
-    if grep -qE '^[[:space:]>*_`-]*STOP:' "$log" || grep -qF 'PUSH FAILED' "$log"; then
+    if grep -qE '^[[:space:]>*_`-]*STOP:' "$log" || grep -qE '^[[:space:]>*_`-]*PUSH FAILED' "$log"; then
         printf 'NOT READY'
         return
     fi

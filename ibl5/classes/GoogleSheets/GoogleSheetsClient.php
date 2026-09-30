@@ -131,7 +131,7 @@ class GoogleSheetsClient
         $base = self::BASE_URL . '/' . rawurlencode($spreadsheetId);
         $range = "'" . str_replace("'", "''", $tab) . "'";
 
-        $this->send($accessToken, 'POST', $base . '/values/' . rawurlencode($range) . ':clear', [], true);
+        $this->send($accessToken, 'POST', $base . '/values/' . rawurlencode($range) . ':clear', (object) [], true);
 
         $data = [];
         foreach (array_chunk($rows, self::WRITE_CHUNK_ROWS) as $index => $chunk) {
@@ -152,10 +152,10 @@ class GoogleSheetsClient
     }
 
     /**
-     * @param array<string, mixed>|null $payload
+     * @param array<string, mixed>|object|null $payload
      * @return array<mixed>
      */
-    private function send(#[\SensitiveParameter] string $accessToken, string $method, string $url, ?array $payload, bool $notFoundMeansMissing): array
+    private function send(#[\SensitiveParameter] string $accessToken, string $method, string $url, array|object|null $payload, bool $notFoundMeansMissing): array
     {
         $body = $payload === null ? null : json_encode($payload, JSON_THROW_ON_ERROR);
         $response = $this->http->request($method, $url, [

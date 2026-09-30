@@ -313,6 +313,26 @@ def test_the_remediation_sentence_names_the_graded_commit():
 
 # --- the DM parser round-trip -------------------------------------------------
 
+def _details_shaped_body(terminal: str, diff_id: str = "d" * 40,
+                         plan_hash: str = "e" * 64) -> str:
+    """A hand-built sticky in the post-PR shape: audit trail after `---`."""
+    return "\n".join([
+        "**READY** · auto-merge armed", "",
+        "Findings: none.", "",
+        "### Merge digest",
+        "**What changed:** x", "**Why:** y", "**Watch:** z",
+        "**Touches:** w", "**Machine-authored fixes:** none",
+        "", "---", "",
+        "<details><summary>Audit trail</summary>", "",
+        "REVIEW-COVERAGE: CURRENT",
+        f"**Reviewed tree:** {'a' * 40}",
+        f"**Reviewed diff:** {diff_id}",
+        f"**Plan hash:** {plan_hash}",
+        "", "</details>", "",
+        terminal,
+        "<!-- pr-ready-verdict -->", ""])
+
+
 def _dm_labels(body):
     """Run bin/digest-dm-build's own _digest_labels over a composed body."""
     src = subprocess.run(["sed", "-n", "/^_digest_labels() {/,/^}/p",
@@ -341,6 +361,49 @@ def test_dm_build_round_trip():
         pytest.skip(f"digest-dm-build unavailable: {proc.stderr.strip()[:120]}")
     assert "a thing" in proc.stdout and "a page" in proc.stdout
     assert "No /pr-ready digest" not in proc.stdout
+
+
+def test_dm_parser_stops_at_rule_before_audit_trail():
+    labels = _dm_labels(_details_shaped_body("READY"))
+    assert len(labels) == 5, labels
+    for rec in labels:
+        for tok in ("REVIEW-COVERAGE", "Reviewed tree", "Reviewed diff", "details", "READY"):
+            assert tok not in rec, (tok, rec)
+
+
+def test_dm_build_round_trip_excludes_audit_trail():
+    body = _details_shaped_body("READY")
+    proc = subprocess.run([os.path.join(ROOT, "bin", "digest-dm-build"),
+                           "--pr-number", "1", "--title", "t", "--url", "u"],
+                          input=body, capture_output=True, text=True)
+    if proc.returncode != 0:
+        pytest.skip(f"digest-dm-build unavailable: {proc.stderr.strip()[:120]}")
+    for tok in ("REVIEW-COVERAGE", "**Reviewed tree:**", "<details>"):
+        assert tok not in proc.stdout, tok
+
+
+def test_carry_forward_reads_machine_lines_inside_details():
+    body = _details_shaped_body("READY WITH NOTES")
+    assert fidelity.carry_forward_predicate(body, "d" * 40, "e" * 64) == ("READY WITH NOTES", "")
+    assert fidelity.carry_forward_predicate(body, "f" * 40, "e" * 64) == (None, "diff-changed")
+
+
+@pytest.mark.parametrize("terminal,expected", [
+    ("READY", "READY"),
+    ("READY WITH NOTES", "READY WITH NOTES"),
+    ("READY WITH NOTES \u2014 notes left for the merging reviewer; the compiled harness "
+     "remediates only NOT READY", "READY WITH NOTES"),
+    ("READY (re-review) \u2014 findings remediated in abc1234 and re-reviewed clean on tree "
+     + "b" * 40, None),
+    ("NOT READY \u2014 the blocking findings listed above remain; remediate and re-run "
+     "/post-plan", None),
+    ("NOT READY (re-review) \u2014 the re-review's blocking findings remain; remediate and "
+     "re-run /post-plan", None),
+    ("NOT READY \u2014 plan-fidelity review produced no verdict (timeout); re-run /post-plan",
+     None),
+])
+def test_prior_verdict_classifies_every_terminal_string(terminal, expected):
+    assert fidelity._sticky_prior_verdict(_details_shaped_body(terminal)) == expected
 
 
 # --- digest_lines -------------------------------------------------------------

@@ -687,7 +687,9 @@ def test_sticky_ordering_and_marker():
     h = body.index(fidelity.MERGE_DIGEST_HEADING)
     r = body.index("**Remediation rounds:**")
     b = body.index("**Backlog issues filed:**")
-    assert "a-jay85/IBL5-backlog#101, a-jay85/IBL5-backlog#102" in body
+    assert ("[a-jay85/IBL5-backlog#101](<https://github.com/a-jay85/IBL5-backlog/issues/101>), "
+            "[a-jay85/IBL5-backlog#102](<https://github.com/a-jay85/IBL5-backlog/issues/102>)"
+            ) in body
     rule = body.index("\n---\n")
     opened = body.index("<details><summary>Audit trail</summary>")
     closed = body.index("</details>")

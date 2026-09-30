@@ -12,6 +12,8 @@ from .state import Classification
 
 FILES_CHANGED_BEGIN = "<!-- files-changed:begin -->"
 FILES_CHANGED_END = "<!-- files-changed:end -->"
+MERGE_DIGEST_BEGIN = "<!-- merge-digest:begin -->"
+MERGE_DIGEST_END = "<!-- merge-digest:end -->"
 TESTS_CHANGED_BEGIN = "<!-- tests-changed:begin -->"
 TESTS_CHANGED_END = "<!-- tests-changed:end -->"
 RESIDUAL_PHASES_BEGIN = "<!-- residual-phases:begin -->"
@@ -292,6 +294,45 @@ def upsert_files_changed(body: str, block: str) -> str:
 
     # Neither both present and in order: append fresh, leave any orphan in place.
     return body.rstrip() + "\n\n" + block + "\n"
+
+
+def render_merge_digest(rows: list[str]) -> str:
+    """Marker-bounded `## Merge digest` block for the top of a PR body.
+
+    One paragraph per row (blank line between rows) so GitHub renders each bold label
+    on its own line. The rows are the exact ones the sticky comment prints.
+    """
+    return "\n".join([MERGE_DIGEST_BEGIN, "## Merge digest", "",
+                      "\n\n".join(rows), MERGE_DIGEST_END])
+
+
+def upsert_merge_digest(body: str, block: str) -> str:
+    """Insert or replace the merge-digest block in a PR body.
+
+    Both markers present, BEGIN before END:
+        Replace everything from BEGIN through END inclusive with ``block``;
+        surrounding text is left byte-identical.
+    Neither marker present:
+        PREPEND ``block + "\\n\\n" + body.lstrip("\\n")`` (the digest sits at the TOP of
+        the body, unlike the files-changed block, which is appended).
+    Exactly one marker, or END before BEGIN:
+        Do not attempt surgery on the body.  Prepend a fresh block exactly as in
+        the neither-present case, leaving the orphan marker untouched.
+    Empty/None body:
+        Return ``block + "\\n"``.
+    """
+    body = body or ""
+    if not body.strip():
+        return block + "\n"
+
+    begin_idx = body.find(MERGE_DIGEST_BEGIN)
+    end_idx = body.find(MERGE_DIGEST_END)
+
+    if begin_idx != -1 and end_idx != -1 and begin_idx < end_idx:
+        after_end = end_idx + len(MERGE_DIGEST_END)
+        return body[:begin_idx] + block + body[after_end:]
+
+    return block + "\n\n" + body.lstrip("\n")
 
 
 def render_residual_phases(items: list[str]) -> str:

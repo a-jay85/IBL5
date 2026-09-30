@@ -90,7 +90,7 @@ Every such claim carries its evidence inline, in one of two forms:
 
 If you cannot produce the evidence, drop the claim. Describe what the PR changes, and name the command a reviewer runs after merge to confirm the state: "After merge, `launchctl list | grep <label>` shows the job." A present-tense external-state claim with no evidence is a fabricated claim, and the reviewer treats it as one.
 
-This rule has no mechanical check. The claims it covers are free-form prose, and the same phrases appear in design descriptions and quoted plans, so a pattern match would flag too many honest lines. Facts derivable from the diff are generated for you: the `**Files changed**` and `**Tests changed**` blocks come from `git diff`, so never restate them by hand.
+This rule has no mechanical check. The claims it covers are free-form prose, and the same phrases appear in design descriptions and quoted plans, so a pattern match would flag too many honest lines. Facts derivable from the diff are generated for you: the `**Files changed**` and `**Tests changed**` blocks come from `git diff`, so never restate them by hand. The `<!-- merge-digest:begin -->` block at the top of the body is runner-owned: it mirrors the sticky verdict, so never edit it by hand.
 
 ## Backlog issue references
 

@@ -16,6 +16,8 @@ TESTS_CHANGED_BEGIN = "<!-- tests-changed:begin -->"
 TESTS_CHANGED_END = "<!-- tests-changed:end -->"
 RESIDUAL_PHASES_BEGIN = "<!-- residual-phases:begin -->"
 RESIDUAL_PHASES_END = "<!-- residual-phases:end -->"
+SCOPE_NOTES_BEGIN = "<!-- scope-notes:begin -->"
+SCOPE_NOTES_END = "<!-- scope-notes:end -->"
 MANUAL_CONFIRMATION_BEGIN = "<!-- manual-confirmation:begin -->"
 MANUAL_CONFIRMATION_END = "<!-- manual-confirmation:end -->"
 REVIEWER_VERIFICATION_BEGIN = "<!-- reviewer-verification:begin -->"
@@ -326,6 +328,54 @@ def upsert_residual_phases(body: str, block: str) -> str:
     well_formed = begin_idx != -1 and end_idx != -1 and begin_idx < end_idx
     if well_formed:
         after_end = end_idx + len(RESIDUAL_PHASES_END)
+        if not block:
+            head = body[:begin_idx].rstrip("\n")
+            tail = body[after_end:].lstrip("\n")
+            return head + ("\n\n" + tail if tail else "\n") if head else tail
+        return body[:begin_idx] + block + body[after_end:]
+    if not block:
+        return body
+    if not body.strip():
+        return block
+    return body.rstrip() + "\n\n" + block + "\n"
+
+
+def render_scope_notes(notes: list[str]) -> str:
+    """The `## Unplanned changes` block for a PR body, or "" when there are no notes.
+
+    `notes` are `unplanned <path> (...)` / `gap <path> (...)` texts from
+    scope_conformance.scope_notes. The block is advisory: it never holds auto-merge.
+    """
+    if not notes:
+        return ""
+    parts = [SCOPE_NOTES_BEGIN, "## Unplanned changes",
+             "The plan did not name these changes, or the diff lacks a planned file. "
+             "Auto-merge is not held on them. Check each one."]
+    for n in notes:
+        m = re.match(r"^(unplanned|gap) (\S+)(.*)$", n)
+        if m:
+            parts.append(f"- {m.group(1)} `{m.group(2)}`{m.group(3)}")
+        else:
+            parts.append(f"- {n.strip()}")
+    parts.append(SCOPE_NOTES_END)
+    return "\n".join(parts)
+
+
+def upsert_scope_notes(body: str, block: str) -> str:
+    """Insert, replace, or remove the scope-notes block in a PR body.
+
+    Same contract as upsert_files_changed for a non-empty block. An EMPTY block removes an
+    existing well-formed marker pair (plus one surrounding blank line) so a re-run after the
+    notes clear removes the notice; with no markers and an empty block the body is returned
+    unchanged. An orphan or reversed marker pair is left untouched and a non-empty block is
+    appended after it.
+    """
+    body = body or ""
+    begin_idx = body.find(SCOPE_NOTES_BEGIN)
+    end_idx = body.find(SCOPE_NOTES_END)
+    well_formed = begin_idx != -1 and end_idx != -1 and begin_idx < end_idx
+    if well_formed:
+        after_end = end_idx + len(SCOPE_NOTES_END)
         if not block:
             head = body[:begin_idx].rstrip("\n")
             tail = body[after_end:].lstrip("\n")

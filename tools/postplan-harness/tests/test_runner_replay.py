@@ -601,15 +601,12 @@ def test_phase6_all_rows_demoted_clears():
         assert dem["exit_ok"] is True
         assert "argv" in dem
     # PR body should contain sentinel, no checkbox line
-    actions = _actions(out)
-    body_edits = [a for a in actions if a.get("action") == "pr_edit_body"]
-    if body_edits:
-        body = body_edits[-1].get("body", "")
-        assert "No manual testing needed" in body
-        assert "- [ ]" not in body
-        # Zero executable rows here, but demoted rows keep the covered-by sentinel.
-        assert MANUAL_TESTING_SENTINEL in body
-        assert MANUAL_TESTING_SENTINEL_STATIC not in body
+    body = _phase6_body(out)
+    assert "No manual testing needed" in body
+    assert "- [ ]" not in body
+    # Zero executable rows here, but demoted rows keep the covered-by sentinel.
+    assert MANUAL_TESTING_SENTINEL in body
+    assert MANUAL_TESTING_SENTINEL_STATIC not in body
 
 
 def test_phase6_all_automated_keeps_covered_sentinel():

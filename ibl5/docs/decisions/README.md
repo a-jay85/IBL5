@@ -61,6 +61,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0146](0146-discord-dev-webhook-notify.md) | Owner notices post to a #dev channel webhook with an opt-in ping | Accepted | `bin/discord-dm` and the notify-discord action post owner-bound notices to a private #dev webhook; `--ping` / `ping: true` @mentions the owner on failures only; other recipients and `--raw --route` stay on the IBLbot DM; `bin/test-discord-dm` pins the 15 call sites and the ping set. |
 | [0152](0152-pull-prod-db-dumps-offsite-to-mac.md) | Pull prod DB dumps offsite to the owner's Mac | Accepted | `bin/db-backups-pull` rsyncs the nightly dumps to `~/Backups/ibl5-db` daily without `--delete`. It keeps 30 dailies plus each month's first, and DMs when the newest dump is over 36 hours old. |
 | [0156](0156-postplan-harness-concurrency-disclosure.md) | Disclose fail-fast changes in post-plan harness concurrency PRs | Accepted | A harness change that adds or alters concurrency names the failure-timing change in its PR body and tests every enabled agent path in submission order; path-scoped rule `.claude/rules/post-plan-concurrency-docs.md`, enforced by review only. |
+| [0151](0151-google-sheets-server-push.md) | Google Sheets export pushes from the server | Accepted | Five Google endpoints go through `ext-curl` behind `GoogleHttpClientInterface`; refresh tokens are `ext-sodium` encrypted under `GOOGLE_TOKEN_KEY`; refresh is queued and drained by the `googleSheetRefreshTick.php` cron worker, never inline in the sim pipeline. |
 
 ## When an ADR is Required
 

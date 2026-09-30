@@ -981,6 +981,8 @@ jobs:
         run: bin/test-pr-triage
       - name: bin/test-post-plan-fleet
         run: bin/test-post-plan-fleet
+      - name: bin/test-usage-gate
+        run: bin/test-usage-gate
       - name: bin/test-plan-index
         run: bin/test-plan-index
       - name: bin/test-post-plan-now-pr-creates-worktree

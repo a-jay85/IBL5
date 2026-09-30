@@ -266,4 +266,44 @@ assert_status "C7 --help exit 0"              0                        "$ST"
 assert_match  "C7 ARMABLE is fail-closed"     "ARMABLE is fail-closed" "$OUT"
 assert_match  "C7 usage mentions update-branch" "update-branch"        "$OUT"
 
+# --- C16/C17: PAUSED bucket (ADR-0143 usage gate) ---
+# A post-plan-now marker whose resume_cwd is this PR's worktree wins over ARMABLE.
+export IBL5_USAGE_GATE_STATE_DIR="$TMP/gate-state"
+mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
+GATE_LIB="$SCRIPT_DIR/lib/usage-gate.sh"
+for wt in wt-a wt-b; do
+    mkdir -p "$TMP/$wt/bin"
+    git init -q "$TMP/$wt"
+    : > "$TMP/$wt/bin/post-plan-now"
+    chmod +x "$TMP/$wt/bin/post-plan-now"
+done
+# Marker for wt-a (the runner name is post-plan-now, the resume script lives in wt-a).
+( . "$GATE_LIB"; usage_marker_write "cccccccc-3333-4333-8333-cccccccccccc" post-plan-now \
+    "$TMP/wt-a/bin/post-plan-now" usage-pause drain 94 five_hour "" ) > /dev/null 2>&1 \
+    || { failcase "C16 setup: marker write failed"; }
+export PR_TRIAGE_WTL="$TMP/wtl.porcelain"
+printf 'worktree %s\nHEAD 0000\nbranch refs/heads/fixture-16\n\nworktree %s\nHEAD 0000\nbranch refs/heads/fixture-17\n' \
+    "$TMP/wt-a" "$TMP/wt-b" > "$PR_TRIAGE_WTL"
+
+FIX="$(mktemp -d -p "$TMP")"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 16).json"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 17).json"
+{ pr_json 16 CLEAN "$BODY_CLEAR"; pr_json 17 CLEAN "$BODY_CLEAR"; } | jq -s . > "$FIX/prs.json"
+run_triage "$FIX" --arm
+assert_match  "C16 paused worktree -> PAUSED"       "^PAUSED$"                                  "$(row_bucket "$OUT" 16)"
+assert_match  "C16 action names the usage gate"     "none . post-plan paused by usage gate"     "$(row_action "$OUT" 16)"
+assert_absent "C16 --arm never merges the paused PR" "^pr merge 16 "                            "$(cat "$FIX/calls.log")"
+assert_match  "C17 other worktree stays ARMABLE"    "^ARMABLE$"                                 "$(row_bucket "$OUT" 17)"
+assert_match  "C17 the unpaused PR is armed"        "^pr merge 17 --squash --auto$"             "$(cat "$FIX/calls.log")"
+assert_status "C16 exit 0"                          0                                           "$ST"
+
+# No marker at all: the PR is ARMABLE again.
+rm -rf "$IBL5_USAGE_GATE_STATE_DIR/markers"
+run_triage "$FIX"
+assert_match  "C18 no marker -> ARMABLE"            "^ARMABLE$"                                 "$(row_bucket "$OUT" 16)"
+
+# --help documents the bucket.
+ST=0; OUT="$("$TRIAGE" --help 2>&1)" || ST=$?
+assert_match  "C19 --help mentions PAUSED"          "PAUSED"                                    "$OUT"
+
 [ "$FAILED" = 0 ] && exit 0 || exit 1

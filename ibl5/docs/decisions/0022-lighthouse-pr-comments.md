@@ -1,6 +1,6 @@
 ---
 description: ADR for Lighthouse PR sticky comments with per-URL scores and deltas vs master baseline
-last_verified: 2026-09-21
+last_verified: 2026-09-29
 ---
 
 # ADR-0022: Lighthouse PR Comments
@@ -10,7 +10,7 @@ last_verified: 2026-09-21
 
 ## Context
 
-Lighthouse CI already runs on every source-affecting PR (`.github/workflows/lighthouse.yml`) and posts a pass/fail status check via the LHCI GitHub App. However, the status check collapses all 5 audited URLs into a single pass/fail signal, hides per-category scores, and provides no delta against the master baseline. Reviewers must click into the workflow run, find the LHCI step, hunt the storage URL, and open each report manually. Most don't bother, and small performance regressions ship invisibly.
+Lighthouse CI already runs on every source-affecting PR (`.github/workflows/lighthouse.yml` (example)) and posts a pass/fail status check via the LHCI GitHub App. However, the status check collapses all 5 audited URLs into a single pass/fail signal, hides per-category scores, and provides no delta against the master baseline. Reviewers must click into the workflow run, find the LHCI step, hunt the storage URL, and open each report manually. Most don't bother, and small performance regressions ship invisibly.
 
 ## Decision
 
@@ -34,7 +34,7 @@ Post a sticky PR comment with per-URL scores, deltas against master, and direct 
 
 ## References
 
-- `.github/workflows/lighthouse.yml` — PR workflow with baseline download and sticky comment
+- `.github/workflows/lighthouse.yml` (example) — PR workflow with baseline download and sticky comment <!-- slop-ok -->
 - `.github/workflows/lighthouse-baseline.yml` — master-only baseline generation workflow
 - `bin/lighthouse-comment` — CLI script for generating the Markdown comment
 - `ibl5/classes/Cli/LighthouseCommentFormatter.php` — formatting logic

@@ -1,7 +1,7 @@
 ---
 description: Go engine workflow — run the CI-pinned golangci-lint locally before merging (auto-merge races ahead of engine.yml), the two lint rules it enforces, and the real measured runtime of an archive A/B walk.
 paths: "engine/**"
-last_verified: 2026-09-16
+last_verified: 2026-09-29
 ---
 
 # Engine (Go) Workflow
@@ -13,12 +13,19 @@ carries only what that one does not.
 ## Lint locally BEFORE merging — CI is not a gate here
 
 `golangci-lint` is not preinstalled locally or on the automouse host, and
-`.github/workflows/engine.yml` is **not a required-status check** (the four required
-contexts are `Tests and Analysis`, `E2E Tests`, `human-signoff`, and `Meta checks` —
-`engine.yml` is not among them), so `gh pr merge --auto` merges as soon as those four
-pass — before `engine.yml` has run lint. Deferring lint to CI therefore lands failures
+`.github/workflows/engine.yml` is **not a required-status check**. The required
+contexts are whatever
+`gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'`
+prints: `Tests and Analysis`, `E2E Tests`, `human-signoff`, and `Meta checks`, plus
+`Infection PHP (per-PR diff)` once the ADR-0145 activation runs. `engine.yml` is not
+among them, so `gh pr merge --auto` merges as soon as those pass, before `engine.yml`
+has run lint. Deferring lint to CI therefore lands failures
 on **master** (that is the PR9b / #933 red-master incident: errcheck flagged unchecked
 `io.Writer` `Fprint*`/`Close` returns and needed a follow-up fix PR).
+
+On a PR, `engine.yml` runs only when `engine/**` or the workflow file changes (a
+workflow-level `on.pull_request.paths` filter). A PR that touches no engine file
+gets no "Engine" check at all. Master pushes keep their own `push.paths` filter.
 
 So for any engine PR, install and run the CI-pinned linter yourself first:
 

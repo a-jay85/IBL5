@@ -3,18 +3,6 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../ibl5/vendor/autoload.php';
-
-$worktreeClasses = realpath(__DIR__ . '/../ibl5/classes');
-if ($worktreeClasses !== false && is_link(__DIR__ . '/../ibl5/vendor')) {
-    spl_autoload_register(static function (string $class) use ($worktreeClasses): void {
-        $file = $worktreeClasses . '/' . str_replace('\\', '/', $class) . '.php';
-        if (file_exists($file)) {
-            require $file;
-        }
-    }, true, true);
-}
-
 use Cli\LighthouseUrls;
 use Module\ModuleRegistry;
 
@@ -40,6 +28,18 @@ foreach ($argv as $i => $arg) {
         fwrite(STDERR, "Usage: bin/lighthouse-pr-urls [--base-url=URL] [--json] [--stdin]\n");
         exit(2);
     }
+}
+
+require_once __DIR__ . '/../ibl5/vendor/autoload.php';
+
+$worktreeClasses = realpath(__DIR__ . '/../ibl5/classes');
+if ($worktreeClasses !== false && is_link(__DIR__ . '/../ibl5/vendor')) {
+    spl_autoload_register(static function (string $class) use ($worktreeClasses): void {
+        $file = $worktreeClasses . '/' . str_replace('\\', '/', $class) . '.php';
+        if (file_exists($file)) {
+            require $file;
+        }
+    }, true, true);
 }
 
 $baseUrl = rtrim($baseUrl, '/');

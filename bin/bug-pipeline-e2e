@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 usage() {
-    cat >&2 <<'EOF'
+    cat <<'EOF'
 Usage: BUG_PIPELINE_E2E=1 bin/bug-pipeline-e2e [--help]
 
   (no flag)  run the full E2E suite (requires bin/bug-pipeline-test-env bring-up)
@@ -17,6 +17,11 @@ Usage: BUG_PIPELINE_E2E=1 bin/bug-pipeline-e2e [--help]
 Distinct from BUG_BOT_E2E which gates the Discord smoke (Phase 8 / server.e2e.test.ts).
 EOF
 }
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    usage
+    exit 0
+fi
 
 # ── Step 5.1: Opt-in gate ────────────────────────────────────────────────────
 if [ "${BUG_PIPELINE_E2E:-}" != "1" ]; then

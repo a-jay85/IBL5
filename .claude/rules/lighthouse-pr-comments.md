@@ -1,58 +1,39 @@
 ---
-description: Lighthouse CI posts per-URL scores and deltas-vs-master as a sticky PR comment on every source-affecting PR
+description: Lighthouse CI runs after merge only (master-push baseline plus weekly audit); where the audited URL set and thresholds live, and the NO_FCP empty-body failure.
 paths:
   - ".github/workflows/lighthouse*"
   - "ibl5/.lighthouserc.json"
-last_verified: 2026-09-16
+last_verified: 2026-09-29
 ---
 
-# Lighthouse PR Comments
+# Lighthouse CI (post-merge)
 
 ## What runs
 
-`.github/workflows/lighthouse.yml` audits a **dynamic subset of URLs selected from
-the PR diff** by `bin/lighthouse-pr-urls` on every PR that touches PHP/CSS/TS/JS/design
-assets. Selection is module-scoped (a changed `ibl5/modules/<Name>/` file audits that
-module's page), with a curated representative-set fallback for global or sweeping
-changes (CSS/TS/JS, `ibl5/classes/**`, workflow/config self-edits, or more than 8
-modules touched). The master baseline runs the **full** site set (via
-`.github/workflows/lighthouse-baseline.yml`) so every PR-selectable URL has a baseline
-row to diff against.
+Lighthouse runs after merge only. PRs get no Lighthouse check and no sticky comment.
 
-## Reading the PR comment
+- `.github/workflows/lighthouse-baseline.yml` runs on master push. It collects the **full** site set with `lhci collect`, applies no assertions, and uploads the `lighthouse-baseline-manifest` artifact. An artifact-age gate skips the run when a fresh baseline already exists.
+- `.github/workflows/lighthouse-audit.yml` runs weekly (Sunday 03:00 UTC) and on `workflow_dispatch`. It audits the full set against `ibl5/.lighthouserc.json` and opens or closes the `lighthouse-audit` issue.
 
-The sticky comment shows per-URL scores in three categories:
+## Why there is no PR run
 
-| Marker | Meaning |
-|--------|---------|
-| `0.92 (±0.00)` | Score and delta vs baseline |
-| 🟡 `0.58` | Below warn threshold OR regression > 0.03 |
-| 🔴 `0.75` | Below error threshold (PR will fail accessibility-error gate) |
-
-A 🔴 score on accessibility blocks merge (LHCI App status check fails).
-A 🟡 marker is informational — investigate before merging.
-
-## When the comment is missing
-
-- Path filter excluded the PR (docs-only, infra-only changes) — expected.
-- Baseline workflow has not run yet on master after the most recent
-  source-affecting push — comment shows scores without deltas plus a footnote
-  "No master baseline yet."
+The PR workflow was removed on 2026-09-29 to free runner slots for the four required checks. It was never a required check, and no hook, harness, or promotion script read its result. An accessibility regression now surfaces in the weekly `lighthouse-audit` issue. To audit a branch before merge, run a local `lhci autorun` with `ibl5/.lighthouserc.json` against the worktree stack.
 
 ## Modifying the audit
 
-- URL **selection** lives in `bin/lighthouse-pr-urls` plus the shared
-  `Cli\LighthouseUrls` class: the module→sub-page map is `LighthouseUrls::SUB_PAGES`,
-  and the global/sweeping fallback set is `LighthouseUrls::REPRESENTATIVE_PATHS`.
+- The module to sub-page map is `LighthouseUrls::SUB_PAGES` in the shared
+  `Cli\LighthouseUrls` class, listed in full by `bin/lighthouse-audit-urls`.
+  `bin/lighthouse-pr-urls` served only the retired PR run and stays until a
+  follow-up removes it. `LighthouseUrls::REPRESENTATIVE_PATHS` was the PR fallback
+  set and still pins the static `collect.url` default (see below).
 - A module that **hard-requires query params** (its bare `?name=<Module>` URL 404s)
   needs BOTH a `SUB_PAGES` entry and a `LighthouseUrls::PARAM_REQUIRED_MODULES` entry —
   the latter suppresses the bare URL, which Lighthouse would otherwise treat as
   `ERRORED_DOCUMENT_REQUEST` and hard-fail the entire audit run on. Enforced by
   `bin/lighthouse-audit-urls --check`, the last step of `.github/actions/lighthouse-setup`
-  — so it gates all three Lighthouse workflows (`lighthouse.yml`, `lighthouse-baseline.yml`,
-  `lighthouse-audit.yml`) before any audit runs. It validates the **full** site set even
-  when the workflow audits only a PR-selected subset, so a new param-required module is
-  caught the first time any Lighthouse workflow runs.
+  and so gates both Lighthouse workflows (`lighthouse-baseline.yml`,
+  `lighthouse-audit.yml`) before any audit runs. A new param-required module is
+  caught the first time either workflow runs.
 - The representative fallback set is mirrored in `ibl5/.lighthouserc.json` `collect.url`
   (pinned equal to `REPRESENTATIVE_PATHS` by a `LighthouseUrlsTest` unit test); both
   workflows `jq`-override `.ci.collect.url`, so the static array is only the

@@ -10,6 +10,23 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/db-test-up [<worktree-name>] [--no-run]
+
+Bootstrap a sibling ibl5_test database and optionally run database
+integration tests against it. Resets ibl5_test on each run; never
+touches iblhoops_ibl5.
+
+Arguments:
+  <worktree-name>  Use the worktree's Docker environment (ibl5-db-<slug> /
+                   ibl5-php-<slug>). Without this, uses the main checkout
+                   environment (ibl5-mariadb / ibl5-php).
+  --no-run         Bootstrap the database only; skip running phpunit.
+EOF
+    exit 0
+fi
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bin/lib/db-helpers.sh"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"

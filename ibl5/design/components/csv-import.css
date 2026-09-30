@@ -1,3 +1,6 @@
+/* Standalone <link> from uploadDraftClass.php (mtime cache-busted) and import-demands.php.
+   Kept out of design/input.css on purpose: style.css has no Cache-Control, so a
+   bundled rule could reach browsers late. See the comment in uploadDraftClass.php. */
 @layer components {
 
 .csv-import {

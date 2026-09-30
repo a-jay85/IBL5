@@ -101,6 +101,11 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    awk 'NR>1 { if ($0 !~ /^#/) exit; sub(/^# ?/, ""); print }' "${BASH_SOURCE[0]}"
+    exit 0
+fi
+
 # --- PATH prelude ------------------------------------------------------------------------
 # A safety net for invocation from a restricted context (launchd, a hook) that lacks the
 # usual tool dirs. Appended, not prepended: an interactive caller's own PATH — and the test
@@ -1079,7 +1084,7 @@ $(_your_turn_lines)"
         _msg="pr-cycle finished — $_FIRED_SUMMARY, armed $ARMED, your turn $LEFT — $_reason
 log: ${PR_CYCLE_LOG:-<foreground>}
 $_yt_block"
-        "$PR_CYCLE_DM_CMD" "$_msg" || true
+        "$PR_CYCLE_DM_CMD" --ping "$_msg" || true
     fi
 
     case "$_reason" in

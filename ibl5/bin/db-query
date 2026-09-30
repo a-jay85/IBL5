@@ -14,6 +14,24 @@
 # (history expansion). If running manually, use <> instead of != in SQL,
 # or use single quotes: ./bin/db-query 'SELECT * FROM t WHERE col != ""'
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/db-query "SQL QUERY"
+
+Run a SQL query against the local Docker MariaDB database.
+
+Arguments:
+  SQL QUERY   SQL query string to execute
+
+Env vars:
+  DB_QUERY_TARGET   'main' to force the main stack (default: route by location)
+
+Exit codes: 0 = success, 1 = missing query or config error,
+            2 = invalid DB_QUERY_TARGET, 3 = worktree container not running
+EOF
+    exit 0
+fi
+
 if [ -z "$1" ]; then
     echo "Usage: $0 \"SQL QUERY\"" >&2
     exit 1
@@ -82,8 +100,14 @@ fi
 # Homebrew leaves mariadb unlinked when mysql is also installed (they ship the
 # same binaries), so launchd jobs with a minimal PATH cannot find the host client.
 # db-sync-nightly failed its post-restore assertion every night for this reason.
-if ! command -v mariadb >/dev/null 2>&1 && [ -x /opt/homebrew/opt/mariadb/bin/mariadb ]; then
-    PATH="/opt/homebrew/opt/mariadb/bin:$PATH"
+# Apple Silicon installs under /opt/homebrew, Intel under /usr/local.
+if ! command -v mariadb >/dev/null 2>&1; then
+    for _brew_mariadb in /opt/homebrew/opt/mariadb/bin /usr/local/opt/mariadb/bin; do
+        if [ -x "$_brew_mariadb/mariadb" ]; then
+            PATH="$_brew_mariadb:$PATH"
+            break
+        fi
+    done
 fi
 
 if [ ! -f "$CONFIG" ]; then

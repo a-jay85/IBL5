@@ -37,10 +37,34 @@ def test_harness_sticky_always_owes_and_fires(tmp_path, monkeypatch):
     assert result["command"].startswith("FIRED: ")
 
 
+def test_harness_sticky_with_banner_line_one_still_owes(tmp_path, monkeypatch):
+    fired = _stub_pr_review_now(tmp_path, monkeypatch)
+    body = (f"**READY** \u2014 2026-09-30 10:00:00 PDT \u00b7 auto-merge armed\n\n"
+            "Findings: none.\n\n---\n\n<details><summary>Audit trail</summary>\n\n"
+            f"REVIEW-COVERAGE: CURRENT\n**Reviewed tree:** {T1}\n\n</details>\n\n"
+            "READY\n<!-- pr-ready-verdict -->\n")
+    result = fidelity.fire_review_owed(
+        None, "master_sha", 123, body, T1, str(tmp_path), live=True)
+    assert result["verdict"] == "REVIEW-OWED"
+    assert result["fired"] is True
+
+
 def test_skill_sticky_current_marker_and_same_tree_is_current(tmp_path, monkeypatch):
     fired = _stub_pr_review_now(tmp_path, monkeypatch)
     result = fidelity.fire_review_owed(
         None, "master_sha", 123, SKILL_STICKY, T1, str(tmp_path), live=True)
+    assert result["verdict"] == "REVIEW-CURRENT"
+    assert result["reason"] == T1
+    assert result["fired"] is False
+    assert not fired.exists()
+
+
+def test_skill_sticky_current_marker_inside_details_is_current(tmp_path, monkeypatch):
+    fired = _stub_pr_review_now(tmp_path, monkeypatch)
+    sticky = (f"**Reviewed tree:** {T1}\n\n<details><summary>Audit trail</summary>\n\n"
+              "REVIEW-COVERAGE: CURRENT\n\n</details>\n<!-- pr-ready-verdict -->\n")
+    result = fidelity.fire_review_owed(
+        None, "master_sha", 123, sticky, T1, str(tmp_path), live=True)
     assert result["verdict"] == "REVIEW-CURRENT"
     assert result["reason"] == T1
     assert result["fired"] is False

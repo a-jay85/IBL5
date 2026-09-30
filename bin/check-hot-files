@@ -4,6 +4,24 @@
 # > THRESHOLD at head. Chronic already-over-THRESHOLD files are not reported.
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-hot-files [--pr]
+
+Lists PHP class files in classes/ over THRESHOLD lines.
+
+  (no flag)  list all hot files
+  --pr       list only classes that crossed THRESHOLD in this PR
+
+Env vars:
+  HOT_FILE_THRESHOLD   line threshold (default: 500)
+  HOT_FILE_BASE_REF    base commit ref for --pr mode (default: origin/master)
+
+Exit codes (--pr mode): 0 = at least one crossing, 1 = no crossing
+EOF
+    exit 0
+fi
+
 THRESHOLD=${HOT_FILE_THRESHOLD:-500}
 BASE_REF=${HOT_FILE_BASE_REF:-origin/master}
 ROOT=$(git rev-parse --show-toplevel)

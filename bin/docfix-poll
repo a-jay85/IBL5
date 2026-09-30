@@ -393,7 +393,7 @@ docfix_run_in_flight() {   # returns 0 = in flight; never prints
 }
 
 health_report() {
-    local alert=false kind="" detail="" report count pr_json pr_num red orphan wedged age_h episode last_pr last_pr_epoch
+    local alert=false kind="" detail="" report count pr_json pr_num red orphan wedged age_h episode last_pr last_pr_epoch wedged_age wedged_polls
     report="$(mktemp)"; trap 'rm -f "$report"' RETURN
     "$MAIN/bin/check-docs" --staleness-report > "$report" \
         || { printf 'alert=false\nkind=\ndetail=\n'; return 0; }
@@ -427,7 +427,18 @@ health_report() {
             detail="Refresh branch ${orphan} is on origin with no PR — the doc-fix run died mid-flight. Log: ls -t /tmp/docfix-run-*.log | head -1"
         elif wedged="$(wedged_local_refresh_branch)"; [ -n "$wedged" ]; then
             alert=true; kind="wedged"
-            detail="Local branch ${wedged} has no origin ref and no in-flight launchd run — the doc-fix run died before pushing. Next poll will salvage it automatically."
+            # The poll runs once a day and tries to salvage a wedged branch each
+            # time, so a branch N days old has survived N salvage attempts. Round
+            # to whole days; floor at 1 because this alert only fires past the
+            # 4h wedge threshold (or on unknown age).
+            wedged_age="$(branch_age_seconds "$wedged")"
+            if [ -n "$wedged_age" ]; then
+                wedged_polls=$(( (wedged_age + 43200) / 86400 ))
+                [ "$wedged_polls" -ge 1 ] || wedged_polls=1
+                detail="Local branch ${wedged} has no origin ref and no in-flight launchd run — the doc-fix run died before pushing. It has survived ${wedged_polls} nightly salvage attempt(s) and needs a manual look."
+            else
+                detail="Local branch ${wedged} has no origin ref and no in-flight launchd run — the doc-fix run died before pushing. Failed salvage attempts: unknown (branch reflog expired); it needs a manual look."
+            fi
         else
             # gh dying inside issue_episode_epoch yields empty output, and an empty
             # arithmetic operand is a syntax error that kills the function. Fall back

@@ -47,6 +47,12 @@ def test_refusable_paths_parser_flags_path_rules():
     assert refusable_paths("phase2: conflicted paths (probe) = -\n") == set()
 
 
+def test_json_paths_are_not_refused_by_path():
+    """classify has no *.json rule; a json conflict (stages {1, 2, 3}) stays resolvable."""
+    text = "phase2: conflicted paths (plain rebase) = ibl5/phpstan-baseline-counts.json\n"
+    assert refusable_paths(text) == set()
+
+
 def test_local_audit_corpus_flip_set():
     if os.environ.get("POSTPLAN_CORPUS_DIFF") != "1":
         pytest.skip("SKIP: set POSTPLAN_CORPUS_DIFF=1 to diff the local audit-log corpus")

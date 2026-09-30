@@ -199,6 +199,7 @@ def test_probe_records_delete_modify_stages(tmp_path):
                            master_deletes=True)
     assert result == ("c.txt",)
     assert g.last_conflict_stages == {"c.txt": frozenset({1, 3})}
+    assert g.last_conflict_stages["c.txt"] != frozenset({1,2,3})
 
 
 def test_probe_committed_branch_is_not_exact(tmp_path):

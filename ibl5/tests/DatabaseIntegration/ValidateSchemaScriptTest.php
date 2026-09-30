@@ -14,6 +14,11 @@ use PHPUnit\Framework\TestCase;
  * from config/schema-assertions.php. Extends TestCase directly, not DatabaseTestCase:
  * CREATE DATABASE and CREATE TABLE commit implicitly, so the transaction wrapper is moot.
  * The shared migrated database is never altered; the scratch database is dropped in tearDown.
+ *
+ * The script reads credentials from config.php, which in CI requires a config.local.php with
+ * hardcoded values and ignores DB_* env vars. So each run copies the script into a sandbox
+ * tree whose own config.php points at the scratch database; vendor/, classes/ and config/
+ * are symlinks back to the real tree.
  */
 #[Group('database')]
 final class ValidateSchemaScriptTest extends TestCase
@@ -21,6 +26,7 @@ final class ValidateSchemaScriptTest extends TestCase
     private string $ibl5Dir;
     private \mysqli $db;
     private string $scratchDb;
+    private string $sandboxDir = '';
 
     protected function setUp(): void
     {
@@ -43,8 +49,27 @@ final class ValidateSchemaScriptTest extends TestCase
         $this->db->select_db($this->scratchDb);
     }
 
+    private function removeSandbox(): void
+    {
+        if ($this->sandboxDir === '' || !is_dir($this->sandboxDir)) {
+            return;
+        }
+        $ibl5 = $this->sandboxDir . '/ibl5';
+        foreach (['vendor', 'classes', 'config', 'config.php', 'bin/validate-schema'] as $entry) {
+            if (is_link($ibl5 . '/' . $entry) || is_file($ibl5 . '/' . $entry)) {
+                unlink($ibl5 . '/' . $entry);
+            }
+        }
+        foreach ([$ibl5 . '/bin', $ibl5, $this->sandboxDir] as $dir) {
+            if (is_dir($dir)) {
+                rmdir($dir);
+            }
+        }
+    }
+
     protected function tearDown(): void
     {
+        $this->removeSandbox();
         if (isset($this->db)) {
             try {
                 if (isset($this->scratchDb)) {
@@ -127,19 +152,41 @@ final class ValidateSchemaScriptTest extends TestCase
     }
 
     /**
-     * @param array<string, string> $overrides
+     * Builds the sandbox tree and returns the path of the copied script.
+     */
+    private function buildSandbox(string $dbUser): string
+    {
+        $this->sandboxDir = sys_get_temp_dir() . '/ibl_vs_' . bin2hex(random_bytes(6));
+        $ibl5 = $this->sandboxDir . '/ibl5';
+        self::assertTrue(mkdir($ibl5 . '/bin', 0777, true));
+        foreach (['vendor', 'classes', 'config'] as $dir) {
+            self::assertTrue(symlink($this->ibl5Dir . '/' . $dir, $ibl5 . '/' . $dir));
+        }
+        $config = sprintf(
+            "<?php\n\$dbhost = %s;\n\$dbuname = %s;\n\$dbpass = %s;\n\$dbname = %s;\n",
+            var_export($this->requireEnv('DB_HOST'), true),
+            var_export($dbUser, true),
+            var_export($this->requireEnv('DB_PASS'), true),
+            var_export($this->scratchDb, true)
+        );
+        self::assertNotFalse(file_put_contents($ibl5 . '/config.php', $config));
+        self::assertTrue(copy($this->ibl5Dir . '/bin/validate-schema', $ibl5 . '/bin/validate-schema'));
+
+        return $ibl5 . '/bin/validate-schema';
+    }
+
+    /**
      * @return array{code: int, stdout: string, stderr: string}
      */
-    private function runScript(array $overrides): array
+    private function runScript(?string $dbUser = null): array
     {
-        $env = array_merge(getenv(), $overrides);
+        $script = $this->buildSandbox($dbUser ?? $this->requireEnv('DB_USER'));
 
         $process = proc_open(
-            [PHP_BINARY, $this->ibl5Dir . '/bin/validate-schema'],
+            [PHP_BINARY, $script],
             [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes,
-            $this->ibl5Dir,
-            $env
+            dirname($script, 2)
         );
         self::assertIsResource($process);
         $stdout = (string) stream_get_contents($pipes[1]);
@@ -157,7 +204,7 @@ final class ValidateSchemaScriptTest extends TestCase
         self::assertGreaterThan(0, count($assertions));
         $this->buildSchema(null);
 
-        $result = $this->runScript(['DB_NAME' => $this->scratchDb]);
+        $result = $this->runScript();
 
         self::assertSame(0, $result['code'], $result['stdout'] . $result['stderr']);
         self::assertSame('Schema validation passed (' . count($assertions) . " assertions).\n", $result['stdout']);
@@ -169,7 +216,7 @@ final class ValidateSchemaScriptTest extends TestCase
         $target = $this->pickDriftTarget($this->loadAssertions());
         $this->buildSchema($target);
 
-        $result = $this->runScript(['DB_NAME' => $this->scratchDb]);
+        $result = $this->runScript();
 
         self::assertSame(1, $result['code'], $result['stdout'] . $result['stderr']);
         self::assertStringContainsString('SCHEMA VALIDATION FAILED:', $result['stdout']);
@@ -187,11 +234,7 @@ final class ValidateSchemaScriptTest extends TestCase
     #[Test]
     public function testConnectFailureExitsNonZeroAndDistinctFromDrift(): void
     {
-        // A non-empty user is required: config.php reads getenv('DB_USER') ?: 'root'.
-        $result = $this->runScript([
-            'DB_NAME' => $this->scratchDb,
-            'DB_USER' => 'ibl_no_such_user_' . bin2hex(random_bytes(4)),
-        ]);
+        $result = $this->runScript('ibl_no_such_user_' . bin2hex(random_bytes(4)));
 
         self::assertNotSame(0, $result['code']);
         self::assertNotSame(1, $result['code']);

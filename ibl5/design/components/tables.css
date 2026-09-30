@@ -577,7 +577,6 @@
    so centered content lands off-screen. Pin it to the visible scroll area
    (100cqw = the scroll container's width). */
 @media (max-width: 768px) {
-    .table-scroll-container:has(.team-table-caption),
     .table-scroll-container:has(.fa-table),
     .sticky-scroll-wrapper:has(.fa-table) {
         container-type: inline-size;
@@ -585,7 +584,6 @@
 
     /* Scoped to the same ancestors: outside a container, cqw falls back
        to the viewport width */
-    .table-scroll-container .team-table-caption > *,
     .table-scroll-container .fa-table__title,
     .sticky-scroll-wrapper .fa-table__title {
         position: sticky;

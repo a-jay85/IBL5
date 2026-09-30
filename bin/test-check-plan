@@ -2105,6 +2105,36 @@ assert_viol "gateM-fenced-methods-only-flags" 1 '[M]' "$FM$PU"'
 assert_viol "gateM-no-phpunit-row-silent" 0 '[M]' "$FM$E2E_ONLY"
 
 # ---------------------------------------------------------------------------
+# Gate [X] fixtures (4 cases)
+# ---------------------------------------------------------------------------
+XVR='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | baselines unchanged | Visual-regression | post-impl | `t.spec.ts-snapshots` (no-change) |
+'
+# Marker on a Visual-regression row, directly after the token: the only honored shape.
+assert_viol "gateX-vr-row-marker-ok" 0 '[X]' "$FM$XVR"
+XE2E='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | E2E | post-impl | `t.spec.ts` (no-change) |
+'
+assert_viol "gateX-e2e-row-marker-fires" 1 '[X]' "$FM$XE2E"
+# The type must be a WHOLE cell; a description mentioning visual regression is not one.
+XDESC='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | visual regression spec passes | E2E | post-impl | `t.spec.ts` (no-change) |
+'
+assert_viol "gateX-description-mention-fires" 1 '[X]' "$FM$XDESC"
+XPOS='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | baselines unchanged | Visual-regression | post-impl | (no-change) `t.spec.ts-snapshots` |
+'
+assert_viol "gateX-marker-before-token-fires" 1 '[X]' "$FM$XPOS"
+
+# ---------------------------------------------------------------------------
 # Gate [G] fixtures (4 cases)
 # ---------------------------------------------------------------------------
 # Unwired bin/test-* script in the location cell — must flag [G].

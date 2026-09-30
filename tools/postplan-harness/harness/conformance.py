@@ -214,6 +214,9 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     """Returns unresolved `MISSING:` / `MISSING-FILE:` / `MISSING-METHOD:` /
     `UNMET-CONTRACT:` / `MISSING-PHASE:` / `UNREALISED-ASSERTION:` items (empty = clean).
 
+    A planned token listed in `plan.no_change_test_paths` (every planning row is a
+    Visual-regression row marked `(no-change)`) never yields `MISSING:`.
+
     `UNMET-CONTRACT:` items are produced even when the plan has no Verification
     Matrix — a matrix-less doc/tooling plan is exactly what `evidence-present`
     exists for.
@@ -237,6 +240,13 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     if not plan.has_matrix:
         return items
     for t in plan.planned_test_paths:
+        if t in plan.no_change_test_paths:
+            # Every row planning this token is a Visual-regression row marked
+            # `(no-change)`: the planned outcome IS an untouched baseline, so an
+            # absent diff entry is the pass condition, not a missing test
+            # (backlog#1222). parse_no_change_test_paths already refused the
+            # exemption when any unmarked row shares the token.
+            continue
         hit = _resolve(t, changed_files)
         if hit is None:
             items.append(f"MISSING: {t} (matrix planned a test the diff never wrote)")

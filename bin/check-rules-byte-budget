@@ -296,4 +296,10 @@ MSG
   exit 1
 fi
 
+# Early warning: resident aggregate >= 90% of budget (still under it). Warning only; exit stays 0.
+if (( total_bytes * 100 >= MAX_TOTAL * 90 )); then
+  printf 'WARNING: resident aggregate %d bytes is >= 90%% of the %d-byte budget; %d bytes of headroom left -- trim resident rules before adding more\n' \
+    "$total_bytes" "$MAX_TOTAL" $(( MAX_TOTAL - total_bytes )) >&2
+fi
+
 echo "OK: .claude/rules/*.md within budgets — resident per-file ${RESIDENT_MAX_BYTES}-byte cap, resident aggregate ${MAX_TOTAL}-byte budget (${total_bytes} bytes total), lazy per-file ${LAZY_MAX_BYTES}-byte cap"

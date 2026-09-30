@@ -1351,6 +1351,7 @@ OUT="$( (unset BURNDOWN_NOW; bd_home "$SW" burndown-sweep) 2>&1)"; RC=$?
     && ok "C50k-unset: unset BURNDOWN_NOW uses the real clock" \
     || fail "C50k-unset: unset BURNDOWN_NOW uses the real clock (got $RC: $OUT)"
 sw_reset
+# A colon-less default (${BURNDOWN_NOW-}) would keep the empty string, fail the numeric check and die 3.
 OUT="$(BURNDOWN_NOW="" bd_home "$SW" burndown-sweep 2>&1)"; RC=$?
 [ "$(sw_item "$SW_OLD" 192 status)" = "skipped" ] \
     && ok "C50k-empty: empty BURNDOWN_NOW uses the real clock" \

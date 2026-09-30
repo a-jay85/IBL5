@@ -19,6 +19,7 @@
 
 set -u
 
+# Keep the colon: ${AUTOMOUSE_SINGLE_UNAME-$(uname)} would treat an empty override as non-Darwin.
 PLATFORM="${AUTOMOUSE_SINGLE_UNAME:-$(uname)}"
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"

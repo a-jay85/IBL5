@@ -7,6 +7,9 @@
 
 set -euo pipefail
 
+# shellcheck source=bin/lib/ci-checks-green.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/ci-checks-green.sh"
+
 MIN_REQUIRED_CHECKS="${MIN_REQUIRED_CHECKS:-1}"
 GH_API_CMD="${GH_API_CMD:-gh api}"
 # Comma-separated EXACT check-run names to ignore. Empty by default: this gate
@@ -50,6 +53,7 @@ Limitation: fetches one page of check-runs (100 results). IBL5's combined
 workflow count is well under 50, so a single page suffices. Results are
 deduplicated by check name (most recent run wins), so re-runs of flaky
 checks are handled correctly.
+Verdict logic is shared with bin/check-pr-checks-green via bin/lib/ci-checks-green.sh.
 
 Exit codes: 0 = pass, 1 = CI failure, 2 = usage error.
 EOF
@@ -114,17 +118,7 @@ JSON="$(bash -c "$GH_API_CMD \"repos/$REPO/commits/$SHA/check-runs?per_page=100\
 
 # Exact-name skip list as a JSON array. "" -> [""] -> [] after the length filter,
 # so an unset SKIP_CHECKS is byte-for-byte a no-op.
-SKIP_JSON="$(printf '%s\n' "$SKIP_CHECKS" \
-  | jq -R 'split(",") | map(sub("^ +";"") | sub(" +$";"")) | map(select(length > 0))')"
-
-# Drop skipped names, then keep only the most recent run per check name
-# (re-runs supersede earlier failures). $skip is a jq variable, not shell.
-# shellcheck disable=SC2016
-DEDUPE_JQ='
-  [ .check_runs[] | select(.name | IN($skip[]) | not) ]
-  | group_by(.name) | map(sort_by(.completed_at // .started_at) | last)
-  | { total_count: length, check_runs: . }
-'
+SKIP_JSON="$(ccg_skip_json "$SKIP_CHECKS")"
 
 if [ "$(printf '%s\n' "$SKIP_JSON" | jq 'length')" -gt 0 ]; then
     MATCHED="$(echo "$JSON" | jq -r --argjson skip "$SKIP_JSON" \
@@ -132,7 +126,7 @@ if [ "$(printf '%s\n' "$SKIP_JSON" | jq 'length')" -gt 0 ]; then
     echo "SKIP_CHECKS active — ignoring: ${MATCHED:-<none matched>}"
 fi
 
-JSON="$(echo "$JSON" | jq --argjson skip "$SKIP_JSON" "$DEDUPE_JQ")"
+JSON="$(echo "$JSON" | ccg_dedupe "$SKIP_JSON")"
 
 TOTAL="$(echo "$JSON" | jq '.check_runs | length')"
 
@@ -141,7 +135,7 @@ if [ "$TOTAL" -eq 0 ]; then
     FOUND=0
     for ANCESTOR_SHA in $(git log --format=%H "$SHA" --skip=1 --max-count="$MAX_WALKBACK"); do
         ANCESTOR_JSON="$(bash -c "$GH_API_CMD \"repos/$REPO/commits/$ANCESTOR_SHA/check-runs?per_page=100\"" 2>/dev/null)" || continue
-        ANCESTOR_JSON="$(echo "$ANCESTOR_JSON" | jq --argjson skip "$SKIP_JSON" "$DEDUPE_JQ")"
+        ANCESTOR_JSON="$(echo "$ANCESTOR_JSON" | ccg_dedupe "$SKIP_JSON")"
         ANCESTOR_TOTAL="$(echo "$ANCESTOR_JSON" | jq '.check_runs | length')"
         if [ "$ANCESTOR_TOTAL" -ge "$MIN_REQUIRED_CHECKS" ]; then
             echo "HEAD ${SHA:0:11} has no check-runs (path-filtered). Falling back to ancestor ${ANCESTOR_SHA:0:11} ($ANCESTOR_TOTAL run(s))."
@@ -163,13 +157,13 @@ elif [ "$TOTAL" -lt "$MIN_REQUIRED_CHECKS" ]; then
     exit 1
 fi
 
-STILL_RUNNING="$(echo "$JSON" | jq -r '[.check_runs[] | select(.status != "completed")] | map(.name) | join(", ")')"
+STILL_RUNNING="$(printf '%s' "$JSON" | ccg_pending)"
 if [ -n "$STILL_RUNNING" ]; then
     echo "FAIL: checks still running: $STILL_RUNNING" >&2
     exit 1
 fi
 
-FAILED="$(echo "$JSON" | jq -r '[.check_runs[] | select(.status == "completed" and (.conclusion | IN("success","skipped","neutral") | not))] | map(.name + " (" + .conclusion + ")") | join(", ")')"
+FAILED="$(printf '%s' "$JSON" | ccg_failed)"
 if [ -n "$FAILED" ]; then
     echo "FAIL: checks failed: $FAILED" >&2
     exit 1

@@ -1,0 +1,312 @@
+#!/usr/bin/env bash
+# bin/test-ci-checks-green — characterization + unit tests for the shared
+# check-run verdict logic (bin/lib/ci-checks-green.sh) and its callers
+# bin/check-master-ci-green and bin/check-pr-checks-green.
+#
+# C1-C4  run bin/check-master-ci-green end to end against fixture JSON via the
+#        GH_API_CMD seam (a `gh` shim answers `auth status`; a throwaway git repo
+#        supplies the origin remote).
+# L1-L5  source the lib and call its functions directly.
+# P1-P12 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
+#        (the Nth poll serves the Nth fixture; every case uses --interval-seconds=0).
+#
+# Run: bin/test-ci-checks-green  (exit 0 = all pass, 1 = a case failed)
+set -uo pipefail
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    echo "Usage: bin/test-ci-checks-green [--help|-h]"
+    awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+    exit 0
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CHECK="$SCRIPT_DIR/check-master-ci-green"
+LIB="$SCRIPT_DIR/lib/ci-checks-green.sh"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILED=0
+ok()   { echo "ok: $1"; }
+fail() { echo "FAIL: $1" >&2; FAILED=1; }
+
+# --- shared fixtures ---------------------------------------------------------
+SHIMD="$TMP/shim"
+mkdir -p "$SHIMD"
+cat > "$SHIMD/gh" <<'SHIM'
+#!/bin/sh
+# Only job: satisfy `gh auth status`.
+[ "$1" = "auth" ] && exit 0
+exit 1
+SHIM
+chmod +x "$SHIMD/gh"
+
+REPO_DIR="$TMP/repo"
+mkdir -p "$REPO_DIR"
+git -C "$REPO_DIR" init -q
+git -C "$REPO_DIR" remote add origin https://github.com/a-jay85/IBL5.git
+
+FAKE_SHA="0123456789abcdef0123456789abcdef01234567"
+
+# run_check <fixture-file> → sets OUT, ERR, RC
+run_check() {
+    local fixture="$1"
+    OUT="$TMP/out"; ERR="$TMP/err"
+    ( cd "$REPO_DIR" && PATH="$SHIMD:$PATH" GH_API_CMD="cat $fixture #" \
+        "$CHECK" "$FAKE_SHA" >"$OUT" 2>"$ERR" )
+    RC=$?
+}
+
+# --- C1-C4: characterization of bin/check-master-ci-green ---------------------
+cat > "$TMP/c1.json" <<'JSON'
+{"total_count":2,"check_runs":[
+ {"name":"a","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"b","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+run_check "$TMP/c1.json"
+if [ "$RC" -eq 0 ] && grep -qF "PASS: 2 check-run(s) all green" "$OUT"; then
+    ok "C1 PASS on all-green"
+else
+    fail "C1 PASS on all-green (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"
+fi
+
+cat > "$TMP/c2.json" <<'JSON'
+{"total_count":1,"check_runs":[
+ {"name":"pytest (stdlib harness)","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"}]}
+JSON
+run_check "$TMP/c2.json"
+if [ "$RC" -eq 1 ] && grep -qF "FAIL: checks failed: pytest (stdlib harness) (failure)" "$ERR"; then
+    ok "C2 FAIL lists failing name and conclusion"
+else
+    fail "C2 FAIL lists failing name and conclusion (rc=$RC err=$(cat "$ERR"))"
+fi
+
+cat > "$TMP/c3.json" <<'JSON'
+{"total_count":1,"check_runs":[
+ {"name":"slow","status":"in_progress","conclusion":null,"started_at":"2026-01-01T00:00:00Z"}]}
+JSON
+run_check "$TMP/c3.json"
+if [ "$RC" -eq 1 ] && grep -qF "FAIL: checks still running:" "$ERR"; then
+    ok "C3 FAIL on still-running"
+else
+    fail "C3 FAIL on still-running (rc=$RC err=$(cat "$ERR"))"
+fi
+
+cat > "$TMP/c4.json" <<'JSON'
+{"total_count":2,"check_runs":[
+ {"name":"flaky","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},
+ {"name":"flaky","status":"completed","conclusion":"success","completed_at":"2026-01-02T00:00:00Z"}]}
+JSON
+run_check "$TMP/c4.json"
+if [ "$RC" -eq 0 ]; then
+    ok "C4 latest-per-name wins"
+else
+    fail "C4 latest-per-name wins (rc=$RC err=$(cat "$ERR"))"
+fi
+
+# --- L1-L5: lib unit cases ----------------------------------------------------
+# shellcheck source=bin/lib/ci-checks-green.sh
+if [ -f "$LIB" ]; then
+    source "$LIB"
+
+    got="$(printf '%s' '{"check_runs":[{"name":"x","status":"completed","conclusion":null}]}' | ccg_failed)"
+    if [ "$got" = "x (unknown)" ]; then
+        ok "L1 null conclusion reported as (unknown)"
+    else
+        fail "L1 null conclusion reported as (unknown) (got: $got)"
+    fi
+
+    got="$(printf '%s' '{"check_runs":[
+      {"name":"a","status":"completed","conclusion":"cancelled"},
+      {"name":"b","status":"completed","conclusion":"timed_out"},
+      {"name":"c","status":"completed","conclusion":"action_required"},
+      {"name":"d","status":"completed","conclusion":"stale"},
+      {"name":"e","status":"completed","conclusion":"startup_failure"},
+      {"name":"f","status":"completed","conclusion":"success"},
+      {"name":"g","status":"completed","conclusion":"skipped"},
+      {"name":"h","status":"completed","conclusion":"neutral"}]}' | ccg_failed)"
+    want="a (cancelled), b (timed_out), c (action_required), d (stale), e (startup_failure)"
+    if [ "$got" = "$want" ]; then
+        ok "L2 non-pass conclusions listed, pass set omitted"
+    else
+        fail "L2 non-pass conclusions listed, pass set omitted (got: $got)"
+    fi
+
+    got="$(printf '%s' '{"check_runs":[
+      {"name":"human-signoff","status":"completed","conclusion":"success","completed_at":"2026-01-01"},
+      {"name":"human-signoff-ish","status":"completed","conclusion":"success","completed_at":"2026-01-01"}]}' \
+      | ccg_dedupe '["human-signoff"]' | jq -c '[.check_runs[].name], .total_count')"
+    if [ "$got" = "$(printf '%s\n%s' '["human-signoff-ish"]' '1')" ]; then
+        ok "L3 skip list is exact-name"
+    else
+        fail "L3 skip list is exact-name (got: $got)"
+    fi
+
+    got="$(printf '%s' '{"check_runs":[
+      {"name":"q","status":"queued"},
+      {"name":"i","status":"in_progress"},
+      {"name":"p","status":"pending"},
+      {"name":"d","status":"completed","conclusion":"success"}]}' | ccg_pending)"
+    if [ "$got" = "q, i, p" ]; then
+        ok "L4 pending statuses named"
+    else
+        fail "L4 pending statuses named (got: $got)"
+    fi
+
+    e="$(ccg_skip_json "" | jq -c .)"
+    s="$(ccg_skip_json " a , b " | jq -c .)"
+    if [ "$e" = "[]" ] && [ "$s" = '["a","b"]' ]; then
+        ok "L5 skip csv to json"
+    else
+        fail "L5 skip csv to json (empty=$e spaced=$s)"
+    fi
+else
+    fail "L1-L5 cannot run: $LIB is missing"
+fi
+
+# --- P1-P12: bin/check-pr-checks-green (PR-head poller) ---------------------
+POLL="$SCRIPT_DIR/check-pr-checks-green"
+P_SHA="0123456789abcdef0123456789abcdef01234567"
+
+# Sequence shim: the Nth check-runs call serves $PFIX/N-checkruns.json and bumps
+# the counter; an actions/runs call serves $PFIX/N-runs.json for the current N.
+# A missing N falls back to the highest-numbered fixture, so a one-poll case
+# serves poll 1 forever. PSHIM_FAIL=1 makes every call exit 1 (API error).
+PSHIM="$TMP/pshim"
+cat > "$PSHIM" <<'SHIM'
+#!/usr/bin/env bash
+[ "${PSHIM_FAIL:-0}" = "1" ] && exit 1
+counter="$PFIX/counter"
+n="$(cat "$counter" 2>/dev/null || echo 0)"
+case "$*" in
+    *check-runs*) n=$((n + 1)); echo "$n" > "$counter"; kind=checkruns ;;
+    *actions/runs*) kind=runs ;;
+    *) exit 1 ;;
+esac
+pick() { local i="$1"; while [ "$i" -gt 0 ]; do
+    [ -f "$PFIX/$i-$kind.json" ] && { cat "$PFIX/$i-$kind.json"; return 0; }
+    i=$((i - 1)); done; return 1; }
+pick "$n"
+SHIM
+chmod +x "$PSHIM"
+
+# new_case — fresh fixture dir in $PFIX, counter reset.
+new_case() { PFIX="$TMP/p-$1"; rm -rf "$PFIX"; mkdir -p "$PFIX"; export PFIX; }
+# cr <n> <runs-json-array>  — write poll n's check-runs as a one-page slurped array.
+cr() { printf '[{"check_runs":%s}]' "$2" > "$PFIX/$1-checkruns.json"; }
+# wr <n> <runs-json-array>  — write poll n's workflow runs as a one-page slurped array.
+wr() { printf '[{"workflow_runs":%s}]' "$2" > "$PFIX/$1-runs.json"; }
+# run_poll <args...> → OUT, ERR, RC (GITHUB_WORKFLOW cleared unless the caller exports PGW)
+run_poll() {
+    OUT="$TMP/pout"; ERR="$TMP/perr"
+    GITHUB_WORKFLOW="${PGW:-}" GH_API_CMD="$PSHIM" \
+        "$POLL" --repo=a-jay85/IBL5 --sha="$P_SHA" --interval-seconds=0 "$@" >"$OUT" 2>"$ERR"
+    RC=$?
+}
+counter() { cat "$PFIX/counter" 2>/dev/null || echo 0; }
+
+G='"status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"'
+RUNS_DONE='[{"name":"Tests","status":"completed"}]'
+
+new_case p1
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A,B --wait --timeout-seconds=5
+if [ "$RC" -eq 0 ] && grep -q '^PASS:' "$OUT" && grep -qF 'anchors settled: A, B' "$OUT"; then
+    ok "P1 all green + anchors complete"
+else fail "P1 all green + anchors complete (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+new_case p2
+cr 1 '[{"name":"pytest (stdlib harness)","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"},{"name":"A","status":"in_progress","conclusion":null}]'
+wr 1 "$RUNS_DONE"
+run_poll --anchor=A --wait --timeout-seconds=5
+if [ "$RC" -eq 1 ] && [ "$(counter)" = "1" ] \
+        && grep -qF 'FAIL: checks failed: pytest (stdlib harness) (failure)' "$ERR"; then
+    ok "P2 failure wins immediately under --wait"
+else fail "P2 failure wins immediately under --wait (rc=$RC counter=$(counter) err=$(cat "$ERR"))"; fi
+
+new_case p3
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"C\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A,B --wait --timeout-seconds=1
+if [ "$RC" -eq 1 ] && grep -qF 'anchors not reported/completed: B' "$ERR" && grep -q 'TIMEOUT:' "$ERR"; then
+    ok "P3 anchor missing holds"
+else fail "P3 anchor missing holds (rc=$RC err=$(tail -3 "$ERR"))"; fi
+
+new_case p4
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 '[{"name":"E2E Tests","status":"in_progress"}]'
+run_poll --anchor=A
+if [ "$RC" -eq 1 ] && grep -qF 'workflow runs still active: E2E Tests' "$ERR"; then
+    ok "P4 active workflow run holds"
+else fail "P4 active workflow run holds (rc=$RC err=$(cat "$ERR"))"; fi
+
+new_case p5
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 '[{"name":"All checks green","status":"in_progress"}]'
+PGW="All checks green" run_poll --anchor=A
+p5_rc=$RC
+PGW="" run_poll --anchor=A
+p5_empty_rc=$RC
+( unset GITHUB_WORKFLOW PGW; GH_API_CMD="$PSHIM" "$POLL" --repo=a-jay85/IBL5 --sha="$P_SHA" \
+    --anchor=A >/dev/null 2>&1 ); p5_unset_rc=$?
+if [ "$p5_rc" -eq 0 ] && [ "$p5_empty_rc" -eq 1 ] && [ "$p5_unset_rc" -eq 1 ]; then
+    ok "P5 self workflow run does not deadlock"
+else fail "P5 self workflow run does not deadlock (self=$p5_rc empty=$p5_empty_rc unset=$p5_unset_rc)"; fi
+
+new_case p6
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"All checks green\",\"status\":\"in_progress\",\"conclusion\":null},{\"name\":\"human-signoff\",\"status\":\"completed\",\"conclusion\":\"failure\",\"completed_at\":\"2026-01-01T00:00:00Z\"},{\"name\":\"needs-a-human label\",\"status\":\"completed\",\"conclusion\":\"failure\",\"completed_at\":\"2026-01-01T00:00:00Z\"}]"
+wr 1 "$RUNS_DONE"
+run_poll --anchor=A --self='All checks green' --ignore='human-signoff,needs-a-human label'
+if [ "$RC" -eq 0 ] && grep -qF 'ignored: All checks green, human-signoff, needs-a-human label' "$OUT"; then
+    ok "P6 self + ignore names excluded"
+else fail "P6 self + ignore names excluded (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+new_case p7
+cr 1 '[{"name":"A","status":"in_progress","conclusion":null}]'
+cr 2 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A --wait --timeout-seconds=30
+if [ "$RC" -eq 0 ] && [ "$(counter)" = "2" ] && grep -q '^WAIT:' "$ERR"; then
+    ok "P7 wait then pass"
+else fail "P7 wait then pass (rc=$RC counter=$(counter) err=$(cat "$ERR"))"; fi
+
+new_case p8
+PSHIM_FAIL=1 run_poll --anchor=A --wait --timeout-seconds=1
+p8_rc=$RC; p8_err="$(cat "$ERR")"
+PSHIM_FAIL=1 run_poll --anchor=A
+p8_oneshot_rc=$RC
+if [ "$p8_rc" -eq 1 ] && [[ "$p8_err" == *"api error"* ]] && [[ "$p8_err" == *"TIMEOUT:"* ]] \
+        && [ "$p8_oneshot_rc" -eq 2 ]; then
+    ok "P8 api error is pending then fail-closed"
+else fail "P8 api error is pending then fail-closed (wait rc=$p8_rc oneshot rc=$p8_oneshot_rc)"; fi
+
+new_case p9
+printf '[{"check_runs":[{"name":"A",%s}]},{"check_runs":[{"name":"Engine","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"}]}]' "$G" \
+    > "$PFIX/1-checkruns.json"
+wr 1 "$RUNS_DONE"
+run_poll --anchor=A
+if [ "$RC" -eq 1 ] && grep -qF 'Engine (failure)' "$ERR"; then
+    ok "P9 pagination flattening"
+else fail "P9 pagination flattening (rc=$RC err=$(cat "$ERR"))"; fi
+
+p10_ok=1
+for bad in "--sha abc" "--bogus=1" "--sha=notahex" "--repo=../x"; do
+    # shellcheck disable=SC2086  # word-split on purpose: "--sha abc" is the space form
+    if [ "$bad" = "--repo=../x" ]; then set -- $bad --sha="$P_SHA"; else set -- --repo=a-jay85/IBL5 $bad; fi
+    GH_API_CMD="$PSHIM" "$POLL" "$@" >/dev/null 2>"$TMP/p10err"; rc=$?
+    if [ "$rc" -ne 2 ] || ! grep -qiE 'unknown flag|invalid|unexpected' "$TMP/p10err"; then
+        p10_ok=0; echo "  P10 '$bad' -> rc=$rc: $(head -1 "$TMP/p10err")" >&2
+    fi
+done
+set --
+if [ "$p10_ok" -eq 1 ]; then ok "P10 rejected flag forms"; else fail "P10 rejected flag forms"; fi
+
+p11_out="$(env -i PATH=/usr/bin:/bin bash -euo pipefail "$POLL" --help 2>&1)"; p11_rc=$?
+if [ "$p11_rc" -eq 0 ] && [[ "$p11_out" == *"Usage: bin/check-pr-checks-green"* ]]; then
+    ok "P11 bare-environment help"
+else fail "P11 bare-environment help (rc=$p11_rc)"; fi
+
+new_case p12
+cr 1 '[{"name":"A","status":"completed","conclusion":null,"completed_at":"2026-01-01T00:00:00Z"}]'; wr 1 "$RUNS_DONE"
+run_poll --anchor=A
+if [ "$RC" -eq 1 ] && grep -qF 'A (unknown)' "$ERR"; then
+    ok "P12 null conclusion fails"
+else fail "P12 null conclusion fails (rc=$RC err=$(cat "$ERR"))"; fi
+
+
+exit "$FAILED"

@@ -1,6 +1,6 @@
 ---
-description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting; ad-hoc bar, ad-hoc safety mirror, Sonnet execution-routing, hard trigger (≥5 files, hook-enforced), /plan-verdict routing (hook-enforced to bin/plan-now), and calibration.
-last_verified: 2026-09-16
+description: Triage non-trivial work as ad-hoc vs /plan; ad-hoc bar, safety mirror, Sonnet execution routing, hook-enforced triggers.
+last_verified: 2026-09-30
 ---
 
 # Work Triage Rule
@@ -27,7 +27,7 @@ Even when the bar says ad-hoc, run a quick safety check. If the change touches a
 - a **security surface** (SQL, POST/form endpoint, auth/authz-gated route, user-facing output rendering),
 - a **destructive or schema-tightening migration**,
 - **new or redesigned user-visible UI/UX**,
-- a **gate removal or weakening** — input an executable gate (a hook deny, a `bin/check-*` condition, a Phase 6.5 arming condition) previously rejected now passes — or a **bootstrap hazard** (it rewrites the rule governing its own merge); *not* decision-procedure-preserving prose, an additive gate, or a mechanism/plumbing change, or
+- a **gate removal or weakening** (input an executable gate, meaning a hook deny, a `bin/check-*` condition, or a Phase 6.5 arming condition, previously rejected now passes) or a **bootstrap hazard** (it rewrites the rule governing its own merge); prose that keeps the decision procedure, additive gates, and plumbing changes don't count, or
 - a property needing **subjective human judgment** to confirm,
 
 then prefer `/plan`, so the defense and its verification are designed up front. Which mechanisms count, and why the PR-time backstop isn't a substitute: `work-triage-detail.md` § Safety mirror backstop.
@@ -57,7 +57,7 @@ Hook-enforced by `~/.claude/hooks/plan-gate-skill.sh` — denies inline `Skill(p
 
 Never poll on the main thread — a poll loop re-reads full context per call. Use `run_in_background: true` + Monitor, or ScheduleWakeup matched to expected completion time.
 
-**Then name the completion signal before writing the watcher** — process exit, job label gone, or the producer's own verdict line. An mtime/size on a file the producer appends to incrementally is **not** one; and if the producer already computes a verdict, read it rather than recomputing. Full rationale: `work-triage-detail.md` § Repeat-polling.
+Name the completion signal before writing the watcher. File mtime or size is never one. Valid signals: `work-triage-detail.md` § The readiness predicate.
 
 ## Calibration
 

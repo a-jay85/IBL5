@@ -1,6 +1,6 @@
 #!/bin/bash
 # Scans E2E specs for anti-patterns banned by .claude/rules/playwright-tests.md
-# DON'Ts 10-14. Exits 0 (clean) or 1 (blocking violations found).
+# § Mandatory: No Skips, No Silent Passes. Exits 0 (clean) or 1 (blocking violations found).
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
@@ -18,7 +18,7 @@ Exceptions:
   File-level: .e2e-hygiene-skip-allowlist (one glob per line, # comments)
   Per-line:   // e2e-hygiene-allow: <reason >= 20 chars>
 
-See .claude/rules/playwright-tests.md DON'Ts 10-14.
+See .claude/rules/playwright-tests.md § Mandatory: No Skips, No Silent Passes.
 EOF
     exit 0
 fi
@@ -42,7 +42,7 @@ Exceptions:
   File-level: .e2e-hygiene-skip-allowlist (one glob per line, # comments)
   Per-line:   // e2e-hygiene-allow: <reason >= 20 chars>
 
-See .claude/rules/playwright-tests.md DON'Ts 10-14.
+See .claude/rules/playwright-tests.md § Mandatory: No Skips, No Silent Passes.
 EOF
   exit 0
 }
@@ -313,5 +313,5 @@ for hit in "${BLOCKING_HITS[@]}"; do
   echo "  $hit"
 done
 echo ""
-echo "FAIL: $BLOCKING_TOTAL blocking hits across ${#HIT_FILES[@]} files. See .claude/rules/playwright-tests.md DOs/DON'Ts 10-14."
+echo "FAIL: $BLOCKING_TOTAL blocking hits across ${#HIT_FILES[@]} files. See .claude/rules/playwright-tests.md § Mandatory: No Skips, No Silent Passes."
 exit 1

@@ -1591,6 +1591,32 @@ Update `bin/b` accordingly.
     assert phases[1].evidence_paths == ["bin/b"]
 
 
+def test_parse_phases_counts_heading_paths_as_evidence():
+    """backlog#1253 / PR #2580 shape: the heading names the target file, the body cites
+    only a fixture string. Heading paths come first, then body paths.
+
+    Mutation caught: dropping the heading seed leaves ["docs/IBL5/rel.md"] only, and
+    conformance.phase_omission_items then reports a phase that shipped as MISSING-PHASE.
+    """
+    plan = """
+## Phase 3: Absolute-path parity tests in `tools/postplan-harness/tests/test_planfile.py`
+
+Assert the parser turns `/Users/x/IBL5/docs/IBL5/rel.md` into `docs/IBL5/rel.md`.
+
+## Phase 3: Duplicate heading in `bin/extra`
+
+More.
+"""
+    phases = parse_phases(plan)
+    assert len(phases) == 1
+    assert phases[0].evidence_paths[0] == "tools/postplan-harness/tests/test_planfile.py"
+    assert "docs/IBL5/rel.md" in phases[0].evidence_paths
+    assert "bin/extra" in phases[0].evidence_paths
+
+    info = PlanInfo(found=True, has_matrix=True, phases=phases)
+    assert conformance.phase_omission_items(info,["tools/postplan-harness/tests/test_planfile.py"]) == []
+
+
 def test_parse_phases_skips_fenced_blocks_and_example_tokens():
     plan = """
 ## Phase 1: Real

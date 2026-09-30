@@ -178,7 +178,7 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str]) -> list[str]:
 
     Exempt, in order: a phase whose heading carries an all-S `[phases: S]` marker
     (bookkeeping), a phase number named in `## Out of Scope` (declared deferred), and a
-    phase whose body cites no path at all (no evidence = cannot verify = skip). Empty when
+    phase whose heading and body cite no path at all (no evidence = cannot verify = skip). Empty when
     the plan was not found or has no parsed phases, so a plan-blind run and every
     pre-existing PlanInfo literal produce nothing. Hold-only: the items flow into arming
     condition (3) via check(); fidelity.build_work_list excludes them from the fixer loop.

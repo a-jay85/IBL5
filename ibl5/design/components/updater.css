@@ -56,7 +56,7 @@ body:has(> .updater) {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: var(--tracking-eyebrow);
-    color: var(--gray-400);
+    color: var(--gray-500);
     margin-bottom: var(--space-2);
 }
 

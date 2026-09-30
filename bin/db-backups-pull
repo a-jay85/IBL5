@@ -1,0 +1,274 @@
+#!/usr/bin/env bash
+# Pull the nightly prod DB dumps offsite to this Mac, keep a longer history, and
+# alert when the newest prod dump is stale.
+#
+# .github/workflows/db-backup.yml writes ~/backups/db/ibl5-YYYY-MM-DD.sql.gz on the
+# prod host and keeps 14. This script copies them here over rsync/SSH, keeps 30
+# dailies plus the earliest dump of every month forever, and sends a Discord DM
+# when the newest local dump is older than DB_BACKUP_MAX_AGE_HOURS (covers a
+# GitHub cron that never fires, which sends no failure alert).
+#
+# Pull-only. There is no push mode and --delete is never passed to rsync, so a
+# compromised prod host cannot wipe the offsite copy. -z is omitted (dumps are
+# already gzip). Pre-deploy dumps (~/backups/db-predeploy/) land in predeploy/
+# and the newest 20 are kept.
+#
+# Usage:
+#   bin/db-backups-pull                          # pull, verify, prune, freshness check
+#   bin/db-backups-pull --ssh-host USER@HOST --ssh-port 22 --ssh-key ~/.ssh/id
+#   bin/db-backups-pull --print-schedule         # emit the launchd plist to stdout
+#   bin/db-backups-pull --install-schedule       # install + load the LaunchAgent (10:30 daily)
+#   bin/db-backups-pull --uninstall-schedule     # unload + remove the LaunchAgent
+#
+# Env:
+#   IBL5_DB_BACKUP_DIR           local dir (default ~/Backups/ibl5-db, mode 700; never
+#                                put it under ibl5/backups, which backups-sync --push uploads)
+#   DB_BACKUP_MAX_AGE_HOURS      staleness threshold (default 36)
+#   DISCORD_DM_BIN               override bin/discord-dm for DM sends
+#   DB_BACKUPS_PULL_RSYNC_BIN    override the local rsync binary (tests)
+#   DB_BACKUPS_PULL_NOW_EPOCH    override "now" in epoch seconds (tests)
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT_DIR="$REPO_ROOT/bin"
+DISCORD_DM="${DISCORD_DM_BIN:-$SCRIPT_DIR/discord-dm}"
+RSYNC_BIN="${DB_BACKUPS_PULL_RSYNC_BIN:-rsync}"
+LOCAL_DIR="${IBL5_DB_BACKUP_DIR:-$HOME/Backups/ibl5-db}"
+MAX_AGE_HOURS="${DB_BACKUP_MAX_AGE_HOURS:-36}"
+REMOTE_RSYNC="bin/rsync"
+KEEP_DAILY=30
+KEEP_PREDEPLOY=20
+
+ACTION="pull"
+SSH_HOST=""
+SSH_PORT=""
+SSH_KEY=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --ssh-host) SSH_HOST="$2"; shift 2 ;;
+    --ssh-port) SSH_PORT="$2"; shift 2 ;;
+    --ssh-key) SSH_KEY="$2"; shift 2 ;;
+    --install-schedule)   ACTION="install";   shift ;;
+    --uninstall-schedule) ACTION="uninstall"; shift ;;
+    --print-schedule)     ACTION="print";     shift ;;
+    -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
+
+# --- Scheduling (pattern: bin/db-sync-cron-setup) ------------------------------
+if [ "$ACTION" != "pull" ]; then
+  # The plist must point at the durable MAIN checkout, never a worktree.
+  MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+  [ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"
+
+  PLIST_LABEL="com.ibl5.db-backups-pull"
+  PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
+  LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/db-backups-pull/logs"
+  PROGRAM="$MAIN_WT/bin/db-backups-pull"
+
+  build_plist() {
+    cat <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>${PLIST_LABEL}</string>
+	<!-- StartCalendarInterval fires once daily at 10:30 local. The GitHub cron at
+	     07:30 UTC often lands hours late, so this runs well after it. -->
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>10</integer>
+		<key>Minute</key>
+		<integer>30</integer>
+	</dict>
+	<key>ProgramArguments</key>
+	<array>
+		<string>${PROGRAM}</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>${MAIN_WT}</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>${LOG_DIR}/db-backups-pull.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>${LOG_DIR}/db-backups-pull.err.log</string>
+</dict>
+</plist>
+PLIST
+  }
+
+  case "$ACTION" in
+    print) build_plist ;;
+    install)
+      mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
+      build_plist > "$PLIST_PATH"
+      launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true
+      launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+      echo "Installed ${PLIST_LABEL} (10:30 daily). Program: $PROGRAM"
+      ;;
+    uninstall)
+      launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true
+      rm -f "$PLIST_PATH"
+      echo "Uninstalled ${PLIST_LABEL}."
+      ;;
+  esac
+  exit 0
+fi
+
+# --- SSH host resolution (copied from bin/backups-sync) ------------------------
+if [ -z "$SSH_HOST" ]; then
+  ENV_FILE="${REPO_ROOT}/.env"
+  if [ ! -f "$ENV_FILE" ]; then
+    GIT_ROOT="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')" || true
+    if [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.env" ]; then
+      ENV_FILE="$GIT_ROOT/.env"
+    else
+      echo "FAILED: No --ssh-host and no .env found." >&2
+      exit 1
+    fi
+  fi
+  # shellcheck source=/dev/null
+  source "$ENV_FILE"
+  SSH_HOST="${PROD_SSH_HOST:-}"
+fi
+
+if [ -z "$SSH_HOST" ]; then
+  echo "FAILED: SSH host unset (pass --ssh-host or set PROD_SSH_HOST in .env)." >&2
+  exit 1
+fi
+
+SSH_CMD="ssh"
+[ -n "$SSH_PORT" ] && SSH_CMD="$SSH_CMD -p $SSH_PORT"
+[ -n "$SSH_KEY" ] && SSH_CMD="$SSH_CMD -i $SSH_KEY"
+
+NOW="${DB_BACKUPS_PULL_NOW_EPOCH:-$(date +%s)}"
+
+send_dm() {
+  if printf '%s\n' "$1" | "$DISCORD_DM" --ping --chunk -; then
+    log "DM sent"
+  else
+    log "WARNING: DM send failed"
+  fi
+}
+
+# epoch of 07:30 UTC on the given YYYY-MM-DD (GNU date, else BSD date).
+dump_epoch() {
+  date -u -d "$1 07:30:00" +%s 2>/dev/null \
+    || date -u -j -f '%Y-%m-%d %H:%M:%S' "$1 07:30:00" +%s
+}
+
+umask 077
+mkdir -p "$LOCAL_DIR" "$LOCAL_DIR/predeploy"
+chmod 700 "$LOCAL_DIR" "$LOCAL_DIR/predeploy"
+
+RSYNC_FLAGS=(-a --partial --rsync-path="$REMOTE_RSYNC")
+
+# --- Pull ----------------------------------------------------------------------
+log "Pulling ${SSH_HOST}:backups/db/ -> ${LOCAL_DIR}/"
+rc=0
+"$RSYNC_BIN" "${RSYNC_FLAGS[@]}" -e "$SSH_CMD" "${SSH_HOST}:backups/db/" "${LOCAL_DIR}/" || rc=$?
+if [ "$rc" -ne 0 ]; then
+  log "FAILED: rsync of backups/db exited $rc"
+  send_dm "db-backups-pull: rsync from ${SSH_HOST} failed (exit $rc). Prod DB dumps were not copied offsite."
+  exit 1
+fi
+
+log "Pulling ${SSH_HOST}:backups/db-predeploy/ -> ${LOCAL_DIR}/predeploy/"
+rc=0
+out="$("$RSYNC_BIN" "${RSYNC_FLAGS[@]}" -e "$SSH_CMD" "${SSH_HOST}:backups/db-predeploy/" "${LOCAL_DIR}/predeploy/" 2>&1)" || rc=$?
+if [ "$rc" -ne 0 ]; then
+  if printf '%s' "$out" | grep -qi 'no such file'; then
+    log "No remote db-predeploy dir yet; skipping"
+  else
+    log "FAILED: rsync of backups/db-predeploy exited $rc: $out"
+    send_dm "db-backups-pull: rsync of db-predeploy from ${SSH_HOST} failed (exit $rc)."
+    exit 1
+  fi
+fi
+
+# rsync -a copies the remote dir mode (755) onto the local dirs. Re-lock them:
+# the dumps hold emails and password hashes.
+chmod -R go-rwx "$LOCAL_DIR"
+
+# --- Verify --------------------------------------------------------------------
+STATUS=0
+for f in "$LOCAL_DIR"/ibl5-*.sql.gz "$LOCAL_DIR"/predeploy/*.gz; do
+  [ -f "$f" ] || continue
+  if ! gzip -t "$f" 2>/dev/null; then
+    log "CORRUPT: $f failed gzip -t"
+    STATUS=1
+  fi
+done
+
+# --- Retention -----------------------------------------------------------------
+# Daily: newest KEEP_DAILY plus the earliest file of each calendar month.
+# Dates come from filenames (they sort lexically), never mtimes.
+daily=()
+for f in "$LOCAL_DIR"/ibl5-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].sql.gz; do
+  [ -f "$f" ] && daily+=("$(basename "$f")")
+done
+if [ "${#daily[@]}" -gt 0 ]; then
+  sorted=()
+  while IFS= read -r line; do sorted+=("$line"); done < <(printf '%s\n' "${daily[@]}" | sort)
+  total=${#sorted[@]}
+  prev_month=""
+  for ((i=0; i<total; i++)); do
+    name="${sorted[$i]}"
+    month="${name:5:7}"
+    keep=false
+    [ "$month" != "$prev_month" ] && keep=true
+    [ "$i" -ge $((total - KEEP_DAILY)) ] && keep=true
+    prev_month="$month"
+    if ! $keep; then
+      rm -f "$LOCAL_DIR/$name"
+      log "Pruned $name"
+    fi
+  done
+fi
+
+# Predeploy: newest KEEP_PREDEPLOY by filename.
+pre=()
+for f in "$LOCAL_DIR"/predeploy/*; do
+  [ -f "$f" ] && pre+=("$(basename "$f")")
+done
+if [ "${#pre[@]}" -gt "$KEEP_PREDEPLOY" ]; then
+  psorted=()
+  while IFS= read -r line; do psorted+=("$line"); done < <(printf '%s\n' "${pre[@]}" | sort)
+  for ((i=0; i<${#psorted[@]} - KEEP_PREDEPLOY; i++)); do
+    rm -f "$LOCAL_DIR/predeploy/${psorted[$i]}"
+    log "Pruned predeploy/${psorted[$i]}"
+  done
+fi
+
+# --- Freshness dead-man --------------------------------------------------------
+newest=""
+for f in "$LOCAL_DIR"/ibl5-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].sql.gz; do
+  [ -f "$f" ] && newest="$(basename "$f")"
+done
+if [ -z "$newest" ]; then
+  log "STALE: no ibl5-*.sql.gz dumps found locally"
+  send_dm "db-backups-pull: no prod DB dumps found in ${LOCAL_DIR}. The db-backup.yml cron may not be running."
+  exit 1
+fi
+date_part="${newest#ibl5-}"; date_part="${date_part%.sql.gz}"
+epoch="$(dump_epoch "$date_part")"
+age_s=$((NOW - epoch))
+age_h=$((age_s / 3600))
+if [ "$age_s" -gt $((MAX_AGE_HOURS * 3600)) ]; then
+  log "STALE: newest dump $newest is ${age_h}h old (limit ${MAX_AGE_HOURS}h)"
+  send_dm "db-backups-pull: newest prod DB dump is $newest, ${age_h}h old (limit ${MAX_AGE_HOURS}h). The db-backup.yml cron may not be running."
+  exit 1
+fi
+log "OK: newest dump $newest is ${age_h}h old"
+exit "$STATUS"

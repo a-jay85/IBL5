@@ -1069,6 +1069,8 @@ jobs:
         run: bin/test-docfix-poll
       - name: bin/test-launchd-health-check
         run: bin/test-launchd-health-check
+      - name: bin/test-db-backups-pull
+        run: bin/test-db-backups-pull
       - name: bin/test-post-review-findings
         run: bin/test-post-review-findings
       - name: bin/test-human-signoff-classifier

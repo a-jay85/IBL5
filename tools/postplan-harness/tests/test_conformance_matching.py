@@ -353,6 +353,133 @@ def test_migration_exact_match_wins_over_renumber():
     assert resolutions.get(tok) is None
 
 
+# ---------------------------------------------------------------------------
+# ADR renumber tolerance (backlog#1169) — Tier 3 of _resolve, ADR sibling
+# ---------------------------------------------------------------------------
+
+_ADR_TOK = "ibl5/docs/decisions/0070-harness-adr-tier.md"
+_ADR_HIT = "ibl5/docs/decisions/0072-harness-adr-tier.md"
+
+
+def test_adr_renumber_resolves_when_suffix_unique():
+    """Plan names 0070-<suffix>; diff carries 0072-<suffix> and nothing else with
+    that suffix → resolves, no MISSING-FILE, and the resolution is logged.
+
+    Mutation caught: delete `_renumbered_adr` (or drop it from the Tier 3 return
+    in `_resolve`) and the token falls through basename matching —
+    `0070-x.md` != `0072-x.md` — producing MISSING-FILE.
+    """
+    plan = _plan_with_critical(_ADR_TOK)
+    resolutions: dict[str, str] = {}
+    items = check(plan, [_ADR_HIT], resolutions=resolutions)
+    assert items == [], f"expected no MISSING-FILE, got: {items}"
+    assert resolutions.get(_ADR_TOK) == _ADR_HIT
+
+
+def test_adr_missing_when_no_suffix_match():
+    """Plan names 0070-<suffix>; diff carries an ADR with a DIFFERENT suffix →
+    MISSING-FILE survives.
+
+    Mutation caught: match `_ADR_RENUMBER` on the `ibl5/docs/decisions/\\d{4}-`
+    prefix alone (drop the suffix equality) and any added ADR would discharge any
+    planned ADR, clearing the item.
+    """
+    plan = _plan_with_critical(_ADR_TOK)
+    items = check(plan, ["ibl5/docs/decisions/0072-unrelated-decision.md"])
+    assert any("MISSING-FILE" in i and "0070-harness-adr-tier.md" in i for i in items)
+
+
+def test_adr_two_suffix_matches_stay_missing():
+    """Two added ADRs share the planned suffix → ambiguous → MISSING-FILE.
+
+    Mutation caught: return the first suffix hit (`hits[0]` without the
+    `len(hits) == 1` guard) and the item is cleared on an ambiguous diff.
+    """
+    plan = _plan_with_critical(_ADR_TOK)
+    items = check(plan, [
+        _ADR_HIT,
+        "ibl5/docs/decisions/0073-harness-adr-tier.md",
+    ])
+    assert any("MISSING-FILE" in i and "0070-harness-adr-tier.md" in i for i in items)
+
+
+def test_adr_exact_match_wins_over_renumber():
+    """Diff carries BOTH the planned 0070-<suffix> and a 0072-<suffix> sibling →
+    Tier 1 exact match resolves to 0070; Tier 3 never runs, so the sibling does
+    not make the set ambiguous.
+
+    Mutation caught: call `_renumbered_adr` before Tier 1 (or unconditionally)
+    and the two suffix hits produce None, emitting a MISSING-FILE for a file
+    that IS in the diff.
+    """
+    plan = _plan_with_critical(_ADR_TOK)
+    resolutions: dict[str, str] = {}
+    items = check(plan, [_ADR_TOK, _ADR_HIT], resolutions=resolutions)
+    assert items == []
+    # Exact match (Tier 1) does not write to resolutions; key absent confirms
+    # Tier 3 was never consulted.
+    assert resolutions.get(_ADR_TOK) is None
+
+
+def test_non_adr_renumber_gets_no_tolerance():
+    """Same NNNN-<suffix> shape OUTSIDE ibl5/docs/decisions/ → no ADR tier →
+    MISSING-FILE.
+
+    Mutation caught: anchor `_ADR_RENUMBER` on the basename only (drop the
+    `ibl5/docs/decisions/` directory prefix) and a renumbered doc elsewhere
+    would resolve, widening the tolerance beyond ADRs.
+    """
+    tok = "ibl5/docs/runbooks/0070-harness-adr-tier.md"
+    plan = _plan_with_critical(tok)
+    items = check(plan, ["ibl5/docs/runbooks/0072-harness-adr-tier.md"])
+    assert any("MISSING-FILE" in i and "0070-harness-adr-tier.md" in i for i in items)
+
+
+def test_adr_readme_never_counts_as_suffix_hit():
+    """Diff carries only `ibl5/docs/decisions/README.md` (the index every ADR
+    PR touches) → it is not a NNNN-<suffix> path → MISSING-FILE survives.
+
+    Mutation caught: loosen `_ADR_RENUMBER` to `^ibl5/docs/decisions/(?:\\d{4}-)?(?P<suffix>.+)$`
+    (optional number) and README.md would match with suffix `README.md`; the
+    suffix still differs from the token's, so this test additionally pins the
+    suffix equality against a diff that only touched the index. Delete the
+    `n.group("suffix") == suffix` clause together with the optional-number
+    loosening and the item clears; this assertion turns red.
+    """
+    plan = _plan_with_critical(_ADR_TOK)
+    items = check(plan, ["ibl5/docs/decisions/README.md"])
+    assert any("MISSING-FILE" in i and "0070-harness-adr-tier.md" in i for i in items)
+
+
+def test_adr_glob_token_gets_no_tolerance():
+    """Real corpus shape `ibl5/docs/decisions/0134-*.md` (a glob the plan wrote
+    instead of a slug) → suffix `*.md` matches no real file suffix → MISSING-FILE.
+
+    Mutation caught: treat the token suffix as a glob/regex (e.g. `fnmatch`
+    instead of `==` in `_renumbered_adr`) and `*.md` would match any changed ADR,
+    clearing the item.
+    """
+    tok = "ibl5/docs/decisions/0134-*.md"
+    plan = _plan_with_critical(tok)
+    items = check(plan, ["ibl5/docs/decisions/0135-harness-adr-draft-on-denial.md"])
+    assert any("MISSING-FILE" in i and "0134-*.md" in i for i in items)
+
+
+def test_adr_placeholder_token_gets_no_tolerance():
+    """Real corpus shape `ibl5/docs/decisions/NNNN-<slug>.md` (the number
+    placeholder the architect contract prescribes) → `NNNN` is not four digits
+    → `_ADR_RENUMBER` does not match the token → MISSING-FILE.
+
+    Mutation caught: widen the token-side digit class to `[\\dN]{4}` (or
+    `\\w{4}`) so a placeholder resolves against the real numbered file, and
+    the item clears; this assertion turns red.
+    """
+    tok = "ibl5/docs/decisions/NNNN-discord-dev-webhook-notify.md"
+    plan = _plan_with_critical(tok)
+    items = check(plan, ["ibl5/docs/decisions/0140-discord-dev-webhook-notify.md"])
+    assert any("MISSING-FILE" in i and "NNNN-discord-dev-webhook-notify.md" in i for i in items)
+
+
 def test_phase_omission_end_to_end_positive_and_negative():
     """locate_plan + check: exactly one MISSING-PHASE: 2 on negative diff, zero on positive.
 

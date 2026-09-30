@@ -410,6 +410,76 @@ def test_composed_sticky_round_trips_through_readers():
         assert "Reviewed" not in rec
 
 
+# Hand-built clean-READY verdict excerpts, modelled on the shape of the #2565 sticky.
+# OLD is what the reviewer wrote before the terse contract; NEW is what it writes now.
+OLD_EXCERPT = "\n".join([
+    "1. Intent coverage: matches. Every plan phase has a matching change in the diff.",
+    "2. Intent fidelity: matches. Each change does what its phase describes.",
+    "3. Scope creep: matches. The diff touches only files the plan names.",
+    "4. PR body vs. reality: matches. The body's hand-written claims agree with the diff.",
+    "5. Verification Matrix realisation: matches. Every matrix row has a test in the diff.",
+    "6. Conflict-resolution audit: matches. The rebase was clean, so the list is empty.",
+    "",
+    "Phase 4B structured code review ran on 2026-09-28 "
+    "(https://github.com/a-jay85/IBL5/pull/2565#issuecomment-1). It reviewed head "
+    "abc1234, and today's head adds no commits past it, so the review covers the "
+    "whole diff.",
+    "REVIEW-COVERAGE: CURRENT",
+    "Phase 4B reviewed the pre-rebase diff. No path was conflict-resolved, so no "
+    "line lacks structured review coverage.",
+    "procedure-source: master pin loaded as expected.",
+    "",
+    "## FINDINGS",
+    "",
+    "READY",
+])
+NEW_EXCERPT = "Passed: 1, 2, 3, 4, 5, 6.\nREVIEW-COVERAGE: CURRENT\n\n## FINDINGS\n\nREADY"
+
+
+def _master_fidelity(tmp_path):
+    """The pre-PR composer from origin/master, or None when it cannot be loaded."""
+    proc = subprocess.run(
+        ["git", "show", "origin/master:tools/postplan-harness/harness/fidelity.py"],
+        cwd=os.path.dirname(os.path.abspath(__file__)), capture_output=True, text=True)
+    if proc.returncode != 0 or not proc.stdout:
+        return None
+    path = tmp_path / "fidelity_master.py"
+    path.write_text(proc.stdout)
+    import importlib.util
+    # A dotted name gives the module the `harness` package, so its relative imports
+    # (`from .state import HarnessError`) resolve against this checkout.
+    spec = importlib.util.spec_from_file_location("harness._fidelity_master", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_clean_ready_byte_count_shrinks(tmp_path):
+    master = _master_fidelity(tmp_path)
+    if master is None:
+        pytest.skip("origin/master fidelity.py unavailable")
+
+    def compose(mod, excerpt):
+        fid = {"verdict_1": "READY", "error_kind": None, "reviewed_tree": TREE,
+               "remediation_sha": None, "verdict_2": None, "reviewed_tree_2": None}
+        return mod.compose_sticky(
+            "REBASE=clean (HEAD already contains origin/master)", CI_PASS, fid,
+            _decision(),
+            ["**What changed:** a thing", "**Why:** a reason", "**Watch:** a page",
+             "**Touches:** a file", "**Machine-authored fixes:** none"],
+            excerpt, "READY", diff_id="d" * 40, plan_hash="e" * 64, posted_at=TS)
+
+    before = compose(master, OLD_EXCERPT)
+    if "Plan-fidelity verdict:" not in before:
+        pytest.skip("origin/master already carries the deviation-only composer")
+    after = compose(fidelity, NEW_EXCERPT)
+    print(f"STICKY-BYTES before={len(before.encode())} after={len(after.encode())}")
+    assert len(after.encode()) < len(before.encode())
+    # The composer alone must shrink the comment too, so reverting Phase 2 fails here
+    # even though the terser reviewer excerpt would still shrink the total.
+    assert len(compose(fidelity, OLD_EXCERPT).encode()) < len(before.encode())
+
+
 # --- the DM parser round-trip -------------------------------------------------
 
 def _details_shaped_body(terminal: str, diff_id: str = "d" * 40,

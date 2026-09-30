@@ -139,7 +139,7 @@ class ApiKeysView implements ApiKeysViewInterface
         <p class="text-sm text-gray-600">Google Sheets sync is not configured on this server.</p>
         <?php elseif ($summary === null): ?>
         <p class="mb-4">Sign in with Google and the site creates a spreadsheet in your Drive, then rewrites its Players tab with the full player export after every sim. Other tabs you add are never touched.</p>
-        <form method="post" action="modules.php?name=ApiKeys&amp;op=google_start">
+        <form method="post" action="modules.php?name=ApiKeys&amp;op=google_start" hx-boost="false">
             <?= \Security\CsrfGuard::generateToken('google_start') ?>
             <button type="submit" id="google-sheet-connect" class="ibl-btn ibl-btn--primary">Sign in with Google</button>
         </form>
@@ -172,7 +172,7 @@ class ApiKeysView implements ApiKeysViewInterface
             <a id="google-sheet-open" class="ibl-btn" href="<?= HtmlSanitizer::e($safeUrl) ?>" target="_blank" rel="noopener">Open sheet</a>
             <?php endif; ?>
             <?php if ($isBroken): ?>
-            <form method="post" action="modules.php?name=ApiKeys&amp;op=google_start">
+            <form method="post" action="modules.php?name=ApiKeys&amp;op=google_start" hx-boost="false">
                 <?= \Security\CsrfGuard::generateToken('google_start') ?>
                 <button type="submit" id="google-sheet-reconnect" class="ibl-btn ibl-btn--primary">Reconnect Google</button>
             </form>

@@ -13,10 +13,12 @@ import type { APIRequestContext, Page, Route } from '@playwright/test';
 
 const API_KEYS = 'modules.php?name=ApiKeys';
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e2e-sheet-id/edit';
+// The PHP container has no IBL_TEST_USER_REGULAR, so name the user per request.
+const USER = `username=${encodeURIComponent(process.env.IBL_TEST_USER_REGULAR ?? '')}`;
 
 async function seed(request: APIRequestContext, status: 'active' | 'broken', reason = ''): Promise<void> {
   const response = await request.post(
-    `test-state.php?action=seed-google-sheet-connection&status=${status}&reason=${encodeURIComponent(reason)}`,
+    `test-state.php?action=seed-google-sheet-connection&${USER}&status=${status}&reason=${encodeURIComponent(reason)}`,
     { data: {} },
   );
   if (!response.ok()) {
@@ -25,11 +27,11 @@ async function seed(request: APIRequestContext, status: 'active' | 'broken', rea
 }
 
 async function clear(request: APIRequestContext): Promise<void> {
-  await request.delete('test-state.php?action=delete-google-sheet-connection');
+  await request.delete(`test-state.php?action=delete-google-sheet-connection&${USER}`);
 }
 
 async function connection(request: APIRequestContext): Promise<{ status: number; body: { status?: string } }> {
-  const response = await request.get('test-state.php?action=get-google-sheet-connection');
+  const response = await request.get(`test-state.php?action=get-google-sheet-connection&${USER}`);
   return { status: response.status(), body: response.ok() ? await response.json() : {} };
 }
 

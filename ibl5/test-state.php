@@ -166,23 +166,25 @@ if ($action !== '' && !in_array($action, $knownActions, true)) {
     exit;
 }
 
-// Google Sheets card fixtures, all scoped to the E2E regular user. The seeded
-// token is a fixed fake encrypted with GOOGLE_TOKEN_KEY; nothing here calls Google.
+// Google Sheets card fixtures, all scoped to the E2E regular user, named by
+// ?username= (the PHP container does not get IBL_TEST_USER_REGULAR; only the
+// Playwright container does). The seeded token is a fixed fake encrypted with
+// GOOGLE_TOKEN_KEY; nothing here calls Google.
 if (in_array($action, ['seed-google-sheet-connection', 'get-google-sheet-connection', 'delete-google-sheet-connection'], true)) {
-    $regularName = getenv('IBL_TEST_USER_REGULAR');
+    $regularName = $_GET['username'] ?? '';
     $regular = is_string($regularName) && $regularName !== ''
         ? (new \Repositories\TeamIdentityRepository($db))->getUserByUsername($regularName)
         : null;
     if ($regular === null) {
         http_response_code(400);
-        echo json_encode(['error' => 'IBL_TEST_USER_REGULAR is unset or unknown']);
+        echo json_encode(['error' => 'username is missing or unknown']);
         $db->close();
         exit;
     }
     $regularId = (int) $regular['user_id'];
     $googleRepo = new \GoogleSheets\GoogleSheetConnectionRepository($db);
 
-    // POST ?action=seed-google-sheet-connection&status=active|broken&reason=<REASON_*>
+    // POST ?action=seed-google-sheet-connection&username=NAME&status=active|broken&reason=<REASON_*>
     if ($method === 'POST' && $action === 'seed-google-sheet-connection') {
         $googleRepo->upsert(
             $regularId,
@@ -199,7 +201,7 @@ if (in_array($action, ['seed-google-sheet-connection', 'get-google-sheet-connect
         exit;
     }
 
-    // GET ?action=get-google-sheet-connection — {status, broken_reason} or 404
+    // GET ?action=get-google-sheet-connection&username=NAME — {status, broken_reason} or 404
     if ($method === 'GET' && $action === 'get-google-sheet-connection') {
         $row = $googleRepo->findByUserId($regularId);
         if ($row === null) {
@@ -212,7 +214,7 @@ if (in_array($action, ['seed-google-sheet-connection', 'get-google-sheet-connect
         exit;
     }
 
-    // DELETE ?action=delete-google-sheet-connection
+    // DELETE ?action=delete-google-sheet-connection&username=NAME
     if ($method === 'DELETE' && $action === 'delete-google-sheet-connection') {
         $googleRepo->deleteByUserId($regularId);
         echo json_encode(['deleted' => true]);

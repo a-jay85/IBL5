@@ -386,6 +386,16 @@ run_p50() {
 rm -f "/tmp/post-plan-changed-$PPID"' 2>&1 )
 }
 
+# run_p50c <block> <planfile> <changed-list-file>
+# run_p50 with a NON-empty changed list, so plan->file conformance can be
+# exercised on both sides of "is the Critical File in the diff".
+run_p50c() {
+    ( cd "$REPO_ROOT" && PLAN_FILE="$2" CHANGED_SRC="$3" \
+        bash -c 'cp "$CHANGED_SRC" "/tmp/post-plan-changed-$PPID"
+'"$1"'
+rm -f "/tmp/post-plan-changed-$PPID"' 2>&1 )
+}
+
 # assert_block_sources <marker> <name> <lib-substring> <file>
 # Generalized sibling of assert_self_contained: assert_self_contained is
 # hardwired to pr-armable.sh and $SKILL, and its call sites must not change.
@@ -671,6 +681,105 @@ if [ "$CF_LIB" = "$_want" ]; then
 else
     echo "FAIL: agreed-but-wrong — expected 5 must-appear, got: $(printf '%s' "$CF_LIB" | tr '\n' ' ')"
     FAILED=1
+fi
+
+# --- backlog#1211: absolute Critical Files paths normalise to repo-relative --
+# Shapes mirror tests/test_planfile.py::ABS_PARITY_CASES. Every consumer of
+# cf_parse_section (Phase 5.0, CF_PRINT_ONLY, gate [C]) sees the stripped form;
+# only gate [F] reads cf_parse_section_raw.
+CF_ABS="$BASE_TMP/cf-abs.md"
+cat > "$CF_ABS" <<'CFEOF'
+## Critical Files
+
+- `/Users/ajaynicolas/GitHub/IBL5/ibl5/classes/Foo.php` — main checkout
+- `/Users/ajaynicolas/GitHub/IBL5-worktrees/my-slug/bin/check-plan` — worktree
+- `/a/IBL5/b/IBL5/c` — greedy: last root wins
+- `/a/IBL5-worktrees/x` — no slash after the slug: unchanged
+- `/a/IBL5` — no trailing slash: unchanged
+- `/a/ibl5/y` — lowercase: unchanged
+- `/Users/ajaynicolas/claude-plans/z.md` — out-of-repo: unchanged
+- `docs/IBL5/rel.md` — relative with IBL5 mid-string: unchanged
+- `ibl5/schema.sql` (reference)
+CFEOF
+_abs_lib=$( cd "$REPO_ROOT" && bash -c 'source bin/lib/critical-files.sh && cf_parse_section "$1"' _ "$CF_ABS" )
+_abs_want=$(printf '%s\n' \
+    'MUST_APPEAR:ibl5/classes/Foo.php' \
+    'MUST_APPEAR:bin/check-plan' \
+    'MUST_APPEAR:c' \
+    'MUST_APPEAR:/a/IBL5-worktrees/x' \
+    'MUST_APPEAR:/a/IBL5' \
+    'MUST_APPEAR:/a/ibl5/y' \
+    'MUST_APPEAR:/Users/ajaynicolas/claude-plans/z.md' \
+    'MUST_APPEAR:docs/IBL5/rel.md' \
+    'EXEMPT:ibl5/schema.sql')
+if [ "$_abs_lib" = "$_abs_want" ]; then
+    echo "ok: cf-abs lib normalises absolute paths (5 unchanged edge shapes, 3 stripped)"
+else
+    echo "FAIL: cf-abs lib — got: $(printf '%s' "$_abs_lib" | tr '\n' ' ')"; FAILED=1
+fi
+
+# Three-way agreement holds on the absolute fixture too.
+_abs_lib_ma=$(printf '%s\n' "$_abs_lib" | sed -n 's/^MUST_APPEAR://p')
+_abs_block=$( run_p50 "$B50" "$CF_ABS" | sed -n 's/^MISSING-FILE: \([^ ]*\).*/\1/p' )
+_abs_py=$( cd "$REPO_ROOT/tools/postplan-harness" && python3 -c '
+import sys
+from harness.planfile import parse_critical_files
+for p, _a, ex in parse_critical_files(open(sys.argv[1]).read()):
+    if not ex:
+        print(p)
+' "$CF_ABS" )
+if [ "$_abs_lib_ma" = "$_abs_block" ] && [ "$_abs_lib_ma" = "$_abs_py" ]; then
+    echo "ok: cf-abs three-way agreement on absolute paths"
+else
+    echo "FAIL: cf-abs parser divergence"
+    echo "  lib:   $(printf '%s' "$_abs_lib_ma" | tr '\n' ' ')"
+    echo "  block: $(printf '%s' "$_abs_block"  | tr '\n' ' ')"
+    echo "  py:    $(printf '%s' "$_abs_py"     | tr '\n' ' ')"
+    FAILED=1
+fi
+
+# Empty-result edge: a bare root entry stays as written (fail-closed). Python
+# returns "" here; the divergence is deliberate and pinned on both sides
+# (tests/test_planfile.py::test_lib_empty_normalisation_divergence_pinned).
+CF_ROOT="$BASE_TMP/cf-root.md"
+printf '## Critical Files\n\n- `/Users/ajaynicolas/GitHub/IBL5/`\n' > "$CF_ROOT"
+_root=$( cd "$REPO_ROOT" && bash -c 'source bin/lib/critical-files.sh && cf_parse_section "$1"' _ "$CF_ROOT" )
+if [ "$_root" = 'MUST_APPEAR:/Users/ajaynicolas/GitHub/IBL5/' ]; then
+    echo "ok: cf-abs bare root entry passes through unchanged (no empty MUST_APPEAR row)"
+else
+    echo "FAIL: cf-abs bare root — got: '$_root'"; FAILED=1
+fi
+
+# Raw entry point is byte-identical to the pre-#1211 parser (gate [F]'s view).
+_raw=$( cd "$REPO_ROOT" && bash -c 'source bin/lib/critical-files.sh && cf_parse_section_raw "$1"' _ "$CF_ABS" | head -1 )
+if [ "$_raw" = 'MUST_APPEAR:/Users/ajaynicolas/GitHub/IBL5/ibl5/classes/Foo.php' ]; then
+    echo "ok: cf-abs cf_parse_section_raw keeps the absolute path"
+else
+    echo "FAIL: cf-abs raw — got: '$_raw'"; FAILED=1
+fi
+
+# --- Phase 5.0 plan->file arming condition (3), the intentional weakening ---
+# Before #1211 an absolute Critical File NEVER matched `git diff --name-only`,
+# so it held arming forever. Now it matches iff the file is in the diff.
+CF_P50="$BASE_TMP/cf-p50-abs.md"
+printf '## Critical Files\n\n- `/Users/ajaynicolas/GitHub/IBL5-worktrees/my-slug/ibl5/classes/Foo.php`\n- `/Users/ajaynicolas/claude-plans/notes.md`\n' > "$CF_P50"
+printf 'ibl5/classes/Foo.php\nbin/other\n' > "$BASE_TMP/p50-changed-hit.txt"
+printf 'bin/other\n' > "$BASE_TMP/p50-changed-miss.txt"
+
+_hit=$( run_p50c "$B50" "$CF_P50" "$BASE_TMP/p50-changed-hit.txt" )
+if printf '%s\n' "$_hit" | grep -q 'MISSING-FILE: ibl5/classes/Foo.php'; then
+    echo "FAIL: p50-abs-in-diff — absolute CF in the diff still reported MISSING"; FAILED=1
+elif printf '%s\n' "$_hit" | grep -q 'MISSING-FILE: /Users/ajaynicolas/claude-plans/notes.md'; then
+    echo "ok: p50-abs-in-diff (in-repo absolute CF matches the diff; out-of-repo still MISSING)"
+else
+    echo "FAIL: p50-abs-in-diff — out-of-repo CF lost its MISSING hold: $_hit"; FAILED=1
+fi
+
+_miss=$( run_p50c "$B50" "$CF_P50" "$BASE_TMP/p50-changed-miss.txt" )
+if printf '%s\n' "$_miss" | grep -q 'MISSING-FILE: ibl5/classes/Foo.php'; then
+    echo "ok: p50-abs-not-in-diff (normalised path reported MISSING when absent from diff)"
+else
+    echo "FAIL: p50-abs-not-in-diff — expected MISSING-FILE: ibl5/classes/Foo.php, got: $_miss"; FAILED=1
 fi
 
 # --- Phase 5.0 diff->plan conformance: run_p50u helper + U1..U4 cases -------

@@ -11,7 +11,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import conformance
-from harness.planfile import (EXEMPT_RE, _normalise_cf_path, _strip_fenced,
+from harness.planfile import (EXEMPT_RE, _ABS_PREFIX_RE, _normalise_cf_path,
+                              _strip_fenced,
                               count_executable_matrix_rows,
                               frontmatter_auto_merge_false,
                               frontmatter_autonomy_contract, locate_plan,
@@ -361,6 +362,133 @@ def test_lib_sync(tmp_path):
         "parser divergence\n python: %s\n shell:  %s" % (_classify(AGREEMENT_PLAN), shell))
     assert sum(1 for ln in shell if ln.startswith("EXEMPT:")) == 17
     assert sum(1 for ln in shell if ln.startswith("MUST_APPEAR:")) == 11
+
+
+# backlog#1211: absolute-path parity. Each entry is (path-as-written, expected
+# repo-relative form). The shell lib and _normalise_cf_path must agree on every
+# one. Relative paths are covered by AGREEMENT_PLAN / test_lib_sync.
+ABS_PARITY_CASES = [
+    ("/Users/x/GitHub/IBL5/ibl5/classes/Foo.php", "ibl5/classes/Foo.php"),
+    ("/Users/x/GitHub/IBL5-worktrees/my-slug/bin/check-plan", "bin/check-plan"),
+    ("/a/IBL5/b/IBL5/c", "c"),                      # greedy: LAST root wins
+    ("/a/IBL5-worktrees/slug/IBL5/d", "d"),         # worktree then plain root
+    ("/a/IBL5/IBL5-worktrees/slug/e", "e"),         # plain root then worktree
+    ("/a/IBL5-worktrees/x", "/a/IBL5-worktrees/x"),  # no slash after slug
+    ("/a/IBL5", "/a/IBL5"),                         # no trailing slash
+    ("/a/ibl5/y", "/a/ibl5/y"),                     # case-sensitive
+    ("/Users/x/claude-plans/z.md", "/Users/x/claude-plans/z.md"),  # out-of-repo
+    ("docs/IBL5/rel.md", "docs/IBL5/rel.md"),       # relative: untouched
+]
+
+
+def _abs_plan(cases):
+    body = "".join("- `%s`%s\n" % (p, " (reference)" if i % 2 else "")
+                   for i, (p, _e) in enumerate(cases))
+    return "## Critical Files\n\n" + body
+
+
+def _shell_parse(planfile_path, fn="cf_parse_section"):
+    proc = subprocess.run(
+        ["bash", "-c", 'source "$1" && %s "$2"' % fn, "_", LIB, str(planfile_path)],
+        capture_output=True, text=True, check=True)
+    return [ln for ln in proc.stdout.splitlines() if ln.strip()]
+
+
+def test_lib_sync_absolute_paths(tmp_path):
+    """backlog#1211: shell cf_parse_section strips the same IBL5 prefix _normalise_cf_path does."""
+    plan = _abs_plan(ABS_PARITY_CASES)
+    f = tmp_path / "abs.md"
+    f.write_text(plan)
+    shell = _shell_parse(f)
+    python = _classify(plan)
+    assert python == shell, "parser divergence\n python: %s\n shell:  %s" % (python, shell)
+    # Agreement on the RIGHT answer, not merely mutual agreement.
+    want = [("EXEMPT:" if i % 2 else "MUST_APPEAR:") + e
+            for i, (_p, e) in enumerate(ABS_PARITY_CASES)]
+    assert shell == want
+    for p, e in ABS_PARITY_CASES:
+        assert _normalise_cf_path(p) == e
+    # The raw entry point is the pre-#1211 parser: paths exactly as written.
+    raw = _shell_parse(f, "cf_parse_section_raw")
+    assert raw == [("EXEMPT:" if i % 2 else "MUST_APPEAR:") + p
+                   for i, (p, _e) in enumerate(ABS_PARITY_CASES)]
+
+
+def test_lib_empty_normalisation_divergence_pinned(tmp_path):
+    """A bare root entry: Python yields "", the shell keeps the path as written.
+
+    Deliberate and confined to a plan-authoring defect that gate [F] rejects at
+    plan time. An empty MUST_APPEAR row would be skipped by Phase 5.0 (dropping a
+    hold), so the shell fails closed by leaving the entry unchanged.
+    """
+    root = "/Users/x/GitHub/IBL5/"
+    assert _normalise_cf_path(root) == ""
+    f = tmp_path / "root.md"
+    f.write_text("## Critical Files\n\n- `%s`\n" % root)
+    assert _shell_parse(f) == ["MUST_APPEAR:" + root]
+
+
+def test_lib_abs_prefix_pattern_sync():
+    """Byte-level drift guard for the prefix regex, sibling of test_lib_pattern_sync."""
+    m = re.search(r"^CF_ABS_PREFIX_ERE='([^']+)'", open(LIB).read(), re.M)
+    assert m, "CF_ABS_PREFIX_ERE not found in " + LIB
+    assert _ABS_PREFIX_RE.pattern.replace("(?:", "(") == m.group(1)
+
+
+_CORPUS_SNAP = r'''
+source "$1"
+for f in "$HOME"/claude-plans/*.md; do
+    cf_parse_section_raw "$f" | awk -v p="$(basename "$f")" '{ print p "\t" $0 }' >> "$2"
+    cf_parse_section "$f" | awk -v p="$(basename "$f")" '{ print p "\t" $0 }' >> "$3"
+done
+'''
+
+
+@pytest.mark.skipif(not os.path.isdir(os.path.expanduser("~/claude-plans")),
+                    reason="needs the machine-local ~/claude-plans corpus")
+def test_lib_corpus_normalisation_diff(tmp_path):
+    """backlog#1211: over every real plan, only in-repo absolute rows move, and each
+    moves to exactly what _normalise_cf_path yields.
+
+    cf_parse_section_raw is byte-identical to the pre-#1211 parser, so it is the
+    stable "before" side and the test stays valid after this change merges.
+    """
+    before_tsv = tmp_path / "before.tsv"
+    after_tsv = tmp_path / "after.tsv"
+    before_tsv.write_text("")
+    after_tsv.write_text("")
+    subprocess.run(["bash", "-c", _CORPUS_SNAP, "_", LIB, str(before_tsv), str(after_tsv)],
+                   check=True, capture_output=True, text=True)
+    before = before_tsv.read_text().splitlines()
+    after = after_tsv.read_text().splitlines()
+    # Row 1: the baseline really contains the legacy absolute rows under test.
+    assert len(before) >= 5807, len(before)
+    n_abs = sum(1 for ln in before
+                if ln.split("\t", 1)[1].split(":", 1)[1].startswith("/"))
+    assert n_abs >= 117, n_abs
+    # Row 15: per-row comparison.
+    assert len(after) == len(before)
+    changed = out_of_repo = 0
+    for old_row, new_row in zip(before, after):
+        plan, old_entry = old_row.split("\t", 1)
+        plan2, new_entry = new_row.split("\t", 1)
+        old_kind, old = old_entry.split(":", 1)
+        new_kind, new = new_entry.split(":", 1)
+        assert (plan, old_kind) == (plan2, new_kind), (old_row, new_row)
+        assert new != "", "empty path emitted: " + old_row
+        if not old.startswith("/"):
+            assert new == old, ("relative row changed", old_row, new_row)
+            continue
+        exp = _normalise_cf_path(old)
+        if exp == "":
+            assert new == old, ("bare-root row must pass through", old_row, new_row)
+        elif exp == old:
+            assert new == old, ("out-of-repo row changed", old_row, new_row)
+            out_of_repo += 1
+        else:
+            assert new == exp, ("differs from _normalise_cf_path(old)", old_row, new_row)
+            changed += 1
+    assert changed >= 103 and out_of_repo >= 14, (changed, out_of_repo)
 
 
 def test_lib_pattern_sync():

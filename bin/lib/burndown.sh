@@ -262,9 +262,30 @@ bd_cost_for() {
     fi
 }
 
+# bd_load_repo_files — one `git ls-files` per run into a C-sorted list at $BD_REPO_FILES
+bd_load_repo_files() {
+    BD_REPO_FILES="$BD_TMP/repo-files.txt"
+    local raw="$BD_TMP/repo-files.raw" rc=0
+    "$BD_GIT" -C "$BD_REPO_ROOT" ls-files > "$raw" 2>/dev/null || rc=$?
+    [ "$rc" -eq 0 ] || bd_die 3 "git ls-files failed (exit $rc)"
+    LC_ALL=C sort -u "$raw" > "$BD_REPO_FILES"
+    [ -s "$BD_REPO_FILES" ] || bd_die 3 "git ls-files listed no files"
+}
+
 # bd_paths_for <body> — sets _bd_paths (newline-sep file paths, sorted -u)
 bd_paths_for() {
-    _bd_paths="$(grep -oE "$FILE_LINE_RE" <<< "$1" | sed 's/:[0-9]*$//' | sort -u)"
+    [ -n "${BD_REPO_FILES:-}" ] || bd_die 3 "bd_paths_for called before bd_load_repo_files"
+    local fl bare
+    fl="$(grep -oE "$FILE_LINE_RE" <<< "$1" | sed 's/:[0-9]*$//')" || true
+    bare="$(grep -oE '[A-Za-z0-9_./-]*/[A-Za-z0-9_./-]*' <<< "$1" \
+        | sed -e 's#^\./##' -e 's/[.,;]*$//' | LC_ALL=C sort -u \
+        | LC_ALL=C comm -12 - "$BD_REPO_FILES")" || true
+    _bd_paths="$(printf '%s\n%s\n' "$fl" "$bare" | grep -v '^$' | LC_ALL=C sort -u)" || true
+}
+
+# bd_batch_holders <picked_rows> — "#A #B+#C" in pick order (col 2 = partner, 0 = none)
+bd_batch_holders() {
+    awk -F'\t' 'NF { printf "%s#%s%s", sep, $1, ($2 != "0" ? "+#" $2 : ""); sep = " " }' <<< "$1"
 }
 
 # bd_has_overlap <paths> <held_tsv_file> — print "path<TAB>holder_num"; exit 1 if none
@@ -334,6 +355,7 @@ bd_cmd_burndown() {
     local inflight_file="$BD_TMP/inflight.tsv"
     touch "$inflight_file"
     bd_inflight "$inflight_file"
+    bd_load_repo_files
 
     # 3. Main selection loop — sorted by rank so P1 is always before P2-P4
     local sorted_tsv
@@ -380,6 +402,7 @@ bd_cmd_burndown() {
         # --- Verdicts for primary candidate (and partner if pair) ---
         local skip_reason=""
         local p_skip_reason=""  # partner's skip reason
+        local solo=0
 
         # Check primary: stale?
         local upd title body
@@ -402,7 +425,15 @@ bd_cmd_burndown() {
         if [ -z "$skip_reason" ]; then
             bd_paths_for "$body"
             paths="$_bd_paths"
-            [ -n "$paths" ] || skip_reason="no file:line refs (overlap unknowable)"
+            if [ -z "$paths" ]; then
+                if [ "$is_pair" -eq 1 ]; then
+                    skip_reason="solo slot: pairs cannot take it (#$num has no path refs)"
+                elif [ -n "$picked_rows" ]; then
+                    skip_reason="solo slot: no path refs; batch already holds $(bd_batch_holders "$picked_rows")"
+                else
+                    solo=1
+                fi
+            fi
         fi
 
         # Check primary: overlap?
@@ -439,7 +470,7 @@ bd_cmd_burndown() {
                 if [ -z "$p_skip_reason" ]; then
                     bd_paths_for "$p_body"
                     local p_paths="$_bd_paths"
-                    [ -n "$p_paths" ] || p_skip_reason="pair: #$partner no file:line refs"
+                    [ -n "$p_paths" ] || p_skip_reason="pair: #$partner solo slot: no path refs (pairs cannot take it)"
                 fi
                 if [ -z "$p_skip_reason" ]; then
                     local p_conflict=""
@@ -492,7 +523,7 @@ bd_cmd_burndown() {
 
         # PICK
         printf '%-5s #%-5s %-3s %-4s %s\n' "PICK" "$num" "$rank" "$cost" \
-            "tier=${tier}${partner:+ +#$partner}"
+            "tier=${tier}${partner:+ +#$partner}$([ "$solo" -eq 1 ] && printf ' solo')"
         if [ "$is_pair" -eq 1 ]; then
             local p_rank
             p_rank="$(awk -F'\t' -v n="$partner" '$1==n{print $2;exit}' <<< "$BD_REPORT_TSV")"
@@ -522,6 +553,7 @@ bd_cmd_burndown() {
         picked_rows="${picked_rows}${num}	${also_c}	${rank}	${cost}	${tier}	${title}	${all_paths//$'\n'/|}"$'\n'
 
         [ "$used" -lt "$BD_BUDGET" ] || done_flag=1
+        [ "$solo" -eq 0 ] || done_flag=1
     done <<< "$sorted_tsv"
 
     # Unranked open issues
@@ -930,10 +962,46 @@ bd_cmd_status() {
     [ "$unknown_count" -eq 0 ]
 }
 
-bd_cmd_close_merged() {
-    if [ $# -gt 1 ]; then bd_die 2 "burndown-close-merged wants at most one argument"; fi
-    bd_pick_ledger "${1:-}"
-    local ledger="$BD_LEDGER"
+# bd_sweep_cutoff — sets BD_SWEEP_CUTOFF to "now - 24h" as a zone-less local timestamp.
+# BURNDOWN_NOW (epoch seconds) replaces the clock for tests; unset and empty both mean real time.
+bd_sweep_cutoff() {
+    local now="${BURNDOWN_NOW:-}" cut_epoch
+    [ -n "$now" ] || now="$(date +%s)"
+    [[ "$now" =~ ^[0-9]+$ ]] || bd_die 3 "BURNDOWN_NOW must be a Unix epoch integer, got: $now"
+    cut_epoch=$((now - 86400))
+    BD_SWEEP_CUTOFF="$(date -d "@$cut_epoch" +%Y-%m-%dT%H:%M:%S 2>/dev/null \
+        || date -r "$cut_epoch" +%Y-%m-%dT%H:%M:%S 2>/dev/null)" || true
+    [ -n "$BD_SWEEP_CUTOFF" ] || bd_die 3 "cannot format sweep cutoff with date"
+}
+
+# bd_sweep_queued <ledger> <item> <issue_num> — flip a zombie queued plan item to skipped,
+# report a STALE-PLAN, or WAIT. Zombie: queued, slug set, no queue entry, ledger older than
+# 24h, no plan file (the caller has already seen zero PRs from a working gh).
+bd_sweep_queued() {
+    local ledger="$1" item="$2" issue_num="$3" slug status created
+    slug="$(jq -r '.slug // ""' <<< "$item")"
+    status="$(jq -r '.status // ""' <<< "$item")"
+    created="$(jq -r '.created // ""' "$ledger")"
+    if [ "$status" = "queued" ] && [ -n "$slug" ] && [ ! -e "$BD_QUEUE_DIR/$slug.md" ] \
+        && [[ "$created" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] \
+        && [[ "$created" < "$BD_SWEEP_CUTOFF" ]]; then
+        if [ -e "$BD_PLANS_DIR/$slug.md" ]; then
+            printf 'STALE-PLAN #%s %s (plan file, no queue entry, no PR; not flipped)\n' \
+                "$issue_num" "$slug"
+        else
+            bd_record_apply "$ledger" "$issue_num" '{"status":"skipped"}'
+            printf 'ZOMBIE #%s %s -> skipped (no plan, no queue entry, no PR)\n' \
+                "$issue_num" "$slug"
+        fi
+        return 0
+    fi
+    printf 'WAIT #%s queued\n' "$issue_num"
+}
+
+# bd_close_ledger <ledger> <caller> <mode> — per-ledger merge handling shared by
+# burndown-close-merged (mode=close) and burndown-sweep (mode=sweep).
+bd_close_ledger() {
+    local ledger="$1" caller="$2" mode="$3"
 
     local n=0 item_count any_fail=0
     item_count="$(jq '.items | length' "$ledger")"
@@ -959,6 +1027,32 @@ bd_cmd_close_merged() {
                 continue
                 ;;
         esac
+
+        if [ "$mode" = sweep ]; then
+            case "$live_state" in
+                open)
+                    local have_url
+                    have_url="$(jq -r '.pr_url // ""' <<< "$item")"
+                    if [ -z "$have_url" ] && [[ "$live_pr" =~ $PR_URL_EXACT_RE ]]; then
+                        bd_record_apply "$ledger" "$issue_num" \
+                            "$(jq -n --arg u "$live_pr" '{pr_url:$u}')"
+                        printf 'OPEN #%s %s (pr_url recorded)\n' "$issue_num" "$live_pr"
+                    else
+                        printf 'OPEN #%s %s\n' "$issue_num" "$live_pr"
+                    fi
+                    continue
+                    ;;
+                pr-closed)
+                    printf 'CLOSED #%s %s (unmerged; item stays %s)\n' \
+                        "$issue_num" "$live_pr" "$ledger_status"
+                    continue
+                    ;;
+                queued)
+                    bd_sweep_queued "$ledger" "$item" "$issue_num"
+                    continue
+                    ;;
+            esac
+        fi
 
         if [ "$live_state" != "merged" ]; then
             printf 'WAIT #%s %s\n' "$issue_num" "$live_state"
@@ -999,7 +1093,7 @@ bd_cmd_close_merged() {
                 OPEN)
                     local close_rc=0
                     "$GH" issue close "$inum" --repo "$REPO" \
-                        -c "Fixed by ${live_pr} (merged). Closed by bin/backlog burndown-close-merged from $(basename "$ledger")." \
+                        -c "Fixed by ${live_pr} (merged). Closed by bin/backlog ${caller} from $(basename "$ledger")." \
                         >/dev/null 2>&1 || close_rc=$?
                     if [ "$close_rc" -ne 0 ]; then
                         printf 'FAIL #%s issue close %s failed\n' "$issue_num" "$inum"
@@ -1030,6 +1124,35 @@ bd_cmd_close_merged() {
     [ "$any_fail" -eq 0 ]
 }
 
+bd_cmd_close_merged() {
+    if [ $# -gt 1 ]; then bd_die 2 "burndown-close-merged wants at most one argument"; fi
+    bd_pick_ledger "${1:-}"
+    bd_close_ledger "$BD_LEDGER" burndown-close-merged close
+}
+
+# bd_cmd_sweep — walk every ledger oldest to newest through bd_close_ledger in sweep mode
+bd_cmd_sweep() {
+    [ $# -eq 0 ] || bd_die 2 "burndown-sweep takes no arguments"
+    bd_sweep_cutoff
+    local files=() f any_fail=0
+    for f in "$BD_REPORTS_DIR"/burndown-batch-*.json; do
+        [ -f "$f" ] && files+=("$f")
+    done
+    if [ "${#files[@]}" -eq 0 ]; then
+        printf 'sweep: no burndown ledgers in %s\n' "$BD_REPORTS_DIR"
+        return 0
+    fi
+    for f in "${files[@]}"; do
+        jq -e '.items | type == "array"' "$f" >/dev/null 2>&1 \
+            || bd_die 3 "malformed ledger $f"
+    done
+    for f in "${files[@]}"; do
+        printf 'ledger %s\n' "$(basename "$f")"
+        bd_close_ledger "$f" burndown-sweep sweep || any_fail=1
+    done
+    [ "$any_fail" -eq 0 ]
+}
+
 bd_main() {
     local cmd="$1"; shift
     bd_init
@@ -1040,6 +1163,7 @@ bd_main() {
         burndown-record)       bd_cmd_record       "$@" ;;
         burndown-status)       bd_cmd_status       "$@" ;;
         burndown-close-merged) bd_cmd_close_merged "$@" ;;
+        burndown-sweep)        bd_cmd_sweep        "$@" ;;
         *)                     bd_die 2 "unknown burndown subcommand: $cmd" ;;
     esac
 }

@@ -20,6 +20,7 @@
 #                                        update one ledger item (route, slug, status, pr_url)
 #   bin/backlog burndown-status [<ledger>]        read-only live status table
 #   bin/backlog burndown-close-merged [<ledger>]  close backlog issues of merged ad-hoc PRs
+#   bin/backlog burndown-sweep                    sweep all ledgers: record merges, close merged ad-hoc issues, flip zombies
 #
 # Flags (must precede subcommand):
 #   --help, -h       Show this help and exit 0
@@ -81,6 +82,8 @@ Usage: bin/backlog [--dry-run] <subcommand> [args...]
                         Read-only live status of a batch (default: newest ledger)
   burndown-close-merged [<ledger>]
                         Close backlog issues whose ad-hoc PR merged
+  burndown-sweep
+                        Sweep every ledger: record merges and PR URLs, close merged ad-hoc issues, flip zombie plans
 
 Flags:
   --help, -h    Show this help

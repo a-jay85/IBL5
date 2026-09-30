@@ -26,10 +26,18 @@ try {
 export default defineConfig({
   testDir: './tests/e2e',
   testMatch: /visual-regression\.spec\.ts/,
-  fullyParallel: false,
+  // Every cell is a read-only screenshot: appState is a per-context cookie override
+  // (no DB writes) and storageState is written once by the `setup` project. So cells
+  // are order-independent. Serial (workers: 1) was the original default (#357), not a
+  // documented requirement. The CI docker run step does not yet pass -e CI=true into
+  // the container, so workers resolves to 1 on CI. To enable 3 workers on CI, add
+  // -e "CI=true" to the "Run visual regression tests" docker run step. Flake risk:
+  // screenshot timing under CPU load (mitigated by gotoWithRetry + re-sampling in
+  // captureSnapshot). If pixel-diff flakes appear, drop back to 2, then 1.
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  workers: 1,
+  workers: process.env.CI ? 3 : 1,
   reporter: [['html', { open: 'never' }], ['json', { outputFile: 'test-results.json' }], ['list']],
 
   expect: {

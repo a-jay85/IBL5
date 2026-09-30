@@ -148,10 +148,17 @@ class GoogleOAuthFlowHandlerTest extends TestCase
     public function testCallbackForOtherUsersStateIsRejected(): void
     {
         $this->handler->start(1);
+        // A forged request param naming the issuing user must not rebind the flow.
+        $_GET['user_id'] = '1';
 
-        $result = $this->handler->callback(2, $this->storedState(), 'code-1', null);
+        try {
+            $result = $this->handler->callback(2, $this->storedState(), 'code-1', null);
+        } finally {
+            unset($_GET['user_id']);
+        }
 
         self::assertSame(['type' => 'error', 'text' => GoogleOAuthFlowHandler::TEXT_BAD_STATE], $result);
         self::assertSame([], $this->http->requests);
+        self::assertSame([], $this->repo->rows);
     }
 }

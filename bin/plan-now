@@ -123,11 +123,36 @@ NOTIFY=1
 PROMPT_SRC=""
 TIER_OK_REASON=""
 RESUME_ID=""        # old run's TS under --resume; empty on a normal fire
+RESUME_FRESH=0      # 1 when the resumed run paused before its first turn: no transcript, start fresh
 MODEL_SET=0         # 1 when --model was given explicitly (resume keeps the old value otherwise)
 DISPOSITION_SET=0   # 1 when --queue/--implement was given explicitly
 
+# Source the usage gate beside THIS script (same reason as session-id.sh below).
+PLAN_NOW_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib"
+# shellcheck source=bin/lib/usage-gate.sh
+. "$PLAN_NOW_LIB_DIR/usage-gate.sh"
+
+# --resume-paused <sid>: the coordinator's entry point. Replays the argv saved when the
+# run started (`--resume <TS>`), so the existing --resume pre-flight below does the rest.
+if [ "${1:-}" = "--resume-paused" ]; then
+    if [ $# -ne 2 ]; then
+        echo "plan-now: --resume-paused takes exactly one session id" >&2
+        exit 2
+    fi
+    _saved_file=$(mktemp)
+    if ! usage_resume_paused_args plan-now "$2" > "$_saved_file"; then
+        rm -f "$_saved_file"
+        exit 2
+    fi
+    _saved=()
+    while IFS= read -r -d '' _a; do _saved[${#_saved[@]}]="$_a"; done < "$_saved_file"
+    rm -f "$_saved_file"
+    set -- ${_saved[@]+"${_saved[@]}"}
+fi
+
 while [ $# -gt 0 ]; do
     case "$1" in
+        --resume-paused) echo "plan-now: --resume-paused must be the only argument" >&2; exit 2 ;;
         --queue)     DISPOSITION="queue"; DISPOSITION_SET=1; shift ;;
         --implement) DISPOSITION="implement"; DISPOSITION_SET=1; shift ;;
         --model)     MODEL="${2:?--model needs a value}"; MODEL_SET=1; shift 2 ;;
@@ -215,9 +240,14 @@ if [ -n "$RESUME_ID" ]; then
     LAST_VERDICT=$(grep '^plan-now: RESULT ' "$OLD_LOG" | tail -1) || LAST_VERDICT=""
     case "$LAST_VERDICT" in
         "plan-now: RESULT failed"*) ;;
-        "")  resume_refuse "log $OLD_LOG carries no RESULT verdict; only a failed run is resumable." ;;
-        *)   resume_refuse "log $OLD_LOG ends in '$LAST_VERDICT'; only a failed run is resumable." ;;
+        "plan-now: RESULT paused"*) ;;
+        "")  resume_refuse "log $OLD_LOG carries no RESULT verdict; only a failed or paused run is resumable." ;;
+        *)   resume_refuse "log $OLD_LOG ends in '$LAST_VERDICT'; only a failed or paused run is resumable." ;;
     esac
+    case "$LAST_VERDICT" in
+        "plan-now: RESULT paused"*) usage_session_started "$RESUME_SESSION" || RESUME_FRESH=1 ;;
+    esac
+    usage_marker_clear "$RESUME_SESSION"
 
     # The runner wrote these with printf %q. Both are plain tokens in practice;
     # anything %q had to escape fails the shape check and is refused rather
@@ -348,6 +378,8 @@ else
 fi
 write_session_sidecar "$LOG" "$SESSION_ID" \
     || { echo "plan-now: could not write the session sidecar next to $LOG." >&2; exit 1; }
+# Usage gate (ADR-0143): the coordinator replays this argv through --resume-paused.
+usage_argv_save "$SESSION_ID" --resume "$(basename "$LOG" .log | sed 's/^plan-now-//')" || true
 
 if [ -n "$RESUME_ID" ]; then
     # The resumed session already holds the original prompt and coda; nothing is
@@ -480,11 +512,21 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     printf 'DISCORD_DM=%q\n' "${PLAN_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
     printf 'CLAUDE_BIN=%q\n' "${PLAN_NOW_CLAUDE:-claude}"
     printf 'PLAN_SLUG_RE=%q\n' "$PLAN_SLUG_RE"
+    printf 'USAGE_GATE_LIB=%q\n' "$PLAN_NOW_LIB_DIR/usage-gate.sh"
+    printf 'RESUME_BIN=%q\n' "$ROOT/bin/plan-now"
+    printf 'RESUME_FRESH=%q\n' "$RESUME_FRESH"
     printf 'REVIEW_ROUTE=%q\n' "${PLAN_NOW_REVIEW_ROUTE:-$REVIEW_ROUTE_DEFAULT}"
     cat <<'RUNNER_EOF'
 # launchd runs with a minimal env — same PATH prelude bin/automouse/run uses.
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 cd "$ROOT" || exit 1
+# shellcheck source=/dev/null
+. "$USAGE_GATE_LIB"
+# A coordinator-granted drain token names the launcher's pid, which exited after the
+# bootstrap. Re-record this runner's pid so usage_token_reclaim_dead keeps the token.
+if [ "$(usage_token_holder)" = "$SESSION_ID" ]; then
+    usage_token_acquire "$SESSION_ID" $$ 2>/dev/null || true
+fi
 if [ -n "${TIER_OVERRIDE:-}" ]; then echo "plan-now: tier-ok override was active: $TIER_OVERRIDE"; fi
 
 before=$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)
@@ -624,7 +666,8 @@ promote_draft() {
 # the continue message: the prompt and the coda are already in that session, and
 # re-sending them is how a resumed run restarts from scratch. Same uuid either
 # way, so ${LOG%.log}.session always names the transcript bin/fleet-status wants.
-if [ -n "${RESUME_FROM:-}" ]; then
+# A run paused BEFORE its first turn has no transcript to continue; it starts fresh.
+if [ -n "${RESUME_FROM:-}" ] && [ "${RESUME_FRESH:-0}" != 1 ]; then
     echo "plan-now: resuming session $SESSION_ID from run $RESUME_FROM"
     PROMPT_TEXT="$CONTINUE_MSG"
     SESSION_ARGS=(--resume "$SESSION_ID")
@@ -632,15 +675,28 @@ else
     PROMPT_TEXT=$(cat "$PROMPT")
     SESSION_ARGS=(--session-id "$SESSION_ID")
 fi
-CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
-    CLAUDE_HEADLESS=1 caffeinate -s \
-    timeout "$RUN_TIMEOUT" "$CLAUDE_BIN" -p "$PROMPT_TEXT" \
-    --dangerously-skip-permissions \
-    --model "$MODEL" \
-    "${SESSION_ARGS[@]}" \
-    --effort high \
-    --name "$LABEL" > "$OUT" 2>&1
-rc=$?
+# Usage gate (ADR-0143): in the drain/stop zone a run without the token pauses before
+# the call; a limit-hit or hook pause after it is classified before any verdict.
+PAUSED=0
+if ! usage_prestart_gate plan-now "$SESSION_ID" "$RESUME_BIN"; then
+    PAUSED=1
+    rc=0
+    : > "$OUT"
+else
+    IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_MODEL="$MODEL" \
+        IBL5_USAGE_GATE_RESUME_BIN="$RESUME_BIN" \
+        CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+        CLAUDE_HEADLESS=1 caffeinate -s \
+        timeout "$RUN_TIMEOUT" "$CLAUDE_BIN" -p "$PROMPT_TEXT" \
+        --dangerously-skip-permissions \
+        --model "$MODEL" \
+        "${SESSION_ARGS[@]}" \
+        --effort high \
+        --name "$LABEL" > "$OUT" 2>&1
+    rc=$?
+    usage_postrun_pause plan-now "$SESSION_ID" "$RESUME_BIN" "$rc" "$OUT" && PAUSED=1
+fi
+usage_token_release "$SESSION_ID" 2>/dev/null || true
 cat "$OUT"
 elapsed=$(( $(date +%s) - started ))
 
@@ -683,7 +739,10 @@ newfiles=$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep 
 echo "----------------------------------------------------------------"
 echo "plan-now: claude exited $rc after ${elapsed}s"
 
-if [ "$rc" -ne 0 ]; then
+if [ "$PAUSED" = 1 ]; then
+    echo "plan-now: RESULT paused — usage gate; auto-resumes after reset."
+    DM_ICON="⏸️"; DM_VERDICT="paused — usage gate"; DM_NEXT="auto-resumes after reset"
+elif [ "$rc" -ne 0 ]; then
     # A nonzero exit means any file this run wrote may be TRUNCATED mid-plan, and
     # check-plan can pass on a truncated plan. Never green here.
     [ "$rc" -eq 124 ] && echo "plan-now: the ${RUN_TIMEOUT}s timeout killed it."
@@ -950,6 +1009,8 @@ fi
 # prod is bouncing.
 notify() {
     [ "$NOTIFY" = 1 ] || return 0
+    # The coordinator sends one DM per pause wave; a paused run stays quiet.
+    [ "${PAUSED:-0}" != 1 ] || return 0
     if [ ! -x "$DISCORD_DM" ]; then
         echo "plan-now: no executable discord-dm at $DISCORD_DM — not notifying."
         return 0

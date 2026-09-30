@@ -981,6 +981,8 @@ jobs:
         run: bin/test-pr-triage
       - name: bin/test-post-plan-fleet
         run: bin/test-post-plan-fleet
+      - name: bin/test-usage-gate
+        run: bin/test-usage-gate
       - name: bin/test-plan-index
         run: bin/test-plan-index
       - name: bin/test-post-plan-now-pr-creates-worktree
@@ -1076,6 +1078,8 @@ jobs:
 
       - name: bin/test-merge-line-select
         run: bin/test-merge-line-select
+      - name: bin/test-merge-line-watch
+        run: bin/test-merge-line-watch
       - name: bin/test-check-workflow-checkout
         run: bin/test-check-workflow-checkout
       - name: bin/test-check-composite-contracts

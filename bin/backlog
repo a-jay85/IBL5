@@ -18,8 +18,12 @@
 #   bin/backlog burndown [--pair A,B]... select one 5-unit batch and write its ledger
 #   bin/backlog burndown-record <ledger> <issue> key=value...
 #                                        update one ledger item (route, slug, status, pr_url)
+#     keys: route= slug= status= pr_url= reason=blocked|out-of-repo blocked_by=<PR>
+#   bin/backlog burndown-tag <issue> reason=blocked|out-of-repo [blocked_by=<PR>]
+#                                        tag an issue burndown skips, with no ledger
 #   bin/backlog burndown-status [<ledger>]        read-only live status table
 #   bin/backlog burndown-close-merged [<ledger>]  close backlog issues of merged ad-hoc PRs
+#   bin/backlog burndown-sweep                    sweep all ledgers: record merges, close merged ad-hoc issues, flip zombies
 #
 # Flags (must precede subcommand):
 #   --help, -h       Show this help and exit 0
@@ -76,11 +80,15 @@ Usage: bin/backlog [--dry-run] <subcommand> [args...]
   burndown-refresh <f>  Merge re-ranked lines from <f> into a new dated report
   burndown [--pair A,B] Pick one 5-unit batch; prints LEDGER: <path> last
   burndown-record <ledger> <n> key=value...
-                        Set route=, slug=, status=, pr_url= on ledger item <n>
+                        Set route=, slug=, status=, pr_url=, reason=, blocked_by= on ledger item <n>
+  burndown-tag <n> reason=blocked|out-of-repo [blocked_by=<PR>]
+                        Tag issue <n> so burndown skips it (no ledger needed)
   burndown-status [<ledger>]
                         Read-only live status of a batch (default: newest ledger)
   burndown-close-merged [<ledger>]
                         Close backlog issues whose ad-hoc PR merged
+  burndown-sweep
+                        Sweep every ledger: record merges and PR URLs, close merged ad-hoc issues, flip zombie plans
 
 Flags:
   --help, -h    Show this help

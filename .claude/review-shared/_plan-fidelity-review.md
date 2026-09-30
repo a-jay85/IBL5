@@ -12,7 +12,7 @@ Purpose: the criteria and verdict shape for the semantic judgment this skill exi
 4. The list of conflict-resolved paths recorded in runtime Phase 3.
 5. `PHASE_4B_RAN`, the review timestamp, and the **envelope column** the probe prints for each hit, from runtime Phase 1's prior-review probe.
 
-**6c. Two mandatory statements.** The review is incomplete without both, worded explicitly in the verdict:
+**6c. Two mandatory statements.** The review is incomplete without both. Each has a full form and a terse form, set out in the paragraph after (b).
 
 - **(a) Whether Phase 4B structured code review ran on this PR** (from `PHASE_4B_RAN`).
 
@@ -22,6 +22,8 @@ Purpose: the criteria and verdict shape for the semantic judgment this skill exi
 
   If it **did** run, give its date and link, then **bound how much of today's head it actually covers** — a long-lived branch is typically dozens of force-push rebases past the head that was reviewed, and reporting "review ran, no issues" without that bound endorses code the review never saw. Recover the reviewed head from the branch reflog (`git reflog show <branch>` — the pre-rebase entries survive locally) or, failing that, from the earliest `head_ref_force_pushed` entry after the review timestamp in `gh api "repos/{owner}/{repo}/issues/<N>/timeline" --paginate`. With both SHAs, compare **net changed lines** rather than whole patches: strip context and hunk headers from each side (`grep -E '^[+-]' <patch> | grep -v -E '^(\+\+\+|---)'`) and diff the results, so pure rebase churn — shifted `@@` offsets, new surrounding context from master — does not read as a change to this PR. Report the surviving delta line-by-line; if it is empty, say the review covers the current head verbatim. If the reviewed head is unrecoverable, **say that** rather than implying coverage. **Then emit the coverage marker**, on its own line inside this 6c(a) statement — never as the file's last line, because `SKILL.md` Phase 6 step 3 requires the verdict file to end in the verdict word and prints `STOP: Phase 6 verdict mismatch` otherwise. Write exactly one of: `REVIEW-COVERAGE: NONE` (Phase 4B never ran), `REVIEW-COVERAGE: STALE` (it ran but the surviving delta against today's head is non-empty), `REVIEW-COVERAGE: CURRENT` (it ran and the delta is empty), `REVIEW-COVERAGE: UNKNOWN` (the reviewed head is unrecoverable). A reader that cannot parse the line treats it as `UNKNOWN`. A false "already covered" is the worse failure, so ambiguity resolves toward `UNKNOWN`.
 - **(b) That Phase 4B, when it ran, reviewed the PRE-REBASE diff.** Therefore every line produced by runtime Phase 3 conflict resolution is code no structured review has ever covered, and this fidelity review is its only coverage. **Name each conflict-resolved path** in the statement — do not summarise them as a count.
+
+**Terse form.** When the coverage marker is `REVIEW-COVERAGE: CURRENT`, statement (a) is that marker line alone, with no date, link, or head bound. When 6b's conflict list is empty, omit statement (b), because check 6 already reports it. Write the full form of (a) for `NONE`, `STALE`, and `UNKNOWN`, and write (b) whenever the conflict list names a path.
 
 **Writing style.** These rules apply to all prose in this review. They cover finding bodies, numbered check lines, `## FINDINGS` bullets, and the five `## DIGEST` label values. They do not apply to machine-parsed tokens: the terminal verdict word (`READY` / `READY WITH NOTES` / `NOT READY`), `REVIEWED_TREE=` and `Mode:` lines, the `## DIGEST` heading and label names. Finding titles are copied verbatim into backlog issue titles and the terminal line; keep them short imperative lines under 70 characters.
 
@@ -41,7 +43,7 @@ Avoid these shapes in all prose you write:
 
 These shapes are enumerated in `.claude/rules/prose-style.md`.
 
-**6d. The fidelity checks.** Each produces an explicit finding or an explicit "matches" — never silence. Each check names what makes its finding **blocking** (`NOT READY`) rather than a note (`READY WITH NOTES`); when a finding is blocking, say which clause below made it so:
+**6d. The fidelity checks.** Each check ends in a finding or a pass. Passing checks share one summary line, in the shape `.claude/agents/pr-ready-phase6.md` item 2 sets. Each check names what makes its finding **blocking** (`NOT READY`) rather than a note (`READY WITH NOTES`); when a finding is blocking, say which clause below made it so:
 
 1. **Intent coverage** — for each of the plan's implementation phases, does a corresponding change exist in the diff? Name any phase with no diff footprint. **Blocking** unless the omission is *declared* — the plan, the PR body, or a posted comment says that phase was descoped, deferred, or split to a follow-up. An undeclared missing phase is `NOT READY`; a declared one is a note.
 2. **Intent fidelity** — where a change exists, does it do what the phase *said*, or a different thing that merely satisfies the phase's tests? This is the semantic question `/post-plan` Phase 5.0 (`.claude/skills/post-plan/_phase-5-final-verification.md`) structurally cannot ask: it verifies the declared test *paths* were written, never that the behavior matches intent. **Blocking** whenever the implemented behavior differs from the stated intent in a way a reader of the plan would not predict — this divergence is the defect class the whole skill exists to catch, so resolve doubt toward `NOT READY`. A divergence that still satisfies the phase's stated goal by a better route is a note, and must say why it is better.
@@ -61,7 +63,7 @@ These shapes are enumerated in `.claude/rules/prose-style.md`.
 
 **6e. Verdict shape.** Emit exactly one of:
 
-- **`READY`** — every check above says "matches", with the evidence named.
+- **`READY`**: every check above passes.
 - **`READY WITH NOTES`** — findings exist but none matched a blocking clause in 6d; list each note.
 - **`NOT READY`** — at least one finding matched a blocking clause in 6d; each one must name the clause it matched and the concrete next action.
 

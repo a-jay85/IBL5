@@ -91,7 +91,7 @@ final class QueueSimSummaryStepDbTest extends DatabaseTestCase
     }
 
     /**
-     * execute() returns a skipped result when the phase is not Regular Season.
+     * execute() returns a skipped result when the phase has recaps disabled.
      *
      * RecapPhasePolicy::isEnabled() gates the step before any sim-dates read.
      */

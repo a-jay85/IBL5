@@ -743,12 +743,12 @@ assert "gate13-manual-explicit-opus-ok" 0 '---
 impl_model: opus
 ---'"$M_MANUAL"
 
-# (g) Full-id claude-sonnet-4-6 with a Truly-manual row is forbidden (exit 1) —
+# (g) Full-id claude-sonnet-5-5 with a Truly-manual row is forbidden (exit 1) —
 # regression pin for the closed hole: previously the full-id form slipped past a
 # literal `[ "$RAW" = "sonnet" ]` guard and ran as an opus-tier fallback.
 _f="$TMP/gate13-sonnet46-manual.md"
 printf '%s\n' '---
-impl_model: claude-sonnet-4-6
+impl_model: claude-sonnet-5-5
 ---'"$M_MANUAL" > "$_f"
 "$GUARD" "$_f" >/dev/null 2>&1; _ec=$?
 if [ "$_ec" -eq 0 ]; then
@@ -756,10 +756,10 @@ if [ "$_ec" -eq 0 ]; then
 else
     echo "ok: gate13-sonnet46-manual (exit $_ec)"
 fi
-if "$GUARD" "$_f" 2>&1 | grep -qF 'Truly-manual row forbids impl_model: claude-sonnet-4-6'; then
+if "$GUARD" "$_f" 2>&1 | grep -qF 'Truly-manual row forbids impl_model: claude-sonnet-5-5'; then
     echo "ok: gate13-sonnet46-manual (substring confirmed)"
 else
-    echo "FAIL: gate13-sonnet46-manual — expected 'Truly-manual row forbids impl_model: claude-sonnet-4-6'"; FAILED=1
+    echo "FAIL: gate13-sonnet46-manual — expected 'Truly-manual row forbids impl_model: claude-sonnet-5-5'"; FAILED=1
 fi
 
 # (h) Full-id claude-haiku-4-5 with a Truly-manual row is forbidden (exit 1).
@@ -991,7 +991,7 @@ _gT_body='
 
 Do the mechanical thing.
 '
-for _gT_pair in "opus:claude-opus-5-5" "sonnet:claude-sonnet-4-6" "haiku:claude-haiku-4-5"; do
+for _gT_pair in "opus:claude-opus-5-5" "sonnet:claude-sonnet-5-5" "haiku:claude-haiku-4-5"; do
     _gT_bare="${_gT_pair%%:*}"; _gT_full="${_gT_pair##*:}"
     _fb="$TMP/gateT-alias-${_gT_bare}.md"
     _ff="$TMP/gateT-alias-${_gT_full}.md"
@@ -2045,6 +2045,28 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Gate [F] absolute-path fixtures
+# ---------------------------------------------------------------------------
+assert_viol "cf-absolute-path-ibL5-rejected" 1 '[F]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `/Users/ajaynicolas/GitHub/IBL5/ibl5/classes/Foo.php`
+'
+
+assert_viol "cf-absolute-path-worktree-rejected" 1 '[F]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `/Users/ajaynicolas/GitHub/IBL5-worktrees/my-slug/ibl5/classes/Foo.php`
+'
+
+assert_viol "cf-relative-path-accepted" 0 '[F]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `ibl5/classes/Foo.php`
+- `bin/check-plan`
+'
+
+# ---------------------------------------------------------------------------
 # Gate [M] fixtures (5 cases)
 # ---------------------------------------------------------------------------
 PU='
@@ -2083,6 +2105,36 @@ assert_viol "gateM-fenced-methods-only-flags" 1 '[M]' "$FM$PU"'
 assert_viol "gateM-no-phpunit-row-silent" 0 '[M]' "$FM$E2E_ONLY"
 
 # ---------------------------------------------------------------------------
+# Gate [X] fixtures (4 cases)
+# ---------------------------------------------------------------------------
+XVR='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | baselines unchanged | Visual-regression | post-impl | `t.spec.ts-snapshots` (no-change) |
+'
+# Marker on a Visual-regression row, directly after the token: the only honored shape.
+assert_viol "gateX-vr-row-marker-ok" 0 '[X]' "$FM$XVR"
+XE2E='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | E2E | post-impl | `t.spec.ts` (no-change) |
+'
+assert_viol "gateX-e2e-row-marker-fires" 1 '[X]' "$FM$XE2E"
+# The type must be a WHOLE cell; a description mentioning visual regression is not one.
+XDESC='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | visual regression spec passes | E2E | post-impl | `t.spec.ts` (no-change) |
+'
+assert_viol "gateX-description-mention-fires" 1 '[X]' "$FM$XDESC"
+XPOS='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | baselines unchanged | Visual-regression | post-impl | (no-change) `t.spec.ts-snapshots` |
+'
+assert_viol "gateX-marker-before-token-fires" 1 '[X]' "$FM$XPOS"
+
+# ---------------------------------------------------------------------------
 # Gate [G] fixtures (4 cases)
 # ---------------------------------------------------------------------------
 # Unwired bin/test-* script in the location cell — must flag [G].
@@ -2099,8 +2151,16 @@ assert_viol "gateG-wired-script-ok" 0 '[G]' "$FM"'
 | 1 | run script | CLI-executable | post-impl | `bin/test-check-plan` |
 '
 
-# (one-shot) annotation exempts the unwired script — must pass.
+# (one-shot) annotation as shell comment inside backticks exempts the unwired script — must pass.
 assert_viol "gateG-unwired-oneshot-ok" 0 '[G]' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | run script | CLI-executable | post-impl | `bin/test-nonexistent-thing # (one-shot)` |
+'
+
+# Legacy annotation form: a note after the closing backtick leaves a stray
+# backtick after Phase 5.0's strip, so gate [V] must reject it (Option A).
+assert_viol "gateG-legacy-oneshot-suffix-fails-V" 1 '[V]' "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | run script | CLI-executable | post-impl | `bin/test-nonexistent-thing` (one-shot) |
@@ -2205,7 +2265,7 @@ assert "v-go-wildcard-arg-elision" 1 "$FM"'
 # Message-content check (not just an exit code): gate V must name the offending
 # cell text so an author knows which row to fix. Copies the `2>&1 | grep -q`
 # idiom used for the [W] check above. Named without a `v-` prefix so the
-# `grep -c '^ok: v-'` count stays at the 9 assert cases.
+# `grep -c '^ok: v-'` count stays at the 11 assert cases.
 _f="$TMP/v-msg.md"
 printf '%s\n' "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
@@ -2231,6 +2291,43 @@ if "$GUARD" "$_f" 2>&1 | grep -qF 'must be written \|'; then
     echo "ok: [V]-pipe-message-confirmed"
 else
     echo "FAIL: [V] unescaped-pipe fixture must fire the pipe-escaping message"
+    FAILED=1
+fi
+
+# 10. Unbalanced backtick: a cell that opens a code span, closes it, then has
+# trailing prose. The opening backtick is stripped by matrix_split only when the
+# cell ALSO ends with a backtick; here it ends with prose so MC_LOC keeps the raw
+# text and all existing pattern arms miss. Must fire (exit 1) after Phase 2 lands.
+# On master this case FAILS (exit 0) — that is the regression this plan closes.
+assert "v-backtick-unbalanced-prose" 1 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean | CLI-executable | post-impl | `bin/check-docs` — runs in the worktree |
+'
+
+# 11. Survivor guard for case 10: a cleanly backtick-wrapped command with no
+# trailing prose is balanced (even backtick count after strip) and must STILL
+# pass (exit 0). An over-broad Phase 2 arm that fires on ANY backtick, or that
+# miscounts the balanced pair, trips here and nowhere else.
+assert "v-backtick-balanced-backtick-only" 0 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean | CLI-executable | post-impl | `bin/check-docs` |
+'
+
+# Message-content check for case 10: the unbalanced-backtick violation must carry
+# the [V] tag and quote the cell text. Uses the same idiom as [V]-message-names-row.
+_f="$TMP/v-unbal-msg.md"
+printf '%s\n' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean | CLI-executable | post-impl | `bin/check-docs` — runs in the worktree |
+' > "$_f"
+_out=$("$GUARD" "$_f" 2>&1)
+if printf '%s' "$_out" | grep -q '\[V\]' && printf '%s' "$_out" | grep -qF 'runs in the worktree'; then
+    echo "ok: [V]-unbalanced-message-names-row"
+else
+    echo "FAIL: [V] unbalanced-backtick message must contain '[V]' and the cell text 'runs in the worktree'"
     FAILED=1
 fi
 
@@ -2272,6 +2369,36 @@ ${NMIN_HDR}
 | 13.7c | bad |
 "
 
+# Helper: returns 0 when a corpus plan is a pass or only has downgradeable
+# violations. Downgradeable set: [E] (packet assertion binding, a true positive
+# on historical plans), and [V] lines for the backtick-parity arm added in this
+# PR (also a true positive on historical plans), and the [F] absolute-path line
+# (plans authored before that check existed). Never edit the corpus plans
+# themselves — that mutates historical artifacts and disarms the gate permanently.
+_corpus_guard_ok() {
+    _cgo_out="$("$GUARD" "$1" 2>&1)"; _cgo_rc=$?
+    [ "$_cgo_rc" -eq 0 ] && return 0
+    # Exit code stays PRIMARY. The line filter only ever DOWNGRADES a non-zero
+    # exit, and only when the failure is provably all-downgradeable. Read ONLY
+    # the violations block: [W] advisories and the [N] coverage line print on a
+    # clean run too, so a bare '^\[' match would flag passing plans.
+    _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
+        /^check-plan: violations in /{v=1; next}
+        /^check-plan: /{v=0}
+        v && /^\[/ && !/^\[E\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ {print}')"
+    _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
+        /^check-plan: violations in /{v=1; next}
+        /^check-plan: /{v=0}
+        v && (/^\[E\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/) {print}' | head -1)"
+    # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
+    # least one downgradeable line actually explains the failure. A non-zero exit
+    # with no visible violation line still fails loudly instead of passing silently.
+    if [ -z "$_cgo_other" ] && [ -n "$_cgo_dvio" ]; then
+        return 0
+    fi
+    return 1
+}
+
 # Corpus regression: all 20 queued plans still pass with gate N
 # Plans removed because they trigger new gates added in this PR (all true positives):
 # conference-champions-playoff-semantics, bug-pipeline-survive-db-sync,
@@ -2292,28 +2419,7 @@ for _n_slug in \
     autoresearch-oreb-arming-share-lever retire-rebase-prs-workflow; do
     _n_pf="$HOME/claude-plans/$_n_slug.md"
     [ -f "$_n_pf" ] || continue
-    # These are real, already-merged plans, pinned as a gate-N false-positive
-    # corpus. [E] (packet assertion binding) is a legitimate TRUE positive on
-    # any plan authored before that field existed, so drop [E] lines before
-    # judging. Never silence [E] by editing the corpus plans themselves — that
-    # mutates historical artifacts and disarms the gate on them permanently.
-    _n_out="$("$GUARD" "$_n_pf" 2>&1)"; _n_rc=$?
-    # Exit code stays PRIMARY. The line filter only ever DOWNGRADES a non-zero
-    # exit, and only when the failure is provably all-[E]. Read ONLY the
-    # violations block: [W] advisories and the [N] coverage line print on a
-    # clean run too, so a bare '^\[' match would flag passing plans.
-    _n_other="$(printf '%s\n' "$_n_out" | awk '
-        /^check-plan: violations in /{v=1; next}
-        /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ {print}')"
-    _n_evio="$(printf '%s\n' "$_n_out" | awk '
-        /^check-plan: violations in /{v=1; next}
-        /^check-plan: /{v=0}
-        v && /^\[E\]/ {print}' | head -1)"
-    # Downgrade ONLY when: non-zero exit, zero non-[E] violation lines, and at
-    # least one [E] line actually explains the failure. A non-zero exit with no
-    # visible violation line still fails loudly instead of passing silently.
-    if [ "$_n_rc" -ne 0 ] && { [ -n "$_n_other" ] || [ -z "$_n_evio" ]; }; then
+    if ! _corpus_guard_ok "$_n_pf"; then
         echo "FAIL: n_corpus — $_n_slug failed (gate N false positive)"
         _n_corpus_pass=0; FAILED=1
     fi
@@ -2350,7 +2456,7 @@ _n_atfile="$HOME/claude-plans/agent-tiering-detail-trim.md"
 if [ ! -f "$_n_atfile" ]; then
     echo "ok: n_agent_tiering_pass (skip — plan absent)"
 else
-    if "$GUARD" "$_n_atfile" >/dev/null 2>&1; then
+    if _corpus_guard_ok "$_n_atfile"; then
         echo "ok: n_agent_tiering_pass"
     else
         echo "FAIL: n_agent_tiering_pass — agent-tiering-detail-trim.md failed (false positive)"
@@ -2975,6 +3081,66 @@ fi
 if [ "$_canon_failed" -eq 0 ]; then
   echo "ok: regex_canon_divergence"
 fi
+
+# ---------------------------------------------------------------------------
+# Gate [O]: Hub in module/class names
+# ---------------------------------------------------------------------------
+# PascalCase Hub identifiers fire.
+assert_viol "gate-O-PascalCase-Hub-fires" 1 "[O]" "$FM$CF_MATRIX"'
+Add a new `RecordsHub` class.
+'
+
+# HubXxx pattern fires.
+assert_viol "gate-O-HubPrefix-fires" 1 "[O]" "$FM$CF_MATRIX"'
+Introduce `HubDraft` to manage draft sessions.
+'
+
+# "Records Hub" label fires.
+assert_viol "gate-O-standalone-label-fires" 1 "[O]" "$FM$CF_MATRIX"'
+The Records Hub page consolidates standings.
+'
+
+# GitHub does NOT fire (exempt).
+assert_viol "gate-O-GitHub-clean" 0 "[O]" "$FM$CF_MATRIX"'
+Push to GitHub and open a PR.
+'
+
+# github lowercase does NOT fire (exempt).
+assert_viol "gate-O-github-lowercase-clean" 0 "[O]" "$FM$CF_MATRIX"'
+URL: https://github.com/a-jay85/IBL5
+'
+
+# .github/ path does NOT fire (exempt).
+assert_viol "gate-O-dotgithub-clean" 0 "[O]" "$FM$CF_MATRIX"'
+Update `.github/workflows/tests.yml` to wire the new step.
+'
+
+# records-hub kebab (lowercase h) does NOT fire.
+assert_viol "gate-O-kebab-slug-clean" 0 "[O]" "$FM$CF_MATRIX"'
+Branch name: records-hub-refactor.
+'
+
+# Fenced code block with Hub does NOT fire (fence-aware).
+assert_viol "gate-O-fenced-clean" 0 "[O]" "$FM$CF_MATRIX"'
+```
+class RecordsHub {}
+```
+'
+
+# Path under ibl5/modules/ with Hub fires.
+assert_viol "gate-O-module-path-fires" 1 "[O]" "$FM$CF_MATRIX"'
+New file: `ibl5/modules/RecordsHub.php`
+'
+
+# "Docker Hub" does NOT fire (exempt).
+assert_viol "gate-O-docker-hub-clean" 0 "[O]" "$FM$CF_MATRIX"'
+Pull the image from Docker Hub.
+'
+
+# A line marked <!-- hub-ok --> does NOT fire.
+assert_viol "gate-O-hub-ok-marker-clean" 0 "[O]" "$FM$CF_MATRIX"'
+Order nodes Hub-last in the graph walk. <!-- hub-ok -->
+'
 
 # ---------------------------------------------------------------------------
 # Gate [U]: ## Backlog issues bullet grammar

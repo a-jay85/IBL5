@@ -1,5 +1,8 @@
+import ast
 import json
 import os
+import pathlib
+import re
 import subprocess
 import sys
 
@@ -7,9 +10,11 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.armable import manual_testing_clearance
-from harness.classify import (classify, files_from_diff, filter_diff,
+from harness.armable import (SENTINEL_RE, _manual_section, all_rows_ticked,
+                             manual_testing_clearance)
+from harness.classify import (_manual_testing_span, classify, files_from_diff, filter_diff,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END, MANUAL_TESTING_SENTINEL,
+                               MANUAL_TESTING_SENTINEL_STATIC,
                                name_status_from_diff, qualify_backlog_refs,
                                render_files_changed,
                                render_reviewer_verification,
@@ -554,6 +559,182 @@ def test_sentinel_passes_the_ci_checker():
     assert "verified" not in MANUAL_TESTING_SENTINEL
 
 
+def test_static_sentinel_passes_the_ci_checker():
+    # Same prefix contract as MANUAL_TESTING_SENTINEL: SENTINEL_RE and the shell twins
+    # read it as CLEARED, and the tail carries no test-type keyword for the diff scan.
+    prefix = "No manual testing needed"
+    assert MANUAL_TESTING_SENTINEL_STATIC == (
+        "No manual testing needed — verification is static; "
+        "the plan's Verification Matrix has no executable rows.")
+    assert MANUAL_TESTING_SENTINEL_STATIC.startswith(prefix)
+    assert "verified" not in MANUAL_TESTING_SENTINEL_STATIC.lower()
+    assert SENTINEL_RE.match(MANUAL_TESTING_SENTINEL_STATIC)
+    tail = MANUAL_TESTING_SENTINEL_STATIC[len(prefix):]
+    assert not re.search(r"e2e|playwright|unit|phpunit|integration", tail, re.I)
+    assert MANUAL_TESTING_SENTINEL_STATIC != MANUAL_TESTING_SENTINEL
+
+
+def test_no_harness_code_compares_sentinel_by_equality():
+    # restore/strip key on the `## Manual Testing` heading, so a second wording must
+    # never be compared by text equality anywhere in the harness.
+    harness_root = pathlib.Path(__file__).resolve().parents[1]
+    files = sorted((harness_root / "harness").glob("*.py")) + [harness_root / "runner.py"]
+    names = {"MANUAL_TESTING_SENTINEL", "MANUAL_TESTING_SENTINEL_STATIC"}
+
+    def _is_sentinel(node: ast.AST) -> bool:
+        return ((isinstance(node, ast.Name) and node.id in names)
+                or (isinstance(node, ast.Attribute) and node.attr in names))
+
+    hits = []
+    for path in files:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Compare) and (
+                    _is_sentinel(node.left) or any(_is_sentinel(c) for c in node.comparators)):
+                hits.append(f"{path.name}:{node.lineno}")
+    assert hits == [], f"sentinel compared by equality at: {hits}"
+
+
+# ---------------------------------------------------------------------------
+# restore_manual_testing_section when ## Manual Testing is the LAST section
+# (backlog#1188). Invariant for every case: the arming gate's window
+# (armable._manual_section) and verdict after restore equal the snapshot's.
+# ---------------------------------------------------------------------------
+
+_MT_LAST = ("## Summary\n\nOld bullet.\n\n## Manual Testing\n\n"
+            f"{MANUAL_TESTING_SENTINEL}\n")
+_MT_LAST_HELD = "## Summary\n\nOld bullet.\n\n## Manual Testing\n\n- [ ] **Row 1** — foo\n"
+
+
+def _assert_gate_untouched(result: str, before: str) -> None:
+    assert _manual_section(result) == _manual_section(before)
+    assert manual_testing_clearance(result) == manual_testing_clearance(before)
+    b = _manual_testing_span(before)
+    r = _manual_testing_span(result)
+    assert result[r[0]:r[1]].rstrip("\n") == before[b[0]:b[1]].rstrip("\n")
+
+
+# --- red until Phase 2 -------------------------------------------------------
+
+def test_restore_keeps_evidence_line_appended_after_last_section():
+    after = _MT_LAST + "\nEvidence: `bin/test-pr-cycle` ran green.\n"
+    body, restored = restore_manual_testing_section(after, _MT_LAST)
+    assert restored is True
+    assert "Evidence: `bin/test-pr-cycle` ran green." in body
+    assert body.index("Evidence:") < body.index("## Manual Testing")
+    _assert_gate_untouched(body, _MT_LAST)
+
+
+def test_restore_keeps_closes_trailer_appended_after_last_section():
+    after = _MT_LAST + "\nCloses a-jay85/IBL5-backlog#1188\n"
+    body, restored = restore_manual_testing_section(after, _MT_LAST)
+    assert restored is True
+    assert "Closes a-jay85/IBL5-backlog#1188" in body
+    assert body.index("Closes ") < body.index("## Manual Testing")
+    _assert_gate_untouched(body, _MT_LAST)
+
+
+def test_restore_relocation_is_idempotent():
+    after = _MT_LAST + "\nEvidence line.\n"
+    once, _ = restore_manual_testing_section(after, _MT_LAST)
+    assert "Evidence line." in once
+    assert restore_manual_testing_section(once, _MT_LAST) == (once, False)
+
+
+def test_restore_keeps_append_and_a_following_new_section():
+    after = _MT_LAST + "\nEvidence line.\n\n## Notes\n\nfoo\n"
+    body, restored = restore_manual_testing_section(after, _MT_LAST)
+    assert restored is True
+    assert body.index("Evidence line.") < body.index("## Manual Testing")
+    assert "\n## Notes\n\nfoo\n" in body
+    _assert_gate_untouched(body, _MT_LAST)
+
+
+def test_restore_snapshot_without_trailing_newline_never_glues_next_heading():
+    before = _MT_LAST.rstrip("\n")
+    after = before + "\n\nEvidence line.\n\n## Notes\n\nfoo"
+    body, restored = restore_manual_testing_section(after, before)
+    assert restored is True
+    assert "Evidence line." in body
+    assert "\n## Notes\n" in body
+    _assert_gate_untouched(body, before)
+
+
+def test_restore_counterfeit_level3_heading_with_sentinel_stays_held():
+    # `### ` does not break the gate window (armable._manual_section breaks on
+    # `^## ` only), so the appended sentinel would be gate input if it survived.
+    after = _MT_LAST_HELD + f"\n### Manual Testing\n\n{MANUAL_TESTING_SENTINEL}\n"
+    assert manual_testing_clearance(_MT_LAST_HELD) == "HELD"
+    body, _ = restore_manual_testing_section(after, _MT_LAST_HELD)
+    assert manual_testing_clearance(body) == "HELD"
+    assert "### Manual Testing" not in body
+    _assert_gate_untouched(body, _MT_LAST_HELD)
+
+
+def test_span_ends_at_next_level2_heading_only():
+    body = ("## Manual Testing\n\n- [ ] **R** — x\n\n### Sub\n\nmore\n\n"
+            "## Files changed\n\nx\n")
+    assert _manual_testing_span(body) == (0, body.index("## Files changed"))
+    edited = body.replace("more", "changed")
+    assert restore_manual_testing_section(edited, body) == (body, True)
+
+
+# --- characterization: green before and after Phase 2 ------------------------
+
+def test_restore_drops_edit_plus_append_in_last_section():
+    after = ("## Summary\n\nOld bullet.\n\n## Manual Testing\n\n"
+             "Covered by x.\n\nCloses a-jay85/IBL5-backlog#1188\n")
+    body, restored = restore_manual_testing_section(after, _MT_LAST)
+    assert restored is True
+    assert body == _MT_LAST
+
+
+def test_restore_held_section_plus_appended_sentinel_stays_held():
+    after = _MT_LAST_HELD + f"\n{MANUAL_TESTING_SENTINEL}\n"
+    assert manual_testing_clearance(_MT_LAST_HELD) == "HELD"
+    body, _ = restore_manual_testing_section(after, _MT_LAST_HELD)
+    assert manual_testing_clearance(body) == "HELD"
+    _assert_gate_untouched(body, _MT_LAST_HELD)
+
+
+def test_restore_held_section_plus_appended_ticked_row_stays_held():
+    after = _MT_LAST_HELD + "\n- [x] **Row 2** — bar\n"
+    body, _ = restore_manual_testing_section(after, _MT_LAST_HELD)
+    assert manual_testing_clearance(body) == "HELD"
+    assert all_rows_ticked(body) is False
+    _assert_gate_untouched(body, _MT_LAST_HELD)
+
+
+def test_restore_counterfeit_nospace_heading_in_append_is_dropped():
+    # `##Manual Testing` matches classify._MANUAL_HEADING_RE (`\s*`) but is not a
+    # `_NEXT_HEADING_RE` line; relocated above the real heading it would become
+    # the FIRST span match on the next round. It must be dropped, never moved.
+    after = _MT_LAST_HELD + f"\n##Manual Testing\n\n{MANUAL_TESTING_SENTINEL}\n"
+    body, _ = restore_manual_testing_section(after, _MT_LAST_HELD)
+    assert body == _MT_LAST_HELD
+    assert _manual_testing_span(body)[0] == _MT_LAST_HELD.index("## Manual Testing")
+    _assert_gate_untouched(body, _MT_LAST_HELD)
+
+
+def test_restore_duplicate_level2_heading_after_section_is_outside_gate():
+    after = _MT_LAST_HELD + f"\n## Manual Testing\n\n{MANUAL_TESTING_SENTINEL}\n"
+    body, _ = restore_manual_testing_section(after, _MT_LAST_HELD)
+    assert manual_testing_clearance(body) == "HELD"
+    _assert_gate_untouched(body, _MT_LAST_HELD)
+
+
+def test_restore_whitespace_only_append_collapses_to_snapshot():
+    body, restored = restore_manual_testing_section(_MT_LAST + "\n\n\n", _MT_LAST)
+    assert (body, restored) == (_MT_LAST, True)
+
+
+def test_restore_in_section_insert_when_not_last_is_reverted():
+    after = _MT_BEFORE.replace("## Files changed", "Extra line.\n\n## Files changed")
+    body, restored = restore_manual_testing_section(after, _MT_BEFORE)
+    assert restored is True
+    assert body == _MT_BEFORE
+
+
 # ---------------------------------------------------------------------------
 # commit_subject: coercion (decoration layer) and schema validation
 # ---------------------------------------------------------------------------
@@ -878,3 +1059,118 @@ def test_upsert_residual_phases_noop_without_items_or_markers():
     assert RESIDUAL_PHASES_END in result
     assert RESIDUAL_PHASES_BEGIN in result
     assert "2 — B" in result
+
+
+from harness.classify import (FILES_CHANGED_BEGIN, FILES_CHANGED_END,
+                              TESTS_CHANGED_BEGIN, TESTS_CHANGED_END,
+                              render_files_changed, render_tests_changed,
+                              upsert_files_changed, upsert_tests_changed)
+
+
+def _make_diff_entry(path: str, status: str) -> str:
+    """Build a minimal diff --git block for the given path and A/M/D status."""
+    if status == "A":
+        return (f"diff --git a/{path} b/{path}\n"
+                f"new file mode 100644\n"
+                f"--- /dev/null\n"
+                f"+++ b/{path}\n"
+                f"@@ -0,0 +1,1 @@\n"
+                f"+x\n")
+    elif status == "D":
+        return (f"diff --git a/{path} b/{path}\n"
+                f"deleted file mode 100644\n"
+                f"--- a/{path}\n"
+                f"+++ /dev/null\n"
+                f"@@ -1,1 +0,0 @@\n"
+                f"-x\n")
+    else:
+        return (f"diff --git a/{path} b/{path}\n"
+                f"index aaa..bbb 100644\n"
+                f"--- a/{path}\n"
+                f"+++ b/{path}\n"
+                f"@@ -1,1 +1,2 @@\n"
+                f"+x\n")
+
+
+def test_render_tests_changed_filters_to_test_paths():
+    diff = (
+        _make_diff_entry("ibl5/classes/Foo.php", "M")
+        + _make_diff_entry("ibl5/tests/Unit/FooTest.php", "A")
+        + _make_diff_entry("ibl5/tests/e2e/roster.spec.ts", "M")
+        + _make_diff_entry("tools/postplan-harness/tests/test_classify.py", "M")
+        + _make_diff_entry("engine/internal/sim/rng_test.go", "A")
+        + _make_diff_entry("bin/test-plan-now", "M")
+    )
+    block = render_tests_changed(diff)
+    assert "- `A` `ibl5/tests/Unit/FooTest.php`" in block
+    assert "- `M` `ibl5/tests/e2e/roster.spec.ts`" in block
+    assert "- `M` `tools/postplan-harness/tests/test_classify.py`" in block
+    assert "- `A` `engine/internal/sim/rng_test.go`" in block
+    assert "- `M` `bin/test-plan-now`" in block
+    assert "ibl5/classes/Foo.php" not in block
+
+
+def test_render_tests_changed_reports_none_when_no_tests():
+    diff = (
+        _make_diff_entry("ibl5/classes/Foo.php", "M")
+        + _make_diff_entry("README.md", "M")
+    )
+    block = render_tests_changed(diff)
+    header = ("**Tests changed** (generated from "
+              "`git diff --name-status origin/master...HEAD` — do not edit by hand):")
+    expected = (TESTS_CHANGED_BEGIN + "\n" + header + "\n\n"
+                "- _(no test files changed)_\n" + TESTS_CHANGED_END)
+    assert block == expected
+
+
+def test_render_tests_changed_empty_diff():
+    block = render_tests_changed("")
+    assert block.startswith(TESTS_CHANGED_BEGIN)
+    assert block.endswith(TESTS_CHANGED_END)
+    assert "_(no test files changed)_" in block
+
+
+def test_upsert_tests_changed_replace():
+    old_block = (TESTS_CHANGED_BEGIN + "\nold header\n\n- `M` `old.py`\n" + TESTS_CHANGED_END)
+    body = "## Before\n\n" + old_block + "\n\n## After\n"
+    new_block = (TESTS_CHANGED_BEGIN + "\nnew header\n\n- `A` `new.py`\n" + TESTS_CHANGED_END)
+    result = upsert_tests_changed(body, new_block)
+    assert result == "## Before\n\n" + new_block + "\n\n## After\n"
+
+
+def test_upsert_tests_changed_append_when_absent_and_empty_body():
+    block = render_tests_changed("")
+    body = "## Summary\n- x"
+    result = upsert_tests_changed(body, block)
+    assert result == body.rstrip() + "\n\n" + block + "\n"
+
+    assert upsert_tests_changed("", block) == block
+    assert upsert_tests_changed(None, block) == block
+
+
+def test_upsert_tests_changed_orphan_marker_appends():
+    orphan_body = f"## Orphan\n{TESTS_CHANGED_END}\n- lone begin: {TESTS_CHANGED_BEGIN}\n"
+    block = render_tests_changed("")
+    result = upsert_tests_changed(orphan_body, block)
+    assert orphan_body.rstrip() in result
+    assert result.count(TESTS_CHANGED_BEGIN) >= 2
+    assert result.endswith(block + "\n")
+
+
+def test_upsert_tests_changed_preserves_files_changed_block():
+    diff = _make_diff_entry("ibl5/tests/Unit/FooTest.php", "A")
+    files_block = render_files_changed(diff)
+    tests_block = render_tests_changed(diff)
+    body_with_files = upsert_files_changed("## Summary\n", files_block)
+    files_snapshot = body_with_files[
+        body_with_files.find(FILES_CHANGED_BEGIN):
+        body_with_files.find(FILES_CHANGED_END) + len(FILES_CHANGED_END)
+    ]
+
+    result_1 = upsert_tests_changed(body_with_files, tests_block)
+    result_2 = upsert_tests_changed(result_1, tests_block)
+
+    assert files_snapshot in result_1
+    assert files_snapshot in result_2
+    assert result_1.count(TESTS_CHANGED_BEGIN) == 1
+    assert result_1 == result_2

@@ -1,0 +1,102 @@
+name: Docfix Health
+
+# Dispatched by bin/docfix-poll on the Mac after every completed poll
+# (alert=true|false). Each dispatch run is the poll's heartbeat. The daily
+# schedule is the backstop for a Mac that never reports.
+# Threshold arithmetic: bin/lib/docfix-health.sh (docfix_health_heartbeat_verdict).
+#
+# Load-bearing deployment note: GitHub only dispatches a workflow whose
+# workflow_dispatch trigger already exists on the default branch. The first
+# real dispatch is therefore only possible once this PR lands on the default branch.
+on:
+  workflow_dispatch:
+    inputs:
+      alert:
+        description: "true or false (false = heartbeat only)"
+        required: true
+        type: string
+      kind:
+        description: "ci-red | died | wedged | never-ran (empty when alert=false)"
+        required: false
+        type: string
+        default: ""
+      detail:
+        description: "One-line alert detail from bin/docfix-poll"
+        required: false
+        type: string
+        default: ""
+  schedule:
+    - cron: '0 12 * * *'   # see threshold arithmetic in bin/lib/docfix-health.sh
+
+permissions:
+  contents: read
+  actions: read    # backstop: gh run list --workflow docfix-health.yml
+  issues: read     # backstop: open stale-docs issue lookup
+
+concurrency:
+  group: docfix-health-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  report:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build Discord message
+        id: build
+        env:
+          ALERT: ${{ inputs.alert }}
+          KIND: ${{ inputs.kind }}
+          DETAIL: ${{ inputs.detail }}
+        run: |
+          # Inputs travel via env, never interpolated inline, to prevent shell injection.
+          source bin/lib/docfix-health.sh
+          docfix_health_validate "$ALERT" "$KIND"
+          if [ "$ALERT" = true ]; then
+            docfix_health_compose "$KIND" "$DETAIL" /tmp/discord-msg.txt
+          fi
+          echo "alert=$ALERT" >> "$GITHUB_OUTPUT"
+
+      - name: Send Discord DM
+        if: steps.build.outputs.alert == 'true'
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
+
+  backstop:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check poll heartbeat
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source bin/lib/docfix-health.sh
+          alert=false
+          issue=$(gh issue list --label stale-docs --state open --json number --jq '.[0].number // empty') || issue=""
+          # --event workflow_dispatch keeps this job's own scheduled runs out of the heartbeat.
+          last=$(gh run list --workflow docfix-health.yml --event workflow_dispatch -L 1 \
+            --json createdAt --jq '.[0].createdAt // empty') || last=""
+          verdict=$(docfix_health_heartbeat_verdict "$last" "$(date -u +%s)")
+          if [ -n "$issue" ] && [ "${verdict%% *}" = stale ]; then
+            alert=true
+            docfix_health_compose poll-silent "No docfix-poll heartbeat for ${verdict#stale }h, so the Mac poll has not completed a run since. On the Mac: cd ~/GitHub/IBL5 && git pull && bin/docfix-poll --install-schedule, then read the poll's launchd-stderr.log." /tmp/discord-msg.txt
+          fi
+          echo "alert=$alert" >> "$GITHUB_OUTPUT"
+
+      - name: Send Discord DM
+        if: steps.check.outputs.alert == 'true'
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}

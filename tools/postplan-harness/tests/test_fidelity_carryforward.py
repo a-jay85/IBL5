@@ -71,7 +71,13 @@ def test_full_match_carries_the_prior_ready_verdict():
 # --- row 2: READY WITH NOTES substring trap -----------------------------------
 
 def test_ready_with_notes_carries_despite_not_ready_substring():
-    body = _sticky(verdict="READY WITH NOTES")
+    # terminal_line now emits a bare READY WITH NOTES, so the trap lives only in stickies
+    # posted before that change. Rebuild one with the legacy terminal line.
+    legacy = ("READY WITH NOTES — notes left for the merging reviewer; "
+              "the compiled harness remediates only NOT READY")
+    body = _sticky(verdict="READY WITH NOTES").replace(
+        "\nREADY WITH NOTES\n" + fidelity.STICKY_MARKER,
+        "\n" + legacy + "\n" + fidelity.STICKY_MARKER)
     assert "NOT READY" in body  # proves the substring trap is live
     assert fidelity.carry_forward_predicate(body, DIFF_ID, PLAN_HASH) == ("READY WITH NOTES", "")
 

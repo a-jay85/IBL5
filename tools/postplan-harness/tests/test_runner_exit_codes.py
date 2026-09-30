@@ -22,6 +22,11 @@ def test_local_gate_denial_exits_3():
     """A pre-commit/pre-push hook denial is deterministic — no ~1M skill fallback."""
     assert runner.exit_code_for(_res(TerminalState.FAILED, "local-gate")) == 3
 
+def test_usage_limit_exits_3():
+    """A Claude usage/rate limit is environmental — re-running the skill immediately
+    would hit the same wall, so the harness stops for a human to retry later."""
+    assert runner.exit_code_for(_res(TerminalState.FAILED, "llm-usage-limit")) == 3
+
 def test_other_typed_failure_exits_1():          # negative path: not everything is 3
     assert runner.exit_code_for(_res(TerminalState.FAILED, "push-disabled")) == 1
     assert runner.exit_code_for(_res(TerminalState.FAILED, None)) == 1
@@ -301,3 +306,80 @@ def test_emergency_abort_exists_on_live_git():
     assert callable(getattr(LiveGit, "emergency_abort", None)), (
         "LiveGit.emergency_abort() must be defined for SIGTERM cleanup"
     )
+
+
+def test_every_files_changed_upsert_is_paired_with_tests_changed():
+    """Every upsert_files_changed( call site in runner.py must be followed within two lines
+    by upsert_tests_changed(, so the tests block can never be left stale.
+
+    Mutation caught: deleting any one of the three wire lines from 2b, 2c, or 2d.
+    """
+    src_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            "runner.py")
+    lines = open(src_path).readlines()
+    sites = [i for i, ln in enumerate(lines)
+             if "upsert_files_changed(" in ln and not ln.lstrip().startswith("#")]
+    assert len(sites) >= 3, f"Expected at least 3 upsert_files_changed( sites, found {len(sites)}"
+    for idx in sites:
+        window = lines[idx + 1: idx + 3]
+        assert any("upsert_tests_changed(" in ln for ln in window), (
+            f"Line {idx + 1}: upsert_files_changed( not followed by upsert_tests_changed( "
+            f"within two lines"
+        )
+
+
+# ---------------------------------------------------------------------------
+# blocked-ship.txt: main() hands the human block to bin/post-plan-now on exit 3.
+# ---------------------------------------------------------------------------
+
+_ADR_DENIAL = ("pre-push-adr-hook: Decision-trigger surfaces detected:\n"
+               "  - [bin-script] bin/foo — Tool script")
+
+
+def _drive_main(monkeypatch, tmp_path, res, capsys):
+    """Run runner.main() against a canned RunResult; return (rc, stdout, out_dir)."""
+    out = tmp_path / "out"
+    out.mkdir()
+    canned = tmp_path / "canned.json"
+    canned.write_text("{}")
+    monkeypatch.setattr(sys, "argv", ["runner.py", "--mode", "isolated",
+                                      "--worktree", str(tmp_path / "wt"),
+                                      "--out", str(out), "--canned", str(canned)])
+    monkeypatch.setattr(runner, "_install_sigterm_handler", lambda: None)
+    monkeypatch.setattr(runner, "run", lambda *a, **k: res)
+    rc = runner.main()
+    return rc, capsys.readouterr().out, out
+
+
+def test_main_writes_blocked_ship_on_rc3(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("POSTPLAN_LOG_PATH", "/tmp/x.log")
+    res = _res(TerminalState.FAILED, "local-gate", error=_ADR_DENIAL, slug="feat/x")
+    rc, stdout, out = _drive_main(monkeypatch, tmp_path, res, capsys)
+    assert rc == 3
+    text = (out / "blocked-ship.txt").read_text()
+    assert text.startswith("feat/x did not ship.")
+    assert text.rstrip("\n").split("\n")[-1] == "Log: /tmp/x.log"
+    assert stdout.split("\n")[0].startswith("RESULT: post-plan BLOCKED")
+
+
+def test_main_writes_no_blocked_ship_on_rc1(monkeypatch, tmp_path, capsys):
+    res = _res(TerminalState.FAILED, "push-failed", error="boom", slug="feat/x")
+    rc, _stdout, out = _drive_main(monkeypatch, tmp_path, res, capsys)
+    assert rc == 1
+    assert not (out / "blocked-ship.txt").exists()
+
+
+def test_blocked_ship_log_line_when_env_unset_or_empty(monkeypatch, tmp_path):
+    res = _res(TerminalState.FAILED, "local-gate", error=_ADR_DENIAL, slug="feat/x")
+    monkeypatch.delenv("POSTPLAN_LOG_PATH", raising=False)
+    runner.write_blocked_ship(str(tmp_path), res, 3, "/wt")
+    assert (tmp_path / "blocked-ship.txt").read_text().endswith("Log: (see the run log)\n")
+    (tmp_path / "blocked-ship.txt").unlink()
+    monkeypatch.setenv("POSTPLAN_LOG_PATH", "")
+    runner.write_blocked_ship(str(tmp_path), res, 3, "/wt")
+    assert (tmp_path / "blocked-ship.txt").read_text().endswith("Log: (see the run log)\n")
+
+
+def test_blocked_ship_write_error_keeps_exit_code(tmp_path):
+    res = _res(TerminalState.FAILED, "local-gate", error=_ADR_DENIAL, slug="feat/x")
+    runner.write_blocked_ship(str(tmp_path / "missing"), res, 3, "/wt")  # must not raise

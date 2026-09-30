@@ -1,6 +1,6 @@
 ---
 description: Publish the Playwright visual-regression HTML report to per-SHA GitHub Pages and post a sticky PR comment (grouped by module, with a coverage-gap section) so visual-change PRs are reviewed from the PR itself.
-last_verified: 2026-09-02
+last_verified: 2026-09-29
 ---
 
 # ADR-0068: Visual-review publishing for visual-change PRs
@@ -88,4 +88,4 @@ the serving layer of this decision.
 - `ibl5/tests/e2e/vr-manifest.ts` — `sourceGlobs` field powering coverage selection.
 - `.claude/rules/visual-review-prs.md` — the operator-facing rule for this surface.
 - `.claude/rules/lighthouse-pr-comments.md` — the precedent that PR-comment selection logic is a mechanical-enforcement surface.
-- `bin/lighthouse-comment`, `.github/workflows/lighthouse.yml` — the sticky-comment pattern modeled here.
+- `bin/lighthouse-comment`, `.github/workflows/lighthouse.yml` (example) — the sticky-comment pattern modeled here. <!-- slop-ok -->

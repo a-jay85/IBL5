@@ -5,6 +5,25 @@
 # Migrations are tracked in schema_migrations(version VARCHAR(255) PRIMARY KEY).
 # Already-applied migrations are skipped (idempotent).
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/db-migrate <db-container> <migrations-dir> [db-name]
+
+Run pending SQL migrations against a running Docker MariaDB container.
+Migrations are tracked in schema_migrations and already-applied ones are skipped
+(idempotent).
+
+  db-container    Docker container name running MariaDB
+  migrations-dir  Directory containing .sql migration files
+  db-name         Database name (default: iblhoops_ibl5)
+
+Exit codes:
+  0  All pending migrations applied successfully
+  1  One or more migrations failed
+EOF
+    exit 0
+fi
+
 set -euo pipefail
 
 source "$(dirname "$0")/lib/db-helpers.sh"

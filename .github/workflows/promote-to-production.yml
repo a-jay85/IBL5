@@ -93,14 +93,6 @@ jobs:
         shell: bash
         run: bin/promote-master-to-production "$PROMOTE_SHA" | tee -a "$GITHUB_OUTPUT"
 
-      - name: Setup SSH
-        if: steps.promote.outputs.outcome == 'promoted' || failure()
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
       - name: Build Discord message
         if: steps.promote.outputs.outcome == 'promoted' || failure()
         env:
@@ -142,10 +134,8 @@ jobs:
         if: steps.promote.outputs.outcome == 'promoted' || failure()
         uses: ./.github/actions/notify-discord
         with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
+          ping: ${{ job.status == 'failure' }}
 
   paused-notice:
     # Second and last job in this workflow. Also listed verbatim in SKIP_CHECKS
@@ -165,13 +155,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup SSH
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
       - name: Build Discord message
         env:
           PROMOTE_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -188,7 +171,4 @@ jobs:
       - name: Send Discord DM
         uses: ./.github/actions/notify-discord
         with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}

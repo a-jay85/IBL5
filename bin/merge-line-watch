@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/merge-line-watch — local stand-in for the update-behind-prs workflow.
+#
+# Polls master. Each time it moves, waits for GitHub to settle, asks
+# bin/merge-line-select for the head of the armed-PR merge line, and calls
+# update-branch on that PR when the selector says action=update. Same decision
+# the workflow makes (.github/workflows/update-behind-prs.yml, ADR-0081), run
+# from your own shell with your own gh auth.
+#
+# Runs until Ctrl-C. Prints one line per master move.
+#
+# Exit codes: 0 = --once pass done / interrupted; 1 = runtime error;
+#             2 = usage error.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Seams for bin/test-merge-line-watch. The colon form treats empty like unset.
+GH_CMD="${GH_CMD:-gh}"
+SELECT_CMD="${MERGE_LINE_SELECT_CMD:-$SCRIPT_DIR/merge-line-select}"
+
+REPO="a-jay85/IBL5"
+INTERVAL=30
+SETTLE=45
+RETRY_WAIT="${MERGE_LINE_WATCH_RETRY_WAIT:-10}"
+RETRIES=8
+ONCE=0
+DRY_RUN=0
+
+usage() {
+    cat <<'EOF'
+Usage: bin/merge-line-watch [--repo <owner/name>] [--interval <s>] [--settle <s>]
+                            [--once] [--dry-run]
+
+Watch master and keep the head of the armed-PR merge line up to date.
+
+  --repo <o/n>      Repository (default a-jay85/IBL5).
+  --interval <s>    Seconds between master polls (default 30).
+  --settle <s>      Seconds to wait after master moves before selecting,
+                    so GitHub recomputes mergeability (default 45).
+  --once            Run one pass now (no settle wait) and exit.
+  --dry-run         Print what would happen; never call update-branch.
+  -h, --help        Show this message.
+
+Run it in a spare terminal tab. Ctrl-C to stop.
+EOF
+}
+
+die_usage() { echo "merge-line-watch: $1" >&2; usage >&2; exit 2; }
+
+# need_uint <flag> <argc> <value>: a numeric value must follow the flag.
+need_uint() {
+    [ "$2" -ge 2 ] || die_usage "$1 needs a value"
+    case "$3" in ''|*[!0-9]*) die_usage "$1 needs a number" ;; esac
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help) usage; exit 0 ;;
+        --repo)     [ $# -ge 2 ] || die_usage "--repo needs a value"; REPO="$2"; shift 2 ;;
+        --interval) need_uint "$1" $# "${2:-}"; INTERVAL="$2"; shift 2 ;;
+        --settle)   need_uint "$1" $# "${2:-}"; SETTLE="$2"; shift 2 ;;
+        --once)     ONCE=1; shift ;;
+        --dry-run)  DRY_RUN=1; shift ;;
+        *) die_usage "unknown argument: $1" ;;
+    esac
+done
+
+ts() { date '+%H:%M:%S'; }
+say() { echo "[$(ts)] $*"; }
+
+master_sha() { "$GH_CMD" api "repos/$REPO/commits/master" --jq .sha 2>/dev/null; }
+
+# One head-of-line pass. The selector returns action=unknown while GitHub is
+# still computing mergeability, so retry a few times before giving up.
+run_pass() {
+    local out action="" head="" i err skipped list entry why
+    for ((i = 1; i <= RETRIES; i++)); do
+        if ! out=$("$SELECT_CMD" --live --repo "$REPO" --summary /dev/null 2>&1); then
+            say "select failed: $out"
+            return 1
+        fi
+        action=$(sed -n 's/^action=//p' <<<"$out")
+        head=$(sed -n 's/^head=//p' <<<"$out")
+        [ "$action" = "unknown" ] || break
+        [ "$i" -lt "$RETRIES" ] && sleep "$RETRY_WAIT"
+    done
+
+    # Terminal-only. The workflow owns the skip-notice comments on GitHub.
+    skipped=$(sed -n 's/^skipped=//p' <<<"$out")
+    if [ -n "$skipped" ]; then
+        list=""
+        for entry in $skipped; do
+            case "${entry#*:}" in
+                red)   why="failing check" ;;
+                dirty) why="conflict" ;;
+                *)     why="${entry#*:}" ;;
+            esac
+            list="${list:+$list, }#${entry%%:*} ($why)"
+        done
+        say "skipped: $list"
+    fi
+
+    if [ "$action" != "update" ]; then
+        say "no update needed (action=$action head=$head)"
+        return 0
+    fi
+    if [ "$DRY_RUN" = 1 ]; then
+        say "dry run: would update PR #$head onto master"
+        return 0
+    fi
+    if err=$("$GH_CMD" api -X PUT "repos/$REPO/pulls/$head/update-branch" 2>&1); then
+        say "updated PR #$head onto master"
+    else
+        say "update-branch FAILED for #$head: ${err:0:150}"
+    fi
+}
+
+if [ "$ONCE" = 1 ]; then
+    run_pass
+    exit $?
+fi
+
+last=$(master_sha) || { echo "merge-line-watch: cannot read master on $REPO (gh auth?)" >&2; exit 1; }
+[ -n "$last" ] || { echo "merge-line-watch: empty master sha from $REPO" >&2; exit 1; }
+say "watching $REPO master at ${last:0:8} (poll ${INTERVAL}s, settle ${SETTLE}s)"
+
+trap 'echo; say "stopped"; exit 0' INT TERM
+
+while true; do
+    sleep "$INTERVAL"
+    cur=$(master_sha) || continue
+    [ -n "$cur" ] && [ "$cur" != "$last" ] || continue
+    last=$cur
+    say "master moved to ${cur:0:8}; running merge-line pass"
+    sleep "$SETTLE"
+    run_pass
+done

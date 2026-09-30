@@ -64,6 +64,7 @@ if (!headers_sent()) {
     header('Cache-Control: no-cache');         // prevent proxy caching
 }
 
+/** @var \mysqli $mysqli_db */
 global $mysqli_db;
 
 // Determine league context from the explicit POST parameter only (not cookie/session);
@@ -253,7 +254,6 @@ try {
 
     // IBL-only: Head-to-Head Records, All-Star games, and related steps don't apply to Olympics
     if (!$isOlympics) {
-        /** @phpstan-ignore argument.type */
         $updaterService->addStep(new Updater\Steps\RefreshHeadToHeadRecordsStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(
             $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $sourceResolver,

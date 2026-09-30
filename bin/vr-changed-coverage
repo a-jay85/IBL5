@@ -15,6 +15,14 @@
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
+const USAGE =
+  'Usage: git diff --name-only "$BASE"...HEAD | bin/vr-changed-coverage > coverage.json';
+
+if (process.argv.slice(2).includes('--help')) {
+  process.stdout.write(USAGE + '\n');
+  process.exit(0);
+}
+
 const __dir = dirname(fileURLToPath(import.meta.url));
 const ibl5Dir = resolve(__dir, '..', 'ibl5');
 

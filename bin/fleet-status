@@ -91,6 +91,11 @@
 
 set -u
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    sed -n '4,82p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # MAIN CHECKOUT, not "wherever this script was invoked from". bin/post-plan-now
@@ -116,6 +121,8 @@ REORDER_APP_DIR="${FLEET_STATUS_REORDER_APP_DIR:-$HOME/Library/Caches/ibl5}"
 OSACOMPILE_BIN="${FLEET_STATUS_OSACOMPILE:-osacompile}"
 # shellcheck source=bin/lib/session-id.sh
 . "$SCRIPT_DIR/lib/session-id.sh"
+# shellcheck source=bin/automouse/lib-queue-order
+source "$SCRIPT_DIR/automouse/lib-queue-order"
 
 WATCH=0
 WATCH_SECS=15
@@ -786,11 +793,44 @@ automouse_oneshot_next() {
         || true
 }
 
+# Wall-clock at which a live automouse run hits its time guard, e.g. "run ends
+# Mon 2026-09-28 20:28". Empty when no runner is live.
+#
+# A runner is live when its own per-pid day log exists (bin/automouse/run writes
+# logs/<date>-$$.log) AND that pid is alive with automouse in its command line —
+# the same conjunction the heartbeat rows use. Its start is now minus the
+# process's elapsed time, and the guard is MAX_ELAPSED read from the runner
+# script itself so a retune there never leaves this line stale. With several
+# runners live, the latest end wins: that is when automouse goes quiet.
+automouse_run_end() {
+    local max now log pid el end=0
+    max="$(sed -n 's/^MAX_ELAPSED=\([0-9][0-9]*\).*/\1/p' "$SCRIPT_DIR/automouse/run" 2>/dev/null)"
+    case "$max" in ''|*[!0-9]*) return 0 ;; esac
+    now="$(date +%s)"
+    for log in "$AUTOMOUSE_DIR"/logs/????-??-??-*.log; do
+        [ -f "$log" ] || continue
+        pid="${log%.log}"; pid="${pid##*-}"
+        pid_alive_matching "$pid" 'automouse' || continue
+        el="$(pid_elapsed_secs "$pid")"
+        case "$el" in ''|*[!0-9]*) continue ;; esac
+        [ $(( now - el + max )) -gt "$end" ] && end=$(( now - el + max ))
+    done
+    [ "$end" -gt 0 ] || return 0
+    # BSD first, GNU (CI) second, as in automouse_oneshot_next.
+    date -r "$end" +'run ends %a %Y-%m-%d %H:%M' 2>/dev/null \
+        || date -d "@$end" +'run ends %a %Y-%m-%d %H:%M' 2>/dev/null \
+        || true
+}
+
 render_queue() {
-    local count=0 shown=0 stale=0 f base next pad hb rest pid slug slug_ld slug_lb
+    local count=0 shown=0 stale=0 f base next ends pad hb rest pid slug slug_ld slug_lb
     local claimed=' ' queue_list meta model merge title reorder
 
     next="$(automouse_next_run)"
+    ends="$(automouse_run_end)"
+    if [ -n "$ends" ]; then
+        next="$ends${next:+  ·  $next}"
+    fi
     # The reorder link closes the header, and only when there is a queue to
     # reorder: on an empty one the launcher just prints "Queue empty" and exits,
     # so a click would do nothing visible.
@@ -807,14 +847,10 @@ render_queue() {
         section "AUTOMOUSE QUEUE$reorder"
     fi
 
-    # Rows are in QUEUE order, not alphabetical: `ls -1tr` is byte-for-byte the
-    # same command bin/automouse/run's claim_next_plan() picks with, so row 1 is
-    # genuinely the plan that runs next. Copying the command rather than
-    # reimplementing it with stat+sort is deliberate — queue entries are symlinks
-    # into ~/claude-plans/, and `ls -t` vs. a stat pipeline can disagree on
-    # whether that mtime is the link's or the target's. 2>/dev/null covers the
-    # empty queue, where the glob stays literal.
-    queue_list="$(ls -1tr "$AUTOMOUSE_DIR"/queue/*.md 2>/dev/null)"
+    # Rows are in QUEUE order, not alphabetical: oldest symlink lstat mtime first,
+    # matching claim_next_plan() in bin/automouse/run (both use queue_entries_ordered
+    # from lib-queue-order). Row 1 is the plan that runs next.
+    queue_list="$(queue_entries_ordered "$AUTOMOUSE_DIR/queue")"
 
     # Pass 1: which live runners already belong to a queued plan. Their details
     # print under that plan's row below, so the heartbeat sweep must skip them.

@@ -15,28 +15,70 @@ set -euo pipefail
 # launchd runs with minimal env — ensure our tools are findable
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/automouse/run [subcommand [args...]]
+
+Autonomous plan-execution driver. Called by launchd on the recurring
+com.ibl5.automouse schedule. Loops through queued plans, firing two claude -p
+invocations per plan (implementation + post-plan) until the queue is empty or
+the time guard is exceeded.
+
+Subcommands:
+  (none)                      Run the queue (normal scheduled invocation).
+  plan <slug>                 Execute exactly one named plan and stop.
+  schedule "[YYYY-MM-DD] HH:MM [TZ]"
+                              Schedule a one-shot run at the given time
+                              (no date = today, no TZ = local).
+  disarm-tonight              Skip tonight's run; auto re-enables afterward.
+  disarm-until "YYYY-MM-DD HH:MM [TZ]"
+                              Pause until the given time.
+
+Environment (key overrides):
+  AUTOMOUSE_SKIP_CANARY=1     Skip the between-plans master health canary.
+  CLAUDE_HEADLESS=1           Set automatically; gates /post-plan Phase 10.
+EOF
+    exit 0
+fi
+
+# Resolve "[YYYY-MM-DD] HH:MM [TZ]" to an epoch. A missing date means today; a
+# missing TZ means system-local. BSD (macOS) forms first, GNU fallback last so
+# these helpers stay exercisable on the Linux CI runner.
+parse_when_epoch() {
+    local when="$1" epoch=""
+    if [[ "$when" =~ ^[0-9]{1,2}:[0-9]{2}([[:space:]]|$) ]]; then
+        when="$(date '+%Y-%m-%d') $when"
+    fi
+    epoch=$(date -j -f '%Y-%m-%d %H:%M %Z' "$when" +%s 2>/dev/null || true)
+    [ -n "$epoch" ] || epoch=$(date -j -f '%Y-%m-%d %H:%M' "$when" +%s 2>/dev/null || true)
+    [ -n "$epoch" ] || epoch=$(date -d "$when" +%s 2>/dev/null || true)
+    [ -n "$epoch" ] || return 1
+    printf '%s\n' "$epoch"
+}
+
+# Format an epoch with a strftime spec: BSD `date -r`, GNU `date -d @`.
+epoch_fmt() {
+    date -r "$1" "+$2" 2>/dev/null || date -d "@$1" "+$2"
+}
+
 # --- One-shot scheduler subcommand ----------------------------------------
-# Usage: bin/automouse/run schedule "YYYY-MM-DD HH:MM [TZ]"
+# Usage: bin/automouse/run schedule "[YYYY-MM-DD] HH:MM [TZ]"
 # Creates a self-cleaning launchd agent that fires bin/automouse/run once at the
-# given time, then removes its own plist and boots itself out. The timezone
-# abbreviation is optional and defaults to the system's local zone.
+# given time, then removes its own plist and boots itself out. The date is
+# optional and defaults to today; the timezone abbreviation is optional and
+# defaults to the system's local zone.
 # Example: bin/automouse/run schedule "2026-05-28 20:00 PDT"
 if [ "${1:-}" = "schedule" ]; then
     WHEN="${2:-}"
     if [ -z "$WHEN" ]; then
-        echo "usage: bin/automouse/run schedule \"YYYY-MM-DD HH:MM [TZ]\"" >&2
+        echo "usage: bin/automouse/run schedule \"[YYYY-MM-DD] HH:MM [TZ]\"" >&2
         echo "example: bin/automouse/run schedule \"2026-05-28 20:00 PDT\"" >&2
         exit 1
     fi
 
-    # Resolve to an epoch — try with a timezone abbreviation first, then local.
-    EPOCH=$(date -j -f '%Y-%m-%d %H:%M %Z' "$WHEN" +%s 2>/dev/null || true)
-    if [ -z "$EPOCH" ]; then
-        EPOCH=$(date -j -f '%Y-%m-%d %H:%M' "$WHEN" +%s 2>/dev/null || true)
-    fi
-    if [ -z "$EPOCH" ]; then
+    if ! EPOCH=$(parse_when_epoch "$WHEN"); then
         echo "error: could not parse time '$WHEN'" >&2
-        echo "expected: YYYY-MM-DD HH:MM [TZ]  (e.g. 2026-05-28 20:00 PDT)" >&2
+        echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-05-28 20:00 PDT, or 20:00 for today)" >&2
         exit 1
     fi
 
@@ -122,22 +164,6 @@ fi
 #
 # Every launchctl call goes through $LAUNCHCTL so bin/test-automouse-disarm can
 # stub it with a recording shim and assert the arm-before-disarm ordering.
-
-# Resolve "YYYY-MM-DD HH:MM [TZ]" to an epoch. BSD (macOS) forms first, GNU
-# fallback last so these helpers stay exercisable on the Linux CI runner.
-parse_when_epoch() {
-    local when="$1" epoch=""
-    epoch=$(date -j -f '%Y-%m-%d %H:%M %Z' "$when" +%s 2>/dev/null || true)
-    [ -n "$epoch" ] || epoch=$(date -j -f '%Y-%m-%d %H:%M' "$when" +%s 2>/dev/null || true)
-    [ -n "$epoch" ] || epoch=$(date -d "$when" +%s 2>/dev/null || true)
-    [ -n "$epoch" ] || return 1
-    printf '%s\n' "$epoch"
-}
-
-# Format an epoch with a strftime spec: BSD `date -r`, GNU `date -d @`.
-epoch_fmt() {
-    date -r "$1" "+$2" 2>/dev/null || date -d "@$1" "+$2"
-}
 
 # Hour and Minute of the recurring job's StartCalendarInterval, space-separated.
 # Returns 1 when the key is absent or holds an ARRAY of intervals (which has no
@@ -455,6 +481,18 @@ REPO="/Users/ajaynicolas/GitHub/IBL5"
 # cannot be exercised until after it merges. $REPO stays main-pinned deliberately:
 # it is the bin/wt-new base and the target of the git ops.
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/automouse/lib-queue-order
+source "$SELF_DIR/lib-queue-order"
+# Usage gate (ADR-0143): pause markers, drain token, session-id helpers. The coordinator
+# re-enters this script through AUTOMOUSE_BIN with `--resume-paused <sid>`.
+# A copy of this script run outside the tree (the tests do) finds the libs via $REPO.
+_LIB_DIR="$SELF_DIR/../lib"
+[ -f "$_LIB_DIR/usage-gate.sh" ] || _LIB_DIR="$REPO/bin/lib"
+# shellcheck source=../lib/usage-gate.sh
+. "$_LIB_DIR/usage-gate.sh"
+# shellcheck source=../lib/session-id.sh
+. "$_LIB_DIR/session-id.sh"
+AUTOMOUSE_BIN="$(cd "$(dirname "$0")" && pwd)/run"
 NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
 LOG_DIR="$NIGHTLY_DIR/logs"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
@@ -521,6 +559,37 @@ mkdir -p "$LOG_DIR" "$QUEUE_DIR" "$HANDOFF_DIR"
 # Runs impl + post-plan for exactly ONE named plan, then stops. Reuses all
 # guard machinery (heartbeat/stall-kill, env-breaker, handoff resume, cost
 # roll-up, reports, lock). Foreground, streams to the dated log like a manual run.
+# --resume-paused <sid>: the coordinator's entry point. Replays the argv saved when the
+# impl session was first started, and takes over that plan's held claim lock.
+RESUME_SID=""
+RESUME_PLAN=""
+if [ "${1:-}" = "--resume-paused" ]; then
+    if [ $# -ne 2 ]; then
+        echo "automouse-run: --resume-paused takes exactly one session id" >&2
+        exit 2
+    fi
+    _saved_file=$(mktemp)
+    if ! usage_resume_paused_args automouse "$2" > "$_saved_file"; then
+        rm -f "$_saved_file"
+        exit 2
+    fi
+    RESUME_SID="$2"
+    _saved=()
+    while IFS= read -r -d '' _a; do _saved[${#_saved[@]}]="$_a"; done < "$_saved_file"
+    rm -f "$_saved_file"
+    RESUME_PLAN=$(cat "$(usage_state_dir)/runs/$2.plan" 2>/dev/null) || RESUME_PLAN=""
+    case "$RESUME_PLAN" in
+        "$QUEUE_DIR"/*.md) [ -e "$RESUME_PLAN" ] || RESUME_PLAN="" ;;
+        *) RESUME_PLAN="" ;;
+    esac
+    if [ -z "$RESUME_PLAN" ]; then
+        echo "automouse-run: plan no longer queued for session $2" >&2
+        exit 2
+    fi
+    set -- ${_saved[@]+"${_saved[@]}"}
+fi
+ORIG_ARGS=("$@")
+
 SINGLE_PLAN=""
 if [ "${1:-}" = "plan" ]; then
     slug="${2:-}"
@@ -994,21 +1063,31 @@ refund_attempt() {
     fi
 }
 
-# Disposition for a post-plan-now exit 3 (harness fail-closed sentinel: a rebase
+# Disposition for a post-plan-now exit 3 (a ship block: a rebase
 # conflict the auto-resolver refused, or a local pre-commit/pre-push gate denial;
 # see bin/post-plan-now's exit-code header). Retrying never clears either cause.
-# Parks the plan in skipped/, writes a report quoting the harness's own RESULT:
-# line, and returns normally so the loop continues with the next plan.
+# Parks the plan in skipped/, writes a report carrying the plain-words block
+# post-plan-now printed between its marker lines, plus the RESULT: line,
+# and returns normally so the loop continues with the next plan.
 # post-plan-now already DM'd on rc=3, so no second DM is sent here.
 # $HANDOFF_DIR/${plan_name}.json is removed: the worktree named by the handoff
 # is where a human must fix the cause. Args: plan_name plan_slug log_before.
 dispose_plan_postplan_blocked() {
     local plan_name="$1" plan_slug="$2" log_before="$3"
-    local pp_seg_start pp_result_line reports_dir
+    local pp_seg_start pp_result_line pp_block reports_dir
     pp_seg_start=$(( log_before + 1 ))
     pp_result_line=$(sed -n "${pp_seg_start},\$p" "$LOG" 2>/dev/null | grep -m1 '^RESULT:' || true)
     [ -n "$pp_result_line" ] \
         || pp_result_line="(post-plan-now printed no RESULT: line — see the run log)"
+    # First marker pair after this phase's start; older blocks in the log are ignored.
+    pp_block=$(sed -n "${pp_seg_start},\$p" "$LOG" 2>/dev/null | awk '
+        /^=== post-plan blocked ship ===$/ { inb = 1; next }
+        /^=== end blocked ship ===$/       { if (inb) exit }
+        inb' || true)
+    if [ -z "$pp_block" ]; then
+        pp_block=$(printf '%s did not ship. No PR opened.\n\nWhy: the ship step stopped and the log has the reason.\n\nFix:\n  1. cd %s\n  2. Read the log named on the Log line below and fix what it reports\n  3. bin/post-plan-now\n\nOr open Claude in that folder and ask it to fix the ship block.\nLog: %s' \
+            "$plan_slug" "${PP_WORKTREE:-unknown}" "$LOG")
+    fi
     printf '[%s] %s postplan terminal (rc=3) — moving to skipped/\n' \
         "$(date +%H:%M:%S)" "$plan_slug" >> "$LOG"
     mkdir -p "$NIGHTLY_DIR/skipped" "$NIGHTLY_DIR/reports"
@@ -1018,11 +1097,11 @@ dispose_plan_postplan_blocked() {
           "$HANDOFF_DIR/${plan_name}.json"
     reports_dir="$NIGHTLY_DIR/reports"
     {
-        printf 'Plan "%s" skipped: post-plan-now exited 3 (harness fail-closed sentinel). A retry cannot clear this; a human must.\n\n' \
+        printf 'Plan "%s" was skipped. It did not ship, and running it again will not fix it.\n\n' \
             "$plan_slug"
-        printf '%s\n\n' "$pp_result_line"
+        printf '%s\n\n' "$pp_block"
         printf 'Worktree: %s\n\n' "${PP_WORKTREE:-unknown}"
-        printf 'Clear the cause in that worktree, then re-run bin/post-plan-now there.\n\n'
+        printf 'Result line: %s\n\n' "$pp_result_line"
         printf '## Post-plan log tail\n\n```\n'
         sed -n "${pp_seg_start},\$p" "$LOG" 2>/dev/null | tail -30
         printf '\n```\n'
@@ -1042,9 +1121,7 @@ dispose_plan_postplan_blocked() {
 # auth code does not false-trigger. Returns 0 on match. Safe under `set -e`: only
 # ever called inside an `if` condition.
 phase_env_error() {
-    local log_before=$1
-    tail -n +"$(( log_before + 1 ))" "$LOG" 2>/dev/null | grep -qiE \
-        "hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*(401|403|429|529)|overloaded_error|rate_limit_error"
+    usage_is_env_error "$LOG" "$1"
 }
 
 # A phase that emitted no stream events for STALL_KILL_SECS is force-killed by the
@@ -1532,7 +1609,19 @@ archive_stale() {
 # and stolen — covering a runner that crashed mid-plan. Only ever called as
 # `NEXT_PLAN=$(claim_next_plan) || NEXT_PLAN=""`, so the return-1 is set -e safe.
 claim_next_plan() {
-    local plan plan_name lock owner now lock_epoch
+    local plan plan_name lock owner now lock_epoch held rlock rheld
+    # Resuming a paused impl: take over that one plan's held lock before anything else.
+    if [ -n "${RESUME_PLAN:-}" ] && [ -e "$RESUME_PLAN" ]; then
+        rlock="$QUEUE_DIR/$(basename "$RESUME_PLAN").lock"
+        rheld=$(cat "$rlock/paused-held" 2>/dev/null) || rheld=""
+        if [ -n "$rheld" ] && [ "$rheld" = "${RESUME_SID:-}" ]; then
+            echo "$$" > "$rlock/pid"
+            rm -f "$rlock/paused-held"
+            usage_marker_clear "$RESUME_SID"
+            printf '%s\n' "$RESUME_PLAN"
+            return 0
+        fi
+    fi
     while IFS= read -r plan; do
         [ -n "$plan" ] || continue
         plan_name=$(basename "$plan")
@@ -1556,6 +1645,11 @@ claim_next_plan() {
         owner=$(cat "$lock/pid" 2>/dev/null) || owner=""
         now=$(date +%s)
         lock_epoch=$(stat -f %m "$lock" 2>/dev/null || echo "$now")
+        # A lock held for a usage-gate pause is not stale, whatever its pid or age says.
+        held=$(cat "$lock/paused-held" 2>/dev/null) || held=""
+        if [ -n "$held" ] && usage_paused_hold_live "$held" "$LOCK_TTL_SECS"; then
+            continue
+        fi
         if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
            || [ "$(( now - lock_epoch ))" -gt "$LOCK_TTL_SECS" ]; then
             rm -rf "$lock" 2>/dev/null || true
@@ -1570,7 +1664,7 @@ claim_next_plan() {
             fi
         fi
         # Live lock held by a sibling — skip to the next-oldest plan.
-    done < <(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null)
+    done < <(queue_entries_ordered)
     return 1
 }
 
@@ -1730,7 +1824,7 @@ while true; do
         {
             printf 'Plan "%s" skipped: unusable `impl_model:` frontmatter. Needs human review.\n\n' "$SLUG"
             printf '%s\n\n' "$BASE_MODEL"
-            printf 'Fix the line-1 frontmatter to one of: opus, sonnet, haiku, claude-opus-5-5, claude-sonnet-4-6, claude-haiku-4-5 — then `bin/automouse/queue add %s`.\n' "$SLUG"
+            printf 'Fix the line-1 frontmatter to one of: opus, sonnet, haiku, claude-opus-5-5, claude-sonnet-5-5, claude-sonnet-4-6, claude-haiku-4-5 — then `bin/automouse/queue add %s`.\n' "$SLUG"
         } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
         CURRENT_LOCK=""
@@ -1908,12 +2002,52 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # gates and its handoff to exactly this path. The guard is upstream, not here:
         # bin/automouse/prompt-impl forbids backgrounded Bash, and ~/.claude/hooks/bash-guard.sh
         # check 17 denies `run_in_background: true` whenever CLAUDE_HEADLESS is set.
+        #
+        # Usage gate (ADR-0143). The impl session id is minted here, not read back from the
+        # stream, so a pause marker written mid-run names a session `--resume` can continue.
+        IMPL_SESSION_ARGS=()
+        IMPL_SID=""
+        if [ -n "$RESUME_SID" ] && [ "$PLAN_NAME" = "$(basename "$RESUME_PLAN")" ]; then
+            IMPL_SID="$RESUME_SID"
+            if usage_session_started "$IMPL_SID"; then
+                IMPL_PROMPT="Continue the implementation from where it stopped. The previous turn was paused by the usage gate."
+                IMPL_SESSION_ARGS=(--resume "$IMPL_SID")
+            else
+                IMPL_SESSION_ARGS=(--session-id "$IMPL_SID")
+            fi
+            RESUME_SID=""
+        elif IMPL_SID=$(mint_session_id); then
+            IMPL_SESSION_ARGS=(--session-id "$IMPL_SID")
+        else
+            IMPL_SID=""
+        fi
+        IMPL_PRESTART_PAUSED=0
+        if [ -n "$IMPL_SID" ]; then
+            write_session_sidecar "$LOG" "$IMPL_SID" || true
+            usage_argv_save "$IMPL_SID" ${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"} || true
+            mkdir -p "$(usage_state_dir)/runs"
+            printf '%s\n' "$NEXT_PLAN" > "$(usage_state_dir)/runs/$IMPL_SID.plan"
+            IMPL_GATE_RC=0
+            usage_prestart_gate automouse "$IMPL_SID" "$AUTOMOUSE_BIN" || IMPL_GATE_RC=$?
+            [ "$IMPL_GATE_RC" -eq 10 ] && IMPL_PRESTART_PAUSED=1
+        fi
+        if [ "$IMPL_PRESTART_PAUSED" -eq 1 ]; then
+            printf '[%s] %s usage gate paused before the impl started\n' "$(date +%H:%M:%S)" "$PLAN_SLUG" >> "$LOG"
+        else
+        # The impl agent has no clock — bin/lib/headless-elapsed-hook.sh reads
+        # these two vars and appends an elapsed-clock line after every tool call
+        # so the agent can track the 90% deadline and write a handoff in time.
+        IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=automouse IBL5_USAGE_GATE_MODEL="$IMPL_MODEL" \
+        IBL5_USAGE_GATE_RESUME_BIN="$AUTOMOUSE_BIN" \
         CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
+        IBL5_BUDGET_START_EPOCH="$(date +%s)" \
+        IBL5_BUDGET_SECS="$REMAINING_SECS" \
         timeout "$REMAINING_SECS" \
             claude -p "$IMPL_PROMPT" \
                 --dangerously-skip-permissions \
                 --model "$IMPL_MODEL" \
+                ${IMPL_SESSION_ARGS[@]+"${IMPL_SESSION_ARGS[@]}"} \
                 --effort high \
                 --output-format stream-json \
                 --verbose \
@@ -1921,6 +2055,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
             | bin/lib/automouse-stream-filter.sh "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" impl \
             >> "$LOG" || IMPL_STATUS=$?
+        fi
 
         kill "$WATCHER_PID" 2>/dev/null || true
         wait "$WATCHER_PID" 2>/dev/null || true
@@ -1960,6 +2095,20 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # CAP_REFUND_LIMIT times per plan.
         IMPL_HANDOFF=0;  [ -f "$HANDOFF_FILE" ] && IMPL_HANDOFF=1
         IMPL_IN_QUEUE=0; [ -e "$NEXT_PLAN" ]   && IMPL_IN_QUEUE=1
+        # Usage-gate pause: a marker on disk, a pre-start pause, or a limit-hit in this
+        # phase's log. No env-stop report, no poison-pill count. The claim lock stays
+        # held (paused-held holds the session id) until the coordinator resumes it.
+        # 401/403/529/overload fall through to the env-stop breaker unchanged.
+        if [ -n "$IMPL_SID" ] \
+           && { [ "$IMPL_PRESTART_PAUSED" -eq 1 ] \
+                || usage_postrun_pause automouse "$IMPL_SID" "$AUTOMOUSE_BIN" any "$LOG" "$IMPL_LOG_BEFORE"; }; then
+            printf '%s\n' "$IMPL_SID" > "$CURRENT_LOCK/paused-held"
+            echo "Impl paused (usage gate) — session $IMPL_SID; coordinator resumes it. Refunding attempt, stopping loop." >> "$LOG"
+            refund_attempt
+            CURRENT_LOCK=""
+            break
+        fi
+        [ -z "$IMPL_SID" ] || usage_token_release "$IMPL_SID"
         IMPL_ENV_ERR=0;  phase_env_error "$IMPL_LOG_BEFORE" && IMPL_ENV_ERR=1
         IMPL_STALLED=0;  phase_stalled "$IMPL_LOG_BEFORE"   && IMPL_STALLED=1
         IMPL_FAST=0;     [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ] && IMPL_FAST=1
@@ -2114,7 +2263,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         fi
 
         echo "--- Plan #$PLANS_RUN postplan finished at $(date) ---" >> "$LOG"
-        append_cost_row "$PLAN_NAME" postplan "$PP_LOG_BEFORE" claude-sonnet-4-6
+        append_cost_row "$PLAN_NAME" postplan "$PP_LOG_BEFORE" claude-sonnet-5-5
 
         PP_DUR=$(( $(date +%s) - PP_START ))
 
@@ -2148,6 +2297,18 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             fi
         fi
         # postplan-no-worktree-merged: end
+        # A paused post-plan-now (exit 75) owns its own marker and resume (ADR-0143). Hold the
+        # claim lock for its session and stop; the coordinator resumes post-plan-now directly.
+        if [ "$PP_STATUS" -eq 75 ]; then
+            pp_sid=$(usage_marker_find post-plan-now "${PP_WORKTREE:-}") || pp_sid=""
+            if [ -n "$pp_sid" ]; then
+                printf '%s\n' "$pp_sid" > "$CURRENT_LOCK/paused-held"
+                CURRENT_LOCK=""
+            fi
+            echo "Post-plan paused (usage gate); post-plan-now owns the resume. Refunding attempt, stopping loop." >> "$LOG"
+            refund_attempt
+            break
+        fi
         # postplan-env-breaker: begin
         # Environmental-failure breaker (mirrors impl). A successful post-plan
         # removes the handoff (the agent moves the plan to done/ and deletes it),

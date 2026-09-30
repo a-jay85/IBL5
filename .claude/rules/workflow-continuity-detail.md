@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-09-26
+last_verified: 2026-09-29
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -22,17 +22,20 @@ branch; it survives you closing Claude Code. Engine selection:
 - **Compiled post-plan harness** (`tools/postplan-harness`) when present — a
   deterministic sequencer with bounded LLM calls. `bin/post-plan-now` pins the MAIN-CHECKOUT
   copy, never the worktree's (ADR-0092).
-- **Fallback:** a fresh **Sonnet 4.6** `/post-plan` skill session, used if the harness
+- **Fallback:** a fresh **Sonnet 5.5** `/post-plan` skill session, used if the harness
   fails or is absent. `POST_PLAN_SKILL=1` forces the skill path.
 - **No partial resume.** The harness runs Phase 5.5's plan-intent review itself
   (`harness/fidelity.py`), posts the sticky `<!-- pr-ready-verdict -->` comment, and feeds the
   verdict to arming condition (12). It exits **0**, **1** or **3** only. There is no exit 4 and
   no Phase-5.5 re-entry. Any harness failure outside exit 3 re-runs the **full** skill from
   Phase 0. Exit **3** is the fail-closed sentinel and suppresses the skill fallback entirely.
-  Three kinds reach it: a rebase conflict, a **diverged remote head** (the PR branch was
-  rewritten on GitHub with different content), and a **local gate denial** (a `bin/pre-commit-hook`
-  or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget). All three are
-  deterministic, so a skill re-run would hit the same wall; the run stops for a human.
+  Four kinds reach it: a rebase conflict, a **diverged remote head** (the PR branch was
+  rewritten on GitHub with different content), a **local gate denial** (a `bin/pre-commit-hook`
+  or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget), and a
+  **usage limit** (`llm-usage-limit`: a model call returned a session, rate, or API limit
+  message). A skill re-run would hit the same wall on each one, so the run stops for a human.
+  For a usage limit, re-run `bin/post-plan-now` after the limit resets.
+  On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines and prints a plain block of the same shape when the file is missing. The DM below carries the same block. `bin/automouse/run` copies the block into the skip report. The one-line `RESULT:` verdict is unchanged.
   `bin/post-plan-fail-dm` sends the DM. With no live Claude session in the worktree it DMs
   at once. With one, it holds the DM 15 min and sends it only if nobody re-fired the branch.
 

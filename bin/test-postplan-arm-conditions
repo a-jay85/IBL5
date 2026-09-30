@@ -233,16 +233,18 @@ run_findings() {
 # the '--- V2_FINDINGS ---' marker produced by the render block); embeds them in
 # template order before ### Merge digest.  When the second arg carries no
 # '--- V2_FINDINGS ---' marker the findings slot is omitted entirely.
+# Template order: banner, `Findings: none.`, findings slot, ### Merge digest and its
+# five labels, `---`, the <details> audit trail holding **Reviewed tree:** and
+# **Re-reviewed tree:**, terminal line, marker.
 compose_fixture_body() {
     local rr_line="$1" raw_slot="$2"
     local slot=""
     if grep -q '^--- V2_FINDINGS ---$' <<< "$raw_slot"; then
         slot="$(awk '/^--- V2_FINDINGS ---$/{found=1;next} found{print}' <<< "$raw_slot")"
     fi
-    printf 'Plan-fidelity verdict: READY — synthetic test body.\n'
+    printf '**READY** — 2026-09-30 00:00:00 UTC\n'
     printf '\n'
-    printf '**Reviewed tree:** deadbeef0000\n'
-    [ -n "$rr_line" ] && printf '%s\n' "$rr_line"
+    printf 'Findings: none.\n'
     if [ -n "$slot" ]; then
         printf '\n'
         printf '%s\n' "$slot"
@@ -258,7 +260,12 @@ compose_fixture_body() {
     printf '\n'
     printf '%s\n' '---'
     printf '\n'
-    printf 'Remediation: none.\n'
+    printf '<details><summary>Audit trail</summary>\n'
+    printf '\n'
+    printf '**Reviewed tree:** deadbeef0000\n'
+    [ -n "$rr_line" ] && printf '%s\n' "$rr_line"
+    printf '\n'
+    printf '</details>\n'
     printf '\n'
     printf ': READY — synthetic terminal line.\n'
     printf '<!-- pr-ready-verdict -->\n'
@@ -273,6 +280,7 @@ for _cft in \
     '**Touches:**' \
     '**Machine-authored fixes:**' \
     '### Merge digest' \
+    '<details><summary>Audit trail</summary>' \
     '**Re-reviewed tree:**'; do
     grep -qF "$_cft" "$P55_SKILL" || {
         echo "FAIL: compose_fixture_body binding — '$_cft' no longer in $P55_SKILL; update composer to match"
@@ -531,10 +539,10 @@ expect_block "S2: tail names unit, Test.php in diff → NONE" NONE \
 _s3_out="$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed"}' '' '')"
 expect_block "S3: no files key → NONE (null guard)" NONE "$_s3_out"
 if grep -qF 'jq: error' <<< "$_s3_out"; then
-    echo "FAIL: S3 — jq error on missing files key (remove // [] guard)"
+    echo "FAIL: S3: jq error on missing files key (remove // [] guard)"
     FAILED=1
 else
-    echo "ok: S3 — no jq error when files key absent"
+    echo "ok: S3: no jq error when files key absent"
 fi
 
 # condition (3) — the fail-open this gate closed: an empty bridge file is
@@ -681,13 +689,22 @@ rm -f "/tmp/post-plan-changed-$PPID"' 2>&1 )
 }
 UB="$(extract_block '# Diff→plan conformance' "$P5_SKILL")"
 
-assert_block_sources '# Diff→plan conformance' "phase 5.0 diff->plan" \
-    'bin/lib/critical-files.sh' "$P5_SKILL"
-_ub_no_comments="$(printf '%s\n' "$UB" | grep -v '^[[:space:]]*#')"
-if grep -qF 'cf_is_exempt' <<< "$_ub_no_comments"; then
-    echo "FAIL: diff->plan block filters on cf_is_exempt (polarity inversion)"; FAILED=1
+if grep -qF 'bin/lib/plan-scope-conformance' <<< "$UB"; then
+    echo "ok: phase 5.0 diff->plan block invokes bin/lib/plan-scope-conformance"
 else
-    echo "ok: phase 5.0 diff->plan block does not call cf_is_exempt (polarity correct)"
+    echo "FAIL: phase 5.0 diff->plan block does not invoke bin/lib/plan-scope-conformance"; FAILED=1
+fi
+if grep -v '^[[:space:]]*#' "$REPO_ROOT/bin/lib/plan-scope-conformance" \
+        | grep -qE '^[[:space:]]*(source|\.)[[:space:]].*critical-files\.sh'; then
+    echo "ok: plan-scope-conformance helper sources bin/lib/critical-files.sh"
+else
+    echo "FAIL: plan-scope-conformance helper does not source bin/lib/critical-files.sh"; FAILED=1
+fi
+_ub_no_comments="$(grep -v '^[[:space:]]*#' "$REPO_ROOT/bin/lib/plan-scope-conformance")"
+if grep -qF 'cf_is_exempt' <<< "$_ub_no_comments"; then
+    echo "FAIL: plan-scope-conformance helper filters on cf_is_exempt (polarity inversion)"; FAILED=1
+else
+    echo "ok: plan-scope-conformance helper does not call cf_is_exempt (polarity correct)"
 fi
 
 # Case U1 — both verdicts count as planned (MUST_APPEAR and EXEMPT both dismiss).
@@ -706,10 +723,15 @@ printf '%s\n' \
     'ibl5/index.php' > "$_u1_changed"
 _u1_out="$(run_p50u "$UB" "$_u1_plan" "$_u1_changed" 'found' '{"body":"no scope section"}')"
 _u1_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u1_out")"
-if [ "$_u1_count" -eq 1 ] && grep -qF 'rogue.md' <<< "$_u1_out"; then
+if [ "$_u1_count" -eq 1 ] \
+        && grep -qF 'UNPLANNED-FILE: .claude/rules/rogue.md' <<< "$_u1_out" \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/index.php' <<< "$_u1_out" \
+        && ! grep -q '^UNPLANNED-FILE:.*ibl5/index.php' <<< "$_u1_out" \
+        && ! grep -qF 'SKILL.md' <<< "$_u1_out" \
+        && ! grep -qF 'doc-freshness.md' <<< "$_u1_out"; then
     echo "ok: U1 both parse verdicts count as planned"
 else
-    echo "FAIL: U1 — expected 1 UNPLANNED-FILE: naming rogue.md, got: '$_u1_out'"
+    echo "FAIL: U1 — expected 1 UNPLANNED-FILE: naming rogue.md plus SCOPE-NOTE: unplanned ibl5/index.php, got: '$_u1_out'"
     FAILED=1
 fi
 
@@ -765,6 +787,289 @@ if [ "$_u4_count" -eq 1 ] \
     echo "ok: U4 declared-scope dismissal is section-bounded"
 else
     echo "FAIL: U4 — expected 1 UNPLANNED-FILE: naming elsewhere.md (declared.md absent); got: '$_u4_out'"
+    FAILED=1
+fi
+
+# Case U5 — live block wiring: the gh body reaches the helper, a real bullet
+# clears, and a path only inside the generated files-changed span stays flagged.
+_u5_plan="$BASE_TMP/u5-plan.md"
+_u5_changed="$BASE_TMP/u5-changed.txt"
+printf '%s\n' '## Critical Files' '' '- `ibl5/planned.php` — edit' > "$_u5_plan"
+printf '%s\n' 'ibl5/planned.php' 'ibl5/decl.php' 'ibl5/undecl.php' > "$_u5_changed"
+_u5_body='{"body":"## Declared scope\n\n- ibl5/decl.php (intended)\n\n<!-- files-changed:begin -->\n- `A` `ibl5/undecl.php`\n<!-- files-changed:end -->\n"}'
+_u5_out="$(run_p50u "$UB" "$_u5_plan" "$_u5_changed" 'found' "$_u5_body")"
+_u5_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u5_out" || true)"
+if [ "$_u5_count" -eq 0 ] \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/undecl.php' <<< "$_u5_out" \
+        && ! grep -qF 'ibl5/decl.php' <<< "$_u5_out"; then
+    echo "ok: U5 block passes the gh body to the helper; generated span stays flagged"
+else
+    echo "FAIL: U5 — expected SCOPE-NOTE: unplanned ibl5/undecl.php only (no UNPLANNED-FILE:), got: '$_u5_out'"
+    FAILED=1
+fi
+
+# Case U6 — a helper usage error surfaces as an indeterminate finding (fail-closed).
+_u6_out="$(run_p50u "$UB" "$BASE_TMP/does-not-exist.md" "$_u5_changed" 'found' '{"body":""}')"
+if grep -qF 'UNPLANNED-FILE: helper exited 2 (indeterminate)' <<< "$_u6_out"; then
+    echo "ok: U6 helper exit 2 surfaces as an indeterminate UNPLANNED-FILE: line"
+else
+    echo "FAIL: U6 — expected 'UNPLANNED-FILE: helper exited 2 (indeterminate)', got: '$_u6_out'"
+    FAILED=1
+fi
+
+# Case U7 — label plumbing: condition (3) and the Phase 5.0 END list name
+# UNPLANNED-FILE: and neither names SCOPE-NOTE or the retired gap label, so
+# advisory notes can never gate. SKILL.md points at the helper and the Plan gaps heading.
+_u7_bad=0
+_u7_cond3="$(grep -m1 '^3\. No unresolved' "$P25_SKILL" || true)"
+_u7_end="$(grep -m1 '^At Phase 5.0 END, append each remaining' "$P5_SKILL" || true)"
+if ! grep -qF -- 'UNPLANNED-FILE:' <<< "$_u7_cond3"; then
+    echo "FAIL: U7 — SKILL.md condition (3) does not name UNPLANNED-FILE:"; _u7_bad=1
+fi
+if ! grep -qF -- 'UNPLANNED-FILE:' <<< "$_u7_end"; then
+    echo "FAIL: U7 — Phase 5.0 END list does not name UNPLANNED-FILE:"; _u7_bad=1
+fi
+if [ -z "$_u7_cond3" ] || [ -z "$_u7_end" ]; then
+    echo "FAIL: U7 — could not locate condition (3) or the Phase 5.0 END line"; _u7_bad=1
+fi
+for _u7_label in 'SCOPE-NOTE' 'UNEXPLAINED''-GAP'; do
+    if grep -qF -- "$_u7_label" <<< "$_u7_cond3"; then
+        echo "FAIL: U7 — SKILL.md condition (3) names $_u7_label"; _u7_bad=1
+    fi
+    if grep -qF -- "$_u7_label" <<< "$_u7_end"; then
+        echo "FAIL: U7 — Phase 5.0 END list names $_u7_label"; _u7_bad=1
+    fi
+done
+for _u7_tok in 'bin/lib/plan-scope-conformance' '## Plan gaps'; do
+    if ! grep -qF -- "$_u7_tok" "$P25_SKILL"; then
+        echo "FAIL: U7 — SKILL.md does not name $_u7_tok"; _u7_bad=1
+    fi
+done
+if [ "$_u7_bad" -eq 0 ]; then
+    echo "ok: U7 UNPLANNED-FILE: reaches condition (3) and the END list; SCOPE-NOTE never does"
+else
+    FAILED=1
+fi
+
+# ── plan-scope-conformance helper ──
+# S1..S9 call bin/lib/plan-scope-conformance directly. The Phase 5.0 block and
+# harness/scope_conformance.py both delegate to it, so these cases pin the
+# shared contract once for both engines.
+PSC="$REPO_ROOT/bin/lib/plan-scope-conformance"
+PSC_EXEMPT="$REPO_ROOT/bin/lib/plan-scope-exempt.txt"
+PSC_FX="$REPO_ROOT/tools/postplan-harness/tests/fixtures/scope-1996"
+_s_empty="$BASE_TMP/s-empty"
+: > "$_s_empty"
+
+# Case S1 — every changed path is checked, not only .claude/.
+_s1_plan="$BASE_TMP/s1-plan.md"
+_s1_changed="$BASE_TMP/s1-changed.txt"
+cat > "$_s1_plan" <<'S1PLANEOF'
+## Critical Files
+
+- `.claude/skills/post-plan/SKILL.md` — edit
+S1PLANEOF
+printf '%s\n' '.claude/skills/post-plan/SKILL.md' 'ibl5/classes/Foo.php' > "$_s1_changed"
+_s1_out="$("$PSC" "$_s1_plan" "$_s1_changed" "" "$_s_empty" 2>&1)"
+_s1_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_s1_out" || true)"
+if [ "$_s1_count" -eq 0 ] \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/classes/Foo.php' <<< "$_s1_out" \
+        && ! grep -q '^UNPLANNED-FILE:.*Foo.php' <<< "$_s1_out"; then
+    echo "ok: S1 an undeclared non-.claude path is an advisory SCOPE-NOTE"
+else
+    echo "FAIL: S1 — expected SCOPE-NOTE: unplanned ibl5/classes/Foo.php and no UNPLANNED-FILE:, got: '$_s1_out'"
+    FAILED=1
+fi
+
+# Case S2 — a matrix test path declares its file; a fenced matrix row does not.
+_s2_plan="$BASE_TMP/s2-plan.md"
+_s2_changed="$BASE_TMP/s2-changed.txt"
+cat > "$_s2_plan" <<'S2PLANEOF'
+## Critical Files
+
+- `ibl5/classes/Foo/Foo.php` — edit
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | foo works | PHPUnit | post-impl | `ibl5/tests/Foo/FooTest.php` |
+
+```bash
+| 2 | scaffold row | PHPUnit | post-impl | `ibl5/tests/Foo/FencedTest.php` |
+```
+S2PLANEOF
+printf '%s\n' 'ibl5/classes/Foo/Foo.php' 'ibl5/tests/Foo/FooTest.php' 'ibl5/tests/Foo/FencedTest.php' > "$_s2_changed"
+_s2_out="$("$PSC" "$_s2_plan" "$_s2_changed" "" "$_s_empty" 2>&1)"
+_s2_count="$(grep -c '^SCOPE-NOTE: unplanned' <<< "$_s2_out" || true)"
+if [ "$_s2_count" -eq 1 ] \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/tests/Foo/FencedTest.php' <<< "$_s2_out" \
+        && ! grep -q '^UNPLANNED-FILE:' <<< "$_s2_out" \
+        && ! grep -qF 'FooTest.php' <<< "$_s2_out"; then
+    echo "ok: S2 matrix test path declares; fenced matrix row declares nothing"
+else
+    echo "FAIL: S2 — expected only FencedTest.php flagged, got: '$_s2_out'"
+    FAILED=1
+fi
+
+# Case S3 — a generated files-changed span inside Declared scope never declares.
+_s3_plan="$BASE_TMP/s3-plan.md"
+_s3_changed="$BASE_TMP/s3-changed.txt"
+_s3_body_gen="$BASE_TMP/s3-body-gen.md"
+_s3_body_real="$BASE_TMP/s3-body-real.md"
+printf '%s\n' '## Critical Files' '' '- `ibl5/y.php` — edit' > "$_s3_plan"
+printf '%s\n' 'ibl5/x.php' 'ibl5/y.php' > "$_s3_changed"
+cat > "$_s3_body_gen" <<'S3GENEOF'
+## Declared scope
+
+<!-- files-changed:begin -->
+- `ibl5/x.php`
+<!-- files-changed:end -->
+S3GENEOF
+cat > "$_s3_body_real" <<'S3REALEOF'
+## Declared scope
+
+- `ibl5/x.php` (intended: shared helper)
+S3REALEOF
+_s3_gen="$("$PSC" "$_s3_plan" "$_s3_changed" "$_s3_body_gen" "$_s_empty" 2>&1)"
+_s3_real="$("$PSC" "$_s3_plan" "$_s3_changed" "$_s3_body_real" "$_s_empty" 2>&1)"
+if grep -qF 'SCOPE-NOTE: unplanned ibl5/x.php' <<< "$_s3_gen" \
+        && ! grep -q '^UNPLANNED-FILE:' <<< "$_s3_gen" \
+        && ! grep -q '^SCOPE-NOTE: unplanned' <<< "$_s3_real" \
+        && ! grep -q '^UNPLANNED-FILE:' <<< "$_s3_real"; then
+    echo "ok: S3 generated span never declares; a plain bullet clears"
+else
+    echo "FAIL: S3 — generated-span out: '$_s3_gen'; plain-bullet out: '$_s3_real'"
+    FAILED=1
+fi
+
+# Case S4 — a two-segment directory token declares its subtree; one segment does not.
+_s4_plan="$BASE_TMP/s4-plan.md"
+_s4_changed="$BASE_TMP/s4-changed.txt"
+_s4_body="$BASE_TMP/s4-body.md"
+printf '%s\n' '## Critical Files' '' '- `bin/unrelated` — edit' > "$_s4_plan"
+printf '%s\n' 'bin/unrelated' 'ibl5/classes/Foo/Bar.php' 'ibl5/classes/Baz.php' \
+    'ibl5/classes/Qux/One.php' 'ibl5/classes/Qux/Two.php' > "$_s4_changed"
+printf '%s\n' '## Declared scope' '' '- `ibl5/classes/Foo/` (whole module)' '- `ibl5/` (too broad)' \
+    '- `ibl5/classes/Qux/One.php` (a file bullet declares no sibling)' > "$_s4_body"
+_s4_out="$("$PSC" "$_s4_plan" "$_s4_changed" "$_s4_body" "$_s_empty" 2>&1)"
+_s4_count="$(grep -c '^SCOPE-NOTE: unplanned' <<< "$_s4_out" || true)"
+if [ "$_s4_count" -eq 2 ] \
+        && ! grep -q '^UNPLANNED-FILE:' <<< "$_s4_out" \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/classes/Baz.php' <<< "$_s4_out" \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/classes/Qux/Two.php' <<< "$_s4_out"; then
+    echo "ok: S4 two-segment directory token declares its subtree; ibl5/ and a file bullet's parent declare nothing"
+else
+    echo "FAIL: S4 — expected ibl5/classes/Baz.php and ibl5/classes/Qux/Two.php flagged, got: '$_s4_out'"
+    FAILED=1
+fi
+
+# Case S5 — the exemption is ADDED-only and never covers .claude/.
+_s5_plan="$BASE_TMP/s5-plan.md"
+_s5_changed="$BASE_TMP/s5-changed.txt"
+_s5_added="$BASE_TMP/s5-added.txt"
+printf '%s\n' '## Critical Files' '' '- `bin/unrelated` — edit' > "$_s5_plan"
+printf '%s\n' 'bin/unrelated' 'ibl5/tests/New/NewTest.php' 'ibl5/tests/Old/OldTest.php' '.claude/rules/new.md' > "$_s5_changed"
+printf '%s\n' 'ibl5/tests/New/NewTest.php' '.claude/rules/new.md' > "$_s5_added"
+_s5_out="$("$PSC" "$_s5_plan" "$_s5_changed" "" "$_s5_added" 2>&1)"
+_s5_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_s5_out" || true)"
+if [ "$_s5_count" -eq 1 ] \
+        && ! grep -qF 'NewTest.php' <<< "$_s5_out" \
+        && grep -qF 'SCOPE-NOTE: unplanned ibl5/tests/Old/OldTest.php' <<< "$_s5_out" \
+        && ! grep -q '^UNPLANNED-FILE:.*OldTest.php' <<< "$_s5_out" \
+        && grep -qF 'UNPLANNED-FILE: .claude/rules/new.md' <<< "$_s5_out"; then
+    echo "ok: S5 added test exempt; modified test is a note; added .claude path holds"
+else
+    echo "FAIL: S5 — expected OldTest.php as SCOPE-NOTE and .claude/rules/new.md as UNPLANNED-FILE: only, got: '$_s5_out'"
+    FAILED=1
+fi
+
+# Case S6 — exempt-list invariant: every line anchored, none matches .claude/.
+_s6_bad=0
+_s6_probe="$BASE_TMP/s6-probe"
+printf '%s\n' '.claude/probe' > "$_s6_probe"
+_s6_lines="$(grep -vE '^[[:space:]]*(#|$)' "$PSC_EXEMPT" || true)"
+if [ -z "$_s6_lines" ]; then
+    _s6_bad=1
+fi
+while IFS= read -r _s6_pat; do
+    [ -z "$_s6_pat" ] && continue
+    case "$_s6_pat" in '^'*) ;; *) _s6_bad=1 ;; esac
+    if grep -qE -- "$_s6_pat" "$_s6_probe"; then _s6_bad=1; fi
+done <<< "$_s6_lines"
+if [ "$_s6_bad" -eq 0 ]; then
+    echo "ok: S6 exempt list is anchored and never matches .claude/"
+else
+    echo "FAIL: S6 — bin/lib/plan-scope-exempt.txt has an unanchored line or one matching .claude/probe"
+    FAILED=1
+fi
+
+# Case S7 — gap direction: must-appear only, and only a Plan gaps bullet clears.
+_s7_plan="$BASE_TMP/s7-plan.md"
+_s7_changed="$BASE_TMP/s7-changed.txt"
+cat > "$_s7_plan" <<'S7PLANEOF'
+## Critical Files
+
+- `ibl5/a.php` — edit
+- `ibl5/b.php` (reference)
+- `ibl5/c.php` (conditional)
+S7PLANEOF
+printf '%s\n' 'ibl5/unrelated.php' > "$_s7_changed"
+_s7_gap_ok="$BASE_TMP/s7-gap-ok.md"
+_s7_gap_notes="$BASE_TMP/s7-gap-notes.md"
+_s7_gap_decl="$BASE_TMP/s7-gap-decl.md"
+printf '%s\n' '## Plan gaps' '' '- `ibl5/a.php` (shipped by #2036 before branch cut)' > "$_s7_gap_ok"
+printf '%s\n' '## Notes' '' '- `ibl5/a.php` (shipped by #2036 before branch cut)' > "$_s7_gap_notes"
+printf '%s\n' '## Declared scope' '' '- `ibl5/a.php` (shipped by #2036 before branch cut)' > "$_s7_gap_decl"
+_s7_none="$("$PSC" "$_s7_plan" "$_s7_changed" "" "$_s_empty" 2>&1)"
+_s7_ok="$("$PSC" "$_s7_plan" "$_s7_changed" "$_s7_gap_ok" "$_s_empty" 2>&1)"
+_s7_notes="$("$PSC" "$_s7_plan" "$_s7_changed" "$_s7_gap_notes" "$_s_empty" 2>&1)"
+_s7_decl="$("$PSC" "$_s7_plan" "$_s7_changed" "$_s7_gap_decl" "$_s_empty" 2>&1)"
+_s7_count="$(grep -c '^SCOPE-NOTE: gap' <<< "$_s7_none" || true)"
+if [ "$_s7_count" -eq 1 ] \
+        && grep -qF 'SCOPE-NOTE: gap ibl5/a.php' <<< "$_s7_none" \
+        && ! grep -q '^SCOPE-NOTE: gap' <<< "$_s7_ok" \
+        && grep -qF 'SCOPE-NOTE: gap ibl5/a.php' <<< "$_s7_notes" \
+        && grep -qF 'SCOPE-NOTE: gap ibl5/a.php' <<< "$_s7_decl"; then
+    echo "ok: S7 only must-appear gaps are noted; only a Plan gaps bullet clears"
+else
+    echo "FAIL: S7 — none: '$_s7_none'; plan-gaps: '$_s7_ok'; notes: '$_s7_notes'; declared: '$_s7_decl'"
+    FAILED=1
+fi
+
+# Case S8 — rejected forms exit 2 with Usage on stderr.
+_s8_bad=0
+_s8_body="$BASE_TMP/s8-unreadable-body"
+printf 'x\n' > "$_s8_body"
+chmod 000 "$_s8_body"
+for _s8_case in noargs changed body; do
+    case "$_s8_case" in
+        noargs)  _s8_err="$("$PSC" 2>&1 >/dev/null)"; _s8_rc=$? ;;
+        changed) _s8_err="$("$PSC" "$_s1_plan" "$BASE_TMP/s8-no-such-file" 2>&1 >/dev/null)"; _s8_rc=$? ;;
+        body)    _s8_err="$("$PSC" "$_s1_plan" "$_s1_changed" "$_s8_body" 2>&1 >/dev/null)"; _s8_rc=$? ;;
+    esac
+    if [ "$_s8_rc" -ne 2 ] || ! grep -qF 'Usage:' <<< "$_s8_err"; then
+        echo "FAIL: S8 — $_s8_case: rc=$_s8_rc stderr='$_s8_err'"
+        _s8_bad=1
+    fi
+done
+chmod 600 "$_s8_body"
+if [ "$_s8_bad" -eq 0 ]; then
+    echo "ok: S8 no args, unreadable changed file and unreadable body each exit 2 with Usage"
+else
+    FAILED=1
+fi
+
+# Case S9 — PR #1996 replay: ScheduleUpdater.php flagged, cleared by the declaring body.
+_s9_bare="$("$PSC" "$PSC_FX/plan.md" "$PSC_FX/changed.txt" "" "$PSC_FX/added.txt" 2>&1)"
+_s9_decl="$("$PSC" "$PSC_FX/plan.md" "$PSC_FX/changed.txt" "$PSC_FX/body-declared.md" "$PSC_FX/added.txt" 2>&1)"
+if grep -qF 'SCOPE-NOTE: unplanned ibl5/classes/Updater/ScheduleUpdater.php' <<< "$_s9_bare" \
+        && ! grep -q '^UNPLANNED-FILE:.*ScheduleUpdater.php' <<< "$_s9_bare" \
+        && ! grep -q '^SCOPE-NOTE: unplanned' <<< "$_s9_decl" \
+        && ! grep -q '^UNPLANNED-FILE:' <<< "$_s9_decl"; then
+    echo "ok: S9 #1996 replay notes ScheduleUpdater.php; declaring body clears it"
+else
+    echo "FAIL: S9 — bare: '$(grep -c '^SCOPE-NOTE:' <<< "$_s9_bare" || true)' notes; declared out: '$_s9_decl'"
     FAILED=1
 fi
 
@@ -898,6 +1203,287 @@ else
         "$(run_cond15 '[{"name":"pytest (stdlib harness)","bucket":"pass"}]')"
 fi
 
+# --- Phase 5.0d autonomy contract: run_p50d helper + D1..D6 cases ---------
+# The 5.0d block regenerates /tmp/post-plan-changed-$PPID from
+# `git diff --name-only origin/master...HEAD` when the list is absent. Nothing
+# else runs that path, so this section runs the REAL block in a scratch repo and
+# proves the regeneration with two in-test mutants (M1, M2).
+
+P5D="$(extract_block '# Phase 5.0d' "$P5_SKILL")"
+_p5d_n=$(grep -rF '# Phase 5.0d' "$REPO_ROOT/.claude/skills" | wc -l | tr -d ' ')
+[ "$_p5d_n" = "1" ] && echo "ok: p5d marker unique in .claude/skills" \
+    || { echo "FAIL: p5d marker '# Phase 5.0d' appears $_p5d_n times (expected 1)"; FAILED=1; }
+if [ -n "$P5D" ] && printf '%s' "$P5D" | bash -n 2>/dev/null; then
+    echo "ok: p5d block extracted and parses"
+else
+    echo "FAIL: p5d block empty or does not parse"; FAILED=1
+fi
+
+# Scratch repo: origin/master ref, three committed files on top, bin/lib
+# symlinked afterwards (untracked, so it never enters the diff).
+P5D_REPO="$BASE_TMP/p5d-repo"
+mkdir -p "$P5D_REPO"
+(
+    cd "$P5D_REPO" || exit 1
+    git init -q
+    git config user.name t
+    git config user.email t@example.invalid
+    git config commit.gpgsign false
+    echo base > base.txt
+    git add base.txt
+    git commit -q -m base
+    git update-ref refs/remotes/origin/master HEAD
+    mkdir -p docs x/deep/tools/z bin
+    echo a > docs/exact.md
+    echo b > x/deep/tools/z/check.sh
+    echo c > bin/xylophone
+    git add docs x bin
+    git commit -q -m feature
+    ln -s "$REPO_ROOT/bin/lib" bin/lib
+)
+
+# run_p50d <block> <planfile> <PLAN_FOUND> <status-or-empty> [seed-list-file]
+# Runs the 5.0d block in the scratch repo. Prints the missing-tests lines,
+# then '@@LIST' + the changed list if one exists after the run. Everything
+# happens in ONE bash -c so prelude, block and cleanup share $PPID.
+run_p50d() {
+    ( cd "$P5D_REPO" && PLAN_FILE="$2" PLAN_FOUND="$3" \
+        P5D_STATUS="$4" P5D_SEED="${5:-}" \
+        bash -c 'rm -f "/tmp/post-plan-changed-$PPID" "/tmp/post-plan-missing-tests-$PPID"
+unset PHASE5_VERIFY_STATUS
+if [ -n "$P5D_STATUS" ]; then export PHASE5_VERIFY_STATUS="$P5D_STATUS"; fi
+if [ -n "$P5D_SEED" ]; then cp "$P5D_SEED" "/tmp/post-plan-changed-$PPID"; fi
+'"$1"'
+cat "/tmp/post-plan-missing-tests-$PPID" 2>/dev/null
+if [ -f "/tmp/post-plan-changed-$PPID" ]; then echo "@@LIST"; cat "/tmp/post-plan-changed-$PPID"; fi
+rm -f "/tmp/post-plan-changed-$PPID" "/tmp/post-plan-missing-tests-$PPID"' 2>&1 )
+}
+
+# mk_p5d_plan <name> <stop_condition-or-empty> <evidence-or-empty>
+mk_p5d_plan() {
+    {
+        if [ -n "$2" ] || [ -n "$3" ]; then
+            printf -- '---\n'
+            [ -n "$2" ] && printf 'stop_condition: %s\n' "$2"
+            [ -n "$3" ] && printf 'evidence: %s\n' "$3"
+            printf -- '---\n'
+        fi
+        printf '# Plan\n'
+    } > "$BASE_TMP/$1.md"
+    printf '%s' "$BASE_TMP/$1.md"
+}
+
+# p5d_expect <label> <expected> <actual>
+p5d_expect() {
+    if [ "$2" = "$3" ]; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1"; echo "  expected: $2"; echo "  actual:   $3"; FAILED=1
+    fi
+}
+
+P5D_PLAN_EV="$(mk_p5d_plan p5d-evidence-present evidence-present 'docs/exact.md,tools/z/check.sh,bin/x,docs/missing.md')"
+P5D_PLAN_NONE="$(mk_p5d_plan p5d-no-contract '' '')"
+P5D_PLAN_BAD="$(mk_p5d_plan p5d-malformed evidence-present 'a,,b')"
+P5D_PLAN_TG="$(mk_p5d_plan p5d-tests-green tests-green 'docs/exact.md')"
+printf 'bin/x\ndocs/missing.md\n' > "$BASE_TMP/p5d-seed.txt"
+
+# Each contract fixture must parse (or not) as its case intends.
+for _f in "$P5D_PLAN_EV" "$P5D_PLAN_TG"; do
+    "$REPO_ROOT/bin/lib/plan-autonomy-contract" --print "$_f" >/dev/null 2>&1 \
+        || { echo "FAIL: p5d fixture $_f should parse"; FAILED=1; }
+done
+if "$REPO_ROOT/bin/lib/plan-autonomy-contract" --print "$P5D_PLAN_BAD" >/dev/null 2>&1; then
+    echo "FAIL: p5d fixture malformed should be rejected"; FAILED=1
+fi
+
+D1_LIST="$(printf '@@LIST\nbin/xylophone\ndocs/exact.md\nx/deep/tools/z/check.sh')"
+D1_EXPECT="$(printf 'UNMET-CONTRACT: evidence bin/x declared but never appeared in the diff\nUNMET-CONTRACT: evidence docs/missing.md declared but never appeared in the diff\n%s' "$D1_LIST")"
+D2_EXPECT="$(printf 'UNMET-CONTRACT: evidence docs/exact.md declared but never appeared in the diff\nUNMET-CONTRACT: evidence tools/z/check.sh declared but never appeared in the diff\n@@LIST\nbin/x\ndocs/missing.md')"
+
+# D1: list absent -> regenerated; exact, suffix and exact-not-substring pinned.
+p5d_expect "p5d D1 absent list regenerated" "$D1_EXPECT" \
+    "$(run_p50d "$P5D" "$P5D_PLAN_EV" x '')"
+
+# D2: list present -> survives byte-for-byte and drives the verdicts.
+p5d_expect "p5d D2 seeded list preserved" "$D2_EXPECT" \
+    "$(run_p50d "$P5D" "$P5D_PLAN_EV" x '' "$BASE_TMP/p5d-seed.txt")"
+
+# D3: no contract -> silent, no list created.
+p5d_expect "p5d D3 no contract is silent" "" \
+    "$(run_p50d "$P5D" "$P5D_PLAN_NONE" x '')"
+
+# D4: malformed -> exactly one line, prefix-checked, no list.
+_d4="$(run_p50d "$P5D" "$P5D_PLAN_BAD" x '')"
+_d4_prefix='UNMET-CONTRACT: malformed autonomy contract — '
+if [ "$(printf '%s\n' "$_d4" | wc -l | tr -d ' ')" = "1" ] && [ "${_d4#"$_d4_prefix"}" != "$_d4" ]; then
+    echo "ok: p5d D4 malformed reported once"
+else
+    echo "FAIL: p5d D4 expected one malformed line, got: $_d4"; FAILED=1
+fi
+
+# D5: plan-blind -> silent.
+p5d_expect "p5d D5 plan-blind is silent" "" \
+    "$(run_p50d "$P5D" "$P5D_PLAN_EV" none '')"
+
+# D6: tests-green is met only on pass.
+D6_LIST="$(printf '@@LIST\nbin/xylophone\ndocs/exact.md\nx/deep/tools/z/check.sh')"
+_d6_ok=1
+_d6_pass="$(run_p50d "$P5D" "$P5D_PLAN_TG" x pass)"
+[ "$_d6_pass" = "$D6_LIST" ] || { _d6_ok=0; echo "FAIL: p5d D6 pass: $_d6_pass"; }
+for _pair in "fail:fail" "skipped:skipped" ":none"; do
+    _in="${_pair%%:*}"; _shown="${_pair#*:}"
+    _want="$(printf 'UNMET-CONTRACT: stop_condition tests-green declared but PHASE5_VERIFY_STATUS=%s\n%s' "$_shown" "$D6_LIST")"
+    _got="$(run_p50d "$P5D" "$P5D_PLAN_TG" x "$_in")"
+    [ "$_got" = "$_want" ] || { _d6_ok=0; echo "FAIL: p5d D6 status '$_in': $_got"; }
+done
+if [ "$_d6_ok" = "1" ]; then
+    echo "ok: p5d D6 tests-green x status (4 cases)"
+else
+    FAILED=1
+fi
+
+# M1: delete the regeneration line. D1 must FAIL against this mutant.
+P5D_M1="$(printf '%s\n' "$P5D" | grep -vF 'git diff --name-only origin/master...HEAD > "/tmp/post-plan-changed-')"
+if [ "$P5D_M1" = "$P5D" ]; then
+    echo "FAIL: p5d mutant M1 identical to original (anchor drifted)"; FAILED=1
+elif [ "$(printf '%s\n' "$P5D" | wc -l)" -ne "$(( $(printf '%s\n' "$P5D_M1" | wc -l) + 1 ))" ]; then
+    echo "FAIL: p5d mutant M1 removed other than exactly one line"; FAILED=1
+elif [ "$(run_p50d "$P5D_M1" "$P5D_PLAN_EV" x '')" != "$D1_EXPECT" ]; then
+    echo "ok: p5d D1 detects missing regeneration (M1)"
+else
+    echo "FAIL: p5d D1 did not detect M1 (regeneration deleted)"; FAILED=1
+fi
+
+# M2: make the regeneration unconditional. D2 must FAIL against this mutant.
+_m2_pat='[ -f "/tmp/post-plan-changed-$PPID" ] || '
+P5D_M2="${P5D/"$_m2_pat"/}"
+if [ "$P5D_M2" = "$P5D" ]; then
+    echo "FAIL: p5d mutant M2 identical to original (anchor drifted)"; FAILED=1
+elif [ "$(run_p50d "$P5D_M2" "$P5D_PLAN_EV" x '' "$BASE_TMP/p5d-seed.txt")" != "$D2_EXPECT" ]; then
+    echo "ok: p5d D2 detects unconditional regeneration (M2)"
+else
+    echo "FAIL: p5d D2 did not detect M2 (unconditional regeneration)"; FAILED=1
+fi
+
+# --- Phase 5.0d TWO-WAY AGREEMENT: 5.0d block vs harness.conformance.check ---
+# The block and conformance.check both enforce the autonomy contract. This
+# section feeds them the same plan and the same changed list and requires the
+# same ordered UNMET-CONTRACT lines. The parse half (lib vs planfile.py) is
+# pinned by test_contract_lib_sync in the harness pytest job. The malformed
+# line is compared by prefix only: the two sides word it differently by design.
+
+P5D_REPO="$BASE_TMP/p5d-agree-repo"
+mkdir -p "$P5D_REPO"
+(
+    cd "$P5D_REPO" || exit 1
+    git init -q
+    git config user.name t
+    git config user.email t@example.invalid
+    git config commit.gpgsign false
+    echo base > base.txt
+    git add base.txt
+    git commit -q -m base
+    git update-ref refs/remotes/origin/master HEAD
+    mkdir -p docs x/deep/tools/z aXb bin
+    echo a > docs/exact.md
+    echo b > x/deep/tools/z/check.sh
+    echo c > aXb/c
+    echo d > bin/xylophone
+    echo e > plain.txt
+    git add docs x aXb bin plain.txt
+    git commit -q -m feature
+    ln -s "$REPO_ROOT/bin/lib" bin/lib
+    git diff --name-only origin/master...HEAD > "$BASE_TMP/p5d-agree-changed.txt"
+)
+
+P5D_AGREE_EV='docs/exact.md,tools/z/check.sh,check.sh,z/check.sh,exact.md,a.b/c,aXb/c,bin/x,bin/xylophone,./plain.txt,plain.txt/,plain.txt,docs/missing.md'
+
+# py_p5d <planfile> <status-or-empty> — UNMET-CONTRACT lines from conformance.check
+py_p5d() {
+    ( cd "$REPO_ROOT/tools/postplan-harness" && python3 -c '
+import sys
+from harness import conformance
+from harness.planfile import frontmatter_autonomy_contract
+from harness.state import PlanInfo
+sc, ev, err = frontmatter_autonomy_contract(open(sys.argv[1]).read())
+changed = open(sys.argv[2]).read().split()
+plan = PlanInfo(found=True, stop_condition=sc, evidence=ev, contract_error=err)
+for item in conformance.check(plan, changed, phase5_status=(sys.argv[3] or None)):
+    if item.startswith("UNMET-CONTRACT:"):
+        print(item)
+' "$1" "$BASE_TMP/p5d-agree-changed.txt" "$2" )
+}
+
+# p5d_norm — keep UNMET-CONTRACT lines; collapse the malformed line to its prefix.
+p5d_norm() {
+    grep '^UNMET-CONTRACT:' | sed 's/^\(UNMET-CONTRACT: malformed autonomy contract\).*/\1/'
+}
+
+_agree_n=0
+_agree_bad=0
+# p5d_agree <label> <planfile> <status-or-empty>
+p5d_agree() {
+    _agree_n=$((_agree_n + 1))
+    _sh="$(run_p50d "$P5D_AGREE_BLOCK" "$2" x "$3" | p5d_norm)"
+    _py="$(py_p5d "$2" "$3" | p5d_norm)"
+    if [ "$_sh" != "$_py" ]; then
+        _agree_bad=$((_agree_bad + 1))
+        echo "FAIL: p5d two-way disagreement on $1"
+        echo "  block: $(printf '%s' "$_sh" | tr '\n' '|')"
+        echo "  py:    $(printf '%s' "$_py" | tr '\n' '|')"
+    fi
+}
+
+P5D_AGREE_BLOCK="$P5D"
+for _sc in evidence-present tests-green; do
+    _plan="$(mk_p5d_plan "p5d-agree-$_sc" "$_sc" "$P5D_AGREE_EV")"
+    for _st in "" pass fail skipped; do
+        p5d_agree "$_sc/${_st:-unset}" "$_plan" "$_st"
+    done
+done
+p5d_agree "malformed a,,b" "$(mk_p5d_plan p5d-agree-m1 evidence-present 'a,,b')" fail
+p5d_agree "malformed a..b" "$(mk_p5d_plan p5d-agree-m2 evidence-present 'a..b')" fail
+p5d_agree "malformed ,a" "$(mk_p5d_plan p5d-agree-m3 evidence-present ',a')" fail
+p5d_agree "malformed /etc/x" "$(mk_p5d_plan p5d-agree-m4 evidence-present '/etc/x')" fail
+p5d_agree "malformed bogus stop_condition" "$(mk_p5d_plan p5d-agree-m5 bogus 'docs/exact.md')" fail
+p5d_agree "malformed stop_condition alone" "$(mk_p5d_plan p5d-agree-m6 tests-green '')" fail
+p5d_agree "no contract" "$P5D_PLAN_NONE" fail
+
+if [ "$_agree_n" -ne 15 ]; then
+    echo "FAIL: p5d two-way agreement ran $_agree_n cases (expected 15)"; FAILED=1
+elif [ "$_agree_bad" -ne 0 ]; then
+    echo "FAIL: p5d two-way agreement: $_agree_bad of 15 cases disagree"; FAILED=1
+else
+    echo "ok: p5d two-way agreement (15 cases)"
+fi
+
+# Agreed-but-wrong negative half: pin three agreed outputs to literal strings.
+P5D_FIVE="$(printf 'UNMET-CONTRACT: evidence a.b/c declared but never appeared in the diff\nUNMET-CONTRACT: evidence bin/x declared but never appeared in the diff\nUNMET-CONTRACT: evidence ./plain.txt declared but never appeared in the diff\nUNMET-CONTRACT: evidence plain.txt/ declared but never appeared in the diff\nUNMET-CONTRACT: evidence docs/missing.md declared but never appeared in the diff')"
+p5d_expect "p5d agreed output pinned" "$P5D_FIVE" \
+    "$(run_p50d "$P5D" "$BASE_TMP/p5d-agree-evidence-present.md" x pass | p5d_norm)"
+p5d_expect "p5d agreed output pinned" \
+    "$(printf 'UNMET-CONTRACT: stop_condition tests-green declared but PHASE5_VERIFY_STATUS=none\n%s' "$P5D_FIVE")" \
+    "$(run_p50d "$P5D" "$BASE_TMP/p5d-agree-tests-green.md" x '' | p5d_norm)"
+p5d_expect "p5d agreed output pinned" "UNMET-CONTRACT: malformed autonomy contract" \
+    "$(run_p50d "$P5D" "$BASE_TMP/p5d-agree-m2.md" x fail | p5d_norm)"
+
+# M3: disable the block's suffix arm. The comparator must see the divergence.
+_m3_pat='! grep -qE "/$('
+_m3_rep='! false "/$('
+P5D_M3="${P5D/"$_m3_pat"/"$_m3_rep"}"
+if [ "$P5D_M3" = "$P5D" ]; then
+    echo "FAIL: p5d mutant M3 identical to original (anchor drifted)"; FAILED=1
+else
+    _m3_sh="$(run_p50d "$P5D_M3" "$BASE_TMP/p5d-agree-evidence-present.md" x pass | p5d_norm)"
+    _m3_py="$(py_p5d "$BASE_TMP/p5d-agree-evidence-present.md" pass | p5d_norm)"
+    if [ "$_m3_sh" != "$_m3_py" ]; then
+        echo "ok: p5d agreement detects a one-sided suffix-match break (M3)"
+    else
+        echo "FAIL: p5d agreement did not detect M3 (suffix arm disabled)"; FAILED=1
+    fi
+fi
+
 # --- predicate exit-status invariant (the truncation bug) -------------------
 # The shim answers OPEN for #1100 and MERGED for every other number, so #1071 is
 # the merged predecessor that made pr_dep_holds return 1. `gh api graphql` is not
@@ -993,6 +1579,27 @@ expect_clearance_2arg "(1) type-agnostic sentinel + non-test file → CLEARED" "
 # the path that let the callers clear without a tail-clause check.
 expect_clearance_2arg "(1) tail names e2e+unit, EMPTY changed_files → CLEARED (one-arg compat exit)" "CLEARED" \
     "$TAIL_BODY" ""
+
+# --- (1) static wording (backlog#877) -------------------------------------------
+# The runner writes MANUAL_TESTING_SENTINEL_STATIC when the plan's Verification
+# Matrix has zero executable rows. Read it from the harness so this fixture tracks
+# the real constant. It must stay CLEARED in both the one-arg and two-arg forms: a
+# non-test changed file makes the two-arg form run the tail keyword scan, which the
+# static tail must not trip.
+STATIC_SENTINEL="$(PYTHONPATH="$REPO_ROOT/tools/postplan-harness" python3 -c \
+    'from harness.classify import MANUAL_TESTING_SENTINEL_STATIC as s; print(s)' 2>&1)" || true
+if [[ "$STATIC_SENTINEL" != "No manual testing needed"* ]]; then
+    echo "FAIL: could not read MANUAL_TESTING_SENTINEL_STATIC from harness.classify: $STATIC_SENTINEL"
+    FAILED=1
+fi
+STATIC_BODY="$(printf '## Manual Testing\n\n%s\n' "$STATIC_SENTINEL")"
+expect_clearance "(1) static wording → CLEARED" "CLEARED" "$STATIC_BODY"
+expect_clearance_2arg "(1) static wording + non-test file → CLEARED (tail has no test keyword)" "CLEARED" \
+    "$STATIC_BODY" "ibl5/classes/Foo.php"
+# Control: the same body with a test keyword appended to the tail HOLDS on the same
+# non-test file, so the CLEARED case above is exercising the tail scan, not skipping it.
+expect_clearance_2arg "(1) static wording + appended unit-test tail, non-test file → HELD (control)" "HELD" \
+    "$(printf '## Manual Testing\n\n%s covered by unit tests\n' "$STATIC_SENTINEL")" "ibl5/classes/Foo.php"
 
 # Wiring: both callers must pass a changed-file list as the second argument.
 # Negative half: the exact one-arg call shipped on master must be gone.
@@ -1539,7 +2146,7 @@ else
 fi
 
 # Case 2 — quiet: findingsempty produces an empty slot and only blank lines between
-# **Re-reviewed tree:** and ### Merge digest
+# `Findings: none.` and ### Merge digest
 out2="$(run_findings "$B58F" findingsempty spawn)"
 body2="$(compose_fixture_body "$RR_LINE" "$out2")"
 if grep -q '^--- V2_FINDINGS ---$' <<< "$out2"; then
@@ -1548,12 +2155,12 @@ if grep -q '^--- V2_FINDINGS ---$' <<< "$out2"; then
 else
     echo "ok: 5.8c quiet: rendered slot is empty (V2_FINDINGS_PRESENT=no)"
 fi
-between2="$(awk '/^\*\*Re-reviewed tree:\*\*/{found=1;next} found && /^### Merge digest/{exit} found{print}' <<< "$body2")"
+between2="$(awk '/^Findings: none\.$/{found=1;next} found && /^### Merge digest/{exit} found{print}' <<< "$body2")"
 if grep -q '[^[:space:]]' <<< "$between2"; then
-    echo "FAIL: 5.8c quiet: non-blank content between **Re-reviewed tree:** and ### Merge digest: '$between2'"
+    echo "FAIL: 5.8c quiet: non-blank content between Findings: none. and ### Merge digest: '$between2'"
     FAILED=1
 else
-    echo "ok: 5.8c quiet: only blank lines between re-reviewed tree and ### Merge digest"
+    echo "ok: 5.8c quiet: only blank lines between Findings: none. and ### Merge digest"
 fi
 
 # Case 3 — degrade: absent -2 file; composed body is byte-identical to the

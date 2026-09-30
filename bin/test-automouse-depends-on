@@ -63,6 +63,7 @@ setup() {
     rm -rf "$TMP/automouse" "$TMP/plans" "$TMP/stub"
     mkdir -p "$TMP/automouse/queue" "$TMP/automouse/skipped" "$TMP/automouse/done" \
              "$TMP/plans" "$TMP/stub"
+    make_gh fail
 }
 
 write_plan() {
@@ -77,17 +78,23 @@ mark_done() {
     ln -sfn "$TMP/plans/$1.md" "$TMP/automouse/done/$1.md"
 }
 
-# make_gh <mode> — mode: merged | open | closed | fail
+# make_gh <mode> — mode: merged | open | closed | none | fail
+# Answers both `pr view` (PR-number deps) and `pr list` (slug deps). gh applies
+# --jq itself, so the stub prints the post-jq value. `none` prints nothing (no
+# PR for the branch). Every invocation's argv is appended to $TMP/stub/gh.args.
 make_gh() {
     local mode="$1"
+    mkdir -p "$TMP/stub"
     cat > "$TMP/stub/gh" <<STUB
 #!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$TMP/stub/gh.args"
 case "\$*" in
-  *"pr view"*)
+  *"pr view"*|*"pr list"*)
       case "$mode" in
         merged) echo MERGED ;;
         open)   echo OPEN ;;
         closed) echo CLOSED ;;
+        none)   : ;;
         fail)   echo "gh: could not authenticate" >&2; exit 1 ;;
       esac ;;
   *) exit 1 ;;
@@ -116,10 +123,14 @@ setup
 write_plan "p1"
 assert_eq "case 1: no key → met" "$(evaluate p1)" "met"
 
-# Case 2 — slug dep satisfied by symlink in done/
-setup; mark_done alpha
+# Case 2 — slug dep in done/ + PR MERGED → met
+setup; mark_done alpha; make_gh merged
 write_plan "p2" "depends_on: alpha"
-assert_eq "case 2: slug dep met via symlink" "$(evaluate p2)" "met"
+assert_eq "case 2: slug in done/ + PR MERGED → met" "$(evaluate p2)" "met"
+ARGS2="$(cat "$TMP/stub/gh.args" 2>/dev/null)"
+want "case 2: slug dep queries gh pr list" "$ARGS2" "pr list"
+want "case 2: slug is used as the branch name" "$ARGS2" "--head alpha"
+want "case 2: query spans all PR states" "$ARGS2" "--state all"
 
 # Case 3 — slug dep not in done/
 setup
@@ -146,14 +157,14 @@ assert_eq "case 6: gh failure → unresolvable:gh-error" "$GOT6" "unresolvable:2
 want "case 6 verdict names the closed reason vocabulary" "$GOT6" "gh-error"
 
 # Case 7 — list, first dep met, second unmet (first-unmet-wins)
-setup; mark_done alpha
+setup; mark_done alpha; make_gh merged
 write_plan "p7" "depends_on:" "  - alpha" "  - beta"
 GOT7="$(evaluate p7)"
 assert_eq "case 7: list, first unmet wins" "$GOT7" "unmet:beta"
 want "case 7 verdict names the FIRST unmet dep, not the last" "$GOT7" "beta"
 
 # Case 8 — list, both deps met
-setup; mark_done alpha; mark_done beta
+setup; mark_done alpha; mark_done beta; make_gh merged
 write_plan "p8" "depends_on:" "  - alpha" "  - beta"
 assert_eq "case 8: list, all met" "$(evaluate p8)" "met"
 
@@ -224,6 +235,43 @@ GOT13="$(evaluate p13)"
 assert_eq "case 13: dangling symlink → unresolvable (not met)" \
     "$GOT13" "unresolvable:<none>:unreadable-plan"
 want "case 13 verdict names the unreadable-plan reason" "$GOT13" "unreadable-plan"
+
+# Case 14 — slug in done/, PR still OPEN → unmet (a done/ file alone is not a merge)
+setup; mark_done alpha; make_gh open
+write_plan "p14" "depends_on: alpha"
+assert_eq "case 14: slug in done/ + PR OPEN → unmet" "$(evaluate p14)" "unmet:alpha"
+
+# Case 15 — slug in done/, PR CLOSED without merge → unresolvable (needs a human)
+setup; mark_done alpha; make_gh closed
+write_plan "p15" "depends_on: alpha"
+GOT15="$(evaluate p15)"
+assert_eq "case 15: slug in done/ + PR CLOSED → unresolvable:closed-unmerged" \
+    "$GOT15" "unresolvable:alpha:closed-unmerged"
+want "case 15 verdict names the closed-unmerged reason" "$GOT15" "closed-unmerged"
+
+# Case 16 — slug in done/, no PR for the branch → unresolvable
+setup; mark_done alpha; make_gh none
+write_plan "p16" "depends_on: alpha"
+GOT16="$(evaluate p16)"
+assert_eq "case 16: slug in done/ + no PR → unresolvable:no-pr" \
+    "$GOT16" "unresolvable:alpha:no-pr"
+want "case 16 verdict names the no-pr reason" "$GOT16" "no-pr"
+
+# Case 17 — slug in done/, gh fails → unresolvable:gh-error, never met
+setup; mark_done alpha; make_gh fail
+write_plan "p17" "depends_on: alpha"
+GOT17="$(evaluate p17)"
+assert_eq "case 17: slug in done/ + gh failure → unresolvable:gh-error" \
+    "$GOT17" "unresolvable:alpha:gh-error"
+want "case 17 verdict names the gh-error reason" "$GOT17" "gh-error"
+
+# Case 18 — slug NOT in done/: unmet without any gh call (done/ check runs first)
+setup; make_gh merged
+write_plan "p18" "depends_on: alpha"
+assert_eq "case 18: slug absent from done/ → unmet even if gh would say MERGED" \
+    "$(evaluate p18)" "unmet:alpha"
+assert_absent "case 18: gh never called when slug is absent from done/" \
+    "$TMP/stub/gh.args"
 
 # ── check-plan gate: depends_on: is inert to existing frontmatter validation ──
 
@@ -319,7 +367,8 @@ write_heal_plan "hp6" "depends_on: prereq6"
 mark_heal_done prereq6
 HOLD6="$TMP/heal/queue/hp6.md.depends-hold"
 echo "unmet:prereq6" > "$HOLD6"
-NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
+make_gh merged
+GH="$TMP/stub/gh" NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
 assert_absent "V6: self-heal clears hold when dep is met" "$HOLD6"
 
 # V7 — self-heal leaves hold intact while dep is still unmet
@@ -329,6 +378,26 @@ HOLD7="$TMP/heal/queue/hp7.md.depends-hold"
 echo "unmet:prereq7" > "$HOLD7"
 NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
 assert_present "V7: self-heal leaves hold when dep still unmet" "$HOLD7"
+
+# V7b — dep in done/ but PR still OPEN: hold stays (unmet arm is a silent no-op)
+heal_setup
+write_heal_plan "hp7b" "depends_on: prereq7b"
+mark_heal_done prereq7b
+make_gh open
+HOLD7B="$TMP/heal/queue/hp7b.md.depends-hold"
+echo "unmet:prereq7b" > "$HOLD7B"
+GH="$TMP/stub/gh" NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
+assert_present "V7b: self-heal keeps hold when dep is in done/ but PR is OPEN" "$HOLD7B"
+
+# V7c — dep in done/ but PR CLOSED unmerged: hold stays (unresolvable arm never clears)
+heal_setup
+write_heal_plan "hp7c" "depends_on: prereq7c"
+mark_heal_done prereq7c
+make_gh closed
+HOLD7C="$TMP/heal/queue/hp7c.md.depends-hold"
+echo "unmet:prereq7c" > "$HOLD7C"
+GH="$TMP/stub/gh" NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
+assert_present "V7c: self-heal keeps hold when dep PR is CLOSED unmerged" "$HOLD7C"
 
 # V8 — orphan sidecar (no matching plan) is reaped
 heal_setup
@@ -344,9 +413,10 @@ mark_heal_done prereq9
 HOLD9="$TMP/heal/queue/hp9.md.depends-hold"
 echo "unmet:prereq9" > "$HOLD9"
 PLAN9_LINK="$TMP/heal/queue/hp9.md"
+make_gh merged
 MTIME_BEFORE=$(mtime_of "$PLAN9_LINK")
 sleep 1
-NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
+GH="$TMP/stub/gh" NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
 MTIME_AFTER=$(mtime_of "$PLAN9_LINK")
 if [ "$MTIME_BEFORE" -eq "$MTIME_AFTER" ]; then
     ok "V9: plan mtime preserved across heal (queue order unchanged)"
@@ -388,6 +458,8 @@ mkdir -p "$E2_NDIR/queue" "$E2_NDIR/handoff" "$E2_NDIR/logs" \
 # file) and calls "$SELF_DIR/../post-plan-now" for postplan. The runner lives
 # in $E2_NDIR, so the post-plan-now stub goes in $E2_ROOT.
 ln -sf "$REPO_ROOT/bin/automouse/prompt-impl" "$E2_NDIR/prompt-impl"
+# The runner also sources $SELF_DIR/lib-queue-order (queue_entries_ordered).
+ln -sf "$REPO_ROOT/bin/automouse/lib-queue-order" "$E2_NDIR/lib-queue-order"
 
 # Rewritten runner: REPO→worktree, NIGHTLY_DIR→temp, PATH→stub first
 E2_RUNNER="$E2_NDIR/run"
@@ -446,6 +518,19 @@ exit 0
 PPSTUB
 chmod +x "$E2_ROOT/post-plan-now"
 
+# gh stub for bin/lib/plan-depends-on only (reached via GH=, not PATH).
+# Prints the contents of $E2_ROOT/gh.mode for `pr list`; the runner never reads $GH.
+E2_GH="$E2_ROOT/gh"
+cat > "$E2_GH" <<GHSTUB
+#!/usr/bin/env bash
+case "\$*" in
+  *"pr list"*) cat "$E2_ROOT/gh.mode" 2>/dev/null ;;
+  *) exit 1 ;;
+esac
+GHSTUB
+chmod +x "$E2_GH"
+echo MERGED > "$E2_ROOT/gh.mode"
+
 write_e2_plan() {
     local name="$1"; shift
     { echo '---'; echo 'impl_model: sonnet'; printf '%s\n' "$@"; echo '---'; echo "# $name"; } \
@@ -463,10 +548,11 @@ reset_e2() {
           "$E2_NDIR/queue"/*.depends-hold "$E2_NDIR/handoff"/*.json \
           "$E2_NDIR/done"/*.md "$E2_TRACE"
     : > "$E2_TRACE"
+    echo MERGED > "$E2_ROOT/gh.mode"
 }
 
 run_e2() {  # run exactly one iteration; each caller pre-loads exactly one plan in queue
-    NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
+    GH="$E2_GH" NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
     CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
     timeout 30 "$E2_RUNNER" 2>&1 || true
 }
@@ -523,6 +609,25 @@ run_e2 > /dev/null 2>&1
 assert_absent "V3: met dep → no .depends-hold (stale hold cleared)" \
     "$E2_NDIR/queue/met-plan.md.depends-hold"
 assert_present "V3: met dep → moved to done/" "$E2_NDIR/done/met-plan.md"
+
+# V3b — dep in done/ but its PR CLOSED unmerged: runner holds, never runs impl
+reset_e2
+mark_e2_done prereq
+echo CLOSED > "$E2_ROOT/gh.mode"
+write_e2_plan "closed-dep" "depends_on: prereq"
+run_e2 > /dev/null 2>&1
+assert_present "V3b: closed-unmerged dep → .depends-hold written" \
+    "$E2_NDIR/queue/closed-dep.md.depends-hold"
+assert_present "V3b: closed-unmerged dep → plan stays in queue/" \
+    "$E2_NDIR/queue/closed-dep.md"
+LOGTXT_V3B="$(e2_logtxt)"
+want "V3b: log carries [depends-unresolvable]" "$LOGTXT_V3B" "[depends-unresolvable]"
+want "V3b: log names the closed-unmerged reason" "$LOGTXT_V3B" "closed-unmerged"
+if grep -q 'closed-dep.md impl' "$E2_TRACE" 2>/dev/null; then
+    fail "V3b: claude was unexpectedly invoked"
+else
+    ok "V3b: claude never invoked for closed-unmerged dep"
+fi
 
 # V4 — unresolvable dep: hold written with reason, log has [depends-unresolvable]
 reset_e2

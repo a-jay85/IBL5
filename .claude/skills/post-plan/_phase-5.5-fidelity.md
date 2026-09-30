@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-09-23
+last_verified: 2026-09-30
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -93,7 +93,7 @@ Appending a metadata line is **not** editing the verdict: the word, the findings
 
 ## Step 4 — Remediation on `READY WITH NOTES` (and `NOT READY`)
 
-Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written, including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`) and its fifth-file gate handoff to one `subagent_type: "sonnet-4-6"` delegate. On the harness path, the harness commits and pushes after the phase exits. On the skill-fallback path, the `/post-plan` skill's own commit and push phases follow.
+Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written, including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`) and its fifth-file gate handoff to one `subagent_type: "sonnet-5-5"` delegate. On the harness path, the harness commits and pushes after the phase exits. On the skill-fallback path, the `/post-plan` skill's own commit and push phases follow.
 
 Three post-plan-specific rules on top — these are where a re-spawn would otherwise creep in:
 
@@ -207,15 +207,14 @@ git show <MASTER_SHA>:.claude/review-shared/scripts/digest.sh > /tmp/post-plan-d
 The body template (write to `/tmp/post-plan-fidelity-comment-<N>.md` with the `Write` tool):
 
 ```
-**LATEST VERDICT: <FIDELITY word>** — posted <YYYY-MM-DD HH:MM:SS TZ>
+**<FIDELITY word>** — <YYYY-MM-DD HH:MM:SS TZ>
 
-REBASE=<Phase 1 REBASE= line verbatim>
-CI: <result — and post-remediation CI result when step 4 ran>
+<Phase 1 REBASE= line verbatim; omit when it is a clean or plain-rebase success spelling>
+<CI: result, and post-remediation CI result when step 4 ran; omit when local verification passed>
 
-Plan-fidelity verdict: <FIDELITY word> — posted <YYYY-MM-DD HH:MM:SS TZ> — <reviewer findings, REVIEW-COVERAGE: marker line, and include-source: line if the fallback fired>
-
-**Reviewed tree:** <REVIEWED_TREE from step 1>
-**Re-reviewed tree:** <tree from step 4b, and the re-review's verdict word — omit this line entirely when step 4b did not run>
+<reviewer findings from the verdict file: drop every REVIEW-COVERAGE: line and the bare
+verdict word; when ## FINDINGS is empty, write `Findings: none.` in its place; keep an
+include-source: line when the fallback fired>
 
 <findings slot — when `$V2_FINDINGS` (extracted in step 4b) is non-empty, emit a blank line, then its content pasted VERBATIM (no condensing, no re-wording, no re-ordering), then a blank line, before the `### Merge digest` heading below. When `$V2_FINDINGS` is empty, or step 4b did not run, emit nothing here and leave the single blank line above `### Merge digest` exactly as it is.>
 
@@ -228,20 +227,25 @@ Plan-fidelity verdict: <FIDELITY word> — posted <YYYY-MM-DD HH:MM:SS TZ> — <
 
 ---
 
-<Remediation: what step 4 fixed, anything left unfixed, and the commit SHA>
+<details><summary>Audit trail</summary>
 
-*Verdict posted <YYYY-MM-DD HH:MM:SS TZ>.*
-<terminal verdict line — build it from step 4's terminal-line recipe; never a bare verdict word>
+<REVIEW-COVERAGE: line(s) lifted from the verdict file, byte-identical>
+**Reviewed tree:** <REVIEWED_TREE from step 1>
+**Re-reviewed tree:** <tree from step 4b and the re-review's verdict word; omit when step 4b did not run>
+
+</details>
+
+<terminal verdict line from step 4's terminal-line recipe>
 <!-- pr-ready-verdict -->
 ```
 
-**Top banner and timestamp fields:** use `date '+%Y-%m-%d %H:%M:%S %Z'` for all three timestamp slots. The `<FIDELITY word>` in the banner and in the `Plan-fidelity verdict:` line must be the same word. The banner is invisible to every downstream verdict parser: `bin/pr-cycle`'s `_precheck_verdict` strips `*`, `#` and backticks and then anchors on `^(NOT )?READY`, and the stripped banner begins with `LATEST`, so only the terminal line matches.
+**Top banner and timestamp fields:** the banner has one timestamp slot. Fill it from `date '+%Y-%m-%d %H:%M:%S %Z'`. The banner word equals the step-3 `FIDELITY` word. The banner carries no auto-merge segment, because this fallback posts before Phase 6.5 decides arming. `bin/pr-cycle`'s `_precheck_verdict` strips `*`, `#` and backticks and reads the LAST verdict-shaped line. That line is the terminal line, so the banner cannot outvote it.
 
-**The `---` after the digest is load-bearing.** `_digest_labels` in `bin/digest-dm-build` folds every later non-label, non-blank line into the LAST label's value until a heading or a horizontal rule stops it. Without the rule, the remediation note, the `*Verdict posted ...*` line, the terminal verdict line and the `<!-- pr-ready-verdict -->` marker all get appended to `**Machine-authored fixes:**` in the Discord merge DM. Single-star italic keeps the posted-at line from being read as a sixth *label*, but that alone does not keep it out of the block. Emit the rule.
+**The `---` after the digest is load-bearing.** `_digest_labels` in `bin/digest-dm-build` folds every later non-label, non-blank line into the LAST label's value until a heading or a horizontal rule stops it. Without the rule, the audit trail, the terminal verdict line and the `<!-- pr-ready-verdict -->` marker all get appended to `**Machine-authored fixes:**` in the Discord merge DM. Emit the rule.
 
-**`**Reviewed tree:**` and `**Re-reviewed tree:**` placement rule:** both bold-labelled lines must appear before the digest heading. `bin/digest-dm-build`'s `_digest_labels` starts capturing at that heading and treats every `^\*\*[^*]+:\*\*` line inside that span as a label — a bold-labelled line placed inside the block becomes a sixth label and corrupts the digest parse. Before the heading they are invisible to the parser. The five digest labels and their order are unchanged.
+**`**Reviewed tree:**` and `**Re-reviewed tree:**` placement rule:** both lines go inside the `<details>` audit trail AFTER `---`, each at column 0. The carry-forward regexes are line-anchored, so they still match there, and `_digest_labels` has already stopped at the rule, so it never reads them. The digest span stays free of bold-labelled lines. The five digest labels and their order are unchanged.
 
-**Findings slot placement:** the same rule governs `$V2_FINDINGS`. When it is non-empty, insert a blank line, then `$V2_FINDINGS` verbatim, then a blank line, between the `**Re-reviewed tree:**` line and the `### Merge digest` heading. Place it above that heading only. Re-review findings routinely carry their own `####` sub-headings and `**Finding N:**` bold labels: below the heading a `#+ ` line truncates the digest block and a bold label becomes a sixth digest label, either of which corrupts `bin/digest-dm-build`'s parse. Above the heading the parser never sees them, so the findings text needs no escaping, no re-wrapping, and no label stripping.
+**Findings slot placement:** `$V2_FINDINGS` must also stay out of the digest span. When it is non-empty, insert a blank line, then `$V2_FINDINGS` verbatim, then a blank line, between the reviewer findings and the `### Merge digest` heading. Place it above that heading only. Re-review findings routinely carry their own `####` sub-headings and `**Finding N:**` bold labels: below the heading a `#+ ` line truncates the digest block and a bold label becomes a sixth digest label, either of which corrupts `bin/digest-dm-build`'s parse. Above the heading the parser never sees them, so the findings text needs no escaping, no re-wrapping, and no label stripping.
 
 **Five digest labels — do not re-word, re-order, merge, or add a sixth line.** The labels in the given order are: `**What changed:**`, `**Why:**`, `**Watch:**`, `**Touches:**`, `**Machine-authored fixes:**`. If `/tmp/post-plan-digest-lines-<N>.txt` is absent or empty, emit the heading anyway with all five labels carrying `unavailable — digest script did not produce output`. The one permitted amendment is step 4 rule 3 (appending remediation SHA to `**Machine-authored fixes:**`).
 

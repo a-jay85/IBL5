@@ -1,5 +1,24 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
+if [[ "${1:-}" = "--help" || "${1:-}" = "-h" ]]; then
+    cat <<'EOF'
+Usage: prune-vr-galleries [--dry-run] [--cutoff-days N] [--max-dirs N]
+
+Prune stale per-SHA VR gallery directories from the gh-pages checkout.
+Operates on cwd (the gh-pages checkout) and never clones.
+
+Options:
+  --dry-run        Report only, never git rm.
+  --cutoff-days N  Age threshold in whole days (default: 7). Must be a positive integer.
+  --max-dirs N     After the age pass, keep only the N most recent survivors.
+                   Must be a positive integer. Default: unset (no count cap).
+
+Directories matching ./<40-hex-char SHA> whose most-recent commit date is
+older than N days are pruned. Directories with no git history are skipped.
+Dirs with no git history are never cap-pruned (intentional fail-closed behaviour).
+EOF
+    exit 0
+fi
 set -euo pipefail
 
 # Prune stale per-SHA VR gallery directories from the gh-pages checkout.

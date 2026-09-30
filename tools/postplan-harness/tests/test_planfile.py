@@ -1,6 +1,8 @@
 import contextlib
 import io
+import itertools
 import os
+import pathlib
 import pytest
 import re
 import subprocess
@@ -9,7 +11,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import conformance
-from harness.planfile import (EXEMPT_RE, _strip_fenced, frontmatter_auto_merge_false,
+from harness.planfile import (EXEMPT_RE, _normalise_cf_path, _strip_fenced,
+                              count_executable_matrix_rows,
+                              frontmatter_auto_merge_false,
                               frontmatter_autonomy_contract, locate_plan,
                               parse_critical_files, parse_matrix,
                               parse_deferred_phase_numbers, parse_phases,
@@ -101,6 +105,112 @@ def test_matrix_ignores_fenced_rows():
     assert len(manual) == len(parse_matrix(PLAN)[1])
     assert "tests/X.php" not in planned
     assert not any("eyeball it" in row.raw for row in manual)
+
+
+_MATRIX_HEAD = (
+    "| # | What to verify | Test type | Timing | Test file / location |\n"
+    "|---|----------------|-----------|--------|----------------------|\n"
+)
+
+_DOCS_ONLY_MATRIX = (
+    "# Docs only\n\n## Verification Matrix\n\n" + _MATRIX_HEAD
+    + "| 1 | Wording reads correctly | Doc review | post-impl | `docs/x.md` |\n"
+    "| 2 | Links resolve | Static | post-impl | `bin/check-links` |\n"
+)
+
+_MIXED_MATRIX = (
+    "# Mixed\n\n## Verification Matrix\n\n" + _MATRIX_HEAD
+    + "| 1 | Service returns the row | PHPUnit | pre-impl "
+    "| `ibl5/tests/Foo/FooServiceTest.php` |\n"
+    "| 2 | Page renders the row | E2E | post-impl "
+    "| `ibl5/tests/e2e/tests/foo.spec.ts` |\n"
+    "| 3 | Lint stays clean | CLI-executable | post-impl | `grep -c x f \\| wc -l` |\n"
+    "| 4 | Layout feels right | Truly-manual | post-impl | open the page and look |\n"
+    "| 5 | Wording reads correctly | Doc review | post-impl | `docs/x.md` |\n"
+    "\n## Notes\n\n"
+    "| Item | Detail |\n|------|--------|\n"
+    "| Coverage | E2E is deferred to a later plan |\n"
+)
+
+_NO_MATRIX = (
+    "# No matrix\n\n## Critical Files\n\n- `ibl5/classes/Foo/FooService.php`\n\n"
+    "## Notes\n\n| Item | Detail |\n|------|--------|\n| Scope | One service |\n"
+)
+
+
+def test_executable_count_docs_only_matrix_is_zero():
+    # A real matrix with only non-taxonomy types is 0, never None.
+    count = count_executable_matrix_rows(_DOCS_ONLY_MATRIX)
+    assert count == 0
+    assert count is not None
+
+
+def test_executable_count_ignores_critical_files_table():
+    content = (
+        _DOCS_ONLY_MATRIX
+        + "\n## Critical Files\n\n"
+        "| File | Why |\n|------|-----|\n"
+        "| `ibl5/tests/Foo/FooTest.php` | PHPUnit coverage for Foo |\n"
+    )
+    assert count_executable_matrix_rows(content) == 0
+
+
+def test_executable_count_ignores_fenced_matrix():
+    fenced_block = (
+        "\n## Appendix\n\n```markdown\n" + _MATRIX_HEAD
+        + "| 1 | Thing works | PHPUnit | pre-impl | `ibl5/tests/Foo/FooTest.php` |\n```\n"
+    )
+    assert count_executable_matrix_rows(_DOCS_ONLY_MATRIX + fenced_block) == 0
+    # Only header is inside a fence: no real matrix at all.
+    fenced_only = "# Plan\n" + fenced_block
+    assert count_executable_matrix_rows(fenced_only) is None
+
+
+def test_executable_count_mixed_matrix():
+    # PHPUnit + E2E + CLI-executable (escaped-pipe location) = 3; Truly-manual and
+    # Doc review add nothing, and the later Notes table naming E2E is out of scope.
+    assert count_executable_matrix_rows(_MIXED_MATRIX) == 3
+
+
+def test_executable_count_visual_regression_counts():
+    content = (
+        "# Visual\n\n## Verification Matrix\n\n" + _MATRIX_HEAD
+        + "| 1 | Roster page pixels unchanged | Visual-regression | post-impl "
+        "| `ibl5/tests/e2e/visual/roster.spec.ts` |\n"
+    )
+    assert count_executable_matrix_rows(content) == 1
+
+
+def test_executable_count_none_without_matrix():
+    assert count_executable_matrix_rows(_NO_MATRIX) is None
+
+
+# Committed corpus: tests/fixtures/matrix_count/ (one .plan.txt per counter shape).
+_FIXTURE_DIR = pathlib.Path(__file__).parent / "fixtures" / "matrix_count"
+
+
+@pytest.mark.parametrize("name,expected", [
+    ("docs_only.plan.txt", 0),
+    ("critical_files_phpunit.plan.txt", 0),
+    ("fenced_matrix.plan.txt", 0),
+    ("fenced_only.plan.txt", None),
+    ("mixed.plan.txt", 3),
+    ("visual_regression_only.plan.txt", 1),
+    ("misaligned_columns.plan.txt", 1),
+    ("no_matrix.plan.txt", None),
+])
+def test_executable_count_fixture_corpus(name, expected):
+    content = (_FIXTURE_DIR / name).read_text(encoding="utf-8")
+    assert count_executable_matrix_rows(content) == expected
+
+
+def test_locate_plan_sets_executable_row_count():
+    info = locate_plan("x", content_override=_MIXED_MATRIX)
+    assert info.has_matrix is True
+    assert info.executable_row_count == 3
+    blind = locate_plan("x", content_override=_NO_MATRIX)
+    assert blind.has_matrix is False
+    assert blind.executable_row_count is None
 
 
 def test_matrix_fence_width_awareness():
@@ -1072,6 +1182,35 @@ _CONTRACT_SYNC_FIXTURES = [
      "empty-evidence", "", "empty"),
 ]
 
+# Evidence-token grammar cases: (evidence value, label, expect_reject).
+# The first block diverged between shell and Python before this fix; the
+# second block always agreed and pins the edges the fix must not move.
+_TOKEN_GRAMMAR_CASES = [
+    ("a,,b", "interior-empty", True),
+    (",a", "leading-empty", True),
+    ("a,  ,b", "whitespace-only-token", True),
+    ("a..b", "dotdot-inside-token", True),
+    ("...", "triple-dot", True),
+    ("a,", "single-trailing-comma", False),
+    ("a,b,", "list-trailing-comma", False),
+    (".", "single-dot", False),
+    ("./a", "dot-slash", False),
+    ("a/", "trailing-slash", False),
+    ("a/../b", "dotdot-segment", True),
+    ("..", "bare-dotdot", True),
+]
+
+
+def _grammar_plan(ev):
+    return f"---\nstop_condition: evidence-present\nevidence: {ev}\n---\n# Plan\n"
+
+
+_CONTRACT_SYNC_FIXTURES += [
+    (_grammar_plan(ev), f"grammar-{label}",
+     "" if rej else "evidence-present", "rejected" if rej else None)
+    for ev, label, rej in _TOKEN_GRAMMAR_CASES
+]
+
 
 # sect-7a -- Parser unit tests
 
@@ -1143,7 +1282,13 @@ def test_contract_malformed_evidence_token_flagged(content, label):
 
 
 def test_contract_lib_sync(tmp_path):
-    """Python parser and bin/lib/plan-autonomy-contract classify identically."""
+    """Python parser and bin/lib/plan-autonomy-contract classify every fixture
+    identically (accept vs reject).
+
+    _TOKEN_GRAMMAR_CASES and test_contract_token_grammar_sweep cover the token
+    grammar. The sibling semantic pin is the "Phase 5.0d TWO-WAY AGREEMENT"
+    section of bin/test-postplan-arm-conditions.
+    """
     if not os.path.isfile(AUTONOMY_CONTRACT_LIB):
         pytest.skip("plan-autonomy-contract lib not found: " + AUTONOMY_CONTRACT_LIB)
     if not os.access(AUTONOMY_CONTRACT_LIB, os.X_OK):
@@ -1163,6 +1308,56 @@ def test_contract_lib_sync(tmp_path):
         py_ok = py_err == ""
         assert shell_ok == py_ok, (
             f"classification divergence on '{label}': "
+            f"shell rc={proc.returncode}, python err={py_err!r}")
+
+
+def _skip_without_contract_lib():
+    if not os.path.isfile(AUTONOMY_CONTRACT_LIB):
+        pytest.skip("plan-autonomy-contract lib not found: " + AUTONOMY_CONTRACT_LIB)
+    if not os.access(AUTONOMY_CONTRACT_LIB, os.X_OK):
+        pytest.skip("plan-autonomy-contract not executable: " + AUTONOMY_CONTRACT_LIB)
+
+
+@pytest.mark.parametrize("ev,label,expect_reject", _TOKEN_GRAMMAR_CASES)
+def test_contract_token_grammar_direction(tmp_path, ev, label, expect_reject):
+    """Both parsers reject/accept each grammar case in the stated direction.
+
+    Parity alone would pass if both sides drifted to accept together.
+    """
+    _skip_without_contract_lib()
+    content = _grammar_plan(ev)
+    f = tmp_path / f"{label}.md"
+    f.write_text(content)
+    proc = subprocess.run(
+        [AUTONOMY_CONTRACT_LIB, str(f)], capture_output=True, text=True)
+    assert proc.returncode == (1 if expect_reject else 0), (
+        f"shell rc={proc.returncode} for '{label}' ({ev!r}): stderr={proc.stderr!r}")
+    _, _, py_err = frontmatter_autonomy_contract(content)
+    assert (py_err != "") == expect_reject, (
+        f"python err={py_err!r} for '{label}' ({ev!r}), expect_reject={expect_reject}")
+
+
+def test_contract_token_grammar_sweep(tmp_path):
+    """Every 1-3 field comma list over a small alphabet classifies identically."""
+    _skip_without_contract_lib()
+    alphabet = ["a", "", "..", "a..b"]
+    values = [
+        ",".join(combo)
+        for n in (1, 2, 3)
+        for combo in itertools.product(alphabet, repeat=n)
+    ]
+    assert len(values) == 84, f"sweep generator produced {len(values)} values"
+    for i, value in enumerate(values):
+        content = _grammar_plan(value)
+        f = tmp_path / f"sweep-{i}.md"
+        f.write_text(content)
+        proc = subprocess.run(
+            [AUTONOMY_CONTRACT_LIB, str(f)], capture_output=True, text=True)
+        assert proc.returncode in (0, 1), (
+            f"unexpected rc={proc.returncode} for {value!r}: stderr={proc.stderr!r}")
+        _, _, py_err = frontmatter_autonomy_contract(content)
+        assert (proc.returncode == 0) == (py_err == ""), (
+            f"classification divergence on evidence {value!r}: "
             f"shell rc={proc.returncode}, python err={py_err!r}")
 
 
@@ -1397,3 +1592,50 @@ Edit `harness/x.py`.
     assert len(info.phases) >= 1
     assert info.phases[0].number == 1
     assert info.deferred_phase_numbers == [2]
+
+
+# ---------------------------------------------------------------------------
+# Tests for _normalise_cf_path and parse_critical_files absolute-path handling
+# ---------------------------------------------------------------------------
+
+def test_normalise_cf_path_relative_unchanged():
+    assert _normalise_cf_path("ibl5/classes/Foo.php") == "ibl5/classes/Foo.php"
+    assert _normalise_cf_path("bin/check-plan") == "bin/check-plan"
+
+
+def test_normalise_cf_path_ibL5_prefix_stripped():
+    p = "/Users/ajaynicolas/GitHub/IBL5/ibl5/classes/Foo.php"
+    assert _normalise_cf_path(p) == "ibl5/classes/Foo.php"
+
+
+def test_normalise_cf_path_worktree_prefix_stripped():
+    p = "/Users/ajaynicolas/GitHub/IBL5-worktrees/my-branch/ibl5/classes/Foo.php"
+    assert _normalise_cf_path(p) == "ibl5/classes/Foo.php"
+
+
+def test_normalise_cf_path_case_sensitive_no_strip():
+    # IBL5 is always uppercase; lowercase does not match.
+    p = "/Users/ajaynicolas/GitHub/ibl5/ibl5/classes/Foo.php"
+    assert _normalise_cf_path(p) == p
+
+
+def test_parse_critical_files_normalises_absolute_path():
+    plan = (
+        "## Critical Files\n\n"
+        "- `/Users/ajaynicolas/GitHub/IBL5/ibl5/classes/Foo.php`\n"
+        "- `/Users/ajaynicolas/GitHub/IBL5-worktrees/slug/bin/check-plan`\n"
+    )
+    cf = parse_critical_files(plan)
+    paths = [p for p, _ann, _ex in cf]
+    assert paths == ["ibl5/classes/Foo.php", "bin/check-plan"]
+
+
+def test_parse_critical_files_relative_paths_unchanged():
+    plan = (
+        "## Critical Files\n\n"
+        "- `ibl5/classes/Foo.php`\n"
+        "- `bin/check-plan`\n"
+    )
+    cf = parse_critical_files(plan)
+    paths = [p for p, _ann, _ex in cf]
+    assert paths == ["ibl5/classes/Foo.php", "bin/check-plan"]

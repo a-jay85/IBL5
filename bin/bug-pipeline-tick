@@ -24,6 +24,24 @@
 
 set -u
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/bug-pipeline-tick
+
+Poll-only Discord bug/feature pipeline driver (ADR-0080). Fired every 180s
+by the launchd LaunchAgent (bin/bug-pipeline-cron-setup). Accepts no
+positional arguments; all tuning is via environment variables.
+
+Key environment overrides (all have production defaults):
+  BUG_PIPELINE_CI_AUTOFIX_DRY_RUN      1 = soak (default); 0 = live CI-autofix
+  BUG_PIPELINE_CI_AUTOFIX_ENABLED      0 = kill switch for CI-autofix path
+  BUG_PIPELINE_PLAN_REVIEW_DRAIN_ENABLED  0 = skip plan-review drain
+
+Exit codes: 0 success, 1 tick failure.
+EOF
+    exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -42,12 +60,13 @@ DISCORD_DM_BIN="${BUG_PIPELINE_DM_BIN:-$SCRIPT_DIR/discord-dm}"
 PLANS_DIR="${BUG_PIPELINE_PLANS_DIR:-$HOME/claude-plans}"
 IDLE_SECS="${BUG_PIPELINE_IDLE_SECS:-3600}"
 BACKOFF_SECS="${BUG_PIPELINE_BACKOFF_SECS:-1800}"
-CLASSIFY_MODEL="${BUG_PIPELINE_CLASSIFY_MODEL:-claude-sonnet-4-6}"
-PLAN_MODEL="${BUG_PIPELINE_PLAN_MODEL:-claude-sonnet-4-6}"
+CLASSIFY_MODEL="${BUG_PIPELINE_CLASSIFY_MODEL:-claude-sonnet-5-5}"
+PLAN_MODEL="${BUG_PIPELINE_PLAN_MODEL:-claude-sonnet-5-5}"
 CLAUDE_TIMEOUT="${BUG_PIPELINE_CLAUDE_TIMEOUT:-120}"
 PLAN_TIMEOUT="${BUG_PIPELINE_PLAN_TIMEOUT:-1800}"
 CLASSIFY_PROMPT_FILE="${BUG_PIPELINE_CLASSIFY_PROMPT:-$SCRIPT_DIR/bug-pipeline-classify-prompt}"
 GATHER_PROMPT_FILE="${BUG_PIPELINE_GATHER_PROMPT:-$SCRIPT_DIR/bug-pipeline-gather-prompt}"
+STRUCTURED_THINK_LINE='Think the problem through before you answer.'
 
 # Posted in-channel when a report classifies as roster_error: a player's ratings, contract,
 # or team assignment being wrong in the league data. Those values live in the JSB files, so
@@ -116,7 +135,7 @@ file_and_close_row() { # row_json
 
 # ── Hunter seams (#5b) — all default to production; tests override ─────────────
 HUNT_PROMPT_FILE="${BUG_PIPELINE_HUNT_PROMPT:-$SCRIPT_DIR/bug-pipeline-hunter-prompt}"
-HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-sonnet-4-6 claude-opus-5-5}"  # cheap→dear, Opus last; no Haiku tier
+HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-sonnet-5-5 claude-opus-5-5}"  # cheap→dear, Opus last; no Haiku tier
 HUNTER_TIMEOUT_SECS="${BUG_PIPELINE_HUNTER_TIMEOUT:-1800}"
 HUNT_LOG="${BUG_PIPELINE_HUNT_LOG:-$HOME/.claude/logs/bug-pipeline-hunt.log}"
 # Liveness heartbeat: epoch of the last tick START (bin/bug-pipeline-check reads it).
@@ -140,7 +159,7 @@ CI_AUTOFIX_LEDGER="${BUG_PIPELINE_CI_AUTOFIX_LEDGER:-$HOME/.claude/logs/ci-autof
 CI_AUTOFIX_LOG="${BUG_PIPELINE_CI_AUTOFIX_LOG:-$HOME/.claude/logs/ci-autofix.log}"
 CI_AUTOFIX_LOCK="${BUG_PIPELINE_CI_AUTOFIX_LOCK:-$HOME/.claude/logs/ci-autofix.lock}"
 CI_AUTOFIX_TIMEOUT_SECS="${BUG_PIPELINE_CI_AUTOFIX_TIMEOUT:-1800}"
-CI_AUTOFIX_SONNET_MODEL="${BUG_PIPELINE_CI_AUTOFIX_SONNET_MODEL:-claude-sonnet-4-6}"
+CI_AUTOFIX_SONNET_MODEL="${BUG_PIPELINE_CI_AUTOFIX_SONNET_MODEL:-claude-sonnet-5-5}"
 CI_AUTOFIX_OPUS_MODEL="${BUG_PIPELINE_CI_AUTOFIX_OPUS_MODEL:-claude-opus-5-5}"
 CI_AUTOFIX_LOG_MAX_BYTES="${BUG_PIPELINE_CI_AUTOFIX_LOG_MAX_BYTES:-40000}"  # tail cap on the fetched CI job log
 CI_AUTOFIX_PROMPT_FILE="${BUG_PIPELINE_CI_AUTOFIX_PROMPT:-$SCRIPT_DIR/bug-pipeline-ci-autofix-prompt}"
@@ -281,8 +300,14 @@ GATHER_SCHEMA='{"type":"object","additionalProperties":false,"required":["enough
 run_structured_call() {
     local errf; errf="$(mktemp)"
     # NO --dangerously-skip-permissions; empty --allowedTools = deny-all (capability starvation).
+    # --effort high is pinned so the call never inherits the interactive /effort setting.
+    # The appended think-first line follows Anthropic's Sonnet 5.5 guidance for
+    # schema-constrained answers that need a few steps of reasoning: at lower effort the
+    # model often answers with no thinking at all.
     CJ_OUT="$(timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" -p "$1" \
         --model "$CLASSIFY_MODEL" \
+        --effort high \
+        --append-system-prompt "$STRUCTURED_THINK_LINE" \
         --output-format json \
         --json-schema "$2" \
         --allowedTools '' 2>"$errf")"
@@ -291,8 +316,9 @@ run_structured_call() {
 }
 
 # Extract the schema-constrained result object from the envelope, or empty on any defect.
+# A max_tokens stop counts as a defect even when .result parses: the reply was cut off.
 envelope_result() { # raw_envelope
-    printf '%s' "$1" | jq -rc 'if (.is_error // false) == true then empty else (.result // empty) end' 2>/dev/null
+    printf '%s' "$1" | jq -rc 'if (.is_error // false) == true or .stop_reason == "max_tokens" then empty else (.result // empty) end' 2>/dev/null
 }
 
 # Render a row's DB attachments (Phase 6 .attachments enrichment) as sanitized, data-only
@@ -330,12 +356,47 @@ att_line() { # attachments_json
     ' 2>/dev/null
 }
 
+# ── Per-render nonce tags (prompt-injection hardening) ───────────────────────
+# Every prompt wraps GM-authored text in a tag pair the model is told to treat as data.
+# A fixed closing tag is guessable: a GM who types "</untrusted>" ends the block early and
+# the rest reads as instructions. Two helpers close that:
+#   prompt_nonce         — 8 hex chars, fresh per render. Every open/close tag carries it as
+#                          an id attribute and the framing text says only a closing tag with
+#                          that id ends the block. The attacker never sees the render.
+#   neutralize_untrusted — backup for a model that ignores the id rule: rewrites the four
+#                          closing-tag prefixes to a "_"-suffixed form so no well-formed
+#                          closing tag survives in a payload. The text stays readable, since a
+#                          report that mentions </report> must still reach the classifier.
+# Pure bash parameter expansion (never sed/eval): a payload with &, \1, or a newline can
+# never be reinterpreted by the tool doing the rewrite.
+prompt_nonce() {
+    openssl rand -hex 4
+}
+
+neutralize_untrusted() { # payload  → stdout
+    local s="$1" tag
+    for tag in report untrusted transcript attachments; do
+        s="${s//<\/$tag/</${tag}_}"
+        # Idempotent: a second pass turns "</tag_" into "</tag__"; collapse it back.
+        while [[ "$s" == *"</${tag}__"* ]]; do s="${s//<\/${tag}__/</${tag}_}"; done
+    done
+    printf '%s' "$s"
+}
+
 # Build a prompt by safe bash substitution (never sed — untrusted content in replacement).
+# {{nonce}} is substituted FIRST, over the template alone, so a GM who types the literal
+# "{{nonce}}" in a report cannot have it rewritten into the real nonce inside the data block.
+# Every untrusted argument is neutralized before it is spliced in.
 render_prompt() { # template original_text transcript attachments_text
-    local t="$1"
-    t="${t//\{\{original_text\}\}/$2}"
-    t="${t//\{\{transcript\}\}/$3}"
-    t="${t//\{\{attachments_text\}\}/$4}"
+    local t="$1" nonce o tr at
+    nonce="$(prompt_nonce)"
+    t="${t//\{\{nonce\}\}/$nonce}"
+    o="$(neutralize_untrusted "$2")"
+    tr="$(neutralize_untrusted "$3")"
+    at="$(neutralize_untrusted "$4")"
+    t="${t//\{\{original_text\}\}/$o}"
+    t="${t//\{\{transcript\}\}/$tr}"
+    t="${t//\{\{attachments_text\}\}/$at}"
     printf '%s' "$t"
 }
 
@@ -644,6 +705,7 @@ drive_ready_for_plan() { # row id thread_id original_text issue_number clear_opt
     # --implement keeps the plan on disk, NOT auto-queued (§5 rule 1) — #5a must not implement.
     timeout "$PLAN_TIMEOUT" "$CLAUDE_BIN" -p "/plan ${summary} --implement" \
         --model "$PLAN_MODEL" \
+        --effort high \
         --dangerously-skip-permissions \
         --output-format stream-json \
         --verbose \
@@ -972,6 +1034,9 @@ render_hunter_prompt() { # claimed wt_appdir
     transcript="$(row_transcript "$thread_id")"
     att="$(att_line "$(printf '%s' "$claimed" | jq -c '.attachments // []')")"
     t="$(cat "$HUNT_PROMPT_FILE")"
+    # Nonce first, template-only — same ordering rationale as render_prompt().
+    local nonce; nonce="$(prompt_nonce)"
+    t="${t//\{\{nonce\}\}/$nonce}"
     t="${t//\{\{bug_id\}\}/$id}"
     t="${t//\{\{class\}\}/$class}"
     t="${t//\{\{worktree\}\}/$wt_appdir}"
@@ -983,6 +1048,12 @@ render_hunter_prompt() { # claimed wt_appdir
     # a strict [a-z0-9-] allowlist.
     host="$(basename "$(dirname "$wt_appdir")").localhost"
     t="${t//\{\{hostname\}\}/$host}"
+    # report / transcript / att are GM-authored (or GM-named): neutralize each so no payload
+    # carries a closing tag. id/class/worktree/hostname above are trusted (DB id, fixed enum,
+    # bug_slug() allowlist) and stay raw.
+    report="$(neutralize_untrusted "$report")"
+    transcript="$(neutralize_untrusted "$transcript")"
+    att="$(neutralize_untrusted "$att")"
     t="${t//\{\{report\}\}/$report}"
     t="${t//\{\{transcript\}\}/$transcript}"
     t="${t//\{\{attachments_text\}\}/$att}"
@@ -1266,8 +1337,9 @@ ci_log() {
 ci_lock_acquire() {
     if [ -d "$CI_AUTOFIX_LOCK" ]; then
         local lock_mtime now
-        lock_mtime="$(stat -f '%m' "$CI_AUTOFIX_LOCK" 2>/dev/null || \
-                      stat -c '%Y' "$CI_AUTOFIX_LOCK" 2>/dev/null || echo 0)"
+        # GNU stat -c %Y runs first: on GNU/Linux, stat -f exits 1 but dumps filesystem info to stdout first; BSD-first appended the epoch to that dump, producing a non-integer.
+        lock_mtime="$(stat -c '%Y' "$CI_AUTOFIX_LOCK" 2>/dev/null || \
+                      stat -f '%m' "$CI_AUTOFIX_LOCK" 2>/dev/null || echo 0)"
         now="$(date +%s)"
         if [ $(( now - lock_mtime )) -gt "$CI_AUTOFIX_TIMEOUT_SECS" ]; then
             ci_log "ci_lock_acquire: stale lock (age $(( now - lock_mtime ))s) — cleaning"

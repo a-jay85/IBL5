@@ -38,11 +38,11 @@ class QueueSimSummaryStepTest extends TestCase
     public function testSkipsWhenPhaseIsDisabledForRecaps(): void
     {
         $stubQuery = self::createStub(SeasonQueryRepository::class);
-        $stubQuery->method('getSeasonPhase')->willReturn('HEAT');
+        $stubQuery->method('getSeasonPhase')->willReturn('Preseason');
 
         $result = $this->buildStep(seasonQuery: $stubQuery)->execute();
 
-        $this->assertStringContainsString('HEAT', $result->detail);
+        $this->assertStringContainsString('Preseason', $result->detail);
     }
 
     public function testSkipsWhenNoSimDatesRecorded(): void

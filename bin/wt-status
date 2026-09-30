@@ -28,6 +28,30 @@
 
 set -u
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/wt-status [--stalled-only] [--min-idle-hours N]
+
+Classify every linked worktree's shipping state.
+
+Classifications (mutually exclusive, first-match wins):
+  PROTECTED  master / main / production branch (excluded from output)
+  MERGED     confirmed merged to master (safe to reap)
+  OPEN-PR    has an open pull request (in-flight / healthy)
+  UNPUSHED   >=1 own-commit not on master; no PR (committed work, never shipped)
+  STALLED    0 own-commits, dirty tree, no PR (work exists but never committed)
+  EMPTY      0 own-commits, clean tree, no PR (harmless scaffold)
+
+Options:
+  --stalled-only        Print only STALLED/UNPUSHED rows; exit 1 if any exist.
+  --min-idle-hours N    When N>0, suppress worktrees whose newest dirty/untracked
+                        file is newer than N hours (likely still in progress).
+
+Note: does NOT run git fetch. Relies on cached refs.
+EOF
+    exit 0
+fi
+
 # shellcheck source=bin/lib/wt-guards.sh
 source "$(dirname "$0")/lib/wt-guards.sh"
 REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"

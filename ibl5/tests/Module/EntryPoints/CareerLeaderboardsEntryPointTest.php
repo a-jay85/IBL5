@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Module\EntryPoints;
 
 /**
- * CareerLeaderboards is now a redirect stub using sendWithPassthrough;
+ * CareerLeaderboards is now a redirect stub using ModuleRedirect::send();
  * the board lives at Leaderboards?tab=career. The redirect header itself
  * is asserted by curl since CLI PHPUnit cannot read response headers.
  */

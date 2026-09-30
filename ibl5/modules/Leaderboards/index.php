@@ -7,7 +7,7 @@ declare(strict_types=1);
  *
  * tab=season (the default) shows the single-season leaderboard and
  * tab=career shows the career leaderboard. The retired SeasonLeaderboards
- * and CareerLeaderboards module names 302 here via sendWithPassthrough.
+ * and CareerLeaderboards module names 302 here via ModuleRedirect::send().
  *
  * @see SeasonLeaderboards\SeasonLeaderboardsView For the season board
  * @see CareerLeaderboards\CareerLeaderboardsView For the career board

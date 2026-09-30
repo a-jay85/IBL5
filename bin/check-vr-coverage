@@ -6,6 +6,11 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
+if (process.argv.slice(2).includes('--help')) {
+  process.stdout.write('Usage: bin/check-vr-coverage [--update-baseline]\n');
+  process.exit(0);
+}
+
 const __dir = dirname(fileURLToPath(import.meta.url));
 const ibl5Dir = resolve(__dir, '..', 'ibl5');
 

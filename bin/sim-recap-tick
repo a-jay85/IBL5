@@ -13,11 +13,11 @@
 # main() aborts the tick rather than reporting a cheap exit. Without that, a
 # broken pipeline is indistinguishable from a quiet one in the launchd log.
 #
-# Phase gate (RecapPhasePolicy): sim recaps are enabled only during Regular
-# Season. When claim-next reports recaps_enabled=false and there is no pending
-# sim (nothing to drain), the tick self-unloads via `launchctl bootout` rather
+# Phase gate (RecapPhasePolicy): sim recaps are enabled only during HEAT and
+# Regular Season. When claim-next reports recaps_enabled=false and there is no
+# pending sim (nothing to drain), the tick self-unloads via `launchctl bootout` rather
 # than spinning every 300s doing nothing. Run `bin/sim-recap-cron-setup --resume`
-# to re-arm the poller when Regular Season begins (Discord #admin-chat posts a
+# to re-arm the poller when HEAT begins (Discord #admin-chat posts a
 # reminder automatically when the phase is changed via LeagueControlPanel).
 # Self-unload never fires in --dry-run mode or when --sim=N is supplied.
 #

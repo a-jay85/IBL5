@@ -1,12 +1,12 @@
 {
     "phpstan-baseline.neon": {
-        "argument.type": 354,
+        "argument.type": 335,
         "binaryOp.invalid": 18,
         "booleanAnd.leftNotBoolean": 1,
         "booleanAnd.rightNotBoolean": 1,
         "booleanNot.alwaysTrue": 1,
         "booleanNot.exprNotBoolean": 11,
-        "cast.int": 12,
+        "cast.int": 13,
         "cast.string": 7,
         "cast.useless": 3,
         "constant.notFound": 9,
@@ -54,7 +54,7 @@
         "varTag.misplaced": 2,
         "varTag.nativeType": 1,
         "varTag.type": 1,
-        "variable.undefined": 39
+        "variable.undefined": 40
     },
     "phpstan-tests-baseline.neon": {
         "argument.type": 8,

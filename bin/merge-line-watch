@@ -115,6 +115,7 @@ run_pass() {
         say "updated PR #$head onto master"
     else
         say "update-branch FAILED for #$head: ${err:0:150}"
+        return 1
     fi
 }
 

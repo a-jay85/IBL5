@@ -101,7 +101,7 @@ class Classification:
 class PhaseInfo:
     """One `## Phase N:` / `## Step N:` section of a plan, as parsed by planfile.parse_phases.
 
-    `evidence_paths` = backticked path tokens found in the phase section's own body.
+    `evidence_paths` = backticked path tokens found in the phase heading and its own body.
     `bookkeeping` is True when the heading carries `[phases: S]` / `[phases: S/S]` (all-S tier
     marker), which exempts the phase from the omission check.
     """

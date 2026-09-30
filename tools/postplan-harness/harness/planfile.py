@@ -458,7 +458,9 @@ def _phase_evidence_paths(body: str) -> list[str]:
 def parse_phases(content: str) -> list[PhaseInfo]:
     """One PhaseInfo per `## Phase N:` / `## Step N:` h2 heading, in document order.
 
-    The body runs to the next h2 (`## `), so `### Delegate` packets inside a phase are part
+    Backticked paths in the heading itself count as evidence, ahead of body paths: a
+    heading like `## Phase 3: Tests in `tests/test_x.py`` names the phase's target file
+    even when the body only cites fixture strings. The body runs to the next h2 (`## `), so `### Delegate` packets inside a phase are part
     of that phase and their Scope/Recipe paths count as evidence. Fenced blocks are
     stripped first. Sub-numbered headings (`## Phase 5.5:`) and h3 headings never open a
     phase. A repeated phase number merges into the first occurrence (evidence unioned) so
@@ -493,6 +495,7 @@ def parse_phases(content: str) -> list[PhaseInfo]:
                                     bookkeeping=bool(_BOOKKEEPING_MARKER_RE.search(heading)))
                 by_number[num] = current
                 phases.append(current)
+            buf = [heading]
             continue
         if current is not None:
             buf.append(line)

@@ -316,6 +316,9 @@ try {
             new \Season\SeasonQueryRepository($mysqli_db),
             \SimRecap\GitHubDispatchClient::fromConfig(),
         ));
+        $updaterService->addStep(new Updater\Steps\QueueGoogleSheetRefreshStep(
+            new GoogleSheets\GoogleSheetConnectionRepository($mysqli_db)
+        ));
     }
 
     $controller = new Updater\UpdaterController($updaterService, $view);

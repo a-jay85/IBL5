@@ -26,10 +26,16 @@ try {
 export default defineConfig({
   testDir: './tests/e2e',
   testMatch: /visual-regression\.spec\.ts/,
-  fullyParallel: false,
+  // Every cell is a read-only screenshot: appState is a per-context cookie override
+  // (no DB writes) and storageState is written once by the `setup` project. So cells
+  // are order-independent. Serial (workers: 1) was the original default (#357), not a
+  // documented requirement. CI runs 3 workers on a 4-vCPU runner; flake risk is
+  // screenshot timing under CPU load (mitigated by gotoWithRetry + re-sampling in
+  // captureSnapshot). If pixel-diff flakes appear in CI, drop back to 2, then 1.
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  workers: 1,
+  workers: process.env.CI ? 3 : 1,
   reporter: [['html', { open: 'never' }], ['json', { outputFile: 'test-results.json' }], ['list']],
 
   expect: {

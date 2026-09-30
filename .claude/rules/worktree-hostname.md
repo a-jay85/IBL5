@@ -1,9 +1,14 @@
 ---
-description: Worktree Docker hostnames, URL paths, and slug-derivation rules — path-scoped, loads only for ibl5/** and bin/wt-up work.
-last_verified: 2026-09-24
+description: Worktree Docker hostnames, URL paths, and slug-derivation rules — path-scoped, loads only for E2E tests and worktree Docker scripts.
+last_verified: 2026-09-30
 paths:
-  - "ibl5/**"
+  - "ibl5/tests/e2e/**"
+  - "ibl5/playwright*.config.ts"
   - "bin/wt-up"
+  - "bin/e2e-wt"
+  - "bin/dev-up"
+  - "bin/wt-list"
+  - ".github/workflows/e2e-tests.yml"
 ---
 
 # Worktree Hostname

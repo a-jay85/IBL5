@@ -1,13 +1,13 @@
 ---
 description: After JSB engine work ships, file and close findings in a-jay85/IBL5-backlog (label: jsb-native) — GitHub Issues are the single source of truth; git is the authority for merged-PR hashes.
-last_verified: 2026-09-08
+last_verified: 2026-09-30
 ---
 
 # JSB Engine Post-Work Checklist
 
 **Trigger.** Any worktree change that touches `engine/` code or closes / discovers a J-series backlog item.
 
-This step is **required before `bin/post-plan-now --auto` fires**. `.claude/rules/backlog-housekeep.md` carries the same expectation — the overlap is intentional; engine work routinely surfaces new items and the double-trigger prevents "I'll file the Issue after the PR" drift.
+This step is **required before `bin/post-plan-now --auto` fires**. The `/backlog` skill is the entry point for filing and closing; engine work routinely surfaces new items, so file the Issue before the PR.
 
 ## One source, one edit site
 

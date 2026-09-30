@@ -435,6 +435,62 @@ def test_lib_abs_prefix_pattern_sync():
     assert _ABS_PREFIX_RE.pattern.replace("(?:", "(") == m.group(1)
 
 
+_CORPUS_SNAP = r'''
+source "$1"
+for f in "$HOME"/claude-plans/*.md; do
+    cf_parse_section_raw "$f" | awk -v p="$(basename "$f")" '{ print p "\t" $0 }' >> "$2"
+    cf_parse_section "$f" | awk -v p="$(basename "$f")" '{ print p "\t" $0 }' >> "$3"
+done
+'''
+
+
+@pytest.mark.skipif(not os.path.isdir(os.path.expanduser("~/claude-plans")),
+                    reason="needs the machine-local ~/claude-plans corpus")
+def test_lib_corpus_normalisation_diff(tmp_path):
+    """backlog#1211: over every real plan, only in-repo absolute rows move, and each
+    moves to exactly what _normalise_cf_path yields.
+
+    cf_parse_section_raw is byte-identical to the pre-#1211 parser, so it is the
+    stable "before" side and the test stays valid after this change merges.
+    """
+    before_tsv = tmp_path / "before.tsv"
+    after_tsv = tmp_path / "after.tsv"
+    before_tsv.write_text("")
+    after_tsv.write_text("")
+    subprocess.run(["bash", "-c", _CORPUS_SNAP, "_", LIB, str(before_tsv), str(after_tsv)],
+                   check=True, capture_output=True, text=True)
+    before = before_tsv.read_text().splitlines()
+    after = after_tsv.read_text().splitlines()
+    # Row 1: the baseline really contains the legacy absolute rows under test.
+    assert len(before) >= 5807, len(before)
+    n_abs = sum(1 for ln in before
+                if ln.split("\t", 1)[1].split(":", 1)[1].startswith("/"))
+    assert n_abs >= 117, n_abs
+    # Row 15: per-row comparison.
+    assert len(after) == len(before)
+    changed = out_of_repo = 0
+    for old_row, new_row in zip(before, after):
+        plan, old_entry = old_row.split("\t", 1)
+        plan2, new_entry = new_row.split("\t", 1)
+        old_kind, old = old_entry.split(":", 1)
+        new_kind, new = new_entry.split(":", 1)
+        assert (plan, old_kind) == (plan2, new_kind), (old_row, new_row)
+        assert new != "", "empty path emitted: " + old_row
+        if not old.startswith("/"):
+            assert new == old, ("relative row changed", old_row, new_row)
+            continue
+        exp = _normalise_cf_path(old)
+        if exp == "":
+            assert new == old, ("bare-root row must pass through", old_row, new_row)
+        elif exp == old:
+            assert new == old, ("out-of-repo row changed", old_row, new_row)
+            out_of_repo += 1
+        else:
+            assert new == exp, ("differs from _normalise_cf_path(old)", old_row, new_row)
+            changed += 1
+    assert changed >= 103 and out_of_repo >= 14, (changed, out_of_repo)
+
+
 def test_lib_pattern_sync():
     """Byte-level drift guard: the two patterns are one string modulo regex dialect."""
     m = re.search(r"^CF_EXEMPT_PATTERN='([^']+)'", open(LIB).read(), re.M)

@@ -1239,6 +1239,154 @@ cmp -s "$T/c47e.before" "$LEDGER47E" && ok "C47e: ledger byte-identical" \
     || fail "C47e: ledger byte-identical"
 rm -f "$LEDGER47E" "$T/c47e.before"
 
+# ── C50: burndown-sweep ───────────────────────────────────────────────────────
+# Private HOME so the shared $T/home ledgers never leak into the walk.
+# BURNDOWN_NOW=1790726400 is 2026-09-30T00:00:00Z, so the zombie cutoff is 2026-09-29T00:00:00.
+SW="$T/sw"
+SWQ="$SW/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue"
+SW_OLD="$SW/claude-plans/_reports/burndown-batch-20260927T100000.json"
+SW_NEW="$SW/claude-plans/_reports/burndown-batch-20260929T230000.json"
+SW_NOW=1790726400
+printf '[{"url":"https://github.com/a-jay85/IBL5/pull/1190","state":"MERGED"}]\n' > "$T/fx/pr-fix-190.json"
+printf '[{"url":"https://github.com/a-jay85/IBL5/pull/1196","state":"OPEN"}]\n' > "$T/fx/pr-fix-196.json"
+for s in zombie-192 stale-193 live-194 young-197; do printf '[]\n' > "$T/fx/pr-$s.json"; done
+printf '{"state":"OPEN"}\n' > "$T/fx/issue-190.json"
+printf '{"state":"OPEN"}\n' > "$T/fx/issue-191.json"
+
+sw_reset() {
+    rm -rf "$SW"
+    mkdir -p "$SW/claude-plans/_reports" "$SWQ"
+    cat > "$SW_OLD" <<'JSON'
+{
+  "schema": 1,
+  "created": "2026-09-27T10:00:00",
+  "items": [
+    {"issue_num":190,"also_closes":[191],"issue_title":"Fix 190","rank":"P1","tier":"default","cost":1,"paths":["bin/a"],"route":"ad-hoc","slug":"fix-190","pr_url":"","status":"shipped"},
+    {"issue_num":192,"also_closes":[],"issue_title":"Zombie 192","rank":"P2","tier":"default","cost":1,"paths":["bin/b"],"route":"plan","slug":"zombie-192","pr_url":"","status":"queued"},
+    {"issue_num":193,"also_closes":[],"issue_title":"Stale 193","rank":"P2","tier":"default","cost":1,"paths":["bin/c"],"route":"plan","slug":"stale-193","pr_url":"","status":"queued"},
+    {"issue_num":194,"also_closes":[],"issue_title":"Live 194","rank":"P2","tier":"default","cost":1,"paths":["bin/d"],"route":"plan","slug":"live-194","pr_url":"","status":"queued"},
+    {"issue_num":195,"also_closes":[],"issue_title":"Slugless 195","rank":"P2","tier":"default","cost":1,"paths":["bin/e"],"route":"plan","slug":"","pr_url":"","status":"queued"},
+    {"issue_num":196,"also_closes":[],"issue_title":"Fix 196","rank":"P2","tier":"default","cost":1,"paths":["bin/f"],"route":"ad-hoc","slug":"fix-196","pr_url":"","status":"shipped"}
+  ],
+  "skipped": [],
+  "units_used": 5,
+  "budget": 5
+}
+JSON
+    cat > "$SW_NEW" <<'JSON'
+{
+  "schema": 1,
+  "created": "2026-09-29T23:00:00",
+  "items": [
+    {"issue_num":197,"also_closes":[],"issue_title":"Young 197","rank":"P2","tier":"default","cost":1,"paths":["bin/g"],"route":"plan","slug":"young-197","pr_url":"","status":"queued"}
+  ],
+  "skipped": [],
+  "units_used": 1,
+  "budget": 5
+}
+JSON
+    touch "$SW/claude-plans/stale-193.md" "$SWQ/live-194.md"
+    rm -f "$T/gh.log"
+}
+sw_item() { jq -r --argjson n "$2" --arg k "$3" '.items[] | select(.issue_num==$n) | .[$k]' "$1"; }
+
+sw_reset
+OUT="$(BURNDOWN_NOW=$SW_NOW bd_home "$SW" burndown-sweep 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C50a: sweep exits 0" || fail "C50a: sweep exits 0 (got $RC: $OUT)"
+grep -qF 'issue close 190' "$T/gh.log" && grep -qF 'issue close 191' "$T/gh.log" \
+    && grep -qF 'Closed by bin/backlog burndown-sweep from burndown-batch-20260927T100000.json' "$T/gh.log" \
+    && ok "C50a: merged ad-hoc issue and also_closes closed by sweep" \
+    || fail "C50a: merged ad-hoc issue and also_closes closed by sweep"
+[ "$(sw_item "$SW_OLD" 190 status)" = "merged" ] \
+    && [ "$(sw_item "$SW_OLD" 190 pr_url)" = "https://github.com/a-jay85/IBL5/pull/1190" ] \
+    && ok "C50a: #190 merged with pr_url" || fail "C50a: #190 merged with pr_url"
+[ "$(sw_item "$SW_OLD" 192 status)" = "skipped" ] && grep -qF 'ZOMBIE #192' <<< "$OUT" \
+    && ok "C50b: zombie flipped to skipped" || fail "C50b: zombie flipped to skipped (got: $OUT)"
+[ "$(sw_item "$SW_OLD" 193 status)" = "queued" ] && grep -qF 'STALE-PLAN #193' <<< "$OUT" \
+    && ok "C50c: STALE-PLAN reported, not flipped" || fail "C50c: STALE-PLAN reported, not flipped (got: $OUT)"
+[ "$(sw_item "$SW_OLD" 194 status)" = "queued" ] && [ "$(sw_item "$SW_OLD" 195 status)" = "queued" ] \
+    && [ "$(sw_item "$SW_NEW" 197 status)" = "queued" ] \
+    && ok "C50d: queue-entry, slug-less and young items stay queued" \
+    || fail "C50d: queue-entry, slug-less and young items stay queued"
+[ "$(sw_item "$SW_OLD" 196 pr_url)" = "https://github.com/a-jay85/IBL5/pull/1196" ] \
+    && [ "$(sw_item "$SW_OLD" 196 status)" = "shipped" ] \
+    && ok "C50e: open PR backfills pr_url, status unchanged" \
+    || fail "C50e: open PR backfills pr_url, status unchanged"
+L_OLD="$(grep -nF 'ledger burndown-batch-20260927T100000.json' <<< "$OUT" | cut -d: -f1)"
+L_NEW="$(grep -nF 'ledger burndown-batch-20260929T230000.json' <<< "$OUT" | cut -d: -f1)"
+[ -n "$L_OLD" ] && [ -n "$L_NEW" ] && [ "$L_OLD" -lt "$L_NEW" ] \
+    && ok "C50f: ledgers walked oldest to newest" || fail "C50f: ledgers walked oldest to newest"
+
+rm -f "$T/gh.log"
+OUT="$(BURNDOWN_NOW=$SW_NOW bd_home "$SW" burndown-sweep 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ! grep -qF 'issue close' "$T/gh.log" \
+    && ok "C50g: re-run is idempotent" || fail "C50g: re-run is idempotent (got $RC: $OUT)"
+
+sw_reset
+cp "$SW_OLD" "$T/sw-old.before"; cp "$SW_NEW" "$T/sw-new.before"
+OUT="$(BURNDOWN_NOW=$SW_NOW GH_FAIL_ON="pr list" bd_home "$SW" burndown-sweep 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ! grep -qF 'issue close' "$T/gh.log" \
+    && cmp -s "$T/sw-old.before" "$SW_OLD" && cmp -s "$T/sw-new.before" "$SW_NEW" \
+    && ok "C50h: unknown state exits 1, nothing closed, ledgers untouched" \
+    || fail "C50h: unknown state exits 1, nothing closed, ledgers untouched (got $RC: $OUT)"
+
+sw_reset
+printf '{"not_items":1}\n' > "$SW/claude-plans/_reports/burndown-batch-20260930T000000.json"
+cp "$SW_OLD" "$T/sw-old.before"
+OUT="$(BURNDOWN_NOW=$SW_NOW bd_home "$SW" burndown-sweep 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && grep -qF 'malformed ledger' <<< "$OUT" && [ ! -s "$T/gh.log" ] \
+    && cmp -s "$T/sw-old.before" "$SW_OLD" \
+    && ok "C50i: malformed newest ledger exits 3 before any gh call" \
+    || fail "C50i: malformed newest ledger exits 3 before any gh call (got $RC: $OUT)"
+
+mkdir -p "$T/sw-empty/claude-plans/_reports"
+OUT="$(BURNDOWN_NOW=$SW_NOW bd_home "$T/sw-empty" burndown-sweep 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && grep -qF 'sweep: no burndown ledgers' <<< "$OUT" \
+    && ok "C50j: no ledgers exits 0 with a note" || fail "C50j: no ledgers exits 0 with a note (got $RC: $OUT)"
+
+sw_reset
+OUT="$( (unset BURNDOWN_NOW; bd_home "$SW" burndown-sweep) 2>&1)"; RC=$?
+[ "$(sw_item "$SW_OLD" 192 status)" = "skipped" ] \
+    && ok "C50k-unset: unset BURNDOWN_NOW uses the real clock" \
+    || fail "C50k-unset: unset BURNDOWN_NOW uses the real clock (got $RC: $OUT)"
+sw_reset
+OUT="$(BURNDOWN_NOW="" bd_home "$SW" burndown-sweep 2>&1)"; RC=$?
+[ "$(sw_item "$SW_OLD" 192 status)" = "skipped" ] \
+    && ok "C50k-empty: empty BURNDOWN_NOW uses the real clock" \
+    || fail "C50k-empty: empty BURNDOWN_NOW uses the real clock (got $RC: $OUT)"
+
+sw_reset
+cp "$SW_OLD" "$T/sw-old.before"; cp "$SW_NEW" "$T/sw-new.before"
+OUT="$(BURNDOWN_NOW=abc bd_home "$SW" burndown-sweep 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && grep -qF 'BURNDOWN_NOW' <<< "$OUT" && [ ! -s "$T/gh.log" ] \
+    && cmp -s "$T/sw-old.before" "$SW_OLD" && cmp -s "$T/sw-new.before" "$SW_NEW" \
+    && ok "C50l: non-numeric BURNDOWN_NOW exits 3 before any gh call" \
+    || fail "C50l: non-numeric BURNDOWN_NOW exits 3 before any gh call (got $RC: $OUT)"
+
+# C50m: the 24h boundary is strict (created == cutoff is not a zombie)
+sw_reset
+jq '.created = "2026-09-29T00:00:00"' "$SW_OLD" > "$T/sw-tmp.json" && cp "$T/sw-tmp.json" "$SW_OLD"
+BURNDOWN_NOW=$SW_NOW bd_home "$SW" burndown-sweep >/dev/null 2>&1
+S_AT="$(sw_item "$SW_OLD" 192 status)"
+sw_reset
+jq '.created = "2026-09-28T23:59:59"' "$SW_OLD" > "$T/sw-tmp.json" && cp "$T/sw-tmp.json" "$SW_OLD"
+BURNDOWN_NOW=$SW_NOW bd_home "$SW" burndown-sweep >/dev/null 2>&1
+S_BEFORE="$(sw_item "$SW_OLD" 192 status)"
+[ "$S_AT" = "queued" ] && [ "$S_BEFORE" = "skipped" ] \
+    && ok "C50m: 24h boundary is strict" || fail "C50m: 24h boundary is strict (at=$S_AT before=$S_BEFORE)"
+
+# C50n: a ledger without .created is never a zombie
+sw_reset
+jq 'del(.created)' "$SW_OLD" > "$T/sw-tmp.json" && cp "$T/sw-tmp.json" "$SW_OLD"
+BURNDOWN_NOW=$SW_NOW bd_home "$SW" burndown-sweep >/dev/null 2>&1
+[ "$(sw_item "$SW_OLD" 192 status)" = "queued" ] \
+    && ok "C50n: missing .created is never a zombie" || fail "C50n: missing .created is never a zombie"
+rm -rf "$SW" "$T/sw-empty" "$T/sw-old.before" "$T/sw-new.before" "$T/sw-tmp.json"
+
+OUT="$(bd burndown-sweep extra 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C50o: burndown-sweep with an argument exits 2" \
+    || fail "C50o: burndown-sweep with an argument exits 2 (got $RC)"
+
 # ── Phase 6: env-seam cases ───────────────────────────────────────────────────
 
 # Restore C14 fixture for C41/C42

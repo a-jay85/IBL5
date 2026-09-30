@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook — deploy, rollback, DB restore, sim-file recovery, logs, and running the app without the Claude Code harness.
-last_verified: 2026-09-23
+last_verified: 2026-09-29
 ---
 
 # IBL5 Operations Runbook
@@ -437,11 +437,11 @@ The sim recap poller is a macOS LaunchAgent (`com.ibl5.sim-recap-poll`, label ma
 
 ### Phase gate — when the poller stops itself
 
-Recap generation is gated to **Regular Season only** (`RecapPhasePolicy::ENABLED_PHASES`). When the season phase is advanced via the League Control Panel admin, `setSeasonPhase()` posts a notice to `#admin-chat` if the new phase is enabled. When the phase changes **away** from Regular Season, the next tick that finds no pending sim and `recaps_enabled: false` will self-unload the LaunchAgent via `launchctl bootout`. The poller logs the reason before unloading.
+Recap generation is gated to **HEAT and Regular Season** (`RecapPhasePolicy::ENABLED_PHASES`). When the season phase is advanced via the League Control Panel admin, `setSeasonPhase()` posts a notice to `#admin-chat` if the new phase is enabled. When the phase changes to a disabled phase (Preseason, or Playoffs onward), the next tick that finds no pending sim and `recaps_enabled: false` will self-unload the LaunchAgent via `launchctl bootout`. The poller logs the reason before unloading.
 
 ### Resuming the poller after a phase change
 
-When the season phase is set to Regular Season, `#admin-chat` receives a notification. To re-arm the poller:
+When the season phase is set to HEAT or Regular Season, `#admin-chat` receives a notification. To re-arm the poller:
 
 ```bash
 bin/sim-recap-cron-setup --resume

@@ -2045,6 +2045,28 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Gate [F] absolute-path fixtures
+# ---------------------------------------------------------------------------
+assert_viol "cf-absolute-path-ibL5-rejected" 1 '[F]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `/Users/ajaynicolas/GitHub/IBL5/ibl5/classes/Foo.php`
+'
+
+assert_viol "cf-absolute-path-worktree-rejected" 1 '[F]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `/Users/ajaynicolas/GitHub/IBL5-worktrees/my-slug/ibl5/classes/Foo.php`
+'
+
+assert_viol "cf-relative-path-accepted" 0 '[F]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `ibl5/classes/Foo.php`
+- `bin/check-plan`
+'
+
+# ---------------------------------------------------------------------------
 # Gate [M] fixtures (5 cases)
 # ---------------------------------------------------------------------------
 PU='
@@ -2081,6 +2103,36 @@ assert_viol "gateM-fenced-methods-only-flags" 1 '[M]' "$FM$PU"'
 
 # No PHPUnit row — gate [M] must stay silent.
 assert_viol "gateM-no-phpunit-row-silent" 0 '[M]' "$FM$E2E_ONLY"
+
+# ---------------------------------------------------------------------------
+# Gate [X] fixtures (4 cases)
+# ---------------------------------------------------------------------------
+XVR='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | baselines unchanged | Visual-regression | post-impl | `t.spec.ts-snapshots` (no-change) |
+'
+# Marker on a Visual-regression row, directly after the token: the only honored shape.
+assert_viol "gateX-vr-row-marker-ok" 0 '[X]' "$FM$XVR"
+XE2E='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | E2E | post-impl | `t.spec.ts` (no-change) |
+'
+assert_viol "gateX-e2e-row-marker-fires" 1 '[X]' "$FM$XE2E"
+# The type must be a WHOLE cell; a description mentioning visual regression is not one.
+XDESC='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | visual regression spec passes | E2E | post-impl | `t.spec.ts` (no-change) |
+'
+assert_viol "gateX-description-mention-fires" 1 '[X]' "$FM$XDESC"
+XPOS='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | baselines unchanged | Visual-regression | post-impl | (no-change) `t.spec.ts-snapshots` |
+'
+assert_viol "gateX-marker-before-token-fires" 1 '[X]' "$FM$XPOS"
 
 # ---------------------------------------------------------------------------
 # Gate [G] fixtures (4 cases)
@@ -2320,7 +2372,8 @@ ${NMIN_HDR}
 # Helper: returns 0 when a corpus plan is a pass or only has downgradeable
 # violations. Downgradeable set: [E] (packet assertion binding, a true positive
 # on historical plans), and [V] lines for the backtick-parity arm added in this
-# PR (also a true positive on historical plans). Never edit the corpus plans
+# PR (also a true positive on historical plans), and the [F] absolute-path line
+# (plans authored before that check existed). Never edit the corpus plans
 # themselves — that mutates historical artifacts and disarms the gate permanently.
 _corpus_guard_ok() {
     _cgo_out="$("$GUARD" "$1" 2>&1)"; _cgo_rc=$?
@@ -2332,11 +2385,11 @@ _corpus_guard_ok() {
     _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ {print}')"
+        v && /^\[/ && !/^\[E\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ {print}')"
     _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && (/^\[E\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/) {print}' | head -1)"
+        v && (/^\[E\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/) {print}' | head -1)"
     # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
     # least one downgradeable line actually explains the failure. A non-zero exit
     # with no visible violation line still fails loudly instead of passing silently.
@@ -3028,6 +3081,66 @@ fi
 if [ "$_canon_failed" -eq 0 ]; then
   echo "ok: regex_canon_divergence"
 fi
+
+# ---------------------------------------------------------------------------
+# Gate [O]: Hub in module/class names
+# ---------------------------------------------------------------------------
+# PascalCase Hub identifiers fire.
+assert_viol "gate-O-PascalCase-Hub-fires" 1 "[O]" "$FM$CF_MATRIX"'
+Add a new `RecordsHub` class.
+'
+
+# HubXxx pattern fires.
+assert_viol "gate-O-HubPrefix-fires" 1 "[O]" "$FM$CF_MATRIX"'
+Introduce `HubDraft` to manage draft sessions.
+'
+
+# "Records Hub" label fires.
+assert_viol "gate-O-standalone-label-fires" 1 "[O]" "$FM$CF_MATRIX"'
+The Records Hub page consolidates standings.
+'
+
+# GitHub does NOT fire (exempt).
+assert_viol "gate-O-GitHub-clean" 0 "[O]" "$FM$CF_MATRIX"'
+Push to GitHub and open a PR.
+'
+
+# github lowercase does NOT fire (exempt).
+assert_viol "gate-O-github-lowercase-clean" 0 "[O]" "$FM$CF_MATRIX"'
+URL: https://github.com/a-jay85/IBL5
+'
+
+# .github/ path does NOT fire (exempt).
+assert_viol "gate-O-dotgithub-clean" 0 "[O]" "$FM$CF_MATRIX"'
+Update `.github/workflows/tests.yml` to wire the new step.
+'
+
+# records-hub kebab (lowercase h) does NOT fire.
+assert_viol "gate-O-kebab-slug-clean" 0 "[O]" "$FM$CF_MATRIX"'
+Branch name: records-hub-refactor.
+'
+
+# Fenced code block with Hub does NOT fire (fence-aware).
+assert_viol "gate-O-fenced-clean" 0 "[O]" "$FM$CF_MATRIX"'
+```
+class RecordsHub {}
+```
+'
+
+# Path under ibl5/modules/ with Hub fires.
+assert_viol "gate-O-module-path-fires" 1 "[O]" "$FM$CF_MATRIX"'
+New file: `ibl5/modules/RecordsHub.php`
+'
+
+# "Docker Hub" does NOT fire (exempt).
+assert_viol "gate-O-docker-hub-clean" 0 "[O]" "$FM$CF_MATRIX"'
+Pull the image from Docker Hub.
+'
+
+# A line marked <!-- hub-ok --> does NOT fire.
+assert_viol "gate-O-hub-ok-marker-clean" 0 "[O]" "$FM$CF_MATRIX"'
+Order nodes Hub-last in the graph walk. <!-- hub-ok -->
+'
 
 # ---------------------------------------------------------------------------
 # Gate [U]: ## Backlog issues bullet grammar

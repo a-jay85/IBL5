@@ -11,6 +11,7 @@ on:
       - '.github/workflows/python-tests.yml'
       - 'bin/post-plan-now'
       - 'bin/normalize-manual-testing'
+      - 'bin/lib/pr-sticky.sh'
   push:
     branches: [master]
     paths:
@@ -18,6 +19,7 @@ on:
       - '.github/workflows/python-tests.yml'
       - 'bin/post-plan-now'
       - 'bin/normalize-manual-testing'
+      - 'bin/lib/pr-sticky.sh'
 
 permissions:
   contents: read
@@ -40,8 +42,7 @@ jobs:
           python-version: '3.12'
       - name: Install pytest
         run: python -m pip install --upgrade pip pytest
-      - name: Run harness tests (skip live gh/git suites)
+      # test_ghad_live.py needs no live gh: it fakes gh on PATH, and ghad.py:364 strips GH_CMD so the shim wins.
+      - name: Run harness tests
         run: |
-          python -m pytest tools/postplan-harness/tests/ \
-            --ignore=tools/postplan-harness/tests/test_ghad_live.py \
-            -q
+          python -m pytest tools/postplan-harness/tests/ -q

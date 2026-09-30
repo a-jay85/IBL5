@@ -5,7 +5,7 @@ on:
     - cron: '0 11 * * 1'  # Monday 11am UTC (3am PST, 4am PDT)
   workflow_dispatch:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [labeled]  # per-PR diff job (required check) lives in mutation-pr.yml
 
 permissions:
   contents: read
@@ -109,164 +109,6 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
         fi
 
-  mutation-pr:
-    name: Infection PHP (per-PR diff)
-    runs-on: ubuntu-latest
-    # Skip on `labeled` events (e.g. update-baselines/human-approved bookkeeping
-    # labels) — those carry no code change for this diff job to analyse.
-    if: github.event_name == 'pull_request' && github.event.action != 'labeled'
-    timeout-minutes: 15
-
-    services:
-      mariadb:
-        image: mariadb:10.11
-        env:
-          MARIADB_ROOT_PASSWORD: root
-          MARIADB_DATABASE: ibl5
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval=5s
-          --health-timeout=3s
-          --health-retries=10
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        fetch-depth: 0
-
-    - name: Check infection excludes
-      working-directory: ibl5
-      run: bin/check-infection-excludes
-
-    - name: Setup PHP environment
-      uses: ./.github/actions/setup-php-env
-      with:
-        extensions: mbstring, intl, mysqli, pcov
-        coverage: pcov
-
-    - name: Detect covered changes
-      id: changes
-      working-directory: ibl5
-      run: |
-        CHANGED=$(git diff --name-only --diff-filter=AM \
-          origin/${{ github.base_ref }}...HEAD \
-          -- 'classes/**/*.php' || true)
-        if [ -z "$CHANGED" ]; then
-          echo "skip=true" >> $GITHUB_OUTPUT
-        else
-          echo "skip=false" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Check new files for test coverage
-      if: steps.changes.outputs.skip == 'false'
-      id: new-files
-      working-directory: ibl5
-      run: |
-        GAPS=$(bin/check-new-class-coverage --base origin/${{ github.base_ref }})
-        if [ -n "$GAPS" ]; then
-          echo "has_gaps=true" >> $GITHUB_OUTPUT
-          {
-            echo "## New Classes Without Test Coverage"
-            echo ""
-            echo "These new files have no test referencing their class name:"
-            echo '```'
-            echo "$GAPS"
-            echo '```'
-            echo "_This is advisory — mutation testing cannot catch bugs in untested new code._"
-          } > /tmp/new-class-warning.md
-        else
-          echo "has_gaps=false" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Apply migrations
-      if: steps.changes.outputs.skip == 'false'
-      working-directory: ibl5
-      run: bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5
-
-    - name: Import seed data
-      if: steps.changes.outputs.skip == 'false'
-      working-directory: ibl5
-      run: mysql -h 127.0.0.1 -u root -proot ibl5 < tests/DatabaseIntegration/Fixtures/db-seed.sql
-
-    - name: Generate coverage
-      if: steps.changes.outputs.skip == 'false'
-      working-directory: ibl5
-      env:
-        DB_HOST: 127.0.0.1
-        DB_USER: root
-        DB_PASS: root
-        DB_NAME: ibl5
-      run: |
-        mkdir -p coverage
-        vendor/bin/phpunit \
-          --configuration=phpunit-mutation.xml \
-          --coverage-clover coverage/clover.xml \
-          --coverage-xml coverage/coverage-xml \
-          --log-junit coverage/junit.xml \
-          --no-progress
-
-    - name: Run Infection on diff
-      if: steps.changes.outputs.skip == 'false'
-      working-directory: ibl5
-      run: |
-        git config diff.relative true
-        vendor/bin/infection \
-          --configuration=infection.json5 \
-          --coverage=coverage \
-          --git-diff-base=origin/${{ github.base_ref }} \
-          --git-diff-lines \
-          --map-source-class-to-test \
-          --only-covering-test-cases \
-          --skip-initial-tests \
-          --show-mutations \
-          --no-progress \
-          --min-msi=100 \
-          --ignore-msi-with-no-mutations
-
-    - name: Build mutation comment body
-      if: always() && steps.changes.outputs.skip == 'false' && hashFiles('ibl5/infection-summary.log') != ''
-      working-directory: ibl5
-      run: |
-        {
-          echo "## Mutation Testing (Diff)"
-          echo ""
-          echo '```'
-          cat infection-summary.log
-          echo '```'
-        } > /tmp/mutation-comment.md
-        if [ -f /tmp/new-class-warning.md ]; then
-          echo "" >> /tmp/mutation-comment.md
-          cat /tmp/new-class-warning.md >> /tmp/mutation-comment.md
-        fi
-
-    - name: Post sticky mutation comment
-      if: always() && steps.changes.outputs.skip == 'false' && hashFiles('ibl5/infection-summary.log') != ''
-      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
-      with:
-        header: mutation-comment
-        path: /tmp/mutation-comment.md
-
-    - name: Remove stale mutation comment
-      if: always() && hashFiles('ibl5/infection-summary.log') == ''
-      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
-      with:
-        header: mutation-comment
-        delete: true
-
-    - name: Post summary
-      if: always() && steps.changes.outputs.skip == 'false'
-      working-directory: ibl5
-      run: |
-        if [ -f infection-summary.log ]; then
-          echo "## Mutation Testing (Diff) Results" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat infection-summary.log >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-        fi
-
   notify-mutation-failure:
     name: Notify Mutation Failure
     runs-on: ubuntu-latest
@@ -277,14 +119,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup SSH
-        # Real prod host — the IBLbot Discord-DM endpoint is reachable only there.
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
       - name: Build Discord message
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
@@ -294,7 +128,4 @@ jobs:
       - name: Send Discord DM
         uses: ./.github/actions/notify-discord
         with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}

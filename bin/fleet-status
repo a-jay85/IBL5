@@ -121,6 +121,8 @@ REORDER_APP_DIR="${FLEET_STATUS_REORDER_APP_DIR:-$HOME/Library/Caches/ibl5}"
 OSACOMPILE_BIN="${FLEET_STATUS_OSACOMPILE:-osacompile}"
 # shellcheck source=bin/lib/session-id.sh
 . "$SCRIPT_DIR/lib/session-id.sh"
+# shellcheck source=bin/automouse/lib-queue-order
+source "$SCRIPT_DIR/automouse/lib-queue-order"
 
 WATCH=0
 WATCH_SECS=15
@@ -812,14 +814,10 @@ render_queue() {
         section "AUTOMOUSE QUEUE$reorder"
     fi
 
-    # Rows are in QUEUE order, not alphabetical: `ls -1tr` is byte-for-byte the
-    # same command bin/automouse/run's claim_next_plan() picks with, so row 1 is
-    # genuinely the plan that runs next. Copying the command rather than
-    # reimplementing it with stat+sort is deliberate — queue entries are symlinks
-    # into ~/claude-plans/, and `ls -t` vs. a stat pipeline can disagree on
-    # whether that mtime is the link's or the target's. 2>/dev/null covers the
-    # empty queue, where the glob stays literal.
-    queue_list="$(ls -1tr "$AUTOMOUSE_DIR"/queue/*.md 2>/dev/null)"
+    # Rows are in QUEUE order, not alphabetical: oldest symlink lstat mtime first,
+    # matching claim_next_plan() in bin/automouse/run (both use queue_entries_ordered
+    # from lib-queue-order). Row 1 is the plan that runs next.
+    queue_list="$(queue_entries_ordered "$AUTOMOUSE_DIR/queue")"
 
     # Pass 1: which live runners already belong to a queued plan. Their details
     # print under that plan's row below, so the heartbeat sweep must skip them.

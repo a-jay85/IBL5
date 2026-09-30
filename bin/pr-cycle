@@ -1084,7 +1084,7 @@ $(_your_turn_lines)"
         _msg="pr-cycle finished — $_FIRED_SUMMARY, armed $ARMED, your turn $LEFT — $_reason
 log: ${PR_CYCLE_LOG:-<foreground>}
 $_yt_block"
-        "$PR_CYCLE_DM_CMD" "$_msg" || true
+        "$PR_CYCLE_DM_CMD" --ping "$_msg" || true
     fi
 
     case "$_reason" in

@@ -10,6 +10,11 @@
 # present or both must be absent; a plan carrying one without the other is
 # malformed.
 #
+# Python mirror: frontmatter_autonomy_contract in
+# tools/postplan-harness/harness/planfile.py. A grammar change here must land in
+# the mirror in the same PR. Parity pins: test_contract_lib_sync and
+# test_contract_token_grammar_sweep (harness pytest) and the Phase 5.0d
+# TWO-WAY AGREEMENT section of bin/test-postplan-arm-conditions.
 # Usage: bin/lib/plan-autonomy-contract <plan-file>
 #        bin/lib/plan-autonomy-contract --print <plan-file>
 #   exit 0, no output           -> contract is well-formed, or absent entirely (nothing to check)

@@ -67,10 +67,11 @@ printf '%s\n' "$1" >> "$CASE_DIR/sleep.log"
 STUB
     chmod +x "$CASE/bin/sleep"
 
-    # fake-dm stub: append stdin + separator to dm.log; exit dm-rc (default 0)
+    # fake-dm stub: append argv to dm.argv, stdin + separator to dm.log; exit dm-rc (default 0)
     cat > "$CASE/bin/fake-dm" <<'STUB'
 #!/bin/sh
 CASE_DIR="$(dirname "$0")/.."
+printf '%s\n' "$*" >> "$CASE_DIR/dm.argv"
 cat >> "$CASE_DIR/dm.log"
 printf '%s\n' '---' >> "$CASE_DIR/dm.log"
 exit "$(cat "$CASE_DIR/dm-rc" 2>/dev/null || echo 0)"
@@ -482,6 +483,11 @@ if [ "$RC" -eq 0 ] \
 else
     fail D1 "rc=$RC stamps=$_STAMPS dm=$([ -f "$CASE/dm.log" ] && echo present || echo absent)"
 fi
+if [ ! -f "$CASE/dm.argv" ]; then
+    ok "D1b no new problems: DM stub never called"
+else
+    fail "D1b DM stub called with no new problems: $(cat "$CASE/dm.argv")"
+fi
 
 # ---------------------------------------------------------------------------
 # D2: db-sync-nightly missing → DM sent, stamp written, new=1
@@ -517,6 +523,13 @@ if [ "$RC" -eq 1 ] \
     ok D2
 else
     fail D2 "rc=$RC stamp=$([ -f "$_STAMP" ] && cat "$_STAMP" || echo absent) dm_blocks=$_DMBLOCKS out=$OUT"
+fi
+
+_ARGV_D2="$(cat "$CASE/dm.argv" 2>/dev/null)"
+if grep -qF -- '--ping' <<< "$_ARGV_D2" && grep -qF -- '--chunk' <<< "$_ARGV_D2"; then
+    ok "D2b new-problem DM carries --ping and --chunk"
+else
+    fail "D2b new-problem DM argv lacks --ping/--chunk: '$_ARGV_D2'"
 fi
 
 _run_d234 2026-09-28

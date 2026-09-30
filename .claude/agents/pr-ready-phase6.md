@@ -2,7 +2,7 @@
 name: pr-ready-phase6
 description: Pinned Opus 5.5 plan-intent fidelity reviewer for /pr-ready runtime Phase 6. Spawned exactly once per run by the /pr-ready orchestrator; performs the _plan-fidelity-review.md 6b-6e review over the post-rebase diff and writes a verdict file. Never spawns a delegate, never edits repo files, never pushes.
 model: claude-opus-5-5
-last_verified: 2026-09-28
+last_verified: 2026-09-30
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
@@ -86,11 +86,18 @@ in this review.
 1. **Write** the full verdict to the absolute path your prompt names
    (`/tmp/pr-ready-phase6-verdict-<N>.md`). This file is the handoff: the orchestrator is
    worktree-isolated and cannot capture your stdout through `$(...)`.
-2. The verdict body must contain, in this order: a line per 6d check numbered 1 through 6
-   (all six always present, each with a one-line finding or `no finding`), then a
-   `## FINDINGS` section (item 2a below), then a final line that is exactly one of
-   `READY`, `READY WITH NOTES`, or `NOT READY` per 6e. The `## DIGEST` section specified
-   in item 3 below follows that verdict line as the last thing in the file.
+2. The verdict body must contain, in this order: the 6c statements (terse form when it
+   applies), the check summary, the `## FINDINGS` section (item 2a below), then a final
+   line that is exactly one of `READY`, `READY WITH NOTES`, or `NOT READY` per 6e. The
+   `## DIGEST` section in item 3 follows that verdict line as the last thing in the file.
+   Check summary: a check with a finding gets its own line, `<n>. <one-line finding>`.
+   Every check with no finding goes on one shared line, for example
+   `Passed: 3, 4, 6. Skipped (no plan): 1, 2, 5.` A passing check gets no justification.
+   Each of checks 1 to 6 appears exactly once across these lines.
+   Write nothing before the 6c statements. Skip any preamble or summary paragraph, and
+   do not restate the verdict. `## FINDINGS` is the summary.
+   Emit a `procedure-source:`, `include-source:`, or `plan-source:` line only for a
+   discrepancy or fallback this def names. A normal load writes none of them.
 2a. Emit a `## FINDINGS` section between the numbered check lines and the terminal verdict
    word. Write the heading exactly as `## FINDINGS` (no trailing colon, no count, no
    severity suffix) so a downstream reader can locate it with a fixed-string match instead

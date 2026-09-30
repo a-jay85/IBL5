@@ -14,6 +14,7 @@ The production deploy workflow automatically reverts the last commit if post-dep
 2. **No irreversible data transforms**: Data migrations that destroy the old format cannot be auto-rolled back; use a two-step deploy (schema first, data transform after confirming stability)
 3. **Backward-compatible indexes**: Adding indexes is safe; removing indexes that existing PHP code depends on is not
 4. **Two-step pattern for breaking changes**: Deploy 1 adds new column + PHP reads both old and new. Deploy 2 (after Deploy 1 is stable) removes old column.
+5. **Slow migrations ship first**: The deploy pulls new code before it runs migrations, so for a few seconds new PHP runs against the old schema. If a migration is slow (a big backfill or table rebuild) and the same PR's PHP reads its new column, split it into two PRs. Ship the migration first, then the code that reads it.
 
 If a reverted deploy still fails smoke tests (because the old code is incompatible with the new schema), the workflow sends a "manual intervention required" notification instead of reverting again.
 
@@ -28,8 +29,11 @@ The `migration-safety.yml` workflow includes a **destructive migration scan** (`
 | `drop-column` | `ALTER TABLE ... DROP COLUMN` |
 | `drop-table` | `DROP TABLE` (suppressed when `IF EXISTS` + matching `CREATE TABLE` in same file) |
 | `truncate` | `TRUNCATE [TABLE] ...` |
-| `rename-column` | `ALTER TABLE ... RENAME COLUMN` |
+| `rename-column` | `ALTER TABLE ... RENAME COLUMN`, or `CHANGE [COLUMN] <old> <new>` with different names |
 | `add-not-null-no-default` | `ADD COLUMN ... NOT NULL` without `DEFAULT` |
+| `tighten-not-null` | `MODIFY [COLUMN] <col> ... NOT NULL`, or same-name `CHANGE`, without `DEFAULT` (false positive if the column was already `NOT NULL`; use the bypass marker) |
+| `drop-index` | `DROP INDEX` / `DROP KEY` (suppressed when the same file adds an index with the same name) |
+| `rename-table` | `RENAME TABLE ...` or `ALTER TABLE ... RENAME TO\|AS ...` |
 
 The file `000_baseline_schema.sql` is always excluded from scanning.
 

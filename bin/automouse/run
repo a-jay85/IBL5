@@ -27,8 +27,9 @@ the time guard is exceeded.
 Subcommands:
   (none)                      Run the queue (normal scheduled invocation).
   plan <slug>                 Execute exactly one named plan and stop.
-  schedule "YYYY-MM-DD HH:MM [TZ]"
-                              Schedule a one-shot run at the given time.
+  schedule "[YYYY-MM-DD] HH:MM [TZ]"
+                              Schedule a one-shot run at the given time
+                              (no date = today, no TZ = local).
   disarm-tonight              Skip tonight's run; auto re-enables afterward.
   disarm-until "YYYY-MM-DD HH:MM [TZ]"
                               Pause until the given time.
@@ -40,28 +41,44 @@ EOF
     exit 0
 fi
 
+# Resolve "[YYYY-MM-DD] HH:MM [TZ]" to an epoch. A missing date means today; a
+# missing TZ means system-local. BSD (macOS) forms first, GNU fallback last so
+# these helpers stay exercisable on the Linux CI runner.
+parse_when_epoch() {
+    local when="$1" epoch=""
+    if [[ "$when" =~ ^[0-9]{1,2}:[0-9]{2}([[:space:]]|$) ]]; then
+        when="$(date '+%Y-%m-%d') $when"
+    fi
+    epoch=$(date -j -f '%Y-%m-%d %H:%M %Z' "$when" +%s 2>/dev/null || true)
+    [ -n "$epoch" ] || epoch=$(date -j -f '%Y-%m-%d %H:%M' "$when" +%s 2>/dev/null || true)
+    [ -n "$epoch" ] || epoch=$(date -d "$when" +%s 2>/dev/null || true)
+    [ -n "$epoch" ] || return 1
+    printf '%s\n' "$epoch"
+}
+
+# Format an epoch with a strftime spec: BSD `date -r`, GNU `date -d @`.
+epoch_fmt() {
+    date -r "$1" "+$2" 2>/dev/null || date -d "@$1" "+$2"
+}
+
 # --- One-shot scheduler subcommand ----------------------------------------
-# Usage: bin/automouse/run schedule "YYYY-MM-DD HH:MM [TZ]"
+# Usage: bin/automouse/run schedule "[YYYY-MM-DD] HH:MM [TZ]"
 # Creates a self-cleaning launchd agent that fires bin/automouse/run once at the
-# given time, then removes its own plist and boots itself out. The timezone
-# abbreviation is optional and defaults to the system's local zone.
+# given time, then removes its own plist and boots itself out. The date is
+# optional and defaults to today; the timezone abbreviation is optional and
+# defaults to the system's local zone.
 # Example: bin/automouse/run schedule "2026-05-28 20:00 PDT"
 if [ "${1:-}" = "schedule" ]; then
     WHEN="${2:-}"
     if [ -z "$WHEN" ]; then
-        echo "usage: bin/automouse/run schedule \"YYYY-MM-DD HH:MM [TZ]\"" >&2
+        echo "usage: bin/automouse/run schedule \"[YYYY-MM-DD] HH:MM [TZ]\"" >&2
         echo "example: bin/automouse/run schedule \"2026-05-28 20:00 PDT\"" >&2
         exit 1
     fi
 
-    # Resolve to an epoch — try with a timezone abbreviation first, then local.
-    EPOCH=$(date -j -f '%Y-%m-%d %H:%M %Z' "$WHEN" +%s 2>/dev/null || true)
-    if [ -z "$EPOCH" ]; then
-        EPOCH=$(date -j -f '%Y-%m-%d %H:%M' "$WHEN" +%s 2>/dev/null || true)
-    fi
-    if [ -z "$EPOCH" ]; then
+    if ! EPOCH=$(parse_when_epoch "$WHEN"); then
         echo "error: could not parse time '$WHEN'" >&2
-        echo "expected: YYYY-MM-DD HH:MM [TZ]  (e.g. 2026-05-28 20:00 PDT)" >&2
+        echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-05-28 20:00 PDT, or 20:00 for today)" >&2
         exit 1
     fi
 
@@ -147,22 +164,6 @@ fi
 #
 # Every launchctl call goes through $LAUNCHCTL so bin/test-automouse-disarm can
 # stub it with a recording shim and assert the arm-before-disarm ordering.
-
-# Resolve "YYYY-MM-DD HH:MM [TZ]" to an epoch. BSD (macOS) forms first, GNU
-# fallback last so these helpers stay exercisable on the Linux CI runner.
-parse_when_epoch() {
-    local when="$1" epoch=""
-    epoch=$(date -j -f '%Y-%m-%d %H:%M %Z' "$when" +%s 2>/dev/null || true)
-    [ -n "$epoch" ] || epoch=$(date -j -f '%Y-%m-%d %H:%M' "$when" +%s 2>/dev/null || true)
-    [ -n "$epoch" ] || epoch=$(date -d "$when" +%s 2>/dev/null || true)
-    [ -n "$epoch" ] || return 1
-    printf '%s\n' "$epoch"
-}
-
-# Format an epoch with a strftime spec: BSD `date -r`, GNU `date -d @`.
-epoch_fmt() {
-    date -r "$1" "+$2" 2>/dev/null || date -d "@$1" "+$2"
-}
 
 # Hour and Minute of the recurring job's StartCalendarInterval, space-separated.
 # Returns 1 when the key is absent or holds an ARRAY of intervals (which has no

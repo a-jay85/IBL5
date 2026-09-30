@@ -514,7 +514,8 @@ cat > "$SCRATCH/hookrej-fire.json" <<'JSON'
 [
   {"number": 3005, "title": "hookrej-ready",    "isDraft": false, "headRefName": "branch-hookrej-ready",    "author": {"login": "a-jay85"}},
   {"number": 3006, "title": "hookrej-pfailed",  "isDraft": false, "headRefName": "branch-hookrej-pfailed",  "author": {"login": "a-jay85"}},
-  {"number": 3007, "title": "hookrej-notready", "isDraft": false, "headRefName": "branch-hookrej-notready", "author": {"login": "a-jay85"}}
+  {"number": 3007, "title": "hookrej-notready", "isDraft": false, "headRefName": "branch-hookrej-notready", "author": {"login": "a-jay85"}},
+  {"number": 3008, "title": "hookrej-midline", "isDraft": false, "headRefName": "branch-hookrej-midline", "author": {"login": "a-jay85"}}
 ]
 JSON
 cat > "$SCRATCH/hookrej-wtl.txt" <<EOF
@@ -522,9 +523,10 @@ cat > "$SCRATCH/hookrej-wtl.txt" <<EOF
 /Users/x/IBL5-worktrees/hookrej-ready/ibl5    aaaaaab [branch-hookrej-ready]
 /Users/x/IBL5-worktrees/hookrej-pfailed/ibl5  aaaaaac [branch-hookrej-pfailed]
 /Users/x/IBL5-worktrees/hookrej-notready/ibl5 aaaaaad [branch-hookrej-notready]
+/Users/x/IBL5-worktrees/hookrej-midline/ibl5  aaaaaae [branch-hookrej-midline]
 EOF
-rm -f /tmp/post-plan-fleet-300{5,6,7}.log
-TMP_LOGS+=("/tmp/post-plan-fleet-3005.log" "/tmp/post-plan-fleet-3006.log" "/tmp/post-plan-fleet-3007.log")
+rm -f /tmp/post-plan-fleet-300{5,6,7,8}.log
+TMP_LOGS+=("/tmp/post-plan-fleet-3005.log" "/tmp/post-plan-fleet-3006.log" "/tmp/post-plan-fleet-3007.log" "/tmp/post-plan-fleet-3008.log")
 # 3005: recovered run -- HOOK REJECTED then PUSHED then READY → derive_status must return READY
 printf 'HOOK REJECTED — pre-push-adr-hook refused this push: the branch is not rebased onto origin/master.\nPUSHED PR #7 abc123 (moved: yes, push rc: 0)\nREADY\n' \
     > /tmp/post-plan-fleet-3005.log
@@ -534,11 +536,13 @@ printf 'HOOK REJECTED — pre-push-adr-hook refused this push: the branch is not
 # 3007: hook-only rejection, no recovery -- HOOK REJECTED then NOT READY → NOT READY
 printf 'HOOK REJECTED — pre-push-adr-hook refused this push: the branch is not rebased onto origin/master.\nNOT READY\n' \
     > /tmp/post-plan-fleet-3007.log
+# 3008: PUSH FAILED only mid-line (quoted prose) then READY -> must stay READY (anchor)
+printf 'the doc says PUSH FAILED is non-retriable\nREADY\n' > /tmp/post-plan-fleet-3008.log
 clean_slots  # clear the 4 plist slots from the first run; otherwise the cap fires immediately
 out2="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/hookrej-fire.json" \
         POST_PLAN_FLEET_WTL="$SCRATCH/hookrej-wtl.txt" \
         POST_PLAN_FLEET_DRY_RUN=1 \
-        run_driver --go --jobs 3 2>&1)"; rc2=$?
+        run_driver --go --jobs 4 2>&1)"; rc2=$?
 [[ $rc2 -eq 0 ]] || fail "report-statuses hookrej: exit $rc2 (out: $out2)"
 rp2="$SCRATCH/claude-plans/_reports/ibl5/firstpass/pr-firstpass-${_rdate}.md"
 [[ -f "$rp2" ]] || fail "report-statuses hookrej: report not found at $rp2"
@@ -547,6 +551,8 @@ grep '3005' "$rp2" | grep -qF '| READY |' \
     || fail "PR 3005 HOOK REJECTED+PUSHED+READY log: derive_status returned wrong status (expected READY)"
 grep '3006' "$rp2" | grep -qF '| NOT READY |' \
     || fail "PR 3006 HOOK REJECTED+PUSH FAILED+NOT READY log: derive_status returned wrong status (expected NOT READY)"
+grep '3008' "$rp2" | grep -qF '| READY |' \
+    || fail "PR 3008 mid-line PUSH FAILED+READY log: unanchored PUSH FAILED must not be a hard-stop (expected READY)"
 grep '3007' "$rp2" | grep -qF '| NOT READY |' \
     || fail "PR 3007 HOOK REJECTED+NOT READY log: derive_status returned wrong status (expected NOT READY)"
 # Source-level negative: HOOK REJECTED must never appear as a hard-stop marker in post-plan-fleet.

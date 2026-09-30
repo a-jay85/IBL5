@@ -98,6 +98,16 @@ assert_eq "F: exit 1" 1 "$RC"
 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' run "$WATCH" --once
 assert_match "G: failure surfaced" 'update-branch FAILED for #3: boom' "$OUT"
 
+# I: skipped PRs print with readable reasons; unknown reasons pass through.
+SEL_OUT=$'action=update\nhead=8\nskipped=12:dirty 13:red 14:weird' run "$WATCH" --once
+assert_match "I: skipped line" 'skipped: #12 \(conflict\), #13 \(failing check\), #14 \(weird\)$' "$OUT"
+assert_match "I: head still updated" 'updated PR #8' "$OUT"
+assert_absent "I: no comment posted" 'comments' "$GH"
+
+# J: empty skipped= prints nothing.
+SEL_OUT=$'action=none\nhead=8\nskipped=' run "$WATCH" --once
+assert_absent "J: no skipped line" 'skipped:' "$OUT"
+
 # H: usage errors exit 2.
 run "$WATCH" --interval abc
 assert_eq "H: bad --interval exits 2" 2 "$RC"

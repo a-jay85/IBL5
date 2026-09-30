@@ -29,9 +29,11 @@ export default defineConfig({
   // Every cell is a read-only screenshot: appState is a per-context cookie override
   // (no DB writes) and storageState is written once by the `setup` project. So cells
   // are order-independent. Serial (workers: 1) was the original default (#357), not a
-  // documented requirement. CI runs 3 workers on a 4-vCPU runner; flake risk is
+  // documented requirement. The CI docker run step does not yet pass -e CI=true into
+  // the container, so workers resolves to 1 on CI. To enable 3 workers on CI, add
+  // -e "CI=true" to the "Run visual regression tests" docker run step. Flake risk:
   // screenshot timing under CPU load (mitigated by gotoWithRetry + re-sampling in
-  // captureSnapshot). If pixel-diff flakes appear in CI, drop back to 2, then 1.
+  // captureSnapshot). If pixel-diff flakes appear, drop back to 2, then 1.
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,

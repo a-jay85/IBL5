@@ -8,6 +8,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runner
 from harness import conflict
+from harness.adapters import gitad
 from harness.adapters.gitad import LiveGit
 from harness.adapters.ghad import RecordingGh
 from harness.adapters.llm import FixtureLlm, UsageLedger
@@ -380,6 +381,84 @@ def test_runner_conflict_advisory_with_llm_reaches_body_check(tmp_path, monkeypa
     audit_text = (tmp_path / "out" / "audit.log").read_text()
     assert "merge-tree probe predicted" in audit_text
     assert "stopping before body check" not in audit_text
+
+
+def _assert_refused_before_body_check(tmp_path, monkeypatch, wt, path, reason_prefix):
+    head0 = _rev(wt, "HEAD")
+
+    def spy(*a, **k):
+        raise AssertionError("_body_check must not run on a resolver-refused conflict")
+
+    res, calls = _run_live(tmp_path, wt, monkeypatch, spy)
+    assert res.terminal == TerminalState.FAILED
+    assert res.error_kind == "rebase-conflict"
+    assert runner.exit_code_for(res) == 3
+    assert "merge-tree probe" in res.error
+    assert path in res.error
+    assert reason_prefix in res.error
+    assert calls["pr_copy"] == 0
+    assert any("LLM resolver would refuse" in l for l in res.audit)
+    assert _rev(wt, "HEAD") == head0
+
+
+def test_runner_refusable_migration_conflict_fails_closed_with_llm(tmp_path, monkeypatch):
+    path = "ibl5/migrations/001_x.sql"
+    wt = _plain_scenario(tmp_path, conflict=True, dirty=True, path=path)
+    _assert_refused_before_body_check(
+        tmp_path, monkeypatch, wt, path, conflict.UNRESOLVABLE_MIGRATION)
+
+
+def test_runner_delete_modify_conflict_fails_closed_with_llm(tmp_path, monkeypatch):
+    wt = _plain_scenario(tmp_path, conflict=True, dirty=True, path="c.txt",
+                         master_deletes=True)
+    _assert_refused_before_body_check(
+        tmp_path, monkeypatch, wt, "c.txt", conflict.UNRESOLVABLE_STAGES)
+
+
+def _assert_advisory_fall_through(tmp_path, monkeypatch, wt):
+    hits = []
+    calls = {"pr_copy": 0}
+
+    def spy(*a, **k):
+        hits.append(1)
+        raise _Stop()
+
+    with pytest.raises(_Stop):
+        _run_live(tmp_path, wt, monkeypatch, spy, calls=calls)
+
+    assert hits == [1]
+    assert calls["pr_copy"] == 1
+    return (tmp_path / "out" / "audit.log").read_text()
+
+
+def test_runner_refusable_path_on_committed_branch_stays_advisory(tmp_path, monkeypatch):
+    wt = _plain_scenario(tmp_path, conflict=True, dirty=False,
+                         path="ibl5/migrations/001_x.sql")
+    audit_text = _assert_advisory_fall_through(tmp_path, monkeypatch, wt)
+    assert "probe is advisory" in audit_text
+    assert "would refuse" not in audit_text
+
+
+def test_runner_refusable_path_with_ibl_base_stays_advisory(tmp_path, monkeypatch):
+    wt = _plain_scenario(tmp_path, conflict=True, dirty=True,
+                         path="ibl5/migrations/001_x.sql")
+    _git(wt, "config", "branch.feature.iblBase", _rev(wt, "HEAD"))
+    audit_text = _assert_advisory_fall_through(tmp_path, monkeypatch, wt)
+    assert "probe is advisory" in audit_text
+    assert "would refuse" not in audit_text
+
+
+def test_runner_probe_git_error_falls_through_even_for_migration(tmp_path, monkeypatch):
+    wt = _plain_scenario(tmp_path, conflict=True, dirty=True,
+                         path="ibl5/migrations/001_x.sql")
+
+    def boom(self, *a, **k):
+        raise HarnessError("git", "boom")
+
+    monkeypatch.setattr(gitad.LiveGit, "_merge_tree_conflicts", boom)
+    audit_text = _assert_advisory_fall_through(tmp_path, monkeypatch, wt)
+    assert "conflict probe git error" in audit_text
+    assert "would refuse" not in audit_text
 
 
 def test_runner_clean_branch_reaches_body_check(tmp_path, monkeypatch):

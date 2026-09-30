@@ -12,6 +12,26 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/log-fetch-prod [options]
+
+Fetch and aggregate production logs into a compact digest (~500-2000 tokens).
+Runs all aggregation server-side via SSH to minimize data transfer.
+
+Options:
+  --all-levels              Include all log levels (default: WARNING+ only).
+  --days <n>                Number of days to look back (default: 7).
+  --ssh-host <user@host>    SSH host (default: PROD_SSH_HOST from .env).
+  --ssh-port <port>         SSH port.
+  --ssh-key <path>          SSH private key path.
+
+Environment (for local use, read from .env):
+  PROD_SSH_HOST   SSH host string.
+EOF
+    exit 0
+fi
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DAYS=7
 ALL_LEVELS=false

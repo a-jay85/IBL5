@@ -1,6 +1,6 @@
 ---
 description: Rationale for forcing all CI checks on Dependabot PRs and enabling squash auto-merge.
-last_verified: 2026-08-29
+last_verified: 2026-09-29
 ---
 
 # ADR-0017: Dependabot Full CI and Auto-Merge
@@ -39,7 +39,7 @@ Force all CI workflows to run on Dependabot PRs by adding `github.event.pull_req
 - `.github/workflows/tests.yml`
 - `.github/workflows/e2e-tests.yml`
 - `.github/workflows/eslint.yml`
-- `.github/workflows/lighthouse.yml`
+- `.github/workflows/lighthouse.yml` (example)
 - `.github/workflows/codeql.yml`
 - `.github/workflows/update-behind-prs.yml` — the push-triggered consumer this arming token feeds.
 - `ibl5/docs/decisions/0081-scheduled-branch-update-for-armed-behind-prs.md` — the anti-recursion guard, documented there first.

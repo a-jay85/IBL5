@@ -389,10 +389,6 @@
     width: 18%;
 }
 
-.trading-card-back .highs-table .stat-label {
-    width: 28%;
-}
-
 .trading-card-back .highs-table .highs-header {
     color: var(--card-accent);
     font-weight: 600;
@@ -410,6 +406,7 @@
 }
 
 .trading-card-back .highs-table .stat-label {
+    width: 28%;
     color: var(--card-accent);
     font-weight: 600;
     text-align: left;

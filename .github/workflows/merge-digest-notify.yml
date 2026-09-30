@@ -52,10 +52,9 @@ concurrency:
 jobs:
   notify-merge-digest:
     # `merged == true` filters plain closes. The head-repo equality test filters FORK PRs:
-    # a fork's `pull_request` event gets no secrets, so setup-ssh would write an empty
-    # ~/.ssh/id_deploy and notify-discord would run `ssh -p ""` and die on "Bad port"
-    # (observed: run 27378437919). With loud delivery failure armed below, that is a
-    # guaranteed red run on every fork merge, so the guard is executable, not advisory.
+    # a fork's `pull_request` event gets no secrets, so `webhook-url` arrives empty and
+    # `send.sh` exits 1 under `fail-on-delivery: 'true'`; the guard keeps every fork
+    # merge from going red.
     if: >-
       github.event.pull_request.merged == true &&
       github.event.pull_request.head.repo.full_name == github.repository
@@ -111,21 +110,12 @@ jobs:
           # Visible in the run log, and a cheap tripwire if the 2000-char budget ever slips.
           printf 'message bytes: %s\n' "$(wc -c < /tmp/discord-msg.txt)"
 
-      - name: Setup SSH
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
       - name: Send Discord DM
         uses: ./.github/actions/notify-discord
         with:
           # message-file defaults to /tmp/discord-msg.txt -- the path written above.
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
+          ping: 'true'
           # A silently-dropped merge notification is indistinguishable from "nothing merged",
           # which is the exact failure the ledger had. Fail the run instead.
           fail-on-delivery: 'true'

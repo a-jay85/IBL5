@@ -120,6 +120,26 @@ class LeagueStartersServiceTest extends TestCase
         $this->assertSame(4040404, $result['C'][0]->getPlayerID());
     }
 
+    public function testMissingPlaceholderRowFallsBackToBlankPlayer(): void
+    {
+        $mockRepo = self::createStub(LeagueStartersRepositoryInterface::class);
+        $mockRepo->method('getAllStartersWithTeamData')->willReturn([
+            $this->makeStarterRow(101, 1, 'PG', 'Test Team'),
+        ]);
+        $mockRepo->method('getPlaceholderRow')->willReturn(null);
+
+        $this->mockDb->onQuery('SELECT[\s\S]*ibl_team_info[\s\S]*teamid BETWEEN', [
+            $this->makeTeamRow(1, 'Test Team', 'Test City'),
+        ]);
+
+        $service = new LeagueStartersService($this->mockDb, $this->mockLeague, $mockRepo);
+        $result = $service->getAllStartersByPosition();
+
+        $this->assertSame(101, $result['PG'][0]->getPlayerID());
+        $this->assertSame(4040404, $result['C'][0]->getPlayerID());
+        $this->assertSame('Test Team', $result['C'][0]->getTeamName());
+    }
+
     public function testPlaceholderSetsTeamProperties(): void
     {
         $mockRepo = self::createStub(LeagueStartersRepositoryInterface::class);

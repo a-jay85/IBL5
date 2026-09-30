@@ -1,6 +1,6 @@
 {
     "phpstan-baseline.neon": {
-        "argument.type": 346,
+        "argument.type": 335,
         "binaryOp.invalid": 18,
         "booleanAnd.leftNotBoolean": 1,
         "booleanAnd.rightNotBoolean": 1,
@@ -13,7 +13,7 @@
         "deadCode.unreachable": 1,
         "echo.nonString": 1,
         "empty.notAllowed": 7,
-        "encapsedStringPart.nonString": 16,
+        "encapsedStringPart.nonString": 17,
         "equal.alwaysFalse": 1,
         "equal.notAllowed": 10,
         "function.alreadyNarrowedType": 2,
@@ -47,18 +47,18 @@
         "offsetAccess.nonArray": 1,
         "offsetAccess.nonOffsetAccessible": 14,
         "offsetAccess.notFound": 2,
-        "property.nonObject": 1,
+        "property.nonObject": 2,
         "return.type": 1,
         "ternary.condNotBoolean": 1,
         "ternary.shortNotAllowed": 1,
         "varTag.misplaced": 2,
         "varTag.nativeType": 1,
         "varTag.type": 1,
-        "variable.undefined": 39
+        "variable.undefined": 40
     },
     "phpstan-tests-baseline.neon": {
         "argument.type": 8,
-        "classConstant.unused": 43,
+        "classConstant.unused": 42,
         "parameter.notFound": 1,
         "staticMethod.dynamicCall": 1
     }

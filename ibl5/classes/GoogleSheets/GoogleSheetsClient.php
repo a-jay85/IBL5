@@ -172,7 +172,7 @@ class GoogleSheetsClient
             throw $e;
         }
 
-        $decoded = json_decode($response['body'], true);
+        $decoded = GoogleJson::decode($response['body']);
 
         return is_array($decoded) ? $decoded : [];
     }

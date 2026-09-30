@@ -19,6 +19,9 @@ use Security\SecretBox;
 use Tests\GoogleSheets\Fakes\FakeGoogleHttpClient;
 use Tests\GoogleSheets\Fakes\InMemoryConnectionRepository;
 
+/**
+ * @phpstan-import-type ConnectionRow from GoogleSheetConnectionRepositoryInterface
+ */
 class GoogleSheetExportServiceTest extends TestCase
 {
     private const USER_ID = 42;
@@ -69,7 +72,7 @@ class GoogleSheetExportServiceTest extends TestCase
     }
 
     /**
-     * @return array<string, mixed>
+     * @return ConnectionRow
      */
     private function row(): array
     {

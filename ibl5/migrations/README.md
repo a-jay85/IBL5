@@ -17,6 +17,8 @@ The production deploy workflow automatically reverts the last commit if post-dep
 
 If a reverted deploy still fails smoke tests (because the old code is incompatible with the new schema), the workflow sends a "manual intervention required" notification instead of reverting again.
 
+Deploys that bring new migration files also take a full database dump first. The dump lands in `~/backups/db-predeploy/` on the prod host and the newest 10 are kept. To restore one, run `gunzip -c <file> | mysql <db>` on the host.
+
 ## Destructive Migration CI Scan
 
 The `migration-safety.yml` workflow includes a **destructive migration scan** (`bin/check-destructive-migrations`) that blocks PRs and pushes containing these patterns in new or modified `.sql` files under `ibl5/migrations/`:

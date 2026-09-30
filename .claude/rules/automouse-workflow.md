@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-09-29
+last_verified: 2026-09-30
 paths: "bin/automouse/**"
 ---
 
@@ -8,7 +8,7 @@ paths: "bin/automouse/**"
 
 > **"Automouse" is this pipeline — the autonomous plan-execution machinery (`bin/automouse/*`, this rule).** It was **formerly called "nightly"**; the term was renamed because the user runs it outside nighttime too, so "nightly" was a misnomer that sent people hunting through `cron` / `/schedule` / `CronCreate` / launchd-by-hand. When you read "automouse" (or legacy "nightly") referring to autonomous plan execution, it means **`bin/automouse/run` fired by launchd**, draining the queue built by `bin/automouse/queue` — *not* a generic scheduler. (The macOS `launchd` agent is the scheduling substrate, but the concept lives in these scripts.)
 
-A headless `claude -p` process runs on a recurring schedule via macOS `launchd`. It loops through queued plans — two `claude -p` invocations per plan (implementation, then post-plan) — until the queue is empty or the time guard is exceeded. For a single watched run, `bin/automouse/run plan <slug>` executes exactly one named plan (auto-queuing it if absent) with the same guard machinery, then stops — leaving the rest of the queue untouched.
+A headless `claude -p` process runs on a recurring schedule via macOS `launchd`. It loops through queued plans, two `claude -p` invocations per plan (implementation, then post-plan), until the queue is empty or the time guard is exceeded. For a single watched run, `bin/automouse/run plan <slug>` executes exactly one named plan (auto-queuing it if absent) with the same guard machinery, then stops.
 
 ## Quick Reference
 
@@ -63,15 +63,15 @@ Each phase's cost is recorded in two places: the markdown row in `reports/YYYY-M
 
 **Recomputed vs. harness cost.** The harness `result` event undercounts: it sums only the top-level `usage` of the main transcript, missing `usage.iterations[]` entries and all subagent transcripts. `bin/lib/automouse-pricer` recomputes from transcripts after the phase exits — subagent transcripts are still flushing when `result` fires.
 
-**Prov column:** `recomputed` (agrees with harness), `recomputed-anomalous` (>$0.01 below harness or duration mismatch), `unknown` (no transcript; harness figure kept), `harness-ledger` (harness-only run, no Sonnet session).
+**Prov column:** `recomputed` (transcript recomputation succeeded, no anomaly flagged), `recomputed-anomalous` (>$0.01 below harness or duration mismatch), `unknown` (no transcript, e.g. aged out after ~30 days; harness figure kept), `harness-ledger` (harness's own `result.json` usage ledger; harness-only runs exiting 0 or 3, no Sonnet session).
 
-**`peak_ctx`:** main transcript occupancy over `usage.iterations[]`; sub-agents excluded; pre-2026-08-26 rows read high. Reported cost is a floor: compaction surcharge is separate ("Surcharge est ($)").
+**`peak_ctx`:** main transcript occupancy over `usage.iterations[]` (top-level `usage` sums them, so it is no single occupancy), excluding `advisor_message` iterations and sub-agents; pre-2026-08-26 rows read high. Reported cost is a floor: compaction surcharge is separate, a `low–high` range in "Surcharge est ($)".
 
 ### Startup archival
 
 At launch, `bin/automouse/run` sweeps `logs/`, `reports/`, `done/`, and `skipped/` and moves any
 entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into a sibling
-`<dir>.archive/`. This keeps the working dirs small without deleting history. Symlinks
+`<dir>.archive/`. Symlinks
 (`done/`, `skipped/`) are judged on their *own* mtime — the disposition date — and their
 absolute targets keep resolving after the move. `queue/` (pending work) and `handoff/`
 (transient) are never touched. The step is non-fatal: an archival error never aborts the run.
@@ -105,7 +105,7 @@ scans `skipped/`:
    - **Implementation agent** (`bin/automouse/prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, runs a pre-handoff conformance check (Step 6.6), writes a handoff file. Model per-plan via `impl_model:` (six values: `sonnet`/`claude-sonnet-5-5` → Sonnet (legacy: `claude-sonnet-4-6`), `haiku`/`claude-haiku-4-5` → Haiku, `opus`/`claude-opus-5-5` or absent → Opus; validated by `bin/lib/plan-impl-model`; other values rejected before the counter). Declare `sonnet` for uniformly-mechanical plans only. Post-plan runs `bin/post-plan-now` (Sonnet `/post-plan` fallback).
    - **Post-plan** (`bin/post-plan-now --foreground`, run in the handoff's worktree): runs `/post-plan` (code review, security audit, PR, CI monitoring, auto-merge), writes the completion report
 4. **Guards:** The loop stops when the queue is empty or ~4h45m have elapsed. Plans that fail 3 times (after genuine, full-length attempts) are moved to `skipped/` as poison pills.
-   - Environmental failures stop the run cleanly. A usage/rate limit, auth error, or any transient that kills an agent refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run. Each stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report. The watchdog stall threshold is **30 min, not 10**, because an asynchronous `Agent` delegate emits nothing on the parent's stream while it works. For the delegate's whole runtime a healthy impl is indistinguishable from a wedged one. A deliberate impl disposition (to `done/` or `skipped/`) is an outcome; the loop continues. A `bin/wt-new` failure is a counted attempt; the agent drops `<plan>.wt-fail` and the loop defers the plan. `MAX_ATTEMPTS` bounds retries. A wall-clock cap-timeout is refunded too, but only a bounded number of times per plan, and does not break the loop. Exact signatures, thresholds and refund limits: `should_impl_env_stop()`, `impl_cap_timeout()`, `should_refund_cap_timeout()`. Locked by `bin/test-automouse-env-breaker` and `bin/test-automouse-impl-cap-timeout`. Post-plan uses `postplan_cap_timeout()` (classifies 124/137/143 against `REMAINING_SECS`) and `should_hold_postplan_disposal()`: a cap-killed OPEN PR whose Phase 5.5 verdict predates the run is held in `queue/`; `notify_postplan_hold()` DMs the PR URL. Locked by `bin/test-automouse-postplan-disposition`.
+   - Environmental failures stop the run cleanly. A usage/rate limit, auth error, or any transient that kills an agent refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run. Each stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report. The watchdog stall threshold is **30 min, not 10**, because an asynchronous `Agent` delegate emits nothing on the parent's stream while it works. A deliberate impl disposition (to `done/` or `skipped/`) is an outcome; the loop continues. A `bin/wt-new` failure is a counted attempt; the agent drops `<plan>.wt-fail` and the loop defers the plan. `MAX_ATTEMPTS` bounds retries. A wall-clock cap-timeout is refunded too, but only a bounded number of times per plan, and does not break the loop. Exact signatures, thresholds and refund limits: `should_impl_env_stop()`, `impl_cap_timeout()`, `should_refund_cap_timeout()`. Locked by `bin/test-automouse-env-breaker` and `bin/test-automouse-impl-cap-timeout`. Post-plan uses `postplan_cap_timeout()` (classifies 124/137/143 against `REMAINING_SECS`) and `should_hold_postplan_disposal()`: a cap-killed OPEN PR whose Phase 5.5 verdict predates the run is held in `queue/`; `notify_postplan_hold()` DMs the PR URL. Locked by `bin/test-automouse-postplan-disposition`.
 5. **After a run:** Check `gh pr list` for new PRs, read reports for details
 
 ## Headless Mode

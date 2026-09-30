@@ -207,6 +207,11 @@
 #                              Truly-manual rows, or whose manual rows are
 #                              non-visual ("the exported CSV opens in Excel"),
 #                              never reaches it.
+#   X  (no-change) marker    — a `(no-change)` matrix marker sits on a Visual-regression
+#                              row, directly after the backticked test token. The
+#                              post-plan harness honors it nowhere else, so a
+#                              misplaced one is a silent no-op that surfaces only
+#                              after implementation.
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
@@ -927,6 +932,27 @@ if grep -qiE '\|[[:space:]]*PHPUnit[[:space:]]*\|' "$MATRIX_FILE"; then
         viol "[M] matrix has a PHPUnit row but no parseable ## Required Test Methods section — list the exact method names (bare name, one per bullet, outside any fence), or add <!-- no-test-methods: reason at least 15 characters -->"
     fi
 fi
+
+# ---------------------------------------------------------------------------
+# Gate X: a `(no-change)` matrix marker is honored by the post-plan harness
+# (tools/postplan-harness/harness/planfile.py parse_no_change_test_paths) ONLY
+# on a Visual-regression row and ONLY directly after the row's backticked test
+# token. Anywhere else it is a silent no-op: the row still plans the test,
+# Phase 5.0 emits MISSING, and arming condition (3) holds after implementation.
+# Catch that at authoring time. Herestrings, not printf pipes: pipefail + grep -q
+# (see .claude/rules/shell-pipefail-grep.md).
+# ---------------------------------------------------------------------------
+while IFS= read -r row; do
+    grep -qiF '(no-change)' <<< "$row" || continue
+    if ! awk -F'|' '
+        { for (i = 1; i <= NF; i++) { c = tolower($i); gsub(/[[:space:]*]/, "", c)
+          if (c ~ /^visual-?regression$/) found = 1 } }
+        END { exit found ? 0 : 1 }' <<< "$row"; then
+        viol "[X] (no-change) marker on a non-Visual-regression matrix row — the harness honors it only when a whole cell reads Visual-regression; write the test the row plans, or retype the row: ${row}"
+    elif ! grep -qiE '`[[:space:]]*\(no-change\)' <<< "$row"; then
+        viol "[X] (no-change) marker is not directly after the row's backticked test token — the harness honors only the shape \`path\` (no-change): ${row}"
+    fi
+done < "$MATRIX_FILE"
 
 # ---------------------------------------------------------------------------
 # Gate G: a matrix row naming a bin/test-* / bin/check-* script must name one CI

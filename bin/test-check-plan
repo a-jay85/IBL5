@@ -2044,6 +2044,21 @@ else
     echo "ok: cf-count (2 must-appear, 3 exempt)"
 fi
 
+# --print-critical-files must emit the NORMALISED form (what Phase 5.0 consumes),
+# while gate [F] below still sees the raw absolute path and rejects it.
+_cfp="$TMP/cf-print-normalised.md"
+printf '%s\n' "$FM$CF_MATRIX" '## Critical Files' '' \
+    '- `/Users/ajaynicolas/GitHub/IBL5-worktrees/my-slug/ibl5/classes/Foo.php`' \
+    '- `/Users/ajaynicolas/GitHub/IBL5/bin/check-plan` (reference)' \
+    '- `bin/lib/critical-files.sh`' > "$_cfp"
+_want=$(printf 'MUST_APPEAR:ibl5/classes/Foo.php\nEXEMPT:bin/check-plan\nMUST_APPEAR:bin/lib/critical-files.sh')
+_got=$("$GUARD" --print-critical-files "$_cfp")
+if [ "$_got" = "$_want" ]; then
+    echo "ok: cf-print-normalised (--print-critical-files strips the IBL5 root)"
+else
+    echo "FAIL: cf-print-normalised — got: $(printf '%s' "$_got" | tr '\n' ' ')"; FAILED=1
+fi
+
 # ---------------------------------------------------------------------------
 # Gate [F] absolute-path fixtures
 # ---------------------------------------------------------------------------

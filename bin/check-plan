@@ -911,8 +911,11 @@ elif [ -n "$(printf '%s' "$CF_SECTION" | tr -d '[:space:]')" ]; then
         # repo-relative and cannot be matched by `git diff --name-only` at Phase
         # 5.0 conformance time. Paths like /Users/.../IBL5/ibl5/... or
         # /Users/.../IBL5-worktrees/<slug>/... must be written as ibl5/... etc.
-        # cf_parse_section already strips fenced code blocks.
-        _f_abs=$(cf_parse_section "$PLAN_FILE" | grep -E '^(MUST_APPEAR|EXEMPT):/' | head -1 | sed -E 's/^[A-Z_]+://')
+        # This is the ONE caller of cf_parse_section_raw: the normalising
+        # cf_parse_section strips exactly these prefixes (so legacy plans can
+        # match at Phase 5.0), which would blind this check. Raw already strips
+        # fenced code blocks.
+        _f_abs=$(cf_parse_section_raw "$PLAN_FILE" | grep -E '^(MUST_APPEAR|EXEMPT):/' | head -1 | sed -E 's/^[A-Z_]+://')
         if [ -n "$_f_abs" ]; then
             viol "[F] ## Critical Files entry has an absolute path (\`$_f_abs\`) — paths must be repo-relative (e.g. \`ibl5/...\`, \`bin/...\`) because post-plan's Phase 5.0 compares them to \`git diff --name-only\` output"
         fi

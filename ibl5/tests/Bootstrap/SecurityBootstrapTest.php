@@ -109,12 +109,23 @@ final class SecurityBootstrapTest extends TestCase
 
     public function testIncludeSafeStripsNullBytes(): void
     {
-        // PHP 8 throws ValueError from file_exists() when a path contains a null byte.
-        // The str_replace("\0", '', $dir) guard in includeSafe must strip the null byte
-        // before the file_exists() call, or the call would throw.
-        // If the guard is removed, this test fails because the ValueError propagates.
-        $level = ob_get_level();
-        SecurityBootstrap::includeSafe("subdir\0/test.php");
-        self::assertSame($level, ob_get_level(), 'includeSafe with null-byte path must not alter output buffer state');
+        // PHP 8.5 file_exists() returns false (no ValueError) for paths with a NUL byte,
+        // so asserting "no exception" passes vacuously. Instead, prove the NUL is stripped:
+        // the real fixture file is only included if includeSafe removes "\0" from the dir.
+        $tempDir = sys_get_temp_dir() . '/nul-strip-test-' . uniqid();
+        mkdir($tempDir . '/sub', 0777, true);
+        $tempFile = $tempDir . '/sub/test.php';
+        file_put_contents($tempFile, '<?php $GLOBALS["nul_strip_test"] = "included";');
+
+        try {
+            SecurityBootstrap::includeSafe($tempDir . "/sub\0/test.php");
+
+            self::assertSame('included', $GLOBALS['nul_strip_test'] ?? null, 'includeSafe must strip the null byte and include the real file');
+        } finally {
+            unset($GLOBALS['nul_strip_test']);
+            unlink($tempFile);
+            rmdir($tempDir . '/sub');
+            rmdir($tempDir);
+        }
     }
 }

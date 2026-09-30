@@ -41,7 +41,10 @@ build_sandbox() {
     # Exits SHIM_DOCFIX_RUN_RC (default 0).
     printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\nexit "${SHIM_DOCFIX_RUN_RC:-0}"\n' \
         "$SB" > "$SB/bin/docfix-run"
-    chmod +x "$SB/bin/check-docs" "$SB/bin/cleanup" "$SB/bin/docfix-run"
+    # wt-remove stub: logs worktree name to wt-remove-calls; exits SHIM_WTREMOVE_RC (def 0).
+    printf '#!/usr/bin/env bash\necho "$1" >> "%s/wt-remove-calls"\nexit "${SHIM_WTREMOVE_RC:-0}"\n' \
+        "$SB" > "$SB/bin/wt-remove"
+    chmod +x "$SB/bin/check-docs" "$SB/bin/cleanup" "$SB/bin/docfix-run" "$SB/bin/wt-remove"
 
     # git shim: _SB is baked in at write time; SHIM_* vars are env at runtime.
     # Strips the -C <path> prefix before matching on the subcommand — all
@@ -74,6 +77,10 @@ case "$_SUBCMD" in
     push)   printf 'push\n'   >> "$_SB/git-push-calls"
             exit "${SHIM_GIT_PUSH_RC:-0}" ;;
     reset)  printf 'reset\n'  >> "$_SB/git-reset-calls" ;;
+    # show-ref default 1 = "ref gone" (the reap succeeded); 0 = ref still present.
+    show-ref)   exit "${SHIM_SHOWREF_RC:-1}" ;;
+    # merge-base default 1 = branch has own commits (not an ancestor of master).
+    merge-base) exit "${SHIM_MERGEBASE_RC:-1}" ;;
     *)
         printf '%s\n' "${_ORIG[*]:-}" >> "$_SB/git-unmatched-calls"
         exec /usr/bin/git "${_ORIG[@]}" ;;
@@ -671,6 +678,55 @@ OUT22="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
   || bad "(22b) unknown age: health should emit alert=true kind=wedged"
 
 # ---------------------------------------------------------------------------
+# Test 23: clean zero-own-commit wedged branch. The real bin/cleanup SKIPs it as
+# "not merged" (exit 0, ref survives), which wedged docs-stale-refresh-20260925
+# for 4+ nights. Salvage must fall through to wt-remove + branch -D.
+# (23a) positive: ref survives cleanup, tip is an ancestor of master → removed.
+SB="$(_wt_sandbox)"
+WL23="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL23" SHIM_STATUS_OUT="" SHIM_LAUNCHCTL_OUT="" \
+    SHIM_SHOWREF_RC=0 SHIM_MERGEBASE_RC=0 \
+    run_poll_err "$SB"
+{ grep -q "$B_OLD" "$SB/wt-remove-calls" 2>/dev/null \
+    && grep -q "$B_OLD" "$SB/git-branch-d-calls" 2>/dev/null \
+    && ! grep -q "Could not reap" "$POLL_STDERR_FILE"; } \
+  && ok "(23a) zero-own-commit clean wedged branch: wt-remove + branch -D, no 'Could not reap'" \
+  || bad "(23a) zero-own-commit clean wedged branch not removed"
+
+# (23b) negative: branch has own commits (not an ancestor) → left in place.
+SB="$(_wt_sandbox)"
+WL23B="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL23B" SHIM_STATUS_OUT="" SHIM_LAUNCHCTL_OUT="" \
+    SHIM_SHOWREF_RC=0 SHIM_MERGEBASE_RC=1 \
+    run_poll_err "$SB"
+{ [ ! -f "$SB/wt-remove-calls" ] && [ ! -f "$SB/git-branch-d-calls" ] \
+    && grep -q "Could not reap" "$POLL_STDERR_FILE"; } \
+  && ok "(23b) clean branch with own commits: not force-removed, left in place" \
+  || bad "(23b) branch with own commits must not be force-removed"
+
+# (23c) dirty wedged branch salvaged + pushed, but bin/cleanup SKIPs it (the salvage
+# commit is on no merged PR). The ref must still be removed, or it re-wedges nightly.
+SB="$(_wt_sandbox)"
+WL23C="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL23C" SHIM_STATUS_OUT=" M docs/foo.md" SHIM_LAUNCHCTL_OUT="" \
+    SHIM_SHOWREF_RC=0 \
+    run_poll_err "$SB"
+{ [ -f "$SB/git-push-calls" ] \
+    && grep -q "$B_OLD" "$SB/wt-remove-calls" 2>/dev/null \
+    && grep -q "$B_OLD" "$SB/git-branch-d-calls" 2>/dev/null \
+    && ! grep -q "could not remove" "$POLL_STDERR_FILE"; } \
+  && ok "(23c) salvaged branch left by cleanup: wt-remove + branch -D after push" \
+  || bad "(23c) salvaged branch must be removed after a successful push"
+
 if [ "$FAILED" -eq 0 ]; then
     echo "All docfix-poll checks passed."
 else

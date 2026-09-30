@@ -260,6 +260,7 @@ class ApiKeysViewTest extends TestCase
         $source = (string) file_get_contents($file);
 
         $this->assertStringNotContainsString('refresh_token', $source);
+        $this->assertStringNotContainsString("\$summary['refresh_token_enc']", $source);
     }
 
     public function testRenderFlashEscapesTextAndReturnsEmptyForNull(): void

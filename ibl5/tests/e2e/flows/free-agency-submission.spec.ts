@@ -180,8 +180,12 @@ test.describe('Free Agency -- quick offer buttons', () => {
 
     await submitFormAndAssertEffect(page, {
       submit: async () => {
+        // Quick-offer buttons ask before sending; accept and check the prompt names the offer
+        let confirmText = '';
+        page.once('dialog', (dialog) => { confirmText = dialog.message(); void dialog.accept(); });
         await page.getByTestId('quick-offer-vetmin').click();
         await page.waitForURL(/result=offer_success/);
+        expect(confirmText).toMatch(/a 1-year offer\?/);
       },
       expectSameSpot: async () => {
         await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
@@ -199,6 +203,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
 
     await submitFormAndAssertEffect(page, {
       submit: async () => {
+        page.once('dialog', (dialog) => dialog.accept());
         await page.getByTestId('quick-offer-mle-yr1').click();
         await page.waitForURL(/result=offer_success/);
       },
@@ -235,6 +240,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
 
     await submitFormAndAssertEffect(page, {
       submit: async () => {
+        page.once('dialog', (dialog) => dialog.accept());
         await page.getByTestId('quick-offer-lle').click();
         await page.waitForURL(/result=offer_success/);
       },
@@ -268,6 +274,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
 
     await submitFormAndAssertEffect(page, {
       submit: async () => {
+        page.once('dialog', (dialog) => dialog.accept());
         await page.getByTestId('quick-offer-max-yr1').click();
         await page.waitForURL(/result=offer_success/);
       },

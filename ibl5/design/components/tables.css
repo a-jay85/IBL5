@@ -566,9 +566,38 @@
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
+/* clip (not hidden) so the caption does not become a scroll container
+   and capture the sticky children below */
 .team-table-caption {
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    overflow: hidden;
+    overflow: clip;
+}
+
+/* Mobile: a wide table's caption and title row span the full table width,
+   so centered content lands off-screen. Pin it to the visible scroll area
+   (100cqw = the scroll container's width). */
+@media (max-width: 768px) {
+    .table-scroll-container:has(.team-table-caption),
+    .table-scroll-container:has(.fa-table),
+    .sticky-scroll-wrapper:has(.fa-table) {
+        container-type: inline-size;
+    }
+
+    /* Scoped to the same ancestors: outside a container, cqw falls back
+       to the viewport width */
+    .table-scroll-container .team-table-caption > *,
+    .table-scroll-container .fa-table__title,
+    .sticky-scroll-wrapper .fa-table__title {
+        position: sticky;
+        left: 0;
+        width: 100cqw;
+        box-sizing: border-box;
+    }
+
+    .fa-table__title {
+        display: block;
+        text-align: center;
+    }
 }
 
 /* Scroll container for wide tables on mobile */
@@ -730,6 +759,19 @@
     position: sticky;
     left: 0;
     z-index: 5;
+}
+
+/* FA tables pin the Player column on phones only, matching the
+   .responsive-table FA tables above it on the same page */
+@media (min-width: 769px) {
+    .fa-table.sticky-table .sticky-col {
+        position: static;
+    }
+
+    .fa-table.sticky-table tbody td.sticky-col {
+        box-shadow: none;
+        border-right: none;
+    }
 }
 
 /* Second sticky column (e.g. Draft table: radio + name) */

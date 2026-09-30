@@ -159,9 +159,13 @@ class FreeAgencyFormView
     private function renderOfferButtonForm(array $offers, int $finalYear, int $offerType = 0, string $testId = ''): string
     {
         $testIdAttr = $testId !== '' ? ' data-testid="' . HtmlSanitizer::e($testId) . '"' : '';
+        // One tap sends a real offer, so ask first (htmx shows the confirm on boosted submits)
+        $years = count($offers);
+        $confirmMessage = 'Send ' . ($this->player->getName() ?? 'this player') . ' a ' . $years . '-year offer? '
+            . implode(' / ', array_map('strval', $offers));
         ob_start();
         ?>
-<form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+<form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="<?= HtmlSanitizer::e($confirmMessage) ?>">
     <?= HtmlSanitizer::trusted($this->csrfHtml) // @phpstan-ignore ibl.trustedVariable (pre-generated CSRF hidden-input HTML set by the caller via setCsrfHtml(); no request or DB data interpolated) ?>
     <?= HtmlSanitizer::trusted($this->renderHiddenFields($offers, $offerType)) ?>
     <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary"<?= HtmlSanitizer::trusted($testIdAttr) // @phpstan-ignore ibl.trustedVariable ($testIdAttr is built above from HtmlSanitizer::e($testId) wrapped in a data-testid attribute; no unescaped data) ?>><?= (int) $offers[$finalYear - 1] ?></button>

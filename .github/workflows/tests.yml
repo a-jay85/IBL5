@@ -226,7 +226,9 @@ jobs:
         mkdir -p coverage
         echo "::group::Full PHPUnit output"
         set +eo pipefail
-        vendor/bin/phpunit \
+        vendor/bin/paratest \
+          --processes="$(nproc)" \
+          --cache-directory=/tmp/phpunit-cache \
           --testdox \
           --coverage-clover coverage/clover.xml \
           --colors=always 2>&1 | tee /tmp/phpunit-output.txt

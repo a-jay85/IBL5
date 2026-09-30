@@ -20,6 +20,8 @@
 #                 a spend bug; see .claude/rules/work-triage.md). Times out at 7200s and then exits 1 after writing the report.
 #                 A slot is released only when its label is gone AND no process carries it,
 #                 so a run aborted without --stop holds its slot until the ceiling.
+#                 A session paused by the usage gate (ADR-0143) ends its label, so it counts
+#                 as settled here and the report lists it as PAUSED. The exit code is unchanged.
 #   --stop N[,N...]   Abort the fired session(s) for these PRs: bootout the launchd label,
 #                     TERM then KILL anything carrying --name <label>, release the slot
 #                     (remove the plist) and clear the PR's /tmp scratch. Exits nonzero and
@@ -78,7 +80,7 @@
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    sed -n '2,76p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,78p' "$0" | sed 's/^# \{0,1\}//'
     exit 0
 fi
 
@@ -109,6 +111,9 @@ ROOT="$(dirname "$GIT_COMMON")"
 # --- session-id helpers ------------------------------------------------------------------
 . "$SCRIPT_DIR/lib/session-id.sh"
 . "$SCRIPT_DIR/lib/launchd-job.sh"
+# Usage-gate markers (ADR-0143): a post-plan session paused by the gate is resumed by the
+# coordinator, so the fleet must not fire a second one into the same worktree.
+. "$SCRIPT_DIR/lib/usage-gate.sh"
 
 # --- defaults ----------------------------------------------------------------------------
 GO=0
@@ -126,7 +131,7 @@ CEILING_SECS="${POST_PLAN_FLEET_CEILING:-7200}"
 WAIT_POLL_SECS="${POST_PLAN_FLEET_WAIT_POLL:-20}"
 
 # --- flag parsing ------------------------------------------------------------------------
-usage() { sed -n '2,76p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,78p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -300,11 +305,20 @@ FIRE_PRS=(); FIRE_BRANCHES=(); FIRE_PRE=(); SKIP_LINES=()
 # _REPORT_MASTER_SHA is always resolved lazily inside write_report when empty.
 _REPORT_MASTER_SHA=""
 
-# derive_status <log-path>
+# derive_status <log-path> [worktree-path]
 # Returns the status string for a single PR log: READY, NOT READY, NOT READY (no log),
-# or MASTER-MOVING-TOO-FAST.
+# MASTER-MOVING-TOO-FAST, or PAUSED (usage gate; auto-resumes). PAUSED wins: a paused
+# session has not finished, so nothing else in its log is a verdict yet.
 derive_status() {
-    local log="$1"
+    local log="$1" wt="${2:-}"
+    if [[ -f "$log" ]] && grep -qE '^post-plan-now: RESULT paused' "$log"; then
+        printf 'PAUSED (usage gate; auto-resumes)'
+        return
+    fi
+    if [[ -n "$wt" ]] && usage_worktree_paused "$wt"; then
+        printf 'PAUSED (usage gate; auto-resumes)'
+        return
+    fi
     # Missing log: session may still be running (e.g. --go without --wait).
     if [[ ! -f "$log" ]]; then
         printf 'NOT READY (no log)'
@@ -363,7 +377,7 @@ write_report() {
                 br="${FIRE_BRANCHES[$i]}"
                 pre="${FIRE_PRE[$i]}"
                 log="/tmp/post-plan-fleet-${pr}.log"
-                st="$(derive_status "$log")"
+                st="$(derive_status "$log" "$(wt_path_for_branch "$br")")"
                 printf '| %s | %s | %s | %s | %s |\n' "$pr" "$br" "$pre" "$st" "$log"
             done
         fi
@@ -468,6 +482,13 @@ else
     [[ -f "$_WTL" ]] || { echo "ERROR: POST_PLAN_FLEET_WTL not found: $_WTL" >&2; exit 1; }
 fi
 
+# wt_path_for_branch <branch>: the worktree path from the listing for [branch], or nothing.
+# grep -F: without it, [$branch] is treated as a character class.
+wt_path_for_branch() {
+    [[ -n "${1:-}" && -f "$_WTL" ]] || return 0
+    grep -F "[$1]" "$_WTL" | head -1 | awk '{print $1}'
+}
+
 while read -r pr; do
     [[ -n "$pr" ]] || continue
     # Anchored at end-of-line: the label carries no suffix, so an unanchored match
@@ -490,6 +511,11 @@ while read -r pr; do
     elif [[ -n "$w" ]];            then pre="WT"
     elif [[ -n "$p" ]];            then pre="PLAN"
     else                                pre="—"
+    fi
+    # A post-plan run paused by the usage gate is resumed by the coordinator. Firing another
+    # into the same worktree would race it, so skip; the row takes no slot.
+    if [[ -n "$w" ]] && usage_worktree_paused "$(wt_path_for_branch "$branch")"; then
+        SKIP_LINES+=("$pr|$branch|$pre|post-plan paused by usage gate; coordinator resumes it"); continue
     fi
     if [[ -z "$w" ]]; then
         # Skip unless an explicit --pr was given (allows dry-run with fictional PR numbers).

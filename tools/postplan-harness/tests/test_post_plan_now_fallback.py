@@ -107,7 +107,10 @@ def test_plan_blind_prompt_reaches_the_model_intact():
 
 def test_embed_sites_are_shell_quoted():
     src = open(PPN).read()
-    assert 'claude -p $(shq "$PROMPT")' in src      # not \"$PROMPT\" — see shq() header
+    # The prompt is shq()'d into SKILL_PROMPT_ARG, which the claude call splices in
+    # (usage gate resume swaps it); it must never be interpolated inside \"...\".
+    assert 'SKILL_PROMPT_ARG="$(shq "$PROMPT")"' in src   # see shq() header
+    assert 'claude -p ${SKILL_PROMPT_ARG}' in src
     assert r'claude -p \"$PROMPT\"' not in src
     assert '--plan $(shq "$PLAN_OVERRIDE")' in src
 
@@ -373,7 +376,7 @@ def _generate_cmd(tmp_path, extra_env=None):
 def test_generated_cmd_has_no_rc4_arm(tmp_path):
     cmd = _generate_cmd(tmp_path)
     assert '[ "$rc" = 4 ]' not in cmd, "rc=4 arm must be gone after the full-port"
-    assert cmd.index('should_fallback "$rc"; then') < cmd.index('elif [ "$rc" = 3 ]; then')
+    assert cmd.index('should_fallback "$rc" && ! usage_postrun_pause') < cmd.index('elif [ "$rc" = 3 ]; then')
 
 def test_generated_cmd_carries_one_claude_invocation(tmp_path):
     cmd = _generate_cmd(tmp_path)
@@ -495,7 +498,7 @@ def test_generated_cmd_captures_the_harness_result_line(tmp_path):
     assert "HARNESS_RESULT=$(grep -m1 '^RESULT:'" in cmd
     assert "HARNESS_RESULT=${HARNESS_RESULT:0:1200}" in cmd
     assert (cmd.index("rc=$?; ") < cmd.index("HARNESS_RESULT=$(grep")
-            < cmd.index('should_fallback "$rc"; then'))
+            < cmd.index('should_fallback "$rc" && ! usage_postrun_pause'))
 
 
 def test_skill_only_cmd_has_no_harness_result_capture(tmp_path):
@@ -1586,7 +1589,7 @@ def test_generated_cmd_guards_gate_open_with_sigterm_flag(tmp_path):
     """
     cmd = _generate_cmd(tmp_path)
     # The guard appears before should_fallback in the gate expression
-    gate_pos = cmd.index('should_fallback "$rc"; then')
+    gate_pos = cmd.index('should_fallback "$rc" && ! usage_postrun_pause')
     sigterm_guard = '_sigterm_received'
     assert sigterm_guard in cmd[:gate_pos], (
         "GATE_OPEN must check _sigterm_received BEFORE calling should_fallback"

@@ -110,6 +110,9 @@ fi
 assert_contains "$PP_BLOCK" 'PP_WORKTREE=$(automouse_worktree_for_plan' "PP block starts with the worktree resolution"
 assert_contains "$PP_BLOCK" '--foreground'   "PP block invokes --foreground"
 
+# phase_env_error delegates to the usage gate's predicate (ADR-0143).
+# shellcheck source=/dev/null
+. "$REPO_ROOT/bin/lib/usage-gate.sh"
 eval "$ENV_ERR_FN"
 
 # Timeout passthrough shim: the PP block uses `timeout $secs cmd`, but the

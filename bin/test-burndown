@@ -101,6 +101,7 @@ OUT="$("$SCRIPT" --help 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && ok "--help exits 0" || fail "--help exits 0 (got $RC)"
 want "--help: burndown-status listed" "$OUT" "burndown-status"
 want "--help: burndown-close-merged listed" "$OUT" "burndown-close-merged"
+want "--help: burndown-sweep listed" "$OUT" "burndown-sweep"
 
 # ── C2: unknown burndown subcommand rejected ──────────────────────────────────
 OUT="$(bd burndown-bogus 2>&1)"; RC=$?

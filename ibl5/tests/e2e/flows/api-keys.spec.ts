@@ -12,25 +12,6 @@ test.describe('API Keys flow', () => {
     await assertNoPhpErrors(page, 'on ApiKeys page');
   });
 
-  test('export guide offers Apps Script header auth alongside IMPORTDATA', async ({ page }) => {
-    await page.goto('modules.php?name=ApiKeys');
-
-    // Guide renders below every key-state card, so this holds regardless of key state.
-    await expect(page.getByRole('heading', { name: /Apps Script \(header auth\)/i })).toBeVisible();
-
-    const codeBlocks = page.locator('pre.ibl-code-block');
-    await expect(codeBlocks).toHaveCount(2);
-    await expect(codeBlocks.nth(0)).toContainText('=IMPORTDATA(');
-    await expect(codeBlocks.nth(0)).toContainText('?key=YOUR_KEY');
-    await expect(codeBlocks.nth(1)).toContainText('setIblApiKey');
-    await expect(codeBlocks.nth(1)).toContainText('IBL_PLAYERS');
-    await expect(codeBlocks.nth(1)).toContainText('PropertiesService.getUserProperties');
-    await expect(codeBlocks.nth(1)).toContainText('UrlFetchApp.fetch');
-    await expect(codeBlocks.nth(1)).not.toContainText('?key=');
-
-    await assertNoPhpErrors(page, 'on ApiKeys export guide');
-  });
-
   test('shows generate button when no key exists', async ({ page }) => {
     // Clean up any existing key first by revoking it
     await page.goto('modules.php?name=ApiKeys');

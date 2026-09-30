@@ -593,6 +593,10 @@ else
     _a4_bad="bin/check-pr-checks-green is not called with --timeout-seconds="
   elif grep -qE ':[[:space:]]*write' <<< "$agg_perms$(printf '\n')$(grep -E '^[[:space:]]+[a-z-]+:[[:space:]]*write' <<< "$agg_jobs" || true)"; then
     _a4_bad="permissions grant a write scope"
+  # PR-controlled text (github.event.pull_request.title|body|head.ref|labels) must never
+  # reach the workflow: it would be a script-injection path into the run block.
+  elif grep -qE 'github\.event\.pull_request\.(title|body|head\.ref|labels)' "$agg_file"; then
+    _a4_bad="interpolates PR-controlled text (title, body, head.ref or labels)"
   fi
   if [ -n "$_a4_bad" ]; then
     echo "composite-contracts: all-checks-green (A4) — $_a4_bad; the aggregator would not fail closed or would hold more privilege than it reads with ($agg_file)" >&2

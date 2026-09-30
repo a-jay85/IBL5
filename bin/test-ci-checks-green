@@ -275,6 +275,8 @@ if [ "$p8_rc" -eq 1 ] && [[ "$p8_err" == *"api error"* ]] && [[ "$p8_err" == *"T
     ok "P8 api error is pending then fail-closed"
 else fail "P8 api error is pending then fail-closed (wait rc=$p8_rc oneshot rc=$p8_oneshot_rc)"; fi
 
+# P9: the failure sits on the second slurped page. Mutation: reading `.[0].check_runs`
+# only (first page) would miss Engine and pass.
 new_case p9
 printf '[{"check_runs":[{"name":"A",%s}]},{"check_runs":[{"name":"Engine","status":"completed","conclusion":"failure","completed_at":"2026-01-01T00:00:00Z"}]}]' "$G" \
     > "$PFIX/1-checkruns.json"

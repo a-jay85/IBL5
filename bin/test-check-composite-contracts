@@ -571,6 +571,9 @@ put_agg() {
     a4-wait) wait="" ;;
     a4-write) perms="  contents: read
   checks: write" ;;
+    a4-inject)
+      # shellcheck disable=SC2016  # the ${{ }} expression is literal fixture YAML
+      wait='--wait --title="${{ github.event.pull_request.title }}" ' ;;
     *) echo "put_agg: unknown variant $2" >&2; return 1 ;;
   esac
   {
@@ -612,6 +615,7 @@ run_agg "agg-a3-if" 1 a3-if
 run_agg "agg-a4-timeout" 1 a4-timeout
 run_agg "agg-a4-wait" 1 a4-wait
 run_agg "agg-a4-write" 1 a4-write
+run_agg "agg-a4-inject" 1 a4-inject
 
 # agg-a2-duplicate-name: a second workflow names a job with the same context
 d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"

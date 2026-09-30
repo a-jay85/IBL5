@@ -122,7 +122,8 @@ def test_llm_less_abort_names_conflicted_paths(repo_with_origin):
 
 def test_probe_last_conflict_files_agree_with_rebase_snapshot(repo_with_origin):
     """The stage-recording probe still fills last_conflict_files with the same sorted path
-    tuple the real rebase snapshots afterwards.
+    tuple the real rebase snapshots afterwards. Guards the LiveGit consumers that read
+    last_conflict_files (this file: tests/test_gitad_conflict_evidence.py).
 
     Mutation caught: drop the `self.last_conflict_files = tuple(sorted(conflicted))`
     assignment in predict_rebase_conflict -> the probe assertion sees ().

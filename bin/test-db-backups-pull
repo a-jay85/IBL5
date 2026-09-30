@@ -89,8 +89,8 @@ run
 count="$(find "$CASE/local" -maxdepth 1 -name "ibl5-*.sql.gz" | wc -l | tr -d ' ')"
 # newest 30 = 03-15..02-14 ; month firsts older than that: 2026-01-15 is the earliest (60 days back = 01-14)
 oldest="$(day_before 59)"
-jan_first="$(find "$CASE/remote/backups/db" -name "ibl5-*" -exec basename {} + | sed 's/ibl5-//;s/.sql.gz//' | grep '^2026-01' | sort | head -1)"
-feb_first="$(find "$CASE/remote/backups/db" -name "ibl5-*" -exec basename {} + | sed 's/ibl5-//;s/.sql.gz//' | grep '^2026-02' | sort | head -1)"
+jan_first="$(find "$CASE/remote/backups/db" -name "ibl5-*" -exec basename -a {} + | sed 's/ibl5-//;s/.sql.gz//' | grep '^2026-01' | sort | head -1)"
+feb_first="$(find "$CASE/remote/backups/db" -name "ibl5-*" -exec basename -a {} + | sed 's/ibl5-//;s/.sql.gz//' | grep '^2026-02' | sort | head -1)"
 if [ "$RC" -eq 0 ] && [ -f "$CASE/local/ibl5-$jan_first.sql.gz" ] && [ -f "$CASE/local/ibl5-$feb_first.sql.gz" ] \
    && [ -f "$CASE/local/ibl5-$(day_before 29).sql.gz" ] && [ ! -f "$CASE/local/ibl5-$(day_before 30).sql.gz" ] \
    && [ ! -f "$CASE/local/ibl5-$(day_before 58).sql.gz" ] && [ "$count" -eq 32 ]; then

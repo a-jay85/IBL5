@@ -416,7 +416,7 @@
 }
 
 .ibl-segmented__option input:checked + .ibl-segmented__text {
-    background: var(--accent-500);
+    background: var(--accent-700); /* white on accent-500 is 2.8:1, fails WCAG AA */
     color: white;
     font-weight: 600;
 }

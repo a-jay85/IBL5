@@ -5,6 +5,23 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/wt-down <worktree-name> [--force]
+       bin/wt-down --all [--force]
+
+Stop a worktree Docker environment and remove its volumes.
+
+Arguments:
+  worktree-name   Name of the worktree to tear down.
+
+Options:
+  --all     Tear down all known worktree environments.
+  --force   Tear down even if the worktree has uncommitted changes.
+EOF
+    exit 0
+fi
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$(dirname "$0")/lib/wt-guards.sh"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"

@@ -666,6 +666,16 @@ def strip_manual_testing_section(body: str) -> tuple[str, bool]:
 MANUAL_TESTING_SENTINEL = (
     "No manual testing needed — all changes are covered by automated tests.")
 
+# Written instead of MANUAL_TESTING_SENTINEL when the located plan's Verification
+# Matrix has zero executable rows (.claude/rules/pr-body-test-claim.md mandates this
+# text). Same `No manual testing needed` prefix, so armable.SENTINEL_RE and the shell
+# twins (bin/lib/pr-armable.sh, bin/check-pr-manual-testing) read it as CLEARED; the
+# tail carries no e2e/unit/integration keyword, so the diff-coverage scan stays quiet.
+# Never "verified by" (#2489).
+MANUAL_TESTING_SENTINEL_STATIC = (
+    "No manual testing needed — verification is static; "
+    "the plan's Verification Matrix has no executable rows.")
+
 
 def _manual_testing_span(body: str) -> tuple[int, int] | None:
     """`(start, end)` of the arming gate's window: the first `_MANUAL_HEADING_RE`

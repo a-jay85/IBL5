@@ -9,6 +9,29 @@
 #   exit 0 — no duplicate signal (or no slug derivable); caller should proceed
 #   exit 2 — usage error
 #   exit 3 — duplicate found; the decline message is on stdout
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/plan-dup-check <prompt-file>
+
+Pre-flight duplicate detector for bin/plan-now.
+Derives the candidate branch slug from the prompt's Sequencing section and
+reports whether a planning artifact for that slug already exists on disk.
+Detection only: no writes, no deletes.
+
+  prompt-file  Path to a /plan prompt file
+
+Env:
+  NIGHTLY_DIR  Automouse queue root (default: ~/.claude/projects/.../automouse)
+  PLANS_DIR    Plan files directory (default: ~/claude-plans)
+
+Exit codes:
+  0  No duplicate found; caller should proceed
+  2  Usage error (missing or non-existent prompt file)
+  3  Duplicate found; decline message on stdout
+EOF
+    exit 0
+fi
+
 set -euo pipefail
 
 PROMPT="${1:-}"

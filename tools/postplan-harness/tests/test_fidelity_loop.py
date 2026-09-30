@@ -265,3 +265,52 @@ def test_before_remediation_called_once_not_twice(tmp_path, git_shim):
     finally:
         _cleanup(99, "99-2")
     assert call_count[0] == 1
+
+
+_FULL_KEYS = {
+    "verdict_1", "error_kind", "reviewed_tree", "verdict_path",
+    "remediation_sha", "verdict_2", "reviewed_tree_2",
+    "findings_round", "rounds", "rounds_completed",
+    "backlog_issue_numbers", "diff_id", "plan_hash", "models",
+}
+
+
+def _call(tmp_path, canned, live=False, gh=None):
+    llm = FixtureLlm(UsageLedger(), canned)
+    res = _Res()
+    out = runner._run_fidelity(
+        llm, str(tmp_path), str(tmp_path), _git(), gh or RecordingGh(str(tmp_path)),
+        _plan(), "diff", "body", 99, "dead" * 10, TREE_1, live, lambda m: None, res,
+    )
+    return res, out
+
+
+def test_synthetic_ready_early_return_has_full_schema(tmp_path, git_shim):
+    """Replay fixture with no canned plan-fidelity-review: synthetic READY literal."""
+    res, out = _call(tmp_path, {})
+    assert out == ("READY", "")
+    assert set(res.fidelity) == _FULL_KEYS
+    assert res.fidelity["models"] == []
+
+
+def test_carry_forward_early_return_has_full_schema(tmp_path, git_shim, monkeypatch):
+    """Carry-forward literal: full key set plus carried_forward."""
+    monkeypatch.setattr(runner.fidelity, "carry_forward_predicate",
+                        lambda *a, **kw: ("READY", ""))
+    gh = types.SimpleNamespace(pr_sticky_body=lambda pr: "sticky")
+    res, out = _call(tmp_path, {"plan-fidelity-review": "x"}, live=True, gh=gh)
+    assert out == ("READY", "")
+    assert set(res.fidelity) == _FULL_KEYS | {"carried_forward"}
+    assert res.fidelity["models"] == []
+
+
+def test_build_packet_failure_early_return_has_full_schema(tmp_path, git_shim, monkeypatch):
+    """HarnessError from build_packet: indeterminate literal keeps the full key set."""
+    def _boom(*a, **kw):
+        raise HarnessError("packet-failed", "test")
+
+    monkeypatch.setattr(runner.fidelity, "build_packet", _boom)
+    res, out = _call(tmp_path, {"plan-fidelity-review": "x"})
+    assert out == (None, "packet-failed")
+    assert set(res.fidelity) == _FULL_KEYS
+    assert res.fidelity["models"] == []

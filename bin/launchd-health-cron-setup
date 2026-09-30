@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# bin/launchd-health-cron-setup — installer for the launchd-health-check LaunchAgents.
+#
+# Usage:
+#   bin/launchd-health-cron-setup --print-schedule <login|daily>
+#   bin/launchd-health-cron-setup --install-schedule
+#   bin/launchd-health-cron-setup --uninstall-schedule
+#   bin/launchd-health-cron-setup -h|--help
+#
+# Install AFTER this lands on master.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ACTION=""
+VARIANT=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --print-schedule)
+      VARIANT="${2:-}"
+      case "$VARIANT" in
+        login|daily) ACTION="print"; shift 2 ;;
+        *) printf "Error: --print-schedule needs 'login' or 'daily'\n" >&2; exit 1 ;;
+      esac
+      ;;
+    --install-schedule)   ACTION="install";   shift ;;
+    --uninstall-schedule) ACTION="uninstall"; shift ;;
+    -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
+    *) printf 'Unknown option: %s\n' "$1" >&2; exit 1 ;;
+  esac
+done
+
+[ -n "$ACTION" ] || { printf 'No action given. See --help.\n' >&2; exit 1; }
+
+# --- Durable MAIN-checkout derivation -----------------------------------------
+# Program/WorkingDirectory MUST point at the main checkout, never this worktree
+# (a worktree gets torn down — the LaunchAgent would then point at a dead path).
+# The first `git worktree list` entry is the main working tree.
+MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+[ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"   # fallback: not in a git tree
+
+LABEL_PREFIX="com.ibl5.launchd-health"
+AGENTS_DIR="$HOME/Library/LaunchAgents"
+LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/launchd-health/logs"
+PROGRAM="$MAIN_WT/bin/launchd-health-check"
+CHECK_BIN="${LAUNCHD_HEALTH_CHECK_BIN:-$PROGRAM}"
+
+# Single source of truth for the plist — used by both --print-schedule and
+# --install-schedule, so the MAIN-checkout derivation is exercised by tests.
+# $1 = variant (login or daily)
+build_plist() {
+  local v="$1"
+  cat <<PLIST_HEAD
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>${LABEL_PREFIX}-${v}</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>${PROGRAM}</string>
+PLIST_HEAD
+
+  if [ "$v" = "login" ]; then
+    cat <<PLIST_DELAY
+		<string>--startup-delay</string>
+		<string>180</string>
+PLIST_DELAY
+  fi
+
+  cat <<PLIST_COMMON
+	</array>
+	<key>WorkingDirectory</key>
+	<string>${MAIN_WT}</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- launchd agents start with a minimal PATH that omits Homebrew; git and the
+		     checker must resolve. HOME interpolates HERE, at generation time —
+		     launchd does NOT expand variables in EnvironmentVariables, so a literal
+		     dollar-sign-HOME would bake in a dead path. -->
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/opt/homebrew/opt/mariadb/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin</string>
+	</dict>
+PLIST_COMMON
+
+  if [ "$v" = "login" ]; then
+    cat <<PLIST_RUNATLOAD
+	<key>RunAtLoad</key>
+	<true/>
+PLIST_RUNATLOAD
+  else
+    cat <<PLIST_CALENDAR
+	<!-- do NOT "fix" this to StartInterval — that is a repeating interval, not a calendar time -->
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>8</integer>
+		<key>Minute</key>
+		<integer>45</integer>
+	</dict>
+PLIST_CALENDAR
+  fi
+
+  cat <<PLIST_TAIL
+	<key>StandardOutPath</key>
+	<string>${LOG_DIR}/launchd-health-${v}.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>${LOG_DIR}/launchd-health-${v}.err.log</string>
+</dict>
+</plist>
+PLIST_TAIL
+}
+
+case "$ACTION" in
+  print)
+    build_plist "$VARIANT"
+    ;;
+  install)
+    # Refusal 1 (checked first): launchd-health-check must exist and be executable.
+    if [ ! -x "$CHECK_BIN" ]; then
+      printf 'Error: launchd-health-check not found or not executable at %s. Install AFTER this lands on master.\n' "${CHECK_BIN}" >&2
+      exit 1
+    fi
+    # Refusal 2: must be run from the main checkout — worktrees are torn down after
+    # their PR merges; a plist pointing into one silently stops working.
+    if [ "$REPO_ROOT" != "$MAIN_WT" ]; then
+      printf 'Error: --install-schedule must be run from the main checkout (%s).\n' "${MAIN_WT}" >&2
+      printf 'Current location: %s\n' "${REPO_ROOT}" >&2
+      printf 'cd to %s and re-run.\n' "${MAIN_WT}" >&2
+      exit 1
+    fi
+    mkdir -p "$AGENTS_DIR" "$LOG_DIR"
+    for v in login daily; do
+      launchctl bootout "gui/$(id -u)/${LABEL_PREFIX}-${v}" 2>/dev/null || true
+      build_plist "$v" > "${AGENTS_DIR}/${LABEL_PREFIX}-${v}.plist"
+      launchctl bootstrap "gui/$(id -u)" "${AGENTS_DIR}/${LABEL_PREFIX}-${v}.plist"
+    done
+    printf 'Installed %s-login (RunAtLoad, 180s delay) and %s-daily (08:45). Program: %s\n' \
+      "$LABEL_PREFIX" "$LABEL_PREFIX" "$PROGRAM"
+    ;;
+  uninstall)
+    for v in login daily; do
+      launchctl bootout "gui/$(id -u)/${LABEL_PREFIX}-${v}" 2>/dev/null || true
+      rm -f "${AGENTS_DIR}/${LABEL_PREFIX}-${v}.plist"
+    done
+    ;;
+esac

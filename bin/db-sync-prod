@@ -24,6 +24,33 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/db-sync-prod [worktree-name] [--snapshot <file.sql.gz> [--print-plan]]
+
+Sync the production database into a running Docker MariaDB container.
+Streams mariadb-dump → docker exec stdin (no intermediate file).
+
+Arguments:
+  worktree-name          Target the named worktree's MariaDB container.
+                         Omit to target the main ibl5-mariadb container.
+
+Options:
+  --snapshot <file.sql.gz>   Load from a local snapshot instead of prod.
+  --print-plan               Print the snapshot load pipeline and exit.
+                             Requires --snapshot; there is no dry run for
+                             the prod path (see .claude/rules/db-sync-prod-dry-run.md).
+
+Target resolution order:
+  1. <worktree-name> argument
+  2. CWD inside a worktree directory
+  3. Main ibl5-mariadb container
+
+Prereqs: .env with REMOTE_* credentials; target container already running.
+EOF
+    exit 0
+fi
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bin/lib/db-helpers.sh"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"

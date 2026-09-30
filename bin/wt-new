@@ -5,6 +5,23 @@
 # Usage: bin/wt-new <name> [--base <branch>]
 #        bin/wt-new --existing <branch> [<name>] [--base <parent-branch>]
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/wt-new <name> [--base <branch>]
+       bin/wt-new --existing <branch> [<name>] [--base <parent-branch>]
+
+Create a git worktree outside the repo (sibling IBL5-worktrees/<name>) with
+symlinks and CSS ready for development. Does not start Docker.
+
+  name                  Slug for the new branch and worktree directory
+  --base <branch>       Branch to cut from (default: master)
+  --existing <branch>   Check out an existing origin branch instead of cutting a new one
+
+Use bin/wt-up <name> to start a Docker environment for the worktree.
+EOF
+    exit 0
+fi
+
 set -euo pipefail
 
 SCRIPT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

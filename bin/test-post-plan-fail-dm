@@ -29,11 +29,12 @@ trap 'rm -rf "$TMP"' EXIT
 
 WT="$TMP/wt"; OTHER="$TMP/other"; LOGS="$TMP/logs"; PLISTS="$TMP/plists"
 mkdir -p "$WT" "$OTHER" "$LOGS" "$TMP/bin"
-DM_OUT="$TMP/dm.out"; LC_OUT="$TMP/lc.out"
+DM_OUT="$TMP/dm.out"; DM_ARGV="$TMP/dm.argv"; LC_OUT="$TMP/lc.out"
 
 cat > "$TMP/bin/dm" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "\${*: -1}" >> "$DM_OUT"
+printf '%s\n' "\$*" >> "$DM_ARGV"
 EOF
 cat > "$TMP/bin/lc-ok" <<EOF
 #!/usr/bin/env bash
@@ -49,7 +50,7 @@ registry() {   # registry <repo> <pid>
 LOG="$LOGS/post-plan-now-foo-20260926-182719-111.log"
 
 reset() {
-    rm -f "$DM_OUT" "$LC_OUT" "$LOGS"/* "$TMP/reg.json"
+    rm -f "$DM_OUT" "$DM_ARGV" "$LC_OUT" "$LOGS"/* "$TMP/reg.json"
     rm -rf "$PLISTS"
     : > "$LOG"
 }
@@ -69,6 +70,8 @@ echo "post-plan-fail-dm:"
 reset; registry "$WT" 999999
 run
 [ "$(dm_count)" = 1 ] && [ "$(lc_count)" = 0 ] && ok "1 dead session: DM now" || fail "1 dead session: DM now"
+grep -qF -- '--ping' <<< "$(cat "$DM_ARGV" 2>/dev/null)" \
+    && ok "1b immediate DM carries --ping" || fail "1b immediate DM lacks --ping"
 
 reset; registry "$WT" $$
 run
@@ -101,11 +104,20 @@ if [ "$(dm_count)" = 1 ] && grep -q '^Nobody re-ran it within 15 min.*the-msg$' 
 else
     fail "7 not re-fired: prefixed DM"
 fi
+grep -qF -- '--ping' <<< "$(cat "$DM_ARGV" 2>/dev/null)" \
+    && ok "7b deferred DM carries --ping" || fail "7b deferred DM lacks --ping"
 
 reset; touch -t 202609261800 "$LOG.faildm-stamp"
 : > "$LOGS/post-plan-now-foo-bar-20260926-183043-333.log"
 run --deferred
 [ "$(dm_count)" = 1 ] && ok "8 other branch log ignored" || fail "8 other branch log ignored"
+
+# Static: every DM_CMD invocation line (line-leading, so the env-forwarding line is skipped) pings.
+_inv=$(grep -c '^ *"$DM_CMD"' "$SUT")
+_ping=$(grep -c '^ *"$DM_CMD" --ping' "$SUT")
+[ "$_inv" -ge 1 ] && [ "$_inv" = "$_ping" ] \
+    && ok "9 every DM_CMD call passes --ping ($_ping of $_inv)" \
+    || fail "9 DM_CMD calls without --ping ($_ping of $_inv)"
 
 if [ "$FAILS" -gt 0 ]; then
     echo "test-post-plan-fail-dm: $FAILS case(s) failed"

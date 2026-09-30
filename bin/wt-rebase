@@ -21,6 +21,21 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/wt-rebase [--dry-run]
+
+Reconcile all active worktree branches with origin/<branch> and merge each
+branch's recorded base into it. Fetches once up front; never pushes.
+
+Options:
+  --dry-run   report what would be done without making any changes
+
+Arguments: none
+EOF
+    exit 0
+fi
+
 # shellcheck source=bin/lib/wt-guards.sh
 source "$(dirname "$0")/lib/wt-guards.sh"
 # shellcheck source=bin/lib/git-helpers.sh

@@ -5,6 +5,30 @@
 # Exits 0 (clean) or 1 (blocking violations found).
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-phpunit-hygiene [--pr] [--help|-h]
+
+Blocking checks on PHPUnit tests:
+  mark-test-skipped  markTestSkipped() silently disables a test — banned.
+  no-db-group        Concrete class extending DatabaseTestCase missing
+                     #[Group('database')] — attribute is NOT inherited.
+  set-accessible     Reflection setAccessible() — no-op since PHP 8.1,
+                     deprecated since 8.5 (fatal in PHP 9).
+
+Modes:
+  (no args)  Scan all ibl5/tests/**/*.php
+  --pr       Scan only files changed vs origin/master
+
+Exceptions (inline allow markers, reason >= 20 chars):
+  // phpunit-hygiene-allow: <reason>
+  // phpunit-hygiene-allow-no-db-group: <reason>
+
+See .claude/rules/phpunit-tests.md.
+EOF
+    exit 0
+fi
+
 ROOT=$(git rev-parse --show-toplevel)
 TESTS_DIR="$ROOT/ibl5/tests"
 

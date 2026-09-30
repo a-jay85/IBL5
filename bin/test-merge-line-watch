@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-merge-line-watch — regression harness for bin/merge-line-watch.
+#
+# Drives --once passes against a stub gh (GH_CMD) and a stub selector
+# (MERGE_LINE_SELECT_CMD). No network, no credentials.
+#
+# Run: bin/test-merge-line-watch  (exit 0 = all pass, exit 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+WATCH="$SCRIPT_DIR/merge-line-watch"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+assert_match() {
+    if grep -qE -- "$2" <<< "$3"; then pass "$1"; else
+        failcase "$1 — expected to match: $2"; printf '%s\n' "$3" | sed 's/^/    /'; fi
+}
+assert_absent() {
+    if grep -qE -- "$2" <<< "$3"; then
+        failcase "$1 — expected NOT to match: $2"; printf '%s\n' "$3" | sed 's/^/    /'
+    else pass "$1"; fi
+}
+
+assert_eq() {
+    if [ "$2" = "$3" ]; then pass "$1"; else failcase "$1 — expected '$2', got '$3'"; fi
+}
+
+GH_LOG="$TMP/gh.log"
+cat > "$TMP/gh" <<EOF
+#!/bin/sh
+echo "\$*" >> "$GH_LOG"
+case "\$*" in *update-branch*) [ -n "\${GH_PUT_FAIL:-}" ] && { echo "boom" >&2; exit 1; } ;; esac
+echo deadbeefcafe
+EOF
+chmod +x "$TMP/gh"
+
+# Stub selector: prints whatever $SEL_OUT holds. A counter file lets the
+# unknown-retry case flip to a real answer on the Nth call.
+cat > "$TMP/select" <<EOF
+#!/bin/sh
+n=\$(cat "$TMP/calls" 2>/dev/null || echo 0); n=\$((n + 1)); echo \$n > "$TMP/calls"
+if [ -n "\${SEL_UNKNOWN_UNTIL:-}" ] && [ \$n -lt "\$SEL_UNKNOWN_UNTIL" ]; then
+    printf 'action=unknown\nhead=\n'; exit 0
+fi
+[ -n "\${SEL_FAIL:-}" ] && { echo "graphql error"; exit 1; }
+printf '%s\n' "\$SEL_OUT"
+EOF
+chmod +x "$TMP/select"
+
+run() {
+    rm -f "$GH_LOG" "$TMP/calls"
+    : > "$GH_LOG"
+    OUT=$(GH_CMD="$TMP/gh" MERGE_LINE_SELECT_CMD="$TMP/select" "$@" 2>&1)
+    RC=$?
+    GH=$(cat "$GH_LOG")
+}
+
+# A: action=update calls update-branch on the head PR.
+SEL_OUT=$'action=update\nhead=42' run "$WATCH" --once
+assert_match "A: update reported" 'updated PR #42 onto master' "$OUT"
+assert_match "A: PUT on head PR" '^api -X PUT repos/a-jay85/IBL5/pulls/42/update-branch$' "$GH"
+assert_eq "A: exit 0" 0 "$RC"
+
+# B: --dry-run never calls update-branch.
+SEL_OUT=$'action=update\nhead=42' run "$WATCH" --once --dry-run
+assert_match "B: dry-run message" 'dry run: would update PR #42' "$OUT"
+assert_absent "B: no PUT" 'update-branch' "$GH"
+
+# C: action=none makes no write.
+SEL_OUT=$'action=none\nhead=7' run "$WATCH" --once
+assert_match "C: no-op message" 'no update needed \(action=none head=7\)' "$OUT"
+assert_absent "C: no PUT" 'update-branch' "$GH"
+
+# D: --repo flows into the PUT path.
+SEL_OUT=$'action=update\nhead=9' run "$WATCH" --once --repo o/r
+assert_match "D: repo honored" '^api -X PUT repos/o/r/pulls/9/update-branch$' "$GH"
+
+# E: unknown retries until the selector answers.
+MERGE_LINE_WATCH_RETRY_WAIT=0 SEL_UNKNOWN_UNTIL=2 SEL_OUT=$'action=update\nhead=5' run "$WATCH" --once
+assert_match "E: retried then updated" 'updated PR #5' "$OUT"
+assert_eq "E: two selector calls" 2 "$(cat "$TMP/calls")"
+
+# F: selector failure is reported, exit 1, no write.
+SEL_FAIL=1 run "$WATCH" --once
+assert_match "F: failure reported" 'select failed: graphql error' "$OUT"
+assert_absent "F: no PUT" 'update-branch' "$GH"
+assert_eq "F: exit 1" 1 "$RC"
+
+# G: update-branch failure is surfaced with the error text.
+GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' run "$WATCH" --once
+assert_match "G: failure surfaced" 'update-branch FAILED for #3: boom' "$OUT"
+
+# H: usage errors exit 2.
+run "$WATCH" --interval abc
+assert_eq "H: bad --interval exits 2" 2 "$RC"
+run "$WATCH" --bogus
+assert_eq "H: unknown flag exits 2" 2 "$RC"
+
+exit "$FAILED"

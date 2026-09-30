@@ -474,6 +474,10 @@ The Mac poller runs as an active second host (ADR-0196). It claims rows handed t
 
 The sim recap poller is a macOS LaunchAgent (`com.ibl5.sim-recap-poll`, label managed by `bin/sim-recap-cron-setup`) that fires `bin/sim-recap-tick` every 300 s.
 
+### Google Sheets refresh cron
+
+The Google Sheets player export has its own prod crontab worker, `ibl5/scripts/googleSheetRefreshTick.php`, separate from the sim recap LaunchAgent. Install, verify, exit codes, key rotation, and the `broken` reasons are in `ibl5/docs/GOOGLE_SHEETS_SETUP.md` section 5. `php ibl5/scripts/googleSheetRefreshTick.php --dry-run` shows the pending queue without calling Google.
+
 ### Phase gate: the poller stays loaded
 
 Recap generation is gated to **HEAT and Regular Season** (`RecapPhasePolicy::ENABLED_PHASES`). In a disabled phase (Preseason, or Playoffs onward), a tick that finds no pending sim and `recaps_enabled: false` logs the phase and exits 0. It does the same reclaim-stale and claim-next ssh calls as an idle in-season tick, so a disabled tick costs the same. The job is never booted out.

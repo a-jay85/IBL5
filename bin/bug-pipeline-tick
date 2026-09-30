@@ -24,6 +24,24 @@
 
 set -u
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/bug-pipeline-tick
+
+Poll-only Discord bug/feature pipeline driver (ADR-0080). Fired every 180s
+by the launchd LaunchAgent (bin/bug-pipeline-cron-setup). Accepts no
+positional arguments; all tuning is via environment variables.
+
+Key environment overrides (all have production defaults):
+  BUG_PIPELINE_CI_AUTOFIX_DRY_RUN      1 = soak (default); 0 = live CI-autofix
+  BUG_PIPELINE_CI_AUTOFIX_ENABLED      0 = kill switch for CI-autofix path
+  BUG_PIPELINE_PLAN_REVIEW_DRAIN_ENABLED  0 = skip plan-review drain
+
+Exit codes: 0 success, 1 tick failure.
+EOF
+    exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -1319,8 +1337,9 @@ ci_log() {
 ci_lock_acquire() {
     if [ -d "$CI_AUTOFIX_LOCK" ]; then
         local lock_mtime now
-        lock_mtime="$(stat -f '%m' "$CI_AUTOFIX_LOCK" 2>/dev/null || \
-                      stat -c '%Y' "$CI_AUTOFIX_LOCK" 2>/dev/null || echo 0)"
+        # GNU stat -c %Y runs first: on GNU/Linux, stat -f exits 1 but dumps filesystem info to stdout first; BSD-first appended the epoch to that dump, producing a non-integer.
+        lock_mtime="$(stat -c '%Y' "$CI_AUTOFIX_LOCK" 2>/dev/null || \
+                      stat -f '%m' "$CI_AUTOFIX_LOCK" 2>/dev/null || echo 0)"
         now="$(date +%s)"
         if [ $(( now - lock_mtime )) -gt "$CI_AUTOFIX_TIMEOUT_SECS" ]; then
             ci_log "ci_lock_acquire: stale lock (age $(( now - lock_mtime ))s) — cleaning"

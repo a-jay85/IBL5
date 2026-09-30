@@ -4,7 +4,7 @@
 // the markup is unit-testable (tests/ts-unit/vr-review-comment.test.ts).
 //
 // Models the "script writes a .md consumed by marocchino" pattern of
-// bin/lighthouse-comment (consumed in .github/workflows/lighthouse.yml).
+// bin/lighthouse-comment (written for the retired PR Lighthouse workflow).
 import type { VrRow, Viewport } from './vr-manifest';
 
 export const COMMENT_HEADER = '🖼️ Visual review';

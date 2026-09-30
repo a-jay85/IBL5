@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-09-26
+last_verified: 2026-09-28
 ---
 
 # bin/lib — Shared Library Files
@@ -12,6 +12,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `automouse-escalate-model` | Resolve the automouse impl model for the current attempt, escalating to Opus on the final retry |
 | `automouse-reorder-router.php` | PHP router spawned by `bin/automouse/queue-reorder-ui`; serves the drag-and-drop queue reorder UI and applies reorders via `bin/automouse/queue reorder` |
 | `automouse-stream-filter.sh` | Filter for `claude -p --output-format stream-json` NDJSON; emits per-phase log lines (tool:/exit:/COMPACTION:) and maintains heartbeat |
+| `headless-elapsed-hook.sh` | PostToolUse hook that appends an elapsed-clock line (`elapsed <E>s / <B>s`) after every tool call in opt-in runs; activated by `IBL5_BUDGET_START_EPOCH` and `IBL5_BUDGET_SECS` set by `bin/automouse/run` on the impl invocation; exits 0 with no output in all other sessions |
 | `bug-pipeline-gh.sh` | Best-effort GitHub issue-tracking seam for the autonomous bug pipeline (§3f) |
 | `bug-pipeline-test-stubs.sh` | Shared stub scaffolding for `bin/test-bug-pipeline-*` harnesses |
 | `db-helpers.sh` | Shared database helper functions for Docker MariaDB interactions (password-warning suppression, exec wrappers, and `db_resolve_target` / `db_container_running` — the main-stack-vs-worktree-container routing used by `ibl5/bin/db-query`) |
@@ -21,6 +22,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `git-helpers.sh` | Shared git-layout helpers: canonical repo root resolution and related utilities |
 | `human-signoff-classifier.sh` | Single source of truth for the feature-PR human sign-off classifier (ADR-0062), sourced by both the workflow and its regression harness |
 | `launchd-job.sh` | Shared launchd background-job plumbing: one-shot `launchctl list` snapshot and label lookup, fail-closed pgrep liveness probe, TERM-then-KILL stop and slot release, compact runner plist emission, bootout/bootstrap, slot count / stale reap / wait-for-slot, the loaded-idle job reaper, runner-embeddable finish-DM helpers, and `xml_escape` / `shq`. Sourced by `bin/post-plan-fleet`, `bin/pr-review-now`, `bin/post-plan-now` and `bin/pr-cycle`; tested by `bin/test-launchd-job` |
+| `launchd-expected-jobs.sh` | Single source of truth for the launchd health check: the expected long-lived `com.ibl5.*` labels with their check mode (`standard` / `keepalive` / `phase-gated`), the one-shot label prefixes, the required main-stack containers, and the plist-to-`/tmp`-runner lookup used for stale one-shot detection. Sourced by `bin/launchd-health-check` (example) and `bin/test-launchd-health-check` (example) |
 | `pr-sticky.sh` | Canonical find-by-HTML-marker sticky PR comment helpers (upsert / delete); sourced by `bin/pr-canary-check`, `bin/check-pr-collisions`, and `bin/post-plan-now` |
 | `session-id.sh` | Mint, validate and persist the `claude -p --session-id` uuid for detached headless runs; writes the `${LOG%.log}.session` sidecar that `bin/fleet-status` reads to locate a live run's transcript. Sourced by `bin/plan-now`, `bin/docfix-run`, `bin/post-plan-now` and `bin/fleet-status` |
 | `plan-autonomy-contract` | Shared `stop_condition:` / `evidence:` frontmatter validator; invoked by `bin/check-plan` gate `[K]` and the `/post-plan` Phase 5.0d skill path |

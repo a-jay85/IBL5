@@ -9,6 +9,25 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/e2e-for-pr <worktree-name>
+
+Map a PR's changed files to the minimal E2E test set.
+
+Arguments:
+  <worktree-name>   name of the worktree to inspect
+
+Env vars:
+  E2E_THRESHOLD   max mapped test count before falling back to full suite (default: 40)
+
+Exit codes: 0 + paths on stdout = run those tests,
+            0 + empty stdout = skip E2E entirely,
+            2 = run the full suite (infra changed or too many tests)
+EOF
+    exit 0
+fi
+
 WORKTREE_NAME="${1:-}"
 if [[ -z "$WORKTREE_NAME" ]]; then
     echo "Usage: bin/e2e-for-pr <worktree-name>" >&2

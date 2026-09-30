@@ -34,8 +34,11 @@
 #                             `bug-<id>` branch name); UNCONDITIONAL — no label
 #                             clears it, so it is never armed
 #   7. FEAT-AWAITING-SIGNOFF  feat: title without the human-approved label
-#   8. UNCLEARED              no Manual-Testing section (fail-closed; never armed)
-#   9. ARMABLE                CLEARED + an armable merge-state (mergeable, or
+#   8. PAUSED                 post-plan paused by the usage gate (ADR-0143) in this PR's
+#                             worktree; the coordinator resumes it, so nothing to do and
+#                             --arm skips it
+#   9. UNCLEARED              no Manual-Testing section (fail-closed; never armed)
+#  10. ARMABLE                CLEARED + an armable merge-state (mergeable, or
 #                             BEHIND) + all required checks green on the current
 #                             head
 #
@@ -50,6 +53,8 @@ GH_API_CMD="${GH_API_CMD:-gh api}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/lib/pr-armable.sh
 source "$SCRIPT_DIR/lib/pr-armable.sh"
+# shellcheck source=bin/lib/usage-gate.sh
+source "$SCRIPT_DIR/lib/usage-gate.sh"
 
 usage() {
     cat <<'EOF'
@@ -68,6 +73,11 @@ Options:
 Environment (test seams):
   GH_CMD        Override the gh command (default: "gh").
   GH_API_CMD    Override the gh api command (default: "gh api").
+  PR_TRIAGE_WTL Read `git worktree list --porcelain` output from this file instead of git.
+  IBL5_USAGE_GATE_STATE_DIR  Where the usage-gate pause markers live.
+
+A PR whose worktree holds a post-plan session paused by the usage gate is bucketed
+PAUSED (no action; the coordinator resumes it) and --arm never touches it.
 
 ARMABLE is fail-closed: a PR is armed only with a positive Manual-Testing
 clearance ("No manual testing needed"), all required checks green-and-current,
@@ -259,6 +269,22 @@ mss_action() {
     esac
 }
 
+# --- PAUSED support: PR head branch -> worktree path --------------------------------------
+# One `git worktree list --porcelain` read up front (or the PR_TRIAGE_WTL test seam).
+if [ -n "${PR_TRIAGE_WTL:-}" ]; then
+    WT_PORCELAIN="$(cat "$PR_TRIAGE_WTL" 2>/dev/null || true)"
+else
+    WT_PORCELAIN="$(git -C "$SCRIPT_DIR" worktree list --porcelain 2>/dev/null || true)"
+fi
+
+# wt_for_branch <branch> -> the worktree path checked out on that branch, or nothing.
+wt_for_branch() {
+    [ -n "${1:-}" ] || return 0
+    printf '%s\n' "$WT_PORCELAIN" | awk -v b="refs/heads/$1" '
+        /^worktree / { path = substr($0, 10) }
+        $1 == "branch" && $2 == b { print path; exit }'
+}
+
 EXIT=0
 RERUN_HINTS=""
 ROWS=0
@@ -366,6 +392,9 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         bucket="PIPELINE-HELD"; action="human merge (never arms)"
     elif [ -n "$feat" ]; then
         bucket="FEAT-AWAITING-SIGNOFF"; action="human sign-off + label"
+    elif usage_worktree_paused "$(wt_for_branch "$head_ref")"; then
+        # The coordinator resumes the paused post-plan run; a merge decision now would race it.
+        bucket="PAUSED"; action="none — post-plan paused by usage gate"
     elif [ "$clearance" = "UNKNOWN" ]; then
         bucket="UNCLEARED"; action="human review (no clearance)"
     elif [ "$clearance" = "CLEARED" ] && mss_armable "$mss" && [ "$armable_checks_green" = "1" ]; then

@@ -40,7 +40,8 @@ from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
 from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
-                              MANUAL_TESTING_SENTINEL, backlog_closes_mismatch, classify, files_from_diff,
+                              MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC,
+                              backlog_closes_mismatch, classify, files_from_diff,
                               modified_files_from_diff,
                               name_status_text, normalize_backlog_closes, numstat_text,
                               qualify_backlog_refs,
@@ -421,8 +422,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
 
         # ---- Phase 4: review + security (gated bounded calls) ---------
-        # Runs in the background under Phase 5 → 5.0 → 6 → the Phase 5.5 review call; none
-        # of those read Phase 4's output. Only the LLM calls and the PR posts run on the
+        # Runs in the background through Phase 5 → 5.0 → 6; joined before Phase 5.5
+        # builds its fidelity packet so phase4b_ran is truthful. Only the LLM calls and
+        # the PR posts run on the
         # worker: log(), state.checkpoint() and the pr-copy degradation merge stay on
         # this thread, in _join_review, so audit.log and the state file keep their serial
         # order. The join happens before anything moves the head (fidelity remediation),
@@ -465,6 +467,13 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             res.findings = findings
             res.scored_findings = scored
             res.degraded_agents = degraded_agents
+            code_review_purposes = {"review-agent-a", "review-agent-b", "review-agent-d"}
+            expected_code = [p for p in ("review-agent-a", "review-agent-b", "review-agent-d")
+                             if gates.get({"review-agent-a": "A", "review-agent-b": "B",
+                                           "review-agent-d": "D"}[p])]
+            code_degraded = [p for p in degraded_agents if p in code_review_purposes]
+            res.phase4b_code_ran = bool(expected_code) and len(code_degraded) < len(expected_code)
+            res.phase4b_reviewed_head = meta.get("headRefOid") or ""
             state.checkpoint("review", res, review_gates=gates, reviewed_head=meta.get("headRefOid") or "")
             log(f"phase4 gates={ {k: v for k, v in gates.items()} } findings: raw={len(scored)} surviving={len(findings)} scores={[s['score'] for s in scored]}")
             if degraded_agents:
@@ -493,9 +502,18 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         clearance = manual_testing_clearance(body)
         if clearance == "UNKNOWN":
             if plan.found and not plan.truly_manual_rows:
-                body += f"\n\n## Manual Testing\n\n{MANUAL_TESTING_SENTINEL}\n"
+                # Zero executable rows is a static-only plan: claiming automated coverage
+                # would be false (.claude/rules/pr-body-test-claim.md). `== 0`, never
+                # falsiness: None means no matrix was parsed, and that keeps the covered
+                # sentinel because the static text asserts a matrix exists.
+                static = plan.has_matrix and plan.executable_row_count == 0
+                sentinel = MANUAL_TESTING_SENTINEL_STATIC if static else MANUAL_TESTING_SENTINEL
+                body += f"\n\n## Manual Testing\n\n{sentinel}\n"
                 clearance = "CLEARED"
-                log("phase6: plan matrix fully automated — sentinel appended (CLEARED)")
+                if static:
+                    log("phase6: plan matrix has zero executable rows — static sentinel appended (CLEARED)")
+                else:
+                    log("phase6: plan matrix fully automated — sentinel appended (CLEARED)")
             elif plan.found:
                 surviving_rows = _recheck_manual_rows(llm, probe, plan, cls, log, res)
                 if not surviving_rows:
@@ -1800,8 +1818,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                   unresolved_conformance=(), meta_check_failures=(), scored_findings=()):
     """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
 
-    `before_remediation` runs once, just before the first remediation commit, so the
-    background Phase 4 review finishes before the head moves.
+    `before_remediation` runs once, before `build_packet()`, so Phase 4 results are
+    available when the fidelity packet is built. It is set to None after the call.
 
     Replay fixtures that carry no canned `plan-fidelity-review` keep the historical
     synthetic READY, so the pre-Phase-5.5 trace corpus stays green; a fixture opts into
@@ -1851,10 +1869,23 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "carried_forward": True}
         return carried, ""
     log(f"phase5.5 fidelity: review: full (carry-forward declined: {decline_reason})")
+    # Join Phase 4 before building the fidelity packet so phase4b_ran is truthful.
+    if before_remediation is not None:
+        before_remediation()
+        before_remediation = None  # prevent double-call in the NOT READY guard below
+    phase4b_ran = getattr(res, "phase4b_code_ran", False)
+    _reviewed_head = getattr(res, "phase4b_reviewed_head", "")
+    _findings = getattr(res, "findings", ()) or ()
+    _lines = [f"- {f.path}:{f.line} (score {f.score or 0}) -- {(f.body or '')[:160]}"
+              for f in _findings]
+    if _reviewed_head:
+        _lines.insert(0, f"reviewed_head: {_reviewed_head}")
+    review_findings = "\n".join(_lines)
     try:
         packet = fidelity.build_packet(
             out_dir, master_sha, reviewed_tree, plan, diff, body, pr,
-            phase4b_ran=False, worktree=worktree or ".")
+            phase4b_ran=phase4b_ran, worktree=worktree or ".",
+            review_findings=review_findings)
     except HarnessError as e:
         log(f"phase5.5 fidelity: packet failed ({e.kind}) - verdict indeterminate")
         res.fidelity = {"verdict_1": None, "error_kind": e.kind,
@@ -1883,8 +1914,6 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     rounds = []
     current_verdict_path = fidelity.verdict_path(pr)
     final_verdict, final_err = verdict, err
-    if final_verdict == "NOT READY" and before_remediation is not None:
-        before_remediation()
     for round_num in range(1, fidelity.MAX_FIDELITY_ROUNDS + 1):
         if final_verdict != "NOT READY":
             break
@@ -2200,6 +2229,172 @@ def _pull_url_base(worktree: str | None) -> str:
     return f"https://github.com/{m.group(1)}/pull"
 
 
+_BLOCK_BUDGET = 1800          # bin/discord-dm cuts at 1900; the deferred DM adds a ~55-char prefix
+_BLOCK_MAX_PATHS = 5
+_BLOCK_MAX_PATH_LEN = 120
+
+
+def _dedupe(items: list[str]) -> list[str]:
+    seen: dict[str, None] = {}
+    for it in items:
+        if it and it not in seen:
+            seen[it] = None
+    return list(seen)
+
+
+def _adr_trigger_paths(error: str | None) -> list[str]:
+    """Files from bin/adr-check's `Decision-trigger surfaces detected:` list."""
+    return _dedupe(re.findall(r"(?m)^\s*- \[[^\]]+\] (\S+) —", error or ""))
+
+
+def _conflict_paths(error: str | None) -> list[str]:
+    """Conflicted files: `Merge conflict in <path>` and the merge-tree probe form."""
+    text = error or ""
+    paths = re.findall(r"Merge conflict in (\S+)", text)
+    for m in re.finditer(r"vs origin/master: ([^\n|]*)", text):
+        paths.extend(p.strip() for p in m.group(1).split(","))
+    return _dedupe(paths)
+
+
+def _over_budget_paths(error: str | None) -> list[str]:
+    """Per-file `FAIL  <path>  N bytes` lines; the `aggregate` line has no byte count after the path."""
+    return _dedupe(re.findall(r"(?m)^FAIL  (\S+)  \d+ bytes", error or ""))
+
+
+def _stale_doc_paths(error: str | None) -> list[str]:
+    """Any `.md` path on a line that also mentions last_verified."""
+    paths: list[str] = []
+    for line in (error or "").splitlines():
+        if "last_verified" in line:
+            paths.extend(re.findall(r"[\w./-]+\.md", line))
+    return _dedupe(paths)
+
+
+def _path_lines(paths: list[str], limit: int) -> list[str]:
+    """At most `limit` indented path lines, each cut to _BLOCK_MAX_PATH_LEN, plus `+N more`."""
+    if limit <= 0:
+        return []
+    out = []
+    for p in paths[:limit]:
+        if len(p) > _BLOCK_MAX_PATH_LEN:
+            p = p[:_BLOCK_MAX_PATH_LEN - 1] + "…"
+        out.append(f"  {p}")
+    if len(paths) > limit:
+        out.append(f"  +{len(paths) - limit} more")
+    return out
+
+
+def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
+    """Plain-language message for an exit-3 stop: what broke, the exact fix, where the log is.
+
+    Text only. `verdict_line` stays the one-line machine verdict; this is what a person
+    reads. Paths come from the FULL res.error, never the 300-char `_flat` form. Returns
+    "" for any rc but 3."""
+    if rc != 3:
+        return ""
+    branch = res.slug or "This branch"
+    leaf = (res.slug or "branch").rsplit("/", 1)[-1]
+    wt = worktree or "(the worktree folder)"
+    log = log_path or "(see the run log)"
+    if res.error_kind in ("rebase-conflict", "remote-head-diverged", "llm-usage-limit"):
+        key = res.error_kind
+    elif res.error_kind == "local-gate":
+        key = "gate-" + classify_local_gate_denial(res.error or "")
+    else:
+        key = "unknown"
+    if key == "gate-adr" and res.adr_drafted:
+        key = "gate-adr-drafted"
+
+    err = res.error or ""
+    paths: list[str] = []
+    read_log = "Read the log named on the Log line below and fix what it reports"
+    if key == "gate-adr":
+        why = "This change adds a file that needs a decision record (ADR) before it can ship."
+        paths = _adr_trigger_paths(err)
+        steps = [f'bin/next-adr "{leaf}"',
+                 "Fill in the file it prints, then add its row to the bottom of "
+                 "ibl5/docs/decisions/README.md",
+                 "bin/adr-check --commit"]
+    elif key == "gate-adr-drafted":
+        why = ("This change adds a file that needs a decision record (ADR). A draft is at "
+               f"{res.adr_path}, but it did not pass the check yet.")
+        paths = _adr_trigger_paths(err)
+        steps = [f"Finish the draft at {res.adr_path} and make sure its row is at the "
+                 "bottom of ibl5/docs/decisions/README.md",
+                 "bin/adr-check --commit"]
+    elif key == "gate-stale-base":
+        why = "master moved on GitHub and this branch is behind it."
+        steps = ["git fetch origin master", "git rebase origin/master"]
+    elif key == "gate-byte-budget":
+        why = "A rule file under .claude/rules is over its size limit."
+        paths = _over_budget_paths(err)
+        steps = ["Trim the file(s) above, or move detail into a *-detail.md file next to it",
+                 "bin/check-rules-byte-budget"]
+    elif key == "gate-doc-staleness":
+        why = "A doc changed but its last_verified date was not updated."
+        paths = _stale_doc_paths(err)
+        steps = ["Set last_verified: to today's date in each doc above",
+                 "bin/check-docs --since=master --no-staleness"]
+    elif key == "gate-unknown":
+        why = "A pre-commit or pre-push check refused the commit. The log shows which one."
+        steps = [read_log]
+    elif key == "rebase-conflict":
+        why = "This branch and master both changed the same lines, so the rebase stopped."
+        paths = _conflict_paths(err)
+        steps = ["git fetch origin master", "git rebase origin/master",
+                 "Fix each conflicted file, then run: git add <file> && git rebase --continue"]
+    elif key == "remote-head-diverged":
+        why = ("Someone pushed to this branch on GitHub, so GitHub's copy no longer "
+               "matches this folder.")
+        b = res.slug or "<branch>"
+        steps = ["git fetch origin", f"git log --oneline HEAD..origin/{b}  (shows what was pushed)",
+                 f"git rebase origin/{b}  (keeps their commits; to take GitHub's copy as is "
+                 f"instead, run: git reset --hard origin/{b})"]
+    elif key == "llm-usage-limit":
+        why = "The Claude usage limit was reached before the ship step finished."
+        steps = ["Wait for the limit to reset (the log shows the reset time)"]
+    else:
+        why = "The ship step stopped and the log has the reason."
+        steps = [read_log]
+
+    outcome = (f"PR #{res.pr_number} was not updated." if res.pr_number
+               else "No PR opened.")
+
+    def render(limit: int) -> str:
+        lines = [f"{branch} did not ship. {outcome}", "", f"Why: {why}"]
+        lines.extend(_path_lines(paths, limit))
+        lines += ["", "Fix:", f"  1. cd {wt}"]
+        n = 1
+        for s in steps:
+            n += 1
+            lines.append(f"  {n}. {s}")
+        lines += [f"  {n + 1}. bin/post-plan-now", "",
+                  "Or open Claude in that folder and ask it to fix the ship block.",
+                  f"Log: {log}"]
+        return "\n".join(lines)
+
+    block = render(_BLOCK_MAX_PATHS)
+    if len(block) > _BLOCK_BUDGET:
+        block = render(0)
+    return block
+
+
+BLOCKED_SHIP_FILE = "blocked-ship.txt"
+
+
+def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> None:
+    """Write the human block for bin/post-plan-now to read. rc != 3 writes nothing.
+    Best effort: an OSError is swallowed so this text never changes the exit code."""
+    if rc != 3:
+        return
+    block = human_block(res, rc, worktree or "", os.environ.get("POSTPLAN_LOG_PATH", ""))
+    try:
+        with open(os.path.join(out_dir, BLOCKED_SHIP_FILE), "w") as fh:
+            fh.write(block + "\n")
+    except OSError:
+        pass
+
+
 def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
     """The one line a watcher greps for — printed FIRST, before the stats lines.
 
@@ -2334,6 +2529,7 @@ def main() -> int:
     # First line, so `head -1 <log>` is the whole verdict and bin/watch-run can
     # terminate on it without waiting for the launchd label to disappear.
     print(verdict_line(res, rc, _pull_url_base(args.worktree)))
+    write_blocked_ship(args.out, res, rc, args.worktree)
     print(f"terminal={res.terminal.value} phase5={res.phase5} "
           f"armed={bool(res.arm and res.arm.armed)} findings={len(res.findings)}")
     print(f"llm: {t['llm_invocations']} calls, {t['gross_tokens']} gross tok, "

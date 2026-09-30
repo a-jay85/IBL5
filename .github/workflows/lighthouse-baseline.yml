@@ -29,15 +29,14 @@ concurrency:
 
 # The baseline audit is ~18 minutes of runner time (56 URLs x ~17s, collected
 # serially by lhci), and the paths filter above fires it on nearly every master
-# push — roughly twice a day. Neither consumer needs that cadence: the weekly
-# audit accepts a baseline up to 7 days old (lighthouse-audit.yml, "Check
-# baseline freshness"), and the PR comment (lighthouse.yml) only wants "recent
-# master", which is already a moving target between merges. So gate the audit on
+# push, roughly twice a day. Its one consumer does not need that cadence: the
+# weekly audit accepts a baseline up to 7 days old (lighthouse-audit.yml, "Check
+# baseline freshness"). So gate the audit on
 # artifact age and skip it when a fresh one exists, returning the runner time to
-# a contended pool. FRESH_HOURS is far tighter than either consumer requires, so
+# a contended pool. FRESH_HOURS is far tighter than the audit requires, so
 # it collapses same-day merge bursts without letting the baseline drift.
-# Skipping makes this workflow's newest successful run artifact-less, so both
-# consumers set `search_artifacts: true` on their download step to walk back to
+# Skipping makes this workflow's newest successful run artifact-less, so the
+# audit sets `search_artifacts: true` on its download step to walk back to
 # the newest run that actually published the manifest. Removing the gate is safe;
 # removing those flags without removing the gate silently drops the baseline.
 env:

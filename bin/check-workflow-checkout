@@ -12,6 +12,21 @@
 # Usage: bin/check-workflow-checkout [file ...]   (default: .github/workflows/*.yml)
 set -eu
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-workflow-checkout [file ...]
+
+CI gate: any workflow job that uses a local composite action (./.github/actions/*)
+must run actions/checkout first in that job.
+
+Arguments:
+  [file ...]   workflow files to check (default: .github/workflows/*.yml)
+
+Exit codes: 0 = clean, 1 = violation found
+EOF
+    exit 0
+fi
+
 if [ "$#" -gt 0 ]; then
   set -- "$@"
 else

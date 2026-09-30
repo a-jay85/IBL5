@@ -3,7 +3,7 @@
 # when no worktree has the PR's head branch, reuses an existing one, refuses fork
 # PRs, and maps slash-bearing branch names to hostname-safe slugs.
 #
-# Five cases, exit 0 iff all pass.
+# Seven cases, exit 0 iff all pass.
 set -euo pipefail
 
 # ---- environment --------------------------------------------------------
@@ -17,6 +17,14 @@ export PATH="$SHIMS:$PATH"
 WTNEW_LOG="$TMP/wtnew.log"
 LAUNCHCTL_LOG="$TMP/launchctl.log"
 export WTNEW_LOG LAUNCHCTL_LOG
+
+# Usage gate (ADR-0143): post-plan-now asks the gate before it launches. Point the gate at a
+# private state dir and shadow `security` so no case reads the real keychain, cache or
+# network; no token means no usage data, which fails open.
+export IBL5_USAGE_GATE_STATE_DIR="$TMP/gate"
+mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
+printf '#!/bin/sh\nexit 1\n' > "$SHIMS/security"
+chmod +x "$SHIMS/security"
 
 # ---- pass/fail counters -------------------------------------------------
 PASS=0; FAIL=0
@@ -292,6 +300,103 @@ printf '%s\n' "$*" >> "${LAUNCHCTL_LOG:-/dev/null}"
 exit 0
 SHIM_EOF
 chmod +x "$SHIMS/launchctl"
+
+# ==========================================================================
+# Case 7 — a paused or limit-hit skill run is RESULT paused, never a FAIL-DM
+# ==========================================================================
+# Runs the far-side $CMD that post-plan-now writes into its plist, with a fake claude
+# behind a caffeinate shim. POST_PLAN_SKILL=1 selects the skill-only engine, so the
+# harness (which lives in the main checkout) never runs.
+unset GH_PR_JSON
+HOME7="$TMP/home7"
+mkdir -p "$HOME7/Library/LaunchAgents" "$HOME7/.local/bin" "$WT6/bin/lib"
+cp "$REPO/bin/lib/usage-gate.sh" "$REPO/bin/lib/usage-fetch.sh" "$WT6/bin/lib/"
+# The gate refuses a marker whose resume binary does not exist, and the far side names
+# $ROOT/bin/post-plan-now (here $WT6), so the fixture needs an executable copy.
+cp "$REPO/bin/post-plan-now" "$WT6/bin/post-plan-now"
+chmod +x "$WT6/bin/post-plan-now"
+FAILDM_LOG="$TMP/faildm.log"
+export FAILDM_LOG
+cat > "$WT6/bin/post-plan-fail-dm" << 'SHIM_EOF'
+#!/usr/bin/env bash
+printf 'called\n' >> "${FAILDM_LOG:-/dev/null}"
+exit 0
+SHIM_EOF
+chmod +x "$WT6/bin/post-plan-fail-dm"
+printf '#!/bin/sh\nexit 1\n' > "$SHIMS/gh-none"
+chmod +x "$SHIMS/gh-none"
+GATE_LIB="$REPO/bin/lib/usage-gate.sh"
+export GATE_LIB
+RESUME_BIN7="$REPO/bin/post-plan-now"
+export RESUME_BIN7
+
+cat > "$HOME7/.local/bin/caffeinate" << 'SHIM_EOF'
+#!/usr/bin/env bash
+while [ $# -gt 0 ]; do case "$1" in -*) shift ;; *) break ;; esac; done
+shift
+exec "$FAKE_CLAUDE" "$@"
+SHIM_EOF
+chmod +x "$HOME7/.local/bin/caffeinate"
+
+FAKE_CLAUDE="$TMP/fake-claude"
+export FAKE_CLAUDE
+cat > "$FAKE_CLAUDE" << 'SHIM_EOF'
+#!/usr/bin/env bash
+case "${FAKE_MODE:-}" in
+    marker)
+        sid=""; prev=""
+        for a in "$@"; do [ "$prev" = "--session-id" ] && sid="$a"; prev="$a"; done
+        . "$GATE_LIB"
+        usage_marker_write "$sid" post-plan-now "$RESUME_BIN7" usage-pause drain 94 five_hour ""
+        exit 0 ;;
+    limit) echo "You've hit your limit"; exit 1 ;;
+    auth)  echo "API Error: 401"; exit 1 ;;
+esac
+exit 0
+SHIM_EOF
+chmod +x "$FAKE_CLAUDE"
+
+# run_far_side <mode> → P7_OUT (the log the run wrote), P7_MARKERS (marker count)
+run_far_side() {
+    local mode="$1" plist log cmd
+    rm -f "$HOME7"/Library/LaunchAgents/*.plist "$FAILDM_LOG"
+    rm -rf "$IBL5_USAGE_GATE_STATE_DIR"; mkdir -p "$IBL5_USAGE_GATE_STATE_DIR/markers"
+    set +e
+    (cd "$WT6" && POST_PLAN_SKILL=1 HOME="$HOME7" "$REPO/bin/post-plan-now" >/dev/null 2>&1)
+    set -e
+    plist=$(ls "$HOME7"/Library/LaunchAgents/com.ibl5.postplan-now-feat-x-*.plist 2>/dev/null | head -1)
+    P7_OUT="no plist written"; P7_MARKERS=0
+    [ -n "$plist" ] || return 0
+    cmd=$(python3 -c 'import plistlib,sys; print(plistlib.load(open(sys.argv[1],"rb"))["ProgramArguments"][2])' "$plist")
+    log=$(python3 -c 'import plistlib,sys; print(plistlib.load(open(sys.argv[1],"rb"))["StandardOutPath"])' "$plist")
+    set +e
+    HOME="$HOME7" FAKE_MODE="$mode" GH_CMD="$SHIMS/gh-none" /bin/bash -c "$cmd" > "$log" 2>&1
+    set -e
+    P7_OUT=$(cat "$log")
+    P7_MARKERS=$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -name '*.json' 2>/dev/null | wc -l | tr -d ' ')
+    rm -f "$log" "${log%.log}.session"
+}
+
+FAIL_BEFORE=$FAIL
+run_far_side marker
+grep -qF -- "RESULT paused" <<< "$P7_OUT" || fail "paused marker: output has no 'RESULT paused' (got: $P7_OUT)"
+[ ! -s "$FAILDM_LOG" ] || fail "paused marker: FAIL-DM fired"
+[ "$P7_MARKERS" = 1 ] || fail "paused marker: marker count is $P7_MARKERS, expected 1"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "marker written by the run: RESULT paused, no FAIL-DM"
+
+FAIL_BEFORE=$FAIL
+run_far_side limit
+grep -qF -- "RESULT paused" <<< "$P7_OUT" || fail "limit hit: output has no 'RESULT paused' (got: $P7_OUT)"
+[ ! -s "$FAILDM_LOG" ] || fail "limit hit: FAIL-DM fired"
+[ "$P7_MARKERS" = 1 ] || fail "limit hit: marker count is $P7_MARKERS, expected 1"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "limit-hit log on a failing exit: RESULT paused, no FAIL-DM"
+
+FAIL_BEFORE=$FAIL
+run_far_side auth
+if grep -qF -- "RESULT paused" <<< "$P7_OUT"; then fail "auth error: wrongly reported paused"; fi
+[ "$(wc -l < "$FAILDM_LOG" 2>/dev/null | tr -d ' ')" = 1 ] || fail "auth error: FAIL-DM count is not 1 (got: $(cat "$FAILDM_LOG" 2>/dev/null))"
+[ "$P7_MARKERS" = 0 ] || fail "auth error: a marker was written"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "API Error 401: not paused, one FAIL-DM"
 
 # ==========================================================================
 # Summary

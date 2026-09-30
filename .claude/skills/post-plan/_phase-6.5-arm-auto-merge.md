@@ -1,6 +1,6 @@
 ---
 description: Per-condition run-and-report blocks for Phase 6.5 auto-merge arming.
-last_verified: 2026-09-25
+last_verified: 2026-09-29
 ---
 
 # Phase 6.5 — Arm Auto-Merge (post-plan reference)
@@ -18,6 +18,8 @@ _prfiles="$(gh pr view --json files --jq '(.files // [])[].path')"
 CLEAR=$(pr_manual_testing_clearance "$_prbody" "$_prfiles")
 [ "$CLEAR" != "CLEARED" ] && echo "BLOCKED: Manual-Testing not cleared (state=$CLEAR) — held for human review"
 ```
+
+A Visual-regression matrix row marked `(no-change)` directly after its backticked test token plans an untouched baseline. `conformance.check` skips that token, so a CSS-only diff can arm without a `MISSING:` for the snapshots directory (backlog#1222). The harness honors the marker only on Visual-regression rows and only when no unmarked row shares the token; the row shape is specified in `.claude/review-shared/_plan-verification.md`.
 
 Condition (3) is three-state, and an indeterminate Phase 5.0 BLOCKS. The bridge file `/tmp/post-plan-missing-tests-$PPID` is truncated at 5.0 START and appended to at 5.0 END, so *empty* is ambiguous on its own: it is byte-identical for "5.0 ran and found nothing unresolved" and "5.0 died before it finished". Reading empty as PASS is a fail-OPEN that contradicts the fail-closed default. The disambiguator is the **done-marker** `/tmp/post-plan-conformance-done-$PPID`, written as the last action of Phase 5.0 on **both** the normal path and the skip path (`PLAN_FOUND=none` or `! $HAS_MATRIX`; see `SKILL.md` Phase 5.0). Marker absent ⇒ indeterminate ⇒ **BLOCKED**; marker present + empty bridge ⇒ clean ⇒ pass. The skip-path write is what keeps this from blocking every plan-blind PR (the dominant case), so treat it as load-bearing. The compiled harness computes conformance in-process, then writes the same two signals into its own run dir (`conformance-done` and `missing-tests`, beside `result.json`) as that run's audit trail. So the harness never uses the `/tmp` files, and it no longer drives this block: the rc=4 resume arm that once re-entered the skill here is gone. The defaults below are the production path, read by the skill on its own fallback run. The `$DONE_MARK`/`$BRIDGE` indirection now survives only as a test seam, and `bin/test-postplan-arm-conditions` is its sole caller:
 

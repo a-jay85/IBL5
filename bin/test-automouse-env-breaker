@@ -172,6 +172,8 @@ mkdir -p "$E2_NDIR/queue" "$E2_NDIR/handoff" "$E2_NDIR/logs" \
 # Symlink prompt files so the runner cat succeeds under set -e
 ln -sf "$REPO_ROOT/bin/automouse/prompt-impl"    "$E2_ROOT/prompt-impl"
 ln -sf "$REPO_ROOT/bin/automouse/prompt-postplan" "$E2_ROOT/prompt-postplan"
+# The runner also sources $SELF_DIR/lib-queue-order (queue_entries_ordered).
+ln -sf "$REPO_ROOT/bin/automouse/lib-queue-order" "$E2_ROOT/lib-queue-order"
 
 # Rewritten runner: NIGHTLY_DIR→temp, REPO→worktree root, PATH→stub first
 E2_RUNNER="$E2_ROOT/run"
@@ -185,6 +187,39 @@ chmod +x "$E2_RUNNER"
 E2_TRACE="$E2_ROOT/trace"
 : > "$E2_TRACE"
 
+# Usage gate (ADR-0143): the runner asks the gate before every impl. Use a private state
+# dir and a `security` shim that finds no token, so no case reads the real keychain, cache
+# or markers; no usage data fails open.
+GATE_LIB="$REPO_ROOT/bin/lib/usage-gate.sh"
+E2_GATE="$E2_ROOT/gate"
+export IBL5_USAGE_GATE_STATE_DIR="$E2_GATE"
+mkdir -p "$E2_GATE"
+# usage_session_started seam: an empty projects dir means every session looks "not started".
+# Tests that need a transcript create a file under this dir before the --resume-paused call.
+E2_PROJECTS="$E2_ROOT/projects"
+mkdir -p "$E2_PROJECTS/default"
+export IBL5_USAGE_CLAUDE_PROJECTS="$E2_PROJECTS"
+printf '#!/bin/sh\nexit 1\n' > "$E2_STUB/security"
+chmod +x "$E2_STUB/security"
+E2_ARGS="$E2_ROOT/stub-args"
+: > "$E2_ARGS"
+
+# P6 post-plan pause: the impl hands off to this worktree, and the post-plan-now stub
+# (the runner calls "$SELF_DIR/../post-plan-now", so it sits beside $E2_ROOT) writes a
+# post-plan-now marker whose resume_cwd is the worktree, then exits 75.
+E2_PP_WT="$E2_ROOT/pp-worktree"
+E2_PP_SID="cccccccc-3333-4333-8333-cccccccccccc"
+mkdir -p "$E2_PP_WT"
+printf '#!/bin/sh\nexit 0\n' > "$E2_PP_WT/post-plan-now"
+chmod +x "$E2_PP_WT/post-plan-now"
+cat > "$E2_ROOT/../post-plan-now" <<PPSTUB
+#!/usr/bin/env bash
+. "$GATE_LIB"
+usage_marker_write "$E2_PP_SID" post-plan-now "$E2_PP_WT/post-plan-now" usage-pause drain 94 five_hour ""
+exit 75
+PPSTUB
+chmod +x "$E2_ROOT/../post-plan-now"
+
 # Stub claude: keyed on PLAN_FILE= in the prompt text.
 # wtfail.md  — touches the wt-fail sentinel, writes no handoff, exits 0.
 # fastfail.md — writes nothing, exits 0 (a genuine fast-no-outcome shape).
@@ -193,6 +228,23 @@ cat > "$E2_STUB/claude" <<CLAUDE
 set -u
 NDIR="$E2_NDIR"
 TRACE="$E2_TRACE"
+printf 'ARGS %s\n' "\$*" >> "$E2_ARGS"
+sid=""; prev=""
+for a in "\$@"; do [ "\$prev" = "--session-id" ] && sid="\$a"; prev="\$a"; done
+case "\${STUB_MODE:-}" in
+    marker)
+        . "$GATE_LIB"
+        usage_marker_write "\$sid" automouse "$E2_RUNNER" usage-pause drain 94 five_hour ""
+        exit 0 ;;
+    limit) echo "You've hit your weekly limit" >&2; echo "You've hit your weekly limit"; exit 1 ;;
+    auth)  echo "API Error: 401" >&2; echo "API Error: 401"; exit 1 ;;
+    ppause)
+        plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
+        printf '{"slug":"stub","worktree":"%s","branch":"stub","plan_file":"%s","plan_title":"stub","completed_at":"2026-01-01T00:00:00Z"}\n' \
+            "$E2_PP_WT" "\$plan" > "\$NDIR/handoff/\$plan.json"
+        printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":100,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
+        exit 0 ;;
+esac
 plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
 if [ -n "\$plan" ]; then
     case "\$plan" in
@@ -225,12 +277,15 @@ write_e2_plan() {
 e2_logtxt() { cat "$E2_NDIR/logs/"*.log 2>/dev/null || true; }
 
 reset_e2() {
-    rm -f "$E2_NDIR/queue"/*.md "$E2_NDIR/queue"/*.lock "$E2_NDIR/queue"/*.attempts \
+    rm -f "$E2_NDIR/queue"/*.md "$E2_NDIR/queue"/*.attempts \
           "$E2_NDIR/queue"/*.depends-hold "$E2_NDIR/queue"/*.wt-fail \
           "$E2_NDIR/queue"/*.failure "$E2_NDIR/handoff"/*.json \
           "$E2_NDIR/done"/*.md "$E2_TRACE"
     : > "$E2_TRACE"
     rm -f "$E2_NDIR/logs"/*.log
+    rm -rf "$E2_NDIR/queue"/*.lock "$E2_GATE"
+    mkdir -p "$E2_GATE"
+    : > "$E2_ARGS"
 }
 
 run_e2() {
@@ -286,6 +341,129 @@ assert_absent  "W3: queue/fastfail.md.attempts absent (refunded)" \
 want_absent    "W3: log has no WT-NEW FAILURE"           "$W3_LOG" "WT-NEW FAILURE"
 assert_absent  "W3: stale sentinel cleared by 3b (rm before attempt)" \
                "$E2_NDIR/queue/fastfail.md.wt-fail"
+
+# ── Usage-gate pause cases (ADR-0143) ─────────────────────────────────────────
+run_e2_mode() { # $1 = STUB_MODE
+    STUB_MODE="$1" run_e2 > /dev/null 2>&1
+}
+stub_sid() { grep -oE -- '--session-id [0-9a-f-]{36}' "$E2_ARGS" | head -1 | awk '{print $2}'; }
+gate_marker_count() { find "$E2_GATE/markers" -name '*.json' 2>/dev/null | wc -l | tr -d ' '; }
+
+echo ""
+echo "# P1: a marker written mid-run pauses the impl (no env-stop, attempt refunded, lock held)"
+reset_e2
+write_e2_plan "pausey"
+run_e2_mode marker
+P1_LOG="$(e2_logtxt)"
+P1_SID="$(stub_sid)"
+[ -n "$P1_SID" ] && echo "ok: P1: the impl was launched with --session-id $P1_SID" \
+    || fail "P1: the impl call carried no --session-id <uuid>"
+want           "P1: log says the impl paused"            "$P1_LOG" "Impl paused (usage gate)"
+want_absent    "P1: no env-stop"                         "$P1_LOG" "Environmental failure"
+assert_eq      "P1: paused-held names the impl session"  "$(cat "$E2_NDIR/queue/pausey.md.lock/paused-held" 2>/dev/null)" "$P1_SID"
+assert_absent  "P1: attempt refunded"                    "$E2_NDIR/queue/pausey.md.attempts"
+assert_present "P1: plan stays queued"                   "$E2_NDIR/queue/pausey.md"
+assert_present "P1: runs/<sid>.plan exists"              "$E2_GATE/runs/$P1_SID.plan"
+assert_present "P1: marker survives for the coordinator" "$E2_GATE/markers/$P1_SID.json"
+
+echo ""
+echo "# P2: a weekly-limit message pauses with reason=limit-hit"
+reset_e2
+write_e2_plan "limity"
+run_e2_mode limit
+P2_LOG="$(e2_logtxt)"
+want           "P2: log says the impl paused"            "$P2_LOG" "Impl paused (usage gate)"
+want_absent    "P2: no env-stop"                         "$P2_LOG" "Environmental failure"
+assert_eq      "P2: one marker"                          "$(gate_marker_count)" "1"
+assert_eq      "P2: marker reason is limit-hit"          "$(jq -r .reason "$E2_GATE"/markers/*.json 2>/dev/null)" "limit-hit"
+
+echo ""
+echo "# P3: API Error 401 stays on the env-stop path"
+reset_e2
+write_e2_plan "authy"
+run_e2_mode auth
+P3_LOG="$(e2_logtxt)"
+want           "P3: env-stop report path"                "$P3_LOG" "Environmental failure during impl"
+want_absent    "P3: not paused"                          "$P3_LOG" "Impl paused (usage gate)"
+assert_eq      "P3: no marker"                           "$(gate_marker_count)" "0"
+
+echo ""
+echo "# P4: --resume-paused continues mid-run pause with --resume (session has a transcript)"
+reset_e2
+write_e2_plan "pausey"
+run_e2_mode marker
+P4_SID="$(stub_sid)"
+assert_eq      "P4 setup: paused-held holds the sid"     "$(cat "$E2_NDIR/queue/pausey.md.lock/paused-held" 2>/dev/null)" "$P4_SID"
+# Create a fake transcript so usage_session_started returns true -> uses --resume
+touch "$E2_PROJECTS/default/$P4_SID.jsonl"
+: > "$E2_ARGS"
+NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+    timeout 30 "$E2_RUNNER" --resume-paused "$P4_SID" > /dev/null 2>&1 || true
+rm -f "$E2_PROJECTS/default/$P4_SID.jsonl"
+P4_ARGS="$(cat "$E2_ARGS")"
+want           "P4: the impl got --resume <sid>"         "$P4_ARGS" "--resume $P4_SID"
+want           "P4: the impl got the continue prompt"    "$P4_ARGS" "Continue the implementation from where it stopped"
+assert_absent  "P4: the pause marker is gone"            "$E2_GATE/markers/$P4_SID.json"
+assert_absent  "P4: no paused-held left"                 "$E2_NDIR/queue/pausey.md.lock/paused-held"
+
+echo ""
+echo "# P4b: --resume-paused of pre-start pause uses --session-id; resume_count carries through clear"
+reset_e2
+write_e2_plan "pausey"
+# Seed a drain-zone usage cache so the prestart gate fires on the first run
+printf '{"five_hour":{"utilization":95,"resets_at":null},"seven_day":{"utilization":30,"resets_at":null},"fetched_at":%s}\n' \
+    "$(date +%s)" > "$E2_GATE/cache.json"
+run_e2
+P4B_SID="$(cat "$E2_NDIR/queue/pausey.md.lock/paused-held" 2>/dev/null)"
+[ -n "$P4B_SID" ] && echo "ok: P4b setup: prestart gate paused with sid $P4B_SID" \
+    || fail "P4b setup: no paused-held after prestart pause"
+assert_present "P4b setup: prestart pause marker exists"   "$E2_GATE/markers/$P4B_SID.json"
+assert_eq      "P4b setup: resume_count starts at 0"       "$(jq -r .resume_count "$E2_GATE/markers/$P4B_SID.json" 2>/dev/null)" "0"
+# Simulate the coordinator bumping the count before it resumes the session
+# shellcheck source=/dev/null
+( . "$GATE_LIB"; IBL5_USAGE_GATE_STATE_DIR="$E2_GATE" usage_marker_bump_resume "$P4B_SID" ) > /dev/null 2>&1
+# Clear the drain-zone cache so the resumed run's prestart gate passes
+rm -f "$E2_GATE/cache.json"
+: > "$E2_ARGS"
+# No transcript exists — usage_session_started returns false — runner must use --session-id
+# STUB_MODE=marker causes the resumed impl to re-pause, so we can verify resume_count carried
+STUB_MODE=marker NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
+    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+    timeout 30 "$E2_RUNNER" --resume-paused "$P4B_SID" > /dev/null 2>&1 || true
+P4B_ARGS="$(cat "$E2_ARGS")"
+want           "P4b: impl used --session-id (no transcript)"   "$P4B_ARGS" "--session-id $P4B_SID"
+want_absent    "P4b: impl did NOT use --resume"                "$P4B_ARGS" "--resume $P4B_SID"
+want_absent    "P4b: no continue prompt"                       "$P4B_ARGS" "Continue the implementation from where it stopped"
+# The stub re-paused: verify resume_count=1 was carried through the clear
+assert_present "P4b: new marker written after re-pause"        "$E2_GATE/markers/$P4B_SID.json"
+assert_eq      "P4b: resume_count=1 carried through clear"     "$(jq -r .resume_count "$E2_GATE/markers/$P4B_SID.json" 2>/dev/null)" "1"
+
+echo ""
+echo "# P5: --resume-paused rejects bad input with exit 2"
+reset_e2
+p5_rc() { NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 timeout 30 "$E2_RUNNER" "$@" > /dev/null 2>&1; echo $?; }
+assert_eq      "P5: no sid"                              "$(p5_rc --resume-paused)" "2"
+assert_eq      "P5: two sids"                            "$(p5_rc --resume-paused a b)" "2"
+assert_eq      "P5: path-like sid"                       "$(p5_rc --resume-paused ../x)" "2"
+P5_SID="bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb"
+# shellcheck source=/dev/null
+( . "$GATE_LIB"; usage_marker_write "$P5_SID" plan-now "$E2_RUNNER" usage-pause drain 94 five_hour ""; usage_argv_save "$P5_SID" ) > /dev/null 2>&1
+assert_eq      "P5: marker belongs to plan-now"          "$(p5_rc --resume-paused "$P5_SID")" "2"
+
+echo ""
+echo "# P6: post-plan-now exit 75 holds the claim lock for its session and refunds the attempt"
+reset_e2
+write_e2_plan "ppausey"
+run_e2_mode ppause
+P6_LOG="$(e2_logtxt)"
+want           "P6: post-plan ran and exited 75"         "$P6_LOG" "post-plan-now exited code=75"
+want           "P6: log says post-plan paused"           "$P6_LOG" "Post-plan paused (usage gate)"
+want_absent    "P6: no env-stop"                         "$P6_LOG" "Environmental failure"
+assert_eq      "P6: paused-held names the post-plan session" \
+               "$(cat "$E2_NDIR/queue/ppausey.md.lock/paused-held" 2>/dev/null)" "$E2_PP_SID"
+assert_absent  "P6: attempt refunded"                    "$E2_NDIR/queue/ppausey.md.attempts"
+assert_present "P6: plan stays queued"                   "$E2_NDIR/queue/ppausey.md"
+assert_present "P6: post-plan marker survives"           "$E2_GATE/markers/$E2_PP_SID.json"
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

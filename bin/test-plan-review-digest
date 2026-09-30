@@ -330,7 +330,7 @@ EOF
 
 prd_run --help
 prd_expect_eq "help exits 0" 0 "$PRD_RC"
-prd_err_has "default 1500" "help mentions default 1500"
+prd_out_has "default 1500" "help mentions default 1500"
 
 prd_run --maxchars=900 "$NEITHER"
 prd_expect_eq "NEG unknown flag exits 2" 2 "$PRD_RC"

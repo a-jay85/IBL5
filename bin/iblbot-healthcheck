@@ -4,6 +4,19 @@
 # pm2 start/save output is informational. Neither warrants a notification.
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/iblbot-healthcheck
+
+IBLbot pm2 watchdog. If IBLbot is not responding on port 50000, restarts it
+via pm2. All output is redirected to the healthcheck log.
+Intended for cron use — not for interactive invocation.
+
+Arguments: none
+EOF
+    exit 0
+fi
+
 LOG=/home/iblhoops/.pm2/iblbot-healthcheck.log
 NVM_PM2=/home/iblhoops/.nvm/versions/node/v22.7.0/bin/pm2
 IBLBOT=/home/iblhoops/public_html/ibl5/IBLbot

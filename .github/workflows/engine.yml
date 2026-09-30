@@ -9,6 +9,13 @@ on:
   pull_request:
     branches: [ master, develop ]
     types: [opened, synchronize, reopened, ready_for_review]
+    # Workflow-level filter, same globs as push above. Engine is not a
+    # required check (.claude/rules/engine-go.md), so a skipped run blocks
+    # nothing. Never copy this into a required workflow; see guard R1 in
+    # bin/check-composite-contracts.
+    paths:
+      - 'engine/**'
+      - '.github/workflows/engine.yml'
 
 permissions:
   contents: read
@@ -18,31 +25,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Change-detection strategy: dorny/paths-filter with a static glob list.
-  # Engine CI only needs to run when Go engine sources (or this workflow) change,
-  # so an engine/** glob is exactly right. bin/website-affecting is NOT used: it
-  # models PHP app-rendering impact, which is unrelated to the Go engine build.
-  changes:
-    name: Detect changes
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: read
-    outputs:
-      engine: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.engine == 'true' }}
-    steps:
-      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
-        id: filter
-        if: github.event_name == 'pull_request'
-        with:
-          filters: |
-            engine:
-              - 'engine/**'
-              - '.github/workflows/engine.yml'
+  # Go engine CI. bin/website-affecting is not used: it models PHP
+  # app-rendering impact. Path scoping lives in the on: triggers above.
 
   engine:
     name: Go build, vet, lint, test
-    needs: [changes]
-    if: needs.changes.outputs.engine == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -102,7 +89,7 @@ jobs:
   gate:
     name: Engine
     if: always()
-    needs: [changes, engine]
+    needs: [engine]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

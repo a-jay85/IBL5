@@ -4,6 +4,22 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/wt-list
+
+List all running worktree Docker environments.
+
+Prints a table of every worktree found under IBL5-worktrees/, showing
+the worktree directory name, its branch slug, its dev URL, and the
+status of its Docker containers.
+
+Arguments: none
+Exit codes: 0 always
+EOF
+    exit 0
+fi
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"
 WORKTREES_DIR="$(worktrees_parent_dir "$REPO_ROOT")"

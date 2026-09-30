@@ -11,6 +11,28 @@
 # comparisons may miss data in those four tables.
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/phase-snapshot-capture
+
+Capture one prod DB snapshot per season phase, on entry into that phase.
+Runs on the prod host; invoked by .github/workflows/db-backup.yml.
+
+Idempotent: skips if the current phase snapshot already exists.
+
+Env vars:
+  SNAP_DIR          Snapshot output directory (default ~/backups/db/phase-snapshots).
+  REMOTE_DATABASE   Database name to dump (default iblhoops_ibl5).
+  LEAGUE            League identifier for ibl_settings lookup (default ibl).
+  DUMPER            Path to the dump script (default ~/.phase-snapshot/rehearsal-prod-dump).
+  RETAIN_SEASONS    Number of seasons of snapshots to keep per phase slug (default 2).
+  DRY_RUN           Set to 1 to print planned actions without making changes.
+  PHASE_OVERRIDE    Override current phase (test seam).
+  SEASON_OVERRIDE   Override current season year (test seam).
+EOF
+    exit 0
+fi
+
 SNAP_DIR="${SNAP_DIR:-$HOME/backups/db/phase-snapshots}"
 REMOTE_DATABASE="${REMOTE_DATABASE:-iblhoops_ibl5}"
 LEAGUE="${LEAGUE:-ibl}"

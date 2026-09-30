@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time; no deferred manual items; E2E assertions must be seed- and DOM-grounded.
-last_verified: 2026-09-28
+last_verified: 2026-09-29
 ---
 
 # Plan Verification Matrix
@@ -48,6 +48,20 @@ Each implementation phase that changes behavior must have a corresponding row (o
 - **A truly-manual row must be performable on the *open PR*, before it merges.** Design an exercise path on one of the three pre-prod environments and keep the row. Only an *intrinsic* deploy-dependency that survives that challenge may use the `pre-prod-exception:` marker recorded by `bin/check-plan` gate `[P]`. Why: _plan-verification-detail.md § Why the test-type boundaries fall where they do
 - **Deploy-dependent behavior needs a row at all — an absent row is the violation.** Name which pre-prod environment exercises it — see § Pre-prod exercise paths.
 - If a plan has zero truly-manual items, state: `All verification is automated — no manual testing needed.`
+
+### Visual-regression rows that expect no baseline change
+
+The post-plan harness treats each test row's backticked token as a file the diff must touch. A row planning an untouched baseline (backlog#1222) would hold arming condition (3) with `MISSING:` forever. Mark it `(no-change)` right after the token's closing backtick:
+
+```
+| 4 | CSS split leaves every smoke baseline byte-identical | Visual-regression | post-impl | `ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots` (no-change) |
+```
+
+Harness rules (`parse_no_change_test_paths` in `tools/postplan-harness/harness/planfile.py`):
+
+- Honored only on a row with a cell reading exactly `Visual-regression`. Elsewhere the marker is ignored. `bin/check-plan` gate `[X]` rejects it on other row types and anywhere but directly after the token.
+- Exempts only that row's token. If another row plans the same token unmarked, the unmarked row wins.
+- Fenced examples never count.
 
 ### Pre-prod exercise paths
 

@@ -12,7 +12,7 @@ source "$(cd "$(dirname "$0")" && pwd)/lib/bug-pipeline-test-stubs.sh"
 
 bpt_setup
 OLD='2020-01-01 00:00:00'                       # far past IDLE window
-NOW="$(date '+%Y-%m-%d %H:%M:%S')"              # within the window
+NOW="$(TZ=UTC date '+%Y-%m-%d %H:%M:%S')"      # within the window (UTC: the tick's epoch_of parses stamps as UTC)
 
 # ── Idle sends EXACTLY ONE reminder (awaiting_info) ───────────────────────────
 bpt_reset

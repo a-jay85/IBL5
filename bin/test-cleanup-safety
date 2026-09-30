@@ -191,6 +191,29 @@ run_cleanup() {
     ( cd "$main" && PATH="$STUBBIN:$PATH" "$CLEANUP" --all --dry-run "$@" 2>&1 )
 }
 
+# run_cleanup_split <main> [args...] — run the cleanup under test from inside
+# <main> with EXACTLY the given args (no implicit --all/--dry-run). stdout goes
+# to $SPLIT_OUT, stderr to $SPLIT_ERR, and the exit code to SPLIT_RC.
+SPLIT_OUT="$TMP/split.out"
+SPLIT_ERR="$TMP/split.err"
+SPLIT_RC=0
+run_cleanup_split() {
+    local main="$1"; shift
+    SPLIT_RC=0
+    ( cd "$main" && PATH="$STUBBIN:$PATH" "$CLEANUP" "$@" ) \
+        >"$SPLIT_OUT" 2>"$SPLIT_ERR" || SPLIT_RC=$?
+}
+
+# assert_rc <name> <expected> <actual>
+assert_rc() {
+    if [ "$3" = "$2" ]; then
+        pass "$1"
+    else
+        failcase "$1 — expected exit $2, got $3"
+        sed 's/^/    stderr: /' "$SPLIT_ERR"
+    fi
+}
+
 # run_cleanup_gh <main> <fixture-file> [flags...] — like run_cleanup but with a table-driven
 # gh fixture, scoped to the subshell so it never leaks into a later no-fixture case.
 run_cleanup_gh() {
@@ -771,6 +794,68 @@ printf 'created\tghi789abc123ghi7\t2026-07-01T00:00:00.000000000Z\n' >> "$_fx_ho
 out="$(run_cleanup_docker "$e" "$_fx_hole2_labeled")"
 assert_absent "hole2-ibl5-labeled-container-spared" \
     'WOULD remove stale unlabeled container: ibl5-mariadb' "$out"
+
+# ----------------------------------------------------------------------------
+# Named mode exit codes (IBL5-backlog#1244): 0 = cleaned, 1 = not found,
+# 3 = the named target was SKIPPED (reason on stderr). --all stays 0.
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+git -C "$e" worktree add -q -b zero "$e/worktrees/zero" master 2>/dev/null
+
+# (a) named, real run, zero-own-commit branch -> SKIP, exit 3, reason on stderr
+run_cleanup_split "$e" zero
+assert_rc "named-skip-exit3" 3 "$SPLIT_RC"
+assert_match "named-skip-stderr-reason" \
+    "^bin/cleanup: 'zero' skipped: branch 'zero' not merged to master$" \
+    "$(cat "$SPLIT_ERR")"
+assert_match "named-skip-stdout-unchanged" \
+    "^  SKIP zero: branch 'zero' not merged to master$" "$(cat "$SPLIT_OUT")"
+assert_absent "named-skip-reason-not-on-stdout" \
+    "bin/cleanup: 'zero' skipped:" "$(cat "$SPLIT_OUT")"
+if git -C "$e" show-ref --verify -q refs/heads/zero; then
+    pass "named-skip-ref-survives"
+else
+    failcase "named-skip-ref-survives"
+fi
+if [ -d "$e/worktrees/zero" ]; then
+    pass "named-skip-worktree-survives"
+else
+    failcase "named-skip-worktree-survives"
+fi
+
+# (b) named + --dry-run that would skip -> exit 3 as well
+run_cleanup_split "$e" zero --dry-run
+assert_rc "named-dryrun-skip-exit3" 3 "$SPLIT_RC"
+
+# (c) --all over the same skipped worktree -> exit 0, no stderr reason line
+run_cleanup_split "$e" --all --dry-run
+assert_rc "all-skip-exit0" 0 "$SPLIT_RC"
+assert_match "all-skip-still-reports-skip" \
+    "SKIP zero: branch 'zero' not merged to master" "$(cat "$SPLIT_OUT")"
+assert_absent "all-skip-no-stderr-reason" "skipped:" "$(cat "$SPLIT_ERR")"
+
+# (e) named, nonexistent worktree -> exit 1, unchanged error text
+run_cleanup_split "$e" nosuch
+assert_rc "named-missing-exit1" 1 "$SPLIT_RC"
+assert_match "named-missing-stderr" \
+    "Error: Worktree 'nosuch' not found" "$(cat "$SPLIT_ERR")"
+
+# (d) named, genuinely merged clean worktree, --dry-run -> exit 0
+e="$(new_env)"
+add_merged_wt "$e" "feat"
+run_cleanup_split "$e" feat --dry-run
+assert_rc "named-merged-dryrun-exit0" 0 "$SPLIT_RC"
+assert_match "named-merged-dryrun-would-clean" \
+    'WOULD clean: feat' "$(cat "$SPLIT_OUT")"
+assert_absent "named-merged-dryrun-no-stderr-reason" \
+    "skipped:" "$(cat "$SPLIT_ERR")"
+
+# (f) a second SKIP site: untracked files -> exit 3 with THAT site's reason
+printf 'draft\n' > "$e/worktrees/feat/untracked-note.md"
+run_cleanup_split "$e" feat --dry-run
+assert_rc "named-untracked-exit3" 3 "$SPLIT_RC"
+assert_match "named-untracked-stderr-reason" \
+    "^bin/cleanup: 'feat' skipped: has untracked files$" "$(cat "$SPLIT_ERR")"
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

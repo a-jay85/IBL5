@@ -150,6 +150,15 @@ run_poll_err() {
       "$REAL_POLL" >/dev/null 2>"$POLL_STDERR_FILE" ) || true
 }
 
+# run_poll_split: run_poll with stdout -> POLL_OUT_FILE, stderr -> POLL_ERR_FILE.
+POLL_OUT_FILE=""; POLL_ERR_FILE=""
+run_poll_split() {
+    local SB="$1"
+    POLL_OUT_FILE="$(mktemp)"; POLL_ERR_FILE="$(mktemp)"
+    ( IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$SB/bin:$PATH" \
+      "$REAL_POLL" >"$POLL_OUT_FILE" 2>"$POLL_ERR_FILE" ) || true
+}
+
 # run_health: drives bin/docfix-poll --health-report; returns stdout.
 run_health() {
     local SB="$1" ISSUE="${2:-}"
@@ -726,6 +735,65 @@ SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
     && ! grep -q "could not remove" "$POLL_STDERR_FILE"; } \
   && ok "(23c) salvaged branch left by cleanup: wt-remove + branch -D after push" \
   || bad "(23c) salvaged branch must be removed after a successful push"
+
+# Test 24: reaper prints "could not reap" when bin/cleanup exits non-zero
+# (named mode exits 3 on SKIP, IBL5-backlog#1244).
+# _reap_case <label> <pr_state> <cleanup_rc> <expect: reaped|not-reaped>
+_reap_case() {
+    local label="$1" pr_state="$2" rc="$3" expect="$4" SB pass=true
+    SB="$(_wt_sandbox)"
+    SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+        SHIM_BRANCH_OUT="$B_OLD" SHIM_LS_REMOTE="" \
+        SHIM_REFLOG_OUT="$REFLOG_OLD" SHIM_WORKTREE_LIST="$(_wl "$SB")" \
+        SHIM_STATUS_OUT="" SHIM_LAUNCHCTL_OUT="" \
+        SHIM_PR_STATE="$pr_state" SHIM_CLEANUP_RC="$rc" \
+        run_poll_split "$SB"
+    grep -qx "$B_OLD" "$SB/cleanup-calls" 2>/dev/null || pass=false
+    if [ "$expect" = "reaped" ]; then
+        grep -qF "docfix-poll: reaped '$B_OLD' (PR ${pr_state})." "$POLL_OUT_FILE" || pass=false
+        ! grep -qF 'could not reap' "$POLL_ERR_FILE" || pass=false
+    else
+        grep -qF "docfix-poll: could not reap '$B_OLD'" "$POLL_ERR_FILE" || pass=false
+        ! grep -qF "reaped '$B_OLD'" "$POLL_OUT_FILE" || pass=false
+    fi
+    $pass && ok "$label" || bad "$label"
+}
+_reap_case "(24a) MERGED + cleanup rc 3: could not reap, no reaped line" MERGED 3 not-reaped
+_reap_case "(24b) MERGED + cleanup rc 0: reaped line, no could-not-reap" MERGED 0 reaped
+_reap_case "(24c) CLOSED + cleanup rc 3: could not reap, no reaped line" CLOSED 3 not-reaped
+
+# Test 25: wedged alert states a failed-attempt count, not an automatic-salvage promise.
+SB="$(build_sandbox)"
+WL25="$(_wl "$SB")"
+OUT25A="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
+    SHIM_LS_REMOTE="" SHIM_PR_FOR_BRANCH=0 \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_LAUNCHCTL_OUT="" SHIM_WORKTREE_LIST="$WL25" \
+    run_health "$SB" 77)"
+OUT25B="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
+    SHIM_LS_REMOTE="" SHIM_PR_FOR_BRANCH=0 \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_REFLOG_OUT="" \
+    SHIM_LAUNCHCTL_OUT="" SHIM_WORKTREE_LIST="$WL25" \
+    run_health "$SB" 77)"
+OUT25C="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
+    SHIM_LS_REMOTE="" SHIM_PR_FOR_BRANCH=0 \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_REFLOG_OUT="$REFLOG_5H" \
+    SHIM_LAUNCHCTL_OUT="" SHIM_WORKTREE_LIST="$WL25" \
+    run_health "$SB" 77)"
+printf '%s\n' "$OUT25A" | grep -qxF "detail=Local branch $B_OLD has no origin ref and no in-flight launchd run — the doc-fix run died before pushing. It has survived 2 nightly salvage attempt(s) and needs a manual look." \
+  && ok "(25a) wedged detail: 48h age reports 2 failed salvage attempts" \
+  || bad "(25a) wedged detail with known age"
+printf '%s\n' "$OUT25B" | grep -qxF "detail=Local branch $B_OLD has no origin ref and no in-flight launchd run — the doc-fix run died before pushing. Failed salvage attempts: unknown (branch reflog expired); it needs a manual look." \
+  && ok "(25b) wedged detail: unknown age says the count is unknown" \
+  || bad "(25b) wedged detail with unknown age"
+printf '%s\n' "$OUT25C" | grep -qF 'It has survived 1 nightly salvage attempt(s)' \
+  && ok "(25c) wedged detail: 5h age floors at 1 attempt" \
+  || bad "(25c) wedged detail attempt-count floor"
+{ [ "$(printf '%s\n' "$OUT25A" | grep -c '^')" -eq 3 ] \
+    && [ "$(printf '%s\n' "$OUT25B" | grep -c '^')" -eq 3 ] \
+    && ! printf '%s\n' "$OUT25A" "$OUT25B" | grep -q 'salvage it automatically'; } \
+  && ok "(25d) wedged outputs stay 3 lines and drop the automatic-salvage promise" \
+  || bad "(25d) wedged outputs: 3-line contract / no automatic-salvage promise"
 
 if [ "$FAILED" -eq 0 ]; then
     echo "All docfix-poll checks passed."

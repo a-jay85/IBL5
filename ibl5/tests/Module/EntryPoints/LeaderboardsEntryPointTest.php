@@ -15,7 +15,7 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->onQuery('cache', []);
     }
 
-    public function testDefaultTabRendersSeasonLeaders(): void
+    public function testDefaultTabRendersSeasonFormOnly(): void
     {
         $output = $this->runModule('Leaderboards', [], [], $this->dbGlobals());
 

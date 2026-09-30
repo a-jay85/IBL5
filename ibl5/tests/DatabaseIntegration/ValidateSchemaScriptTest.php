@@ -178,6 +178,12 @@ final class ValidateSchemaScriptTest extends TestCase
         self::assertSame(1, substr_count($result['stdout'], 'MISSING:'));
     }
 
+    /**
+     * On PHP 8.1+ the default mysqli report mode throws on a failed connect, so the script's
+     * `exit(2)` branch is unreachable and the process exits 255. Adding
+     * `mysqli_report(MYSQLI_REPORT_OFF);` before the connect revives that branch, and the
+     * regex below accepts either message.
+     */
     #[Test]
     public function testConnectFailureExitsNonZeroAndDistinctFromDrift(): void
     {

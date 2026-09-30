@@ -99,6 +99,10 @@ final class CheckCoverageRegressionScriptTest extends TestCase
         );
     }
 
+    /**
+     * Boundary: `CoverageComparator::compare` uses `>=` against previous minus tolerance,
+     * so 79.50% against an 80.0 baseline with 0.5 tolerance passes.
+     */
     #[Test]
     public function testExitsZeroAtExactToleranceBoundary(): void
     {

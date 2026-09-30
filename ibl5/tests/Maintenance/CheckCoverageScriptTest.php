@@ -80,6 +80,9 @@ final class CheckCoverageScriptTest extends TestCase
         self::assertSame('', $result['stderr']);
     }
 
+    /**
+     * Boundary: equality passes because `CoverageChecker::check` compares with strict `<`.
+     */
     #[Test]
     public function testExitsZeroWhenCoverageEqualsThresholdExactly(): void
     {

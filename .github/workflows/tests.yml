@@ -1076,6 +1076,8 @@ jobs:
 
       - name: bin/test-merge-line-select
         run: bin/test-merge-line-select
+      - name: bin/test-merge-line-watch
+        run: bin/test-merge-line-watch
       - name: bin/test-check-workflow-checkout
         run: bin/test-check-workflow-checkout
       - name: bin/test-check-composite-contracts

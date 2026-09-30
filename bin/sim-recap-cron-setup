@@ -165,7 +165,7 @@ case "$ACTION" in
   resume)
     # Re-arm an existing plist — intended for the case where the phase-gate in
     # bin/sim-recap-tick self-unloaded the job when recaps were disabled and the
-    # Regular Season phase has now begun.  No env vars required: the plist
+    # HEAT or Regular Season phase has now begun.  No env vars required: the plist
     # already embeds everything it needs.
     if [ ! -f "$PLIST_PATH" ]; then
       echo "Error: ${PLIST_PATH} does not exist — run --install-schedule first." >&2

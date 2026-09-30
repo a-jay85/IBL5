@@ -233,16 +233,18 @@ run_findings() {
 # the '--- V2_FINDINGS ---' marker produced by the render block); embeds them in
 # template order before ### Merge digest.  When the second arg carries no
 # '--- V2_FINDINGS ---' marker the findings slot is omitted entirely.
+# Template order: banner, `Findings: none.`, findings slot, ### Merge digest and its
+# five labels, `---`, the <details> audit trail holding **Reviewed tree:** and
+# **Re-reviewed tree:**, terminal line, marker.
 compose_fixture_body() {
     local rr_line="$1" raw_slot="$2"
     local slot=""
     if grep -q '^--- V2_FINDINGS ---$' <<< "$raw_slot"; then
         slot="$(awk '/^--- V2_FINDINGS ---$/{found=1;next} found{print}' <<< "$raw_slot")"
     fi
-    printf 'Plan-fidelity verdict: READY — synthetic test body.\n'
+    printf '**READY** — 2026-09-30 00:00:00 UTC\n'
     printf '\n'
-    printf '**Reviewed tree:** deadbeef0000\n'
-    [ -n "$rr_line" ] && printf '%s\n' "$rr_line"
+    printf 'Findings: none.\n'
     if [ -n "$slot" ]; then
         printf '\n'
         printf '%s\n' "$slot"
@@ -258,7 +260,12 @@ compose_fixture_body() {
     printf '\n'
     printf '%s\n' '---'
     printf '\n'
-    printf 'Remediation: none.\n'
+    printf '<details><summary>Audit trail</summary>\n'
+    printf '\n'
+    printf '**Reviewed tree:** deadbeef0000\n'
+    [ -n "$rr_line" ] && printf '%s\n' "$rr_line"
+    printf '\n'
+    printf '</details>\n'
     printf '\n'
     printf ': READY — synthetic terminal line.\n'
     printf '<!-- pr-ready-verdict -->\n'
@@ -273,6 +280,7 @@ for _cft in \
     '**Touches:**' \
     '**Machine-authored fixes:**' \
     '### Merge digest' \
+    '<details><summary>Audit trail</summary>' \
     '**Re-reviewed tree:**'; do
     grep -qF "$_cft" "$P55_SKILL" || {
         echo "FAIL: compose_fixture_body binding — '$_cft' no longer in $P55_SKILL; update composer to match"
@@ -1841,7 +1849,7 @@ else
 fi
 
 # Case 2 — quiet: findingsempty produces an empty slot and only blank lines between
-# **Re-reviewed tree:** and ### Merge digest
+# `Findings: none.` and ### Merge digest
 out2="$(run_findings "$B58F" findingsempty spawn)"
 body2="$(compose_fixture_body "$RR_LINE" "$out2")"
 if grep -q '^--- V2_FINDINGS ---$' <<< "$out2"; then
@@ -1850,12 +1858,12 @@ if grep -q '^--- V2_FINDINGS ---$' <<< "$out2"; then
 else
     echo "ok: 5.8c quiet: rendered slot is empty (V2_FINDINGS_PRESENT=no)"
 fi
-between2="$(awk '/^\*\*Re-reviewed tree:\*\*/{found=1;next} found && /^### Merge digest/{exit} found{print}' <<< "$body2")"
+between2="$(awk '/^Findings: none\.$/{found=1;next} found && /^### Merge digest/{exit} found{print}' <<< "$body2")"
 if grep -q '[^[:space:]]' <<< "$between2"; then
-    echo "FAIL: 5.8c quiet: non-blank content between **Re-reviewed tree:** and ### Merge digest: '$between2'"
+    echo "FAIL: 5.8c quiet: non-blank content between Findings: none. and ### Merge digest: '$between2'"
     FAILED=1
 else
-    echo "ok: 5.8c quiet: only blank lines between re-reviewed tree and ### Merge digest"
+    echo "ok: 5.8c quiet: only blank lines between Findings: none. and ### Merge digest"
 fi
 
 # Case 3 — degrade: absent -2 file; composed body is byte-identical to the

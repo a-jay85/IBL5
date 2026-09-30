@@ -10,7 +10,7 @@ paths:
 
 ## When this applies
 
-A script is multi-invocation when invocation 1 writes state that invocation 2 reads. One example is a `--gate-candidates` run that prints a `WORK=` directory, followed by a `--work <dir>` run that consumes it. A `--resume` pair has the same shape. The harness for such a script is a `bin/test-*` file.
+A script is multi-invocation when invocation 1 writes state that invocation 2 reads. One example is a `--gate-candidates` run that prints a `WORK=` directory, followed by a `--work <dir>` run that consumes it. A `--resume` pair has the same shape. The harness for such a script is a `bin/test-*` file. Keep the `paths:` globs in this rule's frontmatter matching a tracked file. A typo such as `bin/tests-*` matches nothing, and the rule never attaches.
 
 ## The rule
 

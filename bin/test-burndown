@@ -86,6 +86,16 @@ bd() {
     "$SCRIPT" "$@"
 }
 
+# Helper: run bin/backlog with all stubs and an explicit HOME (sweep tests use a
+# private HOME so the shared $T/home ledgers never leak into their walk).
+bd_home() {
+    local h="$1"; shift
+    GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$h" TZ=UTC \
+    "$SCRIPT" "$@"
+}
+
 # ── C1: --help lists new subcommands ──────────────────────────────────────────
 OUT="$("$SCRIPT" --help 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && ok "--help exits 0" || fail "--help exits 0 (got $RC)"
@@ -1006,6 +1016,65 @@ grep -qE 'FAIL #80' <<< "$OUT" && ok "C40: FAIL #80 row" || fail "C40: FAIL #80 
 [ "$(jq -r '.items[] | select(.issue_num==80) | .status' "$LEDGER40")" != "merged" ] \
     && ok "C40: #80 ledger unchanged on failure" || fail "C40: #80 ledger unchanged on failure"
 rm -f "$LEDGER40"
+
+# ── C47: close-merged characterization pins (guard the Phase 4 extraction) ───
+# C47a: literal golden stdout. Literal text, never a captured baseline.
+LEDGER47="$T/home/claude-plans/_reports/burndown-batch-20260927T160000.json"
+cp "$LEDGER_C33" "$LEDGER47"
+rm -f "$T/gh.log"
+OUT="$(bd burndown-close-merged "$LEDGER47" 2>/dev/null)"; RC=$?
+C47_WANT='DONE #80 closed
+DONE #82 plan PR merged
+WAIT #83 open
+WAIT #84 queued
+SKIP #85 unknown (2 PRs for head fix-85)'
+[ "$OUT" = "$C47_WANT" ] && ok "C47a: close-merged stdout golden" \
+    || fail "C47a: close-merged stdout golden (got: $OUT)"
+[ "$RC" -eq 1 ] && ok "C47a: exit 1 with a SKIP row" || fail "C47a: exit 1 (got $RC)"
+# C47b: pr_url recorded on merge, both routes
+[ "$(jq -r '.items[] | select(.issue_num==80) | .pr_url' "$LEDGER47")" \
+    = "https://github.com/a-jay85/IBL5/pull/880" ] \
+    && ok "C47b: #80 pr_url recorded" || fail "C47b: #80 pr_url recorded"
+[ "$(jq -r '.items[] | select(.issue_num==82) | .pr_url' "$LEDGER47")" \
+    = "https://github.com/a-jay85/IBL5/pull/882" ] \
+    && ok "C47b: #82 pr_url recorded" || fail "C47b: #82 pr_url recorded"
+# C47c: close comment names the calling subcommand
+grep -qF 'Closed by bin/backlog burndown-close-merged from burndown-batch-20260927T160000.json' \
+    "$T/gh.log" && ok "C47c: close comment names burndown-close-merged" \
+    || fail "C47c: close comment names burndown-close-merged"
+rm -f "$LEDGER47"
+
+# C47d: pr-closed PR -> WAIT, no close, status unchanged
+printf '[{"url":"https://github.com/a-jay85/IBL5/pull/886","state":"CLOSED"}]\n' \
+    > "$T/fx/pr-fix-86.json"
+LEDGER47D="$T/home/claude-plans/_reports/burndown-batch-20260927T161000.json"
+jq '.items = [{"issue_num":86,"also_closes":[],"issue_title":"Fix eighty-six","rank":"P2","tier":"default","cost":1,"paths":["bin/fix86"],"route":"ad-hoc","slug":"fix-86","pr_url":"","status":"shipped"}]' \
+    "$LEDGER_C33" > "$LEDGER47D"
+rm -f "$T/gh.log"
+OUT="$(bd burndown-close-merged "$LEDGER47D" 2>/dev/null)"; RC=$?
+[ "$OUT" = "WAIT #86 pr-closed" ] && ok "C47d: pr-closed prints WAIT" \
+    || fail "C47d: pr-closed prints WAIT (got: $OUT)"
+[ "$RC" -eq 0 ] && ok "C47d: pr-closed exits 0" || fail "C47d: pr-closed exits 0 (got $RC)"
+grep -qF 'issue close' "$T/gh.log" && fail "C47d: no close on pr-closed" \
+    || ok "C47d: no close on pr-closed"
+[ "$(jq -r '.items[0].status' "$LEDGER47D")" = "shipped" ] \
+    && ok "C47d: #86 stays shipped" || fail "C47d: #86 stays shipped"
+rm -f "$LEDGER47D"
+
+# C47e: gh pr list failure -> SKIP unknown (gh failed), exit 1, nothing closed, ledger byte-identical
+LEDGER47E="$T/home/claude-plans/_reports/burndown-batch-20260927T162000.json"
+cp "$LEDGER_C33" "$LEDGER47E"
+cp "$LEDGER47E" "$T/c47e.before"
+rm -f "$T/gh.log"
+OUT="$(GH_FAIL_ON="pr list" bd burndown-close-merged "$LEDGER47E" 2>/dev/null)"; RC=$?
+[ "$RC" -eq 1 ] && ok "C47e: gh failure exits 1" || fail "C47e: gh failure exits 1 (got $RC)"
+grep -qF 'SKIP #80 unknown (gh failed)' <<< "$OUT" && ok "C47e: SKIP #80 unknown" \
+    || fail "C47e: SKIP #80 unknown (got: $OUT)"
+grep -qF 'issue close' "$T/gh.log" && fail "C47e: no close on unknown" \
+    || ok "C47e: no close on unknown"
+cmp -s "$T/c47e.before" "$LEDGER47E" && ok "C47e: ledger byte-identical" \
+    || fail "C47e: ledger byte-identical"
+rm -f "$LEDGER47E" "$T/c47e.before"
 
 # ── Phase 6: env-seam cases ───────────────────────────────────────────────────
 

@@ -74,6 +74,10 @@ bin/backlog burndown [--pair A,B]... | tee "$W/select.txt"
 Parse only the final `LEDGER:` line. `LEDGER: none` means all delta issues are in
 flight or over budget. Show the SKIP rows and stop.
 
+A `SKIP ... skip-label: <label>` row is a tagged item. It consumes no unit. A
+`cleared blocked on #N` line on stderr means the blocking PR closed and the item is
+eligible again.
+
 **5. Per picked item** (read items with `jq .items[]` from the ledger path), in ledger
 order:
 
@@ -90,8 +94,17 @@ bin/backlog burndown-record <ledger> <n> status=closed-fixed
 Freed units are not backfilled; one batch per call.
 
 **Route.** Apply `.claude/rules/work-triage.md` (cite it; do not restate its bar). An
-item you cannot classify: `bin/backlog burndown-record <ledger> <n> status=skipped`
-and report why.
+item you cannot do gets one of three skip forms, then report why:
+
+- Blocked on an open IBL5 PR: `bin/backlog burndown-record <ledger> <n> status=skipped reason=blocked blocked_by=<PR>`.
+  This adds the `blocked` label and posts one comment with the PR number. The label
+  clears itself on a later run once that PR merges or closes.
+- The target files live outside the repo: `bin/backlog burndown-record <ledger> <n> status=skipped reason=out-of-repo`.
+  The `out-of-repo` label stays until a human removes it.
+- Any other reason you cannot classify: plain `status=skipped`.
+
+A `reason=` record that exits 3 means the ledger kept the skip but the tag failed.
+Check `gh auth status`, then rerun `bin/backlog burndown-tag <n> reason=...`.
 
 **Plan route.** Pick a kebab slug. Compose the prompt exactly as
 `.claude/skills/plan-prompt/SKILL.md` does, adding this fixed constraints block:

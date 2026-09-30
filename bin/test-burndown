@@ -45,10 +45,21 @@ case "$*" in
         SLUG=$(printf '%s' "$*" | sed 's/.*--head //' | awk '{print $1}')
         cat "${GH_FX_DIR:-/dev/null}/pr-${SLUG}.json" 2>/dev/null || echo '[]'
         ;;
+    *"issue view"*"--json comments"*)
+        NUM=$(printf '%s' "$*" | awk '{for(i=1;i<=NF;i++) if($i=="view") print $(i+1)}')
+        cat "${GH_FX_DIR:-/dev/null}/issue-${NUM}-comments.json" 2>/dev/null || echo '{"comments":[]}'
+        ;;
+    *"pr view"*)
+        NUM=$(printf '%s' "$*" | awk '{for(i=1;i<=NF;i++) if($i=="view") print $(i+1)}')
+        cat "${GH_FX_DIR:-/dev/null}/pr-view-${NUM}.json" 2>/dev/null || echo '{}'
+        ;;
     *"issue view"*)
         NUM=$(printf '%s' "$*" | awk '{for(i=1;i<=NF;i++) if($i=="view") print $(i+1)}')
         cat "${GH_FX_DIR:-/dev/null}/issue-${NUM}.json" 2>/dev/null || echo '{}'
         ;;
+    *"label create"*) exit 0 ;;
+    *"issue edit"*) exit 0 ;;
+    *"issue comment"*) exit 0 ;;
     *"issue close"*) exit 0 ;;
     *) exit 0 ;;
 esac
@@ -96,12 +107,21 @@ bd_home() {
     "$SCRIPT" "$@"
 }
 
+# Helper: same stubs as bd(), isolated HOME + fixtures for the skip-label tests
+bdl() {
+    GH_LOG="$T/lbl/gh.log" GH_FX_DIR="$T/lbl/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="$T/tier" \
+    HOME="$T/lbl/home" \
+    "$SCRIPT" "$@"
+}
+
 # ── C1: --help lists new subcommands ──────────────────────────────────────────
 OUT="$("$SCRIPT" --help 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && ok "--help exits 0" || fail "--help exits 0 (got $RC)"
 want "--help: burndown-status listed" "$OUT" "burndown-status"
 want "--help: burndown-close-merged listed" "$OUT" "burndown-close-merged"
 want "--help: burndown-sweep listed" "$OUT" "burndown-sweep"
+want "--help: burndown-tag listed" "$OUT" "burndown-tag"
 
 # ── C2: unknown burndown subcommand rejected ──────────────────────────────────
 OUT="$(bd burndown-bogus 2>&1)"; RC=$?
@@ -1498,6 +1518,323 @@ if [ -f "$SKILL_FILE" ]; then
 else
     fail "C46: SKILL.md not found at $SKILL_FILE"
 fi
+
+# ══ Skip-label region: isolated HOME + fixtures ($T/lbl) ══════════════════════
+mkdir -p "$T/lbl/home/claude-plans/_reports" "$T/lbl/fx"
+echo '[]' > "$T/lbl/fx/prs-open.json"
+touch "$T/lbl/fx/worktrees.txt"
+cat > "$T/lbl/home/claude-plans/_reports/backlog-triage-2026-09-26.md" <<'REPORT'
+# Backlog triage 2026-09-26
+
+## P2 (6)
+
+- [#40](u40) Forty — r40
+- [#41](u41) Forty-one — r41
+- [#42](u42) Forty-two — r42
+- [#43](u43) Forty-three — r43
+- [#44](u44) Forty-four — r44
+- [#45](u45) Forty-five — r45
+
+## Notes
+
+- [#99](u99) unranked note — should not rank
+REPORT
+touch -t 202609260000 "$T/lbl/home/claude-plans/_reports/backlog-triage-2026-09-26.md"
+
+# lbl_issues <labels40> <labels41> [upd40] [labels44] — writes five open issues
+# #40-#44 plus #45 (ranked, updated after the report).
+lbl_issues() {
+    local l40="$1" l41="$2" u40="${3:-2026-09-20T00:00:00Z}" l44="${4:-[]}"
+    [ -n "$u40" ] || u40="2026-09-20T00:00:00Z"
+    [ -n "$l44" ] || l44="[]"
+    cat > "$T/lbl/fx/issues.json" <<JSON
+[
+  {"number":40,"title":"Forty","body":"bin/a.sh:1","url":"u40","updatedAt":"$u40","labels":$l40},
+  {"number":41,"title":"Forty-one","body":"bin/b.sh:1","url":"u41","updatedAt":"2026-09-20T00:00:00Z","labels":$l41},
+  {"number":42,"title":"Forty-two","body":"bin/c.sh:1","url":"u42","updatedAt":"2026-09-20T00:00:00Z","labels":[]},
+  {"number":43,"title":"Forty-three","body":"bin/d.sh:1","url":"u43","updatedAt":"2026-09-20T00:00:00Z","labels":[]},
+  {"number":44,"title":"Forty-four","body":"bin/e.sh:1","url":"u44","updatedAt":"2026-09-20T00:00:00Z","labels":$l44},
+  {"number":45,"title":"Forty-five","body":"bin/f.sh:1","url":"u45","updatedAt":"2026-09-28T00:00:00Z","labels":[]}
+]
+JSON
+}
+
+# bdl_b [args] — burndown with any prior ledger removed (a queued ledger would
+# make its items in-flight on the next run)
+# shellcheck disable=SC2120
+bdl_b() {
+    rm -f "$T/lbl/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+    bdl burndown "$@"
+}
+
+# ── L1: characterization — unlabeled issues are picked (must stay green) ──────
+lbl_issues '[]' '[]'
+OUT="$(bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L1: unlabeled run exits 0" || fail "L1: unlabeled run exits 0 (got $RC)"
+grep -qE '^PICK +#40 ' <<< "$OUT" && ok "L1: #40 PICK" || fail "L1: #40 PICK (got: $OUT)"
+grep -qE '^PICK +#41 ' <<< "$OUT" && ok "L1: #41 PICK" || fail "L1: #41 PICK"
+grep -qE '^PICK +#42 ' <<< "$OUT" && ok "L1: #42 PICK" || fail "L1: #42 PICK"
+want "L1: units count the picks" "$OUT" "units: 5/5"
+
+# ── L2: characterization — delta lists updated #45, omits ranked #40 ──────────
+OUT="$(bdl burndown-delta 2>/dev/null)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L2: delta exits 0" || fail "L2: delta exits 0 (got $RC)"
+NUMS="$(jq -c '[.issues[].number]' <<< "$OUT" 2>/dev/null)"
+[ "$NUMS" = "[45]" ] && ok "L2: delta issues are [45]" || fail "L2: delta issues are [45] (got $NUMS)"
+
+# ── L3: labeled primaries are skipped, unlabeled #42 still picked ─────────────
+lbl_issues '[{"name":"blocked"}]' '[{"name":"out-of-repo"}]'
+OUT="$(bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L3: labeled run exits 0" || fail "L3: labeled run exits 0 (got $RC)"
+want "L3: #40 blocked row" "$OUT" "skip-label: blocked (PR unknown)"
+want "L3: #41 out-of-repo row" "$OUT" "skip-label: out-of-repo"
+want "L3: #42 PICK" "$OUT" "PICK  #42"
+if grep -qF "PICK  #40" <<< "$OUT"; then fail "L3: #40 must not PICK"; else ok "L3: #40 not PICKed"; fi
+if grep -qF "PICK  #41" <<< "$OUT"; then fail "L3: #41 must not PICK"; else ok "L3: #41 not PICKed"; fi
+want "L3: units 3/5" "$OUT" "units: 3/5"
+
+# ── L4: boundary — label check beats stale-rank ───────────────────────────────
+lbl_issues '[{"name":"blocked"}]' '[]' '2026-09-28T00:00:00Z'
+OUT="$(bdl_b 2>&1)"; RC=$?
+ROW40="$(grep -E '^SKIP +#40 ' <<< "$OUT")"
+want "L4: #40 shows skip-label" "$ROW40" "skip-label: blocked"
+if grep -qF "stale-rank" <<< "$ROW40"; then fail "L4: #40 row must not say stale-rank"; else ok "L4: #40 row not stale-rank"; fi
+
+# ── L5: labeled pair partner ──────────────────────────────────────────────────
+lbl_issues '[]' '[]' '' '[{"name":"out-of-repo"}]'
+OUT="$(bdl_b --pair 43,44 2>&1)"; RC=$?
+want "L5: partner row" "$OUT" "pair: #44 skip-label: out-of-repo"
+want "L5: primary row" "$OUT" "pair: with #43"
+if grep -qF "PICK  #43" <<< "$OUT"; then fail "L5: #43 must not PICK"; else ok "L5: #43 not PICKed"; fi
+
+# ── L6: unranked labeled issue ────────────────────────────────────────────────
+lbl_issues '[]' '[]'
+jq '. + [{"number":46,"title":"Forty-six","body":"bin/g.sh:1","url":"u46","updatedAt":"2026-09-20T00:00:00Z","labels":[{"name":"out-of-repo"}]}]' \
+    "$T/lbl/fx/issues.json" > "$T/lbl/fx/issues.tmp" && mv "$T/lbl/fx/issues.tmp" "$T/lbl/fx/issues.json"
+OUT="$(bdl_b 2>&1)"; RC=$?
+ROW46="$(grep -E '^SKIP +#46 ' <<< "$OUT")"
+want "L6: #46 skip-label row" "$ROW46" "skip-label: out-of-repo"
+if grep -qF "unranked (run burndown-delta" <<< "$ROW46"; then fail "L6: #46 must not get unranked advice"; else ok "L6: #46 no unranked advice"; fi
+
+# ── L7: delta drops skip-labeled issues (updated #40, unranked #46) ───────────
+lbl_issues '[{"name":"blocked"}]' '[]' '2026-09-28T00:00:00Z'
+jq '. + [{"number":46,"title":"Forty-six","body":"bin/g.sh:1","url":"u46","updatedAt":"2026-09-20T00:00:00Z","labels":[{"name":"out-of-repo"}]},
+         {"number":47,"title":"Forty-seven","body":"bin/h.sh:1","url":"u47","updatedAt":"2026-09-20T00:00:00Z","labels":[]}]' \
+    "$T/lbl/fx/issues.json" > "$T/lbl/fx/issues.tmp" && mv "$T/lbl/fx/issues.tmp" "$T/lbl/fx/issues.json"
+OUT="$(bdl burndown-delta 2>/dev/null)"; RC=$?
+NUMS="$(jq -r '.issues[].number' <<< "$OUT" 2>/dev/null | tr '\n' ' ')"
+if grep -qwF 40 <<< "$NUMS"; then fail "L7: delta must omit labeled #40 (got $NUMS)"; else ok "L7: delta omits labeled #40"; fi
+if grep -qwF 46 <<< "$NUMS"; then fail "L7: delta must omit labeled #46 (got $NUMS)"; else ok "L7: delta omits labeled #46"; fi
+grep -qwF 45 <<< "$NUMS" && ok "L7: delta keeps #45" || fail "L7: delta keeps #45 (got $NUMS)"
+grep -qwF 47 <<< "$NUMS" && ok "L7: delta keeps #47" || fail "L7: delta keeps #47 (got $NUMS)"
+
+# ── L8: refresh demands only what delta lists (#45, #47) ──────────────────────
+RANKS_L8="$T/lbl/ranks.md"
+cat > "$RANKS_L8" <<'RANKS'
+## P2 (2)
+- [#45](https://github.com/a-jay85/IBL5-backlog/issues/45) Forty-five — re-ranked
+- [#47](https://github.com/a-jay85/IBL5-backlog/issues/47) Forty-seven — now ranked
+RANKS
+OUT="$(bdl burndown-refresh "$RANKS_L8" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L8: refresh exits 0" || fail "L8: refresh exits 0 (got $RC)"
+if grep -qF "omits delta issue #40" <<< "$OUT"; then fail "L8: refresh must not demand labeled #40"; else ok "L8: refresh does not demand #40"; fi
+# refresh wrote a dated report into the isolated HOME; drop it so the fixture report stays newest-by-name
+L8_REPORT="$(tail -1 <<< "$OUT")"; L8_REPORT="${L8_REPORT#REPORT: }"
+[ ! -f "$L8_REPORT" ] || unlink "$L8_REPORT"
+
+# ── L9: burndown-record reason= / blocked_by= ─────────────────────────────────
+lbl_issues '[]' '[]'
+OUT="$(bdl_b 2>&1)"
+L="$(grep '^LEDGER: ' <<< "$OUT" | sed 's/^LEDGER: //')"
+if [ -f "$L" ]; then ok "L9: ledger created"; else fail "L9: ledger created (got: $OUT)"; fi
+SNAP="$T/lbl/ledger.snap"
+cp "$L" "$SNAP"
+: > "$T/lbl/gh.log"
+OUT="$(bdl burndown-record "$L" 42 status=skipped reason=blocked blocked_by=77 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L9: reason=blocked record exits 0" || fail "L9: reason=blocked record exits 0 (got $RC: $OUT)"
+[ "$(jq -r '.items[] | select(.issue_num==42) | .skip_label' "$L")" = "blocked" ] \
+    && ok "L9: #42 skip_label=blocked" || fail "L9: #42 skip_label=blocked"
+[ "$(jq -r '.items[] | select(.issue_num==42) | .blocked_by' "$L")" = "77" ] \
+    && ok "L9: #42 blocked_by=77" || fail "L9: #42 blocked_by=77"
+OUT="$(bdl burndown-record "$L" 43 status=skipped reason=out-of-repo 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L9: reason=out-of-repo record exits 0" || fail "L9: reason=out-of-repo record exits 0 (got $RC: $OUT)"
+[ "$(jq -r '.items[] | select(.issue_num==43) | .skip_label' "$L")" = "out-of-repo" ] \
+    && ok "L9: #43 skip_label=out-of-repo" || fail "L9: #43 skip_label=out-of-repo"
+[ "$(jq '.items[] | select(.issue_num==43) | has("blocked_by")' "$L")" = "false" ] \
+    && ok "L9: #43 has no blocked_by" || fail "L9: #43 has no blocked_by"
+
+# ── L10: rejected forms leave the ledger byte-identical and make no tag call ──
+cp "$SNAP" "$L"
+: > "$T/lbl/gh.log"
+l10_reject() {
+    local label="$1"; shift
+    local out rc
+    out="$(bdl burndown-record "$L" "$@" 2>&1)"; rc=$?
+    [ "$rc" -eq 2 ] && ok "L10: $label exits 2" || fail "L10: $label exits 2 (got $rc: $out)"
+    cmp -s "$L" "$SNAP" && ok "L10: $label ledger unchanged" || fail "L10: $label ledger unchanged"
+}
+l10_reject "blocked without blocked_by" 42 status=skipped reason=blocked
+l10_reject "out-of-repo with blocked_by" 42 status=skipped reason=out-of-repo blocked_by=77
+l10_reject "blocked_by alone" 42 status=skipped blocked_by=77
+l10_reject "bogus reason" 42 status=skipped reason=bogus
+l10_reject "non-numeric blocked_by" 42 status=skipped reason=blocked blocked_by=abc
+l10_reject "reason on a picked item" 42 reason=out-of-repo
+OUT="$(bdl burndown-record "$L" 999 status=skipped reason=out-of-repo 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "L10: unknown item exits 2" || fail "L10: unknown item exits 2 (got $RC)"
+want "L10: unknown item message" "$OUT" "no item #999"
+cmp -s "$L" "$SNAP" && ok "L10: unknown item ledger unchanged" || fail "L10: unknown item ledger unchanged"
+if grep -qE 'label create|issue edit|issue comment' "$T/lbl/gh.log"; then
+    fail "L10: rejected forms made a tag gh call"
+else
+    ok "L10: rejected forms made no tag gh call"
+fi
+
+# ── L11: record with reason= tags the issue and posts one marker comment ──────
+cp "$SNAP" "$L"
+: > "$T/lbl/gh.log"
+OUT="$(bdl burndown-record "$L" 42 status=skipped reason=blocked blocked_by=77 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L11: tag record exits 0" || fail "L11: tag record exits 0 (got $RC: $OUT)"
+GHLOG="$(cat "$T/lbl/gh.log")"
+want "L11: label create blocked" "$GHLOG" "label create blocked"
+want "L11: label create --force" "$GHLOG" "--force"
+want "L11: --add-label blocked" "$GHLOG" "--add-label blocked"
+want "L11: marker in comment" "$GHLOG" "<!-- burndown-blocked-by: 77 -->"
+[ "$(grep -c 'issue comment' "$T/lbl/gh.log")" -eq 1 ] && ok "L11: exactly one comment" || fail "L11: exactly one comment"
+want "L11: stdout says comment posted" "$OUT" "comment posted"
+
+# ── L12: idempotency — an equivalent marker means no new comment ──────────────
+l12_case() {
+    local label="$1" want_n="$2"; shift 2
+    cp "$SNAP" "$L"
+    : > "$T/lbl/gh.log"
+    local out rc n
+    out="$(bdl burndown-record "$L" "$@" 2>&1)"; rc=$?
+    n="$(grep -c 'issue comment' "$T/lbl/gh.log")"
+    [ "$rc" -eq 0 ] && [ "$n" -eq "$want_n" ] && ok "L12: $label" || fail "L12: $label (rc=$rc comments=$n want=$want_n: $out)"
+}
+printf '%s' '{"comments":[{"body":"x\n\n<!-- burndown-blocked-by: 77 -->"}]}' > "$T/lbl/fx/issue-42-comments.json"
+l12_case "same PR marker posts nothing" 0 42 status=skipped reason=blocked blocked_by=77
+l12_case "different PR posts one" 1 42 status=skipped reason=blocked blocked_by=78
+printf '%s' '{"comments":[{"body":"<!-- burndown-blocked-by: 78 -->"},{"body":"<!-- burndown-blocked-by: 77 -->"}]}' > "$T/lbl/fx/issue-42-comments.json"
+l12_case "last marker wins (77)" 0 42 status=skipped reason=blocked blocked_by=77
+l12_case "last marker wins (78 re-posts)" 1 42 status=skipped reason=blocked blocked_by=78
+rm -f "$T/lbl/fx/issue-42-comments.json"
+printf '%s' '{"comments":[{"body":"x\n\n<!-- burndown-out-of-repo -->"}]}' > "$T/lbl/fx/issue-43-comments.json"
+l12_case "out-of-repo marker posts nothing" 0 43 status=skipped reason=out-of-repo
+rm -f "$T/lbl/fx/issue-43-comments.json"
+
+# ── L13: gh failures exit 3 and the ledger keeps its record ───────────────────
+l13_case() {
+    local fail_on="$1"
+    cp "$SNAP" "$L"
+    : > "$T/lbl/gh.log"
+    local out rc n st
+    out="$(GH_FAIL_ON="$fail_on" bdl burndown-record "$L" 42 status=skipped reason=blocked blocked_by=77 2>&1)"; rc=$?
+    n="$(grep -c 'issue comment' "$T/lbl/gh.log")"
+    st="$(jq -r '.items[] | select(.issue_num==42) | .status' "$L")"
+    [ "$rc" -eq 3 ] && ok "L13: $fail_on failure exits 3" || fail "L13: $fail_on failure exits 3 (got $rc: $out)"
+    [ "$st" = "skipped" ] && ok "L13: $fail_on failure keeps status=skipped" || fail "L13: $fail_on failure keeps status=skipped (got $st)"
+    L13_N="$n"
+}
+l13_case "label create"
+[ "$L13_N" -eq 0 ] && ok "L13: label create failure posts no comment" || fail "L13: label create failure posts no comment"
+l13_case "--json comments"
+[ "$L13_N" -eq 0 ] && ok "L13: comments read failure posts no comment" || fail "L13: comments read failure posts no comment"
+l13_case "issue comment"
+
+# ── L14: burndown-tag needs no ledger; rejected forms make no gh call ─────────
+rm -f "$T/lbl/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+: > "$T/lbl/gh.log"
+OUT="$(bdl burndown-tag 268 reason=out-of-repo 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L14: burndown-tag exits 0" || fail "L14: burndown-tag exits 0 (got $RC: $OUT)"
+GHLOG="$(cat "$T/lbl/gh.log")"
+want "L14: --add-label out-of-repo" "$GHLOG" "--add-label out-of-repo"
+want "L14: out-of-repo marker" "$GHLOG" "<!-- burndown-out-of-repo -->"
+if ls "$T/lbl/home/claude-plans/_reports"/burndown-batch-*.json >/dev/null 2>&1; then
+    fail "L14: burndown-tag must not create a ledger"
+else
+    ok "L14: burndown-tag creates no ledger"
+fi
+l14_reject() {
+    local label="$1"; shift
+    : > "$T/lbl/gh.log"
+    local out rc
+    out="$(bdl burndown-tag "$@" 2>&1)"; rc=$?
+    [ "$rc" -eq 2 ] && ok "L14: $label exits 2" || fail "L14: $label exits 2 (got $rc: $out)"
+    [ ! -s "$T/lbl/gh.log" ] && ok "L14: $label makes no gh call" || fail "L14: $label makes no gh call"
+}
+l14_reject "no args"
+l14_reject "issue alone" 268
+l14_reject "non-numeric issue" abc reason=out-of-repo
+l14_reject "blocked without PR" 1233 reason=blocked
+l14_reject "unknown key" 1 foo=bar
+
+# ── L15-L19: auto-clear of blocked labels at selection time ───────────────────
+l15_setup() {
+    lbl_issues '[{"name":"blocked"}]' '[{"name":"out-of-repo"}]'
+    printf '%s' '{"comments":[{"body":"<!-- burndown-blocked-by: 900 -->"}]}' > "$T/lbl/fx/issue-40-comments.json"
+    rm -f "$T/lbl/fx/pr-view-900.json"
+    : > "$T/lbl/gh.log"
+}
+l15_pr_state() { printf '{"state":"%s"}' "$1" > "$T/lbl/fx/pr-view-900.json"; }
+l15_count() { grep -cF -e "$1" "$T/lbl/gh.log" || true; }
+
+for ST in MERGED CLOSED; do
+    l15_setup; l15_pr_state "$ST"
+    OUT="$(bdl_b 2>&1)"; RC=$?
+    GHLOG="$(cat "$T/lbl/gh.log")"
+    [ "$RC" -eq 0 ] && ok "L15: $ST exits 0" || fail "L15: $ST exits 0 (got $RC: $OUT)"
+    want "L15: $ST pr view call" "$GHLOG" "pr view 900 --repo a-jay85/IBL5"
+    want "L15: $ST --remove-label" "$GHLOG" "--remove-label blocked"
+    want "L15: $ST cleared line" "$OUT" "cleared blocked on #40"
+    want "L15: $ST #40 PICK" "$OUT" "PICK  #40"
+done
+
+l15_setup; l15_pr_state OPEN
+OUT="$(bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L17: OPEN exits 0" || fail "L17: OPEN exits 0 (got $RC: $OUT)"
+want "L17: OPEN row names the PR" "$OUT" "skip-label: blocked (PR #900)"
+[ "$(l15_count '--remove-label')" -eq 0 ] && ok "L17: OPEN keeps the tag" || fail "L17: OPEN keeps the tag"
+
+l15_setup; l15_pr_state OPEN
+OUT="$(GH_FAIL_ON="pr view" bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "L18: pr view failure exits 1" || fail "L18: pr view failure exits 1 (got $RC: $OUT)"
+want "L18: pr view failure WARN" "$OUT" "WARN"
+want "L18: pr view failure keeps PR in row" "$OUT" "skip-label: blocked (PR #900)"
+[ "$(l15_count '--remove-label')" -eq 0 ] && ok "L18: pr view failure keeps the tag" || fail "L18: pr view failure keeps the tag"
+
+l15_setup; l15_pr_state MERGED
+OUT="$(GH_FAIL_ON="--remove-label" bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "L18: remove-label failure exits 1" || fail "L18: remove-label failure exits 1 (got $RC: $OUT)"
+want "L18: remove-label failure WARN" "$OUT" "WARN"
+if grep -qF "PICK  #40" <<< "$OUT"; then fail "L18: remove-label failure must not PICK #40"; else ok "L18: remove-label failure keeps #40 skipped"; fi
+
+l15_setup; l15_pr_state OPEN
+OUT="$(GH_FAIL_ON="--json comments" bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "L18: comments failure exits 1" || fail "L18: comments failure exits 1 (got $RC: $OUT)"
+want "L18: comments failure row" "$OUT" "skip-label: blocked (PR unknown)"
+
+l15_setup; l15_pr_state OPEN
+printf '%s' '{"comments":[{"body":"hand-applied, no marker"}]}' > "$T/lbl/fx/issue-40-comments.json"
+OUT="$(bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "L18: missing marker exits 0" || fail "L18: missing marker exits 0 (got $RC: $OUT)"
+want "L18: missing marker WARN" "$OUT" "no burndown-blocked-by marker"
+[ "$(l15_count 'pr view')" -eq 0 ] && ok "L18: missing marker makes no pr view call" || fail "L18: missing marker makes no pr view call"
+if grep -qF "PICK  #40" <<< "$OUT"; then fail "L18: missing marker must not PICK #40"; else ok "L18: missing marker keeps #40 skipped"; fi
+
+l15_setup
+printf '{}' > "$T/lbl/fx/pr-view-900.json"
+OUT="$(bdl_b 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "L18: unrecognized state exits 1" || fail "L18: unrecognized state exits 1 (got $RC: $OUT)"
+want "L18: unrecognized state message" "$OUT" "unrecognized PR state"
+[ "$(l15_count '--remove-label')" -eq 0 ] && ok "L18: unrecognized state keeps the tag" || fail "L18: unrecognized state keeps the tag"
+
+lbl_issues '[]' '[{"name":"out-of-repo"}]'
+: > "$T/lbl/gh.log"
+OUT="$(bdl_b 2>&1)"; RC=$?
+[ "$(l15_count 'pr view')" -eq 0 ] && ok "L19: out-of-repo never triggers pr view" || fail "L19: out-of-repo never triggers pr view"
+want "L19: #41 still skipped" "$OUT" "skip-label: out-of-repo"
+rm -f "$T/lbl/fx/issue-40-comments.json" "$T/lbl/fx/pr-view-900.json"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

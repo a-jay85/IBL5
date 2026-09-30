@@ -103,7 +103,8 @@ check "d: exits 0" test "$rc" -eq 0
 check "d: keeps 3 files" test "$(count_snaps)" = "3"
 check "d: oldest deleted" test ! -e "$SNAP/predeploy-20200101-000001-abc1234.sql.gz"
 check "d: older-but-newest-of-seed kept" test -e "$SNAP/predeploy-20200101-000005-abc1234.sql.gz"
-new_f="$(find "$SNAP" -name "predeploy-*-$sha.sql.gz" | head -1)"
+d_sha="$(git -C "$REPO" rev-parse --short origin/production)"
+new_f="$(find "$SNAP" -name "predeploy-*-${d_sha}.sql.gz" | head -1)"
 check "d: new dump retained" test -n "$new_f"
 
 # (e) REMOTE_DATABASE unset

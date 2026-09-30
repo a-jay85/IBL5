@@ -17,7 +17,7 @@ migration can be recovered from minutes-old data instead of the nightly dump.
 
 Run from inside the www checkout after `git fetch origin` and before
 `git reset --hard origin/production`. Does nothing when
-ibl5/migrations/ is identical between HEAD and origin/production.
+no new .sql files are added to ibl5/migrations/ in origin/production.
 
 Exits non-zero on any failure so the deploy stops before the code reset.
 
@@ -34,7 +34,7 @@ HELP
     exit 0
 fi
 
-changed="$(git diff --name-only HEAD origin/production -- ibl5/migrations/)"
+changed="$(git diff --name-only --diff-filter=A HEAD origin/production -- 'ibl5/migrations/*.sql')"
 if [ -z "$changed" ]; then
     echo "no new migrations; skipping pre-deploy snapshot"
     exit 0

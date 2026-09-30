@@ -9,7 +9,7 @@ import type { APIRequestContext, Page } from '@playwright/test';
  * route-stubbed and every other Google host is counted and expected to stay at 0.
  *
  * CI passes placeholder GOOGLE_OAUTH_* / GOOGLE_TOKEN_KEY values so the feature
- * renders as configured. Local runs without them skip (see beforeEach).
+ * renders as configured. Local runs need the same three variables.
  */
 
 const API_KEYS = 'modules.php?name=ApiKeys';
@@ -33,17 +33,14 @@ function countGoogleApiRequests(page: Page): { count: number } {
 regularTest.describe('Google sign-in (regular user)', () => {
   regularTest.describe.configure({ mode: 'serial' });
 
+  // e2e-hygiene-allow: CI-config env gating — auth-regular.setup.ts also skips when IBL_TEST_USER_REGULAR is unset, so regular.json is absent or stale and these assertions would run against an unauthenticated session
   regularTest.skip(
     !process.env.IBL_TEST_USER_REGULAR || !process.env.IBL_TEST_PASS_REGULAR,
     'IBL_TEST_USER_REGULAR / IBL_TEST_PASS_REGULAR not set — regular.json is not freshly authenticated',
   );
 
   regularTest.beforeEach(async ({ page }) => {
-    const configured = await isConfigured(page.request);
-    regularTest.skip(
-      !configured && !process.env.CI,
-      'Google Sheets sync not configured locally (GOOGLE_OAUTH_* / GOOGLE_TOKEN_KEY unset)',
-    );
+    expect(await isConfigured(page.request), 'set GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_TOKEN_KEY for the PHP server').toBe(true);
     // The connect button only renders with no row for this user.
     await page.request.delete('test-state.php?action=delete-google-sheet-connection');
   });

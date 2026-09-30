@@ -67,6 +67,7 @@ async function post(request: APIRequestContext, op: string, withToken: boolean):
 test.describe('Google Sheets card', () => {
   test.describe.configure({ mode: 'serial' });
 
+  // e2e-hygiene-allow: CI-config env gating — auth-regular.setup.ts also skips when IBL_TEST_USER_REGULAR is unset, so regular.json is absent or stale and these assertions would run against an unauthenticated session
   test.skip(
     !process.env.IBL_TEST_USER_REGULAR || !process.env.IBL_TEST_PASS_REGULAR,
     'IBL_TEST_USER_REGULAR / IBL_TEST_PASS_REGULAR not set — regular.json is not freshly authenticated',
@@ -76,10 +77,7 @@ test.describe('Google Sheets card', () => {
 
   test.beforeEach(async ({ page }) => {
     const html = await (await page.request.get(API_KEYS)).text();
-    test.skip(
-      html.includes('sync is not configured') && !process.env.CI,
-      'Google Sheets sync not configured locally (GOOGLE_OAUTH_* / GOOGLE_TOKEN_KEY unset)',
-    );
+    expect(html, 'set GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_TOKEN_KEY for the PHP server').not.toContain('sync is not configured');
     await clear(page.request);
     google = countGoogleApiRequests(page);
   });

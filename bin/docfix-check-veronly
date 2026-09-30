@@ -71,8 +71,8 @@ mask_numbers() { printf '%s\n' "$1" | sed 's/[0-9][0-9]*/__NUM__/g'; }
 #   0  everything else (holds)
 # Bash `case` `*` matches `/`, so `.claude/*.md` covers every depth under .claude/
 # but only markdown; `.claude/settings.json` or a hook script prints 0.
-# CLAUDE.md / AGENTS.md are matched at the repo root only (`ibl5/CLAUDE.md`
-# prints 0): neither is tracked today, and root-only is the fail-closed choice.
+# CLAUDE.md / AGENTS.md are matched at the repo root only (a nested one prints
+# 0): neither is tracked today, and root-only is the fail-closed choice.
 path_tier() {
     case "$1" in
         ibl5/docs/*)              echo 1 ;;

@@ -1142,6 +1142,53 @@ grep -qF '• manual tests need you: Row 1' "$_DM_CAPTURE" \
     || fail "dm-held-terminal-reports-held: held run told the user to merge"
 end_case dm-held-terminal-reports-held
 
+# --- case 51a: dm-armed-warns-red-ci --------------------------------------------------------
+# Condition (15) demoted to a warning (the aggregator is required): the run armed, and the
+# DM must name the red check under the READY verdict without turning it into a hold.
+begin_case
+_dm_result_case 511 'RESULT: terminal=shipped-armed' <<'RJSON'
+{
+  "terminal": "shipped-armed",
+  "arm": {"armed": true, "conditions": [
+    {"number": 15, "name": "red-ci-check", "blocked": false, "reason": "",
+     "warning": "red CI check(s): pytest (stdlib harness) — arming anyway; the required 'All checks green' context keeps the merge blocked until green"}
+  ]},
+  "fidelity": {"verdict_1": "READY", "verdict_2": null, "rounds": [],
+    "reviewed_tree_2": null, "error_kind": null, "remediation_sha": null}
+}
+RJSON
+[[ -f "$_DM_CAPTURE" ]] || fail "dm-armed-warns-red-ci: no DM sent"
+grep -qF '⚠ red CI check(s): pytest (stdlib harness)' "$_DM_CAPTURE" \
+    || fail "dm-armed-warns-red-ci: warning line missing ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+grep -q 'RESULT READY' "$_DM_CAPTURE" \
+    || fail "dm-armed-warns-red-ci: armed run not reported READY"
+grep -q "merge when you're ready" "$_DM_CAPTURE" \
+    || fail "dm-armed-warns-red-ci: armed READY missing 'merge when you're ready'"
+! grep -q 'HELD' "$_DM_CAPTURE" \
+    || fail "dm-armed-warns-red-ci: a warning was reported as a hold"
+! grep -qF '• ' "$_DM_CAPTURE" \
+    || fail "dm-armed-warns-red-ci: a warning became a hold bullet"
+end_case dm-armed-warns-red-ci
+
+# --- case 51a2: dm-armed-empty-warning-silent --------------------------------------------
+begin_case
+_dm_result_case 512 'RESULT: terminal=shipped-armed' <<'RJSON'
+{
+  "terminal": "shipped-armed",
+  "arm": {"armed": true, "conditions": [
+    {"number": 15, "name": "red-ci-check", "blocked": false, "reason": "", "warning": ""}
+  ]},
+  "fidelity": {"verdict_1": "READY", "verdict_2": null, "rounds": [],
+    "reviewed_tree_2": null, "error_kind": null, "remediation_sha": null}
+}
+RJSON
+[[ -f "$_DM_CAPTURE" ]] || fail "dm-armed-empty-warning-silent: no DM sent"
+grep -q 'RESULT READY' "$_DM_CAPTURE" \
+    || fail "dm-armed-empty-warning-silent: armed run not reported READY ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -qF '⚠' "$_DM_CAPTURE" \
+    || fail "dm-armed-empty-warning-silent: an empty warning printed a line"
+end_case dm-armed-empty-warning-silent
+
 # --- case 51b: dm-links-pr-and-title-and-bail-fix ----------------------------------------
 # The gh lookup succeeds: PR number and title both link to the PR, with no embed.
 # The run bailed (no verdict, rc!=0): post-plan-now's own lines become the Fix: block,

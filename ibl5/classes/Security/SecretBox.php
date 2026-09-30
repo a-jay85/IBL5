@@ -111,7 +111,7 @@ final class SecretBox
     }
 
     /**
-     * @return array{0: non-empty-string, 1: string}
+     * @return array{0: non-falsy-string, 1: string}
      */
     private function split(string $ciphertext): array
     {
@@ -130,7 +130,7 @@ final class SecretBox
             throw new SecretBoxDecryptException('unsupported ciphertext format');
         }
 
-        /** @var non-empty-string $nonce */
+        /** @var non-falsy-string $nonce */
         $nonce = substr($raw, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
 
         return [$nonce, substr($raw, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES)];

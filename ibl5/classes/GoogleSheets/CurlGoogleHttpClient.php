@@ -17,6 +17,9 @@ final class CurlGoogleHttpClient implements GoogleHttpClientInterface
      */
     public function request(string $method, string $url, array $headers, ?string $body): array
     {
+        if ($url === '' || $method === '') {
+            throw new GoogleHttpException('empty request url or method');
+        }
         $curl = curl_init();
 
         $options = [

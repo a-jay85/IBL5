@@ -24,7 +24,7 @@ class GoogleApiException extends \RuntimeException
         $reason = 'unknown';
         $message = '';
 
-        $decoded = json_decode($body, true);
+        $decoded = GoogleJson::decode($body);
         if (is_array($decoded)) {
             $error = $decoded['error'] ?? null;
             if (is_string($error)) {

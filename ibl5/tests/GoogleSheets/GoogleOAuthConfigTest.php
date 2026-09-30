@@ -34,10 +34,12 @@ class GoogleOAuthConfigTest extends TestCase
     {
         putenv('GOOGLE_OAUTH_CLIENT_SECRET=s3cret');
 
-        $this->expectException(GoogleOAuthNotConfiguredException::class);
-        $this->expectExceptionMessage('GOOGLE_OAUTH_CLIENT_ID');
-
-        GoogleOAuthConfig::fromEnv('example.test', true);
+        try {
+            GoogleOAuthConfig::fromEnv('example.test', true);
+            self::fail('expected GoogleOAuthNotConfiguredException');
+        } catch (GoogleOAuthNotConfiguredException $e) {
+            self::assertStringContainsString('GOOGLE_OAUTH_CLIENT_ID', $e->getMessage());
+        }
     }
 
     public function testConfigThrowsWhenClientIdEmpty(): void
@@ -45,10 +47,12 @@ class GoogleOAuthConfigTest extends TestCase
         putenv('GOOGLE_OAUTH_CLIENT_ID=');
         putenv('GOOGLE_OAUTH_CLIENT_SECRET=s3cret');
 
-        $this->expectException(GoogleOAuthNotConfiguredException::class);
-        $this->expectExceptionMessage('GOOGLE_OAUTH_CLIENT_ID');
-
-        GoogleOAuthConfig::fromEnv('example.test', true);
+        try {
+            GoogleOAuthConfig::fromEnv('example.test', true);
+            self::fail('expected GoogleOAuthNotConfiguredException');
+        } catch (GoogleOAuthNotConfiguredException $e) {
+            self::assertStringContainsString('GOOGLE_OAUTH_CLIENT_ID', $e->getMessage());
+        }
     }
 
     public function testConfigThrowsWhenSecretEmpty(): void

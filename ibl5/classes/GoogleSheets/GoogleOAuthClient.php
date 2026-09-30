@@ -58,7 +58,7 @@ final class GoogleOAuthClient
             throw GoogleApiException::fromResponse($response['status'], $response['body']);
         }
 
-        $data = json_decode($response['body'], true);
+        $data = GoogleJson::decode($response['body']);
         $accessToken = is_array($data) ? ($data['access_token'] ?? null) : null;
         $refreshToken = is_array($data) ? ($data['refresh_token'] ?? null) : null;
 
@@ -97,7 +97,7 @@ final class GoogleOAuthClient
             throw $exception;
         }
 
-        $data = json_decode($response['body'], true);
+        $data = GoogleJson::decode($response['body']);
         $accessToken = is_array($data) ? ($data['access_token'] ?? null) : null;
         if (!is_string($accessToken) || $accessToken === '') {
             throw new GoogleApiException('Google token response missing access_token', 200, 'no_access_token');

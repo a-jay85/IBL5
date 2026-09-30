@@ -90,6 +90,111 @@ class ApiKeysView implements ApiKeysViewInterface
     }
 
     /**
+     * Human text for each GoogleSheetConnectionRepositoryInterface::REASON_* value.
+     */
+    private const REASON_TEXT = [
+        'invalid_grant' => 'Google access was revoked or expired.',
+        'sheet_missing' => 'The spreadsheet was deleted from Drive.',
+        'key_unavailable' => 'The server encryption key changed.',
+    ];
+
+    private const GOOGLE_SHEET_URL_PREFIX = 'https://docs.google.com/';
+
+    /**
+     * @see ApiKeysViewInterface::renderFlash()
+     */
+    public function renderFlash(?array $flash): string
+    {
+        if ($flash === null) {
+            return '';
+        }
+        $modifier = $flash['type'] === 'success' ? 'success' : 'error';
+
+        ob_start();
+        ?>
+<div class="ibl-alert ibl-alert--<?= HtmlSanitizer::e($modifier) ?> mb-4" id="apikeys-flash"><?= HtmlSanitizer::e($flash['text']) ?></div>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @see ApiKeysViewInterface::renderGoogleSheetCard()
+     */
+    public function renderGoogleSheetCard(?array $summary, bool $configured): string
+    {
+        $url = $summary['spreadsheet_url'] ?? '';
+        $safeUrl = str_starts_with($url, self::GOOGLE_SHEET_URL_PREFIX) ? $url : null;
+        $isBroken = $summary !== null && $summary['status'] === 'broken';
+        $reason = $summary['broken_reason'] ?? '';
+        $showOpen = $safeUrl !== null && !($isBroken && $reason === 'sheet_missing');
+
+        ob_start();
+        ?>
+<div class="ibl-card" id="google-sheet-card">
+    <div class="ibl-card__header">
+        <h2 class="ibl-card__title">Google Sheets Sync</h2>
+    </div>
+    <div class="ibl-card__body">
+        <?php if (!$configured): ?>
+        <p class="text-sm text-gray-600">Google Sheets sync is not configured on this server.</p>
+        <?php elseif ($summary === null): ?>
+        <p class="mb-4">Sign in with Google and the site creates a spreadsheet in your Drive, then rewrites its Players tab with the full player export after every sim. Other tabs you add are never touched.</p>
+        <form method="post" action="modules.php?name=ApiKeys&amp;op=google_start">
+            <?= \Security\CsrfGuard::generateToken('google_start') ?>
+            <button type="submit" id="google-sheet-connect" class="ibl-btn ibl-btn--primary">Sign in with Google</button>
+        </form>
+        <?php else: ?>
+            <?php if ($isBroken): ?>
+        <div class="ibl-alert ibl-alert--warning mb-4">Your Google connection needs attention: <?= HtmlSanitizer::e(self::REASON_TEXT[$reason] ?? 'Please reconnect.') ?></div>
+            <?php else: ?>
+        <table class="ibl-data-table mb-4">
+            <tbody>
+                <tr>
+                    <th class="text-left">Status</th>
+                    <td>Connected</td>
+                </tr>
+                <tr>
+                    <th class="text-left">Last refreshed</th>
+                    <td><?= $summary['last_refresh_at'] !== null ? HtmlSanitizer::e($summary['last_refresh_at']) : 'Never' ?></td>
+                </tr>
+                <tr>
+                    <th class="text-left">Last result</th>
+                    <td><?= HtmlSanitizer::e($summary['last_refresh_status'] ?? 'None yet') ?></td>
+                </tr>
+            </tbody>
+        </table>
+                <?php if ($summary['last_refresh_status'] === 'error'): ?>
+        <div class="ibl-alert ibl-alert--warning mb-4">Last refresh failed: <?= HtmlSanitizer::e($summary['last_error'] ?? 'unknown error') ?></div>
+                <?php endif; ?>
+            <?php endif; ?>
+        <div class="flex gap-4 items-center">
+            <?php if ($showOpen && $safeUrl !== null): ?>
+            <a id="google-sheet-open" class="ibl-btn" href="<?= HtmlSanitizer::e($safeUrl) ?>" target="_blank" rel="noopener">Open sheet</a>
+            <?php endif; ?>
+            <?php if ($isBroken): ?>
+            <form method="post" action="modules.php?name=ApiKeys&amp;op=google_start">
+                <?= \Security\CsrfGuard::generateToken('google_start') ?>
+                <button type="submit" id="google-sheet-reconnect" class="ibl-btn ibl-btn--primary">Reconnect Google</button>
+            </form>
+            <?php else: ?>
+            <form method="post" action="modules.php?name=ApiKeys&amp;op=google_refresh">
+                <?= \Security\CsrfGuard::generateToken('google_refresh') ?>
+                <button type="submit" id="google-sheet-refresh" class="ibl-btn">Refresh now</button>
+            </form>
+            <?php endif; ?>
+            <form method="post" action="modules.php?name=ApiKeys&amp;op=google_disconnect" onsubmit="return confirm('Disconnect Google? The spreadsheet stays in your Drive but will stop updating.');">
+                <?= \Security\CsrfGuard::generateToken('google_disconnect') ?>
+                <button type="submit" id="google-sheet-disconnect" class="ibl-btn ibl-btn--danger">Disconnect</button>
+            </form>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
      * @see ApiKeysViewInterface::renderActiveKeyState()
      */
     public function renderActiveKeyState(array $keyStatus): string
@@ -152,6 +257,7 @@ class ApiKeysView implements ApiKeysViewInterface
         <h2 class="ibl-card__title">Player Export Guide</h2>
     </div>
     <div class="ibl-card__body">
+        <p class="mb-4">Prefer a sheet the site keeps fresh for you? Use Google Sheets Sync above; the IMPORTDATA formula below keeps working either way.</p>
         <h3 class="mb-2">Quick Start</h3>
         <ol class="mb-6">
             <li class="mb-2">Go to API Key Management and generate an API key.</li>

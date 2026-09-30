@@ -8,16 +8,18 @@
 # self-heal gated OFF in single mode, auto-queue-if-absent, hard-fail on
 # unresolvable slug, and already-queued tolerance.
 #
-# macOS-only: automouse-run depends on launchd/BSD tools (caffeinate, stat -f, BSD date).
+# Cases 4 and 6 run on every platform. Cases 1, 2, 3 and 5 drive the run loop,
+# which needs macOS tools inside bin/automouse/run (caffeinate, BSD mktemp,
+# stat -f, BSD date), so off macOS they print a SKIP line and do not run.
+# AUTOMOUSE_SINGLE_UNAME overrides the platform check (default: $(uname)).
 #
-# Run: bin/test-automouse-single  (exit 0 = pass/skip, 1 = any assertion failed)
+# Run: bin/test-automouse-single
+#   exit 0 = every case that ran passed (off macOS: cases 4 and 6 only)
+#   exit 1 = any assertion failed
 
 set -u
 
-if [ "$(uname)" != "Darwin" ]; then
-    echo "SKIP: test-automouse-single is macOS-only (automouse-run depends on launchd/BSD tools)."
-    exit 0
-fi
+PLATFORM="${AUTOMOUSE_SINGLE_UNAME:-$(uname)}"
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT="$(mktemp -d)"
@@ -106,6 +108,69 @@ reset_state() {
              "$NDIR/done" "$NDIR/skipped" "$PDIR"
 }
 
+# Case 4 and case 6 must see a runner failure as a value, never as a script
+# abort. Save the caller's errexit state, turn it off, and put it back after.
+ERREXIT_WAS_ON=0
+errexit_off() {
+    case $- in *e*) ERREXIT_WAS_ON=1 ;; *) ERREXIT_WAS_ON=0 ;; esac
+    set +e
+}
+errexit_restore() {
+    if [ "$ERREXIT_WAS_ON" -eq 1 ]; then set -e; fi
+}
+
+# ===========================================================================
+# Platform-independent cases (4, 6): these exit before the run loop, so they
+# pass on Linux too. They run first on every platform.
+# ===========================================================================
+# ===========================================================================
+# Case 4 — unresolvable slug hard-fails before the loop (Phases 1 & 4)
+# ===========================================================================
+echo "--- case 4: unresolvable slug hard-fails ---"
+reset_state
+errexit_off
+out=$(PLANS_DIR="$PDIR" "$RUNNER" plan nonexistent-slug 2>&1); exit_code=$?
+errexit_restore
+[ "$exit_code" -ne 0 ] || { echo "FAIL: case4 expected non-zero exit, got 0"; FAILED=1; }
+echo "$out" | grep -qi "cannot resolve\|no such plan\|nonexistent-slug" \
+    || { echo "FAIL: case4 expected a loud unresolved-slug message, got: $out"; FAILED=1; }
+assert_absent "case4 no no-queue report" \
+    "$NDIR/reports/$(date +%Y-%m-%d)-no-queue.md"
+
+# ===========================================================================
+# Case 6 — unusable impl_model is disposed WITHOUT burning an attempt (Phase 4)
+# ===========================================================================
+echo "--- case 6: unusable impl_model disposed, no attempt burned ---"
+reset_state
+printf -- '---\nimpl_model: claude-sonnet-4.6\n---\n\n# plan-badmodel\n' > "$PDIR/plan-badmodel.md"
+ln -s "$PDIR/plan-badmodel.md" "$NDIR/queue/plan-badmodel.md"
+errexit_off
+PLANS_DIR="$PDIR" "$RUNNER" plan plan-badmodel > "$ROOT/run.out" 2>&1; rc=$?
+errexit_restore
+[ "$rc" -eq 0 ] || { echo "FAIL: case6 runner aborted (rc=$rc) instead of skipping"; FAILED=1; }
+assert_present "case6 disposed to skipped/"     "$NDIR/skipped/plan-badmodel.md"
+assert_absent  "case6 left queue"               "$NDIR/queue/plan-badmodel.md"
+assert_absent  "case6 no attempts sidecar"      "$NDIR/queue/plan-badmodel.md.attempts"
+assert_absent  "case6 no handoff (claude never ran)" "$NDIR/handoff/plan-badmodel.md.json"
+assert_absent  "case6 not completed"            "$NDIR/done/plan-badmodel.md"
+assert_present "case6 skipped report written"   "$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-badmodel.md"
+grep -qF 'is not a recognized model' "$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-badmodel.md" \
+    || { echo "FAIL: case6 report lacks the rejection reason"; FAILED=1; }
+
+# ===========================================================================
+# macOS-only run-loop cases (1, 2, 3, 5)
+# ===========================================================================
+if [ "$PLATFORM" != "Darwin" ]; then
+    echo ""
+    echo "SKIP: cases 1, 2, 3, 5 (run loop) need macOS: bin/automouse/run calls caffeinate, BSD mktemp, stat -f and BSD date. macOS coverage for them comes from running bin/test-automouse-single locally on a Mac (there is no macOS CI job). Platform: $PLATFORM."
+    if [ "$FAILED" -ne 0 ]; then
+        echo "RESULT: FAILED"
+    else
+        echo "RESULT: cases 4 and 6 passed; cases 1, 2, 3, 5 skipped"
+    fi
+    exit "$FAILED"
+fi
+
 # ===========================================================================
 # Case 1 — only the named plan runs; others remain untouched (Phases 2 & 4)
 # ===========================================================================
@@ -174,20 +239,6 @@ assert_absent  "case3 plan-other not done"    "$NDIR/done/plan-other.md"
 assert_absent  "case3 plan-other no lock"     "$NDIR/queue/plan-other.md.lock"
 
 # ===========================================================================
-# Case 4 — unresolvable slug hard-fails before the loop (Phases 1 & 4)
-# ===========================================================================
-echo "--- case 4: unresolvable slug hard-fails ---"
-reset_state
-set +e
-out=$(PLANS_DIR="$PDIR" "$RUNNER" plan nonexistent-slug 2>&1); exit_code=$?
-set -e
-[ "$exit_code" -ne 0 ] || { echo "FAIL: case4 expected non-zero exit, got 0"; FAILED=1; }
-echo "$out" | grep -qi "cannot resolve\|no such plan\|nonexistent-slug" \
-    || { echo "FAIL: case4 expected a loud unresolved-slug message, got: $out"; FAILED=1; }
-assert_absent "case4 no no-queue report" \
-    "$NDIR/reports/$(date +%Y-%m-%d)-no-queue.md"
-
-# ===========================================================================
 # Case 5 — already-queued tolerance (Phase 1 pre-check)
 # ===========================================================================
 echo "--- case 5: already-queued tolerance ---"
@@ -198,26 +249,6 @@ assert_present "case5 plan-dup completed"  "$NDIR/done/plan-dup.md"
 assert_absent  "case5 plan-dup left queue" "$NDIR/queue/plan-dup.md"
 grep -qi "already queued" "$ROOT/run.out" \
     && { echo "FAIL: case5 leaked an 'already queued' error"; FAILED=1; }
-
-# ===========================================================================
-# Case 6 — unusable impl_model is disposed WITHOUT burning an attempt (Phase 4)
-# ===========================================================================
-echo "--- case 6: unusable impl_model disposed, no attempt burned ---"
-reset_state
-printf -- '---\nimpl_model: claude-sonnet-4.6\n---\n\n# plan-badmodel\n' > "$PDIR/plan-badmodel.md"
-ln -s "$PDIR/plan-badmodel.md" "$NDIR/queue/plan-badmodel.md"
-set +e
-PLANS_DIR="$PDIR" "$RUNNER" plan plan-badmodel > "$ROOT/run.out" 2>&1; rc=$?
-set -e
-[ "$rc" -eq 0 ] || { echo "FAIL: case6 runner aborted (rc=$rc) instead of skipping"; FAILED=1; }
-assert_present "case6 disposed to skipped/"     "$NDIR/skipped/plan-badmodel.md"
-assert_absent  "case6 left queue"               "$NDIR/queue/plan-badmodel.md"
-assert_absent  "case6 no attempts sidecar"      "$NDIR/queue/plan-badmodel.md.attempts"
-assert_absent  "case6 no handoff (claude never ran)" "$NDIR/handoff/plan-badmodel.md.json"
-assert_absent  "case6 not completed"            "$NDIR/done/plan-badmodel.md"
-assert_present "case6 skipped report written"   "$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-badmodel.md"
-grep -qF 'is not a recognized model' "$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-badmodel.md" \
-    || { echo "FAIL: case6 report lacks the rejection reason"; FAILED=1; }
 
 # ===========================================================================
 echo ""

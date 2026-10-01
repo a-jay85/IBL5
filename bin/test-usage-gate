@@ -154,6 +154,15 @@ usage_json() {  # <five> <week>
     printf '{"five_hour":{"utilization":%s,"resets_at":"2026-09-28T20:00:00.123+00:00"},"seven_day":{"utilization":%s,"resets_at":"2026-10-02T00:00:00+00:00"}}' "$1" "$2"
 }
 
+# usage_json_resets <five> <week> <five_resets_epoch|""> <week_resets_epoch|"">
+# Builds ISO resets_at via jq todate (portable on BSD and GNU). An empty epoch
+# omits that window's resets_at entirely.
+usage_json_resets() {
+    jq -cn --argjson f "$1" --argjson w "$2" --arg fr "$3" --arg wr "$4" '
+      {five_hour:({utilization:$f} + (if $fr=="" then {} else {resets_at:($fr|tonumber|todate)} end)),
+       seven_day:({utilization:$w} + (if $wr=="" then {} else {resets_at:($wr|tonumber|todate)} end))}'
+}
+
 SID_A=11111111-1111-4111-8111-111111111111
 SID_B=22222222-2222-4222-8222-222222222222
 SID_C=33333333-3333-4333-8333-333333333333
@@ -833,6 +842,30 @@ test_prestart_gate_no_usage() {
     in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
     assert_eq prestart_no_usage:rc 0 "$?"
     assert_no_file prestart_no_usage:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_prestart_fail_open_stale_resets_passed() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 95 12)"
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_stale_passed:rc 0 "$?"
+    assert_no_file prestart_stale_passed:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_contains prestart_stale_passed:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "prestart-fail-open reason=stale-usage"
+}
+
+test_coord_stale_never_pauses_or_grants() {
+    coord_setup 95
+    local now
+    now=$(date +%s)
+    seed_cache "$(( now - 600 ))" "$(usage_json_resets 95 0 $(( now + 3600 )) $(( now + 86400 )))"
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A ".resets_at = $(( now + 3600 ))"
+    run_coord --once >/dev/null 2>&1
+    assert_no_file coord_stale_conservative:not-resumed "$T/launched.$SID_A"
+    assert_no_file coord_stale_conservative:no-grant "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d"
+    assert_eq coord_stale_conservative:one-marker 1 "$(ls "$IBL5_USAGE_GATE_STATE_DIR/markers" | wc -l | tr -d ' ')"
+    assert_contains coord_stale_conservative:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "coordinator-stale-usage"
 }
 
 test_postrun_pause_marker_rc0() {

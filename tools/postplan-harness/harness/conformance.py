@@ -24,6 +24,14 @@ _MIGRATION_RENUMBER = re.compile(r"^ibl5/migrations/\d+_(?P<suffix>.+)$")
 # Exactly four digits: `bin/next-adr` emits `printf "%04d"` and `bin/check-numbering`
 # greps `^[0-9]{4}-`. A 3- or 5-digit prefix is not an ADR filename and gets no tolerance.
 _ADR_RENUMBER = re.compile(r"^ibl5/docs/decisions/\d{4}-(?P<suffix>.+)$")
+# Token side only. The architect contract (.claude/skills/plan/_architect-contract.md
+# "Number placeholders") tells a plan to write `ibl5/docs/decisions/NNNN-<slug>.md`
+# because the real number is known only at implementation time, so a plan token may
+# legitimately carry the literal `NNNN` where a changed file carries `\d{4}`. The
+# alternation is the exact uppercase literal: `nnnn`, `NNNNN`, `\w{4}` and `[\dN]{4}`
+# are all deliberately NOT accepted, and the changed-file side stays `_ADR_RENUMBER`
+# (`\d{4}`) so a committed placeholder file never satisfies a numbered token.
+_ADR_TOKEN = re.compile(r"^ibl5/docs/decisions/(?:\d{4}|NNNN)-(?P<suffix>.+)$")
 
 
 def _contract_items(plan: PlanInfo, changed_files: list[str],
@@ -79,14 +87,15 @@ def _renumbered_migration(tok: str, changed_files: list[str]) -> str | None:
 def _renumbered_adr(tok: str, changed_files: list[str]) -> str | None:
     """The single changed ADR sharing `tok`'s suffix under a different number.
 
-    None unless `tok` is `ibl5/docs/decisions/NNNN-<suffix>` AND exactly one changed
-    path is `ibl5/docs/decisions/MMMM-<suffix>` with the identical suffix. Two such
+    None unless `tok` is `ibl5/docs/decisions/NNNN-<suffix>` (four digits, or the
+    literal placeholder `NNNN`) AND exactly one changed path is
+    `ibl5/docs/decisions/MMMM-<suffix>` (four digits) with the identical suffix. Two such
     paths is ambiguous and returns None, so a MISSING-FILE still fires; the caller
     has already established that no exact, suffix, or basename match exists. Kept
     as a sibling of `_renumbered_migration` rather than a shared helper so the
     migration tier's body stays byte-identical (backlog#1169 scope).
     """
-    m = _ADR_RENUMBER.match(tok)
+    m = _ADR_TOKEN.match(tok)
     if not m:
         return None
     suffix = m.group("suffix")
@@ -118,7 +127,8 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
     `ibl5/migrations/NNN_<suffix>` resolves to the one changed path
     `ibl5/migrations/MMM_<suffix>` with the identical suffix, and a token of the
     form `ibl5/docs/decisions/NNNN-<suffix>` resolves to the one changed path
-    `ibl5/docs/decisions/MMMM-<suffix>`. Both are the shape a plan-authorized
+    `ibl5/docs/decisions/MMMM-<suffix>` (the token's number may be four digits or
+    the literal placeholder `NNNN`). Both are the shape a plan-authorized
     renumber produces when `bin/next-migration` or `bin/next-adr` prints a
     different number than the plan quoted. Migration is checked first, then ADR;
     the prefixes are disjoint so order never changes the result. Zero or 2+

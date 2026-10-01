@@ -71,6 +71,7 @@ class Classification:
     has_shell: bool = False
     has_workflow: bool = False
     has_skill_prose: bool = False
+    has_gm_visible: bool = False     # any changed path a league GM could see (classify._NON_RUNTIME denylist miss)
     count_shell: int = 0
     count_workflow: int = 0
     lines_php_changed: int = 0
@@ -93,7 +94,8 @@ class Classification:
             f"GOLDEN_CHANGED={self.golden_changed} COUNT_GO={self.count_go}\n"
             f"HAS_SHELL={self.has_shell} HAS_WORKFLOW={self.has_workflow} "
             f"HAS_SKILL_PROSE={self.has_skill_prose} COUNT_SHELL={self.count_shell} "
-            f"COUNT_WORKFLOW={self.count_workflow} LINES_SHELL_CHANGED={self.lines_shell_changed}"
+            f"COUNT_WORKFLOW={self.count_workflow} LINES_SHELL_CHANGED={self.lines_shell_changed}\n"
+            f"HAS_GM_VISIBLE={self.has_gm_visible}"
         )
 
 

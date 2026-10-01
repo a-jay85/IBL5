@@ -18,7 +18,7 @@ from harness.adapters.llm import FixtureLlm, extract_json
 from harness.state import HarnessError, TerminalState, UsageLedger
 from harness import cifix, ciwatch, schemas
 from harness.armable import manual_testing_clearance
-from harness.classify import MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC
+from harness.classify import MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC, classify
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -216,6 +216,65 @@ def test_bad_pr_copy_json_without_subject_opens_feat_pr():
     creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
     assert creates and creates[-1]["title"] == "feat: synthetic-degrade"
     assert not res.arm.armed
+
+
+_TOOLING_DIFF = "diff --git a/bin/fleet-status b/bin/fleet-status\n+echo 1\n"
+
+
+def _feat_pr_copy_canned():
+    canned = dict(CANNED)
+    canned["pr-copy"] = {"type": "feat", "title": "feat: synthetic",
+                         "commit_subject": "feat: synthetic", "summary_md": "## Summary\n- x\n"}
+    return canned
+
+
+def test_model_feat_copy_on_tooling_diff_opens_chore_pr_and_clears_condition_8():
+    out = tempfile.mkdtemp()
+    llm = FixtureLlm(UsageLedger(), _feat_pr_copy_canned())
+    res = runner.run(_fixture(pr_number=None, pr_meta=None, diff=_TOOLING_DIFF), out, llm,
+                     mode="replay")
+    creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
+    assert creates and creates[-1]["title"] == "chore: synthetic"
+    assert 8 not in {c.number for c in res.arm.holds}
+    assert res.terminal != TerminalState.FAILED
+
+
+def test_model_feat_copy_on_runtime_diff_still_opens_feat_pr_and_holds_condition_8():
+    out = tempfile.mkdtemp()
+    llm = FixtureLlm(UsageLedger(), _feat_pr_copy_canned())
+    res = runner.run(_fixture(pr_number=None, pr_meta=None), out, llm, mode="replay")
+    creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
+    assert creates and creates[-1]["title"] == "feat: synthetic"
+    assert 8 in {c.number for c in res.arm.holds}
+
+
+def test_bad_pr_copy_json_without_subject_on_tooling_diff_opens_chore_pr_and_stays_held():
+    out = tempfile.mkdtemp()
+    llm = DegradingLlm(UsageLedger(), CANNED, {"pr-copy"})
+    res = runner.run(_fixture(pr_number=None, pr_meta=None, diff=_TOOLING_DIFF), out, llm,
+                     mode="replay")
+    creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
+    assert creates and creates[-1]["title"] == "chore: synthetic-degrade"
+    assert not res.arm.armed
+    assert res.terminal == TerminalState.DEGRADED
+    assert "pr-copy" in res.degraded_agents
+    assert 8 not in {c.number for c in res.arm.holds}
+
+
+def test_clean_rerun_live_feat_title_on_tooling_diff_is_not_retyped():
+    class _Gh:
+        def pr_exists(self): return True
+        def pr_title(self): return "feat: x"
+
+    class _Git:
+        def has_changes_to_commit(self): return False
+        def branch_head_subject(self): return "chore: last commit"
+
+    cls = classify(["bin/fleet-status"], "")
+    copy, degraded = runner._pr_copy(None, _Git(), _Gh(), None, "slug", cls, None,
+                                     lambda m: None)
+    assert copy["title"] == "feat: x"
+    assert degraded is False
 
 
 def test_other_pr_copy_errors_still_fail():

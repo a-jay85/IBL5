@@ -55,6 +55,30 @@ _SHELL_INC = re.compile(r"(^|/)bin/|\.sh$")
 _SHELL_EXC = re.compile(r"\.(php|md|json|py|ts|tsx|css|sql|ya?ml|lock|txt|neon)$")
 _WORKFLOW = re.compile(r"^\.github/workflows/.*\.ya?ml$")
 _SKILL_PROSE = re.compile(r"^\.claude/.*\.md$")
+# Paths a league GM can never see change: dev tooling, docs, tests, build config.
+# FAIL-SAFE DENYLIST: a path that matches nothing here counts as GM-visible, so an
+# unknown new directory keeps whatever type the model chose (never retyped).
+_NON_RUNTIME = re.compile(
+    r"^(bin|tools|\.claude|\.github)/"        # repo-level tooling roots
+    r"|^[^/]+$"                               # root-level files: README.md, CLAUDE.md, .gitignore
+    r"|^ibl5/(tests|docs|bin|node_modules|vendor|worktrees)/"
+    r"|^ibl5/(phpstan|phpunit|playwright|vitest|coverage|infection|test-results|tmp)"  # stem match: files and dirs
+    r"|^ibl5/(eslint\.config\.js|package\.json|composer\.(json|lock)|bun\.lock|[^/]*\.neon)$"
+    r"|\.md$"                                 # markdown anywhere (the app renders PHP, never markdown)
+    r"|_test\.go$"                            # Go engine tests
+)
+
+
+def is_gm_visible_path(p: str) -> bool:
+    """True when ``p`` is a runtime file whose change a league GM could notice.
+
+    Not GM-visible: `bin/`, `tools/`, `.claude/`, `.github/`, root-level files, markdown
+    anywhere, `ibl5/tests/`, `ibl5/docs/`, `ibl5/bin/`, ibl5 build/lint/test config, and
+    Go `_test.go` files. Everything else under `ibl5/` and `engine/` (and any unknown root)
+    is GM-visible.
+    """
+    p = p.strip()
+    return bool(p) and not _NON_RUNTIME.search(p)
 
 def is_shell_path(p: str) -> bool:
     return bool(_SHELL_INC.search(p)) and not _SHELL_EXC.search(p)
@@ -638,6 +662,7 @@ def classify(files: list[str], diff_text: str, modified_files: list[str] | None 
     c.has_shell = c.count_shell > 0
     c.has_workflow = c.count_workflow > 0
     c.has_skill_prose = any(_SKILL_PROSE.match(f) for f in files)
+    c.has_gm_visible = any(is_gm_visible_path(f) for f in files)
 
     t = c.count_total
     c.docs_only = t > 0 and c.count_md == t

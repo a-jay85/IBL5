@@ -301,6 +301,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # rebase_onto() below stays authoritative. A predicted conflict propagates to the
         # outer `except HarnessError`, which sets error_kind="rebase-conflict" (exit 3 via
         # _FAIL_CLOSED_KINDS). This is the same terminal the post-commit rebase arm reaches.
+        # With an LLM wired, the probe also exits 3 when resolver_refusal_reason() names a
+        # conflict the resolver is certain to refuse; any other predicted conflict is advisory.
         if live:
             try:
                 conflict_files = git.predict_rebase_conflict()
@@ -317,6 +319,15 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                         "rebase-conflict",
                         f"predicted by merge-tree probe vs origin/master: "
                         f"{', '.join(conflict_files)}")
+                refusal_fn = getattr(git, 'resolver_refusal_reason', None)
+                refusal = refusal_fn() if callable(refusal_fn) else None
+                if refusal is not None:
+                    log(f"phase2: LLM resolver would refuse ({refusal}) -- "
+                        "stopping before body check (exit 3)")
+                    raise HarnessError(
+                        "rebase-conflict",
+                        f"predicted by merge-tree probe vs origin/master: "
+                        f"{', '.join(conflict_files)}; resolver would refuse: {refusal}")
                 log("phase2: LLM resolver active -- probe is advisory, falling through to rebase_onto()")
 
         copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)

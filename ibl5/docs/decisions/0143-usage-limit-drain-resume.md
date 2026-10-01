@@ -1,6 +1,6 @@
 ---
 description: Usage-limit drain, pause, and auto-resume for headless runners via an env-gated PreToolUse hook, pause markers, a drain token, and a launchd coordinator.
-last_verified: 2026-09-30
+last_verified: 2026-10-01
 ---
 
 # ADR-0143: Usage-limit drain, pause, and auto-resume

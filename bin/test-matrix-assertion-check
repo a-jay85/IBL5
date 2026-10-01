@@ -45,6 +45,115 @@ plan_fixture() {
     fi
 }
 
+# replay_2578_fixture <dir> [tagged]
+# Writes the PR #2578 plan's Verification Matrix (14 rows, verbatim) to <dir>/plan.md,
+# the PR's unified diff to <dir>/diff.txt, and commits <dir>/tree.txt carrying the two
+# tokens the live tree realises (`--self-test`, `.claude/rules/prose-style.md`) so
+# arm 3 behaves as it did on the real replay. With "tagged", rows 12 and 14 carry the
+# one-time-check tag at the end of their "What to verify" cell.
+replay_2578_fixture() {
+    local dir="$1" mode="${2:-untagged}"
+    cat > "$dir/plan.md" <<'EOF_PLAN'
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | Baseline: `--self-test` prints `59 cases passed, 20 tells covered` on master (fails if any fixture is edited before Phase 1). | CLI-executable | pre-impl | `bin/check-prose --self-test \| grep '59 cases passed, 20 tells covered'` |
+| 2 | Baseline false positive: `#1 seed` and `#1 pick` fire `bare-hash-ref` in chat scope on master (count 1: first-match search). Locks the behavior Phase 1 removes. | CLI-executable | pre-impl | `test "$(printf 'He was the #1 seed and the #1 pick.\n' \| bin/check-prose --stdin --chat \| grep -c bare-hash-ref)" = 1` |
+| 3 | Phase 1+2: `--self-test` prints `72 cases passed, 20 tells covered`; reverting the Phase 1 regex ⇒ seven `FAIL (scope)` lines; dropping any Phase 2 tuple ⇒ count is not 72. | CLI-executable | post-impl | `bin/check-prose --self-test \| grep '72 cases passed, 20 tells covered'` |
+| 4 | Phase 1: ranking prose passes in chat scope (exit 0, no output); deleting the `(?!...)` lookahead ⇒ exit 1. | CLI-executable | post-impl | `printf 'He was the #1 seed and the #1 pick.\nthe #3 overall pick\nthey finished #2 in the West\nthe #8 seeded team\n' \| bin/check-prose --stdin --chat` |
+| 5 | Phase 1: keep-firing positives `see #1234 for context` and `closed by PR #99` still produce two `bare-hash-ref` hits; widening the exemption to `\d+` or dropping the `\d+\b` tail ⇒ count is not 2. | CLI-executable | post-impl | `test "$(printf 'see #1234 for context\nclosed by PR #99\n' \| bin/check-prose --stdin --chat \| grep -c bare-hash-ref)" = 2` |
+| 6 | Phase 1 negative path: digit cap keeps `#1234 seed data` firing; changing `\d{1,2}` to `\d+` ⇒ count 0. | CLI-executable | post-impl | `test "$(printf '#1234 seed data\n' \| bin/check-prose --stdin --chat \| grep -c bare-hash-ref)" = 1` |
+| 7 | Phase 1 negative path: same-line real ref survives the exemption; the hit snippet names `#2453`. Anchoring the regex or wrapping the first branch so `search` skips the line ⇒ count 0. | CLI-executable | post-impl | `test "$(printf '#1 seed lost to #2453\n' \| bin/check-prose --stdin --chat \| grep -c '#2453')" = 1` |
+| 8 | Phase 1 negative path: phrasal verb `#12 pick up the slack` fires; dropping `(?!\s+up\b)` ⇒ count 0. | CLI-executable | post-impl | `test "$(printf '#12 pick up the slack\n' \| bin/check-prose --stdin --chat \| grep -c bare-hash-ref)" = 1` |
+| 9 | Phase 1 negative path: `#2 in the queue` and `#12 in the stack` both fire (closed conference list); adding `queue` or `stack` to the list ⇒ count drops below 2. | CLI-executable | post-impl | `test "$(printf '#2 in the queue\n#12 in the stack\n' \| bin/check-prose --stdin --chat \| grep -c bare-hash-ref)" = 2` |
+| 10 | Phase 1 boundary paths: `#1 seedling` and `backlog#12 seed` fire (word boundary; backlog branch untouched) while `#9 seed the DB` passes (accepted residual). Dropping the trailing `\b` or adding the lookahead to the backlog branch ⇒ count is not 2. | CLI-executable | post-impl | `test "$(printf '#1 seedling\nbacklog#12 seed\n#9 seed the DB before the run\n' \| bin/check-prose --stdin --chat \| grep -c bare-hash-ref)" = 2` |
+| 11 | Phase 3: on-touch freshness passes for `.claude/rules/prose-style.md`; skipping the `last_verified` bump ⇒ exit 1 `body changed but last_verified not bumped`; a future date ⇒ exit 1 `last_verified in the future`. | CLI-executable | post-impl | `bin/check-docs --since=master --no-staleness` |
+| 12 | Phase 3: the new Shape sentence carries no tell; writing it with a hanging dash ⇒ exit 1 `[em-dash]`. | CLI-executable | post-impl | `bin/check-prose --since=master` |
+| 13 | Phase 3: the doc row names the exemption; deleting the added sentence ⇒ grep exits 1. | CLI-executable | post-impl | `grep -c 'followed by a ranking word' .claude/rules/prose-style.md` |
+| 14 | Phase 4: corpus diff (master regex vs working tree over PR bodies, local transcripts, and the synthetic block) prints `CORPUS-DIFF OK` and exits 0 with `appeared=0 bad=0 synth_old=8 synth_new=2`; reverting the regex ⇒ `synth_new=8` FAIL; `\d+` in the lookahead ⇒ `synth_new=1` FAIL; removing a lookbehind ⇒ `appeared>0` FAIL; adding `for` to the word list ⇒ `BAD:` lines from real refs. | CLI-executable | post-impl | `python3 -c 'import glob,json,os,re,subprocess,sys,collections,types; L=lambda s,n:(lambda m:(sys.modules.__setitem__(n,m),exec(compile(s,n,"exec"),m.__dict__),m.__dict__)[2])(types.ModuleType(n)); old=L(subprocess.check_output(["git","show","origin/master:bin/check-prose"],text=True),"cp_old"); new=L(open("bin/check-prose").read(),"cp_new"); R=lambda ns:[t for t in ns["TELLS"] if t.name=="bare-hash-ref"][0].regex; ro,rn=R(old),R(new); P=new["prose_lines"]; J=lambda s:(json.loads(s) if s.lstrip().startswith("{") else {}); prs=json.loads(subprocess.check_output(["gh","pr","list","--repo","a-jay85/IBL5","--state","all","--limit","400","--json","number,title,body"],text=True)); texts=[str(p.get("title") or "")+"\n"+str(p.get("body") or "") for p in prs]+[b.get("text") or "" for f in glob.glob(os.path.expanduser("~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5*/*.jsonl")) for o in map(J,open(f,encoding="utf-8",errors="replace")) if o.get("type")=="assistant" for b in ((o.get("message") or {}).get("content") or []) if isinstance(b,dict) and b.get("type")=="text"]; synth=["He was the #1 seed and the #1 pick.","the #3 overall pick","they finished #2 in the West","the #8 seeded team","ranked #4 overall","#1234 seed data","#2 in the queue"]; H=lambda r,ts:collections.Counter((l,m.start()) for t in ts for _,l in P(t) for m in r.finditer(l)); ho,hn,so,sn=H(ro,texts),H(rn,texts),H(ro,synth),H(rn,synth); d=ho-hn; a=hn-ho; W=("seed","pick","overall","rank","in the "); M=lambda l,s:re.compile(r"#\d{1,2}\s+").match(l,s); isrank=lambda l,s:(M(l,s) is not None and l[M(l,s).end():].lower().startswith(W)); bad=[l[s:s+40] for (l,s) in d if not isrank(l,s)]; print("old=%d new=%d disappeared=%d appeared=%d bad=%d synth_old=%d synth_new=%d"%(sum(ho.values()),sum(hn.values()),sum(d.values()),sum(a.values()),len(bad),sum(so.values()),sum(sn.values()))); [print("GONE:",l[max(0,s-20):s+30].strip()) for (l,s) in d]; [print("BAD:",x) for x in bad]; [print("NEW:",l[max(0,s-20):s+30].strip()) for (l,s) in a]; ok=(not bad and not a and sum(so.values())==8 and sum(sn.values())==2); print("CORPUS-DIFF OK" if ok else "CORPUS-DIFF FAIL"); sys.exit(0 if ok else 1)'` |
+EOF_PLAN
+    if [ "$mode" = "tagged" ]; then
+        sed -i.bak -E \
+            -e 's/^(\| 12 \| .*) \| CLI-executable \|/\1 (one-time-check: evidence is the exit code of one check-prose run at plan time) | CLI-executable |/' \
+            -e 's/^(\| 14 \| .*) \| CLI-executable \|/\1 (one-time-check: corpus diff is a one-shot run over local transcripts) | CLI-executable |/' \
+            "$dir/plan.md" && rm -f "$dir/plan.md.bak"
+    fi
+    cat > "$dir/diff.txt" <<'EOF_DIFF'
+diff --git a/.claude/rules/prose-style.md b/.claude/rules/prose-style.md
+index aa50c8a7d3..0d8cc19474 100644
+--- a/.claude/rules/prose-style.md
++++ b/.claude/rules/prose-style.md
+@@ -1,6 +1,6 @@
+ ---
+ description: The AI-tell sentence shapes ("Claude slop") that must not land in repo prose, PR bodies, or chat replies. Lists each tell with its fix, the on-touch policy, and the escape hatches. Enforced by bin/check-prose in CI and by two hooks.
+-last_verified: 2026-09-26
++last_verified: 2026-09-30
+ paths: "**/*.md"
+ ---
+ 
+@@ -45,7 +45,7 @@ Each row is one regex in the script. The fix column is what the deny message pri
+ | closing-offer | `let me know if`, `happy to help`, `want me to`, `shall I`. | Stop when the content stops. |
+ | sycophant-opener | `Great question`, `Certainly!`, `Absolutely,`. | Delete it. Start with the answer. |
+ | lets-opener | A line that opens with `Let's` or `Let me`. Docs only. | State what the section does. |
+-| bare-hash-ref | A bare `#N` PR or issue reference not written as a markdown link. Chat only. | Link it: PR `[#123](https://github.com/a-jay85/IBL5/pull/123)` or backlog issue `[backlog#45](https://github.com/a-jay85/IBL5-backlog/issues/45)`. |
++| bare-hash-ref | A bare `#N` PR or issue reference not written as a markdown link. Chat only. A one- or two-digit `#N` followed by a ranking word (`seed`, `pick`, `overall`, `ranked`, `in the West`) is league prose and passes. | Link it: PR `[#123](https://github.com/a-jay85/IBL5/pull/123)` or backlog issue `[backlog#45](https://github.com/a-jay85/IBL5-backlog/issues/45)`. |
+ 
+ Two shapes from the same family stay judgment-only because a regex cannot separate them from normal usage: `rather than` and generic three-item lists. Cut them when you see them while editing. Metaphor restatement and narrating your steps are also judgment-only.
+ 
+diff --git a/bin/check-prose b/bin/check-prose
+index 35a06ea494..e9eef0299e 100755
+--- a/bin/check-prose
++++ b/bin/check-prose
+@@ -163,9 +163,13 @@ TELLS: list[Tell] = [
+         #              and backlog#N inline in text (word char before #)
+         #   Common noun prefixes — "check #N", "gate #N", etc. are not hyperlink
+         #              obligations; flag only unambiguous prose issue/PR refs.
++        #   Rankings (lookahead) — a one- or two-digit #N followed by seed/pick/
++        #              overall/ranked/"in the <conference>" is league prose, not a ref.
+         # Note: "Docker Hub" aside, prose_lines replaces link targets with ]()
+         # so [#123](url) → [#123]() and the [ preceding # blocks the match.
+-        r"(?<![/\[&\w])(?<!check )(?<!gate )(?<!step )(?<!item )(?<!phase )(?<!no\. )(?<!number )(?<!condition )#\d+\b"
++        r"(?<![/\[&\w])(?<!check )(?<!gate )(?<!step )(?<!item )(?<!phase )(?<!no\. )(?<!number )(?<!condition )"
++        r"#(?!\d{1,2}\s+(?:seeds?|seeded|picks?(?!\s+up\b)|overall|ranked|ranking"
++        r"|in the (?:west|east|league|conference|division|draft|standings))\b)\d+\b"
+         r"|(?<![/\[\w-])(?:IBL5-)?backlog#\d+\b",
+         "Link it: PR `[#123](https://github.com/a-jay85/IBL5/pull/123)` or backlog issue `[backlog#45](https://github.com/a-jay85/IBL5-backlog/issues/45)`.",
+         scope="chat",
+@@ -454,6 +458,27 @@ def mode_self_test() -> int:
+         ("check #19 in the list", False, False),
+         ("gate #3 fires here", False, False),
+         ("step #2 is next", False, False),
++        ("He was the #1 seed and the #1 pick.", False, False),
++        ("the #3 overall pick in the 2019 draft", False, False),
++        ("they finished #2 in the West", False, False),
++        ("the #8 seeded team upset the #1 seed", False, False),
++        ("ranked #4 overall by the model, #12 picks later", False, False),
++        # Accepted residual: "seed" read as a verb still passes. Deliberate.
++        ("#9 seed the DB before the run", False, False),
++        # Negative paths: the exemption must not mask a real ref.
++        # First-match search falls through to the real ref on the same line.
++        ("#1 seed lost to #2453", False, True),
++        # Digit cap: a 3+ digit number before a ranking word is still a ref.
++        ("#1234 seed data", False, True),
++        # Phrasal verb "pick up" is excluded from the exemption.
++        ("#12 pick up the slack", False, True),
++        # "in the <X>" is exempt only for the listed conference/league words.
++        ("#2 in the queue", False, True),
++        ("#12 in the stack", False, True),
++        # Word boundary: a prefix of a ranking word is not a ranking word.
++        ("#1 seedling", False, True),
++        # The backlog#N branch has no ranking exemption.
++        ("backlog#12 seed", False, True),
+     ]
+     fails = 0
+     for text, expected in positive:
+EOF_DIFF
+    printf -- '--self-test\n.claude/rules/prose-style.md\n' > "$dir/tree.txt"
+    git -C "$dir" add tree.txt
+    git -C "$dir" commit -q -m "tree tokens"
+}
+
 extract_step67_block() {
     # Prints the first bash fence found between ## Step 6.7: and ## Step 7: headings
     local prompt_file
@@ -682,9 +791,24 @@ skip-equals-class5)
     fi
     ;;
 
+replay-2578-untagged)
+    # Characterization: the #2578 matrix, untagged, flags rows 12 and 14 and nothing else.
+    replay_2578_fixture "$root"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    total=$(printf '%s\n' "$out" | grep -c '^UNREALISED-ASSERTION:' || true)
+    r12=$(printf '%s\n' "$out" | grep -c '^UNREALISED-ASSERTION: row 12 ' || true)
+    r14=$(printf '%s\n' "$out" | grep -c '^UNREALISED-ASSERTION: row 14 ' || true)
+    if [ "$rc" -eq 0 ] && [ "$total" -eq 2 ] && [ "$r12" -eq 1 ] && [ "$r14" -eq 1 ]; then
+        ok "replay-2578-untagged"
+    else
+        fail "replay-2578-untagged (rc=$rc, total=$total, r12=$r12, r14=$r14, out=$out)"
+    fi
+    ;;
+
 *)
     printf 'Unknown case: %s\n' "$case" >&2
-    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire all\n' >&2
+    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 replay-2578-untagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire all\n' >&2
     exit 2
     ;;
 esac
@@ -696,7 +820,7 @@ rm -rf "$root"
 
 ARG="${1:-all}"
 
-CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire"
+CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 replay-2578-untagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire"
 
 if [ "$ARG" = "all" ]; then
     for c in $CASES; do

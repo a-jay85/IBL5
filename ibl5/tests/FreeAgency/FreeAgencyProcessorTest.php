@@ -778,6 +778,9 @@ class FreeAgencyProcessorTest extends TestCase
         $this->assertNotSame('', $result['error']);
     }
 
+    /**
+     * FreeAgencyProcessor::deleteOffers('') refuses without resolving a teamid or deleting.
+     */
     public function testDeleteOffersRefusesEmptyTeamWithoutDeleting(): void
     {
         [$processor, $repository, $entityLoader, $commonRepo] = $this->buildProcessorWithMocks();

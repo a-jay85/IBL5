@@ -294,6 +294,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             log("phase2: empty diff vs base — nothing to ship")
             return _finish(res, out_dir)
         files = git.changed_files()
+        # Rename sources included; read ONLY by the conformance check. classify(),
+        # scope conformance and denied_gate_edits keep `files`, or an old path
+        # would surface as UNPLANNED-FILE and create a new hold.
+        conf_files = git.conformance_files()
         cls = classify(files, diff, git.modified_files())
         res.classification = cls
         log("phase3 classify:\n" + cls.summary())
@@ -347,7 +351,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             copy["summary_md"] = check["corrected_body"]
             for f in check.get("findings", []):
                 log(f"phase2 body-check finding: {f}")
-        _inject_residual_phases(copy, plan, files, log)
+        _inject_residual_phases(copy, plan, conf_files, log)
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
@@ -461,6 +465,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if git.head() != head_before_45:
             sha = git.head()
             files = git.changed_files()
+            conf_files = git.conformance_files()
             diff = git.diff_vs_base()
             meta = gh.pr_meta() or meta
         review_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -505,7 +510,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             + f" -> PHASE5_VERIFY_STATUS={phase5}"
             + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
         resolutions: dict[str, str] = {}
-        unresolved = conformance.check(plan, files, diff, phase5_status=phase5,
+        unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                        resolutions=resolutions,
                                        pr_body=gh.pr_body() or meta.get("body", ""))
         res.unresolved_conformance = unresolved
@@ -606,9 +611,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             # clean run buy nothing, and the gate is "did the tree change", not "did
             # remediation run".
             files = git.changed_files()
+            conf_files = git.conformance_files()
             diff = git.diff_vs_base()
             resolutions = {}
-            unresolved = conformance.check(plan, files, diff, phase5_status=phase5,
+            unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                            resolutions=resolutions,
                                            pr_body=gh.pr_body() or body)
             res.unresolved_conformance = unresolved

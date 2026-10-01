@@ -1370,9 +1370,19 @@ def _patch_two_call_git(monkeypatch, first_files, second_files):
     call_count = [0]
 
     class _TwoCallGit(runner.ReplayGit):
+        _last: list[str] = []
+
         def changed_files(self, base="origin/master"):
             call_count[0] += 1
-            return first_files if call_count[0] == 1 else second_files
+            self._last = first_files if call_count[0] == 1 else second_files
+            return self._last
+
+        def conformance_files(self, base="origin/master"):
+            # The runner reads conformance_files right after each changed_files, so
+            # it sees the same snapshot. Not counted: the call count tracks snapshots.
+            # The fakes in test_fidelity_remediation.py and test_fidelity_rounds.py
+            # override only `changed_files` and stay untouched: ReplayGit delegates.
+            return list(self._last)
 
     monkeypatch.setattr(runner, "ReplayGit", _TwoCallGit)
     return call_count
@@ -1399,6 +1409,83 @@ def test_conformance_rerun_clears_hold_when_remediation_adds_planned_file(tmp_pa
     bridge = os.path.join(out, runner.CONFORMANCE_BRIDGE_NAME)
     assert os.path.exists(bridge) and os.path.getsize(bridge) == 0
     assert "phase5.0 conformance (post-remediation): clean" in "\n".join(res.audit)
+
+
+_PLAN_RENAMED_AGENT = (
+    "# Synthetic rename-source conformance plan\n\n"
+    "## Critical Files\n\n"
+    "- `.claude/agents/sonnet-4-6.md` — renamed to sonnet-5-5.md\n"
+)
+
+_PLAN_RENAME_TARGET_ONLY = (
+    "# Synthetic scope-conformance plan\n\n"
+    "## Critical Files\n\n"
+    "- `.claude/agents/sonnet-5-5.md` — the rename target\n"
+)
+
+
+class _RenameGit(runner.ReplayGit):
+    """changed_files lists only the rename target; conformance_files adds the source."""
+    def changed_files(self, base="origin/master"):
+        return [".claude/agents/sonnet-5-5.md"]
+
+    def conformance_files(self, base="origin/master"):
+        return [".claude/agents/sonnet-5-5.md", ".claude/agents/sonnet-4-6.md"]
+
+
+def test_conformance_reads_rename_sources_not_changed_files(tmp_path, monkeypatch):
+    """PR #2514 shape: the plan names the rename source as a Critical File, only the
+    target is in `changed_files`. The conformance check must read `conformance_files`.
+
+    Mutation caught: revert either `conformance.check(plan, conf_files, ...)` or
+    `_inject_residual_phases(copy, plan, conf_files, log)` to `files` and
+    `MISSING-FILE: .claude/agents/sonnet-4-6.md` reappears.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha=None)
+    monkeypatch.setattr(runner, "ReplayGit", _RenameGit)
+    seen: list[list[str]] = []
+    real_inject = runner._inject_residual_phases
+
+    def _spy(copy, plan, files, log):
+        seen.append(list(files))
+        return real_inject(copy, plan, files, log)
+
+    monkeypatch.setattr(runner, "_inject_residual_phases", _spy)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    fx = _fixture(plan_content=_PLAN_RENAMED_AGENT)
+    res = runner.run(fx, out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert res.unresolved_conformance == []
+    assert not any("MISSING-FILE" in line for line in res.audit)
+    assert seen and ".claude/agents/sonnet-4-6.md" in seen[0]
+
+
+def test_scope_conformance_still_reads_changed_files_not_rename_sources(tmp_path, monkeypatch):
+    """Scope conformance keeps `changed_files`, so a rename source never shows up as
+    an unplanned file and creates a new hold.
+
+    Mutation caught: pass `conf_files` to `scope_conformance.scope_notes` and the old
+    path is handed to the unplanned-file check.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha=None)
+    monkeypatch.setattr(runner, "ReplayGit", _RenameGit)
+    seen: list[list[str]] = []
+    real_notes = runner.scope_conformance.scope_notes
+
+    def _spy(plan, changed_files, diff_body, pr_body, *a, **kw):
+        seen.append(list(changed_files))
+        return real_notes(plan, changed_files, diff_body, pr_body, *a, **kw)
+
+    monkeypatch.setattr(runner.scope_conformance, "scope_notes", _spy)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    fx = _fixture(plan_content=_PLAN_RENAME_TARGET_ONLY)
+    runner.run(fx, out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert seen, "scope_notes was never called"
+    assert all(".claude/agents/sonnet-4-6.md" not in files for files in seen)
+    assert ".claude/agents/sonnet-5-5.md" in seen[0]
 
 
 def test_conformance_hold_stays_when_remediation_does_not_add_file(tmp_path, monkeypatch):

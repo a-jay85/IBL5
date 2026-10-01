@@ -255,6 +255,30 @@ class LiveGit:
                     out.append(f)
         return out
 
+
+    def conformance_files(self, base: str = "origin/master") -> list[str]:
+        """Every path this branch touched, INCLUDING the old path of a rename.
+
+        `--no-renames` makes git report a rename as a delete of the old path plus an
+        add of the new one, so one diff call yields both sides with no extra parsing
+        (PR #2514: `R067 .claude/agents/sonnet-4-6.md -> .claude/agents/sonnet-5-5.md`
+        held arming condition (3) because only the new path was listed). This is a
+        strict superset of `changed_files`, and it is read ONLY by the conformance
+        check (runner conformance.check / phase_omission_items); classify(), scope
+        conformance and denied_gate_edits keep reading `changed_files`, because an
+        old path showing up there would look like an unplanned file and create a
+        new hold. Same two git calls as `changed_files`: no third call.
+        """
+        vs_base = self._run("diff", "--no-renames", "--name-only",
+                            self._merge_base(base)).strip()
+        untracked = self._run("ls-files", "--others", "--exclude-standard").strip()
+        out: list[str] = []
+        for chunk in (vs_base, untracked):
+            for f in chunk.splitlines():
+                if f and f not in out:
+                    out.append(f)
+        return out
+
     def modified_files(self, base: str = "origin/master") -> list[str]:
         out = self._run("diff", "--diff-filter=M", "--name-only",
                         self._merge_base(base)).strip()
@@ -945,6 +969,23 @@ class ReplayGit:
     def changed_files(self, base: str = "origin/master") -> list[str]:
         from ..classify import files_from_diff
         return files_from_diff(self.diff_vs_base())
+
+    def conformance_files(self, base: str = "origin/master") -> list[str]:
+        """`changed_files(base)` plus the OLD path of every rename in the fixture diff.
+
+        Built ON TOP of `changed_files` on purpose: replay test fakes override
+        `changed_files` to inject a touched-path list (test_runner_replay._TwoCallGit,
+        test_fidelity_remediation._GateEditGit, test_fidelity_rounds._CountingGit), and
+        this delegation keeps their injected list flowing into the conformance check
+        without each fake having to learn a second method. Deleted files are already
+        in `changed_files` (b-side of the header) and stay counted.
+        """
+        from ..classify import rename_sources_from_diff
+        out = list(self.changed_files(base))
+        for src in rename_sources_from_diff(self.diff_vs_base()):
+            if src not in out:
+                out.append(src)
+        return out
 
     def modified_files(self, base: str = "origin/master") -> list[str]:
         from ..classify import modified_files_from_diff

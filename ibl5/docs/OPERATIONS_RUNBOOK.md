@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, and running the app without the Claude Code harness.
-last_verified: 2026-09-30
+last_verified: 2026-10-01
 ---
 
 # IBL5 Operations Runbook
@@ -448,14 +448,15 @@ With no secrets set, the workflow skips every real step and ends green. Merging 
 
 ### Secrets
 
-Eight Actions secrets switch the workflow on: `CLAUDE_CODE_OAUTH_TOKEN`, `SIM_RECAP_SSH_KEY`, `SIM_RECAP_REMOTE_ROOT`, `SIM_RECAP_DB_USER`, `SIM_RECAP_DB_NAME`, `SIM_RECAP_DB_PASSWORD`, plus the existing `HOST` and `PORT` and `USERNAME`. Two more are optional ops-alert settings: `SIM_RECAP_OPS_WEBHOOK_URL` and `SIM_RECAP_OPS_ALERT_THREAD_ID`. The table in section 7 lists where each one lives. If any required secret is empty the workflow skips and prints `secrets not configured, skipping`.
+Nine Actions secrets switch the workflow on: `CLAUDE_CODE_OAUTH_TOKEN`, `SIM_RECAP_SSH_KEY`, `SIM_RECAP_REMOTE_ROOT`, `SIM_RECAP_DB_USER`, `SIM_RECAP_DB_NAME`, `SIM_RECAP_DB_PASSWORD`, plus the existing `HOST` and `PORT` and `USERNAME`. Two more are optional ops-alert settings: `SIM_RECAP_OPS_WEBHOOK_URL` and `SIM_RECAP_OPS_ALERT_THREAD_ID`. The table in section 7 lists where each one lives. If any required secret is empty the workflow skips and prints `secrets not configured, skipping`.
 
 ### Installing the restricted key
 
-1. Generate a dedicated key: `ssh-keygen -t ed25519 -f sim-recap-actions -C sim-recap-actions`.
-2. On the production box, run `bin/sim-recap-ssh-gate --print-key-line sim-recap-actions.pub`. Append the one line it prints to `~/.ssh/authorized_keys`. Do not edit the line by hand. It carries `restrict`, a `permitopen` for `127.0.0.1:3306`, and the forced `command=`.
+1. Generate a dedicated key: `ssh-keygen -t ed25519 -f sim-recap-actions -C sim-recap-actions -N ''`.
+2. On the production box, run `chmod +x <root>/bin/sim-recap-ssh-gate` if the deploy did not preserve the execute bit, then run `bin/sim-recap-ssh-gate --print-key-line sim-recap-actions.pub`. Append the one line it prints to `~/.ssh/authorized_keys`. Do not edit the line by hand. It carries `restrict`, a `permitopen` for `127.0.0.1:3306`, and the forced `command=`.
 3. Store the private key as the `SIM_RECAP_SSH_KEY` Actions secret, then delete the local copy.
 4. Check the restriction from any machine with the private key: `ssh -i sim-recap-actions <user>@<host> id`. The reply must be `sim-recap-ssh-gate: denied: id`. Any other reply means the line lost its `command=` and the key has a shell. Remove it at once.
+5. Confirm the gate accepts a live queue call: `ssh -i sim-recap-actions <user>@<host> "php <root>/ibl5/scripts/simRecapQueue.php find --sim=1"` must print JSON. The gate compares the root path as a plain string. A `SIM_RECAP_REMOTE_ROOT` secret whose value differs by a symlink or a trailing slash makes the gate deny every call. This step catches the mismatch at install time.
 
 ### Dispatch from prod
 
@@ -467,7 +468,7 @@ Run `gh workflow run sim-recap.yml` for a claim-next drain. Add `-f sim=<N>` to 
 
 ### Uninstalling the Mac poller later
 
-Once a few sims have recapped from Actions, remove the Mac backup with `bin/sim-recap-cron-setup --uninstall-schedule`. Until then, an outage can send one onset ping and one recovery ping from each host.
+Once a few sims have recapped from Actions, remove the Mac backup with `bin/sim-recap-cron-setup --uninstall-schedule`. Until then, an outage can send one onset ping and one recovery ping from each host. After uninstalling, remove the `com.ibl5.sim-recap-poll` entry from `bin/lib/launchd-expected-jobs.sh` in a follow-up PR. Until that follow-up lands, `bin/launchd-health-check` reports the job as missing.
 
 ### Mac poller (backup)
 

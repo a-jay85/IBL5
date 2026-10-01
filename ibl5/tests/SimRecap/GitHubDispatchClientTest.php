@@ -235,6 +235,17 @@ class GitHubDispatchClientTest extends TestCase
             }
         }
 
+        foreach ($class->getMethods() as $method) {
+            if ($isForbiddenType($method->getReturnType())) {
+                $violations[] = 'method ' . $method->getName() . '() return type is mysqli';
+            }
+            foreach ($method->getParameters() as $parameter) {
+                if ($isForbiddenType($parameter->getType())) {
+                    $violations[] = 'method ' . $method->getName() . '() parameter $' . $parameter->getName() . ' is typed mysqli';
+                }
+            }
+        }
+
         $file = $class->getFileName();
         if (!$class->isAnonymous() && $file !== false) {
             $source = (string) file_get_contents($file);

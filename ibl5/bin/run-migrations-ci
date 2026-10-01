@@ -8,7 +8,9 @@
 set -euo pipefail
 trap 'echo "ERROR: Failed applying migration: $(basename "${f:-unknown}")"; exit 1' ERR
 
-MIGRATIONS_DIR="$(cd "$(dirname "$0")/../migrations" && pwd)"
+# RUN_MIGRATIONS_CI_DIR overrides the dir (used by bin/check-old-code-compat).
+# Unset or empty means the default dir next to this script.
+MIGRATIONS_DIR="$(cd "${RUN_MIGRATIONS_CI_DIR:-$(dirname "$0")/../migrations}" && pwd)"
 numbered=()
 for f in "$MIGRATIONS_DIR"/*.sql; do
     base=$(basename "$f")

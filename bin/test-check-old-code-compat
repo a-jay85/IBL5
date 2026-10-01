@@ -281,6 +281,99 @@ junit 12 0 "Unknown column 'other_col' in 'field list'"
 run_case stacked-base 0 'PASS (bypass)' '902_' --verdict-only "--junit=$J" --phpunit-exit=1 \
     "--migrations-dir=$REPO/migrations" "--since=$STACK_B"
 
+# --- Pipeline cases: a stub mysql and a stub old-tree phpunit, no database. ---
+
+mkdir -p "$WORK/fakebin" "$WORK/oldtree/vendor/bin" "$WORK/oldtree/tests/DatabaseIntegration/Fixtures"
+printf '#!/bin/sh\ncat >/dev/null\nexit 0\n' > "$WORK/fakebin/mysql"
+echo 'INSERT INTO ibl_foo VALUES (2, 2);' > "$WORK/oldtree/tests/DatabaseIntegration/Fixtures/db-seed.sql"
+cat > "$WORK/oldtree/vendor/bin/phpunit" <<STUB
+#!/bin/sh
+echo "\$@" >> "$WORK/phpunit.args"
+out=""
+while [ \$# -gt 0 ]; do
+    [ "\$1" = "--log-junit" ] && out="\$2"
+    shift
+done
+n="\${FAKE_TESTS:-5}"
+printf '<?xml version="1.0"?>\n<testsuites>\n<testsuite name="database" tests="%s" assertions="%s" errors="0" failures="0" skipped="0" time="0.1">\n</testsuite>\n</testsuites>\n' "\$n" "\$n" > "\$out"
+exit "\${FAKE_EXIT:-0}"
+STUB
+chmod +x "$WORK/fakebin/mysql" "$WORK/oldtree/vendor/bin/phpunit"
+: > "$WORK/phpunit.args"
+
+check_has() {
+    local label="$1" haystack="$2" token="$3"
+    TOTAL=$((TOTAL + 1))
+    if grep -qF -- "$token" <<< "$haystack"; then
+        echo "ok $label"
+    else
+        FAILED=$((FAILED + 1))
+        echo "FAIL $label: missing: $token"
+        printf '%s\n' "$haystack" | sed 's/^/    | /'
+    fi
+}
+
+# RUN_MIGRATIONS_CI_DIR on the real runner: unset and empty mean the default dir.
+REAL_COUNT=0
+for f in "$REPO_ROOT"/ibl5/migrations/*.sql; do
+    if [[ "$(basename "$f")" =~ ^[0-9]{1,3}[a-z]?_ ]]; then
+        REAL_COUNT=$((REAL_COUNT + 1))
+    fi
+done
+RUNNER="$REPO_ROOT/ibl5/bin/run-migrations-ci"
+OUT="$(env -u RUN_MIGRATIONS_CI_DIR PATH="$WORK/fakebin:$PATH" "$RUNNER" x 2>&1)"
+check_has runner-dir-unset "$OUT" "Applying $REAL_COUNT migrations"
+OUT="$(env RUN_MIGRATIONS_CI_DIR= PATH="$WORK/fakebin:$PATH" "$RUNNER" x 2>&1)"
+check_has runner-dir-empty "$OUT" "Applying $REAL_COUNT migrations"
+mkdir -p "$WORK/two-migs"
+echo 'SELECT 1;' > "$WORK/two-migs/001_a.sql"
+echo 'SELECT 2;' > "$WORK/two-migs/002_b.sql"
+OUT="$(env RUN_MIGRATIONS_CI_DIR="$WORK/two-migs" PATH="$WORK/fakebin:$PATH" "$RUNNER" x 2>&1)"
+check_has runner-dir-set "$OUT" "Applying 2 migrations..."
+
+export PATH="$WORK/fakebin:$PATH"
+export DB_HOST=127.0.0.1 DB_USER=root DB_PASS=root
+mkstd plain
+PIPE=("--since=$BASE" "--migrations-dir=$REPO/migrations" "--old-tree=$WORK/oldtree")
+
+unset DB_HOST
+run_case pipe-db-host-unset 2 "DB_HOST is required" "" "${PIPE[@]}"
+export DB_HOST=""
+run_case pipe-db-host-empty 2 "DB_HOST is required" "" "${PIPE[@]}"
+export DB_HOST=127.0.0.1
+export DB_PASS=""
+run_case pipe-db-pass-empty 0 'PASS (5 tests executed)' "" "${PIPE[@]}"
+export DB_PASS=root
+run_case pipe-bad-db-name 2 "--db-name" "" "${PIPE[@]}" "--db-name=x;y"
+run_case pipe-missing-old-tree 2 "--old-tree" "" "--since=$BASE" "--migrations-dir=$REPO/migrations" "--old-tree=$WORK/none"
+
+mkrepo
+mkdir -p "$REPO/migrations"
+echo 'notes' > "$REPO/migrations/README.md"
+commit_all only-readme
+run_case pipe-empty-dir 3 "no numbered .sql" "" "--since=HEAD" "--migrations-dir=$REPO/migrations" "--old-tree=$WORK/oldtree"
+
+mkrepo
+write_mig 000_baseline_schema.sql 'CREATE TABLE ibl_foo (id INT);'
+commit_all base
+BASE="$(git -C "$REPO" rev-parse HEAD)"
+write_mig 1000_too_long.sql 'ALTER TABLE ibl_foo ADD COLUMN note INT NULL;'
+commit_all head
+run_case pipe-changed-not-applied 3 "was not applied" "" "--since=$BASE" "--migrations-dir=$REPO/migrations" "--old-tree=$WORK/oldtree"
+
+mkstd plain
+: > "$WORK/phpunit.args"
+run_case pipe-pass 0 'PASS (5 tests executed)' "" "--since=$BASE" "--migrations-dir=$REPO/migrations" "--old-tree=$WORK/oldtree"
+check_has pipe-pass-group "$(cat "$WORK/phpunit.args")" "--group database"
+check_has pipe-pass-junit "$(cat "$WORK/phpunit.args")" "--log-junit"
+
+: > "$WORK/phpunit.args"
+export FAKE_TESTS=0
+run_case pipe-zero-tests 3 FALSE-GREEN "" "--since=$BASE" "--migrations-dir=$REPO/migrations" "--old-tree=$WORK/oldtree" \
+    "--phpunit-args=--filter NoSuchTest"
+unset FAKE_TESTS
+check_has pipe-zero-tests-args "$(cat "$WORK/phpunit.args")" "NoSuchTest"
+
 REPO_STATUS_AFTER="$(git -C "$REPO_ROOT" status --porcelain)"
 check_equal repo-untouched "$REPO_STATUS_BEFORE" "$REPO_STATUS_AFTER"
 

@@ -91,11 +91,16 @@ _usage_fetch_backoff_arm() {
 
 # _usage_fetch_log_once <marker_file> <key> <msg...>: logs only when key differs from the last logged key.
 _usage_fetch_log_once() {
-    local f="$1" key="$2" last=""
+    local f="$1" key="$2" last="" old
     shift 2
     [ -f "$f" ] && read -r last < "$f" 2>/dev/null
     [ "$last" = "$key" ] && return 0
+    # Claim the key atomically (O_EXCL) so concurrent callers log it once, not once each.
+    ( set -C; : > "$f.$key" ) 2>/dev/null || return 0
     { printf '%s\n' "$key" > "$f"; } 2>/dev/null
+    for old in "$f".*; do
+        [ "$old" = "$f.$key" ] || rm -f "$old"
+    done
     usage_log "$@"
 }
 
@@ -109,7 +114,8 @@ _usage_fetch_lock_acquire() {
     fi
     if [ ! -f "$lock/at" ]; then
         # Orphan from a holder that died between mkdir and its stamp: stamp it so it ages out.
-        { printf '%s 0\n' "$now" > "$lock/at"; } 2>/dev/null
+        # noclobber (O_EXCL): never overwrite the real holder's stamp, or its release can't match its pid.
+        ( set -C; printf '%s 0\n' "$now" > "$lock/at" ) 2>/dev/null
         return 1
     fi
     read -r at pid < "$lock/at" 2>/dev/null
@@ -206,8 +212,8 @@ usage_fetch() {
         body=$(curl -s -m 4 -D "$hdr" https://api.anthropic.com/api/oauth/usage \
             -H "Authorization: Bearer $tok" -H "anthropic-beta: oauth-2025-04-20"); crc=$?
         tok=""
-        status=$(tr -d '\r' < "$hdr" 2>/dev/null | awk '/^HTTP\//{s=$2} END{print s}')
-        ra=$(tr -d '\r' < "$hdr" 2>/dev/null \
+        status=$({ tr -d '\r' < "$hdr"; } 2>/dev/null | awk '/^HTTP\//{s=$2} END{print s}')
+        ra=$({ tr -d '\r' < "$hdr"; } 2>/dev/null \
             | awk 'tolower($0) ~ /^retry-after:/{sub(/^[^:]*:[ \t]*/, ""); r=$0} END{print r}')
         rm -f "$hdr"
         case "$status" in [0-9][0-9][0-9]) ;; *) status="" ;; esac
@@ -224,7 +230,7 @@ usage_fetch() {
         local tmp="$cache.tmp.$$"
         if printf '%s' "$body" | jq --argjson t "$(date +%s)" '. + {fetched_at:$t}' > "$tmp" 2>/dev/null \
             && mv "$tmp" "$cache"; then
-            rm -f "$d/fetch-backoff" "$d/fetch-backoff.logged"
+            rm -f "$d/fetch-backoff" "$d/fetch-backoff.logged" "$d"/fetch-backoff.logged.*
             _usage_fetch_lock_release "$d"
             printf '%s' "$body" | jq 'del(.fetched_at)'
             return 0

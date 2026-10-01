@@ -20,6 +20,7 @@ from harness.conflict import (
     ConflictResolutionResult,
     abort_and_restore,
     inventory_conflicts,
+    parse_verdict,
     purge_verdict_artifacts,
     resolve_all,
     resolve_one,
@@ -53,7 +54,7 @@ class _StubLlm:
         self.calls.append({
             "purpose": purpose, "model": model,
             "allowed_tools": allowed_tools, "denied_tools": denied_tools,
-            "add_dirs": add_dirs,
+            "add_dirs": add_dirs, "prompt": prompt,
         })
         if not self.replies:
             return "FAILED"
@@ -463,6 +464,98 @@ def test_tree_marker_sweep():
 
 # ── Phase 5f: verdict tests ────────────────────────────────────────────────────
 
+# Verbatim model reply from PR #2587 (branch evidence-path-line-suffix), whose
+# verdict file recorded CONFLICT-REVIEW=ABSENT under the old line-1-only parser.
+# Line 1 is a summary sentence containing a non-ASCII en dash; the token is line 3.
+# No trailing newline: the real reply ended on the final period.
+_PR2587_REPLY = (
+    "The new test from the patch is at lines 1620–1632 in the file. "
+    "It matches exactly what the patch added. The assertions are correct. "
+    "Nothing is dropped, duplicated, or invented.\n"
+    "\n"
+    "CONFLICT-REVIEW=CLEAN\n"
+    "\n"
+    "The resolved file has the new test "
+    "(`test_parse_phases_strips_line_suffix_from_evidence_paths`) with the exact "
+    "same plan string, `parse_phases` call, and two assertions as in the pre-rebase "
+    "patch. No content was lost or changed."
+)
+
+
+def test_parse_verdict_line_one_clean():
+    assert parse_verdict("CONFLICT-REVIEW=CLEAN\nLooked good.\n") == "CONFLICT-REVIEW=CLEAN"
+    assert (
+        parse_verdict("CONFLICT-REVIEW=FOUND-PROBLEM\ndropped hunk\n")
+        == "CONFLICT-REVIEW=FOUND-PROBLEM"
+    )
+
+
+def test_parse_verdict_preamble_then_clean():
+    reply = "One summary sentence.\n\nCONFLICT-REVIEW=CLEAN\n\nReasoning.\n"
+    assert parse_verdict(reply) == "CONFLICT-REVIEW=CLEAN"
+
+
+def test_parse_verdict_preamble_then_found_problem():
+    reply = "One summary sentence.\n\nCONFLICT-REVIEW=FOUND-PROBLEM\n\nReasoning.\n"
+    assert parse_verdict(reply) == "CONFLICT-REVIEW=FOUND-PROBLEM"
+
+
+@pytest.mark.parametrize("reply", [
+    "CONFLICT-REVIEW=CLEAN\nbut also\nCONFLICT-REVIEW=FOUND-PROBLEM\n",
+    "CONFLICT-REVIEW=FOUND-PROBLEM\nbut also\nCONFLICT-REVIEW=CLEAN\n",
+    "CONFLICT-REVIEW=CLEAN\nCONFLICT-REVIEW=FOUND-PROBLEM\n",
+    "CONFLICT-REVIEW=FOUND-PROBLEM\nCONFLICT-REVIEW=CLEAN\n",
+])
+def test_parse_verdict_both_tokens_fail_closed(reply):
+    assert parse_verdict(reply) == "CONFLICT-REVIEW=FOUND-PROBLEM"
+
+
+@pytest.mark.parametrize("reply", [
+    "not CONFLICT-REVIEW=CLEAN",
+    "CONFLICT-REVIEW=CLEAN extra",
+    "I would say CONFLICT-REVIEW=CLEAN.",
+    "`CONFLICT-REVIEW=CLEAN`",
+    "- CONFLICT-REVIEW=CLEAN",
+    "CONFLICT-REVIEW=CLEAN CONFLICT-REVIEW=FOUND-PROBLEM",
+])
+def test_parse_verdict_token_inside_prose_is_absent(reply):
+    assert parse_verdict(reply) == "CONFLICT-REVIEW=ABSENT"
+
+
+@pytest.mark.parametrize("reply", [
+    "",
+    "\n\n",
+    "other",
+    "conflict-review=clean",
+    "CONFLICT-REVIEW=ABSENT",
+])
+def test_parse_verdict_empty_and_noise_absent(reply):
+    assert parse_verdict(reply) == "CONFLICT-REVIEW=ABSENT"
+
+
+@pytest.mark.parametrize("reply", [
+    " CONFLICT-REVIEW=CLEAN",
+    "CONFLICT-REVIEW=CLEAN\r\n",
+    "\tCONFLICT-REVIEW=CLEAN  \n",
+    " CONFLICT-REVIEW=CLEAN",
+])
+def test_parse_verdict_whitespace_variants_are_stripped(reply):
+    assert parse_verdict(reply) == "CONFLICT-REVIEW=CLEAN"
+
+
+def test_parse_verdict_fenced_token_is_not_skipped():
+    assert parse_verdict("```\nCONFLICT-REVIEW=CLEAN\n```\n") == "CONFLICT-REVIEW=CLEAN"
+    fenced_plus_real = "```\nCONFLICT-REVIEW=CLEAN\n```\nCONFLICT-REVIEW=FOUND-PROBLEM\n"
+    assert parse_verdict(fenced_plus_real) == "CONFLICT-REVIEW=FOUND-PROBLEM"
+
+
+def test_parse_verdict_long_reply():
+    filler = ["filler line"] * 10_000
+    assert parse_verdict("\n".join(filler) + "\nCONFLICT-REVIEW=CLEAN") == "CONFLICT-REVIEW=CLEAN"
+    early_clean = ["CONFLICT-REVIEW=CLEAN", *filler, "CONFLICT-REVIEW=FOUND-PROBLEM"]
+    assert parse_verdict("\n".join(early_clean)) == "CONFLICT-REVIEW=FOUND-PROBLEM"
+
+
 def _make_review_run(sha="abc1234"):
     def run(*args, check=True):
         if args[0] == "rev-parse":
@@ -510,9 +603,9 @@ def test_verdict_found_problem(tmp_path):
 
 
 def test_verdict_malformed_is_absent(tmp_path):
-    """Leading space, trailing suffix, and empty reply each record CONFLICT-REVIEW=ABSENT."""
+    """Trailing suffix, empty reply, noise, and a token buried in a prose line each record CONFLICT-REVIEW=ABSENT."""
     sha = "00000000"
-    for bad in [" CONFLICT-REVIEW=CLEAN", "CONFLICT-REVIEW=CLEAN extra", "", "other"]:
+    for bad in ["CONFLICT-REVIEW=CLEAN extra", "", "other", "Looks fine. CONFLICT-REVIEW=CLEAN"]:
         key = f"test-{uuid.uuid4().hex[:8]}"
         llm = _StubLlm([bad])
         run = _make_review_run(sha)
@@ -532,6 +625,99 @@ def test_verdict_outage_is_absent(tmp_path):
                                 resolved_files=(), proof_out="")
     assert verdict == "CONFLICT-REVIEW=ABSENT"
     _cleanup_verdict(key, sha)
+
+
+def test_verdict_leading_space_is_clean(tmp_path):
+    """A leading-space token is accepted and normalized to a bare line 1."""
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    sha = "33333333"
+    llm = _StubLlm([" CONFLICT-REVIEW=CLEAN\n"])
+    run = _make_review_run(sha)
+    try:
+        verdict = review_resolution(llm, run, worktree=str(tmp_path), key=key,
+                                    resolved_files=(), proof_out="")
+        assert verdict == "CONFLICT-REVIEW=CLEAN"
+        verdict_file = f"/tmp/postplan-conflict-verdict-{key}-{sha}.ok"
+        assert open(verdict_file).readline().rstrip() == "CONFLICT-REVIEW=CLEAN"
+    finally:
+        _cleanup_verdict(key, sha)
+
+
+def test_verdict_preamble_then_clean_writes_normalized_line_one(tmp_path):
+    """Preamble-wrapped CLEAN: line 1 normalized, raw reply follows, armable reads CLEAN."""
+    from harness.armable import conflict_verdict_for
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    sha = "44444444"
+    reply = "Summary sentence.\n\nCONFLICT-REVIEW=CLEAN\n\nReasoning.\n"
+    llm = _StubLlm([reply])
+    run = _make_review_run(sha)
+    try:
+        verdict = review_resolution(llm, run, worktree=str(tmp_path), key=key,
+                                    resolved_files=(), proof_out="")
+        assert verdict == "CONFLICT-REVIEW=CLEAN"
+        verdict_file = f"/tmp/postplan-conflict-verdict-{key}-{sha}.ok"
+        assert open(verdict_file).read() == "CONFLICT-REVIEW=CLEAN\n" + reply
+        assert conflict_verdict_for(key) == "CONFLICT-REVIEW=CLEAN"
+    finally:
+        _cleanup_verdict(key, sha)
+
+
+def test_verdict_both_tokens_end_to_end_fails_closed(tmp_path):
+    """Both tokens in one reply record FOUND-PROBLEM and armable reads FOUND-PROBLEM."""
+    from harness.armable import conflict_verdict_for
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    sha = "55555555"
+    reply = "CONFLICT-REVIEW=CLEAN\nOn reflection:\nCONFLICT-REVIEW=FOUND-PROBLEM\n"
+    llm = _StubLlm([reply])
+    run = _make_review_run(sha)
+    try:
+        verdict = review_resolution(llm, run, worktree=str(tmp_path), key=key,
+                                    resolved_files=(), proof_out="")
+        assert verdict == "CONFLICT-REVIEW=FOUND-PROBLEM"
+        verdict_file = f"/tmp/postplan-conflict-verdict-{key}-{sha}.ok"
+        assert open(verdict_file).readline().rstrip() == "CONFLICT-REVIEW=FOUND-PROBLEM"
+        assert conflict_verdict_for(key) == "CONFLICT-REVIEW=FOUND-PROBLEM"
+    finally:
+        _cleanup_verdict(key, sha)
+
+
+def test_verdict_replay_pr2587_is_clean(tmp_path):
+    """The exact PR #2587 reply, rejected by the line-1-only parser, now records CLEAN."""
+    from harness.armable import conflict_verdict_for
+    assert "–" in _PR2587_REPLY
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    sha = "d5400802"
+    llm = _StubLlm([_PR2587_REPLY])
+    run = _make_review_run(sha)
+    try:
+        verdict = review_resolution(llm, run, worktree=str(tmp_path), key=key,
+                                    resolved_files=(), proof_out="")
+        assert verdict == "CONFLICT-REVIEW=CLEAN"
+        verdict_file = f"/tmp/postplan-conflict-verdict-{key}-{sha}.ok"
+        assert open(verdict_file).readline().rstrip() == "CONFLICT-REVIEW=CLEAN"
+        assert conflict_verdict_for(key) == "CONFLICT-REVIEW=CLEAN"
+        assert open(verdict_file).read() == "CONFLICT-REVIEW=CLEAN\n" + _PR2587_REPLY
+    finally:
+        _cleanup_verdict(key, sha)
+
+
+def test_reviewer_prompt_demands_line_one_verdict(tmp_path):
+    """The reviewer prompt asks for the token on line 1, once, and drops the old FIRST-line wording."""
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    sha = "66666666"
+    llm = _StubLlm(["CONFLICT-REVIEW=CLEAN\n"])
+    run = _make_review_run(sha)
+    try:
+        review_resolution(llm, run, worktree=str(tmp_path), key=key,
+                          resolved_files=(), proof_out="")
+        p = llm.calls[0]["prompt"]
+        assert "Line 1 of your reply is exactly" in p
+        assert "`CONFLICT-REVIEW=CLEAN`" in p
+        assert "`CONFLICT-REVIEW=FOUND-PROBLEM`" in p
+        assert "Write the verdict token exactly once" in p
+        assert "Reply with a FIRST line" not in p
+    finally:
+        _cleanup_verdict(key, sha)
 
 
 def test_reviewer_is_read_only(tmp_path):

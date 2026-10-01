@@ -789,6 +789,8 @@ def test_coerce_commit_subject_unparseable_returns_unchanged():
 # has_gm_visible: non-runtime denylist (Phase 1 of pr-copy-tooling-not-feat)
 
 def test_is_gm_visible_path_denylist_table():
+    """Every `_NON_RUNTIME` alternative is pinned: dropping `*.md` handling (`\\.md$`) flips the
+    SimRecap README row, dropping `^[^/]+$` flips README.md."""
     cases = [
         ("bin/post-plan-now", False),
         ("bin/test-burndown", False),
@@ -836,6 +838,8 @@ def test_classify_sets_has_gm_visible_and_summary_prints_it():
 
 
 def test_has_gm_visible_is_independent_of_only_flag_ladder():
+    """has_gm_visible is derived outside the `*_only` ladder (docs_only/test_only/non_code_only),
+    so the order-sensitive `*_only` flags and `coerce_commit_subject` stay untouched."""
     c = classify(["ibl5/tests/ATest.php"], "")
     assert c.test_only is True and c.has_gm_visible is False
     c = classify(["ibl5/classes/A.php", "ibl5/tests/ATest.php"], "")

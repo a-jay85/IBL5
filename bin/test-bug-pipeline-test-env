@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/test-bug-pipeline-test-env — regression harness for bin/bug-pipeline-test-env.
+#
+# Usage: bin/test-bug-pipeline-test-env [path-to-bug-pipeline-test-env]
+#   The optional positional arg names the script under test (default: the
+#   sibling bin/bug-pipeline-test-env). Verification mutants pass their own copy.
+#
+# Guards two fixes: F3 (IBLBOT resolves to the main checkout from a linked
+# worktree) and F6 (the Step 4.3 control run redirects the attachment cache).
+# Builds a throwaway repo with a linked worktree and relies on the script's own
+# template-placeholder rejection to exit 1 before any Docker, DB, or pm2 call.
+# Needs only git, mktemp, awk, grep (no Docker, pm2, node, or network).
+#
+# No set -e. bash 3.2 safe. Cleanup via trap EXIT.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TARGET="${1:-$SCRIPT_DIR/bug-pipeline-test-env}"
+if [ ! -f "$TARGET" ]; then
+    echo "usage: bin/test-bug-pipeline-test-env [path-to-bug-pipeline-test-env]" >&2
+    exit 2
+fi
+TARGET="$(cd "$(dirname "$TARGET")" && pwd)/$(basename "$TARGET")"
+
+PASSED=0
+FAILED=0
+
+bpt_ok()   { echo "ok: $1";  PASSED=$(( PASSED + 1 )); }
+bpt_fail() { echo "FAIL: $1"; FAILED=$(( FAILED + 1 )); }
+bpt_expect_eq() {
+    if [ "$2" = "$3" ]; then bpt_ok "$1"
+    else bpt_fail "$1 — want [$2] got [$3]"
+    fi
+}
+bpt_expect_contains() {
+    case "$3" in
+        *"$2"*) bpt_ok "$1" ;;
+        *) bpt_fail "$1 — want to contain [$2] got [$3]" ;;
+    esac
+}
+bpt_expect_absent() {
+    case "$3" in
+        *"$2"*) bpt_fail "$1 — must not contain [$2] got [$3]" ;;
+        *) bpt_ok "$1" ;;
+    esac
+}
+
+# Canonicalize: macOS records the physical /private/var/... in a worktree's
+# .git file, so a logical /var/... root would never compare equal.
+ROOT_RAW="$(mktemp -d)" || { echo "mktemp failed" >&2; exit 1; }
+ROOT="$(cd "$ROOT_RAW" && pwd -P)"
+_cleanup() { rm -rf "$ROOT_RAW"; }
+trap '_cleanup' EXIT
+export HOME="$ROOT/home"; mkdir -p "$HOME"
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+MAIN="$ROOT/main"; WT="$ROOT/wt"; STUBS="$ROOT/stubs"; CALLS="$ROOT/stub-calls.log"
+mkdir -p "$MAIN/bin/lib" "$STUBS"
+cp "$TARGET" "$MAIN/bin/bug-pipeline-test-env"
+cp "$SCRIPT_DIR/lib/db-helpers.sh" "$SCRIPT_DIR/lib/git-helpers.sh" "$MAIN/bin/lib/"
+chmod +x "$MAIN/bin/bug-pipeline-test-env"
+{
+    git -C "$MAIN" init -q \
+    && git -C "$MAIN" add -A \
+    && git -C "$MAIN" -c user.name=bpte-test -c user.email=bpte@example.invalid \
+        -c commit.gpgsign=false commit -q -m fixture \
+    && git -C "$MAIN" worktree add -q -b bpte-wt "$WT"
+} >/dev/null 2>&1 || { echo "fixture setup failed" >&2; exit 1; }
+# Untracked/gitignored artifacts exist ONLY in the main checkout, as in reality.
+mkdir -p "$MAIN/ibl5/IBLbot/dist/bug-bot"
+printf 'BUG_PIPELINE_APPROVER_ID=REPLACE_WITH_TEST\n' > "$MAIN/ibl5/IBLbot/.env.bugbot.test"
+: > "$MAIN/ibl5/IBLbot/dist/bug-bot/index.js"
+for b in docker pm2 mariadb; do
+    printf '#!/bin/sh\necho "%s $*" >> "%s"\nexit 1\n' "$b" "$CALLS" > "$STUBS/$b"
+    chmod +x "$STUBS/$b"
+done
+
+RC=0
+ERR=""
+run_from() {  # $1 = checkout root; sets RC and ERR
+    ERR="$(cd "$1" && PATH="$STUBS:$PATH" bash "$1/bin/bug-pipeline-test-env" 2>&1 >/dev/null)"
+    RC=$?
+}
+
+# ── Case 0: fixture sanity ────────────────────────────────────────────────────
+if [ ! -e "$WT/ibl5/IBLbot/.env.bugbot.test" ] && [ -f "$MAIN/ibl5/IBLbot/.env.bugbot.test" ]; then
+    bpt_ok "0: fixture"
+else
+    bpt_fail "0: fixture"
+fi
+
+# ── Case 1: worktree, secrets in main ─────────────────────────────────────────
+run_from "$WT"
+bpt_expect_eq "1a: worktree rc=1" 1 "$RC"
+bpt_expect_contains "1b: worktree resolves IBLBOT to main" \
+    "BUG_PIPELINE_APPROVER_ID is still the template placeholder in $MAIN/ibl5/IBLbot/.env.bugbot.test" "$ERR"
+
+# ── Case 2: worktree, no secrets anywhere ─────────────────────────────────────
+mv "$MAIN/ibl5/IBLbot/.env.bugbot.test" "$ROOT/secrets.bak"
+run_from "$WT"
+mv "$ROOT/secrets.bak" "$MAIN/ibl5/IBLbot/.env.bugbot.test"
+bpt_expect_eq "2a: missing-secrets rc=1" 1 "$RC"
+bpt_expect_contains "2b: missing names main path" "missing $MAIN/ibl5/IBLbot/.env.bugbot.test" "$ERR"
+bpt_expect_absent "2c: missing never names worktree path" "$WT/ibl5/IBLbot" "$ERR"
+
+# ── Case 3: control, main checkout ────────────────────────────────────────────
+run_from "$MAIN"
+bpt_expect_eq "3a: main rc=1" 1 "$RC"
+bpt_expect_contains "3b: main placeholder message" \
+    "BUG_PIPELINE_APPROVER_ID is still the template placeholder in $MAIN/ibl5/IBLbot/.env.bugbot.test" "$ERR"
+
+# ── Case 4: Step 4.3 control-run region redirects the attachment cache ───────
+bpt_expect_eq "4a: anchor 4.3 unique" 1 "$(grep -cF '# Step 4.3 — Prove the check has teeth' "$TARGET")"
+bpt_expect_eq "4b: anchor 3.2 unique" 1 "$(grep -cF '# Step 3.2 — Start the test bot.' "$TARGET")"
+REGION="$(awk '/# Step 4\.3 — Prove the check has teeth/{f=1} /# Step 3\.2 — Start the test bot\./{f=0} f' "$TARGET")"
+bpt_expect_contains "4c: region is the control run" 'bin/bug-pipeline-tick"' "$REGION"
+bpt_expect_contains "4d: control run redirects attachment cache" 'BUG_PIPELINE_ATTACHMENT_CACHE_DIR="/tmp/' "$REGION"
+
+# ── Case 5: IBLBOT wiring ─────────────────────────────────────────────────────
+# shellcheck disable=SC2016  # literal $REPO_ROOT is the grep needle
+bpt_expect_eq "5a: no worktree-rooted IBLbot path" 0 "$(grep -cF '$REPO_ROOT/ibl5/IBLbot' "$TARGET")"
+bpt_expect_eq "5b: single IBLBOT assignment" 1 "$(grep -cE '^[[:space:]]*IBLBOT=' "$TARGET")"
+
+# ── Case 6: no side effects ───────────────────────────────────────────────────
+bpt_expect_eq "6: no docker/pm2/mariadb call" "" "$(cat "$CALLS" 2>/dev/null)"
+
+echo "passed=$PASSED failed=$FAILED"
+[ "$FAILED" -eq 0 ]

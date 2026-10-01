@@ -215,6 +215,38 @@ describe('navy-as-text on light surfaces meets WCAG AA', () => {
     const ratio = contrast(tok(key), surface());
     expect(ratio, `contrast ${ratio.toFixed(2)} < 4.5`).toBeGreaterThanOrEqual(4.5);
   });
+
+  // Mutation proof: a navy-600 lightened to #94a3b8 must fail on every light surface.
+  it('mutant navy-600 #94a3b8 fails on all three light surfaces', () => {
+    for (const [label, hex] of surfaces) {
+      const ratio = contrast('#94a3b8', hex());
+      expect(ratio, `#94a3b8 on ${label} unexpectedly ${ratio.toFixed(2)}`).toBeLessThan(4.5);
+    }
+  });
+});
+
+describe('axe colour-contrast ratchet stays closed', () => {
+  // Mutation proof for the axe rows: white header text on a navy-800 of #94a3b8 is ~2.6:1.
+  it('mutant navy-800 #94a3b8 drops white header text below AA', () => {
+    const ratio = contrast(white, '#94a3b8');
+    expect(ratio).toBeGreaterThan(2.5);
+    expect(ratio).toBeLessThan(2.7);
+  });
+
+  // Pages whose navy table headers currently pass axe must never be allowlisted to hide a
+  // navy regression. The spec file itself is owned elsewhere and is read, never edited.
+  it("KNOWN_FAILING['color-contrast'] excludes navy-header pages", () => {
+    const spec = readFileSync(`${ibl5Root}tests/e2e/smoke/accessibility.spec.ts`, 'utf8');
+    const block = spec.match(/'color-contrast':\s*new Set\(\[([\s\S]*?)\]\)/);
+    expect(block, "KNOWN_FAILING['color-contrast'] block not found").not.toBeNull();
+    const entries = (block?.[1] ?? '')
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('//'))
+      .flatMap((line) => [...line.matchAll(/'([^']+)'/g)].map((m) => m[1]));
+    expect(entries.length).toBeGreaterThan(0);
+    expect(entries).not.toContain('standings');
+    expect(entries).not.toContain('career leaderboards');
+  });
 });
 
 describe('navy source hygiene', () => {

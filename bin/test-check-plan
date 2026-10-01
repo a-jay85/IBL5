@@ -2420,6 +2420,7 @@ _corpus_guard_ok() {
 # bug-pipeline-test-env, sim-recap-boxid-resolution (gate [A]: migration literals);
 # bug-hunter-escalation-discord-dm (gate [V]: main.localhost);
 # pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags).
+# authz-verdict-refactor-trading-backlog (gate [Z]: bold-markup residue token).
 _n_corpus_pass=1
 for _n_slug in \
     plan-architect-phase-drift-guard \
@@ -2430,7 +2431,7 @@ for _n_slug in \
     plan-gate-skill-inline sim-recap-floor-and-cold-open \
     authz-verdict-refactor-1a-trading-pins authz-verdict-refactor-1b-trading-reject-service \
     authz-verdict-refactor-1c-trading-reject-shim authz-verdict-refactor-1d-trading-accept-service \
-    authz-verdict-refactor-1e-trading-accept-shim authz-verdict-refactor-trading-backlog \
+    authz-verdict-refactor-1e-trading-accept-shim \
     autoresearch-oreb-arming-share-lever retire-rebase-prs-workflow; do
     _n_pf="$HOME/claude-plans/$_n_slug.md"
     [ -f "$_n_pf" ] || continue

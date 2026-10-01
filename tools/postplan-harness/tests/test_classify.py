@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from harness.armable import (SENTINEL_RE, _manual_section, all_rows_ticked,
                              manual_testing_clearance)
 from harness.classify import (_manual_testing_span, classify, files_from_diff, filter_diff,
+                               is_gm_visible_path,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END, MANUAL_TESTING_SENTINEL,
                                MANUAL_TESTING_SENTINEL_STATIC,
                                name_status_from_diff, qualify_backlog_refs,
@@ -779,6 +780,63 @@ def test_coerce_commit_subject_preserves_scope_and_bang():
 def test_coerce_commit_subject_unparseable_returns_unchanged():
     for subject in ("no type prefix here", "FEAT: uppercase type"):
         assert coerce_commit_subject(subject, _flagged(test_only=True)) == subject
+
+
+# has_gm_visible: non-runtime denylist (Phase 1 of pr-copy-tooling-not-feat)
+
+def test_is_gm_visible_path_denylist_table():
+    cases = [
+        ("bin/post-plan-now", False),
+        ("bin/test-burndown", False),
+        ("tools/postplan-harness/runner.py", False),
+        (".claude/rules/x.md", False),
+        (".github/workflows/ci.yml", False),
+        ("README.md", False),
+        (".gitignore", False),
+        ("ibl5/tests/Foo/BarTest.php", False),
+        ("ibl5/docs/decisions/0106-x.md", False),
+        ("ibl5/bin/x", False),
+        ("ibl5/phpstan-rules/Foo.php", False),
+        ("ibl5/phpstan.neon", False),
+        ("ibl5/phpunit.xml", False),
+        ("ibl5/playwright.config.ts", False),
+        ("ibl5/package.json", False),
+        ("ibl5/composer.lock", False),
+        ("ibl5/bun.lock", False),
+        ("ibl5/vendor/x.php", False),
+        ("ibl5/classes/SimRecap/README.md", False),
+        ("engine/internal/sim/a_test.go", False),
+        ("", False),
+        ("  ", False),
+        ("ibl5/classes/SimRecap/RecapPhasePolicy.php", True),
+        ("ibl5/modules/Trades/index.php", True),
+        ("ibl5/scripts/import.php", True),
+        ("ibl5/shellScripts/sim.sh", True),
+        ("ibl5/migrations/001_x.sql", True),
+        ("ibl5/design/x.css", True),
+        ("engine/internal/sim/a.go", True),
+        ("engine/internal/sim/testdata/golden.json", True),
+        ("newroot/whatever.txt", True),
+    ]
+    for path, expected in cases:
+        assert is_gm_visible_path(path) is expected, path
+
+
+def test_classify_sets_has_gm_visible_and_summary_prints_it():
+    c = classify(["bin/x", ".claude/rules/y.md"], "")
+    assert c.has_gm_visible is False
+    assert "HAS_GM_VISIBLE=False" in c.summary()
+    c = classify(["bin/x", "ibl5/classes/A.php"], "")
+    assert c.has_gm_visible is True
+    assert "HAS_GM_VISIBLE=True" in c.summary()
+
+
+def test_has_gm_visible_is_independent_of_only_flag_ladder():
+    c = classify(["ibl5/tests/ATest.php"], "")
+    assert c.test_only is True and c.has_gm_visible is False
+    c = classify(["ibl5/classes/A.php", "ibl5/tests/ATest.php"], "")
+    assert c.test_only is False and c.has_gm_visible is True
+    assert classify([], "").has_gm_visible is False
 
 
 def _valid_pr_copy() -> dict:

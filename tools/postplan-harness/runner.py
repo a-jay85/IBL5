@@ -1553,11 +1553,12 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     holds arming: an unreviewed title is exactly the feat-vs-chore judgment condition
     (8) depends on. Any other error kind still propagates.
 
-    Both non-skip returns pass through schemas.coerce_pr_copy, so title, commit_subject and
+    The model path returns schemas.coerce_pr_copy(copy, cls), so title, commit_subject and
     type agree and a diff with no GM-visible file (Classification.has_gm_visible False)
-    can never open a feat: PR. The skip path is deliberately left alone: its title is the
-    live one, and retyping only the dict would let the pr_meta() fallback at the
-    condition-(8) call site see chore: on a feat: PR.
+    can never open a feat: PR. The degraded path calls schemas.coerce_copy_type on the
+    single subject string (the degraded dict has no type key). The skip path is
+    deliberately left alone: its title is the live one, and retyping only the dict would
+    let the pr_meta() fallback at the condition-(8) call site see chore: on a feat: PR.
     """
     if gh.pr_exists() and not git.has_changes_to_commit():
         head_subject = git.branch_head_subject()

@@ -123,6 +123,8 @@ def test_normalize_never_lowers_feat():
 
 
 def test_normalize_preserves_scope_and_bang():
+    # Guards the slice point: cutting at mt.end(0) instead of mt.end(1) would drop the
+    # (scope) and the bang along with the type token.
     d = _valid(type="chore", title="docs(api)!: x", commit_subject="chore(api): x")
     out = normalize_pr_copy(d)
     assert out["title"] == "chore(api)!: x"

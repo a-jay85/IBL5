@@ -427,6 +427,7 @@ PIPE=("--since=$BASE" "--migrations-dir=$REPO/migrations" "--old-tree=$WORK/oldt
 unset DB_HOST
 run_case pipe-db-host-unset 2 "DB_HOST is required" "" "${PIPE[@]}"
 export DB_HOST=""
+# An empty value must fail too: a ${DB_HOST+x} set-ness test would pass it.
 run_case pipe-db-host-empty 2 "DB_HOST is required" "" "${PIPE[@]}"
 export DB_HOST=127.0.0.1
 export DB_PASS=""

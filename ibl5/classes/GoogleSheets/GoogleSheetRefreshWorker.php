@@ -34,7 +34,8 @@ class GoogleSheetRefreshWorker
      */
     public function run(int $limit, int $budgetSeconds, bool $dryRun, bool $all, callable $out): int
     {
-        if ($all) {
+        // --dry-run stays zero-write, so --all is ignored under it.
+        if ($all && !$dryRun) {
             $this->connections->markAllActivePending();
         }
 

@@ -122,3 +122,85 @@ def test_char_clean_branch_unlinks_stale_flag(prose_repo):
     assert runner.run_meta_checks_local(e.git, e.repo, "master", e.log.append) is True
     assert os.path.exists(e.flag) is False
     assert meta_checks_clearance(e.flag, 0) == "CLEARED"
+
+
+# ---------------------------------------------------------------- Phase 2: helpers
+
+from harness import prosefix  # noqa: E402
+
+CAPTURED = """\
+PASS  check-prose-self-test
+FAIL  check-prose-since
+.claude/review-shared/_plan-fidelity-review.md:51: [em-dash] ...**PR body vs. reality** — check the PR body's **hand...  FIX: End the sentence and start a new one. For a bullet label use `**Label.** text` or `Label: text`.
+.claude/review-shared/_plan-fidelity-review.md:51: [comma-not] ...econciled by construction, not a claim — a drift there is...  FIX: Define by what it is. Keep only the true half; delete the ', not Y' tail.
+
+check-prose: 2 Claude-slop tell(s) on lines added vs origin/master. Rewrite them per .claude/rules/prose-style.md. Verbatim quotes go in a code span or carry <!-- slop-ok --> on the line.
+PASS  check-registry-trigger-rows
+META-CHECK-FAILED: check-prose-since
+META-CHECKS: FAILED stage=pre-push hard=6 failed=1 warn=0 skip=9 defer=0
+"""
+
+
+def test_parse_hits_real_captured_shape():
+    assert prosefix.parse_hits(CAPTURED) == {
+        ".claude/review-shared/_plan-fidelity-review.md": {51}}
+
+
+def test_parse_hits_two_files():
+    extra = ".claude/skills/plan/SKILL.md:234: [em-dash] ...x — y...  FIX: End the sentence.\n"
+    hits = prosefix.parse_hits(CAPTURED + extra)
+    assert set(hits) == {".claude/review-shared/_plan-fidelity-review.md",
+                         ".claude/skills/plan/SKILL.md"}
+    assert hits[".claude/skills/plan/SKILL.md"] == {234}
+
+
+def test_parse_hits_no_hits_is_empty():
+    out = ("PASS  a\nFAIL  check-prose-since\nbin/tool.sh:12: [em-dash] x\n"
+           "check-prose: 0 Claude-slop tell(s)\nMETA-CHECK-FAILED: check-prose-since\n")
+    assert prosefix.parse_hits(out) == {}
+
+
+def test_gate_owned_flags_rules_path():
+    assert prosefix.gate_owned({".claude/rules/prose-style.md": {3}, "docs/x.md": {1}}) == [
+        ".claude/rules/prose-style.md"]
+    assert prosefix.gate_owned({"docs/x.md": {1}}) == []
+
+
+FLAGGED = {"docs/note.md": {4}}
+
+
+def _note(env) -> Path:
+    return Path(env.repo) / "docs" / "note.md"
+
+
+def test_scope_in_place_rewrite_ok(prose_repo):
+    n = _note(prose_repo)
+    n.write_text(n.read_text().replace(TELL_LINE, CLEAN_LINE))
+    assert prosefix.scope_violations(prose_repo.repo, FLAGGED) == []
+
+
+def test_scope_sentence_split_ok(prose_repo):
+    n = _note(prose_repo)
+    n.write_text(n.read_text().replace(TELL_LINE, "The cache warms fast.\nThe pool stays small."))
+    assert prosefix.scope_violations(prose_repo.repo, FLAGGED) == []
+
+
+def test_scope_unflagged_line_rejected(prose_repo):
+    n = _note(prose_repo)
+    n.write_text(n.read_text().replace(TELL_LINE, CLEAN_LINE)
+                 .replace("The pool starts small.", "The pool starts tiny."))
+    assert "docs/note.md:3: edit outside flagged lines" in prosefix.scope_violations(
+        prose_repo.repo, FLAGGED)
+
+
+def test_scope_outside_file_rejected(prose_repo):
+    (Path(prose_repo.repo) / "docs" / "other.md").write_text("x\n")
+    assert "docs/other.md: file outside flagged set" in prosefix.scope_violations(
+        prose_repo.repo, FLAGGED)
+
+
+def test_scope_deleted_flagged_file_rejected(prose_repo):
+    _note(prose_repo).unlink()
+    v = prosefix.scope_violations(prose_repo.repo, FLAGGED)
+    for n in (1, 2, 3):
+        assert f"docs/note.md:{n}: edit outside flagged lines" in v

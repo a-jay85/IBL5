@@ -466,19 +466,23 @@ def test_adr_glob_token_gets_no_tolerance():
     assert any("MISSING-FILE" in i and "0134-*.md" in i for i in items)
 
 
-def test_adr_placeholder_token_gets_no_tolerance():
+def test_adr_placeholder_token_resolves_to_single_numbered_file():
     """Real corpus shape `ibl5/docs/decisions/NNNN-<slug>.md` (the number
-    placeholder the architect contract prescribes) → `NNNN` is not four digits
-    → `_ADR_RENUMBER` does not match the token → MISSING-FILE.
+    placeholder the architect contract prescribes, PR #2549) → `_ADR_TOKEN`
+    accepts the literal `NNNN` on the token side → resolves to the one changed
+    `0140-<slug>.md` → no MISSING-FILE.
 
-    Mutation caught: widen the token-side digit class to `[\\dN]{4}` (or
-    `\\w{4}`) so a placeholder resolves against the real numbered file, and
-    the item clears; this assertion turns red.
+    Mutation caught: revert `_renumbered_adr` to match the token with
+    `_ADR_RENUMBER` (`\\d{4}` only) and the placeholder never resolves; the
+    empty-items assertion turns red.
     """
     tok = "ibl5/docs/decisions/NNNN-discord-dev-webhook-notify.md"
     plan = _plan_with_critical(tok)
-    items = check(plan, ["ibl5/docs/decisions/0140-discord-dev-webhook-notify.md"])
-    assert any("MISSING-FILE" in i and "NNNN-discord-dev-webhook-notify.md" in i for i in items)
+    resolutions: dict[str, str] = {}
+    items = check(plan, ["ibl5/docs/decisions/0140-discord-dev-webhook-notify.md"],
+                  resolutions=resolutions)
+    assert items == []
+    assert resolutions[tok] == "ibl5/docs/decisions/0140-discord-dev-webhook-notify.md"
 
 
 def test_phase_omission_end_to_end_positive_and_negative():

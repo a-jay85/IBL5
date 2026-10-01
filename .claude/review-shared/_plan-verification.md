@@ -20,6 +20,8 @@ Each implementation phase that changes behavior must have a corresponding row (o
 | 2 | Example: form submits and redirects | E2E | post-impl | e2e/trades/submit-trade.spec.ts |
 ```
 
+Every row names its test type and its file or command; a bare "run X and check Y" is not a row.
+
 ### Test type — exactly one of:
 
 | Test type | When to use |
@@ -41,6 +43,7 @@ Each implementation phase that changes behavior must have a corresponding row (o
 ### Classification rules
 
 - "Verify X returns Y", "check that Z happens", "confirm the redirect works" → automatable. Never classify as truly-manual.
+- Classify every row at plan-write time. Post-plan Phase 6 is a safety net for a missed row and does not replace plan-time classification.
 - "Compare against production" / "does output still match iblhoops.net?" → **visual-regression** (screenshot diff), not truly-manual — unless UI/UX was intentionally redesigned.
 - If nothing in UI/UX changed, visual regression covers it. Do not classify as truly-manual.
 - The **only** truly-manual items are subjective judgment on **new or redesigned** UI/UX.
@@ -61,7 +64,7 @@ Harness rules (`parse_no_change_test_paths` in `tools/postplan-harness/harness/p
 
 - Honored only on a row with a cell reading exactly `Visual-regression`. Elsewhere the marker is ignored. `bin/check-plan` gate `[X]` rejects it on other row types and anywhere but directly after the token.
 - Exempts only that row's token. If another row plans the same token unmarked, the unmarked row wins.
-- Fenced examples never count.
+- Fenced examples and a code-span `(no-change)` never count. Gate `[X]` skips both.
 
 ### Pre-prod exercise paths
 
@@ -79,7 +82,7 @@ Why: _plan-verification-detail.md § Pre-prod exercise paths — worked catalogu
 
 ### Weave tests inline
 
-Pre-implementation tests go **before** their implementation step. Post-implementation tests go **immediately after**. Never collect all tests into a separate appendix.
+Pre-implementation tests go **before** their implementation step. Post-implementation tests go **immediately after**. Never collect all tests into a separate appendix, and never substitute a standalone Testing or Verification prose section for the matrix.
 
 ## Required Test Methods
 
@@ -220,12 +223,3 @@ flags the PR (advisory comment, non-blocking).
 - **Bypass:** Include `<!-- no-adr: reason at least 15 characters -->` in the PR body when the decision is already in an existing ADR (e.g., new PHPStan rules enforcing ADR-0001's architecture split).
 
 If the plan has no phases adding trigger-pattern files, no action is needed.
-
-## What the plan must NOT do
-
-- List "verify manually" or "check by hand" for any item that can be asserted by PHPUnit, an API test, E2E, or visual-regression.
-- Defer test classification to post-plan Phase 6. Phase 6 is a safety net, not the primary classification point.
-- Add a standalone "Testing" or "Verification" section with prose descriptions instead of the matrix.
-- Use "run X and check Y" without specifying the test type and file path.
-
-Why: _plan-verification-detail.md § Counter-examples

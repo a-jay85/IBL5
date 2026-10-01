@@ -1836,6 +1836,117 @@ OUT="$(bdl_b 2>&1)"; RC=$?
 want "L19: #41 still skipped" "$OUT" "skip-label: out-of-repo"
 rm -f "$T/lbl/fx/issue-40-comments.json" "$T/lbl/fx/pr-view-900.json"
 
+# ══ --after backfill: capacity left by earlier ledgers of the same run ═════════
+mkdir -p "$T/lbl/prior"
+
+# af_ledger <name> <items-json> — writes a prior ledger OUTSIDE the reports dir
+# (a ledger there would make its queued items in-flight) and echoes its path.
+# units_used is deliberately the all-items sum, as bd_record_apply writes it.
+af_ledger() {
+    local f="$T/lbl/prior/$1.json"
+    jq -n --argjson items "$2" \
+        '{schema:1,created:"2026-10-01T00:00:00",report:"r",budget:5,
+          units_used:([$items[].cost] | add // 0),items:$items,skipped:[]}' > "$f"
+    printf '%s' "$f"
+}
+# af_item <num> <cost> <status> <route> <paths-json>
+af_item() {
+    jq -nc --argjson n "$1" --argjson c "$2" --arg s "$3" --arg r "$4" --argjson p "$5" \
+        '{issue_num:$n,also_closes:[],issue_title:"t",rank:"P2",tier:"default",cost:$c,paths:$p,route:$r,slug:"",pr_url:"",status:$s}'
+}
+# af_ledger_path <output> — the path on the final LEDGER: line
+af_ledger_path() { sed -n 's/^LEDGER: //p' <<< "$1" | tail -1; }
+
+lbl_issues '[]' '[]'
+
+# AF1: reduced capacity (live queued 1-unit item + closed-fixed item)
+AF_L="$(af_ledger af1 "[$(af_item 90 1 queued plan '["bin/z.sh"]'),$(af_item 91 1 closed-fixed '' '["bin/y.sh"]')]")"
+OUT="$(bdl_b --after "$AF_L" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "AF1: reduced capacity exits 0" || fail "AF1: reduced capacity exits 0 (got $RC: $OUT)"
+want "AF1: units line shows budget 4" "$OUT" "units: 4/4"
+AF1_PICKS=$(grep -cE '^PICK' <<< "$OUT" || true)
+[ "$AF1_PICKS" -eq 4 ] && ok "AF1: picks up to 4 units" || fail "AF1: picks up to 4 units (got $AF1_PICKS)"
+want "AF1: later candidates not reached" "$OUT" "not reached: 2 candidate(s)"
+if grep -qF "PICK  #44" <<< "$OUT"; then fail "AF1: #44 must not be picked"; else ok "AF1: #44 not picked (budget 4)"; fi
+AF1_LP="$(af_ledger_path "$OUT")"
+[ "$(jq '.budget' "$AF1_LP" 2>/dev/null)" = "4" ] && ok "AF1: ledger budget is 4" || fail "AF1: ledger budget is 4"
+[ "$(jq -c '.after' "$AF1_LP" 2>/dev/null)" = "[\"$AF_L\"]" ] && ok "AF1: ledger after lists the prior ledger" || fail "AF1: ledger after lists the prior ledger"
+if grep -qE '^(PICK|SKIP) +#9[01] ' <<< "$OUT"; then fail "AF1: prior issues must not reappear"; else ok "AF1: prior issues do not reappear"; fi
+
+# AF2: a skipped (no route) issue of a prior ledger is never picked again
+AF_L="$(af_ledger af2 "[$(af_item 40 1 skipped '' '["bin/a.sh"]'),$(af_item 90 1 queued plan '["bin/z.sh"]')]")"
+OUT="$(bdl_b --after "$AF_L" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "AF2: exclusion run exits 0" || fail "AF2: exclusion run exits 0 (got $RC: $OUT)"
+if grep -qE '^(PICK|SKIP) +#40 ' <<< "$OUT"; then fail "AF2: skipped #40 must not be picked or listed again"; else ok "AF2: skipped #40 is excluded"; fi
+want "AF2: other candidates still picked" "$OUT" "PICK  #41"
+want "AF2: skipped item freed its unit" "$OUT" "units: 4/4"
+
+# AF3: failed ad-hoc item (route=ad-hoc, status=skipped) keeps its unit
+AF_L="$(af_ledger af3 "[$(af_item 90 2 skipped ad-hoc '["bin/z.sh"]')]")"
+OUT="$(bdl_b --after "$AF_L" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "AF3: failed ad-hoc run exits 0" || fail "AF3: failed ad-hoc run exits 0 (got $RC: $OUT)"
+want "AF3: ad-hoc cost counts against the budget" "$OUT" "units: 3/3"
+[ "$(jq '.budget' "$(af_ledger_path "$OUT")" 2>/dev/null)" = "3" ] && ok "AF3: ledger budget is 3" || fail "AF3: ledger budget is 3"
+# the same item with no route frees the units
+AF_L="$(af_ledger af3b "[$(af_item 90 2 skipped '' '["bin/z.sh"]')]")"
+OUT="$(bdl_b --after "$AF_L" 2>&1)"
+want "AF3: skip without ad-hoc route frees the units" "$OUT" "units: 5/5"
+
+# AF4: overlap with a prior live item's paths
+AF_L="$(af_ledger af4 "[$(af_item 90 1 queued plan '["bin/a.sh"]')]")"
+OUT="$(bdl_b --after "$AF_L" 2>&1)"; RC=$?
+ROW40="$(grep -E '^SKIP +#40 ' <<< "$OUT")"
+want "AF4: #40 overlaps the prior item" "$ROW40" "overlap with #90 on bin/a.sh"
+want "AF4: #41 still picked" "$OUT" "PICK  #41"
+
+# AF5: prior live solo item leaves no capacity
+AF_L="$(af_ledger af5 "[$(af_item 90 1 queued plan '[]')]")"
+OUT="$(bdl_b --after "$AF_L" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "AF5: solo prior exits 0" || fail "AF5: solo prior exits 0 (got $RC: $OUT)"
+want "AF5: LEDGER none" "$OUT" "LEDGER: none"
+want "AF5: units 0/0" "$OUT" "units: 0/0"
+if grep -qE '^PICK' <<< "$OUT"; then fail "AF5: nothing may be picked"; else ok "AF5: nothing picked"; fi
+AF5_N=$(find "$T/lbl/home/claude-plans/_reports" -name 'burndown-batch-[0-9]*.json' | wc -l | tr -d ' ')
+[ "$AF5_N" -eq 0 ] && ok "AF5: no ledger written" || fail "AF5: no ledger written (found $AF5_N)"
+
+# AF6: path-less candidate with a prior live item hits the solo-slot rule
+jq 'map(if .number == 40 then .body = "no path refs here" else . end)' \
+    "$T/lbl/fx/issues.json" > "$T/lbl/fx/issues.tmp" && mv "$T/lbl/fx/issues.tmp" "$T/lbl/fx/issues.json"
+AF_L="$(af_ledger af6 "[$(af_item 90 1 queued plan '["bin/z.sh"]')]")"
+OUT="$(bdl_b --after "$AF_L" 2>&1)"
+ROW40="$(grep -E '^SKIP +#40 ' <<< "$OUT")"
+want "AF6: path-less #40 hits the solo slot" "$ROW40" "solo slot: no path refs; batch already holds #90"
+lbl_issues '[]' '[]'
+
+# AF7: a --pair with an excluded member is dropped
+AF_L="$(af_ledger af7 "[$(af_item 41 1 skipped '' '["bin/b.sh"]'),$(af_item 90 1 queued plan '["bin/z.sh"]')]")"
+OUT="$(bdl_b --after "$AF_L" --pair 40,41 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "AF7: dropped pair exits 0" || fail "AF7: dropped pair exits 0 (got $RC: $OUT)"
+want "AF7: #40 evaluated alone" "$OUT" "PICK  #40"
+if grep -qE 'pair|\+#41' <<< "$OUT"; then fail "AF7: no pair text may remain"; else ok "AF7: no misleading pair row"; fi
+
+# AF8: bad arguments
+OUT="$(bdl burndown --after 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "AF8: --after without a value exits 2" || fail "AF8: --after without a value exits 2 (got $RC: $OUT)"
+OUT="$(bdl burndown --after "$T/lbl/prior/nope.json" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "AF8: missing ledger file exits 2" || fail "AF8: missing ledger file exits 2 (got $RC: $OUT)"
+printf '{not json' > "$T/lbl/prior/bad.json"
+OUT="$(bdl burndown --after "$T/lbl/prior/bad.json" 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "AF8: malformed JSON exits 3" || fail "AF8: malformed JSON exits 3 (got $RC: $OUT)"
+want "AF8: malformed message names the ledger" "$OUT" "malformed ledger bad.json"
+printf '{"items":"x"}' > "$T/lbl/prior/bad2.json"
+OUT="$(bdl burndown --after "$T/lbl/prior/bad2.json" 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "AF8: non-array items exits 3" || fail "AF8: non-array items exits 3 (got $RC: $OUT)"
+
+# AF9: no --after keeps the full budget and records an empty after list
+OUT="$(bdl_b 2>&1)"; RC=$?
+AF9_LP="$(af_ledger_path "$OUT")"
+want "AF9: units 5/5 without --after" "$OUT" "units: 5/5"
+[ "$(jq '.budget' "$AF9_LP" 2>/dev/null)" = "5" ] && ok "AF9: ledger budget is 5" || fail "AF9: ledger budget is 5"
+[ "$(jq -c '.after' "$AF9_LP" 2>/dev/null)" = "[]" ] && ok "AF9: ledger after is []" || fail "AF9: ledger after is []"
+OUT="$(bdl burndown-status "$AF9_LP" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "AF9: burndown-status reads the new ledger" || fail "AF9: burndown-status reads the new ledger (got $RC: $OUT)"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

@@ -116,7 +116,7 @@ class RecordingGh:
         self.record("issue_create", title=title, label=label)
         return existing + 1
 
-    def issue_titles(self, label: str) -> list[str]:
+    def issue_titles(self, label: str | None, *, strict: bool = False) -> list[str]:
         return []
 
     # -- reads (fixture-backed) ------------------------------------------
@@ -407,14 +407,17 @@ class LiveGh(RecordingGh):
         self.record("issue_create", title=title, label=label, issue=n)
         return n
 
-    def issue_titles(self, label: str) -> list[str]:
+    def issue_titles(self, label: str | None, *, strict: bool = False) -> list[str]:
+        argv = ["issue", "list", "--repo", "a-jay85/IBL5-backlog",
+                "--state", "all", "--limit", "3000", "--json", "title"]
+        if label is not None:
+            argv += ["--label", label]
         try:
-            out = self._gh("issue", "list", "--repo", "a-jay85/IBL5-backlog",
-                           "--label", label, "--state", "all", "--limit", "3000",
-                           "--json", "title")
-            items = json.loads(out)
+            items = json.loads(self._gh(*argv))
             return [i.get("title", "") for i in items if i.get("title")]
-        except (HarnessError, json.JSONDecodeError):
+        except (HarnessError, json.JSONDecodeError) as exc:
+            if strict:
+                raise HarnessError("gh", f"issue list failed: {exc}") from exc
             return []
 
     def post_review_findings(self, pr: int, head_sha: str, title: str, findings: list) -> None:

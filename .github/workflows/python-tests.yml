@@ -10,6 +10,7 @@ on:
       - 'tools/postplan-harness/**'
       - '.github/workflows/python-tests.yml'
       - 'bin/post-plan-now'
+      - 'bin/lib/usage-gate.sh'
       - 'bin/normalize-manual-testing'
       - 'bin/lib/pr-sticky.sh'
   push:
@@ -18,6 +19,7 @@ on:
       - 'tools/postplan-harness/**'
       - '.github/workflows/python-tests.yml'
       - 'bin/post-plan-now'
+      - 'bin/lib/usage-gate.sh'
       - 'bin/normalize-manual-testing'
       - 'bin/lib/pr-sticky.sh'
 

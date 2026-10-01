@@ -212,6 +212,8 @@
 #                              post-plan harness honors it nowhere else, so a
 #                              misplaced one is a silent no-op that surfaces only
 #                              after implementation.
+#                              A mention inside a backtick code span, or inside a
+#                              fenced fixture block, is not a marker and is skipped.
 #   Z  Leading-star matrix token — a backticked single-word token in a matrix
 #                              "What to verify" cell that starts with '*' (the
 #                              catch-all case arm, a bare extension glob).
@@ -426,6 +428,39 @@ awk '
     inm && /^[[:space:]]*\|/ { print; next }
     inm && !/^[[:space:]]*\|/ { inm=0 }
 ' "$PLAN_FILE" > "$MATRIX_FILE"
+
+# Fence-aware body + matrix, shared by gates X and P. $MATRIX_FILE above is
+# deliberately fence-blind (gates 3/V/G/Q read it as-is); gates X and P must NOT
+# see rows that sit inside a fenced fixture block, because a fence-blind read
+# makes a plan that DOCUMENTS a marker read as CARRYING it, and lets a fixture's
+# matrix row clear a real declared artifact. Built once, here, because gate X
+# (below) runs before gate P. Fence logic is gate T's, verbatim: a closing fence
+# is backticks-only AND at least as long as the opener.
+awk '
+    function fence_ticks(s,   t) {
+        if (match(s, /^[ \t]*`+/)) {
+            t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
+        }
+        return 0
+    }
+    BEGIN { in_fence = 0; fence_len = 0 }
+    {
+        n = fence_ticks($0)
+        # A closing fence is backticks-only AND at least as long as the opener.
+        if (in_fence) { if (n >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) { in_fence = 0; fence_len = 0 }; next }
+        if (n >= 3)   { in_fence = 1; fence_len = n; next }
+        print
+    }
+' "$PLAN_FILE" > "$GATEP_BODY"
+
+# [P]'s own matrix parse — same shape as :201-205 but over the fence-stripped
+# body. NOT $MATRIX_FILE, which is built from the raw file and would let a
+# fenced fixture row clear a real artifact.
+awk '
+    /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
+    inm && /^[[:space:]]*\|/ { print; next }
+    inm && !/^[[:space:]]*\|/ { inm=0 }
+' "$GATEP_BODY" > "$GATEP_MATRIX"
 
 # The isolation awk consumes the header row, but gate V needs its column count to
 # tell an escaped pipe from a raw one. Grab it separately; 0 means "unknown, skip
@@ -951,11 +986,17 @@ fi
 # on a Visual-regression row and ONLY directly after the row's backticked test
 # token. Anywhere else it is a silent no-op: the row still plans the test,
 # Phase 5.0 emits MISSING, and arming condition (3) holds after implementation.
-# Catch that at authoring time. Herestrings, not printf pipes: pipefail + grep -q
+# Catch that at authoring time. Rows come from $GATEP_MATRIX (fence-aware), and a
+# `(no-change)` quoted only inside a backtick code span does not count as a marker.
+# Herestrings, not printf pipes: pipefail + grep -q
 # (see .claude/rules/shell-pipefail-grep.md).
 # ---------------------------------------------------------------------------
 while IFS= read -r row; do
-    grep -qiF '(no-change)' <<< "$row" || continue
+    # Presence test runs on a copy with balanced backtick spans removed: a
+    # `(no-change)` that is only quoted in a code span is a mention, not a marker.
+    # The checks below still read the original row.
+    bare=$(sed 's/`[^`]*`//g' <<< "$row")
+    grep -qiF '(no-change)' <<< "$bare" || continue
     if ! awk -F'|' '
         { for (i = 1; i <= NF; i++) { c = tolower($i); gsub(/[[:space:]*]/, "", c)
           if (c ~ /^visual-?regression$/) found = 1 } }
@@ -964,7 +1005,7 @@ while IFS= read -r row; do
     elif ! grep -qiE '`[[:space:]]*\(no-change\)' <<< "$row"; then
         viol "[X] (no-change) marker is not directly after the row's backticked test token — the harness honors only the shape \`path\` (no-change): ${row}"
     fi
-done < "$MATRIX_FILE"
+done < "$GATEP_MATRIX"
 
 # ---------------------------------------------------------------------------
 # Gate Y: the `(one-time-check: <reason>)` matrix tag. bin/lib/plan-matrix-assertions
@@ -1356,35 +1397,7 @@ done < <(printf '%s\n' "$_PACKET_SCAN" | grep '^\[E\]')
 # only; the only clears are an exercising matrix row and a line-anchored
 # pre-prod-exception: marker.
 
-# Every [P] read is ````-AWARE. This plan file (and the two docs it edits)
-# embed complete plan fixtures inside fences; a fence-blind read makes a plan
-# that DOCUMENTS the marker read as CARRYING it, and lets a fixture's matrix row
-# clear a real declared artifact. Fence logic is gate T's, verbatim.
-awk '
-    function fence_ticks(s,   t) {
-        if (match(s, /^[ \t]*`+/)) {
-            t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
-        }
-        return 0
-    }
-    BEGIN { in_fence = 0; fence_len = 0 }
-    {
-        n = fence_ticks($0)
-        # A closing fence is backticks-only AND at least as long as the opener.
-        if (in_fence) { if (n >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) { in_fence = 0; fence_len = 0 }; next }
-        if (n >= 3)   { in_fence = 1; fence_len = n; next }
-        print
-    }
-' "$PLAN_FILE" > "$GATEP_BODY"
-
-# [P]'s own matrix parse — same shape as :201-205 but over the fence-stripped
-# body. NOT $MATRIX_FILE, which is built from the raw file and would let a
-# fenced fixture row clear a real artifact.
-awk '
-    /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
-    inm && /^[[:space:]]*\|/ { print; next }
-    inm && !/^[[:space:]]*\|/ { inm=0 }
-' "$GATEP_BODY" > "$GATEP_MATRIX"
+# $GATEP_BODY / $GATEP_MATRIX are built once, next to $MATRIX_FILE above (shared with gate X).
 
 # Marker: line-anchored HTML-comment form ONLY (see header) — a bare grep -qF
 # would be cleared by any plan that merely quotes the token in prose.

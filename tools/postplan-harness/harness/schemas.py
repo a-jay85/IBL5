@@ -281,6 +281,50 @@ def coerce_commit_subject(subject: str, cls: Classification) -> str:
     return coerce_to + scope + bang + subject[m.end() - 1:]
 
 
+_SUBJECT_TYPE_RE = re.compile(r"^([a-z]+)(\([^)]*\))?(!)?:")
+
+
+def retype_tooling_feat(subject: str, cls: Classification) -> str:
+    """Tooling rule: a diff with no GM-visible runtime file cannot be `feat:`.
+
+    Retypes ONLY feat -> chore, preserving `(scope)` and `!`. Everything else passes through
+    byte-identical: any other type, an unparseable subject (same lowercase regex as
+    `coerce_commit_subject`), an empty file list (nothing to judge), and every diff that
+    touches at least one GM-visible path (`Classification.has_gm_visible`, Phase 1 denylist).
+    Never raises.
+    """
+    m = _SUBJECT_TYPE_RE.match(subject)
+    if not m or m.group(1) != "feat":
+        return subject
+    if cls.has_gm_visible or cls.count_total == 0:
+        return subject
+    return "chore" + (m.group(2) or "") + (m.group(3) or "") + subject[m.end() - 1:]
+
+
+def coerce_copy_type(subject: str, cls: Classification) -> str:
+    """The whole deterministic typing layer: the *_only ladder first, the tooling rule second.
+
+    Ladder first is load-bearing: `feat:` + test_only must still become `test:`; the tooling
+    rule only ever sees a `feat` the ladder waved through.
+    """
+    return retype_tooling_feat(coerce_commit_subject(subject, cls), cls)
+
+
+def coerce_pr_copy(copy: dict, cls: Classification) -> dict:
+    """Coerce `title` and `commit_subject` together and refresh `type` when the key exists,
+    so `validate_pr_copy`'s shared-prefix invariant survives coercion. Mutates and returns
+    `copy`. Dicts without `type` (the skip and degraded shapes) get no `type` key added.
+    """
+    for key in ("title", "commit_subject"):
+        if isinstance(copy.get(key), str):
+            copy[key] = coerce_copy_type(copy[key], cls)
+    if "type" in copy:
+        m = _SUBJECT_TYPE_RE.match(copy.get("commit_subject", ""))
+        if m:
+            copy["type"] = m.group(1)
+    return copy
+
+
 def validate_safety_verdict(data) -> None:
     """{holds: [str]} — condition (9) bounded verdict; may only ADD holds."""
     if not isinstance(data, dict) or "holds" not in data or not isinstance(data["holds"], list):

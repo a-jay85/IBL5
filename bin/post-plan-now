@@ -583,17 +583,21 @@ GATE_OPEN=""
 POST_HARNESS_SEG=""
 GATE_CLOSE=""
 ENGINE="Sonnet 5.5 /post-plan skill session"
+# Usage-gate context for the harness (ADR-0143 addendum). No IBL5_USAGE_GATE=1 here:
+# the harness adapter turns the gate on for its own claude children after checking
+# this context, so an older harness never gates.
+HARNESS_GATE_CTX="IBL5_USAGE_GATE_RUNNER=post-plan-now IBL5_USAGE_GATE_RESUME_BIN=$(shq "$ROOT/bin/post-plan-now") IBL5_USAGE_GATE_SESSION_ID=$(shq "$SESSION_ID") "
 if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ] && [ "${RESUME_STARTED:-0}" != 1 ]; then
     FALLBACK_FN="$(declare -f should_fallback blocked_ship_block); "
     PLAN_ARG="${PLAN_OVERRIDE:+ --plan $(shq "$PLAN_OVERRIDE")}"
     HARNESS_RUN_DIR="$HARNESS/out/live-$SAFE_SLUG-$TS"
-    HARNESS_SEG="CLAUDE_HEADLESS=1 POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}; rc=\$?; "
+    HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}; rc=\$?; "
     # Foreground has no plist, so nothing points stdout at $LOG. Without the tee, $LOG
     # never exists: the RESULT capture below comes back empty and the Log line in the
     # rc=3 message points at a missing file. Foreground only:
     # under launchd, stdout already IS $LOG, and a tee there would write every line twice.
     [ "$FOREGROUND" -eq 1 ] \
-        && HARNESS_SEG="CLAUDE_HEADLESS=1 POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG} 2>&1 | tee \"$LOG\"; rc=\${PIPESTATUS[0]}; "
+        && HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG} 2>&1 | tee \"$LOG\"; rc=\${PIPESTATUS[0]}; "
     GATE_OPEN="if [ \"\${_sigterm_received:-0}\" -eq 0 ] && should_fallback \"\$rc\" && ! usage_postrun_pause post-plan-now $(shq "$SESSION_ID") $(shq "$ROOT/bin/post-plan-now") \"\$rc\" $(shq "$LOG"); then "
     # The harness has already exited and flushed by the time HARNESS_SEG's `rc=` runs,
     # so $LOG holds its final RESULT: line. The capture now feeds only

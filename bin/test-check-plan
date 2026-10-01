@@ -2150,6 +2150,66 @@ XPOS='
 assert_viol "gateX-marker-before-token-fires" 1 '[X]' "$FM$XPOS"
 
 # ---------------------------------------------------------------------------
+# Gate [Y] fixtures (9 cases)
+# ---------------------------------------------------------------------------
+YHDR='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|'
+YROW='| 2 | `pinned_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+| 3 | `other_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+| 4 | `third_thing` works | PHPUnit | post-impl | `tests/XTest.php` |'
+# 1 of 4 tagged, well-formed, CLI-executable: the honored shape.
+assert_viol "gateY-tagged-cli-row-ok" 0 '[Y]' "$FM$YHDR"'
+| 1 | corpus diff prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Y props -->
+'
+# Well-formed tag on an E2E row: the helper ignores it.
+assert_viol "gateY-tag-on-e2e-row-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | page shows `CORPUS-DIFF` (one-time-check: one-shot corpus diff over local transcripts) | E2E | post-impl | `e2e/x.spec.ts` |
+'"$YROW"'
+'
+# Tag not trailing: malformed.
+assert_viol "gateY-tag-not-trailing-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | (one-time-check: one-shot corpus diff over local transcripts) prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+'
+# Reason under 15 chars.
+assert_viol "gateY-short-reason-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one shot) | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+'
+# Escaped pipe inside the reason: the helper restores it to | and rejects it.
+assert_viol "gateY-pipe-in-reason-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: corpus diff via grep \| sort at plan time) | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+'
+# Tag in the location cell: not the What-to-verify cell.
+assert_viol "gateY-tag-in-location-cell-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/x` (one-time-check: one-shot corpus diff over local transcripts) |
+'"$YROW"'
+'
+# Share boundary: 1 of 3 is exactly a third and passes.
+assert_viol "gateY-share-at-third-ok" 0 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 2 | `pinned_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+| 3 | `other_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+<!-- no-test-methods: fixture rows are gate Y props -->
+'
+# Share over a third: 2 of 4.
+assert_viol "gateY-share-over-third-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 2 | prints `appeared=0` (one-time-check: one-shot counterfactual mutation run at plan time) | CLI-executable | post-impl | `bin/y` |
+| 3 | `other_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+| 4 | `third_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+'
+# Every row tagged.
+assert_viol "gateY-all-tagged-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 2 | prints `appeared=0` (one-time-check: one-shot counterfactual mutation run at plan time) | CLI-executable | post-impl | `bin/y` |
+'
+
+# ---------------------------------------------------------------------------
 # Gate [G] fixtures (4 cases)
 # ---------------------------------------------------------------------------
 # Unwired bin/test-* script in the location cell — must flag [G].

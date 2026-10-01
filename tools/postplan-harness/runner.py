@@ -35,7 +35,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import (adr_draft, body_numbers, cifix, ciwatch, conformance, fidelity, gitutil, llm_calls,
-                     manual_rows, manual_testing, schemas, scope_conformance, statefile)
+                     manual_rows, manual_testing, schemas, scope_conformance, statefile,
+                     usage_pause)
 from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
@@ -265,6 +266,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _active_git = git
         slug = git.branch()
         gh = LiveGh(out_dir, worktree, slug) if live else RecordingGh(out_dir)
+        gh = usage_pause.dedupe_on_resume(gh, worktree, out_dir)   # ADR-0143 addendum: no double post on resume
         verifier = LiveVerify(worktree)
         if probe is None:
             probe = LiveProbe(repo_root=worktree)
@@ -854,6 +856,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.error = f"{e.kind}: {e.detail}"
         res.error_kind = e.kind
         log(f"FAILED: {res.error}")
+    except usage_pause.UsagePause as p:
+        res.terminal = TerminalState.FAILED
+        res.error_kind = "usage-pause-dirty" if p.dirty else "usage-pause"
+        res.error = f"{res.error_kind}: {p.purpose}"
+        log(f"PAUSED: {res.error}")
     finally:
         # A Phase 5-5.5 failure can land while the background review is still running.
         # Wait for it so the review checkpoint lands as it did when Phase 4 ran first;
@@ -861,7 +868,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if join_review is not None:
             try:
                 join_review()
-            except Exception as e:  # noqa: BLE001
+            except (Exception, usage_pause.UsagePause) as e:  # noqa: BLE001
                 log(f"phase4: background review failed after the run failed ({e!r})")
         state.checkpoint("terminal", res)
         _phase11_cleanup(llm, log)
@@ -2196,7 +2203,8 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
 
 # All four are deterministic walls a full skill re-run cannot climb — see exit_code_for.
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
-                      "llm-usage-limit")
+                      "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty")
+PAUSE_EXIT = 75   # ADR-0143 reserved pause exit; only with an S marker on disk
 
 # Per-class remedy for a local-gate denial. Every arm is still exit 3 -- naming the
 # class only shortens the human's search, it never changes the verdict. "doc-staleness"
@@ -2231,7 +2239,10 @@ def exit_code_for(res: RunResult) -> int:
         re-run cannot climb.
     1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
     0 = shipped (armed or held), nothing to ship, or degraded.
-    There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm."""
+    There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm.
+    usage-pause maps to 75; main() downgrades it to 3 when the marker is gone."""
+    if res.terminal == TerminalState.FAILED and res.error_kind == "usage-pause":
+        return PAUSE_EXIT
     if res.terminal == TerminalState.FAILED and res.error_kind in _FAIL_CLOSED_KINDS:
         return 3
     if res.terminal == TerminalState.DEGRADED:
@@ -2328,7 +2339,8 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     leaf = (res.slug or "branch").rsplit("/", 1)[-1]
     wt = worktree or "(the worktree folder)"
     log = log_path or "(see the run log)"
-    if res.error_kind in ("rebase-conflict", "remote-head-diverged", "llm-usage-limit"):
+    if res.error_kind in ("rebase-conflict", "remote-head-diverged", "llm-usage-limit",
+                          "usage-pause-unconfirmed", "usage-pause-dirty"):
         key = res.error_kind
     elif res.error_kind == "local-gate":
         key = "gate-" + classify_local_gate_denial(res.error or "")
@@ -2382,9 +2394,14 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
         steps = ["git fetch origin", f"git log --oneline HEAD..origin/{b}  (shows what was pushed)",
                  f"git rebase origin/{b}  (keeps their commits; to take GitHub's copy as is "
                  f"instead, run: git reset --hard origin/{b})"]
-    elif key == "llm-usage-limit":
+    elif key in ("llm-usage-limit", "usage-pause-unconfirmed"):
         why = "The Claude usage limit was reached before the ship step finished."
         steps = ["Wait for the limit to reset (the log shows the reset time)"]
+    elif key == "usage-pause-dirty":
+        why = ("The usage gate paused a model call while it was editing the worktree, "
+               "so the edit may be half done.")
+        steps = [f"cd {wt} && git status && git diff  (check the interrupted edit)",
+                 "Keep or revert the change, then re-run bin/post-plan-now"]
     else:
         why = "The ship step stopped and the log has the reason."
         steps = [read_log]
@@ -2441,6 +2458,9 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
         s = " ".join((s or "").split())
         return s[:limit] + "…" if len(s) > limit else s
 
+    if rc == PAUSE_EXIT:
+        return (f"RESULT: post-plan PAUSED at {res.error.split(': ', 1)[-1]} (usage gate); "
+                "the usage-gate coordinator resumes it after the reset.")
     pr = ""
     if res.pr_number:
         pr = f" PR #{res.pr_number}"
@@ -2475,6 +2495,18 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                     f"ERROR terminal=failed kind=llm-usage-limit. "
                     + (f"{detail} " if detail else "")
                     + "Re-run bin/post-plan-now after the limit resets.")
+        if res.error_kind == "usage-pause-unconfirmed":
+            detail = _flat(res.error or "")
+            return (f"RESULT: post-plan BLOCKED — usage gate paused but the pause marker "
+                    f"is missing; ERROR terminal=failed kind=usage-pause-unconfirmed. "
+                    + (f"{detail} " if detail else "")
+                    + "Re-run bin/post-plan-now after the limit resets.")
+        if res.error_kind == "usage-pause-dirty":
+            detail = _flat(res.error or "")
+            return (f"RESULT: post-plan BLOCKED — usage gate paused a tooled edit mid-run; "
+                    f"ERROR terminal=failed kind=usage-pause-dirty. "
+                    + (f"{detail} " if detail else "")
+                    + "Inspect `git status` in the worktree, then re-run bin/post-plan-now.")
         # Unknown or None error_kind — name all possible fail-closed causes
         return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict, local-gate, or "
                 "llm-usage-limit), cause unknown; ERROR terminal=failed, no PR opened. "
@@ -2515,6 +2547,27 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                 f"merges{pr}{tail} findings={len(res.findings)}")
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
             f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}")
+
+
+def _settle_pause_marker(res: RunResult, rc: int) -> int:
+    """Enforce exit 75 <=> S marker on disk. No gate context: rc unchanged."""
+    ctx, _ = usage_pause.context_from_env()
+    if ctx is None:
+        if rc == PAUSE_EXIT:
+            res.error_kind = "usage-pause-unconfirmed"
+            return 3
+        return rc
+    if res.error_kind == "usage-pause-dirty":
+        usage_pause.marker_clear(ctx)
+        return rc
+    if rc == PAUSE_EXIT:
+        if usage_pause.marker_exists(ctx):
+            return rc
+        res.error_kind = "usage-pause-unconfirmed"
+        return 3
+    if usage_pause.marker_exists(ctx):
+        usage_pause.marker_clear(ctx)
+    return rc
 
 
 def main() -> int:
@@ -2558,6 +2611,9 @@ def main() -> int:
               headless=not args.interactive, live=args.live, explicit_path=args.plan)
     t = ledger.totals()
     rc = exit_code_for(res)
+    rc = _settle_pause_marker(res, rc)
+    if rc != PAUSE_EXIT:
+        usage_pause.ledger_clear()
     # First line, so `head -1 <log>` is the whole verdict and bin/watch-run can
     # terminate on it without waiting for the launchd label to disappear.
     print(verdict_line(res, rc, _pull_url_base(args.worktree)))
@@ -2567,6 +2623,7 @@ def main() -> int:
     print(f"llm: {t['llm_invocations']} calls, {t['gross_tokens']} gross tok, "
           f"{t['non_cached_tokens']} non-cached tok, ${t['cost_usd']}, {t['wall_seconds']}s")
     print(f"outputs: {args.out}/result.json, {args.out}/audit.log, {args.out}/actions.jsonl")
+    print(f"usage-gate: {'on' if usage_pause.context_from_env()[0] else 'off'}")
     return rc
 
 

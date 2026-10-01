@@ -22,6 +22,11 @@ deny() {
     exit 2
 }
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+fi
+
 if [ "$#" -gt 0 ]; then
     if [ "$1" != "--print-key-line" ] || [ "$#" -ne 2 ] || [ ! -f "$2" ]; then
         usage

@@ -612,6 +612,14 @@ main() {
         return 1
     fi
 
+    # `claim --sim=N` echoes N back even when the row was not claimed (already
+    # done, or another host holds it). Generating anyway would overwrite a stored
+    # recap and re-post it, so only an explicit claimed:true proceeds.
+    if [ -n "$DRY_SIM" ] && ! jq_ok "$claim" '.claimed == true'; then
+        log "ERROR: sim $DRY_SIM was not claimable (not pending) — aborting tick (no claude spawned)"
+        return 1
+    fi
+
     sim="$(printf '%s' "$claim" | "$SIM_RECAP_JQ_BIN" -r '.sim // empty' 2>/dev/null)"
     if [ -z "$sim" ] || [ "$sim" = "null" ]; then
         # Phase gate: if recaps are disabled and there is nothing left to drain,

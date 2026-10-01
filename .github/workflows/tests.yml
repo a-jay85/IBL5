@@ -1154,6 +1154,8 @@ jobs:
         run: bin/test-check-registry-trigger-rows
       - name: bin/test-ci-memo
         run: bin/test-ci-memo
+      - name: bin/test-predeploy-db-snapshot
+        run: bin/test-predeploy-db-snapshot
 
   gate:
     name: Tests and Analysis

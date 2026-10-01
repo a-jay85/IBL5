@@ -922,6 +922,21 @@ test_marker_clear_stamps() {
     assert_file clear_stamp:stamp "$IBL5_USAGE_GATE_STATE_DIR/cleared/$SID_A"
 }
 
+# Runners call usage_marker_clear under `set -e`. When dm-seen holds only this sid,
+# grep -v prints nothing and exits 1; that must not kill the caller.
+test_marker_clear_sole_dm_seen_under_set_e() {
+    new_env
+    mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
+    printf '%s\n' "$SID_A" > "$IBL5_USAGE_GATE_STATE_DIR/dm-seen"
+    in_env "set -euo pipefail; usage_marker_clear $SID_A; echo survived > '$T/after'"
+    assert_eq clear_sole_seen:rc 0 "$?"
+    assert_file clear_sole_seen:caller-continued "$T/after"
+    assert_eq clear_sole_seen:seen-empty "" "$(cat "$IBL5_USAGE_GATE_STATE_DIR/dm-seen")"
+    printf '%s\n%s\n' "$SID_A" "$SID_B" > "$IBL5_USAGE_GATE_STATE_DIR/dm-seen"
+    in_env "set -euo pipefail; usage_marker_clear $SID_A"
+    assert_eq clear_sole_seen:keeps-other "$SID_B" "$(cat "$IBL5_USAGE_GATE_STATE_DIR/dm-seen")"
+}
+
 test_paused_hold_live() {
     new_env
     in_env "usage_paused_hold_live $SID_A 60"

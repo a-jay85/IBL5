@@ -89,6 +89,6 @@ named only inside a fence therefore never counts as declared.
 A phase that ships no new test method needs no entry. One example is a phase that re-runs an
 existing suite as a characterization check.
 
-### One-time-check rows — tag rules
+### One-time-check rows: tag rules
 
 A `CLI-executable` row whose evidence is a single run at plan time (a corpus diff, a counterfactual mutation, a command's printed output) ends its "What to verify" cell with `(one-time-check: <reason of 15+ characters>)`. `bin/lib/plan-matrix-assertions` then skips that row's assertion-footprint check and prints `ONE-TIME-CHECK: row N` instead of `UNREALISED-ASSERTION`. The tag sits outside backticks, holds no `(`, `)`, `|` or backtick, and is honored only as the trailing text of that cell on a row whose type cell reads exactly `CLI-executable`; a tag anywhere else is ignored fail-closed and the row is checked as untagged. `bin/check-plan` gate `[Y]` rejects a malformed tag, a tag on any other row type, and a matrix with tagged rows above one third of its rows. The cell still says what was run and what it printed. Never tag a row a regression test could pin; the allowed shapes are listed in `.claude/skills/plan/_architect-contract.md`.

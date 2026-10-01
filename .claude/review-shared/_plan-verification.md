@@ -63,9 +63,6 @@ Harness rules (`parse_no_change_test_paths` in `tools/postplan-harness/harness/p
 - Exempts only that row's token. If another row plans the same token unmarked, the unmarked row wins.
 - Fenced examples never count.
 
-### One-time-check rows
-A `CLI-executable` row whose evidence is a single plan-time run ends its "What to verify" cell with `(one-time-check: <reason of 15+ characters>)`. `bin/lib/plan-matrix-assertions` skips it; `bin/check-plan` gate `[Y]` caps tagged rows at one third. Why: _plan-verification-detail.md § One-time-check rows — tag rules
-
 ### Pre-prod exercise paths
 
 **Operative definition.** There is no staging web environment in this repo. Pre-prod is exactly these three reachable environments; an item is **pre-prod-exercisable** iff it runs on at least one:

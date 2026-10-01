@@ -1,4 +1,5 @@
 import ast
+import copy as copy_module
 import json
 import os
 import pathlib
@@ -740,7 +741,10 @@ def test_restore_in_section_insert_when_not_last_is_reverted():
 # commit_subject: coercion (decoration layer) and schema validation
 # ---------------------------------------------------------------------------
 
-from harness.schemas import coerce_commit_subject, validate_pr_copy
+from harness.schemas import (
+    coerce_commit_subject, coerce_copy_type, coerce_pr_copy, retype_tooling_feat,
+    validate_pr_copy,
+)
 from harness.state import Classification, HarnessError
 
 
@@ -837,6 +841,64 @@ def test_has_gm_visible_is_independent_of_only_flag_ladder():
     c = classify(["ibl5/classes/A.php", "ibl5/tests/ATest.php"], "")
     assert c.test_only is False and c.has_gm_visible is True
     assert classify([], "").has_gm_visible is False
+
+
+# tooling rule: feat -> chore when no GM-visible file (Phase 2 of pr-copy-tooling-not-feat)
+
+def test_retype_tooling_feat_table():
+    tooling = _flagged(count_total=2)
+    mixed = _flagged(count_total=3, has_gm_visible=True)
+    cases = [
+        ("feat: add fleet status", tooling, "chore: add fleet status"),
+        ("feat: add fleet status", mixed, "feat: add fleet status"),
+        ("fix: x", _flagged(count_total=1), "fix: x"),
+        ("chore: x", _flagged(count_total=1), "chore: x"),
+        ("refactor: x", _flagged(count_total=1), "refactor: x"),
+        ("feat: x", _flagged(count_total=0), "feat: x"),
+        ("feat(harness)!: x", _flagged(count_total=1), "chore(harness)!: x"),
+        ("FEAT: x", _flagged(count_total=1), "FEAT: x"),
+        ("no type here", _flagged(count_total=1), "no type here"),
+    ]
+    for subject, cls, expected in cases:
+        assert retype_tooling_feat(subject, cls) == expected, (
+            f"{subject!r} count_total={cls.count_total} gm_visible={cls.has_gm_visible}")
+
+
+def test_coerce_copy_type_runs_ladder_before_tooling_rule():
+    cases = [
+        (_flagged(test_only=True, count_total=1), "test: x"),
+        (_flagged(docs_only=True, non_code_only=True, count_total=1), "docs: x"),
+        (_flagged(non_code_only=True, count_total=1), "chore: x"),
+        (_flagged(count_total=1), "chore: x"),
+        (_flagged(count_total=1, has_gm_visible=True), "feat: x"),
+    ]
+    for cls, expected in cases:
+        assert coerce_copy_type("feat: x", cls) == expected, vars(cls)
+
+
+def test_coerce_pr_copy_retypes_title_subject_and_type():
+    copy = {"type": "feat", "title": "feat: add fleet status",
+            "commit_subject": "feat: add fleet status", "summary_md": "## Summary\n- x\n"}
+    out = coerce_pr_copy(copy, _flagged(count_total=2))
+    assert out["type"] == "chore"
+    assert out["title"].startswith("chore: ")
+    assert out["commit_subject"].startswith("chore: ")
+    assert out["summary_md"] == "## Summary\n- x\n"
+    validate_pr_copy(out)
+
+
+def test_coerce_pr_copy_leaves_mixed_diff_and_typeless_dicts_alone():
+    copy = {"type": "feat", "title": "feat: add fleet status",
+            "commit_subject": "feat: add fleet status", "summary_md": "## Summary\n- x\n"}
+    before = copy_module.deepcopy(copy)
+    out = coerce_pr_copy(copy, _flagged(count_total=2, has_gm_visible=True))
+    assert out == before
+
+    typeless = {"title": "feat: x", "commit_subject": "feat: x", "summary_md": ""}
+    out = coerce_pr_copy(typeless, _flagged(count_total=1))
+    assert out["title"] == "chore: x"
+    assert out["commit_subject"] == "chore: x"
+    assert "type" not in out
 
 
 def _valid_pr_copy() -> dict:

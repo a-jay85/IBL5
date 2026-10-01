@@ -1552,6 +1552,12 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     commit subject instead of failing the run, and returns degraded=True so the caller
     holds arming: an unreviewed title is exactly the feat-vs-chore judgment condition
     (8) depends on. Any other error kind still propagates.
+
+    Both non-skip returns pass through schemas.coerce_pr_copy, so title, commit_subject and
+    type agree and a diff with no GM-visible file (Classification.has_gm_visible False)
+    can never open a feat: PR. The skip path is deliberately left alone: its title is the
+    live one, and retyping only the dict would let the pr_meta() fallback at the
+    condition-(8) call site see chore: on a feat: PR.
     """
     if gh.pr_exists() and not git.has_changes_to_commit():
         head_subject = git.branch_head_subject()
@@ -1567,10 +1573,11 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     else:
         plan_excerpt = ""
     try:
-        return llm.call("pr-copy", "sonnet",
+        copy = llm.call("pr-copy", "sonnet",
                         llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt),
                         schemas.validate_pr_copy,
-                        normalizer=schemas.normalize_pr_copy), False
+                        normalizer=schemas.normalize_pr_copy)
+        return schemas.coerce_pr_copy(copy, cls), False
     except HarnessError as e:
         if e.kind != "llm-invalid-output":
             raise
@@ -1578,9 +1585,11 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     subject = git.branch_head_subject()
     if not re.match(r"^[a-z]+(\([^)]*\))?!?:", subject):
         # No conventional subject to borrow. feat: is the fail-closed type: it trips the
-        # human-signoff hold, and coerce_commit_subject re-types docs/test/non-code diffs.
+        # human-signoff hold. coerce_copy_type re-types docs/test/non-code diffs and turns
+        # feat: into chore: on a tooling-only diff; arming is still held on this path by
+        # degraded=True (copy_degraded), so the floor is never the only guard here.
         subject = f"feat: {subject or slug}"
-    subject = schemas.coerce_commit_subject(subject, cls)
+    subject = schemas.coerce_copy_type(subject, cls)
     return {"title": subject, "commit_subject": subject,
             "summary_md": f"## Summary\n- {subject}\n"}, True
 

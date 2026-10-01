@@ -504,6 +504,23 @@ usage_prestart_gate() {
     return 0
 }
 
+# usage_limit_hit_marker <runner> <sid> <resume_bin>
+# Writes a limit-hit marker for <sid> from the current usage reading (zone "unknown" when
+# no reading is available). Returns the marker write's status. Callers that have already
+# matched the limit text themselves use it directly; usage_postrun_pause matches the log
+# first.
+usage_limit_hit_marker() {
+    local runner="${1:-}" sid="${2:-}" rbin="${3:-}"
+    local body zone="unknown" pct=0 w="five_hour" resets=""
+    if body=$(usage_fetch 300) && [ -n "$body" ]; then
+        zone=$(usage_zone "$body")
+        pct=$(usage_zone_pct "$body")
+        w=$(usage_limiting_window "$body")
+        resets=$(usage_resets_epoch "$body" "$w")
+    fi
+    usage_marker_write "$sid" "$runner" "$rbin" limit-hit "$zone" "$pct" "$w" "$resets"
+}
+
 # usage_postrun_pause <runner> <sid> <resume_bin> <rc> <log> [after_line]
 # rc 0 (paused): a marker for <sid> exists, or <rc> is not 0/3/124/143 and the log
 # shows a limit-hit (a limit-hit marker is written). rc 1: not paused.
@@ -515,14 +532,7 @@ usage_postrun_pause() {
     fi
     case "$rc" in 0|3|124|143) return 1 ;; any) ;; esac
     usage_is_limit_hit "$log" "$after" || return 1
-    local body zone="unknown" pct=0 w="five_hour" resets=""
-    if body=$(usage_fetch 300) && [ -n "$body" ]; then
-        zone=$(usage_zone "$body")
-        pct=$(usage_zone_pct "$body")
-        w=$(usage_limiting_window "$body")
-        resets=$(usage_resets_epoch "$body" "$w")
-    fi
-    usage_marker_write "$sid" "$runner" "$rbin" limit-hit "$zone" "$pct" "$w" "$resets" || return 1
+    usage_limit_hit_marker "$runner" "$sid" "$rbin" || return 1
     usage_log "postrun-limit-hit runner=$runner sid=$sid rc=$rc"
     return 0
 }
@@ -553,6 +563,19 @@ usage_resume_paused_args() {
 
 # ------------------------------------------------------------ 3b hook decision
 
+# usage_gate_run_sid <hook_sid>: the sid a pause is keyed on. Unset
+# IBL5_USAGE_GATE_SESSION_ID keeps the hook's own sid (skill leg: already the
+# run sid). Set-but-empty or not a uuid returns 1 so the caller fails open; a
+# child-keyed marker would have no runs/<sid>.argv and would strand.
+usage_gate_run_sid() {
+    if [ -z "${IBL5_USAGE_GATE_SESSION_ID+x}" ]; then
+        printf '%s' "${1:-}"
+        return 0
+    fi
+    usage_valid_sid "$IBL5_USAGE_GATE_SESSION_ID" || return 1
+    printf '%s' "$IBL5_USAGE_GATE_SESSION_ID"
+}
+
 # usage_gate_decide
 # Reads the PreToolUse hook input JSON on stdin. Prints nothing (allow) or exactly
 # {"continue":false,"stopReason":"usage-pause"}. Always returns 0. Invariant: no
@@ -560,10 +583,15 @@ usage_resume_paused_args() {
 #
 # Env contract (exported by runners alongside IBL5_USAGE_GATE=1):
 #   IBL5_USAGE_GATE_RUNNER, IBL5_USAGE_GATE_MODEL, IBL5_USAGE_GATE_RESUME_BIN
+#   IBL5_USAGE_GATE_SESSION_ID (optional): the run sid; keys the marker, token check, and delta row
 usage_gate_decide() {
     local input sid runner="${IBL5_USAGE_GATE_RUNNER:-}" rbin="${IBL5_USAGE_GATE_RESUME_BIN:-}"
     input=$(cat)
     sid=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
+    if ! sid=$(usage_gate_run_sid "$sid"); then
+        usage_log "fail-open reason=bad-run-sid"
+        return 0
+    fi
     if ! usage_valid_sid "$sid"; then
         usage_log "fail-open reason=bad-sid"
         return 0

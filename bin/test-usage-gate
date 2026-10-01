@@ -916,6 +916,54 @@ test_decide_bad_sid() {
     assert_eq decide_bad_sid:no-marker 0 "$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -type f | wc -l | tr -d ' ')"
 }
 
+# Run-sid keying (post-plan harness addendum): IBL5_USAGE_GATE_SESSION_ID re-keys the pause.
+# Unset keeps the hook's own sid, which is already the run sid on the skill leg.
+test_decide_run_sid_unset_uses_hook_sid() {
+    decide_setup 99
+    local out
+    out=$(env -u IBL5_USAGE_GATE_SESSION_ID IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" \
+        bash -c "$(declare -f decide); STUB='$STUB'; ORIG_PATH='$ORIG_PATH'; REPO_ROOT='$REPO_ROOT'; decide $SID_A")
+    assert_eq run_sid_unset:out "$PAUSE_JSON" "$out"
+    assert_file run_sid_unset:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_run_sid_keys_marker() {
+    decide_setup 99
+    local out m="$IBL5_USAGE_GATE_STATE_DIR/markers"
+    out=$(IBL5_USAGE_GATE_SESSION_ID=$SID_B IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq run_sid_keys:out "$PAUSE_JSON" "$out"
+    assert_file run_sid_keys:run-marker "$m/$SID_B.json"
+    assert_no_file run_sid_keys:no-child-marker "$m/$SID_A.json"
+    assert_eq run_sid_keys:argv-sid "$SID_B" "$(jq -r '.resume_argv[2]' "$m/$SID_B.json" 2>/dev/null)"
+}
+
+test_decide_run_sid_empty_fails_open() {
+    decide_setup 99
+    local out
+    out=$(IBL5_USAGE_GATE_SESSION_ID="" IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq run_sid_empty:out "" "$out"
+    assert_eq run_sid_empty:no-marker 0 "$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -type f | wc -l | tr -d ' ')"
+    assert_contains run_sid_empty:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "fail-open reason=bad-run-sid"
+}
+
+test_decide_run_sid_invalid_fails_open() {
+    decide_setup 99
+    local out
+    out=$(IBL5_USAGE_GATE_SESSION_ID="not-a-uuid" IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq run_sid_invalid:out "" "$out"
+    assert_eq run_sid_invalid:no-marker 0 "$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -type f | wc -l | tr -d ' ')"
+    assert_contains run_sid_invalid:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "fail-open reason=bad-run-sid"
+}
+
+test_decide_run_sid_drain_holder_allows() {
+    decide_setup 95
+    gate_run "usage_token_acquire $SID_B $$"
+    local out
+    out=$(IBL5_USAGE_GATE_SESSION_ID=$SID_B IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq run_sid_holder:out "" "$out"
+    assert_eq run_sid_holder:no-marker 0 "$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -type f | wc -l | tr -d ' ')"
+}
+
 # ---------------------------------------------------------------- Phase 4
 
 # coord_setup <pct>: env with a fresh cache at <pct>, failing curl stub, a DM stub
@@ -1502,6 +1550,23 @@ test_postrun_pause_any() {
     in_env "usage_postrun_pause post-plan-now $SID_B $PPN_BIN any $T/log"
     assert_eq postrun_any:401 1 "$?"
     assert_no_file postrun_any:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_B.json"
+}
+
+test_limit_hit_marker_writes() {
+    new_env
+    make_stub_bin "$STUB" "" '{}' 1
+    seed_cache "$(date +%s)" "$(usage_json 50 0)"
+    in_env "usage_limit_hit_marker post-plan-now $SID_C $PPN_BIN"
+    assert_eq limit_hit_marker:rc 0 "$?"
+    local f="$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_C.json"
+    assert_eq limit_hit_marker:reason limit-hit "$(jq -r .reason "$f" 2>/dev/null)"
+    assert_eq limit_hit_marker:runner post-plan-now "$(jq -r .runner "$f" 2>/dev/null)"
+    assert_eq limit_hit_marker:argv "$PPN_BIN --resume-paused $SID_C" "$(jq -r '.resume_argv | join(" ")' "$f" 2>/dev/null)"
+    local notexec="$T/notexec"
+    : > "$notexec"
+    in_env "usage_limit_hit_marker post-plan-now $SID_D $notexec"
+    assert_eq limit_hit_marker:notexec-rc 1 "$?"
+    assert_no_file limit_hit_marker:notexec-no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_D.json"
 }
 
 # ---------------------------------------------------------------- runner

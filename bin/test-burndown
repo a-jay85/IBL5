@@ -522,18 +522,18 @@ OUT="$(bd_b 2>&1)"; RC=$?
 want "C19: #31 overlap with #30 on bin/foo" "$OUT" "overlap"
 grep -qE 'SKIP\s+#31.*overlap.*#30' <<< "$OUT" && ok "C19: #31 cites #30" || fail "C19: #31 cites #30"
 
-# ── C20: lone no-path issue takes the solo slot ───────────────────────────────
+# ── C20: lone no-path issue is picked like any other item ─────────────────────
 cat > "$T/fx/issues.json" <<'JSON'
 [{"number":35,"title":"Thirty-five noref","body":"This issue has no code refs","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}]
 JSON
 OUT="$(bd_b 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && ok "C20: no refs exits 0" || fail "C20: no refs exits 0 (got $RC)"
-grep -qE 'PICK +#35 .*solo' <<< "$OUT" && ok "C20: PICK #35 solo" \
-    || fail "C20: PICK #35 solo (got: $OUT)"
+grep -qE '^PICK +#35 +[^ ]+ +1 +tier=[^ ]+$' <<< "$OUT" && ok "C20: PICK #35 row carries no solo tag" \
+    || fail "C20: PICK #35 row carries no solo tag (got: $OUT)"
 want "C20: units 1/5" "$OUT" "units: 1/5"
 C20_LEDGER="$(grep '^LEDGER:' <<< "$OUT" | tail -1 | sed 's/^LEDGER: //')"
 [ "$(jq -c '.items[0].paths' "$C20_LEDGER" 2>/dev/null)" = "[]" ] \
-    && ok "C20: solo ledger item paths empty" || fail "C20: solo ledger item paths empty"
+    && ok "C20: pathless ledger item paths empty" || fail "C20: pathless ledger item paths empty"
 C49_ALL="$OUT"
 
 # ── C21: stale-rank and unranked ──────────────────────────────────────────────
@@ -658,8 +658,8 @@ STUB
     fi
 done
 
-# ── C49: solo batch slot for no-path issues ───────────────────────────────────
-# C49a: empty-batch no-path issue is picked alone and closes the batch
+# ── C49: pathless issues share the batch ──────────────────────────────────────
+# C49a: a pathless issue ahead of pathed ones does not close the batch
 cat > "$T/fx/issues.json" <<'JSON'
 [
   {"number":100,"title":"Hundred","body":"no refs here","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
@@ -669,18 +669,21 @@ cat > "$T/fx/issues.json" <<'JSON'
 JSON
 OUT="$(bd_b 2>&1)"; RC=$?
 C49_ALL="$C49_ALL"$'\n'"$OUT"
-grep -qE 'PICK +#100 .*solo' <<< "$OUT" && ok "C49a: PICK #100 solo" || fail "C49a: PICK #100 solo (got: $OUT)"
-want "C49a: units 1/5" "$OUT" "units: 1/5"
-want "C49a: later candidates not reached" "$OUT" "not reached: 2 candidate(s)"
-grep -qE 'PICK +#101' <<< "$OUT" && fail "C49a: no PICK #101" || ok "C49a: no PICK #101"
+grep -qE '^PICK +#100 +[^ ]+ +1 +tier=[^ ]+$' <<< "$OUT" && ok "C49a: PICK #100 row carries no solo tag" \
+    || fail "C49a: PICK #100 row carries no solo tag (got: $OUT)"
+grep -qE '^PICK +#101 ' <<< "$OUT" && grep -qE '^PICK +#102 ' <<< "$OUT" \
+    && ok "C49a: pathed #101 and #102 picked alongside #100" \
+    || fail "C49a: pathed #101 and #102 picked alongside #100 (got: $OUT)"
+grep -qF 'not reached:' <<< "$OUT" && fail "C49a: no candidate left unreached (got: $OUT)" \
+    || ok "C49a: no candidate left unreached"
 C49E_LEDGER="$(grep '^LEDGER:' <<< "$OUT" | tail -1 | sed 's/^LEDGER: //')"
-# C49e: solo ledger item has paths [] and the batch holds one item
-[ "$(jq -c '.items[0].paths' "$C49E_LEDGER" 2>/dev/null)" = "[]" ] \
-    && [ "$(jq '.items | length' "$C49E_LEDGER" 2>/dev/null)" = "1" ] \
-    && ok "C49e: solo ledger item paths [] and batch length 1" \
-    || fail "C49e: solo ledger item paths [] and batch length 1"
+# C49e: the pathless ledger item has paths [] inside a 3-item batch
+[ "$(jq -c '.items[] | select(.issue_num==100) | .paths' "$C49E_LEDGER" 2>/dev/null)" = "[]" ] \
+    && [ "$(jq '.items | length' "$C49E_LEDGER" 2>/dev/null)" = "3" ] \
+    && ok "C49e: pathless item paths [] in a 3-item batch" \
+    || fail "C49e: pathless item paths [] in a 3-item batch"
 
-# C49b: no-path issue after a pick is skipped naming the holders
+# C49b: a pathless issue after a pathed pick is picked too
 cat > "$T/fx/issues.json" <<'JSON'
 [
   {"number":100,"title":"Hundred","body":"bin/backlog:1","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
@@ -689,11 +692,11 @@ cat > "$T/fx/issues.json" <<'JSON'
 JSON
 OUT="$(bd_b 2>&1)"; RC=$?
 C49_ALL="$C49_ALL"$'\n'"$OUT"
-grep -qE 'PICK +#100' <<< "$OUT" && ok "C49b: PICK #100" || fail "C49b: PICK #100 (got: $OUT)"
-grep -qE 'SKIP +#101 .*solo slot: no path refs; batch already holds #100' <<< "$OUT" \
-    && ok "C49b: #101 skipped naming holders" || fail "C49b: #101 skipped naming holders (got: $OUT)"
+grep -qE '^PICK +#100 ' <<< "$OUT" && grep -qE '^PICK +#101 +[^ ]+ +1 +tier=[^ ]+$' <<< "$OUT" \
+    && ok "C49b: pathless #101 picked after pathed #100" \
+    || fail "C49b: pathless #101 picked after pathed #100 (got: $OUT)"
 
-# C49c: a second no-path issue after a solo pick is not picked
+# C49c: two pathless issues are both picked
 cat > "$T/fx/issues.json" <<'JSON'
 [
   {"number":100,"title":"Hundred","body":"nothing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
@@ -702,11 +705,11 @@ cat > "$T/fx/issues.json" <<'JSON'
 JSON
 OUT="$(bd_b 2>&1)"; RC=$?
 C49_ALL="$C49_ALL"$'\n'"$OUT"
-grep -qE 'PICK +#100 .*solo' <<< "$OUT" && ok "C49c: PICK #100 solo" || fail "C49c: PICK #100 solo (got: $OUT)"
-want "C49c: second no-path not reached" "$OUT" "not reached: 1 candidate(s)"
-grep -qE 'PICK +#101' <<< "$OUT" && fail "C49c: no PICK #101" || ok "C49c: no PICK #101"
+grep -qE '^PICK +#100 +[^ ]+ +1 +tier=[^ ]+$' <<< "$OUT" && grep -qE '^PICK +#101 +[^ ]+ +1 +tier=[^ ]+$' <<< "$OUT" \
+    && ok "C49c: both pathless issues picked" \
+    || fail "C49c: both pathless issues picked (got: $OUT)"
 
-# C49d: pairs never take the solo slot
+# C49d: pathless issues can be pair members
 cat > "$T/fx/issues.json" <<'JSON'
 [
   {"number":100,"title":"Hundred","body":"bin/backlog:1","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
@@ -718,20 +721,42 @@ JSON
 rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
 OUT="$(bd burndown --pair 100,101 2>&1)"; RC=$?
 C49_ALL="$C49_ALL"$'\n'"$OUT"
-grep -qE 'SKIP +#100 .*pair: #101 solo slot' <<< "$OUT" && grep -qE 'SKIP +#101 .*pair: with #100' <<< "$OUT" \
-    && ok "C49d: partner without paths blocks the pair" \
-    || fail "C49d: partner without paths blocks the pair (got: $OUT)"
+grep -qE '^PICK +#100 .*tier=[^ ]+ \+#101$' <<< "$OUT" && grep -qE '^SKIP +#101 .*paired with #100' <<< "$OUT" \
+    && ok "C49d: pathless partner pairs with #100" \
+    || fail "C49d: pathless partner pairs with #100 (got: $OUT)"
 rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
 OUT="$(bd burndown --pair 102,103 2>&1)"; RC=$?
 C49_ALL="$C49_ALL"$'\n'"$OUT"
-grep -qE 'SKIP +#102 .*solo slot: pairs cannot take it' <<< "$OUT" \
-    && ok "C49d: path-free primary cannot pair" \
-    || fail "C49d: path-free primary cannot pair (got: $OUT)"
+grep -qE '^PICK +#102 .*tier=[^ ]+ \+#103$' <<< "$OUT" && grep -qE '^SKIP +#103 .*paired with #102' <<< "$OUT" \
+    && ok "C49d: pathless primary pairs with #103" \
+    || fail "C49d: pathless primary pairs with #103 (got: $OUT)"
+
+# C49g: pathed overlap is still rejected beside a pathless pick
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"no refs at all","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"bin/backlog:1","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":102,"title":"Hundred-two","body":"bin/backlog:2","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+C49_ALL="$C49_ALL"$'\n'"$OUT"
+grep -qE '^PICK +#100 ' <<< "$OUT" && grep -qE '^PICK +#101 ' <<< "$OUT" \
+    && ok "C49g: #100 and #101 picked" || fail "C49g: #100 and #101 picked (got: $OUT)"
+grep -qE '^SKIP +#102 .*overlap with #101 on bin/backlog' <<< "$OUT" \
+    && ok "C49g: #102 overlap with #101 still rejected" \
+    || fail "C49g: #102 overlap with #101 still rejected (got: $OUT)"
+grep -qE '^PICK +#102 ' <<< "$OUT" && fail "C49g: no PICK #102" || ok "C49g: no PICK #102"
 
 # C49f: the old reason string is gone
 [ "$(grep -c 'no file:line refs' <<< "$C49_ALL")" -eq 0 ] \
     && ok "C49f: old no-file:line-refs reason never printed" \
     || fail "C49f: old no-file:line-refs reason never printed"
+
+# C49h: no solo tag or solo-slot reason anywhere in the C20/C49 output
+[ "$(grep -c 'solo' <<< "$C49_ALL")" -eq 0 ] \
+    && ok "C49h: no solo tag or solo-slot reason printed" \
+    || fail "C49h: no solo tag or solo-slot reason printed"
 
 # ── C23: rejected flag forms ──────────────────────────────────────────────────
 rm -f "$T/gh.log"
@@ -1899,23 +1924,27 @@ ROW40="$(grep -E '^SKIP +#40 ' <<< "$OUT")"
 want "AF4: #40 overlaps the prior item" "$ROW40" "overlap with #90 on bin/a.sh"
 want "AF4: #41 still picked" "$OUT" "PICK  #41"
 
-# AF5: prior live solo item leaves no capacity
+# AF5: a live pathless prior item costs only its own units
 AF_L="$(af_ledger af5 "[$(af_item 90 1 queued plan '[]')]")"
 OUT="$(bdl_b --after "$AF_L" 2>&1)"; RC=$?
-[ "$RC" -eq 0 ] && ok "AF5: solo prior exits 0" || fail "AF5: solo prior exits 0 (got $RC: $OUT)"
-want "AF5: LEDGER none" "$OUT" "LEDGER: none"
-want "AF5: units 0/0" "$OUT" "units: 0/0"
-if grep -qE '^PICK' <<< "$OUT"; then fail "AF5: nothing may be picked"; else ok "AF5: nothing picked"; fi
-AF5_N=$(find "$T/lbl/home/claude-plans/_reports" -name 'burndown-batch-[0-9]*.json' | wc -l | tr -d ' ')
-[ "$AF5_N" -eq 0 ] && ok "AF5: no ledger written" || fail "AF5: no ledger written (found $AF5_N)"
+[ "$RC" -eq 0 ] && ok "AF5: pathless prior exits 0" || fail "AF5: pathless prior exits 0 (got $RC: $OUT)"
+grep -qE '^units: [1-4]/4$' <<< "$OUT" && ok "AF5: units x/4 with one live pathless 1-unit item" \
+    || fail "AF5: units x/4 with one live pathless 1-unit item (got: $OUT)"
+AF5_LEDGER="$(af_ledger_path "$OUT")"
+[ -n "$AF5_LEDGER" ] && [ "$(jq '.budget' "$AF5_LEDGER" 2>/dev/null)" = "4" ] \
+    && ok "AF5: ledger budget is 4" || fail "AF5: ledger budget is 4 (got: $OUT)"
+grep -qE '^PICK ' <<< "$OUT" && ok "AF5: candidates picked" || fail "AF5: candidates picked (got: $OUT)"
+grep -qE '^(PICK|SKIP) +#90 ' <<< "$OUT" && fail "AF5: prior #90 does not reappear" \
+    || ok "AF5: prior #90 does not reappear"
 
-# AF6: path-less candidate with a prior live item hits the solo-slot rule
+# AF6: a pathless candidate joins a batch with a live pathed prior item
 jq 'map(if .number == 40 then .body = "no path refs here" else . end)' \
     "$T/lbl/fx/issues.json" > "$T/lbl/fx/issues.tmp" && mv "$T/lbl/fx/issues.tmp" "$T/lbl/fx/issues.json"
 AF_L="$(af_ledger af6 "[$(af_item 90 1 queued plan '["bin/z.sh"]')]")"
 OUT="$(bdl_b --after "$AF_L" 2>&1)"
-ROW40="$(grep -E '^SKIP +#40 ' <<< "$OUT")"
-want "AF6: path-less #40 hits the solo slot" "$ROW40" "solo slot: no path refs; batch already holds #90"
+grep -qE '^PICK +#40 +[^ ]+ +1 +tier=[^ ]+$' <<< "$OUT" && ok "AF6: pathless #40 picked beside live #90" \
+    || fail "AF6: pathless #40 picked beside live #90 (got: $OUT)"
+grep -qE '^SKIP +#40 ' <<< "$OUT" && fail "AF6: #40 not skipped" || ok "AF6: #40 not skipped"
 lbl_issues '[]' '[]'
 
 # AF7: a --pair with an excluded member is dropped

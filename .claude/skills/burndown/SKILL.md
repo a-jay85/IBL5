@@ -117,8 +117,10 @@ Check `gh auth status`, then rerun `bin/backlog burndown-tag <n> reason=...`.
 > issues` with `closes a-jay85/IBL5-backlog#<n>` (plus each `also_closes`). A parser
 > or gate change carries a corpus diff in its verification.
 
-An item with empty `.paths` took the batch's solo slot and is the only live item in the
-run, so the `Do not touch` list is empty.
+An item with empty `.paths` claims no files and shares the batch like any other item.
+Its `Do not touch` list carries the paths of every other live item. No other item's
+list names it, so a collision with it surfaces as a merge conflict, fixed when the
+later PR rebases.
 
 Fire `bin/plan-now` in its default queue mode through the plan-prompt skill's fire
 step. Never start automouse early. Then:
@@ -128,14 +130,14 @@ bin/backlog burndown-record <ledger> <n> route=plan slug=<slug> status=queued
 ```
 
 **Ad-hoc route.** `bin/wt-new <slug>` (base master). Spawn one
-`Agent(subagent_type: "sonnet-5-5")` per ad-hoc item with `model` omitted. Items hold
+`Agent(subagent_type: "sonnet-5-5")` per ad-hoc item with `model` omitted. Items with path refs hold
 disjoint paths, so spawn them in one message. The helper prompt carries: the absolute
 worktree path, the issue body, the liveness evidence, the paths it may touch, and these
 rules. Edit only inside the worktree. Run the relevant tests. Leave the tree dirty. Do
 not commit. Never run `bin/post-plan-now`. Reply in one line.
 
-A solo item (empty `.paths`) carries no path list, so the helper prompt says to keep the
-change to the files the issue body names.
+A pathless item (empty `.paths`) carries no path list, so the helper prompt says to keep
+the change to the files the issue body names.
 
 When a helper returns, read `git -C <wt> diff --stat` and re-run the helper's named
 test. Only when that passes:

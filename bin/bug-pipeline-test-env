@@ -57,15 +57,23 @@ ENV_FILE='/tmp/bug-pipeline-test-env.sh'
 STUB_BIN='/tmp/bug-pipeline-test-stubs/bin'
 WT_BASE='/tmp/bug-pipeline-test-worktrees'
 PLANS='/tmp/bug-pipeline-test-plans'
-IBLBOT="$REPO_ROOT/ibl5/IBLbot"
 
 # Fail closed before ANY write. A constant can still be broken by a bad edit.
 case "$SCRATCH_DB" in iblhoops_ibl5|ibl5_test|'') echo "refusing: unsafe DB name '$SCRATCH_DB'" >&2; exit 1;; esac
 case "$BOT_URL"    in *:50001*)                    echo "refusing: BOT_URL points at the production bug-bot" >&2; exit 1;; esac
 
-# ── Shared DB helper ─────────────────────────────────────────────────────────
+# ── Shared helpers ───────────────────────────────────────────────────────────
 # shellcheck source=bin/lib/db-helpers.sh
 source "$REPO_ROOT/bin/lib/db-helpers.sh"
+# shellcheck source=bin/lib/git-helpers.sh
+source "$REPO_ROOT/bin/lib/git-helpers.sh"
+
+# IBLbot always resolves to the MAIN checkout, even when this script runs from a
+# linked worktree: the untracked secrets file and the gitignored dist/ build
+# output exist only there. resolve_canonical_root returns REPO_ROOT unchanged in
+# the main checkout. All three consumers (secrets check, dist precondition, pm2
+# ecosystem path) read this one variable.
+IBLBOT="$(resolve_canonical_root "$REPO_ROOT")/ibl5/IBLbot"
 
 # ── Bring-up ─────────────────────────────────────────────────────────────────
 if [ "$MODE" = "up" ]; then
@@ -206,8 +214,11 @@ EOF
     # Step 4.3 — Prove the check has teeth: without the env block the tick resolves
     # the production DB name. Use a non-executing probe so no DB connection is made.
     # CI-autofix is disabled (BUG_PIPELINE_CI_AUTOFIX_ENABLED=0) so the pass does
-    # not make real GitHub calls. CODE_REPO and TICK_HEARTBEAT are also redirected
-    # so this probe never touches production seams (B1/B2 fix).
+    # not make real GitHub calls. CODE_REPO, TICK_HEARTBEAT and ATTACHMENT_CACHE_DIR
+    # are also redirected so this probe never touches production seams (B1/B2 fix).
+    # The probe prints nothing, so the tick's empty-tick guard does not fire and
+    # prune_attachment_cache runs; without the redirect it deletes week-old files
+    # from the production attachment cache under $HOME.
     cat > /tmp/bpte-probe-only <<'SH'
 #!/usr/bin/env bash
 echo "DB_NAME=$DB_NAME" >> /tmp/bpte-control.log
@@ -217,6 +228,7 @@ SH
     rm -f /tmp/bpte-control.log /tmp/bpte-control-heartbeat
     (   unset DB_NAME
         BUG_PIPELINE_CI_AUTOFIX_ENABLED=0 \
+        BUG_PIPELINE_ATTACHMENT_CACHE_DIR="/tmp/bug-pipeline-test-attachments" \
         BUG_PIPELINE_CODE_REPO="ibl-test/fake-code-repo" \
         BUG_PIPELINE_TICK_HEARTBEAT="/tmp/bpte-control-heartbeat" \
         PHP_BIN=/tmp/bpte-probe-only \

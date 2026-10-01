@@ -41,6 +41,8 @@ from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
 from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
+                              MERGE_DIGEST_BEGIN, MERGE_DIGEST_END, render_merge_digest,
+                              upsert_merge_digest,
                               MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC,
                               backlog_closes_mismatch, classify, files_from_diff,
                               modified_files_from_diff,
@@ -759,6 +761,20 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 # `|| true`, and a new hold here would change condition semantics.
                 res.sticky_error = "sticky-post-failed"
                 log("phase6.5: sticky verdict comment not confirmed")
+            # Digest at the top of the PR body, from the same rows the sticky printed.
+            # Still BEFORE arming, and never able to change it: log-and-continue.
+            try:
+                drows = fidelity.digest_rows_for_display(digest, fid)
+                if all(" unavailable — " in r for r in drows):
+                    log("phase6.5: merge digest all degraded; PR body digest left as is")
+                else:
+                    cur = gh.pr_body_fresh() or ""
+                    new = upsert_merge_digest(cur, render_merge_digest(drows))
+                    if new != cur:
+                        gh.pr_edit_body(pr, new)
+                    log("phase6.5: merge digest upserted into PR body")
+            except (HarnessError, OSError, subprocess.SubprocessError) as e:
+                log(f"phase6.5: merge digest body write failed ({e.__class__.__name__}: {e})")
             # Review-owed decision: AFTER the sticky post (the script reads the body this
             # run composed and the tree it ends on) and BEFORE arming (a launched
             # /pr-review races an `--auto` merge no worse than the skill path does).
@@ -938,7 +954,7 @@ def _last_remediation_commit(fid: dict) -> str | None:
 
 
 def _body_signature(body: str | None) -> str:
-    """The comparable part of a PR body: everything outside the files-changed block.
+    """The comparable part of a PR body: everything outside the files-changed and merge-digest blocks.
 
     Phase 5.5 rewrites <!-- files-changed:begin -->..<!-- files-changed:end --> on every
     round, so that block churns whenever the diff grows and says nothing about whether
@@ -951,6 +967,10 @@ def _body_signature(body: str | None) -> str:
     end = text.find(FILES_CHANGED_END)
     if begin != -1 and end != -1 and end > begin:
         text = text[:begin] + text[end + len(FILES_CHANGED_END):]
+    begin = text.find(MERGE_DIGEST_BEGIN)
+    end = text.find(MERGE_DIGEST_END)
+    if begin != -1 and end != -1 and end > begin:
+        text = text[:begin] + text[end + len(MERGE_DIGEST_END):]
     return text.strip()
 
 

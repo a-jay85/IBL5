@@ -3,7 +3,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from harness.classify import FILES_CHANGED_BEGIN, FILES_CHANGED_END
+from harness.classify import (FILES_CHANGED_BEGIN, FILES_CHANGED_END,
+                              MERGE_DIGEST_BEGIN, MERGE_DIGEST_END)
 
 
 @dataclass(frozen=True)
@@ -80,6 +81,13 @@ def _protected_spans(body: str) -> list[tuple[int, int]]:
         end = body.find(FILES_CHANGED_END, begin + len(FILES_CHANGED_BEGIN))
         if end != -1 and end > begin:
             spans.append((begin, end + len(FILES_CHANGED_END)))
+
+    # 1b. Merge-digest block (runner-written from the sticky verdict)
+    begin = body.find(MERGE_DIGEST_BEGIN)
+    if begin != -1:
+        end = body.find(MERGE_DIGEST_END, begin + len(MERGE_DIGEST_BEGIN))
+        if end != -1 and end > begin:
+            spans.append((begin, end + len(MERGE_DIGEST_END)))
 
     # 2. ## Manual Testing section
     mt_match = re.search(r"^## Manual Testing\b", body, re.MULTILINE)

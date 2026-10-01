@@ -2116,3 +2116,38 @@ def test_phase7_rewatch_timeout_is_indeterminate_not_green(monkeypatch, tmp_path
     acts = _actions(out)
     assert not any(a.get("action") == "pr_comment" and a.get("title") == cifix.FLAKY_TITLE
                    for a in acts), "flaky comment must not be posted on a timeout"
+
+
+# ---- merge digest in the PR body ----
+
+def _digest_rows(unavailable=False):
+    from harness import fidelity
+    if unavailable:
+        return fidelity._digest_degraded()
+    return [fidelity.linkify_refs(f"{lbl} row backlog#1169 PR #2559")
+            for lbl in fidelity.LABELS]
+
+
+def test_merge_digest_prepended_to_body_with_remediation_suffix(tmp_path, monkeypatch):
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha="abc1234")
+    monkeypatch.setattr(runner.fidelity, "digest_lines", lambda *a, **k: _digest_rows())
+    out = str(tmp_path / "out")
+    runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    edits = [a for a in _actions(out) if a["action"] == "pr_edit_body"]
+    digest_edits = [a for a in edits if "<!-- merge-digest:begin -->" in a["body"]]
+    assert len(digest_edits) == 1
+    body = digest_edits[0]["body"]
+    assert body.startswith("<!-- merge-digest:begin -->\n## Merge digest\n")
+    assert "(post-plan remediation: abc1234)" in body
+    assert "[backlog#1169](<https://github.com/a-jay85/IBL5-backlog/issues/1169>)" in body
+    assert body.count("<!-- merge-digest:begin -->") == 1
+
+
+def test_all_degraded_digest_writes_no_body_block(tmp_path, monkeypatch):
+    _patch_fidelity_with_remediation(monkeypatch)
+    monkeypatch.setattr(runner.fidelity, "digest_lines",
+                        lambda *a, **k: _digest_rows(unavailable=True))
+    out = str(tmp_path / "out")
+    runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    edits = [a for a in _actions(out) if a["action"] == "pr_edit_body"]
+    assert not any("<!-- merge-digest:begin -->" in a["body"] for a in edits)

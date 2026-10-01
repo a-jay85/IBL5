@@ -151,15 +151,46 @@ def _is_test_path(tok: str) -> bool:
 _NO_CHANGE_MARKER = r"\(no-change\)"
 
 
-def _planned_token(row: str) -> str | None:
+# A WHOLE cell that is a planning Test-type label. Measured on the 1144-file
+# ~/claude-plans corpus on 2026-10-01: every real Test-type cell is the bare label
+# or the label followed by one of `(…)`, `+ / , & — –`, `-analogue`, or
+# ` DB-integration`; prose cells that merely start with the word (`E2E failures …`)
+# and CLI rows whose command or description contains `e2e` / `phpunit` do not match.
+# Header-independent on purpose: a `| Type |` header and a cell shifted by `\|\|`
+# both still carry the label as a whole cell (see tests/test_planfile_type_cell.py).
+_TEST_TYPE_LABEL = re.compile(
+    r"^(?:PHPUnit|API.?test|E2E|Visual.?regression)"
+    r"(?:$|\s*\(|\s*[+/,&—–]|-analogue|\s+DB-integration)",
+    re.IGNORECASE)
+
+
+def _norm_cell(cell: str) -> str:
+    """Cell text with surrounding whitespace, bold/code/underscore markup stripped."""
+    return cell.strip().strip("*`_").strip()
+
+
+def _has_planning_type_cell(cells: list[str]) -> bool:
+    """True when some WHOLE cell is a PHPUnit / API-test / E2E / Visual-regression label."""
+    return any(_TEST_TYPE_LABEL.match(_norm_cell(c)) for c in cells)
+
+
+def _planned_token(cells: list[str]) -> str | None:
     """The row's planned test token, or None when the row plans nothing.
 
     Single source of truth for "this matrix row plans a test": parse_matrix and
     parse_no_change_test_paths must agree on it, or a token could be exempted by
     one parser and planned by the other.
+
+    The Test type is read from a WHOLE cell (`_has_planning_type_cell`), never
+    from the joined row. The old whole-row `\\bE2E\\b` search planned
+    `/tmp/bug-pipeline-test-env.sh` from a CLI-executable row whose command ended
+    in `bin/test-bug-pipeline-e2e` (bug-pipeline-e2e-guard-tests row 10), and the
+    phantom path blocked arming via Phase 5.0 condition (3). The path itself is
+    still the first backticked `test|spec` token in the joined row.
     """
-    if not re.search(r"\b(PHPUnit|API.?test|E2E|Visual.?regression)\b", row, re.I):
+    if not _has_planning_type_cell(cells):
         return None
+    row = " | ".join(cells)
     m = re.search(r"`([^`]*(?:test|spec|Test)[^`]*)`", row)
     if m and _is_test_path(m.group(1)):
         return m.group(1)
@@ -192,7 +223,7 @@ def parse_no_change_test_paths(content: str) -> list[str]:
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         row = " | ".join(cells)
-        p = _planned_token(row)
+        p = _planned_token(cells)
         if p is None:
             continue
         has_marker = re.search(r"`" + re.escape(p) + r"`\s*" + _NO_CHANGE_MARKER, row, re.I)
@@ -209,6 +240,8 @@ def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
 
     Planned tests: rows whose Test type is PHPUnit / API-test / E2E / Visual-regression;
     path taken from the row's backticked file token.
+    The type is matched as a whole cell (see _planned_token), so a CLI-executable row
+    that merely mentions e2e or phpunit plans nothing.
     Truly-manual rows are returned as ManualRow objects (typed, with noise columns
     stripped) rather than raw pipe-delimited strings.
 
@@ -240,7 +273,7 @@ def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
         row = " | ".join(cells)
         if re.search(r"truly.?manual", row, re.I):
             manual.append(manual_rows.row_from_cells(cells, len(manual) + 1))
-        p = _planned_token(row)
+        p = _planned_token(cells)
         if p is not None and p not in planned:
             planned.append(p)
     return planned, manual

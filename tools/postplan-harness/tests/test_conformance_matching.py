@@ -482,7 +482,7 @@ def test_adr_placeholder_token_resolves_to_single_numbered_file():
     items = check(plan, ["ibl5/docs/decisions/0140-discord-dev-webhook-notify.md"],
                   resolutions=resolutions)
     assert items == []
-    assert resolutions.get(tok) == "ibl5/docs/decisions/0140-discord-dev-webhook-notify.md"
+    assert resolutions[tok] == "ibl5/docs/decisions/0140-discord-dev-webhook-notify.md"
 
 
 def test_phase_omission_end_to_end_positive_and_negative():

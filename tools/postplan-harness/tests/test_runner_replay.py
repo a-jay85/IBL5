@@ -1380,6 +1380,8 @@ def _patch_two_call_git(monkeypatch, first_files, second_files):
         def conformance_files(self, base="origin/master"):
             # The runner reads conformance_files right after each changed_files, so
             # it sees the same snapshot. Not counted: the call count tracks snapshots.
+            # The fakes in test_fidelity_remediation.py and test_fidelity_rounds.py
+            # override only `changed_files` and stay untouched: ReplayGit delegates.
             return list(self._last)
 
     monkeypatch.setattr(runner, "ReplayGit", _TwoCallGit)

@@ -30,12 +30,33 @@ DEFERRAL_RE = re.compile(
 )
 
 # The item already points at a tracked issue or PR.
-CITED_RE = re.compile(r"(?:\b[\w.-]+/[\w.-]+#\d+\b|(?<![\w/])#\d+\b|/issues/\d+|/pull/\d+)")
+CITED_RE = re.compile(
+    r"(?:\b[\w.-]+/[\w.-]+#\d+\b|(?<![\w/])#\d+\b|\bbacklog#\d+\b|/issues/\d+|/pull/\d+)")
 
-# The item states a decision to exclude, not a deferral.
+# The item states a decision to exclude, or a boundary someone else already owns, not a
+# deferral. Each arm was added against a labelled false positive in the corpus review
+# (tests/fixtures/outofscope/corpus_hits.tsv): conditional "if a future ..." wording,
+# "would change / needs its own plan" boundary wording, a peer session or sibling plan that
+# already owns the work, and "a decision, not a deferral" preambles.
 REJECTION_RE = re.compile(
-    r"\b(?:not\s+a\s+deferred|resolved\s+decision|rejected|won'?t\s+(?:do|fix)"
-    r"|not\s+planned|no\s+plan\s+to|out\s+of\s+scope\s+permanently)\b",
+    r"\b(?:not\s+a\s+defer(?:red|ral)|resolved\s+decision|rejected|won'?t\s+(?:do|fix)"
+    r"|not\s+planned|no\s+plan\s+to|out\s+of\s+scope\s+permanently"
+    r"|if\s+(?:ever|a\s+future|a\s+later|this\s+work\s+later)"
+    r"|(?:would|will)\s+(?:change|need|affect|widen|ripple|multiply|require)"
+    r"|needs?\s+(?:its|their)\s+own"
+    r"|peer\s+session|separate\s+branch|plan\s+owns|not\s+modified"
+    r"|(?:is|are)\s+(?:pre-existing|inherited)|unchanged"
+    r"|needing\s+its\s+own|would\s+be\s+a|any\s+future|ever\s+wanted"
+    r"|if\s+(?:one|it|they)\s+starts?|tracked\s+by|byte-identical|frozen"
+    r"|stays?\s+that\s+way|would\s+invalidate|deliberately"
+    r"|ever\s+becomes?|would\s+be\s+its|when\s+a\s+future|independent,|by\s+decision"
+    r"|re-?open|calls?\s+for\s+its\s+own|stacks?\s+on|merges\s+first|unreachable"
+    r"|its\s+own\s+PR\s+holds|filed\s+and\s+skipped"
+    r"|if\s+(?:\w+\s+){1,4}(?:fails?|finds?|becomes?))\b"
+    # An existing named plan already owns the work: "(separate plan: `slug`)" or
+    # "(`slug`) — separate PR".
+    r"|\bseparate\s+(?:plan|PR)\s*:\s*`[\w-]+`"
+    r"|`[a-z0-9]+(?:-[a-z0-9]+)+`\)\s*[—-]+\s*separate\s+(?:plan|PR)",
     re.I,
 )
 

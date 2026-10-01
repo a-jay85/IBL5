@@ -336,3 +336,27 @@ def test_skill_phase_25_invokes_sweep():
     assert '--slug "$SLUG"' in section
     assert "(non-blocking)" in section
     assert "exit 1" not in section
+
+
+# --- Exclusions added from the corpus review ----------------------------------
+
+@pytest.mark.parametrize("item", [
+    "Each exclusion below is a decision, not a deferral. None becomes a follow-up ticket.",
+    "Gating the check on the changes job is cleaner. Its own PR if the extractor ever becomes fragile.",
+    "Widening it would loosen a gate, which calls for its own plan.",
+    "Moving the runner to Linux would be its own plan.",
+    "Fixing the leak (backlog#1103) is a separate PR.",
+    "That work is a separate follow-up, owned by a peer session as a separate PR.",
+    "The leaders instrument is a separate plan: `jsb-j13-2-leaders`.",
+    "The leaders instrument (`jsb-j13-2-leaders`) — separate PR.",
+    "If a tagged spec fails in a phase, that is its own PR.",
+    "The stacked change lands as a separate PR that merges first.",
+])
+def test_corpus_review_exclusions_are_not_hits(item):
+    plan = f"# Plan\n\n## Out of Scope\n\n- {item}\n"
+    assert extract_deferral_hits(plan, SLUG) == []
+
+
+def test_plain_deferral_still_hits_after_exclusions():
+    plan = "# Plan\n\n## Out of Scope\n\n- Retire the old CSV endpoint in a follow-up PR.\n"
+    assert len(extract_deferral_hits(plan, SLUG)) == 1

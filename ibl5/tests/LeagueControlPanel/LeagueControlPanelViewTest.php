@@ -62,6 +62,10 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringContainsString('</main>', $html);
     }
 
+    /**
+     * Structural companion to testRenderWrapsContentInMainLandmark: fails when
+     * LeagueControlPanelView::render() emits any element or text outside <main>.
+     */
     #[DataProvider('bodyLandmarkScenarioProvider')]
     public function testRenderPlacesEveryBodyNodeInsideMain(
         string $league,
@@ -102,6 +106,11 @@ class LeagueControlPanelViewTest extends TestCase
             . '<main><h1>Inside</h1></main><p>stray</p>loose text</body></html>';
 
         $this->assertSame(['p', '#text'], self::findBodyNodesOutsideMain($html));
+
+        $elementOnly = '<!DOCTYPE html><html lang="en"><head><title>t</title></head><body>'
+            . '<main><h1>Inside</h1></main><p>stray</p></body></html>';
+
+        $this->assertSame(['p'], self::findBodyNodesOutsideMain($elementOnly));
     }
 
     public function testOutsideMainDetectorIgnoresWhitespaceAndComments(): void

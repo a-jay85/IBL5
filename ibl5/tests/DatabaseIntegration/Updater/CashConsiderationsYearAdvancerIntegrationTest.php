@@ -110,11 +110,11 @@ class CashConsiderationsYearAdvancerIntegrationTest extends DatabaseTestCase
         self::assertSame('2010', $this->readMarker());
     }
 
-    public function testMigrationSeedsMarkerAt2026(): void
+    public function testMigrationSeedsMarkerAt2009(): void
     {
         $marker = $this->readMarker();
         self::assertNotNull($marker, 'migration 189 did not seed the marker row');
-        self::assertSame('2026', $marker);
+        self::assertSame('2009', $marker);
     }
 
     public function testMigrationIsIdempotent(): void
@@ -133,7 +133,7 @@ class CashConsiderationsYearAdvancerIntegrationTest extends DatabaseTestCase
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
         self::assertSame(1, (int) ($row['cnt'] ?? 0));
-        self::assertSame('2026', $this->readMarker());
+        self::assertSame('2009', $this->readMarker());
     }
 
     public function testMigrationDoesNotOverwriteAdvancedMarker(): void

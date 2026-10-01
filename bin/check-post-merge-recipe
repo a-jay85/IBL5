@@ -217,6 +217,7 @@ function scan(src, re, strip,   rest, off, tok, abs) {
 function process(L, Lo,   i, n, c, outside, cs) {
     cs = "[a-z0-9_.-]+"
     bad1 = ""
+    lid++
     if (L ~ /gh[ \t]+api/ || L ~ /api\.github\.com/)
         scan(L, "repos/" cs "/" cs, "^repos/")
     scan(L, "--repo[ =][ \t]*" cs "/" cs, "^.*[ \t=]")
@@ -228,7 +229,7 @@ function process(L, Lo,   i, n, c, outside, cs) {
 
     if (match(L, /(^|[ \t])(--method|-x)[ \t=]*(put|post|patch)([^a-z]|$)/) \
         && L ~ /\/protection(\/required_status_checks)?([ \t"'\\]|$)/)
-        wl[++nw] = physln(RSTART)
+        wl[++nw] = segln[1]
     if (L ~ /(^|[^a-z_])"?contexts"?[ \t]*:/ || index(L, "contexts[]=") > 0 || index(L, "[contexts][]=") > 0)
         hasctx = 1
     if (L ~ /(^|[^a-z_])"?checks"?[ \t]*:/ || index(L, "[checks]") > 0)
@@ -245,7 +246,7 @@ function process(L, Lo,   i, n, c, outside, cs) {
                 depth--
                 if (depth == 0) {
                     indel = 0
-                    if (span ~ /(^|[^a-z_])checks([^a-z_]|$)/) cand3[++n3] = delln
+                    if (span ~ /(^|[^a-z_])checks([^a-z_]|$)/ && lastdel != lid) { cand3[++n3] = delln; lastdel = lid }
                 }
             }
         } else if (substr(L, i, 4) == "del(" && (i == 1 || substr(L, i - 1, 1) !~ /[a-z0-9_]/)) {

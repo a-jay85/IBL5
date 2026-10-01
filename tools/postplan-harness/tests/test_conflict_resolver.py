@@ -645,7 +645,7 @@ def test_verdict_leading_space_is_clean(tmp_path):
 
 def test_verdict_preamble_then_clean_writes_normalized_line_one(tmp_path):
     """Preamble-wrapped CLEAN: line 1 normalized, raw reply follows, armable reads CLEAN."""
-    from harness.armable import conflict_verdict_for
+    from harness import armable
     key = f"test-{uuid.uuid4().hex[:8]}"
     sha = "44444444"
     reply = "Summary sentence.\n\nCONFLICT-REVIEW=CLEAN\n\nReasoning.\n"
@@ -657,7 +657,7 @@ def test_verdict_preamble_then_clean_writes_normalized_line_one(tmp_path):
         assert verdict == "CONFLICT-REVIEW=CLEAN"
         verdict_file = f"/tmp/postplan-conflict-verdict-{key}-{sha}.ok"
         assert open(verdict_file).read() == "CONFLICT-REVIEW=CLEAN\n" + reply
-        assert conflict_verdict_for(key) == "CONFLICT-REVIEW=CLEAN"
+        assert armable.conflict_verdict_for(key) == "CONFLICT-REVIEW=CLEAN"
     finally:
         _cleanup_verdict(key, sha)
 

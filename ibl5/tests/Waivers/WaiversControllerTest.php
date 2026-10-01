@@ -56,6 +56,30 @@ class WaiversControllerTest extends TestCase
         );
     }
 
+    /**
+     * HtmxHelper::redirect() exits the process, so a behavioral test of this collapse is not buildable; pin the source instead.
+     * WaiversSubmissionService::submit() refuses null and empty only, so this collapse is the sole barrier against a Free Agents session.
+     */
+    public function testExecuteWaiverOperationCollapsesTeamlessSessionToNullBeforeSubmit(): void
+    {
+        $src = file_get_contents(dirname(__DIR__, 2) . '/classes/Waivers/WaiversController.php');
+        self::assertIsString($src);
+
+        $guard = 'if ($verifiedTeamName === null || $verifiedTeamName === \'\' || $verifiedTeamName === \League\League::FREE_AGENTS_TEAM_NAME) {';
+        $guardPos = strpos($src, $guard);
+        self::assertIsInt($guardPos, 'Waivers FA/null/empty collapse removed or weakened: WaiversSubmissionService does not refuse Free Agents');
+
+        self::assertMatchesRegularExpression(
+            '/\{\s*\$verifiedTeamName = null;\s*\}/',
+            substr($src, $guardPos, 200),
+            'Waivers collapse guard no longer assigns null to $verifiedTeamName'
+        );
+
+        $submitPos = strpos($src, '->submit($postData, $verifiedTeamName)');
+        self::assertIsInt($submitPos, 'Waivers submit($postData, $verifiedTeamName) call not found');
+        self::assertLessThan($submitPos, $guardPos, 'Waivers collapse guard must precede the submit() call');
+    }
+
     public function testWaiverPoolMovesCategoryIdIsPositive(): void
     {
         $this->assertGreaterThan(0, WaiversController::WAIVER_POOL_MOVES_CATEGORY_ID);

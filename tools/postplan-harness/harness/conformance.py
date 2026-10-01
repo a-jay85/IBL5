@@ -344,11 +344,13 @@ def _changed_files(repo_root: str) -> list[str]:
     Committed (merge-base range) + uncommitted tracked + untracked-not-ignored.
     The third arm is why a brand-new test file counts as PRESENT before its first
     commit; `--exclude-standard` honors every gitignore source so build droppings
-    never enter the set.
+    never enter the set. `--no-renames` lists a rename as its old path plus its new
+    path, matching `LiveGit.conformance_files` so this seam and post-plan Phase 5.0
+    agree on a renamed Critical File.
     """
     seen: list[str] = []
-    for args in (["diff", "--name-only", "origin/master...HEAD"],
-                 ["diff", "--name-only", "HEAD"],
+    for args in (["diff", "--no-renames", "--name-only", "origin/master...HEAD"],
+                 ["diff", "--no-renames", "--name-only", "HEAD"],
                  ["ls-files", "--others", "--exclude-standard"]):
         for path in _git_lines(args, repo_root):
             if path not in seen:

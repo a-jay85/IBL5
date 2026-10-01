@@ -4,12 +4,16 @@ Each test is named for the mutation it kills. Kept out of test_conformance_match
 because a peer branch owns that file.
 """
 import os
+import subprocess
 import sys
+import tempfile
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.adapters.gitad import ReplayGit
-from harness.conformance import check
+from harness.conformance import _changed_files, check
 from harness.state import PlanInfo
 
 
@@ -161,3 +165,46 @@ def test_rename_source_resolves_critical_file():
     """PR #2514 acceptance at adapter level."""
     files = ReplayGit({"slug": "x", "diff": RENAME_DIFF}).conformance_files()
     assert check(_plan_with_critical(".claude/agents/sonnet-4-6.md"), files) == []
+
+
+@pytest.fixture()
+def seam_repo():
+    d = tempfile.mkdtemp(prefix="conformance-seam-test-")
+    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+
+    def sh(*a):
+        subprocess.run(["git", "-C", d, *a], check=True, capture_output=True, env=env)
+
+    subprocess.run(["git", "init", "-b", "master", d], check=True, capture_output=True)
+    sh("config", "user.email", "t@t")
+    sh("config", "user.name", "t")
+    sh("config", "diff.renames", "true")
+    for name in ("a.txt", "z.txt"):
+        with open(os.path.join(d, name), "w") as fh:
+            fh.write("base\n")
+    sh("add", "-A")
+    sh("commit", "-m", "base")
+    sh("update-ref", "refs/remotes/origin/master", "HEAD")
+    sh("checkout", "-b", "feature")
+    return d, sh
+
+
+def test_seam_changed_files_includes_rename_source_and_deleted(seam_repo):
+    """Mutation caught: remove `--no-renames` from the first arm and `a.txt` vanishes."""
+    d, sh = seam_repo
+    sh("mv", "a.txt", "c.txt")
+    sh("commit", "-m", "rename a to c")
+    got = _changed_files(d)
+    assert "a.txt" in got and "c.txt" in got
+    sh("rm", "z.txt")
+    sh("commit", "-m", "delete z")
+    assert "z.txt" in _changed_files(d)
+
+
+def test_seam_uncommitted_rename_includes_source(seam_repo):
+    """Mutation caught: remove `--no-renames` from the `HEAD` arm."""
+    d, sh = seam_repo
+    sh("mv", "a.txt", "e.txt")
+    got = _changed_files(d)
+    assert "a.txt" in got and "e.txt" in got

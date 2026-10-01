@@ -1,13 +1,16 @@
 ---
 name: burndown
-description: Run one automatic backlog burn-down batch: rank new issues, pick 5 units, route each item to a plan or an ad-hoc worktree, and start it.
-last_verified: 2026-09-29
+description: Run an automatic backlog burn-down: rank new issues, pick 5 units (backfilling freed units with further selection rounds), route each item to a plan or an ad-hoc worktree, and start it.
+last_verified: 2026-10-01
 ---
 
 # /burndown
 
-Run one automatic backlog burn-down batch. Picks up to 5 units of work from the
-highest-priority delta issues, routes each item, and starts implementation.
+Run an automatic backlog burn-down. Picks up to 5 units of work from the
+highest-priority delta issues, routes each item, and starts implementation. When an
+item closes as already fixed or is skipped, its unit is freed and a further selection
+round fills it. An xhigh item costs 2 units, so a run can end at 4 of 5 when no
+candidate fits the last unit.
 
 ## Exit-code contract (from `bin/lib/burndown.sh`)
 
@@ -71,8 +74,9 @@ nothing.
 bin/backlog burndown [--pair A,B]... | tee "$W/select.txt"
 ```
 
-Parse only the final `LEDGER:` line. `LEDGER: none` means all delta issues are in
-flight or over budget. Show the SKIP rows and stop.
+Parse only the final `LEDGER:` line. `LEDGER: none` on the first round means all
+delta issues are in flight or over budget. Show the SKIP rows and stop. On a later
+round it means the run is full or out of candidates. Go to step 6.
 
 A `SKIP ... skip-label: <label>` row is a tagged item. It consumes no unit. A
 `cleared blocked on #N` line on stderr means the blocking PR closed and the item is
@@ -90,8 +94,6 @@ If already fixed: `bin/backlog close <n> "<command + excerpt>"`, then:
 ```bash
 bin/backlog burndown-record <ledger> <n> status=closed-fixed
 ```
-
-Freed units are not backfilled; one batch per call.
 
 **Route.** Apply `.claude/rules/work-triage.md` (cite it; do not restate its bar). An
 item you cannot do gets one of three skip forms, then report why:
@@ -111,12 +113,12 @@ Check `gh auth status`, then rerun `bin/backlog burndown-tag <n> reason=...`.
 
 > Verify the issue's premise with a real scan or run before designing. Resolve
 > migration numbers at implement time. Base on master. Do not touch these files held
-> by other batch items: `<paths from every other ledger item>`. Emit `## Backlog
+> by other batch items: `<paths from every other live ledger item across all ledgers of this run>`. Emit `## Backlog
 > issues` with `closes a-jay85/IBL5-backlog#<n>` (plus each `also_closes`). A parser
 > or gate change carries a corpus diff in its verification.
 
-An item with empty `.paths` took the batch's solo slot and is the only item in it, so the
-`Do not touch` list is empty.
+An item with empty `.paths` took the batch's solo slot and is the only live item in the
+run, so the `Do not touch` list is empty.
 
 Fire `bin/plan-now` in its default queue mode through the plan-prompt skill's fire
 step. Never start automouse early. Then:
@@ -152,8 +154,22 @@ bin/backlog burndown-record <ledger> <n> route=ad-hoc slug=<slug> status=skipped
 ```
 
 Its worktree stays dirty and keeps the issue in flight through the Phase 3c worktree check.
+A failed ad-hoc item keeps its unit.
 
-**6. Report.** Show the full status:
+**Backfill.** Once every item in the current ledger has a settled status (closed-fixed,
+skipped, queued, or shipped), check for freed units. If any item closed-fixed, or was
+skipped with no ad-hoc route, run the selection again. Pass every ledger of this run so
+far:
+
+```bash
+bin/backlog burndown --after <L1> [--after <L2>]... [--pair A,B]... | tee -a "$W/select.txt"
+```
+
+Process the new ledger with step 5 again. Repeat until the output ends in
+`LEDGER: none`. The loop ends because every round either picks a new issue or returns
+none. Issues from earlier ledgers are excluded and never come back.
+
+**6. Report.** Show the full status. Run it for each ledger of the run:
 
 ```bash
 bin/backlog burndown-status <ledger>

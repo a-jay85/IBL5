@@ -1,0 +1,284 @@
+#!/bin/bash
+
+# Old-code compatibility gate: runs production's PHP tests against the PR-head
+# schema, which is the state auto-rollback leaves behind. This file holds the
+# verdict engine; the DB pipeline wraps it.
+#
+# Exit codes: 0 = pass, 1 = old code broke, 2 = usage error,
+#             3 = false-green guard tripped.
+
+set -euo pipefail
+
+BYPASS_MIN_LENGTH=20
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-old-code-compat --since=<sha> [--verdict-only --junit=<file> --phpunit-exit=<int>] [options]
+
+Runs the old tree's (origin/production) database PHPUnit suite against the
+PR-head schema and reports whether production PHP still works on it. A drop or
+rename that production still reads breaks that suite, and this gate fails.
+
+Required:
+  --since=<sha>             Diff base for "changed migrations". The range is
+                            <sha>...HEAD. Never derived inside the script.
+
+Verdict-only mode (no DB work; the inputs below stand in for the pipeline):
+  --verdict-only            Skip all DB work.
+  --junit=<file>            PHPUnit JUnit XML from the old-tree run (required).
+  --phpunit-exit=<int>      Old-tree phpunit exit code (required).
+  --seed-exit=<int>         Seed-import exit code (default 0).
+  --seed-log=<file>         Seed-import stderr, read when --seed-exit is nonzero.
+
+Options:
+  --migrations-dir=<dir>    Default ibl5/migrations.
+  --min-tests=<int>         Minimum executed tests (tests - skipped). Default 1.
+  --bypass-from-stdin       Read the PR body from stdin for the per-PR marker.
+  --help, -h                Show this message.
+
+All flags take the --name=value form. A bare "--name value" is an unknown flag.
+
+Bypass markers (distinct from destructive-migration:, which accepts data loss):
+  Per-file (SQL comment on an added line of a changed migration):
+    -- rollback-incompatible: <reason at least 20 chars>
+  Per-PR (HTML comment in the PR body, via --bypass-from-stdin):
+    <!-- rollback-incompatible: <reason at least 20 chars> -->
+
+The marker waives a real break. It never waives the false-green guard.
+
+Limits:
+  .php data migrations are not applied by run-migrations-ci, so they are not
+  part of the PR-head schema this gate tests.
+
+Exit codes:
+  0  pass
+  1  old code broke on the PR-head schema
+  2  usage error
+  3  false-green guard tripped (empty run, DB short of PR-head); not bypassable
+EOF
+}
+
+die_usage() {
+    echo "ERROR: $1" >&2
+    echo "Usage: bin/check-old-code-compat --since=<sha> [--verdict-only --junit=<file> --phpunit-exit=<int>] [options] (--help for more)" >&2
+    exit 2
+}
+
+require_int() {
+    case "$2" in
+        ''|*[!0-9]*) die_usage "$1 needs a non-negative integer, got: $2" ;;
+    esac
+}
+
+VERDICT_ONLY=0
+JUNIT=""
+PHPUNIT_EXIT=""
+SEED_EXIT=0
+SEED_LOG=""
+SINCE=""
+MIGRATIONS_DIR="ibl5/migrations"
+MIN_TESTS=1
+BYPASS_STDIN=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --verdict-only)
+            VERDICT_ONLY=1
+            ;;
+        --junit=*)
+            JUNIT="${arg#--junit=}"
+            ;;
+        --phpunit-exit=*)
+            PHPUNIT_EXIT="${arg#--phpunit-exit=}"
+            require_int "--phpunit-exit" "$PHPUNIT_EXIT"
+            ;;
+        --seed-exit=*)
+            SEED_EXIT="${arg#--seed-exit=}"
+            require_int "--seed-exit" "$SEED_EXIT"
+            ;;
+        --seed-log=*)
+            SEED_LOG="${arg#--seed-log=}"
+            ;;
+        --since=*)
+            SINCE="${arg#--since=}"
+            ;;
+        --migrations-dir=*)
+            MIGRATIONS_DIR="${arg#--migrations-dir=}"
+            ;;
+        --min-tests=*)
+            MIN_TESTS="${arg#--min-tests=}"
+            require_int "--min-tests" "$MIN_TESTS"
+            ;;
+        --bypass-from-stdin)
+            BYPASS_STDIN=1
+            ;;
+        *)
+            die_usage "unknown argument: $arg"
+            ;;
+    esac
+done
+
+[ -n "$SINCE" ] || die_usage "--since=<sha> is required"
+
+if [ "$VERDICT_ONLY" = "0" ]; then
+    die_usage "pipeline mode is not implemented yet; pass --verdict-only"
+fi
+
+# A seed break never reaches phpunit, so the junit inputs are optional then.
+if [ "$SEED_EXIT" = "0" ]; then
+    [ -n "$JUNIT" ] || die_usage "--junit=<file> is required with --verdict-only"
+    [ -n "$PHPUNIT_EXIT" ] || die_usage "--phpunit-exit=<int> is required with --verdict-only"
+fi
+
+if ! git -C "$MIGRATIONS_DIR" rev-parse --verify --quiet "${SINCE}^{commit}" >/dev/null 2>&1; then
+    die_usage "--since=$SINCE is not a commit in $MIGRATIONS_DIR"
+fi
+
+trim() {
+    echo "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+# Changed migrations, relative to the migrations dir so the same code reads the
+# real repo and a throwaway test repo. The baseline is a recreate template.
+changed_migrations() {
+    git -C "$MIGRATIONS_DIR" diff --relative --name-only --diff-filter=AM \
+        "$SINCE"...HEAD -- '*.sql' | grep -v '^000_baseline_schema\.sql$' || true
+}
+
+added_lines() {
+    git -C "$MIGRATIONS_DIR" diff --relative "$SINCE"...HEAD -- "$1" \
+        | grep '^+' | grep -v '^+++' | sed 's/^+//' || true
+}
+
+# Identifiers a migration drops, renames, or retypes: the names old code could
+# still be reading. Advisory only, so a miss degrades to candidate: lines.
+removed_identifiers() {
+    local ident upper
+    sed 's/--.*$//' \
+        | { grep -oiE '(DROP[[:space:]]+(COLUMN[[:space:]]+)?|CHANGE[[:space:]]+(COLUMN[[:space:]]+)?|MODIFY[[:space:]]+(COLUMN[[:space:]]+)?|RENAME[[:space:]]+(COLUMN|TABLE|TO)[[:space:]]+|DROP[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+EXISTS[[:space:]]+)?)`?[A-Za-z0-9_]+' || true; } \
+        | sed -E 's/.*[[:space:]`]//' | sort -u \
+        | while IFS= read -r ident; do
+            [ "${#ident}" -ge 3 ] || continue
+            upper="$(echo "$ident" | tr '[:lower:]' '[:upper:]')"
+            case "$upper" in
+                IF|EXISTS|COLUMN|TABLE|INDEX|KEY|CONSTRAINT|FOREIGN|PRIMARY|TO) continue ;;
+            esac
+            echo "$ident"
+        done
+}
+
+junit_attr() {
+    local line
+    line="$(grep -m1 '<testsuite ' "$JUNIT" || true)"
+    echo "$line" | sed -nE "s/.* $1=\"([0-9]+)\".*/\\1/p"
+}
+
+CHANGED="$(changed_migrations)"
+
+BROKE=0
+FAILURE_TEXT=""
+EXECUTED=0
+
+# 1. Seed break: a seed that cannot import into the new schema is a real break.
+if [ "$SEED_EXIT" != "0" ]; then
+    BROKE=1
+    if [ -n "$SEED_LOG" ] && [ -r "$SEED_LOG" ]; then
+        FAILURE_TEXT="$(cat "$SEED_LOG")"
+    fi
+else
+    # 2. False-green guard. No marker is consulted before this exit.
+    if [ ! -r "$JUNIT" ]; then
+        echo "OLD-CODE-COMPAT: FALSE-GREEN: junit file missing or unreadable: $JUNIT"
+        exit 3
+    fi
+    TESTS="$(junit_attr tests)"
+    if [ -z "$TESTS" ]; then
+        echo "OLD-CODE-COMPAT: FALSE-GREEN: no tests=\"N\" on the first <testsuite> line of $JUNIT"
+        exit 3
+    fi
+    SKIPPED="$(junit_attr skipped)"
+    SKIPPED="${SKIPPED:-0}"
+    EXECUTED=$((TESTS - SKIPPED))
+    if [ "$EXECUTED" -lt "$MIN_TESTS" ]; then
+        echo "OLD-CODE-COMPAT: FALSE-GREEN: $EXECUTED tests executed ($TESTS total, $SKIPPED skipped), need at least $MIN_TESTS"
+        exit 3
+    fi
+
+    # 3. Pass.
+    if [ "$PHPUNIT_EXIT" = "0" ]; then
+        echo "OLD-CODE-COMPAT: PASS ($EXECUTED tests executed)"
+        exit 0
+    fi
+    BROKE=1
+    FAILURE_TEXT="$(sed -n '/<failure/,/<\/failure>/p;/<error/,/<\/error>/p' "$JUNIT")"
+fi
+
+# 4. Name the offender.
+OFFENDERS=""
+while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    while IFS= read -r ident; do
+        [ -n "$ident" ] || continue
+        if grep -qiF -- "$ident" <<< "$FAILURE_TEXT"; then
+            OFFENDERS="${OFFENDERS}likely: ${f} (matched: ${ident})
+"
+        fi
+    done <<< "$(added_lines "$f" | removed_identifiers)"
+done <<< "$CHANGED"
+
+if [ -z "$OFFENDERS" ]; then
+    if [ -z "$CHANGED" ]; then
+        OFFENDERS="candidate: (no changed .sql migrations in --since range)
+"
+    else
+        while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            OFFENDERS="${OFFENDERS}candidate: ${f}
+"
+        done <<< "$CHANGED"
+    fi
+fi
+
+# 5. Bypass. Per-file markers count only on added lines of changed migrations.
+BYPASS_REASON=""
+while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    reason="$(added_lines "$f" | sed -n 's/^[[:space:]]*--[[:space:]]*rollback-incompatible:[[:space:]]*\(.\{1,\}\)/\1/p' | head -1 || true)"
+    reason="$(trim "$reason")"
+    if [ "${#reason}" -ge "$BYPASS_MIN_LENGTH" ]; then
+        BYPASS_REASON="$reason"
+        break
+    fi
+done <<< "$CHANGED"
+
+if [ -z "$BYPASS_REASON" ] && [ "$BYPASS_STDIN" = "1" ]; then
+    PR_BODY="$(cat)"
+    reason="$(echo "$PR_BODY" | sed -n 's/.*<!--[[:space:]]*rollback-incompatible:[[:space:]]*\(.\{1,\}\)[[:space:]]*-->.*/\1/p' | head -1 || true)"
+    reason="$(trim "$reason")"
+    if [ "${#reason}" -ge "$BYPASS_MIN_LENGTH" ]; then
+        BYPASS_REASON="$reason"
+    fi
+fi
+
+if [ -n "$BYPASS_REASON" ]; then
+    echo "OLD-CODE-COMPAT: PASS (bypass) reason: $BYPASS_REASON"
+    exit 0
+fi
+
+# 6. Fail.
+echo "OLD-CODE-COMPAT: FAIL: production PHP breaks on the PR-head schema"
+printf '%s' "$OFFENDERS"
+echo ""
+printf '%s\n' "$FAILURE_TEXT" | sed -n '1,40p'
+echo ""
+echo "If the break is intended (a contract phase, prod no longer reads it), add one of:"
+echo "  Per-file (SQL comment in the migration):"
+echo "    -- rollback-incompatible: <reason, 20+ chars>"
+echo "  Per-PR (HTML comment in the PR body):"
+echo "    <!-- rollback-incompatible: <reason, 20+ chars> -->"
+echo "See ibl5/migrations/README.md (Auto-Rollback Compatibility)."
+exit 1

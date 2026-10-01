@@ -34,8 +34,8 @@ CITED_RE = re.compile(
     r"(?:\b[\w.-]+/[\w.-]+#\d+\b|(?<![\w/])#\d+\b|\bbacklog#\d+\b|/issues/\d+|/pull/\d+)")
 
 # The item states a decision to exclude, or a boundary someone else already owns, not a
-# deferral. Each arm was added against a labelled false positive in the corpus review
-# (tests/fixtures/outofscope/corpus_hits.tsv): conditional "if a future ..." wording,
+# deferral. The arms past Phase 1's seven were tuned against corpus false positives that
+# are not committed (corpus_hits.tsv keeps only surviving hits): conditional "if a future ..." wording,
 # "would change / needs its own plan" boundary wording, a peer session or sibling plan that
 # already owns the work, and "a decision, not a deferral" preambles.
 REJECTION_RE = re.compile(

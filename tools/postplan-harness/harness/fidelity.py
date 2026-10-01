@@ -1061,6 +1061,67 @@ def _shape_excerpt(excerpt: str) -> tuple[str, list[str]]:
     return "\n".join(collapsed).strip("\n"), coverage
 
 
+BACKLOG_ISSUES_URL = "https://github.com/a-jay85/IBL5-backlog/issues/"
+PR_URL = "https://github.com/a-jay85/IBL5/pull/"
+
+_BACKLOG_REF = r"(?:a-jay85/)?(?:IBL5-)?backlog#(\d+)(?!\d)"
+_REF_RE = re.compile(
+    r"(?<![\w/])" + _BACKLOG_REF
+    + r"|(?<![\w/&\[#-])#(\d{3,})(?!\d)",
+    re.IGNORECASE)
+_WHOLE_BACKLOG_RE = re.compile(_BACKLOG_REF, re.IGNORECASE)
+# Existing markdown links and code spans are opaque: the leftmost match wins, so a ref
+# inside either is never seen by _REF_RE.
+_OPAQUE_RE = re.compile(r"\[[^\]\n]*\]\([^)\n]*\)|`[^`\n]*`")
+
+
+def _backlog_link(text: str, n) -> str:
+    return f"[{text}](<{BACKLOG_ISSUES_URL}{n}>)"
+
+
+def _link_plain(seg: str) -> str:
+    def repl(m):
+        if m.group(1):
+            return _backlog_link(m.group(0), m.group(1))
+        return f"[#{m.group(2)}](<{PR_URL}{m.group(2)}>)"
+    return _REF_RE.sub(repl, seg)
+
+
+def linkify_refs(text: str) -> str:
+    """Turn backlog and PR refs in digest prose into explicit markdown links.
+
+    Backlog refs never autolink on GitHub and nothing autolinks in the Discord DM, so the
+    links are spelled out; the URL sits in `<>` (valid CommonMark, and Discord skips the
+    embed, as bin/digest-dm-build does). Backlog forms run in the same leftmost pass as
+    bare `#N` (3+ digits, same bar as bin/check-prose), so `backlog#12` is not re-matched.
+    Text inside an existing link or a code span is left alone, except a code span whose
+    whole content is one backlog ref, which is unwrapped. Idempotent.
+    """
+    out: list[str] = []
+    pos = 0
+    for m in _OPAQUE_RE.finditer(text):
+        out.append(_link_plain(text[pos:m.start()]))
+        tok = m.group(0)
+        inner = tok[1:-1] if tok.startswith("`") else None
+        wm = _WHOLE_BACKLOG_RE.fullmatch(inner) if inner is not None else None
+        out.append(_backlog_link(inner, wm.group(1)) if wm else tok)
+        pos = m.end()
+    out.append(_link_plain(text[pos:]))
+    return "".join(out)
+
+
+def digest_rows_for_display(digest: list, fid: dict) -> list:
+    """The five digest rows exactly as the sticky prints them, remediation suffix included.
+
+    Shared by compose_sticky and the runner's PR-body write so the two cannot disagree.
+    """
+    rows = list(digest)[:5]
+    sha = (fid or {}).get("remediation_sha")
+    if sha and len(rows) == 5:
+        rows[4] = rows[4] + f" (post-plan remediation: {sha})"
+    return rows
+
+
 def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
                    digest: list, excerpt: str, terminal: str, *,
                    diff_id: str = "", plan_hash: str = "",
@@ -1122,15 +1183,11 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
     nums = fid.get("backlog_issue_numbers") or []
     if nums:
         out.append("**Backlog issues filed:** " + ", ".join(
-            f"a-jay85/IBL5-backlog#{n}" for n in nums))
+            _backlog_link(f"a-jay85/IBL5-backlog#{n}", n) for n in nums))
 
     out.append("")
     out.append(MERGE_DIGEST_HEADING)
-    rows = list(digest)[:5]
-    sha = fid.get("remediation_sha")
-    if sha and len(rows) == 5:
-        rows[4] = rows[4] + f" (post-plan remediation: {sha})"
-    out.extend(rows)
+    out.extend(digest_rows_for_display(digest, fid))
 
     # The digest block must END here. `_digest_labels` in bin/digest-dm-build folds every
     # later non-label, non-blank line into the LAST label's value until it hits a heading
@@ -1231,7 +1288,7 @@ def digest_lines(worktree, master_sha: str, verdict_path: str, out_dir: str,
     # digest.sh's own `<label> unavailable — <reason>` degrades pass this shape test and are
     # used verbatim, exactly as the skill pastes them. The tree-line strip runs AFTER the
     # shape test, so a label reduced to just its label still degrades the same way.
-    return [_REVIEWED_TREE_TAIL_RE.sub("", ln) for ln in lines]
+    return [linkify_refs(_REVIEWED_TREE_TAIL_RE.sub("", ln)) for ln in lines]
 
 
 def _review_owed_result(verdict: str, reason: str, *, fired: bool = False,

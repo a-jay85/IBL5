@@ -107,6 +107,7 @@ class CashConsiderationsYearAdvancerIntegrationTest extends DatabaseTestCase
         self::assertSame(0, $second);
         self::assertSame(2, $this->readCy('CY-ADVANCE-TEST-A'));
         self::assertSame(4, $this->readCy('CY-ADVANCE-TEST-B'));
+        self::assertSame('2010', $this->readMarker());
     }
 
     public function testMigrationSeedsMarkerAt2026(): void

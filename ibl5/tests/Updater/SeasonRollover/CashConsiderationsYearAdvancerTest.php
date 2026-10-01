@@ -74,8 +74,9 @@ final class CashConsiderationsYearAdvancerTest extends TestCase
         $ledger = self::createMock(BuyoutLedgerRepositoryInterface::class);
         $ledger->expects($this->never())->method('advanceAllCy');
 
-        $settings = self::createStub(LeagueControlPanelRepositoryInterface::class);
-        $settings->method('getSetting')->willReturn(null);
+        $settings = self::createMock(LeagueControlPanelRepositoryInterface::class);
+        $settings->expects($this->once())->method('getSetting')->willReturn(null);
+        $settings->expects($this->never())->method('updateSetting');
 
         $advancer = new CashConsiderationsYearAdvancer($ledger, $settings);
 
@@ -89,8 +90,9 @@ final class CashConsiderationsYearAdvancerTest extends TestCase
         $ledger = self::createMock(BuyoutLedgerRepositoryInterface::class);
         $ledger->expects($this->never())->method('advanceAllCy');
 
-        $settings = self::createStub(LeagueControlPanelRepositoryInterface::class);
-        $settings->method('getSetting')->willReturn('not-a-year');
+        $settings = self::createMock(LeagueControlPanelRepositoryInterface::class);
+        $settings->expects($this->once())->method('getSetting')->willReturn('not-a-year');
+        $settings->expects($this->never())->method('updateSetting');
 
         $advancer = new CashConsiderationsYearAdvancer($ledger, $settings);
 

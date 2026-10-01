@@ -857,6 +857,66 @@ assert_rc "named-untracked-exit3" 3 "$SPLIT_RC"
 assert_match "named-untracked-stderr-reason" \
     "^bin/cleanup: 'feat' skipped: has untracked files$" "$(cat "$SPLIT_ERR")"
 
+# ----------------------------------------------------------------------------
+# kill_infra_processes must not kill a live job that merely NAMES the worktree.
+# PRs #2466 and #2606: a post-merge `bin/cleanup --all` SIGKILLed an in-flight
+# post-plan run (`bash -lc "cd <worktree> ..."`) via a `pgrep -f <path>` sweep,
+# then removed the worktree because the in-use check no longer saw the job.
+# ----------------------------------------------------------------------------
+# Physical path: lsof reports the resolved cwd (/private/var/... on macOS).
+mkdir -p "$TMP/killwt/feat" "$TMP/killwt/feat-2"
+kw="$(cd "$TMP/killwt/feat" && pwd -P)"
+# The victim shape: argv carries the worktree path, cwd is inside it. The
+# trailing `:` stops bash from exec'ing sleep, so the path stays in argv.
+bash -c "cd '$kw' && sleep 300; :" >/dev/null 2>&1 & victim=$!
+sibling="" infra=""
+# lsof names a process by its real binary, so only a real node can stand in
+# for an infra watcher (a copied or symlinked sleep still reports as sleep).
+if command -v node >/dev/null 2>&1 && command -v lsof >/dev/null 2>&1; then
+    (cd "$kw-2" && exec node -e 'setTimeout(() => {}, 300000)') >/dev/null 2>&1 & sibling=$!
+    (cd "$kw" && exec node -e 'setTimeout(() => {}, 300000)') >/dev/null 2>&1 & infra=$!
+fi
+_reap_kill_procs() {
+    local p
+    for p in $victim $sibling $infra; do
+        pkill -9 -P "$p" 2>/dev/null || true
+        kill -9 "$p" 2>/dev/null || true
+    done
+}
+trap '_reap_kill_procs; chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
+sleep 1
+kill_infra_processes "$kw"
+sleep 1
+if kill -0 "$victim" 2>/dev/null; then
+    pass "kill-infra-spares-job-naming-worktree"
+else
+    failcase "kill-infra-spares-job-naming-worktree"
+fi
+if ! command -v lsof >/dev/null 2>&1; then
+    echo "SKIP: kill-infra-then-in-use-still-sees-job (no lsof)"
+elif is_worktree_in_use "$kw"; then
+    pass "kill-infra-then-in-use-still-sees-job"
+else
+    failcase "kill-infra-then-in-use-still-sees-job"
+fi
+if [ -n "$infra" ]; then
+    if kill -0 "$sibling" 2>/dev/null; then
+        pass "kill-infra-spares-prefix-sibling-worktree"
+    else
+        failcase "kill-infra-spares-prefix-sibling-worktree"
+    fi
+    if kill -0 "$infra" 2>/dev/null; then
+        failcase "kill-infra-still-kills-node-in-worktree"
+    else
+        pass "kill-infra-still-kills-node-in-worktree"
+    fi
+else
+    echo "SKIP: kill-infra-spares-prefix-sibling-worktree (no node or lsof)"
+    echo "SKIP: kill-infra-still-kills-node-in-worktree (no node or lsof)"
+fi
+_reap_kill_procs
+wait 2>/dev/null || true
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

@@ -927,6 +927,7 @@ test_decide_run_sid_unset_uses_hook_sid() {
     assert_file run_sid_unset:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
 }
 
+# Run sid S = $SID_B, hook sid = $SID_A: the marker is markers/S.json, never the child's.
 test_decide_run_sid_keys_marker() {
     decide_setup 99
     local out m="$IBL5_USAGE_GATE_STATE_DIR/markers"

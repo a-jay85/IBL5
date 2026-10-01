@@ -1,6 +1,8 @@
 """Usage-gate pause for the post-plan harness (ADR-0143 addendum).
 
-Adapter-level and runner-level tests: the gate context, the gate-lib bridge, the
+Adapter-level and runner-level tests. They run beside the existing suites they must
+not disturb: test_runner_replay.py, test_llm_tooled.py, test_llm_usage_limit.py and
+test_runner_exit_codes.py. Covered here: the gate context, the gate-lib bridge, the
 pre-spawn gate and shared pause flag in ClaudeCli, the exit-75 map in runner.main,
 and the resume effect ledger. The bash library is faked by a stub `usage-gate.sh`
 whose functions read env vars, except in the real-library row at the end.
@@ -379,6 +381,7 @@ def test_parallel_calls_one_pause(shim, gate, tmp_path, monkeypatch):
 
 
 def test_tooled_hook_pause_clean_tree(shim, gate, tmp_path, monkeypatch):
+    """The child hook wrote an S marker and left the tree alone: UsagePause(dirty=False)."""
     repo = _git_repo(tmp_path / "wt")
     monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
     with pytest.raises(UsagePause) as ei:
@@ -387,6 +390,7 @@ def test_tooled_hook_pause_clean_tree(shim, gate, tmp_path, monkeypatch):
 
 
 def test_tooled_hook_pause_dirty_tree(shim, gate, tmp_path, monkeypatch):
+    """The same pause after the child edited the tree: UsagePause(dirty=True)."""
     repo = _git_repo(tmp_path / "wt")
     monkeypatch.setenv("FAKE_MARKER_EXISTS_RC", "0")
     monkeypatch.setenv("CLAUDE_SHIM_TOUCH", str(repo / "half-edit.txt"))

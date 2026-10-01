@@ -182,7 +182,7 @@ class GitHubDispatchClientTest extends TestCase
     /**
      * Reflection predicate: reports every way a class holds a DB handle or actor identity.
      *
-     * @param \ReflectionClass<object> $class
+     * @param \ReflectionClass<*> $class
      * @return list<string>
      */
     private static function findDbOrIdentityViolations(\ReflectionClass $class): array

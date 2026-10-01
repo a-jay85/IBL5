@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time; no deferred manual items; E2E assertions must be seed- and DOM-grounded.
-last_verified: 2026-09-29
+last_verified: 2026-09-30
 ---
 
 # Plan Verification Matrix
@@ -62,6 +62,9 @@ Harness rules (`parse_no_change_test_paths` in `tools/postplan-harness/harness/p
 - Honored only on a row with a cell reading exactly `Visual-regression`. Elsewhere the marker is ignored. `bin/check-plan` gate `[X]` rejects it on other row types and anywhere but directly after the token.
 - Exempts only that row's token. If another row plans the same token unmarked, the unmarked row wins.
 - Fenced examples never count.
+
+### One-time-check rows
+A `CLI-executable` row whose evidence is a single run at plan time (a corpus diff, a counterfactual mutation, a command's printed output) ends its "What to verify" cell with `(one-time-check: <reason of 15+ characters>)`. `bin/lib/plan-matrix-assertions` then skips that row's assertion-footprint check and prints `ONE-TIME-CHECK: row N` instead of `UNREALISED-ASSERTION`. The tag sits outside backticks, holds no `(`, `)`, `|` or backtick, and is honored only as the trailing text of that cell on a row whose type cell reads exactly `CLI-executable`; a tag anywhere else is ignored fail-closed and the row is checked as untagged. `bin/check-plan` gate `[Y]` rejects a malformed tag, a tag on any other row type, and a matrix with tagged rows above one third of its rows. The cell still says what was run and what it printed. Never tag a row a regression test could pin; the allowed shapes are listed in `.claude/skills/plan/_architect-contract.md`.
 
 ### Pre-prod exercise paths
 

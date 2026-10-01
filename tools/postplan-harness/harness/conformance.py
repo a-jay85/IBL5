@@ -14,11 +14,16 @@ from .state import PhaseInfo, PlanInfo
 _MATRIX_ASSERTIONS_SCRIPT = str(
     PurePosixPath(os.path.abspath(__file__)).parents[3] / "bin" / "lib" / "plan-matrix-assertions")
 
-# Tier 3 of _resolve: a plan-named migration whose number shifted at implementation
-# time because a parallel branch claimed the same number first (backlog#937). The
-# directory prefix is part of the pattern on purpose — the tolerance is for
-# `ibl5/migrations/NNN_<suffix>` only, never for any other numbered filename.
+# Tier 3 of _resolve: a plan-named migration or ADR whose number shifted at
+# implementation time because a parallel branch claimed the same number first
+# (backlog#937 for migrations, backlog#1169 for ADRs). The directory prefix is part
+# of each pattern on purpose — the tolerance is for `ibl5/migrations/NNN_<suffix>`
+# and `ibl5/docs/decisions/NNNN-<suffix>` only, never for any other numbered
+# filename. The two prefixes are disjoint, so a token matches at most one pattern.
 _MIGRATION_RENUMBER = re.compile(r"^ibl5/migrations/\d+_(?P<suffix>.+)$")
+# Exactly four digits: `bin/next-adr` emits `printf "%04d"` and `bin/check-numbering`
+# greps `^[0-9]{4}-`. A 3- or 5-digit prefix is not an ADR filename and gets no tolerance.
+_ADR_RENUMBER = re.compile(r"^ibl5/docs/decisions/\d{4}-(?P<suffix>.+)$")
 
 
 def _contract_items(plan: PlanInfo, changed_files: list[str],
@@ -71,6 +76,28 @@ def _renumbered_migration(tok: str, changed_files: list[str]) -> str | None:
     return hits[0] if len(hits) == 1 else None
 
 
+def _renumbered_adr(tok: str, changed_files: list[str]) -> str | None:
+    """The single changed ADR sharing `tok`'s suffix under a different number.
+
+    None unless `tok` is `ibl5/docs/decisions/NNNN-<suffix>` AND exactly one changed
+    path is `ibl5/docs/decisions/MMMM-<suffix>` with the identical suffix. Two such
+    paths is ambiguous and returns None, so a MISSING-FILE still fires; the caller
+    has already established that no exact, suffix, or basename match exists. Kept
+    as a sibling of `_renumbered_migration` rather than a shared helper so the
+    migration tier's body stays byte-identical (backlog#1169 scope).
+    """
+    m = _ADR_RENUMBER.match(tok)
+    if not m:
+        return None
+    suffix = m.group("suffix")
+    hits: list[str] = []
+    for f in changed_files:
+        n = _ADR_RENUMBER.match(f)
+        if n and n.group("suffix") == suffix:
+            hits.append(f)
+    return hits[0] if len(hits) == 1 else None
+
+
 def _resolve(tok: str, changed_files: list[str]) -> str | None:
     """The single changed path a plan token names, or None when 0 or 2+ candidates.
 
@@ -89,9 +116,13 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
 
     Tier 3 runs only when Tiers 1 and 2 found nothing: a token of the form
     `ibl5/migrations/NNN_<suffix>` resolves to the one changed path
-    `ibl5/migrations/MMM_<suffix>` with the identical suffix, which is the shape a
-    plan-authorized renumber produces when `bin/next-migration` prints a different
-    number than the plan quoted. Zero or 2+ same-suffix paths still return None.
+    `ibl5/migrations/MMM_<suffix>` with the identical suffix, and a token of the
+    form `ibl5/docs/decisions/NNNN-<suffix>` resolves to the one changed path
+    `ibl5/docs/decisions/MMMM-<suffix>`. Both are the shape a plan-authorized
+    renumber produces when `bin/next-migration` or `bin/next-adr` prints a
+    different number than the plan quoted. Migration is checked first, then ADR;
+    the prefixes are disjoint so order never changes the result. Zero or 2+
+    same-suffix paths still return None.
     """
     tok = tok.strip().strip("/")
     # pytest node-id form `path/to/file.py::test_name` — strip the test-name
@@ -118,7 +149,7 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
         return cands.pop()
     if cands:
         return None
-    return _renumbered_migration(tok, changed_files)
+    return _renumbered_migration(tok, changed_files) or _renumbered_adr(tok, changed_files)
 
 
 def _touched(tok: str, changed_files: list[str]) -> bool:
@@ -147,7 +178,7 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str]) -> list[str]:
 
     Exempt, in order: a phase whose heading carries an all-S `[phases: S]` marker
     (bookkeeping), a phase number named in `## Out of Scope` (declared deferred), and a
-    phase whose body cites no path at all (no evidence = cannot verify = skip). Empty when
+    phase whose heading and body cite no path at all (no evidence = cannot verify = skip). Empty when
     the plan was not found or has no parsed phases, so a plan-blind run and every
     pre-existing PlanInfo literal produce nothing. Hold-only: the items flow into arming
     condition (3) via check(); fidelity.build_work_list excludes them from the fixer loop.

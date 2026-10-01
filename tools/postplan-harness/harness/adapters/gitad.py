@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from ..state import HarnessError
+from ..conflict import classify, parse_unmerged
 
 # Local gate denials (bin/pre-commit-hook, bin/pre-push-adr-hook) are deterministic:
 # re-running the FULL /post-plan skill hits the identical hook and cannot clear it
@@ -131,6 +132,11 @@ class LiveGit:
         # the index. Reset at the start of each rebase method; read by runner.py for the
         # audit log so a fail-closed exit 3 names the files that conflicted.
         self.last_conflict_files: tuple[str, ...] = ()
+        # Probe-only state (set by predict_rebase_conflict, read by resolver_refusal_reason).
+        # Stage sets per conflicted path from the merge-tree probe, and whether the probe's
+        # net merge is guaranteed to match the per-commit rebase (see predict_rebase_conflict).
+        self.last_conflict_stages: dict[str, frozenset[int]] = {}
+        self.last_probe_exact: bool = False
         # HEAD before the current rebase; None outside one. The public rebase methods
         # clear it in `finally`. The SIGTERM handler reads it to abort and restore.
         self._pre_rebase_sha: Optional[str] = None
@@ -318,23 +324,35 @@ class LiveGit:
                              check=False).strip()
         return resolved or None
 
-    def _merge_tree_conflicts(self, merge_base: str, base: str, tree: str) -> tuple[str, ...]:
-        """One `git merge-tree --write-tree` probe. Returns the conflicted paths, sorted and
-        deduplicated; () means a clean merge. Exit 1 is git's only "conflicts" code, so any
-        other non-zero exit raises HarnessError("git") and the caller fails open."""
+    def _merge_tree_conflicts(self, merge_base: str, base: str,
+                              tree: str) -> dict[str, frozenset[int]]:
+        """One `git merge-tree --write-tree` probe. Returns {path: stages} for each conflicted
+        path; {} means a clean merge. Exit 1 is git's only "conflicts" code, so any other
+        non-zero exit raises HarnessError("git") and the caller fails open.
+
+        Without --name-only, stdout is the merged tree OID followed by one
+        `mode oid stage<TAB>path` line per conflicted index entry, the exact shape of
+        `git ls-files --unmerged`, so conflict.parse_unmerged reads it verbatim. The stage
+        sets match what a real rebase leaves (both-modified {1,2,3}, delete/modify two
+        stages). Unparseable output raises HarnessError("git"): same fail-open path."""
         proc = subprocess.run(
-            ["git", "-C", self.worktree, "merge-tree", "--write-tree", "--name-only",
+            ["git", "-C", self.worktree, "merge-tree", "--write-tree",
              "--no-messages", f"--merge-base={merge_base}", base, tree],
             capture_output=True, text=True, errors="replace")
         if proc.returncode == 0:
-            return ()
+            return {}
         if proc.returncode != 1:
             raise HarnessError(
                 "git", f"git merge-tree (rc={proc.returncode}): {proc.stderr.strip()[:400]}")
-        # stdout: line 1 = merged tree OID; each later non-empty line = a conflicted path
-        # (repeated once per index stage under --name-only).
-        paths = {p for p in proc.stdout.splitlines()[1:] if p.strip()}
-        return tuple(sorted(paths))
+        # Line 1 is the merged tree OID; skip it.
+        body = "\n".join(proc.stdout.splitlines()[1:])
+        try:
+            parsed = parse_unmerged(body)
+        except ValueError as exc:
+            raise HarnessError("git", f"git merge-tree: unparseable conflict output: {exc}")
+        if not parsed:
+            raise HarnessError("git", "git merge-tree exited 1 but listed no conflicted entries")
+        return {path: frozenset(stages) for path, stages in parsed.items()}
 
     def predict_rebase_conflict(self, base: str = "origin/master") -> tuple[str, ...]:
         """Predict, without touching refs, index, or worktree, whether a rebase onto `base`
@@ -346,9 +364,12 @@ class LiveGit:
 
         Raises HarnessError("git") on any git error; the caller treats that as "no prediction"
         and falls through. Does not raise HarnessError("rebase-conflict") — gating on a
-        predicted conflict is the caller's responsibility."""
+        predicted conflict is the caller's responsibility. On a predicted conflict it also
+        sets last_conflict_stages and last_probe_exact for resolver_refusal_reason()."""
         self.last_conflict_files = ()
-        tree = self._run("write-tree").strip()
+        self.last_conflict_stages = {}
+        self.last_probe_exact = False
+        tree =self._run("write-tree").strip()
         fork_point = self._run("merge-base", "HEAD", base).strip()
         if not tree or not fork_point:
             raise HarnessError("git", f"conflict probe: empty write-tree/merge-base output "
@@ -362,8 +383,38 @@ class LiveGit:
             if not onto_conflicted:
                 return ()
             conflicted = onto_conflicted
-        self.last_conflict_files = conflicted
-        return conflicted
+        # Exactness: the probe merges the NET index tree; the rebase replays per commit, and
+        # the two can disagree once the branch has >= 1 commit past the fork point. They are
+        # identical only when the staged work becomes the single replayed commit. A recorded
+        # iblBase gives autoresolve_stacked_rebase a second chance, so the plain-arm verdict
+        # is not terminal there either.
+        count_out = self._run("rev-list", "--count", f"{fork_point}..HEAD").strip()
+        try:
+            branch_commits = int(count_out)
+        except ValueError:
+            raise HarnessError("git", f"conflict probe: bad rev-list --count output {count_out!r}")
+        self.last_conflict_files = tuple(sorted(conflicted))
+        self.last_conflict_stages = dict(conflicted)
+        self.last_probe_exact = branch_commits == 0 and ibl_base is None
+        return self.last_conflict_files
+
+    def resolver_refusal_reason(self) -> Optional[str]:
+        """Reason the LLM resolver is certain to refuse the conflict the last
+        predict_rebase_conflict() call predicted, or None when it might resolve it.
+
+        Decidable before the rebase only through conflict.classify (migration .sql,
+        lockfile, stages != {1, 2, 3}); binary files, LLM decline, marker survival, and the
+        lost-work / tree-equivalence proofs are post-LLM and never predicted here. Returns
+        None unless the probe was exact (no branch commits past the fork point and no
+        iblBase), because only then does the probe's net merge equal the rebase that the
+        resolver will see. Paths are checked in sorted order; the first reason wins."""
+        if not self.last_probe_exact:
+            return None
+        for path in sorted(self.last_conflict_stages):
+            reason = classify(path, set(self.last_conflict_stages[path]))
+            if reason is not None:
+                return reason
+        return None
 
     def _load_lostwork(self, master_sha: str, key: str) -> Optional[Path]:
         """Load lostwork.sh from a pinned master SHA. Returns the path, or None if absent."""

@@ -53,6 +53,14 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringContainsString('value="Playoffs" selected', $html);
     }
 
+    public function testRenderWrapsContentInMainLandmark(): void
+    {
+        $html = $this->renderWithDefaults();
+
+        $this->assertStringContainsString('<main class="updater">', $html);
+        $this->assertStringContainsString('</main>', $html);
+    }
+
     public function testRenderShowsSuccessFlashMessage(): void
     {
         $html = $this->renderWithDefaults([

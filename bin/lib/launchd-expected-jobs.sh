@@ -23,6 +23,7 @@ com.ibl5.automouse-morning-digest standard
 com.ibl5.backups-sync standard
 com.ibl5.bug-bot keepalive
 com.ibl5.bug-pipeline-cron standard
+com.ibl5.db-backups-pull standard
 com.ibl5.db-sync-nightly standard
 com.ibl5.docfix-poll standard
 com.ibl5.sim-recap-poll phase-gated

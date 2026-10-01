@@ -434,20 +434,23 @@ _PHASE_HEADING_RE = re.compile(r"^##\s+(?:Phase|Step)\s*(\d+)(?!\.\d)\b\s*[:.\-â
 # All-S tier marker = bookkeeping-only phase (close a backlog issue, bump a doc date).
 _BOOKKEEPING_MARKER_RE = re.compile(r"\[phases:\s*S(\s*/\s*S)*\s*\]")
 _EXAMPLE_SUFFIX_RE = re.compile(r"^\s*\(example\)")
+_LINE_SUFFIX_RE = re.compile(r"(?::|#)L?\d+(?:-L?\d+)?$")
 
 
 def _phase_evidence_paths(body: str) -> list[str]:
     """Backticked tokens in a phase body that look like repo paths, deduped, first-seen order.
 
     A token followed by ` (example)` is an intentionally-absent path (staleness-guard idiom)
-    and is skipped. A `path::test_fn` pytest node id contributes its file part only. Glob
-    tokens are skipped because _resolve cannot match them.
+    and is skipped. A `path::test_fn` pytest node id contributes its file part only. A
+    trailing line suffix (`:120`, `:438-457`, `#L12-L20`) is stripped so the token matches
+    the changed file. Glob tokens are skipped because _resolve cannot match them.
     """
     out: list[str] = []
     for m in re.finditer(r"`([^`\n]+)`", body):
         if _EXAMPLE_SUFFIX_RE.match(body[m.end():m.end() + 12]):
             continue
         tok = m.group(1).split("::", 1)[0].strip()
+        tok = _LINE_SUFFIX_RE.sub("", tok)
         if not _is_test_path(tok) or re.search(r"[*?\[\]]", tok):
             continue
         if tok not in out:
@@ -458,7 +461,9 @@ def _phase_evidence_paths(body: str) -> list[str]:
 def parse_phases(content: str) -> list[PhaseInfo]:
     """One PhaseInfo per `## Phase N:` / `## Step N:` h2 heading, in document order.
 
-    The body runs to the next h2 (`## `), so `### Delegate` packets inside a phase are part
+    Backticked paths in the heading itself count as evidence, ahead of body paths: a
+    heading like `## Phase 3: Tests in `tests/test_x.py`` names the phase's target file
+    even when the body only cites fixture strings. The body runs to the next h2 (`## `), so `### Delegate` packets inside a phase are part
     of that phase and their Scope/Recipe paths count as evidence. Fenced blocks are
     stripped first. Sub-numbered headings (`## Phase 5.5:`) and h3 headings never open a
     phase. A repeated phase number merges into the first occurrence (evidence unioned) so
@@ -493,6 +498,7 @@ def parse_phases(content: str) -> list[PhaseInfo]:
                                     bookkeeping=bool(_BOOKKEEPING_MARKER_RE.search(heading)))
                 by_number[num] = current
                 phases.append(current)
+            buf = [heading]
             continue
         if current is not None:
             buf.append(line)

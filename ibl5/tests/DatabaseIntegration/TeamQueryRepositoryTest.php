@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration;
 
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 use Team\TeamQueryRepository;
+use Team\TeamCapCalculator;
 
 #[Group('database')]
 class TeamQueryRepositoryTest extends DatabaseTestCase
@@ -273,6 +275,117 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
         // Verify the SF player is NOT in PG results
         $pids = array_column($result, 'pid');
         self::assertNotContains(200090111, $pids, 'SF player should not be in PG query');
+    }
+
+    // --- Unique-pid contract (feeds TeamCapCalculator salary totals) ---
+
+    /**
+     * TeamCapCalculator sums every row it is given, so pid uniqueness is this
+     * query layer's contract (backlog a-jay85/IBL5-backlog#228).
+     *
+     * @return list<int> Team-1 pids that every under-contract query must return once
+     */
+    private function seedUniquePidRoster(): array
+    {
+        $this->insertTestPlayer(200090201, 'Unique Pid A', ['teamid' => 1, 'pos' => 'PG', 'salary_yr1' => 1000, 'salary_yr2' => 2000]);
+        $this->insertTestPlayer(200090202, 'Unique Pid B', ['teamid' => 1, 'pos' => 'PG', 'salary_yr1' => 1100, 'salary_yr2' => 2100]);
+        $this->insertTestPlayer(200090203, 'Unique Pid C', ['teamid' => 1, 'pos' => 'PG', 'salary_yr1' => 1200, 'salary_yr2' => 2200]);
+        $this->insertTestPlayer(200090204, 'Unique Pid Team Two', ['teamid' => 2, 'pos' => 'PG', 'salary_yr1' => 1300, 'salary_yr2' => 2300]);
+        $this->insertTestPlayer(200090205, 'Unique Pid Team Three', ['teamid' => 3, 'pos' => 'PG', 'salary_yr1' => 1400, 'salary_yr2' => 2400]);
+        $this->insertTestPlayer(200090206, 'Unique Pid Retired', ['teamid' => 1, 'pos' => 'PG', 'retired' => 1]);
+
+        return [200090201, 200090202, 200090203];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function primaryKeyColumns(string $table): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = 'PRIMARY' ORDER BY ORDINAL_POSITION"
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('s', $table);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        self::assertNotFalse($result);
+
+        $columns = [];
+        while ($row = $result->fetch_assoc()) {
+            $columns[] = (string) $row['COLUMN_NAME'];
+        }
+        $stmt->close();
+
+        return $columns;
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function underContractQueryProvider(): array
+    {
+        return [
+            'all under contract' => ['all'],
+            'by position PG' => ['byPosition'],
+            'roster ordered by name' => ['rosterByName'],
+        ];
+    }
+
+    #[DataProvider('underContractQueryProvider')]
+    public function testUnderContractQueriesReturnEachPidOnce(string $query): void
+    {
+        $seeded = $this->seedUniquePidRoster();
+
+        $rows = match ($query) {
+            'all' => $this->repo->getAllPlayersUnderContract(self::TEST_TID),
+            'byPosition' => $this->repo->getPlayersUnderContractByPosition(self::TEST_TID, 'PG'),
+            'rosterByName' => $this->repo->getRosterUnderContractOrderedByName(self::TEST_TID),
+            default => self::fail('Unknown query label: ' . $query),
+        };
+        $pids = array_column($rows, 'pid');
+
+        self::assertCount(
+            count($rows),
+            array_unique($pids),
+            $query . ' returned a repeated pid, which TeamCapCalculator would double-count'
+        );
+        foreach ($seeded as $pid) {
+            self::assertContains($pid, $pids, $query . ' should return seeded team-1 pid ' . $pid);
+        }
+        self::assertNotContains(200090204, $pids, $query . ' should not return a team-2 player');
+        self::assertNotContains(200090205, $pids, $query . ' should not return a team-3 player');
+        self::assertNotContains(200090206, $pids, $query . ' should not return a retired player');
+    }
+
+    public function testPlayerAndTeamPrimaryKeysAreSingleColumn(): void
+    {
+        self::assertSame(['pid'], $this->primaryKeyColumns('ibl_plr'));
+        self::assertSame(['teamid'], $this->primaryKeyColumns('ibl_team_info'));
+    }
+
+    public function testCapTotalsOverFetchedRowsEqualTotalsOverDistinctPids(): void
+    {
+        $this->seedUniquePidRoster();
+        $calculator = new TeamCapCalculator($this->db);
+
+        $rosterRows = $this->repo->getRosterUnderContractOrderedByName(self::TEST_TID);
+        $rosterDistinct = array_values(array_column($rosterRows, null, 'pid'));
+        $currentTotal = $calculator->getTotalCurrentSeasonSalaries($rosterRows);
+        self::assertGreaterThan(0, $currentTotal);
+        self::assertSame($calculator->getTotalCurrentSeasonSalaries($rosterDistinct), $currentTotal);
+
+        $allRows = $this->repo->getAllPlayersUnderContract(self::TEST_TID);
+        $allDistinct = array_values(array_column($allRows, null, 'pid'));
+        $nextTotalAll = $calculator->getTotalNextSeasonSalaries($allRows);
+        self::assertGreaterThan(0, $nextTotalAll);
+        self::assertSame($calculator->getTotalNextSeasonSalaries($allDistinct), $nextTotalAll);
+
+        $positionRows = $this->repo->getPlayersUnderContractByPosition(self::TEST_TID, 'PG');
+        $positionDistinct = array_values(array_column($positionRows, null, 'pid'));
+        $nextTotalPosition = $calculator->getTotalNextSeasonSalaries($positionRows);
+        self::assertGreaterThan(0, $nextTotalPosition);
+        self::assertSame($calculator->getTotalNextSeasonSalaries($positionDistinct), $nextTotalPosition);
     }
 
     // --- Roster Ordering ---

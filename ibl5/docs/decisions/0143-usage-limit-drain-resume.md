@@ -1,6 +1,6 @@
 ---
 description: Usage-limit drain, pause, and auto-resume for headless runners via an env-gated PreToolUse hook, pause markers, a drain token, and a launchd coordinator.
-last_verified: 2026-09-28
+last_verified: 2026-10-01
 ---
 
 # ADR-0143: Usage-limit drain, pause, and auto-resume
@@ -36,3 +36,15 @@ Meta-tooling bar: three new `bin/` scripts, `bin/usage-gate-coordinator`, `bin/u
 
 - `bin/lib/usage-fetch.sh`
 - `bin/test-usage-gate`
+
+## Addendum — Fetch backoff and blind-gate trust (2026-10-01) <!-- slop-ok -->
+
+On 2026-09-30 the usage endpoint answered most live fetches with HTTP 429, and `usage_fetch` logged each one as `reason=bad-body`. Every gated tool call in every session retried the live fetch, in bursts of about 50 per 10 minutes. The retries kept the endpoint rate-limited, so the cache aged past 300 s and the gate failed open. A post-plan-now prestart at 93% was let through.
+
+Two changes follow.
+
+1. `usage_fetch` shares one backoff and one fetch lock across processes, both in the usage-gate state dir. A 429 arms `fetch-backoff` for the Retry-After value when it is numeric (capped at 900 s), else for 30 s doubling per consecutive 429 up to 480 s. Until it expires no process makes a live request. A `mkdir` lock (`fetch.lock.d`, reclaimed after 15 s) allows one live request at a time. A caller that hits the backoff or loses the lock gets the cached body with rc 2 and never waits. A successful fetch clears the backoff. The log names each case: `fetch-failed reason=rate-limited`, `backoff-skip` (once per backoff window) and `fetch-skip reason=in-flight` (once per 30 s). `bad-body` keeps its meaning of a response without `.five_hour.utilization`.
+
+2. The stale-usage fail-open rule changes for `usage_gate_decide` and `usage_prestart_gate`. The gate is blind when the live fetch fails and the cache is 300 s old or more. A blind gate now trusts the last reading when its zone is drain or stop and the limiting window's `resets_at` is still in the future. It acts on that reading exactly as on a fresh one, through the same `usage_marker_write` path, so the invariant stands: no pause output without a marker on disk. It logs `blind-trust zone=<z> age=<n>` and skips the delta log. The gate still fails open when the last reading is in the normal zone, when no reading exists, and when `resets_at` has passed, is missing, or cannot be parsed. A passed reset must not strand work behind a blind gate.
+
+The coordinator is unchanged. Its stale branch only resumes markers whose `resets_at` has passed, so it already errs toward waiting. The max_age values (45, 60 and 120 s) also stay. Failed fetches drove the stampede, and a longer max_age would only add staleness to a zone decision near the 93% threshold.

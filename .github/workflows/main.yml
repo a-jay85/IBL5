@@ -49,13 +49,39 @@ jobs:
           port: ${{ secrets.PORT }}
           private-key: ${{ secrets.PRIVATE_KEY }}
 
-      - name: Pull latest code on server
+      - name: Fetch latest code on server
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
-            echo "Pull latest code on server" > /tmp/ibl5-last-deploy-step
+            echo "Fetch latest code on server" > /tmp/ibl5-last-deploy-step
             set -e
             cd www
             git fetch origin
+          '
+
+      # Runs after fetch and before reset: the prod checkout is still at the OLD
+      # commit, so the script ships from this runner checkout. It dumps the DB only
+      # when the deploy brings new migration files. No continue-on-error: a failed
+      # snapshot fails the deploy before the code changes.
+      - name: Snapshot database before migrations
+        env:
+          REMOTE_DATABASE: iblhoops_ibl5
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Snapshot database before migrations" > /tmp/ibl5-last-deploy-step
+            mkdir -p ~/.predeploy-snapshot
+          '
+          scp -P ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
+            bin/predeploy-db-snapshot \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:~/.predeploy-snapshot/
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            "cd www && REMOTE_DATABASE='${REMOTE_DATABASE}' bash ~/.predeploy-snapshot/predeploy-db-snapshot"
+
+      - name: Reset server to latest code
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Reset server to latest code" > /tmp/ibl5-last-deploy-step
+            set -e
+            cd www
             git reset --hard origin/production
           '
 

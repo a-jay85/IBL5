@@ -212,6 +212,15 @@
 #                              post-plan harness honors it nowhere else, so a
 #                              misplaced one is a silent no-op that surfaces only
 #                              after implementation.
+#   Z  Leading-star matrix token — a backticked single-word token in a matrix
+#                              "What to verify" cell that starts with '*' (the
+#                              catch-all case arm, a bare extension glob).
+#                              bin/lib/plan-matrix-assertions realises a glob
+#                              token only through its prefix before the first
+#                              '*', so an empty prefix is reported
+#                              UNREALISED-ASSERTION at post-plan Step 6.7
+#                              whatever the diff holds. Extraction mirrors the
+#                              checker; bin/test-check-plan pins the parity.
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
@@ -911,8 +920,11 @@ elif [ -n "$(printf '%s' "$CF_SECTION" | tr -d '[:space:]')" ]; then
         # repo-relative and cannot be matched by `git diff --name-only` at Phase
         # 5.0 conformance time. Paths like /Users/.../IBL5/ibl5/... or
         # /Users/.../IBL5-worktrees/<slug>/... must be written as ibl5/... etc.
-        # cf_parse_section already strips fenced code blocks.
-        _f_abs=$(cf_parse_section "$PLAN_FILE" | grep -E '^(MUST_APPEAR|EXEMPT):/' | head -1 | sed -E 's/^[A-Z_]+://')
+        # This is the ONE caller of cf_parse_section_raw: the normalising
+        # cf_parse_section strips exactly these prefixes (so legacy plans can
+        # match at Phase 5.0), which would blind this check. Raw already strips
+        # fenced code blocks.
+        _f_abs=$(cf_parse_section_raw "$PLAN_FILE" | grep -E '^(MUST_APPEAR|EXEMPT):/' | head -1 | sed -E 's/^[A-Z_]+://')
         if [ -n "$_f_abs" ]; then
             viol "[F] ## Critical Files entry has an absolute path (\`$_f_abs\`) — paths must be repo-relative (e.g. \`ibl5/...\`, \`bin/...\`) because post-plan's Phase 5.0 compares them to \`git diff --name-only\` output"
         fi
@@ -1670,6 +1682,61 @@ if [ -n "$_u_bad" ]; then
         viol "[U] ## Backlog issues line must read '- closes|refs a-jay85/IBL5-backlog#N — <what>' (lowercase tag, full repo path, a description): \"${_u_line}\""
     done <<< "$_u_bad"
 fi
+
+# ---------------------------------------------------------------------------
+# Gate [Z]: leading-star backticked token in a matrix "What to verify" cell.
+# ---------------------------------------------------------------------------
+# >>> gate-Z-leading-star-token
+# bin/lib/plan-matrix-assertions treats a backticked single-word token holding
+# '*' as a glob and realises it only through the text BEFORE the first '*'. A
+# token that STARTS with '*' has an empty prefix, so the checker reports its
+# row UNREALISED-ASSERTION whatever the diff holds, and post-plan Step 6.7
+# fails the run. This awk mirrors the checker's row-extraction awk and its
+# placeholder filter exactly: plain ``` / ~~~ fence toggle, the What-to-verify
+# header, the \| escape, the 2nd table column, separator rows skipped, first
+# row id wins, odd backtick splits, whitespace tokens dropped, name=value cut
+# at the first '=', then tokens holding ... or <x> dropped. bin/test-check-plan
+# pins this mirror to the real checker (its "Gate [Z] parity" block). WAIVE-
+# MATRIX-ROW waivers live in the PR body, which does not exist at lint time,
+# so they are not consulted. A (one-time-check: ...) tagged row is still
+# flagged: the tag does not change how the checker globs the token.
+_z_hits=$(awk -F'|' '
+BEGIN { fence=0; inm=0; }
+/^[[:space:]]*(```|~~~)/ { fence = !fence; inm = 0; next; }
+fence { next; }
+/\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
+inm && /^[[:space:]]*\|/ {
+    line = $0;
+    gsub(/\\\|/, "\001", line);
+    n = split(line, f, "|");
+    if (n < 3) { next; }
+    id = f[2]; gsub(/^[[:space:]]+|[[:space:]]+$/, "", id);
+    cell = f[3]; gsub(/\001/, "|", cell); gsub(/\t/, " ", cell);
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", cell);
+    if (cell ~ /^[[:space:]:-]*$/) next;
+    if (seen[id]) next;
+    seen[id] = 1;
+    n2 = split(cell, parts, "`");
+    for (i = 2; i < n2; i += 2) {
+        t = parts[i];
+        if (t == "") continue;
+        if (t ~ /[[:space:]]/) continue;
+        sub(/=.*/, "", t);
+        if (t == "") continue;
+        if (index(t, "...") > 0) continue;
+        if (t ~ /<.*>/) continue;
+        if (substr(t, 1, 1) == "*") print id "\t" t;
+    }
+    next;
+}
+inm && !/^[[:space:]]*\|/ { inm=0; }
+' "$PLAN_FILE")
+if [ -n "$_z_hits" ]; then
+    while IFS=$'\t' read -r _z_id _z_tok; do
+        viol "[Z] matrix row ${_z_id}: backticked token '${_z_tok}' starts with '*'. bin/lib/plan-matrix-assertions globs on the text before the first '*', so an empty prefix is never realised and post-plan Step 6.7 reports this row UNREALISED-ASSERTION whatever the diff holds. Drop the backticks or reword the token in prose (e.g. the token '*)' becomes \"the catch-all case arm\")"
+    done <<< "$_z_hits"
+fi
+# <<< gate-Z-leading-star-token
 
 # ---------------------------------------------------------------------------
 # Report.

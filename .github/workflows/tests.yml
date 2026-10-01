@@ -226,7 +226,9 @@ jobs:
         mkdir -p coverage
         echo "::group::Full PHPUnit output"
         set +eo pipefail
-        vendor/bin/phpunit \
+        vendor/bin/paratest \
+          --processes="$(nproc)" \
+          --cache-directory=/tmp/phpunit-cache \
           --testdox \
           --coverage-clover coverage/clover.xml \
           --colors=always 2>&1 | tee /tmp/phpunit-output.txt
@@ -965,6 +967,8 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       - name: bin/test-bin-help
         run: bin/test-bin-help
+      - name: bin/test-check-old-code-compat
+        run: bin/test-check-old-code-compat
       - name: bin/test-cleanup-safety
         run: bin/test-cleanup-safety
       - name: bin/test-check-pr-collisions
@@ -1067,6 +1071,8 @@ jobs:
         run: bin/test-docfix-poll
       - name: bin/test-launchd-health-check
         run: bin/test-launchd-health-check
+      - name: bin/test-db-backups-pull
+        run: bin/test-db-backups-pull
       - name: bin/test-post-review-findings
         run: bin/test-post-review-findings
       - name: bin/test-human-signoff-classifier
@@ -1108,6 +1114,8 @@ jobs:
         run: bin/test-bug-pipeline-check
       - name: bin/test-bug-pipeline-cron-setup
         run: bin/test-bug-pipeline-cron-setup
+      - name: bin/test-bug-pipeline-e2e
+        run: bin/test-bug-pipeline-e2e
       - name: bin/test-launchd-health-cron-setup
         run: bin/test-launchd-health-cron-setup
       - name: bin/test-bug-pipeline-ci-autofix
@@ -1152,6 +1160,11 @@ jobs:
         run: bin/test-check-registry-trigger-rows
       - name: bin/test-ci-memo
         run: bin/test-ci-memo
+      - name: bin/test-predeploy-db-snapshot
+        run: bin/test-predeploy-db-snapshot
+
+      - name: bin/test-restore-rowcount-compare
+        run: bin/test-restore-rowcount-compare
 
   gate:
     name: Tests and Analysis

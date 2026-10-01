@@ -1558,7 +1558,8 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     try:
         return llm.call("pr-copy", "sonnet",
                         llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt),
-                        schemas.validate_pr_copy), False
+                        schemas.validate_pr_copy,
+                        normalizer=schemas.normalize_pr_copy), False
     except HarnessError as e:
         if e.kind != "llm-invalid-output":
             raise

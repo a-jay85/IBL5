@@ -2120,7 +2120,7 @@ assert_viol "gateM-fenced-methods-only-flags" 1 '[M]' "$FM$PU"'
 assert_viol "gateM-no-phpunit-row-silent" 0 '[M]' "$FM$E2E_ONLY"
 
 # ---------------------------------------------------------------------------
-# Gate [X] fixtures (4 cases)
+# Gate [X] fixtures (8 cases)
 # ---------------------------------------------------------------------------
 XVR='
 | # | What to verify | Test type | Timing | Test file / location |
@@ -2148,6 +2148,105 @@ XPOS='
 | 1 | baselines unchanged | Visual-regression | post-impl | (no-change) `t.spec.ts-snapshots` |
 '
 assert_viol "gateX-marker-before-token-fires" 1 '[X]' "$FM$XPOS"
+# Shape 1 (backlog#1233): the literal (no-change) appears ONLY inside a backtick
+# code span on a non-VR row. It is a mention, not a marker; gate X must stay silent.
+XSPAN='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | a `(no-change)` mention inside a code span is not a marker | E2E | post-impl | `t.spec.ts` |
+'
+assert_viol "gateX-code-span-mention-ignored" 0 '[X]' "$FM$XSPAN"
+# Shape 2 (backlog#1233): a fenced fixture block carries a marker on an E2E row.
+# Fenced examples never count (harness _strip_fenced); gate X reads fence-aware rows.
+XFENCE='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | E2E | post-impl | `t.spec.ts` |
+
+```
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | E2E | post-impl | `t.spec.ts` (no-change) |
+```
+'
+assert_viol "gateX-fenced-fixture-ignored" 0 '[X]' "$FM$XFENCE"
+# Still rejected: a code-span mention does NOT launder a bare marker on a non-VR row.
+XBOTH='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | a `(no-change)` mention plus a bare marker | E2E | post-impl | `t.spec.ts` (no-change) |
+'
+assert_viol "gateX-bare-marker-non-vr-still-fires" 1 '[X]' "$FM$XBOTH"
+# Pinned UNCHANGED: marker after a SECOND backticked token on a VR row. Gate X is
+# silent on this shape today (the position regex only needs a backtick before the
+# marker); the harness is what emits MISSING for token 1. This fix must neither
+# newly exempt nor newly reject it.
+XSECOND='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | baselines unchanged | Visual-regression | post-impl | `a.spec.ts-snapshots` and `b.spec.ts-snapshots` (no-change) |
+'
+assert_viol "gateX-second-token-marker-unchanged" 0 '[X]' "$FM$XSECOND"
+
+# ---------------------------------------------------------------------------
+# Gate [Y] fixtures (9 cases)
+# ---------------------------------------------------------------------------
+YHDR='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|'
+YROW='| 2 | `pinned_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+| 3 | `other_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+| 4 | `third_thing` works | PHPUnit | post-impl | `tests/XTest.php` |'
+# 1 of 4 tagged, well-formed, CLI-executable: the honored shape.
+assert_viol "gateY-tagged-cli-row-ok" 0 '[Y]' "$FM$YHDR"'
+| 1 | corpus diff prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Y props -->
+'
+# Well-formed tag on an E2E row: the helper ignores it.
+assert_viol "gateY-tag-on-e2e-row-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | page shows `CORPUS-DIFF` (one-time-check: one-shot corpus diff over local transcripts) | E2E | post-impl | `e2e/x.spec.ts` |
+'"$YROW"'
+'
+# Tag not trailing: malformed.
+assert_viol "gateY-tag-not-trailing-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | (one-time-check: one-shot corpus diff over local transcripts) prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+'
+# Reason under 15 chars.
+assert_viol "gateY-short-reason-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one shot) | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+'
+# Escaped pipe inside the reason: the helper restores it to | and rejects it.
+assert_viol "gateY-pipe-in-reason-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: corpus diff via grep \| sort at plan time) | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+'
+# Tag in the location cell: not the What-to-verify cell.
+assert_viol "gateY-tag-in-location-cell-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/x` (one-time-check: one-shot corpus diff over local transcripts) |
+'"$YROW"'
+'
+# Share boundary: 1 of 3 is exactly a third and passes.
+assert_viol "gateY-share-at-third-ok" 0 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 2 | `pinned_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+| 3 | `other_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+<!-- no-test-methods: fixture rows are gate Y props -->
+'
+# Share over a third: 2 of 4.
+assert_viol "gateY-share-over-third-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 2 | prints `appeared=0` (one-time-check: one-shot counterfactual mutation run at plan time) | CLI-executable | post-impl | `bin/y` |
+| 3 | `other_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+| 4 | `third_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+'
+# Every row tagged.
+assert_viol "gateY-all-tagged-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 2 | prints `appeared=0` (one-time-check: one-shot counterfactual mutation run at plan time) | CLI-executable | post-impl | `bin/y` |
+'
 
 # ---------------------------------------------------------------------------
 # Gate [G] fixtures (4 cases)

@@ -35,12 +35,14 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import (adr_draft, body_numbers, cifix, ciwatch, conformance, fidelity, gitutil, llm_calls,
-                     manual_rows, manual_testing, outofscope, schemas, scope_conformance, statefile,
-                     usage_pause)
+                     manual_rows, manual_testing, outofscope, prosefix, schemas, scope_conformance,
+                     statefile, usage_pause)
 from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
 from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
+                              MERGE_DIGEST_BEGIN, MERGE_DIGEST_END, render_merge_digest,
+                              upsert_merge_digest,
                               MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC,
                               backlog_closes_mismatch, classify, files_from_diff,
                               modified_files_from_diff,
@@ -294,6 +296,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             log("phase2: empty diff vs base — nothing to ship")
             return _finish(res, out_dir)
         files = git.changed_files()
+        # Rename sources included; read ONLY by the conformance check. classify(),
+        # scope conformance and denied_gate_edits keep `files`, or an old path
+        # would surface as UNPLANNED-FILE and create a new hold.
+        conf_files = git.conformance_files()
         cls = classify(files, diff, git.modified_files())
         res.classification = cls
         log("phase3 classify:\n" + cls.summary())
@@ -347,7 +353,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             copy["summary_md"] = check["corrected_body"]
             for f in check.get("findings", []):
                 log(f"phase2 body-check finding: {f}")
-        _inject_residual_phases(copy, plan, files, log)
+        _inject_residual_phases(copy, plan, conf_files, log)
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
@@ -400,7 +406,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                if sha == pre_rebase else "REBASE=rebased onto origin/master")
         res.meta_checks_ok = run_meta_checks_local(
             git, worktree or "", "origin/master", log, live=live,
-            failures_out=res.meta_check_failures)
+            failures_out=res.meta_check_failures, llm=llm)
         if live:
             sha = git.head()  # refresh — remediation may have committed and moved HEAD
         pr_known = gh.pr_number() if (live and gh.pr_exists()) else None
@@ -461,6 +467,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if git.head() != head_before_45:
             sha = git.head()
             files = git.changed_files()
+            conf_files = git.conformance_files()
             diff = git.diff_vs_base()
             meta = gh.pr_meta() or meta
         review_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -505,7 +512,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             + f" -> PHASE5_VERIFY_STATUS={phase5}"
             + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
         resolutions: dict[str, str] = {}
-        unresolved = conformance.check(plan, files, diff, phase5_status=phase5,
+        unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                        resolutions=resolutions,
                                        pr_body=gh.pr_body() or meta.get("body", ""))
         res.unresolved_conformance = unresolved
@@ -606,9 +613,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             # clean run buy nothing, and the gate is "did the tree change", not "did
             # remediation run".
             files = git.changed_files()
+            conf_files = git.conformance_files()
             diff = git.diff_vs_base()
             resolutions = {}
-            unresolved = conformance.check(plan, files, diff, phase5_status=phase5,
+            unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                            resolutions=resolutions,
                                            pr_body=gh.pr_body() or body)
             res.unresolved_conformance = unresolved
@@ -753,6 +761,20 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 # `|| true`, and a new hold here would change condition semantics.
                 res.sticky_error = "sticky-post-failed"
                 log("phase6.5: sticky verdict comment not confirmed")
+            # Digest at the top of the PR body, from the same rows the sticky printed.
+            # Still BEFORE arming, and never able to change it: log-and-continue.
+            try:
+                drows = fidelity.digest_rows_for_display(digest, fid)
+                if all(" unavailable — " in r for r in drows):
+                    log("phase6.5: merge digest all degraded; PR body digest left as is")
+                else:
+                    cur = gh.pr_body_fresh() or ""
+                    new = upsert_merge_digest(cur, render_merge_digest(drows))
+                    if new != cur:
+                        gh.pr_edit_body(pr, new)
+                    log("phase6.5: merge digest upserted into PR body")
+            except (HarnessError, OSError, subprocess.SubprocessError) as e:
+                log(f"phase6.5: merge digest body write failed ({e.__class__.__name__}: {e})")
             # Review-owed decision: AFTER the sticky post (the script reads the body this
             # run composed and the tree it ends on) and BEFORE arming (a launched
             # /pr-review races an `--auto` merge no worse than the skill path does).
@@ -932,7 +954,7 @@ def _last_remediation_commit(fid: dict) -> str | None:
 
 
 def _body_signature(body: str | None) -> str:
-    """The comparable part of a PR body: everything outside the files-changed block.
+    """The comparable part of a PR body: everything outside the files-changed and merge-digest blocks.
 
     Phase 5.5 rewrites <!-- files-changed:begin -->..<!-- files-changed:end --> on every
     round, so that block churns whenever the diff grows and says nothing about whether
@@ -945,6 +967,10 @@ def _body_signature(body: str | None) -> str:
     end = text.find(FILES_CHANGED_END)
     if begin != -1 and end != -1 and end > begin:
         text = text[:begin] + text[end + len(FILES_CHANGED_END):]
+    begin = text.find(MERGE_DIGEST_BEGIN)
+    end = text.find(MERGE_DIGEST_END)
+    if begin != -1 and end != -1 and end > begin:
+        text = text[:begin] + text[end + len(MERGE_DIGEST_END):]
     return text.strip()
 
 
@@ -1560,6 +1586,13 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     commit subject instead of failing the run, and returns degraded=True so the caller
     holds arming: an unreviewed title is exactly the feat-vs-chore judgment condition
     (8) depends on. Any other error kind still propagates.
+
+    The model path returns schemas.coerce_pr_copy(copy, cls), so title, commit_subject and
+    type agree and a diff with no GM-visible file (Classification.has_gm_visible False)
+    can never open a feat: PR. The degraded path calls schemas.coerce_copy_type on the
+    single subject string (the degraded dict has no type key). The skip path is
+    deliberately left alone: its title is the live one, and retyping only the dict would
+    let the pr_meta() fallback at the condition-(8) call site see chore: on a feat: PR.
     """
     if gh.pr_exists() and not git.has_changes_to_commit():
         head_subject = git.branch_head_subject()
@@ -1575,10 +1608,11 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     else:
         plan_excerpt = ""
     try:
-        return llm.call("pr-copy", "sonnet",
+        copy = llm.call("pr-copy", "sonnet",
                         llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt),
                         schemas.validate_pr_copy,
-                        normalizer=schemas.normalize_pr_copy), False
+                        normalizer=schemas.normalize_pr_copy)
+        return schemas.coerce_pr_copy(copy, cls), False
     except HarnessError as e:
         if e.kind != "llm-invalid-output":
             raise
@@ -1586,9 +1620,11 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     subject = git.branch_head_subject()
     if not re.match(r"^[a-z]+(\([^)]*\))?!?:", subject):
         # No conventional subject to borrow. feat: is the fail-closed type: it trips the
-        # human-signoff hold, and coerce_commit_subject re-types docs/test/non-code diffs.
+        # human-signoff hold. coerce_copy_type re-types docs/test/non-code diffs and turns
+        # feat: into chore: on a tooling-only diff; arming is still held on this path by
+        # degraded=True (copy_degraded), so the floor is never the only guard here.
         subject = f"feat: {subject or slug}"
-    subject = schemas.coerce_commit_subject(subject, cls)
+    subject = schemas.coerce_copy_type(subject, cls)
     return {"title": subject, "commit_subject": subject,
             "summary_md": f"## Summary\n- {subject}\n"}, True
 
@@ -1731,7 +1767,7 @@ def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool
 
 
 def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True,
-                         failures_out: list | None = None) -> bool:
+                         failures_out: list | None = None, llm=None) -> bool:
     if os.environ.get("PRE_PUSH_META_CHECKS_SKIP") == "1":
         log("phase2: meta-checks SKIPPED (PRE_PUSH_META_CHECKS_SKIP=1)")
         return True
@@ -1775,6 +1811,22 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
             raise HarnessError("local-gate",
                                f"meta-checks filter-parse failure: {(result2.stderr or '').strip()[:200]}")
         if rc2 == 0:
+            try:
+                os.unlink(flag)
+            except FileNotFoundError:
+                pass
+            return True
+    # One bounded prose-fix pass (harness/prosefix.py) when check-prose-since is the
+    # only failing gate. On failure it resets to its own head_before, so the flag,
+    # log line, and pushed tree below are exactly what they would have been.
+    if (llm is not None and worktree
+            and prosefix.failed_check_names(last_result.stdout or "")
+            == [prosefix.PROSE_CHECK]):
+        if prosefix.attempt_prose_fix(
+                git=git, llm=llm, repo=worktree, argv=argv,
+                first_stdout=last_result.stdout or "",
+                commit=lambda m: _commit_with_gate_remediation(git, worktree, m, log),
+                log=log):
             try:
                 os.unlink(flag)
             except FileNotFoundError:

@@ -12,6 +12,8 @@ from .state import Classification
 
 FILES_CHANGED_BEGIN = "<!-- files-changed:begin -->"
 FILES_CHANGED_END = "<!-- files-changed:end -->"
+MERGE_DIGEST_BEGIN = "<!-- merge-digest:begin -->"
+MERGE_DIGEST_END = "<!-- merge-digest:end -->"
 TESTS_CHANGED_BEGIN = "<!-- tests-changed:begin -->"
 TESTS_CHANGED_END = "<!-- tests-changed:end -->"
 RESIDUAL_PHASES_BEGIN = "<!-- residual-phases:begin -->"
@@ -55,6 +57,30 @@ _SHELL_INC = re.compile(r"(^|/)bin/|\.sh$")
 _SHELL_EXC = re.compile(r"\.(php|md|json|py|ts|tsx|css|sql|ya?ml|lock|txt|neon)$")
 _WORKFLOW = re.compile(r"^\.github/workflows/.*\.ya?ml$")
 _SKILL_PROSE = re.compile(r"^\.claude/.*\.md$")
+# Paths a league GM can never see change: dev tooling, docs, tests, build config.
+# FAIL-SAFE DENYLIST: a path that matches nothing here counts as GM-visible, so an
+# unknown new directory keeps whatever type the model chose (never retyped).
+_NON_RUNTIME = re.compile(
+    r"^(bin|tools|\.claude|\.github)/"        # repo-level tooling roots
+    r"|^[^/]+$"                               # root-level files: README.md, CLAUDE.md, .gitignore
+    r"|^ibl5/(tests|docs|bin|node_modules|vendor|worktrees)/"
+    r"|^ibl5/(phpstan|phpunit|playwright|vitest|coverage|infection|test-results|tmp)"  # stem match: files and dirs
+    r"|^ibl5/(eslint\.config\.js|package\.json|composer\.(json|lock)|bun\.lock|[^/]*\.neon)$"
+    r"|\.md$"                                 # markdown anywhere (the app renders PHP, never markdown)
+    r"|_test\.go$"                            # Go engine tests
+)
+
+
+def is_gm_visible_path(p: str) -> bool:
+    """True when ``p`` is a runtime file whose change a league GM could notice.
+
+    Not GM-visible: `bin/`, `tools/`, `.claude/`, `.github/`, root-level files, markdown
+    anywhere, `ibl5/tests/`, `ibl5/docs/`, `ibl5/bin/`, ibl5 build/lint/test config, and
+    Go `_test.go` files. Everything else under `ibl5/` and `engine/` (and any unknown root)
+    is GM-visible.
+    """
+    p = p.strip()
+    return bool(p) and not _NON_RUNTIME.search(p)
 
 def is_shell_path(p: str) -> bool:
     return bool(_SHELL_INC.search(p)) and not _SHELL_EXC.search(p)
@@ -74,6 +100,24 @@ def files_from_diff(diff_text: str) -> list[str]:
                 if path not in files:
                     files.append(path)
     return files
+
+
+def rename_sources_from_diff(diff_text: str) -> list[str]:
+    """OLD paths of every rename in a unified diff, diff order, de-duplicated.
+
+    Keys on the `rename from ` extended header, which git emits only for a detected
+    rename, so a copy (`copy from `) or a plain add/delete pair contributes nothing.
+    Companion of `files_from_diff` (b-side paths): the union of the two is the set the
+    conformance check reads (`ReplayGit.conformance_files`), while `files_from_diff`
+    alone stays the set classify() and scope conformance read.
+    """
+    out: list[str] = []
+    for line in diff_text.splitlines():
+        if line.startswith("rename from "):
+            src = line[len("rename from "):]
+            if src and src not in out:
+                out.append(src)
+    return out
 
 
 def modified_files_from_diff(diff_text: str) -> list[str]:
@@ -292,6 +336,45 @@ def upsert_files_changed(body: str, block: str) -> str:
 
     # Neither both present and in order: append fresh, leave any orphan in place.
     return body.rstrip() + "\n\n" + block + "\n"
+
+
+def render_merge_digest(rows: list[str]) -> str:
+    """Marker-bounded `## Merge digest` block for the top of a PR body.
+
+    One paragraph per row (blank line between rows) so GitHub renders each bold label
+    on its own line. The rows are the exact ones the sticky comment prints.
+    """
+    return "\n".join([MERGE_DIGEST_BEGIN, "## Merge digest", "",
+                      "\n\n".join(rows), MERGE_DIGEST_END])
+
+
+def upsert_merge_digest(body: str, block: str) -> str:
+    """Insert or replace the merge-digest block in a PR body.
+
+    Both markers present, BEGIN before END:
+        Replace everything from BEGIN through END inclusive with ``block``;
+        surrounding text is left byte-identical.
+    Neither marker present:
+        PREPEND ``block + "\\n\\n" + body.lstrip("\\n")`` (the digest sits at the TOP of
+        the body, unlike the files-changed block, which is appended).
+    Exactly one marker, or END before BEGIN:
+        Do not attempt surgery on the body.  Prepend a fresh block exactly as in
+        the neither-present case, leaving the orphan marker untouched.
+    Empty/None body:
+        Return ``block + "\\n"``.
+    """
+    body = body or ""
+    if not body.strip():
+        return block + "\n"
+
+    begin_idx = body.find(MERGE_DIGEST_BEGIN)
+    end_idx = body.find(MERGE_DIGEST_END)
+
+    if begin_idx != -1 and end_idx != -1 and begin_idx < end_idx:
+        after_end = end_idx + len(MERGE_DIGEST_END)
+        return body[:begin_idx] + block + body[after_end:]
+
+    return block + "\n\n" + body.lstrip("\n")
 
 
 def render_residual_phases(items: list[str]) -> str:
@@ -620,6 +703,7 @@ def classify(files: list[str], diff_text: str, modified_files: list[str] | None 
     c.has_shell = c.count_shell > 0
     c.has_workflow = c.count_workflow > 0
     c.has_skill_prose = any(_SKILL_PROSE.match(f) for f in files)
+    c.has_gm_visible = any(is_gm_visible_path(f) for f in files)
 
     t = c.count_total
     c.docs_only = t > 0 and c.count_md == t

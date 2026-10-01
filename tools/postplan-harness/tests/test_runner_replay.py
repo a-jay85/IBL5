@@ -18,7 +18,7 @@ from harness.adapters.llm import FixtureLlm, extract_json
 from harness.state import HarnessError, TerminalState, UsageLedger
 from harness import cifix, ciwatch, schemas
 from harness.armable import manual_testing_clearance
-from harness.classify import MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC
+from harness.classify import MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC, classify
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -216,6 +216,65 @@ def test_bad_pr_copy_json_without_subject_opens_feat_pr():
     creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
     assert creates and creates[-1]["title"] == "feat: synthetic-degrade"
     assert not res.arm.armed
+
+
+_TOOLING_DIFF = "diff --git a/bin/fleet-status b/bin/fleet-status\n+echo 1\n"
+
+
+def _feat_pr_copy_canned():
+    canned = dict(CANNED)
+    canned["pr-copy"] = {"type": "feat", "title": "feat: synthetic",
+                         "commit_subject": "feat: synthetic", "summary_md": "## Summary\n- x\n"}
+    return canned
+
+
+def test_model_feat_copy_on_tooling_diff_opens_chore_pr_and_clears_condition_8():
+    out = tempfile.mkdtemp()
+    llm = FixtureLlm(UsageLedger(), _feat_pr_copy_canned())
+    res = runner.run(_fixture(pr_number=None, pr_meta=None, diff=_TOOLING_DIFF), out, llm,
+                     mode="replay")
+    creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
+    assert creates and creates[-1]["title"] == "chore: synthetic"
+    assert 8 not in {c.number for c in res.arm.holds}
+    assert res.terminal != TerminalState.FAILED
+
+
+def test_model_feat_copy_on_runtime_diff_still_opens_feat_pr_and_holds_condition_8():
+    out = tempfile.mkdtemp()
+    llm = FixtureLlm(UsageLedger(), _feat_pr_copy_canned())
+    res = runner.run(_fixture(pr_number=None, pr_meta=None), out, llm, mode="replay")
+    creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
+    assert creates and creates[-1]["title"] == "feat: synthetic"
+    assert 8 in {c.number for c in res.arm.holds}
+
+
+def test_bad_pr_copy_json_without_subject_on_tooling_diff_opens_chore_pr_and_stays_held():
+    out = tempfile.mkdtemp()
+    llm = DegradingLlm(UsageLedger(), CANNED, {"pr-copy"})
+    res = runner.run(_fixture(pr_number=None, pr_meta=None, diff=_TOOLING_DIFF), out, llm,
+                     mode="replay")
+    creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
+    assert creates and creates[-1]["title"] == "chore: synthetic-degrade"
+    assert not res.arm.armed
+    assert res.terminal == TerminalState.DEGRADED
+    assert "pr-copy" in res.degraded_agents
+    assert 8 not in {c.number for c in res.arm.holds}
+
+
+def test_clean_rerun_live_feat_title_on_tooling_diff_is_not_retyped():
+    class _Gh:
+        def pr_exists(self): return True
+        def pr_title(self): return "feat: x"
+
+    class _Git:
+        def has_changes_to_commit(self): return False
+        def branch_head_subject(self): return "chore: last commit"
+
+    cls = classify(["bin/fleet-status"], "")
+    copy, degraded = runner._pr_copy(None, _Git(), _Gh(), None, "slug", cls, None,
+                                     lambda m: None)
+    assert copy["title"] == "feat: x"
+    assert degraded is False
 
 
 def test_other_pr_copy_errors_still_fail():
@@ -1370,9 +1429,19 @@ def _patch_two_call_git(monkeypatch, first_files, second_files):
     call_count = [0]
 
     class _TwoCallGit(runner.ReplayGit):
+        _last: list[str] = []
+
         def changed_files(self, base="origin/master"):
             call_count[0] += 1
-            return first_files if call_count[0] == 1 else second_files
+            self._last = first_files if call_count[0] == 1 else second_files
+            return self._last
+
+        def conformance_files(self, base="origin/master"):
+            # The runner reads conformance_files right after each changed_files, so
+            # it sees the same snapshot. Not counted: the call count tracks snapshots.
+            # The fakes in test_fidelity_remediation.py and test_fidelity_rounds.py
+            # override only `changed_files` and stay untouched: ReplayGit delegates.
+            return list(self._last)
 
     monkeypatch.setattr(runner, "ReplayGit", _TwoCallGit)
     return call_count
@@ -1399,6 +1468,83 @@ def test_conformance_rerun_clears_hold_when_remediation_adds_planned_file(tmp_pa
     bridge = os.path.join(out, runner.CONFORMANCE_BRIDGE_NAME)
     assert os.path.exists(bridge) and os.path.getsize(bridge) == 0
     assert "phase5.0 conformance (post-remediation): clean" in "\n".join(res.audit)
+
+
+_PLAN_RENAMED_AGENT = (
+    "# Synthetic rename-source conformance plan\n\n"
+    "## Critical Files\n\n"
+    "- `.claude/agents/sonnet-4-6.md` — renamed to sonnet-5-5.md\n"
+)
+
+_PLAN_RENAME_TARGET_ONLY = (
+    "# Synthetic scope-conformance plan\n\n"
+    "## Critical Files\n\n"
+    "- `.claude/agents/sonnet-5-5.md` — the rename target\n"
+)
+
+
+class _RenameGit(runner.ReplayGit):
+    """changed_files lists only the rename target; conformance_files adds the source."""
+    def changed_files(self, base="origin/master"):
+        return [".claude/agents/sonnet-5-5.md"]
+
+    def conformance_files(self, base="origin/master"):
+        return [".claude/agents/sonnet-5-5.md", ".claude/agents/sonnet-4-6.md"]
+
+
+def test_conformance_reads_rename_sources_not_changed_files(tmp_path, monkeypatch):
+    """PR #2514 shape: the plan names the rename source as a Critical File, only the
+    target is in `changed_files`. The conformance check must read `conformance_files`.
+
+    Mutation caught: revert either `conformance.check(plan, conf_files, ...)` or
+    `_inject_residual_phases(copy, plan, conf_files, log)` to `files` and
+    `MISSING-FILE: .claude/agents/sonnet-4-6.md` reappears.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha=None)
+    monkeypatch.setattr(runner, "ReplayGit", _RenameGit)
+    seen: list[list[str]] = []
+    real_inject = runner._inject_residual_phases
+
+    def _spy(copy, plan, files, log):
+        seen.append(list(files))
+        return real_inject(copy, plan, files, log)
+
+    monkeypatch.setattr(runner, "_inject_residual_phases", _spy)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    fx = _fixture(plan_content=_PLAN_RENAMED_AGENT)
+    res = runner.run(fx, out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert res.unresolved_conformance == []
+    assert not any("MISSING-FILE" in line for line in res.audit)
+    assert seen and ".claude/agents/sonnet-4-6.md" in seen[0]
+
+
+def test_scope_conformance_still_reads_changed_files_not_rename_sources(tmp_path, monkeypatch):
+    """Scope conformance keeps `changed_files`, so a rename source never shows up as
+    an unplanned file and creates a new hold.
+
+    Mutation caught: pass `conf_files` to `scope_conformance.scope_notes` and the old
+    path is handed to the unplanned-file check.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha=None)
+    monkeypatch.setattr(runner, "ReplayGit", _RenameGit)
+    seen: list[list[str]] = []
+    real_notes = runner.scope_conformance.scope_notes
+
+    def _spy(plan, changed_files, diff_body, pr_body, *a, **kw):
+        seen.append(list(changed_files))
+        return real_notes(plan, changed_files, diff_body, pr_body, *a, **kw)
+
+    monkeypatch.setattr(runner.scope_conformance, "scope_notes", _spy)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    fx = _fixture(plan_content=_PLAN_RENAME_TARGET_ONLY)
+    runner.run(fx, out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert seen, "scope_notes was never called"
+    assert all(".claude/agents/sonnet-4-6.md" not in files for files in seen)
+    assert ".claude/agents/sonnet-5-5.md" in seen[0]
 
 
 def test_conformance_hold_stays_when_remediation_does_not_add_file(tmp_path, monkeypatch):
@@ -1970,3 +2116,38 @@ def test_phase7_rewatch_timeout_is_indeterminate_not_green(monkeypatch, tmp_path
     acts = _actions(out)
     assert not any(a.get("action") == "pr_comment" and a.get("title") == cifix.FLAKY_TITLE
                    for a in acts), "flaky comment must not be posted on a timeout"
+
+
+# ---- merge digest in the PR body ----
+
+def _digest_rows(unavailable=False):
+    from harness import fidelity
+    if unavailable:
+        return fidelity._digest_degraded()
+    return [fidelity.linkify_refs(f"{lbl} row backlog#1169 PR #2559")
+            for lbl in fidelity.LABELS]
+
+
+def test_merge_digest_prepended_to_body_with_remediation_suffix(tmp_path, monkeypatch):
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha="abc1234")
+    monkeypatch.setattr(runner.fidelity, "digest_lines", lambda *a, **k: _digest_rows())
+    out = str(tmp_path / "out")
+    runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    edits = [a for a in _actions(out) if a["action"] == "pr_edit_body"]
+    digest_edits = [a for a in edits if "<!-- merge-digest:begin -->" in a["body"]]
+    assert len(digest_edits) == 1
+    body = digest_edits[0]["body"]
+    assert body.startswith("<!-- merge-digest:begin -->\n## Merge digest\n")
+    assert "(post-plan remediation: abc1234)" in body
+    assert "[backlog#1169](<https://github.com/a-jay85/IBL5-backlog/issues/1169>)" in body
+    assert body.count("<!-- merge-digest:begin -->") == 1
+
+
+def test_all_degraded_digest_writes_no_body_block(tmp_path, monkeypatch):
+    _patch_fidelity_with_remediation(monkeypatch)
+    monkeypatch.setattr(runner.fidelity, "digest_lines",
+                        lambda *a, **k: _digest_rows(unavailable=True))
+    out = str(tmp_path / "out")
+    runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    edits = [a for a in _actions(out) if a["action"] == "pr_edit_body"]
+    assert not any("<!-- merge-digest:begin -->" in a["body"] for a in edits)

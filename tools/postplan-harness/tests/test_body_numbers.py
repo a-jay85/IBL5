@@ -98,3 +98,12 @@ def test_body_number_facts_extracts_all_fields():
     assert facts.lines_deleted == 32
     assert facts.migration_numbers == ("047",)
     assert facts.adr_numbers == ("0131",)
+
+
+def test_merge_digest_block_is_protected():
+    from harness.body_numbers import _protected_spans
+    from harness.classify import MERGE_DIGEST_BEGIN, MERGE_DIGEST_END
+    body = (f"{MERGE_DIGEST_BEGIN}\n## Merge digest\n\n**What changed:** 3 files\n"
+            f"{MERGE_DIGEST_END}\n\n## Summary\n3 files\n")
+    spans = _protected_spans(body)
+    assert (0, body.index(MERGE_DIGEST_END) + len(MERGE_DIGEST_END)) in spans

@@ -14,7 +14,7 @@ last_verified: 2026-09-30
 
 ## Decision
 
-Run `bin/db-backups-pull` daily at 10:30 local from a launchd job (`com.ibl5.db-backups-pull`). It rsyncs `backups/db/` and `backups/db-predeploy/` from prod into `~/Backups/ibl5-db` (mode 700). It never passes `--delete`, so a compromised host cannot wipe the offsite copy. It verifies each file with `gzip -t`. Retention keeps the newest 30 dailies plus the earliest dump of every month, and the newest 20 pre-deploy dumps. After the pull it checks the newest dump date. If that dump is older than 36 hours, it sends a Discord DM through `bin/discord-dm` and exits 1. A failed rsync also sends a DM and exits 1. `bin/test-db-backups-pull` covers the behavior in CI.
+Run `bin/db-backups-pull` daily at 10:30 local from a launchd job (`com.ibl5.db-backups-pull`). It rsyncs `backups/db/` and `backups/db-predeploy/` from prod into `~/Backups/ibl5-db` (mode 700). It never passes `--delete`, so a compromised host cannot wipe the offsite copy. It verifies each file with `gzip -t`. A file that fails sends a Discord DM and makes the run exit 1. Retention keeps the newest 30 dailies plus the earliest dump of every month, and the newest 20 pre-deploy dumps. After the pull it checks the newest dump date. If that dump is older than 36 hours, it sends a Discord DM through `bin/discord-dm` and exits 1. A failed rsync, or an empty local dump dir, also sends a DM and exits 1. Every exit re-locks the local copy to owner-only, including a failed pull. `bin/test-db-backups-pull` covers the behavior in CI.
 
 ## Alternatives Considered
 

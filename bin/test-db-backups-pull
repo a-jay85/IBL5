@@ -33,6 +33,7 @@ for a in "$@"; do
 done
 [ -f "$CASE_DIR/rsync-fail" ] && { echo "ssh: connection refused" >&2; exit 255; }
 src="${*: -2:1}"; dst="${*: -1}"
+case "$src" in *db-predeploy*) [ -f "$CASE_DIR/rsync-fail-predeploy" ] && { echo "ssh: connection reset" >&2; exit 12; } ;; esac
 rel="${src#*:}"
 remote="$CASE_DIR/remote/${rel%/}"
 if [ ! -d "$remote" ]; then
@@ -125,13 +126,27 @@ setup_case f
 mkgz "$CASE/remote/backups/db/ibl5-2026-03-15.sql.gz"
 printf 'not gzip' > "$CASE/remote/backups/db/ibl5-2026-03-14.sql.gz"
 run
-if [ "$RC" -ne 0 ] && grep -q 'CORRUPT' <<< "$OUT"; then ok "f corrupt gzip -> non-zero"; else fail f "rc=$RC out=$OUT"; fi
+if [ "$RC" -ne 0 ] && grep -q 'CORRUPT' <<< "$OUT" && grep -q 'ibl5-2026-03-14.sql.gz' "$CASE/dm.log" 2>/dev/null; then
+  ok "f corrupt gzip -> DM, non-zero"
+else fail f "rc=$RC out=$OUT dm=$(cat "$CASE/dm.log" 2>&1)"; fi
 
 # (g) rsync failure -> DM + exit 1
 setup_case g
 touch "$CASE/rsync-fail"
 run
 if [ "$RC" -eq 1 ] && [ -f "$CASE/dm.log" ]; then ok "g rsync failure -> DM, exit 1"; else fail g "rc=$RC out=$OUT"; fi
+
+# (g2) predeploy rsync failure still re-locks the already-pulled dailies
+setup_case g2
+mkgz "$CASE/remote/backups/db/ibl5-2026-03-15.sql.gz"
+mkdir -p "$CASE/remote/backups/db-predeploy"
+touch "$CASE/rsync-fail-predeploy"
+run
+mode="$(stat -c %a "$CASE/local" 2>/dev/null || stat -f %Lp "$CASE/local")"
+fmode="$(stat -c %a "$CASE/local/ibl5-2026-03-15.sql.gz" 2>/dev/null || stat -f %Lp "$CASE/local/ibl5-2026-03-15.sql.gz")"
+if [ "$RC" -eq 1 ] && [ -f "$CASE/dm.log" ] && [ "$mode" = 700 ] && [ "$fmode" = 600 ]; then
+  ok "g2 predeploy rsync failure -> DM, exit 1, modes re-locked"
+else fail g2 "rc=$RC mode=$mode fmode=$fmode out=$OUT"; fi
 
 # (h) missing remote predeploy dir is not an error
 setup_case h

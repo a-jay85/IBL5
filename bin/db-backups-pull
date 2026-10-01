@@ -174,6 +174,11 @@ chmod 700 "$LOCAL_DIR" "$LOCAL_DIR/predeploy"
 
 RSYNC_FLAGS=(-a --partial --rsync-path="$REMOTE_RSYNC")
 
+# rsync -a copies the remote modes (dir 755, files 644) onto the local copy.
+# Re-lock on every exit, including a failed pull: the dumps hold emails and
+# password hashes.
+trap 'chmod -R go-rwx "$LOCAL_DIR" 2>/dev/null || true' EXIT
+
 # --- Pull ----------------------------------------------------------------------
 log "Pulling ${SSH_HOST}:backups/db/ -> ${LOCAL_DIR}/"
 rc=0
@@ -197,19 +202,22 @@ if [ "$rc" -ne 0 ]; then
   fi
 fi
 
-# rsync -a copies the remote dir mode (755) onto the local dirs. Re-lock them:
-# the dumps hold emails and password hashes.
 chmod -R go-rwx "$LOCAL_DIR"
 
 # --- Verify --------------------------------------------------------------------
 STATUS=0
+corrupt=()
 for f in "$LOCAL_DIR"/ibl5-*.sql.gz "$LOCAL_DIR"/predeploy/*.gz; do
   [ -f "$f" ] || continue
   if ! gzip -t "$f" 2>/dev/null; then
     log "CORRUPT: $f failed gzip -t"
+    corrupt+=("$(basename "$f")")
     STATUS=1
   fi
 done
+if [ "$STATUS" -ne 0 ]; then
+  send_dm "db-backups-pull: ${#corrupt[@]} offsite dump(s) failed gzip -t: ${corrupt[*]}"
+fi
 
 # --- Retention -----------------------------------------------------------------
 # Daily: newest KEEP_DAILY plus the earliest file of each calendar month.

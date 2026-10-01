@@ -35,7 +35,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import (adr_draft, body_numbers, cifix, ciwatch, conformance, fidelity, gitutil, llm_calls,
-                     manual_rows, manual_testing, schemas, scope_conformance, statefile,
+                     manual_rows, manual_testing, outofscope, schemas, scope_conformance, statefile,
                      usage_pause)
 from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
@@ -581,6 +581,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         body = _upsert_no_adr_markers(body, plan)
         gh.pr_edit_body(pr, body)
         _check_backlog_closes(gh, pr, plan, log)
+        _sweep_out_of_scope(gh, pr, plan, slug, log)
 
         # ---- Phase 5.5: plan-intent fidelity review --------------------
         # Pinned BEFORE the call: condition (12) compares the tree the reviewer saw
@@ -1631,6 +1632,23 @@ def _check_backlog_closes(gh, pr, plan, log) -> None:
         return
     msg = backlog_closes_mismatch(closes, base, refs)
     log(msg)
+
+
+def _sweep_out_of_scope(gh, pr, plan, slug, log) -> list[int]:
+    """File one backlog issue per `## Out of Scope` deferral. Additive: never raises,
+    never touches arming state. Dedup lives in outofscope.file_deferral_issues."""
+    if not (plan and plan.found and plan.deferral_hits):
+        return []
+    try:
+        hits = [outofscope.DeferralHit(*t) for t in plan.deferral_hits]
+        nums = outofscope.file_deferral_issues(
+            gh, hits, slug, pr, log=log,
+            plan_name=os.path.basename(plan.path) or f"{slug}.md")
+        log(f"oos-sweep: {len(hits)} hits, {len(nums)} issues filed")
+        return nums
+    except Exception as exc:  # broad on purpose: the sweep is never a run failure
+        log(f"oos-sweep: sweep failed ({type(exc).__name__}: {exc})")
+        return []
 
 
 def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str]:

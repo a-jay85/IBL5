@@ -706,6 +706,151 @@ test_decide_fail_open_stale() {
     assert_no_file decide_stale:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
 }
 
+# blind_setup <five> <week> <five_resets_epoch|""> <week_resets_epoch|""> [age]
+# No-token stub, so usage_fetch returns rc 2 with the seeded cache; age defaults to 600 (stale).
+blind_setup() {
+    new_env
+    make_stub_bin "$STUB" "" '{}' 1
+    seed_cache "$(( $(date +%s) - ${5:-600} ))" "$(usage_json_resets "$1" "$2" "$3" "$4")"
+    RBIN="$T/resume.sh"
+    printf '#!/bin/sh\n' > "$RBIN"; chmod +x "$RBIN"
+}
+
+test_decide_blind_normal_allows() {
+    local FUT out
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 50 0 "$FUT" ""
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_normal:out "" "$out"
+    assert_no_file decide_blind_normal:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_contains decide_blind_normal:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "fail-open reason=stale-usage"
+    assert_eq decide_blind_normal:no-blind-trust 0 "$(log_count blind-trust)"
+}
+
+test_decide_blind_drain_pauses() {
+    local FUT out m
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_drain:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_drain:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    m=$(cat "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json" 2>/dev/null)
+    assert_eq decide_blind_drain:zone drain "$(printf '%s' "$m" | jq -r .zone)"
+    assert_eq decide_blind_drain:reason usage-pause "$(printf '%s' "$m" | jq -r .reason)"
+    assert_eq decide_blind_drain:window five_hour "$(printf '%s' "$m" | jq -r .window)"
+    assert_eq decide_blind_drain:resets_at "$FUT" "$(printf '%s' "$m" | jq -r .resets_at)"
+    assert_contains decide_blind_drain:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "blind-trust zone=drain age="
+    assert_no_file decide_blind_drain:no-delta-log "$IBL5_USAGE_GATE_STATE_DIR/deltas.jsonl"
+}
+
+test_decide_blind_drain_allows_holder() {
+    local FUT out
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    gate_run "usage_token_acquire $SID_A $$"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_holder:out "" "$out"
+    assert_no_file decide_blind_holder:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_blind_stop_pauses_holder() {
+    local FUT out
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 99 0 "$FUT" ""
+    gate_run "usage_token_acquire $SID_A $$"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_stop:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_stop:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_eq decide_blind_stop:zone stop "$(jq -r .zone "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json" 2>/dev/null)"
+    assert_no_file decide_blind_stop:token-gone "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d"
+}
+
+test_decide_blind_resets_passed_allows() {
+    local PAST out pct
+    PAST=$(( $(date +%s) - 60 ))
+    blind_setup 95 0 "$PAST" ""
+    for pct in 95 99; do
+        seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json_resets "$pct" 0 "$PAST" "")"
+        out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+        assert_eq "decide_blind_passed:out:$pct" "" "$out"
+        assert_no_file "decide_blind_passed:no-marker:$pct" "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    done
+    assert_contains decide_blind_passed:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "reason=stale-usage"
+}
+
+test_decide_blind_resets_unparseable_allows() {
+    local out
+    blind_setup 95 0 "" ""
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_unparse:missing:out "" "$out"
+    assert_no_file decide_blind_unparse:missing:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json_resets 95 0 "" "" | jq -c '.five_hour.resets_at="not-a-date"')"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_unparse:garbage:out "" "$out"
+    assert_no_file decide_blind_unparse:garbage:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_blind_seven_day_window() {
+    local FUT PAST out
+    FUT=$(( $(date +%s) + 3600 ))
+    PAST=$(( $(date +%s) - 60 ))
+    blind_setup 10 96 "$FUT" "$FUT"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_week:future:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_week:future:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_eq decide_blind_week:future:window seven_day "$(jq -r .window "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json" 2>/dev/null)"
+    blind_setup 10 96 "$FUT" "$PAST"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_week:past:out "" "$out"
+    assert_no_file decide_blind_week:past:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_blind_marker_write_fails_no_pause() {
+    local FUT out log
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    chmod 500 "$IBL5_USAGE_GATE_STATE_DIR/markers"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    chmod 700 "$IBL5_USAGE_GATE_STATE_DIR/markers"
+    if [ "$(id -u)" = "0" ]; then
+        pass decide_blind_marker_fail:skipped-as-root
+        return 0
+    fi
+    log=$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")
+    assert_eq decide_blind_marker_fail:out "" "$out"
+    assert_no_file decide_blind_marker_fail:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_contains decide_blind_marker_fail:log "$log" "fail-open reason=marker-write-failed"
+    assert_contains decide_blind_marker_fail:blind "$log" "blind-trust"
+}
+
+test_decide_blind_age_boundary() {
+    local PAST out
+    PAST=$(( $(date +%s) - 60 ))
+    blind_setup 95 0 "$PAST" "" 290
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_age:290:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_age:290:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    blind_setup 95 0 "$PAST" "" 300
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_age:300:out "" "$out"
+    assert_no_file decide_blind_age:300:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_blind_during_backoff() {
+    local FUT out log
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY"
+    printf '%s\n' "$(( $(date +%s) + 300 )) 1" > "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    log=$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")
+    assert_eq decide_blind_backoff:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_backoff:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_eq decide_blind_backoff:no-curl 0 "$(curl_calls "$STUB")"
+    assert_contains decide_blind_backoff:log-skip "$log" "backoff-skip"
+    assert_contains decide_blind_backoff:log-blind "$log" "blind-trust zone=drain"
+}
+
 test_decide_runner_env_unset() {
     decide_setup 99
     local out
@@ -1137,6 +1282,67 @@ test_prestart_fail_open_stale_resets_passed() {
     assert_eq prestart_stale_passed:rc 0 "$?"
     assert_no_file prestart_stale_passed:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
     assert_contains prestart_stale_passed:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "prestart-fail-open reason=stale-usage"
+}
+
+test_prestart_blind_normal_allows() {
+    local FUT
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 50 0 "$FUT" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_blind_normal:rc 0 "$?"
+    assert_no_file prestart_blind_normal:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_contains prestart_blind_normal:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "prestart-fail-open reason=stale-usage"
+}
+
+test_prestart_blind_drain_pauses() {
+    local FUT rc m
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    rc=$?
+    assert_eq prestart_blind_drain:rc 10 "$rc"
+    m="$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_file prestart_blind_drain:marker "$m"
+    assert_eq prestart_blind_drain:zone drain "$(jq -r .zone "$m" 2>/dev/null)"
+    assert_eq prestart_blind_drain:reason usage-pause "$(jq -r .reason "$m" 2>/dev/null)"
+    assert_contains prestart_blind_drain:log "$(grep -F 'blind-trust zone=drain' "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "runner=post-plan-now"
+}
+
+test_prestart_blind_stop_pauses() {
+    local FUT rc m
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 99 0 "$FUT" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    rc=$?
+    assert_eq prestart_blind_stop:rc 10 "$rc"
+    m="$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_file prestart_blind_stop:marker "$m"
+    assert_eq prestart_blind_stop:zone stop "$(jq -r .zone "$m" 2>/dev/null)"
+}
+
+test_prestart_blind_drain_allows_holder() {
+    local FUT
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    in_env "usage_token_acquire $SID_A; usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_blind_holder:rc 0 "$?"
+    assert_no_file prestart_blind_holder:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_prestart_blind_resets_passed_allows() {
+    local PAST
+    PAST=$(( $(date +%s) - 60 ))
+    blind_setup 95 0 "$PAST" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_blind_passed:rc 0 "$?"
+    assert_no_file prestart_blind_passed:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_prestart_blind_resets_missing_allows() {
+    blind_setup 95 0 "" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_blind_missing:rc 0 "$?"
+    assert_no_file prestart_blind_missing:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
 }
 
 test_coord_stale_never_pauses_or_grants() {

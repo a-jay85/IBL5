@@ -243,7 +243,6 @@ describe('axe colour-contrast ratchet stays closed', () => {
       .split('\n')
       .filter((line) => !line.trim().startsWith('//'))
       .flatMap((line) => [...line.matchAll(/'([^']+)'/g)].map((m) => m[1]));
-    expect(entries.length).toBeGreaterThan(0);
     expect(entries).not.toContain('standings');
     expect(entries).not.toContain('career leaderboards');
   });

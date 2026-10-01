@@ -59,17 +59,17 @@ def _git(repo, *args):
                           check=True).stdout
 
 
-@pytest.fixture
-def prose_repo(tmp_path, monkeypatch):
+def make_prose_repo(tmp_path, monkeypatch, note_path="docs/note.md"):
     repo = tmp_path / "repo"
     (repo / "bin").mkdir(parents=True)
     (repo / "docs").mkdir()
+    (repo / note_path).parent.mkdir(parents=True, exist_ok=True)
     r = str(repo)
     _git(r, "init", "-b", "master")
     _git(r, "config", "user.email", "t@t")
     _git(r, "config", "user.name", "t")
     _git(r, "config", "commit.gpgsign", "false")
-    (repo / "docs" / "note.md").write_text("# Note\n\nThe pool starts small.\n")
+    (repo / note_path).write_text("# Note\n\nThe pool starts small.\n")
     shutil.copy2(REAL_CHECK_PROSE, repo / "bin" / "check-prose")
     stub = repo / "bin" / "run-meta-checks-local"
     stub.write_text(STUB)
@@ -78,7 +78,7 @@ def prose_repo(tmp_path, monkeypatch):
     _git(r, "commit", "-m", "base")
     branch = f"pfx-{tmp_path.name}"
     _git(r, "checkout", "-b", branch)
-    with open(repo / "docs" / "note.md", "a") as fh:
+    with open(repo / note_path, "a") as fh:
         fh.write(TELL_LINE + "\n")
     _git(r, "add", "-A")
     _git(r, "commit", "-m", "feat: add note")
@@ -89,10 +89,16 @@ def prose_repo(tmp_path, monkeypatch):
     proc = subprocess.run([str(stub), "--stage", "pre-push", "--base", "master"],
                           cwd=r, capture_output=True, text=True)
     assert proc.returncode == 1
-    assert "docs/note.md:4:" in proc.stdout
-    yield Env(r, LiveGit(r), flag, [])
-    if os.path.exists(flag):
-        os.unlink(flag)
+    assert f"{note_path}:4:" in proc.stdout
+    return Env(r, LiveGit(r), flag, [])
+
+
+@pytest.fixture
+def prose_repo(tmp_path, monkeypatch):
+    env = make_prose_repo(tmp_path, monkeypatch)
+    yield env
+    if os.path.exists(env.flag):
+        os.unlink(env.flag)
 
 
 def test_char_sole_prose_failure_holds_today(prose_repo):
@@ -410,3 +416,184 @@ def test_call_shape_binds_live_adapter():
         allowed_tools=prosefix.PROSE_FIX_ALLOWED_TOOLS,
         denied_tools=prosefix.PROSE_FIX_DENIED_TOOLS)
     assert set(prosefix.PROSE_FIX_MODELS) <= set(TOOLED_MODELS)
+
+
+# --------------------------------------------------- Phase 4: runner integration
+
+import tempfile  # noqa: E402
+
+from harness.adapters.gitad import ReplayGit  # noqa: E402
+from harness.adapters.llm import FixtureLlm  # noqa: E402
+from harness.state import UsageLedger  # noqa: E402
+
+HELD_LOG = ("phase2: META-CHECKS FAILED (check-prose-since) — "
+            "pushing anyway, auto-merge will not arm")
+STILL_RED = "The cache warms fast — the pool stays tiny."
+
+
+def _meta(env, llm, **kw):
+    fo: list = []
+    ok = runner.run_meta_checks_local(env.git, env.repo, "master", env.log.append,
+                                      failures_out=fo, llm=llm, **kw)
+    return ok, fo
+
+
+def test_runner_prose_fix_clears_condition_16(prose_repo):
+    e = prose_repo
+    head_before = e.git.head()
+    Path(e.flag).write_text("check-prose-since\n")
+    llm = FakeToolLlm([_fix_line4])
+    ok, fo = _meta(e, llm)
+    assert ok is True
+    assert os.path.exists(e.flag) is False
+    assert fo == []
+    assert _git(e.repo, "rev-list", "--count", f"{head_before}..HEAD").strip() == "1"
+    assert _git(e.repo, "log", "-1", "--format=%s").strip() == "chore: rewrite flagged prose tells"
+    assert e.git.is_dirty() is False
+    assert meta_checks_clearance(e.flag, 0) == "CLEARED"
+
+
+def test_runner_prose_fix_failure_matches_today(prose_repo):
+    e = prose_repo
+    head_before = e.git.head()
+    llm = FakeToolLlm([_edit(TELL_LINE, STILL_RED), _noop])
+    ok, fo = _meta(e, llm)
+    assert ok is False
+    assert open(e.flag).read() == "check-prose-since\n"
+    assert e.log[-1] == HELD_LOG
+    assert e.git.head() == head_before
+    assert e.git.is_dirty() is False
+    assert [c[1] for c in llm.calls] == ["sonnet", "opus"]
+    assert "docs/note.md:4:" in fo[0]["output"]
+    assert "The cache warms fast" in fo[0]["output"]
+    assert "stays tiny" not in fo[0]["output"]
+
+
+def test_runner_scope_violation_holds(prose_repo):
+    e = prose_repo
+    head_before = e.git.head()
+
+    def a1(cwd):
+        _fix_line4(cwd)
+        _edit("The pool starts small.", "The pool starts tiny.")(cwd)
+
+    def a2(cwd):
+        _fix_line4(cwd)
+        (Path(cwd) / "docs" / "other.md").write_text("x\n")
+
+    ok, _ = _meta(e, FakeToolLlm([a1, a2]))
+    assert ok is False
+    assert os.path.exists(e.flag)
+    assert e.git.head() == head_before
+    assert not (Path(e.repo) / "docs" / "other.md").exists()
+
+
+def test_runner_gate_owned_path_no_call(tmp_path, monkeypatch):
+    e = make_prose_repo(tmp_path, monkeypatch, note_path=".claude/rules/note.md")
+    try:
+        llm = FakeToolLlm([_fix_line4])
+        ok, _ = _meta(e, llm)
+        assert ok is False
+        assert llm.calls == []
+        assert os.path.exists(e.flag)
+        assert any("gate-owning path: .claude/rules/note.md" in l for l in e.log)
+    finally:
+        if os.path.exists(e.flag):
+            os.unlink(e.flag)
+
+
+def test_runner_other_failure_no_call(prose_repo, monkeypatch):
+    e = prose_repo
+    monkeypatch.setenv("STUB_EXTRA_FAIL", "check-docs-since")
+    llm = FakeToolLlm([_fix_line4])
+    ok, _ = _meta(e, llm)
+    assert ok is False
+    assert llm.calls == []
+    assert open(e.flag).read() == "check-prose-since check-docs-since\n"
+
+
+def test_runner_dirty_tree_no_call(prose_repo):
+    e = prose_repo
+    scratch = Path(e.repo) / "scratch.txt"
+    scratch.write_text("x\n")
+    llm = FakeToolLlm([_fix_line4])
+    ok, _ = _meta(e, llm)
+    assert ok is False
+    assert llm.calls == []
+    assert scratch.exists()
+    assert os.path.exists(e.flag)
+
+
+def test_runner_llm_none_unchanged(prose_repo):
+    e = prose_repo
+    head = e.git.head()
+    ok = runner.run_meta_checks_local(e.git, e.repo, "master", e.log.append)
+    assert ok is False
+    assert open(e.flag).read() == "check-prose-since\n"
+    assert e.log[-1] == HELD_LOG
+    assert e.git.head() == head
+
+
+@pytest.mark.usefixtures("stub_ambient_git_show")
+def test_run_passes_llm_to_meta_checks(monkeypatch):
+    recorded: dict = {}
+
+    def fake(*a, **kw):
+        recorded.update(kw)
+        return True
+
+    monkeypatch.setattr(runner, "run_meta_checks_local", fake)
+    fx = {
+        "slug": "prosefix-llm-passthrough",
+        "diff": "diff --git a/ibl5/x.php b/ibl5/x.php\n+<?php echo 1;\n",
+        "pr_number": 8889,
+        "pr_meta": {"number": 8889, "title": "chore: passthrough test",
+                    "body": "## Manual Testing\n\nNo manual testing needed\n",
+                    "headRefOid": "deadbeef"},
+        "labels": [],
+        "final_state": "OPEN",
+        "checks_outcome": {"exit": 0, "failed": []},
+        "verify": {"phpunit": None, "phpstan": None, "go": None},
+        "plan_content": "# Test plan\n\nNo matrix.\n",
+    }
+    canned = {
+        "pr-copy": {"type": "chore", "title": "chore: passthrough test",
+                    "commit_subject": "chore: passthrough test commit",
+                    "summary_md": "## Summary\n- x\n"},
+        "review-agent-a": [], "review-agent-b": [], "review-agent-d": [],
+        "security-audit": [],
+        "safety-verdict": {"holds": []},
+        "manual-classify": [],
+        "retrospective": {"save": False},
+    }
+    out = tempfile.mkdtemp(prefix="postplan-test-prosefix-")
+    llm = FixtureLlm(UsageLedger(), canned)
+    runner.run(fx, out, llm, mode="replay", headless=True)
+    assert recorded.get("llm") is llm
+
+
+def test_runner_usage_limit_propagates(prose_repo):
+    e = prose_repo
+    head_before = e.git.head()
+
+    def boom(cwd):
+        raise HarnessError("llm-usage-limit", "cap")
+
+    with pytest.raises(HarnessError) as ei:
+        _meta(e, FakeToolLlm([boom]))
+    assert ei.value.kind == "llm-usage-limit"
+    assert e.git.is_dirty() is False
+    assert e.git.head() == head_before
+
+
+def test_runner_model_error_holds(prose_repo):
+    e = prose_repo
+
+    def boom(cwd):
+        raise HarnessError("llm-tooled-timeout", "t")
+
+    llm = FakeToolLlm([boom, _fix_line4])
+    ok, _ = _meta(e, llm)
+    assert ok is False
+    assert os.path.exists(e.flag)
+    assert len(llm.calls) == 1

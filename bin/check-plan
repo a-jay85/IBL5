@@ -1008,6 +1008,44 @@ while IFS= read -r row; do
 done < "$GATEP_MATRIX"
 
 # ---------------------------------------------------------------------------
+# Gate Y: the `(one-time-check: <reason>)` matrix tag. bin/lib/plan-matrix-assertions
+# skips a tagged row instead of reporting UNREALISED-ASSERTION, and ignores the tag
+# fail-closed when it is malformed, so a bad tag silently re-arms the gate the author
+# meant to release. Reject the bad shapes here, and cap the tagged share at one third
+# of the matrix: a one-shot check is evidence that cannot be pinned, and a plan that
+# cannot pin more than a third of its rows needs regression tests, not tags.
+# The helper honors the tag only as the TRAILING text of the What-to-verify cell, only
+# with a reason >= 15 chars free of ( ) | and backtick, and only on a CLI-executable row.
+# ---------------------------------------------------------------------------
+_y_total=0; _y_tagged=0
+_y_shape='\(one-time-check: [^()|`]*\)$'
+while IFS= read -r row; do
+    matrix_split "$row" || continue
+    [ "$MC_NUM" != "#" ] || continue
+    _y_total=$((_y_total + 1))
+    grep -qF 'one-time-check' <<< "$row" || continue
+    _y_what="${MC_WHAT//$MSEN/|}"
+    if ! grep -qE "$_y_shape" <<< "$_y_what"; then
+        viol "[Y] one-time-check tag is not the trailing text of the What-to-verify cell, or its reason holds ( ) | or a backtick — the helper ignores it fail-closed and the row is still checked; write the cell as '<what> (one-time-check: <reason>)': ${row}"
+        continue
+    fi
+    _y_reason=$(sed -E 's/.*\(one-time-check: ([^()|`]*)\)$/\1/' <<< "$_y_what")
+    _y_reason=$(mtrim "$_y_reason")
+    if [ "${#_y_reason}" -lt 15 ]; then
+        viol "[Y] one-time-check reason is under 15 characters — say what was run and what it printed: ${row}"
+        continue
+    fi
+    if [ "$MC_TYPE" != "CLI-executable" ]; then
+        viol "[Y] one-time-check tag on a ${MC_TYPE} row — the helper honors it only when the Test type cell reads exactly CLI-executable; a regression test or a human judgment is never a one-shot run: ${row}"
+        continue
+    fi
+    _y_tagged=$((_y_tagged + 1))
+done < "$MATRIX_FILE"
+if [ "$_y_tagged" -gt 0 ] && [ $((_y_tagged * 3)) -gt "$_y_total" ]; then
+    viol "[Y] ${_y_tagged} of ${_y_total} matrix rows carry (one-time-check: ...) — more than one third of the matrix is unpinned; a one-time check is for evidence no regression test can hold, so convert rows to tests or split the plan"
+fi
+
+# ---------------------------------------------------------------------------
 # Gate G: a matrix row naming a bin/test-* / bin/check-* script must name one CI
 # actually runs. Narrow by design — most CLI-executable rows are legitimately
 # one-shots (curl, bin/db-query), and a gate that taxes them gets ignored.

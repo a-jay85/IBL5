@@ -192,3 +192,7 @@ A **path-scoped** rule belongs in the field when the delegate depends on it but 
 - A `*-detail.md` companion whose parent rule the phase must apply in full rather than in summary.
 
 Omit the field entirely when the phase needs nothing beyond the always-on set. An empty `Rules:` line is worse than no line: it reads as "I considered this and found nothing", which is indistinguishable from "I did not consider it".
+
+## One-time-check tag shape
+
+The reason is 15 or more characters, free of `(`, `)`, `|` and backticks, so a reviewer can rerun the check by hand. `bin/lib/plan-matrix-assertions` skips a tagged row instead of reporting it unrealised; a malformed tag is ignored fail-closed and the row is checked. `bin/check-plan` gate `[Y]` rejects a bad shape, a tag on a non-`CLI-executable` row, and a matrix with tagged rows above one third of its rows.

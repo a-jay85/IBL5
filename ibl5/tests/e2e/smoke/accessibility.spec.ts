@@ -105,9 +105,8 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   'landmark-unique': new Set([
   ]),
 
-  // No <main> landmark — legacy root page bypasses PageLayout. See a-jay85/IBL5-backlog (label: a11y) — search "landmark-one-main".
+  // League control panel now has a <main> landmark (LeagueControlPanelView wraps its body in <main>) — ratchet tightened.
   'landmark-one-main': new Set([
-    'league control panel',
   ]),
 
   // Content outside landmark regions — same root-page bypass. See a-jay85/IBL5-backlog (label: a11y) — search "region".

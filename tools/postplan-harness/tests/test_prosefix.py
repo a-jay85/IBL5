@@ -204,3 +204,209 @@ def test_scope_deleted_flagged_file_rejected(prose_repo):
     v = prosefix.scope_violations(prose_repo.repo, FLAGGED)
     for n in (1, 2, 3):
         assert f"docs/note.md:{n}: edit outside flagged lines" in v
+
+
+# ------------------------------------------------------------ Phase 3: attempt loop
+
+import inspect  # noqa: E402
+
+from harness.adapters.llm import ClaudeCli, TOOLED_MODELS  # noqa: E402
+from harness.state import HarnessError  # noqa: E402
+
+
+class FakeToolLlm:
+    def __init__(self, actions):
+        self.actions = actions
+        self.calls: list = []
+
+    def call_tooled(self, purpose, model, prompt, *, cwd, allowed_tools, denied_tools, **kw):
+        self.calls.append((purpose, model, list(allowed_tools), list(denied_tools)))
+        return self.actions[len(self.calls) - 1](cwd)
+
+
+def _argv(env):
+    return [os.path.join(env.repo, "bin", "run-meta-checks-local"),
+            "--stage", "pre-push", "--base", "master"]
+
+
+def _first_stdout(env):
+    return subprocess.run(_argv(env), cwd=env.repo, capture_output=True, text=True).stdout
+
+
+def _run_fix(env, llm, commit=None, first_stdout=None):
+    return prosefix.attempt_prose_fix(
+        git=env.git, llm=llm, repo=env.repo, argv=_argv(env),
+        first_stdout=_first_stdout(env) if first_stdout is None else first_stdout,
+        commit=commit or env.git.commit_all, log=env.log.append)
+
+
+def _edit(old, new, rel="docs/note.md"):
+    def act(cwd):
+        p = Path(cwd) / rel
+        p.write_text(p.read_text().replace(old, new))
+    return act
+
+
+def _noop(cwd):
+    return None
+
+
+def _fix_line4(cwd):
+    _edit(TELL_LINE, CLEAN_LINE)(cwd)
+
+
+def _commit_count(env) -> int:
+    return int(_git(env.repo, "rev-list", "--count", "HEAD").strip())
+
+
+def test_fix_first_attempt_clears(prose_repo):
+    e = prose_repo
+    head_before = e.git.head()
+    llm = FakeToolLlm([_fix_line4])
+    assert _run_fix(e, llm) is True
+    assert [c[1] for c in llm.calls] == ["sonnet"]
+    assert llm.calls[0][0] == "prose-fix"
+    assert llm.calls[0][2] == ["Read", "Grep", "Glob", "Edit"]
+    assert "Bash" in llm.calls[0][3]
+    assert _git(e.repo, "log", "-1", "--format=%s").strip() == "chore: rewrite flagged prose tells"
+    assert _git(e.repo, "rev-parse", "HEAD^").strip() == head_before
+    assert e.git.is_dirty() is False
+
+
+def test_escalates_to_opus_after_noop(prose_repo):
+    llm = FakeToolLlm([_noop, _fix_line4])
+    assert _run_fix(prose_repo, llm) is True
+    assert [c[1] for c in llm.calls] == ["sonnet", "opus"]
+
+
+def test_both_attempts_fail_reverts(prose_repo):
+    e = prose_repo
+    head_before = e.git.head()
+    count = _commit_count(e)
+    llm = FakeToolLlm([_edit(TELL_LINE, "The cache warms fast — the pool stays tiny."), _noop])
+    assert _run_fix(e, llm) is False
+    assert [c[1] for c in llm.calls] == ["sonnet", "opus"]
+    assert e.git.head() == head_before
+    assert e.git.is_dirty() is False
+    assert _commit_count(e) == count
+
+
+def test_scope_violation_reverts_and_counts(prose_repo):
+    e = prose_repo
+    head_before = e.git.head()
+    note = Path(e.repo) / "docs" / "note.md"
+    original = note.read_text()
+
+    def a1(cwd):
+        _fix_line4(cwd)
+        _edit("The pool starts small.", "The pool starts tiny.")(cwd)
+
+    def a2(cwd):
+        _fix_line4(cwd)
+        (Path(cwd) / "docs" / "other.md").write_text("x\n")
+
+    llm = FakeToolLlm([a1, a2])
+    assert _run_fix(e, llm) is False
+    assert len(llm.calls) == 2
+    assert e.git.head() == head_before
+    assert not (Path(e.repo) / "docs" / "other.md").exists()
+    assert note.read_text() == original
+
+
+def test_escape_hatch_rejected(prose_repo):
+    e = prose_repo
+    head_before = e.git.head()
+    llm = FakeToolLlm([_edit(TELL_LINE, TELL_LINE + " <!-- slop-ok -->"),
+                       _edit("— the pool", "`— the pool`")])
+    assert _run_fix(e, llm) is False
+    assert e.git.head() == head_before
+
+
+def test_gate_owned_path_makes_no_call(prose_repo):
+    e = prose_repo
+    llm = FakeToolLlm([])
+    out = (".claude/rules/x.md:4: [em-dash] ...a — b...  FIX: End the sentence.\n"
+           "META-CHECK-FAILED: check-prose-since\n")
+    assert _run_fix(e, llm, first_stdout=out) is False
+    assert llm.calls == []
+    assert any("gate-owning path: .claude/rules/x.md" in l for l in e.log)
+
+
+def test_dirty_tree_skips(prose_repo):
+    e = prose_repo
+    first = _first_stdout(e)
+    scratch = Path(e.repo) / "scratch.txt"
+    scratch.write_text("x\n")
+    llm = FakeToolLlm([_fix_line4])
+    assert _run_fix(e, llm, first_stdout=first) is False
+    assert llm.calls == []
+    assert scratch.exists()
+
+
+def test_usage_limit_propagates(prose_repo):
+    e = prose_repo
+    head_before = e.git.head()
+
+    def boom(cwd):
+        _edit("The pool starts small.", "The pool starts tiny.")(cwd)
+        raise HarnessError("llm-usage-limit", "cap")
+
+    with pytest.raises(HarnessError) as ei:
+        _run_fix(e, FakeToolLlm([boom]))
+    assert ei.value.kind == "llm-usage-limit"
+    assert e.git.head() == head_before
+    assert e.git.is_dirty() is False
+
+
+def test_other_model_error_holds(prose_repo):
+    e = prose_repo
+
+    def boom(cwd):
+        raise HarnessError("llm-tooled-timeout", "t")
+
+    llm = FakeToolLlm([boom, _fix_line4])
+    assert _run_fix(e, llm) is False
+    assert len(llm.calls) == 1
+    assert e.git.is_dirty() is False
+
+
+def test_rerun_other_failure_stops(prose_repo, monkeypatch):
+    e = prose_repo
+    head_before = e.git.head()
+    first = _first_stdout(e)
+    monkeypatch.setenv("STUB_EXTRA_FAIL", "check-docs-since")
+    still_red = _edit(TELL_LINE, "The cache warms fast — the pool stays tiny.")
+    llm = FakeToolLlm([still_red, still_red])
+    assert _run_fix(e, llm, first_stdout=first) is False
+    assert len(llm.calls) == 1
+    assert e.git.head() == head_before
+    assert any("failed=check-prose-since check-docs-since" in l for l in e.log)
+
+
+def test_commit_denial_counts_failed(prose_repo):
+    e = prose_repo
+    state = {"n": 0}
+
+    def commit(msg):
+        state["n"] += 1
+        if state["n"] == 1:
+            raise HarnessError("local-gate", "denied")
+        return e.git.commit_all(msg)
+
+    llm = FakeToolLlm([_fix_line4, _fix_line4])
+    assert _run_fix(e, llm, commit=commit) is True
+    assert [c[1] for c in llm.calls] == ["sonnet", "opus"]
+
+
+def test_failed_check_names_parses_markers():
+    out = ("PASS  a\nMETA-CHECK-FAILED: check-prose-since\nMETA-CHECK-FAILED: adr-check\n"
+           "META-CHECKS: FAILED stage=pre-push")
+    assert prosefix.failed_check_names(out) == ["check-prose-since", "adr-check"]
+
+
+def test_call_shape_binds_live_adapter():
+    inspect.signature(ClaudeCli.call_tooled).bind(
+        None, prosefix.PROSE_FIX_PURPOSE, "sonnet", "p", cwd="/tmp",
+        allowed_tools=prosefix.PROSE_FIX_ALLOWED_TOOLS,
+        denied_tools=prosefix.PROSE_FIX_DENIED_TOOLS)
+    assert set(prosefix.PROSE_FIX_MODELS) <= set(TOOLED_MODELS)

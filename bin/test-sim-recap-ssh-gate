@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-sim-recap-ssh-gate — harness for bin/sim-recap-ssh-gate (the prod-side
+# forced command for the sim-recap-actions key).
+#
+# A stub `php` records its argv and stdin; no real php runs.
+#
+# Run: bin/test-sim-recap-ssh-gate  (exit 0 = all pass, 1 = failures)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GATE="$SCRIPT_DIR/sim-recap-ssh-gate"
+
+FAILED=0
+GATE_RC=0
+
+srt_ok()   { echo "ok: $1"; }
+srt_fail() { echo "FAIL: $1"; FAILED=1; }
+
+# srt_expect_eq <name> <want> <got>
+srt_expect_eq() {
+    if [ "$2" = "$3" ]; then srt_ok "$1"
+    else srt_fail "$1 — want [$2] got [$3]"; fi
+}
+
+STUB="$(mktemp -d)"
+trap 'rm -rf "$STUB"' EXIT
+
+cat > "$STUB/php" <<'SH'
+#!/usr/bin/env bash
+printf '%s' "$*" > "$STUB/php.argv"
+cat > "$STUB/php.stdin"
+exit 0
+SH
+chmod +x "$STUB/php"
+
+export STUB
+export SIM_RECAP_GATE_PHP_BIN="$STUB/php"
+export SIM_RECAP_GATE_ROOT=/srv/ibl
+
+# gate_run <request> — run the gate as sshd would; sets GATE_RC, stderr in $STUB/err.
+gate_run() {
+    rm -f "$STUB/php.argv" "$STUB/php.stdin" "$STUB/err"
+    SSH_ORIGINAL_COMMAND="$1" "$GATE" </dev/null >/dev/null 2>"$STUB/err"
+    GATE_RC=$?
+}
+
+# gate_expect_denied <request> — records a failure message in $DENY_FAILS when admitted.
+DENY_FAILS=""
+gate_expect_denied() {
+    gate_run "$1"
+    if [ "$GATE_RC" -ne 2 ] || [ -e "$STUB/php.argv" ]; then
+        DENY_FAILS="$DENY_FAILS [$1 rc=$GATE_RC]"
+    fi
+}
+gate_denied_report() {
+    if [ -z "$DENY_FAILS" ]; then srt_ok "$1"
+    else srt_fail "$1 —$DENY_FAILS"; fi
+    DENY_FAILS=""
+}
+
+# ── 1. admits claim-next ──────────────────────────────────────────────────────
+gate_run "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next"
+srt_expect_eq "admits claim-next" \
+    "0|/srv/ibl/ibl5/scripts/simRecapQueue.php claim-next" \
+    "$GATE_RC|$(cat "$STUB/php.argv" 2>/dev/null)"
+
+# ── 2. admits every tick verb ─────────────────────────────────────────────────
+verbs_bad=""
+while IFS='|' read -r script args; do
+    gate_run "php /srv/ibl/ibl5/scripts/$script.php $args"
+    want="/srv/ibl/ibl5/scripts/$script.php $args"
+    got="$(cat "$STUB/php.argv" 2>/dev/null)"
+    if [ "$GATE_RC" -ne 0 ] || [ "$got" != "$want" ]; then
+        verbs_bad="$verbs_bad [$script $args rc=$GATE_RC argv=$got]"
+    fi
+done <<'VERBS'
+simRecapQueue|reclaim-stale
+simRecapQueue|recent-themes
+simRecapQueue|mention-map
+simRecapQueue|claim --sim=12
+simRecapQueue|park --sim=12
+simRecapQueue|find --sim=12
+simRecapContext|--sim=12
+storeSimRecap|--sim=12
+VERBS
+if [ -z "$verbs_bad" ]; then srt_ok "admits every tick verb"
+else srt_fail "admits every tick verb —$verbs_bad"; fi
+
+# ── 3. store passes stdin through ─────────────────────────────────────────────
+rm -f "$STUB/php.stdin"
+printf '{"x":1}' | SSH_ORIGINAL_COMMAND="php /srv/ibl/ibl5/scripts/storeSimRecap.php --sim=12" \
+    "$GATE" >/dev/null 2>&1
+srt_expect_eq "store passes stdin through" '{"x":1}' "$(cat "$STUB/php.stdin" 2>/dev/null)"
+
+# ── 4. denies wrong root ──────────────────────────────────────────────────────
+gate_expect_denied "php /tmp/evil/ibl5/scripts/simRecapQueue.php claim-next"
+gate_expect_denied "php /srv/ibl/../evil/ibl5/scripts/simRecapQueue.php claim-next"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php x /srv/ibl/ibl5/scripts/storeSimRecap.php claim-next"
+gate_denied_report "denies wrong root"
+
+# ── 5. denies shell metacharacters ────────────────────────────────────────────
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next; id"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next && cat /etc/passwd"
+gate_expect_denied 'php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next `id`'
+gate_expect_denied 'php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next $(id)'
+gate_denied_report "denies shell metacharacters"
+
+# ── 6. denies unknown verb and non-numeric sim ────────────────────────────────
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php drop-all"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim --sim=1e3"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php park --sim="
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim --sim=1 --sim=2"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapContext.php --sim=1234567890"
+gate_denied_report "denies unknown verb and non-numeric sim"
+
+# ── 7. denies other scripts ───────────────────────────────────────────────────
+gate_expect_denied "php /srv/ibl/ibl5/scripts/updateAllTheThings.php"
+gate_expect_denied "bash"
+gate_expect_denied "mysql"
+gate_denied_report "denies other scripts"
+
+# ── 8. empty env denied without spawning php ──────────────────────────────────
+rm -f "$STUB/php.argv" "$STUB/err"
+env -i SIM_RECAP_GATE_PHP_BIN="$STUB/php" bash "$GATE" </dev/null >/dev/null 2>"$STUB/err"
+rc=$?
+if [ "$rc" -eq 2 ] && grep -qF "denied: no command" "$STUB/err" && [ ! -e "$STUB/php.argv" ]; then
+    srt_ok "empty env denied without spawning php"
+else
+    srt_fail "empty env denied without spawning php — rc=$rc"
+fi
+
+# ── 9. print-key-line emits restrict line ─────────────────────────────────────
+printf 'ssh-ed25519 AAAATESTKEY comment-ignored\n' > "$STUB/key.pub"
+got="$("$GATE" --print-key-line "$STUB/key.pub" 2>/dev/null)"
+want='restrict,port-forwarding,permitopen="127.0.0.1:3306",command="/srv/ibl/bin/sim-recap-ssh-gate" ssh-ed25519 AAAATESTKEY sim-recap-actions'
+srt_expect_eq "print-key-line emits restrict line" "$want" "$got"
+
+# ── 10. rejects unknown flag loudly ───────────────────────────────────────────
+flag_bad=""
+for args in "--print-key-line" "--bogus" "--print-key-line $STUB/missing.pub"; do
+    # shellcheck disable=SC2086  # word-splitting the flag list is intended
+    "$GATE" $args >/dev/null 2>"$STUB/err"
+    rc=$?
+    if [ "$rc" -ne 2 ] || ! grep -q usage "$STUB/err"; then
+        flag_bad="$flag_bad [$args rc=$rc]"
+    fi
+done
+if [ -z "$flag_bad" ]; then srt_ok "rejects unknown flag loudly"
+else srt_fail "rejects unknown flag loudly —$flag_bad"; fi
+
+# ── 11. denial never echoes stdin ─────────────────────────────────────────────
+printf 'PAYLOAD-SENTINEL' | SSH_ORIGINAL_COMMAND="php /srv/ibl/ibl5/scripts/updateAllTheThings.php" \
+    "$GATE" >/dev/null 2>"$STUB/err"
+if grep -qF PAYLOAD-SENTINEL "$STUB/err"; then srt_fail "denial never echoes stdin — sentinel leaked"
+else srt_ok "denial never echoes stdin"; fi
+
+exit "$FAILED"

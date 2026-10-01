@@ -312,6 +312,7 @@ try {
         $updaterService->addStep(new Updater\Steps\QueueSimSummaryStep(
             new \SimRecap\SimSummaryRepository($mysqli_db),
             new \Season\SeasonQueryRepository($mysqli_db),
+            \SimRecap\GitHubDispatchClient::fromConfig(),
         ));
     }
 

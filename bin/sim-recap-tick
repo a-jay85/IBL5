@@ -83,6 +83,10 @@ SIM_RECAP_MYSQL_BIN="${SIM_RECAP_MYSQL_BIN:-/opt/homebrew/opt/mysql@8.4/bin/mysq
 SIM_RECAP_CURL_BIN="${SIM_RECAP_CURL_BIN:-curl}"
 SIM_RECAP_BOT_BASE_URL="${SIM_RECAP_BOT_BASE_URL:-http://127.0.0.1:50001}"
 SIM_RECAP_OPS_ALERT_THREAD_ID="${SIM_RECAP_OPS_ALERT_THREAD_ID:-}"
+# Discord webhook URL (secret; embeds its token). Non-empty = post ops alerts
+# straight to Discord (Actions host). Empty = Mac bot at SIM_RECAP_BOT_BASE_URL.
+# Travels to curl via `-K -` on stdin, never argv, never a log line.
+SIM_RECAP_OPS_WEBHOOK_URL="${SIM_RECAP_OPS_WEBHOOK_URL:-}"
 # Where the ops-alert edge state lives. Deliberately NOT under WORKDIR (mktemp -d,
 # rm -rf'd on EXIT) — suppressing a repeat across ticks needs a path that outlives
 # the run. Sits in the sim-recap dir sim-recap-cron-setup already creates (for its
@@ -96,6 +100,9 @@ SIM_RECAP_OPS_ALERT_STATE="${SIM_RECAP_OPS_ALERT_STATE:-${HOME:-/tmp}/.claude/pr
 SIM_RECAP_LAUNCHCTL_BIN="${SIM_RECAP_LAUNCHCTL_BIN:-launchctl}"
 SIM_RECAP_DB_SYNC_BIN="${SIM_RECAP_DB_SYNC_BIN:-$REPO_ROOT/ibl5/bin/db-sync-now}"
 SIM_RECAP_DB_SYNC_LOG="${SIM_RECAP_DB_SYNC_LOG:-${HOME:-/tmp}/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/logs/db-sync.log}"
+# launchd (Mac poller, default) | actions (GitHub Actions runner). Host-specific
+# steps key on this, never on hostname: bootout, db-sync, ops transport (Phase 2).
+SIM_RECAP_HOST_MODE="${SIM_RECAP_HOST_MODE:-launchd}"
 DRY_RUN=0
 # SIM_RECAP_DB_PASSWORD is read from the environment ONLY (never defaulted, never
 # argv, never logged). require_password() enforces its presence on the live path.
@@ -147,6 +154,16 @@ log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >&2; }
 # ping waits for the first sim after it. That is the right trade — the alert is
 # about recaps shipping roster-blind, and no recap is shipping.
 ops_post() { # message — fault-tolerant by contract; never fails the tick
+    if [ -n "$SIM_RECAP_OPS_WEBHOOK_URL" ]; then
+        local url="$SIM_RECAP_OPS_WEBHOOK_URL" sep='?'
+        case "$url" in *\?*) sep='&' ;; esac
+        url="${url}${sep}thread_id=${SIM_RECAP_OPS_ALERT_THREAD_ID}"
+        printf 'url = "%s"\n' "$url" | "$SIM_RECAP_CURL_BIN" -s -K - -X POST \
+            -H 'Content-Type: application/json' \
+            -d "$("$SIM_RECAP_JQ_BIN" -nc --arg m "$1" '{content:$m}')" \
+            2>/dev/null >/dev/null || true
+        return 0
+    fi
     "$SIM_RECAP_CURL_BIN" -s -X POST "$SIM_RECAP_BOT_BASE_URL/post-to-thread" \
         -H 'Content-Type: application/json' \
         -d "$("$SIM_RECAP_JQ_BIN" -nc --arg t "$SIM_RECAP_OPS_ALERT_THREAD_ID" --arg m "$1" \
@@ -419,11 +436,13 @@ generate() { # sim
         # inside launchd's 300s StartInterval. It self-guards (lock + 30-min
         # throttle + container check), so firing per stored sim is safe and a
         # sim-less tick never reaches this line.
-        if [ "$DRY_RUN" -eq 0 ] && [ -x "$SIM_RECAP_DB_SYNC_BIN" ]; then
+        if [ "$DRY_RUN" -eq 0 ] && [ "$SIM_RECAP_HOST_MODE" = launchd ] && [ -x "$SIM_RECAP_DB_SYNC_BIN" ]; then
             log "sim $sim: triggering local DB sync (detached)"
             mkdir -p "$(dirname "$SIM_RECAP_DB_SYNC_LOG")" 2>/dev/null || true
             nohup "$SIM_RECAP_DB_SYNC_BIN" >> "$SIM_RECAP_DB_SYNC_LOG" 2>&1 &
             disown 2>/dev/null || true
+        elif [ "$SIM_RECAP_HOST_MODE" = actions ]; then
+            log "sim $sim: db-sync skipped (host mode: actions)"
         fi
         local avg_len
         avg_len="$("$SIM_RECAP_JQ_BIN" -r \
@@ -505,6 +524,10 @@ main() {
             *) log "unknown argument: $arg"; exit 2 ;;
         esac
     done
+    case "$SIM_RECAP_HOST_MODE" in
+        launchd|actions) ;;
+        *) log "ERROR: unknown SIM_RECAP_HOST_MODE '$SIM_RECAP_HOST_MODE' (expected launchd|actions) — aborting tick (no sim claimed)"; return 2 ;;
+    esac
 
     # Preflight: the agent binary must actually resolve, BEFORE anything claims a
     # sim. An unresolvable $SIM_RECAP_CLAUDE_BIN makes `timeout` exit 127, which
@@ -558,14 +581,20 @@ main() {
     fi
 
     local claim normalized sim
-    claim="$(q claim-next)"
+    local claim_verb="claim-next"
+    if [ -n "$DRY_SIM" ]; then
+        claim_verb="claim --sim=$DRY_SIM"
+        claim="$(q claim --sim="$DRY_SIM")"
+    else
+        claim="$(q claim-next)"
+    fi
     rc=$?
     # This check MUST precede the empty-tick guard below: a failed call returns
     # empty stdout, so the guard would swallow it and report an idle queue. That
     # is not hypothetical — the poller logged 342 consecutive "exiting cheap"
     # ticks while simRecapQueue.php was simply absent from the remote root.
     if [ "$rc" -ne 0 ]; then
-        log "ERROR: claim-next did not complete — aborting tick (no claude spawned)"
+        log "ERROR: $claim_verb did not complete — aborting tick (no claude spawned)"
         return 1
     fi
     normalized="$(printf '%s' "$claim" | tr -d '[:space:]')"
@@ -579,7 +608,7 @@ main() {
     # Fail-closed: a truncated ssh, an HTML error page, or a stub returning
     # garbage must NOT be parsed into a bogus sim number and spawn the agent.
     if ! jq_ok "$claim" 'type == "object" and .ok == true'; then
-        log "ERROR: claim-next did not return a valid queue object — aborting tick (no claude spawned)"
+        log "ERROR: $claim_verb did not return a valid queue object — aborting tick (no claude spawned)"
         return 1
     fi
 
@@ -600,6 +629,10 @@ main() {
             local phase_log
             phase_log="$(printf '%s' "$claim" | \
                 "$SIM_RECAP_JQ_BIN" -r '.phase // "unknown"' 2>/dev/null)"
+            if [ "$SIM_RECAP_HOST_MODE" = actions ]; then
+                log "recaps disabled (phase: ${phase_log}) and no pending sim — host mode actions: leaving the hourly schedule armed (no bootout)"
+                return 0
+            fi
             log "recaps disabled (phase: ${phase_log}) and no pending sim — booting out poller (label: com.ibl5.sim-recap-poll)"
             "$SIM_RECAP_LAUNCHCTL_BIN" bootout "gui/$(id -u)/com.ibl5.sim-recap-poll"
             return 0

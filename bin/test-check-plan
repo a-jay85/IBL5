@@ -2120,7 +2120,7 @@ assert_viol "gateM-fenced-methods-only-flags" 1 '[M]' "$FM$PU"'
 assert_viol "gateM-no-phpunit-row-silent" 0 '[M]' "$FM$E2E_ONLY"
 
 # ---------------------------------------------------------------------------
-# Gate [X] fixtures (4 cases)
+# Gate [X] fixtures (8 cases)
 # ---------------------------------------------------------------------------
 XVR='
 | # | What to verify | Test type | Timing | Test file / location |
@@ -2148,6 +2148,45 @@ XPOS='
 | 1 | baselines unchanged | Visual-regression | post-impl | (no-change) `t.spec.ts-snapshots` |
 '
 assert_viol "gateX-marker-before-token-fires" 1 '[X]' "$FM$XPOS"
+# Shape 1 (backlog#1233): the literal (no-change) appears ONLY inside a backtick
+# code span on a non-VR row. It is a mention, not a marker; gate X must stay silent.
+XSPAN='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | a `(no-change)` mention inside a code span is not a marker | E2E | post-impl | `t.spec.ts` |
+'
+assert_viol "gateX-code-span-mention-ignored" 0 '[X]' "$FM$XSPAN"
+# Shape 2 (backlog#1233): a fenced fixture block carries a marker on an E2E row.
+# Fenced examples never count (harness _strip_fenced); gate X reads fence-aware rows.
+XFENCE='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | E2E | post-impl | `t.spec.ts` |
+
+```
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | E2E | post-impl | `t.spec.ts` (no-change) |
+```
+'
+assert_viol "gateX-fenced-fixture-ignored" 0 '[X]' "$FM$XFENCE"
+# Still rejected: a code-span mention does NOT launder a bare marker on a non-VR row.
+XBOTH='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | a `(no-change)` mention plus a bare marker | E2E | post-impl | `t.spec.ts` (no-change) |
+'
+assert_viol "gateX-bare-marker-non-vr-still-fires" 1 '[X]' "$FM$XBOTH"
+# Pinned UNCHANGED: marker after a SECOND backticked token on a VR row. Gate X is
+# silent on this shape today (the position regex only needs a backtick before the
+# marker); the harness is what emits MISSING for token 1. This fix must neither
+# newly exempt nor newly reject it.
+XSECOND='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | baselines unchanged | Visual-regression | post-impl | `a.spec.ts-snapshots` and `b.spec.ts-snapshots` (no-change) |
+'
+assert_viol "gateX-second-token-marker-unchanged" 0 '[X]' "$FM$XSECOND"
 
 # ---------------------------------------------------------------------------
 # Gate [G] fixtures (4 cases)

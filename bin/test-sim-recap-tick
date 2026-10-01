@@ -928,18 +928,17 @@ srt_expect_eq "phase_gate_no_bootout_in_dry_run — exit 0" 0 "$SRT_RC"
 srt_file_absent "$STUB/launchctl.log" \
     "phase_gate_no_bootout_in_dry_run — launchctl never called in dry-run mode"
 
-# ── phase_gate_no_bootout_when_sim_flag ──────────────────────────────────────
-# When --sim=N is supplied (DRY_SIM non-empty) and recaps_enabled:false, the
-# bootout guard must be skipped — a human explicitly invoked the tick for a
-# specific sim and we must never pull the rug out from under them. With no
-# claimed:true the unclaimable-sim guard aborts first (exit 1), before the gate.
+# ── unclaimed_sim_aborts_before_bootout_gate ──────────────────────────────────
+# When --sim=N is supplied and the queue returns claimed:false, the
+# unclaimable-sim guard exits 1 before the bootout gate runs. The launchctl
+# assertion confirms the bootout never fires even though recaps_enabled:false.
 srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":null,"phase":"Playoffs","recaps_enabled":false}\n' \
     > "$STUB/resp.claim"
 srt_run --sim=42
-srt_expect_eq "phase_gate_no_bootout_when_sim_flag — exit 1" 1 "$SRT_RC"
+srt_expect_eq "unclaimed_sim_aborts_before_bootout_gate — exit 1" 1 "$SRT_RC"
 srt_file_absent "$STUB/launchctl.log" \
-    "phase_gate_no_bootout_when_sim_flag — launchctl not called when --sim=N supplied"
+    "unclaimed_sim_aborts_before_bootout_gate — launchctl not called"
 
 # ── phase_gate_fail_safe_missing_field ────────────────────────────────────────
 # If claim-next returns a response without the recaps_enabled field (e.g. the

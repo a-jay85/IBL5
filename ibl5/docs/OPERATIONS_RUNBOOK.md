@@ -464,7 +464,7 @@ Copy `ibl5/config/github-dispatch.config.example.php` to `ibl5/config/github-dis
 
 ### Manual rerun
 
-Run `gh workflow run sim-recap.yml` for a claim-next drain. Add `-f sim=<N>` to claim one sim. Watch it with `gh run watch`. The job log stays quiet on purpose, because the repo is public. Read the outcome in the recap viewer or the ops alert thread.
+Run `gh workflow run sim-recap.yml` for a claim-next drain. Add `-f sim=<N>` to claim a specific sim; only do this after re-queuing it on prod, because the tick exits 1 and turns the job red when that sim is not pending. Watch it with `gh run watch`. The job log stays quiet on purpose, because the repo is public. Read the outcome in the recap viewer or the ops alert thread.
 
 ### Uninstalling the Mac poller later
 

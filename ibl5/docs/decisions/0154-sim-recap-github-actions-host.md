@@ -1,6 +1,6 @@
 ---
 description: Sim recaps run on a GitHub Actions runner, triggered by a repository_dispatch from prod with an hourly schedule as fallback, over a dedicated forced-command SSH key; the Mac poller stays as a backup.
-last_verified: 2026-09-30
+last_verified: 2026-10-01
 ---
 
 # ADR-0154: Run the sim-recap pipeline on GitHub Actions
@@ -46,7 +46,7 @@ Workflow hygiene is asserted by `bin/test-sim-recap-tick`. Secrets reach the job
 
 ## Lineage
 
-Extends the sim-recap poller design recorded in ADR-0093 and ADR-0124 with a second host. Neither ADR is superseded: the Mac poller stays as a backup, and ADR-0093's credential split is unchanged and restated above as a constraint.
+Extends the sim-recap poller design recorded in ADR-0093 with a second host. ADR-0093 is not superseded: the Mac poller stays as a backup, and its credential split is unchanged and restated above as a constraint.
 
 ## References
 

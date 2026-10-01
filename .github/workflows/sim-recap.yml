@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40          # SIM_RECAP_CLAUDE_TIMEOUT 1800s + setup
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check secrets
         id: secrets
         env:
@@ -59,7 +59,7 @@ jobs:
           mkdir -p ~/.ssh/cm && printf 'Host ibl-prod\n  HostName %s\n  Port %s\n  User %s\n  IdentityFile ~/.ssh/id_deploy\n  IdentitiesOnly yes\n  ControlMaster auto\n  ControlPath ~/.ssh/cm/%%C\n  ControlPersist 10m\n  ServerAliveInterval 30\n' "$H" "$P" "$U" >> ~/.ssh/config
       - name: Restore ops-alert edge state
         if: steps.secrets.outputs.configured == 'true'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with: { path: '${{ runner.temp }}/sim-recap-state', key: 'sim-recap-ops-alert-${{ github.run_id }}', restore-keys: 'sim-recap-ops-alert-' }
       - name: Run tick
         if: steps.secrets.outputs.configured == 'true'
@@ -93,5 +93,5 @@ jobs:
         run: ssh -O exit ibl-prod 2>/dev/null || true
       - name: Save ops-alert edge state
         if: always() && steps.secrets.outputs.configured == 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with: { path: '${{ runner.temp }}/sim-recap-state', key: 'sim-recap-ops-alert-${{ github.run_id }}' }

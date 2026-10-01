@@ -109,9 +109,8 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   'landmark-one-main': new Set([
   ]),
 
-  // Content outside landmark regions — same root-page bypass. See a-jay85/IBL5-backlog (label: a11y) — search "region".
+  // Content outside landmark regions. League control panel renders everything inside its <main> landmark (LeagueControlPanelView) — ratchet tightened.
   'region': new Set([
-    'league control panel',
   ]),
 };
 

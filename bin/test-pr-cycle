@@ -1476,13 +1476,9 @@ end_case "case 28 skip opt-out and fail-toward-running paths"
 begin_case
 WF="$SCRIPT_DIR/../.github/workflows/tests.yml"
 if [[ -f "$WF" ]]; then
-    [[ "$(grep -c 'run: bin/test-pr-cycle' "$WF")" == "1" ]] \
-        || fail "tests.yml does not run bin/test-pr-cycle exactly once"
-    A="$(grep -n 'run: bin/test-post-plan-fleet' "$WF" | head -1 | cut -d: -f1)"
-    B="$(grep -n 'run: bin/test-pr-cycle' "$WF" | head -1 | cut -d: -f1)"
-    C="$(grep -n 'run: bin/test-check-phpunit-hygiene' "$WF" | head -1 | cut -d: -f1)"
-    [[ -n "$A" && -n "$B" && -n "$C" && "$A" -lt "$B" && "$B" -lt "$C" ]] \
-        || fail "bin/test-pr-cycle is not wired between post-plan-fleet and phpunit-hygiene"
+    # Listed once in the bin/run-shell-harnesses argument list (one script per line).
+    [[ "$(grep -cE '^[[:space:]]+bin/test-pr-cycle( \\)?$' "$WF")" == "1" ]] \
+        || fail "tests.yml does not list bin/test-pr-cycle exactly once in the harness runner"
 else
     fail "workflow file not found at $WF"
 fi

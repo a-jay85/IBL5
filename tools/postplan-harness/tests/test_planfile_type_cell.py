@@ -1,6 +1,7 @@
 """Matrix Test-type matching: `_planned_token` reads a WHOLE label cell.
 
-Each test is named for the mutation it kills.
+Each test is named for the mutation it kills. test_conformance_no_change.py also
+calls `_planned_token` indirectly and must stay green with the cells signature.
 """
 import os
 import re
@@ -97,6 +98,7 @@ def test_visual_regression_label_cell_plans_path():
 
 
 def test_bold_type_cell_plans_path():
+    """A bold label cell (`**…**`) plans: `*` must stay in the `_norm_cell` strip set."""
     assert parse_matrix(HDR + BOLD_ROW)[0] == ["tests/Trade/BoldTest.php"]
 
 

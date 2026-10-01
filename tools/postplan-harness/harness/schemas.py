@@ -17,6 +17,9 @@ MANUAL_CATEGORIES = {"cli-executable", "phpunit", "api-test", "e2e",
 HOLD_DISCHARGE_CATEGORIES = {"decision", "cli-executable", "phpunit", "api-test",
                               "e2e", "visual-regression", "truly-manual"}
 COMMIT_TYPES = {"feat", "fix", "refactor", "perf", "test", "docs", "build", "ci", "chore"}
+# Conventional-commit prefix: type, optional (scope), optional bang. Case-insensitive on the
+# type token because validate_pr_copy compares lowercased. Same shape coerce_commit_subject uses.
+_CC_PREFIX_RE = re.compile(r"^([a-z]+)(\([^)]*\))?(!)?:", re.IGNORECASE)
 
 
 def _normalize_finding(item):
@@ -174,6 +177,47 @@ def validate_hold_discharge(data) -> None:
                 raise HarnessError("schema", f"discharge[{i}].probe must be non-empty list")
             if not all(isinstance(s, str) for s in probe):
                 raise HarnessError("schema", f"discharge[{i}].probe elements must be strings")
+
+
+def normalize_pr_copy(data):
+    """Reconcile type / title prefix / commit_subject prefix before validate_pr_copy.
+
+    Runs before validation and can never lower a `feat`. Pure: returns a new dict, never
+    mutates the input, idempotent. Conservative: acts only when `type` is a known
+    COMMIT_TYPES member AND both title and commit_subject are strings whose prefix parses
+    with a known type. Anything else is returned untouched so validate_pr_copy decides
+    exactly as before (missing / non-string fields, unknown type, unparseable prefix,
+    non-dict). Stricter-type rule: if any of the three says feat, all three become feat;
+    otherwise `type` wins. Only the type token is rewritten; each field keeps its own
+    scope, bang and text.
+    """
+    if not isinstance(data, dict):
+        return data
+    t = data.get("type")
+    title = data.get("title")
+    subject = data.get("commit_subject")
+    if not isinstance(t, str) or t not in COMMIT_TYPES:
+        return data
+    if not isinstance(title, str) or not isinstance(subject, str):
+        return data
+    mt = _CC_PREFIX_RE.match(title)
+    ms = _CC_PREFIX_RE.match(subject)
+    if mt is None or ms is None:
+        return data
+    title_type = mt.group(1).lower()
+    subject_type = ms.group(1).lower()
+    if title_type not in COMMIT_TYPES or subject_type not in COMMIT_TYPES:
+        return data
+    winner = "feat" if "feat" in (t, title_type, subject_type) else t
+    if t == winner and title_type == winner and subject_type == winner:
+        return data
+    out = dict(data)
+    out["type"] = winner
+    if title_type != winner:
+        out["title"] = winner + title[mt.end(1):]
+    if subject_type != winner:
+        out["commit_subject"] = winner + subject[ms.end(1):]
+    return out
 
 
 def validate_pr_copy(data) -> None:

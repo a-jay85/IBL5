@@ -168,6 +168,7 @@ def test_hit_cap_limits_filing(tmp_path):
 
 
 def test_issue_titles_strict_raises_default_swallows(tmp_path, monkeypatch):
+    """LiveGh.issue_titles swallows by default, raises under strict, omits --label for None."""
     gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "br")
 
     def _boom(*args, **kw):

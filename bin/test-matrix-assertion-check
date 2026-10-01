@@ -791,6 +791,113 @@ skip-equals-class5)
     fi
     ;;
 
+tag-skips-row)
+    # A well-formed tag on a CLI-executable row: no UNREALISED line, one ONE-TIME-CHECK line on stdout.
+    plan_fixture '| 7 | `FIXTURE_ONE_SHOT_TOKEN` printed by the run (one-time-check: evidence is printed output at plan time) | CLI-executable | post-impl | `bin/run-it` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    unreal=$(printf '%s\n' "$out" | grep -c '^UNREALISED-ASSERTION:' || true)
+    skipped=$(printf '%s\n' "$out" | grep -c '^ONE-TIME-CHECK: row 7 ' || true)
+    if [ "$rc" -eq 0 ] && [ "$unreal" -eq 0 ] && [ "$skipped" -eq 1 ]; then
+        ok "tag-skips-row"
+    else
+        fail "tag-skips-row (rc=$rc, unreal=$unreal, skipped=$skipped, out=$out)"
+    fi
+    ;;
+
+tag-untagged-same-row-flags)
+    # The identical row without the tag still flags: the skip is the tag's doing, nothing else.
+    plan_fixture '| 7 | `FIXTURE_ONE_SHOT_TOKEN` printed by the run | CLI-executable | post-impl | `bin/run-it` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 7'; then
+        ok "tag-untagged-same-row-flags"
+    else
+        fail "tag-untagged-same-row-flags (rc=$rc, out=$out)"
+    fi
+    ;;
+
+tag-malformed-checked)
+    # Fail-closed: a tag that is not the trailing text of the cell is ignored; row still flags;
+    # the ignore notice goes to stderr with its own prefix.
+    plan_fixture '| 7 | (one-time-check: evidence is printed output at plan time) `FIXTURE_ONE_SHOT_TOKEN` printed | CLI-executable | post-impl | `bin/run-it` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 >/dev/null)
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    ignored=$(printf '%s\n' "$err" | grep -c '^ONE-TIME-CHECK-IGNORED: row 7 ' || true)
+    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 7' && [ "$ignored" -eq 1 ]; then
+        ok "tag-malformed-checked"
+    else
+        fail "tag-malformed-checked (rc=$rc, ignored=$ignored, out=$out, err=$err)"
+    fi
+    ;;
+
+tag-short-reason-checked)
+    # Fail-closed: a reason under 15 chars is ignored; row still flags.
+    plan_fixture '| 7 | `FIXTURE_ONE_SHOT_TOKEN` printed (one-time-check: too short) | CLI-executable | post-impl | `bin/run-it` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 7'; then
+        ok "tag-short-reason-checked"
+    else
+        fail "tag-short-reason-checked (rc=$rc, out=$out)"
+    fi
+    ;;
+
+tag-wrong-type-checked)
+    # Fail-closed: a well-formed tag on a non-CLI-executable row is ignored; row still flags.
+    plan_fixture '| 7 | `FIXTURE_ONE_SHOT_TOKEN` shown in the browser (one-time-check: evidence is printed output at plan time) | E2E | post-impl | `e2e/x.spec.ts` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 7'; then
+        ok "tag-wrong-type-checked"
+    else
+        fail "tag-wrong-type-checked (rc=$rc, out=$out)"
+    fi
+    ;;
+
+tag-line-prefix)
+    # The informational lines must never start with the prefix every caller greps for.
+    plan_fixture \
+        '| 7 | `FIXTURE_ONE_SHOT_TOKEN` printed (one-time-check: evidence is printed output at plan time) | CLI-executable | post-impl | `bin/run-it` |' \
+        '| 8 | `FIXTURE_OTHER_TOKEN` printed (one-time-check: short) | CLI-executable | post-impl | `bin/run-it` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    all=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1)
+    rc=$?
+    unreal=$(printf '%s\n' "$all" | grep -c '^UNREALISED-ASSERTION:' || true)
+    info=$(printf '%s\n' "$all" | grep -c '^ONE-TIME-CHECK' || true)
+    if [ "$rc" -eq 0 ] && [ "$unreal" -eq 1 ] && [ "$info" -eq 2 ]; then
+        ok "tag-line-prefix"
+    else
+        fail "tag-line-prefix (rc=$rc, unreal=$unreal, info=$info, all=$all)"
+    fi
+    ;;
+
+replay-2578-tagged)
+    # The motivating case: rows 12 and 14 tagged, same diff as the untagged replay, zero UNREALISED lines.
+    replay_2578_fixture "$root" tagged
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    unreal=$(printf '%s\n' "$out" | grep -c '^UNREALISED-ASSERTION:' || true)
+    skipped=$(printf '%s\n' "$out" | grep -c '^ONE-TIME-CHECK: row 1[24] ' || true)
+    if [ "$rc" -eq 0 ] && [ "$unreal" -eq 0 ] && [ "$skipped" -eq 2 ]; then
+        ok "replay-2578-tagged"
+    else
+        fail "replay-2578-tagged (rc=$rc, unreal=$unreal, skipped=$skipped, out=$out)"
+    fi
+    ;;
+
 replay-2578-untagged)
     # Characterization: the #2578 matrix, untagged, flags rows 12 and 14 and nothing else.
     replay_2578_fixture "$root"
@@ -808,7 +915,7 @@ replay-2578-untagged)
 
 *)
     printf 'Unknown case: %s\n' "$case" >&2
-    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 replay-2578-untagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire all\n' >&2
+    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 replay-2578-untagged tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire all\n' >&2
     exit 2
     ;;
 esac
@@ -820,7 +927,7 @@ rm -rf "$root"
 
 ARG="${1:-all}"
 
-CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 replay-2578-untagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire"
+CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 replay-2578-untagged tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire"
 
 if [ "$ARG" = "all" ]; then
     for c in $CASES; do

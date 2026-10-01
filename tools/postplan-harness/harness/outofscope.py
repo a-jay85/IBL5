@@ -5,10 +5,14 @@ The extractor is pure (no I/O, no `gh` call), so every engine shares one definit
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
+import os
 import re
+import tempfile
 from dataclasses import dataclass
 
+from .adapters.ghad import LiveGh
 from .planfile import _section, _strip_fenced
 from .state import HarnessError
 
@@ -164,3 +168,44 @@ def file_deferral_issues(gh, hits: list[DeferralHit], slug: str,
         seen.add(tag)
         log(f"oos-sweep: filed #{n} {hit.key}")
     return nums
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="python3 -m harness.outofscope",
+                                 description="File backlog issues for ## Out of Scope deferrals")
+    ap.add_argument("--plan", required=True)
+    ap.add_argument("--slug", required=True)
+    ap.add_argument("--pr", required=True, type=int)
+    ap.add_argument("--worktree", default=os.getcwd())
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args(argv)  # malformed flags: SystemExit(2), loud
+    if args.pr <= 0:
+        ap.error("--pr must be a positive integer")
+    try:
+        if not os.path.isfile(args.plan):
+            print(f"oos-sweep: plan not found: {args.plan}")
+            return 0
+        with open(args.plan, encoding="utf-8") as fh:
+            hits = extract_deferral_hits(fh.read(), args.slug)
+        if not hits:
+            print("oos-sweep: 0 hits")
+            return 0
+        for h in hits:
+            print(f"oos-hit\t{h.key}\t{h.line_no}\t{_short(h.text)}")
+        gh = LiveGh(tempfile.mkdtemp(prefix="oos-sweep-"), args.worktree, args.slug)
+        if args.dry_run:
+            seen = {m.group(0) for t in gh.issue_titles(None, strict=True)
+                    for m in [_TAG_RE.search(t)] if m}
+            for h in hits[:MAX_HITS_PER_PLAN]:
+                print(f"{'exists' if f'[{h.key}]' in seen else 'would-file'}\t{h.key}")
+            return 0
+        file_deferral_issues(gh, hits, args.slug, args.pr, log=print,
+                             plan_name=os.path.basename(args.plan))
+    except Exception as exc:  # additive: never a non-zero exit after parsing
+        print(f"oos-sweep: sweep failed ({type(exc).__name__}: {exc})")
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())

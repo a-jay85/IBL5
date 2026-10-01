@@ -14,7 +14,7 @@ REAL_POLL="$REPO_ROOT/bin/docfix-poll"
 WORKFLOW="$REPO_ROOT/.github/workflows/doc-freshness-audit.yml"
 NOTIFY_WORKFLOW="$REPO_ROOT/.github/workflows/docs-refreshed-notify.yml"
 HEALTH_WORKFLOW="$REPO_ROOT/.github/workflows/docfix-health.yml"
-REAL_VERONLY="$REPO_ROOT/bin/docfix-check-veronly"
+REAL_VERONLY="${REAL_VERONLY:-$REPO_ROOT/bin/docfix-check-veronly}"
 FAILED=0
 ok()   { echo "ok: $1"; }
 bad()  { echo "FAIL: $1"; FAILED=1; }
@@ -1200,8 +1200,9 @@ RC23=$?
     && grep -qF 'NEVER SWAP A FIGURE WITHOUT RE-READING ITS SENTENCE' "$REAL_DOCFIX" \
     && grep -qF '## Addendum' "$REAL_DOCFIX" \
     && grep -qF '## Content rewritten' "$REAL_DOCFIX" \
-    && grep -qF 'ibl5/classes/*/README.md' "$REAL_DOCFIX"; } \
-  && ok "(48) prompt: ADR append-only + figure-resubstitution + content-rewrite disclosure + allowlist clauses present" \
+    && grep -qF 'ibl5/classes/*/README.md' "$REAL_DOCFIX" \
+    && grep -qF 'Tier 2 is agent-steering markdown' "$REAL_DOCFIX"; } \
+  && ok "(48) prompt: ADR append-only + figure-resubstitution + content-rewrite disclosure + allowlist + Tier 2 clauses present" \
   || bad "(48) prompt: an append-only/disclosure clause was dropped from \$PROMPT"
 
 # --- Case 48b: static — launch keeps --effort low and the prompt demands a real check
@@ -1209,6 +1210,12 @@ RC23=$?
     && grep -qF 'run a real check that exercises it' "$REAL_DOCFIX"; } \
   && ok "(48b) launch passes --effort low and prompt requires a real verification check" \
   || bad "(48b) --effort low or the real-check verification paragraph missing from bin/docfix-run"
+
+# --- Case 48c: static — TODAY is the local date (launchd-shaped env has no TZ surprise)
+{ grep -qF 'TODAY="$(date +%Y-%m-%d)"' "$REAL_DOCFIX" \
+    && ! grep -q 'date -u' "$REAL_DOCFIX"; } \
+  && ok "(48c) TODAY uses the local date, not UTC" \
+  || bad "(48c) bin/docfix-run TODAY must be local date +%Y-%m-%d with no date -u"
 
 # --- Cases 49-64: bin/docfix-check-veronly numeric-pass + boundary cases ------
 
@@ -1223,6 +1230,19 @@ veronly_add_master() {
     git -C "$R" commit -qm "add $RELPATH" >/dev/null 2>&1
     git -C "$R" branch -f "$VR_SLUG" master
     git -C "$R" checkout -q "$VR_SLUG"
+}
+
+# Frontmatter fixture: line 1 ---, 2 description, 3 paths, 4 last_verified, 5 ---, body from 6.
+veronly_seed_fm() {   # veronly_seed_fm "$R" relpath date body...   (commits to master, re-points branch)
+    local R="$1" RELPATH="$2" D="$3"; shift 3
+    veronly_add_master "$R" "$RELPATH" '---' 'description: fixture' 'paths: "ibl5/**"' "last_verified: $D" '---' "$@"
+}
+write_fm() {          # write_fm "$R" relpath date body...           (working-tree edit only)
+    local R="$1" RELPATH="$2" D="$3"; shift 3
+    printf '%s\n' '---' 'description: fixture' 'paths: "ibl5/**"' "last_verified: $D" '---' "$@" > "$R/$RELPATH"
+}
+veronly_run() {       # veronly_run "$R" "$SB2" → sets VOUT, VRC
+    VOUT="$( cd "$1" && HOME="$2/home" DOCFIX_BASE_REF=master "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
 }
 
 # Case 49: date-only bump in ibl5/docs/decisions/0002.md (PR #2059 shape) → PASS
@@ -1527,66 +1547,67 @@ VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
   && ok "(66) veronly: class README date bump + numeric swap arms the plan (rc 0)" \
   || bad "(66) veronly: ibl5/classes/*/README.md should PASS and arm"
 
-# Case 67: .claude/rules/x.md date-bump-only → HOLD, path outside docfix allowlist
-SB2="$(build_veronly_repo)"
-R="$SB2/repo"
-PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-veronly_add_master "$R" ".claude/rules/x.md" 'last_verified: 2026-01-01'
-printf 'last_verified: 2026-09-24\n' > "$R/.claude/rules/x.md"
-VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
-    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
-{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
-    && grep -q '## Automouse Hold Justification' "$PLAN_V" \
-    && printf '%s' "$VOUT" | grep -qF 'path outside docfix allowlist' \
-    && printf '%s' "$VOUT" | grep -qF '.claude/rules/x.md'; } \
-  && ok "(67) veronly: .claude/rules date-only bump holds (rc 1, path guard fires)" \
-  || bad "(67) veronly: .claude/rules/x.md should HOLD"
+# Assertion helpers for the tier-2 cases (read VRC, VOUT, PLAN_V from the caller).
+# expect_pass "label"            → rc 0, 'PASS — armed', auto_merge: true, no hold section
+# expect_hold "label" "token"    → rc 1, auto_merge: false, hold section present, token in VOUT
+expect_pass() {
+    { [ "$VRC" -eq 0 ] \
+        && grep -qF -- 'PASS — armed' <<< "$VOUT" \
+        && grep -q '^auto_merge: true$' "$PLAN_V" \
+        && ! grep -q '## Automouse Hold Justification' "$PLAN_V"; } \
+      && ok "$1" || bad "$1 (rc=$VRC: $VOUT)"
+}
+expect_hold() {
+    { [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+        && grep -q '## Automouse Hold Justification' "$PLAN_V" \
+        && grep -qF -- "$2" <<< "$VOUT"; } \
+      && ok "$1" || bad "$1 (rc=$VRC: $VOUT)"
+}
 
-# Case 68a: mixed diff — allowed class README + .claude/rules/x.md (PR #2383 shape) → HOLD
+# Case 67: .claude/rules/x.md frontmatter date-bump-only → PASS (tier 2: agent-steering markdown)
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-veronly_add_master "$R" "ibl5/classes/EventLog/README.md" 'last_verified: 2026-01-01'
-veronly_add_master "$R" ".claude/rules/x.md" 'last_verified: 2026-01-01'
-printf 'last_verified: 2026-09-24\n' > "$R/ibl5/classes/EventLog/README.md"
-printf 'last_verified: 2026-09-24\n' > "$R/.claude/rules/x.md"
-VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
-    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
-{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
-    && printf '%s' "$VOUT" | grep -qF 'path outside docfix allowlist' \
-    && printf '%s' "$VOUT" | grep -qF '.claude/rules/x.md'; } \
-  && ok "(68a) veronly: mixed allowed README + .claude/rules diff holds (rc 1)" \
-  || bad "(68a) veronly: mixed diff should HOLD"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 'body'
+write_fm "$R" .claude/rules/x.md 2026-09-30 'body'
+veronly_run "$R" "$SB2"
+expect_pass "(67) veronly: .claude/rules date-only bump arms the plan (tier 2)"
 
-# Case 68b: same mixed shape with the disallowed path sorting AFTER the allowed one
-# (git name-status is path-sorted; 'R' < 'n' so README.md is row 1) → still HOLD.
+# Case 68a: mixed diff — allowed class README + .claude/rules/x.md (PR #2383 shape) → PASS.
+# Row-order note: every tier-2 path (.claude/, AGENTS.md, CLAUDE.md) sorts before ibl5/ in
+# git's byte order, so a tier-1-first mixed diff cannot be fabricated; both failing-row
+# positions are instead covered by 78a/78b below.
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 'body'
 veronly_add_master "$R" "ibl5/classes/EventLog/README.md" 'last_verified: 2026-01-01'
+write_fm "$R" .claude/rules/x.md 2026-09-30 'body'
+printf 'last_verified: 2026-09-30\n' > "$R/ibl5/classes/EventLog/README.md"
+veronly_run "$R" "$SB2"
+expect_pass "(68a) veronly: mixed .claude/rules + class README date bumps arm the plan"
+
+# Case 68b: same mixed shape but the second path is ibl5/classes/EventLog/notes.md
+# (not README.md, outside the allowlist) → HOLD
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 'body'
 veronly_add_master "$R" "ibl5/classes/EventLog/notes.md" 'last_verified: 2026-01-01'
-printf 'last_verified: 2026-09-24\n' > "$R/ibl5/classes/EventLog/README.md"
-printf 'last_verified: 2026-09-24\n' > "$R/ibl5/classes/EventLog/notes.md"
-VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
-    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
-{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
-    && printf '%s' "$VOUT" | grep -qF 'path outside docfix allowlist' \
-    && printf '%s' "$VOUT" | grep -qF 'ibl5/classes/EventLog/notes.md'; } \
-  && ok "(68b) veronly: mixed diff holds when the allowed path is row 1 (rc 1)" \
-  || bad "(68b) veronly: mixed diff (allowed first) should HOLD"
+write_fm "$R" .claude/rules/x.md 2026-09-30 'body'
+printf 'last_verified: 2026-09-30\n' > "$R/ibl5/classes/EventLog/notes.md"
+veronly_run "$R" "$SB2"
+expect_hold "(68b) veronly: tier-2 date bump plus notes.md holds (rc 1)" \
+    "path outside docfix allowlist: 'ibl5/classes/EventLog/notes.md'"
 
-# Case 69: repo-root CLAUDE.md date-bump-only → HOLD
+# Case 69: repo-root CLAUDE.md frontmatter date-bump-only → PASS
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-veronly_add_master "$R" "CLAUDE.md" 'last_verified: 2026-01-01'
-printf 'last_verified: 2026-09-24\n' > "$R/CLAUDE.md"
-VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
-    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
-{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
-    && printf '%s' "$VOUT" | grep -qF "path outside docfix allowlist: 'CLAUDE.md'"; } \
-  && ok "(69) veronly: CLAUDE.md date-only bump holds (rc 1)" \
-  || bad "(69) veronly: CLAUDE.md should HOLD"
+veronly_seed_fm "$R" CLAUDE.md 2026-01-01 'body'
+write_fm "$R" CLAUDE.md 2026-09-30 'body'
+veronly_run "$R" "$SB2"
+expect_pass "(69) veronly: CLAUDE.md date-only bump arms the plan"
 
 # Case 70: ibl5/foo/README.md date-bump-only (README outside the allowlist) → HOLD
 SB2="$(build_veronly_repo)"
@@ -1600,6 +1621,154 @@ VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     && printf '%s' "$VOUT" | grep -qF "path outside docfix allowlist: 'ibl5/foo/README.md'"; } \
   && ok "(70) veronly: README outside ibl5/classes/*/ holds (rc 1)" \
   || bad "(70) veronly: ibl5/foo/README.md should HOLD"
+
+# --- Cases 71-80: tier-2 (agent-steering markdown) frontmatter date-bump guard ---
+BODY157='Logged from 157 call sites.'
+
+# Case 71: date bump + body numeric swap → 2 hunks → HOLD (steering files take the date-only path)
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 "$BODY157"
+write_fm "$R" .claude/rules/x.md 2026-09-30 'Logged from 159 call sites.'
+veronly_run "$R" "$SB2"
+expect_hold "(71) veronly: steering date + body numeric swap holds (2 hunks)" \
+    "steering file '.claude/rules/x.md': expected exactly 1 hunk, found 2"
+
+# Case 72: date bump + adjacent paths: edit → 1 hunk, 2 pairs → HOLD. The -U0 header
+# '@@ -3,2 +3,2 @@' trips the one-line-replacement guard before the -/+ pair-count check runs
+# (that count check is defensive; a 1-line header can only carry one pair).
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 "$BODY157"
+printf '%s\n' '---' 'description: fixture' 'paths: "bin/**"' 'last_verified: 2026-09-30' '---' "$BODY157" \
+    > "$R/.claude/rules/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(72) veronly: steering date + adjacent paths edit holds (2 pairs)" \
+    "steering file '.claude/rules/x.md': hunk is not a one-line replacement: @@ -3,2 +3,2 @@"
+
+# Case 73b: backwards date → HOLD
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 "$BODY157"
+write_fm "$R" .claude/rules/x.md 2025-12-31 "$BODY157"
+veronly_run "$R" "$SB2"
+expect_hold "(73b) veronly: steering backwards date holds" \
+    "date not strictly advancing '2026-01-01' → '2025-12-31'"
+
+# Case 73c: CRLF on the date line → new line fails DATE_RE → HOLD
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 "$BODY157"
+{ printf '%s\n' '---' 'description: fixture' 'paths: "ibl5/**"'
+  printf 'last_verified: 2026-01-01\r\n'
+  printf '%s\n' '---' "$BODY157"; } > "$R/.claude/rules/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(73c) veronly: steering CRLF date line holds" "change line is not a last_verified date"
+
+# Case 74a: fenced last_verified on line 7 (inside body) bumped → HOLD outside frontmatter
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 '```yaml' 'last_verified: 2026-01-01' '```'
+write_fm "$R" .claude/rules/x.md 2026-01-01 '```yaml' 'last_verified: 2026-09-30' '```'
+veronly_run "$R" "$SB2"
+expect_hold "(74a) veronly: steering fenced last_verified outside frontmatter holds" \
+    "last_verified line 7 is outside the frontmatter (closing --- at line 5)"
+
+# Case 74b: base blob has no frontmatter → HOLD
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R" .claude/rules/x.md 'last_verified: 2026-01-01'
+printf 'last_verified: 2026-09-30\n' > "$R/.claude/rules/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(74b) veronly: steering file without frontmatter holds" \
+    "base blob has no closed YAML frontmatter"
+
+# Case 75: .claude/hooks/x.sh (not markdown) → HOLD outside allowlist
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R" .claude/hooks/x.sh 'last_verified: 2026-01-01'
+printf 'last_verified: 2026-09-30\n' > "$R/.claude/hooks/x.sh"
+veronly_run "$R" "$SB2"
+expect_hold "(75) veronly: .claude/hooks/x.sh holds (only .claude/*.md is tier 2)" \
+    "path outside docfix allowlist: '.claude/hooks/x.sh'"
+
+# Case 76a: AGENTS.md date-only → PASS
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" AGENTS.md 2026-01-01 'body'
+write_fm "$R" AGENTS.md 2026-09-30 'body'
+veronly_run "$R" "$SB2"
+expect_pass "(76a) veronly: AGENTS.md date-only bump arms the plan"
+
+# Case 76b: AGENTS.md date bump + body edit → HOLD 2 hunks
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" AGENTS.md 2026-01-01 'body'
+write_fm "$R" AGENTS.md 2026-09-30 'body two'
+veronly_run "$R" "$SB2"
+expect_hold "(76b) veronly: AGENTS.md date + body edit holds" \
+    "steering file 'AGENTS.md': expected exactly 1 hunk, found 2"
+
+# Case 76c: ibl5/CLAUDE.md (not repo-root) → HOLD outside allowlist
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" ibl5/CLAUDE.md 2026-01-01 'body'
+write_fm "$R" ibl5/CLAUDE.md 2026-09-30 'body'
+veronly_run "$R" "$SB2"
+expect_hold "(76c) veronly: ibl5/CLAUDE.md holds (only repo-root CLAUDE.md is tier 2)" \
+    "path outside docfix allowlist: 'ibl5/CLAUDE.md'"
+
+# Case 77a: mode change 100644 → 100755 with unchanged content → HOLD
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 'body'
+git -C "$R" config core.fileMode true
+chmod 755 "$R/.claude/rules/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(77a) veronly: steering mode change holds" \
+    "mode/type is not a regular 100644 file on both sides (100644 → 100755)"
+
+# Case 77b: symlink retarget (120000 → 120000) → HOLD
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+git -C "$R" checkout -q master
+mkdir -p "$R/.claude/rules"
+printf 'last_verified: 2026-01-01\n' > "$R/.claude/rules/y.md"
+printf 'last_verified: 2026-01-01\n' > "$R/.claude/rules/y2.md"
+ln -s y.md "$R/.claude/rules/x.md"
+git -C "$R" add .claude/rules
+git -C "$R" commit -qm "add symlink fixture" >/dev/null 2>&1
+git -C "$R" branch -f "$VR_SLUG" master
+git -C "$R" checkout -q "$VR_SLUG"
+ln -sfn y2.md "$R/.claude/rules/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(77b) veronly: steering symlink retarget holds" "(120000 → 120000)"
+
+# Case 78a: tier-2 body-only edit + a tier-1 date bump → HOLD on the steering file
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 "$BODY157"
+veronly_add_master "$R" ibl5/docs/x.md 'last_verified: 2026-01-01'
+write_fm "$R" .claude/rules/x.md 2026-01-01 'Logged from 157 sites now.'
+printf 'last_verified: 2026-09-30\n' > "$R/ibl5/docs/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(78a) veronly: steering body edit holds even beside a clean tier-1 bump" \
+    "steering file '.claude/rules/x.md'"
+
+# Case 78b: clean tier-2 date bump + a tier-1 file with an unpaired line → HOLD on the tier-1 file
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 "$BODY157"
+veronly_add_master "$R" ibl5/docs/x.md 'last_verified: 2026-01-01'
+write_fm "$R" .claude/rules/x.md 2026-09-30 "$BODY157"
+printf '%s\n' 'last_verified: 2026-09-30' 'new prose' > "$R/ibl5/docs/x.md"
+veronly_run "$R" "$SB2"
+expect_hold "(78b) veronly: clean steering bump does not mask a later unpaired tier-1 file" \
+    "unpaired change lines in 'ibl5/docs/x.md'"
+
+# Case 79: PR #2559 replay — environment.md (list-style paths) + ADR date bumps → PASS
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R" .claude/rules/environment.md '---' 'description: env' 'paths:' \
+    '  - "ibl5/**"' 'last_verified: 2026-07-31' '---' '# Environment' 'body'
+veronly_add_master "$R" ibl5/docs/decisions/0036-x.md 'last_verified: 2026-01-01'
+printf '%s\n' '---' 'description: env' 'paths:' '  - "ibl5/**"' 'last_verified: 2026-09-30' '---' \
+    '# Environment' 'body' > "$R/.claude/rules/environment.md"
+printf 'last_verified: 2026-09-30\n' > "$R/ibl5/docs/decisions/0036-x.md"
+veronly_run "$R" "$SB2"
+expect_pass "(79) veronly: PR #2559 replay (environment.md + ADR date bumps) arms the plan"
+
+# Case 80: .claude/skills/plan/SKILL.md (nested) date-only → PASS
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/skills/plan/SKILL.md 2026-01-01 'body'
+write_fm "$R" .claude/skills/plan/SKILL.md 2026-09-30 'body'
+veronly_run "$R" "$SB2"
+expect_pass "(80) veronly: nested .claude/skills/plan/SKILL.md date-only bump arms the plan"
 
 if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
 exit "$FAILED"

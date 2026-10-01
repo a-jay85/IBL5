@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-09-30
+last_verified: 2026-10-01
 ---
 
 # IBL5 Architecture Decision Records
@@ -60,6 +60,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0147](0147-auto-mergeable-label.md) | Advisory `auto-mergeable` PR label | Accepted | `.github/workflows/auto-mergeable-label.yml` adds the label when auto-merge is armed and `hs_pr_cleared` passes, and removes it otherwise; it reuses `bin/lib/human-signoff-classifier.sh` so it cannot drift from the gate; no gate reads the label. |
 | [0146](0146-discord-dev-webhook-notify.md) | Owner notices post to a #dev channel webhook with an opt-in ping | Accepted | `bin/discord-dm` and the notify-discord action post owner-bound notices to a private #dev webhook; `--ping` / `ping: true` @mentions the owner on failures only; other recipients and `--raw --route` stay on the IBLbot DM; `bin/test-discord-dm` pins the 15 call sites and the ping set. |
 | [0152](0152-pull-prod-db-dumps-offsite-to-mac.md) | Pull prod DB dumps offsite to the owner's Mac | Accepted | `bin/db-backups-pull` rsyncs the nightly dumps to `~/Backups/ibl5-db` daily without `--delete`. It keeps 30 dailies plus each month's first, and DMs when the newest dump is over 36 hours old. |
+| [0156](0156-postplan-harness-concurrency-disclosure.md) | Disclose fail-fast changes in post-plan harness concurrency PRs | Accepted | A harness change that adds or alters concurrency names the failure-timing change in its PR body and tests every enabled agent path in submission order; path-scoped rule `.claude/rules/post-plan-concurrency-docs.md`, enforced by review only. |
 
 ## When an ADR is Required
 

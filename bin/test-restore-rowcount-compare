@@ -483,6 +483,8 @@ else
 fi
 
 # --- 17. ROWCOUNT_MYSQL set but empty falls back to mysql on PATH ----------------------
+# Mutation guard: testing ${ROWCOUNT_MYSQL+x} (set) instead of non-empty would run an
+# empty command here and fail this case.
 case_17() {
     PATH="$SIMBIN:$PATH" ROWCOUNT_MYSQL='' run_cmd "$HELPER" snapshot db t_a
     [ "$RC" -eq 0 ] && out_has 'ROWCOUNT t_a 120'

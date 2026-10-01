@@ -289,11 +289,6 @@ bd_paths_for() {
     _bd_paths="$(printf '%s\n%s\n' "$fl" "$bare" | grep -v '^$' | LC_ALL=C sort -u)" || true
 }
 
-# bd_batch_holders <picked_rows> — "#A #B+#C" in pick order (col 2 = partner, 0 = none)
-bd_batch_holders() {
-    awk -F'\t' 'NF { printf "%s#%s%s", sep, $1, ($2 != "0" ? "+#" $2 : ""); sep = " " }' <<< "$1"
-}
-
 # bd_has_overlap <paths> <held_tsv_file> — print "path<TAB>holder_num"; exit 1 if none
 # held_tsv_file has lines: path<TAB>issue_num
 bd_has_overlap() {
@@ -474,21 +469,18 @@ bd_cmd_burndown() {
     # stays live: its work started and its dirty worktree keeps it in flight.
     # Capacity comes from item statuses, never the ledger's units_used, which
     # sums every item's cost including closed and skipped ones.
-    local budget="$BD_BUDGET" prior_holders=""
+    local budget="$BD_BUDGET"
     if [ -n "$afters" ]; then
         local after_files=() _af
         while IFS= read -r _af; do
             [ -z "$_af" ] || after_files+=("$_af")
         done <<< "$afters"
         local live_def='[.[].items[] | select(.status != "closed-fixed" and .status != "merged" and ((.status == "skipped" and .route != "ad-hoc") | not))]'
-        local live_cost live_solo _xn _hp _hn
+        local live_cost _xn _hp _hn
         live_cost="$(jq -s "$live_def"' | map(.cost // 0) | add // 0' "${after_files[@]}")" \
-            || bd_die 3 "cannot read --after ledgers"
-        live_solo="$(jq -s "$live_def"' | any(.[]; ((.paths // []) | length) == 0)' "${after_files[@]}")" \
             || bd_die 3 "cannot read --after ledgers"
         budget=$((BD_BUDGET - live_cost))
         [ "$budget" -ge 0 ] || budget=0
-        [ "$live_solo" != "true" ] || budget=0
         # Every issue in the after-ledgers is excluded, whatever its status
         while IFS= read -r _xn; do
             [ -z "$_xn" ] || printf '%s\n' "$_xn" >> "$processed_file"
@@ -496,7 +488,6 @@ bd_cmd_burndown() {
         while IFS=$'\t' read -r _hp _hn; do
             [ -z "$_hp" ] || printf '%s\t%s\n' "$_hp" "$_hn" >> "$held_file"
         done < <(jq -s -r "$live_def"' | .[] | .issue_num as $n | (.paths // [])[] | "\(.)\t\($n)"' "${after_files[@]}")
-        prior_holders="$(jq -s -r "$live_def"' | map("#\(.issue_num)" + ((.also_closes // []) | map("+#\(.)") | join(""))) | join(" ")' "${after_files[@]}")"
         # Drop any --pair with an excluded member
         if [ -n "$pairs" ]; then
             local kept_pairs="" _pp
@@ -548,7 +539,6 @@ bd_cmd_burndown() {
         # --- Verdicts for primary candidate (and partner if pair) ---
         local skip_reason=""
         local p_skip_reason=""  # partner's skip reason
-        local solo=0
 
         # Check primary: skip label, then stale?
         local upd title body slabel
@@ -575,15 +565,6 @@ bd_cmd_burndown() {
         if [ -z "$skip_reason" ]; then
             bd_paths_for "$body"
             paths="$_bd_paths"
-            if [ -z "$paths" ]; then
-                if [ "$is_pair" -eq 1 ]; then
-                    skip_reason="solo slot: pairs cannot take it (#$num has no path refs)"
-                elif [ -n "$picked_rows" ] || [ -n "$prior_holders" ]; then
-                    skip_reason="solo slot: no path refs; batch already holds ${prior_holders}${prior_holders:+${picked_rows:+ }}$(bd_batch_holders "$picked_rows")"
-                else
-                    solo=1
-                fi
-            fi
         fi
 
         # Check primary: overlap?
@@ -624,7 +605,6 @@ bd_cmd_burndown() {
                 if [ -z "$p_skip_reason" ]; then
                     bd_paths_for "$p_body"
                     local p_paths="$_bd_paths"
-                    [ -n "$p_paths" ] || p_skip_reason="pair: #$partner solo slot: no path refs (pairs cannot take it)"
                 fi
                 if [ -z "$p_skip_reason" ]; then
                     local p_conflict=""
@@ -677,7 +657,7 @@ bd_cmd_burndown() {
 
         # PICK
         printf '%-5s #%-5s %-3s %-4s %s\n' "PICK" "$num" "$rank" "$cost" \
-            "tier=${tier}${partner:+ +#$partner}$([ "$solo" -eq 1 ] && printf ' solo')"
+            "tier=${tier}${partner:+ +#$partner}"
         if [ "$is_pair" -eq 1 ]; then
             local p_rank
             p_rank="$(awk -F'\t' -v n="$partner" '$1==n{print $2;exit}' <<< "$BD_REPORT_TSV")"
@@ -707,7 +687,6 @@ bd_cmd_burndown() {
         picked_rows="${picked_rows}${num}	${also_c}	${rank}	${cost}	${tier}	${title}	${all_paths//$'\n'/|}"$'\n'
 
         [ "$used" -lt "$budget" ] || done_flag=1
-        [ "$solo" -eq 0 ] || done_flag=1
     done <<< "$sorted_tsv"
 
     # Unranked open issues

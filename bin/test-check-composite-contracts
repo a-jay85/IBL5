@@ -6,8 +6,9 @@
 # skip/active behavior. Verifies the logic even while the live composites are absent
 # on master (the check is dormant there, but its logic must already be correct so it
 # is sound the moment the composites land). Also covers the mutation-pr.yml
-# invariants (M1-M4) with throwaway workflow + ADR fixtures, and the read-only
-# --protection-readback mode (R0-R4) with generated protection JSON fixtures.
+# invariants (M1-M4) and the all-checks-green.yml invariants (A1-A4) with
+# throwaway workflow + ADR fixtures, and the read-only --protection-readback
+# mode (R0-R4, default and --context=) with generated protection JSON fixtures.
 #
 # Run: bin/test-check-composite-contracts  (exit 0 = all pass, 1 = a case failed)
 set -u
@@ -546,6 +547,118 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# all-checks-green invariants (A1-A4)
+# ---------------------------------------------------------------------------
+
+AGG_LITERAL='All checks green'
+
+# put_agg <workflows-dir> <variant> — writes all-checks-green.yml, good or one defect.
+put_agg() {
+  local on_extra="" types="[opened, reopened, synchronize, ready_for_review, edited, labeled, unlabeled]"
+  local job_name="All checks green" job_if="" timeout="    timeout-minutes: 45" wait="--wait "
+  local perms="  contents: read
+  checks: read
+  actions: read
+  pull-requests: read"
+  case "$2" in
+    good) ;;
+    a1-paths) on_extra="    paths: ['ibl5/**']" ;;
+    a1-branches) on_extra="    branches: [master]" ;;
+    a1-types) types="[opened, reopened, synchronize]" ;;
+    a2-name) job_name="All checks green!" ;;
+    a3-if) job_if="    if: github.event.pull_request.draft == false" ;;
+    a4-timeout) timeout="" ;;
+    a4-wait) wait="" ;;
+    a4-write) perms="  contents: read
+  checks: write" ;;
+    a4-inject)
+      # shellcheck disable=SC2016  # the ${{ }} expression is literal fixture YAML
+      wait='--wait --title="${{ github.event.pull_request.title }}" ' ;;
+    *) echo "put_agg: unknown variant $2" >&2; return 1 ;;
+  esac
+  {
+    printf 'name: All checks green\n\non:\n  pull_request:\n'
+    [ -n "$on_extra" ] && printf '%s\n' "$on_extra"
+    printf '    types: %s\n\npermissions:\n%s\n\n' "$types" "$perms"
+    printf 'jobs:\n  all-checks-green:\n    name: %s\n    runs-on: ubuntu-latest\n' "$job_name"
+    [ -n "$job_if" ] && printf '%s\n' "$job_if"
+    [ -n "$timeout" ] && printf '%s\n' "$timeout"
+    printf '    steps:\n      - name: Wait\n        run: |\n'
+    printf "          bin/check-pr-checks-green --sha=x %s--self='All checks green' --timeout-seconds=2400\n" "$wait"
+  } > "$1/all-checks-green.yml"
+}
+
+put_agg_adr() {
+  mkdir -p "$1"
+  printf '# ADR-0998\n\nRequired context: %s\n' "$2" > "$1/0998-required-ci-aggregator-all-checks-green.md"
+}
+
+# run_agg <case-name> <want-exit> <variant> [adr-literal|-none-]
+run_agg() {
+  local name="$1" want="$2" variant="$3" adr="${4:-$AGG_LITERAL}"
+  local d_a d_wf d_dec
+  d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+  put_agg "$d_wf" "$variant"
+  if [ "$adr" != "-none-" ]; then put_agg_adr "$d_dec" "$adr"; fi
+  "$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+  expect "$name" "$want" $?
+}
+
+run_agg "agg-good" 0 good
+run_agg "agg-a1-paths" 1 a1-paths
+run_agg "agg-a1-branches" 1 a1-branches
+run_agg "agg-a1-types" 1 a1-types
+run_agg "agg-a2-name" 1 a2-name
+run_agg "agg-a2-adr-drift" 1 good 'All checks pass'
+run_agg "agg-a2-adr-absent" 1 good -none-
+run_agg "agg-a3-if" 1 a3-if
+run_agg "agg-a4-timeout" 1 a4-timeout
+run_agg "agg-a4-wait" 1 a4-wait
+run_agg "agg-a4-write" 1 a4-write
+run_agg "agg-a4-inject" 1 a4-inject
+
+# agg-a2-duplicate-name: a second workflow names a job with the same context
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+put_agg "$d_wf" good; put_agg_adr "$d_dec" "$AGG_LITERAL"
+printf 'name: Other\njobs:\n  other:\n    name: All checks green\n' > "$d_wf/other.yml"
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+expect "agg-a2-duplicate-name" 1 $?
+
+# agg-a2-lib-drift: the check reads pr-armable.sh and armable.py from its own
+# repo root, so run a copy of it in a throwaway tree whose shell literal drifted.
+LD="$TMP/libdrift"
+mkdir -p "$LD/bin/lib" "$LD/tools/postplan-harness/harness"
+cp "$CHECK" "$LD/bin/check-composite-contracts"
+printf "PR_ARMABLE_AGGREGATOR_CONTEXT='All checks'\n" > "$LD/bin/lib/pr-armable.sh"
+printf 'AGGREGATOR_CONTEXT = "All checks green"\n' > "$LD/tools/postplan-harness/harness/armable.py"
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+put_agg "$d_wf" good; put_agg_adr "$d_dec" "$AGG_LITERAL"
+out="$("$LD/bin/check-composite-contracts" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" 2>&1)"; rc=$?
+expect "agg-a2-lib-drift" 1 "$rc"
+if printf '%s' "$out" | grep -qF 'pr-armable.sh does not set'; then
+  echo "ok: agg-a2-lib-drift-names-lib"
+else
+  echo "FAIL: agg-a2-lib-drift — output does not name pr-armable.sh: $out"; FAILED=1
+fi
+# Same tree with the shell literal fixed passes, so the case above failed on the drift.
+printf "PR_ARMABLE_AGGREGATOR_CONTEXT='All checks green'\n" > "$LD/bin/lib/pr-armable.sh"
+"$LD/bin/check-composite-contracts" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+expect "agg-a2-lib-aligned" 0 $?
+printf 'AGGREGATOR_CONTEXT = "All checks"\n' > "$LD/tools/postplan-harness/harness/armable.py"
+"$LD/bin/check-composite-contracts" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+expect "agg-a2-harness-drift" 1 $?
+
+# agg-absent-skips: no all-checks-green.yml → exit 0 with a visible skip line
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" 2>&1)"; rc=$?
+expect "agg-absent-skips" 0 "$rc"
+if printf '%s' "$out" | grep -q 'all-checks-green absent — skipped'; then
+  echo "ok: agg-absent-skips-skip-visible"
+else
+  echo "FAIL: agg-absent-skips — no skip line in output; output: $out"; FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
 # --protection-readback mode (R0-R4) — fixtures shaped like the live
 # `gh api .../branches/master/protection` response.
 # ---------------------------------------------------------------------------
@@ -611,6 +724,42 @@ expect "rb-fail-other-key" 1 $?
 expect "rb-fail-appid-changed" 1 $?
 "$CHECK" "--protection-readback=$TMP/rb-pass5.json" "--pre-image=$TMP/rb-pass5.json" >/dev/null 2>&1
 expect "rb-fail-pre-has-it" 1 $?
+
+# --context=<name>: the ADR-0149 activation adds `All checks green` to a 5-context
+# pre-image. The default (no --context) stays the mutation context (rb-pass-5 above).
+RB_PRE5="$TMP/rb-pre5.json"
+jq --arg m "$MUT_LITERAL" '.required_status_checks.contexts += [$m] | .required_status_checks.checks += [{"context": $m, "app_id": 15368}]' \
+  "$RB_PRE" > "$RB_PRE5"
+jq --arg a "$AGG_LITERAL" '.required_status_checks.contexts += [$a] | .required_status_checks.checks += [{"context": $a, "app_id": 15368}]' \
+  "$RB_PRE5" > "$TMP/rb-agg6.json"
+
+out="$("$CHECK" "--protection-readback=$TMP/rb-agg6.json" "--pre-image=$RB_PRE5" "--context=$AGG_LITERAL" 2>&1)"; rc=$?
+expect "rb-context-pass-6" 0 "$rc"
+if printf '%s' "$out" | grep -qF "protection-readback: OK — 6 contexts (pre 5 + \"$AGG_LITERAL\")"; then
+  echo "ok: rb-context-pass-6-count-visible"
+else
+  echo "FAIL: rb-context-pass-6 — no 'OK — 6 contexts (pre 5 + \"$AGG_LITERAL\")' line; output: $out"; FAILED=1
+fi
+
+# rb-context-missing: the POST never landed → R1 names the requested context
+out="$("$CHECK" "--protection-readback=$RB_PRE5" "--pre-image=$RB_PRE5" "--context=$AGG_LITERAL" 2>&1)"; rc=$?
+expect "rb-context-missing" 1 "$rc"
+if printf '%s' "$out" | grep -qF '(R1)' && printf '%s' "$out" | grep -qF "$AGG_LITERAL"; then
+  echo "ok: rb-context-missing-names-context"
+else
+  echo "FAIL: rb-context-missing — output lacks (R1) or the context: $out"; FAILED=1
+fi
+
+# rb-context-default: the agg post read without --context checks the mutation
+# context, which the pre5 image already has → R0 fails.
+"$CHECK" "--protection-readback=$TMP/rb-agg6.json" "--pre-image=$RB_PRE5" >/dev/null 2>&1
+expect "rb-context-default-is-mutation" 1 $?
+"$CHECK" "--protection-readback=$TMP/rb-agg6.json" "--pre-image=$RB_PRE5" "--context=" >/dev/null 2>&1
+expect "rb-usage-empty-context" 2 $?
+"$CHECK" "--protection-readback=$TMP/rb-agg6.json" "--pre-image=$RB_PRE5" "--ctx=x" >/dev/null 2>&1
+expect "rb-usage-bad-third-flag" 2 $?
+"$CHECK" "--protection-readback=$TMP/rb-agg6.json" "--pre-image=$RB_PRE5" "--context=$AGG_LITERAL" extra >/dev/null 2>&1
+expect "rb-usage-four-args" 2 $?
 
 # usage errors and unreadable input → exit 2
 "$CHECK" --protection-readback "$TMP/rb-pass5.json" "--pre-image=$RB_PRE" >/dev/null 2>&1

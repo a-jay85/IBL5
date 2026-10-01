@@ -1,0 +1,177 @@
+#!/bin/bash
+
+# Decides whether every non-ignored check-run on a PR head SHA has settled green,
+# optionally polling until it has. The only thing .github/workflows/all-checks-green.yml
+# runs; that workflow's job is the required `All checks green` context (ADR-0149).
+#
+# Verdict logic is shared with bin/check-master-ci-green via bin/lib/ci-checks-green.sh.
+# Legacy commit statuses are deliberately NOT read: verified 2026-09-30 on PR #2564's
+# head, the combined-status endpoint returned total_count 0, every check on this repo
+# is a check-run, and none of master's required contexts is a status context.
+#
+# Exit codes: 0 = settled green, 1 = failed / pending / deadline hit, 2 = usage or API error.
+
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-pr-checks-green --repo=<owner/repo> --sha=<40-hex> [options]
+
+  --self=<name>            Exact check-run name of the calling job; always ignored.
+  --ignore=<csv>           Extra exact check-run names to ignore (advisory-by-design).
+  --anchor=<csv>           Exact names that MUST exist and be completed before any
+                           PASS verdict (the other required contexts).
+  --wait                   Poll until settled or deadline. Without it: one shot.
+  --interval-seconds=<n>   Poll interval (default 60).
+  --timeout-seconds=<n>    Deadline for --wait (default 2400). Hitting it FAILS.
+  --help, -h
+
+Every value flag takes the --key=value form; the space form is an unknown flag.
+
+Verdict order per poll (first match wins):
+  V1 a completed check-run concluded outside {success, skipped, neutral} -> FAIL now
+  V2 an --anchor name is absent or not completed                          -> WAIT
+  V3 a non-ignored check-run is not completed                              -> WAIT
+  V4 a workflow run on the SHA (other than $GITHUB_WORKFLOW) is active     -> WAIT
+  V5 otherwise                                                             -> PASS
+
+An API error or unparseable response is a WAIT under --wait (so the deadline fails
+closed) and exit 2 in one-shot mode. It is never a pass.
+
+Environment:
+  GH_API_CMD       Override the API command (default "gh api"). Tests point it at a
+                   shim that returns the Nth fixture on the Nth call.
+  GITHUB_WORKFLOW  Display name of the calling workflow. Its own active run is
+                   excluded from V4 so the aggregator never waits on itself.
+                   Unset or empty means no self-exclusion.
+
+Exit codes: 0 = every non-ignored check settled in {success, skipped, neutral};
+            1 = a check failed, a check is still pending (one-shot), or the deadline
+                hit with checks still pending (fail-closed);
+            2 = usage error, unparseable API response.
+EOF
+}
+
+REPO=""
+SHA=""
+SELF=""
+IGNORE=""
+ANCHOR=""
+WAIT=0
+INTERVAL=60
+TIMEOUT=2400
+
+for arg in "$@"; do
+    case "$arg" in
+        --help|-h)            usage; exit 0 ;;
+        --repo=*)             REPO="${arg#--repo=}" ;;
+        --sha=*)              SHA="${arg#--sha=}" ;;
+        --self=*)             SELF="${arg#--self=}" ;;
+        --ignore=*)           IGNORE="${arg#--ignore=}" ;;
+        --anchor=*)           ANCHOR="${arg#--anchor=}" ;;
+        --wait)               WAIT=1 ;;
+        --interval-seconds=*) INTERVAL="${arg#--interval-seconds=}" ;;
+        --timeout-seconds=*)  TIMEOUT="${arg#--timeout-seconds=}" ;;
+        --*)
+            echo "unknown flag: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+        *)
+            echo "unexpected argument: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if ! [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || [[ "$REPO" == *..* ]]; then
+    echo "invalid --repo: '$REPO' (want owner/repo)" >&2
+    exit 2
+fi
+if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "invalid --sha: '$SHA' (want 40 lowercase hex)" >&2
+    exit 2
+fi
+if ! [[ "$INTERVAL" =~ ^[0-9]+$ ]] || ! [[ "$TIMEOUT" =~ ^[0-9]+$ ]]; then
+    echo "invalid --interval-seconds/--timeout-seconds: must be non-negative integers" >&2
+    exit 2
+fi
+
+# Sourced only after --help and flag validation, so --help works with no jq on PATH.
+# shellcheck source=bin/lib/ci-checks-green.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/ci-checks-green.sh"
+
+GH_API_CMD="${GH_API_CMD:-gh api}"
+SELF_WORKFLOW="${GITHUB_WORKFLOW:-}"
+SKIP_JSON="$(ccg_skip_json "$SELF,$IGNORE")"
+ANCHOR_JSON="$(ccg_skip_json "$ANCHOR")"
+IGNORED_LIST="$(printf '%s' "$SKIP_JSON" | jq -r 'join(", ")')"
+ANCHOR_LIST="$(printf '%s' "$ANCHOR_JSON" | jq -r 'join(", ")')"
+
+# poll_once — one verdict. Sets VERDICT (fail|wait|pass|apierr) and LINE.
+poll_once() {
+    local raw runs_raw checks failed missing pending active total
+    if ! raw="$(bash -c "$GH_API_CMD --paginate --slurp \"repos/$REPO/commits/$SHA/check-runs?per_page=100\"" 2>/dev/null)" \
+        || ! checks="$(printf '%s' "$raw" | jq -e '{check_runs: [.[].check_runs[]]}' 2>/dev/null)"; then
+        VERDICT=apierr; LINE="check-runs read failed"; return 0
+    fi
+    if ! runs_raw="$(bash -c "$GH_API_CMD --paginate --slurp \"repos/$REPO/actions/runs?head_sha=$SHA&per_page=100\"" 2>/dev/null)" \
+        || ! active="$(printf '%s' "$runs_raw" | jq -er --arg self_wf "$SELF_WORKFLOW" \
+            '[.[].workflow_runs[] | select(.status != "completed") | select(.name != $self_wf)] | map(.name) | join(", ")' 2>/dev/null)"; then
+        VERDICT=apierr; LINE="workflow-runs read failed"; return 0
+    fi
+    checks="$(printf '%s' "$checks" | ccg_dedupe "$SKIP_JSON")"
+
+    failed="$(printf '%s' "$checks" | ccg_failed)"
+    if [ -n "$failed" ]; then
+        VERDICT="fail"; LINE="FAIL: checks failed: $failed"; return 0
+    fi
+    missing="$(printf '%s' "$checks" | jq -r --argjson a "$ANCHOR_JSON" '
+        [ $a[] as $n | select([.check_runs[] | select(.name == $n and .status == "completed")] | length == 0) | $n ]
+        | join(", ")')"
+    if [ -n "$missing" ]; then
+        VERDICT="wait"; LINE="WAIT: anchors not reported/completed: $missing"; return 0
+    fi
+    pending="$(printf '%s' "$checks" | ccg_pending)"
+    if [ -n "$pending" ]; then
+        VERDICT="wait"; LINE="WAIT: checks still running: $pending"; return 0
+    fi
+    if [ -n "$active" ]; then
+        VERDICT="wait"; LINE="WAIT: workflow runs still active: $active"; return 0
+    fi
+    total="$(printf '%s' "$checks" | jq '.check_runs | length')"
+    VERDICT=pass
+    LINE="PASS: $total check-run(s) settled green on $SHA (anchors settled: ${ANCHOR_LIST:-<none>}) (ignored: ${IGNORED_LIST:-<none>})"
+}
+
+API_ERRORS=0
+START=$SECONDS
+while :; do
+    poll_once
+    case "$VERDICT" in
+        pass) echo "$LINE"; exit 0 ;;
+        fail) echo "$LINE" >&2; exit 1 ;;
+        apierr)
+            API_ERRORS=$((API_ERRORS + 1))
+            LINE="WAIT: api error ($API_ERRORS consecutive): $LINE"
+            if [ "$WAIT" -ne 1 ]; then
+                echo "$LINE" >&2
+                exit 2
+            fi
+            ;;
+        wait)
+            API_ERRORS=0
+            if [ "$WAIT" -ne 1 ]; then
+                echo "$LINE" >&2
+                exit 1
+            fi
+            ;;
+    esac
+    echo "$LINE" >&2
+    if [ $((SECONDS - START)) -ge "$TIMEOUT" ]; then
+        echo "TIMEOUT: $LINE — failing closed after $((SECONDS - START))s" >&2
+        exit 1
+    fi
+    sleep "$INTERVAL"
+done

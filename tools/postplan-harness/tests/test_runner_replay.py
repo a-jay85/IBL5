@@ -463,6 +463,32 @@ def test_red_ci_checks_fixture_holds_condition_15(tmp_path):
     assert "pytest (stdlib harness)" in c15["reason"]
 
 
+def test_red_ci_checks_warns_not_blocks_when_aggregator_required(tmp_path):
+    """Condition (15) demotes to a warning when master requires the aggregator context."""
+    out = str(tmp_path / "out")
+    res = runner.run(
+        _fixture(red_ci_checks=["pytest (stdlib harness)"], aggregator_required=True), out,
+        FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert 15 not in {c.number for c in res.arm.holds}
+    with open(os.path.join(out, "result.json")) as fh:
+        blob = json.load(fh)
+    c15 = [c for c in blob["arm"]["conditions"] if c["number"] == 15][0]
+    assert c15["blocked"] is False
+    c15_live = [c for c in res.arm.conditions if c.number == 15][0]
+    assert "pytest (stdlib harness)" in c15_live.warning
+    assert "All checks green" in c15_live.warning
+
+
+def test_red_ci_checks_no_warning_when_green(tmp_path):
+    out = str(tmp_path / "out")
+    res = runner.run(
+        _fixture(red_ci_checks=[], aggregator_required=True), out,
+        FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    c15 = [c for c in res.arm.conditions if c.number == 15][0]
+    assert c15.blocked is False
+    assert c15.warning == ""
+
+
 def test_conformance_handoff_clean_run_writes_empty_bridge(tmp_path):
     out = str(tmp_path / "out")
     res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
@@ -1182,6 +1208,22 @@ def test_live_probe_failure_holds_condition_15(monkeypatch, tmp_path):
     c15 = _live_arm_c15(monkeypatch, tmp_path, ["pytest (stdlib harness)"])
     assert c15.blocked is True
     assert "pytest (stdlib harness)" in c15.reason
+
+
+def test_live_arm_consults_aggregator_required(monkeypatch, tmp_path):
+    """The live arm reads master protection once, for the exact aggregator context."""
+    from harness.adapters.ghad import RecordingGh
+    calls = []
+
+    def _fake(self, context):
+        calls.append(context)
+        return True
+
+    monkeypatch.setattr(RecordingGh, "aggregator_required", _fake)
+    c15 = _live_arm_c15(monkeypatch, tmp_path, ["pytest (stdlib harness)"])
+    assert calls == ["All checks green"]
+    assert c15.blocked is False
+    assert "pytest (stdlib harness)" in c15.warning
 
 
 def test_live_probe_clean_clears_condition_15(monkeypatch, tmp_path):

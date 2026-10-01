@@ -973,6 +973,8 @@ jobs:
         run: bin/test-cleanup-safety
       - name: bin/test-check-pr-collisions
         run: bin/test-check-pr-collisions
+      - name: bin/test-ci-checks-green
+        run: bin/test-ci-checks-green
       - name: bin/test-run-meta-checks-local
         run: bin/test-run-meta-checks-local
       - name: bin/test-check-pr-manual-testing

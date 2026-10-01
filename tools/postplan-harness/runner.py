@@ -37,7 +37,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from harness import (adr_draft, body_numbers, cifix, ciwatch, conformance, fidelity, gitutil, llm_calls,
                      manual_rows, manual_testing, outofscope, prosefix, schemas, scope_conformance,
                      statefile, usage_pause)
-from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
+from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
 from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
@@ -700,6 +700,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             degraded_agents=res.degraded_agents,
             plan_slug_drift=plan.slug_drift,
             failed_checks=_failed_checks,
+            aggregator_required=(gh.aggregator_required(AGGREGATOR_CONTEXT) if live
+                                 else bool((fixture or {}).get("aggregator_required", False))),
             meta_checks_status=_mc_status,
         )
         if not live and (fixture or {}).get("current_tree"):

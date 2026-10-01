@@ -64,7 +64,7 @@ Harness rules (`parse_no_change_test_paths` in `tools/postplan-harness/harness/p
 - Fenced examples never count.
 
 ### One-time-check rows
-A `CLI-executable` row whose evidence is a single run at plan time (a corpus diff, a counterfactual mutation, a command's printed output) ends its "What to verify" cell with `(one-time-check: <reason of 15+ characters>)`. `bin/lib/plan-matrix-assertions` then skips that row's assertion-footprint check and prints `ONE-TIME-CHECK: row N` instead of `UNREALISED-ASSERTION`. The tag sits outside backticks, holds no `(`, `)`, `|` or backtick, and is honored only as the trailing text of that cell on a row whose type cell reads exactly `CLI-executable`; a tag anywhere else is ignored fail-closed and the row is checked as untagged. `bin/check-plan` gate `[Y]` rejects a malformed tag, a tag on any other row type, and a matrix with tagged rows above one third of its rows. The cell still says what was run and what it printed. Never tag a row a regression test could pin; the allowed shapes are listed in `.claude/skills/plan/_architect-contract.md`.
+A `CLI-executable` row whose evidence is a single plan-time run ends its "What to verify" cell with `(one-time-check: <reason of 15+ characters>)`. `bin/lib/plan-matrix-assertions` skips it; `bin/check-plan` gate `[Y]` caps tagged rows at one third. Why: _plan-verification-detail.md § One-time-check rows — tag rules
 
 ### Pre-prod exercise paths
 

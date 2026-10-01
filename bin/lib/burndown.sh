@@ -407,8 +407,9 @@ bd_autoclear_blocked() {
 }
 
 bd_cmd_burndown() {
-    # 1. Argument parsing — only --pair A,B accepted
+    # 1. Argument parsing — --pair A,B and --after <ledger> (both repeatable)
     local pairs=""   # newline-sep "A,B" strings
+    local afters=""  # newline-sep ledger paths from earlier rounds of this run
     while [ $# -gt 0 ]; do
         case "$1" in
             --pair)
@@ -428,6 +429,15 @@ bd_cmd_burndown() {
                     done <<< "$pairs"
                 fi
                 pairs="${pairs}${pv}"$'\n'
+                shift
+                ;;
+            --after)
+                if [ $# -lt 2 ]; then bd_die 2 "--after wants a ledger path"; fi
+                shift
+                [ -f "$1" ] || bd_die 2 "--after ledger $1 does not exist"
+                jq -e '.items | type == "array"' "$1" >/dev/null 2>&1 || \
+                    bd_die 3 "malformed ledger $(basename "$1")"
+                afters="${afters}${1}"$'\n'
                 shift
                 ;;
             *)
@@ -457,6 +467,50 @@ bd_cmd_burndown() {
     touch "$held_file"
     local processed_file="$BD_TMP/processed.txt"
     touch "$processed_file"
+
+    # Earlier ledgers of this run (--after). A live item holds its unit and
+    # paths. Closed-fixed and merged items free their unit, and so does a skip
+    # with no ad-hoc route. A failed ad-hoc item (route=ad-hoc, status=skipped)
+    # stays live: its work started and its dirty worktree keeps it in flight.
+    # Capacity comes from item statuses, never the ledger's units_used, which
+    # sums every item's cost including closed and skipped ones.
+    local budget="$BD_BUDGET" prior_holders=""
+    if [ -n "$afters" ]; then
+        local after_files=() _af
+        while IFS= read -r _af; do
+            [ -z "$_af" ] || after_files+=("$_af")
+        done <<< "$afters"
+        local live_def='[.[].items[] | select(.status != "closed-fixed" and .status != "merged" and ((.status == "skipped" and .route != "ad-hoc") | not))]'
+        local live_cost live_solo _xn _hp _hn
+        live_cost="$(jq -s "$live_def"' | map(.cost // 0) | add // 0' "${after_files[@]}")" \
+            || bd_die 3 "cannot read --after ledgers"
+        live_solo="$(jq -s "$live_def"' | any(.[]; ((.paths // []) | length) == 0)' "${after_files[@]}")" \
+            || bd_die 3 "cannot read --after ledgers"
+        budget=$((BD_BUDGET - live_cost))
+        [ "$budget" -ge 0 ] || budget=0
+        [ "$live_solo" != "true" ] || budget=0
+        # Every issue in the after-ledgers is excluded, whatever its status
+        while IFS= read -r _xn; do
+            [ -z "$_xn" ] || printf '%s\n' "$_xn" >> "$processed_file"
+        done < <(jq -s -r '[.[].items[] | .issue_num, (.also_closes // [])[]] | unique[]' "${after_files[@]}")
+        while IFS=$'\t' read -r _hp _hn; do
+            [ -z "$_hp" ] || printf '%s\t%s\n' "$_hp" "$_hn" >> "$held_file"
+        done < <(jq -s -r "$live_def"' | .[] | .issue_num as $n | (.paths // [])[] | "\(.)\t\($n)"' "${after_files[@]}")
+        prior_holders="$(jq -s -r "$live_def"' | map("#\(.issue_num)" + ((.also_closes // []) | map("+#\(.)") | join(""))) | join(" ")' "${after_files[@]}")"
+        # Drop any --pair with an excluded member
+        if [ -n "$pairs" ]; then
+            local kept_pairs="" _pp
+            while IFS= read -r _pp; do
+                [ -n "$_pp" ] || continue
+                if grep -qxF "${_pp%%,*}" "$processed_file" || grep -qxF "${_pp##*,}" "$processed_file"; then
+                    continue
+                fi
+                kept_pairs="${kept_pairs}${_pp}"$'\n'
+            done <<< "$pairs"
+            pairs="$kept_pairs"
+        fi
+        [ "$budget" -gt 0 ] || done_flag=1
+    fi
     local picked_rows=""   # accumulate for ledger items
     local skipped_rows=""  # accumulate for ledger skipped
 
@@ -466,7 +520,7 @@ bd_cmd_burndown() {
         printf '%s\n' "$num" >> "$processed_file"
 
         # Determine budget-remaining label
-        local rem=$((BD_BUDGET - used))
+        local rem=$((budget - used))
 
         # Is this issue open?
         if ! bd_issue_is_open "$num" "$issues_file"; then continue; fi
@@ -524,8 +578,8 @@ bd_cmd_burndown() {
             if [ -z "$paths" ]; then
                 if [ "$is_pair" -eq 1 ]; then
                     skip_reason="solo slot: pairs cannot take it (#$num has no path refs)"
-                elif [ -n "$picked_rows" ]; then
-                    skip_reason="solo slot: no path refs; batch already holds $(bd_batch_holders "$picked_rows")"
+                elif [ -n "$picked_rows" ] || [ -n "$prior_holders" ]; then
+                    skip_reason="solo slot: no path refs; batch already holds ${prior_holders}${prior_holders:+${picked_rows:+ }}$(bd_batch_holders "$picked_rows")"
                 else
                     solo=1
                 fi
@@ -608,7 +662,7 @@ bd_cmd_burndown() {
         fi
 
         # Budget check — continue (not break) so later 1-unit items can fit
-        if [ "$((used + cost))" -gt "$BD_BUDGET" ]; then
+        if [ "$((used + cost))" -gt "$budget" ]; then
             printf '%-5s #%-5s %-3s %-4s %s\n' "SKIP" "$num" "$rank" "$cost" \
                 "over budget (cost $cost, $rem left)"
             skipped_rows="${skipped_rows}${num}	over budget (cost $cost, $rem left)"$'\n'
@@ -652,7 +706,7 @@ bd_cmd_burndown() {
         fi
         picked_rows="${picked_rows}${num}	${also_c}	${rank}	${cost}	${tier}	${title}	${all_paths//$'\n'/|}"$'\n'
 
-        [ "$used" -lt "$BD_BUDGET" ] || done_flag=1
+        [ "$used" -lt "$budget" ] || done_flag=1
         [ "$solo" -eq 0 ] || done_flag=1
     done <<< "$sorted_tsv"
 
@@ -675,7 +729,7 @@ bd_cmd_burndown() {
         fi
     done
 
-    printf 'units: %d/%d\n' "$used" "$BD_BUDGET"
+    printf 'units: %d/%d\n' "$used" "$budget"
     [ "$notreached" -eq 0 ] || printf 'not reached: %d candidate(s)\n' "$notreached"
 
     printf '%s' "$picked_rows" > "$BD_TMP/picked.tsv"
@@ -722,16 +776,21 @@ bd_cmd_burndown() {
     local ledger_path="$BD_REPORTS_DIR/burndown-batch-${ledger_base}.json"
     [ ! -e "$ledger_path" ] || bd_die 3 "ledger $ledger_path exists; refusing to overwrite"
 
+    local after_json="[]"
+    if [ -n "$afters" ]; then
+        after_json="$(printf '%s' "$afters" | jq -Rsc 'split("\n") | map(select(. != ""))')"
+    fi
     local doc_json
     doc_json="$(jq -n \
         --argjson schema 1 \
         --arg created "$created" \
         --arg report "$BD_REPORT" \
-        --argjson budget "$BD_BUDGET" \
+        --argjson budget "$budget" \
+        --argjson after "$after_json" \
         --argjson used "$used" \
         --argjson items "$items_arr" \
         --argjson skipped "$skipped_arr" \
-        '{schema:$schema,created:$created,report:$report,budget:$budget,units_used:$used,items:$items,skipped:$skipped}')"
+        '{schema:$schema,created:$created,report:$report,budget:$budget,after:$after,units_used:$used,items:$items,skipped:$skipped}')"
 
     local tmp_path="${ledger_path}.tmp.$$"
     printf '%s\n' "$doc_json" > "$tmp_path"

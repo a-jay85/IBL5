@@ -43,7 +43,7 @@ run                       entry wrapper: replay | demo | isolated | test
 harness/
   classify.py             Phase 3 port (flags, filtered diff, module extraction)
   planfile.py             plan location + frontmatter/matrix/Critical-Files parsing
-  conformance.py          Phase 5.0 MISSING/MISSING-FILE/MISSING-PHASE detection (suffix + unique-basename resolver; phase omission = any-hit resolver)
+  conformance.py          Phase 5.0 MISSING/MISSING-FILE/MISSING-PHASE detection (suffix + unique-basename resolver; phase omission = any-hit resolver). A plan token written with the literal `NNNN` placeholder (the form the architect contract prescribes) resolves like a renumbered ADR, and the check reads `conformance_files()`, which adds a rename's old path to `changed_files()` so a renamed Critical File is not reported missing
   scope_conformance.py    shells out to bin/lib/plan-scope-conformance; renders advisory scope notes as a PR-body `## Unplanned changes` block and holds on none
   armable.py              twelve ported arming conditions (numbered 1–12, no gap; the skill's condition (11), unresolved review-thread findings, stays skill-only)
   review.py               Phase 4 launch gates + bounded review/security/scoring calls

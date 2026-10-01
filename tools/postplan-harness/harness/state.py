@@ -127,6 +127,7 @@ class PlanInfo:
     critical_files: list[tuple] = field(default_factory=list)  # (path, annotation, exempt)
     required_test_methods: list[str] = field(default_factory=list)
     backlog_issues: list[tuple] = field(default_factory=list)  # (kind, number); kind in {"closes", "refs"}
+    deferral_hits: list[tuple] = field(default_factory=list)  # (text, line_no, key) from ## Out of Scope; see outofscope.py
     truly_manual_rows: list[ManualRow] = field(default_factory=list)
     # Verification Matrix rows whose Test type is PHPUnit / API-test / E2E /
     # Visual-regression / CLI-executable (planfile.count_executable_matrix_rows).
@@ -299,6 +300,8 @@ class RunResult:
                 d["plan"].pop("required_test_methods", None)
             if not d["plan"].get("backlog_issues"):
                 d["plan"].pop("backlog_issues", None)
+            if not d["plan"].get("deferral_hits"):
+                d["plan"].pop("deferral_hits", None)
             if not d["plan"].get("no_adr_markers"):
                 d["plan"].pop("no_adr_markers", None)
             if not d["plan"].get("slug_drift"):

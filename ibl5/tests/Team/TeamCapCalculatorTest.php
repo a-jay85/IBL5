@@ -265,6 +265,34 @@ class TeamCapCalculatorTest extends TestCase
         self::assertSame(0, $this->buildCalculator()->getTotalNextSeasonSalaries([]));
     }
 
+    // The calculator sums row-wise by design and does not de-duplicate. Unique
+    // pids are guaranteed by the feeding queries and pinned by
+    // testUnderContractQueriesReturnEachPidOnce in
+    // ibl5/tests/DatabaseIntegration/TeamQueryRepositoryTest.php. A caller that
+    // passes a repeated pid gets it counted twice.
+
+    public function testGetTotalCurrentSeasonSalariesSumsEveryRowIncludingRepeatedPid(): void
+    {
+        $rows = [
+            TestDataFactory::createPlayer(['pid' => 7, 'cy' => 1, 'salary_yr1' => 500]),
+            TestDataFactory::createPlayer(['pid' => 7, 'cy' => 1, 'salary_yr1' => 500]),
+            TestDataFactory::createPlayer(['pid' => 8, 'cy' => 1, 'salary_yr1' => 300]),
+        ];
+
+        self::assertSame(1300, $this->buildCalculator()->getTotalCurrentSeasonSalaries($rows));
+    }
+
+    public function testGetTotalNextSeasonSalariesSumsEveryRowIncludingRepeatedPid(): void
+    {
+        $rows = [
+            TestDataFactory::createPlayer(['pid' => 7, 'cy' => 1, 'salary_yr2' => 600]),
+            TestDataFactory::createPlayer(['pid' => 7, 'cy' => 1, 'salary_yr2' => 600]),
+            TestDataFactory::createPlayer(['pid' => 8, 'cy' => 1, 'salary_yr2' => 400]),
+        ];
+
+        self::assertSame(1600, $this->buildCalculator()->getTotalNextSeasonSalaries($rows));
+    }
+
     // ── Phase-aware aggregates (advances=true) ─────────────────────
 
     public function testGetTotalCurrentSeasonSalariesUsesPhaseAwareSalaryWhenAdvancing(): void

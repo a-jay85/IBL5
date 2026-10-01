@@ -100,6 +100,24 @@ def files_from_diff(diff_text: str) -> list[str]:
     return files
 
 
+def rename_sources_from_diff(diff_text: str) -> list[str]:
+    """OLD paths of every rename in a unified diff, diff order, de-duplicated.
+
+    Keys on the `rename from ` extended header, which git emits only for a detected
+    rename, so a copy (`copy from `) or a plain add/delete pair contributes nothing.
+    Companion of `files_from_diff` (b-side paths): the union of the two is the set the
+    conformance check reads (`ReplayGit.conformance_files`), while `files_from_diff`
+    alone stays the set classify() and scope conformance read.
+    """
+    out: list[str] = []
+    for line in diff_text.splitlines():
+        if line.startswith("rename from "):
+            src = line[len("rename from "):]
+            if src and src not in out:
+                out.append(src)
+    return out
+
+
 def modified_files_from_diff(diff_text: str) -> list[str]:
     """Files modified (not added, not deleted) — replay analogue of
     `git diff --diff-filter=M --name-only`."""

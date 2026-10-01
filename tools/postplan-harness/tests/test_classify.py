@@ -17,7 +17,7 @@ from harness.classify import (_manual_testing_span, classify, files_from_diff, f
                                is_gm_visible_path,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END, MANUAL_TESTING_SENTINEL,
                                MANUAL_TESTING_SENTINEL_STATIC,
-                               name_status_from_diff, qualify_backlog_refs,
+                               name_status_from_diff, qualify_backlog_refs, rename_sources_from_diff,
                                render_files_changed,
                                render_reviewer_verification,
                                retro_registry_row_from_diff,
@@ -253,6 +253,25 @@ def test_name_status_from_diff():
         ("M", "ibl5/modified.php"),
         ("D", "ibl5/deleted.php"),
         ("R", "ibl5/old-name.php → ibl5/new-name.php"),
+    ]
+
+
+def test_rename_sources_from_diff_lists_old_path_only():
+    """Mutation caught: key on the `diff --git` header, or return `[]`."""
+    assert rename_sources_from_diff(NAME_STATUS_DIFF) == ["ibl5/old-name.php"]
+
+
+def test_rename_sources_from_diff_ignores_delete_and_add():
+    """Mutation caught: also collect `deleted file mode` a-side paths."""
+    got = rename_sources_from_diff(NAME_STATUS_DIFF)
+    assert "ibl5/deleted.php" not in got
+    assert "ibl5/added.php" not in got
+
+
+def test_files_from_diff_unchanged_by_rename_sources():
+    """Mutation caught: make `files_from_diff` add a-side paths."""
+    assert files_from_diff(NAME_STATUS_DIFF) == [
+        "ibl5/added.php", "ibl5/modified.php", "ibl5/deleted.php", "ibl5/new-name.php",
     ]
 
 

@@ -1,6 +1,6 @@
 ---
 description: A nightly doc-refresh PR may self-ship only when `bin/docfix-check-veronly` proves its realized diff is exclusively date bumps and same-line numeric corrections on tracked files under `ibl5/docs/` or at `ibl5/classes/*/README.md` (addendum 2026-09-24); every other docfix PR keeps ADR-0086's human-merge hold.
-last_verified: 2026-09-24
+last_verified: 2026-09-30
 ---
 
 # ADR-0104: Verification-only doc refreshes may self-ship
@@ -47,6 +47,10 @@ What stays held. Agent-steering files (`.claude/**`, any `CLAUDE.md`, `AGENTS.md
 Why one star and no `**`. The arm mirrors the audit glob byte for byte, so the set of files the audit can flag and the set the predicate can arm are the same set. Bash `case` lets `*` match `/`, so a nested README under `ibl5/classes/` would also match if one ever existed; none exists today, and such a file would still face the full content predicate.
 
 Coverage: `bin/test-docfix-run` Cases 66-70 (PASS on the README shape; HOLD on `.claude/rules`, on the mixed diff in both row orders, on `CLAUDE.md`, and on a README outside `ibl5/classes/`).
+
+## Addendum 2026-09-30: agent-steering markdown passes on a lone frontmatter date bump
+
+Original figure: the 2026-09-24 addendum's "What stays held" paragraph held every `.claude/**`, `CLAUDE.md`, and `AGENTS.md` change under `path outside docfix allowlist`. Today's figure: `bin/docfix-check-veronly` classifies `.claude/**/*.md`, root `CLAUDE.md`, and root `AGENTS.md` as a second, stricter tier. A tier-2 file passes only when its whole diff against the merge-base is one hunk replacing the frontmatter `last_verified:` line with a strictly later date, on a regular 100644 file with no mode change. A numeric swap, a `paths:` edit, a body change, a bump to a `last_verified:` line outside the frontmatter, or a file with no closed frontmatter still holds, and the tier-1 allowlist (`ibl5/docs/**`, `ibl5/classes/*/README.md`) keeps its date-plus-numeric rule unchanged. What changed: the nightly audit kept flagging `.claude/rules/*` for a date-only refresh (PR #2559), and a date-only bump changes no agent behavior, so each such PR was costing a human merge for nothing. Phase 6.5 conditions still gate arming independently (clause 3). The "What stays held" sentence above is superseded for date-only tier-2 diffs; it remains accurate for every other `.claude/**`, `CLAUDE.md`, `AGENTS.md` change and for the repo-root `README.md`.
 
 ## Alternatives Considered
 

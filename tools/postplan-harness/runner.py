@@ -35,7 +35,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import (adr_draft, body_numbers, cifix, ciwatch, conformance, fidelity, gitutil, llm_calls,
-                     manual_rows, manual_testing, schemas, scope_conformance, statefile)
+                     manual_rows, manual_testing, outofscope, schemas, scope_conformance, statefile,
+                     usage_pause)
 from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
@@ -267,6 +268,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _active_git = git
         slug = git.branch()
         gh = LiveGh(out_dir, worktree, slug) if live else RecordingGh(out_dir)
+        gh = usage_pause.dedupe_on_resume(gh, worktree, out_dir)   # ADR-0143 addendum: no double post on resume
         verifier = LiveVerify(worktree)
         if probe is None:
             probe = LiveProbe(repo_root=worktree)
@@ -294,6 +296,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             log("phase2: empty diff vs base — nothing to ship")
             return _finish(res, out_dir)
         files = git.changed_files()
+        # Rename sources included; read ONLY by the conformance check. classify(),
+        # scope conformance and denied_gate_edits keep `files`, or an old path
+        # would surface as UNPLANNED-FILE and create a new hold.
+        conf_files = git.conformance_files()
         cls = classify(files, diff, git.modified_files())
         res.classification = cls
         log("phase3 classify:\n" + cls.summary())
@@ -303,6 +309,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # rebase_onto() below stays authoritative. A predicted conflict propagates to the
         # outer `except HarnessError`, which sets error_kind="rebase-conflict" (exit 3 via
         # _FAIL_CLOSED_KINDS). This is the same terminal the post-commit rebase arm reaches.
+        # With an LLM wired, the probe also exits 3 when resolver_refusal_reason() names a
+        # conflict the resolver is certain to refuse; any other predicted conflict is advisory.
         if live:
             try:
                 conflict_files = git.predict_rebase_conflict()
@@ -319,6 +327,15 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                         "rebase-conflict",
                         f"predicted by merge-tree probe vs origin/master: "
                         f"{', '.join(conflict_files)}")
+                refusal_fn = getattr(git, 'resolver_refusal_reason', None)
+                refusal = refusal_fn() if callable(refusal_fn) else None
+                if refusal is not None:
+                    log(f"phase2: LLM resolver would refuse ({refusal}) -- "
+                        "stopping before body check (exit 3)")
+                    raise HarnessError(
+                        "rebase-conflict",
+                        f"predicted by merge-tree probe vs origin/master: "
+                        f"{', '.join(conflict_files)}; resolver would refuse: {refusal}")
                 log("phase2: LLM resolver active -- probe is advisory, falling through to rebase_onto()")
 
         copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)
@@ -336,7 +353,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             copy["summary_md"] = check["corrected_body"]
             for f in check.get("findings", []):
                 log(f"phase2 body-check finding: {f}")
-        _inject_residual_phases(copy, plan, files, log)
+        _inject_residual_phases(copy, plan, conf_files, log)
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
@@ -450,6 +467,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if git.head() != head_before_45:
             sha = git.head()
             files = git.changed_files()
+            conf_files = git.conformance_files()
             diff = git.diff_vs_base()
             meta = gh.pr_meta() or meta
         review_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -494,7 +512,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             + f" -> PHASE5_VERIFY_STATUS={phase5}"
             + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
         resolutions: dict[str, str] = {}
-        unresolved = conformance.check(plan, files, diff, phase5_status=phase5,
+        unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                        resolutions=resolutions,
                                        pr_body=gh.pr_body() or meta.get("body", ""))
         res.unresolved_conformance = unresolved
@@ -570,6 +588,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         body = _upsert_no_adr_markers(body, plan)
         gh.pr_edit_body(pr, body)
         _check_backlog_closes(gh, pr, plan, log)
+        _sweep_out_of_scope(gh, pr, plan, slug, log)
 
         # ---- Phase 5.5: plan-intent fidelity review --------------------
         # Pinned BEFORE the call: condition (12) compares the tree the reviewer saw
@@ -594,9 +613,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             # clean run buy nothing, and the gate is "did the tree change", not "did
             # remediation run".
             files = git.changed_files()
+            conf_files = git.conformance_files()
             diff = git.diff_vs_base()
             resolutions = {}
-            unresolved = conformance.check(plan, files, diff, phase5_status=phase5,
+            unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                            resolutions=resolutions,
                                            pr_body=gh.pr_body() or body)
             res.unresolved_conformance = unresolved
@@ -859,6 +879,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.error = f"{e.kind}: {e.detail}"
         res.error_kind = e.kind
         log(f"FAILED: {res.error}")
+    except usage_pause.UsagePause as p:
+        res.terminal = TerminalState.FAILED
+        res.error_kind = "usage-pause-dirty" if p.dirty else "usage-pause"
+        res.error = f"{res.error_kind}: {p.purpose}"
+        log(f"PAUSED: {res.error}")
     finally:
         # A Phase 5-5.5 failure can land while the background review is still running.
         # Wait for it so the review checkpoint lands as it did when Phase 4 ran first;
@@ -866,7 +891,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if join_review is not None:
             try:
                 join_review()
-            except Exception as e:  # noqa: BLE001
+            except (Exception, usage_pause.UsagePause) as e:  # noqa: BLE001
                 log(f"phase4: background review failed after the run failed ({e!r})")
         state.checkpoint("terminal", res)
         _phase11_cleanup(llm, log)
@@ -1561,6 +1586,13 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     commit subject instead of failing the run, and returns degraded=True so the caller
     holds arming: an unreviewed title is exactly the feat-vs-chore judgment condition
     (8) depends on. Any other error kind still propagates.
+
+    The model path returns schemas.coerce_pr_copy(copy, cls), so title, commit_subject and
+    type agree and a diff with no GM-visible file (Classification.has_gm_visible False)
+    can never open a feat: PR. The degraded path calls schemas.coerce_copy_type on the
+    single subject string (the degraded dict has no type key). The skip path is
+    deliberately left alone: its title is the live one, and retyping only the dict would
+    let the pr_meta() fallback at the condition-(8) call site see chore: on a feat: PR.
     """
     if gh.pr_exists() and not git.has_changes_to_commit():
         head_subject = git.branch_head_subject()
@@ -1576,9 +1608,11 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     else:
         plan_excerpt = ""
     try:
-        return llm.call("pr-copy", "sonnet",
+        copy = llm.call("pr-copy", "sonnet",
                         llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt),
-                        schemas.validate_pr_copy), False
+                        schemas.validate_pr_copy,
+                        normalizer=schemas.normalize_pr_copy)
+        return schemas.coerce_pr_copy(copy, cls), False
     except HarnessError as e:
         if e.kind != "llm-invalid-output":
             raise
@@ -1586,9 +1620,11 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     subject = git.branch_head_subject()
     if not re.match(r"^[a-z]+(\([^)]*\))?!?:", subject):
         # No conventional subject to borrow. feat: is the fail-closed type: it trips the
-        # human-signoff hold, and coerce_commit_subject re-types docs/test/non-code diffs.
+        # human-signoff hold. coerce_copy_type re-types docs/test/non-code diffs and turns
+        # feat: into chore: on a tooling-only diff; arming is still held on this path by
+        # degraded=True (copy_degraded), so the floor is never the only guard here.
         subject = f"feat: {subject or slug}"
-    subject = schemas.coerce_commit_subject(subject, cls)
+    subject = schemas.coerce_copy_type(subject, cls)
     return {"title": subject, "commit_subject": subject,
             "summary_md": f"## Summary\n- {subject}\n"}, True
 
@@ -1632,6 +1668,23 @@ def _check_backlog_closes(gh, pr, plan, log) -> None:
         return
     msg = backlog_closes_mismatch(closes, base, refs)
     log(msg)
+
+
+def _sweep_out_of_scope(gh, pr, plan, slug, log) -> list[int]:
+    """File one backlog issue per `## Out of Scope` deferral. Additive: never raises,
+    never touches arming state. Dedup lives in outofscope.file_deferral_issues."""
+    if not (plan and plan.found and plan.deferral_hits):
+        return []
+    try:
+        hits = [outofscope.DeferralHit(*t) for t in plan.deferral_hits]
+        nums = outofscope.file_deferral_issues(
+            gh, hits, slug, pr, log=log,
+            plan_name=os.path.basename(plan.path) or f"{slug}.md")
+        log(f"oos-sweep: {len(hits)} hits, {len(nums)} issues filed")
+        return nums
+    except Exception as exc:  # broad on purpose: the sweep is never a run failure
+        log(f"oos-sweep: sweep failed ({type(exc).__name__}: {exc})")
+        return []
 
 
 def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str]:
@@ -2204,7 +2257,8 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
 
 # All four are deterministic walls a full skill re-run cannot climb — see exit_code_for.
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
-                      "llm-usage-limit")
+                      "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty")
+PAUSE_EXIT = 75   # ADR-0143 reserved pause exit; only with an S marker on disk
 
 # Per-class remedy for a local-gate denial. Every arm is still exit 3 -- naming the
 # class only shortens the human's search, it never changes the verdict. "doc-staleness"
@@ -2239,7 +2293,10 @@ def exit_code_for(res: RunResult) -> int:
         re-run cannot climb.
     1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
     0 = shipped (armed or held), nothing to ship, or degraded.
-    There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm."""
+    There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm.
+    usage-pause maps to 75; main() downgrades it to 3 when the marker is gone."""
+    if res.terminal == TerminalState.FAILED and res.error_kind == "usage-pause":
+        return PAUSE_EXIT
     if res.terminal == TerminalState.FAILED and res.error_kind in _FAIL_CLOSED_KINDS:
         return 3
     if res.terminal == TerminalState.DEGRADED:
@@ -2336,7 +2393,8 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     leaf = (res.slug or "branch").rsplit("/", 1)[-1]
     wt = worktree or "(the worktree folder)"
     log = log_path or "(see the run log)"
-    if res.error_kind in ("rebase-conflict", "remote-head-diverged", "llm-usage-limit"):
+    if res.error_kind in ("rebase-conflict", "remote-head-diverged", "llm-usage-limit",
+                          "usage-pause-unconfirmed", "usage-pause-dirty"):
         key = res.error_kind
     elif res.error_kind == "local-gate":
         key = "gate-" + classify_local_gate_denial(res.error or "")
@@ -2390,9 +2448,14 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
         steps = ["git fetch origin", f"git log --oneline HEAD..origin/{b}  (shows what was pushed)",
                  f"git rebase origin/{b}  (keeps their commits; to take GitHub's copy as is "
                  f"instead, run: git reset --hard origin/{b})"]
-    elif key == "llm-usage-limit":
+    elif key in ("llm-usage-limit", "usage-pause-unconfirmed"):
         why = "The Claude usage limit was reached before the ship step finished."
         steps = ["Wait for the limit to reset (the log shows the reset time)"]
+    elif key == "usage-pause-dirty":
+        why = ("The usage gate paused a model call while it was editing the worktree, "
+               "so the edit may be half done.")
+        steps = [f"cd {wt} && git status && git diff  (check the interrupted edit)",
+                 "Keep or revert the change, then re-run bin/post-plan-now"]
     else:
         why = "The ship step stopped and the log has the reason."
         steps = [read_log]
@@ -2449,6 +2512,9 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
         s = " ".join((s or "").split())
         return s[:limit] + "…" if len(s) > limit else s
 
+    if rc == PAUSE_EXIT:
+        return (f"RESULT: post-plan PAUSED at {res.error.split(': ', 1)[-1]} (usage gate); "
+                "the usage-gate coordinator resumes it after the reset.")
     pr = ""
     if res.pr_number:
         pr = f" PR #{res.pr_number}"
@@ -2483,6 +2549,18 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                     f"ERROR terminal=failed kind=llm-usage-limit. "
                     + (f"{detail} " if detail else "")
                     + "Re-run bin/post-plan-now after the limit resets.")
+        if res.error_kind == "usage-pause-unconfirmed":
+            detail = _flat(res.error or "")
+            return (f"RESULT: post-plan BLOCKED — usage gate paused but the pause marker "
+                    f"is missing; ERROR terminal=failed kind=usage-pause-unconfirmed. "
+                    + (f"{detail} " if detail else "")
+                    + "Re-run bin/post-plan-now after the limit resets.")
+        if res.error_kind == "usage-pause-dirty":
+            detail = _flat(res.error or "")
+            return (f"RESULT: post-plan BLOCKED — usage gate paused a tooled edit mid-run; "
+                    f"ERROR terminal=failed kind=usage-pause-dirty. "
+                    + (f"{detail} " if detail else "")
+                    + "Inspect `git status` in the worktree, then re-run bin/post-plan-now.")
         # Unknown or None error_kind — name all possible fail-closed causes
         return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict, local-gate, or "
                 "llm-usage-limit), cause unknown; ERROR terminal=failed, no PR opened. "
@@ -2523,6 +2601,27 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                 f"merges{pr}{tail} findings={len(res.findings)}")
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
             f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}")
+
+
+def _settle_pause_marker(res: RunResult, rc: int) -> int:
+    """Enforce exit 75 <=> S marker on disk. No gate context: rc unchanged."""
+    ctx, _ = usage_pause.context_from_env()
+    if ctx is None:
+        if rc == PAUSE_EXIT:
+            res.error_kind = "usage-pause-unconfirmed"
+            return 3
+        return rc
+    if res.error_kind == "usage-pause-dirty":
+        usage_pause.marker_clear(ctx)
+        return rc
+    if rc == PAUSE_EXIT:
+        if usage_pause.marker_exists(ctx):
+            return rc
+        res.error_kind = "usage-pause-unconfirmed"
+        return 3
+    if usage_pause.marker_exists(ctx):
+        usage_pause.marker_clear(ctx)
+    return rc
 
 
 def main() -> int:
@@ -2566,6 +2665,9 @@ def main() -> int:
               headless=not args.interactive, live=args.live, explicit_path=args.plan)
     t = ledger.totals()
     rc = exit_code_for(res)
+    rc = _settle_pause_marker(res, rc)
+    if rc != PAUSE_EXIT:
+        usage_pause.ledger_clear()
     # First line, so `head -1 <log>` is the whole verdict and bin/watch-run can
     # terminate on it without waiting for the launchd label to disappear.
     print(verdict_line(res, rc, _pull_url_base(args.worktree)))
@@ -2575,6 +2677,7 @@ def main() -> int:
     print(f"llm: {t['llm_invocations']} calls, {t['gross_tokens']} gross tok, "
           f"{t['non_cached_tokens']} non-cached tok, ${t['cost_usd']}, {t['wall_seconds']}s")
     print(f"outputs: {args.out}/result.json, {args.out}/audit.log, {args.out}/actions.jsonl")
+    print(f"usage-gate: {'on' if usage_pause.context_from_env()[0] else 'off'}")
     return rc
 
 

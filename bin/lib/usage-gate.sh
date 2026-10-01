@@ -63,6 +63,25 @@ usage_resets_epoch() {
         '.[$w].resets_at // empty | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601' 2>/dev/null
 }
 
+# usage_blind_trust <json> <age> [log-suffix]
+# Called when the gate is blind: the live fetch failed and the cache is stale.
+# rc 0: trust this last reading as if fresh. Its zone is drain or stop and the
+# limiting window's resets_at is still in the future. Logs blind-trust.
+# rc 1: fail open. The zone is normal, or resets_at is passed, missing, or
+# unparseable, so the reset boundary cannot be shown to lie ahead.
+usage_blind_trust() {
+    local body="${1:-}" age="${2:-}" zone w resets now
+    zone=$(usage_zone "$body")
+    case "$zone" in drain|stop) ;; *) return 1 ;; esac
+    w=$(usage_limiting_window "$body")
+    resets=$(usage_resets_epoch "$body" "$w")
+    case "$resets" in ''|*[!0-9]*) return 1 ;; esac
+    now=$(date +%s)
+    [ "$resets" -gt "$now" ] || return 1
+    usage_log "blind-trust zone=$zone age=$age${3:+ $3}"
+    return 0
+}
+
 # ------------------------------------------------------------ 2c pause markers
 
 usage_markers_dir() {
@@ -225,7 +244,9 @@ usage_marker_clear() {
     seen="$(usage_state_dir)/dm-seen"
     if [ -f "$seen" ]; then
         tmp="$seen.tmp.$$"
-        grep -vxF "$1" "$seen" > "$tmp" 2>/dev/null
+        # grep -v exits 1 when no line survives (sid was the only entry); callers
+        # run under set -e, so that must not abort them.
+        grep -vxF "$1" "$seen" > "$tmp" 2>/dev/null || true
         mv "$tmp" "$seen"
     fi
     return 0
@@ -464,8 +485,10 @@ usage_prestart_gate() {
         local age
         age=$(usage_cache_age)
         if [ "$age" -lt 0 ] || [ "$age" -ge 300 ]; then
-            usage_log "prestart-fail-open reason=stale-usage runner=$runner"
-            return 0
+            if ! usage_blind_trust "$body" "$age" "runner=$runner"; then
+                usage_log "prestart-fail-open reason=stale-usage runner=$runner"
+                return 0
+            fi
         fi
     fi
     zone=$(usage_zone "$body")
@@ -481,6 +504,23 @@ usage_prestart_gate() {
     return 0
 }
 
+# usage_limit_hit_marker <runner> <sid> <resume_bin>
+# Writes a limit-hit marker for <sid> from the current usage reading (zone "unknown" when
+# no reading is available). Returns the marker write's status. Callers that have already
+# matched the limit text themselves use it directly; usage_postrun_pause matches the log
+# first.
+usage_limit_hit_marker() {
+    local runner="${1:-}" sid="${2:-}" rbin="${3:-}"
+    local body zone="unknown" pct=0 w="five_hour" resets=""
+    if body=$(usage_fetch 300) && [ -n "$body" ]; then
+        zone=$(usage_zone "$body")
+        pct=$(usage_zone_pct "$body")
+        w=$(usage_limiting_window "$body")
+        resets=$(usage_resets_epoch "$body" "$w")
+    fi
+    usage_marker_write "$sid" "$runner" "$rbin" limit-hit "$zone" "$pct" "$w" "$resets"
+}
+
 # usage_postrun_pause <runner> <sid> <resume_bin> <rc> <log> [after_line]
 # rc 0 (paused): a marker for <sid> exists, or <rc> is not 0/3/124/143 and the log
 # shows a limit-hit (a limit-hit marker is written). rc 1: not paused.
@@ -492,14 +532,7 @@ usage_postrun_pause() {
     fi
     case "$rc" in 0|3|124|143) return 1 ;; any) ;; esac
     usage_is_limit_hit "$log" "$after" || return 1
-    local body zone="unknown" pct=0 w="five_hour" resets=""
-    if body=$(usage_fetch 300) && [ -n "$body" ]; then
-        zone=$(usage_zone "$body")
-        pct=$(usage_zone_pct "$body")
-        w=$(usage_limiting_window "$body")
-        resets=$(usage_resets_epoch "$body" "$w")
-    fi
-    usage_marker_write "$sid" "$runner" "$rbin" limit-hit "$zone" "$pct" "$w" "$resets" || return 1
+    usage_limit_hit_marker "$runner" "$sid" "$rbin" || return 1
     usage_log "postrun-limit-hit runner=$runner sid=$sid rc=$rc"
     return 0
 }
@@ -530,6 +563,19 @@ usage_resume_paused_args() {
 
 # ------------------------------------------------------------ 3b hook decision
 
+# usage_gate_run_sid <hook_sid>: the sid a pause is keyed on. Unset
+# IBL5_USAGE_GATE_SESSION_ID keeps the hook's own sid (skill leg: already the
+# run sid). Set-but-empty or not a uuid returns 1 so the caller fails open; a
+# child-keyed marker would have no runs/<sid>.argv and would strand.
+usage_gate_run_sid() {
+    if [ -z "${IBL5_USAGE_GATE_SESSION_ID+x}" ]; then
+        printf '%s' "${1:-}"
+        return 0
+    fi
+    usage_valid_sid "$IBL5_USAGE_GATE_SESSION_ID" || return 1
+    printf '%s' "$IBL5_USAGE_GATE_SESSION_ID"
+}
+
 # usage_gate_decide
 # Reads the PreToolUse hook input JSON on stdin. Prints nothing (allow) or exactly
 # {"continue":false,"stopReason":"usage-pause"}. Always returns 0. Invariant: no
@@ -537,10 +583,15 @@ usage_resume_paused_args() {
 #
 # Env contract (exported by runners alongside IBL5_USAGE_GATE=1):
 #   IBL5_USAGE_GATE_RUNNER, IBL5_USAGE_GATE_MODEL, IBL5_USAGE_GATE_RESUME_BIN
+#   IBL5_USAGE_GATE_SESSION_ID (optional): the run sid; keys the marker, token check, and delta row
 usage_gate_decide() {
     local input sid runner="${IBL5_USAGE_GATE_RUNNER:-}" rbin="${IBL5_USAGE_GATE_RESUME_BIN:-}"
     input=$(cat)
     sid=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
+    if ! sid=$(usage_gate_run_sid "$sid"); then
+        usage_log "fail-open reason=bad-run-sid"
+        return 0
+    fi
     if ! usage_valid_sid "$sid"; then
         usage_log "fail-open reason=bad-sid"
         return 0
@@ -558,7 +609,7 @@ usage_gate_decide() {
         return 0
     fi
 
-    local body rc age
+    local body rc age blind=0
     body=$(usage_fetch 45); rc=$?
     if [ "$rc" -eq 1 ] || [ -z "$body" ]; then
         usage_log "fail-open reason=no-usage"
@@ -567,12 +618,17 @@ usage_gate_decide() {
     if [ "$rc" -eq 2 ]; then
         age=$(usage_cache_age)
         if [ "$age" -lt 0 ] || [ "$age" -ge 300 ]; then
-            usage_log "fail-open reason=stale-usage age=$age"
-            return 0
+            if usage_blind_trust "$body" "$age"; then
+                blind=1
+            else
+                usage_log "fail-open reason=stale-usage age=$age"
+                return 0
+            fi
         fi
     fi
 
-    usage_delta_log "$sid" "$runner" "${IBL5_USAGE_GATE_MODEL:-unknown}" "$body"
+    # A blind reading is not a new delta: keep the delta log to fresh data.
+    [ "$blind" -eq 1 ] || usage_delta_log "$sid" "$runner" "${IBL5_USAGE_GATE_MODEL:-unknown}" "$body"
 
     local zone
     zone=$(usage_zone "$body")

@@ -1,6 +1,6 @@
 ---
 description: Project work tracking moves from 21 markdown backlog files to GitHub Issues in the private repo a-jay85/IBL5-backlog, retiring the union-merge and duplicate-ID machinery that file-shaped tracking required.
-last_verified: 2026-09-08
+last_verified: 2026-09-30
 ---
 
 # ADR-0121: Backlog migration to GitHub Issues
@@ -36,4 +36,4 @@ Project work tracking moves to GitHub Issues in the existing private repo `a-jay
 - `bin/migrate-backlog-to-issues` — the one-shot idempotent migration CLI.
 - `ibl5/tests/Cli/MigrateBacklogToIssuesCliTest.php` — dry-run coverage of extraction, labelling, state, and idempotency.
 - `.gitattributes` — carries the `merge=union` attribute this decision retires for backlog paths.
-- `.claude/rules/backlog-housekeep.md` — the resident rule replaced by a pointer once the corpus is deleted.
+- The `backlog-housekeep` rule (file deleted 2026-09-30): the resident rule replaced by a pointer once the corpus is deleted.

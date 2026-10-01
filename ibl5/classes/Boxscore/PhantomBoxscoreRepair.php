@@ -24,6 +24,20 @@ final class PhantomBoxscoreRepair extends \BaseMysqliRepository
      * Measured against the production snapshot for season 2008. The precondition
      * refuses to delete anything unless the live counts match these exactly.
      *
+     * These six literals are pinned in CI by Tests\Boxscore\PhantomBoxscoreRepairExpectedTest
+     * (literal values plus the team-rows = 2 x games invariants) and by
+     * Tests\DatabaseIntegration\PhantomBoxscoreRepairTest::testDefaultConstructedRepairGatesOnProductionExpected,
+     * which default-constructs this class and checks the thrown message. CI can catch drift
+     * in these values. It cannot prove they match production. Changing any value means
+     * updating both tests in the same PR and attaching the migration-168 dry-run output that
+     * measured the new value to the PR body.
+     *
+     * The duplicate-triple keepers resolved in production (game_of_that_day 1, 2 and 6) are
+     * reported by describeDuplicateResolutions() and are not gated here. They were verified
+     * by the migration-168 dry-run in PR #2001 and stay dry-run-verified. Gating them would
+     * need production data CI does not hold, and a wrong keeper gate would fail a deploy
+     * closed.
+     *
      * @var array<string, int>
      */
     private const EXPECTED = [
@@ -227,10 +241,12 @@ final class PhantomBoxscoreRepair extends \BaseMysqliRepository
      *        tests/DatabaseIntegration/Fixtures/db-seed.sql, which contains no boxscore rows
      *        at all, so the production snapshot's 618/1236/3/6/14502/20 is unreachable there.
      *        This is NOT the precondition-loosening assertPreconditions() forbids: production
-     *        callers (migration 168, bin/check-boxscore-schedule) pass null and are gated on
+     *        callers (migration 168 is the only one) pass null and are gated on
      *        self::EXPECTED, unchanged. Passing a wrong override makes the gate stricter or
      *        differently-shaped, never absent - the throw path is still the only way past a
-     *        mismatch.
+     *        mismatch. Tests\Boxscore\PhantomBoxscoreRepairExpectedTest::testNoProductionCallSitePassesExpectedOverride
+     *        fails CI if any constructor call under classes/, migrations/, bin/ or scripts/
+     *        passes a 4th argument or a named expectedOverride:.
      */
     public function __construct(
         \mysqli $db,

@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Scans migration SQL files for destructive patterns (DROP COLUMN, DROP TABLE,
-# TRUNCATE, RENAME COLUMN, ADD NOT NULL without DEFAULT).
+# TRUNCATE, RENAME COLUMN/TABLE, CHANGE renames, NOT NULL without DEFAULT,
+# DROP INDEX).
 #
 # Exit codes: 0 = pass, 1 = destructive patterns found, 2 = usage error.
 
@@ -30,8 +31,19 @@ Detected patterns (v1):
   drop-table              DROP TABLE (suppressed when IF EXISTS + matching
                           CREATE TABLE in same file = recreate pattern)
   truncate                TRUNCATE [TABLE] ...
-  rename-column           ALTER TABLE ... RENAME COLUMN
+  rename-column           ALTER TABLE ... RENAME COLUMN, or
+                          CHANGE [COLUMN] <old> <new> with old != new
   add-not-null-no-default ADD COLUMN ... NOT NULL without DEFAULT
+  tighten-not-null        MODIFY [COLUMN] <col> ... NOT NULL, or same-name
+                          CHANGE <col> <col> ... NOT NULL, without DEFAULT
+                          (false positive if the column was already NOT NULL;
+                          add the bypass marker in that case)
+  drop-index              DROP INDEX|KEY <name> (suppressed when the same file
+                          adds an index/key with the same name)
+  rename-table            RENAME TABLE, or ALTER TABLE ... RENAME TO|AS
+
+Matching is per line: NOT NULL and DEFAULT must be on the same line as
+MODIFY/CHANGE, and CHANGE needs both column names on that line.
 
 Bypass markers:
   Per-file (inline SQL comment):
@@ -40,7 +52,6 @@ Bypass markers:
     <!-- destructive-migration: <reason at least 20 chars> -->
 
 Explicitly NOT scanned (v1 limitations):
-  - MODIFY ... NOT NULL (requires multi-statement analysis)
   - Bare DELETE FROM (often legitimate cleanup)
 
 Hard-excluded files:
@@ -154,6 +165,13 @@ check_file() {
         stripped="$(echo "$line" | sed 's/--.*$//')"
         [ -z "$stripped" ] && continue
 
+        local lc
+        # Lowercased, with single-quoted string literals removed.
+        lc="$(echo "$stripped" | sed "s/'[^']*'/''/g" | tr '[:upper:]' '[:lower:]')"
+        # Clause start: line start, after a comma, or right after ALTER TABLE <t>.
+        # Keeps words like "change" inside string literals from matching.
+        local clause='(^|,|alter[[:space:]]+table[[:space:]]+[^[:space:]]+)[[:space:]]*'
+
         # drop-column
         if match_icase "$stripped" 'ALTER[[:space:]]+TABLE[[:space:]].*DROP[[:space:]]+COLUMN'; then
             file_triggers="${file_triggers}  [drop-column] ${file}:${line_num} ${stripped}
@@ -198,6 +216,41 @@ check_file() {
             fi
         fi
 
+        # rename-column (CHANGE with a different new name; same name = type change)
+        if [[ "$lc" =~ ${clause}change[[:space:]]+(column[[:space:]]+)?(if[[:space:]]+exists[[:space:]]+)?\`?([a-z0-9_]+)\`?[[:space:]]+\`?([a-z0-9_]+) ]]; then
+            if [ "${BASH_REMATCH[4]}" != "${BASH_REMATCH[5]}" ]; then
+                file_triggers="${file_triggers}  [rename-column] ${file}:${line_num} ${stripped}
+"
+            elif [[ "$lc" =~ not[[:space:]]+null ]] && [[ ! "$lc" =~ default ]]; then
+                file_triggers="${file_triggers}  [tighten-not-null] ${file}:${line_num} ${stripped}
+"
+            fi
+        fi
+
+        # tighten-not-null (MODIFY)
+        if [[ "$lc" =~ ${clause}modify[[:space:]]+[^[:space:]] ]]; then
+            if [[ "$lc" =~ not[[:space:]]+null ]] && [[ ! "$lc" =~ default ]]; then
+                file_triggers="${file_triggers}  [tighten-not-null] ${file}:${line_num} ${stripped}
+"
+            fi
+        fi
+
+        # drop-index (suppressed when the same file re-adds an index with that name)
+        if [[ "$lc" =~ ${clause}drop[[:space:]]+(index|key)[[:space:]]+(if[[:space:]]+exists[[:space:]]+)?\`?([a-z0-9_]+) ]]; then
+            local index_name="${BASH_REMATCH[4]}"
+            if ! echo "$added_lines" | grep -iqE "(ADD[[:space:]]+((UNIQUE|FULLTEXT|SPATIAL)[[:space:]]+)?(INDEX|KEY)|CREATE[[:space:]]+((UNIQUE|FULLTEXT|SPATIAL)[[:space:]]+)?INDEX)[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?\`?${index_name}\`?([^a-zA-Z0-9_]|$)"; then
+                file_triggers="${file_triggers}  [drop-index] ${file}:${line_num} ${stripped}
+"
+            fi
+        fi
+
+        # rename-table (RENAME COLUMN/INDEX/KEY do not match)
+        if [[ "$lc" =~ ^[[:space:]]*rename[[:space:]]+table[[:space:]] ]] \
+            || [[ "$lc" =~ ${clause}rename[[:space:]]+(to|as)[[:space:]] ]]; then
+            file_triggers="${file_triggers}  [rename-table] ${file}:${line_num} ${stripped}
+"
+        fi
+
     done <<< "$added_lines"
 
     if [ -n "$file_triggers" ]; then
@@ -228,6 +281,11 @@ echo "Destructive migration patterns detected:"
 echo ""
 printf '%s' "$TRIGGERS"
 echo ""
+if echo "$TRIGGERS" | grep -q '\[tighten-not-null\]'; then
+    echo "tighten-not-null is a false positive if the column was already NOT NULL"
+    echo "and only its type changed; use a bypass marker in that case."
+    echo ""
+fi
 echo "To proceed, add one of these bypass markers:"
 echo ""
 echo "  Per-file (SQL comment in the migration):"

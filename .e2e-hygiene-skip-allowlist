@@ -7,5 +7,5 @@ ibl5/tests/e2e/smoke/auth-regular-user-provisioned.spec.ts
 ibl5/tests/e2e/flows/import-demands-role-gating.spec.ts
 
 # File-level skip: this spec's purpose is to assert element absence in
-# wrong-phase states. Documented exception in playwright-tests.md DON'T #11.
+# wrong-phase states. Documented exception in playwright-tests.md § Mandatory: No Skips.
 ibl5/tests/e2e/flows/phase-gating-public.spec.ts

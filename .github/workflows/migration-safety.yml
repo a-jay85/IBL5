@@ -5,11 +5,21 @@ on:
     branches: [ master, develop ]
     paths:
       - 'ibl5/migrations/**.sql'
+      - 'ibl5/migrations/**.php'
+      - 'ibl5/bin/run-migrations-ci'
+      - 'bin/check-old-code-compat'
+      - 'bin/test-check-old-code-compat'
+      - '.github/workflows/migration-safety.yml'
   pull_request:
     branches: [ master, develop ]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'ibl5/migrations/**.sql'
+      - 'ibl5/migrations/**.php'
+      - 'ibl5/bin/run-migrations-ci'
+      - 'bin/check-old-code-compat'
+      - 'bin/test-check-old-code-compat'
+      - '.github/workflows/migration-safety.yml'
 
 permissions:
   contents: read
@@ -357,10 +367,113 @@ jobs:
           git push
         fi
 
+  old-code-compat-selftest:
+    name: Old-Code Compat Self-Test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASS: root
+      DB_NAME: ibl5
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mariadb-admin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Setup PHP environment
+      uses: ./.github/actions/setup-php-env
+
+    - name: Self-test scenarios A-F against MariaDB
+      run: |
+        set -o pipefail
+        bin/test-check-old-code-compat --db 2>&1 | tee "$RUNNER_TEMP/oc-selftest.log"
+        grep -qx 'ALL 7 DB CASES PASSED' "$RUNNER_TEMP/oc-selftest.log"
+
+  old-code-compat:
+    name: Old-Code Compat (production PHP on PR-head schema)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASS: root
+      DB_NAME: ibl5_oldcompat
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mariadb-admin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+    - name: Checkout PR head
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: 0
+
+    - name: Checkout production tree
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: production
+        path: old-tree
+
+    - name: Setup PHP environment
+      uses: ./.github/actions/setup-php-env
+      with:
+        cache: 'false'
+        create-config: 'false'
+        install: 'false'
+
+    - name: Configure and install the production tree
+      working-directory: old-tree/ibl5
+      run: |
+        echo "production tree at $(git -C .. rev-parse HEAD)"
+        cp config.php.example config.php
+        printf '<?php\n$dbhost = %s;\n$dbuname = %s;\n$dbpass = %s;\n$dbname = %s;\n' \
+          "'$DB_HOST'" "'$DB_USER'" "'$DB_PASS'" "'$DB_NAME'" > config.local.php
+        composer install --no-progress --no-interaction
+
+    - name: Run production PHP tests against the PR-head schema
+      env:
+        PR_BODY: ${{ github.event.pull_request.body }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      run: |
+        printf '%s' "$PR_BODY" | bin/check-old-code-compat \
+          --since="$BASE_SHA" \
+          --old-tree="$GITHUB_WORKSPACE/old-tree/ibl5" \
+          --db-name=ibl5_oldcompat \
+          --min-tests=100 \
+          --bypass-from-stdin
+
   gate:
     name: Migration Safety
     if: always()
-    needs: [schema-parity-check, schema-completeness, destructive-migration-scan, migration-naming-check]
+    needs: [schema-parity-check, schema-completeness, destructive-migration-scan, migration-naming-check, old-code-compat, old-code-compat-selftest]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

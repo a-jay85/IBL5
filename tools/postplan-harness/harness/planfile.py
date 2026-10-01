@@ -434,20 +434,23 @@ _PHASE_HEADING_RE = re.compile(r"^##\s+(?:Phase|Step)\s*(\d+)(?!\.\d)\b\s*[:.\-â
 # All-S tier marker = bookkeeping-only phase (close a backlog issue, bump a doc date).
 _BOOKKEEPING_MARKER_RE = re.compile(r"\[phases:\s*S(\s*/\s*S)*\s*\]")
 _EXAMPLE_SUFFIX_RE = re.compile(r"^\s*\(example\)")
+_LINE_SUFFIX_RE = re.compile(r"(?::|#)L?\d+(?:-L?\d+)?$")
 
 
 def _phase_evidence_paths(body: str) -> list[str]:
     """Backticked tokens in a phase body that look like repo paths, deduped, first-seen order.
 
     A token followed by ` (example)` is an intentionally-absent path (staleness-guard idiom)
-    and is skipped. A `path::test_fn` pytest node id contributes its file part only. Glob
-    tokens are skipped because _resolve cannot match them.
+    and is skipped. A `path::test_fn` pytest node id contributes its file part only. A
+    trailing line suffix (`:120`, `:438-457`, `#L12-L20`) is stripped so the token matches
+    the changed file. Glob tokens are skipped because _resolve cannot match them.
     """
     out: list[str] = []
     for m in re.finditer(r"`([^`\n]+)`", body):
         if _EXAMPLE_SUFFIX_RE.match(body[m.end():m.end() + 12]):
             continue
         tok = m.group(1).split("::", 1)[0].strip()
+        tok = _LINE_SUFFIX_RE.sub("", tok)
         if not _is_test_path(tok) or re.search(r"[*?\[\]]", tok):
             continue
         if tok not in out:
@@ -766,6 +769,12 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
     info.backlog_issues = parse_backlog_issues(content)
     info.phases = parse_phases(content)
     info.deferred_phase_numbers = parse_deferred_phase_numbers(content)
+    try:
+        from .outofscope import extract_deferral_hits  # local import: outofscope imports planfile
+        info.deferral_hits = [(h.text, h.line_no, h.key)
+                              for h in extract_deferral_hits(content, slug)]
+    except Exception:  # additive sweep: a parser bug must never stop plan location
+        info.deferral_hits = []
     if info.has_security:
         info.security_section = _section(content, "Security")[:4000]
     if info.has_reuse:

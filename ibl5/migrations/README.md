@@ -14,8 +14,31 @@ The production deploy workflow automatically reverts the last commit if post-dep
 2. **No irreversible data transforms**: Data migrations that destroy the old format cannot be auto-rolled back; use a two-step deploy (schema first, data transform after confirming stability)
 3. **Backward-compatible indexes**: Adding indexes is safe; removing indexes that existing PHP code depends on is not
 4. **Two-step pattern for breaking changes**: Deploy 1 adds new column + PHP reads both old and new. Deploy 2 (after Deploy 1 is stable) removes old column.
+5. **Slow migrations ship first**: The deploy pulls new code before it runs migrations, so for a few seconds new PHP runs against the old schema. If a migration is slow (a big backfill or table rebuild) and the same PR's PHP reads its new column, split it into two PRs. Ship the migration first, then the code that reads it.
 
 If a reverted deploy still fails smoke tests (because the old code is incompatible with the new schema), the workflow sends a "manual intervention required" notification instead of reverting again.
+
+### Enforcement
+
+The `old-code-compat` job in `.github/workflows/migration-safety.yml` enforces this rule on every pull request that touches `ibl5/migrations/`. It builds a scratch database at the PR-head schema with `ibl5/bin/run-migrations-ci`, imports the production branch's `db-seed.sql`, and runs the production branch's `--group database` PHPUnit suite against it. When that suite fails, the job fails and names the migration whose dropped or renamed identifier appears in the failure text. The script is `bin/check-old-code-compat`, and ADR-0155 records the design.
+
+A contract-phase change that removes something production still reads fails this job on purpose. When the break is intended, add a marker with a reason of at least 20 characters. Put it on an added line of the migration:
+
+```sql
+-- rollback-incompatible: <reason>
+```
+
+or in the PR body:
+
+```html
+<!-- rollback-incompatible: <reason> -->
+```
+
+The `destructive-migration:` marker does not bypass this job. Accepting data loss and accepting a broken rollback are separate decisions. Dropping a column that production no longer reads needs no marker, because production's tests still pass.
+
+The job runs only on pull requests, so the PR-body marker is always visible to it. `run-migrations-ci` skips `.php` data migrations, so a PR that changes only `.php` migrations builds the same schema as master and passes without testing anything new. The check covers the code paths production's database-integration tests exercise and nothing beyond them.
+
+Deploys that bring new migration files also take a full database dump first. The dump lands in `~/backups/db-predeploy/` on the prod host and the newest 10 are kept. To restore one, run `gunzip -c <file> | mysql <db>` on the host.
 
 ## Destructive Migration CI Scan
 
@@ -26,8 +49,11 @@ The `migration-safety.yml` workflow includes a **destructive migration scan** (`
 | `drop-column` | `ALTER TABLE ... DROP COLUMN` |
 | `drop-table` | `DROP TABLE` (suppressed when `IF EXISTS` + matching `CREATE TABLE` in same file) |
 | `truncate` | `TRUNCATE [TABLE] ...` |
-| `rename-column` | `ALTER TABLE ... RENAME COLUMN` |
+| `rename-column` | `ALTER TABLE ... RENAME COLUMN`, or `CHANGE [COLUMN] <old> <new>` with different names |
 | `add-not-null-no-default` | `ADD COLUMN ... NOT NULL` without `DEFAULT` |
+| `tighten-not-null` | `MODIFY [COLUMN] <col> ... NOT NULL`, or same-name `CHANGE`, without `DEFAULT` (false positive if the column was already `NOT NULL`; use the bypass marker) |
+| `drop-index` | `DROP INDEX` / `DROP KEY` (suppressed when the same file adds an index with the same name) |
+| `rename-table` | `RENAME TABLE ...` or `ALTER TABLE ... RENAME TO\|AS ...` |
 
 The file `000_baseline_schema.sql` is always excluded from scanning.
 

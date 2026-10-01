@@ -54,6 +54,26 @@ def test_pr_copy_prompt_contains_manual_testing_prohibition():
     assert "corrupts the arming gate" in prompt
 
 
+def test_pr_copy_prompt_states_no_gm_visible_files_forbids_feat():
+    c = _cls()
+    c.has_gm_visible = False
+    c.count_total = 3
+    prompt = pr_copy_prompt("some-slug", c, PlanInfo(), "")
+    assert "GM-VISIBLE FILES: none" in prompt
+    assert "MUST NOT be feat" in prompt
+    assert "HAS_GM_VISIBLE=False" in prompt
+    assert "Would a league GM notice a new ability" in prompt
+
+
+def test_pr_copy_prompt_states_gm_visible_files_and_keeps_feat_available():
+    c = _cls()
+    c.has_gm_visible = True
+    prompt = pr_copy_prompt("some-slug", c, PlanInfo(), "")
+    assert "GM-VISIBLE FILES: yes" in prompt
+    assert "MUST NOT be feat" not in prompt
+    assert "HAS_GM_VISIBLE=True" in prompt
+
+
 def test_retrospective_prompt_carries_fidelity_outcome():
     fidelity = {"verdict_1": "NOT READY", "verdict_2": "READY", "remediation_sha": "abc"}
     prompt = retrospective_prompt("my-slug", "shipped-armed", None, 0, None, fidelity)

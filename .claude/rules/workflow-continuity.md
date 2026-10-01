@@ -1,5 +1,5 @@
 ---
-description: All work happens in a worktree (never the main checkout); where plans live (~/claude-plans/<branch-slug>.md, outside the repo); worktree setup (hostname stub → worktree-hostname.md, squash-merge stub → linear-history-squash-merge.md); and post-plan handoff triggers. Engine internals: workflow-continuity-detail.md.
+description: All work happens in a worktree; where plans live (outside the repo); worktree setup; post-plan handoff triggers.
 last_verified: 2026-09-30
 ---
 
@@ -35,7 +35,7 @@ bin/wt-new <slug>   # slug = kebab-case branch name derived from the plan
 
 When a task builds on an open, unmerged PR, stack on it (`--base <that-branch>`) and start now. Don't wait for it to land on master. Work in `IBL5-worktrees/<slug>/ibl5/` (worktrees live outside the repo, per ADR-0046). Skip creation only when this task's worktree already exists (or the plan names one). "This edit is small enough for master" is never a reason to skip.
 
-That worktree's Docker hostname is `<slug>.localhost`, where slug = `basename "$(git rev-parse --show-toplevel)"` — derive it, never hardcode one from a previous worktree, never use `main.localhost` from a worktree, and always navigate `/ibl5/` paths, never bare `/`. Detail: `.claude/rules/worktree-hostname.md`.
+Its Docker hostname is `<slug>.localhost` (slug = `basename "$(git rev-parse --show-toplevel)"`), never `main.localhost`; navigate `/ibl5/` paths only. Detail: `.claude/rules/worktree-hostname.md`.
 
 `master` is squash/rebase-merge only, so a merged SHA absent from it is normal; confirm by content. Before rebasing a stacked branch whose parent merged: `.claude/rules/linear-history-squash-merge.md`.
 

@@ -6,7 +6,7 @@ paths: "bin/automouse/**"
 
 # Automouse Autonomous Workflow
 
-> **"Automouse" is this pipeline — the autonomous plan-execution machinery (`bin/automouse/*`, this rule).** It was **formerly called "nightly"**; the term was renamed because the user runs it outside nighttime too, so "nightly" was a misnomer that sent people hunting through `cron` / `/schedule` / `CronCreate` / launchd-by-hand. When you read "automouse" (or legacy "nightly") referring to autonomous plan execution, it means **`bin/automouse/run` fired by launchd**, draining the queue built by `bin/automouse/queue` — *not* a generic scheduler. (The macOS `launchd` agent is the scheduling substrate, but the concept lives in these scripts.)
+> **"Automouse" (formerly "nightly") is the autonomous plan-execution machinery (`bin/automouse/*`, this rule).** Either term means **`bin/automouse/run` fired by launchd**, draining the queue built by `bin/automouse/queue`. It is not a generic scheduler, so do not hunt through `cron`, `/schedule`, or `CronCreate`.
 
 A headless `claude -p` process runs on a recurring schedule via macOS `launchd`. It loops through queued plans, two `claude -p` invocations per plan (implementation, then post-plan), until the queue is empty or the time guard is exceeded. For a single watched run, `bin/automouse/run plan <slug>` executes exactly one named plan (auto-queuing it if absent) with the same guard machinery, then stops.
 
@@ -20,9 +20,9 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Check morning results | `ls ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/reports/` |
 | Cancel the next run | `rm ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/*.md` |
 | Schedule a one-shot run | `bin/automouse/run schedule "2026-05-28 20:00 PDT"` (self-cleaning; date defaults to today, TZ to local) |
-| Run one plan (one-off, foreground) | `bin/automouse/run plan <slug>` (impl + post-plan for exactly one named plan, then stops; auto-queues if absent, leaves the rest of the queue untouched) |
-| Pause tonight's run (auto re-enables) | `bin/automouse/run disarm-tonight` (re-arms the existing plist ~1 h after the skipped run; the manual `launchctl unload` row below stays off until re-armed by hand) |
-| Pause until a given time | `bin/automouse/run disarm-until "2026-08-20 09:00 PDT"` (re-arms the existing plist at the given time; same caveat as above) |
+| Run one plan (one-off, foreground) | `bin/automouse/run plan <slug>` (impl + post-plan for one plan, then stops; auto-queues if absent, rest of queue untouched) |
+| Pause tonight's run (auto re-enables) | `bin/automouse/run disarm-tonight` (re-arms ~1 h after the skipped run; a manual `launchctl unload` stays off until re-armed by hand) |
+| Pause until a given time | `bin/automouse/run disarm-until "2026-08-20 09:00 PDT"` (re-arms at the given time; same caveat) |
 | Disable the automouse job | `launchctl unload ~/Library/LaunchAgents/com.ibl5.automouse.plist` |
 | Re-enable the automouse job | `launchctl load ~/Library/LaunchAgents/com.ibl5.automouse.plist` |
 | Force-trigger now | `launchctl start com.ibl5.automouse` |
@@ -69,12 +69,7 @@ Each phase's cost is recorded in two places: the markdown row in `reports/YYYY-M
 
 ### Startup archival
 
-At launch, `bin/automouse/run` sweeps `logs/`, `reports/`, `done/`, and `skipped/` and moves any
-entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into a sibling
-`<dir>.archive/`. Symlinks
-(`done/`, `skipped/`) are judged on their *own* mtime — the disposition date — and their
-absolute targets keep resolving after the move. `queue/` (pending work) and `handoff/`
-(transient) are never touched. The step is non-fatal: an archival error never aborts the run.
+At launch, `bin/automouse/run` moves any `logs/`, `reports/`, `done/`, or `skipped/` entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into `<dir>.archive/`. Symlinks are judged on their *own* mtime (the disposition date) and keep resolving after the move. `queue/` and `handoff/` are never touched. An archival error never aborts the run.
 
 **Run order is the queue symlink's mtime** (lstat, via `queue_entries_ordered` in
 `bin/automouse/lib-queue-order`) on macOS and Linux. Editing the plan file does not
@@ -136,7 +131,7 @@ Every parser is **line-1-anchored** (frontmatter only, to the closing `---`), so
 
 ## Feature PRs cannot auto-merge
 
-Conventional-commit **`feat:`** PRs are gated by the required `human-signoff` check and will **not** auto-merge unattended — they wait for a human to apply the `human-approved` label after inspection (ADR-0062). `/post-plan` Phase 6.5 condition (8) deterministically **never arms** a `feat:` PR (a literal title grep), so there is no arm-then-strip; the required `human-signoff` check remains the independent floor that blocks the merge regardless. Maintenance PRs (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) auto-merge as before — still subject to Phase 6.5's other conditions, including the PR-time safety verdict (9) on the realized diff. Check `gh pr list` afterward for `feat:` PRs awaiting your label.
+Conventional-commit **`feat:`** PRs are gated by the required `human-signoff` check and will **not** auto-merge unattended. They wait for a human to apply the `human-approved` label after inspection (ADR-0062). `/post-plan` Phase 6.5 condition (8) deterministically **never arms** a `feat:` PR (a literal title grep), so there is no arm-then-strip; the required `human-signoff` check remains the independent floor that blocks the merge regardless. Maintenance PRs (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) auto-merge as before, still subject to Phase 6.5's other conditions, including the PR-time safety verdict (9) on the realized diff. Check `gh pr list` for `feat:` PRs awaiting your label.
 
 ## `depends_on:` hold gate
 

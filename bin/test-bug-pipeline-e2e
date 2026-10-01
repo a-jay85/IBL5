@@ -1,0 +1,385 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/test-bug-pipeline-e2e — regression harness for the guards in
+# bin/bug-pipeline-e2e (opt-in gate, argv, production-contact guard, stub wiring)
+# and the lsof port guard in bin/bug-pipeline-test-env. L0-L7, E0-E6, G1-G21,
+# S-cases, C1-C3.
+#
+# Usage: bin/test-bug-pipeline-e2e [--mutation-check]
+#   (no arg)          run every case
+#   --mutation-check  neuter each guard in a temp copy and require this harness
+#                     to fail for every mutant (BPE_MUTANT_ONLY=<name> runs one)
+#
+# No set -e. bash 3.2 safe. Cleanup via trap EXIT. Never writes
+# /tmp/bug-pipeline-test-env.sh or /tmp/bug-pipeline-test-stubs/: bug-pipeline-e2e
+# is copied into a temp dir and its two hard-coded /tmp literals are rewritten.
+# bug-pipeline-test-env is never run; only its lsof guard region is extracted.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+E2E_BIN="${BPE_TARGET_E2E:-$SCRIPT_DIR/bug-pipeline-e2e}"
+TESTENV_BIN="${BPE_TARGET_TESTENV:-$SCRIPT_DIR/bug-pipeline-test-env}"
+
+MODE=run
+case "${1:-}" in
+    '')               ;;
+    --mutation-check) MODE=mutation ;;
+    *)                echo "usage: bin/test-bug-pipeline-e2e [--mutation-check]" >&2; exit 2 ;;
+esac
+if [ "$#" -gt 1 ]; then echo "usage: bin/test-bug-pipeline-e2e [--mutation-check]" >&2; exit 2; fi
+
+PASSED=0
+FAILED=0
+
+bpt_ok()   { echo "ok: $1";  PASSED=$(( PASSED + 1 )); }
+bpt_fail() { echo "FAIL: $1"; FAILED=$(( FAILED + 1 )); }
+bpt_expect_eq() {
+    if [ "$2" = "$3" ]; then bpt_ok "$1"
+    else bpt_fail "$1 — want [$2] got [$3]"
+    fi
+}
+# Herestring, never printf|grep -q (.claude/rules/shell-pipefail-grep.md).
+bpt_expect_contains() {   # <label> <needle> <haystack>
+    if grep -qF -- "$2" <<<"$3"; then bpt_ok "$1"
+    else bpt_fail "$1 — missing [$2] in [$3]"
+    fi
+}
+bpt_expect_absent() {     # <label> <needle> <haystack>
+    if grep -qF -- "$2" <<<"$3"; then bpt_fail "$1 — unexpected [$2] in [$3]"
+    else bpt_ok "$1"
+    fi
+}
+
+T="$(mktemp -d)"
+_cleanup() { rm -rf "$T"; }
+trap '_cleanup' EXIT
+
+JQ_PATH="$(command -v jq || true)"
+if [ -z "$JQ_PATH" ]; then echo "FAIL: jq not on PATH (both targets need it)" >&2; exit 1; fi
+JQ_DIR="$(dirname "$JQ_PATH")"
+BASE_PATH="$JQ_DIR:/usr/bin:/bin"
+
+# Fixed-string, exactly-once replace. Values travel through ENVIRON, never awk -v,
+# because -v interprets backslash escapes and several strings contain them.
+bpe_rewrite_once() {   # <file> <old> <new>; fails loudly unless <old> occurs exactly once
+    local n
+    n=$(grep -cF -- "$2" "$1")
+    [ "$n" -eq 1 ] || { echo "REWRITE: [$2] count=$n (want 1)" >&2; return 1; }
+    BPE_O="$2" BPE_N="$3" awk '{i=index($0,ENVIRON["BPE_O"]); if(i){$0=substr($0,1,i-1) ENVIRON["BPE_N"] substr($0,i+length(ENVIRON["BPE_O"]))} print}' "$1" > "$1.tmp" \
+        && mv "$1.tmp" "$1"
+}
+
+PG_START='satisfies the liveness probe while ibl-bug-bot-test dies on EADDRINUSE'
+PG_END='# Delete-then-start so the config file is always re-evaluated'
+pg_extract() {   # <source> <out>; returns 1 with a message when an anchor is missing, duplicated, or off-target
+    local src="$1" out="$2" ns ne needle
+    ns=$(grep -cF -- "$PG_START" "$src"); ne=$(grep -cF -- "$PG_END" "$src")
+    if [ "$ns" -ne 1 ] || [ "$ne" -ne 1 ]; then
+        echo "ANCHOR: start=$ns end=$ne (want 1/1) in $src" >&2; return 1
+    fi
+    awk -v s="$PG_START" -v e="$PG_END" 'index($0,e){exit} f{print} index($0,s){f=1}' "$src" > "$out"
+    for needle in 'OWN_PID="$(pm2 jlist' 'lsof -nP -iTCP:50002 -sTCP:LISTEN -t' 'already held by a foreign process'; do
+        if [ "$(grep -cF -- "$needle" "$out")" -ne 1 ]; then
+            echo "ANCHOR: region off-target, [$needle] not found once" >&2; return 1
+        fi
+    done
+}
+
+# ═══ --mutation-check ════════════════════════════════════════════════════════
+if [ "$MODE" = mutation ]; then
+    mkdir -p "$T/mut"
+    ORIG_E2E="$SCRIPT_DIR/bug-pipeline-e2e"
+    ORIG_TESTENV="$SCRIPT_DIR/bug-pipeline-test-env"
+
+    mut_run() {   # <name> <var> <orig> <mut>
+        local name="$1" var="$2" orig="$3" mut="$4"
+        if cmp -s "$orig" "$mut"; then echo "MUTANT_NOOP: $name"; bpt_fail "$name"; return 0; fi
+        if env "$var=$mut" bash "$SCRIPT_DIR/test-bug-pipeline-e2e" >/dev/null 2>&1; then
+            echo "MUTANT_SURVIVED: $name"; bpt_fail "$name"
+        else
+            echo "MUTANT_KILLED: $name"; bpt_ok "$name"
+        fi
+    }
+    mut() {   # <name> <e2e|testenv> <old> <new>
+        local name="$1" target="$2" orig var m
+        if [ -n "${BPE_MUTANT_ONLY:-}" ] && [ "$BPE_MUTANT_ONLY" != "$name" ]; then return 0; fi
+        if [ "$target" = e2e ]; then orig="$ORIG_E2E"; var=BPE_TARGET_E2E
+        else orig="$ORIG_TESTENV"; var=BPE_TARGET_TESTENV; fi
+        m="$T/mut/$name"
+        cp "$orig" "$m"
+        if ! bpe_rewrite_once "$m" "$3" "$4"; then echo "MUTANT_BUILD_FAILED: $name"; bpt_fail "$name"; return 0; fi
+        mut_run "$name" "$var" "$orig" "$m"
+    }
+
+    mut m-lsof-guard    testenv 'if [ -n "$FOREIGN_PIDS" ]; then' 'if false; then'
+    mut m-lsof-ownpid   testenv 'grep -vx "${OWN_PID:-__no_such_pid__}"' 'cat'
+    mut m-lsof-banner   testenv "| sed -n '/^\\[/,\$p'" '| cat'
+
+    if [ -z "${BPE_MUTANT_ONLY:-}" ] || [ "$BPE_MUTANT_ONLY" = m-anchor-dup ]; then
+        if [ "$(grep -cF -- "$PG_START" "$ORIG_TESTENV")" -ne 1 ]; then
+            echo "MUTANT_BUILD_FAILED: m-anchor-dup"; bpt_fail "m-anchor-dup"
+        else
+            BPE_O="$PG_START" awk '{print} index($0,ENVIRON["BPE_O"]){print}' "$ORIG_TESTENV" > "$T/mut/m-anchor-dup"
+            mut_run m-anchor-dup BPE_TARGET_TESTENV "$ORIG_TESTENV" "$T/mut/m-anchor-dup"
+        fi
+    fi
+
+    mut m-skip-gate    e2e 'if [ "${BUG_PIPELINE_E2E:-}" != "1" ]; then' 'if false; then'
+    mut m-unknown-opt  e2e 'echo "unknown option: $1" >&2; usage >&2; exit 2' ':'
+    mut m-extra-args   e2e '[ "$#" -le 1 ] ||' 'true ||'
+    mut m-envfile      e2e '[ -f "$ENV_FILE" ] ||' 'true ||'
+    mut m-guard-prefix e2e 'PRODUCTION-CONTACT GUARD: ' 'GUARD: '
+
+    mut m-db        e2e 'fail "DB_NAME='               'true "DB_NAME='
+    mut m-boturl    e2e 'fail "BOT_BASE_URL='          'true "BOT_BASE_URL='
+    mut m-wtbase    e2e 'fail "WT_BASE='               'true "WT_BASE='
+    mut m-autofix   e2e 'fail "CI_AUTOFIX_ENABLED='    'true "CI_AUTOFIX_ENABLED='
+    mut m-50001     e2e "fail 'BOT_BASE_URL is the production bug-bot'" 'true'
+    mut m-coderepo  e2e "fail 'code repo is real'"                      'true'
+    mut m-issuerepo e2e "fail 'issue repo is real'"                     'true'
+    mut m-plansdir  e2e "fail 'PLANS_DIR is the real plans dir'"        'true'
+
+    mut m-seam-heartbeat e2e 'fail "TICK_HEARTBEAT='       'true "TICK_HEARTBEAT='
+    mut m-seam-ledger    e2e 'fail "CI_AUTOFIX_LEDGER='    'true "CI_AUTOFIX_LEDGER='
+    mut m-seam-log       e2e 'fail "CI_AUTOFIX_LOG='       'true "CI_AUTOFIX_LOG='
+    mut m-seam-lock      e2e 'fail "CI_AUTOFIX_LOCK='      'true "CI_AUTOFIX_LOCK='
+    mut m-seam-wtrepo    e2e 'fail "CI_AUTOFIX_WT_REPO='   'true "CI_AUTOFIX_WT_REPO='
+
+    mut m-stub-prefix e2e "fail \"\$v='\$p' is not a stub\""       'true'
+    mut m-stub-exec   e2e "fail \"\$v='\$p' is not executable\""   'true'
+    mut m-envelope    e2e "|| fail 'CLAUDE_BIN does not emit"      "|| true 'CLAUDE_BIN does not emit"
+
+    echo "passed=$PASSED failed=$FAILED"
+    [ "$FAILED" -eq 0 ] || exit 1
+    exit 0
+fi
+
+# ═══ L0-L7: lsof port guard (region extracted from bin/bug-pipeline-test-env) ═
+mkdir -p "$T/pgstub"
+printf '%s\n' '#!/bin/sh' 'cat "$BPE_PM2_OUT"'  > "$T/pgstub/pm2"
+printf '%s\n' '#!/bin/sh' 'cat "$BPE_LSOF_OUT"' > "$T/pgstub/lsof"
+chmod 755 "$T/pgstub/pm2" "$T/pgstub/lsof"
+
+PG_RC=0; PG_OUT=""; PG_ERR=""
+pg_case() {   # <pm2 jlist stdout> <lsof stdout>; sets PG_RC PG_OUT PG_ERR
+    printf '%s' "$1" > "$T/pg-pm2.out"
+    printf '%s' "$2" > "$T/pg-lsof.out"
+    PG_OUT=$(PATH="$T/pgstub:$BASE_PATH" BPE_PM2_OUT="$T/pg-pm2.out" BPE_LSOF_OUT="$T/pg-lsof.out" \
+        bash "$T/pg-run.sh" 2>"$T/pg-err")
+    PG_RC=$?
+    PG_ERR=$(cat "$T/pg-err")
+}
+
+if pg_extract "$TESTENV_BIN" "$T/pg-region.sh" 2>"$T/pg-extract-err"; then
+    bpt_ok "L0: lsof guard region extracted"
+    { echo '#!/usr/bin/env bash'; echo 'set -euo pipefail'; cat "$T/pg-region.sh"; echo 'echo PORT_GUARD_PASS'; } > "$T/pg-run.sh"
+
+    OWN_JSON='[{"name":"ibl-bug-bot-test","pid":4242}]'
+
+    pg_case '[]' ''
+    bpt_expect_eq "L1: port free rc" "0" "$PG_RC"
+    bpt_expect_contains "L1: port free passes" "PORT_GUARD_PASS" "$PG_OUT"
+
+    pg_case '[]' $'4242\n'
+    bpt_expect_eq "L2: foreign pid rc" "1" "$PG_RC"
+    bpt_expect_contains "L2: foreign pid wording" \
+        'FAIL: port 50002 already held by a foreign process (pid: 4242 ) — stop it before starting the test bot' "$PG_ERR"
+    bpt_expect_absent "L2: foreign pid no pass" "PORT_GUARD_PASS" "$PG_OUT"
+
+    pg_case "$OWN_JSON" $'4242\n'
+    bpt_expect_eq "L3: own pid rc" "0" "$PG_RC"
+    bpt_expect_contains "L3: own pid passes" "PORT_GUARD_PASS" "$PG_OUT"
+
+    pg_case $'PM2 daemon spawned\n'"$OWN_JSON"$'\n' $'4242\n'
+    bpt_expect_eq "L4: pm2 banner rc" "0" "$PG_RC"
+    bpt_expect_contains "L4: pm2 banner stripped" "PORT_GUARD_PASS" "$PG_OUT"
+
+    pg_case "$OWN_JSON" $'4242\n5151\n'
+    bpt_expect_eq "L5: own plus foreign rc" "1" "$PG_RC"
+    bpt_expect_contains "L5: own plus foreign names foreign" "(pid: 5151 )" "$PG_ERR"
+    bpt_expect_absent "L5: own plus foreign omits own" "4242" "$PG_ERR"
+
+    pg_case '[{"name":"ibl-bug-bot","pid":4242}]' $'4242\n'
+    bpt_expect_eq "L6: name match exact rc" "1" "$PG_RC"
+    bpt_expect_contains "L6: name match exact wording" "(pid: 4242 )" "$PG_ERR"
+else
+    bpt_fail "L0: lsof guard region extraction — $(cat "$T/pg-extract-err")"
+fi
+
+# L7: the anchor check itself fails loudly on a deleted or duplicated anchor.
+grep -vF -- "$PG_START" "$TESTENV_BIN" > "$T/anchor-deleted.sh"
+pg_extract "$T/anchor-deleted.sh" "$T/anchor-out" 2>"$T/anchor-err-a"; A_RC=$?
+BPE_O="$PG_END" awk '{print} index($0,ENVIRON["BPE_O"]){print}' "$TESTENV_BIN" > "$T/anchor-dup.sh"
+pg_extract "$T/anchor-dup.sh" "$T/anchor-out" 2>"$T/anchor-err-b"; B_RC=$?
+bpt_expect_eq "L7: deleted anchor rc" "1" "$A_RC"
+bpt_expect_contains "L7: deleted anchor message" "ANCHOR:" "$(cat "$T/anchor-err-a")"
+bpt_expect_eq "L7: duplicated anchor rc" "1" "$B_RC"
+bpt_expect_contains "L7: duplicated anchor message" "ANCHOR:" "$(cat "$T/anchor-err-b")"
+
+# ═══ E0-E6, G, S, C: bin/bug-pipeline-e2e copied under $T with two literals rewritten ═
+mkdir -p "$T/bin" "$T/ibl5" "$T/stubs/bin" "$T/e2estub" "$T/home"
+cp "$E2E_BIN" "$T/bin/bug-pipeline-e2e"
+E0_OK=1
+bpe_rewrite_once "$T/bin/bug-pipeline-e2e" 'ENV_FILE=/tmp/bug-pipeline-test-env.sh' "ENV_FILE=$T/env.sh" || E0_OK=0
+bpe_rewrite_once "$T/bin/bug-pipeline-e2e" '/tmp/bug-pipeline-test-stubs/bin/' "$T/stubs/bin/" || E0_OK=0
+if cmp -s "$E2E_BIN" "$T/bin/bug-pipeline-e2e"; then E0_OK=0; fi
+if [ "$(grep -cF '/tmp/bug-pipeline-test-stubs/' "$T/bin/bug-pipeline-e2e")" -ne 0 ]; then E0_OK=0; fi
+
+if [ "$E0_OK" -ne 1 ]; then
+    bpt_fail "E0: copy rewritten off the shared /tmp paths — skipping E/G/S/C"
+else
+    bpt_ok "E0: copy rewritten off the shared /tmp paths"
+
+    printf '%s\n' 'echo BPE_STUB_PHP_REACHED >&2' 'exit 97'    > "$T/e2estub/php"
+    printf '%s\n' 'echo BPE_STUB_DOCKER_REACHED >&2' 'exit 98' > "$T/e2estub/docker"
+    chmod 755 "$T/e2estub/php" "$T/e2estub/docker"
+
+    claude_stub() { printf '%s\n' '#!/bin/sh' "printf '%s\\n' '$1'" > "$T/stubs/bin/claude"; chmod 755 "$T/stubs/bin/claude"; }
+    claude_stub '{"is_error":false,"result":{}}'
+    for s in gh wt-new post-plan-now discord-dm; do
+        printf '%s\n' '#!/bin/sh' 'exit 0' > "$T/stubs/bin/$s"; chmod 755 "$T/stubs/bin/$s"
+    done
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$T/stubs/bin/noexec"; chmod 644 "$T/stubs/bin/noexec"
+
+    {
+        printf "export %s='%s'\n" DB_NAME ibl5_bug_pipeline_test
+        printf "export %s='%s'\n" BOT_BASE_URL http://127.0.0.1:50002
+        printf "export %s='%s'\n" BUG_PIPELINE_CODE_REPO bpe-fixture/code
+        printf "export %s='%s'\n" BUG_PIPELINE_ISSUE_REPO bpe-fixture/issues
+        printf "export %s='%s'\n" BUG_PIPELINE_PLANS_DIR /tmp/bpe-fixture-plans
+        printf "export %s='%s'\n" BUG_PIPELINE_WT_BASE /tmp/bug-pipeline-test-worktrees
+        printf "export %s='%s'\n" BUG_PIPELINE_CI_AUTOFIX_ENABLED 0
+        printf "export %s='%s'\n" BUG_PIPELINE_TICK_HEARTBEAT /tmp/bpe-fixture/heartbeat
+        printf "export %s='%s'\n" BUG_PIPELINE_CI_AUTOFIX_LEDGER /tmp/bpe-fixture/ledger
+        printf "export %s='%s'\n" BUG_PIPELINE_CI_AUTOFIX_LOG /tmp/bpe-fixture/log
+        printf "export %s='%s'\n" BUG_PIPELINE_CI_AUTOFIX_LOCK /tmp/bpe-fixture/lock
+        printf "export %s='%s'\n" BUG_PIPELINE_CI_AUTOFIX_WT_REPO /tmp/bpe-fixture/wt-repo
+        printf "export %s='%s'\n" CLAUDE_BIN "$T/stubs/bin/claude"
+        printf "export %s='%s'\n" GH_BIN "$T/stubs/bin/gh"
+        printf "export %s='%s'\n" BUG_PIPELINE_WT_NEW_BIN "$T/stubs/bin/wt-new"
+        printf "export %s='%s'\n" BUG_PIPELINE_POST_PLAN_NOW_BIN "$T/stubs/bin/post-plan-now"
+        printf "export %s='%s'\n" BUG_PIPELINE_DM_BIN "$T/stubs/bin/discord-dm"
+    } > "$T/env.base"
+
+    bpe_env() {   # <spec>...: -KEY drops the line (unset); KEY=val sets it (KEY= sets empty)
+        local spec key
+        cp "$T/env.base" "$T/env.sh"
+        for spec in "$@"; do
+            case "$spec" in
+                -*)  key="${spec#-}" ;;
+                *=*) key="${spec%%=*}" ;;
+                *)   continue ;;
+            esac
+            grep -v "^export $key=" "$T/env.sh" > "$T/env.tmp"; mv "$T/env.tmp" "$T/env.sh"
+            case "$spec" in
+                *=*) printf "export %s='%s'\n" "$key" "${spec#*=}" >> "$T/env.sh" ;;
+            esac
+        done
+    }
+
+    BPE_SCRIPT="$T/bin/bug-pipeline-e2e"
+    RC=0; OUT=""; ERR=""
+    bpe_run() {   # <gate: 1|0|none> <args...>; sets RC OUT ERR. env -i keeps a developer's exports out.
+        local gate="$1"; shift
+        if [ "$gate" = none ]; then
+            OUT=$(env -i PATH="$T/e2estub:$BASE_PATH" HOME="$T/home" bash "$BPE_SCRIPT" "$@" 2>"$T/err")
+        else
+            OUT=$(env -i PATH="$T/e2estub:$BASE_PATH" HOME="$T/home" BUG_PIPELINE_E2E="$gate" bash "$BPE_SCRIPT" "$@" 2>"$T/err")
+        fi
+        RC=$?; ERR=$(cat "$T/err")
+    }
+    bpe_guard() {  # <label> <detail> <spec>...; asserts rc 1 + exact guard line + php stub not reached
+        local label="$1" detail="$2"
+        shift 2
+        bpe_env "$@"; bpe_run 1
+        bpt_expect_eq "$label rc" "1" "$RC"
+        bpt_expect_contains "$label wording" "PRODUCTION-CONTACT GUARD: $detail" "$ERR"
+        bpt_expect_absent "$label stopped before php" "BPE_STUB_PHP_REACHED" "$ERR"
+    }
+
+    # ── E: gate, argv, env file, positive control ──
+    rm -f "$T/env.sh"
+    bpe_run none
+    bpt_expect_eq "E1: gate unset rc" "0" "$RC"
+    bpt_expect_contains "E1: gate unset SKIP" "SKIP: set BUG_PIPELINE_E2E=1 to run (drives real DB writes + a real tick)" "$OUT"
+    bpe_run 0
+    bpt_expect_eq "E2: gate 0 rc" "0" "$RC"
+    bpt_expect_contains "E2: gate 0 SKIP" "SKIP: set BUG_PIPELINE_E2E=1 to run (drives real DB writes + a real tick)" "$OUT"
+    bpe_run 1 --bogus
+    bpt_expect_eq "E3: unknown option rc" "2" "$RC"
+    bpt_expect_contains "E3: unknown option wording" "unknown option: --bogus" "$ERR"
+    bpe_run 1 '' extra
+    bpt_expect_eq "E4: extra args rc" "2" "$RC"
+    bpt_expect_contains "E4: extra args wording" "unexpected extra arguments" "$ERR"
+    rm -f "$T/env.sh"
+    bpe_run 1
+    bpt_expect_eq "E5: missing env file rc" "1" "$RC"
+    bpt_expect_contains "E5: missing env file wording" "missing $T/env.sh — run bin/bug-pipeline-test-env first" "$ERR"
+    bpe_env
+    bpe_run 1
+    bpt_expect_eq "E6: positive control rc (stops at php stub)" "97" "$RC"
+    bpt_expect_contains "E6: positive control reaches php stub" "BPE_STUB_PHP_REACHED" "$ERR"
+    bpt_expect_absent "E6: positive control no guard fired" "PRODUCTION-CONTACT GUARD" "$ERR"
+    bpt_expect_absent "E6: positive control no missing-env" "missing" "$ERR"
+
+    # ── G: production-contact guard ──
+    bpe_guard "G1: DB_NAME unset"  "DB_NAME='<unset>'" -DB_NAME
+    bpe_guard "G2: DB_NAME empty"  "DB_NAME='<unset>'" DB_NAME=
+    bpe_guard "G3: DB_NAME prod"   "DB_NAME='iblhoops_ibl5'" DB_NAME=iblhoops_ibl5
+    bpe_guard "G4: BOT_BASE_URL unset" "BOT_BASE_URL='<unset>'" -BOT_BASE_URL
+    bpe_guard "G5: BOT_BASE_URL 50001" "BOT_BASE_URL='http://127.0.0.1:50001'" BOT_BASE_URL=http://127.0.0.1:50001
+
+    # G6: the *50001* arm is shadowed by the exact-equality line, so run a copy without that line.
+    mkdir -p "$T/bin-shadow"
+    SHADOW_ANCHOR="[ \"\${BOT_BASE_URL:-}\" = 'http://127.0.0.1:50002' ]"
+    if [ "$(grep -cF -- "$SHADOW_ANCHOR" "$T/bin/bug-pipeline-e2e")" -ne 1 ]; then
+        bpt_fail "G6 anchor: BOT_BASE_URL equality line not found exactly once"
+    else
+        BPE_O="$SHADOW_ANCHOR" awk 'index($0,ENVIRON["BPE_O"])==0' "$T/bin/bug-pipeline-e2e" > "$T/bin-shadow/bug-pipeline-e2e"
+        BPE_SCRIPT="$T/bin-shadow/bug-pipeline-e2e"
+        bpe_guard "G6: shadowed 50001 arm" "BOT_BASE_URL is the production bug-bot" BOT_BASE_URL=http://127.0.0.1:50001
+        BPE_SCRIPT="$T/bin/bug-pipeline-e2e"
+    fi
+
+    bpe_guard "G7: code repo real"   "code repo is real"  BUG_PIPELINE_CODE_REPO=a-jay85/IBL5
+    bpe_guard "G8: issue repo real"  "issue repo is real" BUG_PIPELINE_ISSUE_REPO=a-jay85/IBL5-backlog
+    bpe_guard "G9: PLANS_DIR real"   "PLANS_DIR is the real plans dir" "BUG_PIPELINE_PLANS_DIR=$T/home/claude-plans"
+    bpe_guard "G10: PLANS_DIR empty" "PLANS_DIR is the real plans dir" BUG_PIPELINE_PLANS_DIR=
+    bpe_guard "G11: PLANS_DIR unset" "PLANS_DIR is the real plans dir" -BUG_PIPELINE_PLANS_DIR
+    bpe_guard "G12: WT_BASE unset"   "WT_BASE='<unset>'" -BUG_PIPELINE_WT_BASE
+    bpe_guard "G13: WT_BASE wrong"   "WT_BASE='/tmp/other'" BUG_PIPELINE_WT_BASE=/tmp/other
+    bpe_guard "G14: CI_AUTOFIX_ENABLED 1"     "CI_AUTOFIX_ENABLED='1' (must be 0)" BUG_PIPELINE_CI_AUTOFIX_ENABLED=1
+    bpe_guard "G15: CI_AUTOFIX_ENABLED unset" "CI_AUTOFIX_ENABLED='<unset>' (must be 0)" -BUG_PIPELINE_CI_AUTOFIX_ENABLED
+
+    # Seam values are a literal /var/... path: a $T-based value sits under /tmp on the Linux runner.
+    bpe_guard "G16: TICK_HEARTBEAT off /tmp"     "TICK_HEARTBEAT='/var/bpe-fixture/heartbeat' is not under /tmp"       BUG_PIPELINE_TICK_HEARTBEAT=/var/bpe-fixture/heartbeat
+    bpe_guard "G17: CI_AUTOFIX_LEDGER off /tmp"  "CI_AUTOFIX_LEDGER='/var/bpe-fixture/ledger' is not under /tmp"       BUG_PIPELINE_CI_AUTOFIX_LEDGER=/var/bpe-fixture/ledger
+    bpe_guard "G18: CI_AUTOFIX_LOG off /tmp"     "CI_AUTOFIX_LOG='/var/bpe-fixture/log' is not under /tmp"             BUG_PIPELINE_CI_AUTOFIX_LOG=/var/bpe-fixture/log
+    bpe_guard "G19: CI_AUTOFIX_LOCK off /tmp"    "CI_AUTOFIX_LOCK='/var/bpe-fixture/lock' is not under /tmp"           BUG_PIPELINE_CI_AUTOFIX_LOCK=/var/bpe-fixture/lock
+    bpe_guard "G20: CI_AUTOFIX_WT_REPO off /tmp" "CI_AUTOFIX_WT_REPO='/var/bpe-fixture/wt-repo' is not under /tmp"     BUG_PIPELINE_CI_AUTOFIX_WT_REPO=/var/bpe-fixture/wt-repo
+    bpe_guard "G21: TICK_HEARTBEAT unset"        "TICK_HEARTBEAT='<unset>' is not under /tmp"                          -BUG_PIPELINE_TICK_HEARTBEAT
+
+    # ── S: stub wiring ──
+    S_N=0
+    for v in CLAUDE_BIN GH_BIN BUG_PIPELINE_WT_NEW_BIN BUG_PIPELINE_POST_PLAN_NOW_BIN BUG_PIPELINE_DM_BIN; do
+        S_N=$(( S_N + 1 ))
+        bpe_guard "S$S_N-a: $v outside stub dir" "$v='/usr/bin/true' is not a stub" "$v=/usr/bin/true"
+        bpe_guard "S$S_N-b: $v not executable"   "$v='$T/stubs/bin/noexec' is not executable" "$v=$T/stubs/bin/noexec"
+    done
+    bpe_guard "S11: GH_BIN unset" "GH_BIN='' is not a stub" -GH_BIN
+
+    # ── C: claude envelope ──
+    ENV_MSG='CLAUDE_BIN does not emit the {"is_error":false,"result":{...}} envelope'
+    claude_stub '{"is_error":true,"result":{}}'
+    bpe_guard "C1: is_error true"   "$ENV_MSG"
+    claude_stub '{"is_error":false,"result":"x"}'
+    bpe_guard "C2: string result"   "$ENV_MSG"
+    claude_stub 'not json'
+    bpe_guard "C3: non-JSON output" "$ENV_MSG"
+    claude_stub '{"is_error":false,"result":{}}'
+fi
+
+echo "passed=$PASSED failed=$FAILED"
+[ "$FAILED" -eq 0 ] || exit 1
+exit 0

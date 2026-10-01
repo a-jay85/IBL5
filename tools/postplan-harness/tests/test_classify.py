@@ -1,4 +1,5 @@
 import ast
+import copy as copy_module
 import json
 import os
 import pathlib
@@ -13,9 +14,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from harness.armable import (SENTINEL_RE, _manual_section, all_rows_ticked,
                              manual_testing_clearance)
 from harness.classify import (_manual_testing_span, classify, files_from_diff, filter_diff,
+                               is_gm_visible_path,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END, MANUAL_TESTING_SENTINEL,
                                MANUAL_TESTING_SENTINEL_STATIC,
-                               name_status_from_diff, qualify_backlog_refs,
+                               name_status_from_diff, qualify_backlog_refs, rename_sources_from_diff,
                                render_files_changed,
                                render_reviewer_verification,
                                retro_registry_row_from_diff,
@@ -251,6 +253,25 @@ def test_name_status_from_diff():
         ("M", "ibl5/modified.php"),
         ("D", "ibl5/deleted.php"),
         ("R", "ibl5/old-name.php → ibl5/new-name.php"),
+    ]
+
+
+def test_rename_sources_from_diff_lists_old_path_only():
+    """Mutation caught: key on the `diff --git` header, or return `[]`."""
+    assert rename_sources_from_diff(NAME_STATUS_DIFF) == ["ibl5/old-name.php"]
+
+
+def test_rename_sources_from_diff_ignores_delete_and_add():
+    """Mutation caught: also collect `deleted file mode` a-side paths."""
+    got = rename_sources_from_diff(NAME_STATUS_DIFF)
+    assert "ibl5/deleted.php" not in got
+    assert "ibl5/added.php" not in got
+
+
+def test_files_from_diff_unchanged_by_rename_sources():
+    """Mutation caught: make `files_from_diff` add a-side paths."""
+    assert files_from_diff(NAME_STATUS_DIFF) == [
+        "ibl5/added.php", "ibl5/modified.php", "ibl5/deleted.php", "ibl5/new-name.php",
     ]
 
 
@@ -739,7 +760,10 @@ def test_restore_in_section_insert_when_not_last_is_reverted():
 # commit_subject: coercion (decoration layer) and schema validation
 # ---------------------------------------------------------------------------
 
-from harness.schemas import coerce_commit_subject, validate_pr_copy
+from harness.schemas import (
+    coerce_commit_subject, coerce_copy_type, coerce_pr_copy, retype_tooling_feat,
+    validate_pr_copy,
+)
 from harness.state import Classification, HarnessError
 
 
@@ -779,6 +803,125 @@ def test_coerce_commit_subject_preserves_scope_and_bang():
 def test_coerce_commit_subject_unparseable_returns_unchanged():
     for subject in ("no type prefix here", "FEAT: uppercase type"):
         assert coerce_commit_subject(subject, _flagged(test_only=True)) == subject
+
+
+# has_gm_visible: non-runtime denylist (Phase 1 of pr-copy-tooling-not-feat)
+
+def test_is_gm_visible_path_denylist_table():
+    """Every `_NON_RUNTIME` alternative is pinned: dropping `*.md` handling (`\\.md$`) flips the
+    SimRecap README row, dropping `^[^/]+$` flips README.md."""
+    cases = [
+        ("bin/post-plan-now", False),
+        ("bin/test-burndown", False),
+        ("tools/postplan-harness/runner.py", False),
+        (".claude/rules/x.md", False),
+        (".github/workflows/ci.yml", False),
+        ("README.md", False),
+        (".gitignore", False),
+        ("ibl5/tests/Foo/BarTest.php", False),
+        ("ibl5/docs/decisions/0106-x.md", False),
+        ("ibl5/bin/x", False),
+        ("ibl5/phpstan-rules/Foo.php", False),
+        ("ibl5/phpstan.neon", False),
+        ("ibl5/phpunit.xml", False),
+        ("ibl5/playwright.config.ts", False),
+        ("ibl5/package.json", False),
+        ("ibl5/composer.lock", False),
+        ("ibl5/bun.lock", False),
+        ("ibl5/vendor/x.php", False),
+        ("ibl5/classes/SimRecap/README.md", False),
+        ("engine/internal/sim/a_test.go", False),
+        ("", False),
+        ("  ", False),
+        ("ibl5/classes/SimRecap/RecapPhasePolicy.php", True),
+        ("ibl5/modules/Trades/index.php", True),
+        ("ibl5/scripts/import.php", True),
+        ("ibl5/shellScripts/sim.sh", True),
+        ("ibl5/migrations/001_x.sql", True),
+        ("ibl5/design/x.css", True),
+        ("engine/internal/sim/a.go", True),
+        ("engine/internal/sim/testdata/golden.json", True),
+        ("newroot/whatever.txt", True),
+    ]
+    for path, expected in cases:
+        assert is_gm_visible_path(path) is expected, path
+
+
+def test_classify_sets_has_gm_visible_and_summary_prints_it():
+    c = classify(["bin/x", ".claude/rules/y.md"], "")
+    assert c.has_gm_visible is False
+    assert "HAS_GM_VISIBLE=False" in c.summary()
+    c = classify(["bin/x", "ibl5/classes/A.php"], "")
+    assert c.has_gm_visible is True
+    assert "HAS_GM_VISIBLE=True" in c.summary()
+
+
+def test_has_gm_visible_is_independent_of_only_flag_ladder():
+    """has_gm_visible is derived outside the `*_only` ladder (docs_only/test_only/non_code_only),
+    so the order-sensitive `*_only` flags and `coerce_commit_subject` stay untouched."""
+    c = classify(["ibl5/tests/ATest.php"], "")
+    assert c.test_only is True and c.has_gm_visible is False
+    c = classify(["ibl5/classes/A.php", "ibl5/tests/ATest.php"], "")
+    assert c.test_only is False and c.has_gm_visible is True
+    assert classify([], "").has_gm_visible is False
+
+
+# tooling rule: feat -> chore when no GM-visible file (Phase 2 of pr-copy-tooling-not-feat)
+
+def test_retype_tooling_feat_table():
+    tooling = _flagged(count_total=2)
+    mixed = _flagged(count_total=3, has_gm_visible=True)
+    cases = [
+        ("feat: add fleet status", tooling, "chore: add fleet status"),
+        ("feat: add fleet status", mixed, "feat: add fleet status"),
+        ("fix: x", _flagged(count_total=1), "fix: x"),
+        ("chore: x", _flagged(count_total=1), "chore: x"),
+        ("refactor: x", _flagged(count_total=1), "refactor: x"),
+        ("feat: x", _flagged(count_total=0), "feat: x"),
+        ("feat(harness)!: x", _flagged(count_total=1), "chore(harness)!: x"),
+        ("FEAT: x", _flagged(count_total=1), "FEAT: x"),
+        ("no type here", _flagged(count_total=1), "no type here"),
+    ]
+    for subject, cls, expected in cases:
+        assert retype_tooling_feat(subject, cls) == expected, (
+            f"{subject!r} count_total={cls.count_total} gm_visible={cls.has_gm_visible}")
+
+
+def test_coerce_copy_type_runs_ladder_before_tooling_rule():
+    cases = [
+        (_flagged(test_only=True, count_total=1), "test: x"),
+        (_flagged(docs_only=True, non_code_only=True, count_total=1), "docs: x"),
+        (_flagged(non_code_only=True, count_total=1), "chore: x"),
+        (_flagged(count_total=1), "chore: x"),
+        (_flagged(count_total=1, has_gm_visible=True), "feat: x"),
+    ]
+    for cls, expected in cases:
+        assert coerce_copy_type("feat: x", cls) == expected, vars(cls)
+
+
+def test_coerce_pr_copy_retypes_title_subject_and_type():
+    copy = {"type": "feat", "title": "feat: add fleet status",
+            "commit_subject": "feat: add fleet status", "summary_md": "## Summary\n- x\n"}
+    out = coerce_pr_copy(copy, _flagged(count_total=2))
+    assert out["type"] == "chore"
+    assert out["title"].startswith("chore: ")
+    assert out["commit_subject"].startswith("chore: ")
+    assert out["summary_md"] == "## Summary\n- x\n"
+    validate_pr_copy(out)
+
+
+def test_coerce_pr_copy_leaves_mixed_diff_and_typeless_dicts_alone():
+    copy = {"type": "feat", "title": "feat: add fleet status",
+            "commit_subject": "feat: add fleet status", "summary_md": "## Summary\n- x\n"}
+    before = copy_module.deepcopy(copy)
+    out = coerce_pr_copy(copy, _flagged(count_total=2, has_gm_visible=True))
+    assert out == before
+
+    typeless = {"title": "feat: x", "commit_subject": "feat: x", "summary_md": ""}
+    out = coerce_pr_copy(typeless, _flagged(count_total=1))
+    assert out["title"] == "chore: x"
+    assert out["commit_subject"] == "chore: x"
+    assert "type" not in out
 
 
 def _valid_pr_copy() -> dict:

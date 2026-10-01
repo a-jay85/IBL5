@@ -8,6 +8,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.conformance import check, phase_omission_items
+from harness.planfile import parse_phases
 from harness.state import PhaseInfo, PlanInfo
 
 
@@ -465,19 +466,23 @@ def test_adr_glob_token_gets_no_tolerance():
     assert any("MISSING-FILE" in i and "0134-*.md" in i for i in items)
 
 
-def test_adr_placeholder_token_gets_no_tolerance():
+def test_adr_placeholder_token_resolves_to_single_numbered_file():
     """Real corpus shape `ibl5/docs/decisions/NNNN-<slug>.md` (the number
-    placeholder the architect contract prescribes) → `NNNN` is not four digits
-    → `_ADR_RENUMBER` does not match the token → MISSING-FILE.
+    placeholder the architect contract prescribes, PR #2549) → `_ADR_TOKEN`
+    accepts the literal `NNNN` on the token side → resolves to the one changed
+    `0140-<slug>.md` → no MISSING-FILE.
 
-    Mutation caught: widen the token-side digit class to `[\\dN]{4}` (or
-    `\\w{4}`) so a placeholder resolves against the real numbered file, and
-    the item clears; this assertion turns red.
+    Mutation caught: revert `_renumbered_adr` to match the token with
+    `_ADR_RENUMBER` (`\\d{4}` only) and the placeholder never resolves; the
+    empty-items assertion turns red.
     """
     tok = "ibl5/docs/decisions/NNNN-discord-dev-webhook-notify.md"
     plan = _plan_with_critical(tok)
-    items = check(plan, ["ibl5/docs/decisions/0140-discord-dev-webhook-notify.md"])
-    assert any("MISSING-FILE" in i and "NNNN-discord-dev-webhook-notify.md" in i for i in items)
+    resolutions: dict[str, str] = {}
+    items = check(plan, ["ibl5/docs/decisions/0140-discord-dev-webhook-notify.md"],
+                  resolutions=resolutions)
+    assert items == []
+    assert resolutions[tok] == "ibl5/docs/decisions/0140-discord-dev-webhook-notify.md"
 
 
 def test_phase_omission_end_to_end_positive_and_negative():
@@ -530,3 +535,13 @@ No backticked path here.
     # positive: both phases shipped → no MISSING-PHASE items
     items_pos = check(plan_info, ["harness/a.py", "harness/b.py"])
     assert not any(i.startswith("MISSING-PHASE:") for i in items_pos)
+
+
+def test_line_suffixed_evidence_citation_matches_changed_file():
+    """A plan citing `bin/check-prose:438-457` must not yield MISSING-PHASE when the file changed.
+
+    Mutation caught: dropping the line-suffix strip in _phase_evidence_paths.
+    """
+    phases = parse_phases("## Phase 1: Foo\n\nEdit `bin/check-prose:438-457`.\n")
+    plan = _plan_with_phases(phases)
+    assert phase_omission_items(plan, ["bin/check-prose"]) == []

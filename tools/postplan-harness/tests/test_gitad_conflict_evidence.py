@@ -120,6 +120,30 @@ def test_llm_less_abort_names_conflicted_paths(repo_with_origin):
     assert _no_rebase_in_progress(d)
 
 
+def test_probe_last_conflict_files_agree_with_rebase_snapshot(repo_with_origin):
+    """The stage-recording probe still fills last_conflict_files with the same sorted path
+    tuple the real rebase snapshots afterwards. Guards the LiveGit consumers that read
+    last_conflict_files (this file: tests/test_gitad_conflict_evidence.py).
+
+    Mutation caught: drop the `self.last_conflict_files = tuple(sorted(conflicted))`
+    assignment in predict_rebase_conflict -> the probe assertion sees ().
+    """
+    d = repo_with_origin
+    _commit(d, "x.txt", "shared\n", "X0")
+    sh(d, "update-ref", "refs/remotes/origin/master", _sha(d))
+    x0 = _sha(d)
+    sh(d, "checkout", "-b", "feat")
+    _commit(d, "x.txt", "feat side\n", "F1")
+    _publish_as_origin_master(d, x0, "x.txt", "trunk side\n", "T1")
+
+    g = LiveGit(d)
+    assert g.predict_rebase_conflict("origin/master") == ("x.txt",)
+    assert g.last_conflict_files == ("x.txt",)
+    with pytest.raises(HarnessError):
+        g.rebase_onto("origin/master")
+    assert g.last_conflict_files == ("x.txt",)
+
+
 def test_llm_path_snapshot_survives_unresolvable_inventory(repo_with_origin):
     """LLM present but never called: feat DELETES x.txt while origin/master modifies it.
 

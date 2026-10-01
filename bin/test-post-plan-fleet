@@ -2578,7 +2578,8 @@ JSON
 _rdate="$(date +%F)"
 rm -f /tmp/post-plan-fleet-310{1,2,3}.log
 TMP_LOGS+=("/tmp/post-plan-fleet-3101.log" "/tmp/post-plan-fleet-3102.log" "/tmp/post-plan-fleet-3103.log")
-printf 'post-plan-now: RESULT paused (usage gate); auto-resumes after reset.\n' > /tmp/post-plan-fleet-3103.log
+printf '%s\n' 'RESULT: post-plan PAUSED at review (usage gate); the usage-gate coordinator resumes it after the reset.' \
+  'post-plan-now: RESULT paused (usage gate); auto-resumes after reset.' > /tmp/post-plan-fleet-3103.log
 out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/gate-open.json" POST_PLAN_FLEET_WTL="$SCRATCH/gate-wtl.txt" \
        POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --jobs 5 2>&1)"; rc=$?
 [[ $rc -eq 0 ]] || fail "usage-gate-paused: exit $rc (out: $out)"

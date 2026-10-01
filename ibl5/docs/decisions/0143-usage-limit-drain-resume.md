@@ -1,6 +1,6 @@
 ---
 description: Usage-limit drain, pause, and auto-resume for headless runners via an env-gated PreToolUse hook, pause markers, a drain token, and a launchd coordinator.
-last_verified: 2026-10-01
+last_verified: 2026-09-30
 ---
 
 # ADR-0143: Usage-limit drain, pause, and auto-resume
@@ -48,3 +48,13 @@ Two changes follow.
 2. The stale-usage fail-open rule changes for `usage_gate_decide` and `usage_prestart_gate`. The gate is blind when the live fetch fails and the cache is 300 s old or more. A blind gate now trusts the last reading when its zone is drain or stop and the limiting window's `resets_at` is still in the future. It acts on that reading exactly as on a fresh one, through the same `usage_marker_write` path, so the invariant stands: no pause output without a marker on disk. It logs `blind-trust zone=<z> age=<n>` and skips the delta log. The gate still fails open when the last reading is in the normal zone, when no reading exists, and when `resets_at` has passed, is missing, or cannot be parsed. A passed reset must not strand work behind a blind gate.
 
 The coordinator is unchanged. Its stale branch only resumes markers whose `resets_at` has passed, so it already errs toward waiting. The max_age values (45, 60 and 120 s) also stay. Failed fetches drove the stampede, and a longer max_age would only add staleness to a zone decision near the 93% threshold.
+
+## Addendum (2026-09-30): the post-plan harness joins the gate
+
+This addendum narrows one sentence of the Decision. The post-plan harness now runs gated. The skill leg's `GATE_ENV` is unchanged.
+
+- `bin/post-plan-now` exports three context vars into the harness launch: `IBL5_USAGE_GATE_RUNNER`, `IBL5_USAGE_GATE_RESUME_BIN`, and `IBL5_USAGE_GATE_SESSION_ID`, the run's session id S. It does not export `IBL5_USAGE_GATE=1`. The harness adapter sets that flag on its own `claude` children after it validates the context. An older harness, such as the main checkout during version skew, therefore runs ungated as before.
+- `usage_gate_decide` keys the marker, the drain-token check, and the delta row on `IBL5_USAGE_GATE_SESSION_ID` when it is set. Unset keeps the hook's own session id. Set-but-empty or a malformed value fails open, because a marker keyed on a child session would have no saved argv and would strand.
+- Toolless harness calls cannot fire the PreToolUse hook, so the adapter runs the same `usage_gate_decide` before every spawn. A pause stops every harness thread at its next call. The harness exits 75 only while a marker for S is on disk, and it clears that marker on every other exit.
+- A harness pause raised while a tooled edit left the worktree changed is fail-closed. The harness clears the marker and exits 3 for a human, since a resumed run would otherwise commit a partial edit.
+- Resume replays `post-plan-now --resume-paused S`. The harness has no resumable state, so the run re-enters at its start. Git and GitHub steps are already idempotent on re-entry. Review-comment posts are skipped when an earlier launch under the same S already posted them at the same head, using a ledger at `runs/<S>.effects.json` in the gate state dir.

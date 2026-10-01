@@ -242,7 +242,10 @@ def test_harness_marker_write_failure_stays_blocked(tmp_path):
     body = """\
 . "$(dirname "$IBL5_USAGE_GATE_RESUME_BIN")/lib/usage-gate.sh"
 usage_marker_write "$IBL5_USAGE_GATE_SESSION_ID" post-plan-now \
-  /nonexistent/not-executable usage-pause stop 100 five_hour "" || exit 3
+  /nonexistent/not-executable usage-pause stop 100 five_hour "" || {
+  echo "You've hit your weekly limit"    # limit text in the log must not turn an rc 3 into a pause
+  exit 3
+}
 exit 75"""
     run = _run_foreground_with(tmp_path, body)
     assert run.r.returncode == 3, f"stdout={run.r.stdout!r} stderr={run.r.stderr!r}"

@@ -266,6 +266,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _active_git = git
         slug = git.branch()
         gh = LiveGh(out_dir, worktree, slug) if live else RecordingGh(out_dir)
+        gh = usage_pause.dedupe_on_resume(gh, worktree, out_dir)   # ADR-0143 addendum: no double post on resume
         verifier = LiveVerify(worktree)
         if probe is None:
             probe = LiveProbe(repo_root=worktree)
@@ -2611,6 +2612,8 @@ def main() -> int:
     t = ledger.totals()
     rc = exit_code_for(res)
     rc = _settle_pause_marker(res, rc)
+    if rc != PAUSE_EXIT:
+        usage_pause.ledger_clear()
     # First line, so `head -1 <log>` is the whole verdict and bin/watch-run can
     # terminate on it without waiting for the launchd label to disappear.
     print(verdict_line(res, rc, _pull_url_base(args.worktree)))

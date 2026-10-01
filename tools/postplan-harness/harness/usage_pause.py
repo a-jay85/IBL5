@@ -14,6 +14,10 @@ import json
 import os
 import re
 import subprocess
+import sys
+import tempfile
+import threading
+import time
 from dataclasses import dataclass
 
 _SID_RE = re.compile(
@@ -148,3 +152,116 @@ def worktree_fingerprint(cwd: str) -> str | None:
     except (OSError, subprocess.CalledProcessError):
         return None
     return hashlib.sha256("\0".join([head, tree, pairs, ",".join(ops)]).encode()).hexdigest()
+
+
+# ---------------------------------------------------------------- resume dedupe
+# A resumed run re-enters run() under the same S with a fresh out_dir. Every other
+# side effect on that path is idempotent at GitHub or git; these two create a new
+# PR comment per call, so a resume would double-post them.
+DEDUPED_METHODS = ("post_review_findings", "post_review_summary")
+_TITLE_ARG = {"post_review_findings": 2, "post_review_summary": 1}
+
+
+def _ledger_path(ctx: GateContext) -> str | None:
+    sd = state_dir(ctx)
+    return None if sd is None else os.path.join(sd, "runs", f"{ctx.session_id}.effects.json")
+
+
+class EffectLedger:
+    """runs/<S>.effects.json: the deduped posts made by any launch under S."""
+
+    def __init__(self, path: str, run_id: str):
+        self.path = path
+        self.run_id = run_id
+        self._lock = threading.Lock()
+
+    def _load(self) -> list:
+        try:
+            with open(self.path) as fh:
+                data = json.load(fh)
+            return data if isinstance(data, list) else []
+        except (OSError, ValueError):
+            return []
+
+    def earlier(self, key: str) -> tuple[bool, object]:
+        """(True, result) only for an entry under this key from a DIFFERENT run."""
+        with self._lock:
+            for e in self._load():
+                if e.get("key") == key and e.get("run_id") != self.run_id:
+                    return True, e.get("result")
+        return False, None
+
+    def record(self, key: str, result) -> None:
+        try:
+            json.dumps(result)
+        except (TypeError, ValueError):
+            result = None
+        with self._lock:
+            entries = self._load()
+            entries.append({"key": key, "run_id": self.run_id, "result": result,
+                            "ts": time.time()})
+            try:
+                os.makedirs(os.path.dirname(self.path), exist_ok=True)
+                fd, tmp = tempfile.mkstemp(dir=os.path.dirname(self.path), suffix=".tmp")
+                with os.fdopen(fd, "w") as fh:
+                    json.dump(entries, fh)
+                os.replace(tmp, self.path)
+            except OSError:
+                pass
+
+
+class _DedupingGh:
+    """gh proxy: the two comment posts skip a key an earlier launch under S already
+    posted at this HEAD; every other attribute passes straight through."""
+
+    def __init__(self, inner, ledger: EffectLedger, worktree: str):
+        self._inner = inner
+        self._ledger = ledger
+        self._worktree = worktree
+
+    def __getattr__(self, name):
+        target = getattr(self._inner, name)
+        if name not in DEDUPED_METHODS:
+            return target
+
+        def wrapper(*args, **kwargs):
+            try:
+                head = _git(self._worktree, "rev-parse", "HEAD").strip()
+            except (OSError, subprocess.CalledProcessError):
+                return target(*args, **kwargs)   # fail toward a duplicate, never a gap
+            i = _TITLE_ARG[name]
+            title = args[i] if len(args) > i and isinstance(args[i], str) else kwargs.get("title", "")
+            key = hashlib.sha256("\0".join(
+                [name, str(args[0]) if args else str(kwargs.get("pr", "")), head, str(title)]
+            ).encode()).hexdigest()
+            seen, stored = self._ledger.earlier(key)
+            if seen:
+                print(f"resume: skipped duplicate {name}", file=sys.stderr)
+                return stored
+            result = target(*args, **kwargs)
+            self._ledger.record(key, result)
+            return result
+
+        return wrapper
+
+
+def dedupe_on_resume(gh, worktree: str, out_dir: str):
+    ctx, _ = context_from_env()
+    if ctx is None:
+        return gh
+    path = _ledger_path(ctx)
+    if path is None:
+        return gh
+    return _DedupingGh(gh, EffectLedger(path, os.path.abspath(out_dir)), worktree)
+
+
+def ledger_clear() -> None:
+    ctx, _ = context_from_env()
+    if ctx is None:
+        return
+    path = _ledger_path(ctx)
+    if path is not None:
+        try:
+            os.remove(path)
+        except OSError:
+            pass

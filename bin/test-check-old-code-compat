@@ -39,8 +39,8 @@ for arg in "$@"; do
     esac
 done
 
-if [ "$MODE" = "db" ]; then
-    echo "ERROR: --db not implemented yet" >&2
+if [ "$MODE" = "db" ] && { [ -z "${DB_HOST:-}" ] || [ -z "${DB_USER:-}" ]; }; then
+    echo "ERROR: --db needs DB_HOST and DB_USER" >&2
     exit 2
 fi
 
@@ -54,6 +54,7 @@ trap 'rm -rf "$WORK"' EXIT
 TOTAL=0
 FAILED=0
 STDIN_TEXT=""
+LAST_OUT=""
 RUN_ENV_I=0
 REPO_SEQ=0
 JUNIT_SEQ=0
@@ -150,6 +151,7 @@ run_case() {
         out="$("$SUT" "$@" < "$WORK/stdin" 2>&1)"
         rc=$?
     fi
+    LAST_OUT="$out"
     STDIN_TEXT=""
     RUN_ENV_I=0
     TOTAL=$((TOTAL + 1))
@@ -183,6 +185,92 @@ check_equal() {
         echo "    after:  $b"
     fi
 }
+
+if [ "$MODE" = "db" ]; then
+    # End-to-end scenarios against real MariaDB. The PR checkout is the old tree:
+    # it already has vendor/, and ActivityTrackerRepositoryTest reads the column
+    # the scenarios drop (ibl_team_info.eoy_vote).
+    OLD_TREE="$REPO_ROOT/ibl5"
+    FILTER='--phpunit-args=--filter ActivityTrackerRepositoryTest'
+    DROP_EOY='ALTER TABLE ibl_team_info DROP COLUMN eoy_vote;'
+    ADD_NOTE='ALTER TABLE ibl_team_info ADD COLUMN IF NOT EXISTS oc_selftest_note VARCHAR(20) NULL;'
+
+    mkdir -p "$WORK/mig-base"
+    git -c init.defaultBranch=main init -q "$WORK/mig-base"
+    cp "$REPO_ROOT"/ibl5/migrations/*.sql "$WORK/mig-base/"
+    git_in "$WORK/mig-base" add -A
+    git_in "$WORK/mig-base" commit -q -m base
+    BASE="$(git -C "$WORK/mig-base" rev-parse HEAD)"
+
+    # db_repo <id> <file> <content>: copy the base repo and commit one fixture file.
+    # An empty <file> commits nothing, leaving the copy at BASE.
+    db_repo() {
+        REPO="$WORK/mig-$1"
+        cp -R "$WORK/mig-base" "$REPO"
+        if [ -n "$2" ]; then
+            printf '%s\n' "$3" > "$REPO/$2"
+            commit_all "fixture $1"
+        fi
+    }
+    # db_args <id> <extra args...>: sets DB_ARGS for one scenario
+    db_args() {
+        local id="$1"
+        shift
+        DB_ARGS=("--migrations-dir=$WORK/mig-$id" "--since=$BASE" "--old-tree=$OLD_TREE" \
+            "--db-name=ibl5_oc_$id" "$@")
+    }
+
+    db_repo A 999_oldcompat_selftest.sql "$ADD_NOTE"
+    db_args A "$FILTER"
+    run_case A 0 'PASS (' "" "${DB_ARGS[@]}"
+    if [ "$FAILED" -eq 0 ]; then
+        if [[ "$LAST_OUT" =~ PASS\ \(([0-9]+)\ tests\ executed\) ]] && [ "${BASH_REMATCH[1]}" -ge 1 ]; then
+            echo "ok A executed ${BASH_REMATCH[1]} tests"
+        else
+            FAILED=$((FAILED + 1))
+            echo "FAIL A: expected PASS (N tests executed) with N >= 1"
+            printf '%s\n' "$LAST_OUT" | sed 's/^/    | /'
+        fi
+    fi
+
+    db_repo B 999_oldcompat_selftest.sql "$DROP_EOY"
+    db_args B "$FILTER"
+    run_case B 1 'likely: 999_oldcompat_selftest.sql (matched: eoy_vote)' "" "${DB_ARGS[@]}"
+
+    db_repo C 999_oldcompat_selftest.sql "$DROP_EOY
+-- rollback-incompatible: selftest drops eoy_vote on purpose to prove the bypass"
+    db_args C "$FILTER"
+    run_case C 0 'PASS (bypass)' "" "${DB_ARGS[@]}"
+
+    db_repo D 999_oldcompat_selftest.sql "$DROP_EOY"
+    db_args D "$FILTER" --bypass-from-stdin
+    STDIN_TEXT='<!-- rollback-incompatible: selftest PR-body bypass for the eoy_vote drop -->'
+    run_case D 0 'PASS (bypass)' "" "${DB_ARGS[@]}"
+
+    db_repo E 999_oldcompat_selftest.sql "$ADD_NOTE"
+    db_args E '--phpunit-args=--filter NoSuchTestOldCompatZz'
+    run_case E 3 FALSE-GREEN "" "${DB_ARGS[@]}"
+
+    REPO="$WORK/mig-F1"
+    mkdir -p "$REPO"
+    git -c init.defaultBranch=main init -q "$REPO"
+    echo 'notes' > "$REPO/README.md"
+    commit_all readme
+    BASE_F1="$(git -C "$REPO" rev-parse HEAD)"
+    run_case F1 3 'no numbered .sql' "" "--migrations-dir=$WORK/mig-F1" "--since=$BASE_F1" \
+        "--old-tree=$OLD_TREE" "--db-name=ibl5_oc_F1"
+
+    db_repo F2 9999_oldcompat_selftest.sql "$ADD_NOTE"
+    db_args F2 "$FILTER"
+    run_case F2 3 'was not applied' "" "${DB_ARGS[@]}"
+
+    if [ "$FAILED" -eq 0 ]; then
+        echo "ALL $TOTAL DB CASES PASSED"
+        exit 0
+    fi
+    echo "$FAILED of $TOTAL DB CASES FAILED"
+    exit 1
+fi
 
 REPO_STATUS_BEFORE="$(git -C "$REPO_ROOT" status --porcelain)"
 

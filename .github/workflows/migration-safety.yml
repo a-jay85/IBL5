@@ -357,6 +357,44 @@ jobs:
           git push
         fi
 
+  old-code-compat-selftest:
+    name: Old-Code Compat Self-Test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASS: root
+      DB_NAME: ibl5
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mariadb-admin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Setup PHP environment
+      uses: ./.github/actions/setup-php-env
+
+    - name: Self-test scenarios A-F against MariaDB
+      run: |
+        set -o pipefail
+        bin/test-check-old-code-compat --db 2>&1 | tee "$RUNNER_TEMP/oc-selftest.log"
+        grep -qx 'ALL 7 DB CASES PASSED' "$RUNNER_TEMP/oc-selftest.log"
+
   gate:
     name: Migration Safety
     if: always()

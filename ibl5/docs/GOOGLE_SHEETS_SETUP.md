@@ -89,7 +89,7 @@ Exit codes:
 
 A broken row makes no Google call until the GM reconnects. A transient failure ends as `error`, clears the pending flag, and shows on the row as `last_error`. The next sim or the GM's Refresh button retries it.
 
-- **Read-only look at the queue.** `php scripts/googleSheetRefreshTick.php --dry-run` lists pending rows and the row count the export would write. It makes no Google call. Adding `--all` still marks every active connection pending in the database before listing them, so avoid that combination on production when you want a zero-write inspection.
+- **Read-only look at the queue.** `php scripts/googleSheetRefreshTick.php --dry-run` lists pending rows and the row count the export would write. It makes no Google call and no database write. `--all` is ignored under `--dry-run`.
 - **Logs.** The worker and the export service log to the `google-sheets` channel. Output carries user ids, statuses, and counts. Tokens are never logged.
 - **Quota.** The Sheets API allows 300 write requests per minute per project and 60 per minute per user. The worker spends 4 to 5 requests per GM, one GM at a time.
 

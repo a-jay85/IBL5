@@ -11,7 +11,7 @@ declare(strict_types=1);
  *
  * Usage: php ibl5/scripts/googleSheetRefreshTick.php [flags]
  *   --dry-run       List pending rows and the row count to write; no Google calls.
- *   --all           Mark every active connection pending before draining.
+ *   --all           Mark every active connection pending before draining (ignored with --dry-run).
  *   --limit=N       Max rows per tick (default 100).
  *   --budget=N      Stop starting rows after N seconds (default 240).
  *   --print-cron    Print the crontab line for this script and exit 0.

@@ -62,6 +62,21 @@ class GoogleSheetRefreshWorkerTest extends TestCase
         self::assertSame(1, $this->repo->rows[8]['refresh_pending']);
     }
 
+    public function testDryRunWithAllDoesNotMarkRowsPending(): void
+    {
+        $this->connect(7);
+        $this->connect(8);
+        $worker = $this->worker(new FixedClock(1000));
+
+        $exit = $worker->run(100, 240, true, true, $this->collect());
+
+        self::assertSame(0, $exit);
+        self::assertSame([], $this->http->requests);
+        self::assertSame(['rows_to_write: 1'], $this->output);
+        self::assertSame(0, $this->repo->rows[7]['refresh_pending']);
+        self::assertSame(0, $this->repo->rows[8]['refresh_pending']);
+    }
+
     public function testRunProcessesEveryPendingRowIndependentlyAndReturnsOneOnAnyError(): void
     {
         $this->connect(1);

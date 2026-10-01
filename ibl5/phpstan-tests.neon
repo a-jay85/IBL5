@@ -25,7 +25,7 @@ parameters:
     bootstrapFiles:
         - phpstan-stubs/nuke-globals.stub.php
         - phpstan-stubs/mock-aliases.stub.php
-    phpVersion: 80300
+    phpVersion: 80500
     treatPhpDocTypesAsCertain: false
     featureToggles:
         # Mirrors phpstan.neon — see the full rationale there. bleedingEdge enabled

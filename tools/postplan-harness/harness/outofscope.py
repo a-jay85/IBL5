@@ -119,7 +119,8 @@ def _short(text: str, limit: int = 80) -> str:
 
 
 def file_deferral_issues(gh, hits: list[DeferralHit], slug: str,
-                         pr_number: int, log=None) -> list[int]:
+                         pr_number: int, log=None, *,
+                         plan_name: str | None = None) -> list[int]:
     """File one backlog issue per hit, deduped by `[oos-<key>]` tag. Never raises.
 
     A failed dedup read files nothing: a missed filing is recovered by the next rerun,
@@ -139,6 +140,7 @@ def file_deferral_issues(gh, hits: list[DeferralHit], slug: str,
         hits = hits[:MAX_HITS_PER_PLAN]
     nums: list[int] = []
     pr_link = f"https://github.com/a-jay85/IBL5/pull/{pr_number}"
+    plan_ref = plan_name or f"{slug}.md"
     for hit in hits:
         tag = f"[{hit.key}]"
         if tag in seen:
@@ -148,7 +150,7 @@ def file_deferral_issues(gh, hits: list[DeferralHit], slug: str,
         body = (
             f"{pr_link}\n\n"
             f"Deferred in the `## Out of Scope` section of plan `{slug}` "
-            f"(~/claude-plans/{slug}.md:{hit.line_no}):\n\n"
+            f"(~/claude-plans/{plan_ref}:{hit.line_no}):\n\n"
             f"> {hit.text}\n\n"
             f"Filed by the post-plan out-of-scope sweep. Dedup key: {hit.key}.\n"
         )

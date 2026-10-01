@@ -189,3 +189,84 @@ def test_issue_titles_strict_raises_default_swallows(tmp_path, monkeypatch):
     gh.issue_titles("maintenance")
     assert "--label" not in seen[0] and "--state" in seen[0] and "all" in seen[0]
     assert "--label" in seen[1]
+
+
+# --- Phase 3: runner wiring --------------------------------------------------
+
+import copy  # noqa: E402
+import json  # noqa: E402
+import tempfile  # noqa: E402
+
+from test_backlog_closes import _BACKLOG_FIXTURE, _REPLAY_CANNED  # noqa: E402
+
+_OOS_PLAN = """# Plan: oos replay
+
+## Approach
+
+Do the thing.
+
+## Out of Scope
+
+- Rewriting the legacy importer is a separate plan because it touches every season table.
+"""
+
+_NO_OOS_PLAN = """# Plan: no oos
+
+## Approach
+
+Do the thing; file it separately later.
+"""
+
+
+def _replay(plan_content, monkeypatch=None, counter=None):
+    import runner
+    from harness.adapters.llm import FixtureLlm
+    from harness.state import UsageLedger
+    fx = dict(_BACKLOG_FIXTURE, plan_content=plan_content)
+    out = tempfile.mkdtemp(prefix="postplan-test-oos-")
+    llm = FixtureLlm(UsageLedger(), copy.deepcopy(_REPLAY_CANNED))
+    res = runner.run(fx, out, llm, mode="replay", headless=True)
+    actions = []
+    path = os.path.join(out, "actions.jsonl")
+    if os.path.exists(path):
+        with open(path) as fh:
+            actions = [json.loads(ln) for ln in fh if ln.strip()]
+    return res, actions
+
+
+def test_locate_plan_populates_deferral_hits():
+    from harness.planfile import locate_plan
+    info = locate_plan("s", content_override=FIXTURE.read_text())
+    assert len(info.deferral_hits) == 2
+    text, line_no, key = info.deferral_hits[0]
+    assert "legacy importer" in text and isinstance(line_no, int) and key.startswith("oos-")
+    assert locate_plan("s", content_override=_NO_OOS_PLAN).deferral_hits == []
+
+
+def test_replay_run_files_oos_issue():
+    res, actions = _replay(_OOS_PLAN)
+    creates = [a for a in actions if a["action"] == "issue_create"]
+    assert len(creates) == 1
+    assert creates[0]["label"] == "maintenance"
+    assert "[oos-" in creates[0]["title"]
+
+
+def test_replay_run_without_out_of_scope_files_nothing(monkeypatch):
+    calls: list = []
+    monkeypatch.setattr(RecordingGh, "issue_titles",
+                        lambda self, label, *, strict=False: calls.append(label) or [])
+    _res, actions = _replay(_NO_OOS_PLAN)
+    assert [a for a in actions if a["action"] == "issue_create"] == []
+    assert calls == []
+
+
+def test_sweep_exception_does_not_change_terminal_state(monkeypatch):
+    plain, _ = _replay(_OOS_PLAN)
+
+    def _boom(*args, **kw):
+        raise RuntimeError("kaboom")
+
+    monkeypatch.setattr(outofscope, "file_deferral_issues", _boom)
+    broken, _ = _replay(_OOS_PLAN)
+    assert broken.terminal == plain.terminal
+    assert any("oos-sweep: sweep failed" in line for line in broken.audit)

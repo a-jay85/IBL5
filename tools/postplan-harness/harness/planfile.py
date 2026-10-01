@@ -769,6 +769,12 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
     info.backlog_issues = parse_backlog_issues(content)
     info.phases = parse_phases(content)
     info.deferred_phase_numbers = parse_deferred_phase_numbers(content)
+    try:
+        from .outofscope import extract_deferral_hits  # local import: outofscope imports planfile
+        info.deferral_hits = [(h.text, h.line_no, h.key)
+                              for h in extract_deferral_hits(content, slug)]
+    except Exception:  # additive sweep: a parser bug must never stop plan location
+        info.deferral_hits = []
     if info.has_security:
         info.security_section = _section(content, "Security")[:4000]
     if info.has_reuse:

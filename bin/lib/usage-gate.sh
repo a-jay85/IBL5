@@ -63,6 +63,25 @@ usage_resets_epoch() {
         '.[$w].resets_at // empty | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601' 2>/dev/null
 }
 
+# usage_blind_trust <json> <age> [log-suffix]
+# Called when the gate is blind: the live fetch failed and the cache is stale.
+# rc 0: trust this last reading as if fresh. Its zone is drain or stop and the
+# limiting window's resets_at is still in the future. Logs blind-trust.
+# rc 1: fail open. The zone is normal, or resets_at is passed, missing, or
+# unparseable, so the reset boundary cannot be shown to lie ahead.
+usage_blind_trust() {
+    local body="${1:-}" age="${2:-}" zone w resets now
+    zone=$(usage_zone "$body")
+    case "$zone" in drain|stop) ;; *) return 1 ;; esac
+    w=$(usage_limiting_window "$body")
+    resets=$(usage_resets_epoch "$body" "$w")
+    case "$resets" in ''|*[!0-9]*) return 1 ;; esac
+    now=$(date +%s)
+    [ "$resets" -gt "$now" ] || return 1
+    usage_log "blind-trust zone=$zone age=$age${3:+ $3}"
+    return 0
+}
+
 # ------------------------------------------------------------ 2c pause markers
 
 usage_markers_dir() {
@@ -466,8 +485,10 @@ usage_prestart_gate() {
         local age
         age=$(usage_cache_age)
         if [ "$age" -lt 0 ] || [ "$age" -ge 300 ]; then
-            usage_log "prestart-fail-open reason=stale-usage runner=$runner"
-            return 0
+            if ! usage_blind_trust "$body" "$age" "runner=$runner"; then
+                usage_log "prestart-fail-open reason=stale-usage runner=$runner"
+                return 0
+            fi
         fi
     fi
     zone=$(usage_zone "$body")
@@ -560,7 +581,7 @@ usage_gate_decide() {
         return 0
     fi
 
-    local body rc age
+    local body rc age blind=0
     body=$(usage_fetch 45); rc=$?
     if [ "$rc" -eq 1 ] || [ -z "$body" ]; then
         usage_log "fail-open reason=no-usage"
@@ -569,12 +590,17 @@ usage_gate_decide() {
     if [ "$rc" -eq 2 ]; then
         age=$(usage_cache_age)
         if [ "$age" -lt 0 ] || [ "$age" -ge 300 ]; then
-            usage_log "fail-open reason=stale-usage age=$age"
-            return 0
+            if usage_blind_trust "$body" "$age"; then
+                blind=1
+            else
+                usage_log "fail-open reason=stale-usage age=$age"
+                return 0
+            fi
         fi
     fi
 
-    usage_delta_log "$sid" "$runner" "${IBL5_USAGE_GATE_MODEL:-unknown}" "$body"
+    # A blind reading is not a new delta: keep the delta log to fresh data.
+    [ "$blind" -eq 1 ] || usage_delta_log "$sid" "$runner" "${IBL5_USAGE_GATE_MODEL:-unknown}" "$body"
 
     local zone
     zone=$(usage_zone "$body")

@@ -116,6 +116,291 @@ test_fetch_bad_body_serves_stale() {
     assert_eq fetch_bad_body:cache-unchanged "$before" "$(cat "$IBL5_USAGE_GATE_STATE_DIR/cache.json")"
 }
 
+# ---------------------------------------------------------------- fetch backoff / single-flight
+
+SECRET_TOK=TESTSECRET-9f3a1c
+
+# make_stub_http <dir> <token|""> <status> <body> [retry_after|""] [sleep_secs]
+# Like make_stub_bin, but the curl stub honors `-D <file>`: it writes an HTTP status
+# line (and Retry-After when given) there, CRLF-terminated like real curl.
+make_stub_http() {
+    local dir="$1" tok="$2" st="$3" body="$4" ra="${5:-}" sl="${6:-0}"
+    make_stub_bin "$dir" "$tok" "$body"
+    cat > "$dir/curl" <<STUB
+#!/bin/sh
+hdr=""
+while [ \$# -gt 0 ]; do
+    case "\$1" in -D) hdr="\$2"; shift ;; esac
+    shift
+done
+echo call >> "$dir/curl.calls"
+[ "$sl" -gt 0 ] && sleep "$sl"
+if [ -n "\$hdr" ]; then
+    printf 'HTTP/2 %s\r\n' "$st" > "\$hdr"
+    [ -n "$ra" ] && printf 'retry-after: %s\r\n' "$ra" >> "\$hdr"
+    printf '\r\n' >> "\$hdr"
+fi
+cat "$dir/curl.body"
+STUB
+    chmod +x "$dir/curl"
+}
+
+fetch_once() {  # <max_age>: one usage_fetch; stdout = body; rc = usage_fetch rc
+    PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch $1"
+}
+
+# fetch_parallel <n> <max_age>: n concurrent usage_fetch calls; results in $T/out.<i>, $T/rc.<i>.
+# Waits only on its own pids (never a bare `wait`).
+fetch_parallel() {
+    local i=1 pids=""
+    while [ "$i" -le "$1" ]; do
+        ( fetch_once "$2" > "$T/out.$i"; echo $? > "$T/rc.$i" ) &
+        pids="$pids $!"
+        i=$((i + 1))
+    done
+    for p in $pids; do wait "$p"; done
+}
+
+log_count() {  # <fixed-string>: occurrences in usage-gate.log
+    local n
+    n=$(grep -cF -- "$1" "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log" 2>/dev/null)
+    echo "${n:-0}"
+}
+
+fetch_log() { cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log" 2>/dev/null; }
+util_of() { printf '%s' "$1" | jq -r '.five_hour.utilization'; }
+
+RL_BODY='{"error":{"type":"rate_limit_error","message":"Rate limited. Please try again later."}}'
+
+test_fetch_429_retry_after_arms_backoff() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY" 120
+    local out rc until step now i
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_429_ra:rc1 2 "$rc"
+    assert_eq fetch_429_ra:stale1 41.0 "$(util_of "$out")"
+    assert_eq fetch_429_ra:one-call 1 "$(curl_calls "$STUB")"
+    assert_contains fetch_429_ra:log "$(fetch_log)" "fetch-failed reason=rate-limited retry_after=120 backoff=120"
+    read -r until step < "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+    now=$(date +%s)
+    assert_eq fetch_429_ra:step 1 "$step"
+    if [ $((until - now)) -ge 118 ] && [ $((until - now)) -le 121 ]; then
+        pass fetch_429_ra:until
+    else
+        fail fetch_429_ra:until "until-now=$((until - now))"
+    fi
+    for i in 2 3; do
+        out=$(fetch_once 45); rc=$?
+        assert_eq "fetch_429_ra:rc$i" 2 "$rc"
+        assert_eq "fetch_429_ra:stale$i" 41.0 "$(util_of "$out")"
+        assert_eq "fetch_429_ra:calls$i" 1 "$(curl_calls "$STUB")"
+    done
+    assert_eq fetch_429_ra:skip-logged-once 1 "$(log_count backoff-skip)"
+    assert_eq fetch_429_ra:no-bad-body 0 "$(log_count bad-body)"
+}
+
+test_fetch_429_retry_after_capped() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY" 99999
+    fetch_once 45 >/dev/null
+    assert_contains fetch_429_cap:log "$(fetch_log)" "backoff=900"
+
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY" 0
+    fetch_once 45 >/dev/null
+    assert_contains fetch_429_cap:zero-falls-to-exp "$(fetch_log)" "backoff=30"
+}
+
+test_fetch_429_exponential_and_expiry() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY"
+    local bf="$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff" until step
+    fetch_once 45 >/dev/null
+    assert_contains fetch_429_exp:first "$(fetch_log)" "retry_after=none backoff=30"
+    read -r until step < "$bf"
+    assert_eq fetch_429_exp:step1 1 "$step"
+    printf '%s\n' "$(( $(date +%s) - 1 )) 1" > "$bf"
+    fetch_once 45 >/dev/null
+    assert_eq fetch_429_exp:live-fetch 2 "$(curl_calls "$STUB")"
+    assert_contains fetch_429_exp:second "$(fetch_log)" "retry_after=none backoff=60"
+    read -r until step < "$bf"
+    assert_eq fetch_429_exp:step2 2 "$step"
+    printf '%s\n' "$(( $(date +%s) - 1 )) 9" > "$bf"
+    fetch_once 45 >/dev/null
+    assert_contains fetch_429_exp:cap "$(fetch_log)" "retry_after=none backoff=480"
+}
+
+test_fetch_429_concurrent_one_call() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY" 120 2
+    local i round
+    for round in 1 2; do
+        fetch_parallel 6 45
+        assert_eq "fetch_429_conc:calls$round" 1 "$(curl_calls "$STUB")"
+        for i in 1 2 3 4 5 6; do
+            assert_eq "fetch_429_conc:rc$round.$i" 2 "$(cat "$T/rc.$i")"
+            assert_eq "fetch_429_conc:util$round.$i" 41.0 "$(util_of "$(cat "$T/out.$i")")"
+        done
+        assert_no_file "fetch_429_conc:no-lock$round" "$IBL5_USAGE_GATE_STATE_DIR/fetch.lock.d"
+    done
+}
+
+test_fetch_success_clears_backoff() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" out rc
+    printf '%s\n' "$(( $(date +%s) - 1 )) 3" > "$d/fetch-backoff"
+    printf '%s\n' 12345 > "$d/fetch-backoff.logged"
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_clears:rc 0 "$rc"
+    assert_eq fetch_clears:body 77.0 "$(util_of "$out")"
+    assert_eq fetch_clears:one-call 1 "$(curl_calls "$STUB")"
+    assert_no_file fetch_clears:backoff "$d/fetch-backoff"
+    assert_no_file fetch_clears:logged "$d/fetch-backoff.logged"
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY"
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    fetch_once 45 >/dev/null
+    assert_contains fetch_clears:step-reset "$(fetch_log)" "retry_after=none backoff=30"
+}
+
+test_fetch_429_no_cache_rc1() {
+    new_env
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY"
+    local out rc
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_429_nocache:rc1 1 "$rc"
+    assert_eq fetch_429_nocache:empty1 "" "$out"
+    assert_file fetch_429_nocache:backoff "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_429_nocache:rc2 1 "$rc"
+    assert_eq fetch_429_nocache:empty2 "" "$out"
+    assert_eq fetch_429_nocache:one-call 1 "$(curl_calls "$STUB")"
+}
+
+test_fetch_single_flight_parallel() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B" "" 3
+    local i rc saw77=0 n
+    fetch_parallel 6 45
+    assert_eq fetch_single_flight:calls 1 "$(curl_calls "$STUB")"
+    for i in 1 2 3 4 5 6; do
+        rc=$(cat "$T/rc.$i")
+        if [ "$rc" = 0 ] || [ "$rc" = 2 ]; then pass "fetch_single_flight:rc.$i"; else fail "fetch_single_flight:rc.$i" "rc=$rc"; fi
+        [ "$(util_of "$(cat "$T/out.$i")")" = "77.0" ] && saw77=1
+    done
+    assert_eq fetch_single_flight:saw-fresh 1 "$saw77"
+    assert_eq fetch_single_flight:cache 77.0 "$(jq -r '.five_hour.utilization' "$IBL5_USAGE_GATE_STATE_DIR/cache.json")"
+    assert_no_file fetch_single_flight:no-lock "$IBL5_USAGE_GATE_STATE_DIR/fetch.lock.d"
+    n=$(log_count "fetch-skip reason=in-flight")
+    if [ "$n" = 1 ] || [ "$n" = 2 ]; then pass fetch_single_flight:inflight-logged; else fail fetch_single_flight:inflight-logged "count=$n"; fi
+}
+
+test_fetch_stale_lock_reclaimed() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" out rc leftovers
+    mkdir "$d/fetch.lock.d"
+    printf '%s\n' "$(( $(date +%s) - 60 )) 999999" > "$d/fetch.lock.d/at"
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_stale_lock:rc 0 "$rc"
+    assert_eq fetch_stale_lock:body 77.0 "$(util_of "$out")"
+    assert_eq fetch_stale_lock:one-call 1 "$(curl_calls "$STUB")"
+    assert_no_file fetch_stale_lock:lock-gone "$d/fetch.lock.d"
+    leftovers=$(ls -d "$d"/fetch.lock.d.stale.* 2>/dev/null)
+    assert_eq fetch_stale_lock:no-stale-dir "" "$leftovers"
+}
+
+test_fetch_fresh_lock_respected() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" out rc stamp
+    mkdir "$d/fetch.lock.d"
+    stamp="$(date +%s) 999999"
+    printf '%s\n' "$stamp" > "$d/fetch.lock.d/at"
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_fresh_lock:rc 2 "$rc"
+    assert_eq fetch_fresh_lock:stale 41.0 "$(util_of "$out")"
+    assert_eq fetch_fresh_lock:no-curl 0 "$(curl_calls "$STUB")"
+    assert_file fetch_fresh_lock:lock-kept "$d/fetch.lock.d"
+    assert_eq fetch_fresh_lock:at-unchanged "$stamp" "$(cat "$d/fetch.lock.d/at")"
+    assert_contains fetch_fresh_lock:log "$(fetch_log)" "fetch-skip reason=in-flight"
+    rm -f "$d/cache.json"
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_fresh_lock:nocache-rc 1 "$rc"
+    assert_eq fetch_fresh_lock:nocache-empty "" "$out"
+    assert_eq fetch_fresh_lock:nocache-no-curl 0 "$(curl_calls "$STUB")"
+}
+
+test_fetch_orphan_lock_ages_out() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" rc epoch pid
+    mkdir "$d/fetch.lock.d"
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    fetch_once 45 >/dev/null; rc=$?
+    assert_eq fetch_orphan:rc1 2 "$rc"
+    assert_eq fetch_orphan:no-curl 0 "$(curl_calls "$STUB")"
+    assert_file fetch_orphan:stamped "$d/fetch.lock.d/at"
+    read -r epoch pid < "$d/fetch.lock.d/at"
+    case "$epoch" in ''|*[!0-9]*) fail fetch_orphan:numeric "epoch=[$epoch]" ;; *) pass fetch_orphan:numeric ;; esac
+    printf '%s\n' "$(( $(date +%s) - 60 )) 0" > "$d/fetch.lock.d/at"
+    fetch_once 45 >/dev/null; rc=$?
+    assert_eq fetch_orphan:rc2 0 "$rc"
+    assert_eq fetch_orphan:one-call 1 "$(curl_calls "$STUB")"
+}
+
+test_fetch_non_429_errors_no_backoff() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" rc
+    make_stub_http "$STUB" "$SECRET_TOK" 500 "$RL_BODY"
+    fetch_once 45 >/dev/null; rc=$?
+    assert_eq fetch_non429:rc500 2 "$rc"
+    assert_contains fetch_non429:log500 "$(fetch_log)" "fetch-failed reason=http-500"
+    assert_no_file fetch_non429:no-backoff500 "$d/fetch-backoff"
+    make_stub_bin "$STUB" "$SECRET_TOK" "" 28
+    fetch_once 45 >/dev/null; rc=$?
+    assert_eq fetch_non429:rc28 2 "$rc"
+    assert_contains fetch_non429:log28 "$(fetch_log)" "fetch-failed reason=curl-exit-28"
+    assert_no_file fetch_non429:no-backoff28 "$d/fetch-backoff"
+}
+
+test_fetch_bad_body_200_status() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" rc
+    make_stub_http "$STUB" "$SECRET_TOK" 200 '{"error":"x"}'
+    fetch_once 45 >/dev/null; rc=$?
+    assert_eq fetch_bad200:rc 2 "$rc"
+    assert_contains fetch_bad200:log "$(fetch_log)" "fetch-failed reason=bad-body"
+    assert_eq fetch_bad200:not-rate-limited 0 "$(log_count rate-limited)"
+    assert_no_file fetch_bad200:no-backoff "$d/fetch-backoff"
+}
+
+test_fetch_token_never_persisted() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" grc hdrs
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY"
+    fetch_once 45 >/dev/null
+    printf '%s\n' "$(( $(date +%s) - 1 )) 1" > "$d/fetch-backoff"
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    fetch_once 45 >/dev/null
+    grep -rF "$SECRET_TOK" "$d" >/dev/null 2>&1; grc=$?
+    if [ "$grc" -ne 0 ]; then pass fetch_token_leak:none; else fail fetch_token_leak:none "token found under state dir"; fi
+    hdrs=$(ls "$d"/fetch.hdr.* 2>/dev/null)
+    assert_eq fetch_token_leak:no-hdr-files "" "$hdrs"
+}
+
 test_fetch_rejects_bad_max_age() {
     new_env
     local err rc
@@ -152,6 +437,15 @@ gate_run() {
 
 usage_json() {  # <five> <week>
     printf '{"five_hour":{"utilization":%s,"resets_at":"2026-09-28T20:00:00.123+00:00"},"seven_day":{"utilization":%s,"resets_at":"2026-10-02T00:00:00+00:00"}}' "$1" "$2"
+}
+
+# usage_json_resets <five> <week> <five_resets_epoch|""> <week_resets_epoch|"">
+# Builds ISO resets_at via jq todate (portable on BSD and GNU). An empty epoch
+# omits that window's resets_at entirely.
+usage_json_resets() {
+    jq -cn --argjson f "$1" --argjson w "$2" --arg fr "$3" --arg wr "$4" '
+      {five_hour:({utilization:$f} + (if $fr=="" then {} else {resets_at:($fr|tonumber|todate)} end)),
+       seven_day:({utilization:$w} + (if $wr=="" then {} else {resets_at:($wr|tonumber|todate)} end))}'
 }
 
 SID_A=11111111-1111-4111-8111-111111111111
@@ -410,6 +704,151 @@ test_decide_fail_open_stale() {
     assert_eq decide_stale:out "" "$out"
     assert_contains decide_stale:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "reason=stale-usage"
     assert_no_file decide_stale:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+# blind_setup <five> <week> <five_resets_epoch|""> <week_resets_epoch|""> [age]
+# No-token stub, so usage_fetch returns rc 2 with the seeded cache; age defaults to 600 (stale).
+blind_setup() {
+    new_env
+    make_stub_bin "$STUB" "" '{}' 1
+    seed_cache "$(( $(date +%s) - ${5:-600} ))" "$(usage_json_resets "$1" "$2" "$3" "$4")"
+    RBIN="$T/resume.sh"
+    printf '#!/bin/sh\n' > "$RBIN"; chmod +x "$RBIN"
+}
+
+test_decide_blind_normal_allows() {
+    local FUT out
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 50 0 "$FUT" ""
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_normal:out "" "$out"
+    assert_no_file decide_blind_normal:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_contains decide_blind_normal:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "fail-open reason=stale-usage"
+    assert_eq decide_blind_normal:no-blind-trust 0 "$(log_count blind-trust)"
+}
+
+test_decide_blind_drain_pauses() {
+    local FUT out m
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_drain:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_drain:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    m=$(cat "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json" 2>/dev/null)
+    assert_eq decide_blind_drain:zone drain "$(printf '%s' "$m" | jq -r .zone)"
+    assert_eq decide_blind_drain:reason usage-pause "$(printf '%s' "$m" | jq -r .reason)"
+    assert_eq decide_blind_drain:window five_hour "$(printf '%s' "$m" | jq -r .window)"
+    assert_eq decide_blind_drain:resets_at "$FUT" "$(printf '%s' "$m" | jq -r .resets_at)"
+    assert_contains decide_blind_drain:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "blind-trust zone=drain age="
+    assert_no_file decide_blind_drain:no-delta-log "$IBL5_USAGE_GATE_STATE_DIR/deltas.jsonl"
+}
+
+test_decide_blind_drain_allows_holder() {
+    local FUT out
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    gate_run "usage_token_acquire $SID_A $$"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_holder:out "" "$out"
+    assert_no_file decide_blind_holder:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_blind_stop_pauses_holder() {
+    local FUT out
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 99 0 "$FUT" ""
+    gate_run "usage_token_acquire $SID_A $$"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_stop:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_stop:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_eq decide_blind_stop:zone stop "$(jq -r .zone "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json" 2>/dev/null)"
+    assert_no_file decide_blind_stop:token-gone "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d"
+}
+
+test_decide_blind_resets_passed_allows() {
+    local PAST out pct
+    PAST=$(( $(date +%s) - 60 ))
+    blind_setup 95 0 "$PAST" ""
+    for pct in 95 99; do
+        seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json_resets "$pct" 0 "$PAST" "")"
+        out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+        assert_eq "decide_blind_passed:out:$pct" "" "$out"
+        assert_no_file "decide_blind_passed:no-marker:$pct" "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    done
+    assert_contains decide_blind_passed:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "reason=stale-usage"
+}
+
+test_decide_blind_resets_unparseable_allows() {
+    local out
+    blind_setup 95 0 "" ""
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_unparse:missing:out "" "$out"
+    assert_no_file decide_blind_unparse:missing:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json_resets 95 0 "" "" | jq -c '.five_hour.resets_at="not-a-date"')"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_unparse:garbage:out "" "$out"
+    assert_no_file decide_blind_unparse:garbage:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_blind_seven_day_window() {
+    local FUT PAST out
+    FUT=$(( $(date +%s) + 3600 ))
+    PAST=$(( $(date +%s) - 60 ))
+    blind_setup 10 96 "$FUT" "$FUT"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_week:future:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_week:future:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_eq decide_blind_week:future:window seven_day "$(jq -r .window "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json" 2>/dev/null)"
+    blind_setup 10 96 "$FUT" "$PAST"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_week:past:out "" "$out"
+    assert_no_file decide_blind_week:past:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_blind_marker_write_fails_no_pause() {
+    local FUT out log
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    chmod 500 "$IBL5_USAGE_GATE_STATE_DIR/markers"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    chmod 700 "$IBL5_USAGE_GATE_STATE_DIR/markers"
+    if [ "$(id -u)" = "0" ]; then
+        pass decide_blind_marker_fail:skipped-as-root
+        return 0
+    fi
+    log=$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")
+    assert_eq decide_blind_marker_fail:out "" "$out"
+    assert_no_file decide_blind_marker_fail:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_contains decide_blind_marker_fail:log "$log" "fail-open reason=marker-write-failed"
+    assert_contains decide_blind_marker_fail:blind "$log" "blind-trust"
+}
+
+test_decide_blind_age_boundary() {
+    local PAST out
+    PAST=$(( $(date +%s) - 60 ))
+    blind_setup 95 0 "$PAST" "" 290
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_age:290:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_age:290:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    blind_setup 95 0 "$PAST" "" 300
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_age:300:out "" "$out"
+    assert_no_file decide_blind_age:300:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_blind_during_backoff() {
+    local FUT out log
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY"
+    printf '%s\n' "$(( $(date +%s) + 300 )) 1" > "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    log=$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")
+    assert_eq decide_blind_backoff:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_backoff:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_eq decide_blind_backoff:no-curl 0 "$(curl_calls "$STUB")"
+    assert_contains decide_blind_backoff:log-skip "$log" "backoff-skip"
+    assert_contains decide_blind_backoff:log-blind "$log" "blind-trust zone=drain"
 }
 
 test_decide_runner_env_unset() {
@@ -833,6 +1272,91 @@ test_prestart_gate_no_usage() {
     in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
     assert_eq prestart_no_usage:rc 0 "$?"
     assert_no_file prestart_no_usage:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_prestart_fail_open_stale_resets_passed() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 95 12)"
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_stale_passed:rc 0 "$?"
+    assert_no_file prestart_stale_passed:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_contains prestart_stale_passed:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "prestart-fail-open reason=stale-usage"
+}
+
+test_prestart_blind_normal_allows() {
+    local FUT
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 50 0 "$FUT" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_blind_normal:rc 0 "$?"
+    assert_no_file prestart_blind_normal:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_contains prestart_blind_normal:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "prestart-fail-open reason=stale-usage"
+}
+
+test_prestart_blind_drain_pauses() {
+    local FUT rc m
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    rc=$?
+    assert_eq prestart_blind_drain:rc 10 "$rc"
+    m="$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_file prestart_blind_drain:marker "$m"
+    assert_eq prestart_blind_drain:zone drain "$(jq -r .zone "$m" 2>/dev/null)"
+    assert_eq prestart_blind_drain:reason usage-pause "$(jq -r .reason "$m" 2>/dev/null)"
+    assert_contains prestart_blind_drain:log "$(grep -F 'blind-trust zone=drain' "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "runner=post-plan-now"
+}
+
+test_prestart_blind_stop_pauses() {
+    local FUT rc m
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 99 0 "$FUT" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    rc=$?
+    assert_eq prestart_blind_stop:rc 10 "$rc"
+    m="$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_file prestart_blind_stop:marker "$m"
+    assert_eq prestart_blind_stop:zone stop "$(jq -r .zone "$m" 2>/dev/null)"
+}
+
+test_prestart_blind_drain_allows_holder() {
+    local FUT
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    in_env "usage_token_acquire $SID_A; usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_blind_holder:rc 0 "$?"
+    assert_no_file prestart_blind_holder:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_prestart_blind_resets_passed_allows() {
+    local PAST
+    PAST=$(( $(date +%s) - 60 ))
+    blind_setup 95 0 "$PAST" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_blind_passed:rc 0 "$?"
+    assert_no_file prestart_blind_passed:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_prestart_blind_resets_missing_allows() {
+    blind_setup 95 0 "" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_blind_missing:rc 0 "$?"
+    assert_no_file prestart_blind_missing:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_coord_stale_never_pauses_or_grants() {
+    coord_setup 95
+    local now
+    now=$(date +%s)
+    seed_cache "$(( now - 600 ))" "$(usage_json_resets 95 0 $(( now + 3600 )) $(( now + 86400 )))"
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A ".resets_at = $(( now + 3600 ))"
+    run_coord --once >/dev/null 2>&1
+    assert_no_file coord_stale_conservative:not-resumed "$T/launched.$SID_A"
+    assert_no_file coord_stale_conservative:no-grant "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d"
+    assert_eq coord_stale_conservative:one-marker 1 "$(ls "$IBL5_USAGE_GATE_STATE_DIR/markers" | wc -l | tr -d ' ')"
+    assert_contains coord_stale_conservative:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "coordinator-stale-usage"
 }
 
 test_postrun_pause_marker_rc0() {

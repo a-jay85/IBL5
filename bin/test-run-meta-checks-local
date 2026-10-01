@@ -117,7 +117,7 @@ make_repo() {
 
     # Stub every script the runner invokes. Each stub reads STUB_RC_<name>,
     # defaulting to 0. Uses indirect expansion which bash 3.2 supports via ${!}.
-    for sname in check-docs check-prose check-pr-manual-testing \
+    for sname in check-docs check-prose check-pr-manual-testing check-post-merge-recipe \
                  check-registry-trigger-rows check-numbering check-e2e-hygiene \
                  check-e2e-fa-offers-owner check-e2e-mutator-isolation \
                  check-hot-files check-orphan-css adr-check refactor-flag \

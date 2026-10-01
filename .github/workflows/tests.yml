@@ -1163,6 +1163,9 @@ jobs:
       - name: bin/test-predeploy-db-snapshot
         run: bin/test-predeploy-db-snapshot
 
+      - name: bin/test-restore-rowcount-compare
+        run: bin/test-restore-rowcount-compare
+
   gate:
     name: Tests and Analysis
     if: always()

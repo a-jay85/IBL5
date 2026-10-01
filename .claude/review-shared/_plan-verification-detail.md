@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _plan-verification.md — why each forced trigger exists, the incidents behind them, the worked pre-prod exercise-path catalogue, and the non-compliant counter-examples. Read only when editing the verification rules; the plan-architect never reads it.
-last_verified: 2026-09-16
+last_verified: 2026-09-28
 ---
 
 # _plan-verification Detail
@@ -71,6 +71,10 @@ Only an *intrinsic* deploy-dependency that survives that challenge may be record
 ### Counter-examples
 
 Minimal section — specific counter-examples are embedded inline in the rules themselves (PR #887 for seed grounding, PR #1067 for forced manual rows, PR #1753 for required test methods).
+
+### What the plan must NOT do
+
+Folded into the positive rules on 2026-09-28. The four retired bullets, kept for the record: a "verify manually" item that PHPUnit, an API test, E2E, or visual-regression can assert; classification deferred to post-plan Phase 6; a standalone Testing or Verification prose section in place of the matrix; a "run X and check Y" row with no test type and no file path. Each now lives beside the rule it negated: § Classification rules, § Required format, and § Weave tests inline.
 
 ### HTTP response shape changes
 

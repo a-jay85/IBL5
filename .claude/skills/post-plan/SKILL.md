@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-29
+last_verified: 2026-10-01
 ---
 
 # Post-Plan Orchestrator
@@ -301,7 +301,19 @@ fi
 
 ## Phase 2.5: Backlog Housekeeping
 
-(Phase 2.5 retired — ADR-0121)
+Out-of-Scope deferral sweep. Skip when `PLAN_FOUND=none`. The sweep files one backlog issue per deferral phrase in the plan's `## Out of Scope` section and dedups against every existing backlog issue, open or closed. It shares its code with the harness, so a harness run that already filed an item makes this a no-op for that item. A non-zero exit or a missing module never stops the run. Substitute `<PLAN_FILE>` (from Phase 1) and `<PR_NUMBER>` (from Phase 2). The original Phase 2.5 housekeeping was retired by ADR-0121; this slot now holds only the sweep.
+
+```bash
+WT=$(git rev-parse --show-toplevel)
+SLUG=$(git rev-parse --abbrev-ref HEAD)
+if [ -f "$WT/tools/postplan-harness/harness/outofscope.py" ]; then
+  (cd "$WT/tools/postplan-harness" && python3 -m harness.outofscope \
+      --plan "<PLAN_FILE>" --slug "$SLUG" --pr "<PR_NUMBER>" \
+      --worktree "$WT") || echo "oos-sweep: exit $? (non-blocking)"
+else
+  echo "oos-sweep: module absent on this branch (non-blocking)"
+fi
+```
 
 ---
 

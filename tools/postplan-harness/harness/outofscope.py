@@ -49,7 +49,7 @@ REJECTION_RE = re.compile(
     r"|needing\s+its\s+own|would\s+be\s+a|any\s+future|ever\s+wanted"
     r"|if\s+(?:one|it|they)\s+starts?|tracked\s+by|byte-identical|frozen"
     r"|stays?\s+that\s+way|would\s+invalidate|deliberately"
-    r"|ever\s+becomes?|would\s+be\s+its|when\s+a\s+future|independent,|by\s+decision"
+    r"|ever\s+becomes?|would\s+be\s+its|when\s+a\s+future|by\s+decision"
     r"|re-?open|calls?\s+for\s+its\s+own|stacks?\s+on|merges\s+first|unreachable"
     r"|its\s+own\s+PR\s+holds|filed\s+and\s+skipped"
     r"|if\s+(?:\w+\s+){1,4}(?:fails?|finds?|becomes?))\b"

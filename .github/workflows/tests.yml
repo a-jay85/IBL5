@@ -1114,6 +1114,8 @@ jobs:
         run: bin/test-bug-pipeline-check
       - name: bin/test-bug-pipeline-cron-setup
         run: bin/test-bug-pipeline-cron-setup
+      - name: bin/test-bug-pipeline-test-env
+        run: bin/test-bug-pipeline-test-env
       - name: bin/test-bug-pipeline-e2e
         run: bin/test-bug-pipeline-e2e
       - name: bin/test-launchd-health-cron-setup

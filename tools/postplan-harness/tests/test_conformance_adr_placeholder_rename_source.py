@@ -8,6 +8,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from harness.adapters.gitad import ReplayGit
 from harness.conformance import check
 from harness.state import PlanInfo
 
@@ -93,3 +94,70 @@ def test_adr_placeholder_does_not_leak_into_migration_tier():
     tok = "ibl5/migrations/NNN_add_thing.sql"
     items = check(_plan_with_critical(tok), ["ibl5/migrations/123_add_thing.sql"])
     assert _missing(items, "NNN_add_thing.sql")
+
+
+RENAME_DIFF = """\
+diff --git a/.claude/agents/sonnet-4-6.md b/.claude/agents/sonnet-5-5.md
+similarity index 67%
+rename from .claude/agents/sonnet-4-6.md
+rename to .claude/agents/sonnet-5-5.md
+--- a/.claude/agents/sonnet-4-6.md
++++ b/.claude/agents/sonnet-5-5.md
+@@ -1,1 +1,1 @@
+-old
++new
+diff --git a/ibl5/gone.php b/ibl5/gone.php
+deleted file mode 100644
+--- a/ibl5/gone.php
++++ /dev/null
+@@ -1,1 +0,0 @@
+-$old = 1;
+"""
+
+NO_RENAME_DIFF = """\
+diff --git a/.claude/agents/sonnet-5-5.md b/.claude/agents/sonnet-5-5.md
+new file mode 100644
+--- /dev/null
++++ b/.claude/agents/sonnet-5-5.md
+@@ -0,0 +1,1 @@
++new
+"""
+
+
+def test_replay_conformance_files_has_rename_source_target_and_deleted():
+    """Mutation caught: return `files_from_diff` alone."""
+    got = ReplayGit({"slug": "x", "diff": RENAME_DIFF}).conformance_files()
+    assert ".claude/agents/sonnet-4-6.md" in got
+    assert ".claude/agents/sonnet-5-5.md" in got
+    assert "ibl5/gone.php" in got
+
+
+def test_replay_changed_files_still_b_side_only():
+    """Mutation caught: widen `files_from_diff`."""
+    got = ReplayGit({"slug": "x", "diff": RENAME_DIFF}).changed_files()
+    assert got == [".claude/agents/sonnet-5-5.md", "ibl5/gone.php"]
+
+
+def test_replay_conformance_files_builds_on_overridden_changed_files():
+    """Mutation caught: compute `conformance_files` from `files_from_diff` directly
+    instead of `self.changed_files`, which breaks the three existing test fakes."""
+    class _Fake(ReplayGit):
+        def changed_files(self, base="origin/master"):
+            return ["ibl5/x.php"]
+
+    got = _Fake({"slug": "x", "diff": RENAME_DIFF}).conformance_files()
+    assert got == ["ibl5/x.php", ".claude/agents/sonnet-4-6.md"]
+
+
+def test_rename_source_named_but_file_absent_still_missing():
+    """Mutation caught: make `rename_sources_from_diff` also return a-side paths of
+    `new file mode` blocks."""
+    files = ReplayGit({"slug": "x", "diff": NO_RENAME_DIFF}).conformance_files()
+    items = check(_plan_with_critical(".claude/agents/sonnet-4-6.md"), files)
+    assert _missing(items, "sonnet-4-6.md")
+
+
+def test_rename_source_resolves_critical_file():
+    """PR #2514 acceptance at adapter level."""
+    files = ReplayGit({"slug": "x", "diff": RENAME_DIFF}).conformance_files()
+    assert check(_plan_with_critical(".claude/agents/sonnet-4-6.md"), files) == []

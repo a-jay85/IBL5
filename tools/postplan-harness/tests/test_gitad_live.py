@@ -39,6 +39,59 @@ def test_dirty_commit_and_changed_files(repo):
     assert g.commit_all("noop") == ""      # nothing staged -> no empty commit
 
 
+def _rename_repo(repo):
+    """Feature branch where a.txt was `git mv`ed to c.txt and committed; rename
+    detection is forced on so the test does not depend on the runner's git config."""
+    def sh(*a):
+        subprocess.run(["git", "-C", repo, *a], check=True, capture_output=True)
+    sh("config", "diff.renames", "true")
+    sh("checkout", "-b", "feature")
+    sh("mv", "a.txt", "c.txt")
+    sh("commit", "-m", "rename a to c")
+    return repo
+
+
+def test_changed_files_lists_only_rename_target(repo):
+    """Characterization (pre-impl): `changed_files` keeps git's rename-detected shape
+    and lists only the NEW path. Phase 2 must not widen this list, because it feeds
+    classify(), scope conformance and denied_gate_edits.
+
+    Mutation caught: add `--no-renames` to `LiveGit.changed_files` and `a.txt`
+    appears; the equality fails.
+    """
+    _rename_repo(repo)
+    g = LiveGit(repo)
+    assert g.changed_files(base="master") == ["c.txt"]
+
+
+def test_conformance_files_includes_rename_source_and_target(repo):
+    """Mutation caught: drop `--no-renames` from `conformance_files`."""
+    _rename_repo(repo)
+    g = LiveGit(repo)
+    got = g.conformance_files(base="master")
+    assert "a.txt" in got and "c.txt" in got
+    assert set(g.changed_files(base="master")) <= set(got)
+
+
+def test_conformance_files_counts_deleted_file(repo):
+    """Mutation caught: filter `D` status out of the no-renames output."""
+    def sh(*a):
+        subprocess.run(["git", "-C", repo, *a], check=True, capture_output=True)
+    sh("checkout", "-b", "feature")
+    sh("rm", "a.txt")
+    sh("commit", "-m", "delete a")
+    g = LiveGit(repo)
+    assert "a.txt" in g.conformance_files(base="master")
+    assert "a.txt" in g.changed_files(base="master")
+
+
+def test_conformance_files_includes_untracked(repo):
+    """Mutation caught: drop the `ls-files --others` arm."""
+    open(os.path.join(repo, "d.php"), "w").write("<?php\n")
+    g = LiveGit(repo)
+    assert "d.php" in g.conformance_files(base="HEAD")
+
+
 def test_changes_to_commit_and_branch_head_subject(repo):
     subprocess.run(["git", "-C", repo, "checkout", "-b", "feature"],
                    check=True, capture_output=True)

@@ -225,7 +225,9 @@ usage_marker_clear() {
     seen="$(usage_state_dir)/dm-seen"
     if [ -f "$seen" ]; then
         tmp="$seen.tmp.$$"
-        grep -vxF "$1" "$seen" > "$tmp" 2>/dev/null
+        # grep -v exits 1 when no line survives (sid was the only entry); callers
+        # run under set -e, so that must not abort them.
+        grep -vxF "$1" "$seen" > "$tmp" 2>/dev/null || true
         mv "$tmp" "$seen"
     fi
     return 0

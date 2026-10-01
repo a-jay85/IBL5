@@ -9,7 +9,8 @@ Both sets are computed in one process: "old" rebinds
 it in a `finally`. Prints ADDED, DROPPED and TYPED-LOSS blocks plus a SUMMARY line.
 TYPED-LOSS is a row under a Test-type header whose type cell names a planning type,
 fails the label rule, and would have planned a path under the old rule.
-Exits 1 when added > 0 or typed_loss > 0. Stdlib only.
+Exits 1 when added>0 or typed_loss>0; the opt-in pytest also requires dropped>=1.
+Stdlib only.
 """
 import argparse
 import glob

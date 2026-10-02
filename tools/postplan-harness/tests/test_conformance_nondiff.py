@@ -61,3 +61,103 @@ def test_plan_not_found_yields_nothing():
     ph = PhaseInfo(number=1, heading="Phase 1: X", evidence_paths=["bin/wt-up"])
     assert conformance.phase_omission_items(PlanInfo(found=False, phases=[ph]), []) == []
     assert conformance.phase_omission_items(PlanInfo(found=True, phases=[]), []) == []
+
+
+TRACKED = ["bin/wt-up", "ibl5/docs/API_GUIDE.md", ".claude/skills/post-plan/SKILL.md"]
+NON_REPO = ["/proc/self/fd/1", "api/v1", "a-jay85/ibl5-bugs", "~/claude-plans/x.md", "origin/master"]
+
+
+def test_non_repo_citations_only_is_uncheckable_not_held():
+    ph = PhaseInfo(number=1, heading="Phase 1: Elsewhere", evidence_paths=list(NON_REPO))
+    notes: list[str] = []
+    items = conformance.phase_omission_items(
+        _plan(ph), ["ibl5/docs/API_GUIDE.md"], tracked_files=TRACKED, notes=notes)
+    assert items == []
+    assert len(notes) == 1
+    assert notes[0].startswith("UNCHECKABLE-PHASE: 1")
+    assert "/proc/self/fd/1, api/v1, a-jay85/ibl5-bugs (+2 more)" in notes[0]
+
+
+def test_mixed_citations_check_only_repo_ones():
+    ph = PhaseInfo(number=1, heading="Phase 1: Mixed",
+                   evidence_paths=["/proc/self/fd/1", "bin/wt-up"])
+    items = conformance.phase_omission_items(
+        _plan(ph), ["ibl5/docs/API_GUIDE.md"], tracked_files=TRACKED)
+    assert len(items) == 1
+    assert "phase cites bin/wt-up;" in items[0]
+    assert "/proc" not in items[0]
+    notes: list[str] = []
+    assert conformance.phase_omission_items(
+        _plan(ph), ["bin/wt-up"], tracked_files=TRACKED, notes=notes) == []
+    assert notes == []
+
+
+def test_basename_collision_with_tracked_dir_stays_candidate():
+    ph = PhaseInfo(number=1, heading="Phase 1: Skill", evidence_paths=["/post-plan"])
+    items = conformance.phase_omission_items(
+        _plan(ph), ["ibl5/docs/API_GUIDE.md"], tracked_files=TRACKED)
+    assert len(items) == 1
+    assert items[0].startswith("MISSING-PHASE: 1")
+
+
+def test_no_diff_phase_exempt_with_note():
+    ph = PhaseInfo(number=1, heading="Phase 1: Close the issue", evidence_paths=["bin/wt-up"],
+                   no_diff_reason="closes the issue through the PR body")
+    notes: list[str] = []
+    items = conformance.phase_omission_items(_plan(ph), [], tracked_files=TRACKED, notes=notes)
+    assert items == []
+    assert notes == ["NO-DIFF-PHASE: 1 — Phase 1: Close the issue "
+                     "(exempt: closes the issue through the PR body)"]
+
+
+def test_no_diff_rejected_marker_still_holds():
+    ph = PhaseInfo(number=1, heading="Phase 1: Close", evidence_paths=["bin/wt-up"],
+                   no_diff_rejected=True)
+    notes: list[str] = []
+    items = conformance.phase_omission_items(_plan(ph), [], tracked_files=TRACKED, notes=notes)
+    assert len(items) == 1
+    assert items[0].startswith("MISSING-PHASE: 1")
+    assert len(notes) == 1
+    assert notes[0].startswith("NO-DIFF-IGNORED: phase 1")
+
+
+def test_tracked_unavailable_fails_closed(monkeypatch):
+    monkeypatch.setattr(conformance, "_tracked_files", lambda *a, **k: None)
+    ph = PhaseInfo(number=1, heading="Phase 1: Elsewhere", evidence_paths=["/proc/self/fd/1"])
+    items = conformance.phase_omission_items(_plan(ph), ["ibl5/docs/API_GUIDE.md"])
+    assert len(items) == 1
+    assert items[0].startswith("MISSING-PHASE: 1")
+
+
+def test_empty_tracked_list_is_not_fail_closed():
+    ph = PhaseInfo(number=1, heading="Phase 1: Elsewhere", evidence_paths=["/proc/self/fd/1"])
+    assert conformance.phase_omission_items(
+        _plan(ph), ["ibl5/docs/API_GUIDE.md"], tracked_files=[]) == []
+
+
+def test_check_passes_tracked_and_notes_through():
+    ph = PhaseInfo(number=1, heading="Phase 1: Elsewhere", evidence_paths=["/proc/self/fd/1"])
+    plan = PlanInfo(found=True, has_matrix=False, phases=[ph])
+    notes: list[str] = []
+    items = conformance.check(plan, ["ibl5/docs/API_GUIDE.md"],
+                              tracked_files=TRACKED, notes=notes)
+    assert not any(i.startswith("MISSING-PHASE") for i in items)
+    assert len(notes) == 1
+    assert notes[0].startswith("UNCHECKABLE-PHASE: 1")
+
+
+def test_tracked_files_reads_git_ls_files(tmp_path):
+    import subprocess
+    repo = tmp_path / "repo"
+    (repo / "a").mkdir(parents=True)
+    (repo / "a" / "b.txt").write_text("x")
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "a/b.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "x"],
+                   cwd=repo, check=True)
+    got = conformance._tracked_files.__wrapped__(str(repo))
+    assert isinstance(got, tuple)
+    assert "a/b.txt" in got
+    nogit = tmp_path / "nogit"
+    nogit.mkdir()
+    assert conformance._tracked_files.__wrapped__(str(nogit)) is None

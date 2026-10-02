@@ -214,3 +214,26 @@ def test_fetch_history_missing_sha_has_zero_parents(tmp_path):
     assert history[0].parent_count == 0
     results = run_backtest(str(repo), "HEAD", [gate()], history, overlay(), str(tmp_path))
     assert [(r.outcome, r.detail) for r in results] == [("skipped", "sha-missing")]
+
+
+def test_backtest_changes_replays_settled_prs_past_the_young_ones(monkeypatch, tmp_path):
+    from harness import gate_backtest_replay as gbr
+    from harness.gate_backtest import HistoricalPR
+    now = T0 + timedelta(days=10)
+    young = [HistoricalPR(100 + i, "feat: new", "a" * 40, 1, now - timedelta(hours=i + 1), "b", ())
+             for i in range(5)]
+    old = [HistoricalPR(i, "feat: old", "c" * 40, 1, now - timedelta(days=4, hours=i), "b", ())
+           for i in range(1, 4)]
+    seen = {}
+    monkeypatch.setattr(gbr, "_detect", lambda *a, **k: [gate()])
+    monkeypatch.setattr(gbr, "fetch_history", lambda *a, **k: young + old)
+
+    def fake_run(repo, head, gates, history, *a, **k):
+        seen["numbers"] = [p.number for p in history]
+        return []
+
+    monkeypatch.setattr(gbr, "run_backtest", fake_run)
+    out = gbr.backtest_changes(str(tmp_path), "HEAD", [("D", "bin/check-x")], fetch=False,
+                               limit=2, now=now)
+    assert seen["numbers"] == [1, 2]
+    assert out.window == 2

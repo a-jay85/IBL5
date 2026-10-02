@@ -31,6 +31,7 @@ REPO_SLUG = "a-jay85/IBL5"
 PER_REPLAY_TIMEOUT = 60
 TOTAL_CAP = 900
 HISTORY_LIMIT = 30
+FETCH_CAP = 250  # merged PRs fetched; the newest HISTORY_LIMIT settled ones are replayed
 
 # Hooks must never run inside the scratch worktree: a post-checkout hook would be repo code
 # executing against historical trees.
@@ -362,12 +363,16 @@ def backtest_changes(repo: str, head: str, changes: list[tuple[str, str]], *,
             if fetch:
                 git(["fetch", "--quiet", "origin", "master"])
             bodies: dict[int, str] = {}
-            history = fetch_history(gh_json, git, limit, exclude_pr, bodies)
+            # Fetch past `limit` so the replay window can skip the PRs younger than the repair
+            # window: at this repo's merge pace the newest 30 PRs are all under 48h old, which
+            # would leave no replay to count. Unsettled PRs stay in the fetch as repair evidence.
+            fetched = fetch_history(gh_json, git, FETCH_CAP, exclude_pr, bodies)
+            truth = classify_truth(fetched, now or datetime.now(timezone.utc))
+            history = [p for p in fetched if truth[p.number].state != "unsettled"][:limit]
             window = len(history)
             results = run_backtest(repo, head, gates, history, overlay_files, plans_dir,
                                    per_replay_timeout=per_replay_timeout, total_cap=total_cap,
                                    bodies=bodies)
-            truth = classify_truth(history, now or datetime.now(timezone.utc))
         except Exception:
             results = None
             truth = {}

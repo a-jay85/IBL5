@@ -8,7 +8,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
-from harness.state import ArmDecision, RunResult, TerminalState
+from harness.state import ArmDecision, ConditionResult, RunResult, TerminalState
 
 
 def _res(terminal, **kw):
@@ -20,6 +20,18 @@ def _res(terminal, **kw):
 
 def _arm(armed=True):
     return ArmDecision(armed=armed)
+
+
+def _held_arm(*blocked_numbers):
+    """A HELD ArmDecision whose blocked conditions carry the given numbers."""
+    return ArmDecision(
+        armed=False,
+        conditions=[ConditionResult(n, f"cond-{n}", True, "held") for n in blocked_numbers],
+    )
+
+
+# Slug chosen so the /tmp auto-resolved-conflict file verdict_line probes never exists.
+_PIN_SLUG = "verdict-line-pin-no-such-autoresolved-file"
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +89,80 @@ def test_shipped_held_is_not_armed():
     line = runner.verdict_line(r, 0)
     # must not claim the merge was armed
     assert "auto-merge=armed" not in line
+
+
+def test_held_other_condition_line_unchanged():
+    """Pin: a run held by condition (8) with no meta-check failures prints this exact line."""
+    r = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+             arm=_held_arm(8))
+    line = runner.verdict_line(r, 0)
+    assert line == (
+        "RESULT: post-plan complete — terminal=shipped-held "
+        "auto-merge=HELD (human merges) PR #7 findings=0"
+    )
+
+
+_PROSE_FAIL = {"name": "check-prose-since", "output": "x"}
+_DOCS_FAIL = {"name": "check-docs", "output": "y"}
+
+
+def test_prose_hold_names_prose_check():
+    r = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+             arm=_held_arm(16), meta_check_failures=[_PROSE_FAIL])
+    line = runner.verdict_line(r, 0)
+    assert line.startswith("RESULT: ")
+    assert "\n" not in line
+    assert "held-by=prose-check (check-prose-since failed pre-push)" in line
+    assert "auto-merge=HELD (human merges)" in line
+    assert "findings=" in line
+
+
+def test_condition16_other_check_no_prose_note():
+    with_docs = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+                     arm=_held_arm(16), meta_check_failures=[_DOCS_FAIL])
+    without = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+                   arm=_held_arm(16))
+    line = runner.verdict_line(with_docs, 0)
+    assert "held-by=" not in line
+    assert line == runner.verdict_line(without, 0)
+
+
+def test_prose_failure_without_condition16_no_note():
+    r = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+             arm=_held_arm(8), meta_check_failures=[_PROSE_FAIL])
+    assert "held-by=" not in runner.verdict_line(r, 0)
+    no_arm = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+                  arm=None, meta_check_failures=[_PROSE_FAIL])
+    assert "held-by=" not in runner.verdict_line(no_arm, 0)
+
+
+def test_armed_with_stale_prose_failure_no_note():
+    armed = ArmDecision(armed=True,
+                        conditions=[ConditionResult(16, "meta-checks", True, "stale")])
+    r = _res(TerminalState.SHIPPED_ARMED, pr_number=7, slug=_PIN_SLUG,
+             arm=armed, meta_check_failures=[_PROSE_FAIL])
+    line = runner.verdict_line(r, 0)
+    assert "held-by=" not in line
+    assert "auto-merge=armed" in line
+
+
+def test_prose_and_other_failure_note_once():
+    r = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
+             arm=_held_arm(16, 8),
+             meta_check_failures=[_DOCS_FAIL, _PROSE_FAIL])
+    line = runner.verdict_line(r, 0)
+    assert line.count("held-by=prose-check") == 1
+    assert "\n" not in line
+
+
+def test_behind_cap_line_unchanged_with_prose_failure():
+    kw = dict(pr_number=7, slug=_PIN_SLUG, arm=_held_arm(16),
+              retry_cap="behind-retry-cap")
+    with_fail = _res(TerminalState.SHIPPED_HELD, meta_check_failures=[_PROSE_FAIL], **kw)
+    without = _res(TerminalState.SHIPPED_HELD, **kw)
+    line = runner.verdict_line(with_fail, 0)
+    assert "held-by=" not in line
+    assert line == runner.verdict_line(without, 0)
 
 
 def test_nothing_to_ship_starts_with_result():

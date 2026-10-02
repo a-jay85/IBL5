@@ -121,4 +121,27 @@ class GameBoxscoreRepositoryTest extends WideUnitTestCase
 
         self::assertSame([], $result);
     }
+
+    public function testGetGameInfoQueryIsSargable(): void
+    {
+        $this->mockDb->onQuery('ibl_box_scores_teams', []);
+
+        $this->repo()->getGameInfo('2026-02-20', 1);
+
+        $sql = implode("\n", $this->getExecutedQueries());
+        self::assertStringNotContainsString('DATE(', strtoupper($sql));
+        // mock inlines bound params, so match the literal
+        self::assertStringContainsString("game.game_date = '2026-02-20'", $sql);
+    }
+
+    public function testGetPlayerRowsQueryIsSargable(): void
+    {
+        $this->mockDb->onQuery('isAwayPlayer', []);
+
+        $this->repo()->getPlayerRows('2026-02-20', 1, 1, 2);
+
+        $sql = implode("\n", $this->getExecutedQueries());
+        self::assertStringNotContainsString('DATE(', strtoupper($sql));
+        self::assertStringContainsString("bp.game_date = '2026-02-20'", $sql);
+    }
 }

@@ -1,0 +1,242 @@
+#!/usr/bin/env bash
+# Headless /burndown loop paced against the weekly usage window.
+#
+# Runs one fresh `claude -p "/burndown"` session per batch. Before each batch it
+# re-reads live usage and paces weekly utilization along a straight line to
+# (100 - IBL5_BURNDOWN_RESERVE_PCT)% at seven_day.resets_at (usage_pace_verdict in
+# bin/lib/usage-gate.sh). Pause and resume reuse the ADR-0143 usage-gate primitives.
+#
+# Usage:
+#   bin/burndown-loop start [--no-dm]
+#   bin/burndown-loop stop
+#   bin/burndown-loop status
+#   bin/burndown-loop run [--once] [--dry-run] [--no-dm]
+#   bin/burndown-loop --print-plist
+#   bin/burndown-loop --resume-paused <sid>
+# ---
+# Environment (unset and empty both take the default):
+#   IBL5_BURNDOWN_RESERVE_PCT         weekly percent kept free at reset (default 10)
+#   IBL5_BURNDOWN_MAX_FAILS           consecutive failed batches before giving up (3)
+#   IBL5_BURNDOWN_BATCH_TIMEOUT_MIN   per-batch wall clock in minutes (90)
+#
+# Exit codes: 0 loop finished (supply exhausted, stop requested, or --once done).
+#             1 consecutive-failure cap hit.  2 usage or environment error.
+#             4 another instance holds the lock.  75 paused by the usage gate.
+#
+# Bash 3.2 / macOS compatible: no declare -A, no mapfile, no date -d/-v, no GNU timeout.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/usage-gate.sh
+. "$ROOT/bin/lib/usage-gate.sh"
+
+[ -n "${HOME:-}" ] || { echo "burndown-loop: HOME is unset" >&2; exit 2; }
+
+STATE="$HOME/.claude/burndown-loop"
+LOCK="$STATE/lock"
+STOP_FLAG="$STATE/stop"
+# shellcheck disable=SC2034  # launchd stdout/stderr target, used by the Phase 5 plist
+LOOP_LOG="$STATE/loop.log"
+# shellcheck disable=SC2034  # read by the Phase 3 batch ledger diff
+REPORTS="$HOME/claude-plans/_reports"
+BL_SLEEP_CAP=1800
+
+bl_usage() {
+    cat >&2 <<'USAGE_EOF'
+Usage: bin/burndown-loop <subcommand>
+  start [--no-dm]                    launch detached under launchd
+  stop                               finish the current batch, then exit
+  status                             lock pid, liveness, recent log
+  run [--once] [--dry-run] [--no-dm] the loop body (what launchd runs)
+  --print-plist                      emit the launchd unit on stdout
+  --resume-paused <sid>              coordinator entry
+USAGE_EOF
+}
+
+bl_unknown() {
+    echo "burndown-loop: unknown argument: $1" >&2
+    bl_usage
+    exit 2
+}
+
+bl_log() {
+    printf '%s burndown-loop %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
+}
+
+# bl_posint_env <NAME> <default>: unset and empty take the default; anything that
+# is not a positive integer exits 2 (these knobs bound runtime, so a typo is loud).
+bl_posint_env() {
+    local name="$1" def="$2" v
+    v="${!name:-}"
+    [ -n "$v" ] || { echo "$def"; return 0; }
+    case "$v" in
+        *[!0-9]*|0*) echo "burndown-loop: $name must be a positive integer (got '$v')" >&2; exit 2 ;;
+    esac
+    echo "$v"
+}
+
+# ------------------------------------------------------------ lock
+
+bl_lock_release() {
+    if [ -f "$LOCK/pid" ] && [ "$(cat "$LOCK/pid" 2>/dev/null)" = "$$" ]; then
+        rm -rf "$LOCK"
+    fi
+}
+
+# bl_lock_live_pid: echoes the pid holding a live lock, nothing otherwise.
+bl_lock_live_pid() {
+    local pid
+    pid=$(cat "$LOCK/pid" 2>/dev/null || true)
+    case "$pid" in ''|*[!0-9]*) return 0 ;; esac
+    if kill -0 "$pid" 2>/dev/null; then echo "$pid"; fi
+}
+
+bl_lock_acquire() {
+    local pid
+    mkdir -p "$STATE"
+    if ! mkdir "$LOCK" 2>/dev/null; then
+        pid=$(bl_lock_live_pid)
+        if [ -n "$pid" ]; then
+            echo "burndown-loop: already running (pid $pid)" >&2
+            exit 4
+        fi
+        bl_log "reclaimed stale lock pid=$(cat "$LOCK/pid" 2>/dev/null || echo none)"
+        rm -rf "$LOCK"
+        mkdir "$LOCK" 2>/dev/null || { echo "burndown-loop: already running" >&2; exit 4; }
+    fi
+    echo "$$" > "$LOCK/pid"
+    trap bl_lock_release EXIT
+}
+
+# ------------------------------------------------------------ pacing decision
+
+# bl_decide: prints exactly one line, the single pacing decision for both the live
+# loop and --dry-run. Fails closed on a missing or stale reading: the loop is
+# discretionary work, so a skipped batch costs time while an unpaced one costs the
+# owner's week (unlike usage_prestart_gate, which guards a run the user asked for).
+bl_decide() {
+    local body frc=0 v verdict wait
+    body=$(usage_fetch 45) || frc=$?
+    if [ "$frc" -ne 0 ]; then
+        echo "sleep $BL_SLEEP_CAP blind fetch-rc=$frc"
+        return 0
+    fi
+    v=$(usage_pace_verdict "$body" "$(date +%s)")
+    verdict="${v%% *}"
+    case "$verdict" in
+        go) echo "launch $v" ;;
+        wait)
+            wait=$(printf '%s' "$v" | cut -d' ' -f4)
+            if [ "$wait" -gt "$BL_SLEEP_CAP" ]; then wait=$BL_SLEEP_CAP; fi
+            echo "sleep $wait pace $v"
+            ;;
+        zone) echo "pause $v" ;;
+        *) echo "sleep $BL_SLEEP_CAP blind $v" ;;
+    esac
+}
+
+# bl_sleep <secs> <reason>: logged sleep in chunks of at most 60s. Returns 1 as soon
+# as the stop flag appears, so `stop` lands within a minute.
+bl_sleep() {
+    local left="$1" reason="$2" chunk
+    bl_log "sleep ${left}s reason=$reason"
+    while [ "$left" -gt 0 ]; do
+        [ ! -e "$STOP_FLAG" ] || return 1
+        chunk=60
+        if [ "$left" -lt "$chunk" ]; then chunk=$left; fi
+        sleep "$chunk"
+        left=$((left - chunk))
+    done
+    [ ! -e "$STOP_FLAG" ] || return 1
+    return 0
+}
+
+# ------------------------------------------------------------ run
+
+bl_cmd_run() {
+    local once=0 dry=0 a decision action
+    # shellcheck disable=SC2034  # consumed by the Phase 5 finish DM
+    NO_DM=0
+    for a in "$@"; do
+        case "$a" in
+            --once) once=1 ;;
+            --dry-run) dry=1; once=1 ;;
+            --no-dm) NO_DM=1 ;;
+            *) bl_unknown "$a" ;;
+        esac
+    done
+
+    MAX_FAILS=$(bl_posint_env IBL5_BURNDOWN_MAX_FAILS 3)
+    BATCH_TIMEOUT_MIN=$(bl_posint_env IBL5_BURNDOWN_BATCH_TIMEOUT_MIN 90)
+    # shellcheck disable=SC2034  # consumed by the Phase 3 batch launcher
+    BATCH_TIMEOUT=$((BATCH_TIMEOUT_MIN * 60))
+    : "$MAX_FAILS"
+
+    if [ "$dry" -eq 1 ]; then
+        decision=$(bl_decide)
+        echo "burndown-loop: DRY RUN reserve=$(usage_pace_reserve) decision=$decision"
+        return 0
+    fi
+
+    bl_lock_acquire
+    while :; do
+        if [ -e "$STOP_FLAG" ]; then
+            rm -f "$STOP_FLAG"
+            bl_log "stop requested; exiting"
+            return 0
+        fi
+        decision=$(bl_decide)
+        action="${decision%% *}"
+        bl_log "decision=$decision"
+        case "$action" in
+            sleep)
+                local secs rest reason
+                rest="${decision#sleep }"
+                secs="${rest%% *}"
+                rest="${rest#* }"
+                reason="${rest%% *}"
+                bl_sleep "$secs" "$reason" || { bl_log "stop requested; exiting"; rm -f "$STOP_FLAG"; return 0; }
+                ;;
+            pause) bl_on_pause ;;
+            launch) bl_on_launch ;;
+        esac
+        [ "$once" -eq 0 ] || return 0
+    done
+}
+
+# Phase 3 fills in the batch launch and Phase 4 the gate pause.
+bl_on_launch() { bl_log "launch: batch launcher not implemented"; }
+bl_on_pause() { bl_log "pause: gate pause not implemented"; }
+
+bl_not_implemented() { echo "burndown-loop: $1 is not implemented yet" >&2; exit 2; }
+
+# ------------------------------------------------------------ dispatch
+
+main() {
+    [ "$#" -gt 0 ] || { echo "burndown-loop: no subcommand" >&2; bl_usage; exit 2; }
+    local cmd="$1"
+    shift
+    case "$cmd" in
+        run) bl_cmd_run "$@" ;;
+        start)
+            local a
+            for a in "$@"; do
+                case "$a" in --no-dm) ;; *) bl_unknown "$a" ;; esac
+            done
+            bl_not_implemented start
+            ;;
+        stop|status)
+            [ "$#" -eq 0 ] || bl_unknown "$1"
+            bl_not_implemented "$cmd"
+            ;;
+        --print-plist)
+            [ "$#" -eq 0 ] || bl_unknown "$1"
+            bl_not_implemented --print-plist
+            ;;
+        --resume-paused) bl_not_implemented --resume-paused ;;
+        *) bl_unknown "$cmd" ;;
+    esac
+}
+
+main "$@"

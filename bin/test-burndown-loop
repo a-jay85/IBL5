@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Harness for bin/burndown-loop. Filled in by Phase 6.
+set -euo pipefail
+echo "passed=0 failed=0"

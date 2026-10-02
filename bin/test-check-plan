@@ -2082,6 +2082,107 @@ assert_viol "cf-relative-path-accepted" 0 '[F]' "$FM$CF_MATRIX"'
 '
 
 # ---------------------------------------------------------------------------
+# Gate [VR] fixtures (11 cases) — a VR -snapshots Critical File needs a marker
+# ---------------------------------------------------------------------------
+VR_SNAP='ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots'
+
+# (VR-1) Unmarked -snapshots entry (the PR 2625 shape) — must flag [VR].
+assert_viol "vr-unmarked-snapshots-rejected" 1 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` — VR baselines
+- `bin/check-plan`
+'
+
+# (VR-2) The conditional marker exempts it — clean.
+assert_viol "vr-conditional-marker-accepted" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (conditional — only if VR baselines change)
+'
+
+# (VR-3) Deliberate regen/deletion opt-out token — clean.
+assert_viol "vr-baseline-change-token-accepted" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (vr-baseline-change: deletes the contracts-hub baselines)
+'
+
+# (VR-4) Token match is case-insensitive — clean.
+assert_viol "vr-baseline-change-token-uppercase-accepted" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (VR-Baseline-Change: regenerates the smoke baselines)
+'
+
+# (VR-5) Whole word only: a longer word does not clear — must flag [VR].
+assert_viol "vr-baseline-changes-suffix-rejected" 1 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` — vr-baseline-changes expected
+'
+
+# (VR-6) The token on ANOTHER entry line does not clear this entry — must flag [VR].
+assert_viol "vr-token-on-other-entry-rejected" 1 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` — VR baselines
+- `bin/check-plan` — vr-baseline-change
+'
+
+# (VR-7) The token in phase prose outside Critical Files does not clear — must flag [VR].
+assert_viol "vr-token-in-prose-only-rejected" 1 '[VR]' "$FM$CF_MATRIX"'
+### Notes
+
+This plan is a vr-baseline-change.
+
+## Critical Files
+
+- `'"$VR_SNAP"'` — VR baselines
+'
+
+# (VR-8) A non-snapshot must-appear entry is untouched by [VR] — clean.
+assert_viol "vr-non-snapshot-entry-ignored" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `bin/check-plan` — add gate
+- `ibl5/tests/e2e/smoke/visual-regression.spec.ts` — edit spec
+'
+
+# (VR-9) A (reference)-exempt -snapshots entry is not flagged — clean.
+assert_viol "vr-reference-exempt-snapshots-ignored" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (reference)
+- `bin/check-plan`
+'
+
+# (VR-10) A fenced example of the unmarked form is not counted — clean.
+assert_viol "vr-fenced-example-ignored" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+```
+- `'"$VR_SNAP"'` — VR baselines
+```
+
+- `bin/check-plan`
+'
+
+# (VR-11) The [VR] message names both fixes verbatim.
+f="$TMP/vr-message-names-fix.md"
+printf '%s\n' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` — VR baselines
+' > "$f"
+out="$("$GUARD" "$f" 2>&1)" || true
+if grep -qF 'Mark it (conditional — only if VR baselines change), or (vr-baseline-change: <what changes>)' <<<"$out"; then
+    echo "ok: vr-message-names-fix"
+else
+    echo "FAIL: vr-message-names-fix — [VR] message lost its fix text"; FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
 # Gate [M] fixtures (5 cases)
 # ---------------------------------------------------------------------------
 PU='

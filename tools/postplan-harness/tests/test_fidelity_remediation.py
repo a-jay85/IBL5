@@ -976,9 +976,10 @@ def test_remediation_prompt_never_relies_on_packet_path_alone(tmp_path, git_shim
     fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
                        packet_dir, verdict_path, "deadbeef")
     prompt = llm.captured_prompts["fidelity-remediation"]
-    # A packet path in the prompt means the content is also present inline.
-    if packet_dir in prompt:
-        assert "+SENTINEL_DIFF_LINE" in prompt
+    # The diff content is inline unconditionally, so the check cannot pass vacuously
+    # when the packet path happens to be absent from the prompt.
+    assert "+SENTINEL_DIFF_LINE" in prompt
+    assert "=== END DIFF ===" in prompt
 
 
 def test_remediation_prompt_truncates_oversized_diff(tmp_path, git_shim):

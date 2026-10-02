@@ -31,6 +31,33 @@ def test_other_typed_failure_exits_1():          # negative path: not everything
     assert runner.exit_code_for(_res(TerminalState.FAILED, "push-disabled")) == 1
     assert runner.exit_code_for(_res(TerminalState.FAILED, None)) == 1
 
+_EXIT_CODE_TABLE = (
+    [(TerminalState.FAILED, k, 3) for k in (
+        "rebase-conflict", "local-gate", "remote-head-diverged",
+        "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty")]
+    + [(TerminalState.FAILED, "usage-pause", 75)]
+    + [(TerminalState.FAILED, k, 1) for k in (
+        "push-disabled", "push-failed", "push-retry-cap",
+        "lostwork-unproved", "git", None)]
+    + [(t, None, 0) for t in (
+        TerminalState.SHIPPED_ARMED, TerminalState.SHIPPED_HELD,
+        TerminalState.NOTHING_TO_SHIP, TerminalState.DEGRADED)]
+)
+
+
+@pytest.mark.parametrize("terminal,error_kind,expected", _EXIT_CODE_TABLE)
+def test_exit_code_table_pins_every_kind(terminal, error_kind, expected):
+    """Literal table (not _FAIL_CLOSED_KINDS) so mutating the tuple fails here."""
+    assert runner.exit_code_for(_res(terminal, error_kind)) == expected
+
+
+def test_harness_error_positional_signature_pinned():
+    """Two-argument raise sites keep their meaning when keyword-only fields are added."""
+    e = HarnessError("git", "boom")
+    assert e.kind == "git"
+    assert e.detail == "boom"
+    assert str(e) == "git: boom"
+
 def test_success_and_nothing_to_ship_exit_0():
     assert runner.exit_code_for(_res(TerminalState.SHIPPED_ARMED)) == 0
     assert runner.exit_code_for(_res(TerminalState.SHIPPED_HELD)) == 0

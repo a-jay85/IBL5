@@ -311,3 +311,197 @@ def classify_truth(prs, now: datetime, window: timedelta = TRUTH_WINDOW) -> dict
         else:
             result[p.number] = Truth("unsettled")
     return result
+
+
+# --- Verdict ---------------------------------------------------------------------------------
+#
+# Threshold reasoning. The pipeline review of 2026-10-02 found 20 of 34 fix PRs repairing
+# something merged under 2 days earlier, so the 48h repair window captures most real breakage.
+# The labels still carry noise: a latent bug fixed after 48h, or a fix that touched other files,
+# leaves a truly broken PR labelled clean. A threshold of 1 would hold a gate on one mislabelled
+# PR. At 2, two independent clean PRs must be flagged. A window of about 30 PRs leaves 20 to 25
+# matured after the 48h rule, so 2 false flags means the gate would have blocked about one good
+# PR in ten. About 90% of merged PRs are tooling or meta work that a ship-pipeline gate sees, so
+# that rate would mean several spurious blocks a week. MIN_MATURED_REPLAYS keeps a gate skipped
+# on almost every PR (a plan-reading gate with no plans on disk) from reading as CLEARED.
+
+GATE_BACKTEST_BEGIN = "<!-- gate-backtest:begin -->"
+GATE_BACKTEST_END = "<!-- gate-backtest:end -->"
+STATE_LINE_RE = re.compile(
+    r"^<!-- gate-backtest-state: (NOT-APPLICABLE|CLEARED|HELD|UNKNOWN) -->$", re.M)
+FALSE_FLAG_THRESHOLD = 2
+MIN_MATURED_REPLAYS = 5
+LIST_CAP = 20
+TEXT_CAP = 160
+
+
+@dataclass
+class GateTally:
+    replayed: int = 0
+    matured: int = 0
+    catches: list[int] | None = None
+    false_flags: list[int] | None = None
+    unsettled_flags: list[int] | None = None
+    skipped: int = 0
+    errors: int = 0
+    first_error: str = ""
+
+    def __post_init__(self) -> None:
+        self.catches = self.catches if self.catches is not None else []
+        self.false_flags = self.false_flags if self.false_flags is not None else []
+        self.unsettled_flags = self.unsettled_flags if self.unsettled_flags is not None else []
+
+
+@dataclass(frozen=True)
+class Verdict:
+    state: str
+    reason: str
+    per_gate: dict
+
+
+def _tally(gate_path: str, results, truth: dict[int, Truth]) -> GateTally:
+    tally = GateTally()
+    for r in results:
+        if r.gate != gate_path:
+            continue
+        if r.outcome == "skipped":
+            tally.skipped += 1
+            continue
+        if r.outcome in ("error", "timeout"):
+            tally.errors += 1
+            if not tally.first_error:
+                tally.first_error = f"{r.outcome}: {r.detail}"
+            continue
+        tally.replayed += 1
+        state = truth.get(r.pr, Truth("unsettled")).state
+        if state in ("clean", "repaired"):
+            tally.matured += 1
+        if r.outcome == "flag":
+            if state == "repaired":
+                tally.catches.append(r.pr)
+            elif state == "clean":
+                tally.false_flags.append(r.pr)
+            else:
+                tally.unsettled_flags.append(r.pr)
+    return tally
+
+
+def _clean(text: str) -> str:
+    return " ".join(text.replace("`", "").split())[:TEXT_CAP]
+
+
+def compute_verdict(gates, results, truth: dict[int, Truth]) -> Verdict:
+    """First matching row wins; every state the replay cannot vouch for holds."""
+    replayable = [g for g in gates if g.state == "replayable"]
+    per_gate: dict[str, GateTally] = {}
+    if results is not None:
+        for g in replayable:
+            per_gate[g.path] = _tally(g.path, results, truth)
+
+    if not gates:
+        return Verdict("NOT-APPLICABLE", "no gate changed", per_gate)
+    if results is None and replayable:
+        return Verdict("UNKNOWN", "the backtest runner failed before producing results", per_gate)
+    for g in gates:
+        if g.state == "unspecified":
+            return Verdict("HELD", f"`{_clean(g.path)}` has no replay spec ({_clean(g.reason)})",
+                           per_gate)
+    for g in replayable:
+        t = per_gate[g.path]
+        if t.errors > 0:
+            return Verdict("UNKNOWN", f"`{_clean(g.path)}` replay failed ({_clean(t.first_error)})",
+                           per_gate)
+    for g in replayable:
+        n = len(per_gate[g.path].false_flags)
+        if n >= FALSE_FLAG_THRESHOLD:
+            return Verdict("HELD", f"`{_clean(g.path)}` flagged {n} clean PRs "
+                                   f"(threshold {FALSE_FLAG_THRESHOLD})", per_gate)
+    for g in replayable:
+        if per_gate[g.path].matured < MIN_MATURED_REPLAYS:
+            return Verdict("UNKNOWN", f"thin sample: `{_clean(g.path)}` replayed on "
+                                      f"{per_gate[g.path].matured} matured PRs "
+                                      f"(minimum {MIN_MATURED_REPLAYS})", per_gate)
+    if not replayable:
+        return Verdict("NOT-APPLICABLE", "only non-replayable gates changed", per_gate)
+    return Verdict("CLEARED", "no gate crossed the false-flag threshold", per_gate)
+
+
+# --- PR-body block ---------------------------------------------------------------------------
+
+def _numbers(nums, truth=None) -> str:
+    shown = []
+    for n in list(nums)[:LIST_CAP]:
+        if truth is not None and n in truth and truth[n].repaired_by:
+            shown.append(f"#{n} (repaired by " + ", ".join(f"#{x}" for x in truth[n].repaired_by) + ")")
+        else:
+            shown.append(f"#{n}")
+    extra = len(nums) - LIST_CAP
+    return ", ".join(shown) + (f" (+{extra} more)" if extra > 0 else "")
+
+
+def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Truth],
+                         window_size: int) -> str:
+    """Markdown block for the PR body. Only PR numbers are rendered, never historical titles."""
+    if not gates:
+        return ""
+    lines = [GATE_BACKTEST_BEGIN, f"<!-- gate-backtest-state: {verdict.state} -->",
+             "### Gate backtest", "",
+             f"**State:** {verdict.state}. {verdict.reason}", "",
+             f"Replayed against the last {window_size} merged PRs. Repaired: a `fix` PR touching "
+             "an overlapping file merged within 48h. Clean: older than 48h and not repaired. "
+             "Unsettled: younger than 48h, shown and never counted.", ""]
+    catches: list[int] = []
+    false_flags: list[int] = []
+    unsettled: list[int] = []
+    if verdict.per_gate:
+        lines += ["| Gate | Replayed | Catches | False flags | Unsettled flags | Skipped | Errors |",
+                  "|------|----------|---------|-------------|-----------------|---------|--------|"]
+        for path, t in verdict.per_gate.items():
+            lines.append(f"| `{_clean(path)}` | {t.replayed} | {len(t.catches)} | "
+                         f"{len(t.false_flags)} | {len(t.unsettled_flags)} | {t.skipped} | "
+                         f"{t.errors} |")
+            catches += t.catches
+            false_flags += t.false_flags
+            unsettled += t.unsettled_flags
+        lines.append("")
+    if catches:
+        lines.append("- Catches: " + _numbers(catches, truth))
+    if false_flags:
+        lines.append("- False flags: " + _numbers(false_flags))
+    if unsettled:
+        lines.append("- Unsettled flags: " + _numbers(unsettled))
+    for label, state in (("Not replayable", "not-replayable"), ("Unspecified", "unspecified"),
+                         ("Removed", "removed")):
+        entries = [f"`{_clean(g.path)}` ({_clean(g.reason)})" for g in gates if g.state == state]
+        if entries:
+            lines.append(f"- {label}: " + ", ".join(entries))
+    lines.append(GATE_BACKTEST_END)
+    return "\n".join(lines)
+
+
+def upsert_gate_backtest(body: str, block: str) -> str:
+    """Insert or replace the gate-backtest block in a PR body (same contract as
+    classify.upsert_tests_changed): both markers in order replace BEGIN..END inclusive,
+    otherwise append a fresh block and leave any orphan marker."""
+    body = body or ""
+    if not body.strip():
+        return block
+    begin_idx = body.find(GATE_BACKTEST_BEGIN)
+    end_idx = body.find(GATE_BACKTEST_END)
+    if begin_idx != -1 and end_idx != -1 and begin_idx < end_idx:
+        after_end = end_idx + len(GATE_BACKTEST_END)
+        return body[:begin_idx] + block + body[after_end:]
+    return body.rstrip() + "\n\n" + block + "\n"
+
+
+def parse_gate_backtest_state(body: str) -> str:
+    """No block: NOT-APPLICABLE. One state line inside a closed block: that token. Else UNKNOWN."""
+    body = body or ""
+    begin_idx = body.find(GATE_BACKTEST_BEGIN)
+    if begin_idx == -1:
+        return "NOT-APPLICABLE"
+    end_idx = body.find(GATE_BACKTEST_END, begin_idx)
+    if end_idx == -1:
+        return "UNKNOWN"
+    matches = STATE_LINE_RE.findall(body[begin_idx:end_idx])
+    return matches[0] if len(matches) == 1 else "UNKNOWN"

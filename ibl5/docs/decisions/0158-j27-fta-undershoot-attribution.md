@@ -59,3 +59,4 @@ Measured and ruled-out levers. Each FTA per game figure is the instrument's engi
 - `engine/internal/validate/testdata/calibration-5.60-20261001-fta-measure-before.txt`
 - `jsb-native/re-artifacts/jsb-J27-fta-RE-20261001.md` (private repo)
 - ADR-0084, ADR-0090
+- [backlog#1282](https://github.com/a-jay85/IBL5-backlog/issues/1282): the follow-up for the NEEDS-STATE levers

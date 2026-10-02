@@ -259,6 +259,10 @@ set_sec_rc 0 "not json"
 eq "tier2-bad-json" "unknown:bad-json" "$(login_probe)"
 
 reset_stubs
+set_sec_rc 0 "{\"claudeAiOauth\":{\"accessToken\":\"TOK\",\"refreshToken\":\"r\",\"expiresAt\":$PAST}}"
+eq "tier2-missing-refresh-ts-fails-open" "unknown:bad-json" "$(login_probe)"
+
+reset_stubs
 set_sec_rc 44 ""
 CLAUDE_SAVE="$LOGIN_PROBE_CLAUDE_BIN"
 export LOGIN_PROBE_CLAUDE_BIN="$T/nope"

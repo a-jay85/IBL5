@@ -50,7 +50,7 @@ login_probe() {
         # The last line carries the two pipeline exit codes; the lines before it hold
         # only the two expiry numbers.
         raw=$("$sec_bin" find-generic-password -s "Claude Code-credentials" -w 2>/dev/null \
-            | jq -r '[(.claudeAiOauth.refreshTokenExpiresAt // empty), (.claudeAiOauth.expiresAt // empty)] | map(tostring) | join(" ")' 2>/dev/null
+            | jq -r '[(.claudeAiOauth.refreshTokenExpiresAt // "x"), (.claudeAiOauth.expiresAt // empty)] | map(tostring) | join(" ")' 2>/dev/null
             echo "rc ${PIPESTATUS[0]} ${PIPESTATUS[1]}")
         rcs=$(printf '%s\n' "$raw" | tail -1)
         sec_rc=$(printf '%s' "$rcs" | cut -d' ' -f2)

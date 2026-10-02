@@ -155,7 +155,7 @@ A discharge never replaces a defense — the **Security** bullet (SQL prepared s
 
 **Why the grant exists.** Before it, an unknown that surfaced *during* design could not be explored at all: the orchestrator's Step-2 fan-out is spent before the architect starts, so the architect either guessed or the orchestrator had to have guessed the architect's needs in advance. Both produce plans with soft spots the architect could see but not close.
 
-**What it is not.** It is not a licence to delegate reading. A direct `Read`/`Grep` beats a ~3–5K-token spawn; an architect-side spawn must clear `.claude/rules/agent-tiering-detail.md` § Skip the Agent on its own merits, the same bar the orchestrator's Step-2 spawns clear.
+**What it is not.** It is not a licence to delegate reading. A direct `Read`/`Grep` beats a ~17-23K-token spawn; an architect-side spawn must clear `.claude/rules/agent-tiering-detail.md` § Skip the Agent on its own merits, the same bar the orchestrator's Step-2 spawns clear.
 
 **Budget — per actor, not per run.** The `/plan` Step-2 cap (≤2 orchestrator agents; never 3) is unchanged. The architect gets **≤1 `Explore` spawn per architect invocation**, on top of it. Run-wide ceiling: **3** (2 orchestrator + 1 architect). A per-actor cap needs no shared counter and no cross-actor bookkeeping, and 1 rather than 2 keeps the ceiling one above today's rather than doubling it — the grant's justification is *a* question that surfaced mid-design, singular.
 

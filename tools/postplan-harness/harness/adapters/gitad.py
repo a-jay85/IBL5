@@ -185,8 +185,10 @@ class LiveGit:
             blob = f"{proc.stdout}\n{proc.stderr}"
             if any(m in blob for m in _LOCAL_GATE_MARKERS):
                 detail = "\n".join(s for s in (proc.stderr.strip(), proc.stdout.strip()) if s)
-                raise HarnessError("local-gate", f"git {' '.join(args)}: {detail[:600]}")
-            raise HarnessError("git", f"git {' '.join(args)}: {proc.stderr.strip()[:400]}")
+                raise HarnessError("local-gate", f"git {' '.join(args)}: {detail[:600]}",
+                                   cmd=f"git {' '.join(args)}", output=detail)
+            raise HarnessError("git", f"git {' '.join(args)}: {proc.stderr.strip()[:400]}",
+                               cmd=f"git {' '.join(args)}", output=proc.stderr.strip())
         return proc.stdout
 
     def _run_out(self, *args: str) -> tuple[int, str]:
@@ -308,7 +310,8 @@ class LiveGit:
         if proc.returncode != 0:
             detail = "\n".join(s for s in (proc.stderr.strip(), proc.stdout.strip()) if s)
             raise HarnessError("local-gate",
-                               detail[:800] or f"git commit exited {proc.returncode}")
+                               detail[:800] or f"git commit exited {proc.returncode}",
+                               cmd="git commit", output=detail)
         return self._run("rev-parse", "HEAD").strip()
 
     def head(self) -> str:
@@ -914,8 +917,12 @@ class LiveGit:
                                 remote, f"HEAD:refs/heads/{branch}")
         if rc != 0:
             if any(m in out for m in _LOCAL_GATE_MARKERS):
-                raise HarnessError("local-gate", f"git push: {out[:600]}")
-            raise HarnessError("push-failed", out[:600])
+                raise HarnessError("local-gate", f"git push: {out[:600]}",
+                                   cmd=f"git push --force-with-lease={branch}:{lease} {remote} HEAD:refs/heads/{branch}",
+                                   output=out)
+            raise HarnessError("push-failed", out[:600],
+                               cmd=f"git push --force-with-lease={branch}:{lease} {remote} HEAD:refs/heads/{branch}",
+                               output=out)
 
     def push_ff(self) -> str:
         if not self.push_remote:
@@ -928,8 +935,10 @@ class LiveGit:
         rc, out = self._run_out("push", remote, f"HEAD:refs/heads/{branch}")
         if rc != 0:
             if any(m in out for m in _LOCAL_GATE_MARKERS):
-                raise HarnessError("local-gate", f"git push: {out[:600]}")
-            raise HarnessError("push-failed", out[:600])
+                raise HarnessError("local-gate", f"git push: {out[:600]}",
+                                   cmd=f"git push {remote} HEAD:refs/heads/{branch}", output=out)
+            raise HarnessError("push-failed", out[:600],
+                               cmd=f"git push {remote} HEAD:refs/heads/{branch}", output=out)
         return self.head()
 
 

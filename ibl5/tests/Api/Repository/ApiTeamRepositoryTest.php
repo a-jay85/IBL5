@@ -6,6 +6,7 @@ namespace Tests\Api\Repository;
 
 use Api\Pagination\Paginator;
 use Api\Repository\ApiTeamRepository;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\WideUnit\WideUnitTestCase;
 
 class ApiTeamRepositoryTest extends WideUnitTestCase
@@ -58,6 +59,61 @@ class ApiTeamRepositoryTest extends WideUnitTestCase
         $result = $this->repository->getTeams($this->buildPaginator());
 
         self::assertSame([], $result);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function allowedSortColumnProvider(): array
+    {
+        return [
+            'team_name' => ['team_name'],
+            'team_city' => ['team_city'],
+            'owner_name' => ['owner_name'],
+            'conference' => ['conference'],
+            'division' => ['division'],
+        ];
+    }
+
+    /**
+     * Characterization pin: every allowed sort column reaches the executed SQL
+     * as the ORDER BY identifier. Literal oracle — independent of production consts.
+     */
+    #[DataProvider('allowedSortColumnProvider')]
+    public function testGetTeamsOrdersByEachAllowedSortColumn(string $col): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->getTeams($this->buildAllowlistPaginator(['sort' => $col]));
+
+        $this->assertPreparedSqlContains(' ORDER BY ' . $col . ' ASC LIMIT ? OFFSET ?');
+    }
+
+    public function testGetTeamsFallsBackToDefaultSortForRejectedColumn(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->getTeams($this->buildAllowlistPaginator(['sort' => 'owner_name DESC, (SELECT 1)']));
+
+        $this->assertPreparedSqlContains(' ORDER BY team_name ASC ');
+        foreach ($this->mockDb->getPreparedQueries() as $query) {
+            self::assertStringNotContainsString('DROP', $query);
+            self::assertStringNotContainsString('SELECT 1', $query);
+        }
+    }
+
+    public function testGetTeamsOrdersDescendingWhenRequested(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->getTeams($this->buildAllowlistPaginator(['sort' => 'owner_name', 'order' => 'DESC']));
+        $this->assertPreparedSqlContains(' ORDER BY owner_name DESC ');
+
+        $this->mockDb->clearQueries();
+
+        $this->repository->getTeams($this->buildAllowlistPaginator(['sort' => 'owner_name', 'order' => 'sideways']));
+        $this->assertPreparedSqlContains(' ORDER BY owner_name ASC ');
+        $this->assertPreparedSqlNotContains(' DESC ');
     }
 
     // --- countTeams ---
@@ -124,5 +180,37 @@ class ApiTeamRepositoryTest extends WideUnitTestCase
     private function buildPaginator(): Paginator
     {
         return new Paginator([], 'team_name', ['team_name', 'team_city', 'conference']);
+    }
+
+    /**
+     * Paginator built directly with literal allowlist/default (independent oracle).
+     *
+     * @param array<string, string> $query
+     */
+    private function buildAllowlistPaginator(array $query): Paginator
+    {
+        return new Paginator($query, 'team_name', ['team_name', 'team_city', 'owner_name', 'conference', 'division']);
+    }
+
+    private function assertPreparedSqlContains(string $needle): void
+    {
+        $found = false;
+        foreach ($this->mockDb->getPreparedQueries() as $query) {
+            if (str_contains($query, $needle)) {
+                $found = true;
+                break;
+            }
+        }
+        self::assertTrue(
+            $found,
+            "No prepared query contained '" . $needle . "'. Prepared: " . implode(' | ', $this->mockDb->getPreparedQueries())
+        );
+    }
+
+    private function assertPreparedSqlNotContains(string $needle): void
+    {
+        foreach ($this->mockDb->getPreparedQueries() as $query) {
+            self::assertStringNotContainsString($needle, $query);
+        }
     }
 }

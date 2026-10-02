@@ -230,10 +230,18 @@ def correct_body_numbers(body: str, name_status: str, numstat: str) -> str:
     """
     facts = body_number_facts(name_status, numstat)
 
-    # Count distinct ADR numbers in the full body (used by ADR correction guard)
-    body_adr_count = len(set(re.findall(r"\bADR-(\d{4})\b", body)))
-
     spans = sorted(_protected_spans(body))
+
+    # Count distinct ADR numbers in unprotected text only (used by ADR correction guard)
+    unprotected: list[str] = []
+    _pos = 0
+    for start, end in spans:
+        if _pos < start:
+            unprotected.append(body[_pos:start])
+        _pos = max(_pos, end)
+    if _pos < len(body):
+        unprotected.append(body[_pos:])
+    body_adr_count = len(set(re.findall(r"\bADR-(\d{4})\b", "\n".join(unprotected))))
 
     result_parts: list[str] = []
     pos = 0

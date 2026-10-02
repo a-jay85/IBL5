@@ -24,7 +24,7 @@ Usage: bin/run-meta-checks-local [--base <sha>] [--pr <n>] [--body-file <path>]
 
   --base <sha>            Base commit to diff against. Default: merge-base with origin/master.
   --pr <n>                PR number. Required for --stage post-pr.
-  --body-file <p>         Planned PR body for check-pr-manual-testing before a PR exists.
+  --body-file <p>         Planned PR body for check-pr-manual-testing and check-post-merge-recipe before a PR exists.
   --stage <s>             pre-push (default) or post-pr. Selects which step subset runs.
   --print-filters         Print <filter>=true|false per filter and changed-path count, then exit 0.
   --self-test-hook <dir>  Override repo root for workflow YAML and bin/ scripts (test seam).
@@ -351,6 +351,14 @@ if [ "$STAGE" = "pre-push" ]; then
         SKIP_COUNT=$((SKIP_COUNT + 1))
     fi
 
+    # Row 7b: pre-push form of the post-merge recipe check
+    if [ -n "$BODY_FILE" ]; then
+        run_step "check-post-merge-recipe" hard "$BIN/check-post-merge-recipe" --body-file "$BODY_FILE"
+    else
+        printf 'SKIP  check-post-merge-recipe (no --body-file)\n'
+        SKIP_COUNT=$((SKIP_COUNT + 1))
+    fi
+
     # Filtered hard gates (rows 8-11)
     run_filtered_step "check-numbering"            hard "numbering" "$BIN/check-numbering" "--since=$BASE"
     run_filtered_step "check-e2e-hygiene"          hard "e2ehygiene" "$BIN/check-e2e-hygiene" --pr
@@ -390,6 +398,9 @@ fi
 if [ "$STAGE" = "post-pr" ]; then
     # Row 16: live PR body check (hard)
     run_step "check-pr-manual-testing" hard "$BIN/check-pr-manual-testing" --pr "$PR"
+
+    # Row 16b: live PR body post-merge recipe check (hard)
+    run_step "check-post-merge-recipe" hard "$BIN/check-post-merge-recipe" --pr "$PR"
 
     # Row 17: advisory collision check
     run_filtered_step "check-pr-collisions" advisory "prcollisions" "$BIN/check-pr-collisions" --pr "$PR"

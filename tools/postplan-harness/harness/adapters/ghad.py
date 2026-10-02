@@ -167,6 +167,9 @@ class RecordingGh:
     def branch_protection_strict(self) -> bool:
         return bool((self.fixture or {}).get("protection_strict", False))
 
+    def aggregator_required(self, context: str) -> bool:
+        return context in ((self.fixture or {}).get("protection_contexts") or [])
+
     def merge_state_status(self, pr: int | None = None) -> str:
         return str((self.fixture or {}).get("merge_state_status", "CLEAN"))
 
@@ -481,6 +484,15 @@ class LiveGh(RecordingGh):
         if val in ("true", "false"):
             return val == "true"
         return True
+
+    def aggregator_required(self, context: str) -> bool:
+        """Fail closed: unreadable protection or a missing context -> False (condition 15 keeps blocking)."""
+        try:
+            out = self._gh("api", f"repos/{self._repo()}/branches/master",
+                           "--jq", ".protection.required_status_checks.contexts[]?")
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            return False
+        return context in (out or "").splitlines()
 
     def merge_state_status(self, pr: int | None = None) -> str:
         """Fail open with "": an unreadable merge state must not trigger a rebase storm."""

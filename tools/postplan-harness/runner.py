@@ -35,9 +35,9 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import (adr_draft, body_numbers, cifix, ciwatch, conformance, fidelity, gitutil, llm_calls,
-                     manual_rows, manual_testing, outofscope, schemas, scope_conformance, statefile,
-                     usage_pause)
-from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
+                     manual_rows, manual_testing, outofscope, prosefix, schemas, scope_conformance,
+                     statefile, usage_pause)
+from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
 from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
@@ -406,7 +406,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                if sha == pre_rebase else "REBASE=rebased onto origin/master")
         res.meta_checks_ok = run_meta_checks_local(
             git, worktree or "", "origin/master", log, live=live,
-            failures_out=res.meta_check_failures)
+            failures_out=res.meta_check_failures, llm=llm)
         if live:
             sha = git.head()  # refresh — remediation may have committed and moved HEAD
         pr_known = gh.pr_number() if (live and gh.pr_exists()) else None
@@ -700,6 +700,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             degraded_agents=res.degraded_agents,
             plan_slug_drift=plan.slug_drift,
             failed_checks=_failed_checks,
+            aggregator_required=(gh.aggregator_required(AGGREGATOR_CONTEXT) if live
+                                 else bool((fixture or {}).get("aggregator_required", False))),
             meta_checks_status=_mc_status,
         )
         if not live and (fixture or {}).get("current_tree"):
@@ -1767,7 +1769,7 @@ def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool
 
 
 def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True,
-                         failures_out: list | None = None) -> bool:
+                         failures_out: list | None = None, llm=None) -> bool:
     if os.environ.get("PRE_PUSH_META_CHECKS_SKIP") == "1":
         log("phase2: meta-checks SKIPPED (PRE_PUSH_META_CHECKS_SKIP=1)")
         return True
@@ -1811,6 +1813,22 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
             raise HarnessError("local-gate",
                                f"meta-checks filter-parse failure: {(result2.stderr or '').strip()[:200]}")
         if rc2 == 0:
+            try:
+                os.unlink(flag)
+            except FileNotFoundError:
+                pass
+            return True
+    # One bounded prose-fix pass (harness/prosefix.py) when check-prose-since is the
+    # only failing gate. On failure it resets to its own head_before, so the flag,
+    # log line, and pushed tree below are exactly what they would have been.
+    if (llm is not None and worktree
+            and prosefix.failed_check_names(last_result.stdout or "")
+            == [prosefix.PROSE_CHECK]):
+        if prosefix.attempt_prose_fix(
+                git=git, llm=llm, repo=worktree, argv=argv,
+                first_stdout=last_result.stdout or "",
+                commit=lambda m: _commit_with_gate_remediation(git, worktree, m, log),
+                log=log):
             try:
                 os.unlink(flag)
             except FileNotFoundError:

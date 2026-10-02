@@ -13,6 +13,7 @@
 #   (10) pipeline-authored floor   -> pr_pipeline_authored_hold <labels_json> [head_ref]
 #   (11) unresolved review thread  -> pr_unresolved_findings_hold <pr_number>
 #   (15) already-red CI checks     -> pr_red_check_hold <pr_number>
+#        demoted to a warning when  -> pr_aggregator_required  (reads master protection)
 #
 # Conditions (2) review>=80, (3) MISSING-tests, (4) Phase-5 local verify, (7)
 # non-UI auto_merge:false, (9) realized-diff verdict are deliberately NOT here:
@@ -29,12 +30,18 @@
 # Test seam: GH_CMD (default `gh`) is a single-token command (a path to a shim in
 # tests) invoked as `"$GH_CMD" pr view ...` or `"$GH_CMD" pr checks ...`.
 # pr_dep_holds, pr_unresolved_findings_hold, and pr_red_check_hold all touch it.
+# pr_aggregator_required also touches GH_CMD via "$GH_CMD" api repos/$REPO_SLUG/branches/master.
 # REPO_SLUG (default `a-jay85/IBL5`) is the second seam, consumed only by
 # pr_unresolved_findings_hold's GraphQL call; it is the same seam name
 # bin/lib/post-review-findings.sh already uses.
 
 GH_CMD="${GH_CMD:-gh}"
 REPO_SLUG="${REPO_SLUG:-a-jay85/IBL5}"
+
+# The aggregator context name. bin/check-composite-contracts A2 pins this literal to
+# the job name in .github/workflows/all-checks-green.yml and to
+# tools/postplan-harness/harness/armable.py, so the three cannot drift apart.
+PR_ARMABLE_AGGREGATOR_CONTEXT='All checks green'
 
 # pr_manual_testing_clearance <body>
 #   The fail-closed positive-clearance axis (Phase 6.5 condition (1), mechanized).
@@ -325,4 +332,19 @@ pr_red_check_hold() {
     printf '%s' "$raw" | jq -r '.[] | select(.bucket == "fail") | select(.name != "human-signoff") | .name' \
         2>/dev/null || true
     return 0
+}
+
+# pr_aggregator_required
+#   Returns 0 iff master's live branch protection lists $PR_ARMABLE_AGGREGATOR_CONTEXT
+#   as a required status check; 1 otherwise. FAIL-CLOSED: any gh error, a missing
+#   .protection object, or an empty contexts list returns 1, which keeps condition
+#   (15) BLOCKING exactly as before this predicate existed. Uses the public
+#   branches endpoint (.protection is populated for the repo owner's token; the
+#   .../protection endpoint needs admin and is deliberately not used).
+#   Boolean predicate: call it in an `if`, never capture it under set -e.
+pr_aggregator_required() {
+    local ctxs
+    ctxs=$("$GH_CMD" api "repos/$REPO_SLUG/branches/master" \
+        --jq '.protection.required_status_checks.contexts[]?' 2>/dev/null) || return 1
+    grep -qxF -- "$PR_ARMABLE_AGGREGATOR_CONTEXT" <<< "$ctxs"
 }

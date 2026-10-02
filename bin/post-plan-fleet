@@ -614,7 +614,7 @@ timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground > "$LOG" 2>&1 || RC=$?
 notify() {
     ljob_dm_ready post-plan-fleet || return 0
     local DM_ICON="" DM_VERDICT="" DM_NEXT="" msg stop_text=""
-    local verdict="" parsed="" terminal="" latest_unconfirmed="" holds="" sticky=""
+    local verdict="" parsed="" terminal="" latest_unconfirmed="" holds="" warns="" sticky=""
     # STOP: lines take priority (same rule as derive_status)
     local stop_line=""
     stop_line=$(grep -m1 '^[[:space:]>*_`-]*STOP:' "$LOG" 2>/dev/null || true)
@@ -635,6 +635,8 @@ notify() {
             # never verdict_1). No rounds -> verdict_1 (null -> empty, falls through
             # to the RESULT: line exactly as before). Any parse error -> empty.
             # hold= lines turn each blocked Phase 6.5 arm condition into a fix hint.
+            # warn= lines carry a non-blocking condition warning (e.g. (15) once the
+            # aggregator is required); they never change the verdict.
             parsed=$(python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
@@ -672,11 +674,16 @@ for c in (d.get("arm") or {}).get("conditions") or []:
     else:
         h = "%s: %s" % (name, reason)
     print("hold=" + h.replace("\n", " "))
+for c in (d.get("arm") or {}).get("conditions") or []:
+    w = (c.get("warning") or "")[:150]
+    if w:
+        print("warn=" + w.replace("\n", " "))
 ' "$run_dir/result.json" "$PR" 2>/dev/null || true)
             terminal=$(printf '%s\n' "$parsed" | sed -n 's/^terminal=//p')
             verdict=$(printf '%s\n' "$parsed" | sed -n 's/^verdict=//p')
             sticky=$(printf '%s\n' "$parsed" | sed -n 's/^sticky=//p')
             holds=$(printf '%s\n' "$parsed" | sed -n 's/^hold=/• /p')
+            warns=$(printf '%s\n' "$parsed" | sed -n 's/^warn=/⚠ /p')
             if [ "$verdict" = null ]; then
                 verdict=""; latest_unconfirmed=1
             fi
@@ -703,9 +710,12 @@ for c in (d.get("arm") or {}).get("conditions") or []:
     [ -n "$sticky" ] \
         && verdict_link="read the verdict comment: <https://github.com/a-jay85/IBL5/pull/${PR}#issuecomment-${sticky}>"
     case "$verdict" in
-        READY)              DM_ICON="✅"; DM_VERDICT="READY";           DM_NEXT="merge when you're ready" ;;
-        HELD)               DM_ICON="⏸";  DM_VERDICT="HELD";            DM_NEXT="$holds" ;;
-        "READY WITH NOTES") DM_ICON="⚠️"; DM_VERDICT="READY WITH NOTES"; DM_NEXT="$holds" ;;
+        READY)              DM_ICON="✅"; DM_VERDICT="READY"
+                            DM_NEXT="merge when you're ready${warns:+$'\n'}${warns}" ;;
+        HELD)               DM_ICON="⏸";  DM_VERDICT="HELD"
+                            DM_NEXT="${holds}${holds:+${warns:+$'\n'}}${warns}" ;;
+        "READY WITH NOTES") DM_ICON="⚠️"; DM_VERDICT="READY WITH NOTES"
+                            DM_NEXT="${holds}${holds:+${warns:+$'\n'}}${warns}" ;;
         "NOT READY")        DM_ICON="❌"; DM_VERDICT="NOT READY";        DM_NEXT="$verdict_link" ;;
         STOPPED)            DM_ICON="🛑"; DM_VERDICT="STOPPED";          DM_NEXT="$stop_text" ;;
         "TIMED OUT")        DM_ICON="⏱";  DM_VERDICT="TIMED OUT"

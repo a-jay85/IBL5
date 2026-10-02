@@ -108,4 +108,28 @@ class TradingControllerSubmitOfferTest extends TestCase
         // setAction is NOT called — mirroring the CSRF-failure path
         EventLogger::flush($repo);
     }
+
+    /**
+     * HtmxHelper::redirect() exits the process, so a behavioral test of this refusal is not buildable; pin the source instead.
+     * $offeringTeam is bound straight from the session with no later check, so this guard is the only barrier.
+     */
+    public function testSubmitTradeOfferRefusesTeamlessSessionBeforeBindingOfferingTeam(): void
+    {
+        $src = file_get_contents(dirname(__DIR__, 2) . '/classes/Trading/TradingController.php');
+        self::assertIsString($src);
+
+        $guard = 'if ($sessionTeam === null || $sessionTeam === \'\' || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME) {';
+        $guardPos = strpos($src, $guard);
+        self::assertIsInt($guardPos, 'Trading submit guard removed or weakened: a null, empty, or Free Agents session would bind offeringTeam');
+
+        self::assertMatchesRegularExpression(
+            '/\{\s*\\\\Utilities\\\\HtmxHelper::redirect\(/',
+            substr($src, $guardPos, 300),
+            'Trading submit guard body no longer redirects'
+        );
+
+        $bindPos = strpos($src, '$offeringTeam = $sessionTeam;');
+        self::assertIsInt($bindPos, 'Trading $offeringTeam = $sessionTeam; binding not found');
+        self::assertLessThan($bindPos, $guardPos, 'Trading submit guard must precede binding $offeringTeam');
+    }
 }

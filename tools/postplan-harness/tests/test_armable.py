@@ -225,6 +225,22 @@ def test_red_ci_check_empty_does_not_block():
     assert not any(c.number == 15 and c.blocked for c in d.conditions)
 
 
+def test_red_ci_check_aggregator_required_false_blocks():
+    """(15) explicit aggregator_required=False keeps the hold."""
+    d = evaluate(inputs(failed_checks=["x"], aggregator_required=False))
+    assert not d.armed
+    assert any(c.number == 15 and c.blocked for c in d.conditions)
+
+
+def test_red_ci_check_aggregator_required_true_warns():
+    """(15) aggregator_required=True demotes the hold to a warning."""
+    d = evaluate(inputs(failed_checks=["x"], aggregator_required=True))
+    c15 = next(c for c in d.conditions if c.number == 15)
+    assert not c15.blocked
+    assert "x" in c15.warning
+    assert "All checks green" in c15.warning
+
+
 def test_red_ci_check_reason_lists_names():
     """(15) reason string joins all failing check names."""
     d = evaluate(inputs(failed_checks=["check-a", "check-b"]))

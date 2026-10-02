@@ -394,6 +394,99 @@ class DraftControllerTest extends TestCase
     }
 
     /**
+     * A Free Agents session is rejected even when the POST names Free Agents too,
+     * so the `!==` clause cannot mask the Free Agents clause.
+     */
+    public function testFreeAgentsSessionTeamIsRejectedWithNoDraftQuery(): void
+    {
+        $this->withValidCsrfToken();
+        $controller = new DraftController(
+            $this->mockDb,
+            $this->repoWithSessionTeam(\League\League::FREE_AGENTS_TEAM_NAME),
+            $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService,
+            null,
+            null,
+            $this->authedNukeCompat()
+        );
+
+        $result = $controller->submitSelection(
+            ['teamname' => \League\League::FREE_AGENTS_TEAM_NAME, 'player' => 'Some Prospect', 'draft_round' => '1', 'draft_pick' => '1'],
+            'user-cookie'
+        );
+
+        $this->assertStringContainsString('You can only make selections for your own team.', $result);
+        $this->assertNoDraftQuery();
+    }
+
+    /**
+     * An empty-string session with a real posted team is refused by the
+     * session/POST mismatch clause at check (3).
+     */
+    public function testEmptySessionTeamWithRealPostedTeamIsRejectedWithNoDraftQuery(): void
+    {
+        $this->withValidCsrfToken();
+        $controller = new DraftController(
+            $this->mockDb,
+            $this->repoWithSessionTeam(''),
+            $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService,
+            null,
+            null,
+            $this->authedNukeCompat()
+        );
+
+        $result = $controller->submitSelection(
+            ['teamname' => 'Metros', 'player' => 'Some Prospect', 'draft_round' => '1', 'draft_pick' => '1'],
+            'user-cookie'
+        );
+
+        $this->assertStringContainsString('You can only make selections for your own team.', $result);
+        $this->assertNoDraftQuery();
+    }
+
+    /**
+     * Session `''` with a `''` posted team passes check (3) and is refused by
+     * check (4) pick-slot ownership, with no write.
+     */
+    public function testEmptySessionTeamWithEmptyPostedTeamIsRefusedAtPickOwnership(): void
+    {
+        $this->withValidCsrfToken();
+        $this->routeOwnershipQueries(5, 'Metros');
+        $controller = new DraftController(
+            $this->mockDb,
+            $this->repoWithSessionTeam(''),
+            $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService,
+            null,
+            null,
+            $this->authedNukeCompat()
+        );
+
+        $result = $controller->submitSelection(
+            ['teamname' => '', 'player' => 'Some Prospect', 'draft_round' => '1', 'draft_pick' => '1'],
+            'user-cookie'
+        );
+
+        $this->assertStringContainsString('You do not own this draft pick.', $result);
+        foreach ($this->mockDb->getExecutedQueries() as $query) {
+            $this->assertDoesNotMatchRegularExpression('/^\s*(INSERT|UPDATE|DELETE)\b/i', $query);
+        }
+    }
+
+    /**
      * Matrix row 7: a fully-authorized submission (auth + valid token + owning
      * team) passes the guards and reaches the draft-processing path — the
      * draft-selection lookup query is issued.

@@ -217,6 +217,32 @@ class ApiPlayerRepositoryTest extends WideUnitTestCase
         $this->assertQueryExecuted('player_uuid');
     }
 
+    public function testPlayersThrowsForSortOutsideRepositoryMap(): void
+    {
+        $paginator = new Paginator(['sort' => 'secret_col'], 'secret_col', ['secret_col']);
+
+        try {
+            $this->repository->getPlayers($paginator);
+            self::fail('expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('Invalid sort column: secret_col', $e->getMessage());
+        } finally {
+            self::assertSame([], $this->mockDb->getExecutedQueries());
+        }
+    }
+
+    /**
+     * Contract pin: SORT_COLUMNS publishes exactly the master API sort vocabulary,
+     * each key mapping to the identically named SQL column.
+     */
+    public function testPlayerSortColumnsMatchPublishedApiSortList(): void
+    {
+        $expected = ['name', 'age', 'position', 'points_per_game', 'experience'];
+
+        self::assertSame($expected, array_keys(ApiPlayerRepository::SORT_COLUMNS));
+        self::assertSame($expected, array_values(ApiPlayerRepository::SORT_COLUMNS));
+    }
+
     private function buildPaginator(): Paginator
     {
         return new Paginator([], 'name', ['name', 'position', 'points_per_game']);

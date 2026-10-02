@@ -14,6 +14,13 @@ use League\LeagueContext;
  */
 class ApiGameRepository extends \BaseMysqliRepository
 {
+    /** Public API sort key => SQL column. The controller's allowlist is array_keys() of this map. */
+    public const SORT_COLUMNS = [
+        'game_date' => 'game_date',
+        'visitor_score' => 'visitor_score',
+        'home_score' => 'home_score',
+    ];
+
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
@@ -34,10 +41,12 @@ class ApiGameRepository extends \BaseMysqliRepository
         $this->applyFilters($filters, $where, $types, $params);
 
         $whereClause = $where !== [] ? 'WHERE ' . implode(' AND ', $where) : '';
-        $orderBy = $paginator->getOrderByClause();
+        $sortColumn = self::SORT_COLUMNS[$paginator->getSort()]
+            ?? throw new \InvalidArgumentException('Invalid sort column: ' . $paginator->getSort());
+        $direction = $paginator->getOrder() === 'desc' ? 'DESC' : 'ASC';
 
-        // IDENTIFIER (already-validated): $whereClause = hardcoded fragments; $orderBy = allowlist-validated by Paginator
-        $query = 'SELECT * FROM vw_schedule_upcoming ' . $whereClause . ' ORDER BY ' . $orderBy . ' LIMIT ? OFFSET ?';
+        // IDENTIFIER: $whereClause = hardcoded fragments; $sortColumn = SORT_COLUMNS map value; $direction = literal ternary
+        $query = 'SELECT * FROM vw_schedule_upcoming ' . $whereClause . ' ORDER BY ' . $sortColumn . ' ' . $direction . ' LIMIT ? OFFSET ?';
         $types .= 'ii';
         $params[] = $paginator->getLimit();
         $params[] = $paginator->getOffset();

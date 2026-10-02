@@ -177,6 +177,32 @@ class ApiTeamRepositoryTest extends WideUnitTestCase
         $this->assertQueryExecuted('t.uuid =');
     }
 
+    public function testTeamsThrowsForSortOutsideRepositoryMap(): void
+    {
+        $paginator = new Paginator(['sort' => 'secret_col'], 'secret_col', ['secret_col']);
+
+        try {
+            $this->repository->getTeams($paginator);
+            self::fail('expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('Invalid sort column: secret_col', $e->getMessage());
+        } finally {
+            self::assertSame([], $this->mockDb->getExecutedQueries());
+        }
+    }
+
+    /**
+     * Contract pin: SORT_COLUMNS publishes exactly the master API sort vocabulary,
+     * each key mapping to the identically named SQL column.
+     */
+    public function testTeamSortColumnsMatchPublishedApiSortList(): void
+    {
+        $expected = ['team_name', 'team_city', 'owner_name', 'conference', 'division'];
+
+        self::assertSame($expected, array_keys(ApiTeamRepository::SORT_COLUMNS));
+        self::assertSame($expected, array_values(ApiTeamRepository::SORT_COLUMNS));
+    }
+
     private function buildPaginator(): Paginator
     {
         return new Paginator([], 'team_name', ['team_name', 'team_city', 'conference']);

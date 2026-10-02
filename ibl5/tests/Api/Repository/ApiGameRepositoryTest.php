@@ -258,6 +258,32 @@ class ApiGameRepositoryTest extends WideUnitTestCase
         $this->assertQueryExecuted('ibl_box_scores');
     }
 
+    public function testGamesThrowsForSortOutsideRepositoryMap(): void
+    {
+        $paginator = new Paginator(['sort' => 'secret_col'], 'secret_col', ['secret_col']);
+
+        try {
+            $this->repository->getGames($paginator);
+            self::fail('expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('Invalid sort column: secret_col', $e->getMessage());
+        } finally {
+            self::assertSame([], $this->mockDb->getExecutedQueries());
+        }
+    }
+
+    /**
+     * Contract pin: SORT_COLUMNS publishes exactly the master API sort vocabulary,
+     * each key mapping to the identically named SQL column.
+     */
+    public function testGameSortColumnsMatchPublishedApiSortList(): void
+    {
+        $expected = ['game_date', 'visitor_score', 'home_score'];
+
+        self::assertSame($expected, array_keys(ApiGameRepository::SORT_COLUMNS));
+        self::assertSame($expected, array_values(ApiGameRepository::SORT_COLUMNS));
+    }
+
     private function buildPaginator(): Paginator
     {
         return new Paginator([], 'game_date', ['game_date', 'season_year', 'game_status']);

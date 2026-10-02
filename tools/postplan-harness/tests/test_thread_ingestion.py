@@ -122,6 +122,10 @@ def test_fetch_empty_snapshot_skips_trusted_open_threads(tmp_path):
 
 
 def test_live_snapshot_failure_returns_empty_set(tmp_path, monkeypatch):
+    """A failed snapshot is the same input as an empty one.
+
+    Mutation caught: LiveGh.pr_thread_ids re-raising in its `except Exception` arm.
+    """
     gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
 
     def _boom(*a, **k):

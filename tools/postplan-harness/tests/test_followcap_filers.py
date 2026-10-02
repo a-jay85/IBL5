@@ -61,6 +61,7 @@ def test_outofscope_eight_hits_nothing_dropped(tmp_path):
 
 @pytest.mark.parametrize("n", [2, 3, 4, 8])
 def test_fidelity_counts_two_three_four_eight(tmp_path, n):
+    # `min(n,3)` issues for n notes; the roll-up holds every extra note.
     gh = RecordingGh(str(tmp_path))
     fidelity.file_note_issues(gh, _notes(n), PR)
     issues = _pr_issues(gh)
@@ -72,6 +73,8 @@ def test_fidelity_counts_two_three_four_eight(tmp_path, n):
 
 
 def test_retry_with_fresh_adapter_files_nothing_new(tmp_path):
+    # Run 2 sees only what `RecordingGh.__init__` seeds from the `backlog_issues` fixture key,
+    # as a real retry sees only what GitHub holds. It never reads run 1's actions.jsonl.
     run1 = RecordingGh(str(tmp_path / "run1"))
     fidelity.file_note_issues(run1, _notes(5), PR)
     seeded = [dataclasses.asdict(i) for i in run1._followup_store.list_all()]
@@ -127,6 +130,8 @@ def _backlog_new(title: str, k: int) -> None:
 
 
 def test_mixed_filers_share_one_cap(tmp_path, monkeypatch):
+    # `LiveGh.followup_create` must reach the core. If it fell back to `self.issue_create`,
+    # the notes and hits would file 4 more issues instead of folding into the roll-up.
     store = _fake_gh_on_path(tmp_path, monkeypatch)
     gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "b")
     notes = _notes(2)

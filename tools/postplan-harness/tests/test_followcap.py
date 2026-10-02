@@ -38,6 +38,8 @@ def _pr(store, url: str = URL):
 
 @pytest.mark.parametrize("n", [2, 3, 4, 8])
 def test_issue_count_is_min_n_cap(n):
+    # The PR ends with `min(n,3)` issues. Every `unique-token-k` for k >= 3 lives in the
+    # roll-up, so dropping the slot-3 item loses `unique-token-3`.
     store = MemoryStore()
     for k in range(1, n + 1):
         _file(store, k)

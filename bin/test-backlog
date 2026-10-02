@@ -236,7 +236,7 @@ for i in json.load(open(sys.argv[1]))["issues"]:
     want "Case 13 says nothing filed" "$OUT" "nothing filed"
     [ "$(store_count)" -eq 0 ] && ok "Case 13 files zero issues" || fail "Case 13 files zero issues"
 
-    # Case 14: validation runs before any GitHub read.
+    # Case 14: validation runs before any GitHub read, so `store.json.log` never appears.
     mkfake case14
     BACKLOG_GH="$FAKE_DIR/gh" "$SCRIPT" new maintenance "t" "$PR900
 no location here, but long enough to clear the length floor on its own so only file:line fails the gate" >/dev/null 2>&1; RC=$?
@@ -245,6 +245,11 @@ no location here, but long enough to clear the length floor on its own so only f
 else
     printf '[SKIP] Cases 10-14 (python3 not installed)\n'
 fi
+
+# Case 15: the skill doc that agents read names the cap decisions (`backlog/SKILL.md`).
+SKILL_DOC="$(cd "$(dirname "$0")/.." && pwd)/.claude/skills/backlog/SKILL.md"
+want "backlog skill documents would-convert" "$(cat "$SKILL_DOC")" "would-convert"
+want "backlog skill documents the cap of 3" "$(cat "$SKILL_DOC")" "caps each origin PR at 3 follow-up issues"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

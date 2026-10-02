@@ -1,7 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-10-01
-last_verified: 2026-09-30
+last_verified: 2026-10-02
 ---
 
 # IBL5 Architecture Decision Records

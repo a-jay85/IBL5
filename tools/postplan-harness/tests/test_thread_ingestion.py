@@ -113,6 +113,14 @@ def test_fetch_nonempty_snapshot_calls_trusted_open_threads_once(tmp_path):
     assert result[0]["commentId"] == 4074926171
 
 
+def test_fetch_empty_snapshot_skips_trusted_open_threads(tmp_path):
+    gh = _CountingGh(str(tmp_path), {"trusted_threads": [THREAD_2340]})
+    result = fetch_trusted_threads(gh, PR, pre_posting_ids=set())
+    assert result is not None
+    assert result == []
+    assert gh.trusted_calls == 0
+
+
 def test_live_snapshot_failure_returns_empty_set(tmp_path, monkeypatch):
     gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
 
@@ -204,6 +212,100 @@ def test_run_decline_resolves_without_commit(tmp_path):
     resolve_actions = [a for a in actions if a.get("action") == "pr_resolve_thread"]
     assert len(resolve_actions) == 1
     assert resolve_actions[0]["body"].startswith("Declined: ")
+
+
+def test_run_nonempty_snapshot_fetches_once_and_declines(tmp_path):
+    gh = _CountingGh(str(tmp_path), {
+        "trusted_threads": [THREAD_2340],
+        "pr_number": PR,
+    })
+    llm = _llm({PURPOSE: '{"verdict":"DECLINE","reason":"Already handles this case"}'})
+    git = ReplayGit({})
+
+    def _no_commit(msg):
+        raise AssertionError("commit should not be called for a DECLINE")
+
+    result = run_thread_ingestion(
+        gh, llm, git, str(tmp_path), PR,
+        pre_posting_ids={4074926171},
+        out_dir=str(tmp_path),
+        log=lambda msg: None,
+        commit=_no_commit,
+        push=lambda: "",
+    )
+
+    assert gh.trusted_calls == 1
+    assert result["declined"] == 1
+    actions = gh.actions()
+    resolve_actions = [a for a in actions if a.get("action") == "pr_resolve_thread"]
+    assert len(resolve_actions) == 1
+    assert resolve_actions[0]["body"].startswith("Declined: ")
+
+
+def test_run_empty_snapshot_makes_zero_trusted_calls_and_no_llm_calls(tmp_path):
+    gh = _CountingGh(str(tmp_path), {"trusted_threads": [THREAD_2340]})
+    llm = _llm({})
+
+    result = run_thread_ingestion(
+        gh, llm, ReplayGit({}), str(tmp_path), PR,
+        pre_posting_ids=set(),
+        out_dir=str(tmp_path),
+        log=lambda m: None,
+        commit=lambda m: "",
+        push=lambda: "",
+    )
+
+    assert gh.trusted_calls == 0
+    assert llm.tooled_argvs == []
+    assert result["found"] == 0
+    assert "reason" not in result
+    with open(tmp_path / "thread-ingestion.json") as fh:
+        written = json.load(fh)
+    assert written == result
+    assert written["threads"] == []
+
+
+def test_run_empty_snapshot_skips_even_when_fetch_would_fail(tmp_path):
+    gh = _CountingGh(str(tmp_path), {"trusted_threads": None})
+
+    result = run_thread_ingestion(
+        gh, _llm({}), ReplayGit({}), str(tmp_path), PR,
+        pre_posting_ids=set(),
+        out_dir=str(tmp_path),
+        log=lambda m: None,
+        commit=lambda m: "",
+        push=lambda: "",
+    )
+
+    assert gh.trusted_calls == 0
+    assert "reason" not in result
+    assert result["found"] == 0
+    assert os.path.exists(tmp_path / "thread-ingestion.json")
+
+
+def test_run_failed_snapshot_skips_fetch(tmp_path, monkeypatch):
+    live = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+
+    def _boom(*a, **k):
+        raise RuntimeError("gh down")
+
+    monkeypatch.setattr("harness.adapters.llm._run_reaped", _boom)
+    snap = live.pr_thread_ids(PR)
+
+    gh = _CountingGh(str(tmp_path), {"trusted_threads": [THREAD_2340]})
+    llm = _llm({})
+    run_thread_ingestion(
+        gh, llm, ReplayGit({}), str(tmp_path), PR,
+        pre_posting_ids=snap,
+        out_dir=str(tmp_path),
+        log=lambda m: None,
+        commit=lambda m: "",
+        push=lambda: "",
+    )
+
+    assert snap == set()
+    assert gh.trusted_calls == 0
+    assert llm.tooled_argvs == []
 
 
 def test_run_fix_with_no_edits_is_skipped_and_stays_open(tmp_path):

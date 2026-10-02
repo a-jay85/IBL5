@@ -1,7 +1,7 @@
 ---
 description: PHPUnit testing rules: output parsing, behavior-focused patterns, PHPStan test-neon suppressions, integration test seeding.
 paths: ibl5/tests/**/*.php
-last_verified: 2026-09-16
+last_verified: 2026-09-30
 ---
 
 # PHPUnit Testing Rules
@@ -153,7 +153,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase {
 2. **Weekly full** — Mon 03:00 UTC.
 3. **On-demand full** — apply the `mutation-test` label.
 
-Thresholds: **100% MSI / 100% Covered MSI**. Details in `memory/ci-quality-gates.md`.
+Thresholds: **100% MSI / 100% Covered MSI** (`ibl5/infection.json5`, `.github/workflows/mutation-pr.yml`). Config: `phpunit-mutation.xml`; per-file deferrals live in `infection.json5`.
 
 ## Completion Criteria
 

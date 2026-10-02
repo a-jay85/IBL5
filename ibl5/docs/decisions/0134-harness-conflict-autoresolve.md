@@ -1,6 +1,6 @@
 ---
 description: The harness attempts auto-resolution of ordinary rebase conflicts behind a class gate, a bounded per-file resolver, and a conjunctive TREE-EQUIVALENT proof; condition (14) holds auto-merge until a reviewer issues a CONFLICT-REVIEW=CLEAN verdict.
-last_verified: 2026-09-21
+last_verified: 2026-10-01
 ---
 
 # ADR-0134: Harness conflict auto-resolution behind a proof gate
@@ -79,3 +79,13 @@ A fail-closed exit 3 used to name no files. Both rebase methods abort before `in
 Both rebase methods now snapshot the unmerged path set with `diff --name-only --diff-filter=U` **before** any `--abort`, store it on `LiveGit.last_conflict_files`, and the runner writes it to `audit.log` as `phase2: conflicted paths (plain rebase) = ...` and `phase2: conflicted paths (--onto) = ...`. On the two LLM-less paths the list is also appended to the raised detail or the decline reason, because no other channel exists there. The snapshot is independent of `inventory_conflicts()`, which returns `files=()` whenever it classifies a conflict as unresolvable, which is precisely when the operator most needs the list.
 
 This is diagnosis plumbing. No decision changes, no decline becomes a success, and the fail-closed contract is unchanged.
+
+## Addendum (2026-09-30): the verdict parser scans every reply line
+
+The "Residual risk and backstop" section above says the harness reads one exact literal from the reply. The exact-literal half still holds. The position rule changed with branch `conflict-review-verdict-scan`.
+
+**Observed failure.** On PR #2587 the reviewer replied with one summary sentence, a blank line, and then `CONFLICT-REVIEW=CLEAN` on line 3. The parser read line 1 only, recorded `CONFLICT-REVIEW=ABSENT`, and condition (14) held a review the model had passed. It was the only (14) hold in the harness audit logs.
+
+**Decision.** `harness/conflict.py` gained `parse_verdict(reply)`. It splits the reply into lines, strips each line, and treats a line as a verdict token only when it equals `CONFLICT-REVIEW=CLEAN` or `CONFLICT-REVIEW=FOUND-PROBLEM` in full. One distinct token anywhere in the reply yields that verdict. Both tokens present yield `FOUND-PROBLEM`. No token yields `ABSENT`. The prompt now asks for the token on line 1 with nothing before it, and the parser tolerates a reply that ignores the instruction. The verdict file format is unchanged: line 1 is the normalized verdict and the raw reply follows. `armable.py`, the skill readers, and `bin/test-postplan-arm-conditions` are untouched.
+
+**What this widens.** A token on its own line anywhere in the reply now counts, including inside a code fence or a quoted list. A token padded by whitespace (spaces, tabs, a trailing `\r`, NBSP) counts. A token embedded in a prose line, or followed by other text on its line, still does not count. The both-tokens rule closes the case where the reviewer quotes `CLEAN` while explaining a `FOUND-PROBLEM`, and the case where it quotes both. A reply that carries a quoted `CLEAN` on its own line and no real verdict is a false CLEAN and is the accepted residual risk; the read-only reviewer and the deterministic tree proof named above remain the backstops. Fence skipping was rejected because a fence-aware scan would turn a reviewer that fences its whole reply into an ABSENT hold, which is the failure this addendum fixes.

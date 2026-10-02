@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# One-time setup for the usage-gate coordinator launchd agent (ADR-0143).
+#
+# Installs a Mac-local LaunchAgent (com.ibl5.usage-gate-coordinator) that fires
+# bin/usage-gate-coordinator --once every 60 s. Program/WorkingDirectory point at the
+# durable MAIN checkout (never a worktree, which gets torn down).
+#
+# INSTALL ONLY AFTER THIS LANDS ON master — the launchd program is the main
+# checkout's bin/usage-gate-coordinator, which must exist there.
+#
+# Usage:
+#   bin/usage-gate-cron-setup --print           # coordinator plist to stdout (no side effect)
+#   bin/usage-gate-cron-setup --install         # write plist + load the LaunchAgent
+#   bin/usage-gate-cron-setup --uninstall       # unload + remove the LaunchAgent
+#   bin/usage-gate-cron-setup --probe-keychain  # one-shot launchd probe: can a launchd job read the keychain token?
+#   bin/usage-gate-cron-setup --print-probe     # probe plist to stdout (no side effect)
+#
+# Exactly one action per run.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=/dev/null
+. "$REPO_ROOT/bin/lib/launchd-job.sh"
+ACTION=""
+
+set_action() {
+    if [ -n "$ACTION" ]; then
+        echo "one action only" >&2
+        exit 2
+    fi
+    ACTION="$1"
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --install)        set_action install;        shift ;;
+        --uninstall)      set_action uninstall;      shift ;;
+        --print)          set_action print;          shift ;;
+        --probe-keychain) set_action probe;          shift ;;
+        --print-probe)    set_action print-probe;    shift ;;
+        -h|--help) awk 'NR==1||NR==2{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
+        *) echo "Unknown option: $1" >&2; exit 2 ;;
+    esac
+done
+
+[ -n "$ACTION" ] || { echo "No action given. See --help." >&2; exit 2; }
+
+# The first `git worktree list` entry is the main working tree; a worktree gets
+# torn down, so the plist must never point into one.
+MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+[ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"
+
+PLIST_LABEL="com.ibl5.usage-gate-coordinator"
+PROBE_LABEL="com.ibl5.usage-gate-keychain-probe"
+AGENTS_DIR="$HOME/Library/LaunchAgents"
+PLIST_PATH="$AGENTS_DIR/${PLIST_LABEL}.plist"
+PROBE_PATH="$AGENTS_DIR/${PROBE_LABEL}.plist"
+STATE_DIR="${IBL5_USAGE_GATE_STATE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate}"
+PROGRAM="$MAIN_WT/bin/usage-gate-coordinator"
+PLIST_PATHVAR="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME}/.local/bin"
+PROBE_RESULT="$STATE_DIR/keychain-probe.txt"
+
+# Single source of truth for the coordinator plist, used by --print and --install.
+# AbandonProcessGroup is required: the coordinator launches runner resumes with
+# `nohup ... &`, and launchd otherwise kills the job's process group when the tick
+# exits, which would kill every resumed session.
+build_plist() {
+    cat <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>${PLIST_LABEL}</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>${PROGRAM}</string>
+		<string>--once</string>
+	</array>
+	<key>StartInterval</key>
+	<integer>60</integer>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>AbandonProcessGroup</key>
+	<true/>
+	<key>WorkingDirectory</key>
+	<string>${MAIN_WT}</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>${PLIST_PATHVAR}</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>${STATE_DIR}/launchd-stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>${STATE_DIR}/launchd-stderr.log</string>
+</dict>
+</plist>
+PLIST
+}
+
+# The probe answers: can a launchd-hosted job read the Claude Code keychain token?
+# The token itself never leaves the pipe; only ok / fail rc=<n> is written.
+build_probe_plist() {
+    local script
+    script="if security find-generic-password -s \"Claude Code-credentials\" -w 2>/dev/null | jq -e -r '.claudeAiOauth.accessToken | length > 0' >/dev/null; then printf 'ok %s\\n' \"\$(date -u +%FT%TZ)\"; else printf 'fail rc=%s %s\\n' \"\$?\" \"\$(date -u +%FT%TZ)\"; fi > '${PROBE_RESULT}'"
+    script="$(xml_escape "$script")"
+    cat <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>${PROBE_LABEL}</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>${script}</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>${PLIST_PATHVAR}</string>
+	</dict>
+</dict>
+</plist>
+PLIST
+}
+
+probe_cleanup() {
+    launchctl bootout "gui/$(id -u)/${PROBE_LABEL}" 2>/dev/null || true
+    rm -f "$PROBE_PATH"
+}
+
+case "$ACTION" in
+    print)
+        build_plist
+        ;;
+    print-probe)
+        build_probe_plist
+        ;;
+    install)
+        mkdir -p "$AGENTS_DIR" "$STATE_DIR"
+        launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent
+        build_plist > "$PLIST_PATH"
+        launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+        echo "Installed ${PLIST_LABEL} (StartInterval 60s). Program: $PROGRAM"
+        ;;
+    uninstall)
+        launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent
+        rm -f "$PLIST_PATH"                                                   # idempotent
+        echo "Uninstalled ${PLIST_LABEL}."
+        ;;
+    probe)
+        mkdir -p "$AGENTS_DIR" "$STATE_DIR"
+        rm -f "$PROBE_RESULT"
+        trap probe_cleanup EXIT
+        launchctl bootout "gui/$(id -u)/${PROBE_LABEL}" 2>/dev/null || true
+        build_probe_plist > "$PROBE_PATH"
+        launchctl bootstrap "gui/$(id -u)" "$PROBE_PATH"
+        i=0
+        while [ ! -s "$PROBE_RESULT" ] && [ "$i" -lt 15 ]; do
+            sleep 1
+            i=$((i + 1))
+        done
+        if [ -s "$PROBE_RESULT" ]; then
+            verdict="$(cat "$PROBE_RESULT")"
+            echo "$verdict"
+            case "$verdict" in ok*) exit 0 ;; *) exit 1 ;; esac
+        fi
+        echo "fail timeout (no result after 15s)"
+        exit 1
+        ;;
+esac

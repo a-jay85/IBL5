@@ -19,7 +19,7 @@ Without `--live`, every would-be side effect remains a typed intent record.
 | Owned by code (deterministic) | Retained LLM calls (bounded, typed, validated) |
 |---|---|
 | Phase sequencing + terminal states | `pr-copy`: commit/PR title + summary (haiku). Skipped when the PR is open and the tree is clean |
-| Phase 2 pre-push meta-check gate (rebase → gate → push) | none; remediation is mechanical |
+| Phase 2 pre-push meta-check gate (rebase → gate → push) | `prose-fix`: rewrites the flagged lines when `check-prose-since` is the only failing check (sonnet, then opus; at most 2 tool-enabled calls with Read/Grep/Glob/Edit). A diff check enforces the line scope, and a re-run of the real gate decides success. Doc-staleness remediation stays mechanical |
 | Phase 3 diff classification (all flags) | `review-agent-a/b/d` — code review judgment (sonnet) |
 | Phase 5 verify aggregation | `security-audit` — security judgment (haiku) |
 | Phase 5.0 plan→test/file conformance | `score-findings` — rubric confidence scoring (haiku) |
@@ -43,7 +43,9 @@ run                       entry wrapper: replay | demo | isolated | test
 harness/
   classify.py             Phase 3 port (flags, filtered diff, module extraction)
   planfile.py             plan location + frontmatter/matrix/Critical-Files parsing
-  conformance.py          Phase 5.0 MISSING/MISSING-FILE/MISSING-PHASE detection (suffix + unique-basename resolver; phase omission = any-hit resolver)
+  prosefix.py             Phase 2 bounded prose-fix pass for a sole check-prose-since failure (hit parser, diff scope check, sonnet→opus attempts)
+  conformance.py          Phase 5.0 MISSING/MISSING-FILE/MISSING-PHASE detection (suffix + unique-basename resolver; phase omission = any-hit resolver). A plan token written with the literal `NNNN` placeholder (the form the architect contract prescribes) resolves like a renumbered ADR, and the check reads `conformance_files()`, which adds a rename's old path to `changed_files()` so a renamed Critical File is not reported missing
+  scope_conformance.py    shells out to bin/lib/plan-scope-conformance; renders advisory scope notes as a PR-body `## Unplanned changes` block and holds on none
   armable.py              twelve ported arming conditions (numbered 1–12, no gap; the skill's condition (11), unresolved review-thread findings, stays skill-only)
   review.py               Phase 4 launch gates + bounded review/security/scoring calls
   ciwatch.py              Phase 7 outcome interpretation

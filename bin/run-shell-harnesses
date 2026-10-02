@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# bin/run-shell-harnesses — run shell harness scripts in parallel, fail if ANY fails.
+#
+# Used by the "Shell harness regression tests" job in .github/workflows/tests.yml,
+# which lists the harnesses explicitly so bin/check-plan gate [G] can still see
+# each one. Every harness builds its own state under mktemp, so they are safe to
+# run concurrently; a harness that is not stays in its own serial workflow step.
+#
+# Each script's output goes to its own log and is printed as one ::group:: block
+# when it finishes; a pass/fail table with durations follows. Scripts start in
+# the order given (list the slowest first for the best packing).
+#
+# Usage: bin/run-shell-harnesses [-j N] <script> [<script> ...]
+#   -j N   parallel workers (default: CPU count)
+set -euo pipefail
+
+usage() { sed -n '/^# Usage:/,/^set /p' "$0" | sed '$d; s/^# \{0,1\}//'; }
+
+jobs_n=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help) usage; exit 0 ;;
+        -j) jobs_n="${2:?-j needs a number}"; shift 2 ;;
+        --) shift; break ;;
+        -*) echo "Usage: unknown flag $1" >&2; exit 2 ;;
+        *) break ;;
+    esac
+done
+[ $# -gt 0 ] || { usage >&2; exit 2; }
+[ -n "$jobs_n" ] || jobs_n="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
+
+HARNESS_RUN_DIR="$(mktemp -d)"
+trap 'rm -rf "$HARNESS_RUN_DIR"' EXIT
+export HARNESS_RUN_DIR
+: >"$HARNESS_RUN_DIR/results.tsv"
+
+run_one() {
+    local script="$1" key log start rc dur
+    key="$(printf '%s' "$script" | tr '/' '_')"
+    log="$HARNESS_RUN_DIR/$key.log"
+    start=$SECONDS
+    rc=0
+    "$script" >"$log" 2>&1 </dev/null || rc=$?
+    dur=$((SECONDS - start))
+    # mkdir is an atomic lock; keeps each group block contiguous across workers.
+    until mkdir "$HARNESS_RUN_DIR/lock" 2>/dev/null; do sleep 0.05; done
+    echo "::group::$script ($( [ "$rc" -eq 0 ] && echo PASS || echo "FAIL rc=$rc" ), ${dur}s)"
+    cat "$log"
+    [ -z "$(tail -c1 "$log")" ] || echo
+    echo "::endgroup::"
+    rmdir "$HARNESS_RUN_DIR/lock"
+    printf '%s\t%s\t%s\n' "$script" "$rc" "$dur" >>"$HARNESS_RUN_DIR/results.tsv"
+}
+export -f run_one
+
+t0=$SECONDS
+printf '%s\0' "$@" | xargs -0 -n 1 -P "$jobs_n" bash -c 'run_one "$1"' _ || true
+wall=$((SECONDS - t0))
+
+echo
+printf '%-6s %6s  %s\n' RESULT SECS SCRIPT
+fails=0
+sort -t"$(printf '\t')" -k3,3nr "$HARNESS_RUN_DIR/results.tsv" | while IFS="$(printf '\t')" read -r s rc d; do
+    printf '%-6s %6s  %s\n' "$([ "$rc" -eq 0 ] && echo PASS || echo "FAIL")" "$d" "$s"
+done
+fails="$(awk -F'\t' '$2 != 0' "$HARNESS_RUN_DIR/results.tsv" | wc -l | tr -d ' ')"
+ran="$(wc -l <"$HARNESS_RUN_DIR/results.tsv" | tr -d ' ')"
+echo "Ran $ran/$# scripts, $fails failed, ${wall}s wall, $jobs_n workers"
+if [ "$fails" -ne 0 ] || [ "$ran" -ne "$#" ]; then
+    echo "FAILED:" >&2
+    awk -F'\t' '$2 != 0 {print "  " $1 " (rc=" $2 ")"}' "$HARNESS_RUN_DIR/results.tsv" >&2
+    exit 1
+fi

@@ -45,7 +45,7 @@ final class FreeAgencyOtherFreeAgentsSectionView implements FreeAgencyOtherFreeA
         <tr>
             <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= HtmlSanitizer::e($player->getPlayerID() ?? 0) ?>">Offer</a></td>
             <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
-            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->getPlayerID() ?? 0, $player->getName() ?? '') ?>
+            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->getPlayerID() ?? 0, $player->getName() ?? '', 'sticky-col') ?>
             <?= HtmlSanitizer::trusted($this->tableRenderer->renderTeamCell($player, $teamColors)) ?>
             <td><?= HtmlSanitizer::e($player->getAge() ?? 0) ?></td>
             <?= HtmlSanitizer::trusted($this->tableRenderer->renderPlayerRatings($player)) ?>

@@ -80,10 +80,11 @@ final class FreeAgencyTableRendererView implements FreeAgencyTableRendererInterf
     <thead>
         <tr>
             <th colspan="<?= HtmlSanitizer::e($colspan) ?>">
-                <?= HtmlSanitizer::e($fullTitle) ?>
+                <span class="fa-table__title"><?= HtmlSanitizer::e($fullTitle) ?>
                 <?php if ($showBirdRightsNote): ?>
                     <br><small>(Note: * and <em>italicized</em> indicates player has Bird Rights)</small>
                 <?php endif; ?>
+                </span>
             </th>
         </tr>
         <tr>
@@ -91,7 +92,7 @@ final class FreeAgencyTableRendererView implements FreeAgencyTableRendererInterf
             <th><span class="sr-only">Actions</span></th>
             <?php endif; ?>
             <th>Pos</th>
-            <th>Player</th>
+            <th class="sticky-col sticky-corner">Player</th>
             <?php if ($showTeamColumn): ?>
             <th class="sep-r-team">Team</th>
             <?php endif; ?>

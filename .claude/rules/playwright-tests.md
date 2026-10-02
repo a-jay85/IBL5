@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-09-18
+last_verified: 2026-09-30
 ---
 
 # Playwright E2E Testing Rules
@@ -24,7 +24,7 @@ Use `test:e2e:serial` to decide whether an intermittent failure is a genuine bug
 
 1. **Docker running:** `docker compose ps` — if down, `docker compose up -d`.
 2. **`.env.test` exists** with valid credentials — copy from `.env.test.example` if missing.
-3. **Rebuild CSS after a branch switch:** `css:watch` may miss source changes from `git checkout`. Run `bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css`. Per `.claude/rules/css-auto-rebuild.md` this is the sanctioned recovery exception to the no-manual-build rule, not a routine step.
+3. **CSS is rebuilt automatically.** The watcher covers saves and git hooks cover checkout, rebase, and merge. Run a manual build only as a fallback when both are unavailable; the command is in `.claude/rules/css-auto-rebuild.md`.
 
 ## Test Categories
 
@@ -70,7 +70,7 @@ test.beforeEach(async ({ appState, page }) => {
 | Public, with state control | `../fixtures/public` | None (cookie-based `appState`) |
 | Authenticated | `../fixtures/auth` | None (stored auth state + cookie `appState`) |
 
-**Never** call the login flow inside a test — use the auth fixture. `auth.setup.ts` runs first and saves state to `playwright/.auth/user.json`.
+**Never** call the login flow inside a test, and never import from `@playwright/test` for an authenticated test; use the auth fixture. `auth.setup.ts` runs first and saves state to `playwright/.auth/user.json`.
 
 ### Shared server session — never mutate it; test the isolation invariant
 
@@ -128,7 +128,7 @@ await expect(sel.locator('option').first()).toBeVisible();   // ❌ <option> nev
 
 Tests depending on app state (season phase, trading open, trivia mode…) **set the state they need** rather than detecting-and-skipping, via the `test-state.php` endpoint (gated by `E2E_TESTING=1`). Authenticated → `appState` from `../fixtures/auth`; public → `appState` from `../fixtures/public` (cookie-based, no DB races). Both auto-restore: the cookie is BrowserContext-scoped, so no teardown hook exists.
 
-**WARNING:** Never use `setState()` from `helpers/test-state` in a test — it writes the DB directly and races with parallel workers. Always use the `appState` fixture.
+**WARNING:** Never use `setState()` from `helpers/test-state` in a test. It writes the DB directly and races with parallel workers. Use the `appState` fixture. The one exception is code that reads `ibl_settings` through a repository and so never sees the `appState` cookie; see `playwright-gotchas.md` § Auth & state.
 
 **Allowlisted settings:** `Current Season Phase`, `Current Season Ending Year`, `Allow Trades`, `Allow Waiver Moves`, `Show Draft Link`, `Trivia Mode`, `ASG Voting`, `EOY Voting`, `Free Agency Notifications`. Always include `'Current Season Ending Year': '2026'` when tests depend on CI seed data.
 
@@ -141,32 +141,24 @@ Tests depending on app state (season phase, trading open, trivia mode…) **set 
 ## DO
 
 1. Check PHP errors on every page a smoke test visits; add new pages to the error-check loop.
-2. Use the auth fixture for authenticated tests; `publicStorageState()` for public tests.
-3. Use `appState` to set required state (include `'Current Season Ending Year': '2026'` for seed-dependent tests).
-4. Use stable CSS classes or accessible roles for locators.
-5. Keep smoke tests fast — one assertion per test, no complex interactions.
-6. Register `page.route()` mocks **before** `page.goto()`/any navigation — routes only intercept requests made after registration.
+2. Use `appState` to set required state (include `'Current Season Ending Year': '2026'` for seed-dependent tests).
+3. Use stable CSS classes or accessible roles for locators.
+4. Keep smoke tests fast: one assertion per test, no complex interactions.
+5. Register `page.route()` mocks **before** `page.goto()`/any navigation. Routes only intercept requests made after registration.
 
 ## DON'T
 
-1. **Don't** call login inside tests — use the auth fixture.
-2. **Don't** skip tests due to season phase — use `appState`; never `setState()` (races with parallel workers).
-3. **Don't** use fragile structural selectors — use roles/text/stable classes.
-4. **Don't** mutate production data (trades, form submits) without cleanup — `appState` for reversible settings, or `afterEach`/`afterAll` for created data.
-5. **Don't** import from `@playwright/test` for authenticated tests — import from `../fixtures/auth`.
-6. **Don't** use `toBeVisible()`/`toHaveText()` on locators matching multiple elements — strict mode throws. Use `.first()`, `.nth(n)`, or `.count()`.
-7. **Don't** use `boundingBox()` to verify CSS like `width: fit-content` — parent layout skews it. Use `page.evaluate(() => getComputedStyle(el).property)`.
-8. **Don't** import `Page` from `../fixtures/auth` (it exports only `test`/`expect`) — `import type { Page } from '@playwright/test'`.
-9. **Don't** use `link.click()` for page-to-page navigation — the managed nav-wait times out under parallel load. Extract `getAttribute('href')` and `page.goto(href)`.
-10. **Don't** use `test.skip()` — set prerequisites via `appState` + CI seed.
-11. **Don't** use `.catch(() => false)` to swallow visibility errors — use `await expect().toBeVisible()` with a timeout (exception: `phase-gating-public.spec.ts`, where absence IS the test).
-12. **Don't** use bare `return` without a preceding assertion.
-13. **Don't** write dual-path `if/else` inside a test — split into focused tests with explicit `appState` prerequisites.
-14. **Don't** write `if (count > 0) { assert }` with no else — it silently passes when the element is absent. Use a hard assertion.
+1. **Don't** skip tests due to season phase. Use `appState` (see the `setState()` warning above).
+2. **Don't** use fragile structural selectors. Use roles, text, or stable classes.
+3. **Don't** mutate production data (trades, form submits) without cleanup. Use `appState` for reversible settings, or `afterEach`/`afterAll` for created data.
+4. **Don't** use `toBeVisible()`/`toHaveText()` on locators matching multiple elements, because strict mode throws. Use `.first()`, `.nth(n)`, or `.count()`.
+5. **Don't** use `boundingBox()` to verify CSS like `width: fit-content`, because parent layout skews it. Use `page.evaluate(() => getComputedStyle(el).property)`.
+6. **Don't** import `Page` from `../fixtures/auth` (it exports only `test`/`expect`). Use `import type { Page } from '@playwright/test'`.
+7. **Don't** use `link.click()` for page-to-page navigation, because the managed nav-wait times out under parallel load. Extract `getAttribute('href')` and `page.goto(href)`.
 
 ## Mandatory: No Skips, No Silent Passes
 
-DON'Ts 10 through 14 (the most common anti-patterns) are mechanically enforced by `bin/check-e2e-hygiene` (CI: the `e2e-hygiene` check in `.github/workflows/pr-meta-checks.yml`, consolidated from the former `e2e-hygiene.yml`). Exceptions go in `.e2e-hygiene-skip-allowlist` (file-level) or inline `// e2e-hygiene-allow: <reason >= 20 chars>`. The skip ban matches any aliased test object (e.g. `nonAdminTest.skip(`, `setup.skip(`) as well as the literal `test.skip(`, so renaming the import is not an escape hatch. `test.fail()` stays allowed: Playwright fails it once it starts passing. Banned forms:
+These anti-patterns are mechanically enforced by `bin/check-e2e-hygiene` (CI: the `e2e-hygiene` check in `.github/workflows/pr-meta-checks.yml`, consolidated from the former `e2e-hygiene.yml`). Exceptions go in `.e2e-hygiene-skip-allowlist` (file-level) or inline `// e2e-hygiene-allow: <reason >= 20 chars>`. The skip ban matches any aliased test object (e.g. `nonAdminTest.skip(`, `setup.skip(`) as well as the literal `test.skip(`, so renaming the import is not an escape hatch. The only `.catch(() => false)` exception is `phase-gating-public.spec.ts`, where absence IS the test. `test.fail()` stays allowed: Playwright fails it once it starts passing. Banned forms:
 
 ```typescript
 if (count === 0) { test.skip(true, 'No data'); return; }      // BANNED — hides failures
@@ -193,7 +185,6 @@ E2E runs in `.github/workflows/e2e-tests.yml`:
 ## Worktree & Environment Gotchas
 
 - **`bin/e2e-wt <name>`** runs Playwright from the worktree's `ibl5/` — test files and `BASE_URL` both resolve to the worktree, so TS changes are picked up with no extra steps.
-- **Rebuild CSS after a branch switch** (see Prerequisites #3).
 - **Login/registration tests can trip auth throttling** (`auth_users_throttling` accumulates failures). If `auth.setup.ts` fails with "Too many login attempts": `DELETE FROM auth_users_throttling WHERE 1=1;`. CI is unaffected (fresh DB per run).
 
 ## Completion Criteria
@@ -217,6 +208,6 @@ E2E runs in `.github/workflows/e2e-tests.yml`:
 
 **Running VR locally needs its own config.** `playwright.config.ts` excludes the spec (`testIgnore: [… /visual-regression/ …]`), so a plain `bunx playwright test` never runs it. Use `cd ibl5 && bunx playwright test --config=playwright.visual.config.ts`, against a `bin/wt-up <name> --seed` stack — baselines built from dev data mismatch CI wholesale.
 
-**Coverage:** `bin/check-vr-coverage` reports rows missing dimensions; new gaps fail CI (exit 1), existing gaps in `ibl5/tests/e2e/vr-coverage-baseline.json` are advisory. `bin/check-vr-coverage --update-baseline` acknowledges current gaps.
+**Coverage:** CI runs `bin/vr-changed-coverage` (`e2e-tests.yml`) to report VR rows missing for changed files.
 
 **Baseline regen via the `update-baselines` label — add the label AFTER creating the PR.** `.github/workflows/e2e-tests.yml` bypasses its path filter only when `github.event.action == 'labeled'`. A PR created *with* the label fires `opened`, the path filter finds no source change, Visual Regression is skipped entirely, and the regen never runs. So never `gh pr create --label update-baselines` — create the PR, then add the label as a separate action (or remove and re-add it). Prefer this CI flow over local `--update-snapshots`; baselines must come from the CI seed.

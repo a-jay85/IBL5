@@ -19,26 +19,23 @@ kill_infra_processes() {
         fi
     done
 
-    # Kill any remaining node processes with CWD in this worktree.
+    # Kill any remaining node processes with CWD in this worktree. The path match
+    # is exact (the worktree or a dir under it), so cleaning `foo` never touches
+    # a process in a sibling `foo-bar` worktree.
     local pids
     pids=$(lsof -d cwd 2>/dev/null \
-        | grep "$wt_path" \
-        | awk '/^node / { print $2 }' \
+        | awk -v p="$wt_path" '$1 == "node" && ($NF == p || index($NF, p "/") == 1) { print $2 }' \
         | sort -u || true)
     if [ -n "$pids" ]; then
         echo "$pids" | xargs kill -9 2>/dev/null || true
     fi
 
-    # Kill processes whose command line references this worktree path.
-    # CSS watchers started by wt-up use absolute paths in -i/-o flags but their
-    # CWD is wherever wt-up was called from, so lsof -d cwd misses them.
-    # After rm -rf deletes the worktree, the PID files are gone too, so the
-    # PID-file check above also misses them — they become unkillable zombies
-    # that recreate the output directory on every rebuild cycle.
-    pids=$(pgrep -f "$wt_path" 2>/dev/null || true)
-    if [ -n "$pids" ]; then
-        echo "$pids" | xargs kill -9 2>/dev/null || true
-    fi
+    # No kill by command line. A `pgrep -f <worktree path>` sweep used to live here
+    # for host CSS watchers, which wt-up no longer starts (Tailwind --watch runs in
+    # a container). It SIGKILLed any live job whose argv named the worktree, e.g.
+    # post-plan-now's `bash -lc "cd <worktree> ..."`. That ran before the in-use
+    # check below could see the job, so a post-merge `bin/cleanup --all` killed
+    # in-flight post-plan runs (PRs #2466, #2606) and then removed their worktrees.
 }
 
 # Check if any process has its working directory inside the worktree.

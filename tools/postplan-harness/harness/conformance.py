@@ -14,11 +14,24 @@ from .state import PhaseInfo, PlanInfo
 _MATRIX_ASSERTIONS_SCRIPT = str(
     PurePosixPath(os.path.abspath(__file__)).parents[3] / "bin" / "lib" / "plan-matrix-assertions")
 
-# Tier 3 of _resolve: a plan-named migration whose number shifted at implementation
-# time because a parallel branch claimed the same number first (backlog#937). The
-# directory prefix is part of the pattern on purpose — the tolerance is for
-# `ibl5/migrations/NNN_<suffix>` only, never for any other numbered filename.
+# Tier 3 of _resolve: a plan-named migration or ADR whose number shifted at
+# implementation time because a parallel branch claimed the same number first
+# (backlog#937 for migrations, backlog#1169 for ADRs). The directory prefix is part
+# of each pattern on purpose — the tolerance is for `ibl5/migrations/NNN_<suffix>`
+# and `ibl5/docs/decisions/NNNN-<suffix>` only, never for any other numbered
+# filename. The two prefixes are disjoint, so a token matches at most one pattern.
 _MIGRATION_RENUMBER = re.compile(r"^ibl5/migrations/\d+_(?P<suffix>.+)$")
+# Exactly four digits: `bin/next-adr` emits `printf "%04d"` and `bin/check-numbering`
+# greps `^[0-9]{4}-`. A 3- or 5-digit prefix is not an ADR filename and gets no tolerance.
+_ADR_RENUMBER = re.compile(r"^ibl5/docs/decisions/\d{4}-(?P<suffix>.+)$")
+# Token side only. The architect contract (.claude/skills/plan/_architect-contract.md
+# "Number placeholders") tells a plan to write `ibl5/docs/decisions/NNNN-<slug>.md`
+# because the real number is known only at implementation time, so a plan token may
+# legitimately carry the literal `NNNN` where a changed file carries `\d{4}`. The
+# alternation is the exact uppercase literal: `nnnn`, `NNNNN`, `\w{4}` and `[\dN]{4}`
+# are all deliberately NOT accepted, and the changed-file side stays `_ADR_RENUMBER`
+# (`\d{4}`) so a committed placeholder file never satisfies a numbered token.
+_ADR_TOKEN = re.compile(r"^ibl5/docs/decisions/(?:\d{4}|NNNN)-(?P<suffix>.+)$")
 
 
 def _contract_items(plan: PlanInfo, changed_files: list[str],
@@ -71,6 +84,29 @@ def _renumbered_migration(tok: str, changed_files: list[str]) -> str | None:
     return hits[0] if len(hits) == 1 else None
 
 
+def _renumbered_adr(tok: str, changed_files: list[str]) -> str | None:
+    """The single changed ADR sharing `tok`'s suffix under a different number.
+
+    None unless `tok` is `ibl5/docs/decisions/NNNN-<suffix>` (four digits, or the
+    literal placeholder `NNNN`) AND exactly one changed path is
+    `ibl5/docs/decisions/MMMM-<suffix>` (four digits) with the identical suffix. Two such
+    paths is ambiguous and returns None, so a MISSING-FILE still fires; the caller
+    has already established that no exact, suffix, or basename match exists. Kept
+    as a sibling of `_renumbered_migration` rather than a shared helper so the
+    migration tier's body stays byte-identical (backlog#1169 scope).
+    """
+    m = _ADR_TOKEN.match(tok)
+    if not m:
+        return None
+    suffix = m.group("suffix")
+    hits: list[str] = []
+    for f in changed_files:
+        n = _ADR_RENUMBER.match(f)
+        if n and n.group("suffix") == suffix:
+            hits.append(f)
+    return hits[0] if len(hits) == 1 else None
+
+
 def _resolve(tok: str, changed_files: list[str]) -> str | None:
     """The single changed path a plan token names, or None when 0 or 2+ candidates.
 
@@ -89,9 +125,14 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
 
     Tier 3 runs only when Tiers 1 and 2 found nothing: a token of the form
     `ibl5/migrations/NNN_<suffix>` resolves to the one changed path
-    `ibl5/migrations/MMM_<suffix>` with the identical suffix, which is the shape a
-    plan-authorized renumber produces when `bin/next-migration` prints a different
-    number than the plan quoted. Zero or 2+ same-suffix paths still return None.
+    `ibl5/migrations/MMM_<suffix>` with the identical suffix, and a token of the
+    form `ibl5/docs/decisions/NNNN-<suffix>` resolves to the one changed path
+    `ibl5/docs/decisions/MMMM-<suffix>` (the token's number may be four digits or
+    the literal placeholder `NNNN`). Both are the shape a plan-authorized
+    renumber produces when `bin/next-migration` or `bin/next-adr` prints a
+    different number than the plan quoted. Migration is checked first, then ADR;
+    the prefixes are disjoint so order never changes the result. Zero or 2+
+    same-suffix paths still return None.
     """
     tok = tok.strip().strip("/")
     # pytest node-id form `path/to/file.py::test_name` — strip the test-name
@@ -118,7 +159,7 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
         return cands.pop()
     if cands:
         return None
-    return _renumbered_migration(tok, changed_files)
+    return _renumbered_migration(tok, changed_files) or _renumbered_adr(tok, changed_files)
 
 
 def _touched(tok: str, changed_files: list[str]) -> bool:
@@ -147,7 +188,7 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str]) -> list[str]:
 
     Exempt, in order: a phase whose heading carries an all-S `[phases: S]` marker
     (bookkeeping), a phase number named in `## Out of Scope` (declared deferred), and a
-    phase whose body cites no path at all (no evidence = cannot verify = skip). Empty when
+    phase whose heading and body cite no path at all (no evidence = cannot verify = skip). Empty when
     the plan was not found or has no parsed phases, so a plan-blind run and every
     pre-existing PlanInfo literal produce nothing. Hold-only: the items flow into arming
     condition (3) via check(); fidelity.build_work_list excludes them from the fixer loop.
@@ -214,6 +255,9 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     """Returns unresolved `MISSING:` / `MISSING-FILE:` / `MISSING-METHOD:` /
     `UNMET-CONTRACT:` / `MISSING-PHASE:` / `UNREALISED-ASSERTION:` items (empty = clean).
 
+    A planned token listed in `plan.no_change_test_paths` (every planning row is a
+    Visual-regression row marked `(no-change)`) never yields `MISSING:`.
+
     `UNMET-CONTRACT:` items are produced even when the plan has no Verification
     Matrix — a matrix-less doc/tooling plan is exactly what `evidence-present`
     exists for.
@@ -237,6 +281,13 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     if not plan.has_matrix:
         return items
     for t in plan.planned_test_paths:
+        if t in plan.no_change_test_paths:
+            # Every row planning this token is a Visual-regression row marked
+            # `(no-change)`: the planned outcome IS an untouched baseline, so an
+            # absent diff entry is the pass condition, not a missing test
+            # (backlog#1222). parse_no_change_test_paths already refused the
+            # exemption when any unmarked row shares the token.
+            continue
         hit = _resolve(t, changed_files)
         if hit is None:
             items.append(f"MISSING: {t} (matrix planned a test the diff never wrote)")
@@ -293,11 +344,13 @@ def _changed_files(repo_root: str) -> list[str]:
     Committed (merge-base range) + uncommitted tracked + untracked-not-ignored.
     The third arm is why a brand-new test file counts as PRESENT before its first
     commit; `--exclude-standard` honors every gitignore source so build droppings
-    never enter the set.
+    never enter the set. `--no-renames` lists a rename as its old path plus its new
+    path, matching `LiveGit.conformance_files` so this seam and post-plan Phase 5.0
+    agree on a renamed Critical File.
     """
     seen: list[str] = []
-    for args in (["diff", "--name-only", "origin/master...HEAD"],
-                 ["diff", "--name-only", "HEAD"],
+    for args in (["diff", "--no-renames", "--name-only", "origin/master...HEAD"],
+                 ["diff", "--no-renames", "--name-only", "HEAD"],
                  ["ls-files", "--others", "--exclude-standard"]):
         for path in _git_lines(args, repo_root):
             if path not in seen:

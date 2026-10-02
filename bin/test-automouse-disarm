@@ -111,6 +111,14 @@ assert_eq "$(parse_when_epoch 'not a time' >/dev/null 2>&1; echo $?)" "1" "parse
 RT_EPOCH=$(parse_when_epoch '2026-08-20 09:00')
 assert_eq "$(epoch_fmt "$RT_EPOCH" '%Y-%m-%d %H:%M')" "2026-08-20 09:00" "parse/format round-trip"
 
+# A bare time means today, local zone.
+TODAY=$(date '+%Y-%m-%d')
+TIME_ONLY=$(parse_when_epoch '21:15')
+assert_eq "$(epoch_fmt "$TIME_ONLY" '%Y-%m-%d %H:%M')" "$TODAY 21:15" "time-only defaults to today"
+LOCAL_TZ=$(date '+%Z')
+TIME_TZ=$(parse_when_epoch "21:15 $LOCAL_TZ")
+assert_eq "$(epoch_fmt "$TIME_TZ" '%Y-%m-%d %H:%M')" "$TODAY 21:15" "time-only with TZ defaults to today"
+
 # next_daily_epoch rolls forward when the time has already passed today, and
 # stays on today when it hasn't. Both are checked against the wall clock, not
 # against a +86400 assumption, so a DST day cannot false-fail this.

@@ -356,12 +356,47 @@ att_line() { # attachments_json
     ' 2>/dev/null
 }
 
+# ── Per-render nonce tags (prompt-injection hardening) ───────────────────────
+# Every prompt wraps GM-authored text in a tag pair the model is told to treat as data.
+# A fixed closing tag is guessable: a GM who types "</untrusted>" ends the block early and
+# the rest reads as instructions. Two helpers close that:
+#   prompt_nonce         — 8 hex chars, fresh per render. Every open/close tag carries it as
+#                          an id attribute and the framing text says only a closing tag with
+#                          that id ends the block. The attacker never sees the render.
+#   neutralize_untrusted — backup for a model that ignores the id rule: rewrites the four
+#                          closing-tag prefixes to a "_"-suffixed form so no well-formed
+#                          closing tag survives in a payload. The text stays readable, since a
+#                          report that mentions </report> must still reach the classifier.
+# Pure bash parameter expansion (never sed/eval): a payload with &, \1, or a newline can
+# never be reinterpreted by the tool doing the rewrite.
+prompt_nonce() {
+    openssl rand -hex 4
+}
+
+neutralize_untrusted() { # payload  → stdout
+    local s="$1" tag
+    for tag in report untrusted transcript attachments; do
+        s="${s//<\/$tag/</${tag}_}"
+        # Idempotent: a second pass turns "</tag_" into "</tag__"; collapse it back.
+        while [[ "$s" == *"</${tag}__"* ]]; do s="${s//<\/${tag}__/</${tag}_}"; done
+    done
+    printf '%s' "$s"
+}
+
 # Build a prompt by safe bash substitution (never sed — untrusted content in replacement).
+# {{nonce}} is substituted FIRST, over the template alone, so a GM who types the literal
+# "{{nonce}}" in a report cannot have it rewritten into the real nonce inside the data block.
+# Every untrusted argument is neutralized before it is spliced in.
 render_prompt() { # template original_text transcript attachments_text
-    local t="$1"
-    t="${t//\{\{original_text\}\}/$2}"
-    t="${t//\{\{transcript\}\}/$3}"
-    t="${t//\{\{attachments_text\}\}/$4}"
+    local t="$1" nonce o tr at
+    nonce="$(prompt_nonce)"
+    t="${t//\{\{nonce\}\}/$nonce}"
+    o="$(neutralize_untrusted "$2")"
+    tr="$(neutralize_untrusted "$3")"
+    at="$(neutralize_untrusted "$4")"
+    t="${t//\{\{original_text\}\}/$o}"
+    t="${t//\{\{transcript\}\}/$tr}"
+    t="${t//\{\{attachments_text\}\}/$at}"
     printf '%s' "$t"
 }
 
@@ -999,6 +1034,9 @@ render_hunter_prompt() { # claimed wt_appdir
     transcript="$(row_transcript "$thread_id")"
     att="$(att_line "$(printf '%s' "$claimed" | jq -c '.attachments // []')")"
     t="$(cat "$HUNT_PROMPT_FILE")"
+    # Nonce first, template-only — same ordering rationale as render_prompt().
+    local nonce; nonce="$(prompt_nonce)"
+    t="${t//\{\{nonce\}\}/$nonce}"
     t="${t//\{\{bug_id\}\}/$id}"
     t="${t//\{\{class\}\}/$class}"
     t="${t//\{\{worktree\}\}/$wt_appdir}"
@@ -1010,6 +1048,12 @@ render_hunter_prompt() { # claimed wt_appdir
     # a strict [a-z0-9-] allowlist.
     host="$(basename "$(dirname "$wt_appdir")").localhost"
     t="${t//\{\{hostname\}\}/$host}"
+    # report / transcript / att are GM-authored (or GM-named): neutralize each so no payload
+    # carries a closing tag. id/class/worktree/hostname above are trusted (DB id, fixed enum,
+    # bug_slug() allowlist) and stay raw.
+    report="$(neutralize_untrusted "$report")"
+    transcript="$(neutralize_untrusted "$transcript")"
+    att="$(neutralize_untrusted "$att")"
     t="${t//\{\{report\}\}/$report}"
     t="${t//\{\{transcript\}\}/$transcript}"
     t="${t//\{\{attachments_text\}\}/$att}"

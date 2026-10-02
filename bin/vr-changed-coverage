@@ -26,8 +26,7 @@ if (process.argv.slice(2).includes('--help')) {
 const __dir = dirname(fileURLToPath(import.meta.url));
 const ibl5Dir = resolve(__dir, '..', 'ibl5');
 
-// Dynamic import so this works when invoked from the repo root (same idiom as
-// bin/check-vr-coverage).
+// Dynamic import so this works when invoked from the repo root.
 const { VR_MANIFEST } = await import(resolve(ibl5Dir, 'tests/e2e/vr-manifest.ts'));
 const { classifyChangedFiles } = await import(
   resolve(ibl5Dir, 'tests/e2e/vr-coverage-map.ts')

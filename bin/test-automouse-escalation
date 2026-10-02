@@ -150,6 +150,22 @@ else
         fi
         rm -f "$LOG"
         rm -rf "$QUEUE_DIR"
+
+        # --- w5: backward compat — a 4-arg call writes NO failure-signature line
+        #         and keeps the header as line 1 (Phase 4 adds an optional 5th arg).
+        LOG=$(mktemp)
+        QUEUE_DIR=$(mktemp -d)
+        printf 'some-log-line\n' > "$LOG"
+        write_failure_report "plan" 0 "claude-sonnet-5-5" 2
+        if head -n 1 "$QUEUE_DIR/plan.failure" | grep -q '^# Prior attempt 2/3 failed (model: claude-sonnet-5-5)' \
+            && ! grep -q '^failure-signature:' "$QUEUE_DIR/plan.failure"; then
+            echo "ok: w5-four-arg-call-has-no-signature-line"
+        else
+            echo "FAIL: w5-four-arg-call-has-no-signature-line — header moved or signature line written without a 5th arg"
+            FAILED=1
+        fi
+        rm -f "$LOG"
+        rm -rf "$QUEUE_DIR"
     fi
 fi
 

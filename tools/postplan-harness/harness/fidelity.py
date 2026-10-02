@@ -776,6 +776,9 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[in
     the verdict opens with the reviewer's process narration, so a fixed-length cut of it
     was always off-topic and ended mid-sentence. The full verdict is the PR's sticky
     comment, one click from the link.
+
+    Notes carry no severity, so they file in the order the reviewer listed them. Past the
+    per-PR cap of 3 they fold into one roll-up issue (`harness/followcap.py`).
     """
     log = log or _noop_log
     if not notes:
@@ -796,13 +799,13 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[in
             continue
         body = f"{pr_link}\n\n{detail}"
         try:
-            n = gh.issue_create(title, body, "maintenance")
+            n = gh.followup_create(title, body, "maintenance")
             if n is not None:
                 nums.append(n)
                 seen.add(key)
                 log(f"phase5.5 notes: filed issue #{n} '{title[:50]}'")
         except (HarnessError, OSError) as exc:
-            log(f"phase5.5 notes: issue_create failed ({exc})")
+            log(f"phase5.5 notes: followup_create failed ({exc})")
     return nums
 
 
@@ -891,6 +894,18 @@ def findings_excerpt(path: str, verdict_present: bool) -> str:
     if len(text) > EXCERPT_LIMIT:
         text = text[:EXCERPT_LIMIT] + "… (truncated)"
     return text
+
+
+def verdict_file_usable(path: str) -> bool:
+    """True when the verdict file would put a non-empty findings excerpt in the sticky.
+
+    Carry-forward reuses a prior verdict without re-running the reviewer, but the sticky
+    the runner then composes still quotes this file. A file gone from /tmp (a reboot),
+    unreadable, blank, or holding nothing above the digest cut would print an empty
+    excerpt and placeholder digest rows over a sticky that already had real ones. Same
+    definition as the sticky's own excerpt, so the two can never disagree.
+    """
+    return bool(findings_excerpt(path, True))
 
 
 def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed) -> str:

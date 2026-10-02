@@ -454,8 +454,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # Phase 4.5 snapshot: thread ids that exist BEFORE this run posts anything.
         # Taken before the review worker is submitted, so nothing this run posts can
         # enter it. Empty on any failure = Phase 4.5 acts on nothing.
+        t_snap = time.monotonic()
         pre_posting_ids = gh.pr_thread_ids(pr)
-        log(f"phase4.5 snapshot: {len(pre_posting_ids)} pre-existing thread(s)")
+        log(f"phase4.5 snapshot: {len(pre_posting_ids)} pre-existing thread(s) "
+            f"in {time.monotonic() - t_snap:.2f}s")
 
         # ---- Phase 4.5: pre-existing trusted review threads --------------
         # Runs before the review worker starts, so a fix commit can never move the head
@@ -1011,6 +1013,7 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
     Swallows everything except gate-path-edit (a local commit touched a gate-owning
     path; shipping it later would bypass the gate) and push-failed (the tree and origin
     disagree; nothing downstream can reason about the head)."""
+    t0 = time.monotonic()
     try:
         out = run_thread_ingestion(
             gh, llm, git, worktree or ".", pr, pre_posting_ids, out_dir, log,
@@ -1032,7 +1035,8 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
         out = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None,
                "error": repr(e)}
     log(f"phase4.5: {out.get('found', 0)} trusted thread(s) found, {out.get('fixed', 0)} fixed, "
-        f"{out.get('declined', 0)} declined, {out.get('skipped', 0)} skipped (error)")
+        f"{out.get('declined', 0)} declined, {out.get('skipped', 0)} skipped (error) "
+        f"in {time.monotonic() - t0:.2f}s")
     return out
 
 
@@ -1966,6 +1970,11 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             prior_sticky = None
     carried, decline_reason = fidelity.carry_forward_predicate(
         prior_sticky, diff_id, plan_hash)
+    # The sticky composed after a carry still quotes verdict_path(pr). If /tmp lost it,
+    # carrying would overwrite the prior sticky's real excerpt and digest with
+    # placeholders, so decline and let the full review regenerate the file.
+    if carried and not fidelity.verdict_file_usable(fidelity.verdict_path(pr)):
+        carried, decline_reason = None, "verdict-file-missing"
     if carried:
         log(f"phase5.5 fidelity: review: carried forward (patch-id {diff_id[:12]})")
         res.fidelity = {"verdict_1": carried, "error_kind": None,
@@ -2516,6 +2525,25 @@ def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> 
         pass
 
 
+def _prose_hold_note(res: RunResult) -> str:
+    """Display-only RESULT-line suffix naming the prose check as a hold cause.
+
+    Non-empty only when the run is held, condition (16) is blocked, and the
+    pre-push meta-check failures include the prose check. Condition (16) also
+    blocks on post-pr failures and UNKNOWN state, which never populate
+    meta_check_failures, so both signals are required.
+    """
+    arm = res.arm
+    if arm is None or arm.armed:
+        return ""
+    if not any(c.number == 16 for c in arm.holds):
+        return ""
+    names = [f.get("name") for f in (res.meta_check_failures or [])]
+    if prosefix.PROSE_CHECK not in names:
+        return ""
+    return f" held-by=prose-check ({prosefix.PROSE_CHECK} failed pre-push)"
+
+
 def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
     """The one line a watcher greps for — printed FIRST, before the stats lines.
 
@@ -2617,6 +2645,7 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
         return ("RESULT: post-plan BLOCKED — BEHIND retry cap reached (branch still "
                 "behind master after 3 re-rebases); auto-merge disarmed, human "
                 f"merges{pr}{tail} findings={len(res.findings)}")
+    tail += _prose_hold_note(res)
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
             f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}")
 

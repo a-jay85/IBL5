@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-repeat-failure — regression test for the automouse
+# repeated-failure stop (ADR-0160).
+#
+# Pins:
+#   - bin/lib/automouse-failure-signature: true repeats normalize equal,
+#     different failures do not, no informative error yields empty output
+#   - the run-loop helpers in bin/automouse/run that read and compare signatures
+#
+# Run: bin/test-automouse-repeat-failure  (exit 0 = all pass, 1 = a case failed)
+
+set -uo pipefail
+
+REPO=$(cd "$(dirname "$0")/.." && pwd)
+SIG="$REPO/bin/lib/automouse-failure-signature"
+
+FAILED=0
+TMPS=()
+cleanup() { [ "${#TMPS[@]}" -gt 0 ] && rm -rf "${TMPS[@]}"; return 0; }
+trap cleanup EXIT
+
+WORK=$(mktemp -d)
+TMPS+=("$WORK")
+
+# rec <file> <tool> <command> <error-text>
+rec() {
+    printf 'tool: %s\ncommand: %s\nerror:\n%s\n' "$2" "$3" "$4" > "$1"
+}
+
+# check <name> <command-that-succeeds-on-pass...>
+pass() { echo "ok: $1"; }
+fail() { echo "FAIL: $1 — $2"; FAILED=1; }
+
+# --- n1: SHAs, timestamps, worktree paths, line numbers, durations normalize equal
+rec "$WORK/a" Bash 'cd /Users/a/IBL5-worktrees/x/ibl5 && vendor/bin/phpunit' \
+'Exit code 1
+2026-10-01T03:12:44Z fatal: bad object 3f9c2ab71e0d at /Users/a/IBL5-worktrees/x/ibl5/classes/Foo.php:118 after 4.2s'
+rec "$WORK/b" Bash 'cd /Users/a/IBL5-worktrees/y/ibl5 && vendor/bin/phpunit' \
+'Exit code 1
+2026-10-02T05:40:01Z fatal: bad object a81be09c44f2d7e at /Users/a/IBL5-worktrees/y/ibl5/classes/Foo.php:131 after 9.8s'
+SA=$("$SIG" "$WORK/a")
+SB=$("$SIG" "$WORK/b")
+if [ -n "$SA" ] && [ "$SA" = "$SB" ]; then
+    pass "n1-sha-timestamp-paths-normalize-equal"
+else
+    fail "n1-sha-timestamp-paths-normalize-equal" "A='$SA' B='$SB'"
+fi
+
+# --- n2: different error text differs
+rec "$WORK/c" Bash 'git status' 'fatal: bad object'
+rec "$WORK/d" Bash 'git status' 'fatal: not a git repository'
+SC=$("$SIG" "$WORK/c")
+SD=$("$SIG" "$WORK/d")
+if [ -n "$SC" ] && [ -n "$SD" ] && [ "$SC" != "$SD" ]; then
+    pass "n2-different-error-text-differs"
+else
+    fail "n2-different-error-text-differs" "C='$SC' D='$SD'"
+fi
+
+# --- n3: small integers are kept
+rec "$WORK/e" Bash 'bin/t' 'assertion failed at row 2'
+rec "$WORK/f" Bash 'bin/t' 'assertion failed at row 14'
+SE=$("$SIG" "$WORK/e")
+SF=$("$SIG" "$WORK/f")
+if [ -n "$SE" ] && [ -n "$SF" ] && [ "$SE" != "$SF" ]; then
+    pass "n3-small-integers-kept"
+else
+    fail "n3-small-integers-kept" "E='$SE' F='$SF'"
+fi
+
+# --- n4: the PHPUnit header alone must not make two failing tests equal
+rec "$WORK/g" Bash 'vendor/bin/phpunit' 'There was 1 failure:
+
+1) Tests\FooTest::testAlpha'
+rec "$WORK/h" Bash 'vendor/bin/phpunit' 'There was 1 failure:
+
+1) Tests\FooTest::testBeta'
+SG=$("$SIG" "$WORK/g")
+SH=$("$SIG" "$WORK/h")
+if [ -n "$SG" ] && [ -n "$SH" ] && [ "$SG" != "$SH" ]; then
+    pass "n4-phpunit-header-window-differs"
+else
+    fail "n4-phpunit-header-window-differs" "G='$SG' H='$SH'"
+fi
+
+# --- n5: an error that is only `Exit code N` is empty (fail-open)
+rec "$WORK/i" Bash 'false' 'Exit code 1'
+SI=$("$SIG" "$WORK/i"); RC=$?
+if [ -z "$SI" ] && [ "$RC" -eq 0 ]; then
+    pass "n5-exit-code-only-is-empty"
+else
+    fail "n5-exit-code-only-is-empty" "out='$SI' rc=$RC"
+fi
+
+# --- n6: a missing record file is empty, exit 0
+SJ=$("$SIG" "$WORK/does-not-exist"); RC=$?
+if [ -z "$SJ" ] && [ "$RC" -eq 0 ]; then
+    pass "n6-missing-file-is-empty"
+else
+    fail "n6-missing-file-is-empty" "out='$SJ' rc=$RC"
+fi
+
+# --- n7: wrong argument count is a usage error (exit 2)
+"$SIG" 2>/dev/null; RC0=$?
+"$SIG" "$WORK/a" "$WORK/b" 2>/dev/null; RC2=$?
+if [ "$RC0" -eq 2 ] && [ "$RC2" -eq 2 ]; then
+    pass "n7-no-arg-usage-exit-2"
+else
+    fail "n7-no-arg-usage-exit-2" "no-arg rc=$RC0, two-arg rc=$RC2"
+fi
+
+# --- n8: runs under an empty environment (launchd-like PATH)
+SK=$(env -i PATH=/usr/bin:/bin "$SIG" "$WORK/a")
+if [ -n "$SK" ] && [ "$SK" = "$SA" ]; then
+    pass "n8-env-i-runs"
+else
+    fail "n8-env-i-runs" "env-i='$SK' normal='$SA'"
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

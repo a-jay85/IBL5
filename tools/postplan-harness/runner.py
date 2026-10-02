@@ -2535,9 +2535,26 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     outcome = (f"PR #{res.pr_number} was not updated." if res.pr_number
                else "No PR opened.")
 
-    def render(limit: int) -> str:
+    cmd = _cmd_text(res.error_cmd)
+    detail: list[str] = []
+    if key in ("unknown", "remote-head-diverged"):
+        detail.append(f"Stopped during: {_stage_of(res)}")
+    if key in ("unknown", "gate-unknown", "remote-head-diverged"):
+        if cmd:
+            detail.append(f"Command: {cmd}")
+        src = res.error_output_tail or err
+        if key == "remote-head-diverged" and src.startswith("remote-head-diverged: "):
+            src = src[len("remote-head-diverged: "):]
+        tail = _error_tail(src)
+        if tail:
+            detail.append("Evidence:" if key == "remote-head-diverged" else "Last error lines:")
+            detail.extend(f"> {t}" for t in tail)
+
+    def render(limit: int, show_detail: bool) -> str:
         lines = [f"{branch} did not ship. {outcome}", "", f"Why: {why}"]
         lines.extend(_path_lines(paths, limit))
+        if show_detail and detail:
+            lines += [""] + detail
         lines += ["", "Fix:", f"  1. cd {wt}"]
         n = 1
         for s in steps:
@@ -2548,9 +2565,11 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
                   f"Log: {log}"]
         return "\n".join(lines)
 
-    block = render(_BLOCK_MAX_PATHS)
+    block = render(_BLOCK_MAX_PATHS, True)
     if len(block) > _BLOCK_BUDGET:
-        block = render(0)
+        block = render(0, True)
+    if len(block) > _BLOCK_BUDGET:
+        block = render(0, False)
     return block
 
 

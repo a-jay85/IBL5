@@ -212,3 +212,73 @@ def test_verdict_redacts_token_in_tail():
     line = runner.verdict_line(res, 3, "")
     assert secret not in line
     assert "github.com/a/b.git" in line
+
+
+# --- human_block ----------------------------------------------------------------
+
+_FILLER_TAIL = "\n".join([f"filler {i:03d}" for i in range(60)] + ["GUIDANCE: run bin/check-x"])
+
+
+def _block(res, wt="/w", log="/l"):
+    return runner.human_block(res, 3, wt, log)
+
+
+def test_unknown_block_shows_stage_command_and_tail():
+    res = _failed("mystery", "phase3: odd", error_cmd="bin/foo --x",
+                  error_output_tail=_FILLER_TAIL)
+    block = _block(res, log="/tmp/run.log")
+    assert "Stopped during: phase3" in block
+    assert "Command: bin/foo --x" in block
+    assert "Last error lines:" in block
+    assert "> GUIDANCE: run bin/check-x" in block
+    assert "filler 000" not in block
+    assert block.splitlines()[-1] == "Log: /tmp/run.log"
+
+
+def test_gate_unknown_block_shows_command_and_tail():
+    res = _failed("local-gate", "One or more checks failed:", error_cmd="git commit")
+    block = _block(res)
+    assert "Command: git commit" in block
+    assert "> One or more checks failed:" in block
+
+
+def test_diverged_block_names_stage_and_evidence():
+    res = _failed("remote-head-diverged",
+                  "remote-head-diverged: phase7: remote head abc1234 diverged from "
+                  "def5678 with different content")
+    block = _block(res)
+    assert "Stopped during: phase7" in block
+    assert "Evidence:" in block
+    assert "abc1234" in block
+    assert "git fetch origin" in block
+
+
+def test_block_10kb_error_under_budget_keeps_fix_and_log():
+    big = "\n".join(f"line {i:03d} " + "x" * 40 for i in range(200))
+    res = _failed(None, big, error_cmd="c" * 10000, error_output_tail=big, slug="z" * 200)
+    log = "l" * 500
+    block = _block(res, wt="w" * 500, log=log)
+    assert len(block) <= runner._BLOCK_BUDGET
+    assert "\nFix:\n  1. cd " in block
+    assert block.splitlines()[-1] == f"Log: {log}"
+    assert sum(1 for ln in block.splitlines() if ln.startswith("> ")) <= 3
+
+
+def test_block_drops_detail_before_fix_under_pressure(monkeypatch):
+    res = _failed("mystery", "phase3: odd", error_cmd="bin/foo --x",
+                  error_output_tail=_FILLER_TAIL)
+    full = _block(res, log="/tmp/run.log")
+    monkeypatch.setattr(runner, "_BLOCK_BUDGET", len(full) - 1)
+    squeezed = _block(res, log="/tmp/run.log")
+    assert "Command:" not in squeezed
+    assert "Last error lines:" not in squeezed
+    assert "Fix:" in squeezed
+    assert squeezed.splitlines()[-1] == "Log: /tmp/run.log"
+    assert len(squeezed) <= len(full) - 1
+
+
+def test_block_redacts_token():
+    secret = "ghs_" + _ALNUM36
+    res = _failed(None, "boom",
+                  error_output_tail=f"https://x-access-token:{secret}@github.com/a/b.git")
+    assert secret not in _block(res)

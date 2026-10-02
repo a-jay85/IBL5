@@ -107,11 +107,13 @@ class ScratchTree:
 
     def __enter__(self) -> "ScratchTree":
         self.dir = tempfile.mkdtemp(prefix="gate-backtest-")
+        added = False
         try:
             self._git(self.repo, ["worktree", "add", "--detach", self.dir, self.first_sha])
-        except BaseException:
-            self._cleanup()
-            raise
+            added = True
+        finally:
+            if not added:
+                self._cleanup()
         return self
 
     def checkout(self, sha: str) -> None:

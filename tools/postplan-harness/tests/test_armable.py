@@ -146,13 +146,14 @@ def test_fidelity_default_is_fail_closed():
 
 
 def test_condition_set_is_skill_numbered():
-    """The set is {1..16} with no gaps. The numbers track the SKILL's condition numbers,
+    """The set is {1..17} with no gaps. The numbers track the SKILL's condition numbers,
     not this list's position: (11) shells out to bin/lib/pr-armable.sh for unresolved
     review-thread findings, (14) reads the conflict-resolved flag, (15) checks for
     already-red CI checks on the PR head at arm time, and (16) checks the pre-push
-    local meta-check gate."""
+    local meta-check gate. (17) holds when the gate backtest flagged clean PRs or could
+    not run."""
     nums = sorted(c.number for c in evaluate(inputs()).conditions)
-    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
 
 
 def test_fidelity_is_additive_and_releases_nothing():
@@ -164,6 +165,33 @@ def test_fidelity_is_additive_and_releases_nothing():
     cleared = inputs(pr_title="feat: shiny new GM power", fidelity_verdict="READY")
     assert 8 in {c.number for c in evaluate(cleared).holds}      # (12) did not release (8)
     assert not evaluate(cleared).armed
+
+
+@pytest.mark.parametrize("status,expected", [
+    ("NOT-APPLICABLE", True), ("CLEARED", True), ("HELD", False), ("UNKNOWN", False),
+    ("", False), ("cleared", False),
+])
+def test_gate_backtest_condition_states(status, expected):
+    d = evaluate(inputs(gate_backtest_status=status))
+    assert d.armed is expected
+    if not expected:
+        assert {c.number for c in d.holds} == {17}
+
+
+def test_gate_backtest_reason_surfaces():
+    d = evaluate(inputs(gate_backtest_status="HELD",
+                        gate_backtest_reason="bin/check-foo flagged 3 clean PRs"))
+    c17 = next(c for c in d.conditions if c.number == 17)
+    assert "state=HELD" in c17.reason and "bin/check-foo" in c17.reason
+
+
+def test_gate_backtest_is_additive_and_releases_nothing():
+    """(17) may add a hold; it may never clear one."""
+    feat = "feat: shiny new GM power"
+    assert {c.number for c in evaluate(inputs(pr_title=feat, gate_backtest_status="CLEARED")).holds} == {8}
+    assert {c.number for c in evaluate(inputs(pr_title=feat, gate_backtest_status="HELD")).holds} == {8, 17}
+    both = inputs(meta_checks_status="HELD", gate_backtest_status="CLEARED")
+    assert {c.number for c in evaluate(both).holds} == {16}
 
 
 # Frozen from the evaluate() on master before condition (17) existed. A new condition that

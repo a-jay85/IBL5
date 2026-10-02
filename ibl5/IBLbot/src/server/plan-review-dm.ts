@@ -38,19 +38,90 @@ export function clampDigest(digest: string, slug: string): string {
  * The Queue/Discard action row. Built here and rebuilt disabled by the button
  * handler, so the emitted `custom_id` has exactly one definition.
  */
-export function buildPlanReviewRow(slug: string, disabled = false): ActionRowBuilder<ButtonBuilder> {
+/**
+ * The only verbs a plan-review row can carry, in render order. Every rendered
+ * custom_id is `plan_<verb>_<slug>`: <verb> comes from this tuple and <slug> has
+ * already matched PLAN_SLUG_RE. No caller-supplied string reaches Discord.
+ */
+export const PLAN_BUTTON_VERBS = ['queue', 'discard'] as const;
+export type PlanButtonVerb = (typeof PLAN_BUTTON_VERBS)[number];
+
+const BUTTON_SPEC: Record<PlanButtonVerb, { label: string; style: ButtonStyle }> = {
+    queue: { label: 'Queue', style: ButtonStyle.Success },
+    discard: { label: 'Discard', style: ButtonStyle.Danger },
+};
+
+export function buildPlanReviewRow(
+    slug: string,
+    disabled = false,
+    verbs: readonly PlanButtonVerb[] = PLAN_BUTTON_VERBS,
+): ActionRowBuilder<ButtonBuilder> {
+    const wanted = new Set<PlanButtonVerb>(verbs);
+    // Discord rejects an empty action row. Neither producer below can yield an
+    // empty set, so an empty list here means "default", which is both buttons.
+    const rendered = PLAN_BUTTON_VERBS.filter((v) => wanted.size === 0 || wanted.has(v));
     return new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`plan_queue_${slug}`)
-            .setLabel('Queue')
-            .setStyle(ButtonStyle.Success)
-            .setDisabled(disabled),
-        new ButtonBuilder()
-            .setCustomId(`plan_discard_${slug}`)
-            .setLabel('Discard')
-            .setStyle(ButtonStyle.Danger)
-            .setDisabled(disabled),
+        rendered.map((verb) =>
+            new ButtonBuilder()
+                .setCustomId(`plan_${verb}_${slug}`)
+                .setLabel(BUTTON_SPEC[verb].label)
+                .setStyle(BUTTON_SPEC[verb].style)
+                .setDisabled(disabled),
+        ),
     );
+}
+
+/**
+ * Validate the optional `buttons` payload field. `undefined` (field absent) means
+ * both buttons, which keeps older callers working. Anything else must be a
+ * non-empty array whose every element exactly equals `plan_queue_<slug>` or
+ * `plan_discard_<slug>` for this payload's slug, with no repeats. Returns null
+ * on any violation; the caller turns null into a 400. Call only after `slug`
+ * has passed PLAN_SLUG_RE.
+ */
+export function parsePlanButtons(raw: unknown, slug: string): PlanButtonVerb[] | null {
+    if (raw === undefined) {
+        return [...PLAN_BUTTON_VERBS];
+    }
+    if (!Array.isArray(raw) || raw.length === 0) {
+        return null;
+    }
+    const seen = new Set<PlanButtonVerb>();
+    for (const entry of raw) {
+        const verb = PLAN_BUTTON_VERBS.find((v) => entry === `plan_${v}_${slug}`);
+        if (verb === undefined || seen.has(verb)) {
+            return null;
+        }
+        seen.add(verb);
+    }
+    return PLAN_BUTTON_VERBS.filter((v) => seen.has(v));
+}
+
+/**
+ * Recover the button set from a message the bot already sent, so a disabled
+ * rebuild keeps the original set. Reads `customId` (discord.js ButtonComponent)
+ * or `data.custom_id` (builder or raw component). Defaults to both when
+ * components are absent, malformed, or carry no matching id.
+ */
+export function derivePlanButtons(components: unknown, slug: string): PlanButtonVerb[] {
+    const ids = new Set<string>();
+    if (Array.isArray(components)) {
+        for (const row of components) {
+            const inner = (row as { components?: unknown } | null)?.components;
+            if (!Array.isArray(inner)) {
+                continue;
+            }
+            for (const c of inner) {
+                const btn = c as { customId?: unknown; data?: { custom_id?: unknown } } | null;
+                const id = btn?.customId ?? btn?.data?.custom_id;
+                if (typeof id === 'string') {
+                    ids.add(id);
+                }
+            }
+        }
+    }
+    const found = PLAN_BUTTON_VERBS.filter((v) => ids.has(`plan_${v}_${slug}`));
+    return found.length > 0 ? found : [...PLAN_BUTTON_VERBS];
 }
 
 export const PLAN_OUTCOMES = ['queued', 'discarded', 'refused', 'rejected'] as const;
@@ -77,12 +148,15 @@ export async function editPlanReviewDM(
     const user = await client.users.fetch(userId);
     const dm = await user.createDM();
     const message = await dm.messages.fetch(messageId);
-    await message.edit({ content, components: [buildPlanReviewRow(slug, true)] });
+    await message.edit({
+        content,
+        components: [buildPlanReviewRow(slug, true, derivePlanButtons(message.components, slug))],
+    });
 }
 
 export function handlePlanReviewDM(client: Client) {
     return (req: Request, res: Response): void => {
-        const payload = req.body as { slug?: unknown; digest?: unknown } | undefined;
+        const payload = req.body as { slug?: unknown; digest?: unknown; buttons?: unknown } | undefined;
         const slug = payload?.slug;
         const digest = payload?.digest;
 
@@ -95,6 +169,14 @@ export function handlePlanReviewDM(client: Client) {
 
         if (typeof digest !== 'string' || digest === '') {
             res.status(400).json({ error: 'missing digest' });
+            return;
+        }
+
+        // Never echo a caller string into a custom_id: map to the verb enum and
+        // let buildPlanReviewRow render from it.
+        const buttons = parsePlanButtons(payload?.buttons, slug);
+        if (buttons === null) {
+            res.status(400).json({ error: 'invalid buttons' });
             return;
         }
 
@@ -113,7 +195,7 @@ export function handlePlanReviewDM(client: Client) {
             .setFooter({ text: slug })
             .setTimestamp();
 
-        client.users.send(owner, { embeds: [embed], components: [buildPlanReviewRow(slug)] })
+        client.users.send(owner, { embeds: [embed], components: [buildPlanReviewRow(slug, false, buttons)] })
             .then(() => {
                 console.log(`Plan review DM sent for ${slug}`);
                 res.json({ ok: true, slug });

@@ -670,3 +670,88 @@ def test_derive_from_trace_ignores_human_signoff():
     assert got.exit_code == 8 and got.failed == ["build"]
     # unparseable FAILURE text still fails closed
     assert ciwatch.derive_from_trace({"watch_tail": '"state": "FAILURE" …'}).exit_code == 8
+
+
+# --- classify_snapshot (exit-1 classification) ---
+
+def _row(name, bucket, state=""):
+    return {"name": name, "state": state, "bucket": bucket}
+
+
+def test_classify_ignored_only_red_with_real_pass_is_success():
+    v = ciwatch.classify_snapshot([_row("human-signoff", "fail"),
+                                   _row("build", "pass"),
+                                   _row("docs", "skipping")])
+    assert v.kind == "success"
+    assert "only ignored checks failed: human-signoff" in v.reason
+    assert v.failed == []
+
+
+def test_classify_real_fail_is_failure():
+    v = ciwatch.classify_snapshot([_row("human-signoff", "fail"),
+                                   _row("build", "fail"),
+                                   _row("lint", "pass")])
+    assert v.kind == "failure"
+    assert v.failed == ["build"]
+    # precedence: a real fail beside a pending check is still a failure
+    v2 = ciwatch.classify_snapshot([_row("build", "fail"), _row("lint", "pending")])
+    assert v2.kind == "failure"
+    assert v2.failed == ["build"]
+
+
+def test_classify_pending_is_pending():
+    v = ciwatch.classify_snapshot([_row("build", "pending"), _row("lint", "pass")])
+    assert v.kind == "pending"
+    assert v.reason == "checks pending: build"
+
+
+def test_classify_cancel_is_named_hold():
+    v = ciwatch.classify_snapshot([_row("build", "cancel"), _row("lint", "pass")])
+    assert v.kind == "hold"
+    assert v.reason == "checks cancelled: build"
+
+
+@pytest.mark.parametrize("rows", [
+    [],
+    [_row("human-signoff", "fail")],
+    [_row("human-signoff", "pass")],
+])
+def test_classify_zero_checks_never_passes(rows):
+    v = ciwatch.classify_snapshot(rows)
+    assert v.kind == "retry"
+    assert v.reason == "no checks registered"
+    assert v.kind != "success"
+
+
+def test_classify_unavailable_snapshot_never_passes():
+    v = ciwatch.classify_snapshot(None, "")
+    assert v.kind == "retry"
+    assert v.reason == "gh snapshot unavailable"
+    weird = ciwatch.classify_snapshot([_row("build", "weird")])
+    assert weird.kind == "retry"
+    assert weird.reason.startswith("gh snapshot unavailable")
+    red = ciwatch.classify_snapshot(None, "build\tfail\t1m\n")
+    assert red.kind == "failure"
+    assert red.failed == ["build"]
+    # text rows alone never yield green: an ignored-only text fail stays a retry
+    assert ciwatch.classify_snapshot(None, "human-signoff\tfail\t1m\n").kind == "retry"
+
+
+def test_snapshot_checks_maps_gh_exits(monkeypatch):
+    def run_with(proc):
+        def fake_run(cmd, **kwargs):
+            if isinstance(proc, Exception):
+                raise proc
+            return proc
+        monkeypatch.setattr(ciwatch.subprocess, "run", fake_run)
+        return ciwatch.snapshot_checks(".", 1)
+
+    assert run_with(P(1, "", "no checks reported on the 'x' branch")) == []
+    assert run_with(P(1, "", "")) is None
+    assert run_with(P(0, "not json{", "")) is None
+    assert run_with(P(0, "[1, 2]", "")) is None
+    assert run_with(OSError("gh missing")) is None
+    got = run_with(P(0, '[{"name":"build","state":"SUCCESS","bucket":"pass"},'
+                        '{"name":"lint","bucket":"fail"}]', ""))
+    assert got == [{"name": "build", "state": "SUCCESS", "bucket": "pass"},
+                   {"name": "lint", "state": "", "bucket": "fail"}]

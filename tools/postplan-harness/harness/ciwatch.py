@@ -157,6 +157,102 @@ def derive_from_trace(ci: dict | None) -> CiOutcome:
     return CiOutcome(-1, [], "no CI watch output recorded in trace")
 
 
+_KNOWN_BUCKETS = frozenset({"pass", "fail", "pending", "skipping", "cancel"})
+
+
+@dataclass
+class CheckVerdict:
+    """Classification of one --json snapshot taken after a non-0/non-8 --watch exit.
+
+    kind: "failure" (exit 8) | "success" (exit 0) | "pending" (wait, no budget burn)
+          | "hold" (named indeterminate, stop now) | "retry" (burns one settle try;
+          its reason becomes the named hold if the budget runs out).
+    """
+    kind: str
+    reason: str
+    failed: list[str] = field(default_factory=list)
+    rows: "list[dict] | None" = None
+
+
+def snapshot_checks(worktree: str, pr: int, timeout: int = 60) -> "list[dict] | None":
+    """One `gh pr checks --json name,state,bucket` read, normalized.
+
+    [] means gh said no checks are registered ("no checks reported", exit 1).
+    None means the snapshot is unavailable: gh missing, timed out, any other
+    exit, or output that is not a JSON list of objects. Never raises.
+    """
+    try:
+        proc = subprocess.run(
+            ["gh", "pr", "checks", str(pr), "--json", "name,state,bucket"],
+            cwd=worktree, capture_output=True, text=True, timeout=timeout)
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if proc.returncode == 1 and "no checks reported" in (proc.stderr or ""):
+        return []
+    if proc.returncode not in (0, 8):
+        return None
+    try:
+        rows = json.loads(proc.stdout or "[]")
+    except (ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(rows, list) or not all(isinstance(r, dict) for r in rows):
+        return None
+    return [{"name": str(r.get("name") or "?"),
+             "state": str(r.get("state") or ""),
+             "bucket": str(r.get("bucket") or "")} for r in rows]
+
+
+def bucket_summary(rows: "list[dict] | None") -> str:
+    """Compact `bucket=count` line for evidence strings, e.g. "fail=1 pass=6"."""
+    if rows is None:
+        return "snapshot unavailable"
+    if not rows:
+        return "no rows"
+    counts: dict[str, int] = {}
+    for r in rows:
+        counts[r["bucket"]] = counts.get(r["bucket"], 0) + 1
+    return " ".join(f"{b or '?'}={n}" for b, n in sorted(counts.items()))
+
+
+def classify_snapshot(rows: "list[dict] | None", watch_stdout: str = "") -> CheckVerdict:
+    """Pure verdict for a non-0/non-8 `gh pr checks --watch` exit.
+
+    gh exits 1 (empty stderr) when any check sits in the fail or cancel bucket,
+    and 8 only for pending, so exit 1 is where real failures and the by-design
+    human-signoff red both land. A pass needs positive evidence: at least one
+    non-ignored row, every non-ignored row pass or skipping. Zero rows, rows
+    that are all IGNORED_CHECKS, and an unavailable snapshot never pass.
+    """
+    if rows is None:
+        text_fails = real_failures(_parse_fail_lines(watch_stdout))
+        if text_fails:                       # red evidence may stand alone; green may not
+            return CheckVerdict("failure", "watch output fail rows: "
+                                + ", ".join(text_fails), text_fails, None)
+        return CheckVerdict("retry", "gh snapshot unavailable", [], None)
+    real = [r for r in rows if r["name"] not in IGNORED_CHECKS]
+    ignored_red = sorted({r["name"] for r in rows
+                          if r["name"] in IGNORED_CHECKS and r["bucket"] == "fail"})
+    failed = real_failures([r["name"] for r in real if r["bucket"] == "fail"])
+    if failed:
+        return CheckVerdict("failure", "fail bucket: " + ", ".join(failed), failed, rows)
+    if not real:
+        return CheckVerdict("retry", "no checks registered", [], rows)
+    unknown = sorted({r["bucket"] or "?" for r in real if r["bucket"] not in _KNOWN_BUCKETS})
+    if unknown:
+        return CheckVerdict("retry", "gh snapshot unavailable: unrecognized bucket "
+                            + ", ".join(unknown), [], rows)
+    pending = sorted({r["name"] for r in real if r["bucket"] == "pending"})
+    if pending:
+        return CheckVerdict("pending", "checks pending: " + ", ".join(pending), [], rows)
+    cancelled = sorted({r["name"] for r in real if r["bucket"] == "cancel"})
+    if cancelled:
+        return CheckVerdict("hold", "checks cancelled: " + ", ".join(cancelled), [], rows)
+    if ignored_red:
+        return CheckVerdict("success", "only ignored checks failed: "
+                            + ", ".join(ignored_red), [], rows)
+    return CheckVerdict("success", "every check passed or skipped", [], rows)
+
+
 def probe_failed_checks(worktree: str, pr: int, timeout: int = 60) -> list[str]:
     """Names of checks on the PR's current head already in gh's `fail` bucket.
 
@@ -168,22 +264,8 @@ def probe_failed_checks(worktree: str, pr: int, timeout: int = 60) -> list[str]:
     IGNORED_CHECKS names are dropped, so a PR whose only red check is
     `human-signoff` falls through to the watch instead of short-circuiting.
     """
-    try:
-        proc = subprocess.run(
-            ["gh", "pr", "checks", str(pr), "--json", "name,state,bucket"],
-            cwd=worktree, capture_output=True, text=True, timeout=timeout)
-    except (subprocess.TimeoutExpired, OSError):
-        return []
-    if proc.returncode not in (0, 8):   # 1 = "no checks reported" yet
-        return []
-    try:
-        rows = json.loads(proc.stdout or "[]")
-    except (ValueError, json.JSONDecodeError):
-        return []
-    if not isinstance(rows, list):
-        return []
-    return real_failures([str(r.get("name") or "?") for r in rows
-                          if isinstance(r, dict) and r.get("bucket") == "fail"])
+    rows = snapshot_checks(worktree, pr, timeout=timeout)
+    return real_failures([r["name"] for r in (rows or []) if r["bucket"] == "fail"])
 
 
 def _write_outcome(bg: BackgroundWatch, status: str, failed: list[str],

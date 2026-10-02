@@ -388,3 +388,225 @@ def test_no_upstream_branch(tmp_path):
         capture_output=True, text=True,
     ).stdout.strip()
     assert result.stdout.strip() == local_head
+
+
+# ---------------------------------------------------------------------------
+# Real-git side assertions (issues #827-#830)
+# ---------------------------------------------------------------------------
+
+_GIT_ENV = {**os.environ,
+            "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+
+
+def _sh(*args):
+    return subprocess.run(list(args), check=True, capture_output=True, text=True,
+                          env=_GIT_ENV).stdout.strip()
+
+
+def _commit(repo, name, text="x\n"):
+    (repo / name).write_text(text)
+    _sh("git", "-C", str(repo), "add", "-A")
+    _sh("git", "-C", str(repo), "commit", "-m", name)
+
+
+def _feature_repo(tmp_path):
+    """Worktree on `feature` (a commit ahead of master) plus a bare origin holding master."""
+    wt, bare = tmp_path / "wt", tmp_path / "bare"
+    wt.mkdir()
+    bare.mkdir()
+    _sh("git", "init", "-b", "master", str(wt))
+    _sh("git", "-C", str(wt), "config", "user.email", "t@t")
+    _sh("git", "-C", str(wt), "config", "user.name", "t")
+    _commit(wt, "base.txt")
+    _sh("git", "init", "--bare", str(bare))
+    _sh("git", "-C", str(wt), "remote", "add", "origin", str(bare))
+    _sh("git", "-C", str(wt), "push", "origin", "master")
+    _sh("git", "-C", str(wt), "fetch", "origin", "master")
+    _sh("git", "-C", str(wt), "checkout", "-b", "feature")
+    _commit(wt, "feat.txt")
+    return wt, bare
+
+
+def _advance_origin_master(tmp_path, bare, extra=None):
+    other = tmp_path / "other"
+    _sh("git", "clone", "-b", "master", str(bare), str(other))
+    _sh("git", "-C", str(other), "config", "user.email", "t@t")
+    _sh("git", "-C", str(other), "config", "user.name", "t")
+    if extra:
+        for rel, text in extra.items():
+            p = other / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text)
+        _sh("git", "-C", str(other), "add", "-A", "-f")
+        _sh("git", "-C", str(other), "commit", "-m", "extra")
+    _commit(other, "master-moved.txt")
+    _sh("git", "-C", str(other), "push", "origin", "master")
+
+
+def _spy_live_git(wt, stub_proof=True):
+    git = LiveGit(str(wt), push_remote="origin")
+    argvs = []
+    orig = git._run_out
+
+    def spy(*args):
+        argvs.append(args)
+        return orig(*args)
+
+    git._run_out = spy
+    if stub_proof:
+        # the lostwork.sh gate itself is exercised in test_push_blocked_when_lostwork_unproved_real_gate
+        git.capture_lostwork_pre = lambda key: True
+        git.prove_lostwork = lambda key: (True, "TREE-EQUIVALENT")
+    return git, argvs
+
+
+def _reject_hook(bare, once):
+    """pre-receive hook rejecting with git's stale-lease wording; `once` rejects only the first push."""
+    marker = bare / "rejected-once"
+    body = "#!/bin/sh\n"
+    if once:
+        body += f'[ -e "{marker}" ] && exit 0\ntouch "{marker}"\n'
+    body += 'echo "! [remote rejected] feature (stale info)" >&2\nexit 1\n'
+    hook = bare / "hooks" / "pre-receive"
+    hook.write_text(body)
+    hook.chmod(0o755)
+
+
+def _push_argvs(argvs):
+    return [a for a in argvs if a and a[0] == "push"]
+
+
+def test_stale_lease_once_then_ok_real_remote(tmp_path):
+    """#827: real remote rejects the first push; the retry lands HEAD on the bare remote
+    and both pushes carried the explicit lease + refspec argv."""
+    wt, bare = _feature_repo(tmp_path)
+    _reject_hook(bare, once=True)
+    git, argvs = _spy_live_git(wt)
+    result = runner._push_with_lease_retry(git, _noop_log, "phase2")
+    local_head = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    assert result == local_head
+    assert _sh("git", "-C", str(bare), "rev-parse", "refs/heads/feature") == local_head
+    pushes = _push_argvs(argvs)
+    assert len(pushes) == 2
+    for argv in pushes:
+        assert f"--force-with-lease=feature:{'0' * 40}" in argv
+        assert "HEAD:refs/heads/feature" in argv
+
+
+def test_stale_lease_three_times_cap_real_remote(tmp_path):
+    """#827: a remote that always rejects is pushed exactly 3 times, raises
+    push-retry-cap, and the bare remote never receives the branch."""
+    wt, bare = _feature_repo(tmp_path)
+    _reject_hook(bare, once=False)
+    git, argvs = _spy_live_git(wt)
+    with pytest.raises(HarnessError) as exc_info:
+        runner._push_with_lease_retry(git, _noop_log, "phase2")
+    assert exc_info.value.kind == "push-retry-cap"
+    assert len(_push_argvs(argvs)) == 3
+    probe = subprocess.run(["git", "-C", str(bare), "rev-parse", "--verify", "--quiet",
+                            "refs/heads/feature"], capture_output=True, text=True)
+    assert probe.returncode != 0, "capped push must leave the remote untouched"
+
+
+def test_push_disabled_and_detached_head_record_no_push_argv(tmp_path):
+    """#827: push-disabled / detached-HEAD short-circuit before any `git push` runs."""
+    wt, bare = _feature_repo(tmp_path)
+    git, argvs = _spy_live_git(wt)
+    git.push_remote = None
+    assert runner._push_with_lease_retry(git, _noop_log, "phase2") == ""
+    assert _push_argvs(argvs) == []
+
+    git2, argvs2 = _spy_live_git(wt)
+    _sh("git", "-C", str(wt), "checkout", "--detach")
+    with pytest.raises(HarnessError) as exc_info:
+        runner._push_with_lease_retry(git2, _noop_log, "phase2")
+    assert exc_info.value.kind == "push-failed"
+    assert _push_argvs(argvs2) == []
+
+
+def test_push_blocked_when_lostwork_unproved_real_gate(tmp_path):
+    """#828: with a real LiveGit.prove_lostwork, a lostwork.sh that prints TREE-EQUIVALENT
+    but exits non-zero fails the conjunctive gate, so the retry push never happens."""
+    wt, bare = _feature_repo(tmp_path)
+    _advance_origin_master(
+        tmp_path, bare,
+        extra={".claude/review-shared/scripts/lostwork.sh":
+               "#!/bin/sh\necho TREE-EQUIVALENT\nexit 1\n"})
+    _sh("git", "-C", str(wt), "fetch", "origin", "master")
+    _reject_hook(bare, once=False)
+    git, argvs = _spy_live_git(wt, stub_proof=False)
+    with pytest.raises(HarnessError) as exc_info:
+        runner._push_with_lease_retry(git, _noop_log, "phase2")
+    assert exc_info.value.kind == "lostwork-unproved"
+    assert "lost-work proof failed" in exc_info.value.detail
+    assert len(_push_argvs(argvs)) == 1
+
+
+def test_merge_state_read_failure_drives_resolve_behind(tmp_path, monkeypatch):
+    """#829: an unreadable merge state ('') makes _resolve_behind return at once: no
+    rebase, no push, no CI watch, no disarm, no retry cap."""
+    gh = LiveGh(str(tmp_path), str(tmp_path), "main")
+    gh._gh = lambda *a, **kw: (_ for _ in ()).throw(HarnessError("gh", "HTTP 403"))
+    disarms = []
+    gh.pr_disable_auto_merge = lambda pr: disarms.append(pr)
+    git = FakeGit()
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED)
+    watched = _make_ci_patches(monkeypatch)
+    initial = CiOutcome(0, [])
+    sha, outcome = runner._resolve_behind(
+        git, gh, _noop_log, res, "/wt", 1, "sha-in", initial, "/out")
+    assert (sha, outcome) == ("sha-in", initial)
+    assert git.rebases == 0 and git.pushes == 0 and git.proofs == 0
+    assert watched == []
+    assert disarms == []
+    assert res.retry_cap is None
+
+
+def test_reviewed_tree_invalidated_by_re_rebase(tmp_path, monkeypatch):
+    """#830 (condition 12): a verdict-2 reviewed before a BEHIND re-rebase carries the
+    pre-rebase tree; once _resolve_behind rewrites HEAD the tree differs, verdict 2 is
+    stale, and condition 12 falls back to the NOT READY verdict 1 and holds."""
+    from harness import fidelity
+    from harness.armable import ArmInputs, evaluate
+    from harness.state import Classification
+
+    wt, bare = _feature_repo(tmp_path)
+    _sh("git", "-C", str(wt), "push", "origin", "feature")
+    _advance_origin_master(tmp_path, bare)
+    git, argvs = _spy_live_git(wt)
+
+    verdict = tmp_path / "verdict-2.md"
+    verdict.write_text("READY\n")
+    pre_tree = git.head_tree()
+    fidelity.record_reviewed_tree(str(verdict), pre_tree)
+    tree2 = fidelity.read_reviewed_tree(str(verdict))
+    assert tree2 == pre_tree
+
+    def arm_inputs(current_tree):
+        return ArmInputs(
+            pr_body="## Summary\nx\n\n## Manual Testing\n\nNo manual testing needed — covered.\n",
+            pr_title="chore: x", pr_labels=[], classification=Classification(),
+            findings=[], unresolved_conformance=[], phase5_status="pass",
+            plan_auto_merge_false=False, headless=True,
+            dep_state_lookup=lambda n: "MERGED", fidelity_verdict="NOT READY",
+            fidelity_verdict_2="READY", fidelity_tree_2=tree2,
+            unresolved_findings=[], conflict_resolved=False, current_tree=current_tree)
+
+    # control: HEAD unchanged -> verdict 2 is fresh and condition 12 does not hold
+    assert 12 not in {c.number for c in evaluate(arm_inputs(pre_tree)).holds}
+
+    gh = FakeGh(states=["BEHIND", "CLEAN"], strict=True)
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED)
+    _make_ci_patches(monkeypatch, outcomes=[CiOutcome(0, [])])
+    head_before = git.head()
+    runner._resolve_behind(git, gh, _noop_log, res, "", 1, head_before,
+                           CiOutcome(0, []), "/out")
+    assert git.head() != head_before, "re-rebase must rewrite HEAD"
+    post_tree = git.head_tree()
+    assert post_tree != pre_tree
+
+    decision = evaluate(arm_inputs(post_tree))
+    assert not decision.armed
+    held12 = [c for c in decision.holds if c.number == 12]
+    assert held12 and "source: verdict-1" in held12[0].reason

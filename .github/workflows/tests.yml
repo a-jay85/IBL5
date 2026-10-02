@@ -734,6 +734,8 @@ jobs:
         run: bin/test-automouse-impl-model
       - name: Run automouse env-breaker regression test
         run: bin/test-automouse-env-breaker
+      - name: Run automouse login-preflight regression test
+        run: bin/test-automouse-login-preflight
       - name: Run headless elapsed-clock hook regression test
         run: bin/test-headless-elapsed-hook
       - name: Run automouse impl cap-timeout regression test
@@ -1054,6 +1056,7 @@ jobs:
             bin/test-post-plan-fail-dm \
             bin/test-token-report \
             bin/test-automouse-escalation \
+            bin/test-automouse-repeat-failure \
             bin/test-automouse-disarm \
             bin/test-bun-audit-triage \
             bin/test-prune-eligibility \

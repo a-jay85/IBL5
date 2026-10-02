@@ -29,6 +29,7 @@ PASS_TEXT = re.compile(r"\ball checks (have )?pass|successful\b", re.I)
 IGNORED_CHECKS = frozenset({"human-signoff"})
 
 HEAD_CHECK_INTERVAL = 300  # seconds between head checks during the background watch
+HEAD_MOVE_RESTART_CAP = 3  # head-changed restarts watch_or_reuse follows before holding
 
 
 class _HeadChanged(Exception):
@@ -157,6 +158,102 @@ def derive_from_trace(ci: dict | None) -> CiOutcome:
     return CiOutcome(-1, [], "no CI watch output recorded in trace")
 
 
+_KNOWN_BUCKETS = frozenset({"pass", "fail", "pending", "skipping", "cancel"})
+
+
+@dataclass
+class CheckVerdict:
+    """Classification of one --json snapshot taken after a non-0/non-8 --watch exit.
+
+    kind: "failure" (exit 8) | "success" (exit 0) | "pending" (wait, no budget burn)
+          | "hold" (named indeterminate, stop now) | "retry" (burns one settle try;
+          its reason becomes the named hold if the budget runs out).
+    """
+    kind: str
+    reason: str
+    failed: list[str] = field(default_factory=list)
+    rows: "list[dict] | None" = None
+
+
+def snapshot_checks(worktree: str, pr: int, timeout: int = 60) -> "list[dict] | None":
+    """One `gh pr checks --json name,state,bucket` read, normalized.
+
+    [] means gh said no checks are registered ("no checks reported", exit 1).
+    None means the snapshot is unavailable: gh missing, timed out, any other
+    exit, or output that is not a JSON list of objects. Never raises.
+    """
+    try:
+        proc = subprocess.run(
+            ["gh", "pr", "checks", str(pr), "--json", "name,state,bucket"],
+            cwd=worktree, capture_output=True, text=True, timeout=timeout)
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if proc.returncode == 1 and "no checks reported" in (proc.stderr or ""):
+        return []
+    if proc.returncode not in (0, 8):
+        return None
+    try:
+        rows = json.loads(proc.stdout or "[]")
+    except (ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(rows, list) or not all(isinstance(r, dict) for r in rows):
+        return None
+    return [{"name": str(r.get("name") or "?"),
+             "state": str(r.get("state") or ""),
+             "bucket": str(r.get("bucket") or "")} for r in rows]
+
+
+def bucket_summary(rows: "list[dict] | None") -> str:
+    """Compact `bucket=count` line for evidence strings, e.g. "fail=1 pass=6"."""
+    if rows is None:
+        return "snapshot unavailable"
+    if not rows:
+        return "no rows"
+    counts: dict[str, int] = {}
+    for r in rows:
+        counts[r["bucket"]] = counts.get(r["bucket"], 0) + 1
+    return " ".join(f"{b or '?'}={n}" for b, n in sorted(counts.items()))
+
+
+def classify_snapshot(rows: "list[dict] | None", watch_stdout: str = "") -> CheckVerdict:
+    """Pure verdict for a non-0/non-8 `gh pr checks --watch` exit.
+
+    gh exits 1 (empty stderr) when any check sits in the fail or cancel bucket,
+    and 8 only for pending, so exit 1 is where real failures and the by-design
+    human-signoff red both land. A pass needs positive evidence: at least one
+    non-ignored row, every non-ignored row pass or skipping. Zero rows, rows
+    that are all IGNORED_CHECKS, and an unavailable snapshot never pass.
+    """
+    if rows is None:
+        text_fails = real_failures(_parse_fail_lines(watch_stdout))
+        if text_fails:                       # red evidence may stand alone; green may not
+            return CheckVerdict("failure", "watch output fail rows: "
+                                + ", ".join(text_fails), text_fails, None)
+        return CheckVerdict("retry", "gh snapshot unavailable", [], None)
+    real = [r for r in rows if r["name"] not in IGNORED_CHECKS]
+    ignored_red = sorted({r["name"] for r in rows
+                          if r["name"] in IGNORED_CHECKS and r["bucket"] == "fail"})
+    failed = real_failures([r["name"] for r in real if r["bucket"] == "fail"])
+    if failed:
+        return CheckVerdict("failure", "fail bucket: " + ", ".join(failed), failed, rows)
+    if not real:
+        return CheckVerdict("retry", "no checks registered", [], rows)
+    unknown = sorted({r["bucket"] or "?" for r in real if r["bucket"] not in _KNOWN_BUCKETS})
+    if unknown:
+        return CheckVerdict("retry", "gh snapshot unavailable: unrecognized bucket "
+                            + ", ".join(unknown), [], rows)
+    pending = sorted({r["name"] for r in real if r["bucket"] == "pending"})
+    if pending:
+        return CheckVerdict("pending", "checks pending: " + ", ".join(pending), [], rows)
+    cancelled = sorted({r["name"] for r in real if r["bucket"] == "cancel"})
+    if cancelled:
+        return CheckVerdict("hold", "checks cancelled: " + ", ".join(cancelled), [], rows)
+    if ignored_red:
+        return CheckVerdict("success", "only ignored checks failed: "
+                            + ", ".join(ignored_red), [], rows)
+    return CheckVerdict("success", "every check passed or skipped", [], rows)
+
+
 def probe_failed_checks(worktree: str, pr: int, timeout: int = 60) -> list[str]:
     """Names of checks on the PR's current head already in gh's `fail` bucket.
 
@@ -168,26 +265,14 @@ def probe_failed_checks(worktree: str, pr: int, timeout: int = 60) -> list[str]:
     IGNORED_CHECKS names are dropped, so a PR whose only red check is
     `human-signoff` falls through to the watch instead of short-circuiting.
     """
-    try:
-        proc = subprocess.run(
-            ["gh", "pr", "checks", str(pr), "--json", "name,state,bucket"],
-            cwd=worktree, capture_output=True, text=True, timeout=timeout)
-    except (subprocess.TimeoutExpired, OSError):
-        return []
-    if proc.returncode not in (0, 8):   # 1 = "no checks reported" yet
-        return []
-    try:
-        rows = json.loads(proc.stdout or "[]")
-    except (ValueError, json.JSONDecodeError):
-        return []
-    if not isinstance(rows, list):
-        return []
-    return real_failures([str(r.get("name") or "?") for r in rows
-                          if isinstance(r, dict) and r.get("bucket") == "fail"])
+    rows = snapshot_checks(worktree, pr, timeout=timeout)
+    return real_failures([r["name"] for r in (rows or []) if r["bucket"] == "fail"])
 
 
 def _write_outcome(bg: BackgroundWatch, status: str, failed: list[str],
-                   evidence: str, probe: list[str] | None = None) -> None:
+                   evidence: str, probe: list[str] | None = None, *,
+                   gh_stdout_tail: str = "",
+                   bucket_snapshot: "list[dict] | None" = None) -> None:
     """Write <run_dir>/ci-<sha>.json exactly once. Never raises."""
     with bg.lock:
         if bg.written:
@@ -200,6 +285,8 @@ def _write_outcome(bg: BackgroundWatch, status: str, failed: list[str],
             "failed_checks": bg.failed,
             "probe": sorted(set(probe or [])),
             "evidence": evidence,
+            "gh_stdout_tail": (gh_stdout_tail or "")[-2000:],
+            "bucket_snapshot": bucket_snapshot,
             "started": bg.started, "finished": time.time(),
         }
         try:
@@ -216,7 +303,9 @@ def _watch_thread(bg: BackgroundWatch, timeout: int,
                   settle_tries: int, settle_wait: int) -> None:
     deadline = bg.started + timeout
     last_rc, last_stderr = "none", ""
-    for _ in range(settle_tries):
+    last_reason, last_tail, last_rows = "checks never settled", "", None
+    tries = 0
+    while tries < settle_tries:
         if bg.stop.is_set():
             break
         remaining = deadline - time.time()
@@ -277,6 +366,33 @@ def _watch_thread(bg: BackgroundWatch, timeout: int,
                            "gh pr checks --watch exit 8", probe=probe)
             return
         last_rc, last_stderr = str(proc.returncode), (err or "").strip()[:200]
+        last_tail = (out or "")[-2000:]
+        v = classify_snapshot(snapshot_checks(bg.worktree, bg.pr), out or "")
+        last_rows = v.rows
+        evidence = (f"gh pr checks --watch exit {proc.returncode}: {v.reason} "
+                    f"[{bucket_summary(v.rows)}]")
+        keep = {"gh_stdout_tail": last_tail, "bucket_snapshot": v.rows}
+        if v.kind == "failure":
+            _write_outcome(bg, "failure", v.failed, evidence, probe=v.failed, **keep)
+            return
+        if v.kind == "success":
+            _write_outcome(bg, "success", [], evidence, **keep)
+            return
+        if v.kind == "hold":
+            moved = _head_moved(bg)
+            if moved:
+                bg.remote_sha = moved
+                _write_outcome(bg, "head-changed", [],
+                               f"{v.reason} after remote head moved "
+                               f"{bg.sha[:8]} -> {moved[:8]}", **keep)
+            else:
+                _write_outcome(bg, "indeterminate", [], evidence, **keep)
+            return
+        last_reason = v.reason
+        if v.kind == "retry":
+            tries += 1                  # pending waits without spending the budget
+        if tries >= settle_tries:
+            break
         if time.time() >= deadline or bg.stop.wait(settle_wait):
             break
     moved = _head_moved(bg)
@@ -286,7 +402,9 @@ def _watch_thread(bg: BackgroundWatch, timeout: int,
                        f"timeout after remote head moved {bg.sha[:8]} -> {moved[:8]}")
     else:
         _write_outcome(bg, "timeout", [],
-                       f"checks never settled; last gh exit {last_rc}: {last_stderr}")
+                       f"{last_reason} after {tries} tries; last gh exit {last_rc}: "
+                       f"{last_stderr} [{bucket_summary(last_rows)}]",
+                       gh_stdout_tail=last_tail, bucket_snapshot=last_rows)
 
 
 def start_background_watch(worktree: str, pr: int | None, sha: str | None,
@@ -382,6 +500,8 @@ def watch_or_reuse(worktree: str, pr: int, sha: str | None, out_dir: str | None,
     Ceiling contract: this function's total wall clock is bounded by `timeout`,
     the same ceiling `watch_live` had before. Time spent waiting on the
     background watch is DEDUCTED from the budget handed to the fallback.
+    A head that keeps moving is followed up to HEAD_MOVE_RESTART_CAP restarts;
+    past that the result is an indeterminate "head moved N times (cap 3)" hold.
     """
     started = time.time()
 
@@ -400,25 +520,45 @@ def watch_or_reuse(worktree: str, pr: int, sha: str | None, out_dir: str | None,
     if got is not None:
         return CiOutcome(got.exit_code, got.failed, got.evidence, head_sha=sha or "")
 
-    # One restart if the background watch timed out or detected a head change
-    if (verify_head and sha and out_dir and bg is not None
-            and bg.sha == sha and bg.status in ("head-changed", "timeout")):
+    # Follow a moving head: each head-changed watch is restarted on the synced
+    # remote head, up to HEAD_MOVE_RESTART_CAP times. Every restart is a new
+    # BackgroundWatch, so it gets a fresh settle clock and settle budget. A
+    # timed-out watch keeps the single restart it always had.
+    cur_bg, moves, timeout_restarted = bg, 0, False
+    while (verify_head and sha and out_dir and cur_bg is not None
+           and cur_bg.sha == sha and cur_bg.status in ("head-changed", "timeout")):
+        if cur_bg.status == "head-changed":
+            moves += 1
+            if moves > HEAD_MOVE_RESTART_CAP:
+                return CiOutcome(-1, [], f"head moved {moves} times "
+                                         f"(cap {HEAD_MOVE_RESTART_CAP})", head_sha=sha)
+        elif timeout_restarted:
+            break
+        else:
+            timeout_restarted = True
         r2 = gitutil.reconcile_remote_head(pr, sha, sha, None, worktree,
                                            gh_cmd=gh_cmd, run_git=run_git)
         if r2.action == "diverged":
             return CiOutcome(-1, [], r2.evidence, head_sha=r2.remote_sha, diverged=True)
         new_sha = r2.remote_sha if r2.remote_sha else sha
         remaining2 = int(timeout - (time.time() - started))
+        if cur_bg.status == "head-changed" and remaining2 <= 0:
+            return CiOutcome(-1, [], f"head moved {moves} times; CI budget exhausted",
+                             head_sha=new_sha)
         bg2 = start_background_watch(worktree, pr, new_sha, out_dir,
                                      timeout=max(remaining2, 60),
                                      verify_head=True, gh_cmd=gh_cmd, run_git=run_git)
-        if bg2 is not None:
-            bg2.done.wait(timeout=max(remaining2, 0))
-            reap_background_watch(bg2)
-            got2 = read_outcome(out_dir, new_sha)
-            if got2 is not None:
-                return CiOutcome(got2.exit_code, got2.failed, got2.evidence,
-                                 head_sha=new_sha)
+        if bg2 is None:
+            break
+        bg2.done.wait(timeout=max(remaining2, 0))
+        reap_background_watch(bg2)
+        if bg2.status == "diverged":
+            return CiOutcome(-1, [], bg2.evidence, head_sha=bg2.remote_sha, diverged=True)
+        sha = bg2.sha
+        got2 = read_outcome(out_dir, sha)
+        if got2 is not None:
+            return CiOutcome(got2.exit_code, got2.failed, got2.evidence, head_sha=sha)
+        cur_bg = bg2
 
     remaining = int(timeout - (time.time() - started))
     outcome = watch_live(worktree, pr, timeout=max(remaining, 60),
@@ -432,13 +572,17 @@ def watch_live(worktree: str, pr: int, timeout: int = 5400,
     """Block on `gh pr checks --watch` until CI settles.
 
     Immediately after pr create, checks may not be reported yet ("no checks
-    reported" exit 1) — retry with a short wait before treating as
-    indeterminate. Never raises: Phase 7 only decides SHIPPED reporting.
+    reported" exit 1) — retry with a short wait. Any other non-0/non-8 exit is
+    classified from a --json snapshot (see classify_snapshot); pending checks
+    wait without spending the settle budget. Never raises: Phase 7 only decides
+    SHIPPED reporting.
     """
     deadline = time.time() + timeout
     last_rc = "none"          # str, so the message renders cleanly when the loop never ran
     last_stderr = ""
-    for _ in range(settle_tries):
+    last_reason, last_rows = "checks never settled", None
+    tries = 0
+    while tries < settle_tries:
         already_failed = probe_failed_checks(worktree, pr)
         if already_failed:
             return CiOutcome(8, already_failed,
@@ -467,17 +611,27 @@ def watch_live(worktree: str, pr: int, timeout: int = 5400,
                                             + ", ".join(sorted(set(parsed))))
                 failed = probe
             return CiOutcome(8, failed, "gh pr checks --watch exit 8")
-        # any other exit is treated as "checks not settled yet" (right after pr
-        # create, gh exits 1 — sometimes with EMPTY stderr — until checks
-        # register), so retry until the settle budget runs out
+        # Non-0/non-8: gh exits 1 when any check is in the fail or cancel bucket
+        # (and when no checks are registered yet). Classify a --json snapshot.
         last_rc, last_stderr = str(proc.returncode), (proc.stderr or "").strip()[:200]
-        if time.time() < deadline:
-            time.sleep(settle_wait)
-            continue
-        return CiOutcome(-1, [], f"gh pr checks exit {proc.returncode}: "
-                                 f"{(proc.stderr or '').strip()[:200]}")
-    return CiOutcome(-1, [], f"checks never settled after {settle_tries} tries; "
-                             f"last gh exit {last_rc}: {last_stderr}")
+        v = classify_snapshot(snapshot_checks(worktree, pr), proc.stdout or "")
+        last_rows = v.rows
+        evidence = (f"gh pr checks --watch exit {proc.returncode}: {v.reason} "
+                    f"[{bucket_summary(v.rows)}]")
+        if v.kind == "failure":
+            return CiOutcome(8, v.failed, evidence)
+        if v.kind == "success":
+            return CiOutcome(0, [], evidence)
+        if v.kind == "hold":
+            return CiOutcome(-1, [], evidence)
+        last_reason = v.reason
+        if v.kind == "retry":
+            tries += 1                  # pending waits without spending the budget
+        if tries >= settle_tries or time.time() >= deadline:
+            break
+        time.sleep(settle_wait)
+    return CiOutcome(-1, [], f"{last_reason} after {tries} tries; last gh exit "
+                             f"{last_rc}: {last_stderr} [{bucket_summary(last_rows)}]")
 
 
 if __name__ == "__main__":             # one-shot live seam: see plan Phase 1.6

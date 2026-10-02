@@ -18,6 +18,8 @@ class ActivePlayersCsvExporter
     private const FILENAME_PREFIX = 'iblhoops_ibl5_';
     private const FILENAME_PATTERN = '/^iblhoops_ibl5_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.csv$/';
 
+    private const EXPORT_TTL_SECONDS = 3600;
+
     private LeagueControlPanelRepositoryInterface $repository;
     private string $exportDir;
 
@@ -38,6 +40,8 @@ class ActivePlayersCsvExporter
             throw new \RuntimeException('Could not create export directory.');
         }
 
+        $this->pruneExpiredExports($now);
+
         $filename = self::FILENAME_PREFIX . $now->format('Y-m-d_H-i-s') . '.csv';
         $csv = self::buildCsv($this->repository->getActivePlayerNames());
 
@@ -46,6 +50,29 @@ class ActivePlayersCsvExporter
         }
 
         return $filename;
+    }
+
+    /**
+     * Delete export files (matching our own filename pattern only) older than
+     * the TTL, so temp exports do not accumulate.
+     */
+    private function pruneExpiredExports(\DateTimeImmutable $now): void
+    {
+        $files = glob($this->exportDir . '/' . self::FILENAME_PREFIX . '*.csv');
+        if ($files === false) {
+            return;
+        }
+
+        $cutoff = $now->getTimestamp() - self::EXPORT_TTL_SECONDS;
+        foreach ($files as $file) {
+            if (preg_match(self::FILENAME_PATTERN, basename($file)) !== 1) {
+                continue;
+            }
+            $mtime = filemtime($file);
+            if ($mtime !== false && $mtime < $cutoff) {
+                @unlink($file);
+            }
+        }
     }
 
     /**

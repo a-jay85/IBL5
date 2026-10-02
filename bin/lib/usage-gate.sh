@@ -147,6 +147,7 @@ usage_runner_priority() {  # <runner>
         post-plan-now) echo 1 ;;
         automouse) echo 2 ;;
         plan-now) echo 3 ;;
+        burndown-loop) echo 4 ;;
         *) return 1 ;;
     esac
 }

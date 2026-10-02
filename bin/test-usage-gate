@@ -1658,6 +1658,16 @@ test_pace_verdict_clamps() {
     assert_eq pace_clamp:far-floor 60 "$(printf '%s' "$out" | cut -d' ' -f4)"
 }
 
+test_runner_priority_burndown_loop() {
+    new_env
+    assert_eq prio_burndown_loop 4 "$(gate_run "usage_runner_priority burndown-loop")"
+    gate_run "usage_runner_priority burndown" >/dev/null 2>&1
+    assert_eq prio_burndown_near_miss 1 "$?"
+    in_env "usage_marker_write $SID_A burndown-loop '$REPO_ROOT/bin/burndown-loop' usage-pause drain 94 seven_day ''"
+    assert_eq prio_burndown_loop:marker-rc 0 "$?"
+    assert_eq prio_burndown_loop:runner burndown-loop "$(jq -r .runner "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json" 2>/dev/null)"
+}
+
 # ---------------------------------------------------------------- runner
 
 TESTS=$(grep -E '^test_[a-z0-9_]+\(\)' "$0" | sed 's/().*//')

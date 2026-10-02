@@ -107,3 +107,11 @@ def test_merge_digest_block_is_protected():
             f"{MERGE_DIGEST_END}\n\n## Summary\n3 files\n")
     spans = _protected_spans(body)
     assert (0, body.index(MERGE_DIGEST_END) + len(MERGE_DIGEST_END)) in spans
+
+
+def test_adr_in_files_changed_block_does_not_suppress_prose_correction():
+    block = f"{FILES_CHANGED_BEGIN}ibl5/docs/decisions/ADR-0042-other.md{FILES_CHANGED_END}"
+    body = f"See ADR-9999 for details\n{block}\n"
+    result = correct_body_numbers(body, _NAME_STATUS, _NUMSTAT)
+    assert "See ADR-0131 for details" in result
+    assert "ADR-0042-other.md" in result

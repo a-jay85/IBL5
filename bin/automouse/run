@@ -633,7 +633,8 @@ cleanup_watcher() {
         wait "$WATCHER_PID" 2>/dev/null || true
     fi
     rm -f "$NIGHTLY_DIR/.heartbeat-$$-impl" "$NIGHTLY_DIR/.heartbeat-$$-postplan" \
-         "$NIGHTLY_DIR/.cmdpid-$$-impl" "$NIGHTLY_DIR/.cmdpid-$$-postplan" 2>/dev/null || true
+         "$NIGHTLY_DIR/.cmdpid-$$-impl" "$NIGHTLY_DIR/.cmdpid-$$-postplan" \
+         "$NIGHTLY_DIR/.failsig-$$-impl" 2>/dev/null || true
     # Release any plan claim still held (e.g. we broke out of the loop mid-plan on
     # a time guard or env-failure) so a sibling/next run can resume it.
     if [ -n "$CURRENT_LOCK" ]; then
@@ -1552,13 +1553,15 @@ run_between_plans_canary() {
 # because the slice can be a multi-hour transcript; a crashed/stall-killed agent
 # may have written nothing structured, so a raw log tail is the reliable,
 # agent-cooperation-free baseline.
-# Args: <plan_name> <log_before> <impl_model> <attempt_num>
+# Args: <plan_name> <log_before> <impl_model> <attempt_num> [<failure_signature>]
 write_failure_report() {
-    _wfr_plan="$1"; _wfr_before="$2"; _wfr_model="$3"; _wfr_attempt="$4"
+    _wfr_plan="$1"; _wfr_before="$2"; _wfr_model="$3"; _wfr_attempt="$4"; _wfr_sig="${5:-}"
     _wfr_file="$QUEUE_DIR/${_wfr_plan}.failure"
     {
-        printf '# Prior attempt %d/%d failed (model: %s) at %s\n\n' \
+        printf '# Prior attempt %d/%d failed (model: %s) at %s\n' \
             "$_wfr_attempt" "$MAX_ATTEMPTS" "$_wfr_model" "$(date)"
+        [ -z "$_wfr_sig" ] || printf 'failure-signature: %s\n' "$_wfr_sig"
+        printf '\n'
         printf 'This is the tail of the previous impl attempt that did NOT complete.\n'
         printf 'Read it to avoid repeating the same failure; it is capped and may be truncated mid-line.\n\n'
         printf '## Last %d lines of the failed attempt log (hard-capped to %d bytes)\n\n```\n' \
@@ -1568,6 +1571,36 @@ write_failure_report() {
             | tail -c "$FAILURE_TAIL_BYTES"
         printf '\n```\n'
     } > "$_wfr_file"
+}
+
+# Print the failure-signature header line of a .failure sidecar, or nothing.
+# Reads only the header region (stops at the first ``` fence), so a log line in
+# the fenced tail that happens to start with "failure-signature:" is never read.
+# Args: <failure_file>
+read_failure_signature() {
+    [ -f "$1" ] || return 0
+    awk '/^```/ { exit } sub(/^failure-signature: /, "") { print; exit }' "$1"
+}
+
+# Exit 0 iff the two signatures are BOTH non-empty and byte-equal. Empty never
+# matches: an attempt with no informative failing tool call keeps today's ladder.
+# Args: <previous_signature> <new_signature>
+failure_signature_repeats() {
+    [ -n "$1" ] && [ -n "$2" ] && [ "$1" = "$2" ]
+}
+
+# Write the skipped report for a plan stopped on a repeated failure. Mirrors
+# the poison-pill report in the plan-claim block; morning-digest surfaces it.
+# Args: <plan_name> <signature> <previous_attempt> <this_attempt>
+write_repeat_failure_report() {
+    local _rfr_dir="$NIGHTLY_DIR/reports" _rfr_slug
+    _rfr_slug=$(basename "$1" .md)
+    mkdir -p "$_rfr_dir"
+    {
+        printf 'Plan "%s" stopped: attempts %s and %s failed the same way, so the escalated retry was not spent. Needs human review; requeue after fixing the cause.\n\n' \
+            "$_rfr_slug" "$3" "$4"
+        printf '## Repeated failure\n\n```\n%s\n```\n' "$2"
+    } > "$_rfr_dir/$(date +%Y-%m-%d)-skipped-$_rfr_slug.md"
 }
 
 # Decide whether to feed the prior-failure report to this attempt's impl prompt.
@@ -1926,7 +1959,8 @@ while true; do
         IMPL_LOG_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
         HEARTBEAT_FILE="$NIGHTLY_DIR/.heartbeat-$$-impl"
         CMDPID_FILE="$NIGHTLY_DIR/.cmdpid-$$-impl"
-        rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
+        FAILSIG_FILE="$NIGHTLY_DIR/.failsig-$$-impl"   # last failing tool call of this impl attempt (stream-filter side file; never in $LOG)
+        rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE" "$FAILSIG_FILE"
 
         run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "impl" "$CMDPID_FILE" "$PLAN_SLUG" &
         WATCHER_PID=$!
@@ -2065,7 +2099,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 --verbose \
                 --name "automouse-impl-$(date +%Y-%m-%d-%H%M)" \
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
-            | bin/lib/automouse-stream-filter.sh "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" impl \
+            | bin/lib/automouse-stream-filter.sh "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" impl "$FAILSIG_FILE" \
             >> "$LOG" || IMPL_STATUS=$?
         fi
 
@@ -2188,8 +2222,27 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             # incremented attempt stays in place (→ eventual poison-pill, unchanged).
             # Persist the capped failure report so the NEXT attempt — escalated to
             # Opus on the final retry (ADR-0085) — has this attempt's context.
-            write_failure_report "$PLAN_NAME" "$IMPL_LOG_BEFORE" "$IMPL_MODEL" "$(( ATTEMPTS + 1 ))"
+            # Repeated-failure stop: read the PREVIOUS signature before the
+            # overwrite, compute this attempt's, persist it, compare.
+            PREV_FAILSIG=$(read_failure_signature "$FAILURE_FILE" 2>/dev/null) || PREV_FAILSIG=""
+            PREV_FAILATTEMPT=$(sed -n '1s/^# Prior attempt \([0-9][0-9]*\)\/.*/\1/p' "$FAILURE_FILE" 2>/dev/null) || PREV_FAILATTEMPT=""
+            NEW_FAILSIG=$(bin/lib/automouse-failure-signature "$FAILSIG_FILE" 2>/dev/null) || NEW_FAILSIG=""
+            rm -f "$FAILSIG_FILE" 2>/dev/null || true
+            write_failure_report "$PLAN_NAME" "$IMPL_LOG_BEFORE" "$IMPL_MODEL" "$(( ATTEMPTS + 1 ))" "$NEW_FAILSIG"
             echo "Genuine impl failure — wrote $FAILURE_FILE (attempt $(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS)." >> "$LOG"
+            if [ -n "$NEW_FAILSIG" ]; then
+                echo "failsig: recorded (${#NEW_FAILSIG} chars)" >> "$LOG"
+            else
+                echo "failsig: none (no informative failing tool call; retry ladder unchanged)" >> "$LOG"
+            fi
+            if failure_signature_repeats "$PREV_FAILSIG" "$NEW_FAILSIG"; then
+                echo "REPEATED FAILURE — $PLAN_NAME failed the same way on attempts ${PREV_FAILATTEMPT:-?} and $(( ATTEMPTS + 1 )); moving to skipped/ without the escalated retry." >> "$LOG"
+                mkdir -p "$NIGHTLY_DIR/skipped"
+                mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+                touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
+                write_repeat_failure_report "$PLAN_NAME" "$NEW_FAILSIG" "${PREV_FAILATTEMPT:-?}" "$(( ATTEMPTS + 1 ))"
+                rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
+            fi
         fi
     fi
 

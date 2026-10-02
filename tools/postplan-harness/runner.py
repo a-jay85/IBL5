@@ -2521,6 +2521,25 @@ def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> 
         pass
 
 
+def _prose_hold_note(res: RunResult) -> str:
+    """Display-only RESULT-line suffix naming the prose check as a hold cause.
+
+    Non-empty only when the run is held, condition (16) is blocked, and the
+    pre-push meta-check failures include the prose check. Condition (16) also
+    blocks on post-pr failures and UNKNOWN state, which never populate
+    meta_check_failures, so both signals are required.
+    """
+    arm = res.arm
+    if arm is None or arm.armed:
+        return ""
+    if not any(c.number == 16 for c in arm.holds):
+        return ""
+    names = [f.get("name") for f in (res.meta_check_failures or [])]
+    if prosefix.PROSE_CHECK not in names:
+        return ""
+    return f" held-by=prose-check ({prosefix.PROSE_CHECK} failed pre-push)"
+
+
 def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
     """The one line a watcher greps for — printed FIRST, before the stats lines.
 
@@ -2622,6 +2641,7 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
         return ("RESULT: post-plan BLOCKED — BEHIND retry cap reached (branch still "
                 "behind master after 3 re-rebases); auto-merge disarmed, human "
                 f"merges{pr}{tail} findings={len(res.findings)}")
+    tail += _prose_hold_note(res)
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
             f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}")
 

@@ -42,7 +42,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      * Get grouping column names for a region type
      *
      * @param string $region Region name
-     * @return array{grouping: string, gbColumn: string, magicNumberColumn: string}
+     * @return array{grouping: '`conference`'|'`division`', gbColumn: '`conf_gb`'|'`div_gb`', magicNumberColumn: '`conf_magic_number`'|'`div_magic_number`'}
      */
     private function getGroupingColumns(string $region): array
     {

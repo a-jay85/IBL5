@@ -439,6 +439,8 @@ def test_carried_forward_log_line(tmp_path):
                                  diff=DIFF_EDITED,
                                  canned={"plan-fidelity-review": "6d checks\n\nREADY\n"})
     assert any("carry-forward declined: diff-changed" in ln for ln in logs_miss)
+    assert not any("carried forward" in ln for ln in logs_miss)
+    assert not any("carry-forward declined" in ln for ln in logs_match)
 
 
 @pytest.mark.usefixtures("git_shim")

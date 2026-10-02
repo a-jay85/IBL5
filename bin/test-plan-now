@@ -1191,9 +1191,10 @@ preflight_cleanup "$TPRE_OUT"
 echo "── Phase 7: review-DM button assignments ──"
 
 # Phase 7 assertion 1 (two sites): check-plan-FAILED outcomes send a payload with
-# plan_discard_ and no plan_queue_ custom_id (payload scope only). The bot currently
-# shows both buttons regardless — it ignores the buttons field; ADR-0096 is enforced
-# by bin/plan-review-drain's check-plan gate, not by the message content.
+# plan_discard_ and no plan_queue_ custom_id (payload scope only). The bot honors
+# the buttons field and renders a Discard-only row for this payload (pinned by
+# ibl5/IBLbot/src/server/plan-review-dm.test.ts). ADR-0096 is still enforced by
+# bin/plan-review-drain's check-plan gate, independent of the message content.
 # Mutation guard: if DM_REVIEW_BUTTONS were set to "queue discard" here, or derived
 # from DM_PLAN (which is live at both FAILED sites), the payload would carry
 # plan_queue_ for a plan check-plan just rejected — contradicting the intended signal.

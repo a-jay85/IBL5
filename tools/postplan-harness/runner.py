@@ -216,7 +216,7 @@ def _discharge_hold_sentences(llm, probe, justification: str, log) -> tuple[str,
 
 def _record_failure_context(res: RunResult, e: HarnessError) -> None:
     """Copy the failing command and its output tail from a HarnessError onto the result.
-    Redacted at storage time so result.json never contains raw credentials."""
+    Both fields are redacted before storage; res.error stays raw."""
     res.error_cmd = _redact(e.cmd) or None
     res.error_output_tail = _redact(e.output) or None
 

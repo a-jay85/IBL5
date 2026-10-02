@@ -215,9 +215,10 @@ def _discharge_hold_sentences(llm, probe, justification: str, log) -> tuple[str,
 
 
 def _record_failure_context(res: RunResult, e: HarnessError) -> None:
-    """Copy the failing command and its output tail from a HarnessError onto the result."""
-    res.error_cmd = e.cmd or None
-    res.error_output_tail = e.output or None
+    """Copy the failing command and its output tail from a HarnessError onto the result.
+    Redacted at storage time so result.json never contains raw credentials."""
+    res.error_cmd = _redact(e.cmd) or None
+    res.error_output_tail = _redact(e.output) or None
 
 
 def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",

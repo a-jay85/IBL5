@@ -88,6 +88,19 @@ def test_result_json_omits_unset_error_cmd():
     assert "error_output_tail" not in d2
 
 
+def test_result_json_redacts_credentials():
+    secret = "ghp_" + _ALNUM36
+    res = RunResult(terminal=TerminalState.FAILED)
+    runner._record_failure_context(res, HarnessError(
+        "local-gate", "push failed",
+        cmd=f"git push https://x:{secret}@github.com/a/b.git",
+        output=f"remote: https://x:{secret}@github.com/a/b.git",
+    ))
+    d = json.loads(res.to_json())
+    assert secret not in d.get("error_cmd", "")
+    assert secret not in d.get("error_output_tail", "")
+
+
 # --- tail / redaction helpers -------------------------------------------------
 
 def test_error_tail_keeps_last_three_lines_of_10kb():

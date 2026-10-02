@@ -25,7 +25,7 @@ let tmp: string;
 
 // Build a fully-wired client double. `fakeMessage` is mutated between tests to
 // control the `content` the sweeper reads back.
-function makeClient(fakeMessage: { content: string; edit: ReturnType<typeof vi.fn> }): {
+function makeClient(fakeMessage: { content: string; edit: ReturnType<typeof vi.fn>; components?: unknown }): {
     client: Client;
     fetch: ReturnType<typeof vi.fn>;
     send: ReturnType<typeof vi.fn>;
@@ -247,5 +247,51 @@ describe('sweepOnce — Row 17: re-entrant sweepOnce and startStaleSweeper', () 
         const callsAtClear = sweepCalls;
         await vi.advanceTimersByTimeAsync(SWEEP_INTERVAL_MS * 3);
         expect(sweepCalls).toBe(callsAtClear);
+    });
+});
+
+describe('sweepOnce — Row 18: discard-only DM keeps one disabled button', () => {
+    it('rebuilds a discard-only message with only the disabled Discard button', async () => {
+        appendDecision({ slug: 'stale-solo', action: 'discard', actor: 'ACTOR', channelId: 'C', messageId: 'M' }, tmp);
+        backdateRecords(tmp, 16 * 60 * 1000);
+
+        const fakeMessage = {
+            content: '',
+            edit: vi.fn(async () => undefined),
+            components: [{ components: [{ customId: 'plan_discard_stale-solo' }] }],
+        };
+        const { client } = makeClient(fakeMessage);
+
+        await sweepOnce(client, tmp);
+
+        expect(fakeMessage.edit).toHaveBeenCalledTimes(1);
+        const payload = fakeMessage.edit.mock.calls[0]![0] as {
+            components: { components: { data: { custom_id?: string; disabled?: boolean } }[] }[];
+        };
+        const row = payload.components[0]!.components;
+        expect(row).toHaveLength(1);
+        expect(row[0]!.data.custom_id).toBe('plan_discard_stale-solo');
+        expect(row[0]!.data.disabled).toBe(true);
+    });
+});
+
+describe('sweepOnce — Row 19: message without components keeps both disabled buttons', () => {
+    it('rebuilds both disabled buttons when the fetched message has no components', async () => {
+        appendDecision({ slug: 'stale-plan', action: 'queue', actor: 'ACTOR', channelId: 'C', messageId: 'M' }, tmp);
+        backdateRecords(tmp, 16 * 60 * 1000);
+
+        const fakeMessage = { content: '', edit: vi.fn(async () => undefined) };
+        const { client } = makeClient(fakeMessage);
+
+        await sweepOnce(client, tmp);
+
+        const payload = fakeMessage.edit.mock.calls[0]![0] as {
+            components: { components: { data: { custom_id?: string; disabled?: boolean } }[] }[];
+        };
+        const row = payload.components[0]!.components;
+        expect(row.map((c) => c.data.custom_id)).toEqual(['plan_queue_stale-plan', 'plan_discard_stale-plan']);
+        for (const c of row) {
+            expect(c.data.disabled).toBe(true);
+        }
     });
 });

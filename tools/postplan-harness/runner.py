@@ -880,6 +880,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.terminal = TerminalState.FAILED
         res.error = f"{e.kind}: {e.detail}"
         res.error_kind = e.kind
+        res.error_cmd = e.cmd or None
+        res.error_output_tail = e.output or None
         log(f"FAILED: {res.error}")
     except usage_pause.UsagePause as p:
         res.terminal = TerminalState.FAILED
@@ -1794,7 +1796,8 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
     rc = result.returncode
     if rc == 3:
         raise HarnessError("local-gate",
-                           f"meta-checks filter-parse failure: {(result.stderr or '').strip()[:200]}")
+                           f"meta-checks filter-parse failure: {(result.stderr or '').strip()[:200]}",
+                           cmd=" ".join(argv), output=(result.stderr or ""))
     if rc == 0:
         try:
             os.unlink(flag)
@@ -1811,7 +1814,8 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
         rc2 = result2.returncode
         if rc2 == 3:
             raise HarnessError("local-gate",
-                               f"meta-checks filter-parse failure: {(result2.stderr or '').strip()[:200]}")
+                               f"meta-checks filter-parse failure: {(result2.stderr or '').strip()[:200]}",
+                               cmd=" ".join(argv), output=(result2.stderr or ""))
         if rc2 == 0:
             try:
                 os.unlink(flag)

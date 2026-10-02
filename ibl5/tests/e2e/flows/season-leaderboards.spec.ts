@@ -91,7 +91,12 @@ test.describe('Season Leaderboards flow', () => {
     await page.locator('select[name="year"]').selectOption('2025');
     await submitFilters(page);
 
-    await expect.poll(() => rows.count()).toBeLessThan(count2026);
+    await expect
+      .poll(async () => {
+        const n = await rows.count();
+        return n > 0 && n < count2026;
+      })
+      .toBe(true);
     await expect(rows.first()).toBeVisible();
   });
 
@@ -100,7 +105,12 @@ test.describe('Season Leaderboards flow', () => {
     await submitFilters(page);
 
     const rows = page.locator('.ibl-data-table').first().locator('tbody tr');
-    await expect.poll(() => rows.count()).toBeLessThanOrEqual(5);
+    await expect
+      .poll(async () => {
+        const n = await rows.count();
+        return n > 0 && n <= 5;
+      })
+      .toBe(true);
     await expect(rows.first()).toBeVisible();
   });
 

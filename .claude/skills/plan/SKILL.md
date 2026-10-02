@@ -475,7 +475,7 @@ When the work was split into multiple PRs (Step 2.5), queue **every** queue-safe
 
 Report which plans were queued (and which were left for in-session implementation) in Step 6.
 
-**Under `CLAUDE_HEADLESS=1` (a `bin/plan-now` run), skip this step.** Never run `bin/automouse/queue` yourself. The job queues the plan after its own `bin/check-plan` verdict.
+**Under `CLAUDE_HEADLESS=1` (a `bin/plan-now` run), skip this step.** Never run `bin/automouse/queue` yourself. By default (`--queue`), the job queues the plan after its own `bin/check-plan` verdict. Under `--implement`, the plan stays on disk and nothing is queued.
 
 ## Step 6: Report
 

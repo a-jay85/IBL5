@@ -57,14 +57,15 @@ test.describe('Season Leaderboards flow', () => {
   test('changing sort category updates results', async ({ page }) => {
     const table = page.locator('.ibl-data-table').first();
     await expect(table).toBeVisible();
-    const defaultSortedText = await table.locator('th.sorted-col').first().textContent();
+    const defaultSortedText = await table.locator('th.sorted-col').first().innerText();
+    expect(defaultSortedText.trim()).not.toBe('');
 
     await page.locator('select[name="sortby"]').selectOption('REB');
     await submitFilters(page);
 
     const sortedCol = page.locator('.ibl-data-table').first().locator('th.sorted-col').first();
     await expect(sortedCol).toBeVisible();
-    await expect(sortedCol).not.toHaveText(defaultSortedText ?? '');
+    await expect(sortedCol).not.toHaveText(defaultSortedText);
   });
 
   test('filtering by team shows only that team players', async ({ page }) => {

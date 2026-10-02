@@ -212,7 +212,7 @@ class GitHubDispatchClientTest extends TestCase
             }
             return false;
         };
-        $isForbiddenName = static fn (string $name): bool => preg_match('/teamid|session/i', $name) === 1;
+        $isForbiddenName = static fn (string $name): bool => preg_match('/teamid|session|user/i', $name) === 1;
 
         foreach ($class->getProperties() as $property) {
             if ($isForbiddenType($property->getType())) {

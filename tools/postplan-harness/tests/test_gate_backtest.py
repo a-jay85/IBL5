@@ -348,3 +348,23 @@ def test_parse_state_table():
     assert parse_gate_backtest_state(two) == "UNKNOWN"
     unclosed = f"{GATE_BACKTEST_BEGIN}\n<!-- gate-backtest-state: HELD -->\n"
     assert parse_gate_backtest_state(unclosed) == "UNKNOWN"
+
+
+def test_changes_from_unified_diff():
+    from harness.gate_backtest import changes_from_unified_diff
+    diff = (
+        "diff --git a/bin/check-new b/bin/check-new\n"
+        "new file mode 100755\n"
+        "--- /dev/null\n+++ b/bin/check-new\n@@ -0,0 +1 @@\n+x\n"
+        "diff --git a/bin/check-old b/bin/check-old\n"
+        "deleted file mode 100755\n"
+        "--- a/bin/check-old\n+++ /dev/null\n@@ -1 +0,0 @@\n-x\n"
+        "diff --git a/bin/check-was b/bin/check-now\n"
+        "similarity index 90%\nrename from bin/check-was\nrename to bin/check-now\n"
+        "diff --git a/ibl5/x.php b/ibl5/x.php\n"
+        "--- a/ibl5/x.php\n+++ b/ibl5/x.php\n@@ -1 +1 @@\n-a\n+b\n"
+    )
+    assert changes_from_unified_diff(diff) == [
+        ("A", "bin/check-new"), ("D", "bin/check-old"),
+        ("R", "bin/check-now"), ("M", "ibl5/x.php")]
+    assert changes_from_unified_diff("") == []

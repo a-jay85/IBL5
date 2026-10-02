@@ -207,6 +207,39 @@ def is_check_script(path: str) -> bool:
     return fnmatch.fnmatchcase(path, "bin/check-*") and "/" not in path[len("bin/"):]
 
 
+_DIFF_HEADER_RE = re.compile(r"^diff --git a/(.*) b/(.*)$")
+
+
+def changes_from_unified_diff(diff_text: str) -> list[tuple[str, str]]:
+    """(status, path) pairs from a unified diff's `diff --git` headers.
+
+    `new file mode` gives A, `deleted file mode` gives D, `rename to` gives R, else M. The
+    runner already holds this diff, so the detector reads what the PR body describes.
+    """
+    out: list[tuple[str, str]] = []
+    old_path = ""
+    settled = True
+    for line in diff_text.splitlines():
+        m = _DIFF_HEADER_RE.match(line)
+        if m:
+            old_path = m.group(1)
+            out.append(("M", m.group(2)))
+            settled = False
+            continue
+        if settled:
+            continue
+        if line.startswith("new file mode"):
+            out[-1] = ("A", out[-1][1])
+        elif line.startswith("deleted file mode"):
+            out[-1] = ("D", old_path)
+        elif line.startswith("rename to "):
+            out[-1] = ("R", out[-1][1])
+        else:
+            continue
+        settled = True
+    return out
+
+
 def detect_gate_changes(changed, read_candidate, check_sources) -> list[GateChange]:
     """Classify a diff's changed paths into gate changes. `[]` means no gate was touched.
 

@@ -6,6 +6,7 @@ names) is ever shell-parsed.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -15,12 +16,14 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections import namedtuple
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from harness.gate_backtest import (GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, GateChange,
                                    HistoricalPR, ReplayResult, Verdict, classify_exit,
-                                   classify_truth, compute_verdict, detect_gate_changes,
+                                   changes_from_unified_diff, classify_truth, compute_verdict,
+                                   detect_gate_changes,
                                    expand_argv, expand_env, is_check_script,
                                    render_gate_backtest, resolve_spec)
 
@@ -293,15 +296,38 @@ def _file_mode(repo: str, rev: str, path: str) -> int:
         return 0o100644
 
 
-def backtest_branch(repo: str, base: str, head: str = "HEAD", *, gh_json=live_gh_json,
-                    fetch: bool = True, plans_dir: str = "", limit: int = HISTORY_LIMIT,
-                    per_replay_timeout: int = PER_REPLAY_TIMEOUT, total_cap: int = TOTAL_CAP,
-                    now: datetime | None = None, exclude_pr: int | None = None,
-                    forced_gate: tuple[str, str] | None = None) -> BacktestOutcome:
-    """Detect the gates a branch changes and replay them against recent merged PRs.
+def _detect(repo: str, head: str, changes: list[tuple[str, str]], *,
+            read: bool = True) -> list[GateChange]:
+    """The gates `changes` touch. `read=False` skips every `git show` (replay-mode runner)."""
+    def read_candidate(path: str) -> str | None:
+        if not read:
+            return None
+        try:
+            return _git_bytes(repo, ["show", f"{head}:{path}"]).decode("utf-8", "replace")
+        except (subprocess.CalledProcessError, OSError):
+            return None
 
-    A branch that touches no gate returns NOT-APPLICABLE after one `git diff`, with no fetch,
-    worktree, or `gh` call. Any failure after a replayable gate is found maps to UNKNOWN.
+    check_sources: dict[str, str] = {}
+    if read and any(p.startswith("bin/lib/") for _, p in changes):
+        listing = make_git(repo)(["ls-tree", "-r", "--name-only", head, "--", "bin"]).splitlines()
+        for p in listing:
+            if is_check_script(p):
+                text = read_candidate(p)
+                if text is not None:
+                    check_sources[p] = text
+    return detect_gate_changes(changes, read_candidate, check_sources)
+
+
+def backtest_changes(repo: str, head: str, changes: list[tuple[str, str]], *,
+                     gh_json=live_gh_json, fetch: bool = True, plans_dir: str = "",
+                     limit: int = HISTORY_LIMIT, per_replay_timeout: int = PER_REPLAY_TIMEOUT,
+                     total_cap: int = TOTAL_CAP, now: datetime | None = None,
+                     exclude_pr: int | None = None,
+                     forced_gate: tuple[str, str] | None = None) -> BacktestOutcome:
+    """Detect the gates a change list touches and replay them against recent merged PRs.
+
+    A change list with no gate returns NOT-APPLICABLE with no fetch, worktree, or `gh` call.
+    Any failure after a replayable gate is found maps to UNKNOWN.
     """
     git = make_git(repo)
     overlay_files: dict[str, tuple[bytes, int]] = {}
@@ -316,23 +342,8 @@ def backtest_branch(repo: str, base: str, head: str = "HEAD", *, gh_json=live_gh
         gates = [GateChange(path, kind, state, spec, reason)]
         overlay_files[path] = (data, 0o100755)
     else:
-        changed = parse_name_status(git(["diff", "--name-status", f"{base}...{head}"]))
-
-        def read_candidate(path: str) -> str | None:
-            try:
-                return _git_bytes(repo, ["show", f"{head}:{path}"]).decode("utf-8", "replace")
-            except subprocess.CalledProcessError:
-                return None
-
-        check_sources: dict[str, str] = {}
-        if any(p.startswith("bin/lib/") for _, p in changed):
-            listing = git(["ls-tree", "-r", "--name-only", head, "--", "bin"]).splitlines()
-            for p in listing:
-                if is_check_script(p):
-                    text = read_candidate(p)
-                    if text is not None:
-                        check_sources[p] = text
-        gates = detect_gate_changes(changed, read_candidate, check_sources)
+        changed = changes
+        gates = _detect(repo, head, changed)
         if not gates:
             return BacktestOutcome(compute_verdict([], [], {}), [], [], {}, 0, "")
         for status, path in changed:
@@ -363,6 +374,71 @@ def backtest_branch(repo: str, base: str, head: str = "HEAD", *, gh_json=live_gh
     verdict = compute_verdict(gates, results, truth)
     block = render_gate_backtest(verdict, gates, results or [], truth, window)
     return BacktestOutcome(verdict, gates, results, truth, window, block)
+
+
+def backtest_from_refs(repo: str, base: str, head: str, **kw) -> BacktestOutcome:
+    """CLI entry: the change list comes from `git diff --name-status <base>...<head>`."""
+    out = make_git(repo)(["diff", "--name-status", f"{base}...{head}"])
+    return backtest_changes(repo, head, parse_name_status(out), **kw)
+
+
+def backtest_branch(repo: str, head: str, changes: list[tuple[str, str]], *,
+                    exclude_pr: int | None = None, fixture_history=None,
+                    now: datetime | None = None, plans_dir: str | None = None,
+                    per_replay_timeout: int = PER_REPLAY_TIMEOUT,
+                    total_cap: int = TOTAL_CAP) -> tuple[Verdict, str]:
+    """Runner entry: replay the gates in `changes`. A fixture history replaces `gh` and the fetch."""
+    if plans_dir is None:
+        home = os.environ.get("HOME", "")
+        plans_dir = os.path.join(home, "claude-plans") if home else ""
+    kw: dict = {}
+    if fixture_history is not None:
+        kw = {"gh_json": (lambda _argv: fixture_history), "fetch": False}
+    out = backtest_changes(repo, head, changes, plans_dir=plans_dir, exclude_pr=exclude_pr,
+                           now=now, per_replay_timeout=per_replay_timeout, total_cap=total_cap,
+                           **kw)
+    return out.verdict, out.block
+
+
+GateBacktestResult = namedtuple("GateBacktestResult", "status reason block")
+_MEMO: dict[tuple[str, str], GateBacktestResult] = {}
+
+
+def _unknown(gates: list[GateChange], reason: str) -> GateBacktestResult:
+    shown = gates or [GateChange("(detector)", "check-script", "unspecified", None,
+                                 "detector failed")]
+    block = render_gate_backtest(Verdict("UNKNOWN", reason, {}), shown, [], {}, 0)
+    return GateBacktestResult("UNKNOWN", reason, block)
+
+
+def gate_backtest_result(repo: str, diff_text: str, *, pr, live: bool, fixture, log
+                         ) -> GateBacktestResult:
+    """The runner's one call: the backtest verdict for the diff it already holds.
+
+    No gate in the diff returns NOT-APPLICABLE with no fetch, worktree, or `gh` call. Replay mode
+    reads a `gate_backtest` fixture key and never touches git. A live run memoizes on the diff hash,
+    so the body-assembly and arming call sites share one backtest, and any raise maps to UNKNOWN.
+    """
+    changes = changes_from_unified_diff(diff_text)
+    gates: list[GateChange] = []
+    try:
+        gates = _detect(repo, "HEAD", changes, read=live)
+        if not gates:
+            return GateBacktestResult("NOT-APPLICABLE", "", "")
+        if not live:
+            seam = (fixture or {}).get("gate_backtest")
+            if isinstance(seam, dict):
+                return GateBacktestResult(seam.get("status", "NOT-APPLICABLE"),
+                                          seam.get("reason", ""), seam.get("block", ""))
+            return GateBacktestResult("NOT-APPLICABLE", "replay fixture has no gate_backtest", "")
+        key = (repo, hashlib.sha256(diff_text.encode("utf-8", "replace")).hexdigest())
+        if key not in _MEMO:
+            verdict, block = backtest_branch(repo, "HEAD", changes, exclude_pr=pr)
+            _MEMO[key] = GateBacktestResult(verdict.state, verdict.reason, block)
+        return _MEMO[key]
+    except Exception as exc:
+        log(f"gate-backtest: runner error — {type(exc).__name__}: {exc}")
+        return _unknown(gates, f"runner error: {type(exc).__name__}")
 
 
 _VALUE_FLAGS = ("repo", "base", "head", "limit", "plans-dir", "per-replay-timeout", "total-cap",
@@ -453,7 +529,7 @@ def main(argv: list[str]) -> int:
         gh_json = lambda _argv: fixture_data  # noqa: E731
     repo = opts.get("repo") or os.getcwd()
     try:
-        outcome = backtest_branch(
+        outcome = backtest_from_refs(
             repo, opts.get("base", "origin/master"), opts.get("head", "HEAD"), gh_json=gh_json,
             fetch=not fixture, plans_dir=plans_dir, limit=numbers["limit"],
             per_replay_timeout=numbers["per-replay-timeout"], total_cap=numbers["total-cap"],

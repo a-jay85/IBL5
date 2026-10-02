@@ -2622,7 +2622,9 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                     "human required; ERROR terminal=failed, no PR opened."
                     f"{detail} Resolve the rebase, then re-run bin/post-plan-now.")
         if res.error_kind == "local-gate":
-            detail = _flat(res.error) or "see gate output"
+            tail = " ".join(_error_tail(res.error_output_tail or res.error)) or "see gate output"
+            cmd = _cmd_text(res.error_cmd)
+            detail = f"Command: {cmd}. Error: {tail}" if cmd else tail
             # Classify on the FULL res.error, never on `detail`: _flat truncates at 300
             # chars and the hooks echo their guidance line LAST, so classifying the
             # flattened form would silently degrade a long byte-budget denial to
@@ -2652,10 +2654,32 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                     f"ERROR terminal=failed kind=usage-pause-dirty. "
                     + (f"{detail} " if detail else "")
                     + "Inspect `git status` in the worktree, then re-run bin/post-plan-now.")
-        # Unknown or None error_kind — name all possible fail-closed causes
+        if res.error_kind == "remote-head-diverged":
+            ev = res.error or ""
+            if ev.startswith("remote-head-diverged: "):
+                ev = ev[len("remote-head-diverged: "):]
+            evidence = " ".join(_error_tail(ev)) or "no evidence recorded"
+            cmd = _cmd_text(res.error_cmd)
+            cmd_part = f" Command: {cmd}." if cmd else ""
+            return (f"RESULT: post-plan BLOCKED — remote head diverged at {_stage_of(res)} "
+                    f"(the PR branch changed on GitHub); ERROR terminal=failed "
+                    f"kind=remote-head-diverged{pr}.{cmd_part} {evidence} "
+                    "Fetch origin and inspect what was pushed, then rebase onto it or "
+                    "reset to it, and re-run bin/post-plan-now.")
+        # Unknown or None error_kind. Name the stage; say "cause unknown" only when no
+        # command failed.
+        stage = _stage_of(res)
+        tail = " ".join(_error_tail(res.error_output_tail or res.error))
+        cmd = _cmd_text(res.error_cmd)
+        if cmd:
+            return (f"RESULT: post-plan BLOCKED — rc=3 kind={res.error_kind or 'none'} at "
+                    f"{stage}; ERROR terminal=failed{pr}. Command: {cmd}. Error: "
+                    f"{tail or 'no output captured'} "
+                    "Resolve the cause, then re-run bin/post-plan-now.")
         return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict, local-gate, or "
-                "llm-usage-limit), cause unknown; ERROR terminal=failed, no PR opened. "
-                "Resolve the cause, then re-run bin/post-plan-now.")
+                f"llm-usage-limit), cause unknown (stage: {stage}); ERROR terminal=failed, "
+                "no PR opened. " + (f"{tail} " if tail else "")
+                + "Resolve the cause, then re-run bin/post-plan-now.")
     if res.error_kind in ("push-retry-cap", "lostwork-unproved"):
         cause = ("push retry cap reached (stale lease after 3 attempts)"
                  if res.error_kind == "push-retry-cap"

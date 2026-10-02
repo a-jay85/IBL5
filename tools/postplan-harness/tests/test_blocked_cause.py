@@ -152,3 +152,63 @@ def test_stage_of_prefers_phase_then_kind():
     assert runner._stage_of(_stage_res("local-gate", "local-gate: phase5.5: x")) == "phase5.5"
     assert runner._stage_of(_stage_res("git", "boom")) == "git"
     assert runner._stage_of(_stage_res(None, None)) == "unrecorded"
+
+
+# --- verdict_line ---------------------------------------------------------------
+
+def _failed(kind, error, **kw):
+    r = RunResult(terminal=TerminalState.FAILED)
+    r.error_kind = kind
+    r.error = error
+    for k, v in kw.items():
+        setattr(r, k, v)
+    return r
+
+
+def test_diverged_verdict_names_stage_and_evidence():
+    res = _failed("remote-head-diverged",
+                  "remote-head-diverged: phase7: remote head abc1234 diverged from "
+                  "def5678 with different content", pr_number=42)
+    line = runner.verdict_line(res, 3, "")
+    assert "at phase7" in line
+    assert "abc1234" in line and "def5678" in line
+    assert "PR #42" in line
+    assert "cause unknown" not in line
+    assert "\n" not in line
+    assert line.startswith("RESULT: post-plan BLOCKED")
+
+
+def test_local_gate_verdict_names_command_and_tail():
+    tail = "\n".join([f"filler {i:03d}" for i in range(60)] + ["GUIDANCE: run bin/check-x"])
+    res = _failed("local-gate", "local-gate: git commit: " + "f" * 800,
+                  error_output_tail=tail, error_cmd="git commit")
+    line = runner.verdict_line(res, 3, "")
+    assert "Command: git commit." in line
+    assert "GUIDANCE: run bin/check-x" in line
+    assert "[class=" in line
+    assert "filler 000" not in line
+    assert "\n" not in line
+
+
+def test_fallback_names_stage_when_no_command():
+    line = runner.verdict_line(_failed(None, "phase3: something odd"), 3, "")
+    assert "cause unknown (stage: phase3)" in line
+    assert "something odd" in line
+
+
+def test_fallback_with_command_omits_cause_unknown():
+    line = runner.verdict_line(_failed("mystery", "boom", error_cmd="bin/foo --x"), 3, "")
+    assert "Command: bin/foo --x." in line
+    assert "Error: boom" in line
+    assert "at mystery" in line
+    assert "cause unknown" not in line
+
+
+def test_verdict_redacts_token_in_tail():
+    secret = "ghs_" + _ALNUM36
+    res = _failed("local-gate", "local-gate: git push",
+                  error_output_tail=f"https://x-access-token:{secret}@github.com/a/b.git",
+                  error_cmd="git push")
+    line = runner.verdict_line(res, 3, "")
+    assert secret not in line
+    assert "github.com/a/b.git" in line

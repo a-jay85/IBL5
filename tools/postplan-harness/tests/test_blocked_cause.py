@@ -86,3 +86,69 @@ def test_result_json_omits_unset_error_cmd():
     d2 = json.loads(RunResult(terminal=TerminalState.FAILED, error_cmd="git commit").to_json())
     assert d2["error_cmd"] == "git commit"
     assert "error_output_tail" not in d2
+
+
+# --- tail / redaction helpers -------------------------------------------------
+
+def test_error_tail_keeps_last_three_lines_of_10kb():
+    lines = [f"line {i:03d} " + "x" * 40 for i in range(200)]
+    result = runner._error_tail("\n".join(lines))
+    assert result == lines[-3:]
+    assert len(" ".join(result)) <= 300
+    assert all("\n" not in el for el in result)
+
+
+def test_error_tail_cuts_single_huge_line_to_its_end():
+    result = runner._error_tail("y" * 10000 + "END-MARKER")
+    assert len(result) == 1
+    assert len(result[0]) <= 300
+    assert result[0].endswith("END-MARKER")
+    assert result[0].startswith("…")
+
+
+@pytest.mark.parametrize("text", [None, "", " \n\t\n "])
+def test_error_tail_empty_inputs(text):
+    assert runner._error_tail(text) == []
+
+
+def test_error_tail_matches_flat_for_short_errors():
+    from test_verdict_line import _RC3_CASES
+    gate_ids = {"gate-adr", "gate-adr-drafted", "gate-unknown",
+                "gate-stale-base", "gate-byte-budget", "gate-doc-staleness"}
+    rows = [c for c in _RC3_CASES if c[0] in gate_ids]
+    assert len(rows) == 6
+    for _id, _kind, err, _extra, _expected in rows:
+        assert " ".join(runner._error_tail(err)) == " ".join(err.split()), _id
+
+
+_ALNUM36 = "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
+
+
+@pytest.mark.parametrize("text,secret,survivor", [
+    (f"https://x-access-token:ghs_{_ALNUM36}@github.com/a/b.git", f"ghs_{_ALNUM36}",
+     "github.com/a/b.git"),
+    (f"push failed with ghp_{_ALNUM36}", f"ghp_{_ALNUM36}", None),
+    ("token github_pat_" + "a1B2c3D4e5" * 4, "a1B2c3D4e5" * 4, None),
+    ("Authorization: Bearer abc.def-ghi", "abc.def-ghi", None),
+])
+def test_redact_strips_credentials(text, secret, survivor):
+    assert secret not in " ".join(runner._error_tail(text))
+    assert secret not in runner._cmd_text(text)
+    if survivor:
+        assert survivor in " ".join(runner._error_tail(text))
+
+
+def _stage_res(kind, error):
+    r = RunResult(terminal=TerminalState.FAILED)
+    r.error_kind = kind
+    r.error = error
+    return r
+
+
+def test_stage_of_prefers_phase_then_kind():
+    diverged = ("remote-head-diverged: phase7: remote head X diverged from Y "
+                "with different content")
+    assert runner._stage_of(_stage_res("remote-head-diverged", diverged)) == "phase7"
+    assert runner._stage_of(_stage_res("local-gate", "local-gate: phase5.5: x")) == "phase5.5"
+    assert runner._stage_of(_stage_res("git", "boom")) == "git"
+    assert runner._stage_of(_stage_res(None, None)) == "unrecorded"

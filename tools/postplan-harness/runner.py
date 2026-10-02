@@ -2357,6 +2357,51 @@ _BLOCK_BUDGET = 1800          # bin/discord-dm cuts at 1900; the deferred DM add
 _BLOCK_MAX_PATHS = 5
 _BLOCK_MAX_PATH_LEN = 120
 
+_TAIL_LINES = 3
+_TAIL_LINE_LEN = 160
+_TAIL_MAX = 300
+_CMD_MAX = 160
+
+_REDACT_RULES = (
+    (re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s@]+@"), r"\1***@"),
+    (re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}"), "***"),
+    (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}"), "***"),
+    (re.compile(r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]+"), r"\1***"),
+)
+_STAGE_RE = re.compile(r"\b(phase\d+(?:\.\d+)?[a-z]?)\b")
+
+
+def _redact(text: str) -> str:
+    """Strip credentials from text that is about to reach the RESULT line, block, or DM."""
+    for pattern, repl in _REDACT_RULES:
+        text = pattern.sub(repl, text)
+    return text
+
+
+def _error_tail(text: str | None) -> list[str]:
+    """Last few non-empty lines of `text`, redacted and bounded. Hooks and git print
+    the deciding line last, so the tail (not the head) is what a reader needs."""
+    lines = [" ".join(ln.split()) for ln in _redact(text or "").splitlines()]
+    lines = [ln for ln in lines if ln][-_TAIL_LINES:]
+    lines = [ln if len(ln) <= _TAIL_LINE_LEN else "…" + ln[-(_TAIL_LINE_LEN - 1):]
+             for ln in lines]
+    while len(" ".join(lines)) > _TAIL_MAX and len(lines) > 1:
+        lines.pop(0)
+    if lines and len(lines[0]) > _TAIL_MAX:
+        lines[0] = "…" + lines[0][-(_TAIL_MAX - 1):]
+    return lines
+
+
+def _cmd_text(cmd: str | None) -> str:
+    """Redacted, flattened command, cut to its head (the subcommand comes first)."""
+    flat = " ".join(_redact(cmd or "").split())
+    return flat if len(flat) <= _CMD_MAX else flat[:_CMD_MAX - 1] + "…"
+
+
+def _stage_of(res: RunResult) -> str:
+    m = _STAGE_RE.search(res.error or "")
+    return m.group(1) if m else (res.error_kind or "unrecorded")
+
 
 def _dedupe(items: list[str]) -> list[str]:
     seen: dict[str, None] = {}

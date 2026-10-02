@@ -217,7 +217,7 @@ class ApiPlayerRepositoryTest extends WideUnitTestCase
         $this->assertQueryExecuted('player_uuid');
     }
 
-    public function testPlayersThrowsForSortOutsideRepositoryMap(): void
+    public function testGetPlayersThrowsForSortOutsideRepositoryMap(): void
     {
         $paginator = new Paginator(['sort' => 'secret_col'], 'secret_col', ['secret_col']);
 

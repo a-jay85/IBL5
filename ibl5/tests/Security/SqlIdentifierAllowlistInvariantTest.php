@@ -76,6 +76,9 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
     }
 
     /**
+     * Catches a free-text value slipped into a map, e.g. setting
+     * ApiGameRepository::SORT_COLUMNS['game_date'] to 'game_date DESC'.
+     *
      * @param class-string $class
      */
     #[DataProvider('identifierMapProvider')]

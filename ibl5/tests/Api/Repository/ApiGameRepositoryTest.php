@@ -258,7 +258,7 @@ class ApiGameRepositoryTest extends WideUnitTestCase
         $this->assertQueryExecuted('ibl_box_scores');
     }
 
-    public function testGamesThrowsForSortOutsideRepositoryMap(): void
+    public function testGetGamesThrowsForSortOutsideRepositoryMap(): void
     {
         $paginator = new Paginator(['sort' => 'secret_col'], 'secret_col', ['secret_col']);
 

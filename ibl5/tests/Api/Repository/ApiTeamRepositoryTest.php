@@ -177,7 +177,7 @@ class ApiTeamRepositoryTest extends WideUnitTestCase
         $this->assertQueryExecuted('t.uuid =');
     }
 
-    public function testTeamsThrowsForSortOutsideRepositoryMap(): void
+    public function testGetTeamsThrowsForSortOutsideRepositoryMap(): void
     {
         $paginator = new Paginator(['sort' => 'secret_col'], 'secret_col', ['secret_col']);
 

@@ -73,7 +73,7 @@ def test_loop_exhausted_message_carries_rc_and_stderr(monkeypatch):
     out = ciwatch.watch_live(".", 1, settle_tries=2)
 
     assert out.exit_code == -1
-    assert "never settled" in out.evidence
+    assert "no checks registered after 2 tries" in out.evidence
     assert "exit 1" in out.evidence
     assert "Bad credentials" in out.evidence
 
@@ -260,6 +260,7 @@ def test_background_watch_failure_records_failed_checks_and_probe(monkeypatch, t
 def test_background_watch_retries_when_checks_not_reported(monkeypatch, tmp_path):
     """gh exit 1 right after pr create is a retry, never a verdict."""
     constructed = []
+    monkeypatch.setattr(ciwatch, "snapshot_checks", lambda w, pr, timeout=60: [])
     monkeypatch.setattr(
         ciwatch.subprocess, "Popen",
         _scripted_popen([FakePopen(1, err="no checks reported"), FakePopen(0)],
@@ -755,3 +756,179 @@ def test_snapshot_checks_maps_gh_exits(monkeypatch):
                         '{"name":"lint","bucket":"fail"}]', ""))
     assert got == [{"name": "build", "state": "SUCCESS", "bucket": "pass"},
                    {"name": "lint", "state": "", "bucket": "fail"}]
+
+
+# --- exit-1 classification in the watchers ---
+
+_SIGNOFF_ONLY = [_row("human-signoff", "fail"), _row("build", "pass")]
+_PENDING = [_row("build", "pending")]
+_CANCEL = [_row("build", "cancel"), _row("lint", "pass")]
+
+
+def _run_background(monkeypatch, tmp_path, sha, popens, snapshot, **kw):
+    """Drive _watch_thread with scripted Popen exits and a faked snapshot."""
+    constructed = []
+    snap = snapshot if callable(snapshot) else (lambda w, pr, timeout=60: snapshot)
+    monkeypatch.setattr(ciwatch, "snapshot_checks", snap)
+    monkeypatch.setattr(ciwatch.subprocess, "Popen", _scripted_popen(popens, constructed))
+    args = {"timeout": 30, "settle_tries": 3, "settle_wait": 0}
+    args.update(kw)
+    bg = ciwatch.start_background_watch("/wt", 42, sha, str(tmp_path), **args)
+    bg.done.wait(15)
+    ciwatch.reap_background_watch(bg)
+    data = json.loads((tmp_path / f"ci-{sha}.json").read_text())
+    return bg, data, constructed
+
+
+def _watch_live_fake(monkeypatch, watch_results, json_results):
+    """Fake subprocess.run for watch_live; each list's last entry repeats."""
+    watch_calls = []
+    watch_q, json_q = list(watch_results), list(json_results)
+
+    def fake_run(cmd, **kwargs):
+        if "--watch" in cmd:
+            watch_calls.append(list(cmd))
+            return watch_q.pop(0) if len(watch_q) > 1 else watch_q[0]
+        return json_q.pop(0) if len(json_q) > 1 else json_q[0]
+
+    monkeypatch.setattr(ciwatch.subprocess, "run", fake_run)
+    monkeypatch.setattr(ciwatch.time, "sleep", lambda s: None)
+    return watch_calls
+
+
+def _json_rows(rows):
+    return P(0, json.dumps(rows), "")
+
+
+def test_background_watch_rc1_human_signoff_only_is_success(monkeypatch, tmp_path):
+    out = "human-signoff\tfail\t0\nbuild\tpass\t1m\n"
+    _, data, constructed = _run_background(
+        monkeypatch, tmp_path, "r1a111", [FakePopen(1, out=out)], _SIGNOFF_ONLY)
+    assert data["status"] == "success"
+    assert data["exit_code"] == 0
+    assert "only ignored checks failed: human-signoff" in data["evidence"]
+    assert data["gh_stdout_tail"] == out
+    assert data["bucket_snapshot"] == _SIGNOFF_ONLY
+    assert len(constructed) == 1
+
+
+def test_watch_live_rc1_human_signoff_only_is_success(monkeypatch):
+    calls = _watch_live_fake(monkeypatch, [P(1, "human-signoff\tfail\t0\n", "")],
+                             [_json_rows(_SIGNOFF_ONLY)])
+    out = ciwatch.watch_live(".", 1)
+    assert out.exit_code == 0
+    assert "exit 1" in out.evidence
+    assert len(calls) == 1
+
+
+def test_background_watch_rc1_real_fail_is_failure(monkeypatch, tmp_path):
+    _, data, _ = _run_background(
+        monkeypatch, tmp_path, "r1b222", [FakePopen(1)],
+        [_row("human-signoff", "fail"), _row("build", "fail")])
+    assert data["status"] == "failure"
+    assert data["exit_code"] == 8
+    assert data["failed_checks"] == ["build"]
+
+
+def test_watch_live_rc1_real_fail_is_exit_8(monkeypatch):
+    _watch_live_fake(monkeypatch, [P(1, "", "")],
+                     [_json_rows(_PENDING), _json_rows([_row("build", "fail")])])
+    out = ciwatch.watch_live(".", 1)
+    assert out.exit_code == 8
+    assert out.failed == ["build"]
+    assert "exit 1" in out.evidence
+
+
+def test_background_watch_rc1_cancel_is_named_hold(monkeypatch, tmp_path):
+    _, data, constructed = _run_background(
+        monkeypatch, tmp_path, "r1c333", [FakePopen(1)], _CANCEL)
+    assert data["status"] == "indeterminate"
+    assert data["exit_code"] == -1
+    assert "checks cancelled: build" in data["evidence"]
+    assert len(constructed) == 1
+    assert ciwatch.read_outcome(str(tmp_path), "r1c333") is None
+
+
+def test_watch_live_rc1_cancel_is_named_hold(monkeypatch):
+    _watch_live_fake(monkeypatch, [P(1, "", "")], [_json_rows(_CANCEL)])
+    out = ciwatch.watch_live(".", 1)
+    assert out.exit_code == -1
+    assert "checks cancelled: build" in out.evidence
+
+
+def test_background_cancel_after_head_move_reports_head_changed(monkeypatch, tmp_path):
+    from harness import gitutil
+    sha = "r1d444"
+    monkeypatch.setattr(ciwatch.gitutil, "reconcile_remote_head",
+                        lambda *a, **k: gitutil.Reconcile("match", sha, ""))
+    monkeypatch.setattr(ciwatch.gitutil, "remote_head_matches",
+                        lambda *a, **k: (False, "fff999" + "0" * 34))
+    bg, data, _ = _run_background(
+        monkeypatch, tmp_path, sha, [FakePopen(1)], _CANCEL, verify_head=True)
+    assert data["status"] == "head-changed"
+    assert bg.remote_sha.startswith("fff999")
+    assert "checks cancelled: build" in data["evidence"]
+
+
+def test_background_pending_does_not_burn_settle_budget(monkeypatch, tmp_path):
+    _, data, constructed = _run_background(
+        monkeypatch, tmp_path, "r1e555",
+        [FakePopen(1), FakePopen(1), FakePopen(0)], _PENDING, settle_tries=1)
+    assert data["status"] == "success"
+    assert len(constructed) == 3
+
+
+def test_watch_live_pending_does_not_burn_settle_budget(monkeypatch):
+    calls = _watch_live_fake(monkeypatch, [P(1), P(1), P(0)], [_json_rows(_PENDING)])
+    out = ciwatch.watch_live(".", 1, settle_tries=1)
+    assert out.exit_code == 0
+    assert len(calls) == 3
+
+
+def test_watch_live_pending_forever_ends_in_named_reason(monkeypatch):
+    _watch_live_fake(monkeypatch, [P(1)], [_json_rows(_PENDING)])
+    out = ciwatch.watch_live(".", 1, timeout=0, settle_tries=10)
+    assert out.exit_code == -1
+    assert out.evidence.startswith("checks pending: build after 0 tries")
+
+
+def test_background_pending_forever_times_out_with_named_reason(monkeypatch, tmp_path):
+    _, data, _ = _run_background(
+        monkeypatch, tmp_path, "r1f666", [FakePopen(1)], _PENDING,
+        timeout=1, settle_wait=0.05, settle_tries=10)
+    assert data["status"] == "timeout"
+    assert "checks pending: build" in data["evidence"]
+
+
+def test_watch_live_unparseable_snapshot_is_named_hold(monkeypatch):
+    calls = _watch_live_fake(monkeypatch, [P(1, "", "")], [P(0, "not json{", "")])
+    out = ciwatch.watch_live(".", 1, settle_tries=2)
+    assert out.exit_code == -1
+    assert "gh snapshot unavailable after 2 tries" in out.evidence
+    assert len(calls) == 2
+
+
+def test_background_unparseable_snapshot_is_named_hold(monkeypatch, tmp_path):
+    _, data, _ = _run_background(
+        monkeypatch, tmp_path, "r1g777", [FakePopen(1)], None, settle_tries=2)
+    assert data["status"] == "timeout"
+    assert "gh snapshot unavailable after 2 tries" in data["evidence"]
+    assert data["bucket_snapshot"] is None
+
+
+def test_watch_live_zero_checks_never_passes(monkeypatch):
+    none_yet = P(1, "", "no checks reported on the 'x' branch")
+    _watch_live_fake(monkeypatch, [P(1, "", "no checks reported")], [none_yet])
+    out = ciwatch.watch_live(".", 1, settle_tries=3)
+    assert out.exit_code == -1
+    assert "no checks registered after 3 tries" in out.evidence
+
+
+@pytest.mark.parametrize("snapshot", [[], [_row("human-signoff", "pass")]])
+def test_background_zero_checks_never_passes(monkeypatch, tmp_path, snapshot):
+    _, data, _ = _run_background(
+        monkeypatch, tmp_path, "r1h888", [FakePopen(1)], snapshot, settle_tries=2)
+    assert data["status"] == "timeout"
+    assert data["exit_code"] == -1
+    assert "no checks registered" in data["evidence"]
+    assert ciwatch.read_outcome(str(tmp_path), "r1h888") is None

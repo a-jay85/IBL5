@@ -53,13 +53,22 @@ cat > "$SCRATCH/.local/bin/gh" << 'SHIM_EOF'
 #!/usr/bin/env bash
 # Shim: dispatch by subcommand.
 # gh api graphql ...        -> serve GH_FIXTURE_GRAPHQL (pre-jq-filtered content)
-# gh api repos/... ...      -> serve GH_FIXTURE_COMMIT  (pre-jq-filtered content)
+# gh api repos/... ...      -> serve GH_FIXTURE_COMMIT  (pre-jq-filtered content), or when
+#                              GH_FIXTURE_COMMIT_MAP names a file of "<oid> <tree>" lines,
+#                              the tree for the OID in the last path segment (exit 1 if none)
 # gh pr view ...            -> serve GH_FIXTURE
 if [ "${1:-}" = "api" ]; then
     if [ "${2:-}" = "graphql" ]; then
         [ -n "${GH_FIXTURE_GRAPHQL:-}" ] && { cat "$GH_FIXTURE_GRAPHQL"; exit 0; }
         exit 1
     else
+        if [ -n "${GH_FIXTURE_COMMIT_MAP:-}" ]; then
+            _oid="${2##*/}"
+            while read -r _o _t; do
+                [ "$_o" = "$_oid" ] && { printf '%s\n' "$_t"; exit 0; }
+            done < "$GH_FIXTURE_COMMIT_MAP"
+            exit 1
+        fi
         [ -n "${GH_FIXTURE_COMMIT:-}" ] && { cat "$GH_FIXTURE_COMMIT"; exit 0; }
         exit 1
     fi
@@ -377,11 +386,13 @@ begin_case
 fix14="$SCRATCH/fix14.json"
 _mk_delta_fixture "$RUNG2_TREE" "$fix14"
 fix14_gql="$SCRATCH/fix14-gql.txt"
-printf '%s\n' "$RUNG2_COMMIT" > "$fix14_gql"
+# Decoy OID comes first (newest-first) so a first-OID-only mutant fails.
+FIX14_DECOY="deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+printf '%s\n%s\n' "$FIX14_DECOY" "$RUNG2_COMMIT" > "$fix14_gql"
 fix14_commit="$SCRATCH/fix14-commit.txt"
-printf '%s\n' "$RUNG2_TREE" > "$fix14_commit"
+printf '%s %s\n%s %s\n' "$FIX14_DECOY" "$D_BASE_TREE" "$RUNG2_COMMIT" "$RUNG2_TREE" > "$fix14_commit"
 OUT14="$(cd "$DELTA_REPO" && \
-    GH_FIXTURE="$fix14" GH_FIXTURE_GRAPHQL="$fix14_gql" GH_FIXTURE_COMMIT="$fix14_commit" \
+    GH_FIXTURE="$fix14" GH_FIXTURE_GRAPHQL="$fix14_gql" GH_FIXTURE_COMMIT_MAP="$fix14_commit" \
     bash "$SKIP_SCRIPT" --delta 9999 "")"
 want "case 14 DELTA-STATUS delta" "$OUT14" "DELTA-STATUS: delta"
 end_case "case 14 rung2-graphql-recovery"

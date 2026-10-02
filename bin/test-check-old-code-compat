@@ -1,0 +1,474 @@
+#!/bin/bash
+
+# Harness for bin/check-old-code-compat.
+#
+# Default: pure --verdict-only cases against throwaway git repos. No database.
+# --db:    end-to-end scenarios against real MariaDB (CI self-test job).
+#
+# Exit codes: 0 = all cases passed, 1 = a case failed, 2 = usage error.
+
+set -uo pipefail
+
+usage() {
+    cat <<'EOF'
+Usage: bin/test-check-old-code-compat [--db] [--help|-h]
+
+  (no args)   Run the pure verdict cases. Needs no database.
+  --db        Run the end-to-end scenarios against MariaDB.
+  --help, -h  Show this message.
+
+Everything is built under a mktemp -d directory; nothing is written in the repo.
+EOF
+}
+
+MODE="pure"
+for arg in "$@"; do
+    case "$arg" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --db)
+            MODE="db"
+            ;;
+        *)
+            echo "ERROR: unknown argument: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [ "$MODE" = "db" ] && { [ -z "${DB_HOST:-}" ] || [ -z "${DB_USER:-}" ]; }; then
+    echo "ERROR: --db needs DB_HOST and DB_USER" >&2
+    exit 2
+fi
+
+HARNESS_DIR="$(cd "$(dirname "$0")" && pwd)"
+SUT="$HARNESS_DIR/check-old-code-compat"
+REPO_ROOT="$(git -C "$HARNESS_DIR" rev-parse --show-toplevel)"
+
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+
+TOTAL=0
+FAILED=0
+STDIN_TEXT=""
+LAST_OUT=""
+RUN_ENV_I=0
+REPO_SEQ=0
+JUNIT_SEQ=0
+
+REPO=""
+BASE=""
+HEAD_SHA=""
+J=""
+
+git_in() {
+    local repo="$1"
+    shift
+    git -C "$repo" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false "$@"
+}
+
+commit_all() {
+    git_in "$REPO" add -A
+    git_in "$REPO" commit -q -m "$1"
+}
+
+mkrepo() {
+    REPO_SEQ=$((REPO_SEQ + 1))
+    REPO="$WORK/repo-$REPO_SEQ"
+    mkdir -p "$REPO/migrations"
+    git -c init.defaultBranch=main init -q "$REPO"
+}
+
+write_mig() {
+    printf '%s\n' "$2" > "$REPO/migrations/$1"
+}
+
+# Standard repo. BASE holds the baseline and a seed. HEAD adds 901 (harmless),
+# 902 (drops legacy_flag), and touches the baseline.
+#   mkstd [plain|shortmark|okmark|removed|context]
+mkstd() {
+    local variant="${1:-plain}"
+    local drop='ALTER TABLE ibl_foo DROP COLUMN legacy_flag;'
+    local marker='-- rollback-incompatible: contract phase, prod stopped reading it in PR 1234'
+    mkrepo
+    write_mig 000_baseline_schema.sql 'CREATE TABLE ibl_foo (id INT, legacy_flag INT);'
+    write_mig 100_seed.sql "INSERT INTO ibl_foo VALUES (1, 1);"
+    case "$variant" in
+        removed|context) write_mig 902_drop_col.sql "$marker" ;;
+    esac
+    commit_all base
+    BASE="$(git -C "$REPO" rev-parse HEAD)"
+
+    write_mig 901_add_note.sql 'ALTER TABLE ibl_foo ADD COLUMN note VARCHAR(20) NULL;'
+    case "$variant" in
+        plain|removed) write_mig 902_drop_col.sql "$drop" ;;
+        shortmark) write_mig 902_drop_col.sql "-- rollback-incompatible: too short
+$drop" ;;
+        okmark) write_mig 902_drop_col.sql "$marker
+$drop" ;;
+        context) write_mig 902_drop_col.sql "$marker
+$drop" ;;
+    esac
+    printf '%s\n' '-- touched' >> "$REPO/migrations/000_baseline_schema.sql"
+    commit_all head
+    HEAD_SHA="$(git -C "$REPO" rev-parse HEAD)"
+}
+
+# junit <tests> <skipped> [failure-text] -> sets J
+junit() {
+    local tests="$1" skipped="$2" text="${3:-}" failures=0
+    [ -n "$text" ] && failures=1
+    JUNIT_SEQ=$((JUNIT_SEQ + 1))
+    J="$WORK/junit-$JUNIT_SEQ.xml"
+    {
+        echo '<?xml version="1.0"?>'
+        echo '<testsuites>'
+        printf '<testsuite name="database" tests="%s" assertions="%s" errors="0" failures="%s" skipped="%s" time="0.1">\n' \
+            "$tests" "$tests" "$failures" "$skipped"
+        if [ -n "$text" ]; then
+            echo '<testcase name="t" class="C">'
+            printf '<failure type="x">%s</failure>\n' "$text"
+            echo '</testcase>'
+        fi
+        echo '</testsuite>'
+        echo '</testsuites>'
+    } > "$J"
+}
+
+# run_case <label> <expected-exit> <must-contain> <must-not-contain> <sut args...>
+# Empty must-contain / must-not-contain skip that check.
+run_case() {
+    local label="$1" want="$2" must="$3" mustnot="$4" out rc bad=""
+    shift 4
+    printf '%s' "$STDIN_TEXT" > "$WORK/stdin"
+    if [ "$RUN_ENV_I" = "1" ]; then
+        out="$(env -i PATH=/usr/bin:/bin "$SUT" "$@" < "$WORK/stdin" 2>&1)"
+        rc=$?
+    else
+        out="$("$SUT" "$@" < "$WORK/stdin" 2>&1)"
+        rc=$?
+    fi
+    LAST_OUT="$out"
+    STDIN_TEXT=""
+    RUN_ENV_I=0
+    TOTAL=$((TOTAL + 1))
+
+    [ "$rc" = "$want" ] || bad="exit=$rc want=$want"
+    if [ -n "$must" ] && ! grep -qF -- "$must" <<< "$out"; then
+        bad="${bad:+$bad; }missing: $must"
+    fi
+    if [ -n "$mustnot" ] && grep -qF -- "$mustnot" <<< "$out"; then
+        bad="${bad:+$bad; }unexpected: $mustnot"
+    fi
+
+    if [ -z "$bad" ]; then
+        echo "ok $label"
+    else
+        FAILED=$((FAILED + 1))
+        echo "FAIL $label: $bad"
+        printf '%s\n' "$out" | sed 's/^/    | /'
+    fi
+}
+
+check_equal() {
+    local label="$1" a="$2" b="$3"
+    TOTAL=$((TOTAL + 1))
+    if [ "$a" = "$b" ]; then
+        echo "ok $label"
+    else
+        FAILED=$((FAILED + 1))
+        echo "FAIL $label: state changed"
+        echo "    before: $a"
+        echo "    after:  $b"
+    fi
+}
+
+if [ "$MODE" = "db" ]; then
+    # End-to-end scenarios against real MariaDB. The PR checkout is the old tree:
+    # it already has vendor/, and ActivityTrackerRepositoryTest reads the column
+    # the scenarios drop (ibl_team_info.eoy_vote).
+    OLD_TREE="$REPO_ROOT/ibl5"
+    FILTER='--phpunit-args=--filter ActivityTrackerRepositoryTest'
+    DROP_EOY='ALTER TABLE ibl_team_info DROP COLUMN eoy_vote;'
+    ADD_NOTE='ALTER TABLE ibl_team_info ADD COLUMN IF NOT EXISTS oc_selftest_note VARCHAR(20) NULL;'
+
+    mkdir -p "$WORK/mig-base"
+    git -c init.defaultBranch=main init -q "$WORK/mig-base"
+    cp "$REPO_ROOT"/ibl5/migrations/*.sql "$WORK/mig-base/"
+    git_in "$WORK/mig-base" add -A
+    git_in "$WORK/mig-base" commit -q -m base
+    BASE="$(git -C "$WORK/mig-base" rev-parse HEAD)"
+
+    # db_repo <id> <file> <content>: copy the base repo and commit one fixture file.
+    # An empty <file> commits nothing, leaving the copy at BASE.
+    db_repo() {
+        REPO="$WORK/mig-$1"
+        cp -R "$WORK/mig-base" "$REPO"
+        if [ -n "$2" ]; then
+            printf '%s\n' "$3" > "$REPO/$2"
+            commit_all "fixture $1"
+        fi
+    }
+    # db_args <id> <extra args...>: sets DB_ARGS for one scenario
+    db_args() {
+        local id="$1"
+        shift
+        DB_ARGS=("--migrations-dir=$WORK/mig-$id" "--since=$BASE" "--old-tree=$OLD_TREE" \
+            "--db-name=ibl5_oc_$id" "$@")
+    }
+
+    db_repo A 999_oldcompat_selftest.sql "$ADD_NOTE"
+    db_args A "$FILTER"
+    run_case A 0 'PASS (' "" "${DB_ARGS[@]}"
+    if [ "$FAILED" -eq 0 ]; then
+        if [[ "$LAST_OUT" =~ PASS\ \(([0-9]+)\ tests\ executed\) ]] && [ "${BASH_REMATCH[1]}" -ge 1 ]; then
+            echo "ok A executed ${BASH_REMATCH[1]} tests"
+        else
+            FAILED=$((FAILED + 1))
+            echo "FAIL A: expected PASS (N tests executed) with N >= 1"
+            printf '%s\n' "$LAST_OUT" | sed 's/^/    | /'
+        fi
+    fi
+
+    db_repo B 999_oldcompat_selftest.sql "$DROP_EOY"
+    db_args B "$FILTER"
+    run_case B 1 'likely: 999_oldcompat_selftest.sql (matched: eoy_vote)' "" "${DB_ARGS[@]}"
+
+    db_repo C 999_oldcompat_selftest.sql "$DROP_EOY
+-- rollback-incompatible: selftest drops eoy_vote on purpose to prove the bypass"
+    db_args C "$FILTER"
+    run_case C 0 'PASS (bypass)' "" "${DB_ARGS[@]}"
+
+    db_repo D 999_oldcompat_selftest.sql "$DROP_EOY"
+    db_args D "$FILTER" --bypass-from-stdin
+    STDIN_TEXT='<!-- rollback-incompatible: selftest PR-body bypass for the eoy_vote drop -->'
+    run_case D 0 'PASS (bypass)' "" "${DB_ARGS[@]}"
+
+    db_repo E 999_oldcompat_selftest.sql "$ADD_NOTE"
+    db_args E '--phpunit-args=--filter NoSuchTestOldCompatZz'
+    run_case E 3 FALSE-GREEN "" "${DB_ARGS[@]}"
+
+    REPO="$WORK/mig-F1"
+    mkdir -p "$REPO"
+    git -c init.defaultBranch=main init -q "$REPO"
+    echo 'notes' > "$REPO/README.md"
+    commit_all readme
+    BASE_F1="$(git -C "$REPO" rev-parse HEAD)"
+    run_case F1 3 'no numbered .sql' "" "--migrations-dir=$WORK/mig-F1" "--since=$BASE_F1" \
+        "--old-tree=$OLD_TREE" "--db-name=ibl5_oc_F1"
+
+    db_repo F2 9999_oldcompat_selftest.sql "$ADD_NOTE"
+    db_args F2 "$FILTER"
+    run_case F2 3 'was not applied' "" "${DB_ARGS[@]}"
+
+    if [ "$FAILED" -eq 0 ]; then
+        echo "ALL $TOTAL DB CASES PASSED"
+        exit 0
+    fi
+    echo "$FAILED of $TOTAL DB CASES FAILED"
+    exit 1
+fi
+
+REPO_STATUS_BEFORE="$(git -C "$REPO_ROOT" status --porcelain)"
+
+PR_OK='<!-- rollback-incompatible: contract phase, prod stopped reading it -->'
+LEGACY_FAIL="Unknown column 'legacy_flag' in 'field list'"
+
+mkstd plain
+MD="--migrations-dir=$REPO/migrations"
+SINCE="--since=$BASE"
+
+RUN_ENV_I=1
+run_case help-env-i 0 rollback-incompatible "" --help
+junit 12 0
+RUN_ENV_I=1
+run_case verdict-env-i 0 'PASS (' "" --verdict-only "--junit=$J" --phpunit-exit=0 "$MD" "$SINCE"
+run_case unknown-flag 2 'unknown argument' "" --bogus
+run_case space-form 2 "" "" --verdict-only --junit "$J" --phpunit-exit=0 "$MD" "$SINCE"
+run_case non-int-exit 2 "" "" --verdict-only "--junit=$J" --phpunit-exit=abc "$MD" "$SINCE"
+run_case missing-since 2 "" "" --verdict-only "--junit=$J" --phpunit-exit=0 "$MD"
+
+junit 0 0
+run_case zero-tests 3 FALSE-GREEN "" --verdict-only "--junit=$J" --phpunit-exit=0 "$MD" "$SINCE"
+
+mkstd okmark
+STDIN_TEXT="$PR_OK"
+run_case zero-tests-marker-ignored 3 FALSE-GREEN "PASS" --verdict-only "--junit=$J" --phpunit-exit=1 \
+    --bypass-from-stdin "--migrations-dir=$REPO/migrations" "--since=$BASE"
+
+mkstd plain
+MD="--migrations-dir=$REPO/migrations"
+SINCE="--since=$BASE"
+
+junit 5 5
+run_case all-skipped 3 FALSE-GREEN "" --verdict-only "--junit=$J" --phpunit-exit=0 "$MD" "$SINCE"
+run_case missing-junit 3 FALSE-GREEN "" --verdict-only "--junit=$WORK/nope.xml" --phpunit-exit=0 "$MD" "$SINCE"
+junit 100 0
+run_case min-tests-boundary-ok 0 'PASS (100 tests executed)' "" --verdict-only "--junit=$J" --phpunit-exit=0 \
+    --min-tests=100 "$MD" "$SINCE"
+junit 100 1
+run_case min-tests-boundary-short 3 FALSE-GREEN "" --verdict-only "--junit=$J" --phpunit-exit=0 \
+    --min-tests=100 "$MD" "$SINCE"
+junit 12 2
+run_case all-pass 0 'PASS (10 tests executed)' "" --verdict-only "--junit=$J" --phpunit-exit=0 "$MD" "$SINCE"
+
+junit 12 0 "$LEGACY_FAIL"
+run_case names-offender 1 'likely: 902_drop_col.sql (matched: legacy_flag)' 'likely: 901_' \
+    --verdict-only "--junit=$J" --phpunit-exit=1 "$MD" "$SINCE"
+run_case baseline-excluded 1 "" 000_baseline_schema.sql --verdict-only "--junit=$J" --phpunit-exit=1 "$MD" "$SINCE"
+
+junit 12 0 "Something unrelated"
+run_case no-match-candidates 1 'candidate: 901_add_note.sql' "" --verdict-only "--junit=$J" --phpunit-exit=1 "$MD" "$SINCE"
+run_case no-match-candidates-902 1 'candidate: 902_drop_col.sql' "" --verdict-only "--junit=$J" --phpunit-exit=1 "$MD" "$SINCE"
+
+junit 12 0 "$LEGACY_FAIL"
+mkstd shortmark
+run_case short-file-marker 1 "" "PASS" --verdict-only "--junit=$J" --phpunit-exit=1 \
+    "--migrations-dir=$REPO/migrations" "--since=$BASE"
+mkstd removed
+run_case marker-removed-line 1 "" "PASS" --verdict-only "--junit=$J" --phpunit-exit=1 \
+    "--migrations-dir=$REPO/migrations" "--since=$BASE"
+mkstd context
+run_case marker-context-line 1 "" "PASS" --verdict-only "--junit=$J" --phpunit-exit=1 \
+    "--migrations-dir=$REPO/migrations" "--since=$BASE"
+mkstd okmark
+run_case file-marker-ok 0 'PASS (bypass) reason: contract phase' "" --verdict-only "--junit=$J" --phpunit-exit=1 \
+    "--migrations-dir=$REPO/migrations" "--since=$BASE"
+
+mkstd plain
+MD="--migrations-dir=$REPO/migrations"
+SINCE="--since=$BASE"
+STDIN_TEXT="$PR_OK"
+run_case pr-marker-ok 0 'PASS (bypass)' "" --verdict-only "--junit=$J" --phpunit-exit=1 --bypass-from-stdin "$MD" "$SINCE"
+STDIN_TEXT='<!-- rollback-incompatible: too short -->'
+run_case pr-marker-short 1 "" "PASS" --verdict-only "--junit=$J" --phpunit-exit=1 --bypass-from-stdin "$MD" "$SINCE"
+
+printf "%s\n" "ERROR 1054 (42S22): Unknown column 'legacy_flag'" > "$WORK/seed.log"
+run_case seed-break 1 'likely: 902_drop_col.sql' "FALSE-GREEN" --verdict-only --seed-exit=1 "--seed-log=$WORK/seed.log" "$MD" "$SINCE"
+
+EMPTY="--since=$HEAD_SHA"
+STDIN_TEXT="$PR_OK"
+run_case empty-range-escape 0 'PASS (bypass)' "" --verdict-only "--junit=$J" --phpunit-exit=1 --bypass-from-stdin "$MD" "$EMPTY"
+run_case empty-range-fail 1 'no changed .sql migrations' "" --verdict-only "--junit=$J" --phpunit-exit=1 "$MD" "$EMPTY"
+
+# Stacked PR: B is the parent PR's migration, C is this PR's. The caller-declared
+# base is B, so only 903 is in range and 902 is never named.
+mkrepo
+write_mig 000_baseline_schema.sql 'CREATE TABLE ibl_foo (id INT, legacy_flag INT, other_col INT);'
+commit_all A
+write_mig 902_drop_col.sql 'ALTER TABLE ibl_foo DROP COLUMN legacy_flag;'
+commit_all B
+STACK_B="$(git -C "$REPO" rev-parse HEAD)"
+write_mig 903_drop_other.sql '-- rollback-incompatible: contract phase, prod no longer reads it
+ALTER TABLE ibl_foo DROP COLUMN other_col;'
+commit_all C
+junit 12 0 "Unknown column 'other_col' in 'field list'"
+run_case stacked-base 0 'PASS (bypass)' '902_' --verdict-only "--junit=$J" --phpunit-exit=1 \
+    "--migrations-dir=$REPO/migrations" "--since=$STACK_B"
+
+# --- Pipeline cases: a stub mysql and a stub old-tree phpunit, no database. ---
+
+mkdir -p "$WORK/fakebin" "$WORK/oldtree/vendor/bin" "$WORK/oldtree/tests/DatabaseIntegration/Fixtures"
+printf '#!/bin/sh\ncat >/dev/null\nexit 0\n' > "$WORK/fakebin/mysql"
+echo 'INSERT INTO ibl_foo VALUES (2, 2);' > "$WORK/oldtree/tests/DatabaseIntegration/Fixtures/db-seed.sql"
+cat > "$WORK/oldtree/vendor/bin/phpunit" <<STUB
+#!/bin/sh
+echo "\$@" >> "$WORK/phpunit.args"
+out=""
+while [ \$# -gt 0 ]; do
+    [ "\$1" = "--log-junit" ] && out="\$2"
+    shift
+done
+n="\${FAKE_TESTS:-5}"
+printf '<?xml version="1.0"?>\n<testsuites>\n<testsuite name="database" tests="%s" assertions="%s" errors="0" failures="0" skipped="0" time="0.1">\n</testsuite>\n</testsuites>\n' "\$n" "\$n" > "\$out"
+exit "\${FAKE_EXIT:-0}"
+STUB
+chmod +x "$WORK/fakebin/mysql" "$WORK/oldtree/vendor/bin/phpunit"
+: > "$WORK/phpunit.args"
+
+check_has() {
+    local label="$1" haystack="$2" token="$3"
+    TOTAL=$((TOTAL + 1))
+    if grep -qF -- "$token" <<< "$haystack"; then
+        echo "ok $label"
+    else
+        FAILED=$((FAILED + 1))
+        echo "FAIL $label: missing: $token"
+        printf '%s\n' "$haystack" | sed 's/^/    | /'
+    fi
+}
+
+# RUN_MIGRATIONS_CI_DIR on the real runner: unset and empty mean the default dir.
+REAL_COUNT=0
+for f in "$REPO_ROOT"/ibl5/migrations/*.sql; do
+    if [[ "$(basename "$f")" =~ ^[0-9]{1,3}[a-z]?_ ]]; then
+        REAL_COUNT=$((REAL_COUNT + 1))
+    fi
+done
+RUNNER="$REPO_ROOT/ibl5/bin/run-migrations-ci"
+OUT="$(env -u RUN_MIGRATIONS_CI_DIR PATH="$WORK/fakebin:$PATH" "$RUNNER" x 2>&1)"
+check_has runner-dir-unset "$OUT" "Applying $REAL_COUNT migrations"
+OUT="$(env RUN_MIGRATIONS_CI_DIR= PATH="$WORK/fakebin:$PATH" "$RUNNER" x 2>&1)"
+check_has runner-dir-empty "$OUT" "Applying $REAL_COUNT migrations"
+mkdir -p "$WORK/two-migs"
+echo 'SELECT 1;' > "$WORK/two-migs/001_a.sql"
+echo 'SELECT 2;' > "$WORK/two-migs/002_b.sql"
+OUT="$(env RUN_MIGRATIONS_CI_DIR="$WORK/two-migs" PATH="$WORK/fakebin:$PATH" "$RUNNER" x 2>&1)"
+check_has runner-dir-set "$OUT" "Applying 2 migrations..."
+
+export PATH="$WORK/fakebin:$PATH"
+export DB_HOST=127.0.0.1 DB_USER=root DB_PASS=root
+mkstd plain
+PIPE=("--since=$BASE" "--migrations-dir=$REPO/migrations" "--old-tree=$WORK/oldtree")
+
+unset DB_HOST
+run_case pipe-db-host-unset 2 "DB_HOST is required" "" "${PIPE[@]}"
+export DB_HOST=""
+# An empty value must fail too: a ${DB_HOST+x} set-ness test would pass it.
+run_case pipe-db-host-empty 2 "DB_HOST is required" "" "${PIPE[@]}"
+export DB_HOST=127.0.0.1
+export DB_PASS=""
+run_case pipe-db-pass-empty 0 'PASS (5 tests executed)' "" "${PIPE[@]}"
+export DB_PASS=root
+run_case pipe-bad-db-name 2 "--db-name" "" "${PIPE[@]}" "--db-name=x;y"
+run_case pipe-missing-old-tree 2 "--old-tree" "" "--since=$BASE" "--migrations-dir=$REPO/migrations" "--old-tree=$WORK/none"
+
+mkrepo
+mkdir -p "$REPO/migrations"
+echo 'notes' > "$REPO/migrations/README.md"
+commit_all only-readme
+run_case pipe-empty-dir 3 "no numbered .sql" "" "--since=HEAD" "--migrations-dir=$REPO/migrations" "--old-tree=$WORK/oldtree"
+
+mkrepo
+write_mig 000_baseline_schema.sql 'CREATE TABLE ibl_foo (id INT);'
+commit_all base
+BASE="$(git -C "$REPO" rev-parse HEAD)"
+write_mig 1000_too_long.sql 'ALTER TABLE ibl_foo ADD COLUMN note INT NULL;'
+commit_all head
+run_case pipe-changed-not-applied 3 "was not applied" "" "--since=$BASE" "--migrations-dir=$REPO/migrations" "--old-tree=$WORK/oldtree"
+
+mkstd plain
+: > "$WORK/phpunit.args"
+run_case pipe-pass 0 'PASS (5 tests executed)' "" "--since=$BASE" "--migrations-dir=$REPO/migrations" "--old-tree=$WORK/oldtree"
+check_has pipe-pass-group "$(cat "$WORK/phpunit.args")" "--group database"
+check_has pipe-pass-junit "$(cat "$WORK/phpunit.args")" "--log-junit"
+
+: > "$WORK/phpunit.args"
+export FAKE_TESTS=0
+run_case pipe-zero-tests 3 FALSE-GREEN "" "--since=$BASE" "--migrations-dir=$REPO/migrations" "--old-tree=$WORK/oldtree" \
+    "--phpunit-args=--filter NoSuchTest"
+unset FAKE_TESTS
+check_has pipe-zero-tests-args "$(cat "$WORK/phpunit.args")" "NoSuchTest"
+
+REPO_STATUS_AFTER="$(git -C "$REPO_ROOT" status --porcelain)"
+check_equal repo-untouched "$REPO_STATUS_BEFORE" "$REPO_STATUS_AFTER"
+
+if [ "$FAILED" -eq 0 ]; then
+    echo "ALL $TOTAL CASES PASSED"
+    exit 0
+fi
+echo "$FAILED of $TOTAL CASES FAILED"
+exit 1

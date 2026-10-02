@@ -35,11 +35,14 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import (adr_draft, body_numbers, cifix, ciwatch, conformance, fidelity, gitutil, llm_calls,
-                     manual_rows, manual_testing, schemas, statefile)
-from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
+                     manual_rows, manual_testing, outofscope, prosefix, schemas, scope_conformance,
+                     statefile, usage_pause)
+from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
 from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
+                              MERGE_DIGEST_BEGIN, MERGE_DIGEST_END, render_merge_digest,
+                              upsert_merge_digest,
                               MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC,
                               backlog_closes_mismatch, classify, files_from_diff,
                               modified_files_from_diff,
@@ -48,10 +51,12 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               render_files_changed, render_manual_confirmation,
                               render_tests_changed,
                               render_residual_phases, render_reviewer_verification,
+                              render_scope_notes,
                               restore_manual_testing_section, strip_manual_testing_section,
                               upsert_files_changed, upsert_manual_confirmation,
                               upsert_tests_changed,
-                              upsert_residual_phases, upsert_reviewer_verification)
+                              upsert_residual_phases, upsert_reviewer_verification,
+                              upsert_scope_notes)
 from harness.planfile import locate_plan, split_hold_justification
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
@@ -263,6 +268,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _active_git = git
         slug = git.branch()
         gh = LiveGh(out_dir, worktree, slug) if live else RecordingGh(out_dir)
+        gh = usage_pause.dedupe_on_resume(gh, worktree, out_dir)   # ADR-0143 addendum: no double post on resume
         verifier = LiveVerify(worktree)
         if probe is None:
             probe = LiveProbe(repo_root=worktree)
@@ -290,6 +296,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             log("phase2: empty diff vs base — nothing to ship")
             return _finish(res, out_dir)
         files = git.changed_files()
+        # Rename sources included; read ONLY by the conformance check. classify(),
+        # scope conformance and denied_gate_edits keep `files`, or an old path
+        # would surface as UNPLANNED-FILE and create a new hold.
+        conf_files = git.conformance_files()
         cls = classify(files, diff, git.modified_files())
         res.classification = cls
         log("phase3 classify:\n" + cls.summary())
@@ -299,6 +309,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # rebase_onto() below stays authoritative. A predicted conflict propagates to the
         # outer `except HarnessError`, which sets error_kind="rebase-conflict" (exit 3 via
         # _FAIL_CLOSED_KINDS). This is the same terminal the post-commit rebase arm reaches.
+        # With an LLM wired, the probe also exits 3 when resolver_refusal_reason() names a
+        # conflict the resolver is certain to refuse; any other predicted conflict is advisory.
         if live:
             try:
                 conflict_files = git.predict_rebase_conflict()
@@ -315,6 +327,15 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                         "rebase-conflict",
                         f"predicted by merge-tree probe vs origin/master: "
                         f"{', '.join(conflict_files)}")
+                refusal_fn = getattr(git, 'resolver_refusal_reason', None)
+                refusal = refusal_fn() if callable(refusal_fn) else None
+                if refusal is not None:
+                    log(f"phase2: LLM resolver would refuse ({refusal}) -- "
+                        "stopping before body check (exit 3)")
+                    raise HarnessError(
+                        "rebase-conflict",
+                        f"predicted by merge-tree probe vs origin/master: "
+                        f"{', '.join(conflict_files)}; resolver would refuse: {refusal}")
                 log("phase2: LLM resolver active -- probe is advisory, falling through to rebase_onto()")
 
         copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)
@@ -332,7 +353,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             copy["summary_md"] = check["corrected_body"]
             for f in check.get("findings", []):
                 log(f"phase2 body-check finding: {f}")
-        _inject_residual_phases(copy, plan, files, log)
+        _inject_residual_phases(copy, plan, conf_files, log)
+        _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
         sha = _commit_with_gate_remediation(
@@ -384,7 +406,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                if sha == pre_rebase else "REBASE=rebased onto origin/master")
         res.meta_checks_ok = run_meta_checks_local(
             git, worktree or "", "origin/master", log, live=live,
-            failures_out=res.meta_check_failures)
+            failures_out=res.meta_check_failures, llm=llm)
         if live:
             sha = git.head()  # refresh — remediation may have committed and moved HEAD
         pr_known = gh.pr_number() if (live and gh.pr_exists()) else None
@@ -445,6 +467,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if git.head() != head_before_45:
             sha = git.head()
             files = git.changed_files()
+            conf_files = git.conformance_files()
             diff = git.diff_vs_base()
             meta = gh.pr_meta() or meta
         review_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -489,7 +512,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             + f" -> PHASE5_VERIFY_STATUS={phase5}"
             + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
         resolutions: dict[str, str] = {}
-        unresolved = conformance.check(plan, files, diff, phase5_status=phase5,
+        unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                        resolutions=resolutions,
                                        pr_body=gh.pr_body() or meta.get("body", ""))
         res.unresolved_conformance = unresolved
@@ -565,6 +588,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         body = _upsert_no_adr_markers(body, plan)
         gh.pr_edit_body(pr, body)
         _check_backlog_closes(gh, pr, plan, log)
+        _sweep_out_of_scope(gh, pr, plan, slug, log)
 
         # ---- Phase 5.5: plan-intent fidelity review --------------------
         # Pinned BEFORE the call: condition (12) compares the tree the reviewer saw
@@ -589,9 +613,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             # clean run buy nothing, and the gate is "did the tree change", not "did
             # remediation run".
             files = git.changed_files()
+            conf_files = git.conformance_files()
             diff = git.diff_vs_base()
             resolutions = {}
-            unresolved = conformance.check(plan, files, diff, phase5_status=phase5,
+            unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                            resolutions=resolutions,
                                            pr_body=gh.pr_body() or body)
             res.unresolved_conformance = unresolved
@@ -675,6 +700,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             degraded_agents=res.degraded_agents,
             plan_slug_drift=plan.slug_drift,
             failed_checks=_failed_checks,
+            aggregator_required=(gh.aggregator_required(AGGREGATOR_CONTEXT) if live
+                                 else bool((fixture or {}).get("aggregator_required", False))),
             meta_checks_status=_mc_status,
         )
         if not live and (fixture or {}).get("current_tree"):
@@ -736,6 +763,20 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 # `|| true`, and a new hold here would change condition semantics.
                 res.sticky_error = "sticky-post-failed"
                 log("phase6.5: sticky verdict comment not confirmed")
+            # Digest at the top of the PR body, from the same rows the sticky printed.
+            # Still BEFORE arming, and never able to change it: log-and-continue.
+            try:
+                drows = fidelity.digest_rows_for_display(digest, fid)
+                if all(" unavailable — " in r for r in drows):
+                    log("phase6.5: merge digest all degraded; PR body digest left as is")
+                else:
+                    cur = gh.pr_body_fresh() or ""
+                    new = upsert_merge_digest(cur, render_merge_digest(drows))
+                    if new != cur:
+                        gh.pr_edit_body(pr, new)
+                    log("phase6.5: merge digest upserted into PR body")
+            except (HarnessError, OSError, subprocess.SubprocessError) as e:
+                log(f"phase6.5: merge digest body write failed ({e.__class__.__name__}: {e})")
             # Review-owed decision: AFTER the sticky post (the script reads the body this
             # run composed and the tree it ends on) and BEFORE arming (a launched
             # /pr-review races an `--auto` merge no worse than the skill path does).
@@ -840,6 +881,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.error = f"{e.kind}: {e.detail}"
         res.error_kind = e.kind
         log(f"FAILED: {res.error}")
+    except usage_pause.UsagePause as p:
+        res.terminal = TerminalState.FAILED
+        res.error_kind = "usage-pause-dirty" if p.dirty else "usage-pause"
+        res.error = f"{res.error_kind}: {p.purpose}"
+        log(f"PAUSED: {res.error}")
     finally:
         # A Phase 5-5.5 failure can land while the background review is still running.
         # Wait for it so the review checkpoint lands as it did when Phase 4 ran first;
@@ -847,7 +893,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if join_review is not None:
             try:
                 join_review()
-            except Exception as e:  # noqa: BLE001
+            except (Exception, usage_pause.UsagePause) as e:  # noqa: BLE001
                 log(f"phase4: background review failed after the run failed ({e!r})")
         state.checkpoint("terminal", res)
         _phase11_cleanup(llm, log)
@@ -910,7 +956,7 @@ def _last_remediation_commit(fid: dict) -> str | None:
 
 
 def _body_signature(body: str | None) -> str:
-    """The comparable part of a PR body: everything outside the files-changed block.
+    """The comparable part of a PR body: everything outside the files-changed and merge-digest blocks.
 
     Phase 5.5 rewrites <!-- files-changed:begin -->..<!-- files-changed:end --> on every
     round, so that block churns whenever the diff grows and says nothing about whether
@@ -923,6 +969,10 @@ def _body_signature(body: str | None) -> str:
     end = text.find(FILES_CHANGED_END)
     if begin != -1 and end != -1 and end > begin:
         text = text[:begin] + text[end + len(FILES_CHANGED_END):]
+    begin = text.find(MERGE_DIGEST_BEGIN)
+    end = text.find(MERGE_DIGEST_END)
+    if begin != -1 and end != -1 and end > begin:
+        text = text[:begin] + text[end + len(MERGE_DIGEST_END):]
     return text.strip()
 
 
@@ -1538,6 +1588,13 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     commit subject instead of failing the run, and returns degraded=True so the caller
     holds arming: an unreviewed title is exactly the feat-vs-chore judgment condition
     (8) depends on. Any other error kind still propagates.
+
+    The model path returns schemas.coerce_pr_copy(copy, cls), so title, commit_subject and
+    type agree and a diff with no GM-visible file (Classification.has_gm_visible False)
+    can never open a feat: PR. The degraded path calls schemas.coerce_copy_type on the
+    single subject string (the degraded dict has no type key). The skip path is
+    deliberately left alone: its title is the live one, and retyping only the dict would
+    let the pr_meta() fallback at the condition-(8) call site see chore: on a feat: PR.
     """
     if gh.pr_exists() and not git.has_changes_to_commit():
         head_subject = git.branch_head_subject()
@@ -1553,9 +1610,11 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     else:
         plan_excerpt = ""
     try:
-        return llm.call("pr-copy", "sonnet",
+        copy = llm.call("pr-copy", "sonnet",
                         llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt),
-                        schemas.validate_pr_copy), False
+                        schemas.validate_pr_copy,
+                        normalizer=schemas.normalize_pr_copy)
+        return schemas.coerce_pr_copy(copy, cls), False
     except HarnessError as e:
         if e.kind != "llm-invalid-output":
             raise
@@ -1563,9 +1622,11 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     subject = git.branch_head_subject()
     if not re.match(r"^[a-z]+(\([^)]*\))?!?:", subject):
         # No conventional subject to borrow. feat: is the fail-closed type: it trips the
-        # human-signoff hold, and coerce_commit_subject re-types docs/test/non-code diffs.
+        # human-signoff hold. coerce_copy_type re-types docs/test/non-code diffs and turns
+        # feat: into chore: on a tooling-only diff; arming is still held on this path by
+        # degraded=True (copy_degraded), so the floor is never the only guard here.
         subject = f"feat: {subject or slug}"
-    subject = schemas.coerce_commit_subject(subject, cls)
+    subject = schemas.coerce_copy_type(subject, cls)
     return {"title": subject, "commit_subject": subject,
             "summary_md": f"## Summary\n- {subject}\n"}, True
 
@@ -1611,6 +1672,23 @@ def _check_backlog_closes(gh, pr, plan, log) -> None:
     log(msg)
 
 
+def _sweep_out_of_scope(gh, pr, plan, slug, log) -> list[int]:
+    """File one backlog issue per `## Out of Scope` deferral. Additive: never raises,
+    never touches arming state. Dedup lives in outofscope.file_deferral_issues."""
+    if not (plan and plan.found and plan.deferral_hits):
+        return []
+    try:
+        hits = [outofscope.DeferralHit(*t) for t in plan.deferral_hits]
+        nums = outofscope.file_deferral_issues(
+            gh, hits, slug, pr, log=log,
+            plan_name=os.path.basename(plan.path) or f"{slug}.md")
+        log(f"oos-sweep: {len(hits)} hits, {len(nums)} issues filed")
+        return nums
+    except Exception as exc:  # broad on purpose: the sweep is never a run failure
+        log(f"oos-sweep: sweep failed ({type(exc).__name__}: {exc})")
+        return []
+
+
 def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str]:
     """Phase 2: upsert `## Residual Phases` into copy["summary_md"] from phase-omission items.
 
@@ -1625,6 +1703,23 @@ def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str
     for it in items:
         log(f"phase2 residual-phase: {it}")
     return items
+
+
+def _inject_scope_notes(copy: dict, plan, files: list[str], diff_body: str, pr_body: str,
+                        log) -> list[str]:
+    """Phase 2: upsert `## Unplanned changes` into copy["summary_md"] from scope notes.
+
+    Runs right after _inject_residual_phases. Advisory only: no hold, no fail-closed
+    path. `pr_body` is the body being authored, so a `## Declared scope` or
+    `## Plan gaps` section in it clears its own note; the helper strips generated
+    marker spans first, so this block never declares itself. Idempotent: an empty note
+    list removes a stale block. Returns the notes for the caller's log line.
+    """
+    notes = scope_conformance.scope_notes(plan, files, diff_body, pr_body)
+    copy["summary_md"] = upsert_scope_notes(copy["summary_md"], render_scope_notes(notes))
+    for n in notes:
+        log(f"phase2 scope-note: {n}")
+    return notes
 
 
 def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool]:
@@ -1674,7 +1769,7 @@ def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool
 
 
 def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True,
-                         failures_out: list | None = None) -> bool:
+                         failures_out: list | None = None, llm=None) -> bool:
     if os.environ.get("PRE_PUSH_META_CHECKS_SKIP") == "1":
         log("phase2: meta-checks SKIPPED (PRE_PUSH_META_CHECKS_SKIP=1)")
         return True
@@ -1718,6 +1813,22 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
             raise HarnessError("local-gate",
                                f"meta-checks filter-parse failure: {(result2.stderr or '').strip()[:200]}")
         if rc2 == 0:
+            try:
+                os.unlink(flag)
+            except FileNotFoundError:
+                pass
+            return True
+    # One bounded prose-fix pass (harness/prosefix.py) when check-prose-since is the
+    # only failing gate. On failure it resets to its own head_before, so the flag,
+    # log line, and pushed tree below are exactly what they would have been.
+    if (llm is not None and worktree
+            and prosefix.failed_check_names(last_result.stdout or "")
+            == [prosefix.PROSE_CHECK]):
+        if prosefix.attempt_prose_fix(
+                git=git, llm=llm, repo=worktree, argv=argv,
+                first_stdout=last_result.stdout or "",
+                commit=lambda m: _commit_with_gate_remediation(git, worktree, m, log),
+                log=log):
             try:
                 os.unlink(flag)
             except FileNotFoundError:
@@ -2164,7 +2275,8 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
 
 # All four are deterministic walls a full skill re-run cannot climb — see exit_code_for.
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
-                      "llm-usage-limit")
+                      "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty")
+PAUSE_EXIT = 75   # ADR-0143 reserved pause exit; only with an S marker on disk
 
 # Per-class remedy for a local-gate denial. Every arm is still exit 3 -- naming the
 # class only shortens the human's search, it never changes the verdict. "doc-staleness"
@@ -2199,7 +2311,10 @@ def exit_code_for(res: RunResult) -> int:
         re-run cannot climb.
     1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
     0 = shipped (armed or held), nothing to ship, or degraded.
-    There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm."""
+    There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm.
+    usage-pause maps to 75; main() downgrades it to 3 when the marker is gone."""
+    if res.terminal == TerminalState.FAILED and res.error_kind == "usage-pause":
+        return PAUSE_EXIT
     if res.terminal == TerminalState.FAILED and res.error_kind in _FAIL_CLOSED_KINDS:
         return 3
     if res.terminal == TerminalState.DEGRADED:
@@ -2229,6 +2344,178 @@ def _pull_url_base(worktree: str | None) -> str:
     return f"https://github.com/{m.group(1)}/pull"
 
 
+_BLOCK_BUDGET = 1800          # bin/discord-dm cuts at 1900; the deferred DM adds a ~55-char prefix
+_BLOCK_MAX_PATHS = 5
+_BLOCK_MAX_PATH_LEN = 120
+
+
+def _dedupe(items: list[str]) -> list[str]:
+    seen: dict[str, None] = {}
+    for it in items:
+        if it and it not in seen:
+            seen[it] = None
+    return list(seen)
+
+
+def _adr_trigger_paths(error: str | None) -> list[str]:
+    """Files from bin/adr-check's `Decision-trigger surfaces detected:` list."""
+    return _dedupe(re.findall(r"(?m)^\s*- \[[^\]]+\] (\S+) —", error or ""))
+
+
+def _conflict_paths(error: str | None) -> list[str]:
+    """Conflicted files: `Merge conflict in <path>` and the merge-tree probe form."""
+    text = error or ""
+    paths = re.findall(r"Merge conflict in (\S+)", text)
+    for m in re.finditer(r"vs origin/master: ([^\n|]*)", text):
+        paths.extend(p.strip() for p in m.group(1).split(","))
+    return _dedupe(paths)
+
+
+def _over_budget_paths(error: str | None) -> list[str]:
+    """Per-file `FAIL  <path>  N bytes` lines; the `aggregate` line has no byte count after the path."""
+    return _dedupe(re.findall(r"(?m)^FAIL  (\S+)  \d+ bytes", error or ""))
+
+
+def _stale_doc_paths(error: str | None) -> list[str]:
+    """Any `.md` path on a line that also mentions last_verified."""
+    paths: list[str] = []
+    for line in (error or "").splitlines():
+        if "last_verified" in line:
+            paths.extend(re.findall(r"[\w./-]+\.md", line))
+    return _dedupe(paths)
+
+
+def _path_lines(paths: list[str], limit: int) -> list[str]:
+    """At most `limit` indented path lines, each cut to _BLOCK_MAX_PATH_LEN, plus `+N more`."""
+    if limit <= 0:
+        return []
+    out = []
+    for p in paths[:limit]:
+        if len(p) > _BLOCK_MAX_PATH_LEN:
+            p = p[:_BLOCK_MAX_PATH_LEN - 1] + "…"
+        out.append(f"  {p}")
+    if len(paths) > limit:
+        out.append(f"  +{len(paths) - limit} more")
+    return out
+
+
+def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
+    """Plain-language message for an exit-3 stop: what broke, the exact fix, where the log is.
+
+    Text only. `verdict_line` stays the one-line machine verdict; this is what a person
+    reads. Paths come from the FULL res.error, never the 300-char `_flat` form. Returns
+    "" for any rc but 3."""
+    if rc != 3:
+        return ""
+    branch = res.slug or "This branch"
+    leaf = (res.slug or "branch").rsplit("/", 1)[-1]
+    wt = worktree or "(the worktree folder)"
+    log = log_path or "(see the run log)"
+    if res.error_kind in ("rebase-conflict", "remote-head-diverged", "llm-usage-limit",
+                          "usage-pause-unconfirmed", "usage-pause-dirty"):
+        key = res.error_kind
+    elif res.error_kind == "local-gate":
+        key = "gate-" + classify_local_gate_denial(res.error or "")
+    else:
+        key = "unknown"
+    if key == "gate-adr" and res.adr_drafted:
+        key = "gate-adr-drafted"
+
+    err = res.error or ""
+    paths: list[str] = []
+    read_log = "Read the log named on the Log line below and fix what it reports"
+    if key == "gate-adr":
+        why = "This change adds a file that needs a decision record (ADR) before it can ship."
+        paths = _adr_trigger_paths(err)
+        steps = [f'bin/next-adr "{leaf}"',
+                 "Fill in the file it prints, then add its row to the bottom of "
+                 "ibl5/docs/decisions/README.md",
+                 "bin/adr-check --commit"]
+    elif key == "gate-adr-drafted":
+        why = ("This change adds a file that needs a decision record (ADR). A draft is at "
+               f"{res.adr_path}, but it did not pass the check yet.")
+        paths = _adr_trigger_paths(err)
+        steps = [f"Finish the draft at {res.adr_path} and make sure its row is at the "
+                 "bottom of ibl5/docs/decisions/README.md",
+                 "bin/adr-check --commit"]
+    elif key == "gate-stale-base":
+        why = "master moved on GitHub and this branch is behind it."
+        steps = ["git fetch origin master", "git rebase origin/master"]
+    elif key == "gate-byte-budget":
+        why = "A rule file under .claude/rules is over its size limit."
+        paths = _over_budget_paths(err)
+        steps = ["Trim the file(s) above, or move detail into a *-detail.md file next to it",
+                 "bin/check-rules-byte-budget"]
+    elif key == "gate-doc-staleness":
+        why = "A doc changed but its last_verified date was not updated."
+        paths = _stale_doc_paths(err)
+        steps = ["Set last_verified: to today's date in each doc above",
+                 "bin/check-docs --since=master --no-staleness"]
+    elif key == "gate-unknown":
+        why = "A pre-commit or pre-push check refused the commit. The log shows which one."
+        steps = [read_log]
+    elif key == "rebase-conflict":
+        why = "This branch and master both changed the same lines, so the rebase stopped."
+        paths = _conflict_paths(err)
+        steps = ["git fetch origin master", "git rebase origin/master",
+                 "Fix each conflicted file, then run: git add <file> && git rebase --continue"]
+    elif key == "remote-head-diverged":
+        why = ("Someone pushed to this branch on GitHub, so GitHub's copy no longer "
+               "matches this folder.")
+        b = res.slug or "<branch>"
+        steps = ["git fetch origin", f"git log --oneline HEAD..origin/{b}  (shows what was pushed)",
+                 f"git rebase origin/{b}  (keeps their commits; to take GitHub's copy as is "
+                 f"instead, run: git reset --hard origin/{b})"]
+    elif key in ("llm-usage-limit", "usage-pause-unconfirmed"):
+        why = "The Claude usage limit was reached before the ship step finished."
+        steps = ["Wait for the limit to reset (the log shows the reset time)"]
+    elif key == "usage-pause-dirty":
+        why = ("The usage gate paused a model call while it was editing the worktree, "
+               "so the edit may be half done.")
+        steps = [f"cd {wt} && git status && git diff  (check the interrupted edit)",
+                 "Keep or revert the change, then re-run bin/post-plan-now"]
+    else:
+        why = "The ship step stopped and the log has the reason."
+        steps = [read_log]
+
+    outcome = (f"PR #{res.pr_number} was not updated." if res.pr_number
+               else "No PR opened.")
+
+    def render(limit: int) -> str:
+        lines = [f"{branch} did not ship. {outcome}", "", f"Why: {why}"]
+        lines.extend(_path_lines(paths, limit))
+        lines += ["", "Fix:", f"  1. cd {wt}"]
+        n = 1
+        for s in steps:
+            n += 1
+            lines.append(f"  {n}. {s}")
+        lines += [f"  {n + 1}. bin/post-plan-now", "",
+                  "Or open Claude in that folder and ask it to fix the ship block.",
+                  f"Log: {log}"]
+        return "\n".join(lines)
+
+    block = render(_BLOCK_MAX_PATHS)
+    if len(block) > _BLOCK_BUDGET:
+        block = render(0)
+    return block
+
+
+BLOCKED_SHIP_FILE = "blocked-ship.txt"
+
+
+def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> None:
+    """Write the human block for bin/post-plan-now to read. rc != 3 writes nothing.
+    Best effort: an OSError is swallowed so this text never changes the exit code."""
+    if rc != 3:
+        return
+    block = human_block(res, rc, worktree or "", os.environ.get("POSTPLAN_LOG_PATH", ""))
+    try:
+        with open(os.path.join(out_dir, BLOCKED_SHIP_FILE), "w") as fh:
+            fh.write(block + "\n")
+    except OSError:
+        pass
+
+
 def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
     """The one line a watcher greps for — printed FIRST, before the stats lines.
 
@@ -2243,6 +2530,9 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
         s = " ".join((s or "").split())
         return s[:limit] + "…" if len(s) > limit else s
 
+    if rc == PAUSE_EXIT:
+        return (f"RESULT: post-plan PAUSED at {res.error.split(': ', 1)[-1]} (usage gate); "
+                "the usage-gate coordinator resumes it after the reset.")
     pr = ""
     if res.pr_number:
         pr = f" PR #{res.pr_number}"
@@ -2277,6 +2567,18 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                     f"ERROR terminal=failed kind=llm-usage-limit. "
                     + (f"{detail} " if detail else "")
                     + "Re-run bin/post-plan-now after the limit resets.")
+        if res.error_kind == "usage-pause-unconfirmed":
+            detail = _flat(res.error or "")
+            return (f"RESULT: post-plan BLOCKED — usage gate paused but the pause marker "
+                    f"is missing; ERROR terminal=failed kind=usage-pause-unconfirmed. "
+                    + (f"{detail} " if detail else "")
+                    + "Re-run bin/post-plan-now after the limit resets.")
+        if res.error_kind == "usage-pause-dirty":
+            detail = _flat(res.error or "")
+            return (f"RESULT: post-plan BLOCKED — usage gate paused a tooled edit mid-run; "
+                    f"ERROR terminal=failed kind=usage-pause-dirty. "
+                    + (f"{detail} " if detail else "")
+                    + "Inspect `git status` in the worktree, then re-run bin/post-plan-now.")
         # Unknown or None error_kind — name all possible fail-closed causes
         return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict, local-gate, or "
                 "llm-usage-limit), cause unknown; ERROR terminal=failed, no PR opened. "
@@ -2317,6 +2619,27 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                 f"merges{pr}{tail} findings={len(res.findings)}")
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
             f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}")
+
+
+def _settle_pause_marker(res: RunResult, rc: int) -> int:
+    """Enforce exit 75 <=> S marker on disk. No gate context: rc unchanged."""
+    ctx, _ = usage_pause.context_from_env()
+    if ctx is None:
+        if rc == PAUSE_EXIT:
+            res.error_kind = "usage-pause-unconfirmed"
+            return 3
+        return rc
+    if res.error_kind == "usage-pause-dirty":
+        usage_pause.marker_clear(ctx)
+        return rc
+    if rc == PAUSE_EXIT:
+        if usage_pause.marker_exists(ctx):
+            return rc
+        res.error_kind = "usage-pause-unconfirmed"
+        return 3
+    if usage_pause.marker_exists(ctx):
+        usage_pause.marker_clear(ctx)
+    return rc
 
 
 def main() -> int:
@@ -2360,14 +2683,19 @@ def main() -> int:
               headless=not args.interactive, live=args.live, explicit_path=args.plan)
     t = ledger.totals()
     rc = exit_code_for(res)
+    rc = _settle_pause_marker(res, rc)
+    if rc != PAUSE_EXIT:
+        usage_pause.ledger_clear()
     # First line, so `head -1 <log>` is the whole verdict and bin/watch-run can
     # terminate on it without waiting for the launchd label to disappear.
     print(verdict_line(res, rc, _pull_url_base(args.worktree)))
+    write_blocked_ship(args.out, res, rc, args.worktree)
     print(f"terminal={res.terminal.value} phase5={res.phase5} "
           f"armed={bool(res.arm and res.arm.armed)} findings={len(res.findings)}")
     print(f"llm: {t['llm_invocations']} calls, {t['gross_tokens']} gross tok, "
           f"{t['non_cached_tokens']} non-cached tok, ${t['cost_usd']}, {t['wall_seconds']}s")
     print(f"outputs: {args.out}/result.json, {args.out}/audit.log, {args.out}/actions.jsonl")
+    print(f"usage-gate: {'on' if usage_pause.context_from_env()[0] else 'off'}")
     return rc
 
 

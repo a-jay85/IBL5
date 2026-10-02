@@ -19,8 +19,11 @@ use PHPUnit\Framework\Attributes\Group;
  * triple whose score-matched survivor is not the lowest `game_of_that_day`, exempt and
  * unscheduled triples that must be skipped, and scheduled games that must survive —
  * and passes the matching expectations through the constructor's test-only
- * `$expectedOverride` seam. The production figures are verified against the real
- * snapshot by `bin/check-boxscore-schedule` and the migration's dry-run report, not here.
+ * `$expectedOverride` seam. The provenance of the production figures is verified only by
+ * migration 168's dry-run report against the real snapshot. Their values are pinned in CI
+ * by `Tests\Boxscore\PhantomBoxscoreRepairExpectedTest` and by
+ * `testDefaultConstructedRepairGatesOnProductionExpected` below, which constructs the repair
+ * without the override and asserts the six production values appear in the refusal message.
  *
  * `season_year` is GENERATED on both boxscore tables (`month >= 10 ? year + 1 : year`),
  * so April 2008 dates land in season 2008 without being inserted directly. On
@@ -315,6 +318,56 @@ final class PhantomBoxscoreRepairTest extends DatabaseTestCase
         } catch (\RuntimeException $e) {
             self::assertStringContainsString('precondition failed', $e->getMessage());
         }
+    }
+
+    /**
+     * Constructs the repair with the three-argument form, so `$expectedOverride` takes its
+     * null default and the gate reads PhantomBoxscoreRepair::EXPECTED. The six `expected N`
+     * literals below mirror that constant on purpose: they must change in the same PR as any
+     * change to it, together with
+     * Tests\Boxscore\PhantomBoxscoreRepairExpectedTest::testExpectedPinsProductionSnapshotLiterals.
+     * The `found M` halves are the fixture counts pinned by FIXTURE_EXPECTED.
+     */
+    public function testDefaultConstructedRepairGatesOnProductionExpected(): void
+    {
+        $this->seedBaseFixture();
+
+        $repair = new PhantomBoxscoreRepair($this->db, $this->repository, false);
+
+        try {
+            $repair->assertPreconditions(self::SEASON);
+            self::fail('A default-constructed repair must refuse the fixture-scaled season');
+        } catch (\RuntimeException $e) {
+            self::assertStringContainsString('refusing to delete anything', $e->getMessage());
+            foreach ([
+                'orphan_games: expected 618, found 2',
+                'orphan_team_rows: expected 1236, found 4',
+                'duplicate_triple_games: expected 3, found 1',
+                'duplicate_team_rows: expected 6, found 2',
+                'player_rows: expected 14502, found 5',
+                'recap_rows: expected 20, found 3',
+            ] as $fragment) {
+                self::assertStringContainsString($fragment, $e->getMessage());
+            }
+        }
+
+        // The refused run deleted nothing: a fixture-scaled repair still sees the full fixture.
+        self::assertSame('proceed', $this->makeRepair()->assertPreconditions(self::SEASON));
+    }
+
+    /**
+     * The production gate on an already-repaired database: every season 2008 count is zero
+     * (the shared seed has no boxscore rows), so the gate reports noop instead of throwing.
+     */
+    public function testDefaultConstructedRepairNoopsOnEmptySeason(): void
+    {
+        $repair = new PhantomBoxscoreRepair($this->db, $this->repository, false);
+
+        self::assertSame(
+            'noop',
+            $repair->assertPreconditions(self::SEASON),
+            'With production EXPECTED and nothing to repair, the gate must report noop, never throw.'
+        );
     }
 
     public function testDuplicateSurvivorAbortOnNoScoreMatch(): void

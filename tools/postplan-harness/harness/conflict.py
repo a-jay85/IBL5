@@ -255,6 +255,35 @@ def assert_text_only(worktree: str, paths) -> Optional[str]:
     return None
 
 
+VERDICT_CLEAN = "CONFLICT-REVIEW=CLEAN"
+VERDICT_FOUND_PROBLEM = "CONFLICT-REVIEW=FOUND-PROBLEM"
+VERDICT_ABSENT = "CONFLICT-REVIEW=ABSENT"
+_VERDICT_TOKENS = frozenset((VERDICT_CLEAN, VERDICT_FOUND_PROBLEM))
+
+
+def parse_verdict(reply: str) -> str:
+    """Return the normalized conflict-review verdict for a model reply.
+
+    A line is a verdict token when, after str.strip(), it equals exactly
+    CONFLICT-REVIEW=CLEAN or CONFLICT-REVIEW=FOUND-PROBLEM. Any other line is
+    ignored, including lines that merely contain a token inside prose.
+
+    - exactly one distinct token anywhere in the reply -> that token
+    - both tokens present                               -> FOUND-PROBLEM (fail closed)
+    - no token, empty reply                             -> ABSENT
+    """
+    found = {
+        stripped
+        for stripped in (line.strip() for line in reply.splitlines())
+        if stripped in _VERDICT_TOKENS
+    }
+    if not found:
+        return VERDICT_ABSENT
+    if len(found) > 1:
+        return VERDICT_FOUND_PROBLEM
+    return next(iter(found))
+
+
 def review_resolution(
     llm,
     run: Callable[..., str],
@@ -284,8 +313,11 @@ def review_resolution(
         "Read each of those files in the worktree and judge whether the resolution "
         "dropped, duplicated, or invented content relative to the pre-rebase diff.\n"
         "The tree proof already passed, so look for semantically wrong merges the proof cannot see.\n"
-        "Reply with a FIRST line that is exactly `CONFLICT-REVIEW=CLEAN` or exactly "
-        "`CONFLICT-REVIEW=FOUND-PROBLEM`, then your reasoning."
+        "Your reply MUST begin with the verdict. Line 1 of your reply is exactly "
+        "`CONFLICT-REVIEW=CLEAN` or exactly `CONFLICT-REVIEW=FOUND-PROBLEM` and "
+        "nothing else: no preamble, no summary sentence, no blank line, no code fence "
+        "before it. Put your reasoning on the lines after the verdict. "
+        "Write the verdict token exactly once."
     )
 
     reply = ""
@@ -299,14 +331,10 @@ def review_resolution(
             denied_tools=("Bash", "Agent", "Write", "Edit"),
             add_dirs=(str(review_dir),),
         )
-        first_line = reply.splitlines()[0].rstrip() if reply.strip() else ""
     except Exception:
-        first_line = ""
+        reply = ""
 
-    if first_line not in ("CONFLICT-REVIEW=CLEAN", "CONFLICT-REVIEW=FOUND-PROBLEM"):
-        verdict_line = "CONFLICT-REVIEW=ABSENT"
-    else:
-        verdict_line = first_line
+    verdict_line = parse_verdict(reply)
 
     post_resolution_sha = run("rev-parse", "HEAD").strip()
     verdict_path = Path(

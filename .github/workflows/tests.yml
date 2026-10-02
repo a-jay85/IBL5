@@ -226,7 +226,9 @@ jobs:
         mkdir -p coverage
         echo "::group::Full PHPUnit output"
         set +eo pipefail
-        vendor/bin/phpunit \
+        vendor/bin/paratest \
+          --processes="$(nproc)" \
+          --cache-directory=/tmp/phpunit-cache \
           --testdox \
           --coverage-clover coverage/clover.xml \
           --colors=always 2>&1 | tee /tmp/phpunit-output.txt
@@ -963,191 +965,120 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-      - name: bin/test-bin-help
-        run: bin/test-bin-help
-      - name: bin/test-cleanup-safety
-        run: bin/test-cleanup-safety
-      - name: bin/test-check-pr-collisions
-        run: bin/test-check-pr-collisions
-      - name: bin/test-run-meta-checks-local
-        run: bin/test-run-meta-checks-local
-      - name: bin/test-check-pr-manual-testing
-        run: bin/test-check-pr-manual-testing
-      - name: bin/test-pr-overlap
-        run: bin/test-pr-overlap
-      - name: bin/test-pr-attack
-        run: bin/test-pr-attack
-      - name: bin/test-pr-triage
-        run: bin/test-pr-triage
-      - name: bin/test-post-plan-fleet
-        run: bin/test-post-plan-fleet
-      - name: bin/test-plan-index
-        run: bin/test-plan-index
-      - name: bin/test-post-plan-now-pr-creates-worktree
-        run: bin/test-post-plan-now-pr-creates-worktree
-      - name: bin/test-review-shared-skip
-        run: bin/test-review-shared-skip
-      - name: bin/test-pr-cycle
-        run: bin/test-pr-cycle
-      - name: bin/test-digest-dm-build
-        run: bin/test-digest-dm-build
-      - name: bin/test-pr-review-now
-        run: bin/test-pr-review-now
-      - name: bin/test-launchd-job
-        run: bin/test-launchd-job
-      - name: bin/test-check-phpunit-hygiene
-        run: bin/test-check-phpunit-hygiene
-      - name: bin/test-test
-        run: bin/test-test
-      - name: bin/test-refactor-flag
-        run: bin/test-refactor-flag
-      - name: bin/test-automouse-queue
-        run: bin/test-automouse-queue
-      - name: bin/test-automouse-self-heal
-        run: bin/test-automouse-self-heal
-      - name: bin/test-automouse-depends-on
-        run: bin/test-automouse-depends-on
-      - name: bin/test-automouse-single
-        run: bin/test-automouse-single
-      - name: bin/test-automouse-concurrency
-        run: bin/test-automouse-concurrency
-      - name: bin/test-automouse-stream-filter
-        run: bin/test-automouse-stream-filter
-      - name: bin/test-automouse-cost-rows
-        run: bin/test-automouse-cost-rows
-      - name: bin/test-automouse-measure-delegate-cost
-        run: bin/test-automouse-measure-delegate-cost
-      - name: bin/test-automouse-morning-digest
-        run: bin/test-automouse-morning-digest
-      - name: bin/test-automouse-postplan-engine
-        run: bin/test-automouse-postplan-engine
-      - name: bin/test-automouse-canary
-        run: bin/test-automouse-canary
-      - name: bin/test-fleet-status
-        run: bin/test-fleet-status
-      - name: bin/test-wt-status
-        run: bin/test-wt-status
-      - name: bin/test-wt-new-root
-        run: bin/test-wt-new-root
-      - name: bin/test-wt-rebase
-        run: bin/test-wt-rebase
-      - name: bin/test-wt-sync-tick
-        run: bin/test-wt-sync-tick
-      - name: bin/test-check-plan
-        run: bin/test-check-plan
-      - name: bin/test-check-plan-staleness
-        run: bin/test-check-plan-staleness
-      - name: bin/test-matrix-assertion-check
-        run: bin/test-matrix-assertion-check
-      - name: bin/test-plan-tier-hint
-        run: bin/test-plan-tier-hint
-      - name: bin/test-backlog
-        run: bin/test-backlog
+      # Parallel run: each script logs to its own ::group:: and the step fails if any fails.
+      # Add a new harness as one line in this list (slowest first packs best). A harness
+      # that cannot share the runner (fixed ports, global state) gets its own step instead.
+      - name: Shell harnesses (parallel)
+        run: |
+          bin/run-shell-harnesses \
+            bin/test-post-plan-fleet \
+            bin/test-check-plan \
+            bin/test-plan-now \
+            bin/test-wt-sync-tick \
+            bin/test-bin-help \
+            bin/test-check-old-code-compat \
+            bin/test-cleanup-safety \
+            bin/test-check-pr-collisions \
+            bin/test-ci-checks-green \
+            bin/test-run-meta-checks-local \
+            bin/test-check-pr-manual-testing \
+            bin/test-check-post-merge-recipe \
+            bin/test-pr-overlap \
+            bin/test-pr-attack \
+            bin/test-pr-triage \
+            bin/test-usage-gate \
+            bin/test-plan-index \
+            bin/test-post-plan-now-pr-creates-worktree \
+            bin/test-review-shared-skip \
+            bin/test-pr-cycle \
+            bin/test-digest-dm-build \
+            bin/test-pr-review-now \
+            bin/test-launchd-job \
+            bin/test-check-phpunit-hygiene \
+            bin/test-test \
+            bin/test-refactor-flag \
+            bin/test-automouse-queue \
+            bin/test-automouse-self-heal \
+            bin/test-automouse-depends-on \
+            bin/test-automouse-single \
+            bin/test-automouse-concurrency \
+            bin/test-automouse-stream-filter \
+            bin/test-automouse-cost-rows \
+            bin/test-automouse-measure-delegate-cost \
+            bin/test-automouse-morning-digest \
+            bin/test-automouse-postplan-engine \
+            bin/test-automouse-canary \
+            bin/test-fleet-status \
+            bin/test-wt-status \
+            bin/test-wt-new-root \
+            bin/test-wt-rebase \
+            bin/test-check-plan-staleness \
+            bin/test-matrix-assertion-check \
+            bin/test-plan-tier-hint \
+            bin/test-backlog \
+            bin/test-adr-check \
+            bin/test-check-docs \
+            bin/test-check-numbering \
+            bin/test-postplan-arm-conditions \
+            bin/test-docfix-run \
+            bin/test-sigpipe-grep-q-guard \
+            bin/test-shell-scripts-lib \
+            bin/test-phase-snapshot-detect \
+            bin/test-docfix-poll \
+            bin/test-launchd-health-check \
+            bin/test-post-review-findings \
+            bin/test-human-signoff-classifier \
+            bin/test-playwright-version \
+            bin/test-pr-canary-check \
+            bin/test-merge-line-select \
+            bin/test-merge-line-watch \
+            bin/test-check-workflow-checkout \
+            bin/test-check-composite-contracts \
+            bin/test-promote-master-to-production \
+            bin/test-check-e2e-mutator-isolation \
+            bin/test-check-e2e-fixture-drift \
+            bin/test-website-affecting \
+            bin/test-bug-pipeline-tick \
+            bin/test-bug-pipeline-classify \
+            bin/test-bug-pipeline-feature \
+            bin/test-bug-pipeline-park \
+            bin/test-bug-pipeline-issue \
+            bin/test-bug-pipeline-hunt \
+            bin/test-bug-pipeline-check \
+            bin/test-bug-pipeline-cron-setup \
+            bin/test-bug-pipeline-test-env \
+            bin/test-launchd-health-cron-setup \
+            bin/test-bug-pipeline-ci-autofix \
+            bin/test-sim-recap-tick \
+            bin/test-discord-dm \
+            bin/test-post-plan-fail-dm \
+            bin/test-token-report \
+            bin/test-automouse-escalation \
+            bin/test-automouse-disarm \
+            bin/test-bun-audit-triage \
+            bin/test-prune-eligibility \
+            bin/test-scrub-log-credentials \
+            bin/test-db-query-routing \
+            bin/test-watch-run \
+            ibl5/bin/test-flake-ledger \
+            bin/test-path-filters \
+            ibl5/bin/test-db-sync-now \
+            bin/test-architect-contract-split \
+            bin/test-plan-review-digest \
+            bin/test-plan-review-seam \
+            bin/test-check-registry-trigger-rows \
+            bin/test-ci-memo \
+            bin/test-db-backups-pull \
+            bin/test-predeploy-db-snapshot
+      # Exercises a real lsof port guard, so it cannot share the runner.
+      - name: bin/test-bug-pipeline-e2e
+        run: bin/test-bug-pipeline-e2e
+      # Needs a scrubbed environment, so it cannot share the runner.
       - name: bin/test-burndown
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-burndown'
-      - name: bin/test-adr-check
-        run: bin/test-adr-check
-      - name: bin/test-check-docs
-        run: bin/test-check-docs
-      - name: bin/test-check-numbering
-        run: bin/test-check-numbering
-      - name: bin/test-postplan-arm-conditions
-        run: bin/test-postplan-arm-conditions
-      - name: bin/test-docfix-run
-        run: bin/test-docfix-run
-      - name: bin/test-sigpipe-grep-q-guard
-        run: bin/test-sigpipe-grep-q-guard
-      - name: bin/test-shell-scripts-lib
-        run: bin/test-shell-scripts-lib
-      - name: bin/test-phase-snapshot-detect
-        run: bin/test-phase-snapshot-detect
-      - name: bin/test-docfix-poll
-        run: bin/test-docfix-poll
-      - name: bin/test-launchd-health-check
-        run: bin/test-launchd-health-check
-      - name: bin/test-post-review-findings
-        run: bin/test-post-review-findings
-      - name: bin/test-human-signoff-classifier
-        run: bin/test-human-signoff-classifier
-      - name: bin/test-playwright-version
-        run: bin/test-playwright-version
-      - name: bin/test-pr-canary-check
-        run: bin/test-pr-canary-check
 
-      - name: bin/test-merge-line-select
-        run: bin/test-merge-line-select
-      - name: bin/test-check-workflow-checkout
-        run: bin/test-check-workflow-checkout
-      - name: bin/test-check-composite-contracts
-        run: bin/test-check-composite-contracts
-      - name: bin/test-promote-master-to-production
-        run: bin/test-promote-master-to-production
-      - name: bin/test-check-e2e-mutator-isolation
-        run: bin/test-check-e2e-mutator-isolation
-      - name: bin/test-check-e2e-fixture-drift
-        run: bin/test-check-e2e-fixture-drift
-      - name: bin/test-website-affecting
-        run: bin/test-website-affecting
-      - name: bin/test-bug-pipeline-tick
-        run: bin/test-bug-pipeline-tick
-      - name: bin/test-bug-pipeline-classify
-        run: bin/test-bug-pipeline-classify
-      - name: bin/test-bug-pipeline-feature
-        run: bin/test-bug-pipeline-feature
-      - name: bin/test-bug-pipeline-park
-        run: bin/test-bug-pipeline-park
-      - name: bin/test-bug-pipeline-issue
-        run: bin/test-bug-pipeline-issue
-      - name: bin/test-bug-pipeline-hunt
-        run: bin/test-bug-pipeline-hunt
-      - name: bin/test-bug-pipeline-check
-        run: bin/test-bug-pipeline-check
-      - name: bin/test-bug-pipeline-cron-setup
-        run: bin/test-bug-pipeline-cron-setup
-      - name: bin/test-launchd-health-cron-setup
-        run: bin/test-launchd-health-cron-setup
-      - name: bin/test-bug-pipeline-ci-autofix
-        run: bin/test-bug-pipeline-ci-autofix
-      - name: bin/test-sim-recap-tick
-        run: bin/test-sim-recap-tick
-      - name: bin/test-plan-now
-        run: bin/test-plan-now
-      - name: bin/test-discord-dm
-        run: bin/test-discord-dm
-      - name: bin/test-post-plan-fail-dm
-        run: bin/test-post-plan-fail-dm
-      - name: bin/test-token-report
-        run: bin/test-token-report
-      - name: bin/test-automouse-escalation
-        run: bin/test-automouse-escalation
-      - name: bin/test-automouse-disarm
-        run: bin/test-automouse-disarm
-      - name: bin/test-bun-audit-triage
-        run: bin/test-bun-audit-triage
-      - name: bin/test-prune-eligibility
-        run: bin/test-prune-eligibility
-      - name: bin/test-scrub-log-credentials
-        run: bin/test-scrub-log-credentials
-      - name: bin/test-db-query-routing
-        run: bin/test-db-query-routing
-      - name: bin/test-watch-run
-        run: bin/test-watch-run
-      - name: ibl5/bin/test-flake-ledger
-        run: ibl5/bin/test-flake-ledger
-      - name: bin/test-path-filters
-        run: bin/test-path-filters
-      - name: ibl5/bin/test-db-sync-now
-        run: ibl5/bin/test-db-sync-now
-      - name: bin/test-architect-contract-split
-        run: bin/test-architect-contract-split
-      - name: bin/test-plan-review-digest
-        run: bin/test-plan-review-digest
-      - name: bin/test-plan-review-seam
-        run: bin/test-plan-review-seam
-      - name: bin/test-check-registry-trigger-rows
-        run: bin/test-check-registry-trigger-rows
-      - name: bin/test-ci-memo
-        run: bin/test-ci-memo
+      - name: bin/test-restore-rowcount-compare
+        run: bin/test-restore-rowcount-compare
 
   gate:
     name: Tests and Analysis

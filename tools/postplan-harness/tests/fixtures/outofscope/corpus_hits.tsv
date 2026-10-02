@@ -1,0 +1,51 @@
+# scan_date=2026-10-01 scanned=703 hit_plans=49 hits=49
+# reviewed=49 false_positives=6
+a11y-contrast-palette-slice	111	oos-e725372d17	D	**Follow-up: five stale-clean entries.** `all-star appearances`, `free agency preview` and `schedule
+automouse-context-accounting	727	oos-61f7a69cc5	D	**The compaction-surcharge over-estimate.** `bin/lib/automouse-pricer:220` feeds `prev = (ctx_of(u),
+boxscore-array-param-progress-reporter	533	oos-475a7cf5ee	D	`insertPlayerBoxscore()` (29-positional-arg twin) — separate backlog finding / future PR. Do NOT tou
+bug-pipeline-test-env	815	oos-1260ee74c3	D	**Production-cron liveness check** ("no tick in N minutes") — a separate follow-up PR. It monitors t
+bugreport-1-26-split-repository	413	oos-39c8c06794	D	**Migrating callers off the facade.** The 15 delegations are intentional debt with a clear retiremen
+check-docs-source-comment-refs	1113	oos-a90c471fec	D	**Backlog L4 Retro-miner remains ⬜ Open.** Building the weekly mining job is the actual L4 work — a 
+ci-memo-vr-lighthouse	654	oos-0f2432e0b8	D	**Gating `ci-memo-check` in `lighthouse.yml` on the `changes` job** to save the 5-minute-capped memo
+ci-runner-slot-diet	764	oos-f87ccd2a52	D	**Orphaned PR-only Lighthouse tooling.** With lighthouse.yml deleted, these have no workflow caller.
+ci-setup-php-env-composite	425	oos-3a9e341626	B	PR 2 (notify-discord composite, backlog 1.2) — independent, separate PR on `master`.
+cleanup-ship-leftovers	480	oos-d22f985378	D	**Making `bin/cleanup --dry-run` genuinely side-effect-free.** `kill_infra_processes()` firing befor
+collapse-clean-pr-comments	381	oos-8c89eeaf88	D	**Hot files** — `.github/workflows/hot-files.yml` (`bin/check-hot-files --pr | tee`). Clean signal i
+conformance-adr-placeholder-rename-source	568	oos-bf1d88b2d1	D	One-time matrix rows (`~/claude-plans/matrix-one-time-check-tag.md`): separate plan.
+context-budget-gate-v2	868	oos-2cee7c5334	R	**Gate [C] threshold calibration** (the 500-line / 12-phase numbers themselves): L16's title says "m
+docs-backlog-module-scaffolding-triage	43	oos-a6eb786804	D	The `bin/check-plan-staleness` creation-cue fix itself (separate PR/plan).
+e2e-runner-footprint-reduction	259	oos-81ebc44713	D	**A concurrency cap in `rebase-prs.yml` to bound a rebase *storm*:** a real lever against the storm,
+e2e-test-user-rename	1472	oos-003ec766f1	B	**Plaintext credentials in logs.** Separate plan slug: `redact-credentials-from-error-logs`. It touc
+extract-pythagorean-calc-from-standings-repo	389	oos-49deeebded	D	Backlog finding 7.15 (PlayerRepository mapping extraction) — separate PR.
+fix-1993-phantom-warriors-sonics-boxscore	595	oos-e381f68bb9	D	**A new unique index on `(game_date, visitor_teamid, home_teamid)`.** Adding one would be the preven
+fix-sim-recap-roster-blindness	803	oos-b74b993858	D	**The stale ADR citation in `ibl5/scripts/simRecapQueue.php`.** Its docblock cites ADR-0092; the gov
+harness-conflict-evidence-logging	401	oos-bc00bb66fa	D	**Enriching the LLM resolution prompt or retry policy** (ADR-0134 body). The newly logged path evide
+harness-remediation-loop-holds	427	oos-074a1f7676	D	ADR drafting on ADR-hook denial and `bin/check-numbering` collisions. Separate plan.
+j24-matchupquality-phase34	615	oos-ca9d7053e6	D	**DREB and armed-fraction `assertBand` gates in the archive test** — not yet measured/pinned; deferr
+jsb-j15-faithful-foul-bucket-program	537	oos-4f9ff40ce2	D	**`rl_stl`/`rl_tov` bundle wiring** — the production-bundle counting-stat columns feeding the faithf
+jsb-j24-dc-minutes-wiring	1738	oos-ff4e280151	R	**Re-deriving the era-matched CI floor.** The ~12.42 at 216.58 poss/g bar from `ibl5/docs/decisions/
+jsb-j24-pr4b-transoff-rotation	336	oos-54e50151e4	D	**Lever (A) — arming share (NOT this PR):** armed fraction 37.58% vs the 39.82% gate-1 threshold, ~2
+launchd-job-lib	608	oos-414f0ea837	D	**`bin/automouse/*`, `bin/plan-now`, `bin/docfix-run`.** They carry their own launchd code, and migr
+maint-11-3-11-14-css-tables-split-round-2	457	oos-c05e0082bb	D	**Bootstrap button colors** in `ibl5/design/components/block-fa-admin.css`: `#dc3545`, `#c82333`, `#
+maint-14-8-14-12-httprequest-value-object	1032	oos-f71c3e95eb	D	**3. `TradingController` keeps reading `$_GET`.** `ibl5/classes/Trading/TradingController.php` reads
+maint-2-1-module-entrypoint-globals-to-controllers	830	oos-698a9f5c85	D	**Behavior changes to any of the five modules**: this plan is a pure structural extraction. No chang
+meaningful-assertions-rule-type-scope	297	oos-47ed690fef	D	**Burndown of the newly-baselined `assertNotNull` sites.** This PR baselines them; rewriting each to
+news-topics-transaction-preset	732	oos-699191914b	D	**Deleting the TransactionHistory classes and tests.** `ibl5/classes/TransactionHistory/` and `ibl5/
+phpstan-modules-path-coverage	388	oos-c4f312743f	D	**Routing the ~65 `ibl.bannedNukeGlobal` hits through `Utilities\NukeCompat`.** The correct fix (Q2)
+plr-ratings-congruence-check	388	oos-d615fff5c7	D	**Preseason→HEAT continuity check.** Flagging Preseason edits that get lost at the reset gets its ow
+postplan-carry-no-adr-markers	400	oos-b7dc0de6b6	D	Remediating `bin/adr-check` failures in Phase 7 (separate issue)
+postplan-fold-fidelity-and-digest	2025	oos-2ef2238c15	R	**Relaxing `auto_merge: false` on any open PR.** This plan changes no other plan's frontmatter, arms
+postplan-prose-autofix	419	oos-2027980fff	D	**Stale-flag defect (record, do not build).** The Phase 5.5 fidelity fixer already receives hold-(16
+postplan-rebase-robustness	877	oos-7d5ca11873	B	**Making `/post-plan` addressable by PR number.** Separate PR, branch slug `postplan-pr-targeting`. 
+postplan-remediation-count-body-only-fix	630	oos-bbf320f86b	D	**Teaching `LiveGh._fetch_meta()` to distinguish a failed `gh pr view` from an empty body.** The rig
+pr-ready-skill-prose-drift	284	oos-fa82528133	D	**E17** (fixed-count words like `either`/`the two` going stale) — different failure mode, separate P
+pr-rebase-idle-pipeline	610	oos-245f0c2fc3	D	**Extracting `ci_*` helpers to `bin/lib/`.** A reasonable follow-up PR, but it edits a 1497-line liv
+redact-credentials-from-error-logs	478	oos-bd82db8dc3	D	**The duplicate-user / username-collision bug** that raised the original exception. Separate PR; thi
+registry-trigger-row-backfill	297	oos-859023c372	D	**Back-filling `anchor:` keys onto the other 18 rows** that use the `(section: …)` parenthetical. Th
+retire-language-loader	786	oos-bc02f05135	D	Removing the Search and News stubs from `ibl5/phpstan-stubs/nuke-globals.stub.php`. A follow-up PR c
+sim-recap-boxid-resolution	939	oos-35c76d34b9	D	**Per-game recap regeneration.** Now that an orphaned game is *visible*, the obvious next want is a 
+sort-determinism-phpstan-gate	228	oos-11e2b14e4c	D	This PR delivers ONLY the gate — the PHPStan rule, the ADR (ADR-0079), and the regenerated baseline.
+standings-extraction-1-32	301	oos-4f0a28fcfa	D	`RecordHolders` repository extraction — backlog 1.21, separate plan.
+standings-extraction-2-35	321	oos-873cf4219c	D	`RecordHolders` view extraction — backlog 1.24, separate plan.
+tests-updater-steps-6-14	405	oos-207a0b629b	D	**Axis 2** (6.17 TradeExecutionRepository / TradeFormRepository + 6.18 SQL-assembly residuals: year-
+trading-1-31-api-handler-extract	476	oos-f33efd9ee4	D	**The two pre-existing `new \Team\SplitStatsRepository($this->db)` instantiations** (lines 85-88 and

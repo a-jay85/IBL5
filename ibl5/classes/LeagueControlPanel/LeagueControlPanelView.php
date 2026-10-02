@@ -30,7 +30,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <link rel="stylesheet" href="/ibl5/themes/IBL/style/style.css">
 </head>
 <body>
-<div class="updater">
+<main class="updater">
     <h1 class="updater__title">League Control Panel</h1>
 
     <?= HtmlSanitizer::trusted($this->renderFlashMessage($resultMessage, $resultSuccess)) ?>
@@ -59,7 +59,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     </form>
 
     <a href="/ibl5/index.php" class="updater__return underline">Return to IBL</a>
-</div>
+</main>
 </body>
 </html>
         <?php

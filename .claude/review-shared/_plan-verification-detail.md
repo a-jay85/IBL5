@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _plan-verification.md — why each forced trigger exists, the incidents behind them, the worked pre-prod exercise-path catalogue, and the non-compliant counter-examples. Read only when editing the verification rules; the plan-architect never reads it.
-last_verified: 2026-09-16
+last_verified: 2026-09-28
 ---
 
 # _plan-verification Detail
@@ -72,6 +72,10 @@ Only an *intrinsic* deploy-dependency that survives that challenge may be record
 
 Minimal section — specific counter-examples are embedded inline in the rules themselves (PR #887 for seed grounding, PR #1067 for forced manual rows, PR #1753 for required test methods).
 
+### What the plan must NOT do
+
+Folded into the positive rules on 2026-09-28. The four retired bullets, kept for the record: a "verify manually" item that PHPUnit, an API test, E2E, or visual-regression can assert; classification deferred to post-plan Phase 6; a standalone Testing or Verification prose section in place of the matrix; a "run X and check Y" row with no test type and no file path. Each now lives beside the rule it negated: § Classification rules, § Required format, and § Weave tests inline.
+
 ### HTTP response shape changes
 
 When an endpoint was already covered by E2E response-body assertions, those assertions become stale on the new shape; PHPUnit does not test the browser-observed response chain. The plan must audit all existing E2E tests asserting against that endpoint's response body and update any whose expected value depended on the old shape.
@@ -88,3 +92,7 @@ named only inside a fence therefore never counts as declared.
 
 A phase that ships no new test method needs no entry. One example is a phase that re-runs an
 existing suite as a characterization check.
+
+### One-time-check rows: tag rules
+
+A `CLI-executable` row whose evidence is a single run at plan time (a corpus diff, a counterfactual mutation, a command's printed output) ends its "What to verify" cell with `(one-time-check: <reason of 15+ characters>)`. `bin/lib/plan-matrix-assertions` then skips that row's assertion-footprint check and prints `ONE-TIME-CHECK: row N` instead of `UNREALISED-ASSERTION`. The tag sits outside backticks, holds no `(`, `)`, `|` or backtick, and is honored only as the trailing text of that cell on a row whose type cell reads exactly `CLI-executable`; a tag anywhere else is ignored fail-closed and the row is checked as untagged. `bin/check-plan` gate `[Y]` rejects a malformed tag, a tag on any other row type, and a matrix with tagged rows above one third of its rows. The cell still says what was run and what it printed. Never tag a row a regression test could pin; the allowed shapes are listed in `.claude/skills/plan/_architect-contract.md`.

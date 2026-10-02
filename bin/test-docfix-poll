@@ -41,7 +41,10 @@ build_sandbox() {
     # Exits SHIM_DOCFIX_RUN_RC (default 0).
     printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\nexit "${SHIM_DOCFIX_RUN_RC:-0}"\n' \
         "$SB" > "$SB/bin/docfix-run"
-    chmod +x "$SB/bin/check-docs" "$SB/bin/cleanup" "$SB/bin/docfix-run"
+    # wt-remove stub: logs worktree name to wt-remove-calls; exits SHIM_WTREMOVE_RC (def 0).
+    printf '#!/usr/bin/env bash\necho "$1" >> "%s/wt-remove-calls"\nexit "${SHIM_WTREMOVE_RC:-0}"\n' \
+        "$SB" > "$SB/bin/wt-remove"
+    chmod +x "$SB/bin/check-docs" "$SB/bin/cleanup" "$SB/bin/docfix-run" "$SB/bin/wt-remove"
 
     # git shim: _SB is baked in at write time; SHIM_* vars are env at runtime.
     # Strips the -C <path> prefix before matching on the subcommand — all
@@ -74,6 +77,10 @@ case "$_SUBCMD" in
     push)   printf 'push\n'   >> "$_SB/git-push-calls"
             exit "${SHIM_GIT_PUSH_RC:-0}" ;;
     reset)  printf 'reset\n'  >> "$_SB/git-reset-calls" ;;
+    # show-ref default 1 = "ref gone" (the reap succeeded); 0 = ref still present.
+    show-ref)   exit "${SHIM_SHOWREF_RC:-1}" ;;
+    # merge-base default 1 = branch has own commits (not an ancestor of master).
+    merge-base) exit "${SHIM_MERGEBASE_RC:-1}" ;;
     *)
         printf '%s\n' "${_ORIG[*]:-}" >> "$_SB/git-unmatched-calls"
         exec /usr/bin/git "${_ORIG[@]}" ;;
@@ -141,6 +148,15 @@ run_poll_err() {
     POLL_STDERR_FILE="$(mktemp)"
     ( IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$SB/bin:$PATH" \
       "$REAL_POLL" >/dev/null 2>"$POLL_STDERR_FILE" ) || true
+}
+
+# run_poll_split: run_poll with stdout -> POLL_OUT_FILE, stderr -> POLL_ERR_FILE.
+POLL_OUT_FILE=""; POLL_ERR_FILE=""
+run_poll_split() {
+    local SB="$1"
+    POLL_OUT_FILE="$(mktemp)"; POLL_ERR_FILE="$(mktemp)"
+    ( IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$SB/bin:$PATH" \
+      "$REAL_POLL" >"$POLL_OUT_FILE" 2>"$POLL_ERR_FILE" ) || true
 }
 
 # run_health: drives bin/docfix-poll --health-report; returns stdout.
@@ -671,6 +687,114 @@ OUT22="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
   || bad "(22b) unknown age: health should emit alert=true kind=wedged"
 
 # ---------------------------------------------------------------------------
+# Test 23: clean zero-own-commit wedged branch. The real bin/cleanup SKIPs it as
+# "not merged" (exit 0, ref survives), which wedged docs-stale-refresh-20260925
+# for 4+ nights. Salvage must fall through to wt-remove + branch -D.
+# (23a) positive: ref survives cleanup, tip is an ancestor of master → removed.
+SB="$(_wt_sandbox)"
+WL23="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL23" SHIM_STATUS_OUT="" SHIM_LAUNCHCTL_OUT="" \
+    SHIM_SHOWREF_RC=0 SHIM_MERGEBASE_RC=0 \
+    run_poll_err "$SB"
+{ grep -q "$B_OLD" "$SB/wt-remove-calls" 2>/dev/null \
+    && grep -q "$B_OLD" "$SB/git-branch-d-calls" 2>/dev/null \
+    && ! grep -q "Could not reap" "$POLL_STDERR_FILE"; } \
+  && ok "(23a) zero-own-commit clean wedged branch: wt-remove + branch -D, no 'Could not reap'" \
+  || bad "(23a) zero-own-commit clean wedged branch not removed"
+
+# (23b) negative: branch has own commits (not an ancestor) → left in place.
+SB="$(_wt_sandbox)"
+WL23B="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL23B" SHIM_STATUS_OUT="" SHIM_LAUNCHCTL_OUT="" \
+    SHIM_SHOWREF_RC=0 SHIM_MERGEBASE_RC=1 \
+    run_poll_err "$SB"
+{ [ ! -f "$SB/wt-remove-calls" ] && [ ! -f "$SB/git-branch-d-calls" ] \
+    && grep -q "Could not reap" "$POLL_STDERR_FILE"; } \
+  && ok "(23b) clean branch with own commits: not force-removed, left in place" \
+  || bad "(23b) branch with own commits must not be force-removed"
+
+# (23c) dirty wedged branch salvaged + pushed, but bin/cleanup SKIPs it (the salvage
+# commit is on no merged PR). The ref must still be removed, or it re-wedges nightly.
+SB="$(_wt_sandbox)"
+WL23C="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL23C" SHIM_STATUS_OUT=" M docs/foo.md" SHIM_LAUNCHCTL_OUT="" \
+    SHIM_SHOWREF_RC=0 \
+    run_poll_err "$SB"
+{ [ -f "$SB/git-push-calls" ] \
+    && grep -q "$B_OLD" "$SB/wt-remove-calls" 2>/dev/null \
+    && grep -q "$B_OLD" "$SB/git-branch-d-calls" 2>/dev/null \
+    && ! grep -q "could not remove" "$POLL_STDERR_FILE"; } \
+  && ok "(23c) salvaged branch left by cleanup: wt-remove + branch -D after push" \
+  || bad "(23c) salvaged branch must be removed after a successful push"
+
+# Test 24: reaper prints "could not reap" when bin/cleanup exits non-zero
+# (named mode exits 3 on SKIP, IBL5-backlog#1244).
+# _reap_case <label> <pr_state> <cleanup_rc> <expect: reaped|not-reaped>
+_reap_case() {
+    local label="$1" pr_state="$2" rc="$3" expect="$4" SB pass=true
+    SB="$(_wt_sandbox)"
+    SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+        SHIM_BRANCH_OUT="$B_OLD" SHIM_LS_REMOTE="" \
+        SHIM_REFLOG_OUT="$REFLOG_OLD" SHIM_WORKTREE_LIST="$(_wl "$SB")" \
+        SHIM_STATUS_OUT="" SHIM_LAUNCHCTL_OUT="" \
+        SHIM_PR_STATE="$pr_state" SHIM_CLEANUP_RC="$rc" \
+        run_poll_split "$SB"
+    grep -qx "$B_OLD" "$SB/cleanup-calls" 2>/dev/null || pass=false
+    if [ "$expect" = "reaped" ]; then
+        grep -qF "docfix-poll: reaped '$B_OLD' (PR ${pr_state})." "$POLL_OUT_FILE" || pass=false
+        ! grep -qF 'could not reap' "$POLL_ERR_FILE" || pass=false
+    else
+        grep -qF "docfix-poll: could not reap '$B_OLD'" "$POLL_ERR_FILE" || pass=false
+        ! grep -qF "reaped '$B_OLD'" "$POLL_OUT_FILE" || pass=false
+    fi
+    $pass && ok "$label" || bad "$label"
+}
+_reap_case "(24a) MERGED + cleanup rc 3: could not reap, no reaped line" MERGED 3 not-reaped
+_reap_case "(24b) MERGED + cleanup rc 0: reaped line, no could-not-reap" MERGED 0 reaped
+_reap_case "(24c) CLOSED + cleanup rc 3: could not reap, no reaped line" CLOSED 3 not-reaped
+
+# Test 25: wedged alert states a failed-attempt count, not an automatic-salvage promise.
+SB="$(build_sandbox)"
+WL25="$(_wl "$SB")"
+OUT25A="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
+    SHIM_LS_REMOTE="" SHIM_PR_FOR_BRANCH=0 \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_LAUNCHCTL_OUT="" SHIM_WORKTREE_LIST="$WL25" \
+    run_health "$SB" 77)"
+OUT25B="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
+    SHIM_LS_REMOTE="" SHIM_PR_FOR_BRANCH=0 \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_REFLOG_OUT="" \
+    SHIM_LAUNCHCTL_OUT="" SHIM_WORKTREE_LIST="$WL25" \
+    run_health "$SB" 77)"
+OUT25C="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
+    SHIM_LS_REMOTE="" SHIM_PR_FOR_BRANCH=0 \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_REFLOG_OUT="$REFLOG_5H" \
+    SHIM_LAUNCHCTL_OUT="" SHIM_WORKTREE_LIST="$WL25" \
+    run_health "$SB" 77)"
+printf '%s\n' "$OUT25A" | grep -qxF "detail=Local branch $B_OLD has no origin ref and no in-flight launchd run — the doc-fix run died before pushing. It has survived 2 nightly salvage attempt(s) and needs a manual look." \
+  && ok "(25a) wedged detail: 48h age reports 2 failed salvage attempts" \
+  || bad "(25a) wedged detail with known age"
+printf '%s\n' "$OUT25B" | grep -qxF "detail=Local branch $B_OLD has no origin ref and no in-flight launchd run — the doc-fix run died before pushing. Failed salvage attempts: unknown (branch reflog expired); it needs a manual look." \
+  && ok "(25b) wedged detail: unknown age says the count is unknown" \
+  || bad "(25b) wedged detail with unknown age"
+printf '%s\n' "$OUT25C" | grep -qF 'It has survived 1 nightly salvage attempt(s)' \
+  && ok "(25c) wedged detail: 5h age floors at 1 attempt" \
+  || bad "(25c) wedged detail attempt-count floor"
+{ [ "$(printf '%s\n' "$OUT25A" | grep -c '^')" -eq 3 ] \
+    && [ "$(printf '%s\n' "$OUT25B" | grep -c '^')" -eq 3 ] \
+    && ! printf '%s\n' "$OUT25A" "$OUT25B" | grep -q 'salvage it automatically'; } \
+  && ok "(25d) wedged outputs stay 3 lines and drop the automatic-salvage promise" \
+  || bad "(25d) wedged outputs: 3-line contract / no automatic-salvage promise"
+
 if [ "$FAILED" -eq 0 ]; then
     echo "All docfix-poll checks passed."
 else

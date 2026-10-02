@@ -1,0 +1,387 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/check-post-merge-recipe — Blocking gate: lints the shell in a PR body's post-merge sections.
+#
+# A "post-merge" recipe is shell the person who merges runs against the live repo
+# (branch protection, secrets, settings). PR 2144's recipe hardcoded the wrong repo slug,
+# rebuilt required_status_checks from `contexts` (which drops app_id), and verified with a
+# del() that stripped `checks` before comparing. This gate catches those three shapes from
+# the PR body text, before anyone runs the recipe. The body is data only: it is never
+# eval'd, sourced, or used as a printf format.
+#
+# Shapes:
+#   1  a repo slug that differs from origin (`<expected>-backlog` is allowed)
+#   2  a PUT/POST/PATCH to .../protection or .../protection/required_status_checks whose
+#      payload is built from `contexts` with no `checks` key
+#   3  a del() that removes `checks` before the comparison, with no real checks readback
+#
+# Modes:
+#   --pr <n>          Fetch the body via gh and check it (live gate use).
+#   --body-file <p>   Read the body from a file path (test seam).
+#
+# Exit codes:
+#   0  Clean, no post-merge section, or a valid waiver marker.
+#   1  At least one finding, or a malformed waiver marker.
+#   2  Usage error, gh failure, unreadable file, or unresolvable expected slug.
+
+set -euo pipefail
+
+GH_CMD="${GH_CMD:-gh}"
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-post-merge-recipe (--pr <n> | --body-file <path>) [--repo-slug <owner>/<repo>] [--help|-h]
+
+Lints the fenced shell under post-merge style headings in a PR body for the three
+recipe defects that bit PR 2144 (wrong repo slug, contexts-only protection write,
+verification that deletes .checks).
+
+Options:
+  --pr <n>                 PR number; the body is fetched via gh.
+  --body-file <p>          Read the body from a file (test seam; mutually exclusive with --pr).
+  --repo-slug <owner>/<r>  Expected repo slug (test seam). Default: parsed from `git remote get-url origin`.
+  --help, -h               Show this message.
+
+Environment (test seams):
+  GH_CMD                   Override the gh command. Unset and empty both fall back to "gh".
+
+Waiver:
+  <!-- post-merge-recipe-ok: <reason, 15+ chars> -->   in the PR body passes and prints the reason.
+
+Exit codes:
+  0  Clean, no post-merge section, or valid waiver.
+  1  Finding (see stderr) or a waiver reason shorter than 15 characters.
+  2  Usage error, gh failure, unreadable file, or unresolvable expected slug.
+EOF
+}
+
+PR_NUM=""
+BODY_FILE=""
+SLUG_ARG=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --pr)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --pr requires a PR number" >&2
+                usage >&2
+                exit 2
+            fi
+            PR_NUM="$2"
+            shift 2
+            ;;
+        --body-file)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --body-file requires a path" >&2
+                usage >&2
+                exit 2
+            fi
+            BODY_FILE="$2"
+            shift 2
+            ;;
+        --repo-slug)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --repo-slug requires <owner>/<repo>" >&2
+                usage >&2
+                exit 2
+            fi
+            SLUG_ARG="$2"
+            shift 2
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Error: unknown option: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [[ -z "$PR_NUM" && -z "$BODY_FILE" ]]; then
+    echo "Error: exactly one of --pr or --body-file is required" >&2
+    usage >&2
+    exit 2
+fi
+if [[ -n "$PR_NUM" && -n "$BODY_FILE" ]]; then
+    echo "Error: --pr and --body-file are mutually exclusive" >&2
+    usage >&2
+    exit 2
+fi
+if [[ -n "$PR_NUM" && ! "$PR_NUM" =~ ^[0-9]+$ ]]; then
+    echo "Error: --pr must be a number, got: $PR_NUM" >&2
+    exit 2
+fi
+
+SLUG_CHARS='[A-Za-z0-9_.-]+'
+re_slug="^${SLUG_CHARS}/${SLUG_CHARS}\$"
+re_scp="^git@github\\.com:(${SLUG_CHARS}/${SLUG_CHARS})\$"
+re_ssh="^ssh://git@github\\.com/(${SLUG_CHARS}/${SLUG_CHARS})\$"
+re_https="^https://([^@/]+@)?github\\.com/(${SLUG_CHARS}/${SLUG_CHARS})\$"
+
+# Expected slug, resolved eagerly so a broken checkout fails loudly even on a clean body.
+EXPECTED=""
+if [[ -n "$SLUG_ARG" ]]; then
+    if [[ ! "$SLUG_ARG" =~ $re_slug ]]; then
+        echo "Error: --repo-slug must look like <owner>/<repo>, got: $SLUG_ARG" >&2
+        exit 2
+    fi
+    EXPECTED="$SLUG_ARG"
+else
+    origin="$(git remote get-url origin 2>/dev/null || true)"
+    origin="${origin%.git}"
+    if [[ "$origin" =~ $re_scp ]]; then
+        EXPECTED="${BASH_REMATCH[1]}"
+    elif [[ "$origin" =~ $re_ssh ]]; then
+        EXPECTED="${BASH_REMATCH[1]}"
+    elif [[ "$origin" =~ $re_https ]]; then
+        EXPECTED="${BASH_REMATCH[2]}"
+    fi
+fi
+if [[ -z "$EXPECTED" ]]; then
+    echo "check-post-merge-recipe: cannot resolve expected repo slug (no usable origin remote); pass --repo-slug <owner>/<repo>" >&2
+    exit 2
+fi
+EXPECTED_LC="$(printf '%s' "$EXPECTED" | tr '[:upper:]' '[:lower:]')"
+
+TMPD="$(mktemp -d "${TMPDIR:-/tmp}/check-post-merge-recipe.XXXXXX")"
+trap 'rm -rf "$TMPD"' EXIT
+TMP_BODY="$TMPD/body"
+TMP_NORM="$TMPD/norm"
+TMP_OUT="$TMPD/awk-out"
+
+if [[ -n "$BODY_FILE" ]]; then
+    if [[ ! -r "$BODY_FILE" || -d "$BODY_FILE" ]]; then
+        echo "Error: --body-file not readable: $BODY_FILE" >&2
+        exit 2
+    fi
+    cp "$BODY_FILE" "$TMP_BODY"
+else
+    if ! "$GH_CMD" pr view "$PR_NUM" --json body -q .body > "$TMP_BODY" 2>/dev/null; then
+        echo "check-post-merge-recipe: gh pr view failed for PR $PR_NUM" >&2
+        exit 2
+    fi
+fi
+
+# GitHub returns CRLF bodies; a stray \r breaks heading and fence matching.
+tr -d '\r' < "$TMP_BODY" > "$TMP_NORM"
+
+# Waiver marker. A short reason fails even on a clean body.
+WAIVED=0
+REASON=""
+marker_line="$(grep -m1 -F '<!-- post-merge-recipe-ok:' "$TMP_NORM" || true)"
+if [[ -n "$marker_line" ]]; then
+    REASON="${marker_line#*post-merge-recipe-ok:}"
+    REASON="${REASON%%-->*}"
+    REASON="${REASON#"${REASON%%[![:space:]]*}"}"
+    REASON="${REASON%"${REASON##*[![:space:]]}"}"
+    if [[ ${#REASON} -lt 15 ]]; then
+        echo "check-post-merge-recipe: post-merge-recipe-ok marker needs a reason of at least 15 characters (got ${#REASON})" >&2
+        exit 1
+    fi
+    WAIVED=1
+fi
+
+IFS= read -r -d '' AWK_PROG <<'AWK_EOF' || true
+function physln(pos,   i, r) {
+    r = segln[1]
+    for (i = 1; i <= nseg; i++) if (segstart[i] <= pos) r = segln[i]
+    return r
+}
+
+function emit(ln, shape, detail) {
+    printf "%d\t%d\t%s\n", ln, shape, detail
+}
+
+# Scan src for tokens matching re; strip leading noise with strip; check each slug.
+function scan(src, re, strip,   rest, off, tok, abs) {
+    rest = src
+    off = 0
+    while (match(rest, re)) {
+        abs = off + RSTART
+        tok = tolower(substr(rest, RSTART, RLENGTH))
+        off += RSTART + RLENGTH - 1
+        rest = substr(rest, RSTART + RLENGTH)
+        sub(strip, "", tok)
+        sub(/\.git$/, "", tok)
+        if (tok != expected && tok != expected "-backlog" && bad1 == "") {
+            bad1 = tok
+            bad1ln = physln(abs)
+        }
+    }
+}
+
+function process(L, Lo,   i, n, c, outside, cs) {
+    cs = "[a-z0-9_.-]+"
+    bad1 = ""
+    lid++
+    if (L ~ /gh[ \t]+api/ || L ~ /api\.github\.com/)
+        scan(L, "repos/" cs "/" cs, "^repos/")
+    scan(L, "--repo[ =][ \t]*" cs "/" cs, "^.*[ \t=]")
+    if (L ~ /(^|[^a-z0-9_])gh[ \t]/)
+        scan(Lo, "(^|[ \t])-R[ \t]+[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", "^.*[ \t]")
+    scan(L, "git@github\\.com:" cs "/" cs, "^git@github\\.com:")
+    scan(L, "https://github\\.com/" cs "/" cs, "^https://github\\.com/")
+    if (bad1 != "") emit(bad1ln, 1, "wrong-repo-slug: " bad1 " (expected " expected ")")
+
+    if (match(L, /(^|[ \t])(--method|-x)[ \t=]*(put|post|patch)([^a-z]|$)/) \
+        && L ~ /\/protection(\/required_status_checks)?([ \t"'\\]|$)/)
+        wl[++nw] = segln[1]
+    if (L ~ /(^|[^a-z_])"?contexts"?[ \t]*:/ || index(L, "contexts[]=") > 0 || index(L, "[contexts][]=") > 0)
+        hasctx = 1
+    if (L ~ /(^|[^a-z_])"?checks"?[ \t]*:/ || index(L, "[checks]") > 0)
+        haschecks = 1
+
+    n = length(L)
+    outside = ""
+    for (i = 1; i <= n; i++) {
+        c = substr(L, i, 1)
+        if (indel) {
+            span = span c
+            if (c == "(") depth++
+            else if (c == ")") {
+                depth--
+                if (depth == 0) {
+                    indel = 0
+                    if (span ~ /(^|[^a-z_])checks([^a-z_]|$)/ && lastdel != lid) { cand3[++n3] = delln; lastdel = lid }
+                }
+            }
+        } else if (substr(L, i, 4) == "del(" && (i == 1 || substr(L, i - 1, 1) !~ /[a-z0-9_]/)) {
+            indel = 1
+            depth = 1
+            span = "del("
+            delln = physln(i)
+            i += 3
+        } else {
+            outside = outside c
+        }
+    }
+    if (indel) span = span " "
+    if (index(outside, "required_status_checks.checks") > 0 || L ~ /check-composite-contracts[ \t]+--protection-readback/)
+        readschecks = 1
+}
+
+function end_section(   i) {
+    if (haspend) { haspend = 0; process(pendL, pendO) }
+    if (nw > 0 && hasctx && !haschecks)
+        for (i = 1; i <= nw; i++)
+            emit(wl[i], 2, "contexts-only-protection-write: payload built from contexts without checks drops app_id")
+    if (!readschecks)
+        for (i = 1; i <= n3; i++)
+            emit(cand3[i], 3, "checks-dropped-from-verification: del() removes .checks before the comparison")
+    insec = 0
+    nw = 0; n3 = 0; hasctx = 0; haschecks = 0; readschecks = 0; indel = 0
+}
+
+BEGIN { infence = 0; insec = 0; nsec = 0; haspend = 0 }
+
+{
+    line = $0
+    s = line
+    sub(/^[ \t]*/, "", s)
+    if (match(line, /^[ \t]*(```+|~~~+)/)) {
+        ch = substr(s, 1, 1)
+        n = 0
+        while (substr(s, n + 1, 1) == ch) n++
+        rest = substr(s, n + 1)
+        if (!infence) {
+            infence = 1; fch = ch; flen = n
+            next
+        }
+        if (ch == fch && n >= flen && rest ~ /^[ \t]*$/) {
+            infence = 0
+            if (haspend) { haspend = 0; process(pendL, pendO) }
+            next
+        }
+    }
+    if (!infence) {
+        if (match(line, /^ ? ? ?#+[ \t]+/)) {
+            t = line
+            sub(/^ */, "", t)
+            lvl = 0
+            while (substr(t, lvl + 1, 1) == "#") lvl++
+            if (lvl <= 6) {
+                text = tolower(substr(t, lvl + 1))
+                if (insec && lvl <= seclvl) end_section()
+                if (!insec && text ~ /post-?merge|after[ -]merg(e|ing)|activation|owner action/) {
+                    insec = 1; seclvl = lvl; nsec++
+                }
+            }
+        }
+        next
+    }
+    if (!insec) next
+
+    cur = tolower(line)
+    curo = line
+    if (haspend) {
+        segstart[nseg + 1] = length(pendL) + 2
+        joinL = pendL " " cur
+        joinO = pendO " " curo
+    } else {
+        nseg = 0
+        segstart[1] = 1
+        joinL = cur
+        joinO = curo
+    }
+    nseg++
+    segln[nseg] = NR
+    if (match(joinL, /\\[ \t]*$/)) {
+        pendL = substr(joinL, 1, RSTART - 1)
+        pendO = substr(joinO, 1, RSTART - 1)
+        haspend = 1
+        next
+    }
+    haspend = 0
+    process(joinL, joinO)
+}
+
+END {
+    if (insec) end_section()
+    printf "sections\t%d\n", nsec
+}
+AWK_EOF
+
+if ! awk -v expected="$EXPECTED_LC" "$AWK_PROG" "$TMP_NORM" > "$TMP_OUT"; then
+    echo "check-post-merge-recipe: awk scan failed" >&2
+    exit 2
+fi
+
+NSEC="$(grep '^sections' "$TMP_OUT" | cut -f2)"
+FINDINGS="$(grep -v '^sections' "$TMP_OUT" | sort -t "$(printf '\t')" -k1,1n -k2,2n -u || true)"
+
+if [[ -z "$FINDINGS" ]]; then
+    if [[ "$WAIVED" -eq 1 ]]; then
+        echo "post-merge-recipe-ok: $REASON"
+    elif [[ "${NSEC:-0}" -eq 0 ]]; then
+        echo "check-post-merge-recipe: no post-merge section"
+    fi
+    exit 0
+fi
+
+PREFIX=""
+[[ "$WAIVED" -eq 1 ]] && PREFIX="WAIVED: "
+SEEN_SHAPES=" "
+while IFS=$'\t' read -r ln shape detail; do
+    case "$shape" in
+        1) name="wrong-repo-slug" ;;
+        2) name="contexts-only-protection-write" ;;
+        *) name="checks-dropped-from-verification" ;;
+    esac
+    printf '%scheck-post-merge-recipe: line %s: shape %s (%s): %s\n' "$PREFIX" "$ln" "$shape" "$name" "${detail#*: }" >&2
+    SEEN_SHAPES="$SEEN_SHAPES$shape "
+done <<< "$FINDINGS"
+
+if [[ "$WAIVED" -eq 1 ]]; then
+    echo "post-merge-recipe-ok: $REASON"
+    exit 0
+fi
+
+[[ "$SEEN_SHAPES" == *" 1 "* ]] && echo "  shape 1 fix: use the slug from git remote get-url origin ($EXPECTED)" >&2
+[[ "$SEEN_SHAPES" == *" 2 "* ]] && echo "  shape 2 fix: append with POST .../required_status_checks/contexts, or carry the checks[] array with app_id in the PUT payload" >&2
+[[ "$SEEN_SHAPES" == *" 3 "* ]] && echo "  shape 3 fix: compare .required_status_checks.checks (or run bin/check-composite-contracts --protection-readback) instead of deleting it" >&2
+echo "  false positive? add <!-- post-merge-recipe-ok: <reason, 15+ chars> --> to the PR body" >&2
+exit 1

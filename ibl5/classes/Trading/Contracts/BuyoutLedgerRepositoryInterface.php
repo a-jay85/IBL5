@@ -83,4 +83,17 @@ interface BuyoutLedgerRepositoryInterface
      * @return int Number of deleted rows
      */
     public function deleteExpiredCashConsiderations(): int;
+
+    /**
+     * Advance the contract year of every cash-consideration row by one.
+     *
+     * Called once per season rollover, after the new `Current Season Ending Year`
+     * has been written. Every row advances: cash considerations are IBL-only
+     * (the table has no league column) and each row's salary slots are indexed
+     * from its own `cy`, so a partial advance would desynchronise the rows that
+     * were skipped from the contracts they mirror.
+     *
+     * @return int Number of rows whose `cy` was incremented
+     */
+    public function advanceAllCy(): int;
 }

@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time; no deferred manual items; E2E assertions must be seed- and DOM-grounded.
-last_verified: 2026-09-28
+last_verified: 2026-09-30
 ---
 
 # Plan Verification Matrix
@@ -19,6 +19,8 @@ Each implementation phase that changes behavior must have a corresponding row (o
 | 1 | Example: salary cap calculation rejects over-cap trades | PHPUnit | pre-impl (characterization) | tests/Trade/TradeValidatorTest.php |
 | 2 | Example: form submits and redirects | E2E | post-impl | e2e/trades/submit-trade.spec.ts |
 ```
+
+Every row names its test type and its file or command; a bare "run X and check Y" is not a row.
 
 ### Test type — exactly one of:
 
@@ -41,6 +43,7 @@ Each implementation phase that changes behavior must have a corresponding row (o
 ### Classification rules
 
 - "Verify X returns Y", "check that Z happens", "confirm the redirect works" → automatable. Never classify as truly-manual.
+- Classify every row at plan-write time. Post-plan Phase 6 is a safety net for a missed row and does not replace plan-time classification.
 - "Compare against production" / "does output still match iblhoops.net?" → **visual-regression** (screenshot diff), not truly-manual — unless UI/UX was intentionally redesigned.
 - If nothing in UI/UX changed, visual regression covers it. Do not classify as truly-manual.
 - The **only** truly-manual items are subjective judgment on **new or redesigned** UI/UX.
@@ -48,6 +51,20 @@ Each implementation phase that changes behavior must have a corresponding row (o
 - **A truly-manual row must be performable on the *open PR*, before it merges.** Design an exercise path on one of the three pre-prod environments and keep the row. Only an *intrinsic* deploy-dependency that survives that challenge may use the `pre-prod-exception:` marker recorded by `bin/check-plan` gate `[P]`. Why: _plan-verification-detail.md § Why the test-type boundaries fall where they do
 - **Deploy-dependent behavior needs a row at all — an absent row is the violation.** Name which pre-prod environment exercises it — see § Pre-prod exercise paths.
 - If a plan has zero truly-manual items, state: `All verification is automated — no manual testing needed.`
+
+### Visual-regression rows that expect no baseline change
+
+The post-plan harness treats each test row's backticked token as a file the diff must touch. A row planning an untouched baseline (backlog#1222) would hold arming condition (3) with `MISSING:` forever. Mark it `(no-change)` right after the token's closing backtick:
+
+```
+| 4 | CSS split leaves every smoke baseline byte-identical | Visual-regression | post-impl | `ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots` (no-change) |
+```
+
+Harness rules (`parse_no_change_test_paths` in `tools/postplan-harness/harness/planfile.py`):
+
+- Honored only on a row with a cell reading exactly `Visual-regression`. Elsewhere the marker is ignored. `bin/check-plan` gate `[X]` rejects it on other row types and anywhere but directly after the token.
+- Exempts only that row's token. If another row plans the same token unmarked, the unmarked row wins.
+- Fenced examples and a code-span `(no-change)` never count. Gate `[X]` skips both.
 
 ### Pre-prod exercise paths
 
@@ -65,7 +82,7 @@ Why: _plan-verification-detail.md § Pre-prod exercise paths — worked catalogu
 
 ### Weave tests inline
 
-Pre-implementation tests go **before** their implementation step. Post-implementation tests go **immediately after**. Never collect all tests into a separate appendix.
+Pre-implementation tests go **before** their implementation step. Post-implementation tests go **immediately after**. Never collect all tests into a separate appendix, and never substitute a standalone Testing or Verification prose section for the matrix.
 
 ## Required Test Methods
 
@@ -206,12 +223,3 @@ flags the PR (advisory comment, non-blocking).
 - **Bypass:** Include `<!-- no-adr: reason at least 15 characters -->` in the PR body when the decision is already in an existing ADR (e.g., new PHPStan rules enforcing ADR-0001's architecture split).
 
 If the plan has no phases adding trigger-pattern files, no action is needed.
-
-## What the plan must NOT do
-
-- List "verify manually" or "check by hand" for any item that can be asserted by PHPUnit, an API test, E2E, or visual-regression.
-- Defer test classification to post-plan Phase 6. Phase 6 is a safety net, not the primary classification point.
-- Add a standalone "Testing" or "Verification" section with prose descriptions instead of the matrix.
-- Use "run X and check Y" without specifying the test type and file path.
-
-Why: _plan-verification-detail.md § Counter-examples

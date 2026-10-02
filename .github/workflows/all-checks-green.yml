@@ -1,0 +1,56 @@
+name: All checks green
+
+# Required status check that makes GitHub auto-merge block on ANY red check on the
+# PR head, required or not. Closes the class of PR #2304 (merged while the
+# non-required `pytest (stdlib harness)` was red). Polls the Checks API for this
+# PR's head SHA via bin/check-pr-checks-green and fails closed on timeout.
+# Legacy commit statuses are not read (zero exist on this repo; see the script header).
+# ADR-0149 records the design, the --ignore list rationale, and the activation.
+
+on:
+  pull_request:
+    # No `branches`, no `paths`, no job-level `if:` (ci-gotchas.md, ADR-0145): a
+    # required context that never reports leaves the PR pending forever.
+    # labeled/unlabeled: e2e-tests.yml (update-baselines) and mutation.yml
+    # (mutation-test) start jobs on labels, so the aggregator must re-settle.
+    # edited: pr-meta-checks.yml and human-signoff.yml re-run on edited.
+    types: [opened, reopened, synchronize, ready_for_review, edited, labeled, unlabeled]
+
+permissions:
+  contents: read
+  checks: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: all-checks-green-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  all-checks-green:
+    name: All checks green
+    runs-on: ubuntu-latest
+    # Fails closed: a job killed here concludes `cancelled`, which the required
+    # context reads as red. Must exceed the slowest sibling (E2E Tests: 10-13 min
+    # on full runs measured 2026-09-30) plus the script deadline below.
+    timeout-minutes: 45
+    steps:
+      - name: Checkout (for bin/check-pr-checks-green and bin/lib/ci-checks-green.sh)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Wait for every other check on this head to settle green
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # Startup grace: sibling workflows started by the same event register
+          # their workflow runs within seconds; wait before the first read so
+          # the actions/runs anchor (V4) sees them.
+          sleep 60
+          bin/check-pr-checks-green \
+            --repo="$REPO" --sha="$HEAD_SHA" --wait \
+            --self='All checks green' \
+            --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \
+            --ignore='human-signoff,needs-a-human label,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Infection PHP,Notify Mutation Failure' \
+            --interval-seconds=60 --timeout-seconds=2400

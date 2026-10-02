@@ -1,9 +1,10 @@
 ---
 description: scp -r with a trailing slash on the source copies directory contents rather than the named directory — omit the trailing slash. Enforced at review time by Agent E Topic 3.
-last_verified: 2026-09-05
+last_verified: 2026-09-30
 paths:
-  - ".github/workflows/*.yml"
-  - "bin/**"
+  - ".github/workflows/db-backup.yml"
+  - ".github/workflows/main.yml"
+  - "bin/backups-sync-setup"
 ---
 
 # scp Trailing Slash

@@ -11,7 +11,10 @@
 # are wrapped in `if` (mirrors bin/bug-pipeline-tick's discipline).
 #
 # NEVER pushes, never force-pushes, never calls gh, never rebases, never
-# resets --hard, never creates or deletes worktrees. Fast-forward only.
+# resets --hard (one exception: the stale-copy reset in backup_and_reset,
+# which writes refs/wt-sync-backup/<branch> first and logs RESET-STALE),
+# never creates or deletes worktrees. Otherwise fast-forward only, plus the
+# --only diverged-clean merge (ADR-0133).
 # See ADR-0106 and ADR-0133 for the design rationale.
 #
 # Usage: bin/wt-sync-tick [--dry-run] [--force] [--help] [--only <path>]
@@ -111,6 +114,49 @@ _bounded_fetch() {   # <wt> <branch> — 0 = fetched, 1 = failed or timed out
     return 0
 }
 
+# ── Stale-copy helpers ────────────────────────────────────────────────────────
+# A stale copy is a local branch whose every local-only commit has a
+# patch-equivalent (cherry-pick-equal) twin already on origin. It is the
+# leftover of a remote squash/rebase. It carries no unique work, so backing up
+# HEAD and resetting to origin loses nothing. Every failure path returns
+# "not stale" / "did nothing". For a destructive action, fail-closed is the
+# only safe default.
+
+is_stale_copy() {   # <wt> <branch> — 0 = every ahead commit has an origin twin
+    local wt="$1" branch="$2" ahead unique
+    git -C "$wt" rev-parse --verify --quiet "refs/remotes/origin/$branch" >/dev/null 2>&1 || return 1
+    git -C "$wt" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null 2>&1 || return 1
+    ahead="$(git -C "$wt" rev-list --count "refs/remotes/origin/$branch..refs/heads/$branch" 2>/dev/null)" || return 1
+    [ -n "$ahead" ] && [ "$ahead" -gt 0 ] 2>/dev/null || return 1
+    # Exit status is captured separately. A failed rev-list prints nothing, and
+    # empty output must never read as "all stale".
+    unique="$(git -C "$wt" rev-list --cherry-pick --right-only \
+        "refs/remotes/origin/$branch...refs/heads/$branch" 2>/dev/null)" || return 1
+    [ -z "$unique" ]
+}
+
+backup_and_reset() {   # <wt> <branch> — 0 = backed up + reset; 1 = nothing changed
+    local wt="$1" branch="$2" cur old_sha backup_sha
+    cur="$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null)" || return 1
+    [ "$cur" = "$branch" ] || return 1
+    if has_uncommitted_changes "$wt" || has_untracked_files "$wt"; then
+        return 1
+    fi
+    old_sha="$(git -C "$wt" rev-parse --verify --quiet HEAD 2>/dev/null)" || return 1
+    [ -n "$old_sha" ] || return 1
+    # Refuse to overwrite an existing backup ref that has no reflog. Without a
+    # reflog the current SHA would be unrecoverable once overwritten.
+    if git -C "$wt" rev-parse --verify --quiet "refs/wt-sync-backup/$branch" >/dev/null 2>&1; then
+        git -C "$wt" reflog exists "refs/wt-sync-backup/$branch" 2>/dev/null || return 1
+    fi
+    git -C "$wt" update-ref --create-reflog -m "wt-sync-tick: stale-copy backup" \
+        "refs/wt-sync-backup/$branch" "$old_sha" >/dev/null 2>&1 || return 1
+    backup_sha="$(git -C "$wt" rev-parse --verify --quiet "refs/wt-sync-backup/$branch" 2>/dev/null)" || return 1
+    [ "$backup_sha" = "$old_sha" ] || return 1
+    git -C "$wt" reset --hard --quiet "refs/remotes/origin/$branch" >/dev/null 2>&1 || return 1   # stale-copy-reset
+    return 0
+}
+
 on_demand_sync() {
     local wt="$1" branch counts behind ahead
 
@@ -172,6 +218,23 @@ on_demand_sync() {
     # Diverged: ahead>0 AND behind>0.
     if has_uncommitted_changes "$wt" || has_untracked_files "$wt"; then
         _only_emit "$wt" "$branch" "DIVERGED-DIRTY"; return 0
+    fi
+    # Stale copy: every local-only commit is already on origin by content
+    # (a squash-merged parent). Back up HEAD, then hard-reset to origin.
+    # This runs after the dirty gate on purpose: a reset must never touch
+    # uncommitted or untracked work.
+    if is_stale_copy "$wt" "$branch"; then
+        if [ "$DRY_RUN" = true ]; then
+            _only_emit "$wt" "$branch" "RESET-STALE"
+            printf '[dry-run] no git write performed\n' >&2
+            return 0
+        fi
+        if backup_and_reset "$wt" "$branch" >/dev/null 2>&1; then
+            _only_emit "$wt" "$branch" "RESET-STALE"
+        else
+            _only_emit "$wt" "$branch" "DIVERGED-CONFLICT"
+        fi
+        return 0
     fi
     if [ "$DRY_RUN" = true ]; then
         if git -C "$wt" merge-tree --write-tree "HEAD" "origin/$branch" >/dev/null 2>&1; then
@@ -304,6 +367,7 @@ CURRENT=0
 DIRTY=0
 IN_USE=0
 AHEAD=0
+RESET_STALE=0
 CANNOT_FF=0
 NO_REMOTE=0
 
@@ -373,8 +437,39 @@ while IFS= read -r wt; do
     case "$behind" in ''|*[!0-9]*) behind=0 ;; esac
     case "$ahead"  in ''|*[!0-9]*) ahead=0  ;; esac
 
-    # AHEAD gate — NEVER touch a worktree with unpushed commits. Load-bearing.
+    # AHEAD gate — NEVER discard a worktree's unique unpushed commits. Load-bearing.
+    # The one exception is a STALE COPY: every ahead commit is already on
+    # origin/<branch> in rewritten form (is_stale_copy), the tree is clean
+    # including untracked files, and nobody is in it. Such a worktree is
+    # backed up (backup_and_reset) and then reset to origin/<branch>. Any
+    # other ahead>0 state stays a STRAGGLER, untouched.
     if [ "$ahead" -gt 0 ]; then
+        if ! has_untracked_files "$wt" && is_stale_copy "$wt" "$branch"; then
+            if [ "$DRY_RUN" = true ]; then
+                log "  WOULD-RESET-STALE $wt_name ($branch) — ahead=$ahead behind=$behind (stale copy of origin)"
+                RESET_STALE=$(( RESET_STALE + 1 ))
+                continue
+            fi
+            # TOCTOU re-check: is_stale_copy ran git work since the line-348 lsof probe.
+            if is_worktree_in_use "$wt"; then
+                log "  IN-USE     $wt_name ($branch) — became in-use before stale reset"
+                IN_USE=$(( IN_USE + 1 ))
+                continue
+            fi
+            if backup_and_reset "$wt" "$branch"; then
+                log "  RESET-STALE $wt_name ($branch) — ahead=$ahead behind=$behind (backed up, reset to origin/$branch)"
+                RESET_STALE=$(( RESET_STALE + 1 ))
+                printf 'RESET-STALE branch=%s behind=%d ahead=%d\n' \
+                    "$branch" "$behind" "$ahead" >> "$_straggler_tmp"
+                continue
+            fi
+            # backup_and_reset refused or failed: leave the worktree alone, record why.
+            log "  STRAGGLER  $wt_name ($branch) — ahead=$ahead behind=$behind (stale-copy reset failed)"
+            AHEAD=$(( AHEAD + 1 ))
+            printf 'STRAGGLER branch=%s reason=reset-failed behind=%d ahead=%d\n' \
+                "$branch" "$behind" "$ahead" >> "$_straggler_tmp"
+            continue
+        fi
         log "  STRAGGLER  $wt_name ($branch) — ahead=$ahead behind=$behind (unpushed commits)"
         AHEAD=$(( AHEAD + 1 ))
         printf 'STRAGGLER branch=%s reason=ahead behind=%d ahead=%d\n' \
@@ -413,18 +508,18 @@ while IFS= read -r wt; do
 done < <(git -C "$REPO_ROOT" worktree list --porcelain | awk '/^worktree / { print substr($0, 10) }')
 
 # ── Summary (stdout) ─────────────────────────────────────────────────────────
-printf 'Done: %d synced, %d current, %d dirty, %d in-use, %d ahead, %d cannot-ff, %d no-remote.\n' \
-    "$SYNCED" "$CURRENT" "$DIRTY" "$IN_USE" "$AHEAD" "$CANNOT_FF" "$NO_REMOTE"
+printf 'Done: %d synced, %d current, %d dirty, %d in-use, %d ahead, %d reset-stale, %d cannot-ff, %d no-remote.\n' \
+    "$SYNCED" "$CURRENT" "$DIRTY" "$IN_USE" "$AHEAD" "$RESET_STALE" "$CANNOT_FF" "$NO_REMOTE"
 
 # ── Structured log append ────────────────────────────────────────────────────
-# One tick-summary line + one STRAGGLER line per problem worktree.
+# One tick-summary line + one STRAGGLER line per problem worktree + one RESET-STALE line per stale-copy reset (audit trail for every destructive action).
 # STRAGGLER lines are the evidence base for deciding whether a smarter
 # conflict-resolution tool is worth building. Grep with: grep STRAGGLER wt-sync.log
 mkdir -p "$(dirname "$WT_SYNC_LOG")" 2>/dev/null || true
 {
-    printf '[%s] synced=%d current=%d dirty=%d in-use=%d ahead=%d cannot-ff=%d no-remote=%d\n' \
+    printf '[%s] synced=%d current=%d dirty=%d in-use=%d ahead=%d reset-stale=%d cannot-ff=%d no-remote=%d\n' \
         "$(date '+%Y-%m-%dT%H:%M:%S')" \
-        "$SYNCED" "$CURRENT" "$DIRTY" "$IN_USE" "$AHEAD" "$CANNOT_FF" "$NO_REMOTE"
+        "$SYNCED" "$CURRENT" "$DIRTY" "$IN_USE" "$AHEAD" "$RESET_STALE" "$CANNOT_FF" "$NO_REMOTE"
     if [ -s "$_straggler_tmp" ]; then
         while IFS= read -r _sl; do
             printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$_sl"

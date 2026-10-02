@@ -27,6 +27,7 @@ PLAN_NOW="$ROOT/bin/plan-now"
 RUN_TIMEOUT=$(sed -n 's/^RUN_TIMEOUT=\([0-9][0-9]*\)$/\1/p' "$PLAN_NOW" | head -1)
 [ -n "$RUN_TIMEOUT" ] || { echo "test-plan-now: could not read RUN_TIMEOUT from $PLAN_NOW" >&2; exit 1; }
 FAILS=0
+REPO_ROOT_GATE=$(cd "$(dirname "$PLAN_NOW")" && pwd)
 
 ok()   { printf '  ok   %s\n' "$1"; }
 fail() { printf '  FAIL %s\n' "$1"; FAILS=$((FAILS + 1)); }
@@ -63,6 +64,14 @@ while [ $# -gt 0 ]; do case "$1" in -*) shift ;; *) break ;; esac; done
 exec "$@"
 SHIM_EOF
 chmod +x "$SHIM/caffeinate"
+# Usage gate (ADR-0143): plan-now now asks the gate before every model call. Point it at a
+# private state dir and shadow `security` so the real keychain, network and cache are never
+# read; no token means no usage data, which fails open (the run starts as before).
+GATE_DIR="$TMP/usage-gate"
+mkdir -p "$GATE_DIR"
+export IBL5_USAGE_GATE_STATE_DIR="$GATE_DIR"
+printf '#!/bin/sh\nexit 1\n' > "$SHIM/security"
+chmod +x "$SHIM/security"
 export PATH="$SHIM:$PATH"
 
 # ── The DM + queue stubs ─────────────────────────────────────────────────────
@@ -172,6 +181,17 @@ if [ -n "${STUB_PLANFILE2:-}" ]; then
     sleep 1
     cat "$STUB_PLANFILE2_SRC" > "$STUB_PLANFILE2"
 fi
+if [ -n "${STUB_MARKER:-}" ]; then
+    sid=""; prev=""
+    for a in "$@"; do [ "$prev" = "--session-id" ] && sid="$a"; prev="$a"; done
+    . "$STUB_GATE_LIB"
+    usage_marker_write "$sid" plan-now "$STUB_RESUME_BIN" usage-pause drain 94 five_hour ""
+fi
+if [ -n "${STUB_HOLDER_OUT:-}" ]; then
+    read -r _hs _hp _ha < "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d/holder"
+    if kill -0 "$_hp" 2>/dev/null; then _alive=yes; else _alive=no; fi
+    printf '%s %s %s\n' "$_hs" "$_hp" "$_alive" > "$STUB_HOLDER_OUT"
+fi
 printf 'Done — the plan is written and check-plan is clean.\n'
 [ -n "${STUB_TAIL:-}" ] && printf '%s\n' "$STUB_TAIL"
 # $STUB_RC emulates the crashed/timed-out run — rc 124 is the runner's timeout kill.
@@ -197,6 +217,8 @@ run_case() {
         STUB_PLAN_SRC="${STUB_PLAN_SRC:-}" STUB_RC="${STUB_RC:-0}" \
         STUB_PLANFILE="${STUB_PLANFILE:-}" STUB_PLANFILE_SRC="${STUB_PLANFILE_SRC:-}" \
         QUEUE_FAIL="${QUEUE_FAIL:-}" QUEUE_ALREADY="${QUEUE_ALREADY:-}" DM_FAIL="${DM_FAIL:-}" \
+        STUB_MARKER="${STUB_MARKER:-}" STUB_GATE_LIB="$REPO_ROOT_GATE/lib/usage-gate.sh" \
+        STUB_RESUME_BIN="$PLAN_NOW" \
         bash "$runner" 2>&1
     rm -f "$runner"
 }
@@ -1352,7 +1374,7 @@ want    "R-5 no runner message" "$RES_OUT" "no runner at"
 resume_fixture oklog
 run_resume --resume "$RES_TS"
 [ "$RES_RC" = 2 ] && ok "R-6 oklog rc 2" || fail "R-6 oklog rc 2 (got $RES_RC)"
-want    "R-6 oklog: only failed is resumable" "$RES_OUT" "only a failed run is resumable"
+want    "R-6 oklog: only failed is resumable" "$RES_OUT" "only a failed or paused run is resumable"
 
 resume_fixture noverdict
 run_resume --resume "$RES_TS"
@@ -1520,6 +1542,84 @@ R14_OUT2=$(STUB_PLAN="$P" STUB_TAIL="PLAN_FILE: $P" \
 want    "R-14 failing plan: RESULT degraded"   "$R14_OUT2" "RESULT degraded"
 want    "R-14 failing plan: NOT queued"        "$R14_OUT2" "NOT queued"
 preflight_cleanup "$RES_OUT"
+
+echo "── usage gate: a paused or limit-hit run is 'paused', never 'failed' ──"
+
+gate_reset() { rm -rf "$GATE_DIR"; mkdir -p "$GATE_DIR/markers"; }
+gate_markers() { find "$GATE_DIR/markers" -name '*.json' 2>/dev/null | wc -l | tr -d ' '; }
+
+# G-1 the hook wrote a marker and the run exited 0: paused, no finish DM, nothing queued.
+gate_reset
+out=$(DISP=--queue STUB_MARKER=1 STUB_PLAN="$P" STUB_TAIL="PLAN_FILE: $P" run_case "$P" "PLAN_FILE: $P")
+want    "G-1 marker → RESULT paused"        "$out" "RESULT paused"
+want_no "G-1 marker → not failed"           "$out" "RESULT failed"
+want_no "G-1 marker → not queued"           "$out" "queued for automouse"
+[ ! -s "$DM_LOG" ] && ok "G-1 marker → no finish DM" || fail "G-1 marker → no finish DM (got: $(dm))"
+[ "$(gate_markers)" = 1 ] && ok "G-1 marker survives for the coordinator" || fail "G-1 marker survives for the coordinator"
+
+# G-2 a weekly-limit message on a failing exit: paused, with a limit-hit marker.
+gate_reset
+out=$(DISP=--queue STUB_RC=1 run_case "$P" "You've hit your weekly limit")
+want    "G-2 limit hit → RESULT paused"     "$out" "RESULT paused"
+want_no "G-2 limit hit → not failed"        "$out" "RESULT failed"
+[ ! -s "$DM_LOG" ] && ok "G-2 limit hit → no finish DM" || fail "G-2 limit hit → no finish DM (got: $(dm))"
+want    "G-2 marker reason=limit-hit"       "$(cat "$GATE_DIR"/markers/*.json 2>/dev/null)" '"reason": "limit-hit"'
+
+# G-3 an auth error is an environment failure: still RESULT failed, DM still fires.
+gate_reset
+out=$(DISP=--queue STUB_RC=1 run_case "$P" "API Error: 401")
+want    "G-3 401 → RESULT failed"           "$out" "RESULT failed"
+want_no "G-3 401 → not paused"              "$out" "RESULT paused"
+want    "G-3 401 → the DM fires"            "$(dm)" "RESULT failed"
+[ "$(gate_markers)" = 0 ] && ok "G-3 401 writes no marker" || fail "G-3 401 writes no marker"
+
+# G-4 --resume against a paused log passes pre-flight and clears the marker.
+gate_reset
+resume_fixture
+printf 'plan-now: RESULT paused — usage gate; auto-resumes after reset.\n' > "/tmp/plan-now-$RES_TS.log"
+( . "$REPO_ROOT_GATE/lib/usage-gate.sh"; usage_marker_write "$RES_UUID" plan-now "$PLAN_NOW" usage-pause drain 94 five_hour "" )
+[ "$(gate_markers)" = 1 ] && ok "G-4 fixture marker written" || fail "G-4 fixture marker written"
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 0 ] && ok "G-4 paused log resumes (rc 0)" || fail "G-4 paused log resumes (got $RES_RC: $RES_OUT)"
+[ "$(gate_markers)" = 0 ] && ok "G-4 resume clears the marker" || fail "G-4 resume clears the marker"
+# The fixture session has no transcript, so it paused before its first turn: start fresh.
+want    "G-4 no transcript → RESUME_FRESH=1" "$(cat "$RES_RUNNER" 2>/dev/null)" "RESUME_FRESH=1"
+preflight_cleanup "$RES_OUT"
+
+# G-5 --resume-paused takes exactly one session id.
+gate_reset
+run_resume --resume-paused
+[ "$RES_RC" = 2 ] && ok "G-5 no id: rc 2" || fail "G-5 no id: rc 2 (got $RES_RC)"
+want    "G-5 no id: names the rule"         "$RES_OUT" "--resume-paused takes exactly one session id"
+run_resume --resume-paused a b
+[ "$RES_RC" = 2 ] && ok "G-5 two ids: rc 2" || fail "G-5 two ids: rc 2 (got $RES_RC)"
+run_resume --queue --resume-paused "$RES_UUID"
+[ "$RES_RC" = 2 ] && ok "G-5 not first: rc 2" || fail "G-5 not first: rc 2 (got $RES_RC)"
+want    "G-5 not first: names the rule"     "$RES_OUT" "--resume-paused must be the only argument"
+
+# G-6 a coordinator-granted token names the launcher's (now dead) pid. The runner must
+# re-record its own pid before the model call, or usage_token_reclaim_dead drops it.
+gate_reset
+rm -f "$PLANS"/*.md
+dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+          PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+          "$PLAN_NOW" --queue --no-dm "$PROMPT" 2>&1)
+g6_runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
+g6_sid=$(sed -n "s/^SESSION_ID=//p" "$g6_runner" | tr -d "'")
+sh -c 'exit 0' & g6_dead=$!; wait "$g6_dead" 2>/dev/null
+( . "$REPO_ROOT_GATE/lib/usage-gate.sh"; usage_token_acquire "$g6_sid" "$g6_dead" )
+g6_out="$TMP/g6-holder"
+rm -f "$g6_out"
+STUB_PLAN="$P" STUB_TAIL="PLAN_FILE: $P" STUB_HOLDER_OUT="$g6_out" \
+    STUB_GATE_LIB="$REPO_ROOT_GATE/lib/usage-gate.sh" STUB_RESUME_BIN="$PLAN_NOW" \
+    bash "$g6_runner" >/dev/null 2>&1
+rm -f "$g6_runner"
+read -r g6_hs g6_hp g6_alive < "$g6_out" 2>/dev/null || true
+[ "$g6_hs" = "$g6_sid" ] && ok "G-6 token still names the session" || fail "G-6 token still names the session (got '$g6_hs', want '$g6_sid')"
+[ -n "$g6_hp" ] && [ "$g6_hp" != "$g6_dead" ] && [ "$g6_alive" = yes ] \
+    && ok "G-6 runner re-recorded a live holder pid" \
+    || fail "G-6 runner re-recorded a live holder pid (got pid '$g6_hp' alive=$g6_alive, dead launcher pid $g6_dead)"
+[ ! -d "$GATE_DIR/drain-token.d" ] && ok "G-6 runner releases the token at exit" || fail "G-6 runner releases the token at exit"
 
 echo
 if [ "$FAILS" -eq 0 ]; then

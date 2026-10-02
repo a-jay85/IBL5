@@ -219,6 +219,221 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
         self::assertStringContainsString('drop-column', $sinceResult['output']);
     }
 
+    public function testChangeRenameExitsOne(): void
+    {
+        $this->writeMigration('114_change_rename.sql', "ALTER TABLE foo CHANGE COLUMN a b INT;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('rename-column', $result['output']);
+    }
+
+    public function testKeywordsInsideStringLiteralsNotFlagged(): void
+    {
+        $this->writeMigration(
+            '114_string_literals.sql',
+            "UPDATE foo SET note = 'change player names' WHERE id = 1;\n"
+            . "UPDATE foo SET note = 'rename to new, modify x NOT NULL' WHERE id = 2;\n"
+            . "UPDATE foo SET note = 'we drop index idx_a later' WHERE id = 3;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testMultiLineAlterClausesAreFlagged(): void
+    {
+        $this->writeMigration(
+            '114_multi_line.sql',
+            "ALTER TABLE foo\n    CHANGE COLUMN `a` `b` INT,\n    DROP INDEX idx_a;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('rename-column', $result['output']);
+        self::assertStringContainsString('drop-index', $result['output']);
+    }
+
+    public function testChangeSameNameIsNotRenameColumn(): void
+    {
+        $this->writeMigration('115_change_same.sql', "ALTER TABLE foo CHANGE `a` `A` VARCHAR(100) DEFAULT NULL;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringNotContainsString('rename-column', $result['output']);
+    }
+
+    public function testModifyNotNullNoDefaultExitsOne(): void
+    {
+        $this->writeMigration('116_modify_nn.sql', "ALTER TABLE foo MODIFY COLUMN bar INT NOT NULL;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('tighten-not-null', $result['output']);
+        self::assertStringContainsString('bypass marker', $result['output']);
+    }
+
+    public function testChangeSameNameNotNullNoDefaultExitsOne(): void
+    {
+        $this->writeMigration('117_change_nn.sql', "ALTER TABLE foo CHANGE bar bar INT NOT NULL;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('tighten-not-null', $result['output']);
+        self::assertStringNotContainsString('rename-column', $result['output']);
+    }
+
+    public function testModifyNotNullWithDefaultExitsZero(): void
+    {
+        $this->writeMigration('118_modify_nn_default.sql', "ALTER TABLE foo MODIFY bar INT NOT NULL DEFAULT 0;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testModifyWithoutNotNullExitsZero(): void
+    {
+        $this->writeMigration('119_modify_null.sql', "ALTER TABLE foo MODIFY bar VARCHAR(100) NULL;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testDropIndexExitsOne(): void
+    {
+        $this->writeMigration('120_drop_index.sql', "ALTER TABLE foo DROP INDEX idx_bar;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('drop-index', $result['output']);
+    }
+
+    public function testDropKeyStandaloneExitsOne(): void
+    {
+        $this->writeMigration('121_drop_key.sql', "DROP INDEX `idx_bar` ON foo;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('drop-index', $result['output']);
+    }
+
+    public function testDropIndexWithReaddSameNameSuppressed(): void
+    {
+        $this->writeMigration('122_reindex.sql', "ALTER TABLE foo DROP INDEX idx_bar;\nALTER TABLE foo ADD UNIQUE INDEX idx_bar (bar);\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testDropIndexWithCreateIndexSameNameSuppressed(): void
+    {
+        $this->writeMigration('123_reindex_create.sql', "DROP INDEX idx_bar ON foo;\nCREATE UNIQUE INDEX idx_bar ON foo (bar, baz);\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testDropIndexWithDifferentNameAddStillExitsOne(): void
+    {
+        $this->writeMigration('124_reindex_other.sql', "ALTER TABLE foo DROP INDEX idx_bar;\nALTER TABLE foo ADD INDEX idx_other (bar);\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('drop-index', $result['output']);
+    }
+
+    public function testDropPrimaryAndForeignKeyNotFlagged(): void
+    {
+        $this->writeMigration('125_drop_pk_fk.sql', "ALTER TABLE foo DROP PRIMARY KEY;\nALTER TABLE foo DROP FOREIGN KEY fk_bar;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testRenameTableExitsOne(): void
+    {
+        $this->writeMigration('126_rename_table.sql', "RENAME TABLE foo TO bar;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('rename-table', $result['output']);
+    }
+
+    public function testAlterTableRenameToExitsOne(): void
+    {
+        $this->writeMigration('127_alter_rename_to.sql', "ALTER TABLE foo RENAME TO bar;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('rename-table', $result['output']);
+    }
+
+    public function testRenameColumnNotReportedAsRenameTable(): void
+    {
+        $this->writeMigration('128_rename_col_only.sql', "ALTER TABLE foo RENAME COLUMN a TO b;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('rename-column', $result['output']);
+        self::assertStringNotContainsString('rename-table', $result['output']);
+    }
+
+    public function testRenameIndexNotReportedAsRenameTable(): void
+    {
+        $this->writeMigration('129_rename_index.sql', "ALTER TABLE foo RENAME INDEX a TO b;\nALTER TABLE foo RENAME KEY c TO d;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringNotContainsString('rename-table', $result['output']);
+    }
+
+    public function testInlineBypassCoversNewPatterns(): void
+    {
+        $this->writeMigration('130_bypass_new.sql', "-- destructive-migration: type change only, column was already NOT NULL\nALTER TABLE foo MODIFY bar INT NOT NULL;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('PASS (bypass)', $result['output']);
+    }
+
     public function testHelpFlagExitsZero(): void
     {
         $output = [];

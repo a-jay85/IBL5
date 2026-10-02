@@ -2350,6 +2350,34 @@ assert_viol "gateY-all-tagged-fires" 1 '[Y]' "$FM$YHDR"'
 '
 
 # ---------------------------------------------------------------------------
+# Gate [ND] fixtures (4 cases)
+# ---------------------------------------------------------------------------
+# Marker with a 15+ character reason inside a phase body: the honored shape.
+assert_viol "gateND-valid-marker-passes" 0 '[ND]' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Queue the parked plan
+
+**No diff:** queues the parked plan after merge
+'
+# Reason under 15 characters: the harness ignores it, so the gate fires.
+assert_viol "gateND-short-reason-fails" 1 '[ND]' "$FM"'
+## Phase 1: Queue the parked plan
+
+**No diff:** later
+'
+# Marker under a non-phase heading: the harness never reads it.
+assert_viol "gateND-outside-phase-fails" 1 '[ND]' "$FM"'
+## Context
+
+**No diff:** queues the parked plan after merge
+'
+# A code-span mention does not start the line, so it is not a marker.
+assert_viol "gateND-code-span-mention-passes" 0 '[ND]' "$FM_OPUS$CF_MATRIX"'
+## Context
+
+A phase can carry `**No diff:** x` to opt out of the omission check.
+'
+
+# ---------------------------------------------------------------------------
 # Gate [G] fixtures (4 cases)
 # ---------------------------------------------------------------------------
 # Unwired bin/test-* script in the location cell — must flag [G].

@@ -510,10 +510,10 @@ else
     FAILED=1
 fi
 
-# e8: discord-dm invoked via SELF_DIR, never hard-coded
+# e8: discord-dm invoked via SELF_DIR, never hard-coded (postplan-hold DM + login preflight)
 e8_self=$(grep -cF '"$SELF_DIR/../discord-dm"' "$RUNNER" || true)
 e8_hard=$(grep -cF 'bin/discord-dm' "$RUNNER" || true)
-if [ "$e8_self" -eq 1 ] && [ "$e8_hard" -eq 0 ]; then
+if [ "$e8_self" -eq 2 ] && [ "$e8_hard" -eq 0 ]; then
     echo "ok: e8-discord-dm-path-relative"
 else
     echo "FAIL: e8-discord-dm-path-relative — self_dir_count=$e8_self hard_count=$e8_hard"

@@ -733,11 +733,15 @@ seam_case_ack_outcomes() {
     reset_drain_state
     printf '# ok\n' > "$PLANS/ack-forced.md"
     set_get '{"decisions":[{"id":"ao6","slug":"ack-forced","action":"queue","actor":"u","ts":"t"}]}'
-    # First pass: ack POST returns 400 (bot refuses), burns one attempt
+    # Passes 1..MAX_ATTEMPTS: the ack POST returns 400 (bot refuses), each burns
+    # one attempt; the third drives the real ladder to FORCED.
     set_ack '{"error":"nope"}' 400 0
     run_drain --drain
-    # Pre-seed the ledger to FORCED state directly to simulate MAX_ATTEMPTS exhausted
-    printf 'ao6\tFORCED\n' > "$STATE"
+    want "ack outcomes: ladder pass 1 burns one attempt" "$(cat "$STATE" 2>/dev/null)" "ao6	1"
+    run_drain --drain
+    want "ack outcomes: ladder pass 2 burns a second attempt" "$(cat "$STATE" 2>/dev/null)" "ao6	2"
+    run_drain --drain
+    want "ack outcomes: ladder pass 3 reaches FORCED" "$(cat "$STATE" 2>/dev/null)" "ao6	FORCED"
     # Second pass: the record is still listed (bot still has it), drain sees FORCED → marks rejected
     set_ack '{"acked":1}' 200 0
     run_drain --drain

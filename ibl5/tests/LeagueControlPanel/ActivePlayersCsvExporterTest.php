@@ -63,6 +63,30 @@ class ActivePlayersCsvExporterTest extends TestCase
         $this->assertSame("\"Aaron Nesmith\"\n\"Zion Williamson\"\n", file_get_contents($path));
     }
 
+    public function testExportDeletesOldMatchingFilesButKeepsRecentAndNonMatching(): void
+    {
+        mkdir($this->exportDir, 0700, true);
+        $now = new \DateTimeImmutable('2026-09-17 20:16:09');
+        $old = $this->exportDir . '/iblhoops_ibl5_2026-09-17_10-00-00.csv';
+        $recent = $this->exportDir . '/iblhoops_ibl5_2026-09-17_20-00-00.csv';
+        $other = $this->exportDir . '/notes.csv';
+        foreach ([$old, $recent, $other] as $file) {
+            file_put_contents($file, 'x');
+        }
+        touch($old, $now->getTimestamp() - 7200);
+        touch($recent, $now->getTimestamp() - 600);
+        touch($other, $now->getTimestamp() - 7200);
+
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getActivePlayerNames')->willReturn(['Aaron Nesmith']);
+        $filename = (new ActivePlayersCsvExporter($stub, $this->exportDir))->export($now);
+
+        $this->assertFileDoesNotExist($old);
+        $this->assertFileExists($recent);
+        $this->assertFileExists($other);
+        $this->assertFileExists($this->exportDir . '/' . $filename);
+    }
+
     public function testResolvePathReturnsNullForMissingFile(): void
     {
         $exporter = new ActivePlayersCsvExporter(self::createStub(LeagueControlPanelRepositoryInterface::class), $this->exportDir);

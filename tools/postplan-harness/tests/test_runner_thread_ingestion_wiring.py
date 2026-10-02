@@ -6,7 +6,9 @@ runner._run_thread_ingestion_phase directly with a fake run_thread_ingestion,
 a RecordingGh, a ReplayGit, and a RunResult.
 """
 import os
+import re
 import sys
+import types
 
 import pytest
 
@@ -203,10 +205,64 @@ def test_phase45_passes_snapshot_and_injected_commit_push(tmp_path, monkeypatch)
     assert callable(captured["push"]), "push argument must be callable"
 
     # Verify the summary log line
-    expected_log = "phase4.5: 2 trusted thread(s) found, 1 fixed, 1 declined, 0 skipped (error)"
-    assert any(line == expected_log for line in log.lines), (
-        f"Expected summary log line {expected_log!r}, got: {log.lines}"
+    expected_re = (r"phase4\.5: 2 trusted thread\(s\) found, 1 fixed, 1 declined, "
+                   r"0 skipped \(error\) in \d+\.\d{2}s")
+    assert any(re.fullmatch(expected_re, line) for line in log.lines), (
+        f"Expected summary log line {expected_re!r}, got: {log.lines}"
     )
+
+
+def _patch_clock(monkeypatch):
+    """Patch only runner's module-global `time`: 100.0 on first call, 101.25 after."""
+    calls = [0]
+
+    def fake():
+        calls[0] += 1
+        return 100.0 if calls[0] == 1 else 101.25
+
+    monkeypatch.setattr(runner, "time", types.SimpleNamespace(monotonic=fake))
+
+
+def test_phase45_summary_line_carries_elapsed_seconds(tmp_path, monkeypatch):
+    """Mutation caught: dropping the suffix, timing after the call, or :.0f formatting."""
+    _patch_clock(monkeypatch)
+    monkeypatch.setattr(
+        runner, "run_thread_ingestion",
+        lambda *a, **k: {"found": 1, "fixed": 1, "declined": 0, "skipped": 0, "last_sha": None})
+    log = _log()
+
+    runner._run_thread_ingestion_phase(
+        _gh(tmp_path), None, _git(), str(tmp_path), None, set(), str(tmp_path), log, _res())
+
+    assert ("phase4.5: 1 trusted thread(s) found, 1 fixed, 0 declined, 0 skipped (error) in 1.25s"
+            in log.lines)
+
+
+def test_phase45_failure_summary_line_still_carries_elapsed(tmp_path, monkeypatch):
+    """Mutation caught: starting the timer inside try, or logging the suffix only on success."""
+    _patch_clock(monkeypatch)
+
+    def _boom(*a, **k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(runner, "run_thread_ingestion", _boom)
+    log = _log()
+
+    runner._run_thread_ingestion_phase(
+        _gh(tmp_path), None, _git(), str(tmp_path), None, set(), str(tmp_path), log, _res())
+
+    assert any(line.startswith("phase4.5: thread ingestion failed") for line in log.lines)
+    assert ("phase4.5: 0 trusted thread(s) found, 0 fixed, 0 declined, 0 skipped (error) in 1.25s"
+            in log.lines)
+
+
+def test_snapshot_log_line_carries_elapsed_seconds():
+    """Mutation caught: dropping the snapshot suffix, or taking t_snap after the GraphQL call."""
+    src = _src()
+    assert src.index("t_snap = time.monotonic()") < src.index("pre_posting_ids = gh.pr_thread_ids(pr)")
+    assert re.search(
+        r'pre-existing thread\(s\) "\s*f"in \{time\.monotonic\(\) - t_snap:\.2f\}s"', src
+    ) is not None
 
 
 def test_run_result_carries_thread_ingestion():

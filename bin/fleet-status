@@ -171,7 +171,8 @@ fi
 # the short name a human reads ("live-plan.md") while the click target is the
 # absolute path, which a bare printed path cannot do.
 #
-# THREE FAIL-SOFT GATES, each returning plain text rather than a broken link:
+# THREE FAIL-SOFT GATES, each returning plain text rather than a broken link.
+# They live in link_ok, so callers can ask whether a link would be emitted:
 #   not a TTY   escapes would corrupt a pipe, a capture or a grep.
 #   relative    the URI has no notion of cwd, so a relative path yields a link
 #               that silently opens the wrong thing — worse than no link.
@@ -179,11 +180,17 @@ fi
 # Spaces are percent-encoded because a raw space ends the URI; no other encoding
 # is done deliberately — these paths are /tmp and $HOME names, and a general URL
 # encoder is bulk this reporting tool has no use for.
+# link_ok PATH — return 0 when link_file would emit an OSC 8 link for PATH, 1
+# when it would print plain text. Checks the three gates described above.
+link_ok() {
+    [ "$LINKS" -ne 0 ] || return 1
+    case "${1:-}" in /*) return 0 ;; *) return 1 ;; esac
+}
+
 link_file() {
     local path="${1:-}" text="${2:-}" enc
     [ -z "$text" ] && text="$path"
-    if [ "$LINKS" -eq 0 ] || [ -z "$path" ]; then printf '%s' "$text"; return; fi
-    case "$path" in /*) ;; *) printf '%s' "$text"; return ;; esac
+    if ! link_ok "$path"; then printf '%s' "$text"; return; fi
     enc="$(printf '%s' "$path" | sed 's/ /%20/g')"
     # shellcheck disable=SC1003  # '\033\\' is ESC + a literal backslash: the ST
     # that terminates an OSC sequence. Not an escaped quote.
@@ -194,11 +201,10 @@ link_file() {
 # else `  log` linked to the log, else nothing. In a terminal the word IS the
 # reference — the path lives only in the link, which is the whole compaction win.
 #
-# But link_file fails soft to bare text on a pipe, a capture or a relative path,
-# and a lone `audit` then names no file at all. A captured run is how an agent
-# reads this page, so that case falls back to the pre-compaction `audit: <path>`
-# form. Detected by comparing link_file's output to the word it was handed,
-# which covers all three of its gates rather than re-testing one of them here.
+# But a pipe, a capture or a relative path gets no link, and a lone `audit` then
+# names no file at all. A captured run is how an agent reads this page, so that
+# case falls back to the pre-compaction `audit: <path>` form. link_ok decides
+# which form; the output of link_file is never inspected.
 log_word() {
     local path label rendered
     if [ -n "${1:-}" ]; then
@@ -208,8 +214,7 @@ log_word() {
     else
         return 0
     fi
-    rendered="$(link_file "$path" "$label")"
-    [ "$rendered" = "$label" ] && rendered="$label: $path"
+    if link_ok "$path"; then rendered="$(link_file "$path" "$label")"; else rendered="$label: $path"; fi
     printf '  %s%s%s' "$DIM" "$rendered" "$R"
 }
 
@@ -250,7 +255,7 @@ reorder_link() {
         rm -rf "$tmp"
         "$OSACOMPILE_BIN" -o "$tmp" -e "do shell script \"$cmd\"" >/dev/null 2>&1 \
             || { rm -rf "$tmp"; return 0; }
-        rm -rf "$app" && mv "$tmp" "$app" || return 0
+        { rm -rf "$app" && mv "$tmp" "$app"; } || { rm -rf "$tmp"; return 0; }
         printf '%s' "$cmd" > "$stamp"
     fi
     # Trailing slash: an .app is a directory, and file:// directory URIs end in one.

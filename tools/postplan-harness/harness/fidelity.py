@@ -776,6 +776,9 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[in
     the verdict opens with the reviewer's process narration, so a fixed-length cut of it
     was always off-topic and ended mid-sentence. The full verdict is the PR's sticky
     comment, one click from the link.
+
+    Notes carry no severity, so they file in the order the reviewer listed them. Past the
+    per-PR cap of 3 they fold into one roll-up issue (`harness/followcap.py`).
     """
     log = log or _noop_log
     if not notes:
@@ -796,13 +799,13 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[in
             continue
         body = f"{pr_link}\n\n{detail}"
         try:
-            n = gh.issue_create(title, body, "maintenance")
+            n = gh.followup_create(title, body, "maintenance")
             if n is not None:
                 nums.append(n)
                 seen.add(key)
                 log(f"phase5.5 notes: filed issue #{n} '{title[:50]}'")
         except (HarnessError, OSError) as exc:
-            log(f"phase5.5 notes: issue_create failed ({exc})")
+            log(f"phase5.5 notes: followup_create failed ({exc})")
     return nums
 
 

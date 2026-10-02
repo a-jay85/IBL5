@@ -453,7 +453,7 @@ def test_file_note_issues_dedupes_by_normalized_title(tmp_path):
     ]
     nums = fidelity.file_note_issues(gh, notes, 99)
     assert len(nums) == 1
-    acts = [a for a in gh.actions() if a["action"] == "issue_create"]
+    acts = [a for a in gh.actions() if a["action"] == "followup_create"]
     assert len(acts) == 1
 
 
@@ -463,9 +463,9 @@ def test_file_note_issues_body_is_link_plus_detail_only(tmp_path):
     bodies = []
 
     class _Gh(RecordingGh):
-        def issue_create(self, title, body, label):
+        def followup_create(self, title, body, label):
             bodies.append(body)
-            return super().issue_create(title, body, label)
+            return super().followup_create(title, body, label)
 
     gh = _Gh(str(tmp_path))
     detail = "harness/x.py asserts on the echo. Stub the DM and assert on its argument."
@@ -484,7 +484,7 @@ def test_file_note_issues_skips_existing_titles(tmp_path):
     notes = [{"title": "Add index on email", "detail": "Needs an index."}]
     nums = fidelity.file_note_issues(gh, notes, 99)
     assert nums == []
-    assert not [a for a in gh.actions() if a["action"] == "issue_create"]
+    assert not [a for a in gh.actions() if a["action"] == "followup_create"]
 
 
 # --- _run_fidelity loop helpers -----------------------------------------------
@@ -700,7 +700,7 @@ def test_notes_end_to_end(tmp_path, git_shim):
         assert res.fidelity.get("remediation_sha") is None
         nums = res.fidelity.get("backlog_issue_numbers") or []
         assert len(nums) == 2
-        creates = [a for a in gh.actions() if a["action"] == "issue_create"]
+        creates = [a for a in gh.actions() if a["action"] == "followup_create"]
         assert len(creates) == 2
         sticky = fidelity.compose_sticky(
             "", "", res.fidelity, None, [], "", fidelity.terminal_line(
@@ -740,7 +740,7 @@ def test_notes_from_re_review_round_are_filed(tmp_path, git_shim):
         assert res.fidelity["verdict_1"] == "NOT READY"
         assert res.fidelity["rounds_completed"] == 1
         assert len(res.fidelity["backlog_issue_numbers"]) == 1
-        creates = [a for a in gh.actions() if a["action"] == "issue_create"]
+        creates = [a for a in gh.actions() if a["action"] == "followup_create"]
         assert len(creates) == 1
     finally:
         _cleanup(9950, "9950-2")
@@ -769,7 +769,7 @@ def test_notes_dedupe_run_twice(tmp_path, git_shim):
         )
         nums = res.fidelity.get("backlog_issue_numbers") or []
         assert nums == []
-        creates = [a for a in gh.actions() if a["action"] == "issue_create"]
+        creates = [a for a in gh.actions() if a["action"] == "followup_create"]
         assert creates == []
     finally:
         _cleanup(996)
@@ -782,7 +782,7 @@ def test_notes_dedupe_run_twice(tmp_path, git_shim):
     gh2 = RecordingGh(str(tmp_path))
     nums2 = fidelity.file_note_issues(gh2, notes_case, 9960)
     assert len(nums2) == 1
-    creates2 = [a for a in gh2.actions() if a["action"] == "issue_create"]
+    creates2 = [a for a in gh2.actions() if a["action"] == "followup_create"]
     assert len(creates2) == 1
 
 
@@ -830,17 +830,17 @@ def test_verdict_path_threading(tmp_path, git_shim):
 
 
 def test_file_note_issues_continues_after_failed_create(tmp_path):
-    """A failed issue_create does not abort remaining notes."""
+    """A failed followup_create does not abort remaining notes."""
     from harness.state import HarnessError as _HE
 
     calls = [0]
 
     class _FailFirst(RecordingGh):
-        def issue_create(self, title, body, label):
+        def followup_create(self, title, body, label):
             calls[0] += 1
             if calls[0] == 1:
                 raise _HE("gh", "first failed")
-            return super().issue_create(title, body, label)
+            return super().followup_create(title, body, label)
 
     gh = _FailFirst(str(tmp_path))
     notes = [

@@ -94,17 +94,17 @@ class _TitlesGh(RecordingGh):
             raise self.read_error
         return self.seeded + self.created
 
-    def issue_create(self, title, body, label):
+    def followup_create(self, title, body, label):
         self.create_calls += 1
         if self.create_calls in self.fail_create_at:
             raise HarnessError("gh", "boom")
         self.bodies = getattr(self, "bodies", []) + [body]
         self.created.append(title)
-        return super().issue_create(title, body, label)
+        return super().followup_create(title, body, label)
 
 
 def _creates(gh):
-    return [a for a in gh.actions() if a.get("action") == "issue_create"]
+    return [a for a in gh.actions() if a.get("action") == "followup_create"]
 
 
 def _make_hits(n):
@@ -152,19 +152,22 @@ def test_dedup_read_failure_files_nothing(tmp_path):
     assert any("dedup read failed" in m for m in logs)
 
 
-def test_issue_create_failure_continues(tmp_path):
+def test_followup_create_failure_continues(tmp_path):
     gh = _TitlesGh(tmp_path, fail_create_at={1})
     nums = file_deferral_issues(gh, _hits(), SLUG, 77)
     assert len(nums) == 1
     assert len(_creates(gh)) == 1
 
 
-def test_hit_cap_limits_filing(tmp_path):
+def test_every_hit_files_none_dropped(tmp_path):
     gh = _TitlesGh(tmp_path)
     logs: list[str] = []
     nums = file_deferral_issues(gh, _make_hits(7), SLUG, 77, log=logs.append)
-    assert len(nums) == 5
-    assert any("2 hits over cap" in m for m in logs)
+    assert len(nums) == 7
+    assert not any("over cap" in m for m in logs)
+    bodies = "\n".join(a["body"] for a in _creates(gh))
+    for h in _make_hits(7):
+        assert h.key in bodies
 
 
 def test_issue_titles_strict_raises_default_swallows(tmp_path, monkeypatch):
@@ -246,7 +249,7 @@ def test_locate_plan_populates_deferral_hits():
 
 def test_replay_run_files_oos_issue():
     res, actions = _replay(_OOS_PLAN)
-    creates = [a for a in actions if a["action"] == "issue_create"]
+    creates = [a for a in actions if a["action"] == "followup_create"]
     assert len(creates) == 1
     assert creates[0]["label"] == "maintenance"
     assert "[oos-" in creates[0]["title"]
@@ -257,7 +260,7 @@ def test_replay_run_without_out_of_scope_files_nothing(monkeypatch):
     monkeypatch.setattr(RecordingGh, "issue_titles",
                         lambda self, label, *, strict=False: calls.append(label) or [])
     _res, actions = _replay(_NO_OOS_PLAN)
-    assert [a for a in actions if a["action"] == "issue_create"] == []
+    assert [a for a in actions if a["action"] == "followup_create"] == []
     assert calls == []
 
 

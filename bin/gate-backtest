@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/gate-backtest — replay the ship-pipeline gates a branch adds or changes against the last
+# ~30 merged PRs, and print the catch-list block.
+#
+# Run: bin/gate-backtest [--base=<ref>] [--head=<ref>] [--limit=<N>] [--gate=<path>@<rev>] ...
+#   exit 0 = NOT-APPLICABLE or CLEARED, 1 = HELD, 2 = usage error, 3 = UNKNOWN
+#
+# Flags take the `--flag=value` form only. The logic lives in
+# tools/postplan-harness/harness/gate_backtest_replay.py; this wrapper resolves the base ref
+# and puts the harness on PYTHONPATH. It never reads a bare $HOME, so it runs under `env -i`.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+REPO=""
+HAVE_BASE=0
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help)
+            exec python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); \
+from harness.gate_backtest_replay import USAGE; print(USAGE)' "$ROOT/tools/postplan-harness"
+            ;;
+        --repo=*) REPO="${arg#--repo=}" ;;
+        --base=*) HAVE_BASE=1 ;;
+    esac
+done
+REPO="${REPO:-$ROOT}"
+
+EXTRA=()
+if [ "$HAVE_BASE" = 0 ]; then
+    # shellcheck source=lib/branch-base.sh
+    . "$ROOT/bin/lib/branch-base.sh"
+    BRANCH="$(git -C "$REPO" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    BASE=""
+    if [ -n "$BRANCH" ] && [ "$BRANCH" != "HEAD" ]; then
+        BASE="$(branch_base_resolve "$REPO" "$BRANCH" 2>/dev/null || true)"
+    fi
+    case "$BASE" in
+        "") BASE="origin/master" ;;
+        origin/*) ;;
+        *) BASE="origin/$BASE" ;;
+    esac
+    EXTRA=("--base=$BASE")
+fi
+
+export PYTHONPATH="$ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m harness.gate_backtest_replay --repo="$REPO" ${EXTRA[@]+"${EXTRA[@]}"} "$@"

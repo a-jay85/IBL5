@@ -203,7 +203,7 @@ def resolve_spec(path: str, text: str) -> tuple[str, ReplaySpec | None, str]:
 
 # --- Detector --------------------------------------------------------------------------------
 
-def _is_check_script(path: str) -> bool:
+def is_check_script(path: str) -> bool:
     return fnmatch.fnmatchcase(path, "bin/check-*") and "/" not in path[len("bin/"):]
 
 
@@ -225,7 +225,7 @@ def detect_gate_changes(changed, read_candidate, check_sources) -> list[GateChan
 
     for status, path in changed:
         removed = status.startswith("D")
-        if _is_check_script(path):
+        if is_check_script(path):
             if removed:
                 add(GateChange(path, "check-script", "removed", None, "gate deleted"))
             else:

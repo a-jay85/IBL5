@@ -10,13 +10,19 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
+import sys
 import tempfile
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from harness.gate_backtest import (GateChange, HistoricalPR, ReplayResult, classify_exit,
-                                   expand_argv, expand_env)
+from harness.gate_backtest import (GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, GateChange,
+                                   HistoricalPR, ReplayResult, Verdict, classify_exit,
+                                   classify_truth, compute_verdict, detect_gate_changes,
+                                   expand_argv, expand_env, is_check_script,
+                                   render_gate_backtest, resolve_spec)
 
 REPO_SLUG = "a-jay85/IBL5"
 PER_REPLAY_TIMEOUT = 60
@@ -60,7 +66,7 @@ def fetch_history(gh_json, git, limit: int = HISTORY_LIMIT, exclude: int | None 
                    "--limit", str(limit), "--json",
                    "number,title,mergeCommit,mergedAt,headRefName,body"])
     out: list[HistoricalPR] = []
-    for item in raw:
+    for item in raw[:limit]:
         number = int(item["number"])
         if exclude is not None and number == exclude:
             continue
@@ -150,6 +156,8 @@ def resolve_plan(plans_dir: str, head_ref: str) -> tuple[str | None, str]:
     """(path, "") when found; (None, reason) otherwise. The path stays under plans_dir."""
     if not _safe_head_ref(head_ref):
         return None, "bad-head-ref"
+    if not plans_dir:
+        return None, "no-plan"
     root = os.path.realpath(plans_dir)
     for candidate in (os.path.join(plans_dir, head_ref + ".md"),
                       os.path.join(plans_dir, "_archive", head_ref + ".md")):
@@ -243,3 +251,227 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return results
+
+
+# --- Branch-level entry point and CLI --------------------------------------------------------
+
+class GateReadError(Exception):
+    """A forced `--gate=<path>@<rev>` could not be read."""
+
+
+@dataclass
+class BacktestOutcome:
+    verdict: Verdict
+    gates: list
+    results: list | None
+    truth: dict
+    window: int
+    block: str
+
+
+def parse_name_status(text: str) -> list[tuple[str, str]]:
+    """`git diff --name-status` lines to (status letter, path); a rename carries its new path."""
+    out: list[tuple[str, str]] = []
+    for line in text.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2 and parts[0]:
+            out.append((parts[0][0], parts[-1]))
+    return out
+
+
+def _git_bytes(repo: str, argv: list[str]) -> bytes:
+    return subprocess.run(["git", "-C", repo, *argv], capture_output=True, check=True).stdout
+
+
+def _file_mode(repo: str, rev: str, path: str) -> int:
+    try:
+        out = _git_bytes(repo, ["ls-tree", rev, "--", path]).decode()
+        return int(out.split()[0], 8)
+    except (subprocess.CalledProcessError, ValueError, IndexError):
+        return 0o100644
+
+
+def backtest_branch(repo: str, base: str, head: str = "HEAD", *, gh_json=live_gh_json,
+                    fetch: bool = True, plans_dir: str = "", limit: int = HISTORY_LIMIT,
+                    per_replay_timeout: int = PER_REPLAY_TIMEOUT, total_cap: int = TOTAL_CAP,
+                    now: datetime | None = None, exclude_pr: int | None = None,
+                    forced_gate: tuple[str, str] | None = None) -> BacktestOutcome:
+    """Detect the gates a branch changes and replay them against recent merged PRs.
+
+    A branch that touches no gate returns NOT-APPLICABLE after one `git diff`, with no fetch,
+    worktree, or `gh` call. Any failure after a replayable gate is found maps to UNKNOWN.
+    """
+    git = make_git(repo)
+    overlay_files: dict[str, tuple[bytes, int]] = {}
+    if forced_gate is not None:
+        path, rev = forced_gate
+        try:
+            data = _git_bytes(repo, ["show", f"{rev}:{path}"])
+        except subprocess.CalledProcessError:
+            raise GateReadError(f"cannot read {path}@{rev}")
+        state, spec, reason = resolve_spec(path, data.decode("utf-8", "replace"))
+        kind = "check-script" if is_check_script(path) else "lib-gate"
+        gates = [GateChange(path, kind, state, spec, reason)]
+        overlay_files[path] = (data, 0o100755)
+    else:
+        changed = parse_name_status(git(["diff", "--name-status", f"{base}...{head}"]))
+
+        def read_candidate(path: str) -> str | None:
+            try:
+                return _git_bytes(repo, ["show", f"{head}:{path}"]).decode("utf-8", "replace")
+            except subprocess.CalledProcessError:
+                return None
+
+        check_sources: dict[str, str] = {}
+        if any(p.startswith("bin/lib/") for _, p in changed):
+            listing = git(["ls-tree", "-r", "--name-only", head, "--", "bin"]).splitlines()
+            for p in listing:
+                if is_check_script(p):
+                    text = read_candidate(p)
+                    if text is not None:
+                        check_sources[p] = text
+        gates = detect_gate_changes(changed, read_candidate, check_sources)
+        if not gates:
+            return BacktestOutcome(compute_verdict([], [], {}), [], [], {}, 0, "")
+        for status, path in changed:
+            if status != "D" and (path.startswith("bin/lib/") or is_check_script(path)):
+                try:
+                    overlay_files[path] = (_git_bytes(repo, ["show", f"{head}:{path}"]),
+                                           _file_mode(repo, head, path))
+                except subprocess.CalledProcessError:
+                    pass
+
+    results: list[ReplayResult] | None = []
+    truth: dict = {}
+    window = 0
+    if any(g.state == "replayable" for g in gates):
+        try:
+            if fetch:
+                git(["fetch", "--quiet", "origin", "master"])
+            bodies: dict[int, str] = {}
+            history = fetch_history(gh_json, git, limit, exclude_pr, bodies)
+            window = len(history)
+            results = run_backtest(repo, head, gates, history, overlay_files, plans_dir,
+                                   per_replay_timeout=per_replay_timeout, total_cap=total_cap,
+                                   bodies=bodies)
+            truth = classify_truth(history, now or datetime.now(timezone.utc))
+        except Exception:
+            results = None
+            truth = {}
+    verdict = compute_verdict(gates, results, truth)
+    block = render_gate_backtest(verdict, gates, results or [], truth, window)
+    return BacktestOutcome(verdict, gates, results, truth, window, block)
+
+
+_VALUE_FLAGS = ("repo", "base", "head", "limit", "plans-dir", "per-replay-timeout", "total-cap",
+                "fixture-history", "now", "gate")
+EXIT_FOR_STATE = {"NOT-APPLICABLE": 0, "CLEARED": 0, "HELD": 1, "UNKNOWN": 3}
+
+USAGE = """Usage: bin/gate-backtest [--base=<ref>] [--head=<ref>] [--limit=<N>] [--gate=<path>@<rev>]
+                         [--plans-dir=<dir>] [--per-replay-timeout=<s>] [--total-cap=<s>]
+                         [--repo=<dir>] [--fixture-history=<file>] [--now=<ISO-8601>]
+
+Replays the gates this branch adds or changes against the last merged PRs and prints the
+catch-list block. Exit 0 NOT-APPLICABLE or CLEARED, 1 HELD, 2 usage, 3 UNKNOWN."""
+
+
+def _parse_args(argv: list[str]) -> dict[str, str] | str:
+    """Hand-rolled on purpose: argparse would accept the space form. Returns an error string."""
+    opts: dict[str, str] = {}
+    for arg in argv:
+        if arg in ("-h", "--help"):
+            opts["help"] = "1"
+            continue
+        if not arg.startswith("--"):
+            return f"gate-backtest: unknown flag: {arg}"
+        name, eq, value = arg[2:].partition("=")
+        if name not in _VALUE_FLAGS:
+            return f"gate-backtest: unknown flag: {arg}"
+        if not eq:
+            return f"gate-backtest: use --{name}=<value>"
+        opts[name] = value
+    return opts
+
+
+def _int_opt(opts: dict[str, str], name: str, default: int, lo: int, hi: int) -> int | str:
+    if name not in opts:
+        return default
+    try:
+        value = int(opts[name])
+    except ValueError:
+        return f"gate-backtest: --{name} needs an integer"
+    if not lo <= value <= hi:
+        return f"gate-backtest: --{name} must be between {lo} and {hi}"
+    return value
+
+
+def main(argv: list[str]) -> int:
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    opts = _parse_args(argv)
+    if isinstance(opts, str):
+        print(opts, file=sys.stderr)
+        return 2
+    if "help" in opts:
+        print(USAGE)
+        return 0
+    numbers = {}
+    for name, default, lo, hi in (("limit", HISTORY_LIMIT, 1, 100),
+                                  ("per-replay-timeout", PER_REPLAY_TIMEOUT, 1, 3600),
+                                  ("total-cap", TOTAL_CAP, 1, 7200)):
+        value = _int_opt(opts, name, default, lo, hi)
+        if isinstance(value, str):
+            print(value, file=sys.stderr)
+            return 2
+        numbers[name] = value
+    now = None
+    if "now" in opts:
+        try:
+            now = _parse_merged_at(opts["now"])
+        except ValueError:
+            print("gate-backtest: --now needs an ISO-8601 timestamp", file=sys.stderr)
+            return 2
+    forced = None
+    if "gate" in opts:
+        path, at, rev = opts["gate"].rpartition("@")
+        if not at or not path or not rev:
+            print(f"gate-backtest: cannot read {opts['gate']}", file=sys.stderr)
+            return 2
+        forced = (path, rev)
+    home = os.environ.get("HOME", "")
+    plans_dir = opts.get("plans-dir", os.path.join(home, "claude-plans") if home else "")
+    fixture = opts.get("fixture-history")
+    gh_json = live_gh_json
+    if fixture:
+        try:
+            with open(fixture, encoding="utf-8") as fh:
+                fixture_data = json.load(fh)
+        except (OSError, ValueError) as exc:
+            print(f"gate-backtest: cannot read fixture history: {exc}", file=sys.stderr)
+            return 2
+        gh_json = lambda _argv: fixture_data  # noqa: E731
+    repo = opts.get("repo") or os.getcwd()
+    try:
+        outcome = backtest_branch(
+            repo, opts.get("base", "origin/master"), opts.get("head", "HEAD"), gh_json=gh_json,
+            fetch=not fixture, plans_dir=plans_dir, limit=numbers["limit"],
+            per_replay_timeout=numbers["per-replay-timeout"], total_cap=numbers["total-cap"],
+            now=now, forced_gate=forced)
+    except GateReadError as exc:
+        print(f"gate-backtest: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:
+        reason = f"backtest crashed: {type(exc).__name__}"
+        print(f"{GATE_BACKTEST_BEGIN}\n<!-- gate-backtest-state: UNKNOWN -->\n### Gate backtest\n\n"
+              f"**State:** UNKNOWN. {reason}\n{GATE_BACKTEST_END}")
+        print(f"gate-backtest: UNKNOWN: {reason}", file=sys.stderr)
+        return 3
+    if not outcome.gates:
+        print("gate-backtest: NOT-APPLICABLE (no gate files changed)", file=sys.stderr)
+        return 0
+    print(outcome.block)
+    print(f"gate-backtest: {outcome.verdict.state}: {outcome.verdict.reason}", file=sys.stderr)
+    return EXIT_FOR_STATE[outcome.verdict.state]
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

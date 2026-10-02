@@ -244,8 +244,6 @@ def append_cli_passes(pr: int, cli_rows: list[dict]) -> Optional[str]:
                 if r["verdict"] == "PASS":
                     f.write(f"ROW {r['id']} PASS\n")
         return None
-    except FileNotFoundError:
-        return "rows-file-missing"
     except Exception as exc:  # noqa: BLE001
         return f"append-error:{exc}"
 

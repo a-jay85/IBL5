@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-01
+last_verified: 2026-10-02
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -204,3 +204,15 @@ Omit the field entirely when the phase needs nothing beyond the always-on set. A
 ## One-time-check tag shape
 
 The reason is 15 or more characters, free of `(`, `)`, `|` and backticks, so a reviewer can rerun the check by hand. `bin/lib/plan-matrix-assertions` skips a tagged row instead of reporting it unrealised; a malformed tag is ignored fail-closed and the row is checked. `bin/check-plan` gate `[Y]` rejects a bad shape, a tag on a non-`CLI-executable` row, and a matrix with tagged rows above one third of its rows.
+
+## Non-diff phase marker shape
+
+Use the `**No diff:** <reason>` line for a phase whose deliverable is not a change to the tree: closing a backlog issue through the PR body, queueing a parked plan, or a post-merge step.
+
+post-plan's Phase 6.5 condition (3) skips a marked phase and logs `NO-DIFF-PHASE` in the audit log. The marker is read only from a `## Phase N:` / `## Step N:` body, exact case, at line start (an optional `- ` bullet is fine). A fenced example, a code-span mention, or a reason under 15 characters is ignored, and the phase is checked as unmarked. `bin/check-plan` gate `[ND]` rejects those shapes at plan time.
+
+A phase that cites only non-repo tokens (`/proc/...`, `~/...`, `origin/master`, an `owner/repo` slug, a URL route fragment) needs no marker: condition (3) treats it as uncheckable and logs `UNCHECKABLE-PHASE`. Any citation that could name a tracked file or directory, by exact path, suffix, or basename, keeps the phase checkable. So a phase that reads `bin/wt-up` without changing it still needs the marker.
+
+## Context bounds rationale
+
+A sectioned delivery keeps one context across all turns, so what you read on turn 1 is still in front of you on turn 9. Re-Reading the contract re-pays ~7K tokens for text the architect already holds. Opening a `*-detail.md` companion costs ~5K tokens and changes no decision made while writing a plan. Re-reading a `$DRAFT` that grows each turn costs quadratically across the delivery.

@@ -28,6 +28,11 @@ def _is_trusted(login: str, typename: str) -> bool:
 
 def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int]) -> list[dict] | None:
     # None = cap/API failure: caller skips ingestion; condition (11) keeps the hold.
+    if not pre_posting_ids:
+        # Empty or failed snapshot: the snapshot filter below drops every row, so the
+        # second prf_review_threads query is dead work. Mirrors the skill path's
+        # `[ -s "$PRE4D_IDS" ]` skip in _phase-4-review-audit.md section 4.5.
+        return []
     rows = gh.trusted_open_threads(pr)
     if rows is None:
         return None

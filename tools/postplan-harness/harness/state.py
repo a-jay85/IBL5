@@ -26,16 +26,19 @@ class TerminalState(str, Enum):
     FAILED = "failed"                        # typed failure aborted the run
 
 
+OUTPUT_KEEP = 4000   # HarnessError.output keeps this many trailing characters
+
+
 class HarnessError(Exception):
     """Typed failure. `kind` is a stable machine-readable failure class."""
 
-    OUTPUT_KEEP = 4000
+    OUTPUT_KEEP = OUTPUT_KEEP
 
     def __init__(self, kind: str, detail: str, *, cmd: str = "", output: str = ""):
         self.kind = kind
         self.detail = detail
         self.cmd = cmd or ""
-        self.output = (output or "")[-HarnessError.OUTPUT_KEEP:]
+        self.output = (output or "")[-OUTPUT_KEEP:]
         super().__init__(f"{kind}: {detail}")
 
 

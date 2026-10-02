@@ -219,7 +219,9 @@ def sync_to_remote(branch, worktree, *, run_git=None) -> str:
         if reset_r.returncode != 0:
             raise HarnessError("remote-head-diverged",
                                 f"sync failed: reset --hard origin/{branch}: "
-                                + (reset_r.stderr or "").strip()[:200])
+                                + (reset_r.stderr or "").strip()[:200],
+                                cmd=f"git reset --hard origin/{branch}",
+                                output=(reset_r.stderr or ""))
         head_r = _run(["rev-parse", "HEAD"], worktree)
         return head_r.stdout.strip()
     except HarnessError:

@@ -238,6 +238,22 @@ def test_re_review_packet_is_separate_from_the_first(tmp_path, git_shim):
             os.unlink(path2)
 
 
+def test_re_review_packet_tells_reviewer_last_verified_bump_is_not_a_finding(tmp_path, git_shim):
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review-2": "READY\n"})
+    out = tmp_path / "out"
+    out.mkdir()
+    fidelity.re_review(llm, _git(dirty=False), str(out), str(tmp_path), _plan(),
+                       "deadbeef", "body", 85, "sha", _verdict(tmp_path, "NOT READY"))
+    path2 = fidelity.verdict_path("85-2")
+    try:
+        ctx = " ".join(open(os.path.join(str(out), "fidelity-packet-2", "context.md")).read().split())
+        assert "last_verified date bump" in ctx
+        assert "not a new finding" in ctx
+    finally:
+        if os.path.exists(path2):
+            os.unlink(path2)
+
+
 # --- multi-round fixture tests ------------------------------------------------
 
 def test_re_review_round_2_uses_different_purpose(tmp_path, git_shim):

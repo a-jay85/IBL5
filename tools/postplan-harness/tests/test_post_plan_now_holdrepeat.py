@@ -96,6 +96,8 @@ def test_fails_open_when_check_errors(tmp_path):
 
 
 def test_state_dir_empty_env_uses_harness_default(tmp_path):
+    """An empty HOLDREPEAT_STATE_DIR is the same as unset: the function reads $H/out/state."""
+    assert "${HOLDREPEAT_STATE_DIR:-$harness/out/state}" in open(PPN, encoding="utf-8").read()
     root, plan, state, _ = _setup(tmp_path, slug="hr-unique-empty-env-slug-7f3a")
     r = _decline(root, plan, state, "hr-unique-empty-env-slug-7f3a", state_env="")
     assert "rc=1" in r.stdout

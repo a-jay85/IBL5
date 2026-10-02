@@ -201,7 +201,7 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
     {
         $offending = [];
         foreach ($map as $key => $value) {
-            if (!is_string($key) && !($allowListKeys && is_int($key))) {
+            if (is_int($key) && !$allowListKeys) {
                 $offending[] = 'key ' . var_export($key, true);
                 continue;
             }

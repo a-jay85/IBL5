@@ -250,6 +250,16 @@ def test_live_sticky_body_fail_closed(tmp_path):
 # --- Phase 5: integration tests -----------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def _cleanup_verdict_99():
+    """Real-review tests (pr=99) write the verdict file; remove it afterwards."""
+    yield
+    try:
+        os.unlink(fidelity.verdict_path(99))
+    except FileNotFoundError:
+        pass
+
+
 @pytest.fixture
 def git_shim(tmp_path, monkeypatch):
     """Shims git for _run_fidelity tests. Passes `git patch-id` through to the real binary."""

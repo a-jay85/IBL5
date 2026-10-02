@@ -294,6 +294,7 @@ class RunResult:
     scored_findings: list[dict] = field(default_factory=list)
     manual_demotions: list[dict] = field(default_factory=list)
     manual_testing: dict = field(default_factory=dict)  # Phase 6.7 record; popped when empty
+    hold_repeat: dict | None = None  # Phase 6.5 advisory record (action, key, repeat_count, reasons, dm); arming never reads it
     audit: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:

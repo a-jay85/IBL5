@@ -4,7 +4,7 @@
 # bin/gate-backtest — replay the ship-pipeline gates a branch adds or changes against the last
 # ~30 merged PRs, and print the catch-list block.
 #
-# Run: bin/gate-backtest [--base=<ref>] [--head=<ref>] [--limit=<N>] [--gate=<path>@<rev>] ...
+# Usage: bin/gate-backtest [--base=<ref>] [--head=<ref>] [--limit=<N>] [--gate=<path>@<rev>] ...
 #   exit 0 = NOT-APPLICABLE or CLEARED, 1 = HELD, 2 = usage error, 3 = UNKNOWN
 #
 # Flags take the `--flag=value` form only. The logic lives in
@@ -20,8 +20,8 @@ HAVE_BASE=0
 for arg in "$@"; do
     case "$arg" in
         -h|--help)
-            exec python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); \
-from harness.gate_backtest_replay import USAGE; print(USAGE)' "$ROOT/tools/postplan-harness"
+            awk 'NR==1||/shellcheck/{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+            exit 0
             ;;
         --repo=*) REPO="${arg#--repo=}" ;;
         --base=*) HAVE_BASE=1 ;;

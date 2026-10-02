@@ -37,6 +37,9 @@ fi
 
 source "$(dirname "$0")/lib/wt-guards.sh"
 
+# N days ago as YYYY-MM-DD (BSD date first, GNU fallback). Same helper as bin/automouse/run.
+_date_ago() { date -v-"$1"d +%F 2>/dev/null || date -d "$1 days ago" +%F; }
+
 # Resolve to the main repo root, even when run from a worktree.
 # git worktree list always shows the main checkout first.
 REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
@@ -784,8 +787,10 @@ if [ "$ALL" = true ]; then
         # C3: never running (status filter). C4: any compose label skips (covers ibl5).
         # C5: dry-run non-destructive. C6: explicit-ID removal only.
         STALE_CONTAINER_DAYS=30
-        _cutoff=$(date -v-${STALE_CONTAINER_DAYS}d +%s 2>/dev/null \
-            || date -d "${STALE_CONTAINER_DAYS} days ago" +%s)
+        # Compare ISO calendar dates (YYYY-MM-DD) lexically: no epoch parsing.
+        # _cutoff stays fatal under set -e: _date_ago only fails if BOTH date
+        # flavors fail, which means the host has no usable date at all.
+        _cutoff=$(_date_ago "$STALE_CONTAINER_DAYS")
         while IFS= read -r _line; do
             _proj="${_line%%$'\t'*}"
             _rest="${_line#*$'\t'}"
@@ -793,13 +798,12 @@ if [ "$ALL" = true ]; then
             _cname="${_rest#*$'\t'}"
             [ -n "$_proj" ] && continue    # has compose-project label — skip (covers C4)
             [ -z "$_cid" ] && continue
-            _created=$(docker inspect --format '{{.Created}}' "$_cid" 2>/dev/null)
+            # A failed inspect (container vanished) skips this one container, not the run.
+            _created=$(docker inspect --format '{{.Created}}' "$_cid" 2>/dev/null) || continue
             [ -z "$_created" ] && continue
-            # Cross-platform epoch: macOS date -j first, Linux date -d fallback
-            _epoch=$(date -j -f '%Y-%m-%dT%H:%M:%S' "${_created%%.*}" +%s 2>/dev/null \
-                || date -d "$_created" +%s 2>/dev/null)
-            [ -z "$_epoch" ] && continue
-            [ "$_epoch" -gt "$_cutoff" ] && continue    # too recent
+            _created_day="${_created%%T*}"
+            [[ "$_created_day" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || continue
+            [[ "$_created_day" > "$_cutoff" ]] && continue    # too recent
             if [ "$DRY_RUN" = true ]; then
                 echo "  WOULD remove stale unlabeled container: $_cname"
             else

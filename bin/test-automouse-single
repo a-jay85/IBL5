@@ -55,6 +55,23 @@ assert_absent() {
     fi
 }
 
+# check <desc> <command...>: print "ok: <desc>" when the command succeeds, else
+# "FAIL: <desc>" and set FAILED. A leading "!" argument (right after <desc>)
+# inverts the result: the command must fail.
+check() {
+    local desc="$1" want=0
+    shift
+    if [ "${1:-}" = "!" ]; then want=1; shift; fi
+    "$@" >/dev/null 2>&1
+    local rc=$?
+    if { [ "$want" -eq 0 ] && [ "$rc" -eq 0 ]; } || { [ "$want" -eq 1 ] && [ "$rc" -ne 0 ]; }; then
+        echo "ok: $desc"
+    else
+        echo "FAIL: $desc"
+        FAILED=1
+    fi
+}
+
 # --- Stub claude ------------------------------------------------------------
 # First call per plan (no handoff) = impl: writes handoff JSON.
 # Second call (handoff present) = postplan: moves plan to done/, clears handoff.
@@ -163,11 +180,11 @@ grep -qF 'is not a recognized model' "$NDIR/reports/$(date +%Y-%m-%d)-skipped-pl
 # ===========================================================================
 if [ "$PLATFORM" != "Darwin" ]; then
     echo ""
-    echo "SKIP: cases 1, 2, 3, 5 (run loop) need macOS: bin/automouse/run calls caffeinate, BSD mktemp, stat -f and BSD date. macOS coverage for them comes from running bin/test-automouse-single locally on a Mac (there is no macOS CI job). Platform: $PLATFORM."
+    echo "SKIP: cases 1, 2, 3, 5, 7, 8, 9 (run loop) need macOS: bin/automouse/run calls caffeinate, BSD mktemp, stat -f and BSD date. macOS coverage for them comes from running bin/test-automouse-single locally on a Mac (there is no macOS CI job). Platform: $PLATFORM."
     if [ "$FAILED" -ne 0 ]; then
         echo "RESULT: FAILED"
     else
-        echo "RESULT: cases 4 and 6 passed; cases 1, 2, 3, 5 skipped"
+        echo "RESULT: cases 4 and 6 passed; cases 1, 2, 3, 5, 7, 8, 9 skipped"
     fi
     exit "$FAILED"
 fi
@@ -250,6 +267,116 @@ assert_present "case5 plan-dup completed"  "$NDIR/done/plan-dup.md"
 assert_absent  "case5 plan-dup left queue" "$NDIR/queue/plan-dup.md"
 grep -qi "already queued" "$ROOT/run.out" \
     && { echo "FAIL: case5 leaked an 'already queued' error"; FAILED=1; }
+
+# ---------------------------------------------------------------------------
+# Cases 7-9 — repeated-failure stop (ADR: automouse stop on repeated failure).
+# A failing stub claude emits one Bash tool_use + an is_error tool_result whose
+# text comes from line N of $NDIR/stub-errors on call N, and never writes a
+# handoff, so every attempt is a genuine impl failure. MIN_VIABLE_SECS=0 keeps
+# the sub-minute env-stop guard from reclassifying the fast stub as environmental.
+# ---------------------------------------------------------------------------
+RUNNER_RF="$ROOT/automouse/run-rf"
+sed -e 's#^MIN_VIABLE_SECS=[0-9]*#MIN_VIABLE_SECS=0#' "$RUNNER" > "$RUNNER_RF"
+chmod +x "$RUNNER_RF"
+grep -q '^MIN_VIABLE_SECS=0' "$RUNNER_RF" \
+    || { echo "FAIL: case7-9 setup could not zero MIN_VIABLE_SECS"; FAILED=1; }
+run_single_rf() {
+    PLANS_DIR="$PDIR" "$RUNNER_RF" plan "$1" > "$ROOT/run.out" 2>&1
+}
+printf '#!/usr/bin/env bash\nNDIR=%q\n' "$NDIR" > "$STUBDIR/claude"
+cat >> "$STUBDIR/claude" <<'STUB'
+set -u
+# Only impl/postplan runs (claude -p) count as attempts; the login preflight
+# (claude auth status ...) must neither consume an error line nor a call slot.
+[ "${1:-}" = "-p" ] || exit 0
+# One line per call holding just the --model value: the multi-line prompt would
+# otherwise break line counting, and its prose mentions opus on every call.
+model=none; prev=
+for a in "$@"; do [ "$prev" = "--model" ] && model=$a; prev=$a; done
+n=$(( $(wc -l < "$NDIR/stub-calls" 2>/dev/null || echo 0) + 1 ))
+printf '%s\n' "$model" >> "$NDIR/stub-calls"
+err=$(sed -n "${n}p" "$NDIR/stub-errors")
+printf '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu%d","name":"Bash","input":{"command":"vendor/bin/phpunit --filter FooTest"}}]}}\n' "$n"
+printf '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu%d","is_error":true,"content":"Exit code 1\\n%s"}]}}\n' "$n" "$err"
+printf '{"type":"result","subtype":"error_during_execution","stop_reason":"end_turn","num_turns":2,"duration_ms":2000,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
+exit 0
+STUB
+chmod +x "$STUBDIR/claude"
+
+# drive_attempts <slug>: up to 3 single-mode attempts, stopping once the plan leaves queue/
+drive_attempts() {
+    for _ in 1 2 3; do
+        [ -L "$NDIR/queue/$1.md" ] || break
+        run_single_rf "$1" || true
+    done
+}
+stub_calls() { wc -l < "$NDIR/stub-calls" 2>/dev/null | tr -d ' '; }
+check_present() { check "$1" test -e "$2" -o -L "$2"; }
+check_absent() { check "$1" test ! -e "$2" -a ! -L "$2"; }
+# seed_plan_sonnet <slug>: seed_plan, then rewrite the plan with a line-1 frontmatter
+# impl_model. bin/lib/plan-impl-model reads ONLY a frontmatter block, so the bare
+# line seed_plan writes resolves to the Opus default and would never escalate.
+seed_plan_sonnet() {
+    seed_plan "$1"
+    printf -- '---\nimpl_model: sonnet\n---\n\n# %s\n' "$1" > "$PDIR/$1.md"
+}
+calls_are() { [ "$(stub_calls)" = "$1" ]; }
+attempt_is_opus() { sed -n "${1}p" "$NDIR/stub-calls" | grep -q opus; }
+
+# ===========================================================================
+# Case 7 — identical failure (differing SHA + timestamp) stops before attempt 3
+# ===========================================================================
+echo "--- case 7: identical failure stops before a 3rd attempt ---"
+reset_state; rm -f "$NDIR/stub-calls" "$NDIR/stub-errors"
+printf '%s\n' \
+    'fatal: bad object 3f9c2ab71e0d at 2026-10-01T03:12:44Z' \
+    'fatal: bad object a81be09c44f2d7e at 2026-10-02T05:40:01Z' \
+    'fatal: bad object 0b1c2d3e4f5 at 2026-10-03T01:00:00Z' > "$NDIR/stub-errors"
+seed_plan_sonnet plan-rep
+drive_attempts plan-rep
+RF7_REPORT="$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-rep.md"
+check "case7 exactly 2 stub calls (no 3rd attempt)" calls_are 2
+check_present "case7 moved to skipped/"      "$NDIR/skipped/plan-rep.md"
+check_absent  "case7 left queue"             "$NDIR/queue/plan-rep.md"
+check_absent  "case7 no attempts sidecar"    "$NDIR/queue/plan-rep.md.attempts"
+check_absent  "case7 no failure sidecar"     "$NDIR/queue/plan-rep.md.failure"
+check_present "case7 skipped report written" "$RF7_REPORT"
+check "case7 report names attempts 1 and 2" grep -q 'attempts 1 and 2' "$RF7_REPORT"
+check "case7 report quotes the failure signature" grep -q 'fatal: bad object <SHA>' "$RF7_REPORT"
+check "case7 log records REPEATED FAILURE" grep -rq 'REPEATED FAILURE' "$NDIR/logs"
+check "case7 tool error text absent from logs" ! grep -rq 'fatal: bad object' "$NDIR/logs"
+
+# ===========================================================================
+# Case 8 — different failures: the 3rd (Opus) attempt still runs
+# ===========================================================================
+echo "--- case 8: different failures still get a 3rd (Opus) attempt ---"
+reset_state; rm -f "$NDIR/stub-calls" "$NDIR/stub-errors"
+printf '%s\n' \
+    'fatal: bad object 3f9c2ab71e0d' \
+    'PHP Parse error: syntax error, unexpected token in Foo.php:12' \
+    'Undefined variable bar in Baz.php:40' > "$NDIR/stub-errors"
+seed_plan_sonnet plan-diff
+drive_attempts plan-diff
+check "case8 exactly 3 stub calls (3rd attempt ran)" calls_are 3
+check "case8 attempt 3 is the escalated Opus try" attempt_is_opus 3
+check "case8 attempt 2 is not Opus" ! attempt_is_opus 2
+check_present "case8 still queued"  "$NDIR/queue/plan-diff.md"
+check_absent  "case8 not skipped"   "$NDIR/skipped/plan-diff.md"
+check "case8 log has no REPEATED FAILURE" ! grep -rq 'REPEATED FAILURE' "$NDIR/logs"
+check "case8 failure sidecar holds attempt-3 signature" grep -q '^failure-signature: .*Undefined variable' "$NDIR/queue/plan-diff.md.failure"
+
+# ===========================================================================
+# Case 9 — no extractable signature fails open (never a false stop)
+# ===========================================================================
+echo "--- case 9: empty signature fails open ---"
+reset_state; rm -f "$NDIR/stub-calls" "$NDIR/stub-errors"
+printf '%s\n' '' '' '' > "$NDIR/stub-errors"
+seed_plan_sonnet plan-none
+drive_attempts plan-none
+check "case9 exactly 3 stub calls" calls_are 3
+check "case9 log records failsig: none" grep -rq 'failsig: none' "$NDIR/logs"
+check "case9 log has no REPEATED FAILURE" ! grep -rq 'REPEATED FAILURE' "$NDIR/logs"
+check_absent  "case9 not skipped" "$NDIR/skipped/plan-none.md"
 
 # ===========================================================================
 echo ""

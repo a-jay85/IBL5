@@ -1056,6 +1056,7 @@ jobs:
             bin/test-post-plan-fail-dm \
             bin/test-token-report \
             bin/test-automouse-escalation \
+            bin/test-automouse-repeat-failure \
             bin/test-automouse-disarm \
             bin/test-bun-audit-triage \
             bin/test-prune-eligibility \

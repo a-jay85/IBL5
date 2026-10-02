@@ -1338,3 +1338,50 @@ def test_comment_nit_re_keeps_additive_and_defect_notes(title, detail):
     assert not fidelity._is_comment_nit(title, detail), (
         f"Expected _is_comment_nit to return False for title: {title!r}"
     )
+
+
+@pytest.mark.parametrize("pr_number,expected", [(4242, "gh pr edit 4242 --body-file"),
+                                                ("4242", "gh pr edit 4242 --body-file")])
+def test_remediation_prompt_names_pr_edit_when_pr_number_given(tmp_path, git_shim,
+                                                                pr_number, expected):
+    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                       _packet(tmp_path), _verdict(tmp_path, "NOT READY"), "deadbeef",
+                       pr_number=pr_number)
+    assert expected in llm.captured_prompts["fidelity-remediation"]
+
+
+def test_remediation_prompt_omits_pr_edit_when_pr_number_none(tmp_path, git_shim):
+    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                       _packet(tmp_path), _verdict(tmp_path, "NOT READY"), "deadbeef",
+                       pr_number=None)
+    prompt = llm.captured_prompts["fidelity-remediation"]
+    assert "gh pr edit None" not in prompt
+    assert "--body-file" not in prompt
+
+
+def test_runner_passes_pr_number_to_remediate(tmp_path, git_shim):
+    """runner._run_fidelity threads the PR number into fidelity.remediate."""
+    pr = 998
+    seen = []
+
+    def _spy(*args, **kw):
+        seen.append(kw.get("pr_number"))
+        return None
+
+    git_shim.setattr(fidelity, "remediate", _spy)
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-review": "6d checks\n\nNOT READY\n"})
+    gh = RecordingGh(str(tmp_path))
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), _CountingGit({
+                "slug": "demo", "worktree_diff": "",
+                "diff": "diff --git a/x b/x\n",
+                "head_trees": [TREE_1, TREE_2],
+            }), gh, _plan(),
+            "diff", "body", pr, "dead" * 10, TREE_1, False, lambda m: None, _Res(),
+        )
+        assert seen and all(n == pr for n in seen)
+    finally:
+        _cleanup(pr, f"{pr}-2", f"{pr}-3", f"{pr}-4")

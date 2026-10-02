@@ -19,7 +19,7 @@ login_probe() {
     if [ -n "${AUTOMOUSE_LOGIN_PROBE_CMD:-}" ]; then
         # shellcheck disable=SC2086
         out=$($AUTOMOUSE_LOGIN_PROBE_CMD 2>/dev/null | head -1)
-        if printf '%s\n' "$out" | grep -Eq '^(ok|expired:[a-z0-9-]+|unknown:[a-z0-9-]+)$'; then
+        if grep -Eq '^(ok|expired:[a-z0-9-]+|unknown:[a-z0-9-]+)$' <<< "$out"; then
             printf '%s\n' "$out"
         else
             echo "unknown:bad-probe-output"
@@ -35,7 +35,7 @@ login_probe() {
     if command -v "$claude_bin" >/dev/null 2>&1; then
         local st rc
         st=$("$claude_bin" auth status --json 2>/dev/null); rc=$?
-        if [ "$rc" -eq 1 ] && printf '%s' "$st" | grep -q '"loggedIn":[[:space:]]*false'; then
+        if [ "$rc" -eq 1 ] && grep -q '"loggedIn":[[:space:]]*false' <<< "$st"; then
             echo "expired:not-logged-in"
             return 0
         fi

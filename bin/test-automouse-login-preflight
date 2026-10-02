@@ -231,6 +231,8 @@ set_claude 1 '{"loggedIn": false}'
 unset AUTOMOUSE_LOGIN_PROBE_CMD
 eq "seam-unset-uses-real-probe" "expired:not-logged-in" "$(login_probe)"
 export AUTOMOUSE_LOGIN_PROBE_CMD=""
+# Guard the case itself: the variable must be set-but-empty here, not unset.
+eq "seam-empty-uses-real-probe: seam is set but empty" "x" "${AUTOMOUSE_LOGIN_PROBE_CMD+x}"
 eq "seam-empty-uses-real-probe" "expired:not-logged-in" "$(login_probe)"
 
 echo "--- real probe tier cases ---"

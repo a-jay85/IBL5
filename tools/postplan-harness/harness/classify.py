@@ -900,10 +900,11 @@ def restore_manual_testing_section(after: str, before: str) -> tuple[str, bool]:
 
 BACKLOG_REPO = "a-jay85/IBL5-backlog"
 
-# "backlog issue #160", "backlog items #12 and #13", "Backlog #7, #8". A bare `#N`
+# "backlog issue #160", "backlog items #12 and #13", "Backlog #7, #8",
+# "backlog: #160", "(backlog) #5", "backlog - #7". A bare `#N`
 # autolinks to IBL5's own PR/issue N, so backlog refs must carry the repo prefix.
 _BACKLOG_REF_RE = re.compile(
-    r"(\bbacklog(?:\s+(?:issues?|items?|entry|entries))?\s+)"
+    r"(\bbacklog(?:\s+(?:issues?|items?|entry|entries))?(?:\s*[:)\-\u2013\u2014]\s*|\s+))"
     r"(#\d+(?:(?:\s*,\s*|\s*/\s*|,?\s+(?:and|or)\s+)#\d+)*)",
     re.I,
 )

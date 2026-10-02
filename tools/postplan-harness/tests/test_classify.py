@@ -1131,6 +1131,12 @@ def test_split_hold_justification_matches_shell(tmp_path):
     ("Backlog #7, #8", "Backlog a-jay85/IBL5-backlog#7, a-jay85/IBL5-backlog#8", 2),
     ("Filed a-jay85/IBL5-backlog#9 from backlog housekeeping.", "Filed a-jay85/IBL5-backlog#9 from backlog housekeeping.", 0),
     ("Fixes #2311 and backlog", "Fixes #2311 and backlog", 0),
+    ("See backlog: #160.", "See backlog: a-jay85/IBL5-backlog#160.", 1),
+    ("Tracked (backlog) #5 here.", "Tracked (backlog) a-jay85/IBL5-backlog#5 here.", 1),
+    ("backlog - #7", "backlog - a-jay85/IBL5-backlog#7", 1),
+    ("backlog: #160, #161", "backlog: a-jay85/IBL5-backlog#160, a-jay85/IBL5-backlog#161", 2),
+    ("See IBL5-backlog#9 now.", "See IBL5-backlog#9 now.", 0),
+    ("Plain #42 only.", "Plain #42 only.", 0),
 ])
 def test_qualify_backlog_refs(src, want, n):
     assert qualify_backlog_refs(src) == (want, n)

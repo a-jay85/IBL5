@@ -230,7 +230,7 @@ printf 'stale' > "$FS"
 run_filter_failsig "$FS" "$(nd "$RESULT_LINE")" >/dev/null
 if [ ! -e "$FS" ]; then echo "ok: f7-stale-file-removed-at-start"; else echo "FAIL: f7-stale-file-removed-at-start — stale file survived"; FAILED=1; fi
 
-# f8 — a non-error result writes nothing
+# f8 — a non-error result (is_error:false) writes nothing
 rm -f "$FS"
 run_filter_failsig "$FS" "$(nd "$USE1" "$OKRES" "$RESULT_LINE")" >/dev/null
 if [ ! -e "$FS" ]; then echo "ok: f8-non-error-result-ignored"; else echo "FAIL: f8-non-error-result-ignored — file written"; FAILED=1; fi

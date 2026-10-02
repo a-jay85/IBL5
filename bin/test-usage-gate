@@ -1570,6 +1570,94 @@ test_limit_hit_marker_writes() {
     assert_no_file limit_hit_marker:notexec-no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_D.json"
 }
 
+# ---------------------------------------------------------------- Phase 8 (weekly pacing)
+
+PACE_RS=1790000000
+
+# pace_json <five> <week> <week_resets_epoch|"">
+pace_json() {
+    jq -cn --argjson f "$1" --argjson w "$2" --arg wr "$3" '
+      {five_hour:{utilization:$f},
+       seven_day:({utilization:$w} + (if $wr=="" then {} else {resets_at:($wr|tonumber|todate)} end))}'
+}
+
+# pace_at <body> <hours_before_reset>: run usage_pace_verdict at RS - hours*3600.
+pace_at() {
+    gate_run "usage_pace_verdict '$1' $(( PACE_RS - $2 * 3600 ))"
+}
+
+test_pace_reserve_parse() {
+    new_env
+    assert_eq pace_reserve:unset 10 "$(gate_run "unset IBL5_BURNDOWN_RESERVE_PCT; usage_pace_reserve")"
+    assert_eq pace_reserve:empty 10 "$(gate_run "IBL5_BURNDOWN_RESERVE_PCT= usage_pace_reserve")"
+    assert_eq pace_reserve:abc 10 "$(gate_run "IBL5_BURNDOWN_RESERVE_PCT=abc usage_pace_reserve")"
+    assert_contains pace_reserve:abc-log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "bad-reserve value=abc"
+    assert_eq pace_reserve:100 10 "$(gate_run "IBL5_BURNDOWN_RESERVE_PCT=100 usage_pace_reserve")"
+    assert_eq pace_reserve:0 0 "$(gate_run "IBL5_BURNDOWN_RESERVE_PCT=0 usage_pace_reserve")"
+    assert_eq pace_reserve:25 25 "$(gate_run "IBL5_BURNDOWN_RESERVE_PCT=25 usage_pace_reserve")"
+}
+
+test_pace_verdict_go_early_window() {
+    new_env
+    local out
+    out=$(pace_at "$(pace_json 5 20 "$PACE_RS")" 120)
+    assert_eq pace_go:verdict go "$(printf '%s' "$out" | cut -d' ' -f1)"
+    assert_eq pace_go:allowed 25.7 "$(printf '%s' "$out" | cut -d' ' -f3)"
+    assert_eq pace_go:wait 0 "$(printf '%s' "$out" | cut -d' ' -f4)"
+}
+
+test_pace_verdict_wait_formula() {
+    new_env
+    local out want
+    out=$(pace_at "$(pace_json 5 30 "$PACE_RS")" 120)
+    want=$(jq -n '((30*168/90)-48)*3600 | ceil')
+    assert_eq pace_wait:verdict wait "$(printf '%s' "$out" | cut -d' ' -f1)"
+    assert_eq pace_wait:allowed 25.7 "$(printf '%s' "$out" | cut -d' ' -f3)"
+    assert_eq pace_wait:seconds "$want" "$(printf '%s' "$out" | cut -d' ' -f4)"
+    assert_eq pace_wait:seconds-literal 28800 "$(printf '%s' "$out" | cut -d' ' -f4)"
+}
+
+test_pace_verdict_over_ceiling() {
+    new_env
+    local out
+    out=$(pace_at "$(pace_json 5 91 "$PACE_RS")" 10)
+    assert_eq pace_ceiling:verdict wait "$(printf '%s' "$out" | cut -d' ' -f1)"
+    assert_eq pace_ceiling:until-reset 36000 "$(printf '%s' "$out" | cut -d' ' -f4)"
+}
+
+test_pace_verdict_zone_five_hour() {
+    new_env
+    local out
+    out=$(pace_at "$(pace_json 95 10 "$PACE_RS")" 120)
+    assert_eq pace_zone:verdict zone "$(printf '%s' "$out" | cut -d' ' -f1)"
+    assert_eq pace_zone:wait 0 "$(printf '%s' "$out" | cut -d' ' -f4)"
+}
+
+test_pace_verdict_blind() {
+    new_env
+    local out
+    out=$(pace_at "$(pace_json 5 20 "")" 120)
+    assert_eq pace_blind:no-resets blind "$(printf '%s' "$out" | cut -d' ' -f1)"
+    out=$(pace_at "$(pace_json 5 20 "$PACE_RS" | jq -c 'del(.seven_day.utilization)')" 120)
+    assert_eq pace_blind:no-util blind "$(printf '%s' "$out" | cut -d' ' -f1)"
+    out=$(gate_run "usage_pace_verdict '$(pace_json 5 20 "$PACE_RS")' abc")
+    assert_eq pace_blind:bad-now blind "$(printf '%s' "$out" | cut -d' ' -f1)"
+    out=$(gate_run "usage_pace_verdict '' $(( PACE_RS - 120 * 3600 ))")
+    assert_eq pace_blind:empty-body blind "$(printf '%s' "$out" | cut -d' ' -f1)"
+}
+
+test_pace_verdict_clamps() {
+    new_env
+    local out
+    out=$(gate_run "usage_pace_verdict '$(pace_json 5 50 "$PACE_RS")' $(( PACE_RS + 3600 ))")
+    assert_eq pace_clamp:past-verdict go "$(printf '%s' "$out" | cut -d' ' -f1)"
+    assert_eq pace_clamp:past-allowed 90 "$(printf '%s' "$out" | cut -d' ' -f3)"
+    out=$(pace_at "$(pace_json 5 0 "$PACE_RS")" 200)
+    assert_eq pace_clamp:far-verdict wait "$(printf '%s' "$out" | cut -d' ' -f1)"
+    assert_eq pace_clamp:far-allowed 0 "$(printf '%s' "$out" | cut -d' ' -f3)"
+    assert_eq pace_clamp:far-floor 60 "$(printf '%s' "$out" | cut -d' ' -f4)"
+}
+
 # ---------------------------------------------------------------- runner
 
 TESTS=$(grep -E '^test_[a-z0-9_]+\(\)' "$0" | sed 's/().*//')

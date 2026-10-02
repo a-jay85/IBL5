@@ -53,6 +53,8 @@ if [ "$1" = "pr" ] && [ "$2" = "diff" ]; then
   exit 0
 fi
 if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
+  # GH_PR_FAIL set -> emulate an unreadable PR body (condition (17) fail-closed case).
+  [ -n "${GH_PR_FAIL:-}" ] && exit 1
   if [[ "$3" =~ ^[0-9]+$ ]]; then
     case "$3" in 1100) echo '{"state":"OPEN"}' ;; *) echo '{"state":"MERGED"}' ;; esac
     exit 0
@@ -510,6 +512,7 @@ B10="$(extract_block '# condition (10)')"
 B7="$(extract_block '# condition (7)')"
 B13="$(extract_block '# condition (13)')"
 B15="$(extract_block '# condition (15)')"
+B17="$(extract_block '# condition (17)')"
 BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
 B12="$(extract_block '# condition (12)')"
@@ -552,6 +555,7 @@ else
     echo "FAIL: c11_lib_header_widened — pr-armable.sh header still promises unscored threads never block"; FAILED=1
 fi
 assert_self_contained '# condition (15)' "condition (15)"
+assert_self_contained '# condition (17)' "condition (17)"
 assert_block_sources '# condition (7)' "condition (7)" "plan-resolve.sh" "$SKILL"
 assert_block_sources '# condition (13)' "condition (13)" "plan-resolve.sh" "$SKILL"
 
@@ -1400,6 +1404,64 @@ else
         echo "ok: pr_aggregator_required returns 0 when the context is listed"
     else
         echo "FAIL: pr_aggregator_required returned 1 with 'All checks green' listed"
+        FAILED=1
+    fi
+fi
+
+# condition (17) — gate backtest hold. The block reads the PR body: a Gate backtest block
+# is judged by its state line, and a body with no block runs bin/gate-backtest itself.
+# run_cond17 <body|__fail__> [stub-rc] — scratch repo with the real predicate library
+# symlinked and a stub bin/gate-backtest that records the call and exits with stub-rc.
+c17_block() { # state-line-token...  -> a Gate backtest block with one state line per arg
+    printf '%s\n' '<!-- gate-backtest:begin -->'
+    local s
+    for s in "$@"; do printf '<!-- gate-backtest-state: %s -->\n' "$s"; done
+    printf '%s\n' '### Gate backtest' '<!-- gate-backtest:end -->'
+}
+run_cond17() {
+    local c17="$BASE_TMP/c17"
+    rm -rf "$c17"
+    mkdir -p "$c17/bin/lib"
+    git -C "$c17" init -q
+    ln -s "$REPO_ROOT/bin/lib/pr-armable.sh" "$c17/bin/lib/pr-armable.sh"
+    printf '#!/bin/sh\ntouch "%s/called"\nexit %s\n' "$c17" "${2:-0}" > "$c17/bin/gate-backtest"
+    chmod +x "$c17/bin/gate-backtest"
+    local fail=""
+    if [ "$1" = "__fail__" ]; then
+        fail=1
+        printf '{"number":2100,"body":""}' > "$BASE_TMP/fixture.json"
+    else
+        jq -n --arg b "$1" '{number: 2100, body: $b}' > "$BASE_TMP/fixture.json"
+    fi
+    ( cd "$c17" && PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+        GH_PR_FAIL="$fail" bash -c "$B17" 2>&1 )
+}
+c17_called() { [ -e "$BASE_TMP/c17/called" ] && echo yes || echo no; }
+
+if [ -z "$B17" ]; then
+    echo "FAIL: no block matching '# condition (17)' in $SKILL — marker drifted"
+    FAILED=1
+else
+    expect_block "(17) HELD block -> BLOCK" BLOCK "$(run_cond17 "$(c17_block HELD)")"
+    expect_block "(17) UNKNOWN block -> BLOCK" BLOCK "$(run_cond17 "$(c17_block UNKNOWN)")"
+    expect_block "(17) CLEARED block -> NONE" NONE "$(run_cond17 "$(c17_block CLEARED)")"
+    [ "$(c17_called)" = no ] && echo "ok: (17) CLEARED block does not run the stub" \
+        || { echo "FAIL: (17) CLEARED block ran bin/gate-backtest"; FAILED=1; }
+    expect_block "(17) NOT-APPLICABLE block -> NONE" NONE "$(run_cond17 "$(c17_block NOT-APPLICABLE)")"
+    expect_block "(17) block without a state line -> BLOCK" BLOCK "$(run_cond17 "$(c17_block)")"
+    expect_block "(17) two state lines -> BLOCK" BLOCK "$(run_cond17 "$(c17_block CLEARED CLEARED)")"
+    expect_block "(17) no block, stub rc 0 -> NONE" NONE "$(run_cond17 'plain body' 0)"
+    [ "$(c17_called)" = yes ] && echo "ok: (17) no block runs the stub" \
+        || { echo "FAIL: (17) no block did not run bin/gate-backtest"; FAILED=1; }
+    expect_block "(17) no block, stub rc 1 -> BLOCK" BLOCK "$(run_cond17 'plain body' 1)"
+    expect_block "(17) no block, stub rc 3 -> BLOCK" BLOCK "$(run_cond17 'plain body' 3)"
+    expect_block "(17) no block, stub rc 2 -> BLOCK" BLOCK "$(run_cond17 'plain body' 2)"
+    out="$(run_cond17 __fail__)"
+    expect_block "(17) unreadable PR body -> BLOCK" BLOCK "$out"
+    if [[ "$out" == *"cannot read the PR body"* ]]; then
+        echo "ok: (17) unreadable body names the cause"
+    else
+        echo "FAIL: (17) unreadable body should say 'cannot read the PR body', got: '$out'"
         FAILED=1
     fi
 fi

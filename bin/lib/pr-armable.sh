@@ -5,7 +5,7 @@
 #
 # Usage: source "$(dirname "$0")/lib/pr-armable.sh"
 #
-# Covers the seven live-derivable conditions:
+# Covers the live-derivable conditions (17: pr_gate_backtest_hold <body>):
 #   (1) Manual-Testing clearance   -> pr_manual_testing_clearance <body>
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
@@ -163,6 +163,36 @@ pr_feat_hold() {
         fi
         echo "feat-awaiting-signoff"
     fi
+}
+
+# pr_gate_backtest_hold <body>
+#   Phase 6.5 condition (17). Mirrors harness/gate_backtest.py parse_gate_backtest_state.
+#   No '<!-- gate-backtest:begin -->' line -> prints nothing (not a gate PR).
+#   Block present: exactly one '<!-- gate-backtest-state: X -->' line between the
+#   markers, X in NOT-APPLICABLE|CLEARED -> prints nothing; X in HELD|UNKNOWN ->
+#   prints 'gate-backtest:X'. Zero or 2+ state lines, or no end marker -> prints
+#   'gate-backtest:UNKNOWN' (fail-closed).
+pr_gate_backtest_hold() {
+    local body="$1" line inside=0 seen_begin=0 seen_end=0 n=0 state=""
+    while IFS= read -r line; do
+        case "$line" in
+            '<!-- gate-backtest:begin -->') seen_begin=1; inside=1 ;;
+            '<!-- gate-backtest:end -->')   [ "$inside" = 1 ] && seen_end=1; inside=0 ;;
+            '<!-- gate-backtest-state: '*' -->')
+                if [ "$inside" = 1 ]; then
+                    n=$((n + 1)); state="${line#<!-- gate-backtest-state: }"; state="${state% -->}"
+                fi ;;
+        esac
+    done <<EOF
+$body
+EOF
+    [ "$seen_begin" = 0 ] && return 0
+    if [ "$seen_end" = 0 ] || [ "$n" != 1 ]; then echo "gate-backtest:UNKNOWN"; return 0; fi
+    case "$state" in
+        NOT-APPLICABLE|CLEARED) ;;
+        HELD|UNKNOWN) echo "gate-backtest:$state" ;;
+        *) echo "gate-backtest:UNKNOWN" ;;
+    esac
 }
 
 # pr_dep_holds <body>

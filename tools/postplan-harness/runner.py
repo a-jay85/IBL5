@@ -57,6 +57,8 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               upsert_tests_changed,
                               upsert_residual_phases, upsert_reviewer_verification,
                               upsert_scope_notes)
+from harness.gate_backtest import upsert_gate_backtest
+from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan, split_hold_justification
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
@@ -575,7 +577,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # Discharged sentences get a separate `## Reviewer verification` block
         # positioned after Manual Testing.  Order of the three upserts is load-
         # bearing: manual_confirmation first, reviewer_verification second,
-        # files_changed then tests_changed last; exactly one pr_edit_body call.
+        # files_changed, tests_changed, then gate_backtest; exactly one pr_edit_body call.
         residual, discharged = _discharge_hold_sentences(
             llm, probe, plan.hold_justification, log)
         body = upsert_manual_confirmation(
@@ -586,6 +588,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # PR body's scope can't silently drift from the actual diff.
         body = upsert_files_changed(body, render_files_changed(diff))
         body = upsert_tests_changed(body, render_tests_changed(diff))
+        _gb = gate_backtest_result(worktree or ".", diff, pr=pr, live=live,
+                                   fixture=fixture, log=log)
+        if _gb.block:
+            body = upsert_gate_backtest(body, _gb.block)
         body = _apply_backlog_closes(body, plan, log)
         body = _upsert_no_adr_markers(body, plan)
         gh.pr_edit_body(pr, body)
@@ -678,6 +684,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         else:
             _mc_post_rc = int((fixture or {}).get("meta_checks_post_rc", 0))
         _mc_status = meta_checks_clearance(_mc_flag, _mc_post_rc)
+        _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
+                                   fixture=fixture, log=log)
         inputs = ArmInputs(
             pr_body=gh.pr_body() or body, pr_title=meta.get("title", copy["title"]),
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
@@ -705,6 +713,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             aggregator_required=(gh.aggregator_required(AGGREGATOR_CONTEXT) if live
                                  else bool((fixture or {}).get("aggregator_required", False))),
             meta_checks_status=_mc_status,
+            gate_backtest_status=_gb.status,
+            gate_backtest_reason=_gb.reason,
         )
         if not live and (fixture or {}).get("current_tree"):
             # replay-only seam, the checks_outcome pattern: live mode never reads it

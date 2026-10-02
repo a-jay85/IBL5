@@ -1,11 +1,12 @@
-"""Phase 6.5 — the sixteen ported arming conditions as pure, typed functions.
+"""Phase 6.5 — the seventeen ported arming conditions as pure, typed functions.
 
 The numbers track the SKILL's condition numbers, not this list's position. The set is
-now {1..16} with no gaps: condition (11) shells out to
+now {1..17} with no gaps: condition (11) shells out to
 `bin/lib/pr-armable.sh::pr_unresolved_findings_hold` for unresolved review-thread
 findings, condition (14) reads the run-local conflict-resolved flag, condition (15)
-probes for already-red CI checks at arm time, and condition (16) checks the
-pre-push local meta-check gate.
+probes for already-red CI checks at arm time, condition (16) checks the
+pre-push local meta-check gate, and condition (17) holds when the gate backtest
+flagged clean PRs or could not run.
 
 Faithful port of .claude/skills/post-plan/_phase-6.5-arm-auto-merge.md +
 bin/lib/pr-armable.sh. Historically each condition was a separate model-driven
@@ -177,6 +178,8 @@ class ArmInputs:
     failed_checks: list[str] = field(default_factory=list)  # checks in gh's fail bucket at arm time
     aggregator_required: bool = False   # master protection requires AGGREGATOR_CONTEXT; False = (15) blocks
     meta_checks_status: str = "CLEARED"               # pre-push meta-check gate; "HELD"/"UNKNOWN" blocks
+    gate_backtest_status: str = "NOT-APPLICABLE"      # gate replay verdict; "HELD"/"UNKNOWN"/other blocks
+    gate_backtest_reason: str = ""                    # verdict reason, surfaced in the hold line
 
 
 def select_fidelity_verdict(v1, v2, tree2, current_tree):
@@ -375,5 +378,11 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     mc_blocked = mc != "CLEARED"
     cs.append(ConditionResult(16, "meta-checks", mc_blocked,
                               f"state={mc}" if mc_blocked else ""))
+
+    # Condition (17) — gate backtest: a changed gate flagged clean PRs, or its replay failed.
+    gb = inp.gate_backtest_status
+    gb_blocked = gb not in ("NOT-APPLICABLE", "CLEARED")
+    gb_reason = f"state={gb}" + (f"; {inp.gate_backtest_reason}" if inp.gate_backtest_reason else "")
+    cs.append(ConditionResult(17, "gate-backtest", gb_blocked, gb_reason if gb_blocked else ""))
 
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

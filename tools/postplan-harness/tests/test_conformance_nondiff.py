@@ -155,9 +155,11 @@ def test_tracked_files_reads_git_ls_files(tmp_path):
     subprocess.run(["git", "add", "a/b.txt"], cwd=repo, check=True)
     subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "x"],
                    cwd=repo, check=True)
-    got = conformance._tracked_files.__wrapped__(str(repo))
+    root = str(repo)
+    got = conformance._tracked_files.__wrapped__(root)
     assert isinstance(got, tuple)
     assert "a/b.txt" in got
     nogit = tmp_path / "nogit"
     nogit.mkdir()
-    assert conformance._tracked_files.__wrapped__(str(nogit)) is None
+    root = str(nogit)
+    assert conformance._tracked_files.__wrapped__(root) is None

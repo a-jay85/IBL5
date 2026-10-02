@@ -97,3 +97,13 @@ def test_replay_audit_crosscheck(tmp_path):
     res = rpo.replay(str(out), str(HARNESS), str(HARNESS.parents[1]), tracked=("bin/wt-up",))
     assert res["runs"]["live-d"]["audit_match"] is False
     assert rpo.compare(res, res)["audit_mismatch"] == 1
+
+
+def test_unknown_flag_exits_2_with_usage():
+    """argparse parse_args rejects a typo'd flag; parse_known_args would swallow it and replay."""
+    import subprocess
+    script = str(HARNESS / "bench" / "replay_phase_omission.py")
+    r = subprocess.run([sys.executable, script, "--no-such-flag"],
+                       capture_output=True, text=True)
+    assert r.returncode == 2
+    assert "usage:" in r.stderr

@@ -29,6 +29,7 @@ PASS_TEXT = re.compile(r"\ball checks (have )?pass|successful\b", re.I)
 IGNORED_CHECKS = frozenset({"human-signoff"})
 
 HEAD_CHECK_INTERVAL = 300  # seconds between head checks during the background watch
+HEAD_MOVE_RESTART_CAP = 3  # head-changed restarts watch_or_reuse follows before holding
 
 
 class _HeadChanged(Exception):
@@ -499,6 +500,8 @@ def watch_or_reuse(worktree: str, pr: int, sha: str | None, out_dir: str | None,
     Ceiling contract: this function's total wall clock is bounded by `timeout`,
     the same ceiling `watch_live` had before. Time spent waiting on the
     background watch is DEDUCTED from the budget handed to the fallback.
+    A head that keeps moving is followed up to HEAD_MOVE_RESTART_CAP restarts;
+    past that the result is an indeterminate "head moved N times (cap 3)" hold.
     """
     started = time.time()
 
@@ -517,25 +520,45 @@ def watch_or_reuse(worktree: str, pr: int, sha: str | None, out_dir: str | None,
     if got is not None:
         return CiOutcome(got.exit_code, got.failed, got.evidence, head_sha=sha or "")
 
-    # One restart if the background watch timed out or detected a head change
-    if (verify_head and sha and out_dir and bg is not None
-            and bg.sha == sha and bg.status in ("head-changed", "timeout")):
+    # Follow a moving head: each head-changed watch is restarted on the synced
+    # remote head, up to HEAD_MOVE_RESTART_CAP times. Every restart is a new
+    # BackgroundWatch, so it gets a fresh settle clock and settle budget. A
+    # timed-out watch keeps the single restart it always had.
+    cur_bg, moves, timeout_restarted = bg, 0, False
+    while (verify_head and sha and out_dir and cur_bg is not None
+           and cur_bg.sha == sha and cur_bg.status in ("head-changed", "timeout")):
+        if cur_bg.status == "head-changed":
+            moves += 1
+            if moves > HEAD_MOVE_RESTART_CAP:
+                return CiOutcome(-1, [], f"head moved {moves} times "
+                                         f"(cap {HEAD_MOVE_RESTART_CAP})", head_sha=sha)
+        elif timeout_restarted:
+            break
+        else:
+            timeout_restarted = True
         r2 = gitutil.reconcile_remote_head(pr, sha, sha, None, worktree,
                                            gh_cmd=gh_cmd, run_git=run_git)
         if r2.action == "diverged":
             return CiOutcome(-1, [], r2.evidence, head_sha=r2.remote_sha, diverged=True)
         new_sha = r2.remote_sha if r2.remote_sha else sha
         remaining2 = int(timeout - (time.time() - started))
+        if cur_bg.status == "head-changed" and remaining2 <= 0:
+            return CiOutcome(-1, [], f"head moved {moves} times; CI budget exhausted",
+                             head_sha=new_sha)
         bg2 = start_background_watch(worktree, pr, new_sha, out_dir,
                                      timeout=max(remaining2, 60),
                                      verify_head=True, gh_cmd=gh_cmd, run_git=run_git)
-        if bg2 is not None:
-            bg2.done.wait(timeout=max(remaining2, 0))
-            reap_background_watch(bg2)
-            got2 = read_outcome(out_dir, new_sha)
-            if got2 is not None:
-                return CiOutcome(got2.exit_code, got2.failed, got2.evidence,
-                                 head_sha=new_sha)
+        if bg2 is None:
+            break
+        bg2.done.wait(timeout=max(remaining2, 0))
+        reap_background_watch(bg2)
+        if bg2.status == "diverged":
+            return CiOutcome(-1, [], bg2.evidence, head_sha=bg2.remote_sha, diverged=True)
+        sha = bg2.sha
+        got2 = read_outcome(out_dir, sha)
+        if got2 is not None:
+            return CiOutcome(got2.exit_code, got2.failed, got2.evidence, head_sha=sha)
+        cur_bg = bg2
 
     remaining = int(timeout - (time.time() - started))
     outcome = watch_live(worktree, pr, timeout=max(remaining, 60),

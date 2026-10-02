@@ -932,3 +932,121 @@ def test_background_zero_checks_never_passes(monkeypatch, tmp_path, snapshot):
     assert data["exit_code"] == -1
     assert "no checks registered" in data["evidence"]
     assert ciwatch.read_outcome(str(tmp_path), "r1h888") is None
+
+
+# --- capped head-move restarts ---
+
+_A, _B, _C, _D, _E = ("a" * 40, "b" * 40, "c" * 40, "d" * 40, "e" * 40)
+_NEXT = {_A: _B, _B: _C, _C: _D, _D: _E}
+
+
+def _moving_head(monkeypatch, tmp_path, settle_on=(), reconcile=None,
+                 seed_status="head-changed"):
+    """Seed a stale watch on A and fake a head that moves A -> B -> C -> D -> E."""
+    from harness import gitutil
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    bg = ciwatch.BackgroundWatch(sha=_A, pr=42, worktree=str(tmp_path),
+                                 path=ciwatch.outcome_path(out, _A),
+                                 started=time.time(), verify_head=True)
+    ciwatch._write_outcome(bg, seed_status, [], "seed")
+    if seed_status == "head-changed":
+        bg.remote_sha = _B
+
+    calls = {"n": 0}
+
+    def fake_reconcile(pr, expected_sha, local_sha, branch, worktree, **kw):
+        n = calls["n"]
+        calls["n"] += 1
+        if reconcile is not None:
+            return reconcile(n, expected_sha)
+        if n % 2 == 0:      # entry reconcile and each start_background_watch reconcile
+            return gitutil.Reconcile("match", expected_sha, "")
+        return gitutil.Reconcile("synced", _NEXT[expected_sha], "")   # restart reconcile
+
+    watched = []
+
+    def fake_thread(bg, timeout, settle_tries, settle_wait):
+        watched.append(bg.sha)
+        if seed_status == "timeout":
+            ciwatch._write_outcome(bg, "timeout", [], "fake timeout")
+        elif bg.sha in settle_on:
+            ciwatch._write_outcome(bg, "success", [], "fake green")
+        else:
+            bg.remote_sha = _NEXT.get(bg.sha, "")
+            ciwatch._write_outcome(bg, "head-changed", [], "fake move")
+
+    def no_live(*a, **k):
+        raise AssertionError("fell through to watch_live")
+
+    monkeypatch.setattr(ciwatch.gitutil, "reconcile_remote_head", fake_reconcile)
+    monkeypatch.setattr(ciwatch, "_watch_thread", fake_thread)
+    monkeypatch.setattr(ciwatch, "watch_live", no_live)
+    return bg, out, watched
+
+
+def _follow_head(tmp_path, out, bg):
+    return ciwatch.watch_or_reuse(str(tmp_path), 42, _A, out, bg,
+                                  timeout=30, verify_head=True)
+
+
+def test_head_move_mid_watch_follows_new_sha_and_settles(monkeypatch, tmp_path):
+    bg, out, watched = _moving_head(monkeypatch, tmp_path, settle_on=(_B,))
+    got = _follow_head(tmp_path, out, bg)
+    assert got.exit_code == 0
+    assert got.head_sha == _B
+    assert watched == [_B]
+    data = json.loads((tmp_path / "out" / f"ci-{_B}.json").read_text())
+    assert data["status"] == "success"
+
+
+def test_head_move_at_cap_still_settles(monkeypatch, tmp_path):
+    bg, out, watched = _moving_head(monkeypatch, tmp_path, settle_on=(_D,))
+    got = _follow_head(tmp_path, out, bg)
+    assert got.exit_code == 0
+    assert got.head_sha == _D
+    assert watched == [_B, _C, _D]
+
+
+def test_head_move_restart_cap_reached_is_named_hold(monkeypatch, tmp_path):
+    bg, out, watched = _moving_head(monkeypatch, tmp_path, settle_on=())
+    got = _follow_head(tmp_path, out, bg)
+    assert got.exit_code == -1
+    assert got.evidence == "head moved 4 times (cap 3)"
+    assert got.diverged is False
+    assert watched == [_B, _C, _D]
+
+
+def test_head_move_restart_diverged_returns_diverged(monkeypatch, tmp_path):
+    from harness import gitutil
+
+    def reconcile(n, expected_sha):
+        if n == 0:
+            return gitutil.Reconcile("match", expected_sha, "")
+        if n == 1:
+            return gitutil.Reconcile("synced", _B, "")
+        return gitutil.Reconcile("diverged", "f" * 40, "remote head diverged")
+
+    bg, out, watched = _moving_head(monkeypatch, tmp_path, reconcile=reconcile)
+    got = _follow_head(tmp_path, out, bg)
+    assert got.diverged is True
+    assert got.exit_code == -1
+    assert watched == []
+
+
+def test_timeout_status_restarts_once_then_falls_back(monkeypatch, tmp_path):
+    from harness import gitutil
+    bg, out, watched = _moving_head(
+        monkeypatch, tmp_path, seed_status="timeout",
+        reconcile=lambda n, expected_sha: gitutil.Reconcile("match", expected_sha, ""))
+    live_calls = []
+
+    def live(*a, **k):
+        live_calls.append(1)
+        return ciwatch.CiOutcome(-1, [], "live")
+
+    monkeypatch.setattr(ciwatch, "watch_live", live)
+    got = _follow_head(tmp_path, out, bg)
+    assert watched == [_A]
+    assert len(live_calls) == 1
+    assert got.exit_code == -1

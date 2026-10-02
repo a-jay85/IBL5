@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-repeat-failure — regression test for the automouse
+# repeated-failure stop (ADR-0160).
+#
+# Pins:
+#   - bin/lib/automouse-failure-signature: true repeats normalize equal,
+#     different failures do not, no informative error yields empty output
+#   - the run-loop helpers in bin/automouse/run that read and compare signatures
+#
+# Run: bin/test-automouse-repeat-failure  (exit 0 = all pass, 1 = a case failed)
+
+set -uo pipefail
+
+REPO=$(cd "$(dirname "$0")/.." && pwd)
+SIG="$REPO/bin/lib/automouse-failure-signature"
+
+FAILED=0
+TMPS=()
+cleanup() { [ "${#TMPS[@]}" -gt 0 ] && rm -rf "${TMPS[@]}"; return 0; }
+trap cleanup EXIT
+
+WORK=$(mktemp -d)
+TMPS+=("$WORK")
+
+# rec <file> <tool> <command> <error-text>
+rec() {
+    printf 'tool: %s\ncommand: %s\nerror:\n%s\n' "$2" "$3" "$4" > "$1"
+}
+
+# check <name> <command-that-succeeds-on-pass...>
+pass() { echo "ok: $1"; }
+fail() { echo "FAIL: $1 — $2"; FAILED=1; }
+
+# --- n1: SHAs, timestamps, worktree paths, line numbers, durations normalize equal
+rec "$WORK/a" Bash 'cd /Users/a/IBL5-worktrees/x/ibl5 && vendor/bin/phpunit' \
+'Exit code 1
+2026-10-01T03:12:44Z fatal: bad object 3f9c2ab71e0d at /Users/a/IBL5-worktrees/x/ibl5/classes/Foo.php:118 after 4.2s'
+rec "$WORK/b" Bash 'cd /Users/a/IBL5-worktrees/y/ibl5 && vendor/bin/phpunit' \
+'Exit code 1
+2026-10-02T05:40:01Z fatal: bad object a81be09c44f2d7e at /Users/a/IBL5-worktrees/y/ibl5/classes/Foo.php:131 after 9.8s'
+SA=$("$SIG" "$WORK/a")
+SB=$("$SIG" "$WORK/b")
+if [ -n "$SA" ] && [ "$SA" = "$SB" ]; then
+    pass "n1-sha-timestamp-paths-normalize-equal"
+else
+    fail "n1-sha-timestamp-paths-normalize-equal" "A='$SA' B='$SB'"
+fi
+
+# --- n2: different error text differs
+rec "$WORK/c" Bash 'git status' 'fatal: bad object'
+rec "$WORK/d" Bash 'git status' 'fatal: not a git repository'
+SC=$("$SIG" "$WORK/c")
+SD=$("$SIG" "$WORK/d")
+if [ -n "$SC" ] && [ -n "$SD" ] && [ "$SC" != "$SD" ]; then
+    pass "n2-different-error-text-differs"
+else
+    fail "n2-different-error-text-differs" "C='$SC' D='$SD'"
+fi
+
+# --- n3: small integers are kept
+rec "$WORK/e" Bash 'bin/t' 'assertion failed at row 2'
+rec "$WORK/f" Bash 'bin/t' 'assertion failed at row 14'
+SE=$("$SIG" "$WORK/e")
+SF=$("$SIG" "$WORK/f")
+if [ -n "$SE" ] && [ -n "$SF" ] && [ "$SE" != "$SF" ]; then
+    pass "n3-small-integers-kept"
+else
+    fail "n3-small-integers-kept" "E='$SE' F='$SF'"
+fi
+
+# --- n4: the PHPUnit header alone must not make two failing tests equal
+rec "$WORK/g" Bash 'vendor/bin/phpunit' 'There was 1 failure:
+
+1) Tests\FooTest::testAlpha'
+rec "$WORK/h" Bash 'vendor/bin/phpunit' 'There was 1 failure:
+
+1) Tests\FooTest::testBeta'
+SG=$("$SIG" "$WORK/g")
+SH=$("$SIG" "$WORK/h")
+if [ -n "$SG" ] && [ -n "$SH" ] && [ "$SG" != "$SH" ]; then
+    pass "n4-phpunit-header-window-differs"
+else
+    fail "n4-phpunit-header-window-differs" "G='$SG' H='$SH'"
+fi
+
+# --- n5: an error that is only `Exit code N` is empty (fail-open)
+rec "$WORK/i" Bash 'false' 'Exit code 1'
+SI=$("$SIG" "$WORK/i"); RC=$?
+if [ -z "$SI" ] && [ "$RC" -eq 0 ]; then
+    pass "n5-exit-code-only-is-empty"
+else
+    fail "n5-exit-code-only-is-empty" "out='$SI' rc=$RC"
+fi
+
+# --- n6: a missing record file is empty, exit 0
+SJ=$("$SIG" "$WORK/does-not-exist"); RC=$?
+if [ -z "$SJ" ] && [ "$RC" -eq 0 ]; then
+    pass "n6-missing-file-is-empty"
+else
+    fail "n6-missing-file-is-empty" "out='$SJ' rc=$RC"
+fi
+
+# --- n7: wrong argument count is a usage error (exit 2)
+"$SIG" 2>/dev/null; RC0=$?
+"$SIG" "$WORK/a" "$WORK/b" 2>/dev/null; RC2=$?
+if [ "$RC0" -eq 2 ] && [ "$RC2" -eq 2 ]; then
+    pass "n7-no-arg-usage-exit-2"
+else
+    fail "n7-no-arg-usage-exit-2" "no-arg rc=$RC0, two-arg rc=$RC2"
+fi
+
+# --- n8: runs under an empty environment (launchd-like PATH)
+SK=$(env -i PATH=/usr/bin:/bin "$SIG" "$WORK/a")
+if [ -n "$SK" ] && [ "$SK" = "$SA" ]; then
+    pass "n8-env-i-runs"
+else
+    fail "n8-env-i-runs" "env-i='$SK' normal='$SA'"
+fi
+
+# --- run-loop helpers, extracted from bin/automouse/run so the test cannot drift
+RUN="$REPO/bin/automouse/run"
+for fn in write_failure_report read_failure_signature failure_signature_repeats write_repeat_failure_report; do
+    FN_SRC=$(awk -v f="$fn" '$0 ~ "^"f"\\(\\) \\{" {capture=1} capture {print} capture && /^\}/ {exit}' "$RUN")
+    if [ -z "$FN_SRC" ]; then
+        fail "extract-$fn" "function not found in bin/automouse/run"
+        echo "RESULT: FAILED"
+        exit 1
+    fi
+    eval "$FN_SRC"
+done
+MAX_ATTEMPTS=3
+FAILURE_TAIL_LINES=200
+FAILURE_TAIL_BYTES=20000
+
+# r1: identical non-empty signatures repeat
+if failure_signature_repeats "phpunit | x | fatal" "phpunit | x | fatal"; then
+    pass "r1-identical-signatures-repeat"
+else
+    fail "r1-identical-signatures-repeat" "returned non-zero"
+fi
+
+# r2: different signatures do not
+if failure_signature_repeats "phpunit | x | fatal: a" "phpunit | x | fatal: b"; then
+    fail "r2-different-signatures-continue" "returned zero"
+else
+    pass "r2-different-signatures-continue"
+fi
+
+# r3: an empty side never matches
+R3=ok
+failure_signature_repeats "" "" && R3=bad
+failure_signature_repeats "" "X" && R3=bad
+failure_signature_repeats "X" "" && R3=bad
+if [ "$R3" = ok ]; then
+    pass "r3-empty-never-matches"
+else
+    fail "r3-empty-never-matches" "an empty signature matched"
+fi
+
+# r4: the signature round-trips through the sidecar header; line 1 stays the header
+LOG=$(mktemp); QUEUE_DIR=$(mktemp -d); NIGHTLY_DIR=$(mktemp -d)
+TMPS+=("$LOG" "$QUEUE_DIR" "$NIGHTLY_DIR")
+printf 'some-log-line\n' > "$LOG"
+write_failure_report plan 0 claude-sonnet-5-5 1 "Bash | phpunit | fatal: x"
+GOT=$(read_failure_signature "$QUEUE_DIR/plan.failure")
+if [ "$GOT" = "Bash | phpunit | fatal: x" ] \
+    && head -n 1 "$QUEUE_DIR/plan.failure" | grep -q '^# Prior attempt 1/3'; then
+    pass "r4-signature-roundtrip"
+else
+    fail "r4-signature-roundtrip" "got '$GOT'"
+fi
+
+# r5: a signature-looking line inside the fenced log tail is not read
+printf 'failure-signature: injected-from-log\n' > "$LOG"
+write_failure_report plan 0 claude-sonnet-5-5 1
+GOT=$(read_failure_signature "$QUEUE_DIR/plan.failure")
+if [ -z "$GOT" ]; then
+    pass "r5-fenced-tail-line-ignored"
+else
+    fail "r5-fenced-tail-line-ignored" "read '$GOT'"
+fi
+
+# r6: the repeat-stop report names both attempts and carries the signature
+write_repeat_failure_report plan-x.md "Bash | phpunit | fatal: x" 1 2
+REPORT="$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-plan-x.md"
+if grep -q 'attempts 1 and 2' "$REPORT" 2>/dev/null \
+    && grep -qF 'Bash | phpunit | fatal: x' "$REPORT" 2>/dev/null; then
+    pass "r6-repeat-report-carries-signature"
+else
+    fail "r6-repeat-report-carries-signature" "report missing or incomplete: $REPORT"
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

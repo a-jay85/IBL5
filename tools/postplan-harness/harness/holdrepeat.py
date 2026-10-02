@@ -273,7 +273,7 @@ def _build_parser() -> argparse.ArgumentParser:
     chk = sub.add_parser("check", help="decline a run that would repeat a notified hold")
     chk.add_argument("--state-dir", required=True)
     chk.add_argument("--slug", required=True)
-    chk.add_argument("--plan", required=True)
+    chk.add_argument("--plan", default="")  # explicit override path only; "" = resolve via locate_plan
     chk.add_argument("--worktree", required=True)
     return ap
 
@@ -281,7 +281,9 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     args = _build_parser().parse_args(argv)
     try:
-        fp = fingerprint(args.plan, args.worktree)
+        from harness.planfile import locate_plan
+        plan_info = locate_plan(args.slug, explicit_path=args.plan or None)
+        fp = fingerprint(plan_info.path or "", args.worktree)
         decline, reason = should_decline(args.state_dir, args.slug, fp)
     except Exception as e:  # noqa: BLE001 - fail open by design
         print(f"holdrepeat: check failed ({e}); proceeding", file=sys.stderr)

@@ -501,7 +501,7 @@ fi
 # Exit 8: declined, repeated hold with unchanged plan+diff+harness (holdrepeat.py).
 if postplan_holdrepeat_decline \
      "${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}" \
-     "$SLUG" "$PLAN_FILE" "$ROOT"; then
+     "$SLUG" "${PLAN_OVERRIDE:-}" "$ROOT"; then
   echo "RESULT: post-plan DECLINED — held twice on the same reason and nothing changed" \
        "since; no tokens spent, no PR change. Override: bin/post-plan-now --force"
   exit 8

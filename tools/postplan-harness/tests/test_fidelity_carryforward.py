@@ -515,6 +515,8 @@ def test_condition_12_identical_for_ready_with_notes(tmp_path):
     assert _cond12(res_cf, TREE)[1][0] == "READY WITH NOTES"
 
 
+# The verdict-file decline arm never changes the sticky shape: findings_excerpt,
+# digest_lines and compose_sticky output stay pinned by test_fidelity_sticky.py.
 def _matching_sticky(plan_body):
     plan_hash = hashlib.sha256(plan_body).hexdigest()
     diff_id = fidelity.diff_patch_id(DIFF)

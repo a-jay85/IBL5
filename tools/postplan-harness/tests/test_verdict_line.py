@@ -621,13 +621,15 @@ _RC3_CASES = [
      "terminal=failed kind=llm-usage-limit. Claude usage limit reached "
      "Re-run bin/post-plan-now after the limit resets."),
     ("diverged", "remote-head-diverged", "phase4: head moved", {},
-     "RESULT: post-plan BLOCKED — rc=3 (rebase-conflict, local-gate, or "
-     "llm-usage-limit), cause unknown; ERROR terminal=failed, no PR opened. "
-     "Resolve the cause, then re-run bin/post-plan-now."),
+     "RESULT: post-plan BLOCKED — remote head diverged at phase4 "
+     "(the PR branch changed on GitHub); ERROR terminal=failed "
+     "kind=remote-head-diverged. phase4: head moved "
+     "Fetch origin and inspect what was pushed, then rebase onto it or "
+     "reset to it, and re-run bin/post-plan-now."),
     ("none", None, "", {},
      "RESULT: post-plan BLOCKED — rc=3 (rebase-conflict, local-gate, or "
-     "llm-usage-limit), cause unknown; ERROR terminal=failed, no PR opened. "
-     "Resolve the cause, then re-run bin/post-plan-now."),
+     "llm-usage-limit), cause unknown (stage: unrecorded); ERROR terminal=failed, "
+     "no PR opened. Resolve the cause, then re-run bin/post-plan-now."),
     ("gate-stale-base", "local-gate", "does not contain origin/master", {},
      "RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit "
      "[class=stale-base]; ERROR terminal=failed, no PR opened. "

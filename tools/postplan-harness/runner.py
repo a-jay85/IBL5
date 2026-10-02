@@ -216,6 +216,13 @@ def _discharge_hold_sentences(llm, probe, justification: str, log) -> tuple[str,
     return residual, discharged
 
 
+def _record_failure_context(res: RunResult, e: HarnessError) -> None:
+    """Copy the failing command and its output tail from a HarnessError onto the result.
+    Both fields are redacted before storage; res.error stays raw."""
+    res.error_cmd = _redact(e.cmd) or None
+    res.error_output_tail = _redact(e.output) or None
+
+
 def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         worktree: str | None = None, headless: bool = True,
         plans_dir: str | None = None, live: bool = False,
@@ -892,6 +899,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.terminal = TerminalState.FAILED
         res.error = f"{e.kind}: {e.detail}"
         res.error_kind = e.kind
+        _record_failure_context(res, e)
         log(f"FAILED: {res.error}")
     except usage_pause.UsagePause as p:
         res.terminal = TerminalState.FAILED
@@ -1808,7 +1816,8 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
     rc = result.returncode
     if rc == 3:
         raise HarnessError("local-gate",
-                           f"meta-checks filter-parse failure: {(result.stderr or '').strip()[:200]}")
+                           f"meta-checks filter-parse failure: {(result.stderr or '').strip()[:200]}",
+                           cmd=" ".join(argv), output=(result.stderr or ""))
     if rc == 0:
         try:
             os.unlink(flag)
@@ -1825,7 +1834,8 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
         rc2 = result2.returncode
         if rc2 == 3:
             raise HarnessError("local-gate",
-                               f"meta-checks filter-parse failure: {(result2.stderr or '').strip()[:200]}")
+                               f"meta-checks filter-parse failure: {(result2.stderr or '').strip()[:200]}",
+                               cmd=" ".join(argv), output=(result2.stderr or ""))
         if rc2 == 0:
             try:
                 os.unlink(flag)
@@ -2367,6 +2377,51 @@ _BLOCK_BUDGET = 1800          # bin/discord-dm cuts at 1900; the deferred DM add
 _BLOCK_MAX_PATHS = 5
 _BLOCK_MAX_PATH_LEN = 120
 
+_TAIL_LINES = 3
+_TAIL_LINE_LEN = 160
+_TAIL_MAX = 300
+_CMD_MAX = 160
+
+_REDACT_RULES = (
+    (re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s@]+@"), r"\1***@"),
+    (re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}"), "***"),
+    (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}"), "***"),
+    (re.compile(r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]+"), r"\1***"),
+)
+_STAGE_RE = re.compile(r"\b(phase\d+(?:\.\d+)?[a-z]?)\b")
+
+
+def _redact(text: str) -> str:
+    """Strip credentials from text that is about to reach the RESULT line, block, or DM."""
+    for pattern, repl in _REDACT_RULES:
+        text = pattern.sub(repl, text)
+    return text
+
+
+def _error_tail(text: str | None) -> list[str]:
+    """Last few non-empty lines of `text`, redacted and bounded. Hooks and git print
+    the deciding line last, so the tail (not the head) is what a reader needs."""
+    lines = [" ".join(ln.split()) for ln in _redact(text or "").splitlines()]
+    lines = [ln for ln in lines if ln][-_TAIL_LINES:]
+    lines = [ln if len(ln) <= _TAIL_LINE_LEN else "…" + ln[-(_TAIL_LINE_LEN - 1):]
+             for ln in lines]
+    while len(" ".join(lines)) > _TAIL_MAX and len(lines) > 1:
+        lines.pop(0)
+    if lines and len(lines[0]) > _TAIL_MAX:
+        lines[0] = "…" + lines[0][-(_TAIL_MAX - 1):]
+    return lines
+
+
+def _cmd_text(cmd: str | None) -> str:
+    """Redacted, flattened command, cut to its head (the subcommand comes first)."""
+    flat = " ".join(_redact(cmd or "").split())
+    return flat if len(flat) <= _CMD_MAX else flat[:_CMD_MAX - 1] + "…"
+
+
+def _stage_of(res: RunResult) -> str:
+    m = _STAGE_RE.search(res.error or "")
+    return m.group(1) if m else (res.error_kind or "unrecorded")
+
 
 def _dedupe(items: list[str]) -> list[str]:
     seen: dict[str, None] = {}
@@ -2500,9 +2555,26 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     outcome = (f"PR #{res.pr_number} was not updated." if res.pr_number
                else "No PR opened.")
 
-    def render(limit: int) -> str:
+    cmd = _cmd_text(res.error_cmd)
+    detail: list[str] = []
+    if key in ("unknown", "remote-head-diverged"):
+        detail.append(f"Stopped during: {_stage_of(res)}")
+    if key in ("unknown", "gate-unknown", "remote-head-diverged"):
+        if cmd:
+            detail.append(f"Command: {cmd}")
+        src = res.error_output_tail or err
+        if key == "remote-head-diverged" and src.startswith("remote-head-diverged: "):
+            src = src[len("remote-head-diverged: "):]
+        tail = _error_tail(src)
+        if tail:
+            detail.append("Evidence:" if key == "remote-head-diverged" else "Last error lines:")
+            detail.extend(f"> {t}" for t in tail)
+
+    def render(limit: int, show_detail: bool) -> str:
         lines = [f"{branch} did not ship. {outcome}", "", f"Why: {why}"]
         lines.extend(_path_lines(paths, limit))
+        if show_detail and detail:
+            lines += [""] + detail
         lines += ["", "Fix:", f"  1. cd {wt}"]
         n = 1
         for s in steps:
@@ -2513,9 +2585,11 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
                   f"Log: {log}"]
         return "\n".join(lines)
 
-    block = render(_BLOCK_MAX_PATHS)
+    block = render(_BLOCK_MAX_PATHS, True)
     if len(block) > _BLOCK_BUDGET:
-        block = render(0)
+        block = render(0, True)
+    if len(block) > _BLOCK_BUDGET:
+        block = render(0, False)
     return block
 
 
@@ -2587,7 +2661,9 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                     "human required; ERROR terminal=failed, no PR opened."
                     f"{detail} Resolve the rebase, then re-run bin/post-plan-now.")
         if res.error_kind == "local-gate":
-            detail = _flat(res.error) or "see gate output"
+            tail = " ".join(_error_tail(res.error_output_tail or res.error)) or "see gate output"
+            cmd = _cmd_text(res.error_cmd)
+            detail = f"Command: {cmd}. Error: {tail}" if cmd else tail
             # Classify on the FULL res.error, never on `detail`: _flat truncates at 300
             # chars and the hooks echo their guidance line LAST, so classifying the
             # flattened form would silently degrade a long byte-budget denial to
@@ -2617,10 +2693,32 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                     f"ERROR terminal=failed kind=usage-pause-dirty. "
                     + (f"{detail} " if detail else "")
                     + "Inspect `git status` in the worktree, then re-run bin/post-plan-now.")
-        # Unknown or None error_kind — name all possible fail-closed causes
+        if res.error_kind == "remote-head-diverged":
+            ev = res.error or ""
+            if ev.startswith("remote-head-diverged: "):
+                ev = ev[len("remote-head-diverged: "):]
+            evidence = " ".join(_error_tail(ev)) or "no evidence recorded"
+            cmd = _cmd_text(res.error_cmd)
+            cmd_part = f" Command: {cmd}." if cmd else ""
+            return (f"RESULT: post-plan BLOCKED — remote head diverged at {_stage_of(res)} "
+                    f"(the PR branch changed on GitHub); ERROR terminal=failed "
+                    f"kind=remote-head-diverged{pr}.{cmd_part} {evidence} "
+                    "Fetch origin and inspect what was pushed, then rebase onto it or "
+                    "reset to it, and re-run bin/post-plan-now.")
+        # Unknown or None error_kind. Name the stage; say "cause unknown" only when no
+        # command failed.
+        stage = _stage_of(res)
+        tail = " ".join(_error_tail(res.error_output_tail or res.error))
+        cmd = _cmd_text(res.error_cmd)
+        if cmd:
+            return (f"RESULT: post-plan BLOCKED — rc=3 kind={res.error_kind or 'none'} at "
+                    f"{stage}; ERROR terminal=failed{pr}. Command: {cmd}. Error: "
+                    f"{tail or 'no output captured'} "
+                    "Resolve the cause, then re-run bin/post-plan-now.")
         return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict, local-gate, or "
-                "llm-usage-limit), cause unknown; ERROR terminal=failed, no PR opened. "
-                "Resolve the cause, then re-run bin/post-plan-now.")
+                f"llm-usage-limit), cause unknown (stage: {stage}); ERROR terminal=failed, "
+                "no PR opened. " + (f"{tail} " if tail else "")
+                + "Resolve the cause, then re-run bin/post-plan-now.")
     if res.error_kind in ("push-retry-cap", "lostwork-unproved"):
         cause = ("push retry cap reached (stale lease after 3 attempts)"
                  if res.error_kind == "push-retry-cap"

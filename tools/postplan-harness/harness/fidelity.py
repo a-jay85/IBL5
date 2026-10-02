@@ -893,6 +893,18 @@ def findings_excerpt(path: str, verdict_present: bool) -> str:
     return text
 
 
+def verdict_file_usable(path: str) -> bool:
+    """True when the verdict file would put a non-empty findings excerpt in the sticky.
+
+    Carry-forward reuses a prior verdict without re-running the reviewer, but the sticky
+    the runner then composes still quotes this file. A file gone from /tmp (a reboot),
+    unreadable, blank, or holding nothing above the digest cut would print an empty
+    excerpt and placeholder digest rows over a sticky that already had real ones. Same
+    definition as the sticky's own excerpt, so the two can never disagree.
+    """
+    return bool(findings_excerpt(path, True))
+
+
 def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed) -> str:
     """The last prose line of the sticky comment. First matching row wins.
 

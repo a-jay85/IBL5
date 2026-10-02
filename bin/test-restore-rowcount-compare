@@ -1,0 +1,494 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# test-restore-rowcount-compare — behavioural harness for bin/lib/restore-rowcount-compare.sh.
+#
+# Drives the helper's snapshot / extract / compare subcommands with a fake SQL
+# client and fixture files, and asserts on exit codes and exact output lines.
+#
+# Run: bin/test-restore-rowcount-compare  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+HELPER="${HELPER:-$SCRIPT_DIR/lib/restore-rowcount-compare.sh}"
+BASE_TMP="$(mktemp -d)"
+trap 'rm -rf "$BASE_TMP"' EXIT
+
+FAILED=0
+OUT="$BASE_TMP/out"
+ERR="$BASE_TMP/err"
+
+check() { # name cmd [args...]: passes when the command succeeds
+    local name="$1"
+    shift
+    if "$@"; then
+        echo "ok: $name"
+    else
+        echo "FAIL: $name"
+        sed 's/^/      | /' "$OUT" 2>/dev/null | head -20
+        sed 's/^/      ! /' "$ERR" 2>/dev/null | head -20
+        FAILED=1
+    fi
+}
+
+# Fake SQL client: logs argv, branches on the table named in the -e SQL text.
+FAKE="$BASE_TMP/fake-mysql"
+CALLS="$BASE_TMP/client-calls.log"
+cat > "$FAKE" <<'FAKE_EOF'
+#!/bin/sh
+echo "$*" >> "$CALLS_LOG"
+sql=""
+while [ "$#" -gt 0 ]; do
+    if [ "$1" = "-e" ]; then
+        sql="$2"
+    fi
+    shift
+done
+case "$sql" in
+    *'`t_fail`'*) echo "ERROR 1146 (42S02): Table doesn't exist" >&2; exit 1 ;;
+    *'`t_junk`'*) echo "N/A"; exit 0 ;;
+    *'`t_a`'*) echo 120 ;;
+    *'`t_b`'*) echo 0 ;;
+    *) echo 7 ;;
+esac
+FAKE_EOF
+chmod +x "$FAKE"
+export CALLS_LOG="$CALLS"
+
+# Same fake, but it drains stdin first like a real client reading a script from a pipe.
+STDIN_FAKE="$BASE_TMP/fake-mysql-stdin"
+printf '#!/bin/sh\ncat > /dev/null\nexec "%s" "$@"\n' "$FAKE" > "$STDIN_FAKE"
+chmod +x "$STDIN_FAKE"
+
+# fixture <name> <line>... writes $BASE_TMP/<name> and prints its path.
+fixture() {
+    local path="$BASE_TMP/$1"
+    shift
+    : > "$path"
+    local line
+    for line in "$@"; do
+        printf '%s\n' "$line" >> "$path"
+    done
+    printf '%s' "$path"
+}
+
+# run_cmd <cmd>...: capture stdout to $OUT, stderr to $ERR, keep the exit code in $RC.
+RC=0
+run_cmd() {
+    if "$@" > "$OUT" 2> "$ERR"; then
+        RC=0
+    else
+        RC=$?
+    fi
+    return 0
+}
+
+out_has() { grep -qxF -- "$1" "$OUT"; }
+err_has() { grep -qF -- "$1" "$ERR"; }
+
+# --- 1. match passes ---------------------------------------------------------
+case_1() {
+    local e a
+    e="$(fixture c1e 'ROWCOUNT t_a 120' 'ROWCOUNT t_b 5')"
+    a="$(fixture c1a 'ROWCOUNT t_a 120' 'ROWCOUNT t_b 5')"
+    run_cmd "$HELPER" compare "$e" "$a" t_a t_b
+    [ "$RC" -eq 0 ] && out_has 'Row-count check passed (2 tables).'
+}
+check "1 equal counts pass" case_1
+
+# --- 2. truncated table fails, log line pinned --------------------------------
+case_2() {
+    local e a
+    e="$(fixture c2e 'ROWCOUNT t_a 120')"
+    a="$(fixture c2a 'ROWCOUNT t_a 10')"
+    run_cmd "$HELPER" compare "$e" "$a" t_a
+    [ "$RC" -eq 1 ] \
+        && out_has 'rowcount t_a: pre-dump=120 restored=10 FAIL (restored below pre-dump)' \
+        && err_has 'ERROR: row-count check failed for 1 of 1 tables'
+}
+check "2 truncated table fails" case_2
+
+# --- 3. grew during dump passes -----------------------------------------------
+case_3() {
+    local e a
+    e="$(fixture c3e 'ROWCOUNT t_a 120')"
+    a="$(fixture c3a 'ROWCOUNT t_a 121')"
+    run_cmd "$HELPER" compare "$e" "$a" t_a
+    [ "$RC" -eq 0 ] && out_has 'rowcount t_a: pre-dump=120 restored=121 OK'
+}
+check "3 restored above pre-dump passes" case_3
+
+# --- 4. required table missing from expected fails ------------------------------
+case_4() {
+    local e a
+    e="$(fixture c4e 'ROWCOUNT t_a 120')"
+    a="$(fixture c4a 'ROWCOUNT t_a 120' 'ROWCOUNT t_b 5')"
+    run_cmd "$HELPER" compare "$e" "$a" t_a t_b
+    [ "$RC" -eq 1 ] && out_has 'rowcount t_b: pre-dump=- restored=5 FAIL (missing pre-dump count)'
+}
+check "4 table missing from expected fails" case_4
+
+# --- 5. invalid or duplicate counts fail ----------------------------------------
+case_5a() {
+    local e a
+    e="$(fixture c5ae 'ROWCOUNT t_a ERROR')"
+    a="$(fixture c5aa 'ROWCOUNT t_a 120')"
+    run_cmd "$HELPER" compare "$e" "$a" t_a
+    [ "$RC" -eq 1 ] && out_has 'rowcount t_a: pre-dump=ERROR restored=120 FAIL (pre-dump count invalid)'
+}
+case_5b() {
+    local e a
+    e="$(fixture c5be 'ROWCOUNT t_a 120')"
+    a="$(fixture c5ba 'ROWCOUNT t_a abc')"
+    run_cmd "$HELPER" compare "$e" "$a" t_a
+    [ "$RC" -eq 1 ] && out_has 'rowcount t_a: pre-dump=120 restored=abc FAIL (restored count invalid)'
+}
+case_5c() {
+    local e a
+    e="$(fixture c5ce 'ROWCOUNT t_a 120' 'ROWCOUNT t_a 120')"
+    a="$(fixture c5ca 'ROWCOUNT t_a 120')"
+    run_cmd "$HELPER" compare "$e" "$a" t_a
+    [ "$RC" -eq 1 ] && grep -qF 'FAIL (duplicate count line)' "$OUT"
+}
+check "5a ERROR pre-dump count fails" case_5a
+check "5b non-numeric restored count fails" case_5b
+check "5c duplicate count line fails" case_5c
+
+# --- 6. empty expected fails ----------------------------------------------------
+case_6() {
+    local e a
+    e="$(fixture c6e)"
+    a="$(fixture c6a 'ROWCOUNT t_a 120' 'ROWCOUNT t_b 5')"
+    run_cmd "$HELPER" compare "$e" "$a" t_a t_b
+    [ "$RC" -eq 1 ] \
+        && out_has 'rowcount t_a: pre-dump=- restored=120 FAIL (missing pre-dump count)' \
+        && out_has 'rowcount t_b: pre-dump=- restored=5 FAIL (missing pre-dump count)'
+}
+check "6 empty expected fails" case_6
+
+# --- 7. restored-side table missing fails ---------------------------------------
+case_7() {
+    local e a
+    e="$(fixture c7e 'ROWCOUNT t_a 120')"
+    a="$(fixture c7a)"
+    run_cmd "$HELPER" compare "$e" "$a" t_a
+    [ "$RC" -eq 1 ] && out_has 'rowcount t_a: pre-dump=120 restored=- FAIL (missing after restore)'
+}
+check "7 table missing after restore fails" case_7
+
+# --- 8. zero/zero passes --------------------------------------------------------
+case_8() {
+    local e a
+    e="$(fixture c8e 'ROWCOUNT t_b 0')"
+    a="$(fixture c8a 'ROWCOUNT t_b 0')"
+    run_cmd "$HELPER" compare "$e" "$a" t_b
+    [ "$RC" -eq 0 ] && out_has 'rowcount t_b: pre-dump=0 restored=0 OK'
+}
+check "8 zero and zero pass" case_8
+
+# --- 9. extract keeps only well-formed lines ------------------------------------
+case_9() {
+    local log want
+    log="$BASE_TMP/c9.log"
+    {
+        printf 'Dump size: 5 bytes\n'
+        printf 'Retained dumps:\n'
+        printf 'ROWCOUNT t_a 120\n'
+        printf 'ROWCOUNT t_b ERROR\n'
+        printf 'ROWCOUNT t_c 1.5\n'
+        printf 'ROWCOUNT bad-name 3\n'
+        printf ' ROWCOUNT t_d 4\n'
+        printf 'ROWCOUNT t_e 9\r\n'
+    } > "$log"
+    want="$(fixture c9want 'ROWCOUNT t_a 120' 'ROWCOUNT t_b ERROR' 'ROWCOUNT t_e 9')"
+    run_cmd "$HELPER" extract "$log"
+    [ "$RC" -eq 0 ] && diff "$want" "$OUT" > /dev/null || return 1
+    run_cmd "$HELPER" extract "$BASE_TMP/no-such.log"
+    [ "$RC" -eq 2 ]
+}
+check "9 extract filters noise" case_9
+
+# --- 10. snapshot records ERROR and keeps going ----------------------------------
+case_10() {
+    local want
+    : > "$CALLS"
+    want="$(fixture c10want \
+        'ROWCOUNT t_a 120' 'ROWCOUNT t_fail ERROR' 'ROWCOUNT t_junk ERROR' \
+        'ROWCOUNT x;DROP ERROR' 'ROWCOUNT t_b 0')"
+    ROWCOUNT_MYSQL="$FAKE" run_cmd "$HELPER" snapshot db t_a t_fail t_junk 'x;DROP' t_b
+    [ "$RC" -eq 0 ] && diff "$want" "$OUT" > /dev/null || return 1
+    [ "$(wc -l < "$CALLS" | tr -d ' ')" -eq 4 ] || return 1
+    ! grep -q 'DROP' "$CALLS" || return 1
+    [ "$(grep -c -e '-N' -e '-B' "$CALLS")" -eq 4 ] && [ "$(grep -c ' db$' "$CALLS")" -eq 4 ] || return 1
+    ROWCOUNT_MYSQL="$FAKE" run_cmd "$HELPER" snapshot db
+    [ "$RC" -eq 2 ]
+}
+check "10 snapshot records ERROR and continues" case_10
+
+# --- 11. dispatch guard ----------------------------------------------------------
+case_11() {
+    local sh=/bin/bash
+    [ -x "$sh" ] || sh=bash
+    "$sh" -s < "$HELPER" > "$OUT" 2> "$ERR" || return 1
+    [ ! -s "$OUT" ] || return 1
+    local want
+    want="$(fixture c11want 'ROWCOUNT t_a 120' 'ROWCOUNT t_fail ERROR' 'ROWCOUNT t_b 0' 'AFTER')"
+    {
+        cat "$HELPER"
+        printf 'set -euo pipefail\nrrc_snapshot db t_a t_fail t_b\necho AFTER\n'
+    } | ROWCOUNT_MYSQL="$STDIN_FAKE" "$sh" -s > "$OUT" 2> "$ERR" || return 1
+    diff "$want" "$OUT" > /dev/null
+}
+check "11 piped helper defines functions only and survives set -e" case_11
+
+# --- 12. usage errors exit 2 -----------------------------------------------------
+case_12() {
+    local e a
+    e="$(fixture c12e 'ROWCOUNT t_a 1')"
+    a="$(fixture c12a 'ROWCOUNT t_a 1')"
+    run_cmd "$HELPER"
+    [ "$RC" -eq 2 ] && err_has usage || return 1
+    run_cmd "$HELPER" bogus
+    [ "$RC" -eq 2 ] && err_has usage || return 1
+    run_cmd "$HELPER" compare "$e" "$a"
+    [ "$RC" -eq 2 ] && err_has usage
+}
+check "12 usage errors exit 2" case_12
+
+# --- Workflow extraction -----------------------------------------------------------
+WORKFLOW="${WORKFLOW:-$SCRIPT_DIR/../.github/workflows/db-backup.yml}"
+
+# remote_body <workflow>: the dump step's remote heredoc body. The start anchor is the
+# unique `- <<'REMOTE'` line; its backslash continuations (the ssh and tee lines) are
+# skipped; the body ends at the first later bare REMOTE terminator.
+remote_body() {
+    awk '
+        state == 0 && index($0, "- <<'"'"'REMOTE'"'"'") { state = 1; next }
+        state == 1 { if ($0 !~ /\\$/) state = 2; next }
+        state == 2 && /^ *REMOTE$/ { exit }
+        state == 2 { print }
+    ' "$1"
+}
+
+# restore_block <workflow>: the restore step's compare block, from its unique opening
+# comment up to (excluding) the "Restore verification passed." echo.
+restore_block() {
+    awk '
+        index($0, "# Restored COUNT(*) must be >= prod'"'"'s pre-dump COUNT(*)") { on = 1 }
+        on && index($0, "echo \"Restore verification passed.\"") { exit }
+        on { print }
+    ' "$1"
+}
+
+# Fake binaries on PATH for the workflow simulations: mysql logs COUNT then delegates to
+# the Phase 2 fake; mariadb-dump logs DUMP and emits ~1.2 MB of incompressible data.
+SIMBIN="$BASE_TMP/simbin"
+ORDER="$BASE_TMP/order.log"
+mkdir -p "$SIMBIN"
+printf '#!/bin/sh\necho COUNT >> "%s"\nexec "%s" "$@"\n' "$ORDER" "$FAKE" > "$SIMBIN/mysql"
+printf '#!/bin/sh\necho DUMP >> "%s"\nhead -c 1200000 /dev/urandom\n' "$ORDER" > "$SIMBIN/mariadb-dump"
+chmod +x "$SIMBIN/mysql" "$SIMBIN/mariadb-dump"
+
+# sim_remote <workflow>: run the real remote script body (helper piped ahead of it) in a
+# fresh cwd with fake clients. Leaves stdout in $OUT and the COUNT/DUMP order in $ORDER.
+sim_remote() {
+    local sim
+    sim="$(mktemp -d "$BASE_TMP/sim.XXXXXX")"
+    : > "$ORDER"
+    {
+        cat "$HELPER"
+        remote_body "$1"
+    } | (
+        cd "$sim" \
+            && env -u ROWCOUNT_MYSQL PATH="$SIMBIN:$PATH" \
+                REMOTE_DATABASE=db REMOTE_FILE=backups/db/ibl5-2026-01-01.sql.gz \
+                ROWCOUNT_TABLES='t_a t_fail t_b' bash -s
+    ) > "$OUT" 2> "$ERR"
+    SIM_RC=$?
+    SIM_DIR="$sim"
+    return 0
+}
+
+# order_ok: every COUNT precedes the DUMP, and both happened.
+order_ok() {
+    [ "$(grep -c '^DUMP$' "$ORDER")" -eq 1 ] \
+        && [ "$(grep -c '^COUNT$' "$ORDER")" -eq 3 ] \
+        && awk '/^DUMP$/ { d = 1 } /^COUNT$/ && d { bad = 1 } END { exit bad }' "$ORDER"
+}
+
+xargs_ok=1
+if ! echo | xargs -r true > /dev/null 2>&1; then
+    xargs_ok=0
+fi
+
+# --- 13. remote script simulation -----------------------------------------------------
+case_13() {
+    local want
+    sim_remote "$WORKFLOW"
+    [ "$SIM_RC" -eq 0 ] || return 1
+    [ -f "$SIM_DIR/backups/db/ibl5-2026-01-01.sql.gz" ] || return 1
+    want="$(fixture c13want 'ROWCOUNT t_a 120' 'ROWCOUNT t_fail ERROR' 'ROWCOUNT t_b 0')"
+    "$HELPER" extract "$OUT" > "$BASE_TMP/c13got" || return 1
+    diff "$want" "$BASE_TMP/c13got" > /dev/null || return 1
+    order_ok
+}
+if [ "$xargs_ok" -eq 1 ]; then
+    check "13 remote script keeps the backup, emits counts, counts before dumping" case_13
+else
+    echo "SKIP: xargs -r unsupported (case 13)"
+fi
+
+# --- 14. anchor is unique and on-target -----------------------------------------------
+case_14() {
+    local mut="$BASE_TMP/mut.yml"
+    [ "$(grep -c "<<'REMOTE'" "$WORKFLOW")" -eq 1 ] || return 1
+
+    # Injected early exit: the simulation must see no ROWCOUNT line.
+    awk '/^ *rrc_snapshot "\$REMOTE_DATABASE"/ { print "            exit 0" } { print }' \
+        "$WORKFLOW" > "$mut"
+    grep -q '^            exit 0$' "$mut" || return 1
+    sim_remote "$mut"
+    [ "$SIM_RC" -eq 0 ] || return 1
+    ! grep -q '^ROWCOUNT ' "$OUT" || return 1
+
+    # Snapshot moved below the dump: the ordering assertion must report it.
+    awk '
+        /^ *rrc_snapshot "\$REMOTE_DATABASE"/ { hold = $0; getline l2; hold = hold "\n" l2; next }
+        { print }
+        /\| gzip > "\$REMOTE_FILE"/ && hold != "" { print hold }
+    ' "$WORKFLOW" > "$mut"
+    sim_remote "$mut"
+    [ "$SIM_RC" -eq 0 ] || return 1
+    ! order_ok
+}
+if [ "$xargs_ok" -eq 1 ]; then
+    check "14 remote anchor is unique and the simulation reads the real snapshot call" case_14
+else
+    echo "SKIP: xargs -r unsupported (case 14)"
+fi
+
+# --- 15. restore-side compare block ---------------------------------------------------
+run_restore_block() { # <workflow> <prod rowcounts...>: runs the block, leaves rc in RC
+    local rt="$BASE_TMP/rt"
+    local wf="$1"
+    shift
+    mkdir -p "$rt"
+    fixture rt/prod-rowcounts.txt "$@" > /dev/null
+    : > "$CALLS"
+    {
+        echo 'set -euo pipefail'
+        restore_block "$wf"
+    } | (
+        cd "$SCRIPT_DIR/.." \
+            && env PATH="$SIMBIN:$PATH" RUNNER_TEMP="$rt" DB=db ROWCOUNT_TABLES='t_a t_b' bash -s
+    ) > "$OUT" 2> "$ERR"
+    RC=$?
+    return 0
+}
+
+case_15() {
+    local mut="$BASE_TMP/mut-restore.yml" bad
+    [ "$(grep -c "# Restored COUNT(\*) must be >= prod's pre-dump" "$WORKFLOW")" -eq 1 ] || return 1
+
+    run_restore_block "$WORKFLOW" 'ROWCOUNT t_a 120' 'ROWCOUNT t_b 0'
+    [ "$RC" -eq 0 ] && out_has 'Row-count check passed (2 tables).' || return 1
+    [ -s "$CALLS" ] || return 1
+    bad="$(grep -v -e '-h 127.0.0.1' "$CALLS" | wc -l | tr -d ' ')"
+    [ "$bad" -eq 0 ] || return 1
+    bad="$(grep -v -e '-P 3306' "$CALLS" | wc -l | tr -d ' ')"
+    [ "$bad" -eq 0 ] || return 1
+
+    run_restore_block "$WORKFLOW" 'ROWCOUNT t_a 121' 'ROWCOUNT t_b 0'
+    [ "$RC" -eq 1 ] \
+        && out_has 'rowcount t_a: pre-dump=121 restored=120 FAIL (restored below pre-dump)' \
+        || return 1
+
+    # A workflow with the compare call deleted must be caught: the fail case then exits 0.
+    awk '
+        skip { if ($0 ~ /"\$\{ROWCOUNT_TABLE_LIST\[@\]\}"$/) skip = 0; next }
+        /bin\/lib\/restore-rowcount-compare\.sh compare/ { skip = 1; next }
+        { print }
+    ' "$WORKFLOW" > "$mut"
+    run_restore_block "$mut" 'ROWCOUNT t_a 121' 'ROWCOUNT t_b 0'
+    [ "$RC" -eq 0 ]
+}
+check "15 restore-step compare block passes, fails, and detects a deleted compare" case_15
+
+# --- 16. real-MariaDB snapshot (opt-in: RRC_LIVE_DB=1) --------------------------------
+# Needs the worktree Docker stack. With RRC_LIVE_DB=1 an unreachable DB is a failure.
+live_setup() {
+    local checkout container db_name db_user db_pass
+    checkout="$(cd "$SCRIPT_DIR/.." && pwd)"
+    # shellcheck source=lib/db-helpers.sh
+    . "$SCRIPT_DIR/lib/db-helpers.sh"
+    container="$(db_resolve_target "$checkout")"
+    [ "$container" != "main" ] || { echo "live case needs a worktree stack, not the main checkout" > "$ERR"; return 1; }
+    db_container_running "$container" || { echo "container $container is not running (bin/wt-up)" > "$ERR"; return 1; }
+    db_user="$(php -r "error_reporting(0); include '$checkout/ibl5/config.php'; echo \$dbuname;" 2>/dev/null)"
+    db_pass="$(php -r "error_reporting(0); include '$checkout/ibl5/config.php'; echo \$dbpass;" 2>/dev/null)"
+    db_name="$(php -r "error_reporting(0); include '$checkout/ibl5/config.php'; echo \$dbname;" 2>/dev/null)"
+    [ -n "$db_name" ] || { echo "could not resolve the database name from config.php" > "$ERR"; return 1; }
+    LIVE_DB="$db_name"
+    LIVE_CLIENT="$BASE_TMP/live-mysql"
+    printf '#!/bin/sh\nexec docker exec -i "%s" mariadb --skip-ssl -u "%s" -p"%s" "$@"\n' \
+        "$container" "$db_user" "$db_pass" > "$LIVE_CLIENT"
+    chmod +x "$LIVE_CLIENT"
+}
+
+case_16() {
+    local tables t want n
+    live_setup || return 1
+    tables="$(awk '
+        /^ *ROWCOUNT_TABLES: >-$/ { on = 1; next }
+        on && /^ *#/ { next }
+        on && /^        [a-z_]/ { printf "%s ", $0; next }
+        on { exit }
+    ' "$WORKFLOW")"
+    # shellcheck disable=SC2086  # word-splitting the table list is the point
+    set -- $tables
+    [ "$#" -eq 11 ] || { echo "expected 11 ROWCOUNT_TABLES, parsed $#" > "$ERR"; return 1; }
+
+    ROWCOUNT_MYSQL="$LIVE_CLIENT" run_cmd "$HELPER" snapshot "$LIVE_DB" "$@" ibl_no_such_table
+    [ "$RC" -eq 0 ] || return 1
+    [ "$(wc -l < "$OUT" | tr -d ' ')" -eq 12 ] || return 1
+    [ "$(grep -c -E '^ROWCOUNT [a-z_]+ [0-9]+$' "$OUT")" -eq 11 ] || return 1
+    [ "$(tail -n 1 "$OUT")" = 'ROWCOUNT ibl_no_such_table ERROR' ] || return 1
+    n="$(awk '$2 == "ibl_team_info" { print $3 }' "$OUT")"
+    [ "${n:-0}" -ge 28 ] || return 1
+    cp "$OUT" "$BASE_TMP/live-snap"
+    grep -v ibl_no_such_table "$BASE_TMP/live-snap" > "$BASE_TMP/live-exp"
+
+    run_cmd "$HELPER" compare "$BASE_TMP/live-exp" "$BASE_TMP/live-exp" "$@"
+    [ "$RC" -eq 0 ] || return 1
+
+    # Raise ibl_plr's expected count by 1: the real snapshot is now below it.
+    awk '$2 == "ibl_plr" { $3 = $3 + 1 } { print }' "$BASE_TMP/live-exp" > "$BASE_TMP/live-exp-up"
+    run_cmd "$HELPER" compare "$BASE_TMP/live-exp-up" "$BASE_TMP/live-exp" "$@"
+    [ "$RC" -eq 1 ] && grep -F 'rowcount ibl_plr:' "$OUT" | grep -qF 'restored below pre-dump' || return 1
+
+    # Prod pipe shape: docker exec -i reads stdin, so </dev/null must protect the script.
+    {
+        cat "$HELPER"
+        printf 'set -euo pipefail\nrrc_snapshot %s ibl_plr ibl_no_such_table ibl_team_info\necho AFTER\n' "$LIVE_DB"
+    } | ROWCOUNT_MYSQL="$LIVE_CLIENT" bash -s > "$OUT" 2> "$ERR" || return 1
+    [ "$(wc -l < "$OUT" | tr -d ' ')" -eq 4 ] && [ "$(tail -n 1 "$OUT")" = 'AFTER' ] || return 1
+    t="$(grep -c '^ROWCOUNT ' "$OUT")"
+    [ "$t" -eq 3 ]
+}
+if [ "${RRC_LIVE_DB:-}" = "1" ]; then
+    check "16 live MariaDB snapshot, compare, and prod pipe shape" case_16
+else
+    echo "SKIP: live DB case (set RRC_LIVE_DB=1)"
+fi
+
+# --- 17. ROWCOUNT_MYSQL set but empty falls back to mysql on PATH ----------------------
+# Mutation guard: testing ${ROWCOUNT_MYSQL+x} (set) instead of non-empty would run an
+# empty command here and fail this case.
+case_17() {
+    PATH="$SIMBIN:$PATH" ROWCOUNT_MYSQL='' run_cmd "$HELPER" snapshot db t_a
+    [ "$RC" -eq 0 ] && out_has 'ROWCOUNT t_a 120'
+}
+check "17 empty ROWCOUNT_MYSQL falls back to mysql on PATH" case_17
+
+exit "$FAILED"

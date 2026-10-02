@@ -905,8 +905,7 @@ def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed)
     if v1 == "READY":
         return "READY"
     if v1 == "READY WITH NOTES":
-        return ("READY WITH NOTES — notes left for the merging reviewer; "
-                "the compiled harness remediates only NOT READY")
+        return "READY WITH NOTES"
     if not remediation_sha:
         return ("NOT READY — the blocking findings listed above remain; "
                 "remediate and re-run /post-plan")
@@ -925,10 +924,11 @@ def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed)
 def _sticky_prior_verdict(sticky_body: str) -> str | None:
     """The carry-forwardable verdict word from a prior sticky's terminal line.
 
-    Prefix matching, never substring: terminal_line's READY WITH NOTES text ends with
-    "... the compiled harness remediates only NOT READY", so a `"NOT READY" in last`
-    test would reject a perfectly valid carry-forward. Order matters too — the longest
-    alternative is checked first, the same property VERDICT_RE encodes.
+    Prefix matching, never substring: terminal_line now emits a bare READY WITH NOTES,
+    but stickies posted before that change still end in "... the compiled harness
+    remediates only NOT READY", so a `"NOT READY" in last` test would reject a valid
+    carry-forward from one of them. Order matters too: the longest alternative is
+    checked first, the same property VERDICT_RE encodes.
 
     A remediated run is deliberately excluded. terminal_line emits "READY (re-review) —
     ..." when a remediation round produced the passing verdict, and that verdict belongs
@@ -1008,18 +1008,133 @@ def carry_forward_predicate(sticky_body, diff_id: str,
     return verdict, ""
 
 
+# Status lines the runner builds on every clean run. The composer prints only a line that
+# deviates from these, so a clean sticky carries no REBASE= or CI: line at all.
+_EXPECTED_REBASE = ("REBASE=clean (HEAD already contains origin/master)",
+                    "REBASE=rebased onto origin/master")
+_EXPECTED_CI_RE = re.compile(
+    r"^CI: local verification pass; GitHub checks are watched after this comment"
+    r"(; remediation commit [0-9a-f]+ is inside that watch)?$")
+
+
+def _shape_excerpt(excerpt: str) -> tuple[str, list[str]]:
+    """Split the reviewer's excerpt into (visible text, REVIEW-COVERAGE: lines).
+
+    Coverage lines are lifted byte-identical so the audit trail can carry them; every one
+    is lifted, so a reviewer that emits two never leaks one. The bare verdict word is
+    dropped because the banner and the terminal line already carry it. An `## FINDINGS`
+    heading with nothing under it becomes `Findings: none.`; a non-empty section is kept
+    verbatim, heading included.
+    """
+    if not excerpt:
+        return "", []
+    coverage: list[str] = []
+    kept: list[str] = []
+    for line in excerpt.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("REVIEW-COVERAGE:"):
+            coverage.append(line.rstrip())
+            continue
+        if VERDICT_RE.match(stripped):
+            continue
+        kept.append(line)
+
+    shaped: list[str] = []
+    i = 0
+    while i < len(kept):
+        if kept[i].strip() == "## FINDINGS":
+            j = i + 1
+            while j < len(kept) and not kept[j].startswith("#") and not kept[j].strip():
+                j += 1
+            if j == len(kept) or kept[j].startswith("#"):
+                shaped.extend(["Findings: none.", ""])
+                i = j
+                continue
+        shaped.append(kept[i])
+        i += 1
+
+    collapsed: list[str] = []
+    for line in shaped:
+        if not line.strip() and collapsed and not collapsed[-1].strip():
+            continue
+        collapsed.append(line)
+    return "\n".join(collapsed).strip("\n"), coverage
+
+
+BACKLOG_ISSUES_URL = "https://github.com/a-jay85/IBL5-backlog/issues/"
+PR_URL = "https://github.com/a-jay85/IBL5/pull/"
+
+_BACKLOG_REF = r"(?:a-jay85/)?(?:IBL5-)?backlog#(\d+)(?!\d)"
+_REF_RE = re.compile(
+    r"(?<![\w/])" + _BACKLOG_REF
+    + r"|(?<![\w/&\[#-])#(\d{3,})(?!\d)",
+    re.IGNORECASE)
+_WHOLE_BACKLOG_RE = re.compile(_BACKLOG_REF, re.IGNORECASE)
+# Existing markdown links and code spans are opaque: the leftmost match wins, so a ref
+# inside either is never seen by _REF_RE.
+_OPAQUE_RE = re.compile(r"\[[^\]\n]*\]\([^)\n]*\)|`[^`\n]*`")
+
+
+def _backlog_link(text: str, n) -> str:
+    return f"[{text}](<{BACKLOG_ISSUES_URL}{n}>)"
+
+
+def _link_plain(seg: str) -> str:
+    def repl(m):
+        if m.group(1):
+            return _backlog_link(m.group(0), m.group(1))
+        return f"[#{m.group(2)}](<{PR_URL}{m.group(2)}>)"
+    return _REF_RE.sub(repl, seg)
+
+
+def linkify_refs(text: str) -> str:
+    """Turn backlog and PR refs in digest prose into explicit markdown links.
+
+    Backlog refs never autolink on GitHub and nothing autolinks in the Discord DM, so the
+    links are spelled out; the URL sits in `<>` (valid CommonMark, and Discord skips the
+    embed, as bin/digest-dm-build does). Backlog forms run in the same leftmost pass as
+    bare `#N` (3+ digits, same bar as bin/check-prose), so `backlog#12` is not re-matched.
+    Text inside an existing link or a code span is left alone, except a code span whose
+    whole content is one backlog ref, which is unwrapped. Idempotent.
+    """
+    out: list[str] = []
+    pos = 0
+    for m in _OPAQUE_RE.finditer(text):
+        out.append(_link_plain(text[pos:m.start()]))
+        tok = m.group(0)
+        inner = tok[1:-1] if tok.startswith("`") else None
+        wm = _WHOLE_BACKLOG_RE.fullmatch(inner) if inner is not None else None
+        out.append(_backlog_link(inner, wm.group(1)) if wm else tok)
+        pos = m.end()
+    out.append(_link_plain(text[pos:]))
+    return "".join(out)
+
+
+def digest_rows_for_display(digest: list, fid: dict) -> list:
+    """The five digest rows exactly as the sticky prints them, remediation suffix included.
+
+    Shared by compose_sticky and the runner's PR-body write so the two cannot disagree.
+    """
+    rows = list(digest)[:5]
+    sha = (fid or {}).get("remediation_sha")
+    if sha and len(rows) == 5:
+        rows[4] = rows[4] + f" (post-plan remediation: {sha})"
+    return rows
+
+
 def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
                    digest: list, excerpt: str, terminal: str, *,
                    diff_id: str = "", plan_hash: str = "",
                    posted_at: str = "") -> str:
     """The full sticky comment body, marker last.
 
-    Ordering is a contract, not a style: every line the DM parser must NOT read as a digest
-    label sits ABOVE `### Merge digest`, and the marker is the final line.
+    Ordering is a contract, not a style: every non-label line sits above `### Merge digest`
+    or after the `---` that ends it. The machine-read audit trail sits after `---`, so
+    `_digest_labels` never folds it into the fifth label, and the marker is the final line.
+    Expected lines are not printed: a clean rebase, a passing CI line, and an armed
+    decision leave no trace beyond the banner.
 
-    `posted_at` — when non-empty, adds a top banner, timestamps the verdict line, and adds
-    an italic timestamp line immediately above the terminal line. When empty, the output is
-    identical to the pre-timestamp shape so existing callers are unaffected.
+    `posted_at` adds a timestamp to the banner and changes nothing else.
     """
     fid = fid or {}
 
@@ -1035,24 +1150,58 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
     else:
         verdict_word = fid.get("verdict_1") or "missing"
 
-    out = []
-    if posted_at:
-        out.append(f"**LATEST VERDICT: {verdict_word}** — posted {posted_at}")
-        out.append("")
-    out.extend([rebase_line, ci_line, ""])
-
-    # The timestamp is inserted before "reviewer findings follow" so the line reads:
-    # "Plan-fidelity verdict: NOT READY — posted <ts> — reviewer findings follow"
-    ts_mid = f"posted {posted_at} — " if posted_at else ""
+    armed = decision is not None and getattr(decision, "armed", False)
+    banner = f"**{verdict_word}**"
     if findings_round and findings_round <= len(rounds):
-        out.append(f"Plan-fidelity verdict: {verdict_word} (re-review after "
-                   f"remediation round {findings_round}) — {ts_mid}reviewer findings follow")
-    else:
-        out.append(f"Plan-fidelity verdict: {verdict_word} — {ts_mid}"
-                   "reviewer findings follow")
-    out.append(excerpt if excerpt else f"(no verdict file: {fid.get('error_kind')})")
+        banner += f" (re-review, round {findings_round})"
+    if posted_at:
+        banner += f" — {posted_at}"
+    banner += " · auto-merge armed" if armed else " · auto-merge held"
+    out = [banner, ""]
+
+    status = []
+    if rebase_line and rebase_line not in _EXPECTED_REBASE:
+        status.append(rebase_line)
+    if ci_line and not _EXPECTED_CI_RE.match(ci_line):
+        status.append(ci_line)
+    if not armed:
+        status.append("Auto-merge held:")
+        holds = list(getattr(decision, "holds", []) or []) if decision is not None else []
+        if holds:
+            status.extend(f"- ({c.number}) {c.name} — {c.reason}" for c in holds)
+        else:
+            status.append("- no arming decision recorded")
+    if status:
+        out.extend(status)
+        out.append("")
+
+    visible, coverage = _shape_excerpt(excerpt)
+    if visible:
+        out.append(visible)
+    elif not excerpt:
+        out.append(f"(no verdict file: {fid.get('error_kind')})")
+    nums = fid.get("backlog_issue_numbers") or []
+    if nums:
+        out.append("**Backlog issues filed:** " + ", ".join(
+            _backlog_link(f"a-jay85/IBL5-backlog#{n}", n) for n in nums))
 
     out.append("")
+    out.append(MERGE_DIGEST_HEADING)
+    out.extend(digest_rows_for_display(digest, fid))
+
+    # The digest block must END here. `_digest_labels` in bin/digest-dm-build folds every
+    # later non-label, non-blank line into the LAST label's value until it hits a heading
+    # or a horizontal rule, so without this terminator the audit trail, the terminal
+    # verdict line and the marker all land inside the Discord DM's
+    # `**Machine-authored fixes:**` value. The awk already treats `---` as an end-of-block
+    # token for exactly this reason, and /pr-ready emits the same one after its digest.
+    out.append("")
+    out.append("---")
+
+    # Audit trail: machine-read lines, collapsed for humans. Each stays at column 0 so the
+    # line-anchored carry-forward regexes and bin/pr-cycle's Path 2 still match them.
+    out.extend(["", "<details><summary>Audit trail</summary>", ""])
+    out.extend(coverage)
     out.append(f"**Reviewed tree:** {fid.get('reviewed_tree') or 'unrecorded'}")
     if diff_id:
         out.append(f"**Reviewed diff:** {diff_id}")
@@ -1069,59 +1218,9 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
             f"{i + 1}. {(r.get('remediation_sha') or '')[:12]} "
             f"→ {r.get('verdict') or 'INDETERMINATE'}"
             for i, r in enumerate(rounds)))
-    nums = fid.get("backlog_issue_numbers") or []
-    if nums:
-        out.append("**Backlog issues filed:** " + ", ".join(
-            f"a-jay85/IBL5-backlog#{n}" for n in nums))
+    out.extend(["", "</details>"])
 
     out.append("")
-    if decision is not None and getattr(decision, "armed", False):
-        out.append("Arming decision (Phase 6.5): ARM — auto-merge is requested right after "
-                   "this comment")
-    else:
-        out.append("Arming decision (Phase 6.5): HOLD — auto-merge not armed")
-    holds = list(getattr(decision, "holds", []) or []) if decision is not None else []
-    if holds:
-        out.extend(f"- ({c.number}) {c.name} — {c.reason}" for c in holds)
-    else:
-        out.append("- all fourteen conditions clear")
-
-    out.append("")
-    out.append(MERGE_DIGEST_HEADING)
-    rows = list(digest)[:5]
-    sha = fid.get("remediation_sha")
-    if sha and len(rows) == 5:
-        rows[4] = rows[4] + f" (post-plan remediation: {sha})"
-    out.extend(rows)
-
-    # The digest block must END here. `_digest_labels` in bin/digest-dm-build folds every
-    # later non-label, non-blank line into the LAST label's value until it hits a heading
-    # or a horizontal rule, so without this terminator the remediation note, the posted-at
-    # line, the terminal verdict line and the marker all land inside the Discord DM's
-    # `**Machine-authored fixes:**` value. The awk already treats `---` as an end-of-block
-    # token for exactly this reason, and /pr-ready emits the same one after its digest.
-    out.append("")
-    out.append("---")
-
-    if sha:
-        out.append("")
-        if findings_round:
-            # NOT `sha`: remediation_sha is the LAST commit the harness authored, which
-            # Phase 7 needs for the CI watch. A trailing ungraded round moves it past the
-            # round the excerpt came from, and naming it here would pair a commit with a
-            # re-review that never saw it.
-            graded_sha = rounds[findings_round - 1].get("remediation_sha") or sha
-            out.append(f"Remediation: commit {graded_sha} closed remediation round "
-                       f"{findings_round}. The findings above come from the re-review "
-                       "that graded it.")
-        else:
-            out.append(f"Remediation: commit {sha} addresses the verdict-1 NOT READY "
-                       "findings. Every re-review round was indeterminate, so the "
-                       "findings above are verdict 1's.")
-
-    out.append("")
-    if posted_at:
-        out.append(f"*Verdict posted {posted_at}.*")
     out.append(terminal)
     out.append(STICKY_MARKER)
     return "\n".join(out) + "\n"
@@ -1189,7 +1288,7 @@ def digest_lines(worktree, master_sha: str, verdict_path: str, out_dir: str,
     # digest.sh's own `<label> unavailable — <reason>` degrades pass this shape test and are
     # used verbatim, exactly as the skill pastes them. The tree-line strip runs AFTER the
     # shape test, so a label reduced to just its label still degrades the same way.
-    return [_REVIEWED_TREE_TAIL_RE.sub("", ln) for ln in lines]
+    return [linkify_refs(_REVIEWED_TREE_TAIL_RE.sub("", ln)) for ln in lines]
 
 
 def _review_owed_result(verdict: str, reason: str, *, fired: bool = False,

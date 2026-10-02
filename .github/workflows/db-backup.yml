@@ -77,6 +77,12 @@ jobs:
       # Backup host is overridable via dispatch input for failure testing.
       BACKUP_HOST: ${{ github.event.inputs.ssh_host_override || secrets.HOST }}
       REMOTE_DATABASE: iblhoops_ibl5
+      # Tables whose exact pre-dump COUNT(*) on prod must be matched or exceeded
+      # by the restored dump (bin/lib/restore-rowcount-compare.sh). Space-separated.
+      ROWCOUNT_TABLES: >-
+        ibl_box_scores ibl_box_scores_teams ibl_plr_snapshots ibl_plb_snapshots
+        ibl_events ibl_rcb_season_records ibl_one_on_one ibl_hist ibl_plr
+        ibl_team_info ibl_schedule
       # CI writes config.local.php from these four env vars; the duplicate-invariant
       # step below needs them to reach the ephemeral MariaDB holding the restored
       # dump. DB_NAME repeats REMOTE_DATABASE's literal because YAML cannot
@@ -103,11 +109,23 @@ jobs:
           REMOTE_FILE="backups/db/ibl5-$(date +%F).sql.gz"
           echo "remote_file=$REMOTE_FILE" >> "$GITHUB_OUTPUT"
 
-          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
-            ${{ secrets.USERNAME }}@"$BACKUP_HOST" \
-            "REMOTE_DATABASE='${REMOTE_DATABASE}' REMOTE_FILE='${REMOTE_FILE}' bash -s" <<'REMOTE'
+          # The row-count helper's functions are piped ahead of the remote
+          # script, so prod runs the same bytes bin/test-restore-rowcount-compare
+          # tests. Its main is guarded and never runs under bash -s.
+          cat bin/lib/restore-rowcount-compare.sh - <<'REMOTE' \
+            | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
+              ${{ secrets.USERNAME }}@"$BACKUP_HOST" \
+              "REMOTE_DATABASE='${REMOTE_DATABASE}' REMOTE_FILE='${REMOTE_FILE}' ROWCOUNT_TABLES='${ROWCOUNT_TABLES}' bash -s" \
+            | tee "$RUNNER_TEMP/dump-ssh.log"
             set -euo pipefail
             mkdir -p "$(dirname "$REMOTE_FILE")"
+
+            # Exact pre-dump COUNT(*) per table, printed as ROWCOUNT lines on
+            # stdout. A failed count prints ERROR and never stops the dump; the
+            # restore step's compare fails the job later instead.
+            read -r -a ROWCOUNT_TABLE_LIST <<< "$ROWCOUNT_TABLES"
+            rrc_snapshot "$REMOTE_DATABASE" "${ROWCOUNT_TABLE_LIST[@]}" \
+              || echo "WARN: row-count snapshot exited $?; compare will fail" >&2
 
             # Host has local socket/.my.cnf auth (same as main.yml `mysql -N -e`).
             if command -v mariadb-dump >/dev/null 2>&1; then
@@ -137,6 +155,11 @@ jobs:
             echo "Retained dumps:"
             ls -1t backups/db/ibl5-*.sql.gz 2>/dev/null | head -n 14
           REMOTE
+
+          bin/lib/restore-rowcount-compare.sh extract "$RUNNER_TEMP/dump-ssh.log" \
+            > "$RUNNER_TEMP/prod-rowcounts.txt"
+          echo "Pre-dump prod row counts:"
+          cat "$RUNNER_TEMP/prod-rowcounts.txt"
 
       - name: Pull dump back to runner
         run: |
@@ -179,6 +202,20 @@ jobs:
             echo "ERROR: expected > 0 players, got $PLAYERS" >&2
             exit 1
           fi
+          # Restored COUNT(*) must be >= prod's pre-dump COUNT(*) for every
+          # ROWCOUNT_TABLES table (captured by step dump). Any FAIL exits 1,
+          # which fails the job and fires notify-backup-failure.
+          VERIFY_MYSQL="$RUNNER_TEMP/verify-mysql"
+          printf '%s\n' '#!/bin/sh' \
+            'exec mysql -h 127.0.0.1 -P 3306 -uroot -proot "$@"' > "$VERIFY_MYSQL"
+          chmod +x "$VERIFY_MYSQL"
+          read -r -a ROWCOUNT_TABLE_LIST <<< "$ROWCOUNT_TABLES"
+          ROWCOUNT_MYSQL="$VERIFY_MYSQL" bin/lib/restore-rowcount-compare.sh \
+            snapshot "$DB" "${ROWCOUNT_TABLE_LIST[@]}" \
+            > "$RUNNER_TEMP/restored-rowcounts.txt"
+          bin/lib/restore-rowcount-compare.sh compare \
+            "$RUNNER_TEMP/prod-rowcounts.txt" "$RUNNER_TEMP/restored-rowcounts.txt" \
+            "${ROWCOUNT_TABLE_LIST[@]}"
           echo "Restore verification passed."
 
       # After the restore, so a PHP-setup failure can never cost a backup. The
@@ -269,7 +306,7 @@ jobs:
         continue-on-error: true
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          MSG=$(printf 'Production DB backup job FAILED (%s trigger).\n\nThe dump, its restore verification, or the boxscore duplicate invariant did not pass. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          MSG=$(printf 'Production DB backup job FAILED (%s trigger).\n\nThe dump, its restore verification (row floors and the pre-dump row-count comparison), or the boxscore duplicate invariant did not pass. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
           printf '%s' "$MSG" > /tmp/discord-msg.txt
 
       - name: Send Discord DM

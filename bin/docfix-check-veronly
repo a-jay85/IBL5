@@ -5,8 +5,11 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/docfix-check-veronly [<slug>]
 
-Decides whether the worktree's diff is verification-only (date bumps only);
-if so, arms the plan file for auto-merge.
+Decides whether the worktree's diff is verification-only and, if so, arms the
+plan file for auto-merge. Docs under ibl5/docs/ and ibl5/classes/*/README.md
+pass on a strictly-advancing last_verified: bump plus optional same-line numeric
+edits; .claude/**/*.md, CLAUDE.md and AGENTS.md pass only on a lone frontmatter
+last_verified: bump.
 
 Arguments:
   <slug>   worktree branch slug (default: current branch)
@@ -27,6 +30,8 @@ fi
 # plus/minus pair per file.  If so, arms the seeded plan file atomically:
 #   (a) flips auto_merge: false → true (frontmatter only)
 #   (b) deletes the ## Automouse Hold Justification section (to EOF or next ##)
+#
+# Steering markdown (.claude/**/*.md, CLAUDE.md, AGENTS.md) is held to a stricter tier: see check_steering_date_only.
 #
 # The predicate is fail-closed: any doubt holds.
 #
@@ -57,6 +62,26 @@ DATE_RE='^last_verified: [0-9]{4}-[0-9]{2}-[0-9]{2}$'
 # Mask all digit-runs with a placeholder.  BRE [0-9][0-9]* (not ERE +) for
 # BSD sed.  printf '%s\n' instead of echo to avoid backslash mangling.
 mask_numbers() { printf '%s\n' "$1" | sed 's/[0-9][0-9]*/__NUM__/g'; }
+
+# path_tier <repo-relative path> — prints the allowlist tier for one diff row.
+#   1  docfix allowlist: ibl5/docs/** or a depth-one ibl5/classes/*/README.md
+#      (date bump + optional same-line numeric edits; Step 2.5 pair_hunk path)
+#   2  agent-steering markdown: .claude/**/*.md, root CLAUDE.md, root AGENTS.md
+#      (lone frontmatter last_verified: bump only; check_steering_date_only path)
+#   0  everything else (holds)
+# Bash `case` `*` matches `/`, so `.claude/*.md` covers every depth under .claude/
+# but only markdown; `.claude/settings.json` or a hook script prints 0.
+# CLAUDE.md / AGENTS.md are matched at the repo root only (a nested one prints
+# 0): neither is tracked today, and root-only is the fail-closed choice.
+path_tier() {
+    case "$1" in
+        ibl5/docs/*)              echo 1 ;;
+        ibl5/classes/*/README.md) echo 1 ;;
+        .claude/*.md)             echo 2 ;;
+        CLAUDE.md|AGENTS.md)      echo 2 ;;
+        *)                        echo 0 ;;
+    esac
+}
 
 # pair_hunk — called at each @@ boundary and once after the final hunk.
 # Reads HUNK_MINUS[0..HM_N-1] / HUNK_PLUS[0..HP_N-1] (diff-prefix already
@@ -120,6 +145,100 @@ pair_hunk() {
     unset HUNK_MINUS HUNK_PLUS
 }
 
+# check_steering_date_only — tier-2 predicate for one status-M steering file.
+# Reads $BASE and $path; writes STEERING_HOLD (empty ⇒ PASS for this file).
+# PASS requires ALL of:
+#   (a) git diff --raw modes are 100644 → 100644 (no mode flip, no symlink);
+#   (b) git diff -U0 has exactly one hunk whose header is `@@ -N +N @@` (a
+#       one-line replacement; git omits the `,1` count for single lines);
+#   (c) that hunk holds exactly one `-` line and one `+` line, both matching
+#       DATE_RE, new date strictly greater than old;
+#   (d) line N of the BASE blob sits inside its YAML frontmatter: line 1 is
+#       `---`, the closing `---` is at line K, and 2 <= N < K.  A `last_verified:`
+#       line in a fenced body example (.claude/rules/doc-freshness.md has one)
+#       is outside the frontmatter and holds.
+# Every other shape holds.  No pipeline exits early (no awk `exit`, no grep -q
+# on a pipe) so pipefail can never turn a PASS-shaped file into a silent abort.
+check_steering_date_only() {
+    STEERING_HOLD=""
+    local raw old_mode new_mode hunks minus plus n_old n_new old_line new_line line blob_k old_date new_date
+
+    # (a) mode / type
+    raw="$(git diff --raw "$BASE" -- "$path")"
+    if [ -z "$raw" ]; then
+        STEERING_HOLD="steering file '$path': git diff --raw produced no row"
+        return
+    fi
+    read -r old_mode new_mode _ <<< "$raw"
+    old_mode="${old_mode#:}"
+    if [ "$old_mode" != "100644" ] || [ "$new_mode" != "100644" ]; then
+        STEERING_HOLD="steering file '$path': mode/type is not a regular 100644 file on both sides ($old_mode → $new_mode)"
+        return
+    fi
+
+    # (b)+(c) exactly one one-line hunk, one -/+ pair
+    hunks=0; minus=0; plus=0; n_old=""; n_new=""; old_line=""; new_line=""
+    while IFS= read -r line; do
+        case "$line" in
+            "--- "*|"+++ "*|"diff --git "*|"index "*) continue ;;
+            "@@"*)
+                hunks=$(( hunks + 1 ))
+                if [[ "$line" =~ ^@@\ -([0-9]+)\ \+([0-9]+)\ @@ ]]; then
+                    n_old="${BASH_REMATCH[1]}"; n_new="${BASH_REMATCH[2]}"
+                else
+                    STEERING_HOLD="steering file '$path': hunk is not a one-line replacement: ${line:0:80}"
+                    return
+                fi
+                ;;
+            -*) minus=$(( minus + 1 )); old_line="${line#-}" ;;
+            +*) plus=$(( plus + 1 ));  new_line="${line#+}" ;;
+            *)
+                STEERING_HOLD="steering file '$path': unexpected diff line: ${line:0:80}"
+                return
+                ;;
+        esac
+    done < <(git diff --no-color -U0 "$BASE" -- "$path")
+
+    if [ "$hunks" -ne 1 ]; then
+        STEERING_HOLD="steering file '$path': expected exactly 1 hunk, found $hunks"
+        return
+    fi
+    if [ "$minus" -ne 1 ] || [ "$plus" -ne 1 ]; then
+        STEERING_HOLD="steering file '$path': expected exactly one -/+ line pair, found $minus removed / $plus added"
+        return
+    fi
+    if [ "$n_old" != "$n_new" ]; then
+        STEERING_HOLD="steering file '$path': hunk moves the line ($n_old → $n_new)"
+        return
+    fi
+    if ! [[ "$old_line" =~ $DATE_RE ]] || ! [[ "$new_line" =~ $DATE_RE ]]; then
+        STEERING_HOLD="steering file '$path': change line is not a last_verified date: ${old_line:0:80}"
+        return
+    fi
+    old_date="${old_line#last_verified: }"
+    new_date="${new_line#last_verified: }"
+    if [[ ! "$new_date" > "$old_date" ]]; then
+        STEERING_HOLD="steering file '$path': date not strictly advancing '$old_date' → '$new_date' (equal or backwards)"
+        return
+    fi
+
+    # (d) frontmatter position in the BASE blob.  awk scans the whole blob (no
+    # early exit → no SIGPIPE under pipefail); prints "none" when line 1 is not
+    # `---`, else the closing delimiter's line number, or 0 when never closed.
+    blob_k="$(git show "$BASE:$path" | awk '
+        NR==1 && $0 !~ /^---[[:space:]]*$/ { bad=1 }
+        NR>1 && !k && /^---[[:space:]]*$/  { k=NR }
+        END { if (bad) print "none"; else print k+0 }')"
+    if [ "$blob_k" = "none" ] || [ "$blob_k" -lt 3 ]; then
+        STEERING_HOLD="steering file '$path': base blob has no closed YAML frontmatter (line 1 must be ---, closing --- at line >= 3)"
+        return
+    fi
+    if [ "$n_old" -lt 2 ] || [ "$n_old" -ge "$blob_k" ]; then
+        STEERING_HOLD="steering file '$path': last_verified line $n_old is outside the frontmatter (closing --- at line $blob_k)"
+        return
+    fi
+}
+
 # --- Step 2.2: Merge-base against working tree -------------------------------
 # Compare merge-base..working-tree so that an uncommitted prose edit is visible
 # and cannot slip past this predicate into the post-plan commit.
@@ -139,11 +258,9 @@ if [ -n "$UNTRACKED" ]; then
 fi
 
 # --- Step 2.4: Name-status gate ----------------------------------------------
-# Every changed file must carry status exactly 'M' and match the docfix
-# allowlist below: ibl5/docs/** or a depth-one ibl5/classes/*/README.md (the
-# same class README set bin/check-docs audits). Agent-steering files
-# (.claude/**, CLAUDE.md, AGENTS.md) and every other path fall to the
-# catch-all and hold.
+# Every changed file must carry status exactly 'M' and classify to tier 1
+# (ibl5/docs/**, depth-one ibl5/classes/*/README.md) or tier 2 (.claude/**/*.md,
+# root CLAUDE.md, root AGENTS.md); every other path holds.
 # An empty diff is not a pass — it would make "every file is M" vacuously true
 # with zero rows.
 ROW_COUNT=0
@@ -155,14 +272,10 @@ while IFS=$'\t' read -r status path; do
         NAME_STATUS_HOLD="non-M change in diff: status '$status' on '$path'"
         break
     fi
-    case "$path" in
-        ibl5/docs/*) ;;
-        ibl5/classes/*/README.md) ;;
-        *)
-            NAME_STATUS_HOLD="path outside docfix allowlist: '$path'"
-            break
-            ;;
-    esac
+    if [ "$(path_tier "$path")" = "0" ]; then
+        NAME_STATUS_HOLD="path outside docfix allowlist: '$path'"
+        break
+    fi
 done < <(git diff "$BASE" --name-status)
 
 if [ -n "$NAME_STATUS_HOLD" ]; then
@@ -181,8 +294,21 @@ fi
 # same-skeleton numeric correction.  Every change line must fall into one of
 # these two categories; anything else holds.  Two-level process substitution:
 # outer iterates files, inner reads each diff.
+# Tier-2 rows are dispatched to check_steering_date_only first and skip the
+# pairing loop.
 
 while IFS=$'\t' read -r _status path; do
+
+    # Tier 2: steering markdown gets the strict lone-frontmatter-date predicate
+    # and never enters pair_hunk (no numeric allowance for these files).
+    if [ "$(path_tier "$path")" = "2" ]; then
+        check_steering_date_only
+        if [ -n "$STEERING_HOLD" ]; then
+            echo "docfix-check-veronly: HOLD — $STEERING_HOLD"
+            exit 1
+        fi
+        continue
+    fi
 
     DATE_PAIRS=0
     NUM_PAIRS=0

@@ -113,6 +113,26 @@ class RookieOptionControllerTest extends TestCase
         self::assertCount(0, $this->mockDb->getExecutedQueries());
     }
 
+    /**
+     * Pins today's behavior: the ownership gate has no `''` clause, so a `''` session
+     * with a `''` posted team is refused by the validation block, before any query.
+     */
+    public function testEmptySessionTeamWithEmptyPostedTeamIsRefusedWithoutWrite(): void
+    {
+        $repository = $this->createMock(RookieOptionRepositoryInterface::class);
+        $repository->expects(self::never())->method('updatePlayerRookieOption');
+
+        $teams = $this->createMock(TeamIdentityRepositoryInterface::class);
+        $teams->expects(self::never())->method('getTidFromTeamname');
+
+        $result = $this->makeController($repository, $teams)->processRookieOption('', 1, 500, '');
+
+        self::assertFalse($result['success']);
+        self::assertSame('validation_error', $result['type']);
+        self::assertSame(1, $result['playerID']);
+        self::assertCount(0, $this->mockDb->getExecutedQueries());
+    }
+
     public function testMismatchedSessionTeamIsRefusedWithoutWrite(): void
     {
         $repository = $this->createMock(RookieOptionRepositoryInterface::class);

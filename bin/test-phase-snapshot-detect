@@ -587,9 +587,11 @@ test_db_sync_prod_snapshot_load_is_offline_and_preserves_local_tables() {
         return 0
     fi
 
+    # Probe over TCP against the target DB: the entrypoint's init-phase server
+    # answers on the socket before MARIADB_DATABASE exists, but never on TCP.
     local i ready=0
     for i in $(seq 1 90); do
-        if docker exec "$cname" mariadb -uroot -proot -e "SELECT 1" >/dev/null 2>&1; then
+        if docker exec "$cname" mariadb --protocol=tcp -h127.0.0.1 -uroot -proot iblhoops_ibl5 -e "SELECT 1" >/dev/null 2>&1; then
             ready=1
             break
         fi

@@ -1,8 +1,13 @@
 ---
 description: Localhost browsing is logged-out by default; set an `_auto_login=1` cookie to auto-authenticate via DEV_AUTO_LOGIN. Identity matrix for all test layers.
-last_verified: 2026-09-16
+last_verified: 2026-09-30
 paths:
-  - "ibl5/**"
+  - "ibl5/tests/e2e/**"
+  - "ibl5/playwright*.config.ts"
+  - "ibl5/classes/Auth/DevAutoLogin.php"
+  - "bin/wt-up"
+  - "bin/e2e-wt"
+  - "bin/dev-up"
   - ".github/workflows/e2e-tests.yml"
 ---
 

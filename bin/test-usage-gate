@@ -1,0 +1,1588 @@
+#!/usr/bin/env bash
+# Unit and CLI tests for the usage-limit drain/pause/resume gate.
+# Phases 1-8 of usage-limit-drain-resume extend this file.
+#
+# Every test points IBL5_USAGE_GATE_STATE_DIR at a fresh mktemp dir so the real
+# state dir is never written, and shadows `security` / `curl` on PATH so the real
+# keychain and network are never touched.
+
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PASS=0
+FAIL=0
+FAILED_NAMES=""
+
+pass() { PASS=$((PASS + 1)); echo "  ok   $1"; }
+fail() { FAIL=$((FAIL + 1)); FAILED_NAMES="$FAILED_NAMES $1"; echo "  FAIL $1${2:+ — $2}"; }
+
+assert_eq() {  # name expected actual
+    if [ "$2" = "$3" ]; then pass "$1"; else fail "$1" "expected [$2] got [$3]"; fi
+}
+assert_contains() {  # name haystack needle
+    case "$2" in *"$3"*) pass "$1" ;; *) fail "$1" "missing [$3] in [$2]" ;; esac
+}
+assert_file() {  # name path
+    if [ -e "$2" ]; then pass "$1"; else fail "$1" "missing file $2"; fi
+}
+assert_no_file() {  # name path
+    if [ ! -e "$2" ]; then pass "$1"; else fail "$1" "unexpected file $2"; fi
+}
+
+TMPROOT=$(mktemp -d)
+trap 'rm -rf "$TMPROOT"' EXIT
+
+# make_stub_bin <dir> <token|""> <curl-body> [curl-exit]
+# PATH-shadowed `security` and `curl`. curl appends a line to <dir>/curl.calls.
+make_stub_bin() {
+    local dir="$1" tok="$2" body="$3" rc="${4:-0}"
+    mkdir -p "$dir"
+    if [ -n "$tok" ]; then
+        printf '#!/bin/sh\necho '"'"'{"claudeAiOauth":{"accessToken":"%s"}}'"'"'\n' "$tok" > "$dir/security"
+    else
+        printf '#!/bin/sh\nexit 1\n' > "$dir/security"
+    fi
+    printf '%s' "$body" > "$dir/curl.body"
+    printf '#!/bin/sh\necho call >> "%s/curl.calls"\ncat "%s/curl.body"\nexit %s\n' "$dir" "$dir" "$rc" > "$dir/curl"
+    chmod +x "$dir/security" "$dir/curl"
+}
+
+curl_calls() {  # <stubdir>
+    if [ -f "$1/curl.calls" ]; then wc -l < "$1/curl.calls" | tr -d ' '; else echo 0; fi
+}
+
+BODY_A='{"five_hour":{"utilization":41.0,"resets_at":"2026-09-28T20:00:00.123+00:00"},"seven_day":{"utilization":12.0,"resets_at":"2026-10-02T00:00:00+00:00"}}'
+BODY_B='{"five_hour":{"utilization":77.0,"resets_at":"2026-09-28T21:00:00+00:00"},"seven_day":{"utilization":30.0,"resets_at":"2026-10-02T00:00:00+00:00"}}'
+
+# new_env: fresh state dir + stub dir, exported for the current test.
+new_env() {
+    T=$(mktemp -d "$TMPROOT/t.XXXXXX")
+    export IBL5_USAGE_GATE_STATE_DIR="$T/state"
+    STUB="$T/stub"
+    mkdir -p "$IBL5_USAGE_GATE_STATE_DIR/markers"
+    ORIG_PATH="${ORIG_PATH:-$PATH}"
+}
+
+seed_cache() {  # <fetched_at> <body>
+    printf '%s' "$2" | jq --argjson t "$1" '. + {fetched_at:$t}' > "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+}
+
+# ---------------------------------------------------------------- Phase 1
+
+test_fetch_fresh_cache_hit() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B" 1
+    seed_cache "$(date +%s)" "$BODY_A"
+    local out rc
+    out=$(PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq fetch_fresh_cache_hit:rc 0 "$rc"
+    assert_eq fetch_fresh_cache_hit:body "$(printf '%s' "$BODY_A" | jq -S -c .)" "$(printf '%s' "$out" | jq -S -c .)"
+    assert_eq fetch_fresh_cache_hit:no-curl 0 "$(curl_calls "$STUB")"
+}
+
+test_fetch_stale_triggers_live() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local out rc
+    out=$(PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq fetch_stale_triggers_live:rc 0 "$rc"
+    assert_eq fetch_stale_triggers_live:body 77.0 "$(printf '%s' "$out" | jq -r '.five_hour.utilization')"
+    assert_eq fetch_stale_triggers_live:cache 77.0 "$(jq -r '.five_hour.utilization' "$IBL5_USAGE_GATE_STATE_DIR/cache.json")"
+    assert_eq fetch_stale_triggers_live:one-call 1 "$(curl_calls "$STUB")"
+}
+
+test_fetch_no_token_fail_open() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    local out rc
+    out=$(PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq fetch_no_token:rc 1 "$rc"
+    assert_eq fetch_no_token:empty "" "$out"
+    assert_contains fetch_no_token:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "fetch-failed reason=no-token"
+    assert_eq fetch_no_token:no-curl 0 "$(curl_calls "$STUB")"
+}
+
+test_fetch_bad_body_serves_stale() {
+    new_env
+    make_stub_bin "$STUB" tok '{"error":"x"}'
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local before out rc
+    before=$(cat "$IBL5_USAGE_GATE_STATE_DIR/cache.json")
+    out=$(PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq fetch_bad_body:rc 2 "$rc"
+    assert_eq fetch_bad_body:stale 41.0 "$(printf '%s' "$out" | jq -r '.five_hour.utilization')"
+    assert_contains fetch_bad_body:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "reason=bad-body"
+    assert_eq fetch_bad_body:cache-unchanged "$before" "$(cat "$IBL5_USAGE_GATE_STATE_DIR/cache.json")"
+}
+
+# ---------------------------------------------------------------- fetch backoff / single-flight
+
+SECRET_TOK=TESTSECRET-9f3a1c
+
+# make_stub_http <dir> <token|""> <status> <body> [retry_after|""] [sleep_secs]
+# Like make_stub_bin, but the curl stub honors `-D <file>`: it writes an HTTP status
+# line (and Retry-After when given) there, CRLF-terminated like real curl.
+make_stub_http() {
+    local dir="$1" tok="$2" st="$3" body="$4" ra="${5:-}" sl="${6:-0}"
+    make_stub_bin "$dir" "$tok" "$body"
+    cat > "$dir/curl" <<STUB
+#!/bin/sh
+hdr=""
+while [ \$# -gt 0 ]; do
+    case "\$1" in -D) hdr="\$2"; shift ;; esac
+    shift
+done
+echo call >> "$dir/curl.calls"
+[ "$sl" -gt 0 ] && sleep "$sl"
+if [ -n "\$hdr" ]; then
+    printf 'HTTP/2 %s\r\n' "$st" > "\$hdr"
+    [ -n "$ra" ] && printf 'retry-after: %s\r\n' "$ra" >> "\$hdr"
+    printf '\r\n' >> "\$hdr"
+fi
+cat "$dir/curl.body"
+STUB
+    chmod +x "$dir/curl"
+}
+
+fetch_once() {  # <max_age>: one usage_fetch; stdout = body; rc = usage_fetch rc
+    PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch $1"
+}
+
+# fetch_parallel <n> <max_age>: n concurrent usage_fetch calls; results in $T/out.<i>, $T/rc.<i>.
+# Waits only on its own pids (never a bare `wait`).
+fetch_parallel() {
+    local i=1 pids=""
+    while [ "$i" -le "$1" ]; do
+        ( fetch_once "$2" > "$T/out.$i"; echo $? > "$T/rc.$i" ) &
+        pids="$pids $!"
+        i=$((i + 1))
+    done
+    for p in $pids; do wait "$p"; done
+}
+
+log_count() {  # <fixed-string>: occurrences in usage-gate.log
+    local n
+    n=$(grep -cF -- "$1" "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log" 2>/dev/null)
+    echo "${n:-0}"
+}
+
+fetch_log() { cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log" 2>/dev/null; }
+util_of() { printf '%s' "$1" | jq -r '.five_hour.utilization'; }
+
+RL_BODY='{"error":{"type":"rate_limit_error","message":"Rate limited. Please try again later."}}'
+
+test_fetch_429_retry_after_arms_backoff() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY" 120
+    local out rc until step now i
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_429_ra:rc1 2 "$rc"
+    assert_eq fetch_429_ra:stale1 41.0 "$(util_of "$out")"
+    assert_eq fetch_429_ra:one-call 1 "$(curl_calls "$STUB")"
+    assert_contains fetch_429_ra:log "$(fetch_log)" "fetch-failed reason=rate-limited retry_after=120 backoff=120"
+    read -r until step < "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+    now=$(date +%s)
+    assert_eq fetch_429_ra:step 1 "$step"
+    if [ $((until - now)) -ge 118 ] && [ $((until - now)) -le 121 ]; then
+        pass fetch_429_ra:until
+    else
+        fail fetch_429_ra:until "until-now=$((until - now))"
+    fi
+    for i in 2 3; do
+        out=$(fetch_once 45); rc=$?
+        assert_eq "fetch_429_ra:rc$i" 2 "$rc"
+        assert_eq "fetch_429_ra:stale$i" 41.0 "$(util_of "$out")"
+        assert_eq "fetch_429_ra:calls$i" 1 "$(curl_calls "$STUB")"
+    done
+    assert_eq fetch_429_ra:skip-logged-once 1 "$(log_count backoff-skip)"
+    assert_eq fetch_429_ra:no-bad-body 0 "$(log_count bad-body)"
+}
+
+test_fetch_429_retry_after_capped() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY" 99999
+    fetch_once 45 >/dev/null
+    assert_contains fetch_429_cap:log "$(fetch_log)" "backoff=900"
+
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY" 0
+    fetch_once 45 >/dev/null
+    assert_contains fetch_429_cap:zero-falls-to-exp "$(fetch_log)" "backoff=30"
+}
+
+test_fetch_429_exponential_and_expiry() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY"
+    local bf="$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff" until step
+    fetch_once 45 >/dev/null
+    assert_contains fetch_429_exp:first "$(fetch_log)" "retry_after=none backoff=30"
+    read -r until step < "$bf"
+    assert_eq fetch_429_exp:step1 1 "$step"
+    printf '%s\n' "$(( $(date +%s) - 1 )) 1" > "$bf"
+    fetch_once 45 >/dev/null
+    assert_eq fetch_429_exp:live-fetch 2 "$(curl_calls "$STUB")"
+    assert_contains fetch_429_exp:second "$(fetch_log)" "retry_after=none backoff=60"
+    read -r until step < "$bf"
+    assert_eq fetch_429_exp:step2 2 "$step"
+    printf '%s\n' "$(( $(date +%s) - 1 )) 9" > "$bf"
+    fetch_once 45 >/dev/null
+    assert_contains fetch_429_exp:cap "$(fetch_log)" "retry_after=none backoff=480"
+}
+
+test_fetch_429_concurrent_one_call() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY" 120 2
+    local i round
+    for round in 1 2; do
+        fetch_parallel 6 45
+        assert_eq "fetch_429_conc:calls$round" 1 "$(curl_calls "$STUB")"
+        for i in 1 2 3 4 5 6; do
+            assert_eq "fetch_429_conc:rc$round.$i" 2 "$(cat "$T/rc.$i")"
+            assert_eq "fetch_429_conc:util$round.$i" 41.0 "$(util_of "$(cat "$T/out.$i")")"
+        done
+        assert_no_file "fetch_429_conc:no-lock$round" "$IBL5_USAGE_GATE_STATE_DIR/fetch.lock.d"
+    done
+}
+
+test_fetch_success_clears_backoff() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" out rc
+    printf '%s\n' "$(( $(date +%s) - 1 )) 3" > "$d/fetch-backoff"
+    printf '%s\n' 12345 > "$d/fetch-backoff.logged"
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_clears:rc 0 "$rc"
+    assert_eq fetch_clears:body 77.0 "$(util_of "$out")"
+    assert_eq fetch_clears:one-call 1 "$(curl_calls "$STUB")"
+    assert_no_file fetch_clears:backoff "$d/fetch-backoff"
+    assert_no_file fetch_clears:logged "$d/fetch-backoff.logged"
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY"
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    fetch_once 45 >/dev/null
+    assert_contains fetch_clears:step-reset "$(fetch_log)" "retry_after=none backoff=30"
+}
+
+test_fetch_429_no_cache_rc1() {
+    new_env
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY"
+    local out rc
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_429_nocache:rc1 1 "$rc"
+    assert_eq fetch_429_nocache:empty1 "" "$out"
+    assert_file fetch_429_nocache:backoff "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_429_nocache:rc2 1 "$rc"
+    assert_eq fetch_429_nocache:empty2 "" "$out"
+    assert_eq fetch_429_nocache:one-call 1 "$(curl_calls "$STUB")"
+}
+
+test_fetch_single_flight_parallel() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B" "" 3
+    local i rc saw77=0 n
+    fetch_parallel 6 45
+    assert_eq fetch_single_flight:calls 1 "$(curl_calls "$STUB")"
+    for i in 1 2 3 4 5 6; do
+        rc=$(cat "$T/rc.$i")
+        if [ "$rc" = 0 ] || [ "$rc" = 2 ]; then pass "fetch_single_flight:rc.$i"; else fail "fetch_single_flight:rc.$i" "rc=$rc"; fi
+        [ "$(util_of "$(cat "$T/out.$i")")" = "77.0" ] && saw77=1
+    done
+    assert_eq fetch_single_flight:saw-fresh 1 "$saw77"
+    assert_eq fetch_single_flight:cache 77.0 "$(jq -r '.five_hour.utilization' "$IBL5_USAGE_GATE_STATE_DIR/cache.json")"
+    assert_no_file fetch_single_flight:no-lock "$IBL5_USAGE_GATE_STATE_DIR/fetch.lock.d"
+    n=$(log_count "fetch-skip reason=in-flight")
+    if [ "$n" = 1 ] || [ "$n" = 2 ]; then pass fetch_single_flight:inflight-logged; else fail fetch_single_flight:inflight-logged "count=$n"; fi
+}
+
+test_fetch_stale_lock_reclaimed() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" out rc leftovers
+    mkdir "$d/fetch.lock.d"
+    printf '%s\n' "$(( $(date +%s) - 60 )) 999999" > "$d/fetch.lock.d/at"
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_stale_lock:rc 0 "$rc"
+    assert_eq fetch_stale_lock:body 77.0 "$(util_of "$out")"
+    assert_eq fetch_stale_lock:one-call 1 "$(curl_calls "$STUB")"
+    assert_no_file fetch_stale_lock:lock-gone "$d/fetch.lock.d"
+    leftovers=$(ls -d "$d"/fetch.lock.d.stale.* 2>/dev/null)
+    assert_eq fetch_stale_lock:no-stale-dir "" "$leftovers"
+}
+
+test_fetch_fresh_lock_respected() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" out rc stamp
+    mkdir "$d/fetch.lock.d"
+    stamp="$(date +%s) 999999"
+    printf '%s\n' "$stamp" > "$d/fetch.lock.d/at"
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_fresh_lock:rc 2 "$rc"
+    assert_eq fetch_fresh_lock:stale 41.0 "$(util_of "$out")"
+    assert_eq fetch_fresh_lock:no-curl 0 "$(curl_calls "$STUB")"
+    assert_file fetch_fresh_lock:lock-kept "$d/fetch.lock.d"
+    assert_eq fetch_fresh_lock:at-unchanged "$stamp" "$(cat "$d/fetch.lock.d/at")"
+    assert_contains fetch_fresh_lock:log "$(fetch_log)" "fetch-skip reason=in-flight"
+    rm -f "$d/cache.json"
+    out=$(fetch_once 45); rc=$?
+    assert_eq fetch_fresh_lock:nocache-rc 1 "$rc"
+    assert_eq fetch_fresh_lock:nocache-empty "" "$out"
+    assert_eq fetch_fresh_lock:nocache-no-curl 0 "$(curl_calls "$STUB")"
+}
+
+test_fetch_orphan_lock_ages_out() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" rc epoch pid
+    mkdir "$d/fetch.lock.d"
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    fetch_once 45 >/dev/null; rc=$?
+    assert_eq fetch_orphan:rc1 2 "$rc"
+    assert_eq fetch_orphan:no-curl 0 "$(curl_calls "$STUB")"
+    assert_file fetch_orphan:stamped "$d/fetch.lock.d/at"
+    read -r epoch pid < "$d/fetch.lock.d/at"
+    case "$epoch" in ''|*[!0-9]*) fail fetch_orphan:numeric "epoch=[$epoch]" ;; *) pass fetch_orphan:numeric ;; esac
+    printf '%s\n' "$(( $(date +%s) - 60 )) 0" > "$d/fetch.lock.d/at"
+    fetch_once 45 >/dev/null; rc=$?
+    assert_eq fetch_orphan:rc2 0 "$rc"
+    assert_eq fetch_orphan:one-call 1 "$(curl_calls "$STUB")"
+}
+
+test_fetch_non_429_errors_no_backoff() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" rc
+    make_stub_http "$STUB" "$SECRET_TOK" 500 "$RL_BODY"
+    fetch_once 45 >/dev/null; rc=$?
+    assert_eq fetch_non429:rc500 2 "$rc"
+    assert_contains fetch_non429:log500 "$(fetch_log)" "fetch-failed reason=http-500"
+    assert_no_file fetch_non429:no-backoff500 "$d/fetch-backoff"
+    make_stub_bin "$STUB" "$SECRET_TOK" "" 28
+    fetch_once 45 >/dev/null; rc=$?
+    assert_eq fetch_non429:rc28 2 "$rc"
+    assert_contains fetch_non429:log28 "$(fetch_log)" "fetch-failed reason=curl-exit-28"
+    assert_no_file fetch_non429:no-backoff28 "$d/fetch-backoff"
+}
+
+test_fetch_bad_body_200_status() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" rc
+    make_stub_http "$STUB" "$SECRET_TOK" 200 '{"error":"x"}'
+    fetch_once 45 >/dev/null; rc=$?
+    assert_eq fetch_bad200:rc 2 "$rc"
+    assert_contains fetch_bad200:log "$(fetch_log)" "fetch-failed reason=bad-body"
+    assert_eq fetch_bad200:not-rate-limited 0 "$(log_count rate-limited)"
+    assert_no_file fetch_bad200:no-backoff "$d/fetch-backoff"
+}
+
+test_fetch_token_never_persisted() {
+    new_env
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" grc hdrs
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY"
+    fetch_once 45 >/dev/null
+    printf '%s\n' "$(( $(date +%s) - 1 )) 1" > "$d/fetch-backoff"
+    make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B"
+    fetch_once 45 >/dev/null
+    grep -rF "$SECRET_TOK" "$d" >/dev/null 2>&1; grc=$?
+    if [ "$grc" -ne 0 ]; then pass fetch_token_leak:none; else fail fetch_token_leak:none "token found under state dir"; fi
+    hdrs=$(ls "$d"/fetch.hdr.* 2>/dev/null)
+    assert_eq fetch_token_leak:no-hdr-files "" "$hdrs"
+}
+
+test_fetch_rejects_bad_max_age() {
+    new_env
+    local err rc
+    err=$(bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch abc" 2>&1 >/dev/null); rc=$?
+    assert_eq fetch_bad_max_age:abc-rc 1 "$rc"
+    assert_contains fetch_bad_max_age:abc-msg "$err" "usage_fetch: max_age must be an integer"
+    err=$(bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch" 2>&1 >/dev/null); rc=$?
+    assert_eq fetch_bad_max_age:none-rc 1 "$rc"
+    assert_contains fetch_bad_max_age:none-msg "$err" "usage_fetch: max_age must be an integer"
+}
+
+test_state_dir_env_unset() {
+    new_env
+    local h out
+    h=$(mktemp -d "$TMPROOT/home.XXXXXX")
+    out=$(env -u IBL5_USAGE_GATE_STATE_DIR HOME="$h" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_state_dir")
+    assert_eq state_dir_env_unset "$h/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate" "$out"
+}
+
+test_state_dir_env_empty() {
+    new_env
+    local h out
+    h=$(mktemp -d "$TMPROOT/home.XXXXXX")
+    out=$(IBL5_USAGE_GATE_STATE_DIR="" HOME="$h" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_state_dir")
+    assert_eq state_dir_env_empty "$h/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate" "$out"
+}
+
+# ---------------------------------------------------------------- Phase 2
+
+# gate_run <bash-snippet>: run a snippet with usage-gate.sh sourced.
+gate_run() {
+    bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; $1"
+}
+
+usage_json() {  # <five> <week>
+    printf '{"five_hour":{"utilization":%s,"resets_at":"2026-09-28T20:00:00.123+00:00"},"seven_day":{"utilization":%s,"resets_at":"2026-10-02T00:00:00+00:00"}}' "$1" "$2"
+}
+
+# usage_json_resets <five> <week> <five_resets_epoch|""> <week_resets_epoch|"">
+# Builds ISO resets_at via jq todate (portable on BSD and GNU). An empty epoch
+# omits that window's resets_at entirely.
+usage_json_resets() {
+    jq -cn --argjson f "$1" --argjson w "$2" --arg fr "$3" --arg wr "$4" '
+      {five_hour:({utilization:$f} + (if $fr=="" then {} else {resets_at:($fr|tonumber|todate)} end)),
+       seven_day:({utilization:$w} + (if $wr=="" then {} else {resets_at:($wr|tonumber|todate)} end))}'
+}
+
+SID_A=11111111-1111-4111-8111-111111111111
+SID_B=22222222-2222-4222-8222-222222222222
+SID_C=33333333-3333-4333-8333-333333333333
+SID_D=44444444-4444-4444-8444-444444444444
+
+test_zone_boundaries() {
+    new_env
+    assert_eq zone:92.99 normal "$(gate_run "usage_zone '$(usage_json 92.99 0)'")"
+    assert_eq zone:93.0 drain "$(gate_run "usage_zone '$(usage_json 93.0 0)'")"
+    assert_eq zone:97.99 drain "$(gate_run "usage_zone '$(usage_json 97.99 0)'")"
+    assert_eq zone:98.0 stop "$(gate_run "usage_zone '$(usage_json 98.0 0)'")"
+    assert_eq zone:100 stop "$(gate_run "usage_zone '$(usage_json 100 0)'")"
+    assert_eq zone:weekly-max drain "$(gate_run "usage_zone '$(usage_json 10 95)'")"
+}
+
+test_thresholds_env_unset() {
+    new_env
+    assert_eq thresholds_unset "93 98" "$(env -u IBL5_USAGE_DRAIN_PCT -u IBL5_USAGE_STOP_PCT bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; usage_thresholds")"
+}
+
+test_thresholds_env_empty() {
+    new_env
+    assert_eq thresholds_empty "93 98" "$(IBL5_USAGE_DRAIN_PCT="" IBL5_USAGE_STOP_PCT="" bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; usage_thresholds")"
+}
+
+test_thresholds_env_invalid() {
+    new_env
+    assert_eq thresholds_inverted "93 98" "$(IBL5_USAGE_DRAIN_PCT=99 IBL5_USAGE_STOP_PCT=98 gate_run usage_thresholds)"
+    assert_contains thresholds_inverted:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "bad-thresholds drain=99 stop=98"
+    assert_eq thresholds_alpha "93 98" "$(IBL5_USAGE_DRAIN_PCT=abc gate_run usage_thresholds)"
+    assert_eq thresholds_custom "80 90" "$(IBL5_USAGE_DRAIN_PCT=80 IBL5_USAGE_STOP_PCT=90 gate_run usage_thresholds)"
+    assert_eq thresholds_custom:zone drain "$(IBL5_USAGE_DRAIN_PCT=80 IBL5_USAGE_STOP_PCT=90 gate_run "usage_zone '$(usage_json 85 0)'")"
+}
+
+test_resets_epoch_formats() {
+    new_env
+    local a b n
+    a=$(gate_run "usage_resets_epoch '{\"five_hour\":{\"resets_at\":\"2026-09-28T20:00:00.123+00:00\"}}' five_hour")
+    b=$(gate_run "usage_resets_epoch '{\"five_hour\":{\"resets_at\":\"2026-09-28T20:00:00Z\"}}' five_hour")
+    n=$(gate_run "usage_resets_epoch '{\"five_hour\":{\"resets_at\":null}}' five_hour")
+    assert_eq resets_epoch:fraction-eq-z "$a" "$b"
+    assert_eq resets_epoch:value 1790625600 "$a"
+    assert_eq resets_epoch:null "" "$n"
+}
+
+test_limiting_window_tie() {
+    new_env
+    assert_eq limiting_window:tie seven_day "$(gate_run "usage_limiting_window '$(usage_json 50 50)'")"
+    assert_eq limiting_window:five five_hour "$(gate_run "usage_limiting_window '$(usage_json 60 50)'")"
+}
+
+test_marker_write_read_clear() {
+    new_env
+    local rbin="$T/resume.sh"
+    printf '#!/bin/sh\n' > "$rbin"; chmod +x "$rbin"
+    gate_run "usage_marker_write $SID_A post-plan-now '$rbin' usage-pause drain 95 five_hour 1790625600"
+    assert_eq marker:rc 0 "$?"
+    local m
+    m=$(gate_run "usage_marker_read $SID_A")
+    assert_eq marker:argv1 --resume-paused "$(printf '%s' "$m" | jq -r '.resume_argv[1]')"
+    assert_eq marker:argv2 "$SID_A" "$(printf '%s' "$m" | jq -r '.resume_argv[2]')"
+    assert_eq marker:priority 1 "$(printf '%s' "$m" | jq -r '.priority')"
+    assert_eq marker:resume_count 0 "$(printf '%s' "$m" | jq -r '.resume_count')"
+    gate_run "usage_marker_bump_resume $SID_A"
+    gate_run "usage_marker_write $SID_A post-plan-now '$rbin' usage-pause drain 96 five_hour 1790625600"
+    assert_eq marker:count-carried 1 "$(gate_run "usage_marker_read $SID_A" | jq -r '.resume_count')"
+    gate_run "usage_marker_clear $SID_A"
+    gate_run "usage_marker_clear $SID_A"
+    assert_no_file marker:cleared "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_marker_rejects_bad_input() {
+    new_env
+    local rbin="$T/resume.sh" rc
+    printf '#!/bin/sh\n' > "$rbin"; chmod +x "$rbin"
+    gate_run "usage_marker_write ../evil post-plan-now '$rbin' usage-pause drain 95 five_hour 1"; rc=$?
+    assert_eq marker_bad:sid 1 "$rc"
+    gate_run "usage_marker_write $SID_A bogus '$rbin' usage-pause drain 95 five_hour 1"; rc=$?
+    assert_eq marker_bad:runner 1 "$rc"
+    gate_run "usage_marker_write $SID_A plan-now relative/bin usage-pause drain 95 five_hour 1"; rc=$?
+    assert_eq marker_bad:relative 1 "$rc"
+    gate_run "usage_marker_write $SID_A plan-now '$T/not-exec' usage-pause drain 95 five_hour 1"; rc=$?
+    assert_eq marker_bad:missing-bin 1 "$rc"
+    assert_eq marker_bad:dir-empty 0 "$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -type f | wc -l | tr -d ' ')"
+    assert_no_file marker_bad:no-escape "$IBL5_USAGE_GATE_STATE_DIR/evil.json"
+}
+
+test_markers_sorted_order() {
+    new_env
+    local rbin="$T/resume.sh" f
+    printf '#!/bin/sh\n' > "$rbin"; chmod +x "$rbin"
+    assert_eq sorted:empty "" "$(gate_run usage_markers_sorted)"
+    gate_run "usage_marker_write $SID_A plan-now '$rbin' usage-pause drain 95 five_hour 1"
+    gate_run "usage_marker_write $SID_B automouse '$rbin' usage-pause drain 95 five_hour 1"
+    gate_run "usage_marker_write $SID_C post-plan-now '$rbin' usage-pause drain 95 five_hour 1"
+    gate_run "usage_marker_write $SID_D post-plan-now '$rbin' usage-pause drain 95 five_hour 1"
+    # pin paused_at: A=1 B=3 C=5 D=2
+    set_paused() {  # sid t
+        f="$IBL5_USAGE_GATE_STATE_DIR/markers/$1.json"
+        jq --argjson t "$2" '.paused_at = $t' "$f" > "$f.x" && mv "$f.x" "$f"
+    }
+    set_paused $SID_A 1; set_paused $SID_B 3; set_paused $SID_C 5; set_paused $SID_D 2
+    assert_eq sorted:order "$SID_D $SID_C $SID_B $SID_A" "$(gate_run usage_markers_sorted | tr '\n' ' ' | sed 's/ $//')"
+}
+
+test_token_exclusive() {
+    new_env
+    local rc
+    gate_run "usage_token_acquire $SID_A 99999"; rc=$?
+    assert_eq token:A-acquires 0 "$rc"
+    gate_run "usage_token_acquire $SID_B 99998"; rc=$?
+    assert_eq token:B-blocked 1 "$rc"
+    gate_run "usage_token_acquire $SID_A"; rc=$?
+    assert_eq token:A-idempotent 0 "$rc"
+    gate_run "usage_token_release $SID_B"; rc=$?
+    assert_eq token:foreign-release-rc 0 "$rc"
+    assert_eq token:still-A "$SID_A" "$(gate_run usage_token_holder)"
+    gate_run "usage_token_release $SID_A"
+    assert_no_file token:freed "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d"
+    gate_run "usage_token_acquire $SID_B 99998"; rc=$?
+    assert_eq token:B-acquires 0 "$rc"
+}
+
+test_token_reclaim_dead_pid() {
+    new_env
+    local dead
+    sh -c 'exit 0' & dead=$!
+    wait "$dead"
+    gate_run "usage_token_acquire $SID_A $dead"
+    gate_run usage_token_reclaim_dead
+    assert_no_file token_reclaim:dead "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d"
+    assert_contains token_reclaim:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "token-reclaimed sid=$SID_A"
+    sleep 30 & local live=$!
+    gate_run "usage_token_acquire $SID_B $live"
+    gate_run usage_token_reclaim_dead
+    assert_file token_reclaim:live-kept "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d"
+    kill "$live" 2>/dev/null
+    wait "$live" 2>/dev/null
+}
+
+test_delta_log_throttle() {
+    new_env
+    local log="$IBL5_USAGE_GATE_STATE_DIR/deltas.jsonl"
+    gate_run "usage_delta_log $SID_A plan-now haiku '$(usage_json 40 10)'"
+    gate_run "usage_delta_log $SID_A plan-now haiku '$(usage_json 40 10)'"
+    assert_eq delta:one-line 1 "$(wc -l < "$log" | tr -d ' ')"
+    assert_eq delta:first-zero 0 "$(head -1 "$log" | jq -r '.d_five')"
+    gate_run "usage_delta_log $SID_A plan-now haiku '$(usage_json 43 10)'"
+    assert_eq delta:two-lines 2 "$(wc -l < "$log" | tr -d ' ')"
+    assert_eq delta:d_five 3 "$(tail -1 "$log" | jq -r '.d_five')"
+}
+
+test_limit_hit_vs_env_error() {
+    new_env
+    local f="$T/log.txt" n
+    for line in "You've hit your weekly limit" "API Error: 429" "rate_limit_error"; do
+        printf '%s\n' "$line" > "$f"
+        gate_run "usage_is_limit_hit '$f'"; n=$?
+        assert_eq "limit_hit:$line" 0 "$n"
+        gate_run "usage_is_env_error '$f'"; n=$?
+        assert_eq "env_error:$line" 0 "$n"
+    done
+    for line in "API Error: 401" "API Error: 529" "overloaded_error"; do
+        printf '%s\n' "$line" > "$f"
+        gate_run "usage_is_limit_hit '$f'"; n=$?
+        assert_eq "not_limit_hit:$line" 1 "$n"
+        gate_run "usage_is_env_error '$f'"; n=$?
+        assert_eq "env_only:$line" 0 "$n"
+    done
+    printf 'discussing 401 handling in AuthService\n' > "$f"
+    gate_run "usage_is_limit_hit '$f'"; n=$?
+    assert_eq prose:limit 1 "$n"
+    gate_run "usage_is_env_error '$f'"; n=$?
+    assert_eq prose:env 1 "$n"
+    printf 'API Error: 429\nfine\n' > "$f"
+    gate_run "usage_is_limit_hit '$f' 1"; n=$?
+    assert_eq after_line:skips 1 "$n"
+}
+
+# ---------------------------------------------------------------- Phase 3
+
+PAUSE_JSON='{"continue":false,"stopReason":"usage-pause"}'
+
+# decide_setup <five> [week]: fresh env, fresh cache at that utilization, stub PATH
+# that fails curl (so a cache miss is visible), and an executable RESUME_BIN.
+decide_setup() {
+    new_env
+    make_stub_bin "$STUB" "" '{}' 1
+    seed_cache "$(date +%s)" "$(usage_json "$1" "${2:-0}")"
+    RBIN="$T/resume.sh"
+    printf '#!/bin/sh\n' > "$RBIN"; chmod +x "$RBIN"
+}
+
+# decide <sid> [extra env assignments via the environment]: prints hook output.
+decide() {
+    printf '{"session_id":"%s","cwd":"%s"}' "$1" "$PWD" \
+        | PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; usage_gate_decide"
+}
+
+test_decide_normal_allows() {
+    decide_setup 50
+    local out
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_normal:out "" "$out"
+    assert_no_file decide_normal:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_drain_pauses_non_holder() {
+    decide_setup 95
+    local out
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_drain:out "$PAUSE_JSON" "$out"
+    assert_file decide_drain:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    local m
+    m=$(cat "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")
+    assert_eq decide_drain:zone drain "$(printf '%s' "$m" | jq -r .zone)"
+    assert_eq decide_drain:reason usage-pause "$(printf '%s' "$m" | jq -r .reason)"
+}
+
+test_decide_drain_allows_holder() {
+    decide_setup 95
+    gate_run "usage_token_acquire $SID_A $$"
+    local out
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_holder:out "" "$out"
+    assert_no_file decide_holder:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_stop_pauses_holder_and_releases() {
+    decide_setup 99
+    gate_run "usage_token_acquire $SID_A $$"
+    local out
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_stop:out "$PAUSE_JSON" "$out"
+    assert_no_file decide_stop:token-gone "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d"
+    assert_file decide_stop:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_fail_open_no_usage() {
+    new_env
+    make_stub_bin "$STUB" "" '{}' 1
+    RBIN="$T/resume.sh"; printf '#!/bin/sh\n' > "$RBIN"; chmod +x "$RBIN"
+    local out
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_no_usage:out "" "$out"
+    assert_contains decide_no_usage:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "reason=no-usage"
+}
+
+test_decide_fail_open_stale() {
+    decide_setup 99
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    local out
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_stale:out "" "$out"
+    assert_contains decide_stale:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "reason=stale-usage"
+    assert_no_file decide_stale:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+# blind_setup <five> <week> <five_resets_epoch|""> <week_resets_epoch|""> [age]
+# No-token stub, so usage_fetch returns rc 2 with the seeded cache; age defaults to 600 (stale).
+blind_setup() {
+    new_env
+    make_stub_bin "$STUB" "" '{}' 1
+    seed_cache "$(( $(date +%s) - ${5:-600} ))" "$(usage_json_resets "$1" "$2" "$3" "$4")"
+    RBIN="$T/resume.sh"
+    printf '#!/bin/sh\n' > "$RBIN"; chmod +x "$RBIN"
+}
+
+test_decide_blind_normal_allows() {
+    local FUT out
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 50 0 "$FUT" ""
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_normal:out "" "$out"
+    assert_no_file decide_blind_normal:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_contains decide_blind_normal:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "fail-open reason=stale-usage"
+    assert_eq decide_blind_normal:no-blind-trust 0 "$(log_count blind-trust)"
+}
+
+test_decide_blind_drain_pauses() {
+    local FUT out m
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_drain:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_drain:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    m=$(cat "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json" 2>/dev/null)
+    assert_eq decide_blind_drain:zone drain "$(printf '%s' "$m" | jq -r .zone)"
+    assert_eq decide_blind_drain:reason usage-pause "$(printf '%s' "$m" | jq -r .reason)"
+    assert_eq decide_blind_drain:window five_hour "$(printf '%s' "$m" | jq -r .window)"
+    assert_eq decide_blind_drain:resets_at "$FUT" "$(printf '%s' "$m" | jq -r .resets_at)"
+    assert_contains decide_blind_drain:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "blind-trust zone=drain age="
+    assert_no_file decide_blind_drain:no-delta-log "$IBL5_USAGE_GATE_STATE_DIR/deltas.jsonl"
+}
+
+test_decide_blind_drain_allows_holder() {
+    local FUT out
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    gate_run "usage_token_acquire $SID_A $$"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_holder:out "" "$out"
+    assert_no_file decide_blind_holder:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_blind_stop_pauses_holder() {
+    local FUT out
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 99 0 "$FUT" ""
+    gate_run "usage_token_acquire $SID_A $$"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_stop:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_stop:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_eq decide_blind_stop:zone stop "$(jq -r .zone "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json" 2>/dev/null)"
+    assert_no_file decide_blind_stop:token-gone "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d"
+}
+
+test_decide_blind_resets_passed_allows() {
+    local PAST out pct
+    PAST=$(( $(date +%s) - 60 ))
+    blind_setup 95 0 "$PAST" ""
+    for pct in 95 99; do
+        seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json_resets "$pct" 0 "$PAST" "")"
+        out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+        assert_eq "decide_blind_passed:out:$pct" "" "$out"
+        assert_no_file "decide_blind_passed:no-marker:$pct" "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    done
+    assert_contains decide_blind_passed:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "reason=stale-usage"
+}
+
+test_decide_blind_resets_unparseable_allows() {
+    local out
+    blind_setup 95 0 "" ""
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_unparse:missing:out "" "$out"
+    assert_no_file decide_blind_unparse:missing:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json_resets 95 0 "" "" | jq -c '.five_hour.resets_at="not-a-date"')"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_unparse:garbage:out "" "$out"
+    assert_no_file decide_blind_unparse:garbage:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_blind_seven_day_window() {
+    local FUT PAST out
+    FUT=$(( $(date +%s) + 3600 ))
+    PAST=$(( $(date +%s) - 60 ))
+    blind_setup 10 96 "$FUT" "$FUT"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_week:future:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_week:future:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_eq decide_blind_week:future:window seven_day "$(jq -r .window "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json" 2>/dev/null)"
+    blind_setup 10 96 "$FUT" "$PAST"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_week:past:out "" "$out"
+    assert_no_file decide_blind_week:past:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_blind_marker_write_fails_no_pause() {
+    local FUT out log
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    chmod 500 "$IBL5_USAGE_GATE_STATE_DIR/markers"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    chmod 700 "$IBL5_USAGE_GATE_STATE_DIR/markers"
+    if [ "$(id -u)" = "0" ]; then
+        pass decide_blind_marker_fail:skipped-as-root
+        return 0
+    fi
+    log=$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")
+    assert_eq decide_blind_marker_fail:out "" "$out"
+    assert_no_file decide_blind_marker_fail:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_contains decide_blind_marker_fail:log "$log" "fail-open reason=marker-write-failed"
+    assert_contains decide_blind_marker_fail:blind "$log" "blind-trust"
+}
+
+test_decide_blind_age_boundary() {
+    local PAST out
+    PAST=$(( $(date +%s) - 60 ))
+    blind_setup 95 0 "$PAST" "" 290
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_age:290:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_age:290:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    blind_setup 95 0 "$PAST" "" 300
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_blind_age:300:out "" "$out"
+    assert_no_file decide_blind_age:300:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_blind_during_backoff() {
+    local FUT out log
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY"
+    printf '%s\n' "$(( $(date +%s) + 300 )) 1" > "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    log=$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")
+    assert_eq decide_blind_backoff:out "$PAUSE_JSON" "$out"
+    assert_file decide_blind_backoff:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_eq decide_blind_backoff:no-curl 0 "$(curl_calls "$STUB")"
+    assert_contains decide_blind_backoff:log-skip "$log" "backoff-skip"
+    assert_contains decide_blind_backoff:log-blind "$log" "blind-trust zone=drain"
+}
+
+test_decide_runner_env_unset() {
+    decide_setup 99
+    local out
+    out=$(env -u IBL5_USAGE_GATE_RUNNER IBL5_USAGE_GATE_RESUME_BIN="$RBIN" bash -c "$(declare -f decide); SID_A=$SID_A; STUB='$STUB'; ORIG_PATH='$ORIG_PATH'; REPO_ROOT='$REPO_ROOT'; decide $SID_A")
+    assert_eq decide_runner_unset:out "" "$out"
+    assert_no_file decide_runner_unset:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_runner_env_empty() {
+    decide_setup 99
+    local out
+    out=$(IBL5_USAGE_GATE_RUNNER="" IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq decide_runner_empty:out "" "$out"
+    assert_no_file decide_runner_empty:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_resume_bin_unset() {
+    decide_setup 99
+    local out
+    out=$(env -u IBL5_USAGE_GATE_RESUME_BIN IBL5_USAGE_GATE_RUNNER=plan-now bash -c "$(declare -f decide); STUB='$STUB'; ORIG_PATH='$ORIG_PATH'; REPO_ROOT='$REPO_ROOT'; decide $SID_A")
+    assert_eq decide_bin_unset:out "" "$out"
+    assert_no_file decide_bin_unset:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_resume_bin_empty() {
+    decide_setup 99
+    local out
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="" decide $SID_A)
+    assert_eq decide_bin_empty:out "" "$out"
+    assert_no_file decide_bin_empty:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_decide_model_env_unset_and_empty() {
+    decide_setup 50
+    IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A >/dev/null
+    seed_cache "$(date +%s)" "$(usage_json 55 0)"
+    IBL5_USAGE_GATE_MODEL="" IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A >/dev/null
+    local log="$IBL5_USAGE_GATE_STATE_DIR/deltas.jsonl"
+    assert_eq decide_model:lines 2 "$(wc -l < "$log" | tr -d ' ')"
+    assert_eq decide_model:unset unknown "$(head -1 "$log" | jq -r .model)"
+    assert_eq decide_model:empty unknown "$(tail -1 "$log" | jq -r .model)"
+}
+
+test_decide_marker_write_fails_allows() {
+    decide_setup 99
+    chmod 500 "$IBL5_USAGE_GATE_STATE_DIR/markers"
+    local out
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    chmod 700 "$IBL5_USAGE_GATE_STATE_DIR/markers"
+    if [ "$(id -u)" = "0" ]; then
+        pass decide_marker_fail:skipped-as-root
+        return 0
+    fi
+    assert_eq decide_marker_fail:out "" "$out"
+    assert_contains decide_marker_fail:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "marker-write-failed"
+}
+
+test_decide_bad_sid() {
+    decide_setup 99
+    local out
+    out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide '../x')
+    assert_eq decide_bad_sid:out "" "$out"
+    assert_eq decide_bad_sid:no-marker 0 "$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -type f | wc -l | tr -d ' ')"
+}
+
+# Run-sid keying (post-plan harness addendum): IBL5_USAGE_GATE_SESSION_ID re-keys the pause.
+# Unset keeps the hook's own sid, which is already the run sid on the skill leg.
+test_decide_run_sid_unset_uses_hook_sid() {
+    decide_setup 99
+    local out
+    out=$(env -u IBL5_USAGE_GATE_SESSION_ID IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" \
+        bash -c "$(declare -f decide); STUB='$STUB'; ORIG_PATH='$ORIG_PATH'; REPO_ROOT='$REPO_ROOT'; decide $SID_A")
+    assert_eq run_sid_unset:out "$PAUSE_JSON" "$out"
+    assert_file run_sid_unset:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+# Run sid S = $SID_B, hook sid = $SID_A: the marker is markers/S.json, never the child's.
+test_decide_run_sid_keys_marker() {
+    decide_setup 99
+    local out m="$IBL5_USAGE_GATE_STATE_DIR/markers"
+    out=$(IBL5_USAGE_GATE_SESSION_ID=$SID_B IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq run_sid_keys:out "$PAUSE_JSON" "$out"
+    assert_file run_sid_keys:run-marker "$m/$SID_B.json"
+    assert_no_file run_sid_keys:no-child-marker "$m/$SID_A.json"
+    assert_eq run_sid_keys:argv-sid "$SID_B" "$(jq -r '.resume_argv[2]' "$m/$SID_B.json" 2>/dev/null)"
+}
+
+test_decide_run_sid_empty_fails_open() {
+    decide_setup 99
+    local out
+    out=$(IBL5_USAGE_GATE_SESSION_ID="" IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq run_sid_empty:out "" "$out"
+    assert_eq run_sid_empty:no-marker 0 "$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -type f | wc -l | tr -d ' ')"
+    assert_contains run_sid_empty:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "fail-open reason=bad-run-sid"
+}
+
+test_decide_run_sid_invalid_fails_open() {
+    decide_setup 99
+    local out
+    out=$(IBL5_USAGE_GATE_SESSION_ID="not-a-uuid" IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq run_sid_invalid:out "" "$out"
+    assert_eq run_sid_invalid:no-marker 0 "$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -type f | wc -l | tr -d ' ')"
+    assert_contains run_sid_invalid:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "fail-open reason=bad-run-sid"
+}
+
+test_decide_run_sid_drain_holder_allows() {
+    decide_setup 95
+    gate_run "usage_token_acquire $SID_B $$"
+    local out
+    out=$(IBL5_USAGE_GATE_SESSION_ID=$SID_B IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
+    assert_eq run_sid_holder:out "" "$out"
+    assert_eq run_sid_holder:no-marker 0 "$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -type f | wc -l | tr -d ' ')"
+}
+
+# ---------------------------------------------------------------- Phase 4
+
+# coord_setup <pct>: env with a fresh cache at <pct>, failing curl stub, a DM stub
+# that records each call, and a resume script that touches $T/launched.<sid>.
+coord_setup() {
+    new_env
+    make_stub_bin "$STUB" "" '{}' 1
+    seed_cache "$(date +%s)" "$(usage_json "$1" 0)"
+    RBIN="$T/resume.sh"
+    printf '#!/bin/sh\ntouch "%s/launched.$2"\n' "$T" > "$RBIN"; chmod +x "$RBIN"
+    DM="$T/dm"
+    printf '#!/bin/sh\necho call >> "%s/dm.calls"\ncat >> "%s/dm.txt"\n' "$T" "$T" > "$DM"; chmod +x "$DM"
+}
+
+run_coord() {
+    PATH="$STUB:$ORIG_PATH" DISCORD_DM="$DM" NOTIFY=1 "$REPO_ROOT/bin/usage-gate-coordinator" "$@"
+}
+
+# coord_marker <sid> <runner> [reason]
+coord_marker() {
+    gate_run "usage_marker_write $1 $2 '$RBIN' ${3:-usage-pause} drain 95 five_hour 1790625600"
+}
+
+# patch_marker <sid> <jq-filter>
+patch_marker() {
+    local f="$IBL5_USAGE_GATE_STATE_DIR/markers/$1.json"
+    jq "$2" "$f" > "$f.x" && mv "$f.x" "$f"
+}
+
+# wait_file <path>: the resume launch is detached, so poll up to ~5 s.
+wait_file() {
+    local i=0
+    while [ ! -e "$1" ] && [ "$i" -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
+    [ -e "$1" ]
+}
+
+dm_calls() { if [ -f "$T/dm.calls" ]; then wc -l < "$T/dm.calls" | tr -d ' '; else echo 0; fi; }
+
+test_coord_rejects_bad_args() {
+    coord_setup 50
+    local rc
+    run_coord >/dev/null 2>"$T/err"; rc=$?
+    assert_eq coord_args:none 2 "$rc"
+    assert_contains coord_args:none-usage "$(cat "$T/err")" "Usage"
+    run_coord --dry-run >/dev/null 2>&1; rc=$?
+    assert_eq coord_args:dry-alone 2 "$rc"
+    run_coord --bogus >/dev/null 2>&1; rc=$?
+    assert_eq coord_args:bogus 2 "$rc"
+}
+
+test_coord_idle_no_fetch() {
+    coord_setup 50
+    rm -f "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+    make_stub_bin "$STUB" tok "$BODY_B"
+    run_coord --once >/dev/null 2>&1
+    assert_eq coord_idle:rc-and-no-calls 0 "$(curl_calls "$STUB")"
+}
+
+test_coord_normal_resumes_all() {
+    coord_setup 50
+    coord_marker $SID_A plan-now; coord_marker $SID_B automouse; coord_marker $SID_C post-plan-now
+    run_coord --once >/dev/null 2>&1
+    local s
+    for s in $SID_A $SID_B $SID_C; do
+        wait_file "$T/launched.$s"
+        assert_file "coord_normal:launched.$s" "$T/launched.$s"
+        assert_eq "coord_normal:count.$s" 1 "$(jq -r .resume_count "$IBL5_USAGE_GATE_STATE_DIR/markers/$s.json")"
+    done
+    assert_no_file coord_normal:token-cleared "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d"
+    assert_eq coord_normal:one-dm 1 "$(dm_calls)"
+}
+
+test_coord_dry_run_mutates_nothing() {
+    coord_setup 50
+    coord_marker $SID_A plan-now; coord_marker $SID_B automouse; coord_marker $SID_C post-plan-now
+    local out
+    out=$(run_coord --once --dry-run 2>&1)
+    assert_contains coord_dry:zone-line "$(printf '%s\n' "$out" | head -1)" "ZONE normal"
+    assert_eq coord_dry:three-resumes 3 "$(printf '%s\n' "$out" | grep -c '^ACTION resume')"
+    assert_eq coord_dry:one-dm 1 "$(printf '%s\n' "$out" | grep -c '^ACTION dm')"
+    sleep 0.3
+    assert_eq coord_dry:no-launch 0 "$(find "$T" -maxdepth 1 -name 'launched.*' | wc -l | tr -d ' ')"
+    assert_eq coord_dry:count-0 0 "$(jq -r .resume_count "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_no_file coord_dry:no-dm "$T/dm.calls"
+    assert_no_file coord_dry:no-dm-seen "$IBL5_USAGE_GATE_STATE_DIR/dm-seen"
+}
+
+test_coord_drain_grants_by_priority() {
+    coord_setup 95
+    coord_marker $SID_A plan-now; coord_marker $SID_B post-plan-now
+    patch_marker $SID_A '.paused_at = 1'; patch_marker $SID_B '.paused_at = 9'
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_B"
+    assert_file coord_drain:post-plan-launched "$T/launched.$SID_B"
+    assert_no_file coord_drain:plan-now-waits "$T/launched.$SID_A"
+    assert_eq coord_drain:holder "$SID_B" "$(gate_run usage_token_holder)"
+    local pid
+    pid=$(awk '{print $2}' "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d/holder")
+    case "$pid" in ''|*[!0-9]*) fail coord_drain:holder-pid "got [$pid]" ;; *) pass coord_drain:holder-pid ;; esac
+}
+
+test_coord_drain_holder_alive_noop() {
+    coord_setup 95
+    coord_marker $SID_A plan-now
+    gate_run "usage_token_acquire $SID_B $$"
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    assert_no_file coord_holder_alive:no-launch "$T/launched.$SID_A"
+}
+
+test_coord_drain_dead_holder_regrants() {
+    coord_setup 95
+    coord_marker $SID_A plan-now
+    local dead
+    sh -c 'exit 0' & dead=$!
+    wait "$dead"
+    gate_run "usage_token_acquire $SID_B $dead"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
+    assert_file coord_dead_holder:launched "$T/launched.$SID_A"
+    assert_eq coord_dead_holder:regranted "$SID_A" "$(gate_run usage_token_holder)"
+}
+
+test_coord_stop_waits_and_dms_once() {
+    coord_setup 99
+    coord_marker $SID_A plan-now
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    assert_no_file coord_stop:no-launch "$T/launched.$SID_A"
+    assert_eq coord_stop:first-tick-dm 1 "$(dm_calls)"
+    run_coord --once >/dev/null 2>&1
+    assert_eq coord_stop:second-tick-no-new-dm 1 "$(dm_calls)"
+}
+
+test_coord_weekly_dm() {
+    coord_setup 99
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A '.window = "seven_day"'
+    run_coord --once >/dev/null 2>&1
+    assert_contains coord_weekly:dm "$(cat "$T/dm.txt")" "WEEKLY"
+}
+
+test_coord_limit_hit_backoff() {
+    coord_setup 50
+    coord_marker $SID_A plan-now limit-hit
+    patch_marker $SID_A ".paused_at = $(( $(date +%s) - 60 ))"
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    assert_no_file coord_backoff:recent-waits "$T/launched.$SID_A"
+    patch_marker $SID_A ".paused_at = $(( $(date +%s) - 700 ))"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
+    assert_file coord_backoff:old-launches "$T/launched.$SID_A"
+}
+
+test_coord_runaway_stuck() {
+    coord_setup 50
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A '.resume_count = 5'
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    assert_no_file coord_runaway:not-launched "$T/launched.$SID_A"
+    assert_eq coord_runaway:stuck true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_eq coord_runaway:one-dm 1 "$(dm_calls)"
+    run_coord --once >/dev/null 2>&1
+    assert_eq coord_runaway:no-second-dm 1 "$(dm_calls)"
+}
+
+test_coord_in_flight_skip() {
+    coord_setup 50
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A ".resuming_pid = $$"
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    assert_no_file coord_in_flight:not-relaunched "$T/launched.$SID_A"
+    assert_eq coord_in_flight:count-unchanged 0 "$(jq -r .resume_count "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+}
+
+test_coord_stale_resets_passed() {
+    coord_setup 99
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99 0)"
+    coord_marker $SID_A plan-now; coord_marker $SID_B plan-now
+    patch_marker $SID_A ".resets_at = $(( $(date +%s) - 3600 ))"
+    patch_marker $SID_B ".resets_at = $(( $(date +%s) + 3600 ))"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
+    assert_file coord_stale:past-launches "$T/launched.$SID_A"
+    assert_no_file coord_stale:future-waits "$T/launched.$SID_B"
+    assert_contains coord_stale:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "coordinator-stale-usage"
+}
+
+test_coord_tick_busy() {
+    coord_setup 50
+    coord_marker $SID_A plan-now
+    mkdir "$IBL5_USAGE_GATE_STATE_DIR/coordinator.lock.d"
+    printf '%s\n' "$(date +%s)" > "$IBL5_USAGE_GATE_STATE_DIR/coordinator.lock.d/at"
+    run_coord --once >/dev/null 2>&1
+    assert_eq coord_busy:rc 0 "$?"
+    sleep 0.3
+    assert_no_file coord_busy:not-launched "$T/launched.$SID_A"
+    assert_contains coord_busy:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "tick-busy"
+}
+
+test_coord_empty_launchd_env() {
+    new_env
+    local h out rc
+    h=$(mktemp -d "$TMPROOT/home.XXXXXX")
+    out=$(env -i HOME="$h" PATH=/usr/bin:/bin IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" \
+        "$REPO_ROOT/bin/usage-gate-coordinator" --once --dry-run 2>&1); rc=$?
+    assert_eq coord_launchd_env:rc 0 "$rc"
+    assert_contains coord_launchd_env:zone "$out" "ZONE"
+}
+
+# ---------------------------------------------------------------- Phase 5
+
+SETUP="$REPO_ROOT/bin/usage-gate-cron-setup"
+
+test_setup_print_plist_shape() {
+    new_env
+    local out first
+    out=$("$SETUP" --print)
+    assert_contains setup_shape:once "$out" "<string>--once</string>"
+    assert_contains setup_shape:interval "$(printf '%s\n' "$out" | grep -A1 'StartInterval')" "<integer>60</integer>"
+    assert_contains setup_shape:abandon "$(printf '%s\n' "$out" | grep -A1 'AbandonProcessGroup')" "<true/>"
+    assert_contains setup_shape:path-usr-bin "$(printf '%s\n' "$out" | grep -A1 '<key>PATH</key>')" "/usr/bin:/bin"
+    assert_contains setup_shape:path-local-bin "$(printf '%s\n' "$out" | grep -A1 '<key>PATH</key>')" "/.local/bin"
+    first=$(printf '%s\n' "$out" | grep -A2 'ProgramArguments' | tail -1 | sed -e 's/.*<string>//' -e 's/<\/string>.*//')
+    case "$first" in
+        /*/bin/usage-gate-coordinator) pass setup_shape:program-absolute ;;
+        *) fail setup_shape:program-absolute "got [$first]" ;;
+    esac
+}
+
+test_setup_print_no_unexpanded() {
+    new_env
+    local out
+    out="$("$SETUP" --print)
+$("$SETUP" --print-probe)"
+    if printf '%s\n' "$out" | grep -qE '\$\{|\$[A-Za-z_]'; then
+        fail setup_unexpanded:dollar "found an unexpanded variable"
+    else
+        pass setup_unexpanded:dollar
+    fi
+    if printf '%s\n' "$out" | grep -q '<string></string>'; then
+        fail setup_unexpanded:empty-string "found an empty <string>"
+    else
+        pass setup_unexpanded:empty-string
+    fi
+}
+
+test_setup_print_touches_nothing() {
+    new_env
+    local h
+    h=$(mktemp -d "$TMPROOT/home.XXXXXX")
+    HOME="$h" "$SETUP" --print >/dev/null
+    HOME="$h" "$SETUP" --print-probe >/dev/null
+    assert_no_file setup_touch:no-library "$h/Library"
+}
+
+test_setup_rejects_bad_args() {
+    new_env
+    local rc
+    "$SETUP" >/dev/null 2>&1; rc=$?
+    assert_eq setup_args:none 2 "$rc"
+    "$SETUP" --bogus >/dev/null 2>&1; rc=$?
+    assert_eq setup_args:bogus 2 "$rc"
+    "$SETUP" --print --install >/dev/null 2>&1; rc=$?
+    assert_eq setup_args:two-actions 2 "$rc"
+}
+
+test_setup_empty_launchd_env() {
+    new_env
+    local h out rc
+    h=$(mktemp -d "$TMPROOT/home.XXXXXX")
+    out=$(env -i HOME="$h" PATH=/usr/bin:/bin "$SETUP" --print 2>&1); rc=$?
+    assert_eq setup_launchd_env:rc 0 "$rc"
+    assert_contains setup_launchd_env:homebrew "$out" "/opt/homebrew/bin"
+}
+
+test_setup_plutil_lint() {
+    if ! command -v plutil >/dev/null 2>&1; then
+        pass setup_plutil:skipped-no-plutil
+        return 0
+    fi
+    new_env
+    "$SETUP" --print | plutil -lint - >/dev/null 2>&1
+    assert_eq setup_plutil:coordinator 0 "$?"
+    "$SETUP" --print-probe | plutil -lint - >/dev/null 2>&1
+    assert_eq setup_plutil:probe 0 "$?"
+}
+
+# ---------------------------------------------------------------- Phase 6
+
+# in_env <bash-snippet>: run with the stub dir first on PATH and a private HOME.
+in_env() {
+    ( export PATH="$STUB:$ORIG_PATH" HOME="$T/home"; mkdir -p "$HOME"; gate_run "$1" )
+}
+
+PPN_BIN="$REPO_ROOT/bin/post-plan-now"
+
+test_argv_roundtrip() {
+    new_env
+    local out
+    out=$(gate_run "usage_argv_save $SID_A --auto '' 'a b' --resume; while IFS= read -r -d '' a; do printf '[%s]' \"\$a\"; done < <(usage_argv_load $SID_A)")
+    assert_eq argv_roundtrip "[--auto][][a b][--resume]" "$out"
+    gate_run "usage_argv_load $SID_B" >/dev/null 2>&1
+    assert_eq argv_roundtrip:missing-rc 1 "$?"
+}
+
+test_session_started() {
+    new_env
+    mkdir -p "$T/home/.claude/projects/-some-proj"
+    : > "$T/home/.claude/projects/-some-proj/$SID_A.jsonl"
+    in_env "usage_session_started $SID_A"
+    assert_eq session_started:present 0 "$?"
+    in_env "usage_session_started $SID_B"
+    assert_eq session_started:absent 1 "$?"
+    in_env "usage_session_started ../x"
+    assert_eq session_started:bad-sid 1 "$?"
+}
+
+test_prestart_gate_normal() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"
+    seed_cache "$(date +%s)" "$(usage_json 41 12)"
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_normal:rc 0 "$?"
+    assert_no_file prestart_normal:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_prestart_gate_drain_nonholder() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"
+    seed_cache "$(date +%s)" "$(usage_json 95 12)"
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_drain:rc 10 "$?"
+    assert_file prestart_drain:marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_eq prestart_drain:reason usage-pause "$(jq -r .reason "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_eq prestart_drain:zone drain "$(jq -r .zone "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+}
+
+test_prestart_gate_drain_holder() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"
+    seed_cache "$(date +%s)" "$(usage_json 95 12)"
+    in_env "usage_token_acquire $SID_A; usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_holder:rc 0 "$?"
+    assert_no_file prestart_holder:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_prestart_gate_no_usage() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_no_usage:rc 0 "$?"
+    assert_no_file prestart_no_usage:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_prestart_fail_open_stale_resets_passed() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 95 12)"
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_stale_passed:rc 0 "$?"
+    assert_no_file prestart_stale_passed:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_contains prestart_stale_passed:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "prestart-fail-open reason=stale-usage"
+}
+
+test_prestart_blind_normal_allows() {
+    local FUT
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 50 0 "$FUT" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_blind_normal:rc 0 "$?"
+    assert_no_file prestart_blind_normal:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_contains prestart_blind_normal:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "prestart-fail-open reason=stale-usage"
+}
+
+test_prestart_blind_drain_pauses() {
+    local FUT rc m
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    rc=$?
+    assert_eq prestart_blind_drain:rc 10 "$rc"
+    m="$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_file prestart_blind_drain:marker "$m"
+    assert_eq prestart_blind_drain:zone drain "$(jq -r .zone "$m" 2>/dev/null)"
+    assert_eq prestart_blind_drain:reason usage-pause "$(jq -r .reason "$m" 2>/dev/null)"
+    assert_contains prestart_blind_drain:log "$(grep -F 'blind-trust zone=drain' "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "runner=post-plan-now"
+}
+
+test_prestart_blind_stop_pauses() {
+    local FUT rc m
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 99 0 "$FUT" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    rc=$?
+    assert_eq prestart_blind_stop:rc 10 "$rc"
+    m="$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_file prestart_blind_stop:marker "$m"
+    assert_eq prestart_blind_stop:zone stop "$(jq -r .zone "$m" 2>/dev/null)"
+}
+
+test_prestart_blind_drain_allows_holder() {
+    local FUT
+    FUT=$(( $(date +%s) + 3600 ))
+    blind_setup 95 0 "$FUT" ""
+    in_env "usage_token_acquire $SID_A; usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_blind_holder:rc 0 "$?"
+    assert_no_file prestart_blind_holder:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_prestart_blind_resets_passed_allows() {
+    local PAST
+    PAST=$(( $(date +%s) - 60 ))
+    blind_setup 95 0 "$PAST" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_blind_passed:rc 0 "$?"
+    assert_no_file prestart_blind_passed:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_prestart_blind_resets_missing_allows() {
+    blind_setup 95 0 "" ""
+    in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
+    assert_eq prestart_blind_missing:rc 0 "$?"
+    assert_no_file prestart_blind_missing:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_coord_stale_never_pauses_or_grants() {
+    coord_setup 95
+    local now
+    now=$(date +%s)
+    seed_cache "$(( now - 600 ))" "$(usage_json_resets 95 0 $(( now + 3600 )) $(( now + 86400 )))"
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A ".resets_at = $(( now + 3600 ))"
+    run_coord --once >/dev/null 2>&1
+    assert_no_file coord_stale_conservative:not-resumed "$T/launched.$SID_A"
+    assert_no_file coord_stale_conservative:no-grant "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d"
+    assert_eq coord_stale_conservative:one-marker 1 "$(ls "$IBL5_USAGE_GATE_STATE_DIR/markers" | wc -l | tr -d ' ')"
+    assert_contains coord_stale_conservative:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "coordinator-stale-usage"
+}
+
+test_postrun_pause_marker_rc0() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    : > "$T/log"
+    in_env "usage_marker_write $SID_A post-plan-now $PPN_BIN usage-pause drain 94 five_hour ''; usage_postrun_pause post-plan-now $SID_A $PPN_BIN 0 $T/log"
+    assert_eq postrun_marker_rc0 0 "$?"
+}
+
+test_postrun_pause_limit_rc1() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf "You've hit your weekly limit\n" > "$T/log"
+    in_env "usage_postrun_pause post-plan-now $SID_A $PPN_BIN 1 $T/log"
+    assert_eq postrun_limit_rc1:rc 0 "$?"
+    assert_eq postrun_limit_rc1:reason limit-hit "$(jq -r .reason "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_eq postrun_limit_rc1:zone unknown "$(jq -r .zone "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+}
+
+test_postrun_pause_auth_401() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf 'API Error: 401\n' > "$T/log"
+    in_env "usage_postrun_pause post-plan-now $SID_A $PPN_BIN 1 $T/log"
+    assert_eq postrun_401:rc 1 "$?"
+    assert_no_file postrun_401:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_postrun_pause_rc3_limit() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf "You've hit your limit\n" > "$T/log"
+    in_env "usage_postrun_pause post-plan-now $SID_A $PPN_BIN 3 $T/log"
+    assert_eq postrun_rc3:rc 1 "$?"
+    assert_no_file postrun_rc3:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_postrun_pause_rc143() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf "You've hit your limit\n" > "$T/log"
+    in_env "usage_postrun_pause post-plan-now $SID_A $PPN_BIN 143 $T/log"
+    assert_eq postrun_rc143:rc 1 "$?"
+    assert_no_file postrun_rc143:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_resume_paused_args_rejects() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    in_env "usage_resume_paused_args post-plan-now ../x" >/dev/null 2>&1
+    assert_eq resume_args:bad-sid 2 "$?"
+    in_env "usage_resume_paused_args post-plan-now $SID_A" >/dev/null 2>&1
+    assert_eq resume_args:no-marker 2 "$?"
+    in_env "usage_marker_write $SID_A automouse $PPN_BIN usage-pause drain 94 five_hour ''; usage_argv_save $SID_A --auto; usage_resume_paused_args post-plan-now $SID_A" >/dev/null 2>&1
+    assert_eq resume_args:runner-mismatch 2 "$?"
+    in_env "usage_marker_write $SID_B post-plan-now $PPN_BIN usage-pause drain 94 five_hour ''; usage_resume_paused_args post-plan-now $SID_B" >/dev/null 2>&1
+    assert_eq resume_args:no-argv 2 "$?"
+    in_env "usage_marker_write $SID_C post-plan-now $PPN_BIN usage-pause drain 94 five_hour ''; usage_argv_save $SID_C --auto --force; usage_resume_paused_args post-plan-now $SID_C" >/dev/null 2>&1
+    assert_eq resume_args:ok 0 "$?"
+}
+
+test_ppn_resume_paused_argcount() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    local rc
+    mkdir -p "$T/home"
+    ( export PATH="$STUB:$ORIG_PATH" HOME="$T/home"; "$PPN_BIN" --resume-paused ) >/dev/null 2>&1
+    assert_eq ppn_argcount:none 2 "$?"
+    ( export PATH="$STUB:$ORIG_PATH" HOME="$T/home"; "$PPN_BIN" --resume-paused a b ) >/dev/null 2>&1
+    assert_eq ppn_argcount:two 2 "$?"
+    ( export PATH="$STUB:$ORIG_PATH" HOME="$T/home"; "$PPN_BIN" --auto --resume-paused "$SID_A" ) >/dev/null 2>&1
+    assert_eq ppn_argcount:not-first 2 "$?"
+    ( export PATH="$STUB:$ORIG_PATH" HOME="$T/home"; "$PPN_BIN" --resume-paused ../x ) >/dev/null 2>&1
+    assert_eq ppn_argcount:bad-sid 2 "$?"
+    assert_no_file ppn_argcount:no-runs "$IBL5_USAGE_GATE_STATE_DIR/runs"
+    assert_no_file ppn_argcount:no-plist "$T/home/Library/LaunchAgents"
+}
+
+# ---------------------------------------------------------------- Phase 7
+
+test_marker_clear_stamps() {
+    new_env
+    in_env "usage_marker_write $SID_A post-plan-now $PPN_BIN usage-pause drain 94 five_hour ''; usage_marker_clear $SID_A"
+    assert_eq clear_stamp:rc 0 "$?"
+    assert_no_file clear_stamp:marker-gone "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_file clear_stamp:stamp "$IBL5_USAGE_GATE_STATE_DIR/cleared/$SID_A"
+}
+
+# Runners call usage_marker_clear under `set -e`. When dm-seen holds only this sid,
+# grep -v prints nothing and exits 1; that must not kill the caller.
+test_marker_clear_sole_dm_seen_under_set_e() {
+    new_env
+    mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
+    printf '%s\n' "$SID_A" > "$IBL5_USAGE_GATE_STATE_DIR/dm-seen"
+    in_env "set -euo pipefail; usage_marker_clear $SID_A; echo survived > '$T/after'"
+    assert_eq clear_sole_seen:rc 0 "$?"
+    assert_file clear_sole_seen:caller-continued "$T/after"
+    assert_eq clear_sole_seen:seen-empty "" "$(cat "$IBL5_USAGE_GATE_STATE_DIR/dm-seen")"
+    printf '%s\n%s\n' "$SID_A" "$SID_B" > "$IBL5_USAGE_GATE_STATE_DIR/dm-seen"
+    in_env "set -euo pipefail; usage_marker_clear $SID_A"
+    assert_eq clear_sole_seen:keeps-other "$SID_B" "$(cat "$IBL5_USAGE_GATE_STATE_DIR/dm-seen")"
+}
+
+test_paused_hold_live() {
+    new_env
+    in_env "usage_paused_hold_live $SID_A 60"
+    assert_eq hold_live:nothing 1 "$?"
+    in_env "usage_marker_write $SID_A post-plan-now $PPN_BIN usage-pause drain 94 five_hour ''; usage_paused_hold_live $SID_A 60"
+    assert_eq hold_live:marker 0 "$?"
+    in_env "usage_marker_clear $SID_A; usage_paused_hold_live $SID_A 60"
+    assert_eq hold_live:cleared-fresh 0 "$?"
+    echo 1577836800 > "$IBL5_USAGE_GATE_STATE_DIR/cleared/$SID_A"
+    in_env "usage_paused_hold_live $SID_A 60"
+    assert_eq hold_live:cleared-old 1 "$?"
+    in_env "usage_paused_hold_live ../x 60"
+    assert_eq hold_live:bad-sid 1 "$?"
+}
+
+test_marker_find() {
+    new_env
+    local out cwd
+    cwd=$(git -C "$(dirname "$PPN_BIN")" rev-parse --show-toplevel)
+    in_env "usage_marker_find post-plan-now $cwd" >/dev/null 2>&1
+    assert_eq marker_find:none 1 "$?"
+    in_env "usage_marker_write $SID_A post-plan-now $PPN_BIN usage-pause drain 94 five_hour ''"
+    out=$(in_env "usage_marker_find post-plan-now $cwd")
+    assert_eq marker_find:match "$SID_A" "$out"
+    in_env "usage_marker_find automouse $cwd" >/dev/null 2>&1
+    assert_eq marker_find:other-runner 1 "$?"
+    in_env "usage_marker_find post-plan-now /nowhere" >/dev/null 2>&1
+    assert_eq marker_find:other-cwd 1 "$?"
+}
+
+test_postrun_pause_any() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf "You've hit your limit\n" > "$T/log"
+    in_env "usage_postrun_pause post-plan-now $SID_A $PPN_BIN any $T/log"
+    assert_eq postrun_any:limit 0 "$?"
+    assert_eq postrun_any:reason limit-hit "$(jq -r .reason "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    printf 'API Error: 401\n' > "$T/log"
+    in_env "usage_postrun_pause post-plan-now $SID_B $PPN_BIN any $T/log"
+    assert_eq postrun_any:401 1 "$?"
+    assert_no_file postrun_any:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_B.json"
+}
+
+test_limit_hit_marker_writes() {
+    new_env
+    make_stub_bin "$STUB" "" '{}' 1
+    seed_cache "$(date +%s)" "$(usage_json 50 0)"
+    in_env "usage_limit_hit_marker post-plan-now $SID_C $PPN_BIN"
+    assert_eq limit_hit_marker:rc 0 "$?"
+    local f="$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_C.json"
+    assert_eq limit_hit_marker:reason limit-hit "$(jq -r .reason "$f" 2>/dev/null)"
+    assert_eq limit_hit_marker:runner post-plan-now "$(jq -r .runner "$f" 2>/dev/null)"
+    assert_eq limit_hit_marker:argv "$PPN_BIN --resume-paused $SID_C" "$(jq -r '.resume_argv | join(" ")' "$f" 2>/dev/null)"
+    local notexec="$T/notexec"
+    : > "$notexec"
+    in_env "usage_limit_hit_marker post-plan-now $SID_D $notexec"
+    assert_eq limit_hit_marker:notexec-rc 1 "$?"
+    assert_no_file limit_hit_marker:notexec-no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_D.json"
+}
+
+# ---------------------------------------------------------------- runner
+
+TESTS=$(grep -E '^test_[a-z0-9_]+\(\)' "$0" | sed 's/().*//')
+if [ "$#" -gt 0 ]; then TESTS="$*"; fi
+for t in $TESTS; do
+    echo "$t"
+    "$t"
+done
+
+echo
+echo "passed=$PASS failed=$FAIL"
+if [ "$FAIL" -ne 0 ]; then
+    echo "failed:$FAILED_NAMES"
+    exit 1
+fi
+exit 0

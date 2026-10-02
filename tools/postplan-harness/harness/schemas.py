@@ -17,6 +17,9 @@ MANUAL_CATEGORIES = {"cli-executable", "phpunit", "api-test", "e2e",
 HOLD_DISCHARGE_CATEGORIES = {"decision", "cli-executable", "phpunit", "api-test",
                               "e2e", "visual-regression", "truly-manual"}
 COMMIT_TYPES = {"feat", "fix", "refactor", "perf", "test", "docs", "build", "ci", "chore"}
+# Conventional-commit prefix: type, optional (scope), optional bang. Case-insensitive on the
+# type token because validate_pr_copy compares lowercased. Same shape coerce_commit_subject uses.
+_CC_PREFIX_RE = re.compile(r"^([a-z]+)(\([^)]*\))?(!)?:", re.IGNORECASE)
 
 
 def _normalize_finding(item):
@@ -176,6 +179,47 @@ def validate_hold_discharge(data) -> None:
                 raise HarnessError("schema", f"discharge[{i}].probe elements must be strings")
 
 
+def normalize_pr_copy(data):
+    """Reconcile type / title prefix / commit_subject prefix before validate_pr_copy.
+
+    Runs before validation and can never lower a `feat`. Pure: returns a new dict, never
+    mutates the input, idempotent. Conservative: acts only when `type` is a known
+    COMMIT_TYPES member AND both title and commit_subject are strings whose prefix parses
+    with a known type. Anything else is returned untouched so validate_pr_copy decides
+    exactly as before (missing / non-string fields, unknown type, unparseable prefix,
+    non-dict). Stricter-type rule: if any of the three says feat, all three become feat;
+    otherwise `type` wins. Only the type token is rewritten; each field keeps its own
+    scope, bang and text.
+    """
+    if not isinstance(data, dict):
+        return data
+    t = data.get("type")
+    title = data.get("title")
+    subject = data.get("commit_subject")
+    if not isinstance(t, str) or t not in COMMIT_TYPES:
+        return data
+    if not isinstance(title, str) or not isinstance(subject, str):
+        return data
+    mt = _CC_PREFIX_RE.match(title)
+    ms = _CC_PREFIX_RE.match(subject)
+    if mt is None or ms is None:
+        return data
+    title_type = mt.group(1).lower()
+    subject_type = ms.group(1).lower()
+    if title_type not in COMMIT_TYPES or subject_type not in COMMIT_TYPES:
+        return data
+    winner = "feat" if "feat" in (t, title_type, subject_type) else t
+    if t == winner and title_type == winner and subject_type == winner:
+        return data
+    out = dict(data)
+    out["type"] = winner
+    if title_type != winner:
+        out["title"] = winner + title[mt.end(1):]
+    if subject_type != winner:
+        out["commit_subject"] = winner + subject[ms.end(1):]
+    return out
+
+
 def validate_pr_copy(data) -> None:
     """{type, title, commit_subject, summary_md} — commit/PR copy generation.
 
@@ -235,6 +279,50 @@ def coerce_commit_subject(subject: str, cls: Classification) -> str:
     if parsed in allowed:
         return subject
     return coerce_to + scope + bang + subject[m.end() - 1:]
+
+
+_SUBJECT_TYPE_RE = re.compile(r"^([a-z]+)(\([^)]*\))?(!)?:")
+
+
+def retype_tooling_feat(subject: str, cls: Classification) -> str:
+    """Tooling rule: a diff with no GM-visible runtime file cannot be `feat:`.
+
+    Retypes ONLY feat -> chore, preserving `(scope)` and `!`. Everything else passes through
+    byte-identical: any other type, an unparseable subject (same lowercase regex as
+    `coerce_commit_subject`), an empty file list (nothing to judge), and every diff that
+    touches at least one GM-visible path (`Classification.has_gm_visible`, Phase 1 denylist).
+    Never raises.
+    """
+    m = _SUBJECT_TYPE_RE.match(subject)
+    if not m or m.group(1) != "feat":
+        return subject
+    if cls.has_gm_visible or cls.count_total == 0:
+        return subject
+    return "chore" + (m.group(2) or "") + (m.group(3) or "") + subject[m.end() - 1:]
+
+
+def coerce_copy_type(subject: str, cls: Classification) -> str:
+    """The whole deterministic typing layer: the *_only ladder first, the tooling rule second.
+
+    Ladder first is load-bearing: `feat:` + test_only must still become `test:`; the tooling
+    rule only ever sees a `feat` the ladder waved through.
+    """
+    return retype_tooling_feat(coerce_commit_subject(subject, cls), cls)
+
+
+def coerce_pr_copy(copy: dict, cls: Classification) -> dict:
+    """Coerce `title` and `commit_subject` together and refresh `type` when the key exists,
+    so `validate_pr_copy`'s shared-prefix invariant survives coercion. Mutates and returns
+    `copy`. Dicts without `type` (the skip and degraded shapes) get no `type` key added.
+    """
+    for key in ("title", "commit_subject"):
+        if isinstance(copy.get(key), str):
+            copy[key] = coerce_copy_type(copy[key], cls)
+    if "type" in copy:
+        m = _SUBJECT_TYPE_RE.match(copy.get("commit_subject", ""))
+        if m:
+            copy["type"] = m.group(1)
+    return copy
 
 
 def validate_safety_verdict(data) -> None:

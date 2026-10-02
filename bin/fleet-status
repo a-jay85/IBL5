@@ -793,11 +793,44 @@ automouse_oneshot_next() {
         || true
 }
 
+# Wall-clock at which a live automouse run hits its time guard, e.g. "run ends
+# Mon 2026-09-28 20:28". Empty when no runner is live.
+#
+# A runner is live when its own per-pid day log exists (bin/automouse/run writes
+# logs/<date>-$$.log) AND that pid is alive with automouse in its command line —
+# the same conjunction the heartbeat rows use. Its start is now minus the
+# process's elapsed time, and the guard is MAX_ELAPSED read from the runner
+# script itself so a retune there never leaves this line stale. With several
+# runners live, the latest end wins: that is when automouse goes quiet.
+automouse_run_end() {
+    local max now log pid el end=0
+    max="$(sed -n 's/^MAX_ELAPSED=\([0-9][0-9]*\).*/\1/p' "$SCRIPT_DIR/automouse/run" 2>/dev/null)"
+    case "$max" in ''|*[!0-9]*) return 0 ;; esac
+    now="$(date +%s)"
+    for log in "$AUTOMOUSE_DIR"/logs/????-??-??-*.log; do
+        [ -f "$log" ] || continue
+        pid="${log%.log}"; pid="${pid##*-}"
+        pid_alive_matching "$pid" 'automouse' || continue
+        el="$(pid_elapsed_secs "$pid")"
+        case "$el" in ''|*[!0-9]*) continue ;; esac
+        [ $(( now - el + max )) -gt "$end" ] && end=$(( now - el + max ))
+    done
+    [ "$end" -gt 0 ] || return 0
+    # BSD first, GNU (CI) second, as in automouse_oneshot_next.
+    date -r "$end" +'run ends %a %Y-%m-%d %H:%M' 2>/dev/null \
+        || date -d "@$end" +'run ends %a %Y-%m-%d %H:%M' 2>/dev/null \
+        || true
+}
+
 render_queue() {
-    local count=0 shown=0 stale=0 f base next pad hb rest pid slug slug_ld slug_lb
+    local count=0 shown=0 stale=0 f base next ends pad hb rest pid slug slug_ld slug_lb
     local claimed=' ' queue_list meta model merge title reorder
 
     next="$(automouse_next_run)"
+    ends="$(automouse_run_end)"
+    if [ -n "$ends" ]; then
+        next="$ends${next:+  ·  $next}"
+    fi
     # The reorder link closes the header, and only when there is a queue to
     # reorder: on an empty one the launcher just prints "Queue empty" and exits,
     # so a click would do nothing visible.

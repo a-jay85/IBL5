@@ -1,6 +1,6 @@
 ---
 description: GitHub Actions gotchas learned in production — cascade cancels, payload freezing, required check wiring, mutation gate, Dependabot, ssh-keyscan, VR update-baselines label flow.
-last_verified: 2026-09-29
+last_verified: 2026-09-30
 paths: ".github/workflows/**"
 ---
 
@@ -39,6 +39,8 @@ Only after confirming those three can you treat a failure as infrastructure nois
 Branch protection on master names job-level contexts. `Tests and Analysis` is the aggregator job in `.github/workflows/tests.yml` and `E2E Tests` is the one in `.github/workflows/e2e-tests.yml`. To gate merge on a new job inside either workflow, add its job id to that aggregator's `needs:`. Leave the protection settings alone for that case.
 
 A new protection context is a separate decision (ADR-0120, ADR-0145). The workflow that emits it must report on every PR: no `paths` or `branches` filter and no job-level `if:`. A context with no matching check run leaves the PR pending forever. Add it with the append-only `POST .../required_status_checks/contexts` and check it with `bin/check-composite-contracts --protection-readback`. Never use the protection `PUT`, which replaces the whole object. Live list: `gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'`.
+
+`All checks green` (`.github/workflows/all-checks-green.yml`, ADR-0149) is the required cross-workflow aggregator. Once activated, a red check anywhere on the head blocks the merge. After you re-run one flaky job, re-run the aggregator run too: `gh run list --workflow all-checks-green.yml --branch <head-branch> --limit 1 --json databaseId --jq '.[0].databaseId' | xargs gh run rerun`. The excluded names live in the workflow's `--ignore=`. To make a new job advisory, add its name there. Never delete a check to get a merge through.
 
 ## Mutation testing: per-PR diff job required, full suite label-gated
 

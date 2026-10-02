@@ -163,9 +163,13 @@ TELLS: list[Tell] = [
         #              and backlog#N inline in text (word char before #)
         #   Common noun prefixes — "check #N", "gate #N", etc. are not hyperlink
         #              obligations; flag only unambiguous prose issue/PR refs.
+        #   Rankings (lookahead) — a one- or two-digit #N followed by seed/pick/
+        #              overall/ranked/"in the <conference>" is league prose, not a ref.
         # Note: "Docker Hub" aside, prose_lines replaces link targets with ]()
         # so [#123](url) → [#123]() and the [ preceding # blocks the match.
-        r"(?<![/\[&\w])(?<!check )(?<!gate )(?<!step )(?<!item )(?<!phase )(?<!no\. )(?<!number )(?<!condition )#\d+\b"
+        r"(?<![/\[&\w])(?<!check )(?<!gate )(?<!step )(?<!item )(?<!phase )(?<!no\. )(?<!number )(?<!condition )"
+        r"#(?!\d{1,2}\s+(?:seeds?|seeded|picks?(?!\s+up\b)|overall|ranked|ranking"
+        r"|in the (?:west|east|league|conference|division|draft|standings))\b)\d+\b"
         r"|(?<![/\[\w-])(?:IBL5-)?backlog#\d+\b",
         "Link it: PR `[#123](https://github.com/a-jay85/IBL5/pull/123)` or backlog issue `[backlog#45](https://github.com/a-jay85/IBL5-backlog/issues/45)`.",
         scope="chat",
@@ -454,6 +458,27 @@ def mode_self_test() -> int:
         ("check #19 in the list", False, False),
         ("gate #3 fires here", False, False),
         ("step #2 is next", False, False),
+        ("He was the #1 seed and the #1 pick.", False, False),
+        ("the #3 overall pick in the 2019 draft", False, False),
+        ("they finished #2 in the West", False, False),
+        ("the #8 seeded team upset the #1 seed", False, False),
+        ("ranked #4 overall by the model, #12 picks later", False, False),
+        # Accepted residual: "seed" read as a verb still passes. Deliberate.
+        ("#9 seed the DB before the run", False, False),
+        # Negative paths: the exemption must not mask a real ref.
+        # First-match search falls through to the real ref on the same line.
+        ("#1 seed lost to #2453", False, True),
+        # Digit cap: a 3+ digit number before a ranking word is still a ref.
+        ("#1234 seed data", False, True),
+        # Phrasal verb "pick up" is excluded from the exemption.
+        ("#12 pick up the slack", False, True),
+        # "in the <X>" is exempt only for the listed conference/league words.
+        ("#2 in the queue", False, True),
+        ("#12 in the stack", False, True),
+        # Word boundary: a prefix of a ranking word is not a ranking word.
+        ("#1 seedling", False, True),
+        # The backlog#N branch has no ranking exemption.
+        ("backlog#12 seed", False, True),
     ]
     fails = 0
     for text, expected in positive:

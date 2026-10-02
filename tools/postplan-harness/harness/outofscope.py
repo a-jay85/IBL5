@@ -1,0 +1,232 @@
+"""Sweep a plan's `## Out of Scope` deferrals into backlog issues.
+
+The extractor is pure (no I/O, no `gh` call), so every engine shares one definition of
+"a deferral". The filer dedups against every existing backlog issue and never raises.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import os
+import re
+import tempfile
+from dataclasses import dataclass
+
+from .adapters.ghad import LiveGh
+from .planfile import _section, _strip_fenced
+from .state import HarnessError
+
+OOS_LABEL = "maintenance"
+MAX_HITS_PER_PLAN = 5
+_TAG_RE = re.compile(r"\[oos-[0-9a-f]{10}\]")
+
+DEFERRAL_RE = re.compile(
+    r"\bfile[sd]?\s+(?:it\s+|this\s+|them\s+)?separately\b"
+    r"|\b(?:its|their)\s+own\s+(?:plan|PR|issue)\b"
+    r"|\bseparate\s+(?:PR|plan|issue|ticket)\b"
+    r"|\bfollow-?up\s+(?:PR|plan|issue|ticket)\b"
+    r"|\b(?:later|future)\s+(?:PR|plan)\b",
+    re.I,
+)
+
+# The item already points at a tracked issue or PR.
+CITED_RE = re.compile(
+    r"(?:\b[\w.-]+/[\w.-]+#\d+\b|(?<![\w/])#\d+\b|\bbacklog#\d+\b|/issues/\d+|/pull/\d+)")
+
+# The item states a decision to exclude, or a boundary someone else already owns, not a
+# deferral. The arms past Phase 1's seven were tuned against corpus false positives that
+# are not committed (corpus_hits.tsv keeps only surviving hits): conditional "if a future ..." wording,
+# "would change / needs its own plan" boundary wording, a peer session or sibling plan that
+# already owns the work, and "a decision, not a deferral" preambles.
+REJECTION_RE = re.compile(
+    r"\b(?:not\s+a\s+defer(?:red|ral)|resolved\s+decision|rejected|won'?t\s+(?:do|fix)"
+    r"|not\s+planned|no\s+plan\s+to|out\s+of\s+scope\s+permanently"
+    r"|if\s+(?:ever|a\s+future|a\s+later|this\s+work\s+later)"
+    r"|(?:would|will)\s+(?:change|need|affect|widen|ripple|multiply|require)"
+    r"|needs?\s+(?:its|their)\s+own"
+    r"|peer\s+session|separate\s+branch|plan\s+owns|not\s+modified"
+    r"|(?:is|are)\s+(?:pre-existing|inherited)|unchanged"
+    r"|needing\s+its\s+own|would\s+be\s+a|any\s+future|ever\s+wanted"
+    r"|if\s+(?:one|it|they)\s+starts?|tracked\s+by|byte-identical|frozen"
+    r"|stays?\s+that\s+way|would\s+invalidate|deliberately"
+    r"|ever\s+becomes?|would\s+be\s+its|when\s+a\s+future|by\s+decision"
+    r"|re-?open|calls?\s+for\s+its\s+own|stacks?\s+on|merges\s+first|unreachable"
+    r"|its\s+own\s+PR\s+holds|filed\s+and\s+skipped"
+    r"|if\s+(?:\w+\s+){1,4}(?:fails?|finds?|becomes?))\b"
+    # An existing named plan already owns the work: "(separate plan: `slug`)" or
+    # "(`slug`) — separate PR".
+    r"|\bseparate\s+(?:plan|PR)\s*:\s*`[\w-]+`"
+    r"|`[a-z0-9]+(?:-[a-z0-9]+)+`\)\s*[—-]+\s*separate\s+(?:plan|PR)",
+    re.I,
+)
+
+_LIST_MARKER_RE = re.compile(r"^\s{0,3}(?:[-*+]|\d+[.)])\s+")
+_HEADING_RE = re.compile(r"^#+ *Out of Scope", re.I)
+
+
+@dataclass(frozen=True)
+class DeferralHit:
+    text: str  # item text, list marker stripped, whitespace collapsed
+    line_no: int  # 1-based line in the ORIGINAL plan of the item's first line
+    key: str  # dedup key, see dedup_key()
+
+
+def normalize(text: str) -> str:
+    t = re.sub(r"[`*_]", "", text)  # drop inline-code and emphasis markers
+    return re.sub(r"\s+", " ", t).strip().lower()
+
+
+def dedup_key(slug: str, text: str) -> str:
+    digest = hashlib.sha1(f"{slug}\n{normalize(text)}".encode()).hexdigest()[:10]
+    return f"oos-{digest}"
+
+
+def _group_items(section: str) -> list[list[str]]:
+    """Split the section into logical items (raw lines), one per bullet or paragraph."""
+    items: list[list[str]] = []
+    current: list[str] | None = None
+    for line in section.splitlines():
+        if not line.strip():
+            current = None
+            continue
+        if current is None or _LIST_MARKER_RE.match(line):
+            current = [line]
+            items.append(current)
+        else:
+            current.append(line)
+    return items
+
+
+def extract_deferral_hits(content: str, slug: str) -> list[DeferralHit]:
+    """Deferral items in `## Out of Scope`, ordered by line, deduped by key."""
+    section = _section("\n".join(_strip_fenced(content)), r"Out of Scope")
+    if not section:
+        return []
+    raw_lines = content.splitlines()
+    cursor = next((i for i, ln in enumerate(raw_lines) if _HEADING_RE.match(ln)), 0)
+    hits: list[DeferralHit] = []
+    seen: set[str] = set()
+    for item in _group_items(section):
+        first = item[0]
+        text = " ".join(
+            _LIST_MARKER_RE.sub("", ln, count=1) if i == 0 else ln for i, ln in enumerate(item)
+        )
+        text = re.sub(r"\s+", " ", text).strip()
+        # Advance the cursor to this item's first raw line, even when it is dropped,
+        # so a later duplicate line resolves to its own position.
+        line_idx = cursor
+        for j in range(cursor, len(raw_lines)):
+            if raw_lines[j] == first:
+                line_idx = j
+                break
+        cursor = line_idx + 1
+        if not DEFERRAL_RE.search(text):
+            continue
+        if CITED_RE.search(text) or REJECTION_RE.search(text):
+            continue
+        key = dedup_key(slug, text)
+        if key in seen:
+            continue
+        seen.add(key)
+        hits.append(DeferralHit(text=text, line_no=line_idx + 1, key=key))
+    return sorted(hits, key=lambda h: h.line_no)
+
+
+def _noop_log(_msg: str) -> None:
+    return
+
+
+def _short(text: str, limit: int = 80) -> str:
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0] or text[:limit]
+    return cut + "..."
+
+
+def file_deferral_issues(gh, hits: list[DeferralHit], slug: str,
+                         pr_number: int, log=None, *,
+                         plan_name: str | None = None) -> list[int]:
+    """File one backlog issue per hit, deduped by `[oos-<key>]` tag. Never raises.
+
+    A failed dedup read files nothing: a missed filing is recovered by the next rerun,
+    while a duplicate never cleans itself up.
+    """
+    log = log or _noop_log
+    if not hits:
+        return []
+    try:
+        existing = gh.issue_titles(None, strict=True)
+    except (HarnessError, OSError) as exc:
+        log(f"oos-sweep: dedup read failed ({exc}); filing nothing")
+        return []
+    seen = {m.group(0) for t in existing for m in [_TAG_RE.search(t)] if m}
+    if len(hits) > MAX_HITS_PER_PLAN:
+        log(f"oos-sweep: {len(hits) - MAX_HITS_PER_PLAN} hits over cap, not filed")
+        hits = hits[:MAX_HITS_PER_PLAN]
+    nums: list[int] = []
+    pr_link = f"https://github.com/a-jay85/IBL5/pull/{pr_number}"
+    plan_ref = plan_name or f"{slug}.md"
+    for hit in hits:
+        tag = f"[{hit.key}]"
+        if tag in seen:
+            log(f"oos-sweep: skipping duplicate {hit.key}")
+            continue
+        title = f"Deferred from {slug}: {_short(hit.text)} {tag}"
+        body = (
+            f"{pr_link}\n\n"
+            f"Deferred in the `## Out of Scope` section of plan `{slug}` "
+            f"(~/claude-plans/{plan_ref}:{hit.line_no}):\n\n"
+            f"> {hit.text}\n\n"
+            f"Filed by the post-plan out-of-scope sweep. Dedup key: {hit.key}.\n"
+        )
+        try:
+            n = gh.issue_create(title, body, OOS_LABEL)
+        except (HarnessError, OSError) as exc:
+            log(f"oos-sweep: issue_create failed for {hit.key} ({exc})")
+            continue
+        if n is not None:
+            nums.append(n)
+        seen.add(tag)
+        log(f"oos-sweep: filed #{n} {hit.key}")
+    return nums
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="python3 -m harness.outofscope",
+                                 description="File backlog issues for ## Out of Scope deferrals")
+    ap.add_argument("--plan", required=True)
+    ap.add_argument("--slug", required=True)
+    ap.add_argument("--pr", required=True, type=int)
+    ap.add_argument("--worktree", default=os.getcwd())
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args(argv)  # malformed flags: SystemExit(2), loud
+    if args.pr <= 0:
+        ap.error("--pr must be a positive integer")
+    try:
+        if not os.path.isfile(args.plan):
+            print(f"oos-sweep: plan not found: {args.plan}")
+            return 0
+        with open(args.plan, encoding="utf-8") as fh:
+            hits = extract_deferral_hits(fh.read(), args.slug)
+        if not hits:
+            print("oos-sweep: 0 hits")
+            return 0
+        for h in hits:
+            print(f"oos-hit\t{h.key}\t{h.line_no}\t{_short(h.text)}")
+        gh = LiveGh(tempfile.mkdtemp(prefix="oos-sweep-"), args.worktree, args.slug)
+        if args.dry_run:
+            seen = {m.group(0) for t in gh.issue_titles(None, strict=True)
+                    for m in [_TAG_RE.search(t)] if m}
+            for h in hits[:MAX_HITS_PER_PLAN]:
+                print(f"{'exists' if f'[{h.key}]' in seen else 'would-file'}\t{h.key}")
+            return 0
+        file_deferral_issues(gh, hits, args.slug, args.pr, log=print,
+                             plan_name=os.path.basename(args.plan))
+    except Exception as exc:  # additive: never a non-zero exit after parsing
+        print(f"oos-sweep: sweep failed ({type(exc).__name__}: {exc})")
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())

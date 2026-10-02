@@ -24,6 +24,10 @@ from typing import Callable, Optional, Sequence
 
 from .state import ArmDecision, Classification, ConditionResult, Finding
 
+# Required aggregator context (ADR-0149). bin/check-composite-contracts A2 pins this
+# literal to the workflow job name and to bin/lib/pr-armable.sh.
+AGGREGATOR_CONTEXT = "All checks green"
+
 FEAT_RE = re.compile(r"^feat(\([^)]*\))?!?:", re.IGNORECASE)
 GOLDEN_PATH = "engine/internal/sim/testdata/golden.json"
 SENTINEL_RE = re.compile(r"^\s*No manual testing needed", re.IGNORECASE)
@@ -171,6 +175,7 @@ class ArmInputs:
     conflict_resolved: Optional[bool] = None          # None = never consulted -> BLOCKS
     conflict_verdict: Optional[str] = None            # verdict-file line 1; None = ABSENT -> HOLDS
     failed_checks: list[str] = field(default_factory=list)  # checks in gh's fail bucket at arm time
+    aggregator_required: bool = False   # master protection requires AGGREGATOR_CONTEXT; False = (15) blocks
     meta_checks_status: str = "CLEARED"               # pre-push meta-check gate; "HELD"/"UNKNOWN" blocks
 
 
@@ -352,9 +357,18 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     # `failed_checks` list is a deliberate pass-through, not a green signal: the only
     # correct way to clear a real hold is to fix CI and re-run, never to assume
     # absence of a probe result means success. Additive: can only ADD a hold, never
-    # release one.
-    cs.append(ConditionResult(15, "red-ci-check", bool(inp.failed_checks),
-                              ", ".join(inp.failed_checks)))
+    # release one. The one exception: demotion to a warning happens only when
+    # `aggregator_required` is True, which the runner sets from live branch protection.
+    # The default False keeps the block, so a harness that never consults protection
+    # behaves exactly as before.
+    red = ", ".join(inp.failed_checks)
+    if inp.failed_checks and inp.aggregator_required:
+        c15 = ConditionResult(15, "red-ci-check", False, "")
+        c15.warning = (f"red CI check(s): {red} — arming anyway; the required "
+                       f"'{AGGREGATOR_CONTEXT}' context keeps the merge blocked until green")
+    else:
+        c15 = ConditionResult(15, "red-ci-check", bool(inp.failed_checks), red)
+    cs.append(c15)
 
     # Condition (16) — pre-push meta-check gate flag or post-pr run failure.
     mc = inp.meta_checks_status

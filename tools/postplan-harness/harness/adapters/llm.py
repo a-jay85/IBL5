@@ -22,8 +22,11 @@ import shutil
 import signal
 import subprocess
 import tempfile
+import threading
 
+from .. import usage_pause
 from ..state import HarnessError, LlmCallRecord, UsageLedger
+from ..usage_pause import UsagePause
 
 MAX_PROMPT_BYTES = 120_000        # hard cap on any single call's input packet
 DEFAULT_TIMEOUT = 1500            # sonnet 4.6 thinks long on large diffs; observed >600s
@@ -155,6 +158,8 @@ class ClaudeCli:
         self._owns_workdir = workdir is None
         self.workdir = workdir or tempfile.mkdtemp(prefix="postplan-llm-")
         self.out_dir = out_dir      # None => raw-attempt persistence disabled
+        self.gate, self.gate_reason = usage_pause.context_from_env()
+        self.paused = threading.Event()   # one pause stops every thread's next call
 
     def close(self) -> None:
         """Phase 11: remove the temp cwd this adapter created. Idempotent; never raises."""
@@ -173,6 +178,32 @@ class ClaudeCli:
         except OSError:
             pass
 
+    def _child_env(self, base: dict, model_label: str) -> dict:
+        env = dict(base)
+        if self.gate is None:
+            env.pop("IBL5_USAGE_GATE", None)   # no valid context: children run ungated
+            return env
+        env["IBL5_USAGE_GATE"] = "1"
+        env["IBL5_USAGE_GATE_MODEL"] = model_label
+        return env
+
+    def _gate_before_spawn(self, purpose: str, cwd: str) -> None:
+        if self.paused.is_set():
+            raise UsagePause(purpose)
+        if self.gate is not None and usage_pause.prespawn_decide(self.gate, cwd):
+            self.paused.set()
+            raise UsagePause(purpose)
+
+    def _usage_limit_pause(self, purpose: str, cwd=None, fp_before=None) -> None:
+        """Limit text seen: pause only if a limit-hit marker lands on disk; else return
+        so the caller's existing HarnessError('llm-usage-limit') (exit 3) stands."""
+        if self.gate is None or not usage_pause.limit_hit_marker(self.gate):
+            return
+        self.paused.set()
+        dirty = cwd is not None and (fp_before is None
+                                     or usage_pause.worktree_fingerprint(cwd) != fp_before)
+        raise UsagePause(purpose, dirty=dirty)
+
     def call(self, purpose: str, model: str, prompt: str, validate,
              max_retries: int = 1, normalizer=None):
         if len(prompt.encode()) > MAX_PROMPT_BYTES:
@@ -183,12 +214,15 @@ class ClaudeCli:
         last_err = ""
         for attempt in range(max_retries + 1):
             try:
+                self._gate_before_spawn(purpose, self.workdir)
                 proc = _run_reaped(
                     ["claude", "-p", "--model", model_id, "--output-format", "json",
                      "--max-turns", "1", "--tools", ""],
                     attempt_prompt, DEFAULT_TIMEOUT, self.workdir,
-                    {**os.environ, "CLAUDE_HEADLESS": "1"},
+                    self._child_env({**os.environ, "CLAUDE_HEADLESS": "1"}, model_id),
                 )
+                if self.paused.is_set():
+                    raise UsagePause(purpose)   # a sibling paused while this ran: discard
             except subprocess.TimeoutExpired:
                 last_err = f"call exceeded {DEFAULT_TIMEOUT}s wall clock"
                 rec.retries = attempt
@@ -201,6 +235,7 @@ class ClaudeCli:
                     rec.ok = False
                     rec.retries = attempt
                     self.ledger.add(rec)
+                    self._usage_limit_pause(purpose)
                     raise HarnessError("llm-usage-limit",
                                        f"{purpose}: {raw[:200].strip()}")
                 last_err = f"CLI non-JSON output (rc={proc.returncode}): {proc.stdout[:200]} {proc.stderr[:200]}"
@@ -233,6 +268,7 @@ class ClaudeCli:
                     rec.ok = False
                     rec.retries = attempt
                     self.ledger.add(rec)
+                    self._usage_limit_pause(purpose)
                     raise HarnessError("llm-usage-limit",
                                        f"{purpose}: {result_text[:200].strip()}")
                 last_err = str(e)
@@ -273,8 +309,17 @@ class ClaudeCli:
         last_err = ""
         for attempt in range(max_retries + 1):
             try:
+                self._gate_before_spawn(purpose, cwd)
+                fp_before = usage_pause.worktree_fingerprint(cwd) if self.gate else None
                 proc = _run_reaped(argv, prompt, timeout, cwd,
-                                   _tooled_env(allowed_tools, denied_tools))
+                                   self._child_env(_tooled_env(allowed_tools, denied_tools),
+                                                   MODEL_MAP[model]))
+                if self.gate is not None and usage_pause.marker_exists(self.gate):
+                    self.paused.set()   # the hook paused this child (marker keyed on S)
+                if self.paused.is_set():
+                    raise UsagePause(purpose, dirty=(
+                        fp_before is None
+                        or usage_pause.worktree_fingerprint(cwd) != fp_before))
             except subprocess.TimeoutExpired:
                 last_err = f"tooled call exceeded {timeout}s wall clock"
                 rec.retries = attempt
@@ -287,6 +332,7 @@ class ClaudeCli:
                     rec.ok = False
                     rec.retries = attempt
                     self.ledger.add(rec)
+                    self._usage_limit_pause(purpose, cwd, fp_before)
                     raise HarnessError("llm-usage-limit",
                                        f"{purpose}: {raw[:200].strip()}")
                 last_err = (f"CLI non-JSON output (rc={proc.returncode}): "
@@ -313,6 +359,7 @@ class ClaudeCli:
             if (_is_error_env or len(result_text.strip()) < 400) and _USAGE_LIMIT_RE.search(result_text):
                 rec.ok = False
                 self.ledger.add(rec)
+                self._usage_limit_pause(purpose, cwd, fp_before)
                 raise HarnessError("llm-usage-limit",
                                    f"{purpose}: {result_text[:200].strip()}")
             # Content failures are never re-asked: a reviewer that errored out mid-review
@@ -357,6 +404,8 @@ class FixtureLlm:
         if purpose not in self.canned:
             raise HarnessError("llm-fixture-missing", purpose)
         data = self.canned[purpose]
+        if isinstance(data, dict) and data.get("kind") == "usage-pause":
+            raise UsagePause(purpose, dirty=bool(data.get("dirty")))
         if normalizer is not None:
             data = normalizer(data)
         validate(data)
@@ -380,8 +429,12 @@ class FixtureLlm:
         if purpose not in self.canned:
             raise HarnessError("llm-fixture-missing", purpose)
         val = self.canned[purpose]
+        if isinstance(val, dict) and val.get("kind") == "usage-pause":
+            raise UsagePause(purpose, dirty=bool(val.get("dirty")))
         if isinstance(val, dict) and "raise" in val:
             spec = val["raise"]
+            if spec["kind"] == "usage-pause":
+                raise UsagePause(purpose, dirty=bool(spec.get("dirty")))
             raise HarnessError(spec["kind"], spec.get("detail", ""))
         self.ledger.add(LlmCallRecord(purpose=purpose, model=f"fixture:{model}"))
         return val

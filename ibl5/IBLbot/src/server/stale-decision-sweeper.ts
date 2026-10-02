@@ -1,7 +1,7 @@
 import type { Client } from 'discord.js';
 import { config } from '../config.js';
 import { readPending } from './decision-store.js';
-import { buildPlanReviewRow } from './plan-review-dm.js';
+import { buildPlanReviewRow, derivePlanButtons } from './plan-review-dm.js';
 
 export const STALE_THRESHOLD_MS = 15 * 60 * 1000;
 export const SWEEP_INTERVAL_MS = 60_000;
@@ -33,7 +33,8 @@ export async function sweepOnce(client: Client, dir?: string): Promise<void> {
                 const dm = await user.createDM();
                 const message = await dm.messages.fetch(decision.messageId);
                 if (message.content === want) continue;
-                await message.edit({ content: want, components: [buildPlanReviewRow(decision.slug, true)] });
+                const verbs = derivePlanButtons(message.components, decision.slug);
+                await message.edit({ content: want, components: [buildPlanReviewRow(decision.slug, true, verbs)] });
                 await client.users.send(owner, want);
             } catch (error: unknown) {
                 console.error(`sweepOnce error for decision ${decision.id}:`, error);

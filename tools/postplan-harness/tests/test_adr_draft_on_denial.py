@@ -840,13 +840,17 @@ def test_collision_renumbers_before_draft(repo, tmp_path, monkeypatch):
         num = os.path.basename(rel)[:4]
         return valid_adr(num)
 
+    llm = WritingLlm(_content)
     result = adr_draft.draft(
-        WritingLlm(_content), git, str(wt), out_dir, logged.append,
+        llm, git, str(wt), out_dir, logged.append,
         phase="phase2", today="2026-09-20",
     )
 
     assert result.path == "ibl5/docs/decisions/0135-wt-slug.md"
     assert any("renumbered to" in line for line in logged)
+    prompts = [c[2] for c in llm.calls]
+    assert prompts
+    assert "ADR-0135" in prompts[-1]
 
 
 def test_collision_on_foreign_number_is_terminal(repo, tmp_path, monkeypatch):

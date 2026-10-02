@@ -418,11 +418,27 @@ def test_cli_argv_no_backticks():
 # override guard: SKIP-HUMAN rows not ticked
 # ---------------------------------------------------------------------------
 
-def test_override_guard_skip_human(monkeypatch):
+class TickAwareGh:
+    """Body flips to all-ticked once the fake tick script ran, like a real tick would."""
+
+    def __init__(self, before):
+        self.before = before
+        self.after = before.replace("- [ ]", "- [x]")
+        self.ticked = False
+
+    def pr_body(self):
+        return self.after if self.ticked else self.before
+
+    def pr_body_fresh(self):
+        return self.pr_body()
+
+
+def _run_guard_case(monkeypatch, verdict):
     body = (
         "## Manual Testing\n\n"
         "- [ ] **Row 1** — `bin/test-foo`\n"
     )
+    gh = TickAwareGh(body)
     tick_calls = []
 
     def fake_run(path, args, timeout_s, cwd=None):
@@ -430,10 +446,11 @@ def test_override_guard_skip_human(monkeypatch):
         if "bring-up" in name or "wt-bring" in name:
             return 0, "BRINGUP: UP\nBRINGUP-COMPLETE\n", ""
         if "tick" in name:
+            # Worst case: tick marks every row, so only the pass_ids guard can stop it.
             tick_calls.append(args)
-            return 0, "TICKED: 0\nTICK-COMPLETE\n", ""
-        # manual-rows returns SKIP-HUMAN for Row 1
-        return 0, "ROW Row 1 SKIP-HUMAN\nMANUAL-ROWS-COMPLETE\n", ""
+            gh.ticked = True
+            return 0, "TICKED: 1\nTICKED-ROW: Row 1\nTICK-COMPLETE\n", ""
+        return 0, f"ROW Row 1 {verdict}\nMANUAL-ROWS-COMPLETE\n", ""
 
     monkeypatch.setattr(mt, "_run_script", fake_run)
     monkeypatch.setattr(mt, "docker_available", lambda: (True, ""))
@@ -441,13 +458,26 @@ def test_override_guard_skip_human(monkeypatch):
 
     result = mt.run(
         pr=1, worktree="/fake/worktree", body=body,
-        gh=FakeGh([body, body]),
+        gh=gh,
         probe=FixtureProbe({}),
         show_blob=_make_scripts_show(),
         master_sha=SHA, head_tree=lambda: "tree1",
         live=True, log=lambda s: None,
     )
+    return result, tick_calls
+
+
+def test_override_guard_skip_human(monkeypatch):
+    result, tick_calls = _run_guard_case(monkeypatch, "SKIP-HUMAN")
+    assert tick_calls == []
     assert "Row 1" not in result.ticked
+
+
+def test_override_guard_pass_row_is_ticked(monkeypatch):
+    """Contrast case: the same harness ticks a PASS row, so the guard test is meaningful."""
+    result, tick_calls = _run_guard_case(monkeypatch, "PASS")
+    assert len(tick_calls) == 1
+    assert "Row 1" in result.ticked
 
 
 # ---------------------------------------------------------------------------

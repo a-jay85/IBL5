@@ -257,3 +257,52 @@ def file_followup(store: Store, label: str, title: str, body: str) -> tuple[str,
     if d.reopen and d.target is not None:
         store.reopen(d.target)
     return d.kind, num
+
+
+# --- CLI --------------------------------------------------------------------------
+
+
+def _gh_runner() -> Callable[..., str]:
+    gh = os.environ.get("BACKLOG_GH") or "gh"
+
+    def run(*args: str) -> str:
+        try:
+            proc = subprocess.run([gh, *args], capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired as exc:
+            raise FollowcapError(f"gh {args[0]} {args[1]} timed out") from exc
+        except OSError as exc:
+            raise FollowcapError(f"cannot run {gh}: {exc}") from exc
+        if proc.returncode != 0:
+            raise FollowcapError(proc.stderr.strip()[:400] or f"gh exited {proc.returncode}")
+        return proc.stdout
+
+    return run
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="python3 -m harness.followcap")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    for name in ("file", "plan"):
+        p = sub.add_parser(name)
+        p.add_argument("label")
+        p.add_argument("title")
+        p.add_argument("body")
+    args = parser.parse_args(argv)
+    store = GhStore(_gh_runner())
+    try:
+        if args.cmd == "file":
+            kind, num = file_followup(store, args.label, args.title, args.body)
+            print(f"https://github.com/{REPO}/issues/{num}")
+            print(f"followcap: {kind} #{num}", file=sys.stderr)
+        else:
+            d = plan_followup(store, args.title, args.body)
+            target = f"#{d.target}" if d.target is not None else "-"
+            print(f"would-{d.kind}\t{target}\t{args.title.strip()}")
+    except FollowcapError as exc:
+        print(f"backlog new: {exc}; nothing filed", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

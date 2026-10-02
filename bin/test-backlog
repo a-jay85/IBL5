@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/test-backlog — offline harness for bin/backlog (all cases use --dry-run).
+# bin/test-backlog — offline harness for bin/backlog (--dry-run, a stub gh, or a stateful fake gh).
 set -uo pipefail
 
 PASS=0
@@ -26,20 +26,42 @@ OUT="$("$SCRIPT" --help 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && ok "--help exits 0" || fail "--help exits 0 (got $RC)"
 want "--help names the repo" "$OUT" "a-jay85/IBL5-backlog"
 
-# Case 2: --dry-run new prints gh issue create with correct flags
+# Fake gh shared with the harness pytest. mkfake <name> [seed-json] sets FAKE_DIR/FAKE_STORE
+# and writes a `gh` wrapper that routes to the stateful fake.
+FIXTURE="$(cd "$(dirname "$0")/.." && pwd)/tools/postplan-harness/tests/fixtures/fake_backlog_gh.py"
+FAKE_ROOT="$(mktemp -d)"
+trap 'rm -rf "$FAKE_ROOT" "${STUB_DIR:-}"' EXIT
+mkfake() {
+    FAKE_DIR="$FAKE_ROOT/$1"; mkdir -p "$FAKE_DIR"
+    FAKE_STORE="$FAKE_DIR/store.json"
+    local seed='{"issues": [], "fail_list": false}'
+    [ -n "${2:-}" ] && seed="$2"
+    printf '%s' "$seed" > "$FAKE_STORE"
+    printf '#!/bin/sh\nexec python3 "%s" --store "%s" "$@"\n' "$FIXTURE" "$FAKE_STORE" > "$FAKE_DIR/gh"
+    chmod +x "$FAKE_DIR/gh"
+}
+
+# Case 2: --dry-run new reads GitHub (an empty fake) and prints the cap decision
 VALID_BODY='https://github.com/a-jay85/IBL5/pull/1234
 bin/backlog:83 passes an empty --body, so every filed issue carries no origin.
 Failure scenario: a Phase 6.5 writer files a finding and triage cannot locate it.'
-OUT="$("$SCRIPT" --dry-run new ci "x" "$VALID_BODY" 2>&1)"; RC=$?
-[ "$RC" -eq 0 ] && ok "--dry-run new exits 0" || fail "--dry-run new exits 0 (got $RC)"
-want "--dry-run new: gh issue create" "$OUT" "gh issue create"
-want "--dry-run new: repo flag" "$OUT" "--repo a-jay85/IBL5-backlog"
-want "--dry-run new: label flag" "$OUT" "--label ci"
-# `gh issue create` aborts non-interactively unless --body is passed alongside
-# --title, so headless callers (/pr-ready Phase 6.5, /fix-and-prevent) need it present.
-want "--dry-run new: body flag present (headless-safe)" "$OUT" "--body"
-want "--dry-run new: body forwarded, not empty" "$OUT" \
-    "--body https://github.com/a-jay85/IBL5/pull/1234"
+if command -v python3 >/dev/null 2>&1; then
+    mkfake case2
+    OUT="$(BACKLOG_GH="$FAKE_DIR/gh" "$SCRIPT" --dry-run new ci "x" "$VALID_BODY" 2>&1)"; RC=$?
+    [ "$RC" -eq 0 ] && ok "--dry-run new exits 0" || fail "--dry-run new exits 0 (got $RC)"
+    if grep -qE '^would-create	-	x$' <<< "$OUT"; then
+        ok "--dry-run new prints would-create"
+    else
+        fail "--dry-run new prints would-create (got: $OUT)"
+    fi
+    if [ -e "$FAKE_STORE.log" ] && grep -qE '"issue", "(create|edit|reopen)"' "$FAKE_STORE.log"; then
+        fail "--dry-run new wrote to GitHub"
+    else
+        ok "--dry-run new wrote nothing"
+    fi
+else
+    printf '[SKIP] Case 2 --dry-run new (python3 not installed)\n'
+fi
 
 # Case 3: unknown subcommand exits non-zero
 "$SCRIPT" bogus-subcommand >/dev/null 2>&1; RC=$?
@@ -109,7 +131,7 @@ want "--help lists for-pr" "$OUT" "for-pr <pr-url>"
 
 # Case 9: for-pr filter semantics against fixture JSON via a gh stub.
 if command -v jq >/dev/null 2>&1; then
-    STUB_DIR="$(mktemp -d)"; trap 'rm -rf "$STUB_DIR"' EXIT
+    STUB_DIR="$(mktemp -d)"
     cat > "$STUB_DIR/gh" <<'STUB'
 #!/usr/bin/env bash
 filter=""
@@ -136,6 +158,92 @@ STUB
     done
 else
     printf '[SKIP] Case 9 for-pr filter (jq not installed)\n'
+fi
+
+# Cases 10-14: the per-PR cap through `new`, against the stateful fake gh.
+if command -v python3 >/dev/null 2>&1; then
+    PR900='https://github.com/a-jay85/IBL5/pull/900'
+    body_for() {
+        printf '%s\n\nbin/backlog:144 failure scenario for item %s, padded so the body clears the one hundred character floor. unique-token-%s' \
+            "$PR900" "$1" "$1"
+    }
+    store_count() { python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["issues"]))' "$FAKE_STORE"; }
+    file_items() {
+        local from="$1" to="$2" k rc=0
+        for k in $(seq "$from" "$to"); do
+            BACKLOG_GH="$FAKE_DIR/gh" "$SCRIPT" new maintenance "item $k" "$(body_for "$k")" >/dev/null 2>&1 || rc=$?
+        done
+        return "$rc"
+    }
+
+    # Case 10: n = 2, 3, 4, 8 leave min(n, 3) issues; extras live in one roll-up.
+    for n in 2 3 4 8; do
+        mkfake "case10-$n"
+        file_items 1 "$n"
+        want_count=$(( n < 3 ? n : 3 ))
+        [ "$(store_count)" -eq "$want_count" ] \
+            && ok "Case 10 n=$n leaves $want_count issues" \
+            || fail "Case 10 n=$n leaves $want_count issues (got $(store_count))"
+        if [ "$n" -gt 3 ]; then
+            if python3 - "$FAKE_STORE" "$n" <<'PY'
+import json, sys
+issues = json.load(open(sys.argv[1]))["issues"]
+n = int(sys.argv[2])
+rollups = [i for i in issues if "<!-- followup-rollup -->" in i["body"]]
+ok = len(rollups) == 1 and all(f"unique-token-{k}" in rollups[0]["body"] for k in range(3, n + 1))
+sys.exit(0 if ok else 1)
+PY
+            then ok "Case 10 n=$n: one roll-up holds items 3..$n"
+            else fail "Case 10 n=$n: one roll-up holds items 3..$n"; fi
+        fi
+    done
+
+    # Case 11: re-filing the same 5 items adds nothing.
+    mkfake case11
+    file_items 1 5
+    file_items 1 5; RC=$?
+    [ "$RC" -eq 0 ] && ok "Case 11 retry calls exit 0" || fail "Case 11 retry calls exit 0 (got $RC)"
+    [ "$(store_count)" -eq 3 ] && ok "Case 11 retry leaves 3 issues" || fail "Case 11 retry leaves 3 issues (got $(store_count))"
+    LINES="$(python3 -c 'import json,re,sys
+for i in json.load(open(sys.argv[1]))["issues"]:
+    if "<!-- followup-rollup -->" in i["body"]:
+        print(len(re.findall(r"^- \[ \] ", i["body"], re.M)))' "$FAKE_STORE")"
+    [ "$LINES" = "3" ] && ok "Case 11 roll-up keeps 3 checklist lines" || fail "Case 11 roll-up keeps 3 checklist lines (got $LINES)"
+
+    # Case 12: --dry-run new is a read-only decision probe.
+    mkfake case12
+    file_items 1 3
+    cp "$FAKE_STORE" "$FAKE_DIR/before.json"
+    OUT="$(BACKLOG_GH="$FAKE_DIR/gh" "$SCRIPT" --dry-run new maintenance "item 4" "$(body_for 4)" 2>&1)"; RC=$?
+    [ "$RC" -eq 0 ] && ok "Case 12 dry-run exits 0" || fail "Case 12 dry-run exits 0 (got $RC)"
+    if grep -qE '^would-convert	#3	item 4$' <<< "$OUT"; then
+        ok "Case 12 dry-run prints would-convert #3"
+    else
+        fail "Case 12 dry-run prints would-convert #3 (got: $OUT)"
+    fi
+    cmp -s "$FAKE_STORE" "$FAKE_DIR/before.json" && ok "Case 12 store unchanged" || fail "Case 12 store unchanged"
+    # The first 3 filings legitimately logged creates; only calls after the snapshot matter.
+    if [ "$(grep -cE '"issue", "(create|edit|reopen)"' "$FAKE_STORE.log")" -eq 3 ]; then
+        ok "Case 12 dry-run logged no write"
+    else
+        fail "Case 12 dry-run logged no write"
+    fi
+
+    # Case 13: a failing list read fails closed.
+    mkfake case13 '{"issues": [], "fail_list": true}'
+    OUT="$(BACKLOG_GH="$FAKE_DIR/gh" "$SCRIPT" new maintenance "item 1" "$(body_for 1)" 2>&1 >/dev/null)"; RC=$?
+    [ "$RC" -eq 1 ] && ok "Case 13 read failure exits 1" || fail "Case 13 read failure exits 1 (got $RC)"
+    want "Case 13 says nothing filed" "$OUT" "nothing filed"
+    [ "$(store_count)" -eq 0 ] && ok "Case 13 files zero issues" || fail "Case 13 files zero issues"
+
+    # Case 14: validation runs before any GitHub read.
+    mkfake case14
+    BACKLOG_GH="$FAKE_DIR/gh" "$SCRIPT" new maintenance "t" "$PR900
+no location here, but long enough to clear the length floor on its own so only file:line fails the gate" >/dev/null 2>&1; RC=$?
+    [ "$RC" -eq 2 ] && ok "Case 14 invalid body exits 2" || fail "Case 14 invalid body exits 2 (got $RC)"
+    [ ! -e "$FAKE_STORE.log" ] && ok "Case 14 gh never ran" || fail "Case 14 gh never ran"
+else
+    printf '[SKIP] Cases 10-14 (python3 not installed)\n'
 fi
 
 echo ""

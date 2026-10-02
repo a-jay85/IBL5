@@ -1,0 +1,303 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-login-preflight — regression test for the login preflight
+# (bin/lib/login-preflight.sh) and its wiring in bin/automouse/run.
+#
+# The preflight parks the loop only on a positive "login expired" signal, sends one
+# Discord DM per outage, and fails open (loudly) on anything inconclusive.
+#
+# The real probe runs against stubbed claude / security / curl binaries through the
+# LOGIN_PROBE_*_BIN seams. The run-loop guard block is EXTRACTED from bin/automouse/run
+# and eval'd inside a stub loop, so the test cannot drift from the implementation.
+#
+# Hermetic: reads no HOME or USER and passes under `env -i PATH=/usr/bin:/bin`.
+#
+# Run: bin/test-automouse-login-preflight  (exit 0 = all pass, 1 = a case failed)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
+RUN_SCRIPT="${LOGIN_PREFLIGHT_TEST_RUN:-$REPO/bin/automouse/run}"
+LIB="$REPO/bin/lib/login-preflight.sh"
+
+T="$(mktemp -d)"
+trap 'rm -rf "$T"' EXIT
+FAILED=0
+
+# jq is required by the real probe; link it into the sandbox PATH from wherever it lives.
+JQ="$(command -v jq || true)"
+if [ -z "$JQ" ]; then
+    for c in /opt/homebrew/bin/jq /usr/local/bin/jq; do
+        if [ -x "$c" ]; then JQ="$c"; break; fi
+    done
+fi
+if [ -z "$JQ" ]; then echo "FAIL: jq not found"; exit 1; fi
+mkdir -p "$T/bin"
+ln -s "$JQ" "$T/bin/jq"
+PATH="$T/bin:$PATH"
+
+# --- helpers --------------------------------------------------------------
+
+pass() { echo "ok: $1"; }
+fail() { echo "FAIL: $1"; FAILED=1; }
+
+eq() { # label want got
+    if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 (want '$2', got '$3')"; fi
+}
+has() { # label file fixed-string
+    if [ -f "$2" ] && grep -qF -- "$3" "$2"; then pass "$1"; else fail "$1 (no '$3' in $2)"; fi
+}
+present() { if [ -e "$2" ]; then pass "$1"; else fail "$1 (missing $2)"; fi; }
+absent() { if [ ! -e "$2" ]; then pass "$1"; else fail "$1 (unexpected $2)"; fi; }
+count() { # file fixed-string -> number of matching lines (0 when file absent)
+    if [ -f "$1" ]; then grep -cF -- "$2" "$1" || true; else echo 0; fi
+}
+
+# --- stubs ----------------------------------------------------------------
+
+cat > "$T/claude" <<STUB
+#!/bin/sh
+cat "$T/claude.out"
+exit "\$(cat "$T/claude.rc")"
+STUB
+cat > "$T/security" <<STUB
+#!/bin/sh
+cat "$T/sec.out"
+exit "\$(cat "$T/sec.rc")"
+STUB
+cat > "$T/curl" <<STUB
+#!/bin/sh
+printf '%s\n' "\$*" >> "$T/curl.argv"
+cat >> "$T/curl.stdin"
+printf '%s' "\$(cat "$T/curl.code")"
+STUB
+cat > "$T/discord-dm" <<STUB
+#!/bin/sh
+{ echo ---; cat; } >> "$T/dm.log"
+exit "\${DM_STUB_RC:-0}"
+STUB
+chmod +x "$T/claude" "$T/security" "$T/curl" "$T/discord-dm"
+
+export LOGIN_PROBE_CLAUDE_BIN="$T/claude"
+export LOGIN_PROBE_SECURITY_BIN="$T/security"
+export LOGIN_PROBE_CURL_BIN="$T/curl"
+
+set_claude() { printf '%s\n' "$2" > "$T/claude.out"; echo "$1" > "$T/claude.rc"; }
+set_curl() { echo "$1" > "$T/curl.code"; rm -f "$T/curl.argv" "$T/curl.stdin"; }
+set_sec_rc() { printf '%s\n' "$2" > "$T/sec.out"; echo "$1" > "$T/sec.rc"; }
+set_sec() { # refresh_ms access_ms [token]
+    set_sec_rc 0 "{\"claudeAiOauth\":{\"accessToken\":\"${3:-TOK}\",\"refreshToken\":\"r\",\"expiresAt\":$2,\"refreshTokenExpiresAt\":$1}}"
+}
+
+NOW_S=$(date +%s)
+FUTURE=$(( (NOW_S + 86400) * 1000 ))
+PAST=$(( (NOW_S - 86400) * 1000 ))
+TODAY=$(date +%F)
+
+reset_stubs() {
+    set_claude 0 '{"loggedIn": true}'
+    set_sec "$FUTURE" "$FUTURE"
+    set_curl 200
+    unset AUTOMOUSE_LOGIN_PROBE_CMD
+}
+
+# --- sandbox + loop driver -------------------------------------------------
+
+NIGHTLY_DIR="$T/nightly"
+LOG="$T/run.log"
+SELF_DIR="$T/automouse"
+
+fresh() {
+    rm -rf "$NIGHTLY_DIR" "$LOG" "$T/dm.log" "$T/claimed" "$T/lock-taken" "$T/attempts"
+    mkdir -p "$NIGHTLY_DIR/queue" "$SELF_DIR"
+    : > "$NIGHTLY_DIR/queue/plan-a.md"
+    : > "$LOG"
+    unset DM_STUB_RC
+}
+
+# shellcheck source=/dev/null
+. "$LIB"
+
+START_ANCHOR='# Login preflight: park (queue intact, no lock taken, no attempt counted)'
+ANCHOR_COUNT=$(grep -cF -- "$START_ANCHOR" "$RUN_SCRIPT" || true)
+REGION=$(awk -v start="$START_ANCHOR" '
+    index($0, start) { capture = 1 }
+    capture { print }
+    capture && index($0, "NEXT_PLAN=$(claim_next_plan)") { exit }
+' "$RUN_SCRIPT")
+REGION_LAST=$(printf '%s\n' "$REGION" | tail -1)
+REGION_OK=1
+if [ "$ANCHOR_COUNT" != "1" ] || [ -z "$REGION" ]; then REGION_OK=0; fi
+case "$REGION_LAST" in *'NEXT_PLAN=$(claim_next_plan)'*) ;; *) REGION_OK=0 ;; esac
+if [ "$REGION_OK" -ne 1 ]; then
+    echo "FAIL: loop-guard region not extractable from $RUN_SCRIPT (anchor count $ANCHOR_COUNT)"
+    exit 1
+fi
+
+# tick: one automouse launch. Park ends the launch; a pass reaches the stub claim.
+tick() {
+    (
+        claim_next_plan() { touch "$T/lock-taken"; echo "$NIGHTLY_DIR/queue/plan-a.md"; }
+        eval "while true; do
+$REGION
+touch \"$T/claimed\"
+echo \$(( \$(cat \"$T/attempts\" 2>/dev/null || echo 0) + 1 )) > \"$T/attempts\"
+break
+done"
+    )
+}
+
+# --- cases -----------------------------------------------------------------
+
+reset_stubs
+fresh
+
+echo "--- loop-level cases ---"
+
+export AUTOMOUSE_LOGIN_PROBE_CMD='echo expired:refresh-token-expired'
+tick; tick; tick
+eq "expired-three-ticks-one-dm: one DM" 1 "$(count "$T/dm.log" '---')"
+absent "expired-three-ticks-one-dm: no claim" "$T/claimed"
+absent "expired-three-ticks-one-dm: no lock" "$T/lock-taken"
+absent "expired-three-ticks-one-dm: no attempt" "$T/attempts"
+present "expired-three-ticks-one-dm: queue file kept" "$NIGHTLY_DIR/queue/plan-a.md"
+present "expired-three-ticks-one-dm: marker" "$NIGHTLY_DIR/login-expired.alerted"
+eq "expired-three-ticks-one-dm: alert once" 1 "$(count "$LOG" 'alert sent, parking')"
+eq "expired-three-ticks-one-dm: still-expired twice" 2 "$(count "$LOG" 'alert already sent this outage')"
+present "expired-three-ticks-one-dm: report" "$NIGHTLY_DIR/reports/$TODAY-login-expired.md"
+
+export AUTOMOUSE_LOGIN_PROBE_CMD='echo ok'
+tick
+absent "recovered-clears-marker-and-runs: marker gone" "$NIGHTLY_DIR/login-expired.alerted"
+present "recovered-clears-marker-and-runs: claimed" "$T/claimed"
+present "recovered-clears-marker-and-runs: lock taken" "$T/lock-taken"
+eq "recovered-clears-marker-and-runs: attempts" 1 "$(cat "$T/attempts" 2>/dev/null || echo none)"
+has "recovered-clears-marker-and-runs: log" "$LOG" 'outage marker cleared'
+eq "recovered-clears-marker-and-runs: still one DM" 1 "$(count "$T/dm.log" '---')"
+
+rm -f "$T/claimed" "$T/lock-taken" "$T/attempts"
+export AUTOMOUSE_LOGIN_PROBE_CMD='echo expired:refresh-token-expired'
+tick; tick
+eq "rearmed-after-recovery: two DMs total" 2 "$(count "$T/dm.log" '---')"
+
+fresh
+echo '123 refresh-token-expired' > "$NIGHTLY_DIR/login-expired.alerted"
+cp "$NIGHTLY_DIR/login-expired.alerted" "$T/marker.save"
+export AUTOMOUSE_LOGIN_PROBE_CMD='echo unknown:keychain-unreadable'
+tick
+present "unknown-fails-open-loudly: claimed" "$T/claimed"
+has "unknown-fails-open-loudly: log" "$LOG" 'WARNING probe inconclusive (keychain-unreadable)'
+present "unknown-fails-open-loudly: report" "$NIGHTLY_DIR/reports/$TODAY-login-probe-inconclusive.md"
+absent "unknown-fails-open-loudly: no DM" "$T/dm.log"
+if cmp -s "$NIGHTLY_DIR/login-expired.alerted" "$T/marker.save"; then
+    pass "unknown-fails-open-loudly: marker untouched"
+else
+    fail "unknown-fails-open-loudly: marker changed"
+fi
+
+fresh
+export DM_STUB_RC=1
+export AUTOMOUSE_LOGIN_PROBE_CMD='echo expired:refresh-token-expired'
+tick; tick
+eq "dm-failure-still-parks-once: spool warning once" 1 "$(count "$LOG" 'DM undeliverable (spooled)')"
+present "dm-failure-still-parks-once: marker kept" "$NIGHTLY_DIR/login-expired.alerted"
+absent "dm-failure-still-parks-once: no claim" "$T/claimed"
+eq "dm-failure-still-parks-once: stub called once" 1 "$(count "$T/dm.log" '---')"
+unset DM_STUB_RC
+
+echo "--- source-order case ---"
+
+PRE_LINE=$(grep -nF 'login_preflight "$NIGHTLY_DIR"' "$RUN_SCRIPT" | head -1 | cut -d: -f1)
+CLAIM_LINE=$(grep -nE '^[[:space:]]*NEXT_PLAN=\$\(claim_next_plan\)' "$RUN_SCRIPT" | head -1 | cut -d: -f1)
+ATTEMPT_LINE=$(grep -nF 'echo $(( ATTEMPTS + 1 )) > "$ATTEMPT_FILE"' "$RUN_SCRIPT" | head -1 | cut -d: -f1)
+SRC_COUNT=$(grep -cF '. "$_LIB_DIR/login-preflight.sh"' "$RUN_SCRIPT" || true)
+if [ -n "$PRE_LINE" ] && [ -n "$CLAIM_LINE" ] && [ -n "$ATTEMPT_LINE" ] \
+    && [ "$PRE_LINE" -lt "$CLAIM_LINE" ] && [ "$PRE_LINE" -lt "$ATTEMPT_LINE" ] \
+    && [ "$SRC_COUNT" = "1" ]; then
+    pass "preflight-precedes-claim-and-attempt"
+else
+    fail "preflight-precedes-claim-and-attempt (pre=$PRE_LINE claim=$CLAIM_LINE attempt=$ATTEMPT_LINE sourced=$SRC_COUNT)"
+fi
+
+echo "--- probe seam cases ---"
+
+reset_stubs
+export AUTOMOUSE_LOGIN_PROBE_CMD='echo hello'
+eq "seam-junk-output" "unknown:bad-probe-output" "$(login_probe)"
+
+set_claude 1 '{"loggedIn": false}'
+unset AUTOMOUSE_LOGIN_PROBE_CMD
+eq "seam-unset-uses-real-probe" "expired:not-logged-in" "$(login_probe)"
+export AUTOMOUSE_LOGIN_PROBE_CMD=""
+eq "seam-empty-uses-real-probe" "expired:not-logged-in" "$(login_probe)"
+
+echo "--- real probe tier cases ---"
+
+reset_stubs
+set_claude 1 'boom'
+set_curl 200
+eq "tier1-rc1-without-string-not-expired" "ok" "$(login_probe)"
+
+reset_stubs
+set_sec "$PAST" "$FUTURE"
+eq "tier2-refresh-expired" "expired:refresh-token-expired" "$(login_probe)"
+
+reset_stubs
+set_sec "$FUTURE" "$PAST"
+set_curl 401
+eq "tier2-access-expired-refresh-valid" "ok" "$(login_probe)"
+absent "tier2-access-expired-refresh-valid: curl never called" "$T/curl.argv"
+
+reset_stubs
+set_sec_rc 44 ""
+eq "tier2-keychain-unreadable" "unknown:keychain-unreadable" "$(login_probe)"
+set_sec_rc 0 "not json"
+eq "tier2-bad-json" "unknown:bad-json" "$(login_probe)"
+
+reset_stubs
+set_sec_rc 44 ""
+CLAUDE_SAVE="$LOGIN_PROBE_CLAUDE_BIN"
+export LOGIN_PROBE_CLAUDE_BIN="$T/nope"
+CM_OUT="$(login_probe)"
+export LOGIN_PROBE_CLAUDE_BIN="$CLAUDE_SAVE"
+case "$CM_OUT" in unknown:*) pass "claude-missing" ;; *) fail "claude-missing (got '$CM_OUT')" ;; esac
+
+reset_stubs
+for pair in 401:expired:usage-endpoint-401 403:expired:usage-endpoint-403 \
+    503:unknown:usage-endpoint-503 429:unknown:usage-endpoint-429 \
+    000:unknown:usage-endpoint-timeout 200:ok; do
+    code=${pair%%:*}
+    want=${pair#*:}
+    set_curl "$code"
+    eq "tier3-statuses: $code" "$want" "$(login_probe)"
+done
+
+echo "--- credential-leak case ---"
+
+reset_stubs
+fresh
+SENTINEL="SENTINEL-TOK-9f3a"
+set_sec "$FUTURE" "$FUTURE" "$SENTINEL"
+set_curl 401
+export AUTOMOUSE_LOGIN_PROBE_CMD=""
+bash -x -c ". '$LIB'; login_preflight '$NIGHTLY_DIR' '$LOG' '$T/discord-dm'" > /dev/null 2> "$T/trace" || true
+has "token-never-in-argv-log-report-dm: reached curl stdin" "$T/curl.stdin" "$SENTINEL"
+LEAKS=""
+for f in "$T/curl.argv" "$LOG" "$T/trace" "$T/dm.log" "$NIGHTLY_DIR"/reports/*; do
+    if [ -f "$f" ] && grep -qF -- "$SENTINEL" "$f"; then LEAKS="$LEAKS $f"; fi
+done
+if [ -z "$LEAKS" ]; then
+    pass "token-never-in-argv-log-report-dm: no leak"
+else
+    fail "token-never-in-argv-log-report-dm: sentinel leaked into:$LEAKS"
+fi
+
+echo
+if [ "$FAILED" -eq 0 ]; then
+    echo "RESULT: PASSED"
+    exit 0
+fi
+echo "RESULT: FAILED"
+exit 1

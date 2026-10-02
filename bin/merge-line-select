@@ -131,8 +131,20 @@ def ctx_red:
   elif .__typename == "StatusContext" then
     ((.state // "") as $s | any(["FAILURE","ERROR"][]; . == $s))
   else false end;
+# A re-run leaves the old run in the rollup. Only the newest run per name counts.
+# An unfinished run with no timestamp sorts newest; rollup order breaks ties.
+def ctx_ts:
+  if .__typename == "CheckRun" then
+    (.completedAt // .startedAt
+     // (if .status == "COMPLETED" then "" else "9999-12-31T23:59:59Z" end))
+  else (.createdAt // "") end;
+def latest_ctxs:
+  [ (.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // [])
+    | to_entries[] | .value + {__idx: .key} ]
+  | group_by(ctx_name)
+  | map(sort_by([ctx_ts, .__idx]) | last);
 def is_red:
-  [ (.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // [])[]
+  [ latest_ctxs[]
     | select(ctx_name as $n | any(required[]; . == $n))
     | select(ctx_red) ] | length > 0;
 def is_dirty: (.mergeStateStatus == "DIRTY" or .mergeable == "CONFLICTING");
@@ -205,8 +217,8 @@ query($owner:String!, $name:String!) {
         autoMergeRequest { enabledAt }
         commits(last:1) { nodes { commit { oid statusCheckRollup { state
           contexts(first:100) { nodes { __typename
-            ... on CheckRun { name status conclusion }
-            ... on StatusContext { context state } } } } } } }
+            ... on CheckRun { name status conclusion startedAt completedAt }
+            ... on StatusContext { context state createdAt } } } } } } }
       }
     }
   }

@@ -42,11 +42,33 @@ _DIFF_WITHOUT_TOKEN = "+something_else=1\n"
 _WAIVER_ROW_7 = "WAIVE-MATRIX-ROW: 7\n"
 _WAIVER_ROW_9 = "WAIVE-MATRIX-ROW: 9\n"
 
+_MATRIX_PLAN_TAGGED = """\
+# Test plan
 
-def _make_plan(tmp_path, has_matrix: bool = True, planned_test_paths=None) -> PlanInfo:
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 7 | `FIXTURE_NEW_SYMBOL` printed by the run (one-time-check: evidence is one command's printed output at plan time) | CLI-executable | post-impl | `bin/run-it` |
+"""
+
+_MATRIX_PLAN_TAG_MALFORMED = """\
+# Test plan
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 7 | (one-time-check: evidence is one command's printed output at plan time) `FIXTURE_NEW_SYMBOL` printed | CLI-executable | post-impl | `bin/run-it` |
+"""
+
+
+def _make_plan(
+    tmp_path, has_matrix: bool = True, planned_test_paths=None, matrix_text: str | None = None
+) -> PlanInfo:
     plan_file = tmp_path / "plan.md"
     if has_matrix:
-        plan_file.write_text(_MATRIX_PLAN)
+        plan_file.write_text(matrix_text if matrix_text is not None else _MATRIX_PLAN)
     else:
         plan_file.write_text("# Plan without matrix\n\nNo Verification Matrix here.\n")
     return PlanInfo(
@@ -113,6 +135,40 @@ def test_waiver_for_other_row_does_not_clear(tmp_path, monkeypatch):
     items = _matrix_assertion_items(plan, _DIFF_WITHOUT_TOKEN, _WAIVER_ROW_9)
     unrealised = [i for i in items if i.startswith("UNREALISED-ASSERTION:")]
     assert len(unrealised) == 1
+
+
+def test_one_time_check_row_never_reaches_items(tmp_path, monkeypatch):
+    """Tagged row + diff lacking the token: the helper prints its skip line, and
+    check() carries no UNREALISED-ASSERTION item and no promoted skip line, so
+    arming condition (3) never sees the row."""
+    git_root = _make_git_root(tmp_path)
+    monkeypatch.setenv("MATRIX_ASSERT_ROOT", git_root)
+    plan = _make_plan(tmp_path, matrix_text=_MATRIX_PLAN_TAGGED)
+    # The skip is real (the helper said so on stdout), not a silent no-op.
+    diff_path = tmp_path / "diff.patch"
+    diff_path.write_text(_DIFF_WITHOUT_TOKEN)
+    proc = subprocess.run(
+        [_MATRIX_ASSERTIONS_SCRIPT, plan.path, str(diff_path)],
+        capture_output=True, text=True, check=False, env=_isolated_env(git_root))
+    assert proc.returncode == 0
+    assert "ONE-TIME-CHECK: row 7" in proc.stdout
+    assert "UNREALISED-ASSERTION:" not in proc.stdout
+    # And the harness promotes nothing from it.
+    items = check(plan, [], diff_body=_DIFF_WITHOUT_TOKEN, pr_body="")
+    assert not any(i.startswith("UNREALISED-ASSERTION:") for i in items)
+    assert not any("ONE-TIME-CHECK" in i for i in items)
+
+
+def test_one_time_check_malformed_tag_still_reports(tmp_path, monkeypatch):
+    """A tag that is not the trailing text of the cell is ignored fail-closed:
+    the row is still an UNREALISED-ASSERTION item naming row 7."""
+    git_root = _make_git_root(tmp_path)
+    monkeypatch.setenv("MATRIX_ASSERT_ROOT", git_root)
+    plan = _make_plan(tmp_path, matrix_text=_MATRIX_PLAN_TAG_MALFORMED)
+    items = _matrix_assertion_items(plan, _DIFF_WITHOUT_TOKEN, "")
+    unrealised = [i for i in items if i.startswith("UNREALISED-ASSERTION:")]
+    assert len(unrealised) == 1
+    assert "row 7" in unrealised[0]
 
 
 def test_empty_diff_body_skips_check(tmp_path, monkeypatch):

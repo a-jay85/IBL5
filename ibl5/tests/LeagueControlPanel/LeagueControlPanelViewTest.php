@@ -6,6 +6,7 @@ namespace Tests\LeagueControlPanel;
 
 use LeagueControlPanel\Contracts\LeagueControlPanelViewInterface;
 use LeagueControlPanel\LeagueControlPanelView;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -51,6 +52,73 @@ class LeagueControlPanelViewTest extends TestCase
         ]);
 
         $this->assertStringContainsString('value="Playoffs" selected', $html);
+    }
+
+    public function testRenderWrapsContentInMainLandmark(): void
+    {
+        $html = $this->renderWithDefaults();
+
+        $this->assertStringContainsString('<main class="updater">', $html);
+        $this->assertStringContainsString('</main>', $html);
+    }
+
+    /**
+     * Structural companion to testRenderWrapsContentInMainLandmark: fails when
+     * LeagueControlPanelView::render() emits any element or text outside <main>.
+     */
+    #[DataProvider('bodyLandmarkScenarioProvider')]
+    public function testRenderPlacesEveryBodyNodeInsideMain(
+        string $league,
+        ?string $resultMessage,
+        bool $resultSuccess,
+        string $phase,
+    ): void {
+        $html = $this->renderWithDefaults([
+            'currentLeague' => $league,
+            'resultMessage' => $resultMessage,
+            'resultSuccess' => $resultSuccess,
+            'panelData' => self::createPanelData(['phase' => $phase]),
+        ]);
+
+        $this->assertSame([], self::findBodyNodesOutsideMain($html));
+
+        $document = \Dom\HTMLDocument::createFromString($html, LIBXML_NOERROR);
+        $this->assertSame(1, $document->querySelectorAll('main')->length);
+    }
+
+    /**
+     * @return array<string, array{string, string|null, bool, string}>
+     */
+    public static function bodyLandmarkScenarioProvider(): array
+    {
+        return [
+            'ibl, no flash, regular season' => ['ibl', null, false, 'Regular Season'],
+            'ibl, success flash, regular season' => ['ibl', 'Phase updated.', true, 'Regular Season'],
+            'ibl, error flash, free agency' => ['ibl', 'Something went wrong.', false, 'Free Agency'],
+            'olympics, success flash, regular season' => ['olympics', 'Phase updated.', true, 'Regular Season'],
+            'olympics, error flash, draft' => ['olympics', 'Something went wrong.', false, 'Draft'],
+        ];
+    }
+
+    public function testOutsideMainDetectorFlagsStrayBodyContent(): void
+    {
+        $html = '<!DOCTYPE html><html lang="en"><head><title>t</title></head><body>'
+            . '<main><h1>Inside</h1></main><p>stray</p>loose text</body></html>';
+
+        $this->assertSame(['p', '#text'], self::findBodyNodesOutsideMain($html));
+
+        $elementOnly = '<!DOCTYPE html><html lang="en"><head><title>t</title></head><body>'
+            . '<main><h1>Inside</h1></main><p>stray</p></body></html>';
+
+        $this->assertSame(['p'], self::findBodyNodesOutsideMain($elementOnly));
+    }
+
+    public function testOutsideMainDetectorIgnoresWhitespaceAndComments(): void
+    {
+        $html = "<!DOCTYPE html><html lang=\"en\"><head><title>t</title></head><body>\n"
+            . "<main><h1>Inside</h1></main>\n<!-- trailing comment -->\n</body></html>";
+
+        $this->assertSame([], self::findBodyNodesOutsideMain($html));
     }
 
     public function testRenderShowsSuccessFlashMessage(): void
@@ -496,6 +564,33 @@ class LeagueControlPanelViewTest extends TestCase
 
         $this->assertStringContainsString('name="current_phase"', $html);
         $this->assertStringContainsString('value="Draft"', $html);
+    }
+
+    /**
+     * Labels every direct child of <body> that axe `region` would flag:
+     * an element other than <main> (its local name), or a text node
+     * with non-whitespace content ('#text'). Comments and whitespace pass.
+     *
+     * @return list<string>
+     */
+    private static function findBodyNodesOutsideMain(string $html): array
+    {
+        $document = \Dom\HTMLDocument::createFromString($html, LIBXML_NOERROR);
+        $body = $document->body;
+        self::assertNotNull($body);
+
+        $offenders = [];
+        foreach ($body->childNodes as $node) {
+            if ($node instanceof \Dom\Element) {
+                if ($node->localName !== 'main') {
+                    $offenders[] = $node->localName;
+                }
+            } elseif ($node instanceof \Dom\Text && trim($node->textContent) !== '') {
+                $offenders[] = '#text';
+            }
+        }
+
+        return $offenders;
     }
 
     /**

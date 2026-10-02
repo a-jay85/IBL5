@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-28
+last_verified: 2026-10-01
 ---
 
 # Post-Plan Orchestrator
@@ -208,6 +208,8 @@ fi
    > **Scope-expansion justification:** when the diff touches production module code under `ibl5/modules/`, the files-changed block records *what* changed but never *why* a production file was in a non-feature PR. The body must then carry a short `**Scope expansion:**` paragraph naming each such file and the reason it changed. Place it **immediately above** the `<!-- files-changed:begin -->` marker — **outside** the marker pair, never between the markers. Anything between the markers is destroyed on the next regeneration (Phase 6 here), so a justification written inside them silently disappears on the next body write. Norm and per-title-type expectations: `.claude/rules/scope-expansion-justification.md` — NEW in this PR.
    > Run the same one-shot `bin/check-digest-prose` voice check on this paragraph and rewrite once on a violation.
 
+   > **Declared scope and plan gaps:** when `PLAN_FOUND != none`, run the Phase 5.0 scope helper before writing the body, with an empty body argument: `git diff --name-only origin/master...HEAD > /tmp/post-plan-scope-changed-$PPID; git diff --name-status --diff-filter=A origin/master...HEAD | cut -f2- > /tmp/post-plan-scope-added-$PPID; bin/lib/plan-scope-conformance "$PLAN_FILE" /tmp/post-plan-scope-changed-$PPID "" /tmp/post-plan-scope-added-$PPID; rm -f /tmp/post-plan-scope-changed-$PPID /tmp/post-plan-scope-added-$PPID`. The helper re-reads the changed list once per Critical File, so it needs real files; a process substitution can be read only once. For each `UNPLANNED-FILE:` or `SCOPE-NOTE: unplanned` path that is an intended change, write a bullet under a `## Declared scope` heading: the path plus a one-line reason. Revert an accidental edit instead of declaring it. For each `SCOPE-NOTE: gap` path, write a bullet under a `## Plan gaps` heading: the path plus why the diff lacks it (cut from scope, or already shipped before the branch was cut, with the PR number). Place both sections above the `<!-- files-changed:begin -->` marker, outside the marker pair. The helper strips every generated marker span before it reads a section, so a bullet between the markers clears nothing. Emit neither heading when it would have zero bullets. Format: `.claude/skills/post-plan/_pr-body-claims.md`.
+
    > **Retrospective-origin block:** if `git diff origin/master...HEAD` **adds** a row to the `## Class registry` table in `ibl5/docs/retrospective-class-registry.md`, this branch is a Phase 9 retrospective routing that got materialized as its own PR — usually because the origin PR had already merged. The body must then carry a `## Why this PR exists` section immediately above `## Manual Testing`. Without it the PR reads as an unexplained doc edit: the files-changed block shows *what* row was added, never why the class exists. Derive the section from the **added row alone** — it is self-sufficient (`#<origin PR>`, `class:`, `routed to: Rung <n>`, `prior:`), so this works on a plan-blind run, or a run months later that never saw the retrospective. Four required elements:
    >
    > 1. **Origin defect** — the `#<PR>` the row names and what it actually broke. Read its title/body with `gh pr view <n>` rather than guessing from the class sentence.
@@ -299,7 +301,19 @@ fi
 
 ## Phase 2.5: Backlog Housekeeping
 
-(Phase 2.5 retired — ADR-0121)
+Out-of-Scope deferral sweep. Skip when `PLAN_FOUND=none`. The sweep files one backlog issue per deferral phrase in the plan's `## Out of Scope` section and dedups against every existing backlog issue, open or closed. It shares its code with the harness, so a harness run that already filed an item makes this a no-op for that item. A non-zero exit or a missing module never stops the run. Substitute `<PLAN_FILE>` (from Phase 1) and `<PR_NUMBER>` (from Phase 2). The original Phase 2.5 housekeeping was retired by ADR-0121; this slot now holds only the sweep.
+
+```bash
+WT=$(git rev-parse --show-toplevel)
+SLUG=$(git rev-parse --abbrev-ref HEAD)
+if [ -f "$WT/tools/postplan-harness/harness/outofscope.py" ]; then
+  (cd "$WT/tools/postplan-harness" && python3 -m harness.outofscope \
+      --plan "<PLAN_FILE>" --slug "$SLUG" --pr "<PR_NUMBER>" \
+      --worktree "$WT") || echo "oos-sweep: exit $? (non-blocking)"
+else
+  echo "oos-sweep: module absent on this branch (non-blocking)"
+fi
+```
 
 ---
 
@@ -329,7 +343,7 @@ Each Bash tool call runs in a fresh shell, so the classification flags are **not
 
 **INLINE invariant — Critical-Files must-appear rule (do NOT move to the reference file):** every file listed in the plan's `## Critical Files` section MUST appear in the PR diff, **unless** its annotation carries an explicit reference marker (`reference` / `read-only` / `verify` / `template` / `no-edit` / `unchanged` / `context`). A must-appear Critical File absent from the diff is a `MISSING-FILE:` finding that stays UNRESOLVED — and **blocks Phase 6.5 arming** — until you either make the dropped change (the #923 remedy) or note the legitimate cut in a PR comment. The matching regex, the `awk` that enforces it, and the sibling planned-test conformance check live in the reference file.
 
-**Sibling rule, also inline.** Do NOT move this to the reference file. Every `.claude/` path in the PR diff MUST be accounted for, by the plan's `## Critical Files` section (under either parse verdict, so a `(reference)` entry counts as planned) or by a `## Declared scope` bullet in the PR body. An unaccounted `.claude/` path is an `UNPLANNED-FILE:` finding that stays UNRESOLVED and blocks Phase 6.5 arming until the edit is reverted, declared in the PR body, or added to the plan. This is the must-appear rule read in the opposite direction, gated on `PLAN_FOUND != none` so plan-blind runs produce no findings. The normalization, the parse, and the `## Declared scope` extraction live in the reference file.
+**Sibling rule, also inline.** Do NOT move this to the reference file. Every `.claude/` path in the PR diff MUST be accounted for by the plan's `## Critical Files` section (under either parse verdict, so a `(reference)` entry counts as planned), by a Verification Matrix test path, or by a `## Declared scope` bullet in the PR body. An unaccounted `.claude/` path is an `UNPLANNED-FILE:` finding. It stays UNRESOLVED and blocks Phase 6.5 arming until resolved as the reference file describes. The added-test exempt list `bin/lib/plan-scope-exempt.txt` never covers `.claude/`. Other unaccounted paths, and must-appear Critical Files absent from the diff, are `SCOPE-NOTE:` lines. They are advisory. They are not bridged and they do not hold. Both checks are gated on `PLAN_FOUND != none`, so plan-blind runs produce no findings. `bin/lib/plan-scope-conformance` holds the parse and the matching for both engines.
 
 Phase 5 consumes the Phase-3 flags `$HAS_PHP`, `$HAS_GO`, `$HAS_MATRIX`, `$PLAN_FOUND` — carried from Phase 3, never recomputed. **You MUST Read `.claude/skills/post-plan/_phase-5-final-verification.md` and run every block it lists, in order,** before computing the status. It writes the three carry-forward artifacts Phase 6.5 reads: the UNRESOLVED-items bridge `/tmp/post-plan-missing-tests-$PPID`, the Phase-5.0 done-marker `/tmp/post-plan-conformance-done-$PPID`, and the status file `/tmp/post-plan-phase5-status-$PPID`.
 
@@ -501,7 +515,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 12. Plan-intent fidelity — Phase 5.5 produced a verdict of `READY` or `READY WITH NOTES` **covering the current `HEAD` tree** — either the first reviewer's verdict, or the bounded second-review verdict Phase 5.5 writes after remediation.
 13. Plan-slug drift — the plan was located by drift (`<prefix>-<slug>.md`) rather than the exact branch-slug path; adoption is a guess, so auto-merge is held until a human confirms the plan is this branch's plan.
 14. **No unreviewed conflict this run.** The Phase 2 rebase did not conflict, or it did and `_phase-2-conflict-resolution.md` step 7.5 wrote a verdict whose first line is exactly `CONFLICT-REVIEW=CLEAN` at the path keyed to this branch slug and the current `HEAD` sha. Fail-closed: the flag existing blocks, and only that exact verdict clears it. A missing, empty, negative, or stale-sha verdict blocks.
-15. **No already-red CI check.** No check on the PR's current head sits in `gh`'s `fail` bucket, excluding `human-signoff` (red by design on every `feat:` PR, and already covered by condition (8)). This closes the gap that merged #2304: a check outside master's required-status-checks list can be red without blocking the queued merge, so nothing downstream of arming would have caught it. Fail-OPEN on pending checks, unlike its fail-closed neighbours: an empty probe result means "no failure proven at arm time", never "all checks are green", so a check that has not yet reported clears this condition.
+15. **No already-red CI check.** It is a warning when the aggregator is required. No check on the PR's current head sits in `gh`'s `fail` bucket, excluding `human-signoff` (red by design on every `feat:` PR, and already covered by condition (8)). This closes the gap that merged #2304: a check outside master's required-status-checks list can be red without blocking the queued merge, so nothing downstream of arming would have caught it. Blocks only while master's protection lacks the `All checks green` context (ADR-0149); once that context is required, a red check is reported as a WARNING and arming proceeds, because the required context makes GitHub hold the merge itself. Fail-closed on unreadable protection (keeps blocking). Fail-OPEN on pending checks, unlike its fail-closed neighbours: an empty probe result means "no failure proven at arm time", never "all checks are green", so a check that has not yet reported clears this condition.
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
 
@@ -549,7 +563,7 @@ The Phase 7 re-rebase loop can hit a *second* conflict after auto-merge is alrea
 path disarms and posts through this same marker, so the existing comment is updated in place
 rather than stacked.
 
-Conditions (1)/(5)/(6)/(8)/(10)/(11)/(15) come from the shared predicate `bin/lib/pr-armable.sh`. That is the single source of truth, also used by `bin/pr-triage`, so the live-readable arming judgment has **one executable home** and cannot drift between consumers (hand-re-derived divergence is exactly what mis-armed #1163/#1188). The run-only conditions (2)/(3)/(4)/(7)/(9)/(12)/(13)/(14) stay inline below. They read post-plan-run-local state (`/tmp`, the local plan file, the realized diff) that no cross-PR consumer can see, so they cannot move into the shared predicate.
+Conditions (1)/(5)/(6)/(8)/(10)/(11)/(15) come from the shared predicate `bin/lib/pr-armable.sh`; (15)'s demotion predicate `pr_aggregator_required` lives there too. That is the single source of truth, also used by `bin/pr-triage`, so the live-readable arming judgment has **one executable home** and cannot drift between consumers (hand-re-derived divergence is exactly what mis-armed #1163/#1188). The run-only conditions (2)/(3)/(4)/(7)/(9)/(12)/(13)/(14) stay inline below. They read post-plan-run-local state (`/tmp`, the local plan file, the realized diff) that no cross-PR consumer can see, so they cannot move into the shared predicate.
 
 **Each condition block is SELF-CONTAINED** — it `source`s the predicate and fetches its own inputs in-block, exactly as condition (7) re-derives `$PLAN_FILE` and the original (6)/(8) ran their own `gh pr view`. **Do not** hoist the `source` or a shared `PR_JSON` into a preamble block: a sourced function or a shell variable does not survive into a separately-executed block (only exported env vars like `$CLAUDE_HEADLESS` do), and a missing `source` would make `pr_feat_hold` a no-op — **failing OPEN, auto-arming a `feat:` PR**. Each block re-`source`ing the lib is idempotent and cheap. Every block extracts gh output with `gh ... --jq` (gh does the decode — no `echo`/`printf` round-trip needed); when a block must round-trip a multi-field `PR_JSON` it uses `printf '%s'` (never `echo`, whose zsh `\n` expansion corrupts jq's parse).
 

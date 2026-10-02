@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# test-predeploy-db-snapshot — behavioural harness for bin/predeploy-db-snapshot.
+#
+# Builds a throwaway git repo with an origin/production ref, stubs the dump
+# binary, and asserts on exit code and on the files left in the snapshot dir.
+#
+# Run: bin/test-predeploy-db-snapshot  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT="$SCRIPT_DIR/predeploy-db-snapshot"
+BASE_TMP="$(mktemp -d)"
+trap 'rm -rf "$BASE_TMP"' EXIT
+
+FAILED=0
+OUT="$BASE_TMP/out"
+REPO=""
+SNAP=""
+
+check() { # name cmd [args...]: passes when the command succeeds
+    local name="$1"
+    shift
+    if "$@"; then
+        echo "ok: $name"
+    else
+        echo "FAIL: $name"
+        sed 's/^/      | /' "$OUT" 2>/dev/null | head -20
+        FAILED=1
+    fi
+}
+
+GOOD_DUMP="$BASE_TMP/good-dump"
+printf '#!/bin/sh\necho "-- dump of $*"\n' > "$GOOD_DUMP"
+BAD_DUMP="$BASE_TMP/bad-dump"
+printf '#!/bin/sh\necho partial\nexit 3\n' > "$BAD_DUMP"
+chmod +x "$GOOD_DUMP" "$BAD_DUMP"
+
+GIT_ENV=(-c user.name=t -c user.email=t@example.com -c commit.gpgsign=false)
+
+# new_repo [with-migration]: HEAD is the "old" prod commit; origin/production
+# is one commit ahead, optionally adding a migration file.
+new_repo() {
+    REPO="$(mktemp -d "$BASE_TMP/repo.XXXXXX")"
+    SNAP="$REPO.snap"
+    git -C "$REPO" init -q -b master
+    mkdir -p "$REPO/ibl5/migrations"
+    echo "-- 001" > "$REPO/ibl5/migrations/001_a.sql"
+    git -C "$REPO" add -A
+    git -C "$REPO" "${GIT_ENV[@]}" commit -q -m base
+    if [ "${1:-}" = "with-migration" ]; then
+        echo "-- 002" > "$REPO/ibl5/migrations/002_b.sql"
+    else
+        echo "x" > "$REPO/other.txt"
+    fi
+    git -C "$REPO" add -A
+    git -C "$REPO" "${GIT_ENV[@]}" commit -q -m next
+    git -C "$REPO" update-ref refs/remotes/origin/production HEAD
+    git -C "$REPO" reset -q --hard HEAD~1
+}
+
+run() { # env assignments as args; runs script in $REPO
+    (cd "$REPO" && env PREDEPLOY_SNAPSHOT_DIR="$SNAP" "$@" "$SCRIPT") > "$OUT" 2>&1
+}
+
+count_snaps() { find "$SNAP" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' '; }
+
+# (a) no migration changes
+new_repo
+run PREDEPLOY_DUMP_BIN="$GOOD_DUMP" REMOTE_DATABASE=testdb; rc=$?
+check "a: exits 0" test "$rc" -eq 0
+check "a: no file created" test "$(count_snaps)" = "0"
+check "a: skip message printed" grep -q "no new migrations; skipping pre-deploy snapshot" "$OUT"
+
+# (b) migration added
+new_repo with-migration
+run PREDEPLOY_DUMP_BIN="$GOOD_DUMP" REMOTE_DATABASE=testdb; rc=$?
+check "b: exits 0" test "$rc" -eq 0
+check "b: exactly one file created" test "$(count_snaps)" = "1"
+f="$(find "$SNAP" -name 'predeploy-*.sql.gz' | head -1)"
+check "b: file passes gzip -t" gzip -t "$f"
+sha="$(git -C "$REPO" rev-parse --short origin/production)"
+check "b: name carries origin/production short sha" test "${f%-"$sha".sql.gz}" != "$f"
+# shellcheck disable=SC2016
+check "b: dump flags and db name" bash -c 'gunzip -c "$1" | grep -q -- "--single-transaction --skip-lock-tables --routines --triggers testdb"' _ "$f"
+
+# (c) dump fails
+new_repo with-migration
+run PREDEPLOY_DUMP_BIN="$BAD_DUMP" REMOTE_DATABASE=testdb; rc=$?
+check "c: failing dump exits non-zero" test "$rc" -ne 0
+check "c: no partial file left" test "$(count_snaps)" = "0"
+
+# (d) rotation keeps newest N
+new_repo with-migration
+mkdir -p "$SNAP"
+for i in 01 02 03 04 05; do
+    echo x | gzip > "$SNAP/predeploy-20200101-0000$i-abc1234.sql.gz"
+done
+run PREDEPLOY_DUMP_BIN="$GOOD_DUMP" REMOTE_DATABASE=testdb PREDEPLOY_KEEP=3; rc=$?
+check "d: exits 0" test "$rc" -eq 0
+check "d: keeps 3 files" test "$(count_snaps)" = "3"
+check "d: oldest deleted" test ! -e "$SNAP/predeploy-20200101-000001-abc1234.sql.gz"
+check "d: older-but-newest-of-seed kept" test -e "$SNAP/predeploy-20200101-000005-abc1234.sql.gz"
+d_sha="$(git -C "$REPO" rev-parse --short origin/production)"
+new_f="$(find "$SNAP" -name "predeploy-*-${d_sha}.sql.gz" | head -1)"
+check "d: new dump retained" test -n "$new_f"
+
+# (e) REMOTE_DATABASE unset
+new_repo with-migration
+run PREDEPLOY_DUMP_BIN="$GOOD_DUMP" REMOTE_DATABASE=; rc=$?
+check "e: unset REMOTE_DATABASE exits non-zero" test "$rc" -ne 0
+check "e: message names REMOTE_DATABASE" grep -q "REMOTE_DATABASE" "$OUT"
+check "e: no file created" test "$(count_snaps)" = "0"
+
+# --help
+"$SCRIPT" --help > "$OUT" 2>&1
+check "--help prints Usage" grep -q "^Usage" "$OUT"
+
+if [ "$FAILED" -eq 0 ]; then echo "All predeploy-db-snapshot cases passed"; exit 0; fi
+exit 1

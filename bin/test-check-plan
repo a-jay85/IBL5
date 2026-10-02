@@ -2044,6 +2044,21 @@ else
     echo "ok: cf-count (2 must-appear, 3 exempt)"
 fi
 
+# --print-critical-files must emit the NORMALISED form (what Phase 5.0 consumes),
+# while gate [F] below still sees the raw absolute path and rejects it.
+_cfp="$TMP/cf-print-normalised.md"
+printf '%s\n' "$FM$CF_MATRIX" '## Critical Files' '' \
+    '- `/Users/ajaynicolas/GitHub/IBL5-worktrees/my-slug/ibl5/classes/Foo.php`' \
+    '- `/Users/ajaynicolas/GitHub/IBL5/bin/check-plan` (reference)' \
+    '- `bin/lib/critical-files.sh`' > "$_cfp"
+_want=$(printf 'MUST_APPEAR:ibl5/classes/Foo.php\nEXEMPT:bin/check-plan\nMUST_APPEAR:bin/lib/critical-files.sh')
+_got=$("$GUARD" --print-critical-files "$_cfp")
+if [ "$_got" = "$_want" ]; then
+    echo "ok: cf-print-normalised (--print-critical-files strips the IBL5 root)"
+else
+    echo "FAIL: cf-print-normalised — got: $(printf '%s' "$_got" | tr '\n' ' ')"; FAILED=1
+fi
+
 # ---------------------------------------------------------------------------
 # Gate [F] absolute-path fixtures
 # ---------------------------------------------------------------------------
@@ -2103,6 +2118,135 @@ assert_viol "gateM-fenced-methods-only-flags" 1 '[M]' "$FM$PU"'
 
 # No PHPUnit row — gate [M] must stay silent.
 assert_viol "gateM-no-phpunit-row-silent" 0 '[M]' "$FM$E2E_ONLY"
+
+# ---------------------------------------------------------------------------
+# Gate [X] fixtures (8 cases)
+# ---------------------------------------------------------------------------
+XVR='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | baselines unchanged | Visual-regression | post-impl | `t.spec.ts-snapshots` (no-change) |
+'
+# Marker on a Visual-regression row, directly after the token: the only honored shape.
+assert_viol "gateX-vr-row-marker-ok" 0 '[X]' "$FM$XVR"
+XE2E='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | E2E | post-impl | `t.spec.ts` (no-change) |
+'
+assert_viol "gateX-e2e-row-marker-fires" 1 '[X]' "$FM$XE2E"
+# The type must be a WHOLE cell; a description mentioning visual regression is not one.
+XDESC='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | visual regression spec passes | E2E | post-impl | `t.spec.ts` (no-change) |
+'
+assert_viol "gateX-description-mention-fires" 1 '[X]' "$FM$XDESC"
+XPOS='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | baselines unchanged | Visual-regression | post-impl | (no-change) `t.spec.ts-snapshots` |
+'
+assert_viol "gateX-marker-before-token-fires" 1 '[X]' "$FM$XPOS"
+# Shape 1 (backlog#1233): the literal (no-change) appears ONLY inside a backtick
+# code span on a non-VR row. It is a mention, not a marker; gate X must stay silent.
+XSPAN='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | a `(no-change)` mention inside a code span is not a marker | E2E | post-impl | `t.spec.ts` |
+'
+assert_viol "gateX-code-span-mention-ignored" 0 '[X]' "$FM$XSPAN"
+# Shape 2 (backlog#1233): a fenced fixture block carries a marker on an E2E row.
+# Fenced examples never count (harness _strip_fenced); gate X reads fence-aware rows.
+XFENCE='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | E2E | post-impl | `t.spec.ts` |
+
+```
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | E2E | post-impl | `t.spec.ts` (no-change) |
+```
+'
+assert_viol "gateX-fenced-fixture-ignored" 0 '[X]' "$FM$XFENCE"
+# Still rejected: a code-span mention does NOT launder a bare marker on a non-VR row.
+XBOTH='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | a `(no-change)` mention plus a bare marker | E2E | post-impl | `t.spec.ts` (no-change) |
+'
+assert_viol "gateX-bare-marker-non-vr-still-fires" 1 '[X]' "$FM$XBOTH"
+# Pinned UNCHANGED: marker after a SECOND backticked token on a VR row. Gate X is
+# silent on this shape today (the position regex only needs a backtick before the
+# marker); the harness is what emits MISSING for token 1. This fix must neither
+# newly exempt nor newly reject it.
+XSECOND='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | baselines unchanged | Visual-regression | post-impl | `a.spec.ts-snapshots` and `b.spec.ts-snapshots` (no-change) |
+'
+assert_viol "gateX-second-token-marker-unchanged" 0 '[X]' "$FM$XSECOND"
+
+# ---------------------------------------------------------------------------
+# Gate [Y] fixtures (9 cases)
+# ---------------------------------------------------------------------------
+YHDR='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|'
+YROW='| 2 | `pinned_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+| 3 | `other_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+| 4 | `third_thing` works | PHPUnit | post-impl | `tests/XTest.php` |'
+# 1 of 4 tagged, well-formed, CLI-executable: the honored shape.
+assert_viol "gateY-tagged-cli-row-ok" 0 '[Y]' "$FM$YHDR"'
+| 1 | corpus diff prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Y props -->
+'
+# Well-formed tag on an E2E row: the helper ignores it.
+assert_viol "gateY-tag-on-e2e-row-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | page shows `CORPUS-DIFF` (one-time-check: one-shot corpus diff over local transcripts) | E2E | post-impl | `e2e/x.spec.ts` |
+'"$YROW"'
+'
+# Tag not trailing: malformed.
+assert_viol "gateY-tag-not-trailing-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | (one-time-check: one-shot corpus diff over local transcripts) prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+'
+# Reason under 15 chars.
+assert_viol "gateY-short-reason-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one shot) | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+'
+# Escaped pipe inside the reason: the helper restores it to | and rejects it.
+assert_viol "gateY-pipe-in-reason-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: corpus diff via grep \| sort at plan time) | CLI-executable | post-impl | `bin/x` |
+'"$YROW"'
+'
+# Tag in the location cell: not the What-to-verify cell.
+assert_viol "gateY-tag-in-location-cell-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/x` (one-time-check: one-shot corpus diff over local transcripts) |
+'"$YROW"'
+'
+# Share boundary: 1 of 3 is exactly a third and passes.
+assert_viol "gateY-share-at-third-ok" 0 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 2 | `pinned_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+| 3 | `other_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+<!-- no-test-methods: fixture rows are gate Y props -->
+'
+# Share over a third: 2 of 4.
+assert_viol "gateY-share-over-third-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 2 | prints `appeared=0` (one-time-check: one-shot counterfactual mutation run at plan time) | CLI-executable | post-impl | `bin/y` |
+| 3 | `other_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+| 4 | `third_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
+'
+# Every row tagged.
+assert_viol "gateY-all-tagged-fires" 1 '[Y]' "$FM$YHDR"'
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 2 | prints `appeared=0` (one-time-check: one-shot counterfactual mutation run at plan time) | CLI-executable | post-impl | `bin/y` |
+'
 
 # ---------------------------------------------------------------------------
 # Gate [G] fixtures (4 cases)
@@ -2375,6 +2519,7 @@ _corpus_guard_ok() {
 # bug-pipeline-test-env, sim-recap-boxid-resolution (gate [A]: migration literals);
 # bug-hunter-escalation-discord-dm (gate [V]: main.localhost);
 # pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags).
+# authz-verdict-refactor-trading-backlog (gate [Z]: bold-markup residue token).
 _n_corpus_pass=1
 for _n_slug in \
     plan-architect-phase-drift-guard \
@@ -2385,7 +2530,7 @@ for _n_slug in \
     plan-gate-skill-inline sim-recap-floor-and-cold-open \
     authz-verdict-refactor-1a-trading-pins authz-verdict-refactor-1b-trading-reject-service \
     authz-verdict-refactor-1c-trading-reject-shim authz-verdict-refactor-1d-trading-accept-service \
-    authz-verdict-refactor-1e-trading-accept-shim authz-verdict-refactor-trading-backlog \
+    authz-verdict-refactor-1e-trading-accept-shim \
     autoresearch-oreb-arming-share-lever retire-rebase-prs-workflow; do
     _n_pf="$HOME/claude-plans/$_n_slug.md"
     [ -f "$_n_pf" ] || continue
@@ -3169,6 +3314,103 @@ assert_viol "gate-U-prose-hash-line" 1 "[U]" "$FM$_U_BASE"'
 
 Closes a-jay85/IBL5-backlog#12
 '
+
+# ---------------------------------------------------------------------------
+# Gate [Z]: leading-star backticked token in a matrix "What to verify" cell
+# ---------------------------------------------------------------------------
+_Z_BT3='```'
+_Z_TL3='~~~'
+_Z_HEAD='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+'
+_Z_LOC=' | E2E | post-impl | `tests/e2e/trade.spec.ts` |'
+_Z_BASE="$_Z_HEAD"'| 1 | reaches `parse_args` on a bad flag'"$_Z_LOC"
+
+# Positives: each token the checker can never realise fires [Z].
+assert_viol "gate-Z-catch-all-arm" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | the `*)` arm prints usage'"$_Z_LOC"
+assert_viol "gate-Z-json-glob" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | every `*.json` report parses'"$_Z_LOC"
+assert_viol "gate-Z-suffix-glob" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | each `*_only` flag is honored'"$_Z_LOC"
+assert_viol "gate-Z-infix-glob" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | rows matching `*50001*` are dropped'"$_Z_LOC"
+assert_viol "gate-Z-md-glob" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | denylist covers `*.md` files'"$_Z_LOC"
+assert_viol "gate-Z-scenario-name-star" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | scenario `*.json=present` passes'"$_Z_LOC"
+assert_viol "gate-Z-one-time-check-tag-still-fires" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | the `*.json` reader runs (one-time-check: corpus replay only)'"$_Z_LOC"
+assert_viol "gate-Z-escaped-pipe-cell" 1 "[Z]" "$FM$_Z_HEAD"'| 1 | a \| b then the `*)` arm'"$_Z_LOC"
+
+# Negatives: none of these can trip [Z].
+assert_viol "gate-Z-prefixed-glob-clean" 0 "[Z]" "$FM$_Z_HEAD"'| 1 | builds `engine/*.go` and writes `out/*/audit.log`'"$_Z_LOC"
+assert_viol "gate-Z-no-star-clean" 0 "[Z]" "$FM$_Z_BASE"
+assert_viol "gate-Z-unbackticked-clean" 0 "[Z]" "$FM$_Z_HEAD"'| 1 | every *.json report parses'"$_Z_LOC"
+assert_viol "gate-Z-placeholder-clean" 0 "[Z]" "$FM$_Z_HEAD"'| 1 | writes `*<slug>.md` and `*...json`'"$_Z_LOC"
+assert_viol "gate-Z-scenario-value-star-clean" 0 "[Z]" "$FM$_Z_HEAD"'| 1 | scenario `mode=*.json` passes'"$_Z_LOC"
+assert_viol "gate-Z-fenced-clean" 0 "[Z]" "$FM$_Z_BASE
+$_Z_BT3$_Z_HEAD"'| 2 | the `*)` arm prints usage'"$_Z_LOC
+$_Z_BT3"
+assert_viol "gate-Z-tilde-fenced-clean" 0 "[Z]" "$FM$_Z_BASE
+$_Z_TL3$_Z_HEAD"'| 2 | the `*)` arm prints usage'"$_Z_LOC
+$_Z_TL3"
+assert_viol "gate-Z-non-matrix-table-clean" 0 "[Z]" "$FM$_Z_BASE"'
+
+Denylist:
+
+| Glob | Why |
+|------|-----|
+| `*.md` | docs are tooling |
+| `*.neon` | phpstan config is tooling |
+'
+assert_viol "gate-Z-duplicate-row-id-clean" 0 "[Z]" "$FM$_Z_BASE"'
+
+Second matrix:
+'"$_Z_HEAD"'| 1 | the `*)` arm prints usage'"$_Z_LOC"
+
+# Parity: run the REAL checker and gate [Z] on one fixture and require they
+# agree. A fire case feeds a diff that CONTAINS the token text, so the only
+# way the checker reports the row is its empty-glob-prefix arm. A silent case
+# proves the checker accepts (or never extracts) what [Z] lets through.
+_z_parity() {
+    name="$1"; want="$2"; body="$3"; diffbody="$4"
+    p="$TMP/$name.md"; d="$TMP/$name.diff"
+    printf '%s\n' "$body" > "$p"
+    printf '%s\n' "$diffbody" > "$d"
+    chk_out="$(MATRIX_ASSERT_ROOT='' "$SCRIPT_DIR/lib/plan-matrix-assertions" "$p" "$d" 2>&1)"
+    lint_out="$("$GUARD" "$p" 2>&1)"
+    if printf '%s' "$chk_out" | grep -qF 'UNREALISED-ASSERTION: row'; then chk=fire; else chk=silent; fi
+    if printf '%s' "$lint_out" | grep -qF '[Z]'; then lint=fire; else lint=silent; fi
+    if [ "$chk" != "$want" ] || [ "$lint" != "$want" ]; then
+        echo "FAIL: $name — want $want, checker $chk, gate [Z] $lint"; FAILED=1
+    else
+        echo "ok: $name (checker and [Z] both $want)"
+    fi
+}
+_Z_PDIFF_HDR='--- a/f
++++ b/f
+@@ -0,0 +1 @@'
+_z_parity "gate-Z-parity-catch-all-arm" fire "$FM$_Z_HEAD"'| 1 | the `*)` arm prints usage'"$_Z_LOC" "$_Z_PDIFF_HDR"'
++    *) usage ;;'
+_z_parity "gate-Z-parity-json-glob" fire "$FM$_Z_HEAD"'| 1 | every `*.json` report parses'"$_Z_LOC" "$_Z_PDIFF_HDR"'
++for f in *.json; do jq . "$f"; done'
+_z_parity "gate-Z-parity-suffix-glob" fire "$FM$_Z_HEAD"'| 1 | each `*_only` flag is honored'"$_Z_LOC" "$_Z_PDIFF_HDR"'
++case "$flag" in *_only) on=1 ;; esac'
+_z_parity "gate-Z-parity-infix-glob" fire "$FM$_Z_HEAD"'| 1 | rows matching `*50001*` are dropped'"$_Z_LOC" "$_Z_PDIFF_HDR"'
++ls *50001*'
+_z_parity "gate-Z-parity-md-glob" fire "$FM$_Z_HEAD"'| 1 | denylist covers `*.md` files'"$_Z_LOC" "$_Z_PDIFF_HDR"'
++  - *.md'
+_z_parity "gate-Z-parity-escaped-pipe-cell" fire "$FM$_Z_HEAD"'| 1 | a \| b then the `*)` arm'"$_Z_LOC" "$_Z_PDIFF_HDR"'
++    *) usage ;;'
+_z_parity "gate-Z-parity-prefixed-glob" silent "$FM$_Z_HEAD"'| 1 | builds `engine/*.go`'"$_Z_LOC" "$_Z_PDIFF_HDR"'
++engine/main.go'
+_z_parity "gate-Z-parity-placeholder" silent "$FM$_Z_HEAD"'| 1 | writes `*<slug>.md`'"$_Z_LOC" "$_Z_PDIFF_HDR"'
++unrelated'
+_z_parity "gate-Z-parity-fenced" silent "$FM$_Z_HEAD"'| 1 | plain row'"$_Z_LOC
+$_Z_BT3$_Z_HEAD"'| 2 | the `*)` arm prints usage'"$_Z_LOC
+$_Z_BT3" "$_Z_PDIFF_HDR"'
++unrelated'
+_z_parity "gate-Z-parity-non-matrix-table" silent "$FM$_Z_HEAD"'| 1 | plain row'"$_Z_LOC"'
+
+| Glob | Why |
+|------|-----|
+| `*.md` | docs are tooling |' "$_Z_PDIFF_HDR"'
++unrelated'
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

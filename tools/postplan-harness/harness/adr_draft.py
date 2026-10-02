@@ -19,6 +19,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 
+from . import usage_pause
 from .adapters.llm import MODEL_MAP
 from .state import HarnessError
 
@@ -355,6 +356,9 @@ def draft(llm, git, worktree: str, out_dir: str, log, *, phase: str = "phase2",
                         allowed_tools=ADR_DRAFT_ALLOWED_TOOLS,
                         denied_tools=ADR_DRAFT_DENIED_TOOLS,
                         max_turns=ADR_DRAFT_MAX_TURNS)
+    except usage_pause.UsagePause:
+        _discard(worktree, rel, out_dir, log, phase, "usage-pause")
+        raise
     except HarnessError as exc:
         # The adapter's kind is diagnostic in the audit line. The caller never lets it
         # become the exit code.

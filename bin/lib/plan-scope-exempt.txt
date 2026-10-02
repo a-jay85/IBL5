@@ -1,0 +1,10 @@
+# bin/lib/plan-scope-exempt.txt: ERE patterns for bin/lib/plan-scope-conformance.
+#
+# Two invariants, both enforced by bin/test-postplan-arm-conditions case S6:
+#   1. A pattern here applies ONLY to paths the diff ADDED. An undeclared edit
+#      to an existing test stays flagged, because that is the test-weakening risk.
+#   2. Nothing under .claude/ is ever exempt. Every line is ^-anchored, and no
+#      line may match a .claude/ path.
+^ibl5/tests/
+^tools/[^/]+/tests/
+^bin/test-[^/]+$

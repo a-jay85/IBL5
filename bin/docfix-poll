@@ -277,6 +277,17 @@ salvage_wedged_branch() {   # $1 = branch name
             echo "Wedged branch '$branch' was clean; reaped directly."
             return 0
         fi
+        # bin/cleanup SKIPs a zero-own-commit branch as "not merged" (bin/cleanup:234),
+        # and a run that dies before its first commit leaves exactly that shape, so the
+        # arm above can never reap it and the poll re-alerts every night. Clean tree AND
+        # tip already on origin/master ⇒ nothing unique to lose; remove it ourselves.
+        # A stale origin/master fails the ancestor test and falls through to "leaving".
+        if git -C "$MAIN" merge-base --is-ancestor "refs/heads/$branch" origin/master 2>/dev/null \
+            && "$MAIN/bin/wt-remove" "$branch" --force --volumes >/dev/null 2>&1 \
+            && git -C "$MAIN" branch -D "$branch" >/dev/null 2>&1; then
+            echo "Wedged branch '$branch' was clean with no own commits; removed directly."
+            return 0
+        fi
         echo "Could not reap clean wedged branch '$branch' — leaving." >&2
         return 1
     fi
@@ -297,8 +308,15 @@ salvage_wedged_branch() {   # $1 = branch name
     fi
     # Push to the salvage branch (not refresh-*, cannot become fire-forever residue).
     if git -C "$wt" push origin "HEAD:refs/heads/$salvage_branch" >/dev/null 2>&1; then
-        "$MAIN/bin/cleanup" "$branch" >/dev/null 2>&1 \
-            || echo "docfix-poll: salvage pushed but could not cleanup '$branch' — leaving." >&2
+        # The salvage commit is on no merged PR, so bin/cleanup SKIPs the branch as
+        # "not merged" and it would re-wedge tomorrow. The work is safe on origin now;
+        # remove the worktree and ref ourselves when cleanup leaves them behind.
+        "$MAIN/bin/cleanup" "$branch" >/dev/null 2>&1 || true
+        if git -C "$MAIN" show-ref --verify --quiet "refs/heads/$branch" \
+            && ! { "$MAIN/bin/wt-remove" "$branch" --force --volumes >/dev/null 2>&1 \
+                   && git -C "$MAIN" branch -D "$branch" >/dev/null 2>&1; }; then
+            echo "docfix-poll: salvage pushed but could not remove '$branch' — leaving." >&2
+        fi
         echo "Salvaged uncommitted edits from '$branch' to '$salvage_branch' (files: $files). Review before merging. No PR was opened."
         return 0
     fi
@@ -375,7 +393,7 @@ docfix_run_in_flight() {   # returns 0 = in flight; never prints
 }
 
 health_report() {
-    local alert=false kind="" detail="" report count pr_json pr_num red orphan wedged age_h episode last_pr last_pr_epoch
+    local alert=false kind="" detail="" report count pr_json pr_num red orphan wedged age_h episode last_pr last_pr_epoch wedged_age wedged_polls
     report="$(mktemp)"; trap 'rm -f "$report"' RETURN
     "$MAIN/bin/check-docs" --staleness-report > "$report" \
         || { printf 'alert=false\nkind=\ndetail=\n'; return 0; }
@@ -409,7 +427,18 @@ health_report() {
             detail="Refresh branch ${orphan} is on origin with no PR — the doc-fix run died mid-flight. Log: ls -t /tmp/docfix-run-*.log | head -1"
         elif wedged="$(wedged_local_refresh_branch)"; [ -n "$wedged" ]; then
             alert=true; kind="wedged"
-            detail="Local branch ${wedged} has no origin ref and no in-flight launchd run — the doc-fix run died before pushing. Next poll will salvage it automatically."
+            # The poll runs once a day and tries to salvage a wedged branch each
+            # time, so a branch N days old has survived N salvage attempts. Round
+            # to whole days; floor at 1 because this alert only fires past the
+            # 4h wedge threshold (or on unknown age).
+            wedged_age="$(branch_age_seconds "$wedged")"
+            if [ -n "$wedged_age" ]; then
+                wedged_polls=$(( (wedged_age + 43200) / 86400 ))
+                [ "$wedged_polls" -ge 1 ] || wedged_polls=1
+                detail="Local branch ${wedged} has no origin ref and no in-flight launchd run — the doc-fix run died before pushing. It has survived ${wedged_polls} nightly salvage attempt(s) and needs a manual look."
+            else
+                detail="Local branch ${wedged} has no origin ref and no in-flight launchd run — the doc-fix run died before pushing. Failed salvage attempts: unknown (branch reflog expired); it needs a manual look."
+            fi
         else
             # gh dying inside issue_episode_epoch yields empty output, and an empty
             # arithmetic operand is a syntax error that kills the function. Fall back

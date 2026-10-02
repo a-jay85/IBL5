@@ -268,6 +268,34 @@ def test_branch_protection_strict_null_fails_closed(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# LiveGh.aggregator_required — fail-closed
+# ---------------------------------------------------------------------------
+
+def test_aggregator_required_true_when_context_listed(tmp_path):
+    gh = LiveGh(str(tmp_path), str(tmp_path), "main")
+    gh._gh = lambda *a, **kw: "Other check\nAll checks green\n"
+    assert gh.aggregator_required("All checks green") is True
+
+
+def test_aggregator_required_false_when_context_absent(tmp_path):
+    gh = LiveGh(str(tmp_path), str(tmp_path), "main")
+    gh._gh = lambda *a, **kw: "Other check\n"
+    assert gh.aggregator_required("All checks green") is False
+
+
+def test_aggregator_required_false_on_api_error(tmp_path):
+    gh = LiveGh(str(tmp_path), str(tmp_path), "main")
+    gh._gh = lambda *a, **kw: (_ for _ in ()).throw(HarnessError("gh", "HTTP 403"))
+    assert gh.aggregator_required("All checks green") is False
+
+
+def test_aggregator_required_exact_match(tmp_path):
+    gh = LiveGh(str(tmp_path), str(tmp_path), "main")
+    gh._gh = lambda *a, **kw: "All checks green \n"
+    assert gh.aggregator_required("All checks green") is False
+
+
+# ---------------------------------------------------------------------------
 # verdict_line for cap paths
 # ---------------------------------------------------------------------------
 

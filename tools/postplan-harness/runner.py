@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import datetime
 import hashlib
 import json
 import os
@@ -34,7 +35,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from harness import (adr_draft, body_numbers, cifix, ciwatch, conformance, fidelity, gitutil, llm_calls,
+from harness import (adr_draft, body_numbers, cifix, ciwatch, conformance, fidelity, gitutil, holdrepeat, llm_calls,
                      manual_rows, manual_testing, outofscope, prosefix, schemas, scope_conformance,
                      statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
@@ -744,6 +745,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         log("phase6.5: " + ("ARMED" if decision.armed else
                             "HELD — " + "; ".join(f"({c.number}) {c.reason or c.name}"
                                                   for c in decision.holds)))
+        if (live or state_dir is not None) and res.hold_repeat is None:
+            res.hold_repeat = _record_hold_repeat(res, decision, slug, worktree,
+                                                  _state_dir(out_dir, live, state_dir), log)
         fid = res.fidelity or {}
         fid["selected"], fid["selected_source"] = select_fidelity_verdict(
             inputs.fidelity_verdict, inputs.fidelity_verdict_2,
@@ -2609,6 +2613,60 @@ def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> 
         pass
 
 
+def _record_hold_repeat(res, decision, slug, worktree, state_dir, log) -> dict | None:
+    """Advisory only: never raises, never reads or writes res.arm."""
+    try:
+        plan_path = res.plan.path if (res.plan and res.plan.found) else ""
+        fp = holdrepeat.fingerprint(plan_path, worktree or os.getcwd())
+        obs = holdrepeat.observe(state_dir, slug, armed=decision.armed,
+                                 conditions=decision.conditions, fingerprint=fp,
+                                 pr=res.pr_number,
+                                 now=datetime.datetime.now(datetime.timezone.utc).isoformat())
+        out = {"action": obs.action, "key": obs.key,
+               "repeat_count": obs.repeat_count, "reasons": obs.reasons, "dm": ""}
+        if obs.action == "repeat-dm":
+            ok = _send_hold_repeat_dm(slug, res.pr_number, obs)
+            out["dm"] = "sent" if ok else "failed"
+            if ok:
+                holdrepeat.mark_dm_sent(state_dir, slug, obs.key)
+        elif obs.action == "repeat-silent":
+            out["dm"] = "already-sent"
+        log(f"phase6.5 hold-repeat: {obs.action} x{obs.repeat_count} dm={out['dm'] or '-'}")
+        return out
+    except Exception as exc:  # advisory; a bug here must not change the run
+        log(f"phase6.5 hold-repeat: skipped ({exc})")
+        return None
+
+
+def _send_hold_repeat_dm(slug, pr, obs) -> bool:
+    """DM the operator once per repeated structural hold. True only on exit 0."""
+    reasons = "; ".join(f"({n}) {reason}" for n, _name, reason in obs.reasons)
+    msg = (f"post-plan held twice on the same reason: {slug} PR #{pr if pr else 'none'}\n"
+           f"Repeated hold (run {obs.repeat_count}): {reasons}\n"
+           "The next re-run with the same plan, diff, and harness will be declined\n"
+           "before it spends tokens. Fix the reason, or re-fire with:\n"
+           "  bin/post-plan-now --force")
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    dm_cmd = os.environ.get("HOLDREPEAT_DM_CMD") or os.path.join(repo_root, "bin", "discord-dm")
+    try:
+        proc = subprocess.run([dm_cmd, "--quiet", "--no-fallback", msg],
+                              capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return proc.returncode == 0
+
+
+def _hold_repeat_note(res: RunResult) -> str:
+    """Display-only RESULT-line suffix: a held run that repeated a structural hold."""
+    arm, hr = res.arm, res.hold_repeat
+    if arm is None or arm.armed or not hr:
+        return ""
+    if hr.get("action") not in ("repeat-dm", "repeat-silent"):
+        return ""
+    nums = ",".join(str(r[0]) for r in hr.get("reasons") or [])
+    return f" hold-repeat={hr.get('repeat_count')}x ({nums}) dm={hr.get('dm')}"
+
+
 def _prose_hold_note(res: RunResult) -> str:
     """Display-only RESULT-line suffix naming the prose check as a hold cause.
 
@@ -2754,6 +2812,7 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                 "behind master after 3 re-rebases); auto-merge disarmed, human "
                 f"merges{pr}{tail} findings={len(res.findings)}")
     tail += _prose_hold_note(res)
+    tail += _hold_repeat_note(res)
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
             f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}")
 

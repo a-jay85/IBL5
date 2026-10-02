@@ -297,6 +297,9 @@ def test_carry_forward_early_return_has_full_schema(tmp_path, git_shim, monkeypa
     """Carry-forward literal: full key set plus carried_forward."""
     monkeypatch.setattr(runner.fidelity, "carry_forward_predicate",
                         lambda *a, **kw: ("READY", ""))
+    vfile = tmp_path / "verdict-99.md"
+    vfile.write_text("6d checks\n\nREADY\n")
+    monkeypatch.setattr(runner.fidelity, "verdict_path", lambda pr: str(vfile))
     gh = types.SimpleNamespace(pr_sticky_body=lambda pr: "sticky")
     res, out = _call(tmp_path, {"plan-fidelity-review": "x"}, live=True, gh=gh)
     assert out == ("READY", "")

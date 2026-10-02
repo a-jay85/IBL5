@@ -1966,6 +1966,11 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             prior_sticky = None
     carried, decline_reason = fidelity.carry_forward_predicate(
         prior_sticky, diff_id, plan_hash)
+    # The sticky composed after a carry still quotes verdict_path(pr). If /tmp lost it,
+    # carrying would overwrite the prior sticky's real excerpt and digest with
+    # placeholders, so decline and let the full review regenerate the file.
+    if carried and not fidelity.verdict_file_usable(fidelity.verdict_path(pr)):
+        carried, decline_reason = None, "verdict-file-missing"
     if carried:
         log(f"phase5.5 fidelity: review: carried forward (patch-id {diff_id[:12]})")
         res.fidelity = {"verdict_1": carried, "error_kind": None,

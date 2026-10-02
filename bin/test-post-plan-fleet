@@ -2401,6 +2401,27 @@ printf '%s\n' "**What changed:** The runner now pins v2.12.2. The old pin drifte
 printf '%s\n' "**Why:** Use a codebase name, e.g. Phase 6.5, not a relative clause. That keeps the line short." > "$SCRATCH/fp-abbrev.txt"
 [[ -z "$("$CDP" "$SCRATCH/fp-abbrev.txt")" ]] || fail "cdp: e.g. abbreviation flagged"
 
+# fp-digit-survives: digit after a period is kept (old gsub dropped it). The long sentence
+# holds "3.5"; the excerpt must show it intact, not "3." or "3\001".
+printf '%s\n' "**What changed:** Short opener here. Version 3.5 shipped with one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twentyone twentytwo." > "$SCRATCH/digit-long.txt"
+out=$("$CDP" "$SCRATCH/digit-long.txt")
+grep -qF 'SENTENCE_TOO_LONG' <<<"$out" || fail "cdp: long sentence with 3.5 not flagged"
+grep -qF 'Version 3.5 shipped' <<<"$out" || fail "cdp: digit after period lost in excerpt"
+
+# anchor: "devs." is not the abbreviation "vs." -- the boundary after it must still split.
+# Merged, the two sentences total 27 words (flagged); split, each is under 25 (clean).
+printf '%s\n' "**Why:** Ask the devs. one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twentyone twentytwo twentythree." > "$SCRATCH/anchor-devs.txt"
+[[ -z "$("$CDP" "$SCRATCH/anchor-devs.txt")" ]] || fail "cdp: devs. treated as vs. abbreviation, merging two sentences"
+# A real "vs." still excludes the boundary (28 words in one sentence, flagged).
+printf '%s\n' "**Why:** Ask old vs. new one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twentyone twentytwo twentythree." > "$SCRATCH/anchor-vs.txt"
+grep -qF 'SENTENCE_TOO_LONG' <<<"$("$CDP" "$SCRATCH/anchor-vs.txt")" || fail "cdp: real vs. no longer excluded"
+
+# excerpt: shows the offending (second) sentence, not the line start.
+printf '%s\n' "**Why:** Short opener here. Offending sentence begins now one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twentyone twentytwo." > "$SCRATCH/excerpt.txt"
+out=$("$CDP" "$SCRATCH/excerpt.txt")
+grep -qF 'Offending sentence begins' <<<"$out" || fail "cdp: excerpt does not show offending sentence"
+grep -qF 'Short opener' <<<"$out" && fail "cdp: excerpt shows line start instead of offending sentence"
+
 # (d) Exit-0 proof and stdin seam.
 "$CDP" "$SCRATCH/wc-bad.txt" >/dev/null 2>&1; rc=$?
 [[ $rc -eq 0 ]] || fail "cdp: exited $rc on a violating file — must always exit 0"

@@ -507,3 +507,27 @@ def test_push_raises_push_failed_in_detached_head(tmp_path):
         g.push()
     assert exc_info.value.kind == "push-failed"
     assert "detached HEAD" in exc_info.value.detail
+
+
+@pytest.mark.parametrize("script,expected_ok", [
+    ("echo TREE-EQUIVALENT\nexit 0\n", True),
+    ("echo TREE-EQUIVALENT\nexit 1\n", False),   # marker without a zero exit
+    ("echo all good\nexit 0\n", False),           # zero exit without the marker
+    (None, False),                                # lostwork.sh absent at pinned master
+])
+def test_prove_lostwork_conjunctive_gate(repo, script, expected_ok):
+    """#828: prove_lostwork passes only when stdout has TREE-EQUIVALENT AND the exit is 0."""
+    if script is not None:
+        path = os.path.join(repo, ".claude", "review-shared", "scripts")
+        os.makedirs(path)
+        open(os.path.join(path, "lostwork.sh"), "w").write("#!/bin/sh\n" + script)
+        subprocess.run(["git", "-C", repo, "add", "-f", ".claude"], check=True,
+                       capture_output=True)
+        subprocess.run(["git", "-C", repo, "commit", "-m", "lostwork"], check=True,
+                       capture_output=True, env=_git_env())
+    subprocess.run(["git", "-C", repo, "update-ref", "refs/remotes/origin/master", "HEAD"],
+                   check=True, capture_output=True)
+    ok, evidence = LiveGit(repo).prove_lostwork(f"gate-test-{os.path.basename(repo)}")
+    assert ok is expected_ok, evidence
+    if script is None:
+        assert "lostwork.sh not found" in evidence

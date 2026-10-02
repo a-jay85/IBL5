@@ -255,7 +255,7 @@ reorder_link() {
         rm -rf "$tmp"
         "$OSACOMPILE_BIN" -o "$tmp" -e "do shell script \"$cmd\"" >/dev/null 2>&1 \
             || { rm -rf "$tmp"; return 0; }
-        rm -rf "$app" && mv "$tmp" "$app" || return 0
+        { rm -rf "$app" && mv "$tmp" "$app"; } || { rm -rf "$tmp"; return 0; }
         printf '%s' "$cmd" > "$stamp"
     fi
     # Trailing slash: an .app is a directory, and file:// directory URIs end in one.

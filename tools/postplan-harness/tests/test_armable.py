@@ -166,6 +166,41 @@ def test_fidelity_is_additive_and_releases_nothing():
     assert not evaluate(cleared).armed
 
 
+# Frozen from the evaluate() on master before condition (17) existed. A new condition that
+# blocks on its default flips all-pass; one that releases another hold flips feat-plus-meta-held.
+_CHARACTERIZATION_FIXTURES = [
+    ("all-pass", {}, True, set()),
+    ("pr-body-held", dict(pr_body=BODY_HELD), False, {1}),
+    ("finding-85", dict(findings=[Finding("code-review", "A", "f.php", 1, "bug", 85)]), False, {2}),
+    ("unresolved-conformance", dict(unresolved_conformance=["MISSING: t.php"]), False, {3}),
+    ("phase5-fail", dict(phase5_status="fail"), False, {4}),
+    ("golden-headless", dict(classification=Classification(golden_changed=True)), False, {5}),
+    ("dep-open", dict(dep_state_lookup=lambda n: "OPEN",
+                      pr_body=BODY_CLEARED + "\nDepends-on: #1400\n"), False, {6}),
+    ("plan-auto-merge-false", dict(plan_auto_merge_false=True), False, {7}),
+    ("feat-title", dict(pr_title="feat: shiny new GM power"), False, {8}),
+    ("llm-safety", dict(llm_safety_holds=["new UI needs visual judgment"]), False, {9}),
+    ("pipeline-authored", dict(pr_labels=["pipeline-authored"]), False, {10}),
+    ("fidelity-none", dict(fidelity_verdict=None), False, {12}),
+    ("unresolved-findings-none", dict(unresolved_findings=None), False, {11}),
+    ("slug-drift", dict(plan_slug_drift="other-slug"), False, {13}),
+    ("conflict-none", dict(conflict_resolved=None), False, {14}),
+    ("red-check", dict(failed_checks=["php-tests"]), False, {15}),
+    ("meta-held", dict(meta_checks_status="HELD"), False, {16}),
+    ("meta-unknown", dict(meta_checks_status="UNKNOWN"), False, {16}),
+    ("feat-plus-meta-held", dict(pr_title="feat: shiny new GM power",
+                                 meta_checks_status="HELD"), False, {8, 16}),
+]
+
+
+@pytest.mark.parametrize("label,kwargs,expected_armed,expected_holds", _CHARACTERIZATION_FIXTURES,
+                         ids=[f[0] for f in _CHARACTERIZATION_FIXTURES])
+def test_arm_outcomes_characterization(label, kwargs, expected_armed, expected_holds):
+    d = evaluate(inputs(**kwargs))
+    assert d.armed is expected_armed
+    assert {c.number for c in d.holds} == expected_holds
+
+
 # ---------------------------------------------------------------------------
 # Condition (11) — slug-drift hold tests (f, g)
 # ---------------------------------------------------------------------------

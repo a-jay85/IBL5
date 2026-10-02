@@ -22,7 +22,7 @@ The reverse-engineering note is `jsb-native/re-artifacts/jsb-J27-fta-RE-20261001
 
 Measured and ruled-out levers. Each FTA per game figure is the instrument's engine value for that A/B arm versus 14.09 on the default arm (60 games per snapshot, seed 20240601):
 
-- **`unfaithful3pt`** (ADR-0090 putback 3pt restore, reverted in the arm): 13.62, a change of minus 0.46. Faithful and not reverted.
+- **`unfaithful3pt`** (the arm makes a putback 3pt reachable again, the unfaithful 2026-07-22 behavior that ADR-0055 Correction 2 withdrew): 13.62, a change of minus 0.46. The faithful default suppresses putback 3pt and so raises FTA by 0.46, which narrows the gap. Faithful and not reverted.
 - **`putback`** (ADR-0055 putback arm): 14.16, plus 0.07. Faithful and not reverted.
 - **`suppress_transition`** (ADR-0090 transition 3pt port, removed in the arm): 14.28, plus 0.20. Faithful and not reverted.
 - **`suppress_w4_rescale`** (the shot-clock foul-bucket rescale from [#1675](https://github.com/a-jay85/IBL5/pull/1675), removed in the arm): 14.19, plus 0.11. This is the first recorded FTA effect for that port.

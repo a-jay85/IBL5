@@ -214,6 +214,12 @@ def _discharge_hold_sentences(llm, probe, justification: str, log) -> tuple[str,
     return residual, discharged
 
 
+def _record_failure_context(res: RunResult, e: HarnessError) -> None:
+    """Copy the failing command and its output tail from a HarnessError onto the result."""
+    res.error_cmd = e.cmd or None
+    res.error_output_tail = e.output or None
+
+
 def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         worktree: str | None = None, headless: bool = True,
         plans_dir: str | None = None, live: bool = False,
@@ -880,8 +886,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.terminal = TerminalState.FAILED
         res.error = f"{e.kind}: {e.detail}"
         res.error_kind = e.kind
-        res.error_cmd = e.cmd or None
-        res.error_output_tail = e.output or None
+        _record_failure_context(res, e)
         log(f"FAILED: {res.error}")
     except usage_pause.UsagePause as p:
         res.terminal = TerminalState.FAILED

@@ -2376,6 +2376,14 @@ assert_viol "nd-code-span-mention-passes" 0 '[ND]' "$FM_OPUS$CF_MATRIX"'
 
 A phase can carry `**No diff:** x` to opt out of the omission check.
 '
+# A marker inside a fenced block is stripped before the gate reads $GATEP_BODY.
+assert_viol "nd-fenced-marker-ignored-passes" 0 '[ND]' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Queue the parked plan
+
+```
+**No diff:** queues the parked plan after merge
+```
+'
 
 # ---------------------------------------------------------------------------
 # Gate [G] fixtures (4 cases)

@@ -515,6 +515,27 @@ def test_autoresolved_files_surfaced(tmp_path):
             os.unlink(autoresolved_path)
 
 
+def test_autoresolved_files_surfaced_in_sticky_body():
+    """The composed sticky (PR comment) names the auto-resolved files, not just the RESULT line.
+
+    runner.py builds rebase_line with "; auto-resolved conflict in <files>" from the
+    resolver's resolved_files and hands it to fidelity.compose_sticky; a non-clean rebase
+    line is printed in the sticky status block.
+    """
+    from harness import fidelity
+    files = ["harness/conflict.py", "harness/adapters/gitad.py"]
+    rebase_line = ("REBASE=conflict auto-resolved via --onto; TREE-EQUIVALENT; "
+                   f"manifest=/tmp/m.json; auto-resolved conflict in {', '.join(files)}")
+    fid = {"verdict_1": "READY", "error_kind": None, "reviewed_tree": "t",
+           "remediation_sha": None, "verdict_2": None, "reviewed_tree_2": None}
+    body = fidelity.compose_sticky(
+        rebase_line, "CI: local verification pass; GitHub checks are watched after this comment",
+        fid, _arm(True), ["**What changed:** x"], "finding", "READY")
+    assert "auto-resolved conflict in" in body
+    for f in files:
+        assert f in body
+
+
 def test_autoresolved_files_surfaced_slashed_branch():
     """A slashed branch (feat/x) writes its sidecar under the dash-flattened key that
     gitad uses (branch.replace("/", "-")). verdict_line must read that same key, or the

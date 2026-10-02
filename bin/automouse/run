@@ -36,6 +36,9 @@ Subcommands:
 
 Environment (key overrides):
   AUTOMOUSE_SKIP_CANARY=1     Skip the between-plans master health canary.
+  AUTOMOUSE_LOGIN_PROBE_CMD   Test seam: command whose first stdout line
+                              (ok | expired:<r> | unknown:<r>) replaces the
+                              real login probe. Unset or empty = real probe.
   CLAUDE_HEADLESS=1           Set automatically; gates /post-plan Phase 10.
 EOF
     exit 0
@@ -490,6 +493,8 @@ _LIB_DIR="$SELF_DIR/../lib"
 [ -f "$_LIB_DIR/usage-gate.sh" ] || _LIB_DIR="$REPO/bin/lib"
 # shellcheck source=../lib/usage-gate.sh
 . "$_LIB_DIR/usage-gate.sh"
+# shellcheck source=../lib/login-preflight.sh
+. "$_LIB_DIR/login-preflight.sh"
 # shellcheck source=../lib/session-id.sh
 . "$_LIB_DIR/session-id.sh"
 AUTOMOUSE_BIN="$(cd "$(dirname "$0")" && pwd)/run"
@@ -1752,6 +1757,13 @@ while true; do
     ELAPSED=$(( $(date +%s) - START ))
     if [ "$ELAPSED" -gt "$MAX_ELAPSED" ]; then
         echo "Time guard: ${ELAPSED}s elapsed (max ${MAX_ELAPSED}s), stopping." >> "$LOG"
+        break
+    fi
+
+    # Login preflight: park (queue intact, no lock taken, no attempt counted)
+    # when the Claude login has expired. One Discord DM per outage.
+    if ! login_preflight "$NIGHTLY_DIR" "$LOG" "$SELF_DIR/../discord-dm"; then
+        echo "Login preflight: login expired, parking; queue left intact." >> "$LOG"
         break
     fi
 

@@ -1340,6 +1340,87 @@ def test_comment_nit_re_keeps_additive_and_defect_notes(title, detail):
     )
 
 
+# ---------------------------------------------------------------------------
+# _ALREADY_DONE_RE regression: backlog#1070 — `recorded` verb and body target
+# ---------------------------------------------------------------------------
+# Branch isolation: "in the PR body" is caught by the earlier `the pr` target, so
+# it never reaches the body alternative. The body-only cases use "in (the) body"
+# with `fixed`; the verb-only cases use `recorded` with a non-body target.
+
+@pytest.mark.parametrize("text,pr_number", [
+    # `recorded` verb, non-body target (pins the verb alternative alone)
+    ("Deviation recorded in this PR.", None),
+    ("Deviation recorded in PR #2400.", 2400),
+    ("The drift was recorded by the remediation.", None),
+    # body target, non-`recorded` verb (pins the body alternative alone)
+    ("Caveat fixed in the body.", None),
+    ("Caveat fixed in body.", None),
+    # both branches together, including the issue's own wording
+    ("Deviation recorded in the PR body.", None),
+    ("RECORDED IN THE BODY", None),
+])
+def test_already_done_re_drops_recorded_and_body_notes(text, pr_number):
+    """The `recorded` verb and the `(the) (PR) body` target mark a note as landed."""
+    assert fidelity._says_already_done(text, pr_number), (
+        f"Expected _says_already_done to return True for: {text!r}"
+    )
+
+
+@pytest.mark.parametrize("text,pr_number", [
+    # negation in the 20 chars before the verb cancels the match
+    ("Not recorded in the PR body. Add it.", None),
+    ("never recorded in the body", None),
+    # `recorded` with a target outside the alternation
+    ("Recorded in the backlog.", None),
+    ("recorded in the review thread", None),
+    # word boundary around `body`
+    ("recorded in the embodiment of the spec", None),
+    ("recorded in the bodywork", None),
+    # the [^.]{0,40}? window between verb and preposition is capped at 40 chars;
+    # widening it to {0,80} would make this case match and fail the test
+    ("recorded elsewhere in the long document, then later in the body", None),
+    # an older numbered PR stays filable when the reviewed PR is known
+    ("Recorded in PR #1900 earlier", 2400),
+])
+def test_already_done_re_keeps_unrecorded_and_non_body_notes(text, pr_number):
+    """Negated, off-target, out-of-window, and older-PR notes stay filable."""
+    assert not fidelity._says_already_done(text, pr_number), (
+        f"Expected _says_already_done to return False for: {text!r}"
+    )
+
+
+def test_extract_notes_drops_recorded_and_body_followups(tmp_path):
+    """`recorded` and body-target notes drop; negated, off-target, older-PR notes file."""
+    notes_fixture = [
+        {"title": "Note the cap-rounding deviation", "kind": "followup",
+         "detail": "Deviation recorded in the PR body."},
+        {"title": "Flag the trade-window caveat", "kind": "followup",
+         "detail": "Caveat fixed in the body."},
+        {"title": "Cap the roster at fifteen", "kind": "followup",
+         "detail": "Drift recorded by the remediation."},
+        {"title": "Backfill the missing draft picks", "kind": "followup",
+         "detail": "Not recorded in the PR body. Add the backfill."},
+        {"title": "Seed the waiver wire fixture", "kind": "followup",
+         "detail": "Recorded in PR #1900 earlier; the fixture is still missing."},
+        {"title": "Guard the empty depth chart", "kind": "followup",
+         "detail": "Recorded in the backlog and still unfixed."},
+    ]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"),
+                                    pr_number=2400)
+    assert [n["title"] for n in result] == ["Backfill the missing draft picks",
+                                            "Seed the waiver wire fixture",
+                                            "Guard the empty depth chart"]
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "backlog#1070 known limitation: _ALREADY_DONE_RE drops a note that names work "
+    "after 'recorded in the PR body'. Remove this marker when the regex is narrowed."))
+def test_already_done_re_keeps_note_that_names_work_after_recorded_body():
+    """The issue's own example names owed work, so it should stay filable."""
+    assert not fidelity._says_already_done("drift recorded in the PR body; add a guard")
+
+
 @pytest.mark.parametrize("pr_number,expected", [(4242, "gh pr edit 4242 --body-file"),
                                                 ("4242", "gh pr edit 4242 --body-file")])
 def test_remediation_prompt_names_pr_edit_when_pr_number_given(tmp_path, git_shim,

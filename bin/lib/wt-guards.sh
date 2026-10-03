@@ -44,7 +44,18 @@ is_worktree_in_use() {
     local wt_path="${1%/}"
     # lsof -d cwd lists every process's current working directory.
     # Fast: only checks the cwd file descriptor, not all open files.
-    lsof -d cwd 2>/dev/null | grep -q "$wt_path"
+    # -Fn prints one `n<path>` line per cwd (safe for paths with spaces). Match
+    # literally: the path itself or anything under it (path + "/"). A bare
+    # substring match let sibling `feat-bar` block cleanup of `feat`. The path
+    # goes via ENVIRON, not -v, so awk does not interpret backslash escapes.
+    # awk reads all input (no early exit) so lsof never takes SIGPIPE under pipefail.
+    lsof -d cwd -Fn 2>/dev/null | WTG_P="$wt_path" awk '
+        BEGIN { p = ENVIRON["WTG_P"]; pl = length(p) }
+        substr($0, 1, 1) == "n" {
+            n = substr($0, 2)
+            if (n == p || substr(n, 1, pl + 1) == p "/") found = 1
+        }
+        END { exit !found }'
 }
 
 # Check if a branch has an open PR on GitHub.

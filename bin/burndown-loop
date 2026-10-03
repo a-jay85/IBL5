@@ -77,6 +77,8 @@ START_EPOCH=$(date +%s)
 # (claude -p) never inherit the values. Honored only when RX_PID is this process's
 # own PID; a stale export in an operator's shell is ignored.
 REEXEC=0
+CODE_HASH=""
+RX_SKIP_HASH=""
 RX_PID="${IBL5_BURNDOWN_REEXEC_PID:-}"
 RX_SID="${IBL5_BURNDOWN_REEXEC_SID:-}"
 RX_BATCHES="${IBL5_BURNDOWN_REEXEC_BATCHES:-}"
@@ -430,6 +432,54 @@ bl_reexec_apply() {
     fi
 }
 
+# bl_code_hash: sha256 over the loop and its two sourced libs; prints nothing when a
+# file is unreadable or shasum fails, which callers treat as "no change".
+bl_code_hash() {
+    local f h
+    for f in "$ROOT/bin/burndown-loop" "$ROOT/bin/lib/usage-gate.sh" "$ROOT/bin/lib/usage-fetch.sh"; do
+        [ -r "$f" ] || return 0
+    done
+    h=$(cat "$ROOT/bin/burndown-loop" "$ROOT/bin/lib/usage-gate.sh" \
+        "$ROOT/bin/lib/usage-fetch.sh" 2>/dev/null | shasum -a 256 2>/dev/null) || return 0
+    h=${h%% *}
+    case "$h" in ''|*[!0-9a-f]*) return 0 ;; esac
+    echo "$h"
+}
+
+# bl_maybe_reexec: between batches only. On a code change, hand the counters to the
+# new image through IBL5_BURNDOWN_REEXEC_* and exec it with the same PID (the lock's
+# pid stays valid; exec skips the EXIT trap, so the lock and usage token survive).
+bl_maybe_reexec() {
+    local now_hash xrc=0
+    now_hash=$(bl_code_hash)
+    [ -n "$now_hash" ] || return 0
+    if [ -z "$CODE_HASH" ]; then CODE_HASH="$now_hash"; return 0; fi
+    [ "$now_hash" != "$CODE_HASH" ] || return 0
+    if [ ! -x "$ROOT/bin/burndown-loop" ] || ! bash -n "$ROOT/bin/burndown-loop" 2>/dev/null; then
+        if [ "$RX_SKIP_HASH" != "$now_hash" ]; then
+            bl_log "re-exec skipped: new code fails syntax check old=${CODE_HASH:0:12} new=${now_hash:0:12}"
+            RX_SKIP_HASH="$now_hash"
+        fi
+        return 0
+    fi
+    bl_log "code changed; re-exec old=${CODE_HASH:0:12} new=${now_hash:0:12} batches=$BATCHES items=$ITEMS fails=$FAILS"
+    export IBL5_BURNDOWN_REEXEC_PID="$$" IBL5_BURNDOWN_REEXEC_SID="$LOOP_SID" \
+        IBL5_BURNDOWN_REEXEC_BATCHES="$BATCHES" IBL5_BURNDOWN_REEXEC_ITEMS="$ITEMS" \
+        IBL5_BURNDOWN_REEXEC_UNITS="$UNITS" IBL5_BURNDOWN_REEXEC_FAILS="$FAILS" \
+        IBL5_BURNDOWN_REEXEC_START="$START_EPOCH" IBL5_BURNDOWN_REEXEC_LAST_FAIL="$LAST_FAIL"
+    set -- run "--loop-sid=$LOOP_SID"
+    if [ "$NO_DM" -eq 1 ]; then set -- "$@" --no-dm; fi
+    # execfail: a failed exec returns here instead of killing the loop.
+    shopt -s execfail
+    exec "$ROOT/bin/burndown-loop" "$@" || xrc=$?
+    shopt -u execfail
+    unset IBL5_BURNDOWN_REEXEC_PID IBL5_BURNDOWN_REEXEC_SID IBL5_BURNDOWN_REEXEC_BATCHES \
+        IBL5_BURNDOWN_REEXEC_ITEMS IBL5_BURNDOWN_REEXEC_UNITS IBL5_BURNDOWN_REEXEC_FAILS \
+        IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL
+    bl_log "re-exec failed rc=$xrc; continuing on the old code"
+    CODE_HASH="$now_hash"
+}
+
 # ------------------------------------------------------------ run
 
 bl_cmd_run() {
@@ -471,8 +521,10 @@ bl_cmd_run() {
         bl_lock_acquire
     fi
     echo "$LOOP_SID" > "$STATE/loop.sid"
+    CODE_HASH=$(bl_code_hash)
     while :; do
         if [ -e "$STOP_FLAG" ]; then bl_stopped; fi
+        bl_maybe_reexec
         decision=$(bl_decide)
         action="${decision%% *}"
         bl_log "decision=$decision"

@@ -84,6 +84,13 @@ foreach (array_slice($argv, 1) as $arg) {
     }
 }
 
+// Only <id> and <status> are positional; a stray third (e.g. an unquoted multi-word value)
+// was silently ignored, hiding caller bugs.
+if (count($positional) > 2) {
+    fail('unexpected extra argument(s): ' . implode(' ', array_map('strval', array_slice($positional, 2)))
+        . '. Usage: transition.php <id> <status> [opts]');
+}
+
 $idArg = $positional[0] ?? null;
 $status = $positional[1] ?? null;
 

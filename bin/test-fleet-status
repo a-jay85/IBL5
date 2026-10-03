@@ -720,11 +720,11 @@ assert_lacks "queue: a past one-shot is not a next run" \
 # header line. MAX_ELAPSED comes from bin/automouse/run itself, so a retune there
 # moves this line with it. No live runner, no end time.
 assert_has "queue: a live run's end time precedes the next run" \
-    "$OUTPUT" "AUTOMOUSE QUEUE.*run ends [A-Z][a-z]{2} [0-9-]{10} ($RUN_END_A|$RUN_END_B)  ·  next run [A-Z][a-z]{2} "
+    "$OUTPUT" "AUTOMOUSE QUEUE.*new work stops [A-Z][a-z]{2} [0-9-]{10} ($RUN_END_A|$RUN_END_B)  ·  next run [A-Z][a-z]{2} "
 assert_has   "queue: no live runner still prints the next run" \
     "$OUTPUT_IDLE" 'AUTOMOUSE QUEUE.*next run'
 assert_lacks "queue: no live runner prints no end time" \
-    "$OUTPUT_IDLE" 'run ends'
+    "$OUTPUT_IDLE" 'new work stops'
 
 # 6b — lock-dir slug resolution for documented forms (no .md / no plan arg).
 # Neither plan has a queue file, so each runner gets its own row above the queue.

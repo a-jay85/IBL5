@@ -494,13 +494,17 @@ exit 0
 CLAUDE
 chmod +x "$E2_STUB/claude"
 
-# post-plan-now stub: simulates a successful postplan. Parses the plan name from
-# --plan <path>, moves the queue symlink to done/, removes the handoff.
+# post-plan-now stub. Mode comes from $E2_ROOT/pp.mode (reset to "success" by
+# reset_e2). success: moves the queue symlink to done/, removes the handoff,
+# exits 0. fail: touches nothing in queue/ or handoff/, records a
+# "<plan> postplan-fail" trace line, exits 1 with output that matches no
+# environmental-error signature, so only the runner's own logic decides the path.
 cat > "$E2_ROOT/post-plan-now" <<PPSTUB
 #!/usr/bin/env bash
 set -u
 NDIR="$E2_NDIR"
 TRACE="$E2_TRACE"
+MODE_FILE="$E2_ROOT/pp.mode"
 plan=""
 while [ "\$#" -gt 0 ]; do
     case "\$1" in
@@ -508,6 +512,13 @@ while [ "\$#" -gt 0 ]; do
         *)      shift ;;
     esac
 done
+mode=\$(cat "\$MODE_FILE" 2>/dev/null || echo success)
+if [ "\$mode" = "fail" ]; then
+    [ -n "\$plan" ] && printf '%s postplan-fail\n' "\$plan" >> "\$TRACE"
+    printf 'post-plan stub: simulated plan failure\n'
+    printf 'RESULT: failure\n'
+    exit 1
+fi
 if [ -n "\$plan" ]; then
     mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
     rm -f "\$NDIR/handoff/\$plan.json" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
@@ -530,6 +541,7 @@ esac
 GHSTUB
 chmod +x "$E2_GH"
 echo MERGED > "$E2_ROOT/gh.mode"
+echo success > "$E2_ROOT/pp.mode"
 
 write_e2_plan() {
     local name="$1"; shift
@@ -549,6 +561,18 @@ reset_e2() {
           "$E2_NDIR/done"/*.md "$E2_TRACE"
     : > "$E2_TRACE"
     echo MERGED > "$E2_ROOT/gh.mode"
+    echo success > "$E2_ROOT/pp.mode"
+}
+
+# reset_e2_clean: reset_e2 plus empty logs/, reports/, and skipped/. Used only by
+# the post-plan failure cases (P1-P2). reset_e2 keeps every earlier runner log
+# and report, and e2_logtxt reads all of today's logs, so a negative assertion
+# ("no env-stop report", "no Environmental failure line") would otherwise see a
+# previous case's files. V1-V5 keep calling plain reset_e2, unchanged.
+reset_e2_clean() {
+    reset_e2
+    rm -f "$E2_NDIR/logs"/*.log "$E2_NDIR/reports"/*.md "$E2_NDIR/skipped"/*.md \
+          "$E2_NDIR/skipped"/*.attempts 2>/dev/null || true
 }
 
 run_e2() {  # run exactly one iteration; each caller pre-loads exactly one plan in queue

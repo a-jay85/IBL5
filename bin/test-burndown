@@ -122,6 +122,12 @@ want "--help: burndown-status listed" "$OUT" "burndown-status"
 want "--help: burndown-close-merged listed" "$OUT" "burndown-close-merged"
 want "--help: burndown-sweep listed" "$OUT" "burndown-sweep"
 want "--help: burndown-tag listed" "$OUT" "burndown-tag"
+want "--help: burndown-prompt listed" "$OUT" "burndown-prompt"
+want "--help: burndown-launch listed" "$OUT" "burndown-launch"
+OUT="$("$SCRIPT" --dry-run burndown-prompt x 1 s 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C1: --dry-run burndown-prompt exits 2" || fail "C1: --dry-run burndown-prompt exits 2 (got $RC)"
+OUT="$(HOME="$T/home" "$SCRIPT" burndown-nope 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C1: unknown burndown subcommand exits 2" || fail "C1: unknown burndown subcommand exits 2 (got $RC)"
 
 # ── C2: unknown burndown subcommand rejected ──────────────────────────────────
 OUT="$(bd burndown-bogus 2>&1)"; RC=$?

@@ -12,6 +12,14 @@
 # post-plan-now's headless guard skips them. post-plan-now unsets it before
 # launching its own children.
 #
+# A usage fetch that serves only a stale reading (usage_fetch rc 2) sleeps out the
+# 429 backoff plus 5s, clamped to 30-300s, or 120s when no backoff is active. No
+# reading at all (rc 1) sleeps 1800s. Neither case ever launches a batch.
+#
+# Between batches the loop hashes itself, bin/lib/usage-gate.sh and
+# bin/lib/usage-fetch.sh. When the hash changes (new code checked out where launchd
+# runs it from), it execs the new code with the same PID, lock, SID and counters.
+#
 # Usage:
 #   bin/burndown-loop start [--no-dm]
 #   bin/burndown-loop stop
@@ -22,12 +30,15 @@
 # ---
 # Environment (unset and empty both take the default):
 #   IBL5_BURNDOWN_RESERVE_PCT         weekly percent kept free at reset (default 10)
-#   IBL5_BURNDOWN_MAX_FAILS           consecutive failed batches before giving up (3)
+#   IBL5_BURNDOWN_MAX_FAILS           consecutive failed or aborted batches before giving up (3)
+#   IBL5_BURNDOWN_REEXEC_*            internal re-exec hand-off; ignored unless this PID set it
 #   IBL5_BURNDOWN_BATCH_TIMEOUT_MIN   per-batch wall clock in minutes (90)
 #   IBL5_BURNDOWN_DISCORD_DM          finish-DM sender (default bin/discord-dm)
 #
 # Exit codes: 0 loop finished (supply exhausted, stop requested, or --once done).
-#             1 consecutive-failure cap hit or /burndown failed closed.
+#             1 consecutive-failure cap hit. Failed batches and /burndown exit-3
+#               aborts share the cap; below it a failure retries after 300s and an
+#               abort after 600s.
 #             2 usage or environment error.
 #             4 another instance holds the lock.
 #             75 paused by the usage gate (coordinator resumes it).

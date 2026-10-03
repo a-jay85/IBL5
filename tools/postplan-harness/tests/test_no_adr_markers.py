@@ -306,3 +306,55 @@ def test_replay_control_identity_upsert_drops_markers(monkeypatch):
     edits = _bodies(acts, "pr_edit_body")
     assert creates and edits
     assert all(RM1 not in b and RM2 not in b for b in creates + edits)
+
+
+from test_fidelity_rounds import (NOT_READY, TREE_1, _ScriptedLlm,  # noqa: F401
+                                   _cleanup, _counting_git, _Res, git_shim)
+from test_fidelity_body_only_round import _BodySeqGh
+
+
+def _found_plan(tmp_path, *markers):
+    text = _marker_plan(*markers)
+    path = tmp_path / "plan.md"
+    path.write_text(text)
+    plan = runner.locate_plan("fidelity-markers", content_override=text)
+    plan.path = str(path)
+    assert plan.found
+    assert plan.no_adr_markers == list(markers)
+    return plan
+
+
+def _body_only_round(tmp_path, plan, pr):
+    gh = _BodySeqGh(str(tmp_path), ["BEFORE body prose", "AFTER body prose",
+                                     "AFTER body prose"],
+                    fixture={"pr_number": pr})
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [NOT_READY],
+        "fidelity-remediation": ["answered in the body"],
+        "plan-fidelity-re-review-2": ["READY\n"],
+    })
+    try:
+        runner._run_fidelity(llm, str(tmp_path), str(tmp_path),
+                             _counting_git(commit_returns=[""]), gh, plan,
+                             "diff", "original-body", pr, "dead" * 10, TREE_1,
+                             False, lambda _m: None, _Res())
+    finally:
+        _cleanup(pr, f"{pr}-2")
+    return _bodies(_actions(str(tmp_path)), "pr_edit_body")
+
+
+def test_fidelity_body_only_round_write_carries_markers(tmp_path, git_shim):
+    edits = _body_only_round(tmp_path, _found_plan(tmp_path, RM1, RM2), 9941)
+    assert edits
+    last = edits[-1]
+    assert "AFTER body prose" in last
+    assert last.startswith(RM1 + "\n" + RM2 + "\n\n")
+    assert last.count(RM1) == 1
+    assert last.count(RM2) == 1
+
+
+def test_fidelity_body_only_round_no_marker_plan_adds_none(tmp_path, git_shim):
+    edits = _body_only_round(tmp_path, _found_plan(tmp_path), 9942)
+    assert edits
+    assert "AFTER body prose" in edits[-1]
+    assert "no-adr" not in edits[-1]

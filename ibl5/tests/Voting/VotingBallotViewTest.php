@@ -15,30 +15,30 @@ class VotingBallotViewTest extends TestCase
     private const string PINNED_ASG_HTML = '<form name="ASGVote" method="post" action="action.php"><CSRF><div class="voting-form-container"><img src="images/logo/1.jpg" alt="Team Logo" class="team-logo-banner"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button><script>
 function ShowAndHideGM() {
     var x = document.getElementById(\'GM\');
-    if (x.style.display == \'none\') {
-        x.style.display = \'\';
+    if (x.classList.contains(\'voting-collapsed\')) {
+        x.classList.remove(\'voting-collapsed\');
         if (typeof window.IBL_refreshResponsiveTables === \'function\') {
             window.IBL_refreshResponsiveTables();
         }
     } else {
-        x.style.display = \'none\';
+        x.classList.add(\'voting-collapsed\');
     }
 }
-</script><div class="voting-category" onclick="ShowAndHideGM()"><h2 class="ibl-title voting-category-title">GM of the Year</h2><p class="voting-category-instruction">Select THREE.</p></div><table id="GM" style="display:none" class="sortable ibl-data-table voting-form-table"><thead><tr><th>Vote</th><th>Name</th><th>Team</th></tr></thead><tbody><tr><td><input type="checkbox" name="GM[]" value="Pat O&apos;Brien, Boston Celtics"></td><td>Pat O&apos;Brien</td><td>Boston Celtics</td></tr><tr><td><input type="checkbox" name="GM[]" value="Jane Roe, Chicago Bulls"></td><td>Jane Roe</td><td>Chicago Bulls</td></tr></tbody></table><input type="hidden" name="teamname" value="Test Team"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button></div></form>';
+</script><div class="voting-category" onclick="ShowAndHideGM()"><h2 class="ibl-title voting-category-title">GM of the Year</h2><p class="voting-category-instruction">Select THREE.</p></div><table id="GM" class="sortable ibl-data-table voting-form-table voting-collapsed"><thead><tr><th>Vote</th><th>Name</th><th>Team</th></tr></thead><tbody><tr><td><input type="checkbox" name="GM[]" value="Pat O&apos;Brien, Boston Celtics"></td><td>Pat O&apos;Brien</td><td>Boston Celtics</td></tr><tr><td><input type="checkbox" name="GM[]" value="Jane Roe, Chicago Bulls"></td><td>Jane Roe</td><td>Chicago Bulls</td></tr></tbody></table><input type="hidden" name="teamname" value="Test Team"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button></div></form>';
 
     private const string PINNED_EOY_HTML = '<form name="EOYVote" method="post" action="action.php"><CSRF><div class="voting-form-container"><img src="images/logo/1.jpg" alt="Team Logo" class="team-logo-banner"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button><script>
 function ShowAndHideGM() {
     var x = document.getElementById(\'GM\');
-    if (x.style.display == \'none\') {
-        x.style.display = \'\';
+    if (x.classList.contains(\'voting-collapsed\')) {
+        x.classList.remove(\'voting-collapsed\');
         if (typeof window.IBL_refreshResponsiveTables === \'function\') {
             window.IBL_refreshResponsiveTables();
         }
     } else {
-        x.style.display = \'none\';
+        x.classList.add(\'voting-collapsed\');
     }
 }
-</script><div class="voting-category" onclick="ShowAndHideGM()"><h2 class="ibl-title voting-category-title">GM of the Year</h2><p class="voting-category-instruction">Select THREE.</p></div><table id="GM" style="display:none" class="sortable ibl-data-table voting-form-table"><thead><tr><th>1st</th><th>2nd</th><th>3rd</th><th>Name</th><th>Team</th></tr></thead><tbody><tr><td><input type="radio" name="GM[1]" value="Pat O&apos;Brien, Boston Celtics"></td><td><input type="radio" name="GM[2]" value="Pat O&apos;Brien, Boston Celtics"></td><td><input type="radio" name="GM[3]" value="Pat O&apos;Brien, Boston Celtics"></td><td>Pat O&apos;Brien</td><td>Boston Celtics</td></tr><tr><td><input type="radio" name="GM[1]" value="Jane Roe, Chicago Bulls"></td><td><input type="radio" name="GM[2]" value="Jane Roe, Chicago Bulls"></td><td><input type="radio" name="GM[3]" value="Jane Roe, Chicago Bulls"></td><td>Jane Roe</td><td>Chicago Bulls</td></tr></tbody></table><input type="hidden" name="teamname" value="Test Team"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button></div></form>';
+</script><div class="voting-category" onclick="ShowAndHideGM()"><h2 class="ibl-title voting-category-title">GM of the Year</h2><p class="voting-category-instruction">Select THREE.</p></div><table id="GM" class="sortable ibl-data-table voting-form-table voting-collapsed"><thead><tr><th>1st</th><th>2nd</th><th>3rd</th><th>Name</th><th>Team</th></tr></thead><tbody><tr><td><input type="radio" name="GM[1]" value="Pat O&apos;Brien, Boston Celtics"></td><td><input type="radio" name="GM[2]" value="Pat O&apos;Brien, Boston Celtics"></td><td><input type="radio" name="GM[3]" value="Pat O&apos;Brien, Boston Celtics"></td><td>Pat O&apos;Brien</td><td>Boston Celtics</td></tr><tr><td><input type="radio" name="GM[1]" value="Jane Roe, Chicago Bulls"></td><td><input type="radio" name="GM[2]" value="Jane Roe, Chicago Bulls"></td><td><input type="radio" name="GM[3]" value="Jane Roe, Chicago Bulls"></td><td>Jane Roe</td><td>Chicago Bulls</td></tr></tbody></table><input type="hidden" name="teamname" value="Test Team"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button></div></form>';
 
     protected function setUp(): void
     {
@@ -301,6 +301,8 @@ function ShowAndHideGM() {
     /**
      * Characterization: the token line varies per call, so strip it and pin
      * the rest. The constants were captured from the pre-redisplay tree.
+     * The toggle and collapsed-table fragments were updated by hand when the
+     * hidden state moved to the voting-collapsed class.
      */
     public function testGetBallotHtmlIsPinnedForAsg(): void
     {
@@ -352,13 +354,65 @@ function ShowAndHideGM() {
         $this->assertStringContainsString('window.IBL_refreshResponsiveTables();', $html);
     }
 
+    public function testShowHideScriptTogglesCollapsedClass(): void
+    {
+        $categories = [
+            [
+                'code' => 'MVP',
+                'title' => 'Most Valuable Player',
+                'instruction' => 'Select THREE.',
+                'candidates' => [],
+            ],
+        ];
+
+        $html = $this->view->renderBallotForm('action.php', 'Test', 1, 'Playoffs', $categories);
+
+        $this->assertStringContainsString("x.classList.contains('voting-collapsed')", $html);
+        $this->assertStringContainsString("x.classList.remove('voting-collapsed');", $html);
+        $this->assertStringContainsString("x.classList.add('voting-collapsed');", $html);
+        $this->assertStringNotContainsString('style.display', $html);
+
+        $removeAt = strpos($html, "x.classList.remove('voting-collapsed');");
+        $refreshAt = strpos($html, 'window.IBL_refreshResponsiveTables();');
+        $addAt = strpos($html, "x.classList.add('voting-collapsed');");
+        $this->assertIsInt($removeAt);
+        $this->assertIsInt($refreshAt);
+        $this->assertIsInt($addAt);
+        $this->assertLessThan($refreshAt, $removeAt, 'Reveal branch removes the class before refreshing tables.');
+        $this->assertLessThan($addAt, $refreshAt, 'Else branch re-adds the class after the reveal branch.');
+    }
+
+    public function testCandidateTableStartsCollapsedWithClass(): void
+    {
+        $categories = [
+            [
+                'code' => 'MVP',
+                'title' => 'Most Valuable Player',
+                'instruction' => 'Select THREE.',
+                'candidates' => [],
+            ],
+        ];
+
+        $html = $this->view->renderBallotForm('action.php', 'Test', 1, 'Playoffs', $categories);
+
+        $this->assertStringContainsString(
+            '<table id="MVP" class="sortable ibl-data-table voting-form-table voting-collapsed">',
+            $html
+        );
+        $this->assertStringNotContainsString('style="display:none"', $html);
+    }
+
     public function testRenderResultsExpanderEmitsToggleAndHint(): void
     {
         $html = $this->view->renderResultsExpander('<p>RESULTS</p>');
 
         $this->assertStringContainsString('ShowAndHideResults', $html);
         $this->assertStringContainsString('Voting Results', $html);
-        $this->assertStringContainsString('<i>Tap/click to reveal/hide results.</i>', $html);
+        $this->assertStringContainsString(
+            '<p class="voting-category-instruction"><em>Tap/click to reveal/hide results.</em></p>',
+            $html
+        );
+        $this->assertStringNotContainsString('<i>', $html);
         $this->assertStringContainsString('<p>RESULTS</p>', $html);
     }
 
@@ -367,7 +421,11 @@ function ShowAndHideGM() {
         $html = $this->view->renderResultsExpander('<p>RESULTS</p>');
 
         // Same hidden-state convention the category candidate tables use.
-        $this->assertStringContainsString('id="Results" style="display:none"', $html);
+        $this->assertStringContainsString('<div id="Results" class="voting-collapsed">', $html);
+        $this->assertStringNotContainsString('style=', $html);
+        // The expander's own toggle must target the class the container starts with.
+        $this->assertStringContainsString("getElementById('Results')", $html);
+        $this->assertStringContainsString("x.classList.contains('voting-collapsed')", $html);
         $this->assertLessThan(
             strpos($html, '<p>RESULTS</p>'),
             strpos($html, 'id="Results"'),

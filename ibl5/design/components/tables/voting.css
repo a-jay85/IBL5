@@ -84,6 +84,13 @@
     color: var(--gray-500);
 }
 
+/* Collapsed state for the ballot category tables and the results expander.
+   Toggled by the inline ShowAndHide<Code>() script in VotingBallotView. */
+.voting-collapsed,
+.voting-form-table.voting-collapsed {
+    display: none;
+}
+
 /* Mobile adjustments for voting form - keep full table display */
 @media (max-width: 768px) {
     .voting-category {

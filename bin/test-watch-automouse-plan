@@ -7,6 +7,13 @@
 # a temp tree with a stub bin/discord-dm and points AUTOMOUSE_DIR at a temp state
 # dir. Nothing touches the real queue or sends a real DM.
 #
+# Counterfactual mutations (point WATCHER_UNDER_TEST at a mutated copy; the named
+# case must go red):
+#   slug_log greps "$SLUG/" without the phase        -> case 5
+#   slug_log first match wins (drop the -nt test)    -> case 4
+#   GH_BIN=${WATCH_AUTOMOUSE_GH_BIN-gh} (no colon)   -> case 22
+#   fire() without the `date > "$SENTINEL"` line     -> case 1
+#
 # no-adr: stub-driven regression harness copying the bin/test-watch-run pattern; it adds no architectural constraint and no new governance gate
 set -uo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)

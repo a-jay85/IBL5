@@ -83,6 +83,7 @@ class CiFixGh:
     def pr_edit_body(self, pr, body): self.body_edits.append((pr, body))
     def pr_checks_json(self, pr): return list(self.checks)
     def run_log_failed(self, run_id, job_id, dest): pass
+    def run_rerun_failed(self, run_id): pass
     def pr_body_fresh(self, *a, **kw): return self.body
     def merge_state_status(self, pr): return "CLEAN"
     def pr_disable_auto_merge(self, pr): self.disarmed.append(pr)
@@ -102,7 +103,7 @@ class ScriptedLlm:
 
 
 def _run(monkeypatch, tmp_path, git, gh, llm, *, failed, commit=("b" * 40,),
-         rewatch=(), res=None):
+         rewatch=(), res=None, run_started=None):
     """Drive _ci_fix_loop in live mode with every external call faked. `commit` is a
     sequence of new SHAs or HarnessErrors, one per attempt. `rewatch` is the list of
     CiOutcomes watch_or_reuse hands back."""
@@ -129,11 +130,16 @@ def _run(monkeypatch, tmp_path, git, gh, llm, *, failed, commit=("b" * 40,),
                         lambda *a, **kw: object())
     monkeypatch.setattr(runner.ciwatch, "watch_or_reuse", fake_watch)
     monkeypatch.setattr(runner.ciwatch, "reap_background_watch", lambda *a, **kw: None)
+    # A no-change attempt reaches the rerun probe, which sleeps and watches live.
+    monkeypatch.setattr(runner.time, "sleep", lambda s: None)
+    monkeypatch.setattr(runner.ciwatch, "watch_live",
+                        lambda *a, **kw: CiOutcome(-1, [], "probe not scripted"))
     res = res if res is not None else RunResult(terminal=TerminalState.FAILED)
     out = runner._ci_fix_loop(git, gh, llm, lines.append, res, worktree=None, pr=4242,
                               sha="a" * 40, outcome=CiOutcome(8, list(failed), "red"),
                               out_dir=str(tmp_path), mode="live", fixture={},
-                              run_started=time.time())
+                              run_started=(time.time() if run_started is None
+                                           else run_started))
     return SimpleNamespace(out=out, res=res, lines=lines, watched=watched)
 
 
@@ -425,3 +431,56 @@ def test_catchup_push_with_no_budget_left_skips_rewatch(monkeypatch, tmp_path):
     assert r.watched == []
     assert r.res.ci_head == "b" * 40
     assert _has(r.lines, "outcome=pushed-unwatched")
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: one-shot bun-audit catch-up before an Opus attempt
+# ---------------------------------------------------------------------------
+
+_BUN = "JS Dependency Audit (bun)"
+
+
+def _dep_changed(monkeypatch, changed):
+    monkeypatch.setattr(runner.cifix_ship, "master_dep_files_changed",
+                        lambda worktree, **kw: changed)
+
+
+def test_bun_audit_master_changed_catches_up_before_llm(monkeypatch, tmp_path):
+    _dep_changed(monkeypatch, True)
+    git, llm = CiFixGit(head_shas=["a" * 40, "c" * 40]), ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, git, CiFixGh(), llm, failed=[_BUN],
+             rewatch=[CiOutcome(0, [], "green")])
+    assert llm.calls == []
+    assert git.rebases == 1
+    assert git.push_calls == ["push"]
+    assert r.watched == ["c" * 40]
+    assert r.res.ci_head == "c" * 40
+
+
+def test_bun_audit_master_unchanged_no_catchup(monkeypatch, tmp_path):
+    _dep_changed(monkeypatch, False)
+    git, llm = CiFixGit(head_shas=["b" * 40]), ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, git, CiFixGh(), llm, failed=[_BUN],
+             rewatch=[CiOutcome(0, [], "green")])
+    assert git.rebases == 0
+    assert len(llm.calls) == 1
+    assert _has(r.lines, "no catch-up")
+
+
+def test_bun_audit_catchup_once_per_run(monkeypatch, tmp_path):
+    _dep_changed(monkeypatch, True)
+    git, llm = CiFixGit(head_shas=["a" * 40, "c" * 40]), ScriptedLlm()
+    red = CiOutcome(8, [_BUN], "red")
+    _run(monkeypatch, tmp_path, git, CiFixGh(), llm, failed=[_BUN],
+         commit=("d" * 40, "e" * 40, "f" * 40), rewatch=[red, red, red])
+    assert git.rebases == 1
+    assert len(llm.calls) >= 2
+
+
+def test_bun_audit_budget_exhausted_no_catchup(monkeypatch, tmp_path):
+    _dep_changed(monkeypatch, True)
+    git, llm = CiFixGit(), ScriptedLlm()
+    _run(monkeypatch, tmp_path, git, CiFixGh(), llm, failed=[_BUN],
+         run_started=time.time() - runner._CI_FIX_WALL_BUDGET_SECS)
+    assert git.fetches == 0
+    assert llm.calls == []

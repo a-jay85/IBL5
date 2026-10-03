@@ -35,7 +35,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from harness import (adr_draft, body_numbers, cifix, ciwatch, conformance, fidelity, gitutil, holdrepeat, llm_calls,
+from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gitutil, holdrepeat, llm_calls,
                      manual_rows, manual_testing, outofscope, prosefix, schemas, scope_conformance,
                      statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
@@ -1008,6 +1008,7 @@ def _round_model(round_num: int) -> str:
     """
     return "sonnet" if round_num == 1 else "opus"
 _MAX_BEHIND_RETRIES = 3
+_DEP_CATCHUP_KEY = 9   # lost-work key outside the 1..3 push/BEHIND attempt keys
 
 
 def _retry_key(branch: str, attempt: int) -> str:
@@ -1293,6 +1294,29 @@ def _phase7_stop(log, trail: list[str], attempt: int, sha, stage: str,
     return last
 
 
+def _phase7_rewatch(gh, log, res, worktree, pr, sha, out_dir, run_started):
+    """Re-watch CI on a freshly pushed Phase 7 head. Returns (outcome, sha). Too little
+    budget left skips the watch and hands back an indeterminate outcome."""
+    remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+    if remaining - 120 < _CI_FIX_REWATCH_FLOOR_SECS:
+        log(f"phase7 ci-fix: wall-clock budget exhausted after dep catch-up "
+            f"({int(remaining)}s left); CI on {str(sha)[:8]} not re-watched")
+        return ciwatch.CiOutcome(-1, [], "budget exhausted after dep catch-up"), sha
+    bg = ciwatch.start_background_watch(worktree, pr, sha, out_dir,
+                                        timeout=int(remaining - 120), verify_head=True)
+    try:
+        outcome = ciwatch.watch_or_reuse(worktree, pr, sha, out_dir, bg,
+                                         timeout=int(remaining - 120), verify_head=True)
+    finally:
+        ciwatch.reap_background_watch(bg)
+    if outcome.diverged:
+        _fail_closed_on_divergence(gh, log, pr, "phase7", outcome.evidence, disarm=True)
+    if outcome.head_sha and outcome.head_sha != sha:
+        sha = outcome.head_sha
+        res.ci_head = sha
+    return outcome, sha
+
+
 def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                  mode, fixture, run_started):
     """Phase 7 CI fix loop — attempts to fix red CI with Opus.
@@ -1332,6 +1356,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
     probed = False
     last = None
     trail: list[str] = []
+    dep_caught_up = False
 
     while True:
         kind, names = cifix.triage(outcome.failed)
@@ -1419,6 +1444,34 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 _fail_closed_on_divergence(gh, log, pr, "phase7", r.evidence, disarm=True)
             if r.action == "synced":
                 sha = r.remote_sha
+
+        # One-shot dependency catch-up: a bun advisory master already fixed clears on
+        # a rebase, so try that before paying for an Opus attempt.
+        if mode != "replay" and not dep_caught_up and cifix_ship.bun_audit_failed(names):
+            dep_caught_up = True
+            git.fetch_base("origin/master")
+            if not cifix_ship.master_dep_files_changed(worktree):
+                log("phase7 ci-fix: bun audit red; master has no package.json/bun.lock "
+                    "change since merge-base - no catch-up")
+            else:
+                try:
+                    _refresh_and_reprove(git, log, "phase7-dep", _DEP_CATCHUP_KEY)
+                    sha = _push_with_adr_draft(
+                        git, log, "phase7", llm=llm, worktree=worktree, out_dir=out_dir,
+                        res=res, pr=(pr if isinstance(git, LiveGit) else None)) or git.head()
+                except HarnessError as e:
+                    if e.kind == "remote-head-diverged":
+                        raise
+                    last = _phase7_stop(log, trail, 0, sha, "catchup", e)
+                    break
+                res.ci_head = sha
+                outcome, sha = _phase7_rewatch(gh, log, res, worktree, pr, sha,
+                                               out_dir, run_started)
+                trail.append(f"dep catch-up: "
+                             f"{'green' if outcome.exit_code == 0 else 'still-red'}")
+                log(f"phase7 ci-fix dep catch-up: exit={outcome.exit_code} "
+                    f"failed={outcome.failed} sha={str(sha)[:8]}")
+                continue
 
         # Fix attempt
         attempt += 1

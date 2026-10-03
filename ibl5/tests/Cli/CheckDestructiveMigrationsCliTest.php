@@ -136,7 +136,7 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
         self::assertSame(0, $result['exit'], "Output: {$result['output']}");
     }
 
-    public function testInlineBypassExitsZero(): void
+    public function testUntaggedInlineBypassIsRejected(): void
     {
         $sql = "-- destructive-migration: dropping unused legacy column after data migration confirmed\n";
         $sql .= "ALTER TABLE foo DROP COLUMN bar;\n";
@@ -145,8 +145,9 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
 
         $result = $this->runScript();
 
-        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
-        self::assertStringContainsString('PASS (bypass)', $result['output']);
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('destructive-migration[<trigger>', $result['output']);
+        self::assertStringContainsString('untagged', $result['output']);
     }
 
     public function testShortInlineBypassExitsOne(): void
@@ -162,7 +163,7 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
         self::assertStringContainsString('drop-column', $result['output']);
     }
 
-    public function testPrBodyBypassExitsZero(): void
+    public function testUntaggedPrBodyBypassIsRejected(): void
     {
         $this->writeMigration('111_pr_bypass.sql', "ALTER TABLE foo DROP COLUMN bar;\n");
         $this->runInDir('git add -A');
@@ -170,8 +171,9 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
         $prBody = '<!-- destructive-migration: removing deprecated column after successful data migration -->';
         $result = $this->runScript(['--bypass-from-stdin'], $prBody);
 
-        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
-        self::assertStringContainsString('PASS (bypass)', $result['output']);
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('PR-body', $result['output']);
+        self::assertStringContainsString('drop-column', $result['output']);
     }
 
     public function testShortPrBodyBypassExitsOne(): void
@@ -425,7 +427,7 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
 
     public function testInlineBypassCoversNewPatterns(): void
     {
-        $this->writeMigration('130_bypass_new.sql', "-- destructive-migration: type change only, column was already NOT NULL\nALTER TABLE foo MODIFY bar INT NOT NULL;\n");
+        $this->writeMigration('130_bypass_new.sql', "-- destructive-migration[rename-column,tighten-not-null,drop-index,rename-table]: type change only, column was already NOT NULL\nALTER TABLE foo MODIFY bar INT NOT NULL;\n");
         $this->runInDir('git add -A');
 
         $result = $this->runScript();

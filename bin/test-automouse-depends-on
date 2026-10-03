@@ -704,7 +704,9 @@ assert_eq "P1: post-plan-now invoked exactly once (loop stopped, no re-claim)" \
 assert_present "P1: fast failure → plan stays in queue/" "$E2_NDIR/queue/ppfast.md"
 assert_absent  "P1: fast failure → plan NOT moved to done/" "$E2_NDIR/done/ppfast.md"
 assert_absent  "P1: fast failure → plan NOT moved to skipped/" "$E2_NDIR/skipped/ppfast.md"
-assert_absent  "P1: fast failure → attempt refunded (.attempts removed)" \
+# run:2204 already cleared .attempts at impl handoff, so this absence alone does
+# not prove a refund. The "Refunding attempt, stopping loop" want below pins it.
+assert_absent  "P1: fast failure → no .attempts counter left behind" \
     "$E2_NDIR/queue/ppfast.md.attempts"
 P1_REPORT="$(ls "$E2_NDIR/reports"/*-env-stop-*ppfast*.md 2>/dev/null | head -1)"
 if [ -n "$P1_REPORT" ]; then

@@ -95,6 +95,7 @@
   --color-discord-hover: #4752c4;
 
   /* Type scale */
+  --text-3xs:   0.5625rem;
   --text-2xs:   0.6875rem;
   --text-xs:    0.75rem;
   --text-sm:    0.875rem;

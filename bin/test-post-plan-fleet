@@ -796,8 +796,8 @@ end_case stop-fails-closed
 
 # === DM-dispatch cases (driver slice, 37–52) =============================================
 # Shared setup: PR 9901 with headRefName=branch-live (already in WTL_FIXTURE at line 58),
-# a DM-capture stub, a caffeinate shim (strips -s + timeout SECS; execs the remainder),
-# and derive_status sourced from the driver for the cross-slice guards in cases 44 and 47.
+# a DM-capture stub, and derive_status sourced from the driver for the cross-slice
+# guards in cases 44 and 47.
 _DM_PR=9901
 _DM_JSON="$SCRATCH/dm-9901.json"
 cat > "$_DM_JSON" <<'DMJSON'
@@ -809,22 +809,9 @@ _DM_STUB="$SCRATCH/.local/bin/pr-ready-dm-capture"
 printf '#!/usr/bin/env bash\ncat >> "%s"\n' "$_DM_CAPTURE" > "$_DM_STUB"
 chmod +x "$_DM_STUB"
 
-# Shim: strip -s, then the 'timeout SECS' pair, then exec the remainder.  Avoids any
-# dependency on a system timeout binary when the runner is executed manually in tests.
-cat > "$SCRATCH/.local/bin/caffeinate" <<'CAFF'
-#!/usr/bin/env bash
-[ "${1:-}" = "-s" ] && shift
-if [ "${1:-}" = "timeout" ]; then shift; shift; fi
-exec "$@"
-CAFF
-chmod +x "$SCRATCH/.local/bin/caffeinate"
-
 _DM_RUNNER="/tmp/post-plan-fleet-runner-${_DM_PR}.sh"
 _DM_LOG="/tmp/post-plan-fleet-${_DM_PR}.log"
-_DM_MARKER="/tmp/pr-ready-marker-${_DM_PR}.txt"
-TMP_LOGS+=("$_DM_CAPTURE" "$_DM_LOG" "$_DM_MARKER" "$_DM_RUNNER"
-           "/tmp/post-plan-fleet-prompt-${_DM_PR}.md"
-           "/tmp/pr-ready-commenturl-${_DM_PR}.txt")
+TMP_LOGS+=("$_DM_CAPTURE" "$_DM_LOG" "$_DM_RUNNER")
 
 # run_driver bakes POST_PLAN_FLEET_CLAUDE="$CLAUDE_STUB" unconditionally via env; DM cases
 # need their own stubs, so they bypass run_driver and call the driver directly.
@@ -848,7 +835,7 @@ eval "$(sed -n '/^derive_status()/,/^}/p' "$DRIVER")"
 
 # --- case 37: dm-fires-on-marker ----------------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs37="$SCRATCH/.local/bin/dm-cs-37"
 cat > "$_cs37" <<'STUB'
 #!/usr/bin/env bash
@@ -871,7 +858,7 @@ end_case dm-fires-on-marker
 
 # --- case 38: dm-fires-on-stop-line -------------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs38="$SCRATCH/.local/bin/dm-cs-38"
 printf '#!/usr/bin/env bash\nprintf "STOP: xyzzy-test-stop-reason\n"\n' > "$_cs38"
 chmod +x "$_cs38"
@@ -889,7 +876,7 @@ end_case dm-fires-on-stop-line
 
 # --- case 39: dm-fires-on-timeout ---------------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs39="$SCRATCH/.local/bin/dm-cs-39"
 printf '#!/usr/bin/env bash\nexit 124\n' > "$_cs39"
 chmod +x "$_cs39"
@@ -905,7 +892,7 @@ end_case dm-fires-on-timeout
 
 # --- case 40: dm-fires-on-nonzero-exit ---------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs40="$SCRATCH/.local/bin/dm-cs-40"
 printf '#!/usr/bin/env bash\nexit 1\n' > "$_cs40"
 chmod +x "$_cs40"
@@ -921,7 +908,7 @@ end_case dm-fires-on-nonzero-exit
 
 # --- case 41: dm-undeliverable-is-not-fatal -----------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _dm41_stub="$SCRATCH/.local/bin/dm-41-undeliverable"
 printf '#!/usr/bin/env bash\ncat > /dev/null\nexit 1\n' > "$_dm41_stub"
 chmod +x "$_dm41_stub"
@@ -937,7 +924,7 @@ end_case dm-undeliverable-is-not-fatal
 
 # --- case 42: dm-missing-binary-degrades --------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 # Sub-case a: non-existent path.
 POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
     POST_PLAN_FLEET_DISCORD_DM="$SCRATCH/.local/bin/no-such-dm" POST_PLAN_FLEET_CLAUDE="$CLAUDE_STUB" \
@@ -946,7 +933,7 @@ _out42a="$(HOME="$SCRATCH" bash "$_DM_RUNNER" 2>&1 || true)"
 grep -q 'no executable discord-dm' <<< "$_out42a" \
     || fail "dm-missing-binary-degrades: non-existent path missing degrade message"
 # Sub-case b: existing but non-executable.
-rm -f "$_DM_LOG" "$_DM_MARKER"
+rm -f "$_DM_LOG"
 _dm42b="$SCRATCH/.local/bin/dm-42b-nonexec"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$_dm42b"
 POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
@@ -960,7 +947,7 @@ end_case dm-missing-binary-degrades
 
 # --- case 43: dm-suppressed-by-no-dm -------------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
     POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$CLAUDE_STUB" \
     run_dm_driver --go --no-dm >/dev/null 2>&1
@@ -971,7 +958,7 @@ end_case dm-suppressed-by-no-dm
 
 # --- case 44: dm-does-not-pollute-status --------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs44="$SCRATCH/.local/bin/dm-cs-44"
 cat > "$_cs44" <<'STUB'
 #!/usr/bin/env bash
@@ -995,7 +982,7 @@ end_case dm-unknown-flag-rejected
 
 # --- case 47: dm-marker-absent-rc0-no-stop ------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs47="$SCRATCH/.local/bin/dm-cs-47"
 printf '#!/usr/bin/env bash\nprintf "run completed without verdict\n"\n' > "$_cs47"
 chmod +x "$_cs47"
@@ -1011,7 +998,7 @@ end_case dm-marker-absent-rc0-no-stop
 
 # --- case 48: dm-teardown-order-static ---------------------------------------------------
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER"
+clean_slots; rm -f "$_DM_LOG"
 POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
     POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$CLAUDE_STUB" \
     run_dm_driver --go >/dev/null 2>&1
@@ -1033,7 +1020,7 @@ end_case dm-teardown-order-static
 _dm_result_case() {  # $1 = case number, $2 = RESULT: line to log; stdin = result.json body
     local n="$1" result_line="$2"
     local dir="$SCRATCH/harness-run-$n" stub="$SCRATCH/.local/bin/dm-cs-$n"
-    clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+    clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
     rm -rf "$dir"; mkdir -p "$dir"
     cat > "$dir/result.json"
     {
@@ -1194,7 +1181,7 @@ end_case dm-armed-empty-warning-silent
 # The run bailed (no verdict, rc!=0): post-plan-now's own lines become the Fix: block,
 # minus its postplan-rc=/harness-run-dir= bookkeeping.
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 printf '#!/usr/bin/env bash\nprintf "My [cool] PR\\thttps://github.com/o/r/pull/9901\\n"\n' \
     > "$SCRATCH/.local/bin/gh-title"
 chmod +x "$SCRATCH/.local/bin/gh-title"
@@ -1249,7 +1236,7 @@ end_case dm-malformed-result-json-falls-back
 # HELD. Case 52 exercises this incidentally (malformed JSON); this case exercises it
 # directly (no result.json path emitted at all).
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs53="$SCRATCH/.local/bin/dm-cs-53"
 printf '#!/usr/bin/env bash\nprintf "RESULT: terminal=shipped-held\n"\n' > "$_cs53"
 chmod +x "$_cs53"
@@ -1268,7 +1255,7 @@ end_case dm-held-fallback
 # HELD must not suppress a failing verdict. terminal=shipped-held with verdict_1=NOT READY
 # must report NOT READY, not HELD.
 begin_case
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 _cs54_dir="$SCRATCH/harness-run-54"; mkdir -p "$_cs54_dir"
 printf '%s\n' '{"terminal":"shipped-held","fidelity":{"verdict_1":"NOT READY","verdict_2":null,"rounds":[],"reviewed_tree_2":null,"error_kind":null,"remediation_sha":null}}' \
     > "$_cs54_dir/result.json"
@@ -1811,23 +1798,7 @@ end_case pr-ready-merge-digest-shape
 # === Marker-parse and prose-pin cases (skill slice, 28–38) ===============================
 _PRD="$SCRIPT_DIR/../.claude/review-shared"
 _VM_PR=8801
-TMP_LOGS+=("/tmp/pr-ready-marker-${_VM_PR}.txt"
-           "/tmp/pr-ready-commenturl-${_VM_PR}.txt"
-           "/tmp/pr-ready-holdsout-${_VM_PR}.txt")
-
-# --- case 31: verdict-marker-line-not-misclassified ---------------------------------------
-# Cross-slice guard: the marker line starts with 'P', which must NOT match
-# derive_status's READY pattern (^[[:space:]>*_`-]*READY). If someone widens the
-# sentinel prefix to start with "READY|...", this case fails immediately.
-begin_case
-_log31="/tmp/pr-ready-test-marker-classify-$$.log"
-TMP_LOGS+=("$_log31")
-printf 'PR-READY-VERDICT-MARKER-V1|pr=%s|verdict=READY|url=-|holds=none\n' \
-    "$_VM_PR" > "$_log31"
-_st31="$(derive_status "$_log31")"
-[[ "$_st31" == "NOT READY" ]] \
-    || fail "verdict-marker-line-not-misclassified: derive_status='$_st31' on marker-only log, want 'NOT READY' — sentinel leaked into READY pattern"
-end_case verdict-marker-line-not-misclassified
+TMP_LOGS+=("/tmp/pr-ready-holdsout-${_VM_PR}.txt")
 
 # --- case 35: no-command-substitution-after-worktree -------------------------------------
 begin_case
@@ -2608,7 +2579,7 @@ _dm_result_case 94 'RESULT: post-plan complete terminal=shipped-held' <<< 'not j
 # rc 124 is what `timeout` returns on expiry.
 _to_stub="$SCRATCH/.local/bin/dm-cs-timeout"
 printf '#!/usr/bin/env bash\nexit 124\n' > "$_to_stub"; chmod +x "$_to_stub"
-clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
     POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_to_stub" \
     run_dm_driver --go >/dev/null 2>&1

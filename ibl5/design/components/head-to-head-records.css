@@ -193,7 +193,7 @@
 /* Never met: keep the zebra background, mute the text */
 .ibl-data-table .h2h-unplayed {
     --series-cell-bg: transparent;
-    color: var(--gray-400);
+    color: var(--gray-500);
 }
 
 .h2h-matrix .h2h-self {

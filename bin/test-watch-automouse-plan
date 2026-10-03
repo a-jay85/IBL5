@@ -170,5 +170,123 @@ expected=$(printf '%s\n\n%s' "$FIRE_MSG" "log: $AM/logs/")
 body_is "same body as the unset case" "$expected"
 [ -e "$AM/.notified-s1-postplan" ] && pass "sentinel written" || fail "sentinel written"
 
+# smoke_run <args...> — --smoke-test exits before the poll loop, so no bounds are needed.
+smoke_run() {
+    OUT=$(AUTOMOUSE_DIR="$AM" WATCH_AUTOMOUSE_GH_BIN="$T/gh-stub" "$T/bin/watch-automouse-plan" --slug s1 "$@" 2>&1); RC=$?
+}
+# nothing_sent — a smoke run must leave no DM, sentinel or watcher log behind.
+nothing_sent() {
+    [ ! -e "$T/dm.body" ] && pass "no DM sent" || fail "no DM sent"
+    [ ! -e "$AM/.notified-s1-postplan" ] && pass "no sentinel written" || fail "no sentinel written"
+    [ ! -e "$AM/watch-s1-postplan.log" ] && pass "no watcher log" || fail "no watcher log"
+}
+
+if command -v jq > /dev/null 2>&1; then HAVE_JQ=1; else HAVE_JQ=0; fi
+
+echo "== 13. smoke happy path, plan nowhere"
+if [ "$HAVE_JQ" = 1 ]; then
+    make_tree c13
+    make_gh_stub
+    smoke_run --smoke-test
+    [ "$RC" = 0 ] && pass "exit 0" || fail "exit 0 (got $RC)"
+    want "discord-dm check" "$OUT" "ok: discord-dm executable"
+    want "plan location" "$OUT" "info: plan location nowhere"
+    want "message header" "$OUT" "--- message (not sent) ---"
+    want "smoke verdict line" "$OUT" "🧪 smoke test for **s1** (postplan) — nothing was sent."
+    want "PR block" "$OUT" "PR #42 [OPEN] Smoke title"
+    want "log link" "$OUT" "log: $AM/logs/"
+    want "pass line" "$OUT" "smoke-test: PASS"
+    nothing_sent
+else
+    echo "SKIP: case 13 needs jq"
+fi
+
+echo "== 14. smoke ignores the sentinel"
+if [ "$HAVE_JQ" = 1 ]; then
+    make_tree c14
+    make_gh_stub
+    printf 'old\n' > "$AM/.notified-s1-postplan"
+    smoke_run --smoke-test
+    [ "$RC" = 0 ] && pass "exit 0" || fail "exit 0 (got $RC)"
+    deny "no short-circuit" "$OUT" "already notified"
+    want "sentinel noted" "$OUT" "info: sentinel present (ignored by --smoke-test)"
+    [ "$(cat "$AM/.notified-s1-postplan")" = "old" ] && pass "sentinel untouched" || fail "sentinel untouched"
+    [ ! -e "$T/dm.body" ] && pass "no DM sent" || fail "no DM sent"
+else
+    echo "SKIP: case 14 needs jq"
+fi
+
+echo "== 15. smoke renders the same log link fire would"
+if [ "$HAVE_JQ" = 1 ]; then
+    make_tree c15
+    make_gh_stub
+    printf '[00:01:00] s1/postplan exit: stop_reason=end_turn\n' > "$AM/logs/2026-08-18-111.log"
+    printf '[00:01:00] s1/postplan exit: stop_reason=end_turn\n' > "$AM/logs/2026-08-18-222.log"
+    printf '[00:01:00] s2/postplan exit: stop_reason=end_turn\n' > "$AM/logs/2026-08-18-333.log"
+    printf '[00:01:00] s1/postplan exit: stop_reason=end_turn\n' > "$AM/logs/2026-08-18.log"
+    touch -t 202608180100 "$AM/logs/2026-08-18-111.log"
+    touch -t 202608180200 "$AM/logs/2026-08-18-222.log"
+    touch -t 202608180300 "$AM/logs/2026-08-18-333.log" "$AM/logs/2026-08-18.log"
+    smoke_run --smoke-test
+    want "newest matching per-runner log" "$OUT" "log: $AM/logs/2026-08-18-222.log"
+else
+    echo "SKIP: case 15 needs jq"
+fi
+
+echo "== 16. a missing discord-dm fails loudly"
+make_tree c16
+make_gh_stub
+rm "$T/bin/discord-dm"
+smoke_run --smoke-test
+[ "$RC" = 1 ] && pass "exit 1" || fail "exit 1 (got $RC)"
+want "names the failed check" "$OUT" "FAIL: discord-dm executable"
+want "counts the failure" "$OUT" "smoke-test: FAIL (1 checks failed)"
+
+echo "== 17. a missing logs dir fails loudly"
+make_tree c17
+make_gh_stub
+rm -rf "$AM/logs"
+smoke_run --smoke-test
+[ "$RC" = 1 ] && pass "exit 1" || fail "exit 1 (got $RC)"
+want "names the failed check" "$OUT" "FAIL: logs dir"
+want "fail line" "$OUT" "smoke-test: FAIL"
+
+echo "== 18. --smoke-test --detach is rejected"
+make_tree c18
+smoke_run --smoke-test --detach
+[ "$RC" = 2 ] && pass "exit 2" || fail "exit 2 (got $RC)"
+want "names the conflict" "$OUT" "--smoke-test cannot be combined with --detach"
+[ ! -e "$AM/watch-s1-postplan.log" ] && pass "no detached re-exec" || fail "no detached re-exec"
+[ ! -e "$T/dm.body" ] && pass "no DM sent" || fail "no DM sent"
+
+echo "== 19. --smoke-test=1 is rejected"
+make_tree c19
+smoke_run --smoke-test=1
+[ "$RC" = 2 ] && pass "exit 2" || fail "exit 2 (got $RC)"
+want "unknown argument" "$OUT" "unknown argument --smoke-test=1"
+
+echo "== 20. help lists the flag and its exit codes"
+make_tree c20
+OUT=$("$T/bin/watch-automouse-plan" --help 2>&1); RC=$?
+[ "$RC" = 0 ] && pass "exit 0" || fail "exit 0 (got $RC)"
+want "flag line" "$OUT" "--smoke-test       one-shot dry run"
+want "exit-code line" "$OUT" "--smoke-test: 0 every check ok"
+
+echo "== 21. smoke under an empty env"
+if [ "$HAVE_JQ" = 1 ]; then
+    make_tree c21
+    make_gh_stub
+    OUT=$(env -i PATH=/usr/bin:/bin AUTOMOUSE_DIR="$AM" WATCH_AUTOMOUSE_GH_BIN="$T/gh-stub" "$T/bin/watch-automouse-plan" --slug s1 --smoke-test 2>&1); RC=$?
+    [ "$RC" = 0 ] && pass "exit 0 without HOME" || fail "exit 0 without HOME (got $RC: $OUT)"
+    want "pass line" "$OUT" "smoke-test: PASS"
+else
+    echo "SKIP: case 21 needs jq"
+fi
+
+echo "== 22. empty seam falls back to gh in the smoke check"
+make_tree c22
+OUT=$(AUTOMOUSE_DIR="$AM" WATCH_AUTOMOUSE_GH_BIN="" "$T/bin/watch-automouse-plan" --slug s1 --smoke-test 2>&1); RC=$?
+want "empty seam falls back to gh" "$OUT" "gh resolves (gh)"
+
 [ "$FAILED" = 0 ] && { echo "all watch-automouse-plan cases passed"; exit 0; }
 echo "watch-automouse-plan harness: FAILURES above"; exit 1

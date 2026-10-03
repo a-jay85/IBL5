@@ -53,6 +53,12 @@ LABEL="com.ibl5.burndown-loop"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 RUNNER="$STATE/runner.sh"
 BL_SLEEP_CAP=1800
+# rc-2 fetch retry (usage_fetch served stale or nothing fresh): sleep out the 429
+# backoff plus a pad, clamped, or a short fixed retry when no backoff is active.
+BL_BACKOFF_PAD=5
+BL_BACKOFF_FLOOR=30
+BL_BACKOFF_CAP=300
+BL_FETCH_RETRY=120
 BL_PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin:$HOME/.bun/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 DISCORD_DM="${IBL5_BURNDOWN_DISCORD_DM:-$ROOT/bin/discord-dm}"
 
@@ -155,13 +161,36 @@ bl_lock_acquire() {
 
 # ------------------------------------------------------------ pacing decision
 
+# bl_fetch_retry_decision <frc>: the one decision line for usage_fetch rc 2. An active
+# 429 backoff gives (until - now + pad) clamped to [floor, cap]; an absent, expired
+# or garbled backoff file gives the fixed retry. Never prints launch.
+bl_fetch_retry_decision() {
+    local frc="$1" bo bo_until now secs
+    bo=$(_usage_fetch_backoff_read "$(usage_state_dir)/fetch-backoff")
+    bo_until=${bo% *}
+    now=$(date +%s)
+    if [ "$bo_until" -gt "$now" ]; then
+        secs=$(( 10#$bo_until - now + BL_BACKOFF_PAD ))
+        if [ "$secs" -lt "$BL_BACKOFF_FLOOR" ]; then secs=$BL_BACKOFF_FLOOR; fi
+        if [ "$secs" -gt "$BL_BACKOFF_CAP" ]; then secs=$BL_BACKOFF_CAP; fi
+        echo "sleep $secs backoff fetch-rc=$frc until=$bo_until"
+        return 0
+    fi
+    echo "sleep $BL_FETCH_RETRY fetch-retry fetch-rc=$frc"
+}
+
 # bl_decide: prints exactly one line, the single pacing decision for both the live
 # loop and --dry-run. Fails closed on a missing or stale reading: the loop is
 # discretionary work, so a skipped batch costs time while an unpaced one costs the
 # owner's week (unlike usage_prestart_gate, which guards a run the user asked for).
+# A stale reading (fetch rc 2) only shortens the sleep to the backoff or a 120s retry.
 bl_decide() {
     local body frc=0 v verdict wait
     body=$(usage_fetch 45) || frc=$?
+    if [ "$frc" -eq 2 ]; then
+        bl_fetch_retry_decision "$frc"
+        return 0
+    fi
     if [ "$frc" -ne 0 ]; then
         echo "sleep $BL_SLEEP_CAP blind fetch-rc=$frc"
         return 0

@@ -127,6 +127,21 @@ seed_usage() {
           fetched_at:$t}' > "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
 }
 
+# seed_stale <age_secs>: seed_usage 5 0 1, then age the cache past usage_fetch 45.
+seed_stale() {
+    seed_usage 5 0 1
+    jq -c --argjson a "$1" '.fetched_at -= $a' "$IBL5_USAGE_GATE_STATE_DIR/cache.json" \
+        > "$IBL5_USAGE_GATE_STATE_DIR/cache.tmp"
+    mv "$IBL5_USAGE_GATE_STATE_DIR/cache.tmp" "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+}
+
+# seed_backoff <offset_secs>: a fetch-backoff file expiring offset seconds from now.
+seed_backoff() {
+    printf '%s 30\n' "$(( $(date +%s) + $1 ))" > "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+}
+
+decision_lines() { printf '%s\n' "$OUT" | grep -c 'decision='; }
+
 queue() { printf '%s\n' "$@" > "$T/claude.queue"; }
 
 # run_loop <args...>: sets OUT (stdout+stderr) and RC.
@@ -270,7 +285,72 @@ test_dry_run_fetch_fail_closed() {
     new_env
     run_loop run --dry-run
     assert_eq dry_blind:rc 0 "$RC"
-    assert_contains dry_blind:decision "$OUT" "decision=sleep 1800 blind"
+    assert_contains dry_blind:decision "$OUT" "decision=sleep 1800 blind fetch-rc=1"
+    assert_eq dry_blind:one-line 1 "$(decision_lines)"
+}
+
+test_dry_run_fetch_backoff_sleep() {
+    local secs
+    new_env
+    seed_stale 600
+    seed_backoff 100
+    run_loop run --dry-run
+    assert_eq fetch_backoff:rc 0 "$RC"
+    secs=$(printf '%s\n' "$OUT" | sed -n 's/.*decision=sleep \([0-9]*\) backoff fetch-rc=2.*/\1/p')
+    case "$secs" in 104|105) pass fetch_backoff:secs ;; *) fail fetch_backoff:secs "got [$secs]" ;; esac
+    assert_eq fetch_backoff:one-line 1 "$(decision_lines)"
+    assert_not_contains fetch_backoff:no-launch "$OUT" "decision=launch"
+
+    new_env
+    seed_stale 600
+    seed_backoff 3
+    run_loop run --dry-run
+    assert_contains fetch_backoff:floor "$OUT" "decision=sleep 30 backoff fetch-rc=2"
+    assert_not_contains fetch_backoff:floor-no-launch "$OUT" "decision=launch"
+
+    new_env
+    seed_stale 600
+    seed_backoff 900
+    run_loop run --dry-run
+    assert_contains fetch_backoff:cap "$OUT" "decision=sleep 300 backoff fetch-rc=2"
+    assert_not_contains fetch_backoff:cap-no-launch "$OUT" "decision=launch"
+}
+
+test_dry_run_fetch_retry_no_backoff() {
+    new_env
+    seed_stale 600
+    assert_no_file fetch_retry:no-backoff-armed "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+    run_loop run --dry-run
+    assert_eq fetch_retry:absent-rc 0 "$RC"
+    assert_contains fetch_retry:absent "$OUT" "decision=sleep 120 fetch-retry fetch-rc=2"
+    assert_eq fetch_retry:absent-one-line 1 "$(decision_lines)"
+
+    new_env
+    seed_stale 600
+    seed_backoff -100
+    run_loop run --dry-run
+    assert_eq fetch_retry:expired-rc 0 "$RC"
+    assert_contains fetch_retry:expired "$OUT" "decision=sleep 120 fetch-retry fetch-rc=2"
+    assert_eq fetch_retry:expired-one-line 1 "$(decision_lines)"
+
+    new_env
+    seed_stale 600
+    printf 'garbage x\n' > "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+    run_loop run --dry-run
+    assert_eq fetch_retry:garbled-rc 0 "$RC"
+    assert_contains fetch_retry:garbled "$OUT" "decision=sleep 120 fetch-retry fetch-rc=2"
+    assert_eq fetch_retry:garbled-one-line 1 "$(decision_lines)"
+}
+
+test_loop_backoff_sleep_reason() {
+    new_env
+    seed_stale 600
+    seed_backoff 100
+    run_loop run --once --no-dm
+    assert_eq backoff_loop:rc 0 "$RC"
+    assert_contains backoff_loop:reason "$OUT" "reason=backoff"
+    assert_eq backoff_loop:first-sleep 60 "$(head -n1 "$T/sleep.calls")"
+    assert_no_file backoff_loop:no-claude "$T/claude.calls"
 }
 
 # ---------------------------------------------------------------- lock

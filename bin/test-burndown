@@ -2122,6 +2122,54 @@ rm -f "$CAL_RPT"
 [ "$(jq -r 'has("report") and has("since") and has("issues") and has("dropped")' <<< "$OUT")" = "true" ] \
     && ok "CAL5: existing delta fields survive" || fail "CAL5: existing delta fields survive"
 
+# ══ burndown-launch ═══════════════════════════════════════════════════════════
+mkdir -p "$T/launch/bin" "$T/launch/cwd" "$T/launch/tmp"
+cat > "$T/launch/bin/claude" <<'STUB'
+#!/bin/bash
+{ pwd; printf '%s\n' "$@"; } > "$LAUNCH_LOG"
+exit 7
+STUB
+chmod +x "$T/launch/bin/claude"
+BL_LOG="$T/launch/argv.log"
+# BL1/BL2: argv, cwd, and exec exit code (TMPDIR set for the BL7 leak check)
+rm -f "$BL_LOG"
+( cd "$T/launch/cwd" && HOME="$T/home" LAUNCH_LOG="$BL_LOG" TMPDIR="$T/launch/tmp" \
+    BURNDOWN_CLAUDE="$T/launch/bin/claude" "$SCRIPT" burndown-launch ) >/dev/null 2>&1
+RC=$?
+printf '%s\n' "$(cd "$T/launch/cwd" && pwd -P)" --model claude-sonnet-5-5 /burndown > "$T/launch/want.log"
+BL_GOT="$(cd "$T/launch/cwd" && pwd -P)"
+{ printf '%s\n' "$BL_GOT"; sed -n '2,$p' "$BL_LOG" 2>/dev/null; } > "$T/launch/got.log"
+diff "$T/launch/want.log" "$T/launch/got.log" >/dev/null 2>&1 \
+    && ok "BL1: argv is --model claude-sonnet-5-5 /burndown" || fail "BL1: argv is --model claude-sonnet-5-5 /burndown"
+[ "$(wc -l < "$BL_LOG" | tr -d ' ')" = "4" ] && ok "BL1: stub saw exactly four lines" || fail "BL1: stub saw exactly four lines"
+[ "$(cd "$(head -1 "$BL_LOG")" && pwd -P)" = "$BL_GOT" ] && ok "BL1: stub ran in the caller's cwd" || fail "BL1: stub ran in the caller's cwd"
+[ "$RC" -eq 7 ] && ok "BL2: exit code is the stub's 7 (exec)" || fail "BL2: exit code is the stub's 7 (got $RC)"
+# BL7: no temp dir left behind
+[ "$(find "$T/launch/tmp" -mindepth 1 | wc -l | tr -d ' ')" = "0" ] && ok "BL7: no temp dir leaked" || fail "BL7: no temp dir leaked"
+# BL3: empty value falls back to claude
+rm -f "$BL_LOG"
+( cd "$T/launch/cwd" && PATH="$T/launch/bin:$PATH" HOME="$T/home" LAUNCH_LOG="$BL_LOG" \
+    BURNDOWN_CLAUDE="" "$SCRIPT" burndown-launch ) >/dev/null 2>&1
+[ "$(sed -n 2p "$BL_LOG" 2>/dev/null)" = "--model" ] && ok "BL3: empty BURNDOWN_CLAUDE falls back to claude" || fail "BL3: empty BURNDOWN_CLAUDE falls back to claude"
+# BL4: unset falls back to claude
+rm -f "$BL_LOG"
+( cd "$T/launch/cwd" && env -u BURNDOWN_CLAUDE PATH="$T/launch/bin:$PATH" HOME="$T/home" LAUNCH_LOG="$BL_LOG" \
+    "$SCRIPT" burndown-launch ) >/dev/null 2>&1
+[ "$(sed -n 2p "$BL_LOG" 2>/dev/null)" = "--model" ] && ok "BL4: unset BURNDOWN_CLAUDE falls back to claude" || fail "BL4: unset BURNDOWN_CLAUDE falls back to claude"
+# BL5: missing binary
+rm -f "$BL_LOG"
+OUT="$(cd "$T/launch/cwd" && HOME="$T/home" LAUNCH_LOG="$BL_LOG" BURNDOWN_CLAUDE="$T/launch/nope" \
+    "$SCRIPT" burndown-launch 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "BL5: missing binary exits 3" || fail "BL5: missing binary exits 3 (got $RC)"
+want "BL5: message names the failure" "$OUT" "not found on PATH"
+[ ! -e "$BL_LOG" ] && ok "BL5: no log written" || fail "BL5: no log written"
+# BL6: extra argument
+rm -f "$BL_LOG"
+OUT="$(cd "$T/launch/cwd" && HOME="$T/home" LAUNCH_LOG="$BL_LOG" BURNDOWN_CLAUDE="$T/launch/bin/claude" \
+    "$SCRIPT" burndown-launch --now 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "BL6: extra argument exits 2" || fail "BL6: extra argument exits 2 (got $RC)"
+[ ! -e "$BL_LOG" ] && ok "BL6: no log written" || fail "BL6: no log written"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

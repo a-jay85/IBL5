@@ -1062,6 +1062,17 @@ bd_cmd_prompt() {
     printf -- '- A parser or gate change carries a corpus diff in its verification.\n'
 }
 
+# bd_cmd_launch — exec the /burndown orchestrator pinned to Sonnet 5.5.
+# A skill's frontmatter model: does not switch the model; --model does.
+bd_cmd_launch() {
+    [ $# -eq 0 ] || bd_die 2 "burndown-launch takes no arguments"
+    local cl="${BURNDOWN_CLAUDE:-claude}"
+    command -v "$cl" >/dev/null 2>&1 || bd_die 3 "$cl not found on PATH"
+    # exec skips the EXIT trap bd_init set, so drop BD_TMP first
+    rm -rf "$BD_TMP"; trap - EXIT
+    exec "$cl" --model claude-sonnet-5-5 "/burndown"
+}
+
 bd_cmd_refresh() {
     if [ $# -ne 1 ]; then bd_die 2 "burndown-refresh wants <ranks-file>"; fi
     local ranks_file="$1"
@@ -1493,6 +1504,7 @@ bd_main() {
         burndown-status)       bd_cmd_status       "$@" ;;
         burndown-close-merged) bd_cmd_close_merged "$@" ;;
         burndown-sweep)        bd_cmd_sweep        "$@" ;;
+        burndown-launch)       bd_cmd_launch       "$@" ;;
         *)                     bd_die 2 "unknown burndown subcommand: $cmd" ;;
     esac
 }

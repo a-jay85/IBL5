@@ -16,7 +16,8 @@ interface TrainingCampRatingsDiffViewInterface
      *
      * When $baselineYear is null or $rows is empty, renders an empty-state block.
      * $baselinePhase picks the intro text's baseline label (playoffs,
-     * end-of-season, or mid-season ratings).
+     * end-of-season, or mid-season ratings). An unknown or null phase falls
+     * back to the generic "last season ratings" label.
      *
      * @param list<RatingRow> $rows
      */

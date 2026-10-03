@@ -426,7 +426,7 @@ EMPTY_GOLDEN;
 
         $html = $this->view->render($data);
 
-        $this->assertStringContainsString('&amp;preset=transactions', $html);
+        $this->assertSame(2, substr_count($html, '&amp;preset=transactions'));
     }
 
         /**

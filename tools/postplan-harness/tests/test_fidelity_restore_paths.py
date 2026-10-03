@@ -232,6 +232,7 @@ _BITE = {
 @pytest.mark.parametrize("scenario", sorted(_BITE))
 def test_restore_disabled_leaves_the_body_corrupted(tmp_path, git_shim, monkeypatch,
                                                     scenario, disabled):
+    """Disabling runner.restore_manual_testing_section leaves the corrupted body unwritten."""
     script, kind, commits, reads = _BITE[scenario]
     if disabled:
         monkeypatch.setattr(runner, "restore_manual_testing_section",

@@ -211,6 +211,8 @@ def _bodies(actions, kind):
     return [a["body"] for a in actions if a.get("action") == kind]
 
 
+# Mutation: delete the _upsert_no_adr_markers call at runner.py:434 and the
+# startswith assertion below (RM1\nRM2\n\n) fails.
 @pytest.mark.usefixtures("stub_ambient_git_show")
 def test_replay_create_path_markers_reach_pr_create_body():
     acts = _replay(pr_number=None, pr_meta=None,
@@ -235,6 +237,8 @@ def test_replay_create_path_markers_survive_phase4_pr_edit_body():
     assert last.index(RM1) < last.index(RM2)
 
 
+# Mutation: delete the _upsert_no_adr_markers call at runner.py:604 and the
+# startswith assertion below (RM1\nRM2\n\n) fails.
 @pytest.mark.usefixtures("stub_ambient_git_show")
 def test_replay_edit_path_markers_reach_pr_edit_body():
     acts = _replay(plan_content=_marker_plan(RM1, RM2))
@@ -267,6 +271,8 @@ FENCED_ONLY_PLAN = (
 )
 
 
+# Both parametrized cases (test_replay_no_marker_plan_adds_no_marker[create-path]
+# and [edit-path]) fail if an empty marker list emits a placeholder.
 @pytest.mark.usefixtures("stub_ambient_git_show")
 @pytest.mark.parametrize("over", [
     {"pr_number": None, "pr_meta": None},
@@ -297,6 +303,8 @@ def test_replay_plan_blind_adds_no_marker(monkeypatch, tmp_path):
     assert all("no-adr" not in b for b in edits)
 
 
+# Control: with runner._upsert_no_adr_markers neutralised, no other code path
+# may carry plan markers into a body.
 @pytest.mark.usefixtures("stub_ambient_git_show")
 def test_replay_control_identity_upsert_drops_markers(monkeypatch):
     monkeypatch.setattr(runner, "_upsert_no_adr_markers", lambda body, plan: body)
@@ -308,6 +316,8 @@ def test_replay_control_identity_upsert_drops_markers(monkeypatch):
     assert all(RM1 not in b and RM2 not in b for b in creates + edits)
 
 
+# Sibling imports: renaming CANNED or _BodySeqGh breaks collection of
+# test_no_adr_markers.py.
 from test_fidelity_rounds import (NOT_READY, TREE_1, _ScriptedLlm,  # noqa: F401
                                    _cleanup, _counting_git, _Res, git_shim)
 from test_fidelity_body_only_round import _BodySeqGh
@@ -343,6 +353,8 @@ def _body_only_round(tmp_path, plan, pr):
     return _bodies(_actions(str(tmp_path)), "pr_edit_body")
 
 
+# Mutation: delete the _upsert_no_adr_markers call at runner.py:2326 and the
+# startswith assertion below (RM1\nRM2\n\n) fails.
 def test_fidelity_body_only_round_write_carries_markers(tmp_path, git_shim):
     edits = _body_only_round(tmp_path, _found_plan(tmp_path, RM1, RM2), 9941)
     assert edits

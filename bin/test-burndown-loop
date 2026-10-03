@@ -195,6 +195,37 @@ test_env_knob_invalid() {
     assert_contains knob_neg:names-var "$OUT" "IBL5_BURNDOWN_BATCH_TIMEOUT_MIN"
 }
 
+test_env_reserve_values() {
+    new_env
+    # Mutation: ${IBL5_BURNDOWN_RESERVE_PCT-10} in place of :- makes the empty case yield ''.
+    run_loop run --dry-run
+    assert_contains reserve:unset "$OUT" "reserve=10 "
+    IBL5_BURNDOWN_RESERVE_PCT='' run_loop run --dry-run
+    assert_contains reserve:empty "$OUT" "reserve=10 "
+    IBL5_BURNDOWN_RESERVE_PCT=abc run_loop run --dry-run
+    assert_contains reserve:abc "$OUT" "reserve=10 "
+    assert_contains reserve:abc-log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log" 2>/dev/null)" "bad-reserve value=abc"
+    IBL5_BURNDOWN_RESERVE_PCT=100 run_loop run --dry-run
+    assert_contains reserve:100 "$OUT" "reserve=10 "
+    IBL5_BURNDOWN_RESERVE_PCT=0 run_loop run --dry-run
+    assert_contains reserve:zero "$OUT" "reserve=0 "
+    IBL5_BURNDOWN_RESERVE_PCT=25 run_loop run --dry-run
+    assert_contains reserve:25 "$OUT" "reserve=25 "
+}
+
+test_state_outside_repo() {
+    new_env
+    seed_usage 5 0 1
+    queue none
+    run_loop run
+    assert_eq outside_repo:rc 0 "$RC"
+    # Mutation: STATE pointed at $ROOT/.burndown-loop would leave new untracked paths here.
+    assert_no_file outside_repo:no-state-in-repo "$REPO_ROOT/.burndown-loop"
+    assert_file outside_repo:state-under-home "$STATE/loop.sid"
+    run_loop start
+    assert_file outside_repo:plist-under-home "$LAUNCH_DIR/com.ibl5.burndown-loop.plist"
+}
+
 test_home_unset() {
     new_env
     OUT=$(env -u HOME "$LOOP" run --dry-run 2>&1)

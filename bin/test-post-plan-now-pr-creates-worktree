@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Tests that bin/post-plan-now --pr creates a worktree via bin/wt-new --existing
 # when no worktree has the PR's head branch, reuses an existing one, refuses fork
-# PRs, and maps slash-bearing branch names to hostname-safe slugs.
+# PRs, and maps slash-bearing branch names to hostname-safe slugs. Cases 11-14 cover
+# the --auto headless guard and its IBL5_BURNDOWN_LOOP=1 opt-in.
 #
-# Ten cases, exit 0 iff all pass.
+# Fourteen cases, exit 0 iff all pass.
 set -euo pipefail
 
 # ---- environment --------------------------------------------------------
@@ -369,6 +370,7 @@ case "${FAKE_MODE:-}" in
         exit 0 ;;
     limit) echo "You've hit your limit"; exit 1 ;;
     auth)  echo "API Error: 401"; exit 1 ;;
+    envprobe) printf '%s\n' "${IBL5_BURNDOWN_LOOP-unset}" > "$PROBE_FILE"; exit 0 ;;
 esac
 exit 0
 SHIM_EOF
@@ -473,6 +475,79 @@ if [ -s "$WTNEW_LOG" ]; then
 fi
 unset GH_NO_FORK_FIELD
 [ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "unknown fork status is refused before wt-new runs"
+
+# ==========================================================================
+# Cases 11-14 — --auto headless guard + IBL5_BURNDOWN_LOOP opt-in
+# ==========================================================================
+# run_auto_headless <opt-in-state> → G_OUT (stdout+stderr), G_RC, G_PLIST (0/1)
+# opt-in-state: "unset" | "empty" | any literal value
+run_auto_headless() {
+    local state="$1"
+    rm -f "$HOME7"/Library/LaunchAgents/*.plist
+    set +e
+    if [ "$state" = "unset" ]; then
+        G_OUT=$(cd "$WT6" && env -u IBL5_BURNDOWN_LOOP CLAUDE_HEADLESS=1 \
+            POST_PLAN_SKILL=1 HOME="$HOME7" "$REPO/bin/post-plan-now" --auto 2>&1)
+    elif [ "$state" = "empty" ]; then
+        G_OUT=$(cd "$WT6" && IBL5_BURNDOWN_LOOP='' CLAUDE_HEADLESS=1 \
+            POST_PLAN_SKILL=1 HOME="$HOME7" "$REPO/bin/post-plan-now" --auto 2>&1)
+    else
+        G_OUT=$(cd "$WT6" && IBL5_BURNDOWN_LOOP="$state" CLAUDE_HEADLESS=1 \
+            POST_PLAN_SKILL=1 HOME="$HOME7" "$REPO/bin/post-plan-now" --auto 2>&1)
+    fi
+    G_RC=$?
+    set -e
+    G_PLIST=0
+    ls "$HOME7"/Library/LaunchAgents/com.ibl5.postplan-now-feat-x-*.plist >/dev/null 2>&1 && G_PLIST=1
+    rm -f "$HOME7"/Library/LaunchAgents/*.plist
+}
+
+# assert_skips <label> — the last run_auto_headless must have skipped
+assert_skips() {
+    [ "$G_RC" = 0 ] || fail "$1: expected RC=0, got $G_RC"
+    grep -qF -- "skipping auto-fire" <<< "$G_OUT" || fail "$1: no 'skipping auto-fire' (got: $G_OUT)"
+    [ "$G_PLIST" = 0 ] || fail "$1: a plist was written"
+}
+
+FAIL_BEFORE=$FAIL
+run_auto_headless unset
+assert_skips "unset opt-in"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto without opt-in skips"
+
+FAIL_BEFORE=$FAIL
+run_auto_headless empty
+assert_skips "empty opt-in"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with empty opt-in skips"
+
+FAIL_BEFORE=$FAIL
+run_auto_headless 0
+assert_skips "opt-in=0"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with opt-in=0 skips"
+
+FAIL_BEFORE=$FAIL
+run_auto_headless 1
+if grep -qF -- "skipping auto-fire" <<< "$G_OUT"; then fail "opt-in=1: still skipped (got: $G_OUT)"; fi
+grep -qF -- "IBL5_BURNDOWN_LOOP=1" <<< "$G_OUT" || fail "opt-in=1: no opt-in message (got: $G_OUT)"
+[ "$G_PLIST" = 1 ] || fail "opt-in=1: no plist written (got: $G_OUT)"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with IBL5_BURNDOWN_LOOP=1 fires"
+
+# Case 14 — the launchd path never inherits the caller's env, so only --foreground
+# can prove the scrub: the far-side claude must see IBL5_BURNDOWN_LOOP as unset.
+FAIL_BEFORE=$FAIL
+PROBE_FILE="$TMP/optin.probe"; export PROBE_FILE; rm -f "$PROBE_FILE"
+set +e
+(cd "$WT6" && IBL5_BURNDOWN_LOOP=1 CLAUDE_HEADLESS=1 POST_PLAN_SKILL=1 \
+    HOME="$HOME7" FAKE_MODE=envprobe GH_CMD="$SHIMS/gh-none" \
+    "$REPO/bin/post-plan-now" --auto --foreground >/dev/null 2>&1)
+set -e
+if [ ! -f "$PROBE_FILE" ]; then
+    fail "scrub: probe file missing (far-side claude never ran)"
+elif [ "$(cat "$PROBE_FILE")" != "unset" ]; then
+    fail "scrub: far side saw IBL5_BURNDOWN_LOOP=$(cat "$PROBE_FILE"), expected unset"
+fi
+rm -f "$PROBE_FILE"
+rm -f "$HOME7"/Library/LaunchAgents/*.plist
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "opt-in is scrubbed before the far-side claude runs"
 
 # ==========================================================================
 # Summary

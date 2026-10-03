@@ -1563,12 +1563,15 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 trail.append(f"attempt {attempt}: {last}")
                 break
             else:
-                pre_push_head = new
+                pre_push_head, head_before = new, git.head()
                 try:
-                    sha = _push_with_adr_draft(
+                    pushed = _push_with_adr_draft(
                         git, log, "phase7", llm=llm, worktree=worktree,
                         out_dir=out_dir, res=res,
-                        pr=(pr if isinstance(git, LiveGit) else None)) or git.head()
+                        pr=(pr if isinstance(git, LiveGit) else None))
+                    # Only a head the push path moved (catch-up rebase, ADR draft)
+                    # replaces the fix commit's own sha.
+                    sha = pushed if pushed and pushed != head_before else new
                 except HarnessError as push_err:
                     if push_err.kind == "remote-head-diverged":
                         raise

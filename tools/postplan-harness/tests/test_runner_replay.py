@@ -1778,14 +1778,7 @@ class _TwoShaLiveGit(_LiveShapedGit):
 
     def commit_all(self, message):
         super(_LiveShapedGit, self).commit_all(message)
-        sha = f"replay-sha-{len(self.commit_messages)}"
-        if message.startswith("fix: address Phase 7 CI failures"):
-            self._fix_head = sha
-        return sha
-
-    def head(self):
-        # The Phase 7 lease push reports git.head(), so HEAD follows the fix commit.
-        return getattr(self, "_fix_head", None) or super().head()
+        return f"replay-sha-{len(self.commit_messages)}"
 
 
 class _NoEditLiveGit(_LiveShapedGit):

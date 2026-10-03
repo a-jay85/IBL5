@@ -181,6 +181,9 @@
         <testsuite name="ContractList Module Tests">
             <directory>tests/ContractList</directory>
         </testsuite>
+        <testsuite name="Contracts Module Tests">
+            <directory>tests/Contracts</directory>
+        </testsuite>
         <testsuite name="DraftHistory Module Tests">
             <directory>tests/DraftHistory</directory>
         </testsuite>

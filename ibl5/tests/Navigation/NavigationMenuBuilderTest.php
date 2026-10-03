@@ -290,8 +290,8 @@ class NavigationMenuBuilderTest extends TestCase
 
         $expectedSeasonLinks = [
             'Standings', 'Schedule', 'Injuries', 'Player Database', 'Player Export',
-            'Cap Space', 'Draft Pick Locator', 'Training Camp Ratings Diff',
-            'Free Agency Preview', 'Contract List', 'Player Movement',
+            'Contracts', 'Draft Pick Locator', 'Training Camp Ratings Diff',
+            'Free Agency Preview', 'Player Movement',
         ];
         foreach ($expectedSeasonLinks as $label) {
             $this->assertContains($label, $seasonLabels, "Season menu should contain '$label'");
@@ -318,6 +318,34 @@ class NavigationMenuBuilderTest extends TestCase
         }
     }
 
+    public function testIblSeasonMenuHasSingleContractsLinkAndNoLegacyLinks(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'ibl'));
+        $menus = $builder->getMenuStructure();
+
+        $contractsLinks = array_values(array_filter(
+            $menus['Season']['links'],
+            static fn (array $link): bool => ($link['label'] ?? '') === 'Contracts'
+        ));
+        $this->assertCount(1, $contractsLinks, 'Season menu should have exactly one Contracts link');
+        $this->assertSame('modules.php?name=Contracts', $contractsLinks[0]['url'] ?? null);
+
+        $seasonLabels = array_map(
+            static fn (array $link): string => $link['label'] ?? '',
+            $menus['Season']['links']
+        );
+        $this->assertNotContains('Cap Space', $seasonLabels);
+        $this->assertNotContains('Contract List', $seasonLabels);
+
+        foreach ($menus as $menu) {
+            foreach ($menu['links'] as $link) {
+                $url = $link['url'] ?? '';
+                $this->assertStringNotContainsString('name=CapSpace', $url);
+                $this->assertStringNotContainsString('name=ContractList', $url);
+            }
+        }
+    }
+
     public function testOlympicsModeFiltersIblOnlyLinksFromMenuStructure(): void
     {
         $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'olympics'));
@@ -331,8 +359,8 @@ class NavigationMenuBuilderTest extends TestCase
         }
 
         $shouldBeAbsent = [
-            'Cap Space', 'Projected Draft Order', 'Draft Pick Locator',
-            'Training Camp Ratings Diff', 'Free Agency Preview', 'Contract List',
+            'Contracts', 'Projected Draft Order', 'Draft Pick Locator',
+            'Training Camp Ratings Diff', 'Free Agency Preview',
             'Player Movement', 'Franchise History', 'Draft History',
             'All-Star Appearances', '1-On-1 Game', 'JSB Export',
             'Award History', 'Record Holders', 'Season Leaderboards',

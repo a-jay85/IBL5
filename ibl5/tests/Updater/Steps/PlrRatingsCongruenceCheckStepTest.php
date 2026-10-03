@@ -47,6 +47,7 @@ class PlrRatingsCongruenceCheckStepTest extends TestCase
         $result = $step->execute();
 
         $this->assertTrue($result->success);
+        $this->assertTrue($result->skipped);
         $this->assertSame($case['reason'], $result->detail);
     }
 

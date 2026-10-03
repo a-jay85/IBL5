@@ -1376,7 +1376,8 @@ def test_already_done_re_drops_recorded_and_body_notes(text, pr_number):
     # word boundary around `body`
     ("recorded in the embodiment of the spec", None),
     ("recorded in the bodywork", None),
-    # the [^.]{0,40}? window between verb and preposition is capped at 40 chars
+    # the [^.]{0,40}? window between verb and preposition is capped at 40 chars;
+    # widening it to {0,80} would make this case match and fail the test
     ("recorded elsewhere in the long document, then later in the body", None),
     # an older numbered PR stays filable when the reviewed PR is known
     ("Recorded in PR #1900 earlier", 2400),

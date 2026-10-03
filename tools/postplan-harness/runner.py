@@ -1276,6 +1276,22 @@ _CI_FIX_WALL_BUDGET_SECS = 4800
 _CI_FIX_MIN_ITER_SECS = 1200   # one Opus fix plus one CI cycle; less than this, stop
 
 
+def _phase7_stop(log, trail: list[str], attempt: int, sha, stage: str,
+                 e: HarnessError) -> str:
+    """Log and record a Phase 7 attempt that stopped on an error. `stage` is
+    "llm", "commit" or "push". Returns the `last` outcome token."""
+    last = f"error:{e.kind}"
+    tail = " | ".join(_error_tail(e.output or e.detail))
+    log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} "
+        f"outcome={last} stage={stage} sha={str(sha)[:8]}")
+    log(f"phase7 ci-fix {stage}-time denial: {tail or '(no output captured)'}")
+    trail.append(f"attempt {attempt}: {last} ({stage}-time): {tail or 'no output captured'}")
+    if stage in ("commit", "push"):
+        log("ci-fix commit is LOCAL and unpushed; "
+            "the next bin/post-plan-now run ships it")
+    return last
+
+
 def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                  mode, fixture, run_started):
     """Phase 7 CI fix loop — attempts to fix red CI with Opus.
@@ -1423,6 +1439,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
             gh.run_log_failed(run_id, job_id, log_dest)
             log_paths[name] = log_dest
 
+        stage = "llm"
         try:
             remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
             llm.call_tooled("ci-fix", cifix.CI_FIX_MODEL,
@@ -1432,17 +1449,13 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                             denied_tools=cifix.CI_FIX_DENIED_TOOLS, add_dirs=(fix_dir,),
                             timeout=int(min(TOOLED_TIMEOUT, remaining / 2)))
             remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+            stage = "commit"
             new = _commit_with_gate_remediation(git, worktree,
                     cifix.CI_FIX_COMMIT_MSG.format(n=attempt), log, phase="phase7")
         except HarnessError as e:
             if e.kind == "remote-head-diverged":
                 raise
-            last = f"error:{e.kind}"
-            log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} "
-                f"outcome={last} sha={str(sha)[:8]}")
-            trail.append(f"attempt {attempt}: {last}")
-            log("ci-fix commit is LOCAL and unpushed; "
-                "the next bin/post-plan-now run ships it")
+            last = _phase7_stop(log, trail, attempt, sha, stage, e)
             break
 
         if new == "":
@@ -1464,12 +1477,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 except HarnessError as push_err:
                     if push_err.kind == "remote-head-diverged":
                         raise
-                    last = f"error:{push_err.kind}"
-                    log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} "
-                        f"outcome={last} sha={str(sha)[:8]}")
-                    trail.append(f"attempt {attempt}: {last}")
-                    log("ci-fix commit is LOCAL and unpushed; "
-                        "the next bin/post-plan-now run ships it")
+                    last = _phase7_stop(log, trail, attempt, sha, "push", push_err)
                     break
                 res.ci_head = sha
                 # Re-watch

@@ -185,3 +185,66 @@ def test_char_successful_push_sets_ci_head_and_rewatches_new_sha(monkeypatch, tm
     assert r.res.ci_head == "b" * 40
     assert r.watched == ["b" * 40]
     assert _has(r.lines, "outcome=fixed")
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: redacted denial text, distinct commit-time and push-time tags
+# ---------------------------------------------------------------------------
+
+_ALNUM36 = "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"   # same literal test_blocked_cause.py uses
+
+
+def test_push_denial_text_in_log_and_trail(monkeypatch, tmp_path):
+    git = CiFixGit(push_errors=[HarnessError(
+        "local-gate", "git push: To github.com:a/b.git",
+        output="remote: ok\nerror: failed to push some refs\n"
+               "pre-push-adr-hook: ADR required for bin/foo\n")])
+    gh = CiFixGh()
+    r = _run(monkeypatch, tmp_path, git, gh, ScriptedLlm(), failed=["PHPUnit"])
+    assert any("push-time denial:" in ln and "ADR required for bin/foo" in ln
+               for ln in r.lines)
+    trail = _trail_text(gh)
+    assert "(push-time)" in trail
+    assert "ADR required for bin/foo" in trail
+
+
+def test_commit_and_push_tags_differ(monkeypatch, tmp_path):
+    gh1 = CiFixGh()
+    r1 = _run(monkeypatch, tmp_path, CiFixGit(), gh1, ScriptedLlm(), failed=["PHPUnit"],
+              commit=(HarnessError("local-gate", "x", output="pre-commit-hook: stale doc"),))
+    assert _has(r1.lines, "stage=commit")
+    assert not _has(r1.lines, "stage=push")
+    assert "(commit-time)" in _trail_text(gh1)
+    assert "push-time" not in _trail_text(gh1)
+
+    gh2 = CiFixGh()
+    git2 = CiFixGit(push_errors=[HarnessError("local-gate", "git push: pre-push-adr-hook: ADR")])
+    r2 = _run(monkeypatch, tmp_path, git2, gh2, ScriptedLlm(), failed=["PHPUnit"])
+    assert _has(r2.lines, "stage=push")
+    assert "(push-time)" in _trail_text(gh2)
+    assert "commit-time" not in _trail_text(gh2)
+
+
+def test_credential_in_push_output_never_reaches_log_or_trail(monkeypatch, tmp_path):
+    token = f"ghs_{_ALNUM36}"
+    git = CiFixGit(push_errors=[HarnessError(
+        "local-gate", "git push: denied",
+        output=f"fatal: https://x-access-token:{token}@github.com/a/b.git\n"
+               "pre-push-adr-hook: ADR required\n")])
+    gh = CiFixGh()
+    r = _run(monkeypatch, tmp_path, git, gh, ScriptedLlm(), failed=["PHPUnit"])
+    assert _has(r.lines, "push-time denial:")
+    assert not any(_ALNUM36 in ln for ln in r.lines)
+    assert gh.comments
+    assert not any(_ALNUM36 in body for _pr, _t, body in gh.comments)
+
+
+def test_llm_stage_error_does_not_claim_local_commit(monkeypatch, tmp_path):
+    def boom(kw):
+        raise HarnessError("llm-timeout", "t")
+
+    git = CiFixGit()
+    r = _run(monkeypatch, tmp_path, git, CiFixGh(), ScriptedLlm([boom]), failed=["PHPUnit"])
+    assert _has(r.lines, "stage=llm")
+    assert not _has(r.lines, "ci-fix commit is LOCAL")
+    assert git.pushes == 0

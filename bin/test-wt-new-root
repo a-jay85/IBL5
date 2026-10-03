@@ -317,6 +317,58 @@ if [ "$RC10" -ne 0 ]; then pass "case 10: exits non-zero"; else
 assert_match "case 10: error names requires a branch name" "requires a branch name" "$OUT10"
 assert_absent "case 10: no unbound variable crash" "unbound variable" "$OUT10"
 
+echo "== case 11: CLAUDE_CODE_SESSION_ID set — session marker written with exact content"
+# wt-new fails later materializing config (no real ibl5 tree); the marker is written
+# right after `worktree add`, so it is asserted on disk regardless.
+ENV11="$(new_env)"
+env CLAUDE_CODE_SESSION_ID="sess-abc-123" "$ENV11/IBL5/bin/wt-new" marker >/dev/null 2>&1 || true
+GITDIR11="$(git -C "$ENV11/IBL5-worktrees/marker" rev-parse --absolute-git-dir 2>/dev/null)"
+if [ -n "$GITDIR11" ] && [ -f "$GITDIR11/wt-new-session" ]; then
+    pass "case 11: wt-new-session marker exists in the worktree's git dir"
+    assert_eq "case 11: marker content is the session id" \
+        "sess-abc-123" "$(cat "$GITDIR11/wt-new-session")"
+    assert_eq "case 11: marker is exactly one line" \
+        "1" "$(wc -l < "$GITDIR11/wt-new-session" | tr -d ' ')"
+else
+    failcase "case 11: wt-new-session marker missing (git dir: '$GITDIR11')"
+fi
+
+echo "== case 12: CLAUDE_CODE_SESSION_ID empty — no marker written"
+ENV12="$(new_env)"
+env CLAUDE_CODE_SESSION_ID="" "$ENV12/IBL5/bin/wt-new" marker >/dev/null 2>&1 || true
+GITDIR12="$(git -C "$ENV12/IBL5-worktrees/marker" rev-parse --absolute-git-dir 2>/dev/null)"
+if [ -z "$GITDIR12" ]; then
+    failcase "case 12: worktree was not created"
+elif [ -e "$GITDIR12/wt-new-session" ]; then
+    failcase "case 12: marker must not exist when the var is empty"
+else
+    pass "case 12: no marker when the var is empty"
+fi
+
+echo "== case 13: CLAUDE_CODE_SESSION_ID unset — no marker written"
+ENV13="$(new_env)"
+env -u CLAUDE_CODE_SESSION_ID "$ENV13/IBL5/bin/wt-new" marker >/dev/null 2>&1 || true
+GITDIR13="$(git -C "$ENV13/IBL5-worktrees/marker" rev-parse --absolute-git-dir 2>/dev/null)"
+if [ -z "$GITDIR13" ]; then
+    failcase "case 13: worktree was not created"
+elif [ -e "$GITDIR13/wt-new-session" ]; then
+    failcase "case 13: marker must not exist when the var is unset"
+else
+    pass "case 13: no marker when the var is unset"
+fi
+
+echo "== case 14: --existing with the var set — no marker (branch can carry earlier work)"
+ENV14="$(new_env_base_branch)"
+env CLAUDE_CODE_SESSION_ID="sess-abc-123" "$ENV14/IBL5/bin/wt-new" --existing feature-a >/dev/null 2>&1 || true
+GITDIR14="$(git -C "$ENV14/IBL5-worktrees/feature-a" rev-parse --absolute-git-dir 2>/dev/null)"
+if [ -z "$GITDIR14" ]; then
+    failcase "case 14: --existing worktree was not created"
+elif [ -e "$GITDIR14/wt-new-session" ]; then
+    failcase "case 14: --existing must not write the marker"
+else
+    pass "case 14: --existing writes no marker"
+fi
+
 echo "----"
 if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "FAILURES"; fi
 exit "$FAILED"

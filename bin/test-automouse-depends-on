@@ -720,6 +720,82 @@ want "P1: breaker reason names the sub-minute exit" "$LOGTXT_P1" "postplan exite
 want "P1: breaker names the refund-and-stop decision" \
     "$LOGTXT_P1" "Refunding attempt, stopping loop"
 
+# P2 — post-plan-now exits 1 past the viability floor: a genuine plan failure.
+# A second runner copy pins MIN_VIABLE_SECS=0 so the breaker's duration arm
+# cannot fire; the shared $E2_RUNNER stays untouched for V1-V5. Its PATH puts
+# $E2_STUB_SF first: the same claude stub plus a gh stub that prints nothing
+# (no PR), so terminal disposition never reaches the real GitHub CLI.
+# `plan ppslow` is single-plan mode: one attempt, then break before the
+# between-plans canary.
+E2_STUB_SF="$E2_ROOT/stub-sf"
+E2_GH_SF_ARGS="$E2_ROOT/gh-sf.args"
+mkdir -p "$E2_STUB_SF"
+ln -sf "$E2_STUB/claude" "$E2_STUB_SF/claude"
+cat > "$E2_STUB_SF/gh" <<GHSF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$E2_GH_SF_ARGS"
+exit 0
+GHSF
+chmod +x "$E2_STUB_SF/gh"
+E2_RUNNER_SF="$E2_NDIR/run-slowfail"
+sed \
+    -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$E2_NDIR\"#" \
+    -e "s#^REPO=.*#REPO=\"$REPO_ROOT\"#" \
+    -e "s#^export PATH=.*#export PATH=\"$E2_STUB_SF:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
+    -e "s#^MIN_VIABLE_SECS=[0-9][0-9]*#MIN_VIABLE_SECS=0#" \
+    "$REPO_ROOT/bin/automouse/run" > "$E2_RUNNER_SF"
+chmod +x "$E2_RUNNER_SF"
+assert_eq "P2: slow-fail runner copy pins MIN_VIABLE_SECS=0" \
+    "$(grep -c '^MIN_VIABLE_SECS=0' "$E2_RUNNER_SF")" "1"
+
+reset_e2_clean
+: > "$E2_GH_SF_ARGS"
+echo fail > "$E2_ROOT/pp.mode"
+write_e2_plan "ppslow"
+GH="$E2_GH" NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
+CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+timeout 30 "$E2_RUNNER_SF" plan ppslow > /dev/null 2>&1 || true
+LOGTXT_P2="$(e2_logtxt)"
+if grep -q 'ppslow.md postplan-fail' "$E2_TRACE" 2>/dev/null; then
+    ok "P2: runner reached postplan and the stub took its fail branch"
+else
+    fail "P2: post-plan-now fail branch never ran (trace: $(cat "$E2_TRACE" 2>/dev/null); gh calls: $(cat "$E2_GH_SF_ARGS" 2>/dev/null))"
+fi
+assert_eq "P2: post-plan-now invoked exactly once (single-plan mode, no retry)" \
+    "$(grep -c 'ppslow.md postplan-fail' "$E2_TRACE" 2>/dev/null)" "1"
+assert_present "P2: genuine failure → plan stays in queue/ for retry" "$E2_NDIR/queue/ppslow.md"
+assert_absent  "P2: genuine failure → plan NOT filed to done/" "$E2_NDIR/done/ppslow.md"
+assert_absent  "P2: genuine failure → plan NOT moved to skipped/" "$E2_NDIR/skipped/ppslow.md"
+# The runner clears .attempts when impl writes its handoff (run:2204), before
+# postplan starts, so a postplan failure leaves no counter. The env-stop report
+# and Environmental line below are what separate this path from the breaker.
+assert_absent  "P2: genuine failure → impl-success reset left no .attempts counter" \
+    "$E2_NDIR/queue/ppslow.md.attempts"
+P2_REPORT="$(ls "$E2_NDIR/reports"/*-env-stop-*ppslow*.md 2>/dev/null | head -1)"
+if [ -z "$P2_REPORT" ]; then
+    ok "P2: no env-stop report for a genuine failure"
+else
+    fail "P2: env-stop report written for a genuine failure: $P2_REPORT"
+fi
+want "P2: log records the non-zero post-plan exit" \
+    "$LOGTXT_P2" "post-plan-now exited code=1 (postplan phase)"
+case "$LOGTXT_P2" in
+    *"Environmental failure during postplan"*)
+        fail "P2: genuine failure misclassified as Environmental failure during postplan" ;;
+    *)  ok "P2: no Environmental failure during postplan line" ;;
+esac
+want "P2: terminal disposition queried PR state via the stub gh (pr list --head)" \
+    "$(cat "$E2_GH_SF_ARGS" 2>/dev/null)" "pr list --head"
+
+# P3 — invocation 2 over P2's real output (no hand-built state): a plan that
+# depends on the failed plan must stay held. ppslow is still in queue/, not
+# done/, so the resolver answers unmet without any gh call.
+write_e2_plan "ppdep" "depends_on: ppslow"
+GOT_P3="$( export NIGHTLY_DIR="$E2_NDIR" GH="$E2_GH"
+           . "$REPO_ROOT/bin/lib/plan-depends-on"
+           plan_depends_on_status "$E2_NDIR/queue/ppdep.md" )"
+assert_eq "P3: dependent of a failed post-plan resolves unmet:ppslow" "$GOT_P3" "unmet:ppslow"
+
 # ── Final summary ─────────────────────────────────────────────────────────────
 
 echo ""

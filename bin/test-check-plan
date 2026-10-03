@@ -1195,6 +1195,117 @@ no-assertions: mechanical rename, no matrix rows
 ````
 '
 
+# (E4b) A "- no-assertions: <reason>" list item clears gate E (faprep-xss-fix.md shape).
+assert "gateE-no-assertions-bullet-clears" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- no-assertions: mechanical rename, no matrix rows
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4c) An indented "<!-- no-assertions: <reason> -->" clears gate E (trim-plan-hold-criteria-lore.md shape).
+assert "gateE-no-assertions-html-comment-clears" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+  <!-- no-assertions: mechanical rename, no matrix rows -->
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4d) A backticked "- \`no-assertions: <reason>\`" list item clears gate E.
+assert "gateE-no-assertions-backtick-clears" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- `no-assertions: mechanical rename, no matrix rows`
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4e) A mid-sentence prose mention of the marker does NOT clear gate E (#947).
+assert "gateE-no-assertions-prose-midsentence-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+We chose not to use no-assertions: here, so list them later.
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4f) A prose mention inside another packet field does NOT clear gate E (#947 live repro).
+assert "gateE-no-assertions-prose-in-bullet-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate; we chose not to use no-assertions: here, so list them later
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4g) A bare marker with no reason does NOT clear gate E.
+assert "gateE-no-assertions-empty-reason-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+no-assertions:
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4h) An HTML-comment marker whose only "reason" is the closing --> does NOT clear gate E.
+assert "gateE-no-assertions-empty-comment-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+<!-- no-assertions: -->
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
 # (E5) Gate E is NOT impl_model-gated: an OPUS plan with a packet missing
 # **Assertions:** still exits 1. Proves gate E runs for all plans.
 assert "gateE-opus-plan-still-gated" 1 "$TFM$M"'
@@ -2347,6 +2458,42 @@ assert_viol "gateY-share-over-third-fires" 1 '[Y]' "$FM$YHDR"'
 assert_viol "gateY-all-tagged-fires" 1 '[Y]' "$FM$YHDR"'
 | 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
 | 2 | prints `appeared=0` (one-time-check: one-shot counterfactual mutation run at plan time) | CLI-executable | post-impl | `bin/y` |
+'
+
+# ---------------------------------------------------------------------------
+# Gate [ND] fixtures (4 cases)
+# ---------------------------------------------------------------------------
+# Marker with a 15+ character reason inside a phase body: the honored shape.
+assert_viol "nd-valid-marker-passes" 0 '[ND]' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Queue the parked plan
+
+**No diff:** queues the parked plan after merge
+'
+# Reason under 15 characters: the harness ignores it, so the gate fires.
+assert_viol "nd-short-reason-fails" 1 '[ND]' "$FM"'
+## Phase 1: Queue the parked plan
+
+**No diff:** later
+'
+# Marker under a non-phase heading: the harness never reads it.
+assert_viol "nd-outside-phase-fails" 1 '[ND]' "$FM"'
+## Context
+
+**No diff:** queues the parked plan after merge
+'
+# A code-span mention does not start the line, so it is not a marker.
+assert_viol "nd-code-span-mention-passes" 0 '[ND]' "$FM_OPUS$CF_MATRIX"'
+## Context
+
+A phase can carry `**No diff:** x` to opt out of the omission check.
+'
+# A marker inside a fenced block is stripped before the gate reads $GATEP_BODY.
+assert_viol "nd-fenced-marker-ignored-passes" 0 '[ND]' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Queue the parked plan
+
+```
+**No diff:** queues the parked plan after merge
+```
 '
 
 # ---------------------------------------------------------------------------

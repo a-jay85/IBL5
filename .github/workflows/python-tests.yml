@@ -13,6 +13,8 @@ on:
       - 'bin/lib/usage-gate.sh'
       - 'bin/normalize-manual-testing'
       - 'bin/lib/pr-sticky.sh'
+      - 'bin/check-*'
+      - 'bin/gate-backtest'
   push:
     branches: [master]
     paths:
@@ -22,6 +24,8 @@ on:
       - 'bin/lib/usage-gate.sh'
       - 'bin/normalize-manual-testing'
       - 'bin/lib/pr-sticky.sh'
+      - 'bin/check-*'
+      - 'bin/gate-backtest'
 
 permissions:
   contents: read

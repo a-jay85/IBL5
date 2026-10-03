@@ -83,7 +83,8 @@ GO_OK = re.compile(r"^ok\s|\bPASS\b|coverage", re.M)
 E2E_FAIL = re.compile(r"\b\d+ failed\b|Error:|timed out", re.I)
 E2E_OK = re.compile(r"\b\d+ passed\b", re.I)
 E2E_NONE = re.compile(r"No E2E tests map|^\s*$")
-SHELLCHECK_OK = re.compile(r"Checking \d+ shell scripts")
+# A clean shellcheck prints nothing, so LiveVerify stores "" (whitespace-only).
+SHELLCHECK_OK = re.compile(r"Checking \d+ shell scripts|^\s*$")
 SHELLCHECK_FAIL = re.compile(r"In .+ line \d+:|SC\d+")
 
 

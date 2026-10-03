@@ -79,8 +79,12 @@ cat > "$STUBBIN/docker" << 'DOCKERSTUB'
 # TSV fixture rows (tab-separated):
 #   project  <name>                             — compose project names (pass-1 stream)
 #   workdir  <project>  <path>                 — working_dir for hole-1 check
-#   unlabeled  <compose-label>  <id>  <name>   — pass-5 stream row (label may be empty)
+#   unlabeled  <compose-label>  <id>  <name>  [status]
+#                                              — pass-5 stream row (label may be empty);
+#                                                status defaults to exited; listed only if
+#                                                it matches a --filter status=<s> arg
 #   created  <id>  <iso8601>                   — docker inspect Created value
+#   inspectfail  <id>                          — docker inspect exits 1 for this id
 #   image    <name>                             — orphaned image name
 #   vol      <name>                             — orphaned volume name
 [ -z "$DOCKER_FIXTURE" ] && exit 0
@@ -89,11 +93,15 @@ if [[ "$args" == *'com.docker.compose.project.working_dir'* ]]; then
     project=$(printf '%s' "$args" | grep -oE 'project=[^"[:space:]]+' | tail -1 | cut -d= -f2)
     awk -F'\t' -v k="workdir" -v p="$project" '$1==k && $2==p {print $3}' "$DOCKER_FIXTURE"
 elif [[ "$args" == *'com.docker.compose.project'* && "$args" == *'status=created'* ]]; then
-    awk -F'\t' '$1=="unlabeled" {printf "%s\t%s\t%s\n",$2,$3,$4}' "$DOCKER_FIXTURE"
+    _sf=" $(printf '%s' "$args" | grep -oE 'status=[a-z]+' | cut -d= -f2 | tr '\n' ' ')"
+    awk -F'\t' -v sf="$_sf" '$1=="unlabeled" { st = ($5=="" ? "exited" : $5); if (index(sf, " " st " ")) printf "%s\t%s\t%s\n",$2,$3,$4 }' "$DOCKER_FIXTURE"
 elif [[ "$args" == *'com.docker.compose.project'* ]]; then
     awk -F'\t' '$1=="project" {print $2}' "$DOCKER_FIXTURE"
 elif [[ "$args" == *inspect* && "$args" == *Created* ]]; then
     for _cid; do true; done
+    if awk -F'\t' -v c="$_cid" '$1=="inspectfail" && $2==c {f=1} END{exit !f}' "$DOCKER_FIXTURE"; then
+        exit 1
+    fi
     awk -F'\t' -v k="created" -v c="$_cid" '$1==k && $2==c {print $3}' "$DOCKER_FIXTURE"
 elif [[ "$args" == *images* ]]; then
     awk -F'\t' '$1=="image" {print $2}' "$DOCKER_FIXTURE"
@@ -785,6 +793,33 @@ printf 'created\tdef456abc123def4\t%s\n' "$_recent_ts" >> "$_fx_hole2_recent"
 out="$(run_cleanup_docker "$e" "$_fx_hole2_recent")"
 assert_absent "hole2-recent-unlabeled-spared" \
     'WOULD remove stale unlabeled container: recent-orphan' "$out"
+
+# Failed docker inspect on one container skips just it: the run completes,
+# the next container is still evaluated, and later passes (sixth) still run.
+_fx_hole2_ifail="$TMP/docker-hole2-ifail.tsv"
+printf 'unlabeled\t\tbad000000000000a\tinspect-fails\n' > "$_fx_hole2_ifail"
+printf 'unlabeled\t\tabc123def456abc1\torphan-sim\n' >> "$_fx_hole2_ifail"
+printf 'inspectfail\tbad000000000000a\n' >> "$_fx_hole2_ifail"
+printf 'created\tabc123def456abc1\t2026-07-01T00:00:00.000000000Z\n' >> "$_fx_hole2_ifail"
+out="$(run_cleanup_docker "$e" "$_fx_hole2_ifail")"
+assert_match "hole2-inspect-fail-run-continues" \
+    'WOULD remove stale unlabeled container: orphan-sim' "$out"
+assert_absent "hole2-inspect-fail-container-skipped" \
+    'inspect-fails' "$out"
+assert_match "hole2-inspect-fail-reaches-sixth-pass" 'build cache' "$out"
+
+# Running unlabeled container, old enough to be stale, is spared: the stub only
+# lists it if cleanup's --filter status=... args include "running" (C3).
+_fx_hole2_running="$TMP/docker-hole2-running.tsv"
+printf 'unlabeled\t\trun000000000000a1\trunning-orphan\trunning\n' > "$_fx_hole2_running"
+printf 'unlabeled\t\tabc123def456abc1\torphan-sim\n' >> "$_fx_hole2_running"
+printf 'created\trun000000000000a1\t2026-07-01T00:00:00.000000000Z\n' >> "$_fx_hole2_running"
+printf 'created\tabc123def456abc1\t2026-07-01T00:00:00.000000000Z\n' >> "$_fx_hole2_running"
+out="$(run_cleanup_docker "$e" "$_fx_hole2_running")"
+assert_match "hole2-running-control-exited-caught" \
+    'WOULD remove stale unlabeled container: orphan-sim' "$out"
+assert_absent "hole2-running-unlabeled-spared" \
+    'running-orphan' "$out"
 
 # Container with compose label "ibl5" (main stack member) is spared — label
 # is non-empty so pass 5 skips it via [ -n "$_proj" ] && continue.

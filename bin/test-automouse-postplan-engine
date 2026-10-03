@@ -557,6 +557,7 @@ rm -rf "$SB"
 rc3_sandbox 1 no
 set_runner_state
 run_span "trap record_lock EXIT"$'\n'"$PP_TERMINAL_SPAN"
+assert_eq "$(yn test -e "$PP_START_MARKER")" "yes" "row 12i: rc=1 leaves PP_START_MARKER"
 assert_eq "$(yn test -d "$SB/claim.lock")" "yes" "row 12i: rc=1 leaves the CURRENT_LOCK dir"
 assert_eq "$(cat "$SB/lock-var")" "$SB/claim.lock" "row 12i: rc=1 leaves CURRENT_LOCK set"
 rm -rf "$SB"

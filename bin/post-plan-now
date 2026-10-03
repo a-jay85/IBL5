@@ -465,8 +465,11 @@ if [ "${FORCE:-0}" -eq 0 ]; then
   fi
 fi
 
-# Nothing to ship? Clean tree AND no commits ahead of origin/master.
+# Nothing to ship? Clean tree AND no untracked files AND no commits ahead of origin/master.
+# `git diff` ignores untracked files, so a tree whose only change is a new file needs its
+# own check.
 if git diff --quiet && git diff --cached --quiet \
+   && [ -z "$(git ls-files --others --exclude-standard)" ] \
    && [ -z "$(git log --oneline origin/master..HEAD 2>/dev/null)" ]; then
     echo "post-plan-now: nothing to do — clean tree and no commits ahead of master." >&2
     exit 1

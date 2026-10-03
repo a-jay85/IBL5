@@ -15,6 +15,11 @@ BD_LABEL_BLOCKED="blocked"
 BD_LABEL_OUT_OF_REPO="out-of-repo"
 BD_SKIP_LABELS_JSON='["blocked","out-of-repo"]'
 BD_RANKS='^P[1-4]$'
+# Live-item predicate over a jq -s slurp of ledgers. A live item holds its unit
+# and its paths. Closed-fixed and merged items are settled, and so is a skip
+# with no ad-hoc route. A failed ad-hoc item (route=ad-hoc, status=skipped)
+# stays live. Shared by bd_cmd_burndown (--after) and bd_cmd_prompt.
+BD_LIVE_DEF='[.[].items[] | select(.status != "closed-fixed" and .status != "merged" and ((.status == "skipped" and .route != "ad-hoc") | not))]'
 
 bd_die() {
     local code="$1"; shift
@@ -111,6 +116,7 @@ bd_cmd_delta() {
     out="$(jq -c \
         --arg report "$BD_REPORT" \
         --arg since "$BD_SINCE" \
+        --arg tsv "$BD_REPORT_TSV" \
         --argjson ranked "$ranked_json" \
         --argjson skip "$BD_SKIP_LABELS_JSON" \
         'def skiplabeled($s): any((.labels // [])[]; .name as $l | any($s[]; . == $l));
@@ -123,7 +129,12 @@ bd_cmd_delta() {
                 | sort_by(.number)
                 | [.[] | {number: .number, title: .title, url: .url, updatedAt: .updatedAt, body: (.body // "" | .[0:1500])}]
             ),
-            dropped: ($ranked - [.[].number])
+            dropped: ($ranked - [.[].number]),
+            calibration: (
+                [$tsv | split("\n")[] | select(length > 0) | split("\t")] as $rows
+                | reduce ("P1","P2","P3","P4") as $r ({};
+                    .[$r] = ([$rows[] | select(.[1] == $r) | .[2:] | join("\t")] | .[0:5]))
+            )
         }' "$issues_file")"
     rm -f "$issues_file"
     local k
@@ -429,9 +440,7 @@ bd_cmd_burndown() {
             --after)
                 if [ $# -lt 2 ]; then bd_die 2 "--after wants a ledger path"; fi
                 shift
-                [ -f "$1" ] || bd_die 2 "--after ledger $1 does not exist"
-                jq -e '.items | type == "array"' "$1" >/dev/null 2>&1 || \
-                    bd_die 3 "malformed ledger $(basename "$1")"
+                bd_check_after_ledger "$1"
                 afters="${afters}${1}"$'\n'
                 shift
                 ;;
@@ -475,7 +484,7 @@ bd_cmd_burndown() {
         while IFS= read -r _af; do
             [ -z "$_af" ] || after_files+=("$_af")
         done <<< "$afters"
-        local live_def='[.[].items[] | select(.status != "closed-fixed" and .status != "merged" and ((.status == "skipped" and .route != "ad-hoc") | not))]'
+        local live_def="$BD_LIVE_DEF"
         local live_cost _xn _hp _hn
         live_cost="$(jq -s "$live_def"' | map(.cost // 0) | add // 0' "${after_files[@]}")" \
             || bd_die 3 "cannot read --after ledgers"
@@ -907,6 +916,13 @@ bd_validate_skip_args() {
     fi
 }
 
+# bd_check_after_ledger <path> — one --after ledger: absent → 2, malformed → 3
+bd_check_after_ledger() {
+    [ -f "$1" ] || bd_die 2 "--after ledger $1 does not exist"
+    jq -e '.items | type == "array"' "$1" >/dev/null 2>&1 || \
+        bd_die 3 "malformed ledger $(basename "$1")"
+}
+
 bd_cmd_record() {
     if [ $# -lt 3 ]; then
         bd_die 2 "burndown-record wants <ledger> <issue> key=value..."
@@ -984,6 +1000,77 @@ bd_cmd_record() {
     bd_record_apply "$ledger" "$issue_num" "$patch"
     printf 'recorded #%s:%s\n' "$issue_num" "$applied_keys"
     [ -z "$reason" ] || bd_apply_skip_label "$issue_num" "$reason" "$blocked_by"
+}
+
+# bd_arch_for_tier <tier> — ledger .tier → the /plan Step 3 architect def
+bd_arch_for_tier() {
+    case "$1" in
+        xhigh)  echo "plan-architect-xhigh" ;;
+        sonnet) echo "plan-architect-sonnet" ;;
+        *)      echo "plan-architect" ;;
+    esac
+}
+
+bd_cmd_prompt() {
+    [ $# -ge 3 ] || bd_die 2 "burndown-prompt wants <ledger> <issue> <slug> [--after <ledger>]... [--evidence <file>]"
+    local ledger="$1" issue_num="$2" slug="$3"; shift 3
+    { [ -f "$ledger" ] && jq -e '.items | type=="array"' "$ledger" >/dev/null 2>&1; } \
+        || bd_die 3 "malformed or missing ledger $ledger"
+    [[ "$issue_num" =~ ^[0-9]+$ ]] || bd_die 2 "issue $issue_num is not a number"
+    jq -e --argjson n "$issue_num" 'any(.items[]; .issue_num == $n)' "$ledger" \
+        >/dev/null 2>&1 || bd_die 2 "no item #$issue_num in $ledger"
+    [[ "$slug" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]] \
+        || bd_die 2 "slug=$slug rejected: must match ^[a-z0-9][a-z0-9-]{0,62}\$"
+    local ledgers=("$ledger") evidence=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --after)
+                [ $# -ge 2 ] || bd_die 2 "--after wants a ledger path"
+                bd_check_after_ledger "$2"; ledgers+=("$2"); shift 2 ;;
+            --evidence)
+                [ $# -ge 2 ] || bd_die 2 "--evidence wants a file path"
+                [ -f "$2" ] || bd_die 2 "--evidence file $2 does not exist"
+                evidence="$2"; shift 2 ;;
+            *) bd_die 2 "unknown argument $1" ;;
+        esac
+    done
+    local item title arch pointers held closes
+    item="$(jq -c --argjson n "$issue_num" '[.items[] | select(.issue_num == $n)][0]' "$ledger")" \
+        || bd_die 3 "cannot read $ledger"
+    title="$(jq -r '.issue_title // ""' <<< "$item")"
+    arch="$(bd_arch_for_tier "$(jq -r '.tier // "default"' <<< "$item")")"
+    pointers="$(jq -r '(.paths // [])[] | "- `\(.)`: file the issue cites (path ref recorded at selection)."' <<< "$item")"
+    held="$(jq -s -r --argjson n "$issue_num" "$BD_LIVE_DEF"' | [.[] | select(.issue_num != $n) | (.paths // [])[]] | unique | map("`" + . + "`") | join(", ")' "${ledgers[@]}")" \
+        || bd_die 3 "cannot read ledgers"
+    closes="$(jq -r '[.issue_num] + (.also_closes // []) | map("`closes a-jay85/IBL5-backlog#\(.)`") | join(" and ")' <<< "$item")"
+
+    printf '/plan Resolve a-jay85/IBL5-backlog#%s (%s). Read the issue first with `gh issue view %s -R a-jay85/IBL5-backlog`.\n\n' "$issue_num" "$title" "$issue_num"
+    printf -- '- Branch slug: `%s`. Base: `master`.\n- Step 3 MUST route to %s.\n' "$slug" "$arch"
+    if [ -n "$pointers" ]; then printf '\n## Exploration pointers\n%s\n' "$pointers"; fi
+    if [ -n "$evidence" ] && grep -q '[^[:space:]]' "$evidence"; then
+        printf '\n## Liveness evidence\n'; cat "$evidence"; printf '\n'
+    fi
+    printf '\n## Hard constraints\n'
+    printf -- "- Verify the issue's premise with a real scan or run before designing.\n"
+    printf -- '- Resolve migration numbers at implement time.\n- Base on master.\n'
+    if [ -n "$held" ]; then
+        printf -- '- Do not touch these files held by other batch items: %s.\n' "$held"
+    else
+        printf -- '- No other batch item holds files.\n'
+    fi
+    printf -- '- Emit `## Backlog issues` with %s.\n' "$closes"
+    printf -- '- A parser or gate change carries a corpus diff in its verification.\n'
+}
+
+# bd_cmd_launch — exec the /burndown orchestrator pinned to Sonnet 5.5.
+# A skill's frontmatter model: does not switch the model; --model does.
+bd_cmd_launch() {
+    [ $# -eq 0 ] || bd_die 2 "burndown-launch takes no arguments"
+    local cl="${BURNDOWN_CLAUDE:-claude}"
+    command -v "$cl" >/dev/null 2>&1 || bd_die 3 "$cl not found on PATH"
+    # exec skips the EXIT trap bd_init set, so drop BD_TMP first
+    rm -rf "$BD_TMP"; trap - EXIT
+    exec "$cl" --model claude-sonnet-5-5 "/burndown"
 }
 
 bd_cmd_refresh() {
@@ -1412,10 +1499,12 @@ bd_main() {
         burndown-refresh)      bd_cmd_refresh      "$@" ;;
         burndown)              bd_cmd_burndown     "$@" ;;
         burndown-record)       bd_cmd_record       "$@" ;;
+        burndown-prompt)       bd_cmd_prompt       "$@" ;;
         burndown-tag)          bd_cmd_tag          "$@" ;;
         burndown-status)       bd_cmd_status       "$@" ;;
         burndown-close-merged) bd_cmd_close_merged "$@" ;;
         burndown-sweep)        bd_cmd_sweep        "$@" ;;
+        burndown-launch)       bd_cmd_launch       "$@" ;;
         *)                     bd_die 2 "unknown burndown subcommand: $cmd" ;;
     esac
 }

@@ -67,13 +67,13 @@ class ApiTeamRepositoryTest extends DatabaseTestCase
     {
         $page1 = new Paginator(
             ['page' => '1', 'per_page' => '10'],
-            'teamid',
-            ['teamid'],
+            'team_name',
+            ['team_name'],
         );
         $page2 = new Paginator(
             ['page' => '2', 'per_page' => '10'],
-            'teamid',
-            ['teamid'],
+            'team_name',
+            ['team_name'],
         );
 
         $teams1 = $this->repo->getTeams($page1);
@@ -104,8 +104,8 @@ class ApiTeamRepositoryTest extends DatabaseTestCase
         // Get a known UUID from the first team
         $paginator = new Paginator(
             ['page' => '1', 'per_page' => '1'],
-            'teamid',
-            ['teamid'],
+            'team_name',
+            ['team_name'],
         );
         $teams = $this->repo->getTeams($paginator);
         self::assertNotEmpty($teams);

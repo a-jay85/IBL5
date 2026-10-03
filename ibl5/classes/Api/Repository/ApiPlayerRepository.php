@@ -11,6 +11,15 @@ use Api\Pagination\Paginator;
  */
 class ApiPlayerRepository extends \BaseMysqliRepository
 {
+    /** Public API sort key => SQL column. The controller's allowlist is array_keys() of this map. */
+    public const SORT_COLUMNS = [
+        'name' => 'name',
+        'age' => 'age',
+        'position' => 'position',
+        'points_per_game' => 'points_per_game',
+        'experience' => 'experience',
+    ];
+
     /**
      * Get paginated list of players from the API view.
      *
@@ -42,10 +51,12 @@ class ApiPlayerRepository extends \BaseMysqliRepository
         }
 
         $whereClause = $where !== [] ? 'WHERE ' . implode(' AND ', $where) : '';
-        $orderBy = $paginator->getOrderByClause();
+        $sortColumn = self::SORT_COLUMNS[$paginator->getSort()]
+            ?? throw new \InvalidArgumentException('Invalid sort column: ' . $paginator->getSort());
+        $direction = $paginator->getOrder() === 'desc' ? 'DESC' : 'ASC';
 
-        // IDENTIFIER (already-validated): $whereClause = hardcoded fragments; $orderBy = allowlist-validated by Paginator
-        $query = 'SELECT * FROM vw_player_current ' . $whereClause . ' ORDER BY ' . $orderBy . ' LIMIT ? OFFSET ?';
+        // IDENTIFIER: $whereClause = hardcoded fragments; $sortColumn = SORT_COLUMNS map value; $direction = literal ternary
+        $query = 'SELECT * FROM vw_player_current ' . $whereClause . ' ORDER BY ' . $sortColumn . ' ' . $direction . ' LIMIT ? OFFSET ?';
         $types .= 'ii';
         $params[] = $paginator->getLimit();
         $params[] = $paginator->getOffset();

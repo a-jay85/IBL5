@@ -991,6 +991,7 @@ jobs:
             bin/test-usage-gate \
             bin/test-plan-index \
             bin/test-post-plan-now-pr-creates-worktree \
+            bin/test-post-plan-now-untracked-only \
             bin/test-review-shared-skip \
             bin/test-pr-cycle \
             bin/test-digest-dm-build \

@@ -20,14 +20,12 @@ class PlayerListController implements ControllerInterface
         $this->repo = $repo;
     }
 
-    private const ALLOWED_SORT_COLUMNS = ['name', 'age', 'position', 'points_per_game', 'experience'];
-
     /**
      * @see ControllerInterface::handle()
      */
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
-        $paginator = new Paginator($query, 'name', self::ALLOWED_SORT_COLUMNS);
+        $paginator = new Paginator($query, 'name', array_keys(ApiPlayerRepository::SORT_COLUMNS));
         $repo = $this->repo;
         $transformer = new PlayerTransformer();
         $etag = new ETagHandler();

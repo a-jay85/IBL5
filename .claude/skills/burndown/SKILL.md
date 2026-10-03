@@ -1,7 +1,7 @@
 ---
 name: burndown
 description: Run an automatic backlog burn-down: rank new issues, pick 5 units (backfilling freed units with further selection rounds), route each item to a plan or an ad-hoc worktree, and start it.
-last_verified: 2026-10-02
+last_verified: 2026-10-03
 ---
 
 # /burndown
@@ -22,6 +22,13 @@ candidate fits the last unit.
 | 3 | fail-closed abort (missing report, gh/git/jq failure, HOME unset, missing or malformed ledger) |
 
 ## Steps
+
+**Preflight (model).** This run belongs on Sonnet 5.5. A session on any other model,
+Opus included, stops here and tells the user to start the run with
+`bin/backlog burndown-launch`, which opens `claude --model claude-sonnet-5-5 "/burndown"`
+in the current directory. Continue on another model only when the user says to run it
+here anyway. A skill's frontmatter `model:` does not switch the session model, so the
+launcher is the pin.
 
 State between bash blocks persists through `${TMPDIR:-/tmp}/burndown-run/`. Create
 that directory at the start and remove it at the end.
@@ -52,10 +59,11 @@ run a full backlog triage first, then re-run `/burndown`. Never guess ranks.
 
 **2. Rank (judgment).** Read `$W/delta.json`. If `.issues` is empty, skip to step 3.
 
-Otherwise read five lines from each `## P<N>` section of the current triage report as
-calibration context, then rank every delta issue into a ranks file at
-`$W/ranks.md` using `## P<N>` headings and lines shaped like the report's own
-(e.g. `- [#42](url) Title — reason`). <!-- slop-ok -->
+Otherwise read `.calibration` from `$W/delta.json` as calibration context. It holds the
+first five item lines of each `## P<N>` section of the current triage report, and an
+empty section shows as `[]`. Do not open the report itself. Then rank every delta issue
+into a ranks file at `$W/ranks.md` using `## P<N>` headings and lines shaped like the
+report's own (e.g. `- [#42](url) Title — reason`). <!-- slop-ok -->
 
 ```bash
 bin/backlog burndown-refresh "$W/ranks.md"
@@ -71,8 +79,15 @@ nothing.
 **4. Select.** Run the selection:
 
 ```bash
-bin/backlog burndown [--pair A,B]... | tee "$W/select.txt"
+W="${TMPDIR:-/tmp}/burndown-run"
+bin/backlog burndown [--pair A,B]... > "$W/select.txt"; rc=$?
+grep -E '^SKIP|^LEDGER:' "$W/select.txt"; echo "exit $rc"
 ```
+
+The full output stays in `$W/select.txt`. Only `SKIP` rows and the `LEDGER:` line reach
+the transcript. The redirect keeps `rc`, so exit 3 stops the run with stderr shown to
+the user. A pipe into `tee` or `grep` would report that pipe's status and hide the 3.
+Stderr is left unredirected, so `cleared blocked on #N` lines still show.
 
 Parse only the final `LEDGER:` line. `LEDGER: none` on the first round means all
 delta issues are in flight or over budget. Show the SKIP rows and stop. On a later
@@ -108,22 +123,31 @@ item you cannot do gets one of three skip forms, then report why:
 A `reason=` record that exits 3 means the ledger kept the skip but the tag failed.
 Check `gh auth status`, then rerun `bin/backlog burndown-tag <n> reason=...`.
 
-**Plan route.** Pick a kebab slug. Compose the prompt exactly as
-`.claude/skills/plan-prompt/SKILL.md` does, adding this fixed constraints block:
+**Plan route.** Pick a kebab slug. Build the prompt with the script, then fire it:
 
-> Verify the issue's premise with a real scan or run before designing. Resolve
-> migration numbers at implement time. Base on master. Do not touch these files held
-> by other batch items: `<paths from every other live ledger item across all ledgers of this run>`. Emit `## Backlog
-> issues` with `closes a-jay85/IBL5-backlog#<n>` (plus each `also_closes`). A parser
-> or gate change carries a corpus diff in its verification.
+```bash
+W="${TMPDIR:-/tmp}/burndown-run"
+f="$W/prompt-<n>.md"
+bin/backlog burndown-prompt <ledger> <n> <slug> [--after <L1>]... \
+    --evidence "$W/liveness-<n>.txt" > "$f" && bin/plan-now "$f"
+```
+
+Pass every earlier ledger of this run as `--after` so the `Do not touch` list covers the
+whole batch. The script writes the task line, the branch slug, the Step 3 architect
+directive from the item's `.tier`, pointers from `.paths`, the liveness evidence, and
+the fixed constraints: verify the premise with a real scan or run, resolve migration
+numbers at implement time, base on master, do not touch the paths of every other live
+item across the given ledgers, emit `## Backlog issues` with
+`closes a-jay85/IBL5-backlog#<n>` plus each `also_closes`, and carry a corpus diff for a
+parser or gate change. Do not read `.claude/skills/plan-prompt/SKILL.md`. Exit 2 or 3
+from `burndown-prompt` stops this item: record `status=skipped` and report the stderr.
 
 An item with empty `.paths` claims no files and shares the batch like any other item.
 Its `Do not touch` list carries the paths of every other live item. No other item's
 list names it, so a collision with it surfaces as a merge conflict, fixed when the
 later PR rebases.
 
-Fire `bin/plan-now` in its default queue mode through the plan-prompt skill's fire
-step. Never start automouse early. Then:
+`bin/plan-now` runs in its default queue mode. Never start automouse early. Then:
 
 ```bash
 bin/backlog burndown-record <ledger> <n> route=plan slug=<slug> status=queued
@@ -164,8 +188,13 @@ skipped with no ad-hoc route, run the selection again. Pass every ledger of this
 far:
 
 ```bash
-bin/backlog burndown --after <L1> [--after <L2>]... [--pair A,B]... | tee -a "$W/select.txt"
+W="${TMPDIR:-/tmp}/burndown-run"
+n=$(wc -l < "$W/select.txt")
+bin/backlog burndown --after <L1> [--after <L2>]... [--pair A,B]... >> "$W/select.txt"; rc=$?
+tail -n +"$((n + 1))" "$W/select.txt" | grep -E '^SKIP|^LEDGER:'; echo "exit $rc"
 ```
+
+The `tail` prints only this round's rows, so the final `LEDGER:` line shown is this round's. Exit 3 stops the run as in step 4.
 
 Process the new ledger with step 5 again. Repeat until the output ends in
 `LEDGER: none`. The loop ends because every round either picks a new issue or returns

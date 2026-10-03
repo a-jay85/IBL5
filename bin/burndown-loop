@@ -56,6 +56,7 @@ NO_DM=0
 ONCE=0
 BATCHES=0
 ITEMS=0
+UNITS=0
 FAILS=0
 LAST_FAIL=""
 START_EPOCH=$(date +%s)
@@ -106,7 +107,9 @@ bl_uuid() {
 }
 
 bl_timeout_secs() {
-    echo $(( $(bl_posint_env IBL5_BURNDOWN_BATCH_TIMEOUT_MIN 90) * 60 ))
+    local m
+    m=$(bl_posint_env IBL5_BURNDOWN_BATCH_TIMEOUT_MIN 90) || exit 2
+    echo $((m * 60))
 }
 
 # ------------------------------------------------------------ lock
@@ -266,7 +269,8 @@ bl_run_batch() {
     NEW_LEDGERS=$(comm -13 "$STATE/ledgers.before" "$STATE/ledgers.after")
 }
 
-# bl_count_new: adds the new ledgers' items to ITEMS and bumps BATCHES; echoes units.
+# bl_count_new: adds the new ledgers' items to ITEMS, bumps BATCHES, sets UNITS.
+# Never call it in $(...): the counters would update a subshell copy.
 bl_count_new() {
     local n units=0 u f
     BATCHES=$((BATCHES + 1))
@@ -276,7 +280,7 @@ bl_count_new() {
         u=$(jq '[.items[].units_used // 0] | add // 0' "$f" 2>/dev/null || echo 0)
         units=$((units + u))
     done
-    echo "$units"
+    UNITS=$units
 }
 
 bl_on_launch() {
@@ -294,8 +298,8 @@ bl_on_launch() {
     case "$class" in
         ran)
             FAILS=0
-            units=$(bl_count_new)
-            bl_log "batch ran ledgers=$new items=$ITEMS units=$units rc=$BATCH_RC log=$BLOG"
+            bl_count_new
+            bl_log "batch ran ledgers=$new items=$ITEMS units=$UNITS rc=$BATCH_RC log=$BLOG"
             ;;
         empty)
             bl_log "supply exhausted (first round LEDGER: none)"

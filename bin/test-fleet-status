@@ -261,12 +261,15 @@ printf '%s\n' "$NIGHTLY_PID" > "$AM/queue/nightly-plan.md.lock/pid"
 printf '3\n' > "$AM/queue/nightly-plan.md.attempts"
 
 # Runner progress. Impl lines come from each runner's own per-pid log, filtered
-# to that runner's slug and phase. With per-pid logs each runner only sees its
-# own file; the old concern about the nodotmd line leaking into live-plan is now
-# structurally impossible. launchd-rearm.log is skipped by the dated-name glob.
+# to that runner's slug and phase. Per-pid logs isolate runners from each other,
+# but one runner loops over queue items, so its log still carries lines for every
+# slug it has processed. The slug filter is still load-bearing: the live-plan
+# file below ends with another slug's newer line, which a naive last-line reader
+# would show. launchd-rearm.log is skipped by the dated-name glob.
 mkdir -p "$AM/logs"
 cat > "$AM/logs/2026-09-10-$LIVE_AUTOMOUSE_PID.log" <<'AMLOG'
 [00:03:39] live-plan/impl tool: Bash (#28, turn 28)
+[00:04:10] other-loop-plan/impl tool: LOOPLEAKTOOL (#3, turn 3)
 AMLOG
 touch -t 202609100100 "$AM/logs/2026-09-10-$LIVE_AUTOMOUSE_PID.log"
 # The nodotmd runner has its own per-pid log.
@@ -646,6 +649,8 @@ assert_lacks "queue: rearm log is never read as the day log" \
     "$OUTPUT" 'REARM-NOISE'
 assert_lacks "queue: another runner's newer per-pid log is never read" \
     "$OUTPUT" 'DECOY-OTHER-RUNNER'
+assert_lacks "queue: a looping runner's other-slug log line never reaches the live row" \
+    "$OUTPUT" 'other-loop-plan|LOOPLEAKTOOL'
 IDLE_NEXT="$(grep -EA2 'idle-plan\.md +sonnet' <<< "$OUTPUT" | tail -n 2)"
 assert_lacks "queue: a queued plan has no details under it" \
     "$IDLE_NEXT" '●|pid |  log: |  audit: '

@@ -1843,13 +1843,19 @@ def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str
     Runs AFTER _body_check so an LLM-corrected body cannot drop the block, and BEFORE the
     commit so the commit body and the PR body carry it. Idempotent: an empty item list
     removes a stale block. Never raises on a plan-blind run (phase_omission_items returns
-    [] when plan.found is False). Returns the items for the caller's log line.
+    [] when plan.found is False). Returns the items for the caller's log line. Exemption
+    notes (`UNCHECKABLE-PHASE`, `NO-DIFF-PHASE`, `NO-DIFF-IGNORED`) are logged under
+    `phase2 residual-phase-exempt:` and never enter the `## Residual Phases` block or the
+    return value.
     """
-    items = conformance.phase_omission_items(plan, files)
+    notes: list[str] = []
+    items = conformance.phase_omission_items(plan, files, notes=notes)
     copy["summary_md"] = upsert_residual_phases(copy["summary_md"],
                                                 render_residual_phases(items))
     for it in items:
         log(f"phase2 residual-phase: {it}")
+    for note in notes:
+        log(f"phase2 residual-phase-exempt: {note}")
     return items
 
 

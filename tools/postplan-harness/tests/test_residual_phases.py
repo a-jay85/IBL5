@@ -6,8 +6,17 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
+
 from runner import _inject_residual_phases
+from harness import conformance
 from harness.state import PhaseInfo, PlanInfo
+
+
+@pytest.fixture(autouse=True)
+def _no_tracked_lookup(monkeypatch):
+    """These tests cite invented paths. Fail closed so each stays a repo-path candidate."""
+    monkeypatch.setattr(conformance, "_tracked_files", lambda *a, **k: None)
 
 
 def test_inject_adds_block_and_logs_when_phase_missing():

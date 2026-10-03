@@ -435,6 +435,8 @@ _PHASE_HEADING_RE = re.compile(r"^##\s+(?:Phase|Step)\s*(\d+)(?!\.\d)\b\s*[:.\-â
 _BOOKKEEPING_MARKER_RE = re.compile(r"\[phases:\s*S(\s*/\s*S)*\s*\]")
 _EXAMPLE_SUFFIX_RE = re.compile(r"^\s*\(example\)")
 _LINE_SUFFIX_RE = re.compile(r"(?::|#)L?\d+(?:-L?\d+)?$")
+NO_DIFF_MIN_REASON = 15
+_NO_DIFF_MARKER_RE = re.compile(r"^\s*(?:[-*]\s+)?\*\*No diff:\*\*[ \t]*(.*?)\s*$")
 
 
 def _phase_evidence_paths(body: str) -> list[str]:
@@ -467,7 +469,9 @@ def parse_phases(content: str) -> list[PhaseInfo]:
     of that phase and their Scope/Recipe paths count as evidence. Fenced blocks are
     stripped first. Sub-numbered headings (`## Phase 5.5:`) and h3 headings never open a
     phase. A repeated phase number merges into the first occurrence (evidence unioned) so
-    a plan with a duplicated heading yields one entry per number.
+    a plan with a duplicated heading yields one entry per number. A body line
+    `**No diff:** <reason>` of NO_DIFF_MIN_REASON or more characters sets `no_diff_reason`;
+    a shorter reason sets `no_diff_rejected` instead.
     """
     lines = _strip_fenced(content)
     phases: list[PhaseInfo] = []
@@ -502,6 +506,14 @@ def parse_phases(content: str) -> list[PhaseInfo]:
             continue
         if current is not None:
             buf.append(line)
+            nd = _NO_DIFF_MARKER_RE.match(line)
+            if nd and not current.no_diff_reason:
+                reason = nd.group(1).strip()
+                if len(reason) >= NO_DIFF_MIN_REASON:
+                    current.no_diff_reason = reason
+                    current.no_diff_rejected = False
+                else:
+                    current.no_diff_rejected = True
     _flush()
     return phases
 

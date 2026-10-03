@@ -5,6 +5,19 @@ when `POST /discordPlanReviewDM` is called by the plan drain script. Decisions a
 `data/plan-decisions.jsonl` (a sibling of `dist/`, created on first write). Read pending
 decisions with `GET /planDecisions`; drain with `POST /planDecisions/ack`.
 
+## Button set
+
+The request body may carry a `buttons` array naming which buttons to render. Each entry must
+be exactly `plan_queue_<slug>` or `plan_discard_<slug>` for the request's own `slug`.
+`bin/plan-now` sends `["plan_discard_<slug>"]` for a plan that failed `bin/check-plan`, so that
+DM shows only **Discard**. A request without the field renders both buttons. Any other value
+gets a **400** and no DM: a non-array, an empty array, a repeated entry, a non-string entry, an
+unknown verb, or another plan's slug. The bot never copies a caller string into a `custom_id`.
+It maps each accepted entry to a fixed verb and builds the button itself.
+
+When the bot later disables the row (after a press, after an outcome ack, or in the stale-decision
+sweep), it reads the set back from the message. A Discard-only DM stays Discard-only.
+
 ## One-time provisioning (after first deploy)
 
 The deploy copies only `dist/` to the VPS — it never writes `.env`. Until

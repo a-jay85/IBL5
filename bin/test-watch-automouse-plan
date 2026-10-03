@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/test-watch-automouse-plan — regression harness for bin/watch-automouse-plan.
+# Run: bin/test-watch-automouse-plan  (exit 0 = all pass, 1 = a case failed)
+#
+# The watcher derives REPO from its own path, so each case copies the script into
+# a temp tree with a stub bin/discord-dm and points AUTOMOUSE_DIR at a temp state
+# dir. Nothing touches the real queue or sends a real DM.
+#
+# no-adr: stub-driven regression harness copying the bin/test-watch-run pattern; it adds no architectural constraint and no new governance gate
+set -uo pipefail
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# WATCHER_UNDER_TEST lets the mutation checks point the harness at a mutated copy.
+SRC="${WATCHER_UNDER_TEST:-$REPO_ROOT/bin/watch-automouse-plan}"
+FAILED=0
+TMP_ROOT=$(mktemp -d); trap 'rm -rf "$TMP_ROOT"' EXIT
+pass() { printf '  ok   %s\n' "$1"; }
+fail() { printf '  FAIL %s\n' "$1"; FAILED=1; }
+want() { if grep -qF -- "$3" <<< "$2"; then pass "$1"; else fail "$1 (missing: $3)"; fi; }
+deny() { if grep -qF -- "$3" <<< "$2"; then fail "$1 (unexpected: $3)"; else pass "$1"; fi; }
+
+# make_tree <name> — fresh copied tree + automouse state dir; sets T and AM.
+make_tree() {
+    T="$TMP_ROOT/$1"; AM="$T/am"
+    mkdir -p "$T/bin" "$AM/queue" "$AM/done" "$AM/skipped" "$AM/logs"
+    cp "$SRC" "$T/bin/watch-automouse-plan"; chmod +x "$T/bin/watch-automouse-plan"
+    cat > "$T/bin/discord-dm" <<'STUB'
+#!/bin/bash
+d=$(cd "$(dirname "$0")/.." && pwd)
+printf '%s\n' "$*" > "$d/dm.args"
+cat > "$d/dm.body"
+exit "${STUB_DM_RC:-0}"
+STUB
+    chmod +x "$T/bin/discord-dm"
+}
+# run_watch <args...> — bounded run: --poll/--wait/--timeout keep a broken case from hanging.
+run_watch() {
+    OUT=$(AUTOMOUSE_DIR="$AM" "$T/bin/watch-automouse-plan" --poll 1 --wait 3 --timeout 3 "$@" 2>&1); RC=$?
+}
+# body_is <label> <expected> — compare the stub's captured DM body exactly.
+body_is() {
+    if [ -f "$T/dm.body" ] && [ "$(cat "$T/dm.body")" = "$2" ]; then pass "$1"
+    else fail "$1 (body: $(cat "$T/dm.body" 2>/dev/null || echo '<none>'))"; fi
+}
+FIRE_MSG='✅ automouse finished **s1** — plan landed in done/.'
+
+echo "== 1. fire happy path (exact body)"
+make_tree c1
+touch "$AM/done/s1.md"
+run_watch --slug s1 --force
+expected=$(printf '%s\n\n%s' "$FIRE_MSG" "log: $AM/logs/")
+[ "$RC" = 0 ] && pass "exit 0" || fail "exit 0 (got $RC)"
+body_is "exact DM body" "$expected"
+[ "$(cat "$T/dm.args" 2>/dev/null)" = "-" ] && pass "dm args are -" || fail "dm args are - (got $(cat "$T/dm.args" 2>/dev/null))"
+[ -e "$AM/.notified-s1-postplan" ] && pass "sentinel written" || fail "sentinel written"
+want "prints notified." "$OUT" "notified."
+
+echo "== 2. fire forwards --to"
+make_tree c2
+touch "$AM/done/s1.md"
+run_watch --slug s1 --force --to 123
+[ "$(cat "$T/dm.args" 2>/dev/null)" = "--to 123 -" ] && pass "dm args carry --to" || fail "dm args carry --to (got $(cat "$T/dm.args" 2>/dev/null))"
+
+echo "== 3. fire undelivered"
+make_tree c3
+touch "$AM/done/s1.md"
+OUT=$(STUB_DM_RC=1 AUTOMOUSE_DIR="$AM" "$T/bin/watch-automouse-plan" --poll 1 --wait 3 --timeout 3 --slug s1 --force 2>&1); RC=$?
+[ "$RC" = 1 ] && pass "exit 1" || fail "exit 1 (got $RC)"
+want "flags undelivered" "$OUT" "NOTIFICATION UNDELIVERED"
+want "prints the message" "$OUT" "plan landed in done/."
+[ ! -e "$AM/.notified-s1-postplan" ] && pass "no sentinel" || fail "no sentinel"
+
+echo "== 4. slug_log picks the newest matching per-runner log"
+make_tree c4
+touch "$AM/done/s1.md"
+printf '[00:01:00] s1/postplan exit: stop_reason=end_turn\n' > "$AM/logs/2026-08-18-111.log"
+printf '[00:01:00] s1/postplan exit: stop_reason=end_turn\n' > "$AM/logs/2026-08-18-222.log"
+printf '[00:01:00] s2/postplan exit: stop_reason=end_turn\n' > "$AM/logs/2026-08-18-333.log"
+printf '[00:01:00] s1/postplan exit: stop_reason=end_turn\n' > "$AM/logs/2026-08-18.log"
+touch -t 202608180100 "$AM/logs/2026-08-18-111.log"
+touch -t 202608180200 "$AM/logs/2026-08-18-222.log"
+touch -t 202608180300 "$AM/logs/2026-08-18-333.log" "$AM/logs/2026-08-18.log"
+run_watch --slug s1 --force
+[ "$(tail -n 1 "$T/dm.body" 2>/dev/null)" = "log: $AM/logs/2026-08-18-222.log" ] \
+    && pass "newest matching per-runner log linked" \
+    || fail "newest matching per-runner log linked (got $(tail -n 1 "$T/dm.body" 2>/dev/null))"
+
+echo "== 5. slug_log is phase-specific"
+make_tree c5
+touch "$AM/done/s1.md"
+printf '[00:01:00] s1/impl exit: stop_reason=end_turn\n' > "$AM/logs/2026-08-18-111.log"
+run_watch --slug s1 --force
+[ "$(tail -n 1 "$T/dm.body" 2>/dev/null)" = "log: $AM/logs/" ] \
+    && pass "other-phase log ignored, falls back to logs dir" \
+    || fail "other-phase log ignored, falls back to logs dir (got $(tail -n 1 "$T/dm.body" 2>/dev/null))"
+
+echo "== 6. slug_log fallback with an empty logs dir"
+make_tree c6
+touch "$AM/done/s1.md"
+run_watch --slug s1 --force
+want "fallback names the logs dir" "$(cat "$T/dm.body" 2>/dev/null)" "log: $AM/logs/"
+
+echo "== 7. sentinel short-circuit"
+make_tree c7
+date > "$AM/.notified-s1-postplan"
+touch "$AM/done/s1.md"
+run_watch --slug s1 --force
+[ "$RC" = 0 ] && pass "exit 0" || fail "exit 0 (got $RC)"
+want "reports the sentinel" "$OUT" "sentinel present"
+[ ! -e "$T/dm.body" ] && pass "no DM sent" || fail "no DM sent"
+
+echo "== 8. queue/ precondition"
+make_tree c8
+touch "$AM/done/s1.md"
+run_watch --slug s1
+[ "$RC" = 2 ] && pass "exit 2" || fail "exit 2 (got $RC)"
+want "names the disposition dir" "$OUT" "is done/ (already shipped), not in queue/"
+[ ! -e "$T/dm.body" ] && pass "no DM sent" || fail "no DM sent"
+
+echo "== 9. empty-env run"
+make_tree c9
+touch "$AM/done/s1.md"
+OUT=$(env -i PATH=/usr/bin:/bin AUTOMOUSE_DIR="$AM" "$T/bin/watch-automouse-plan" --slug s1 --force --poll 1 --wait 3 --timeout 3 2>&1); RC=$?
+expected=$(printf '%s\n\n%s' "$FIRE_MSG" "log: $AM/logs/")
+[ "$RC" = 0 ] && pass "exit 0 without HOME" || fail "exit 0 without HOME (got $RC: $OUT)"
+body_is "same exact body" "$expected"
+
+[ "$FAILED" = 0 ] && { echo "all watch-automouse-plan cases passed"; exit 0; }
+echo "watch-automouse-plan harness: FAILURES above"; exit 1

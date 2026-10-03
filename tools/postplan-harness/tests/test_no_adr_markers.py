@@ -177,3 +177,132 @@ def test_upsert_stub_missing_field_passthrough():
 def test_upsert_empty_body():
     result = _upsert_no_adr_markers("", _plan(markers=[M1]))
     assert result == M1 + "\n\n"
+
+
+# ---------------------------------------------------------------------------
+# Replay integration: markers reach the PR body (backlog#1100, #1101)
+# ---------------------------------------------------------------------------
+
+import tempfile
+
+import runner
+from harness.adapters.llm import FixtureLlm
+from harness.state import UsageLedger
+from test_runner_replay import CANNED, _actions, _fixture
+
+RM1 = "<!-- no-adr: first marker reason long enough -->"
+RM2 = "<!-- no-adr: second marker reason long enough -->"
+
+
+def _marker_plan(*markers):
+    head = "# P\n\n"
+    mid = "".join(m + "\n\n" for m in markers)
+    return head + mid + "## Phase 1\nx\n"
+
+
+def _replay(**over):
+    out = tempfile.mkdtemp()
+    runner.run(_fixture(**over), out, FixtureLlm(UsageLedger(), CANNED),
+               mode="replay", headless=True)
+    return _actions(out)
+
+
+def _bodies(actions, kind):
+    return [a["body"] for a in actions if a.get("action") == kind]
+
+
+@pytest.mark.usefixtures("stub_ambient_git_show")
+def test_replay_create_path_markers_reach_pr_create_body():
+    acts = _replay(pr_number=None, pr_meta=None,
+                   plan_content=_marker_plan(RM1, RM2))
+    creates = _bodies(acts, "pr_create")
+    assert len(creates) == 1
+    body = creates[0]
+    assert body.startswith(RM1 + "\n" + RM2 + "\n\n")
+    assert body.count(RM1) == 1
+    assert body.count(RM2) == 1
+
+
+@pytest.mark.usefixtures("stub_ambient_git_show")
+def test_replay_create_path_markers_survive_phase4_pr_edit_body():
+    acts = _replay(pr_number=None, pr_meta=None,
+                   plan_content=_marker_plan(RM1, RM2))
+    edits = _bodies(acts, "pr_edit_body")
+    assert edits
+    last = edits[-1]
+    assert last.count(RM1) == 1
+    assert last.count(RM2) == 1
+    assert last.index(RM1) < last.index(RM2)
+
+
+@pytest.mark.usefixtures("stub_ambient_git_show")
+def test_replay_edit_path_markers_reach_pr_edit_body():
+    acts = _replay(plan_content=_marker_plan(RM1, RM2))
+    assert _bodies(acts, "pr_create") == []
+    edits = _bodies(acts, "pr_edit_body")
+    assert edits
+    last = edits[-1]
+    assert last.startswith(RM1 + "\n" + RM2 + "\n\n")
+    assert last.count(RM1) == 1
+    assert last.count(RM2) == 1
+
+
+@pytest.mark.usefixtures("stub_ambient_git_show")
+def test_replay_edit_path_marker_already_in_body_not_duplicated():
+    meta = dict(_fixture()["pr_meta"],
+                body=RM1 + "\n\n## Manual Testing\n\nNo manual testing needed\n")
+    acts = _replay(pr_meta=meta, plan_content=_marker_plan(RM1, RM2))
+    last = _bodies(acts, "pr_edit_body")[-1]
+    assert last.count(RM1) == 1
+    assert last.count(RM2) == 1
+    assert last.startswith(RM2 + "\n\n")
+
+
+FENCED_ONLY_PLAN = (
+    "# P\n\n"
+    "```\n"
+    "<!-- no-adr: fenced example marker reason -->\n"
+    "```\n\n"
+    "## Phase 1\nx\n"
+)
+
+
+@pytest.mark.usefixtures("stub_ambient_git_show")
+@pytest.mark.parametrize("over", [
+    {"pr_number": None, "pr_meta": None},
+    {},
+], ids=["create-path", "edit-path"])
+def test_replay_no_marker_plan_adds_no_marker(over):
+    acts = _replay(plan_content=_marker_plan(), **over)
+    bodies = _bodies(acts, "pr_create") + _bodies(acts, "pr_edit_body")
+    assert bodies
+    assert all("no-adr" not in b for b in bodies)
+
+
+@pytest.mark.usefixtures("stub_ambient_git_show")
+def test_replay_fenced_only_marker_adds_no_marker():
+    acts = _replay(pr_number=None, pr_meta=None, plan_content=FENCED_ONLY_PLAN)
+    bodies = _bodies(acts, "pr_create") + _bodies(acts, "pr_edit_body")
+    assert bodies
+    assert all("no-adr" not in b for b in bodies)
+
+
+@pytest.mark.usefixtures("stub_ambient_git_show")
+def test_replay_plan_blind_adds_no_marker(monkeypatch, tmp_path):
+    monkeypatch.setenv("PLANS_DIR", str(tmp_path))
+    assert not runner.locate_plan("synthetic-degrade", content_override=None).found
+    acts = _replay(plan_content="")
+    edits = _bodies(acts, "pr_edit_body")
+    assert edits
+    assert all("no-adr" not in b for b in edits)
+
+
+@pytest.mark.usefixtures("stub_ambient_git_show")
+def test_replay_control_identity_upsert_drops_markers(monkeypatch):
+    monkeypatch.setattr(runner, "_upsert_no_adr_markers", lambda body, plan: body)
+    acts = _replay(pr_number=None, pr_meta=None,
+                   plan_content=_marker_plan(RM1, RM2))
+    creates = _bodies(acts, "pr_create")
+    edits = _bodies(acts, "pr_edit_body")
+    assert creates and edits
+    assert all(RM1 not in b and RM2 not in b for b in creates + edits)

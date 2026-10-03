@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Tests bin/post-plan-now's "nothing to ship" guard: a worktree whose only change is an
+# untracked file must ship, while a clean tree or an ignored-only file must still refuse.
+#
+# Three cases, exit 0 iff all pass.
+set -euo pipefail
+
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+ORIGIN="$TMP/origin.git"
+MAIN="$TMP/IBL5"
+WT="$TMP/IBL5-worktrees/feat-new-file"
+SHIMS="$TMP/shims"; mkdir -p "$SHIMS" "$TMP/Library/LaunchAgents"
+export PATH="$SHIMS:$PATH"
+
+# Usage gate (ADR-0143): private state dir and no keychain, so the gate fails open.
+export IBL5_USAGE_GATE_STATE_DIR="$TMP/gate"
+mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
+printf '#!/bin/sh\nexit 1\n' > "$SHIMS/security"
+# launchctl: never touch real launchd.
+printf '#!/bin/sh\nexit 0\n' > "$SHIMS/launchctl"
+chmod +x "$SHIMS/security" "$SHIMS/launchctl"
+unset CLAUDE_HEADLESS
+
+PASS=0; FAIL=0
+pass() { echo "PASS: $1"; PASS=$((PASS+1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL+1)); }
+
+git init --bare -b master "$ORIGIN" >/dev/null 2>&1
+mkdir -p "$MAIN/bin/lib"
+git -C "$MAIN" init -b master >/dev/null 2>&1
+git -C "$MAIN" config user.email "test@example.com"
+git -C "$MAIN" config user.name "Test"
+git -C "$MAIN" remote add origin "file://$ORIGIN"
+cp "$REPO/bin/lib/git-helpers.sh" "$MAIN/bin/lib/git-helpers.sh"
+printf 'ignored.log\n' > "$MAIN/.gitignore"
+git -C "$MAIN" add .
+git -C "$MAIN" commit --quiet -m "init"
+git -C "$MAIN" push --quiet origin master
+git -C "$MAIN" fetch --quiet origin
+git -C "$MAIN" worktree add --quiet -b feat-new-file "$WT" master
+
+RC=0; ERR=""
+run_ppn() {
+    RC=0; ERR=""
+    set +e
+    ERR="$(cd "$WT" && POST_PLAN_MAIN_ROOT="$MAIN" POST_PLAN_SELF_BIN="$MAIN/bin" HOME="$TMP" \
+           "$REPO/bin/post-plan-now" 2>&1 >/dev/null)"
+    RC=$?
+    set -e
+}
+
+# Case 1 — clean tree: refused.
+run_ppn
+if [ "$RC" -eq 1 ] && grep -qF "nothing to do" <<< "$ERR"; then
+    pass "clean tree: refused as nothing to do"
+else
+    fail "clean tree: expected rc=1 + 'nothing to do', got rc=$RC: $ERR"
+fi
+
+# Case 2 — ignored file only: still refused.
+printf 'x\n' > "$WT/ignored.log"
+run_ppn
+if [ "$RC" -eq 1 ] && grep -qF "nothing to do" <<< "$ERR"; then
+    pass "ignored-only tree: refused as nothing to do"
+else
+    fail "ignored-only tree: expected rc=1 + 'nothing to do', got rc=$RC: $ERR"
+fi
+
+# Case 3 — untracked new file only: not refused.
+printf 'new\n' > "$WT/NewTest.php"
+run_ppn
+if grep -qF "nothing to do" <<< "$ERR"; then
+    fail "untracked-only tree: refused as nothing to do (rc=$RC)"
+else
+    pass "untracked-only tree: passes the nothing-to-ship guard"
+fi
+
+echo "---"
+echo "$PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

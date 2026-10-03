@@ -239,7 +239,7 @@ bl_finish() {
         else
             msg="burndown-loop: finished ($reason)
 batches=$BATCHES items=$ITEMS elapsed=${elapsed}m"
-            if [ "$reason" = "failures" ] && [ -n "$LAST_FAIL" ]; then
+            if { [ "$reason" = "failures" ] || [ "$reason" = "fail-closed" ]; } && [ -n "$LAST_FAIL" ]; then
                 msg="$msg
 $LAST_FAIL"
             fi
@@ -342,9 +342,15 @@ bl_on_launch() {
             bl_finish exhausted 0
             ;;
         abort)
+            # An abort batch can still have written ledgers; count them before retrying.
             bl_count_new >/dev/null
-            bl_log "batch aborted: burndown exit 3 log=$BLOG"
-            bl_finish fail-closed 1
+            FAILS=$((FAILS + 1))
+            LAST_FAIL="last fail: reason=abort-exit-3 log=$BLOG"
+            bl_log "batch aborted: burndown exit 3 fails=$FAILS/$MAX_FAILS log=$BLOG"
+            if [ "$FAILS" -ge "$MAX_FAILS" ]; then bl_finish fail-closed 1; fi
+            if [ "$ONCE" -eq 0 ]; then
+                bl_sleep 600 retry-after-abort || bl_stopped
+            fi
             ;;
         *)
             FAILS=$((FAILS + 1))

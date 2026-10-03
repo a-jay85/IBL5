@@ -248,3 +248,114 @@ def test_llm_stage_error_does_not_claim_local_commit(monkeypatch, tmp_path):
     assert _has(r.lines, "stage=llm")
     assert not _has(r.lines, "ci-fix commit is LOCAL")
     assert git.pushes == 0
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: cifix_ship helpers
+# ---------------------------------------------------------------------------
+
+from harness import cifix_ship  # noqa: E402
+
+_BODY = ("## Summary\n\nOld summary paragraph.\n\n"
+         "**no-adr:** tooling only\n\n"
+         "## Manual Testing\n\n- [ ] Check the page renders\n")
+
+
+def test_judge_refuses_no_adr_comment_conversion():
+    proposed = _BODY.replace("**no-adr:** tooling only", "<!-- no-adr: tooling only -->")
+    v = cifix_ship.judge_proposal(_BODY, proposed)
+    assert v.action == "refuse"
+    assert "waiver" in v.reason
+
+
+def test_judge_refuses_post_merge_recipe_ok_addition():
+    proposed = _BODY.replace("Old summary paragraph.",
+                             "Old summary paragraph.\n\n<!-- post-merge-recipe-ok -->")
+    v = cifix_ship.judge_proposal(_BODY, proposed)
+    assert v.action == "refuse"
+    assert "waiver" in v.reason
+
+
+def test_judge_refuses_manual_testing_sentinel():
+    proposed = _BODY.replace("- [ ] Check the page renders",
+                             "No manual testing needed.")
+    v = cifix_ship.judge_proposal(_BODY, proposed)
+    assert v.action == "refuse"
+    assert v.reason == "## Manual Testing change"
+
+
+def test_judge_refuses_manual_testing_heading_removal():
+    proposed = _BODY.split("## Manual Testing")[0].rstrip() + "\n"
+    v = cifix_ship.judge_proposal(_BODY, proposed)
+    assert v.action == "refuse"
+    assert v.reason == "## Manual Testing change"
+
+
+def test_judge_applies_benign_summary_edit():
+    proposed = _BODY.replace("Old summary paragraph.", "New, clearer summary paragraph.")
+    v = cifix_ship.judge_proposal(_BODY, proposed)
+    assert v.action == "apply"
+    assert v.body == proposed
+
+
+def test_judge_absent_and_noop():
+    assert cifix_ship.judge_proposal(_BODY, None).action == "absent"
+    assert cifix_ship.judge_proposal(_BODY, "\n  " + _BODY + "\n\n").action == "noop"
+
+
+def _cp(rc, out):
+    return SimpleNamespace(returncode=rc, stdout=out, stderr="")
+
+
+def _fake_run_git(outputs):
+    seq = list(outputs)
+    return lambda args, cwd: seq.pop(0)
+
+
+def test_master_dep_files_changed_true_and_false():
+    base = _cp(0, "c" * 40 + "\n")
+    assert cifix_ship.master_dep_files_changed(
+        "/wt", run_git=_fake_run_git([base, _cp(0, "ibl5/bun.lock\n")])) is True
+    assert cifix_ship.master_dep_files_changed(
+        "/wt", run_git=_fake_run_git([base, _cp(0, "")])) is False
+    assert cifix_ship.master_dep_files_changed(
+        "/wt", run_git=_fake_run_git([base, _cp(128, "ibl5/bun.lock\n")])) is False
+    assert cifix_ship.master_dep_files_changed(
+        "/wt", run_git=_fake_run_git([_cp(128, "")])) is False
+    assert cifix_ship.master_dep_files_changed(None) is False
+
+
+def _meta(run_id, state):
+    return {"name": "Meta checks", "state": state,
+            "link": f"https://github.com/a/b/actions/runs/{run_id}/job/{run_id}9"}
+
+
+def _poller(polls):
+    seq = list(polls)
+    calls = []
+
+    def fn():
+        calls.append(1)
+        return seq.pop(0) if len(seq) > 1 else seq[0]
+    return fn, calls
+
+
+def test_wait_ignores_pre_edit_red_and_cancelled():
+    fn, calls = _poller([[_meta(100, "FAILURE")], [_meta(101, "CANCELLED")],
+                         [_meta(100, "FAILURE"), _meta(102, "SUCCESS")]])
+    got = cifix_ship.wait_for_fresh_meta_run(fn, "100", deadline=time.time() + 3600,
+                                             sleep=lambda s: None)
+    assert got == "green"
+    assert len(calls) == 3
+
+
+def test_wait_indeterminate_on_deadline():
+    clock = [1000.0]
+
+    def sleep(s):
+        clock[0] += s
+
+    fn, _ = _poller([[_meta(101, "CANCELLED")]])
+    got = cifix_ship.wait_for_fresh_meta_run(fn, "100", deadline=1100.0, sleep=sleep,
+                                             now=lambda: clock[0])
+    assert got == "indeterminate"

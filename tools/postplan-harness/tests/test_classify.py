@@ -1189,9 +1189,10 @@ def test_upsert_residual_phases_append_replace_remove():
     assert "3 — C" in replaced
     assert "2 — B" not in replaced
 
-    # remove: body equals pre-append body
+    # remove: upsert re-terminates the head with exactly one "\n" (body.rstrip() + "\n"),
+    # so the restored body is the original plus a single trailing newline, not byte-identical.
     removed = upsert_residual_phases(replaced, "")
-    assert removed.strip() == body.strip()
+    assert removed == body.rstrip() + "\n"
 
 
 def test_upsert_residual_phases_noop_without_items_or_markers():

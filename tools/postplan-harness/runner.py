@@ -1527,9 +1527,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 log(f"phase7 ci-fix: body proposal refused ({verdict.reason})")
                 refused.append((attempt, verdict.reason, proposal or ""))
             elif verdict.action == "apply":
-                baseline = cifix.failed_job_refs(
-                    gh.pr_checks_json(pr), [cifix_ship.META_CHECK_NAME]
-                ).get(cifix_ship.META_CHECK_NAME, (None, None))[0]
+                baseline = cifix_ship.meta_run_id(gh.pr_checks_json(pr))
                 gh.pr_edit_body(pr, verdict.body)
                 body_applied = True
                 log("phase7 ci-fix: body proposal applied")

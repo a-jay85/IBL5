@@ -310,12 +310,22 @@ def _git(head_trees=None):
 
 
 def _drive_cf(tmp_path, prior_sticky, plan_body=b"# plan\n", canned=None, diff=DIFF,
-              tree=TREE, git_shim_fixture=None):
-    """Run _run_fidelity in live mode against RecordingGh."""
+              tree=TREE, git_shim_fixture=None, verdict_text="6d checks\n\nREADY\n"):
+    """Run _run_fidelity in live mode against RecordingGh.
+
+    verdict_text=None leaves the verdict file absent.
+    """
     tmp_path = tmp_path if hasattr(tmp_path, "mkdir") else tmp_path
     import pathlib
     pathlib.Path(tmp_path).mkdir(parents=True, exist_ok=True)
     tmp_path = pathlib.Path(tmp_path)
+
+    def _tmp_verdict_path(pr_number):
+        return str(tmp_path / f"verdict-{pr_number}.md")
+
+    vfile = pathlib.Path(_tmp_verdict_path(99))
+    if verdict_text is not None:
+        vfile.write_text(verdict_text)
     plan_file = tmp_path / "plan.md"
     plan_file.write_bytes(plan_body)
     plan_obj = types.SimpleNamespace(found=True, path=str(plan_file), auto_merge_false=False)
@@ -328,6 +338,7 @@ def _drive_cf(tmp_path, prior_sticky, plan_body=b"# plan\n", canned=None, diff=D
 
     spawn_count = [0]
     orig_review = runner.fidelity.review
+    orig_verdict_path = runner.fidelity.verdict_path
 
     def counting_review(*a, **kw):
         spawn_count[0] += 1
@@ -337,11 +348,13 @@ def _drive_cf(tmp_path, prior_sticky, plan_body=b"# plan\n", canned=None, diff=D
     res = runner.RunResult(terminal=TerminalState.FAILED)
     try:
         runner.fidelity.review = counting_review
+        runner.fidelity.verdict_path = _tmp_verdict_path
         runner._run_fidelity(
             llm, str(tmp_path), str(tmp_path), _git(head_trees=[tree, tree]),
             gh, plan_obj, diff, "body", 99, "dead" * 10, tree, True, logs.append, res)
     finally:
         runner.fidelity.review = orig_review
+        runner.fidelity.verdict_path = orig_verdict_path
     return res, spawn_count[0], logs
 
 
@@ -426,6 +439,8 @@ def test_carried_forward_log_line(tmp_path):
                                  diff=DIFF_EDITED,
                                  canned={"plan-fidelity-review": "6d checks\n\nREADY\n"})
     assert any("carry-forward declined: diff-changed" in ln for ln in logs_miss)
+    assert not any("carried forward" in ln for ln in logs_miss)
+    assert not any("carry-forward declined" in ln for ln in logs_match)
 
 
 @pytest.mark.usefixtures("git_shim")
@@ -500,3 +515,88 @@ def test_condition_12_identical_for_ready_with_notes(tmp_path):
 
     assert _cond12(res_cf, TREE) == _cond12(res_full, TREE)
     assert _cond12(res_cf, TREE)[1][0] == "READY WITH NOTES"
+
+
+# The verdict-file decline arm never changes the sticky shape: findings_excerpt,
+# digest_lines and compose_sticky output stay pinned by test_fidelity_sticky.py.
+def _matching_sticky(plan_body):
+    plan_hash = hashlib.sha256(plan_body).hexdigest()
+    diff_id = fidelity.diff_patch_id(DIFF)
+    return _sticky(verdict="READY", diff_id=diff_id, plan_hash=plan_hash)
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_missing_verdict_file_declines_carry_forward(tmp_path):
+    plan_body = b"# plan\n"
+    sticky = _matching_sticky(plan_body)
+    canned = {"plan-fidelity-review": "6d checks\n\nREADY\n"}
+    res, spawns, logs = _drive_cf(tmp_path, prior_sticky=sticky, plan_body=plan_body,
+                                   canned=canned, verdict_text=None)
+    assert spawns == 1
+    assert res.fidelity.get("carried_forward") is None
+    assert any("carry-forward declined: verdict-file-missing" in ln for ln in logs)
+    assert res.fidelity["verdict_1"] == "READY"
+    assert res.fidelity["verdict_path"] == str(tmp_path / "verdict-99.md")
+    excerpt = fidelity.findings_excerpt(res.fidelity["verdict_path"], True)
+    assert "6d checks" in excerpt
+    digest = fidelity.digest_lines(None, "dead" * 10, res.fidelity["verdict_path"],
+                                   str(tmp_path), True)
+    assert not any("no Phase 6 verdict file" in ln for ln in digest)
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_whitespace_verdict_file_declines_carry_forward(tmp_path):
+    plan_body = b"# plan\n"
+    sticky = _matching_sticky(plan_body)
+    canned = {"plan-fidelity-review": "6d checks\n\nREADY\n"}
+    res, spawns, logs = _drive_cf(tmp_path, prior_sticky=sticky, plan_body=plan_body,
+                                   canned=canned, verdict_text="   \n\n\t\n")
+    assert spawns == 1
+    assert res.fidelity.get("carried_forward") is None
+    assert any("carry-forward declined: verdict-file-missing" in ln for ln in logs)
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_usable_verdict_file_still_carries_forward(tmp_path):
+    plan_body = b"# plan\n"
+    sticky = _matching_sticky(plan_body)
+    res, spawns, logs = _drive_cf(tmp_path, prior_sticky=sticky, plan_body=plan_body)
+    assert spawns == 0
+    assert res.fidelity["carried_forward"] is True
+    assert res.fidelity["verdict_path"] == str(tmp_path / "verdict-99.md")
+    assert any("carried forward (patch-id" in ln for ln in logs)
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_diff_change_with_missing_verdict_file_keeps_original_reason(tmp_path):
+    plan_body = b"# plan\n"
+    sticky = _matching_sticky(plan_body)
+    canned = {"plan-fidelity-review": "6d checks\n\nREADY\n"}
+    res, spawns, logs = _drive_cf(tmp_path, prior_sticky=sticky, plan_body=plan_body,
+                                   diff=DIFF_EDITED, canned=canned, verdict_text=None)
+    assert spawns == 1
+    assert any("carry-forward declined: diff-changed" in ln for ln in logs)
+    assert not any("verdict-file-missing" in ln for ln in logs)
+
+
+@pytest.mark.parametrize("case", ["missing", "directory", "empty", "whitespace",
+                                  "reviewed_tree_only", "digest_first"])
+def test_verdict_file_usable_false_for_degraded_files(tmp_path, case):
+    p = tmp_path / "verdict.md"
+    if case == "directory":
+        p.mkdir()
+    elif case == "empty":
+        p.write_text("")
+    elif case == "whitespace":
+        p.write_text("  \n\t\n")
+    elif case == "reviewed_tree_only":
+        p.write_text("REVIEWED_TREE=" + "a" * 40 + "\n")
+    elif case == "digest_first":
+        p.write_text(fidelity.DIGEST_CUT + "\n**Plan:** x\n")
+    assert fidelity.verdict_file_usable(str(p)) is False
+
+
+def test_verdict_file_usable_true_for_real_findings(tmp_path):
+    p = tmp_path / "verdict.md"
+    p.write_text("6d checks\n\nREADY\n" + fidelity.DIGEST_CUT + "\n**Plan:** x\n")
+    assert fidelity.verdict_file_usable(str(p)) is True

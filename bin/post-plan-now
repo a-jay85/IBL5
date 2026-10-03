@@ -45,6 +45,9 @@
 # Run from anywhere inside the target worktree.
 # Exit 7: refused because $ROOT is the main checkout (ADR-0062); nothing was fired.
 # Callers key on 7 to tell "wrong tree" apart from a generic failure (exit 1).
+# Exit 8: declined because the last run for this slug held on the same structural
+# reasons, the repeat DM was already sent, and plan+diff+harness are unchanged
+# (harness/holdrepeat.py). Nothing was fired. --force overrides.
 #
 # --pr <n> drives the worktree that has PR <n>'s head branch checked out, instead
 # of the current branch. When no worktree has that branch, --pr creates one via
@@ -220,6 +223,20 @@ postplan_sweep_stale_badge() {   # <pr>
     if postplan_badge_label_live "$label"; then return 0; fi
     pr_sticky_upsert "$n" "$POSTPLAN_BADGE_MARKER" \
         "$(postplan_badge_banner_body "stale" "$label" "unknown")" || true
+    return 0
+}
+
+# Repeat-hold decline (holdrepeat.py). Returns 0 = DECLINE (prints the reason),
+# 1 = proceed. Fails open: a missing harness, python error, or any exit other
+# than 10 proceeds. --force (FORCE=1) always proceeds.
+postplan_holdrepeat_decline() {
+    local harness="$1" slug="$2" plan="$3" root="$4" out rc
+    [ "${FORCE:-0}" -eq 0 ] || return 1
+    out=$(PYTHONPATH="$harness" python3 -m harness.holdrepeat check \
+            --state-dir "${HOLDREPEAT_STATE_DIR:-$harness/out/state}" \
+            --slug "$slug" --plan "$plan" --worktree "$root" 2>/dev/null) && rc=0 || rc=$?
+    [ "$rc" -eq 10 ] || return 1
+    printf '%s\n' "$out"
     return 0
 }
 
@@ -479,6 +496,15 @@ if [ "${FORCE:-0}" -eq 0 ]; then
             exit 5
         fi
     fi
+fi
+
+# Exit 8: declined, repeated hold with unchanged plan+diff+harness (holdrepeat.py).
+if postplan_holdrepeat_decline \
+     "${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}" \
+     "$SLUG" "${PLAN_OVERRIDE:-}" "$ROOT"; then
+  echo "RESULT: post-plan DECLINED — held twice on the same reason and nothing changed" \
+       "since; no tokens spent, no PR change. Override: bin/post-plan-now --force"
+  exit 8
 fi
 
 [ -f "$PLAN_FILE" ] \

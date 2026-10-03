@@ -16,4 +16,30 @@ class PlrParserRepositoryTest extends TestCase
         $this->assertIsArray($interfaces);
         $this->assertArrayHasKey(PlrParserRepositoryInterface::class, $interfaces);
     }
+
+    public function testPromotePriorSeasonSnapshotsBindsPriorYearAsInteger(): void
+    {
+        $stmt = $this->getMockBuilder(\mysqli_stmt::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['bind_param', 'execute', 'close'])
+            ->getMock();
+        $stmt->expects($this->once())
+            ->method('bind_param')
+            ->with('i', 2008)
+            ->willReturn(true);
+        $stmt->method('execute')->willReturn(true);
+        $stmt->method('close')->willReturn(true);
+
+        $db = self::createStub(\mysqli::class);
+        $db->method('prepare')->willReturn($stmt);
+
+        $repository = new class ($db) extends PlrParserRepository {
+            protected function getAffectedRows(object $stmt): int
+            {
+                return 7;
+            }
+        };
+
+        $this->assertSame(7, $repository->promotePriorSeasonSnapshots(2008));
+    }
 }

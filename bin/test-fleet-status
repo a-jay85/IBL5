@@ -528,6 +528,13 @@ OUTPUT_NOOSA="$(run_fleet FLEET_STATUS_FORCE_LINKS=1 \
     FLEET_STATUS_OSACOMPILE=/nonexistent/osacompile \
     FLEET_STATUS_REORDER_APP_DIR="$TMP/apps-noosa")"
 
+# The same build with mv failing: the half-built .build-* applet must not be left behind.
+MVFAIL="$TMP/mvfail-bin"; mkdir -p "$MVFAIL"
+printf '#!/bin/sh\nexit 1\n' > "$MVFAIL/mv"; chmod +x "$MVFAIL/mv"
+run_fleet FLEET_STATUS_FORCE_LINKS=1 PATH="$MVFAIL:$STUBBIN:$PATH" \
+    FLEET_STATUS_REORDER_APP_DIR="$TMP/apps-mvfail" >/dev/null
+LEFTOVER_BUILD="$(find "$TMP/apps-mvfail" -maxdepth 1 -name '.build-*' 2>/dev/null)"
+
 OUTPUT_STRIPPED="$(printf '%s\n' "$OUTPUT_LINKS" | perl -pe 's/\e\]8;;[^\e]*\e\\//g')"
 
 OUTPUT_MIDNIGHT="$(run_fleet FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST_MIDNIGHT")"
@@ -777,6 +784,8 @@ assert_lacks "links: no reorder link in a non-tty capture" \
     "$OUTPUT" 'AUTOMOUSE QUEUE.*reorder'
 assert_lacks "links: no reorder link when osacompile is missing" \
     "$OUTPUT_NOOSA" 'AUTOMOUSE QUEUE.*reorder'
+assert_lacks "links: failed mv leaves no .build-* temp applet behind" \
+    "$LEFTOVER_BUILD" '.build-'
 # The word is the link text; the path lives only in the URI.
 assert_has "links: post-plan audit word links its audit.log" \
     "$OUTPUT_LINKS" 'last-exit-col 0  [^ ]*8;;vscode://file/[^ ]*live-demo-slug-20260910-120000-4242/audit\.log[^ ]*audit'

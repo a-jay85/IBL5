@@ -1,11 +1,12 @@
 #!/bin/bash
-# Usage: claude ... --output-format stream-json | automouse-stream-filter <heartbeat_file> [<cmdpid_file>] [<slug>] [<phase>]
+# Usage: claude ... --output-format stream-json | automouse-stream-filter <heartbeat_file> [<cmdpid_file>] [<slug>] [<phase>] [<failsig_file>]
 set -euo pipefail
 
-HEARTBEAT_FILE="${1:?Usage: automouse-stream-filter <heartbeat_file> [<cmdpid_file>] [<slug>] [<phase>]}"
+HEARTBEAT_FILE="${1:?Usage: automouse-stream-filter <heartbeat_file> [<cmdpid_file>] [<slug>] [<phase>] [<failsig_file>]}"
 CMDPID_FILE="${2:-}"
 SLUG="${3:-}"
 PHASE="${4:-}"
+FAILSIG_FILE="${5:-}"
 TOOL_COUNT=0
 PEAK_CTX=0
 TURN_COUNT=1
@@ -39,6 +40,75 @@ line_prefix() {
     fi
 }
 
+# Failure-signature capture (ADR-0160). Active
+# only when a 5th arg is given. The record goes to a SIDE FILE, never stdout:
+# bin/automouse/run's env-error scan reads the log, and a tool result quoting
+# an API error must not trip it. Raw record format is the input contract of
+# bin/lib/automouse-failure-signature.
+FAILSIG_RECENT_RESULTS=5   # an error followed by MORE than this many tool results was recovered from
+FAILSIG_USE_IDS=()
+FAILSIG_USE_NAMES=()
+FAILSIG_USE_CMDS=()
+FAILSIG_RESULTS_SINCE_ERR=0
+if [ -n "$FAILSIG_FILE" ]; then rm -f "$FAILSIG_FILE" "$FAILSIG_FILE.tmp" 2>/dev/null || true; fi
+
+failsig_note_uses() {   # $1 = assistant event line
+    local tsv id name cmd
+    tsv=$(printf '%s' "$1" | jq -r '
+        .message.content[]? | select(type=="object" and .type=="tool_use")
+        | [ (.id // ""), (.name // "?"), ((.input.command // "") | tostring | split("\n")[0]) ]
+        | @tsv' 2>/dev/null) || return 0
+    while IFS=$'\t' read -r id name cmd; do
+        [ -n "$id" ] || continue
+        FAILSIG_USE_IDS+=("$id"); FAILSIG_USE_NAMES+=("$name"); FAILSIG_USE_CMDS+=("$cmd")
+    done <<< "$tsv"
+    return 0
+}
+
+failsig_note_results() {   # $1 = user event line
+    local n out id text i name cmd
+    n=$(printf '%s' "$1" | jq -r '[.message.content[]? | select(type=="object" and .type=="tool_result")] | length' 2>/dev/null) || return 0
+    out=$(printf '%s' "$1" | jq -r '
+        [ .message.content[]? | select(type=="object" and .type=="tool_result" and .is_error == true) ]
+        | last // empty
+        | (.tool_use_id // ""),
+          ( .content
+            | if type == "string" then .
+              elif type == "array" then ([ .[] | select(type=="object" and .type=="text") | .text ] | join("\n"))
+              else "" end )' 2>/dev/null) || return 0
+    if [ -z "$out" ]; then
+        FAILSIG_RESULTS_SINCE_ERR=$(( FAILSIG_RESULTS_SINCE_ERR + ${n:-0} ))
+        return 0
+    fi
+    id=${out%%$'\n'*}
+    case "$out" in *$'\n'*) text=${out#*$'\n'} ;; *) text="" ;; esac
+    name="?"; cmd=""
+    i=${#FAILSIG_USE_IDS[@]}
+    while [ "$i" -gt 0 ]; do
+        i=$(( i - 1 ))
+        if [ "${FAILSIG_USE_IDS[$i]}" = "$id" ]; then
+            name=${FAILSIG_USE_NAMES[$i]}; cmd=${FAILSIG_USE_CMDS[$i]}; break
+        fi
+    done
+    {
+        printf 'tool: %s\ncommand: %s\nerror:\n' "$name" "$cmd"
+        printf '%s\n' "$text" | head -c 4000
+    } > "$FAILSIG_FILE.tmp" 2>/dev/null && mv -f "$FAILSIG_FILE.tmp" "$FAILSIG_FILE" 2>/dev/null
+    FAILSIG_RESULTS_SINCE_ERR=0
+    return 0
+}
+
+# An error the agent recovered from (followed by more than
+# FAILSIG_RECENT_RESULTS further tool results) is not the failure the attempt
+# ended on: drop it, so the signature is empty and never matches (fail-open).
+failsig_finalize() {
+    [ -n "$FAILSIG_FILE" ] || return 0
+    if [ "$FAILSIG_RESULTS_SINCE_ERR" -gt "$FAILSIG_RECENT_RESULTS" ]; then
+        rm -f "$FAILSIG_FILE" 2>/dev/null
+    fi
+    return 0
+}
+
 while IFS= read -r line; do
     date +%s > "$HEARTBEAT_FILE"
 
@@ -54,6 +124,7 @@ while IFS= read -r line; do
                 TOOL_COUNT=$(( TOOL_COUNT + 1 ))
                 printf '%s tool: %s (#%d, turn %d)\n' "$(line_prefix)" "$tool_name" "$TOOL_COUNT" "$TURN_COUNT"
             fi
+            if [ -n "$FAILSIG_FILE" ]; then failsig_note_uses "$line" || true; fi
             # Text blocks only — `thinking` blocks are not the run's answer, and a
             # whitespace-only block must not clobber a real preceding message.
             msg_text=$(printf '%s' "$line" | jq -r '
@@ -84,6 +155,7 @@ while IFS= read -r line; do
             ;;
         user)
             TURN_COUNT=$(( TURN_COUNT + 1 ))
+            if [ -n "$FAILSIG_FILE" ]; then failsig_note_results "$line" || true; fi
             ;;
         system)
             # Claude Code emits a `system`/`compact_boundary` event when context is
@@ -133,6 +205,7 @@ while IFS= read -r line; do
                 "$(line_prefix)" "$stop_reason" "$num_turns" "$TOOL_COUNT" "$duration_ms" \
                 "$cost_usd" "$in_tokens" "$out_tokens" "$cache_tokens" "$cache_write" "${PEAK_CTX:-0}" \
                 "$session_id"
+            failsig_finalize || true
             # result is the final stream-json event — terminate claude and exit
             if [ -n "$CMDPID_FILE" ]; then
                 _target_pid=$(cat "$CMDPID_FILE" 2>/dev/null) || true
@@ -144,3 +217,4 @@ while IFS= read -r line; do
             ;;
     esac
 done
+failsig_finalize || true

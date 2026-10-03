@@ -22,6 +22,7 @@ import time
 
 from pathlib import Path
 
+from .. import followcap
 from ..state import HarnessError
 
 # bin/lib/pr-sticky.sh in the harness's own checkout. Not under pr-ready/,
@@ -41,7 +42,8 @@ PR_STICKY_MARKER = "<!-- pr-ready-verdict -->"
 class RecordingGh:
     MUTATIONS = ("pr_create", "pr_comment", "pr_review_findings", "pr_edit_body",
                  "pr_merge_auto", "label_add", "pr_status_badge",
-                 "pr_sticky_verdict", "issue_create", "pr_disable_auto_merge",
+                 "pr_sticky_verdict", "issue_create", "followup_create",
+                 "pr_disable_auto_merge",
                  "pr_checks_json", "run_log_failed", "run_rerun_failed",
                  "pr_resolve_thread")
 
@@ -54,6 +56,10 @@ class RecordingGh:
         # so two long records never interleave into an unparseable line.
         self._actions_lock = threading.Lock()
         self._body_override: str | None = None
+        # Stands in for GitHub's backlog repo: a test seeds prior state through the
+        # fixture key `backlog_issues`, the way a retry sees issues an earlier run filed.
+        self._followup_store = followcap.MemoryStore(
+            [followcap.Issue(**i) for i in self.fixture.get("backlog_issues", [])])
 
     # -- side-effect intents (recorded, never executed) -----------------
     def record(self, action: str, **payload) -> None:
@@ -118,6 +124,15 @@ class RecordingGh:
 
     def issue_titles(self, label: str | None, *, strict: bool = False) -> list[str]:
         return []
+
+    def followup_create(self, title: str, body: str, label: str) -> int | None:
+        """File one PR follow-up under the per-PR cap (harness/followcap.py)."""
+        try:
+            kind, n = followcap.file_followup(self._followup_store, label, title, body)
+        except followcap.FollowcapError as exc:
+            raise HarnessError("gh", f"followup: {exc}") from exc
+        self.record("followup_create", title=title, body=body, label=label, kind=kind, number=n)
+        return n
 
     # -- reads (fixture-backed) ------------------------------------------
     def pr_exists(self) -> bool:
@@ -208,7 +223,7 @@ class RecordingGh:
 
 
 class LiveGh(RecordingGh):
-    """Installed live adapter. Each of the thirteen MUTATIONS maps to one fixed `gh`
+    """Installed live adapter. Each MUTATION maps to one fixed `gh`
     invocation built inside its method — the allowlist IS the method set.
     Reads come from live `gh pr view` state. Merge deliberately omits
     --delete-branch: in a multi-worktree clone it errors benignly, and a parent
@@ -408,6 +423,14 @@ class LiveGh(RecordingGh):
             raise HarnessError("gh", f"issue create returned no issue URL: {out[:200]}")
         n = int(m.group(1))
         self.record("issue_create", title=title, label=label, issue=n)
+        return n
+
+    def followup_create(self, title: str, body: str, label: str) -> int | None:
+        try:
+            kind, n = followcap.file_followup(followcap.GhStore(self._gh), label, title, body)
+        except followcap.FollowcapError as exc:
+            raise HarnessError("gh", f"followup: {exc}") from exc
+        self.record("followup_create", title=title, label=label, kind=kind, number=n)
         return n
 
     def issue_titles(self, label: str | None, *, strict: bool = False) -> list[str]:

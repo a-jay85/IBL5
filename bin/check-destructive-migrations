@@ -79,8 +79,14 @@ Bypass markers name the triggers they suppress:
     -- destructive-migration[<trigger>[,<trigger>]]: <reason at least 20 chars>
   Per-PR (HTML comment in PR body, via --bypass-from-stdin):
     <!-- destructive-migration[<trigger>]: <reason at least 20 chars> -->
+  A marker suppresses only the triggers it names. Known tags: drop-column,
+  drop-table, truncate, rename-column, add-not-null-no-default,
+  tighten-not-null, drop-index, rename-table, delete-no-where,
+  update-no-where, narrow-type, drop-recreate-existing.
   An untagged marker (destructive-migration: <reason>) is rejected in --staged
-  and --since modes. An unknown trigger name is an error.
+  and --since modes and honoured only by --full-scan. An unknown tag is an error.
+
+Requires python3; exits 2 (never a silent pass) when it is missing.
 
 Hard-excluded files:
   - 000_baseline_schema.sql (recreate template with intentional DROP TABLE)

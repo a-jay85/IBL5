@@ -490,6 +490,32 @@ new_repo 1; stage_bin_trigger
 run_adr_check_commit_stdin '<!-- no-adr: too short -->'
 expect "commit-bypass-too-short" 1 $?
 
+# workflow trigger + runner-shaped bypass body (marker prepended above the
+# PR body, as runner.py _upsert_no_adr_markers writes it) → pass
+new_repo 1; stage_trigger workflow
+run_adr_check_commit_stdin $'<!-- no-adr: new CI workflow governed by existing ADR-0059 -->\n\n## Summary\n- x\n'
+expect "commit-workflow-bypass-runner-shape" 0 $?
+
+# workflow trigger + two prepended markers → pass
+new_repo 1; stage_trigger workflow
+run_adr_check_commit_stdin $'<!-- no-adr: first marker reason long enough -->\n<!-- no-adr: second marker reason long enough -->\n\n## Summary\n- x\n'
+expect "commit-workflow-bypass-two-markers" 0 $?
+
+# workflow trigger + marker whose reason spans lines → pass
+new_repo 1; stage_trigger workflow
+run_adr_check_commit_stdin $'<!-- no-adr:\n  reason line one long\n  line two -->\n\n## Summary\n- x\n'
+expect "commit-workflow-bypass-multiline" 0 $?
+
+# workflow trigger + reason under 15 chars → fail
+new_repo 1; stage_trigger workflow
+run_adr_check_commit_stdin $'<!-- no-adr: ADR-0059 -->\n\n## Summary\n- x\n'
+expect "commit-workflow-bypass-too-short" 1 $?
+
+# workflow trigger + wrong comment form (no "no-" prefix) → fail
+new_repo 1; stage_trigger workflow
+run_adr_check_commit_stdin $'<!-- adr: new CI workflow governed by existing ADR-0059 -->\n\n## Summary\n- x\n'
+expect "commit-workflow-bypass-wrong-form" 1 $?
+
 # no trigger → pass
 new_repo 1; add_no_trigger
 run_adr_check_commit; expect "commit-no-trigger-clean" 0 $?

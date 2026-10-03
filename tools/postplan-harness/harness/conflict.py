@@ -349,9 +349,12 @@ def review_resolution(
 
 
 def purge_verdict_artifacts(key: str) -> None:
-    """Remove the sidecar and verdict files for key. Never removes the conflict flag file."""
+    """Remove the sidecar, verdict, and autoresolved-files temp files for key. Never removes the conflict flag file."""
     sidecar = f"/tmp/postplan-conflict-sha-{key}.txt"
     if os.path.exists(sidecar):
         os.unlink(sidecar)
+    autoresolved = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
+    if os.path.exists(autoresolved):
+        os.unlink(autoresolved)
     for p in glob.glob(f"/tmp/postplan-conflict-verdict-{key}-*.ok"):
         os.unlink(p)

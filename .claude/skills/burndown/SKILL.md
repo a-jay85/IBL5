@@ -1,7 +1,7 @@
 ---
 name: burndown
 description: Run an automatic backlog burn-down: rank new issues, pick 5 units (backfilling freed units with further selection rounds), route each item to a plan or an ad-hoc worktree, and start it.
-last_verified: 2026-10-01
+last_verified: 2026-10-02
 ---
 
 # /burndown
@@ -181,6 +181,10 @@ Show this verbatim, plus one line per closed-fixed or skipped item. Show `$W/swe
 above the status table. Tell the user to run `/burndown` again for the next batch.
 Ad-hoc PRs carry no `Closes` line, so their issues close when the next run's sweep sees
 the merge.
+
+For unattended batches paced against the weekly usage window, a human runs
+`bin/burndown-loop start` from a shell (`stop`, `status`, `run --dry-run` are the other
+forms). A /burndown session never starts the loop itself.
 
 `burndown-status` is read-only and safe to re-run anywhere. `burndown-sweep` (every
 ledger, run by step 1) and `burndown-close-merged` (one ledger) are the only commands

@@ -1,0 +1,571 @@
+#!/usr/bin/env bash
+# Headless /burndown loop paced against the weekly usage window.
+#
+# Runs one fresh `claude -p` /burndown session per batch. Before each batch it
+# re-reads live usage and paces weekly utilization along a straight line to
+# (100 - IBL5_BURNDOWN_RESERVE_PCT)% at seven_day.resets_at (usage_pace_verdict in
+# bin/lib/usage-gate.sh). Pause and resume reuse the ADR-0143 usage-gate primitives.
+#
+# Usage:
+#   bin/burndown-loop start [--no-dm]
+#   bin/burndown-loop stop
+#   bin/burndown-loop status
+#   bin/burndown-loop run [--once] [--dry-run] [--no-dm]
+#   bin/burndown-loop --print-plist
+#   bin/burndown-loop --resume-paused <sid>
+# ---
+# Environment (unset and empty both take the default):
+#   IBL5_BURNDOWN_RESERVE_PCT         weekly percent kept free at reset (default 10)
+#   IBL5_BURNDOWN_MAX_FAILS           consecutive failed batches before giving up (3)
+#   IBL5_BURNDOWN_BATCH_TIMEOUT_MIN   per-batch wall clock in minutes (90)
+#   IBL5_BURNDOWN_DISCORD_DM          finish-DM sender (default bin/discord-dm)
+#
+# Exit codes: 0 loop finished (supply exhausted, stop requested, or --once done).
+#             1 consecutive-failure cap hit or /burndown failed closed.
+#             2 usage or environment error.
+#             4 another instance holds the lock.
+#             75 paused by the usage gate (coordinator resumes it).
+#
+# Hard stop: launchctl bootout gui/$(id -u)/com.ibl5.burndown-loop
+#
+# Bash 3.2 / macOS compatible: no declare -A, no mapfile, no date -d/-v, no GNU timeout.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/usage-gate.sh
+. "$ROOT/bin/lib/usage-gate.sh"
+
+[ -n "${HOME:-}" ] || { echo "burndown-loop: HOME is unset" >&2; exit 2; }
+
+STATE="$HOME/.claude/burndown-loop"
+LOCK="$STATE/lock"
+STOP_FLAG="$STATE/stop"
+LOOP_LOG="$STATE/loop.log"
+REPORTS="$HOME/claude-plans/_reports"
+LABEL="com.ibl5.burndown-loop"
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+RUNNER="$STATE/runner.sh"
+BL_SLEEP_CAP=1800
+BL_PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin:$HOME/.bun/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+DISCORD_DM="${IBL5_BURNDOWN_DISCORD_DM:-$ROOT/bin/discord-dm}"
+
+LOOP_SID=""
+RESUME_SID=""
+NO_DM=0
+ONCE=0
+BATCHES=0
+ITEMS=0
+UNITS=0
+FAILS=0
+LAST_FAIL=""
+START_EPOCH=$(date +%s)
+
+BL_PROMPT='Invoke the /burndown skill now and run every step to completion. No human is present: never ask questions or wait for input. When the skill says to show or tell the user something, print it and continue. Make the safe choice and continue. If the first selection round in step 4 prints `LEDGER: none`, end your final message with this exact line on its own: BURNDOWN-LOOP: none-selected. If any bin/backlog command in the run exits 3 (fail-closed abort), stop the run and end your final message with this exact line on its own: BURNDOWN-LOOP: abort-exit-3'
+
+bl_usage() {
+    cat <<'USAGE_EOF'
+Usage: bin/burndown-loop <subcommand>
+  start [--no-dm]                    launch detached under launchd
+  stop                               finish the current batch, then exit
+  status                             lock pid, liveness, recent log
+  run [--once] [--dry-run] [--no-dm] the loop body (what launchd runs)
+  --print-plist                      emit the launchd unit on stdout
+  --resume-paused <sid>              coordinator entry
+Hard stop: launchctl bootout gui/$(id -u)/com.ibl5.burndown-loop
+USAGE_EOF
+}
+
+bl_unknown() {
+    echo "burndown-loop: unknown argument: $1" >&2
+    bl_usage >&2
+    exit 2
+}
+
+bl_log() {
+    printf '%s burndown-loop %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
+}
+
+# bl_posint_env <NAME> <default>: unset and empty take the default; anything that
+# is not a positive integer exits 2 (these knobs bound runtime, so a typo is loud).
+bl_posint_env() {
+    local name="$1" def="$2" v
+    v="${!name:-}"
+    [ -n "$v" ] || { echo "$def"; return 0; }
+    case "$v" in
+        *[!0-9]*|0*) echo "burndown-loop: $name must be a positive integer (got '$v')" >&2; exit 2 ;;
+    esac
+    echo "$v"
+}
+
+bl_uuid() {
+    if command -v uuidgen >/dev/null 2>&1; then
+        uuidgen | tr 'A-Z' 'a-z'
+    else
+        cat /proc/sys/kernel/random/uuid
+    fi
+}
+
+bl_timeout_secs() {
+    local m
+    m=$(bl_posint_env IBL5_BURNDOWN_BATCH_TIMEOUT_MIN 90) || exit 2
+    echo $((m * 60))
+}
+
+# ------------------------------------------------------------ lock
+
+bl_cleanup() {
+    if [ -n "$LOOP_SID" ]; then usage_token_release "$LOOP_SID" 2>/dev/null || true; fi
+    if [ -f "$LOCK/pid" ] && [ "$(cat "$LOCK/pid" 2>/dev/null)" = "$$" ]; then
+        rm -rf "$LOCK"
+    fi
+}
+
+# bl_lock_live_pid: echoes the pid holding a live lock, nothing otherwise.
+bl_lock_live_pid() {
+    local pid
+    pid=$(cat "$LOCK/pid" 2>/dev/null || true)
+    case "$pid" in ''|*[!0-9]*) return 0 ;; esac
+    if kill -0 "$pid" 2>/dev/null; then echo "$pid"; fi
+    return 0
+}
+
+bl_lock_acquire() {
+    local pid
+    mkdir -p "$STATE"
+    if ! mkdir "$LOCK" 2>/dev/null; then
+        pid=$(bl_lock_live_pid)
+        if [ -n "$pid" ]; then
+            echo "burndown-loop: already running (pid $pid)" >&2
+            exit 4
+        fi
+        bl_log "reclaimed stale lock pid=$(cat "$LOCK/pid" 2>/dev/null || echo none)"
+        rm -rf "$LOCK"
+        mkdir "$LOCK" 2>/dev/null || { echo "burndown-loop: already running" >&2; exit 4; }
+    fi
+    echo "$$" > "$LOCK/pid"
+    trap bl_cleanup EXIT
+}
+
+# ------------------------------------------------------------ pacing decision
+
+# bl_decide: prints exactly one line, the single pacing decision for both the live
+# loop and --dry-run. Fails closed on a missing or stale reading: the loop is
+# discretionary work, so a skipped batch costs time while an unpaced one costs the
+# owner's week (unlike usage_prestart_gate, which guards a run the user asked for).
+bl_decide() {
+    local body frc=0 v verdict wait
+    body=$(usage_fetch 45) || frc=$?
+    if [ "$frc" -ne 0 ]; then
+        echo "sleep $BL_SLEEP_CAP blind fetch-rc=$frc"
+        return 0
+    fi
+    v=$(usage_pace_verdict "$body" "$(date +%s)")
+    verdict="${v%% *}"
+    case "$verdict" in
+        go) echo "launch $v" ;;
+        wait)
+            wait=$(printf '%s' "$v" | cut -d' ' -f4)
+            if [ "$wait" -gt "$BL_SLEEP_CAP" ]; then wait=$BL_SLEEP_CAP; fi
+            echo "sleep $wait pace $v"
+            ;;
+        zone) echo "pause $v" ;;
+        *) echo "sleep $BL_SLEEP_CAP blind $v" ;;
+    esac
+}
+
+# bl_sleep <secs> <reason>: logged sleep in chunks of at most 60s. Returns 1 as soon
+# as the stop flag appears, so `stop` lands within a minute.
+bl_sleep() {
+    local left="$1" reason="$2" chunk
+    bl_log "sleep ${left}s reason=$reason"
+    while [ "$left" -gt 0 ]; do
+        [ ! -e "$STOP_FLAG" ] || return 1
+        chunk=60
+        if [ "$left" -lt "$chunk" ]; then chunk=$left; fi
+        sleep "$chunk"
+        left=$((left - chunk))
+    done
+    [ ! -e "$STOP_FLAG" ] || return 1
+    return 0
+}
+
+# ------------------------------------------------------------ finish
+
+# bl_finish <reason> <rc>: logs, sends the one finish DM, exits <rc>. A paused loop
+# sends nothing (the coordinator DMs once per pause wave), nor do --no-dm and --once.
+bl_finish() {
+    local reason="$1" rc="$2" elapsed msg
+    elapsed=$(( ($(date +%s) - START_EPOCH) / 60 ))
+    bl_log "finish reason=$reason batches=$BATCHES items=$ITEMS"
+    if [ "$reason" != "paused" ] && [ "$NO_DM" -eq 0 ] && [ "$ONCE" -eq 0 ]; then
+        if [ ! -x "$DISCORD_DM" ]; then
+            bl_log "no executable discord-dm at $DISCORD_DM; not notifying"
+        else
+            msg="burndown-loop: finished ($reason)
+batches=$BATCHES items=$ITEMS elapsed=${elapsed}m"
+            if [ "$reason" = "failures" ] && [ -n "$LAST_FAIL" ]; then
+                msg="$msg
+$LAST_FAIL"
+            fi
+            msg="$msg
+log: $LOOP_LOG"
+            printf '%s' "$msg" | "$DISCORD_DM" - || true
+        fi
+    fi
+    exit "$rc"
+}
+
+bl_stopped() {
+    rm -f "$STOP_FLAG"
+    bl_log "stop requested; exiting"
+    bl_finish stopped 0
+}
+
+# ------------------------------------------------------------ batch
+
+bl_ledgers() {
+    local f
+    for f in "$REPORTS"/burndown-batch-*.json; do
+        [ -e "$f" ] || continue
+        basename "$f"
+    done | sort
+}
+
+# bl_classify <brc> <new_count> <blog>: one word, plus a reason after "failed".
+bl_classify() {
+    local brc="$1" new="$2" blog="$3"
+    if [ "$brc" -eq 142 ]; then echo "failed timeout"; return 0; fi
+    if grep -qx 'BURNDOWN-LOOP: abort-exit-3' "$blog" 2>/dev/null; then echo "abort"; return 0; fi
+    if [ "$new" -ge 1 ]; then echo "ran"; return 0; fi
+    if [ "$brc" -eq 0 ] && grep -qx 'BURNDOWN-LOOP: none-selected' "$blog" 2>/dev/null; then
+        echo "empty"
+        return 0
+    fi
+    echo "failed rc=$brc"
+}
+
+# bl_run_batch: one fresh headless session. Sets BATCH_RC, BLOG, NEW_LEDGERS.
+bl_run_batch() {
+    local ts timeout_secs caff=""
+    ts=$(date -u +%Y%m%dT%H%M%SZ)
+    BLOG="$STATE/batch-$ts.log"
+    bl_ledgers > "$STATE/ledgers.before"
+    timeout_secs=$(bl_timeout_secs)
+    if command -v caffeinate >/dev/null 2>&1; then caff="caffeinate -s"; fi
+    BATCH_RC=0
+    # $caff is expanded unquoted on purpose: empty off macOS.
+    # shellcheck disable=SC2086
+    env CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 \
+        IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=burndown-loop \
+        IBL5_USAGE_GATE_MODEL=claude-opus-5-5 \
+        IBL5_USAGE_GATE_RESUME_BIN="$ROOT/bin/burndown-loop" \
+        IBL5_USAGE_GATE_SESSION_ID="$LOOP_SID" \
+        perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$timeout_secs" \
+        $caff claude -p "$BL_PROMPT" --dangerously-skip-permissions \
+        --model claude-opus-5-5 --effort high --name "burndown-loop-$ts" \
+        >"$BLOG" 2>&1 || BATCH_RC=$?
+    bl_ledgers > "$STATE/ledgers.after"
+    NEW_LEDGERS=$(comm -13 "$STATE/ledgers.before" "$STATE/ledgers.after")
+}
+
+# bl_count_new: adds the new ledgers' items to ITEMS, bumps BATCHES, sets UNITS.
+# Never call it in $(...): the counters would update a subshell copy.
+bl_count_new() {
+    local n units=0 u f
+    BATCHES=$((BATCHES + 1))
+    for n in $NEW_LEDGERS; do
+        f="$REPORTS/$n"
+        ITEMS=$((ITEMS + $(jq '.items | length' "$f" 2>/dev/null || echo 0)))
+        u=$(jq '[.items[].units_used // 0] | add // 0' "$f" 2>/dev/null || echo 0)
+        units=$((units + u))
+    done
+    UNITS=$units
+}
+
+bl_on_launch() {
+    local class reason new units tail3
+    bl_run_batch
+    if usage_postrun_pause burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" "$BATCH_RC" "$BLOG"; then
+        bl_log "RESULT paused (usage gate); auto-resumes after reset."
+        bl_finish paused 75
+    fi
+    new=0
+    if [ -n "$NEW_LEDGERS" ]; then new=$(printf '%s\n' "$NEW_LEDGERS" | grep -c .); fi
+    class=$(bl_classify "$BATCH_RC" "$new" "$BLOG")
+    reason="${class#* }"
+    class="${class%% *}"
+    case "$class" in
+        ran)
+            FAILS=0
+            bl_count_new
+            bl_log "batch ran ledgers=$new items=$ITEMS units=$UNITS rc=$BATCH_RC log=$BLOG"
+            ;;
+        empty)
+            bl_log "supply exhausted (first round LEDGER: none)"
+            bl_finish exhausted 0
+            ;;
+        abort)
+            bl_count_new >/dev/null
+            bl_log "batch aborted: burndown exit 3 log=$BLOG"
+            bl_finish fail-closed 1
+            ;;
+        *)
+            FAILS=$((FAILS + 1))
+            tail3=$(tail -n 3 "$BLOG" 2>/dev/null | tr '\n' ' ' | cut -c1-300)
+            LAST_FAIL="last fail: reason=$reason tail=$tail3"
+            bl_log "batch failed reason=$reason fails=$FAILS/$MAX_FAILS tail=$tail3"
+            if [ "$FAILS" -ge "$MAX_FAILS" ]; then bl_finish failures 1; fi
+            if [ "$ONCE" -eq 0 ]; then
+                bl_sleep 300 retry-after-failure || bl_stopped
+            fi
+            ;;
+    esac
+}
+
+# ------------------------------------------------------------ usage-gate pause
+
+bl_on_pause() {
+    local gate_rc=0 zone
+    usage_prestart_gate burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" || gate_rc=$?
+    if [ "$gate_rc" -eq 10 ]; then
+        zone=$(usage_marker_read "$LOOP_SID" | jq -r '.zone // "unknown"' 2>/dev/null)
+        bl_log "paused zone=$zone"
+        bl_finish paused 75
+    fi
+    # The gate failed open (token held, stale fetch, or marker write failed). The loop
+    # still never starts a batch in the drain or stop zone.
+    zone=$(usage_zone "$(usage_fetch 45 2>/dev/null || true)" 2>/dev/null || true)
+    bl_log "zone=${zone:-unknown} but no marker; sleeping"
+    bl_sleep "$BL_SLEEP_CAP" zone-no-marker || bl_stopped
+}
+
+# ------------------------------------------------------------ run
+
+bl_cmd_run() {
+    local dry=0 a decision action rest secs reason max_fails timeout_secs
+    for a in "$@"; do
+        case "$a" in
+            --once) ONCE=1 ;;
+            --dry-run) dry=1; ONCE=1 ;;
+            --no-dm) NO_DM=1 ;;
+            --loop-sid=*)
+                LOOP_SID="${a#--loop-sid=}"
+                usage_valid_sid "$LOOP_SID" || { echo "burndown-loop: --loop-sid needs a uuid" >&2; exit 2; }
+                ;;
+            *) bl_unknown "$a" ;;
+        esac
+    done
+
+    MAX_FAILS=$(bl_posint_env IBL5_BURNDOWN_MAX_FAILS 3)
+    max_fails="$MAX_FAILS"
+    timeout_secs=$(bl_timeout_secs)
+
+    if [ "$dry" -eq 1 ]; then
+        decision=$(bl_decide)
+        echo "burndown-loop: DRY RUN reserve=$(usage_pace_reserve) timeout=$timeout_secs max_fails=$max_fails dm=$DISCORD_DM decision=$decision"
+        return 0
+    fi
+
+    [ -n "$LOOP_SID" ] || LOOP_SID=$(bl_uuid)
+    mkdir -p "$STATE"
+    # An old stop request must not kill a new loop.
+    rm -f "$STOP_FLAG"
+    bl_lock_acquire
+    echo "$LOOP_SID" > "$STATE/loop.sid"
+    while :; do
+        if [ -e "$STOP_FLAG" ]; then bl_stopped; fi
+        decision=$(bl_decide)
+        action="${decision%% *}"
+        bl_log "decision=$decision"
+        case "$action" in
+            sleep)
+                rest="${decision#sleep }"
+                secs="${rest%% *}"
+                rest="${rest#* }"
+                reason="${rest%% *}"
+                bl_sleep "$secs" "$reason" || bl_stopped
+                ;;
+            pause) bl_on_pause ;;
+            launch) bl_on_launch ;;
+        esac
+        [ "$ONCE" -eq 0 ] || return 0
+    done
+}
+
+# ------------------------------------------------------------ launchd
+
+# bl_render_plist: the launchd unit with every value expanded at generation time.
+# Single source for `start` and `--print-plist`.
+bl_render_plist() {
+    cat <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>$LABEL</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-lc</string>
+		<string>exec "$RUNNER"</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>$BL_PATH</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>WorkingDirectory</key>
+	<string>$ROOT</string>
+	<key>StandardOutPath</key>
+	<string>$LOOP_LOG</string>
+	<key>StandardErrorPath</key>
+	<string>$LOOP_LOG</string>
+</dict>
+</plist>
+PLIST_EOF
+}
+
+bl_write_runner() {
+    {
+        printf '#!/usr/bin/env bash\n'
+        printf '# Generated by bin/burndown-loop start at %s.\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf 'export PATH=%q\n' "$BL_PATH"
+        printf 'rc=0\n'
+        printf '%q run --loop-sid=%s' "$ROOT/bin/burndown-loop" "$LOOP_SID"
+        if [ "$NO_DM" -eq 1 ]; then printf ' --no-dm'; fi
+        printf ' || rc=$?\n'
+        printf 'rm -f %q\n' "$PLIST"
+        printf 'launchctl bootout "gui/$(id -u)/%s" 2>/dev/null || true\n' "$LABEL"
+        printf 'exit "$rc"\n'
+    } > "$RUNNER"
+    chmod +x "$RUNNER"
+}
+
+bl_cmd_start() {
+    local a gate_rc=0 pid zone
+    for a in "$@"; do
+        case "$a" in
+            --no-dm) NO_DM=1 ;;
+            *) bl_unknown "$a" ;;
+        esac
+    done
+    pid=$(bl_lock_live_pid)
+    if [ -n "$pid" ]; then
+        echo "burndown-loop: already running (pid $pid); use: bin/burndown-loop stop" >&2
+        exit 4
+    fi
+    [ -n "$LOOP_SID" ] || LOOP_SID=$(bl_uuid)
+    # The saved argv is `start`, never `run`, so a resume always goes through launchd.
+    if [ "$NO_DM" -eq 1 ]; then
+        usage_argv_save "$LOOP_SID" start --no-dm || true
+    else
+        usage_argv_save "$LOOP_SID" start || true
+    fi
+    usage_prestart_gate burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" || gate_rc=$?
+    if [ "$gate_rc" -eq 10 ]; then
+        zone=$(usage_marker_read "$LOOP_SID" | jq -r '.zone // "unknown"' 2>/dev/null)
+        echo "burndown-loop: usage gate ${zone}; paused before start, auto-resumes after reset."
+        exit 75
+    fi
+    [ -z "$RESUME_SID" ] || usage_marker_clear "$RESUME_SID"
+
+    mkdir -p "$STATE" "$(dirname "$PLIST")"
+    bl_write_runner
+    bl_render_plist > "$PLIST"
+    launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+    launchctl bootstrap "gui/$(id -u)" "$PLIST"
+
+    echo "burndown-loop: started under launchd."
+    echo "  label:  $LABEL"
+    echo "  log:    $LOOP_LOG"
+    echo "  stop:   bin/burndown-loop stop"
+    if [ "$NO_DM" -eq 1 ]; then echo "  notify: none (--no-dm)"; else echo "  notify: Discord DM on finish"; fi
+}
+
+# bl_paused_sid: echoes the loop sid when a pause marker exists for it.
+bl_paused_sid() {
+    local sid
+    sid=$(cat "$STATE/loop.sid" 2>/dev/null || true)
+    if [ -n "$sid" ] && usage_marker_exists "$sid"; then echo "$sid"; fi
+    return 0
+}
+
+# Graceful: the running batch completes first, since a kill can leave a ledger with
+# picked-but-unrouted items.
+bl_cmd_stop() {
+    local pid sid
+    pid=$(bl_lock_live_pid)
+    if [ -n "$pid" ]; then
+        mkdir -p "$STATE"
+        : > "$STOP_FLAG"
+        echo "burndown-loop: stop requested (pid $pid); the current batch finishes first."
+        return 0
+    fi
+    sid=$(bl_paused_sid)
+    if [ -n "$sid" ]; then
+        usage_marker_clear "$sid"
+        echo "burndown-loop: cancelled paused loop $sid"
+        return 0
+    fi
+    echo "burndown-loop: not running"
+}
+
+bl_cmd_status() {
+    local pid sid
+    pid=$(bl_lock_live_pid)
+    sid=$(bl_paused_sid)
+    if [ -n "$pid" ]; then
+        echo "running pid=$pid sid=$(cat "$STATE/loop.sid" 2>/dev/null || echo unknown)"
+    elif [ -n "$sid" ]; then
+        echo "paused sid=$sid (resumes after reset)"
+    else
+        echo "not running"
+    fi
+    if [ -f "$LOOP_LOG" ]; then tail -n 5 "$LOOP_LOG"; fi
+    return 0
+}
+
+# ------------------------------------------------------------ dispatch
+
+main() {
+    [ "$#" -gt 0 ] || { echo "burndown-loop: no subcommand" >&2; bl_usage >&2; exit 2; }
+    # --resume-paused <sid>: the coordinator's entry point. Replays the argv saved at
+    # start (always `start [--no-dm]`) under the same loop sid.
+    if [ "$1" = "--resume-paused" ]; then
+        if [ "$#" -ne 2 ]; then
+            echo "--resume-paused takes exactly one session id" >&2
+            exit 2
+        fi
+        local saved_file a
+        saved_file=$(mktemp)
+        if ! usage_resume_paused_args burndown-loop "$2" > "$saved_file"; then
+            rm -f "$saved_file"
+            exit 2
+        fi
+        RESUME_SID="$2"
+        LOOP_SID="$2"
+        local saved=()
+        while IFS= read -r -d '' a; do saved[${#saved[@]}]="$a"; done < "$saved_file"
+        rm -f "$saved_file"
+        set -- ${saved[@]+"${saved[@]}"}
+        [ "$#" -gt 0 ] || { echo "--resume-paused: saved argv is empty" >&2; exit 2; }
+        [ "$1" != "--resume-paused" ] || { echo "--resume-paused: must be the only argument" >&2; exit 2; }
+    fi
+    local cmd="$1"
+    shift
+    case "$cmd" in
+        run) bl_cmd_run "$@" ;;
+        start) bl_cmd_start "$@" ;;
+        stop) [ "$#" -eq 0 ] || bl_unknown "$1"; bl_cmd_stop ;;
+        status) [ "$#" -eq 0 ] || bl_unknown "$1"; bl_cmd_status ;;
+        --print-plist) [ "$#" -eq 0 ] || bl_unknown "$1"; bl_render_plist ;;
+        -h|--help) bl_usage ;;
+        *) bl_unknown "$cmd" ;;
+    esac
+}
+
+main "$@"

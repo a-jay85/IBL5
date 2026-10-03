@@ -1,0 +1,39 @@
+# /pr-ready Phase 6 — plan-intent fidelity review, PR #2341
+
+`procedure-source:` packet copy at `fidelity-packet/procedure.md` (read by path; `Bash` is disabled for this invocation, so `git show <MASTER_SHA>:...` was not used). Its 6a is already the post-2026-08-26 delegated-to-Opus-5 form, so there is no discrepancy to report. `bin/plan-index` was not run: the packet carries a PLAN-BLIND marker, so there is no plan to index.
+
+## 6c(a) — Phase 4B structured code review
+
+`PHASE_4B_RAN: no`. No structured `/pr-review` has run against PR #2341. No staleness bound is needed, because there is no reviewed head to recover.
+
+REVIEW-COVERAGE: NONE
+
+`scripts/review-owed.sh` reads that marker and fires `/pr-review 2341` automatically once this verdict posts. No manual run is needed.
+
+## 6c(b) — Conflict-resolved lines
+
+`CONFLICT_RESOLVED_PATHS` is present in the packet and declared empty: the harness path rebases cleanly or fails closed before Phase 5.5. There are zero conflict-resolved paths, so there is no body of code that escaped structured review by way of conflict resolution. Both 6b literals were supplied, so no check is `UNVERIFIED`.
+
+## The six checks
+
+1. **Intent coverage.** Not assessable — plan-blind run.
+2. **Intent fidelity.** Not assessable — plan-blind run.
+3. **Scope creep.** No finding. All three changed files serve the two changes the PR body declares. The `STUB_SLEEP_<name>` seam in `bin/test-run-meta-checks-local` exists to drive the new timeout cases, so it is in scope. No blocking surface is touched: no SQL, no endpoint, no migration, no `.claude/skills`, `.claude/rules` or hook file, and no user-visible behavior. The advisory timeout is not a gate weakening, because an advisory step already returned 0 on failure and never fed the exit code; hard gates are left unguarded on purpose. On the arming question a reader will raise: `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` condition 16 branches on `MC_RC`, and `bin/run-meta-checks-local` derives that code from hard gates only. Nothing that previously blocked arming now passes; a hang becomes a completed run.
+4. **PR body vs. reality.** Finding, blocking. The Summary claims the `check-orphan-css` rewrite is "~150 fewer lines". The diff grows that file by **+44** lines.
+   - **4a. Named-constant volumes.** Does not fire. The diff introduces no `EXPECTED` constant array or equivalent named-constant count.
+   - **4b. Manual-confirmation block.** Does not fire. The PR body carries no `<!-- manual-confirmation -->` region, and its absence is explicitly out of scope.
+5. **Verification Matrix realisation.** Not assessable — plan-blind run.
+6. **Conflict-resolution audit.** Passes. 6b's conflict list is genuinely empty (clean rebase), which the procedure states is a pass.
+
+## FINDINGS
+
+- `bin/check-orphan-css` grew by 44 net lines, and the PR body Summary claims the rewrite is "~150 fewer lines". Confirmed two ways: by summing the hunks, and from the final hunk header `@@ -482,7 +526,7 @@`, where 526 minus 482 is 44. The real removals are the `class_in_source` helper plus three `while read` loops, roughly 25 lines; the new one-pass helpers, their comment blocks and the underscore-boundary self-test add more than that back. Supporting totals: `bin/run-meta-checks-local` +36, `bin/test-run-meta-checks-local` +47, PR total +127. This matched 6d check 4's blocking clause, "a hand-written body claim the diff contradicts". Next action: correct or drop that clause in the Summary, then re-run Phase 6.
+
+NOT READY
+
+## DIGEST
+**What changed:** Advisory meta-checks now give up after 120 seconds, and the orphan-CSS scanner reads the source corpus once per run.
+**Why:** The PR Summary states that a hung advisory check must not stall a run, and that the old per-class regex scan was slow.
+**Watch:** Case m self-skips wherever no `timeout` or `gtimeout` resolves, which is macOS by default. CI runs the suite on `ubuntu-latest`, so the timeout path is exercised there (`.github/workflows/tests.yml:952`).
+**Touches:** `bin/check-orphan-css`, `bin/run-meta-checks-local`, `bin/test-run-meta-checks-local`
+**Machine-authored fixes:** pending — Phase 6.5 has not run

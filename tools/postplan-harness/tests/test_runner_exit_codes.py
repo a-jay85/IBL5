@@ -31,6 +31,33 @@ def test_other_typed_failure_exits_1():          # negative path: not everything
     assert runner.exit_code_for(_res(TerminalState.FAILED, "push-disabled")) == 1
     assert runner.exit_code_for(_res(TerminalState.FAILED, None)) == 1
 
+_EXIT_CODE_TABLE = (
+    [(TerminalState.FAILED, k, 3) for k in (
+        "rebase-conflict", "local-gate", "remote-head-diverged",
+        "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty")]
+    + [(TerminalState.FAILED, "usage-pause", 75)]
+    + [(TerminalState.FAILED, k, 1) for k in (
+        "push-disabled", "push-failed", "push-retry-cap",
+        "lostwork-unproved", "git", None)]
+    + [(t, None, 0) for t in (
+        TerminalState.SHIPPED_ARMED, TerminalState.SHIPPED_HELD,
+        TerminalState.NOTHING_TO_SHIP, TerminalState.DEGRADED)]
+)
+
+
+@pytest.mark.parametrize("terminal,error_kind,expected", _EXIT_CODE_TABLE)
+def test_exit_code_table_pins_every_kind(terminal, error_kind, expected):
+    """Literal table (not _FAIL_CLOSED_KINDS) so mutating the tuple fails here."""
+    assert runner.exit_code_for(_res(terminal, error_kind)) == expected
+
+
+def test_harness_error_positional_signature_pinned():
+    """Two-argument raise sites keep their meaning when keyword-only fields are added."""
+    e = HarnessError("git", "boom")
+    assert e.kind == "git"
+    assert e.detail == "boom"
+    assert str(e) == "git: boom"
+
 def test_success_and_nothing_to_ship_exit_0():
     assert runner.exit_code_for(_res(TerminalState.SHIPPED_ARMED)) == 0
     assert runner.exit_code_for(_res(TerminalState.SHIPPED_HELD)) == 0
@@ -360,6 +387,69 @@ def test_main_writes_blocked_ship_on_rc3(monkeypatch, tmp_path, capsys):
     assert text.startswith("feat/x did not ship.")
     assert text.rstrip("\n").split("\n")[-1] == "Log: /tmp/x.log"
     assert stdout.split("\n")[0].startswith("RESULT: post-plan BLOCKED")
+
+
+def test_forced_commit_failure_names_command_and_error_end_to_end(monkeypatch, tmp_path, capsys):
+    import subprocess
+    import tempfile
+    from harness.adapters.gitad import LiveGit
+
+    repo = tempfile.mkdtemp(prefix="postplan-forced-fail-")
+    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+    subprocess.run(["git", "init", "-b", "master", repo], check=True, capture_output=True)
+    for args in (["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+        subprocess.run(["git", "-C", repo, *args], check=True, capture_output=True)
+    with open(os.path.join(repo, "a.txt"), "w") as fh:
+        fh.write("base\n")
+    subprocess.run(["git", "-C", repo, "add", "-A"], check=True, capture_output=True, env=env)
+    subprocess.run(["git", "-C", repo, "commit", "-m", "base"], check=True,
+                   capture_output=True, env=env)
+
+    secret = "ghs_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
+    hooks = os.path.join(repo, ".git", "hooks")
+    os.makedirs(hooks, exist_ok=True)
+    hook = os.path.join(hooks, "pre-commit")
+    assert hook.startswith(tempfile.gettempdir()), f"refusing to write a hook at {hook}"
+    with open(hook, "w") as fh:
+        fh.write("#!/bin/sh\n"
+                 "i=0\n"
+                 "while [ $i -lt 120 ]; do echo \"filler $(printf '%03d' $i)\"; i=$((i+1)); done\n"
+                 f"echo 'remote: https://x-access-token:{secret}@github.com/a/b.git'\n"
+                 "echo 'GUIDANCE: hook-x refused the commit'\n"
+                 "exit 1\n")
+    os.chmod(hook, 0o755)
+
+    with open(os.path.join(repo, "b.txt"), "w") as fh:
+        fh.write("blocked\n")
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(repo).commit_all("chore: should be rejected")
+    e = ei.value
+
+    res = RunResult(terminal=TerminalState.FAILED)
+    res.slug = "feat/x"
+    res.error = f"{e.kind}: {e.detail}"
+    res.error_kind = e.kind
+    runner._record_failure_context(res, e)
+
+    monkeypatch.setenv("POSTPLAN_LOG_PATH", "/tmp/x.log")
+    rc, stdout, out = _drive_main(monkeypatch, tmp_path, res, capsys)
+    assert rc == 3
+    first = stdout.split("\n")[0]
+    block = (out / "blocked-ship.txt").read_text()
+    assert first.startswith("RESULT: post-plan BLOCKED")
+    assert "Command: git commit." in first
+    assert "GUIDANCE: hook-x refused the commit" in first
+    assert "Command: git commit" in block
+    assert "> GUIDANCE: hook-x refused the commit" in block
+    assert block.rstrip("\n").split("\n")[-1] == "Log: /tmp/x.log"
+    for text in (first, block):
+        assert secret not in text
+        assert "filler 000" not in text
+
+
+def test_run_handler_records_failure_context():
+    assert "_record_failure_context(res, e)" in inspect.getsource(runner.run)
 
 
 def test_main_writes_no_blocked_ship_on_rc1(monkeypatch, tmp_path, capsys):

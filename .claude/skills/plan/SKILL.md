@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-09-29
+last_verified: 2026-10-01
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -475,10 +475,10 @@ When the work was split into multiple PRs (Step 2.5), queue **every** queue-safe
 
 Report which plans were queued (and which were left for in-session implementation) in Step 6.
 
-**Under `CLAUDE_HEADLESS=1` (a `bin/plan-now` run), skip this step.** Never run `bin/automouse/queue` yourself. The job queues the plan after its own `bin/check-plan` verdict.
+**Under `CLAUDE_HEADLESS=1` (a `bin/plan-now` run), skip this step.** Never run `bin/automouse/queue` yourself. By default (`--queue`), the job queues the plan after its own `bin/check-plan` verdict. Under `--implement`, the plan stays on disk and nothing is queued.
 
 ## Step 6: Report
 
 Tell the user the plan file path, and every path when the work was split into multiple PRs. Then give each plan's disposition (auto-queued for automouse by default, or left for in-session implementation under `--implement`) with the resulting `bin/automouse/queue` state, and a one-line matrix summary per plan. Cover each of these as well, and say so in one line when it did not arise: a flagged security surface and how it is defended; an `auto_merge: false` hold and its reason (Step 4 gate 14); a recorded `pre-prod-exception:` with its intrinsic slice and what was built for the reducible slice (Step 4 gate 16); a mechanized post-merge follow-up and what it runs; the PR order for a multi-PR split; and whether each plan is ready for implementation or has open questions.
 
-**Headless final line.** Under `CLAUDE_HEADLESS=1`, the report's last line is `PLAN_FILE: <absolute path>`, on its own with nothing after it. Report the disposition as "`bin/plan-now` queues it", since this run did not queue it. A report that ends on queue state ("Queued at position 11", "Automouse will pick it up") with no `PLAN_FILE:` line is the known failure. `bin/plan-now` then reports `RESULT degraded (recovered)` or `RESULT unconfirmed`.
+**Headless final line.** Under `CLAUDE_HEADLESS=1`, the report's last line is `PLAN_FILE: <absolute path>`, on its own with nothing after it. Report the disposition as "`bin/plan-now` queues it" by default, since this run did not queue it; under `--implement`, say the plan stays on disk for a human to review and nothing was queued. A report that ends on queue state ("Queued at position 11", "Automouse will pick it up") with no `PLAN_FILE:` line is the known failure. `bin/plan-now` then reports `RESULT degraded (recovered)` or `RESULT unconfirmed`.

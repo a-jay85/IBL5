@@ -96,6 +96,12 @@ const RETIRED_FIGURES = [
         'why'     => 'ADR-0094 Phase 6 spaced seed blocks 1 apart while runs=4 consumes seed..seed+3, so the 8 readings were a sliding window over 11 draws; the sample SD is deflated ~x0.781',
         'use'     => 'use 0.016pp (de-overlapped Phase 6, all-era) or 0.021pp (matched recent-era, PR #1620) — see ibl5/docs/decisions/0094-gate1-ci-construction-audit.md § Addendum',
     ],
+    [
+        'pattern' => '/3[–-]5K-token spawn/u',
+        'label'   => 'sub-agent spawn cost ~3–5K tokens',
+        'why'     => 'the spawn cost was re-measured at ~17–23K tokens (agent-tiering-detail.md § Skip the Agent, corrected 2026-08-14); the ~3–5K figure understates it and made delegation look cheaper than a direct Read/Grep',
+        'use'     => '~17–23K tokens, see .claude/rules/agent-tiering-detail.md § Skip the Agent',
+    ],
 ];
 
 // A retired figure may be quoted legitimately inside its own correction. Any of
@@ -1332,6 +1338,8 @@ function selfTestRetiredFigures(): int
         ['section scope ends at next heading', "# Doc\n\n## Addendum (2026-07-24)\n\nfine\n\n## Phase 6\n\nSeed SD 0.012pp across 8 seeds.\n", 1],
         ['frontmatter is exempt', "---\ndescription: corrects seed SD 0.012pp to 0.016pp\nlast_verified: 2026-07-24\n---\n\n# Doc\n", 0],
         ['frontmatter exemption does not leak into body', "---\ndescription: a doc\nlast_verified: 2026-07-24\n---\n\nSeed SD 0.012pp.\n", 1],
+        ['spawn-cost figure flags', "# Doc\n\nA direct Read beats a ~3–5K-token spawn.\n", 1],
+        ['spawn-cost figure inside CORRECTED line exempts', "# Doc\n\nSpawn costs ~17–23K [CORRECTED 2026-08-14 — was \"~3–5K-token spawn\"].\n", 0],
         ['unrelated nearby figure does not flag', "# Doc\n\nSeed SD 0.0125pp and 0.021pp are fine.\n", 0],
         ['warning glyph alone does not exempt', "# Doc\n\n⚠ heads up\n\nSeed SD 0.012pp across 8 seeds.\n", 1],
         // Regression guard: \R would split inside `✅` (E2 9C 85) and shift the

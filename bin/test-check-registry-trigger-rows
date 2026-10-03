@@ -170,12 +170,16 @@ check 9 "--verification nonexistent exits 1" 1 \
     --registry "$REAL_REGISTRY" --verification /nonexistent/file.md
 
 # Case 10: Verification file exists but is unreadable chmod 000 — exit 1
-make_verification "$TMPDIR_FIXTURES/v10.md"
-make_registry_with_anchor "$TMPDIR_FIXTURES/r10.md" "Forced integration-verification trigger" "asserts it is gitignored"
-chmod 000 "$TMPDIR_FIXTURES/v10.md"
-check 10 "unreadable verification file exits 1" 1 \
-    --registry "$TMPDIR_FIXTURES/r10.md" --verification "$TMPDIR_FIXTURES/v10.md"
-chmod 644 "$TMPDIR_FIXTURES/v10.md"
+if [ "$(id -u)" -eq 0 ]; then
+    echo "SKIP: Case 10 — unreadable verification file (root can read mode-000 files)"
+else
+    make_verification "$TMPDIR_FIXTURES/v10.md"
+    make_registry_with_anchor "$TMPDIR_FIXTURES/r10.md" "Forced integration-verification trigger" "asserts it is gitignored"
+    chmod 000 "$TMPDIR_FIXTURES/v10.md"
+    check 10 "unreadable verification file exits 1" 1 \
+        --registry "$TMPDIR_FIXTURES/r10.md" --verification "$TMPDIR_FIXTURES/v10.md"
+    chmod 644 "$TMPDIR_FIXTURES/v10.md"
+fi
 
 # Case 11: Unknown flag --bogus — exit 2
 check 11 "unknown flag exits 2" 2 \

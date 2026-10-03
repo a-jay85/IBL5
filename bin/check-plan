@@ -157,8 +157,12 @@
 #                              verbatim) AND every backtick-quoted token in
 #                              that field must appear literally as a substring
 #                              in the packet's **Self-verify:** block. A
-#                              `no-assertions: <reason>` line inside the
-#                              packet clears BOTH sub-checks for that packet
+#                              `no-assertions: <reason>` marker line inside
+#                              the packet clears BOTH sub-checks for that
+#                              packet. The marker must open its line (after
+#                              optional indent, >, a -/* bullet, <!--, or a
+#                              backtick) and carry a non-empty reason; a
+#                              mid-sentence prose mention does not count
 #                              (mirrors no-adr: / context-budget:). Runs for
 #                              ALL plans (not impl_model-gated, unlike gate S).
 #                              Two past PRs were blocked because a delegate
@@ -223,6 +227,16 @@
 #                              UNREALISED-ASSERTION at post-plan Step 6.7
 #                              whatever the diff holds. Extraction mirrors the
 #                              checker; bin/test-check-plan pins the parity.
+#   VR VR snapshots marker   — a `## Critical Files` entry that
+#                              cf_parse_section_raw classifies MUST_APPEAR and
+#                              whose path contains `-snapshots` must carry the
+#                              whole-word token `vr-baseline-change` on its
+#                              line (a deliberate regen or deletion). Otherwise
+#                              mark it `(conditional — only if VR baselines
+#                              change)`, which exempts it. CI changes a
+#                              baseline dir only on a screenshot diff, so an
+#                              unmarked entry holds post-plan forever
+#                              (backlog#1277). Fenced examples never count.
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
@@ -955,7 +969,7 @@ elif [ -n "$(printf '%s' "$CF_SECTION" | tr -d '[:space:]')" ]; then
         # repo-relative and cannot be matched by `git diff --name-only` at Phase
         # 5.0 conformance time. Paths like /Users/.../IBL5/ibl5/... or
         # /Users/.../IBL5-worktrees/<slug>/... must be written as ibl5/... etc.
-        # This is the ONE caller of cf_parse_section_raw: the normalising
+        # Gate [F] and gate [VR] are the callers of cf_parse_section_raw: the normalising
         # cf_parse_section strips exactly these prefixes (so legacy plans can
         # match at Phase 5.0), which would blind this check. Raw already strips
         # fenced code blocks.
@@ -964,6 +978,36 @@ elif [ -n "$(printf '%s' "$CF_SECTION" | tr -d '[:space:]')" ]; then
             viol "[F] ## Critical Files entry has an absolute path (\`$_f_abs\`) — paths must be repo-relative (e.g. \`ibl5/...\`, \`bin/...\`) because post-plan's Phase 5.0 compares them to \`git diff --name-only\` output"
         fi
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [VR]: a VR `-snapshots` Critical File needs an explicit baseline marker.
+# ---------------------------------------------------------------------------
+# A Visual Regression baseline directory changes only when CI sees a screenshot
+# diff, so a plan that leaves rendered output unchanged never touches it. An
+# unmarked (MUST_APPEAR) `-snapshots` entry then holds post-plan arming
+# condition (3) and Phase 6 check 5 forever (a-jay85/IBL5-backlog#1277).
+# Two clears: `(conditional — only if VR baselines change)` makes the entry
+# EXEMPT in cf_parse_section_raw, so this loop never sees it; the whole-word
+# token `vr-baseline-change` on the entry line accepts a deliberate regen or
+# deletion while Phase 5.0 still requires the path in the diff. Additive only:
+# the lib parser and Phase 5.0 are unchanged. Fence-stripped (cf_section and
+# cf_parse_section_raw both strip fences). Skipped on an unbalanced fence,
+# which gate [F] already rejects. Measured 2026-10-01 on the 1050-plan corpus:
+# fires on 3 plans, all shipped. Herestrings, not printf pipes: pipefail +
+# grep (see .claude/rules/shell-pipefail-grep.md).
+if ! cf_fence_unbalanced "$PLAN_FILE"; then
+    _vr_paths=$(cf_parse_section_raw "$PLAN_FILE" \
+        | sed -n 's/^MUST_APPEAR://p' | grep -F -- '-snapshots' || true)
+    _vr_entry_lines=$(grep -E "$CF_LINE_PATTERN" <<<"$CF_SECTION" || true)
+    while IFS= read -r _vr_path; do
+        [ -n "$_vr_path" ] || continue
+        _vr_lines=$(grep -F -- "\`$_vr_path\`" <<<"$_vr_entry_lines" || true)
+        if ! grep -iE '(^|[^[:alnum:]_-])vr-baseline-change([^[:alnum:]_-]|$)' \
+            <<<"$_vr_lines" >/dev/null; then
+            viol "[VR] ## Critical Files entry \`$_vr_path\` is a Visual Regression baseline directory listed as must-appear. CI changes it only when a screenshot diff regenerates baselines, so post-plan hold (3) blocks forever on a green VR run. Mark it (conditional — only if VR baselines change), or (vr-baseline-change: <what changes>) when the plan deliberately regenerates or deletes baselines."
+        fi
+    done <<<"$_vr_paths"
 fi
 
 # ---------------------------------------------------------------------------
@@ -1293,7 +1337,7 @@ packet_scan() {
                 print "[S] delegation packet " q pname q " lacks a **Self-verify:** line (required for impl_model: sonnet plans)"
             if (!has_no_assertions) {
                 if (!has_assertions)
-                    print "[E] delegation packet " q pname q " lacks an **Assertions:** field (paste the phase" q "s Verification Matrix assertions verbatim, or add a " q "no-assertions: <reason>" q " line)"
+                    print "[E] delegation packet " q pname q " lacks an **Assertions:** field (paste the phase" q "s Verification Matrix assertions verbatim, or add a line that opens with " q "no-assertions: <reason>" q ")"
                 else {
                     s = assert_text
                     while (match(s, /`[^`]+`/)) {
@@ -1320,7 +1364,19 @@ packet_scan() {
                 if (pname == "") pname = "(unnamed)"
             }
             if (in_packet) {
-                if ($0 ~ /no-assertions:/) has_no_assertions=1
+                # Gate E escape. Anchored like the gate T **Tier:** match: the
+                # marker must OPEN its line, after optional indent, an optional
+                # blockquote `>`, an optional `-`/`*` bullet, an optional `<!--`,
+                # and an optional backtick. It must also carry a non-empty reason
+                # once a closing `-->`, backticks, and whitespace are stripped.
+                # An unanchored match let a mid-sentence prose mention clear the
+                # gate (#947).
+                if (match($0, /^[ \t]*>?[ \t]*([-*][ \t]+)?(<!--[ \t]*)?`?no-assertions:/)) {
+                    na_reason = substr($0, RSTART + RLENGTH)
+                    gsub(/-->/, "", na_reason)
+                    gsub(/[` \t]/, "", na_reason)
+                    if (na_reason != "") has_no_assertions=1
+                }
                 if ($0 ~ /\*\*Self-verify:\*\*/) { has_sv=1; in_block="sv" }
                 if ($0 ~ /\*\*Assertions:\*\*/) { has_assertions=1; in_block="assertions" }
                 if ($0 ~ /^[ \t]*[-*][ \t]*\*\*[A-Za-z]/) {
@@ -1383,8 +1439,10 @@ esac
 # ---------------------------------------------------------------------------
 # Every ### Delegate packet must (a) carry an **Assertions:** field and
 # (b) name every backtick-quoted token from that field somewhere in the
-# packet's **Self-verify:** block. A `no-assertions: <reason>` line anywhere
-# inside the packet clears BOTH sub-checks for that packet. Uses the
+# packet's **Self-verify:** block. A `no-assertions: <reason>` marker line
+# inside the packet clears BOTH sub-checks for that packet. The marker must
+# open its line (optional indent, >, -/* bullet, <!--, or backtick) and carry
+# a non-empty reason; a mid-sentence prose mention does not clear it. Uses the
 # _PACKET_SCAN cache populated above.
 while IFS= read -r eviol; do
     [ -n "$eviol" ] && viol "$eviol"

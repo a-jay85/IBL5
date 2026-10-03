@@ -12,7 +12,9 @@ SIGNOFF_CHECKS = frozenset({"human-signoff"})
 # if: always(), needs: [...], exit 1 on any upstream failure). Never a fix target.
 ROLLUP_CHECKS = frozenset({"Tests and Analysis"})
 CI_FIX_ALLOWED_TOOLS = REMEDIATION_ALLOWED_TOOLS
-CI_FIX_DENIED_TOOLS = REMEDIATION_DENIED_TOOLS
+# Ci-fix only: the harness judges and applies a proposed PR body. Phase 5.5's fixer
+# shares REMEDIATION_DENIED_TOOLS and still needs raw `gh pr edit`.
+CI_FIX_DENIED_TOOLS = REMEDIATION_DENIED_TOOLS + ("Bash(gh pr edit:*)",)
 _RUN_LINK = re.compile(r"/actions/runs/(\d+)/job/(\d+)")
 
 SURVIVOR_TITLE = "Phase 7 CI fix loop: failures remain"
@@ -71,7 +73,8 @@ def failed_job_refs(checks: list[dict], names: list[str]) -> dict[str, tuple[str
 
 
 def ci_fix_prompt(pr_number, attempt: int, names: list[str], log_paths: dict[str, str],
-                  diff_path: str, prior: list[str]) -> str:
+                  diff_path: str, prior: list[str], *, dep_advisory: bool = False,
+                  proposal_path: str = "") -> str:
     """Build the Opus prompt for a CI fix attempt."""
     lines = [
         f"Fix the failing CI checks for PR #{pr_number}.",
@@ -88,18 +91,30 @@ def ci_fix_prompt(pr_number, attempt: int, names: list[str], log_paths: dict[str
         "",
         f"Diff path (origin/master...HEAD patch): {diff_path}",
         "",
-        "Master is green. This PR's diff caused every failure listed. Find the root cause in the diff and fix it.",
+        "Assume this PR's diff caused each failure listed unless the log shows otherwise. Find the root cause and fix it in this PR.",
         "",
         "Do NOT change a test's expected value, snapshot, baseline, fixture count or hardcoded total just to make it match new output. Change one only when the PR intentionally changed the thing it counts, and name the diff line that did so in your reply.",
         "",
-        "If the failure is not caused by this diff (runner outage, network timeout, cancelled job), make NO edits and reply FLAKY.",
+        "Reply FLAKY (and make NO edits) only for an infrastructure failure: runner outage, network timeout, cancelled job. A dependency security advisory is never FLAKY, even when this diff did not touch the dependency.",
         "",
         GATE_EDIT_DENY_TEXT,
         "",
-        "The following Bash commands are denied: git push, git commit, gh pr merge, gh pr review, gh api are denied; the harness commits and pushes.",
+        "The following Bash commands are denied: git push, git commit, gh pr merge, gh pr review, gh api, gh pr edit are denied; the harness commits and pushes.",
         "",
         f"This is attempt {attempt} of {MAX_CI_FIX_ATTEMPTS}.",
     ]
+
+    if dep_advisory:
+        lines += [
+            "",
+            'JS Dependency Audit (bun) is red. If the advisory names a patched version, fix it here: bump the package or add an "overrides" entry in ibl5/package.json, then regenerate ibl5/bun.lock with "cd ibl5 && bun install". Do not edit .github/workflows.',
+        ]
+
+    if proposal_path:
+        lines += [
+            "",
+            f'If a PR-body check (Meta checks) fails, do NOT run gh pr edit (it is denied). Write the complete proposed PR body to {proposal_path}. The harness reviews it and applies it. Never add or change a no-adr marker, post-merge-recipe-ok, or anything under "## Manual Testing"; such a proposal is refused and left for a human.',
+        ]
 
     if prior:
         lines.append("")
@@ -110,10 +125,13 @@ def ci_fix_prompt(pr_number, attempt: int, names: list[str], log_paths: dict[str
     return "\n".join(lines) + "\n"
 
 
-def survivor_comment(survivors: list[str], attempts: list[str], flaky: bool) -> str:
+def survivor_comment(survivors: list[str], attempts: list[str], flaky: bool, *,
+                     refused: list[tuple[int, str, str]] = ()) -> str:
     """Markdown PR comment body for surviving CI failures.
 
     No heading — post_review_summary(pr, title, body) prepends '## <title>'.
+    `refused` holds (attempt, reason, quoted_block) for each PR-body proposal the
+    harness refused; the caller redacts and fences the block.
     Raises ValueError when survivors is empty.
     """
     if not survivors:
@@ -125,6 +143,11 @@ def survivor_comment(survivors: list[str], attempts: list[str], flaky: bool) -> 
     for audit in attempts:
         lines.append(f"- {audit}")
     lines.append("A human needs to look at these before merging.")
+    if refused:
+        lines += ["", "### Proposed PR body (refused, needs a human)"]
+        for attempt, reason, block in refused:
+            lines += ["", f"Attempt {attempt}, refused: {reason}. A human may apply it "
+                          "with gh pr edit after review.", block]
     return "\n".join(lines) + "\n"
 
 

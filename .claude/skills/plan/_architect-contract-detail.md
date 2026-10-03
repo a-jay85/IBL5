@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-09-28
+last_verified: 2026-10-01
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -33,6 +33,14 @@ The `(conditional)` marker exempts an entry from the MISSING-FILE check, but onl
 A keyword in surrounding prose does **not** exempt — only the parenthesized group signals "this is a marker, not a description." Canonical markers: `(reference)`, `(read-only)`, `(read-only reference)`, `(verify)`, `(verification)`, `(template)`, `(no-edit)`, `(no-change)`, `(unchanged)`, `(context)`, `(conditional)`. All tokens match as **whole words** — `(filename references the affected class)` and `(the referenced file is deleted)` are **not** exempt because `references`/`referenced` are not the token `reference`. An explanatory tail inside the same parens is allowed for the non-`conditional` tokens — e.g. `(reference — pattern to mirror)`.
 
 A bare path OR a path you annotate with a change-description is still checked; only the reference marker exempts. The `## Critical Files` section must be in **list form** (`- \`path\` (annotation)`); a markdown-table section is rejected by `bin/check-plan` gate `[F]` because a table parses to zero entries and silently voids the whole conformance check.
+
+**VR `-snapshots` directories.** A Visual Regression baseline directory changes only when CI sees a screenshot diff and the `update-baselines` label regenerates it (`.claude/rules/playwright-tests.md`). A plan that leaves rendered output byte-identical never touches the directory. An unmarked entry then holds post-plan arming condition (3) and Phase 6 check 5 with `MISSING-FILE:` forever (a-jay85/IBL5-backlog#1277, PR 2625). Gate `[VR]` in `bin/check-plan` accepts two forms and rejects the third:
+
+- `` `ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots` (conditional — only if VR baselines change) `` → EXEMPT. Use it whenever the plan does not intend a baseline change. <!-- slop-ok -->
+- `` `…-snapshots` (vr-baseline-change: deletes the contracts-hub baselines) `` → MUST_APPEAR, and `[VR]` passes. Use it when the plan deliberately regenerates or `git rm`s baselines. `vr-baseline-change` is a gate token and is absent from the canonical exempt list, so Phase 5.0 still requires the path in the diff. A planned regen that never lands keeps the hold, which is the correct outcome.
+- `` `…-snapshots` — VR baselines `` → MUST_APPEAR, and `[VR]` fails the plan. <!-- slop-ok -->
+
+The gate is a hard fail. Every flagged plan holds deterministically whenever VR is green, and one marker clears it. The 2026-10-01 corpus scan flagged 3 of 1050 plans, all already shipped.
 
 ### Phase-count guard — HTML comment mechanism
 
@@ -155,7 +163,7 @@ A discharge never replaces a defense — the **Security** bullet (SQL prepared s
 
 **Why the grant exists.** Before it, an unknown that surfaced *during* design could not be explored at all: the orchestrator's Step-2 fan-out is spent before the architect starts, so the architect either guessed or the orchestrator had to have guessed the architect's needs in advance. Both produce plans with soft spots the architect could see but not close.
 
-**What it is not.** It is not a licence to delegate reading. A direct `Read`/`Grep` beats a ~3–5K-token spawn; an architect-side spawn must clear `.claude/rules/agent-tiering-detail.md` § Skip the Agent on its own merits, the same bar the orchestrator's Step-2 spawns clear.
+**What it is not.** It is not a licence to delegate reading. A direct `Read`/`Grep` beats a ~17-23K-token spawn; an architect-side spawn must clear `.claude/rules/agent-tiering-detail.md` § Skip the Agent on its own merits, the same bar the orchestrator's Step-2 spawns clear.
 
 **Budget — per actor, not per run.** The `/plan` Step-2 cap (≤2 orchestrator agents; never 3) is unchanged. The architect gets **≤1 `Explore` spawn per architect invocation**, on top of it. Run-wide ceiling: **3** (2 orchestrator + 1 architect). A per-actor cap needs no shared counter and no cross-actor bookkeeping, and 1 rather than 2 keeps the ceiling one above today's rather than doubling it — the grant's justification is *a* question that surfaced mid-design, singular.
 

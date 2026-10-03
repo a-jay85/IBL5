@@ -81,6 +81,7 @@ cat > "$STUBBIN/docker" << 'DOCKERSTUB'
 #   workdir  <project>  <path>                 — working_dir for hole-1 check
 #   unlabeled  <compose-label>  <id>  <name>   — pass-5 stream row (label may be empty)
 #   created  <id>  <iso8601>                   — docker inspect Created value
+#   inspectfail  <id>                          — docker inspect exits 1 for this id
 #   image    <name>                             — orphaned image name
 #   vol      <name>                             — orphaned volume name
 [ -z "$DOCKER_FIXTURE" ] && exit 0
@@ -94,6 +95,9 @@ elif [[ "$args" == *'com.docker.compose.project'* ]]; then
     awk -F'\t' '$1=="project" {print $2}' "$DOCKER_FIXTURE"
 elif [[ "$args" == *inspect* && "$args" == *Created* ]]; then
     for _cid; do true; done
+    if awk -F'\t' -v c="$_cid" '$1=="inspectfail" && $2==c {f=1} END{exit !f}' "$DOCKER_FIXTURE"; then
+        exit 1
+    fi
     awk -F'\t' -v k="created" -v c="$_cid" '$1==k && $2==c {print $3}' "$DOCKER_FIXTURE"
 elif [[ "$args" == *images* ]]; then
     awk -F'\t' '$1=="image" {print $2}' "$DOCKER_FIXTURE"
@@ -785,6 +789,20 @@ printf 'created\tdef456abc123def4\t%s\n' "$_recent_ts" >> "$_fx_hole2_recent"
 out="$(run_cleanup_docker "$e" "$_fx_hole2_recent")"
 assert_absent "hole2-recent-unlabeled-spared" \
     'WOULD remove stale unlabeled container: recent-orphan' "$out"
+
+# Failed docker inspect on one container skips just it: the run completes,
+# the next container is still evaluated, and later passes (sixth) still run.
+_fx_hole2_ifail="$TMP/docker-hole2-ifail.tsv"
+printf 'unlabeled\t\tbad000000000000a\tinspect-fails\n' > "$_fx_hole2_ifail"
+printf 'unlabeled\t\tabc123def456abc1\torphan-sim\n' >> "$_fx_hole2_ifail"
+printf 'inspectfail\tbad000000000000a\n' >> "$_fx_hole2_ifail"
+printf 'created\tabc123def456abc1\t2026-07-01T00:00:00.000000000Z\n' >> "$_fx_hole2_ifail"
+out="$(run_cleanup_docker "$e" "$_fx_hole2_ifail")"
+assert_match "hole2-inspect-fail-run-continues" \
+    'WOULD remove stale unlabeled container: orphan-sim' "$out"
+assert_absent "hole2-inspect-fail-container-skipped" \
+    'inspect-fails' "$out"
+assert_match "hole2-inspect-fail-reaches-sixth-pass" 'build cache' "$out"
 
 # Container with compose label "ibl5" (main stack member) is spared — label
 # is non-empty so pass 5 skips it via [ -n "$_proj" ] && continue.

@@ -1195,6 +1195,117 @@ no-assertions: mechanical rename, no matrix rows
 ````
 '
 
+# (E4b) A "- no-assertions: <reason>" list item clears gate E (faprep-xss-fix.md shape).
+assert "gateE-no-assertions-bullet-clears" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- no-assertions: mechanical rename, no matrix rows
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4c) An indented "<!-- no-assertions: <reason> -->" clears gate E (trim-plan-hold-criteria-lore.md shape).
+assert "gateE-no-assertions-html-comment-clears" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+  <!-- no-assertions: mechanical rename, no matrix rows -->
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4d) A backticked "- \`no-assertions: <reason>\`" list item clears gate E.
+assert "gateE-no-assertions-backtick-clears" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- `no-assertions: mechanical rename, no matrix rows`
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4e) A mid-sentence prose mention of the marker does NOT clear gate E (#947).
+assert "gateE-no-assertions-prose-midsentence-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+We chose not to use no-assertions: here, so list them later.
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4f) A prose mention inside another packet field does NOT clear gate E (#947 live repro).
+assert "gateE-no-assertions-prose-in-bullet-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate; we chose not to use no-assertions: here, so list them later
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4g) A bare marker with no reason does NOT clear gate E.
+assert "gateE-no-assertions-empty-reason-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+no-assertions:
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4h) An HTML-comment marker whose only "reason" is the closing --> does NOT clear gate E.
+assert "gateE-no-assertions-empty-comment-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+<!-- no-assertions: -->
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
 # (E5) Gate E is NOT impl_model-gated: an OPUS plan with a packet missing
 # **Assertions:** still exits 1. Proves gate E runs for all plans.
 assert "gateE-opus-plan-still-gated" 1 "$TFM$M"'
@@ -2080,6 +2191,107 @@ assert_viol "cf-relative-path-accepted" 0 '[F]' "$FM$CF_MATRIX"'
 - `ibl5/classes/Foo.php`
 - `bin/check-plan`
 '
+
+# ---------------------------------------------------------------------------
+# Gate [VR] fixtures (11 cases) — a VR -snapshots Critical File needs a marker
+# ---------------------------------------------------------------------------
+VR_SNAP='ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots'
+
+# (VR-1) Unmarked -snapshots entry (the PR 2625 shape) — must flag [VR].
+assert_viol "vr-unmarked-snapshots-rejected" 1 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` — VR baselines
+- `bin/check-plan`
+'
+
+# (VR-2) The conditional marker exempts it — clean.
+assert_viol "vr-conditional-marker-accepted" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (conditional — only if VR baselines change)
+'
+
+# (VR-3) Deliberate regen/deletion opt-out token — clean.
+assert_viol "vr-baseline-change-token-accepted" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (vr-baseline-change: deletes the contracts-hub baselines)
+'
+
+# (VR-4) Token match is case-insensitive — clean.
+assert_viol "vr-baseline-change-token-uppercase-accepted" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (VR-Baseline-Change: regenerates the smoke baselines)
+'
+
+# (VR-5) Whole word only: a longer word does not clear — must flag [VR].
+assert_viol "vr-baseline-changes-suffix-rejected" 1 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` — vr-baseline-changes expected
+'
+
+# (VR-6) The token on ANOTHER entry line does not clear this entry — must flag [VR].
+assert_viol "vr-token-on-other-entry-rejected" 1 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` — VR baselines
+- `bin/check-plan` — vr-baseline-change
+'
+
+# (VR-7) The token in phase prose outside Critical Files does not clear — must flag [VR].
+assert_viol "vr-token-in-prose-only-rejected" 1 '[VR]' "$FM$CF_MATRIX"'
+### Notes
+
+This plan is a vr-baseline-change.
+
+## Critical Files
+
+- `'"$VR_SNAP"'` — VR baselines
+'
+
+# (VR-8) A non-snapshot must-appear entry is untouched by [VR] — clean.
+assert_viol "vr-non-snapshot-entry-ignored" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `bin/check-plan` — add gate
+- `ibl5/tests/e2e/smoke/visual-regression.spec.ts` — edit spec
+'
+
+# (VR-9) A (reference)-exempt -snapshots entry is not flagged — clean.
+assert_viol "vr-reference-exempt-snapshots-ignored" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (reference)
+- `bin/check-plan`
+'
+
+# (VR-10) A fenced example of the unmarked form is not counted — clean.
+assert_viol "vr-fenced-example-ignored" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+```
+- `'"$VR_SNAP"'` — VR baselines
+```
+
+- `bin/check-plan`
+'
+
+# (VR-11) The [VR] message names both fixes verbatim.
+f="$TMP/vr-message-names-fix.md"
+printf '%s\n' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` — VR baselines
+' > "$f"
+out="$("$GUARD" "$f" 2>&1)" || true
+if grep -qF 'Mark it (conditional — only if VR baselines change), or (vr-baseline-change: <what changes>)' <<<"$out"; then
+    echo "ok: vr-message-names-fix"
+else
+    echo "FAIL: vr-message-names-fix — [VR] message lost its fix text"; FAILED=1
+fi
 
 # ---------------------------------------------------------------------------
 # Gate [M] fixtures (5 cases)

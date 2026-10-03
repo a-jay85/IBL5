@@ -15,6 +15,11 @@ BD_LABEL_BLOCKED="blocked"
 BD_LABEL_OUT_OF_REPO="out-of-repo"
 BD_SKIP_LABELS_JSON='["blocked","out-of-repo"]'
 BD_RANKS='^P[1-4]$'
+# Live-item predicate over a jq -s slurp of ledgers. A live item holds its unit
+# and its paths. Closed-fixed and merged items are settled, and so is a skip
+# with no ad-hoc route. A failed ad-hoc item (route=ad-hoc, status=skipped)
+# stays live. Shared by bd_cmd_burndown (--after) and bd_cmd_prompt.
+BD_LIVE_DEF='[.[].items[] | select(.status != "closed-fixed" and .status != "merged" and ((.status == "skipped" and .route != "ad-hoc") | not))]'
 
 bd_die() {
     local code="$1"; shift
@@ -475,7 +480,7 @@ bd_cmd_burndown() {
         while IFS= read -r _af; do
             [ -z "$_af" ] || after_files+=("$_af")
         done <<< "$afters"
-        local live_def='[.[].items[] | select(.status != "closed-fixed" and .status != "merged" and ((.status == "skipped" and .route != "ad-hoc") | not))]'
+        local live_def="$BD_LIVE_DEF"
         local live_cost _xn _hp _hn
         live_cost="$(jq -s "$live_def"' | map(.cost // 0) | add // 0' "${after_files[@]}")" \
             || bd_die 3 "cannot read --after ledgers"

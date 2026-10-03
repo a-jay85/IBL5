@@ -286,6 +286,8 @@ final class MergeMasterToProdCliTest extends TestCase
 
         self::assertSame(0, $result['exit'], "Expected exit 0, got: {$result['output']}");
         self::assertFileExists($sentinel);
+        // The caller passed 0, so only the script's own export can yield 1.
+        // Deleting that export would leave the sentinel reading '--all|0'.
         self::assertSame('--all|1', file_get_contents($sentinel));
     }
 

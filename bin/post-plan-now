@@ -25,8 +25,9 @@
 # Usage:
 #   bin/post-plan-now           # you decided to ship: fire unconditionally
 #   bin/post-plan-now --auto    # impl agent's closing action: always fires
-#                               #   (skips only inside a headless/automouse run, which
-#                               #   owns post-plan itself). post-plan ALWAYS opens the
+#                               #   (skips inside a headless/automouse run, which owns
+#                               #   post-plan itself, unless IBL5_BURNDOWN_LOOP=1 is set
+#                               #   by bin/burndown-loop). post-plan ALWAYS opens the
 #                               #   PR; whether auto-merge ARMS is decided later, at
 #                               #   /post-plan Phase 6.5 (a plan's `auto_merge: false`
 #                               #   holds the merge — it no longer holds post-plan).
@@ -256,7 +257,8 @@ anywhere inside the target worktree.
 
 Options:
   --auto           Impl agent's closing action: fires unconditionally
-                   (skips inside a headless/automouse run that owns post-plan).
+                   (skips inside a headless/automouse run that owns post-plan,
+                   unless IBL5_BURNDOWN_LOOP=1, which bin/burndown-loop sets).
   --force          Override the "PR already exists and working set touches no
                    production files" guard (exit 5).
   --foreground     Run the engine in this shell instead of detaching via launchd.
@@ -434,11 +436,24 @@ if [ "$AUTO" -eq 1 ]; then
     # workflow-continuity rule that tells the impl agent to call this is
     # globally loaded, so the automouse impl agent sees it too; this is the
     # belt-and-suspenders guard against that.
+    # Exception: a bin/burndown-loop batch runs headless (CLAUDE_HEADLESS=1
+    # silences Stop hooks) but has no runner that ships for it, so the loop
+    # exports IBL5_BURNDOWN_LOOP=1 to opt back in. Only the exact value 1
+    # counts; unset, empty and 0 keep the automouse skip.
     if [ "${CLAUDE_HEADLESS:-}" = "1" ]; then
-        echo "post-plan-now: CLAUDE_HEADLESS=1 — automouse/headless run owns post-plan; skipping auto-fire."
-        exit 0
+        if [ "${IBL5_BURNDOWN_LOOP:-}" = "1" ]; then
+            echo "post-plan-now: CLAUDE_HEADLESS=1 with IBL5_BURNDOWN_LOOP=1 — burndown-loop batch opted in; firing."
+        else
+            echo "post-plan-now: CLAUDE_HEADLESS=1 — automouse/headless run owns post-plan; skipping auto-fire."
+            exit 0
+        fi
     fi
 fi
+
+# The opt-in is consumed by the guard above. Drop it so no child of this run
+# (harness, skill-fallback claude, a nested post-plan-now) inherits it through
+# the --foreground exec and re-fires past its own headless guard.
+unset IBL5_BURNDOWN_LOOP
 
 # Reap abandoned post-plan-now jobs (loaded but idle, or unloaded, with no live
 # process) before adding another. Skipped under the test-only root overrides so a

@@ -1735,70 +1735,22 @@ parameters:
 			path: modules/Draft/index.php
 
 		-
-			rawMessage: Cannot access property $name on mixed.
-			identifier: property.nonObject
-			count: 2
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: Cannot cast mixed to int.
-			identifier: cast.int
-			count: 2
-			path: modules/DraftHistory/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class DraftHistory\DraftHistoryApiHandler constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DraftHistory/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class DraftHistory\DraftHistoryRepository constructor expects mysqli, mixed given.'
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 2
+			path: modules/DraftInfo/index.php
+
+		-
+			rawMessage: 'Parameter #1 $json of function json_decode expects string, string|false given.'
 			identifier: argument.type
 			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of static method Team\Team::initialize() expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $team of method DraftHistory\DraftHistoryView::renderTeamHistory() expects Team\Team, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $teamName of method DraftHistory\DraftHistoryRepository::getDraftPicksByTeam() expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Part $team->name (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 1
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: Variable $team might not be defined.
-			identifier: variable.undefined
-			count: 3
-			path: modules/DraftHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class DraftPickLocator\DraftPickLocatorRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftPickLocator/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/DraftPickLocator/index.php
+			path: modules/DraftInfo/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class FranchiseHistory\FranchiseHistoryRepository constructor expects mysqli, mixed given.'
@@ -2852,30 +2804,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/PlayerMovement/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Auth\AuthRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/ProjectedDraftOrder/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class ProjectedDraftOrder\ProjectedDraftOrderRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/ProjectedDraftOrder/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 2
-			path: modules/ProjectedDraftOrder/index.php
-
-		-
-			rawMessage: 'Parameter #1 $json of function json_decode expects string, string|false given.'
-			identifier: argument.type
-			count: 1
-			path: modules/ProjectedDraftOrder/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class AllStarAppearances\AllStarAppearancesRepository constructor expects mysqli, mixed given.'

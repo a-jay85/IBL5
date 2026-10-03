@@ -18,7 +18,7 @@ import { submitFormAndAssertEffect } from '../helpers/submit-form';
 
 test.describe.configure({ mode: 'serial' });
 
-const SAVE_ORDER_URL = 'modules.php?name=ProjectedDraftOrder&op=save_order';
+const SAVE_ORDER_URL = 'modules.php?name=DraftInfo&op=save_order';
 const TEST_SEASON_YEAR = 2026;
 
 test.beforeAll(async ({ request }) => {
@@ -57,7 +57,7 @@ test.describe('save_order: admin happy path', () => {
         expect(body.success).toBe(true);
       },
       readBack: async () => {
-        await page.goto('modules.php?name=ProjectedDraftOrder');
+        await page.goto('modules.php?name=DraftInfo&tab=order');
         const table = page
           .locator('.projected-draft-order-table, .ibl-data-table')
           .first();
@@ -180,7 +180,7 @@ test.describe('ProjectedDraftOrder: finalized render', () => {
     const body = (await response.json()) as SaveOrderResponse;
     expect(body.success).toBe(true);
 
-    await page.goto('modules.php?name=ProjectedDraftOrder');
+    await page.goto('modules.php?name=DraftInfo&tab=order');
 
     // Finalized title: "Draft Order ({year})" (not "Projected Draft Order")
     await expect(page.locator('h1.ibl-title')).toContainText(
@@ -217,7 +217,7 @@ test.describe('ProjectedDraftOrder: admin drag reorder', () => {
     // Ensure non-finalized state (reset clears the finalized flag)
     await resetDraftOrder(request, TEST_SEASON_YEAR);
 
-    await page.goto('modules.php?name=ProjectedDraftOrder');
+    await page.goto('modules.php?name=DraftInfo&tab=order');
 
     // Assert drag UI is rendered: Round 1 table exists with draggable rows
     const round1 = page.locator('#draft-order-round1');
@@ -235,7 +235,7 @@ test.describe('ProjectedDraftOrder: admin drag reorder', () => {
     expect(saveBody.success).toBe(true);
 
     // Read back: navigate and assert the reordered teamid order persisted
-    await page.goto('modules.php?name=ProjectedDraftOrder');
+    await page.goto('modules.php?name=DraftInfo&tab=order');
     const table = page
       .locator('.projected-draft-order-table, .ibl-data-table')
       .first();
@@ -254,6 +254,41 @@ test.describe('ProjectedDraftOrder: admin drag reorder', () => {
         `pick ${i + 1} should link to teamid=${reorderedOrder[i]} (reordered)`,
       ).toMatch(new RegExp(`teamid=${reorderedOrder[i]}(\\D|$)`));
     }
+  });
+});
+
+test.describe('save_order: legacy 307 keeps POST', () => {
+  const LEGACY_SAVE_ORDER_URL = 'modules.php?name=ProjectedDraftOrder&op=save_order';
+
+  test('legacy save_order URL still saves (307 keeps POST)', async ({
+    appState,
+    page,
+    request,
+  }) => {
+    await appState({
+      'Current Season Ending Year': String(TEST_SEASON_YEAR),
+    });
+
+    const order = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        const response = await request.post(LEGACY_SAVE_ORDER_URL, {
+          data: { order },
+          headers: { 'Content-Type': 'application/json' },
+        });
+        expect(response.status()).toBe(200);
+        const body = (await response.json()) as SaveOrderResponse;
+        expect(body.success).toBe(true);
+      },
+      readBack: async () => {
+        await page.goto('modules.php?name=DraftInfo&tab=order');
+        const table = page
+          .locator('.projected-draft-order-table, .ibl-data-table')
+          .first();
+        await expect(table).toBeVisible();
+      },
+    });
   });
 });
 

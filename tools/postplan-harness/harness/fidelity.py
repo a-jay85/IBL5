@@ -348,19 +348,28 @@ def _find_procedure(worktree: str, master_sha: str, paths, kind: str) -> str:
 
 
 PLAN_INDEX_BLIND = "(plan-blind run: no plan, so no index)\n"
+PLAN_INDEX_TIMEOUT = 30
 
 
-def _plan_index(worktree: str, plan_path: str) -> str:
+def _plan_index(worktree: str, plan_path: str, timeout: float | None = None) -> str:
     """`bin/plan-index` output for the packet's plan copy.
 
     The reviewer has no Bash, so the harness runs the index for it. Any failure becomes a
     marker telling the reviewer to find `## ` headings with Grep instead; it never
-    aborts the packet.
+    aborts the packet. A hung script is cut off after `timeout` seconds (default
+    PLAN_INDEX_TIMEOUT); non-UTF-8 output is a marker too.
     """
     script = os.path.join(worktree, "bin", "plan-index")
+    limit = PLAN_INDEX_TIMEOUT if timeout is None else timeout
     try:
         proc = subprocess.run([script, plan_path], cwd=worktree,
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, timeout=limit)
+    except subprocess.TimeoutExpired:
+        return (f"(bin/plan-index timed out after {limit}s; "
+                "Grep plan.md for '^## ' instead)\n")
+    except UnicodeDecodeError as e:
+        return (f"(bin/plan-index output was not valid UTF-8: {e}; "
+                "Grep plan.md for '^## ' instead)\n")
     except OSError as e:
         return f"(bin/plan-index unavailable: {e}; Grep plan.md for '^## ' instead)\n"
     if proc.returncode != 0:

@@ -223,6 +223,28 @@ def test_plan_index_missing_script_is_a_marker(tmp_path, git_shim):
     assert "unavailable" in open(os.path.join(packet, "plan-index.txt")).read()
 
 
+def test_plan_index_timeout_is_a_marker(tmp_path, monkeypatch):
+    # `exec` so the kill lands on the sleeper itself, not a shell holding the pipe open.
+    _fake_plan_index(tmp_path, "#!/usr/bin/env bash\nexec sleep 30\n")
+    monkeypatch.setattr(fidelity, "PLAN_INDEX_TIMEOUT", 0.2)
+    index = fidelity._plan_index(str(tmp_path), str(tmp_path / "plan.md"))
+    assert "timed out after 0.2s" in index
+    assert "Grep plan.md" in index
+
+
+def test_plan_index_timeout_param_overrides_default(tmp_path):
+    _fake_plan_index(tmp_path, "#!/usr/bin/env bash\nexec sleep 30\n")
+    index = fidelity._plan_index(str(tmp_path), str(tmp_path / "plan.md"), timeout=0.2)
+    assert "timed out after 0.2s" in index
+
+
+def test_plan_index_non_utf8_output_is_a_marker(tmp_path):
+    _fake_plan_index(tmp_path, "#!/usr/bin/env bash\nprintf '\\xff\\xfe\\n'\n")
+    index = fidelity._plan_index(str(tmp_path), str(tmp_path / "plan.md"))
+    assert "not valid UTF-8" in index
+    assert "Grep plan.md" in index
+
+
 def test_plan_blind_packet_has_blind_index(tmp_path, git_shim):
     git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
     out = tmp_path / "out"

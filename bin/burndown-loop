@@ -6,6 +6,12 @@
 # (100 - IBL5_BURNDOWN_RESERVE_PCT)% at seven_day.resets_at (usage_pace_verdict in
 # bin/lib/usage-gate.sh). Pause and resume reuse the ADR-0143 usage-gate primitives.
 #
+# Each batch runs with CLAUDE_HEADLESS=1, which silences Stop hooks, plus
+# IBL5_BURNDOWN_LOOP=1. The second var is the opt-in that lets the /burndown
+# skill's `bin/post-plan-now --auto` calls ship from inside the batch; without it
+# post-plan-now's headless guard skips them. post-plan-now unsets it before
+# launching its own children.
+#
 # Usage:
 #   bin/burndown-loop start [--no-dm]
 #   bin/burndown-loop stop
@@ -256,7 +262,7 @@ bl_run_batch() {
     BATCH_RC=0
     # $caff is expanded unquoted on purpose: empty off macOS.
     # shellcheck disable=SC2086
-    env CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 \
+    env CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 IBL5_BURNDOWN_LOOP=1 \
         IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=burndown-loop \
         IBL5_USAGE_GATE_MODEL=claude-opus-5-5 \
         IBL5_USAGE_GATE_RESUME_BIN="$ROOT/bin/burndown-loop" \
@@ -269,7 +275,8 @@ bl_run_batch() {
     NEW_LEDGERS=$(comm -13 "$STATE/ledgers.before" "$STATE/ledgers.after")
 }
 
-# bl_count_new: adds the new ledgers' items to ITEMS, bumps BATCHES, sets UNITS.
+# bl_count_new: adds the new ledgers' items to ITEMS, bumps BATCHES, sets UNITS from
+# each ledger's top-level units_used.
 # Never call it in $(...): the counters would update a subshell copy.
 bl_count_new() {
     local n units=0 u f
@@ -277,7 +284,7 @@ bl_count_new() {
     for n in $NEW_LEDGERS; do
         f="$REPORTS/$n"
         ITEMS=$((ITEMS + $(jq '.items | length' "$f" 2>/dev/null || echo 0)))
-        u=$(jq '[.items[].units_used // 0] | add // 0' "$f" 2>/dev/null || echo 0)
+        u=$(jq '.units_used // 0' "$f" 2>/dev/null || echo 0)
         units=$((units + u))
     done
     UNITS=$units

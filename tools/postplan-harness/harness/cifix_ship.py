@@ -131,11 +131,12 @@ def _newest_meta_run(checks: list[dict]) -> tuple[int, str] | None:
 
 
 def wait_for_fresh_meta_run(checks_fn, baseline_run_id: str | None, *, deadline: float,
-                            sleep=time.sleep, now=time.time, poll_secs: int = 20) -> str:
+                            sleep=None, now=None, poll_secs: int = 20) -> str:
     """Wait for a Meta checks run newer than `baseline_run_id` to conclude. A body edit
     keeps the head SHA, so only a higher run id proves the result reflects the edit.
     CANCELLED is a superseded run (cancel-in-progress), never red. Returns "green",
     "red" or "indeterminate"."""
+    sleep, now = sleep or time.sleep, now or time.time   # resolved per call, patchable
     baseline = int(baseline_run_id) if baseline_run_id else None
     while True:
         newest = _newest_meta_run(checks_fn() or [])

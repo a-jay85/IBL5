@@ -81,7 +81,11 @@ class CiFixGh:
 
     def post_review_summary(self, pr, title, body): self.comments.append((pr, title, body))
     def pr_edit_body(self, pr, body): self.body_edits.append((pr, body))
-    def pr_checks_json(self, pr): return list(self.checks)
+    def pr_checks_json(self, pr):
+        """`checks` is a fixed list, or a list of per-call lists (last one repeats)."""
+        if self.checks and isinstance(self.checks[0], list):
+            return list(self.checks.pop(0) if len(self.checks) > 1 else self.checks[0])
+        return list(self.checks)
     def run_log_failed(self, run_id, job_id, dest): pass
     def run_rerun_failed(self, run_id): pass
     def pr_body_fresh(self, *a, **kw): return self.body
@@ -484,3 +488,124 @@ def test_bun_audit_budget_exhausted_no_catchup(monkeypatch, tmp_path):
          run_started=time.time() - runner._CI_FIX_WALL_BUDGET_SECS)
     assert git.fetches == 0
     assert llm.calls == []
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: ci_fix_prompt
+# ---------------------------------------------------------------------------
+
+from harness import cifix, fidelity  # noqa: E402
+
+
+def _prompt(**kw):
+    return cifix.ci_fix_prompt(4242, 1, ["PHPUnit"], {}, "/tmp/d.patch", [], **kw)
+
+
+def test_prompt_drops_master_green_claim():
+    p = _prompt()
+    assert "Master is green" not in p
+    assert "infrastructure failure" in p
+
+
+def test_prompt_dep_advisory_guidance_only_when_flagged():
+    on = _prompt(dep_advisory=True)
+    assert "overrides" in on
+    assert "never FLAKY" in on
+    assert "overrides" not in _prompt(dep_advisory=False)
+
+
+def test_prompt_names_proposal_path():
+    path = "/tmp/x/proposed-pr-body.md"
+    on = _prompt(proposal_path=path)
+    assert path in on
+    assert "do NOT run gh pr edit" in on
+    off = _prompt()
+    assert path not in off
+    assert "do NOT run gh pr edit" not in off
+
+
+# ---------------------------------------------------------------------------
+# Phase 7: ci-fix-only gh pr edit deny, harness-applied body proposals
+# ---------------------------------------------------------------------------
+
+_META = "Meta checks"
+
+
+def _write_proposal(text):
+    def effect(kw):
+        with open(os.path.join(kw["add_dirs"][0], cifix_ship.PROPOSAL_FILENAME), "w") as fh:
+            fh.write(text)
+    return effect
+
+
+def test_ci_fix_denied_tools_add_gh_pr_edit_only_for_cifix(monkeypatch, tmp_path):
+    assert "Bash(gh pr edit:*)" in cifix.CI_FIX_DENIED_TOOLS
+    assert "Bash(gh pr edit:*)" not in fidelity.REMEDIATION_DENIED_TOOLS
+    llm = ScriptedLlm()
+    _run(monkeypatch, tmp_path, CiFixGit(head_shas=["b" * 40]), CiFixGh(), llm,
+         failed=["PHPUnit"], rewatch=[CiOutcome(0, [], "green")])
+    assert "Bash(gh pr edit:*)" in llm.calls[0][2]["denied_tools"]
+
+
+def test_benign_body_proposal_applied_once_and_waits_fresh_meta_run(monkeypatch, tmp_path):
+    proposed = _BODY.replace("Old summary paragraph.", "New, clearer summary paragraph.")
+    gh = CiFixGh(body=_BODY)
+    gh.checks = [[_meta(100, "FAILURE")],    # failed-job log refs
+                 [_meta(100, "FAILURE")],    # baseline before the edit
+                 [_meta(100, "FAILURE")],    # poll 1: only the pre-edit run
+                 [_meta(101, "SUCCESS")]]    # poll 2: the run the edit fired
+    git = CiFixGit()
+    r = _run(monkeypatch, tmp_path, git, gh, ScriptedLlm([_write_proposal(proposed)]),
+             failed=[_META], commit=("",))
+    sha, outcome = r.out
+    assert len(gh.body_edits) == 1
+    assert gh.body_edits[0][1] == proposed
+    assert outcome.exit_code == 0
+    assert sha != runner.BODY_ONLY_SHA
+    assert r.res.ci_head != runner.BODY_ONLY_SHA
+    assert git.pushes == 0
+    assert _has(r.lines, "outcome=body-fixed")
+
+
+@pytest.mark.parametrize("proposed, reason", [
+    (_BODY.replace("**no-adr:** tooling only", "<!-- no-adr: tooling only -->"),
+     "refused (waiver change"),
+    (_BODY.replace("- [ ] Check the page renders", "No manual testing needed."),
+     "refused (## Manual Testing change"),
+])
+def test_waiver_body_proposal_refused_never_edits(monkeypatch, tmp_path, proposed, reason):
+    gh = CiFixGh(body=_BODY)
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh,
+             ScriptedLlm([_write_proposal(proposed)]), failed=[_META], commit=("",))
+    assert gh.body_edits == []
+    assert _has(r.lines, reason)
+
+
+# ---------------------------------------------------------------------------
+# Phase 8: refused proposals quoted in the survivor comment
+# ---------------------------------------------------------------------------
+
+def test_refused_proposal_quoted_redacted_bounded_in_survivor_comment(monkeypatch, tmp_path):
+    token = f"ghp_{_ALNUM36}"
+    proposed = (_BODY + "\n<!-- no-adr: x -->\n\n"
+                f"remote https://x-access-token:{token}@github.com/a/b.git\n"
+                + "padding line\n" * 500)
+    assert len(proposed) > 5000
+    gh = CiFixGh(body=_BODY)
+    red = CiOutcome(8, [_META], "red")
+    _run(monkeypatch, tmp_path, CiFixGit(), gh, ScriptedLlm([_write_proposal(proposed)]),
+         failed=[_META], commit=("b" * 40, "c" * 40, "d" * 40), rewatch=[red, red, red])
+    body = gh.comments[-1][2]
+    assert "Proposed PR body (refused" in body
+    assert "waiver change" in body
+    assert "~~~" in body
+    assert "(truncated)" in body
+    assert _ALNUM36 not in body
+    assert len(body) < len(proposed)
+
+
+def test_survivor_comment_without_refusals_unchanged():
+    s, trail = ["PHPUnit"], ["attempt 1: still-red"]
+    plain = cifix.survivor_comment(s, trail, False)
+    assert plain == cifix.survivor_comment(s, trail, False, refused=())
+    assert "Proposed PR body" not in plain

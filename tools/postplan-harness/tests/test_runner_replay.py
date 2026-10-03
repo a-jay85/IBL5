@@ -1778,7 +1778,14 @@ class _TwoShaLiveGit(_LiveShapedGit):
 
     def commit_all(self, message):
         super(_LiveShapedGit, self).commit_all(message)
-        return f"replay-sha-{len(self.commit_messages)}"
+        sha = f"replay-sha-{len(self.commit_messages)}"
+        if message.startswith("fix: address Phase 7 CI failures"):
+            self._fix_head = sha
+        return sha
+
+    def head(self):
+        # The Phase 7 lease push reports git.head(), so HEAD follows the fix commit.
+        return getattr(self, "_fix_head", None) or super().head()
 
 
 class _NoEditLiveGit(_LiveShapedGit):
@@ -1980,7 +1987,7 @@ def test_phase7_fix_call_uses_opus_5_5(monkeypatch, tmp_path):
         assert all("claude-sonnet" not in a for a in argv)
 
 
-def test_phase7_fix_push_is_fast_forward_only(monkeypatch, tmp_path):
+def test_phase7_fix_push_is_one_lease_push(monkeypatch, tmp_path):
     green_out = str(tmp_path / "green")
     red_out = str(tmp_path / "red")
     _run_live_shaped_with(
@@ -1996,18 +2003,23 @@ def test_phase7_fix_push_is_fast_forward_only(monkeypatch, tmp_path):
         fixture=_red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}]),
     )
     incident_git = _TwoShaLiveGit.instances[-1]
-    assert incident_git.ff_pushes == 1
-    assert incident_git.pushes == green_git.pushes
+    # The ci-fix push goes through the lease push (stale-base catch-up), never push_ff.
+    assert incident_git.ff_pushes == 0
+    assert incident_git.pushes == green_git.pushes + 1
 
 
 def test_phase7_fix_loop_error_does_not_fail_run(monkeypatch, tmp_path):
     from harness.state import TerminalState as TS
     out = str(tmp_path / "out")
 
-    def _boom_push_ff(self):
-        raise HarnessError("local-gate", "pre-push denied")
+    real_push = runner._push_with_adr_draft
 
-    monkeypatch.setattr(_TwoShaLiveGit, "push_ff", _boom_push_ff)
+    def _boom_phase7_push(git, log, phase, **kw):
+        if phase == "phase7":
+            raise HarnessError("local-gate", "pre-push denied")
+        return real_push(git, log, phase, **kw)
+
+    monkeypatch.setattr(runner, "_push_with_adr_draft", _boom_phase7_push)
     res, _ = _run_live_shaped_with(
         monkeypatch, out,
         git_cls=_TwoShaLiveGit,

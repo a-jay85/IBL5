@@ -1357,6 +1357,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
     last = None
     trail: list[str] = []
     dep_caught_up = False
+    refused: list[tuple[int, str, str]] = []
 
     while True:
         kind, names = cifix.triage(outcome.failed)
@@ -1498,7 +1499,10 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
             remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
             llm.call_tooled("ci-fix", cifix.CI_FIX_MODEL,
                             cifix.ci_fix_prompt(pr, attempt, names, log_paths,
-                                                diff_path, trail),
+                                                diff_path, trail,
+                                                dep_advisory=cifix_ship.bun_audit_failed(names),
+                                                proposal_path=os.path.join(
+                                                    fix_dir, cifix_ship.PROPOSAL_FILENAME)),
                             cwd=worktree or ".", allowed_tools=cifix.CI_FIX_ALLOWED_TOOLS,
                             denied_tools=cifix.CI_FIX_DENIED_TOOLS, add_dirs=(fix_dir,),
                             timeout=int(min(TOOLED_TIMEOUT, remaining / 2)))
@@ -1512,7 +1516,41 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
             last = _phase7_stop(log, trail, attempt, sha, stage, e)
             break
 
-        if new == "":
+        # PR-body proposal: the agent may not run `gh pr edit`; the harness judges the
+        # proposal and applies only a body that leaves every waiver and attestation alone.
+        body_applied, baseline = False, None
+        proposal = cifix_ship.read_proposal(fix_dir)
+        if proposal is not None:
+            verdict = cifix_ship.judge_proposal(gh.pr_body_fresh() or "", proposal,
+                                                signature=_body_signature)
+            if verdict.action == "refuse":
+                log(f"phase7 ci-fix: body proposal refused ({verdict.reason})")
+                refused.append((attempt, verdict.reason, proposal or ""))
+            elif verdict.action == "apply":
+                baseline = cifix.failed_job_refs(
+                    gh.pr_checks_json(pr), [cifix_ship.META_CHECK_NAME]
+                ).get(cifix_ship.META_CHECK_NAME, (None, None))[0]
+                gh.pr_edit_body(pr, verdict.body)
+                body_applied = True
+                log("phase7 ci-fix: body proposal applied")
+
+        if new == "" and body_applied:
+            # Body-only round: the head did not move, so wait for a Meta checks run
+            # newer than the edit. sha and res.ci_head stay as they are.
+            meta = cifix_ship.wait_for_fresh_meta_run(
+                lambda: gh.pr_checks_json(pr), baseline,
+                deadline=run_started + _CI_FIX_WALL_BUDGET_SECS - 120)
+            others = [n for n in outcome.failed if n != cifix_ship.META_CHECK_NAME]
+            if meta == "indeterminate":
+                outcome = ciwatch.CiOutcome(-1, [], "phase7: fresh Meta checks run not observed")
+                last = "body-unconfirmed"
+            else:
+                if meta == "red":
+                    others.append(cifix_ship.META_CHECK_NAME)
+                outcome = ciwatch.CiOutcome(8 if others else 0, others,
+                                            "phase7 body-only re-watch")
+                last = "still-red" if others else "body-fixed"
+        elif new == "":
             last = "no-change"
         else:
             gate_hits = fidelity.denied_gate_edits(git.changed_files(f"{new}^"))
@@ -1594,7 +1632,10 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
     if survivors:
         try:
             gh.post_review_summary(pr, cifix.SURVIVOR_TITLE,
-                                   cifix.survivor_comment(survivors, trail, probed))
+                                   cifix.survivor_comment(
+                                       survivors, trail, probed,
+                                       refused=[(a, r, cifix_ship.quote_proposal(t, _redact))
+                                                for a, r, t in refused]))
         except (HarnessError, OSError, subprocess.SubprocessError):
             log("phase7 ci-fix: survivor comment not posted")
     log(f"phase7 ci-fix: ceiling reached - {len(trail)} attempt(s), survivors={survivors}")
@@ -2170,7 +2211,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     master_sha, log=log,
                     commit=lambda msg: _commit_with_gate_remediation(
                         git, worktree, msg, log, phase="phase5.5"),
-                    # The same retrying push Phase 2 and Phase 7 use, so a master that
+                    # The same retrying push Phase 2 and both Phase 7 pushes (BEHIND, ci-fix) use, so a master that
                     # moved during the review + fix span gets one clean rebase per
                     # attempt instead of ending the loop on the hook's
                     # "does not contain origin/master".

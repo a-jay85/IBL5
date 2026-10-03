@@ -163,6 +163,7 @@ run
 [ "$(dm_count)" = 1 ] && [ "$(lc_count)" = 0 ] && [ ! -f "$LOG.faildm-stamp" ] \
     && ok "10 headless -p: DM now" || fail "10 headless -p: DM now"
 
+# Pins the --print token: a SUT whose token tuple is ("-p",) holds the DM and fails here.
 reset; registry "$WT" "$HPRINT"
 run
 [ "$(dm_count)" = 1 ] && [ "$(lc_count)" = 0 ] \

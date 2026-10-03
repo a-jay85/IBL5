@@ -1195,6 +1195,54 @@ no-assertions: mechanical rename, no matrix rows
 ````
 '
 
+# (E4b) A "- no-assertions: <reason>" list item clears gate E (faprep-xss-fix.md shape).
+assert "gateE-no-assertions-bullet-clears" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- no-assertions: mechanical rename, no matrix rows
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4c) An indented "<!-- no-assertions: <reason> -->" clears gate E (trim-plan-hold-criteria-lore.md shape).
+assert "gateE-no-assertions-html-comment-clears" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+  <!-- no-assertions: mechanical rename, no matrix rows -->
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4d) A backticked "- \`no-assertions: <reason>\`" list item clears gate E.
+assert "gateE-no-assertions-backtick-clears" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- `no-assertions: mechanical rename, no matrix rows`
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
 # (E5) Gate E is NOT impl_model-gated: an OPUS plan with a packet missing
 # **Assertions:** still exits 1. Proves gate E runs for all plans.
 assert "gateE-opus-plan-still-gated" 1 "$TFM$M"'

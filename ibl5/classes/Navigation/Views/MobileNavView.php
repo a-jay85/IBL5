@@ -164,7 +164,7 @@ class MobileNavView implements MobileNavViewInterface
                         $htmxAttrs = ($external || $noBoost) ? '' : ' hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content"';
                         $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
                         $badgeHtml = $badge !== null
-                            ? '<span class="nav-badge">' . HtmlSanitizer::e($badge) . '</span>'
+                            ? '<span class="ibl-chip nav-badge">' . HtmlSanitizer::e($badge) . '</span>'
                             : '';
                         ?>
                         <a href="<?= HtmlSanitizer::trusted($url) ?>"<?= HtmlSanitizer::trusted($target) ?><?= HtmlSanitizer::trusted($htmxAttrs) ?> class="mobile-dropdown-link flex items-center justify-between">
@@ -198,7 +198,7 @@ class MobileNavView implements MobileNavViewInterface
         ob_start();
         ?>
         <div class="px-5 py-3 border-t border-white/10 mt-1">
-            <label for="mobile-league-select" class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>
+            <label for="mobile-league-select" class="nav-section-label">League</label>
             <div class="relative">
                 <select id="mobile-league-select" name="league" onchange="window.location.href=this.value" class="nav-select">
                     <option value="index.php?league=ibl"<?= HtmlSanitizer::e($iblSelected) ?> class="bg-navy-800 text-white">IBL</option>
@@ -223,7 +223,7 @@ class MobileNavView implements MobileNavViewInterface
         ob_start();
         ?>
         <div class="px-5 py-3 border-t border-white/10 mt-1">
-            <div class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2"><?= HtmlSanitizer::e($username) ?></div>
+            <div class="nav-section-label"><?= HtmlSanitizer::e($username) ?></div>
             <a href="modules.php?name=YourAccount&amp;op=logout" hx-boost="false" class="nav-logout-btn">Logout</a>
         </div>
         <?php

@@ -35,6 +35,24 @@ class MobileNavViewTest extends TestCase
         return new MobileNavView($config, new LoginFormView(), new TeamsDropdownView());
     }
 
+    public function testBadgeCarriesChipClass(): void
+    {
+        $view = $this->createView();
+        $menuData = [
+            'icon' => '',
+            'links' => [
+                ['label' => 'Draft', 'url' => 'modules.php?name=Draft', 'badge' => 'LIVE'],
+            ],
+        ];
+        $html = $view->render(
+            ['My Team' => $menuData],
+            null,
+            [['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout']],
+        );
+
+        $this->assertStringContainsString('<span class="ibl-chip nav-badge">LIVE</span>', $html);
+    }
+
     public function testAccordionButtonRendered(): void
     {
         $view = $this->createView();
@@ -126,6 +144,19 @@ class MobileNavViewTest extends TestCase
 
         $this->assertStringContainsString('A-Jay', $html);
         $this->assertStringContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
+    }
+
+    public function testSectionLabelsUseNavSectionLabelClass(): void
+    {
+        $view = $this->createView(isLoggedIn: true, username: 'A-Jay');
+        $html = $view->render(
+            [],
+            $this->sampleMyTeamMenu(),
+            [['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout', 'noBoost' => true]],
+        );
+
+        $this->assertStringContainsString('<div class="nav-section-label">A-Jay</div>', $html);
+        $this->assertStringNotContainsString('tracking-widest uppercase text-gray-500', $html);
     }
 
     public function testAccountAccordionSuppressedWhenMyTeamMenuPresent(): void

@@ -201,7 +201,7 @@ final class PlayerRecordSectionRenderer
     {
         $output = '<div class="record-category">';
         $output .= $this->tableRenderer->renderCategoryHeading('Most All-Star Appearances');
-        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--5col" data-no-responsive>';
+        $output .= '<table class="ibl-data-table ibl-data-table--borderless record-table ibl-table-subheading record-table--5col" data-no-responsive>';
         $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-amount"><col class="col-date" span="2"></colgroup>';
         $output .= '<thead><tr><th>Player</th><th>Team</th><th>Apps</th><th colspan="2">Years</th></tr></thead>';
         $output .= '<tbody>';

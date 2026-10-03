@@ -350,7 +350,7 @@ JAVASCRIPT;
         // Header: photo + pos badge + name + active toggle
         echo '<div class="dc-card__header">';
         echo '<img class="dc-card__photo" src="' . HtmlSanitizer::e($imageUrl) . '" alt="" width="48" height="48" loading="lazy">';
-        echo '<span class="dc-card__pos-badge">' . HtmlSanitizer::e($player['pos']) . '</span>';
+        echo '<span class="ibl-chip ibl-chip--navy dc-card__pos-badge">' . HtmlSanitizer::e($player['pos']) . '</span>';
         echo '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . HtmlSanitizer::e($player['pid']) . '" class="dc-card__name">' . HtmlSanitizer::e($playerName) . '</a>';
 
         echo '<input type="hidden" name="pid' . HtmlSanitizer::e($depthCount) . '" value="' . HtmlSanitizer::e($player['pid']) . '" disabled>';

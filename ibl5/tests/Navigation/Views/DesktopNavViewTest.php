@@ -82,6 +82,7 @@ class DesktopNavViewTest extends TestCase
 
         $this->assertStringContainsString('LIVE', $html);
         $this->assertStringContainsString('nav-badge', $html);
+        $this->assertStringContainsString('<span class="ibl-chip nav-badge">LIVE</span>', $html);
     }
 
     public function testExternalLinkIcon(): void
@@ -144,6 +145,19 @@ class DesktopNavViewTest extends TestCase
         $this->assertStringContainsString('A-Jay', $html);
         // Logout link inside the footer
         $this->assertStringContainsString('modules.php?name=YourAccount&amp;op=logout', $html);
+    }
+
+    public function testSectionLabelsUseNavSectionLabelClass(): void
+    {
+        $view = $this->createView(isLoggedIn: true, username: 'A-Jay');
+        $html = $view->render(
+            [],
+            $this->sampleMenuData(),
+            [['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout', 'noBoost' => true]],
+        );
+
+        $this->assertStringContainsString('<div class="nav-section-label">A-Jay</div>', $html);
+        $this->assertStringNotContainsString('tracking-widest uppercase text-gray-500', $html);
     }
 
     public function testAccountDropdownSuppressedWhenMyTeamMenuPresent(): void

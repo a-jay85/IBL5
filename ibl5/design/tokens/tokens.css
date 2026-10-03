@@ -195,16 +195,13 @@
    Team-Color CSS Custom Property Aliases
    Canonical pair: --team-color-primary / --team-color-secondary
    Emitted by TableStyles::inlineTeamVars() which sanitizes via hex allow-list.
-   Legacy names below are kept for existing CSS selectors in navigation.css,
-   schedule.css, banners.css, team-splits.css.
+   The --team-tab-* pair below stays: jslib/trade-roster-preview.js and
+   jslib/trade-review-preview.js set it inline, and navigation.css keys
+   [style*="--team-tab-bg-color"] on that write (see plan Follow-up).
    ======================================================================== */
 [style*="--team-color-primary"] {
     --team-tab-bg-color: var(--team-color-primary);
     --team-tab-active-color: var(--team-color-secondary);
-    --team-primary: var(--team-color-primary);
-    --team-secondary: var(--team-color-secondary);
-    --banner-primary: var(--team-color-primary);
-    --banner-secondary: var(--team-color-secondary);
 }
 
 } /* end @layer components */

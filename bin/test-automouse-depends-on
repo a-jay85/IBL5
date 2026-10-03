@@ -686,6 +686,40 @@ want "V5: termination log names held plans, not concurrency" \
 case "$LOGTXT_V5" in *"claimed by a concurrent runner"*) \
     fail "V5: runner logged the false concurrency message" ;; esac
 
+# P1 — post-plan-now exits 1 instantly with the handoff kept: the runner must
+# classify it environmental (sub-MIN_VIABLE_SECS exit, handoff present), refund
+# the attempt, write the env-stop report, and stop without re-claiming.
+reset_e2_clean
+echo fail > "$E2_ROOT/pp.mode"
+write_e2_plan "ppfast"
+run_e2 > /dev/null 2>&1
+LOGTXT_P1="$(e2_logtxt)"
+if grep -q 'ppfast.md postplan-fail' "$E2_TRACE" 2>/dev/null; then
+    ok "P1: runner reached postplan and the stub took its fail branch"
+else
+    fail "P1: post-plan-now fail branch never ran (trace: $(cat "$E2_TRACE" 2>/dev/null))"
+fi
+assert_eq "P1: post-plan-now invoked exactly once (loop stopped, no re-claim)" \
+    "$(grep -c 'ppfast.md postplan-fail' "$E2_TRACE" 2>/dev/null)" "1"
+assert_present "P1: fast failure → plan stays in queue/" "$E2_NDIR/queue/ppfast.md"
+assert_absent  "P1: fast failure → plan NOT moved to done/" "$E2_NDIR/done/ppfast.md"
+assert_absent  "P1: fast failure → plan NOT moved to skipped/" "$E2_NDIR/skipped/ppfast.md"
+assert_absent  "P1: fast failure → attempt refunded (.attempts removed)" \
+    "$E2_NDIR/queue/ppfast.md.attempts"
+P1_REPORT="$(ls "$E2_NDIR/reports"/*-env-stop-*ppfast*.md 2>/dev/null | head -1)"
+if [ -n "$P1_REPORT" ]; then
+    ok "P1: env-stop report written"
+else
+    fail "P1: no env-stop report under $E2_NDIR/reports (have: $(ls "$E2_NDIR/reports" 2>/dev/null))"
+fi
+want "P1: log records the non-zero post-plan exit" \
+    "$LOGTXT_P1" "post-plan-now exited code=1 (postplan phase)"
+want "P1: log carries the environmental breaker line" \
+    "$LOGTXT_P1" "Environmental failure during postplan"
+want "P1: breaker reason names the sub-minute exit" "$LOGTXT_P1" "postplan exited in"
+want "P1: breaker names the refund-and-stop decision" \
+    "$LOGTXT_P1" "Refunding attempt, stopping loop"
+
 # ── Final summary ─────────────────────────────────────────────────────────────
 
 echo ""

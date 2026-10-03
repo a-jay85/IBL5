@@ -25,8 +25,8 @@ export GIT_AUTHOR_NAME=T GIT_AUTHOR_EMAIL=t@t.com GIT_COMMITTER_NAME=T GIT_COMMI
 export BRANCH_BASE_OFFLINE=1
 
 NOW="2026-09-20T00:00:00Z"
-PMA_NOISY_REV="36ae7241d"   # #2506 squash merge: the gate as it stood when #2506 shipped
-PMA_GOOD_REV="1174acbdb"    # #2520: suppresses 5 token-notation false positives
+PMA_NOISY_REV="36ae7241de2a477bacb446f192d2722129125ca7"   # #2506 squash merge: the gate as it stood when #2506 shipped
+PMA_GOOD_REV="1174acbdbb5d8c41a87e8e7d3d01c312d18b751d"    # #2520: suppresses 5 token-notation false positives
 
 FAILED=0
 ok() { printf 'PASS %s\n' "$1"; }

@@ -2097,6 +2097,31 @@ OUT="$(bdl burndown-prompt "$BP1_L" 70 bp-one --evidence "$T/bp-evil.txt" 2>&1)"
 [ "$(bp_slug "$OUT")" = "bp-one" ] && ok "BP9: slug parser ignores quoted evidence" || fail "BP9: slug parser ignores quoted evidence (got '$(bp_slug "$OUT")')"
 [ "$(bp_arch "$OUT")" = "plan-architect" ] && ok "BP9: tier parser ignores quoted evidence" || fail "BP9: tier parser ignores quoted evidence (got '$(bp_arch "$OUT")')"
 
+# ══ burndown-delta calibration ════════════════════════════════════════════════
+CAL_SRC="$(ls "$T/lbl/home/claude-plans/_reports"/backlog-triage-*.md | sort | tail -1)"
+CAL_RPT="$T/lbl/home/claude-plans/_reports/backlog-triage-2099-12-31.md"
+{
+    head -2 "$CAL_SRC"
+    printf '\n## P1 (0)\n\n## P2 (7)\n\n'
+    for pair in 201:A 202:B 203:C 204:D 205:E 206:F 207:G; do
+        printf -- '- [#%s](u) %s — r\n' "${pair%%:*}" "${pair##*:}"
+    done
+    printf '\n## P3 (2)\n\n- [#211](u) K — r\n- [#212](u) L — r\n'
+} > "$CAL_RPT"
+lbl_issues '[]' '[]'
+OUT="$(bdl burndown-delta 2>/dev/null)"; RC=$?
+rm -f "$CAL_RPT"
+[ "$RC" -eq 0 ] && ok "CAL: delta exits 0" || fail "CAL: delta exits 0 (got $RC)"
+[ "$(jq -r '.calibration.P2 | length' <<< "$OUT")" = "5" ] && ok "CAL1: P2 capped at five" || fail "CAL1: P2 capped at five"
+[ "$(jq -r '.calibration.P2[0]' <<< "$OUT")" = "- [#201](u) A — r" ] && ok "CAL1: P2 first line is #201" || fail "CAL1: P2 first line is #201"
+[ "$(jq -r '.calibration.P2[4]' <<< "$OUT")" = "- [#205](u) E — r" ] && ok "CAL1: P2 fifth line is #205" || fail "CAL1: P2 fifth line is #205"
+[ "$(jq -c '.calibration.P1' <<< "$OUT")" = "[]" ] && ok "CAL2: empty P1 section is []" || fail "CAL2: empty P1 section is []"
+[ "$(jq -c '.calibration.P4' <<< "$OUT")" = "[]" ] && ok "CAL3: absent P4 section is []" || fail "CAL3: absent P4 section is []"
+[ "$(jq -r '.calibration | keys | join(",")' <<< "$OUT")" = "P1,P2,P3,P4" ] && ok "CAL3: keys are P1..P4" || fail "CAL3: keys are P1..P4"
+[ "$(jq -r '.calibration.P3 | length' <<< "$OUT")" = "2" ] && ok "CAL4: short P3 is not padded" || fail "CAL4: short P3 is not padded"
+[ "$(jq -r 'has("report") and has("since") and has("issues") and has("dropped")' <<< "$OUT")" = "true" ] \
+    && ok "CAL5: existing delta fields survive" || fail "CAL5: existing delta fields survive"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

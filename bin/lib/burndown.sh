@@ -116,6 +116,7 @@ bd_cmd_delta() {
     out="$(jq -c \
         --arg report "$BD_REPORT" \
         --arg since "$BD_SINCE" \
+        --arg tsv "$BD_REPORT_TSV" \
         --argjson ranked "$ranked_json" \
         --argjson skip "$BD_SKIP_LABELS_JSON" \
         'def skiplabeled($s): any((.labels // [])[]; .name as $l | any($s[]; . == $l));
@@ -128,7 +129,12 @@ bd_cmd_delta() {
                 | sort_by(.number)
                 | [.[] | {number: .number, title: .title, url: .url, updatedAt: .updatedAt, body: (.body // "" | .[0:1500])}]
             ),
-            dropped: ($ranked - [.[].number])
+            dropped: ($ranked - [.[].number]),
+            calibration: (
+                [$tsv | split("\n")[] | select(length > 0) | split("\t")] as $rows
+                | reduce ("P1","P2","P3","P4") as $r ({};
+                    .[$r] = ([$rows[] | select(.[1] == $r) | .[2:] | join("\t")] | .[0:5]))
+            )
         }' "$issues_file")"
     rm -f "$issues_file"
     local k

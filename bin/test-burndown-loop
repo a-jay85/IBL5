@@ -144,6 +144,33 @@ seed_backoff() {
 
 decision_lines() { printf '%s\n' "$OUT" | grep -c 'decision='; }
 
+# make_tree: a throwaway copy of the loop and its two libs under $T/tree, so a test
+# can rewrite the code under a running loop. Sets TT.
+make_tree() {
+    TT="$T/tree"
+    mkdir -p "$TT/bin/lib"
+    cp "$REPO_ROOT/bin/burndown-loop" "$TT/bin/burndown-loop"
+    cp "$REPO_ROOT/bin/lib/usage-gate.sh" "$REPO_ROOT/bin/lib/usage-fetch.sh" "$TT/bin/lib/"
+    chmod +x "$TT/bin/burndown-loop"
+}
+
+# tree_hook <file> <line>: on the first sleep, replace <file> under $TT with a copy
+# that has <line> appended. Write-then-rename gives a new inode, like git checkout,
+# so the running shell never reads the appended text.
+tree_hook() {
+    cat > "$T/sleep.hook" <<HOOK_EOF
+cp "$TT/$1" "$TT/$1.new"
+printf '%s\n' '$2' >> "$TT/$1.new"
+mv "$TT/$1.new" "$TT/$1"
+chmod +x "$TT/bin/burndown-loop"
+HOOK_EOF
+}
+
+run_tree_loop() {  # <args...>: like run_loop, against the copied tree
+    OUT=$("$TT/bin/burndown-loop" "$@" 2>&1)
+    RC=$?
+}
+
 queue() { printf '%s\n' "$@" > "$T/claude.queue"; }
 
 # run_loop <args...>: sets OUT (stdout+stderr) and RC.
@@ -753,6 +780,72 @@ test_reexec_dry_run_ignores_handoff() {
     assert_eq reexec_dry:one-line 1 "$(decision_lines)"
     assert_not_contains reexec_dry:no-resume "$OUT" "re-exec resumed"
     assert_eq reexec_dry:lock-untouched "$(cat "$T/handoff.pid")" "$(cat "$STATE/lock/pid" 2>/dev/null)"
+}
+
+# ---------------------------------------------------------------- re-exec in a copied tree
+# Shared scenario: batch 1 aborts after writing a ledger and sleeps (the hook fires
+# there), batch 2 runs, batch 3 finds nothing, so every run ends exhausted.
+
+test_reexec_on_code_change() {
+    new_env
+    seed_usage 5 0 1
+    make_tree
+    queue ledger-exit3 ledger none
+    command -v shasum >/dev/null || fail reexec:shasum "shasum missing on PATH"
+    tree_hook bin/lib/usage-fetch.sh '# changed'
+    run_tree_loop run
+    assert_eq reexec_change:rc 0 "$RC"
+    assert_eq reexec_change:one-exec 1 "$(printf '%s\n' "$OUT" | grep -c 'code changed; re-exec old=')"
+    assert_contains reexec_change:resumed "$OUT" "re-exec resumed pid="
+    assert_contains reexec_change:counters "$OUT" "batches=1 items=1 fails=1"
+    assert_eq reexec_change:calls 3 "$(calls "$T/claude.calls")"
+    assert_eq reexec_change:one-sid 1 "$(sed -n 's/.* SID=\([^ ]*\) .*/\1/p' "$T/claude.calls" | sort -u | wc -l | tr -d ' ')"
+    assert_eq reexec_change:sid-matches "$(cat "$STATE/loop.sid")" "$(sed -n 's/.* SID=\([^ ]*\) .*/\1/p' "$T/claude.calls" | sort -u)"
+    assert_contains reexec_change:totals "$OUT" "finish reason=exhausted batches=2 items=2"
+    assert_eq reexec_change:one-dm 1 "$(grep -c 'burndown-loop: finished' "$T/dm.calls")"
+    assert_contains reexec_change:dm-totals "$(cat "$T/dm.calls")" "batches=2 items=2"
+    assert_no_file reexec_change:lock-released "$STATE/lock"
+    assert_no_file reexec_change:env-unset "$T/claude.reexec-env"
+}
+
+test_reexec_unchanged_no_exec() {
+    new_env
+    seed_usage 5 0 1
+    make_tree
+    queue ledger-exit3 ledger none
+    printf ': > "%s/hook.ran"\n' "$T" > "$T/sleep.hook"
+    run_tree_loop run
+    assert_eq reexec_same:rc 0 "$RC"
+    assert_file reexec_same:slept "$T/hook.ran"
+    assert_not_contains reexec_same:no-change "$OUT" "code changed"
+    assert_not_contains reexec_same:no-resume "$OUT" "re-exec resumed"
+    assert_contains reexec_same:totals "$OUT" "finish reason=exhausted batches=2 items=2"
+}
+
+test_reexec_syntax_error_skipped() {
+    new_env
+    seed_usage 5 0 1
+    make_tree
+    queue ledger-exit3 ledger none
+    tree_hook bin/burndown-loop 'if then'
+    run_tree_loop run
+    assert_eq reexec_syntax:rc 0 "$RC"
+    assert_eq reexec_syntax:logged-once 1 "$(printf '%s\n' "$OUT" | grep -c 're-exec skipped: new code fails syntax check')"
+    assert_not_contains reexec_syntax:no-exec "$OUT" "code changed"
+    assert_contains reexec_syntax:totals "$OUT" "finish reason=exhausted batches=2 items=2"
+}
+
+test_reexec_hash_unreadable_no_exec() {
+    new_env
+    seed_usage 5 0 1
+    make_tree
+    queue ledger-exit3 ledger none
+    printf 'rm -f "%s/bin/lib/usage-gate.sh"\n' "$TT" > "$T/sleep.hook"
+    run_tree_loop run
+    assert_eq reexec_unreadable:rc 0 "$RC"
+    assert_not_contains reexec_unreadable:no-change "$OUT" "code changed"
+    assert_not_contains reexec_unreadable:no-skip "$OUT" "re-exec skipped"
+    assert_contains reexec_unreadable:totals "$OUT" "finish reason=exhausted batches=2 items=2"
 }
 
 # ---------------------------------------------------------------- runner

@@ -97,6 +97,34 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
         return (new \Season\SeasonQueryRepository($this->db))->getAvailableSeasonYears();
     }
 
+    // The points sub-expression `2*fgm+ftm+tgm` (PPG and QA below) mirrors the
+    // canonical PHP definition in BasketballStats\StatsFormatter::calculatePoints().
+    // It is duplicated here only because ORDER BY runs SQL-side, where that PHP
+    // helper cannot be called; keep the two in sync.
+    private const SORT_EXPRESSIONS = [
+        'PPG' => '((2*`fgm`+`ftm`+`tgm`)/`games`)',
+        'REB' => '((`reb`)/`games`)',
+        'OREB' => '((`orb`)/`games`)',
+        'DREB' => '((`reb`-`orb`)/`games`)',
+        'AST' => '((`ast`)/`games`)',
+        'STL' => '((`stl`)/`games`)',
+        'BLK' => '((`blk`)/`games`)',
+        'TO' => '((`tvr`)/`games`)',
+        'FOUL' => '((`pf`)/`games`)',
+        'QA' => '((((2*fgm+ftm+tgm)+reb+(2*ast)+(2*stl)+(2*blk))-((fga-fgm)+(fta-ftm)+tvr+pf))/games)',
+        'FGM' => '((`fgm`)/`games`)',
+        'FGA' => '((`fga`)/`games`)',
+        'FGP' => '(fgm/fga)',
+        'FTM' => '((`ftm`)/`games`)',
+        'FTA' => '((`fta`)/`games`)',
+        'FTP' => '(ftm/fta)',
+        'TGM' => '((`tgm`)/`games`)',
+        'TGA' => '((`tga`)/`games`)',
+        'TGP' => '(tgm/tga)',
+        'GAMES' => '(games)',
+        'MIN' => '((`minutes`)/`games`)',
+    ];
+
     /**
      * Map sort option to database column/expression for ORDER BY clause
      *
@@ -106,38 +134,10 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
      * from this strict whitelist, not user input.
      *
      * @param string $sortBy Sort option identifier (PPG, REB, OREB, DREB, etc.)
-     * @return string SQL expression for sorting
+     * @return value-of<self::SORT_EXPRESSIONS> SQL expression for sorting
      */
     private function getSortColumn(string $sortBy): string
     {
-        // The points sub-expression `2*fgm+ftm+tgm` (PPG and QA below) mirrors the
-        // canonical PHP definition in BasketballStats\StatsFormatter::calculatePoints().
-        // It is duplicated here only because ORDER BY runs SQL-side, where that PHP
-        // helper cannot be called; keep the two in sync.
-        $sortMap = [
-            'PPG' => '((2*`fgm`+`ftm`+`tgm`)/`games`)',
-            'REB' => '((`reb`)/`games`)',
-            'OREB' => '((`orb`)/`games`)',
-            'DREB' => '((`reb`-`orb`)/`games`)',
-            'AST' => '((`ast`)/`games`)',
-            'STL' => '((`stl`)/`games`)',
-            'BLK' => '((`blk`)/`games`)',
-            'TO' => '((`tvr`)/`games`)',
-            'FOUL' => '((`pf`)/`games`)',
-            'QA' => '((((2*fgm+ftm+tgm)+reb+(2*ast)+(2*stl)+(2*blk))-((fga-fgm)+(fta-ftm)+tvr+pf))/games)',
-            'FGM' => '((`fgm`)/`games`)',
-            'FGA' => '((`fga`)/`games`)',
-            'FGP' => '(fgm/fga)',
-            'FTM' => '((`ftm`)/`games`)',
-            'FTA' => '((`fta`)/`games`)',
-            'FTP' => '(ftm/fta)',
-            'TGM' => '((`tgm`)/`games`)',
-            'TGA' => '((`tga`)/`games`)',
-            'TGP' => '(tgm/tga)',
-            'GAMES' => '(games)',
-            'MIN' => '((`minutes`)/`games`)',
-        ];
-
-        return $sortMap[$sortBy] ?? $sortMap['PPG'];
+        return self::SORT_EXPRESSIONS[$sortBy] ?? self::SORT_EXPRESSIONS['PPG'];
     }
 }

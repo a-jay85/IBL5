@@ -952,6 +952,40 @@ fi
 _reap_kill_procs
 wait 2>/dev/null || true
 
+# ----------------------------------------------------------------------------
+# is_worktree_in_use matches the cwd as exact-or-subdirectory, not substring:
+# a sibling `feat-bar` must not block `feat`, a subdirectory of `feat` must.
+# ----------------------------------------------------------------------------
+if ! command -v lsof >/dev/null 2>&1; then
+    echo "SKIP: in-use-exact-path (no lsof)"
+else
+    mkdir -p "$TMP/inuse/feat/sub" "$TMP/inuse/feat-bar"
+    iu="$(cd "$TMP/inuse/feat" && pwd -P)"
+    (cd "$iu-bar" && exec sleep 300) >/dev/null 2>&1 & iu_sib=$!
+    sleep 1
+    if is_worktree_in_use "$iu"; then
+        failcase "in-use-sibling-prefix-does-not-block"
+    else
+        pass "in-use-sibling-prefix-does-not-block"
+    fi
+    (cd "$iu/sub" && exec sleep 300) >/dev/null 2>&1 & iu_sub=$!
+    sleep 1
+    if is_worktree_in_use "$iu"; then
+        pass "in-use-subdirectory-cwd-blocks"
+    else
+        failcase "in-use-subdirectory-cwd-blocks"
+    fi
+    kill -9 "$iu_sub" 2>/dev/null || true
+    sleep 1
+    if is_worktree_in_use "$iu"; then
+        failcase "in-use-released-after-exit"
+    else
+        pass "in-use-released-after-exit"
+    fi
+    kill -9 "$iu_sib" 2>/dev/null || true
+    wait 2>/dev/null || true
+fi
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

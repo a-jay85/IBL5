@@ -57,7 +57,7 @@ assert_eq() {
 # ioreg additionally reaches the tick via the WT_SYNC_IOREG seam (the tick calls
 # it by absolute path so a launchd PATH gap can never silently disable the gate).
 # STUB_IOREG_LINE: what ioreg emits (default: idle 700s — above the 600s threshold).
-# STUB_LSOF_LINE: what lsof -d cwd emits (default: empty — no process in any wt).
+# STUB_LSOF_LINE: what `lsof -d cwd -Fn` emits, i.e. `n<path>` (default: empty — no process in any wt).
 STUBBIN="$TMP/stubbin"
 mkdir -p "$STUBBIN"
 
@@ -541,7 +541,7 @@ LOG6="$(fresh_log t6)"; LOCKD6="$(fresh_lockd t6)"
 WT6="$MAIN6/worktrees/wt-inuse"
 OUT6="$(env PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" WT_SYNC_REPO_ROOT="$MAIN6" WT_SYNC_LOG="$LOG6" \
            WT_SYNC_LOCK_DIR="$LOCKD6" WT_SYNC_ENABLED=1 \
-           STUB_LSOF_LINE="lsof    999 user   3   DIR   $WT6" \
+           STUB_LSOF_LINE="n$WT6" \
            "$TICK" --force 2>&1)" || true
 assert_match "in-use: skipped message" "IN-USE|in-use" "$OUT6"
 assert_match "in-use: counted in summary" "in-use=1" "$(cat "$LOG6" 2>/dev/null)"
@@ -856,7 +856,7 @@ fi
 MAIN29="$(new_env)"
 WT29="$(add_worktree "$MAIN29" "wt-inuse29" current)"
 WT29_REAL="$(cd "$WT29" && pwd -P)"
-STUB_LSOF_LINE="lsof    999 user   3   DIR   $WT29_REAL" run_only "$WT29"
+STUB_LSOF_LINE="n$WT29_REAL" run_only "$WT29"
 if [ -n "$ONLY_OUT" ]; then
     pass "only: in-use gate bypassed — verdict emitted ($ONLY_OUT)"
 else
@@ -970,7 +970,7 @@ WT36_REAL="$(cd "$WT36" && pwd -P)"
 LOG36="$(fresh_log t36)"; LOCKD36="$(fresh_lockd t36)"
 HEAD36_BEFORE="$(git -C "$WT36" rev-parse HEAD)"
 run_with_repo "$MAIN36" "$LOG36" "$LOCKD36" \
-    STUB_LSOF_LINE="lsof    999 user   3   DIR   $WT36_REAL" -- --force
+    STUB_LSOF_LINE="n$WT36_REAL" -- --force
 assert_eq     "stale-inuse: exit 0" "0" "$ST"
 assert_match  "stale-inuse: IN-USE logged" "IN-USE.*wt-sinuse36" "$OUT"
 assert_absent "stale-inuse: no RESET-STALE" "RESET-STALE" "$OUT"

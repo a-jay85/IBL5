@@ -382,6 +382,9 @@ function ShowAndHideGM() {
         $this->assertLessThan($addAt, $refreshAt, 'Else branch re-adds the class after the reveal branch.');
     }
 
+    /**
+     * Guards the table markup built in VotingBallotView::renderCandidateTable() (:135).
+     */
     public function testCandidateTableStartsCollapsedWithClass(): void
     {
         $categories = [

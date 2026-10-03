@@ -85,7 +85,8 @@
 }
 
 /* Collapsed state for the ballot category tables and the results expander.
-   Toggled by the inline ShowAndHide<Code>() script in VotingBallotView. */
+   Toggled by the inline ShowAndHide<Code>() script in VotingBallotView.
+   This file is pulled into the bundle by design/input.css:143. */
 .voting-collapsed,
 .voting-form-table.voting-collapsed {
     display: none;

@@ -387,6 +387,15 @@ run_span() {
 yn() { if "$@"; then echo yes; else echo no; fi; }
 count_envstop() { find "$NIGHTLY_DIR" -name '*-env-stop-*' 2>/dev/null | wc -l | tr -d ' '; }
 skipped_report() { for f in "$NIGHTLY_DIR"/reports/*-skipped-"$PLAN_SLUG".md; do [ -f "$f" ] && echo "$f"; done; }
+# Rows 12i/12j: give the sandbox the runner state the rc=3 helper must release.
+# Set per row (never inside rc3_sandbox) so rows 12-12g, 12c, 12-neg and row 13 keep their state.
+set_runner_state() {
+    PP_START_MARKER="$SB/pp-start-marker"; : > "$PP_START_MARKER"
+    CURRENT_LOCK="$SB/claim.lock"; mkdir -p "$CURRENT_LOCK"
+}
+# EXIT-trap target: run_span runs in a subshell, so the parent cannot read
+# CURRENT_LOCK after it. Prepend `trap record_lock EXIT` to the span instead.
+record_lock() { printf '%s' "${CURRENT_LOCK-UNSET}" > "$SB/lock-var"; }
 
 # --- Row 12: rc=3 + RESULT line → terminal disposition ---
 rc3_sandbox 3 yes
@@ -506,6 +515,39 @@ assert_eq "$(count_envstop)" "1" "row 12-neg: without arm, env-stop report writt
 assert_eq "$(yn test -e "$CAP_REFUND_FILE")" "yes" "row 12-neg: without arm, .cap-refunds survives"
 assert_eq "$(cat "$ATTEMPT_FILE" 2>/dev/null)" "1" "row 12-neg: without arm, attempt refunded not cleared"
 rm -rf "$SB"
+
+# --- Row 12h: a stale RESULT: line from before this phase is never quoted ---
+PRE_LOG='RESULT: STALERESULT from an earlier run'
+rc3_sandbox 3 yes
+run_span "$PP_TERMINAL_SPAN"
+RPT=$(skipped_report)
+assert_contains "$(cat "$RPT" 2>/dev/null)" "Result line: $RC3_RESULT_LINE" "row 12h: fresh RESULT after a stale one is the one quoted"
+assert_eq "$(grep -c 'STALERESULT' "$RPT")" "0" "row 12h: stale RESULT absent when a fresh one exists"
+rm -rf "$SB"
+rc3_sandbox 3 no
+unset PRE_LOG
+run_span "$PP_TERMINAL_SPAN"
+RPT=$(skipped_report)
+assert_contains "$(cat "$RPT" 2>/dev/null)" "printed no RESULT: line" "row 12h: stale-only log falls back"
+assert_eq "$(grep -c 'STALERESULT' "$RPT")" "0" "row 12h: stale-only RESULT is not quoted"
+rm -rf "$SB"
+
+# --- Row 12i: the rc=3 helper removes the start marker and the claim lock ---
+rc3_sandbox 3 yes
+set_runner_state
+run_span "trap record_lock EXIT"$'\n'"$PP_TERMINAL_SPAN"
+assert_eq "$(yn test -e "$PP_START_MARKER")" "no" "row 12i: rc=3 removes PP_START_MARKER"
+assert_eq "$(yn test -d "$SB/claim.lock")" "no" "row 12i: rc=3 removes the CURRENT_LOCK dir"
+assert_eq "$(cat "$SB/lock-var")" "" "row 12i: rc=3 resets CURRENT_LOCK to empty"
+rm -rf "$SB"
+# Negative: rc=1 takes the breaker, which never touches the lock.
+rc3_sandbox 1 no
+set_runner_state
+run_span "trap record_lock EXIT"$'\n'"$PP_TERMINAL_SPAN"
+assert_eq "$(yn test -d "$SB/claim.lock")" "yes" "row 12i: rc=1 leaves the CURRENT_LOCK dir"
+assert_eq "$(cat "$SB/lock-var")" "$SB/claim.lock" "row 12i: rc=1 leaves CURRENT_LOCK set"
+rm -rf "$SB"
+unset PP_START_MARKER CURRENT_LOCK
 
 echo
 echo "-- row 13: post-plan-now rc=7 (no worktree) → merged PR is terminal; unmerged/gh-error refunds + breaks --"

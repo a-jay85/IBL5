@@ -1011,6 +1011,133 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
     }
 
     /**
+     * Runs --full-scan over the real ibl5/migrations and compares the
+     * `[tag] file:line` tokens with the pinned golden. Files numbered above
+     * the golden's pinned-through header are ignored, so a new migration
+     * never breaks this test.
+     */
+    public function testFullScanMatchesGoldenFixture(): void
+    {
+        $golden = $this->readGolden('destructive-migration-full-scan.golden');
+        $result = $this->runRepoFullScan();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertMatchesRegularExpression(
+            '#suppressed \[[a-z-]+\] x\d+ in ibl5/migrations/143_#',
+            $result['output'],
+        );
+
+        $live = [];
+        foreach (explode("\n", $result['output']) as $line) {
+            if (preg_match('#^  (\[[a-z-]+\]) (ibl5/migrations/([^:]+)):(\d+)(?: |$)#', $line, $m) !== 1) {
+                continue;
+            }
+            if (preg_match('/^(\d+)/', $m[3], $n) === 1 && (int) $n[1] > $golden['pinned']) {
+                continue;
+            }
+            $live[] = $m[1] . ' ' . $m[2] . ':' . $m[4];
+        }
+        sort($live, SORT_STRING);
+
+        self::assertSame($golden['body'], $live);
+    }
+
+    /**
+     * Every (tag, file) pair the master v1 engine reported must appear in the
+     * full-scan golden, except pairs declared as v1 per-line false positives.
+     */
+    public function testV1HitsAreSubsetOfFullScanGolden(): void
+    {
+        $full = [];
+        foreach ($this->readGolden('destructive-migration-full-scan.golden')['body'] as $line) {
+            [$tag, $location] = explode(' ', $line, 2);
+            $file = substr($location, 0, (int) strrpos($location, ':'));
+            $full[trim($tag, '[]') . ' ' . $file] = true;
+        }
+
+        $v1 = $this->readGolden('destructive-migration-v1-hits.golden');
+        self::assertNotSame([], $v1['body']);
+        self::assertLessThanOrEqual(3, count($v1['falsePositives']));
+
+        $missing = [];
+        foreach ($v1['body'] as $pair) {
+            if (!isset($full[$pair]) && !in_array($pair, $v1['falsePositives'], true)) {
+                $missing[] = $pair;
+            }
+        }
+
+        self::assertSame([], $missing, 'v1 hits missing from the full-scan golden');
+    }
+
+    /**
+     * Guards against a golden regenerated from a broken engine. The plan's
+     * prototype bounds (delete-no-where >= 100, update-no-where in >= 9 files)
+     * did not survive re-derivation: the corpus holds 6 DELETE statements with
+     * no WHERE and 12 such UPDATEs across the 6 files named below, and every
+     * one of them is flagged.
+     */
+    public function testFullScanSanityBounds(): void
+    {
+        $output = $this->runRepoFullScan()['output'];
+
+        self::assertGreaterThanOrEqual(6, preg_match_all('/^  \[delete-no-where\] /m', $output));
+        self::assertSame(0, preg_match_all('/^  \[drop-recreate-existing\] /m', $output));
+
+        preg_match_all('#^  \[update-no-where\] ibl5/migrations/(\d+)_#m', $output, $m);
+        $files = array_values(array_unique($m[1]));
+        foreach (['009', '038', '039', '040', '090', '106'] as $prefix) {
+            self::assertContains($prefix, $files, "update-no-where expected in migration $prefix");
+        }
+    }
+
+    /** @var array{output: string, exit: int}|null */
+    private static ?array $repoFullScan = null;
+
+    /**
+     * @return array{output: string, exit: int}
+     */
+    private function runRepoFullScan(): array
+    {
+        if (self::$repoFullScan === null) {
+            $output = [];
+            $exit = 0;
+            $root = dirname(__DIR__, 3);
+            exec(
+                'cd ' . escapeshellarg($root) . ' && bash ' . escapeshellarg($this->scriptPath) . ' --full-scan 2>&1',
+                $output,
+                $exit,
+            );
+            self::$repoFullScan = ['output' => implode("\n", $output), 'exit' => $exit];
+        }
+
+        return self::$repoFullScan;
+    }
+
+    /**
+     * @return array{pinned: int, body: list<string>, falsePositives: list<string>}
+     */
+    private function readGolden(string $name): array
+    {
+        $lines = file(__DIR__ . '/fixtures/' . $name, FILE_IGNORE_NEW_LINES);
+        self::assertNotFalse($lines, "fixture $name must exist");
+
+        $pinned = PHP_INT_MAX;
+        $body = [];
+        $falsePositives = [];
+        foreach ($lines as $line) {
+            if (preg_match('/^# pinned-through: (\d+)/', $line, $m) === 1) {
+                $pinned = (int) $m[1];
+            } elseif (preg_match('/^# v1-false-positive: (\S+) (\S+)/', $line, $m) === 1) {
+                $falsePositives[] = $m[1] . ' ' . $m[2];
+            } elseif ($line !== '' && !str_starts_with($line, '#')) {
+                $body[] = $line;
+            }
+        }
+
+        return ['pinned' => $pinned, 'body' => $body, 'falsePositives' => $falsePositives];
+    }
+
+    /**
      * @param list<string> $args
      * @return array{output: string, exit: int}
      */

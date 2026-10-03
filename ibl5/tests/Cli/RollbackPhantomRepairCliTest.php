@@ -222,7 +222,7 @@ final class RollbackPhantomRepairCliTest extends TestCase
         }
         $lines = file($this->dockerLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 
-        return $lines === false ? [] : array_values($lines);
+        return $lines === false ? [] : $lines;
     }
 
     /**

@@ -1,6 +1,6 @@
 ---
 description: The plan-architect's full output contract, Read on demand from Step 3 of plan/SKILL.md — the MUST-produce list, the conditional-section catalogue, the agent-tiering labels to inject, and the delegation-packet format.
-last_verified: 2026-10-01
+last_verified: 2026-10-02
 ---
 
 The `plan-architect` Reads this file when Step 3 of `plan/SKILL.md` points to it, so this contract lands in the architect's own sub-context and never enters the orchestrator's. Mirrors the on-demand convention of the `.claude/review-shared/_*.md` reference files.
@@ -148,6 +148,6 @@ Format each packet as a fenced block within the plan:
 - **Report back:** a one-line summary only
 ````
 
-The `Assertions:` field is the packet's copy of the plan's assertion list. Paste every property the phase's Verification Matrix rows assert. A sub-agent sees only the packet, so a property that stays in the matrix and never reaches the packet is a property the sub-agent will not ship. Two past PRs were blocked by a delegate that tested one property where the plan wrote four. `bin/check-plan` gate `[E]` requires the field, and requires every backticked token in it to appear literally in the packet's `**Self-verify:**`. Name the test methods and run them. A source grep for the property name is green from birth and stays green through the exact regression it pins (§ mutation statement above), so it does not count. A phase with no matrix rows of its own, such as a mechanical rename verified only by `composer run analyse`, carries `no-assertions: <reason>` inside the packet instead.
+The `Assertions:` field is the packet's copy of the plan's assertion list. Paste every property the phase's Verification Matrix rows assert. A sub-agent sees only the packet, so a property that stays in the matrix and never reaches the packet is a property the sub-agent will not ship. Two past PRs were blocked by a delegate that tested one property where the plan wrote four. `bin/check-plan` gate `[E]` requires the field, and requires every backticked token in it to appear literally in the packet's `**Self-verify:**`. Name the test methods and run them. A source grep for the property name is green from birth and stays green through the exact regression it pins (§ mutation statement above), so it does not count. A phase with no matrix rows of its own, such as a mechanical rename verified only by `composer run analyse`, carries a line inside the packet that opens with `no-assertions: <reason>` instead. Indent, a `-` bullet, or a wrapping `<!-- … -->` may precede the marker, and the reason must be non-empty. Gate `[E]` ignores a mid-sentence mention.
 
 **When to fill the `Rules:` field.** Never list an always-on rule (no `paths:` frontmatter key). Those load verbatim into every sub-agent. List a **path-scoped** rule only when the delegate's work depends on it and the packet's own file edits would not match its globs. Omit the field entirely otherwise. `_architect-contract-detail.md` § Rules field: worked examples.

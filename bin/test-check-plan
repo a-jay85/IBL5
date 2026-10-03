@@ -1243,6 +1243,69 @@ Anchor: change lands at the report block.
 ````
 '
 
+# (E4e) A mid-sentence prose mention of the marker does NOT clear gate E (#947).
+assert "gateE-no-assertions-prose-midsentence-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+We chose not to use no-assertions: here, so list them later.
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4f) A prose mention inside another packet field does NOT clear gate E (#947 live repro).
+assert "gateE-no-assertions-prose-in-bullet-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate; we chose not to use no-assertions: here, so list them later
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4g) A bare marker with no reason does NOT clear gate E.
+assert "gateE-no-assertions-empty-reason-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+no-assertions:
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4h) An HTML-comment marker whose only "reason" is the closing --> does NOT clear gate E.
+assert "gateE-no-assertions-empty-comment-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+<!-- no-assertions: -->
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
 # (E5) Gate E is NOT impl_model-gated: an OPUS plan with a packet missing
 # **Assertions:** still exits 1. Proves gate E runs for all plans.
 assert "gateE-opus-plan-still-gated" 1 "$TFM$M"'

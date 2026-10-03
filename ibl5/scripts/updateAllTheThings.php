@@ -313,6 +313,9 @@ try {
             new \SimRecap\SimSummaryRepository($mysqli_db),
             new \Season\SeasonQueryRepository($mysqli_db),
         ));
+        $updaterService->addStep(new Updater\Steps\QueueGoogleSheetRefreshStep(
+            new GoogleSheets\GoogleSheetConnectionRepository($mysqli_db)
+        ));
     }
 
     $controller = new Updater\UpdaterController($updaterService, $view);

@@ -237,6 +237,10 @@ final class HeatPhaseRecapPipelineDbTest extends DatabaseTestCase
 
     // ── Phase 1: queue gating ──────────────────────────────────────────────────
 
+    /**
+     * With the phase pinned to HEAT, QueueSimSummaryStep::execute succeeds
+     * unskipped and find(9101) returns a pending row with 0 attempts.
+     */
     public function testQueueStepQueuesPendingRowDuringHeatPhase(): void
     {
         self::assertSame('HEAT', $this->seasonQuery->getSeasonPhase());
@@ -252,6 +256,10 @@ final class HeatPhaseRecapPipelineDbTest extends DatabaseTestCase
         self::assertSame(0, $row['attempts']);
     }
 
+    /**
+     * Negative: Preseason is not an enabled phase, so execute() skips with a
+     * success result naming the phase and find(9101) stays null.
+     */
     public function testQueueStepSkipsDuringPreseasonPhase(): void
     {
         $this->setSeasonPhase('Preseason');

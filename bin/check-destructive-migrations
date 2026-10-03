@@ -152,6 +152,8 @@ if [ "$SELF_TEST" = "1" ]; then
 fi
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+# Pathspecs and the --full-scan reads are repo-relative.
+cd "$REPO_ROOT"
 
 if [ "$MODE" = "since" ]; then
     RANGE="${SINCE_SHA}...HEAD"

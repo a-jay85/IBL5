@@ -458,6 +458,558 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
         self::assertStringContainsString('unknown flag', implode("\n", $output));
     }
 
+    // ---- Phase 3: wrapper onto the engine -------------------------------
+
+    public function testTrueMultiLineDropColumnIsFlagged(): void
+    {
+        $this->writeMigration('201_multi_line_drop.sql', "ALTER TABLE t\n  DROP COLUMN c;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[drop-column]', $result['output']);
+    }
+
+    public function testUnchangedOldStatementIsNotRescanned(): void
+    {
+        $this->writeMigration('201_a.sql', "ALTER TABLE t DROP COLUMN c;\n");
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "old destructive migration"');
+        $baseSha = $this->headSha();
+
+        $this->writeMigration('201_a.sql', "ALTER TABLE t DROP COLUMN c;\nINSERT INTO t (c) VALUES (1);\n");
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "append an insert"');
+
+        $result = $this->runScript(['--since=' . $baseSha]);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testAddedLineInsideOldMultiLineStatementIsScanned(): void
+    {
+        $this->writeMigration('202_a.sql', "ALTER TABLE t\n  ADD COLUMN a INT DEFAULT 0;\n");
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "old multi-line statement"');
+        $baseSha = $this->headSha();
+
+        $this->writeMigration('202_a.sql', "ALTER TABLE t\n  DROP COLUMN b,\n  ADD COLUMN a INT DEFAULT 0;\n");
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "insert a drop clause"');
+
+        $result = $this->runScript(['--since=' . $baseSha]);
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[drop-column]', $result['output']);
+    }
+
+    public function testMissingPython3ExitsTwo(): void
+    {
+        $binDir = $this->tmpDir . '/pathbin';
+        mkdir($binDir, 0755, true);
+        foreach (['bash', 'git', 'cat', 'mktemp', 'grep', 'sed', 'rm', 'dirname', 'awk'] as $tool) {
+            $resolved = trim((string) shell_exec('command -v ' . escapeshellarg($tool)));
+            self::assertNotSame('', $resolved, "$tool must be on the host PATH");
+            symlink($resolved, $binDir . '/' . $tool);
+        }
+
+        $this->writeMigration('203_clean.sql', "SELECT 1;\n");
+        $this->runInDir('git add -A');
+
+        $output = [];
+        $exit = 0;
+        exec(
+            'cd ' . escapeshellarg($this->tmpDir)
+            . ' && env PATH=' . escapeshellarg($binDir)
+            . ' ' . escapeshellarg($binDir . '/bash')
+            . ' ' . escapeshellarg($this->scriptPath) . ' --staged 2>&1',
+            $output,
+            $exit
+        );
+
+        self::assertSame(2, $exit, 'Output: ' . implode("\n", $output));
+        self::assertStringContainsString('python3', implode("\n", $output));
+    }
+
+    public function testFullScanFlagsCommittedFileWithoutDiff(): void
+    {
+        $this->writeMigration('204_committed.sql', "ALTER TABLE t DROP COLUMN c;\n");
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "committed destructive migration"');
+
+        $result = $this->runScript(['--full-scan']);
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[drop-column]', $result['output']);
+    }
+
+    public function testFullScanRejectsSinceCombination(): void
+    {
+        $result = $this->runScript(['--full-scan', '--since=HEAD']);
+
+        self::assertSame(2, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('--full-scan takes no range and no stdin', $result['output']);
+    }
+
+    public function testSelfTestFlagExitsZero(): void
+    {
+        $result = $this->runScript(['--self-test']);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertMatchesRegularExpression('/\d+ cases, 0 failures/', $result['output']);
+    }
+
+    // ---- Phase 4: new triggers ------------------------------------------
+
+    public function testDeleteWithoutWhereIsFlagged(): void
+    {
+        $this->writeMigration('210_delete.sql', "DELETE FROM t\n;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[delete-no-where]', $result['output']);
+    }
+
+    public function testDeleteWithWhereIsClean(): void
+    {
+        $this->writeMigration('211_delete_where.sql', "DELETE FROM t\nWHERE id = 1;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testDeleteWhereOnlyInCommentStillFlagged(): void
+    {
+        $this->writeMigration('212_delete_comment.sql', "DELETE FROM t; -- where id = 1\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[delete-no-where]', $result['output']);
+    }
+
+    public function testUpdateWithoutWhereIsFlagged(): void
+    {
+        $this->writeMigration('213_update.sql', "UPDATE t SET a = 1;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[update-no-where]', $result['output']);
+    }
+
+    public function testUpdateJoinWithoutWhereIsFlagged(): void
+    {
+        $this->writeMigration('214_update_join.sql', "UPDATE a JOIN b ON a.id = b.id\nSET a.x = b.x;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[update-no-where]', $result['output']);
+    }
+
+    public function testUpdateWithWhereIsClean(): void
+    {
+        $this->writeMigration('215_update_where.sql', "UPDATE t SET a = 1 WHERE id = 2;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testInsertOnDuplicateKeyUpdateIsClean(): void
+    {
+        $this->writeMigration('216_upsert.sql', "INSERT INTO t (id, a) VALUES (1, 2) ON DUPLICATE KEY UPDATE a = 2;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testNarrowTypeFromSchemaIsFlagged(): void
+    {
+        $this->writeSchema("CREATE TABLE `t` (\n  `c` varchar(64) NOT NULL,\n  PRIMARY KEY (`c`)\n) ENGINE=InnoDB;\n");
+        $this->writeMigration('220_narrow.sql', "ALTER TABLE t MODIFY c VARCHAR(32) NULL;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[narrow-type]', $result['output']);
+    }
+
+    public function testWidenTypeFromSchemaIsClean(): void
+    {
+        $this->writeSchema("CREATE TABLE `t` (\n  `c` varchar(32) NOT NULL,\n  PRIMARY KEY (`c`)\n) ENGINE=InnoDB;\n");
+        $this->writeMigration('221_widen.sql', "ALTER TABLE t MODIFY c VARCHAR(64) NULL;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testNarrowTypeUnresolvedFailsClosed(): void
+    {
+        $this->writeSchema("CREATE TABLE `t` (\n  `a` int(11) NOT NULL,\n  PRIMARY KEY (`a`)\n) ENGINE=InnoDB;\n");
+        $this->writeMigration('222_unresolved.sql', "ALTER TABLE t MODIFY c VARCHAR(32) NULL;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('unresolved', $result['output']);
+    }
+
+    public function testNarrowTypeResolvedFromSameFileAddColumn(): void
+    {
+        $this->writeMigration(
+            '223_same_file_narrow.sql',
+            "ALTER TABLE t ADD COLUMN c VARCHAR(64) NULL;\nALTER TABLE t MODIFY c VARCHAR(32) NULL;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $flagged = $this->runScript();
+
+        self::assertSame(1, $flagged['exit'], "Output: {$flagged['output']}");
+        self::assertStringContainsString('[narrow-type]', $flagged['output']);
+
+        unlink($this->tmpDir . '/ibl5/migrations/223_same_file_narrow.sql');
+        $this->writeMigration(
+            '224_same_file_widen.sql',
+            "ALTER TABLE t ADD COLUMN c VARCHAR(32) NULL;\nALTER TABLE t MODIFY c VARCHAR(64) NULL;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $clean = $this->runScript();
+
+        self::assertSame(0, $clean['exit'], "Output: {$clean['output']}");
+    }
+
+    public function testIntDisplayWidthChangeIsClean(): void
+    {
+        $this->writeSchema("CREATE TABLE `t` (\n  `c` int(11) NOT NULL,\n  PRIMARY KEY (`c`)\n) ENGINE=InnoDB;\n");
+        $this->writeMigration('225_int_width.sql', "ALTER TABLE t MODIFY c INT NULL;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testDropRecreateExistingFromSchemaIsFlagged(): void
+    {
+        $this->writeSchema("CREATE TABLE `x` (\n  `id` int(11) NOT NULL,\n  PRIMARY KEY (`id`)\n) ENGINE=InnoDB;\n");
+        $this->writeMigration('230_recreate_schema.sql', "DROP TABLE IF EXISTS x;\nCREATE TABLE x (id INT);\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[drop-recreate-existing]', $result['output']);
+        self::assertStringNotContainsString('[drop-table]', $result['output']);
+    }
+
+    public function testDropRecreateExistingFromEarlierMigrationIsFlagged(): void
+    {
+        $this->writeMigration('100_create_x.sql', "CREATE TABLE x (id INT);\n");
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "create x"');
+
+        $this->writeMigration('101_recreate_x.sql', "DROP TABLE IF EXISTS x;\nCREATE TABLE x (id INT);\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[drop-recreate-existing]', $result['output']);
+    }
+
+    public function testDropRecreateNewTableStaysSuppressed(): void
+    {
+        $this->writeMigration('231_recreate_new.sql', "DROP TABLE IF EXISTS brand_new;\nCREATE TABLE brand_new (id INT);\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testDropRecreateIgnoresLaterNumberedMigration(): void
+    {
+        $this->writeMigration('102_create_x.sql', "CREATE TABLE x (id INT);\n");
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "create x later"');
+
+        $this->writeMigration('101_recreate_x.sql', "DROP TABLE IF EXISTS x;\nCREATE TABLE x (id INT);\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    // ---- Phase 5: PHP migrations ----------------------------------------
+
+    public function testPhpHeredocDropColumnIsFlagged(): void
+    {
+        $this->writeMigration(
+            '240_heredoc.php',
+            "<?php\n\$db->query(<<<SQL\nALTER TABLE t\n  DROP COLUMN c;\nSQL\n);\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[drop-column]', $result['output']);
+        self::assertMatchesRegularExpression('/\.php:\d+/', $result['output']);
+    }
+
+    public function testPhpNowdocDeleteWithoutWhereIsFlagged(): void
+    {
+        $this->writeMigration(
+            '241_nowdoc.php',
+            "<?php\n\$db->query(<<<'SQL'\nDELETE FROM t;\nSQL\n);\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[delete-no-where]', $result['output']);
+    }
+
+    public function testPhpPreparedDeleteWithWhereIsClean(): void
+    {
+        $this->writeMigration(
+            '242_prepared.php',
+            "<?php\n\$stmt = \$db->prepare('DELETE FROM t WHERE id = ?');\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testPhpConcatenatedDeleteWithWhereIsClean(): void
+    {
+        $this->writeMigration(
+            '243_concat.php',
+            "<?php\n\$db->query('DELETE FROM `' . \$table . '` WHERE id = ' . \$id);\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testPhpBareActionWordsAreClean(): void
+    {
+        $this->writeMigration('244_bare_words.php', "<?php\n\$a = 'update';\n\$b = 'delete';\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testPhpCommentedSqlIsClean(): void
+    {
+        $this->writeMigration(
+            '245_commented.php',
+            "<?php\n// DROP TABLE t\n/* TRUNCATE TABLE t */\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testPhpOnlyTouchedFragmentIsScanned(): void
+    {
+        $this->writeMigration('246_fragments.php', "<?php\n\$db->query('DELETE FROM a');\n");
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "old php migration"');
+        $baseSha = $this->headSha();
+
+        $this->writeMigration(
+            '246_fragments.php',
+            "<?php\n\$db->query('DELETE FROM a');\n\$db->query('DELETE FROM b WHERE id = 1');\n"
+        );
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "add clean php fragment"');
+
+        $result = $this->runScript(['--since=' . $baseSha]);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    // ---- Phase 6: tagged bypass markers ---------------------------------
+
+    public function testTaggedInlineBypassExitsZero(): void
+    {
+        $sql = "-- destructive-migration[drop-column]: dropping unused legacy column after data migration confirmed\n";
+        $sql .= "ALTER TABLE foo DROP COLUMN bar;\n";
+        $this->writeMigration('250_tagged.sql', $sql);
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('suppressed [drop-column]', $result['output']);
+        self::assertStringContainsString('PASS (bypass)', $result['output']);
+    }
+
+    public function testTaggedPrBodyBypassExitsZero(): void
+    {
+        $this->writeMigration('251_tagged_pr.sql', "ALTER TABLE foo DROP COLUMN bar;\n");
+        $this->runInDir('git add -A');
+
+        $prBody = '<!-- destructive-migration[drop-column]: removing deprecated column after successful data migration -->';
+        $result = $this->runScript(['--bypass-from-stdin'], $prBody);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('suppressed [drop-column]', $result['output']);
+    }
+
+    public function testTaggedMarkerSuppressesOnlyNamedTrigger(): void
+    {
+        $sql = "-- destructive-migration[drop-column]: dropping unused legacy column after data migration confirmed\n";
+        $sql .= "ALTER TABLE foo DROP COLUMN bar;\n";
+        $sql .= "TRUNCATE TABLE foo;\n";
+        $this->writeMigration('252_partial.sql', $sql);
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[truncate]', $result['output']);
+        self::assertStringContainsString('suppressed [drop-column]', $result['output']);
+    }
+
+    public function testMultiTagMarkerSuppressesEachNamedTrigger(): void
+    {
+        $sql = "-- destructive-migration[drop-column,truncate]: dropping and emptying legacy structures after cutover\n";
+        $sql .= "ALTER TABLE foo DROP COLUMN bar;\n";
+        $sql .= "TRUNCATE TABLE foo;\n";
+        $this->writeMigration('253_multi_tag.sql', $sql);
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('suppressed [drop-column]', $result['output']);
+        self::assertStringContainsString('suppressed [truncate]', $result['output']);
+    }
+
+    public function testUnknownTagInMarkerIsRejected(): void
+    {
+        $sql = "-- destructive-migration[drop-colum]: dropping unused legacy column after data migration confirmed\n";
+        $sql .= "ALTER TABLE foo DROP COLUMN bar;\n";
+        $this->writeMigration('254_unknown_tag.sql', $sql);
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('unknown trigger', $result['output']);
+    }
+
+    public function testShortTaggedReasonIsIgnored(): void
+    {
+        $sql = "-- destructive-migration[drop-column]: too short\n";
+        $sql .= "ALTER TABLE foo DROP COLUMN bar;\n";
+        $this->writeMigration('255_short_tagged.sql', $sql);
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('shorter than 20', $result['output']);
+        self::assertStringContainsString('[drop-column]', $result['output']);
+    }
+
+    public function testPrBodyMarkerSuppressesAcrossFiles(): void
+    {
+        $this->writeMigration('256_pr_a.sql', "ALTER TABLE foo DROP COLUMN bar;\n");
+        $this->writeMigration('257_pr_b.sql', "ALTER TABLE baz DROP COLUMN qux;\n");
+        $this->runInDir('git add -A');
+
+        $prBody = '<!-- destructive-migration[drop-column]: removing deprecated columns after successful data migration -->';
+        $result = $this->runScript(['--bypass-from-stdin'], $prBody);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('256_pr_a.sql', $result['output']);
+        self::assertStringContainsString('257_pr_b.sql', $result['output']);
+    }
+
+    public function testFullScanHonoursLegacyUntaggedMarker(): void
+    {
+        $parentSha = $this->headSha();
+
+        $sql = "-- destructive-migration: dropping unused legacy column after data migration confirmed\n";
+        $sql .= "ALTER TABLE foo DROP COLUMN bar;\n";
+        $this->writeMigration('258_legacy.sql', $sql);
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "legacy untagged marker"');
+
+        $full = $this->runScript(['--full-scan']);
+
+        self::assertSame(0, $full['exit'], "Output: {$full['output']}");
+        self::assertStringContainsString('suppressed', $full['output']);
+
+        $since = $this->runScript(['--since=' . $parentSha]);
+
+        self::assertSame(1, $since['exit'], "Output: {$since['output']}");
+        self::assertStringContainsString('untagged', $since['output']);
+    }
+
+    public function testPhpCommentMarkerIsHonoured(): void
+    {
+        $this->writeMigration(
+            '259_php_marker.php',
+            "<?php\n// destructive-migration[delete-no-where]: wiping the scratch table is intentional here\n"
+            . "\$db->query(<<<SQL\nDELETE FROM t;\nSQL\n);\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testMarkerOnUnchangedLineIsIgnoredInDiffMode(): void
+    {
+        $marker = "-- destructive-migration[drop-column]: dropping unused legacy column after data migration confirmed\n";
+        $this->writeMigration('260_old_marker.sql', $marker);
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "marker only"');
+        $baseSha = $this->headSha();
+
+        $this->writeMigration('260_old_marker.sql', $marker . "ALTER TABLE t DROP COLUMN c;\n");
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "add destructive statement"');
+
+        $result = $this->runScript(['--since=' . $baseSha]);
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[drop-column]', $result['output']);
+    }
+
     /**
      * @param list<string> $args
      * @return array{output: string, exit: int}
@@ -491,6 +1043,22 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
     private function writeMigration(string $filename, string $content): void
     {
         file_put_contents($this->tmpDir . '/ibl5/migrations/' . $filename, $content);
+    }
+
+    private function writeSchema(string $sql): void
+    {
+        $dir = $this->tmpDir . '/ibl5/docs/schema';
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        file_put_contents($dir . '/current-schema.sql', $sql);
+    }
+
+    private function headSha(): string
+    {
+        $raw = shell_exec('cd ' . escapeshellarg($this->tmpDir) . ' && git rev-parse HEAD');
+
+        return trim($raw !== false && $raw !== null ? $raw : '');
     }
 
     private function runInDir(string $cmd): void

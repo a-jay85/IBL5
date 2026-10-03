@@ -1274,6 +1274,7 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
 # Phase 9/10 and teardown; test_ci_fix_budget_below_max_pp_secs pins the relation.
 _CI_FIX_WALL_BUDGET_SECS = 4800
 _CI_FIX_MIN_ITER_SECS = 1200   # one Opus fix plus one CI cycle; less than this, stop
+_CI_FIX_REWATCH_FLOOR_SECS = 300   # less than this after a push: record the head, skip the watch
 
 
 def _phase7_stop(log, trail: list[str], attempt: int, sha, stage: str,
@@ -1471,13 +1472,29 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 trail.append(f"attempt {attempt}: {last}")
                 break
             else:
-                remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+                pre_push_head = new
                 try:
-                    sha = git.push_ff() or new
+                    sha = _push_with_adr_draft(
+                        git, log, "phase7", llm=llm, worktree=worktree,
+                        out_dir=out_dir, res=res,
+                        pr=(pr if isinstance(git, LiveGit) else None)) or git.head()
                 except HarnessError as push_err:
                     if push_err.kind == "remote-head-diverged":
                         raise
                     last = _phase7_stop(log, trail, attempt, sha, "push", push_err)
+                    break
+                if sha != pre_push_head:
+                    log(f"phase7 ci-fix: push caught up to origin/master; "
+                        f"head {str(pre_push_head)[:8]} -> {str(sha)[:8]}; re-watching CI")
+                remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+                if mode != "replay" and remaining - 120 < _CI_FIX_REWATCH_FLOOR_SECS:
+                    res.ci_head = sha
+                    last = "pushed-unwatched"
+                    log(f"phase7 ci-fix: wall-clock budget exhausted after push "
+                        f"({int(remaining)}s left); CI on {str(sha)[:8]} not re-watched")
+                    log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} "
+                        f"outcome={last} sha={str(sha)[:8]}")
+                    trail.append(f"attempt {attempt}: {last}")
                     break
                 res.ci_head = sha
                 # Re-watch

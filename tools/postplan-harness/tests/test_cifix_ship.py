@@ -359,3 +359,69 @@ def test_wait_indeterminate_on_deadline():
     got = cifix_ship.wait_for_fresh_meta_run(fn, "100", deadline=1100.0, sleep=sleep,
                                              now=lambda: clock[0])
     assert got == "indeterminate"
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: stale-base catch-up on the Phase 7 push
+# ---------------------------------------------------------------------------
+
+_STALE = "pre-push-adr-hook: branch does not contain origin/master"
+
+
+def test_stale_base_push_catches_up_and_rewatches_new_head(monkeypatch, tmp_path):
+    git = CiFixGit(head_shas=["b" * 40, "c" * 40], push_errors=[
+        HarnessError("local-gate", f"git push: {_STALE}", output=_STALE + "\n")])
+    r = _run(monkeypatch, tmp_path, git, CiFixGh(), ScriptedLlm(), failed=["PHPUnit"],
+             rewatch=[CiOutcome(0, [], "green")])
+    assert (git.fetches, git.rebases, git.proofs) == (1, 1, 1)
+    assert git.push_calls == ["push", "push"]
+    assert r.watched == ["c" * 40]
+    assert r.res.ci_head == "c" * 40
+    assert _has(r.lines, "caught up to origin/master")
+    assert _has(r.lines, "outcome=fixed")
+
+
+def test_non_stale_base_push_denial_stops_without_catchup(monkeypatch, tmp_path):
+    git = CiFixGit(push_errors=[HarnessError(
+        "local-gate", "git push: pre-push-adr-hook: ADR required",
+        output="pre-push-adr-hook: ADR required\n")])
+    gh, llm = CiFixGh(), ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, git, gh, llm, failed=["PHPUnit"])
+    assert (git.fetches, git.rebases) == (0, 0)
+    assert len(llm.calls) == 1
+    assert any("push-time denial" in ln and "ADR required" in ln for ln in r.lines)
+    assert "(push-time)" in _trail_text(gh)
+    assert "ADR required" in _trail_text(gh)
+
+
+def test_catchup_rebase_conflict_stops_with_push_stage(monkeypatch, tmp_path):
+    git = CiFixGit(push_errors=[
+        HarnessError("local-gate", f"git push: {_STALE}", output=_STALE + "\n")])
+    git.rebase_error = HarnessError(
+        "rebase-conflict", "CONFLICT (content): ibl5/x.php",
+        output="CONFLICT (content): Merge conflict in ibl5/x.php\n")
+    gh = CiFixGh()
+    r = _run(monkeypatch, tmp_path, git, gh, ScriptedLlm(), failed=["PHPUnit"])
+    assert _has(r.lines, "stage=push")
+    assert _has(r.lines, "outcome=error:rebase-conflict")
+    assert "ibl5/x.php" in _trail_text(gh)
+    assert r.watched == []
+
+
+def test_catchup_push_with_no_budget_left_skips_rewatch(monkeypatch, tmp_path):
+    clock = [time.time()]
+    monkeypatch.setattr(runner, "time",
+                        SimpleNamespace(time=lambda: clock[0], sleep=lambda s: None))
+
+    class SlowPushGit(CiFixGit):
+        def push(self):
+            out = super().push()
+            clock[0] += runner._CI_FIX_WALL_BUDGET_SECS
+            return out
+
+    git = SlowPushGit(head_shas=["b" * 40])
+    r = _run(monkeypatch, tmp_path, git, CiFixGh(), ScriptedLlm(), failed=["PHPUnit"],
+             rewatch=[CiOutcome(0, [], "green")])
+    assert r.watched == []
+    assert r.res.ci_head == "b" * 40
+    assert _has(r.lines, "outcome=pushed-unwatched")

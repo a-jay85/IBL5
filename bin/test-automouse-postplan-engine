@@ -528,6 +528,7 @@ assert_eq "$(cat "$ATTEMPT_FILE" 2>/dev/null)" "1" "row 12-neg: without arm, att
 rm -rf "$SB"
 
 # --- Row 12h: a stale RESULT: line from before this phase is never quoted ---
+# Defends the log_before+1 slice at bin/automouse/run:1085.
 PRE_LOG='RESULT: STALERESULT from an earlier run'
 rc3_sandbox 3 yes
 run_span "$PP_TERMINAL_SPAN"
@@ -544,6 +545,7 @@ assert_eq "$(grep -c 'STALERESULT' "$RPT")" "0" "row 12h: stale-only RESULT is n
 rm -rf "$SB"
 
 # --- Row 12i: the rc=3 helper removes the start marker and the claim lock ---
+# Defends the marker removal at :1115 and the lock removal at :1117 of bin/automouse/run.
 rc3_sandbox 3 yes
 set_runner_state
 run_span "trap record_lock EXIT"$'\n'"$PP_TERMINAL_SPAN"
@@ -561,6 +563,7 @@ rm -rf "$SB"
 unset PP_START_MARKER CURRENT_LOCK
 
 # --- Row 12j: SINGLE_PLAN through the rc=3 disposition and the loop bottom ---
+# Defends the single-plan break at :2462 of bin/automouse/run.
 # The trailing `:` stands in for the loop code after the break line. Without it, a
 # span ending in `[ -n "" ] && break` makes eval return 1 and set -e aborts the subshell.
 rc3_sandbox 3 yes

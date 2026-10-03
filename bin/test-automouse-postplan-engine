@@ -18,6 +18,10 @@
 #      quoting the RESULT: line; no refund, no env-stop, no break. 12b: no
 #      RESULT line → fallback text. 12c: rc=1 fast exit still trips the
 #      breaker. 12-neg: breaker alone (no arm) reproduces the defect.
+#      12h: a stale RESULT: line from before the phase is never quoted.
+#      12i: the rc=3 helper removes the start marker and the claim lock;
+#      rc=1 keeps the lock. 12j: SINGLE_PLAN set breaks at the loop bottom
+#      after the rc=3 disposition; SINGLE_PLAN empty falls through.
 #
 # Extraction idiom: awk pulls the live blocks from bin/automouse/run and
 # bin/automouse/run so tests cannot drift from the real code.
@@ -72,6 +76,10 @@ PP_TERMINAL_SPAN=$(awk '/# postplan-rc3-terminal: begin/,/# postplan-env-breaker
 PP_BREAKER_ONLY=$(awk '/# postplan-env-breaker: begin/,/# postplan-env-breaker: end/' "$RUN_FILE")
 # rc=7 (no worktree) arm from Phase 2. Unique comment anchors delimit it, the same scheme as rc3.
 PP_NOWT_SPAN=$(awk '/# postplan-no-worktree-merged: begin/,/# postplan-no-worktree-merged: end/' "$RUN_FILE")
+# Loop bottom after the post-plan arms: queue-file cleanup, lock release, and the
+# single-plan break. The end anchor sits AFTER the break line so a mutation of that
+# line cannot move the range end.
+PP_LOOP_BOTTOM_SPAN=$(awk '/# If the plan moved out of queue\/ \(to done\/ or skipped\/\)/,/# --- Between-plans master health canary dispatch ---/' "$RUN_FILE")
 BLOCKED_FN=$(awk '/^dispose_plan_postplan_blocked\(\) \{/,/^\}/' "$RUN_FILE")
 REFUND_FN=$(awk '/^refund_attempt\(\) \{/,/^\}/' "$RUN_FILE")
 STALLED_FN=$(awk '/^phase_stalled\(\) \{/,/^\}/' "$RUN_FILE")
@@ -84,7 +92,9 @@ for anchor in '# postplan-rc3-terminal: begin' \
               '# postplan-env-breaker: begin' \
               '# postplan-env-breaker: end' \
               '# postplan-no-worktree-merged: begin' \
-              '# postplan-no-worktree-merged: end'; do
+              '# postplan-no-worktree-merged: end' \
+              '# If the plan moved out of queue/ (to done/ or skipped/)' \
+              '# --- Between-plans master health canary dispatch ---'; do
     n=$(grep -cF -e "$anchor" "$RUN_FILE" || true)
     assert_eq "$n" "1" "anchor '$anchor' appears exactly once in bin/automouse/run"
 done
@@ -96,6 +106,7 @@ assert_contains "$BLOCKED_FN" 'dispose_plan_postplan_blocked() {' "blocked dispo
 assert_contains "$PP_NOWT_SPAN" '"$PP_STATUS" -eq 7' "rc7 span tests PP_STATUS against 7"
 assert_contains "$PP_NOWT_SPAN" 'postplan_no_worktree_dispose_if_merged' "rc7 span calls the merged-PR disposer"
 assert_contains "$PP_NOWT_SPAN" 'PP_NOWT_DISPOSED' "rc7 span honors the pre-call disposal flag"
+assert_contains "$PP_LOOP_BOTTOM_SPAN" '[ -n "${SINGLE_PLAN:-}" ]' "loop-bottom span holds the single-plan check"
 # Ordering: the rc7 arm must sit BEFORE the env breaker. Otherwise the breaker's
 # fast-exit `break` fires first and the merged PR is refunded instead of disposed.
 NOWT_LN=$(grep -nF -e '# postplan-no-worktree-merged: begin' "$RUN_FILE" | head -1 | cut -d: -f1)
@@ -548,6 +559,32 @@ assert_eq "$(yn test -d "$SB/claim.lock")" "yes" "row 12i: rc=1 leaves the CURRE
 assert_eq "$(cat "$SB/lock-var")" "$SB/claim.lock" "row 12i: rc=1 leaves CURRENT_LOCK set"
 rm -rf "$SB"
 unset PP_START_MARKER CURRENT_LOCK
+
+# --- Row 12j: SINGLE_PLAN through the rc=3 disposition and the loop bottom ---
+# The trailing `:` stands in for the loop code after the break line. Without it, a
+# span ending in `[ -n "" ] && break` makes eval return 1 and set -e aborts the subshell.
+rc3_sandbox 3 yes
+set_runner_state
+# shellcheck disable=SC2034  # SINGLE_PLAN is read by the eval'd loop-bottom span
+SINGLE_PLAN="test-plan"
+run_span "$PP_TERMINAL_SPAN"$'\n'"$PP_LOOP_BOTTOM_SPAN"$'\n'":"
+assert_eq "$SPAN_RC" "0" "row 12j: SINGLE_PLAN set, span completes"
+assert_eq "$(yn test -L "$NIGHTLY_DIR/skipped/$PLAN_NAME")" "yes" "row 12j: SINGLE_PLAN set, plan still in skipped/"
+if grep -qF -e "SPAN-FELL-THROUGH" "$SB/span.out"; then
+    printf '  FAIL row 12j: SINGLE_PLAN set did not break after the rc=3 disposition\n'; FAILED=1
+else
+    printf '  ok   row 12j: SINGLE_PLAN set breaks at the loop bottom\n'
+fi
+rm -rf "$SB"
+rc3_sandbox 3 yes
+set_runner_state
+# shellcheck disable=SC2034  # SINGLE_PLAN is read by the eval'd loop-bottom span
+SINGLE_PLAN=""
+run_span "$PP_TERMINAL_SPAN"$'\n'"$PP_LOOP_BOTTOM_SPAN"$'\n'":"
+assert_eq "$SPAN_RC" "0" "row 12j: SINGLE_PLAN empty, span completes"
+assert_contains "$(cat "$SB/span.out")" "SPAN-FELL-THROUGH" "row 12j: SINGLE_PLAN empty falls through to the next plan"
+rm -rf "$SB"
+unset SINGLE_PLAN PP_START_MARKER CURRENT_LOCK
 
 echo
 echo "-- row 13: post-plan-now rc=7 (no worktree) → merged PR is terminal; unmerged/gh-error refunds + breaks --"

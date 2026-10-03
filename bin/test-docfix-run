@@ -1770,5 +1770,24 @@ write_fm "$R" .claude/skills/plan/SKILL.md 2026-09-30 'body'
 veronly_run "$R" "$SB2"
 expect_pass "(80) veronly: nested .claude/skills/plan/SKILL.md date-only bump arms the plan"
 
+# Case 81: arming strips the stale " Held for human merge." sentence, keeps the
+# rest of the line, and a second run is a no-op
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+printf '%s\n' '---' 'auto_merge: false' '---' '' \
+    'Refreshes flagged docs (issue #965). Held for human merge.' \
+    '' '## Automouse Hold Justification' '' 'auto_merge: false — hold.' > "$PLAN_V"
+printf 'last_verified: 2026-08-13\n' > "$R/ibl5/docs/x.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
+cp "$PLAN_V" "$SB2/after1.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC2=0 || VRC2=$?
+{ [ "$VRC" -eq 0 ] && [ "$VRC2" -eq 0 ] \
+    && ! grep -q 'Held for human merge' "$PLAN_V" \
+    && grep -qF 'flagged docs (issue #965).' "$PLAN_V" \
+    && cmp -s "$PLAN_V" "$SB2/after1.md"; } \
+  && ok "(81) veronly: arming strips 'Held for human merge', second run is a no-op" \
+  || bad "(81) veronly: stale 'Held for human merge' sentence"
+
 if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
 exit "$FAILED"

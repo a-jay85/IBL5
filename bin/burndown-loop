@@ -73,6 +73,22 @@ FAILS=0
 LAST_FAIL=""
 START_EPOCH=$(date +%s)
 
+# Re-exec hand-off (see bl_maybe_reexec). Read once, then unset, so batch children
+# (claude -p) never inherit the values. Honored only when RX_PID is this process's
+# own PID; a stale export in an operator's shell is ignored.
+REEXEC=0
+RX_PID="${IBL5_BURNDOWN_REEXEC_PID:-}"
+RX_SID="${IBL5_BURNDOWN_REEXEC_SID:-}"
+RX_BATCHES="${IBL5_BURNDOWN_REEXEC_BATCHES:-}"
+RX_ITEMS="${IBL5_BURNDOWN_REEXEC_ITEMS:-}"
+RX_UNITS="${IBL5_BURNDOWN_REEXEC_UNITS:-}"
+RX_FAILS="${IBL5_BURNDOWN_REEXEC_FAILS:-}"
+RX_START="${IBL5_BURNDOWN_REEXEC_START:-}"
+RX_LAST_FAIL="${IBL5_BURNDOWN_REEXEC_LAST_FAIL:-}"
+unset IBL5_BURNDOWN_REEXEC_PID IBL5_BURNDOWN_REEXEC_SID IBL5_BURNDOWN_REEXEC_BATCHES \
+    IBL5_BURNDOWN_REEXEC_ITEMS IBL5_BURNDOWN_REEXEC_UNITS IBL5_BURNDOWN_REEXEC_FAILS \
+    IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL
+
 BL_PROMPT='Invoke the /burndown skill now and run every step to completion. No human is present: never ask questions or wait for input. When the skill says to show or tell the user something, print it and continue. Make the safe choice and continue. If the first selection round in step 4 prints `LEDGER: none`, end your final message with this exact line on its own: BURNDOWN-LOOP: none-selected. If any bin/backlog command in the run exits 3 (fail-closed abort), stop the run and end your final message with this exact line on its own: BURNDOWN-LOOP: abort-exit-3'
 
 bl_usage() {
@@ -382,6 +398,38 @@ bl_on_pause() {
     bl_sleep "$BL_SLEEP_CAP" zone-no-marker || bl_stopped
 }
 
+# ------------------------------------------------------------ re-exec
+
+# bl_nonneg_int <v>: 0, or digits with no leading zero (keeps $(( )) off octal).
+bl_nonneg_int() {
+    case "$1" in
+        0) return 0 ;;
+        ''|*[!0-9]*|0*) return 1 ;;
+    esac
+    return 0
+}
+
+# bl_reexec_apply: when this process was exec'd by a running loop (RX_PID == $$), set
+# REEXEC=1 and restore the carried state; invalid state keeps fresh counters.
+bl_reexec_apply() {
+    if [ -z "$RX_PID" ] || [ "$RX_PID" != "$$" ]; then return 0; fi
+    REEXEC=1
+    if bl_nonneg_int "$RX_BATCHES" && bl_nonneg_int "$RX_ITEMS" \
+        && bl_nonneg_int "$RX_UNITS" && bl_nonneg_int "$RX_FAILS" \
+        && bl_nonneg_int "$RX_START" && [ "$RX_START" -le "$(date +%s)" ] \
+        && usage_valid_sid "$RX_SID"; then
+        LOOP_SID="$RX_SID"
+        BATCHES="$RX_BATCHES"
+        ITEMS="$RX_ITEMS"
+        UNITS="$RX_UNITS"
+        FAILS="$RX_FAILS"
+        START_EPOCH="$RX_START"
+        LAST_FAIL="$RX_LAST_FAIL"
+    else
+        bl_log "re-exec state invalid; counters reset"
+    fi
+}
+
 # ------------------------------------------------------------ run
 
 bl_cmd_run() {
@@ -409,11 +457,19 @@ bl_cmd_run() {
         return 0
     fi
 
+    bl_reexec_apply
     [ -n "$LOOP_SID" ] || LOOP_SID=$(bl_uuid)
     mkdir -p "$STATE"
-    # An old stop request must not kill a new loop.
-    rm -f "$STOP_FLAG"
-    bl_lock_acquire
+    if [ "$REEXEC" -eq 1 ] && [ "$(cat "$LOCK/pid" 2>/dev/null || true)" = "$$" ]; then
+        # exec kept our PID, so the lock is already ours. exec skipped the old EXIT
+        # trap, so install it again. A stop request made before the exec stays.
+        trap bl_cleanup EXIT
+        bl_log "re-exec resumed pid=$$ sid=$LOOP_SID batches=$BATCHES items=$ITEMS fails=$FAILS"
+    else
+        # An old stop request must not kill a new loop.
+        rm -f "$STOP_FLAG"
+        bl_lock_acquire
+    fi
     echo "$LOOP_SID" > "$STATE/loop.sid"
     while :; do
         if [ -e "$STOP_FLAG" ]; then bl_stopped; fi

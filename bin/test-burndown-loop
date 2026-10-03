@@ -82,6 +82,8 @@ make_stubs() {
 T="@T@"
 REPO_ROOT="@REPO@"
 echo "CLAUDE_HEADLESS=${CLAUDE_HEADLESS:-} SID=${IBL5_USAGE_GATE_SESSION_ID:-} RUNNER=${IBL5_USAGE_GATE_RUNNER:-} CEIL=${CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS:-} OPTIN=${IBL5_BURNDOWN_LOOP-unset} ARGV=$*" >> "$T/claude.calls"
+rx=$(env | grep '^IBL5_BURNDOWN_REEXEC_' || true)
+if [ -n "$rx" ]; then printf '%s\n' "$rx" >> "$T/claude.reexec-env"; fi
 q="$T/claude.queue"
 act=none
 if [ -s "$q" ]; then
@@ -686,6 +688,71 @@ test_dm_env_empty_default() {
     assert_eq dm_empty:rc 0 "$RC"
     assert_contains dm_empty:default "$OUT" "dm=$REPO_ROOT/bin/discord-dm"
     assert_no_file dm_empty:nothing-sent "$T/dm.calls"
+}
+
+# ---------------------------------------------------------------- re-exec hand-off
+
+# reexec_handoff <extra-env-assignments> <loop-args>: runs the loop as a same-PID
+# hand-off (bash -c + exec keeps $$), with the lock pid pre-written. Sets OUT and RC.
+reexec_handoff() {
+    OUT=$(LOOP="$LOOP" STATE="$STATE" SID_A="$SID_A" T="$T" bash -c '
+        mkdir -p "$STATE/lock"; echo $$ > "$STATE/lock/pid"; echo $$ > "$T/handoff.pid"
+        export IBL5_BURNDOWN_REEXEC_PID=$$ IBL5_BURNDOWN_REEXEC_SID="$SID_A" \
+            IBL5_BURNDOWN_REEXEC_BATCHES=2 IBL5_BURNDOWN_REEXEC_ITEMS=5 \
+            IBL5_BURNDOWN_REEXEC_UNITS=0 IBL5_BURNDOWN_REEXEC_FAILS=1 \
+            IBL5_BURNDOWN_REEXEC_START=$(( $(date +%s) - 600 ))
+        eval "$1"
+        shift
+        exec "$LOOP" "$@"' _ "$1" "${@:2}" 2>&1)
+    RC=$?
+}
+
+test_reexec_handoff_adopts_lock() {
+    new_env
+    seed_usage 5 0 1
+    queue none
+    reexec_handoff ':' run
+    assert_eq reexec_adopt:rc 0 "$RC"
+    assert_contains reexec_adopt:resumed "$OUT" "re-exec resumed pid="
+    assert_contains reexec_adopt:totals "$OUT" "finish reason=exhausted batches=2 items=5"
+    assert_eq reexec_adopt:sid "$SID_A" "$(cat "$STATE/loop.sid")"
+    assert_contains reexec_adopt:claude-sid "$(cat "$T/claude.calls")" "SID=$SID_A"
+    assert_contains reexec_adopt:elapsed "$(cat "$T/dm.calls" 2>/dev/null)" "elapsed=10m"
+    assert_no_file reexec_adopt:lock-released "$STATE/lock"
+    assert_no_file reexec_adopt:env-unset "$T/claude.reexec-env"
+}
+
+test_reexec_garbage_env_fresh() {
+    new_env
+    seed_usage 5 0 1
+    queue ledger none
+    reexec_handoff 'export IBL5_BURNDOWN_REEXEC_BATCHES=abc IBL5_BURNDOWN_REEXEC_FAILS=-1 IBL5_BURNDOWN_REEXEC_START=x' run
+    assert_eq reexec_garbage:rc 0 "$RC"
+    assert_contains reexec_garbage:invalid "$OUT" "re-exec state invalid; counters reset"
+    assert_contains reexec_garbage:totals "$OUT" "finish reason=exhausted batches=1 items=1"
+    assert_no_file reexec_garbage:env-unset "$T/claude.reexec-env"
+}
+
+test_reexec_stale_env_ignored() {
+    new_env
+    seed_usage 5 0 1
+    queue none
+    IBL5_BURNDOWN_REEXEC_PID=1 IBL5_BURNDOWN_REEXEC_BATCHES=7 IBL5_BURNDOWN_REEXEC_SID="$SID_A" run_loop run
+    assert_eq reexec_stale:rc 0 "$RC"
+    assert_not_contains reexec_stale:no-reexec "$OUT" "re-exec"
+    assert_contains reexec_stale:fresh-counters "$OUT" "batches=0 items=0"
+    if [ "$(cat "$STATE/loop.sid")" != "$SID_A" ]; then pass reexec_stale:fresh-sid; else fail reexec_stale:fresh-sid; fi
+    assert_no_file reexec_stale:env-unset "$T/claude.reexec-env"
+}
+
+test_reexec_dry_run_ignores_handoff() {
+    new_env
+    seed_usage 5 0 1
+    reexec_handoff ':' run --dry-run
+    assert_eq reexec_dry:rc 0 "$RC"
+    assert_eq reexec_dry:one-line 1 "$(decision_lines)"
+    assert_not_contains reexec_dry:no-resume "$OUT" "re-exec resumed"
+    assert_eq reexec_dry:lock-untouched "$(cat "$T/handoff.pid")" "$(cat "$STATE/lock/pid" 2>/dev/null)"
 }
 
 # ---------------------------------------------------------------- runner

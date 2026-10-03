@@ -1740,18 +1740,22 @@ l12_case() {
     : > "$T/lbl/gh.log"
     local out rc n
     out="$(bdl burndown-record "$L" "$@" 2>&1)"; rc=$?
+    L12_OUT="$out"
     n="$(grep -c 'issue comment' "$T/lbl/gh.log")"
     [ "$rc" -eq 0 ] && [ "$n" -eq "$want_n" ] && ok "L12: $label" || fail "L12: $label (rc=$rc comments=$n want=$want_n: $out)"
 }
 printf '%s' '{"comments":[{"body":"x\n\n<!-- burndown-blocked-by: 77 -->"}]}' > "$T/lbl/fx/issue-42-comments.json"
 l12_case "same PR marker posts nothing" 0 42 status=skipped reason=blocked blocked_by=77
+want "L12: same PR marker posts nothing: stdout says comment already present" "$L12_OUT" "(comment already present)"
 l12_case "different PR posts one" 1 42 status=skipped reason=blocked blocked_by=78
 printf '%s' '{"comments":[{"body":"<!-- burndown-blocked-by: 78 -->"},{"body":"<!-- burndown-blocked-by: 77 -->"}]}' > "$T/lbl/fx/issue-42-comments.json"
 l12_case "last marker wins (77)" 0 42 status=skipped reason=blocked blocked_by=77
+want "L12: last marker wins (77): stdout says comment already present" "$L12_OUT" "(comment already present)"
 l12_case "last marker wins (78 re-posts)" 1 42 status=skipped reason=blocked blocked_by=78
 rm -f "$T/lbl/fx/issue-42-comments.json"
 printf '%s' '{"comments":[{"body":"x\n\n<!-- burndown-out-of-repo -->"}]}' > "$T/lbl/fx/issue-43-comments.json"
 l12_case "out-of-repo marker posts nothing" 0 43 status=skipped reason=out-of-repo
+want "L12: out-of-repo marker posts nothing: stdout says comment already present" "$L12_OUT" "(comment already present)"
 rm -f "$T/lbl/fx/issue-43-comments.json"
 
 # ── L13: gh failures exit 3 and the ledger keeps its record ───────────────────

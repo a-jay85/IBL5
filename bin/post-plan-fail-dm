@@ -9,8 +9,8 @@
 # message on stdout, fixes it, and re-fires within minutes. A DM for that case asks
 # nothing of you. So:
 #
-#   - No live Claude session in the worktree -> DM now. Nobody else will fix it.
-#   - A live session in the worktree         -> hold the DM for FAILDM_DELAY seconds
+#   - No live interactive Claude session in the worktree -> DM now. Nobody else will fix it.
+#   - A live interactive session in the worktree         -> hold the DM for FAILDM_DELAY seconds
 #     (default 900) in a detached launchd job. When it wakes, a newer
 #     post-plan-now log for the same branch means someone re-fired, so it stays
 #     silent (that newer run DMs on its own if it fails too). No newer log means
@@ -18,6 +18,9 @@
 #
 # The session check reads ~/.claude/session-registry/active.json (repo == worktree root,
 # pid alive). An unreadable registry counts as "no session": fail open to DM now.
+# Headless runs do not count: an entry whose pid argv has a -p or --print token is
+# skipped, since no human is there to re-fire. If ps cannot read the argv, the entry
+# counts as live and the DM is held.
 #
 # Usage:
 #   bin/post-plan-fail-dm <root> <safe-slug> <log> <message>
@@ -31,8 +34,9 @@ if [ "${1:-}" = "--help" ]; then
 Usage: bin/post-plan-fail-dm [--deferred] <root> <safe-slug> <log> <message>
 
 Send (or hold) the Discord DM for a post-plan harness exit 3.
-If a live Claude session is detected in the worktree, holds the DM for
-FAILDM_DELAY seconds via a detached launchd job; sends immediately otherwise.
+If a live interactive Claude session is detected in the worktree, holds the
+DM for FAILDM_DELAY seconds via a detached launchd job; sends immediately
+otherwise. Headless sessions (claude -p / --print) do not count.
 
   --deferred   Run as the held launchd job (wakes after FAILDM_DELAY seconds)
   root         Worktree root directory
@@ -81,14 +85,30 @@ send_dm() {
 live_session_in_root() {
     [ -r "$REGISTRY" ] || return 0
     python3 - "$REGISTRY" "$ROOT" <<'PY' 2>/dev/null || true
-import json, os, sys
+import json, os, subprocess, sys
 reg, root = sys.argv[1], os.path.realpath(sys.argv[2])
+
+def headless(pid):
+    # A headless run was started as `claude -p ...` or `claude --print ...`.
+    # Exact token match only. Anything ps cannot show counts as interactive.
+    try:
+        r = subprocess.run(["ps", "-ww", "-o", "command=", "-p", str(pid)],
+                           capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if r.returncode != 0:
+        return False
+    return any(t in ("-p", "--print") for t in r.stdout.split())
+
 for s in json.load(open(reg)).values():
     if os.path.realpath(s.get("repo") or "") != root:
         continue
     try:
-        os.kill(int(s.get("pid")), 0)
+        pid = int(s.get("pid"))
+        os.kill(pid, 0)
     except (OSError, TypeError, ValueError):
+        continue
+    if headless(pid):
         continue
     print(1)
     break

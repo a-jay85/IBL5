@@ -36,8 +36,9 @@ branch; it survives you closing Claude Code. Engine selection:
   message). A skill re-run would hit the same wall on each one, so the run stops for a human.
   For a usage limit, re-run `bin/post-plan-now` after the limit resets.
   On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines and prints a plain block of the same shape when the file is missing. The DM below carries the same block. `bin/automouse/run` copies the block into the skip report. When a command failed, the one-line `RESULT:` verdict and the block name it and quote the last few lines of its error, with credentials redacted. When none failed, they name the stage where the run stopped.
-  `bin/post-plan-fail-dm` sends the DM. With no live Claude session in the worktree it DMs
-  at once. With one, it holds the DM 15 min and sends it only if nobody re-fired the branch.
+  `bin/post-plan-fail-dm` sends the DM. With no live interactive Claude session in the
+  worktree it DMs at once. Headless `claude -p` sessions do not count. With an interactive
+  one, it holds the DM 15 min and sends it only if nobody re-fired the branch.
 
 On the commit path that detection is structural: any non-zero `git commit` is treated as a
 gate denial, so a hook message nobody enumerated in `_LOCAL_GATE_MARKERS` is still caught.

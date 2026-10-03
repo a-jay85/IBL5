@@ -28,6 +28,58 @@ class ApiKeysView implements ApiKeysViewInterface
         . '</div>';
 
     /**
+     * Header-auth alternative to IMPORTDATA. Mirrors google-sheets-header-auth.gs;
+     * keep the two in sync when the endpoint or header changes.
+     */
+    private const APPS_SCRIPT_SNIPPET = <<<'GS'
+var IBL_EXPORT_URL = 'https://iblhoops.net/ibl5/api/v1/players/export';
+var IBL_KEY_PROPERTY = 'IBL_API_KEY';
+
+/**
+ * Store the API key once. Edit the literal, run this function from the editor,
+ * then change the literal back to "YOUR_KEY" so the key does not sit in source.
+ */
+function setIblApiKey() {
+  var key = 'YOUR_KEY';
+  if (key === 'YOUR_KEY' || key === '') {
+    throw new Error('Edit setIblApiKey() and replace YOUR_KEY with your real key before running it.');
+  }
+  PropertiesService.getUserProperties().setProperty(IBL_KEY_PROPERTY, key);
+}
+
+/**
+ * Custom function. Returns the full player export as a 2-D array.
+ * @customfunction
+ */
+function IBL_PLAYERS(refresh) {
+  var key = PropertiesService.getUserProperties().getProperty(IBL_KEY_PROPERTY);
+  if (!key) {
+    throw new Error('No API key stored. Run setIblApiKey() from the Apps Script editor first.');
+  }
+
+  var response = UrlFetchApp.fetch(IBL_EXPORT_URL, {
+    method: 'get',
+    headers: { 'X-API-Key': key },
+    muteHttpExceptions: true
+  });
+
+  var status = response.getResponseCode();
+  if (status === 401) {
+    throw new Error('IBL5 rejected the API key (HTTP 401). Re-run setIblApiKey() with a current key.');
+  }
+  if (status !== 200) {
+    throw new Error('IBL5 export failed with HTTP ' + status + '. Try again later.');
+  }
+
+  var body = response.getContentText();
+  if (body === '') {
+    throw new Error('IBL5 export returned an empty body.');
+  }
+  return Utilities.parseCsv(body);
+}
+GS;
+
+    /**
      * @see ApiKeysViewInterface::renderNoKeyState()
      */
     public function renderNoKeyState(): string
@@ -164,6 +216,10 @@ class ApiKeysView implements ApiKeysViewInterface
         <pre class="ibl-code-block mb-4">=IMPORTDATA("https://iblhoops.net/ibl5/api/v1/players/export?key=YOUR_KEY")</pre>
         <?= self::URL_KEY_NOTICE ?>
 
+        <h3 class="mb-2">Apps Script (header auth)</h3>
+        <p class="mb-4">To keep the key out of the URL, use a Google Apps Script instead of <code>IMPORTDATA</code>. In your sheet open <strong>Extensions &gt; Apps Script</strong>, paste this script. Edit <code>setIblApiKey</code> and replace <code>YOUR_KEY</code> with your actual key, then run <code>setIblApiKey</code> once from the editor. In any cell enter <code>=IBL_PLAYERS()</code>. The key is stored in User Properties and travels in the <code>X-API-Key</code> header, so neither the sheet nor the server log contains it. Add a time-driven trigger in Apps Script if you want it to refresh on a schedule.</p>
+        <pre class="ibl-code-block mb-4"><?= HtmlSanitizer::e(self::APPS_SCRIPT_SNIPPET) ?></pre>
+
         <h3 class="mb-2">Column Reference</h3>
         <table class="ibl-data-table mb-6">
             <thead>
@@ -201,7 +257,7 @@ class ApiKeysView implements ApiKeysViewInterface
 
         <h3 class="mb-2">Tips</h3>
         <ul class="mb-6">
-            <li class="mb-1">Data refreshes each time Google Sheets recalculates (approximately every hour).</li>
+            <li class="mb-1">Data refreshes each time Google Sheets recalculates (approximately every hour) for IMPORTDATA; the Apps Script refreshes when you run it or on its trigger.</li>
             <li class="mb-1">Use Google Sheets' built-in FILTER, SORT, and QUERY functions to slice the data.</li>
             <li class="mb-1">Salary values are in thousands (e.g., 1500 = $1,500K).</li>
             <li class="mb-1">Stats columns (GP, MIN, FGM, etc.) are season totals. Divide by GP for per-game averages.</li>

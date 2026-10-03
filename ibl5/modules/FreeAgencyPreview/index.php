@@ -33,7 +33,7 @@ $season = new \Season\Season($mysqli_db);
 // Check if season is available
 if ($season->endingYear === null || $season->endingYear === 0) {
     PageLayout\PageLayout::header();
-    echo '<p style="text-align: center; padding: 2rem;">Season information is not available.</p>';
+    echo '<p class="text-center p-8">Season information is not available.</p>';
     PageLayout\PageLayout::footer();
     return;
 }

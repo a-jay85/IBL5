@@ -4884,13 +4884,7 @@ parameters:
 		-
 			rawMessage: 'Part $bgcolor1 (mixed) of encapsed string cannot be cast to string.'
 			identifier: encapsedStringPart.nonString
-			count: 4
-			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'Part $bgcolor2 (mixed) of encapsed string cannot be cast to string.'
-			identifier: encapsedStringPart.nonString
-			count: 2
+			count: 1
 			path: themes/IBL/theme.php
 
 		-

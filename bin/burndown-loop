@@ -64,7 +64,7 @@ START_EPOCH=$(date +%s)
 BL_PROMPT='Invoke the /burndown skill now and run every step to completion. No human is present: never ask questions or wait for input. When the skill says to show or tell the user something, print it and continue. Make the safe choice and continue. If the first selection round in step 4 prints `LEDGER: none`, end your final message with this exact line on its own: BURNDOWN-LOOP: none-selected. If any bin/backlog command in the run exits 3 (fail-closed abort), stop the run and end your final message with this exact line on its own: BURNDOWN-LOOP: abort-exit-3'
 
 bl_usage() {
-    cat >&2 <<'USAGE_EOF'
+    cat <<'USAGE_EOF'
 Usage: bin/burndown-loop <subcommand>
   start [--no-dm]                    launch detached under launchd
   stop                               finish the current batch, then exit
@@ -78,7 +78,7 @@ USAGE_EOF
 
 bl_unknown() {
     echo "burndown-loop: unknown argument: $1" >&2
-    bl_usage
+    bl_usage >&2
     exit 2
 }
 
@@ -532,7 +532,7 @@ bl_cmd_status() {
 # ------------------------------------------------------------ dispatch
 
 main() {
-    [ "$#" -gt 0 ] || { echo "burndown-loop: no subcommand" >&2; bl_usage; exit 2; }
+    [ "$#" -gt 0 ] || { echo "burndown-loop: no subcommand" >&2; bl_usage >&2; exit 2; }
     # --resume-paused <sid>: the coordinator's entry point. Replays the argv saved at
     # start (always `start [--no-dm]`) under the same loop sid.
     if [ "$1" = "--resume-paused" ]; then
@@ -563,6 +563,7 @@ main() {
         stop) [ "$#" -eq 0 ] || bl_unknown "$1"; bl_cmd_stop ;;
         status) [ "$#" -eq 0 ] || bl_unknown "$1"; bl_cmd_status ;;
         --print-plist) [ "$#" -eq 0 ] || bl_unknown "$1"; bl_render_plist ;;
+        -h|--help) bl_usage ;;
         *) bl_unknown "$cmd" ;;
     esac
 }

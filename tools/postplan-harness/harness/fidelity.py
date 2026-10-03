@@ -399,10 +399,16 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
         try:
             with open(plan.path) as fh:
                 _write("plan.md", fh.read())
-            _write("plan-index.txt", _plan_index(worktree, os.path.join(packet, "plan.md")))
         except OSError:
             _write("plan.md", PLAN_BLIND_MARKER)
             _write("plan-index.txt", PLAN_INDEX_BLIND)
+        else:
+            # plan.md is on disk and intact; an index failure must not blind it.
+            try:
+                _write("plan-index.txt",
+                       _plan_index(worktree, os.path.join(packet, "plan.md")))
+            except OSError:
+                _write("plan-index.txt", PLAN_INDEX_BLIND)
     else:
         _write("plan.md", PLAN_BLIND_MARKER)
         _write("plan-index.txt", PLAN_INDEX_BLIND)

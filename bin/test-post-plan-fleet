@@ -2433,27 +2433,136 @@ HOME="$SCRATCH" POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." POST_PLAN_FLEET_GH_USER=a-
 rm -f "$_plist_tmp"
 end_case plist-shape-dry-run
 
-# --- 6c.3: absent result.json produces a hold (static assertion) -------------------------
-begin_case
-# The script must guard on result.json existence before reading it.
-grep -qE '\[ -f.*result\.json' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.3 absent: post-plan-fleet missing [ -f ...result.json ] existence guard — absent file would abort"
-# An absent result produces 'unconfirmed' (holds the PR, never emits READY).
-grep -qF 'unconfirmed' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.3 absent: 'unconfirmed' verdict absent — absent result not treated as a hold"
-# A null latest-round verdict must block the RESULT: fallback (never borrow a stale word).
-grep -qF '[ -z "$latest_unconfirmed" ]' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.3 absent: RESULT fallback not gated on latest_unconfirmed — null verdict_2 would fall back"
-end_case result-absent-holds
+# _dm_hold_case: _dm_result_case's sibling for the hold fixtures. result.json may be
+# absent or garbage and the RESULT: line is optional. A counting DM stub writes one
+# @@DM@@ line per dispatch so a case can assert exactly one DM.
+_HOLD_DM_STUB="$SCRATCH/.local/bin/dm-hold-capture"
+printf '#!/usr/bin/env bash\necho "@@DM@@" >> "%s"\ncat >> "%s"\n' \
+    "$_DM_CAPTURE" "$_DM_CAPTURE" > "$_HOLD_DM_STUB"
+chmod +x "$_HOLD_DM_STUB"
+_HOLD_PLIST="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-${_DM_PR}.plist"
+_dm_hold_case() {  # $1 arm id, $2 absent|garbage, $3 RESULT: line or "", $4 bash flag or ""
+    local n="$1" mode="$2" result_line="$3" bflag="${4:-}"
+    local dir="$SCRATCH/harness-run-$n" stub="$SCRATCH/.local/bin/dm-cs-$n"
+    clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE" "$_DM_RUNNER"
+    rm -rf "$dir"; mkdir -p "$dir"
+    if [ "$mode" = garbage ]; then printf 'not json {{{\n' > "$dir/result.json"; fi
+    {
+        printf '#!/usr/bin/env bash\n'
+        printf 'echo %q\n' "harness-run-dir=$dir"
+        if [ -n "$result_line" ]; then printf 'echo %q\n' "$result_line"; fi
+    } > "$stub"
+    chmod +x "$stub"
+    POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+        POST_PLAN_FLEET_DISCORD_DM="$_HOLD_DM_STUB" POST_PLAN_FLEET_CLAUDE="$stub" \
+        run_dm_driver --go >/dev/null 2>&1
+    [[ -f "$_DM_RUNNER" ]] || fail "$n: driver generated no runner at $_DM_RUNNER"
+    [[ -f "$_HOLD_PLIST" ]] || fail "$n: precondition: no plist at $_HOLD_PLIST before the run"
+    HOME="$SCRATCH" bash $bflag "$_DM_RUNNER" >/dev/null 2>&1 || true
+}
+# _assert_hold: the shared hold contract for 6c.3 / 6c.4 arms.
+_assert_hold() {  # $1 = case label
+    local c="$1" dms
+    dms=$(grep -c '^@@DM@@$' "$_DM_CAPTURE" 2>/dev/null || true)
+    [[ "$dms" == 1 ]] || fail "$c: want exactly one DM, got '${dms:-0}'"
+    grep -qF 'RESULT unconfirmed' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "$c: DM lacks 'RESULT unconfirmed' ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+    grep -qF 'no verdict marker' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "$c: DM lacks 'no verdict marker'"
+    ! grep -qF 'RESULT READY' "$_DM_CAPTURE" 2>/dev/null || fail "$c: DM says RESULT READY"
+    ! grep -qF "merge when you're ready" "$_DM_CAPTURE" 2>/dev/null \
+        || fail "$c: DM says merge when you're ready"
+    grep -qxF 'post-plan-fleet: outcome=blocked' "$_DM_LOG" 2>/dev/null \
+        || fail "$c: log lacks 'post-plan-fleet: outcome=blocked' ($(grep 'outcome=' "$_DM_LOG" 2>/dev/null))"
+    [[ ! -f "$_HOLD_PLIST" ]] || fail "$c: plist not removed (slot leaked)"
+}
 
-# --- 6c.4: unparseable result.json produces a hold (static assertion) --------------------
+# --- 6c.3: absent result.json produces a hold (behavioral) ------------------------------
+# Real runner path: run dir exists, result.json missing, no RESULT: line -> unconfirmed hold.
 begin_case
-# The verdict extraction must be guarded so a parse failure does not propagate non-zero.
-grep -qF 'import json' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.4 unparseable: no python3 json parse of result.json — parse missing entirely"
-grep -qF 'result.json" 2>/dev/null || true)' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.4 unparseable: result.json parse not guarded by '|| true' — malformed JSON would abort"
+_dm_hold_case 63a absent ''
+_assert_hold result-absent-holds
+end_case result-absent-holds
+# Fallback arm: same absent file plus RESULT: terminal=shipped-armed -> READY. Proves the
+# hold above comes from the missing signal and is not a blanket reject.
+begin_case
+_dm_hold_case 63b absent 'RESULT: terminal=shipped-armed'
+grep -qF 'RESULT READY' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "result-absent-fallback-ready: DM lacks RESULT READY ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+grep -qxF 'post-plan-fleet: outcome=shipped' "$_DM_LOG" 2>/dev/null \
+    || fail "result-absent-fallback-ready: log lacks outcome=shipped"
+end_case result-absent-fallback-ready
+
+# --- 6c.4: unparseable result.json produces a hold (behavioral) -------------------------
+# Garbage result.json, no RESULT: line. Case 52 owns garbage-plus-RESULT (fallback works).
+begin_case
+_dm_hold_case 64a garbage ''
+_assert_hold result-unparseable-holds
 end_case result-unparseable-holds
+# Strict arm: under bash -e the '|| true' parse guards become observable. Positive
+# control first: bash -e must not break the runner on a fallback-READY fixture.
+begin_case
+_dm_hold_case 64c absent 'RESULT: terminal=shipped-armed' -e
+if grep -qF 'RESULT READY' "$_DM_CAPTURE" 2>/dev/null; then
+    _dm_hold_case 64s garbage '' -e
+    _assert_hold result-unparseable-strict-holds
+else
+    echo "SKIP: result-unparseable-strict-holds: runner is not bash -e clean (control gave no READY)" >&2
+fi
+end_case result-unparseable-strict-holds
+
+# --- 6c.5: runner timeout fires for real (behavioral) -----------------------------------
+# Cases 39 and fleet-outcome-line fake rc=124 with a stub that exits 124. This case drives
+# the REAL timeout binary: the generated runner's 'timeout 5400' becomes 'timeout 1' and
+# the stub sleeps 30 s, so timeout kills it and rc=124 arises naturally.
+_dm_timeout_arm() {  # $1 = arm id, $2 = stub body line; sets _T_ELAPSED
+    local n="$1" body="$2" t0
+    local stub="$SCRATCH/.local/bin/dm-cs-$n"
+    clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE" "$_DM_RUNNER"
+    printf '#!/usr/bin/env bash\n%s\n' "$body" > "$stub"; chmod +x "$stub"
+    POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+        POST_PLAN_FLEET_DISCORD_DM="$_HOLD_DM_STUB" POST_PLAN_FLEET_CLAUDE="$stub" \
+        run_dm_driver --go >/dev/null 2>&1
+    grep -qF 'timeout 5400 ' "$_DM_RUNNER" 2>/dev/null \
+        || fail "$n: precondition: generated runner has no 'timeout 5400 ' literal"
+    sed 's/timeout 5400 /timeout 1 /' "$_DM_RUNNER" > "$_DM_RUNNER.t1" \
+        && mv "$_DM_RUNNER.t1" "$_DM_RUNNER"
+    grep -qF 'timeout 1 ' "$_DM_RUNNER" || fail "$n: sed rewrite to 'timeout 1 ' did not take"
+    t0=$SECONDS
+    HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+    _T_ELAPSED=$((SECONDS - t0))
+}
+if ! command -v timeout >/dev/null 2>&1; then
+    echo "SKIP: runner-real-timeout + runner-fast-exit-no-timeout: no 'timeout' on PATH (brew install coreutils)" >&2
+else
+    begin_case
+    _dm_timeout_arm 65t 'exec sleep 30'
+    grep -qxF 'post-plan-now: TIMED OUT after 90m (rc=124)' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-real-timeout: log lacks the TIMED OUT rc=124 line ($(cat "$_DM_LOG" 2>/dev/null))"
+    grep -qxF 'post-plan-fleet: outcome=timed-out' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-real-timeout: log lacks 'post-plan-fleet: outcome=timed-out'"
+    _t_dms=$(grep -c '^@@DM@@$' "$_DM_CAPTURE" 2>/dev/null || true)
+    [[ "$_t_dms" == 1 ]] || fail "runner-real-timeout: want exactly one DM, got '${_t_dms:-0}'"
+    grep -qF 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-real-timeout: DM lacks TIMED OUT ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+    [[ ! -f "$_HOLD_PLIST" ]] || fail "runner-real-timeout: plist not removed (slot leaked)"
+    (( _T_ELAPSED <= 10 )) \
+        || fail "runner-real-timeout: runner took ${_T_ELAPSED}s; the 1 s timeout never fired"
+    end_case runner-real-timeout
+
+    # Negative control: same sed rewrite, stub exits 0 at once -> no timeout path at all.
+    begin_case
+    _dm_timeout_arm 65f 'exit 0'
+    ! grep -qF 'TIMED OUT' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-fast-exit-no-timeout: log says TIMED OUT for a fast stub"
+    ! grep -qF 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-fast-exit-no-timeout: DM says TIMED OUT for a fast stub"
+    grep -qxF 'post-plan-fleet: outcome=blocked' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-fast-exit-no-timeout: want outcome=blocked ($(grep 'outcome=' "$_DM_LOG" 2>/dev/null))"
+    _f_dms=$(grep -c '^@@DM@@$' "$_DM_CAPTURE" 2>/dev/null || true)
+    [[ "$_f_dms" == 1 ]] || fail "runner-fast-exit-no-timeout: want exactly one DM, got '${_f_dms:-0}'"
+    end_case runner-fast-exit-no-timeout
+fi
 
 # --- wait-timeout-exits-nonzero ----------------------------------------------------------
 # A held slot that never drains drives the wait block to its ceiling, which must:

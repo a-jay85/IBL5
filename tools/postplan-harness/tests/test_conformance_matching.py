@@ -7,9 +7,19 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
+
+from harness import conformance
 from harness.conformance import check, phase_omission_items
 from harness.planfile import parse_phases
 from harness.state import PhaseInfo, PlanInfo
+
+
+@pytest.fixture(autouse=True)
+def _no_tracked_lookup(monkeypatch):
+    """These tests cite invented paths (`harness/x.py`). Fail closed so every citation
+    stays a repo-path candidate instead of being judged against the real checkout."""
+    monkeypatch.setattr(conformance, "_tracked_files", lambda *a, **k: None)
 
 
 def _plan_with_test(path: str) -> PlanInfo:

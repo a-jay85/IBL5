@@ -157,8 +157,12 @@
 #                              verbatim) AND every backtick-quoted token in
 #                              that field must appear literally as a substring
 #                              in the packet's **Self-verify:** block. A
-#                              `no-assertions: <reason>` line inside the
-#                              packet clears BOTH sub-checks for that packet
+#                              `no-assertions: <reason>` marker line inside
+#                              the packet clears BOTH sub-checks for that
+#                              packet. The marker must open its line (after
+#                              optional indent, >, a -/* bullet, <!--, or a
+#                              backtick) and carry a non-empty reason; a
+#                              mid-sentence prose mention does not count
 #                              (mirrors no-adr: / context-budget:). Runs for
 #                              ALL plans (not impl_model-gated, unlike gate S).
 #                              Two past PRs were blocked because a delegate
@@ -1368,7 +1372,7 @@ packet_scan() {
                 print "[S] delegation packet " q pname q " lacks a **Self-verify:** line (required for impl_model: sonnet plans)"
             if (!has_no_assertions) {
                 if (!has_assertions)
-                    print "[E] delegation packet " q pname q " lacks an **Assertions:** field (paste the phase" q "s Verification Matrix assertions verbatim, or add a " q "no-assertions: <reason>" q " line)"
+                    print "[E] delegation packet " q pname q " lacks an **Assertions:** field (paste the phase" q "s Verification Matrix assertions verbatim, or add a line that opens with " q "no-assertions: <reason>" q ")"
                 else {
                     s = assert_text
                     while (match(s, /`[^`]+`/)) {
@@ -1395,7 +1399,19 @@ packet_scan() {
                 if (pname == "") pname = "(unnamed)"
             }
             if (in_packet) {
-                if ($0 ~ /no-assertions:/) has_no_assertions=1
+                # Gate E escape. Anchored like the gate T **Tier:** match: the
+                # marker must OPEN its line, after optional indent, an optional
+                # blockquote `>`, an optional `-`/`*` bullet, an optional `<!--`,
+                # and an optional backtick. It must also carry a non-empty reason
+                # once a closing `-->`, backticks, and whitespace are stripped.
+                # An unanchored match let a mid-sentence prose mention clear the
+                # gate (#947).
+                if (match($0, /^[ \t]*>?[ \t]*([-*][ \t]+)?(<!--[ \t]*)?`?no-assertions:/)) {
+                    na_reason = substr($0, RSTART + RLENGTH)
+                    gsub(/-->/, "", na_reason)
+                    gsub(/[` \t]/, "", na_reason)
+                    if (na_reason != "") has_no_assertions=1
+                }
                 if ($0 ~ /\*\*Self-verify:\*\*/) { has_sv=1; in_block="sv" }
                 if ($0 ~ /\*\*Assertions:\*\*/) { has_assertions=1; in_block="assertions" }
                 if ($0 ~ /^[ \t]*[-*][ \t]*\*\*[A-Za-z]/) {
@@ -1458,8 +1474,10 @@ esac
 # ---------------------------------------------------------------------------
 # Every ### Delegate packet must (a) carry an **Assertions:** field and
 # (b) name every backtick-quoted token from that field somewhere in the
-# packet's **Self-verify:** block. A `no-assertions: <reason>` line anywhere
-# inside the packet clears BOTH sub-checks for that packet. Uses the
+# packet's **Self-verify:** block. A `no-assertions: <reason>` marker line
+# inside the packet clears BOTH sub-checks for that packet. The marker must
+# open its line (optional indent, >, -/* bullet, <!--, or backtick) and carry
+# a non-empty reason; a mid-sentence prose mention does not clear it. Uses the
 # _PACKET_SCAN cache populated above.
 while IFS= read -r eviol; do
     [ -n "$eviol" ] && viol "$eviol"

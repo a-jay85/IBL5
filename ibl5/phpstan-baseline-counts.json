@@ -32,7 +32,7 @@
         "ibl.hardcodedEnvString": 8,
         "ibl.inlineCss": 1,
         "ibl.orderByMissingTiebreaker": 83,
-        "ibl.sqlStringConcatenation": 33,
+        "ibl.sqlStringConcatenation": 31,
         "ibl.trustedVariable": 17,
         "ibl.unknownCliOption": 2,
         "identical.alwaysFalse": 1,

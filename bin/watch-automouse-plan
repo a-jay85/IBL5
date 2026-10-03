@@ -59,6 +59,9 @@ REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # PLAN_NOW_PLANS_DIR). Nothing in production sets it.
 AM="${AUTOMOUSE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
 LOG_DIR="$AM/logs"
+# WATCH_AUTOMOUSE_GH_BIN overrides the gh binary so a test can stub the PR lookup;
+# the PATH prepend above would beat a PATH stub. Unset or empty means plain `gh`.
+GH_BIN="${WATCH_AUTOMOUSE_GH_BIN:-gh}"
 
 SLUG=""
 PHASE=postplan
@@ -150,7 +153,7 @@ count_hits() {
 }
 
 pr_line() {
-    (cd "$REPO" && gh pr list --head "$SLUG" --state all \
+    (cd "$REPO" && "$GH_BIN" pr list --head "$SLUG" --state all \
         --json number,url,state,title --limit 1 2>/dev/null \
         | jq -r '.[0] | select(.) | "PR #\(.number) [\(.state)] \(.title)\n\(.url)"') || true
 }
@@ -169,12 +172,20 @@ slug_log() {
     printf '%s' "${newest:-$LOG_DIR/}"
 }
 
-fire() { # verdict-line
-    local msg pr dm_args=()
+# The DM body: verdict line, optional PR block, log link. fire() sends it;
+# --smoke-test prints it. One builder so the two can never drift.
+build_msg() { # verdict-line
+    local msg pr
     pr=$(pr_line)
     msg="$1"
     [ -n "$pr" ] && msg="$msg"$'\n\n'"$pr"
     msg="$msg"$'\n\n'"log: $(slug_log)"
+    printf '%s' "$msg"
+}
+
+fire() { # verdict-line
+    local msg dm_args=()
+    msg=$(build_msg "$1")
     [ -n "$TO" ] && dm_args=(--to "$TO")
 
     # ${a[@]+"${a[@]}"} — macOS ships bash 3.2, where `set -u` treats an empty

@@ -12,6 +12,8 @@ set -uo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # WATCHER_UNDER_TEST lets the mutation checks point the harness at a mutated copy.
 SRC="${WATCHER_UNDER_TEST:-$REPO_ROOT/bin/watch-automouse-plan}"
+# An ambient GH_REPO/GH_HOST would let a real gh resolve a repo from the temp tree.
+unset GH_REPO GH_HOST
 FAILED=0
 TMP_ROOT=$(mktemp -d); trap 'rm -rf "$TMP_ROOT"' EXIT
 pass() { printf '  ok   %s\n' "$1"; }
@@ -36,6 +38,15 @@ STUB
 # run_watch <args...> — bounded run: --poll/--wait/--timeout keep a broken case from hanging.
 run_watch() {
     OUT=$(AUTOMOUSE_DIR="$AM" "$T/bin/watch-automouse-plan" --poll 1 --wait 3 --timeout 3 "$@" 2>&1); RC=$?
+}
+# make_gh_stub — $T/gh-stub records its args and prints one fixed PR.
+make_gh_stub() {
+    cat > "$T/gh-stub" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" > "$(dirname "$0")/gh.args"
+printf '%s\n' '[{"number":42,"url":"https://github.com/a-jay85/IBL5/pull/42","state":"OPEN","title":"Smoke title"}]'
+STUB
+    chmod +x "$T/gh-stub"
 }
 # body_is <label> <expected> — compare the stub's captured DM body exactly.
 body_is() {
@@ -124,6 +135,40 @@ OUT=$(env -i PATH=/usr/bin:/bin AUTOMOUSE_DIR="$AM" "$T/bin/watch-automouse-plan
 expected=$(printf '%s\n\n%s' "$FIRE_MSG" "log: $AM/logs/")
 [ "$RC" = 0 ] && pass "exit 0 without HOME" || fail "exit 0 without HOME (got $RC: $OUT)"
 body_is "same exact body" "$expected"
+
+echo "== 10. seam set: PR block lands between verdict and log"
+if command -v jq > /dev/null 2>&1; then
+    make_tree c10
+    make_gh_stub
+    touch "$AM/done/s1.md"
+    WATCH_AUTOMOUSE_GH_BIN="$T/gh-stub" run_watch --slug s1 --force
+    expected=$(printf '%s\n\n%s\n%s\n\n%s' "$FIRE_MSG" "PR #42 [OPEN] Smoke title" \
+        "https://github.com/a-jay85/IBL5/pull/42" "log: $AM/logs/")
+    [ "$RC" = 0 ] && pass "exit 0" || fail "exit 0 (got $RC)"
+    body_is "body carries the PR block" "$expected"
+    want "stub got the pr list args" "$(cat "$T/gh.args" 2>/dev/null)" "pr list --head s1 --state all"
+else
+    echo "SKIP: case 10 needs jq"
+fi
+
+echo "== 11. seam empty: falls back to plain gh"
+make_tree c11
+make_gh_stub
+touch "$AM/done/s1.md"
+WATCH_AUTOMOUSE_GH_BIN="" run_watch --slug s1 --force
+expected=$(printf '%s\n\n%s' "$FIRE_MSG" "log: $AM/logs/")
+[ "$RC" = 0 ] && pass "exit 0" || fail "exit 0 (got $RC)"
+body_is "same body as the unset case" "$expected"
+[ ! -e "$T/gh.args" ] && pass "stub never called" || fail "stub never called"
+
+echo "== 12. seam points at a missing binary: delivery still happens"
+make_tree c12
+touch "$AM/done/s1.md"
+WATCH_AUTOMOUSE_GH_BIN="$T/no-such-gh" run_watch --slug s1 --force
+expected=$(printf '%s\n\n%s' "$FIRE_MSG" "log: $AM/logs/")
+[ "$RC" = 0 ] && pass "exit 0" || fail "exit 0 (got $RC)"
+body_is "same body as the unset case" "$expected"
+[ -e "$AM/.notified-s1-postplan" ] && pass "sentinel written" || fail "sentinel written"
 
 [ "$FAILED" = 0 ] && { echo "all watch-automouse-plan cases passed"; exit 0; }
 echo "watch-automouse-plan harness: FAILURES above"; exit 1

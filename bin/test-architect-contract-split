@@ -16,6 +16,7 @@
 #   4. Size caps  : _architect-contract.md ≤ 30720 B (raised from 29696 to fit number-placeholder bullet), _plan-verification.md ≤ 21504 B
 #   5. Read budget: every plan-architect def carries the no-re-read bounds (check_read_budget)
 #                   (only enforced when the detail file exists — skipped on the un-split tree)
+#   6. Mutation rule: full-matrix mutation-rule text stays in the contract and SKILL.md gate 9
 #
 # Run: bin/test-architect-contract-split              (exit 0 = pass, 1 = rule missing)
 #      bin/test-architect-contract-split --self-test  (also proves checker catches a deletion)
@@ -402,6 +403,43 @@ run_selftest() {
     printf 'FAIL: self-test did not detect dropped rule — checker is vacuous\n'
     FAILED=$((old_failed + 1))
   fi
+
+  # Mutation 2: strip one mid-line bold span from the contract copy.
+  local mut_contract="$tmpdir/mut-contract.md"
+  sed 's/\*\*The mutation must hit executed code:\*\*//' "$rules_src" > "$mut_contract"
+  if grep -qF '**The mutation must hit executed code:**' "$mut_contract"; then
+    printf 'FAIL: self-test mutation 2 did not remove the target span\n' >&2
+    exit 1
+  fi
+  old_failed=$FAILED
+  FAILED=0
+  check_mutation_rule "$mut_contract" "$REPO_ROOT/.claude/skills/plan/SKILL.md"
+  if [[ "$FAILED" -gt 0 ]]; then
+    printf 'PASS: self-test detected dropped contract mutation-rule text\n'
+    FAILED=$old_failed
+  else
+    printf 'FAIL: mutation-rule check missed a dropped contract span — vacuous\n'
+    FAILED=$((old_failed + 1))
+  fi
+
+  # Mutation 3: strip the gate-9 sentence from a SKILL.md copy.
+  local mut_skill="$tmpdir/mut-SKILL.md"
+  sed 's/each claim in a row names its own catching mutation//' \
+    "$REPO_ROOT/.claude/skills/plan/SKILL.md" > "$mut_skill"
+  if grep -qF 'each claim in a row names its own catching mutation' "$mut_skill"; then
+    printf 'FAIL: self-test mutation 3 did not remove the target sentence\n' >&2
+    exit 1
+  fi
+  old_failed=$FAILED
+  FAILED=0
+  check_mutation_rule "$rules_src" "$mut_skill"
+  if [[ "$FAILED" -gt 0 ]]; then
+    printf 'PASS: self-test detected dropped SKILL.md gate-9 sentence\n'
+    FAILED=$old_failed
+  else
+    printf 'FAIL: mutation-rule check missed a dropped gate-9 sentence — vacuous\n'
+    FAILED=$((old_failed + 1))
+  fi
 }
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -466,6 +504,31 @@ check_read_budget() {
   fi
 }
 
+# -- Assertion 6: full-matrix mutation rule stays resident (backlog#922) ------
+# The three bold spans are mid-line, so extract_bold (bullet-start, fixture-based)
+# never sees them. Probe the live text directly.
+check_mutation_rule() {
+  local contract="$1" skill="$2" probe
+  printf '\n=== mutation rule ===\n'
+  local -a contract_probes=(
+    '**One mutation per claim:**'
+    '**The mutation must hit executed code:**'
+    '**Negative check**'
+    'pre-seeds the production logic'
+  )
+  for probe in "${contract_probes[@]}"; do
+    if ! grep -qF -- "$probe" "$contract"; then
+      printf 'FAIL [mutation rule]: %s is missing: %s\n' "$(basename "$contract")" "$probe"
+      FAILED=$((FAILED + 1))
+    fi
+  done
+  probe='each claim in a row names its own catching mutation'
+  if ! grep -qF -- "$probe" "$skill"; then
+    printf 'FAIL [mutation rule]: SKILL.md Step 4 gate 9 is missing: %s\n' "$probe"
+    FAILED=$((FAILED + 1))
+  fi
+}
+
 if [[ "$MODE" == selftest ]]; then
   run_selftest
 else
@@ -478,6 +541,7 @@ else
     true
 
   check_read_budget
+  check_mutation_rule "$CONTRACT_RULES" "$REPO_ROOT/.claude/skills/plan/SKILL.md"
 
   # Cap is 21504 (21 KB), not the plan's 19456 (19 KB). The plan's movable-rationale
   # inventory was right: "## Required format" measures 11197 B in

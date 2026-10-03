@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Module\EntryPoints;
 
+use Module\ModuleRedirect;
+use Records\RecordsController;
+
 class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
 {
     protected function setUp(): void
@@ -15,27 +18,82 @@ class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
     }
 
-    public function testRendersWithDefaultPhase(): void
+    /**
+     * @param array<string, mixed> $query
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('iblQueryProvider')]
+    public function testIblRedirectStubEmitsNoBody(array $query): void
     {
-        $output = $this->runModule('SeasonHighs');
+        $output = $this->runModule('SeasonHighs', $query);
 
-        $this->assertNotEmpty($output);
-        $this->assertStringContainsString('Regular Season', $output);
+        $this->assertSame('', $output);
+        $this->assertQueryNotExecuted('ibl_settings');
     }
 
-    public function testRendersWithExplicitPhase(): void
+    /**
+     * @return array<string, array{array<string, mixed>}>
+     */
+    public static function iblQueryProvider(): array
     {
-        $output = $this->runModule('SeasonHighs', ['seasonPhase' => 'Playoffs']);
+        return [
+            'default phase' => [[]],
+            'explicit phase' => [['seasonPhase' => 'Playoffs']],
+            'empty phase' => [['seasonPhase' => '']],
+        ];
+    }
 
-        $this->assertNotEmpty($output);
+    public function testOlympicsRendersStandaloneSeasonHighs(): void
+    {
+        $_GET['league'] = 'olympics';
+        $ctx = new \League\LeagueContext();
+
+        $output = $this->runModule(
+            'SeasonHighs',
+            ['league' => 'olympics', 'seasonPhase' => 'Playoffs'],
+            [],
+            ['leagueContext' => $ctx] + $this->dbGlobals()
+        );
+
         $this->assertStringContainsString('Playoffs', $output);
     }
 
-    public function testRendersWithEmptyPhaseFallsBackToCurrent(): void
+    public function testRedirectUrlWithSeasonPhaseIncludesPhase(): void
     {
-        $output = $this->runModule('SeasonHighs', ['seasonPhase' => '']);
+        $url = ModuleRedirect::passthroughUrl(
+            'modules.php?name=Records&tab=' . RecordsController::TAB_THISSEASON,
+            ['seasonPhase'],
+            ['seasonPhase' => 'Playoffs']
+        );
+        $this->assertSame('modules.php?name=Records&tab=thisseason&seasonPhase=Playoffs', $url);
+    }
 
-        $this->assertNotEmpty($output);
-        $this->assertStringContainsString('Regular Season', $output);
+    public function testRedirectUrlWithoutSeasonPhaseOmitsParam(): void
+    {
+        $url = ModuleRedirect::passthroughUrl(
+            'modules.php?name=Records&tab=' . RecordsController::TAB_THISSEASON,
+            ['seasonPhase'],
+            []
+        );
+        $this->assertSame('modules.php?name=Records&tab=thisseason', $url);
+    }
+
+    public function testRedirectUrlWithEmptySeasonPhaseOmitsParam(): void
+    {
+        $url = ModuleRedirect::passthroughUrl(
+            'modules.php?name=Records&tab=' . RecordsController::TAB_THISSEASON,
+            ['seasonPhase'],
+            ['seasonPhase' => '']
+        );
+        $this->assertSame('modules.php?name=Records&tab=thisseason', $url);
+    }
+
+    public function testRedirectUrlEncodesSpecialCharsInSeasonPhase(): void
+    {
+        $url = ModuleRedirect::passthroughUrl(
+            'modules.php?name=Records&tab=' . RecordsController::TAB_THISSEASON,
+            ['seasonPhase'],
+            ['seasonPhase' => 'Regular Season']
+        );
+        $this->assertSame('modules.php?name=Records&tab=thisseason&seasonPhase=Regular%20Season', $url);
     }
 }

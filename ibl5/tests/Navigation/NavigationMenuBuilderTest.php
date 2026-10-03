@@ -335,8 +335,8 @@ class NavigationMenuBuilderTest extends TestCase
             'Training Camp Ratings Diff', 'Free Agency Preview', 'Contract List',
             'Player Movement', 'Franchise History', 'Draft History',
             'All-Star Appearances', '1-On-1 Game', 'JSB Export',
-            'Award History', 'Record Holders', 'Season Leaderboards',
-            'Career Leaderboards', 'Franchise Record Book',
+            'Award History', 'Records', 'Season Leaderboards',
+            'Career Leaderboards',
         ];
         foreach ($shouldBeAbsent as $label) {
             $this->assertNotContains($label, $allLabels, "'$label' should be filtered in Olympics mode");
@@ -410,7 +410,7 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertNull($draftOrderLink['badge'] ?? null);
     }
 
-    public function testAllStarAppearancesLinkPointsToRecordHoldersSubView(): void
+    public function testAllStarAppearancesLinkPointsToAllStarAppearancesModule(): void
     {
         $builder = new NavigationMenuBuilder($this->createConfig());
         $menus = $builder->getMenuStructure();
@@ -424,7 +424,47 @@ class NavigationMenuBuilderTest extends TestCase
         }
 
         $this->assertNotNull($allStarLink, 'History menu should contain an All-Star Appearances link');
-        $this->assertSame('modules.php?name=RecordHolders&op=allstar', $allStarLink['url']);
+        $this->assertSame('modules.php?name=AllStarAppearances', $allStarLink['url']);
+    }
+
+    public function testIblMenuHasSingleRecordsEntryAndNoLegacyLinks(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig());
+        $menus = $builder->getMenuStructure();
+
+        $recordsLinks = [];
+        foreach ($menus as $menu) {
+            foreach ($menu['links'] as $link) {
+                $url = $link['url'] ?? '';
+                if ($url === 'modules.php?name=Records') {
+                    $recordsLinks[] = $link;
+                }
+                foreach (['name=RecordHolders', 'name=FranchiseRecordBook', 'name=SeasonHighs'] as $legacy) {
+                    $this->assertStringNotContainsString($legacy, $url, "IBL nav should not link to legacy '$legacy'");
+                }
+            }
+        }
+
+        $this->assertCount(1, $recordsLinks, 'IBL nav should contain exactly one Records link');
+        $this->assertSame('Records', $recordsLinks[0]['label'] ?? null);
+    }
+
+    public function testOlympicsMenuHidesRecordsAndKeepsSeasonHighs(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'olympics'));
+        $menus = $builder->getMenuStructure();
+
+        foreach ($menus as $menu) {
+            foreach ($menu['links'] as $link) {
+                $this->assertStringNotContainsString('name=Records', $link['url'] ?? '');
+            }
+        }
+
+        $statsUrls = array_map(
+            static fn (array $link): string => $link['url'] ?? '',
+            $menus['Stats']['links']
+        );
+        $this->assertContains('modules.php?name=SeasonHighs', $statsUrls);
     }
 
     public function testPlayerExportLinkPointsToApiKeys(): void

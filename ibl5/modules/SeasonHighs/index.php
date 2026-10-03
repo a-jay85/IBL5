@@ -27,6 +27,16 @@ $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db, $leagueContext;
 
+// IBL serves Season Highs from the Records page; Olympics keeps this standalone page.
+if (!($leagueContext instanceof \League\LeagueContext && $leagueContext->isOlympics())) {
+    \Module\ModuleRedirect::sendWithPassthrough(
+        'modules.php?name=Records&tab=' . \Records\RecordsController::TAB_THISSEASON,
+        ['seasonPhase'],
+        $_GET + $_POST
+    );
+    return;
+}
+
 // Get current season info
 $season = new \Season\Season($mysqli_db, $leagueContext);
 

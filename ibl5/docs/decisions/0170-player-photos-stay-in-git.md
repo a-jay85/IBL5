@@ -55,6 +55,7 @@ Re-run the commands in the Context table to check.
 - Production, CI, and local stacks keep serving photos from the checkout with no extra moving parts.
 - Adding a photo stays a normal commit; reviewers see binary diffs, which is acceptable at one or two commits a year.
 - Anyone revisiting clone size should start with the larger history groups named in Context.
+- This decision changes no code, stylesheet, or `CSS_TABLE_MAP.md` entry. The ADR is the only file in the change.
 
 ## Supersedes
 
@@ -62,7 +63,7 @@ None.
 
 ## References
 
-- a-jay85/IBL5-backlog#206
+- a-jay85/IBL5-backlog#206 (slug `player-photos-stay-in-git`)
 - Commit `f069c22fd` (stop tracking JSB sim files in git/LFS)
 - `ibl5/classes/Player/PlayerImageHelper.php`
 - `.github/workflows/main.yml`

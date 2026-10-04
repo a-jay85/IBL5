@@ -1,6 +1,6 @@
 ---
-description: Production operations runbook — deploy, rollback, DB restore, sim-file recovery, logs, and running the app without the Claude Code harness.
-last_verified: 2026-09-29
+description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, the admin-only faprep.php report, and running the app without the Claude Code harness.
+last_verified: 2026-10-03
 ---
 
 # IBL5 Operations Runbook
@@ -456,3 +456,30 @@ This runs `launchctl bootout` (no-op if not loaded) followed by `launchctl boots
 - `--sim=N` is passed (a specific sim was requested manually).
 
 This prevents a manual invocation from pulling the rug out during debugging.
+
+## 9. Free Agent Prep Report (faprep.php)
+
+`ibl5/faprep.php` is a standalone admin page. It renders one HTML table of every non-retired player (`ibl_plr` rows with `retired = 0`, ordered by `ordinal`), joined to `ibl_team_info` for the team name. The commissioner uses it to prepare the free agency period.
+
+History: [PR #555](https://github.com/a-jay85/IBL5/pull/555) restored the page after a November 2025 deletion. [PR #1015](https://github.com/a-jay85/IBL5/pull/1015) added the admin gate and output escaping. [PR #2368](https://github.com/a-jay85/IBL5/pull/2368) added the guard test and the Playwright specs.
+
+### Access
+
+- **URL.** Open `/ibl5/faprep.php` directly. No nav menu entry or admin-panel link points to it.
+- **Who.** Admins only. The page calls `is_admin()` first and answers HTTP 403 `Forbidden` to everyone else, including logged-in GMs.
+- **Routing.** It is a root script. It does not go through `modules.php`.
+
+### How it differs from Free Agency Preview
+
+The public module at `modules.php?name=FreeAgencyPreview` (optional `&year=`) covers a narrower set. It keeps only players whose contract salary for the chosen year is 0, meaning their contracts expire that year. Its table also leaves out coach, stamina, and ordinal. The faprep page lists every active player and includes those columns. The two pages answer different questions, so both stay.
+
+### Tests that guard it
+
+- `ibl5/tests/WideUnit/Scripts/FaprepGuardTest.php` renders the template and asserts the file carries exactly 13 escaped output calls, one per column.
+- `ibl5/tests/e2e/smoke/faprep-admin.spec.ts` renders the page as an admin against the CI seed and checks that an anonymous visitor gets 403. A column renamed by a migration breaks this spec in CI.
+- `ibl5/tests/e2e/flows/faprep-xss-escape.spec.ts` checks that a script tag in a player name renders as text.
+- `ibl5/tests/e2e/flows/role-gating-non-admin.spec.ts` checks that a logged-in regular user gets 403.
+
+### Changing it
+
+When you add, drop, or rename a column, update the SELECT and the template together and escape every new cell. FaprepGuardTest pins the escaped-call count at 13, so update that expected count in the same PR. Run the guard test and the three specs above before shipping.

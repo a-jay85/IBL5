@@ -185,7 +185,7 @@ try {
     $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db, $boxscoreRepo, $season, $leagueContext);
     $boxscoreView = new Boxscore\BoxscoreView();
 
-    $savedDcRepo = new SavedDepthChart\DepthChartSnapshotRepository($mysqli_db, $leagueContext);
+    $savedDcRepo = new DepthChartSnapshot\DepthChartSnapshotRepository($mysqli_db, $leagueContext);
 
     $jsbRepo = new JsbParser\JsbImportRepository($mysqli_db, $leagueContext);
     $jsbResolver = new JsbParser\PlayerIdResolver($mysqli_db, $leagueContext);

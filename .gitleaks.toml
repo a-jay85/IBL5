@@ -51,6 +51,11 @@ regexes = [
   '''123456789012345678''',
   '''999888777666555444''',
 
+  # Owner's Discord user ID passed as the DM target in bin/test-events-review.
+  # A public user ID (also hardcoded as OWNER_ID in bin/discord-dm), not a
+  # credential; the DISCORD_DM_TO= prefix trips discord-client-id.
+  '''DISCORD_DM_TO=283183467804491776''',
+
   # Literal documentation placeholder in API guides (.archive/, removed docs).
   '''your-api-key''',
 ]

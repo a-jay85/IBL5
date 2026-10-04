@@ -59,6 +59,10 @@ for f in bin/*; do
 done
 ```
 
+The boundary `([^A-Za-z0-9_.-]|$)` keeps `bin/test` from matching
+`bin/test-bin-help`. The `ibl5/` filter drops `ibl5/bin/db-query` style
+references and keeps forms like `./bin/wt-new`.
+
 Scripts that read a CI environment variable (`GITHUB_*` or `CI`), which are the
 ones most likely to act differently when you run them locally:
 

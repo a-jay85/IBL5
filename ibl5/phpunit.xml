@@ -318,9 +318,9 @@
             <directory suffix="Handler.php">classes</directory>
             <!-- Legacy modules not under active development -->
             <directory>classes/OneOnOneGame</directory>
-            <directory>classes/Database</directory>
+            <file>classes/Database/PdoConnection.php</file>
             <!-- Legacy god-class files -->
-            <file>classes/JSB.php</file>
+            <file>classes/League/JSB.php</file>
         </exclude>
     </source>
 </phpunit>

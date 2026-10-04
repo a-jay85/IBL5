@@ -48,4 +48,12 @@ final class BanBeginTransactionInRepositoryRuleTest extends RuleTestCase
             [],
         );
     }
+
+    public function testAllowsBeginTransactionInLookalikeBaseSubclass(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/LookalikeBaseCallsBeginTransaction.php'],
+            [],
+        );
+    }
 }

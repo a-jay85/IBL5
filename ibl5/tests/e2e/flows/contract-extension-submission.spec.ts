@@ -147,8 +147,9 @@ test.describe('Contract Extension submission: happy path', () => {
         });
         expect([301, 302, 303]).toContain(response.status());
         location = response.headers()['location'] ?? '';
-        expect(location).toMatch(/result=extension_(accepted|rejected)/);
-        expect(location).toContain('display=contracts');
+        expect(location).toMatch(
+          /^\/ibl5\/modules\.php\?name=Team&op=team&teamid=\d+&display=contracts&result=extension_(accepted|rejected)&msg=[^&]+$/,
+        );
       },
       readBack: async () => {
         await page.goto(location.replace('/ibl5/', ''));
@@ -266,8 +267,9 @@ test.describe('Contract Extension submission: zero offer', () => {
 
     expect([301, 302, 303]).toContain(response.status());
     const location = response.headers()['location'] ?? '';
-    expect(location).toContain('result=extension_error');
-    expect(location).toMatch(/[?&]msg=[^&]+/);
+    expect(location).toMatch(
+      /^\/ibl5\/modules\.php\?name=Team&op=team&teamid=\d+&display=contracts&result=extension_error&msg=[^&]+$/,
+    );
   });
 });
 

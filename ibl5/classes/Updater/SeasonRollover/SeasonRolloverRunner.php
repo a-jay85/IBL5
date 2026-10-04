@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Updater\SeasonRollover;
 
 /**
- * Runs one season-rollover pass: detect from the uploaded archive, then write
- * the new season and advance cash-consideration contract years.
+ * Runs one season-rollover pass: detect from the uploaded archive, then
+ * advance cash-consideration contract years, then write the new season.
  *
  * State-free by design: holds only the three collaborators, reads no request
  * or session data, renders nothing. The admin, POST and CSRF guards and all
@@ -28,8 +28,12 @@ final class SeasonRolloverRunner
             return new SeasonRolloverRunResult($decision, null);
         }
 
-        $this->applier->apply($decision);
+        // Advance cash first. A missing or bad marker throws here, before the
+        // season year is written, so the next run still detects the rollover.
+        // A retry after a later failure is safe: advance() returns 0 once the
+        // marker equals the target year.
         $advanced = $this->cashAdvancer->advance((int) $decision->targetYear);
+        $this->applier->apply($decision);
 
         return new SeasonRolloverRunResult($decision, $advanced);
     }

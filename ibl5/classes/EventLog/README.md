@@ -1,6 +1,6 @@
 ---
 description: Fire-and-forget product-analytics request logging to the ibl_events table, with traffic classification and domain-event instrumentation.
-last_verified: 2026-09-24
+last_verified: 2026-10-03
 ---
 
 # EventLog
@@ -42,3 +42,19 @@ At shutdown, PHP calls `EventLogger::flush()` which issues `EventLogRepository::
 ## Adding a new domain event
 
 Call `\EventLog\EventLogger::setAction('your_event')` on the **success path** of the POST handler, **before** any redirect or `exit`. Use a hardcoded snake_case literal ≤ 64 chars — **never** a value derived from `$_POST`/`$_GET`. The call must be placed *below* any CSRF or validation guard so failed attempts never inflate conversion metrics.
+
+## Weekly review
+
+`bin/events-review` is the only reader of `ibl_events` outside the backup workflow. launchd runs it Mondays at 09:17 on the owner's Mac. It reads the last 7 days through the ADR-0093 SELECT-only credential and builds a digest with these sections: traffic classes against the prior week, active GMs and an event-count histogram, top routes for logged-in GMs and for anonymous humans, domain actions, status classes, referer buckets, and a per-day trend. A tool-less `claude -p` run drafts 3 to 5 recommendations. The reply is defanged and sent to the owner only, through `bin/discord-dm`. Nothing is applied automatically. A week with fewer than 20 human events sends one line and spawns no model. The decision record is `ibl5/docs/decisions/0168-weekly-events-review.md`.
+
+**Privacy contract.** The aggregate never selects `request_uri` or `user_agent`. It reduces `referer` to four literals: `none`, `internal`, `search`, `external`. `username` and `session_id` reach the output only as counts.
+
+**Rendering rule for authors of new events.** An `action` literal must match `^[a-z][a-z0-9_]{0,47}$` or the digest folds it into `other`. A route renders only if a logged-in GM hit it that week. Every other route name folds into `other`, because `route_name` comes from `?name=` and anyone can mint one.
+
+**Setup, in this order:**
+
+1. On prod, confirm the ADR-0093 SELECT-only user can read `ibl_events`. The script's preflight fails loudly if it cannot.
+2. Write that user's password to a mode-600 file outside the repo.
+3. Export the four `EVENTS_REVIEW_*` variables: `EVENTS_REVIEW_SSH_HOST`, `EVENTS_REVIEW_DB_USER`, `EVENTS_REVIEW_DB_NAME`, `EVENTS_REVIEW_DB_PASSWORD_FILE`.
+4. Run `bin/events-review --print-schedule` to inspect the plist, then `--install-schedule` from the main checkout.
+5. Run `bin/events-review --dry-run` for an on-demand look with no model call and no DM.

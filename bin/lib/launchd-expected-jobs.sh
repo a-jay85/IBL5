@@ -27,6 +27,7 @@ com.ibl5.bug-pipeline-cron standard
 com.ibl5.db-backups-pull standard
 com.ibl5.db-sync-nightly standard
 com.ibl5.docfix-poll standard
+com.ibl5.events-review standard
 com.ibl5.retro-mine standard
 com.ibl5.sim-recap-poll phase-gated
 com.ibl5.wt-gc standard

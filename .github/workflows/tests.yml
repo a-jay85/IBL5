@@ -1057,6 +1057,7 @@ jobs:
             bin/test-launchd-health-cron-setup \
             bin/test-bug-pipeline-ci-autofix \
             bin/test-sim-recap-tick \
+            bin/test-events-review \
             bin/test-discord-dm \
             bin/test-post-plan-fail-dm \
             bin/test-token-report \

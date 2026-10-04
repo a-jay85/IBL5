@@ -172,6 +172,24 @@ final class ExtensionControllerTest extends TestCase
         ]);
     }
 
+    public function testArrayDemandsFieldsAreCoercedToZero(): void
+    {
+        $processor = $this->createMock(ExtensionProcessorInterface::class);
+        $processor->expects(self::once())
+            ->method('processExtension')
+            ->with(self::callback(static function (array $data): bool {
+                return $data['demands'] === ['total' => 0, 'years' => 0];
+            }))
+            ->willReturn(['success' => false, 'error' => 'x']);
+        $controller = new ExtensionController($this->teams('Boston'), $processor);
+
+        $this->submit($controller, [
+            'teamName' => 'Boston',
+            'demandsTotal' => ['x'],
+            'demandsYears' => ['y'],
+        ]);
+    }
+
     public function testUnknownTeamIdRedirectsToIndexAfterProcessing(): void
     {
         $processor = $this->createMock(ExtensionProcessorInterface::class);

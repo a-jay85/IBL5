@@ -367,6 +367,14 @@ class JsbExportServiceTest extends TestCase
         }
     }
 
+    public function testRepositoryContractExtendsPlrExportRepositoryContract(): void
+    {
+        $this->assertContains(
+            \PlrParser\Contracts\PlrExportRepositoryInterface::class,
+            class_implements(JsbExportRepositoryInterface::class),
+        );
+    }
+
     // ── exportTrnFile ────────────────────────────────────────────
 
     public function testExportTrnFileHandlesZeroItems(): void

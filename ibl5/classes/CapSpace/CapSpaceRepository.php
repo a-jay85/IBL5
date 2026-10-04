@@ -43,7 +43,7 @@ class CapSpaceRepository extends \Database\BaseMysqliRepository implements CapSp
              WHERE retired = 0
                AND teamid = ?
                AND cy <> cyt
-               AND ordinal <= '" . \League\JSB::WAIVERS_ORDINAL . "'",
+               AND ordinal <= '" . \League\JsbConstants::WAIVERS_ORDINAL . "'",
             "i",
             $teamId
         );

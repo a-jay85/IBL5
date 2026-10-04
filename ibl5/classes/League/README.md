@@ -1,6 +1,6 @@
 ---
 description: Core league entity, multi-league context (IBL vs Olympics), and team filtering.
-last_verified: 2026-09-22
+last_verified: 2026-10-04
 ---
 
 # League
@@ -12,3 +12,4 @@ Provides league-wide data and multi-league support. `League` is the core entity 
 | `League` | Core entity: conference/division constants, team data |
 | `LeagueContext` | IBL vs Olympics context; table-name mapping |
 | `OlympicsTeamFilter` | Filters to Olympics-only teams |
+| `JsbConstants` | JSB engine constants: position list, playoff month, waivers ordinal (not parser code; see `JsbParser/`) |

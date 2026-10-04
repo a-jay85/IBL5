@@ -161,7 +161,7 @@ class DepthChartEntryProcessor implements DepthChartEntryProcessorInterface
      */
     public function generateCsvContent(array $playerData): string
     {
-        $csv = "Name," . implode(',', \League\JSB::PLAYER_POSITIONS) . ",ACTIVE,MIN,OF,DF,OI,DI,BH\n";
+        $csv = "Name," . implode(',', \League\JsbConstants::PLAYER_POSITIONS) . ",ACTIVE,MIN,OF,DF,OI,DI,BH\n";
         
         foreach ($playerData as $player) {
             $csv .= sprintf(

@@ -20,14 +20,24 @@ final class RootClassNamespaceTest extends TestCase
         self::assertStringEndsWith('/classes/Database/BaseMysqliRepository.php', (string) $ref->getFileName());
     }
 
-    public function testLeagueJsbResolvesWithConstants(): void
+    public function testLeagueJsbConstantsResolvesWithConstants(): void
     {
-        $ref = new \ReflectionClass(\League\JSB::class);
+        $ref = new \ReflectionClass(\League\JsbConstants::class);
         self::assertSame('League', $ref->getNamespaceName());
         foreach (['PLAYER_POSITIONS', 'PLAYOFF_MONTH', 'WAIVERS_ORDINAL'] as $constant) {
-            self::assertTrue($ref->hasConstant($constant), "League\\JSB lacks {$constant}");
+            self::assertTrue($ref->hasConstant($constant), "League\\JsbConstants lacks {$constant}");
         }
-        self::assertStringEndsWith('/classes/League/JSB.php', (string) $ref->getFileName());
+        self::assertStringEndsWith('/classes/League/JsbConstants.php', (string) $ref->getFileName());
+    }
+
+    public function testJsbConstantValuesArePinned(): void
+    {
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (const value statically known; assertion guards future edits)
+        self::assertSame(['PG', 'SG', 'SF', 'PF', 'C'], \League\JsbConstants::PLAYER_POSITIONS);
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (const value statically known; assertion guards future edits)
+        self::assertSame(22, \League\JsbConstants::PLAYOFF_MONTH);
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (const value statically known; assertion guards future edits)
+        self::assertSame(960, \League\JsbConstants::WAIVERS_ORDINAL);
     }
 
     public function testLeagueContractRulesResolves(): void
@@ -53,6 +63,12 @@ final class RootClassNamespaceTest extends TestCase
     public function testOldGlobalNameDoesNotResolve(string $oldName): void
     {
         self::assertFalse(class_exists($oldName), "global class {$oldName} still resolves");
+    }
+
+    public function testOldLeagueJsbNameDoesNotResolve(): void
+    {
+        self::assertFalse(class_exists('League\\JSB'), 'League\\JSB still resolves; rename to League\\JsbConstants is incomplete');
+        self::assertFileDoesNotExist(self::CLASSES_DIR . '/League/JSB.php');
     }
 
     public function testNoUnexpectedRootLevelClassFiles(): void

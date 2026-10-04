@@ -55,7 +55,7 @@ interface DepthChartEntryProcessorInterface
      * Generate CSV content from processed player data
      * 
      * Creates a CSV-formatted string suitable for file storage or email.
-     * Header row includes position slot names from JSB::PLAYER_POSITIONS constant.
+     * Header row includes position slot names from JsbConstants::PLAYER_POSITIONS constant.
      * One data row per player in the order provided.
      * 
      * @param list<ProcessedPlayerData> $playerData Array of processed player arrays (from processSubmission)
@@ -73,7 +73,7 @@ interface DepthChartEntryProcessorInterface
      * 
      * **Important Behaviors:**
      * - Player names are output as-is (already sanitized)
-     * - Position slot names come from JSB::PLAYER_POSITIONS constant
+     * - Position slot names come from JsbConstants::PLAYER_POSITIONS constant
      * - Order matches array iteration order (matches form order)
      * - Empty playerData results in header-only CSV
      */

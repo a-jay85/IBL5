@@ -146,7 +146,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             $this->playerWithTeamSelect() . "
             WHERE p.teamid = ?
               AND p.retired = 0
-              AND p.ordinal <= '" . \League\JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
+              AND p.ordinal <= '" . \League\JsbConstants::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
             ORDER BY p.name ASC",
             "i",
             $teamId
@@ -179,7 +179,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             $this->playerWithTeamSelect() . "
             WHERE p.teamid = ?
               AND p.retired = 0
-              AND p.ordinal <= '" . \League\JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
+              AND p.ordinal <= '" . \League\JsbConstants::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
               AND p.injured = '0'
             ORDER BY p.name ASC",
             "i",

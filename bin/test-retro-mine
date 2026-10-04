@@ -1,0 +1,351 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-retro-mine — harness for bin/retro-mine.
+#
+# Every case builds its own fixture registry under mktemp -d and points the
+# RETRO_MINE_* env seams at it. No PATH modification; jq and awk are real.
+#
+# Run: bin/test-retro-mine              all cases
+#      bin/test-retro-mine case_a ...   only the named cases (unknown name exits 2)
+#
+# RETRO_MINE_SELF overrides the script under test (mutation proofs point it at
+# a doctored copy). Exit 0 = all pass, 1 = failures.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+RM_DRIVER="${RETRO_MINE_SELF:-$SCRIPT_DIR/retro-mine}"
+
+FAILED=0
+RM_RC=0
+RM_OUT=""
+RM_ERR=""
+
+rm_ok()   { echo "ok: $1"; }
+rm_fail() { echo "FAIL: $1"; FAILED=1; }
+
+# rm_expect_eq <name> <want> <got>
+rm_expect_eq() {
+    if [ "$2" = "$3" ]; then rm_ok "$1"
+    else rm_fail "$1 — want [$2] got [$3]"; fi
+}
+# rm_has <name> <haystack> <needle>   /   rm_lacks <name> <haystack> <needle>
+rm_has() {
+    if grep -qF -- "$3" <<< "$2"; then rm_ok "$1"
+    else rm_fail "$1 — '$3' absent from: $2"; fi
+}
+rm_lacks() {
+    if grep -qF -- "$3" <<< "$2"; then rm_fail "$1 — '$3' unexpectedly present in: $2"
+    else rm_ok "$1"; fi
+}
+
+RM_TMPS=()
+rm_cleanup() {
+    local d
+    for d in ${RM_TMPS[@]+"${RM_TMPS[@]}"}; do rm -rf "$d"; done
+}
+trap rm_cleanup EXIT
+
+# rm_tmp — make a scratch dir, register it for cleanup, print its path.
+rm_tmp() {
+    local d
+    d="$(mktemp -d)"
+    RM_TMPS+=("$d")
+    printf '%s\n' "$d"
+}
+
+# rm_registry <file> <row>... — write a fixture registry with the given data rows.
+rm_registry() {
+    local f="$1"
+    shift
+    {
+        echo "# fixture registry"
+        echo '```'
+        echo "| Date       | PR   | Class | Routed to rung | Prior |"
+        echo "| ---------- | ---- | ----- | -------------- | ----- |"
+        local row
+        for row in "$@"; do printf '%s\n' "$row"; done
+        echo '```'
+    } > "$f"
+}
+
+# rm_row <pr> <class> <rung> <dest> <prior>
+rm_row() {
+    printf '| 2026-08-01 | %s | class: %s | routed to: Rung %s - rule doc %s | prior: %s |' \
+        "$1" "$2" "$3" "$4" "$5"
+}
+
+# rm_run <registry> <state_dir> [args...] — run the driver, capture rc/out/err.
+rm_run() {
+    local reg="$1" state="$2" errf
+    shift 2
+    errf="$(mktemp)"
+    RM_OUT="$(RETRO_MINE_REGISTRY="$reg" RETRO_MINE_STATE_DIR="$state" \
+        "$RM_DRIVER" "$@" 2>"$errf")"
+    RM_RC=$?
+    RM_ERR="$(cat "$errf")"
+    rm -f "$errf"
+}
+
+# ── Scan cases ────────────────────────────────────────────────────────────────
+case_scan_row_count() {
+    local t; t="$(rm_tmp)"
+    rm_registry "$t/reg.md" \
+        "$(rm_row '#1' 'alpha' 3 .claude/rules/a.md '--')" \
+        "$(rm_row '#2' 'beta' 3 .claude/rules/b.md '--')" \
+        "$(rm_row '#3' 'gamma' 4 .claude/rules/c.md '--')" \
+        "$(rm_row '#4' 'delta' 1 bin/d '--')" \
+        "$(rm_row '#5' 'eps' 2 bin/check-e '--')"
+    rm_run "$t/reg.md" "$t/state" --dry-run
+    rm_expect_eq "scan_row_count: exit 0" 0 "$RM_RC"
+    rm_has "scan_row_count: ROWS 5" "$RM_OUT" "ROWS 5"
+    rm_lacks "scan_row_count: header row not parsed" "$RM_OUT" "ROWS 6"
+}
+
+case_family_below_min_rows() {
+    local t; t="$(rm_tmp)"
+    rm_registry "$t/reg.md" \
+        "$(rm_row '#1' 'shell quoting' 3 .claude/rules/a.md '--')" \
+        "$(rm_row '#2' 'shell globbing' 4 .claude/rules/b.md '--')"
+    rm_run "$t/reg.md" "$t/state" --dry-run
+    rm_expect_eq "family_below_min_rows: exit 0" 0 "$RM_RC"
+    rm_lacks "family_below_min_rows: no shell family" "$RM_OUT" "FAMILY shell"
+}
+
+case_single_span_suppressed() {
+    local t; t="$(rm_tmp)"
+    rm_registry "$t/reg.md" \
+        "$(rm_row '#1' 'shell quoting' 3 .claude/rules/a.md '--')" \
+        "$(rm_row '#2' 'shell globbing' 3 .claude/rules/a.md '--')" \
+        "$(rm_row '#3' 'shell tilde' 3 .claude/rules/a.md '--')"
+    rm_run "$t/reg.md" "$t/state" --dry-run
+    rm_expect_eq "single_span_suppressed: exit 0" 0 "$RM_RC"
+    rm_lacks "single_span_suppressed: no FAMILY line" "$RM_OUT" "FAMILY"
+}
+
+case_escalation_flagged() {
+    local t; t="$(rm_tmp)"
+    rm_registry "$t/reg.md" \
+        "$(rm_row '#100' 'first sighting' 2 bin/check-x '--')" \
+        "$(rm_row '#200' 'weaker recurrence' 3 .claude/rules/r.md '#100')" \
+        "$(rm_row '#300' 'stronger recurrence' 1 bin/check-y '#100')"
+    rm_run "$t/reg.md" "$t/state" --dry-run
+    rm_expect_eq "escalation_flagged: exit 0" 0 "$RM_RC"
+    rm_has "escalation_flagged: weaker recurrence reported" "$RM_OUT" "ESCALATION #200 rung=3 prior=#100 prior_rung=2"
+    rm_lacks "escalation_flagged: stronger recurrence not reported" "$RM_OUT" "ESCALATION #300"
+}
+
+case_malformed_row_fails() {
+    local t; t="$(rm_tmp)"
+    rm_registry "$t/reg.md" \
+        "$(rm_row '#1' 'alpha' 3 .claude/rules/a.md '--')" \
+        "| 2026-08-01 | #2 | class: short | routed to: Rung 3 |"
+    rm_run "$t/reg.md" "$t/state" --dry-run
+    rm_expect_eq "malformed_row_fails: exit 1" 1 "$RM_RC"
+    rm_has "malformed_row_fails: named error" "$RM_ERR" "malformed registry row"
+}
+
+case_empty_registry_fails() {
+    local t; t="$(rm_tmp)"
+    rm_registry "$t/reg.md"
+    rm_run "$t/reg.md" "$t/state" --dry-run
+    rm_expect_eq "empty_registry_fails: exit 1" 1 "$RM_RC"
+    rm_has "empty_registry_fails: named error" "$RM_ERR" "no registry rows parsed"
+}
+
+case_state_dedupe() {
+    local t; t="$(rm_tmp)"
+    mkdir -p "$t/state"
+    printf 'family-shell\t3\t2026-09-01\n' > "$t/state/proposed.tsv"
+    cp "$t/state/proposed.tsv" "$t/state.before"
+    rm_registry "$t/reg3.md" \
+        "$(rm_row '#1' 'shell quoting' 3 .claude/rules/a.md '--')" \
+        "$(rm_row '#2' 'shell globbing' 4 .claude/rules/b.md '--')" \
+        "$(rm_row '#3' 'shell tilde' 3 .claude/rules/c.md '--')"
+    rm_run "$t/reg3.md" "$t/state" --dry-run
+    rm_has "state_dedupe: 3 rows after a 3-row record is seen" "$RM_OUT" "FAMILY shell rows=3 rungs=3,4 dests=3 prs=#1,#2,#3 status=seen"
+    rm_registry "$t/reg5.md" \
+        "$(rm_row '#1' 'shell quoting' 3 .claude/rules/a.md '--')" \
+        "$(rm_row '#2' 'shell globbing' 4 .claude/rules/b.md '--')" \
+        "$(rm_row '#3' 'shell tilde' 3 .claude/rules/c.md '--')" \
+        "$(rm_row '#4' 'shell trap' 3 .claude/rules/d.md '--')" \
+        "$(rm_row '#5' 'shell glob' 4 .claude/rules/e.md '--')"
+    rm_run "$t/reg5.md" "$t/state" --dry-run
+    rm_has "state_dedupe: 5 rows after a 3-row record is regrown" "$RM_OUT" "status=regrown"
+    if cmp -s "$t/state.before" "$t/state/proposed.tsv"; then
+        rm_ok "state_dedupe: --dry-run leaves state byte-identical"
+    else
+        rm_fail "state_dedupe: --dry-run changed proposed.tsv"
+    fi
+    rm_run "$t/reg5.md" "$t/state-empty" --dry-run
+    rm_has "state_dedupe: missing state file reads as empty (new)" "$RM_OUT" "status=new"
+    if [ -e "$t/state-empty" ]; then
+        rm_fail "state_dedupe: --dry-run created the state dir"
+    else
+        rm_ok "state_dedupe: --dry-run creates no state dir"
+    fi
+}
+
+case_unknown_flag() {
+    local t arg; t="$(rm_tmp)"
+    rm_registry "$t/reg.md" "$(rm_row '#1' 'alpha' 3 .claude/rules/a.md '--')"
+    for arg in --bogus --dry-run=1 x; do
+        rm_run "$t/reg.md" "$t/state" "$arg"
+        rm_expect_eq "unknown_flag [$arg]: exit 2" 2 "$RM_RC"
+        rm_has "unknown_flag [$arg]: stderr names it" "$RM_ERR" "unknown argument"
+    done
+}
+
+case_empty_env() {
+    local t rc err; t="$(rm_tmp)"
+    rm_registry "$t/reg.md" "$(rm_row '#1' 'alpha' 3 .claude/rules/a.md '--')"
+    RETRO_MINE_REGISTRY='' RETRO_MINE_STATE_DIR="$t/state" "$RM_DRIVER" --dry-run >/dev/null 2>&1
+    rc=$?
+    rm_expect_eq "empty_env: empty RETRO_MINE_REGISTRY exits 2" 2 "$rc"
+    RETRO_MINE_REGISTRY="$t/reg.md" RETRO_MINE_STATE_DIR='' "$RM_DRIVER" --dry-run >/dev/null 2>&1
+    rc=$?
+    rm_expect_eq "empty_env: empty RETRO_MINE_STATE_DIR exits 2" 2 "$rc"
+    err="$(env -i PATH=/usr/bin:/bin RETRO_MINE_REGISTRY="$t/reg.md" "$RM_DRIVER" --dry-run 2>&1 >/dev/null)"
+    rc=$?
+    rm_expect_eq "empty_env: no HOME and no state var exits 2" 2 "$rc"
+    rm_has "empty_env: error names HOME" "$err" "HOME"
+}
+
+case_claude_bin_empty() {
+    local t rc; t="$(rm_tmp)"
+    rm_registry "$t/reg.md" "$(rm_row '#1' 'alpha' 3 .claude/rules/a.md '--')"
+    RETRO_MINE_REGISTRY="$t/reg.md" RETRO_MINE_STATE_DIR="$t/state" RETRO_MINE_CLAUDE_BIN='' \
+        "$RM_DRIVER" --dry-run >/dev/null 2>&1
+    rc=$?
+    rm_expect_eq "claude_bin_empty: empty RETRO_MINE_CLAUDE_BIN exits 2" 2 "$rc"
+}
+
+case_gh_bin_empty() {
+    local t rc; t="$(rm_tmp)"
+    rm_registry "$t/reg.md" "$(rm_row '#1' 'alpha' 3 .claude/rules/a.md '--')"
+    RETRO_MINE_REGISTRY="$t/reg.md" RETRO_MINE_STATE_DIR="$t/state" RETRO_MINE_GH_BIN='' \
+        "$RM_DRIVER" --dry-run >/dev/null 2>&1
+    rc=$?
+    rm_expect_eq "gh_bin_empty: empty RETRO_MINE_GH_BIN exits 2" 2 "$rc"
+    RETRO_MINE_REGISTRY="$t/reg.md" RETRO_MINE_STATE_DIR="$t/state" RETRO_MINE_REPO='' \
+        "$RM_DRIVER" --dry-run >/dev/null 2>&1
+    rc=$?
+    rm_expect_eq "gh_bin_empty: empty RETRO_MINE_REPO exits 2" 2 "$rc"
+}
+
+case_launchd_env_dry_run() {
+    local t out rc; t="$(rm_tmp)"
+    rm_registry "$t/reg.md" "$(rm_row '#1' 'alpha' 3 .claude/rules/a.md '--')"
+    out="$(env -i PATH=/usr/bin:/bin HOME="$t" RETRO_MINE_REGISTRY="$t/reg.md" \
+        RETRO_MINE_STATE_DIR="$t/state" /bin/bash "$RM_DRIVER" --dry-run 2>&1)"
+    rc=$?
+    rm_expect_eq "launchd_env_dry_run: exit 0" 0 "$rc"
+    rm_has "launchd_env_dry_run: prints ROWS" "$out" "ROWS 1"
+}
+
+# ── Cron emitter cases ────────────────────────────────────────────────────────
+RM_CRON="$SCRIPT_DIR/retro-mine-cron-setup"
+
+# rm_cron <home> [args...] — run the emitter under a launchd-like env.
+rm_cron() {
+    local home="$1" errf
+    shift
+    errf="$(mktemp)"
+    RM_OUT="$(env -i PATH=/usr/bin:/bin HOME="$home" "$RM_CRON" "$@" 2>"$errf")"
+    RM_RC=$?
+    RM_ERR="$(cat "$errf")"
+    rm -f "$errf"
+}
+
+case_cron_print_schedule_env() {
+    local t; t="$(rm_tmp)"
+    rm_cron "$t/home" --print-schedule
+    rm_expect_eq "cron_print_schedule_env: exit 0" 0 "$RM_RC"
+    rm_has "cron_print_schedule_env: label" "$RM_OUT" "<string>com.ibl5.retro-mine</string>"
+    rm_has "cron_print_schedule_env: PATH covers brew, system, and expanded HOME" "$RM_OUT" \
+        "<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$t/home/.local/bin</string>"
+    rm_has "cron_print_schedule_env: weekly key" "$RM_OUT" "<key>Weekday</key>"
+    rm_has "cron_print_schedule_env: ProgramArguments target" "$RM_OUT" "/bin/retro-mine</string>"
+    if grep -qF '$' <<< "$RM_OUT"; then rm_fail "cron_print_schedule_env: unexpanded \$ in plist"
+    else rm_ok "cron_print_schedule_env: no unexpanded \$"; fi
+    rm_lacks "cron_print_schedule_env: no empty string" "$RM_OUT" "<string></string>"
+    if [ "$(uname -s)" = "Darwin" ] && command -v plutil >/dev/null 2>&1; then
+        if plutil -lint - <<< "$RM_OUT" >/dev/null 2>&1; then rm_ok "cron_print_schedule_env: plutil lint"
+        else rm_fail "cron_print_schedule_env: plutil lint rejected the plist"; fi
+    else
+        echo "SKIP: plutil lint (macOS only)"
+    fi
+}
+
+case_cron_print_no_side_effect() {
+    local t; t="$(rm_tmp)"
+    rm_cron "$t/home" --print-schedule
+    rm_expect_eq "cron_print_no_side_effect: exit 0" 0 "$RM_RC"
+    if [ -e "$t/home/Library" ]; then rm_fail "cron_print_no_side_effect: --print-schedule created Library/"
+    else rm_ok "cron_print_no_side_effect: no Library/ created"; fi
+}
+
+case_cron_unknown_flag() {
+    local t arg; t="$(rm_tmp)"
+    for arg in --bogus --print-schedule=1; do
+        rm_cron "$t/home" "$arg"
+        rm_expect_eq "cron_unknown_flag [$arg]: exit 2" 2 "$RM_RC"
+    done
+    rm_cron "$t/home"
+    rm_expect_eq "cron_unknown_flag [no argument]: exit 2" 2 "$RM_RC"
+}
+
+case_cron_install_refuses_missing_target() {
+    local t rc; t="$(rm_tmp)"
+    mkdir -p "$t/fix/bin" "$t/stubs" "$t/home"
+    cp "$RM_CRON" "$t/fix/bin/retro-mine-cron-setup"
+    printf '#!/bin/sh\necho "$*" >> "%s/launchctl.log"\n' "$t" > "$t/stubs/launchctl"
+    chmod +x "$t/stubs/launchctl"
+    env -i PATH="$t/stubs:/usr/bin:/bin" HOME="$t/home" \
+        "$t/fix/bin/retro-mine-cron-setup" --install-schedule >/dev/null 2>&1
+    rc=$?
+    rm_expect_eq "cron_install_refuses_missing_target: exit 1" 1 "$rc"
+    if [ -s "$t/launchctl.log" ]; then rm_fail "cron_install_refuses_missing_target: launchctl was called"
+    else rm_ok "cron_install_refuses_missing_target: no launchctl call"; fi
+}
+
+case_expected_jobs_registered() {
+    local label
+    # shellcheck source=lib/launchd-expected-jobs.sh
+    . "$SCRIPT_DIR/lib/launchd-expected-jobs.sh"
+    if grep -qxF 'com.ibl5.retro-mine standard' <<< "$LEJ_EXPECTED_JOBS"; then
+        rm_ok "expected_jobs_registered: LEJ_EXPECTED_JOBS holds the line"
+    else
+        rm_fail "expected_jobs_registered: 'com.ibl5.retro-mine standard' absent from LEJ_EXPECTED_JOBS"
+    fi
+    label="$(sed -n 's/^PLIST_LABEL="\(.*\)"$/\1/p' "$RM_CRON")"
+    rm_expect_eq "expected_jobs_registered: plist label matches the registered job" "com.ibl5.retro-mine" "$label"
+}
+
+# ── Dispatch ──────────────────────────────────────────────────────────────────
+RM_ALL_CASES() {
+    declare -F | awk '$3 ~ /^case_/ {print $3}'
+}
+
+main() {
+    local c
+    if [ "$#" -gt 0 ]; then
+        for c in "$@"; do
+            if ! declare -F "$c" >/dev/null 2>&1 || [[ "$c" != case_* ]]; then
+                echo "unknown case: $c" >&2
+                exit 2
+            fi
+        done
+        for c in "$@"; do "$c"; done
+    else
+        for c in $(RM_ALL_CASES); do "$c"; done
+    fi
+    if [ "$FAILED" -ne 0 ]; then
+        echo "FAILED"
+        exit 1
+    fi
+    echo "all passed"
+}
+
+main "$@"

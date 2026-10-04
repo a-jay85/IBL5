@@ -1,0 +1,248 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/retro-mine — weekly miner over the retrospective class registry.
+#
+# Scans ibl5/docs/retrospective-class-registry.md, tags rows with keyword
+# facets, and reports recurring families and prior: escalations that did not
+# route one rung more mechanical. Never auto-applies a norm: a human reviews
+# each proposal as a draft PR.
+#
+# Usage:
+#   bin/retro-mine --dry-run   print the scan report, change nothing
+#   bin/retro-mine             scan, then draft and deliver proposals
+#
+# Runs under launchd with `env -i PATH=/usr/bin:/bin`, so this file stays
+# bash 3.2 clean: no associative arrays, no mapfile, no ${v,,}. Row parsing and
+# family aggregation live in one BSD-compatible awk program.
+
+set -euo pipefail
+
+# ── Constants (a human tunes these by PR) ─────────────────────────────────────
+MIN_ROWS=3            # a family needs at least this many rows
+MIN_SPAN=2            # ... spanning at least this many distinct rungs OR destinations
+REPROPOSE_GROWTH=2    # a seen family re-surfaces only after gaining this many rows
+FACETS='shell	shell|bash|pipefail|grep|awk|sed |posix|portab|wrapper|probe|exit code|set -e
+gate-guard	gate|guard|hook|check-
+import-store	import|store'
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
+
+log() { echo "retro-mine: $*" >&2; }
+
+usage() {
+    cat <<'EOF'
+Usage: bin/retro-mine [--dry-run] [--help]
+
+  --dry-run   print the scan report; no drafter call, no git, no state write
+  --help      show this help
+
+Env (unset is legal for all; an empty value exits 2):
+  RETRO_MINE_REGISTRY    registry file (default: <repo>/ibl5/docs/retrospective-class-registry.md)
+  RETRO_MINE_STATE_DIR   dedupe state dir (default: $HOME/.local/state/ibl5-retro-mine)
+  RETRO_MINE_CLAUDE_BIN  drafter binary (default: claude)
+  RETRO_MINE_GH_BIN      gh binary (default: gh)
+  RETRO_MINE_REPO        repo the draft PR is cut from (default: this checkout)
+EOF
+}
+
+# ── Environment ───────────────────────────────────────────────────────────────
+# An empty value is a misconfiguration, never a request for the default.
+reject_empty_env() {
+    local v
+    for v in RETRO_MINE_REGISTRY RETRO_MINE_STATE_DIR RETRO_MINE_CLAUDE_BIN \
+             RETRO_MINE_GH_BIN RETRO_MINE_REPO; do
+        if [ -n "${!v+set}" ] && [ -z "${!v}" ]; then
+            log "ERROR: $v is set but empty"
+            exit 2
+        fi
+    done
+}
+
+resolve_env() {
+    reject_empty_env
+    REGISTRY="${RETRO_MINE_REGISTRY-$REPO_ROOT/ibl5/docs/retrospective-class-registry.md}"
+    if [ -n "${RETRO_MINE_STATE_DIR-}" ]; then
+        STATE_DIR="$RETRO_MINE_STATE_DIR"
+    elif [ -n "${HOME-}" ]; then
+        STATE_DIR="$HOME/.local/state/ibl5-retro-mine"
+    else
+        log "ERROR: RETRO_MINE_STATE_DIR unset and HOME unset"
+        exit 2
+    fi
+    STATE_FILE="$STATE_DIR/proposed.tsv"
+    CLAUDE_BIN="${RETRO_MINE_CLAUDE_BIN-claude}"
+    GH_BIN="${RETRO_MINE_GH_BIN-gh}"
+    MINE_REPO="${RETRO_MINE_REPO-$REPO_ROOT}"
+}
+
+# ── State ─────────────────────────────────────────────────────────────────────
+# state_record <key> <count>: upsert one line, atomically. Called only after a
+# draft PR opens; the scan and --dry-run paths never call it.
+state_record() {
+    local key="$1" count="$2" tmp="$STATE_FILE.tmp"
+    if ! mkdir -p "$STATE_DIR" 2>/dev/null; then
+        log "ERROR: cannot create state dir: $STATE_DIR"
+        exit 1
+    fi
+    {
+        if [ -r "$STATE_FILE" ]; then
+            awk -F'\t' -v k="$key" '$1 != k' "$STATE_FILE"
+        fi
+        printf '%s\t%s\t%s\n' "$key" "$count" "$(date +%Y-%m-%d)"
+    } > "$tmp"
+    mv "$tmp" "$STATE_FILE"
+}
+
+# ── Scan ──────────────────────────────────────────────────────────────────────
+# scan_registry: parse the table, aggregate facets, check escalations, and print
+# the report on stdout. Exit 1 on an unreadable, malformed, or empty registry.
+scan_registry() {
+    if [ ! -r "$REGISTRY" ]; then
+        log "ERROR: registry file not readable: $REGISTRY"
+        return 1
+    fi
+    RM_FACETS="$FACETS" RM_STATE_FILE="$STATE_FILE" \
+    RM_MIN_ROWS="$MIN_ROWS" RM_MIN_SPAN="$MIN_SPAN" RM_GROWTH="$REPROPOSE_GROWTH" \
+    awk '
+    function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+    function status_for(key, rows,    s) {
+        if (!(key in seen)) return "new"
+        if (rows != "" && rows + 0 >= seen[key] + growth) return "regrown"
+        return "seen"
+    }
+    BEGIN {
+        FS = "|"
+        minrows = ENVIRON["RM_MIN_ROWS"] + 0
+        minspan = ENVIRON["RM_MIN_SPAN"] + 0
+        growth  = ENVIRON["RM_GROWTH"] + 0
+        nfac = split(ENVIRON["RM_FACETS"], facline, "\n")
+        for (i = 1; i <= nfac; i++) {
+            split(facline[i], kv, "\t")
+            facname[i] = kv[1]
+            facre[i] = kv[2]
+        }
+        sf = ENVIRON["RM_STATE_FILE"]
+        while ((getline l < sf) > 0) {
+            split(l, sv, "\t")
+            seen[sv[1]] = sv[3] == "" && sv[2] == "" ? 0 : sv[2] + 0
+        }
+        close(sf)
+        nrows = 0
+        bad = 0
+    }
+    /^\| [0-9][0-9][0-9][0-9]-/ {
+        # A free-text cell may itself contain "|" (a shell "||" in a Routed
+        # cell), so the field count is a floor, not an exact 7. Date and PR are
+        # the first two cells, Prior is the last, and the Routed cell starts at
+        # the first cell that opens with "routed to:".
+        rk = 0
+        if (NF >= 7) for (k = 5; k <= NF - 2; k++) if (trim($k) ~ /^routed to:/) { rk = k; break }
+        if (NF < 7 || rk == 0 || trim($(NF - 1)) !~ /^prior:/) {
+            print "ERROR: malformed registry row: " $0 > "/dev/stderr"
+            bad = 1
+            exit 1
+        }
+        nrows++
+        cls = ""
+        for (k = 4; k < rk; k++) cls = cls (k > 4 ? "|" : "") $k
+        routed = ""
+        for (k = rk; k <= NF - 2; k++) routed = routed (k > rk ? "|" : "") $k
+        pr = trim($3); cls = tolower(trim(cls)); routed = trim(routed); pri = trim($(NF - 1))
+        rung = "?"
+        if (match(routed, /Rung [0-9]/)) rung = substr(routed, RSTART + 5, 1)
+        dest = "-"
+        if (match(routed, /(\.claude|bin|ibl5)\/[A-Za-z0-9_.\/-]+/)) {
+            dest = substr(routed, RSTART, RLENGTH)
+            while (dest ~ /[.,)]$/) sub(/[.,)]$/, "", dest)
+        }
+        rpr[nrows] = pr; rrung[nrows] = rung; rdate[nrows] = trim($2)
+        priors = ""
+        rest = pri
+        while (match(rest, /#[0-9]+/)) {
+            priors = priors (priors == "" ? "" : ",") substr(rest, RSTART, RLENGTH)
+            rest = substr(rest, RSTART + RLENGTH)
+        }
+        rprior[nrows] = priors
+        if (pr != "--" && rung != "?" && (!(pr in prmin) || rung + 0 < prmin[pr] + 0)) prmin[pr] = rung
+        for (f = 1; f <= nfac; f++) {
+            if (cls !~ facre[f]) continue
+            fcount[f]++
+            if (rung != "?") frung[f, rung] = 1
+            if (dest != "-" && !((f, dest) in fdest)) { fdest[f, dest] = 1; fdn[f]++ }
+            if (pr != "--") fprs[f] = fprs[f] (fprs[f] == "" ? "" : ",") pr
+        }
+    }
+    END {
+        if (bad) exit 1
+        if (nrows == 0) {
+            print "ERROR: no registry rows parsed" > "/dev/stderr"
+            exit 1
+        }
+        print "ROWS " nrows
+        # Families, sorted by facet name.
+        nf = 0
+        for (f = 1; f <= nfac; f++) {
+            rungs = ""; nr = 0
+            for (r = 1; r <= 9; r++) if ((f, r) in frung) { rungs = rungs (rungs == "" ? "" : ",") r; nr++ }
+            if (fcount[f] + 0 < minrows) continue
+            if (!(nr >= minspan || fdn[f] + 0 >= minspan)) continue
+            key = "family-" facname[f]
+            nf++
+            okey[nf] = key
+            oline[nf] = "FAMILY " facname[f] " rows=" fcount[f] " rungs=" rungs " dests=" fdn[f] + 0 \
+                " prs=" fprs[f] " status=" status_for(key, fcount[f])
+        }
+        for (i = 2; i <= nf; i++) {
+            k = okey[i]; v = oline[i]; j = i - 1
+            while (j >= 1 && okey[j] > k) { okey[j + 1] = okey[j]; oline[j + 1] = oline[j]; j-- }
+            okey[j + 1] = k; oline[j + 1] = v
+        }
+        for (i = 1; i <= nf; i++) print oline[i]
+        # Escalations: a recurrence must route strictly more mechanical (lower rung).
+        ne = 0
+        for (i = 1; i <= nrows; i++) {
+            if (rprior[i] == "" || rrung[i] == "?") continue
+            np = split(rprior[i], pl, ",")
+            low = ""
+            for (p = 1; p <= np; p++) if (pl[p] in prmin && (low == "" || prmin[pl[p]] + 0 < low + 0)) low = prmin[pl[p]]
+            if (low == "") continue
+            if (rrung[i] + 0 < low + 0) continue
+            key = "escalation-" (rpr[i] == "--" ? "nopr-" rdate[i] : substr(rpr[i], 2))
+            ne++
+            ekey[ne] = key
+            eline[ne] = "ESCALATION " rpr[i] " rung=" rrung[i] " prior=" rprior[i] " prior_rung=" low " status=" status_for(key, "")
+        }
+        for (i = 2; i <= ne; i++) {
+            k = ekey[i]; v = eline[i]; j = i - 1
+            while (j >= 1 && ekey[j] > k) { ekey[j + 1] = ekey[j]; eline[j + 1] = eline[j]; j-- }
+            ekey[j + 1] = k; eline[j + 1] = v
+        }
+        for (i = 1; i <= ne; i++) print eline[i]
+    }
+    ' "$REGISTRY"
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+main() {
+    local dry_run=0 arg
+    for arg in "$@"; do
+        case "$arg" in
+            --dry-run) dry_run=1 ;;
+            --help|-h) usage; exit 0 ;;
+            *) log "unknown argument: $arg"; exit 2 ;;
+        esac
+    done
+
+    resolve_env
+
+    local report
+    report="$(scan_registry)" || exit 1
+    printf '%s\n' "$report"
+
+    if [ "$dry_run" -eq 1 ]; then
+        exit 0
+    fi
+}
+
+main "$@"

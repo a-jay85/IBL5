@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/wt-gc-tick — scheduled merged-worktree sweep driver (ADR-0165).
+#
+# Fired hourly by the launchd LaunchAgent installed by bin/wt-gc-cron-setup.
+# Runs the unchanged `bin/cleanup --all` (reaps only proven-merged worktrees;
+# in-use and dirty worktrees are skipped by cleanup itself), then counts what
+# the sweep must never delete (STALLED, UNPUSHED, EMPTY, OPEN-PR) via the
+# read-only bin/wt-status and logs it.
+#
+# NEVER passes --discard-generated, --discard-closed, or --drop-merged-stashes to bin/cleanup.
+# The cleanup argv is a literal; no flag of this script forwards to it.
+#
+# Gates, in order: kill switch (WT_GC_ENABLED=0), fail-closed HID-idle gate,
+# 6h minimum-interval stamp, single-flight PID lock. Every gated skip is exit 0.
+# Exit 1 only for a bad flag, an unresolvable repo root, or a failed
+# bin/cleanup / bin/wt-status (so the launchd health check alerts).
+#
+# Usage: bin/wt-gc-tick [--dry-run] [--force] [--help]
+#   --dry-run         Pass --dry-run to cleanup; never write the stamp.
+#   --force           Bypass the HID-idle gate and the min-interval stamp.
+#   --help            Print this header comment.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# launchd and `env -i` runs may lack HOME.
+if [ -z "${HOME:-}" ]; then HOME="$(cd ~ 2>/dev/null && pwd)"; export HOME; fi
+
+# ── Env seams (defaults = production; tests override) ─────────────────────────
+WT_GC_ENABLED="${WT_GC_ENABLED:-1}"            # "0" = kill switch; any other value = enabled
+WT_GC_IDLE_SECS="${WT_GC_IDLE_SECS:-1800}"     # HID idle required before a sweep
+WT_GC_MIN_INTERVAL_SECS="${WT_GC_MIN_INTERVAL_SECS:-21600}"  # one real sweep per 6h at most
+WT_GC_LOCK_DIR="${WT_GC_LOCK_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc}"
+WT_GC_LOG="${WT_GC_LOG:-$WT_GC_LOCK_DIR/wt-gc.log}"
+# Absolute on purpose: the launchd PATH once omitted /usr/sbin and a bare
+# `ioreg` fail-closed every tick (see bin/wt-sync-tick).
+WT_GC_IOREG="${WT_GC_IOREG:-/usr/sbin/ioreg}"
+WT_GC_REPO_ROOT="${WT_GC_REPO_ROOT:-}"         # empty = derive main checkout (below)
+WT_GC_CLEANUP="${WT_GC_CLEANUP:-$SCRIPT_DIR/cleanup}"        # test seam: argv-capture stub
+WT_GC_WT_STATUS="${WT_GC_WT_STATUS:-$SCRIPT_DIR/wt-status}"  # test seam: fixture output
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+log() {
+    local line
+    line="$(printf '[%s] %s' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*")"
+    printf '%s\n' "$line"
+    { mkdir -p "$(dirname "$WT_GC_LOG")" && printf '%s\n' "$line" >> "$WT_GC_LOG"; } 2>/dev/null || true
+}
+
+DRY_RUN=0
+FORCE=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dry-run) DRY_RUN=1; shift ;;
+        --force)   FORCE=1;   shift ;;
+        -h|--help)
+            awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+            exit 0 ;;
+        *) log "Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
+
+# ── Kill switch ───────────────────────────────────────────────────────────────
+if [ "$WT_GC_ENABLED" = 0 ]; then
+    log "disabled (WT_GC_ENABLED=0) — exiting"
+    exit 0
+fi
+
+# ── Interval seam validation (fail-closed) ────────────────────────────────────
+case "$WT_GC_IDLE_SECS" in
+    ''|*[!0-9]*)
+        log "invalid WT_GC_IDLE_SECS '$WT_GC_IDLE_SECS' — fail-closed"
+        exit 0 ;;
+esac
+case "$WT_GC_MIN_INTERVAL_SECS" in
+    ''|*[!0-9]*)
+        log "invalid WT_GC_MIN_INTERVAL_SECS '$WT_GC_MIN_INTERVAL_SECS' — fail-closed"
+        exit 0 ;;
+esac
+
+# ── Repo root ─────────────────────────────────────────────────────────────────
+if [ -z "$WT_GC_REPO_ROOT" ]; then
+    WT_GC_REPO_ROOT="$(git -C "$SCRIPT_DIR/.." worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')" || WT_GC_REPO_ROOT=""
+fi
+if [ -z "$WT_GC_REPO_ROOT" ]; then
+    log "cannot resolve repo root — aborting"
+    exit 1
+fi
+
+# ── Presence gate (HID idle) ──────────────────────────────────────────────────
+# Fail-closed: missing reader, empty, or non-numeric idle means operator present.
+if [ "$FORCE" = 0 ]; then
+    if [ -z "$WT_GC_IOREG" ] || [ ! -x "$WT_GC_IOREG" ]; then
+        log "idle reader missing or not executable ('$WT_GC_IOREG') — treating as operator present (fail-closed)"
+        exit 0
+    fi
+    idle="$("$WT_GC_IOREG" -c IOHIDSystem 2>/dev/null | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}' 2>/dev/null)" || idle=""
+    case "$idle" in
+        ''|*[!0-9]*)
+            log "idle value unreadable ('${idle:-<empty>}') — treating as operator present (fail-closed)"
+            exit 0
+            ;;
+    esac
+    if [ "$idle" -lt "$WT_GC_IDLE_SECS" ]; then
+        log "operator present (idle ${idle}s < threshold ${WT_GC_IDLE_SECS}s) — exiting"
+        exit 0
+    fi
+    log "idle ${idle}s >= threshold ${WT_GC_IDLE_SECS}s — proceeding"
+fi
+
+mkdir -p "$WT_GC_LOCK_DIR" 2>/dev/null || true
+STAMP_FILE="$WT_GC_LOCK_DIR/last-sweep"
+LOCK_FILE="$WT_GC_LOCK_DIR/wt-gc.lock"
+
+# ── Min-interval gate ─────────────────────────────────────────────────────────
+# A missing or non-numeric stamp means "never swept".
+if [ "$FORCE" = 0 ] && [ "$DRY_RUN" = 0 ] && [ -f "$STAMP_FILE" ]; then
+    stamp="$(cat "$STAMP_FILE" 2>/dev/null || true)"
+    case "$stamp" in
+        ''|*[!0-9]*) ;;
+        *)
+            ago=$(( $(date +%s) - stamp ))
+            if [ "$ago" -lt "$WT_GC_MIN_INTERVAL_SECS" ]; then
+                log "last sweep ${ago}s ago < ${WT_GC_MIN_INTERVAL_SECS}s — exiting"
+                exit 0
+            fi
+            ;;
+    esac
+fi
+
+# ── Single-flight lock ────────────────────────────────────────────────────────
+if [ -f "$LOCK_FILE" ]; then
+    existing_pid="$(cat "$LOCK_FILE" 2>/dev/null || true)"
+    if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+        log "previous tick (pid $existing_pid) still running — exiting"
+        exit 0
+    fi
+    log "stale lock (pid ${existing_pid:-<unreadable>}) — reclaiming"
+fi
+if ! printf '%d\n' "$$" > "$LOCK_FILE" 2>/dev/null; then
+    log "could not write lock file $LOCK_FILE — aborting"
+    exit 0
+fi
+TMP_OUT="$(mktemp "${TMPDIR:-/tmp}/wt-gc-out.XXXXXX")"
+TMP_STATUS="$(mktemp "${TMPDIR:-/tmp}/wt-gc-status.XXXXXX")"
+trap 'rm -f "$LOCK_FILE" "$TMP_OUT" "$TMP_STATUS"' EXIT
+
+EXIT_CODE=0
+
+# ── Sweep ─────────────────────────────────────────────────────────────────────
+# The argv is a literal, never built from caller input.
+if [ "$DRY_RUN" = 1 ]; then set -- --all --dry-run; else set -- --all; fi
+cleanup_rc=0
+(cd "$WT_GC_REPO_ROOT" && "$WT_GC_CLEANUP" "$@") > "$TMP_OUT" 2>&1 || cleanup_rc=$?
+{ cat "$TMP_OUT" >> "$WT_GC_LOG"; } 2>/dev/null || true
+
+summary="$(sed -nE 's/^Summary: ([0-9]+) cleaned, ([0-9]+) skipped$/\1 \2/p' "$TMP_OUT" | tail -1)"
+cleaned="?"
+skipped="?"
+summary_state=missing
+if [ -n "$summary" ]; then
+    cleaned="${summary% *}"
+    skipped="${summary#* }"
+    summary_state=present
+fi
+if [ "$cleanup_rc" -ne 0 ] || [ "$summary_state" = missing ]; then
+    log "cleanup failed (rc=$cleanup_rc, summary=$summary_state)"
+    EXIT_CODE=1
+fi
+
+# ── Surface (read-only classifier; never fetches) ─────────────────────────────
+status_rc=0
+(cd "$WT_GC_REPO_ROOT" && "$WT_GC_WT_STATUS") > "$TMP_STATUS" 2>/dev/null || status_rc=$?
+if [ "$status_rc" -ne 0 ]; then
+    log "wt-status failed (rc=$status_rc)"
+    EXIT_CODE=1
+fi
+
+counts="$(awk '
+    $1=="STALLED"  {s++}
+    $1=="UNPUSHED" {u++}
+    $1=="EMPTY"    {e++}
+    $1=="OPEN-PR"  {o++}
+    $1=="MERGED"   {m++}
+    END {printf "%d %d %d %d %d", s, u, e, o, m}' "$TMP_STATUS")"
+read -r n_stalled n_unpushed n_empty n_open_pr n_merged <<EOF
+$counts
+EOF
+
+awk '$1=="STALLED" || $1=="UNPUSHED" {print $1, $2}' "$TMP_STATUS" | while read -r cls wt; do
+    log "SURFACE $cls $wt"
+done
+
+log "done dry_run=$DRY_RUN cleaned=$cleaned skipped=$skipped stalled=$n_stalled unpushed=$n_unpushed empty=$n_empty open_pr=$n_open_pr merged=$n_merged rc=$EXIT_CODE"
+
+if [ "$EXIT_CODE" -eq 0 ] && [ "$DRY_RUN" = 0 ]; then
+    date +%s > "$STAMP_FILE" 2>/dev/null || true
+fi
+exit "$EXIT_CODE"

@@ -119,11 +119,13 @@ final class RenamedModuleApiSurfaceTest extends TestCase
         $classesDir = realpath(__DIR__ . '/../../classes');
         self::assertNotFalse($classesDir);
 
+        $database = 'Player' . 'Database';
+        $movement = 'Player' . 'Movement';
         $retired = [
-            'Player' . 'Database\\PlayerDatabaseRepository',
-            'Player' . 'Database\\PlayerDatabaseService',
-            'Player' . 'Movement\\PlayerMovementRepository',
-            'Player' . 'Movement\\Contracts\\PlayerMovementRepositoryInterface',
+            $database . '\\' . $database . 'Repository',
+            $database . '\\' . $database . 'Service',
+            $movement . '\\' . $movement . 'Repository',
+            $movement . '\\Contracts\\' . $movement . 'RepositoryInterface',
         ];
 
         foreach ($retired as $name) {

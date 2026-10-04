@@ -1,0 +1,502 @@
+#!/usr/bin/env bash
+# test-pr-cycle-tick — behaviour tests for bin/pr-cycle-tick.
+#
+# Builds a sealed fixture: a scratch git repo that holds a copy of bin/pr-cycle-tick and
+# bin/lib/, so the tick derives ROOT from its own location and `git worktree list` plus
+# both harness out dirs are fixture-controlled. gh, launchctl, security and claude are
+# shims on a scratch PATH dir; bin/pr-cycle and bin/discord-dm are replaced through the
+# tick's PR_CYCLE_TICK_*_CMD seams. Nothing here touches a real PR, a real launchd job,
+# the keychain, or any path outside the scratch dir, so it runs identically on macOS and
+# Linux CI. There is deliberately no platform skip.
+#
+# Usage: bin/test-pr-cycle-tick
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SRC_TICK="$SCRIPT_DIR/pr-cycle-tick"
+[[ -x "$SRC_TICK" ]] || { echo "FAIL: $SRC_TICK missing or not executable" >&2; exit 1; }
+REAL_TOP="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
+
+SCRATCH="$(mktemp -d)"
+trap 'rm -rf "$SCRATCH"' EXIT
+
+FAILED=0
+CASE_BASE=0
+fail() { echo "FAIL: $*" >&2; FAILED=$((FAILED + 1)); }
+begin_case() { CASE_BASE=$FAILED; }
+end_case() {  # $1 = case name; prints "<name> OK" only if the case added no failures
+    # The tick must never spend: every case, pass or fail, proves the claude shim stayed cold.
+    [[ ! -e "$SCRATCH/claude.log" ]] || fail "$1: claude was invoked"
+    if [[ $FAILED -eq $CASE_BASE ]]; then echo "$1 OK"; else echo "$1 FAILED" >&2; fi
+}
+
+# --- fixture repo --------------------------------------------------------------------------
+REPO="$SCRATCH/repo"
+WT="$SCRATCH/wt-one"
+HOME_DIR="$SCRATCH/home"
+STATE_DIR="$HOME_DIR/.ibl5-pr-cycle-watch"
+SHIMS="$SCRATCH/shims"
+TICK="$REPO/bin/pr-cycle-tick"
+mkdir -p "$REPO/bin" "$HOME_DIR" "$SHIMS"
+cp "$SRC_TICK" "$TICK"
+cp "$SCRIPT_DIR/pr-cycle-tick-cron-setup" "$REPO/bin/pr-cycle-tick-cron-setup"
+cp -R "$SCRIPT_DIR/lib" "$REPO/bin/lib"
+git -C "$REPO" init -q 2>/dev/null
+git -C "$REPO" config user.email t@t.invalid
+git -C "$REPO" config user.name t
+git -C "$REPO" add -A >/dev/null 2>&1
+git -C "$REPO" commit -qm seed >/dev/null 2>&1
+git -C "$REPO" worktree add -q -b branch-one "$WT" >/dev/null 2>&1
+
+# --- shims ---------------------------------------------------------------------------------
+cat > "$SHIMS/gh" <<GH_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/gh.log"
+if [[ "\${1:-}" == "pr" && "\${2:-}" == "list" ]]; then
+    cat "$SCRATCH/prs.json"
+    exit 0
+fi
+if [[ "\${1:-}" == "api" ]]; then
+    case "\${2:-}" in
+        repos/*/commits/*/check-runs*)
+            sha="\${2#*/commits/}"; sha="\${sha%%/*}"
+            [[ -f "$SCRATCH/checks-\$sha.json" ]] || exit 1
+            cat "$SCRATCH/checks-\$sha.json"
+            exit 0 ;;
+    esac
+fi
+echo "gh shim: unexpected args: \$*" >&2
+exit 1
+GH_EOF
+
+# The 6000-line filler is load-bearing: a SIGPIPE regression (`launchctl list | grep -q`
+# under pipefail) only reproduces when the writer still has queued output after the reader
+# exits, and the filler exceeds the 64KB pipe buffer.
+cat > "$SHIMS/launchctl" <<LC_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/launchctl.log"
+if [[ "\${1:-}" == "list" && \$# -eq 1 ]]; then
+    cat "$SCRATCH/launchctl-list.txt"
+    i=0
+    while [[ \$i -lt 6000 ]]; do
+        printf -- '-\t0\tcom.apple.filler.service.number.%s\n' "\$i"
+        i=\$((i + 1))
+    done
+fi
+exit 0
+LC_EOF
+
+# security: the live usage read asks the keychain for an OAuth token. No token means
+# "no-token" and a fail-open zone, with no network and no real keychain access.
+cat > "$SHIMS/security" <<SEC_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/security.log"
+exit 44
+SEC_EOF
+
+cat > "$SHIMS/claude" <<CL_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/claude.log"
+exit 0
+CL_EOF
+
+cat > "$SCRATCH/pr-cycle-stub" <<PC_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/pr-cycle.log"
+exit "\${STUB_RC:-0}"
+PC_EOF
+
+cat > "$SCRATCH/dm-stub" <<DM_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/dm.log"
+exit 0
+DM_EOF
+chmod +x "$SHIMS"/* "$SCRATCH/pr-cycle-stub" "$SCRATCH/dm-stub"
+
+# --- per-case state ------------------------------------------------------------------------
+UNSET="__UNSET__"
+E_ZONE=normal; E_STOP="$UNSET"; E_STATE="$UNSET"
+E_PRCMD="$SCRATCH/pr-cycle-stub"; E_DMCMD="$SCRATCH/dm-stub"
+E_HOME="set"; E_STUB_RC=0
+
+reset() {
+    rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json
+    rm -rf "$HOME_DIR" "$REPO/tools" "$WT/tools" "$SCRATCH/usage-gate"
+    mkdir -p "$HOME_DIR"
+    : > "$SCRATCH/launchctl-list.txt"
+    echo '[]' > "$SCRATCH/prs.json"
+    E_ZONE=normal; E_STOP="$UNSET"; E_STATE="$UNSET"
+    E_PRCMD="$SCRATCH/pr-cycle-stub"; E_DMCMD="$SCRATCH/dm-stub"
+    E_HOME="set"; E_STUB_RC=0
+}
+
+# set_prs "<num>|<branch>|<sha>|<mergeStateStatus>|<isDraft>" ...
+set_prs() {
+    local e out="[]" n b s m d
+    for e in "$@"; do
+        IFS='|' read -r n b s m d <<< "$e"
+        out="$(jq -c --argjson n "$n" --arg b "$b" --arg s "$s" --arg m "$m" --argjson d "$d" \
+            '. + [{number:$n, headRefName:$b, headRefOid:$s, mergeStateStatus:$m, isDraft:$d}]' <<< "$out")"
+    done
+    printf '%s\n' "$out" > "$SCRATCH/prs.json"
+}
+
+# set_checks <sha> green|pending|red|none
+set_checks() {
+    local f="$SCRATCH/checks-$1.json"
+    case "$2" in
+        green)   echo '{"total_count":1,"check_runs":[{"name":"ci","status":"completed","conclusion":"success","completed_at":"2026-10-03T00:00:00Z"}]}' > "$f" ;;
+        pending) echo '{"total_count":1,"check_runs":[{"name":"ci","status":"in_progress","conclusion":null,"started_at":"2026-10-03T00:00:00Z"}]}' > "$f" ;;
+        red)     echo '{"total_count":1,"check_runs":[{"name":"ci","status":"completed","conclusion":"failure","completed_at":"2026-10-03T00:00:00Z"}]}' > "$f" ;;
+        none)    echo '{"total_count":0,"check_runs":[]}' > "$f" ;;
+    esac
+}
+
+# set_jobs <pid> <label> ...: launchctl-list rows (tab separated: PID, status, label)
+set_jobs() {
+    : > "$SCRATCH/launchctl-list.txt"
+    while [[ $# -ge 2 ]]; do
+        printf '%s\t0\t%s\n' "$1" "$2" >> "$SCRATCH/launchctl-list.txt"
+        shift 2
+    done
+}
+
+_DROP=(); _SET=()
+_envv() { if [[ "$2" == "$UNSET" ]]; then _DROP+=(-u "$1"); else _SET+=("$1=$2"); fi; }
+
+# Run the tick in a sealed environment. Seam variables default per reset(); a value of
+# $UNSET drops the variable entirely, so unset and empty are separately testable.
+OUT=""; ERR=""; RC=0
+run_tick() {
+    _DROP=(); _SET=()
+    _envv PR_CYCLE_TICK_USAGE_ZONE "$E_ZONE"
+    _envv PR_CYCLE_STOP_FILE "$E_STOP"
+    _envv PR_CYCLE_WATCH_STATE_DIR "$E_STATE"
+    _envv PR_CYCLE_TICK_PR_CYCLE_CMD "$E_PRCMD"
+    _envv PR_CYCLE_TICK_DM_CMD "$E_DMCMD"
+    if [[ "$E_HOME" == "set" ]]; then _SET+=("HOME=$HOME_DIR"); else _DROP+=(-u HOME); fi
+    ERR="$SCRATCH/last.err"
+    OUT="$(cd "$SCRATCH" && env ${_DROP[@]+"${_DROP[@]}"} ${_SET[@]+"${_SET[@]}"} \
+        PATH="$SHIMS:$PATH" \
+        IBL5_USAGE_GATE_STATE_DIR="$SCRATCH/usage-gate" \
+        STUB_RC="$E_STUB_RC" \
+        "$TICK" "$@" 2>"$ERR")"
+    RC=$?
+    return 0
+}
+
+out_has() { grep -qF -- "$1" <<< "$OUT"; }
+err_has() { grep -qF -- "$1" "$ERR"; }
+no_file() { [[ ! -e "$1" ]]; }
+attempt() { cat "$STATE_DIR/attempts/$1" 2>/dev/null; }
+RED101='101|branch-one|aaa1111|BLOCKED|false'
+
+# ===========================================================================================
+reset; begin_case
+run_tick --help
+[[ $RC -eq 0 ]] || fail "help: rc $RC, want 0"
+out_has '1800' || fail "help: output omits 1800"
+end_case help
+
+reset; begin_case
+run_tick --bogus
+[[ $RC -eq 2 ]] || fail "unknown-flag: rc $RC, want 2"
+err_has 'unknown option' || fail "unknown-flag: no usage message on stderr"
+no_file "$SCRATCH/gh.log" || fail "unknown-flag: gh was called"
+end_case unknown-flag
+
+reset; begin_case
+touch "$HOME_DIR/.ibl5-pr-cycle.stop"
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick
+[[ $RC -eq 0 ]] || fail "stop-file: rc $RC, want 0"
+out_has 'stop file present' || fail "stop-file: no 'stop file present' line: $OUT"
+no_file "$SCRATCH/gh.log" || fail "stop-file: gh was called"
+no_file "$SCRATCH/pr-cycle.log" || fail "stop-file: pr-cycle was launched"
+end_case stop-file
+
+reset; begin_case
+touch "$HOME_DIR/.ibl5-pr-cycle.stop"
+E_STOP=""
+run_tick
+[[ $RC -eq 0 ]] || fail "stop-file-env-empty: rc $RC, want 0"
+out_has 'stop file present' || fail "stop-file-env-empty: empty PR_CYCLE_STOP_FILE ignored the default file: $OUT"
+no_file "$SCRATCH/gh.log" || fail "stop-file-env-empty: gh was called"
+end_case stop-file-env-empty
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+for z in drain stop; do
+    rm -f "$SCRATCH/gh.log"
+    E_ZONE="$z"
+    run_tick
+    [[ $RC -eq 0 ]] || fail "usage-pause($z): rc $RC, want 0"
+    out_has 'usage zone' || fail "usage-pause($z): no 'usage zone' line: $OUT"
+    no_file "$SCRATCH/gh.log" || fail "usage-pause($z): gh was called"
+    no_file "$SCRATCH/pr-cycle.log" || fail "usage-pause($z): pr-cycle was launched"
+done
+end_case usage-pause
+
+reset; begin_case
+set_prs '101|branch-one|aaa1111|CLEAN|false'; set_checks aaa1111 green
+for z in "$UNSET" ""; do
+    E_ZONE="$z"
+    run_tick
+    [[ $RC -eq 0 ]] || fail "usage-zone-unset-empty('$z'): rc $RC, want 0"
+    out_has 'idle' || fail "usage-zone-unset-empty('$z'): live read did not fail open to idle: $OUT"
+    out_has 'usage zone' && fail "usage-zone-unset-empty('$z'): treated as a pause"
+done
+end_case usage-zone-unset-empty
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+set_jobs 123 com.ibl5.pr-cycle-20261003-120000
+run_tick
+[[ $RC -eq 0 ]] || fail "live-worker: rc $RC, want 0"
+out_has 'worker running' || fail "live-worker: no 'worker running' line: $OUT"
+no_file "$SCRATCH/gh.log" || fail "live-worker: gh was called"
+no_file "$SCRATCH/pr-cycle.log" || fail "live-worker: pr-cycle was launched"
+end_case live-worker
+
+reset; begin_case
+set_prs '101|branch-one|aaa1111|CLEAN|false'; set_checks aaa1111 green
+: > "$SCRATCH/launchctl-list.txt"
+for variant in empty dash-pid watch-label; do
+    rm -f "$SCRATCH/gh.log"
+    case "$variant" in
+        empty)       set_jobs ;;
+        dash-pid)    set_jobs - com.ibl5.pr-cycle-20261003-120000 ;;
+        watch-label) set_jobs 555 com.ibl5.watch-pr-cycle ;;
+    esac
+    run_tick
+    out_has 'worker running' && fail "worker-none-found($variant): matched a non-worker"
+    [[ -e "$SCRATCH/gh.log" ]] || fail "worker-none-found($variant): did not reach guard (d)"
+    out_has 'idle' || fail "worker-none-found($variant): did not reach idle: $OUT"
+done
+end_case worker-none-found
+
+reset; begin_case
+set_prs '101|branch-one|aaa1111|CLEAN|false' '102|branch-two|bbb2222|DIRTY|true'
+set_checks aaa1111 green
+run_tick
+[[ $RC -eq 0 ]] || fail "idle-no-spend: rc $RC, want 0"
+out_has 'idle' || fail "idle-no-spend: no 'idle' line: $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "idle-no-spend: pr-cycle was launched"
+end_case idle-no-spend
+
+reset; begin_case
+set_prs '101|branch-one|aaa1111|BLOCKED|false'
+set_checks aaa1111 pending
+run_tick
+out_has 'checks pending' || fail "pending-skip(in_progress): no 'checks pending': $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "pending-skip(in_progress): launched"
+set_checks aaa1111 none
+run_tick
+out_has 'checks none' || fail "pending-skip(total 0): no 'checks none': $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "pending-skip(total 0): launched"
+rm -f "$SCRATCH/checks-aaa1111.json"
+run_tick
+out_has 'checks pending' || fail "pending-skip(fetch fails): no 'checks pending': $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "pending-skip(fetch fails): launched"
+end_case pending-skip
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick
+[[ $RC -eq 0 ]] || fail "red-qualifies: rc $RC, want 0"
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
+    || fail "red-qualifies: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+[[ "$(attempt 101)" == "aaa1111" ]] || fail "red-qualifies: attempts/101 is '$(attempt 101)', want aaa1111"
+end_case red-qualifies
+
+reset; begin_case
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+run_tick
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
+    || fail "dirty-qualifies: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+grep -qF 'aaa1111' "$SCRATCH/gh.log" 2>/dev/null && fail "dirty-qualifies: fetched checks for a DIRTY PR"
+end_case dirty-qualifies
+
+reset; begin_case
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+mkdir -p "$REPO/tools/postplan-harness/out/live-branch-one-20261003-120000"
+touch "$REPO/tools/postplan-harness/out/live-branch-one-20261003-120000/result.json"
+run_tick
+out_has 'finished <30 min' || fail "grace-main-out: fresh result not skipped: $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "grace-main-out: launched inside the grace window"
+touch -t 202601010000 "$REPO/tools/postplan-harness/out/live-branch-one-20261003-120000/result.json"
+run_tick
+[[ -e "$SCRATCH/pr-cycle.log" ]] || fail "grace-main-out: stale result still skipped: $OUT"
+end_case grace-main-out
+
+reset; begin_case
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+mkdir -p "$WT/tools/postplan-harness/out/live-branch-one-20261003-120000"
+touch "$WT/tools/postplan-harness/out/live-branch-one-20261003-120000/result.json"
+run_tick
+out_has 'finished <30 min' || fail "grace-worktree-out: fresh worktree result not skipped: $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "grace-worktree-out: launched inside the grace window"
+rm -rf "$WT/tools"
+mkdir -p "$WT/tools/postplan-harness/out/live-branch-one-extra-20261003-120000"
+touch "$WT/tools/postplan-harness/out/live-branch-one-extra-20261003-120000/result.json"
+run_tick
+[[ -e "$SCRATCH/pr-cycle.log" ]] || fail "grace-worktree-out: sibling-slug dir matched the anchor: $OUT"
+end_case grace-worktree-out
+
+reset; begin_case
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_jobs 4242 com.ibl5.post-plan-fleet-101
+run_tick
+out_has 'in flight' || fail "inflight-fleet: no 'in flight' skip: $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "inflight-fleet: launched with a fleet rescue loaded"
+set_jobs 4242 com.ibl5.post-plan-fleet-1010
+run_tick
+[[ -e "$SCRATCH/pr-cycle.log" ]] || fail "inflight-fleet: fleet-1010 wrongly blocked PR 101: $OUT"
+end_case inflight-fleet
+
+reset; begin_case
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_jobs 4242 com.ibl5.postplan-now-branch-one-20261003-120000-4242
+run_tick
+out_has 'in flight' || fail "inflight-postplan-now: no 'in flight' skip: $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "inflight-postplan-now: launched with post-plan-now loaded"
+end_case inflight-postplan-now
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+mkdir -p "$STATE_DIR/attempts"; echo aaa1111 > "$STATE_DIR/attempts/101"
+run_tick
+run_tick
+[[ "$(grep -c 'retry cap' <<< "$OUT")" -ge 1 ]] || fail "retry-cap-dm-once: no 'retry cap' on run 2: $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "retry-cap-dm-once: launched past the cap"
+[[ "$(wc -l < "$SCRATCH/dm.log" 2>/dev/null | tr -d ' ')" == "1" ]] \
+    || fail "retry-cap-dm-once: dm.log has $(wc -l < "$SCRATCH/dm.log" 2>/dev/null | tr -d ' ') lines, want 1"
+grep -qF '#101' "$SCRATCH/dm.log" 2>/dev/null || fail "retry-cap-dm-once: DM does not name #101"
+end_case retry-cap-dm-once
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+mkdir -p "$STATE_DIR/attempts"; echo old0000 > "$STATE_DIR/attempts/101"
+run_tick
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
+    || fail "new-head-eligible: did not launch on a new head: $OUT"
+[[ "$(attempt 101)" == "aaa1111" ]] || fail "new-head-eligible: attempts/101 is '$(attempt 101)', want aaa1111"
+end_case new-head-eligible
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+E_STUB_RC=1
+run_tick
+[[ -e "$SCRATCH/pr-cycle.log" ]] || fail "launch-failure-no-record: stub was not launched"
+no_file "$STATE_DIR/attempts/101" || fail "launch-failure-no-record: recorded an attempt after a failed launch"
+end_case launch-failure-no-record
+
+reset; begin_case
+set_prs '105|b5|eee5555|BLOCKED|false' '103|b3|ccc3333|BLOCKED|false' '101|branch-one|aaa1111|BLOCKED|false' \
+    '104|b4|ddd4444|BLOCKED|false' '102|b2|bbb2222|BLOCKED|false'
+for s in aaa1111 bbb2222 ccc3333 ddd4444 eee5555; do set_checks "$s" red; done
+run_tick
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101,102,103 --max-ready 3" ]] \
+    || fail "max-per-tick: argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+[[ "$(attempt 104)" == "" && "$(attempt 105)" == "" ]] || fail "max-per-tick: recorded attempts for PRs cut by the cap"
+end_case max-per-tick
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick --dry-run
+[[ $RC -eq 0 ]] || fail "dry-run-inert: rc $RC, want 0"
+out_has 'would run:' || fail "dry-run-inert: no 'would run:' line: $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "dry-run-inert: launched"
+no_file "$STATE_DIR/attempts" || fail "dry-run-inert: wrote attempts/"
+no_file "$SCRATCH/dm.log" || fail "dry-run-inert: sent a DM"
+end_case dry-run-inert
+
+reset; begin_case
+set_prs "$RED101" '102|branch-two|bbb2222|BLOCKED|false'
+set_checks aaa1111 red; set_checks bbb2222 red
+mkdir -p "$STATE_DIR/attempts"; echo bbb2222 > "$STATE_DIR/attempts/102"
+E_PRCMD=""; E_DMCMD=""
+run_tick --dry-run
+[[ $RC -eq 0 ]] || fail "cmd-seams-empty: rc $RC, want 0"
+out_has "would run: $REPO/bin/pr-cycle" || fail "cmd-seams-empty: empty PR_CYCLE_TICK_PR_CYCLE_CMD did not default to \$ROOT/bin/pr-cycle: $OUT"
+out_has "would DM: $REPO/bin/discord-dm" || fail "cmd-seams-empty: empty PR_CYCLE_TICK_DM_CMD did not default to \$ROOT/bin/discord-dm: $OUT"
+end_case cmd-seams-empty
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+for sd in "$UNSET" ""; do
+    rm -rf "$STATE_DIR" "$SCRATCH/pr-cycle.log"
+    E_STATE="$sd"
+    run_tick
+    [[ "$(attempt 101)" == "aaa1111" ]] || fail "state-dir-outside-repo('$sd'): attempts/101 not under \$HOME/.ibl5-pr-cycle-watch"
+    [[ -z "$REAL_TOP" || "$STATE_DIR" != "$REAL_TOP"* ]] || fail "state-dir-outside-repo('$sd'): state dir is inside the real repo"
+    [[ ! -e "$REPO/.ibl5-pr-cycle-watch" ]] || fail "state-dir-outside-repo('$sd'): state landed under ROOT"
+done
+end_case state-dir-outside-repo
+
+reset; begin_case
+E_HOME="unset"
+run_tick
+[[ $RC -eq 2 ]] || fail "home-unset: rc $RC, want 2"
+err_has 'HOME is unset' || fail "home-unset: no 'HOME is unset' on stderr"
+run_tick --help
+[[ $RC -eq 0 ]] || fail "home-unset: --help rc $RC, want 0"
+end_case home-unset
+
+reset; begin_case
+stripped="$(sed 's/^[[:space:]]*#.*$//' "$SRC_TICK")"
+for bad in 'sleep' 'pr merge' '--arm' 'merge_group'; do
+    grep -qF -- "$bad" <<< "$stripped" && fail "invariants: tick source contains '$bad'"
+done
+end_case invariants
+
+reset; begin_case
+# Run from the linked worktree: Program must still name the MAIN checkout.
+MAIN_REAL="$(cd "$REPO" && pwd -P)"
+PLIST="$(env HOME="$HOME_DIR" PATH="$SHIMS:$PATH" "$WT/bin/pr-cycle-tick-cron-setup" --print-schedule 2>/dev/null)"
+grep -qF '<integer>1800</integer>' <<< "$PLIST" || fail "print-schedule-shape: no 1800 interval"
+grep -qF "<string>$MAIN_REAL/bin/pr-cycle-tick</string>" <<< "$PLIST" \
+    || fail "print-schedule-shape: Program is not the main checkout's tick: $PLIST"
+for want in /opt/homebrew/bin /usr/bin /bin "$HOME_DIR/.local/bin"; do
+    grep -qF -- "$want" <<< "$PLIST" || fail "print-schedule-shape: PATH lacks $want"
+done
+grep -qF '$' <<< "$PLIST" && fail "print-schedule-shape: a literal \$ leaked into the plist"
+grep -qF '<string></string>' <<< "$PLIST" && fail "print-schedule-shape: empty <string>"
+if command -v plutil >/dev/null 2>&1; then
+    plutil -lint - <<< "$PLIST" >/dev/null 2>&1 || fail "print-schedule-shape: plutil -lint failed"
+else
+    echo "SKIP: print-schedule-shape plutil sub-check (no plutil on this platform)"
+fi
+end_case print-schedule-shape
+
+reset; begin_case
+CRON="$WT/bin/pr-cycle-tick-cron-setup"
+LABEL_PLIST="$HOME_DIR/Library/LaunchAgents/com.ibl5.watch-pr-cycle.plist"
+CERR="$SCRATCH/cron.err"
+env HOME="$HOME_DIR" PATH="$SHIMS:$PATH" "$CRON" --bogus >/dev/null 2>"$CERR"; crc=$?
+[[ $crc -eq 1 ]] || fail "cron-setup-cli: --bogus rc $crc, want 1"
+grep -qF 'Unknown option' "$CERR" || fail "cron-setup-cli: --bogus lacks 'Unknown option'"
+env HOME="$HOME_DIR" PATH="$SHIMS:$PATH" "$CRON" >/dev/null 2>"$CERR"; crc=$?
+[[ $crc -eq 1 ]] || fail "cron-setup-cli: no args rc $crc, want 1"
+env -u HOME PATH="$SHIMS:$PATH" "$CRON" --print-schedule >/dev/null 2>"$CERR"; crc=$?
+[[ $crc -ne 0 ]] || fail "cron-setup-cli: HOME unset rc 0"
+grep -qF 'HOME is unset' "$CERR" || fail "cron-setup-cli: no 'HOME is unset': $(cat "$CERR")"
+env HOME="$HOME_DIR" PATH="$SHIMS:$PATH" "$CRON" --install-schedule >/dev/null 2>"$CERR"; crc=$?
+[[ $crc -eq 0 ]] || fail "cron-setup-cli: install rc $crc: $(cat "$CERR")"
+[[ -f "$LABEL_PLIST" ]] || fail "cron-setup-cli: install wrote no plist"
+[[ -d "$HOME_DIR/.ibl5-pr-cycle-watch" ]] || fail "cron-setup-cli: install did not mkdir the log dir"
+grep -qF 'bootstrap gui/' "$SCRATCH/launchctl.log" 2>/dev/null || fail "cron-setup-cli: no bootstrap in launchctl.log"
+env HOME="$HOME_DIR" PATH="$SHIMS:$PATH" "$CRON" --uninstall-schedule >/dev/null 2>"$CERR"; crc=$?
+[[ $crc -eq 0 ]] || fail "cron-setup-cli: uninstall rc $crc"
+no_file "$LABEL_PLIST" || fail "cron-setup-cli: uninstall left the plist"
+grep -qF 'bootout' "$SCRATCH/launchctl.log" 2>/dev/null || fail "cron-setup-cli: no bootout in launchctl.log"
+end_case cron-setup-cli
+
+# --- summary -------------------------------------------------------------------------------
+if [[ $FAILED -eq 0 ]]; then
+    echo "test-pr-cycle-tick: ALL PASS"
+    exit 0
+fi
+echo "test-pr-cycle-tick: $FAILED failure(s)" >&2
+exit 1

@@ -97,13 +97,17 @@ if [ "$FORCE" = 0 ]; then
         log "idle reader missing or not executable ('$WT_GC_IOREG') — treating as operator present (fail-closed)"
         exit 0
     fi
-    idle="$("$WT_GC_IOREG" -c IOHIDSystem 2>/dev/null | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}' 2>/dev/null)" || idle=""
-    case "$idle" in
+    # Validate the raw ns field before any arithmetic. awk's coercion of a
+    # non-numeric field varies by implementation. On Linux CI it came out as 0,
+    # which read as "operator present" instead of fail-closed.
+    idle_ns="$("$WT_GC_IOREG" -c IOHIDSystem 2>/dev/null | awk '/HIDIdleTime/ {print $NF; exit}' 2>/dev/null)" || idle_ns=""
+    case "$idle_ns" in
         ''|*[!0-9]*)
-            log "idle value unreadable ('${idle:-<empty>}') — treating as operator present (fail-closed)"
+            log "idle value unreadable ('${idle_ns:-<empty>}') — treating as operator present (fail-closed)"
             exit 0
             ;;
     esac
+    idle=$(( idle_ns / 1000000000 ))
     if [ "$idle" -lt "$WT_GC_IDLE_SECS" ]; then
         log "operator present (idle ${idle}s < threshold ${WT_GC_IDLE_SECS}s) — exiting"
         exit 0

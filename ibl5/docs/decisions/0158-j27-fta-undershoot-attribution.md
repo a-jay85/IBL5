@@ -1,6 +1,6 @@
 ---
 description: The J27 FTA undershoot decomposes to foul volume; JSB 5.60's non-shooting fouls, team-foul bonus, and 3-shot trips need new engine state, so no lever ships and the levers are recorded with their measured FTA effects.
-last_verified: 2026-10-01
+last_verified: 2026-10-04
 ---
 
 # ADR-0158: Record the J27 FTA undershoot decomposition and its ruled-out levers
@@ -58,5 +58,20 @@ Measured and ruled-out levers. Each FTA per game figure is the instrument's engi
 - `engine/internal/validate/testdata/calibration-5.60-20261001-fta-decomp-before.json`
 - `engine/internal/validate/testdata/calibration-5.60-20261001-fta-measure-before.txt`
 - `jsb-native/re-artifacts/jsb-J27-fta-RE-20261001.md` (private repo)
-- ADR-0084, ADR-0090
+- ADR-0055, ADR-0084, ADR-0090
 - [backlog#1282](https://github.com/a-jay85/IBL5-backlog/issues/1282): the follow-up for the NEEDS-STATE levers
+
+## Addendum: ADR attribution and tied-game exclusion (2026-10-04)
+
+**ADR attribution.** Context reads "Two later faithful ports from ADR-0090 (the OReb putback 3pt restore and the transition 3pt port) widened the gap." The Decision list repeats that attribution in its `suppress_transition` bullet. Both cite the wrong ADR. ADR-0055 defines the putback arms (`UnfaithfulPutback` and `UnfaithfulPutback3pt`). ADR-0055 Correction 2 adjudicates the transition 3pt gate as the carrier of J24 residual 7, and [PR #1595](https://github.com/a-jay85/IBL5/pull/1595) removed that gate. The `SuppressTransition3pt` arm that restores the gate for the A/B is defined in `engine/internal/sim/freeze.go`. ADR-0090 mentions neither port. It supplies only the policy of toggling a mechanism and leaving the constants alone, so the `foulBucketScale` citation in the Decision list stands. The original sentences above are unchanged.
+
+**Tied engine games.** The default before run counted 78 tied engine games: `engine_side.team_games` was 13440 against 6642 `decided_games`. All 78 were 0-0 games with zero FTA, PF, FGA, TOV, and ORB on both teams, drawn from preseason snapshots. The `.sco` side had no ties. Those games counted as team-games and diluted every engine per-game rate. `TestRealArchive_FTADecomp` now drops a game when both teams scored 0 points and both attempted 0 free throws (`isDegenerateFTAGame` in `engine/internal/calibrate/ftadecomp.go`) and records the count as `excluded_degenerate_games`. A tie with points still counts. Re-measured on the default arm with the same snapshots, games cap, and seed:
+
+| Engine metric | 78 games included | 78 games excluded |
+|---|---|---|
+| `team_games` | 13440 | 13284 |
+| `fta_per_g` | 14.0861 | 14.2515 |
+| `pf_per_g` | 8.0177 | 8.1119 |
+| `pace_per_g` | 101.231 | 102.420 |
+
+`decided_games` stays 6642. `fta_per_pf`, `pps`, and `home_away_ratio` are unchanged, and the branch stays `VOLUME`. The engine FTA rate rises about 1.2 percent and the attribution to foul volume holds. The A/B arm figures in the Decision list and their 14.09 default-arm baseline were measured with the 78 games included and were not recomputed. The committed `calibration-5.60-20261001-fta-decomp-*.json` artifacts were not regenerated. `TestMeasureBaseline_Archive`, the source of the 15.81 and 21.32 headline figures, was not checked for the same dilution.

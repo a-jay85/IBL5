@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-01
+last_verified: 2026-10-03
 ---
 
 # Post-Plan Orchestrator
@@ -718,6 +718,8 @@ Then append one line to the `## Class registry` table in
 ```
 | <YYYY-MM-DD> | #<this PR> | class: <one-sentence class> | routed to: Rung <n> - <destination> | prior: <#PR, #PR or --> |
 ```
+
+A weekly job, `bin/retro-mine`, reads these rows. It opens a draft PR when a keyword family spans two or more rungs or destinations, or when a recurrence did not escalate. Write the `class:` text in plain words so its keywords tag the right family.
 
 Before writing it, scan the existing rows for the same class. If one matches, put its PR numbers in
 `prior:` and route **one rung more mechanical** than that earlier line did — a recurrence means the

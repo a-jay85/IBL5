@@ -35,10 +35,6 @@ export function clampDigest(digest: string, slug: string): string {
 }
 
 /**
- * The Queue/Discard action row. Built here and rebuilt disabled by the button
- * handler, so the emitted `custom_id` has exactly one definition.
- */
-/**
  * The only verbs a plan-review row can carry, in render order. Every rendered
  * custom_id is `plan_<verb>_<slug>`: <verb> comes from this tuple and <slug> has
  * already matched PLAN_SLUG_RE. No caller-supplied string reaches Discord.
@@ -51,6 +47,11 @@ const BUTTON_SPEC: Record<PlanButtonVerb, { label: string; style: ButtonStyle }>
     discard: { label: 'Discard', style: ButtonStyle.Danger },
 };
 
+/**
+ * The plan-review action row: Queue and Discard, or just the verbs in `verbs`.
+ * The sender, the button handler, the edit path, and the stale sweeper all build
+ * it here, so the emitted `custom_id` has exactly one definition.
+ */
 export function buildPlanReviewRow(
     slug: string,
     disabled = false,

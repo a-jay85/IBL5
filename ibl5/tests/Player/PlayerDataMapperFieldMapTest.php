@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Player;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Player\PlayerData;
 use Player\PlayerDataMapper;
@@ -193,14 +194,27 @@ class PlayerDataMapperFieldMapTest extends TestCase
         self::assertNull($player->collegeName);
     }
 
-    public function testFillFromCurrentRowMapsNonStringOptionalFieldToNull(): void
+    /**
+     * A non-string value is out of the PlayerRow contract, so it arrives as mixed
+     * and getOptionalStrippedValue returns null (!is_string branch).
+     */
+    #[DataProvider('nonStringOptionalValueProvider')]
+    public function testFillFromCurrentRowMapsNonStringOptionalFieldToNull(mixed $nonString): void
     {
         $row = $this->buildFullCurrentRow();
-        $row['draftedby'] = 12345; // integer → getOptionalStrippedValue returns null (!is_string branch)
+        $row['draftedby'] = $nonString;
 
         $player = $this->mapper->fillFromCurrentRow($row);
 
         self::assertNull($player->draftTeamOriginalName);
+    }
+
+    /**
+     * @return array<string, array{mixed}>
+     */
+    public static function nonStringOptionalValueProvider(): array
+    {
+        return ['integer' => [12345]];
     }
 
     public function testFillFromCurrentRowStripsSlashesFromName(): void

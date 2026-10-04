@@ -104,7 +104,7 @@ final class RcbImporterTest extends TestCase
         (new RcbImporter($this->repositoryCapturing()))->import($data, 2006, 'rcb.rcb');
 
         $this->assertCount(1, $this->alltime);
-        $this->assertSame(count($p['alltime']), count($this->alltime[0]));
+        $this->assertCount(count($p['alltime']), $this->alltime[0]);
         $first = $p['alltime'][0];
         $this->assertSame('Stephen Curry', $first['player_name']);
         $this->assertSame(3851, $first['car_block_id']);
@@ -135,7 +135,7 @@ final class RcbImporterTest extends TestCase
 
         $this->assertCount(1, $this->season);
         $this->assertSame(2006, $this->season[0][0]);
-        $this->assertSame(count($p['currentSeason']), count($this->season[0][1]));
+        $this->assertCount(count($p['currentSeason']), $this->season[0][1]);
         $first = $p['currentSeason'][0];
         $this->assertSame('Stephen Curry', $first['player_name']);
         $this->assertSame(3851, $first['car_block_id']);

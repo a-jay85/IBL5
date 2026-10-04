@@ -13,7 +13,7 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
  * @phpstan-import-type DraftClassPlayerRow from DraftRepositoryInterface
  * @phpstan-import-type DraftPickRow from DraftRepositoryInterface
  */
-class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryInterface
+class DraftRepository extends \Database\BaseMysqliRepository implements DraftRepositoryInterface
 {
     private TeamIdentityRepositoryInterface $commonRepository;
 

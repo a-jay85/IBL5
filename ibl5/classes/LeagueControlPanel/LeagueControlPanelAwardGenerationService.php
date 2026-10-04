@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LeagueControlPanel;
 
 use JsbParser\LeadersHtmParser;
-use LeagueControlPanel\Contracts\AwardGenerationServiceInterface;
+use LeagueControlPanel\Contracts\LeagueControlPanelAwardGenerationServiceInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use Voting\Contracts\VotingResultsServiceInterface;
 use Voting\VotingRepository;
@@ -13,9 +13,9 @@ use Voting\VotingResultsService;
 /**
  * Orchestrates generation of season awards from votes and JSB Leaders.htm data.
  *
- * @see AwardGenerationServiceInterface
+ * @see LeagueControlPanelAwardGenerationServiceInterface
  */
-class AwardGenerationService implements AwardGenerationServiceInterface
+class LeagueControlPanelAwardGenerationService implements LeagueControlPanelAwardGenerationServiceInterface
 {
     /** @var array<string, string> Maps vote category titles to DB award prefixes */
     private const VOTE_AWARD_MAP = [
@@ -53,7 +53,7 @@ class AwardGenerationService implements AwardGenerationServiceInterface
     }
 
     /**
-     * @see AwardGenerationServiceInterface::generateSeasonAwards()
+     * @see LeagueControlPanelAwardGenerationServiceInterface::generateSeasonAwards()
      */
     public function generateSeasonAwards(int $year, string $leadersHtmPath): array
     {

@@ -48,7 +48,7 @@ class TradingRepositoryTest extends TestCase
     public function testTradeOfferRepositoryExtendsBaseMysqliRepository(): void
     {
         self::assertContains(
-            \BaseMysqliRepository::class,
+            \Database\BaseMysqliRepository::class,
             (array) class_parents(TradeOfferRepository::class)
         );
     }
@@ -68,7 +68,7 @@ class TradingRepositoryTest extends TestCase
     public function testTradeAssetRepositoryExtendsBaseMysqliRepository(): void
     {
         self::assertContains(
-            \BaseMysqliRepository::class,
+            \Database\BaseMysqliRepository::class,
             (array) class_parents(TradeAssetRepository::class)
         );
     }
@@ -88,7 +88,7 @@ class TradingRepositoryTest extends TestCase
     public function testTradeFormRepositoryExtendsBaseMysqliRepository(): void
     {
         self::assertContains(
-            \BaseMysqliRepository::class,
+            \Database\BaseMysqliRepository::class,
             (array) class_parents(TradeFormRepository::class)
         );
     }

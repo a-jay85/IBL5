@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
-use LeagueControlPanel\AwardGenerationService;
+use LeagueControlPanel\LeagueControlPanelAwardGenerationService;
 use LeagueControlPanel\LeagueControlPanelRepository;
 use PHPUnit\Framework\Attributes\Group;
 use Voting\Contracts\VotingResultsServiceInterface;
 
 /**
- * Integration tests for AwardGenerationService::generateSeasonAwards() against real MariaDB.
+ * Integration tests for LeagueControlPanelAwardGenerationService::generateSeasonAwards() against real MariaDB.
  *
- * @covers \LeagueControlPanel\AwardGenerationService
+ * @covers \LeagueControlPanel\LeagueControlPanelAwardGenerationService
  */
 #[Group('database')]
-class AwardGenerationServiceIntegrationTest extends DatabaseTestCase
+class LeagueControlPanelAwardGenerationServiceIntegrationTest extends DatabaseTestCase
 {
-    private AwardGenerationService $service;
+    private LeagueControlPanelAwardGenerationService $service;
 
     /** @var VotingResultsServiceInterface&\PHPUnit\Framework\MockObject\Stub */
     private VotingResultsServiceInterface $stubVoting;
@@ -30,7 +30,7 @@ class AwardGenerationServiceIntegrationTest extends DatabaseTestCase
 
         $repository = new LeagueControlPanelRepository($this->db);
         $this->stubVoting = self::createStub(VotingResultsServiceInterface::class);
-        $this->service = new AwardGenerationService($repository, $this->stubVoting);
+        $this->service = new LeagueControlPanelAwardGenerationService($repository, $this->stubVoting);
 
         $this->tempDir = sys_get_temp_dir() . '/award_gen_int_' . uniqid();
         mkdir($this->tempDir);

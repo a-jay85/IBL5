@@ -13,7 +13,7 @@ use TransactionHistory\Contracts\TransactionHistoryRepositoryInterface;
  *
  * @see TransactionHistoryRepositoryInterface
  */
-class TransactionHistoryRepository extends \BaseMysqliRepository implements TransactionHistoryRepositoryInterface
+class TransactionHistoryRepository extends \Database\BaseMysqliRepository implements TransactionHistoryRepositoryInterface
 {
     /** @var string Comma-separated transaction category IDs */
     private const CATEGORY_IDS = '1, 2, 3, 8, 10, 14';

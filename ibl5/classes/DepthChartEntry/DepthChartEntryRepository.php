@@ -12,7 +12,7 @@ use DepthChartEntry\Contracts\DepthChartEntryRepositoryInterface;
  *
  * @see DepthChartEntryRepositoryInterface
  */
-class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthChartEntryRepositoryInterface
+class DepthChartEntryRepository extends \Database\BaseMysqliRepository implements DepthChartEntryRepositoryInterface
 {
     /**
      * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('db').
@@ -36,7 +36,7 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
             "SELECT * FROM `ibl_plr` WHERE teamid = ? AND retired = 0 AND ordinal <= ? ORDER BY ordinal ASC",
             "ii",
             $teamid,
-            \JSB::WAIVERS_ORDINAL
+            \League\JSB::WAIVERS_ORDINAL
         );
     }
     

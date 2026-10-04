@@ -8,7 +8,7 @@
 # repo means the gate is editable from any worktree and travels with a clone,
 # instead of being a machine-local untracked hook one developer happens to have.
 #
-# Five independent blocks, all of which fail the commit. The first four are gated on what is staged; the ADR gate is scoped to this
+# Six independent blocks, all of which fail the commit. The first four are gated on what is staged; the ADR gate is scoped to this
 # branch's commits UNION the index, so it runs whenever origin/master resolves.
 # codebase-map.md is regenerated on master by the regen-codebase-map job in tests.yml, never here.
 
@@ -26,6 +26,7 @@ Checks run on every commit (gated on what is staged):
   - Validate doc frontmatter and references when .md files are staged.
   - Enforce on-touch last_verified bump for changed docs.
   - Enforce rules byte budget.
+  - Scan staged ibl5/migrations/*.sql and *.php for destructive SQL (skips loudly without python3).
   - Check for a required ADR on this branch (scoped to branch commits + index).
 
 Exit codes: 0 all checks passed, 1 a check failed (commit is blocked).
@@ -100,6 +101,24 @@ if command -v shellcheck >/dev/null 2>&1; then
             echo "Fix the shellcheck warning(s) above before committing."
             exit 1
         fi
+    fi
+fi
+
+# Destructive migration scan on staged migration files. Same scan as the
+# destructive-migration-scan job in .github/workflows/migration-safety.yml, which
+# fails closed (exit 2) when python3 is missing. Locally a box without python3
+# must still be able to commit, so this block skips LOUDLY instead.
+if git diff --cached --name-only | grep -qE '^ibl5/migrations/.*\.(sql|php)$'; then
+    if command -v python3 >/dev/null 2>&1; then
+        if ! "$REPO_ROOT/bin/check-destructive-migrations" --staged 2>&1; then
+            echo ""
+            echo "Add a tagged marker (-- destructive-migration[<trigger>]: <reason>) or"
+            echo "remove the destructive statement before committing. CI runs the same scan."
+            exit 1
+        fi
+    else
+        echo "pre-commit: SKIPPED destructive migration scan (python3 not found);" >&2
+        echo "CI will run it and fail closed." >&2
     fi
 fi
 

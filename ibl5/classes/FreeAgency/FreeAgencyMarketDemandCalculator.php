@@ -142,12 +142,12 @@ class FreeAgencyMarketDemandCalculator implements FreeAgencyMarketDemandCalculat
         int $yearsInOffer,
         int $positionSalary
     ): float {
-        $factorPlayForWinner = \ContractRules::calculateWinnerModifier($teamWins, $teamLosses, $playerWinner);
-        $factorTradition = \ContractRules::calculateTraditionModifier($tradWins, $tradLosses, $playerTradition);
-        $factorLoyalty = \ContractRules::calculateLoyaltyModifier($playerLoyalty, $teamName === $playerTeamName);
+        $factorPlayForWinner = \League\ContractRules::calculateWinnerModifier($teamWins, $teamLosses, $playerWinner);
+        $factorTradition = \League\ContractRules::calculateTraditionModifier($tradWins, $tradLosses, $playerTradition);
+        $factorLoyalty = \League\ContractRules::calculateLoyaltyModifier($playerLoyalty, $teamName === $playerTeamName);
         $factorSecurity = (self::SECURITY_YEAR_FACTOR * ($yearsInOffer - 1) + self::SECURITY_BASE_FACTOR)
                           * ($playerSecurity - 1);
-        $factorPlayingTime = \ContractRules::calculatePlayingTimeModifier($positionSalary, $playerPlayingTime);
+        $factorPlayingTime = \League\ContractRules::calculatePlayingTimeModifier($positionSalary, $playerPlayingTime);
 
         return 1 + $factorPlayForWinner + $factorTradition + $factorLoyalty + $factorSecurity + $factorPlayingTime;
     }

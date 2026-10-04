@@ -277,6 +277,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         global _active_git
         _active_git = git
         slug = git.branch()
+        # Once per run, before the first rebase: clear a stale auto-resolved list from a
+        # previous run of this branch. Per-rebase purges must not touch it (BEHIND retries).
+        from harness.conflict import purge_autoresolved_list
+        purge_autoresolved_list(slug.replace("/", "-"))
         gh = LiveGh(out_dir, worktree, slug) if live else RecordingGh(out_dir)
         gh = usage_pause.dedupe_on_resume(gh, worktree, out_dir)   # ADR-0143 addendum: no double post on resume
         verifier = LiveVerify(worktree)

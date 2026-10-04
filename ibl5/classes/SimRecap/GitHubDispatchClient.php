@@ -140,7 +140,6 @@ final class GitHubDispatchClient
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
         $result = curl_exec($ch);
         $status = $result === false ? 0 : (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
         return $status;
     }
 }

@@ -2,6 +2,7 @@
 _phase-5-final-verification.md's two check loops."""
 from __future__ import annotations
 
+import fnmatch
 import functools
 import os
 import re
@@ -110,6 +111,14 @@ def _renumbered_adr(tok: str, changed_files: list[str]) -> str | None:
     return hits[0] if len(hits) == 1 else None
 
 
+# Trailing `:NNN`, `:NNN-MMM`, or a comma list such as `:41,47` that a plan writes after a
+# matrix path to point at lines. Colon-and-digits only: `::test_name` is handled first by
+# the pytest node-id split, and a word after the colon is left alone so `bin/foo:bar`
+# never resolves to `bin/foo`. planfile._LINE_SUFFIX_RE is the phase-evidence sibling; it
+# has no comma-list arm and accepts `#L12`, so the two stay separate on purpose.
+_LINE_SUFFIX_LIST_RE = re.compile(r":\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*$")
+
+
 def _resolve(tok: str, changed_files: list[str]) -> str | None:
     """The single changed path a plan token names, or None when 0 or 2+ candidates.
 
@@ -136,15 +145,33 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
     different number than the plan quoted. Migration is checked first, then ADR;
     the prefixes are disjoint so order never changes the result. Zero or 2+
     same-suffix paths still return None.
+
+    Before tier 1 the token drops a pytest `::name` suffix and a trailing `:NNN` /
+    `:NNN-MMM` / `:41,47` line suffix. A token carrying `*`, `?`, or `[` is a glob and
+    resolves only by `fnmatch` against the changed paths (1+ hits = the first sorted hit;
+    `*` crosses `/`, which is fine for a presence check). An exact path match wins before
+    suffix matching is tried, so a shorter sibling path elsewhere in the diff cannot make
+    it ambiguous.
     """
     tok = tok.strip().strip("/")
     # pytest node-id form `path/to/file.py::test_name` — strip the test-name
     # suffix so the token resolves to the file path the diff actually contains.
     if "::" in tok:
         tok = tok.split("::", 1)[0].strip("/")
+    tok = _LINE_SUFFIX_LIST_RE.sub("", tok).strip("/")
     if not tok:
         return None
-    hits = [f for f in changed_files if f == tok or f.endswith("/" + tok)]
+    if any(ch in tok for ch in "*?["):
+        # A glob token resolves by fnmatch alone: one or more changed paths match it, or
+        # it is missing. No fall-through to the basename or renumber tiers, because a
+        # glob basename names nothing and tier 3 must not gain glob tolerance.
+        globbed = sorted(f for f in changed_files if fnmatch.fnmatchcase(f, tok))
+        return globbed[0] if globbed else None
+    if tok in changed_files:
+        # Exact match wins outright. `bin/README.md` beside `ibl5/bin/README.md` was two
+        # tier-1 hits and therefore ambiguous (PR #2786); the exact path is the answer.
+        return tok
+    hits = [f for f in changed_files if f.endswith("/" + tok)]
     if len(hits) == 1:
         return hits[0]
     if hits:

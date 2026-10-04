@@ -283,7 +283,7 @@ class RunResult:
     error_output_tail: Optional[str] = None    # last 4000 chars of that command's output (HarnessError.output)
     sticky_comment_id: Optional[str] = None  # numeric id read back after the upsert; None = unconfirmed
     sticky_error: Optional[str] = None       # "sticky-post-failed" when the read-back found no comment
-    retry_cap: Optional[str] = None  # "push-retry-cap" | "behind-retry-cap" when a bounded loop spent its cap
+    retry_cap: Optional[str] = None  # reserved fail-closed seam: no production writer since the BEHIND cap stopped disarming (2026-10-04); any value still forces SHIPPED_HELD in _compute_terminal
     adr_drafted: bool = False               # Phase 2 commit gate (or the 5.5 push backstop): harness drafted a missing ADR
     adr_path: Optional[str] = None          # repo-relative path of the drafted ADR; set even when the re-push was denied
     adr_draft_model: Optional[str] = None   # MODEL_MAP id the drafter ran on

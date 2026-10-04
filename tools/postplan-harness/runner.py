@@ -1291,8 +1291,11 @@ def _reconcile_before_arm(git, log, gh, worktree, pr, sha, bg_ci, out_dir, *,
 
 
 def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
-    """Bounded BEHIND resolution. Returns (sha, outcome). Sets res.retry_cap and
-    disarms auto-merge when the cap is spent."""
+    """Bounded BEHIND resolution. Returns (sha, outcome). When the cap is spent
+    and the branch is still BEHIND, auto-merge stays armed and the PR is handed
+    to .github/workflows/update-behind-prs.yml (ADR-0081); retry_cap is never
+    set here. Divergence inside the loop still disarms (see the disarm=True
+    call sites below)."""
     strict = gh.branch_protection_strict()
     for attempt in range(1, _MAX_BEHIND_RETRIES + 1):
         mss = gh.merge_state_status(pr)
@@ -1329,10 +1332,9 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
         if outcome.exit_code != 0:
             return sha, outcome
     if gh.merge_state_status(pr) == "BEHIND":
-        res.retry_cap = "behind-retry-cap"
         log(f"phase7: BEHIND cap hit after {_MAX_BEHIND_RETRIES} re-rebases — "
-            "disarming auto-merge")
-        gh.pr_disable_auto_merge(pr)
+            "leaving auto-merge armed; .github/workflows/update-behind-prs.yml "
+            "(ADR-0081) carries the PR to merge")
     return sha, outcome
 
 
@@ -2998,10 +3000,6 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                 tail += f" auto-resolved conflict in {', '.join(files)}"
         except OSError:
             pass
-    if res.retry_cap == "behind-retry-cap":
-        return ("RESULT: post-plan BLOCKED — BEHIND retry cap reached (branch still "
-                "behind master after 3 re-rebases); auto-merge disarmed, human "
-                f"merges{pr}{tail} findings={len(res.findings)}")
     tail += _prose_hold_note(res)
     tail += _hold_repeat_note(res)
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "

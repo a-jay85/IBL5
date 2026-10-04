@@ -12,7 +12,7 @@ use League\LeagueContext;
  * @phpstan-type TeamListRow array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, discord_id: int|null, ...<string, mixed>}
  * @phpstan-type TeamDetailRow array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, discord_id: int|null, league_record: string|null, conference_record: string|null, division_record: string|null, home_wins: int|null, home_losses: int|null, away_wins: int|null, away_losses: int|null, win_percentage: float|null, conference_games_back: string|null, division_games_back: string|null, games_remaining: int|null}
  */
-class ApiTeamRepository extends \BaseMysqliRepository
+class ApiTeamRepository extends \Database\BaseMysqliRepository
 {
     /** Public API sort key => SQL column. The controller's allowlist is array_keys() of this map. */
     public const SORT_COLUMNS = [

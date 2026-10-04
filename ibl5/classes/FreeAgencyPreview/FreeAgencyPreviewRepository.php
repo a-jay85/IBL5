@@ -12,11 +12,11 @@ use FreeAgencyPreview\Contracts\FreeAgencyPreviewRepositoryInterface;
  * Retrieves player contract and rating information from the ibl_plr table.
  *
  * @see FreeAgencyPreviewRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  *
  * @phpstan-import-type ActivePlayerRow from FreeAgencyPreviewRepositoryInterface
  */
-class FreeAgencyPreviewRepository extends \BaseMysqliRepository implements FreeAgencyPreviewRepositoryInterface
+class FreeAgencyPreviewRepository extends \Database\BaseMysqliRepository implements FreeAgencyPreviewRepositoryInterface
 {
     /**
      * @see FreeAgencyPreviewRepositoryInterface::getActivePlayers()

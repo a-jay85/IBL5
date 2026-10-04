@@ -19,6 +19,8 @@ use PHPStan\Rules\RuleErrorBuilder;
  */
 final class BanBeginTransactionInRepositoryRule implements Rule
 {
+    private const BASE_CLASS = 'Database\\BaseMysqliRepository';
+
     public function getNodeType(): string
     {
         return MethodCall::class;
@@ -44,7 +46,7 @@ final class BanBeginTransactionInRepositoryRule implements Rule
             return [];
         }
 
-        if ($classReflection->getName() === 'BaseMysqliRepository') {
+        if ($classReflection->getName() === self::BASE_CLASS) {
             return [];
         }
 
@@ -53,7 +55,7 @@ final class BanBeginTransactionInRepositoryRule implements Rule
         $parent = $classReflection->getParentClass();
         $isSubclass = false;
         while ($parent !== null) {
-            if ($parent->getName() === 'BaseMysqliRepository') {
+            if ($parent->getName() === self::BASE_CLASS) {
                 $isSubclass = true;
                 break;
             }

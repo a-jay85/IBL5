@@ -14,7 +14,7 @@ use Voting\Contracts\VotingResultsServiceInterface;
  * @phpstan-import-type EoyBallot from VotingRepositoryInterface
  * @phpstan-import-type AsgBallot from VotingRepositoryInterface
  */
-class VotingRepository extends \BaseMysqliRepository implements VotingRepositoryInterface
+class VotingRepository extends \Database\BaseMysqliRepository implements VotingRepositoryInterface
 {
     private const ASG_TABLE = 'ibl_votes_ASG';
     private const EOY_TABLE = 'ibl_votes_EOY';

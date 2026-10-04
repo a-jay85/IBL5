@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace League;
+
 /**
  * IBL Collective Bargaining Agreement (CBA) Contract Rules
  * 

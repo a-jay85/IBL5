@@ -9,7 +9,7 @@ use League\LeagueContext;
 /**
  * Manages announcement pipeline state: last-processed date and unannounced game discovery.
  */
-final class RecordAnnouncementRepository extends \BaseMysqliRepository
+final class RecordAnnouncementRepository extends \Database\BaseMysqliRepository
 {
     private const ANNOUNCEMENT_CACHE_KEY = 'record_announcements_last_date';
 

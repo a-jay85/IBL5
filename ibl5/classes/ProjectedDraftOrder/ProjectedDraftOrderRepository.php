@@ -9,9 +9,9 @@ use ProjectedDraftOrder\Contracts\ProjectedDraftOrderRepositoryInterface;
 
 /**
  * @see ProjectedDraftOrderRepositoryInterface
- * @see \BaseMysqliRepository
+ * @see \Database\BaseMysqliRepository
  */
-class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements ProjectedDraftOrderRepositoryInterface
+class ProjectedDraftOrderRepository extends \Database\BaseMysqliRepository implements ProjectedDraftOrderRepositoryInterface
 {
     /** @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, conf_wins: int|null, conf_losses: int|null, div_wins: int|null, div_losses: int|null, clinched_division: int|null, color1: string, color2: string}> */
     public function getAllTeamsWithStandings(): array

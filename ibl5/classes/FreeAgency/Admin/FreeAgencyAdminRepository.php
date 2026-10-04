@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FreeAgency\Admin;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use FreeAgency\Admin\Contracts\FreeAgencyAdminRepositoryInterface;
 use FreeAgency\DayAlreadyProcessedException;
 use League\LeagueContext;

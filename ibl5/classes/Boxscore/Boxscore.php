@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Boxscore;
 
-use JSB;
+use League\JSB;
 use Season\Season;
 
 class Boxscore

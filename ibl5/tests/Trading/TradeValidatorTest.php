@@ -605,7 +605,7 @@ class TradeValidatorTest extends TestCase
     public function testPlayerTradeableAtExactWaiverThreshold(): void
     {
         $this->mockDb->setMockData([
-            ['ordinal' => \JSB::WAIVERS_ORDINAL, 'cy' => 1000]
+            ['ordinal' => \League\JSB::WAIVERS_ORDINAL, 'cy' => 1000]
         ]);
 
         $result = $this->validator->canPlayerBeTraded(123);
@@ -619,7 +619,7 @@ class TradeValidatorTest extends TestCase
     public function testPlayerNotTradeableOneAboveWaiverThreshold(): void
     {
         $this->mockDb->setMockData([
-            ['ordinal' => \JSB::WAIVERS_ORDINAL + 1, 'cy' => 1000]
+            ['ordinal' => \League\JSB::WAIVERS_ORDINAL + 1, 'cy' => 1000]
         ]);
 
         $result = $this->validator->canPlayerBeTraded(123);

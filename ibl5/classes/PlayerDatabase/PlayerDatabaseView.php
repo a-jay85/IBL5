@@ -21,7 +21,7 @@ class PlayerDatabaseView implements PlayerDatabaseViewInterface
      */
     public function renderSearchForm(array $params): string
     {
-        $positions = \JSB::PLAYER_POSITIONS;
+        $positions = \League\JSB::PLAYER_POSITIONS;
 
         /**
          * Helper to extract a form field value as string for HTML display

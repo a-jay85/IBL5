@@ -69,7 +69,7 @@ class NextSimTabApiHandler
     {
         if (isset($params['position']) && is_string($params['position'])) {
             $rawPosition = $params['position'];
-            if (in_array($rawPosition, \JSB::PLAYER_POSITIONS, true)) {
+            if (in_array($rawPosition, \League\JSB::PLAYER_POSITIONS, true)) {
                 return $rawPosition;
             }
         }

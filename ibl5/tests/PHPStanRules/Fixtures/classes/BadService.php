@@ -2,6 +2,6 @@
 
 declare(strict_types=1);
 
-class BadService extends \BaseMysqliRepository
+class BadService extends \Database\BaseMysqliRepository
 {
 }

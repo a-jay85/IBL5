@@ -67,7 +67,7 @@ class WaiversProcessor implements WaiversProcessorInterface
      */
     public function calculateVeteranMinimumSalary(int $experience): int
     {
-        return \ContractRules::getVeteranMinimumSalary($experience);
+        return \League\ContractRules::getVeteranMinimumSalary($experience);
     }
 
     /**

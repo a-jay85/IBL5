@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace League;
+
 class JSB
 {
     const PLAYER_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];

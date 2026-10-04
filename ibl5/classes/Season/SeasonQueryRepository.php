@@ -14,7 +14,7 @@ use Season\Contracts\SeasonQueryRepositoryInterface;
  *
  * @see SeasonQueryRepositoryInterface
  */
-class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQueryRepositoryInterface
+class SeasonQueryRepository extends \Database\BaseMysqliRepository implements SeasonQueryRepositoryInterface
 {
     private string $league;
 

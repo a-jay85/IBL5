@@ -22,9 +22,9 @@ use Repositories\PlayerTeamJoinQuery;
  * @phpstan-import-type FreeAgencyOfferRow from TeamQueryRepositoryInterface
  *
  * @see TeamQueryRepositoryInterface
- * @see \BaseMysqliRepository For base class documentation and error codes
+ * @see \Database\BaseMysqliRepository For base class documentation and error codes
  */
-class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepositoryInterface
+class TeamQueryRepository extends \Database\BaseMysqliRepository implements TeamQueryRepositoryInterface
 {
     use PlayerTeamJoinQuery;
 
@@ -146,7 +146,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
             $this->playerWithTeamSelect() . "
             WHERE p.teamid = ?
               AND p.retired = 0
-              AND p.ordinal <= '" . \JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
+              AND p.ordinal <= '" . \League\JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
             ORDER BY p.name ASC",
             "i",
             $teamId
@@ -179,7 +179,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
             $this->playerWithTeamSelect() . "
             WHERE p.teamid = ?
               AND p.retired = 0
-              AND p.ordinal <= '" . \JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
+              AND p.ordinal <= '" . \League\JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
               AND p.injured = '0'
             ORDER BY p.name ASC",
             "i",

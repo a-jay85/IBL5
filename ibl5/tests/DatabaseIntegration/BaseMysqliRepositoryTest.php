@@ -18,7 +18,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        \BaseMysqliRepository::clearSharedLeagueContext();
+        \Database\BaseMysqliRepository::clearSharedLeagueContext();
         $this->repo = new TestableBaseMysqliRepository($this->db);
     }
 
@@ -485,7 +485,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
 
-        \BaseMysqliRepository::setSharedLeagueContext($context);
+        \Database\BaseMysqliRepository::setSharedLeagueContext($context);
 
         $repo = new TestableBaseMysqliRepository($this->db);
         $query = "SELECT * FROM `ibl_plr` WHERE pid = ?";
@@ -503,7 +503,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         // would fatal on a non-existent table.
         $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
-        \BaseMysqliRepository::setSharedLeagueContext($context);
+        \Database\BaseMysqliRepository::setSharedLeagueContext($context);
 
         $repo = new TestableBaseMysqliRepository($this->db);
 
@@ -604,7 +604,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
 /**
  * @internal Test double exposing protected BaseMysqliRepository methods.
  */
-class TestableBaseMysqliRepository extends \BaseMysqliRepository
+class TestableBaseMysqliRepository extends \Database\BaseMysqliRepository
 {
     public ?string $lastPreparedQuery = null;
 

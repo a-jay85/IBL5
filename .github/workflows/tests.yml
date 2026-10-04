@@ -1011,6 +1011,7 @@ jobs:
             bin/test-automouse-cost-rows \
             bin/test-automouse-measure-delegate-cost \
             bin/test-automouse-morning-digest \
+            bin/test-automouse-comprehension-digest \
             bin/test-automouse-postplan-engine \
             bin/test-automouse-canary \
             bin/test-fleet-status \

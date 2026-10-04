@@ -72,7 +72,7 @@ class PlayerPageController
     {
         return $this->renderPage(
             $this->resolvePlayerID($rawPlayerID),
-            ($rawPageView !== null) ? intval($rawPageView) : null,
+            ($rawPageView !== null) ? (int) $rawPageView : null,
             $username,
         );
     }

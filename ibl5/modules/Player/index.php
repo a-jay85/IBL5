@@ -3,22 +3,15 @@
 declare(strict_types=1);
 
 use Http\HttpRequest;
-use Player\Player;
+use Player\PlayerActionController;
 use Player\PlayerPageController;
-use Player\PlayerRepository;
-use Player\Stats\PlayerStats;
-use Player\Views\PlayerTradingCardFlipView;
-use RookieOption\RookieOptionValidator;
-use RookieOption\RookieOptionView;
 use RookieOption\RookieOptionController;
 use Repositories\TeamIdentityRepository;
 use Repositories\SalaryCapRepository;
-use Negotiation\ExtensionContractDemandCalculator;
-use Negotiation\NegotiationRepository;
-use Negotiation\NegotiationService;
-use Negotiation\NegotiationValidator;
 
-global $mysqli_db, $commonRepository, $salaryCapRepo, $httpRequest, $authService;
+global $mysqli_db, $commonRepository, $salaryCapRepo, $httpRequest, $authService, $prefix, $user;
+/** @var \mysqli $mysqli_db */
+/** @var \Auth\AuthService $authService */
 
 $commonRepository = new TeamIdentityRepository($mysqli_db);
 $salaryCapRepo = new SalaryCapRepository($mysqli_db);
@@ -42,192 +35,61 @@ $httpRequest = HttpRequest::fromGlobals();
 
 $pagetitle = "- Player Archives";
 
-function negotiate($playerID)
-{
-    global $prefix, $mysqli_db, $commonRepository, $salaryCapRepo, $authService;
-
-    $playerID = intval($playerID);
-
-    PageLayout\PageLayout::header();
-
-    // Get user's team name using existing CommonRepository. Returns null for a
-    // logged-in user with no `ibl_team_info` row (a registered non-GM); passing that
-    // into processNegotiation()'s `string $userTeamName` is a TypeError under
-    // strict_types, so bail with the same error shape rookieoption() uses.
-    $userTeamName = $commonRepository->getTeamnameFromUsername($authService->getUsername() ?? '');
-    if ($userTeamName === null) {
-        echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::safeHtmlOutput('You do not have a team assigned.') . '</div>';
-        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
-        PageLayout\PageLayout::footer();
-        return;
-    }
-
-    $debugSession = new \Debug\DebugSession(
-        $authService->getUsername() ?? '',
-        $_SERVER['SERVER_NAME'] ?? null,
-        $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null,
-    );
-    $bypassOwnership = $debugSession->isViewAllExtensionsEnabled();
-
-    $service = new NegotiationService(
-        $mysqli_db,
-        new NegotiationRepository($mysqli_db, $salaryCapRepo),
-        new NegotiationValidator($mysqli_db),
-        new ExtensionContractDemandCalculator($mysqli_db, $salaryCapRepo),
-    );
-    echo $service->processNegotiation($playerID, $userTeamName, $prefix, $bypassOwnership);
-
-    PageLayout\PageLayout::footer();
-}
-
-function rookieoption($pid)
-{
-    global $mysqli_db, $commonRepository, $authService;
-
-    // Initialize dependencies
-    $season = new \Season\Season($mysqli_db);
-    $validator = new RookieOptionValidator();
-    $formView = new RookieOptionView();
-
-    // Load player
-    $player = Player::withPlayerID($mysqli_db, (int) $pid);
-
-    PageLayout\PageLayout::header();
-
-    // Get user's team name. Returns null for a logged-in user with no `ibl_team_info`
-    // row (a registered non-GM); validatePlayerOwnership() declares `string
-    // $userTeamName`, so null is a TypeError under strict_types.
-    $userTeamName = $commonRepository->getTeamnameFromUsername($authService->getUsername() ?? '');
-    if ($userTeamName === null) {
-        echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::safeHtmlOutput('You do not have a team assigned.') . '</div>';
-        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
-        PageLayout\PageLayout::footer();
-        return;
-    }
-
-    // Validate player ownership
-    $ownershipValidation = $validator->validatePlayerOwnership($player, $userTeamName);
-    if (!$ownershipValidation->isValid()) {
-        echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::safeHtmlOutput($ownershipValidation->getError()) . '</div>';
-        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
-        PageLayout\PageLayout::footer();
-        return;
-    }
-
-    // Validate eligibility and get final year salary
-    $eligibilityValidation = $validator->validateEligibilityAndGetSalary($player, $season->phase);
-    if (!$eligibilityValidation['valid']) {
-        echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::safeHtmlOutput($eligibilityValidation['error']) . '</div>';
-        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
-        PageLayout\PageLayout::footer();
-        return;
-    }
-
-    // Calculate rookie option value (2x final year salary)
-    $rookieOptionValue = 2 * $eligibilityValidation['finalYearSalary'];
-
-    // Get PRG redirect params and origin tracking
-    $error = $_GET['error'] ?? null;
-    $result = $_GET['result'] ?? null;
-    $from = $_GET['from'] ?? null;
-
-    // Trading card (mirrors PlayerPageController::renderPage assembly)
-    $playerRepository = new PlayerRepository($mysqli_db);
-    $playerName = $player->getName() ?? '';
-    $asg = $playerRepository->getAllStarGameCount($playerName);
-    $threepointcontests = $playerRepository->getThreePointContestCount($playerName);
-    $dunkcontests = $playerRepository->getDunkContestCount($playerName);
-    $rooksoph = $playerRepository->getRookieSophChallengeCount($playerName);
-    $playerStats = PlayerStats::withPlayerID($mysqli_db, (int) $pid);
-    $contractDisplay = implode('/', $player->getRemainingContractArray());
-    $cardHtml = PlayerTradingCardFlipView::render(
-        $player,
-        $playerStats,
-        (int) $pid,
-        $contractDisplay,
-        $asg,
-        $threepointcontests,
-        $dunkcontests,
-        $rooksoph,
-        $mysqli_db
-    );
-
-    // Render form
-    echo $formView->renderForm($player, $userTeamName, $rookieOptionValue, $error, $result, $from, $cardHtml);
-
-    // Flip card script (must come after card HTML so elements exist for init)
-    echo PlayerTradingCardFlipView::getFlipStyles();
-
-    PageLayout\PageLayout::footer();
-}
-
-function processrookieoption()
-{
-    global $mysqli_db, $commonRepository, $user, $authService;
-
-    // (1) Auth gate — pa=processrookieoption has no is_user() check.
-    if (!is_user($user)) {
-        loginbox();
-        return;
-    }
-
-    // (2) CSRF — validate before any DB mutation. PRG redirect mirrors
-    // this handler's own error path + extension.php.
-    if (!\Security\CsrfGuard::validateSubmittedToken('rookie_option')) {
-        \Utilities\HtmxHelper::redirect('modules.php?name=Player&error=' . rawurlencode('Invalid or expired form submission. Please reload and try again.'));
-        return;
-    }
-
-    cookiedecode($user);
-    $username = $authService->getUsername() ?? '';
-
-    // Get POST parameters
-    $teamName = is_string($_POST['teamname'] ?? null) ? $_POST['teamname'] : '';
-    $playerID = isset($_POST['playerID']) ? (int) $_POST['playerID'] : 0;
-    $extensionAmount = isset($_POST['rookieOptionValue']) ? (int) $_POST['rookieOptionValue'] : 0;
-    $from = $_POST['from'] ?? '';
-
-    // (3) Ownership + input validation are enforced by
-    // RookieOptionController::processRookieOption(), which refuses a null / Free Agents /
-    // mismatched session team before any DB access. Refusals take the error redirect below.
-    $sessionTeam = $commonRepository->getTeamnameFromUsername($username);
-    $sessionTeam = is_string($sessionTeam) ? $sessionTeam : null;
-
-    // Process rookie option using controller
-    $rookieRepo = new \RookieOption\RookieOptionRepository($mysqli_db);
-    $newsService = new \Topics\News\NewsRepository($mysqli_db);
-    $controller = new RookieOptionController($mysqli_db, $commonRepository, $rookieRepo, $newsService);
-    $result = $controller->processRookieOption($teamName, $playerID, $extensionAmount, $sessionTeam);
-
-    $resultParam = '';
-    if ($result['success']) {
-        $resultParam = ($result['emailSuccess'] ?? true) ? 'rookie_option_success' : 'email_failed';
-    }
-
-    if ($result['success'] && $from === 'fa') {
-        // Came from Free Agency — redirect back there with result banner
-        \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=' . $resultParam);
-    } elseif ($result['success']) {
-        // Came from Player page (or unknown) — redirect to player page with result banner
-        \Utilities\HtmxHelper::redirect('modules.php?name=Player&pa=showpage&pid=' . $playerID . '&result=' . $resultParam);
-    } else {
-        // Error — redirect back to rookie option form with error
-        \Utilities\HtmxHelper::redirect('modules.php?name=Player&pa=rookieoption&pid=' . $playerID . '&from=' . rawurlencode($from) . '&error=' . rawurlencode($result['message']));
-    }
-}
-
 switch ($pa) {
 
     case "negotiate":
-        negotiate($pid);
+        $actionController = new PlayerActionController($mysqli_db, $commonRepository, $salaryCapRepo);
+        $username = $authService->getUsername() ?? '';
+        $debugSession = new \Debug\DebugSession(
+            $username,
+            $_SERVER['SERVER_NAME'] ?? null,
+            $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null,
+        );
+        PageLayout\PageLayout::header();
+        echo $actionController->renderNegotiation(
+            intval($pid),
+            $username,
+            is_string($prefix) ? $prefix : '',
+            $debugSession->isViewAllExtensionsEnabled(),
+        );
+        PageLayout\PageLayout::footer();
         break;
 
     case "rookieoption":
-        rookieoption($pid);
+        $actionController = new PlayerActionController($mysqli_db, $commonRepository, $salaryCapRepo);
+        $username = $authService->getUsername() ?? '';
+        PageLayout\PageLayout::header();
+        echo $actionController->renderRookieOption(
+            (int) $pid,
+            $username,
+            is_string($_GET['error'] ?? null) ? $_GET['error'] : null,
+            is_string($_GET['result'] ?? null) ? $_GET['result'] : null,
+            is_string($_GET['from'] ?? null) ? $_GET['from'] : null,
+        );
+        PageLayout\PageLayout::footer();
         break;
 
     case "processrookieoption":
-        processrookieoption();
+        $rookieController = new RookieOptionController(
+            $mysqli_db,
+            $commonRepository,
+            new \RookieOption\RookieOptionRepository($mysqli_db),
+            new \Topics\News\NewsRepository($mysqli_db),
+        );
+        $redirectUrl = $rookieController->handleSubmission(
+            static fn (): bool => is_user($user) === 1,
+            static fn (): bool => \Security\CsrfGuard::validateSubmittedToken('rookie_option'),
+            static function () use ($user, $authService): string {
+                cookiedecode($user);
+                return $authService->getUsername() ?? '';
+            },
+            $_POST,
+        );
+        if ($redirectUrl === null) {
+            loginbox();
+        } else {
+            \Utilities\HtmxHelper::redirect($redirectUrl);
+        }
         break;
 
     case "showpage":
@@ -237,8 +99,9 @@ switch ($pa) {
             new \Player\PlayerPageService($mysqli_db, $commonRepository),
             $httpRequest,
         );
+        $username = $authService->getUsername() ?? '';
         PageLayout\PageLayout::header();
-        echo $pageController->showPage($pid, $pageView, $authService->getUsername() ?? '');
+        echo $pageController->showPage($pid, $pageView, $username);
         PageLayout\PageLayout::footer();
         break;
 

@@ -263,9 +263,8 @@ test.describe('Forged CSRF token is rejected', () => {
     const location = response.headers()['location'] ?? '';
     // CSRF failure redirects to name=Player with the generic "Invalid" error —
     // NOT the pa=rookieoption eligibility path and NOT a success result.
-    expect(location).toContain('name=Player');
-    expect(decodeURIComponent(location)).toContain('Invalid or expired form submission');
-    expect(location).not.toContain('pa=rookieoption');
-    expect(location).not.toContain('rookie_option_success');
+    expect(location).toBe(
+      'modules.php?name=Player&error=Invalid%20or%20expired%20form%20submission.%20Please%20reload%20and%20try%20again.',
+    );
   });
 });

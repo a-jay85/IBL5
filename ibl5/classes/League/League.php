@@ -6,6 +6,7 @@ namespace League;
 
 use Database\BaseMysqliRepository;
 use League\JSB;
+use Repositories\PlayerTeamJoinQuery;
 use Season\Season;
 
 /**
@@ -19,6 +20,8 @@ use Season\Season;
  */
 class League extends BaseMysqliRepository
 {
+    use PlayerTeamJoinQuery;
+
     const CONFERENCE_NAMES = array('Eastern', 'Western');
     const DIVISION_NAMES = array('Atlantic', 'Central', 'Midwest', 'Pacific');
 
@@ -122,7 +125,7 @@ class League extends BaseMysqliRepository
         // constants) are class constants, never user input — concatenate, not interpolate.
         $query = "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
         FROM `ibl_plr` p
-        JOIN `ibl_team_info` t ON p.teamid = t.teamid
+        " . $this->playerTeamInnerJoin() . "
         WHERE p.pos IN (" . $positions . ")
           AND p.teamid IN ('" . $this->formatTidsForSqlQuery($conferenceTids) . "')
           AND p.retired = 0
@@ -207,7 +210,7 @@ class League extends BaseMysqliRepository
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
             FROM `ibl_plr` p
-            JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            " . $this->playerTeamInnerJoin() . "
             WHERE p.retired = 0
               AND p.stats_gm >= '41'
               AND p.stats_min / p.stats_gm >= '30'
@@ -226,7 +229,7 @@ class League extends BaseMysqliRepository
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
             FROM `ibl_plr` p
-            JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            " . $this->playerTeamInnerJoin() . "
             WHERE p.retired = 0
               AND p.stats_min / p.stats_gm >= 15
               AND p.stats_gs / p.stats_gm <= '.5'
@@ -246,7 +249,7 @@ class League extends BaseMysqliRepository
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
             FROM `ibl_plr` p
-            JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            " . $this->playerTeamInnerJoin() . "
             WHERE p.retired = 0
               AND p.exp = '1'
               AND p.stats_gm >= '41'

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ComparePlayers;
 
 use ComparePlayers\Contracts\ComparePlayersRepositoryInterface;
+use Repositories\PlayerTeamJoinQuery;
 
 /**
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
@@ -13,6 +14,8 @@ use ComparePlayers\Contracts\ComparePlayersRepositoryInterface;
  */
 class ComparePlayersRepository extends \Database\BaseMysqliRepository implements ComparePlayersRepositoryInterface
 {
+    use PlayerTeamJoinQuery;
+
     public function __construct(\mysqli $db)
     {
         parent::__construct($db);
@@ -47,7 +50,7 @@ class ComparePlayersRepository extends \Database\BaseMysqliRepository implements
         return $this->fetchOne(
             "SELECT p.*, t.team_city, t.color1, t.color2
             FROM `ibl_plr` p
-            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            " . $this->playerTeamLeftJoin() . "
             WHERE p.name = ? LIMIT 1",
             "s",
             $playerName

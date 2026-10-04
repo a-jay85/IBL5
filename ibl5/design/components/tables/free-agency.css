@@ -8,6 +8,51 @@
    border-based separators instead of empty separator cells.
    ========================================================================== */
 
+/* Mobile: a wide table's caption and title row span the full table width,
+   so centered content lands off-screen. Pin it to the visible scroll area
+   (100cqw = the scroll container's width). */
+@media (max-width: 768px) {
+    .table-scroll-container:has(.fa-table),
+    .sticky-scroll-wrapper:has(.fa-table) {
+        container-type: inline-size;
+    }
+
+    /* Scoped to the same ancestors: outside a container, cqw falls back
+       to the viewport width */
+    .table-scroll-container .fa-table__title,
+    .sticky-scroll-wrapper .fa-table__title {
+        position: sticky;
+        left: 0;
+        width: 100cqw;
+        box-sizing: border-box;
+    }
+
+    .fa-table__title {
+        display: block;
+        text-align: center;
+    }
+}
+
+/* Desktop: the wrappers shrink to fit here, so container units would
+   collapse them. Instead, sticky offsets are a percent of the scroll area:
+   left and right at 50% conflict, left wins, so the title's left edge
+   sits at the visible center and the transform centers it. */
+@media (min-width: 769px) {
+    /* clip (not hidden): .ibl-data-table's overflow: hidden would make the
+       table the sticky title's scroll box */
+    .table-scroll-container .fa-table {
+        overflow: clip;
+    }
+
+    .fa-table__title {
+        display: inline-block;
+        position: sticky;
+        left: 50%;
+        right: 50%;
+        transform: translateX(-50%);
+    }
+}
+
 .fa-table {
     max-width: none;
 }

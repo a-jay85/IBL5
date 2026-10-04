@@ -6,6 +6,8 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 // the standalone leagueControlPanel.php to modules.php?name=LeagueControlPanel.
 // Path-traversal on the download endpoint is covered in league-control-panel.spec.ts.
 // Non-admin 403 coverage lives in role-gating-non-admin.spec.ts.
+// The admin DOM check mirrors LeagueControlPanelView.php:17-42,39 (main.updater and the form action).
+// Olympics navigation to the module URL goes through helpers/updater.ts (see smoke/olympics-admin.spec.ts).
 
 const LCP_MODULE_URL = 'modules.php?name=LeagueControlPanel';
 

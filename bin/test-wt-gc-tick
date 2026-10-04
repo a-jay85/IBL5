@@ -520,6 +520,7 @@ begin_case G11-writes-outside-repo
 [ -f "$G10_STATE/wt-gc.log" ] || note_err "wt-gc.log missing under WT_GC_LOCK_DIR"
 [ -f "$G10_STATE/last-sweep" ] || note_err "last-sweep missing under WT_GC_LOCK_DIR"
 case "$G10_STATE" in "$G10_MAIN"/*) note_err "state dir is inside the clone" ;; esac
+[ ! -e "$G10_MAIN/.wt-gc" ] || note_err "state leaked into \$WT_GC_REPO_ROOT/.wt-gc"
 
 DEFAULT_LOG="$ROOT/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc/wt-gc.log"
 rm -rf "$ROOT/home/.claude"

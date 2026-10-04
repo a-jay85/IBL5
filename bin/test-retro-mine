@@ -210,6 +210,13 @@ case_empty_env() {
     rc=$?
     rm_expect_eq "empty_env: no HOME and no state var exits 2" 2 "$rc"
     rm_has "empty_env: error names HOME" "$err" "HOME"
+    # The colon form ${RETRO_MINE_REGISTRY:-default} treats empty as unset and
+    # falls back silently, so the driver must never read the variable that way.
+    if grep -qF '${RETRO_MINE_REGISTRY:-' "$RM_DRIVER"; then
+        rm_fail "empty_env: driver reads RETRO_MINE_REGISTRY with the colon-dash form"
+    else
+        rm_ok "empty_env: driver keeps empty distinct from unset"
+    fi
 }
 
 case_claude_bin_empty() {

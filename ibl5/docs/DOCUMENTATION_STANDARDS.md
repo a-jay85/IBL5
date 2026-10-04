@@ -1,6 +1,6 @@
 ---
-description: Documentation organization and lifecycle rules.
-last_verified: 2026-08-22
+description: Documentation organization, lifecycle rules, and the changelog policy (no CHANGELOG file; where change history lives).
+last_verified: 2026-10-04
 ---
 
 # IBL5 Documentation Standards
@@ -132,6 +132,46 @@ The original module refactor is complete, so the "when refactoring" trigger abov
 
 ---
 
+## Changelog Policy
+
+This repo keeps no `CHANGELOG.md` file, by decision ([backlog#195](https://github.com/a-jay85/IBL5-backlog/issues/195)). The merged history on `master` already serves as the changelog. Four sources answer history questions:
+
+| Question | Source |
+|----------|--------|
+| What changed, and when? | First-parent commits on `master`. Each merged PR lands as one squash or rebase commit with a conventional title ending in `(#N)`. The title types are defined in `.claude/rules/commit-conventions.md`. |
+| What did one PR do, and why? | The `## Merge digest` block in that commit's body, with **What changed:**, **Why:**, and **Watch:** paragraphs. `/post-plan` writes it. |
+| Why was a load-bearing decision made? | The ADRs under `ibl5/docs/decisions/`, indexed in `ibl5/docs/decisions/README.md`. |
+| What is planned next? | `ibl5/docs/STRATEGIC_PRIORITIES.md`. It is a roadmap and records nothing about past changes. |
+
+`ibl5/docs/REFACTORING_HISTORY.md` is a frozen archive of the completed module-refactoring effort. Do not add new entries to it.
+
+### Querying recent changes
+
+Many first-parent commits on `master` come from bots: coverage and PHPStan baseline snapshots, codebase-map regeneration, and dependabot bumps. Filter them out before reading the list:
+
+```bash
+git log --first-parent origin/master --since='14 days ago' \
+  --format='%h %s' \
+  | grep -vE '\[auto\]|^[0-9a-f]+ chore\(deps'
+```
+
+Narrower queries:
+
+```bash
+git log -1 --format=%b <sha>    # one PR's merge digest
+gh pr view <N>                  # one PR's body and review thread
+git log --first-parent origin/master \
+  --format='%h %s' -- <path>    # history of one area
+```
+
+### What not to do
+
+- Do not create a `CHANGELOG.md` file at the repo root or under `ibl5/`.
+- Do not append per-PR entries to any doc. The merge digest in the commit body is the record.
+- Write an ADR when a change introduces a decision a later reader needs explained. A plain record of what changed needs no doc edit.
+
+---
+
 ## Quick Decision Tree
 
 **Creating new documentation? Ask:**
@@ -156,6 +196,10 @@ The original module refactor is complete, so the "when refactoring" trigger abov
 5. **Is this superseded or historical?**
    - Move to `.archive/`
    - Update any references
+
+6. **Is this a record of what a PR changed?**
+   - Write no doc. The merge digest in the PR's `master` commit body is the record.
+   - See [Changelog Policy](#changelog-policy)
 
 ---
 

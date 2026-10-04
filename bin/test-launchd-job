@@ -958,6 +958,17 @@ if [[ "$PNL_RC" == "hit=1 miss=1 empty=1" ]]; then
 else
     fail "postplan_now_live_exact_slug" "got '$PNL_RC'"
 fi
+PNL_LABEL_OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_postplan_now_live branch-one "$PNL_SNAP_HIT"
+)"
+if [[ "$PNL_LABEL_OUT" == "com.ibl5.postplan-now-branch-one-20260101-120000-99" ]]; then
+    pass "postplan_now_live_exact_slug: prints label"
+else
+    fail "postplan_now_live_exact_slug: prints label" "got '$PNL_LABEL_OUT'"
+fi
 
 # ---------------------------------------------------------------------------
 # Summary

@@ -137,7 +137,8 @@ final class CookieGlobalReadersCorpusTest extends TestCase
             }
         }
 
-        foreach (glob($root . '/*.php') ?: [] as $topLevel) {
+        $topLevelFiles = glob($root . '/*.php');
+        foreach ($topLevelFiles !== false ? $topLevelFiles : [] as $topLevel) {
             $files[] = substr($topLevel, strlen($root) + 1);
         }
 

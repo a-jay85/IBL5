@@ -53,6 +53,10 @@ type ftaDecompArtifact struct {
 	EngineOnlyFouls       int `json:"engine_only_fouls"`
 	EngineOnlyFTA         int `json:"engine_only_fta"`
 
+	// ExcludedDegenerateGames counts engine games dropped by isDegenerateFTAGame
+	// (0-0 score and 0 FTA on both teams) before any FTASide or ending-mix sum.
+	ExcludedDegenerateGames int `json:"excluded_degenerate_games"`
+
 	Branch    string `json:"branch"`
 	RETarget  string `json:"re_target"`
 	Rationale string `json:"rationale"`
@@ -105,6 +109,7 @@ func TestRealArchive_FTADecomp(t *testing.T) {
 
 	var engSide, scoSide FTASide
 	var mix sim.EndingMixCounts
+	excludedDegenerate := 0
 	snapshots := 0
 
 	seasonZips := make([]string, 0, len(zips))
@@ -142,6 +147,10 @@ func TestRealArchive_FTADecomp(t *testing.T) {
 			gr := res.Games[0]
 			if len(gr.TeamBoxes) == 2 {
 				pts0, pts1 := ftaTeamPoints(gr.TeamBoxes[0]), ftaTeamPoints(gr.TeamBoxes[1])
+				if isDegenerateFTAGame(pts0, pts1, gr.TeamBoxes[0].GameFTA, gr.TeamBoxes[1].GameFTA) {
+					excludedDegenerate++
+					continue // skip AddTeamGame AND the ending-mix loop below
+				}
 				margin := ftaAbs(pts0 - pts1)
 				for ti, tb := range gr.TeamBoxes {
 					mine, theirs := pts0, pts1
@@ -234,11 +243,12 @@ func TestRealArchive_FTADecomp(t *testing.T) {
 		EngineSummary: engSum,
 		ScoSummary:    scoSum,
 
-		EngineOnlyPossessions: mix.Possessions,
-		EngineOnlyAndOneSeqs:  mix.AndOneSeqs,
-		EngineOnlyEndFT:       mix.EndFT,
-		EngineOnlyFouls:       mix.Fouls,
-		EngineOnlyFTA:         mix.FTA,
+		EngineOnlyPossessions:   mix.Possessions,
+		EngineOnlyAndOneSeqs:    mix.AndOneSeqs,
+		EngineOnlyEndFT:         mix.EndFT,
+		EngineOnlyFouls:         mix.Fouls,
+		EngineOnlyFTA:           mix.FTA,
+		ExcludedDegenerateGames: excludedDegenerate,
 
 		Branch:    branch,
 		RETarget:  target,
@@ -246,6 +256,7 @@ func TestRealArchive_FTADecomp(t *testing.T) {
 	}
 
 	t.Logf("FTA_DECOMP branch=%s target=%q rationale=%s", branch, target, rationale)
+	t.Logf("FTA_DECOMP_EXCLUDED degenerate=%d", excludedDegenerate)
 	logSummary := func(label string, s FTASummary) {
 		t.Logf("  %s: fta/g=%.3f pf/g=%.3f fta/pf=%.4f fta/100poss=%.3f pace/g=%.3f pps=%.4f home/away=%.3f winner_fta/g=%.3f loser_fta/g=%.3f bucket_fta/g=%.3f/%.3f/%.3f",
 			label, s.FTAPerG, s.PFPerG, s.FTAPerPF, s.FTAPer100Poss, s.PacePerG, s.PPS,

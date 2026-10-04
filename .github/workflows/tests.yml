@@ -991,6 +991,7 @@ jobs:
             bin/test-usage-gate \
             bin/test-plan-index \
             bin/test-post-plan-now-pr-creates-worktree \
+            bin/test-post-plan-now-untracked-only \
             bin/test-review-shared-skip \
             bin/test-pr-cycle \
             bin/test-digest-dm-build \
@@ -1022,6 +1023,7 @@ jobs:
             bin/test-check-docs \
             bin/test-check-numbering \
             bin/test-postplan-arm-conditions \
+            bin/test-gate-backtest \
             bin/test-docfix-run \
             bin/test-sigpipe-grep-q-guard \
             bin/test-shell-scripts-lib \
@@ -1079,6 +1081,9 @@ jobs:
       # Needs a scrubbed environment, so it cannot share the runner.
       - name: bin/test-burndown
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-burndown'
+      # Needs a scrubbed environment, so it cannot share the runner.
+      - name: bin/test-burndown-loop
+        run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-burndown-loop'
 
       - name: bin/test-restore-rowcount-compare
         run: bin/test-restore-rowcount-compare

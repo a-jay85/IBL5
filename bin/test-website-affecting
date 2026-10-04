@@ -58,6 +58,12 @@ assert_exit "exempt-smoke-prod"      1 ".github/workflows/smoke-prod.yml"
 assert_exit "exempt-cache-deps"      1 ".github/workflows/cache-dependencies.yml"
 assert_exit "exempt-deploy-rehearsal" 1 ".github/workflows/deploy-rehearsal.yml"
 
+# --- tools/ deny: host-side dev tooling never reaches a render ---
+assert_exit "deny-tools-harness"      1 "tools/postplan-harness/runner.py"
+assert_exit "deny-tools-nested"       1 "tools/postplan-harness/harness/ciwatch.py"
+assert_exit "tools-plus-website"      0 $'tools/postplan-harness/runner.py\nibl5/classes/Foo.php'
+assert_exit "anchored-ibl5-tools"     0 "ibl5/tools/foo.php"
+
 # --- (b) GUARD (LOAD-BEARING): E2E/Lighthouse drivers → exit 0 (website) ---
 # This block is the mechanical proof against the silent-skip failure mode: if a
 # future edit ever swept one of these into the exempt set, its PR would skip the

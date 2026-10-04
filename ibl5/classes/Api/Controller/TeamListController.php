@@ -20,14 +20,12 @@ class TeamListController implements ControllerInterface
         $this->repo = $repo;
     }
 
-    private const ALLOWED_SORT_COLUMNS = ['team_name', 'team_city', 'owner_name', 'conference', 'division'];
-
     /**
      * @see ControllerInterface::handle()
      */
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
-        $paginator = new Paginator($query, 'team_name', self::ALLOWED_SORT_COLUMNS);
+        $paginator = new Paginator($query, 'team_name', array_keys(ApiTeamRepository::SORT_COLUMNS));
         $repo = $this->repo;
         $transformer = new TeamTransformer();
         $etag = new ETagHandler();

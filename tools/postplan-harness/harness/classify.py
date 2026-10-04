@@ -220,6 +220,7 @@ def numstat_text(diff_text: str) -> str:
     current_path: str | None = None
     added = deleted = 0
     is_binary = False
+    in_hunk = False  # '---'/'+++' are file headers only before the first '@@'
 
     def flush() -> None:
         if current_path is None:
@@ -237,11 +238,14 @@ def numstat_text(diff_text: str) -> str:
             current_path = parts[1] if len(parts) > 1 else line.split()[-1]
             added = deleted = 0
             is_binary = False
+            in_hunk = False
+        elif not in_hunk and line.startswith("@@"):
+            in_hunk = True
         elif line.startswith("Binary files") and "differ" in line:
             is_binary = True
-        elif line.startswith("+") and not line.startswith("+++"):
+        elif in_hunk and line.startswith("+"):
             added += 1
-        elif line.startswith("-") and not line.startswith("---"):
+        elif in_hunk and line.startswith("-"):
             deleted += 1
 
     flush()

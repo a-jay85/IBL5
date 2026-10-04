@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Tests that bin/post-plan-now --pr creates a worktree via bin/wt-new --existing
 # when no worktree has the PR's head branch, reuses an existing one, refuses fork
-# PRs, and maps slash-bearing branch names to hostname-safe slugs.
+# PRs, and maps slash-bearing branch names to hostname-safe slugs. Cases 11-14 cover
+# the --auto headless guard and its IBL5_BURNDOWN_LOOP=1 opt-in.
 #
-# Seven cases, exit 0 iff all pass.
+# Fourteen cases, exit 0 iff all pass.
 set -euo pipefail
 
 # ---- environment --------------------------------------------------------
@@ -83,6 +84,8 @@ while [ $# -gt 0 ]; do
     esac
 done
 [ -n "${GH_PR_JSON:-}" ] || exit 1
+# GH_NO_FORK_FIELD: answer the isCrossRepository query with nothing (fork status unknown)
+if [ -n "${GH_NO_FORK_FIELD:-}" ] && [ "$jq_filter" = ".isCrossRepository" ]; then exit 0; fi
 if [ -n "$jq_filter" ]; then
     jq -r "$jq_filter" <<< "$GH_PR_JSON"
 else
@@ -117,10 +120,10 @@ cp "$MAIN/bin/wt-new" "$SHIMS/wt-new"
 # Runs post-plan-now --pr <n> with test overrides; sets RC and ERR.
 RC=0; ERR=""
 run_ppn() {
-    local pr_num="$1"
+    local pr_num="$1" self_bin="${2:-$MAIN/bin}"
     RC=0; ERR=""
     set +e
-    ERR="$(POST_PLAN_MAIN_ROOT="$MAIN" POST_PLAN_SELF_BIN="$MAIN/bin" \
+    ERR="$(POST_PLAN_MAIN_ROOT="$MAIN" POST_PLAN_SELF_BIN="$self_bin" \
            HOME="$TMP" \
            "$REPO/bin/post-plan-now" --pr "$pr_num" 2>&1 >/dev/null)"
     RC=$?
@@ -156,6 +159,22 @@ git -C "$MAIN" worktree prune >/dev/null 2>&1
 # ==========================================================================
 # Case 2 — missing worktree is created on the right branch at the origin tip
 # ==========================================================================
+# Advance origin's feat-x from a scratch clone so the local feat-x branch is stale
+# (one commit behind): wt-new --existing must fetch and fast-forward it to the origin tip.
+SCRATCH="$TMP/scratch"
+git clone --quiet "file://$ORIGIN" "$SCRATCH" >/dev/null 2>&1
+git -C "$SCRATCH" config user.email "test@example.com"
+git -C "$SCRATCH" config user.name "Test"
+git -C "$SCRATCH" checkout --quiet feat-x
+printf 'more\n' > "$SCRATCH/more.txt"
+git -C "$SCRATCH" add more.txt
+git -C "$SCRATCH" commit --quiet -m "feat-x advance"
+git -C "$SCRATCH" push --quiet origin feat-x
+STALE_SHA="$FEAT_X_SHA"
+FEAT_X_SHA="$(git -C "$ORIGIN" rev-parse refs/heads/feat-x)"
+[ "$FEAT_X_SHA" != "$STALE_SHA" ] || { echo "setup: origin feat-x did not advance"; exit 1; }
+[ "$(git -C "$MAIN" rev-parse refs/heads/feat-x)" = "$STALE_SHA" ] \
+    || { echo "setup: local feat-x is not stale"; exit 1; }
 export GH_PR_JSON='{"headRefName":"feat-x","isCrossRepository":false}'
 rm -f "$WTNEW_LOG"
 
@@ -291,6 +310,13 @@ FAIL_BEFORE=$FAIL
 if [ "$RC6" -eq 6 ]; then
     fail "loaded-idle-reap-before-inflight: exited 6 (phantom in-flight not reaped)"
 fi
+if [ -e "$PHANTOM_PLIST" ]; then
+    fail "loaded-idle-reap-before-inflight: phantom plist still exists ($PHANTOM_PLIST)"
+fi
+# LAUNCHCTL_LOG may hold lines from earlier cases; match the phantom label.
+if ! grep -Eq "^bootout gui/[0-9]+/${PHANTOM_LABEL}\$" "$LAUNCHCTL_LOG" 2>/dev/null; then
+    fail "loaded-idle-reap-before-inflight: no 'bootout gui/<uid>/$PHANTOM_LABEL' in launchctl log"
+fi
 [ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "loaded-idle-reap-before-inflight"
 
 # Restore simple launchctl stub for any future tests
@@ -351,6 +377,7 @@ case "${FAKE_MODE:-}" in
         exit 0 ;;
     limit) echo "You've hit your limit"; exit 1 ;;
     auth)  echo "API Error: 401"; exit 1 ;;
+    envprobe) printf '%s\n' "${IBL5_BURNDOWN_LOOP-unset}" > "$PROBE_FILE"; exit 0 ;;
 esac
 exit 0
 SHIM_EOF
@@ -397,6 +424,137 @@ if grep -qF -- "RESULT paused" <<< "$P7_OUT"; then fail "auth error: wrongly rep
 [ "$(wc -l < "$FAILDM_LOG" 2>/dev/null | tr -d ' ')" = 1 ] || fail "auth error: FAIL-DM count is not 1 (got: $(cat "$FAILDM_LOG" 2>/dev/null))"
 [ "$P7_MARKERS" = 0 ] || fail "auth error: a marker was written"
 [ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "API Error 401: not paused, one FAIL-DM"
+
+# ==========================================================================
+# Case 8 — wt-new failure (e.g. slug collision) is reported and exits 1
+# ==========================================================================
+export GH_PR_JSON='{"headRefName":"ghost-branch","isCrossRepository":false}'
+STUB_FAIL="$TMP/stub-fail"; mkdir -p "$STUB_FAIL"
+printf '#!/usr/bin/env bash\necho "stub wt-new: slug collision" >&2\nexit 1\n' > "$STUB_FAIL/wt-new"
+chmod +x "$STUB_FAIL/wt-new"
+
+run_ppn 108 "$STUB_FAIL"
+
+FAIL_BEFORE=$FAIL
+if [ "$RC" -ne 1 ]; then
+    fail "wt-new failure: expected RC=1, got $RC"
+fi
+if ! grep -qF -- "bin/wt-new failed for branch 'ghost-branch' (slug 'ghost-branch')" <<< "${ERR:-}"; then
+    fail "wt-new failure: expected 'bin/wt-new failed' message (got: $ERR)"
+fi
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "wt-new failure exits 1 with a specific message"
+
+# ==========================================================================
+# Case 9 — wt-new exits 0 but creates nothing: the re-scan miss is reported
+# ==========================================================================
+STUB_NOOP="$TMP/stub-noop"; mkdir -p "$STUB_NOOP"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB_NOOP/wt-new"
+chmod +x "$STUB_NOOP/wt-new"
+
+run_ppn 109 "$STUB_NOOP"
+
+FAIL_BEFORE=$FAIL
+if [ "$RC" -ne 1 ]; then
+    fail "re-scan miss: expected RC=1, got $RC"
+fi
+if ! grep -qF -- "bin/wt-new succeeded but no worktree has 'ghost-branch' checked out." <<< "${ERR:-}"; then
+    fail "re-scan miss: expected 'succeeded but no worktree' message (got: $ERR)"
+fi
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "re-scan miss after wt-new success exits 1 with a specific message"
+
+# ==========================================================================
+# Case 10 — unknown fork status refuses to create a worktree
+# ==========================================================================
+export GH_NO_FORK_FIELD=1
+rm -f "$WTNEW_LOG"
+
+run_ppn 110
+
+FAIL_BEFORE=$FAIL
+if [ "$RC" -ne 1 ]; then
+    fail "unknown fork status: expected RC=1, got $RC"
+fi
+if ! grep -qF -- "could not determine whether PR #110 is from a fork" <<< "${ERR:-}"; then
+    fail "unknown fork status: expected 'could not determine' message (got: $ERR)"
+fi
+if [ -s "$WTNEW_LOG" ]; then
+    fail "unknown fork status: wt-new was called unexpectedly"
+fi
+unset GH_NO_FORK_FIELD
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "unknown fork status is refused before wt-new runs"
+
+# ==========================================================================
+# Cases 11-14 — --auto headless guard + IBL5_BURNDOWN_LOOP opt-in
+# ==========================================================================
+# run_auto_headless <opt-in-state> → G_OUT (stdout+stderr), G_RC, G_PLIST (0/1)
+# opt-in-state: "unset" | "empty" | any literal value
+run_auto_headless() {
+    local state="$1"
+    rm -f "$HOME7"/Library/LaunchAgents/*.plist
+    set +e
+    if [ "$state" = "unset" ]; then
+        G_OUT=$(cd "$WT6" && env -u IBL5_BURNDOWN_LOOP CLAUDE_HEADLESS=1 \
+            POST_PLAN_SKILL=1 HOME="$HOME7" "$REPO/bin/post-plan-now" --auto 2>&1)
+    elif [ "$state" = "empty" ]; then
+        G_OUT=$(cd "$WT6" && IBL5_BURNDOWN_LOOP='' CLAUDE_HEADLESS=1 \
+            POST_PLAN_SKILL=1 HOME="$HOME7" "$REPO/bin/post-plan-now" --auto 2>&1)
+    else
+        G_OUT=$(cd "$WT6" && IBL5_BURNDOWN_LOOP="$state" CLAUDE_HEADLESS=1 \
+            POST_PLAN_SKILL=1 HOME="$HOME7" "$REPO/bin/post-plan-now" --auto 2>&1)
+    fi
+    G_RC=$?
+    set -e
+    G_PLIST=0
+    ls "$HOME7"/Library/LaunchAgents/com.ibl5.postplan-now-feat-x-*.plist >/dev/null 2>&1 && G_PLIST=1
+    rm -f "$HOME7"/Library/LaunchAgents/*.plist
+}
+
+# assert_skips <label> — the last run_auto_headless must have skipped
+assert_skips() {
+    [ "$G_RC" = 0 ] || fail "$1: expected RC=0, got $G_RC"
+    grep -qF -- "skipping auto-fire" <<< "$G_OUT" || fail "$1: no 'skipping auto-fire' (got: $G_OUT)"
+    [ "$G_PLIST" = 0 ] || fail "$1: a plist was written"
+}
+
+FAIL_BEFORE=$FAIL
+run_auto_headless unset
+assert_skips "unset opt-in"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto without opt-in skips"
+
+FAIL_BEFORE=$FAIL
+run_auto_headless empty
+assert_skips "empty opt-in"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with empty opt-in skips"
+
+FAIL_BEFORE=$FAIL
+run_auto_headless 0
+assert_skips "opt-in=0"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with opt-in=0 skips"
+
+FAIL_BEFORE=$FAIL
+run_auto_headless 1
+if grep -qF -- "skipping auto-fire" <<< "$G_OUT"; then fail "opt-in=1: still skipped (got: $G_OUT)"; fi
+grep -qF -- "IBL5_BURNDOWN_LOOP=1" <<< "$G_OUT" || fail "opt-in=1: no opt-in message (got: $G_OUT)"
+[ "$G_PLIST" = 1 ] || fail "opt-in=1: no plist written (got: $G_OUT)"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with IBL5_BURNDOWN_LOOP=1 fires"
+
+# Case 14 — the launchd path never inherits the caller's env, so only --foreground
+# can prove the scrub: the far-side claude must see IBL5_BURNDOWN_LOOP as unset.
+FAIL_BEFORE=$FAIL
+PROBE_FILE="$TMP/optin.probe"; export PROBE_FILE; rm -f "$PROBE_FILE"
+set +e
+(cd "$WT6" && IBL5_BURNDOWN_LOOP=1 CLAUDE_HEADLESS=1 POST_PLAN_SKILL=1 \
+    HOME="$HOME7" FAKE_MODE=envprobe GH_CMD="$SHIMS/gh-none" \
+    "$REPO/bin/post-plan-now" --auto --foreground >/dev/null 2>&1)
+set -e
+if [ ! -f "$PROBE_FILE" ]; then
+    fail "scrub: probe file missing (far-side claude never ran)"
+elif [ "$(cat "$PROBE_FILE")" != "unset" ]; then
+    fail "scrub: far side saw IBL5_BURNDOWN_LOOP=$(cat "$PROBE_FILE"), expected unset"
+fi
+rm -f "$PROBE_FILE"
+rm -f "$HOME7"/Library/LaunchAgents/*.plist
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "opt-in is scrubbed before the far-side claude runs"
 
 # ==========================================================================
 # Summary

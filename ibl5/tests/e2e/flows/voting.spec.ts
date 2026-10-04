@@ -90,6 +90,27 @@ test.describe('ASG Voting', () => {
     await expect(ecfTable).toBeVisible();
     await expect(ecfTable).toHaveClass(/responsive-table/);
   });
+
+  test.describe('at phone width from first paint', () => {
+    // Viewport is set on the context before the beforeEach goto, so no
+    // resize/orientationchange event fires after the click. The only thing
+    // that can add responsive-table to the expanded table is the ShowAndHide
+    // click handler's own refresh call.
+    test.use({ viewport: { width: 375, height: 812 } });
+
+    test('clicking a ballot category header makes its table responsive', async ({ page }) => {
+      const ecfTable = page.locator('#ECF');
+
+      // Collapsed at load: responsive-tables.js skips hidden tables, so no class yet
+      await expect(ecfTable).toBeHidden();
+      await expect(ecfTable).not.toHaveClass(/responsive-table/);
+
+      await page.locator('.voting-category').first().click();
+
+      await expect(ecfTable).toBeVisible();
+      await expect(ecfTable).toHaveClass(/responsive-table/);
+    });
+  });
 });
 
 // ============================================================

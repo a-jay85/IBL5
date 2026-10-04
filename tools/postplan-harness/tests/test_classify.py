@@ -17,7 +17,7 @@ from harness.classify import (_manual_testing_span, classify, files_from_diff, f
                                is_gm_visible_path,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END, MANUAL_TESTING_SENTINEL,
                                MANUAL_TESTING_SENTINEL_STATIC,
-                               name_status_from_diff, qualify_backlog_refs, rename_sources_from_diff,
+                               name_status_from_diff, numstat_text, qualify_backlog_refs, rename_sources_from_diff,
                                render_files_changed,
                                render_reviewer_verification,
                                retro_registry_row_from_diff,
@@ -1189,9 +1189,10 @@ def test_upsert_residual_phases_append_replace_remove():
     assert "3 — C" in replaced
     assert "2 — B" not in replaced
 
-    # remove: body equals pre-append body
+    # remove: upsert re-terminates the head with exactly one "\n" (body.rstrip() + "\n"),
+    # so the restored body is the original plus a single trailing newline, not byte-identical.
     removed = upsert_residual_phases(replaced, "")
-    assert removed.strip() == body.strip()
+    assert removed == body.rstrip() + "\n"
 
 
 def test_upsert_residual_phases_noop_without_items_or_markers():
@@ -1323,3 +1324,33 @@ def test_upsert_tests_changed_preserves_files_changed_block():
     assert files_snapshot in result_2
     assert result_1.count(TESTS_CHANGED_BEGIN) == 1
     assert result_1 == result_2
+
+
+_NUMSTAT_DIFF = (
+    "diff --git a/q.sql b/q.sql\n"
+    "index 111..222 100644\n"
+    "--- a/q.sql\n"
+    "+++ b/q.sql\n"
+    "@@ -1,3 +1,3 @@\n"
+    " keep\n"
+    "--- sql comment\n"
+    "+++x\n"
+    "-gone\n"
+    "+new\n"
+    "diff --git a/n.txt b/n.txt\n"
+    "new file mode 100644\n"
+    "--- /dev/null\n"
+    "+++ b/n.txt\n"
+    "@@ -0,0 +1 @@\n"
+    "+line\n"
+)
+
+
+def test_numstat_text_counts_dash_prefixed_content_inside_hunks():
+    # Deleted '-- sql comment' renders as '--- sql comment'; added '++x' as '+++x'.
+    assert numstat_text(_NUMSTAT_DIFF).splitlines() == ["2\t2\tq.sql", "1\t0\tn.txt"]
+
+
+def test_numstat_text_does_not_count_file_headers():
+    diff = ("diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1 +1 @@\n-x\n+y\n")
+    assert numstat_text(diff) == "1\t1\ta"

@@ -1,0 +1,358 @@
+[
+  {
+    "slug": "cash-cy",
+    "ts": "20260920-120000",
+    "armed": false,
+    "conditions": [
+      {
+        "number": 3,
+        "name": "cond-3",
+        "blocked": true,
+        "reason": "MISSING-PHASE: 8 not in diff (head a1b2c3d4e5f6)",
+        "warning": ""
+      },
+      {
+        "number": 7,
+        "name": "cond-7",
+        "blocked": true,
+        "reason": "plan sets auto_merge: false",
+        "warning": ""
+      }
+    ]
+  },
+  {
+    "slug": "cash-cy",
+    "ts": "20260921-120000",
+    "armed": false,
+    "conditions": [
+      {
+        "number": 1,
+        "name": "cond-1",
+        "blocked": true,
+        "reason": "manual rows pending",
+        "warning": ""
+      },
+      {
+        "number": 3,
+        "name": "cond-3",
+        "blocked": true,
+        "reason": "MISSING-PHASE: 8 not in diff (head b2c3d4e5f6a1)",
+        "warning": ""
+      },
+      {
+        "number": 7,
+        "name": "cond-7",
+        "blocked": true,
+        "reason": "plan sets auto_merge: false",
+        "warning": ""
+      },
+      {
+        "number": 16,
+        "name": "cond-16",
+        "blocked": true,
+        "reason": "meta-check failing",
+        "warning": ""
+      }
+    ]
+  },
+  {
+    "slug": "cash-cy",
+    "ts": "20260922-120000",
+    "armed": false,
+    "conditions": [
+      {
+        "number": 1,
+        "name": "cond-1",
+        "blocked": true,
+        "reason": "manual rows pending",
+        "warning": ""
+      },
+      {
+        "number": 3,
+        "name": "cond-3",
+        "blocked": true,
+        "reason": "MISSING-PHASE: 8 not in diff (head c3d4e5f6a1b2)",
+        "warning": ""
+      },
+      {
+        "number": 7,
+        "name": "cond-7",
+        "blocked": true,
+        "reason": "plan sets auto_merge: false",
+        "warning": ""
+      }
+    ]
+  },
+  {
+    "slug": "cash-cy",
+    "ts": "20260923-120000",
+    "armed": false,
+    "conditions": [
+      {
+        "number": 1,
+        "name": "cond-1",
+        "blocked": true,
+        "reason": "manual rows pending",
+        "warning": ""
+      },
+      {
+        "number": 3,
+        "name": "cond-3",
+        "blocked": true,
+        "reason": "MISSING-PHASE: 8 not in diff (head d4e5f6a1b2c3)",
+        "warning": ""
+      },
+      {
+        "number": 7,
+        "name": "cond-7",
+        "blocked": true,
+        "reason": "plan sets auto_merge: false",
+        "warning": ""
+      }
+    ]
+  },
+  {
+    "slug": "cash-cy",
+    "ts": "20260924-120000",
+    "armed": true,
+    "conditions": []
+  },
+  {
+    "slug": "cash-cy",
+    "ts": "20260925-120000",
+    "armed": false,
+    "conditions": [
+      {
+        "number": 1,
+        "name": "cond-1",
+        "blocked": true,
+        "reason": "manual rows pending",
+        "warning": ""
+      },
+      {
+        "number": 3,
+        "name": "cond-3",
+        "blocked": true,
+        "reason": "MISSING-PHASE: 8 not in diff (head f6a1b2c3d4e5)",
+        "warning": ""
+      },
+      {
+        "number": 7,
+        "name": "cond-7",
+        "blocked": true,
+        "reason": "plan sets auto_merge: false",
+        "warning": ""
+      },
+      {
+        "number": 16,
+        "name": "cond-16",
+        "blocked": true,
+        "reason": "meta-check failing",
+        "warning": ""
+      }
+    ]
+  },
+  {
+    "slug": "cash-cy",
+    "ts": "20260926-120000",
+    "armed": false,
+    "conditions": [
+      {
+        "number": 3,
+        "name": "cond-3",
+        "blocked": true,
+        "reason": "MISSING-PHASE: 8 not in diff (head 0a1b2c3d4e5f)",
+        "warning": ""
+      },
+      {
+        "number": 7,
+        "name": "cond-7",
+        "blocked": true,
+        "reason": "plan sets auto_merge: false",
+        "warning": ""
+      },
+      {
+        "number": 12,
+        "name": "cond-12",
+        "blocked": true,
+        "reason": "fidelity verdict drifted",
+        "warning": ""
+      },
+      {
+        "number": 15,
+        "name": "cond-15",
+        "blocked": true,
+        "reason": "CI red",
+        "warning": ""
+      }
+    ]
+  },
+  {
+    "slug": "cash-cy",
+    "ts": "20260927-120000",
+    "armed": false,
+    "conditions": [
+      {
+        "number": 3,
+        "name": "cond-3",
+        "blocked": true,
+        "reason": "MISSING-PHASE: 8 not in diff (head 1b2c3d4e5f60)",
+        "warning": ""
+      },
+      {
+        "number": 7,
+        "name": "cond-7",
+        "blocked": true,
+        "reason": "plan sets auto_merge: false",
+        "warning": ""
+      }
+    ]
+  },
+  {
+    "slug": "steady",
+    "ts": "20260920-130000",
+    "armed": false,
+    "conditions": [
+      {
+        "number": 3,
+        "name": "cond-3",
+        "blocked": true,
+        "reason": "MISSING-PHASE: 8 not in diff (head a1b2c3d4e5f6)",
+        "warning": ""
+      },
+      {
+        "number": 7,
+        "name": "cond-7",
+        "blocked": true,
+        "reason": "plan sets auto_merge: false",
+        "warning": ""
+      },
+      {
+        "number": 8,
+        "name": "cond-8",
+        "blocked": true,
+        "reason": "feat: commit type needs human signoff",
+        "warning": ""
+      }
+    ]
+  },
+  {
+    "slug": "steady",
+    "ts": "20260921-130000",
+    "armed": false,
+    "conditions": [
+      {
+        "number": 3,
+        "name": "cond-3",
+        "blocked": true,
+        "reason": "MISSING-PHASE: 8 not in diff (head b2c3d4e5f6a1)",
+        "warning": ""
+      },
+      {
+        "number": 7,
+        "name": "cond-7",
+        "blocked": true,
+        "reason": "plan sets auto_merge: false",
+        "warning": ""
+      },
+      {
+        "number": 8,
+        "name": "cond-8",
+        "blocked": true,
+        "reason": "feat: commit type needs human signoff",
+        "warning": ""
+      }
+    ]
+  },
+  {
+    "slug": "steady",
+    "ts": "20260922-130000",
+    "armed": false,
+    "conditions": [
+      {
+        "number": 3,
+        "name": "cond-3",
+        "blocked": true,
+        "reason": "MISSING-PHASE: 8 not in diff (head c3d4e5f6a1b2)",
+        "warning": ""
+      },
+      {
+        "number": 7,
+        "name": "cond-7",
+        "blocked": true,
+        "reason": "plan sets auto_merge: false",
+        "warning": ""
+      },
+      {
+        "number": 8,
+        "name": "cond-8",
+        "blocked": true,
+        "reason": "feat: commit type needs human signoff",
+        "warning": ""
+      }
+    ]
+  },
+  {
+    "slug": "env-only",
+    "ts": "20260920-140000",
+    "armed": false,
+    "conditions": [
+      {
+        "number": 1,
+        "name": "cond-1",
+        "blocked": true,
+        "reason": "manual rows pending",
+        "warning": ""
+      },
+      {
+        "number": 12,
+        "name": "cond-12",
+        "blocked": true,
+        "reason": "fidelity verdict drifted",
+        "warning": ""
+      }
+    ]
+  },
+  {
+    "slug": "env-only",
+    "ts": "20260921-140000",
+    "armed": false,
+    "conditions": [
+      {
+        "number": 1,
+        "name": "cond-1",
+        "blocked": true,
+        "reason": "manual rows pending",
+        "warning": ""
+      },
+      {
+        "number": 12,
+        "name": "cond-12",
+        "blocked": true,
+        "reason": "fidelity verdict drifted",
+        "warning": ""
+      }
+    ]
+  },
+  {
+    "slug": "env-only",
+    "ts": "20260922-140000",
+    "armed": false,
+    "conditions": [
+      {
+        "number": 1,
+        "name": "cond-1",
+        "blocked": true,
+        "reason": "manual rows pending",
+        "warning": ""
+      },
+      {
+        "number": 12,
+        "name": "cond-12",
+        "blocked": true,
+        "reason": "fidelity verdict drifted",
+        "warning": ""
+      }
+    ]
+  }
+]

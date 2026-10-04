@@ -798,8 +798,10 @@ automouse_oneshot_next() {
         || true
 }
 
-# Wall-clock at which a live automouse run hits its time guard, e.g. "run ends
-# Mon 2026-09-28 20:28". Empty when no runner is live.
+# Wall-clock at which a live automouse run's time guard stops it starting new
+# work, e.g. "new work stops Mon 2026-09-28 20:28". Empty when no runner is live.
+# This is not when the run finishes: bin/automouse/run checks the guard only
+# between iterations, so sessions already running when it fires may finish later.
 #
 # A runner is live when its own per-pid day log exists (bin/automouse/run writes
 # logs/<date>-$$.log) AND that pid is alive with automouse in its command line —
@@ -822,8 +824,8 @@ automouse_run_end() {
     done
     [ "$end" -gt 0 ] || return 0
     # BSD first, GNU (CI) second, as in automouse_oneshot_next.
-    date -r "$end" +'run ends %a %Y-%m-%d %H:%M' 2>/dev/null \
-        || date -d "@$end" +'run ends %a %Y-%m-%d %H:%M' 2>/dev/null \
+    date -r "$end" +'new work stops %a %Y-%m-%d %H:%M' 2>/dev/null \
+        || date -d "@$end" +'new work stops %a %Y-%m-%d %H:%M' 2>/dev/null \
         || true
 }
 

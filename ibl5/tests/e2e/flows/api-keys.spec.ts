@@ -27,6 +27,7 @@ test.describe('API Keys flow', () => {
     await expect(codeBlocks.nth(1)).toContainText('PropertiesService.getUserProperties');
     await expect(codeBlocks.nth(1)).toContainText('UrlFetchApp.fetch');
     await expect(codeBlocks.nth(1)).not.toContainText('?key=');
+    await expect(codeBlocks.nth(1)).toContainText("'X-API-Key'");
 
     await assertNoPhpErrors(page, 'on ApiKeys export guide');
   });

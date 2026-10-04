@@ -311,6 +311,17 @@ test_batch_ran_then_exhausted() {
     assert_contains ran_exhausted:counts "$(cat "$T/dm.calls" 2>/dev/null)" "batches=1 items=1"
 }
 
+test_batch_ran_items_per_batch() {
+    new_env
+    seed_usage 5 0 1
+    queue ledger ledger none
+    run_loop run
+    assert_eq items_per_batch:rc 0 "$RC"
+    assert_contains items_per_batch:second-batch "$OUT" "batch ran ledgers=1 items=1 units=5"
+    assert_not_contains items_per_batch:no-running-total "$OUT" "batch ran ledgers=1 items=2"
+    assert_contains items_per_batch:finish-total "$(cat "$T/dm.calls" 2>/dev/null)" "batches=2 items=2"
+}
+
 test_batch_old_ledger_not_counted() {
     new_env
     seed_usage 5 0 1
@@ -368,7 +379,7 @@ test_batch_env_and_prompt() {
     assert_contains env_prompt:optin "$line" "OPTIN=1"
     assert_contains env_prompt:sid "$line" "SID=$sid"
     assert_contains env_prompt:skip-perms "$line" "--dangerously-skip-permissions"
-    assert_contains env_prompt:model "$line" "--model claude-opus-5-5"
+    assert_contains env_prompt:model "$line" "--model claude-sonnet-5-5"
     assert_contains env_prompt:sentinel "$line" "BURNDOWN-LOOP: none-selected"
 }
 

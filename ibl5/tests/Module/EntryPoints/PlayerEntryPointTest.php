@@ -254,4 +254,15 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $this->assertQueryExecuted("uuid = '" . $uuid . "'");
         $this->assertQueryExecuted('p.pid = 0');
     }
+
+    public function testModuleDeclaresNoGlobalFunctions(): void
+    {
+        $this->mockDb->setMockData([]);
+        $this->runModule('Player', []);
+
+        $this->assertFalse(function_exists('showpage'));
+        $this->assertFalse(function_exists('negotiate'));
+        $this->assertFalse(function_exists('rookieoption'));
+        $this->assertFalse(function_exists('processrookieoption'));
+    }
 }

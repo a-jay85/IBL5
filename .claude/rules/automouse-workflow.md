@@ -65,7 +65,7 @@ Each phase's cost is recorded in two places: the markdown row in `reports/YYYY-M
 
 **Prov column:** `recomputed` (transcript recomputation succeeded, no anomaly flagged), `recomputed-anomalous` (>$0.01 below harness or duration mismatch), `unknown` (no transcript, e.g. aged out after ~30 days; harness figure kept), `harness-ledger` (harness's own `result.json` usage ledger; harness-only runs exiting 0 or 3, no Sonnet session).
 
-**`peak_ctx`:** main transcript occupancy over `usage.iterations[]` (top-level `usage` sums them, so it is no single occupancy), excluding `advisor_message` iterations and sub-agents; pre-2026-08-26 rows read high. Reported cost is a floor: compaction surcharge is separate, a `low–high` range in "Surcharge est ($)" for recomputed rows with at least one compaction, else an em-dash (—).
+**`peak_ctx`:** main transcript occupancy over `usage.iterations[]` (top-level `usage` sums them, so it is no single occupancy), excluding `advisor_message` iterations and sub-agents; pre-2026-08-26 rows read high. Reported cost is a floor: compaction surcharge is separate, a `low–high` range in "Surcharge est ($)" for recomputed or recomputed-anomalous rows with at least one compaction, else an em-dash (—).
 
 ### Startup archival
 

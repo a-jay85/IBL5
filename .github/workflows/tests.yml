@@ -1065,6 +1065,7 @@ jobs:
             bin/test-scrub-log-credentials \
             bin/test-db-query-routing \
             bin/test-watch-run \
+            bin/test-watch-automouse-plan \
             ibl5/bin/test-flake-ledger \
             bin/test-path-filters \
             ibl5/bin/test-db-sync-now \

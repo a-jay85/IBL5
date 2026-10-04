@@ -701,8 +701,9 @@ SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
     run_poll_err "$SB"
 { grep -q "$B_OLD" "$SB/wt-remove-calls" 2>/dev/null \
     && grep -q "$B_OLD" "$SB/git-branch-d-calls" 2>/dev/null \
-    && ! grep -q "Could not reap" "$POLL_STDERR_FILE"; } \
-  && ok "(23a) zero-own-commit clean wedged branch: wt-remove + branch -D, no 'Could not reap'" \
+    && ! grep -q "Could not reap" "$POLL_STDERR_FILE" \
+    && ! grep -q "salvage failed" "$POLL_STDERR_FILE"; } \
+  && ok "(23a) zero-own-commit clean wedged branch: wt-remove + branch -D, no 'Could not reap', no 'salvage failed'" \
   || bad "(23a) zero-own-commit clean wedged branch not removed"
 
 # (23b) negative: branch has own commits (not an ancestor) → left in place.
@@ -715,9 +716,10 @@ SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
     SHIM_SHOWREF_RC=0 SHIM_MERGEBASE_RC=1 \
     run_poll_err "$SB"
 { [ ! -f "$SB/wt-remove-calls" ] && [ ! -f "$SB/git-branch-d-calls" ] \
-    && grep -q "Could not reap" "$POLL_STDERR_FILE"; } \
-  && ok "(23b) clean branch with own commits: not force-removed, left in place" \
-  || bad "(23b) branch with own commits must not be force-removed"
+    && grep -q "Could not reap" "$POLL_STDERR_FILE" \
+    && grep -qF "salvage failed for '$B_OLD'" "$POLL_STDERR_FILE"; } \
+  && ok "(23b) clean branch with own commits: not force-removed, left in place, salvage reported failed" \
+  || bad "(23b) branch with own commits must not be force-removed and salvage must return non-zero"
 
 # (23c) dirty wedged branch salvaged + pushed, but bin/cleanup SKIPs it (the salvage
 # commit is on no merged PR). The ref must still be removed, or it re-wedges nightly.

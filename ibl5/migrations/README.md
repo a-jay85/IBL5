@@ -42,7 +42,7 @@ Deploys that bring new migration files also take a full database dump first. The
 
 ## Destructive Migration CI Scan
 
-The `migration-safety.yml` workflow includes a **destructive migration scan** (`bin/check-destructive-migrations`) that blocks PRs and pushes containing these patterns in new or modified `.sql` files under `ibl5/migrations/`:
+The `migration-safety.yml` workflow includes a **destructive migration scan** (`bin/check-destructive-migrations`) that blocks PRs and pushes containing these patterns in new or modified `.sql` and `.php` files under `ibl5/migrations/`. The scan works on whole statements: statements are split on `;` outside strings and comments, comments are removed and string literals masked, and a statement is scanned when any of its lines is added. `DELIMITER` blocks are not understood, and a `WHERE` inside a subquery counts as the statement's `WHERE`. In `.php` migrations SQL is read from string literals, heredocs and nowdocs, with dotted concatenation joined:
 
 | Pattern | What it catches |
 |---------|----------------|
@@ -54,24 +54,30 @@ The `migration-safety.yml` workflow includes a **destructive migration scan** (`
 | `tighten-not-null` | `MODIFY [COLUMN] <col> ... NOT NULL`, or same-name `CHANGE`, without `DEFAULT` (false positive if the column was already `NOT NULL`; use the bypass marker) |
 | `drop-index` | `DROP INDEX` / `DROP KEY` (suppressed when the same file adds an index with the same name) |
 | `rename-table` | `RENAME TABLE ...` or `ALTER TABLE ... RENAME TO\|AS ...` |
+| `delete-no-where` | `DELETE ... FROM` with no `WHERE` anywhere in the statement |
+| `update-no-where` | `UPDATE ... SET` with no `WHERE` anywhere in the statement (`UPDATE ... JOIN` counts; `INSERT ... ON DUPLICATE KEY UPDATE` does not) |
+| `narrow-type` | `MODIFY` / `CHANGE` to a narrower type. The old type comes from `ibl5/docs/schema/current-schema.sql`, then a same-file definition; a column the dump does not know fires as unresolved |
+| `drop-recreate-existing` | `DROP TABLE IF EXISTS` + `CREATE TABLE` of a table that already exists in the schema dump, the baseline, or an earlier-numbered migration |
 
 The file `000_baseline_schema.sql` is always excluded from scanning.
 
 ### Bypass markers
 
-When a destructive operation is intentional and reviewed, add a bypass marker:
+When a destructive operation is intentional and reviewed, add a bypass marker that names each accepted trigger. A marker suppresses only the triggers it names.
 
-**Per-file** (inline SQL comment — suppresses all triggers for that file):
+**Per-file** (SQL comment on an added line, or a `//`, `#` or `/* */` comment in a `.php` migration):
 ```sql
--- destructive-migration: <reason at least 20 characters>
+-- destructive-migration[drop-column,drop-index]: <reason at least 20 characters>
 ```
 
-**Per-PR** (HTML comment in the PR body — suppresses all triggers globally):
+**Per-PR** (HTML comment in the PR body, applies to every scanned file):
 ```html
-<!-- destructive-migration: <reason at least 20 characters> -->
+<!-- destructive-migration[update-no-where]: <reason at least 20 characters> -->
 ```
 
-The reason must be at least 20 characters. Short reasons are rejected.
+Known tags: `drop-column`, `drop-table`, `truncate`, `rename-column`, `add-not-null-no-default`, `tighten-not-null`, `drop-index`, `rename-table`, `delete-no-where`, `update-no-where`, `narrow-type`, `drop-recreate-existing`. An unknown tag is an error. The reason must be at least 20 characters. Short reasons are rejected.
+
+An untagged marker (`-- destructive-migration: <reason>`) is rejected in `--staged` and `--since` modes. `bin/check-destructive-migrations --full-scan` audits every tracked migration and still honours untagged markers, so historical files scan the same as before.
 
 ## Automated Migration Runner
 

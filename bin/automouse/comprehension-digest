@@ -182,6 +182,7 @@ fi
 # schedule no resume, so a denied week gets a facts-only brief and never a deferred send.
 cdd_usage_gate() (
   local body zone rc=0
+  set +u   # the sourced libraries expand $HOME bare; an unset HOME must fail open, not abort
   # shellcheck source=/dev/null
   . "$REPO_ROOT/bin/lib/usage-gate.sh"
   body="$(usage_fetch 300)" || rc=$?

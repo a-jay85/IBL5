@@ -114,7 +114,7 @@ class PlayerTeamJoinRatchetTest extends TestCase
                 continue;
             }
             foreach ($matches[0] as [, $offset]) {
-                $hits[] = $path . ':' . (substr_count(substr($contents, 0, (int) $offset), "\n") + 1);
+                $hits[] = $path . ':' . (substr_count(substr($contents, 0, $offset), "\n") + 1);
             }
         }
         sort($hits);

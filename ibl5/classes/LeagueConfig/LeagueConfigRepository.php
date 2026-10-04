@@ -12,7 +12,7 @@ use LeagueConfig\Contracts\LeagueConfigRepositoryInterface;
  *
  * @see LeagueConfigRepositoryInterface For the interface contract
  */
-class LeagueConfigRepository extends \BaseMysqliRepository implements LeagueConfigRepositoryInterface
+class LeagueConfigRepository extends \Database\BaseMysqliRepository implements LeagueConfigRepositoryInterface
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {

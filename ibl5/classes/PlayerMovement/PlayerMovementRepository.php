@@ -13,7 +13,7 @@ use PlayerMovement\Contracts\PlayerMovementRepositoryInterface;
  *
  * @see PlayerMovementRepositoryInterface For the interface contract
  */
-class PlayerMovementRepository extends \BaseMysqliRepository implements PlayerMovementRepositoryInterface
+class PlayerMovementRepository extends \Database\BaseMysqliRepository implements PlayerMovementRepositoryInterface
 {
     /**
      * @see PlayerMovementRepositoryInterface::getPlayerMovements()

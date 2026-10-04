@@ -13,7 +13,7 @@ use Repositories\PlayerTeamJoinQuery;
  *
  * @see LeagueStartersRepositoryInterface For the interface contract
  */
-class LeagueStartersRepository extends \BaseMysqliRepository implements LeagueStartersRepositoryInterface
+class LeagueStartersRepository extends \Database\BaseMysqliRepository implements LeagueStartersRepositoryInterface
 {
     use PlayerTeamJoinQuery;
 

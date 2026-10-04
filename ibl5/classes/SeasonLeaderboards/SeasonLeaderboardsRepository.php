@@ -16,7 +16,7 @@ use SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface;
  * @phpstan-import-type LeaderboardResult from SeasonLeaderboardsRepositoryInterface
  * @phpstan-import-type TeamRow from SeasonLeaderboardsRepositoryInterface
  */
-class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements SeasonLeaderboardsRepositoryInterface
+class SeasonLeaderboardsRepository extends \Database\BaseMysqliRepository implements SeasonLeaderboardsRepositoryInterface
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {

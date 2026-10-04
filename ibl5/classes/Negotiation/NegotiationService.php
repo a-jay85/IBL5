@@ -60,7 +60,7 @@ class NegotiationService implements NegotiationServiceInterface
 
         $demands = $this->demandCalculator->calculateDemands($player, $teamFactors);
         $capSpace = $this->repository->getTeamCapSpaceNextSeason($userTeamName);
-        $maxYearOneSalary = \ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
+        $maxYearOneSalary = \League\ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
 
         // Trading card (mirrors PlayerPageController::renderPage assembly)
         $playerRepository = new \Player\PlayerRepository($this->db);

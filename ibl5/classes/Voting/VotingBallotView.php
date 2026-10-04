@@ -65,16 +65,16 @@ class VotingBallotView implements VotingBallotViewInterface
      * @see VotingBallotViewInterface::renderResultsExpander()
      *
      * Mirrors renderCategoryHeader()'s markup rather than calling it: the hint is
-     * italicised, and that private method escapes its instruction argument.
+     * wrapped in <em>, and that private method escapes its instruction argument.
      */
     public function renderResultsExpander(string $resultsHtml): string
     {
         $html = $this->renderShowHideScript('Results');
         $html .= '<div class="voting-category" onclick="ShowAndHideResults()">';
         $html .= '<h2 class="ibl-title voting-category-title">Voting Results</h2>';
-        $html .= '<p class="voting-category-instruction"><i>Tap/click to reveal/hide results.</i></p>';
+        $html .= '<p class="voting-category-instruction"><em>Tap/click to reveal/hide results.</em></p>';
         $html .= '</div>';
-        $html .= '<div id="Results" style="display:none">' . $resultsHtml . '</div>';
+        $html .= '<div id="Results" class="voting-collapsed">' . $resultsHtml . '</div>';
 
         return $html;
     }
@@ -87,13 +87,13 @@ class VotingBallotView implements VotingBallotViewInterface
         return "<script>
 function ShowAndHide{$categoryCode}() {
     var x = document.getElementById('{$categoryCode}');
-    if (x.style.display == 'none') {
-        x.style.display = '';
+    if (x.classList.contains('voting-collapsed')) {
+        x.classList.remove('voting-collapsed');
         if (typeof window.IBL_refreshResponsiveTables === 'function') {
             window.IBL_refreshResponsiveTables();
         }
     } else {
-        x.style.display = 'none';
+        x.classList.add('voting-collapsed');
     }
 }
 </script>";
@@ -132,7 +132,7 @@ function ShowAndHide{$categoryCode}() {
         $isASG = ($phase === 'Regular Season');
         $isGM = ($categoryCode === 'GM');
 
-        $html = "<table id=\"{$categoryCode}\" style=\"display:none\" class=\"sortable ibl-data-table voting-form-table\">";
+        $html = "<table id=\"{$categoryCode}\" class=\"sortable ibl-data-table voting-form-table voting-collapsed\">";
         $html .= '<thead><tr>';
         $html .= $this->renderTableHeaders($isASG, $isGM);
         $html .= '</tr></thead><tbody>';

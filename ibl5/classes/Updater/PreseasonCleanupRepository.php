@@ -9,7 +9,7 @@ use Season\Season;
 /**
  * Database queries for the preseason cleanup pipeline step.
  */
-final class PreseasonCleanupRepository extends \BaseMysqliRepository
+final class PreseasonCleanupRepository extends \Database\BaseMysqliRepository
 {
     public function hasPreseasonBoxScores(int $beginningYear): bool
     {

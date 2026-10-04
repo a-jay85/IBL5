@@ -18,7 +18,7 @@ use League\LeagueContext;
  *
  * @see LastSimRecapRepositoryInterface
  */
-class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRecapRepositoryInterface
+class LastSimRecapRepository extends \Database\BaseMysqliRepository implements LastSimRecapRepositoryInterface
 {
     /**
      * Calendar year of a Sep-Dec transaction = season_year - 1 (season_year is

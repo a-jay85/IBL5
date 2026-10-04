@@ -13,7 +13,7 @@ use SavedDepthChart\Contracts\SavedDepthChartRepositoryInterface;
  *
  * @see SavedDepthChartRepositoryInterface
  */
-class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDepthChartRepositoryInterface
+class SavedDepthChartRepository extends \Database\BaseMysqliRepository implements SavedDepthChartRepositoryInterface
 {
     public function __construct(\mysqli $db, ?\League\LeagueContext $leagueContext = null)
     {
@@ -260,7 +260,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
              ORDER BY ordinal ASC",
             "ii",
             $teamid,
-            \JSB::WAIVERS_ORDINAL
+            \League\JSB::WAIVERS_ORDINAL
         );
     }
 

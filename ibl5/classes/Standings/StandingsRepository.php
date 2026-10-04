@@ -23,9 +23,9 @@ use Standings\Contracts\StandingsRepositoryInterface;
  * @phpstan-import-type UpsertStandingsParams from StandingsRepositoryInterface
  *
  * @see StandingsRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  */
-class StandingsRepository extends \BaseMysqliRepository implements StandingsRepositoryInterface
+class StandingsRepository extends \Database\BaseMysqliRepository implements StandingsRepositoryInterface
 {
     private readonly PythagoreanCalculator $pythagoreanCalculator;
 

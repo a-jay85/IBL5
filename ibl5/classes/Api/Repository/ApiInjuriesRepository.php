@@ -7,7 +7,7 @@ namespace Api\Repository;
 /**
  * @phpstan-type InjuredPlayerRow array{player_uuid: string, pid: int, name: string, pos: string, injured: int, teamid: int|null, team_uuid: string|null, team_city: string|null, team_name: string|null}
  */
-class ApiInjuriesRepository extends \BaseMysqliRepository
+class ApiInjuriesRepository extends \Database\BaseMysqliRepository
 {
     /**
      * Get all currently injured active players with team information.

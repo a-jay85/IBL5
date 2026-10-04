@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PlayerDatabase;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use PlayerDatabase\Contracts\PlayerDatabaseRepositoryInterface;
 use Validation\QueryConditions;
 

@@ -7,7 +7,7 @@ namespace LeagueControlPanel\Contracts;
 /**
  * Interface for generating season awards from votes and JSB Leaders.htm data.
  */
-interface AwardGenerationServiceInterface
+interface LeagueControlPanelAwardGenerationServiceInterface
 {
     /**
      * Generate all non-event season awards for a given year.

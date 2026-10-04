@@ -133,7 +133,7 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
             // only bumps ordinal), so waived players are still in $rosterData. They no longer
             // occupy a roster spot. Their salary still counts against the cap as dead money —
             // calculateTotalSalaries() deliberately does not apply this filter.
-            if (($player->getOrdinal() ?? 0) > \JSB::WAIVERS_ORDINAL) {
+            if (($player->getOrdinal() ?? 0) > \League\JSB::WAIVERS_ORDINAL) {
                 continue;
             }
 

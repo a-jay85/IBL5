@@ -15,9 +15,9 @@ use CapSpace\Contracts\CapSpaceRepositoryInterface;
  * @phpstan-import-type ContractRow from CapSpaceRepositoryInterface
  *
  * @see CapSpaceRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  */
-class CapSpaceRepository extends \BaseMysqliRepository implements CapSpaceRepositoryInterface
+class CapSpaceRepository extends \Database\BaseMysqliRepository implements CapSpaceRepositoryInterface
 {
     /**
      * @see CapSpaceRepositoryInterface::getAllTeams()
@@ -43,7 +43,7 @@ class CapSpaceRepository extends \BaseMysqliRepository implements CapSpaceReposi
              WHERE retired = 0
                AND teamid = ?
                AND cy <> cyt
-               AND ordinal <= '" . \JSB::WAIVERS_ORDINAL . "'",
+               AND ordinal <= '" . \League\JSB::WAIVERS_ORDINAL . "'",
             "i",
             $teamId
         );

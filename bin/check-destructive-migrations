@@ -1,69 +1,107 @@
 #!/bin/bash
 
-# Scans migration SQL files for destructive patterns (DROP COLUMN, DROP TABLE,
-# TRUNCATE, RENAME COLUMN/TABLE, CHANGE renames, NOT NULL without DEFAULT,
-# DROP INDEX).
+# Scans migration files (.sql and .php) for destructive SQL statements.
+# Git plumbing lives here; statement splitting, PHP extraction, the trigger
+# rules and the bypass-marker policy live in bin/lib/destructive-migration-scan.py.
 #
-# Exit codes: 0 = pass, 1 = destructive patterns found, 2 = usage error.
+# Exit codes: 0 = pass, 1 = destructive patterns found, 2 = usage error
+# (or python3 / the engine is missing: the scan never passes silently).
 
 set -euo pipefail
 
 BYPASS_MIN_LENGTH=20
 BASELINE_FILE="ibl5/migrations/000_baseline_schema.sql"
+ENGINE="$(cd "$(dirname "$0")" && pwd)/lib/destructive-migration-scan.py"
 
 usage() {
     cat <<'EOF'
-Usage: bin/check-destructive-migrations [--staged|--since=<sha>] [--bypass-from-stdin] [--help|-h]
+Usage: bin/check-destructive-migrations [--staged|--since=<sha>|--full-scan] [--bypass-from-stdin] [--self-test] [--help|-h]
 
-Scans added/modified migration files under ibl5/migrations/ for destructive
-SQL patterns and blocks unless a bypass marker is present.
+Scans added/modified migration files under ibl5/migrations/ (*.sql and *.php)
+for destructive SQL statements and blocks unless a tagged bypass marker names
+each trigger that fired.
 
 Modes:
   --staged           Scan staged changes (git diff --cached). Default.
   --since=<sha>      Scan changes since the given SHA (git diff <sha>...HEAD).
+  --full-scan        Audit every tracked ibl5/migrations/*.sql|*.php in the
+                     working tree, whole files. Legacy untagged markers are
+                     honoured here only. Takes no --since and no stdin.
 
 Options:
-  --bypass-from-stdin   Read PR body from stdin for the global bypass marker.
+  --bypass-from-stdin   Read PR body from stdin for PR-wide bypass markers.
+  --self-test           Run the engine's inline fixture table.
   --help, -h            Show this message.
 
-Detected patterns (v1):
-  drop-column             ALTER TABLE ... DROP COLUMN
+Detected patterns (v2, statement-level):
+  drop-column             ALTER TABLE ... DROP [COLUMN] <col>
   drop-table              DROP TABLE (suppressed when IF EXISTS + matching
-                          CREATE TABLE in same file = recreate pattern)
+                          CREATE TABLE in the scanned statements = recreate)
   truncate                TRUNCATE [TABLE] ...
   rename-column           ALTER TABLE ... RENAME COLUMN, or
                           CHANGE [COLUMN] <old> <new> with old != new
-  add-not-null-no-default ADD COLUMN ... NOT NULL without DEFAULT
+  add-not-null-no-default ADD [COLUMN] ... NOT NULL without DEFAULT
   tighten-not-null        MODIFY [COLUMN] <col> ... NOT NULL, or same-name
                           CHANGE <col> <col> ... NOT NULL, without DEFAULT
-                          (false positive if the column was already NOT NULL;
-                          add the bypass marker in that case)
-  drop-index              DROP INDEX|KEY <name> (suppressed when the same file
-                          adds an index/key with the same name)
-  rename-table            RENAME TABLE, or ALTER TABLE ... RENAME TO|AS
+                          (false positive if the column was already NOT NULL)
+  drop-index              DROP INDEX|KEY <name> (suppressed when the scanned
+                          statements add an index/key with the same name)
+  rename-table            RENAME TABLE, or ALTER TABLE ... RENAME [TO|AS]
+  delete-no-where         DELETE ... FROM with no WHERE anywhere in the statement
+  update-no-where         UPDATE ... SET with no WHERE anywhere in the statement;
+                          UPDATE ... JOIN without WHERE counts, INSERT ... ON
+                          DUPLICATE KEY UPDATE does not
+  narrow-type             MODIFY/CHANGE to a narrower type. Old type comes from
+                          ibl5/docs/schema/current-schema.sql, then a same-file
+                          definition; a column the dump does not know fires as
+                          unresolved
+  drop-recreate-existing  DROP TABLE IF EXISTS + CREATE TABLE of a table that
+                          already exists in the schema dump, the baseline, or an
+                          earlier-numbered migration
 
-Matching is per line: NOT NULL and DEFAULT must be on the same line as
-MODIFY/CHANGE, and CHANGE needs both column names on that line.
+Statements are split on ';' outside strings and comments, comments are
+removed and string literals masked before matching, so a statement may span
+any number of lines. A statement is scanned when any of its lines is added;
+its text comes from the post-image.
 
-Bypass markers:
-  Per-file (inline SQL comment):
-    -- destructive-migration: <reason at least 20 chars>
+PHP migrations (heuristic): SQL is read from string literals, heredocs and
+nowdocs, with dotted concatenation joined. A WHERE supplied by a concatenated
+variable reads as missing (use a tagged marker).
+
+Explicitly NOT scanned (v2 limitations):
+  - DELIMITER blocks (procedure and trigger bodies split at their inner ';')
+  - A WHERE inside a subquery counts as the statement's WHERE
+  - PHP SQL built by sprintf/implode or held in a variable
+  - narrow-type with no schema dump: only same-file definitions resolve
+
+Bypass markers name the triggers they suppress:
+  Per-file (SQL comment, or PHP // # /* */ comment, on an added line):
+    -- destructive-migration[<trigger>[,<trigger>]]: <reason at least 20 chars>
   Per-PR (HTML comment in PR body, via --bypass-from-stdin):
-    <!-- destructive-migration: <reason at least 20 chars> -->
+    <!-- destructive-migration[<trigger>]: <reason at least 20 chars> -->
+  A marker suppresses only the triggers it names. Known tags: drop-column,
+  drop-table, truncate, rename-column, add-not-null-no-default,
+  tighten-not-null, drop-index, rename-table, delete-no-where,
+  update-no-where, narrow-type, drop-recreate-existing.
+  An untagged marker (destructive-migration: <reason>) is rejected in --staged
+  and --since modes and honoured only by --full-scan. An unknown tag is an error.
 
-Explicitly NOT scanned (v1 limitations):
-  - Bare DELETE FROM (often legitimate cleanup)
+Requires python3; exits 2 (never a silent pass) when it is missing.
 
 Hard-excluded files:
   - 000_baseline_schema.sql (recreate template with intentional DROP TABLE)
 
-Exit codes: 0 = pass, 1 = destructive patterns found, 2 = usage error.
+Exit codes: 0 = pass, 1 = destructive patterns found, 2 = usage error or
+python3 missing.
 EOF
 }
 
 MODE="staged"
 BYPASS_STDIN=0
 SINCE_SHA=""
+SINCE_GIVEN=0
+FULL_GIVEN=0
+SELF_TEST=0
 
 for arg in "$@"; do
     case "$arg" in
@@ -72,10 +110,17 @@ for arg in "$@"; do
             ;;
         --since=*)
             MODE="since"
+            SINCE_GIVEN=1
             SINCE_SHA="${arg#--since=}"
             ;;
         --bypass-from-stdin)
             BYPASS_STDIN=1
+            ;;
+        --full-scan)
+            FULL_GIVEN=1
+            ;;
+        --self-test)
+            SELF_TEST=1
             ;;
         --help|-h)
             usage
@@ -94,6 +139,28 @@ for arg in "$@"; do
     esac
 done
 
+if [ "$FULL_GIVEN" = "1" ]; then
+    if [ "$SINCE_GIVEN" = "1" ] || [ "$BYPASS_STDIN" = "1" ]; then
+        echo "--full-scan takes no range and no stdin" >&2
+        exit 2
+    fi
+    MODE="full"
+fi
+
+PYTHON="$(command -v python3 || true)"
+if [ -z "$PYTHON" ] || [ ! -f "$ENGINE" ]; then
+    echo "check-destructive-migrations: python3 (or bin/lib/destructive-migration-scan.py) not found; refusing to pass silently" >&2
+    exit 2
+fi
+
+if [ "$SELF_TEST" = "1" ]; then
+    exec "$PYTHON" "$ENGINE" --self-test
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+# Pathspecs and the --full-scan reads are repo-relative.
+cd "$REPO_ROOT"
+
 if [ "$MODE" = "since" ]; then
     RANGE="${SINCE_SHA}...HEAD"
 else
@@ -101,8 +168,15 @@ else
 fi
 
 get_migration_files() {
+    if [ "$MODE" = "full" ]; then
+        git ls-files -- 'ibl5/migrations/*.sql' 'ibl5/migrations/*.php' \
+            | grep -v '^$' \
+            | grep -v "^${BASELINE_FILE}$" \
+            || true
+        return
+    fi
     # shellcheck disable=SC2086
-    git diff $RANGE --name-only --diff-filter=AM -- 'ibl5/migrations/*.sql' 2>/dev/null \
+    git diff $RANGE --name-only --diff-filter=AM -- 'ibl5/migrations/*.sql' 'ibl5/migrations/*.php' 2>/dev/null \
         | grep -v '^$' \
         | grep -v "^${BASELINE_FILE}$" \
         || true
@@ -115,151 +189,92 @@ if [ -z "$FILES" ]; then
     exit 0
 fi
 
-PR_BODY_BYPASS=""
+PR_BODY_FILE=""
 if [ "$BYPASS_STDIN" = "1" ]; then
-    PR_BODY="$(cat)"
-    REASON="$(echo "$PR_BODY" | sed -n 's/.*<!--[[:space:]]*destructive-migration:[[:space:]]*\(.\{1,\}\)[[:space:]]*-->.*/\1/p' | head -1)"
-    REASON="$(echo "$REASON" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    if [ -n "$REASON" ] && [ "${#REASON}" -ge "$BYPASS_MIN_LENGTH" ]; then
-        PR_BODY_BYPASS="$REASON"
-    fi
+    PR_BODY_FILE="$(mktemp)"
+    trap 'rm -f "$PR_BODY_FILE"' EXIT
+    cat > "$PR_BODY_FILE"
+fi
+
+if [ "$MODE" = "full" ]; then
+    MARKER_POLICY="legacy"
+else
+    MARKER_POLICY="strict"
+fi
+
+SCHEMA_ARGS=()
+if [ -f "$REPO_ROOT/ibl5/docs/schema/current-schema.sql" ]; then
+    SCHEMA_ARGS=(--schema "$REPO_ROOT/ibl5/docs/schema/current-schema.sql")
+fi
+PR_ARGS=()
+if [ -n "$PR_BODY_FILE" ]; then
+    PR_ARGS=(--pr-body-file "$PR_BODY_FILE")
 fi
 
 TRIGGERS=""
 
-get_added_lines() {
+# Post-image text of a file: the index for --staged, HEAD for --since, the
+# working tree for --full-scan.
+post_image() {
     local file="$1"
-    # shellcheck disable=SC2086
-    git diff $RANGE -- "$file" | grep '^+' | grep -v '^+++' | sed 's/^+//'
+    case "$MODE" in
+        staged) git show ":$file" ;;
+        since) git show "HEAD:$file" ;;
+        full) cat "$file" ;;
+    esac
 }
 
-match_icase() {
-    echo "$1" | grep -iqE "$2"
+# Added line ranges of a file as "a-b,c-d" from the -U0 hunk headers.
+# A hunk with +c,0 is a pure deletion and adds nothing.
+added_ranges() {
+    local file="$1"
+    # shellcheck disable=SC2086
+    git diff -U0 $RANGE -- "$file" \
+        | awk '/^@@/ {
+            split($3, a, ",")
+            c = substr(a[1], 2) + 0
+            d = (a[2] == "") ? 1 : a[2] + 0
+            if (d > 0) { printf "%s%d-%d", (n++ ? "," : ""), c, c + d - 1 }
+        }'
 }
 
 check_file() {
     local file="$1"
-
-    local added_lines
-    added_lines="$(get_added_lines "$file")" || true
-
-    if [ -z "$added_lines" ]; then
-        return
+    local select_args=()
+    if [ "$MODE" = "full" ]; then
+        select_args=(--all-lines)
+    else
+        local ranges
+        ranges="$(added_ranges "$file")"
+        [ -z "$ranges" ] && return
+        select_args=(--added-ranges "$ranges")
     fi
 
-    local inline_bypass=""
-    local bypass_reason
-    bypass_reason="$(echo "$added_lines" | sed -n 's/^[[:space:]]*--[[:space:]]*destructive-migration:[[:space:]]*\(.\{1,\}\)/\1/p' | head -1)" || true
-    bypass_reason="$(echo "$bypass_reason" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    if [ -n "$bypass_reason" ] && [ "${#bypass_reason}" -ge "$BYPASS_MIN_LENGTH" ]; then
-        inline_bypass="$bypass_reason"
-    fi
-
-    local file_triggers=""
-    local line_num=0
-
-    while IFS= read -r line; do
-        line_num=$((line_num + 1))
-
-        local stripped
-        stripped="$(echo "$line" | sed 's/--.*$//')"
-        [ -z "$stripped" ] && continue
-
-        local lc
-        # Lowercased, with single-quoted string literals removed.
-        lc="$(echo "$stripped" | sed "s/'[^']*'/''/g" | tr '[:upper:]' '[:lower:]')"
-        # Clause start: line start, after a comma, or right after ALTER TABLE <t>.
-        # Keeps words like "change" inside string literals from matching.
-        local clause='(^|,|alter[[:space:]]+table[[:space:]]+[^[:space:]]+)[[:space:]]*'
-
-        # drop-column
-        if match_icase "$stripped" 'ALTER[[:space:]]+TABLE[[:space:]].*DROP[[:space:]]+COLUMN'; then
-            file_triggers="${file_triggers}  [drop-column] ${file}:${line_num} ${stripped}
+    local out rc errfile
+    errfile="$(mktemp)"
+    set +e
+    out="$(post_image "$file" | "$PYTHON" "$ENGINE" scan --file "$file" \
+        "${select_args[@]}" --marker-policy "$MARKER_POLICY" \
+        --migrations-dir "$REPO_ROOT/ibl5/migrations" \
+        ${SCHEMA_ARGS[@]+"${SCHEMA_ARGS[@]}"} ${PR_ARGS[@]+"${PR_ARGS[@]}"} 2>"$errfile")"
+    rc=$?
+    set -e
+    case "$rc" in
+        0)
+            [ -n "$out" ] && printf '%s\n' "$out"
+            ;;
+        1)
+            TRIGGERS="${TRIGGERS}${out}
 "
-        fi
-
-        # drop-table
-        if match_icase "$stripped" 'DROP[[:space:]]+TABLE'; then
-            local suppressed=0
-            if match_icase "$stripped" 'DROP[[:space:]]+TABLE[[:space:]]+IF[[:space:]]+EXISTS'; then
-                local table_name
-                table_name="$(echo "$stripped" | sed -E 's/.*DROP[[:space:]]+TABLE[[:space:]]+IF[[:space:]]+EXISTS[[:space:]]+`?([a-zA-Z0-9_]+).*/\1/I' | head -1)" || true
-                if [ -n "$table_name" ]; then
-                    if echo "$added_lines" | grep -iqE "CREATE[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?\`?${table_name}\`?"; then
-                        suppressed=1
-                    fi
-                fi
-            fi
-            if [ "$suppressed" = "0" ]; then
-                file_triggers="${file_triggers}  [drop-table] ${file}:${line_num} ${stripped}
-"
-            fi
-        fi
-
-        # truncate
-        if match_icase "$stripped" 'TRUNCATE[[:space:]]+(TABLE[[:space:]]+)?[^[:space:]]'; then
-            file_triggers="${file_triggers}  [truncate] ${file}:${line_num} ${stripped}
-"
-        fi
-
-        # rename-column
-        if match_icase "$stripped" 'ALTER[[:space:]]+TABLE[[:space:]].*RENAME[[:space:]]+COLUMN'; then
-            file_triggers="${file_triggers}  [rename-column] ${file}:${line_num} ${stripped}
-"
-        fi
-
-        # add-not-null-no-default
-        if match_icase "$stripped" 'ADD[[:space:]]+COLUMN[[:space:]].*NOT[[:space:]]+NULL'; then
-            if ! match_icase "$stripped" 'DEFAULT'; then
-                file_triggers="${file_triggers}  [add-not-null-no-default] ${file}:${line_num} ${stripped}
-"
-            fi
-        fi
-
-        # rename-column (CHANGE with a different new name; same name = type change)
-        if [[ "$lc" =~ ${clause}change[[:space:]]+(column[[:space:]]+)?(if[[:space:]]+exists[[:space:]]+)?\`?([a-z0-9_]+)\`?[[:space:]]+\`?([a-z0-9_]+) ]]; then
-            if [ "${BASH_REMATCH[4]}" != "${BASH_REMATCH[5]}" ]; then
-                file_triggers="${file_triggers}  [rename-column] ${file}:${line_num} ${stripped}
-"
-            elif [[ "$lc" =~ not[[:space:]]+null ]] && [[ ! "$lc" =~ default ]]; then
-                file_triggers="${file_triggers}  [tighten-not-null] ${file}:${line_num} ${stripped}
-"
-            fi
-        fi
-
-        # tighten-not-null (MODIFY)
-        if [[ "$lc" =~ ${clause}modify[[:space:]]+[^[:space:]] ]]; then
-            if [[ "$lc" =~ not[[:space:]]+null ]] && [[ ! "$lc" =~ default ]]; then
-                file_triggers="${file_triggers}  [tighten-not-null] ${file}:${line_num} ${stripped}
-"
-            fi
-        fi
-
-        # drop-index (suppressed when the same file re-adds an index with that name)
-        if [[ "$lc" =~ ${clause}drop[[:space:]]+(index|key)[[:space:]]+(if[[:space:]]+exists[[:space:]]+)?\`?([a-z0-9_]+) ]]; then
-            local index_name="${BASH_REMATCH[4]}"
-            if ! echo "$added_lines" | grep -iqE "(ADD[[:space:]]+((UNIQUE|FULLTEXT|SPATIAL)[[:space:]]+)?(INDEX|KEY)|CREATE[[:space:]]+((UNIQUE|FULLTEXT|SPATIAL)[[:space:]]+)?INDEX)[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?\`?${index_name}\`?([^a-zA-Z0-9_]|$)"; then
-                file_triggers="${file_triggers}  [drop-index] ${file}:${line_num} ${stripped}
-"
-            fi
-        fi
-
-        # rename-table (RENAME COLUMN/INDEX/KEY do not match)
-        if [[ "$lc" =~ ^[[:space:]]*rename[[:space:]]+table[[:space:]] ]] \
-            || [[ "$lc" =~ ${clause}rename[[:space:]]+(to|as)[[:space:]] ]]; then
-            file_triggers="${file_triggers}  [rename-table] ${file}:${line_num} ${stripped}
-"
-        fi
-
-    done <<< "$added_lines"
-
-    if [ -n "$file_triggers" ]; then
-        if [ -n "$inline_bypass" ]; then
-            echo "PASS (bypass): $inline_bypass"
-            return
-        fi
-        TRIGGERS="${TRIGGERS}${file_triggers}"
-    fi
+            ;;
+        *)
+            echo "check-destructive-migrations: engine failed on $file (exit $rc)" >&2
+            cat "$errfile" >&2
+            rm -f "$errfile"
+            exit 2
+            ;;
+    esac
+    rm -f "$errfile"
 }
 
 while IFS= read -r file; do
@@ -272,27 +287,24 @@ if [ -z "$TRIGGERS" ]; then
     exit 0
 fi
 
-if [ -n "$PR_BODY_BYPASS" ]; then
-    echo "PASS (bypass): $PR_BODY_BYPASS"
-    exit 0
-fi
-
 echo "Destructive migration patterns detected:"
 echo ""
 printf '%s' "$TRIGGERS"
 echo ""
-if echo "$TRIGGERS" | grep -q '\[tighten-not-null\]'; then
+if grep -q '\[tighten-not-null\]' <<< "$TRIGGERS"; then
     echo "tighten-not-null is a false positive if the column was already NOT NULL"
-    echo "and only its type changed; use a bypass marker in that case."
+    echo "and only its type changed; use -- destructive-migration[tighten-not-null]: <reason> in that case."
     echo ""
 fi
-echo "To proceed, add one of these bypass markers:"
+echo "To proceed, add a tagged bypass marker naming each accepted trigger:"
 echo ""
 echo "  Per-file (SQL comment in the migration):"
-echo "    -- destructive-migration: <reason at least 20 chars>"
+echo "    -- destructive-migration[<trigger>[,<trigger>]]: <reason at least ${BYPASS_MIN_LENGTH} chars>"
 echo ""
 echo "  Per-PR (HTML comment in PR body):"
-echo "    <!-- destructive-migration: <reason at least 20 chars> -->"
+echo "    <!-- destructive-migration[<trigger>]: <reason at least ${BYPASS_MIN_LENGTH} chars> -->"
+echo ""
+echo "A marker suppresses only the triggers it names."
 echo ""
 echo "See ibl5/migrations/README.md for the full destructive migration policy."
 exit 1

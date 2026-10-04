@@ -19,7 +19,7 @@ use BugPipeline\Contracts\BugReporterProfileRepositoryInterface;
  * facade unchanged — the split is behavior-preserving.
  *
  * The sub-repositories are built in the constructor from the facade's OWN mysqli
- * handle, so a call the facade wraps in {@see \BaseMysqliRepository::transactional()}
+ * handle, so a call the facade wraps in {@see \Database\BaseMysqliRepository::transactional()}
  * (enqueueAuthorizedAndAdvance) and the delegated write it makes share one
  * connection and one transaction/SAVEPOINT — the enqueue stays atomic.
  *
@@ -49,7 +49,7 @@ use BugPipeline\Contracts\BugReporterProfileRepositoryInterface;
  *   file_size: ?int
  * }
  */
-class BugReportRepository extends \BaseMysqliRepository
+class BugReportRepository extends \Database\BaseMysqliRepository
 {
     use BugReportRowCasting;
 

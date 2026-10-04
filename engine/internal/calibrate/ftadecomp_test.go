@@ -417,3 +417,27 @@ func TestFTAShipVerdict_Committed(t *testing.T) {
 	t.Logf("FTA_SHIP_VERDICT ship=%v failed=%v gap_before=%.2f gap_after=%.2f",
 		v.Ship, v.Failed, v.GapBeforePct, v.GapAfterPct)
 }
+
+func TestIsDegenerateFTAGame(t *testing.T) {
+	cases := []struct {
+		name                   string
+		pts0, pts1, fta0, fta1 int
+		want                   bool
+	}{
+		{"all_zero_box", 0, 0, 0, 0, true},
+		{"zero_zero_with_fta_team0", 0, 0, 2, 0, false},
+		{"zero_zero_with_fta_team1", 0, 0, 0, 1, false},
+		{"real_tie_with_points", 98, 98, 0, 0, false},
+		{"team0_scored", 2, 0, 0, 0, false},
+		{"team1_scored", 0, 2, 0, 0, false},
+		{"ordinary_decided_game", 104, 97, 21, 18, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isDegenerateFTAGame(tc.pts0, tc.pts1, tc.fta0, tc.fta1); got != tc.want {
+				t.Errorf("isDegenerateFTAGame(%d,%d,%d,%d) = %v, want %v",
+					tc.pts0, tc.pts1, tc.fta0, tc.fta1, got, tc.want)
+			}
+		})
+	}
+}

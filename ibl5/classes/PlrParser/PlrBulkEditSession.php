@@ -50,7 +50,7 @@ final class PlrBulkEditSession
             $args === [self::DRY_RUN_FLAG],
             $plrPath,
             $copier ?? static fn (string $from, string $to): bool => @copy($from, $to),
-            $timestamp ?? date('Ymd-His'),
+            $timestamp ?? date('Ymd-His', (new \Clock\SystemClock())->now()),
         );
     }
 

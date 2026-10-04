@@ -27,7 +27,8 @@ final class PlrBulkEditSessionTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (glob($this->tmpDir . '/*') ?: [] as $file) {
+        $files = glob($this->tmpDir . '/*');
+        foreach ($files === false ? [] : $files as $file) {
             unlink($file);
         }
         rmdir($this->tmpDir);
@@ -51,7 +52,9 @@ final class PlrBulkEditSessionTest extends TestCase
      */
     private function plrFiles(): array
     {
-        return array_map('basename', glob($this->tmpDir . '/*.plr') ?: []);
+        $files = glob($this->tmpDir . '/*.plr');
+
+        return array_map('basename', $files === false ? [] : $files);
     }
 
     public function testNoArgsSelectsLiveMode(): void
@@ -84,7 +87,7 @@ final class PlrBulkEditSessionTest extends TestCase
     public function testRejectsUnknownOrMalformedArgs(array $args): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Usage:');
+        $this->expectExceptionMessageMatches('/^Usage:/');
 
         $this->session($args);
     }

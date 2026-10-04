@@ -281,6 +281,27 @@ class LiveGit:
                     out.append(f)
         return out
 
+    def read_worktree_file(self, path: str) -> str | None:
+        """Text of `path` in the WORKING TREE, or None when it cannot be read.
+
+        The working tree is what diff_vs_base() diffs against, so this is the text the
+        hunks were cut from. Read ONLY by conformance.check's MISSING-METHOD fallback,
+        which passes paths from conformance_files(). A path that is absolute, carries
+        `..`, or resolves outside the worktree (symlink) is refused with None, as is a
+        missing or non-UTF-8 file; the caller treats None as "not declared here".
+        """
+        if not path or os.path.isabs(path) or ".." in path.split("/"):
+            return None
+        root = os.path.realpath(self.worktree)
+        full = os.path.realpath(os.path.join(root, path))
+        if full != root and not full.startswith(root + os.sep):
+            return None
+        try:
+            with open(full, encoding="utf-8") as fh:
+                return fh.read()
+        except (OSError, UnicodeDecodeError):
+            return None
+
     def modified_files(self, base: str = "origin/master") -> list[str]:
         out = self._run("diff", "--diff-filter=M", "--name-only",
                         self._merge_base(base)).strip()
@@ -1004,6 +1025,10 @@ class ReplayGit:
             if src not in out:
                 out.append(src)
         return out
+
+    def read_worktree_file(self, path: str) -> str | None:
+        """Replay has no tree to read; fail closed so a replayed MISSING-METHOD never clears."""
+        return None
 
     def modified_files(self, base: str = "origin/master") -> list[str]:
         from ..classify import modified_files_from_diff

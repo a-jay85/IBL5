@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import PurePosixPath
+from typing import Callable
 
 from .planfile import NO_DIFF_MIN_REASON
 from .state import PhaseInfo, PlanInfo
@@ -332,12 +333,47 @@ def _matrix_assertion_items(plan: PlanInfo, diff_body: str, pr_body: str,
             if ln.strip().startswith("UNREALISED-ASSERTION:")]
 
 
+def _method_declared(name: str, text: str) -> bool:
+    """True when `text` declares `name`: a PHP/Python `function name` / `def name`, or a
+    bash-style bare `name() {` anchored at start of line (optional diff `+` and indent)
+    so a call site like `$this->name()` never counts (backlog#1133)."""
+    return re.search(
+        rf"(function|def)\s+{re.escape(name)}\b"
+        rf"|^[+\s]*{re.escape(name)}\s*\(\s*\)",
+        text,
+        re.MULTILINE,
+    ) is not None
+
+
+def _method_in_changed_tree(name: str, changed_files: list[str],
+                            read_file: Callable[[str], str | None],
+                            cache: dict[str, str | None]) -> str | None:
+    """The first changed path whose PR-tree text declares `name`, else None.
+
+    Reads ONLY paths from `changed_files`: a method that exists untouched elsewhere in
+    the repo must still be MISSING-METHOD, or "write new test X" passes when X was never
+    written. Any reader error or None is treated as "not here" (fail closed: the item
+    stays). `cache` memoises one read per path across the required-method loop.
+    """
+    for path in changed_files:
+        if path not in cache:
+            try:
+                cache[path] = read_file(path)
+            except Exception:
+                cache[path] = None
+        text = cache[path]
+        if text and _method_declared(name, text):
+            return path
+    return None
+
+
 def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
           phase5_status: str | None = None,
           resolutions: dict[str, str] | None = None,
           pr_body: str = "",
           tracked_files: list[str] | tuple[str, ...] | None = None,
-          notes: list[str] | None = None) -> list[str]:
+          notes: list[str] | None = None,
+          read_file: Callable[[str], str | None] | None = None) -> list[str]:
     """Returns unresolved `MISSING:` / `MISSING-FILE:` / `MISSING-METHOD:` /
     `UNMET-CONTRACT:` / `MISSING-PHASE:` / `UNREALISED-ASSERTION:` items (empty = clean).
 
@@ -360,6 +396,11 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
 
     tracked_files and notes are forwarded to phase_omission_items (see there); notes,
     when a list is passed, collects the phase exemption lines.
+
+    read_file, when given, is called with each path in changed_files to fetch that file's
+    text from the PR tree; a required method the diff hunks never show but a changed file
+    declares is then present (PRs #2708, #2772, #2707). None (the default) disables the
+    fallback. Only changed files are read, never the whole repo.
     """
     if not plan.found:
         return []
@@ -391,20 +432,17 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
         elif resolutions is not None and hit != path:
             resolutions[path] = hit
     if diff_body:
+        tree_cache: dict[str, str | None] = {}
         for m in plan.required_test_methods:
-            # Match PHP/Python-style declarations ('function name' / 'def name') and
-            # bash-style bare declarations ('name() {') that appear without a keyword.
-            # The second branch anchors to start-of-line (with optional diff '+' prefix
-            # and indentation) so call-sites like '$this->name()' are not mistaken for
-            # declarations (backlog#1133 — present-method false-positive fix).
-            _found = re.search(
-                rf"(function|def)\s+{re.escape(m)}\b"
-                rf"|^[+\s]*{re.escape(m)}\s*\(\s*\)",
-                diff_body,
-                re.MULTILINE,
-            )
-            if not _found:
-                items.append(f"MISSING-METHOD: {m} (plan required a test method the diff never wrote)")
+            if _method_declared(m, diff_body):
+                continue
+            if read_file is not None:
+                where = _method_in_changed_tree(m, changed_files, read_file, tree_cache)
+                if where is not None:
+                    _note(notes, f"METHOD-IN-TREE: {m} — declared in {where} "
+                                 f"(changed file; the diff hunks omitted the declaration line)")
+                    continue
+            items.append(f"MISSING-METHOD: {m} (plan required a test method the diff never wrote)")
         items.extend(_matrix_assertion_items(plan, diff_body, pr_body))
     return items
 

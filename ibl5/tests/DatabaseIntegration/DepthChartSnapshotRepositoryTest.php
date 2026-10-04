@@ -6,17 +6,17 @@ namespace Tests\DatabaseIntegration;
 
 use PHPUnit\Framework\Attributes\Group;
 
-use SavedDepthChart\SavedDepthChartRepository;
+use DepthChartSnapshot\DepthChartSnapshotRepository;
 
 #[Group('database')]
-class SavedDepthChartRepositoryTest extends DatabaseTestCase
+class DepthChartSnapshotRepositoryTest extends DatabaseTestCase
 {
-    private SavedDepthChartRepository $repo;
+    private DepthChartSnapshotRepository $repo;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repo = new SavedDepthChartRepository($this->db);
+        $this->repo = new DepthChartSnapshotRepository($this->db);
     }
 
     public function testCreateSavedDepthChartReturnsInsertId(): void

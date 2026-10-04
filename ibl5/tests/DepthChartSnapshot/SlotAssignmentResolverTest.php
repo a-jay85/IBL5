@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Tests\SavedDepthChart;
+namespace Tests\DepthChartSnapshot;
 
 use PHPUnit\Framework\TestCase;
-use SavedDepthChart\SlotAssignmentResolver;
+use DepthChartSnapshot\SlotAssignmentResolver;
 
 /**
- * @covers \SavedDepthChart\SlotAssignmentResolver
+ * @covers \DepthChartSnapshot\SlotAssignmentResolver
  */
 class SlotAssignmentResolverTest extends TestCase
 {

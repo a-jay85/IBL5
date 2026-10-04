@@ -2,23 +2,23 @@
 
 declare(strict_types=1);
 
-namespace SavedDepthChart;
+namespace DepthChartSnapshot;
 
-use SavedDepthChart\Contracts\SavedDepthChartServiceInterface;
-use SavedDepthChart\Contracts\SavedDepthChartRepositoryInterface;
-use SavedDepthChart\Contracts\SlotAssignmentResolverInterface;
+use DepthChartSnapshot\Contracts\DepthChartSnapshotServiceInterface;
+use DepthChartSnapshot\Contracts\DepthChartSnapshotRepositoryInterface;
+use DepthChartSnapshot\Contracts\SlotAssignmentResolverInterface;
 use Season\Season;
 
 /**
- * @phpstan-import-type SavedDepthChartRow from Contracts\SavedDepthChartRepositoryInterface
- * @phpstan-import-type SavedDepthChartPlayerRow from Contracts\SavedDepthChartRepositoryInterface
- * @phpstan-import-type PlayerSnapshotData from Contracts\SavedDepthChartRepositoryInterface
+ * @phpstan-import-type SavedDepthChartRow from Contracts\DepthChartSnapshotRepositoryInterface
+ * @phpstan-import-type SavedDepthChartPlayerRow from Contracts\DepthChartSnapshotRepositoryInterface
+ * @phpstan-import-type PlayerSnapshotData from Contracts\DepthChartSnapshotRepositoryInterface
  *
- * @see SavedDepthChartServiceInterface
+ * @see DepthChartSnapshotServiceInterface
  */
-class SavedDepthChartService implements SavedDepthChartServiceInterface
+class DepthChartSnapshotService implements DepthChartSnapshotServiceInterface
 {
-    private SavedDepthChartRepositoryInterface $repository;
+    private DepthChartSnapshotRepositoryInterface $repository;
     private \mysqli $db;
     private SlotAssignmentResolverInterface $slotResolver;
 
@@ -38,18 +38,18 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
 
     public function __construct(
         \mysqli $db,
-        ?SavedDepthChartRepositoryInterface $repo = null,
+        ?DepthChartSnapshotRepositoryInterface $repo = null,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?SlotAssignmentResolverInterface $slotResolver = null
     ) {
         $this->db = $db;
-        $this->repository = $repo ?? new SavedDepthChartRepository($db);
+        $this->repository = $repo ?? new DepthChartSnapshotRepository($db);
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->slotResolver = $slotResolver ?? new SlotAssignmentResolver();
     }
 
     /**
-     * @see SavedDepthChartServiceInterface::saveOnSubmit()
+     * @see DepthChartSnapshotServiceInterface::saveOnSubmit()
      * @param list<array<string, mixed>> $rosterPlayers
      * @param array<string, mixed> $postData
      */
@@ -151,7 +151,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     }
 
     /**
-     * @see SavedDepthChartServiceInterface::loadSavedDepthChart()
+     * @see DepthChartSnapshotServiceInterface::loadSavedDepthChart()
      * @param list<int> $currentRosterPids
      */
     public function loadSavedDepthChart(int $id, int $teamid, array $currentRosterPids): ?array
@@ -180,7 +180,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     }
 
     /**
-     * @see SavedDepthChartServiceInterface::getWinLossRecord()
+     * @see DepthChartSnapshotServiceInterface::getWinLossRecord()
      * @return array{wins: int, losses: int}
      */
     public function getWinLossRecord(int $teamid, string $startDate, string $endDate): array
@@ -245,7 +245,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     }
 
     /**
-     * @see SavedDepthChartServiceInterface::getDropdownOptions()
+     * @see DepthChartSnapshotServiceInterface::getDropdownOptions()
      * @return list<array{id: int, label: string, isActive: bool}>
      */
     public function getDropdownOptions(int $teamid, Season $season): array
@@ -282,7 +282,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     }
 
     /**
-     * @see SavedDepthChartServiceInterface::buildPlayerSnapshot()
+     * @see DepthChartSnapshotServiceInterface::buildPlayerSnapshot()
      * @param array<string, mixed> $rosterPlayer
      * @param array<string, int> $dcSettings
      * @return PlayerSnapshotData
@@ -447,7 +447,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     }
 
     /**
-     * @see SavedDepthChartServiceInterface::nameOrCreateActive()
+     * @see DepthChartSnapshotServiceInterface::nameOrCreateActive()
      * @return array{success: bool, id: int, name: string}|array{success: bool, error: string}
      */
     public function nameOrCreateActive(int $teamid, string $username, string $name, Season $season): array

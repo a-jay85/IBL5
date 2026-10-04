@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace SavedDepthChart\Contracts;
+namespace DepthChartSnapshot\Contracts;
 
 /**
  * Resolves which submitted depth-chart form slot (1..15) a roster player occupies,
  * and returns that slot's depth-chart settings.
  *
- * Extracted from SavedDepthChartService (backlog 1.34) so the pid -> name -> ordinal
+ * Extracted from DepthChartSnapshotService (backlog 1.34) so the pid -> name -> ordinal
  * matching strategy is independently testable and substitutable.
  *
  * @phpstan-type SlotSettings array{

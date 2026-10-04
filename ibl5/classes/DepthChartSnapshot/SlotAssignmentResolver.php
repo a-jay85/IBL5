@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SavedDepthChart;
+namespace DepthChartSnapshot;
 
-use SavedDepthChart\Contracts\SlotAssignmentResolverInterface;
+use DepthChartSnapshot\Contracts\SlotAssignmentResolverInterface;
 
 /**
  * @phpstan-import-type SlotSettings from Contracts\SlotAssignmentResolverInterface

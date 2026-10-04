@@ -2,23 +2,23 @@
 
 declare(strict_types=1);
 
-namespace Tests\SavedDepthChart;
+namespace Tests\DepthChartSnapshot;
 
-use SavedDepthChart\SavedDepthChartApiHandler;
+use DepthChartSnapshot\DepthChartSnapshotApiHandler;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 
 /**
- * @covers \SavedDepthChart\SavedDepthChartApiHandler
+ * @covers \DepthChartSnapshot\DepthChartSnapshotApiHandler
  */
-class SavedDepthChartApiHandlerTest extends WideUnitTestCase
+class DepthChartSnapshotApiHandlerTest extends WideUnitTestCase
 {
-    private SavedDepthChartApiHandler $handler;
+    private DepthChartSnapshotApiHandler $handler;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->handler = new SavedDepthChartApiHandler($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $this->handler = new DepthChartSnapshotApiHandler($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
     }
 
     public function testHandleUnknownActionReturnsError(): void

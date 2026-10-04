@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace SavedDepthChart;
+namespace DepthChartSnapshot;
 
-use SavedDepthChart\Contracts\SavedDepthChartRepositoryInterface;
+use DepthChartSnapshot\Contracts\DepthChartSnapshotRepositoryInterface;
 
 /**
- * @phpstan-import-type SavedDepthChartRow from Contracts\SavedDepthChartRepositoryInterface
- * @phpstan-import-type SavedDepthChartPlayerRow from Contracts\SavedDepthChartRepositoryInterface
- * @phpstan-import-type PlayerSnapshotData from Contracts\SavedDepthChartRepositoryInterface
+ * @phpstan-import-type SavedDepthChartRow from Contracts\DepthChartSnapshotRepositoryInterface
+ * @phpstan-import-type SavedDepthChartPlayerRow from Contracts\DepthChartSnapshotRepositoryInterface
+ * @phpstan-import-type PlayerSnapshotData from Contracts\DepthChartSnapshotRepositoryInterface
  *
- * @see SavedDepthChartRepositoryInterface
+ * @see DepthChartSnapshotRepositoryInterface
  */
-class SavedDepthChartRepository extends \Database\BaseMysqliRepository implements SavedDepthChartRepositoryInterface
+class DepthChartSnapshotRepository extends \Database\BaseMysqliRepository implements DepthChartSnapshotRepositoryInterface
 {
     public function __construct(\mysqli $db, ?\League\LeagueContext $leagueContext = null)
     {
@@ -21,7 +21,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::createSavedDepthChart()
+     * @see DepthChartSnapshotRepositoryInterface::createSavedDepthChart()
      */
     public function createSavedDepthChart(
         int $teamid,
@@ -65,7 +65,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::saveDepthChartPlayers()
+     * @see DepthChartSnapshotRepositoryInterface::saveDepthChartPlayers()
      * @param list<PlayerSnapshotData> $playerSnapshots
      */
     public function saveDepthChartPlayers(int $depthChartId, array $playerSnapshots): void
@@ -99,7 +99,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::deactivateForTeam()
+     * @see DepthChartSnapshotRepositoryInterface::deactivateForTeam()
      */
     public function deactivateForTeam(int $teamid, string $simEndDate, int $simNumberEnd): void
     {
@@ -115,7 +115,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::deactivateOthersForTeam()
+     * @see DepthChartSnapshotRepositoryInterface::deactivateOthersForTeam()
      */
     public function deactivateOthersForTeam(int $teamid, int $excludeId, string $simEndDate, int $simNumberEnd): void
     {
@@ -132,7 +132,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::getSavedDepthChartsForTeam()
+     * @see DepthChartSnapshotRepositoryInterface::getSavedDepthChartsForTeam()
      * @return list<SavedDepthChartRow>
      */
     public function getSavedDepthChartsForTeam(int $teamid): array
@@ -146,7 +146,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::getSavedDepthChartById()
+     * @see DepthChartSnapshotRepositoryInterface::getSavedDepthChartById()
      * @return SavedDepthChartRow|null
      */
     public function getSavedDepthChartById(int $id, int $teamid): ?array
@@ -161,7 +161,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::getPlayersForDepthChart()
+     * @see DepthChartSnapshotRepositoryInterface::getPlayersForDepthChart()
      * @return list<SavedDepthChartPlayerRow>
      */
     public function getPlayersForDepthChart(int $depthChartId): array
@@ -175,7 +175,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::updateName()
+     * @see DepthChartSnapshotRepositoryInterface::updateName()
      */
     public function updateName(int $id, int $teamid, string $newName): bool
     {
@@ -190,7 +190,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::updateDepthChartPlayers()
+     * @see DepthChartSnapshotRepositoryInterface::updateDepthChartPlayers()
      * @param list<PlayerSnapshotData> $playerSnapshots
      */
     public function updateDepthChartPlayers(int $depthChartId, array $playerSnapshots): void
@@ -205,7 +205,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::extendActiveDepthCharts()
+     * @see DepthChartSnapshotRepositoryInterface::extendActiveDepthCharts()
      */
     public function extendActiveDepthCharts(string $newEndDate, int $newSimNumber): int
     {
@@ -218,7 +218,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::reactivate()
+     * @see DepthChartSnapshotRepositoryInterface::reactivate()
      */
     public function reactivate(int $id, int $teamid): bool
     {
@@ -232,7 +232,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::getMostRecentDepthChart()
+     * @see DepthChartSnapshotRepositoryInterface::getMostRecentDepthChart()
      * @return SavedDepthChartRow|null
      */
     public function getMostRecentDepthChart(int $teamid): ?array
@@ -246,7 +246,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::getLiveRosterSettings()
+     * @see DepthChartSnapshotRepositoryInterface::getLiveRosterSettings()
      * @return list<array{pid: int, name: string, ordinal: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}>
      */
     public function getLiveRosterSettings(int $teamid): array
@@ -265,7 +265,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::getActiveDepthChartForTeam()
+     * @see DepthChartSnapshotRepositoryInterface::getActiveDepthChartForTeam()
      * @return SavedDepthChartRow|null
      */
     public function getActiveDepthChartForTeam(int $teamid): ?array
@@ -279,7 +279,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::getWinLossRecord()
+     * @see DepthChartSnapshotRepositoryInterface::getWinLossRecord()
      * @return array{wins: int, losses: int}
      */
     public function getWinLossRecord(int $teamid, string $startDate, string $endDate): array
@@ -311,7 +311,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
     }
 
     /**
-     * @see SavedDepthChartRepositoryInterface::findActiveChartForTeamOnDate()
+     * @see DepthChartSnapshotRepositoryInterface::findActiveChartForTeamOnDate()
      * @return array{
      *   header: SavedDepthChartRow,
      *   starters: array{PG:int|null,SG:int|null,SF:int|null,PF:int|null,C:int|null}

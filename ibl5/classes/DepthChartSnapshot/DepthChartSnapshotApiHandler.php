@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SavedDepthChart;
+namespace DepthChartSnapshot;
 
 use Security\HtmlSanitizer;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
@@ -14,11 +14,11 @@ use Season\Season;
  *
  * Actions: list, load, rename
  */
-class SavedDepthChartApiHandler
+class DepthChartSnapshotApiHandler
 {
     private \mysqli $db;
-    private SavedDepthChartService $service;
-    private SavedDepthChartRepository $repository;
+    private DepthChartSnapshotService $service;
+    private DepthChartSnapshotRepository $repository;
     private TeamIdentityRepositoryInterface $commonRepo;
     private \Api\Response\HtmlResponder $responder;
     /**
@@ -29,8 +29,8 @@ class SavedDepthChartApiHandler
     public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, ?Season $season = null)
     {
         $this->db = $db;
-        $this->service = new SavedDepthChartService($db);
-        $this->repository = new SavedDepthChartRepository($db);
+        $this->service = new DepthChartSnapshotService($db);
+        $this->repository = new DepthChartSnapshotRepository($db);
         $this->commonRepo = $commonRepo;
         $this->responder = new \Api\Response\HtmlResponder();
         $this->season = $season;

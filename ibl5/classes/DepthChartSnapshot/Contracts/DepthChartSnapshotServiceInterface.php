@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SavedDepthChart\Contracts;
+namespace DepthChartSnapshot\Contracts;
 use Season\Season;
 
 
@@ -12,11 +12,11 @@ use Season\Season;
  * Player ratings are NOT stored in saved depth charts. For analytics,
  * join with ibl_hist on pid + season_year to get position/skill ratings.
  *
- * @phpstan-import-type SavedDepthChartRow from SavedDepthChartRepositoryInterface
- * @phpstan-import-type SavedDepthChartPlayerRow from SavedDepthChartRepositoryInterface
- * @phpstan-import-type PlayerSnapshotData from SavedDepthChartRepositoryInterface
+ * @phpstan-import-type SavedDepthChartRow from DepthChartSnapshotRepositoryInterface
+ * @phpstan-import-type SavedDepthChartPlayerRow from DepthChartSnapshotRepositoryInterface
+ * @phpstan-import-type PlayerSnapshotData from DepthChartSnapshotRepositoryInterface
  */
-interface SavedDepthChartServiceInterface
+interface DepthChartSnapshotServiceInterface
 {
     /**
      * Save or update a depth chart on form submission

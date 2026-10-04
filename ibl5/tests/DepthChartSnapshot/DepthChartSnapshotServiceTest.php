@@ -2,24 +2,24 @@
 
 declare(strict_types=1);
 
-namespace Tests\SavedDepthChart;
+namespace Tests\DepthChartSnapshot;
 
-use SavedDepthChart\SavedDepthChartService;
-use SavedDepthChart\Contracts\SavedDepthChartRepositoryInterface;
+use DepthChartSnapshot\DepthChartSnapshotService;
+use DepthChartSnapshot\Contracts\DepthChartSnapshotRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 use Season\Season;
 
 /**
- * @covers \SavedDepthChart\SavedDepthChartService
+ * @covers \DepthChartSnapshot\DepthChartSnapshotService
  */
-class SavedDepthChartServiceTest extends WideUnitTestCase
+class DepthChartSnapshotServiceTest extends WideUnitTestCase
 {
-    private SavedDepthChartService $service;
+    private DepthChartSnapshotService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new SavedDepthChartService($this->mockDb);
+        $this->service = new DepthChartSnapshotService($this->mockDb);
     }
 
     public function testBuildPlayerSnapshotReturnsCorrectStructure(): void
@@ -267,7 +267,7 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
     {
         $captured = [];
 
-        $repo = self::createStub(SavedDepthChartRepositoryInterface::class);
+        $repo = self::createStub(DepthChartSnapshotRepositoryInterface::class);
         $repo->method('getSavedDepthChartById')->willReturn([
             'id' => 5, 'teamid' => 1, 'username' => 'testuser', 'name' => 'My DC',
             'phase' => 'Regular Season', 'season_year' => 2024,
@@ -281,7 +281,7 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
                 $captured = $snapshots;
             });
 
-        $service = new SavedDepthChartService($this->mockDb, $repo);
+        $service = new DepthChartSnapshotService($this->mockDb, $repo);
         $season = new Season($this->mockDb);
         $service->saveOnSubmit(1, 'testuser', 'My DC', $rosterPlayers, $postData, 5, $season);
 
@@ -457,14 +457,14 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
             'dc_minutes' => 30, 'dc_of' => 1, 'dc_df' => 1, 'dc_oi' => 1, 'dc_di' => 1, 'dc_bh' => 1,
         ];
 
-        $repo = self::createStub(SavedDepthChartRepositoryInterface::class);
+        $repo = self::createStub(DepthChartSnapshotRepositoryInterface::class);
         $repo->method('getActiveDepthChartForTeam')->willReturn($activeDcRow);
         $repo->method('getSavedDepthChartsForTeam')->willReturn([$activeDcRow]);
         $repo->method('getPlayersForDepthChart')->willReturn([$dcPlayerRow]);
         $repo->method('getLiveRosterSettings')->willReturn([$liveRosterRow]);
         $repo->method('getWinLossRecord')->willReturn(['wins' => 3, 'losses' => 1]);
 
-        $service = new SavedDepthChartService($this->mockDb, $repo);
+        $service = new DepthChartSnapshotService($this->mockDb, $repo);
         $result = $service->getDropdownOptions(1, new Season($this->mockDb));
 
         $this->assertCount(1, $result);
@@ -477,11 +477,11 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
     {
         $activeDcRow = $this->makeActiveDcRow(42, 'Championship DC');
 
-        $repo = self::createStub(SavedDepthChartRepositoryInterface::class);
+        $repo = self::createStub(DepthChartSnapshotRepositoryInterface::class);
         $repo->method('getActiveDepthChartForTeam')->willReturn($activeDcRow);
         $repo->method('getWinLossRecord')->willReturn(['wins' => 3, 'losses' => 1]);
 
-        $service = new SavedDepthChartService($this->mockDb, $repo);
+        $service = new DepthChartSnapshotService($this->mockDb, $repo);
         $label = $service->buildCurrentLiveLabel(1, new Season($this->mockDb));
 
         $this->assertStringContainsString('(3-1)', $label);
@@ -490,10 +490,10 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
 
     public function testBuildCurrentLiveLabelFallsBackWhenNoActiveDc(): void
     {
-        $repo = self::createStub(SavedDepthChartRepositoryInterface::class);
+        $repo = self::createStub(DepthChartSnapshotRepositoryInterface::class);
         $repo->method('getActiveDepthChartForTeam')->willReturn(null);
 
-        $service = new SavedDepthChartService($this->mockDb, $repo);
+        $service = new DepthChartSnapshotService($this->mockDb, $repo);
         $label = $service->buildCurrentLiveLabel(1, new Season($this->mockDb));
 
         $this->assertStringContainsString('Current (Live)', $label);
@@ -518,7 +518,7 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
             'dc_minutes' => 30, 'dc_of' => 1, 'dc_df' => 1, 'dc_oi' => 1, 'dc_di' => 1, 'dc_bh' => 1,
         ];
 
-        $mock = $this->createMock(SavedDepthChartRepositoryInterface::class);
+        $mock = $this->createMock(DepthChartSnapshotRepositoryInterface::class);
         $mock->expects($this->once())
             ->method('getActiveDepthChartForTeam')
             ->with(1)
@@ -528,7 +528,7 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
         $mock->method('getLiveRosterSettings')->willReturn([$liveRosterRow]);
         $mock->method('getWinLossRecord')->willReturn(['wins' => 3, 'losses' => 1]);
 
-        $service = new SavedDepthChartService($this->mockDb, $mock);
+        $service = new DepthChartSnapshotService($this->mockDb, $mock);
         $season = new Season($this->mockDb);
         $service->getDropdownOptions(1, $season);
         $service->buildCurrentLiveLabel(1, $season);
@@ -554,7 +554,7 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
             'dc_minutes' => 30, 'dc_of' => 1, 'dc_df' => 1, 'dc_oi' => 1, 'dc_di' => 1, 'dc_bh' => 1,
         ];
 
-        $mock = self::createStub(SavedDepthChartRepositoryInterface::class);
+        $mock = self::createStub(DepthChartSnapshotRepositoryInterface::class);
         $mock->method('getActiveDepthChartForTeam')->willReturnMap([
             [1, $dcTeam1],
             [2, $dcTeam2],
@@ -567,7 +567,7 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
         $mock->method('getLiveRosterSettings')->willReturn([$liveRosterRow]);
         $mock->method('getWinLossRecord')->willReturn(['wins' => 0, 'losses' => 0]);
 
-        $service = new SavedDepthChartService($this->mockDb, $mock);
+        $service = new DepthChartSnapshotService($this->mockDb, $mock);
         $season = new Season($this->mockDb);
 
         $resultTeam1 = $service->getDropdownOptions(1, $season);
@@ -586,7 +586,7 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
     {
         $activeDcRow = $this->makeActiveDcRow(42);
 
-        $mock = $this->createMock(SavedDepthChartRepositoryInterface::class);
+        $mock = $this->createMock(DepthChartSnapshotRepositoryInterface::class);
         $mock->expects($this->exactly(2))
             ->method('getActiveDepthChartForTeam')
             ->with(1)
@@ -595,7 +595,7 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
         $mock->method('deactivateOthersForTeam');
         $mock->method('getWinLossRecord')->willReturn(['wins' => 2, 'losses' => 0]);
 
-        $service = new SavedDepthChartService($this->mockDb, $mock);
+        $service = new DepthChartSnapshotService($this->mockDb, $mock);
         $season = new Season($this->mockDb);
 
         $service->nameOrCreateActive(1, 'gm', 'New Name', $season);

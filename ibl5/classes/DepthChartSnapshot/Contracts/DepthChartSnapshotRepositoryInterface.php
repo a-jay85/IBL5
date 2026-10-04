@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SavedDepthChart\Contracts;
+namespace DepthChartSnapshot\Contracts;
 
 /**
  * Interface for saved depth chart persistence
@@ -64,7 +64,7 @@ namespace SavedDepthChart\Contracts;
  *     dc_bh: int
  * }
  */
-interface SavedDepthChartRepositoryInterface
+interface DepthChartSnapshotRepositoryInterface
 {
     /**
      * Create a new saved depth chart header row

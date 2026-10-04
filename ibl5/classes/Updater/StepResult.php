@@ -10,7 +10,7 @@ namespace Updater;
  * Use the named static factories to create instances:
  * - StepResult::success() — step completed normally
  * - StepResult::failure() — step encountered an error
- * - StepResult::skipped() — step was skipped (treated as a success)
+ * - StepResult::skipped() — step was skipped (treated as a success; `$skipped` is true)
  */
 final class StepResult
 {
@@ -27,6 +27,7 @@ final class StepResult
         public readonly string $errorMessage,
         public readonly array $messages,
         public readonly int $messageErrorCount,
+        public readonly bool $skipped,
     ) {
     }
 
@@ -54,6 +55,7 @@ final class StepResult
             errorMessage: '',
             messages: $messages,
             messageErrorCount: $messageErrorCount,
+            skipped: false,
         );
     }
 
@@ -72,6 +74,7 @@ final class StepResult
             errorMessage: $errorMessage,
             messages: [],
             messageErrorCount: 0,
+            skipped: false,
         );
     }
 
@@ -90,6 +93,7 @@ final class StepResult
             errorMessage: '',
             messages: [],
             messageErrorCount: 0,
+            skipped: true,
         );
     }
 }

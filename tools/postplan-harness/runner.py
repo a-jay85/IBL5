@@ -530,7 +530,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         resolutions: dict[str, str] = {}
         unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                        resolutions=resolutions,
-                                       pr_body=gh.pr_body() or meta.get("body", ""))
+                                       pr_body=gh.pr_body() or meta.get("body", ""),
+                                       read_file=git.read_worktree_file)
         res.unresolved_conformance = unresolved
         _write_conformance_handoff(out_dir, unresolved)
         log(f"phase5.0 conformance: {unresolved or 'clean'}"
@@ -638,7 +639,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             resolutions = {}
             unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                            resolutions=resolutions,
-                                           pr_body=gh.pr_body() or body)
+                                           pr_body=gh.pr_body() or body,
+                                           read_file=git.read_worktree_file)
             res.unresolved_conformance = unresolved
             _write_conformance_handoff(out_dir, unresolved)
             log(f"phase5.0 conformance (post-remediation): {unresolved or 'clean'}"

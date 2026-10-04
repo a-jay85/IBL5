@@ -21,7 +21,7 @@ The `Shell harness regression tests` job in `.github/workflows/tests.yml` ran ea
 
 Add `bin/run-shell-harnesses`, which takes a list of harness scripts and runs them with `xargs -P`. The worker count defaults to the CPU count and `-j N` overrides it. Each script writes to its own log under a `mktemp` directory. When a script finishes, the runner prints its log as one `::group::` block with PASS or FAIL and its duration. A `mkdir` lock keeps each block whole when two workers finish at once. After all scripts finish, the runner prints a table sorted by duration and exits 1 if any script failed or if fewer scripts reported than were passed in.
 
-The workflow replaces the per-harness steps with one step that calls the runner. Every harness still appears on its own line in that step, so `bin/check-plan` gate [G] can still find each harness named in a workflow file. The list starts with the slowest harnesses so the workers pack well. A harness that cannot share the runner keeps its own serial step. Three harnesses do this today. `bin/test-bug-pipeline-e2e` exercises a real `lsof` port guard. `bin/test-burndown` and `bin/test-burndown-loop` each need a scrubbed environment from `env -i`.
+The workflow replaces the per-harness steps with one step that calls the runner. Every harness still appears on its own line in that step, so `bin/check-plan` gate [G] can still find each harness named in a workflow file. The list starts with the slowest harnesses so the workers pack well. A harness that cannot share the runner keeps its own serial step. `bin/test-burndown` is the one case today, because it needs a scrubbed environment from `env -i`.
 
 `bin/test-pr-cycle` and `bin/test-digest-dm-build` each assert that they are wired into CI exactly once. Both now match the harness name as an indented line in the runner's argument list. The order check in `bin/test-pr-cycle` is gone, because parallel runs have no fixed order.
 
@@ -49,3 +49,9 @@ The workflow replaces the per-harness steps with one step that calls the runner.
 - `bin/test-bug-pipeline-e2e`, `bin/test-burndown`, and `bin/test-burndown-loop` (the harnesses that keep their own serial steps)
 - `bin/test-pr-cycle` and `bin/test-digest-dm-build` (CI wiring assertions)
 - `.claude/rules/meta-tooling-bar.md`
+
+## Addendum: three serial harnesses (2026-10-03)
+
+Original figure: the Decision says `bin/test-burndown` is the one harness that keeps its own serial step. Today's figure: three harnesses keep their own serial steps in `.github/workflows/tests.yml`. `bin/test-bug-pipeline-e2e` exercises a real `lsof` port guard, so it cannot share the runner. `bin/test-burndown` and `bin/test-burndown-loop` each need a scrubbed environment from `env -i`.
+
+What changed: the original text named one harness. Two more were already running as serial steps. The decision itself is unchanged: a harness that cannot share the runner keeps its own serial step. The References list above names all three.

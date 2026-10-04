@@ -43,10 +43,13 @@ class ExtensionViewTest extends TestCase
 
     public function testAcceptedResultRendersSuccessAlert(): void
     {
+        $output = $this->view->renderResultBanner('extension_accepted', 'Deal done.');
+
         self::assertSame(
             '<div class="ibl-alert ibl-alert--success"><strong>Player response:</strong> Deal done.' . self::ACCEPTED_NOTE . '</div>',
-            $this->view->renderResultBanner('extension_accepted', 'Deal done.')
+            $output
         );
+        self::assertStringContainsString("commissioner's office", $output);
     }
 
     public function testRejectedResultRendersInfoAlert(): void

@@ -46,7 +46,7 @@ test.describe('Admin page smoke tests', () => {
     // (where the real tokened POST button lives) instead of mutating the league.
     await page.goto('scripts/updateAllTheThings.php', { timeout: 60_000 });
 
-    await expect(page).toHaveURL(/leagueControlPanel\.php/);
+    await expect(page).toHaveURL(/modules\.php\?name=LeagueControlPanel/);
     await expect(page.getByText('Initialization')).not.toBeVisible();
   });
 

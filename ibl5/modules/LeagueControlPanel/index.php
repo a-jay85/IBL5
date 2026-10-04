@@ -2,15 +2,28 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/mainfile.php';
+if (!defined('MODULE_FILE')) {
+    die("You can't access this file directly...");
+}
 
-// Auth guard
-if (!is_user($user)) {
-    $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php';
+global $mysqli_db, $leagueContext, $authService;
+/** @var \mysqli $mysqli_db */
+/** @var \League\LeagueContext $leagueContext */
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
+
+// Auth guard. Order is load-bearing: authenticated, then admin, and only
+// then any CsrfGuard::generateRawToken() call (pinned by
+// tests/Security/LeagueControlPanelExportTokenOrderTest.php). The legacy
+// is_user()/is_admin() helpers read these same AuthService methods.
+if (!$authService->isAuthenticated()) {
+    $queryString = $_SERVER['QUERY_STRING'] ?? '';
+    if (is_string($queryString) && $queryString !== '') {
+        $_SESSION['redirect_after_login'] = $queryString;
+    }
     \Utilities\HtmxHelper::redirect('modules.php?name=YourAccount');
 }
 
-if (!is_admin()) {
+if (!$authService->isAdmin()) {
     http_response_code(403);
     echo 'Access denied. Administrator privileges required.';
     exit;
@@ -22,7 +35,7 @@ $repository = new LeagueControlPanel\LeagueControlPanelRepository($mysqli_db, $l
 $service    = new LeagueControlPanel\LeagueControlPanelService($repository, $currentLeague);
 $votingRepository     = new Voting\VotingRepository($mysqli_db);
 $votingResultsService = new Voting\VotingResultsService($votingRepository);
-$awardGenerationService = new LeagueControlPanel\AwardGenerationService($repository, $votingResultsService);
+$awardGenerationService = new LeagueControlPanel\LeagueControlPanelAwardGenerationService($repository, $votingResultsService);
 $maintenanceRepository = new Maintenance\MaintenanceRepository($mysqli_db);
 $processor  = new LeagueControlPanel\LeagueControlPanelProcessor($repository, $awardGenerationService, $currentLeague, $maintenanceRepository);
 $view       = new LeagueControlPanel\LeagueControlPanelView();
@@ -65,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['export'] ?? null) === 'act
 
     echo json_encode([
         'filename' => $filename,
-        'url' => 'leagueControlPanel.php?download=' . rawurlencode($filename),
+        'url' => 'modules.php?name=LeagueControlPanel&download=' . rawurlencode($filename),
         'csrfToken' => \Security\CsrfGuard::generateRawToken('lcp_export_active_players'),
     ]);
     exit;
@@ -91,18 +104,26 @@ if (is_string($_GET['download'] ?? null)) {
 // POST → Processor → PRG redirect
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!\Security\CsrfGuard::validateSubmittedToken('lcp_update_all')) {
-        \Utilities\HtmxHelper::redirect('leagueControlPanel.php?error=' . rawurlencode('Invalid or expired form submission. Please reload and try again.'));
+        \Utilities\HtmxHelper::redirect('modules.php?name=LeagueControlPanel&error=' . rawurlencode('Invalid or expired form submission. Please reload and try again.'));
     }
 
     $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
-    $result = $processor->dispatch($action, $_POST);
+    $postData = [];
+    foreach ($_POST as $key => $value) {
+        $postData[(string) $key] = $value;
+    }
+    $result = $processor->dispatch($action, $postData);
 
     $queryParam = $result['success'] ? 'success' : 'error';
-    \Utilities\HtmxHelper::redirect('leagueControlPanel.php?' . $queryParam . '=' . rawurlencode($result['message']));
+    \Utilities\HtmxHelper::redirect('modules.php?name=LeagueControlPanel&' . $queryParam . '=' . rawurlencode($result['message']));
 }
 
 // GET → Service + View → render
-$leagueConfig  = $leagueContext->getConfig();
+$rawLeagueConfig = $leagueContext->getConfig();
+$leagueConfig  = [
+    'short_name' => $rawLeagueConfig['short_name'] ?? '',
+    'full_name'  => $rawLeagueConfig['full_name'] ?? '',
+];
 $panelData     = $service->getPanelData();
 
 // Flash message from PRG redirect

@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\LeagueControlPanel;
 
-use LeagueControlPanel\AwardGenerationService;
+use LeagueControlPanel\LeagueControlPanelAwardGenerationService;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use PHPUnit\Framework\TestCase;
 use Voting\Contracts\VotingResultsServiceInterface;
 
 /**
- * @covers \LeagueControlPanel\AwardGenerationService
+ * @covers \LeagueControlPanel\LeagueControlPanelAwardGenerationService
  */
-class AwardGenerationServiceTest extends TestCase
+class LeagueControlPanelAwardGenerationServiceTest extends TestCase
 {
     /** @var LeagueControlPanelRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private LeagueControlPanelRepositoryInterface $stubRepository;
@@ -20,14 +20,14 @@ class AwardGenerationServiceTest extends TestCase
     /** @var VotingResultsServiceInterface&\PHPUnit\Framework\MockObject\Stub */
     private VotingResultsServiceInterface $stubVotingService;
 
-    private AwardGenerationService $service;
+    private LeagueControlPanelAwardGenerationService $service;
     private string $tempDir;
 
     protected function setUp(): void
     {
         $this->stubRepository = self::createStub(LeagueControlPanelRepositoryInterface::class);
         $this->stubVotingService = self::createStub(VotingResultsServiceInterface::class);
-        $this->service = new AwardGenerationService($this->stubRepository, $this->stubVotingService);
+        $this->service = new LeagueControlPanelAwardGenerationService($this->stubRepository, $this->stubVotingService);
         $this->tempDir = sys_get_temp_dir() . '/award_gen_test_' . uniqid();
         mkdir($this->tempDir);
     }
@@ -102,7 +102,7 @@ class AwardGenerationServiceTest extends TestCase
     {
         $mockRepository = $this->createMock(LeagueControlPanelRepositoryInterface::class);
         $stubVotingService = self::createStub(VotingResultsServiceInterface::class);
-        $service = new AwardGenerationService($mockRepository, $stubVotingService);
+        $service = new LeagueControlPanelAwardGenerationService($mockRepository, $stubVotingService);
 
         $stubVotingService->method('getEndOfYearResults')->willReturn([
             ['title' => 'Most Valuable Player', 'rows' => []],

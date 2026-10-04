@@ -265,12 +265,12 @@ bl_run_batch() {
     # shellcheck disable=SC2086
     env CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 IBL5_BURNDOWN_LOOP=1 \
         IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=burndown-loop \
-        IBL5_USAGE_GATE_MODEL=claude-opus-5-5 \
+        IBL5_USAGE_GATE_MODEL=claude-sonnet-5-5 \
         IBL5_USAGE_GATE_RESUME_BIN="$ROOT/bin/burndown-loop" \
         IBL5_USAGE_GATE_SESSION_ID="$LOOP_SID" \
         perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$timeout_secs" \
         $caff claude -p "$BL_PROMPT" --dangerously-skip-permissions \
-        --model claude-opus-5-5 --effort high --name "burndown-loop-$ts" \
+        --model claude-sonnet-5-5 --effort high --name "burndown-loop-$ts" \
         >"$BLOG" 2>&1 || BATCH_RC=$?
     bl_ledgers > "$STATE/ledgers.after"
     NEW_LEDGERS=$(comm -13 "$STATE/ledgers.before" "$STATE/ledgers.after")

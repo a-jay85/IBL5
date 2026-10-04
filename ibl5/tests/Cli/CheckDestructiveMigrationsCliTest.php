@@ -174,6 +174,8 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
         self::assertSame(1, $result['exit'], "Output: {$result['output']}");
         self::assertStringContainsString('PR-body', $result['output']);
         self::assertStringContainsString('drop-column', $result['output']);
+        // The marker-error must tell the author the required tagged form.
+        self::assertStringContainsString('untagged bypass marker; use -- destructive-migration[<trigger>]', $result['output']);
     }
 
     public function testShortPrBodyBypassExitsOne(): void

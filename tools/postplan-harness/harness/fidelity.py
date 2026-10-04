@@ -850,7 +850,8 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[in
         try:
             n = gh.followup_create(title, body, "maintenance")
             if n is not None:
-                nums.append(n)
+                if n not in nums:
+                    nums.append(n)
                 seen.add(key)
                 log(f"phase5.5 notes: filed issue #{n} '{title[:50]}'")
         except (HarnessError, OSError) as exc:

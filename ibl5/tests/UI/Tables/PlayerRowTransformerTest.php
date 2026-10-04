@@ -83,9 +83,8 @@ class PlayerRowTransformerTest extends TestCase
     public function testResolveWithStatsSkipsNonArrayNonPlayerForCurrentSeason(): void
     {
         $db = self::createStub(\mysqli::class);
-        // Pass an iterable with a non-array/non-Player element. The stdClass argument.type
-        // mismatch is a documented baseline defer, not a defect to "fix" by swapping in a
-        // real Player — that would delete the non-Player skip path this test exists to prove.
+        // A non-Player object is admitted by the @param, and the transformer must skip it.
+        // Keep the stdClass: swapping in a real Player would delete the skip path under test.
         $result = PlayerRowTransformer::resolveWithStats($db, [new \stdClass()], '');
         $this->assertSame([], $result);
     }

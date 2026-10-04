@@ -98,19 +98,22 @@ class GameTransformerTest extends TestCase
     }
 
     /**
-     * Null scores occur for scheduled games before results are entered.
-     * The GameViewRow type declares scores as int, but the DB can return NULL
-     * for unplayed games — this is a documented baseline defer (argument.type).
+     * `ibl_schedule` scores are NOT NULL DEFAULT 0, and the view marks a game
+     * `scheduled` when both are 0. The transformer must pass those zeros
+     * through as integers and never coerce them to null.
      */
-    public function testTransformHandlesNullScores(): void
+    public function testTransformScheduledGameReportsZeroScoresNotNull(): void
     {
         $row = $this->makeGameRow();
-        $row['visitor_score'] = null;
-        $row['home_score'] = null;
+        $row['game_status'] = 'scheduled';
+        $row['visitor_score'] = 0;
+        $row['home_score'] = 0;
         $result = $this->transformer->transform($row);
 
-        $this->assertNull($result['visitor']['score']);
-        $this->assertNull($result['home']['score']);
+        $this->assertSame(0, $result['visitor']['score']);
+        $this->assertSame(0, $result['home']['score']);
+        $this->assertNotNull($result['visitor']['score']);
+        $this->assertNotNull($result['home']['score']);
     }
 
     public function testTransformHandlesZeroScores(): void
@@ -128,10 +131,12 @@ class GameTransformerTest extends TestCase
     {
         $row = $this->makeGameRow();
         $row['game_status'] = 'scheduled';
-        $row['visitor_score'] = null;
-        $row['home_score'] = null;
+        $row['visitor_score'] = 0;
+        $row['home_score'] = 0;
         $result = $this->transformer->transform($row);
 
         $this->assertSame('scheduled', $result['status']);
+        $this->assertSame(0, $result['visitor']['score']);
+        $this->assertSame(0, $result['home']['score']);
     }
 }

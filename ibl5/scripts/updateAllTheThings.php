@@ -139,30 +139,31 @@ try {
     // Skipped entirely for a historical-import override (the operator has already
     // stated the season) and for Olympics (separate `league` row, different cadence).
     if ($seasonYearOverride === null && !$isOlympics) {
-        $rolloverDetector = new Updater\SeasonRollover\SeasonRolloverDetector(
-            $backupLocator, $archiveExtractor, $basePath, $filePrefix,
-        );
-        $rolloverResult = $rolloverDetector->detect($season->beginningYear, $season->endingYear);
-
-        if ($rolloverResult->shouldWrite()) {
-            $rolloverApplier = new Updater\SeasonRollover\SeasonRolloverApplier(
+        $rolloverRunner = new Updater\SeasonRollover\SeasonRolloverRunner(
+            new Updater\SeasonRollover\SeasonRolloverDetector(
+                $backupLocator, $archiveExtractor, $basePath, $filePrefix,
+            ),
+            new Updater\SeasonRollover\SeasonRolloverApplier(
                 new LeagueControlPanel\LeagueControlPanelRepository($mysqli_db, $leagueContext),
-            );
-            $rolloverApplier->apply($rolloverResult);
-
-            $cashCyAdvancer = new Updater\SeasonRollover\CashConsiderationsYearAdvancer(
+            ),
+            new Updater\SeasonRollover\CashConsiderationsYearAdvancer(
                 new Trading\BuyoutLedgerRepository($mysqli_db),
                 new LeagueControlPanel\LeagueControlPanelRepository($mysqli_db, $leagueContext),
+            ),
+        );
+        $rolloverRun = $rolloverRunner->run($season->beginningYear, $season->endingYear);
+
+        if ($rolloverRun->rolledOver()) {
+            echo $view->renderInitStatus(
+                'Cash considerations advanced: ' . (int) $rolloverRun->cashRowsAdvanced . ' row(s)'
             );
-            $cashCyAdvanced = $cashCyAdvancer->advance((int) $rolloverResult->targetYear);
-            echo $view->renderInitStatus('Cash considerations advanced: ' . $cashCyAdvanced . ' row(s)');
 
             // Rebuild so every downstream step, backup dir and label reads the new season.
             $season = new \Season\Season($mysqli_db);
         }
 
         echo $view->renderInitStatus(
-            'Season rollover: ' . \Security\HtmlSanitizer::safeHtmlOutput($rolloverResult->reason)
+            'Season rollover: ' . \Security\HtmlSanitizer::safeHtmlOutput($rolloverRun->decision->reason)
         );
         flush();
     }

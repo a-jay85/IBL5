@@ -11,6 +11,7 @@ Covers Phases 1-6 of the harness-behind-lease-retry plan:
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import types
@@ -20,6 +21,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
+from harness import gitutil
 from harness.adapters.gitad import LiveGit, is_stale_lease
 from harness.adapters.ghad import LiveGh
 from harness.ciwatch import CiOutcome
@@ -665,6 +667,73 @@ def test_verdict_remote_head_diverged_no_pr():
     assert "\n" not in line
     assert "remote-head-diverged" in line
     assert "1234abcd" in line
+
+
+def test_probe_remote_tip_leaves_tracking_ref(tmp_path):
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    z = _rival_push(tmp_path, bare, from_branch="feature", files={"foreign.txt": "theirs\n"})
+    assert gitutil.probe_remote_tip("origin", "feature", str(wt)) == (True, z)
+    assert _tracking(wt) == y
+
+
+def test_probe_remote_tip_absent_branch(tmp_path):
+    wt, _bare = _feature_repo(tmp_path)
+    assert gitutil.probe_remote_tip("origin", "feature", str(wt)) == (True, "")
+
+
+def test_probe_remote_tip_bad_remote(tmp_path):
+    wt, _bare = _feature_repo(tmp_path)
+    assert gitutil.probe_remote_tip("no-such-remote", "feature", str(wt)) == (False, "")
+
+
+def test_adopt_tracking_ref_cas(tmp_path):
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    z = _rival_push(tmp_path, bare, from_branch="feature", files={"other.txt": "o\n"})
+    assert gitutil.probe_remote_tip("origin", "feature", str(wt)) == (True, z)
+    assert gitutil.adopt_tracking_ref("origin", "feature", z, "0123" * 10, str(wt)) is False
+    assert _tracking(wt) == y
+    assert gitutil.adopt_tracking_ref("origin", "feature", z, y, str(wt)) is True
+    assert _tracking(wt) == z
+
+
+def test_restore_tracking_ref(tmp_path):
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    z = _rival_push(tmp_path, bare, from_branch="feature", files={"other.txt": "o\n"})
+    head = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    gitutil.content_equivalent(head, z, str(wt))
+    assert _tracking(wt) == z, "content_equivalent's plain fetch moves the tracking ref"
+    assert gitutil.restore_tracking_ref("origin", "feature", y, str(wt)) is True
+    assert _tracking(wt) == y
+
+
+def test_restore_tracking_ref_no_lease_deletes(tmp_path):
+    wt, bare = _feature_repo(tmp_path)
+    z = _rival_push(tmp_path, bare, from_branch="master", files={"other.txt": "o\n"})
+    head = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    gitutil.content_equivalent(head, z, str(wt))
+    assert _tracking(wt) == z
+    assert gitutil.restore_tracking_ref("origin", "feature", "", str(wt)) is True
+    assert _tracking(wt) == ""
+
+
+def test_owned_remote_tip_arms(tmp_path):
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    _commit(wt, "local.txt", "same\n")
+    h = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    z_same = _rival_push(tmp_path, bare, from_branch="feature", files={"local.txt": "same\n"})
+    assert gitutil.probe_remote_tip("origin", "feature", str(wt)) == (True, z_same)
+    assert gitutil.owned_remote_tip(y, h, z_same, str(wt))
+    _sh("git", "-C", str(bare), "update-ref", "refs/heads/feature", y)
+    shutil.rmtree(tmp_path / "rival")
+    z_foreign = _rival_push(tmp_path, bare, from_branch="feature",
+                            files={"foreign.txt": "theirs\n"})
+    assert gitutil.probe_remote_tip("origin", "feature", str(wt)) == (True, z_foreign)
+    assert gitutil.owned_remote_tip(y, h, z_foreign, str(wt)) == ""
+    assert gitutil.owned_remote_tip(y, h, "", str(wt)) == ""
 
 
 def test_push_disabled_and_detached_head_record_no_push_argv(tmp_path):

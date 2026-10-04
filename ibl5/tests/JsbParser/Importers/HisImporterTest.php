@@ -9,6 +9,8 @@ use JsbParser\Importers\HisImporter;
 use PHPUnit\Framework\TestCase;
 
 /**
+ * Pins what HisImporter.php sends to the repository for each team row.
+ *
  * @covers \JsbParser\Importers\HisImporter
  */
 final class HisImporterTest extends TestCase

@@ -11,6 +11,8 @@ use JsbParser\PlayerIdResolver;
 use PHPUnit\Framework\TestCase;
 
 /**
+ * Pins the exact arguments CarImporter hands to PlayerIdResolver::resolve.
+ *
  * @covers \JsbParser\Importers\CarImporter
  */
 final class CarImporterTest extends TestCase

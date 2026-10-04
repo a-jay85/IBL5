@@ -12,7 +12,10 @@ assert_contains()     { local desc="$1" needle="$2" hay="$3"; case "$hay" in *"$
 assert_not_contains() { local desc="$1" needle="$2" hay="$3"; case "$hay" in *"$needle"*) echo "FAIL: $desc — unexpected: $needle"; FAILED=1 ;; esac; }
 
 mkdir -p "$BINSTUB"
-printf '#!/bin/sh\necho "CALLED $*" >> "%s/dm-calls.log"\n' "$TMP" > "$BINSTUB/discord-dm"
+# The stub drains stdin like the real discord-dm. Exiting without reading races
+# the digest's `printf | discord-dm`: CI ignores SIGPIPE, so a printf that loses
+# the race fails with EPIPE and pipefail turns the send into exit 1.
+printf '#!/bin/sh\ncat > /dev/null\necho "CALLED $*" >> "%s/dm-calls.log"\n' "$TMP" > "$BINSTUB/discord-dm"
 chmod +x "$BINSTUB/discord-dm"
 # gh stub: plan-a has a PR, every other slug does not. Ignores its args, the way
 # `gh pr list --jq ... @tsv` output looks is all the digest reads.

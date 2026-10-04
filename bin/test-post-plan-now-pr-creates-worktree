@@ -310,6 +310,13 @@ FAIL_BEFORE=$FAIL
 if [ "$RC6" -eq 6 ]; then
     fail "loaded-idle-reap-before-inflight: exited 6 (phantom in-flight not reaped)"
 fi
+if [ -e "$PHANTOM_PLIST" ]; then
+    fail "loaded-idle-reap-before-inflight: phantom plist still exists ($PHANTOM_PLIST)"
+fi
+# LAUNCHCTL_LOG may hold lines from earlier cases; match the phantom label.
+if ! grep -Eq "^bootout gui/[0-9]+/${PHANTOM_LABEL}\$" "$LAUNCHCTL_LOG" 2>/dev/null; then
+    fail "loaded-idle-reap-before-inflight: no 'bootout gui/<uid>/$PHANTOM_LABEL' in launchctl log"
+fi
 [ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "loaded-idle-reap-before-inflight"
 
 # Restore simple launchctl stub for any future tests

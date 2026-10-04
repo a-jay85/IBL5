@@ -1,6 +1,6 @@
 ---
 description: CI runs the shell harness scripts in parallel through bin/run-shell-harnesses, with each harness still named on its own line in tests.yml.
-last_verified: 2026-09-30
+last_verified: 2026-10-03
 ---
 
 > This ADR was drafted by the post-plan harness for this PR. A human must review and approve it before merging.
@@ -21,7 +21,7 @@ The `Shell harness regression tests` job in `.github/workflows/tests.yml` ran ea
 
 Add `bin/run-shell-harnesses`, which takes a list of harness scripts and runs them with `xargs -P`. The worker count defaults to the CPU count and `-j N` overrides it. Each script writes to its own log under a `mktemp` directory. When a script finishes, the runner prints its log as one `::group::` block with PASS or FAIL and its duration. A `mkdir` lock keeps each block whole when two workers finish at once. After all scripts finish, the runner prints a table sorted by duration and exits 1 if any script failed or if fewer scripts reported than were passed in.
 
-The workflow replaces the per-harness steps with one step that calls the runner. Every harness still appears on its own line in that step, so `bin/check-plan` gate [G] can still find each harness named in a workflow file. The list starts with the slowest harnesses so the workers pack well. A harness that cannot share the runner keeps its own serial step. `bin/test-burndown` is the one case today, because it needs a scrubbed environment from `env -i`.
+The workflow replaces the per-harness steps with one step that calls the runner. Every harness still appears on its own line in that step, so `bin/check-plan` gate [G] can still find each harness named in a workflow file. The list starts with the slowest harnesses so the workers pack well. A harness that cannot share the runner keeps its own serial step. Three harnesses do this today. `bin/test-bug-pipeline-e2e` exercises a real `lsof` port guard. `bin/test-burndown` and `bin/test-burndown-loop` each need a scrubbed environment from `env -i`.
 
 `bin/test-pr-cycle` and `bin/test-digest-dm-build` each assert that they are wired into CI exactly once. Both now match the harness name as an indented line in the runner's argument list. The order check in `bin/test-pr-cycle` is gone, because parallel runs have no fixed order.
 
@@ -46,6 +46,6 @@ The workflow replaces the per-harness steps with one step that calls the runner.
 - `bin/run-shell-harnesses`
 - `.github/workflows/tests.yml` (the `Shell harness regression tests` job)
 - `bin/check-plan` (gate [G], which needs each harness named in a workflow)
-- `bin/test-burndown` (the harness that keeps its own serial step)
+- `bin/test-bug-pipeline-e2e`, `bin/test-burndown`, and `bin/test-burndown-loop` (the harnesses that keep their own serial steps)
 - `bin/test-pr-cycle` and `bin/test-digest-dm-build` (CI wiring assertions)
 - `.claude/rules/meta-tooling-bar.md`

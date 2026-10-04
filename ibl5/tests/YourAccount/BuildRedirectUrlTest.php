@@ -186,11 +186,12 @@ class BuildRedirectUrlTest extends TestCase
 
     public function testRejectsLeagueControlPanelStandalonePathAfterModuleMove(): void
     {
-        $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php';
+        $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php?league=olympics';
 
         $result = buildRedirectUrl();
 
         $this->assertNull($result);
+        $this->assertArrayNotHasKey('redirect_after_login_path', $_SESSION);
     }
 
     public function testBuildsUrlForLeagueControlPanelModuleWithLeague(): void

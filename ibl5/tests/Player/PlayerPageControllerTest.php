@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Player;
 
 use Http\HttpRequest;
+use Player\Contracts\PlayerRepositoryInterface;
 use Player\PlayerPageController;
 use Player\PlayerPageService;
 use Player\PlayerPageType;
@@ -32,13 +33,15 @@ class PlayerPageControllerTest extends WideUnitTestCase
      * Build the controller under test with an explicit request snapshot, so each
      * test supplies its own input instead of mutating global state.
      */
-    private function buildController(?HttpRequest $request = null): PlayerPageController
+    private function buildController(?HttpRequest $request = null, ?PlayerRepositoryInterface $playerRepository = null): PlayerPageController
     {
         return new PlayerPageController(
             $this->mockDb,
             $this->stubRepo,
             new PlayerPageService($this->mockDb, $this->stubRepo),
             $request ?? new HttpRequest(),
+            null,
+            $playerRepository,
         );
     }
 
@@ -447,5 +450,62 @@ class PlayerPageControllerTest extends WideUnitTestCase
         $this->assertStringContainsString('Regular Season', $html);
         // Confirm NOT the active-player overview path (no Game Log for retired fallback)
         $this->assertStringNotContainsString('Game Log', $html);
+    }
+
+    private const SAMPLE_UUID = '123e4567-e89b-42d3-a456-426614174000';
+
+    public function testShowPageResolvesUuidViaRepository(): void
+    {
+        $repository = $this->createMock(PlayerRepositoryInterface::class);
+        $repository->expects($this->once())
+            ->method('getPlayerIdByUuid')
+            ->with(self::SAMPLE_UUID)
+            ->willReturn(1);
+        $controller = $this->buildController(null, $repository);
+
+        $html = $controller->showPage(self::SAMPLE_UUID, null, '');
+
+        $this->assertSame($this->controller->renderPage(1, null, ''), $html);
+    }
+
+    public function testShowPageNumericIdSkipsRepository(): void
+    {
+        $repository = $this->createMock(PlayerRepositoryInterface::class);
+        $repository->expects($this->never())->method('getPlayerIdByUuid');
+        $controller = $this->buildController(null, $repository);
+
+        $html = $controller->showPage('1', null, '');
+
+        $this->assertSame($this->controller->renderPage(1, null, ''), $html);
+    }
+
+    public function testShowPageUnknownUuidFallsBackToIntCast(): void
+    {
+        $repository = $this->createMock(PlayerRepositoryInterface::class);
+        $repository->expects($this->once())
+            ->method('getPlayerIdByUuid')
+            ->with(self::SAMPLE_UUID)
+            ->willReturn(null);
+        $controller = $this->buildController(null, $repository);
+
+        $html = $controller->showPage(self::SAMPLE_UUID, null, '');
+
+        $this->assertSame($this->controller->renderPage(0, null, ''), $html);
+    }
+
+    public function testShowPageNullPageViewPassesNull(): void
+    {
+        $html = $this->controller->showPage('1', null, 'testuser');
+
+        $this->assertSame($this->controller->renderPage(1, null, 'testuser'), $html);
+        $this->assertStringContainsString('Game Log', $html);
+    }
+
+    public function testShowPageCastsPageViewToInt(): void
+    {
+        $html = $this->controller->showPage('1', '3', 'testuser');
+
+        $this->assertSame($this->controller->renderPage(1, 3, 'testuser'), $html);
+        $this->assertNotSame($this->controller->renderPage(1, null, 'testuser'), $html);
     }
 }

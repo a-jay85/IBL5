@@ -16,6 +16,7 @@ use Player\Views\PlayerViewFactory;
 use Player\Views\TeamColorHelper;
 use Http\HttpRequest;
 use Player\Contracts\PlayerPageServiceInterface;
+use Player\Contracts\PlayerRepositoryInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Security\HtmlSanitizer;
 use Team\Team;
@@ -37,6 +38,10 @@ class PlayerPageController
      * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
      */
     private ?Season $season = null;
+    /**
+     * Optional injected PlayerRepository. When null, showPage() falls back to new PlayerRepository($db).
+     */
+    private ?PlayerRepositoryInterface $playerRepository = null;
 
     /**
      * @param \mysqli $mysqliDb MySQLi database connection
@@ -44,13 +49,54 @@ class PlayerPageController
      * @param PlayerPageServiceInterface $pageService Service for player page business logic
      * @param HttpRequest $request Immutable snapshot of this request's input arrays
      */
-    public function __construct(\mysqli $mysqliDb, TeamIdentityRepositoryInterface $commonRepo, PlayerPageServiceInterface $pageService, HttpRequest $request, ?Season $season = null)
+    public function __construct(\mysqli $mysqliDb, TeamIdentityRepositoryInterface $commonRepo, PlayerPageServiceInterface $pageService, HttpRequest $request, ?Season $season = null, ?PlayerRepositoryInterface $playerRepository = null)
     {
         $this->mysqliDb = $mysqliDb;
         $this->commonRepo = $commonRepo;
         $this->pageService = $pageService;
         $this->request = $request;
         $this->season = $season;
+        $this->playerRepository = $playerRepository;
+    }
+
+    /**
+     * Resolve raw request input and render the player page (absorbs the
+     * former modules/Player/index.php showpage() global).
+     *
+     * @param ?string $rawPlayerID Numeric pid or a player UUID, as received in the request
+     * @param ?string $rawPageView Page view type, as received in the request
+     * @param string $username Current user's username
+     * @return string HTML output
+     */
+    public function showPage(?string $rawPlayerID, ?string $rawPageView, string $username): string
+    {
+        return $this->renderPage(
+            $this->resolvePlayerID($rawPlayerID),
+            ($rawPageView !== null) ? intval($rawPageView) : null,
+            $username,
+        );
+    }
+
+    /**
+     * UUID -> pid resolution. A UUID with no matching player, a non-numeric
+     * non-UUID string, and null all fall through to the (int) cast, exactly
+     * as the former showpage() did.
+     */
+    private function resolvePlayerID(?string $rawPlayerID): int
+    {
+        if (
+            $rawPlayerID !== null
+            && !is_numeric($rawPlayerID)
+            && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawPlayerID) === 1
+        ) {
+            $repository = $this->playerRepository ?? new PlayerRepository($this->mysqliDb);
+            $resolvedPid = $repository->getPlayerIdByUuid($rawPlayerID);
+            if ($resolvedPid !== null) {
+                return $resolvedPid;
+            }
+        }
+
+        return (int) $rawPlayerID;
     }
 
     /**

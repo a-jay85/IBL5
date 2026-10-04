@@ -18,7 +18,7 @@ use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationService;
 use Negotiation\NegotiationValidator;
 
-global $mysqli_db, $commonRepository, $salaryCapRepo, $httpRequest;
+global $mysqli_db, $commonRepository, $salaryCapRepo, $httpRequest, $authService;
 
 $commonRepository = new TeamIdentityRepository($mysqli_db);
 $salaryCapRepo = new SalaryCapRepository($mysqli_db);
@@ -41,35 +41,6 @@ $pageView = is_string($_REQUEST['pageView'] ?? null) ? $_REQUEST['pageView'] : n
 $httpRequest = HttpRequest::fromGlobals();
 
 $pagetitle = "- Player Archives";
-
-/**
- * Show a player page — thin wrapper around PlayerPageController
- *
- * @param mixed $playerID Player ID or UUID string
- * @param mixed $pageView Page view type
- */
-function showpage($playerID, $pageView): void
-{
-    global $mysqli_db, $commonRepository, $authService, $httpRequest;
-
-    // Resolve UUID to numeric PID if a UUID string was passed instead of an integer
-    if (!is_numeric($playerID) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string) $playerID)) {
-        $playerRepo = new PlayerRepository($mysqli_db);
-        $resolvedPid = $playerRepo->getPlayerIdByUuid((string) $playerID);
-        if ($resolvedPid !== null) {
-            $playerID = $resolvedPid;
-        }
-    }
-    $playerID = (int) $playerID;
-    $pageView = ($pageView !== null) ? intval($pageView) : null;
-
-    $pageService = new \Player\PlayerPageService($mysqli_db, $commonRepository);
-    $controller = new PlayerPageController($mysqli_db, $commonRepository, $pageService, $httpRequest);
-
-    PageLayout\PageLayout::header();
-    echo $controller->renderPage($playerID, $pageView, $authService->getUsername() ?? '');
-    PageLayout\PageLayout::footer();
-}
 
 function negotiate($playerID)
 {
@@ -260,7 +231,15 @@ switch ($pa) {
         break;
 
     case "showpage":
-        showpage($pid, $pageView);
+        $pageController = new PlayerPageController(
+            $mysqli_db,
+            $commonRepository,
+            new \Player\PlayerPageService($mysqli_db, $commonRepository),
+            $httpRequest,
+        );
+        PageLayout\PageLayout::header();
+        echo $pageController->showPage($pid, $pageView, $authService->getUsername() ?? '');
+        PageLayout\PageLayout::footer();
         break;
 
     default:

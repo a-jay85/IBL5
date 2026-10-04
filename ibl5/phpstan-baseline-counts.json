@@ -55,7 +55,7 @@
         "variable.undefined": 40
     },
     "phpstan-tests-baseline.neon": {
-        "argument.type": 8,
+        "argument.type": 1,
         "classConstant.unused": 42,
         "parameter.notFound": 1,
         "staticMethod.dynamicCall": 1

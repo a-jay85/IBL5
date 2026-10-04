@@ -17,7 +17,7 @@ use League\League;
  *
  * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discord_id?: ?int, used_extension_this_chunk?: int, used_extension_this_season?: ?int, has_mle?: int, has_lle?: int, league_record?: ?string, ...<string, mixed>}
  */
-class Team extends \BaseMysqliRepository
+class Team extends \Database\BaseMysqliRepository
 {
     public int $teamid;
 

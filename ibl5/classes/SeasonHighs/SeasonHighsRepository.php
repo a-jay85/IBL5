@@ -16,9 +16,9 @@ use SeasonHighs\Contracts\SeasonHighsServiceInterface;
  * @phpstan-import-type SeasonHighEntry from SeasonHighsServiceInterface
  *
  * @see SeasonHighsRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  */
-class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighsRepositoryInterface
+class SeasonHighsRepository extends \Database\BaseMysqliRepository implements SeasonHighsRepositoryInterface
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {

@@ -16,7 +16,7 @@ use Standings\Contracts\StandingsRepositoryInterface;
  * @phpstan-import-type TeamMapping from StandingsRepositoryInterface
  * @phpstan-import-type UpsertStandingsParams from StandingsRepositoryInterface
  */
-class StandingsUpdaterRepository extends \BaseMysqliRepository
+class StandingsUpdaterRepository extends \Database\BaseMysqliRepository
 {
     private string $teamAwardsTable;
 

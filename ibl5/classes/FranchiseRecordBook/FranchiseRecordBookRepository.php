@@ -15,7 +15,7 @@ use FranchiseRecordBook\Contracts\FranchiseRecordBookRepositoryInterface;
  * @phpstan-import-type AlltimeRecord from FranchiseRecordBookRepositoryInterface
  * @phpstan-import-type TeamInfo from FranchiseRecordBookRepositoryInterface
  */
-class FranchiseRecordBookRepository extends \BaseMysqliRepository implements FranchiseRecordBookRepositoryInterface
+class FranchiseRecordBookRepository extends \Database\BaseMysqliRepository implements FranchiseRecordBookRepositoryInterface
 {
     /**
      * Derived-table LEFT JOIN that maps an apostrophe-stripped player name to its

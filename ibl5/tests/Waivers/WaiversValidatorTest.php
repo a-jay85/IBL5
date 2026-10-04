@@ -633,7 +633,7 @@ class WaiversValidatorTest extends TestCase
 
     public function testOverCapAllowsExactVetMinThreshold(): void
     {
-        $vetMin = \ContractRules::getVeteranMinimumSalary(10);
+        $vetMin = \League\ContractRules::getVeteranMinimumSalary(10);
         $result = $this->validator->validateAdd(100, 5, League::HARD_CAP_MAX + 1, $vetMin);
         $this->assertTrue($result->isValid());
     }

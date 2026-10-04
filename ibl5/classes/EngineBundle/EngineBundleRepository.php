@@ -19,7 +19,7 @@ use League\League;
  * and optional date range on getUnplayedGames(), which are bound, never
  * interpolated.
  */
-final class EngineBundleRepository extends \BaseMysqliRepository implements EngineBundleRepositoryInterface
+final class EngineBundleRepository extends \Database\BaseMysqliRepository implements EngineBundleRepositoryInterface
 {
     /**
      * @see EngineBundleRepositoryInterface::getPlayers()

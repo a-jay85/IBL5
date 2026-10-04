@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TrainingCampRatingsDiff;
 
 use Database\BaseMysqliRepository;
+use Repositories\PlayerTeamJoinQuery;
 use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface;
 
 /**
@@ -17,6 +18,8 @@ use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface
  */
 class TrainingCampRatingsDiffRepository extends BaseMysqliRepository implements TrainingCampRatingsDiffRepositoryInterface
 {
+    use PlayerTeamJoinQuery;
+
     /**
      * @see TrainingCampRatingsDiffRepositoryInterface::getBaselinePhase()
      *
@@ -77,7 +80,8 @@ SELECT
     s.r_ast   AS s_r_ast,   s.r_stl   AS s_r_stl,
     s.r_tvr   AS s_r_tvr,   s.r_blk   AS s_r_blk,  s.r_foul AS s_r_foul
 FROM `ibl_plr` p
-LEFT JOIN `ibl_team_info` t ON t.teamid = p.teamid
+SQL;
+        $sql .= "\n" . $this->playerTeamLeftJoin() . "\n" . <<<'SQL'
 LEFT JOIN `ibl_plr_snapshots` s
        ON s.pid = p.pid
       AND s.season_year = ?

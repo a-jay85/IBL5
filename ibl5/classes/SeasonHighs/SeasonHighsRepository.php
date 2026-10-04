@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SeasonHighs;
 
 use League\LeagueContext;
+use Repositories\PlayerTeamJoinQuery;
 use SeasonHighs\Contracts\SeasonHighsRepositoryInterface;
 use SeasonHighs\Contracts\SeasonHighsServiceInterface;
 
@@ -20,6 +21,8 @@ use SeasonHighs\Contracts\SeasonHighsServiceInterface;
  */
 class SeasonHighsRepository extends \Database\BaseMysqliRepository implements SeasonHighsRepositoryInterface
 {
+    use PlayerTeamJoinQuery;
+
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
@@ -62,7 +65,7 @@ class SeasonHighsRepository extends \Database\BaseMysqliRepository implements Se
                 " . $statExpression . " AS `" . $safeStatName . "`
                 FROM `ibl_box_scores` bs
                 JOIN `ibl_plr` p ON bs.pid = p.pid
-                LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+                " . $this->playerTeamLeftJoin() . "
                 LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                 WHERE bs.`game_date` BETWEEN ? AND ?" . $locationCondition . "
                 ORDER BY `" . $safeStatName . "` DESC, bs.`game_date` ASC, bs.`id` ASC
@@ -143,7 +146,7 @@ class SeasonHighsRepository extends \Database\BaseMysqliRepository implements Se
                     (" . $statExpression . ") AS stat_value
                     FROM `ibl_box_scores` bs
                     JOIN `ibl_plr` p ON bs.pid = p.pid
-                    LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+                    " . $this->playerTeamLeftJoin() . "
                     LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                     WHERE bs.`game_date` BETWEEN ? AND ?" . $locationCondition . "
                     ORDER BY stat_value DESC, bs.`game_date` ASC, bs.`id` ASC

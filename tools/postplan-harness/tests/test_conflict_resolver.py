@@ -777,6 +777,20 @@ def test_purge_spares_flag(tmp_path):
     os.unlink(flag)
 
 
+def test_purge_removes_autoresolved_file():
+    """purge_verdict_artifacts removes a stale autoresolved-files temp file."""
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    autoresolved = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
+    with open(autoresolved, "w") as fh:
+        fh.write("stale.php\n")
+    try:
+        purge_verdict_artifacts(key)
+        assert not os.path.exists(autoresolved)
+    finally:
+        if os.path.exists(autoresolved):
+            os.unlink(autoresolved)
+
+
 # ── Bug 1: _CONFLICT_MARKER_PAT tightness ─────────────────────────────────────
 
 def test_conflict_marker_pat_rejects_80char_separator():

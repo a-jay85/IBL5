@@ -68,7 +68,7 @@ class PlayerAwardsViewTest extends TestCase
 
         $html = $view->renderAwardsList('Test Player');
 
-        // Award rows use the year-cell class; empty awards must not render any award row.
-        $this->assertStringNotContainsString('year-cell', $html);
+        // Only the Year/Award header row renders; empty awards must not render any award row.
+        $this->assertSame(1, substr_count($html, '<tr>'));
     }
 }

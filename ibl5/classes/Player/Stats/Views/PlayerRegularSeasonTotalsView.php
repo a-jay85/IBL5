@@ -49,9 +49,10 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
 
         ob_start();
         ?>
-<table class="sortable player-table">
+<table class="sortable ibl-data-table player-view-table">
+<thead>
     <tr>
-        <td colspan=15 class="player-table-header">Regular Season Totals</td>
+        <td colspan=15 class="player-view-table__title">Regular Season Totals</td>
     </tr>
     <tr>
         <th>year</th>
@@ -70,6 +71,8 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
         <th>pf</th>
         <th>pts</th>
     </tr>
+</thead>
+<tbody>
         <?php
         foreach ($historicalStats as $row) {
             $gm = $row['games'];
@@ -136,7 +139,9 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
         // Recalculate career total points to ensure accuracy
         $carTotals['pts'] = (2 * $carTotals['fgm']) + $carTotals['ftm'] + $carTotals['tgm'];
         ?>
-    <tr class="player-table-row-bold">
+</tbody>
+<tfoot>
+    <tr class="career-row">
         <td colspan=2>Career</td>
         <td><?= (int)$carTotals['gm'] ?></td>
         <td><?= (int)$carTotals['min'] ?></td>
@@ -152,6 +157,7 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
         <td><?= (int)$carTotals['pf'] ?></td>
         <td><?= (int)$carTotals['pts'] ?></td>
     </tr>
+</tfoot>
 </table>
         <?php
         return (string) ob_get_clean();

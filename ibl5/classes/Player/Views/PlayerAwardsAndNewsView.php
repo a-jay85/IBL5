@@ -43,9 +43,9 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
 
         ob_start();
         ?>
-<table class="sortable player-table">
+<table class="sortable ibl-data-table player-view-table">
     <tr>
-        <td class="player-table-header">AWARDS</td>
+        <td class="player-view-table__title">AWARDS</td>
     </tr>
         <?php
         /** @var list<array{year: int, name: string, award: string, prim: int}> $awards */
@@ -58,7 +58,7 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
         }
         ?>
     <tr>
-        <td class="player-table-header">ARTICLES MENTIONING THIS PLAYER</td>
+        <td class="player-view-table__title">ARTICLES MENTIONING THIS PLAYER</td>
     </tr>
     <tr>
         <td>

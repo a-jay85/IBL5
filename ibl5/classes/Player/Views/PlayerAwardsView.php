@@ -72,7 +72,7 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
 
         ob_start();
         ?>
-<table class="awards-table">
+<table class="ibl-data-table player-view-table">
     <tr>
         <td class="content-header">Year</td>
         <td class="content-header">Award</td>
@@ -81,7 +81,7 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
         foreach ($awards as $award) {
             ?>
     <tr>
-        <td class="year-cell"><?= (int) $award['year'] ?></td>
+        <td><?= (int) $award['year'] ?></td>
         <td><?= HtmlSanitizer::e($award['award']) ?></td>
     </tr>
             <?php

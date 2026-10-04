@@ -9,53 +9,28 @@
 }
 
 /* ==========================================================================
-   Shared Table Base — all player-view tables share these properties
+   Player View Tables: modifier on .ibl-data-table
+   The base look (radius, zebra, hover, navy thead) comes from .ibl-data-table
+   in tables.css. This modifier keeps only the legacy blue title bar and the
+   centering the wrapper-less legacy markup needs.
    ========================================================================== */
 
-.player-table,
-.stats-table,
-.awards-table,
-.sim-stats-table {
+.player-view-table {
     margin: 0 auto;
-    border: 1px solid var(--black);
-    border-collapse: collapse;
 }
 
-.player-table td, .player-table th,
-.stats-table td, .stats-table th,
-.awards-table td, .awards-table th,
-.sim-stats-table td, .sim-stats-table th {
-    text-align: center;
-    padding: 4px 8px;
-    border: 1px solid var(--black);
-}
-
-.player-table-header {
-    background-color: var(--player-legacy-header);
+/* Keyed on the cell class, never `thead td`: the Awards & News table carries
+   a second title row inside tbody. */
+.player-view-table .player-view-table__title {
+    background: var(--player-legacy-header);
     color: white;
     font-weight: bold;
     text-align: center;
 }
 
-/* Bold row for career/total summaries */
-.player-table-row-bold {
-    font-weight: bold;
-}
-
-.player-table th {
-    font-weight: bold;
-}
-
 .content-header {
     font-weight: bold;
     text-align: center;
-}
-
-.player-table ~ .section-title {
-    font-size: 2em;
-    font-weight: bold;
-    text-align: center;
-    margin: 1em 0;
 }
 
 /* ==========================================================================
@@ -80,19 +55,9 @@
     padding: 4px 8px;
 }
 
-/* Awards table — unique rule (shared base above handles the rest) */
-.awards-table .year-cell {
-    text-align: center;
-}
-
 /* Game log cells */
 .gamelog {
     text-align: center;
-}
-
-/* Sortable tables - extends existing .sortable class */
-.sortable.player-table {
-    margin: 0 auto;
 }
 
 /* ==========================================================================

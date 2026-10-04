@@ -527,8 +527,13 @@ def _rival_push(tmp_path, bare, *, from_branch, files=None, merge_master=False):
         _sh("git", "-C", str(rival), "checkout", "-b", "feature")
     if merge_master:
         _sh("git", "-C", str(rival), "merge", "--no-ff", "--no-edit", "origin/master")
+    rival_env = {**_GIT_ENV, "GIT_AUTHOR_NAME": "rival", "GIT_COMMITTER_NAME": "rival"}
     for name, text in (files or {}).items():
-        _commit(rival, name, text)
+        # a distinct author keeps an identical-content commit from hashing to our HEAD
+        (rival / name).write_text(text)
+        _sh("git", "-C", str(rival), "add", "-A")
+        subprocess.run(["git", "-C", str(rival), "commit", "-m", name], check=True,
+                       capture_output=True, text=True, env=rival_env)
     _sh("git", "-C", str(rival), "push", "origin", "HEAD:refs/heads/feature")
     return _sh("git", "-C", str(bare), "rev-parse", "refs/heads/feature")
 

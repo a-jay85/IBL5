@@ -23,6 +23,13 @@ use Tests\WideUnit\Mocks\MockDatabase;
  * reversed (`t.teamid = p.teamid`). The normalizer canonicalizes that to the
  * shared fragment's `p.teamid = t.teamid`; equality is symmetric.
  *
+ * Mutations each golden catches:
+ * - A dropped newline before a fragment call fuses `p` and `LEFT` into pLEFT
+ *   (trait prefix, ApiInjuries, and the TrainingCampRatingsDiff nowdoc split).
+ * - Calling playerTeamInnerJoin() in ComparePlayersRepository::getPlayerByName()
+ *   drops `LEFT` from the join.
+ * - A dropped leading newline on a reopened string fuses `t.teamid` and `WHERE`.
+ *
  * Observed join-query counts: every case captures exactly one query (the
  * SeasonHighs batch case is one UNION ALL query holding two player branches).
  */

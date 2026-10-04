@@ -14,6 +14,9 @@ use PHPUnit\Framework\TestCase;
  * `ibl5/classes/` that spells it out fails here. The unaliased form is frozen
  * to a single allowlisted file, so the allowlist can only shrink.
  *
+ * Each hit is reported as `relative/path.php:LINE`, for example
+ * ContractList/ContractListRepository.php:29 if that site regrew its own copy.
+ *
  * Known blind spot: a copy written with a different alias (for example `ti`)
  * is not matched.
  */

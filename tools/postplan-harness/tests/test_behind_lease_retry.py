@@ -674,6 +674,19 @@ def test_verdict_remote_head_diverged_no_pr():
     assert "1234abcd" in line
 
 
+def test_lease_snapshot_skips_non_livegit_doubles():
+    """The `isinstance(git, LiveGit)` gate keeps every test double on today's path:
+    the doubles in test_adr_draft_on_denial.py, test_cifix_ship.py and
+    test_fidelity_carryforward.py have no push_remote or worktree."""
+    assert runner._lease_snapshot(types.SimpleNamespace()) is None
+    assert runner._lease_snapshot(types.SimpleNamespace(push_remote="origin")) is None
+
+
+def test_lease_snapshot_skips_push_disabled_livegit(tmp_path):
+    wt, _bare = _feature_repo(tmp_path)
+    assert runner._lease_snapshot(LiveGit(str(wt), push_remote=None)) is None
+
+
 def test_probe_remote_tip_leaves_tracking_ref(tmp_path):
     wt, bare = _feature_repo(tmp_path)
     y = _publish_feature(wt)

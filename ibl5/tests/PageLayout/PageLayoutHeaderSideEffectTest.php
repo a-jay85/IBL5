@@ -60,6 +60,7 @@ final class PageLayoutHeaderSideEffectTest extends TestCase
 
     public function testBoostedHeaderNeverResolvesIdentity(): void
     {
+        // header() must not reach AuthServiceInterface::getCookieArray() via cookiedecode().
         $auth = $this->createMock(AuthServiceInterface::class);
         $auth->expects(self::never())->method('getCookieArray');
         $GLOBALS['authService'] = $auth;

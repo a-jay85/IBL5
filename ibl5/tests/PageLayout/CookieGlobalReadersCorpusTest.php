@@ -12,6 +12,10 @@ use PHPUnit\Framework\TestCase;
  * PageLayout::header() no longer calls cookiedecode(), so a new reader of the
  * global would see null. Identity comes from `$authService` or the
  * `auth.username` container entry.
+ *
+ * The last dead declaration, modules/News/categories.php:49, was removed with
+ * this guard. The only comment hit, AuthService.php:27, is skipped by the
+ * comment filter in findViolations().
  */
 final class CookieGlobalReadersCorpusTest extends TestCase
 {

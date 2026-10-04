@@ -97,6 +97,7 @@ class PlrExportService implements PlrExportServiceInterface
         }
 
         // Step 5: Reassemble and write
+        /** @infection-ignore-all Equivalent: $lines is already a list and assembleFile implodes it, so array_values changes nothing. */
         $output = PlrFileWriter::assembleFile(array_values($lines));
 
         // File size assertion

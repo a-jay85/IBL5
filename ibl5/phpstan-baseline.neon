@@ -4102,42 +4102,6 @@ parameters:
 			path: scripts/plrAdvanceBirdYears.php
 
 		-
-			rawMessage: 'Parameter #1 $stream of function fclose expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrAdvanceBirdYears.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function feof expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrAdvanceBirdYears.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fgets expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrAdvanceBirdYears.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fread expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrAdvanceBirdYears.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fseek expects resource, resource|false given.'
-			identifier: argument.type
-			count: 3
-			path: scripts/plrAdvanceBirdYears.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fwrite expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrAdvanceBirdYears.php
-
-		-
 			rawMessage: 'Parameter #1 $string of function substr expects string, string|false given.'
 			identifier: argument.type
 			count: 6
@@ -4156,51 +4120,9 @@ parameters:
 			path: scripts/plrAdvanceYearsOfExperience.php
 
 		-
-			rawMessage: 'Parameter #1 $stream of function fclose expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrAdvanceYearsOfExperience.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function feof expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrAdvanceYearsOfExperience.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fgets expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrAdvanceYearsOfExperience.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fread expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrAdvanceYearsOfExperience.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fseek expects resource, resource|false given.'
-			identifier: argument.type
-			count: 3
-			path: scripts/plrAdvanceYearsOfExperience.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fwrite expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrAdvanceYearsOfExperience.php
-
-		-
 			rawMessage: 'Parameter #1 $string of function substr expects string, string|false given.'
 			identifier: argument.type
 			count: 3
-			path: scripts/plrAdvanceYearsOfExperience.php
-
-		-
-			rawMessage: 'Parameter #2 $data of function fwrite expects string, float|int<10, max>|string given.'
-			identifier: argument.type
-			count: 1
 			path: scripts/plrAdvanceYearsOfExperience.php
 
 		-
@@ -4231,42 +4153,6 @@ parameters:
 			rawMessage: 'Loose comparison via "==" between string and string is not allowed.'
 			identifier: equal.notAllowed
 			count: 1
-			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fclose expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function feof expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fgets expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fread expects resource, resource|false given.'
-			identifier: argument.type
-			count: 2
-			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fseek expects resource, resource|false given.'
-			identifier: argument.type
-			count: 4
-			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fwrite expects resource, resource|false given.'
-			identifier: argument.type
-			count: 2
 			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
 
 		-

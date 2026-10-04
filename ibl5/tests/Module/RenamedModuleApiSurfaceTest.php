@@ -125,6 +125,9 @@ final class RenamedModuleApiSurfaceTest extends TestCase
 
         $database = 'Player' . 'Database';
         $movement = 'Player' . 'Movement';
+        // Widen to list<string>: PHPStan folds the constant names, knows no such class exists,
+        // and flags the class_exists() guard below as always false.
+        /** @var list<string> $retired */
         $retired = [
             $database . '\\' . $database . 'Repository',
             $database . '\\' . $database . 'Service',

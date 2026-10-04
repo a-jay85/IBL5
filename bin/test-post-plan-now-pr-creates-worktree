@@ -4,7 +4,7 @@
 # PRs, and maps slash-bearing branch names to hostname-safe slugs. Cases 11-14 cover
 # the --auto headless guard and its IBL5_BURNDOWN_LOOP=1 opt-in.
 #
-# Fourteen cases, exit 0 iff all pass.
+# Fifteen cases, exit 0 iff all pass.
 set -euo pipefail
 
 # ---- environment --------------------------------------------------------
@@ -555,6 +555,87 @@ fi
 rm -f "$PROBE_FILE"
 rm -f "$HOME7"/Library/LaunchAgents/*.plist
 [ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "opt-in is scrubbed before the far-side claude runs"
+
+# ==========================================================================
+# Case 15 — a live fleet slot refuses a detaching run (post-plan-fleet race)
+# ==========================================================================
+# bin/post-plan-fleet runs `post-plan-now --pr N --foreground` under the label
+# com.ibl5.post-plan-fleet-<N>, which postplan_inflight_label cannot see. A detaching run
+# for the same PR would race it, so it must exit 6. Placed after Case 14 because the
+# --foreground sub-case needs the fake claude and caffeinate shim set up for Case 7.
+cat > "$SHIMS/gh-fleet" << 'SHIM_EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "pr" ] && [ "${2:-}" = "list" ]; then
+    for a in "$@"; do
+        if [ "$a" = "feat-x" ]; then echo 777; exit 0; fi
+    done
+fi
+exit 0
+SHIM_EOF
+chmod +x "$SHIMS/gh-fleet"
+LAUNCHCTL_LIST_STATE="$TMP/launchctl_list_state15"
+export LAUNCHCTL_LIST_STATE
+cat > "$SHIMS/launchctl" << 'SHIM_EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${LAUNCHCTL_LOG:-/dev/null}"
+case "${1:-}" in
+    list) [ -f "${LAUNCHCTL_LIST_STATE:-}" ] && cat "${LAUNCHCTL_LIST_STATE}" ;;
+esac
+exit 0
+SHIM_EOF
+chmod +x "$SHIMS/launchctl"
+
+# run_fleet_case <extra post-plan-now args...> → F_OUT, F_RC
+run_fleet_case() {
+    rm -f "$HOME7"/Library/LaunchAgents/*.plist
+    set +e
+    F_OUT=$(cd "$WT6" && POST_PLAN_SKILL=1 HOME="$HOME7" FAKE_MODE='' \
+        GH_CMD="$SHIMS/gh-fleet" GH_PR_JSON='{"headRefName":"feat-x","isCrossRepository":false}' \
+        "$REPO/bin/post-plan-now" "$@" 2>&1)
+    F_RC=$?
+    set -e
+    rm -f "$HOME7"/Library/LaunchAgents/*.plist
+}
+
+# 15.1 refuse
+FAIL_BEFORE=$FAIL
+printf '%s\t%s\t%s\n' 40477 0 'com.ibl5.post-plan-fleet-777' > "$LAUNCHCTL_LIST_STATE"
+run_fleet_case
+[ "$F_RC" -eq 6 ] || fail "fleet-slot-refuse: exited $F_RC, want 6 (out: $F_OUT)"
+grep -qF -- "fleet rescue for PR #777 is already in flight" <<< "$F_OUT" \
+    || fail "fleet-slot-refuse: no refusal message (out: $F_OUT)"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "fleet-slot-refuse: a live fleet slot refuses a detaching run"
+
+# 15.2 a different PR's slot does not block (end-anchored compare)
+FAIL_BEFORE=$FAIL
+printf '%s\t%s\t%s\n' 40477 0 'com.ibl5.post-plan-fleet-7770' > "$LAUNCHCTL_LIST_STATE"
+run_fleet_case
+[ "$F_RC" -ne 6 ] || fail "fleet-slot-other-pr: PR 7770's slot wrongly refused PR 777 (out: $F_OUT)"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "fleet-slot-other-pr: a different PR's slot does not block"
+
+# 15.3 the fleet's own runner (--pr N --foreground) is not refused by its own slot
+FAIL_BEFORE=$FAIL
+printf '%s\t%s\t%s\n' 40477 0 'com.ibl5.post-plan-fleet-777' > "$LAUNCHCTL_LIST_STATE"
+run_fleet_case --pr 777 --foreground
+[ "$F_RC" -ne 6 ] || fail "fleet-slot-foreground: fleet runner refused its own slot (out: $F_OUT)"
+grep -qF -- "foreground mode" <<< "$F_OUT" \
+    || fail "fleet-slot-foreground: run never reached foreground mode (out: $F_OUT)"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "fleet-slot-foreground: the fleet runner is not self-refused"
+
+# 15.4 --force bypasses
+FAIL_BEFORE=$FAIL
+printf '%s\t%s\t%s\n' 40477 0 'com.ibl5.post-plan-fleet-777' > "$LAUNCHCTL_LIST_STATE"
+run_fleet_case --force
+[ "$F_RC" -ne 6 ] || fail "fleet-slot-force: --force did not bypass the slot (out: $F_OUT)"
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "fleet-slot-force: --force bypasses a live slot"
+
+rm -f "$LAUNCHCTL_LIST_STATE"
+cat > "$SHIMS/launchctl" << 'SHIM_EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${LAUNCHCTL_LOG:-/dev/null}"
+exit 0
+SHIM_EOF
+chmod +x "$SHIMS/launchctl"
 
 # ==========================================================================
 # Summary

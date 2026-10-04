@@ -75,5 +75,3 @@ Measured and ruled-out levers. Each FTA per game figure is the instrument's engi
 | `pace_per_g` | 101.231 | 102.420 |
 
 `decided_games` stays 6642. `fta_per_pf`, `pps`, and `home_away_ratio` are unchanged, and the branch stays `VOLUME`. The engine FTA rate rises about 1.2 percent and the attribution to foul volume holds. The A/B arm figures in the Decision list and their 14.09 default-arm baseline were measured with the 78 games included and were not recomputed. The committed `calibration-5.60-20261001-fta-decomp-*.json` artifacts were not regenerated. `TestMeasureBaseline_Archive`, the source of the 15.81 and 21.32 headline figures, was not checked for the same dilution.
-
-<!-- Append-only check for this addendum: the diff against master removes exactly two lines, the old `last_verified` and the old References line. A grep for `^-[^-]` misses the References line, so filter the `--- ` header and count `^-` instead. -->

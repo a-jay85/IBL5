@@ -17,10 +17,8 @@
 // FreezeConfig A/B arm. Without JSB_ARCHIVE_DIR (or the dir absent) the test
 // SKIPS — always green on CI.
 //
-// Degenerate 0-0 / 0-FTA engine games are excluded (isDegenerateFTAGame). On
-// the default arm of the 113-snapshot corpus that drops 78 games: the artifact
-// reads engine_side.team_games 13284 and excluded_degenerate_games 78, and
-// engine_summary.fta_per_g moves from 14.0861 to about 14.2515.
+// Degenerate 0-0 / 0-FTA engine games are excluded (isDegenerateFTAGame); the
+// count is written to excluded_degenerate_games in the artifact.
 package calibrate
 
 import (

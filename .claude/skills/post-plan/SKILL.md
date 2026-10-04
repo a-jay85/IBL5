@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-03
+last_verified: 2026-10-04
 ---
 
 # Post-Plan Orchestrator
@@ -656,7 +656,7 @@ if [ -n "${HARNESS_RUN_DIR:-}" ] && [ -f "$OUT" ]; then cat "$OUT"; else echo "N
     gh pr view <pr> --json mergeStateStatus --jq .mergeStateStatus
     ```
 
-    `true` **and** `BEHIND` ⇒ **Read `.claude/skills/post-plan/_phase-7-ci-monitoring.md` § BEHIND re-rebase loop and run it** — a bounded 3-iteration disarm → re-pin → re-capture → rebase → force-push cycle that manages arm state, because Phase 6.5 already ran and the PR may already be armed. Anything else ⇒ continue to Phase 8 unchanged: no disarm, no rewrite, no re-arm. The `// false` default makes a permissions error or a missing protection block read as "not strict", i.e. do nothing — fail-safe away from rewriting history. `mergeStateStatus` comes from `gh pr view --json`, never from `gh pr checks` (field-shape gotcha above).
+    `true` **and** `BEHIND` ⇒ **Read `.claude/skills/post-plan/_phase-7-ci-monitoring.md` § BEHIND re-rebase loop and run it**. The loop is a bounded 3-iteration disarm → re-pin → re-capture → rebase → force-push cycle that manages arm state, because Phase 6.5 already ran and the PR may already be armed. At the ceiling the same re-arm gate runs and an armed PR is left armed for `.github/workflows/update-behind-prs.yml` (ADR-0081) to carry to merge. Anything else ⇒ continue to Phase 8 unchanged. Nothing is disarmed, rewritten, or re-armed. The `// false` default makes a permissions error or a missing protection block read as "not strict", i.e. do nothing. That fails safe away from rewriting history. `mergeStateStatus` comes from `gh pr view --json`. `gh pr checks` does not carry it (field-shape gotcha above).
 4. **If exit 8:** Get failed checks via `gh pr checks <pr> --json name,state,link --jq '[.[] | select(.state == "FAILURE")]'` (uppercase `FAILURE`, field is `state` not `conclusion`). **Drop `human-signoff` from that list first.** It is red by design on every `feat:` PR until a human applies the `human-approved` label (ADR-0062), there is nothing in the diff to fix, and Phase 6.5 already reports it as a hold. If it is the only name left, treat the watch as green and go to Phase 8. Download logs (`gh run view <id> --log-failed`). **Fix all failures.** master's CI is green, so any failure on this PR is this PR's fault (even in files outside the diff). Never aim a fix at `Tests and Analysis` alone. It is the `gate` rollup job in `.github/workflows/tests.yml` and goes red whenever an upstream job fails, so fixing the upstream job clears it. Fix, commit, push, loop back to step 1.
 
    **All attempts run on Opus 5.5.** Read `.claude/skills/post-plan/_phase-7-ci-monitoring.md` for the fix procedure. Capture the failed log and the `origin/master...HEAD` diff to temp paths and pass the **paths**. Never summarize the log. Spawn **one** `Agent(model: "opus")` per attempt; it fixes, commits and pushes itself and returns one line. Make at most 3 attempts. When an attempt makes no code change, re-run the failed jobs once with `gh run rerun <run-id> --failed` and re-watch. If they pass, note the flaky check in a PR comment and go to Phase 8. The re-run is not an attempt. After the third attempt, list the surviving failures in a PR comment and continue to Phase 8. The compiled harness runs the same loop (`_ci_fix_loop` in `tools/postplan-harness/runner.py`). Loop back to step 1.

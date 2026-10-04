@@ -12,6 +12,14 @@
 # post-plan-now's headless guard skips them. post-plan-now unsets it before
 # launching its own children.
 #
+# A usage fetch that serves only a stale reading (usage_fetch rc 2) sleeps out the
+# 429 backoff plus 5s, clamped to 30-300s, or 120s when no backoff is active. No
+# reading at all (rc 1) sleeps 1800s. Neither case ever launches a batch.
+#
+# Between batches the loop hashes itself, bin/lib/usage-gate.sh and
+# bin/lib/usage-fetch.sh. When the hash changes (new code checked out where launchd
+# runs it from), it execs the new code with the same PID, lock, SID and counters.
+#
 # Usage:
 #   bin/burndown-loop start [--no-dm]
 #   bin/burndown-loop stop
@@ -22,12 +30,15 @@
 # ---
 # Environment (unset and empty both take the default):
 #   IBL5_BURNDOWN_RESERVE_PCT         weekly percent kept free at reset (default 10)
-#   IBL5_BURNDOWN_MAX_FAILS           consecutive failed batches before giving up (3)
+#   IBL5_BURNDOWN_MAX_FAILS           consecutive failed or aborted batches before giving up (3)
+#   IBL5_BURNDOWN_REEXEC_*            internal re-exec hand-off; ignored unless this PID set it
 #   IBL5_BURNDOWN_BATCH_TIMEOUT_MIN   per-batch wall clock in minutes (90)
 #   IBL5_BURNDOWN_DISCORD_DM          finish-DM sender (default bin/discord-dm)
 #
 # Exit codes: 0 loop finished (supply exhausted, stop requested, or --once done).
-#             1 consecutive-failure cap hit or /burndown failed closed.
+#             1 consecutive-failure cap hit. Failed batches and /burndown exit-3
+#               aborts share the cap; below it a failure retries after 300s and an
+#               abort after 600s.
 #             2 usage or environment error.
 #             4 another instance holds the lock.
 #             75 paused by the usage gate (coordinator resumes it).
@@ -53,6 +64,12 @@ LABEL="com.ibl5.burndown-loop"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 RUNNER="$STATE/runner.sh"
 BL_SLEEP_CAP=1800
+# rc-2 fetch retry (usage_fetch served stale or nothing fresh): sleep out the 429
+# backoff plus a pad, clamped, or a short fixed retry when no backoff is active.
+BL_BACKOFF_PAD=5
+BL_BACKOFF_FLOOR=30
+BL_BACKOFF_CAP=300
+BL_FETCH_RETRY=120
 BL_PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin:$HOME/.bun/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 DISCORD_DM="${IBL5_BURNDOWN_DISCORD_DM:-$ROOT/bin/discord-dm}"
 
@@ -62,10 +79,29 @@ NO_DM=0
 ONCE=0
 BATCHES=0
 ITEMS=0
+BATCH_ITEMS=0
 UNITS=0
 FAILS=0
 LAST_FAIL=""
 START_EPOCH=$(date +%s)
+
+# Re-exec hand-off (see bl_maybe_reexec). Read once, then unset, so batch children
+# (claude -p) never inherit the values. Honored only when RX_PID is this process's
+# own PID; a stale export in an operator's shell is ignored.
+REEXEC=0
+CODE_HASH=""
+RX_SKIP_HASH=""
+RX_PID="${IBL5_BURNDOWN_REEXEC_PID:-}"
+RX_SID="${IBL5_BURNDOWN_REEXEC_SID:-}"
+RX_BATCHES="${IBL5_BURNDOWN_REEXEC_BATCHES:-}"
+RX_ITEMS="${IBL5_BURNDOWN_REEXEC_ITEMS:-}"
+RX_UNITS="${IBL5_BURNDOWN_REEXEC_UNITS:-}"
+RX_FAILS="${IBL5_BURNDOWN_REEXEC_FAILS:-}"
+RX_START="${IBL5_BURNDOWN_REEXEC_START:-}"
+RX_LAST_FAIL="${IBL5_BURNDOWN_REEXEC_LAST_FAIL:-}"
+unset IBL5_BURNDOWN_REEXEC_PID IBL5_BURNDOWN_REEXEC_SID IBL5_BURNDOWN_REEXEC_BATCHES \
+    IBL5_BURNDOWN_REEXEC_ITEMS IBL5_BURNDOWN_REEXEC_UNITS IBL5_BURNDOWN_REEXEC_FAILS \
+    IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL
 
 BL_PROMPT='Invoke the /burndown skill now and run every step to completion. No human is present: never ask questions or wait for input. When the skill says to show or tell the user something, print it and continue. Make the safe choice and continue. If the first selection round in step 4 prints `LEDGER: none`, end your final message with this exact line on its own: BURNDOWN-LOOP: none-selected. If any bin/backlog command in the run exits 3 (fail-closed abort), stop the run and end your final message with this exact line on its own: BURNDOWN-LOOP: abort-exit-3'
 
@@ -155,13 +191,36 @@ bl_lock_acquire() {
 
 # ------------------------------------------------------------ pacing decision
 
+# bl_fetch_retry_decision <frc>: the one decision line for usage_fetch rc 2. An active
+# 429 backoff gives (until - now + pad) clamped to [floor, cap]; an absent, expired
+# or garbled backoff file gives the fixed retry. Never prints launch.
+bl_fetch_retry_decision() {
+    local frc="$1" bo bo_until now secs
+    bo=$(_usage_fetch_backoff_read "$(usage_state_dir)/fetch-backoff")
+    bo_until=${bo% *}
+    now=$(date +%s)
+    if [ "$bo_until" -gt "$now" ]; then
+        secs=$(( 10#$bo_until - now + BL_BACKOFF_PAD ))
+        if [ "$secs" -lt "$BL_BACKOFF_FLOOR" ]; then secs=$BL_BACKOFF_FLOOR; fi
+        if [ "$secs" -gt "$BL_BACKOFF_CAP" ]; then secs=$BL_BACKOFF_CAP; fi
+        echo "sleep $secs backoff fetch-rc=$frc until=$bo_until"
+        return 0
+    fi
+    echo "sleep $BL_FETCH_RETRY fetch-retry fetch-rc=$frc"
+}
+
 # bl_decide: prints exactly one line, the single pacing decision for both the live
 # loop and --dry-run. Fails closed on a missing or stale reading: the loop is
 # discretionary work, so a skipped batch costs time while an unpaced one costs the
 # owner's week (unlike usage_prestart_gate, which guards a run the user asked for).
+# A stale reading (fetch rc 2) only shortens the sleep to the backoff or a 120s retry.
 bl_decide() {
     local body frc=0 v verdict wait
     body=$(usage_fetch 45) || frc=$?
+    if [ "$frc" -eq 2 ]; then
+        bl_fetch_retry_decision "$frc"
+        return 0
+    fi
     if [ "$frc" -ne 0 ]; then
         echo "sleep $BL_SLEEP_CAP blind fetch-rc=$frc"
         return 0
@@ -210,7 +269,7 @@ bl_finish() {
         else
             msg="burndown-loop: finished ($reason)
 batches=$BATCHES items=$ITEMS elapsed=${elapsed}m"
-            if [ "$reason" = "failures" ] && [ -n "$LAST_FAIL" ]; then
+            if { [ "$reason" = "failures" ] || [ "$reason" = "fail-closed" ]; } && [ -n "$LAST_FAIL" ]; then
                 msg="$msg
 $LAST_FAIL"
             fi
@@ -264,29 +323,32 @@ bl_run_batch() {
     # shellcheck disable=SC2086
     env CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 IBL5_BURNDOWN_LOOP=1 \
         IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=burndown-loop \
-        IBL5_USAGE_GATE_MODEL=claude-opus-5-5 \
+        IBL5_USAGE_GATE_MODEL=claude-sonnet-5-5 \
         IBL5_USAGE_GATE_RESUME_BIN="$ROOT/bin/burndown-loop" \
         IBL5_USAGE_GATE_SESSION_ID="$LOOP_SID" \
         perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$timeout_secs" \
         $caff claude -p "$BL_PROMPT" --dangerously-skip-permissions \
-        --model claude-opus-5-5 --effort high --name "burndown-loop-$ts" \
+        --model claude-sonnet-5-5 --effort high --name "burndown-loop-$ts" \
         >"$BLOG" 2>&1 || BATCH_RC=$?
     bl_ledgers > "$STATE/ledgers.after"
     NEW_LEDGERS=$(comm -13 "$STATE/ledgers.before" "$STATE/ledgers.after")
 }
 
-# bl_count_new: adds the new ledgers' items to ITEMS, bumps BATCHES, sets UNITS from
-# each ledger's top-level units_used.
+# bl_count_new: adds the new ledgers' items to ITEMS, bumps BATCHES, sets BATCH_ITEMS to
+# this batch's item count, sets UNITS from each ledger's top-level units_used.
 # Never call it in $(...): the counters would update a subshell copy.
 bl_count_new() {
-    local n units=0 u f
+    local n units=0 u f c batch_items=0
     BATCHES=$((BATCHES + 1))
     for n in $NEW_LEDGERS; do
         f="$REPORTS/$n"
-        ITEMS=$((ITEMS + $(jq '.items | length' "$f" 2>/dev/null || echo 0)))
+        c=$(jq '.items | length' "$f" 2>/dev/null || echo 0)
+        batch_items=$((batch_items + c))
+        ITEMS=$((ITEMS + c))
         u=$(jq '.units_used // 0' "$f" 2>/dev/null || echo 0)
         units=$((units + u))
     done
+    BATCH_ITEMS=$batch_items
     UNITS=$units
 }
 
@@ -306,16 +368,22 @@ bl_on_launch() {
         ran)
             FAILS=0
             bl_count_new
-            bl_log "batch ran ledgers=$new items=$ITEMS units=$UNITS rc=$BATCH_RC log=$BLOG"
+            bl_log "batch ran ledgers=$new items=$BATCH_ITEMS units=$UNITS rc=$BATCH_RC log=$BLOG"
             ;;
         empty)
             bl_log "supply exhausted (first round LEDGER: none)"
             bl_finish exhausted 0
             ;;
         abort)
+            # An abort batch can still have written ledgers; count them before retrying.
             bl_count_new >/dev/null
-            bl_log "batch aborted: burndown exit 3 log=$BLOG"
-            bl_finish fail-closed 1
+            FAILS=$((FAILS + 1))
+            LAST_FAIL="last fail: reason=abort-exit-3 log=$BLOG"
+            bl_log "batch aborted: burndown exit 3 fails=$FAILS/$MAX_FAILS log=$BLOG"
+            if [ "$FAILS" -ge "$MAX_FAILS" ]; then bl_finish fail-closed 1; fi
+            if [ "$ONCE" -eq 0 ]; then
+                bl_sleep 600 retry-after-abort || bl_stopped
+            fi
             ;;
         *)
             FAILS=$((FAILS + 1))
@@ -347,6 +415,86 @@ bl_on_pause() {
     bl_sleep "$BL_SLEEP_CAP" zone-no-marker || bl_stopped
 }
 
+# ------------------------------------------------------------ re-exec
+
+# bl_nonneg_int <v>: 0, or digits with no leading zero (keeps $(( )) off octal).
+bl_nonneg_int() {
+    case "$1" in
+        0) return 0 ;;
+        ''|*[!0-9]*|0*) return 1 ;;
+    esac
+    return 0
+}
+
+# bl_reexec_apply: when this process was exec'd by a running loop (RX_PID == $$), set
+# REEXEC=1 and restore the carried state; invalid state keeps fresh counters.
+bl_reexec_apply() {
+    if [ -z "$RX_PID" ] || [ "$RX_PID" != "$$" ]; then return 0; fi
+    REEXEC=1
+    if bl_nonneg_int "$RX_BATCHES" && bl_nonneg_int "$RX_ITEMS" \
+        && bl_nonneg_int "$RX_UNITS" && bl_nonneg_int "$RX_FAILS" \
+        && bl_nonneg_int "$RX_START" && [ "$RX_START" -le "$(date +%s)" ] \
+        && usage_valid_sid "$RX_SID"; then
+        LOOP_SID="$RX_SID"
+        BATCHES="$RX_BATCHES"
+        ITEMS="$RX_ITEMS"
+        UNITS="$RX_UNITS"
+        FAILS="$RX_FAILS"
+        START_EPOCH="$RX_START"
+        LAST_FAIL="$RX_LAST_FAIL"
+    else
+        bl_log "re-exec state invalid; counters reset"
+    fi
+}
+
+# bl_code_hash: sha256 over the loop and its two sourced libs; prints nothing when a
+# file is unreadable or shasum fails, which callers treat as "no change".
+bl_code_hash() {
+    local f h
+    for f in "$ROOT/bin/burndown-loop" "$ROOT/bin/lib/usage-gate.sh" "$ROOT/bin/lib/usage-fetch.sh"; do
+        [ -r "$f" ] || return 0
+    done
+    h=$(cat "$ROOT/bin/burndown-loop" "$ROOT/bin/lib/usage-gate.sh" \
+        "$ROOT/bin/lib/usage-fetch.sh" 2>/dev/null | shasum -a 256 2>/dev/null) || return 0
+    h=${h%% *}
+    case "$h" in ''|*[!0-9a-f]*) return 0 ;; esac
+    echo "$h"
+}
+
+# bl_maybe_reexec: between batches only. On a code change, hand the counters to the
+# new image through IBL5_BURNDOWN_REEXEC_* and exec it with the same PID (the lock's
+# pid stays valid; exec skips the EXIT trap, so the lock and usage token survive).
+bl_maybe_reexec() {
+    local now_hash xrc=0
+    now_hash=$(bl_code_hash)
+    [ -n "$now_hash" ] || return 0
+    if [ -z "$CODE_HASH" ]; then CODE_HASH="$now_hash"; return 0; fi
+    [ "$now_hash" != "$CODE_HASH" ] || return 0
+    if [ ! -x "$ROOT/bin/burndown-loop" ] || ! bash -n "$ROOT/bin/burndown-loop" 2>/dev/null; then
+        if [ "$RX_SKIP_HASH" != "$now_hash" ]; then
+            bl_log "re-exec skipped: new code fails syntax check old=${CODE_HASH:0:12} new=${now_hash:0:12}"
+            RX_SKIP_HASH="$now_hash"
+        fi
+        return 0
+    fi
+    bl_log "code changed; re-exec old=${CODE_HASH:0:12} new=${now_hash:0:12} batches=$BATCHES items=$ITEMS fails=$FAILS"
+    export IBL5_BURNDOWN_REEXEC_PID="$$" IBL5_BURNDOWN_REEXEC_SID="$LOOP_SID" \
+        IBL5_BURNDOWN_REEXEC_BATCHES="$BATCHES" IBL5_BURNDOWN_REEXEC_ITEMS="$ITEMS" \
+        IBL5_BURNDOWN_REEXEC_UNITS="$UNITS" IBL5_BURNDOWN_REEXEC_FAILS="$FAILS" \
+        IBL5_BURNDOWN_REEXEC_START="$START_EPOCH" IBL5_BURNDOWN_REEXEC_LAST_FAIL="$LAST_FAIL"
+    set -- run "--loop-sid=$LOOP_SID"
+    if [ "$NO_DM" -eq 1 ]; then set -- "$@" --no-dm; fi
+    # execfail: a failed exec returns here instead of killing the loop.
+    shopt -s execfail
+    exec "$ROOT/bin/burndown-loop" "$@" || xrc=$?
+    shopt -u execfail
+    unset IBL5_BURNDOWN_REEXEC_PID IBL5_BURNDOWN_REEXEC_SID IBL5_BURNDOWN_REEXEC_BATCHES \
+        IBL5_BURNDOWN_REEXEC_ITEMS IBL5_BURNDOWN_REEXEC_UNITS IBL5_BURNDOWN_REEXEC_FAILS \
+        IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL
+    bl_log "re-exec failed rc=$xrc; continuing on the old code"
+    CODE_HASH="$now_hash"
+}
+
 # ------------------------------------------------------------ run
 
 bl_cmd_run() {
@@ -374,14 +522,24 @@ bl_cmd_run() {
         return 0
     fi
 
+    bl_reexec_apply
     [ -n "$LOOP_SID" ] || LOOP_SID=$(bl_uuid)
     mkdir -p "$STATE"
-    # An old stop request must not kill a new loop.
-    rm -f "$STOP_FLAG"
-    bl_lock_acquire
+    if [ "$REEXEC" -eq 1 ] && [ "$(cat "$LOCK/pid" 2>/dev/null || true)" = "$$" ]; then
+        # exec kept our PID, so the lock is already ours. exec skipped the old EXIT
+        # trap, so install it again. A stop request made before the exec stays.
+        trap bl_cleanup EXIT
+        bl_log "re-exec resumed pid=$$ sid=$LOOP_SID batches=$BATCHES items=$ITEMS fails=$FAILS"
+    else
+        # An old stop request must not kill a new loop.
+        rm -f "$STOP_FLAG"
+        bl_lock_acquire
+    fi
     echo "$LOOP_SID" > "$STATE/loop.sid"
+    CODE_HASH=$(bl_code_hash)
     while :; do
         if [ -e "$STOP_FLAG" ]; then bl_stopped; fi
+        bl_maybe_reexec
         decision=$(bl_decide)
         action="${decision%% *}"
         bl_log "decision=$decision"

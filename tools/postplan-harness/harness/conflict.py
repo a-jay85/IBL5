@@ -349,9 +349,19 @@ def review_resolution(
 
 
 def purge_verdict_artifacts(key: str) -> None:
-    """Remove the sidecar and verdict files for key. Never removes the conflict flag file."""
+    """Remove the sidecar and verdict temp files for key (per-rebase). Never removes the
+    conflict flag file, and never removes the auto-resolved list: a BEHIND re-rebase in the
+    same run must not drop files an earlier rebase recorded (see purge_autoresolved_list)."""
     sidecar = f"/tmp/postplan-conflict-sha-{key}.txt"
     if os.path.exists(sidecar):
         os.unlink(sidecar)
     for p in glob.glob(f"/tmp/postplan-conflict-verdict-{key}-*.ok"):
         os.unlink(p)
+
+
+def purge_autoresolved_list(key: str) -> None:
+    """Remove the auto-resolved files list for key. Call exactly once per harness run,
+    before the first rebase, so a stale list from a previous run of the same branch is cleared."""
+    autoresolved = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
+    if os.path.exists(autoresolved):
+        os.unlink(autoresolved)

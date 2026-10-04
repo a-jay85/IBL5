@@ -31,7 +31,7 @@ parameters:
         - phpstan-rules/Fixtures
     bootstrapFiles:
         - phpstan-stubs/nuke-globals.stub.php
-    phpVersion: 80300
+    phpVersion: 80500
     treatPhpDocTypesAsCertain: false
     featureToggles:
         # bleedingEdge enabled `unnecessaryNullCoalesce` in phpstan 2.2.6. It reports

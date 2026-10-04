@@ -277,6 +277,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         global _active_git
         _active_git = git
         slug = git.branch()
+        # Once per run, before the first rebase: clear a stale auto-resolved list from a
+        # previous run of this branch. Per-rebase purges must not touch it (BEHIND retries).
+        from harness.conflict import purge_autoresolved_list
+        purge_autoresolved_list(slug.replace("/", "-"))
         gh = LiveGh(out_dir, worktree, slug) if live else RecordingGh(out_dir)
         gh = usage_pause.dedupe_on_resume(gh, worktree, out_dir)   # ADR-0143 addendum: no double post on resume
         verifier = LiveVerify(worktree)
@@ -1030,6 +1034,57 @@ def _refresh_and_reprove(git, log, phase: str, attempt: int) -> None:
     log(f"{phase}: re-rebase {attempt} TREE-EQUIVALENT at {git.head()[:8]}")
 
 
+def _lease_snapshot(git, *, run_git=None):
+    """(remote, branch, lease, pre_rebase_head) for a LiveGit push, else None.
+    Must be taken BEFORE _refresh_and_reprove rewrites HEAD."""
+    if not isinstance(git, LiveGit) or not git.push_remote:
+        return None
+    branch = git.branch()
+    lease = gitutil.tracking_sha(branch, git.worktree, run_git=run_git,
+                                 remote=git.push_remote)
+    return git.push_remote, branch, lease, git.head()
+
+
+def _reclaim_stale_lease(git, log, phase: str, snap, *, run_git=None) -> None:
+    """Stale lease: refs/remotes/<remote>/<branch> no longer matches the remote.
+    Probe the live tip and adopt it as the lease only when it carries no work this
+    worktree lacks; otherwise fail closed. Runs AFTER _refresh_and_reprove so the
+    ownership arms read a fresh origin/master. Never pushes."""
+    remote, branch, lease, pre_head = snap
+    ok, tip = gitutil.probe_remote_tip(remote, branch, git.worktree, run_git=run_git)
+    if not ok:
+        log(f"{phase}: could not probe {remote}/{branch}; keeping lease "
+            f"{lease[:8] or 'none'}")
+        return
+    if tip == lease:
+        log(f"{phase}: {remote}/{branch} still at lease {lease[:8] or 'none'}; "
+            "rejection was not remote movement")
+        return
+    if not tip:
+        _fail_closed_on_divergence(
+            None, log, None, phase,
+            f"{remote}/{branch} was deleted (lease {lease[:8]}); refusing to recreate it",
+            disarm=False)
+    why = gitutil.owned_remote_tip(lease, pre_head, tip, git.worktree, run_git=run_git)
+    if not why:
+        # the ownership helpers' `git fetch origin` may have moved the tracking ref to
+        # the foreign tip; put it back before failing closed
+        gitutil.restore_tracking_ref(remote, branch, lease, git.worktree, run_git=run_git)
+        _fail_closed_on_divergence(
+            None, log, None, phase,
+            f"remote head {tip[:8]} diverged from lease {lease[:8] or 'none'} and "
+            f"local {pre_head[:8]} with different content; refusing to push over it",
+            disarm=False)
+    # the ownership helpers' fetch may already have moved the tracking ref to tip
+    cur = gitutil.tracking_sha(branch, git.worktree, run_git=run_git, remote=remote)
+    if cur != tip and not gitutil.adopt_tracking_ref(remote, branch, tip, cur,
+                                                     git.worktree, run_git=run_git):
+        log(f"{phase}: refs/remotes/{remote}/{branch} moved during adopt; keeping lease")
+        return
+    log(f"{phase}: {remote}/{branch} moved {lease[:8] or 'none'} -> {tip[:8]} "
+        f"({why}); lease refreshed")
+
+
 def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out_dir,
                                 log, res) -> dict:
     """Phase 4.5 wrapper: same commit/push injection as the Phase 5.5 remediation.
@@ -1067,6 +1122,10 @@ def _push_with_lease_retry(git, log, phase: str, *, pr=None, worktree=None,
                            gh_cmd=None, run_git=None) -> str:
     """Push with bounded stale-lease / stale-base retry. Returns pushed HEAD sha, or ""
     when disabled. Raises HarnessError("push-retry-cap") once the cap is spent.
+    A stale lease on a LiveGit push also probes the branch's own remote tip after the
+    re-rebase: an owned tip (tree-equivalent or patch-series-equivalent to HEAD, or
+    equivalent to / an update-branch merge onto the old lease) becomes the new lease; a
+    foreign or deleted tip raises remote-head-diverged without pushing.
 
     Two rejections get the same fetch + clean-rebase + lost-work-proof recovery: a
     stale lease (origin/<branch> moved) and a stale base (bin/pre-push-adr-hook refusing
@@ -1106,7 +1165,11 @@ def _push_with_lease_retry(git, log, phase: str, *, pr=None, worktree=None,
                     f"{(e.detail or '')[:300]}")
             log(f"{phase}: {why} (attempt {attempt}/{_MAX_PUSH_RETRIES}) — "
                 "refetch, re-rebase, re-prove")
+            snap = (_lease_snapshot(git, run_git=run_git)
+                    if why == "stale lease" else None)
             _refresh_and_reprove(git, log, phase, attempt)
+            if snap is not None:
+                _reclaim_stale_lease(git, log, phase, snap, run_git=run_git)
     return ""  # unreachable
 
 
@@ -1527,9 +1590,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 log(f"phase7 ci-fix: body proposal refused ({verdict.reason})")
                 refused.append((attempt, verdict.reason, proposal or ""))
             elif verdict.action == "apply":
-                baseline = cifix.failed_job_refs(
-                    gh.pr_checks_json(pr), [cifix_ship.META_CHECK_NAME]
-                ).get(cifix_ship.META_CHECK_NAME, (None, None))[0]
+                baseline = cifix_ship.meta_run_id(gh.pr_checks_json(pr))
                 gh.pr_edit_body(pr, verdict.body)
                 body_applied = True
                 log("phase7 ci-fix: body proposal applied")

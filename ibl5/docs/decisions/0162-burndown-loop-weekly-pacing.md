@@ -1,6 +1,6 @@
 ---
 description: bin/burndown-loop runs one fresh headless /burndown session per batch, paced so weekly utilization tracks a straight line to (100 - reserve)% at seven_day.resets_at.
-last_verified: 2026-10-02
+last_verified: 2026-10-03
 ---
 
 # ADR-0162: Unattended /burndown loop paced against the weekly window
@@ -53,3 +53,11 @@ a distinct trigger that neither hosts without straining its single job.
 - The loop never yields to automouse and has no open-PR cap. Its dispatched children are
   gated on their own.
 - Raising `BD_BUDGET` or looping inside one session stays rejected (cost per turn).
+
+## Addendum: abort retry, backoff-aware sleep, self re-exec (2026-10-03)
+
+The Decision said the loop ends on a fail-closed exit 3 from /burndown. Since this change, an exit-3 batch counts toward the same `IBL5_BURNDOWN_MAX_FAILS` cap as a failed batch, sleeps 600s, and retries. The loop ends `fail-closed` (rc 1) only when the cap is reached. The trigger was a one-off `gh pr list` failure on 2026-10-03 that left the loop dead for about 6 hours.
+
+The Decision said a missing or failed reading fails closed with a sleep. That still holds, and only the length changed. A stale reading (fetch rc 2) sleeps out the 429 backoff plus 5s, clamped to 30-300s, or 120s without a backoff, where it used to sleep 1800s. No reading (rc 1) still sleeps 1800s. A stale reading never launches a batch.
+
+The loop now re-execs itself between batches when `bin/burndown-loop`, `bin/lib/usage-gate.sh` or `bin/lib/usage-fetch.sh` changes on disk. It keeps the same PID, lock, SID and counters, so a long-running loop picks up landed fixes without a restart.

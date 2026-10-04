@@ -20,6 +20,11 @@ final class RootClassNamespaceTest extends TestCase
         self::assertStringEndsWith('/classes/Database/BaseMysqliRepository.php', (string) $ref->getFileName());
     }
 
+    /**
+     * A file that still declares `class JSB` makes the ReflectionClass below
+     * throw ReflectionException, and a move out of League/ breaks the
+     * namespace and file-suffix assertions.
+     */
     public function testLeagueJsbConstantsResolvesWithConstants(): void
     {
         $ref = new \ReflectionClass(\League\JsbConstants::class);

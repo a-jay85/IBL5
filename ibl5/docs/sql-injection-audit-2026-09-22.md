@@ -1,6 +1,6 @@
 ---
 description: Axis-A SQL injection audit of the IBL5 codebase (backlog #668), site-by-site verdicts and the fixes shipped with it.
-last_verified: 2026-09-22
+last_verified: 2026-10-03
 ---
 
 # SQL injection audit (Axis A) 2026-09-22
@@ -29,7 +29,7 @@ grep -rn "ORDER BY\s*\"\s*\.\|LIMIT\s*\"\s*\." ibl5/classes ibl5/modules --inclu
 | `ibl5/classes/RecordHolders/PlayerRecordRepository.php` stat expressions | CLEAN | Expressions come from `RecordStatDefinitions` class constants via the service; no request path. Same shape as SeasonHighs, with no fail-open branch. |
 | `ibl5/classes/TeamOrderBy.php` | CLEAN | A backed PHP enum; the value can only be one of the declared literals. |
 | `ibl5/classes/Bootstrap/LegacyFunctions.php` table-name prefix | CLEAN | `global $prefix` is assigned once in the untracked config file as the literal `nuke`. `register_globals` does not exist on PHP 8, so no request key can populate it. Every row value in those statements is bound. |
-| `ibl5/classes/BaseMysqliRepository.php` query parameter | CLEAN by design | Protected; reachable only from subclasses in `ibl5/classes/`. These methods are the parameterization seam that binds row values. The savepoint name is built from `bin2hex(random_bytes(4))`. |
+| `ibl5/classes/Database/BaseMysqliRepository.php` query parameter | CLEAN by design | Protected; reachable only from subclasses in `ibl5/classes/`. These methods are the parameterization seam that binds row values. The savepoint name is built from `bin2hex(random_bytes(4))`. |
 | `ibl5/classes/Migration/SchemaValidator.php` `real_escape_string` | CLEAN | A migration-time schema validator. Its input is a migration file identifier supplied by the migration runner. |
 | `ibl5/modules/Player/articles.php` `real_escape_string` plus `bind_param` | NOT INJECTABLE, functional defect | The value is bound, so the SQL text never carried it. `real_escape_string` on `O'Brien` yields `O\'Brien`; inside a LIKE pattern `\'` reads as a literal apostrophe, so matching still worked. The real mismatches were that a newline became `\n` which LIKE reads as a literal `n`, NUL became `\0` which reads as `0`, and `%` or `_` in the search term stayed unescaped wildcards. |
 

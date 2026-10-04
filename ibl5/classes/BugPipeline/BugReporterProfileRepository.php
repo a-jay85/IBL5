@@ -11,7 +11,7 @@ use BugPipeline\Contracts\BugReporterProfileRepositoryInterface;
  * (`ibl_bug_reporter_profile`). Split out of {@see BugReportRepository}
  * (backlog 1.26); the facade delegates to it.
  */
-class BugReporterProfileRepository extends \BaseMysqliRepository implements BugReporterProfileRepositoryInterface
+class BugReporterProfileRepository extends \Database\BaseMysqliRepository implements BugReporterProfileRepositoryInterface
 {
     public function upsertReporterProfile(string $discordId, string $techLevel): void
     {

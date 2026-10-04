@@ -11,7 +11,7 @@ use ComparePlayers\Contracts\ComparePlayersRepositoryInterface;
  *
  * @see ComparePlayersRepositoryInterface
  */
-class ComparePlayersRepository extends \BaseMysqliRepository implements ComparePlayersRepositoryInterface
+class ComparePlayersRepository extends \Database\BaseMysqliRepository implements ComparePlayersRepositoryInterface
 {
     public function __construct(\mysqli $db)
     {

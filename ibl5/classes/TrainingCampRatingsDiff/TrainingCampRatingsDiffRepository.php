@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace TrainingCampRatingsDiff;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface;
 
 /**

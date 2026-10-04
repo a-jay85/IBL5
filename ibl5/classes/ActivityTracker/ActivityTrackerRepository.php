@@ -14,7 +14,7 @@ use League\League;
  *
  * @see ActivityTrackerRepositoryInterface For the interface contract
  */
-class ActivityTrackerRepository extends \BaseMysqliRepository implements ActivityTrackerRepositoryInterface
+class ActivityTrackerRepository extends \Database\BaseMysqliRepository implements ActivityTrackerRepositoryInterface
 {
     /**
      * @see ActivityTrackerRepositoryInterface::getTeamActivity()

@@ -12,7 +12,7 @@ use Trading\BuyoutLedgerRepository;
 /**
  * @see LeagueControlPanelRepositoryInterface
  */
-class LeagueControlPanelRepository extends \BaseMysqliRepository implements LeagueControlPanelRepositoryInterface
+class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implements LeagueControlPanelRepositoryInterface
 {
     private string $league;
 
@@ -205,7 +205,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     {
         $this->execute(
             "UPDATE `ibl_plr` SET teamid = " . League::FREE_AGENTS_TEAMID . ", bird = 0"
-            . " WHERE retired <> 1 AND ordinal > " . \JSB::WAIVERS_ORDINAL
+            . " WHERE retired <> 1 AND ordinal > " . \League\JSB::WAIVERS_ORDINAL
         );
 
         return true;

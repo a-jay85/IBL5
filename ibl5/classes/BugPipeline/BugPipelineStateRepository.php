@@ -11,7 +11,7 @@ use BugPipeline\Contracts\BugPipelineStateRepositoryInterface;
  * (`ibl_bug_pipeline_state`). Split out of {@see BugReportRepository}
  * (backlog 1.26); the facade delegates to it.
  */
-class BugPipelineStateRepository extends \BaseMysqliRepository implements BugPipelineStateRepositoryInterface
+class BugPipelineStateRepository extends \Database\BaseMysqliRepository implements BugPipelineStateRepositoryInterface
 {
     public function upsertPipelineState(string $channelId, string $messageId): void
     {

@@ -680,7 +680,11 @@ NL='
 # Negative fixtures.
 [ -z "$(bd_paths_probe "Edit index.php, README.md and SKILL.md.")" ] \
     && ok "C50e: duplicated basenames yield no path" || fail "C50e: duplicated basenames yield no path"
-[ -z "$(bd_paths_probe "AnnouncementDispatcher and VotingBallotVie and backlog")" ] \
+# Fixture guard: only AnnouncementDispatcherInterface.php is tracked, never AnnouncementDispatcher.php.
+C50F_TRACKED="$(git -C "$(dirname "$SCRIPT")/.." ls-files)"
+grep -qxF "ibl5/classes/RecordHolders/Contracts/AnnouncementDispatcherInterface.php" <<< "$C50F_TRACKED" \
+    && ! grep -qE '(^|/)AnnouncementDispatcher\.php$' <<< "$C50F_TRACKED" \
+    && [ -z "$(bd_paths_probe "AnnouncementDispatcher and VotingBallotVie and backlog")" ] \
     && ok "C50f: Interface-only, prefix and plain-word tokens yield no path" \
     || fail "C50f: Interface-only, prefix and plain-word tokens yield no path"
 

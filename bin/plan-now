@@ -980,13 +980,14 @@ fi
 # Report-only, never queued: a sibling usually depends on the named plan, and
 # queueing it without depends_on: would let automouse run it first. The transcript
 # match keeps a concurrent run's new plan (same $PLANS_DIR diff) out of the list.
+# It matches by basename, so `~/`-relative and bare names count as well as absolute.
 if [ "$rc" -eq 0 ] && [ -n "$newfiles" ]; then
     identified="${plan:-${recovered:-}}"
     split_siblings=""
     while IFS= read -r f; do
         [ -n "$f" ] && [ "$f" != "$identified" ] || continue
         case "$(basename "$f")" in *-shared-context.md | README.md) continue ;; esac
-        grep -qF "$f" "$OUT" 2>/dev/null || continue
+        grep -qF "$(basename "$f")" "$OUT" 2>/dev/null || continue
         split_siblings="$split_siblings $(basename "$f")"
     done <<< "$newfiles"
     if [ -n "$split_siblings" ]; then

@@ -1464,6 +1464,12 @@ grep -qF 'names the proof command that was run in this step' "$SCRIPT_DIR/../.cl
 # Removing the 4c sub-clause makes this fail.
 grep -qF 'not decidable from the diff' "$SCRIPT_DIR/../.claude/review-shared/_plan-fidelity-review.md" \
   || fail "27g: _plan-fidelity-review.md lost 'not decidable from the diff' — #669 reader-side 4c carve-out removed"
+# 27h: backlog #1237 — _plan-fidelity-review.md 6d.4d omitted-behaviors check and its
+# non-blocking verdict. Removing the 4d heading or its note-not-blocker sentence makes this fail.
+grep -qF 'Omitted behaviors within a named file' "$SCRIPT_DIR/../.claude/review-shared/_plan-fidelity-review.md" \
+  || fail "27h: _plan-fidelity-review.md lost 'Omitted behaviors within a named file' — 4d omitted-behaviors check removed"
+grep -qF 'never `NOT READY`' "$SCRIPT_DIR/../.claude/review-shared/_plan-fidelity-review.md" \
+  || fail "27h: _plan-fidelity-review.md lost 'never \`NOT READY\`' — 4d non-blocking verdict removed"
 end_case e22-e23-prevention-prose-pins
 
 # --- case 28 (pr-ready skill block): merge-digest extraction + body shape ---

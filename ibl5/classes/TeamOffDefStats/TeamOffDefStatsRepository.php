@@ -22,7 +22,7 @@ use TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface;
  * @phpstan-import-type TeamOffenseStatsRow from Contracts\TeamOffDefStatsRepositoryInterface
  * @phpstan-import-type TeamDefenseStatsRow from Contracts\TeamOffDefStatsRepositoryInterface
  */
-class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOffDefStatsRepositoryInterface
+class TeamOffDefStatsRepository extends \Database\BaseMysqliRepository implements TeamOffDefStatsRepositoryInterface
 {
     /**
      * @param \mysqli $db Database connection

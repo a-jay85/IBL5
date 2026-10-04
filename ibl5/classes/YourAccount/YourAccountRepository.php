@@ -9,6 +9,6 @@ use YourAccount\Contracts\YourAccountRepositoryInterface;
 /**
  * @see YourAccountRepositoryInterface
  */
-class YourAccountRepository extends \BaseMysqliRepository implements YourAccountRepositoryInterface
+class YourAccountRepository extends \Database\BaseMysqliRepository implements YourAccountRepositoryInterface
 {
 }

@@ -178,7 +178,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
             $playersWithQuality
         );
 
-        $slotNames = \JSB::PLAYER_POSITIONS;
+        $slotNames = \League\JSB::PLAYER_POSITIONS;
 
         $this->view->renderLineupPreview();
         $this->view->renderFormHeader($teamName, $teamid, $slotNames);

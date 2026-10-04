@@ -36,7 +36,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <?= HtmlSanitizer::trusted($this->renderFlashMessage($resultMessage, $resultSuccess)) ?>
     <?= HtmlSanitizer::trusted($this->renderLeagueSwitcher($leagueConfig, $currentLeague)) ?>
 
-    <form action="leagueControlPanel.php" method="POST">
+    <form action="modules.php?name=LeagueControlPanel" method="POST">
         <input type="hidden" name="current_phase" value="<?= HtmlSanitizer::e($panelData['phase']) ?>">
         <?= \Security\CsrfGuard::generateToken('lcp_update_all') ?>
 <?php if ($currentLeague !== 'ibl'): ?>
@@ -80,8 +80,8 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <span class="league-badge <?= HtmlSanitizer::e($badgeClass) ?>"><?= HtmlSanitizer::e(strtoupper($leagueConfig['short_name'])) ?></span>
     <label>Switch to:</label>
     <select onchange="window.location.href=this.value" aria-label="Switch league" class="ibl-select ibl-select--auto">
-        <option value="leagueControlPanel.php?league=ibl"<?= $currentLeague === 'ibl' ? ' selected' : '' ?>>IBL</option>
-        <option value="leagueControlPanel.php?league=olympics"<?= $currentLeague === 'olympics' ? ' selected' : '' ?>>Olympics</option>
+        <option value="modules.php?name=LeagueControlPanel&amp;league=ibl"<?= $currentLeague === 'ibl' ? ' selected' : '' ?>>IBL</option>
+        <option value="modules.php?name=LeagueControlPanel&amp;league=olympics"<?= $currentLeague === 'olympics' ? ' selected' : '' ?>>Olympics</option>
     </select>
 </div>
         <?php
@@ -376,7 +376,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         body.append('export', button.dataset.export);
         body.append('_csrf_token', button.dataset.csrfToken);
 
-        fetch('leagueControlPanel.php', {method: 'POST', body: body, credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+        fetch('modules.php?name=LeagueControlPanel', {method: 'POST', body: body, credentials: 'same-origin', headers: {'Accept': 'application/json'}})
             .then(function (response) {
                 return response.json().then(function (data) {
                     if (data.csrfToken) {

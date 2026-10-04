@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace League;
 
-use BaseMysqliRepository;
-use JSB;
+use Database\BaseMysqliRepository;
+use League\JSB;
 use Season\Season;
 
 /**

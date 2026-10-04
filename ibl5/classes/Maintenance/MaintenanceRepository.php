@@ -14,7 +14,7 @@ use Maintenance\Contracts\MaintenanceRepositoryInterface;
  *
  * @see MaintenanceRepositoryInterface
  */
-class MaintenanceRepository extends \BaseMysqliRepository implements MaintenanceRepositoryInterface
+class MaintenanceRepository extends \Database\BaseMysqliRepository implements MaintenanceRepositoryInterface
 {
     /**
      * @see MaintenanceRepositoryInterface::getAllTeams()

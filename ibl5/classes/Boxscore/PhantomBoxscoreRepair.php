@@ -18,7 +18,7 @@ namespace Boxscore;
  * The class never guesses. If a duplicated triple does not resolve to exactly one
  * score-matched copy, the whole run aborts and deletes nothing.
  */
-final class PhantomBoxscoreRepair extends \BaseMysqliRepository
+final class PhantomBoxscoreRepair extends \Database\BaseMysqliRepository
 {
     /**
      * Measured against the production snapshot for season 2008. The precondition

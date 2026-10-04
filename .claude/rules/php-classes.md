@@ -1,7 +1,7 @@
 ---
 description: Interface-driven PHP class standards, XSS rules, and PHPStan gotchas for ibl5/classes.
 paths: ibl5/classes/**/*.php
-last_verified: 2026-09-27
+last_verified: 2026-10-03
 ---
 
 # PHP Class Development Rules
@@ -15,7 +15,7 @@ last_verified: 2026-09-27
 All classes in `/ibl5/classes/` use mysqli with prepared statements via BaseMysqliRepository:
 ```php
 // Repository pattern (preferred for database operations)
-class MyRepository extends BaseMysqliRepository
+class MyRepository extends \Database\BaseMysqliRepository
 {
     public function getById(int $id): ?array
     {

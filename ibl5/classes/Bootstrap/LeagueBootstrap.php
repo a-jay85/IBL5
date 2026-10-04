@@ -36,6 +36,6 @@ class LeagueBootstrap implements BootstrapStepInterface
 
         $container->set('leagueContext', $leagueContext);
         $GLOBALS['leagueContext'] = $leagueContext;
-        \BaseMysqliRepository::setSharedLeagueContext($leagueContext);
+        \Database\BaseMysqliRepository::setSharedLeagueContext($leagueContext);
     }
 }

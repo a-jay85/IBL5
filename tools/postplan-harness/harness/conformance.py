@@ -2,6 +2,7 @@
 _phase-5-final-verification.md's two check loops."""
 from __future__ import annotations
 
+import fnmatch
 import functools
 import os
 import re
@@ -9,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import PurePosixPath
+from typing import Callable
 
 from .planfile import NO_DIFF_MIN_REASON
 from .state import PhaseInfo, PlanInfo
@@ -110,6 +112,14 @@ def _renumbered_adr(tok: str, changed_files: list[str]) -> str | None:
     return hits[0] if len(hits) == 1 else None
 
 
+# Trailing `:NNN`, `:NNN-MMM`, or a comma list such as `:41,47` that a plan writes after a
+# matrix path to point at lines. Colon-and-digits only: `::test_name` is handled first by
+# the pytest node-id split, and a word after the colon is left alone so `bin/foo:bar`
+# never resolves to `bin/foo`. planfile._LINE_SUFFIX_RE is the phase-evidence sibling; it
+# has no comma-list arm and accepts `#L12`, so the two stay separate on purpose.
+_LINE_SUFFIX_LIST_RE = re.compile(r":\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*$")
+
+
 def _resolve(tok: str, changed_files: list[str]) -> str | None:
     """The single changed path a plan token names, or None when 0 or 2+ candidates.
 
@@ -136,15 +146,33 @@ def _resolve(tok: str, changed_files: list[str]) -> str | None:
     different number than the plan quoted. Migration is checked first, then ADR;
     the prefixes are disjoint so order never changes the result. Zero or 2+
     same-suffix paths still return None.
+
+    Before tier 1 the token drops a pytest `::name` suffix and a trailing `:NNN` /
+    `:NNN-MMM` / `:41,47` line suffix. A token carrying `*`, `?`, or `[` is a glob and
+    resolves only by `fnmatch` against the changed paths (1+ hits = the first sorted hit;
+    `*` crosses `/`, which is fine for a presence check). An exact path match wins before
+    suffix matching is tried, so a shorter sibling path elsewhere in the diff cannot make
+    it ambiguous.
     """
     tok = tok.strip().strip("/")
     # pytest node-id form `path/to/file.py::test_name` — strip the test-name
     # suffix so the token resolves to the file path the diff actually contains.
     if "::" in tok:
         tok = tok.split("::", 1)[0].strip("/")
+    tok = _LINE_SUFFIX_LIST_RE.sub("", tok).strip("/")
     if not tok:
         return None
-    hits = [f for f in changed_files if f == tok or f.endswith("/" + tok)]
+    if any(ch in tok for ch in "*?["):
+        # A glob token resolves by fnmatch alone: one or more changed paths match it, or
+        # it is missing. No fall-through to the basename or renumber tiers, because a
+        # glob basename names nothing and tier 3 must not gain glob tolerance.
+        globbed = sorted(f for f in changed_files if fnmatch.fnmatchcase(f, tok))
+        return globbed[0] if globbed else None
+    if tok in changed_files:
+        # Exact match wins outright. `bin/README.md` beside `ibl5/bin/README.md` was two
+        # tier-1 hits and therefore ambiguous (PR #2786); the exact path is the answer.
+        return tok
+    hits = [f for f in changed_files if f.endswith("/" + tok)]
     if len(hits) == 1:
         return hits[0]
     if hits:
@@ -305,12 +333,47 @@ def _matrix_assertion_items(plan: PlanInfo, diff_body: str, pr_body: str,
             if ln.strip().startswith("UNREALISED-ASSERTION:")]
 
 
+def _method_declared(name: str, text: str) -> bool:
+    """True when `text` declares `name`: a PHP/Python `function name` / `def name`, or a
+    bash-style bare `name() {` anchored at start of line (optional diff `+` and indent)
+    so a call site like `$this->name()` never counts (backlog#1133)."""
+    return re.search(
+        rf"(function|def)\s+{re.escape(name)}\b"
+        rf"|^[+\s]*{re.escape(name)}\s*\(\s*\)",
+        text,
+        re.MULTILINE,
+    ) is not None
+
+
+def _method_in_changed_tree(name: str, changed_files: list[str],
+                            read_file: Callable[[str], str | None],
+                            cache: dict[str, str | None]) -> str | None:
+    """The first changed path whose PR-tree text declares `name`, else None.
+
+    Reads ONLY paths from `changed_files`: a method that exists untouched elsewhere in
+    the repo must still be MISSING-METHOD, or "write new test X" passes when X was never
+    written. Any reader error or None is treated as "not here" (fail closed: the item
+    stays). `cache` memoises one read per path across the required-method loop.
+    """
+    for path in changed_files:
+        if path not in cache:
+            try:
+                cache[path] = read_file(path)
+            except Exception:
+                cache[path] = None
+        text = cache[path]
+        if text and _method_declared(name, text):
+            return path
+    return None
+
+
 def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
           phase5_status: str | None = None,
           resolutions: dict[str, str] | None = None,
           pr_body: str = "",
           tracked_files: list[str] | tuple[str, ...] | None = None,
-          notes: list[str] | None = None) -> list[str]:
+          notes: list[str] | None = None,
+          read_file: Callable[[str], str | None] | None = None) -> list[str]:
     """Returns unresolved `MISSING:` / `MISSING-FILE:` / `MISSING-METHOD:` /
     `UNMET-CONTRACT:` / `MISSING-PHASE:` / `UNREALISED-ASSERTION:` items (empty = clean).
 
@@ -333,6 +396,11 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
 
     tracked_files and notes are forwarded to phase_omission_items (see there); notes,
     when a list is passed, collects the phase exemption lines.
+
+    read_file, when given, is called with each path in changed_files to fetch that file's
+    text from the PR tree; a required method the diff hunks never show but a changed file
+    declares is then present (PRs #2708, #2772, #2707). None (the default) disables the
+    fallback. Only changed files are read, never the whole repo.
     """
     if not plan.found:
         return []
@@ -364,20 +432,17 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
         elif resolutions is not None and hit != path:
             resolutions[path] = hit
     if diff_body:
+        tree_cache: dict[str, str | None] = {}
         for m in plan.required_test_methods:
-            # Match PHP/Python-style declarations ('function name' / 'def name') and
-            # bash-style bare declarations ('name() {') that appear without a keyword.
-            # The second branch anchors to start-of-line (with optional diff '+' prefix
-            # and indentation) so call-sites like '$this->name()' are not mistaken for
-            # declarations (backlog#1133 — present-method false-positive fix).
-            _found = re.search(
-                rf"(function|def)\s+{re.escape(m)}\b"
-                rf"|^[+\s]*{re.escape(m)}\s*\(\s*\)",
-                diff_body,
-                re.MULTILINE,
-            )
-            if not _found:
-                items.append(f"MISSING-METHOD: {m} (plan required a test method the diff never wrote)")
+            if _method_declared(m, diff_body):
+                continue
+            if read_file is not None:
+                where = _method_in_changed_tree(m, changed_files, read_file, tree_cache)
+                if where is not None:
+                    _note(notes, f"METHOD-IN-TREE: {m} — declared in {where} "
+                                 f"(changed file; the diff hunks omitted the declaration line)")
+                    continue
+            items.append(f"MISSING-METHOD: {m} (plan required a test method the diff never wrote)")
         items.extend(_matrix_assertion_items(plan, diff_body, pr_body))
     return items
 

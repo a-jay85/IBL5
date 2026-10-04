@@ -11,7 +11,7 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
  * @phpstan-import-type UserRow from TeamIdentityRepositoryInterface
  * @phpstan-import-type TeamInfoRow from TeamIdentityRepositoryInterface
  */
-class TeamIdentityRepository extends \BaseMysqliRepository implements TeamIdentityRepositoryInterface
+class TeamIdentityRepository extends \Database\BaseMysqliRepository implements TeamIdentityRepositoryInterface
 {
     protected function rewriteTableNames(string $query): string
     {

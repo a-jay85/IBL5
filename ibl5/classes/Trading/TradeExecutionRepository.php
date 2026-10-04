@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Trading;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
 
 /**

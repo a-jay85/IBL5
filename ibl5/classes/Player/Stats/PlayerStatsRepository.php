@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Player\Stats;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use Player\Stats\Contracts\PlayerStatsRepositoryInterface;
 
 /**

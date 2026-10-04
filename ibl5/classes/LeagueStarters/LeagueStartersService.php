@@ -49,7 +49,7 @@ class LeagueStartersService implements LeagueStartersServiceInterface
      */
     public function getAllStartersByPosition(): array
     {
-        $positions = \JSB::PLAYER_POSITIONS;
+        $positions = \League\JSB::PLAYER_POSITIONS;
 
         /** @var array<string, array<int, Player>> $startersByPosition */
         $startersByPosition = [];

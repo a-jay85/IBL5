@@ -1,0 +1,102 @@
+{
+  "generated": "2026-10-01T23:18:55-07:00",
+  "snapshots": 112,
+  "games_cap": 60,
+  "snapshot_stride": 1,
+  "seed": 20240601,
+  "ab_arm": "",
+  "engine_side": {
+    "team_games": 13440,
+    "fta": 189317,
+    "ftm": 141721,
+    "pf": 107758,
+    "fga": 1305023,
+    "tov": 188530,
+    "orb": 216311,
+    "points": 1626276,
+    "home_fta": 96514,
+    "home_games": 6720,
+    "away_fta": 92803,
+    "away_games": 6720,
+    "winner_fta": 96486,
+    "loser_fta": 92831,
+    "decided_games": 6642,
+    "bucket_fta": [
+      43054,
+      76406,
+      69857
+    ],
+    "bucket_games": [
+      3224,
+      5270,
+      4946
+    ]
+  },
+  "sco_side": {
+    "team_games": 12056,
+    "fta": 224079,
+    "ftm": 176673,
+    "pf": 206347,
+    "fga": 1256635,
+    "tov": 165912,
+    "orb": 198926,
+    "points": 1530023,
+    "home_fta": 117401,
+    "home_games": 6028,
+    "away_fta": 106678,
+    "away_games": 6028,
+    "winner_fta": 122454,
+    "loser_fta": 101625,
+    "decided_games": 6028,
+    "bucket_fta": [
+      44136,
+      75097,
+      104846
+    ],
+    "bucket_games": [
+      2380,
+      4000,
+      5676
+    ]
+  },
+  "engine_summary": {
+    "fta_per_g": 14.08608630952381,
+    "pf_per_g": 8.017708333333333,
+    "fta_per_pf": 1.7568718795820264,
+    "fta_per_100poss": 13.914827499415894,
+    "pace_per_g": 101.23076488095238,
+    "pps": 1.1713964323332142,
+    "home_away_ratio": 1.0399879314246308,
+    "winner_fta_per_g": 14.526648599819332,
+    "loser_fta_per_g": 13.976362541403192,
+    "bucket_fta_per_g": [
+      13.354218362282879,
+      14.498292220113852,
+      14.123938536190861
+    ]
+  },
+  "sco_summary": {
+    "fta_per_g": 18.58651293961513,
+    "pf_per_g": 17.1157100199071,
+    "fta_per_pf": 1.085932918821209,
+    "fta_per_100poss": 16.94723408833064,
+    "pace_per_g": 109.6728400796284,
+    "pps": 1.1289768312053596,
+    "home_away_ratio": 1.1005174450214665,
+    "winner_fta_per_g": 20.314200398142003,
+    "loser_fta_per_g": 16.858825481088253,
+    "bucket_fta_per_g": [
+      18.544537815126052,
+      18.77425,
+      18.471811134601833
+    ]
+  },
+  "engine_only_possessions": 1358879,
+  "engine_only_and_one_seqs": 26199,
+  "engine_only_end_ft": 107758,
+  "engine_only_fouls": 107758,
+  "engine_only_fta": 189317,
+  "branch": "VOLUME",
+  "re_target": "second foul decision :93471-93475 + FUN_004ec630 foul types :93571",
+  "rationale": "dPF=-0.5316 dYield=+0.6178 (band 0.05)"
+}

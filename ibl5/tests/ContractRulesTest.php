@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests;
 
 use PHPUnit\Framework\TestCase;
-use ContractRules;
+use League\ContractRules;
 
 /**
  * ContractRulesTest - Comprehensive tests for IBL CBA salary rules
@@ -435,25 +435,25 @@ class ContractRulesTest extends TestCase
 
     public function testCalculateWinnerModifierWithWinningTeamAndHighPreference(): void
     {
-        $result = \ContractRules::calculateWinnerModifier(60, 22, 5);
+        $result = \League\ContractRules::calculateWinnerModifier(60, 22, 5);
         $this->assertEqualsWithDelta(0.023256, $result, 0.000001);
     }
 
     public function testCalculateWinnerModifierWithLosingTeamReturnsNegative(): void
     {
-        $result = \ContractRules::calculateWinnerModifier(20, 62, 5);
+        $result = \League\ContractRules::calculateWinnerModifier(20, 62, 5);
         $this->assertLessThan(0.0, $result);
     }
 
     public function testCalculateWinnerModifierWithDefaultPreferenceReturnsZero(): void
     {
-        $result = \ContractRules::calculateWinnerModifier(60, 22, 1);
+        $result = \League\ContractRules::calculateWinnerModifier(60, 22, 1);
         $this->assertSame(0.0, $result);
     }
 
     public function testCalculateWinnerModifierWith500TeamReturnsZero(): void
     {
-        $result = \ContractRules::calculateWinnerModifier(41, 41, 5);
+        $result = \League\ContractRules::calculateWinnerModifier(41, 41, 5);
         $this->assertSame(0.0, $result);
     }
 
@@ -463,19 +463,19 @@ class ContractRulesTest extends TestCase
 
     public function testCalculateTraditionModifierWithStrongTradition(): void
     {
-        $result = \ContractRules::calculateTraditionModifier(2700, 1900, 5);
+        $result = \League\ContractRules::calculateTraditionModifier(2700, 1900, 5);
         $this->assertEqualsWithDelta(0.000153 * 800 * 4, $result, 0.000001);
     }
 
     public function testCalculateTraditionModifierWithWeakTradition(): void
     {
-        $result = \ContractRules::calculateTraditionModifier(1000, 4000, 5);
+        $result = \League\ContractRules::calculateTraditionModifier(1000, 4000, 5);
         $this->assertLessThan(0.0, $result);
     }
 
     public function testCalculateTraditionModifierWithDefaultPreferenceReturnsZero(): void
     {
-        $result = \ContractRules::calculateTraditionModifier(2700, 1900, 1);
+        $result = \League\ContractRules::calculateTraditionModifier(2700, 1900, 1);
         $this->assertSame(0.0, $result);
     }
 
@@ -485,19 +485,19 @@ class ContractRulesTest extends TestCase
 
     public function testCalculateLoyaltyModifierOwnTeamHighLoyalty(): void
     {
-        $result = \ContractRules::calculateLoyaltyModifier(5, true);
+        $result = \League\ContractRules::calculateLoyaltyModifier(5, true);
         $this->assertEqualsWithDelta(0.1, $result, 0.000001);
     }
 
     public function testCalculateLoyaltyModifierOwnTeamDefaultPreference(): void
     {
-        $result = \ContractRules::calculateLoyaltyModifier(1, true);
+        $result = \League\ContractRules::calculateLoyaltyModifier(1, true);
         $this->assertSame(0.0, $result);
     }
 
     public function testCalculateLoyaltyModifierOtherTeamReturnsNegative(): void
     {
-        $result = \ContractRules::calculateLoyaltyModifier(5, false);
+        $result = \League\ContractRules::calculateLoyaltyModifier(5, false);
         $this->assertEqualsWithDelta(-0.1, $result, 0.000001);
     }
 
@@ -507,39 +507,39 @@ class ContractRulesTest extends TestCase
 
     public function testCalculatePlayingTimeModifierAtMc0(): void
     {
-        $result = \ContractRules::calculatePlayingTimeModifier(0, 5);
+        $result = \League\ContractRules::calculatePlayingTimeModifier(0, 5);
         $this->assertEqualsWithDelta(0.10, $result, 0.000001);
     }
 
     public function testCalculatePlayingTimeModifierAtMc500(): void
     {
-        $result = \ContractRules::calculatePlayingTimeModifier(500, 5);
+        $result = \League\ContractRules::calculatePlayingTimeModifier(500, 5);
         $this->assertEqualsWithDelta(0.05, $result, 0.000001);
     }
 
     public function testCalculatePlayingTimeModifierAtMc1000(): void
     {
-        $result = \ContractRules::calculatePlayingTimeModifier(1000, 5);
+        $result = \League\ContractRules::calculatePlayingTimeModifier(1000, 5);
         $this->assertEqualsWithDelta(0.0, $result, 0.000001);
     }
 
     public function testCalculatePlayingTimeModifierAtMc1500(): void
     {
-        $result = \ContractRules::calculatePlayingTimeModifier(1500, 5);
+        $result = \League\ContractRules::calculatePlayingTimeModifier(1500, 5);
         $this->assertEqualsWithDelta(-0.05, $result, 0.000001);
     }
 
     public function testCalculatePlayingTimeModifierCapsAtMc2000(): void
     {
-        $result2000 = \ContractRules::calculatePlayingTimeModifier(2000, 5);
-        $result3000 = \ContractRules::calculatePlayingTimeModifier(3000, 5);
+        $result2000 = \League\ContractRules::calculatePlayingTimeModifier(2000, 5);
+        $result3000 = \League\ContractRules::calculatePlayingTimeModifier(3000, 5);
         $this->assertEqualsWithDelta(-0.10, $result2000, 0.000001);
         $this->assertEqualsWithDelta($result2000, $result3000, 0.000001);
     }
 
     public function testCalculatePlayingTimeModifierDefaultPreference(): void
     {
-        $result = \ContractRules::calculatePlayingTimeModifier(1500, 1);
+        $result = \League\ContractRules::calculatePlayingTimeModifier(1500, 1);
         $this->assertSame(0.0, $result);
     }
 }

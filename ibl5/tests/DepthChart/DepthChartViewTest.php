@@ -288,7 +288,7 @@ class DepthChartViewTest extends TestCase
         $output = (string) ob_get_clean();
 
         $this->assertStringContainsString('function resetDepthChart()', $output);
-        $this->assertStringContainsString('document.forms[\'DepthChart\']', $output);
+        $this->assertStringContainsString('document.forms[\'DepthChartEntry\']', $output);
         $this->assertStringContainsString('confirm(', $output);
         // Reset handles all three field types: selects (role slots), number
         // inputs (minutes), and checkboxes (canPlayInGame).

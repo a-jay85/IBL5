@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
  */
 class SavedDepthChartScriptTeamGuardLockTest extends TestCase
 {
-    private const HANDLER = 'new SavedDepthChart\SavedDepthChartApiHandler(';
+    private const HANDLER = 'new DepthChartSnapshot\DepthChartSnapshotApiHandler(';
 
     private function source(): string
     {

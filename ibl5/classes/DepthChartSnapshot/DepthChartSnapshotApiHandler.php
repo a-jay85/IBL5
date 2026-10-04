@@ -115,7 +115,7 @@ class DepthChartSnapshotApiHandler
         // Get current roster PIDs
         $teamName = $this->commonRepo->getTeamnameFromTeamID($teamid) ?? '';
 
-        $depthChartRepo = new \DepthChartEntry\DepthChartEntryRepository($this->db);
+        $depthChartRepo = new \DepthChart\DepthChartRepository($this->db);
         $rosterPlayers = ($teamid > 0) ? $depthChartRepo->getPlayersOnTeam($teamid) : [];
         $currentRosterPids = array_map(
             static fn(array $p): int => $p['pid'],

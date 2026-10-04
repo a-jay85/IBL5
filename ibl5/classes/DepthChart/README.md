@@ -1,6 +1,6 @@
 ---
 description: Depth chart submission form, validation, and database update for GM team management; positions and offensive sets simplified.
-last_verified: 2026-09-23
+last_verified: 2026-10-03
 ---
 
 # Depth Chart Entry Module - Refactoring Documentation
@@ -38,7 +38,7 @@ The Depth Chart Entry module has been refactored to follow best practices for te
 
 ## Architecture
 
-### Namespace: `DepthChartEntry\`
+### Namespace: `DepthChart\`
 
 The module is now organized into the following classes:
 

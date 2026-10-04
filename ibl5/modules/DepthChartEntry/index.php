@@ -22,13 +22,13 @@ function userinfo($username)
 {
     global $mysqli_db, $commonRepo, $leagueContext;
 
-    $repository = new DepthChartEntry\DepthChartEntryRepository($mysqli_db);
-    $service = new DepthChartEntry\DepthChartEntryService();
-    $view = new DepthChartEntry\DepthChartEntryView($leagueContext, $service);
+    $repository = new DepthChart\DepthChartRepository($mysqli_db);
+    $service = new DepthChart\DepthChartService();
+    $view = new DepthChart\DepthChartView($leagueContext, $service);
     $teamRepository = new Team\TeamRepository($mysqli_db);
     $teamTableService = new Team\TeamTableService($mysqli_db, $teamRepository);
-    $submissionHandler = new DepthChartEntry\DepthChartEntrySubmissionHandler($mysqli_db, $commonRepo);
-    $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, \Http\HttpRequest::fromGlobals());
+    $submissionHandler = new DepthChart\DepthChartSubmissionHandler($mysqli_db, $commonRepo);
+    $controller = new DepthChart\DepthChartController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, \Http\HttpRequest::fromGlobals());
     $controller->displayForm($username);
 }
 
@@ -80,13 +80,13 @@ function submit($user)
         return;
     }
 
-    $repository = new DepthChartEntry\DepthChartEntryRepository($mysqli_db);
-    $service = new DepthChartEntry\DepthChartEntryService();
-    $view = new DepthChartEntry\DepthChartEntryView($leagueContext, $service);
+    $repository = new DepthChart\DepthChartRepository($mysqli_db);
+    $service = new DepthChart\DepthChartService();
+    $view = new DepthChart\DepthChartView($leagueContext, $service);
     $teamRepository = new Team\TeamRepository($mysqli_db);
     $teamTableService = new Team\TeamTableService($mysqli_db, $teamRepository);
-    $submissionHandler = new DepthChartEntry\DepthChartEntrySubmissionHandler($mysqli_db, $commonRepo);
-    $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, \Http\HttpRequest::fromGlobals());
+    $submissionHandler = new DepthChart\DepthChartSubmissionHandler($mysqli_db, $commonRepo);
+    $controller = new DepthChart\DepthChartController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, \Http\HttpRequest::fromGlobals());
     $controller->handleSubmit($_POST, $username);
 }
 
@@ -94,7 +94,7 @@ function tabApi()
 {
     global $mysqli_db, $commonRepo, $leagueContext;
 
-    $handler = new DepthChartEntry\DepthChartEntryApiHandler($mysqli_db, $commonRepo, $leagueContext);
+    $handler = new DepthChart\DepthChartApiHandler($mysqli_db, $commonRepo, $leagueContext);
     $handler->handle();
 }
 
@@ -149,7 +149,7 @@ function api($user)
         $params = $_GET;
     }
 
-    $handler = new SavedDepthChart\SavedDepthChartApiHandler($mysqli_db, $commonRepo);
+    $handler = new DepthChartSnapshot\DepthChartSnapshotApiHandler($mysqli_db, $commonRepo);
     $handler->handle($action, $teamid, $username, $params);
 }
 

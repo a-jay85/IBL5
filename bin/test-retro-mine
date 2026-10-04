@@ -323,6 +323,454 @@ case_expected_jobs_registered() {
     rm_expect_eq "expected_jobs_registered: plist label matches the registered job" "com.ibl5.retro-mine" "$label"
 }
 
+# ── Drafter, validator, and renderer cases ───────────────────────────────────
+RM_FIXTURE_ENVELOPE="$SCRIPT_DIR/fixtures/retro-mine/drafter-envelope.json"
+RM_TODAY_RE='^last_verified: [0-9]{4}-[0-9]{2}-[0-9]{2}$'
+
+# rm_envelope <result-json> — wrap a result object in a canned CLI envelope.
+rm_envelope() {
+    jq -nc --argjson r "$1" '{type: "result", is_error: false, structured_output: $r}'
+}
+
+RM_RULE_DOC='{"kind":"rule_doc","slug":"shell-demo","description":"A demo rule.","pr_summary":"Summary text.","body":"Body text."}'
+RM_TRIGGER_ROW='{"kind":"trigger_row","slug":"shell-row","description":"A demo row.","pr_summary":"Summary text.","trigger_if":"trig cell","must_assert":"assert cell"}'
+
+# rm_tree <dir> — a fixture tree holding one rule doc and a trigger table.
+rm_tree() {
+    mkdir -p "$1/.claude/rules" "$1/.claude/review-shared"
+    printf 'existing rule\n' > "$1/.claude/rules/existing.md"
+    cat > "$1/.claude/review-shared/_plan-verification.md" <<'EOF'
+---
+description: fixture
+last_verified: 2020-01-01
+---
+# Plan verification
+
+## Earlier section
+
+| a | b |
+| - | - |
+| x | y |
+
+## Forced integration-verification trigger
+
+| Trigger if | Must assert |
+| --- | --- |
+| first | one |
+| second | two |
+
+## Next
+
+| n1 | n2 |
+| -- | -- |
+| z | z |
+EOF
+}
+
+# rm_validate <envelope-json> <tree> [render] — source the script under test in a
+# subshell, run validate_draft (and render_edit when asked), capture rc and stderr.
+rm_validate() {
+    local env="$1" tree="$2" render="${3:-}" errf
+    errf="$(mktemp)"
+    (
+        # shellcheck source=/dev/null
+        . "$RM_DRIVER"
+        set +e
+        validate_draft "$env" "$tree" || exit 1
+        if [ -n "$render" ]; then render_edit "$tree" || exit 1; fi
+    ) 2>"$errf"
+    RM_RC=$?
+    RM_ERR="$(cat "$errf")"
+    rm -f "$errf"
+}
+
+case_validate_rule_doc_ok() {
+    local t f; t="$(rm_tmp)"
+    rm_tree "$t/tree"
+    rm_validate "$(rm_envelope "$RM_RULE_DOC")" "$t/tree" render
+    rm_expect_eq "validate_rule_doc_ok: exit 0" 0 "$RM_RC"
+    f="$t/tree/.claude/rules/shell-demo.md"
+    if [ -f "$f" ]; then
+        rm_expect_eq "validate_rule_doc_ok: line 1 is the fence" "---" "$(sed -n 1p "$f")"
+        rm_has "validate_rule_doc_ok: line 2 is the description" "$(sed -n 2p "$f")" 'description: "A demo rule."'
+        if grep -qE "$RM_TODAY_RE" <<< "$(sed -n 3p "$f")"; then rm_ok "validate_rule_doc_ok: line 3 is a script-owned date"
+        else rm_fail "validate_rule_doc_ok: line 3 not a last_verified date: $(sed -n 3p "$f")"; fi
+        rm_has "validate_rule_doc_ok: heading and body" "$(cat "$f")" "# shell-demo"
+        rm_has "validate_rule_doc_ok: body present" "$(cat "$f")" "Body text."
+        rm_lacks "validate_rule_doc_ok: no paths key" "$(cat "$f")" "paths:"
+    else
+        rm_fail "validate_rule_doc_ok: $f not written"
+    fi
+}
+
+case_validate_rejects_kind() {
+    local t; t="$(rm_tmp)"
+    rm_tree "$t/tree"
+    rm_validate "$(rm_envelope '{"kind":"memory","slug":"x","description":"d","pr_summary":"s"}')" "$t/tree"
+    rm_expect_eq "validate_rejects_kind: exit 1" 1 "$RM_RC"
+    rm_has "validate_rejects_kind: named reason" "$RM_ERR" "kind not allowlisted"
+}
+
+case_validate_rejects_extra_key() {
+    local t; t="$(rm_tmp)"
+    rm_tree "$t/tree"
+    rm_validate "$(rm_envelope '{"kind":"rule_doc","slug":"x","description":"d","pr_summary":"s","body":"b","path":".github/workflows/x.yml"}')" "$t/tree" render
+    rm_expect_eq "validate_rejects_extra_key: exit 1" 1 "$RM_RC"
+    rm_has "validate_rejects_extra_key: names the key" "$RM_ERR" "unexpected key path"
+    rm_expect_eq "validate_rejects_extra_key: nothing written" "1" "$(find "$t/tree/.claude/rules" -type f | wc -l | tr -d ' ')"
+    if [ -e "$t/tree/.github" ]; then rm_fail "validate_rejects_extra_key: .github appeared"
+    else rm_ok "validate_rejects_extra_key: no .github dir"; fi
+}
+
+case_validate_rejects_traversal_slug() {
+    local t slug; t="$(rm_tmp)"
+    rm_tree "$t/tree"
+    for slug in '../../bin/evil' 'a/b' 'a.b' 'Upper' '-lead'; do
+        rm_validate "$(rm_envelope "$(jq -nc --arg s "$slug" '{kind:"rule_doc",slug:$s,description:"d",pr_summary:"s",body:"b"}')")" "$t/tree"
+        rm_expect_eq "validate_rejects_traversal_slug [$slug]: exit 1" 1 "$RM_RC"
+        rm_has "validate_rejects_traversal_slug [$slug]: named reason" "$RM_ERR" "bad slug"
+    done
+}
+
+case_validate_rejects_existing_dest() {
+    local t before; t="$(rm_tmp)"
+    rm_tree "$t/tree"
+    before="$(cksum < "$t/tree/.claude/rules/existing.md")"
+    rm_validate "$(rm_envelope '{"kind":"rule_doc","slug":"existing","description":"d","pr_summary":"s","body":"b"}')" "$t/tree" render
+    rm_expect_eq "validate_rejects_existing_dest: exit 1" 1 "$RM_RC"
+    rm_has "validate_rejects_existing_dest: named reason" "$RM_ERR" "destination exists"
+    rm_expect_eq "validate_rejects_existing_dest: file byte-identical" "$before" "$(cksum < "$t/tree/.claude/rules/existing.md")"
+}
+
+case_validate_rejects_pipe_cell() {
+    local t; t="$(rm_tmp)"
+    rm_tree "$t/tree"
+    rm_validate "$(rm_envelope '{"kind":"trigger_row","slug":"x","description":"d","pr_summary":"s","trigger_if":"a | b","must_assert":"c"}')" "$t/tree"
+    rm_expect_eq "validate_rejects_pipe_cell: exit 1" 1 "$RM_RC"
+    rm_has "validate_rejects_pipe_cell: named reason" "$RM_ERR" "bad trigger cell"
+}
+
+case_validate_rejects_bad_body_and_description() {
+    local t; t="$(rm_tmp)"
+    rm_tree "$t/tree"
+    rm_validate "$(rm_envelope '{"kind":"rule_doc","slug":"x","description":"d","pr_summary":"s","body":"---\nfake: frontmatter"}')" "$t/tree"
+    rm_expect_eq "validate_rejects_bad_body: exit 1" 1 "$RM_RC"
+    rm_has "validate_rejects_bad_body: named reason" "$RM_ERR" "bad body"
+    rm_validate "$(rm_envelope '{"kind":"rule_doc","slug":"x","description":"has \"quote\"","pr_summary":"s","body":"b"}')" "$t/tree"
+    rm_expect_eq "validate_rejects_bad_description: exit 1" 1 "$RM_RC"
+    rm_has "validate_rejects_bad_description: named reason" "$RM_ERR" "bad description"
+}
+
+case_render_trigger_row_position() {
+    local t f row n tail_before tail_after; t="$(rm_tmp)"
+    rm_tree "$t/tree"
+    f="$t/tree/.claude/review-shared/_plan-verification.md"
+    tail_before="$(sed -n '/^## Next/,$p' "$f")"
+    rm_validate "$(rm_envelope "$RM_TRIGGER_ROW")" "$t/tree" render
+    rm_expect_eq "render_trigger_row_position: exit 0" 0 "$RM_RC"
+    row='| trig cell | assert cell |'
+    n="$(grep -nF '| second | two |' "$f" | cut -d: -f1)"
+    rm_expect_eq "render_trigger_row_position: row follows the last table row" "$row" "$(sed -n "$((n + 1))p" "$f")"
+    tail_after="$(sed -n '/^## Next/,$p' "$f")"
+    rm_expect_eq "render_trigger_row_position: following section unchanged" "$tail_before" "$tail_after"
+    rm_lacks "render_trigger_row_position: row absent from the following section" "$tail_after" "$row"
+    rm_expect_eq "render_trigger_row_position: row appears once" 1 "$(grep -cF "$row" "$f")"
+    if grep -qE "$RM_TODAY_RE" <<< "$(sed -n 3p "$f")" && [ "$(sed -n 3p "$f")" != "last_verified: 2020-01-01" ]; then
+        rm_ok "render_trigger_row_position: last_verified bumped"
+    else
+        rm_fail "render_trigger_row_position: last_verified not bumped: $(sed -n 3p "$f")"
+    fi
+}
+
+case_render_missing_section_fails() {
+    local t f before; t="$(rm_tmp)"
+    rm_tree "$t/tree"
+    f="$t/tree/.claude/review-shared/_plan-verification.md"
+    sed 's/^## Forced integration-verification trigger/## Something else/' "$f" > "$f.new"
+    mv "$f.new" "$f"
+    before="$(cksum < "$f")"
+    rm_validate "$(rm_envelope "$RM_TRIGGER_ROW")" "$t/tree" render
+    rm_expect_eq "render_missing_section_fails: exit 1" 1 "$RM_RC"
+    rm_has "render_missing_section_fails: named reason" "$RM_ERR" "trigger section not found"
+    rm_expect_eq "render_missing_section_fails: file unchanged" "$before" "$(cksum < "$f")"
+    if [ -e "$f.tmp" ]; then rm_fail "render_missing_section_fails: temp file left behind"
+    else rm_ok "render_missing_section_fails: no temp file left"; fi
+}
+
+# ── End-to-end fixture: bare remote, seed clone, working clone ───────────────
+RM_BRANCH="retro-mine-$(date +%Y%m%d)-shell"
+
+# rm_repo_fixture <t> — three shell rows over Rung 3 and Rung 4, on a bare remote.
+rm_repo_fixture() {
+    local t="$1"
+    export GIT_AUTHOR_NAME=rm GIT_AUTHOR_EMAIL=rm@example.invalid
+    export GIT_COMMITTER_NAME=rm GIT_COMMITTER_EMAIL=rm@example.invalid
+    git init --quiet --bare "$t/remote.git"
+    git -C "$t/remote.git" symbolic-ref HEAD refs/heads/master
+    git clone --quiet "$t/remote.git" "$t/seed" 2>/dev/null
+    git -C "$t/seed" switch --quiet -c master
+    mkdir -p "$t/seed/ibl5/docs"
+    rm_registry "$t/seed/ibl5/docs/retrospective-class-registry.md" \
+        "$(rm_row '#11' 'shell quoting' 3 .claude/rules/a.md '--')" \
+        "$(rm_row '#12' 'shell globbing' 4 .claude/rules/b.md '--')" \
+        "$(rm_row '#13' 'shell tilde' 3 .claude/rules/c.md '--')"
+    rm_tree "$t/seed"
+    git -C "$t/seed" add -A
+    git -C "$t/seed" commit --quiet -m seed
+    git -C "$t/seed" push --quiet origin master 2>/dev/null
+    git clone --quiet "$t/remote.git" "$t/repo" 2>/dev/null
+}
+
+# rm_stubs <t> <envelope-file> [claude-rc] [gh-rc] — canned claude and gh.
+rm_stubs() {
+    local t="$1" envf="$2" crc="${3:-0}" grc="${4:-0}"
+    cat > "$t/claude" <<EOF
+#!/bin/bash
+printf '[%s]\n' "\$@" > "$t/claude.argv"
+[ $crc -eq 0 ] || exit $crc
+cat "$envf"
+EOF
+    cat > "$t/gh" <<EOF
+#!/bin/bash
+echo "\$*" >> "$t/gh.log"
+while [ \$# -gt 0 ]; do
+    if [ "\$1" = "--body-file" ]; then cp "\$2" "$t/gh-body"; fi
+    shift
+done
+[ $grc -eq 0 ] || exit $grc
+echo https://example.invalid/pr/1
+EOF
+    chmod +x "$t/claude" "$t/gh"
+}
+
+# rm_full_run <t> [args...] — a real run against the fixture repo.
+rm_full_run() {
+    local t="$1" errf
+    shift
+    errf="$(mktemp)"
+    RM_OUT="$(RETRO_MINE_REPO="$t/repo" RETRO_MINE_STATE_DIR="$t/state" \
+        RETRO_MINE_CLAUDE_BIN="$t/claude" RETRO_MINE_GH_BIN="$t/gh" \
+        "$RM_DRIVER" "$@" 2>"$errf")"
+    RM_RC=$?
+    RM_ERR="$(cat "$errf")"
+    rm -f "$errf"
+}
+
+# rm_e2e_setup <t> — fixture repo plus stubs that return a valid rule_doc.
+rm_e2e_setup() {
+    rm_repo_fixture "$1"
+    rm_envelope "$RM_RULE_DOC" > "$1/envelope.json"
+    rm_stubs "$1" "$1/envelope.json"
+}
+
+case_drafter_argv_deny_all() {
+    local t argv; t="$(rm_tmp)"
+    rm_e2e_setup "$t"
+    rm_full_run "$t"
+    argv="$(cat "$t/claude.argv" 2>/dev/null || true)"
+    rm_has "drafter_argv_deny_all: --allowedTools passed" "$argv" "[--allowedTools]"
+    if awk '$0 == "[--allowedTools]" {getline nxt; if (nxt == "[]") ok = 1} END {exit ok ? 0 : 1}' <<< "$argv"; then
+        rm_ok "drafter_argv_deny_all: --allowedTools value is empty"
+    else
+        rm_fail "drafter_argv_deny_all: --allowedTools not followed by an empty argument"
+    fi
+    rm_has "drafter_argv_deny_all: --json-schema passed" "$argv" "[--json-schema]"
+    rm_lacks "drafter_argv_deny_all: no skip-permissions flag" "$argv" "dangerously-skip-permissions"
+}
+
+case_drafter_failure_exits_nonzero() {
+    local t; t="$(rm_tmp)"
+    rm_repo_fixture "$t"
+    rm_envelope "$RM_RULE_DOC" > "$t/envelope.json"
+    rm_stubs "$t" "$t/envelope.json" 3
+    rm_full_run "$t"
+    rm_expect_eq "drafter_failure_exits_nonzero: exit 1" 1 "$RM_RC"
+    rm_has "drafter_failure_exits_nonzero: names the drafter exit" "$RM_ERR" "drafter exited 3"
+    if [ -s "$t/state/proposed.tsv" ]; then rm_fail "drafter_failure_exits_nonzero: state line written"
+    else rm_ok "drafter_failure_exits_nonzero: no state line"; fi
+}
+
+case_invalid_json_exits_nonzero() {
+    local t; t="$(rm_tmp)"
+    rm_repo_fixture "$t"
+    printf 'not json\n' > "$t/envelope.json"
+    rm_stubs "$t" "$t/envelope.json"
+    rm_full_run "$t"
+    rm_expect_eq "invalid_json_exits_nonzero: exit 1" 1 "$RM_RC"
+    rm_has "invalid_json_exits_nonzero: names the rejection" "$RM_ERR" "no result"
+    if [ -s "$t/state/proposed.tsv" ]; then rm_fail "invalid_json_exits_nonzero: state line written"
+    else rm_ok "invalid_json_exits_nonzero: no state line"; fi
+}
+
+case_e2e_draft_pr() {
+    local t sha parent master; t="$(rm_tmp)"
+    rm_e2e_setup "$t"
+    rm_full_run "$t"
+    rm_expect_eq "e2e_draft_pr: exit 0" 0 "$RM_RC"
+    sha="$(git -C "$t/remote.git" rev-parse "$RM_BRANCH" 2>/dev/null || true)"
+    if [ -n "$sha" ]; then
+        rm_ok "e2e_draft_pr: branch pushed"
+        parent="$(git -C "$t/remote.git" rev-parse "$sha^")"
+        master="$(git -C "$t/remote.git" rev-parse master)"
+        rm_expect_eq "e2e_draft_pr: commit sits directly on remote master" "$master" "$parent"
+        rm_has "e2e_draft_pr: tree holds the rule doc" \
+            "$(git -C "$t/remote.git" ls-tree -r --name-only "$sha")" ".claude/rules/shell-demo.md"
+    else
+        rm_fail "e2e_draft_pr: branch $RM_BRANCH not on the remote"
+    fi
+    rm_has "e2e_draft_pr: gh pr create" "$(cat "$t/gh.log" 2>/dev/null)" "pr create"
+    rm_has "e2e_draft_pr: --draft" "$(cat "$t/gh.log" 2>/dev/null)" "--draft"
+    rm_has "e2e_draft_pr: --base master" "$(cat "$t/gh.log" 2>/dev/null)" "--base master"
+    rm_has "e2e_draft_pr: body holds PR #11" "$(cat "$t/gh-body" 2>/dev/null)" "#11"
+    rm_has "e2e_draft_pr: body holds PR #12" "$(cat "$t/gh-body" 2>/dev/null)" "#12"
+    rm_has "e2e_draft_pr: body holds PR #13" "$(cat "$t/gh-body" 2>/dev/null)" "#13"
+    rm_has "e2e_draft_pr: state holds the family and count" "$(cut -f1,2 "$t/state/proposed.tsv" 2>/dev/null)" "$(printf 'family-shell\t3')"
+}
+
+case_e2e_dedupe_second_run() {
+    local t first second; t="$(rm_tmp)"
+    rm_e2e_setup "$t"
+    rm_full_run "$t"
+    first="$(grep -c 'pr create' "$t/gh.log" 2>/dev/null || true)"
+    rm_full_run "$t"
+    rm_expect_eq "e2e_dedupe_second_run: exit 0" 0 "$RM_RC"
+    rm_has "e2e_dedupe_second_run: second run reports seen" "$RM_OUT" "status=seen"
+    second="$(grep -c 'pr create' "$t/gh.log" 2>/dev/null || true)"
+    rm_expect_eq "e2e_dedupe_second_run: no second pr create" "$first" "$second"
+}
+
+case_main_checkout_untouched() {
+    local t branch; t="$(rm_tmp)"
+    rm_e2e_setup "$t"
+    branch="$(git -C "$t/repo" branch --show-current)"
+    rm_full_run "$t"
+    rm_expect_eq "main_checkout_untouched: exit 0" 0 "$RM_RC"
+    rm_expect_eq "main_checkout_untouched: clean tree" "" "$(git -C "$t/repo" status --porcelain)"
+    rm_expect_eq "main_checkout_untouched: branch unchanged" "$branch" "$(git -C "$t/repo" branch --show-current)"
+    rm_expect_eq "main_checkout_untouched: one worktree entry" 1 "$(git -C "$t/repo" worktree list | wc -l | tr -d ' ')"
+    if git -C "$t/repo" show-ref --verify --quiet "refs/heads/$RM_BRANCH"; then
+        rm_fail "main_checkout_untouched: local branch left behind"
+    else
+        rm_ok "main_checkout_untouched: no local draft branch"
+    fi
+}
+
+case_gh_failure_exits_nonzero() {
+    local t; t="$(rm_tmp)"
+    rm_repo_fixture "$t"
+    rm_envelope "$RM_RULE_DOC" > "$t/envelope.json"
+    rm_stubs "$t" "$t/envelope.json" 0 1
+    rm_full_run "$t"
+    rm_expect_eq "gh_failure_exits_nonzero: exit 1" 1 "$RM_RC"
+    rm_has "gh_failure_exits_nonzero: names the step" "$RM_ERR" "gh pr create failed"
+    if [ -s "$t/state/proposed.tsv" ]; then rm_fail "gh_failure_exits_nonzero: state line written"
+    else rm_ok "gh_failure_exits_nonzero: no state line"; fi
+    rm_expect_eq "gh_failure_exits_nonzero: one worktree entry" 1 "$(git -C "$t/repo" worktree list | wc -l | tr -d ' ')"
+}
+
+case_push_failure_exits_nonzero() {
+    local t; t="$(rm_tmp)"
+    if [ "$(id -u)" -eq 0 ]; then
+        echo "SKIP: push_failure_exits_nonzero (root ignores read-only dirs)"
+        return 0
+    fi
+    rm_e2e_setup "$t"
+    chmod -R a-w "$t/remote.git"
+    rm_full_run "$t"
+    chmod -R u+w "$t/remote.git"
+    rm_expect_eq "push_failure_exits_nonzero: exit 1" 1 "$RM_RC"
+    rm_has "push_failure_exits_nonzero: names the step" "$RM_ERR" "push failed"
+    if [ -e "$t/gh.log" ]; then rm_fail "push_failure_exits_nonzero: gh was invoked"
+    else rm_ok "push_failure_exits_nonzero: gh never invoked"; fi
+    rm_expect_eq "push_failure_exits_nonzero: one worktree entry" 1 "$(git -C "$t/repo" worktree list | wc -l | tr -d ' ')"
+}
+
+case_published_branch_not_rewritten() {
+    local t before; t="$(rm_tmp)"
+    rm_e2e_setup "$t"
+    git -C "$t/seed" switch --quiet -c "$RM_BRANCH"
+    printf 'published\n' > "$t/seed/published.txt"
+    git -C "$t/seed" add -A
+    git -C "$t/seed" commit --quiet -m published
+    git -C "$t/seed" push --quiet origin "$RM_BRANCH" 2>/dev/null
+    before="$(git -C "$t/remote.git" rev-parse "$RM_BRANCH")"
+    rm_full_run "$t"
+    rm_expect_eq "published_branch_not_rewritten: exit 1" 1 "$RM_RC"
+    rm_has "published_branch_not_rewritten: names the guard" "$RM_ERR" "branch exists on origin"
+    rm_expect_eq "published_branch_not_rewritten: remote sha unchanged" "$before" "$(git -C "$t/remote.git" rev-parse "$RM_BRANCH")"
+}
+
+case_lock_held() {
+    local t; t="$(rm_tmp)"
+    rm_e2e_setup "$t"
+    mkdir -p "$t/state/lock"
+    rm_full_run "$t"
+    rm_expect_eq "lock_held: exit 1" 1 "$RM_RC"
+    rm_has "lock_held: names the lock" "$RM_ERR" "lock held"
+    if [ -d "$t/state/lock" ]; then rm_ok "lock_held: the foreign lock survives"
+    else rm_fail "lock_held: the run removed a lock it did not create"; fi
+}
+
+case_dry_run_no_side_effects() {
+    local t refs wts; t="$(rm_tmp)"
+    rm_e2e_setup "$t"
+    refs="$(git -C "$t/remote.git" for-each-ref)"
+    wts="$(git -C "$t/repo" worktree list)"
+    rm_full_run "$t" --dry-run
+    rm_expect_eq "dry_run_no_side_effects: exit 0" 0 "$RM_RC"
+    rm_has "dry_run_no_side_effects: report printed" "$RM_OUT" "FAMILY shell"
+    rm_expect_eq "dry_run_no_side_effects: remote refs unchanged" "$refs" "$(git -C "$t/remote.git" for-each-ref)"
+    rm_expect_eq "dry_run_no_side_effects: worktrees unchanged" "$wts" "$(git -C "$t/repo" worktree list)"
+    if [ -e "$t/state" ]; then rm_fail "dry_run_no_side_effects: state dir created"
+    else rm_ok "dry_run_no_side_effects: no state dir"; fi
+    if [ -e "$t/gh.log" ] || [ -e "$t/claude.argv" ]; then rm_fail "dry_run_no_side_effects: a stub was invoked"
+    else rm_ok "dry_run_no_side_effects: gh and claude never invoked"; fi
+}
+
+# ── Real registry and replay cases ───────────────────────────────────────────
+case_real_registry_corpus() {
+    local t reg want got; t="$(rm_tmp)"
+    reg="$SCRIPT_DIR/../ibl5/docs/retrospective-class-registry.md"
+    want="$(grep -c '^| 20' "$reg")"
+    rm_run "$reg" "$t/state" --dry-run
+    rm_expect_eq "real_registry_corpus: exit 0" 0 "$RM_RC"
+    got="$(awk '/^ROWS /{print $2}' <<< "$RM_OUT")"
+    rm_expect_eq "real_registry_corpus: parsed rows equal table rows" "$want" "$got"
+    if [ "${got:-0}" -ge 38 ]; then rm_ok "real_registry_corpus: at least 38 rows"
+    else rm_fail "real_registry_corpus: only [$got] rows"; fi
+    rm_has "real_registry_corpus: shell family surfaces" "$RM_OUT" "FAMILY shell "
+}
+
+case_replay_real_envelope() {
+    local t n; t="$(rm_tmp)"
+    if [ ! -f "$RM_FIXTURE_ENVELOPE" ]; then
+        rm_fail "replay_real_envelope: fixture missing: $RM_FIXTURE_ENVELOPE"
+        return 0
+    fi
+    rm_tree "$t/tree"
+    find "$t/tree" -type f -exec cksum {} + | sort > "$t/before"
+    rm_validate "$(cat "$RM_FIXTURE_ENVELOPE")" "$t/tree" render
+    rm_expect_eq "replay_real_envelope: validate and render exit 0" 0 "$RM_RC"
+    find "$t/tree" -type f -exec cksum {} + | sort > "$t/after"
+    n="$(comm -13 "$t/before" "$t/after" | wc -l | tr -d ' ')"
+    rm_expect_eq "replay_real_envelope: exactly one file written or changed" 1 "$n"
+}
+
+case_replay_tampered_kind() {
+    local t; t="$(rm_tmp)"
+    if [ ! -f "$RM_FIXTURE_ENVELOPE" ]; then
+        rm_fail "replay_tampered_kind: fixture missing: $RM_FIXTURE_ENVELOPE"
+        return 0
+    fi
+    rm_tree "$t/tree"
+    jq -c 'if (.structured_output | type) == "object" then .structured_output.kind = "memory"
+           elif (.result | type) == "string" then .result = ((.result | fromjson) | .kind = "memory" | tojson)
+           else .result.kind = "memory" end' "$RM_FIXTURE_ENVELOPE" > "$t/tampered.json"
+    rm_validate "$(cat "$t/tampered.json")" "$t/tree"
+    rm_expect_eq "replay_tampered_kind: exit 1" 1 "$RM_RC"
+    rm_has "replay_tampered_kind: named reason" "$RM_ERR" "kind not allowlisted"
+}
+
 # ── Dispatch ──────────────────────────────────────────────────────────────────
 RM_ALL_CASES() {
     declare -F | awk '$3 ~ /^case_/ {print $3}'

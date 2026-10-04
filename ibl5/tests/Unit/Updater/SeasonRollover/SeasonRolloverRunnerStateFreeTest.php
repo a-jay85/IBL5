@@ -20,6 +20,10 @@ final class SeasonRolloverRunnerStateFreeTest extends TestCase
 {
     private const FORBIDDEN = ['$_POST', '$_GET', '$_REQUEST', '$_COOKIE', '$_SESSION', 'is_admin', 'mysqli', 'echo'];
 
+    /**
+     * Scans the executable code of SeasonRolloverRunner::run() and the rest of
+     * the class, with comments stripped.
+     */
     public function testRunnerSourceContainsNoForbiddenToken(): void
     {
         $hits = $this->forbiddenTokensIn($this->runnerSource());

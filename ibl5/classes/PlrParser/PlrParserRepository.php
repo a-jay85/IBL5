@@ -13,7 +13,7 @@ use PlrParser\Contracts\PlrParserRepositoryInterface;
  * Handles upserts into `ibl_plr` and ibl_hist tables.
  * League-aware: resolves table names through LeagueContext when provided.
  */
-class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepositoryInterface
+class PlrParserRepository extends \Database\BaseMysqliRepository implements PlrParserRepositoryInterface
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {

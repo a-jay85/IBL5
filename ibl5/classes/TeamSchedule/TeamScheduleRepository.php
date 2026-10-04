@@ -15,7 +15,7 @@ use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
  *
  * @see TeamScheduleRepositoryInterface For the interface contract
  */
-class TeamScheduleRepository extends \BaseMysqliRepository implements TeamScheduleRepositoryInterface
+class TeamScheduleRepository extends \Database\BaseMysqliRepository implements TeamScheduleRepositoryInterface
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {

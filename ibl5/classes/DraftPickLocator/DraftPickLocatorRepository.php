@@ -12,9 +12,9 @@ use DraftPickLocator\Contracts\DraftPickLocatorRepositoryInterface;
  * Retrieves draft pick ownership data from the database.
  *
  * @see DraftPickLocatorRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  */
-class DraftPickLocatorRepository extends \BaseMysqliRepository implements DraftPickLocatorRepositoryInterface
+class DraftPickLocatorRepository extends \Database\BaseMysqliRepository implements DraftPickLocatorRepositoryInterface
 {
     /**
      * @see DraftPickLocatorRepositoryInterface::getAllTeams()

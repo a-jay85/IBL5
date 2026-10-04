@@ -2,7 +2,13 @@
 
 declare(strict_types=1);
 
-final class SubclassCallsBeginTransaction extends \Database\BaseMysqliRepository
+namespace Fixtures\Lookalike;
+
+class BaseMysqliRepository
+{
+}
+
+final class LookalikeCallsBeginTransaction extends BaseMysqliRepository
 {
     public function runTransaction(\mysqli $db): void
     {

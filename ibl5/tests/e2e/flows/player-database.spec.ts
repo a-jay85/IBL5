@@ -5,6 +5,8 @@ import { gotoWithRetry } from '../helpers/navigation';
 
 // Player Database — public page, no authentication required.
 // The results table only appears AFTER submitting a search.
+// The form posts to the action set at PlayerSearchView.php:89. A stale module name there
+// redirects home at modules.php:31 and the results assertions fail.
 test.use({ storageState: publicStorageState() });
 
 test.describe('Player Database flow', () => {

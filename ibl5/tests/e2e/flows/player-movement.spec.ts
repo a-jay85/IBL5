@@ -17,6 +17,7 @@ test.describe('Player Movement flow', () => {
 
   // CI seed guarantees movement: pid=4 played for Metros (tid=1) in 2025,
   // now on Stars (tid=2). Query: ibl_hist.year=2025 AND teamid != plr.tid.
+  // Seed rows: ibl5/tests/e2e/fixtures/ci-seed.sql:902-903.
 
   test('player movement table is visible with expected headers', async ({ page }) => {
     const table = page.locator('.player-movement-table, .ibl-data-table');

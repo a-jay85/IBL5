@@ -10,6 +10,10 @@ use PHPUnit\Framework\TestCase;
 /**
  * Pins the public surface of the PlayerSearch and SeasonRosterChanges modules to the
  * method lists the classes declared before the rename, so the rename added no entry point.
+ *
+ * Related checks: ModuleRegistry.php whitelists both new names, and ModuleRegistryTest covers
+ * that. The entry point ibl5/modules/SeasonRosterChanges/index.php calls the renamed repository
+ * method. The rule .claude/rules/playwright-gotchas.md names the new module.
  */
 final class RenamedModuleApiSurfaceTest extends TestCase
 {

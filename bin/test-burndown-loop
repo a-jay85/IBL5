@@ -379,7 +379,7 @@ test_batch_env_and_prompt() {
     assert_contains env_prompt:optin "$line" "OPTIN=1"
     assert_contains env_prompt:sid "$line" "SID=$sid"
     assert_contains env_prompt:skip-perms "$line" "--dangerously-skip-permissions"
-    assert_contains env_prompt:model "$line" "--model claude-opus-5-5"
+    assert_contains env_prompt:model "$line" "--model claude-sonnet-5-5"
     assert_contains env_prompt:sentinel "$line" "BURNDOWN-LOOP: none-selected"
 }
 

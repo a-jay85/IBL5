@@ -480,9 +480,10 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
     lines = [GATE_BACKTEST_BEGIN, f"<!-- gate-backtest-state: {verdict.state} -->",
              "### Gate backtest", "",
              f"**State:** {verdict.state}. {verdict.reason}", "",
-             f"Replayed against the last {window_size} merged PRs. Repaired: a `fix` PR touching "
-             "an overlapping file merged within 48h. Clean: older than 48h and not repaired. "
-             "Unsettled: younger than 48h, shown and never counted.", ""]
+             f"Replayed against the newest {window_size} settled merged PRs (older than 48h). "
+             "Repaired: a `fix` PR touching an overlapping file merged within 48h. "
+             "Clean: older than 48h and not repaired. "
+             "Unsettled: younger than 48h, never replayed.", ""]
     catches: list[int] = []
     false_flags: list[int] = []
     unsettled: list[int] = []

@@ -1,18 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			rawMessage: 'Parameter #1 $row of method Api\Transformer\GameTransformer::transform() expects array{game_uuid: string, season_year: int, game_date: string, game_status: string, box_score_id: int, game_of_that_day: int, visitor_uuid: string, visitor_city: string, ..., ...<string, mixed>}, array{game_uuid: string, season_year: int, game_date: string, game_status: ''scheduled'', box_score_id: int, game_of_that_day: int, visitor_uuid: string, visitor_city: string, ..., ...<string, mixed>} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Api/Transformer/GameTransformerTest.php
-
-		-
-			rawMessage: 'Parameter #1 $row of method Api\Transformer\GameTransformer::transform() expects array{game_uuid: string, season_year: int, game_date: string, game_status: string, box_score_id: int, game_of_that_day: int, visitor_uuid: string, visitor_city: string, ..., ...<string, mixed>}, array{game_uuid: string, season_year: int, game_date: string, game_status: string, box_score_id: int, game_of_that_day: int, visitor_uuid: string, visitor_city: string, ..., ...<string, mixed>} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Api/Transformer/GameTransformerTest.php
-
-		-
 			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_AWARDS_EMPTY_ACCOMPLISHMENTS is unused.
 			identifier: classConstant.unused
 			count: 1
@@ -271,44 +259,8 @@ parameters:
 			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
 
 		-
-			rawMessage: 'Parameter #1 $plrRow of method Player\PlayerDataMapper::fillFromCurrentRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, non-empty-array<string, mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Player/PlayerDataMapperFieldMapTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
 			path: tests/UI/DebugOutputTest.php
-
-		-
-			rawMessage: 'Parameter #2 $result of static method UI\Tables\PlayerRowTransformer::resolveWithStats() expects iterable<int, array<string, mixed>|Player\Player>, array<int, stdClass> given.'
-			identifier: argument.type
-			count: 1
-			path: tests/UI/Tables/PlayerRowTransformerTest.php
-
-		-
-			rawMessage: 'Parameter #1 $playerData of method Waivers\WaiversProcessor::determineContractData() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Test Player'', teamid: 0, pos: ''PG'', salary_yr1: 0, exp: 8} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $playerData of method Waivers\WaiversProcessor::determineContractData() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Test Player'', teamid: 0, pos: ''PG'', salary_yr1: 0, salary_yr2: 0, exp: 6} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $playerData of method Waivers\WaiversProcessor::determineContractData() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Test Player'', teamid: 1, pos: ''PG'', salary_yr1: 500, cy: 1, cyt: 3, salary_yr2: 550, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $playerData of method Waivers\WaiversProcessor::determineContractData() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Test Player'', teamid: 1, pos: ''PG'', salary_yr1: 500, cy: 2, cyt: 3, salary_yr2: 550, ...} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
 

@@ -62,6 +62,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0152](0152-pull-prod-db-dumps-offsite-to-mac.md) | Pull prod DB dumps offsite to the owner's Mac | Accepted | `bin/db-backups-pull` rsyncs the nightly dumps to `~/Backups/ibl5-db` daily without `--delete`. It keeps 30 dailies plus each month's first, and DMs when the newest dump is over 36 hours old. |
 | [0156](0156-postplan-harness-concurrency-disclosure.md) | Disclose fail-fast changes in post-plan harness concurrency PRs | Accepted | A harness change that adds or alters concurrency names the failure-timing change in its PR body and tests every enabled agent path in submission order; path-scoped rule `.claude/rules/post-plan-concurrency-docs.md`, enforced by review only. |
 | [0162](0162-burndown-loop-weekly-pacing.md) | Unattended /burndown loop paced against the weekly window | Accepted | Fresh headless session per batch, straight-line pacing to (100-R)% at the weekly reset, fail-closed on a missing reading, exit 75 pause resumed by the coordinator. |
+| [0165](0165-scheduled-merged-worktree-gc.md) | Scheduled merged-worktree GC | Accepted | `bin/wt-gc-tick` runs `bin/cleanup --all` hourly under launchd (HID-idle gate, 6 h minimum interval, no destructive flags) and logs stalled, unpushed and empty worktrees without deleting them. |
 
 ## When an ADR is Required
 

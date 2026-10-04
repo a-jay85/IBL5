@@ -1,0 +1,646 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-wt-gc-tick — regression harness for bin/wt-gc-tick (the scheduled
+# merged-worktree sweep driver) and bin/wt-gc-cron-setup (its LaunchAgent
+# plist emitter), plus the worktree-survival contract (ADR-0165): a real
+# `bin/cleanup --all` driven by the tick reaps only the proven-merged
+# worktree and leaves STALLED / UNPUSHED / OPEN-PR / EMPTY ones intact.
+#
+# Fully self-contained: every fixture is built under mktemp. Stub binaries on
+# PATH replace gh, docker, launchctl; the tick's env seams point at argv-capture
+# stubs for cleanup / wt-status / ioreg. Every run uses HOME=$ROOT/home and a
+# per-case WT_GC_LOCK_DIR, so nothing writes to the real ~/.claude, and the
+# docker stub always sits first on PATH so a real bin/cleanup can never touch
+# real containers, volumes, or images.
+#
+# Prints `PASS <case-id>` or `FAIL <case-id>: <detail>` per case; exit 1 if any
+# case fails.
+#
+# Env: WT_GC_TICK_UNDER_TEST  path of the tick to test (default: bin/wt-gc-tick)
+#
+# Run: bin/test-wt-gc-tick  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TICK="${WT_GC_TICK_UNDER_TEST:-$SCRIPT_DIR/wt-gc-tick}"
+CRON_SETUP="$SCRIPT_DIR/wt-gc-cron-setup"
+
+ROOT="$(mktemp -d)"
+ROOT="$(cd "$ROOT" && pwd -P)"   # physical path: git worktree list reports it
+SLEEPER_PID=""
+cleanup_root() {
+    [ -n "$SLEEPER_PID" ] && kill "$SLEEPER_PID" 2>/dev/null
+    chmod -R u+w "$ROOT" 2>/dev/null
+    rm -rf "$ROOT" 2>/dev/null
+}
+trap cleanup_root EXIT
+
+# shellcheck source=bin/lib/git-helpers.sh disable=SC1091
+source "$SCRIPT_DIR/lib/git-helpers.sh"
+
+PASSED=0
+FAILED=0
+CASE=""
+CD=""
+CASE_ERRS=""
+
+mkdir -p "$ROOT/home"
+STUBBIN="$ROOT/stubbin"
+STUB_REPO="$ROOT/stubrepo"
+mkdir -p "$STUBBIN" "$STUB_REPO"
+
+# ── Stub binaries ─────────────────────────────────────────────────────────────
+# cleanup-stub: argv one-per-line to $STUB_CASE_DIR/argv, pwd to .../cwd, prints
+# a Summary line. STUB_CLEANED / STUB_SKIPPED / STUB_RC / STUB_NO_SUMMARY.
+cat > "$STUBBIN/cleanup-stub" <<'SH'
+#!/usr/bin/env bash
+d="${STUB_CASE_DIR:?STUB_CASE_DIR unset}"
+: > "$d/argv"
+for a in "$@"; do printf '%s\n' "$a" >> "$d/argv"; done
+pwd > "$d/cwd"
+if [ "${STUB_NO_SUMMARY:-}" != 1 ]; then
+    echo "Summary: ${STUB_CLEANED:-0} cleaned, ${STUB_SKIPPED:-3} skipped"
+fi
+exit "${STUB_RC:-0}"
+SH
+
+# wt-status-stub: the two header rows bin/wt-status emits, then fixed rows.
+cat > "$STUBBIN/wt-status-stub" <<'SH'
+#!/usr/bin/env bash
+printf "%-12s %-30s %s\n" "STATUS" "WORKTREE" "DETAIL"
+printf "%-12s %-30s %s\n" "------------" "------------------------------" "------"
+printf "%-12s %-30s %s\n" "STALLED" "stalled-a" "(uncommitted/untracked work, never committed)"
+printf "%-12s %-30s %s\n" "STALLED" "stalled-b" "(uncommitted/untracked work, never committed)"
+printf "%-12s %-30s %s\n" "UNPUSHED" "unpushed-a" "(committed work, no PR)"
+printf "%-12s %-30s %s\n" "EMPTY" "empty-a" "(no own commits, clean tree)"
+printf "%-12s %-30s %s\n" "EMPTY" "empty-b" "(no own commits, clean tree)"
+printf "%-12s %-30s %s\n" "EMPTY" "empty-c" "(no own commits, clean tree)"
+printf "%-12s %-30s %s\n" "OPEN-PR" "open-a" "(PR #7)"
+printf "%-12s %-30s %s\n" "MERGED" "merged-a" "(PR merged)"
+SH
+
+# ioreg-stub: HIDIdleTime in ns from STUB_IDLE seconds (default 7200). A
+# non-numeric STUB_IDLE prints "nan": awk's int(nan/1e9) stays non-digit, whereas
+# a bare word like abc coerces to 0 and would read as "operator present".
+cat > "$STUBBIN/ioreg" <<'SH'
+#!/bin/sh
+case "${STUB_IDLE:-7200}" in
+    *[!0-9]*) echo "\"HIDIdleTime\" = nan" ;;
+    *)        echo "\"HIDIdleTime\" = $(( ${STUB_IDLE:-7200} * 1000000000 ))" ;;
+esac
+SH
+
+# gh stub (survival case).
+cat > "$STUBBIN/gh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = pr ] || exit 1
+sub="${2:-}"
+case "$sub" in
+    view)
+        br="${3:-}"; field="${5:-}"
+        case "$field" in
+            state)
+                case "$br" in
+                    wt-merged) echo MERGED ;;
+                    wt-open)   echo OPEN ;;
+                    *)         exit 1 ;;
+                esac ;;
+            number)
+                case "$br" in
+                    wt-merged|wt-open) echo 7 ;;
+                    *)                 exit 1 ;;
+                esac ;;
+            *) exit 1 ;;
+        esac ;;
+    list) : ;;
+    *) exit 1 ;;
+esac
+exit 0
+SH
+
+# docker stub: never touches a real daemon; every subcommand is a silent no-op.
+cat > "$STUBBIN/docker" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+
+# launchctl stub (emitter cases): records argv, succeeds.
+cat > "$STUBBIN/launchctl" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$ROOT/launchctl.calls"
+exit 0
+SH
+
+chmod +x "$STUBBIN"/*
+
+# ── Case plumbing ─────────────────────────────────────────────────────────────
+begin_case() {
+    CASE="$1"
+    CD="$ROOT/$1"
+    mkdir -p "$CD"
+    CASE_ERRS=""
+}
+
+note_err() { CASE_ERRS="${CASE_ERRS:+$CASE_ERRS; }$1"; }
+
+finish_case() {
+    if [ -z "$CASE_ERRS" ]; then
+        echo "PASS $CASE"
+        PASSED=$((PASSED + 1))
+    else
+        echo "FAIL $CASE: $CASE_ERRS"
+        FAILED=$((FAILED + 1))
+    fi
+}
+
+# chk <desc> <cmd...> — error unless the command succeeds.
+chk() {
+    local desc="$1"; shift
+    "$@" >/dev/null 2>&1 || note_err "$desc"
+}
+
+# chk_not <desc> <cmd...> — error if the command succeeds.
+chk_not() {
+    local desc="$1"; shift
+    if "$@" >/dev/null 2>&1; then note_err "$desc"; fi
+}
+
+# chk_rc <desc> <expected-rc> — compares against RC from the last run.
+chk_rc() {
+    [ "$RC" = "$2" ] || note_err "$1: rc=$RC, expected $2"
+}
+
+# fresh — wipe this case's state dir (stamp, lock, log).
+fresh() { rm -rf "$CD/state"; }
+
+LOG()   { printf '%s/state/wt-gc.log' "$CD"; }
+final_line() { tail -n 1 "$(LOG)" 2>/dev/null; }
+
+# log_has <ERE> / out_has <ERE> / err_has <ERE> — grep the last run's artifacts.
+log_has() { grep -qE -- "$1" "$(LOG)" 2>/dev/null; }
+err_has() { grep -qE -- "$1" "$CD/err" 2>/dev/null; }
+
+# run_tick [VAR=val ...] -- [tick args...]
+# Runs the tick under `env -i` with the stub seams; overrides apply after the
+# base set. NOSTATE=1 (set as a prefix) omits WT_GC_LOCK_DIR so the default path
+# resolves. Sets RC; stdout -> $CD/out, stderr -> $CD/err. Clears and then
+# archives $CD/argv per run (all argv ever seen accumulate in $ROOT/all-argv).
+run_tick() {
+    local envs=()
+    while [ $# -gt 0 ] && [ "$1" != "--" ]; do envs+=("$1"); shift; done
+    if [ $# -gt 0 ]; then shift; fi
+    local base=(
+        PATH="$STUBBIN:$PATH"
+        HOME="$ROOT/home"
+        STUB_CASE_DIR="$CD"
+        WT_GC_IOREG="$STUBBIN/ioreg"
+        WT_GC_CLEANUP="$STUBBIN/cleanup-stub"
+        WT_GC_WT_STATUS="$STUBBIN/wt-status-stub"
+        WT_GC_REPO_ROOT="$STUB_REPO"
+    )
+    if [ "${NOSTATE:-}" != 1 ]; then base+=(WT_GC_LOCK_DIR="$CD/state"); fi
+    rm -f "$CD/argv" "$CD/cwd"
+    RC=0
+    env -i "${base[@]}" ${envs[@]+"${envs[@]}"} "$TICK" "$@" >"$CD/out" 2>"$CD/err" || RC=$?
+    if [ -f "$CD/argv" ]; then cat "$CD/argv" >> "$ROOT/all-argv"; fi
+}
+
+argv_exists() { [ -f "$CD/argv" ]; }
+
+# ── Throwaway git repo for the survival case ──────────────────────────────────
+# new_env <dir> — builds <dir>/{origin.git,main}; main carries a stub
+# bin/wt-remove (the real one tears down Docker stacks; this one only removes
+# the git worktree). Echoes nothing; sets ENV_MAIN.
+ENV_MAIN=""
+new_env() {
+    local envdir="$1"
+    git init -q --bare "$envdir/origin.git" >/dev/null 2>&1
+    git clone -q "$envdir/origin.git" "$envdir/main" >/dev/null 2>&1
+    git -C "$envdir/main" config user.email t@example.com
+    git -C "$envdir/main" config user.name tester
+    git -C "$envdir/main" config commit.gpgsign false
+    printf 'init\n' > "$envdir/main/README.md"
+    mkdir -p "$envdir/main/bin"
+    cat > "$envdir/main/bin/wt-remove" <<'SH'
+#!/usr/bin/env bash
+# Harness stub of bin/wt-remove: remove the git worktree only (no Docker).
+# argv: --force --volumes <name>
+root="$(cd "$(dirname "$0")/.." && pwd)"
+exec git -C "$root" worktree remove --force "$(dirname "$root")/IBL5-worktrees/$3"
+SH
+    chmod +x "$envdir/main/bin/wt-remove"
+    git -C "$envdir/main" add README.md bin/wt-remove
+    git -C "$envdir/main" commit -qm init
+    git -C "$envdir/main" branch -q -M master
+    git -C "$envdir/main" push -q -u origin master >/dev/null 2>&1
+    ENV_MAIN="$envdir/main"
+}
+
+# pushed_branch <main> <branch> — branch off master with one pushed commit.
+pushed_branch() {
+    local main="$1" br="$2"
+    git -C "$main" checkout -q -b "$br" master
+    printf 'x\n' > "$main/$br.txt"
+    git -C "$main" add "$br.txt"
+    git -C "$main" commit -qm "feat-$br"
+    git -C "$main" push -q -u origin "$br" >/dev/null 2>&1
+    git -C "$main" checkout -q master
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G1 — rejected flags
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G1-rejected-flags
+for bad in --bogus --dry-run=1 extra; do
+    fresh
+    run_tick -- "$bad"
+    chk_rc "'$bad'" 1
+    err_has 'Unknown option' || note_err "'$bad': no 'Unknown option' on stderr"
+    argv_exists && note_err "'$bad': cleanup stub ran"
+done
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G2 — kill switch
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G2-kill-switch
+fresh
+run_tick WT_GC_ENABLED=0 -- --force
+chk_rc "ENABLED=0" 0
+log_has 'disabled' || note_err "ENABLED=0: no 'disabled' in log"
+argv_exists && note_err "ENABLED=0: cleanup stub ran"
+fresh
+run_tick WT_GC_ENABLED= -- --force
+chk_rc "ENABLED empty" 0
+argv_exists || note_err "ENABLED empty: sweep not reached"
+grep -qx -- '--all' "$CD/argv" 2>/dev/null || note_err "ENABLED empty: argv lacks --all"
+fresh
+run_tick -- --force
+chk_rc "ENABLED unset" 0
+argv_exists || note_err "ENABLED unset: sweep not reached"
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G3 — idle gate fails closed
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G3-idle-fail-closed
+fresh
+run_tick WT_GC_IOREG="$ROOT/missing" --
+chk_rc "missing reader" 0
+log_has 'fail-closed' || note_err "missing reader: no 'fail-closed'"
+argv_exists && note_err "missing reader: swept"
+fresh
+run_tick STUB_IDLE=abc --
+chk_rc "non-numeric idle" 0
+log_has 'fail-closed' || note_err "non-numeric idle: no 'fail-closed'"
+argv_exists && note_err "non-numeric idle: swept"
+fresh
+run_tick STUB_IDLE=60 --
+chk_rc "idle 60" 0
+log_has 'operator present' || note_err "idle 60: no 'operator present'"
+argv_exists && note_err "idle 60: swept"
+fresh
+run_tick WT_GC_IDLE_SECS=abc --
+chk_rc "bad IDLE_SECS" 0
+log_has 'invalid WT_GC_IDLE_SECS' || note_err "bad IDLE_SECS: no 'invalid WT_GC_IDLE_SECS'"
+argv_exists && note_err "bad IDLE_SECS: swept"
+fresh
+run_tick WT_GC_IOREG= WT_GC_IDLE_SECS=999999999 --
+chk_rc "empty IOREG seam" 0
+argv_exists && note_err "empty IOREG seam: swept"
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G4 — idle gate passes; --force bypasses it
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G4-idle-pass-and-force
+fresh
+run_tick STUB_IDLE=7200 --
+chk_rc "idle 7200" 0
+argv_exists || note_err "idle 7200: sweep not reached"
+fresh
+run_tick WT_GC_IDLE_SECS= --
+chk_rc "empty IDLE_SECS" 0
+argv_exists || note_err "empty IDLE_SECS: default 1800 did not reach sweep"
+fresh
+run_tick WT_GC_IOREG="$ROOT/missing" -- --force
+chk_rc "force, missing reader" 0
+argv_exists || note_err "force, missing reader: sweep not reached"
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G5 — single-flight lock
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G5-lock
+fresh
+mkdir -p "$CD/state"
+sleep 30 &
+SLEEPER_PID=$!
+printf '%s\n' "$SLEEPER_PID" > "$CD/state/wt-gc.lock"
+run_tick -- --force
+chk_rc "live lock" 0
+log_has 'still running' || note_err "live lock: no 'still running'"
+argv_exists && note_err "live lock: swept"
+kill "$SLEEPER_PID" 2>/dev/null
+wait "$SLEEPER_PID" 2>/dev/null
+SLEEPER_PID=""
+fresh
+mkdir -p "$CD/state"
+dead=99999
+while kill -0 "$dead" 2>/dev/null; do dead=$((dead + 1)); done
+printf '%s\n' "$dead" > "$CD/state/wt-gc.lock"
+run_tick -- --force
+chk_rc "stale lock" 0
+log_has 'stale lock' || note_err "stale lock: no 'stale lock'"
+argv_exists || note_err "stale lock: did not sweep"
+[ -e "$CD/state/wt-gc.lock" ] && note_err "stale lock: lock file left behind"
+fresh
+run_tick -- --force
+[ -e "$CD/state/wt-gc.lock" ] && note_err "plain run: lock file left behind"
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G6 — minimum-interval stamp
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G6-min-interval
+now="$(date +%s)"
+fresh
+mkdir -p "$CD/state"
+printf '%s\n' "$now" > "$CD/state/last-sweep"
+run_tick --
+chk_rc "fresh stamp" 0
+log_has 'last sweep' || note_err "fresh stamp: no 'last sweep'"
+argv_exists && note_err "fresh stamp: swept"
+fresh
+mkdir -p "$CD/state"
+printf '%s\n' "$((now - 30000))" > "$CD/state/last-sweep"
+run_tick --
+chk_rc "old stamp" 0
+argv_exists || note_err "old stamp: did not sweep"
+new_stamp="$(cat "$CD/state/last-sweep" 2>/dev/null)"
+case "$new_stamp" in
+    ''|*[!0-9]*) note_err "old stamp: stamp not rewritten ('$new_stamp')" ;;
+    *) [ "$new_stamp" -ge "$now" ] || note_err "old stamp: stamp not rewritten ($new_stamp < $now)" ;;
+esac
+fresh
+run_tick -- --dry-run
+chk_rc "dry-run" 0
+argv_exists || note_err "dry-run: sweep not reached"
+[ -e "$CD/state/last-sweep" ] && note_err "dry-run: wrote the stamp"
+fresh
+mkdir -p "$CD/state"
+printf '%s\n' "$now" > "$CD/state/last-sweep"
+run_tick WT_GC_MIN_INTERVAL_SECS= --
+chk_rc "empty MIN_INTERVAL" 0
+log_has '< 21600s' || note_err "empty MIN_INTERVAL: default 21600 not applied"
+argv_exists && note_err "empty MIN_INTERVAL: swept"
+fresh
+run_tick WT_GC_MIN_INTERVAL_SECS=x --
+chk_rc "bad MIN_INTERVAL" 0
+log_has 'invalid' || note_err "bad MIN_INTERVAL: no 'invalid'"
+argv_exists && note_err "bad MIN_INTERVAL: swept"
+fresh
+mkdir -p "$CD/state"
+printf 'garbage\n' > "$CD/state/last-sweep"
+run_tick --
+chk_rc "garbage stamp" 0
+argv_exists || note_err "garbage stamp: did not sweep"
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G7 — cleanup argv is a literal (final verdict printed at the end, once every
+# case's argv has been archived to $ROOT/all-argv)
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G7-cleanup-argv
+fresh
+run_tick -- --force
+chk_rc "real run" 0
+printf -- '--all\n' > "$CD/expect"
+cmp -s "$CD/expect" "$CD/argv" || note_err "real run argv is not exactly '--all'"
+fresh
+run_tick -- --force --dry-run
+chk_rc "dry run" 0
+printf -- '--all\n--dry-run\n' > "$CD/expect"
+cmp -s "$CD/expect" "$CD/argv" || note_err "dry-run argv is not exactly '--all' then '--dry-run'"
+G7_ERRS="$CASE_ERRS"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G8 — summary parsing and failure propagation
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G8-summary-and-failure
+fresh
+run_tick STUB_CLEANED=2 STUB_SKIPPED=5 -- --force
+chk_rc "summary ok" 0
+final_line | grep -qE 'cleaned=2 skipped=5 .*rc=0' || note_err "summary ok: final line lacks 'cleaned=2 skipped=5 ... rc=0' (got: $(final_line))"
+[ -f "$CD/state/last-sweep" ] || note_err "summary ok: stamp not written"
+fresh
+run_tick STUB_NO_SUMMARY=1 -- --force
+chk_rc "no summary" 1
+log_has 'summary=missing' || note_err "no summary: no 'summary=missing'"
+log_has 'cleaned=\?' || note_err "no summary: no 'cleaned=?'"
+[ -e "$CD/state/last-sweep" ] && note_err "no summary: wrote the stamp"
+fresh
+run_tick STUB_RC=4 -- --force
+chk_rc "cleanup rc 4" 1
+log_has 'rc=4' || note_err "cleanup rc 4: no 'rc=4'"
+[ -e "$CD/state/last-sweep" ] && note_err "cleanup rc 4: wrote the stamp"
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G9 — surface counts from wt-status
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G9-surface-counts
+fresh
+run_tick -- --force
+chk_rc "surface" 0
+final_line | grep -qE 'stalled=2 unpushed=1 empty=3 open_pr=1 merged=1' || note_err "final line lacks the counts (got: $(final_line))"
+[ "$(grep -c 'SURFACE STALLED' "$(LOG)" 2>/dev/null)" = 2 ] || note_err "expected two 'SURFACE STALLED' lines"
+[ "$(grep -c 'SURFACE UNPUSHED' "$(LOG)" 2>/dev/null)" = 1 ] || note_err "expected one 'SURFACE UNPUSHED' line"
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G10 — survivors: real cleanup + real wt-status through the tick
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G10-survivors
+new_env "$CD"
+G10_MAIN="$ENV_MAIN"
+G10_STATE="$CD/state"
+WTP="$(worktrees_parent_dir "$G10_MAIN")"
+mkdir -p "$WTP"
+
+# wt-merged: commit merged into master and pushed (gh says MERGED).
+git -C "$G10_MAIN" checkout -q -b wt-merged master
+printf 'x\n' > "$G10_MAIN/wt-merged.txt"
+git -C "$G10_MAIN" add wt-merged.txt
+git -C "$G10_MAIN" commit -qm "feat-wt-merged"
+git -C "$G10_MAIN" push -q -u origin wt-merged >/dev/null 2>&1
+git -C "$G10_MAIN" checkout -q master
+git -C "$G10_MAIN" merge -q --ff-only wt-merged
+git -C "$G10_MAIN" push -q origin master >/dev/null 2>&1
+git -C "$G10_MAIN" worktree add -q "$WTP/wt-merged" wt-merged >/dev/null 2>&1
+
+# wt-open: pushed commit, gh OPEN.
+pushed_branch "$G10_MAIN" wt-open
+git -C "$G10_MAIN" worktree add -q "$WTP/wt-open" wt-open >/dev/null 2>&1
+
+# wt-unpushed: local commit, no PR.
+git -C "$G10_MAIN" worktree add -q -b wt-unpushed "$WTP/wt-unpushed" master >/dev/null 2>&1
+printf 'work\n' > "$WTP/wt-unpushed/work.txt"
+git -C "$WTP/wt-unpushed" add work.txt
+git -C "$WTP/wt-unpushed" commit -qm "local work"
+UNPUSHED_TIP="$(git -C "$G10_MAIN" rev-parse wt-unpushed)"
+
+# wt-stalled: no commit, untracked file.
+git -C "$G10_MAIN" worktree add -q -b wt-stalled "$WTP/wt-stalled" master >/dev/null 2>&1
+printf 'draft\n' > "$WTP/wt-stalled/draft.md"
+
+# wt-empty: no commit, clean.
+git -C "$G10_MAIN" worktree add -q -b wt-empty "$WTP/wt-empty" master >/dev/null 2>&1
+
+run_tick WT_GC_CLEANUP= WT_GC_WT_STATUS= WT_GC_REPO_ROOT="$G10_MAIN" -- --force
+chk_rc "survivors run" 0
+[ -d "$WTP/wt-merged" ] && note_err "wt-merged dir still exists"
+for n in wt-open wt-unpushed wt-stalled wt-empty; do
+    [ -d "$WTP/$n" ] || note_err "$n dir was deleted"
+    git -C "$G10_MAIN" rev-parse --verify -q "refs/heads/$n" >/dev/null || note_err "$n branch was deleted"
+done
+[ -f "$WTP/wt-stalled/draft.md" ] || note_err "untracked file in wt-stalled was lost"
+[ "$(git -C "$G10_MAIN" rev-parse wt-unpushed 2>/dev/null)" = "$UNPUSHED_TIP" ] || note_err "wt-unpushed commit changed"
+[ -f "$WTP/wt-unpushed/work.txt" ] || note_err "wt-unpushed work file lost"
+final_line | grep -qE 'cleaned=1( |$)' || note_err "final line lacks 'cleaned=1' (got: $(final_line))"
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G11 — every write lands outside the repo, at the documented default paths
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G11-writes-outside-repo
+[ -z "$(git -C "$G10_MAIN" status --porcelain 2>/dev/null)" ] || note_err "main clone is dirty after the tick"
+[ -f "$G10_STATE/wt-gc.log" ] || note_err "wt-gc.log missing under WT_GC_LOCK_DIR"
+[ -f "$G10_STATE/last-sweep" ] || note_err "last-sweep missing under WT_GC_LOCK_DIR"
+case "$G10_STATE" in "$G10_MAIN"/*) note_err "state dir is inside the clone" ;; esac
+
+DEFAULT_LOG="$ROOT/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc/wt-gc.log"
+rm -rf "$ROOT/home/.claude"
+NOSTATE=1 run_tick -- --dry-run --force
+chk_rc "default path" 0
+[ -f "$DEFAULT_LOG" ] || note_err "default-path run did not write $DEFAULT_LOG"
+rm -rf "$ROOT/home/.claude"
+NOSTATE=1 run_tick WT_GC_LOG= WT_GC_LOCK_DIR= -- --dry-run --force
+chk_rc "empty LOG and LOCK_DIR" 0
+[ -f "$DEFAULT_LOG" ] || note_err "empty LOG/LOCK_DIR did not write the default path"
+
+fresh
+run_tick WT_GC_REPO_ROOT= -- --dry-run --force
+chk_rc "derived repo root" 0
+expected_root="$(git -C "$(dirname "$TICK")/.." worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+recorded_cwd="$(cat "$CD/cwd" 2>/dev/null)"
+if [ -z "$expected_root" ] || [ "$recorded_cwd" != "$expected_root" ]; then
+    note_err "derived cwd '$recorded_cwd' != first worktree '$expected_root'"
+fi
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G12 — empty environment (env -i): no unbound variable, still runs
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G12-empty-env
+fresh
+mkdir -p "$CD/state"
+env -i PATH=/usr/bin:/bin STUB_CASE_DIR="$CD" \
+    WT_GC_LOCK_DIR="$CD/state" WT_GC_IOREG="$STUBBIN/ioreg" \
+    WT_GC_CLEANUP="$STUBBIN/cleanup-stub" WT_GC_WT_STATUS="$STUBBIN/wt-status-stub" \
+    WT_GC_REPO_ROOT="$G10_MAIN" \
+    bash -euo pipefail "$TICK" --dry-run --force > "$CD/out" 2>&1
+RC=$?
+chk_rc "env -i dry-run" 0
+grep -q 'unbound variable' "$CD/out" && note_err "env -i dry-run: unbound variable"
+final_line | grep -q 'done dry_run=1' || note_err "env -i dry-run: final log line missing (got: $(final_line))"
+env -i PATH=/usr/bin:/bin bash -euo pipefail "$TICK" --help > "$CD/help.out" 2>&1
+RC=$?
+chk_rc "env -i --help" 0
+grep -q 'unbound variable' "$CD/help.out" && note_err "env -i --help: unbound variable"
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G13 — plist emitter output
+# ══════════════════════════════════════════════════════════════════════════════
+EMIT="$ROOT/emit"
+mkdir -p "$EMIT/bin"
+git init -q "$EMIT" >/dev/null 2>&1
+cp "$CRON_SETUP" "$EMIT/bin/wt-gc-cron-setup"
+chmod +x "$EMIT/bin/wt-gc-cron-setup"
+
+begin_case G13-plist
+LOGDIR="$ROOT/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc"
+PLIST_OUT="$CD/plist.xml"
+RC=0
+env HOME="$ROOT/home" "$EMIT/bin/wt-gc-cron-setup" --print-schedule > "$PLIST_OUT" 2>"$CD/err" || RC=$?
+chk_rc "print-schedule" 0
+for want in '<string>com.ibl5.wt-gc</string>' '<integer>3600</integer>' \
+            "<string>$EMIT/bin/wt-gc-tick</string>" \
+            "<string>$LOGDIR/launchd-stdout.log</string>" \
+            "<string>$LOGDIR/launchd-stderr.log</string>"; do
+    grep -qF -- "$want" "$PLIST_OUT" || note_err "plist lacks $want"
+done
+path_str="$(grep -A1 '<key>PATH</key>' "$PLIST_OUT" | tail -n 1 | sed -e 's/^[[:space:]]*<string>//' -e 's/<\/string>.*$//')"
+for comp in /opt/homebrew/bin /usr/bin /bin /usr/sbin; do
+    case ":$path_str:" in *":$comp:"*) ;; *) note_err "PATH lacks $comp (got: $path_str)" ;; esac
+done
+[ "$(grep -c '\$' "$PLIST_OUT")" = 0 ] || note_err "plist contains a '\$'"
+[ "$(grep -c '<string></string>' "$PLIST_OUT")" = 0 ] || note_err "plist contains an empty <string>"
+if [ "$(uname -s)" = Darwin ] && command -v plutil >/dev/null 2>&1; then
+    plutil -lint - < "$PLIST_OUT" >/dev/null 2>&1 || note_err "plutil -lint rejected the plist"
+else
+    echo "SKIP: plutil (non-Darwin)"
+fi
+[ -e "$ROOT/home/Library" ] && note_err "print-schedule wrote under HOME/Library"
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G14 — emitter rejects bad input; install refuses without the tick
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G14-emitter-rejects
+for a in --bogus --install-hook; do
+    RC=0
+    env HOME="$ROOT/home" PATH="$STUBBIN:$PATH" "$EMIT/bin/wt-gc-cron-setup" "$a" >"$CD/out" 2>"$CD/err" || RC=$?
+    chk_rc "$a" 1
+done
+RC=0
+env HOME="$ROOT/home" PATH="$STUBBIN:$PATH" "$EMIT/bin/wt-gc-cron-setup" >"$CD/out" 2>"$CD/err" || RC=$?
+chk_rc "no argument" 1
+RC=0
+env HOME="$ROOT/home" PATH="$STUBBIN:$PATH" "$EMIT/bin/wt-gc-cron-setup" --install-schedule >"$CD/out" 2>"$CD/err" || RC=$?
+chk_rc "install without tick" 1
+err_has 'Refusing to install' || note_err "install without tick: no 'Refusing to install'"
+[ -e "$ROOT/launchctl.calls" ] && note_err "install without tick: launchctl was called"
+[ -e "$ROOT/home/Library" ] && note_err "install without tick: wrote under HOME/Library"
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G15 — emitter under an empty environment
+# ══════════════════════════════════════════════════════════════════════════════
+begin_case G15-emitter-empty-env
+RC=0
+env -i PATH=/usr/bin:/bin bash -euo pipefail "$EMIT/bin/wt-gc-cron-setup" --print-schedule > "$CD/out" 2>&1 || RC=$?
+chk_rc "env -i print-schedule" 0
+grep -q 'unbound variable' "$CD/out" && note_err "unbound variable"
+grep -qE '<string>/[^<$]+/\.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc/launchd-stdout\.log</string>' "$CD/out" \
+    || note_err "no absolute home-based log path"
+grep -qE ':/[^<$:]+/\.local/bin</string>' "$CD/out" || note_err "PATH lacks an absolute home .local/bin"
+[ "$(grep -c '\$' "$CD/out")" = 0 ] || note_err "output contains a '\$'"
+finish_case
+
+# ══════════════════════════════════════════════════════════════════════════════
+# G7 verdict: no run, in any case, ever passed a destructive flag to cleanup
+# ══════════════════════════════════════════════════════════════════════════════
+CASE=G7-cleanup-argv
+CASE_ERRS="$G7_ERRS"   # exact-argv findings from the G7 section above
+if [ ! -s "$ROOT/all-argv" ]; then note_err "no cleanup argv was ever captured"; fi
+if grep -E -- '--discard-generated|--discard-closed|--drop-merged-stashes' "$ROOT/all-argv" >/dev/null 2>&1; then
+    note_err "a run passed a destructive flag to cleanup"
+fi
+finish_case
+
+echo "$PASSED passed, $FAILED failed"
+[ "$FAILED" -eq 0 ]

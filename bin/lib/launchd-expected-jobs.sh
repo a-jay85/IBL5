@@ -27,6 +27,7 @@ com.ibl5.db-backups-pull standard
 com.ibl5.db-sync-nightly standard
 com.ibl5.docfix-poll standard
 com.ibl5.sim-recap-poll phase-gated
+com.ibl5.wt-gc standard
 com.ibl5.wt-sync standard'
 
 # One-shot runner label prefixes (bin/plan-now, bin/pr-review-now,

@@ -193,7 +193,7 @@ log "Pulling ${SSH_HOST}:backups/db-predeploy/ -> ${LOCAL_DIR}/predeploy/"
 rc=0
 out="$("$RSYNC_BIN" "${RSYNC_FLAGS[@]}" -e "$SSH_CMD" "${SSH_HOST}:backups/db-predeploy/" "${LOCAL_DIR}/predeploy/" 2>&1)" || rc=$?
 if [ "$rc" -ne 0 ]; then
-  if printf '%s' "$out" | grep -qi 'no such file'; then
+  if grep -qi 'no such file' <<< "$out"; then
     log "No remote db-predeploy dir yet; skipping"
   else
     log "FAILED: rsync of backups/db-predeploy exited $rc: $out"

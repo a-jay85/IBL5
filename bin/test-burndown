@@ -638,6 +638,86 @@ C48F_LEDGER="$(grep '^LEDGER:' <<< "$OUT" | tail -1 | sed 's/^LEDGER: //')"
     && ok "C48f: pair partner bare path in ledger" \
     || fail "C48f: pair partner bare path in ledger (got: $OUT)"
 
+# C50: unique-basename matching (backlog#1248).
+# bd_paths_probe_hook <hook> <body> — like bd_paths_probe, but evals <hook>
+# between bd_load_repo_files and bd_paths_for.
+bd_paths_probe_hook() (
+    eval "$(grep -E '^FILE_LINE_RE=' "$SCRIPT")"
+    # shellcheck source=/dev/null
+    . "$(dirname "$SCRIPT")/lib/burndown.sh"
+    BD_TMP="$(mktemp -d)"
+    trap 'rm -rf "$BD_TMP"' EXIT
+    # shellcheck disable=SC2034  # read by bd_load_repo_files
+    BD_GIT=git
+    # shellcheck disable=SC2034
+    BD_REPO_ROOT="$(cd "$(dirname "$SCRIPT")/.." && pwd)"
+    bd_load_repo_files
+    eval "$1"
+    bd_paths_for "$2"
+    # shellcheck disable=SC2154  # _bd_paths is set by bd_paths_for
+    printf '%s' "$_bd_paths"
+)
+TAB="$(printf '\t')"
+NL='
+'
+
+# Positive fixtures, token shapes taken from the open no-ref issues (C50d's class
+# name is from #995's title; its body is empty).
+[ "$(bd_paths_probe "Fix flaky \`PreseasonContinuityPipelineTest.php\` setup.")" \
+    = "ibl5/tests/DatabaseIntegration/UpdateAllTheThings/PreseasonContinuityPipelineTest.php" ] \
+    && ok "C50a: #1047 unique test basename maps" || fail "C50a: #1047 unique test basename maps"
+[ "$(bd_paths_probe "Reword work-triage.md and workflow-continuity.md.")" \
+    = ".claude/rules/work-triage.md${NL}.claude/rules/workflow-continuity.md" ] \
+    && ok "C50b: #1096 unique rule basenames map" || fail "C50b: #1096 unique rule basenames map"
+[ "$(bd_paths_probe "Touches armable.py, conflict.py, gitad.py and runner.py.")" \
+    = "tools/postplan-harness/harness/adapters/gitad.py${NL}tools/postplan-harness/harness/armable.py${NL}tools/postplan-harness/harness/conflict.py${NL}tools/postplan-harness/runner.py" ] \
+    && ok "C50c: #897 four unique .py basenames map" || fail "C50c: #897 four unique .py basenames map"
+[ "$(bd_paths_probe "VotingBallotView::render() drops the label.")" \
+    = "ibl5/classes/Voting/VotingBallotView.php" ] \
+    && ok "C50d: CamelCase class maps to exact .php only" \
+    || fail "C50d: CamelCase class maps to exact .php only"
+
+# Negative fixtures.
+[ -z "$(bd_paths_probe "Edit index.php, README.md and SKILL.md.")" ] \
+    && ok "C50e: duplicated basenames yield no path" || fail "C50e: duplicated basenames yield no path"
+# Fixture guard: only AnnouncementDispatcherInterface.php is tracked, never AnnouncementDispatcher.php.
+C50F_TRACKED="$(git -C "$(dirname "$SCRIPT")/.." ls-files)"
+grep -qxF "ibl5/classes/RecordHolders/Contracts/AnnouncementDispatcherInterface.php" <<< "$C50F_TRACKED" \
+    && ! grep -qE '(^|/)AnnouncementDispatcher\.php$' <<< "$C50F_TRACKED" \
+    && [ -z "$(bd_paths_probe "AnnouncementDispatcher and VotingBallotVie and backlog")" ] \
+    && ok "C50f: Interface-only, prefix and plain-word tokens yield no path" \
+    || fail "C50f: Interface-only, prefix and plain-word tokens yield no path"
+
+# Index is read, never rebuilt, by bd_paths_for.
+[ "$(bd_paths_probe_hook \
+    "printf 'ZzFakeOnly.php\tbin/fake/ZzFakeOnly.php\n' > \"\$BD_REPO_BASENAMES\"" \
+    "ZzFakeOnly")" = "bin/fake/ZzFakeOnly.php" ] \
+    && ok "C50g: bd_paths_for reads the prebuilt index" \
+    || fail "C50g: bd_paths_for reads the prebuilt index"
+bd_paths_probe_hook 'unset BD_REPO_BASENAMES' "armable.py" >/dev/null 2>&1; RC=$?
+[ "$RC" -eq 3 ] && ok "C50h: bd_paths_for dies 3 without the index" \
+    || fail "C50h: bd_paths_for dies 3 without the index (rc=$RC)"
+
+# awk index filter smoke: unique basename present, duplicated basenames absent.
+C50I_IDX="$(bd_paths_probe_hook 'cat "$BD_REPO_BASENAMES"; exit 0' "")"
+grep -qxF "armable.py${TAB}tools/postplan-harness/harness/armable.py" <<< "$C50I_IDX" \
+    && ! grep -qE "^(index\.php|README\.md|SKILL\.md)${TAB}" <<< "$C50I_IDX" \
+    && ok "C50i: awk index keeps unique, drops duplicated basenames" \
+    || fail "C50i: awk index keeps unique, drops duplicated basenames"
+
+# C50j: a bare basename creates overlap with a full path:line on the same file.
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"tweak armable.py","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"tools/postplan-harness/harness/armable.py:5 fix","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+grep -qE 'SKIP +#101 .*overlap with #100 on tools/postplan-harness/harness/armable.py' <<< "$OUT" \
+    && grep -qE 'PICK +#100' <<< "$OUT" \
+    && ok "C50j: basename overlap reaches the batch" \
+    || fail "C50j: basename overlap reaches the batch (got: $OUT)"
+
 # C48g / C48h: git ls-files failure and empty list die 3
 for kind in lsfail lsempty; do
     cat > "$T/git-$kind" <<STUB

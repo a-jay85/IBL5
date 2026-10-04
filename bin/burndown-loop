@@ -62,6 +62,7 @@ NO_DM=0
 ONCE=0
 BATCHES=0
 ITEMS=0
+BATCH_ITEMS=0
 UNITS=0
 FAILS=0
 LAST_FAIL=""
@@ -275,18 +276,21 @@ bl_run_batch() {
     NEW_LEDGERS=$(comm -13 "$STATE/ledgers.before" "$STATE/ledgers.after")
 }
 
-# bl_count_new: adds the new ledgers' items to ITEMS, bumps BATCHES, sets UNITS from
-# each ledger's top-level units_used.
+# bl_count_new: adds the new ledgers' items to ITEMS, bumps BATCHES, sets BATCH_ITEMS to
+# this batch's item count, sets UNITS from each ledger's top-level units_used.
 # Never call it in $(...): the counters would update a subshell copy.
 bl_count_new() {
-    local n units=0 u f
+    local n units=0 u f c batch_items=0
     BATCHES=$((BATCHES + 1))
     for n in $NEW_LEDGERS; do
         f="$REPORTS/$n"
-        ITEMS=$((ITEMS + $(jq '.items | length' "$f" 2>/dev/null || echo 0)))
+        c=$(jq '.items | length' "$f" 2>/dev/null || echo 0)
+        batch_items=$((batch_items + c))
+        ITEMS=$((ITEMS + c))
         u=$(jq '.units_used // 0' "$f" 2>/dev/null || echo 0)
         units=$((units + u))
     done
+    BATCH_ITEMS=$batch_items
     UNITS=$units
 }
 
@@ -306,7 +310,7 @@ bl_on_launch() {
         ran)
             FAILS=0
             bl_count_new
-            bl_log "batch ran ledgers=$new items=$ITEMS units=$UNITS rc=$BATCH_RC log=$BLOG"
+            bl_log "batch ran ledgers=$new items=$BATCH_ITEMS units=$UNITS rc=$BATCH_RC log=$BLOG"
             ;;
         empty)
             bl_log "supply exhausted (first round LEDGER: none)"

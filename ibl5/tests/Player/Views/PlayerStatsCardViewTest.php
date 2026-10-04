@@ -78,6 +78,24 @@ class PlayerStatsCardViewTest extends TestCase
         $this->assertStringContainsString('class="stats-table sortable sim-stats-table"', $result);
     }
 
+    /** Characterization: stays green across the Phase 2/3 lockstep rename. */
+    public function testStyleTableMapsRealRendererSnapshotsToCardHooks(): void
+    {
+        $snapshotDir = dirname(__DIR__) . '/Stats/Views/__snapshots__/';
+
+        foreach (['PlayerSimStatsView.html', 'PlayerRegularSeasonAveragesView.html'] as $snapshotFile) {
+            $tableHtml = file_get_contents($snapshotDir . $snapshotFile);
+            $this->assertIsString($tableHtml, "Snapshot {$snapshotFile} must be readable");
+
+            $result = PlayerStatsCardView::styleTable($tableHtml);
+
+            $this->assertMatchesRegularExpression('/<table class="[^"]*\bstats-table\b/', $result, $snapshotFile);
+            $this->assertStringContainsString('class="stats-table-header"', $result, $snapshotFile);
+            $this->assertStringNotContainsString('class="player-table-header"', $result, $snapshotFile);
+            $this->assertStringNotContainsString('class="player-view-table__title"', $result, $snapshotFile);
+        }
+    }
+
     public function testRenderCombinesStyleAndWrap(): void
     {
         $tableHtml = '<table class="sortable player-table"><tr><td>Test</td></tr></table>';

@@ -5,6 +5,28 @@
 #        ./bin/e2e-local --grep "trading"
 set -euo pipefail
 
+# --help / -h: print usage and exit BEFORE any external command, the worktree
+# guard, or any DB/config side effect. Builtins only (printf), so it is safe
+# from any cwd, including a worktree.
+case "${1:-}" in
+    -h|--help)
+        printf '%s\n' \
+            "Usage: ibl5/bin/e2e-local [playwright-args...]" \
+            "" \
+            "MAIN-checkout E2E runner. Seeds ibl5_e2e_test, guards the main config.php," \
+            "and runs Playwright against http://main.localhost/ibl5/." \
+            "" \
+            "Front door: bin/test e2e picks the right runner for where you are." \
+            "  main checkout -> ibl5/bin/e2e-local" \
+            "  worktree      -> bin/e2e-wt <slug> (needs bin/wt-up <slug> --seed first)" \
+            "" \
+            "Examples:" \
+            "  ibl5/bin/e2e-local --headed" \
+            "  ibl5/bin/e2e-local --grep \"trading\""
+        exit 0
+        ;;
+esac
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 IBL5_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 

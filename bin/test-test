@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/test-test — regression tests for bin/test dispatcher.
+# bin/test-test — regression tests for bin/test dispatcher, plus the
+# side-effect-free --help contract of ibl5/bin/e2e-local (its e2e main route).
 #
 # Exercises routing via --dry-run so no docker/host infrastructure is needed.
 # Mirrors the structure of bin/test-check-phpunit-hygiene.
@@ -74,8 +75,65 @@ run_case "db-worktree-derives-name" "$WT_DB"  0 'db-test-up[[:space:]]+db-slug([
 run_case "db-main-no-arg"        "$MAIN"   0 'db-test-up[[:space:]]*$'              -- --dry-run db
 run_case "e2e-worktree"          "$WT_E2E" 0 'e2e-wt[[:space:]]+e2e-slug'          -- --dry-run e2e
 run_case "e2e-main"              "$MAIN"   0 'e2e-local([[:space:]]|$)'              -- --dry-run e2e
+run_case "e2e-main-forwards-help" "$MAIN"  0 'e2e-local[[:space:]]+--help'          -- --dry-run e2e --help
 run_case "unknown-subcommand"    "$MAIN"   2 'Usage|Unknown subcommand'              -- --dry-run bogus
 run_case "unknown-option"        "$MAIN"   2 'Unknown option|Usage'                  -- --bogus
+
+# --- ibl5/bin/e2e-local --help: zero side effects --------------------------------
+# Stubs for every external command e2e-local reaches before Playwright. Each stub
+# logs its name + args to STUB_LOG and exits 1, so a missing or misplaced handler
+# shows up as a non-empty log and a non-zero exit, and never touches a real DB.
+E2E_LOCAL="$SCRIPT_DIR/../ibl5/bin/e2e-local"
+STUB_LOG="$TMP/e2e-local-stub.log"; export STUB_LOG
+mk_stubs() {   # mk_stubs <dir> <cmd...>
+    local dir="$1" c; shift; mkdir -p "$dir"
+    for c in "$@"; do
+        printf '%s\n' '#!/bin/sh' \
+            'printf "%s %s\n" "${0##*/}" "$*" >> "$STUB_LOG"' 'exit 1' > "$dir/$c"
+        chmod +x "$dir/$c"
+    done
+}
+STUBS="$TMP/stubs";         mk_stubs "$STUBS"       git curl mariadb docker composer sed bunx
+STUBS_NOGIT="$TMP/stubs-ng"; mk_stubs "$STUBS_NOGIT" curl mariadb docker composer sed bunx
+
+# e2e_local_case <name> <script> <stubdir> <want-exit|nonzero> <want-regex|-> <want-log: empty|nonempty> -- <args...>
+e2e_local_case() {
+    local name="$1" script="$2" stubs="$3" want="$4" want_re="$5" want_log="$6"; shift 6
+    [ "${1:-}" = "--" ] && shift
+    local out rc
+    : > "$STUB_LOG"
+    out="$( ( cd "$TMP" && PATH="$stubs:$PATH" "$script" "$@" ) 2>&1 )"; rc=$?
+    if [ "$want" = "nonzero" ]; then
+        [ "$rc" -ne 0 ] || { failcase "$name — expected non-zero exit, got 0"; return; }
+    elif [ "$rc" -ne "$want" ]; then
+        failcase "$name — expected exit $want, got $rc"
+        printf '%s\n' "$out" | sed 's/^/    /'; return
+    fi
+    if [ "$want_re" != "-" ] && ! printf '%s' "$out" | grep -qE "$want_re"; then
+        failcase "$name — output did not match: $want_re"
+        printf '%s\n' "$out" | sed 's/^/    /'; return
+    fi
+    if [ "$want_log" = "empty" ] && [ -s "$STUB_LOG" ]; then
+        failcase "$name — side effect: stub log not empty"
+        sed 's/^/    /' "$STUB_LOG"; return
+    fi
+    if [ "$want_log" = "nonempty" ] && [ ! -s "$STUB_LOG" ]; then
+        failcase "$name — expected a stubbed command to run, stub log empty"; return
+    fi
+    pass "$name (exit $rc)"
+}
+
+# Copy of e2e-local inside a real linked worktree, so its worktree guard WOULD fire
+# (real git, git-dir != git-common-dir) if the handler sat below it.
+WT_LOCAL="$(mk_worktree e2e-local-slug)"
+mkdir -p "$WT_LOCAL/ibl5/bin"
+cp "$E2E_LOCAL" "$WT_LOCAL/ibl5/bin/e2e-local"
+
+e2e_local_case "e2e-local-help-no-side-effects"  "$E2E_LOCAL" "$STUBS" 0 '^Usage: ibl5/bin/e2e-local' empty -- --help
+e2e_local_case "e2e-local-h-short-flag"          "$E2E_LOCAL" "$STUBS" 0 '^Usage: ibl5/bin/e2e-local' empty -- -h
+e2e_local_case "e2e-local-help-names-front-door" "$E2E_LOCAL" "$STUBS" 0 'bin/test e2e'               empty -- --help
+e2e_local_case "e2e-local-help-before-wt-guard"  "$WT_LOCAL/ibl5/bin/e2e-local" "$STUBS_NOGIT" 0 '^Usage: ibl5/bin/e2e-local' empty -- --help
+e2e_local_case "e2e-local-non-help-falls-through" "$E2E_LOCAL" "$STUBS" nonzero - nonempty -- --headed
 
 # --- Result -------------------------------------------------------------------
 

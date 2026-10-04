@@ -122,12 +122,12 @@ test.describe('Forged CSRF token is rejected', () => {
     expect(html).toContain('Invalid or expired form submission');
   });
 
-  // ── leagueControlPanel.php (lcp_update_all token gate) ──────────────────
+  // ── modules.php?name=LeagueControlPanel (lcp_update_all token gate) ──────────────────
 
-  test('leagueControlPanel.php with forged token → ?error= CSRF redirect, no dispatch', async ({
+  test('modules.php?name=LeagueControlPanel with forged token → ?error= CSRF redirect, no dispatch', async ({
     request,
   }) => {
-    const response = await request.post('leagueControlPanel.php', {
+    const response = await request.post('modules.php?name=LeagueControlPanel', {
       form: {
         _csrf_token: forgedToken(),
         action: 'set_season_phase',
@@ -153,11 +153,11 @@ test.describe('Forged CSRF token is rejected', () => {
   // to contain (this spec's header commits to no global mutation). A valid token
   // that reaches dispatch yields the dispatch 'Unknown action' message, NOT the
   // CSRF message — positive proof the gate accepted the token and dispatch ran.
-  test('leagueControlPanel.php with valid token → passes gate, reaches dispatch', async ({
+  test('modules.php?name=LeagueControlPanel with valid token → passes gate, reaches dispatch', async ({
     request,
   }) => {
-    const token = await fetchToken(request, 'leagueControlPanel.php');
-    const response = await request.post('leagueControlPanel.php', {
+    const token = await fetchToken(request, 'modules.php?name=LeagueControlPanel');
+    const response = await request.post('modules.php?name=LeagueControlPanel', {
       form: { _csrf_token: token, action: '__csrf_probe__' },
       maxRedirects: 0,
     });

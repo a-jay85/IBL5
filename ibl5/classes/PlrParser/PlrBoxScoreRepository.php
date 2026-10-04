@@ -13,7 +13,7 @@ use PlrParser\Contracts\PlrBoxScoreRepositoryInterface;
  *
  * @see PlrBoxScoreRepositoryInterface
  */
-class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScoreRepositoryInterface
+class PlrBoxScoreRepository extends \Database\BaseMysqliRepository implements PlrBoxScoreRepositoryInterface
 {
     /**
      * Excludes the Rookies/Sophomores and All-Star exhibition rows.

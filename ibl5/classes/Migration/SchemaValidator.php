@@ -11,7 +11,7 @@ namespace Migration;
  * Designed to run after migrations to catch silent no-ops (e.g., IF EXISTS guards
  * that swallowed a failed column rename).
  */
-class SchemaValidator extends \BaseMysqliRepository
+class SchemaValidator extends \Database\BaseMysqliRepository
 {
     /**
      * Validate that all asserted columns exist in the database.

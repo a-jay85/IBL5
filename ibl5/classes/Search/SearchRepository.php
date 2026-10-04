@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Search;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use Search\Contracts\SearchRepositoryInterface;
 
 /**

@@ -229,7 +229,7 @@ const authPages: Array<{
   { name: 'training camp ratings diff', url: 'modules.php?name=TrainingCampRatingsDiff' },
   {
     name: 'league control panel',
-    url: 'leagueControlPanel.php',
+    url: 'modules.php?name=LeagueControlPanel',
     state: { 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' },
   },
 ];

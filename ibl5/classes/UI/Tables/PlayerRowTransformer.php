@@ -25,7 +25,7 @@ class PlayerRowTransformer implements PlayerRowTransformerInterface
      * Filters out '|'-prefixed placeholder names.
      *
      * @param \mysqli $db Database connection
-     * @param iterable<int, Player|array<string, mixed>> $result Player result set
+     * @param iterable<int, Player|array<string, mixed>|object> $result Player rows; any other object is skipped
      * @param string $yr Year filter (empty for current season)
      * @return list<array{player: Player, playerStats: PlayerStats}>
      */
@@ -72,7 +72,7 @@ class PlayerRowTransformer implements PlayerRowTransformerInterface
      * Used by Ratings table which doesn't need PlayerStats.
      *
      * @param \mysqli $db Database connection
-     * @param iterable<int, Player|array<string, mixed>> $result Player result set
+     * @param iterable<int, Player|array<string, mixed>|object> $result Player rows; any other object is skipped
      * @param string $yr Year filter (empty for current season)
      * @return list<Player>
      */

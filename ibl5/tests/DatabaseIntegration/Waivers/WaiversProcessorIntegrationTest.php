@@ -98,7 +98,7 @@ class WaiversProcessorIntegrationTest extends DatabaseTestCase
         $this->assertSame(0, $player['bird']);
         $this->assertSame(0, $player['cy']);
         $this->assertSame(1, $player['cyt']);
-        $vetMin = \ContractRules::getVeteranMinimumSalary(5);
+        $vetMin = \League\ContractRules::getVeteranMinimumSalary(5);
         $this->assertSame($vetMin, $player['salary_yr1']);
         $this->assertSame(0, $player['salary_yr2']);
     }

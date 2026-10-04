@@ -12,7 +12,7 @@ namespace EventLog;
  * caller to the column widths in migration 154 so an over-length client header
  * cannot error the prepared statement.
  */
-class EventLogRepository extends \BaseMysqliRepository
+class EventLogRepository extends \Database\BaseMysqliRepository
 {
     /**
      * Insert one request event. Nullable identity/header fields accept null,

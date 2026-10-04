@@ -7,7 +7,7 @@ namespace Repositories;
 use League\League;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
 
-class SalaryCapRepository extends \BaseMysqliRepository implements SalaryCapRepositoryInterface
+class SalaryCapRepository extends \Database\BaseMysqliRepository implements SalaryCapRepositoryInterface
 {
     public function getTeamTotalSalary(string $teamName): int
     {

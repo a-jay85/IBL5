@@ -134,6 +134,8 @@ e2e_local_case "e2e-local-h-short-flag"          "$E2E_LOCAL" "$STUBS" 0 '^Usage
 e2e_local_case "e2e-local-help-names-front-door" "$E2E_LOCAL" "$STUBS" 0 'bin/test e2e'               empty -- --help
 e2e_local_case "e2e-local-help-before-wt-guard"  "$WT_LOCAL/ibl5/bin/e2e-local" "$STUBS_NOGIT" 0 '^Usage: ibl5/bin/e2e-local' empty -- --help
 e2e_local_case "e2e-local-non-help-falls-through" "$E2E_LOCAL" "$STUBS" nonzero - nonempty -- --headed
+e2e_local_case "e2e-local-wt-guard-names-front-door" "$WT_LOCAL/ibl5/bin/e2e-local" "$STUBS_NOGIT" 1 'bin/wt-up <slug> --seed && bin/test e2e' empty -- --headed
+e2e_local_case "e2e-wt-help-names-front-door"        "$SCRIPT_DIR/e2e-wt"           "$STUBS"       0 'bin/test e2e'                             empty -- --help
 
 # --- Result -------------------------------------------------------------------
 

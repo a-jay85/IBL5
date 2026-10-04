@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\League;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class RootClassNamespaceTest extends TestCase
@@ -36,11 +37,22 @@ final class RootClassNamespaceTest extends TestCase
         self::assertStringEndsWith('/classes/League/ContractRules.php', (string) $ref->getFileName());
     }
 
-    public function testOldGlobalNamesDoNotResolve(): void
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function oldGlobalNameProvider(): array
     {
-        foreach (['BaseMysqliRepository', 'JSB', 'ContractRules'] as $oldName) {
-            self::assertFalse(class_exists($oldName), "global class {$oldName} still resolves");
-        }
+        return [
+            'BaseMysqliRepository' => ['BaseMysqliRepository'],
+            'JSB' => ['JSB'],
+            'ContractRules' => ['ContractRules'],
+        ];
+    }
+
+    #[DataProvider('oldGlobalNameProvider')]
+    public function testOldGlobalNameDoesNotResolve(string $oldName): void
+    {
+        self::assertFalse(class_exists($oldName), "global class {$oldName} still resolves");
     }
 
     public function testNoUnexpectedRootLevelClassFiles(): void

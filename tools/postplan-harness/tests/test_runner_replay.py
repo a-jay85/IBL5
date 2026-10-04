@@ -2198,3 +2198,59 @@ def test_all_degraded_digest_writes_no_body_block(tmp_path, monkeypatch):
     runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
     edits = [a for a in _actions(out) if a["action"] == "pr_edit_body"]
     assert not any("<!-- merge-digest:begin -->" in a["body"] for a in edits)
+
+
+# ---------------------------------------------------------------------------
+# MISSING-METHOD changed-file reader seam
+# ---------------------------------------------------------------------------
+
+_PLAN_REQUIRES_METHOD = (
+    _PLAN_WITH_TEST_FOO
+    + "\n## Required Test Methods\n\n- `test_never_declared_anywhere`\n"
+)
+
+
+def test_runner_conformance_reader_is_worktree_read_at_both_sites(tmp_path, monkeypatch):
+    """Both `conformance.check(` calls get the adapter's bound `read_worktree_file`.
+
+    Mutation caught: dropping `read_file=` at either call site fails the key lookup;
+    a lambda wrapper has no `__self__` and fails the bound-method check.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha="fake-remediation-sha")
+    _patch_two_call_git(
+        monkeypatch,
+        first_files=["runner.py"],
+        second_files=["runner.py", "tools/postplan-harness/tests/test_foo.py"],
+    )
+    calls: list[dict] = []
+    real = runner.conformance.check
+
+    def _spy(*a, **kw):
+        calls.append(kw)
+        return real(*a, **kw)
+
+    monkeypatch.setattr(runner.conformance, "check", _spy)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    runner.run(_fixture(plan_content=_PLAN_WITH_TEST_FOO), out,
+               FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert len(calls) == 2
+    for kw in calls:
+        reader = kw["read_file"]
+        assert isinstance(reader.__self__, runner.ReplayGit)
+        assert reader.__func__ is runner.ReplayGit.read_worktree_file
+    assert calls[0]["read_file"].__self__ is calls[1]["read_file"].__self__
+
+
+def test_replay_runner_missing_method_stays_held(tmp_path):
+    """Replay has no tree, so an undeclared required method stays MISSING-METHOD.
+
+    Mutation caught: a ReplayGit reader that returns a stub declaration.
+    """
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    res = runner.run(_fixture(plan_content=_PLAN_REQUIRES_METHOD), out,
+                     FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert any(i.startswith("MISSING-METHOD: test_never_declared_anywhere")
+               for i in res.unresolved_conformance)

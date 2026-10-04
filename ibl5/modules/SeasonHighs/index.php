@@ -38,7 +38,13 @@ $seasonPhase = isset($_GET['seasonPhase']) && !empty($_GET['seasonPhase'])
 $pagetitle = "- $seasonPhase Stat Leaders";
 
 // Initialize services
-$repository = new SeasonHighsRepository($mysqli_db, $leagueContext);
+$repository = new \SeasonHighs\CachedSeasonHighsRepository(
+    new SeasonHighsRepository($mysqli_db, $leagueContext),
+    new \Cache\DatabaseCache($mysqli_db),
+    $leagueContext instanceof \League\LeagueContext
+        ? $leagueContext->getCurrentLeague()
+        : \League\LeagueContext::LEAGUE_IBL
+);
 $service = new SeasonHighsService($repository, $season);
 $view = new SeasonHighsView();
 

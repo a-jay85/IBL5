@@ -10,8 +10,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 // SECURITY: Redirect logged-out users to login
 if (!function_exists('is_user') || !is_user($user ?? '')) {
-    $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php'
-        . (isset($_GET['league']) && $_GET['league'] === League\LeagueContext::LEAGUE_OLYMPICS ? '?league=olympics' : '');
+    $_SESSION['redirect_after_login'] = 'name=LeagueControlPanel'
+        . (isset($_GET['league']) && $_GET['league'] === League\LeagueContext::LEAGUE_OLYMPICS ? '&league=olympics' : '');
     header('Location: ../modules.php?name=YourAccount');
     exit;
 }
@@ -26,7 +26,7 @@ if (!is_admin()) {
 // GET-based CSRF vector (e.g. <img src=".../updateAllTheThings.php">). A GET
 // from a stale link/bookmark bounces back to the control panel.
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../leagueControlPanel.php');
+    header('Location: ../modules.php?name=LeagueControlPanel');
     exit;
 }
 

@@ -65,7 +65,7 @@ final class GenerateSeasonAwardsStep implements PipelineStepInterface
         <div class="ibl-card__subtitle"><?= $this->eoyVotesCast ?>/<?= $this->totalRealTeams ?> EOY votes submitted</div>
     </div>
     <div class="ibl-card__body">
-        <form method="POST" action="/ibl5/leagueControlPanel.php">
+        <form method="POST" action="/ibl5/modules.php?name=LeagueControlPanel">
             <button type="submit" name="action" value="generate_awards" class="ibl-btn ibl-btn--primary">Generate Season Awards</button>
         </form>
     </div>

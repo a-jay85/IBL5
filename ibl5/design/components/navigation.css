@@ -72,6 +72,17 @@
     display: none;
 }
 
+/* Page-level tab panel (PageTabs): a white card body attached below the
+   tab bar, with bottom corners matching the bar's rounded top. */
+.ibl-tabs + .ibl-tab-panel {
+    background: white;
+    border: 1px solid var(--gray-100);
+    border-top: none;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    padding: var(--space-4);
+}
+
 /* Team banner row: logo centered with action links flanking */
 .team-banner-row {
     display: flex;

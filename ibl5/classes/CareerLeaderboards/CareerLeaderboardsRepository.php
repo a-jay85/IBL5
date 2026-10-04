@@ -36,6 +36,12 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
         'ibl_allstar_career_avgs',
     ];
 
+    // One-game-per-player phases (rookie and sophomore games)
+    private const SINGLE_GAME_TABLES = [
+        'ibl_rookie_career_totals',
+        'ibl_sophomore_career_totals',
+    ];
+
     // Whitelist of valid sort columns
     private const VALID_SORT_COLUMNS = [
         'pts', 'games', 'minutes', 'fgm', 'fga', 'fgpct', 
@@ -103,6 +109,9 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
                 sum(h.tvr) as tvr,
                 sum(h.pf) as pf,
                 sum(h.pts) as pts,
+                sum(h.fgm) / NULLIF(sum(h.fga), 0) as fgpct,
+                sum(h.ftm) / NULLIF(sum(h.fta), 0) as ftpct,
+                sum(h.tgm) / NULLIF(sum(h.tga), 0) as tpct,
                 p.retired
                 FROM `ibl_hist` h
                 LEFT JOIN `ibl_plr` p ON h.pid = p.pid
@@ -111,7 +120,18 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
                 ORDER BY " . $sortColumn . " DESC, pid ASC"
                 . " LIMIT " . ($limit > 0 ? $limit : self::DEFAULT_SAFETY_LIMIT) . ";";
         } else {
-            $query = "SELECT h.*, p.retired
+            // Rookie and sophomore games are one-off events, so every player
+            // played exactly one; report 1 instead of reading the column.
+            $columns = in_array($tableKey, self::SINGLE_GAME_TABLES, true)
+                ? "h.pid, h.name, 1 AS games, h.minutes, h.fgm, h.fga, h.ftm, h.fta, h.tgm, h.tga,"
+                    . " h.orb, h.drb, h.reb, h.ast, h.stl, h.tvr, h.blk, h.pf, h.pts"
+                : "h.*";
+            // Totals tables have no percentage columns; derive them for sorting
+            if ($this->getTableType($tableKey) === 'totals') {
+                $columns .= ", h.fgm / NULLIF(h.fga, 0) AS fgpct, h.ftm / NULLIF(h.fta, 0) AS ftpct,"
+                    . " h.tgm / NULLIF(h.tga, 0) AS tpct";
+            }
+            $query = "SELECT " . $columns . ", p.retired
                 FROM " . $tableKey . " h
                 LEFT JOIN `ibl_plr` p ON h.pid = p.pid
                 WHERE " . $whereClause . "

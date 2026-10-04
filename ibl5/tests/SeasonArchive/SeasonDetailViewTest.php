@@ -52,7 +52,7 @@ class SeasonDetailViewTest extends TestCase
 
         $result = $this->view->renderSeasonDetail($seasonData);
 
-        $this->assertStringContainsString('modules.php?name=SeasonLeaderboards', $result);
+        $this->assertStringContainsString('modules.php?name=Leaderboards&amp;tab=season', $result);
         $this->assertStringContainsString('Season Leaders', $result);
     }
 

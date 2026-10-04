@@ -243,6 +243,16 @@ class LeagueContextTest extends TestCase
     }
 
     /**
+     * Test isModuleEnabled returns false for Leaderboards in Olympics
+     */
+    public function testIsModuleEnabledOlympicsDisablesLeaderboards(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+
+        $this->assertFalse($this->leagueContext->isModuleEnabled('Leaderboards'));
+    }
+
+    /**
      * Test isModuleEnabled returns true for non-restricted modules in Olympics
      */
     public function testIsModuleEnabledOlympicsEnablesOtherModules(): void

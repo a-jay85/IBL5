@@ -27,7 +27,7 @@ final class SeasonLeaderboardsViewTest extends TestCase
         $html = $this->view->renderTableHeader();
 
         // Check for essential column headers (modern <th> tags)
-        $this->assertStringContainsString('>Rank<', $html);
+        $this->assertStringContainsString('>#<', $html);
         $this->assertStringContainsString('>Year<', $html);
         $this->assertStringContainsString('>Name<', $html);
         $this->assertStringContainsString('>Team<', $html);
@@ -89,7 +89,7 @@ final class SeasonLeaderboardsViewTest extends TestCase
         $html = $this->view->renderPlayerRow($stats, 1);
 
         // Check rank (with class attribute)
-        $this->assertStringContainsString('>1.</td>', $html);
+        $this->assertStringContainsString('>1</td>', $html);
 
         // Check player link (& properly encoded as &amp; in HTML)
         $this->assertStringContainsString('modules.php?name=Player&amp;pa=showpage&amp;pid=123', $html);
@@ -120,5 +120,30 @@ final class SeasonLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('</tbody>', $html);
         $this->assertStringContainsString('</table>', $html);
         $this->assertStringContainsString('</div>', $html);
+    }
+
+    public function testFilterFormSubmitsViaGetToLeaderboardsSeasonTab(): void
+    {
+        $html = $this->view->renderFilterForm([], [], ['year' => '', 'team' => 0, 'sortby' => 'PPG', 'limit' => '']);
+
+        $this->assertStringContainsString('method="get" action="modules.php"', $html);
+        $this->assertStringNotContainsString('method="post"', $html);
+        $this->assertStringContainsString('<input type="hidden" name="name" value="Leaderboards">', $html);
+        $this->assertStringContainsString('<input type="hidden" name="tab" value="season">', $html);
+        $this->assertStringContainsString('<input type="hidden" name="submitted" value="1">', $html);
+        // The retired module name would hit the 302 stub and lose the query string.
+        $this->assertStringNotContainsString('name=SeasonLeaderboards"', $html);
+    }
+
+    public function testFilterFormUsesSearchButtonAndResultsLimitLabel(): void
+    {
+        $html = $this->view->renderFilterForm([], [], ['year' => '', 'team' => 0, 'sortby' => 'PPG', 'limit' => '']);
+
+        $this->assertStringContainsString('>Search</button>', $html);
+        $this->assertStringContainsString('>Results Limit:</label>', $html);
+        $this->assertStringNotContainsString('Records', $html);
+        $this->assertStringNotContainsString('Search Season Data', $html);
+        $this->assertStringContainsString('ibl-filter-form--stacked', $html);
+        $this->assertStringContainsString('ibl-filter-form__actions', $html);
     }
 }

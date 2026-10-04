@@ -136,6 +136,62 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         $this->assertGreaterThan(0, count($queries));
     }
 
+    public function testHistQueryDerivesPercentageColumns(): void
+    {
+        $sql = $this->runAndGetSql('ibl_hist', 'fgpct');
+
+        $this->assertStringContainsString('sum(h.fgm) / NULLIF(sum(h.fga), 0) as fgpct', $sql);
+        $this->assertStringContainsString('sum(h.ftm) / NULLIF(sum(h.fta), 0) as ftpct', $sql);
+        $this->assertStringContainsString('sum(h.tgm) / NULLIF(sum(h.tga), 0) as tpct', $sql);
+        $this->assertStringContainsString('ORDER BY fgpct DESC', $sql);
+    }
+
+    public function testTotalsTablesDeriveNullSafePercentageAliases(): void
+    {
+        foreach (['ibl_playoff_career_totals', 'ibl_heat_career_totals', 'ibl_olympics_career_totals', 'ibl_allstar_career_totals'] as $table) {
+            $sql = $this->runAndGetSql($table, 'tpct');
+
+            $this->assertStringContainsString('h.fgm / NULLIF(h.fga, 0) AS fgpct', $sql, $table);
+            $this->assertStringContainsString('h.ftm / NULLIF(h.fta, 0) AS ftpct', $sql, $table);
+            $this->assertStringContainsString('h.tgm / NULLIF(h.tga, 0) AS tpct', $sql, $table);
+            $this->assertStringContainsString('h.*', $sql, $table);
+            $this->assertStringNotContainsString('1 AS games', $sql, $table);
+        }
+    }
+
+    public function testRookieAndSophomoreTablesSelectExplicitColumnsWithOneGame(): void
+    {
+        foreach (['ibl_rookie_career_totals', 'ibl_sophomore_career_totals'] as $table) {
+            $sql = $this->runAndGetSql($table, 'fgpct');
+
+            $this->assertStringContainsString('1 AS games', $sql, $table);
+            $this->assertStringNotContainsString('h.*', $sql, $table);
+            $this->assertStringContainsString('h.fgm / NULLIF(h.fga, 0) AS fgpct', $sql, $table);
+        }
+    }
+
+    public function testAveragesTablesDoNotDerivePercentages(): void
+    {
+        $sql = $this->runAndGetSql('ibl_season_career_avgs', 'fgpct');
+
+        $this->assertStringContainsString('h.*', $sql);
+        $this->assertStringNotContainsString('NULLIF', $sql);
+        $this->assertStringNotContainsString('1 AS games', $sql);
+    }
+
+    private function runAndGetSql(string $table, string $sortColumn): string
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setMockData([['pid' => 1, 'name' => 'Player 1', 'pts' => 100]]);
+        $repository = new CareerLeaderboardsRepository($mockDb);
+        $repository->getLeaderboards($table, $sortColumn, 0, 10);
+
+        $queries = $mockDb->getExecutedQueries();
+        $this->assertNotEmpty($queries);
+
+        return implode("\n", array_map(static fn (mixed $q): string => is_string($q) ? $q : '', $queries));
+    }
+
     public function testGetLeaderboardsBuildsCorrectQueryForAveragesTable(): void
     {
         $mockDb = new MockDatabase();

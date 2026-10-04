@@ -275,7 +275,7 @@ else
 fi
 ```
 
-**(17) Gate backtest hold.** When this PR adds or changes a ship-pipeline gate, the gate is replayed against the last 30 merged PRs and the result sits in the PR body's Gate backtest block. A clean PR is one older than 48 hours that no later `fix` PR repaired. The hold fires when the changed gate flags 2 or more clean PRs, when a `bin/check-*` gate has no replay spec, or when the replay fails or times out. It only adds a hold and never clears another condition. When the body carries no block (the harness did not run), the block runs `bin/gate-backtest` itself, which exits at once for a PR that changes no gate.
+**(17) Gate backtest hold.** When this PR adds or changes a ship-pipeline gate, the gate is replayed against the newest 30 settled merged PRs (older than 48 hours) and the result sits in the PR body's Gate backtest block. A clean PR is one older than 48 hours that no later `fix` PR repaired. The hold fires when the changed gate flags 2 or more clean PRs, when a `bin/check-*` gate has no replay spec, or when the replay fails or times out. It only adds a hold and never clears another condition. When the body carries no block (the harness did not run), the block runs `bin/gate-backtest` itself, which exits at once for a PR that changes no gate.
 
 ```bash
 # condition (17): block if the gate backtest flagged clean PRs or could not run

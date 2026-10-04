@@ -398,7 +398,7 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 *Renamed to PlayerSearch on 2026-10-03 (a-jay85/IBL5-backlog#181). Class names below are as of the original refactor.*
 
-*The sibling module at `ibl5/modules/PlayerMovement` (example) became SeasonRosterChanges in the same change (a-jay85/IBL5-backlog#182). The plural method map ran first, so no `getSeasonRosterChangess` typo exists. The path in the Documentation line moved at REFACTORING_HISTORY.md:443.*
+*The sibling module at `ibl5/modules/PlayerMovement` (example) became SeasonRosterChanges in the same change (a-jay85/IBL5-backlog#182). The plural method map ran first, so no `getSeasonRosterChangess` typo exists. The path in the Documentation line moved at REFACTORING_HISTORY.md:447.*
 
 **Summary:** Refactored PlayerDatabase module to fix **critical SQL injection vulnerability**. Achieved 84% code reduction (462 → 73 lines) while adding comprehensive security and 54 unit tests.
 

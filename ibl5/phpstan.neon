@@ -17,6 +17,7 @@ parameters:
         - bin/check-xml-class-refs
         - bin/migrate
         - bin/migrate-seed
+        - bin/purge-audit-log
         - bin/purge-page-cache
         - bin/rebuild-h2h-records-cache
         - bin/rebuild-record-holders-cache

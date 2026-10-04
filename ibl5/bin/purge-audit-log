@@ -27,6 +27,7 @@ spl_autoload_register(static function (string $class) use ($documentRoot): void 
 });
 
 // Parse before loading config, so a bad flag fails on a machine with no database.
+/** @var list<string> $argv */
 try {
     $opts = \DataRetention\RetentionCliOptionParser::parse(
         array_values(array_slice($argv, 1)),
@@ -46,7 +47,9 @@ if (isset($opts['--help'])) {
     exit(0);
 }
 
-$days = $opts['--days'] ?? \DataRetention\DataRetentionService::AUDIT_LOG_RETENTION_DAYS;
+$days = is_int($opts['--days'] ?? null)
+    ? $opts['--days']
+    : \DataRetention\DataRetentionService::AUDIT_LOG_RETENTION_DAYS;
 $dryRun = isset($opts['--dry-run']);
 
 include $documentRoot . '/ibl5/config.php';

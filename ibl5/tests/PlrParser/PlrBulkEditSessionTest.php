@@ -220,4 +220,11 @@ final class PlrBulkEditSessionTest extends TestCase
             self::assertSame(['IBL5.plr'], $this->plrFiles());
         }
     }
+
+    public function testPhpstanBaselineHasNoEntryForSessionClass(): void
+    {
+        $baseline = file_get_contents(dirname(__DIR__, 2) . '/phpstan-baseline.neon');
+        self::assertIsString($baseline);
+        self::assertStringNotContainsString('PlrBulkEditSession.php', $baseline);
+    }
 }

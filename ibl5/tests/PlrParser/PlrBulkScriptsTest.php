@@ -67,6 +67,9 @@ final class PlrBulkScriptsTest extends TestCase
         self::assertSame(SyntheticPlrCorpus::corpusAfter('waivers'), file_get_contents($this->tmpDir . '/IBL5.plr'));
     }
 
+    /**
+     * Pins the bird field offset: the script's fseek(-321) must land on offset 288 of each line.
+     */
     public function testAdvanceBirdYearsRewritesOnlyBirdFieldOfEligibleRows(): void
     {
         $result = $this->runScript('plrAdvanceBirdYears');

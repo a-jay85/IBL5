@@ -501,6 +501,12 @@ while read -r pr; do
     else
         branch="$(pr_json | jq -r --arg n "$pr" '.[] | select(.number == ($n|tonumber)) | .headRefName')"
     fi
+    # A worktree-fired post-plan-now for this branch holds com.ibl5.postplan-now-<slug>-*.
+    # A rescue fired now would race it on the same worktree, branch and PR. Skip it here,
+    # before a slot, runner and log are spent on a run post-plan-now would refuse (exit 6).
+    if ljob_postplan_now_live "$(ljob_safe_slug "$branch")" "$LAUNCHCTL_LIST" >/dev/null; then
+        SKIP_LINES+=("$pr|$branch|-|post-plan-now in flight; skipped"); continue
+    fi
     # Pre-flight: worktree + plan check.
     # grep -F is required: without it, [$branch] is treated as a character class.
     # The [branch] form (not path) matches git worktree list's "path  sha [branch]" output.

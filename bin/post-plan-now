@@ -181,6 +181,31 @@ postplan_inflight_label() {
   return 0
 }
 
+# Prints com.ibl5.post-plan-fleet-<PR> when a fleet rescue for branch $1's open PR is loaded,
+# else nothing. $2 is the PR number when the caller already knows it (--pr). A fleet rescue
+# runs `post-plan-now --pr N --foreground`, which never creates a postplan-now-* label, so
+# postplan_inflight_label cannot see it. The gh lookup runs only when some fleet label is
+# loaded at all, so the common case costs one launchctl call and no network. A gh failure
+# prints nothing (fail-open), the same posture as the open-PR lookup further down.
+# Exact string compare on the label column: PR 189 never matches a job for PR 1892.
+postplan_fleet_slot_label() {
+  local branch="$1" pr="${2-}" snap _pid _status label
+  snap=$("${LAUNCHCTL_CMD:-launchctl}" list 2>/dev/null || true)
+  case "$snap" in *com.ibl5.post-plan-fleet-[0-9]*) ;; *) return 0 ;; esac
+  if [ -z "$pr" ]; then
+    pr=$("${GH_CMD:-gh}" pr list --head "$branch" --state open \
+         --json number --jq '.[0].number // empty' 2>/dev/null || true)
+  fi
+  case "$pr" in ''|*[!0-9]*) return 0 ;; esac
+  while IFS=$'\t' read -r _pid _status label; do
+    if [ "$label" = "com.ibl5.post-plan-fleet-$pr" ]; then
+      printf '%s\n' "$label"
+      return 0
+    fi
+  done <<< "$snap"
+  return 0
+}
+
 postplan_badge_pr_number() {
     "${GH_CMD:-gh}" pr view --json number --jq .number 2>/dev/null || true
 }
@@ -477,6 +502,17 @@ if [ "${FORCE:-0}" -eq 0 ]; then
     echo "post-plan-now: a post-plan run for '$SLUG' is already in flight ($INFLIGHT_LABEL)."
     echo "post-plan-now: refusing to start a second one. Wait for it, or re-run with --force."
     exit 6
+  fi
+  # A fleet rescue holds com.ibl5.post-plan-fleet-<PR> and runs this script with
+  # --foreground. Only a detaching run checks for one: the fleet's own runner is the
+  # --foreground caller and must not refuse its own slot.
+  if [ "${FOREGROUND:-0}" -eq 0 ]; then
+    FLEET_LABEL=$(postplan_fleet_slot_label "$SLUG" "${PR_NUM:-}")
+    if [ -n "$FLEET_LABEL" ]; then
+      echo "post-plan-now: a fleet rescue for PR #${FLEET_LABEL##*-} is already in flight ($FLEET_LABEL)."
+      echo "post-plan-now: refusing to race it. Wait for it, or re-run with --force."
+      exit 6
+    fi
   fi
 fi
 

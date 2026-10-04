@@ -995,6 +995,7 @@ jobs:
             bin/test-post-plan-now-untracked-only \
             bin/test-review-shared-skip \
             bin/test-pr-cycle \
+            bin/test-pr-cycle-tick \
             bin/test-digest-dm-build \
             bin/test-pr-review-now \
             bin/test-launchd-job \

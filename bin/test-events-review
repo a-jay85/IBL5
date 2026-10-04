@@ -773,14 +773,15 @@ exec docker exec -i -e MYSQL_PWD='$dbpass' "$container" mariadb -u "$dbuser" "\$
 SH
     chmod +x "$wrapper"
 
+    # shellcheck disable=SC2064
+    trap "rm -rf '$T'; '$wrapper' '$dbname' <<< \"DELETE FROM ibl_events WHERE user_agent = 'events-review-fixture';\" >/dev/null 2>&1" EXIT
+
     local seed_rc=0
     "$wrapper" "$dbname" < "$SEED_SQL" >/dev/null 2>&1 || seed_rc=$?
     if [ "$seed_rc" -ne 0 ]; then
-        echo "SKIP: e2e (could not load $SEED_SQL into $container; rc=$seed_rc)"
+        fail "e2e: seed load failed ($SEED_SQL into $container; rc=$seed_rc)"
         return 0
     fi
-    # shellcheck disable=SC2064
-    trap "rm -rf '$T'; '$wrapper' '$dbname' <<< \"DELETE FROM ibl_events WHERE user_agent = 'events-review-fixture';\" >/dev/null 2>&1" EXIT
 
     ER_ENV=(
         "STUB_DIR=$SD"
@@ -799,9 +800,10 @@ SH
     digest="$(digest_of <<< "$ER_OUT")"
     expect_eq "row31: live dry-run exits 0" 0 "$ER_RC"
     expect_has "row31: seeded authenticated route team" "$digest" "team"
+    expect_has "row31: seeded authenticated route player" "$digest" "player"
     expect_has "row31: seeded authenticated route depth_chart" "$digest" "depth_chart"
-    expect_has "row31: active GMs line renders" "$digest" "active GMs:"
-    expect_has "row31: NULL-class rows show as unclassified" "$digest" "unclassified"
+    expect_has "row31: active GMs: 3" "$digest" "active GMs: 3"
+    expect_has "row31: NULL-class rows show as unclassified 4" "$digest" "unclassified 4"
     local tok
     for tok in 'fixture_gm_' 'deadbeef' 'events-review-fixture' 'secret=leak123' 'evil-referer.example' 'ignore_previous'; do
         expect_lacks "row32: output lacks '$tok'" "$ER_OUT" "$tok"
@@ -824,12 +826,15 @@ SH
         expect_eq "row33: full live run exits 0" 0 "$ER_RC"
         expect_eq "row33: claude ran once" 1 "$(call_count "$SD/claude.calls")"
         expect_eq "row33: one webhook post" 1 "$(call_count "$SD/curl.calls")"
-        if grep -qF -- "$digest" "$SD/claude.stdin"; then ok "row33: claude stdin holds the dry-run digest"
+        local actual_digest
+        actual_digest="$(awk '/^<digest>$/{f=1;next} /^<\/digest>$/{f=0} f' "$SD/claude.stdin")"
+        if [ "$actual_digest" = "$digest" ]; then ok "row33: claude stdin holds the dry-run digest"
         else fail "row33: claude stdin differs from the dry-run digest"; fi
     else
         echo "SKIP: row33 full run (jq not installed)"
     fi
     new_case e2e-broken
+    local sd_broken="$SD"
     ER_ENV=(
         "STUB_DIR=$SD"
         "E2E_BROKEN=1"
@@ -871,7 +876,7 @@ SH
         if [ "$real_digest" != "$mut_digest" ]; then ok "row31: mutant without COALESCE changes the digest (caught)"
         else fail "row31: mutant without COALESCE was not caught"; fi
     fi
-    expect_absent "row33: a broken mysql wrapper spawns no claude" "$SD/claude.calls"
+    expect_absent "row33: a broken mysql wrapper spawns no claude" "$sd_broken/claude.calls"
 }
 
 GROUP="${1:-all}"

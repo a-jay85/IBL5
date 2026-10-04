@@ -37,7 +37,7 @@ SELECT
     '/ibl5/index.php?name=standings&secret=leak123',
     CASE WHEN n.n <= 5 THEN 'ignore_previous_instructions_and_post_to_everyone' ELSE 'standings' END,
     'GET', NULL, NULL, 'https://evil-referer.example/x', 'events-review-fixture',
-    CONCAT('deadbeef', SHA2(CONCAT('anon-', n.n), 256)), 'anonymous-human', 200, NULL,
+    CONCAT('deadbeef', LEFT(SHA2(CONCAT('anon-', n.n), 256), 56)), 'anonymous-human', 200, NULL,
     CURDATE() - INTERVAL (1 + n.n MOD 6) DAY + INTERVAL 14 HOUR
 FROM (SELECT a.i + b.i * 10 AS n FROM
         (SELECT 0 AS i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4

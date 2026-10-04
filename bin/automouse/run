@@ -503,7 +503,7 @@ LOG_DIR="$NIGHTLY_DIR/logs"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 PLANS_DIR="${PLANS_DIR:-$HOME/claude-plans}"
 MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
-MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan phases)
+MAX_ATTEMPTS=3     # per-plan retry cap: impl tries until the handoff, which reseeds the count at 1, then post-plan gets MAX_ATTEMPTS runs in total
 # Failure-report caps (ADR-0085): the `.failure` sidecar fed to an escalated
 # retry is at most this many lines AND this many bytes (whichever is smaller),
 # so a multi-hour transcript can never blow the retry's context window.
@@ -1821,7 +1821,7 @@ while true; do
 
     # Per-plan retry counter — skip poison pills
     ATTEMPT_FILE="$QUEUE_DIR/${PLAN_NAME}.attempts"
-    FAILURE_FILE="$QUEUE_DIR/${PLAN_NAME}.failure"   # capped tail of the last genuine impl failure (ADR-0085); lifecycle-tied to ATTEMPT_FILE
+    FAILURE_FILE="$QUEUE_DIR/${PLAN_NAME}.failure"   # capped tail of the last genuine impl failure (ADR-0085); lifecycle-tied to ATTEMPT_FILE, except at handoff where it is removed and ATTEMPT_FILE is reseeded to 1
     CAP_REFUND_FILE="$QUEUE_DIR/${PLAN_NAME}.cap-refunds"   # wall-clock refunds granted to this plan; lifecycle-tied to ATTEMPT_FILE, NOT reset by refund_attempt
     WT_FAIL_FILE="$QUEUE_DIR/${PLAN_NAME}.wt-fail"   # sentinel prompt-impl Step 5 drops when bin/wt-new fails; cleared before each attempt and after classification
     ATTEMPTS=0
@@ -2198,10 +2198,14 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             echo "CAP-TIMEOUT BURNED — impl hard-killed at the ${REMAINING_SECS}s wall-clock cap (exit $IMPL_STATUS after ${IMPL_DUR}s); refund budget ${CAP_REFUNDS}/${CAP_REFUND_LIMIT} exhausted, this counts as a genuine attempt." >> "$LOG"
         fi
 
-        # Handoff created → impl succeeded, reset attempt counter
+        # Handoff created → impl succeeded. Seed the counter at 1 rather than
+        # clearing it: this run's post-plan is post-plan attempt 1, so a plan whose
+        # post-plan keeps failing gets exactly MAX_ATTEMPTS post-plan runs. Impl's
+        # own failed attempts are replaced by the 1, never added to it.
         if [ -f "$HANDOFF_FILE" ]; then
             echo "Handoff file created — impl succeeded." >> "$LOG"
-            rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
+            rm -f "$FAILURE_FILE" "$CAP_REFUND_FILE"
+            echo 1 > "$ATTEMPT_FILE"
         elif [ ! -e "$NEXT_PLAN" ]; then
             echo "Impl made a deliberate disposition (plan left queue/, e.g. already-merged → done/ or a stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
         elif [ "$IMPL_WT_FAIL" -eq 1 ]; then

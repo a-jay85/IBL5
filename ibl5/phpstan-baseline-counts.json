@@ -1,6 +1,6 @@
 {
     "phpstan-baseline.neon": {
-        "argument.type": 335,
+        "argument.type": 336,
         "binaryOp.invalid": 18,
         "booleanAnd.leftNotBoolean": 1,
         "booleanAnd.rightNotBoolean": 1,

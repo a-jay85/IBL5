@@ -80,10 +80,12 @@ require __DIR__ . '/../mainfile.php';
 
 use JsbParser\JsbExportRepository;
 use JsbParser\JsbExportService;
+use PlrParser\PlrExportService;
 use Security\HtmlSanitizer;
 
 $repository = new JsbExportRepository($mysqli_db);
 $service = new JsbExportService($repository);
+$plrExportService = new PlrExportService($repository);
 $season = new \Season\Season($mysqli_db);
 
 $basePath = __DIR__ . '/..';
@@ -108,7 +110,7 @@ echo '<h2>PLR Export</h2>';
 if (!file_exists($plrInput)) {
     echo '<p class="error">ERROR: IBL5.plr not found at ' . HtmlSanitizer::safeHtmlOutput($plrInput) . '</p>';
 } else {
-    $plrResult = $service->exportPlrFile($plrInput, $plrOutput);
+    $plrResult = $plrExportService->exportPlrFile($plrInput, $plrOutput);
 
     foreach ($plrResult->messages as $msg) {
         $class = str_starts_with($msg, 'ERROR') ? 'error' : '';

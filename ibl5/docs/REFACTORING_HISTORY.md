@@ -1,6 +1,6 @@
 ---
 description: Complete timeline of the 31-module interface-driven refactoring.
-last_verified: 2026-08-11
+last_verified: 2026-10-03
 ---
 
 # IBL5 Refactoring History
@@ -396,6 +396,8 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 ### 15. PlayerDatabase Module (November 28, 2025)
 
+*Renamed to PlayerSearch on 2026-10-03 (a-jay85/IBL5-backlog#181). Class names below are as of the original refactor.*
+
 **Summary:** Refactored PlayerDatabase module to fix **critical SQL injection vulnerability**. Achieved 84% code reduction (462 → 73 lines) while adding comprehensive security and 54 unit tests.
 
 **Security Issue Fixed:**
@@ -440,7 +442,7 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 - PlayerDatabaseServiceTest: 7 tests (business logic, data transformation)
 - PlayerDatabaseViewTest: 18 tests (HTML rendering, XSS prevention)
 
-**Documentation:** `ibl5/classes/PlayerDatabase/README.md`
+**Documentation:** `ibl5/classes/PlayerSearch/README.md`
 
 ---
 

@@ -157,8 +157,12 @@
 #                              verbatim) AND every backtick-quoted token in
 #                              that field must appear literally as a substring
 #                              in the packet's **Self-verify:** block. A
-#                              `no-assertions: <reason>` line inside the
-#                              packet clears BOTH sub-checks for that packet
+#                              `no-assertions: <reason>` marker line inside
+#                              the packet clears BOTH sub-checks for that
+#                              packet. The marker must open its line (after
+#                              optional indent, >, a -/* bullet, <!--, or a
+#                              backtick) and carry a non-empty reason; a
+#                              mid-sentence prose mention does not count
 #                              (mirrors no-adr: / context-budget:). Runs for
 #                              ALL plans (not impl_model-gated, unlike gate S).
 #                              Two past PRs were blocked because a delegate
@@ -214,6 +218,11 @@
 #                              after implementation.
 #                              A mention inside a backtick code span, or inside a
 #                              fenced fixture block, is not a marker and is skipped.
+#   ND **No diff:** marker   — a `**No diff:** <reason>` phase marker sits inside a
+#                              `## Phase N:` / `## Step N:` body with a reason of 15+
+#                              characters. The post-plan harness honors it nowhere
+#                              else (planfile.parse_phases), so a short reason or a
+#                              marker outside a phase is a silent no-op.
 #   Z  Leading-star matrix token — a backticked single-word token in a matrix
 #                              "What to verify" cell that starts with '*' (the
 #                              catch-all case arm, a bare extension glob).
@@ -1086,6 +1095,36 @@ if [ "$_y_tagged" -gt 0 ] && [ $((_y_tagged * 3)) -gt "$_y_total" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Gate ND: a `**No diff:** <reason>` phase marker. The post-plan harness reads it only
+# from a `## Phase N:` / `## Step N:` body (planfile.parse_phases) and honors it only
+# with a reason of NO_DIFF_MIN_REASON (15) characters or more; anything else is a silent
+# no-op that holds arming condition (3) after implementation. Reads the fence-stripped
+# $GATEP_BODY, so a fenced example never counts; a code-span mention never starts the
+# line, so it never matches. Case-sensitive, like the harness.
+# ---------------------------------------------------------------------------
+_nd_in_phase=0
+_nd_marker_re='^[[:space:]]*([-*][[:space:]]+)?\*\*No diff:\*\*'
+_nd_h2_re='^##[[:space:]]'
+_nd_phase_re='^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]+'
+while IFS= read -r line; do
+    if [[ "$line" =~ $_nd_h2_re ]]; then
+        if [[ "$line" =~ $_nd_phase_re ]]; then _nd_in_phase=1; else _nd_in_phase=0; fi
+        continue
+    fi
+    [[ "$line" =~ $_nd_marker_re ]] || continue
+    if [ "$_nd_in_phase" -eq 0 ]; then
+        viol "[ND] **No diff:** marker outside a ## Phase N / ## Step N section — the harness reads it only from a phase body; move it into the phase it exempts: ${line}"
+        continue
+    fi
+    _nd_reason=$(sed -E 's/^[[:space:]]*([-*][[:space:]]+)?\*\*No diff:\*\*//' <<< "$line")
+    _nd_reason=$(mtrim "$_nd_reason")
+    # 15 mirrors NO_DIFF_MIN_REASON in tools/postplan-harness/harness/planfile.py
+    if [ "${#_nd_reason}" -lt 15 ]; then
+        viol "[ND] **No diff:** reason is under 15 characters — say what the phase delivers instead of a diff (issue closed, plan queued, post-merge step): ${line}"
+    fi
+done < "$GATEP_BODY"
+
+# ---------------------------------------------------------------------------
 # Gate G: a matrix row naming a bin/test-* / bin/check-* script must name one CI
 # actually runs. Narrow by design — most CLI-executable rows are legitimately
 # one-shots (curl, bin/db-query), and a gate that taxes them gets ignored.
@@ -1333,7 +1372,7 @@ packet_scan() {
                 print "[S] delegation packet " q pname q " lacks a **Self-verify:** line (required for impl_model: sonnet plans)"
             if (!has_no_assertions) {
                 if (!has_assertions)
-                    print "[E] delegation packet " q pname q " lacks an **Assertions:** field (paste the phase" q "s Verification Matrix assertions verbatim, or add a " q "no-assertions: <reason>" q " line)"
+                    print "[E] delegation packet " q pname q " lacks an **Assertions:** field (paste the phase" q "s Verification Matrix assertions verbatim, or add a line that opens with " q "no-assertions: <reason>" q ")"
                 else {
                     s = assert_text
                     while (match(s, /`[^`]+`/)) {
@@ -1360,7 +1399,19 @@ packet_scan() {
                 if (pname == "") pname = "(unnamed)"
             }
             if (in_packet) {
-                if ($0 ~ /no-assertions:/) has_no_assertions=1
+                # Gate E escape. Anchored like the gate T **Tier:** match: the
+                # marker must OPEN its line, after optional indent, an optional
+                # blockquote `>`, an optional `-`/`*` bullet, an optional `<!--`,
+                # and an optional backtick. It must also carry a non-empty reason
+                # once a closing `-->`, backticks, and whitespace are stripped.
+                # An unanchored match let a mid-sentence prose mention clear the
+                # gate (#947).
+                if (match($0, /^[ \t]*>?[ \t]*([-*][ \t]+)?(<!--[ \t]*)?`?no-assertions:/)) {
+                    na_reason = substr($0, RSTART + RLENGTH)
+                    gsub(/-->/, "", na_reason)
+                    gsub(/[` \t]/, "", na_reason)
+                    if (na_reason != "") has_no_assertions=1
+                }
                 if ($0 ~ /\*\*Self-verify:\*\*/) { has_sv=1; in_block="sv" }
                 if ($0 ~ /\*\*Assertions:\*\*/) { has_assertions=1; in_block="assertions" }
                 if ($0 ~ /^[ \t]*[-*][ \t]*\*\*[A-Za-z]/) {
@@ -1423,8 +1474,10 @@ esac
 # ---------------------------------------------------------------------------
 # Every ### Delegate packet must (a) carry an **Assertions:** field and
 # (b) name every backtick-quoted token from that field somewhere in the
-# packet's **Self-verify:** block. A `no-assertions: <reason>` line anywhere
-# inside the packet clears BOTH sub-checks for that packet. Uses the
+# packet's **Self-verify:** block. A `no-assertions: <reason>` marker line
+# inside the packet clears BOTH sub-checks for that packet. The marker must
+# open its line (optional indent, >, -/* bullet, <!--, or backtick) and carry
+# a non-empty reason; a mid-sentence prose mention does not clear it. Uses the
 # _PACKET_SCAN cache populated above.
 while IFS= read -r eviol; do
     [ -n "$eviol" ] && viol "$eviol"

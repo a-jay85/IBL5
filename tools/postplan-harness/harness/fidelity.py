@@ -22,6 +22,11 @@ from . import llm_calls
 # first so "READY WITH NOTES" is never truncated to "READY".
 VERDICT_RE = re.compile(r"^(READY WITH NOTES|NOT READY|READY)[ \t]*$", re.M)
 DIGEST_CUT = "## DIGEST"
+# Output contract item 2a (.claude/agents/pr-ready-phase6.md) puts every real finding
+# under this exact heading; per-check disposition lines sit above it. Case-sensitive on
+# purpose: the Sept 17-18 legacy shape used "## Findings" and must stay on the
+# all-bullets path.
+FINDINGS_HEADING = "## FINDINGS"
 
 # Bare hash only. Anything after the hash on that line is NOT a valid record — the
 # skill's condition (12) parser has the same property, and prose there silently
@@ -113,18 +118,45 @@ def denied_gate_edits(paths) -> list[str]:
             if any(str(p).startswith(prefix) for prefix in GATE_OWNING_PREFIXES)]
 
 
+def _findings_section(lines: list[str]) -> list[str] | None:
+    """Lines under every `## FINDINGS` heading, or None when the heading is absent.
+
+    The heading matches only at column 0, exactly, after a right-strip. A section runs
+    to the next line starting `## `; a `### ` subsection stays inside it. Repeated
+    headings each contribute their section.
+    """
+    if not any(ln.rstrip() == FINDINGS_HEADING for ln in lines):
+        return None
+    section: list[str] = []
+    inside = False
+    for ln in lines:
+        if ln.rstrip() == FINDINGS_HEADING:
+            inside = True
+            continue
+        if ln.startswith("## "):
+            inside = False
+            continue
+        if inside:
+            section.append(ln)
+    return section
+
+
 def _verdict_findings(verdict_path: str) -> list[str]:
     """Hold (12): the blocking findings under a NOT READY verdict, one per bullet.
 
-    A verdict that is not NOT READY contributes nothing -- the loop only ever fixes a
-    verdict it is still held on. A NOT READY verdict whose findings are prose rather
-    than bullets contributes its whole pre-digest body, so a shape the bullet regex
-    does not recognise is never silently dropped.
+    A verdict that is not NOT READY, or a missing verdict file, contributes nothing --
+    the loop only ever fixes a verdict it is still held on.
 
     The body is everything ABOVE the digest cut bar the verdict word lines themselves.
     A real verdict states its 6d checks and their findings first and puts the 6e word
     last, so reading only below the word would make every real verdict contribute
     nothing and skip a remediation the loop is held on.
+
+    When the body carries a `## FINDINGS` heading, only the bullets under it count, so
+    the per-check disposition lines above it (Passes / Not assessable / No finding /
+    Does not fire) never reach the fixer. With no heading, every bullet in the body
+    counts (the legacy shape). When the chosen scope has no bullets, the whole body is
+    one item, so a finding written as prose is never silently dropped.
     """
     if parse_verdict(verdict_path) != "NOT READY":
         return []
@@ -135,7 +167,9 @@ def _verdict_findings(verdict_path: str) -> list[str]:
             lines = lines[:i]
             break
     body = [ln for ln in lines if not VERDICT_RE.match(ln)]
-    bullets = [ln.strip() for ln in body if _FINDING_BULLET_RE.match(ln)]
+    section = _findings_section(body)
+    scope = body if section is None else section
+    bullets = [ln.strip() for ln in scope if _FINDING_BULLET_RE.match(ln)]
     if bullets:
         return bullets
     whole = "\n".join(body).strip()
@@ -314,19 +348,28 @@ def _find_procedure(worktree: str, master_sha: str, paths, kind: str) -> str:
 
 
 PLAN_INDEX_BLIND = "(plan-blind run: no plan, so no index)\n"
+PLAN_INDEX_TIMEOUT = 30
 
 
-def _plan_index(worktree: str, plan_path: str) -> str:
+def _plan_index(worktree: str, plan_path: str, timeout: float | None = None) -> str:
     """`bin/plan-index` output for the packet's plan copy.
 
     The reviewer has no Bash, so the harness runs the index for it. Any failure becomes a
     marker telling the reviewer to find `## ` headings with Grep instead; it never
-    aborts the packet.
+    aborts the packet. A hung script is cut off after `timeout` seconds (default
+    PLAN_INDEX_TIMEOUT); non-UTF-8 output is a marker too.
     """
     script = os.path.join(worktree, "bin", "plan-index")
+    limit = PLAN_INDEX_TIMEOUT if timeout is None else timeout
     try:
         proc = subprocess.run([script, plan_path], cwd=worktree,
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, timeout=limit)
+    except subprocess.TimeoutExpired:
+        return (f"(bin/plan-index timed out after {limit}s; "
+                "Grep plan.md for '^## ' instead)\n")
+    except UnicodeDecodeError as e:
+        return (f"(bin/plan-index output was not valid UTF-8: {e}; "
+                "Grep plan.md for '^## ' instead)\n")
     except OSError as e:
         return f"(bin/plan-index unavailable: {e}; Grep plan.md for '^## ' instead)\n"
     if proc.returncode != 0:
@@ -356,10 +399,16 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
         try:
             with open(plan.path) as fh:
                 _write("plan.md", fh.read())
-            _write("plan-index.txt", _plan_index(worktree, os.path.join(packet, "plan.md")))
         except OSError:
             _write("plan.md", PLAN_BLIND_MARKER)
             _write("plan-index.txt", PLAN_INDEX_BLIND)
+        else:
+            # plan.md is on disk and intact; an index failure must not blind it.
+            try:
+                _write("plan-index.txt",
+                       _plan_index(worktree, os.path.join(packet, "plan.md")))
+            except OSError:
+                _write("plan-index.txt", PLAN_INDEX_BLIND)
     else:
         _write("plan.md", PLAN_BLIND_MARKER)
         _write("plan-index.txt", PLAN_INDEX_BLIND)

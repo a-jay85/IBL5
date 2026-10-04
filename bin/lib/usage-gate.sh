@@ -63,6 +63,52 @@ usage_resets_epoch() {
         '.[$w].resets_at // empty | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601' 2>/dev/null
 }
 
+# ------------------------------------------------------------ 2c weekly pacing (bin/burndown-loop)
+
+# usage_pace_reserve
+# Echoes the weekly reserve percent kept free at seven_day.resets_at. Unset and
+# empty IBL5_BURNDOWN_RESERVE_PCT both take the default 10. A non-integer or a
+# value above 99 logs bad-reserve and also takes 10 (99 keeps the divisor > 0).
+usage_pace_reserve() {
+    local r="${IBL5_BURNDOWN_RESERVE_PCT:-10}"
+    case "$r" in ''|*[!0-9]*) usage_log "bad-reserve value=$r"; echo 10; return 0 ;; esac
+    if [ "$r" -gt 99 ]; then usage_log "bad-reserve value=$r"; echo 10; return 0; fi
+    echo "$r"
+}
+
+# usage_pace_verdict <json> <now_epoch>
+# One line: "<verdict> <weekly_pct|-> <allowed_pct|-> <wait_seconds>".
+#   go    weekly pct < allowed; wait 0.
+#   wait  weekly pct >= allowed; wait = seconds until allowed reaches pct, or until
+#         seven_day.resets_at when pct >= 100-reserve. Floor 60.
+#   zone  usage_zone (max of both windows) is drain or stop; wait 0 (caller defers
+#         to usage_prestart_gate, which writes the pause marker).
+#   blind seven_day.utilization or seven_day.resets_at missing/unparseable, or a
+#         bad now; wait 0 (caller sleeps its own cap). Fails closed.
+# allowed = (100 - reserve) * (168 - hours_left) / 168, hours_left clamped to [0,168].
+usage_pace_verdict() {
+    local body="${1:-}" now="${2:-}" r zone pct resets out
+    case "$now" in ''|*[!0-9]*) echo "blind - - 0"; return 0 ;; esac
+    r=$(usage_pace_reserve)
+    zone=$(usage_zone "$body" 2>/dev/null)
+    pct=$(printf '%s' "$body" | jq -r '.seven_day.utilization // empty | numbers' 2>/dev/null)
+    case "$zone" in drain|stop) echo "zone ${pct:--} - 0"; return 0 ;; esac
+    [ -n "$pct" ] || { echo "blind - - 0"; return 0; }
+    resets=$(usage_resets_epoch "$body" seven_day)
+    case "$resets" in ''|*[!0-9]*) echo "blind $pct - 0"; return 0 ;; esac
+    out=$(jq -nr --argjson p "$pct" --argjson r "$r" --argjson now "$now" --argjson rs "$resets" '
+        (($rs - $now) / 3600) as $hl
+        | (if $hl < 0 then 0 elif $hl > 168 then 168 else $hl end) as $h
+        | ((100 - $r) * (168 - $h) / 168) as $a
+        | ((($a * 10) | round) / 10) as $ar
+        | if $p < $a then "go \($p) \($ar) 0"
+          elif $p >= (100 - $r) then "wait \($p) \($ar) \([($rs - $now), 60] | max | floor)"
+          else "wait \($p) \($ar) \([((($p * 168 / (100 - $r)) - (168 - $h)) * 3600), 60] | max | ceil)"
+          end' 2>/dev/null)
+    [ -n "$out" ] || { echo "blind $pct - 0"; return 0; }
+    echo "$out"
+}
+
 # usage_blind_trust <json> <age> [log-suffix]
 # Called when the gate is blind: the live fetch failed and the cache is stale.
 # rc 0: trust this last reading as if fresh. Its zone is drain or stop and the
@@ -101,6 +147,7 @@ usage_runner_priority() {  # <runner>
         post-plan-now) echo 1 ;;
         automouse) echo 2 ;;
         plan-now) echo 3 ;;
+        burndown-loop) echo 4 ;;
         *) return 1 ;;
     esac
 }

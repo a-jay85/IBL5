@@ -113,11 +113,15 @@ class PhaseInfo:
     `evidence_paths` = backticked path tokens found in the phase heading and its own body.
     `bookkeeping` is True when the heading carries `[phases: S]` / `[phases: S/S]` (all-S tier
     marker), which exempts the phase from the omission check.
+    `no_diff_reason` holds the reason of an honoured `**No diff:**` body marker, which also exempts
+    the phase. `no_diff_rejected` is True when such a marker was seen with a reason under the floor.
     """
     number: int = 0
     heading: str = ""                                          # heading text after `## `, marker included
     evidence_paths: list[str] = field(default_factory=list)   # repo-relative-looking tokens, deduped, first-seen order
     bookkeeping: bool = False
+    no_diff_reason: str = ""      # honoured `**No diff:** <reason>` body marker (reason >= 15 chars); "" = none
+    no_diff_rejected: bool = False  # a `**No diff:**` line was seen but its reason was under the floor
 
 
 @dataclass
@@ -294,6 +298,7 @@ class RunResult:
     scored_findings: list[dict] = field(default_factory=list)
     manual_demotions: list[dict] = field(default_factory=list)
     manual_testing: dict = field(default_factory=dict)  # Phase 6.7 record; popped when empty
+    hold_repeat: dict | None = None  # Phase 6.5 advisory record (action, key, repeat_count, reasons, dm); arming never reads it
     audit: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:

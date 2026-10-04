@@ -1,6 +1,6 @@
 ---
 description: REST API architectural overview — auth, rate limiting, ETag caching, controller inventory, route table, and full per-endpoint reference.
-last_verified: 2026-09-05
+last_verified: 2026-10-01
 ---
 
 # API Guide
@@ -157,6 +157,8 @@ Collection endpoints paginate via `ibl5/classes/Api/Pagination/Paginator.php`. Q
 | `per_page` | `25` | Maximum `100` |
 | `sort` | endpoint-specific | Allowed values listed per endpoint |
 | `order` | `asc` | `asc` or `desc` |
+
+For `/players`, `/teams`, and `/games`, the allowed `sort` values are the keys of the repository's `SORT_COLUMNS` map (`ApiPlayerRepository`, `ApiTeamRepository`, `ApiGameRepository`). The controller passes those keys to `Paginator`, which falls back to the default sort for any other value. The repository then builds the `ORDER BY` column and direction from literals, so `BanSqlStringConcatenationRule` can prove the identifier is constant. `Paginator` no longer builds SQL text; `Paginator::getOrderByClause()` was removed.
 
 The pagination block appears inside `meta` in the success envelope alongside `timestamp` and `version`:
 

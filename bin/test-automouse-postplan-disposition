@@ -834,6 +834,15 @@ else
     FAILED=1
 fi
 
+# s4: Step 1 validates the handoff's required keys (same jq -e filter as prompt-impl)
+if grep -qF '[.slug, .worktree, .branch, .plan_file]' "$PROMPT" \
+   && grep -qF 'all(type == "string" and length > 0)' "$PROMPT"; then
+    echo "ok: s4-handoff-key-filter-present"
+else
+    echo "FAIL: s4-handoff-key-filter-present — jq required-key filter missing from prompt-postplan"
+    FAILED=1
+fi
+
 # ---------------------------------------------------------------------------
 # Group f — postplan_no_worktree_dispose_if_merged (stubbed collaborators)
 # ---------------------------------------------------------------------------

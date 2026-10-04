@@ -11,6 +11,12 @@
 #   6. Held job, newer log for the branch: no DM.
 #   7. Held job, no newer log: DM, prefixed so you know nobody re-ran it.
 #   8. Held job, newer log for a longer branch name ("foo-bar" vs "foo"): still DMs.
+#   9. Static: every DM_CMD invocation passes --ping.
+#  10. Live headless session (argv has -p) in the worktree: DM now, no job.
+#  11. Live headless session (argv has --print): DM now, no job.
+#  12. Live interactive session whose argv only contains "-p" inside other tokens: DM held.
+#  13. Headless and interactive sessions in the same worktree: DM held.
+#  14. ps cannot read the live pid's argv: DM held (counts as live).
 #
 # launchctl and discord-dm are stubbed; nothing leaves the machine.
 # Run: bin/test-post-plan-fail-dm  (exit 0 = all pass, 1 = a case failed)
@@ -25,7 +31,8 @@ ok()   { printf '  ok   %s\n' "$1"; }
 fail() { printf '  FAIL %s\n' "$1"; FAILS=$(( FAILS + 1 )); }
 
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-post-plan-fail-dm.XXXXXX")
-trap 'rm -rf "$TMP"' EXIT
+STUBS=""
+trap 'kill $STUBS 2>/dev/null; rm -rf "$TMP"' EXIT
 
 WT="$TMP/wt"; OTHER="$TMP/other"; LOGS="$TMP/logs"; PLISTS="$TMP/plists"
 mkdir -p "$WT" "$OTHER" "$LOGS" "$TMP/bin"
@@ -45,6 +52,34 @@ chmod +x "$TMP/bin/"*
 
 registry() {   # registry <repo> <pid>
     printf '{"x":{"repo":"%s","pid":%s}}\n' "$1" "$2" > "$TMP/reg.json"
+}
+registry2() {   # registry2 <repo> <pid-a> <pid-b>  (entry a is iterated first)
+    printf '{"a":{"repo":"%s","pid":%s},"b":{"repo":"%s","pid":%s}}\n' \
+        "$1" "$2" "$1" "$3" > "$TMP/reg.json"
+}
+
+# A fake "claude" whose argv ps can read. "sleep 60; :" keeps bash from
+# exec-replacing itself with sleep, so the pid keeps the stub's argv.
+cat > "$TMP/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+sleep 60; :
+EOF
+chmod +x "$TMP/bin/claude"
+mkdir -p "$TMP/psbad"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$TMP/psbad/ps"
+chmod +x "$TMP/psbad/ps"
+
+# spawn_stub <args...>: start the stub, wait until ps shows its argv, set STUB_PID.
+spawn_stub() {
+    "$TMP/bin/claude" "$@" &
+    STUB_PID=$!
+    STUBS="$STUBS $STUB_PID"
+    local i
+    for i in $(seq 1 50); do
+        grep -qF -- "$TMP/bin/claude" <<< "$(ps -ww -o command= -p "$STUB_PID" 2>/dev/null)" && return 0
+        sleep 0.1
+    done
+    fail "stub never exposed its argv: $*"
 }
 
 LOG="$LOGS/post-plan-now-foo-20260926-182719-111.log"
@@ -118,6 +153,37 @@ _ping=$(grep -c '^ *"$DM_CMD" --ping' "$SUT")
 [ "$_inv" -ge 1 ] && [ "$_inv" = "$_ping" ] \
     && ok "9 every DM_CMD call passes --ping ($_ping of $_inv)" \
     || fail "9 DM_CMD calls without --ping ($_ping of $_inv)"
+
+spawn_stub -p hello;      HP=$STUB_PID
+spawn_stub --print hello; HPRINT=$STUB_PID
+spawn_stub --resume x-p --permission-mode default; INT=$STUB_PID
+
+reset; registry "$WT" "$HP"
+run
+[ "$(dm_count)" = 1 ] && [ "$(lc_count)" = 0 ] && [ ! -f "$LOG.faildm-stamp" ] \
+    && ok "10 headless -p: DM now" || fail "10 headless -p: DM now"
+
+# Pins the --print token: a SUT whose token tuple is ("-p",) holds the DM and fails here.
+reset; registry "$WT" "$HPRINT"
+run
+[ "$(dm_count)" = 1 ] && [ "$(lc_count)" = 0 ] \
+    && ok "11 headless --print: DM now" || fail "11 headless --print: DM now"
+
+reset; registry "$WT" "$INT"
+run
+[ "$(dm_count)" = 0 ] && [ "$(lc_count)" = 1 ] && [ -f "$LOG.faildm-stamp" ] \
+    && ok "12 interactive (-p only inside tokens): DM held" \
+    || fail "12 interactive (-p only inside tokens): DM held"
+
+reset; registry2 "$WT" "$HP" "$INT"
+run
+[ "$(dm_count)" = 0 ] && [ "$(lc_count)" = 1 ] \
+    && ok "13 headless + interactive: DM held" || fail "13 headless + interactive: DM held"
+
+reset; registry "$WT" "$HP"
+PATH="$TMP/psbad:$PATH" run
+[ "$(dm_count)" = 0 ] && [ "$(lc_count)" = 1 ] \
+    && ok "14 argv unreadable: DM held" || fail "14 argv unreadable: DM held"
 
 if [ "$FAILS" -gt 0 ]; then
     echo "test-post-plan-fail-dm: $FAILS case(s) failed"

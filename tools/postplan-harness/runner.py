@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import datetime
 import hashlib
 import json
 import os
@@ -34,7 +35,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from harness import (adr_draft, body_numbers, cifix, ciwatch, conformance, fidelity, gitutil, llm_calls,
+from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gitutil, holdrepeat, llm_calls,
                      manual_rows, manual_testing, outofscope, prosefix, schemas, scope_conformance,
                      statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
@@ -744,6 +745,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         log("phase6.5: " + ("ARMED" if decision.armed else
                             "HELD — " + "; ".join(f"({c.number}) {c.reason or c.name}"
                                                   for c in decision.holds)))
+        if (live or state_dir is not None) and res.hold_repeat is None:
+            res.hold_repeat = _record_hold_repeat(res, decision, slug, worktree,
+                                                  _state_dir(out_dir, live, state_dir), log)
         fid = res.fidelity or {}
         fid["selected"], fid["selected_source"] = select_fidelity_verdict(
             inputs.fidelity_verdict, inputs.fidelity_verdict_2,
@@ -1004,6 +1008,7 @@ def _round_model(round_num: int) -> str:
     """
     return "sonnet" if round_num == 1 else "opus"
 _MAX_BEHIND_RETRIES = 3
+_DEP_CATCHUP_KEY = 9   # lost-work key outside the 1..3 push/BEHIND attempt keys
 
 
 def _retry_key(branch: str, attempt: int) -> str:
@@ -1270,6 +1275,46 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
 # Phase 9/10 and teardown; test_ci_fix_budget_below_max_pp_secs pins the relation.
 _CI_FIX_WALL_BUDGET_SECS = 4800
 _CI_FIX_MIN_ITER_SECS = 1200   # one Opus fix plus one CI cycle; less than this, stop
+_CI_FIX_REWATCH_FLOOR_SECS = 300   # less than this after a push: record the head, skip the watch
+
+
+def _phase7_stop(log, trail: list[str], attempt: int, sha, stage: str,
+                 e: HarnessError) -> str:
+    """Log and record a Phase 7 attempt that stopped on an error. `stage` is
+    "llm", "commit" or "push". Returns the `last` outcome token."""
+    last = f"error:{e.kind}"
+    tail = " | ".join(_error_tail(e.output or e.detail))
+    log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} "
+        f"outcome={last} stage={stage} sha={str(sha)[:8]}")
+    log(f"phase7 ci-fix {stage}-time denial: {tail or '(no output captured)'}")
+    trail.append(f"attempt {attempt}: {last} ({stage}-time): {tail or 'no output captured'}")
+    if stage in ("commit", "push"):
+        log("ci-fix commit is LOCAL and unpushed; "
+            "the next bin/post-plan-now run ships it")
+    return last
+
+
+def _phase7_rewatch(gh, log, res, worktree, pr, sha, out_dir, run_started):
+    """Re-watch CI on a freshly pushed Phase 7 head. Returns (outcome, sha). Too little
+    budget left skips the watch and hands back an indeterminate outcome."""
+    remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+    if remaining - 120 < _CI_FIX_REWATCH_FLOOR_SECS:
+        log(f"phase7 ci-fix: wall-clock budget exhausted after dep catch-up "
+            f"({int(remaining)}s left); CI on {str(sha)[:8]} not re-watched")
+        return ciwatch.CiOutcome(-1, [], "budget exhausted after dep catch-up"), sha
+    bg = ciwatch.start_background_watch(worktree, pr, sha, out_dir,
+                                        timeout=int(remaining - 120), verify_head=True)
+    try:
+        outcome = ciwatch.watch_or_reuse(worktree, pr, sha, out_dir, bg,
+                                         timeout=int(remaining - 120), verify_head=True)
+    finally:
+        ciwatch.reap_background_watch(bg)
+    if outcome.diverged:
+        _fail_closed_on_divergence(gh, log, pr, "phase7", outcome.evidence, disarm=True)
+    if outcome.head_sha and outcome.head_sha != sha:
+        sha = outcome.head_sha
+        res.ci_head = sha
+    return outcome, sha
 
 
 def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
@@ -1311,6 +1356,8 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
     probed = False
     last = None
     trail: list[str] = []
+    dep_caught_up = False
+    refused: list[tuple[int, str, str]] = []
 
     while True:
         kind, names = cifix.triage(outcome.failed)
@@ -1399,6 +1446,34 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
             if r.action == "synced":
                 sha = r.remote_sha
 
+        # One-shot dependency catch-up: a bun advisory master already fixed clears on
+        # a rebase, so try that before paying for an Opus attempt.
+        if mode != "replay" and not dep_caught_up and cifix_ship.bun_audit_failed(names):
+            dep_caught_up = True
+            git.fetch_base("origin/master")
+            if not cifix_ship.master_dep_files_changed(worktree):
+                log("phase7 ci-fix: bun audit red; master has no package.json/bun.lock "
+                    "change since merge-base - no catch-up")
+            else:
+                try:
+                    _refresh_and_reprove(git, log, "phase7-dep", _DEP_CATCHUP_KEY)
+                    sha = _push_with_adr_draft(
+                        git, log, "phase7", llm=llm, worktree=worktree, out_dir=out_dir,
+                        res=res, pr=(pr if isinstance(git, LiveGit) else None)) or git.head()
+                except HarnessError as e:
+                    if e.kind == "remote-head-diverged":
+                        raise
+                    last = _phase7_stop(log, trail, 0, sha, "catchup", e)
+                    break
+                res.ci_head = sha
+                outcome, sha = _phase7_rewatch(gh, log, res, worktree, pr, sha,
+                                               out_dir, run_started)
+                trail.append(f"dep catch-up: "
+                             f"{'green' if outcome.exit_code == 0 else 'still-red'}")
+                log(f"phase7 ci-fix dep catch-up: exit={outcome.exit_code} "
+                    f"failed={outcome.failed} sha={str(sha)[:8]}")
+                continue
+
         # Fix attempt
         attempt += 1
         fix_dir = os.path.join(out_dir, f"ci-fix-{attempt}")
@@ -1419,29 +1494,61 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
             gh.run_log_failed(run_id, job_id, log_dest)
             log_paths[name] = log_dest
 
+        stage = "llm"
         try:
             remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
             llm.call_tooled("ci-fix", cifix.CI_FIX_MODEL,
                             cifix.ci_fix_prompt(pr, attempt, names, log_paths,
-                                                diff_path, trail),
+                                                diff_path, trail,
+                                                dep_advisory=cifix_ship.bun_audit_failed(names),
+                                                proposal_path=os.path.join(
+                                                    fix_dir, cifix_ship.PROPOSAL_FILENAME)),
                             cwd=worktree or ".", allowed_tools=cifix.CI_FIX_ALLOWED_TOOLS,
                             denied_tools=cifix.CI_FIX_DENIED_TOOLS, add_dirs=(fix_dir,),
                             timeout=int(min(TOOLED_TIMEOUT, remaining / 2)))
             remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+            stage = "commit"
             new = _commit_with_gate_remediation(git, worktree,
                     cifix.CI_FIX_COMMIT_MSG.format(n=attempt), log, phase="phase7")
         except HarnessError as e:
             if e.kind == "remote-head-diverged":
                 raise
-            last = f"error:{e.kind}"
-            log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} "
-                f"outcome={last} sha={str(sha)[:8]}")
-            trail.append(f"attempt {attempt}: {last}")
-            log("ci-fix commit is LOCAL and unpushed; "
-                "the next bin/post-plan-now run ships it")
+            last = _phase7_stop(log, trail, attempt, sha, stage, e)
             break
 
-        if new == "":
+        # PR-body proposal: the agent may not run `gh pr edit`; the harness judges the
+        # proposal and applies only a body that leaves every waiver and attestation alone.
+        body_applied, baseline = False, None
+        proposal = cifix_ship.read_proposal(fix_dir)
+        if proposal is not None:
+            verdict = cifix_ship.judge_proposal(gh.pr_body_fresh() or "", proposal,
+                                                signature=_body_signature)
+            if verdict.action == "refuse":
+                log(f"phase7 ci-fix: body proposal refused ({verdict.reason})")
+                refused.append((attempt, verdict.reason, proposal or ""))
+            elif verdict.action == "apply":
+                baseline = cifix_ship.meta_run_id(gh.pr_checks_json(pr))
+                gh.pr_edit_body(pr, verdict.body)
+                body_applied = True
+                log("phase7 ci-fix: body proposal applied")
+
+        if new == "" and body_applied:
+            # Body-only round: the head did not move, so wait for a Meta checks run
+            # newer than the edit. sha and res.ci_head stay as they are.
+            meta = cifix_ship.wait_for_fresh_meta_run(
+                lambda: gh.pr_checks_json(pr), baseline,
+                deadline=run_started + _CI_FIX_WALL_BUDGET_SECS - 120)
+            others = [n for n in outcome.failed if n != cifix_ship.META_CHECK_NAME]
+            if meta == "indeterminate":
+                outcome = ciwatch.CiOutcome(-1, [], "phase7: fresh Meta checks run not observed")
+                last = "body-unconfirmed"
+            else:
+                if meta == "red":
+                    others.append(cifix_ship.META_CHECK_NAME)
+                outcome = ciwatch.CiOutcome(8 if others else 0, others,
+                                            "phase7 body-only re-watch")
+                last = "still-red" if others else "body-fixed"
+        elif new == "":
             last = "no-change"
         else:
             gate_hits = fidelity.denied_gate_edits(git.changed_files(f"{new}^"))
@@ -1454,18 +1561,32 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 trail.append(f"attempt {attempt}: {last}")
                 break
             else:
-                remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+                pre_push_head, head_before = new, git.head()
                 try:
-                    sha = git.push_ff() or new
+                    pushed = _push_with_adr_draft(
+                        git, log, "phase7", llm=llm, worktree=worktree,
+                        out_dir=out_dir, res=res,
+                        pr=(pr if isinstance(git, LiveGit) else None))
+                    # Only a head the push path moved (catch-up rebase, ADR draft)
+                    # replaces the fix commit's own sha.
+                    sha = pushed if pushed and pushed != head_before else new
                 except HarnessError as push_err:
                     if push_err.kind == "remote-head-diverged":
                         raise
-                    last = f"error:{push_err.kind}"
+                    last = _phase7_stop(log, trail, attempt, sha, "push", push_err)
+                    break
+                if sha != pre_push_head:
+                    log(f"phase7 ci-fix: push caught up to origin/master; "
+                        f"head {str(pre_push_head)[:8]} -> {str(sha)[:8]}; re-watching CI")
+                remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+                if mode != "replay" and remaining - 120 < _CI_FIX_REWATCH_FLOOR_SECS:
+                    res.ci_head = sha
+                    last = "pushed-unwatched"
+                    log(f"phase7 ci-fix: wall-clock budget exhausted after push "
+                        f"({int(remaining)}s left); CI on {str(sha)[:8]} not re-watched")
                     log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} "
                         f"outcome={last} sha={str(sha)[:8]}")
                     trail.append(f"attempt {attempt}: {last}")
-                    log("ci-fix commit is LOCAL and unpushed; "
-                        "the next bin/post-plan-now run ships it")
                     break
                 res.ci_head = sha
                 # Re-watch
@@ -1512,7 +1633,10 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
     if survivors:
         try:
             gh.post_review_summary(pr, cifix.SURVIVOR_TITLE,
-                                   cifix.survivor_comment(survivors, trail, probed))
+                                   cifix.survivor_comment(
+                                       survivors, trail, probed,
+                                       refused=[(a, r, cifix_ship.quote_proposal(t, _redact))
+                                                for a, r, t in refused]))
         except (HarnessError, OSError, subprocess.SubprocessError):
             log("phase7 ci-fix: survivor comment not posted")
     log(f"phase7 ci-fix: ceiling reached - {len(trail)} attempt(s), survivors={survivors}")
@@ -1717,13 +1841,19 @@ def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str
     Runs AFTER _body_check so an LLM-corrected body cannot drop the block, and BEFORE the
     commit so the commit body and the PR body carry it. Idempotent: an empty item list
     removes a stale block. Never raises on a plan-blind run (phase_omission_items returns
-    [] when plan.found is False). Returns the items for the caller's log line.
+    [] when plan.found is False). Returns the items for the caller's log line. Exemption
+    notes (`UNCHECKABLE-PHASE`, `NO-DIFF-PHASE`, `NO-DIFF-IGNORED`) are logged under
+    `phase2 residual-phase-exempt:` and never enter the `## Residual Phases` block or the
+    return value.
     """
-    items = conformance.phase_omission_items(plan, files)
+    notes: list[str] = []
+    items = conformance.phase_omission_items(plan, files, notes=notes)
     copy["summary_md"] = upsert_residual_phases(copy["summary_md"],
                                                 render_residual_phases(items))
     for it in items:
         log(f"phase2 residual-phase: {it}")
+    for note in notes:
+        log(f"phase2 residual-phase-exempt: {note}")
     return items
 
 
@@ -2088,7 +2218,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     master_sha, log=log,
                     commit=lambda msg: _commit_with_gate_remediation(
                         git, worktree, msg, log, phase="phase5.5"),
-                    # The same retrying push Phase 2 and Phase 7 use, so a master that
+                    # The same retrying push Phase 2 and both Phase 7 pushes (BEHIND, ci-fix) use, so a master that
                     # moved during the review + fix span gets one clean rebase per
                     # attempt instead of ending the loop on the hook's
                     # "does not contain origin/master".
@@ -2609,6 +2739,60 @@ def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> 
         pass
 
 
+def _record_hold_repeat(res, decision, slug, worktree, state_dir, log) -> dict | None:
+    """Advisory only: never raises, never reads or writes res.arm."""
+    try:
+        plan_path = res.plan.path if (res.plan and res.plan.found) else ""
+        fp = holdrepeat.fingerprint(plan_path, worktree or os.getcwd())
+        obs = holdrepeat.observe(state_dir, slug, armed=decision.armed,
+                                 conditions=decision.conditions, fingerprint=fp,
+                                 pr=res.pr_number,
+                                 now=datetime.datetime.now(datetime.timezone.utc).isoformat())
+        out = {"action": obs.action, "key": obs.key,
+               "repeat_count": obs.repeat_count, "reasons": obs.reasons, "dm": ""}
+        if obs.action == "repeat-dm":
+            ok = _send_hold_repeat_dm(slug, res.pr_number, obs)
+            out["dm"] = "sent" if ok else "failed"
+            if ok:
+                holdrepeat.mark_dm_sent(state_dir, slug, obs.key)
+        elif obs.action == "repeat-silent":
+            out["dm"] = "already-sent"
+        log(f"phase6.5 hold-repeat: {obs.action} x{obs.repeat_count} dm={out['dm'] or '-'}")
+        return out
+    except Exception as exc:  # advisory; a bug here must not change the run
+        log(f"phase6.5 hold-repeat: skipped ({exc})")
+        return None
+
+
+def _send_hold_repeat_dm(slug, pr, obs) -> bool:
+    """DM the operator once per repeated structural hold. True only on exit 0."""
+    reasons = "; ".join(f"({n}) {reason}" for n, _name, reason in obs.reasons)
+    msg = (f"post-plan held twice on the same reason: {slug} PR #{pr if pr else 'none'}\n"
+           f"Repeated hold (run {obs.repeat_count}): {reasons}\n"
+           "The next re-run with the same plan, diff, and harness will be declined\n"
+           "before it spends tokens. Fix the reason, or re-fire with:\n"
+           "  bin/post-plan-now --force")
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    dm_cmd = os.environ.get("HOLDREPEAT_DM_CMD") or os.path.join(repo_root, "bin", "discord-dm")
+    try:
+        proc = subprocess.run([dm_cmd, "--quiet", "--no-fallback", msg],
+                              capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return proc.returncode == 0
+
+
+def _hold_repeat_note(res: RunResult) -> str:
+    """Display-only RESULT-line suffix: a held run that repeated a structural hold."""
+    arm, hr = res.arm, res.hold_repeat
+    if arm is None or arm.armed or not hr:
+        return ""
+    if hr.get("action") not in ("repeat-dm", "repeat-silent"):
+        return ""
+    nums = ",".join(str(r[0]) for r in hr.get("reasons") or [])
+    return f" hold-repeat={hr.get('repeat_count')}x ({nums}) dm={hr.get('dm')}"
+
+
 def _prose_hold_note(res: RunResult) -> str:
     """Display-only RESULT-line suffix naming the prose check as a hold cause.
 
@@ -2754,6 +2938,7 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                 "behind master after 3 re-rebases); auto-merge disarmed, human "
                 f"merges{pr}{tail} findings={len(res.findings)}")
     tail += _prose_hold_note(res)
+    tail += _hold_repeat_note(res)
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
             f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}")
 

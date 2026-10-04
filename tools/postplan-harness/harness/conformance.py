@@ -2,6 +2,7 @@
 _phase-5-final-verification.md's two check loops."""
 from __future__ import annotations
 
+import functools
 import os
 import re
 import subprocess
@@ -9,10 +10,12 @@ import sys
 import tempfile
 from pathlib import PurePosixPath
 
+from .planfile import NO_DIFF_MIN_REASON
 from .state import PhaseInfo, PlanInfo
 
 _MATRIX_ASSERTIONS_SCRIPT = str(
     PurePosixPath(os.path.abspath(__file__)).parents[3] / "bin" / "lib" / "plan-matrix-assertions")
+_HARNESS_REPO_ROOT = str(PurePosixPath(os.path.abspath(__file__)).parents[3])
 
 # Tier 3 of _resolve: a plan-named migration or ADR whose number shifted at
 # implementation time because a parallel branch claimed the same number first
@@ -183,27 +186,81 @@ def _touched(tok: str, changed_files: list[str]) -> bool:
     return False
 
 
-def phase_omission_items(plan: PlanInfo, changed_files: list[str]) -> list[str]:
+@functools.lru_cache(maxsize=4)
+def _tracked_files(repo_root: str = _HARNESS_REPO_ROOT) -> tuple[str, ...] | None:
+    """`git ls-files` of repo_root, or None when git is unavailable (fail closed upstream)."""
+    try:
+        lines = _git_lines(["ls-files"], repo_root)
+    except Exception:
+        return None
+    return tuple(lines) or None
+
+
+def _repo_path_candidates(evidence: list[str], changed_files: list[str],
+                          tracked: tuple[str, ...] | list[str] | None) -> list[str]:
+    """Citations that could name a repo path. tracked=None keeps every citation (fail closed)."""
+    if tracked is None:
+        return list(evidence)
+    tracked_list = list(tracked)
+    return [p for p in evidence
+            if _touched(p, changed_files) or _touched(p, tracked_list)]
+
+
+def _note(notes: list[str] | None, line: str) -> None:
+    if notes is not None:
+        notes.append(line)
+
+
+def phase_omission_items(plan: PlanInfo, changed_files: list[str],
+                         tracked_files: list[str] | tuple[str, ...] | None = None,
+                         notes: list[str] | None = None) -> list[str]:
     """`MISSING-PHASE:` items for plan phases with evidence paths none of which the diff touched.
 
     Exempt, in order: a phase whose heading carries an all-S `[phases: S]` marker
-    (bookkeeping), a phase number named in `## Out of Scope` (declared deferred), and a
-    phase whose heading and body cite no path at all (no evidence = cannot verify = skip). Empty when
-    the plan was not found or has no parsed phases, so a plan-blind run and every
-    pre-existing PlanInfo literal produce nothing. Hold-only: the items flow into arming
-    condition (3) via check(); fidelity.build_work_list excludes them from the fixer loop.
+    (bookkeeping), a phase number named in `## Out of Scope` (declared deferred), a phase
+    carrying an honoured `**No diff:**` marker, a phase whose heading and body cite no
+    path at all (no evidence = cannot verify = skip), and a phase none of whose citations
+    can name a repo path (uncheckable). A citation is a repo-path candidate when `_touched`
+    matches it against the diff or against `git ls-files`; a mixed phase is checked on its
+    candidates alone. `tracked_files=None` reads `_tracked_files()` and, when that is
+    unavailable, keeps every citation a candidate (fail closed, today's behaviour); an
+    explicit empty list means nothing is tracked. Empty when the plan was not found or has
+    no parsed phases, so a plan-blind run and every pre-existing PlanInfo literal produce
+    nothing. Hold-only: the items flow into arming condition (3) via check();
+    fidelity.build_work_list excludes them from the fixer loop.
+
+    `notes` is an out-param like `resolutions` on `check`. Each exemption appends one
+    `NO-DIFF-PHASE:` / `UNCHECKABLE-PHASE:` line, and a rejected marker appends
+    `NO-DIFF-IGNORED:`. Notes are never returned as items, so they never hold a PR.
     """
     if not plan.found or not plan.phases:
         return []
     deferred = set(plan.deferred_phase_numbers)
     items: list[str] = []
     for ph in plan.phases:
-        if ph.bookkeeping or ph.number in deferred or not ph.evidence_paths:
+        if ph.bookkeeping or ph.number in deferred:
             continue
-        if any(_touched(p, changed_files) for p in ph.evidence_paths):
+        if ph.no_diff_rejected and not ph.no_diff_reason:
+            _note(notes, f"NO-DIFF-IGNORED: phase {ph.number} — **No diff:** reason under "
+                         f"{NO_DIFF_MIN_REASON} chars; phase checked as unmarked")
+        if ph.no_diff_reason:
+            _note(notes, f"NO-DIFF-PHASE: {ph.number} — {ph.heading[:80]} "
+                         f"(exempt: {ph.no_diff_reason[:80]})")
             continue
-        sample = ", ".join(ph.evidence_paths[:3])
-        more = f" (+{len(ph.evidence_paths) - 3} more)" if len(ph.evidence_paths) > 3 else ""
+        if not ph.evidence_paths:
+            continue
+        tracked = tracked_files if tracked_files is not None else _tracked_files()
+        cands = _repo_path_candidates(ph.evidence_paths, changed_files, tracked)
+        if not cands:
+            sample = ", ".join(ph.evidence_paths[:3])
+            more = f" (+{len(ph.evidence_paths) - 3} more)" if len(ph.evidence_paths) > 3 else ""
+            _note(notes, f"UNCHECKABLE-PHASE: {ph.number} — {ph.heading[:80]} "
+                         f"(no repo-path citation among {sample}{more})")
+            continue
+        if any(_touched(p, changed_files) for p in cands):
+            continue
+        sample = ", ".join(cands[:3])
+        more = f" (+{len(cands) - 3} more)" if len(cands) > 3 else ""
         items.append(f"MISSING-PHASE: {ph.number} — {ph.heading[:80]} "
                      f"(phase cites {sample}{more}; none appeared in the diff)")
     return items
@@ -251,7 +308,9 @@ def _matrix_assertion_items(plan: PlanInfo, diff_body: str, pr_body: str,
 def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
           phase5_status: str | None = None,
           resolutions: dict[str, str] | None = None,
-          pr_body: str = "") -> list[str]:
+          pr_body: str = "",
+          tracked_files: list[str] | tuple[str, ...] | None = None,
+          notes: list[str] | None = None) -> list[str]:
     """Returns unresolved `MISSING:` / `MISSING-FILE:` / `MISSING-METHOD:` /
     `UNMET-CONTRACT:` / `MISSING-PHASE:` / `UNREALISED-ASSERTION:` items (empty = clean).
 
@@ -271,13 +330,16 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
 
     resolutions, when a dict is passed, is filled with token -> actual path for
     each token that matched by suffix or basename rather than exactly.
+
+    tracked_files and notes are forwarded to phase_omission_items (see there); notes,
+    when a list is passed, collects the phase exemption lines.
     """
     if not plan.found:
         return []
     items: list[str] = _contract_items(plan, changed_files, phase5_status)
     # Runs before the has_matrix gate on purpose: a matrix-less doc/tooling plan still
     # has phases, and a phase that shipped nothing is the same defect either way.
-    items.extend(phase_omission_items(plan, changed_files))
+    items.extend(phase_omission_items(plan, changed_files, tracked_files, notes))
     if not plan.has_matrix:
         return items
     for t in plan.planned_test_paths:

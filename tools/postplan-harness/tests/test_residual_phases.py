@@ -6,8 +6,17 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
+
 from runner import _inject_residual_phases
+from harness import conformance
 from harness.state import PhaseInfo, PlanInfo
+
+
+@pytest.fixture(autouse=True)
+def _no_tracked_lookup(monkeypatch):
+    """These tests cite invented paths. Fail closed so each stays a repo-path candidate."""
+    monkeypatch.setattr(conformance, "_tracked_files", lambda *a, **k: None)
 
 
 def test_inject_adds_block_and_logs_when_phase_missing():
@@ -75,4 +84,6 @@ def test_inject_is_idempotent_across_reruns():
 
     # phase now shipped
     _inject_residual_phases(copy, plan, ["harness/b.py"], [].append)
-    assert copy["summary_md"].strip() == orig_body.strip()
+    # Removal re-terminates the head with exactly one "\n" (orig_body.rstrip() + "\n"),
+    # so the restored body is the original plus a single trailing newline.
+    assert copy["summary_md"] == orig_body.rstrip() + "\n"

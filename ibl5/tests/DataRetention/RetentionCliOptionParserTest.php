@@ -18,12 +18,16 @@ class RetentionCliOptionParserTest extends TestCase
             ['--days' => 30, '--dry-run' => true],
             RetentionCliOptionParser::parse(['--days=30', '--dry-run'], self::SPEC)
         );
+        self::assertSame(
+            ['--dry-run' => true, '--days' => 7],
+            RetentionCliOptionParser::parse(['--dry-run', '--days=7'], self::SPEC)
+        );
         self::assertSame([], RetentionCliOptionParser::parse([], self::SPEC));
     }
 
     public function testParseRejectsSpaceFormValue(): void
     {
-        $this->assertParseFails(['--days', '30'], self::SPEC, [], 'requires a value: use --days=N');
+        $this->assertParseFails(['--days', '30'], self::SPEC, [], "flag '--days' requires a value: use --days=N");
     }
 
     public function testParseRejectsUnknownFlag(): void
@@ -39,7 +43,7 @@ class RetentionCliOptionParserTest extends TestCase
     #[DataProvider('invalidIntValues')]
     public function testParseRejectsNonPositiveOrNonIntegerValue(string $value): void
     {
-        $this->assertParseFails(['--days=' . $value], self::SPEC, [], "got '" . $value . "'");
+        $this->assertParseFails(['--days=' . $value], self::SPEC, [], self::outOfRangeMessage($value));
     }
 
     /**
@@ -61,12 +65,12 @@ class RetentionCliOptionParserTest extends TestCase
 
     public function testParseRejectsValueAboveMax(): void
     {
-        $this->assertParseFails(['--days=36501'], self::SPEC, [], "up to 36500, got '36501'");
+        $this->assertParseFails(['--days=36501'], self::SPEC, [], self::outOfRangeMessage('36501'));
         $this->assertParseFails(
             ['--days=999999999999999999999999999999'],
             self::SPEC,
             [],
-            "got '999999999999999999999999999999'"
+            self::outOfRangeMessage('999999999999999999999999999999')
         );
         self::assertSame(['--days' => 36500], RetentionCliOptionParser::parse(['--days=36500'], self::SPEC));
     }
@@ -89,6 +93,19 @@ class RetentionCliOptionParserTest extends TestCase
             ['--user-id'],
             "missing required flag '--user-id'"
         );
+        self::assertSame(
+            ['--user-id' => 5, '--confirm' => true],
+            RetentionCliOptionParser::parse(
+                ['--user-id=5', '--confirm'],
+                ['--user-id' => 4294967295, '--confirm' => null],
+                ['--user-id']
+            )
+        );
+    }
+
+    private static function outOfRangeMessage(string $value): string
+    {
+        return "flag '--days' needs a positive integer up to 36500, got '" . $value . "'";
     }
 
     /**
@@ -101,7 +118,7 @@ class RetentionCliOptionParserTest extends TestCase
         try {
             RetentionCliOptionParser::parse($args, $spec, $required);
         } catch (\InvalidArgumentException $e) {
-            self::assertStringContainsString($expectedMessage, $e->getMessage());
+            self::assertSame($expectedMessage, $e->getMessage());
             return;
         }
         self::fail('Expected InvalidArgumentException for ' . implode(' ', $args));

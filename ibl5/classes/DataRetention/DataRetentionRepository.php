@@ -13,13 +13,15 @@ final class DataRetentionRepository extends \BaseMysqliRepository implements Dat
      */
     public function countAuditLogRowsOlderThan(int $cutoffEpoch): int
     {
+        // COUNT(*) always returns exactly one row.
+        /** @var array{n: int} $row */
         $row = $this->fetchOne(
             'SELECT COUNT(*) AS n FROM `auth_users_audit_log` WHERE `event_at` < ?',
             'i',
             $cutoffEpoch
         );
 
-        return (int) ($row['n'] ?? 0);
+        return $row['n'];
     }
 
     /**

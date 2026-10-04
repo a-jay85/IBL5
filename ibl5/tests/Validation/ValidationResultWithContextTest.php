@@ -28,6 +28,10 @@ class ValidationResultWithContextTest extends TestCase
         $this->assertSame(['a' => 1], $result->getContext());
     }
 
+    /**
+     * fromErrors([..]) with at least one error is invalid, keeps the errors in
+     * order, maps messages through getErrorMessages(), and exposes the first.
+     */
     public function testFromErrorsWithErrorsIsInvalid(): void
     {
         $first = new ValidationError('t1', 'm1');

@@ -8,7 +8,7 @@ test.use({ storageState: publicStorageState() });
 
 test.describe('Player Movement flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=PlayerMovement');
+    await page.goto('modules.php?name=SeasonRosterChanges');
   });
 
   test('page loads with title', async ({ page }) => {

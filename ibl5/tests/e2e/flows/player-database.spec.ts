@@ -9,7 +9,7 @@ test.use({ storageState: publicStorageState() });
 
 test.describe('Player Database flow', () => {
   test.beforeEach(async ({ page }) => {
-    await gotoWithRetry(page, 'modules.php?name=PlayerDatabase');
+    await gotoWithRetry(page, 'modules.php?name=PlayerSearch');
   });
 
   test('page loads with search form', async ({ page }) => {
@@ -58,7 +58,7 @@ test.describe('Player Database flow', () => {
     const allCount = await page.locator('table.sortable tbody tr').count();
 
     // Now navigate back and submit with active=0 (exclude retirees)
-    await gotoWithRetry(page, 'modules.php?name=PlayerDatabase');
+    await gotoWithRetry(page, 'modules.php?name=PlayerSearch');
     await page.locator('select[name="active"]').selectOption('0');
     await page.locator('.ibl-filter-form__submit').click();
     await expect(page.locator('table.sortable').first()).toBeVisible();
@@ -74,7 +74,7 @@ test.describe('Player Database flow', () => {
     const unfilteredCount = await page.locator('table.sortable tbody tr td:nth-child(5)').count();
 
     // Navigate back, apply exp_max=2, resubmit
-    await gotoWithRetry(page, 'modules.php?name=PlayerDatabase');
+    await gotoWithRetry(page, 'modules.php?name=PlayerSearch');
     await page.locator('input[name="exp_max"]').fill('2');
     await page.locator('.ibl-filter-form__submit').click();
     await expect(page.locator('table.sortable').first()).toBeVisible();

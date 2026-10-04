@@ -201,7 +201,57 @@ class TradeOfferTest extends TestCase
         $result = $offer->createTradeOffer($this->makeTradeData());
 
         $this->assertFalse($result['success']);
-        $this->assertSame($capResult, $result['capData']);
+        $this->assertSame(['valid' => false, 'errors' => ['Over hard cap'], 'userPostTradeCapTotal' => 150000, 'partnerPostTradeCapTotal' => 0], $result['capData']);
+        $this->assertSame(['Over hard cap'], $result['errors']);
+    }
+
+    public function testCreateTradeOfferReturnsValidatorCashErrorVerbatim(): void
+    {
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => false, 'error' => 'Cash too low']);
+        $validator->method('getCurrentSeasonCashConsiderations')->willReturn([
+            'cashSentToThem' => 0,
+            'cashSentToMe' => 0,
+        ]);
+        $commonRepo->method('getTidFromTeamname')->willReturn(1);
+        $cashHandler->method('hasCashInTrade')->willReturn(false);
+
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season);
+        $result = $offer->createTradeOffer($this->makeTradeData());
+
+        $this->assertSame(['success' => false, 'error' => 'Cash too low'], $result);
+    }
+
+    public function testCreateTradeOfferRosterFailureOmitsCapData(): void
+    {
+        [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();
+
+        $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
+        $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
+        $validator->method('validateSalaryCaps')->willReturn([
+            'valid' => true,
+            'errors' => [],
+            'userPostTradeCapTotal' => 0,
+            'partnerPostTradeCapTotal' => 0,
+        ]);
+        $validator->method('validateRosterLimits')->willReturn([
+            'valid' => false,
+            'errors' => ['Roster over 15'],
+        ]);
+        $validator->method('getCurrentSeasonCashConsiderations')->willReturn([
+            'cashSentToThem' => 0,
+            'cashSentToMe' => 0,
+        ]);
+        $commonRepo->method('getTidFromTeamname')->willReturn(1);
+        $cashHandler->method('hasCashInTrade')->willReturn(false);
+
+        $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season);
+        $result = $offer->createTradeOffer($this->makeTradeData());
+
+        $this->assertSame(['success' => false, 'errors' => ['Roster over 15']], $result);
+        $this->assertArrayNotHasKey('capData', $result);
     }
 
     // ── Roster limits ────────────────────────────────────────────

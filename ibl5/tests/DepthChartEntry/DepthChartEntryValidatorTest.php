@@ -315,4 +315,55 @@ class DepthChartEntryValidatorTest extends TestCase
         $this->assertStringContainsString('not on your roster', $html);
         $this->assertStringContainsString('<strong>', $html);
     }
+
+    public function testErrorMessagesHtmlMarkupIsByteExactAndEscaped(): void
+    {
+        $depthChartData = [
+            'playerData' => [],
+            'activePlayers' => 12,
+            'pos_1' => 3,
+            'pos_2' => 3,
+            'pos_3' => 3,
+            'pos_4' => 3,
+            'pos_5' => 3,
+            'hasStarterAtMultiplePositions' => true,
+            'nameOfProblemStarter' => '<b>Bad</b> & "Co"',
+        ];
+
+        $this->validator->validate($depthChartData, 'Regular Season');
+        $html = $this->validator->getErrorMessagesHtml();
+
+        $this->assertSame(
+            '<div class="text-center"><span class="text-red-500"><strong>'
+            . \Security\HtmlSanitizer::safeHtmlOutput('<b>Bad</b> & "Co" is set as starter (1st) at multiple positions.')
+            . '</strong></span><p>Set this player as 1st at only one position and resubmit.</p></div>',
+            $html
+        );
+        $this->assertStringNotContainsString('<b>Bad</b>', $html);
+    }
+
+    public function testErrorMessagesHtmlConcatenatesErrorsInCollectionOrder(): void
+    {
+        $validator = new DepthChartEntryValidator();
+        $validator->validateRoster([1, 2, 2, 999], [1, 2, 3]);
+
+        $block = static fn (string $message, string $detail): string => '<div class="text-center"><span class="text-red-500"><strong>'
+            . \Security\HtmlSanitizer::safeHtmlOutput($message)
+            . '</strong></span><p>'
+            . \Security\HtmlSanitizer::safeHtmlOutput($detail)
+            . '</p></div>';
+
+        $expected = $block(
+            'Your submission includes a player who is not on your roster (pid: 999).',
+            'Reload the depth chart form so it lists only your current roster, then resubmit.'
+        ) . $block(
+            'A player appears more than once in your submission (pid: 2).',
+            'Each roster player may appear only once. Reload the form and resubmit.'
+        ) . $block(
+            'Your submission is missing a roster player (pid: 3).',
+            'Every player on your roster must be included, even when inactive. Reload the form and resubmit.'
+        );
+
+        $this->assertSame($expected, $validator->getErrorMessagesHtml());
+    }
 }

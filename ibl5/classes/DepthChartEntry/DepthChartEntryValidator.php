@@ -155,12 +155,9 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
      */
     public function getErrorMessagesHtml(): string
     {
-        $html = '';
-        foreach ($this->errors as $error) {
-            $message = \Security\HtmlSanitizer::safeHtmlOutput($error['message']);
-            $detail = \Security\HtmlSanitizer::safeHtmlOutput($error['detail']);
-            $html .= '<div class="text-center"><span class="text-red-500"><strong>' . $message . '</strong></span><p>' . $detail . '</p></div>';
-        }
-        return $html;
+        return DepthChartEntryErrorHtmlRenderer::render(array_map(
+            static fn (array $e): \Validation\ValidationError => new \Validation\ValidationError($e['type'], $e['message'], $e['detail']),
+            $this->errors
+        ));
     }
 }

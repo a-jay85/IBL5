@@ -168,6 +168,31 @@ class TradeExecutionServiceTest extends TestCase
         $this->assertContains('This trade is illegal since it puts the Stars over the hard cap.', $result['errors']);
     }
 
+    public function testValidationErrorsListCapErrorsBeforeRosterErrors(): void
+    {
+        $processor = $this->createMock(TradeProcessorInterface::class);
+        $processor->expects($this->never())->method('processTrade');
+
+        $validator = self::createStub(TradeValidatorInterface::class);
+        $validator->method('validateSalaryCapsForParties')->willReturn([
+            'valid' => false,
+            'errors' => ['CAP'],
+            'parties' => [],
+        ]);
+        $validator->method('validateRosterLimitsForParties')->willReturn([
+            'valid' => false,
+            'errors' => ['ROSTER'],
+            'parties' => [],
+        ]);
+
+        $service = $this->buildService($this->threeTeamRows(), processor: $processor, validator: $validator);
+
+        $result = $service->validateAndExecute(1, 'Metros');
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(['CAP', 'ROSTER'], $result['errors']);
+    }
+
     /**
      * On valid input by a party GM, processTrade is called exactly once and its
      * result is returned.

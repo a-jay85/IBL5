@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+#
+# bin/pr-cycle-tick: scheduled watcher that hands stuck PRs to bin/pr-cycle.
+#
+# Usage: bin/pr-cycle-tick [--dry-run] [--help]
+#   --dry-run   Run every guard and read, print the qualifying set and the exact
+#               command, write no state, send no DM, launch nothing.
+#   --help      Print this header comment.
+# ---
+# Fired every 1800s by the LaunchAgent that bin/pr-cycle-tick-cron-setup installs.
+# Reads open PRs with gh, drops the ones that do not need a rescue, and passes the rest
+# to `bin/pr-cycle --go --only <csv> --max-ready <n>`. An idle tick exits before
+# bin/pr-cycle and its _auth_probe, so it makes no Claude call.
+#
+# Never merges and never arms: arming stays inside bin/pr-cycle Stage 2 via
+# bin/pr-triage --arm. Never polls or sleeps. NOT set -e: one PR's failed fetch must not
+# abort the tick.
+#
+# Guards, cheapest first: stop file, usage zone, a live pr-cycle worker, then per PR:
+# post-plan in flight, post-plan finished under 30 minutes ago, checks pending or green,
+# and a one-rescue-per-head-SHA retry cap. At most 3 PRs go to one run.
+#
+# Env seams (unset and empty both take the default):
+#   PR_CYCLE_STOP_FILE         default $HOME/.ibl5-pr-cycle.stop (same name bin/pr-cycle reads)
+#   PR_CYCLE_WATCH_STATE_DIR   default $HOME/.ibl5-pr-cycle-watch
+#   PR_CYCLE_TICK_PR_CYCLE_CMD default $ROOT/bin/pr-cycle
+#   PR_CYCLE_TICK_DM_CMD       default $ROOT/bin/discord-dm
+#   PR_CYCLE_TICK_USAGE_ZONE   empty means read the live usage zone
+#
+# See the ADR for bin/pr-cycle-tick (ibl5/docs/decisions/) for the design rationale.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+DRY_RUN=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --help|-h) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
+        --dry-run) DRY_RUN=1; shift ;;
+        *) echo "pr-cycle-tick: unknown option: $1 (try --help)" >&2; exit 2 ;;
+    esac
+done
+
+# shellcheck source=bin/lib/pr-cycle-watch.sh
+source "$SCRIPT_DIR/lib/pr-cycle-watch.sh"
+
+log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*"; }
+
+# ── Env seams ────────────────────────────────────────────────────────────────
+if [[ -n "${PR_CYCLE_STOP_FILE:-}" ]]; then
+    STOP_FILE="$PR_CYCLE_STOP_FILE"
+elif [[ -n "${HOME:-}" ]]; then
+    STOP_FILE="$HOME/.ibl5-pr-cycle.stop"
+else
+    echo "pr-cycle-tick: HOME is unset" >&2; exit 2
+fi
+STATE="$(pcw_state_dir)" || { echo "pr-cycle-tick: HOME is unset" >&2; exit 2; }
+PR_CYCLE_CMD="${PR_CYCLE_TICK_PR_CYCLE_CMD:-$ROOT/bin/pr-cycle}"
+DM_CMD="${PR_CYCLE_TICK_DM_CMD:-$ROOT/bin/discord-dm}"
+
+# shellcheck source=bin/lib/usage-gate.sh
+source "$SCRIPT_DIR/lib/usage-gate.sh"
+
+# gh api's {owner}/{repo} placeholders resolve from the cwd's git remote.
+cd "$ROOT" || { log "cannot cd to $ROOT"; exit 1; }
+
+# ── (a) Stop file ────────────────────────────────────────────────────────────
+if [[ -e "$STOP_FILE" ]]; then
+    log "stop file present ($STOP_FILE)"; exit 0
+fi
+
+# ── (b) Usage gate ───────────────────────────────────────────────────────────
+# Read-only mirror of the first half of usage_prestart_gate. The gate itself writes a
+# resumable-session marker, and a tick has no session to resume.
+zone="${PR_CYCLE_TICK_USAGE_ZONE:-}"
+if [[ -z "$zone" ]]; then
+    body="$(usage_fetch 45)"; urc=$?
+    if [[ "$urc" -eq 1 || -z "$body" ]]; then
+        zone=normal
+    else
+        stale=0
+        if [[ "$urc" -eq 2 ]]; then
+            age="$(usage_cache_age)"
+            if [[ "$age" -lt 0 || "$age" -ge 300 ]]; then
+                usage_blind_trust "$body" "$age" "runner=pr-cycle-tick" || stale=1
+            fi
+        fi
+        if [[ "$stale" -eq 1 ]]; then zone=normal; else zone="$(usage_zone "$body")"; fi
+    fi
+fi
+if [[ "$zone" != "normal" ]]; then
+    log "usage zone $zone"; exit 0
+fi
+
+# ── (c) Single instance ──────────────────────────────────────────────────────
+# Read the snapshot with a here-string, never `| grep -q` (the SIGPIPE trap).
+SNAP="$(ljob_snapshot)"
+while IFS=$'\t' read -r pid _status label; do
+    case "$label" in
+        com.ibl5.pr-cycle-[0-9]*)
+            if [[ "$pid" =~ ^[0-9]+$ ]]; then
+                log "pr-cycle worker running ($label)"; exit 0
+            fi ;;
+    esac
+done <<< "$SNAP"
+
+# ── (d) Qualifying set ───────────────────────────────────────────────────────
+if ! PRS_JSON="$(gh pr list --state open --author @me --limit 200 \
+        --json number,headRefName,headRefOid,mergeStateStatus,isDraft 2>/dev/null)"; then
+    log "gh pr list failed"; exit 0
+fi
+if [[ "$DRY_RUN" -eq 0 ]]; then
+    pcw_prune "$STATE" "$(jq -r '.[].number' <<< "$PRS_JSON")"
+fi
+
+# <wt>/tools/postplan-harness/out for the worktree holding $1, or nothing.
+worktree_out_dir() {
+    local wt
+    wt="$(git -C "$ROOT" worktree list --porcelain 2>/dev/null | awk -v want="branch refs/heads/$1" '
+        /^worktree / { path = substr($0, 10) }
+        $0 == want { print path; exit }')"
+    [[ -n "$wt" ]] && printf '%s\n' "$wt/tools/postplan-harness/out"
+    return 0
+}
+
+QUALIFY=()      # "<pr>|<sha>"
+while IFS=$'\t' read -r pr branch sha mstate; do
+    [[ -n "$pr" ]] || continue
+    if pcw_inflight "$pr" "$branch" "$SNAP"; then
+        log "skip PR $pr: post-plan in flight"; continue
+    fi
+    out_dirs=("$ROOT/tools/postplan-harness/out")
+    wt_out="$(worktree_out_dir "$branch")"
+    [[ -n "$wt_out" ]] && out_dirs+=("$wt_out")
+    if pcw_recent_finish "$branch" "${out_dirs[@]}"; then
+        log "skip PR $pr: post-plan finished <$PCW_GRACE_MIN min ago"; continue
+    fi
+    if [[ "$mstate" == "DIRTY" ]]; then
+        kind=DIRTY
+    else
+        if cr="$(gh api "repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100" 2>/dev/null)"; then
+            verdict="$(pcw_check_verdict <<< "$cr")"
+        else
+            verdict=pending
+        fi
+        if [[ "$verdict" != "red" ]]; then
+            log "skip PR $pr: checks $verdict"; continue
+        fi
+        kind=red
+    fi
+    if pcw_attempted_head "$STATE" "$pr" "$sha"; then
+        log "skip PR $pr: retry cap (head ${sha:0:7})"
+        if pcw_dm_due "$STATE" "$pr" "$sha"; then
+            msg="pr-cycle-watch: PR #$pr is still $kind on head ${sha:0:7} after one rescue. Skipping it until a new push."
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                log "would DM: $msg"
+            else
+                "$DM_CMD" --ping "$msg" || true
+                pcw_mark_dm "$STATE" "$pr" "$sha"
+            fi
+        fi
+        continue
+    fi
+    QUALIFY+=("$pr|$sha")
+done < <(jq -r 'sort_by(.number) | .[] | select(.isDraft | not)
+                | [.number, .headRefName, .headRefOid, .mergeStateStatus] | @tsv' <<< "$PRS_JSON")
+
+if [[ ${#QUALIFY[@]} -eq 0 ]]; then
+    log "idle: nothing qualifies"; exit 0
+fi
+
+# ── (e) Launch ───────────────────────────────────────────────────────────────
+LAUNCH=("${QUALIFY[@]:0:$PCW_MAX_PER_TICK}")
+csv=""
+for entry in "${LAUNCH[@]}"; do csv="${csv:+$csv,}${entry%%|*}"; done
+count=${#LAUNCH[@]}
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "would run: $PR_CYCLE_CMD --go --only $csv --max-ready $count"; exit 0
+fi
+
+log "launching: $PR_CYCLE_CMD --go --only $csv --max-ready $count"
+if "$PR_CYCLE_CMD" --go --only "$csv" --max-ready "$count"; then
+    for entry in "${LAUNCH[@]}"; do
+        pcw_record_attempt "$STATE" "${entry%%|*}" "${entry#*|}"
+    done
+else
+    log "pr-cycle exited non-zero; no attempt recorded"
+fi
+exit 0

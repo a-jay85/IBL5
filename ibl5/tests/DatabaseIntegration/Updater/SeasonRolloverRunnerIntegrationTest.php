@@ -85,6 +85,11 @@ class SeasonRolloverRunnerIntegrationTest extends DatabaseTestCase
         self::assertSame(4, $this->readCy('CY-ROLLOVER-TEST-B'));
     }
 
+    /**
+     * Resetting only the season year makes the detector advance again, but the
+     * marker guard in CashConsiderationsYearAdvancer::advance() keeps cy from
+     * moving a second time.
+     */
     public function testRerunAfterSeasonResetDoesNotDoubleAdvanceCash(): void
     {
         $this->seedLedgerRows();

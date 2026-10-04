@@ -494,7 +494,16 @@ class LiveGit:
 
         if resolved_files:
             autoresolved_path = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
-            Path(autoresolved_path).write_text("\n".join(resolved_files) + "\n")
+            # Union with any list an earlier rebase in this run wrote (stale lists from a
+            # previous run are cleared once at run start); de-dup, order preserved.
+            prior: list[str] = []
+            try:
+                prior = [l.strip() for l in
+                         Path(autoresolved_path).read_text().splitlines() if l.strip()]
+            except OSError:
+                pass
+            merged = list(dict.fromkeys([*prior, *resolved_files]))
+            Path(autoresolved_path).write_text("\n".join(merged) + "\n")
 
         if resolved_files:
             res_list = ", ".join(resolved_files)

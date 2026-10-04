@@ -1644,6 +1644,18 @@ veronly_run "$R" "$SB2"
 expect_hold "(72) veronly: steering date + adjacent paths edit holds (2 pairs)" \
     "steering file '.claude/rules/x.md': hunk is not a one-line replacement: @@ -3,2 +3,2 @@"
 
+# Case 72b: the -/+ pair-count guard in check_steering_date_only. Case 72 stops at the
+# hunk-header check, and a one-line '@@ -N +N @@' header from real git output always
+# carries 1 removed / 1 added, so the guard is only reachable when the line counter
+# drops a row: a removed body line '-- old' renders as '--- old', which the
+# diff-header skip pattern ("--- "*) swallows. Result: 1 hunk, 0 removed / 1 added.
+SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 '-- old'
+write_fm "$R" .claude/rules/x.md 2026-01-01 'new'
+veronly_run "$R" "$SB2"
+expect_hold "(72b) veronly: steering unpaired -/+ count holds (0 removed / 1 added)" \
+    "steering file '.claude/rules/x.md': expected exactly one -/+ line pair, found 0 removed / 1 added"
+
 # Case 73b: backwards date → HOLD
 SB2="$(build_veronly_repo)"; R="$SB2/repo"; PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
 veronly_seed_fm "$R" .claude/rules/x.md 2026-01-01 "$BODY157"

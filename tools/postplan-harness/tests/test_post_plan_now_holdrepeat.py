@@ -47,14 +47,15 @@ def _setup(tmp_path, *, dm_sent=True, slug="hr-test-slug"):
     return root, plans_dir, state, slug
 
 
-def _decline(root, plans_dir, state, slug, *, harness=HARNESS, force=None, state_env=None):
+def _decline(root, plans_dir, state, slug, *, harness=HARNESS, force=None, state_env=None,
+             plan=""):
     env = {**os.environ}
     env.pop("FORCE", None)
     env["HOLDREPEAT_STATE_DIR"] = str(state) if state_env is None else state_env
     env["PLANS_DIR"] = str(plans_dir)
     prefix = f"FORCE={force}; " if force is not None else ""
     script = (f'. "{PPN}"; {prefix}'
-              f'postplan_holdrepeat_decline "{harness}" "{slug}" "" "{root}"; echo "rc=$?"')
+              f'postplan_holdrepeat_decline "{harness}" "{slug}" "{plan}" "{root}"; echo "rc=$?"')
     return subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env)
 
 
@@ -132,3 +133,28 @@ def test_variant_plan_slug_still_declines(tmp_path):
     r = _decline(root, plans_dir, state, slug)
     assert "holdrepeat: DECLINE" in r.stdout, f"Expected decline; got: {r.stdout!r}"
     assert "rc=0" in r.stdout
+
+
+def test_explicit_plan_path_is_the_one_fingerprinted(tmp_path):
+    """--plan reaches the check: state is seeded from an explicit plan outside PLANS_DIR, while a
+    decoy with different bytes sits at the PLANS_DIR/<slug>.md fallback. A DECLINE is only possible
+    if the explicit path was read; ignoring it would fingerprint the decoy and proceed (rc=1)."""
+    slug = "hr-explicit-plan-slug"
+    root, plans_dir, _, _ = _setup(tmp_path, slug=slug)
+    (plans_dir / f"{slug}.md").write_text("# decoy plan found by the PLANS_DIR fallback\n")
+    explicit_dir = tmp_path / "elsewhere"
+    explicit_dir.mkdir()
+    explicit = explicit_dir / "custom-plan-name.md"
+    explicit.write_text("# explicit plan outside PLANS_DIR\n")
+    state = tmp_path / "explicit-state"
+    fp = hr.fingerprint(str(explicit), str(root))
+    assert fp
+    for n in (1, 2):
+        hr.observe(str(state), slug, armed=False, conditions=_COND7, fingerprint=fp,
+                   pr=1, now=f"2026-10-02T00:00:0{n}Z")
+    hr.mark_dm_sent(str(state), slug, hr.structural_key(_COND7))
+    r = _decline(root, plans_dir, state, slug, plan=str(explicit))
+    assert "holdrepeat: DECLINE" in r.stdout, f"Expected decline; got: {r.stdout!r}"
+    assert "rc=0" in r.stdout
+    # Control: without the explicit path the fallback reads the decoy, so the check proceeds.
+    assert "rc=1" in _decline(root, plans_dir, state, slug).stdout

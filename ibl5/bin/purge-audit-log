@@ -1,0 +1,82 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Delete auth_users_audit_log rows older than the retention window, in batches.
+ *
+ * Runs nightly on prod from .github/workflows/db-backup.yml after a verified dump.
+ */
+
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('This script must be run from the command line.');
+}
+
+$documentRoot = dirname(__DIR__, 2);
+$_SERVER['DOCUMENT_ROOT'] = $documentRoot;
+require $documentRoot . '/ibl5/vendor/autoload.php';
+
+// Fallback PSR-4 loader for `docker exec php ...` on macOS; see ibl5/bin/check-boxscore-schedule-run.
+spl_autoload_register(static function (string $class) use ($documentRoot): void {
+    $path = $documentRoot . '/ibl5/classes/' . str_replace('\\', '/', $class) . '.php';
+    if (is_file($path)) {
+        require_once $path;
+    }
+});
+
+// Parse before loading config, so a bad flag fails on a machine with no database.
+try {
+    $opts = \DataRetention\RetentionCliOptionParser::parse(
+        array_values(array_slice($argv, 1)),
+        ['--days' => 36500, '--dry-run' => null, '--help' => null]
+    );
+} catch (\InvalidArgumentException $e) {
+    fwrite(STDERR, 'purge-audit-log: ' . $e->getMessage() . "\n");
+    fwrite(STDERR, "usage: purge-audit-log [--days=N] [--dry-run] [--help]\n");
+    exit(2);
+}
+
+if (isset($opts['--help'])) {
+    echo "usage: purge-audit-log [--days=N] [--dry-run] [--help]\n";
+    echo '  --days=N   delete auth_users_audit_log rows older than N days (default '
+        . \DataRetention\DataRetentionService::AUDIT_LOG_RETENTION_DAYS . ", max 36500)\n";
+    echo "  --dry-run  count eligible rows without deleting any\n";
+    exit(0);
+}
+
+$days = $opts['--days'] ?? \DataRetention\DataRetentionService::AUDIT_LOG_RETENTION_DAYS;
+$dryRun = isset($opts['--dry-run']);
+
+include $documentRoot . '/ibl5/config.php';
+
+// Direct mysqli connection; see ibl5/bin/check-boxscore-schedule-run for why db/db.php is bypassed.
+/** @var string $dbhost */
+/** @var string $dbuname */
+/** @var string $dbpass */
+/** @var string $dbname */
+$mysqli_db = new \mysqli();
+$mysqli_db->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, 1);
+if (!$mysqli_db->real_connect($dbhost, $dbuname, $dbpass, $dbname)) {
+    fwrite(STDERR, "Failed to connect to MariaDB ({$mysqli_db->connect_errno}): {$mysqli_db->connect_error}\n");
+    exit(2);
+}
+$mysqli_db->set_charset('utf8mb4');
+
+try {
+    $service = new \DataRetention\DataRetentionService(new \DataRetention\DataRetentionRepository($mysqli_db));
+    $result = $service->purgeAuditLog($days, $dryRun, time());
+} catch (\Throwable $e) {
+    fwrite(STDERR, 'purge-audit-log: FAILED: ' . $e->getMessage() . "\n");
+    exit(1);
+}
+
+if ($result->dryRun) {
+    echo "purge-audit-log: DRY RUN: {$result->eligible} row(s) older than {$days} day(s)"
+        . " (event_at < {$result->cutoffEpoch}) would be deleted; no rows changed.\n";
+} else {
+    echo "purge-audit-log: deleted {$result->deleted} of {$result->eligible} eligible row(s)"
+        . " older than {$days} day(s) (event_at < {$result->cutoffEpoch}).\n";
+}
+exit(0);

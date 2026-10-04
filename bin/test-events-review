@@ -124,6 +124,7 @@ chmod 600 "$PW_FILE"
 # ER_ENV holds extra VAR=value pairs for one run; the script always starts from
 # an empty environment (plus PATH) so ambient EVENTS_REVIEW_* never leaks in.
 ER_ENV=()
+ER_SCRIPT=""   # set to a mutant copy of events-review for the mutation cases
 ER_RC=0; ER_OUT=""; ER_ERR=""
 SD=""   # per-case stub dir
 
@@ -159,7 +160,7 @@ tsv_env() {
 
 run_er() { # args...
     local errf="$T/stderr.$$"
-    ER_OUT="$(env -i PATH="$PATH" ${ER_ENV[@]+"${ER_ENV[@]}"} bash "$ER" "$@" 2> "$errf")"
+    ER_OUT="$(env -i PATH="$PATH" ${ER_ENV[@]+"${ER_ENV[@]}"} bash "${ER_SCRIPT:-$ER}" "$@" 2> "$errf")"
     ER_RC=$?
     ER_ERR="$(cat "$errf")"
     rm -f "$errf"
@@ -236,6 +237,20 @@ group_env() {
         expect_has "row3: $var empty is named" "$ER_ERR" "$var is required"
     done
     expect_absent "row3: no mysql call on a missing var" "$SD/mysql.argv"
+
+    # Mutation: a set-check `${VAR+x}` in place of the non-empty check lets the
+    # empty case through. The empty-var rows above exist to catch exactly that.
+    local mut="$T/events-review.mut-set"
+    sed 's/\[ -z "\${!var:-}" ]/[ -z "${!var+x}" ]/' "$ER" > "$mut"
+    if cmp -s "$ER" "$mut"; then fail "row3: mutant was not applied"; else
+        new_case env-mut
+        base_env; ER_ENV+=("EVENTS_REVIEW_DB_USER=")
+        ER_SCRIPT="$mut"
+        run_er --dry-run
+        ER_SCRIPT=""
+        if [ "$ER_RC" -ne 2 ]; then ok "row3: mutant with a set-check lets an empty var through (rc $ER_RC)"
+        else fail "row3: mutant with a set-check still exits 2"; fi
+    fi
 }
 
 # ── Group: creds (rows 4, 5, 41) ──────────────────────────────────────────────
@@ -258,6 +273,20 @@ group_creds() {
     expect_file_has "row4: password is in the mysql env" "$SD/mysql.env" "MYSQL_PWD=$PW_VALUE"
     expect_file_lacks "row4: password is never in mysql argv" "$SD/mysql.argv" "$PW_VALUE"
     expect_file_lacks "row4: no -p password flag" "$SD/mysql.argv" "[-p"
+
+    # Mutation: passing `-p"$pw"` in argv puts the password in the recorded argv.
+    local mut="$T/events-review.mut-argv"
+    # shellcheck disable=SC2016  # sed program text, not shell expansions
+    sed 's/MYSQL_PWD="\$DB_PW" "\$EVENTS_REVIEW_MYSQL_BIN"/"$EVENTS_REVIEW_MYSQL_BIN" -p"$DB_PW"/' "$ER" > "$mut"
+    if cmp -s "$ER" "$mut"; then fail "row4: mutant was not applied"; else
+        new_case creds-mut
+        base_env
+        ER_SCRIPT="$mut"
+        run_er --dry-run
+        ER_SCRIPT=""
+        if grep -qF -- "$PW_VALUE" "$SD/mysql.argv" 2>/dev/null; then ok "row4: mutant with -p in argv leaks the password to argv (caught)"
+        else fail "row4: mutant with -p in argv was not caught"; fi
+    fi
 
     local ro="$T/pw-400"
     printf '%s\n' "$PW_VALUE" > "$ro"
@@ -306,6 +335,14 @@ group_digest() {
     echo "# group: digest"
     new_case digest
     tsv_env
+
+    # The three files in bin/fixtures/events-review/ are committed, never
+    # generated. Every scratch file lives under $T, so a run leaves the tree alone.
+    local fx
+    for fx in corpus.tsv expected-dry-run.txt seed.sql; do
+        if [ -f "$SCRIPT_DIR/fixtures/events-review/$fx" ]; then ok "row37: fixture $fx is committed"
+        else fail "row37: fixture $fx is missing"; fi
+    done
 
     local got
     got="$(env -i PATH="$PATH" bash "$ER" "--from-tsv=$CORPUS" --dry-run 2>&1)"
@@ -483,6 +520,19 @@ group_dm() {
     want="IBL5 analytics review 2026-09-21..2026-09-28
 $(cat "$benign")"
     expect_eq "row21: benign multi-line text passes through" "$want" "$(dm_payload 1)"
+
+    # Mutation: widening the `tr` range to include \012 strips the newlines.
+    local mut="$T/events-review.mut-tr"
+    sed 's/\\000-\\010\\013-\\037\\177/\\000-\\037\\177/' "$ER" > "$mut"
+    if cmp -s "$ER" "$mut"; then fail "row21: mutant was not applied"; else
+        new_case dm-mut
+        tsv_env; ER_ENV+=("STUB_CLAUDE_OUT=$benign")
+        ER_SCRIPT="$mut"
+        run_er "--from-tsv=$CORPUS"
+        ER_SCRIPT=""
+        if [ "$(dm_payload 1)" != "$want" ]; then ok "row21: mutant that strips newlines changes the DM (caught)"
+        else fail "row21: mutant that strips newlines was not caught"; fi
+    fi
 
     # Row 22: boundary at the 1800-byte body cap.
     local b1800="$T/b1800.txt" b1801="$T/b1801.txt" b5000="$T/b5000.txt" line49
@@ -794,6 +844,33 @@ SH
     )
     run_er
     expect_eq "row33: a broken mysql wrapper exits 1" 1 "$ER_RC"
+
+    # Mutation (row 31): removing COALESCE(traffic_class,'unclassified') drops the
+    # NULL-class rows, so the digest must change against the real run.
+    local mut="$T/events-review.mut-coalesce"
+    sed "s/COALESCE(traffic_class, 'unclassified')/traffic_class/g" "$ER" > "$mut"
+    if cmp -s "$ER" "$mut"; then fail "row31: mutant was not applied"; else
+        new_case e2e-mut
+        ER_ENV=(
+            "STUB_DIR=$SD"
+            "EVENTS_REVIEW_SSH_HOST=local"
+            "EVENTS_REVIEW_DB_USER=$dbuser"
+            "EVENTS_REVIEW_DB_NAME=$dbname"
+            "EVENTS_REVIEW_DB_PASSWORD_FILE=$PW_FILE"
+            "EVENTS_REVIEW_SSH_BIN=/usr/bin/true"
+            "EVENTS_REVIEW_MYSQL_BIN=$wrapper"
+            "EVENTS_REVIEW_MIN_ROWS=1"
+        )
+        run_er --dry-run
+        local real_digest mut_digest
+        real_digest="$digest"
+        ER_SCRIPT="$mut"
+        run_er --dry-run
+        ER_SCRIPT=""
+        mut_digest="$(digest_of <<< "$ER_OUT")"
+        if [ "$real_digest" != "$mut_digest" ]; then ok "row31: mutant without COALESCE changes the digest (caught)"
+        else fail "row31: mutant without COALESCE was not caught"; fi
+    fi
     expect_absent "row33: a broken mysql wrapper spawns no claude" "$SD/claude.calls"
 }
 

@@ -509,6 +509,164 @@ def test_stale_lease_three_times_cap_real_remote(tmp_path):
     assert probe.returncode != 0, "capped push must leave the remote untouched"
 
 
+def _publish_feature(wt):
+    """Push `feature` so the worktree holds refs/remotes/origin/feature (lease Y)."""
+    _sh("git", "-C", str(wt), "push", "origin", "feature")
+    return _sh("git", "-C", str(wt), "rev-parse", "refs/remotes/origin/feature")
+
+
+def _rival_push(tmp_path, bare, *, from_branch, files=None, merge_master=False):
+    """Second clone moves origin/feature. Returns the new remote tip Z."""
+    rival = tmp_path / "rival"
+    _sh("git", "clone", "-b", from_branch, str(bare), str(rival))
+    _sh("git", "-C", str(rival), "config", "user.email", "r@r")
+    _sh("git", "-C", str(rival), "config", "user.name", "r")
+    if from_branch != "feature":
+        _sh("git", "-C", str(rival), "checkout", "-b", "feature")
+    if merge_master:
+        _sh("git", "-C", str(rival), "merge", "--no-ff", "--no-edit", "origin/master")
+    for name, text in (files or {}).items():
+        _commit(rival, name, text)
+    _sh("git", "-C", str(rival), "push", "origin", "HEAD:refs/heads/feature")
+    return _sh("git", "-C", str(bare), "rev-parse", "refs/heads/feature")
+
+
+def _tracking(wt):
+    r = subprocess.run(["git", "-C", str(wt), "rev-parse", "--verify", "--quiet",
+                        "refs/remotes/origin/feature"], capture_output=True, text=True)
+    return r.stdout.strip()
+
+
+def _bare_feature(bare):
+    return _sh("git", "-C", str(bare), "rev-parse", "refs/heads/feature")
+
+
+def test_lease_owner_update_branch_merge_adopted_real_remote(tmp_path):
+    """backlog#1286: the remote branch moved by a GitHub "Update branch" merge of a newer
+    master is ours; the retry adopts it as the lease and lands HEAD."""
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    _advance_origin_master(tmp_path, bare)
+    z = _rival_push(tmp_path, bare, from_branch="feature", merge_master=True)
+    _commit(wt, "local.txt", "mine\n")
+    git, argvs = _spy_live_git(wt)
+    result = runner._push_with_lease_retry(git, _noop_log, "phase2")
+    local_head = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    assert result == local_head
+    assert _bare_feature(bare) == local_head
+    pushes = _push_argvs(argvs)
+    assert f"--force-with-lease=feature:{y}" in pushes[0]
+    assert f"--force-with-lease=feature:{z}" in pushes[-1]
+
+
+def test_lease_owner_tree_equivalent_adopted_real_remote(tmp_path):
+    """backlog#1286: a remote tip with our exact tree is ours; the retry leases on it."""
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    _commit(wt, "local.txt", "same\n")
+    z = _rival_push(tmp_path, bare, from_branch="feature", files={"local.txt": "same\n"})
+    git, argvs = _spy_live_git(wt)
+    result = runner._push_with_lease_retry(git, _noop_log, "phase2")
+    local_head = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    assert result == local_head
+    assert _bare_feature(bare) == local_head
+    pushes = _push_argvs(argvs)
+    assert f"--force-with-lease=feature:{y}" in pushes[0]
+    assert f"--force-with-lease=feature:{z}" in pushes[-1]
+
+
+def test_lease_owner_foreign_tip_fails_closed_real_remote(tmp_path):
+    """backlog#1286: a foreign commit on the remote branch is never overwritten and never
+    becomes the lease: one rejected push, then remote-head-diverged."""
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    z = _rival_push(tmp_path, bare, from_branch="feature", files={"foreign.txt": "theirs\n"})
+    _commit(wt, "local.txt", "mine\n")
+    git, argvs = _spy_live_git(wt)
+    with pytest.raises(HarnessError) as exc_info:
+        runner._push_with_lease_retry(git, _noop_log, "phase2")
+    assert exc_info.value.kind == "remote-head-diverged"
+    assert len(_push_argvs(argvs)) == 1
+    assert _bare_feature(bare) == z
+    assert _tracking(wt) == y
+
+
+def test_lease_owner_no_tracking_equivalent_adopted_real_remote(tmp_path):
+    """backlog#1286: no tracking ref, remote holds our tree already (pushed elsewhere):
+    adopt it from an absent ref and land with one push."""
+    wt, bare = _feature_repo(tmp_path)
+    z = _rival_push(tmp_path, bare, from_branch="master", files={"feat.txt": "x\n"})
+    git, argvs = _spy_live_git(wt)
+    result = runner._push_with_lease_retry(git, _noop_log, "phase2")
+    local_head = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    assert result == local_head
+    assert _bare_feature(bare) == local_head
+    pushes = _push_argvs(argvs)
+    assert len(pushes) == 1
+    assert f"--force-with-lease=feature:{z}" in pushes[0]
+
+
+def test_lease_owner_no_tracking_foreign_fails_closed_real_remote(tmp_path):
+    """backlog#1286: no tracking ref and a foreign remote branch: zero pushes, remote
+    untouched, tracking ref still absent."""
+    wt, bare = _feature_repo(tmp_path)
+    z = _rival_push(tmp_path, bare, from_branch="master", files={"foreign.txt": "theirs\n"})
+    git, argvs = _spy_live_git(wt)
+    with pytest.raises(HarnessError) as exc_info:
+        runner._push_with_lease_retry(git, _noop_log, "phase2")
+    assert exc_info.value.kind == "remote-head-diverged"
+    assert _push_argvs(argvs) == []
+    assert _bare_feature(bare) == z
+    assert _tracking(wt) == ""
+
+
+def test_lease_owner_remote_branch_deleted_fails_closed_real_remote(tmp_path):
+    """backlog#1286: the remote branch was deleted after we published it; recreating a
+    deleted PR branch is never the harness's call."""
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    _sh("git", "-C", str(bare), "update-ref", "-d", "refs/heads/feature")
+    _commit(wt, "local.txt", "mine\n")
+    git, argvs = _spy_live_git(wt)
+    with pytest.raises(HarnessError) as exc_info:
+        runner._push_with_lease_retry(git, _noop_log, "phase2")
+    assert exc_info.value.kind == "remote-head-diverged"
+    assert len(_push_argvs(argvs)) == 1
+    gone = subprocess.run(["git", "-C", str(bare), "rev-parse", "--verify", "--quiet",
+                           "refs/heads/feature"], capture_output=True, text=True)
+    assert gone.returncode != 0
+    assert _tracking(wt) == y
+
+
+def test_lease_owner_unmoved_tip_falls_through_real_remote(tmp_path):
+    """backlog#1286: a rejection with no remote movement (Z == Y) keeps today's path."""
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    _commit(wt, "local.txt", "mine\n")
+    _reject_hook(bare, once=True)
+    git, argvs = _spy_live_git(wt)
+    result = runner._push_with_lease_retry(git, _noop_log, "phase2")
+    local_head = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    assert result == local_head
+    assert _bare_feature(bare) == local_head
+    pushes = _push_argvs(argvs)
+    assert len(pushes) == 2
+    for argv in pushes:
+        assert f"--force-with-lease=feature:{y}" in argv
+
+
+def test_verdict_remote_head_diverged_no_pr():
+    res = RunResult(
+        terminal=TerminalState.FAILED,
+        error_kind="remote-head-diverged",
+        error="remote-head-diverged: phase2: remote head 1234abcd diverged from lease 5678ef01",
+    )
+    line = runner.verdict_line(res, rc=3)
+    assert "\n" not in line
+    assert "remote-head-diverged" in line
+    assert "1234abcd" in line
+
+
 def test_push_disabled_and_detached_head_record_no_push_argv(tmp_path):
     """#827: push-disabled / detached-HEAD short-circuit before any `git push` runs."""
     wt, bare = _feature_repo(tmp_path)

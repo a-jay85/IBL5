@@ -49,3 +49,9 @@ The workflow replaces the per-harness steps with one step that calls the runner.
 - `bin/test-bug-pipeline-e2e`, `bin/test-burndown`, and `bin/test-burndown-loop` (the harnesses that keep their own serial steps)
 - `bin/test-pr-cycle` and `bin/test-digest-dm-build` (CI wiring assertions)
 - `.claude/rules/meta-tooling-bar.md`
+
+## Addendum: three serial harnesses (2026-10-03)
+
+Original figure: the Decision named `bin/test-burndown` as the one harness that keeps its own serial step. Today's figure: three harnesses keep their own serial steps in `.github/workflows/tests.yml`. `bin/test-bug-pipeline-e2e` exercises a real `lsof` port guard, so it cannot share the runner. `bin/test-burndown` and `bin/test-burndown-loop` each need a scrubbed environment from `env -i`.
+
+What changed: the original text named one harness. Two more were already running as serial steps. The decision itself is unchanged: a harness that cannot share the runner keeps its own serial step. The References list above names all three.

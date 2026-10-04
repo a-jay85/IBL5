@@ -19,6 +19,7 @@
 #                 as something else (bin/sim-recap-tick boots itself out
 #                 outside Regular Season). Unknown phase => not exempt.
 LEJ_EXPECTED_JOBS='com.ibl5.automouse standard
+com.ibl5.automouse-comprehension-digest standard
 com.ibl5.automouse-morning-digest standard
 com.ibl5.backups-sync standard
 com.ibl5.bug-bot keepalive
@@ -26,7 +27,9 @@ com.ibl5.bug-pipeline-cron standard
 com.ibl5.db-backups-pull standard
 com.ibl5.db-sync-nightly standard
 com.ibl5.docfix-poll standard
+com.ibl5.retro-mine standard
 com.ibl5.sim-recap-poll phase-gated
+com.ibl5.wt-gc standard
 com.ibl5.wt-sync standard'
 
 # One-shot runner label prefixes (bin/plan-now, bin/pr-review-now,

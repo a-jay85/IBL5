@@ -1976,6 +1976,19 @@ _fix5_bare="$(calls ready)"
 [[ "$_fix5_legacy" == "$_fix5_bare" ]] || fail "fix5 READY WITH NOTES: suffix form ran fleet $_fix5_legacy time(s), bare form $_fix5_bare"
 end_case "case fix5 details-shaped harness sticky"
 
+# bin/pr-cycle-tick hands bin/pr-cycle the exact argv shape `--go --only <csv> --max-ready <n>`.
+# Pin the dry-run form of it here, so a _normalize_prs change that drops comma input fails
+# this case before the tick breaks silently.
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+run --dry-run --only 101,102 --max-ready 2
+[[ $RC -eq 0 ]] || fail "tick argv contract: '--dry-run --only 101,102 --max-ready 2' exit $RC, want 0"
+reset_state
+run --dry-run --only 101,abc --max-ready 2
+[[ $RC -eq 2 ]] || fail "tick argv contract: '--only 101,abc' exit $RC, want 2"
+end_case "tick-argv-contract"
+
 # --- summary --------------------------------------------------------------------------------
 if [[ $FAILED -eq 0 ]]; then
     echo "test-pr-cycle: ALL PASS"

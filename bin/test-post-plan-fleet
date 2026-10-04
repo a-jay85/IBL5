@@ -313,6 +313,29 @@ grep -qE '1901 +branch-one +WT +WOULD FIRE' <<< "$out" || fail "PR 1901 should f
 clear_live_labels
 end_case label-anchor
 
+# --- case 10b: post-plan-now in flight for the same branch --------------------------------
+# A worktree-fired post-plan-now holds com.ibl5.postplan-now-<slug>-<ts>-<pid>. A fleet
+# rescue for the same branch would race it, so the fire loop must skip that PR.
+begin_case
+clean_slots
+set_live_labels "40477	0	com.ibl5.postplan-now-branch-one-20261003-120000-4242"
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "inflight run exited $rc, want 0 (out: $out)"
+grep -q '1901 .*post-plan-now in flight' <<< "$out" \
+    || fail "PR 1901 fired despite a live postplan-now label (out: $out)"
+grep -qE '1902 +branch-two +WT +WOULD FIRE' <<< "$out" \
+    || fail "PR 1902 should still fire (out: $out)"
+# Anchor: a label for slug branch-one-extra must not suppress branch-one.
+clean_slots
+set_live_labels "40477	0	com.ibl5.postplan-now-branch-one-extra-20261003-120000-4242"
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"
+grep -q 'post-plan-now in flight' <<< "$out" \
+    && fail "branch-one-extra label wrongly suppressed branch-one (out: $out)"
+grep -qE '1901 +branch-one +WT +WOULD FIRE' <<< "$out" \
+    || fail "PR 1901 should fire under the anchor fixture (out: $out)"
+clear_live_labels
+end_case postplan-now-inflight-skip
+
 # --- Phase 8 fixture setup ---------------------------------------------------------------
 # Shared fixtures for preflight/report cases.
 

@@ -25,6 +25,28 @@ ljob_agents_dir() { printf '%s\n' "$HOME/Library/LaunchAgents"; }
 # ---------------------------------------------------------------------------
 ljob_snapshot() { launchctl list 2>/dev/null || true; }
 
+# Branch name -> the SAFE_SLUG bin/post-plan-now derives for its launchd label.
+# Must stay byte-identical to bin/post-plan-now's `tr -cs 'A-Za-z0-9._-' '-'`.
+ljob_safe_slug() { printf '%s' "$1" | tr -cs 'A-Za-z0-9._-' '-'; }
+
+# ljob_postplan_now_live <safe_slug> <snapshot>: prints the label of a live worktree-fired
+# post-plan-now run for that slug and returns 0, or returns 1. Same anchored glob as
+# postplan_inflight_label in bin/post-plan-now: the "-" after the slug must be followed by
+# YYYYmmdd-HHMMSS-<pid>, so slug "foo" never matches a job for slug "foo-bar". The quoted
+# "$want" is matched literally, so dots in a slug need no escaping. Reads a here-string,
+# never a pipe, so an early return cannot SIGPIPE a writer under pipefail.
+ljob_postplan_now_live() {
+    local want="$1" snap="${2-}" _pid _status label
+    [[ -n "$want" ]] || return 1
+    while IFS=$'\t' read -r _pid _status label; do
+        case "$label" in
+            com.ibl5.postplan-now-"$want"-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9]*)
+                printf '%s\n' "$label"; return 0 ;;
+        esac
+    done <<< "$snap"
+    return 1
+}
+
 # ---------------------------------------------------------------------------
 # ljob_listed <ERE> <snapshot> — herestring grep; anchoring is the caller's.
 # ---------------------------------------------------------------------------

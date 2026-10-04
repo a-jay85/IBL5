@@ -49,7 +49,9 @@ Expected: `Installed com.ibl5.watch-pr-cycle (StartInterval 1800s)`, a `launchct
 ## References
 
 - `bin/pr-cycle-tick`: the tick with ordered cheapest-first guards
+- `bin/pr-cycle-tick-cron-setup`: LaunchAgent installer with `--print-schedule`
 - `bin/lib/pr-cycle-watch.sh`: per-PR skip predicates
+- `bin/test-pr-cycle-tick`: tick, lib and installer harness
 - `bin/pr-cycle`: the one-pass pipeline the tick hands PRs to
 - `bin/post-plan-fleet`: fleet-side race fix
 - `bin/post-plan-now`: now-side race fix

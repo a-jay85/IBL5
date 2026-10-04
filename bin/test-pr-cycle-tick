@@ -449,6 +449,11 @@ stripped="$(sed 's/^[[:space:]]*#.*$//' "$SRC_TICK")"
 for bad in 'sleep' 'pr merge' '--arm' 'merge_group'; do
     grep -qF -- "$bad" <<< "$stripped" && fail "invariants: tick source contains '$bad'"
 done
+# A `${VAR-}` default (no colon) treats an empty seam as set, so the empty-seam cases
+# (stop-file-env-empty, cmd-seams-empty) would run with a blank path. Pin the colon form.
+if grep -qE '\$\{PR_CYCLE_[A-Z_]+-[^}]*\}' <<< "$stripped"; then
+    fail "invariants: tick source uses a colon-less \${VAR-} default for a seam variable"
+fi
 end_case invariants
 
 reset; begin_case

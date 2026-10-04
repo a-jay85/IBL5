@@ -191,7 +191,7 @@ Object Reference — finding D-09).
 `submit($user)` gates `is_user()` and resolves the team from the session
 (`cookiedecode($user)` → `getTeamnameFromUsername($cookie[1])`), rejecting
 null/empty/Free-Agents sessions. The session username is threaded into
-`DepthChartEntrySubmissionHandler::handleSubmission()`, which derives the
+`DepthChartSubmissionHandler::handleSubmission()`, which derives the
 authoritative team and **ignores POST `Team_Name`** as the write target.
 
 ```php

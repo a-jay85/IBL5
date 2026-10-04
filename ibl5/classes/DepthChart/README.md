@@ -12,10 +12,10 @@ The Depth Chart Entry module has been refactored to follow best practices for te
 
 **Security: IDOR Close + Roster Validation (September 2026)**
 - Closed IDOR in `updatePlayerDepthChart()`: WHERE clause now keys on `pid AND teamid` instead of player name, so a request cannot update a player on a different team
-- `DepthChartEntrySubmissionHandler` resolves `teamid` from the session before any DB write and passes it to every write method; `getPlayersOnTeam()` uses the session-derived id, not POST data
-- Added `validateRoster()` to `DepthChartEntryValidator`: rejects foreign pids, duplicate pids, and omissions of any roster player before writes begin
-- `DepthChartEntryProcessor` now extracts `pid` from POST for each player row (0 when absent or non-numeric)
-- Added 9 roster-validation tests in `DepthChartEntrySubmissionHandlerRosterTest`
+- `DepthChartSubmissionHandler` resolves `teamid` from the session before any DB write and passes it to every write method; `getPlayersOnTeam()` uses the session-derived id, not POST data
+- Added `validateRoster()` to `DepthChartValidator`: rejects foreign pids, duplicate pids, and omissions of any roster player before writes begin
+- `DepthChartProcessor` now extracts `pid` from POST for each player row (0 when absent or non-numeric)
+- Added 9 roster-validation tests in `DepthChartSubmissionHandlerRosterTest`
 
 ## Recent Updates (2025)
 
@@ -42,21 +42,21 @@ The Depth Chart Entry module has been refactored to follow best practices for te
 
 The module is now organized into the following classes:
 
-#### 1. **DepthChartEntryController**
+#### 1. **DepthChartController**
 - **Purpose**: Main entry point coordinating the depth chart entry workflow
 - **Responsibilities**:
   - Handles user authentication and team retrieval
   - Orchestrates data retrieval and view rendering
   - Manages the form display flow
 
-#### 2. **DepthChartEntryRepository**
+#### 2. **DepthChartRepository**
 - **Purpose**: Handles all database operations
 - **Responsibilities**:
   - Retrieves team player data
   - Updates player depth chart settings
   - Updates team history timestamps
 
-#### 3. **DepthChartEntryProcessor**
+#### 3. **DepthChartProcessor**
 - **Purpose**: Processes and transforms depth chart data
 - **Responsibilities**:
   - Processes form submission data
@@ -64,7 +64,7 @@ The module is now organized into the following classes:
   - Detects invalid configurations (e.g., multiple starting positions)
   - Generates CSV export format
 
-#### 4. **DepthChartEntryValidator**
+#### 4. **DepthChartValidator**
 - **Purpose**: Validates depth chart submissions
 - **Responsibilities**:
   - Validates active player counts
@@ -73,14 +73,14 @@ The module is now organized into the following classes:
   - Adjusts validation rules based on season phase (Regular Season vs Playoffs)
   - Generates formatted error messages
 
-#### 5. **DepthChartEntryView**
+#### 5. **DepthChartView**
 - **Purpose**: Renders all HTML output for the module
 - **Responsibilities**:
   - Renders form elements (dropdowns, inputs)
   - Renders player rows (all players can play at all positions)
   - Renders submission results
 
-#### 6. **DepthChartEntrySubmissionHandler**
+#### 6. **DepthChartSubmissionHandler**
 - **Purpose**: Handles form submissions
 - **Responsibilities**:
   - Orchestrates submission processing
@@ -109,7 +109,7 @@ The module is now organized into the following classes:
 - index.php reduced from 621 lines to 95 lines
 
 ### 4. **Extensibility**
-- New validation rules can be added to DepthChartEntryValidator
+- New validation rules can be added to DepthChartValidator
 - View rendering can be customized without affecting business logic
 - Database schema changes only require updates to Repository
 - Easy to add new features without modifying existing code
@@ -122,25 +122,25 @@ ibl5/
 │   └── DepthChartEntry/
 │       └── index.php (thin controller - 95 lines)
 ├── classes/
-│   └── DepthChartEntry/
-│       ├── DepthChartEntryApiHandler.php
-│       ├── DepthChartEntryController.php
-│       ├── DepthChartEntryProcessor.php
-│       ├── DepthChartEntryRepository.php
-│       ├── DepthChartEntrySubmissionHandler.php
-│       ├── DepthChartEntryValidator.php
-│       └── DepthChartEntryView.php
+│   └── DepthChart/
+│       ├── DepthChartApiHandler.php
+│       ├── DepthChartController.php
+│       ├── DepthChartProcessor.php
+│       ├── DepthChartRepository.php
+│       ├── DepthChartSubmissionHandler.php
+│       ├── DepthChartValidator.php
+│       └── DepthChartView.php
 └── tests/
-    └── DepthChartEntry/
-        ├── DepthChartEntryProcessorTest.php
-        └── DepthChartEntryValidatorTest.php
+    └── DepthChart/
+        ├── DepthChartProcessorTest.php
+        └── DepthChartValidatorTest.php
 ```
 
 ## Testing
 
 Run the Depth Chart tests:
 ```bash
-vendor/bin/phpunit --testsuite="DepthChartEntry Module Tests"
+vendor/bin/phpunit --testsuite="DepthChart Module Tests"
 ```
 
 Run all tests:
@@ -150,9 +150,9 @@ vendor/bin/phpunit
 
 ### Test Coverage
 - **33 tests** covering validation, processing, and repository logic
-- **DepthChartEntryProcessorTest**: 8 tests for data processing and CSV generation
-- **DepthChartEntryValidatorTest**: 16 tests for validation rules
-- **DepthChartEntryRepositoryTest**: 9 tests for database operations (including bug fix verification)
+- **DepthChartProcessorTest**: 8 tests for data processing and CSV generation
+- **DepthChartValidatorTest**: 16 tests for validation rules
+- **DepthChartRepositoryTest**: 9 tests for database operations (including bug fix verification)
 - Tests for regular season and playoff validation rules
 - Tests for detecting invalid configurations
 - Tests for 0 affected rows scenario (critical bug fix)

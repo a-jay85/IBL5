@@ -1,14 +1,14 @@
 ---
 description: Persists and retrieves GM-saved depth chart configurations via a JSON API.
-last_verified: 2026-09-22
+last_verified: 2026-10-03
 ---
 
-# SavedDepthChart
+# DepthChartSnapshot
 
-Provides a JSON API (no page view) for saving and loading GM-defined depth chart configurations. `SavedDepthChartApiHandler` handles incoming HTMX/API requests and delegates to `SavedDepthChartService`, which coordinates persistence through `SavedDepthChartRepository`. There is no HTML view class — all responses are JSON.
+Provides a JSON API (no page view) for saving and loading GM-defined depth chart configurations. `DepthChartSnapshotApiHandler` handles incoming HTMX/API requests and delegates to `DepthChartSnapshotService`, which coordinates persistence through `DepthChartSnapshotRepository`. There is no HTML view class. All responses are JSON.
 
 | Class | Role |
 |---|---|
-| `SavedDepthChartApiHandler` | Handles API requests; routes to service |
-| `SavedDepthChartService` | Orchestrates save/retrieve logic |
-| `SavedDepthChartRepository` | Database persistence for depth chart configs |
+| `DepthChartSnapshotApiHandler` | Handles API requests; routes to service |
+| `DepthChartSnapshotService` | Orchestrates save/retrieve logic |
+| `DepthChartSnapshotRepository` | Database persistence for depth chart configs |

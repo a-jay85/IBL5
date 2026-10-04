@@ -1,5 +1,5 @@
 ---
-description: Admin control panel for managing season phases, league toggles, and system-wide settings via the leagueControlPanel.php entry point.
+description: Admin control panel for managing season phases, league toggles, and system-wide settings via the `modules/LeagueControlPanel/index.php` entry point.
 last_verified: 2026-10-03
 ---
 
@@ -20,7 +20,7 @@ Admin control panel for managing league settings, season phases, and system-wide
 
 ## Entry Point
 
-`ibl5/leagueControlPanel.php` — thin bootstrapper with admin auth guard and PRG pattern.
+`ibl5/modules/LeagueControlPanel/index.php`: thin bootstrapper with admin auth guard and PRG pattern.
 
 ## Actions
 

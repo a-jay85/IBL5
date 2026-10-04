@@ -19,6 +19,12 @@ class JsbExportServiceTest extends TestCase
     /** @var JsbExportRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private JsbExportRepositoryInterface $stubRepo;
 
+    /** sha256 of exportPlrFile output for goldenPlrRecords() + goldenDbPlayers(), captured on master. */
+    private const GOLDEN_PLR_SHA256 = '0ecc0c06d386c9860b4e0d0e4e28808707954da65c9b073b310128988bcca3d7';
+
+    /** sha256 of exportTrnFile output for goldenTradeItems(), captured on master. */
+    private const GOLDEN_TRN_SHA256 = '1cb2a75776283ef93f7d1fa1c42f58e119ceb3fe240552df0bf0746748da33ec';
+
     protected function setUp(): void
     {
         $this->stubRepo = self::createStub(JsbExportRepositoryInterface::class);
@@ -271,6 +277,96 @@ class JsbExportServiceTest extends TestCase
         }
     }
 
+    /**
+     * @return list<string>
+     */
+    private function goldenPlrRecords(): array
+    {
+        return [
+            $this->buildSyntheticRecord(1, 101, 5, 3, 'Golden Match', 2, 3, 900, 950, 1000, 0, 0, 0, 0),
+            $this->buildSyntheticRecord(2, 303, 7, 0, 'Golden Unknown', 1, 1, 300, 0, 0, 0, 0, 0, 0),
+            $this->buildSyntheticRecord(3, 202, 5, 1, 'Golden Changed', 1, 2, 500, 600, 0, 0, 0, 0, 0),
+        ];
+    }
+
+    /**
+     * @return array<int, array{pid: int, name: string, teamid: int, bird: int, cy: int, cyt: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int, fa_signing_flag: int}>
+     */
+    private function goldenDbPlayers(): array
+    {
+        return [
+            101 => [
+                'pid' => 101,
+                'name' => 'Golden Match',
+                'teamid' => 5,
+                'bird' => 3,
+                'cy' => 2,
+                'cyt' => 3,
+                'salary_yr1' => 900,
+                'salary_yr2' => 950,
+                'salary_yr3' => 1000,
+                'salary_yr4' => 0,
+                'salary_yr5' => 0,
+                'salary_yr6' => 0,
+                'fa_signing_flag' => 0,
+            ],
+            202 => [
+                'pid' => 202,
+                'name' => 'Golden Changed',
+                'teamid' => 12,
+                'bird' => 2,
+                'cy' => 1,
+                'cyt' => 3,
+                'salary_yr1' => 500,
+                'salary_yr2' => 600,
+                'salary_yr3' => 700,
+                'salary_yr4' => 0,
+                'salary_yr5' => 0,
+                'salary_yr6' => 0,
+                'fa_signing_flag' => 1,
+            ],
+        ];
+    }
+
+    public function testExportPlrFileGoldenBytesUnchanged(): void
+    {
+        $inputFile = $this->writeTmpFile($this->buildPlrContent($this->goldenPlrRecords()));
+        $outputFile = $inputFile . '.out';
+
+        $this->stubRepo->method('getAllPlayerChangeableFields')->willReturn($this->goldenDbPlayers());
+
+        try {
+            $result = $this->makeService()->exportPlrFile($inputFile, $outputFile);
+            $this->assertSame(0, $result->errors);
+            $this->assertSame(1, $result->playersModified);
+            $this->assertSame(5, $result->fieldsChanged);
+            $this->assertSame([
+                'Loaded 2 players from database',
+                'Found 3 player records in .plr file',
+                'Wrote ' . filesize($outputFile) . ' bytes to ' . $outputFile,
+            ], $result->messages);
+            $this->assertSame([
+                [
+                    'pid' => 202,
+                    'name' => 'Golden Changed',
+                    'changes' => [
+                        ['field' => 'teamid', 'old' => 5, 'new' => 12],
+                        ['field' => 'bird', 'old' => 1, 'new' => 2],
+                        ['field' => 'cyt', 'old' => 2, 'new' => 3],
+                        ['field' => 'salary_yr3', 'old' => 0, 'new' => 700],
+                        ['field' => 'freeAgentSigningFlag', 'old' => 0, 'new' => 1],
+                    ],
+                ],
+            ], $result->changeLog);
+            $this->assertSame(self::GOLDEN_PLR_SHA256, hash_file('sha256', $outputFile));
+        } finally {
+            unlink($inputFile);
+            if (file_exists($outputFile)) {
+                unlink($outputFile);
+            }
+        }
+    }
+
     // ── exportTrnFile ────────────────────────────────────────────
 
     public function testExportTrnFileHandlesZeroItems(): void
@@ -388,6 +484,38 @@ class JsbExportServiceTest extends TestCase
         try {
             $result = $this->makeService()->exportTrnFile($outputFile, '2025-07-01');
             $this->assertSame(0, $result->errors);
+        } finally {
+            if (file_exists($outputFile)) {
+                unlink($outputFile);
+            }
+        }
+    }
+
+    /**
+     * @return list<array{tradeofferid: int, itemid: int, itemtype: string, trade_from: string, trade_to: string, created_at: string}>
+     */
+    private function goldenTradeItems(): array
+    {
+        return [
+            ['tradeofferid' => 1, 'itemid' => 4001, 'itemtype' => \Trading\TradeItemType::Player->value, 'trade_from' => 'Celtics', 'trade_to' => 'Lakers', 'created_at' => '2026-01-15 10:00:00'],
+            ['tradeofferid' => 1, 'itemid' => 4002, 'itemtype' => \Trading\TradeItemType::Player->value, 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'created_at' => '2026-01-15 10:00:00'],
+            ['tradeofferid' => 1, 'itemid' => 2027, 'itemtype' => \Trading\TradeItemType::DraftPick->value, 'trade_from' => 'Celtics', 'trade_to' => 'Lakers', 'created_at' => '2026-01-15 10:00:00'],
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => \Trading\TradeItemType::Cash->value, 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'created_at' => '2026-01-15 10:00:00'],
+            ['tradeofferid' => 2, 'itemid' => 4003, 'itemtype' => \Trading\TradeItemType::Player->value, 'trade_from' => 'Expansion', 'trade_to' => 'Heat', 'created_at' => '2026-02-03 09:30:00'],
+        ];
+    }
+
+    public function testExportTrnFileGoldenBytesUnchanged(): void
+    {
+        $this->stubRepo->method('getCompletedTradeItems')->willReturn($this->goldenTradeItems());
+
+        $outputFile = tempnam(sys_get_temp_dir(), 'trn_out_');
+        $this->assertIsString($outputFile);
+
+        try {
+            $result = $this->makeService()->exportTrnFile($outputFile, '2025-10-01');
+            $this->assertSame(0, $result->errors);
+            $this->assertSame(self::GOLDEN_TRN_SHA256, hash_file('sha256', $outputFile));
         } finally {
             if (file_exists($outputFile)) {
                 unlink($outputFile);

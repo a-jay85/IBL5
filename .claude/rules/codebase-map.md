@@ -123,8 +123,8 @@ Cache -> Clock
 CapSpace -> League Season Security Team UI
 CareerLeaderboards -> BasketballStats Cache Player Security
 Cli -> Module
-ComparePlayers -> BasketballStats Player Security UI
-ContractList -> Player Security UI
+ComparePlayers -> BasketballStats Player Repositories Security UI
+ContractList -> Player Repositories Security UI
 Database -> League
 Debug -> Auth Security Utilities
 DepthChartEntry -> EventLog Http League NextSim Repositories SavedDepthChart Season Security Standings Team TeamSchedule UI
@@ -138,14 +138,14 @@ Extension -> BasketballStats Discord FreeAgency Player Repositories Team
 FranchiseHistory -> League Security UI
 FranchiseRecordBook -> BasketballStats League Player Security UI
 FreeAgency -> Auth Database Discord EventLog Http League Player Repositories Season Security Team Trading UI
-FreeAgencyPreview -> Player Security UI
+FreeAgencyPreview -> Player Repositories Security UI
 GMContactList -> League Security UI
 GameBoxscore -> League Player Security UI
 HeadToHeadRecords -> Cache League Security UI
 Injuries -> League Player Season Security Team UI
 JsbParser -> League PlrParser
 LastSimRecap -> League Player Repositories Security UI Utilities
-League -> Database Season
+League -> Database Repositories Season
 LeagueConfig -> League
 LeagueControlPanel -> Discord JsbParser League Maintenance PageLayout Security Trading Voting
 LeagueSchedule -> BasketballStats League Season Security
@@ -171,7 +171,7 @@ Schedule -> LeagueSchedule Repositories Standings TeamSchedule
 Search -> Database Security
 Season -> League
 SeasonArchive -> Database League Player Security UI
-SeasonHighs -> Cache League Player Season Security UI
+SeasonHighs -> Cache League Player Repositories Season Security UI
 SeasonLeaderboards -> BasketballStats Cache League Player Security UI
 Security -> Clock
 Settings -> Season
@@ -182,7 +182,7 @@ TeamOffDefStats -> BasketballStats League Season Security UI
 TeamSchedule -> BasketballStats League LeagueSchedule Season Security Team
 Topics -> Database Search Security
 Trading -> Auth Database Discord EventLog League Player Repositories Season Security Team UI
-TrainingCampRatingsDiff -> Database Player Security UI
+TrainingCampRatingsDiff -> Database Player Repositories Security UI
 TransactionHistory -> Security
 UI -> League Player Season Security Team
 Updater -> BasketballStats Boxscore BulkImport Discord JsbParser League LeagueConfig LeagueControlPanel PageLayout PlrParser SavedDepthChart Season Security Settings Standings Trading Utilities

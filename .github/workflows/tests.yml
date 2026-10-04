@@ -62,6 +62,7 @@ jobs:
             # and shell:. Guarded by bin/test-path-filters.
             both:
               - 'bin/sim-recap-*'
+              - '.github/workflows/sim-recap.yml'
               - 'ibl5/scripts/simRecapQueue.php'
               - 'ibl5/scripts/storeSimRecap.php'
               - 'ibl5/scripts/simRecapContext.php'
@@ -1054,6 +1055,7 @@ jobs:
             bin/test-launchd-health-cron-setup \
             bin/test-bug-pipeline-ci-autofix \
             bin/test-sim-recap-tick \
+            bin/test-sim-recap-ssh-gate \
             bin/test-discord-dm \
             bin/test-post-plan-fail-dm \
             bin/test-token-report \

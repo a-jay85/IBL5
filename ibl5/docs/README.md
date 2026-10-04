@@ -1,6 +1,6 @@
 ---
 description: Index of all IBL5 project documentation.
-last_verified: 2026-08-11
+last_verified: 2026-10-04
 ---
 
 # IBL5 Documentation Index
@@ -24,7 +24,7 @@ This directory is the primary home for all project documentation.
 | [API_GUIDE.md](API_GUIDE.md) | REST API overview — auth, rate limiting, ETag caching, controller inventory |
 | [DEVELOPMENT_ENVIRONMENT.md](DEVELOPMENT_ENVIRONMENT.md) | Docker setup, dependency caching, database connection |
 | [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md) | Production ops — deploy, rollback, DB restore, logs, running without the harness |
-| [DOCUMENTATION_STANDARDS.md](DOCUMENTATION_STANDARDS.md) | Documentation organization and lifecycle |
+| [DOCUMENTATION_STANDARDS.md](DOCUMENTATION_STANDARDS.md) | Documentation organization, lifecycle, and changelog policy |
 | [TESTING_STANDARDS.md](TESTING_STANDARDS.md) | Testing philosophy and conventions |
 | [decisions/README.md](decisions/README.md) | Architecture Decision Records (ADRs) — why each load-bearing decision was made |
 
@@ -34,6 +34,7 @@ This directory is the primary home for all project documentation.
 |----------|-------------|
 | [REFACTORING_HISTORY.md](REFACTORING_HISTORY.md) | Complete timeline of all 30 module refactorings |
 | [STRATEGIC_PRIORITIES.md](STRATEGIC_PRIORITIES.md) | Post-refactoring roadmap and next priorities |
+| [Changelog Policy](DOCUMENTATION_STANDARDS.md#changelog-policy) | No CHANGELOG file by decision. Where recent changes are recorded, and the filtered `git log` command that answers "what changed recently?" |
 
 ## Component Documentation
 

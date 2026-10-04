@@ -102,6 +102,8 @@ class CachedSeasonHighsRepository implements SeasonHighsRepositoryInterface
     }
 
     /**
+     * The md5(json_encode($stats)) segment makes edits to the stats map self-invalidate.
+     *
      * @param array<string, string> $stats
      */
     private function buildCacheKey(

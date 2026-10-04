@@ -16,6 +16,10 @@ final class SeasonHighsRepositoryConstructionSitesTest extends TestCase
     private const CONSTRUCTION_PATTERN = '/new\s+\\\\?(?:SeasonHighs\\\\)?SeasonHighsRepository\s*\(/';
     private const WRAPPED_PATTERN = '/new\s+\\\\?(?:SeasonHighs\\\\)?CachedSeasonHighsRepository\s*\(\s*$/';
 
+    /**
+     * Restoring the bare construction in the SeasonHighs module entry point
+     * is reported as modules/SeasonHighs/index.php:41.
+     */
     public function testEveryProductionConstructionIsWrappedInCachedDecorator(): void
     {
         $root = dirname(__DIR__, 2);

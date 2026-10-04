@@ -11,6 +11,9 @@ use PlrParser\PlrFileWriter;
 use PHPUnit\Framework\TestCase;
 
 /**
+ * PlrExportService.php must import nothing from JsbParser. The `.trn` counterpart stays in
+ * JsbParser and is described in ibl5/classes/JsbParser/README.md.
+ *
  * @covers \PlrParser\PlrExportService
  */
 class PlrExportServiceTest extends TestCase
@@ -359,6 +362,10 @@ class PlrExportServiceTest extends TestCase
         }
     }
 
+    /**
+     * PlrExportService::__construct takes the PlrParser-owned repository contract, which keeps
+     * the PlrParser module free of a JsbParser dependency.
+     */
     public function testConstructorAcceptsPlrExportRepositoryContract(): void
     {
         $param = (new \ReflectionMethod(PlrExportService::class, '__construct'))->getParameters()[0];

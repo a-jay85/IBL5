@@ -44,13 +44,21 @@ docfix_health_compose() {
 # docfix_health_poll_detail <detail> <log_dir> <run_log_dir>
 #
 # Echoes one line: the detail plus where the Mac poll's launchd logs live and the
-# newest docfix-run log ("none" when there is no log). Always returns 0.
+# newest docfix-run log ("none" when there is no log). When that log holds a
+# usage/session-limit line, the last such line is appended as " | Limit: <line>"
+# (trimmed, cut to 200 chars) so the DM says why a run died. Always returns 0.
 docfix_health_poll_detail() {
-    local detail="${1:-}" log_dir="${2:-}" run_log_dir="${3:-}" newest
+    local detail="${1:-}" log_dir="${2:-}" run_log_dir="${3:-}" newest limit="" suffix=""
     newest="$(ls -t "$run_log_dir"/docfix-run-*.log 2>/dev/null | head -1)" || true
-    [ -n "$newest" ] || newest="none"
-    printf '%s | Poll logs: %s/launchd-stdout.log, %s/launchd-stderr.log | Run log: %s\n' \
-        "$detail" "$log_dir" "$log_dir" "$newest"
+    if [ -n "$newest" ]; then
+        limit="$(grep -E 'hit your session limit|usage limit' "$newest" 2>/dev/null | tail -1 \
+            | tr '\r\n' '  ' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | cut -c1-200)" || true
+    else
+        newest="none"
+    fi
+    [ -n "$limit" ] && suffix=" | Limit: $limit"
+    printf '%s | Poll logs: %s/launchd-stdout.log, %s/launchd-stderr.log | Run log: %s%s\n' \
+        "$detail" "$log_dir" "$log_dir" "$newest" "$suffix"
 }
 
 # docfix_health_heartbeat_verdict <last_iso> <now_epoch> [max_h]

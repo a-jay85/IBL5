@@ -1,6 +1,6 @@
 ---
 description: The prod deploy takes a full database dump on the prod host before the code reset whenever the deploy brings new migration files, and fails the deploy if the dump fails.
-last_verified: 2026-09-30
+last_verified: 2026-10-05
 ---
 
 > This ADR was drafted by the post-plan harness for this PR. A human must review and approve it before merging.
@@ -53,3 +53,7 @@ Any failure exits non-zero. The workflow step has no `continue-on-error`, so a f
 - `.github/workflows/db-backup.yml` (nightly dump whose flags the snapshot copies)
 - `bin/check-destructive-migrations` (the PR-time scan this complements)
 - `ibl5/migrations/README.md` (restore instructions)
+
+## Addendum — narrowed dump trigger (2026-10-05)
+
+The Decision section says the script dumps when migration files differ between `HEAD` and `origin/production`. The script now dumps only when the deploy adds new `.sql` files under `ibl5/migrations/`. It runs `git diff --name-only --diff-filter=A HEAD origin/production -- 'ibl5/migrations/*.sql'`. Edits to existing migration files and other non-added changes print the skip line and exit 0. The rest of the decision is unchanged.

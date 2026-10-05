@@ -1582,8 +1582,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
         except HarnessError as e:
             if e.kind == "remote-head-diverged":
                 raise
-            last = _phase7_stop(log, trail, attempt, sha, stage, e,
-                                local_sha=(git.head() if stage == "commit" else None))
+            last = _phase7_stop(log, trail, attempt, sha, stage, e)
             break
 
         # PR-body proposal: the agent may not run `gh pr edit`; the harness judges the

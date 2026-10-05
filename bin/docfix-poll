@@ -463,11 +463,12 @@ health_report() {
             # pushing" (e.g. a Claude usage limit). In production it now runs on the
             # Mac right after the poll, so the `wedged` arm above and the in-flight
             # interlock both see local state. Name both causes and the Mac check
-            # that splits them.
+            # that splits them. A missing log is not proof the poll is absent: /tmp
+            # clears on macOS reboot, so the detail points at launchctl first.
             # Keep it ONE line: health output is parsed as key=value lines.
             if [ "$age_h" -ge 36 ] && ! docfix_run_in_flight; then
                 alert=true; kind="never-ran"
-                detail="No refresh PR has been opened in ${age_h}h. Either the Mac poll is not installed or the last doc-fix run died before pushing (e.g. a Claude usage limit). On the Mac, check: ls -t /tmp/docfix-run-*.log | head -1 — tail that log for the cause; if there is no log, install the poll: cd ~/GitHub/IBL5 && git pull && bin/docfix-poll --install-schedule"
+                detail="No refresh PR has been opened in ${age_h}h. Either the Mac poll is not installed or the last doc-fix run died before pushing (e.g. a Claude usage limit). On the Mac, check: ls -t /tmp/docfix-run-*.log | head -1 — tail that log for the cause. If there is no log, the poll may still be installed: /tmp is wiped on reboot, so a crashed run followed by a reboot also leaves no log. Run launchctl list | grep docfix; reinstall only if no docfix job is listed: cd ~/GitHub/IBL5 && git pull && bin/docfix-poll --install-schedule"
             fi
         fi
     fi

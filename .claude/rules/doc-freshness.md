@@ -1,6 +1,6 @@
 ---
-description: Operative rules for the frontmatter schema (including `paths:` residency semantics, repo-relative only, never glob an always-loaded rule), 60-day staleness policy, on-touch verification rule, dead-reference rule, and retired-figure rule enforced by bin/check-docs. Rationale, history, and gate mechanics live in doc-freshness-detail.md (Read on demand). Decision-record append-only rule moved to .claude/rules/adr-append-only.md.
-last_verified: 2026-10-01
+description: Operative rules for the frontmatter schema (including `paths:` residency semantics, repo-relative only, never glob an always-loaded rule), 60-day staleness policy, on-touch verification rule, dead-reference rule, and retired-figure rule, and the engine lint-pin rule enforced by bin/check-docs. Rationale, history, and gate mechanics live in doc-freshness-detail.md (Read on demand). Decision-record append-only rule moved to .claude/rules/adr-append-only.md.
+last_verified: 2026-10-05
 paths: "**/*.md"
 ---
 
@@ -57,3 +57,7 @@ When a dated correction retires a *figure*, the correction must propagate to eve
 - **`⚠` is not a marker.**
 
 Adding an entry is a high bar: only when the retired form is distinctive enough that a legitimate live use is implausible. When a figure fails the bar, correct the docs and skip the gate. Run `bin/check-docs --self-test` to exercise the exemption logic. Rationale and scope limit: `doc-freshness-detail.md` § Retired-figure rationale.
+
+## Engine Lint-Pin Rule
+
+`.github/workflows/engine.yml` is the source of truth for the two golangci-lint pins: the action ref (`golangci-lint-action@<sha> # vX.Y.Z`) and the linter binary (`with: version:`). The full scan of `bin/check-docs` fails with `FAIL engine lint pin drift` when a doc listed in its `ENGINE_LINT_PIN_DOCS` constant restates a different value. A doc's abbreviated SHA must be a prefix of the workflow SHA and its action tag must match. Every other three-part `v` semver in the doc must equal the binary version. A pin bump edits the workflow and every tracked doc in one PR. A tracked doc that no longer restates the pins also fails, so drop it from the constant when its prose changes.

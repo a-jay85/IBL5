@@ -150,6 +150,8 @@ set_checks() {
         pending) echo '{"total_count":1,"check_runs":[{"name":"ci","status":"in_progress","conclusion":null,"started_at":"2026-10-03T00:00:00Z"}]}' > "$f" ;;
         red)     echo '{"total_count":1,"check_runs":[{"name":"ci","status":"completed","conclusion":"failure","completed_at":"2026-10-03T00:00:00Z"}]}' > "$f" ;;
         none)    echo '{"total_count":0,"check_runs":[]}' > "$f" ;;
+        signoff) echo '{"total_count":2,"check_runs":[{"name":"ci","status":"completed","conclusion":"success","completed_at":"2026-10-03T00:00:00Z"},{"name":"human-signoff","status":"completed","conclusion":"failure","completed_at":"2026-10-03T00:00:00Z"}]}' > "$f" ;;
+        signoff-red) echo '{"total_count":2,"check_runs":[{"name":"ci","status":"completed","conclusion":"failure","completed_at":"2026-10-03T00:00:00Z"},{"name":"human-signoff","status":"completed","conclusion":"failure","completed_at":"2026-10-03T00:00:00Z"}]}' > "$f" ;;
     esac
 }
 
@@ -300,6 +302,20 @@ run_tick
 out_has 'checks pending' || fail "pending-skip(fetch fails): no 'checks pending': $OUT"
 no_file "$SCRATCH/pr-cycle.log" || fail "pending-skip(fetch fails): launched"
 end_case pending-skip
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 signoff
+run_tick
+out_has 'checks green' || fail "signoff-only-skip: no 'checks green': $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "signoff-only-skip: launched"
+end_case signoff-only-skip
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 signoff-red
+run_tick
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
+    || fail "signoff-plus-red-qualifies: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+end_case signoff-plus-red-qualifies
 
 reset; begin_case
 set_prs "$RED101"; set_checks aaa1111 red

@@ -32,10 +32,27 @@ class TrainingCampRatingsDiffService implements Contracts\TrainingCampRatingsDif
         'oo', 'r_drive_off', 'po', 'r_trans_off', 'od', 'dd', 'pd', 'td',
     ];
 
+    /**
+     * Memoized baseline phase per season year (null results cached too), so the
+     * snapshot-phase query runs once per request however many methods ask.
+     *
+     * @var array<int, string|null>
+     */
+    private array $baselinePhaseCache = [];
+
     public function __construct(
         private readonly TrainingCampRatingsDiffRepositoryInterface $repository,
         private readonly int $currentSeasonEndingYear,
     ) {
+    }
+
+    private function resolveBaselinePhase(int $year): ?string
+    {
+        if (!array_key_exists($year, $this->baselinePhaseCache)) {
+            $this->baselinePhaseCache[$year] = $this->repository->getBaselinePhase($year);
+        }
+
+        return $this->baselinePhaseCache[$year];
     }
 
     /**
@@ -46,7 +63,7 @@ class TrainingCampRatingsDiffService implements Contracts\TrainingCampRatingsDif
     public function getDiffs(?int $overrideYear = null, ?int $filterTid = null, string $filterStatus = ''): array
     {
         $baselineYear  = $overrideYear ?? ($this->currentSeasonEndingYear - 1);
-        $baselinePhase = $this->repository->getBaselinePhase($baselineYear);
+        $baselinePhase = $this->resolveBaselinePhase($baselineYear);
         if ($baselinePhase === null) {
             return [];
         }
@@ -96,7 +113,7 @@ class TrainingCampRatingsDiffService implements Contracts\TrainingCampRatingsDif
     public function getBaselineYear(?int $overrideYear = null): ?int
     {
         $year  = $overrideYear ?? ($this->currentSeasonEndingYear - 1);
-        $phase = $this->repository->getBaselinePhase($year);
+        $phase = $this->resolveBaselinePhase($year);
         return $phase !== null ? $year : null;
     }
 
@@ -105,7 +122,7 @@ class TrainingCampRatingsDiffService implements Contracts\TrainingCampRatingsDif
      */
     public function getBaselinePhase(?int $overrideYear = null): ?string
     {
-        return $this->repository->getBaselinePhase($overrideYear ?? ($this->currentSeasonEndingYear - 1));
+        return $this->resolveBaselinePhase($overrideYear ?? ($this->currentSeasonEndingYear - 1));
     }
 
     /**

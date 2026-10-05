@@ -987,6 +987,8 @@ assert_eq "only: RESET-STALE exit 0" "0" "$ONLY_ST"
 assert_eq "only: RESET-STALE HEAD at origin" "$ORIGIN37" "$(git -C "$WT37" rev-parse HEAD)"
 assert_eq "only: RESET-STALE backup ref" "$HEAD37_BEFORE" \
     "$(git -C "$WT37" rev-parse --verify -q refs/wt-sync-backup/wt-stale37 2>/dev/null)"
+assert_match "only: RESET-STALE logged verdict" "branch=wt-stale37 verdict=RESET-STALE" \
+    "$(cat "$_TICK_LOG" 2>/dev/null)"
 
 # ── Test 38: only: --dry-run on stale copy reports, writes nothing ────────────
 MAIN38="$(new_env)"
@@ -1105,6 +1107,8 @@ run_only "$WT44"
 assert_eq "only-backup-fail: DIVERGED-CONFLICT stdout" "DIVERGED-CONFLICT" "$ONLY_OUT"
 assert_eq "only-backup-fail: exit 0" "0" "$ONLY_ST"
 assert_eq "only-backup-fail: HEAD unchanged" "$HEAD44_BEFORE" "$(git -C "$WT44" rev-parse HEAD)"
+assert_match "only-backup-fail: STRAGGLER logged" \
+    "STRAGGLER branch=wt-stale44 reason=on-demand-DIVERGED-CONFLICT" "$(cat "$_TICK_LOG" 2>/dev/null)"
 # Confirm no in-progress merge was left
 if git -C "$WT44" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
     failcase "only-backup-fail: in-progress merge left"
@@ -1128,6 +1132,26 @@ assert_eq "reflog-guard: exit 0" "0" "$ONLY_ST"
 assert_eq "reflog-guard: HEAD unchanged" "$HEAD45_BEFORE" "$(git -C "$WT45" rev-parse HEAD)"
 assert_eq "reflog-guard: backup ref preserved" "$SAVED45" \
     "$(git -C "$WT45" rev-parse --verify -q refs/wt-sync-backup/wt-stale45 2>/dev/null)"
+
+# ── Test 46: fleet: existing reflog-less backup ref → STRAGGLER reason=reset-failed ─
+# Fleet-mode twin of Test 45: backup_and_reset refuses, so the tick leaves the
+# worktree alone, counts it as ahead, and logs the reset-failed straggler.
+MAIN46="$(new_env)"
+WT46="$(add_worktree "$MAIN46" "wt-stale46" stale-copy)"
+LOG46="$(fresh_log t46)"; LOCKD46="$(fresh_lockd t46)"
+HEAD46_BEFORE="$(git -C "$WT46" rev-parse HEAD)"
+SAVED46="$(git -C "$WT46" rev-parse refs/remotes/origin/wt-stale46)"
+git -C "$WT46" update-ref "refs/wt-sync-backup/wt-stale46" "$SAVED46" >/dev/null 2>&1 || true
+run_with_repo "$MAIN46" "$LOG46" "$LOCKD46" -- --force
+assert_eq     "fleet-reflog-guard: exit 0" "0" "$ST"
+assert_match  "fleet-reflog-guard: STRAGGLER reset-failed logged" \
+    "STRAGGLER branch=wt-stale46 reason=reset-failed" "$(cat "$LOG46" 2>/dev/null)"
+assert_match  "fleet-reflog-guard: counted ahead=1" "ahead=1 reset-stale=0" "$(cat "$LOG46" 2>/dev/null)"
+assert_absent "fleet-reflog-guard: no RESET-STALE audit line" "RESET-STALE branch=wt-stale46" \
+    "$(cat "$LOG46" 2>/dev/null)"
+assert_eq     "fleet-reflog-guard: HEAD unchanged" "$HEAD46_BEFORE" "$(git -C "$WT46" rev-parse HEAD)"
+assert_eq     "fleet-reflog-guard: backup ref preserved" "$SAVED46" \
+    "$(git -C "$WT46" rev-parse --verify -q refs/wt-sync-backup/wt-stale46 2>/dev/null)"
 
 # ── Hook wrapper tests ────────────────────────────────────────────────────────
 HOOK="$SCRIPT_DIR/hooks/wt-sync-session-start.sh"

@@ -54,6 +54,6 @@ Any failure exits non-zero. The workflow step has no `continue-on-error`, so a f
 - `bin/check-destructive-migrations` (the PR-time scan this complements)
 - `ibl5/migrations/README.md` (restore instructions)
 
-## Addendum — narrowed dump trigger (2026-10-05)
+## Addendum: narrowed dump trigger (2026-10-05)
 
 The Decision section says the script dumps when migration files differ between `HEAD` and `origin/production`. The script now dumps only when the deploy adds new `.sql` files under `ibl5/migrations/`. It runs `git diff --name-only --diff-filter=A HEAD origin/production -- 'ibl5/migrations/*.sql'`. Edits to existing migration files and other non-added changes print the skip line and exit 0. The rest of the decision is unchanged.

@@ -403,12 +403,12 @@ PLIST_MIDNIGHT="$TMP/com.ibl5.automouse.midnight.plist"
 sed 's|<integer>4</integer>|<integer>0</integer>|; s|<integer>30</integer>|<integer>0</integer>|' \
     "$PLIST" > "$PLIST_MIDNIGHT"
 
-# Case 19 fixtures. The daily fire sits 12 hours from now, so a one-shot two
+# Case 19 fixtures. The daily fire sits 12 hours from now, so a one-shot ten
 # minutes out always beats it and one two days out always loses, whatever time
 # the suite runs. The expected one-shot HH:MM comes from the same epoch the stub
 # hands out. BSD `date -r` first, GNU `date -d @` second.
 NOW_EPOCH="$(date +%s)"
-ONESHOT_SOON=$(( NOW_EPOCH + 120 ))
+ONESHOT_SOON=$(( NOW_EPOCH + 600 ))
 ONESHOT_LATE=$(( NOW_EPOCH + 2 * 86400 ))
 ONESHOT_PAST=$(( NOW_EPOCH - 3600 ))
 ONESHOT_SOON_HM="$(date -r "$ONESHOT_SOON" +%H:%M 2>/dev/null \

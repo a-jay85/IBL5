@@ -1332,6 +1332,11 @@ def test_comment_nit_re_drops_verb_anchored_rewording_nits(title, detail):
     # Not filtered: defect in detail overrides the nit classification
     ("Clarify _ALREADY_DONE_RE docstring in fidelity.py",
      "The regex drops real followups silently when they name an old PR."),
+    # Not filtered: nit-like titles with no verb prefix (the regex is verb-anchored)
+    ("Stale docstring in compose_sticky",
+     "The docstring is out of date."),
+    ("Misleading comment above the retry loop",
+     "It says three tries but the code does five."),
 ])
 def test_comment_nit_re_keeps_additive_and_defect_notes(title, detail):
     """Additive docstring notes and notes with defect details are not filtered."""

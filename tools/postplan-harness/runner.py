@@ -1346,9 +1346,10 @@ _CI_FIX_REWATCH_FLOOR_SECS = 300   # less than this after a push: record the hea
 
 
 def _phase7_stop(log, trail: list[str], attempt: int, sha, stage: str,
-                 e: HarnessError) -> str:
+                 e: HarnessError, local_sha=None) -> str:
     """Log and record a Phase 7 attempt that stopped on an error. `stage` is
-    "llm", "commit" or "push". Returns the `last` outcome token."""
+    "llm", "commit" or "push". `local_sha` is the local ci-fix commit, named in
+    the unpushed-commit line. Returns the `last` outcome token."""
     last = f"error:{e.kind}"
     tail = " | ".join(_error_tail(e.output or e.detail))
     log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} "
@@ -1357,7 +1358,8 @@ def _phase7_stop(log, trail: list[str], attempt: int, sha, stage: str,
     trail.append(f"attempt {attempt}: {last} ({stage}-time): {tail or 'no output captured'}")
     if stage in ("commit", "push"):
         log("ci-fix commit is LOCAL and unpushed; "
-            "the next bin/post-plan-now run ships it")
+            "the next bin/post-plan-now run ships it"
+            + (f" ({str(local_sha)[:12]})" if local_sha else ""))
     return last
 
 
@@ -1640,7 +1642,8 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 except HarnessError as push_err:
                     if push_err.kind == "remote-head-diverged":
                         raise
-                    last = _phase7_stop(log, trail, attempt, sha, "push", push_err)
+                    last = _phase7_stop(log, trail, attempt, sha, "push", push_err,
+                                         local_sha=new)
                     break
                 if sha != pre_push_head:
                     log(f"phase7 ci-fix: push caught up to origin/master; "

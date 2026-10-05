@@ -1018,6 +1018,22 @@ H5B="$(_hl docfix_health_poll_detail 'base detail' '/logs' "$SBH/emptyrun")"; H5
   && ok "(H5) health lib: poll_detail names launchd logs + newest run log; none when empty" \
   || bad "(H5) health lib: poll_detail"
 
+# (H5b) poll_detail: a session-limit line in the newest run log is appended; a log
+# without one leaves the output identical to the no-limit shape.
+RUNDIR5B="$SBH/runlogs-limit"; mkdir -p "$RUNDIR5B"
+printf 'working...\n  You'"'"'ve hit your session limit · resets 12am  \n' > "$RUNDIR5B/docfix-run-c.log"
+RUNDIR5C="$SBH/runlogs-nolimit"; mkdir -p "$RUNDIR5C"
+printf 'working...\nall quiet\n' > "$RUNDIR5C/docfix-run-d.log"
+H5BL="$(_hl docfix_health_poll_detail 'base detail' '/logs' "$RUNDIR5B")"
+H5CL="$(_hl docfix_health_poll_detail 'base detail' '/logs' "$RUNDIR5C")"
+H5CWANT="base detail | Poll logs: /logs/launchd-stdout.log, /logs/launchd-stderr.log | Run log: $RUNDIR5C/docfix-run-d.log"
+_hl docfix_health_compose wedged "$H5BL" "$SBH/out5b" >/dev/null
+{ printf '%s' "$H5BL" | grep -qF "| Limit: You've hit your session limit · resets 12am" \
+    && sed -n 2p "$SBH/out5b" | grep -qF "resets 12am" \
+    && [ "$H5CL" = "$H5CWANT" ]; } \
+  && ok "(H5b) health lib: poll_detail appends the session-limit line; unchanged without one" \
+  || bad "(H5b) health lib: poll_detail session-limit line"
+
 # (H6) verdict boundaries.
 _epoch() { jq -rn --arg t "$1" '$t | fromdateiso8601'; }
 V6A="$(_hl docfix_health_heartbeat_verdict 2026-09-29T04:05:00Z "$(_epoch 2026-09-29T21:47:00Z)")"

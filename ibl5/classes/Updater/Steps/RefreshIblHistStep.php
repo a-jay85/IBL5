@@ -66,6 +66,9 @@ final class RefreshIblHistStep implements PipelineStepInterface
      * per (pid, season_year). Derived from migration 109; the phase-rank CASE
      * has since diverged from it ('playoffs' rank 0, and conf-finals ranked
      * above playoffs-rd2/rd1 so the latest playoff round wins a stats_gm tie).
+     * PhaseRankOrderConsistencyTest pins the playoff-round order against
+     * TrainingCampRatingsDiffRepository::getBaselinePhase() and the CASE copies in
+     * ci-seed.sql and PromotePriorSeasonSnapshotTest.
      */
     private const string SELECT_SQL = <<<'SQL'
 SELECT

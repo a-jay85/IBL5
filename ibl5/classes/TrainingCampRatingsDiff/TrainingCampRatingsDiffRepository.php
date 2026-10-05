@@ -28,6 +28,8 @@ class TrainingCampRatingsDiffRepository extends BaseMysqliRepository implements 
      * the playoffs phases because it can hold offseason/preseason ratings. The
      * archive-named phases come from bulk imports; 'playoffs' comes from the live
      * updater (SnapshotPlrStep) or a bulk import of {season}_{NN}_playoffs archives.
+     * The relative order of finals, conf-finals and rd2/rd1 must match the ibl_hist
+     * tie-break in RefreshIblHistStep::SELECT_SQL; PhaseRankOrderConsistencyTest asserts it.
      */
     public function getBaselinePhase(int $seasonYear): ?string
     {

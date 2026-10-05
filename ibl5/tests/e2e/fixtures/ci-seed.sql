@@ -2063,6 +2063,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name), teamid = VALUES(teamid), cy = VALUE
 -- Refresh materialized ibl_hist table from seeded snapshots.
 -- CI runs migrations BEFORE seed data, so migration 109's initial INSERT
 -- finds empty ibl_plr_snapshots. This populates ibl_hist from the rows above.
+-- The phase-rank CASE mirrors RefreshIblHistStep::SELECT_SQL; PhaseRankOrderConsistencyTest asserts it.
 -- ============================================================
 DELETE FROM ibl_hist;
 INSERT INTO ibl_hist
@@ -2109,11 +2110,11 @@ FROM (
     PARTITION BY s.pid, s.season_year
     ORDER BY s.stats_gm DESC,
       CASE s.snapshot_phase
-        WHEN 'end-of-season' THEN 1 WHEN 'finals' THEN 2 WHEN 'post-heat' THEN 3
-        WHEN 'heat-finals' THEN 4 WHEN 'heat-end' THEN 5
-        WHEN 'playoffs-rd2-gm4-7' THEN 6 WHEN 'playoffs-rd2-gm1-3' THEN 7
-        WHEN 'playoffs-rd1-gm4-7' THEN 8 WHEN 'playoffs-rd1-gm1-3' THEN 9
-        WHEN 'conf-finals-gm4-7' THEN 10 WHEN 'conf-finals-gm1-3' THEN 11
+        WHEN 'playoffs' THEN 0 WHEN 'end-of-season' THEN 1 WHEN 'finals' THEN 2
+        WHEN 'post-heat' THEN 3 WHEN 'heat-finals' THEN 4 WHEN 'heat-end' THEN 5
+        WHEN 'conf-finals-gm4-7' THEN 6 WHEN 'conf-finals-gm1-3' THEN 7
+        WHEN 'playoffs-rd2-gm4-7' THEN 8 WHEN 'playoffs-rd2-gm1-3' THEN 9
+        WHEN 'playoffs-rd1-gm4-7' THEN 10 WHEN 'playoffs-rd1-gm1-3' THEN 11
         WHEN 'heat-wb' THEN 12 WHEN 'heat-lb' THEN 13 ELSE 99
       END ASC, s.id DESC
   ) AS rn FROM ibl_plr_snapshots s WHERE s.stats_gm > 0

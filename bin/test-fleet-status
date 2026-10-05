@@ -1073,6 +1073,70 @@ HELP_LINES="$(printf '%s\n' "$HELP" | wc -l | tr -d ' ')"
     && pass "--help line count unchanged" \
     || fail "--help line count unchanged (expected $HELP_LINES_BASELINE, got $HELP_LINES)"
 
+# Case 25 — --watch on a real pty: the `[ -t 1 ]` branch (alternate screen, clipping,
+# EXIT restore) never runs under `$(...)` as in Case 22. A python3 pty.fork helper
+# gives the script a controlling terminal sized 8x120, waits for the first frame
+# (its "refreshing every" footer), then, after 1s so bash is in its sleep leg,
+# SIGTERMs the whole process group. The sleep dies, bash runs the TERM trap
+# (exit 130) and then the EXIT restore. The helper keeps draining the pty meanwhile
+# (macOS blocks the child's exit on unread tty output), SIGKILLs any survivor, and
+# prints the captured bytes. Needs only python3; skips if absent or no pty.
+PTY_WATCH_PY='
+import os, pty, sys, time, signal, select, fcntl, termios, struct
+pid, fd = pty.fork()
+if pid == 0:
+    os.execv(sys.argv[1], [sys.argv[1], "--watch", "999"])
+fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 8, 120, 0, 0))
+buf = b""
+deadline = time.time() + 25
+sent = False
+while time.time() < deadline:
+    r, _, _ = select.select([fd], [], [], 0.2)
+    if r:
+        try:
+            d = os.read(fd, 65536)
+        except OSError:
+            break
+        if not d:
+            break
+        buf += d
+    if not sent and b"refreshing every" in buf:
+        time.sleep(1)  # let bash reach its sleep leg; a TERM mid-frame-write is lost
+        sent = True
+        try: os.killpg(pid, signal.SIGTERM)
+        except OSError: pass
+try: os.killpg(pid, signal.SIGKILL)
+except OSError: pass
+try: os.waitpid(pid, 0)
+except OSError: pass
+sys.stdout.buffer.write(buf)
+'
+OUTPUT_PTY=""
+if command -v python3 >/dev/null 2>&1; then
+    OUTPUT_PTY="$(env PATH="$STUBBIN:$PATH" \
+        FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
+        FLEET_STATUS_HARNESS_OUT="$OUT" \
+        FLEET_STATUS_LOG_DIR="$LOGS" \
+        FLEET_STATUS_TRANSCRIPT_ROOT="$TX" \
+        FLEET_STATUS_JQ=jq \
+        FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
+        FLEET_STATUS_REORDER_APP_DIR="$TMP/apps" \
+        FLEET_STATUS_OSACOMPILE="$STUBBIN/osacompile" \
+        python3 -c "$PTY_WATCH_PY" "$FLEET" 2>/dev/null | LC_ALL=C tr -d '\000' || true)"
+fi
+if [ -n "$OUTPUT_PTY" ]; then
+    assert_has "watch tty: alternate-screen enter + autowrap off" \
+        "$OUTPUT_PTY" '\[\?1049h.*\[\?7l'
+    assert_has "watch tty: oversized frame clipped with a more-lines footer" \
+        "$OUTPUT_PTY" '[0-9]+ more lines'
+    assert_has "watch tty: refresh footer still drawn after clipping" \
+        "$OUTPUT_PTY" 'refreshing every 999s'
+    assert_has "watch tty: EXIT trap restores autowrap + main screen after TERM" \
+        "$OUTPUT_PTY" '\[\?7h.*\[\?1049l'
+else
+    printf '  skip  %s\n' "watch tty: alt-screen/clip/restore (no python3 or no pty available)"
+fi
+
 printf '\n'
 if [ "$FAILED" -eq 0 ]; then
     printf 'test-fleet-status: ALL PASS\n'

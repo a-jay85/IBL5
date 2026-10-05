@@ -1,7 +1,7 @@
 ---
 description: Go engine workflow — run the CI-pinned golangci-lint locally before merging (auto-merge races ahead of engine.yml), the two lint rules it enforces, and the real measured runtime of an archive A/B walk.
 paths: "engine/**"
-last_verified: 2026-09-29
+last_verified: 2026-10-05
 ---
 
 # Engine (Go) Workflow
@@ -38,6 +38,7 @@ cd engine && golangci-lint run --path-prefix=engine   # must report 0 issues
 SHA-pinned (`golangci/golangci-lint-action@ba0d7d2… # v9.3.0`); the linter binary it runs is
 pinned separately by `with: version: v2.12.2`. The version to install locally is the
 **tool** pin, `v2.12.2`. When either moves, update this file and the install line together.
+The `bin/check-docs` full scan fails a PR whose pins here or in `engine/.claude/rules/engine-context.md` drift from `engine.yml`.
 
 Two rules it enforces that are easy to trip:
 

@@ -162,8 +162,9 @@ Options:
                      regardless of whether any doc is stale. A report, not a
                      gate. Consumed by the doc-freshness-audit workflow.
   --self-test        Run the offline fixtures and exit — retired-figure
-                     exemptions, plus the changed-doc diff union (in a throwaway
-                     temp repo). Never scans this repo. Both cover logic whose
+                     exemptions, the engine lint-pin fixtures, plus the
+                     changed-doc diff union (in a throwaway
+                     temp repo). Never scans this repo. These cover logic whose
                      bug is a SILENT false negative; the loud failure modes are
                      left to the next PR.
   --verbose, -v      Show passing files too.
@@ -1558,6 +1559,174 @@ function selfTestGitignoreFilter(): int
     return 1;
 }
 
+// Engine lint pins: .github/workflows/engine.yml is the source of truth. Each
+// tracked doc restates the action ref and the linter binary version in prose,
+// so a pin bump that skips the docs silently falsifies them (backlog #712).
+const ENGINE_LINT_WORKFLOW = '.github/workflows/engine.yml';
+const ENGINE_LINT_PIN_DOCS = [
+    '.claude/rules/engine-go.md',
+    'engine/.claude/rules/engine-context.md',
+];
+
+/**
+ * Extract the golangci-lint pins from the engine workflow body.
+ * Returns ['sha' => 40-hex, 'tag' => 'vX.Y.Z', 'binary' => 'vX.Y.Z'] or null
+ * when the Lint step's action ref or its `version:` input cannot be parsed.
+ */
+function parseEngineLintPins(string $yaml): ?array
+{
+    $lines = preg_split('/\R/', $yaml) ?: [];
+    $count = count($lines);
+    foreach ($lines as $i => $line) {
+        if (!preg_match('/^\s*(?:-\s+)?uses:\s*golangci\/golangci-lint-action@([0-9a-f]{40})\s+#\s*(v\d+\.\d+\.\d+)\s*$/', $line, $m)) {
+            continue;
+        }
+        for ($j = $i + 1; $j < $count; $j++) {
+            if (preg_match('/^\s*-\s/', $lines[$j])) {
+                break; // next step: this step has no pinned version
+            }
+            if (preg_match('/^\s*version:\s*[\'"]?(v\d+\.\d+\.\d+)[\'"]?\s*$/', $lines[$j], $v)) {
+                return ['sha' => $m[1], 'tag' => $m[2], 'binary' => $v[1]];
+            }
+        }
+        return null;
+    }
+    return null;
+}
+
+/**
+ * Pure over its inputs so --self-test can drive it. $yaml null = workflow
+ * absent; $docs maps repo-relative path => content (null = file absent).
+ */
+function engineLintPinIssues(?string $yaml, array $docs): array
+{
+    $present = array_filter($docs, static fn ($c): bool => $c !== null);
+    if ($yaml === null) {
+        return $present === []
+            ? []
+            : [ENGINE_LINT_WORKFLOW . ' missing but tracked pin docs exist; update ENGINE_LINT_PIN_DOCS in bin/check-docs'];
+    }
+    $pins = parseEngineLintPins($yaml);
+    if ($pins === null) {
+        return [ENGINE_LINT_WORKFLOW . ': cannot parse the golangci-lint-action@<40-hex sha> # vX.Y.Z ref plus its `version: vX.Y.Z` input; fix the workflow or this parser'];
+    }
+    $issues = [];
+    foreach ($docs as $rel => $content) {
+        if ($content === null) {
+            $issues[] = "{$rel}: tracked pin doc missing; update ENGINE_LINT_PIN_DOCS in bin/check-docs";
+            continue;
+        }
+        $sawAction = false;
+        $sawBinary = false;
+        foreach (preg_split('/\R/', $content) ?: [] as $i => $line) {
+            $n = $i + 1;
+            $tagOffsets = [];
+            if (preg_match_all('/golangci-lint-action@([0-9a-f]{7,40})(?:…|\.\.\.)?\s*#\s*(v\d+\.\d+\.\d+)/u', $line, $am, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
+                foreach ($am as $a) {
+                    $sawAction = true;
+                    $tagOffsets[$a[2][1]] = true;
+                    if (!str_starts_with($pins['sha'], $a[1][0])) {
+                        $issues[] = "{$rel}:{$n}: action SHA {$a[1][0]} is not a prefix of engine.yml's {$pins['sha']}";
+                    }
+                    if ($a[2][0] !== $pins['tag']) {
+                        $issues[] = "{$rel}:{$n}: action tag {$a[2][0]} != engine.yml {$pins['tag']}";
+                    }
+                }
+            }
+            if (preg_match_all('/(?<![0-9A-Za-z_.])v\d+\.\d+\.\d+(?![0-9A-Za-z_])/', $line, $vm, PREG_OFFSET_CAPTURE)) {
+                foreach ($vm[0] as [$tok, $off]) {
+                    if (isset($tagOffsets[$off])) {
+                        continue;
+                    }
+                    $sawBinary = true;
+                    if ($tok !== $pins['binary']) {
+                        $issues[] = "{$rel}:{$n}: binary pin {$tok} != engine.yml version: {$pins['binary']}";
+                    }
+                }
+            }
+        }
+        if (!$sawAction || !$sawBinary) {
+            $issues[] = "{$rel}: no golangci-lint " . (!$sawAction ? 'action ref' : 'binary version') . ' found; the doc no longer restates the pin, so drop it from ENGINE_LINT_PIN_DOCS or restore the pin';
+        }
+    }
+    return $issues;
+}
+
+function checkEngineLintPins(string $repoRoot): array
+{
+    $read = static function (string $rel) use ($repoRoot): ?string {
+        $path = $repoRoot . '/' . $rel;
+        if (!is_file($path)) {
+            return null;
+        }
+        $c = file_get_contents($path);
+        return $c === false ? null : $c;
+    };
+    $docs = [];
+    foreach (ENGINE_LINT_PIN_DOCS as $rel) {
+        $docs[$rel] = $read($rel);
+    }
+    return engineLintPinIssues($read(ENGINE_LINT_WORKFLOW), $docs);
+}
+
+function selfTestEngineLintPins(): int
+{
+    $yaml = static fn (string $sha, string $tag, string $ver): string =>
+        "      - name: Lint\n"
+        . "        uses: golangci/golangci-lint-action@{$sha} # {$tag}\n"
+        . "        with:\n"
+        . "          version: {$ver}\n"
+        . "          working-directory: engine\n"
+        . "      - name: Test\n";
+    $sha = 'ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a';
+    $doc = "golangci-lint **v2.x**\n(`golangci/golangci-lint-action@ba0d7d2… # v9.3.0`)\n`with: version: v2.12.2`\n";
+    $docAscii = "golangci-lint **v2.x**\n(`golangci/golangci-lint-action@ba0d7d2... # v9.3.0`)\n`with: version: v2.12.2`\n";
+    $clean = $yaml($sha, 'v9.3.0', 'v2.12.2');
+    $versionNextStep = "      - name: Lint\n"
+        . "        uses: golangci/golangci-lint-action@{$sha} # v9.3.0\n"
+        . "        with:\n"
+        . "          working-directory: engine\n"
+        . "      - name: Test\n"
+        . "        with:\n"
+        . "          version: v2.12.2\n";
+    $noAction = "      - name: Lint\n        run: golangci-lint run\n        with:\n          version: v2.12.2\n";
+
+    // [label, yaml|null, docs, expected issue count, substring of the issue]
+    $cases = [
+        ['clean', $clean, ['doc-a.md' => $doc], 0, ''],
+        ['ascii-ellipsis', $clean, ['doc-a.md' => $docAscii], 0, ''],
+        ['binary-drift', $yaml($sha, 'v9.3.0', 'v2.13.0'), ['doc-a.md' => $doc], 1, 'binary pin v2.12.2 != engine.yml version: v2.13.0'],
+        ['tag-drift', $yaml($sha, 'v9.4.0', 'v2.12.2'), ['doc-a.md' => $doc], 1, 'action tag v9.3.0 != engine.yml v9.4.0'],
+        ['sha-drift', $yaml(str_repeat('c', 40), 'v9.3.0', 'v2.12.2'), ['doc-a.md' => $doc], 1, 'is not a prefix of'],
+        ['version-latest', $yaml($sha, 'v9.3.0', 'latest'), ['doc-a.md' => $doc], 1, 'cannot parse'],
+        ['version-in-next-step', $versionNextStep, ['doc-a.md' => $doc], 1, 'cannot parse'],
+        ['no-action-line', $noAction, ['doc-a.md' => $doc], 1, 'cannot parse'],
+        ['pins-vanished', $clean, ['doc-a.md' => "golangci-lint **v2.x** only\n"], 1, 'no golangci-lint action ref found'],
+        ['doc-missing', $clean, ['doc-a.md' => null], 1, 'tracked pin doc missing'],
+        ['workflow-missing', null, ['doc-a.md' => $doc], 1, 'missing but tracked pin docs exist'],
+        ['all-absent', null, ['doc-a.md' => null], 0, ''],
+    ];
+
+    $failed = 0;
+    foreach ($cases as [$label, $y, $docs, $want, $needle]) {
+        $issues = engineLintPinIssues($y, $docs);
+        $ok = count($issues) === $want
+            && ($needle === '' || ($issues !== [] && str_contains($issues[0], $needle)));
+        echo ($ok ? 'PASS' : 'FAIL') . ": engine lint pin: {$label}\n";
+        if (!$ok) {
+            $failed++;
+            echo '     got: ' . json_encode($issues, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+        }
+    }
+    $total = count($cases);
+    if ($failed === 0) {
+        echo "\nselfTestEngineLintPins: {$total}/{$total} cases passed.\n";
+        return 0;
+    }
+    echo "\nselfTestEngineLintPins: {$failed}/{$total} cases FAILED.\n";
+    return 1;
+}
+
 function checkSkillDraftPlaceholder(string $repoRoot): array
 {
     $issues = [];
@@ -1616,7 +1785,9 @@ foreach (array_slice($argv, 1) as $arg) {
             echo "\n";
             $rc = max($rc, selfTestChangedDocPaths());
             echo "\n";
-            exit(max($rc, selfTestGitignoreFilter()));
+            $rc = max($rc, selfTestGitignoreFilter());
+            echo "\n";
+            exit(max($rc, selfTestEngineLintPins()));
         case '--help':
         case '-h':
             echo usage();
@@ -1745,6 +1916,17 @@ $skillDraftIssues = checkSkillDraftPlaceholder($root);
 if ($skillDraftIssues !== []) {
     echo "FAIL skill DRAFT= command-substitution\n";
     foreach ($skillDraftIssues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    $failures++;
+}
+
+// Corpus-wide like the retired-figure scan: the drift lands as an engine.yml
+// pin bump that touches no doc, so a --since doc filter would never see it.
+$enginePinIssues = checkEngineLintPins($root);
+if ($enginePinIssues !== []) {
+    echo "FAIL engine lint pin drift\n";
+    foreach ($enginePinIssues as $issue) {
         echo "     - {$issue}\n";
     }
     $failures++;

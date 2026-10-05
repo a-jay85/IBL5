@@ -14,6 +14,8 @@ from harness.adapters.llm import FixtureLlm, MODEL_MAP
 from harness.classify import FILES_CHANGED_BEGIN, name_status_text, numstat_text
 from harness.state import HarnessError, TerminalState, UsageLedger
 
+pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
+
 CANNED = {
     "pr-copy": {"type": "chore", "title": "chore: replay", "commit_subject": "chore: replay commit", "summary_md": "## Summary\n- x\n"},
     "body-check": {"corrected_body": "## Summary\n- replay body\n", "findings": []},

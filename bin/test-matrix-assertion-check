@@ -20,29 +20,13 @@ ok() { printf 'PASS %s\n' "$1"; }
 fail() { printf 'FAIL %s\n' "$1"; FAILED=1; }
 
 # Print the standard Verification Matrix header + separator + given rows.
-# Two calling conventions:
-#   plan_fixture <row> [<row>...]       — write rows to stdout (old behavior)
-#   plan_fixture <dir> <token> [...]    — write plan.md into <dir>, echo path
+# Usage: plan_fixture <row> [<row>...] — writes the header and rows to stdout.
+# To get a plan file outside the repo (keeps git status clean), redirect into a temp path:
+#   plan="$(mktemp -d)/plan.md"; plan_fixture '<row>' > "$plan"
 plan_fixture() {
-    if [ -d "${1:-}" ]; then
-        local _repo="$1"; shift
-        # Write to a temp file outside the repo so git status stays clean
-        local _tmpdir _path
-        _tmpdir=$(mktemp -d)
-        _path="$_tmpdir/plan.md"
-        {
-            printf '| # | What to verify | Test type | Timing | Test file / location |\n'
-            printf '|---|---------------|-----------|--------|---------------------|\n'
-            for _tok in "$@"; do
-                printf '| 1 | `%s` verifies the gate | CLI-executable | post-impl | `bin/test-it` |\n' "$_tok"
-            done
-        } > "$_path"
-        echo "$_path"
-    else
-        printf '| # | What to verify | Test type | Timing | Test file / location |\n'
-        printf '|---|---------------|-----------|--------|---------------------|\n'
-        printf '%s\n' "$@"
-    fi
+    printf '| # | What to verify | Test type | Timing | Test file / location |\n'
+    printf '|---|---------------|-----------|--------|---------------------|\n'
+    printf '%s\n' "$@"
 }
 
 # replay_2578_fixture <dir> [tagged]
@@ -196,7 +180,8 @@ step67-unrealised() {
     git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
 
     local plan
-    plan=$(plan_fixture "$repo" "frobnicate_widget_case")
+    plan="$(mktemp -d)/plan.md"
+    plan_fixture '| 1 | `frobnicate_widget_case` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' > "$plan"
 
     # Branch commit adds a file WITHOUT the token
     echo "nothing here" > "$repo/some_file.txt"
@@ -226,7 +211,8 @@ step67-clean() {
     git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
 
     local plan
-    plan=$(plan_fixture "$repo" "frobnicate_widget_case")
+    plan="$(mktemp -d)/plan.md"
+    plan_fixture '| 1 | `frobnicate_widget_case` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' > "$plan"
 
     # Branch commit adds a file WITH the token
     echo "frobnicate_widget_case" > "$repo/test_widget.py"
@@ -256,7 +242,8 @@ step67-uncommitted() {
     git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
 
     local plan
-    plan=$(plan_fixture "$repo" "frobnicate_widget_case")
+    plan="$(mktemp -d)/plan.md"
+    plan_fixture '| 1 | `frobnicate_widget_case` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' > "$plan"
 
     # Token file exists but is NOT committed (untracked)
     echo "frobnicate_widget_case" > "$repo/test_widget.py"
@@ -284,7 +271,8 @@ step67-unavailable() {
     git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
 
     local plan
-    plan=$(plan_fixture "$repo" "frobnicate_widget_case")
+    plan="$(mktemp -d)/plan.md"
+    plan_fixture '| 1 | `frobnicate_widget_case` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' > "$plan"
 
     echo "frobnicate_widget_case" > "$repo/test_widget.py"
     git -C "$repo" add test_widget.py
@@ -331,7 +319,8 @@ prefire-rule-staged-new-file-realised() {
     git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
 
     local plan
-    plan=$(plan_fixture "$repo" "frobnicate_prefire_case")
+    plan="$(mktemp -d)/plan.md"
+    plan_fixture '| 1 | `frobnicate_prefire_case` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' > "$plan"
 
     # New uncommitted file staged with the token
     echo "frobnicate_prefire_case" > "$repo/test_prefire.py"
@@ -366,7 +355,8 @@ prefire-rule-missing-token-unrealised() {
     git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
 
     local plan
-    plan=$(plan_fixture "$repo" "frobnicate_prefire_case")
+    plan="$(mktemp -d)/plan.md"
+    plan_fixture '| 1 | `frobnicate_prefire_case` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' > "$plan"
 
     # Staged file does NOT contain the token
     echo "nothing relevant" > "$repo/test_prefire.py"

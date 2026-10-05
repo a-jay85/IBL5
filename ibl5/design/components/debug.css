@@ -16,7 +16,7 @@
 .debug-panel__content {
     margin: 0;
     padding: 8px;
-    background-color: #fff;
+    background-color: var(--white);
     overflow: auto;
 }
 

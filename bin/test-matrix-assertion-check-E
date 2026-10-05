@@ -20,13 +20,29 @@ ok() { printf 'PASS %s\n' "$1"; }
 fail() { printf 'FAIL %s\n' "$1"; FAILED=1; }
 
 # Print the standard Verification Matrix header + separator + given rows.
-# Usage: plan_fixture <row> [<row>...] — writes the header and rows to stdout.
-# To get a plan file outside the repo (keeps git status clean), redirect into a temp path:
-#   plan="$(mktemp -d)/plan.md"; plan_fixture '<row>' > "$plan"
+# Two calling conventions:
+#   plan_fixture <row> [<row>...]       — write rows to stdout (old behavior)
+#   plan_fixture <dir> <token> [...]    — write plan.md into <dir>, echo path
 plan_fixture() {
-    printf '| # | What to verify | Test type | Timing | Test file / location |\n'
-    printf '|---|---------------|-----------|--------|---------------------|\n'
-    printf '%s\n' "$@"
+    if [ -d "${1:-}" ]; then
+        local _repo="$1"; shift
+        # Write to a temp file outside the repo so git status stays clean
+        local _tmpdir _path
+        _tmpdir=$(mktemp -d)
+        _path="$_tmpdir/plan.md"
+        {
+            printf '| # | What to verify | Test type | Timing | Test file / location |\n'
+            printf '|---|---------------|-----------|--------|---------------------|\n'
+            for _tok in "$@"; do
+                printf '| 1 | `%s` verifies the gate | CLI-executable | post-impl | `bin/test-it` |\n' "$_tok"
+            done
+        } > "$_path"
+        echo "$_path"
+    else
+        printf '| # | What to verify | Test type | Timing | Test file / location |\n'
+        printf '|---|---------------|-----------|--------|---------------------|\n'
+        printf '%s\n' "$@"
+    fi
 }
 
 # replay_2578_fixture <dir> [tagged]
@@ -159,14 +175,14 @@ step67-skipped-no-plan() {
 
     local block
     block=$(extract_step67_block)
-    [ -n "$block" ] || { echo "FAIL extract_step67_block returned empty"; return 1; }
+    [ -n "$block" ] || { echo "FAIL: extract_step67_block returned empty"; return 1; }
 
     local out
     out=$(cd "$repo" && PLAN_PATH="$plan" MATRIX_SCRIPT="$MATRIX_ASSERTIONS_SCRIPT" bash -c "$block" 2>&1)
     if echo "$out" | grep -q 'MATRIX_VERDICT=skipped'; then
-        echo "PASS step67-skipped-no-plan"
+        echo "PASS: step67-skipped-no-plan"
     else
-        echo "FAIL step67-skipped-no-plan — expected MATRIX_VERDICT=skipped, got: $out"
+        echo "FAIL: step67-skipped-no-plan — expected MATRIX_VERDICT=skipped, got: $out"
         return 1
     fi
 }
@@ -180,8 +196,7 @@ step67-unrealised() {
     git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
 
     local plan
-    plan="$(mktemp -d)/plan.md"
-    plan_fixture '| 1 | `frobnicate_widget_case` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' > "$plan"
+    plan=$(plan_fixture "$repo" "frobnicate_widget_case")
 
     # Branch commit adds a file WITHOUT the token
     echo "nothing here" > "$repo/some_file.txt"
@@ -190,14 +205,14 @@ step67-unrealised() {
 
     local block
     block=$(extract_step67_block)
-    [ -n "$block" ] || { echo "FAIL extract_step67_block returned empty"; return 1; }
+    [ -n "$block" ] || { echo "FAIL: extract_step67_block returned empty"; return 1; }
 
     local out
     out=$(cd "$repo" && PLAN_PATH="$plan" MATRIX_SCRIPT="$MATRIX_ASSERTIONS_SCRIPT" bash -c "$block" 2>&1)
     if echo "$out" | grep -q 'MATRIX_VERDICT=unrealised' && echo "$out" | grep -q 'UNREALISED-ASSERTION: row'; then
-        echo "PASS step67-unrealised"
+        echo "PASS: step67-unrealised"
     else
-        echo "FAIL step67-unrealised — expected unrealised verdict, got: $out"
+        echo "FAIL: step67-unrealised — expected unrealised verdict, got: $out"
         return 1
     fi
 }
@@ -211,8 +226,7 @@ step67-clean() {
     git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
 
     local plan
-    plan="$(mktemp -d)/plan.md"
-    plan_fixture '| 1 | `frobnicate_widget_case` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' > "$plan"
+    plan=$(plan_fixture "$repo" "frobnicate_widget_case")
 
     # Branch commit adds a file WITH the token
     echo "frobnicate_widget_case" > "$repo/test_widget.py"
@@ -221,14 +235,14 @@ step67-clean() {
 
     local block
     block=$(extract_step67_block)
-    [ -n "$block" ] || { echo "FAIL extract_step67_block returned empty"; return 1; }
+    [ -n "$block" ] || { echo "FAIL: extract_step67_block returned empty"; return 1; }
 
     local out
     out=$(cd "$repo" && PLAN_PATH="$plan" MATRIX_SCRIPT="$MATRIX_ASSERTIONS_SCRIPT" bash -c "$block" 2>&1)
     if echo "$out" | grep -q 'MATRIX_VERDICT=clean'; then
-        echo "PASS step67-clean"
+        echo "PASS: step67-clean"
     else
-        echo "FAIL step67-clean — expected MATRIX_VERDICT=clean, got: $out"
+        echo "FAIL: step67-clean — expected MATRIX_VERDICT=clean, got: $out"
         return 1
     fi
 }
@@ -242,22 +256,21 @@ step67-uncommitted() {
     git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
 
     local plan
-    plan="$(mktemp -d)/plan.md"
-    plan_fixture '| 1 | `frobnicate_widget_case` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' > "$plan"
+    plan=$(plan_fixture "$repo" "frobnicate_widget_case")
 
     # Token file exists but is NOT committed (untracked)
     echo "frobnicate_widget_case" > "$repo/test_widget.py"
 
     local block
     block=$(extract_step67_block)
-    [ -n "$block" ] || { echo "FAIL extract_step67_block returned empty"; return 1; }
+    [ -n "$block" ] || { echo "FAIL: extract_step67_block returned empty"; return 1; }
 
     local out
     out=$(cd "$repo" && PLAN_PATH="$plan" MATRIX_SCRIPT="$MATRIX_ASSERTIONS_SCRIPT" bash -c "$block" 2>&1)
     if echo "$out" | grep -q 'MATRIX_VERDICT=uncommitted'; then
-        echo "PASS step67-uncommitted"
+        echo "PASS: step67-uncommitted"
     else
-        echo "FAIL step67-uncommitted — expected MATRIX_VERDICT=uncommitted, got: $out"
+        echo "FAIL: step67-uncommitted — expected MATRIX_VERDICT=uncommitted, got: $out"
         return 1
     fi
 }
@@ -271,8 +284,7 @@ step67-unavailable() {
     git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
 
     local plan
-    plan="$(mktemp -d)/plan.md"
-    plan_fixture '| 1 | `frobnicate_widget_case` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' > "$plan"
+    plan=$(plan_fixture "$repo" "frobnicate_widget_case")
 
     echo "frobnicate_widget_case" > "$repo/test_widget.py"
     git -C "$repo" add test_widget.py
@@ -286,15 +298,15 @@ step67-unavailable() {
 
     local block
     block=$(extract_step67_block)
-    [ -n "$block" ] || { echo "FAIL extract_step67_block returned empty"; return 1; }
+    [ -n "$block" ] || { echo "FAIL: extract_step67_block returned empty"; return 1; }
 
     local out
     out=$(cd "$repo" && PLAN_PATH="$plan" MATRIX_SCRIPT="$stub_checker" bash -c "$block" 2>&1)
     rm -f "$stub_checker"
     if echo "$out" | grep -q 'MATRIX_VERDICT=unavailable'; then
-        echo "PASS step67-unavailable"
+        echo "PASS: step67-unavailable"
     else
-        echo "FAIL step67-unavailable — expected MATRIX_VERDICT=unavailable, got: $out"
+        echo "FAIL: step67-unavailable — expected MATRIX_VERDICT=unavailable, got: $out"
         return 1
     fi
 }
@@ -309,7 +321,7 @@ extract_prefire_command() {
 prefire-rule-staged-new-file-realised() {
     local span
     span=$(extract_prefire_command)
-    [ -n "$span" ] || { echo "FAIL prefire-rule-staged-new-file-realised — extracted span is empty"; return 1; }
+    [ -n "$span" ] || { echo "FAIL: prefire-rule-staged-new-file-realised — extracted span is empty"; return 1; }
 
     local repo
     repo=$(mktemp -d)
@@ -319,8 +331,7 @@ prefire-rule-staged-new-file-realised() {
     git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
 
     local plan
-    plan="$(mktemp -d)/plan.md"
-    plan_fixture '| 1 | `frobnicate_prefire_case` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' > "$plan"
+    plan=$(plan_fixture "$repo" "frobnicate_prefire_case")
 
     # New uncommitted file staged with the token
     echo "frobnicate_prefire_case" > "$repo/test_prefire.py"
@@ -335,9 +346,9 @@ prefire-rule-staged-new-file-realised() {
     local rc=$?
 
     if [ $rc -eq 0 ] && ! echo "$out" | grep -q 'UNREALISED-ASSERTION'; then
-        echo "PASS prefire-rule-staged-new-file-realised"
+        echo "PASS: prefire-rule-staged-new-file-realised"
     else
-        echo "FAIL prefire-rule-staged-new-file-realised — expected no UNREALISED-ASSERTION and exit 0, got rc=$rc out=$out"
+        echo "FAIL: prefire-rule-staged-new-file-realised — expected no UNREALISED-ASSERTION and exit 0, got rc=$rc out=$out"
         return 1
     fi
 }
@@ -345,7 +356,7 @@ prefire-rule-staged-new-file-realised() {
 prefire-rule-missing-token-unrealised() {
     local span
     span=$(extract_prefire_command)
-    [ -n "$span" ] || { echo "FAIL prefire-rule-missing-token-unrealised — extracted span is empty"; return 1; }
+    [ -n "$span" ] || { echo "FAIL: prefire-rule-missing-token-unrealised — extracted span is empty"; return 1; }
 
     local repo
     repo=$(mktemp -d)
@@ -355,8 +366,7 @@ prefire-rule-missing-token-unrealised() {
     git -C "$repo" update-ref refs/remotes/origin/master "$BASE"
 
     local plan
-    plan="$(mktemp -d)/plan.md"
-    plan_fixture '| 1 | `frobnicate_prefire_case` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' > "$plan"
+    plan=$(plan_fixture "$repo" "frobnicate_prefire_case")
 
     # Staged file does NOT contain the token
     echo "nothing relevant" > "$repo/test_prefire.py"
@@ -372,9 +382,9 @@ prefire-rule-missing-token-unrealised() {
     unrealised_count=$(echo "$out" | grep -c 'UNREALISED-ASSERTION: row' || true)
 
     if [ "$unrealised_count" -eq 1 ]; then
-        echo "PASS prefire-rule-missing-token-unrealised"
+        echo "PASS: prefire-rule-missing-token-unrealised"
     else
-        echo "FAIL prefire-rule-missing-token-unrealised — expected exactly 1 UNREALISED-ASSERTION line, got $unrealised_count in: $out"
+        echo "FAIL: prefire-rule-missing-token-unrealised — expected exactly 1 UNREALISED-ASSERTION line, got $unrealised_count in: $out"
         return 1
     fi
 }
@@ -390,7 +400,7 @@ step67-routing() {
     line7=$(grep -n '^## Step 7:' "$prompt_file" | head -1 | cut -d: -f1)
 
     if [ -z "$line67" ] || [ "$line67" -le "$line66" ] || [ "$line67" -ge "$line7" ]; then
-        echo "FAIL step67-routing — Step 6.7 heading not between Step 6.6 ($line66) and Step 7 ($line7), got: $line67"
+        echo "FAIL: step67-routing — Step 6.7 heading not between Step 6.6 ($line66) and Step 7 ($line7), got: $line67"
         return 1
     fi
 
@@ -398,7 +408,7 @@ step67-routing() {
     local section66
     section66=$(awk "NR==$line66{found=1} found && NR>$line66 && /^## /{exit} found{print}" "$prompt_file")
     if echo "$section66" | grep -q 'proceed to Step 7\|proceeding to Step 7'; then
-        echo "FAIL step67-routing — Step 6.6 still routes to Step 7"
+        echo "FAIL: step67-routing — Step 6.6 still routes to Step 7"
         return 1
     fi
 
@@ -406,15 +416,15 @@ step67-routing() {
     local section67
     section67=$(awk "NR==$line67{found=1} found && NR>$line67 && /^## /{exit} found{print}" "$prompt_file")
     if ! echo "$section67" | grep -q 'Do NOT write the handoff file'; then
-        echo "FAIL step67-routing — Step 6.7 missing 'Do NOT write the handoff file'"
+        echo "FAIL: step67-routing — Step 6.7 missing 'Do NOT write the handoff file'"
         return 1
     fi
     if ! echo "$section67" | grep -q 'never proceeds to Step 7'; then
-        echo "FAIL step67-routing — Step 6.7 missing 'never proceeds to Step 7'"
+        echo "FAIL: step67-routing — Step 6.7 missing 'never proceeds to Step 7'"
         return 1
     fi
 
-    echo "PASS step67-routing"
+    echo "PASS: step67-routing"
 }
 
 step67() {
@@ -917,7 +927,7 @@ rm -rf "$root"
 
 ARG="${1:-all}"
 
-CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 replay-2578-untagged tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised"
+CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-prefix glob-prefix-mutation skip-equals-class4 skip-equals-class5 replay-2578-untagged tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire"
 
 if [ "$ARG" = "all" ]; then
     for c in $CASES; do

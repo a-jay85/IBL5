@@ -1968,6 +1968,10 @@ def test_phase7_rerun_probe_runs_at_most_once(monkeypatch, tmp_path):
     )
     audit = _audit(out)
     assert audit.count("rerun probe") == 1
+    for attempt in (1, 2):
+        assert re.search(
+            rf"phase7 ci-fix attempt {attempt}: .*outcome=no-change", audit), \
+            f"attempt {attempt} did not log outcome=no-change"
     acts = _actions(out)
     rerun_count = sum(1 for a in acts if a.get("action") == "run_rerun_failed")
     assert rerun_count == 2

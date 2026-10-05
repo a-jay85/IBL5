@@ -252,11 +252,13 @@ echo "ok: row8b — dangling symlink gives clean error, no raw ln crash"
 # Helpers used by rows 8c, 8d, 10-14, and 17-20.  Defined here so they are
 # available to all callers regardless of which section they are in.
 
-# basenames of queue entries in ls -1tr (oldest-first = runs-first) order, space-joined
+# basenames of queue entries, oldest-first (runs-first), space-joined. Uses
+# queue_entries_ordered (the symlink's own lstat mtime), the same sort key as
+# production. Plain `ls -1tr` sorts by the target's mtime on macOS BSD ls.
 queue_order() {
     local out="" f
     while IFS= read -r f; do out="$out $(basename "$f")"; done \
-        < <(ls -1tr "$NDIR/queue"/*.md 2>/dev/null)
+        < <(queue_entries_ordered "$NDIR/queue")
     echo "${out# }"
 }
 assert_order() {

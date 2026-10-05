@@ -1112,7 +1112,14 @@ except OSError: pass
 sys.stdout.buffer.write(buf)
 '
 OUTPUT_PTY=""
-if command -v python3 >/dev/null 2>&1; then
+# Skip only when the environment lacks python3 or a pty; a helper that breaks
+# where both exist must FAIL, not hide behind the skip.
+PTY_OK=0
+if command -v python3 >/dev/null 2>&1 \
+    && python3 -c 'import os, pty; os.openpty()' >/dev/null 2>&1; then
+    PTY_OK=1
+fi
+if [ "$PTY_OK" -eq 1 ]; then
     OUTPUT_PTY="$(env PATH="$STUBBIN:$PATH" \
         FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
         FLEET_STATUS_HARNESS_OUT="$OUT" \
@@ -1133,6 +1140,8 @@ if [ -n "$OUTPUT_PTY" ]; then
         "$OUTPUT_PTY" 'refreshing every 999s'
     assert_has "watch tty: EXIT trap restores autowrap + main screen after TERM" \
         "$OUTPUT_PTY" '\[\?7h.*\[\?1049l'
+elif [ "$PTY_OK" -eq 1 ]; then
+    fail "watch tty: python pty helper produced no output"
 else
     printf '  skip  %s\n' "watch tty: alt-screen/clip/restore (no python3 or no pty available)"
 fi

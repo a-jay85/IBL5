@@ -48,6 +48,27 @@ final class CheckDocsCliTest extends TestCase
             touch($this->tmpDir . '/bin/' . $sibling);
         }
 
+        // The script's comments also name the engine workflow, so that reference needs a
+        // target here too. Once the workflow exists the engine lint pin check reads it
+        // and its tracked pin docs, so write a minimal matching set.
+        $pinDoc = "---\ndescription: Engine lint pin fixture.\nlast_verified: " . $this->freshDate() . "\n---\n\n"
+            . "# Pins\n\n`golangci/golangci-lint-action@ba0d7d2… # v9.3.0` with `version: v2.12.2`.\n";
+        $fixtures = [
+            '.github/workflows/engine.yml' => "      - name: Lint\n"
+                . "        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0\n"
+                . "        with:\n"
+                . "          version: v2.12.2\n",
+            '.claude/rules/engine-go.md' => $pinDoc,
+            'engine/.claude/rules/engine-context.md' => $pinDoc,
+        ];
+        foreach ($fixtures as $rel => $content) {
+            $dest = $this->tmpDir . '/' . $rel;
+            if (!is_dir(dirname($dest))) {
+                mkdir(dirname($dest), 0o777, true);
+            }
+            file_put_contents($dest, $content);
+        }
+
         $this->runGit('init -q');
         $this->runGit('config user.email test@example.com');
         $this->runGit('config user.name Test');

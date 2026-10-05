@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import { checkCorpus, classifyCss, scanDir } from './component-css-hex-scan';
@@ -7,6 +7,7 @@ import type { Allowlist } from './component-css-hex-scan';
 const ROOT = fileURLToPath(new URL('../../design/components', import.meta.url));
 const IBL5 = fileURLToPath(new URL('../../', import.meta.url));
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
+const COLOR_WHITE_PIN = /--color-white:\s*#ffffff\s*;/i;
 
 // Every remaining raw declaration / definition hex under design/components/**.
 // Keyed by (file, hex, category, count), never by line number. Deleting an
@@ -153,7 +154,19 @@ describe('--white token', () => {
 
   it('input.css defines --color-white as #ffffff', () => {
     const css = readFileSync(`${IBL5}design/input.css`, 'utf8');
-    expect(css).toMatch(/--color-white:\s*#ffffff\s*;/i);
+    expect(css).toMatch(COLOR_WHITE_PIN);
+  });
+
+  it('the --color-white pin rejects a near-white such as #fefefe', () => {
+    expect('--color-white: #fefefe;').not.toMatch(COLOR_WHITE_PIN);
+    expect('--color-white: #ffffff;').toMatch(COLOR_WHITE_PIN);
+  });
+
+  it('the head-to-head smoke baselines exist, so the swap is covered by visual regression', () => {
+    const dir = `${IBL5}tests/e2e/smoke/visual-regression.spec.ts-snapshots`;
+    for (const name of ['head-to-head-records.png', 'head-to-head-records-mobile.png']) {
+      expect(existsSync(`${dir}/${name}`), `missing baseline ${name}`).toBe(true);
+    }
   });
 });
 

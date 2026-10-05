@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Player;
 
+use Player\PlayerImageHelper;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Guards the player photo corpus: PlayerImageHelper::getImageUrl() only serves
  * <pid>.jpg, so a photo in any other format with no .jpg twin is unreachable.
+ *
+ * Regression: pid 1742 shipped as 1742.jpeg and rendered broken (backlog#1317).
+ * The golden .jpg URL assertions stay in ibl5/tests/Player/PlayerImageHelperTest.php.
  */
 final class PlayerPhotoCorpusTest extends TestCase
 {
@@ -90,6 +94,13 @@ final class PlayerPhotoCorpusTest extends TestCase
             $orphans,
             'Player photos with no .jpg twin (PlayerImageHelper::getImageUrl() only serves <pid>.jpg): ' . implode(', ', $orphans)
         );
+    }
+
+    public function testPlayer1742ImageUrlPointsAtAnExistingFile(): void
+    {
+        $url = PlayerImageHelper::getImageUrl(1742);
+        self::assertSame('./images/player/1742.jpg', $url);
+        self::assertFileExists(dirname(__DIR__, 2) . '/' . substr($url, 2));
     }
 
     public function testOrphanDetectorFlagsNonJpgPhotoWithoutJpgTwin(): void

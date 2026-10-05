@@ -161,7 +161,47 @@ _make_stale_copy() {
     git -C "$wt" fetch -q origin "$name" 2>/dev/null
 }
 
-# add_worktree <main> <name> [ahead|behind|current|diverged|stale-copy|stale-copy-plus-unique]
+# _make_squash_folded <main> <name> <wt>
+# Squash-folded negative fixture. The worktree commits A,B and pushes them. Then
+# origin/<name> is force-pushed to ONE commit S carrying the combined A+B patch,
+# as a squash merge leaves it. Local ends ahead=2 behind=1, and every local
+# commit prints '+' in `git cherry origin/<name> HEAD` (patch-ids differ), so
+# the stale-copy detector must NOT treat it as a stale copy.
+# Writes nothing to stdout (add_worktree's stdout is the returned path).
+_make_squash_folded() {
+    local main="$1" name="$2" wt="$3" i url clone a b
+    printf '%s\n' "$name" > "$main/$name.txt"
+    git -C "$main" add "$name.txt"
+    git -C "$main" commit -qm "$name initial"
+    git -C "$main" push -q origin "$name"
+    git -C "$main" checkout -q master
+    git -C "$main" worktree add -q "$wt" "$name"
+    for i in 1 2; do
+        printf 'work %s\n' "$i" > "$wt/work$i.txt"
+        git -C "$wt" add "work$i.txt"
+        git -C "$wt" -c user.email=t@example.com -c user.name=tester \
+            -c commit.gpgsign=false commit -qm "work $i"
+    done
+    git -C "$wt" push -q origin "$name"
+    url="$(git -C "$main" remote get-url origin)"
+    clone="$(mktemp -d "$TMP/clone_squash.XXXXXX")"
+    git clone -q "$url" "$clone" 2>/dev/null
+    git -C "$clone" config user.email t@example.com
+    git -C "$clone" config user.name tester
+    git -C "$clone" config commit.gpgsign false
+    git -C "$clone" checkout -q "$name"
+    a="$(git -C "$clone" rev-parse HEAD~1)"; b="$(git -C "$clone" rev-parse HEAD)"
+    git -C "$clone" reset -q --hard HEAD~2
+    # Apply both patches without committing, then fold them into one commit.
+    git -C "$clone" cherry-pick -n "$a" "$b" >/dev/null 2>&1
+    GIT_COMMITTER_NAME=pipeline-bot GIT_COMMITTER_EMAIL=bot@example.com \
+        git -C "$clone" commit -qm "squashed: work 1 + work 2"
+    git -C "$clone" push -q -f origin "$name" 2>/dev/null
+    # refs/remotes are shared across worktrees, so this updates main's origin/<name>.
+    git -C "$wt" fetch -q origin "$name" 2>/dev/null
+}
+
+# add_worktree <main> <name> [ahead|behind|current|diverged|stale-copy|stale-copy-plus-unique|squash-folded]
 # Sets up a worktree branch in various states relative to origin.
 add_worktree() {
     local main="$1" name="$2" state="${3:-current}"
@@ -357,6 +397,10 @@ add_worktree() {
             git -C "$wt" add unique.txt
             git -C "$wt" -c user.email=t@example.com -c user.name=tester \
                 -c commit.gpgsign=false commit -qm "real unique commit"
+            ;;
+        squash-folded)
+            # N=2 local commits vs one squashed commit on origin: not cherry-equivalent.
+            _make_squash_folded "$main" "$name" "$wt"
             ;;
         diverged)
             # Both local and origin have new commits (non-conflicting files).
@@ -1152,6 +1196,65 @@ assert_absent "fleet-reflog-guard: no RESET-STALE audit line" "RESET-STALE branc
 assert_eq     "fleet-reflog-guard: HEAD unchanged" "$HEAD46_BEFORE" "$(git -C "$WT46" rev-parse HEAD)"
 assert_eq     "fleet-reflog-guard: backup ref preserved" "$SAVED46" \
     "$(git -C "$WT46" rev-parse --verify -q refs/wt-sync-backup/wt-stale46 2>/dev/null)"
+
+# ── Test 47: fleet: squash-folded branch → STRAGGLER reason=ahead, never RESET-STALE ─
+# Negative check from the plan (Architectural trade-offs #1): N local commits
+# folded into one upstream commit are not patch-id-equivalent, so the strict
+# detector must skip the branch, leave it untouched, and write no backup ref.
+MAIN47="$(new_env)"
+WT47="$(add_worktree "$MAIN47" "wt-squash47" squash-folded)"
+LOG47="$(fresh_log t47)"; LOCKD47="$(fresh_lockd t47)"
+HEAD47_BEFORE="$(git -C "$WT47" rev-parse HEAD)"
+# Fixture self-check: prove the fixture is squash-folded before judging the tick.
+assert_eq    "squash-fixture: ahead=2 behind=1" "1	2" \
+    "$(git -C "$WT47" rev-list --left-right --count "origin/wt-squash47...HEAD")"
+assert_eq    "squash-fixture: both local commits unique ('+' lines)" "2" \
+    "$(git -C "$WT47" cherry origin/wt-squash47 HEAD | grep -c '^+')"
+run_with_repo "$MAIN47" "$LOG47" "$LOCKD47" -- --force
+assert_eq     "squash-folded: exit 0" "0" "$ST"
+assert_absent "squash-folded: no RESET-STALE" "RESET-STALE" "$OUT"
+assert_match  "squash-folded: STRAGGLER reason=ahead in log" \
+    "STRAGGLER branch=wt-squash47.*reason=ahead" "$(cat "$LOG47" 2>/dev/null)"
+assert_match  "squash-folded: reset-stale=0" "reset-stale=0" "$(cat "$LOG47" 2>/dev/null)"
+assert_eq     "squash-folded: HEAD unchanged" "$HEAD47_BEFORE" "$(git -C "$WT47" rev-parse HEAD)"
+if git -C "$WT47" rev-parse --verify -q refs/wt-sync-backup/wt-squash47 >/dev/null 2>&1; then
+    failcase "squash-folded: backup ref written for an untouched branch"
+else
+    pass "squash-folded: no backup ref"
+fi
+
+# ── Test 48: fleet: --dry-run beside a live fleet reports, writes nothing ─────
+# One fleet, two stale copies: one in use (lsof stub), one idle. --dry-run must
+# report IN-USE for the first and WOULD-RESET-STALE for the second, and write no
+# backup ref or HEAD move for either. Then a live fleet lock (our own PID, as in
+# Test 31) makes a second --dry-run tick exit without enumerating or touching it.
+MAIN48="$(new_env)"
+WT48A="$(add_worktree "$MAIN48" "wt-live48a" stale-copy)"
+WT48B="$(add_worktree "$MAIN48" "wt-idle48b" stale-copy)"
+WT48A_REAL="$(cd "$WT48A" && pwd -P)"
+LOG48="$(fresh_log t48)"; LOCKD48="$(fresh_lockd t48)"
+HEAD48A_BEFORE="$(git -C "$WT48A" rev-parse HEAD)"
+HEAD48B_BEFORE="$(git -C "$WT48B" rev-parse HEAD)"
+run_with_repo "$MAIN48" "$LOG48" "$LOCKD48" \
+    STUB_LSOF_LINE="n$WT48A_REAL" -- --force --dry-run
+assert_eq     "live-dry: exit 0" "0" "$ST"
+assert_match  "live-dry: in-use copy reported IN-USE" "IN-USE.*wt-live48a" "$OUT"
+assert_absent "live-dry: in-use copy not WOULD-RESET-STALE" "WOULD-RESET-STALE.*wt-live48a" "$OUT"
+assert_match  "live-dry: idle copy reported WOULD-RESET-STALE" "WOULD-RESET-STALE.*wt-idle48b" "$OUT"
+assert_eq     "live-dry: in-use HEAD unchanged" "$HEAD48A_BEFORE" "$(git -C "$WT48A" rev-parse HEAD)"
+assert_eq     "live-dry: idle HEAD unchanged" "$HEAD48B_BEFORE" "$(git -C "$WT48B" rev-parse HEAD)"
+assert_eq     "live-dry: no backup refs written" "" \
+    "$(git -C "$MAIN48" for-each-ref refs/wt-sync-backup/)"
+# Live fleet lock: dry-run tick bows out, lock stays ours, nothing is written.
+printf '%d\n' "$$" > "$LOCKD48/wt-sync.lock"
+run_with_repo "$MAIN48" "$LOG48" "$LOCKD48" -- --force --dry-run
+assert_eq     "live-dry-lock: exit 0" "0" "$ST"
+assert_absent "live-dry-lock: no per-worktree report" "WOULD-RESET-STALE|RESET-STALE" "$OUT"
+assert_eq     "live-dry-lock: lock still holds original PID" "$$" "$(cat "$LOCKD48/wt-sync.lock" 2>/dev/null)"
+assert_eq     "live-dry-lock: idle HEAD unchanged" "$HEAD48B_BEFORE" "$(git -C "$WT48B" rev-parse HEAD)"
+assert_eq     "live-dry-lock: no backup refs written" "" \
+    "$(git -C "$MAIN48" for-each-ref refs/wt-sync-backup/)"
+rm -f "$LOCKD48/wt-sync.lock"
 
 # ── Hook wrapper tests ────────────────────────────────────────────────────────
 HOOK="$SCRIPT_DIR/hooks/wt-sync-session-start.sh"

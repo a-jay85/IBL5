@@ -15,7 +15,7 @@ Read at runtime via `git show <MASTER_SHA>:.claude/review-shared/_phase7-verdict
 
 1. **Run the shared hold predicates.** `bin/lib/pr-armable.sh` is **sourced, not executed** — it carries no `set -euo pipefail` at file scope by design. Reuse its six predicates rather than re-deriving any hold logic:
 
-   `git show <MASTER_SHA>:.claude/review-shared/scripts/holds.sh > /tmp/pr-ready-holds-<N>.sh && test -s /tmp/pr-ready-holds-<N>.sh && bash /tmp/pr-ready-holds-<N>.sh <N> <slug> | tee /tmp/pr-ready-holdsout-<N>.txt`. The script is that single invocation, and prints exactly six labelled lines — fewer means a predicate aborted, itself a finding. The `tee` is what step 3's verdict marker reads: a value captured in one Bash call does not survive into the next, so the holds reach the marker through the file, never through a variable.
+   `git show <MASTER_SHA>:.claude/review-shared/scripts/holds.sh > /tmp/pr-ready-holds-<N>.sh && test -s /tmp/pr-ready-holds-<N>.sh && bash /tmp/pr-ready-holds-<N>.sh <N> <slug> | tee /tmp/pr-ready-holdsout-<N>.txt`. The script is that single invocation, and prints exactly six labelled lines. Fewer than six means a predicate aborted, itself a finding. The `tee` is what step 3's verdict marker reads: a value captured in one Bash call does not survive into the next, so the holds reach the marker through the file.
 
    Report each predicate's result as one line in the verdict. These are **advisory inputs to the human's merge decision** — `/pr-ready` never arms auto-merge and never merges.
 

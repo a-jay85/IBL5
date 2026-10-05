@@ -91,12 +91,12 @@ run_tick() {
            "$TICK" "$@" 2>&1)" || ST=$?
 }
 
-run_only() {   # <wt-path> [extra args...] — sets ONLY_OUT, ONLY_ERR, ONLY_ST
+run_only() {   # <wt-path> [extra args...] — sets ONLY_OUT, ONLY_ERR, ONLY_ST; ONLY_LOG overrides the log path
     local wt="$1"; shift
     ONLY_ST=0
     ONLY_ERR="$TMP/only.err.$$"
     ONLY_OUT="$(PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" \
-                WT_SYNC_LOG="$_TICK_LOG" WT_SYNC_LOCK_DIR="$_TICK_LOCKD" \
+                WT_SYNC_LOG="${ONLY_LOG:-$_TICK_LOG}" WT_SYNC_LOCK_DIR="$_TICK_LOCKD" \
                 WT_SYNC_ENABLED=1 \
                 "$TICK" --only "$wt" "$@" 2>"$ONLY_ERR")" || ONLY_ST=$?
 }
@@ -1025,14 +1025,17 @@ MAIN37="$(new_env)"
 WT37="$(add_worktree "$MAIN37" "wt-stale37" stale-copy)"
 HEAD37_BEFORE="$(git -C "$WT37" rev-parse HEAD)"
 ORIGIN37="$(git -C "$MAIN37" rev-parse origin/wt-stale37)"
-run_only "$WT37"
+LOG37="$(fresh_log t37)"
+ONLY_LOG="$LOG37" run_only "$WT37"
 assert_eq "only: RESET-STALE stdout" "RESET-STALE" "$ONLY_OUT"
 assert_eq "only: RESET-STALE exit 0" "0" "$ONLY_ST"
 assert_eq "only: RESET-STALE HEAD at origin" "$ORIGIN37" "$(git -C "$WT37" rev-parse HEAD)"
 assert_eq "only: RESET-STALE backup ref" "$HEAD37_BEFORE" \
     "$(git -C "$WT37" rev-parse --verify -q refs/wt-sync-backup/wt-stale37 2>/dev/null)"
 assert_match "only: RESET-STALE logged verdict" "branch=wt-stale37 verdict=RESET-STALE" \
-    "$(cat "$_TICK_LOG" 2>/dev/null)"
+    "$(cat "$LOG37" 2>/dev/null)"
+assert_absent "only: no STRAGGLER for the reset branch" "STRAGGLER.*wt-stale37" \
+    "$(cat "$LOG37" 2>/dev/null)"
 
 # ── Test 38: only: --dry-run on stale copy reports, writes nothing ────────────
 MAIN38="$(new_env)"

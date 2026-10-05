@@ -107,20 +107,22 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
         /** @var list<int> $submittedPids */
         $submittedPids = array_column($processedData['playerData'], 'pid');
 
-        if (!$this->validator->validateRoster($submittedPids, $rosterPids)) {
+        $rosterResult = $this->validator->validateRoster($submittedPids, $rosterPids);
+        if (!$rosterResult->isValid()) {
             return [
                 'success' => false,
                 'fileOk' => false,
-                'errorsHtml' => $this->validator->getErrorMessagesHtml(),
+                'errorsHtml' => DepthChartEntryErrorHtmlRenderer::render($rosterResult->getErrors()),
                 'postData' => $postData,
             ];
         }
 
-        if (!$this->validator->validate($processedData, $season->phase)) {
+        $validation = $this->validator->validate($processedData, $season->phase);
+        if (!$validation->isValid()) {
             return [
                 'success' => false,
                 'fileOk' => false,
-                'errorsHtml' => $this->validator->getErrorMessagesHtml(),
+                'errorsHtml' => DepthChartEntryErrorHtmlRenderer::render($validation->getErrors()),
                 'postData' => $postData,
             ];
         }

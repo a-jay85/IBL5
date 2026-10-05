@@ -6,7 +6,7 @@
 #   1. No live session in the worktree: DM now, no launchd job.
 #   2. Live session in the worktree: no DM now, one held job scheduled.
 #   3. Live session in a different worktree: DM now.
-#   4. Registry unreadable: DM now (fail open).
+#   4. Registry unreadable (missing, or malformed JSON): DM now (fail open).
 #   5. launchctl bootstrap fails: DM now.
 #   6. Held job, newer log for the branch: no DM.
 #   7. Held job, no newer log: DM, prefixed so you know nobody re-ran it.
@@ -121,6 +121,11 @@ run
 reset
 run
 [ "$(dm_count)" = 1 ] && ok "4 no registry: DM now" || fail "4 no registry: DM now"
+
+reset
+printf '{"broken": ' > "$TMP/reg.json"
+run
+[ "$(dm_count)" = 1 ] && [ "$(lc_count)" = 0 ] && ok "4b malformed registry: DM now" || fail "4b malformed registry: DM now"
 
 reset; registry "$WT" $$
 LC="$TMP/bin/lc-bad" run

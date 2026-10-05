@@ -344,4 +344,18 @@ assert_contains     "row23: prefixed name joins costs"  "2.5000"    "$out"
 assert_not_contains "row23: not Spend: \$0"             'Spend: $0' "$out"
 echo "ok: row23 — date-prefixed-only done/ entry joins costs"
 
+# --- row24: StandardOutPath / StandardErrorPath under LOG_DIR ---
+# Generated with a throwaway HOME so LOG_DIR is deterministic and nothing touches
+# the real ~/Library.  The value is read from the line after each <key>, so a
+# path under the wrong key (e.g. stdout/stderr swapped) fails too.
+FAKE_HOME24="$TMP/fake-home24"
+EXPECT_LOG_DIR="$FAKE_HOME24/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs"
+out24=$(HOME="$FAKE_HOME24" bin/automouse/morning-digest-cron-setup --print-schedule 2>"$TMP/err24")
+status24=$?
+[ $status24 -eq 0 ] || { echo "FAIL: row24 — --print-schedule failed with status $status24: $(cat "$TMP/err24")"; FAILED=1; }
+plist_value() { printf '%s\n' "$2" | awk -v k="<key>$1</key>" '$0 ~ k {getline; print; exit}'; }
+assert_contains "row24: StandardOutPath"   "<string>${EXPECT_LOG_DIR}/morning-digest-stdout.log</string>" "$(plist_value StandardOutPath "$out24")"
+assert_contains "row24: StandardErrorPath" "<string>${EXPECT_LOG_DIR}/morning-digest-stderr.log</string>" "$(plist_value StandardErrorPath "$out24")"
+echo "ok: row24 — StandardOutPath/StandardErrorPath under LOG_DIR"
+
 [ $FAILED -eq 0 ] && echo "All rows passed" || exit 1

@@ -283,7 +283,7 @@ link_mtime() {
 
 # ---------------------------------------------------------------------------
 # Row 8c — idempotent re-queue preserves run-order position and does not touch
-# the mtimes that `ls -1tr` sorts by.  If the re-queue mistakenly called
+# the symlink mtimes that queue_entries_ordered sorts by.  If the re-queue mistakenly called
 # stamp_back_of_queue, the plan would jump to the back.
 # ---------------------------------------------------------------------------
 setup
@@ -421,13 +421,12 @@ echo "ok: row16 — queues a clean, correctly-marked plan"
 
 # ===========================================================================
 # reorder subcommand — permutation validation + spaced ascending-mtime touch.
-# Order is asserted via `ls -1tr` (oldest-first) — exactly how
-# bin/automouse/run claims the next plan.  GNU ls uses symlink lstat mtime;
-# BSD ls uses target stat mtime.  reorder touches both, so results agree.
+# Order is asserted via queue_entries_ordered (oldest-first by symlink lstat
+# mtime) — exactly how bin/automouse/run claims the next plan.
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
-# Row 10 — happy path: reorder >=3 plans -> ls -1tr matches requested order
+# Row 10 — happy path: reorder >=3 plans -> queue_entries_ordered matches requested order
 # ---------------------------------------------------------------------------
 setup
 mkplan plan-a.md plan-b.md plan-c.md

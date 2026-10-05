@@ -160,9 +160,14 @@ describe('--white token', () => {
 describe('CI trigger', () => {
   it('the ibl5ts path filter covers the files this spec reads', () => {
     const yml = readFileSync(`${REPO}.github/workflows/tests.yml`, 'utf8');
-    const start = yml.indexOf('ibl5ts:\n');
-    expect(start).toBeGreaterThan(-1);
-    const block = yml.slice(start, yml.indexOf('iblbot:', start));
+    const startMatch = /^\s+ibl5ts:\s*$/m.exec(yml);
+    expect(startMatch).not.toBeNull();
+    const rest = yml.slice(startMatch!.index + startMatch![0].length);
+    const endMatch = /^\s{12}[a-z0-9_]+:\s*$/m.exec(rest);
+    expect(endMatch).not.toBeNull();
+    const block = rest.slice(0, endMatch!.index);
+    expect(block.length).toBeGreaterThan(0);
+    expect(block).not.toContain('iblbot:');
     for (const glob of ['ibl5/design/components/**', 'ibl5/design/tokens/tokens.css', 'ibl5/design/input.css']) {
       expect(block, `ibl5ts filter must list ${glob}`).toContain(`'${glob}'`);
     }

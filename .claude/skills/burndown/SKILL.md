@@ -17,7 +17,7 @@ candidate fits the last unit.
 | Code | Meaning |
 |------|---------|
 | 0 | success |
-| 1 | completed but at least one item's live state was unknown (reported, never guessed) <!-- slop-ok --> |
+| 1 | completed but at least one item's live state was unknown (reported as unknown and never guessed) |
 | 2 | usage error (bad subcommand, flag, or argument) |
 | 3 | fail-closed abort (missing report, gh/git/jq failure, HOME unset, missing or malformed ledger) |
 
@@ -63,7 +63,7 @@ Otherwise read `.calibration` from `$W/delta.json` as calibration context. It ho
 first five item lines of each `## P<N>` section of the current triage report, and an
 empty section shows as `[]`. Do not open the report itself. Then rank every delta issue
 into a ranks file at `$W/ranks.md` using `## P<N>` headings and lines shaped like the
-report's own (e.g. `- [#42](url) Title — reason`). <!-- slop-ok -->
+report's own (e.g. `- [#42](url) Title — reason`).
 
 ```bash
 bin/backlog burndown-refresh "$W/ranks.md"

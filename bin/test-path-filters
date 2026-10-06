@@ -23,7 +23,8 @@ grep -q "^      both: .*steps\.filter\.outputs\.both == 'true'" "$WF" \
 
 BOTH="$(group both)"
 for p in 'bin/sim-recap-*' 'ibl5/scripts/simRecapQueue.php' 'ibl5/scripts/storeSimRecap.php' \
-         'ibl5/scripts/simRecapContext.php' 'ibl5/classes/SimRecap/**'; do
+         'ibl5/scripts/simRecapContext.php' 'ibl5/classes/SimRecap/**' \
+         '.github/workflows/sim-recap.yml'; do
   printf '%s\n' "$BOTH" | grep -qF -- "- '$p'" \
     && ok "both: covers $p" || bad "both: is missing $p — producer/consumer pair would split"
 done

@@ -496,19 +496,19 @@ parameters:
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 1
-			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
+			path: classes/PlayerSearch/PlayerSearchRepository.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 1
-			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
+			path: classes/PlayerSearch/PlayerSearchRepository.php
 
 		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "team_name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 1
-			path: classes/PlayerMovement/PlayerMovementRepository.php
+			path: classes/SeasonRosterChanges/SeasonRosterChangesRepository.php
 
 		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "sim" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
@@ -2483,37 +2483,37 @@ parameters:
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
 			identifier: empty.notAllowed
 			count: 1
-			path: modules/PlayerDatabase/index.php
+			path: modules/PlayerSearch/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class PlayerDatabase\PlayerDatabaseRepository constructor expects mysqli, mixed given.'
+			rawMessage: 'Parameter #1 $db of class PlayerSearch\PlayerSearchRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
-			path: modules/PlayerDatabase/index.php
+			path: modules/PlayerSearch/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class Player\PlayerRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
-			path: modules/PlayerDatabase/index.php
+			path: modules/PlayerSearch/index.php
 
 		-
-			rawMessage: 'Parameter #1 $rawParams of method PlayerDatabase\PlayerDatabaseService::search() expects array<string, mixed>, array<mixed> given.'
+			rawMessage: 'Parameter #1 $rawParams of method PlayerSearch\PlayerSearchService::search() expects array<string, mixed>, array<mixed> given.'
 			identifier: argument.type
 			count: 1
-			path: modules/PlayerDatabase/index.php
+			path: modules/PlayerSearch/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class PlayerMovement\PlayerMovementRepository constructor expects mysqli, mixed given.'
+			rawMessage: 'Parameter #1 $db of class SeasonRosterChanges\SeasonRosterChangesRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
-			path: modules/PlayerMovement/index.php
+			path: modules/SeasonRosterChanges/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
-			path: modules/PlayerMovement/index.php
+			path: modules/SeasonRosterChanges/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class Auth\AuthRepository constructor expects mysqli, mixed given.'

@@ -1,6 +1,6 @@
 ---
 description: Contract negotiation demand calculation, eligibility validation, and offer rendering — refactored from a 382-line procedural function.
-last_verified: 2026-10-03
+last_verified: 2026-10-06
 ---
 
 # Contract Negotiation Refactoring - Summary
@@ -34,28 +34,17 @@ function negotiate($playerID) {
 }
 ```
 
-### After: Object-Oriented Code (21 lines)
+### After: Object-Oriented Code
+`modules/Player/index.php` `case "negotiate"` now delegates to `Player\PlayerActionController::renderNegotiation()`, which wires the four collaborators:
 ```php
-function negotiate($playerID)
-{
-    global $prefix, $db, $cookie;
+$service = new NegotiationService(
+    $this->mysqliDb,
+    new NegotiationRepository($this->mysqliDb, $this->salaryCapRepo),
+    new NegotiationValidator($this->mysqliDb),
+    new ExtensionContractDemandCalculator($this->mysqliDb, $this->salaryCapRepo),
+);
 
-    $playerID = intval($playerID);
-    
-    // Get user's team name using existing CommonRepository
-    $commonRepository = new Services\CommonRepository($db);
-    $userTeamName = $commonRepository->getTeamnameFromUsername($cookie[1]);
-
-    PageLayout\PageLayout::header();
-    OpenTable();
-
-    // Use NegotiationService to handle all business logic
-    $processor = new Negotiation\NegotiationService($db, $mysqli_db);
-    echo $processor->processNegotiation($playerID, $userTeamName, $prefix);
-
-    CloseTable();
-    PageLayout\PageLayout::footer();
-}
+return $service->processNegotiation($playerID, $userTeamName, $prefix, $bypassOwnership);
 ```
 
 ## New Architecture
@@ -72,7 +61,7 @@ classes/Negotiation/
 │   └── NegotiationValidatorInterface.php
 ├── Views/
 │   └── DemandsBreakdownView.php
-├── ExtensionContractDemandCalculator.php (370 lines)
+├── ExtensionContractDemandCalculator.php (378 lines)
 │   └── Calculates contract demands based on player ratings
 ├── NegotiationRepository.php (230 lines)
 │   └── Database access layer for negotiation data
@@ -342,7 +331,12 @@ $this->assertStringContainsString('form', $html);
 
 ### Integration Tests:
 ```php
-$processor = new NegotiationService($mockDb);
+$processor = new NegotiationService(
+    $mockDb,
+    $mockRepository,
+    $mockValidator,
+    $mockDemandCalculator,
+);
 $output = $processor->processNegotiation(123, 'Seattle Supersonics', 'nuke');
 $this->assertStringContainsString('Contract Demands', $output);
 ```

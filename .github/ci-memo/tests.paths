@@ -27,3 +27,4 @@ ibl5/phpstan-rules
 ibl5/migrations
 ibl5/IBLbot
 ibl5/classes/SimRecap
+.github/workflows/sim-recap.yml

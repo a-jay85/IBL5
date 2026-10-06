@@ -1,5 +1,5 @@
 ---
-description: Every user-facing script in bin/ and bin/automouse/ answers --help on stdout with exit 0 before any side effect, and bin/test-bin-help enforces it in CI by running each script with stubbed tools.
+description: Every user-facing script in bin/ and bin/automouse/ answers --help on stdout with exit 0 before any git, network, DB, or paid-session call, and bin/test-bin-help checks in CI that no stubbed tool is called.
 last_verified: 2026-10-05
 ---
 
@@ -17,7 +17,7 @@ last_verified: 2026-10-05
 
 ## Decision
 
-Every executable script with a shebang in `bin/` and `bin/automouse/` handles `--help` (and `-h` where that letter is free) as its first action. The check sits at the top of the script, ahead of any `source`, `git`, `cd`, or network call. It prints usage to stdout and exits 0. Scripts whose header comment already documents usage may print that comment with `sed` or `awk` instead of a heredoc. Three scripts accept only `--help`: `bin/regen-schema-dump` (where `-h` means host), `bin/post-plan-fail-dm`, and `bin/vr-changed-coverage`. `bin/plan-index` now exits 0 on `--help` and still exits 1, with usage on stderr, on a wrong argument count. The convention is written down in `bin/README.md`. Enforcement is `bin/test-bin-help`, run as a step in `.github/workflows/tests.yml`. It copies `bin/` to a temp dir, sets `HOME` to a temp dir, and puts stubs first on `PATH` for every tool that could reach the network, the repo, or a paid session (`git`, `gh`, `docker`, `mysql`, `ssh`, `launchctl`, `claude`, and others). Each stub logs its name and exits 1. For each script the test asserts exit 0, non-empty stdout, a `Usage` line in stdout (case-insensitive), and an empty stub log. `bin/test-*` harnesses are out of scope.
+Every executable script with a shebang in `bin/` and `bin/automouse/` handles `--help` (and `-h` where that letter is free) as its first action. The check runs before any `git`, network, DB, or paid-session call. Path resolution with `cd`/`dirname` and sourcing a lib may precede it. It prints usage to stdout and exits 0. Scripts whose header comment already documents usage may print that comment with `sed` or `awk` instead of a heredoc. Three scripts accept only `--help`: `bin/regen-schema-dump` (where `-h` means host), `bin/post-plan-fail-dm`, and `bin/vr-changed-coverage`. `bin/plan-index` now exits 0 on `--help` and still exits 1, with usage on stderr, on a wrong argument count. The convention is written down in `bin/README.md`. Enforcement is `bin/test-bin-help`, run as a step in `.github/workflows/tests.yml`. It copies `bin/` to a temp dir, sets `HOME` to a temp dir, and puts stubs first on `PATH` for every tool that could reach the network, the repo, or a paid session (`git`, `gh`, `docker`, `mysql`, `ssh`, `launchctl`, `claude`, and others). Each stub logs its name and exits 1. For each script the test asserts exit 0, non-empty stdout, a `Usage` line in stdout (case-insensitive), and an empty stub log. It does not detect `cd`, `source`, or other side effects. `bin/test-*` harnesses are out of scope.
 
 ## Alternatives Considered
 

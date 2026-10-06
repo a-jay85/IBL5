@@ -162,9 +162,12 @@ one tracked symlink does not warrant one.
 ## Every script answers `--help`
 
 Run `bin/<script> --help` to see its arguments. Help goes to stdout and exits
-0. The check sits at the top of the script, before any `source`, `git`, `cd`,
-or network call, so asking for help never does anything else. Add it to every
-new script. `bin/test-bin-help` enforces this in CI. It skips `test-*` harnesses,
+0. The check runs before any `git`, network, DB, or paid-session call. Resolving
+the script's own directory with `cd`/`dirname` or sourcing a lib may come first.
+Add it to every new script. `bin/test-bin-help` runs each script with stubbed
+tools (`git`, `gh`, `docker`, `mysql`, `ssh`, `claude`, and others) in CI. It
+asserts exit 0, non-empty stdout, a `Usage` line, and that no stub was called. It
+does not detect `cd`, `source`, or other side effects. It skips `test-*` harnesses,
 `bin/check-composite-contracts` (built-in skip list), and any script whose interpreter is
 absent on the runner.
 

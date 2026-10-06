@@ -200,3 +200,19 @@ def test_methods_flag_rejects_missing_value_and_requires_json():
                        capture_output=True, text=True)
     assert r.returncode == 2
     assert "--json is required" in r.stderr
+
+
+REPO = HARNESS.parent.parent
+
+
+def test_pr_diff_cache_path_is_gitignored():
+    """`.gitignore:106` covers `tools/postplan-harness/out/`; the cache dir must sit under it."""
+    cache = f"tools/postplan-harness/out/{rpo._DIFF_CACHE_DIRNAME}/2506.diff"
+    proc = subprocess.run(["git", "check-ignore", "-q", cache], cwd=REPO, check=False)
+    assert proc.returncode == 0
+
+
+def test_ci_runs_the_whole_harness_suite_with_the_documented_command():
+    """`.github/workflows/python-tests.yml:54` is the command the whole-suite gate must match."""
+    workflow = (REPO / ".github" / "workflows" / "python-tests.yml").read_text(encoding="utf-8")
+    assert "python -m pytest tools/postplan-harness/tests/ -q" in workflow

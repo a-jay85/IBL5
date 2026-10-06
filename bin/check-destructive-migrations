@@ -68,10 +68,17 @@ PHP migrations (heuristic): SQL is read from string literals, heredocs and
 nowdocs, with dotted concatenation joined. A WHERE supplied by a concatenated
 variable reads as missing (use a tagged marker).
 
+Prepared DDL: for PREPARE n FROM @v, the nearest preceding SET @v = ... has
+each string literal that starts with ALTER, CREATE, DROP, RENAME, TRUNCATE,
+DELETE or UPDATE scanned as its own statement, reported at the SET's lines.
+PREPARE n FROM '<literal>' is scanned the same way. An edit to the SET lines
+rescans it; an edit to the PREPARE line alone does not.
+
 Explicitly NOT scanned (v2 limitations):
   - DELIMITER blocks (procedure and trigger bodies split at their inner ';')
   - A WHERE inside a subquery counts as the statement's WHERE
   - PHP SQL built by sprintf/implode or held in a variable
+  - Prepared SQL built by CONCAT(...) or bound by SELECT ... INTO @v
   - narrow-type with no schema dump: only same-file definitions resolve
 
 Bypass markers name the triggers they suppress:

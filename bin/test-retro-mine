@@ -1459,10 +1459,25 @@ case_tuneup_env_i_launchd_path() {
 }
 
 case_zz_isolation_guards() {
+    local probe
     if [ -e "$RM_ISO/dm-called" ]; then rm_fail "isolation: a case reached the DM binary"
     else rm_ok "isolation: no case reached the DM binary"; fi
     rm_expect_eq "isolation: repo tree untouched by the suite" "$RM_GIT_BASELINE" \
         "$(git -C "$SCRIPT_DIR/.." status --porcelain --untracked-files=all 2>/dev/null)"
+    # Prove the guard bites: a stage dir pointed at $REPO_ROOT/.tuneup must
+    # change porcelain, so a leaked write there cannot pass silently.
+    probe="$SCRIPT_DIR/../.tuneup"
+    if [ -e "$probe" ]; then
+        rm_fail "isolation: \$REPO_ROOT/.tuneup already exists"
+        return
+    fi
+    mkdir -p "$probe" && : > "$probe/probe"
+    if [ "$(git -C "$SCRIPT_DIR/.." status --porcelain --untracked-files=all 2>/dev/null)" != "$RM_GIT_BASELINE" ]; then
+        rm_ok "isolation: a write under \$REPO_ROOT/.tuneup changes porcelain"
+    else
+        rm_fail "isolation: a write under \$REPO_ROOT/.tuneup went unseen"
+    fi
+    rm -rf "$probe"
 }
 
 # ── Dispatch ──────────────────────────────────────────────────────────────────

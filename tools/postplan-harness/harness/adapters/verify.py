@@ -40,6 +40,16 @@ def tracks_log_line(tracks: list[TrackResult], phase5: str) -> str:
             + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
 
 
+def fail_log_lines(tracks: list[TrackResult]) -> list[str]:
+    lines = []
+    for t in tracks:
+        if t.status != "fail":
+            continue
+        tail = [ln for ln in t.evidence.strip().splitlines() if ln.strip()]
+        lines.append(f"phase5 FAIL {t.name}: {tail[-1][:200] if tail else '(no output)'}")
+    return lines
+
+
 class LiveVerify:
     def __init__(self, worktree: str, timeout: int = 1800,
                  run_cmd: Callable[[str, str], tuple[int, str]] | None = None):
@@ -56,15 +66,15 @@ class LiveVerify:
         tracks: list[TrackResult] = []
         ibl5 = f"{self.worktree}/ibl5"
         if cls.has_php:
-            rc, out = self._run("vendor/bin/phpunit --no-progress 2>&1 | tail -n 5", ibl5)
+            rc, out = self._run("vendor/bin/phpunit --no-progress 2>&1", ibl5)
             tracks.append(TrackResult("phpunit", "pass" if rc == 0 else "fail", out))
-            rc, out = self._run("composer run analyse -- --no-progress 2>&1 | tail -n 5", ibl5)
+            rc, out = self._run("composer run analyse -- --no-progress 2>&1", ibl5)
             tracks.append(TrackResult("phpstan", "pass" if rc == 0 else "fail", out))
         else:
             tracks += [TrackResult("phpunit", "skipped"), TrackResult("phpstan", "skipped")]
         if cls.has_go:
-            rc1, o1 = self._run("make -C engine fmt-check 2>&1 | tail -n 5", self.worktree)
-            rc2, o2 = self._run("make -C engine cover 2>&1 | tail -n 8", self.worktree)
+            rc1, o1 = self._run("make -C engine fmt-check 2>&1", self.worktree)
+            rc2, o2 = self._run("make -C engine cover 2>&1", self.worktree)
             tracks.append(TrackResult("go", "pass" if rc1 == 0 and rc2 == 0 else "fail", o1 + o2))
         else:
             tracks.append(TrackResult("go", "skipped"))
@@ -72,7 +82,7 @@ class LiveVerify:
             rc, out = self._run(
                 "bin/lib/shell-scripts.sh --full"
                 " | xargs shellcheck --severity=warning --shell=bash"
-                " --exclude=SC2034,SC1090,SC2207 2>&1 | tail -n 20",
+                " --exclude=SC2034,SC1090,SC2207 2>&1",
                 self.worktree
             )
             tracks.append(TrackResult("shellcheck", "pass" if rc == 0 else "fail", out))

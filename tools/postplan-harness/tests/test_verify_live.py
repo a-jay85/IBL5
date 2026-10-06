@@ -6,7 +6,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.adapters.verify import LiveVerify, TrackResult, tracks_log_line
+from harness.adapters.verify import LiveVerify, TrackResult, fail_log_lines, tracks_log_line
 from harness.state import Classification
 
 PHPUNIT = "vendor/bin/phpunit --no-progress"
@@ -100,3 +100,78 @@ def test_tracks_log_line_byte_identical():
     assert tracks_log_line(clean, "pass") == (
         "phase5 tracks: phpunit=pass, go=skipped -> PHASE5_VERIFY_STATUS=pass"
     )
+
+
+# ---- Phase 2: real-shell stubs (prove the pipeline, which the fake runner cannot) ----
+
+def _script(path, body):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("#!/usr/bin/env bash\n" + body)
+    path.chmod(0o755)
+
+
+def _stub_tree(tmp_path, monkeypatch, *, phpunit="exit 0", shellcheck="exit 0", composer="exit 0"):
+    stubdir = tmp_path / "stubs"
+    _script(tmp_path / "ibl5" / "vendor" / "bin" / "phpunit", phpunit + "\n")
+    _script(stubdir / "composer", composer + "\n")
+    _script(stubdir / "shellcheck", shellcheck + "\n")
+    _script(tmp_path / "bin" / "lib" / "shell-scripts.sh", "echo a.sh\n")
+    monkeypatch.setenv("PATH", f"{stubdir}:{os.environ['PATH']}")
+    return str(tmp_path)
+
+
+def _by_name(tracks):
+    return {t.name: t for t in tracks}
+
+
+def test_live_real_shell_failing_phpunit_reports_fail(tmp_path, monkeypatch):
+    wt = _stub_tree(tmp_path, monkeypatch, phpunit='echo FAILURES! >&2\nexit 1')
+    tracks = _by_name(LiveVerify(wt).run(Classification(has_php=True)))
+    assert tracks["phpunit"].status == "fail"
+    assert tracks["phpstan"].status == "pass"
+    assert "FAILURES!" in tracks["phpunit"].evidence
+
+
+def test_live_real_shell_failing_shellcheck_reports_fail(tmp_path, monkeypatch):
+    wt = _stub_tree(tmp_path, monkeypatch, shellcheck='echo "In a.sh line 1:"\nexit 1')
+    tracks = _by_name(LiveVerify(wt).run(Classification(has_shell=True)))
+    assert tracks["shellcheck"].status == "fail"
+    assert "In a.sh line 1:" in tracks["shellcheck"].evidence
+
+
+def test_live_real_shell_passing_stubs_report_pass(tmp_path, monkeypatch):
+    wt = _stub_tree(tmp_path, monkeypatch)
+    tracks = _by_name(LiveVerify(wt).run(Classification(has_php=True, has_shell=True)))
+    assert tracks["phpunit"].status == "pass"
+    assert tracks["phpstan"].status == "pass"
+    assert tracks["shellcheck"].status == "pass"
+
+
+def test_live_evidence_keeps_last_3000_chars(tmp_path, monkeypatch):
+    wt = _stub_tree(tmp_path, monkeypatch,
+                    phpunit='printf "%0.sx" $(seq 1 5000)\necho TAILMARK')
+    tracks = _by_name(LiveVerify(wt).run(Classification(has_php=True)))
+    evidence = tracks["phpunit"].evidence
+    assert len(evidence) <= 3000
+    assert evidence.rstrip().endswith("TAILMARK")
+
+
+def test_fail_log_lines_names_each_failed_track():
+    tracks = [
+        TrackResult("phpunit", "fail", "x\nFAILURES!\n\n"),
+        TrackResult("phpstan", "pass", "ok"),
+        TrackResult("go", "fail", ""),
+    ]
+    assert fail_log_lines(tracks) == [
+        "phase5 FAIL phpunit: FAILURES!",
+        "phase5 FAIL go: (no output)",
+    ]
+
+
+def test_fail_log_lines_empty_when_nothing_failed():
+    tracks = [
+        TrackResult("phpunit", "pass", "boom FAILURES!"),
+        TrackResult("go", "skipped"),
+        TrackResult("e2e", "unavailable", "isolated mode"),
+    ]
+    assert fail_log_lines(tracks) == []

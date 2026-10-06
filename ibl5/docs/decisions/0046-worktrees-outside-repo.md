@@ -61,4 +61,8 @@ location during the transition.
   `wt-db-test`, `db-test-up`, `e2e-wt`, `cleanup`, `ibl5/bin/e2e-local`, and
   `bin/lib/git-helpers.sh`. Local, non-repo follow-ups (vendor-repair hook in
   `.claude/settings.local.json`, permission globs in `~/.claude/settings.json`, stale
-  `~/.claude.json` project keys) are documented in the PR, not in this diff.
+  `~/.claude.json` project keys) are documented in the PR, not in this diff. <!-- slop-ok -->
+
+## Addendum: legacy in-repo fallback removed (2026-10-06)
+
+`bin/db-sync-prod` and `bin/e2e-wt` previously accepted the legacy `worktrees/<name>` path inside the repo as a fallback alongside the canonical external `IBL5-worktrees/<name>` path. PR [#2919](https://github.com/a-jay85/IBL5/pull/2919) removes those fallback branches. All active worktrees were at the external location before this change.

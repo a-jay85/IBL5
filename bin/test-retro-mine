@@ -408,6 +408,9 @@ rm_validate() {
     (
         # shellcheck source=/dev/null
         # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
         . "$RM_DRIVER"
         set +e
         validate_draft "$env" "$tree" || exit 1
@@ -1392,6 +1395,9 @@ case_tuneup_replay_real_digest_envelope() {
     (
         export STATE_DIR="$t" REPO_ROOT="$SCRIPT_DIR/.."
         # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
         . "$RM_DRIVER"
         set +e
         jq -c . "$th" > "$t/thread.jsonl"
@@ -1413,6 +1419,9 @@ case_tuneup_replay_real_rank_envelope() {
     env="$RM_FIXTURE_DIR/tuneup-rank-envelope.json"
     (
         export STATE_DIR="$t" REPO_ROOT="$SCRIPT_DIR/.."
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
         # shellcheck source=/dev/null
         . "$RM_DRIVER"
         set +e

@@ -1036,6 +1036,28 @@ else
 fi
 unset LAUNCHCTL_CMD
 
+# get_worktree_path must not SIGPIPE git under pipefail. The match is the
+# first entry, so an early-exit awk leaves a long list unread.
+gwp_bin="$(mktemp -d)"
+cat > "$gwp_bin/git" <<'GWP'
+#!/bin/bash
+printf 'worktree /tmp/gwp-first\nHEAD 0\nbranch refs/heads/gwp-target\n\n'
+for i in $(seq 1 5000); do
+    printf 'worktree /tmp/gwp-%d\nHEAD 0\nbranch refs/heads/gwp-%d\n\n' "$i" "$i"
+done
+GWP
+chmod +x "$gwp_bin/git"
+gwp_rc=0
+gwp_out="$(PATH="$gwp_bin:$PATH" bash -c \
+    'set -euo pipefail; . "$1"; get_worktree_path gwp-target' \
+    _ "$SCRIPT_DIR/lib/wt-guards.sh")" || gwp_rc=$?
+if [ "$gwp_rc" -eq 0 ] && [ "$gwp_out" = "/tmp/gwp-first" ]; then
+    pass "get-worktree-path-no-sigpipe"
+else
+    failcase "get-worktree-path-no-sigpipe (rc=$gwp_rc out=$gwp_out)"
+fi
+rm -rf "$gwp_bin"
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

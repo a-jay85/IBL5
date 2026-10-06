@@ -412,7 +412,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             log(f"phase2: qualified {qualified} bare backlog ref(s) as {BACKLOG_REPO}#N")
         copy["commit_subject"] = schemas.coerce_commit_subject(copy["commit_subject"], cls)
         check, body_check_degraded = _body_check(
-            llm, git, gh, copy, copy_degraded, cls, log)
+            llm, git, gh, copy, copy_degraded, cls, log, worktree=worktree)
         if copy["summary_md"] and check.get("corrected_body"):
             copy["summary_md"] = check["corrected_body"]
             for f in check.get("findings", []):
@@ -2032,13 +2032,15 @@ def _inject_scope_notes(copy: dict, plan, files: list[str], diff_body: str, pr_b
     return notes
 
 
-def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool]:
+def _body_check(llm, git, gh, copy, copy_degraded, cls, log, worktree=None) -> tuple[dict, bool]:
     """Phase 2 body-vs-diff verification: (result, body_check_degraded).
 
     Returns ({}, False) without calling the LLM when pr-copy was degraded (the
     fallback body is a one-line stub with nothing to reconcile) or when the subject
     text resolves to empty.  On a degraded model reply, returns the mechanically-
-    corrected body so number corrections survive the model failure.
+    corrected body so number corrections survive the model failure.  Test-count
+    mismatches are annotated in the returned corrected_body and appended to
+    findings on both the LLM and degraded paths.
     """
     if copy_degraded:
         log("phase2: body-check skipped (pr-copy degraded)")
@@ -2063,6 +2065,7 @@ def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool
         log("phase2: body-check corrected numbers mechanically")
 
     # LLM pass
+    degraded = False
     try:
         result = llm.call(
             "body-check", "sonnet",
@@ -2070,12 +2073,24 @@ def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool
                 body_numbers.body_prose_for_check(mechanically_corrected), ns),
             schemas.validate_body_check)
         log(f"phase2: body-check findings: {len(result.get('findings', []))}")
-        return result, False
     except HarnessError as e:
         if e.kind not in ("llm-invalid-output", "llm-fixture-missing"):
             raise
         log(f"phase2: body-check DEGRADED ({(e.detail or '')[:200]})")
-        return {"corrected_body": mechanically_corrected, "findings": []}, True
+        result = {"corrected_body": mechanically_corrected, "findings": []}
+        degraded = True
+
+    # Test-count pass: mechanical, after the LLM so its rewrite cannot drop the note
+    read_file = (None if worktree is None
+                 else (lambda p: body_numbers.read_worktree_file(worktree, p)))
+    annotated, tc_findings = body_numbers.annotate_test_count_mismatches(
+        result.get("corrected_body", ""), diff, read_file)
+    if tc_findings:
+        result = {**result, "corrected_body": annotated,
+                  "findings": list(result.get("findings", [])) + tc_findings}
+        for f in tc_findings:
+            log(f"phase2: body-check {f}")
+    return result, degraded
 
 
 def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True,

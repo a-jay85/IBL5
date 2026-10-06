@@ -43,9 +43,11 @@ clear the `.attempts` / `.failure` / `.cap-refunds` sidecars, and write
 decide only whether auto-merge arms, so a PR held for a human (a `feat:` title, an
 unmet autonomy contract, any unmet Phase 6.5 condition) is the pipeline's *normal*
 terminal state — not a failure. Agents that read "held" as "not success" used to leave
-the plan in `queue/`, where it was re-claimed and re-post-planned every iteration,
-forever: creating the handoff resets the attempt counter, so `MAX_ATTEMPTS` never
-retired it. The loop-side check ends that cycle.
+the plan in `queue/`, where it was re-claimed and re-post-planned on every iteration.
+Creating the handoff seeds the attempt counter at 1, so the impl run's post-plan is
+attempt 1 and a plan whose post-plan keeps failing gets at most `MAX_ATTEMPTS`
+post-plan runs before the claim-time cap moves it to `skipped/`. A held PR is a
+success, so the loop-side check files it to `done/` before it burns those attempts.
 
 The two check points:
 

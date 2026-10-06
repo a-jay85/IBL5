@@ -14,6 +14,8 @@ from harness.adapters.llm import FixtureLlm, MODEL_MAP
 from harness.classify import FILES_CHANGED_BEGIN, name_status_text, numstat_text
 from harness.state import HarnessError, TerminalState, UsageLedger
 
+pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
+
 CANNED = {
     "pr-copy": {"type": "chore", "title": "chore: replay", "commit_subject": "chore: replay commit", "summary_md": "## Summary\n- x\n"},
     "body-check": {"corrected_body": "## Summary\n- replay body\n", "findings": []},
@@ -73,6 +75,19 @@ def _run(fx):
     out = tempfile.mkdtemp(prefix="postplan-test-review-owed-")
     res = runner.run(fx, out, FixtureLlm(UsageLedger(), CANNED), mode="replay", headless=True)
     return res, out
+
+
+EXPECTED_ORDER = [
+    ("pr_status_badge", None),
+    ("pr_comment", "Code review"),
+    ("pr_comment", "Security audit"),
+    ("pr_sticky_verdict", None),
+]
+
+
+def _ordered_actions(actions):
+    """(action, title) in recorded order, minus pr_edit_body (races the review thread)."""
+    return [(a["action"], a.get("title")) for a in actions if a["action"] != "pr_edit_body"]
 
 
 def _sticky_bodies(out):
@@ -147,10 +162,20 @@ def test_arming_is_unchanged_by_every_review_owed_outcome(tmp_path, monkeypatch,
     res, out = _run(_fixture(review_owed=canned))
     assert (res.arm.armed, [c.name for c in res.arm.holds]) == \
         (base.arm.armed, [c.name for c in base.arm.holds])
-    # Sorted: ReviewPhase runs on a worker thread, so its pr_comment can land before or
-    # after the main thread's pr_edit_body. Order between the two is not the invariant.
-    assert sorted(a["action"] for a in _actions(out)) == \
-        sorted(a["action"] for a in _actions(base_out))
+    # ReviewPhase runs on a worker thread, so its pr_comment can land before or after the
+    # main thread's pr_edit_body. That pair is the only racing order: pr_edit_body is
+    # compared as an unordered count, and every other action keeps its exact order
+    # (badge first, Code review then Security audit, sticky verdict last: runner joins
+    # the review thread before posting the sticky).
+    assert _ordered_actions(_actions(out)) == _ordered_actions(_actions(base_out))
+    acts, base_acts = _actions(out), _actions(base_out)
+    assert sorted(a["action"] for a in acts if a["action"] == "pr_edit_body") == \
+        sorted(a["action"] for a in base_acts if a["action"] == "pr_edit_body")
+    # Absolute order too: a base-vs-outcome compare alone misses a regression that
+    # reorders both runs the same way.
+    assert _ordered_actions(acts) == EXPECTED_ORDER
+    names = [a["action"] for a in acts]
+    assert names[0] == "pr_status_badge" and names[-1] == "pr_sticky_verdict"
     assert res.terminal == base.terminal
 
 

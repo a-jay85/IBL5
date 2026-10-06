@@ -1809,12 +1809,23 @@ def _run_live_shaped_with(monkeypatch, out, *, git_cls, fixture, canned_extra=No
 
 
 def test_phase7_green_ci_makes_no_ci_fix_call(monkeypatch, tmp_path):
-    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    class _RecordingLiveShapedGit(_LiveShapedGit):
+        instances: list = []
+
+        def __init__(self, fixture):
+            super().__init__(fixture)
+            type(self).instances.append(self)
+
     out = str(tmp_path / "out")
-    _run_live_shaped(monkeypatch, out)
+    _run_live_shaped_with(monkeypatch, out, git_cls=_RecordingLiveShapedGit,
+                          fixture=_INLINE_FIXTURE)
     audit = _audit(out)
     assert "phase7 ci-fix" not in audit
     assert "fix: address Phase 7 CI failures" not in audit
+    assert len(_RecordingLiveShapedGit.instances) == 1
+    commits = _RecordingLiveShapedGit.instances[0].commit_messages
+    assert commits, "ReplayGit recorded no commits; the check below would be vacuous"
+    assert not any("fix: address Phase 7 CI failures" in m for m in commits)
 
 
 def test_phase7_red_ci_without_rewatch_script_passes_through(monkeypatch, tmp_path):
@@ -1957,6 +1968,10 @@ def test_phase7_rerun_probe_runs_at_most_once(monkeypatch, tmp_path):
     )
     audit = _audit(out)
     assert audit.count("rerun probe") == 1
+    for attempt in (1, 2):
+        assert re.search(
+            rf"phase7 ci-fix attempt {attempt}: .*outcome=no-change", audit), \
+            f"attempt {attempt} did not log outcome=no-change"
     acts = _actions(out)
     rerun_count = sum(1 for a in acts if a.get("action") == "run_rerun_failed")
     assert rerun_count == 2

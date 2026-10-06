@@ -602,6 +602,9 @@ finish_case
 # G14 — emitter rejects bad input; install refuses without the tick
 # ══════════════════════════════════════════════════════════════════════════════
 begin_case G14-emitter-rejects
+# Earlier tick cases log `launchctl list` from the live-post-plan-run guard
+# (bin/lib/wt-guards.sh); start clean so only this case's calls count.
+rm -f "$ROOT/launchctl.calls"
 for a in --bogus --install-hook; do
     RC=0
     env HOME="$ROOT/home" PATH="$STUBBIN:$PATH" "$EMIT/bin/wt-gc-cron-setup" "$a" >"$CD/out" 2>"$CD/err" || RC=$?

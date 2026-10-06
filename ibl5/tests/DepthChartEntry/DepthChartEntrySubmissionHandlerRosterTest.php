@@ -158,6 +158,20 @@ class DepthChartEntrySubmissionHandlerRosterTest extends WideUnitTestCase
         $this->assertQueryNotExecuted('UPDATE ibl_plr');
     }
 
+    public function testRosterRejectionErrorsHtmlUsesWrapperMarkup(): void
+    {
+        $roster = $this->roster(15);
+        $post = $this->validPost($roster);
+        // Row 15 gets a pid not on the roster
+        $post['pid15'] = '999';
+        $handler = $this->buildHandler($roster);
+        $result = $handler->handleSubmission($post, 'testuser');
+
+        $this->assertFalse($result['success']);
+        $this->assertStringStartsWith('<div class="text-center"><span class="text-red-500"><strong>', $result['errorsHtml']);
+        $this->assertStringEndsWith('</p></div>', $result['errorsHtml']);
+    }
+
     public function testSavesEveryRowForRosterLargerThanFifteen(): void
     {
         $roster = $this->roster(16);

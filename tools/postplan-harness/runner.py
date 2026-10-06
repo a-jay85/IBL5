@@ -79,6 +79,35 @@ _BADGE_FALLBACK = (
 
 # ── SIGTERM handler — abort any in-progress rebase before the process dies ───
 _active_git: "LiveGit | None" = None  # set once in run() for the isolated/live path
+_active_audit: "list[str] | None" = None  # the live run's audit list; read by the SIGTERM handler
+
+
+def _last_audit_phase(audit) -> str:
+    """The most recent `phaseN[.x]` token in the audit trail, or "start"."""
+    for line in reversed(list(audit or [])[-200:]):
+        m = re.search(r"\bphase\d+(?:\.\d+)?[a-z]?\b", line)
+        if m:
+            return m.group(0)
+    return "start"
+
+
+def _write_killed_line(signum: int) -> None:
+    """Append one `RESULT: post-plan KILLED` line to $POSTPLAN_LOG_PATH. stdout is only
+    flushed at exit, so without this a killed run leaves an empty log. One os.write on an
+    O_APPEND fd (no buffered file object); never raises."""
+    path = os.environ.get("POSTPLAN_LOG_PATH")
+    if not path:
+        return
+    try:
+        line = (f"RESULT: post-plan KILLED (signal {signum}) at "
+                f"{_last_audit_phase(_active_audit)}\n")
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(fd, line.encode())
+        finally:
+            os.close(fd)
+    except Exception:
+        pass
 
 
 def _install_sigterm_handler() -> None:
@@ -92,6 +121,7 @@ def _install_sigterm_handler() -> None:
                 git.emergency_abort()
             except Exception:
                 pass
+        _write_killed_line(signum)
         os._exit(128 + signum)
 
     signal.signal(signal.SIGTERM, _sigterm_handler)
@@ -290,6 +320,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 
     res = RunResult(terminal=TerminalState.FAILED, slug=slug, plan=plan,
                     ledger=ledger, audit=audit)
+    global _active_audit
+    _active_audit = audit
     state = statefile.StateFile(os.path.join(_state_dir(out_dir, live, state_dir), statefile.safe_slug(slug) + ".json"), slug, git, out_dir, log)
     log(f"phase1 plan: found={plan.found} auto_merge_false={plan.auto_merge_false} "
         f"matrix={plan.has_matrix} critical_files={len(plan.critical_files)} "
@@ -906,11 +938,19 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # ---- Phase 10: preview environment ------------------------------
         log("phase10: preview environment skipped — headless harness")
     except HarnessError as e:
-        res.terminal = TerminalState.FAILED
-        res.error = f"{e.kind}: {e.detail}"
-        res.error_kind = e.kind
-        _record_failure_context(res, e)
-        log(f"FAILED: {res.error}")
+        merged = _already_shipped(e, git, gh, log)
+        if merged is not None:
+            res.terminal = TerminalState.ALREADY_SHIPPED
+            res.pr_number = int(merged["number"])
+            res.final_pr_state = "MERGED"
+            log(f"already-shipped: diff vs origin/master is empty and PR "
+                f"#{res.pr_number} is MERGED; suppressing {e.kind} ({(e.detail or '')[:120]})")
+        else:
+            res.terminal = TerminalState.FAILED
+            res.error = f"{e.kind}: {e.detail}"
+            res.error_kind = e.kind
+            _record_failure_context(res, e)
+            log(f"FAILED: {res.error}")
     except usage_pause.UsagePause as p:
         res.terminal = TerminalState.FAILED
         res.error_kind = "usage-pause-dirty" if p.dirty else "usage-pause"
@@ -1019,6 +1059,29 @@ _DEP_CATCHUP_KEY = 9   # lost-work key outside the 1..3 push/BEHIND attempt keys
 
 def _retry_key(branch: str, attempt: int) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "-", f"postplan-{branch}-r{attempt}")
+
+
+# Failure shapes that mean "the branch diff vs origin/master is empty". On their own they
+# are lost work; with the branch's PR already MERGED they are a finished run.
+_EMPTY_DIFF_MARKERS = ("diff vs origin/master is empty", "nothing was compared",
+                       "No commits between")
+
+
+def _already_shipped(e: HarnessError, git, gh, log) -> dict | None:
+    """{"number", "url"} of the merged PR when `e` is an empty-diff failure on a branch
+    whose PR already merged, else None. Never relaxes the proof for a non-empty diff:
+    the live diff vs origin/master must itself be empty, and a merged PR must exist."""
+    if e.kind not in ("lostwork-unproved", "gh"):
+        return None
+    if not any(m in (e.detail or "") for m in _EMPTY_DIFF_MARKERS):
+        return None
+    try:
+        if git.diff_vs_base("origin/master").strip():
+            return None
+        return gh.merged_pr()
+    except Exception as exc:  # noqa: BLE001 - unknown means keep the original failure
+        log(f"already-shipped: probe failed ({exc!r}); keeping {e.kind}")
+        return None
 
 
 def _refresh_and_reprove(git, log, phase: str, attempt: int) -> None:
@@ -1291,8 +1354,11 @@ def _reconcile_before_arm(git, log, gh, worktree, pr, sha, bg_ci, out_dir, *,
 
 
 def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
-    """Bounded BEHIND resolution. Returns (sha, outcome). Sets res.retry_cap and
-    disarms auto-merge when the cap is spent."""
+    """Bounded BEHIND resolution. Returns (sha, outcome). When the cap is spent
+    and the branch is still BEHIND, auto-merge stays armed and the PR is handed
+    to .github/workflows/update-behind-prs.yml (ADR-0081); retry_cap is never
+    set here. Divergence inside the loop still disarms (see the disarm=True
+    call sites below)."""
     strict = gh.branch_protection_strict()
     for attempt in range(1, _MAX_BEHIND_RETRIES + 1):
         mss = gh.merge_state_status(pr)
@@ -1329,10 +1395,9 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
         if outcome.exit_code != 0:
             return sha, outcome
     if gh.merge_state_status(pr) == "BEHIND":
-        res.retry_cap = "behind-retry-cap"
         log(f"phase7: BEHIND cap hit after {_MAX_BEHIND_RETRIES} re-rebases — "
-            "disarming auto-merge")
-        gh.pr_disable_auto_merge(pr)
+            "leaving auto-merge armed; .github/workflows/update-behind-prs.yml "
+            "(ADR-0081) carries the PR to merge")
     return sha, outcome
 
 
@@ -1344,9 +1409,10 @@ _CI_FIX_REWATCH_FLOOR_SECS = 300   # less than this after a push: record the hea
 
 
 def _phase7_stop(log, trail: list[str], attempt: int, sha, stage: str,
-                 e: HarnessError) -> str:
+                 e: HarnessError, local_sha=None) -> str:
     """Log and record a Phase 7 attempt that stopped on an error. `stage` is
-    "llm", "commit" or "push". Returns the `last` outcome token."""
+    "llm", "commit" or "push". `local_sha` is the local ci-fix commit, named in
+    the unpushed-commit line. Returns the `last` outcome token."""
     last = f"error:{e.kind}"
     tail = " | ".join(_error_tail(e.output or e.detail))
     log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} "
@@ -1355,7 +1421,8 @@ def _phase7_stop(log, trail: list[str], attempt: int, sha, stage: str,
     trail.append(f"attempt {attempt}: {last} ({stage}-time): {tail or 'no output captured'}")
     if stage in ("commit", "push"):
         log("ci-fix commit is LOCAL and unpushed; "
-            "the next bin/post-plan-now run ships it")
+            "the next bin/post-plan-now run ships it"
+            + (f" ({str(local_sha)[:12]})" if local_sha else ""))
     return last
 
 
@@ -1638,7 +1705,8 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 except HarnessError as push_err:
                     if push_err.kind == "remote-head-diverged":
                         raise
-                    last = _phase7_stop(log, trail, attempt, sha, "push", push_err)
+                    last = _phase7_stop(log, trail, attempt, sha, "push", push_err,
+                                         local_sha=new)
                     break
                 if sha != pre_push_head:
                     log(f"phase7 ci-fix: push caught up to origin/master; "
@@ -2858,6 +2926,22 @@ def _hold_repeat_note(res: RunResult) -> str:
     return f" hold-repeat={hr.get('repeat_count')}x ({nums}) dm={hr.get('dm')}"
 
 
+HOLD_REASONS_CAP = 300
+
+
+def _hold_reasons_note(res: RunResult) -> str:
+    """Display-only RESULT-line suffix ` hold=(7) reason; (8) reason` for a held run.
+    Same text as the audit.log `phase6.5: HELD` line, flattened, redacted, capped."""
+    arm = res.arm
+    if arm is None or arm.armed or not arm.holds:
+        return ""
+    text = "; ".join(f"({c.number}) {c.reason or c.name}" for c in arm.holds)
+    text = " ".join(_redact(text).split())
+    if len(text) > HOLD_REASONS_CAP:
+        text = text[:HOLD_REASONS_CAP - 1] + "…"
+    return f" hold={text}"
+
+
 def _prose_hold_note(res: RunResult) -> str:
     """Display-only RESULT-line suffix naming the prose check as a hold cause.
 
@@ -2979,6 +3063,9 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
         return (f"RESULT: post-plan FAILED — ERROR terminal=failed "
                 f"kind={res.error_kind or 'unknown'}: "
                 f"{_flat(res.error) or 'no detail'}{pr}")
+    if res.terminal == TerminalState.ALREADY_SHIPPED:
+        return (f"RESULT: post-plan complete — terminal=already-shipped{pr} "
+                "(PR already merged; branch diff vs master is empty); no action needed.")
     if res.terminal == TerminalState.NOTHING_TO_SHIP:
         return ("RESULT: post-plan complete — nothing to ship "
                 "(clean tree, empty diff vs master); no PR opened.")
@@ -2998,14 +3085,11 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                 tail += f" auto-resolved conflict in {', '.join(files)}"
         except OSError:
             pass
-    if res.retry_cap == "behind-retry-cap":
-        return ("RESULT: post-plan BLOCKED — BEHIND retry cap reached (branch still "
-                "behind master after 3 re-rebases); auto-merge disarmed, human "
-                f"merges{pr}{tail} findings={len(res.findings)}")
     tail += _prose_hold_note(res)
     tail += _hold_repeat_note(res)
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
-            f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}")
+            f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}"
+            f"{_hold_reasons_note(res)}")
 
 
 def _settle_pause_marker(res: RunResult, rc: int) -> int:
@@ -3073,8 +3157,8 @@ def main() -> int:
     rc = _settle_pause_marker(res, rc)
     if rc != PAUSE_EXIT:
         usage_pause.ledger_clear()
-    # First line, so `head -1 <log>` is the whole verdict and bin/watch-run can
-    # terminate on it without waiting for the launchd label to disappear.
+    # First harness line (the launcher may write a `started` line above it), so
+    # bin/watch-run can terminate on it without waiting for the launchd label to disappear.
     print(verdict_line(res, rc, _pull_url_base(args.worktree)))
     write_blocked_ship(args.out, res, rc, args.worktree)
     print(f"terminal={res.terminal.value} phase5={res.phase5} "

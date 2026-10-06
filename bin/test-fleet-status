@@ -403,12 +403,12 @@ PLIST_MIDNIGHT="$TMP/com.ibl5.automouse.midnight.plist"
 sed 's|<integer>4</integer>|<integer>0</integer>|; s|<integer>30</integer>|<integer>0</integer>|' \
     "$PLIST" > "$PLIST_MIDNIGHT"
 
-# Case 19 fixtures. The daily fire sits 12 hours from now, so a one-shot two
+# Case 19 fixtures. The daily fire sits 12 hours from now, so a one-shot ten
 # minutes out always beats it and one two days out always loses, whatever time
 # the suite runs. The expected one-shot HH:MM comes from the same epoch the stub
 # hands out. BSD `date -r` first, GNU `date -d @` second.
 NOW_EPOCH="$(date +%s)"
-ONESHOT_SOON=$(( NOW_EPOCH + 120 ))
+ONESHOT_SOON=$(( NOW_EPOCH + 600 ))
 ONESHOT_LATE=$(( NOW_EPOCH + 2 * 86400 ))
 ONESHOT_PAST=$(( NOW_EPOCH - 3600 ))
 ONESHOT_SOON_HM="$(date -r "$ONESHOT_SOON" +%H:%M 2>/dev/null \
@@ -1006,6 +1006,60 @@ else
     printf '  skip  %s\n' "watch: refresh footer in first frame (no timeout/gtimeout)"
 fi
 
+# Case 23 — unknown option: exit 2, one-line complaint on stderr, no page rendered.
+# stderr is captured apart from stdout so the message is pinned to the right stream.
+UNK_ERR="$TMP/unknown-opt.err"
+UNK_OUT="$("$FLEET" --bogus 2>"$UNK_ERR")"; UNK_RC=$?
+[ "$UNK_RC" -eq 2 ] \
+    && pass "unknown option: exits 2" \
+    || fail "unknown option: exits 2 (got $UNK_RC)"
+assert_has "unknown option: stderr names the option" \
+    "$(cat "$UNK_ERR")" 'fleet-status: unknown option --bogus'
+[ -z "$UNK_OUT" ] \
+    && pass "unknown option: nothing on stdout" \
+    || fail "unknown option: nothing on stdout"
+
+# Case 24 — MAIN_CHECKOUT resolves through `git rev-parse --git-common-dir`, so a
+# copy of the script run from a LINKED worktree still points at the MAIN checkout.
+# The observable is the reorder applet's stamp file: reorder_link writes the
+# launcher path it derives from MAIN_CHECKOUT ("$MAIN_CHECKOUT/bin/automouse/
+# queue-reorder-ui") into it. Hermetic: a throwaway repo under $TMP carrying copies
+# of the script and the two files it sources, a stub osacompile, forced links. The
+# GIT_* vars are dropped so a run inside a git hook cannot redirect the scratch repo.
+MC_MAIN="$TMP/mc-main"
+MC_WT="$TMP/mc-wt"
+mkdir -p "$MC_MAIN/bin/lib" "$MC_MAIN/bin/automouse"
+cp "$FLEET" "$MC_MAIN/bin/fleet-status"
+cp "$SCRIPT_DIR/lib/session-id.sh" "$MC_MAIN/bin/lib/session-id.sh"
+cp "$SCRIPT_DIR/automouse/lib-queue-order" "$MC_MAIN/bin/automouse/lib-queue-order"
+mc_git() { env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$MC_MAIN" \
+    -c user.name=t -c user.email=t@example.invalid -c core.hooksPath=/dev/null "$@"; }
+if mc_git init -q -b main >/dev/null 2>&1 \
+    && mc_git add -A >/dev/null 2>&1 \
+    && mc_git commit -q -m fixture >/dev/null 2>&1 \
+    && mc_git worktree add -q "$MC_WT" -b mc-linked >/dev/null 2>&1; then
+    MC_MAIN_REAL="$(cd "$MC_MAIN" && pwd -P)"
+    for _mc in main wt; do
+        if [ "$_mc" = main ]; then _mc_dir="$MC_MAIN"; else _mc_dir="$MC_WT"; fi
+        env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+            PATH="$STUBBIN:$PATH" \
+            FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
+            FLEET_STATUS_LOG_DIR="$LOGS" \
+            FLEET_STATUS_TRANSCRIPT_ROOT="$TX" \
+            FLEET_STATUS_JQ=jq \
+            FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
+            FLEET_STATUS_REORDER_APP_DIR="$TMP/apps-mc-$_mc" \
+            FLEET_STATUS_OSACOMPILE="$STUBBIN/osacompile" \
+            FLEET_STATUS_FORCE_LINKS=1 \
+            "$_mc_dir/bin/fleet-status" >/dev/null 2>&1
+        assert_has "MAIN_CHECKOUT: run from $_mc resolves to the main checkout" \
+            "$(cat "$TMP/apps-mc-$_mc/ibl5-queue-reorder.cmd" 2>/dev/null)" \
+            "'$MC_MAIN_REAL/bin/automouse/queue-reorder-ui'"
+    done
+else
+    printf '  skip  %s\n' "MAIN_CHECKOUT: linked-worktree resolution (scratch git repo/worktree unavailable)"
+fi
+
 # Case 11 — --help window intact: line count must not have changed. 46 while this
 # branch was off master; the rebase onto master picked up 18 more help lines that
 # this branch never wrote, and the § PROGRESS rewrite is line-for-line even. 75
@@ -1018,6 +1072,79 @@ HELP_LINES="$(printf '%s\n' "$HELP" | wc -l | tr -d ' ')"
 [ "$HELP_LINES" -eq "$HELP_LINES_BASELINE" ] \
     && pass "--help line count unchanged" \
     || fail "--help line count unchanged (expected $HELP_LINES_BASELINE, got $HELP_LINES)"
+
+# Case 25 — --watch on a real pty: the `[ -t 1 ]` branch (alternate screen, clipping,
+# EXIT restore) never runs under `$(...)` as in Case 22. A python3 pty.fork helper
+# gives the script a controlling terminal sized 8x120, waits for the first frame
+# (its "refreshing every" footer), then, after 1s so bash is in its sleep leg,
+# SIGTERMs the whole process group. The sleep dies, bash runs the TERM trap
+# (exit 130) and then the EXIT restore. The helper keeps draining the pty meanwhile
+# (macOS blocks the child's exit on unread tty output), SIGKILLs any survivor, and
+# prints the captured bytes. Needs only python3; skips if absent or no pty.
+PTY_WATCH_PY='
+import os, pty, sys, time, signal, select, fcntl, termios, struct
+pid, fd = pty.fork()
+if pid == 0:
+    os.execv(sys.argv[1], [sys.argv[1], "--watch", "999"])
+fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 8, 120, 0, 0))
+buf = b""
+deadline = time.time() + 25
+sent = False
+while time.time() < deadline:
+    r, _, _ = select.select([fd], [], [], 0.2)
+    if r:
+        try:
+            d = os.read(fd, 65536)
+        except OSError:
+            break
+        if not d:
+            break
+        buf += d
+    if not sent and b"refreshing every" in buf:
+        time.sleep(1)  # let bash reach its sleep leg; a TERM mid-frame-write is lost
+        sent = True
+        try: os.killpg(pid, signal.SIGTERM)
+        except OSError: pass
+try: os.killpg(pid, signal.SIGKILL)
+except OSError: pass
+try: os.waitpid(pid, 0)
+except OSError: pass
+sys.stdout.buffer.write(buf)
+'
+OUTPUT_PTY=""
+# Skip only when the environment lacks python3 or a pty; a helper that breaks
+# where both exist must FAIL, not hide behind the skip.
+PTY_OK=0
+if command -v python3 >/dev/null 2>&1 \
+    && python3 -c 'import os, pty; os.openpty()' >/dev/null 2>&1; then
+    PTY_OK=1
+fi
+if [ "$PTY_OK" -eq 1 ]; then
+    OUTPUT_PTY="$(env PATH="$STUBBIN:$PATH" \
+        FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
+        FLEET_STATUS_HARNESS_OUT="$OUT" \
+        FLEET_STATUS_LOG_DIR="$LOGS" \
+        FLEET_STATUS_TRANSCRIPT_ROOT="$TX" \
+        FLEET_STATUS_JQ=jq \
+        FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
+        FLEET_STATUS_REORDER_APP_DIR="$TMP/apps" \
+        FLEET_STATUS_OSACOMPILE="$STUBBIN/osacompile" \
+        python3 -c "$PTY_WATCH_PY" "$FLEET" 2>/dev/null | LC_ALL=C tr -d '\000' || true)"
+fi
+if [ -n "$OUTPUT_PTY" ]; then
+    assert_has "watch tty: alternate-screen enter + autowrap off" \
+        "$OUTPUT_PTY" '\[\?1049h.*\[\?7l'
+    assert_has "watch tty: oversized frame clipped with a more-lines footer" \
+        "$OUTPUT_PTY" '[0-9]+ more lines'
+    assert_has "watch tty: refresh footer still drawn after clipping" \
+        "$OUTPUT_PTY" 'refreshing every 999s'
+    assert_has "watch tty: EXIT trap restores autowrap + main screen after TERM" \
+        "$OUTPUT_PTY" '\[\?7h.*\[\?1049l'
+elif [ "$PTY_OK" -eq 1 ]; then
+    fail "watch tty: python pty helper produced no output"
+else
+    printf '  skip  %s\n' "watch tty: alt-screen/clip/restore (no python3 or no pty available)"
+fi
 
 printf '\n'
 if [ "$FAILED" -eq 0 ]; then

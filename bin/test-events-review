@@ -32,6 +32,16 @@ expect_eq() { # name want got
 expect_has() { # name haystack needle
     if grep -qF -- "$3" <<< "$2"; then ok "$1"; else fail "$1 - '$3' absent"; fi
 }
+expect_has_exact() { # name haystack needle - needle must not run on into a longer number/word
+    if EH_NEEDLE="$3" LC_ALL=C awk 'BEGIN { n = ENVIRON["EH_NEEDLE"] }
+        { s = $0
+          while ((i = index(s, n)) > 0) {
+              c = substr(s, i + length(n), 1)
+              if (c == "" || c !~ /[0-9A-Za-z_]/) { f = 1; exit }
+              s = substr(s, i + 1)
+          } }
+        END { exit !f }' <<< "$2"; then ok "$1"; else fail "$1 - '$3' absent (or only as a prefix of a longer token)"; fi
+}
 expect_lacks() { # name haystack needle
     if grep -qF -- "$3" <<< "$2"; then fail "$1 - '$3' unexpectedly present"; else ok "$1"; fi
 }
@@ -363,13 +373,13 @@ group_digest() {
     longest="$(printf '%s\n' "$digest" | LC_ALL=C awk '{ if (length($0) > m) m = length($0) } END { print m + 0 }')"
     if [ "$longest" -le 200 ]; then ok "row8: longest digest line is $longest bytes"; else fail "row8: a digest line has $longest bytes"; fi
 
-    expect_has "row9: authenticated route team renders" "$digest" "  140  team"
-    expect_has "row9: authenticated route depth_chart renders" "$digest" "  75  depth_chart"
-    expect_has "row9: action trade_offer_submitted renders" "$digest" "  14  trade_offer_submitted"
-    expect_has "row9: folded anonymous count lands in other" "$digest" "  43  other"
-    expect_has "row9: folded action count lands in other" "$digest" "  3  other"
+    expect_has_exact "row9: authenticated route team renders" "$digest" "  140  team"
+    expect_has_exact "row9: authenticated route depth_chart renders" "$digest" "  75  depth_chart"
+    expect_has_exact "row9: action trade_offer_submitted renders" "$digest" "  14  trade_offer_submitted"
+    expect_has_exact "row9: folded anonymous count lands in other" "$digest" "  43  other"
+    expect_has_exact "row9: folded action count lands in other" "$digest" "  3  other"
 
-    expect_has "row10: malformed rows are counted" "$digest" "dropped malformed rows: 3"
+    expect_has_exact "row10: malformed rows are counted" "$digest" "dropped malformed rows: 3"
     expect_eq "row10: dry-run over malformed rows exits 0" 0 "$ER_RC"
 
     # Row 11: 2000 routes and 400 actions force the byte cap.
@@ -802,8 +812,8 @@ SH
     expect_has "row31: seeded authenticated route team" "$digest" "team"
     expect_has "row31: seeded authenticated route player" "$digest" "player"
     expect_has "row31: seeded authenticated route depth_chart" "$digest" "depth_chart"
-    expect_has "row31: active GMs: 3" "$digest" "active GMs: 3"
-    expect_has "row31: NULL-class rows show as unclassified 4" "$digest" "unclassified 4"
+    expect_has_exact "row31: active GMs: 3" "$digest" "active GMs: 3"
+    expect_has_exact "row31: NULL-class rows show as unclassified 4" "$digest" "unclassified 4"
     local tok
     for tok in 'fixture_gm_' 'deadbeef' 'events-review-fixture' 'secret=leak123' 'evil-referer.example' 'ignore_previous'; do
         expect_lacks "row32: output lacks '$tok'" "$ER_OUT" "$tok"

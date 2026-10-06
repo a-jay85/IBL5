@@ -964,24 +964,6 @@ def test_remediation_prompt_embeds_procedure_verdict_and_diff(tmp_path, git_shim
     assert "=== END DIFF ===" in prompt
 
 
-def test_remediation_prompt_never_relies_on_packet_path_alone(tmp_path, git_shim):
-    """When a packet path appears in the prompt, its content is also inline."""
-    packet_dir = _packet(tmp_path)
-    with open(os.path.join(packet_dir, "diff.patch"), "w") as fh:
-        fh.write("+SENTINEL_DIFF_LINE\n")
-    verdict_path = str(tmp_path / "verdict_path.md")
-    with open(verdict_path, "w") as fh:
-        fh.write("6d checks\n\nNOT READY\n\n- finding one\n\n## DIGEST\nstuff\n")
-    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
-    fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
-                       packet_dir, verdict_path, "deadbeef")
-    prompt = llm.captured_prompts["fidelity-remediation"]
-    # The diff content is inline unconditionally, so the check cannot pass vacuously
-    # when the packet path happens to be absent from the prompt.
-    assert "+SENTINEL_DIFF_LINE" in prompt
-    assert "=== END DIFF ===" in prompt
-
-
 def test_remediation_prompt_truncates_oversized_diff(tmp_path, git_shim):
     """Diffs beyond REMEDIATION_DIFF_INLINE_CAP are truncated; tail content absent."""
     packet_dir = _packet(tmp_path)
@@ -1332,6 +1314,11 @@ def test_comment_nit_re_drops_verb_anchored_rewording_nits(title, detail):
     # Not filtered: defect in detail overrides the nit classification
     ("Clarify _ALREADY_DONE_RE docstring in fidelity.py",
      "The regex drops real followups silently when they name an old PR."),
+    # Not filtered: nit-like titles with no verb prefix (the regex is verb-anchored)
+    ("Stale docstring in compose_sticky",
+     "The docstring is out of date."),
+    ("Misleading comment above the retry loop",
+     "It says three tries but the code does five."),
 ])
 def test_comment_nit_re_keeps_additive_and_defect_notes(title, detail):
     """Additive docstring notes and notes with defect details are not filtered."""

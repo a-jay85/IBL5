@@ -28,10 +28,12 @@ pcw_state_dir() {
 
 # {check_runs:[...]} on stdin (one `gh api .../commits/<sha>/check-runs` page) ->
 # prints pending | red | green | none. Unparseable input reads as pending, so a bad
-# fetch skips the PR and never triggers a rescue.
+# fetch skips the PR and never triggers a rescue. human-signoff is dropped first. It is
+# red by design on every feat: PR and no rescue can turn it green, so a PR whose only
+# failure is the sign-off reads as green and is skipped.
 pcw_check_verdict() {
     local json pending failed
-    json="$(ccg_dedupe '[]' 2>/dev/null)" || { echo pending; return 0; }
+    json="$(ccg_dedupe '["human-signoff"]' 2>/dev/null)" || { echo pending; return 0; }
     [[ "$(jq -r '.check_runs | length' <<< "$json" 2>/dev/null)" =~ ^[1-9][0-9]*$ ]] \
         || { echo none; return 0; }
     pending="$(ccg_pending <<< "$json")"

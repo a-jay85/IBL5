@@ -13,8 +13,9 @@
 #   1. No-loss    : every baseline token survives in rules ∪ detail
 #   2. Residency  : every operative token (bold/gate/fenced) survives in rules file specifically
 #   3. Orphans    : every Why: _…-detail.md § <heading> pointer in rules resolves
-#   4. Size caps  : _architect-contract.md ≤ 30720 B (raised from 29696 to fit number-placeholder bullet), _plan-verification.md ≤ 21504 B
+#   4. Size caps  : _architect-contract.md ≤ 31744 B (raised from 30720 to fit the forced-test-edit bullet, backlog#912; earlier 29696 -> 30720 for the number-placeholder bullet), _plan-verification.md ≤ 21504 B
 #   5. Read budget: every plan-architect def carries the no-re-read bounds (check_read_budget)
+#   6. Added rules: every post-split bold lead-in in ADDED_RULES is resident in the contract (check_added_rules)
 #                   (only enforced when the detail file exists — skipped on the un-split tree)
 #
 # Run: bin/test-architect-contract-split              (exit 0 = pass, 1 = rule missing)
@@ -52,6 +53,12 @@ EXPECTED_ABSENT=(
 # Waives residency for the token, but tightens no-loss: token must be in the named detail file.
 # A named detail file that does not yet exist is a hard failure.
 EXPECTED_MOVED=(
+)
+
+# Format: "token<TAB>reason" — bold lead-ins added to _architect-contract.md AFTER the split.
+# The presplit fixture cannot see them, so assertions 1-2 do not protect them; check_added_rules does.
+ADDED_RULES=(
+  "**Existing tests the spec forces to edit.**	backlog#912: plans omitted existing test files their own spec changes forced to edit (PR #2336), and fidelity review flagged them as scope creep"
 )
 
 # ── Validate allowlists ───────────────────────────────────────────────────────
@@ -402,6 +409,25 @@ run_selftest() {
     printf 'FAIL: self-test did not detect dropped rule — checker is vacuous\n'
     FAILED=$((old_failed + 1))
   fi
+
+  # Mutation 2: drop the first ADDED_RULES bullet; check_added_rules must fail.
+  local added_mut="$tmpdir/_architect-contract-added.md"
+  local first_token="${ADDED_RULES[0]%%$'\t'*}"
+  grep -vF -- "$first_token" "$rules_src" > "$added_mut"
+  if grep -qF -- "$first_token" "$added_mut"; then
+    printf 'FAIL: self-test mutation 2 did not remove the added-rule bullet\n' >&2
+    exit 1
+  fi
+  old_failed=$FAILED
+  FAILED=0
+  check_added_rules "$added_mut"
+  if [[ "$FAILED" -gt 0 ]]; then
+    printf 'PASS: self-test detected dropped added rule (%d failure(s))\n' "$FAILED"
+    FAILED=$old_failed
+  else
+    printf 'FAIL: check_added_rules did not detect dropped bullet — checker is vacuous\n'
+    FAILED=$((old_failed + 1))
+  fi
 }
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -466,6 +492,25 @@ check_read_budget() {
   fi
 }
 
+# -- Assertion 6: post-split rules stay resident -----------------------------
+check_added_rules() {
+  local rules_file="$1" entry token reason
+  printf '\n=== added rules ===\n'
+  for entry in "${ADDED_RULES[@]}"; do
+    token="${entry%%$'\t'*}"
+    reason="${entry#*$'\t'}"
+    if [[ "${#reason}" -lt 15 || "$reason" == "$entry" ]]; then
+      printf 'FAIL [added rules]: entry for %s lacks a reason of at least 15 chars\n' "$token"
+      FAILED=$((FAILED + 1))
+      continue
+    fi
+    if ! grep -qF -- "$token" "$rules_file"; then
+      printf 'FAIL [added rules]: %s missing from %s\n' "$token" "$(basename "$rules_file")"
+      FAILED=$((FAILED + 1))
+    fi
+  done
+}
+
 if [[ "$MODE" == selftest ]]; then
   run_selftest
 else
@@ -474,10 +519,11 @@ else
     "$CONTRACT_RULES" \
     "$CONTRACT_DETAIL" \
     "architect-contract" \
-    30720 \
+    31744 \
     true
 
   check_read_budget
+  check_added_rules "$CONTRACT_RULES"
 
   # Cap is 21504 (21 KB), not the plan's 19456 (19 KB). The plan's movable-rationale
   # inventory was right: "## Required format" measures 11197 B in

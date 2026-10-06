@@ -726,13 +726,13 @@ healthy_fixture H2
 grep -v 'com.ibl5.db-sync-nightly' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
 mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
 rm -f "$CASE/home/Library/LaunchAgents/com.ibl5.db-sync-nightly.plist"
-_BEFORE="$(ls "$BASE_HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/launchd-health/" 2>/dev/null | sort | md5 2>/dev/null || echo none)"
+_BEFORE="$(ls "$BASE_HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/launchd-health/" 2>/dev/null | sort)"; : "${_BEFORE:=none}"
 # Unset the seam so the checker uses the $HOME-relative default
 unset LAUNCHD_HEALTH_LOG_DIR
 OUT="$(LAUNCHD_HEALTH_TODAY=2026-09-28 \
       bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
 RC=$?
-_AFTER="$(ls "$BASE_HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/launchd-health/" 2>/dev/null | sort | md5 2>/dev/null || echo none)"
+_AFTER="$(ls "$BASE_HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/launchd-health/" 2>/dev/null | sort)"; : "${_AFTER:=none}"
 _DEFAULT_STAMPS="$CASE/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/launchd-health/logs/stamps"
 _STAMP_H2=''
 for _f in "$_DEFAULT_STAMPS"/*db-sync-nightly*; do [ -e "$_f" ] && _STAMP_H2="$_f" && break; done
@@ -756,7 +756,9 @@ printf '\ncom.ibl5.fixture-extra standard\n' >> "$CASE/lib/LEJ_EXPECTED_JOBS_app
 # Append to the LEJ_EXPECTED_JOBS variable in the copy
 _EXTRA_LIB="$CASE/lib/launchd-expected-jobs.sh"
 # Re-write: append to the quoted block right before the closing quote
-sed -i.bak "s/^com.ibl5.wt-sync standard'/com.ibl5.wt-sync standard\\ncom.ibl5.fixture-extra standard'/" "$_EXTRA_LIB"
+# Backslash + real newline: portable across BSD and GNU sed (a literal \n is not expanded by BSD sed).
+_NL=$'\n'
+sed -i.bak "s/^com.ibl5.wt-sync standard'/com.ibl5.wt-sync standard\\${_NL}com.ibl5.fixture-extra standard'/" "$_EXTRA_LIB"
 
 OUT="$(LAUNCHD_HEALTH_JOBS_LIB="$_EXTRA_LIB" bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
 RC=$?

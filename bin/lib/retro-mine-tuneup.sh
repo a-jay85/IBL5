@@ -34,6 +34,14 @@ tuneup_redact_text() {
     tuneup_jq text -R -s -j
 }
 
+# tuneup_redact_known: the same pass without the long-opaque-run rule, for the
+# report only. Next week's dedupe parses its signature tables, which would
+# otherwise read back mangled. Issue bodies carry LLM free text and keep the
+# full redactor.
+tuneup_redact_known() {
+    tuneup_jq text-known -R -s -j
+}
+
 # ── Pre-pass: transcripts ─────────────────────────────────────────────────────
 # tuneup_extract_file <file>: zero or one thread object on stdout.
 tuneup_extract_file() {
@@ -110,12 +118,12 @@ tuneup_collect_runlogs() {
     cutday="$(epoch_fmt "$((NOW_EPOCH - 7 * 86400))" %Y%m%d)"
     {
         if [ -d "$TMP_LOG_DIR" ]; then
-            find "$TMP_LOG_DIR" -mindepth 1 -maxdepth 1 -type f \( -name 'plan-now-*.log' -o -name 'post-plan-now-*.log' \) 2>/dev/null
+            find -H "$TMP_LOG_DIR" -mindepth 1 -maxdepth 1 -type f \( -name 'plan-now-*.log' -o -name 'post-plan-now-*.log' \) 2>/dev/null
         else
             log "tune-up: run-log dir missing: $TMP_LOG_DIR"
         fi
         if [ -d "$AUTOMOUSE_LOG_DIR" ]; then
-            find "$AUTOMOUSE_LOG_DIR" -mindepth 1 -maxdepth 1 -type f -name '*.log' 2>/dev/null
+            find -H "$AUTOMOUSE_LOG_DIR" -mindepth 1 -maxdepth 1 -type f -name '*.log' 2>/dev/null
         else
             log "tune-up: automouse log dir missing: $AUTOMOUSE_LOG_DIR"
         fi
@@ -629,7 +637,7 @@ tuneup_write_report() {
         printf '\n## Signal counts\n\n| signature | threads | events |\n|---|---|---|\n'
         awk -F'\t' '{ printf "| %s | %s | %s |\n", $1, $2, $3 }' "$daydir/sigs.tsv"
         printf '\n## Spend\n\nTotal this day: $%s across %s digests.\n' "$total" "$ndig"
-    } | tuneup_redact_text > "$tmp" || { rm -f "$tmp"; return 1; }
+    } | tuneup_redact_known > "$tmp" || { rm -f "$tmp"; return 1; }
     mv "$tmp" "$REPORT_DIR/$DAY-tune-up.md"
     printf '%s\t%s\t%s\t%s\t%s\tok\n' "$RUN_ID" "$DAY" "$total" "$k" "$ndig" >> "$STATE_DIR/runs.tsv"
 }

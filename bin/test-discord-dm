@@ -734,6 +734,7 @@ NOTIFY_SITES_WANT=$(cat <<'EXPECT_EOF'
 db-backup.yml#1 webhook=1 ping='true'
 db-backup.yml#2 webhook=1 ping='true'
 db-backup.yml#3 webhook=1 ping='true'
+db-backup.yml#4 webhook=1 ping='true'
 docfix-health.yml#1 webhook=1 ping=-
 docfix-health.yml#2 webhook=1 ping=-
 docs-refreshed-notify.yml#1 webhook=1 ping=-
@@ -754,7 +755,7 @@ printf '\n-- notify-discord call sites --\n'
 # G1: the live workflows match the table.
 G1_GOT=$(notify_sites "$ROOT/.github/workflows")
 if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
-    ok "G1: 15 sites pass webhook-url; ping only on the chosen sites"
+    ok "G1: 16 sites pass webhook-url; ping only on the chosen sites"
 else
     fail "G1: call sites differ from the table"
     diff <(printf '%s\n' "$NOTIFY_SITES_WANT") <(printf '%s\n' "$G1_GOT") | sed 's/^/       /'

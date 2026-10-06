@@ -260,7 +260,7 @@ class SavedDepthChartRepository extends \Database\BaseMysqliRepository implement
              ORDER BY ordinal ASC",
             "ii",
             $teamid,
-            \League\JSB::WAIVERS_ORDINAL
+            \League\JsbConstants::WAIVERS_ORDINAL
         );
     }
 

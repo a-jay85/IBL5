@@ -517,7 +517,7 @@ class TradeWideUnitTest extends WideUnitTestCase
      */
     public function testUntradablePlayerOnWaiversRejected(): void
     {
-        // Arrange - TradeValidator.canPlayerBeTraded() checks ordinal <= JSB::WAIVERS_ORDINAL (960)
+        // Arrange - TradeValidator.canPlayerBeTraded() checks ordinal <= JsbConstants::WAIVERS_ORDINAL (960)
         // Players with ordinal > 960 are on waivers and cannot be traded
         $validator = new \Trading\TradeValidator($this->mockDb);
 

@@ -224,8 +224,8 @@ class TradeValidator implements TradeValidatorInterface
         $ordinal = $player['ordinal'] ?? 99999;
         $cy = $player['cy'] ?? 0;
 
-        // Player cannot be traded if they are waived (ordinal > JSB::WAIVERS_ORDINAL) or have 0 salary
-        return $cy !== 0 && $ordinal <= \League\JSB::WAIVERS_ORDINAL;
+        // Player cannot be traded if they are waived (ordinal > JsbConstants::WAIVERS_ORDINAL) or have 0 salary
+        return $cy !== 0 && $ordinal <= \League\JsbConstants::WAIVERS_ORDINAL;
     }
 
     /**

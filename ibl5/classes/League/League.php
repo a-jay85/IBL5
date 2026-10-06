@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace League;
 
 use Database\BaseMysqliRepository;
-use League\JSB;
 use Repositories\PlayerTeamJoinQuery;
 use Season\Season;
 
@@ -195,7 +194,7 @@ class League extends BaseMysqliRepository
               AND name != '(no starter)'
             ORDER BY name ASC",
             "i",
-            JSB::WAIVERS_ORDINAL
+            JsbConstants::WAIVERS_ORDINAL
         );
     }
 

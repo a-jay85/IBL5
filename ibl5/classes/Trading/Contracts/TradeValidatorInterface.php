@@ -66,7 +66,7 @@ interface TradeValidatorInterface
      * IMPORTANT BEHAVIORS:
      *  - Returns false if player not found in database
      *  - Returns false if player has 0 salary (cy = 0)
-     *  - Returns false if player is waived (ordinal > JSB::WAIVERS_ORDINAL)
+     *  - Returns false if player is waived (ordinal > JsbConstants::WAIVERS_ORDINAL)
      *  - Returns true only if player has contract AND is not waived
      */
     public function canPlayerBeTraded(int $playerId): bool;

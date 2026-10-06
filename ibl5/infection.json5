@@ -8,7 +8,7 @@
             // JSB engine glue is coverage-excluded (see phpunit-mutation.xml);
             // exclude it here too so nothing Infection mutates lacks coverage. The
             // infra-exclude marker makes it gate-2-exempt in check-infection-excludes.
-            "League/JSB.php", // infra-exclude: low-level JSB engine glue, coverage-excluded — never mutated
+            "League/JsbConstants.php", // infra-exclude: low-level JSB engine glue, coverage-excluded — never mutated
             "Database/PdoConnection.php", // infra-exclude: PDO connection bootstrap, coverage-excluded — never mutated
         ]
     },

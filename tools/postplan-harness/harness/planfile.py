@@ -460,6 +460,21 @@ def _phase_evidence_paths(body: str) -> list[str]:
     return out
 
 
+_HEADING_PREFIX_RE = re.compile(r"^(?:Phase|Step)\s*\d+\s*:?\s*", re.I)
+_HEADING_WORD_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
+
+
+def _heading_words(heading: str) -> list[str]:
+    """Bare tokens of a phase heading, deduped, first-seen order. Backticks and edge
+    punctuation are stripped; a token with `/` is evidence territory, never a word."""
+    out: list[str] = []
+    for raw in _HEADING_PREFIX_RE.sub("", heading).split():
+        w = raw.strip("`").strip("()[]{}<>,:;.!?\"'*")
+        if w and "/" not in w and _HEADING_WORD_RE.match(w) and w not in out:
+            out.append(w)
+    return out
+
+
 def parse_phases(content: str) -> list[PhaseInfo]:
     """One PhaseInfo per `## Phase N:` / `## Step N:` h2 heading, in document order.
 
@@ -471,7 +486,8 @@ def parse_phases(content: str) -> list[PhaseInfo]:
     phase. A repeated phase number merges into the first occurrence (evidence unioned) so
     a plan with a duplicated heading yields one entry per number. A body line
     `**No diff:** <reason>` of NO_DIFF_MIN_REASON or more characters sets `no_diff_reason`;
-    a shorter reason sets `no_diff_rejected` instead.
+    a shorter reason sets `no_diff_rejected` instead. Bare heading tokens land in
+    `heading_words` (see state.PhaseInfo); they are never evidence.
     """
     lines = _strip_fenced(content)
     phases: list[PhaseInfo] = []
@@ -497,9 +513,13 @@ def parse_phases(content: str) -> list[PhaseInfo]:
             heading = line[3:].strip()
             if num in by_number:
                 current = by_number[num]
+                for w in _heading_words(heading):
+                    if w not in current.heading_words:
+                        current.heading_words.append(w)
             else:
                 current = PhaseInfo(number=num, heading=heading,
-                                    bookkeeping=bool(_BOOKKEEPING_MARKER_RE.search(heading)))
+                                    bookkeeping=bool(_BOOKKEEPING_MARKER_RE.search(heading)),
+                                    heading_words=_heading_words(heading))
                 by_number[num] = current
                 phases.append(current)
             buf = [heading]
@@ -531,6 +551,14 @@ def parse_deferred_phase_numbers(content: str) -> list[int]:
     return sorted(nums)
 
 
+_HYPHEN_LABEL_RE = re.compile(r"^[*\-]\s+`([A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z0-9_]+)+)`")
+_INLINE_ITEM_RE = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*)(?:\(\))?`")
+_INLINE_LIST_RE = re.compile(
+    r"^[*\-]\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*"
+    r"(`[A-Za-z_][A-Za-z0-9_]*(?:\(\))?`(?:\s*,\s*`[A-Za-z_][A-Za-z0-9_]*(?:\(\))?`)*)"
+    r"\s*[.;]?\s*$")
+
+
 def parse_required_test_methods(content: str) -> list[str]:
     """List of bare method names from `## Required Test Methods` (fenced blocks stripped).
 
@@ -560,6 +588,17 @@ def parse_required_test_methods(content: str) -> list[str]:
         to be followed only by optional '()', then end-of-line, a colon ':',
         or a dash separator ' — ' / ' – ' (U+2014 / U+2013 em/en-dash).
         Plain prose words after a space are still rejected.
+
+    (c) Hyphenated labels — a backticked bash test-case label such as
+        '- `step67-skipped-no-plan`' used to yield 'step67'. The whole token is kept
+        when its closing backtick follows directly; conformance checks it by literal
+        presence in the diff (it is never a `function`/`def` declaration).
+
+    (d) Inline lists — '- New: `testA`, `testB`' used to yield 'New'. When the text
+        after the colon is a pure comma-separated list of backticked identifiers
+        (optional trailing '()' per item, optional trailing '.' or ';'), the items are
+        the methods and the label is dropped. Any prose after the colon keeps the
+        label (today's behaviour), so '- testFoo: covers `bar`' still yields 'testFoo'.
     """
     section = _section("\n".join(_strip_fenced(content)), "Required Test Methods")
     methods = []
@@ -579,10 +618,25 @@ def parse_required_test_methods(content: str) -> list[str]:
         _bt = re.match(r"^[*\-]\s+`([A-Za-z_][A-Za-z0-9_]*)", stripped)
         if _bt:
             _after = stripped[_bt.end()] if _bt.end() < len(stripped) else ""
+            if _after == "-":
+                # M1: a hyphenated bash test-case label. Take the WHOLE token when its
+                # closing backtick follows it directly; anything else is rejected
+                # outright so a prefix never masquerades as a method name.
+                _hy = _HYPHEN_LABEL_RE.match(stripped)
+                if _hy:
+                    methods.append(_hy.group(1))
+                continue
             m = _bt if _after not in ('/', ':', ' ') else None
         else:
             m = None
         if not m:
+            # M2: `Label: `a`, `b`` — the backticked names ARE the required methods.
+            # Only a pure comma-separated list of backticked identifiers qualifies;
+            # `testFoo: covers `bar`` falls through to Pass 2 unchanged.
+            _lst = _INLINE_LIST_RE.match(stripped)
+            if _lst:
+                methods.extend(_INLINE_ITEM_RE.findall(_lst.group(1)))
+                continue
             # Pass 2: bare identifier (no opening backtick).  Accept if followed
             # by optional '()' then end-of-line, ':', or a dash separator
             # (U+2014 em-dash or U+2013 en-dash).  Rejects label phrases where

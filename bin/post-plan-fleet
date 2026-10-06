@@ -881,11 +881,16 @@ _WAIT_TIMED_OUT=0
 if [[ "$WAIT" -eq 1 && "$GO" -eq 1 ]]; then
     if [[ -z "${POST_PLAN_FLEET_DRY_RUN:-}" ]]; then
         _wait_elapsed=0
+        _wait_last_n=""
         while :; do
             reap_stale
             n="$(live_slots)"
             [ "$n" -eq 0 ] && break
-            echo "waiting for $n session(s) to finish…"
+            if [ "$n" != "$_wait_last_n" ]; then
+                printf '[%s] waiting for %s session(s) to finish…\n' \
+                    "$(date '+%Y-%m-%dT%H:%M:%S')" "$n"
+                _wait_last_n="$n"
+            fi
             sleep "$WAIT_POLL_SECS"
             _wait_elapsed=$((_wait_elapsed + WAIT_POLL_SECS))
             if [[ $_wait_elapsed -ge $CEILING_SECS ]]; then

@@ -507,6 +507,26 @@ grep -qE 'waiting for [0-9]+ session' <<< "$out_b" \
 [[ "$(plist_count)" -eq 0 ]] || fail "wait-drains/B: drained to $(plist_count) plists, want 0"
 clear_live_labels
 clean_slots
+
+# Sub-case C — N changes 2 -> 1 -> 0; one timestamped line per distinct N.
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9998.plist"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9999.plist"
+set_live_labels "40476	0	com.ibl5.post-plan-fleet-9998" "40477	0	com.ibl5.post-plan-fleet-9999"
+( sleep 2; printf '40477\t0\tcom.ibl5.post-plan-fleet-9999\n' > "$SCRATCH/launchctl-list.txt"
+  sleep 3; : > "$SCRATCH/launchctl-list.txt" ) &
+_wd_bg=$!
+out_c="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_WAIT_POLL=1 \
+         run_driver --go --wait 2>&1)"; rc_c=$?
+wait "$_wd_bg" 2>/dev/null
+[[ $rc_c -eq 0 ]] || fail "wait-drains/C: exit $rc_c (out: $out_c)"
+_ts_re='^\[[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\] waiting for [0-9]+ session\(s\) to finish'
+[[ "$(grep -c 'waiting for 2 session' <<< "$out_c")" == 1 ]] || fail "wait-drains/C: want one N=2 line (out: $out_c)"
+[[ "$(grep -c 'waiting for 1 session' <<< "$out_c")" == 1 ]] || fail "wait-drains/C: want one N=1 line (out: $out_c)"
+[[ "$(grep -c 'waiting for' <<< "$out_c")" == "$(grep -cE "$_ts_re" <<< "$out_c")" ]] \
+    || fail "wait-drains/C: a waiting line lacks the [YYYY-MM-DDTHH:MM:SS] prefix (out: $out_c)"
+clear_live_labels
+clean_slots
 end_case wait-drains
 
 # --- case 21: report-statuses ------------------------------------------------------------
@@ -2607,11 +2627,13 @@ mkdir -p "$SCRATCH/Library/LaunchAgents"
 : > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9999.plist"
 set_live_labels "40477	0	com.ibl5.post-plan-fleet-9999"
 out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" \
-       POST_PLAN_FLEET_CEILING=2 POST_PLAN_FLEET_WAIT_POLL=1 \
+       POST_PLAN_FLEET_CEILING=3 POST_PLAN_FLEET_WAIT_POLL=1 \
        run_driver --go --wait 2>&1)"; rc=$?
 [[ $rc -eq 1 ]] || fail "wait-timeout-exits-nonzero: exit $rc, want 1 (out: $out)"
 grep -qF 'TIMED OUT waiting for' <<< "$out" || \
     fail "wait-timeout-exits-nonzero: TIMED OUT text missing (out: $out)"
+[[ "$(grep -c 'waiting for 1 session(s) to finish' <<< "$out")" == 1 ]] \
+    || fail "wait-timeout-exits-nonzero: unchanged N printed more than once (out: $out)"
 _rpath="$(echo "$out" | tail -1)"
 [[ -f "$_rpath" ]] || fail "wait-timeout-exits-nonzero: report not written (last line: $_rpath)"
 [[ "$_rpath" == *pr-firstpass-*.md ]] || fail "wait-timeout-exits-nonzero: last line is not a report path: $_rpath"

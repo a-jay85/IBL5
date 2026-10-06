@@ -224,7 +224,13 @@ def prose_lines(text: str):
             else:
                 continue
         if MARKER in raw:
-            continue
+            # The last marker on the line wins. A trailing marker, or one
+            # followed only by a table-cell `|`, exempts the whole line.
+            # Prose after the marker is scanned like any other text.
+            tail = raw.rsplit(MARKER, 1)[1]
+            if tail.strip() in ("", "|"):
+                continue
+            raw = tail
         if raw.lstrip().startswith(">"):
             continue
         if _TABLE_SEP.match(raw):
@@ -412,6 +418,11 @@ def mode_self_test() -> int:
         ("Not a hook. Not a gate. Just a doc.", {"not-x-not-y-just-z"}),
         ("Cache – then rebuild.", {"em-dash"}),
         ("see #1234 for context", {"bare-hash-ref"}),
+        # slop-ok scope: prose after a mid-line marker is still scanned.
+        ("Lead. <!-- slop-ok --> Tail fires — after the marker.", {"em-dash"}),
+        ("Quoted aside. <!-- slop-ok --> It's a nudge, not a block.", {"comma-not"}),
+        # Boundary: only a LONE `|` after the marker exempts the line.
+        ("| a cell <!-- slop-ok --> | next cell — with a tell |", {"em-dash"}),
     ]
     _BARE_HASH_POS = "see #1234 for context"
     _BARE_HASH_POS2 = "closed by PR #99"
@@ -424,6 +435,11 @@ def mode_self_test() -> int:
         "**How to apply:** read the plan.",
         "> quoted: the fix — is here, not there",
         "This line quotes a user verbatim — kept. <!-- slop-ok -->",
+        "<!-- slop-ok -->",
+        "| a — b, never c <!-- slop-ok --> |",
+        "| a — b, never c <!-- slop-ok -->  |  ",
+        "Tell — here. <!-- slop-ok --> A clean tail sentence.",
+        "Tell — one. <!-- slop-ok --> Tell — two. <!-- slop-ok -->",
         "Use --since rather than --files for PRs.",
         "Result: 3 files changed.",
         "See https://example.com/a—b for details.",

@@ -236,3 +236,73 @@ def test_pr_copy_tier_is_sonnet_4_6():
     src = inspect.getsource(runner._pr_copy)
     assert 'llm.call(schemas.PR_COPY_PURPOSE, "sonnet"' in src
     assert 'llm.call(schemas.PR_COPY_PURPOSE, "haiku"' not in src
+
+
+# ── test-count claim verification ─────────────────────────────────────────────
+
+_TC_PATH = "ibl5/tests/Foo/BarCountTest.php"
+_TC_ADDED = ["    public function testA(): void {}",
+             "    public function testB(): void {}",
+             "    public function testC(): void {}"]
+
+
+def _tc_diff(status="A"):
+    head = f"diff --git a/{_TC_PATH} b/{_TC_PATH}\n"
+    head += "new file mode 100644\n--- /dev/null\n" if status == "A" else f"--- a/{_TC_PATH}\n"
+    return head + f"+++ b/{_TC_PATH}\n@@ -1,0 +1,3 @@\n" + "".join(f"+{ln}\n" for ln in _TC_ADDED)
+
+
+class _TcGit:
+    def __init__(self, diff):
+        self._diff = diff
+
+    def diff_vs_base(self):
+        return self._diff
+
+
+class _TcGh:
+    def pr_body_fresh(self):
+        return ""
+
+
+def _tc_check(claim, degraded=False, diff=None, worktree=None):
+    body = f"- `{_TC_PATH}` adds {claim} tests\n"
+    canned = {"body-check": {"corrected_body": body, "findings": ["llm finding"]}}
+    llm = (DegradingLlm(UsageLedger(), canned, {"body-check"}) if degraded
+           else FixtureLlm(UsageLedger(), canned))
+    copy = {"summary_md": body}
+    return runner._body_check(
+        llm, _TcGit(diff or _tc_diff()), _TcGh(), copy, False, None, lambda _m: None,
+        worktree=worktree)
+
+
+def test_body_check_appends_test_count_finding_on_llm_path():
+    result, degraded = _tc_check(5)
+    assert degraded is False
+    assert f"5 tests [harness: measured 3 added / 3 total in `{_TC_PATH}`]" in result["corrected_body"]
+    assert result["findings"][0] == "llm finding"
+    assert any("test-count claim mismatch" in f and "body says 5" in f for f in result["findings"])
+
+
+def test_body_check_test_count_finding_survives_degraded_llm():
+    result, degraded = _tc_check(5, degraded=True)
+    assert degraded is True
+    assert "[harness: measured 3 added / 3 total" in result["corrected_body"]
+    assert any("test-count claim mismatch" in f for f in result["findings"])
+
+
+def test_body_check_matching_test_count_adds_no_finding():
+    result, _ = _tc_check(3)
+    assert result["corrected_body"] == f"- `{_TC_PATH}` adds 3 tests\n"
+    assert result["findings"] == ["llm finding"]
+
+
+def test_body_check_uses_worktree_for_head_total(tmp_path):
+    target = tmp_path / _TC_PATH
+    target.parent.mkdir(parents=True)
+    target.write_text("\n".join(f"    public function testN{i}(): void {{}}" for i in range(7)))
+    diff = _tc_diff(status="M")
+    clean, _ = _tc_check(7, diff=diff, worktree=str(tmp_path))
+    assert "[harness: measured" not in clean["corrected_body"]
+    flagged, _ = _tc_check(9, diff=diff, worktree=str(tmp_path))
+    assert f"[harness: measured 3 added / 7 total in `{_TC_PATH}`]" in flagged["corrected_body"]

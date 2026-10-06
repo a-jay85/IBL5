@@ -39,13 +39,36 @@ The parser also reads entries that carry no `---`/`+++` header lines: binary fil
 
 ### Backtest
 
-BACKTEST-PLACEHOLDER
+`tools/postplan-harness/scripts/lostwork-backtest.sh` rebuilt the seven numstat-blocked runs from their saved `/tmp` patches on 2026-10-06, with the new proof in place:
+
+```text
+KEY | master@run | verdict | lost-lines | PR | proof-at-merge
+ci-shell-harness-parallel | - | UNRECONSTRUCTIBLE | - | - | -
+css-legacy-markup-styles | 412b19c1a87f65d0a582a64a4800d19114ae072f | BLOCK | 4 | #2515 OPEN | -
+google-sheet-oauth-export | - | UNRECONSTRUCTIBLE | - | - | -
+jsb-constants-rename | 693442a783855a990e25a5447976859f657df9aa | PASS | 0 | #2796 OPEN | -
+leaderboards-hub | - | UNRECONSTRUCTIBLE | - | - | -
+phase-rank-order-sync-782 | 2df9ba6700782a57fdfb8d8f91885df19d903119 | BLOCK | 4 | #2817 MERGED | BLOCK
+player-module-renames-181-182 | a7e5be387c89648a26d830a25456938bde5cbea7 | BLOCK | 6 | #2775 MERGED | BLOCK
+SUMMARY: pass=1 block=3 unreconstructible=3 of 7
+```
+
+Per key:
+
+- **jsb-constants-rename.** Flips to pass. The PR is still open, so there is no merge cross-check.
+- **css-legacy-markup-styles.** Real catch. All four `LOST:` lines are the branch's `Go Back` link in `ibl5/modules/Player/index.php` with the `mt-2 inline-block` classes. Master had already moved that `echo` into `PlayerActionController.php` with a different class. The resolution kept master's version, so the branch's class change landed nowhere.
+- **phase-rank-order-sync-782.** Real catch. The four `LOST:` lines are comment lines and a `mkdir` line the branch added to `ibl5/tests/Cli/CheckDocsCliTest.php`. They are absent from master at run time and from the merge commit, so master never absorbed them. `proof-at-merge=BLOCK` names the same four lines. The record does not show whether a human dropped them on purpose later.
+- **player-module-renames-181-182.** Mixed. One `LOST:` line is the `SeasonRosterChangesRepository` class declaration, which both sides edited (master moved the base class to `\Database\BaseMysqliRepository`). That is the accepted fail-closed cost. The other five are false positives in `ibl5/tests/e2e/flows/player-database.spec.ts`. The lines are in the merge-commit tree, but that blob uses CRLF endings and the branch's lines are LF. Exact matching reads the CR-only difference as lost.
+- **ci-shell-harness-parallel.** Unreconstructible. No pre or post patch was saved for it.
+- **google-sheet-oauth-export** and **leaderboards-hub.** Unreconstructible. Their saved post patches carry PNG snapshot entries that `git apply` rejects without a full index line. A diagnostic retry that excluded `*.png` gave `TREE-EQUIVALENT` for leaderboards-hub (the run that gained a row). It gave a block for google-sheet-oauth-export, with `LOST:` lines in `.claude/rules/codebase-map.md` and `docker-compose.ci.yml`. That block is unconfirmed, because the timestamp-derived master may sit a minute before the real one.
+
+The backtest supports the change. Every numstat block in the corpus was a false positive by construction. Under the new proof, the blocks that remain name specific lines, and two of the three blocked runs carry a line the branch really lost.
 
 ### Accepted residuals
 
 - A line both sides edited holds the run for a human, as condition (14) already does for every auto-resolved conflict.
 - A rename's deletion count uses the old path at `origin/master`. A path master lacks counts as zero, which pushes toward a block.
-- Whitespace-only or re-indented resolutions block, because matching is exact.
+- Whitespace-only or re-indented resolutions block, because matching is exact. That includes a line-ending change: a branch's LF line in a file master stores as CRLF reads as lost, as five player-module-renames-181-182 lines did.
 - An added line that already appears elsewhere in the file proves present even if the branch's own copy was dropped. The added-line check tests presence and does not count copies.
 - `git range-diff` and `patch-id` stay rejected for the reasons above.
 

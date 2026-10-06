@@ -1292,6 +1292,8 @@ rm -rf "$SB"
 
 # Case 48e: the command the prompt starts with really runs, read-only, and emits the
 # JSON shape the prompt tells the agent to split on (reason in {stale, dead-glob}).
+# The jq predicate fails if the 'reason' => 'stale' merge in bin/check-docs:1826
+# (line as of authoring; grep for it if it moves) is removed.
 GS48_BEFORE="$(git -C "$REPO_ROOT" status --porcelain)"
 SR48_RC=0
 SR48_OUT="$(cd "$REPO_ROOT" && bin/check-docs --staleness-report 2>/dev/null)" || SR48_RC=$?

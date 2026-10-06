@@ -206,7 +206,7 @@ If a new module needs table styling beyond `.ibl-data-table` base:
 1. Create `design/components/tables/<module>.css` with `@layer components { ... }`.
 2. Add `@import './components/tables/<module>.css';` in `design/input.css` after the existing `tables/` import block.
 3. Add a row to this table.
-4. Moving existing rules out of `tables.css` is different from adding new ones. Import the destination directly after `tables.css` (or at the top of an existing partial) so the moved rules keep their cascade position. Everything sits in one `@layer components`, so source order breaks equal-specificity ties. Compare the compiled CSS before and after the move.
+4. Moving existing rules out of `tables.css` is different from adding new ones. Import the destination directly after `tables.css` so the moved rules keep their cascade position. A later partial is safe only when no element can match both the moved rules and the rules between the two imports. Everything sits in one `@layer components`, so source order breaks equal-specificity ties. Compare the compiled CSS before and after the move.
 
 ## Key Gotchas
 

@@ -1486,6 +1486,22 @@ for wf_copy in wf-ungated wf-badgate wf-stray; do
     }
 done
 srt_expect_eq "gating copies fail with a secret-gating: reason" 0 "$wf_reason_bad"
+srt_expect_eq "NO-WRONG-PASS: none of the six leaking copies passes hygiene" 0 "$wf_bad"
+
+# GUARD-OK: the event guard sits directly under `id: secrets` and no EVENT token
+# remains anywhere in the file.
+wf_guard_ok=0
+wf_after_id=$(grep -A1 'id: secrets' "$SRT_WORKFLOW" || true)
+grep -qF "if: github.event_name != 'pull_request'" <<< "$wf_after_id" || wf_guard_ok=1
+grep -q 'EVENT' "$SRT_WORKFLOW" && wf_guard_ok=1
+srt_expect_eq "GUARD-OK: if: sits under id: secrets and no EVENT token remains" 0 "$wf_guard_ok"
+
+# SMOKE-DONE: the awk fires on a stray ungated step and stays quiet on the committed file.
+wf_stray_hits=$(srt_workflow_hygiene "$STUB/wf-stray.yml" 2>&1 \
+    | grep -c 'secret-gating: step maps a secret with no if' || true)
+wf_committed_hits=$(srt_workflow_hygiene "$SRT_WORKFLOW" 2>&1 | grep -c 'secret-gating:' || true)
+srt_expect_eq "SMOKE-DONE: stray ungated step yields one secret-gating: line" 1 "$wf_stray_hits"
+srt_expect_eq "SMOKE-DONE: committed file yields zero secret-gating: lines" 0 "$wf_committed_hits"
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

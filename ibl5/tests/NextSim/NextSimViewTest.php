@@ -42,7 +42,7 @@ class NextSimViewTest extends TestCase
         $this->userTeam->seasonRecord = '10-5';
 
         $this->userStarters = [];
-        foreach (\League\JSB::PLAYER_POSITIONS as $position) {
+        foreach (\League\JsbConstants::PLAYER_POSITIONS as $position) {
             $player = self::createStub(Player::class);
             $player->method('getPlayerID')->willReturn(100);
             $player->method('getName')->willReturn('User ' . $position);
@@ -238,7 +238,7 @@ class NextSimViewTest extends TestCase
         $game->date = '2025-01-02';
 
         $oppStarters = [];
-        foreach (\League\JSB::PLAYER_POSITIONS as $position) {
+        foreach (\League\JsbConstants::PLAYER_POSITIONS as $position) {
             $player = self::createStub(Player::class);
             $player->method('getPlayerID')->willReturn(200);
             $player->method('getName')->willReturn('Opp ' . $position);

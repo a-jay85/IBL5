@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace League;
 
-class JSB
+/**
+ * Jump Shot Basketball engine constants shared across modules.
+ * Not parser code: .plr/.sch/.trn file parsing lives in JsbParser/.
+ */
+class JsbConstants
 {
     const PLAYER_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
     const PLAYOFF_MONTH = 22;

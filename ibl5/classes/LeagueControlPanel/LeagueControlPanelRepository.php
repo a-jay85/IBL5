@@ -205,7 +205,7 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
     {
         $this->execute(
             "UPDATE `ibl_plr` SET teamid = " . League::FREE_AGENTS_TEAMID . ", bird = 0"
-            . " WHERE retired <> 1 AND ordinal > " . \League\JSB::WAIVERS_ORDINAL
+            . " WHERE retired <> 1 AND ordinal > " . \League\JsbConstants::WAIVERS_ORDINAL
         );
 
         return true;

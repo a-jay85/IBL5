@@ -20,16 +20,6 @@ final class RootClassNamespaceTest extends TestCase
         self::assertStringEndsWith('/classes/Database/BaseMysqliRepository.php', (string) $ref->getFileName());
     }
 
-    public function testLeagueJsbResolvesWithConstants(): void
-    {
-        $ref = new \ReflectionClass(\League\JSB::class);
-        self::assertSame('League', $ref->getNamespaceName());
-        foreach (['PLAYER_POSITIONS', 'PLAYOFF_MONTH', 'WAIVERS_ORDINAL'] as $constant) {
-            self::assertTrue($ref->hasConstant($constant), "League\\JSB lacks {$constant}");
-        }
-        self::assertStringEndsWith('/classes/League/JSB.php', (string) $ref->getFileName());
-    }
-
     public function testLeagueContractRulesResolves(): void
     {
         $ref = new \ReflectionClass(\League\ContractRules::class);

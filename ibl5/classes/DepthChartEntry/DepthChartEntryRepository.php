@@ -36,7 +36,7 @@ class DepthChartEntryRepository extends \Database\BaseMysqliRepository implement
             "SELECT * FROM `ibl_plr` WHERE teamid = ? AND retired = 0 AND ordinal <= ? ORDER BY ordinal ASC",
             "ii",
             $teamid,
-            \League\JSB::WAIVERS_ORDINAL
+            \League\JsbConstants::WAIVERS_ORDINAL
         );
     }
     

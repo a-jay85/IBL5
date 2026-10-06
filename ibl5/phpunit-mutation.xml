@@ -5,7 +5,7 @@
     1. Includes the 'database' group (DB integration tests provide repo coverage)
     2. Broader <source> than infection.json5's mutate-scope, BY DESIGN:
        - This file's coverage-excludes {classes/*/Contracts,
-         classes/Database/PdoConnection.php, classes/League/JSB.php} are a SUBSET
+         classes/Database/PdoConnection.php, classes/League/JsbConstants.php} are a SUBSET
          of infection.json5's mutate-excludes, so nothing Infection mutates lacks
          coverage (no spurious "Not Covered" mutants against minMsi=100).
        - This <source> is a deliberate SUPERSET: Bootstrap and the Group-B View
@@ -290,7 +290,7 @@
         <exclude>
             <directory>classes/*/Contracts</directory>
             <file>classes/Database/PdoConnection.php</file>
-            <file>classes/League/JSB.php</file>
+            <file>classes/League/JsbConstants.php</file>
         </exclude>
     </source>
 </phpunit>

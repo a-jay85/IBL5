@@ -8,6 +8,10 @@
 # launchd job with an almost empty environment).
 #
 # Usage: source "$(dirname "$0")/lib/wt-pool.sh"
+#
+# REPO_ROOT, WT_PARENT, MAIN_IBL5, NAME, BASE_BRANCH and WT_ROOT come from the
+# sourcing script; POOL_CSS_STALE is read back by it.
+# shellcheck disable=SC2153,SC2034
 
 POOL_LABEL="com.ibl5.wt-pool-refill"
 

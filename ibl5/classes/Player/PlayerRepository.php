@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Player;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use Player\Contracts\PlayerRepositoryInterface;
 use Repositories\PlayerTeamJoinQuery;
 

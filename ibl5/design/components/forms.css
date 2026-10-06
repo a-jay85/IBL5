@@ -103,6 +103,12 @@
     background: linear-gradient(135deg, var(--navy-700), var(--navy-800));
 }
 
+/* Spaced inline button (e.g. "Go Back" link under an error alert) */
+.ibl-btn--spaced-inline {
+    margin-top: 0.5rem;
+    display: inline-block;
+}
+
 /* Secondary button */
 .ibl-btn--secondary {
     background: var(--navy-800);

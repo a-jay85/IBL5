@@ -15,18 +15,43 @@ use Migration\Contracts\MigrationRunnerInterface;
  *
  * SQL migrations are executed via MigrationRepository::executeRawSql().
  * PHP migrations are executed via a subprocess to guard against exit()/die().
+ * Successful PHP-migration output is passed to an optional sink closure.
  */
 class MigrationRunner implements MigrationRunnerInterface
 {
     private MigrationRepositoryInterface $repository;
     private MigrationFileResolver $fileResolver;
 
+    /** @var (\Closure(string, string): void)|null */
+    private ?\Closure $phpOutputSink;
+
+    /**
+     * @param (\Closure(string, string): void)|null $phpOutputSink Receives
+     *        (filename, combined stdout+stderr) after each PHP migration that
+     *        exits 0 with non-empty output. Null discards the output.
+     */
     public function __construct(
         MigrationRepositoryInterface $repository,
         MigrationFileResolver $fileResolver,
+        ?\Closure $phpOutputSink = null,
     ) {
         $this->repository = $repository;
         $this->fileResolver = $fileResolver;
+        $this->phpOutputSink = $phpOutputSink;
+    }
+
+    /**
+     * Format PHP-migration output for a CLI log: every line prefixed with
+     * four spaces and the bracketed migration filename, newline-terminated.
+     */
+    public static function formatPhpOutput(string $filename, string $output): string
+    {
+        $formatted = '';
+        foreach (explode("\n", $output) as $line) {
+            $formatted .= "    [{$filename}] {$line}\n";
+        }
+
+        return $formatted;
     }
 
     /**
@@ -132,6 +157,10 @@ class MigrationRunner implements MigrationRunnerInterface
             throw new \RuntimeException(
                 "PHP migration failed ({$filename}): exit code {$exitCode}\n{$outputStr}",
             );
+        }
+
+        if ($this->phpOutputSink !== null && $output !== []) {
+            ($this->phpOutputSink)($filename, implode("\n", $output));
         }
     }
 }

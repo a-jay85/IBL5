@@ -8,7 +8,9 @@ use Tests\WideUnit\WideUnitTestCase;
 use Tests\WideUnit\Mocks\TestDataFactory;
 use DepthChartEntry\DepthChartEntryRepository;
 use DepthChartEntry\DepthChartEntryProcessor;
+use DepthChartEntry\DepthChartEntryErrorHtmlRenderer;
 use DepthChartEntry\DepthChartEntryValidator;
+use Validation\ValidationError;
 
 /**
  * Integration tests for complete depth chart workflows
@@ -64,7 +66,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $result = $this->processor->processSubmission($postData, 15);
 
         // Act - Validate for Regular Season
-        $isValid = $this->validator->validate($result, 'Regular Season');
+        $validation = $this->validator->validate($result, 'Regular Season');
 
         // Act - Save each player to database
         $allUpdateSucceeded = true;
@@ -79,8 +81,8 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $historyResult = $this->repository->updateTeamHistory('Test Team');
 
         // Assert - All steps succeeded
-        $this->assertTrue($isValid, 'Validation should pass');
-        $this->assertEmpty($this->validator->getErrors(), 'No validation errors expected');
+        $this->assertTrue($validation->isValid(), 'Validation should pass');
+        $this->assertSame([], $validation->getErrors(), 'No validation errors expected');
         $this->assertTrue($allUpdateSucceeded, 'All player updates should succeed');
         $this->assertTrue($historyResult, 'Team history update should succeed');
 
@@ -195,15 +197,15 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
-        $isValid = $this->validator->validate($result, 'Regular Season');
+        $validation = $this->validator->validate($result, 'Regular Season');
 
         // Assert
-        $this->assertFalse($isValid);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($validation->isValid());
+        $errors = $validation->getErrors();
         $this->assertNotEmpty($errors);
-        $this->assertSame('active_players_min', $errors[0]['type']);
-        $this->assertStringContainsString('at least 12 active players', $errors[0]['message']);
-        $this->assertStringContainsString('you have 10', $errors[0]['message']);
+        $this->assertSame('active_players_min', $errors[0]->type);
+        $this->assertStringContainsString('at least 12 active players', $errors[0]->message);
+        $this->assertStringContainsString('you have 10', $errors[0]->message);
     }
 
     /**
@@ -218,14 +220,14 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
-        $isValid = $this->validator->validate($result, 'Regular Season');
+        $validation = $this->validator->validate($result, 'Regular Season');
 
         // Assert
-        $this->assertFalse($isValid);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($validation->isValid());
+        $errors = $validation->getErrors();
         $this->assertNotEmpty($errors);
-        $this->assertSame('active_players_max', $errors[0]['type']);
-        $this->assertStringContainsString('more than 12', $errors[0]['message']);
+        $this->assertSame('active_players_max', $errors[0]->type);
+        $this->assertStringContainsString('more than 12', $errors[0]->message);
     }
 
     /**
@@ -240,14 +242,14 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
-        $isValid = $this->validator->validate($result, 'Regular Season');
+        $validation = $this->validator->validate($result, 'Regular Season');
 
         // Assert - Position depth validation catches insufficient PG depth
-        $this->assertFalse($isValid);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($validation->isValid());
+        $errors = $validation->getErrors();
         $this->assertNotEmpty($errors);
-        $this->assertSame('position_depth', $errors[0]['type']);
-        $this->assertStringContainsString('PG', $errors[0]['message']);
+        $this->assertSame('position_depth', $errors[0]->type);
+        $this->assertStringContainsString('PG', $errors[0]->message);
     }
 
     /**
@@ -262,14 +264,14 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
-        $isValid = $this->validator->validate($result, 'Regular Season');
+        $validation = $this->validator->validate($result, 'Regular Season');
 
         // Assert - Multiple-starter validation catches the issue
-        $this->assertFalse($isValid);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($validation->isValid());
+        $errors = $validation->getErrors();
         $this->assertNotEmpty($errors);
         // Find the multiple_starting_positions error
-        $multiStarterErrors = array_filter($errors, static fn (array $e): bool => $e['type'] === 'multiple_starting_positions');
+        $multiStarterErrors = array_filter($errors, static fn (ValidationError $e): bool => $e->type === 'multiple_starting_positions');
         $this->assertNotEmpty($multiStarterErrors, 'Should have a multiple_starting_positions error');
         $this->assertTrue($result['hasStarterAtMultiplePositions']);
         $this->assertSame('Multi Starter', $result['nameOfProblemStarter']);
@@ -288,10 +290,10 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
-        $isValid = $this->validator->validate($result, 'Regular Season');
+        $validation = $this->validator->validate($result, 'Regular Season');
 
         // Assert - Validation fails
-        $this->assertFalse($isValid);
+        $this->assertFalse($validation->isValid());
 
         // We should NOT update database when validation fails
         // (This tests the workflow - the handler should check validation before saving)
@@ -313,11 +315,11 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
-        $isValid = $this->validator->validate($result, 'Playoffs');
+        $validation = $this->validator->validate($result, 'Playoffs');
 
         // Assert
-        $this->assertTrue($isValid, 'Playoffs should allow 10 active players');
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertTrue($validation->isValid(), 'Playoffs should allow 10 active players');
+        $this->assertSame([], $validation->getErrors());
         $this->assertSame(10, $result['activePlayers']);
     }
 
@@ -333,12 +335,12 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
-        $isValid = $this->validator->validate($result, 'Playoffs');
+        $validation = $this->validator->validate($result, 'Playoffs');
 
         // Assert
-        $this->assertFalse($isValid);
-        $errors = $this->validator->getErrors();
-        $this->assertStringContainsString('at least 10', $errors[0]['message']);
+        $this->assertFalse($validation->isValid());
+        $errors = $validation->getErrors();
+        $this->assertStringContainsString('at least 10', $errors[0]->message);
     }
 
     /**
@@ -353,11 +355,11 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
-        $isValid = $this->validator->validate($result, 'Playoffs');
+        $validation = $this->validator->validate($result, 'Playoffs');
 
         // Assert
-        $this->assertTrue($isValid, 'Playoffs should accept 2 per position');
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertTrue($validation->isValid(), 'Playoffs should accept 2 per position');
+        $this->assertSame([], $validation->getErrors());
     }
 
     /**
@@ -372,12 +374,12 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Act & Assert - Fails regular season
         $result = $this->processor->processSubmission($postData, 15);
-        $isValidRegular = $this->validator->validate($result, 'Regular Season');
-        $this->assertFalse($isValidRegular, 'Should fail Regular Season');
+        $regularValidation = $this->validator->validate($result, 'Regular Season');
+        $this->assertFalse($regularValidation->isValid(), 'Should fail Regular Season');
 
         // Reset errors and validate for playoffs
-        $isValidPlayoffs = $this->validator->validate($result, 'Playoffs');
-        $this->assertTrue($isValidPlayoffs, 'Should pass Playoffs');
+        $playoffsValidation = $this->validator->validate($result, 'Playoffs');
+        $this->assertTrue($playoffsValidation->isValid(), 'Should pass Playoffs');
     }
 
     // ========== DATABASE OPERATIONS ==========
@@ -614,15 +616,15 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
-        $isValid = $this->validator->validate($result, 'Regular Season');
+        $validation = $this->validator->validate($result, 'Regular Season');
 
         // Assert - Multiple validation errors
-        $this->assertFalse($isValid);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($validation->isValid());
+        $errors = $validation->getErrors();
 
         // Should have active_players_min + position_depth errors for positions below 3
         $this->assertNotEmpty($errors);
-        $this->assertSame('active_players_min', $errors[0]['type']);
+        $this->assertSame('active_players_min', $errors[0]->type);
         // Additional position_depth errors may follow depending on depth distribution
     }
 
@@ -636,19 +638,19 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         // Arrange - First invalid
         $invalidData = $this->createPostDataWithActiveCount(5);
         $result1 = $this->processor->processSubmission($invalidData, 15);
-        $this->validator->validate($result1, 'Regular Season');
-        $this->assertNotEmpty($this->validator->getErrors());
+        $firstValidation = $this->validator->validate($result1, 'Regular Season');
+        $this->assertNotEmpty($firstValidation->getErrors());
 
         // Arrange - Second valid
         $validData = $this->createValidRegularSeasonPostData();
         $result2 = $this->processor->processSubmission($validData, 15);
 
         // Act
-        $isValid = $this->validator->validate($result2, 'Regular Season');
+        $validation = $this->validator->validate($result2, 'Regular Season');
 
         // Assert - Errors cleared from previous validation
-        $this->assertTrue($isValid);
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertTrue($validation->isValid());
+        $this->assertSame([], $validation->getErrors());
     }
 
     /**
@@ -663,8 +665,8 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Act
         $result = $this->processor->processSubmission($postData, 15);
-        $this->validator->validate($result, 'Regular Season');
-        $html = $this->validator->getErrorMessagesHtml();
+        $validation = $this->validator->validate($result, 'Regular Season');
+        $html = DepthChartEntryErrorHtmlRenderer::render($validation->getErrors());
 
         // Assert - HTML formatting present
         $this->assertStringContainsString('text-red-500', $html);

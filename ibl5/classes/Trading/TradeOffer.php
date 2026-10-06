@@ -103,19 +103,26 @@ class TradeOffer implements TradeOfferInterface
             $tradeData['partnerSendsCash']
         );
         
-        if ($cashValidation['valid'] !== true) {
-            return ['success' => false, 'error' => $cashValidation['error'] ?? 'Cash validation failed'];
+        if (!$cashValidation->isValid()) {
+            return ['success' => false, 'error' => $cashValidation->getError() ?? 'Cash validation failed'];
         }
 
         // Calculate and validate salary caps
         $capData = $this->calculateSalaryCapData($tradeData);
         $capValidation = $this->validator->validateSalaryCaps($capData);
         
-        if ($capValidation['valid'] !== true) {
+        if (!$capValidation->isValid()) {
+            $totals = $capValidation->getContext();
+            $capErrors = $capValidation->getErrorMessages();
             return [
                 'success' => false,
-                'errors' => $capValidation['errors'],
-                'capData' => $capValidation
+                'errors' => $capErrors,
+                'capData' => [
+                    'valid' => false,
+                    'errors' => $capErrors,
+                    'userPostTradeCapTotal' => $totals['userPostTradeCapTotal'],
+                    'partnerPostTradeCapTotal' => $totals['partnerPostTradeCapTotal'],
+                ],
             ];
         }
 
@@ -148,10 +155,10 @@ class TradeOffer implements TradeOfferInterface
             $partnerPlayersSent
         );
 
-        if ($rosterValidation['valid'] !== true) {
+        if (!$rosterValidation->isValid()) {
             return [
                 'success' => false,
-                'errors' => $rosterValidation['errors'],
+                'errors' => $rosterValidation->getErrors(),
             ];
         }
 

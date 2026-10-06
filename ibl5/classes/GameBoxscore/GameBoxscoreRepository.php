@@ -16,9 +16,9 @@ use League\LeagueContext;
  * type-coercion, or display defaults — those live in the Service layer.
  *
  * @see GameBoxscoreRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  */
-class GameBoxscoreRepository extends \BaseMysqliRepository implements GameBoxscoreRepositoryInterface
+class GameBoxscoreRepository extends \Database\BaseMysqliRepository implements GameBoxscoreRepositoryInterface
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {

@@ -91,12 +91,12 @@ run_tick() {
            "$TICK" "$@" 2>&1)" || ST=$?
 }
 
-run_only() {   # <wt-path> [extra args...] — sets ONLY_OUT, ONLY_ERR, ONLY_ST
+run_only() {   # <wt-path> [extra args...] — sets ONLY_OUT, ONLY_ERR, ONLY_ST; ONLY_LOG overrides the log path
     local wt="$1"; shift
     ONLY_ST=0
     ONLY_ERR="$TMP/only.err.$$"
     ONLY_OUT="$(PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" \
-                WT_SYNC_LOG="$_TICK_LOG" WT_SYNC_LOCK_DIR="$_TICK_LOCKD" \
+                WT_SYNC_LOG="${ONLY_LOG:-$_TICK_LOG}" WT_SYNC_LOCK_DIR="$_TICK_LOCKD" \
                 WT_SYNC_ENABLED=1 \
                 "$TICK" --only "$wt" "$@" 2>"$ONLY_ERR")" || ONLY_ST=$?
 }
@@ -161,7 +161,47 @@ _make_stale_copy() {
     git -C "$wt" fetch -q origin "$name" 2>/dev/null
 }
 
-# add_worktree <main> <name> [ahead|behind|current|diverged|stale-copy|stale-copy-plus-unique]
+# _make_squash_folded <main> <name> <wt>
+# Squash-folded negative fixture. The worktree commits A,B and pushes them. Then
+# origin/<name> is force-pushed to ONE commit S carrying the combined A+B patch,
+# as a squash merge leaves it. Local ends ahead=2 behind=1, and every local
+# commit prints '+' in `git cherry origin/<name> HEAD` (patch-ids differ), so
+# the stale-copy detector must NOT treat it as a stale copy.
+# Writes nothing to stdout (add_worktree's stdout is the returned path).
+_make_squash_folded() {
+    local main="$1" name="$2" wt="$3" i url clone a b
+    printf '%s\n' "$name" > "$main/$name.txt"
+    git -C "$main" add "$name.txt"
+    git -C "$main" commit -qm "$name initial"
+    git -C "$main" push -q origin "$name"
+    git -C "$main" checkout -q master
+    git -C "$main" worktree add -q "$wt" "$name"
+    for i in 1 2; do
+        printf 'work %s\n' "$i" > "$wt/work$i.txt"
+        git -C "$wt" add "work$i.txt"
+        git -C "$wt" -c user.email=t@example.com -c user.name=tester \
+            -c commit.gpgsign=false commit -qm "work $i"
+    done
+    git -C "$wt" push -q origin "$name"
+    url="$(git -C "$main" remote get-url origin)"
+    clone="$(mktemp -d "$TMP/clone_squash.XXXXXX")"
+    git clone -q "$url" "$clone" 2>/dev/null
+    git -C "$clone" config user.email t@example.com
+    git -C "$clone" config user.name tester
+    git -C "$clone" config commit.gpgsign false
+    git -C "$clone" checkout -q "$name"
+    a="$(git -C "$clone" rev-parse HEAD~1)"; b="$(git -C "$clone" rev-parse HEAD)"
+    git -C "$clone" reset -q --hard HEAD~2
+    # Apply both patches without committing, then fold them into one commit.
+    git -C "$clone" cherry-pick -n "$a" "$b" >/dev/null 2>&1
+    GIT_COMMITTER_NAME=pipeline-bot GIT_COMMITTER_EMAIL=bot@example.com \
+        git -C "$clone" commit -qm "squashed: work 1 + work 2"
+    git -C "$clone" push -q -f origin "$name" 2>/dev/null
+    # refs/remotes are shared across worktrees, so this updates main's origin/<name>.
+    git -C "$wt" fetch -q origin "$name" 2>/dev/null
+}
+
+# add_worktree <main> <name> [ahead|behind|current|diverged|stale-copy|stale-copy-plus-unique|squash-folded]
 # Sets up a worktree branch in various states relative to origin.
 add_worktree() {
     local main="$1" name="$2" state="${3:-current}"
@@ -357,6 +397,10 @@ add_worktree() {
             git -C "$wt" add unique.txt
             git -C "$wt" -c user.email=t@example.com -c user.name=tester \
                 -c commit.gpgsign=false commit -qm "real unique commit"
+            ;;
+        squash-folded)
+            # N=2 local commits vs one squashed commit on origin: not cherry-equivalent.
+            _make_squash_folded "$main" "$name" "$wt"
             ;;
         diverged)
             # Both local and origin have new commits (non-conflicting files).
@@ -981,19 +1025,25 @@ MAIN37="$(new_env)"
 WT37="$(add_worktree "$MAIN37" "wt-stale37" stale-copy)"
 HEAD37_BEFORE="$(git -C "$WT37" rev-parse HEAD)"
 ORIGIN37="$(git -C "$MAIN37" rev-parse origin/wt-stale37)"
-run_only "$WT37"
+LOG37="$(fresh_log t37)"
+ONLY_LOG="$LOG37" run_only "$WT37"
 assert_eq "only: RESET-STALE stdout" "RESET-STALE" "$ONLY_OUT"
 assert_eq "only: RESET-STALE exit 0" "0" "$ONLY_ST"
 assert_eq "only: RESET-STALE HEAD at origin" "$ORIGIN37" "$(git -C "$WT37" rev-parse HEAD)"
 assert_eq "only: RESET-STALE backup ref" "$HEAD37_BEFORE" \
     "$(git -C "$WT37" rev-parse --verify -q refs/wt-sync-backup/wt-stale37 2>/dev/null)"
+assert_match "only: RESET-STALE logged verdict" "branch=wt-stale37 verdict=RESET-STALE" \
+    "$(cat "$LOG37" 2>/dev/null)"
+assert_absent "only: no STRAGGLER for the reset branch" "STRAGGLER.*wt-stale37" \
+    "$(cat "$LOG37" 2>/dev/null)"
 
 # ── Test 38: only: --dry-run on stale copy reports, writes nothing ────────────
 MAIN38="$(new_env)"
 WT38="$(add_worktree "$MAIN38" "wt-stale38" stale-copy)"
 HEAD38_BEFORE="$(git -C "$WT38" rev-parse HEAD)"
 run_only "$WT38" --dry-run
-assert_match "only-dry: stale state reported" "RESET-STALE" "$ONLY_OUT"
+assert_eq    "only-dry: stale state reported (exact stdout)" "RESET-STALE" "$ONLY_OUT"
+assert_match "only-dry: stderr notes no git write" "\[dry-run\] no git write performed" "$(cat "$ONLY_ERR" 2>/dev/null)"
 assert_eq    "only-dry: exit 0" "0" "$ONLY_ST"
 assert_eq    "only-dry: HEAD unchanged" "$HEAD38_BEFORE" "$(git -C "$WT38" rev-parse HEAD)"
 if git -C "$WT38" rev-parse --verify -q refs/wt-sync-backup/wt-stale38 >/dev/null 2>&1; then
@@ -1105,6 +1155,8 @@ run_only "$WT44"
 assert_eq "only-backup-fail: DIVERGED-CONFLICT stdout" "DIVERGED-CONFLICT" "$ONLY_OUT"
 assert_eq "only-backup-fail: exit 0" "0" "$ONLY_ST"
 assert_eq "only-backup-fail: HEAD unchanged" "$HEAD44_BEFORE" "$(git -C "$WT44" rev-parse HEAD)"
+assert_match "only-backup-fail: STRAGGLER logged" \
+    "STRAGGLER branch=wt-stale44 reason=on-demand-DIVERGED-CONFLICT" "$(cat "$_TICK_LOG" 2>/dev/null)"
 # Confirm no in-progress merge was left
 if git -C "$WT44" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
     failcase "only-backup-fail: in-progress merge left"
@@ -1128,6 +1180,188 @@ assert_eq "reflog-guard: exit 0" "0" "$ONLY_ST"
 assert_eq "reflog-guard: HEAD unchanged" "$HEAD45_BEFORE" "$(git -C "$WT45" rev-parse HEAD)"
 assert_eq "reflog-guard: backup ref preserved" "$SAVED45" \
     "$(git -C "$WT45" rev-parse --verify -q refs/wt-sync-backup/wt-stale45 2>/dev/null)"
+
+# ── Test 46: fleet: existing reflog-less backup ref → STRAGGLER reason=reset-failed ─
+# Fleet-mode twin of Test 45: backup_and_reset refuses, so the tick leaves the
+# worktree alone, counts it as ahead, and logs the reset-failed straggler.
+MAIN46="$(new_env)"
+WT46="$(add_worktree "$MAIN46" "wt-stale46" stale-copy)"
+LOG46="$(fresh_log t46)"; LOCKD46="$(fresh_lockd t46)"
+HEAD46_BEFORE="$(git -C "$WT46" rev-parse HEAD)"
+SAVED46="$(git -C "$WT46" rev-parse refs/remotes/origin/wt-stale46)"
+git -C "$WT46" update-ref "refs/wt-sync-backup/wt-stale46" "$SAVED46" >/dev/null 2>&1 || true
+run_with_repo "$MAIN46" "$LOG46" "$LOCKD46" -- --force
+assert_eq     "fleet-reflog-guard: exit 0" "0" "$ST"
+assert_match  "fleet-reflog-guard: STRAGGLER reset-failed logged" \
+    "STRAGGLER branch=wt-stale46 reason=reset-failed" "$(cat "$LOG46" 2>/dev/null)"
+assert_match  "fleet-reflog-guard: counted ahead=1" "ahead=1 reset-stale=0" "$(cat "$LOG46" 2>/dev/null)"
+assert_absent "fleet-reflog-guard: no RESET-STALE audit line" "RESET-STALE branch=wt-stale46" \
+    "$(cat "$LOG46" 2>/dev/null)"
+assert_eq     "fleet-reflog-guard: HEAD unchanged" "$HEAD46_BEFORE" "$(git -C "$WT46" rev-parse HEAD)"
+assert_eq     "fleet-reflog-guard: backup ref preserved" "$SAVED46" \
+    "$(git -C "$WT46" rev-parse --verify -q refs/wt-sync-backup/wt-stale46 2>/dev/null)"
+
+# ── Test 47: fleet: squash-folded branch → STRAGGLER reason=ahead, never RESET-STALE ─
+# Negative check from the plan (Architectural trade-offs #1): N local commits
+# folded into one upstream commit are not patch-id-equivalent, so the strict
+# detector must skip the branch, leave it untouched, and write no backup ref.
+MAIN47="$(new_env)"
+WT47="$(add_worktree "$MAIN47" "wt-squash47" squash-folded)"
+LOG47="$(fresh_log t47)"; LOCKD47="$(fresh_lockd t47)"
+HEAD47_BEFORE="$(git -C "$WT47" rev-parse HEAD)"
+# Fixture self-check: prove the fixture is squash-folded before judging the tick.
+assert_eq    "squash-fixture: ahead=2 behind=1" "1	2" \
+    "$(git -C "$WT47" rev-list --left-right --count "origin/wt-squash47...HEAD")"
+assert_eq    "squash-fixture: both local commits unique ('+' lines)" "2" \
+    "$(git -C "$WT47" cherry origin/wt-squash47 HEAD | grep -c '^+')"
+run_with_repo "$MAIN47" "$LOG47" "$LOCKD47" -- --force
+assert_eq     "squash-folded: exit 0" "0" "$ST"
+assert_absent "squash-folded: no RESET-STALE" "RESET-STALE" "$OUT"
+assert_match  "squash-folded: STRAGGLER reason=ahead in log" \
+    "STRAGGLER branch=wt-squash47.*reason=ahead" "$(cat "$LOG47" 2>/dev/null)"
+assert_match  "squash-folded: reset-stale=0" "reset-stale=0" "$(cat "$LOG47" 2>/dev/null)"
+assert_eq     "squash-folded: HEAD unchanged" "$HEAD47_BEFORE" "$(git -C "$WT47" rev-parse HEAD)"
+if git -C "$WT47" rev-parse --verify -q refs/wt-sync-backup/wt-squash47 >/dev/null 2>&1; then
+    failcase "squash-folded: backup ref written for an untouched branch"
+else
+    pass "squash-folded: no backup ref"
+fi
+
+# ── Test 48: fleet: --dry-run beside a live fleet reports, writes nothing ─────
+# One fleet, two stale copies: one in use (lsof stub), one idle. --dry-run must
+# report IN-USE for the first and WOULD-RESET-STALE for the second, and write no
+# backup ref or HEAD move for either. Then a live fleet lock (our own PID, as in
+# Test 31) makes a second --dry-run tick exit without enumerating or touching it.
+MAIN48="$(new_env)"
+WT48A="$(add_worktree "$MAIN48" "wt-live48a" stale-copy)"
+WT48B="$(add_worktree "$MAIN48" "wt-idle48b" stale-copy)"
+WT48A_REAL="$(cd "$WT48A" && pwd -P)"
+LOG48="$(fresh_log t48)"; LOCKD48="$(fresh_lockd t48)"
+HEAD48A_BEFORE="$(git -C "$WT48A" rev-parse HEAD)"
+HEAD48B_BEFORE="$(git -C "$WT48B" rev-parse HEAD)"
+run_with_repo "$MAIN48" "$LOG48" "$LOCKD48" \
+    STUB_LSOF_LINE="n$WT48A_REAL" -- --force --dry-run
+assert_eq     "live-dry: exit 0" "0" "$ST"
+assert_match  "live-dry: in-use copy reported IN-USE" "IN-USE.*wt-live48a" "$OUT"
+assert_absent "live-dry: in-use copy not WOULD-RESET-STALE" "WOULD-RESET-STALE.*wt-live48a" "$OUT"
+assert_match  "live-dry: idle copy reported WOULD-RESET-STALE" "WOULD-RESET-STALE.*wt-idle48b" "$OUT"
+assert_eq     "live-dry: in-use HEAD unchanged" "$HEAD48A_BEFORE" "$(git -C "$WT48A" rev-parse HEAD)"
+assert_eq     "live-dry: idle HEAD unchanged" "$HEAD48B_BEFORE" "$(git -C "$WT48B" rev-parse HEAD)"
+assert_eq     "live-dry: no backup refs written" "" \
+    "$(git -C "$MAIN48" for-each-ref refs/wt-sync-backup/)"
+# Live fleet lock: dry-run tick bows out, lock stays ours, nothing is written.
+printf '%d\n' "$$" > "$LOCKD48/wt-sync.lock"
+run_with_repo "$MAIN48" "$LOG48" "$LOCKD48" -- --force --dry-run
+assert_eq     "live-dry-lock: exit 0" "0" "$ST"
+assert_absent "live-dry-lock: no per-worktree report" "WOULD-RESET-STALE|RESET-STALE" "$OUT"
+assert_eq     "live-dry-lock: lock still holds original PID" "$$" "$(cat "$LOCKD48/wt-sync.lock" 2>/dev/null)"
+assert_eq     "live-dry-lock: idle HEAD unchanged" "$HEAD48B_BEFORE" "$(git -C "$WT48B" rev-parse HEAD)"
+assert_eq     "live-dry-lock: no backup refs written" "" \
+    "$(git -C "$MAIN48" for-each-ref refs/wt-sync-backup/)"
+rm -f "$LOCKD48/wt-sync.lock"
+
+# ── Test 49: fleet: origin missing → NO-REMOTE, worktree untouched ───────────
+# Two ways a branch has no origin/<branch>: never pushed, or deleted on the
+# remote (the tick's `fetch --prune` drops the stale tracking ref).
+MAIN49="$(new_env)"
+WT49_LOCAL="$MAIN49/worktrees/wt-local49"
+mkdir -p "$(dirname "$WT49_LOCAL")"
+git -C "$MAIN49" worktree add -q -b wt-local49 "$WT49_LOCAL" master
+WT49_GONE="$(add_worktree "$MAIN49" "wt-gone49" current)"
+git -C "$MAIN49" fetch -q origin
+git --git-dir="$MAIN49/../origin.git" branch -D wt-gone49 >/dev/null 2>&1
+HEAD49_LOCAL="$(git -C "$WT49_LOCAL" rev-parse HEAD)"
+HEAD49_GONE="$(git -C "$WT49_GONE" rev-parse HEAD)"
+LOG49="$(fresh_log t49)"; LOCKD49="$(fresh_lockd t49)"
+run_with_repo "$MAIN49" "$LOG49" "$LOCKD49" -- --force
+assert_eq    "no-remote: exit 0" "0" "$ST"
+assert_match "no-remote: never-pushed branch logged" "NO-REMOTE +wt-local49 \(wt-local49\)" "$OUT"
+assert_match "no-remote: remote-deleted branch logged" "NO-REMOTE +wt-gone49 \(wt-gone49\)" "$OUT"
+assert_match "no-remote: stdout summary no-remote=2" "2 no-remote\." "$OUT"
+assert_match "no-remote: log summary no-remote=2" "no-remote=2" "$(cat "$LOG49" 2>/dev/null)"
+assert_match "no-remote: log summary other counters zero" \
+    "synced=0 current=0 dirty=0 in-use=0 ahead=0 reset-stale=0 cannot-ff=0" "$(cat "$LOG49" 2>/dev/null)"
+assert_absent "no-remote: no STRAGGLER line" "STRAGGLER" "$(cat "$LOG49" 2>/dev/null)"
+assert_eq    "no-remote: never-pushed HEAD unchanged" "$HEAD49_LOCAL" "$(git -C "$WT49_LOCAL" rev-parse HEAD)"
+assert_eq    "no-remote: remote-deleted HEAD unchanged" "$HEAD49_GONE" "$(git -C "$WT49_GONE" rev-parse HEAD)"
+if git -C "$MAIN49" rev-parse --verify --quiet origin/wt-local49 >/dev/null 2>&1; then
+    failcase "no-remote: tick created origin/wt-local49 (must never push)"
+else
+    pass "no-remote: tick did not create origin/wt-local49"
+fi
+
+# ── Test 50: fleet: branch not ahead of origin → never a STRAGGLER ───────────
+# Current (ahead=0 behind=0) and behind-only (ahead=0 behind>0) both skip the
+# AHEAD gate: no STRAGGLER, no reset, no backup ref. Behind fast-forwards.
+MAIN50="$(new_env)"
+WT50_CUR="$(add_worktree "$MAIN50" "wt-cur50" current)"
+WT50_BEH="$(add_worktree "$MAIN50" "wt-beh50" behind)"
+HEAD50_CUR="$(git -C "$WT50_CUR" rev-parse HEAD)"
+HEAD50_ORIGIN="$(git -C "$MAIN50" rev-parse origin/wt-beh50)"
+LOG50="$(fresh_log t50)"; LOCKD50="$(fresh_lockd t50)"
+run_with_repo "$MAIN50" "$LOG50" "$LOCKD50" -- --force
+assert_eq     "not-ahead: exit 0" "0" "$ST"
+assert_match  "not-ahead: current branch logged CURRENT" "CURRENT +wt-cur50" "$OUT"
+assert_match  "not-ahead: behind branch logged SYNCED" "SYNCED +wt-beh50" "$OUT"
+assert_match  "not-ahead: log summary" \
+    "synced=1 current=1 dirty=0 in-use=0 ahead=0 reset-stale=0 cannot-ff=0 no-remote=0" "$(cat "$LOG50" 2>/dev/null)"
+assert_absent "not-ahead: no STRAGGLER line" "STRAGGLER" "$(cat "$LOG50" 2>/dev/null)"
+assert_eq     "not-ahead: current HEAD unchanged" "$HEAD50_CUR" "$(git -C "$WT50_CUR" rev-parse HEAD)"
+assert_eq     "not-ahead: behind HEAD equals origin" "$HEAD50_ORIGIN" "$(git -C "$WT50_BEH" rev-parse HEAD)"
+if git -C "$MAIN50" for-each-ref --format='%(refname)' refs/wt-sync-backup | grep -q .; then
+    failcase "not-ahead: a backup ref was written (nothing should reset)"
+else
+    pass "not-ahead: no backup ref written"
+fi
+
+# ── Test 51: fleet + only: local merge commit → unpushed work, STRAGGLER ─────
+# A local merge commit (master merged into the branch) is unpushed work with no
+# patch-equivalent twin on origin. It must be preserved, never reset as stale.
+MAIN51="$(new_env)"
+WT51="$(add_worktree "$MAIN51" "wt-merge51" current)"
+printf 'master-advance\n' > "$MAIN51/master-advance.txt"
+git -C "$MAIN51" add master-advance.txt
+git -C "$MAIN51" commit -qm "master advance"
+git -C "$WT51" -c user.email=t@example.com -c user.name=tester -c commit.gpgsign=false \
+    merge -q --no-ff --no-edit master >/dev/null 2>&1
+HEAD51_BEFORE="$(git -C "$WT51" rev-parse HEAD)"
+PARENTS51="$(git -C "$WT51" rev-list --parents -n 1 HEAD | awk '{print NF - 1}')"
+assert_eq "merge-commit: fixture HEAD is a merge commit" "2" "$PARENTS51"
+LOG51="$(fresh_log t51)"; LOCKD51="$(fresh_lockd t51)"
+run_with_repo "$MAIN51" "$LOG51" "$LOCKD51" -- --force
+assert_eq     "merge-commit: exit 0" "0" "$ST"
+assert_eq     "merge-commit: HEAD unchanged" "$HEAD51_BEFORE" "$(git -C "$WT51" rev-parse HEAD)"
+assert_match  "merge-commit: logged STRAGGLER" "STRAGGLER +wt-merge51 \(wt-merge51\).*unpushed commits" "$OUT"
+assert_match  "merge-commit: STRAGGLER reason=ahead in log" \
+    "STRAGGLER branch=wt-merge51 reason=ahead behind=0 ahead=2" "$(cat "$LOG51" 2>/dev/null)"
+assert_match  "merge-commit: log summary ahead=1 reset-stale=0" "ahead=1 reset-stale=0" "$(cat "$LOG51" 2>/dev/null)"
+assert_absent "merge-commit: no RESET-STALE audit line" "RESET-STALE branch=" "$(cat "$LOG51" 2>/dev/null)"
+run_only "$WT51"
+assert_eq     "merge-commit: only AHEAD-ONLY stdout" "AHEAD-ONLY" "$ONLY_OUT"
+assert_eq     "merge-commit: only HEAD unchanged" "$HEAD51_BEFORE" "$(git -C "$WT51" rev-parse HEAD)"
+
+# ── Test 52: fleet + only: detached HEAD → fleet skips silently, --only refuses ─
+MAIN52="$(new_env)"
+WT52_DET="$(add_worktree "$MAIN52" "wt-det52" behind)"
+WT52_BEH="$(add_worktree "$MAIN52" "wt-beh52" behind)"
+git -C "$WT52_DET" checkout -q --detach
+HEAD52_DET="$(git -C "$WT52_DET" rev-parse HEAD)"
+HEAD52_ORIGIN="$(git -C "$MAIN52" rev-parse origin/wt-beh52)"
+LOG52="$(fresh_log t52)"; LOCKD52="$(fresh_lockd t52)"
+run_with_repo "$MAIN52" "$LOG52" "$LOCKD52" -- --force
+assert_eq     "detached: fleet exit 0" "0" "$ST"
+assert_eq     "detached: fleet HEAD unchanged" "$HEAD52_DET" "$(git -C "$WT52_DET" rev-parse HEAD)"
+assert_absent "detached: fleet emits no line for the detached worktree" "wt-det52" "$OUT"
+assert_match  "detached: fleet still syncs the next worktree (one failure never aborts)" \
+    "SYNCED +wt-beh52" "$OUT"
+assert_eq     "detached: next worktree HEAD equals origin" "$HEAD52_ORIGIN" "$(git -C "$WT52_BEH" rev-parse HEAD)"
+assert_match  "detached: log counts only the attached worktree" \
+    "synced=1 current=0 dirty=0 in-use=0 ahead=0 reset-stale=0 cannot-ff=0 no-remote=0" "$(cat "$LOG52" 2>/dev/null)"
+run_only "$WT52_DET"
+assert_eq    "detached: only stdout empty" "" "$ONLY_OUT"
+assert_eq    "detached: only exits 2" "2" "$ONLY_ST"
+assert_match "detached: only stderr names detached HEAD" "detached HEAD" "$(cat "$ONLY_ERR")"
+assert_eq    "detached: only HEAD unchanged" "$HEAD52_DET" "$(git -C "$WT52_DET" rev-parse HEAD)"
 
 # ── Hook wrapper tests ────────────────────────────────────────────────────────
 HOOK="$SCRIPT_DIR/hooks/wt-sync-session-start.sh"

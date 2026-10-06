@@ -185,6 +185,142 @@ final class MigrationRunnerTest extends TestCase
         $this->assertSame([], $this->recordedMigrations);
     }
 
+    public function testRunPendingExecutesPhpMigrationAndRecordsIt(): void
+    {
+        file_put_contents(
+            $this->tempDir . '/001_demo.php',
+            "<?php\necho \"BRANCH: taken-A\\n\";\nfwrite(STDERR, \"warn-line\\n\");\n",
+        );
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        // The runner must never echo to the parent process; subprocess output is captured.
+        $this->expectOutputString('');
+
+        $executed = $runner->runPending();
+
+        $this->assertSame(['001_demo.php'], $executed);
+        $this->assertSame([['001_demo.php', 1]], $this->recordedMigrations);
+    }
+
+    public function testRunPendingThrowsOnFailingPhpMigrationWithOutput(): void
+    {
+        file_put_contents(
+            $this->tempDir . '/001_broken.php',
+            "<?php\necho \"boom-line\\n\";\nexit(3);\n",
+        );
+        file_put_contents($this->tempDir . '/002_second.sql', 'SELECT 2;');
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        try {
+            $runner->runPending();
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('PHP migration failed (001_broken.php): exit code 3', $e->getMessage());
+            $this->assertStringContainsString('boom-line', $e->getMessage());
+            $this->assertSame([], $this->recordedMigrations);
+            $this->assertSame([], $this->executedSql);
+        }
+    }
+
+    public function testPhpOutputSinkReceivesCombinedOutputOnSuccess(): void
+    {
+        file_put_contents(
+            $this->tempDir . '/001_demo.php',
+            "<?php echo \"BRANCH: taken-A\\n\"; echo \"Deleted 3 rows\\n\"; fwrite(STDERR, \"warn-line\\n\");",
+        );
+
+        $calls = [];
+        $runner = new MigrationRunner(
+            $this->stubRepository,
+            $this->fileResolver,
+            function (string $f, string $o) use (&$calls): void {
+                $calls[] = [$f, $o];
+            },
+        );
+
+        $runner->runPending();
+
+        $this->assertSame([['001_demo.php', "BRANCH: taken-A\nDeleted 3 rows\nwarn-line"]], $calls);
+    }
+
+    public function testPhpOutputSinkNotCalledWhenOutputIsEmpty(): void
+    {
+        file_put_contents($this->tempDir . '/001_silent.php', '<?php');
+
+        $calls = [];
+        $runner = new MigrationRunner(
+            $this->stubRepository,
+            $this->fileResolver,
+            function (string $f, string $o) use (&$calls): void {
+                $calls[] = [$f, $o];
+            },
+        );
+
+        $runner->runPending();
+
+        $this->assertSame([], $calls);
+        $this->assertSame([['001_silent.php', 1]], $this->recordedMigrations);
+    }
+
+    public function testPhpOutputSinkNotCalledWhenPhpMigrationFails(): void
+    {
+        file_put_contents($this->tempDir . '/001_broken.php', "<?php echo \"boom-line\\n\"; exit(3);");
+
+        $calls = [];
+        $runner = new MigrationRunner(
+            $this->stubRepository,
+            $this->fileResolver,
+            function (string $f, string $o) use (&$calls): void {
+                $calls[] = [$f, $o];
+            },
+        );
+
+        try {
+            $runner->runPending();
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $this->assertSame([], $calls);
+            $this->assertStringContainsString('boom-line', $e->getMessage());
+        }
+    }
+
+    public function testPhpOutputSinkFiresPerMigrationBeforeRecording(): void
+    {
+        file_put_contents($this->tempDir . '/001_a.php', "<?php echo \"first\\n\";");
+        file_put_contents($this->tempDir . '/002_b.php', "<?php echo \"second\\n\";");
+
+        $calls = [];
+        $runner = new MigrationRunner(
+            $this->stubRepository,
+            $this->fileResolver,
+            function (string $f, string $o) use (&$calls): void {
+                $calls[] = [$f, $o, count($this->recordedMigrations)];
+            },
+        );
+
+        $runner->runPending();
+
+        $this->assertSame([['001_a.php', 'first', 0], ['002_b.php', 'second', 1]], $calls);
+    }
+
+    public function testFormatPhpOutputPrefixesEveryLine(): void
+    {
+        $this->assertSame(
+            "    [184_x.php] proceed\n    [184_x.php] Deleted 3 rows\n",
+            MigrationRunner::formatPhpOutput('184_x.php', "proceed\nDeleted 3 rows"),
+        );
+    }
+
+    public function testFormatPhpOutputKeepsBlankInteriorLine(): void
+    {
+        $this->assertSame(
+            "    [m.php] a\n    [m.php] \n    [m.php] b\n",
+            MigrationRunner::formatPhpOutput('m.php', "a\n\nb"),
+        );
+    }
+
     /**
      * Create a stub MigrationRepositoryInterface that tracks calls.
      */

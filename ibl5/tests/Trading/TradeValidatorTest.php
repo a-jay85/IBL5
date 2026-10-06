@@ -52,8 +52,8 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->validateMinimumCashAmounts($userCash, $partnerCash);
 
         // Assert
-        $this->assertTrue($result['valid'], 'Valid cash amounts should pass validation');
-        $this->assertNull($result['error'], 'No error should be returned for valid amounts');
+        $this->assertTrue($result->isValid(), 'Valid cash amounts should pass validation');
+        $this->assertNull($result->getError(), 'No error should be returned for valid amounts');
     }
 
     /**
@@ -69,8 +69,8 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->validateMinimumCashAmounts($userCash, $partnerCash);
 
         // Assert
-        $this->assertFalse($result['valid'], 'Invalid cash amounts should fail validation');
-        $this->assertStringContainsString($expectedErrorText, $result['error']);
+        $this->assertFalse($result->isValid(), 'Invalid cash amounts should fail validation');
+        $this->assertStringContainsString($expectedErrorText, $result->getError());
     }
 
     /**
@@ -91,10 +91,10 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->validateSalaryCaps($tradeData);
 
         // Assert
-        $this->assertTrue($result['valid'], 'Valid salary caps should pass validation');
-        $this->assertEmpty($result['errors'], 'No errors should be returned for valid caps');
-        $this->assertSame(4900, $result['userPostTradeCapTotal']); // 5000 - 500 + 400
-        $this->assertSame(5600, $result['partnerPostTradeCapTotal']); // 5500 - 400 + 500
+        $this->assertTrue($result->isValid(), 'Valid salary caps should pass validation');
+        $this->assertEmpty($result->getErrorMessages(), 'No errors should be returned for valid caps');
+        $this->assertSame(4900, $result->getContext()['userPostTradeCapTotal']); // 5000 - 500 + 400
+        $this->assertSame(5600, $result->getContext()['partnerPostTradeCapTotal']); // 5500 - 400 + 500
     }
 
     /**
@@ -109,8 +109,8 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->validateSalaryCaps($tradeData);
 
         // Assert
-        $this->assertFalse($result['valid'], 'Salary cap violations should fail validation');
-        $this->assertCount($expectedErrorCount, $result['errors']);
+        $this->assertFalse($result->isValid(), 'Salary cap violations should fail validation');
+        $this->assertCount($expectedErrorCount, $result->getErrorMessages());
     }
 
     /**
@@ -256,8 +256,8 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateRosterLimits(1, 2, 1, 2);
 
-        $this->assertTrue($result['valid'], 'Both teams within roster limit should pass');
-        $this->assertSame([], $result['errors']);
+        $this->assertTrue($result->isValid(), 'Both teams within roster limit should pass');
+        $this->assertSame([], $result->getErrors());
     }
 
     /**
@@ -272,10 +272,10 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateRosterLimits(1, 2, 0, 2);
 
-        $this->assertFalse($result['valid']);
-        $this->assertCount(1, $result['errors']);
-        $this->assertStringContainsString('your team', $result['errors'][0]);
-        $this->assertStringContainsString('roster limit', $result['errors'][0]);
+        $this->assertFalse($result->isValid());
+        $this->assertCount(1, $result->getErrors());
+        $this->assertStringContainsString('your team', $result->getErrors()[0]);
+        $this->assertStringContainsString('roster limit', $result->getErrors()[0]);
     }
 
     /**
@@ -290,10 +290,10 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateRosterLimits(1, 2, 2, 0);
 
-        $this->assertFalse($result['valid']);
-        $this->assertCount(1, $result['errors']);
-        $this->assertStringContainsString('other team', $result['errors'][0]);
-        $this->assertStringContainsString('roster limit', $result['errors'][0]);
+        $this->assertFalse($result->isValid());
+        $this->assertCount(1, $result->getErrors());
+        $this->assertStringContainsString('other team', $result->getErrors()[0]);
+        $this->assertStringContainsString('roster limit', $result->getErrors()[0]);
     }
 
     /**
@@ -327,10 +327,10 @@ class TradeValidatorTest extends TestCase
         // User: 16, Partner: 16 — both exceed!
         $result = $this->validator->validateRosterLimits(1, 2, 0, 0);
 
-        $this->assertFalse($result['valid']);
-        $this->assertCount(2, $result['errors']);
-        $this->assertStringContainsString('your team', $result['errors'][0]);
-        $this->assertStringContainsString('other team', $result['errors'][1]);
+        $this->assertFalse($result->isValid());
+        $this->assertCount(2, $result->getErrors());
+        $this->assertStringContainsString('your team', $result->getErrors()[0]);
+        $this->assertStringContainsString('other team', $result->getErrors()[1]);
     }
 
     /**
@@ -346,8 +346,8 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateRosterLimits(1, 2, 1, 1);
 
-        $this->assertTrue($result['valid'], '1-for-1 swap at roster limit should be valid');
-        $this->assertSame([], $result['errors']);
+        $this->assertTrue($result->isValid(), '1-for-1 swap at roster limit should be valid');
+        $this->assertSame([], $result->getErrors());
     }
 
     /**
@@ -362,8 +362,8 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateRosterLimits(1, 2, 2, 2);
 
-        $this->assertTrue($result['valid'], 'Equal swap at roster limit should be valid');
-        $this->assertSame([], $result['errors']);
+        $this->assertTrue($result->isValid(), 'Equal swap at roster limit should be valid');
+        $this->assertSame([], $result->getErrors());
     }
 
     /**
@@ -378,8 +378,8 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateRosterLimits(1, 2, 0, 1);
 
-        $this->assertTrue($result['valid'], 'Exactly at 15-player limit should be valid');
-        $this->assertSame([], $result['errors']);
+        $this->assertTrue($result->isValid(), 'Exactly at 15-player limit should be valid');
+        $this->assertSame([], $result->getErrors());
     }
 
     // --- Merged from TradeValidatorEdgeCaseTest ---
@@ -402,8 +402,8 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateSalaryCaps($tradeData);
 
-        $this->assertTrue($result['valid']);
-        $this->assertSame(League::HARD_CAP_MAX, $result['userPostTradeCapTotal']);
+        $this->assertTrue($result->isValid());
+        $this->assertSame(League::HARD_CAP_MAX, $result->getContext()['userPostTradeCapTotal']);
     }
 
     /**
@@ -420,8 +420,31 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateSalaryCaps($tradeData);
 
-        $this->assertFalse($result['valid']);
-        $this->assertSame(League::HARD_CAP_MAX + 1, $result['userPostTradeCapTotal']);
+        $this->assertFalse($result->isValid());
+        $this->assertSame(League::HARD_CAP_MAX + 1, $result->getContext()['userPostTradeCapTotal']);
+    }
+
+    /**
+     * Cap errors are structured and tagged with the 'salary_cap' type.
+     */
+    public function testValidateSalaryCapsErrorsCarrySalaryCapType(): void
+    {
+        $tradeData = [
+            'userCurrentSeasonCapTotal' => 6500,
+            'partnerCurrentSeasonCapTotal' => 6500,
+            'userCapSentToPartner' => 0,
+            'partnerCapSentToUser' => 501
+        ];
+
+        $result = $this->validator->validateSalaryCaps($tradeData);
+
+        $firstError = $result->getFirstError();
+        $this->assertNotNull($firstError);
+        $this->assertSame('salary_cap', $firstError->type);
+        $this->assertSame(
+            'This trade is illegal since it puts you over the hard cap.',
+            $result->getErrorMessages()[0]
+        );
     }
 
     /**
@@ -438,9 +461,9 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateSalaryCaps($tradeData);
 
-        $this->assertTrue($result['valid']);
-        $this->assertSame(League::HARD_CAP_MAX, $result['userPostTradeCapTotal']);
-        $this->assertSame(League::HARD_CAP_MAX, $result['partnerPostTradeCapTotal']);
+        $this->assertTrue($result->isValid());
+        $this->assertSame(League::HARD_CAP_MAX, $result->getContext()['userPostTradeCapTotal']);
+        $this->assertSame(League::HARD_CAP_MAX, $result->getContext()['partnerPostTradeCapTotal']);
     }
 
     /**
@@ -458,8 +481,8 @@ class TradeValidatorTest extends TestCase
         // User ends at 7500, partner at 4500 - only user over
         $result = $this->validator->validateSalaryCaps($tradeData);
 
-        $this->assertFalse($result['valid']);
-        $this->assertCount(1, $result['errors']);
+        $this->assertFalse($result->isValid());
+        $this->assertCount(1, $result->getErrorMessages());
 
         // Now test both over
         $tradeData2 = [
@@ -473,8 +496,8 @@ class TradeValidatorTest extends TestCase
 
         // User: 6500 - 100 + 700 = 7100
         // Partner: 6500 - 700 + 100 = 5900
-        $this->assertFalse($result2['valid']);
-        $this->assertCount(1, $result2['errors']); // Only user over
+        $this->assertFalse($result2->isValid());
+        $this->assertCount(1, $result2->getErrorMessages()); // Only user over
     }
 
     // ============================================
@@ -497,9 +520,9 @@ class TradeValidatorTest extends TestCase
 
         // User: 5000 - 100 + 0 = 4900
         // Partner: 0 - 0 + 100 = 100
-        $this->assertTrue($result['valid']);
-        $this->assertSame(4900, $result['userPostTradeCapTotal']);
-        $this->assertSame(100, $result['partnerPostTradeCapTotal']);
+        $this->assertTrue($result->isValid());
+        $this->assertSame(4900, $result->getContext()['userPostTradeCapTotal']);
+        $this->assertSame(100, $result->getContext()['partnerPostTradeCapTotal']);
     }
 
     /**
@@ -510,9 +533,9 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->validateSalaryCaps([]);
 
         // All values default to 0, so both teams at 0
-        $this->assertTrue($result['valid']);
-        $this->assertSame(0, $result['userPostTradeCapTotal']);
-        $this->assertSame(0, $result['partnerPostTradeCapTotal']);
+        $this->assertTrue($result->isValid());
+        $this->assertSame(0, $result->getContext()['userPostTradeCapTotal']);
+        $this->assertSame(0, $result->getContext()['partnerPostTradeCapTotal']);
     }
 
     // ============================================
@@ -529,7 +552,7 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateMinimumCashAmounts($userCash, $partnerCash);
 
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -542,8 +565,8 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateMinimumCashAmounts($userCash, $partnerCash);
 
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('minimum amount of cash', $result['error']);
+        $this->assertFalse($result->isValid());
+        $this->assertStringContainsString('minimum amount of cash', $result->getError());
     }
 
     /**
@@ -553,7 +576,7 @@ class TradeValidatorTest extends TestCase
     {
         $result = $this->validator->validateMinimumCashAmounts([], []);
 
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -566,7 +589,7 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateMinimumCashAmounts($userCash, $partnerCash);
 
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -579,7 +602,7 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateMinimumCashAmounts($userCash, $partnerCash);
 
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -592,7 +615,7 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateMinimumCashAmounts($userCash, $partnerCash);
 
-        $this->assertFalse($result['valid']);
+        $this->assertFalse($result->isValid());
     }
 
     // ============================================
@@ -605,7 +628,7 @@ class TradeValidatorTest extends TestCase
     public function testPlayerTradeableAtExactWaiverThreshold(): void
     {
         $this->mockDb->setMockData([
-            ['ordinal' => \JSB::WAIVERS_ORDINAL, 'cy' => 1000]
+            ['ordinal' => \League\JSB::WAIVERS_ORDINAL, 'cy' => 1000]
         ]);
 
         $result = $this->validator->canPlayerBeTraded(123);
@@ -619,7 +642,7 @@ class TradeValidatorTest extends TestCase
     public function testPlayerNotTradeableOneAboveWaiverThreshold(): void
     {
         $this->mockDb->setMockData([
-            ['ordinal' => \JSB::WAIVERS_ORDINAL + 1, 'cy' => 1000]
+            ['ordinal' => \League\JSB::WAIVERS_ORDINAL + 1, 'cy' => 1000]
         ]);
 
         $result = $this->validator->canPlayerBeTraded(123);
@@ -756,8 +779,8 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateSalaryCaps($tradeData);
 
-        $this->assertFalse($result['valid']);
-        $this->assertSame(999999, $result['userPostTradeCapTotal']);
+        $this->assertFalse($result->isValid());
+        $this->assertSame(999999, $result->getContext()['userPostTradeCapTotal']);
     }
 
     /**
@@ -770,7 +793,7 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateMinimumCashAmounts($userCash, $partnerCash);
 
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->isValid());
     }
 
     // ============================================
@@ -795,7 +818,7 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateSalaryCaps($tradeData);
 
-        $this->assertSame($expectedValid, $result['valid']);
+        $this->assertSame($expectedValid, $result->isValid());
     }
 
     public static function boundaryCapValuesProvider(): array
@@ -832,11 +855,11 @@ class TradeValidatorTest extends TestCase
             ['teamName' => 'Cougars', 'currentSeasonCapTotal' => 4000, 'capSent' => 600, 'capReceived' => 500],
         ]);
 
-        $this->assertTrue($result['valid']);
-        $this->assertSame([], $result['errors']);
-        $this->assertSame(4900, $result['parties'][0]['postTradeCapTotal']);
-        $this->assertSame(5200, $result['parties'][1]['postTradeCapTotal']);
-        $this->assertSame(3900, $result['parties'][2]['postTradeCapTotal']);
+        $this->assertTrue($result->isValid());
+        $this->assertSame([], $result->getErrorMessages());
+        $this->assertSame(4900, $result->getContext()[0]['postTradeCapTotal']);
+        $this->assertSame(5200, $result->getContext()[1]['postTradeCapTotal']);
+        $this->assertSame(3900, $result->getContext()[2]['postTradeCapTotal']);
     }
 
     /**
@@ -854,15 +877,15 @@ class TradeValidatorTest extends TestCase
             ['teamName' => 'Cougars', 'currentSeasonCapTotal' => 6800, 'capSent' => 0, 'capReceived' => 500],
         ]);
 
-        $this->assertFalse($result['valid']);
-        $this->assertCount(1, $result['errors']);
-        $this->assertStringContainsString('Cougars', $result['errors'][0]);
-        $this->assertStringNotContainsString('Metros', $result['errors'][0]);
-        $this->assertStringNotContainsString('Stars', $result['errors'][0]);
-        $this->assertSame(League::HARD_CAP_MAX + 300, $result['parties'][2]['postTradeCapTotal']);
-        $this->assertTrue($result['parties'][2]['overCap']);
-        $this->assertFalse($result['parties'][0]['overCap']);
-        $this->assertFalse($result['parties'][1]['overCap']);
+        $this->assertFalse($result->isValid());
+        $this->assertCount(1, $result->getErrorMessages());
+        $this->assertStringContainsString('Cougars', $result->getErrorMessages()[0]);
+        $this->assertStringNotContainsString('Metros', $result->getErrorMessages()[0]);
+        $this->assertStringNotContainsString('Stars', $result->getErrorMessages()[0]);
+        $this->assertSame(League::HARD_CAP_MAX + 300, $result->getContext()[2]['postTradeCapTotal']);
+        $this->assertTrue($result->getContext()[2]['overCap']);
+        $this->assertFalse($result->getContext()[0]['overCap']);
+        $this->assertFalse($result->getContext()[1]['overCap']);
     }
 
     /**
@@ -886,12 +909,34 @@ class TradeValidatorTest extends TestCase
             ['teamId' => 3, 'teamName' => 'Cougars', 'playersSent' => 0, 'playersReceived' => 2],
         ]);
 
-        $this->assertFalse($result['valid']);
-        $this->assertCount(1, $result['errors']);
-        $this->assertStringContainsString('Cougars', $result['errors'][0]);
-        $this->assertStringContainsString('roster limit', $result['errors'][0]);
-        $this->assertSame(16, $result['parties'][2]['postTradeRoster']);
-        $this->assertTrue($result['parties'][2]['overLimit']);
+        $this->assertFalse($result->isValid());
+        $this->assertCount(1, $result->getErrorMessages());
+        $this->assertStringContainsString('Cougars', $result->getErrorMessages()[0]);
+        $this->assertStringContainsString('roster limit', $result->getErrorMessages()[0]);
+        $this->assertSame(16, $result->getContext()[2]['postTradeRoster']);
+        $this->assertTrue($result->getContext()[2]['overLimit']);
+    }
+
+    /**
+     * Roster-limit party errors are structured and tagged with the 'roster_limit' type.
+     *
+     * @group validation
+     * @group roster-limits
+     */
+    public function testValidateRosterLimitsForPartiesErrorsCarryRosterLimitType(): void
+    {
+        $this->mockDb->setMockData([['cnt' => 14]]);
+
+        $result = $this->validator->validateRosterLimitsForParties([
+            ['teamId' => 1, 'teamName' => 'Metros', 'playersSent' => 1, 'playersReceived' => 0],
+            ['teamId' => 2, 'teamName' => 'Stars', 'playersSent' => 1, 'playersReceived' => 1],
+            ['teamId' => 3, 'teamName' => 'Cougars', 'playersSent' => 0, 'playersReceived' => 2],
+        ]);
+
+        $firstError = $result->getFirstError();
+        $this->assertNotNull($firstError);
+        $this->assertSame('roster_limit', $firstError->type);
+        $this->assertTrue($result->getContext()[2]['overLimit']);
     }
 
     /**
@@ -912,12 +957,11 @@ class TradeValidatorTest extends TestCase
         ]);
 
         // User: 6000 - 100 + 1500 = 7400 (over); partner: 5000 - 1500 + 100 = 3600.
-        $this->assertFalse($result['valid']);
-        $this->assertCount(1, $result['errors']);
-        $this->assertSame('This trade is illegal since it puts you over the hard cap.', $result['errors'][0]);
-        $this->assertSame(7400, $result['userPostTradeCapTotal']);
-        $this->assertSame(3600, $result['partnerPostTradeCapTotal']);
-        $this->assertArrayNotHasKey('parties', $result);
+        $this->assertFalse($result->isValid());
+        $this->assertCount(1, $result->getErrorMessages());
+        $this->assertSame('This trade is illegal since it puts you over the hard cap.', $result->getErrorMessages()[0]);
+        $this->assertSame(7400, $result->getContext()['userPostTradeCapTotal']);
+        $this->assertSame(3600, $result->getContext()['partnerPostTradeCapTotal']);
     }
 
     /**
@@ -934,11 +978,10 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateRosterLimits(1, 2, 0, 2);
 
-        $this->assertFalse($result['valid']);
-        $this->assertCount(1, $result['errors']);
-        $this->assertStringContainsString('your team', $result['errors'][0]);
-        $this->assertStringContainsString('roster limit', $result['errors'][0]);
-        $this->assertArrayNotHasKey('parties', $result);
+        $this->assertFalse($result->isValid());
+        $this->assertCount(1, $result->getErrors());
+        $this->assertStringContainsString('your team', $result->getErrors()[0]);
+        $this->assertStringContainsString('roster limit', $result->getErrors()[0]);
     }
 
     // --- Merged from SeasonPhaseTest ---

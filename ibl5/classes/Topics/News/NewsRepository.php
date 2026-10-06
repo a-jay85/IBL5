@@ -6,7 +6,7 @@ namespace Topics\News;
 
 use Topics\News\Contracts\NewsRepositoryInterface;
 
-class NewsRepository extends \BaseMysqliRepository implements NewsRepositoryInterface
+class NewsRepository extends \Database\BaseMysqliRepository implements NewsRepositoryInterface
 {
     public function createNewsStory(
         int $categoryID,

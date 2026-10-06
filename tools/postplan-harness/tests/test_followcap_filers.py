@@ -63,9 +63,11 @@ def test_outofscope_eight_hits_nothing_dropped(tmp_path):
 def test_fidelity_counts_two_three_four_eight(tmp_path, n):
     # `min(n,3)` issues for n notes; the roll-up holds every extra note.
     gh = RecordingGh(str(tmp_path))
-    fidelity.file_note_issues(gh, _notes(n), PR)
+    nums = fidelity.file_note_issues(gh, _notes(n), PR)
     issues = _pr_issues(gh)
     assert len(issues) == min(n, 3)
+    assert nums == sorted(set(nums), key=nums.index)  # roll-up number appears once
+    assert len(nums) == min(n, 3)
     if n > 3:
         rollup = _rollup(issues)
         for k in range(3, n + 1):

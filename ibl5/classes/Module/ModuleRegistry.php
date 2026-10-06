@@ -29,6 +29,7 @@ final class ModuleRegistry
         'GMContactList',
         'HeadToHeadRecords',
         'Injuries',
+        'LeagueControlPanel',
         'LeagueStarters',
         'News',
         'NextSim',

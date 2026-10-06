@@ -7,16 +7,16 @@ namespace Tests\Security;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Pins the admin gate of leagueControlPanel.php by source structure. The page
- * requires mainfile.php (DB + session boot), so PHPUnit cannot run it; the
+ * Pins the admin gate of modules/LeagueControlPanel/index.php by source structure. The page
+ * needs the module router boot (DB + session), so PHPUnit cannot run it; the
  * runtime behavior is covered by the non-admin e2e spec. The guard must set
  * 403, echo the denial text, end in exit, and precede the service wiring and
  * every POST handler.
  */
 final class LeagueControlPanelAdminGateTest extends TestCase
 {
-    private const SCRIPT = __DIR__ . '/../../leagueControlPanel.php';
-    private const GUARD_BLOCK = '/if\s*\(\s*!\s*is_admin\(\)\s*\)\s*\{(?<body>[^{}]*)\}/';
+    private const SCRIPT = __DIR__ . '/../../modules/LeagueControlPanel/index.php';
+    private const GUARD_BLOCK = '/if\s*\(\s*!\s*\$authService->isAdmin\(\)\s*\)\s*\{(?<body>[^{}]*)\}/';
     private const DENIAL = 'Access denied. Administrator privileges required.';
     private const GATED = [
         '/\$leagueContext->getCurrentLeague\(\)/',
@@ -25,7 +25,7 @@ final class LeagueControlPanelAdminGateTest extends TestCase
         '/\$_POST\b/',
     ];
 
-    private const VALID_GUARD = "if (!is_admin()) {\n    http_response_code(403);\n    echo 'Access denied. Administrator privileges required.';\n    exit;\n}\n";
+    private const VALID_GUARD = "if (!\$authService->isAdmin()) {\n    http_response_code(403);\n    echo 'Access denied. Administrator privileges required.';\n    exit;\n}\n";
     private const LEAGUE_LINE = "\$l = \$leagueContext->getCurrentLeague();\n";
     private const WIRING_LINE = "\$r = new LeagueControlPanel\\Repo(\$db);\n";
     private const POST_LINE = "if (\$_SERVER['REQUEST_METHOD'] === 'POST' && \$_POST['x']) {}\n";
@@ -36,7 +36,7 @@ final class LeagueControlPanelAdminGateTest extends TestCase
     private function locateGuard(string $source): array
     {
         $count = preg_match_all(self::GUARD_BLOCK, $source, $matches, PREG_OFFSET_CAPTURE);
-        self::assertSame(1, $count, 'is_admin() guard missing or duplicated');
+        self::assertSame(1, $count, 'isAdmin() guard missing or duplicated');
 
         return [
             'body' => $matches['body'][0][0],
@@ -88,7 +88,7 @@ final class LeagueControlPanelAdminGateTest extends TestCase
 
     public function testCheckerFailsWhenGuardDoesNotExit(): void
     {
-        $guardWithoutExit = "if (!is_admin()) {\n    http_response_code(403);\n    echo 'Access denied. Administrator privileges required.';\n}\n";
+        $guardWithoutExit = "if (!\$authService->isAdmin()) {\n    http_response_code(403);\n    echo 'Access denied. Administrator privileges required.';\n}\n";
         $planted = "<?php\n" . $guardWithoutExit . self::LEAGUE_LINE . self::WIRING_LINE . self::POST_LINE;
 
         $this->expectException('PHPUnit\Framework\AssertionFailedError');
@@ -97,7 +97,7 @@ final class LeagueControlPanelAdminGateTest extends TestCase
 
     public function testCheckerFailsWhenGuardOmitsForbiddenStatus(): void
     {
-        $guardWithoutStatus = "if (!is_admin()) {\n    echo 'Access denied. Administrator privileges required.';\n    exit;\n}\n";
+        $guardWithoutStatus = "if (!\$authService->isAdmin()) {\n    echo 'Access denied. Administrator privileges required.';\n    exit;\n}\n";
         $planted = "<?php\n" . $guardWithoutStatus . self::LEAGUE_LINE . self::WIRING_LINE . self::POST_LINE;
 
         $this->expectException('PHPUnit\Framework\AssertionFailedError');

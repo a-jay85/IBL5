@@ -1,0 +1,18 @@
+Looking at the diff:
+
+The change is fixing how plan titles are extracted from markdown files. The old code just grabbed the first `# ` line anywhere. The new code skips over:
+1. Frontmatter (between `---`)
+2. Code fences (``` and ~~~)
+
+So a `# shellcheck` line inside a bash block won't trick the parser anymore.
+
+This is a **fix** (corrects buggy behavior in internal tooling), applied to 3 shell scripts with a test case added.
+
+```json
+{
+  "type": "fix",
+  "title": "fix(bin): skip code fences in plan title extraction",
+  "commit_subject": "fix(bin): skip code fences when extracting markdown titles",
+  "summary_md": "## Summary\n\nReplaces grep-based title extraction with fence-aware awk parsing in automouse/queue and fleet-status.\n\nThe old logic grabbed the first `# ` line in a file, which would incorrectly pick up `# shellcheck` and other commented code inside fenced blocks. The new logic skips frontmatter and code fences (``` and ~~~) before extracting the H1 title.\n\nIncludes test case validating that H1s inside code blocks are properly ignored."
+}
+```

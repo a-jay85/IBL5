@@ -1,11 +1,11 @@
 ---
 description: Database migration runner, schema validator, and pending-migration tracking.
-last_verified: 2026-09-22
+last_verified: 2026-10-05
 ---
 
 # Migration
 
-Manages database schema migrations. `MigrationRunner` compares available migration files against the tracking table and executes pending ones in order; PHP migrations run in a subprocess to guard against `exit()`/`die()` calls inside migration files. `MigrationFileResolver` discovers migration files on disk. `SchemaValidator` validates the live DB schema against expected column assertions using a batched `INFORMATION_SCHEMA` query, with `SchemaAssertion` and `SchemaValidationResult` as supporting value types.
+Manages database schema migrations. `MigrationRunner` compares available migration files against the tracking table and executes pending ones in order; PHP migrations run in a subprocess to guard against `exit()`/`die()` calls inside migration files; their combined stdout and stderr is passed to an optional constructor sink on success (`ibl5/bin/migrate` prints each line as `    [NNN_name.php] <line>`), and is included in the exception message on failure. `MigrationFileResolver` discovers migration files on disk. `SchemaValidator` validates the live DB schema against expected column assertions using a batched `INFORMATION_SCHEMA` query, with `SchemaAssertion` and `SchemaValidationResult` as supporting value types.
 
 | Class | Role |
 |---|---|

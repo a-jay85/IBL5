@@ -42,9 +42,10 @@ final class LighthouseAuditUrlsTest extends TestCase
         $moduleCount = count(ModuleRegistry::getAllModules());
         $subPageCount = count(LighthouseUrls::SUB_PAGES);
         $paramRequiredCount = count(LighthouseUrls::PARAM_REQUIRED_MODULES);
+        $adminOnlyCount = count(LighthouseUrls::ADMIN_ONLY_MODULES);
         $homepageCount = 1;
         self::assertGreaterThanOrEqual(
-            $moduleCount + $homepageCount + $subPageCount - $paramRequiredCount,
+            $moduleCount + $homepageCount + $subPageCount - $paramRequiredCount - $adminOnlyCount,
             count($lines)
         );
     }
@@ -62,6 +63,10 @@ final class LighthouseAuditUrlsTest extends TestCase
         $output = $this->runScript([]);
 
         foreach (ModuleRegistry::getAllModules() as $module) {
+            if (in_array($module, LighthouseUrls::ADMIN_ONLY_MODULES, true)) {
+                continue;
+            }
+
             self::assertStringContainsString(
                 'name=' . $module,
                 $output,

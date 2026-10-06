@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace OneOnOneGame;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use OneOnOneGame\Contracts\OneOnOneGameEngineInterface;
 use OneOnOneGame\Contracts\OneOnOneGameRepositoryInterface;
 

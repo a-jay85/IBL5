@@ -1,6 +1,6 @@
 ---
 description: ADR for weekly production log review via GitHub Action and Discord DM notification.
-last_verified: 2026-08-25
+last_verified: 2026-10-03
 ---
 
 # ADR-0013: Weekly Log Review Workflow
@@ -34,4 +34,4 @@ Add a weekly GitHub Action (`log-review.yml`) that SSHes to production, runs `bi
 - `bin/log-fetch-prod` — server-side log aggregation script
 - `.github/workflows/smoke-prod.yml` — SSH and Discord DM patterns reused
 - `ibl5/classes/Logging/LoggerFactory.php` — log format and channel configuration
-- `ibl5/classes/BaseMysqliRepository.php` — slow query logging (channel `perf`)
+- `ibl5/classes/Database/BaseMysqliRepository.php`: slow query logging (channel `perf`)

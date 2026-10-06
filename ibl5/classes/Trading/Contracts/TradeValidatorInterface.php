@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Trading\Contracts;
 
+use Validation\ValidationResult;
+use Validation\ValidationResultWithContext;
+
 /**
  * TradeValidatorInterface - Trade validation rules
  *
@@ -22,9 +25,7 @@ interface TradeValidatorInterface
      *
      * @param array<int, int> $userSendsCash Cash amounts sent by user team (indexed 1-6)
      * @param array<int, int> $partnerSendsCash Cash amounts sent by partner team (indexed 1-6)
-     * @return array{valid: bool, error: string|null} Validation result:
-     *         - 'valid': bool - True if both cash arrays pass validation
-     *         - 'error': string|null - Error message if validation failed
+     * @return ValidationResult failure() carries the single legacy message
      *
      * IMPORTANT BEHAVIORS:
      *  - Filters out zero/empty values before checking minimum
@@ -32,7 +33,7 @@ interface TradeValidatorInterface
      *  - Validates user and partner cash separately with specific error messages
      *  - Empty cash arrays are valid (no cash being sent)
      */
-    public function validateMinimumCashAmounts(array $userSendsCash, array $partnerSendsCash): array;
+    public function validateMinimumCashAmounts(array $userSendsCash, array $partnerSendsCash): ValidationResult;
 
     /**
      * Validate post-trade salary cap totals for both teams
@@ -42,12 +43,8 @@ interface TradeValidatorInterface
      *
      * @param array{userCurrentSeasonCapTotal?: int, partnerCurrentSeasonCapTotal?: int, userCapSentToPartner?: int, partnerCapSentToUser?: int} $tradeData
      *        Pre-calculated cap data
-     * @return array{valid: bool, errors: array<string>, userPostTradeCapTotal: int, partnerPostTradeCapTotal: int}
-     *         Validation result:
-     *         - 'valid': bool - True if both teams stay under hard cap
-     *         - 'errors': array - Array of error messages (empty if valid)
-     *         - 'userPostTradeCapTotal': int - User's salary after trade
-     *         - 'partnerPostTradeCapTotal': int - Partner's salary after trade
+     * @return ValidationResultWithContext<array{userPostTradeCapTotal: int, partnerPostTradeCapTotal: int}>
+     *         Totals/parties are read via getContext(); messages via getErrorMessages().
      *
      * IMPORTANT BEHAVIORS:
      *  - User post-trade = current - sent + received
@@ -55,7 +52,7 @@ interface TradeValidatorInterface
      *  - Returns separate errors for each team exceeding cap
      *  - Both errors can be returned if both teams exceed cap
      */
-    public function validateSalaryCaps(array $tradeData): array;
+    public function validateSalaryCaps(array $tradeData): ValidationResultWithContext;
 
     /**
      * Check if a player can be traded
@@ -81,14 +78,14 @@ interface TradeValidatorInterface
      * @param int $partnerTeamId Partner's team ID
      * @param int $userPlayersSent Number of players user is sending
      * @param int $partnerPlayersSent Number of players partner is sending
-     * @return array{valid: bool, errors: array<string>}
+     * @return ValidationResult
      */
     public function validateRosterLimits(
         int $userTeamId,
         int $partnerTeamId,
         int $userPlayersSent,
         int $partnerPlayersSent
-    ): array;
+    ): ValidationResult;
 
     /**
      * Validate post-trade salary caps for an arbitrary set of parties (2 or 3+ teams)
@@ -99,9 +96,9 @@ interface TradeValidatorInterface
      * checked against League::HARD_CAP_MAX.
      *
      * @param list<array{teamName: string, currentSeasonCapTotal: int, capSent: int, capReceived: int}> $partyCapDeltas
-     * @return array{valid: bool, errors: list<string>, parties: list<array{teamName: string, postTradeCapTotal: int, overCap: bool}>}
+     * @return ValidationResultWithContext<list<array{teamName: string, postTradeCapTotal: int, overCap: bool}>>
      */
-    public function validateSalaryCapsForParties(array $partyCapDeltas): array;
+    public function validateSalaryCapsForParties(array $partyCapDeltas): ValidationResultWithContext;
 
     /**
      * Validate post-trade roster limits for an arbitrary set of parties (2 or 3+ teams)
@@ -112,9 +109,9 @@ interface TradeValidatorInterface
      * via the form repository's getTeamPlayerCount().
      *
      * @param list<array{teamId: int, teamName: string, playersSent: int, playersReceived: int}> $partyRosterDeltas
-     * @return array{valid: bool, errors: list<string>, parties: list<array{teamName: string, postTradeRoster: int, overLimit: bool}>}
+     * @return ValidationResultWithContext<list<array{teamName: string, postTradeRoster: int, overLimit: bool}>>
      */
-    public function validateRosterLimitsForParties(array $partyRosterDeltas): array;
+    public function validateRosterLimitsForParties(array $partyRosterDeltas): ValidationResultWithContext;
 
     /**
      * Get cash considerations for current season based on phase

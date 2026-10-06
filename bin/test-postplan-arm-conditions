@@ -2952,7 +2952,9 @@ CIMON_TXT="$(cat "$CIMON")"
 have  "§5.9h: the loop bound is stated as 3"          "$CIMON_TXT" '**Bound: 3 iterations.**'
 have  "§5.9h: iteration 4 is explicitly excluded"     "$CIMON_TXT" 'Iteration 4 does not run.'
 have  "§5.9h: the ceiling halt carries its literal"   "$CIMON_TXT" '3-iteration ceiling'
-have  "§5.9h: the ceiling leaves auto-merge disarmed" "$CIMON_TXT" 'Auto-merge has been left disarmed.'
+have  "§5.9h: the ceiling runs the re-arm gate first"  "$CIMON_TXT" 'The re-arm gate has already run'
+have  "§5.9h: the ceiling hands off to the merge line" "$CIMON_TXT" 'update-behind-prs.yml (ADR-0081)'
+lacks "§5.9h: the ceiling no longer disarms"           "$CIMON_TXT" 'left disarmed'
 # Disarm must precede the rewrite: a reordering rewrites the branch out from under an
 # armed auto-merge, the one sequence that can merge a tree nobody watched land.
 before "§5.9h: --disable-auto precedes the rebase invocation" \

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Api\Repository;
 
-class RateLimitRepository extends \BaseMysqliRepository
+class RateLimitRepository extends \Database\BaseMysqliRepository
 {
     /**
      * Increment the request count for the current minute window.

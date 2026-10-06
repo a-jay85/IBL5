@@ -118,11 +118,16 @@ jobs:
               - '.claude/rules/agent-tiering.md'
               - '.claude/rules/work-triage.md'
             ibl5ts:
-              # Everything the ibl5 TS unit suite executes or imports
-              # (tests/ts-unit/ specs cover the pure VR-review helpers and
-              # the E2E summarizer script — see ibl5/vitest.unit.config.ts).
+              # Everything the ibl5 TS unit suite executes or reads
+              # (tests/ts-unit/ specs cover the pure VR-review helpers, the
+              # E2E summarizer script, and the component CSS hex ratchet,
+              # which reads design/components, tokens.css and input.css;
+              # see ibl5/vitest.unit.config.ts).
               - 'ibl5/tests/ts-unit/**'
               - 'ibl5/tests/e2e/vr-*.ts'
+              - 'ibl5/design/components/**'
+              - 'ibl5/design/tokens/tokens.css'
+              - 'ibl5/design/input.css'
               - '.github/scripts/summarize-e2e-results.mjs'
               - 'ibl5/vitest.unit.config.ts'
               - 'ibl5/package.json'
@@ -1057,6 +1062,7 @@ jobs:
             bin/test-launchd-health-cron-setup \
             bin/test-bug-pipeline-ci-autofix \
             bin/test-sim-recap-tick \
+            bin/test-events-review \
             bin/test-discord-dm \
             bin/test-post-plan-fail-dm \
             bin/test-token-report \

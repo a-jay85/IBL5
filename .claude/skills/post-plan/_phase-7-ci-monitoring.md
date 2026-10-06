@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 7: the all-Opus CI fix procedure, the BEHIND re-rebase loop, and the harness background-CI-outcome short-circuit.
-last_verified: 2026-09-26
+last_verified: 2026-10-04
 ---
 
 # Phase 7 — CI Monitoring (post-plan reference)
@@ -123,18 +123,15 @@ test "$(cat /tmp/postplan-automerge-was-<KEY>.txt)" = armed \
 
 Never add `--delete-branch`. A PR that was `unarmed` before the loop stays unarmed.
 
-### On iteration 4 — halt
+### At the ceiling (after iteration 3)
+
+Iteration 3 exits through `On loop exit` like every other exit, so the re-arm gate above has already run: the PR is armed again when its prior state read `armed` and the conflict flag is absent or cleared, and it stays unarmed otherwise. Then print this NOTE and continue to Phase 8:
 
 ```
-STOP: BEHIND re-rebase loop hit its 3-iteration ceiling. master is moving faster than this run can rebase onto it. Nothing is broken — the PR is correct and CI passed; it is simply behind a master that keeps advancing. Auto-merge has been left disarmed. Rebase and merge by hand, or re-run /post-plan when master is quieter. Loop bound lives in .claude/skills/post-plan/_phase-7-ci-monitoring.md.
+NOTE: BEHIND re-rebase loop hit its 3-iteration ceiling. master is moving faster than this run can rebase onto it. Nothing is broken: the PR is correct and CI passed on the rewritten branch. The re-arm gate has already run, so auto-merge is back in its pre-loop state. An armed PR is carried to merge by .github/workflows/update-behind-prs.yml (ADR-0081), which refreshes the head of the merge line on every push to master. Loop bound lives in .claude/skills/post-plan/_phase-7-ci-monitoring.md.
 ```
 
-The ceiling is a terminal state, not a retry hint: three consecutive losses to a moving master
-means the contention is structural, and an unbounded loop in a headless run is how a
-`MAX_PP_SECS` timeout becomes an abandoned half-pushed branch. Leaving auto-merge **disarmed**
-at the ceiling is deliberate — the last thing the loop did was rewrite the branch, and arming a
-rewritten branch it then walked away from is exactly the unattended-merge risk the disarm exists
-to prevent.
+The ceiling is a terminal state for this run. Three consecutive losses to a moving master mean the contention is structural, and an unbounded loop in a headless run is how a `MAX_PP_SECS` timeout becomes an abandoned half-pushed branch. The run stops rebasing; it does not disarm. Before `.github/workflows/update-behind-prs.yml` existed an armed PR left BEHIND waited forever, so the ceiling disarmed to make a human look. Today the merge line owns that wait (ADR-0081, head-of-line addendum), and a disarmed PR is the one that sits open until a human re-arms it by hand, which is what happened to two READY PRs on 2026-10-04. The per-iteration disarm before each rewrite (step 2) is unchanged: a branch is never rewritten while armed.
 
 ### Disarm-on-conflict
 

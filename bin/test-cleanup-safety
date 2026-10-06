@@ -986,6 +986,56 @@ else
     wait 2>/dev/null || true
 fi
 
+# ----------------------------------------------------------------------------
+# A worktree with a live post-plan run (launchd label
+# com.ibl5.postplan-now-<slug>-<YYYYmmdd-HHMMSS>-<pid>) is in use: kill_infra_processes
+# touches nothing and is_worktree_in_use reports it. The harness `run` wrapper cd's to the
+# harness dir, so no process cwd marks the worktree; the label is the only signal.
+# ----------------------------------------------------------------------------
+mkdir -p "$TMP/ppl/pp-feat" "$TMP/ppl/pp-feat-bar"
+ppw="$(cd "$TMP/ppl/pp-feat" && pwd -P)"
+ppsib="$(cd "$TMP/ppl/pp-feat-bar" && pwd -P)"
+cat > "$STUBBIN/launchctl-pp" <<'LCTL'
+#!/usr/bin/env bash
+printf '123\t0\tcom.apple.something\n'
+[ -n "${PP_LABEL:-}" ] && printf '456\t-\t%s\n' "$PP_LABEL"
+exit 0
+LCTL
+chmod +x "$STUBBIN/launchctl-pp"
+export LAUNCHCTL_CMD="$STUBBIN/launchctl-pp"
+unset PP_LABEL
+if has_live_postplan_run "$ppw"; then
+    failcase "postplan-guard-quiet-without-label"
+else
+    pass "postplan-guard-quiet-without-label"
+fi
+export PP_LABEL="com.ibl5.postplan-now-pp-feat-20260101-120000-4242"
+if has_live_postplan_run "$ppw" && is_worktree_in_use "$ppw"; then
+    pass "postplan-label-marks-worktree-in-use"
+else
+    failcase "postplan-label-marks-worktree-in-use"
+fi
+if has_live_postplan_run "$ppsib"; then
+    failcase "postplan-label-does-not-match-prefix-sibling"
+else
+    pass "postplan-label-does-not-match-prefix-sibling"
+fi
+printf '99999\n' > "$ppw/.bs-sync.pid"
+kill_infra_processes "$ppw"
+if [ -f "$ppw/.bs-sync.pid" ]; then
+    pass "postplan-label-makes-kill-infra-a-noop"
+else
+    failcase "postplan-label-makes-kill-infra-a-noop"
+fi
+unset PP_LABEL
+kill_infra_processes "$ppw"
+if [ -f "$ppw/.bs-sync.pid" ]; then
+    failcase "kill-infra-resumes-without-label"
+else
+    pass "kill-infra-resumes-without-label"
+fi
+unset LAUNCHCTL_CMD
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

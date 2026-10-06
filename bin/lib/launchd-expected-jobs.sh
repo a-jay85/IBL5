@@ -27,6 +27,7 @@ com.ibl5.bug-pipeline-cron standard
 com.ibl5.db-backups-pull standard
 com.ibl5.db-sync-nightly standard
 com.ibl5.docfix-poll standard
+com.ibl5.events-review standard
 com.ibl5.retro-mine standard
 com.ibl5.sim-recap-poll phase-gated
 com.ibl5.wt-gc standard
@@ -66,27 +67,4 @@ lej_job_mode() {
         if [ "$l" = "$1" ]; then printf '%s\n' "$m"; return 0; fi
     done <<< "$LEJ_EXPECTED_JOBS"
     return 1
-}
-
-# lej_is_transient <label> — 0 when the label starts with a one-shot prefix
-# AND has at least one character after it; 1 otherwise.
-lej_is_transient() {
-    local p
-    while read -r p; do
-        [ -n "$p" ] || continue
-        case "$1" in "$p"?*) return 0 ;; esac
-    done <<< "$LEJ_TRANSIENT_PREFIXES"
-    return 1
-}
-
-# lej_plist_runner <plist> — print the first /tmp/*.sh path the plist
-# references (plan-now: `exec "/tmp/plan-now-<TS>.sh"`; pr-review-now:
-# /tmp/pr-review-now-runner-<PR>.sh). Prints nothing when the plist names no
-# /tmp runner or cannot be read. Always returns 0; no pipe, so it is safe
-# under a caller's `set -euo pipefail`.
-lej_plist_runner() {
-    local hits
-    hits="$(grep -oE '/tmp/[A-Za-z0-9._-]+\.sh' "$1" 2>/dev/null)" || return 0
-    printf '%s\n' "${hits%%$'\n'*}"
-    return 0
 }

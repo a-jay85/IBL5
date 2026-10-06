@@ -8,6 +8,9 @@ bin
 ibl5/bin
 .claude
 ibl5/tests
+ibl5/design/components
+ibl5/design/tokens/tokens.css
+ibl5/design/input.css
 :(glob)**/*.php
 :(glob)**/*.sql
 :(glob)ibl5/**/*.ts

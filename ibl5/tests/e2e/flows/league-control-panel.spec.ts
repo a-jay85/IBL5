@@ -305,7 +305,7 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
 // The LCP reads phase from the DB directly (not cookie overrides), so
 // phase must be set via form submission. CI uses a fresh DB per run;
 // local re-runs may need: UPDATE ibl_settings SET setting_value='Free Agency' WHERE setting_key='Current Season Phase';
-// Settings rows come from ci-seed.sql:45 and are written by the test-state.php:948 upsert.
+// Settings rows come from the ibl_settings inserts in ci-seed.sql and are written by the test-state.php upsert endpoint.
 
 test.describe('LeagueControlPanel — Generate Season Awards', () => {
   test.describe.configure({ mode: 'serial' });

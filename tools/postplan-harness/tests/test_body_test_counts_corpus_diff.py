@@ -1,6 +1,6 @@
 """Replay the test-count verifier over real merged-PR bodies (backlog#1060).
 
-The corpus is committed at fixtures/test-count-claims-corpus.json: eleven real PRs with
+The corpus is committed at tools/postplan-harness/tests/fixtures/test-count-claims-corpus.json: eleven real PRs with
 their claim lines, test-file diff sections, and head copies of modified test files.
 """
 import json

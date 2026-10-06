@@ -298,6 +298,8 @@ def test_body_check_matching_test_count_adds_no_finding():
 
 
 def test_body_check_uses_worktree_for_head_total(tmp_path):
+    """A claim of 9 against a 7-test file is flagged only when `worktree=worktree` reaches
+    _body_check from the runner.py:364 call site and `read_file` reads the working tree."""
     target = tmp_path / _TC_PATH
     target.parent.mkdir(parents=True)
     target.write_text("\n".join(f"    public function testN{i}(): void {{}}" for i in range(7)))

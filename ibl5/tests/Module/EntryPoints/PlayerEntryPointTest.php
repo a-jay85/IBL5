@@ -55,7 +55,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->onQuery('ibl_box_scores', []);
         $this->mockDb->onQuery('ibl_sim_dates', []);
         $this->mockDb->onQuery('ibl_playoff_career_totals', []);
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_awards', []);
         $this->mockDb->onQuery('ibl_draft', []);
         $this->mockDb->onQuery('COUNT', [['total' => 0]]);
@@ -94,7 +94,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         // PlayerRepository::loadByID JOINs ibl_team_info; route it before the
         // team-info special handler intercepts the response.
         $this->mockDb->onQuery('FROM ibl_plr', [$player]);
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
 
         $output = $this->runModule('Player', ['pa' => 'negotiate', 'pid' => '1']);
 
@@ -108,7 +108,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockTeamData([self::fullTeamData()]);
         $this->mockDb->setMockData([$player]);
         $this->mockDb->onQuery('FROM ibl_plr', [$player]);
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
 
         $output = $this->runModule('Player', ['pa' => 'negotiate', 'pid' => '1']);
 
@@ -159,7 +159,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $player = TestDataFactory::createPlayer(['pid' => 1]);
         $this->mockDb->onQuery('gm_username', []);
         $this->mockDb->onQuery('FROM ibl_plr', [$player]);
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->setMockData([$player]);
     }
 
@@ -199,7 +199,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         ));
         $this->mockDb->onQuery('gm_username', [['team_name' => $userTeam]]);
         $this->mockDb->onQuery('FROM ibl_plr', [$player]);
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->setMockData([$player]);
     }
 

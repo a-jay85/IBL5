@@ -740,6 +740,13 @@ bd_cmd_burndown() {
     if [ "$used" -eq 0 ]; then
         printf 'LEDGER: none\n'
         [ "$BD_LIVE_UNKNOWN" -eq 0 ] || return 1
+        # Empty-backlog sentinel: bin/burndown-loop exports a batch-scoped
+        # path and treats a batch as empty only when this file exists. First
+        # selection round only (no --after); unset or empty var = no-op.
+        if [ -n "${IBL5_BURNDOWN_EMPTY_SENTINEL:-}" ] && [ -z "$afters" ]; then
+            printf 'LEDGER: none\n' > "$IBL5_BURNDOWN_EMPTY_SENTINEL" 2>/dev/null \
+                || printf 'burndown: cannot write empty sentinel %s\n' "$IBL5_BURNDOWN_EMPTY_SENTINEL" >&2
+        fi
         return 0
     fi
 

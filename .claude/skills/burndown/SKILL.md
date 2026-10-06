@@ -1,7 +1,7 @@
 ---
 name: burndown
 description: Run an automatic backlog burn-down: rank new issues, pick 5 units (backfilling freed units with further selection rounds), route each item to a plan or an ad-hoc worktree, and start it.
-last_verified: 2026-10-03
+last_verified: 2026-10-06
 ---
 
 # /burndown
@@ -92,6 +92,11 @@ Stderr is left unredirected, so `cleared blocked on #N` lines still show.
 Parse only the final `LEDGER:` line. `LEDGER: none` on the first round means all
 delta issues are in flight or over budget. Show the SKIP rows and stop. On a later
 round it means the run is full or out of candidates. Go to step 6.
+
+Under `bin/burndown-loop`, a first-round `LEDGER: none` also writes the batch's empty
+sentinel (the path in `IBL5_BURNDOWN_EMPTY_SENTINEL`). The loop calls a batch empty only
+when that file exists. A live-unknown round (exit 1) writes no sentinel. Run step 4
+exactly as written; the sentinel needs no action from the skill.
 
 A `SKIP ... skip-label: <label>` row is a tagged item. It consumes no unit. A
 `cleared blocked on #N` line on stderr means the blocking PR closed and the item is

@@ -32,9 +32,9 @@ class SeasonQueryRepository extends \Database\BaseMysqliRepository implements Se
      */
     public function getBulkSettings(array $names): array
     {
-        /** @var list<array{setting_key: string, value: string}> $rows */
+        /** @var list<array{setting_key: string, setting_value: string}> $rows */
         $rows = $this->fetchAllInList(
-            "SELECT setting_key, value FROM `ibl_settings` WHERE league = ? AND setting_key IN ({IN})",
+            "SELECT setting_key, setting_value FROM `ibl_settings` WHERE league = ? AND setting_key IN ({IN})",
             's',
             $names,
             's',
@@ -44,7 +44,7 @@ class SeasonQueryRepository extends \Database\BaseMysqliRepository implements Se
         /** @var array<string, string> $map */
         $map = [];
         foreach ($rows as $row) {
-            $map[$row['setting_key']] = $row['value'];
+            $map[$row['setting_key']] = $row['setting_value'];
         }
 
         return $map;
@@ -57,15 +57,15 @@ class SeasonQueryRepository extends \Database\BaseMysqliRepository implements Se
      */
     public function getSeasonPhase(): string
     {
-        /** @var array{value: string}|null $result */
+        /** @var array{setting_value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
             "ss",
             "Current Season Phase",
             $this->league
         );
 
-        return $result['value'] ?? '';
+        return $result['setting_value'] ?? '';
     }
 
     /**
@@ -75,15 +75,15 @@ class SeasonQueryRepository extends \Database\BaseMysqliRepository implements Se
      */
     public function getSeasonEndingYear(): string
     {
-        /** @var array{value: string}|null $result */
+        /** @var array{setting_value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
             "ss",
             "Current Season Ending Year",
             $this->league
         );
 
-        return $result['value'] ?? '';
+        return $result['setting_value'] ?? '';
     }
 
     /**
@@ -184,15 +184,15 @@ class SeasonQueryRepository extends \Database\BaseMysqliRepository implements Se
      */
     public function getAllowTradesStatus(): string
     {
-        /** @var array{value: string}|null $result */
+        /** @var array{setting_value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
             "ss",
             "Allow Trades",
             $this->league
         );
 
-        return $result['value'] ?? '';
+        return $result['setting_value'] ?? '';
     }
 
     /**
@@ -202,15 +202,15 @@ class SeasonQueryRepository extends \Database\BaseMysqliRepository implements Se
      */
     public function getAllowWaiversStatus(): string
     {
-        /** @var array{value: string}|null $result */
+        /** @var array{setting_value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
             "ss",
             "Allow Waiver Moves",
             $this->league
         );
 
-        return $result['value'] ?? '';
+        return $result['setting_value'] ?? '';
     }
 
     /**
@@ -220,15 +220,15 @@ class SeasonQueryRepository extends \Database\BaseMysqliRepository implements Se
      */
     public function getFreeAgencyNotificationsState(): string
     {
-        /** @var array{value: string}|null $result */
+        /** @var array{setting_value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
             "ss",
             "Free Agency Notifications",
             $this->league
         );
 
-        return $result['value'] ?? '';
+        return $result['setting_value'] ?? '';
     }
 
     /**

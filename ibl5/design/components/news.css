@@ -111,13 +111,13 @@
     gap: var(--space-1);
     font-size: var(--text-lg);
     font-weight: 600;
-    color: var(--accent-500);
+    color: var(--accent-700);
     text-decoration: none;
     transition: color var(--transition-fast);
 }
 
 .news-article__link:hover {
-    color: var(--accent-600);
+    color: var(--accent-800);
 }
 
 /* Transaction-specific styling */

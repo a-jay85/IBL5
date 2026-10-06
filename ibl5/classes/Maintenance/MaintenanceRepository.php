@@ -84,7 +84,7 @@ class MaintenanceRepository extends \Database\BaseMysqliRepository implements Ma
     public function getSetting(string $name): ?string
     {
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = 'ibl'",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = 'ibl'",
             "s",
             $name
         );
@@ -94,7 +94,7 @@ class MaintenanceRepository extends \Database\BaseMysqliRepository implements Ma
         }
 
         /** @var string $value */
-        $value = $result['value'];
+        $value = $result['setting_value'];
         return $value;
     }
 }

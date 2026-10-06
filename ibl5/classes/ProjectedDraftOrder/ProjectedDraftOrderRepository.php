@@ -76,10 +76,10 @@ class ProjectedDraftOrderRepository extends \Database\BaseMysqliRepository imple
     public function isDraftOrderFinalized(): bool
     {
         $row = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'",
         );
 
-        return $row !== null && $row['value'] === 'Yes';
+        return $row !== null && $row['setting_value'] === 'Yes';
     }
 
     /**
@@ -122,7 +122,7 @@ class ProjectedDraftOrderRepository extends \Database\BaseMysqliRepository imple
             }
 
             $this->execute(
-                "UPDATE `ibl_settings` SET value = 'Yes' WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'",
+                "UPDATE `ibl_settings` SET setting_value = 'Yes' WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'",
             );
         });
     }

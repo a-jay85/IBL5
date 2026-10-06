@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# bin/test-rebuild-css-if-source-changed - regression harness for the docker
+# paths of bin/rebuild-css-if-source-changed (watcher restart + tailwind
+# container rebuild fallback + mtime gate). Builds a throwaway main repo plus a
+# linked worktree, stubs docker/bunx first on PATH, and asserts both the docker
+# call log and the css-rebuild.log lines for each case.
+# ---
+# Usage: bin/test-rebuild-css-if-source-changed [--help]
+# Env:   REBUILD_CSS_SCRIPT=<path>  run against this copy of the target
+#        (default: the sibling bin/rebuild-css-if-source-changed). Used by the
+#        mutation-control checks.
+# Exit:  0 all cases pass, 1 any assertion failed.
+
+set -uo pipefail
+
+case "${1:-}" in
+    -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
+esac
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TARGET="${REBUILD_CSS_SCRIPT:-$SCRIPT_DIR/rebuild-css-if-source-changed}"
+[ -f "$TARGET" ] || { echo "FAIL: target not found: $TARGET" >&2; exit 1; }
+TARGET="$(cd "$(dirname "$TARGET")" && pwd)/$(basename "$TARGET")"
+
+# A git hook or CI step may export these; they would redirect every git call.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILS=0
+pass() { printf 'ok   %s\n' "$1"; }
+fail() { printf 'FAIL %s\n' "$1"; FAILS=$((FAILS + 1)); }
+want()  { if grep -qF -- "$3" "$2"; then pass "$1"; else fail "$1 (missing: $3)"; fi; }
+deny()  { if grep -qF -- "$3" "$2"; then fail "$1 (unexpected: $3)"; else pass "$1"; fi; }
+wantx() { if grep -qxF -- "$3" "$2"; then pass "$1"; else fail "$1 (missing line: $3)"; fi; }
+denyx() { if grep -qxF -- "$3" "$2"; then fail "$1 (unexpected line: $3)"; else pass "$1"; fi; }
+rc0()   { if [ "$RC" -eq 0 ]; then pass "$1"; else fail "$1 (rc=$RC, out: $OUT)"; fi; }
+
+# --- stubs: docker always present; bunx only when a case asks for it
+STUB_DOCKER="$TMP/stub-docker"; STUB_BUNX="$TMP/stub-bunx"
+mkdir -p "$STUB_DOCKER" "$STUB_BUNX"
+cat > "$STUB_DOCKER/docker" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$STUB_LOG"
+case "${1:-}" in
+    ps)      cat "$STUB_PS_FILE" ;;
+    exec)    exit "${STUB_EXEC_RC:-0}" ;;
+    restart) exit "${STUB_RESTART_RC:-0}" ;;
+esac
+exit 0
+STUB
+cat > "$STUB_BUNX/bunx" <<'STUB'
+#!/usr/bin/env bash
+printf 'bunx %s\n' "$*" >> "$STUB_LOG"
+exit "${STUB_BUNX_RC:-0}"
+STUB
+chmod +x "$STUB_DOCKER/docker" "$STUB_BUNX/bunx"
+
+# --- fixture: main checkout "mainrepo" + linked worktree "feat-x"
+MAIN="$TMP/mainrepo"; WT="$TMP/feat-x"
+mkdir -p "$MAIN/ibl5/design" "$MAIN/ibl5/themes/IBL/style"
+printf '@import "tailwindcss";\n' > "$MAIN/ibl5/design/input.css"
+printf '/* compiled */\n' > "$MAIN/ibl5/themes/IBL/style/style.css"
+git -c init.defaultBranch=main init -q "$MAIN"
+git -C "$MAIN" add -A
+git -C "$MAIN" -c user.name=t -c user.email=t@t commit -q --no-verify -m init
+git -C "$MAIN" worktree add -q "$WT" -b feat-x
+
+# run_case <case-id> <checkout-dir> <bunx: yes|no> <stale: yes|no> <ps names...>
+# Env knobs read by the stubs: STUB_RESTART_RC, STUB_EXEC_RC, STUB_BUNX_RC.
+# Sets globals CALLS (stub call log), LOG (target's css-rebuild.log), RC, OUT.
+run_case() {
+    local id="$1" dir="$2" bunx="$3" stale="$4"; shift 4
+    local cdir="$TMP/case-$id"; mkdir -p "$cdir/cache" "$cdir/home"
+    CALLS="$cdir/calls"; : > "$CALLS"
+    LOG="$cdir/cache/ibl5-hooks/css-rebuild.log"
+    : > "$cdir/ps"; local n; for n in "$@"; do printf '%s\n' "$n" >> "$cdir/ps"; done
+    if [ "$stale" = yes ]; then
+        touch -t 202001010000 "$dir/ibl5/themes/IBL/style/style.css"
+        touch -t 202101010000 "$dir/ibl5/design/input.css"
+    else
+        touch -t 202001010000 "$dir/ibl5/design/input.css"
+        touch -t 202101010000 "$dir/ibl5/themes/IBL/style/style.css"
+    fi
+    local path="$STUB_DOCKER:/usr/bin:/bin"
+    [ "$bunx" = yes ] && path="$STUB_DOCKER:$STUB_BUNX:/usr/bin:/bin"
+    OUT="$(cd "$dir" && env -i HOME="$cdir/home" XDG_CACHE_HOME="$cdir/cache" \
+        PATH="$path" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+        STUB_LOG="$CALLS" STUB_PS_FILE="$cdir/ps" \
+        STUB_RESTART_RC="${STUB_RESTART_RC:-0}" STUB_EXEC_RC="${STUB_EXEC_RC:-0}" \
+        STUB_BUNX_RC="${STUB_BUNX_RC:-0}" \
+        bash "$TARGET" 2>&1)"
+    RC=$?
+    [ -f "$LOG" ] || : > "$LOG"   # absent log => every want() on it fails loudly
+}
+
+# Case 1: main checkout, both watcher names running -> restarts ONLY ibl5-tailwind
+run_case 1 "$MAIN" yes yes ibl5-tailwind ibl5-tailwind-mainrepo
+rc0   "c1 main: exit 0"
+wantx "c1 main: docker restart ibl5-tailwind" "$CALLS" "restart ibl5-tailwind"
+denyx "c1 main: never restarts the slug watcher" "$CALLS" "restart ibl5-tailwind-mainrepo"
+want  "c1 main: restart logged" "$LOG" "restarted ibl5-tailwind to drop its stale source graph"
+deny  "c1 main: host rebuild means no docker exec" "$CALLS" "exec "
+
+# Case 2: linked worktree, both running -> restarts ONLY ibl5-tailwind-feat-x
+run_case 2 "$WT" yes yes ibl5-tailwind ibl5-tailwind-feat-x
+rc0   "c2 worktree: exit 0"
+wantx "c2 worktree: docker restart slug watcher" "$CALLS" "restart ibl5-tailwind-feat-x"
+denyx "c2 worktree: never restarts main watcher" "$CALLS" "restart ibl5-tailwind"
+want  "c2 worktree: restart logged" "$LOG" "restarted ibl5-tailwind-feat-x to drop its stale source graph"
+deny  "c2 worktree: main restart not logged" "$LOG" "restarted ibl5-tailwind to drop"
+
+# Case 3: watcher not running -> probe runs, no restart, no restart log line
+run_case 3 "$MAIN" yes yes ibl5-php-mainrepo
+rc0   "c3 no watcher: exit 0"
+want  "c3 no watcher: subshell ran (host rebuild logged)" "$LOG" "css rebuilt on host (mainrepo)"
+want  "c3 no watcher: watcher probe ran" "$CALLS" "ps --format"
+deny  "c3 no watcher: no docker restart" "$CALLS" "restart "
+deny  "c3 no watcher: no restart log line" "$LOG" "restart"
+
+# Case 4: docker restart fails -> FAILED logged, script still exits 0
+STUB_RESTART_RC=1 run_case 4 "$MAIN" yes yes ibl5-tailwind
+rc0   "c4 restart fails: exit 0"
+wantx "c4 restart fails: restart attempted" "$CALLS" "restart ibl5-tailwind"
+want  "c4 restart fails: FAILED logged" "$LOG" "restart of ibl5-tailwind FAILED"
+deny  "c4 restart fails: no success line" "$LOG" "restarted ibl5-tailwind"
+
+echo
+if [ "$FAILS" -gt 0 ]; then echo "test-rebuild-css-if-source-changed: $FAILS failure(s)"; exit 1; fi
+echo "test-rebuild-css-if-source-changed: all cases passed"

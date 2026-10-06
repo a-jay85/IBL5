@@ -37,6 +37,7 @@ deny()  { if grep -qF -- "$3" "$2"; then fail "$1 (unexpected: $3)"; else pass "
 wantx() { if grep -qxF -- "$3" "$2"; then pass "$1"; else fail "$1 (missing line: $3)"; fi; }
 denyx() { if grep -qxF -- "$3" "$2"; then fail "$1 (unexpected line: $3)"; else pass "$1"; fi; }
 rc0()   { if [ "$RC" -eq 0 ]; then pass "$1"; else fail "$1 (rc=$RC, out: $OUT)"; fi; }
+empty() { if [ -s "$2" ]; then fail "$1 (got: $(tr '\n' ';' < "$2"))"; else pass "$1"; fi; }
 
 # --- stubs: docker always present; bunx only when a case asks for it
 STUB_DOCKER="$TMP/stub-docker"; STUB_BUNX="$TMP/stub-bunx"
@@ -126,6 +127,65 @@ rc0   "c4 restart fails: exit 0"
 wantx "c4 restart fails: restart attempted" "$CALLS" "restart ibl5-tailwind"
 want  "c4 restart fails: FAILED logged" "$LOG" "restart of ibl5-tailwind FAILED"
 deny  "c4 restart fails: no success line" "$LOG" "restarted ibl5-tailwind"
+
+EXEC_SLUG="exec ibl5-tailwind-feat-x bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css"
+EXEC_MAIN="exec ibl5-tailwind bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css"
+HOST_BUNX="bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css"
+
+# Case 5: no host bunx, slug container running -> rebuild in the slug container
+run_case 5 "$WT" no yes ibl5-tailwind ibl5-tailwind-feat-x
+rc0   "c5 slug container: exit 0"
+wantx "c5 slug container: docker exec in ibl5-tailwind-feat-x" "$CALLS" "$EXEC_SLUG"
+denyx "c5 slug container: not the main container" "$CALLS" "$EXEC_MAIN"
+want  "c5 slug container: rebuild logged" "$LOG" "css rebuilt in ibl5-tailwind-feat-x"
+wantx "c5 slug container: restart still runs" "$CALLS" "restart ibl5-tailwind-feat-x"
+
+# Case 5b: no host bunx, slug container absent, ibl5-tailwind running -> falls back to it
+run_case 5b "$WT" no yes ibl5-tailwind
+rc0   "c5b fallback: exit 0"
+wantx "c5b fallback: docker exec in ibl5-tailwind" "$CALLS" "$EXEC_MAIN"
+want  "c5b fallback: rebuild logged" "$LOG" "css rebuilt in ibl5-tailwind"
+deny  "c5b fallback: worktree never restarts the main watcher" "$CALLS" "restart "
+
+# Case 6: no host bunx, no container -> FAILED logged, no docker exec, exit 0
+run_case 6 "$MAIN" no yes
+rc0   "c6 nothing usable: exit 0"
+want  "c6 nothing usable: FAILED logged" "$LOG" "css rebuild FAILED"
+want  "c6 nothing usable: names the cause and slug" "$LOG" "no usable tailwind container (mainrepo)"
+deny  "c6 nothing usable: no docker exec" "$CALLS" "exec "
+deny  "c6 nothing usable: no success line" "$LOG" "css rebuilt"
+
+# Case 6b: container running but docker exec fails -> FAILED logged, restart still runs
+STUB_EXEC_RC=1 run_case 6b "$MAIN" no yes ibl5-tailwind
+rc0   "c6b exec fails: exit 0"
+wantx "c6b exec fails: exec attempted" "$CALLS" "$EXEC_MAIN"
+want  "c6b exec fails: FAILED logged" "$LOG" "css rebuild FAILED"
+deny  "c6b exec fails: no success line" "$LOG" "css rebuilt in"
+wantx "c6b exec fails: restart still runs" "$CALLS" "restart ibl5-tailwind"
+
+# Case 7: host bunx succeeds -> host rebuild, no docker exec, restart still happens
+run_case 7 "$WT" yes yes ibl5-tailwind-feat-x
+rc0   "c7 host bunx: exit 0"
+wantx "c7 host bunx: bunx called with the tailwind args" "$CALLS" "$HOST_BUNX"
+want  "c7 host bunx: host rebuild logged" "$LOG" "css rebuilt on host (feat-x)"
+deny  "c7 host bunx: no docker exec" "$CALLS" "exec "
+wantx "c7 host bunx: restart still runs" "$CALLS" "restart ibl5-tailwind-feat-x"
+want  "c7 host bunx: restart logged" "$LOG" "restarted ibl5-tailwind-feat-x"
+
+# Case 7b: host bunx present but fails -> falls through to the container
+STUB_BUNX_RC=1 run_case 7b "$WT" yes yes ibl5-tailwind-feat-x
+rc0   "c7b host bunx fails: exit 0"
+wantx "c7b host bunx fails: host bunx attempted" "$CALLS" "$HOST_BUNX"
+wantx "c7b host bunx fails: docker exec in slug container" "$CALLS" "$EXEC_SLUG"
+want  "c7b host bunx fails: container rebuild logged" "$LOG" "css rebuilt in ibl5-tailwind-feat-x"
+deny  "c7b host bunx fails: no host success line" "$LOG" "css rebuilt on host"
+
+# Case 8: output fresh -> "css fresh, skip", zero docker/bunx calls
+run_case 8 "$MAIN" yes no ibl5-tailwind
+rc0   "c8 fresh: exit 0"
+want  "c8 fresh: skip logged" "$LOG" "css fresh, skip"
+empty "c8 fresh: zero docker/bunx calls" "$CALLS"
+deny  "c8 fresh: no rebuild started" "$LOG" "rebuilding"
 
 echo
 if [ "$FAILS" -gt 0 ]; then echo "test-rebuild-css-if-source-changed: $FAILS failure(s)"; exit 1; fi

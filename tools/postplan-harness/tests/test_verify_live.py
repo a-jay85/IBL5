@@ -1,12 +1,15 @@
 import os
+import subprocess
 import sys
 import threading
+import time
 
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.adapters.verify import LiveVerify, TrackResult, fail_log_lines, tracks_log_line
+from harness.adapters.verify import (LiveVerify, TrackResult, aggregate, fail_log_lines,
+                                     timing_log_line, tracks_log_line)
 from harness.state import Classification
 
 PHPUNIT = "vendor/bin/phpunit --no-progress"
@@ -175,3 +178,113 @@ def test_fail_log_lines_empty_when_nothing_failed():
         TrackResult("e2e", "unavailable", "isolated mode"),
     ]
     assert fail_log_lines(tracks) == []
+
+
+# ---- Phase 3: concurrency ----
+
+def test_live_tracks_overlap_in_time():
+    barrier = threading.Barrier(3, timeout=5)
+
+    def runner(cmd, cwd):
+        if cmd.startswith((PHPUNIT, PHPSTAN, SHELLCHECK)):
+            barrier.wait()
+        return 0, ""
+
+    tracks = LiveVerify("/wt", run_cmd=runner).run(_all_flags())
+    assert _status(tracks) == {"phpunit": "pass", "phpstan": "pass", "go": "pass",
+                               "shellcheck": "pass", "e2e": "unavailable"}
+
+
+def test_live_concurrent_preserves_submission_order():
+    delays = {PHPUNIT: 0.3, PHPSTAN: 0.2, GO_FMT: 0.1, GO_COVER: 0.0, SHELLCHECK: 0.0}
+
+    def runner(cmd, cwd):
+        for prefix, delay in delays.items():
+            if cmd.startswith(prefix):
+                time.sleep(delay)
+        return 0, ""
+
+    tracks = LiveVerify("/wt", run_cmd=runner).run(_all_flags())
+    assert [t.name for t in tracks] == NAMES
+
+
+def test_live_timeout_in_one_track_does_not_swallow_others():
+    def runner(cmd, cwd):
+        if cmd.startswith(PHPUNIT):
+            raise subprocess.TimeoutExpired("x", 1800)
+        return 0, ""
+
+    tracks = LiveVerify("/wt", run_cmd=runner).run(_all_flags())
+    by = _by_name(tracks)
+    assert by["phpunit"].status == "fail"
+    assert "timed out" in by["phpunit"].evidence
+    assert [by[n].status for n in ("phpstan", "go", "shellcheck")] == ["pass"] * 3
+    assert aggregate(tracks) == "fail"
+
+
+def test_live_exception_in_one_track_does_not_swallow_others():
+    def runner(cmd, cwd):
+        if cmd.startswith(SHELLCHECK):
+            raise OSError("boom")
+        return 0, ""
+
+    by = _by_name(LiveVerify("/wt", run_cmd=runner).run(_all_flags()))
+    assert by["shellcheck"].status == "fail"
+    assert by["shellcheck"].evidence.startswith("OSError")
+    assert [by[n].status for n in ("phpunit", "phpstan", "go")] == ["pass"] * 3
+
+
+def test_live_records_seconds_for_run_tracks_only():
+    verify = LiveVerify("/wt", run_cmd=FakeRunner())
+    by = _by_name(verify.run(Classification(has_php=True)))
+    assert by["phpunit"].seconds is not None
+    assert by["phpstan"].seconds is not None
+    assert by["go"].seconds is None
+    assert by["shellcheck"].seconds is None
+    assert by["e2e"].seconds is None
+    assert isinstance(verify.last_wall_seconds, float)
+
+    idle = LiveVerify("/wt", run_cmd=FakeRunner())
+    idle.run(Classification())
+    assert idle.last_wall_seconds is None
+
+
+def test_timing_log_line_only_when_a_track_ran():
+    assert timing_log_line([TrackResult("phpunit", "skipped")], 1.0) is None
+    assert timing_log_line([TrackResult("phpunit", "pass", seconds=1.0)], None) is None
+    ran = [TrackResult("phpunit", "pass", seconds=12.34), TrackResult("go", "skipped")]
+    assert timing_log_line(ran, 12.5) == "phase5 timing: phpunit=12.3s wall=12.5s"
+
+
+# ---- Phase 4: shellcheck fan-out ----
+
+def test_live_shellcheck_command_fans_out():
+    fake = FakeRunner()
+    LiveVerify("/wt", run_cmd=fake).run(Classification(has_shell=True))
+    (cmd,) = [c for c, _ in fake.calls if c.startswith(SHELLCHECK)]
+    assert "xargs -P" in cmd
+    assert "-n 20" in cmd
+    assert "--severity=warning --shell=bash" in cmd
+    assert "--exclude=SC2034,SC1090,SC2207" in cmd
+
+
+def _many_scripts_tree(tmp_path, monkeypatch, shellcheck):
+    wt = _stub_tree(tmp_path, monkeypatch, shellcheck=shellcheck)
+    names = [f"f{i}.sh" for i in range(59)] + ["bad.sh"]
+    _script(tmp_path / "bin" / "lib" / "shell-scripts.sh",
+            "printf '%s\\n' " + " ".join(names) + "\n")
+    return wt
+
+
+def test_live_real_shell_one_failing_batch_fails_track(tmp_path, monkeypatch):
+    wt = _many_scripts_tree(
+        tmp_path, monkeypatch,
+        'for a in "$@"; do [ "$a" = bad.sh ] && { echo "In bad.sh line 1:"; exit 1; }; done\nexit 0')
+    by = _by_name(LiveVerify(wt).run(Classification(has_shell=True)))
+    assert by["shellcheck"].status == "fail"
+
+
+def test_live_real_shell_all_batches_clean_passes(tmp_path, monkeypatch):
+    wt = _many_scripts_tree(tmp_path, monkeypatch, "exit 0")
+    by = _by_name(LiveVerify(wt).run(Classification(has_shell=True)))
+    assert by["shellcheck"].status == "pass"

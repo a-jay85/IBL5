@@ -172,3 +172,73 @@ scan_worktrees() {
         | awk '/^worktree /{sub(/^worktree /, ""); print}')
     return 0
 }
+
+# --- bin/wt-new tail, shared with the warm pool (bin/lib/wt-pool.sh) ---------
+
+# Record which Claude session created this branch. ~/.claude/hooks/auto-commit-reminder.sh
+# compares it to the Stop payload's session_id: the creating session owns the whole
+# tree, so its ad-hoc work ships by default; any later session holds. Skipped for a
+# human run (var unset or empty).
+wt_write_session() {
+    local wt_root="$1"
+    if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
+        printf '%s\n' "$CLAUDE_CODE_SESSION_ID" \
+            > "$(git -C "$wt_root" rev-parse --absolute-git-dir)/wt-new-session"
+    fi
+}
+
+# Link the shared, gitignored state from the main checkout. -n matters: without it,
+# re-linking over an existing symlink to a directory creates the link INSIDE main's
+# directory (main/ibl5/vendor/vendor), which a warm-slot claim would otherwise hit.
+wt_link_shared() {
+    local wt_ibl5="$1" main_ibl5="$2"
+    ln -sfn "$main_ibl5/.env" "$wt_ibl5/.env"
+    ln -sfn "$main_ibl5/.env.test" "$wt_ibl5/.env.test"
+    ln -sfn "$main_ibl5/vendor" "$wt_ibl5/vendor"
+    ln -sfn "$main_ibl5/node_modules" "$wt_ibl5/node_modules"
+}
+
+# Hide the main docker-compose.yml from the worktree so `docker compose up`
+# can't accidentally be run here (replacing main containers with broken mounts).
+# Worktree Docker uses bin/wt-up which reads docker/worktree-compose.yml instead.
+# --skip-worktree tells git to ignore the deletion so it won't appear in diffs.
+wt_hide_compose() {
+    local wt_root="$1"
+    git -C "$wt_root" update-index --skip-worktree docker-compose.yml
+    rm -f "$wt_root/docker-compose.yml"
+}
+
+# Build the Tailwind stylesheet; on failure copy the main checkout's.
+wt_build_css() {
+    local wt_ibl5="$1" main_ibl5="$2"
+    mkdir -p "$wt_ibl5/themes/IBL/style"
+    (cd "$wt_ibl5" && bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css 2>/dev/null) || {
+        echo "CSS build failed — copying from main repo..."
+        cp "$main_ibl5/themes/IBL/style/style.css" "$wt_ibl5/themes/IBL/style/style.css" 2>/dev/null || true
+    }
+}
+
+# Sync local <base> with origin before branching, so a worktree never forks from a
+# stale tip. An unreachable origin only warns.
+wt_sync_base() {
+    local repo_root="$1" base="$2" behind checked_out
+    echo "Fetching origin/$base..."
+    if git -C "$repo_root" fetch origin "$base" --quiet 2>/dev/null; then
+        behind=$(git -C "$repo_root" rev-list --count "$base..origin/$base" 2>/dev/null || echo 0)
+        if [ "$behind" -gt 0 ]; then
+            echo "Fast-forwarding local $base ($behind commit(s) behind origin)..."
+            checked_out="$(git -C "$repo_root" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+            if [ "$checked_out" = "$base" ]; then
+                # <base> is checked out in the main checkout — git refuses to fetch
+                # into a checked-out ref, so merge --ff-only is the only safe path here.
+                git -C "$repo_root" merge --ff-only "origin/$base" --quiet
+            else
+                # <base> is NOT checked out — use fetch refspec to fast-forward the
+                # local ref directly without needing it to be checked out.
+                git -C "$repo_root" fetch origin "$base:$base" --quiet
+            fi
+        fi
+    else
+        echo "Warning: could not reach origin; creating worktree from local $base." >&2
+    fi
+}

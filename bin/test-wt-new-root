@@ -25,6 +25,8 @@ TMP="$(mktemp -d)"
 trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
 
 FAILED=0
+# Root resolution only: keep the sandbox off the warm pool and launchd (bin/test-wt-pool covers them).
+export WT_POOL=0 WT_POOL_KICK=none
 pass()     { echo "ok: $1"; }
 failcase() { echo "FAIL: $1"; FAILED=1; }
 

@@ -1031,6 +1031,7 @@ jobs:
             bin/test-fleet-status \
             bin/test-wt-status \
             bin/test-wt-new-root \
+            bin/test-wt-pool \
             bin/test-wt-rebase \
             bin/test-check-plan-staleness \
             bin/test-matrix-assertion-check \

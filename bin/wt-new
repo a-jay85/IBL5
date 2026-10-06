@@ -4,11 +4,13 @@
 #
 # Usage: bin/wt-new <name> [--base <branch>]
 #        bin/wt-new --existing <branch> [<name>] [--base <parent-branch>]
+#        bin/wt-new --pool-refill
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/wt-new <name> [--base <branch>]
        bin/wt-new --existing <branch> [<name>] [--base <parent-branch>]
+       bin/wt-new --pool-refill
 
 Create a git worktree outside the repo (sibling IBL5-worktrees/<name>) with
 symlinks and CSS ready for development. Does not start Docker.
@@ -16,6 +18,12 @@ symlinks and CSS ready for development. Does not start Docker.
   name                  Slug for the new branch and worktree directory
   --base <branch>       Branch to cut from (default: master)
   --existing <branch>   Check out an existing origin branch instead of cutting a new one
+  --pool-refill         Build the warm spare worktree (IBL5-worktrees/_pool-N) if none is ready
+
+A default-mode run on master claims the ready spare (branch rename plus
+git worktree move) and falls back to a cold create on any failed check.
+--existing, --base <other> and WT_POOL=0 always create cold. Every run then
+schedules a refill (launchd on macOS; WT_POOL_KICK=none|inline|print overrides).
 
 Use bin/wt-up <name> to start a Docker environment for the worktree.
 EOF
@@ -26,6 +34,8 @@ set -euo pipefail
 
 SCRIPT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$SCRIPT_ROOT/bin/lib/git-helpers.sh"
+source "$SCRIPT_ROOT/bin/lib/wt-pool.sh"
+source "$SCRIPT_ROOT/bin/lib/launchd-job.sh"
 # Always operate on the MAIN checkout, even when invoked through a worktree's own
 # copy of this script. REPO_ROOT drives the ff-only sync below, which targets the
 # CHECKED-OUT branch of whatever root it is given: from a worktree that is the
@@ -38,6 +48,7 @@ NAME=""
 BASE_BRANCH="master"
 EXISTING_BRANCH=""
 BRANCH_NAME=""   # the branch actually checked out; == $NAME in default mode
+POOL_REFILL=0
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -45,6 +56,10 @@ while [[ $# -gt 0 ]]; do
         --base)
             BASE_BRANCH="$2"
             shift 2
+            ;;
+        --pool-refill)
+            POOL_REFILL=1
+            shift
             ;;
         --existing)
             # Arity guard: bare `--existing` would hit `$2` under `set -u` and die with
@@ -67,6 +82,15 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Build the warm spare (bin/lib/wt-pool.sh) and exit. Also what the launchd one-shot runs.
+if [ "$POOL_REFILL" = 1 ]; then
+    if [ -n "$NAME" ] || [ -n "$EXISTING_BRANCH" ] || [ "$BASE_BRANCH" != master ]; then
+        echo "Error: --pool-refill takes no other arguments" >&2
+        exit 1
+    fi
+    pool_refill; exit $?
+fi
 
 # Under --existing the positional name is optional. Branch names may contain "/"
 # (feat/foo); the worktree parent dir is flat, so flatten it. This is exactly the
@@ -112,6 +136,7 @@ if [ -n "$EXISTING_BRANCH" ]; then
     # Fail-closed: unlike the base-branch sync below, an unreachable origin is NOT
     # survivable here — there is no local branch to fall back to in the common case,
     # and silently creating an empty/stale worktree is worse than exiting.
+    echo "wt-pool: bypass (--existing)" >&2
     echo "Fetching origin/$EXISTING_BRANCH..."
     if ! git -C "$REPO_ROOT" fetch origin "$EXISTING_BRANCH" --quiet 2>/dev/null; then
         echo "Error: could not fetch origin/$EXISTING_BRANCH — no such branch on origin, or origin unreachable." >&2
@@ -147,38 +172,22 @@ if [ -n "$EXISTING_BRANCH" ]; then
 else
     BRANCH_NAME="$NAME"
     # Sync local $BASE_BRANCH with origin before branching — avoids forking from a stale tip.
-    echo "Fetching origin/$BASE_BRANCH..."
-    if git -C "$REPO_ROOT" fetch origin "$BASE_BRANCH" --quiet 2>/dev/null; then
-        BEHIND=$(git -C "$REPO_ROOT" rev-list --count "$BASE_BRANCH..origin/$BASE_BRANCH" 2>/dev/null || echo 0)
-        if [ "$BEHIND" -gt 0 ]; then
-            echo "Fast-forwarding local $BASE_BRANCH ($BEHIND commit(s) behind origin)..."
-            CHECKED_OUT="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)"
-            if [ "$CHECKED_OUT" = "$BASE_BRANCH" ]; then
-                # BASE_BRANCH is checked out in the main checkout — git refuses to fetch
-                # into a checked-out ref, so merge --ff-only is the only safe path here.
-                git -C "$REPO_ROOT" merge --ff-only "origin/$BASE_BRANCH" --quiet
-            else
-                # BASE_BRANCH is NOT checked out — use fetch refspec to fast-forward the
-                # local ref directly without needing it to be checked out.
-                git -C "$REPO_ROOT" fetch origin "$BASE_BRANCH:$BASE_BRANCH" --quiet
-            fi
-        fi
+    wt_sync_base "$REPO_ROOT" "$BASE_BRANCH"
+
+    # Claim the warm spare when one is ready (bin/lib/wt-pool.sh, ADR-0177); any
+    # bypass or failed check falls through to the cold create, unchanged.
+    CLAIMED=0
+    if pool_try_claim; then
+        CLAIMED=1
     else
-        echo "Warning: could not reach origin; creating worktree from local $BASE_BRANCH." >&2
+        # Create worktree + branch in one step
+        echo "Creating worktree '$NAME' from $BASE_BRANCH..."
+        git -C "$REPO_ROOT" worktree add "$WT_ROOT" -b "$NAME" "$BASE_BRANCH"
     fi
 
-    # Create worktree + branch in one step
-    echo "Creating worktree '$NAME' from $BASE_BRANCH..."
-    git -C "$REPO_ROOT" worktree add "$WT_ROOT" -b "$NAME" "$BASE_BRANCH"
-
-    # Record which Claude session created this branch. ~/.claude/hooks/auto-commit-reminder.sh
-    # compares it to the Stop payload's session_id: the creating session owns the whole
-    # tree, so its ad-hoc work ships by default; any later session holds. Skipped for a
-    # human run (var unset) and for --existing, whose branch can carry earlier work.
-    if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
-        printf '%s\n' "$CLAUDE_CODE_SESSION_ID" \
-            > "$(git -C "$WT_ROOT" rev-parse --absolute-git-dir)/wt-new-session"
-    fi
+    # Record which Claude session created this branch (see wt_write_session).
+    # Skipped for --existing, whose branch can carry earlier work.
+    wt_write_session "$WT_ROOT"
 fi
 
 # Persist the base so the pre-push ADR gate and bin/wt-rebase can later resolve this
@@ -197,25 +206,21 @@ materialize_worktree_config_local "$WT_IBL5/config.local.php" "$MAIN_IBL5"
 
 # Symlinks
 echo "Setting up symlinks..."
-ln -sf "$MAIN_IBL5/.env" "$WT_IBL5/.env"
-ln -sf "$MAIN_IBL5/.env.test" "$WT_IBL5/.env.test"
-ln -sf "$MAIN_IBL5/vendor" "$WT_IBL5/vendor"
-ln -sf "$MAIN_IBL5/node_modules" "$WT_IBL5/node_modules"
+wt_link_shared "$WT_IBL5" "$MAIN_IBL5"
 
 # Hide the main docker-compose.yml from the worktree so `docker compose up`
 # can't accidentally be run here (replacing main containers with broken mounts).
 # Worktree Docker uses bin/wt-up which reads docker/worktree-compose.yml instead.
 # --skip-worktree tells git to ignore the deletion so it won't appear in diffs.
-git -C "$WT_ROOT" update-index --skip-worktree docker-compose.yml
-rm -f "$WT_ROOT/docker-compose.yml"
+wt_hide_compose "$WT_ROOT"
 
-# Build CSS
-echo "Building CSS..."
-mkdir -p "$WT_IBL5/themes/IBL/style"
-(cd "$WT_IBL5" && bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css 2>/dev/null) || {
-    echo "CSS build failed — copying from main repo..."
-    cp "$MAIN_IBL5/themes/IBL/style/style.css" "$WT_IBL5/themes/IBL/style/style.css" 2>/dev/null || true
-}
+# Build CSS. A claimed slot keeps its stylesheet unless the fast-forward touched ibl5/.
+if [ "${CLAIMED:-0}" = 1 ] && [ "${POOL_CSS_STALE:-1}" = 0 ]; then
+    echo "CSS: reusing the warm slot's stylesheet"
+else
+    echo "Building CSS..."
+    wt_build_css "$WT_IBL5" "$MAIN_IBL5"
+fi
 
 echo ""
 echo "================================================"
@@ -232,3 +237,6 @@ echo "  cd $WT_IBL5"
 echo ""
 echo "  Need browser preview? Run: bin/wt-up $NAME"
 echo ""
+
+# Keep one warm spare for the next run (out of band; never fails this run).
+[ "${WT_POOL:-}" = 0 ] || pool_kick_refill

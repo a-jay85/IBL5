@@ -70,6 +70,13 @@ jobs:
             src:
               - '**.php'
               - 'ibl5/migrations/**.sql'
+              # The destructive-migration engine, its wrapper and the full-scan
+              # golden are tested only by the PHPUnit Cli suite (`test` job), so
+              # an engine-only or golden-only PR must flip src. Exact paths, never
+              # bin/**: bin/test-path-filters forbids src swallowing bin/.
+              - 'bin/check-destructive-migrations'
+              - 'bin/lib/destructive-migration-scan.py'
+              - 'ibl5/tests/Cli/fixtures/**'
               - 'ibl5/composer.json'
               - 'ibl5/composer.lock'
               - 'ibl5/phpunit.xml'

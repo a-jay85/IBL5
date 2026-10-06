@@ -5,6 +5,7 @@
 # sim-recap producer/consumer pair coupled: any path under the `both:` group must
 # trigger BOTH db-integration and harness-tests. Greps the workflow only; it never
 # stats the listed paths.
+# Also asserts src: routes the destructive-migration engine to PHPUnit.
 #
 # Run: bin/test-path-filters [workflow.yml]   (exit 0 = all pass, 1 = a case failed)
 set -u
@@ -32,6 +33,16 @@ done
 for j in db-integration harness-tests; do
   job_if "$j" | grep -qF "needs.changes.outputs.both == 'true'" \
     && ok "$j honors the both output" || bad "$j ignores the both output"
+done
+
+# The destructive-migration engine and its golden are exercised only by the
+# PHPUnit job, so an engine-only PR must flip src:.
+SRC="$(group src)"
+for p in 'bin/check-destructive-migrations' 'bin/lib/destructive-migration-scan.py' \
+         'ibl5/tests/Cli/fixtures/**'; do
+  grep -qF -- "- '$p'" <<< "$SRC" \
+    && ok "src: covers $p" \
+    || bad "src: is missing $p — an engine-only PR would skip PHPUnit"
 done
 
 # Regression guard: src: must never swallow all of bin/, or every shell-only PR

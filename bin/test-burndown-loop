@@ -60,7 +60,8 @@ new_env() {
     export IBL5_USAGE_GATE_STATE_DIR="$T/ug"
     export IBL5_BURNDOWN_DISCORD_DM="$T/dm"
     mkdir -p "$HOME/claude-plans/_reports" "$IBL5_USAGE_GATE_STATE_DIR/markers" "$STUB"
-    unset IBL5_BURNDOWN_RESERVE_PCT IBL5_BURNDOWN_MAX_FAILS IBL5_BURNDOWN_BATCH_TIMEOUT_MIN
+    unset IBL5_BURNDOWN_RESERVE_PCT IBL5_BURNDOWN_MAX_FAILS IBL5_BURNDOWN_BATCH_TIMEOUT_MIN \
+        IBL5_BURNDOWN_EMPTY_SLEEP_MIN
     STATE="$HOME/.claude/burndown-loop"
     REPORTS="$HOME/claude-plans/_reports"
     LAUNCH_DIR="$HOME/Library/LaunchAgents"
@@ -84,8 +85,10 @@ REPO_ROOT="@REPO@"
 echo "CLAUDE_HEADLESS=${CLAUDE_HEADLESS:-} SID=${IBL5_USAGE_GATE_SESSION_ID:-} RUNNER=${IBL5_USAGE_GATE_RUNNER:-} CEIL=${CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS:-} OPTIN=${IBL5_BURNDOWN_LOOP-unset} ARGV=$*" >> "$T/claude.calls"
 rx=$(env | grep '^IBL5_BURNDOWN_REEXEC_' || true)
 if [ -n "$rx" ]; then printf '%s\n' "$rx" >> "$T/claude.reexec-env"; fi
+printf '%s\n' "${IBL5_BURNDOWN_EMPTY_SENTINEL:-}" >> "$T/claude.sentinel-env"
+sentinel() { [ -z "${IBL5_BURNDOWN_EMPTY_SENTINEL:-}" ] || printf 'LEDGER: none\n' > "$IBL5_BURNDOWN_EMPTY_SENTINEL"; }
 q="$T/claude.queue"
-act=none
+act=drain
 if [ -s "$q" ]; then
     act=$(head -n 1 "$q")
     tail -n +2 "$q" > "$q.tmp"
@@ -100,7 +103,15 @@ case "$act" in
     ledger) write_ledger ',"units_used":5' ;;
     ledger-nounits) write_ledger '' ;;
     ledger-exit3) write_ledger ',"units_used":5'; echo "BURNDOWN-LOOP: abort-exit-3" ;;
-    none) echo "BURNDOWN-LOOP: none-selected" ;;
+    none) sentinel; echo "BURNDOWN-LOOP: none-selected" ;;
+    none-unconfirmed) echo "BURNDOWN-LOOP: none-selected" ;;
+    sentinel-ledger) sentinel; write_ledger ',"units_used":5' ;;
+    sentinel-alarm) sentinel; kill -ALRM $$ ;;
+    drain)
+        sentinel
+        echo "BURNDOWN-LOOP: none-selected"
+        touch "$HOME/.claude/burndown-loop/stop"
+        ;;
     exit3) echo "BURNDOWN-LOOP: abort-exit-3" ;;
     silent) ;;
     crash) exit 1 ;;
@@ -411,12 +422,12 @@ test_lock_stale_reclaimed() {
 test_batch_ran_then_exhausted() {
     new_env
     seed_usage 5 0 1
-    queue ledger none
+    queue ledger drain
     run_loop run
     assert_eq ran_exhausted:rc 0 "$RC"
     assert_eq ran_exhausted:calls 2 "$(calls "$T/claude.calls")"
     assert_contains ran_exhausted:log "$OUT" "batch ran ledgers=1 items=1"
-    assert_contains ran_exhausted:dm "$(cat "$T/dm.calls" 2>/dev/null)" "finished (exhausted)"
+    assert_contains ran_exhausted:dm "$(cat "$T/dm.calls" 2>/dev/null)" "finished (stopped)"
     assert_contains ran_exhausted:counts "$(cat "$T/dm.calls" 2>/dev/null)" "batches=1 items=1"
 }
 
@@ -464,14 +475,15 @@ test_batch_timeout_classified() {
 test_batch_abort_retries() {
     new_env
     seed_usage 5 0 1
-    queue ledger-exit3 none
+    queue ledger-exit3 drain
     run_loop run
     assert_eq abort_retry:rc 0 "$RC"
     assert_eq abort_retry:calls 2 "$(calls "$T/claude.calls")"
     assert_contains abort_retry:log "$OUT" "batch aborted: burndown exit 3 fails=1/3"
     assert_contains abort_retry:sleep "$OUT" "sleep 600s reason=retry-after-abort"
-    assert_contains abort_retry:finish "$OUT" "finish reason=exhausted"
-    assert_contains abort_retry:dm "$(cat "$T/dm.calls" 2>/dev/null)" "finished (exhausted)"
+    assert_contains abort_retry:finish "$OUT" "finish reason=stopped"
+    assert_contains abort_retry:empty-line "$OUT" "backlog empty (sentinel confirmed first round LEDGER: none); re-check in 240m streak="
+    assert_contains abort_retry:dm "$(cat "$T/dm.calls" 2>/dev/null)" "finished (stopped)"
     assert_contains abort_retry:counted "$(cat "$T/dm.calls" 2>/dev/null)" "batches=1 items=1"
 }
 
@@ -492,13 +504,14 @@ test_batch_abort_cap_fail_closed() {
 test_batch_abort_then_ran_resets() {
     new_env
     seed_usage 5 0 1
-    queue exit3 ledger exit3 none
+    queue exit3 ledger exit3 drain
     IBL5_BURNDOWN_MAX_FAILS=2 run_loop run
     assert_eq abort_reset:rc 0 "$RC"
     assert_eq abort_reset:calls 4 "$(calls "$T/claude.calls")"
     assert_eq abort_reset:fails-once-each 2 "$(printf '%s\n' "$OUT" | grep -c 'fails=1/2')"
     assert_not_contains abort_reset:never-cap "$OUT" "fails=2/2"
-    assert_contains abort_reset:finish "$OUT" "finish reason=exhausted"
+    assert_contains abort_reset:finish "$OUT" "finish reason=stopped"
+    assert_contains abort_reset:empty-line "$OUT" "backlog empty (sentinel confirmed first round LEDGER: none); re-check in 240m streak="
 }
 
 test_batch_abort_once_no_sleep() {
@@ -748,11 +761,12 @@ reexec_handoff() {
 test_reexec_handoff_adopts_lock() {
     new_env
     seed_usage 5 0 1
-    queue none
+    queue drain
     reexec_handoff ':' run
     assert_eq reexec_adopt:rc 0 "$RC"
     assert_contains reexec_adopt:resumed "$OUT" "re-exec resumed pid="
-    assert_contains reexec_adopt:totals "$OUT" "finish reason=exhausted batches=2 items=5"
+    assert_contains reexec_adopt:totals "$OUT" "finish reason=stopped batches=2 items=5"
+    assert_contains reexec_adopt:empty-line "$OUT" "backlog empty (sentinel confirmed first round LEDGER: none); re-check in 240m streak="
     assert_eq reexec_adopt:sid "$SID_A" "$(cat "$STATE/loop.sid")"
     assert_contains reexec_adopt:claude-sid "$(cat "$T/claude.calls")" "SID=$SID_A"
     assert_contains reexec_adopt:elapsed "$(cat "$T/dm.calls" 2>/dev/null)" "elapsed=10m"
@@ -763,11 +777,12 @@ test_reexec_handoff_adopts_lock() {
 test_reexec_garbage_env_fresh() {
     new_env
     seed_usage 5 0 1
-    queue ledger none
+    queue ledger drain
     reexec_handoff 'export IBL5_BURNDOWN_REEXEC_BATCHES=abc IBL5_BURNDOWN_REEXEC_FAILS=-1 IBL5_BURNDOWN_REEXEC_START=x' run
     assert_eq reexec_garbage:rc 0 "$RC"
     assert_contains reexec_garbage:invalid "$OUT" "re-exec state invalid; counters reset"
-    assert_contains reexec_garbage:totals "$OUT" "finish reason=exhausted batches=1 items=1"
+    assert_contains reexec_garbage:totals "$OUT" "finish reason=stopped batches=1 items=1"
+    assert_contains reexec_garbage:empty-line "$OUT" "backlog empty (sentinel confirmed first round LEDGER: none); re-check in 240m streak="
     assert_no_file reexec_garbage:env-unset "$T/claude.reexec-env"
 }
 
@@ -779,6 +794,7 @@ test_reexec_stale_env_ignored() {
     assert_eq reexec_stale:rc 0 "$RC"
     assert_not_contains reexec_stale:no-reexec "$OUT" "re-exec"
     assert_contains reexec_stale:fresh-counters "$OUT" "batches=0 items=0"
+    assert_contains reexec_stale:empty-line "$OUT" "backlog empty (sentinel confirmed first round LEDGER: none); re-check in 240m streak="
     if [ "$(cat "$STATE/loop.sid")" != "$SID_A" ]; then pass reexec_stale:fresh-sid; else fail reexec_stale:fresh-sid; fi
     assert_no_file reexec_stale:env-unset "$T/claude.reexec-env"
 }
@@ -795,13 +811,13 @@ test_reexec_dry_run_ignores_handoff() {
 
 # ---------------------------------------------------------------- re-exec in a copied tree
 # Shared scenario: batch 1 aborts after writing a ledger and sleeps (the hook fires
-# there), batch 2 runs, batch 3 finds nothing, so every run ends exhausted.
+# there), batch 2 runs, batch 3 finds nothing, so every run ends stopped (the stub's drain action).
 
 test_reexec_on_code_change() {
     new_env
     seed_usage 5 0 1
     make_tree
-    queue ledger-exit3 ledger none
+    queue ledger-exit3 ledger drain
     command -v shasum >/dev/null || fail reexec:shasum "shasum missing on PATH"
     tree_hook bin/lib/usage-fetch.sh '# changed'
     run_tree_loop run
@@ -812,7 +828,8 @@ test_reexec_on_code_change() {
     assert_eq reexec_change:calls 3 "$(calls "$T/claude.calls")"
     assert_eq reexec_change:one-sid 1 "$(sed -n 's/.* SID=\([^ ]*\) .*/\1/p' "$T/claude.calls" | sort -u | wc -l | tr -d ' ')"
     assert_eq reexec_change:sid-matches "$(cat "$STATE/loop.sid")" "$(sed -n 's/.* SID=\([^ ]*\) .*/\1/p' "$T/claude.calls" | sort -u)"
-    assert_contains reexec_change:totals "$OUT" "finish reason=exhausted batches=2 items=2"
+    assert_contains reexec_change:totals "$OUT" "finish reason=stopped batches=2 items=2"
+    assert_contains reexec_change:empty-line "$OUT" "backlog empty (sentinel confirmed first round LEDGER: none); re-check in 240m streak="
     assert_eq reexec_change:one-dm 1 "$(grep -c 'burndown-loop: finished' "$T/dm.calls")"
     assert_contains reexec_change:dm-totals "$(cat "$T/dm.calls")" "batches=2 items=2"
     assert_no_file reexec_change:lock-released "$STATE/lock"
@@ -823,40 +840,212 @@ test_reexec_unchanged_no_exec() {
     new_env
     seed_usage 5 0 1
     make_tree
-    queue ledger-exit3 ledger none
+    queue ledger-exit3 ledger drain
     printf ': > "%s/hook.ran"\n' "$T" > "$T/sleep.hook"
     run_tree_loop run
     assert_eq reexec_same:rc 0 "$RC"
     assert_file reexec_same:slept "$T/hook.ran"
     assert_not_contains reexec_same:no-change "$OUT" "code changed"
     assert_not_contains reexec_same:no-resume "$OUT" "re-exec resumed"
-    assert_contains reexec_same:totals "$OUT" "finish reason=exhausted batches=2 items=2"
+    assert_contains reexec_same:totals "$OUT" "finish reason=stopped batches=2 items=2"
+    assert_contains reexec_same:empty-line "$OUT" "backlog empty (sentinel confirmed first round LEDGER: none); re-check in 240m streak="
 }
 
 test_reexec_syntax_error_skipped() {
     new_env
     seed_usage 5 0 1
     make_tree
-    queue ledger-exit3 ledger none
+    queue ledger-exit3 ledger drain
     tree_hook bin/burndown-loop 'if then'
     run_tree_loop run
     assert_eq reexec_syntax:rc 0 "$RC"
     assert_eq reexec_syntax:logged-once 1 "$(printf '%s\n' "$OUT" | grep -c 're-exec skipped: new code fails syntax check')"
     assert_not_contains reexec_syntax:no-exec "$OUT" "code changed"
-    assert_contains reexec_syntax:totals "$OUT" "finish reason=exhausted batches=2 items=2"
+    assert_contains reexec_syntax:totals "$OUT" "finish reason=stopped batches=2 items=2"
+    assert_contains reexec_syntax:empty-line "$OUT" "backlog empty (sentinel confirmed first round LEDGER: none); re-check in 240m streak="
 }
 
 test_reexec_hash_unreadable_no_exec() {
     new_env
     seed_usage 5 0 1
     make_tree
-    queue ledger-exit3 ledger none
+    queue ledger-exit3 ledger drain
     printf 'rm -f "%s/bin/lib/usage-gate.sh"\n' "$TT" > "$T/sleep.hook"
     run_tree_loop run
     assert_eq reexec_unreadable:rc 0 "$RC"
     assert_not_contains reexec_unreadable:no-change "$OUT" "code changed"
     assert_not_contains reexec_unreadable:no-skip "$OUT" "re-exec skipped"
-    assert_contains reexec_unreadable:totals "$OUT" "finish reason=exhausted batches=2 items=2"
+    assert_contains reexec_unreadable:totals "$OUT" "finish reason=stopped batches=2 items=2"
+    assert_contains reexec_unreadable:empty-line "$OUT" "backlog empty (sentinel confirmed first round LEDGER: none); re-check in 240m streak="
+}
+
+# ---------------------------------------------------------------- empty backlog
+# An empty batch needs the script-written sentinel; the marker alone is a failure.
+# The stub's default action is `drain`: sentinel, marker, then the stop flag.
+
+# stop_on_sleep: the next stubbed sleep creates the stop flag.
+stop_on_sleep() { printf 'touch "%s/stop"\n' "$STATE" > "$T/sleep.hook"; }
+
+# empty_dms: how many "backlog empty" DMs the run sent.
+empty_dms() {
+    if [ -f "$T/dm.calls" ]; then
+        grep -c 'backlog empty; re-checking every 240m' "$T/dm.calls" || true
+    else
+        echo 0
+    fi
+}
+
+test_empty_marker_without_sentinel_fails() {
+    new_env
+    seed_usage 5 0 1
+    queue none-unconfirmed
+    IBL5_BURNDOWN_MAX_FAILS=1 run_loop run
+    # Mutation: classifying on the marker alone makes this batch empty, not failed.
+    assert_eq test_empty_marker_without_sentinel_fails:rc 1 "$RC"
+    assert_contains test_empty_marker_without_sentinel_fails:line "$OUT" \
+        "batch failed reason=none-selected-unconfirmed rc=0 fails=1/1"
+    assert_not_contains test_empty_marker_without_sentinel_fails:no-empty-line "$OUT" "backlog empty"
+}
+
+test_empty_sentinel_sleeps_until_stop() {
+    new_env
+    seed_usage 5 0 1
+    queue none
+    stop_on_sleep
+    run_loop run
+    assert_eq test_empty_sentinel_sleeps_until_stop:rc 0 "$RC"
+    assert_contains test_empty_sentinel_sleeps_until_stop:line "$OUT" \
+        "backlog empty (sentinel confirmed first round LEDGER: none); re-check in 240m streak=1"
+    assert_contains test_empty_sentinel_sleeps_until_stop:sleep "$OUT" "sleep 14400s reason=backlog-empty"
+    assert_contains test_empty_sentinel_sleeps_until_stop:finish "$OUT" "finish reason=stopped"
+    assert_not_contains test_empty_sentinel_sleeps_until_stop:not-exhausted "$OUT" "finish reason=exhausted"
+}
+
+test_empty_dm_once_per_streak() {
+    new_env
+    seed_usage 5 0 1
+    queue none none
+    run_loop run
+    assert_eq test_empty_dm_once_per_streak:rc 0 "$RC"
+    # Three empty rounds (none, none, drain) send one DM, not three.
+    assert_eq test_empty_dm_once_per_streak:one-dm 1 "$(empty_dms)"
+}
+
+test_empty_streak_resets_after_ran() {
+    new_env
+    seed_usage 5 0 1
+    queue none ledger
+    run_loop run
+    assert_eq test_empty_streak_resets_after_ran:rc 0 "$RC"
+    # empty, ran, empty (drain): the ran batch ends the first streak.
+    assert_eq test_empty_streak_resets_after_ran:two-dms 2 "$(empty_dms)"
+}
+
+test_empty_once_exits_zero() {
+    new_env
+    seed_usage 5 0 1
+    queue none
+    run_loop run --once
+    assert_eq test_empty_once_exits_zero:rc 0 "$RC"
+    assert_contains test_empty_once_exits_zero:finish "$OUT" "finish reason=exhausted"
+    assert_contains test_empty_once_exits_zero:line "$OUT" \
+        "backlog empty (sentinel confirmed first round LEDGER: none); --once ends the run"
+    assert_not_contains test_empty_once_exits_zero:no-sleep "$OUT" "reason=backlog-empty"
+    assert_no_file test_empty_once_exits_zero:no-dm "$T/dm.calls"
+}
+
+test_empty_sentinel_with_ledger_ran() {
+    new_env
+    seed_usage 5 0 1
+    queue sentinel-ledger
+    run_loop run --once
+    assert_eq test_empty_sentinel_with_ledger_ran:rc 0 "$RC"
+    assert_contains test_empty_sentinel_with_ledger_ran:ran "$OUT" "batch ran ledgers=1"
+    assert_not_contains test_empty_sentinel_with_ledger_ran:no-empty "$OUT" "backlog empty"
+}
+
+test_empty_sentinel_timeout_failed() {
+    new_env
+    seed_usage 5 0 1
+    queue sentinel-alarm
+    IBL5_BURNDOWN_MAX_FAILS=1 run_loop run
+    assert_eq test_empty_sentinel_timeout_failed:rc 1 "$RC"
+    assert_contains test_empty_sentinel_timeout_failed:reason "$OUT" "batch failed reason=timeout"
+}
+
+test_empty_sentinel_env_scoped() {
+    local first stale
+    new_env
+    seed_usage 5 0 1
+    mkdir -p "$STATE"
+    stale="$STATE/empty-19990101T000000Z"
+    : > "$stale"
+    queue none-unconfirmed
+    IBL5_BURNDOWN_MAX_FAILS=1 run_loop run
+    # A leftover from a crashed batch must never vouch for this one.
+    assert_contains test_empty_sentinel_env_scoped:failed "$OUT" "batch failed reason=none-selected-unconfirmed"
+    assert_no_file test_empty_sentinel_env_scoped:stale-cleared "$stale"
+    first=$(head -n 1 "$T/claude.sentinel-env" 2>/dev/null)
+    if [[ "$first" =~ ^"$HOME"/\.claude/burndown-loop/empty-[0-9]{8}T[0-9]{6}Z$ ]]; then
+        pass test_empty_sentinel_env_scoped:path
+    else
+        fail test_empty_sentinel_env_scoped:path "got [$first]"
+    fi
+    assert_eq test_empty_sentinel_env_scoped:none-left 0 \
+        "$(find "$STATE" -maxdepth 1 -name 'empty-*' | wc -l | tr -d ' ')"
+}
+
+test_empty_sleep_knob() {
+    new_env
+    seed_usage 5 0 1
+    queue none
+    stop_on_sleep
+    IBL5_BURNDOWN_EMPTY_SLEEP_MIN='' run_loop run
+    assert_contains test_empty_sleep_knob:empty "$OUT" "sleep 14400s reason=backlog-empty"
+
+    new_env
+    seed_usage 5 0 1
+    queue none
+    stop_on_sleep
+    IBL5_BURNDOWN_EMPTY_SLEEP_MIN=5 run_loop run
+    assert_contains test_empty_sleep_knob:five "$OUT" "sleep 300s reason=backlog-empty"
+
+    new_env
+    seed_usage 5 0 1
+    queue none
+    IBL5_BURNDOWN_EMPTY_SLEEP_MIN=0 run_loop run
+    assert_eq test_empty_sleep_knob:zero-rc 2 "$RC"
+    assert_contains test_empty_sleep_knob:zero-names-var "$OUT" "IBL5_BURNDOWN_EMPTY_SLEEP_MIN"
+    assert_eq test_empty_sleep_knob:zero-no-batch 0 "$(calls "$T/claude.calls")"
+}
+
+test_empty_streak_survives_reexec() {
+    # (a) The carried streak suppresses the DM for the next empty batch.
+    new_env
+    seed_usage 5 0 1
+    queue none
+    reexec_handoff 'export IBL5_BURNDOWN_REEXEC_EMPTY_STREAK=1' run
+    assert_eq test_empty_streak_survives_reexec:carried-rc 0 "$RC"
+    assert_eq test_empty_streak_survives_reexec:carried-no-dm 0 "$(empty_dms)"
+    assert_no_file test_empty_streak_survives_reexec:carried-env-unset "$T/claude.reexec-env"
+
+    # (b) A hand-off from older code carries no streak var; the other counters still apply.
+    new_env
+    seed_usage 5 0 1
+    queue none-unconfirmed
+    reexec_handoff 'export IBL5_BURNDOWN_REEXEC_FAILS=2 IBL5_BURNDOWN_MAX_FAILS=3' run
+    assert_eq test_empty_streak_survives_reexec:absent-rc 1 "$RC"
+    assert_contains test_empty_streak_survives_reexec:absent-fails "$OUT" "fails=3/3"
+    assert_no_file test_empty_streak_survives_reexec:absent-env-unset "$T/claude.reexec-env"
+
+    # (c) An empty streak value resets nothing.
+    new_env
+    seed_usage 5 0 1
+    queue none-unconfirmed
+    reexec_handoff 'export IBL5_BURNDOWN_REEXEC_EMPTY_STREAK="" IBL5_BURNDOWN_REEXEC_FAILS=2 IBL5_BURNDOWN_MAX_FAILS=3' run
+    assert_eq test_empty_streak_survives_reexec:blank-rc 1 "$RC"
+    assert_contains test_empty_streak_survives_reexec:blank-fails "$OUT" "fails=3/3"
+    assert_no_file test_empty_streak_survives_reexec:blank-env-unset "$T/claude.reexec-env"
 }
 
 # ---------------------------------------------------------------- runner

@@ -1173,11 +1173,65 @@ g_scope_selection_only() {
         | awk -v s="$start" -v e="$end" '$1 > s && $1 < e')"
     [[ -z "$bad" ]]
 }
+# _bucket_emoji is a pure display map in the driver. Extract its text from a driver FILE
+# (header line through the first column-0 closing brace) so cases can eval it in isolation.
+bucket_emoji_src() {
+    awk '/^_bucket_emoji\(\)[[:space:]]*\{/ { on = 1 } on { print } on && /^\}[[:space:]]*$/ { exit }' "$1"
+}
+# Every bucket the map names, plus the fallback. Row = "<bucket>|<emoji>"; "|❓" is the empty string.
+# PAUSED is a real pr-triage bucket with no arm today, so it pins to the fallback.
+BUCKET_EMOJI_TABLE=(
+    'DIRTY|🔀' 'NOT-MERGEABLE|🚫' 'BLOCKED-CHECK|❌' 'HELD|⏸' 'BLOCKED-DEP|🔗'
+    'PIPELINE-HELD|🤖' 'FEAT-AWAITING-SIGNOFF|✍️' 'UNCLEARED|⚠️'
+    'PAUSED|❓' 'NO-SUCH-BUCKET|❓' '|❓'
+)
+BUCKET_EMOJI_ARMS=8   # named (non-*) arms the table above covers
+# $1 = driver file. Prints one line per mismatch; returns 1 on any mismatch or a missing function.
+bucket_emoji_check() {
+    local src arms
+    src="$(bucket_emoji_src "$1")"
+    [[ -n "$src" ]] || { echo "no _bucket_emoji() in $1"; return 1; }
+    arms="$(grep -cE '^[[:space:]]+[A-Z][A-Z-]*\)' <<< "$src")"
+    [[ "$arms" == "$BUCKET_EMOJI_ARMS" ]] \
+        || { echo "_bucket_emoji has $arms named arms, table covers $BUCKET_EMOJI_ARMS"; return 1; }
+    (
+        eval "$src"
+        declare -F _bucket_emoji > /dev/null || { echo "_bucket_emoji not defined after eval"; exit 1; }
+        bad=0
+        for row in "${BUCKET_EMOJI_TABLE[@]}"; do
+            b="${row%%|*}"; want="${row#*|}"
+            got="$(_bucket_emoji "$b")"
+            [[ "$got" == "$want" ]] || { echo "_bucket_emoji '$b' = '$got', want '$want'"; bad=1; }
+        done
+        exit "$bad"
+    )
+}
+# _bucket_emoji must stay a pure map. Allowed body lines: the header, `case "$1" in`,
+# `PATTERN) printf '<text>' ;;` arms, `esac`, the closing brace, blanks and comments.
+# Anything else (if, [ ], &&, a second command in an arm, a pipeline) fails the guard,
+# because g_no_bucket_cond() deliberately skips this body and cannot see logic added here.
+g_bucket_emoji_pure_map() {
+    local src line q="'"
+    local blank_re='^[[:space:]]*(#.*)?$'
+    local head_re='^_bucket_emoji\(\)[[:space:]]*\{[[:space:]]*$'
+    local case_re='^[[:space:]]+case "\$1" in[[:space:]]*$'
+    local arm_re="^[[:space:]]+(\\*|[A-Z][A-Z-]*)\\)[[:space:]]+printf ${q}[^${q}]+${q}[[:space:]]*;;[[:space:]]*\$"
+    local esac_re='^[[:space:]]+esac[[:space:]]*$'
+    local close_re='^\}[[:space:]]*$'
+    src="$(bucket_emoji_src "$1")"
+    [[ -n "$src" ]] || return 1
+    while IFS= read -r line; do
+        [[ "$line" =~ $blank_re || "$line" =~ $head_re || "$line" =~ $case_re \
+            || "$line" =~ $arm_re || "$line" =~ $esac_re || "$line" =~ $close_re ]] || return 1
+    done <<< "$src"
+    return 0
+}
+# end bucket_emoji helpers
 
 begin_case
 for g in g_no_merge g_no_armable_lib g_triage_pin g_one_arm g_no_bucket_cond \
          g_no_sleep g_no_poll g_one_ready g_no_timeout_grep \
-         g_cmd_prefix g_no_digest_fetch g_scope_selection_only; do
+         g_cmd_prefix g_no_digest_fetch g_scope_selection_only g_bucket_emoji_pure_map; do
     "$g" "$DRIVER" || fail "static guard $g fails against the real bin/pr-cycle"
 done
 # Guard 7 — both new files are executable and parse.
@@ -1225,6 +1279,30 @@ awk '/^_arm_and_classify\(\) \{/ { print; print "    _pr_allowed \"$1\" || retur
     "$DRIVER" > "$SCRATCH/mutant"
 g_scope_selection_only "$SCRATCH/mutant" \
     && fail "vacuous: g_scope_selection_only passed a scope filter inside _arm_and_classify"
+# _bucket_emoji mutants. Appending cannot test these: the guard reads only the function body,
+# so each mutation lands inside it (awk after the header, or sed on one arm line).
+awk '/^_bucket_emoji\(\) \{/ { print; print "    if [ \"$1\" = HELD ]; then printf x; return; fi"; next } { print }' \
+    "$DRIVER" > "$SCRATCH/mutant"
+grep -q 'then printf x; return; fi' "$SCRATCH/mutant" || fail "mutant did not land: if inside _bucket_emoji"
+g_bucket_emoji_pure_map "$SCRATCH/mutant" \
+    && fail "vacuous: g_bucket_emoji_pure_map passed an if inside _bucket_emoji"
+mutant; sed -i.bak '/^[[:space:]]*HELD)/s/ ;;$/; echo held >\&2 ;;/' "$SCRATCH/mutant"
+grep -q 'echo held >&2 ;;' "$SCRATCH/mutant" || fail "mutant did not land: second command in HELD arm"
+g_bucket_emoji_pure_map "$SCRATCH/mutant" \
+    && fail "vacuous: g_bucket_emoji_pure_map passed a second command in an arm"
+mutant; sed -i.bak 's/^_bucket_emoji()/_bucket_emoji_gone()/' "$SCRATCH/mutant"
+g_bucket_emoji_pure_map "$SCRATCH/mutant" \
+    && fail "vacuous: g_bucket_emoji_pure_map passed a driver with no _bucket_emoji"
+bucket_emoji_check "$SCRATCH/mutant" > /dev/null \
+    && fail "vacuous: bucket_emoji_check passed a driver with no _bucket_emoji"
+mutant; sed -i.bak '/^[[:space:]]*NOT-MERGEABLE)/d' "$SCRATCH/mutant"
+grep -q 'NOT-MERGEABLE)' "$SCRATCH/mutant" && fail "mutant did not land: NOT-MERGEABLE arm still present"
+bucket_emoji_check "$SCRATCH/mutant" > /dev/null \
+    && fail "vacuous: bucket_emoji_check passed a driver with the NOT-MERGEABLE arm deleted"
+mutant; sed -i.bak "/^[[:space:]]*DIRTY)/s/printf '[^']*'/printf 'X'/" "$SCRATCH/mutant"
+grep -qE "DIRTY\)[[:space:]]+printf 'X'" "$SCRATCH/mutant" || fail "mutant did not land: DIRTY wrong value"
+bucket_emoji_check "$SCRATCH/mutant" > /dev/null \
+    && fail "vacuous: bucket_emoji_check passed a wrong DIRTY emoji"
 end_case "case 26 guards are not vacuous"
 
 # ==========================================================================================
@@ -1656,6 +1734,15 @@ _plain40="$(( $(calls triage) - $(arm_calls) ))"
 [[ "$_plain40" == "1" ]] \
     || fail "case 40: want 1 plain triage call (cache hit for PR 2+3), got $_plain40 ($(calls triage) total, $(arm_calls) arm)"
 end_case "case 40 precheck-bucket cache fires triage exactly once"
+
+# ==========================================================================================
+# 41 — _bucket_emoji maps every bucket it names, and unknown/empty/PAUSED fall back to ❓
+# ==========================================================================================
+# Case 35 only sees two emojis end to end. This case evals the extracted function and checks
+# all eight arms plus the fallback, so a swapped or deleted arm fails here.
+begin_case
+_out41="$(bucket_emoji_check "$DRIVER")" || fail "case 41: $_out41"
+end_case "case 41 bucket emoji map covers every arm and the fallback"
 
 # ==========================================================================================
 # Helpers for Fix 3/4 harness fixtures

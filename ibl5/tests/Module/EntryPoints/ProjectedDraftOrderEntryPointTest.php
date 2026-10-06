@@ -8,7 +8,7 @@ class ProjectedDraftOrderEntryPointTest extends ModuleEntryPointTestCase
 {
     public function testRendersProjectedOrderWhenNotFinalized(): void
     {
-        $this->mockDb->onQuery('Draft Order Finalized', [['value' => 'No']]);
+        $this->mockDb->onQuery('Draft Order Finalized', [['setting_value' => 'No']]);
         $this->mockDb->setMockData([]);
 
         $output = $this->runModule('ProjectedDraftOrder');
@@ -19,7 +19,7 @@ class ProjectedDraftOrderEntryPointTest extends ModuleEntryPointTestCase
 
     public function testRendersFinalizedOrderWhenFinalized(): void
     {
-        $this->mockDb->onQuery('Draft Order Finalized', [['value' => 'Yes']]);
+        $this->mockDb->onQuery('Draft Order Finalized', [['setting_value' => 'Yes']]);
         $this->mockDb->setMockData([]);
 
         $output = $this->runModule('ProjectedDraftOrder');

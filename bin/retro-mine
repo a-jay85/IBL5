@@ -15,6 +15,11 @@
 # Runs under launchd with `env -i PATH=/usr/bin:/bin`, so this file stays
 # bash 3.2 clean: no associative arrays, no mapfile, no ${v,,}. Row parsing and
 # family aggregation live in one BSD-compatible awk program.
+#
+# A second stage (bin/lib/retro-mine-tuneup.sh) mines the week's transcripts and
+# failing run logs: Sonnet digests each kept thread, one Opus call ranks the week,
+# the top 5 are filed as backlog issues and DM'd, and the report lands in
+# ~/claude-plans/_reports/. Each stage runs in its own subshell.
 
 set -euo pipefail
 
@@ -23,8 +28,30 @@ MIN_ROWS=3            # a family needs at least this many rows
 MIN_SPAN=2            # ... spanning at least this many distinct rungs OR destinations
 REPROPOSE_GROWTH=2    # a seen family re-surfaces only after gaining this many rows
 DRAFT_MODEL=opus
+TUNEUP_DIGEST_MODEL=claude-sonnet-5-5
+TUNEUP_RANK_MODEL=opus
+TUNEUP_LLM_TIMEOUT=600
+W_CORRECTION=3
+W_RUNLOG_FAIL=4
+W_HOOK_DENY=2
+W_STOP_BLOCK=2
+W_COMPACTION=2
+W_HEAVY_TURN=1
+HEAVY_TURN_TOKENS=100000   # input + cache_creation + output per API message
+MAX_THREADS=40
+MAX_EXCERPTS=12
+EXCERPT_CHARS=200
+RANK_MAX=8
+TOP_N=5
+TUNEUP_MARKER='retro-mine tune-up call'
+BACKLOG_REPO=a-jay85/IBL5-backlog
+BACKLOG_LABEL=dev-efficiency
+TUNEUP_LABEL=tune-up
 DRAFT_TIMEOUT=600
 DRAFT_SCHEMA='{"type":"object","additionalProperties":false,"required":["kind","slug","description","pr_summary"],"properties":{"kind":{"enum":["rule_doc","trigger_row"]},"slug":{"type":"string","pattern":"^[a-z0-9]+(-[a-z0-9]+)*$","maxLength":48},"description":{"type":"string","maxLength":160},"pr_summary":{"type":"string","maxLength":1200},"body":{"type":"string","maxLength":6000},"trigger_if":{"type":"string","maxLength":300},"must_assert":{"type":"string","maxLength":600}}}'
+TUNEUP_DIGEST_SCHEMA='{"type":"object","additionalProperties":false,"required":["findings"],"properties":{"findings":{"type":"array","maxItems":4,"items":{"type":"object","additionalProperties":false,"required":["signature","summary"],"properties":{"signature":{"type":"string"},"summary":{"type":"string","maxLength":300}}}}}}'
+TUNEUP_RANK_SCHEMA='{"type":"object","additionalProperties":false,"required":["items"],"properties":{"items":{"type":"array","maxItems":8,"items":{"type":"object","additionalProperties":false,"required":["title","summary","proposed_change","signatures"],"properties":{"title":{"type":"string","maxLength":90},"summary":{"type":"string","maxLength":400},"proposed_change":{"type":"string","maxLength":600},"signatures":{"type":"array","items":{"type":"string"}}}}}}}'
+TUNEUP_PROSEFIX_SCHEMA='{"type":"object","additionalProperties":false,"required":["body"],"properties":{"body":{"type":"string","maxLength":8000}}}'
 ALLOWED_KEYS='["kind","slug","description","pr_summary","body","trigger_if","must_assert"]'
 TRIGGER_FILE=.claude/review-shared/_plan-verification.md
 TRIGGER_HEADING='## Forced integration-verification trigger'
@@ -35,6 +62,21 @@ import-store	import|store'
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 
 log() { echo "retro-mine: $*" >&2; }
+
+# The tune-up stage lives in a sourced lib. BASH_SOURCE (not $0) keeps a sourcing
+# test working; a doctored copy elsewhere reaches the lib through RETRO_MINE_LIB_DIR.
+if [ -n "${RETRO_MINE_LIB_DIR+set}" ] && [ -z "$RETRO_MINE_LIB_DIR" ]; then
+    log "ERROR: RETRO_MINE_LIB_DIR is set but empty"
+    exit 2
+fi
+RM_LIB_DIR="${RETRO_MINE_LIB_DIR-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib}"
+# A missing file makes `.` exit the shell before any `||` runs, so test first.
+if [ ! -r "$RM_LIB_DIR/retro-mine-tuneup.sh" ]; then
+    log "ERROR: cannot source $RM_LIB_DIR/retro-mine-tuneup.sh"
+    exit 2
+fi
+# shellcheck source=bin/lib/retro-mine-tuneup.sh
+. "$RM_LIB_DIR/retro-mine-tuneup.sh"
 
 usage() {
     cat <<'EOF'
@@ -49,6 +91,13 @@ Env (unset is legal for all; an empty value exits 2):
   RETRO_MINE_CLAUDE_BIN  drafter binary (default: claude)
   RETRO_MINE_GH_BIN      gh binary (default: gh)
   RETRO_MINE_REPO        repo the draft PR is cut from (default: this checkout)
+  RETRO_MINE_PROJECTS_DIR      transcript root (default: $HOME/.claude/projects)
+  RETRO_MINE_NOW               clock override, epoch seconds (tests only)
+  RETRO_MINE_TMP_LOG_DIR       plan-now and post-plan-now logs (default: /tmp)
+  RETRO_MINE_AUTOMOUSE_LOG_DIR automouse logs (default: <projects>/<repo dir>/automouse/logs)
+  RETRO_MINE_REPORT_DIR        tune-up reports (default: $HOME/claude-plans/_reports)
+  RETRO_MINE_DM_BIN            DM sender (default: <repo>/bin/discord-dm)
+  RETRO_MINE_LIB_DIR           tune-up lib dir (default: bin/lib beside this script)
 EOF
 }
 
@@ -57,7 +106,9 @@ EOF
 reject_empty_env() {
     local v
     for v in RETRO_MINE_REGISTRY RETRO_MINE_STATE_DIR RETRO_MINE_CLAUDE_BIN \
-             RETRO_MINE_GH_BIN RETRO_MINE_REPO; do
+             RETRO_MINE_GH_BIN RETRO_MINE_REPO RETRO_MINE_PROJECTS_DIR RETRO_MINE_NOW \
+             RETRO_MINE_TMP_LOG_DIR RETRO_MINE_AUTOMOUSE_LOG_DIR RETRO_MINE_REPORT_DIR \
+             RETRO_MINE_DM_BIN RETRO_MINE_LIB_DIR; do
         if [ -n "${!v+set}" ] && [ -z "${!v}" ]; then
             log "ERROR: $v is set but empty"
             exit 2
@@ -80,6 +131,15 @@ resolve_env() {
     STATE_FILE="$STATE_DIR/proposed.tsv"
     CLAUDE_BIN="${RETRO_MINE_CLAUDE_BIN-claude}"
     GH_BIN="${RETRO_MINE_GH_BIN-gh}"
+    PROJECTS_DIR="${RETRO_MINE_PROJECTS_DIR-${HOME-}/.claude/projects}"
+    NOW_EPOCH="${RETRO_MINE_NOW-$(date +%s)}"
+    case "$NOW_EPOCH" in
+        ''|*[!0-9]*) log "ERROR: RETRO_MINE_NOW is not epoch seconds: $NOW_EPOCH"; exit 2 ;;
+    esac
+    TMP_LOG_DIR="${RETRO_MINE_TMP_LOG_DIR-/tmp}"
+    AUTOMOUSE_LOG_DIR="${RETRO_MINE_AUTOMOUSE_LOG_DIR-$PROJECTS_DIR/$(printf '%s' "$REPO_ROOT" | tr '/.' '--')/automouse/logs}"
+    REPORT_DIR="${RETRO_MINE_REPORT_DIR-${HOME-}/claude-plans/_reports}"
+    DM_BIN="${RETRO_MINE_DM_BIN-$REPO_ROOT/bin/discord-dm}"
 }
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -532,6 +592,27 @@ main() {
 
     resolve_env
 
+    # Both stages always run, each in a subshell whose own set -e is load-bearing
+    # (a subshell inherits the outer set +e). Never ( ... ) || rc=$?: that form
+    # disables errexit inside the subshell.
+    local reg_rc tune_rc
+    set +e
+    ( set -e; registry_stage "$dry_run" ); reg_rc=$?
+    ( set -e; tuneup_stage "$dry_run" ); tune_rc=$?
+    set -e
+    if [ "$reg_rc" -ne 0 ]; then
+        exit "$reg_rc"
+    fi
+    if [ "$tune_rc" -ne 0 ]; then
+        log "ERROR: tune-up stage failed (exit $tune_rc)"
+        exit "$tune_rc"
+    fi
+}
+
+# registry_stage <dry_run>: the registry scan, drafter and PRs. Runs only in a
+# subshell, so its exits and lock trap end the stage, never the run.
+registry_stage() {
+    local dry_run="$1"
     local report
     report="$(scan_registry)" || exit 1
     printf '%s\n' "$report"

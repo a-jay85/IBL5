@@ -917,6 +917,82 @@ C26_FILES=$(ls "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json 2>/dev
 [ -z "$C26_FILES" ] && ok "C26: no ledger file created" || fail "C26: no ledger file created"
 echo '[]' > "$T/fx/prs-open.json"
 
+# ── ES: empty-backlog sentinel (IBL5_BURNDOWN_EMPTY_SENTINEL) ─────────────────
+ES_DIR="$T/es"; mkdir -p "$ES_DIR"
+cat > "$T/fx/prs-open.json" <<'JSON'
+[{"number":901,"body":"IBL5-backlog#100 IBL5-backlog#101 IBL5-backlog#102 IBL5-backlog#103 IBL5-backlog#104 IBL5-backlog#105"}]
+JSON
+cp "$T/fx/issues.json" "$ES_DIR/issues.json.orig"
+es_reset() { rm -f "$ES_DIR"/empty-*; }
+
+# ES1: var set, first round, empty
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL="$ES_DIR/empty-1"; bd_b 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+[ "$RC" -eq 0 ] && ok "ES1: exits 0" || fail "ES1: exits 0 (got $RC)"
+[ "$ES_LAST" = "LEDGER: none" ] && ok "ES1: LEDGER: none" || fail "ES1: LEDGER: none (got $ES_LAST)"
+[ -f "$ES_DIR/empty-1" ] && ok "ES1: sentinel written" || fail "ES1: sentinel written"
+ES_BODY=$(cat "$ES_DIR/empty-1" 2>/dev/null || true)
+[ "$ES_BODY" = "LEDGER: none" ] && ok "ES1: sentinel content" || fail "ES1: sentinel content (got $ES_BODY)"
+
+# ES2: var unset is a no-op
+es_reset
+OUT="$(unset IBL5_BURNDOWN_EMPTY_SENTINEL; bd_b 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+ES_FILES=$(ls "$ES_DIR"/empty-* 2>/dev/null || true)
+[ "$RC" -eq 0 ] && ok "ES2: unset exits 0" || fail "ES2: unset exits 0 (got $RC)"
+[ "$ES_LAST" = "LEDGER: none" ] && ok "ES2: unset LEDGER: none" || fail "ES2: unset LEDGER: none (got $ES_LAST)"
+[ -z "$ES_FILES" ] && ok "ES2: unset writes no file" || fail "ES2: unset writes no file"
+[[ "$OUT" != *"cannot write empty sentinel"* ]] \
+    && ok "ES2: unset prints no warning" || fail "ES2: unset prints no warning"
+
+# ES3: var set to the empty string is a no-op
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL=""; bd_b 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+ES_FILES=$(ls "$ES_DIR"/empty-* 2>/dev/null || true)
+[ "$RC" -eq 0 ] && ok "ES3: empty var exits 0" || fail "ES3: empty var exits 0 (got $RC)"
+[ "$ES_LAST" = "LEDGER: none" ] && ok "ES3: empty var LEDGER: none" || fail "ES3: empty var LEDGER: none (got $ES_LAST)"
+[ -z "$ES_FILES" ] && ok "ES3: empty var writes no file" || fail "ES3: empty var writes no file"
+[[ "$OUT" != *"cannot write empty sentinel"* ]] \
+    && ok "ES3: empty var prints no warning" || fail "ES3: empty var prints no warning"
+
+# ES4: --after round that is empty writes no sentinel
+cat > "$ES_DIR/after.json" <<'JSON'
+{
+  "schema": 1,
+  "items": [
+    {"issue_num":60,"also_closes":[],"issue_title":"XHIGH a sixty","rank":"P2","tier":"xhigh","cost":2,"paths":["bin/aa"],"route":"","slug":"","pr_url":"","status":"merged"}
+  ],
+  "skipped": [],
+  "units_used": 2,
+  "budget": 5
+}
+JSON
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL="$ES_DIR/empty-4"; bd_b --after "$ES_DIR/after.json" 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+[ "$RC" -eq 0 ] && ok "ES4: --after exits 0" || fail "ES4: --after exits 0 (got $RC)"
+[ "$ES_LAST" = "LEDGER: none" ] && ok "ES4: --after LEDGER: none" || fail "ES4: --after LEDGER: none (got $ES_LAST)"
+[ ! -e "$ES_DIR/empty-4" ] && ok "ES4: --after writes no sentinel" || fail "ES4: --after writes no sentinel"
+
+# ES5: live-unknown first round writes no sentinel
+jq '(.[0].labels) = [{"name":"blocked"}]' "$ES_DIR/issues.json.orig" > "$T/fx/issues.json"
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL="$ES_DIR/empty-5" GH_FAIL_ON="--json comments"; bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "ES5: live-unknown exits 1" || fail "ES5: live-unknown exits 1 (got $RC)"
+want "ES5: live-unknown prints LEDGER: none" "$OUT" "LEDGER: none"
+[ ! -e "$ES_DIR/empty-5" ] && ok "ES5: live-unknown writes no sentinel" || fail "ES5: live-unknown writes no sentinel"
+cp "$ES_DIR/issues.json.orig" "$T/fx/issues.json"
+
+# ES6: a round that selects work writes no sentinel
+echo '[]' > "$T/fx/prs-open.json"
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL="$ES_DIR/empty-6"; bd_b 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+[ "$RC" -eq 0 ] && ok "ES6: picks exit 0" || fail "ES6: picks exit 0 (got $RC)"
+[[ "$ES_LAST" == "LEDGER: /"* ]] && ok "ES6: LEDGER path printed" || fail "ES6: LEDGER path printed (got $ES_LAST)"
+[ ! -e "$ES_DIR/empty-6" ] && ok "ES6: picks write no sentinel" || fail "ES6: picks write no sentinel"
+
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+echo '[]' > "$T/fx/prs-open.json"
+cp "$ES_DIR/issues.json.orig" "$T/fx/issues.json"
+
 # ── C27: record happy path ────────────────────────────────────────────────────
 # Create ledger directly (4 items: #60 cost=2, #61-#62-#64 cost=1 each; units_used=5)
 LEDGER27="$T/home/claude-plans/_reports/burndown-batch-test27.json"

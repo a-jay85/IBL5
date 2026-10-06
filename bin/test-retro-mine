@@ -16,6 +16,22 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 RM_DRIVER="${RETRO_MINE_SELF:-$SCRIPT_DIR/retro-mine}"
+# Isolation: no case may read real transcripts or run logs, write a real report,
+# or reach the real DM. Every tune-up seam points into one throwaway dir.
+RM_ISO="$(mktemp -d)"
+mkdir -p "$RM_ISO/projects" "$RM_ISO/tmplogs" "$RM_ISO/amlogs" "$RM_ISO/reports"
+printf '#!/bin/bash\ntouch "%s/dm-called"\nexit 1\n' "$RM_ISO" > "$RM_ISO/dm-sentinel"
+chmod +x "$RM_ISO/dm-sentinel"
+export RETRO_MINE_PROJECTS_DIR="$RM_ISO/projects"
+export RETRO_MINE_TMP_LOG_DIR="$RM_ISO/tmplogs"
+export RETRO_MINE_AUTOMOUSE_LOG_DIR="$RM_ISO/amlogs"
+export RETRO_MINE_REPORT_DIR="$RM_ISO/reports"
+export RETRO_MINE_DM_BIN="$RM_ISO/dm-sentinel"
+# gh defaults to the real binary; a dry-run lists issues, so fence it off too.
+printf '#!/bin/bash\nexit 127\n' > "$RM_ISO/gh-sentinel"
+chmod +x "$RM_ISO/gh-sentinel"
+export RETRO_MINE_GH_BIN="$RM_ISO/gh-sentinel"
+RM_GIT_BASELINE="$(git -C "$SCRIPT_DIR/.." status --porcelain --untracked-files=all 2>/dev/null)"
 
 FAILED=0
 RM_RC=0
@@ -41,6 +57,7 @@ rm_lacks() {
 }
 
 RM_TMPS=()
+RM_TMPS+=("$RM_ISO")
 rm_cleanup() {
     local d
     for d in ${RM_TMPS[@]+"${RM_TMPS[@]}"}; do rm -rf "$d"; done
@@ -206,7 +223,9 @@ case_empty_env() {
     RETRO_MINE_REGISTRY="$t/reg.md" RETRO_MINE_STATE_DIR='' "$RM_DRIVER" --dry-run >/dev/null 2>&1
     rc=$?
     rm_expect_eq "empty_env: empty RETRO_MINE_STATE_DIR exits 2" 2 "$rc"
-    err="$(env -i PATH=/usr/bin:/bin RETRO_MINE_REGISTRY="$t/reg.md" "$RM_DRIVER" --dry-run 2>&1 >/dev/null)"
+    err="$(env -i PATH=/usr/bin:/bin RETRO_MINE_REGISTRY="$t/reg.md" \
+        RETRO_MINE_PROJECTS_DIR="$RM_ISO/projects" RETRO_MINE_TMP_LOG_DIR="$RM_ISO/tmplogs" RETRO_MINE_AUTOMOUSE_LOG_DIR="$RM_ISO/amlogs" RETRO_MINE_REPORT_DIR="$RM_ISO/reports" RETRO_MINE_DM_BIN="$RM_ISO/dm-sentinel" \
+        "$RM_DRIVER" --dry-run 2>&1 >/dev/null)"
     rc=$?
     rm_expect_eq "empty_env: no HOME and no state var exits 2" 2 "$rc"
     rm_has "empty_env: error names HOME" "$err" "HOME"
@@ -245,6 +264,7 @@ case_launchd_env_dry_run() {
     local t out rc; t="$(rm_tmp)"
     rm_registry "$t/reg.md" "$(rm_row '#1' 'alpha' 3 .claude/rules/a.md '--')"
     out="$(env -i PATH=/usr/bin:/bin HOME="$t" RETRO_MINE_REGISTRY="$t/reg.md" \
+        RETRO_MINE_PROJECTS_DIR="$RM_ISO/projects" RETRO_MINE_TMP_LOG_DIR="$RM_ISO/tmplogs" RETRO_MINE_AUTOMOUSE_LOG_DIR="$RM_ISO/amlogs" RETRO_MINE_REPORT_DIR="$RM_ISO/reports" RETRO_MINE_DM_BIN="$RM_ISO/dm-sentinel" \
         RETRO_MINE_STATE_DIR="$t/state" /bin/bash "$RM_DRIVER" --dry-run 2>&1)"
     rc=$?
     rm_expect_eq "launchd_env_dry_run: exit 0" 0 "$rc"
@@ -273,6 +293,12 @@ case_cron_print_schedule_env() {
     rm_has "cron_print_schedule_env: PATH covers brew, system, and expanded HOME" "$RM_OUT" \
         "<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$t/home/.local/bin</string>"
     rm_has "cron_print_schedule_env: weekly key" "$RM_OUT" "<key>Weekday</key>"
+    rm_expect_eq "cron_print_schedule_env: Weekday value" "<integer>0</integer>" \
+        "$(printf '%s\n' "$RM_OUT" | grep -A1 '<key>Weekday</key>' | tail -1 | tr -d ' \t')"
+    rm_expect_eq "cron_print_schedule_env: Hour value" "<integer>9</integer>" \
+        "$(printf '%s\n' "$RM_OUT" | grep -A1 '<key>Hour</key>' | tail -1 | tr -d ' \t')"
+    rm_expect_eq "cron_print_schedule_env: Minute value" "<integer>15</integer>" \
+        "$(printf '%s\n' "$RM_OUT" | grep -A1 '<key>Minute</key>' | tail -1 | tr -d ' \t')"
     rm_has "cron_print_schedule_env: ProgramArguments target" "$RM_OUT" "/bin/retro-mine</string>"
     if grep -qF '$' <<< "$RM_OUT"; then rm_fail "cron_print_schedule_env: unexpanded \$ in plist"
     else rm_ok "cron_print_schedule_env: no unexpanded \$"; fi
@@ -380,6 +406,10 @@ rm_validate() {
     local env="$1" tree="$2" render="${3:-}" errf
     errf="$(mktemp)"
     (
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
         # shellcheck source=/dev/null
         . "$RM_DRIVER"
         set +e
@@ -730,8 +760,133 @@ case_dry_run_no_side_effects() {
     rm_expect_eq "dry_run_no_side_effects: worktrees unchanged" "$wts" "$(git -C "$t/repo" worktree list)"
     if [ -e "$t/state" ]; then rm_fail "dry_run_no_side_effects: state dir created"
     else rm_ok "dry_run_no_side_effects: no state dir"; fi
-    if [ -e "$t/gh.log" ] || [ -e "$t/claude.argv" ]; then rm_fail "dry_run_no_side_effects: a stub was invoked"
-    else rm_ok "dry_run_no_side_effects: gh and claude never invoked"; fi
+    # The tune-up dry-run may make one read-only gh issue list; nothing else.
+    if [ -e "$t/claude.argv" ] || { [ -e "$t/gh.log" ] && grep -qv '^issue list ' "$t/gh.log"; }; then
+        rm_fail "dry_run_no_side_effects: a stub was invoked"
+    else rm_ok "dry_run_no_side_effects: claude never invoked, gh only listed issues"; fi
+}
+
+# ── Tune-up helpers ───────────────────────────────────────────────────────────
+RM_FIXTURE_DIR="$SCRIPT_DIR/fixtures/retro-mine"
+RM_NOW=1790000000   # fixed clock for every tune-up case (2026-09-21 UTC)
+
+# rm_iso <epoch>: ISO-8601 UTC with ms, portable across BSD and GNU date.
+rm_iso() {
+    date -u -r "$1" +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null || date -u -d "@$1" +%Y-%m-%dT%H:%M:%S.000Z
+}
+
+# rm_tuneup_stubs <t>: claude, gh and DM recorders for tune-up cases.
+#   claude: one "call N" line per call in claude.calls, argv in claude.argv.N
+#     ([arg] per line), the -p text in prompt.N, cwd in claude.cwd; serves
+#     prosefix-env.json when the prompt holds "prose fix", digest-env.json for
+#     --model claude-sonnet-5-5, rank-env.json otherwise; exits claude.rc.
+#   gh: every call appended to gh.log; "issue list" prints issues.json, kept
+#     to the --label when one is given (exits gh.rc); "issue create" appends
+#     an OPEN issue with its --label values to issues.json, copies the
+#     body to gh-body.N and prints its URL.
+#   dm: stdin saved to dm.N; exits dm.rc.
+rm_tuneup_stubs() {
+    local t="$1"
+    mkdir -p "$t/projects" "$t/tmplogs" "$t/amlogs" "$t/reports"
+    [ -f "$t/issues.json" ] || echo '[]' > "$t/issues.json"
+    rm_registry "$t/reg.md" "$(rm_row '#1' 'alpha' 3 .claude/rules/a.md '--')"
+    cat > "$t/claude" <<EOF
+#!/bin/bash
+n=\$(( \$(cat "$t/claude.n" 2>/dev/null || echo 0) + 1 ))
+echo "\$n" > "$t/claude.n"
+echo "call \$n" >> "$t/claude.calls"
+pwd > "$t/claude.cwd"
+printf '[%s]\n' "\$@" > "$t/claude.argv.\$n"
+model=""; prompt=""
+while [ \$# -gt 0 ]; do
+    case "\$1" in
+        -p) prompt="\$2"; shift ;;
+        --model) model="\$2"; shift ;;
+    esac
+    shift
+done
+printf '%s' "\$prompt" > "$t/prompt.\$n"
+rc=\$(cat "$t/claude.rc" 2>/dev/null || echo 0)
+[ "\$rc" -eq 0 ] || exit "\$rc"
+case "\$prompt" in *"prose fix"*) cat "$t/prosefix-env.json"; exit 0 ;; esac
+if [ "\$model" = claude-sonnet-5-5 ]; then cat "$t/digest-env.json"; else cat "$t/rank-env.json"; fi
+EOF
+    cat > "$t/gh" <<EOF
+#!/bin/bash
+echo "\$*" >> "$t/gh.log"
+rc=\$(cat "$t/gh.rc" 2>/dev/null || echo 0)
+[ "\$rc" -eq 0 ] || exit "\$rc"
+if [ "\$1 \$2" = "issue list" ]; then
+    label=""
+    while [ \$# -gt 0 ]; do
+        case "\$1" in --label) label="\$2"; shift ;; esac
+        shift
+    done
+    jq --arg l "\$label" 'map(select(\$l == "" or ((.labels // []) | index(\$l))))' "$t/issues.json"
+    exit 0
+fi
+if [ "\$1 \$2" = "issue create" ]; then
+    title=""; body=""; labels='[]'
+    while [ \$# -gt 0 ]; do
+        case "\$1" in
+            --title) title="\$2"; shift ;;
+            --body-file) body="\$2"; shift ;;
+            --label) labels="\$(jq -c --arg l "\$2" '. + [\$l]' <<< "\$labels")"; shift ;;
+        esac
+        shift
+    done
+    n=\$(( 100 + \$(jq 'length' "$t/issues.json") ))
+    cp "\$body" "$t/gh-body.\$n"
+    jq --argjson n "\$n" --arg t "\$title" --argjson lb "\$labels" '. + [{number: \$n, title: \$t, state: "OPEN", labels: \$lb}]' \
+        "$t/issues.json" > "$t/issues.json.tmp" && mv "$t/issues.json.tmp" "$t/issues.json"
+    echo "https://github.com/a-jay85/IBL5-backlog/issues/\$n"
+fi
+EOF
+    cat > "$t/dm" <<EOF
+#!/bin/bash
+n=\$(( \$(cat "$t/dm.n" 2>/dev/null || echo 0) + 1 ))
+echo "\$n" > "$t/dm.n"
+cat > "$t/dm.\$n"
+exit "\$(cat "$t/dm.rc" 2>/dev/null || echo 0)"
+EOF
+    chmod +x "$t/claude" "$t/gh" "$t/dm"
+}
+
+# rm_tuneup_env <structured-json> [cost]: a claude -p --output-format json envelope.
+rm_tuneup_env() {
+    jq -n -c --argjson s "$1" --argjson c "${2:-0.5}" '{type: "result", is_error: false,
+        stop_reason: "end_turn", total_cost_usd: $c, structured_output: $s,
+        usage: {input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 0, cache_creation_input_tokens: 0}}'
+}
+
+# rm_tuneup_run <t> [args...]: the driver with every seam pointed into <t>.
+# Override the clock per call with RM_RUN_NOW.
+rm_tuneup_run() {
+    local t="$1" errf
+    shift
+    errf="$(mktemp)"
+    RM_OUT="$(RETRO_MINE_REGISTRY="$t/reg.md" RETRO_MINE_STATE_DIR="$t/state" \
+        RETRO_MINE_CLAUDE_BIN="$t/claude" RETRO_MINE_GH_BIN="$t/gh" RETRO_MINE_DM_BIN="$t/dm" \
+        RETRO_MINE_PROJECTS_DIR="$t/projects" RETRO_MINE_TMP_LOG_DIR="$t/tmplogs" \
+        RETRO_MINE_AUTOMOUSE_LOG_DIR="$t/amlogs" RETRO_MINE_REPORT_DIR="$t/reports" \
+        RETRO_MINE_NOW="${RM_RUN_NOW:-$RM_NOW}" "$RM_DRIVER" "$@" 2>"$errf")"
+    RM_RC=$?
+    RM_ERR="$(cat "$errf")"
+    rm -f "$errf"
+}
+
+# rm_tuneup_thread <t> <dir-suffix> <sid> <age-seconds> [deny-text] — one interactive session
+# with a hook deny and a correction, written to <t>/projects/-Users-x-GitHub-IBL5<suffix>/<sid>.jsonl.
+rm_tuneup_thread() {
+    local t="$1" sid="$3" deny="${5:-PreToolUse:Bash hook error: BLOCKED cd into sibling worktree 12}" d ts
+    d="$t/projects/-Users-x-GitHub-IBL5$2"
+    ts="$(rm_iso $((RM_NOW - $4)))"
+    mkdir -p "$d"
+    {
+        jq -n -c --arg s "$sid" --arg ts "$ts" '{type: "user", sessionId: $s, entrypoint: "cli", cwd: "/repo", gitBranch: "b", timestamp: $ts, uuid: "u1", message: {content: "please fix the build"}}'
+        jq -n -c --arg s "$sid" --arg ts "$ts" --arg dn "$deny" '{type: "user", sessionId: $s, entrypoint: "cli", timestamp: $ts, uuid: "u2", message: {content: [{type: "tool_result", is_error: true, content: $dn}]}}'
+        jq -n -c --arg s "$sid" --arg ts "$ts" '{type: "user", sessionId: $s, entrypoint: "cli", timestamp: $ts, uuid: "u3", message: {content: "no, run it in the worktree"}}'
+    } > "$d/$sid.jsonl"
 }
 
 # ── Real registry and replay cases ───────────────────────────────────────────
@@ -776,6 +931,565 @@ case_replay_tampered_kind() {
     rm_validate "$(cat "$t/tampered.json")" "$t/tree"
     rm_expect_eq "replay_tampered_kind: exit 1" 1 "$RM_RC"
     rm_has "replay_tampered_kind: named reason" "$RM_ERR" "kind not allowlisted"
+}
+
+# ── Tune-up cases ─────────────────────────────────────────────────────────────
+RM_TSIG="hook_deny:pretooluse:bash_hook_error:_blocked_cd_into_sibling_worktree"
+RM_TDAY=2026-09-21
+
+# rm_tuneup_week <t> [n-items] [threads]: signal threads, a valid digest and a rank of n items.
+rm_tuneup_week() {
+    local t="$1" n="${2:-7}" th="${3:-2}" i items='['
+    rm_tuneup_stubs "$t"
+    rm_tuneup_thread "$t" "" s1 3600
+    [ "$th" -lt 2 ] || rm_tuneup_thread "$t" "-wt" s2 7200
+    rm_tuneup_env "{\"findings\":[{\"signature\":\"$RM_TSIG\",\"summary\":\"The cd guard fires often.\"}]}" 0.5 \
+        > "$t/digest-env.json"
+    for i in $(seq 1 "$n"); do
+        items="$items{\"title\":\"Fix item $i\",\"summary\":\"Summary $i is short.\",\"proposed_change\":\"Change $i.\",\"signatures\":[]},"
+    done
+    rm_tuneup_env "{\"items\":${items%,}]}" 2.0 > "$t/rank-env.json"
+}
+
+# rm_tline <file> <json>: append one transcript line.
+rm_tline() { printf '%s\n' "$2" >> "$1"; }
+
+# rm_creates <t>: number of "issue create" calls so far.
+rm_creates() { grep -c '^issue create ' "$1/gh.log" 2>/dev/null || true; }
+
+case_tuneup_empty_env_rejected() {
+    local t v
+    t="$(rm_tmp)"
+    rm_tuneup_stubs "$t"
+    for v in RETRO_MINE_PROJECTS_DIR RETRO_MINE_TMP_LOG_DIR RETRO_MINE_AUTOMOUSE_LOG_DIR \
+        RETRO_MINE_REPORT_DIR RETRO_MINE_DM_BIN RETRO_MINE_NOW RETRO_MINE_LIB_DIR; do
+        RM_OUT="$(env "$v=" "$RM_DRIVER" --dry-run 2>&1)"
+        RM_RC=$?
+        rm_expect_eq "tuneup_empty_env_rejected: $v= exits 2" 2 "$RM_RC"
+        rm_has "tuneup_empty_env_rejected: $v named" "$RM_OUT" "$v"
+    done
+    rm_tuneup_run "$t" --dry-run
+    rm_expect_eq "tuneup_empty_env_rejected: all seams set to values is accepted" 0 "$RM_RC"
+    if grep -nE '\$\{RETRO_MINE_[A-Z_]+:-' "$RM_DRIVER" "$SCRIPT_DIR/lib/retro-mine-tuneup.sh"; then
+        rm_fail "tuneup_empty_env_rejected: a :- default hides an empty seam"
+    else rm_ok "tuneup_empty_env_rejected: no :- seam defaults"; fi
+}
+
+case_tuneup_usage_lists_seams() {
+    local out v
+    out="$("$RM_DRIVER" --help 2>&1)"
+    for v in RETRO_MINE_PROJECTS_DIR RETRO_MINE_TMP_LOG_DIR RETRO_MINE_AUTOMOUSE_LOG_DIR \
+        RETRO_MINE_REPORT_DIR RETRO_MINE_DM_BIN RETRO_MINE_NOW RETRO_MINE_LIB_DIR; do
+        rm_has "tuneup_usage_lists_seams: $v" "$out" "$v"
+    done
+}
+
+case_tuneup_stage_isolation() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    echo 1 > "$t/claude.rc"
+    rm_tuneup_run "$t"
+    [ "$RM_RC" -ne 0 ] && rm_ok "tuneup_stage_isolation: tune-up failure exits nonzero" \
+        || rm_fail "tuneup_stage_isolation: tune-up failure exited 0"
+    rm_has "tuneup_stage_isolation: registry report still printed" "$RM_OUT" "ROWS"
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    rm -f "$t/reg.md"
+    rm_tuneup_run "$t"
+    [ "$RM_RC" -ne 0 ] && rm_ok "tuneup_stage_isolation: registry failure exits nonzero" \
+        || rm_fail "tuneup_stage_isolation: registry failure exited 0"
+    [ -s "$t/dm.1" ] && rm_ok "tuneup_stage_isolation: tune-up still delivers after a registry failure" \
+        || rm_fail "tuneup_stage_isolation: no DM after a registry failure"
+}
+
+case_tuneup_lib_dir_override() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_stubs "$t"
+    mkdir -p "$t/copy"
+    cp "$RM_DRIVER" "$t/copy/retro-mine"
+    RETRO_MINE_REPO="$SCRIPT_DIR/.." RM_DRIVER="$t/copy/retro-mine" rm_tuneup_run "$t" --dry-run
+    rm_expect_eq "tuneup_lib_dir_override: copied driver without lib exits 2" 2 "$RM_RC"
+    rm_has "tuneup_lib_dir_override: names the failure" "$RM_ERR" "cannot source"
+    RETRO_MINE_REPO="$SCRIPT_DIR/.." RETRO_MINE_LIB_DIR="$SCRIPT_DIR/lib" RM_DRIVER="$t/copy/retro-mine" \
+        rm_tuneup_run "$t" --dry-run
+    rm_expect_eq "tuneup_lib_dir_override: lib seam makes the copy run" 0 "$RM_RC"
+}
+
+case_tuneup_window_filter() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_stubs "$t"
+    rm_tuneup_thread "$t" "-old" old $((8 * 86400))
+    rm_tuneup_thread "$t" "-new" new $((6 * 86400))
+    rm_tuneup_thread "$t" "-x" other 3600
+    mv "$t/projects/-Users-x-GitHub-IBL5-x" "$t/projects/-Users-x-GitHub-Other"
+    rm_tuneup_run "$t" --dry-run
+    rm_has "tuneup_window_filter: only the 6-day thread counts" "$RM_OUT" "threads interactive=1 headless=0"
+}
+
+case_tuneup_thread_kinds() {
+    local t d ts
+    t="$(rm_tmp)"
+    rm_tuneup_stubs "$t"
+    d="$t/projects/-Users-x-GitHub-IBL5"
+    mkdir -p "$d" "$t/projects/-private-tmp-postplan-llm-1"
+    ts="$(rm_iso $((RM_NOW - 60)))"
+    rm_tline "$d/a.jsonl" "{\"type\":\"user\",\"entrypoint\":\"cli\",\"timestamp\":\"$ts\",\"message\":{\"content\":\"hi\"}}"
+    rm_tline "$d/b.jsonl" "{\"type\":\"user\",\"timestamp\":\"$ts\",\"message\":{\"content\":\"hi\"}}"
+    rm_tline "$d/c.jsonl" "{\"type\":\"user\",\"entrypoint\":\"sdk-cli\",\"timestamp\":\"$ts\",\"message\":{\"content\":\"hi\"}}"
+    rm_tline "$t/projects/-private-tmp-postplan-llm-1/d.jsonl" \
+        "{\"type\":\"user\",\"entrypoint\":\"sdk-ts\",\"cwd\":\"/tmp/postplan-llm-1\",\"timestamp\":\"$ts\",\"message\":{\"content\":\"hi\"}}"
+    rm_tline "$d/e.jsonl" "{\"type\":\"user\",\"entrypoint\":\"sdk-ts\",\"cwd\":\"/repo\",\"timestamp\":\"$ts\",\"message\":{\"content\":\"hi\"}}"
+    rm_tuneup_run "$t" --dry-run
+    rm_has "tuneup_thread_kinds: cli, missing and sdk-ts elsewhere are interactive; sdk-cli and postplan-llm are headless" \
+        "$RM_OUT" "threads interactive=3 headless=2"
+}
+
+case_tuneup_subagents_skipped() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_stubs "$t"
+    rm_tuneup_thread "$t" "" s1 3600
+    mkdir -p "$t/projects/-Users-x-GitHub-IBL5/s1/subagents"
+    mv "$t/projects/-Users-x-GitHub-IBL5/s1.jsonl" "$t/projects/-Users-x-GitHub-IBL5/s1/subagents/agent-1.jsonl"
+    rm_tuneup_run "$t" --dry-run
+    rm_has "tuneup_subagents_skipped: subagent transcript yields no thread" "$RM_OUT" "threads interactive=0 headless=0"
+}
+
+case_tuneup_signal_types() {
+    local t d f ts
+    t="$(rm_tmp)"
+    rm_tuneup_stubs "$t"
+    rm_tuneup_thread "$t" "" s1 3600
+    d="$t/projects/-Users-x-GitHub-IBL5"
+    f="$d/s1.jsonl"
+    ts="$(rm_iso $((RM_NOW - 3000)))"
+    rm_tline "$f" "{\"type\":\"system\",\"subtype\":\"stop_hook_summary\",\"hasOutput\":true,\"hookErrors\":[\"stop blocked: dirty tree\"],\"timestamp\":\"$ts\"}"
+    rm_tline "$f" "{\"type\":\"system\",\"subtype\":\"compact_boundary\",\"compactMetadata\":{\"trigger\":\"auto\",\"preTokens\":160000},\"timestamp\":\"$ts\"}"
+    rm_tline "$f" "{\"type\":\"assistant\",\"timestamp\":\"$ts\",\"message\":{\"id\":\"m1\",\"usage\":{\"input_tokens\":60000,\"output_tokens\":0}}}"
+    rm_tline "$f" "{\"type\":\"assistant\",\"timestamp\":\"$ts\",\"message\":{\"id\":\"m1\",\"usage\":{\"input_tokens\":60000,\"output_tokens\":0}}}"
+    rm_tline "$f" "{\"type\":\"assistant\",\"timestamp\":\"$ts\",\"message\":{\"id\":\"m2\",\"usage\":{\"input_tokens\":150000,\"output_tokens\":0}}}"
+    rm_tline "$d/h.jsonl" "{\"type\":\"user\",\"entrypoint\":\"sdk-cli\",\"timestamp\":\"$ts\",\"message\":{\"content\":\"do the thing\"}}"
+    rm_tline "$d/h.jsonl" "{\"type\":\"user\",\"entrypoint\":\"sdk-cli\",\"timestamp\":\"$ts\",\"message\":{\"content\":\"no, stop that\"}}"
+    rm_tuneup_run "$t" --dry-run
+    rm_has "tuneup_signal_types: one correction (headless ignored)" "$RM_OUT" "signals correction=1"
+    rm_has "tuneup_signal_types: one hook deny" "$RM_OUT" "signals hook_deny=1"
+    rm_has "tuneup_signal_types: one stop block" "$RM_OUT" "signals stop_block=1"
+    rm_has "tuneup_signal_types: one compaction" "$RM_OUT" "signals compaction=1"
+    rm_has "tuneup_signal_types: one heavy turn after message.id dedupe" "$RM_OUT" "signals heavy_turn=1"
+}
+
+case_tuneup_self_ingestion_guard() {
+    local t d ts
+    t="$(rm_tmp)"
+    rm_tuneup_stubs "$t"
+    d="$t/projects/-Users-x-GitHub-IBL5"
+    mkdir -p "$d"
+    ts="$(rm_iso $((RM_NOW - 60)))"
+    rm_tline "$d/m.jsonl" "{\"type\":\"user\",\"entrypoint\":\"cli\",\"timestamp\":\"$ts\",\"message\":{\"content\":\"retro-mine tune-up call: digest\"}}"
+    rm_tuneup_run "$t" --dry-run
+    rm_has "tuneup_self_ingestion_guard: marker thread dropped" "$RM_OUT" "threads interactive=0 headless=0"
+}
+
+case_tuneup_truncated_line() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_stubs "$t"
+    rm_tuneup_thread "$t" "" s1 3600
+    printf '{"type":"user","message":{"cont' >> "$t/projects/-Users-x-GitHub-IBL5/s1.jsonl"
+    rm_tuneup_run "$t" --dry-run
+    rm_has "tuneup_truncated_line: thread survives a cut last line" "$RM_OUT" "threads interactive=1 headless=0"
+    rm_has "tuneup_truncated_line: its signals survive" "$RM_OUT" "signals hook_deny=1"
+}
+
+case_tuneup_runlog_fail() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_stubs "$t"
+    echo "plan-now: RESULT failed rc=1" > "$t/tmplogs/plan-now-20260920-100000.log"
+    echo "plan-now: RESULT ok" > "$t/tmplogs/plan-now-20260920-110000.log"
+    echo "plan-now: RESULT no-plan" > "$t/tmplogs/plan-now-20260920-120000.log"
+    echo "plan-now: RESULT failed rc=1" > "$t/tmplogs/plan-now-20260901-100000.log"
+    printf 'RESULT: shipped\npostplan-rc=1\n' > "$t/tmplogs/post-plan-now-20260920-100000.log"
+    printf 'RESULT: shipped\npostplan-rc=0\n' > "$t/tmplogs/post-plan-now-20260920-110000.log"
+    echo "exit: stop_reason=max_turns" > "$t/amlogs/2026-09-20-slug.log"
+    echo "exit: stop_reason=end_turn" > "$t/amlogs/2026-09-20-other.log"
+    rm_tuneup_run "$t" --dry-run
+    rm_has "tuneup_runlog_fail: three failing logs become headless threads" "$RM_OUT" "threads interactive=0 headless=3"
+}
+
+case_tuneup_max_threads_cap() {
+    local t i
+    t="$(rm_tmp)"
+    rm_tuneup_stubs "$t"
+    for i in $(seq 1 40); do rm_tuneup_thread "$t" "-w$i" "s$i" 3600; done
+    rm_tuneup_run "$t" --dry-run
+    rm_has "tuneup_max_threads_cap: 40 threads drop nothing" "$RM_OUT" "dropped_by_cap=0"
+    rm_lacks "tuneup_max_threads_cap: 40 threads log nothing" "$RM_ERR" "over cap"
+    rm_tuneup_thread "$t" "-w41" s41 3600
+    rm_tuneup_run "$t" --dry-run
+    rm_has "tuneup_max_threads_cap: 41 threads drop one" "$RM_OUT" "dropped_by_cap=1"
+    rm_has "tuneup_max_threads_cap: the drop is logged" "$RM_ERR" "1 threads over cap MAX_THREADS=40 dropped"
+}
+
+case_tuneup_signature_recur() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_stubs "$t"
+    rm_tuneup_thread "$t" "" s1 3600 "PreToolUse:Bash hook error: 12 at /Users/x/a/b"
+    rm_tuneup_thread "$t" "-wt" s2 3600 "PreToolUse:Bash hook error: 3456 at /tmp/c/d"
+    rm_tuneup_env '{"findings":[]}' 0.1 > "$t/digest-env.json"
+    rm_tuneup_run "$t"
+    rm_has "tuneup_signature_recur: variants share one signature in 2 threads" \
+        "$(cat "$t/state/tuneup/$RM_TDAY/sigs.tsv")" "$(printf 'hook_deny:pretooluse:bash_hook_error:_N_at_P\t2\t2')"
+}
+
+case_tuneup_llm_argv() {
+    local t a1 a3
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    rm_tuneup_run "$t"
+    a1="$(tr '\n' ' ' < "$t/claude.argv.1")"
+    a3="$(tr '\n' ' ' < "$t/claude.argv.3")"
+    rm_has "tuneup_llm_argv: no session persistence" "$a1" "[--no-session-persistence]"
+    rm_has "tuneup_llm_argv: empty allowedTools" "$a1" "[--allowedTools] []"
+    rm_has "tuneup_llm_argv: digest model" "$a1" "[--model] [claude-sonnet-5-5]"
+    rm_has "tuneup_llm_argv: digest effort low" "$a1" "[--effort] [low]"
+    rm_has "tuneup_llm_argv: rank model" "$a3" "[--model] [opus]"
+    rm_has "tuneup_llm_argv: rank effort high" "$a3" "[--effort] [high]"
+    rm_has "tuneup_llm_argv: cwd under the state dir" "$(cat "$t/claude.cwd")" "$t/state/"
+}
+
+case_tuneup_spend_log() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    rm_tuneup_run "$t"
+    rm_expect_eq "tuneup_spend_log: one spend row per claude call" \
+        "$(grep -c . "$t/claude.calls")" "$(grep -c . "$t/state/spend.tsv")"
+}
+
+case_tuneup_claude_failure() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    echo 1 > "$t/claude.rc"
+    rm_tuneup_run "$t"
+    [ "$RM_RC" -ne 0 ] && rm_ok "tuneup_claude_failure: exits nonzero" || rm_fail "tuneup_claude_failure: exited 0"
+    [ ! -e "$t/state/tuneup/$RM_TDAY/digests.jsonl" ] && [ ! -e "$t/dm.1" ] \
+        && [ -z "$(ls "$t/reports")" ] && rm_ok "tuneup_claude_failure: no digests, DM or report" \
+        || rm_fail "tuneup_claude_failure: an artifact was written"
+}
+
+case_tuneup_digest_validation() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t" 7 1
+    rm_tuneup_env "{\"findings\":[{\"signature\":\"$RM_TSIG\",\"summary\":\"Valid.\"},{\"signature\":\"made:up\",\"summary\":\"Unknown.\"},{\"signature\":\"$RM_TSIG\",\"summary\":\"Bad — dash.\"}]}" 0.5 \
+        > "$t/digest-env.json"
+    rm_tuneup_run "$t"
+    rm_has "tuneup_digest_validation: two findings dropped" "$RM_ERR" "dropped 2 digest findings"
+    rm_expect_eq "tuneup_digest_validation: the valid finding is kept" 1 \
+        "$(jq -s '[.[].findings[]] | length' "$t/state/tuneup/$RM_TDAY/digests.jsonl")"
+}
+
+# rm_prior_report <t> <rows> [sig-rows]: last week's report with Filed items and Signal counts.
+rm_prior_report() {
+    {
+        printf '# Weekly tune-up 2026-09-14\n\n## Filed items\n\n'
+        printf '| rank | issue | key | signatures | threads | title |\n|---|---|---|---|---|---|\n'
+        printf '%s\n' "$2"
+        printf '\n## Signal counts\n\n| signature | threads | events |\n|---|---|---|\n'
+        printf '%s\n' "${3:-}"
+    } > "$1/reports/2026-09-14-tune-up.md"
+}
+
+case_tuneup_dedupe_open_prior() {
+    local t items
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    items="[{\"title\":\"Cd guard\",\"summary\":\"S.\",\"proposed_change\":\"C.\",\"signatures\":[\"$RM_TSIG\"]},{\"title\":\"Other\",\"summary\":\"S.\",\"proposed_change\":\"C.\",\"signatures\":[]}]"
+    rm_tuneup_env "{\"items\":$items}" 1.0 > "$t/rank-env.json"
+    rm_prior_report "$t" "| 1 | [backlog#7](https://github.com/a-jay85/IBL5-backlog/issues/7) | tuneup-0000beef | $RM_TSIG | 2 | Old cd guard |"
+    echo '[{"number":7,"title":"Tune-up 2026-09-14: Old cd guard [tuneup-0000beef]","state":"OPEN","labels":["tune-up"]}]' > "$t/issues.json"
+    rm_tuneup_run "$t"
+    rm_has "tuneup_dedupe_open_prior: logged still open" "$RM_ERR" "still open: backlog#7 Cd guard"
+    rm_lacks "tuneup_dedupe_open_prior: not filed" "$(cat "$t/gh.log")" "Cd guard"
+    rm_has "tuneup_dedupe_open_prior: unrelated item filed" "$(cat "$t/gh.log")" "Other"
+    rm_has "tuneup_dedupe_open_prior: report lists it" "$(cat "$t/reports/$RM_TDAY-tune-up.md")" "backlog#7"
+}
+
+case_tuneup_adopted_followup() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t" 7 1
+    rm_prior_report "$t" "$(printf '%s\n%s' \
+        "| 1 | [backlog#8](https://github.com/a-jay85/IBL5-backlog/issues/8) | tuneup-0000aaaa | $RM_TSIG | 5 | Cd guard |" \
+        "| 2 | [backlog#9](https://github.com/a-jay85/IBL5-backlog/issues/9) | tuneup-0000bbbb | other:sig | 3 | Other |")" \
+        "| $RM_TSIG | 5 | 9 |"
+    echo '[{"number":8,"title":"x [tuneup-0000aaaa]","state":"CLOSED","labels":["tune-up"]},{"number":9,"title":"y [tuneup-0000bbbb]","state":"OPEN","labels":["tune-up"]}]' > "$t/issues.json"
+    rm_tuneup_run "$t"
+    rm_has "tuneup_adopted_followup: closed item gets then/now counts" "$(cat "$t/dm.1")" \
+        "backlog#8 (closed): signal 5 threads then, 1 now"
+    rm_lacks "tuneup_adopted_followup: open item has no follow-up" "$(cat "$t/dm.1")" "backlog#9 (closed)"
+}
+
+case_tuneup_rank_validation() {
+    local t items
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    items="[{\"title\":\"Good\",\"summary\":\"S.\",\"proposed_change\":\"C.\",\"signatures\":[\"$RM_TSIG\"]},{\"title\":\"Unknown\",\"summary\":\"S.\",\"proposed_change\":\"C.\",\"signatures\":[\"made:up\"]},{\"title\":\"Dash — here\",\"summary\":\"S.\",\"proposed_change\":\"C.\",\"signatures\":[]}]"
+    rm_tuneup_env "{\"items\":$items}" 1.0 > "$t/rank-env.json"
+    rm_tuneup_run "$t"
+    rm_has "tuneup_rank_validation: two items dropped" "$RM_ERR" "dropped 2 rank items"
+    rm_expect_eq "tuneup_rank_validation: one item filed" 1 "$(rm_creates "$t")"
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    rm_tuneup_env '{"items":[{"title":"Unknown","summary":"S.","proposed_change":"C.","signatures":["made:up"]}]}' 1.0 \
+        > "$t/rank-env.json"
+    rm_tuneup_run "$t"
+    [ "$RM_RC" -ne 0 ] && rm_ok "tuneup_rank_validation: all-invalid exits nonzero" \
+        || rm_fail "tuneup_rank_validation: all-invalid exited 0"
+    rm_has "tuneup_rank_validation: names the cause" "$RM_ERR" "rank returned no valid items"
+}
+
+case_tuneup_files_top5_idempotent() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t" 7
+    rm_tuneup_run "$t"
+    rm_expect_eq "tuneup_files_top5_idempotent: 5 creates from 7 items" 5 "$(rm_creates "$t")"
+    rm_tuneup_week "$t" 5
+    RM_RUN_NOW=$((RM_NOW + 86400)) rm_tuneup_run "$t"
+    rm_expect_eq "tuneup_files_top5_idempotent: next-day run over the same items adds 0" 5 "$(rm_creates "$t")"
+}
+
+case_tuneup_stage_cache_reuse() {
+    local t calls
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    echo 1 > "$t/dm.rc"
+    rm_tuneup_run "$t"
+    [ "$RM_RC" -ne 0 ] && rm_ok "tuneup_stage_cache_reuse: DM failure exits nonzero" \
+        || rm_fail "tuneup_stage_cache_reuse: DM failure exited 0"
+    rm_expect_eq "tuneup_stage_cache_reuse: no report after DM failure" "" "$(ls "$t/reports")"
+    calls="$(grep -c . "$t/claude.calls")"
+    echo 0 > "$t/dm.rc"
+    RM_RUN_NOW=$((RM_NOW + 60)) rm_tuneup_run "$t"
+    rm_expect_eq "tuneup_stage_cache_reuse: retry exits 0" 0 "$RM_RC"
+    rm_expect_eq "tuneup_stage_cache_reuse: retry makes 0 claude calls" "$calls" "$(grep -c . "$t/claude.calls")"
+    rm_expect_eq "tuneup_stage_cache_reuse: retry makes 0 creates" 5 "$(rm_creates "$t")"
+    rm_expect_eq "tuneup_stage_cache_reuse: DM carries 5 issue links" 5 \
+        "$(grep -c 'IBL5-backlog/issues/' "$t/dm.2")"
+}
+
+case_tuneup_dm_prose_clean() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    rm_tuneup_run "$t"
+    if "$SCRIPT_DIR/check-prose" --stdin < "$t/dm.1" >/dev/null 2>&1; then rm_ok "tuneup_dm_prose_clean: check-prose clean"
+    else rm_fail "tuneup_dm_prose_clean: check-prose flags the DM"; fi
+    rm_lacks "tuneup_dm_prose_clean: check-digest-prose clean" \
+        "$("$SCRIPT_DIR/check-digest-prose" "$t/dm.1" 2>/dev/null)" "LINE "
+}
+
+case_tuneup_prose_fix_then_fail() {
+    local t items fixed
+    items='[{"title":"Fix it later","summary":"Happy to help with this.","proposed_change":"C.","signatures":[]}]'
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    rm_tuneup_env "{\"items\":$items}" 1.0 > "$t/rank-env.json"
+    rm_tuneup_env '{"body":"Still, not clean."}' 0.1 > "$t/prosefix-env.json"
+    rm_tuneup_run "$t"
+    [ "$RM_RC" -ne 0 ] && [ ! -e "$t/dm.1" ] && rm_ok "tuneup_prose_fix_then_fail: dirty rewrite stays unsent" \
+        || rm_fail "tuneup_prose_fix_then_fail: dirty rewrite sent or exited 0"
+    rm_expect_eq "tuneup_prose_fix_then_fail: one prose fix call" 1 "$(grep -l 'prose fix' "$t"/prompt.* | grep -c .)"
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    rm_tuneup_env "{\"items\":$items}" 1.0 > "$t/rank-env.json"
+    fixed="$(jq -n -c --arg b 'Weekly tune-up. Fix it later.' '{body: $b}')"
+    rm_tuneup_env "$fixed" 0.1 > "$t/prosefix-env.json"
+    rm_tuneup_run "$t"
+    rm_has "tuneup_prose_fix_then_fail: URL-dropping rewrite is refused" "$RM_ERR" "prose fix dropped"
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    rm_tuneup_env "{\"items\":$items}" 1.0 > "$t/rank-env.json"
+    fixed="$(jq -n -c --arg b 'Weekly tune-up. 1. https://github.com/a-jay85/IBL5-backlog/issues/100 Fix it later.' '{body: $b}')"
+    rm_tuneup_env "$fixed" 0.1 > "$t/prosefix-env.json"
+    rm_tuneup_run "$t"
+    rm_expect_eq "tuneup_prose_fix_then_fail: clean rewrite exits 0" 0 "$RM_RC"
+    rm_has "tuneup_prose_fix_then_fail: clean rewrite is what gets sent" "$(cat "$t/dm.1")" "Fix it later."
+}
+
+case_tuneup_redaction() {
+    local t all
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    rm_tuneup_thread "$t" "-r" s3 3600 "PreToolUse:Bash hook error: mail jo@example.com key sk-ant-api03-abcdefghij"
+    rm_tuneup_env '{"items":[{"title":"Mail jo@example.com","summary":"Key sk-ant-api03-abcdefghij leaked.","proposed_change":"C.","signatures":[]}]}' 1.0 \
+        > "$t/rank-env.json"
+    rm_tuneup_run "$t"
+    all="$(cat "$t"/prompt.* "$t"/gh-body.* "$t"/dm.* 2>/dev/null)"
+    rm_lacks "tuneup_redaction: no email leaves" "$all" "jo@example.com"
+    rm_lacks "tuneup_redaction: no sk-ant token leaves" "$all" "sk-ant-api03"
+    rm_lacks "tuneup_redaction: no email in issue titles" "$(cat "$t/gh.log")" "jo@example.com"
+}
+
+case_tuneup_cap_proposal() {
+    local t i
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t" 1
+    for i in 0 1 2 3; do
+        rm -f "$t/claude.calls"
+        echo '[]' > "$t/issues.json"
+        RM_RUN_NOW=$((RM_NOW + i * 7 * 86400)) rm_tuneup_run "$t"
+        rm_tuneup_thread "$t" "-n$i" "n$i" $((3600 - (i + 1) * 7 * 86400))
+        rm_tuneup_thread "$t" "-m$i" "m$i" $((7200 - (i + 1) * 7 * 86400))
+    done
+    rm_lacks "tuneup_cap_proposal: run 3 has no proposal" "$(cat "$t/dm.3")" "Proposed weekly cap"
+    rm_has "tuneup_cap_proposal: run 4 proposes p75 plus 25 percent" "$(cat "$t/dm.4")" 'Proposed weekly cap: $3.75'
+    rm_expect_eq "tuneup_cap_proposal: one ok ledger row per run" 4 "$(grep -c '	ok$' "$t/state/runs.tsv")"
+}
+
+case_tuneup_empty_week() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_stubs "$t"
+    rm_tuneup_run "$t"
+    rm_expect_eq "tuneup_empty_week: exits 0" 0 "$RM_RC"
+    [ ! -e "$t/claude.calls" ] && [ ! -e "$t/dm.1" ] && [ ! -e "$t/gh.log" ] && [ -z "$(ls "$t/reports")" ] \
+        && rm_ok "tuneup_empty_week: no call, DM, create or report" || rm_fail "tuneup_empty_week: something ran"
+}
+
+case_tuneup_already_ran_today() {
+    local t calls rep
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    rm_tuneup_run "$t"
+    calls="$(grep -c . "$t/claude.calls")"
+    RM_RUN_NOW=$((RM_NOW + 60)) rm_tuneup_run "$t"
+    rm_expect_eq "tuneup_already_ran_today: rerun exits 0" 0 "$RM_RC"
+    rm_expect_eq "tuneup_already_ran_today: rerun makes no calls" "$calls" "$(grep -c . "$t/claude.calls")"
+    rep="$(cat "$t/reports/$RM_TDAY-tune-up.md")"
+    rm_has "tuneup_already_ran_today: filed table header" "$rep" "| rank | issue | key | signatures | threads | title |"
+    rm_has "tuneup_already_ran_today: signal table header" "$rep" "| signature | threads | events |"
+    rm_expect_eq "tuneup_already_ran_today: 5 filed rows" 5 "$(grep -c '^| [0-9] | \[backlog#' <<< "$rep")"
+}
+
+case_tuneup_dry_run_no_writes() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    echo '[{"number":5,"title":"Hand-filed","state":"OPEN"},{"number":6,"title":"t [tuneup-0000cafe]","state":"CLOSED","labels":["tune-up"]}]' > "$t/issues.json"
+    rm_tuneup_run "$t" --dry-run
+    rm_expect_eq "tuneup_dry_run_no_writes: exits 0" 0 "$RM_RC"
+    rm_has "tuneup_dry_run_no_writes: reads only tune-up-labelled issues" "$RM_OUT" "tune-up issues visible=1"
+    rm_has "tuneup_dry_run_no_writes: prints the summary" "$RM_OUT" "tune-up dry-run: threads interactive=2"
+    [ ! -e "$t/claude.calls" ] && rm_ok "tuneup_dry_run_no_writes: no claude call" || rm_fail "tuneup_dry_run_no_writes: claude called"
+    if grep -qv '^issue list ' "$t/gh.log"; then rm_fail "tuneup_dry_run_no_writes: gh did more than list"
+    else rm_ok "tuneup_dry_run_no_writes: gh only lists"; fi
+    rm_expect_eq "tuneup_dry_run_no_writes: state and report dirs empty" "" \
+        "$(find "$t/state" "$t/reports" -type f 2>/dev/null)"
+    echo 127 > "$t/gh.rc"
+    rm_tuneup_run "$t" --dry-run
+    rm_expect_eq "tuneup_dry_run_no_writes: gh 127 still exits 0" 0 "$RM_RC"
+}
+
+case_tuneup_replay_real_digest_envelope() {
+    local t env th sig
+    t="$(rm_tmp)"
+    env="$RM_FIXTURE_DIR/tuneup-digest-envelope.json"
+    th="$RM_FIXTURE_DIR/tuneup-thread.json"
+    rm_has "tuneup_replay_real_digest_envelope: names the model" "$(jq -r '.modelUsage | keys[]' "$env")" "claude-sonnet-5-5"
+    (
+        export STATE_DIR="$t" REPO_ROOT="$SCRIPT_DIR/.."
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
+        . "$RM_DRIVER"
+        set +e
+        jq -c . "$th" > "$t/thread.jsonl"
+        n="$(tuneup_validate_digest "$(cat "$t/thread.jsonl")" "$(cat "$env")" | jq '.findings | length')"
+        [ "$n" -ge 1 ] && echo "ok: tuneup_replay_real_digest_envelope: real findings validate ($n)" \
+            || echo "FAIL: tuneup_replay_real_digest_envelope: no finding validated"
+        sig="$(jq -c '.events |= map(.sig = "tampered:sig")' "$t/thread.jsonl")"
+        n="$(tuneup_validate_digest "$sig" "$(cat "$env")" | jq '.findings | length')"
+        [ "$n" -eq 0 ] && echo "ok: tuneup_replay_real_digest_envelope: tampered signatures yield 0" \
+            || echo "FAIL: tuneup_replay_real_digest_envelope: tampered signatures kept $n"
+    ) > "$t/out" 2>&1
+    cat "$t/out"
+    if grep -q '^FAIL' "$t/out" || ! grep -q '^ok' "$t/out"; then FAILED=1; fi
+}
+
+case_tuneup_replay_real_rank_envelope() {
+    local t env
+    t="$(rm_tmp)"
+    env="$RM_FIXTURE_DIR/tuneup-rank-envelope.json"
+    (
+        export STATE_DIR="$t" REPO_ROOT="$SCRIPT_DIR/.."
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
+        # shellcheck source=/dev/null
+        . "$RM_DRIVER"
+        set +e
+        n="$(tuneup_validate_rank "$RM_FIXTURE_DIR/tuneup-sigs.tsv" "$(cat "$env")" | grep -c .)"
+        [ "$n" -ge 1 ] && [ "$n" -le 8 ] && echo "ok: tuneup_replay_real_rank_envelope: 1 to 8 items ($n)" \
+            || echo "FAIL: tuneup_replay_real_rank_envelope: $n items"
+        bad="$(jq -c '.structured_output.items[0].title += " — x"' "$env")"
+        m="$(tuneup_validate_rank "$RM_FIXTURE_DIR/tuneup-sigs.tsv" "$bad" | grep -c .)"
+        [ "$m" -eq $((n - 1)) ] && echo "ok: tuneup_replay_real_rank_envelope: injected em-dash drops one" \
+            || echo "FAIL: tuneup_replay_real_rank_envelope: em-dash kept ($m of $n)"
+    ) > "$t/out" 2>&1
+    cat "$t/out"
+    if grep -q '^FAIL' "$t/out" || ! grep -q '^ok' "$t/out"; then FAILED=1; fi
+}
+
+case_tuneup_env_i_launchd_path() {
+    local t p
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    mkdir -p "$t/home"
+    p="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$HOME/.local/bin"
+    RM_OUT="$(env -i PATH="$p" HOME="$t/home" RETRO_MINE_REGISTRY="$t/reg.md" RETRO_MINE_STATE_DIR="$t/state" \
+        RETRO_MINE_CLAUDE_BIN="$t/claude" RETRO_MINE_GH_BIN="$t/gh" RETRO_MINE_DM_BIN="$t/dm" \
+        RETRO_MINE_PROJECTS_DIR="$t/projects" RETRO_MINE_TMP_LOG_DIR="$t/tmplogs" \
+        RETRO_MINE_AUTOMOUSE_LOG_DIR="$t/amlogs" RETRO_MINE_REPORT_DIR="$t/reports" \
+        RETRO_MINE_NOW="$RM_NOW" "$RM_DRIVER" --dry-run 2>&1)"
+    rm_expect_eq "tuneup_env_i_launchd_path: dry-run exits 0" 0 "$?"
+    env -i PATH="$p" HOME="$t/home" RETRO_MINE_REGISTRY="$t/reg.md" RETRO_MINE_STATE_DIR="$t/state" \
+        RETRO_MINE_CLAUDE_BIN="$t/claude" RETRO_MINE_GH_BIN="$t/gh" RETRO_MINE_DM_BIN="$t/dm" \
+        RETRO_MINE_PROJECTS_DIR="$t/projects" RETRO_MINE_TMP_LOG_DIR="$t/tmplogs" \
+        RETRO_MINE_AUTOMOUSE_LOG_DIR="$t/amlogs" RETRO_MINE_REPORT_DIR="$t/reports" \
+        RETRO_MINE_NOW="$RM_NOW" "$RM_DRIVER" >/dev/null 2>&1
+    rm_expect_eq "tuneup_env_i_launchd_path: full run exits 0" 0 "$?"
+    [ -s "$t/dm.1" ] && rm_ok "tuneup_env_i_launchd_path: DM delivered" || rm_fail "tuneup_env_i_launchd_path: no DM"
+}
+
+case_zz_isolation_guards() {
+    local probe
+    if [ -e "$RM_ISO/dm-called" ]; then rm_fail "isolation: a case reached the DM binary"
+    else rm_ok "isolation: no case reached the DM binary"; fi
+    rm_expect_eq "isolation: repo tree untouched by the suite" "$RM_GIT_BASELINE" \
+        "$(git -C "$SCRIPT_DIR/.." status --porcelain --untracked-files=all 2>/dev/null)"
+    # Prove the guard bites: a stage dir pointed at $REPO_ROOT/.tuneup must
+    # change porcelain, so a leaked write there cannot pass silently.
+    probe="$SCRIPT_DIR/../.tuneup"
+    if [ -e "$probe" ]; then
+        rm_fail "isolation: \$REPO_ROOT/.tuneup already exists"
+        return
+    fi
+    mkdir -p "$probe" && : > "$probe/probe"
+    if [ "$(git -C "$SCRIPT_DIR/.." status --porcelain --untracked-files=all 2>/dev/null)" != "$RM_GIT_BASELINE" ]; then
+        rm_ok "isolation: a write under \$REPO_ROOT/.tuneup changes porcelain"
+    else
+        rm_fail "isolation: a write under \$REPO_ROOT/.tuneup went unseen"
+    fi
+    rm -rf "$probe"
 }
 
 # ── Dispatch ──────────────────────────────────────────────────────────────────

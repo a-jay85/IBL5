@@ -15,7 +15,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   // PHP-Nuke legacy palette debt. See a-jay85/IBL5-backlog (label: a11y-contrast).
   'color-contrast': new Set([
     // Public pages
-    'homepage',
     'cap space',
     'player page',
     'activity tracker',
@@ -31,21 +30,16 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'projected draft order',
     'record holders',
     'schedule',
-    'search',
-    // Same page and same PHP-Nuke palette debt as 'search' above — the preset URL is
-    // modules.php?name=Search with a preset. Verified 2026-09-23: every failing node is
-    // pre-existing results markup (.search-result__meta-item, .search-result__title,
-    // .search-pagination__link, .ibl-search__btn, <time>); none is the new preset select.
+    // Search page with a transactions preset (modules.php?name=Search plus a preset).
+    // Verified 2026-09-23: every failing node is pre-existing results markup
+    // (.search-result__meta-item, .search-result__title, .search-pagination__link, <time>);
+    // none is the new preset select. .ibl-search__btn is fixed in design/components/forms.css.
     'search transactions preset',
     'season archive',
     'season highs',
-    'head-to-head records',
     'team off/def stats',
     'team schedule',
     'topics',
-    'news index',
-    'news categories',
-    'news article',
     // Pages with team-color contrast failures (ibl-team-cell--colored uses DB-configured team colors)
     'league starters',
     // SeasonLeaderboards renders team-color cells via TeamCellHelper; which low-contrast team
@@ -64,8 +58,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     // allowlisted — the residue here is the same DB-configured team-color debt as
     // 'league starters' / 'season leaderboards' above.
     'training camp ratings diff',
-    // Legacy admin page — PHP-Nuke palette debt. See a-jay85/IBL5-backlog (label: a11y).
-    'league control panel',
   ]),
 
   // No <h1> on page — most module pages use <h2 class="ibl-title">. See a-jay85/IBL5-backlog (label: a11y).
@@ -82,7 +74,7 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     // Pre-existing SearchView::renderResults() markup: the page emits <h1 class="ibl-title">
     // then <h3 class="search-results__heading">, skipping h2. Identical on the plain
     // modules.php?name=Search&query=waive results page on master — this is simply the first
-    // search-RESULTS page brought under axe (the allowlisted 'search' row renders the bare
+    // search-RESULTS page brought under axe (the 'search' row renders the bare
     // form, which has no results heading). Loosens enforcement on no previously-checked page.
     // Follow-up: promote .search-results__heading to <h2> and refresh the SearchView golden
     // masters, then delete this entry.

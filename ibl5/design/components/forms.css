@@ -249,7 +249,7 @@
 }
 
 .ibl-search__btn {
-    background: var(--accent-500);
+    background: var(--accent-700);
     color: white;
     border: none;
     border-radius: var(--radius-full);
@@ -261,7 +261,7 @@
 }
 
 .ibl-search__btn:hover {
-    background: var(--accent-600);
+    background: var(--accent-800);
 }
 
 /* ==========================================================================

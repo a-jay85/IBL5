@@ -4,11 +4,14 @@
 # redacts its raw stdin (the outbound pass over DM and issue bodies).
 #
 # Args: --argjson cutoff (epoch) --argjson heavy (tokens) --argjson maxex
-#       --argjson exch (excerpt chars) --arg marker --arg mode (thread|text)
+#       --argjson exch (excerpt chars) --arg marker --arg mode (thread|text|text-known)
 
 # The only redactor for transcript text. Order matters: specific token shapes
-# first, then emails and home paths, then any long opaque run.
-def redact:
+# first, then emails and home paths, then any long opaque run. redact_known
+# stops before the opaque-run rule. Report tables carry signatures, lowercased
+# slugs that can run past 32 characters, and the next week's dedupe reads them
+# back. Their source text was already redacted.
+def redact_known:
   gsub("https://(canary\\.|ptb\\.)?discord(app)?\\.com/api/webhooks/[^\\s\"')]+"; "[redacted]")
   | gsub("sk-ant-[A-Za-z0-9_-]+"; "[redacted]")
   | gsub("gh[po]_[A-Za-z0-9]+"; "[redacted]")
@@ -17,8 +20,9 @@ def redact:
   | gsub("AKIA[0-9A-Z]{16}"; "[redacted]")
   | gsub("Bearer [A-Za-z0-9._~+/=-]+"; "[redacted]")
   | gsub("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z][A-Za-z]+"; "[redacted]")
-  | gsub("/Users/[^/]+/"; "~/")
-  | gsub("[A-Za-z0-9_-]{32,}"; "[redacted]");
+  | gsub("/Users/[^/]+/"; "~/");
+
+def redact: redact_known | gsub("[A-Za-z0-9_-]{32,}"; "[redacted]");
 
 def cut: redact | .[0:$exch];
 
@@ -59,6 +63,7 @@ def tokens:
   + (.message.usage.output_tokens // 0);
 
 if $mode == "text" then redact
+elif $mode == "text-known" then redact_known
 else
   split("\n") | map(fromjson? // empty | select(type == "object")) as $lines
   | (($lines | map(select(.entrypoint != null)) | .[0]) // {}) as $e

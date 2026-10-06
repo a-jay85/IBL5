@@ -6,6 +6,7 @@
 -- recreate trg_team_identity_sync with NO ordering clause (order 1), then trg_gm_tenure_track
 -- FOLLOWS it (order 2). Matches migration 143's action_order 1 -> 2.
 -- destructive-migration[rename-column]: reserved-word column rename value to setting_value, all readers swept in the same PR under ADR-0008
+-- rollback-incompatible: single-step column rename; pre-rename PHP reads ibl_settings.value, which no longer exists after this migration
 
 ALTER TABLE `ibl_settings`
     CHANGE COLUMN `value` `setting_value` VARCHAR(128) NOT NULL COMMENT 'Setting value';

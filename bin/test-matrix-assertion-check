@@ -21,6 +21,9 @@ fail() { printf 'FAIL %s\n' "$1"; FAILED=1; }
 
 # Remove scratch paths (skips empty args). Used by RETURN traps in the step67-*/prefire-* cases
 # so temp dirs are cleaned on every return path, early `return 1` included.
+# Constraint: those traps rely on bash NOT inheriting RETURN traps into called functions (e.g.
+# plan_fixture). Bash only inherits them under `set -T` (functrace); never add `set -T` to this
+# script, or the trap fires when plan_fixture returns and deletes the repo mid-test.
 _rm_tmp() {
     local _p
     for _p in "$@"; do

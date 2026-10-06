@@ -5,7 +5,8 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.gate_backtest import (HistoricalPR, ReplaySpec, detect_gate_changes, expand_argv,
+from harness.gate_backtest import (ALLOWED_PLACEHOLDERS, REPLAY_SPECS, HistoricalPR, ReplaySpec,
+                                   _PLACEHOLDER_RE, detect_gate_changes, expand_argv, expand_env,
                                    resolve_spec)
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -108,6 +109,50 @@ def test_registry_covers_every_check_script():
         rel = "bin/" + os.path.basename(script)
         state, _, reason = resolve_spec(rel, "")
         assert state in ("replayable", "not-replayable"), f"{rel} unspecified: {reason}"
+
+
+def test_body_file_gates_replay_from_body_file():
+    state, spec, _ = resolve_spec("bin/check-pr-manual-testing", "")
+    assert state == "replayable"
+    assert spec.argv == ("--body-file", "{body_file}")
+    assert expand_argv(spec, {"body_file": "/tmp/7.body"}) == ["--body-file", "/tmp/7.body"]
+
+
+def test_post_merge_recipe_pins_repo_slug():
+    state, spec, _ = resolve_spec("bin/check-post-merge-recipe", "")
+    assert state == "replayable"
+    assert spec.argv == ("--body-file", "{body_file}", "--repo-slug", "a-jay85/IBL5")
+    assert spec.flag_exits == frozenset({1})
+
+
+def test_hygiene_gates_replay_pr_mode_against_base():
+    for gate, var in (("bin/check-e2e-hygiene", "E2E_HYGIENE_BASE_REF"),
+                      ("bin/check-phpunit-hygiene", "PHPUNIT_HYGIENE_BASE_REF")):
+        state, spec, _ = resolve_spec(gate, "")
+        assert state == "replayable", gate
+        assert spec.argv == ("--pr",), gate
+        assert expand_env(spec, {"base": "abc123"}) == {var: "abc123"}, gate
+
+
+def test_live_state_gates_stay_not_replayable():
+    for gate in ("bin/check-hot-files", "bin/check-pr-collisions",
+                 "bin/check-master-ci-green", "bin/check-pr-checks-green"):
+        state, spec, reason = resolve_spec(gate, "")
+        assert state == "not-replayable", gate
+        assert spec is None and reason, gate
+    for path, entry in REPLAY_SPECS.items():
+        if isinstance(entry, str):
+            assert "gh --pr" not in entry, path
+
+
+def test_registry_specs_use_only_allowed_placeholders():
+    for path, entry in REPLAY_SPECS.items():
+        if not isinstance(entry, ReplaySpec):
+            continue
+        tokens = list(entry.argv) + [value for _, value in entry.env]
+        for tok in tokens:
+            for name in _PLACEHOLDER_RE.findall(tok):
+                assert name in ALLOWED_PLACEHOLDERS, f"{path}: {{{name}}} in {tok!r}"
 
 
 def test_expand_argv_is_literal():

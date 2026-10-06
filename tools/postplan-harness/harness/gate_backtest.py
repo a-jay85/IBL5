@@ -73,7 +73,8 @@ _SINCE = ReplaySpec(argv=("--since={base}",))
 _TREE = ReplaySpec(argv=())
 _PLAN = ReplaySpec(argv=("{plan_file}",), needs_plan=True)
 
-_PR_STATE = "reads live PR state through gh --pr"
+_PR_BODY = ReplaySpec(argv=("--body-file", "{body_file}"))
+_LIVE_CI = "reads live CI state through gh"
 
 # A string value is a not-replayable reason. Only an entry here can mark a script
 # not-replayable, so the choice shows up in a reviewed diff.
@@ -97,15 +98,23 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     # Plan-file gates: the plan resolves from the historical PR's branch name.
     "bin/check-plan": _PLAN,
     "bin/check-plan-staleness": _PLAN,
-    # PR-number-aware: today's PR state is not the state at merge time.
-    "bin/check-hot-files": _PR_STATE,
-    "bin/check-e2e-hygiene": _PR_STATE,
-    "bin/check-phpunit-hygiene": _PR_STATE,
-    "bin/check-pr-collisions": _PR_STATE,
-    "bin/check-pr-manual-testing": _PR_STATE,
-    "bin/check-post-merge-recipe": _PR_STATE,
-    "bin/check-master-ci-green": "reads live CI state through gh",
-    "bin/check-pr-checks-green": "reads live CI state through gh",
+    # PR-body gates: the replay feeds the merged PR's body (as it reads today).
+    "bin/check-pr-manual-testing": _PR_BODY,
+    "bin/check-post-merge-recipe": ReplaySpec(
+        argv=("--body-file", "{body_file}", "--repo-slug", "a-jay85/IBL5"),
+    ),
+    # Diff-scoped hygiene: --pr diffs against the env base, set to the PR's own base.
+    "bin/check-e2e-hygiene": ReplaySpec(
+        argv=("--pr",), env=(("E2E_HYGIENE_BASE_REF", "{base}"),),
+    ),
+    "bin/check-phpunit-hygiene": ReplaySpec(
+        argv=("--pr",), env=(("PHPUNIT_HYGIENE_BASE_REF", "{base}"),),
+    ),
+    # Not reject gates, or read state that only exists live.
+    "bin/check-hot-files": "informational lister with inverted exit (0 = a crossing found); no reject verdict",
+    "bin/check-pr-collisions": "lists live open PRs through gh and always exits 0",
+    "bin/check-master-ci-green": _LIVE_CI,
+    "bin/check-pr-checks-green": _LIVE_CI,
     # Required arguments or services that fit no placeholder.
     "bin/check-boxscore-schedule": "needs a live database",
     "bin/check-column-rename-sweep": "needs a columns file or live database credentials",

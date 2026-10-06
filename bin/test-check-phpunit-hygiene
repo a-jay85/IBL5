@@ -28,12 +28,16 @@
 # run_pattern triggers over ~1k files is invisible here. After touching
 # run_pattern, also run `bin/check-phpunit-hygiene` on the real tree.
 #
+# It also covers the --pr base-ref seam of bin/check-e2e-hygiene (identical
+# E2E_HYGIENE_BASE_REF / PHPUNIT_HYGIENE_BASE_REF contract) via run_seam_case.
+#
 # Run: bin/test-check-phpunit-hygiene  (exit 0 = all pass, 1 = a case failed)
 
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HYGIENE="$SCRIPT_DIR/check-phpunit-hygiene"
+E2E_HYGIENE="$SCRIPT_DIR/check-e2e-hygiene"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP" 2>/dev/null' EXIT
 
@@ -194,6 +198,81 @@ class NoReflectTest extends TestCase
         $this->assertSame("setAccessible(true)", $doc);
     }
 }'
+
+# --- base-ref seam (--pr): PHPUNIT_HYGIENE_BASE_REF / E2E_HYGIENE_BASE_REF ---
+# Both gates share one contract: unset or empty means origin/master, a non-empty
+# value is the --pr diff base, and a non-empty value that is not a commit exits 2.
+
+# run_seam_case <name> <gate-path> <var-name> <var-mode> <expected-exit> <expected-regex|-> <fixture-relpath> <fixture-body>
+# var-mode: unset | empty | base (commit A) | head (commit B) | bogus
+# Commit A is an empty README that origin/master points at; commit B adds the fixture.
+run_seam_case() {
+    local name="$1" gate="$2" var="$3" mode="$4" want="$5" want_re="$6" relpath="$7" body="$8"
+    local d out rc sha_a sha_b
+    d="$(mk_repo)"
+    : > "$d/README"
+    git -C "$d" add README >/dev/null 2>&1
+    git -C "$d" commit -q -m A >/dev/null 2>&1
+    sha_a="$(git -C "$d" rev-parse HEAD)"
+    git -C "$d" update-ref refs/remotes/origin/master "$sha_a"
+    mkdir -p "$d/$(dirname "$relpath")"
+    printf '%s\n' "$body" > "$d/$relpath"
+    git -C "$d" add -A >/dev/null 2>&1
+    git -C "$d" commit -q -m B >/dev/null 2>&1
+    sha_b="$(git -C "$d" rev-parse HEAD)"
+    case "$mode" in
+        unset) out="$( ( cd "$d" && env -u "$var" "$gate" --pr ) 2>&1 )" ;;
+        empty) out="$( ( cd "$d" && env "$var=" "$gate" --pr ) 2>&1 )" ;;
+        base)  out="$( ( cd "$d" && env "$var=$sha_a" "$gate" --pr ) 2>&1 )" ;;
+        head)  out="$( ( cd "$d" && env "$var=$sha_b" "$gate" --pr ) 2>&1 )" ;;
+        bogus) out="$( ( cd "$d" && env "$var=no-such-ref-1291" "$gate" --pr ) 2>&1 )" ;;
+    esac
+    rc=$?
+    if [ "$rc" -ne "$want" ]; then
+        failcase "$name — expected exit $want, got $rc"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        return
+    fi
+    if [ "$want_re" != "-" ] && ! printf '%s' "$out" | grep -qE "$want_re"; then
+        failcase "$name — output did not match: $want_re"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        return
+    fi
+    pass "$name (exit $rc)"
+}
+
+SEAM_PHP='<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SeamSkipTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $this->markTestSkipped("nope");
+    }
+}'
+SEAM_TS="import { test } from '@playwright/test';
+test.skip('seam', async () => {});"
+
+# The `empty` cases catch the colon-less default `${VAR-origin/master}`, which treats an
+# empty var as a set one and diffs against "".
+PV=PHPUNIT_HYGIENE_BASE_REF
+# Fixtures sit one directory deep: the gates' --pr pathspecs (`ibl5/tests/**/*.php`,
+# `ibl5/tests/e2e/**/*.ts`) need a subdirectory to match.
+PF="ibl5/tests/Seam/SeamSkipTest.php"
+run_seam_case "phpunit-seam-unset-defaults-origin-master" "$HYGIENE" "$PV" unset 1 'mark-test-skipped' "$PF" "$SEAM_PHP"
+run_seam_case "phpunit-seam-empty-defaults-origin-master" "$HYGIENE" "$PV" empty 1 'mark-test-skipped' "$PF" "$SEAM_PHP"
+run_seam_case "phpunit-seam-base-flags"                   "$HYGIENE" "$PV" base  1 'mark-test-skipped' "$PF" "$SEAM_PHP"
+run_seam_case "phpunit-seam-head-excludes-file"           "$HYGIENE" "$PV" head  0 '-' "$PF" "$SEAM_PHP"
+run_seam_case "phpunit-seam-bogus-ref-exit2"              "$HYGIENE" "$PV" bogus 2 'does not resolve to a commit' "$PF" "$SEAM_PHP"
+
+EV=E2E_HYGIENE_BASE_REF
+EF="ibl5/tests/e2e/seam/seam.spec.ts"
+run_seam_case "e2e-seam-unset-defaults-origin-master" "$E2E_HYGIENE" "$EV" unset 1 'skip' "$EF" "$SEAM_TS"
+run_seam_case "e2e-seam-empty-defaults-origin-master" "$E2E_HYGIENE" "$EV" empty 1 'skip' "$EF" "$SEAM_TS"
+run_seam_case "e2e-seam-base-flags"                   "$E2E_HYGIENE" "$EV" base  1 'skip' "$EF" "$SEAM_TS"
+run_seam_case "e2e-seam-head-excludes-file"           "$E2E_HYGIENE" "$EV" head  0 '-' "$EF" "$SEAM_TS"
+run_seam_case "e2e-seam-bogus-ref-exit2"              "$E2E_HYGIENE" "$EV" bogus 2 'does not resolve to a commit' "$EF" "$SEAM_TS"
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

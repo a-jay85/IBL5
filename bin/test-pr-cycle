@@ -357,6 +357,8 @@ run_in() {
         PR_CYCLE_PATCH_ID_CMD="$BIN/patchid" \
         PR_CYCLE_HARNESS_OUT="$SCRATCH/harness-out" \
         PR_CYCLE_FLEET_LOG_DIR="$SCRATCH/fleetlogs" \
+        PR_CYCLE_HOLDREPEAT_HARNESS="${HRHARNESS-$SCRATCH/hr-none}" \
+        PR_CYCLE_HOLDREPEAT_STATE_DIR="${HRSTATE-$SCRATCH/hrstate}" \
         "$DRIVER" "$@" 2>"$ERR")"
     RC=$?
     return 0
@@ -2028,6 +2030,167 @@ SKIPHELD=0 run --worker
 [[ "$(calls ready)" == "1" ]] || fail "fix4 SKIPHELD=0: fleet skipped despite kill switch; want 1 ready call"
 unset SKIPHELD
 end_case "case fix4 held-unchanged skip"
+
+# ==========================================================================================
+# Pre-fire holdrepeat skip
+# ==========================================================================================
+# A real copy of the harness, so the fingerprint's harness hash is stable and the copy owns
+# its own out/state. Seed and check both load this copy, so they hash the same bytes.
+HRH="$SCRATCH/hrh/tools/postplan-harness"
+mkdir -p "$HRH"
+cp -R "$SCRIPT_DIR/../tools/postplan-harness/harness" "$HRH/"
+cp "$SCRIPT_DIR/../tools/postplan-harness/runner.py" "$HRH/"
+HR_BRANCHES=()
+
+# hr_fixture <pr> <branch> <conds> [state-dir] [nowt]
+# Builds a PR worktree with a committed change, a plan file, a harness result blocking <conds>,
+# an armed-state entry carrying headRefOid, and a seeded holdrepeat record (DM already sent).
+# With nowt, the worktree is removed after seeding, so the record exists but no worktree does.
+hr_fixture() {
+    local n="$1" branch="$2" conds="$3" sd="${4:-$SCRATCH/hrstate}" nowt="${5:-}"
+    local wt="$SCRATCH/wt-$branch" oid tmp
+    git -C "$REPO" rev-parse --verify -q refs/remotes/origin/master >/dev/null \
+        || git -C "$REPO" update-ref refs/remotes/origin/master HEAD
+    git -C "$REPO" worktree add -q "$wt" -b "$branch" >/dev/null 2>&1
+    HR_BRANCHES+=("$branch")
+    echo "change $branch" > "$wt/hrfile"
+    git -C "$wt" add hrfile
+    git -C "$wt" commit -qm "hr $branch"
+    oid="$(git -C "$wt" rev-parse HEAD)"
+    mkdir -p "$SCRATCH/claude-plans"
+    echo "# plan $branch" > "$SCRATCH/claude-plans/$branch.md"
+    install_harness_result "$n" "$branch" shipped-held "$conds" CLEAN
+    tmp="$SCRATCH/armed-state.tmp"
+    jq --argjson n "$n" --arg oid "$oid" \
+        'map(if .number == $n then . + {headRefOid: $oid} else . end)' \
+        "$SCRATCH/armed-state.json" > "$tmp" && mv "$tmp" "$SCRATCH/armed-state.json"
+    env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 - "$sd" "$branch" "$wt" "$conds" <<'PY'
+import json, os, sys
+from harness.holdrepeat import SCHEMA_VERSION, fingerprint, record_path
+from harness.planfile import locate_plan
+sd, slug, wt, conds = sys.argv[1:5]
+fp = fingerprint(locate_plan(slug).path or "", wt)
+assert fp, "seed fingerprint empty"
+os.makedirs(sd, exist_ok=True)
+rec = {"schema_version": SCHEMA_VERSION, "structural_key": conds, "repeat_count": 3,
+       "dm_sent_key": conds, "fingerprint": fp}
+open(record_path(sd, slug), "w").write(json.dumps(rec))
+PY
+    if [[ "$nowt" == nowt ]]; then
+        git -C "$REPO" worktree remove --force "$wt" >/dev/null 2>&1
+    fi
+}
+
+hr_cleanup() {
+    local b
+    for b in ${HR_BRANCHES[@]+"${HR_BRANCHES[@]}"}; do
+        git -C "$REPO" worktree remove --force "$SCRATCH/wt-$b" >/dev/null 2>&1 || true
+        git -C "$REPO" branch -D "$b" >/dev/null 2>&1 || true
+    done
+    HR_BRANCHES=()
+    rm -rf "$SCRATCH/hrstate" "$HRH/out" "$SCRATCH/claude-plans" "$SCRATCH/hr-empty" "$SCRATCH/hr-boom"
+}
+
+# hr_run_case <label> <branch> <conds> — A-C: held PR is skipped, slot never fires.
+hr_skip_case() {
+    local label="$1" branch="$2" conds="$3"
+    reset_state
+    printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+    triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+    hr_fixture 101 "$branch" "$conds"
+    HRHARNESS="$HRH" run --worker
+    [[ $RC -eq 0 ]] || fail "holdrepeat $label: exit $RC, want 0"
+    [[ "$(calls ready)" == "0" ]] || fail "holdrepeat $label: fleet ran $(calls ready) time(s), want 0"
+    grep -qxF 101 "$(rundir)/stage1.txt" 2>/dev/null && fail "holdrepeat $label: 101 is in stage1.txt"
+    grep -qF '#101 — holdrepeat would decline' <<< "$OUT" || fail "holdrepeat $label: skip line missing (out: $OUT)"
+    grep -qF 'held it for' <<< "$OUT" && fail "holdrepeat $label: Fix 4 skipped it; the case proves nothing"
+    return 0
+}
+
+begin_case
+hr_skip_case "A held {7,8} (#2648 shape)" first-slug "7,8"
+hr_cleanup
+hr_skip_case "B held {8} (#2765 shape)" first-slug "8"
+hr_cleanup
+hr_skip_case "C held {3,7,8} (#2459 shape)" first-slug "3,7,8"
+
+# D: after the diff changes, the same PR fires.
+hr_cleanup
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hr_fixture 101 first-slug "7,8"
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "0" ]] || fail "holdrepeat D: pre-change run fired"
+echo changed >> "$SCRATCH/wt-first-slug/hrfile"
+: > "$SCRATCH/ready.argv"
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "holdrepeat D: changed diff did not fire (ready calls $(calls ready))"
+grep -qxF 101 "$(rundir)/stage1.txt" || fail "holdrepeat D: 101 missing from stage1.txt"
+hr_cleanup
+
+# E: no worktree for the branch fires.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hr_fixture 101 no-wt-slug "7,8" "$SCRATCH/hrstate" nowt
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "holdrepeat E: no-worktree PR did not fire (ready calls $(calls ready))"
+hr_cleanup
+
+# F: worktree HEAD differs from the PR's headRefOid fires.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hr_fixture 101 first-slug "7,8"
+jq 'map(. + {headRefOid: "0000000000000000000000000000000000000000"})' \
+    "$SCRATCH/armed-state.json" > "$SCRATCH/armed-state.tmp" \
+    && mv "$SCRATCH/armed-state.tmp" "$SCRATCH/armed-state.json"
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "holdrepeat F: stale worktree did not fire (ready calls $(calls ready))"
+hr_cleanup
+
+# G: python check errors fire (empty harness dir; stub harness that raises).
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hr_fixture 101 first-slug "7,8"
+mkdir -p "$SCRATCH/hr-empty"
+HRHARNESS="$SCRATCH/hr-empty" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "holdrepeat G: empty harness dir did not fire (ready calls $(calls ready))"
+mkdir -p "$SCRATCH/hr-boom/harness"
+: > "$SCRATCH/hr-boom/harness/__init__.py"
+echo 'raise RuntimeError("boom")' > "$SCRATCH/hr-boom/harness/holdrepeat.py"
+: > "$SCRATCH/ready.argv"
+HRHARNESS="$SCRATCH/hr-boom" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "holdrepeat G: raising harness did not fire (ready calls $(calls ready))"
+hr_cleanup
+
+# H: empty seams fall back to defaults. Empty state dir -> <harness>/out/state (skips);
+# empty harness -> <main checkout>/tools/postplan-harness, absent in the scratch repo (fires).
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hr_fixture 101 first-slug "7,8" "$HRH/out/state"
+HRSTATE="" HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "0" ]] || fail "holdrepeat H: empty state-dir seam did not fall back to <harness>/out/state"
+: > "$SCRATCH/ready.argv"
+HRSTATE="" HRHARNESS="" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "holdrepeat H: empty harness seam did not fall back to the main-checkout default"
+hr_cleanup
+
+# I: a skipped PR frees its --max-ready slot for the next ordered PR.
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hr_fixture 101 first-slug "7,8"
+HRHARNESS="$HRH" run --worker --max-ready 1
+[[ "$(cat "$(rundir)/stage1.txt")" == "102" ]] || fail "holdrepeat I: stage1.txt is '$(cat "$(rundir)/stage1.txt")', want just 102"
+grep -qF '#101 — holdrepeat would decline' <<< "$OUT" || fail "holdrepeat I: 101 skip line missing"
+grep -qF '#102 — over --max-ready cap' <<< "$OUT" && fail "holdrepeat I: 102 was capped out"
+hr_cleanup
+unset HRHARNESS HRSTATE
+end_case "case holdrepeat pre-fire skip"
 
 begin_case
 # Case A: details-shaped sticky, matching diff -> skip pr-ready

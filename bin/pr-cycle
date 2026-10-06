@@ -70,6 +70,12 @@
 #                            $ROOT/tools/postplan-harness/out.
 #   PR_CYCLE_FLEET_LOG_DIR   Where post-plan-fleet writes post-plan-fleet-<PR>.log. Read for
 #                            the end-of-run outcome counts. Default: /tmp.
+#   PR_CYCLE_HOLDREPEAT_HARNESS
+#                            postplan-harness dir whose `harness.holdrepeat check` decides
+#                            the pre-fire skip. Default:
+#                            $PR_CYCLE_MAIN_CHECKOUT/tools/postplan-harness.
+#   PR_CYCLE_HOLDREPEAT_STATE_DIR
+#                            Holdrepeat state records. Default: <harness>/out/state.
 #
 #   Every seam is PR_CYCLE_-prefixed on purpose. bin/pr-attack reads a bare PR_TRIAGE_CMD
 #   itself, and this script spawns the real bin/pr-attack as a child — an unprefixed export
@@ -143,6 +149,8 @@ PR_CYCLE_PATCH_ID_CMD="${PR_CYCLE_PATCH_ID_CMD:-}"
 PR_CYCLE_HARNESS_OUT="${PR_CYCLE_HARNESS_OUT:-$ROOT/tools/postplan-harness/out}"
 PR_CYCLE_FLEET_LOG_DIR="${PR_CYCLE_FLEET_LOG_DIR:-/tmp}"
 PR_CYCLE_SKIP_HELD_UNCHANGED="${PR_CYCLE_SKIP_HELD_UNCHANGED:-1}"
+PR_CYCLE_HOLDREPEAT_HARNESS="${PR_CYCLE_HOLDREPEAT_HARNESS:-$PR_CYCLE_MAIN_CHECKOUT/tools/postplan-harness}"
+PR_CYCLE_HOLDREPEAT_STATE_DIR="${PR_CYCLE_HOLDREPEAT_STATE_DIR:-$PR_CYCLE_HOLDREPEAT_HARNESS/out/state}"
 
 # Print the usage header above: every comment line from the shebang to `set -euo pipefail`.
 usage() {
@@ -471,7 +479,7 @@ _ensure_armed_state() {
     [ -f "$RUNDIR/armed-state.json" ]   && return 0
     set +e
     "$PR_CYCLE_GH_CMD" pr list --state open --limit 200 \
-        --json number,headRefName,autoMergeRequest,mergeStateStatus \
+        --json number,headRefName,autoMergeRequest,mergeStateStatus,headRefOid \
         > "$RUNDIR/armed-state.json" 2> "$RUNDIR/armed-state.err"
     _easrc=$?
     set -e
@@ -670,6 +678,34 @@ _check_held_unchanged() {
     return 0
 }
 
+# _holdrepeat_would_decline N — exit 0 only when `harness.holdrepeat check` returns 10 (DECLINE)
+# for PR N's worktree. Every other path returns 1, so the skip fails open. Runs only when the
+# PR's worktree exists and its HEAD equals the PR's headRefOid; a stale worktree would
+# fingerprint an old diff. Never sets FORCE.
+_holdrepeat_would_decline() {
+    local _hr_n="$1" _hr_ref _hr_oid _hr_wt _hr_h="$PR_CYCLE_HOLDREPEAT_HARNESS" _hr_rc
+    _ensure_armed_state
+    [ -f "$RUNDIR/armed-state.json" ] || return 1
+    _hr_ref="$(jq -r --argjson n "$_hr_n" '.[] | select(.number == $n) | .headRefName // ""' \
+        "$RUNDIR/armed-state.json" 2>/dev/null || true)"
+    _hr_oid="$(jq -r --argjson n "$_hr_n" '.[] | select(.number == $n) | .headRefOid // ""' \
+        "$RUNDIR/armed-state.json" 2>/dev/null || true)"
+    [ -n "$_hr_ref" ] && [ -n "$_hr_oid" ] || return 1
+    [ -d "$_hr_h/harness" ] || return 1
+    _hr_wt="$(git -C "$PR_CYCLE_MAIN_CHECKOUT" worktree list --porcelain 2>/dev/null \
+        | awk -v b="branch refs/heads/$_hr_ref" '/^worktree /{w=substr($0,10)} $0==b{print w; exit}' \
+        || true)"
+    [ -n "$_hr_wt" ] || return 1
+    [ "$(git -C "$_hr_wt" rev-parse HEAD 2>/dev/null || true)" = "$_hr_oid" ] || return 1
+    set +e
+    PYTHONPATH="$_hr_h" python3 -m harness.holdrepeat check \
+        --state-dir "$PR_CYCLE_HOLDREPEAT_STATE_DIR" --slug "$_hr_ref" --worktree "$_hr_wt" \
+        > /dev/null 2> "$RUNDIR/holdrepeat-$_hr_n.err"
+    _hr_rc=$?
+    set -e
+    [ "$_hr_rc" -eq 10 ]
+}
+
 # _precheck_bucket N — echo PR N's current bucket, or "" when it cannot be determined.
 # Read-only: this invocation deliberately omits --arm, so it reports and changes nothing.
 # Never sets HALT and never returns non-zero: an unknown bucket must fall through to the
@@ -799,6 +835,7 @@ _precheck_verdict() {
 _stage1_list() {
     : > "$RUNDIR/stage1.txt"
     : > "$RUNDIR/stage1-skipped.txt"
+    : > "$RUNDIR/stage1-holdrepeat.txt"
     while IFS=$'\t' read -r _sl_n _sl_needs; do
         [ -n "$_sl_n" ] || continue
         if ! _pr_allowed "$_sl_n"; then continue; fi
@@ -832,6 +869,15 @@ _stage1_list() {
             fi
         fi
 
+        # Pre-fire holdrepeat skip: post-plan-now would DECLINE this PR at zero tokens
+        # (same structural hold, DM already sent, plan+diff+harness unchanged). Skipping
+        # frees the --max-ready slot for the next ordered PR. Fails open: any doubt fires.
+        if _holdrepeat_would_decline "$_sl_n"; then
+            echo "#$_sl_n — holdrepeat would decline (held on the same reason, nothing changed since), skipping" >> "$RUNDIR/stage1-skipped.txt"
+            echo "$_sl_n" >> "$RUNDIR/stage1-holdrepeat.txt"
+            continue
+        fi
+
         echo "$_sl_n" >> "$RUNDIR/stage1.txt"
     done <<EOF
 $(_attack_rows)
@@ -846,6 +892,7 @@ EOF
                 continue
             fi
             if grep -qxF "$_sl_dn" "$RUNDIR/stage1.txt" 2>/dev/null; then continue; fi
+            if grep -qxF "$_sl_dn" "$RUNDIR/stage1-holdrepeat.txt" 2>/dev/null; then continue; fi
             echo "$_sl_dn" >> "$RUNDIR/stage1.txt"
         done <<EOF
 $(_excluded_dirty_rows)
@@ -1185,6 +1232,7 @@ _launch() {
                   PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
                   PR_CYCLE_RESCUE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
                   PR_CYCLE_SKIP_HELD_UNCHANGED PR_CYCLE_HARNESS_OUT PR_CYCLE_FLEET_LOG_DIR \
+                  PR_CYCLE_HOLDREPEAT_HARNESS PR_CYCLE_HOLDREPEAT_STATE_DIR \
                   PR_CYCLE_AUTH_PROBE_CMD PR_CYCLE_PATCH_ID_CMD \
                   PR_CYCLE_STOP_FILE; do
             eval "_val=\${$_v}"

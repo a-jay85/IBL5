@@ -562,6 +562,14 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
         self::assertStringContainsString('schema file not found', $result['output']);
     }
 
+    public function testSchemaFlagRejectsEmptyValue(): void
+    {
+        $result = $this->runScript(['--schema=']);
+
+        self::assertSame(2, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('--schema requires a path', $result['output']);
+    }
+
     public function testSchemaFlagIsHonouredByFullScan(): void
     {
         $narrowHit = '[narrow-type] ibl5/migrations/034_add_column_comments.sql:422';

@@ -53,8 +53,8 @@ Detected patterns (v2, statement-level):
                           UPDATE ... JOIN without WHERE counts, INSERT ... ON
                           DUPLICATE KEY UPDATE does not
   narrow-type             MODIFY/CHANGE to a narrower type. Old type comes from
-                          ibl5/docs/schema/current-schema.sql, then a same-file
-                          definition; a column the dump does not know fires as
+                          ibl5/docs/schema/current-schema.sql (or --schema), then
+                          a same-file definition; a column the dump does not know fires as
                           unresolved
   drop-recreate-existing  DROP TABLE IF EXISTS + CREATE TABLE of a table that
                           already exists in the schema dump, the baseline, or an
@@ -111,6 +111,7 @@ SINCE_GIVEN=0
 FULL_GIVEN=0
 SELF_TEST=0
 SCHEMA_OVERRIDE=""
+SCHEMA_GIVEN=0
 
 for arg in "$@"; do
     case "$arg" in
@@ -123,6 +124,7 @@ for arg in "$@"; do
             SINCE_SHA="${arg#--since=}"
             ;;
         --schema=*)
+            SCHEMA_GIVEN=1
             SCHEMA_OVERRIDE="${arg#--schema=}"
             ;;
         --bypass-from-stdin)
@@ -151,7 +153,11 @@ for arg in "$@"; do
     esac
 done
 
-if [ -n "$SCHEMA_OVERRIDE" ]; then
+if [ "$SCHEMA_GIVEN" = "1" ]; then
+    if [ -z "$SCHEMA_OVERRIDE" ]; then
+        echo "--schema requires a path" >&2
+        exit 2
+    fi
     if [ ! -f "$SCHEMA_OVERRIDE" ]; then
         echo "schema file not found: $SCHEMA_OVERRIDE" >&2
         exit 2

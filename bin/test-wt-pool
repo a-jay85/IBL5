@@ -1,0 +1,245 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# Cases are dispatched by name (SC2329); PHP fixtures are literal (SC2016).
+# shellcheck disable=SC2329,SC2016
+#
+# bin/test-wt-pool — sandbox harness for bin/wt-new and its warm-standby pool
+# (bin/lib/wt-pool.sh, backlog#24).
+#
+# Every case builds a throwaway origin/main/worktrees trio under mktemp, seeded
+# with copies of the real bin/wt-new and bin/lib/*.sh, so nothing real is touched.
+# HOME is a sandbox dir, so a launchd plist write never reaches ~/Library.
+#
+# Run: bin/test-wt-pool                 every case
+#      bin/test-wt-pool <case>...       only the named cases (case_<name>)
+# Exit 0 = all selected cases pass, 1 = a case failed, 2 = unknown case name.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SELF="$SCRIPT_DIR/$(basename "$0")"
+WTNEW="$SCRIPT_DIR/wt-new"
+TMP="$(mktemp -d)"
+TMP="$(cd -P "$TMP" && pwd)"
+trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
+
+mkdir -p "$TMP/home"
+export HOME="$TMP/home"
+export WT_POOL_KICK=none
+unset CLAUDE_CODE_SESSION_ID WT_POOL BUNX_FAIL
+# Pin a sandbox identity so `env -i` runs and CI runners commit the same way.
+export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
+export GIT_CONFIG_NOSYSTEM=1
+
+FAILED=0
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+# assert_absent <name> <regex> <haystack>
+assert_absent() {
+    if grep -qE -- "$2" <<< "$3"; then
+        failcase "$1 — expected NOT to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    else
+        pass "$1"
+    fi
+}
+
+# assert_match <name> <regex> <haystack>
+assert_match() {
+    if grep -qE -- "$2" <<< "$3"; then
+        pass "$1"
+    else
+        failcase "$1 — expected to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    fi
+}
+
+# assert_eq <name> <expected> <actual>
+assert_eq() {
+    if [ "$2" = "$3" ]; then pass "$1"; else failcase "$1 — expected '$2', got '$3'"; fi
+}
+
+git_q() { git -c user.email=t@t -c user.name=t -c init.defaultBranch=master "$@"; }
+
+canon() { (cd -P "$1" 2>/dev/null && pwd) || printf '%s\n' "$1"; }
+
+# new_pool_env — build <TMP>/env.XXXX/{origin.git,IBL5,IBL5-worktrees,stub-bin}
+# shaped like the real main checkout: tracked config examples, a tracked
+# docker-compose.yml, and the untracked vendor/node_modules/.env*/config files
+# wt-new links or copies. Echoes the env base path.
+new_pool_env() {
+    local base m
+    base="$(mktemp -d "$TMP/env.XXXXXX")"
+    m="$base/IBL5"
+    git_q init -q --bare "$base/origin.git" >/dev/null 2>&1
+    git_q clone -q "$base/origin.git" "$m" >/dev/null 2>&1
+    mkdir -p "$m/bin/lib" "$m/ibl5/design" "$m/ibl5/tests" "$base/IBL5-worktrees" "$base/stub-bin"
+    cp "$WTNEW" "$m/bin/wt-new"
+    cp "$SCRIPT_DIR"/lib/*.sh "$m/bin/lib/" 2>/dev/null
+    chmod +x "$m/bin/wt-new"
+    echo 'services: {}' > "$m/docker-compose.yml"
+    echo '@import "tailwindcss";' > "$m/ibl5/design/input.css"
+    echo '<?php $dbname = "example";' > "$m/ibl5/config.php.example"
+    echo '<?php $dbuser = "example";' > "$m/ibl5/config.local.php.example"
+    echo '<?php echo "hi";' > "$m/ibl5/index.php"
+    : > "$m/ibl5/tests/.keep"
+    cat > "$m/.gitignore" <<'EOF'
+ibl5/vendor
+ibl5/node_modules
+ibl5/.env
+ibl5/.env.test
+ibl5/config.php
+ibl5/config.local.php
+ibl5/themes/IBL/style/style.css
+EOF
+    git_q -C "$m" add -A >/dev/null 2>&1
+    git_q -C "$m" commit -qm C1 >/dev/null 2>&1
+    git_q -C "$m" push -q -u origin master >/dev/null 2>&1
+
+    # Untracked, gitignored state the main checkout carries.
+    mkdir -p "$m/ibl5/vendor" "$m/ibl5/node_modules" "$m/ibl5/themes/IBL/style"
+    echo '<?php' > "$m/ibl5/vendor/autoload.php"
+    : > "$m/ibl5/node_modules/.keep"
+    echo 'A=1' > "$m/ibl5/.env"
+    echo 'A=2' > "$m/ibl5/.env.test"
+    echo '<?php $dbname = "main";' > "$m/ibl5/config.php"
+    echo '<?php $dbuser = "main";' > "$m/ibl5/config.local.php"
+    echo 'main-css' > "$m/ibl5/themes/IBL/style/style.css"
+
+    # bunx stub: log the call (plus a probe line when the pool readiness marker
+    # already exists for this worktree), then write the -o target.
+    cat > "$base/stub-bin/bunx" <<EOF
+#!/bin/bash
+echo "\$PWD \$*" >> "$base/bunx.calls"
+gd="\$(git rev-parse --absolute-git-dir 2>/dev/null)" \\
+    && [ -f "\$gd/wt-pool-ready" ] && echo marker-present >> "$base/bunx.calls"
+[ "\${BUNX_FAIL:-}" = 1 ] && exit 1
+out="" prev=""
+for a in "\$@"; do [ "\$prev" = "-o" ] && out="\$a"; prev="\$a"; done
+[ -n "\$out" ] && echo stub-css > "\$out"
+exit 0
+EOF
+    # launchctl stub: log the args, succeed.
+    cat > "$base/stub-bin/launchctl" <<EOF
+#!/bin/bash
+echo "\$*" >> "$base/launchctl.calls"
+exit 0
+EOF
+    chmod +x "$base/stub-bin/bunx" "$base/stub-bin/launchctl"
+    printf '%s\n' "$base"
+}
+
+# bunx_calls <base> — number of real bunx invocations (probe lines excluded).
+bunx_calls() {
+    if [ -f "$1/bunx.calls" ]; then
+        grep -vc '^marker-present$' "$1/bunx.calls" || true
+    else
+        echo 0
+    fi
+}
+
+# wtnew <base> <args...> — run the sandbox wt-new from the main checkout with
+# stub-bin first on PATH; prints combined output, returns wt-new's exit code.
+wtnew() {
+    local base="$1"; shift
+    (cd "$base/IBL5" && PATH="$base/stub-bin:$PATH" "$base/IBL5/bin/wt-new" "$@" 2>&1)
+}
+
+# admin_dir <path> — the worktree's absolute git admin dir.
+admin_dir() { git -C "$1" rev-parse --absolute-git-dir; }
+
+# wt_postconditions <base> <slug> — the full shape of a finished worktree.
+wt_postconditions() {
+    local base="$1" slug="$2" wt m name
+    wt="$base/IBL5-worktrees/$slug"
+    m="$base/IBL5/ibl5"
+    assert_eq "$slug: branch == slug" "$slug" "$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>&1)"
+    assert_eq "$slug: toplevel" "$(canon "$wt")" "$(canon "$(git -C "$wt" rev-parse --show-toplevel 2>&1)")"
+    assert_eq "$slug: clean status" "" "$(git -C "$wt" status --porcelain 2>&1)"
+    assert_eq "$slug: iblBase" "master" "$(git -C "$wt" config "branch.$slug.iblBase" 2>&1)"
+    for name in vendor node_modules .env .env.test; do
+        if [ -L "$wt/ibl5/$name" ] && [ "$(readlink "$wt/ibl5/$name")" = "$m/$name" ]; then
+            pass "$slug: ibl5/$name links to main"
+        else
+            failcase "$slug: ibl5/$name links to main (got '$(readlink "$wt/ibl5/$name" 2>&1)')"
+        fi
+    done
+    for name in config.php config.local.php; do
+        if [ -f "$wt/ibl5/$name" ] && [ ! -L "$wt/ibl5/$name" ]; then
+            pass "$slug: ibl5/$name is a regular file"
+        else
+            failcase "$slug: ibl5/$name is a regular file"
+        fi
+    done
+    if [ -e "$m/vendor/vendor" ] || [ -L "$m/vendor/vendor" ] \
+        || [ -e "$m/node_modules/node_modules" ] || [ -L "$m/node_modules/node_modules" ]; then
+        failcase "$slug: main gained a nested vendor/node_modules link"
+    else
+        pass "$slug: main has no nested vendor/node_modules link"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Cold path (rows 1-4)
+# ---------------------------------------------------------------------------
+
+case_cold_postconditions() {
+    local base out rc
+    base="$(new_pool_env)"
+    out="$(CLAUDE_CODE_SESSION_ID=sess-cold wtnew "$base" alpha)"; rc=$?
+    assert_eq "cold: exit 0" 0 "$rc"
+    [ "$rc" = 0 ] || printf '%s\n' "$out" | sed 's/^/    /'
+    wt_postconditions "$base" alpha
+    assert_eq "cold: session file" "sess-cold" \
+        "$(cat "$(admin_dir "$base/IBL5-worktrees/alpha")/wt-new-session" 2>&1)"
+    assert_eq "cold: one bunx call" 1 "$(bunx_calls "$base")"
+}
+
+case_cold_session_absent() {
+    local base
+    base="$(new_pool_env)"
+    wtnew "$base" bravo >/dev/null
+    CLAUDE_CODE_SESSION_ID='' wtnew "$base" charlie >/dev/null
+    if [ -e "$(admin_dir "$base/IBL5-worktrees/bravo")/wt-new-session" ]; then
+        failcase "session unset: no wt-new-session"
+    else
+        pass "session unset: no wt-new-session"
+    fi
+    if [ -e "$(admin_dir "$base/IBL5-worktrees/charlie")/wt-new-session" ]; then
+        failcase "session empty: no wt-new-session"
+    else
+        pass "session empty: no wt-new-session"
+    fi
+}
+
+# Re-invokes this harness, so it is excluded from the no-arg run.
+case_unknown_case_rejected() {
+    local out rc
+    out="$("$SELF" no_such_case 2>&1)"; rc=$?
+    assert_eq "unknown case: exit 2" 2 "$rc"
+    assert_match "unknown case: names it" '^unknown case: no_such_case$' "$out"
+}
+
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
+
+ALL_CASES="cold_postconditions cold_session_absent"
+
+if [ $# -eq 0 ]; then
+    # shellcheck disable=SC2086
+    set -- $ALL_CASES
+fi
+for c in "$@"; do
+    if ! declare -F "case_$c" >/dev/null; then
+        echo "unknown case: $c" >&2
+        exit 2
+    fi
+done
+for c in "$@"; do
+    echo "== $c"
+    "case_$c"
+done
+
+exit "$FAILED"

@@ -3660,6 +3660,130 @@ _z_parity "gate-Z-parity-non-matrix-table" silent "$FM$_Z_HEAD"'| 1 | plain row'
 | `*.md` | docs are tooling |' "$_Z_PDIFF_HDR"'
 +unrelated'
 
+# ---------------------------------------------------------------------------
+# Gate [L] checks A/B/C (backlog#933): literal-check citations, pid/tid/teamid
+# overflow backstop, copy-verbatim symbol resolution.
+# ---------------------------------------------------------------------------
+L_MATRIX='| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | E2E | post-impl | `tests/e2e/x.spec.ts` |
+'
+
+# Check A: valid and out-of-scope citations pass.
+assert "L-cite-fits-ok" 0 "$FM$L_MATRIX"'
+Seed literal-check: 200001993..200001999 -> ibl_plr.pid int(11) (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-int-max-ok" 0 "$FM$L_MATRIX"'
+Seed literal-check: 2147483647 -> ibl_plr.pid int(11) (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-in-fence-ignored-ok" 0 "$FM$L_MATRIX"'
+```
+literal-check: 200001993000..200001993099 -> ibl_plr.pid int(11) (per ibl5/docs/schema/current-schema.sql)
+```
+'
+assert "L-cite-template-ignored-ok" 0 "$FM$L_MATRIX"'
+Form: literal-check: <literal-or-range> -> <table>.<column> <sqltype> (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-literal-ok-marker-ok" 0 "$FM$L_MATRIX"'
+Bad: literal-check: 200001993000..200001993099 -> ibl_plr.pid int(11) (per ibl5/docs/schema/current-schema.sql) <!-- literal-ok: negative example -->
+'
+
+# Check A: out-of-range, wrong type, unknown column, unsigned negative all flag.
+assert "L-cite-int-max-plus-one-flags" 1 "$FM$L_MATRIX"'
+Seed literal-check: 2147483648 -> ibl_plr.pid int(11) (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-overflow-band-flags" 1 "$FM$L_MATRIX"'
+Seed literal-check: 200001993000..200001993099 -> ibl_plr.pid int(11) (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-wrong-type-flags" 1 "$FM$L_MATRIX"'
+Seed literal-check: 5 -> ibl_plr.pid bigint(20) (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-unknown-column-flags" 1 "$FM$L_MATRIX"'
+Seed literal-check: 5 -> ibl_plr.no_such_col int(11) (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-unsigned-negative-flags" 1 "$FM$L_MATRIX"'
+Seed literal-check: -1 -> auth_users.id int(10) unsigned (per ibl5/docs/schema/current-schema.sql)
+'
+
+# Check B: uncited overflow next to pid/teamid flags, including max+1.
+assert "L-overflow-pid-band-flags" 1 "$FM$L_MATRIX"'
+Seed every pid in 200001993000..200001993099.
+'
+assert "L-overflow-pid-max-plus-one-flags" 1 "$FM$L_MATRIX"'
+Seed pid 2147483648 as the sentinel.
+'
+assert "L-overflow-teamid-flags" 1 "$FM$L_MATRIX"'
+Insert teamid 9999999999 for the phantom.
+'
+
+# Check B: the int(11) max, a BIGINT cue, a quoted literal, a Discord id, a
+# substring match, and a fenced line all pass.
+assert "L-overflow-pid-max-ok" 0 "$FM$L_MATRIX"'
+Seed pid 2147483647 as the sentinel.
+'
+assert "L-overflow-bigint-cue-ok" 0 "$FM$L_MATRIX"'
+Seed pid 200001993000 into the BIGINT shadow column.
+'
+assert "L-overflow-quoted-ok" 0 "$FM$L_MATRIX
+Store pid as the string '200001993000' in the log.
+"
+assert "L-overflow-discord-id-ok" 0 "$FM$L_MATRIX"'
+Post with message_id 1234567890123456789.
+'
+assert "L-overflow-word-boundary-ok" 0 "$FM$L_MATRIX"'
+Expect rapid growth past 3000000000 rows.
+'
+assert "L-overflow-in-fence-ok" 0 "$FM$L_MATRIX"'
+```
+Seed every pid in 200001993000..200001993099.
+```
+'
+
+# Check C: copy-verbatim symbols resolve against the same section's cited files.
+assert "L-verbatim-resolves-ok" 0 "$FM_OPUS$L_MATRIX"'
+## Phase 1: restore
+Copy `bindAndExecute()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+'
+assert "L-verbatim-shell-ok" 0 "$FM_OPUS$L_MATRIX"'
+## Phase 1: gate
+Copy `viol()` verbatim from `bin/check-plan`.
+'
+assert "L-verbatim-python-ok" 0 "$FM_OPUS$L_MATRIX"'
+## Phase 1: harness
+Copy `parse_no_change_test_paths()` verbatim from `tools/postplan-harness/harness/planfile.py`.
+'
+assert "L-verbatim-no-cited-file-ok" 0 "$FM_OPUS$L_MATRIX"'
+## Phase 1: restore
+Copy `madeUpHelperXyz()` verbatim from the 2004 restore class.
+'
+assert "L-verbatim-forward-ref-ok" 0 "$FM_OPUS$L_MATRIX"'
+## Phase 1: restore
+Create a new helper `madeUpHelperXyz()` in `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Then copy `madeUpHelperXyz()` verbatim into the 1993 class.
+'
+assert "L-verbatim-in-fence-ok" 0 "$FM_OPUS$L_MATRIX"'
+## Phase 1: restore
+```
+Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+```
+'
+assert "L-verbatim-gap-over-80-ok" 0 "$FM_OPUS$L_MATRIX"'
+## Phase 1: restore
+Copy `madeUpHelperXyz()` and every caller it needs into the new class without any change at all, keeping it verbatim into `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+'
+
+# Check C: a missing symbol, or one whose file is cited in another section, flags.
+assert "L-verbatim-missing-flags" 1 "$FM_OPUS$L_MATRIX"'
+## Phase 1: restore
+Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+'
+assert "L-verbatim-other-section-flags" 1 "$FM_OPUS$L_MATRIX"'
+## Phase 1: a
+See `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+## Phase 2: b
+Copy `bindAndExecute()` verbatim from the shell helper in `bin/check-plan`.
+'
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

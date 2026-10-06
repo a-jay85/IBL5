@@ -21,7 +21,7 @@ Handles the full lifecycle of IBL player contract extensions. `ExtensionService`
 Extension stays a Player sub-action. There is no `ibl5/modules/Extension/` (example) directory and no GET-navigable extension page. The three user-facing pieces live where their flows already run:
 
 - Offer form: `Negotiation\NegotiationOfferView::renderNegotiationForm()`, reached from `modules.php?name=Player&pa=negotiate`. The form posts to `ibl5/modules/Player/extension.php` with a CSRF token from `generateToken('extension')`.
-- Submission: `ibl5/modules/Player/extension.php`, a POST-only handler (CSRF check, login check, team-ownership gate, then `ExtensionProcessor`). A GET redirects away. Its URL is pinned by three E2E specs and `ibl5/tests/Extension/ExtensionScriptTeamGuardLockTest.php`.
+- Submission: `ibl5/modules/Player/extension.php`, a POST-only handler (CSRF check, login check, team-ownership gate, then `ExtensionProcessor`). A GET redirects away. Its URL is pinned by three E2E specs and `ibl5/tests/Extension/ExtensionControllerTest.php`.
 - Result banner: `ExtensionView::renderResultBanner()`, called by `Team\TeamView::render()` after the PRG redirect to the Team page with `result=` and `msg=` query parameters.
 
 An own module would add a new route and UI surface with no behavior to put behind it, so the View lands here and the form and handler stay with Player and Negotiation.

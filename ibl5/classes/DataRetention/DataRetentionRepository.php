@@ -6,7 +6,7 @@ namespace DataRetention;
 
 use DataRetention\Contracts\DataRetentionRepositoryInterface;
 
-final class DataRetentionRepository extends \BaseMysqliRepository implements DataRetentionRepositoryInterface
+final class DataRetentionRepository extends \Database\BaseMysqliRepository implements DataRetentionRepositoryInterface
 {
     /**
      * @see DataRetentionRepositoryInterface::countAuditLogRowsOlderThan()

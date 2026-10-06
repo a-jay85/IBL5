@@ -46,7 +46,7 @@
 }
 
 .h2h-row-label small {
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
     opacity: 0.8;
 }
 
@@ -217,7 +217,7 @@
 .h2h-matrix .h2h-user-row td,
 .h2h-matrix .h2h-user-row th[scope="row"],
 .h2h-matrix .h2h-user-col {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
 }
 
 .h2h-matrix .h2h-user-row td.sticky-col,
@@ -246,10 +246,10 @@
     padding: 2px 6px;
     border-radius: var(--radius-md);
     font-size: 0.75rem;
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
     white-space: nowrap;
     pointer-events: none;
-    z-index: 10;
+    z-index: var(--z-sticky);
 }
 
 .h2h-matrix .series-record-cell.h2h-tip-open::after {

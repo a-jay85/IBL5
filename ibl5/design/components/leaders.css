@@ -60,7 +60,7 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-2xl);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: white;
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
@@ -126,7 +126,7 @@
 }
 
 .leaders-tabbed__leader-name {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-size: var(--text-lg);
     color: var(--navy-900);
     text-decoration: none;
@@ -163,7 +163,7 @@
 .leaders-tabbed__leader-value {
     font-family: var(--font-display);
     font-size: 1.75rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--accent-700);
     line-height: 1;
     flex-shrink: 0;
@@ -204,7 +204,7 @@
 
 .leaders-tabbed__runner-rank {
     font-size: 1rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--gray-500);
     line-height: 1;
 }
@@ -218,7 +218,7 @@
 
 .leaders-tabbed__runner-name {
     font-size: .86rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--navy-800);
     text-decoration: none;
     white-space: nowrap;
@@ -236,7 +236,7 @@
 .leaders-tabbed__runner-value {
     font-family: var(--font-display);
     font-size: 1rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--navy-700);
     line-height: 1.2;
 }

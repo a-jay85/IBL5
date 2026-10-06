@@ -98,7 +98,7 @@
 .ibl-data-table th {
     color: white;
     font-family: var(--font-display);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-size: var(--text-xl);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
@@ -139,7 +139,7 @@
 .ibl-data-table a {
     color: var(--gray-800);
     text-decoration: none;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     transition: color var(--transition-fast);
 }
 
@@ -160,7 +160,7 @@
 
 /* Rank cell styling */
 .ibl-data-table .rank-cell {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--navy-700);
 }
 
@@ -191,7 +191,7 @@
 .ibl-data-table tbody tr.totals-row:nth-child(odd),
 .ibl-data-table tbody tr.totals-row:nth-child(even) {
     background-color: var(--accent-100);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .ibl-data-table tbody tr.totals-row:nth-child(odd):hover,
@@ -202,7 +202,7 @@
 /* Table footer summary rows (team totals, cap totals, etc.) */
 .ibl-data-table tfoot tr {
     background-color: var(--accent-100);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .ibl-data-table tfoot tr:hover {
@@ -217,7 +217,7 @@
 /* Legend/key row — subtle, de-emphasized */
 .ibl-data-table tfoot tr.tfoot-legend {
     background-color: var(--gray-50);
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
     font-size: var(--text-sm);
     color: var(--gray-500);
 }
@@ -233,7 +233,7 @@
 /* Cap exceeded — red highlight when salary totals exceed hard cap */
 .ibl-data-table tfoot td.cap-exceeded {
     color: var(--color-error-600);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
 }
 
 /* ==========================================================================
@@ -330,12 +330,12 @@
     .ibl-data-table.responsive-table td.sticky-col {
         position: sticky;
         left: 0;
-        z-index: 1;
+        z-index: var(--z-raised);
     }
 
     .ibl-data-table.responsive-table thead th.sticky-col {
         background: var(--team-header-bg, var(--gradient-navy-header));
-        z-index: 3;
+        z-index: var(--z-raised-3);
     }
 
     /* Sticky column backgrounds - consolidated for all variants */
@@ -360,7 +360,7 @@
     .ibl-data-table.responsive-table td.sticky-col-1 {
         position: sticky;
         left: 0;
-        z-index: 1;
+        z-index: var(--z-raised);
         min-width: 36px;
     }
 
@@ -368,14 +368,14 @@
     .ibl-data-table.responsive-table td.sticky-col-2 {
         position: sticky;
         left: 36px;
-        z-index: 1;
+        z-index: var(--z-raised);
         min-width: 36px;
     }
 
     .ibl-data-table.responsive-table thead th.sticky-col-1,
     .ibl-data-table.responsive-table thead th.sticky-col-2 {
         background: var(--team-header-bg, var(--gradient-navy-header));
-        z-index: 3;
+        z-index: var(--z-raised-3);
     }
 
     /* Background colors now handled by consolidated rules above */
@@ -578,7 +578,7 @@
     opacity: 1;
     transition: opacity var(--transition-slow);
     border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
-    z-index: 2;
+    z-index: var(--z-raised-2);
 }
 
 /* Hide scroll indicator when scrolled to the end */
@@ -665,7 +665,7 @@
 .sticky-table thead {
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: var(--z-sticky);
     box-shadow: var(--shadow-sticky-header);
 }
 
@@ -677,19 +677,19 @@
 .sticky-table .sticky-col {
     position: sticky;
     left: 0;
-    z-index: 5;
+    z-index: var(--z-sticky-col);
 }
 
 /* Second sticky column (e.g. Draft table: radio + name) */
 .sticky-table .sticky-col-2 {
     position: sticky;
     left: 36px;
-    z-index: 5;
+    z-index: var(--z-sticky-col);
 }
 
 /* Corner cell — intersection of sticky header and sticky column */
 .sticky-table .sticky-corner {
-    z-index: 15;
+    z-index: var(--z-sticky-corner);
     background: var(--navy-800);
 }
 
@@ -772,7 +772,7 @@
 .page-sticky-header-clone {
     position: fixed;
     top: 72px;
-    z-index: 40;
+    z-index: var(--z-fixed);
     pointer-events: none;
     filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.15));
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
@@ -792,7 +792,7 @@
     top: 0;
     width: var(--radius-lg);
     height: var(--radius-lg);
-    z-index: 1;
+    z-index: var(--z-raised);
     pointer-events: none;
 }
 
@@ -837,7 +837,7 @@
 .sticky-header thead th {
     position: sticky;
     top: 72px; /* Below fixed nav (72px tall) */
-    z-index: 10;
+    z-index: var(--z-sticky);
     background: var(--gradient-navy-header);
 }
 
@@ -875,7 +875,7 @@
 .ibl-table-title {
     font-family: var(--font-display);
     font-size: var(--text-2xl);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--navy-900);
     text-align: center;
     margin: 0 0 1rem 0;
@@ -886,7 +886,7 @@
 .ibl-table-subheading td {
     color: var(--gray-600);
     font-size: var(--text-sm);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
     padding: var(--space-1) var(--space-2);
@@ -919,7 +919,7 @@ tbody tr.user-team-row:nth-child(even):hover {
 }
 
 .ibl-team-cell__name {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--navy-900);
     text-decoration: none;
     white-space: nowrap;
@@ -958,7 +958,7 @@ td.ibl-team-cell--colored {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--team-cell-color);
     text-decoration: none;
     white-space: nowrap;
@@ -1020,7 +1020,7 @@ td.ibl-team-cell--colored {
 }
 
 .ibl-player-cell__name {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: inherit;
     text-decoration: none;
     white-space: nowrap;
@@ -1067,7 +1067,7 @@ td.ibl-team-cell--colored {
 .ibl-stat-highlight,
 .ibl-data-table td.ibl-stat-highlight {
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--accent-500);
 }
 
@@ -1077,7 +1077,7 @@ td.ibl-team-cell--colored {
 
 .ibl-clinched-indicator {
     color: var(--accent-600);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
 }
 
 /* ==========================================================================
@@ -1112,13 +1112,13 @@ td.ibl-team-cell--colored {
     background-color: var(--navy-900);
     color: white;
     font-size: var(--text-sm);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     white-space: nowrap;
     border-radius: var(--radius-sm);
     opacity: 0;
     visibility: hidden;
     transition: opacity var(--transition-fast), visibility var(--transition-fast);
-    z-index: 100;
+    z-index: var(--z-tooltip);
     pointer-events: none;
     margin-right: 8px;
     box-shadow: var(--shadow-md);
@@ -1136,7 +1136,7 @@ td.ibl-team-cell--colored {
     opacity: 0;
     visibility: hidden;
     transition: opacity var(--transition-fast), visibility var(--transition-fast);
-    z-index: 100;
+    z-index: var(--z-tooltip);
     margin-right: -2px;
 }
 

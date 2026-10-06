@@ -8,7 +8,13 @@ Both sets are computed in one process: "old" rebinds
 `planfile._has_planning_type_cell` to the pre-change whole-row search and restores
 it in a `finally`. Prints ADDED, DROPPED and TYPED-LOSS blocks plus a SUMMARY line.
 TYPED-LOSS is a row under a Test-type header whose type cell names a planning type,
-fails the label rule, and would have planned a path under the old rule.
+fails the label rule, and would have planned a path under the old rule. The last
+condition narrows the plan's literal definition (header-column type cell matches the
+old regex but fails the label rule): without it, rows that never planned a path under
+either rule, such as a `CI (E2E gate)` cell or a shifted prose cell, count as losses
+and the tool exits 1 for a row the change cannot have dropped.
+Files under a `_reports/` directory are skipped: they hold earlier runs of this tool,
+and re-reading them feeds their own DROPPED rows back in.
 Exits 1 when added>0 or typed_loss>0; the opt-in pytest also requires dropped>=1.
 Stdlib only.
 """
@@ -92,7 +98,8 @@ def main(argv: list[str] | None = None) -> int:
     # The report lives under the corpus by default; reading it back would feed its own rows in.
     report = os.path.abspath(os.path.expanduser(args.report)) if args.report else None
     paths = [p for p in sorted(glob.glob(os.path.join(args.plans_dir, "**", "*.md"), recursive=True))
-             if os.path.abspath(p) != report]
+             if os.path.abspath(p) != report
+             and "_reports" not in os.path.relpath(p, args.plans_dir).split(os.sep)]
     added: list[tuple] = []
     dropped: list[tuple] = []
     typed_loss: list[tuple] = []

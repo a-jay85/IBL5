@@ -25,7 +25,7 @@ Purpose: the criteria and verdict shape for the semantic judgment this skill exi
 
 **Terse form.** When the coverage marker is `REVIEW-COVERAGE: CURRENT`, statement (a) is that marker line alone, with no date, link, or head bound. When 6b's conflict list is empty, omit statement (b), because check 6 already reports it. Write the full form of (a) for `NONE`, `STALE`, and `UNKNOWN`, and write (b) whenever the conflict list names a path.
 
-**Writing style.** These rules apply to all prose in this review. They cover finding bodies, numbered check lines, `## FINDINGS` bullets, and the five `## DIGEST` label values. They do not apply to machine-parsed tokens: the terminal verdict word (`READY` / `READY WITH NOTES` / `NOT READY`), `REVIEWED_TREE=` and `Mode:` lines, the `## DIGEST` heading and label names. Finding titles are copied verbatim into backlog issue titles and the terminal line; keep them short imperative lines under 70 characters.
+**Writing style.** These rules apply to all prose in this review. They cover finding bodies, numbered check lines, `## FINDINGS` bullets, and the five `## DIGEST` label values. They do not apply to machine-parsed tokens: the terminal verdict word (`READY` / `READY WITH NOTES` / `NOT READY`), `REVIEWED_TREE=` and `Mode:` lines, the `## DIGEST` heading and label names, and the `[BLOCKING]` / `[NOTE]` finding marker. Finding titles, without the marker, are copied verbatim into backlog issue titles and the terminal line; keep them short imperative lines under 70 characters.
 
 For DIGEST label values, `.claude/review-shared/_prose-voice-contract.md` adds five further rules. Those rules apply alongside this list.
 
@@ -66,6 +66,8 @@ These shapes are enumerated in `.claude/rules/prose-style.md`.
 - **`READY`**: every check above passes.
 - **`READY WITH NOTES`** — findings exist but none matched a blocking clause in 6d; list each note.
 - **`NOT READY`** — at least one finding matched a blocking clause in 6d; each one must name the clause it matched and the concrete next action.
+
+Open each `## FINDINGS` bullet with `[BLOCKING]` or `[NOTE]` so the bullets agree with the verdict word above. The marker grammar and the agreement rule are specified in `.claude/agents/pr-ready-phase6.md` § Output contract item 2a; that item is authoritative and this clause must not restate it differently.
 
 A green CI plus a green Phase 5.0 conformance run is **not** sufficient for `READY` on its own — that combination is exactly the state this skill exists to look past.
 

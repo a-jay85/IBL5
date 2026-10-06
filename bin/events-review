@@ -144,7 +144,7 @@ PLIST_LABEL="com.ibl5.events-review"
 # Program and WorkingDirectory MUST point at the main checkout: a worktree is
 # torn down after its PR merges and the job would silently stop working. The
 # first `git worktree list` entry is the main working tree.
-MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}' || true)"
+MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}' || true)"
 [ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"
 
 xml_esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }

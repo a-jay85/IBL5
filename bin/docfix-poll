@@ -53,7 +53,7 @@ fi
 MAIN="${IBL5_MAIN:-}"
 if [ -z "$MAIN" ]; then
     MAIN="$(git -C "$SCRIPT_DIR/.." worktree list --porcelain 2>/dev/null \
-             | awk '/^worktree / {print $2; exit}')"
+             | awk '/^worktree / && !f {print $2; f=1}')"
 fi
 [ -n "$MAIN" ] || MAIN="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -251,7 +251,7 @@ salvage_wedged_branch() {   # $1 = branch name
     salvage_branch="docs-stale-salvage-$(date +%Y%m%d)"
     local wt changed files
     wt="$(git -C "$MAIN" worktree list --porcelain \
-          | awk -v b="refs/heads/$branch" '/^worktree /{p=$2} $0=="branch "b{print p; exit}')"
+          | awk -v b="refs/heads/$branch" '/^worktree /{p=$2} !f && $0=="branch "b{print p; f=1}')"
 
     if [ -z "$wt" ] || [ ! -d "$wt" ]; then
         # No worktree ⇒ nothing uncommitted can exist, and named-mode bin/cleanup

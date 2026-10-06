@@ -77,8 +77,8 @@ def extract_json(text: str):
 
 def _extractor_for(purpose: str):
     """pr-copy gets its own tolerant extractor; every other purpose keeps extract_json."""
-    if purpose == "pr-copy":
-        from ..schemas import extract_pr_copy_json  # function-local: no import cycle
+    from ..schemas import PR_COPY_PURPOSE, extract_pr_copy_json  # function-local: no import cycle
+    if purpose == PR_COPY_PURPOSE:
         return extract_pr_copy_json
     return extract_json
 

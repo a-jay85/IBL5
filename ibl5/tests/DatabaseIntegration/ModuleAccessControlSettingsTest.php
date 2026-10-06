@@ -20,7 +20,7 @@ class ModuleAccessControlSettingsTest extends DatabaseTestCase
     public function testTriviaModeOnInSettingsHidesPlayerModule(): void
     {
         $this->db->query(
-            "REPLACE INTO ibl_settings (setting_key, value, league)"
+            "REPLACE INTO ibl_settings (setting_key, setting_value, league)"
             . " VALUES ('Trivia Mode', 'On', 'ibl')"
         );
 

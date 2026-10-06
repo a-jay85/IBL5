@@ -22,7 +22,7 @@ class ModuleAccessControlTest extends TestCase
 
         $mockDb = new MockDatabase();
         $mockDb->setMockData([
-            ['value' => $triviaMode],
+            ['setting_value' => $triviaMode],
         ]);
 
         return new ModuleAccessControl($season, $leagueContext, $mockDb);
@@ -40,7 +40,7 @@ class ModuleAccessControlTest extends TestCase
 
         $mockDb = new MockDatabase();
         $mockDb->setMockData([
-            ['value' => 'Off'],
+            ['setting_value' => 'Off'],
         ]);
 
         return new ModuleAccessControl($season, $leagueContext, $mockDb);

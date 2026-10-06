@@ -151,7 +151,7 @@ class CashConsiderationsYearAdvancerIntegrationTest extends DatabaseTestCase
     private function setMarker(string $year): void
     {
         $stmt = $this->db->prepare(
-            "UPDATE `ibl_settings` SET value = ?"
+            "UPDATE `ibl_settings` SET setting_value = ?"
             . " WHERE setting_key = 'Cash Considerations Last Advanced Year' AND league = 'ibl'"
         );
         self::assertNotFalse($stmt, 'Failed to prepare setMarker: ' . $this->db->error);
@@ -163,7 +163,7 @@ class CashConsiderationsYearAdvancerIntegrationTest extends DatabaseTestCase
     private function readMarker(): ?string
     {
         $stmt = $this->db->prepare(
-            "SELECT value FROM `ibl_settings`"
+            "SELECT setting_value FROM `ibl_settings`"
             . " WHERE setting_key = 'Cash Considerations Last Advanced Year' AND league = 'ibl'"
         );
         self::assertNotFalse($stmt, 'Failed to prepare readMarker: ' . $this->db->error);
@@ -171,7 +171,7 @@ class CashConsiderationsYearAdvancerIntegrationTest extends DatabaseTestCase
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
-        return is_array($row) ? (string) $row['value'] : null;
+        return is_array($row) ? (string) $row['setting_value'] : null;
     }
 
     private function readCy(string $label): int

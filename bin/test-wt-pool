@@ -376,6 +376,11 @@ case_refill_builds_ready_slot() {
         pass "refill: no session file"
     fi
     assert_eq "refill: clean status" "" "$(git -C "$slot" status --porcelain 2>&1)"
+    if [ -e "$slot/docker-compose.yml" ]; then
+        failcase "refill: docker-compose.yml hidden"
+    else
+        pass "refill: docker-compose.yml hidden"
+    fi
     assert_eq "refill: one bunx call" 1 "$(bunx_calls "$base")"
     assert_absent "refill: marker written after the CSS build" '^marker-present$' "$(cat "$base/bunx.calls")"
 }
@@ -501,7 +506,10 @@ case_claim_bypass_no_side_effect() {
     assert_match "bypass --existing: printed" 'wt-pool: bypass' "$out"
     if slot_ready "$base" "$slot"; then pass "bypass --existing: slot kept"; else failcase "bypass --existing: slot kept"; fi
 
+    # Advance origin first: a claim that got past the pre-check would fast-forward
+    # the slot before the rename fails, leaving it unready.
     git_q -C "$m" branch hotel >/dev/null 2>&1
+    push_origin "$base" ibl5/index.php
     out="$(wtnew "$base" hotel)"
     assert_match "bypass branch exists: printed" 'wt-pool: bypass' "$out"
     if slot_ready "$base" "$slot"; then pass "bypass branch exists: slot kept"; else failcase "bypass branch exists: slot kept"; fi

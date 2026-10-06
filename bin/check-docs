@@ -312,8 +312,11 @@ function collectFiles(string $root, bool $includeMemory): array
     return filterGitignored(array_values($filtered), $root);
 }
 
-/** @return array<string, string>|null */
-function parseFrontmatter(string $content): ?array
+/**
+ * Raw YAML body between the opening and closing `---` delimiters, or null when
+ * the content has no complete frontmatter block.
+ */
+function frontmatterBlock(string $content): ?string
 {
     if (!str_starts_with($content, "---\n") && !str_starts_with($content, "---\r\n")) {
         return null;
@@ -323,7 +326,16 @@ function parseFrontmatter(string $content): ?array
     if ($end === false) {
         return null;
     }
-    $yaml = substr($content, $offset, $end - $offset);
+    return substr($content, $offset, $end - $offset);
+}
+
+/** @return array<string, string>|null */
+function parseFrontmatter(string $content): ?array
+{
+    $yaml = frontmatterBlock($content);
+    if ($yaml === null) {
+        return null;
+    }
     $fields = [];
     foreach (preg_split('/\r?\n/', $yaml) ?: [] as $line) {
         if (preg_match('/^([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/', $line, $m) === 1) {
@@ -346,16 +358,12 @@ function parseFrontmatter(string $content): ?array
  */
 function duplicateFrontmatterKeys(string $content): array
 {
-    if (!str_starts_with($content, "---\n") && !str_starts_with($content, "---\r\n")) {
-        return [];
-    }
-    $offset = str_starts_with($content, "---\r\n") ? 5 : 4;
-    $end = strpos($content, "\n---", $offset);
-    if ($end === false) {
+    $yaml = frontmatterBlock($content);
+    if ($yaml === null) {
         return [];
     }
     $counts = [];
-    foreach (preg_split('/\r?\n/', substr($content, $offset, $end - $offset)) ?: [] as $line) {
+    foreach (preg_split('/\r?\n/', $yaml) ?: [] as $line) {
         if (preg_match('/^([a-zA-Z_][a-zA-Z0-9_]*):/', $line, $m) === 1) {
             $counts[$m[1]] = ($counts[$m[1]] ?? 0) + 1;
         }

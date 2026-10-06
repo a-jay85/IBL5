@@ -20,19 +20,19 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('database')]
 class SettingsRenameTriggerTest extends DatabaseTestCase
 {
-    public function testSettingRoundTripsThroughSettingKey(): void
+    public function testSettingRoundTripsThroughSettingValue(): void
     {
         $this->db->query(
-            "REPLACE INTO ibl_settings (setting_key, value, league)"
+            "REPLACE INTO ibl_settings (setting_key, setting_value, league)"
             . " VALUES ('DB_IntTest_RenameProbe', 'probe_value', 'ibl')"
         );
 
         $row = $this->db->query(
-            "SELECT value FROM ibl_settings WHERE setting_key = 'DB_IntTest_RenameProbe' AND league = 'ibl'"
+            "SELECT setting_value FROM ibl_settings WHERE setting_key = 'DB_IntTest_RenameProbe' AND league = 'ibl'"
         )->fetch_assoc();
 
         self::assertNotNull($row, 'inserted setting not readable via setting_key');
-        self::assertSame('probe_value', $row['value']);
+        self::assertSame('probe_value', $row['setting_value']);
     }
 
     public function testSeasonRolloverTriggerFiresPostRename(): void
@@ -49,7 +49,7 @@ class SettingsRenameTriggerTest extends DatabaseTestCase
         );
 
         $stmt = $this->db->prepare(
-            "UPDATE ibl_settings SET value = ? WHERE setting_key = 'Current Season Ending Year' AND league = 'ibl'"
+            "UPDATE ibl_settings SET setting_value = ? WHERE setting_key = 'Current Season Ending Year' AND league = 'ibl'"
         );
         self::assertNotFalse($stmt);
         $newValue = (string) $newEndingYear;
@@ -108,6 +108,14 @@ class SettingsRenameTriggerTest extends DatabaseTestCase
         $this->db->query('SELECT name FROM ibl_settings LIMIT 1');
     }
 
+    public function testOldValueColumnIsGoneNotAliased(): void
+    {
+        // The column was renamed, not aliased — selecting the old name must error.
+        $this->expectException(\mysqli_sql_exception::class);
+        $this->expectExceptionMessageMatches('/Unknown column .?value.?/');
+        $this->db->query('SELECT value FROM ibl_settings LIMIT 1');
+    }
+
     public function testPrimaryKeyIsSettingKeyLeague(): void
     {
         $cols = [];
@@ -148,7 +156,7 @@ class SettingsRenameTriggerTest extends DatabaseTestCase
         // is_mid_season_start = 0 proves the trigger read the phase row written here.
         $phase = 'Draft';
         $stmt = $this->db->prepare(
-            "UPDATE ibl_settings SET value = ? WHERE setting_key = 'Current Season Phase' AND league = 'ibl'"
+            "UPDATE ibl_settings SET setting_value = ? WHERE setting_key = 'Current Season Phase' AND league = 'ibl'"
         );
         self::assertNotFalse($stmt);
         $stmt->bind_param('s', $phase);

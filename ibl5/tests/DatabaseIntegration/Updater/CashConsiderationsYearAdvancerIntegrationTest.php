@@ -205,6 +205,10 @@ class CashConsiderationsYearAdvancerIntegrationTest extends DatabaseTestCase
             $sqlLines[] = $line;
         }
 
-        return implode("\n", $sqlLines);
+        // The immutable migration predates the ibl_settings.value -> setting_value rename.
+        $sql = str_replace('`value`', '`setting_value`', implode("\n", $sqlLines), $replaced);
+        self::assertSame(1, $replaced, 'migration 189 text drifted; update the setting_value translation');
+
+        return $sql;
     }
 }

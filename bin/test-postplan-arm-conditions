@@ -2897,6 +2897,9 @@ have   "§5.9f: the --onto squash-trap recipe is spelled out" "$CRES_TXT" 'git r
 have   "§5.9f: the squash-trap rule is cited"                "$CRES_TXT" '.claude/rules/linear-history-squash-merge.md'
 
 # §5.9g behavioural: lostwork.sh against real fixture repos, in BOTH directions.
+# The proof is change-level: every line the branch changed before the rebase must still
+# be in the HEAD tree. Gained work (an extra commit after the capture) is expected to
+# pass; only a dropped branch line diverges.
 # The fixtures need a real refs/remotes/origin/master — the script hardcodes
 # `git diff origin/master...HEAD` and ignores every seam, so without the ref its
 # post-diff is empty and a DIVERGED case would pass for the wrong reason.
@@ -2923,12 +2926,27 @@ else
     if [ "$LWRC" -eq 0 ]; then echo "ok: §5.9g: TREE-EQUIVALENT exits 0"
     else echo "FAIL: §5.9g: TREE-EQUIVALENT exited $LWRC"; FAILED=1; fi
 
-    # NEGATIVE: a commit added after the capture makes the numstats disagree.
+    # GAINED WORK: a commit added after the capture does not touch any branch line, so
+    # the change-level proof still holds. The old numstat comparison called this DIVERGED.
     LWR2="$(mk_lostwork_repo)"; LWK2="lw-div-$$"
     ( cd "$LWR2" && git diff origin/master...HEAD > "/tmp/pr-ready-diff-pre-$LWK2.patch" )
     ( cd "$LWR2" && printf 'extra\n' >> f.txt && git commit --quiet -am extra )
     LWO2="$( cd "$LWR2" && bash "$LW" "$LWK2" 2>&1 )" || true
-    have "§5.9g: a tree that gained work -> TREE DIVERGED" "$LWO2" 'TREE DIVERGED'
+    have  "§5.9g: a tree that gained work -> TREE-EQUIVALENT (change-level proof)" "$LWO2" 'TREE-EQUIVALENT'
+    lacks "§5.9g: gained work is not reported as LOST" "$LWO2" 'LOST:'
+
+    # NEGATIVE: a commit that drops the branch's added line ('mine') must diverge. The
+    # replacement line keeps the post diff non-empty so the empty-diff guard is not what
+    # trips. rc stays 0 (the conjunctive-gate contract: callers read the verdict string).
+    LWR3="$(mk_lostwork_repo)"; LWK3="lw-lost-$$"
+    ( cd "$LWR3" && git diff origin/master...HEAD > "/tmp/pr-ready-diff-pre-$LWK3.patch" )
+    ( cd "$LWR3" && printf 'base\nother\n' > f.txt && git commit --quiet -am drop-mine )
+    LWRC3=0
+    LWO3="$( cd "$LWR3" && bash "$LW" "$LWK3" 2>&1 )" || LWRC3=$?
+    have "§5.9g: a dropped branch line -> TREE DIVERGED" "$LWO3" 'TREE DIVERGED — inspect before pushing'
+    have "§5.9g: the dropped line is named" "$LWO3" 'LOST: '
+    if [ "$LWRC3" -eq 0 ]; then echo "ok: §5.9g: TREE DIVERGED still exits 0"
+    else echo "FAIL: §5.9g: TREE DIVERGED exited $LWRC3"; FAILED=1; fi
     # The differing-numstat branch is the ONE failure path that exits 0, which is why
     # _phase-2-conflict-resolution.md gates on the printed verdict, not on the rc alone.
     have "§5.9g: the doc gates on the verdict string, not just the rc" "$CRES_TXT" 'exits **0**'
@@ -2942,7 +2960,9 @@ else
     rm -f "/tmp/pr-ready-diff-pre-$LWK.patch" "/tmp/pr-ready-diff-pre-$LWK2.patch" \
           "/tmp/pr-ready-diff-post-$LWK.patch" "/tmp/pr-ready-diff-post-$LWK2.patch" \
           "/tmp/pr-ready-numstat-pre-$LWK.txt" "/tmp/pr-ready-numstat-post-$LWK.txt" \
-          "/tmp/pr-ready-numstat-pre-$LWK2.txt" "/tmp/pr-ready-numstat-post-$LWK2.txt"
+          "/tmp/pr-ready-numstat-pre-$LWK2.txt" "/tmp/pr-ready-numstat-post-$LWK2.txt" \
+          "/tmp/pr-ready-diff-pre-$LWK3.patch" "/tmp/pr-ready-diff-post-$LWK3.patch" \
+          "/tmp/pr-ready-numstat-pre-$LWK3.txt" "/tmp/pr-ready-numstat-post-$LWK3.txt"
 fi
 
 # §5.9h the BEHIND re-rebase loop. The loop body is orchestrator prose interleaved

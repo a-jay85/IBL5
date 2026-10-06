@@ -50,7 +50,7 @@ done
 # Program/WorkingDirectory MUST point at the main checkout, never this worktree
 # (a worktree gets torn down — the LaunchAgent would then point at a dead path).
 # The first `git worktree list` entry is the main working tree.
-MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
 [ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"   # fallback: not in a git tree
 
 PLIST_LABEL="com.ibl5.sim-recap-poll"

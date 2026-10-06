@@ -312,7 +312,7 @@ rm -rf "$HOME/Library/LaunchAgents"
 
 # Mirror the installer's REPO_ROOT/MAIN_WT derivation exactly.
 _chk_repo="$(cd "$SCRIPT_DIR/.." && pwd)"
-_chk_main_wt="$(git -C "$_chk_repo" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+_chk_main_wt="$(git -C "$_chk_repo" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
 [ -n "$_chk_main_wt" ] || _chk_main_wt="$_chk_repo"
 
 if [ "$_chk_repo" != "$_chk_main_wt" ]; then

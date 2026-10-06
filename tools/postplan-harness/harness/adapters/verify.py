@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from ..state import Classification
@@ -32,10 +33,19 @@ def aggregate(tracks: list[TrackResult]) -> str:
     return "skipped"
 
 
+def tracks_log_line(tracks: list[TrackResult], phase5: str) -> str:
+    unavailable = [t.name for t in tracks if t.status == "unavailable"]
+    return ("phase5 tracks: " + ", ".join(f"{t.name}={t.status}" for t in tracks)
+            + f" -> PHASE5_VERIFY_STATUS={phase5}"
+            + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
+
+
 class LiveVerify:
-    def __init__(self, worktree: str, timeout: int = 1800):
+    def __init__(self, worktree: str, timeout: int = 1800,
+                 run_cmd: Callable[[str, str], tuple[int, str]] | None = None):
         self.worktree = worktree
         self.timeout = timeout
+        self._run = run_cmd or self._sh
 
     def _sh(self, cmd: str, cwd: str) -> tuple[int, str]:
         p = subprocess.run(["bash", "-c", cmd], cwd=cwd, capture_output=True,
@@ -46,20 +56,20 @@ class LiveVerify:
         tracks: list[TrackResult] = []
         ibl5 = f"{self.worktree}/ibl5"
         if cls.has_php:
-            rc, out = self._sh("vendor/bin/phpunit --no-progress 2>&1 | tail -n 5", ibl5)
+            rc, out = self._run("vendor/bin/phpunit --no-progress 2>&1 | tail -n 5", ibl5)
             tracks.append(TrackResult("phpunit", "pass" if rc == 0 else "fail", out))
-            rc, out = self._sh("composer run analyse -- --no-progress 2>&1 | tail -n 5", ibl5)
+            rc, out = self._run("composer run analyse -- --no-progress 2>&1 | tail -n 5", ibl5)
             tracks.append(TrackResult("phpstan", "pass" if rc == 0 else "fail", out))
         else:
             tracks += [TrackResult("phpunit", "skipped"), TrackResult("phpstan", "skipped")]
         if cls.has_go:
-            rc1, o1 = self._sh("make -C engine fmt-check 2>&1 | tail -n 5", self.worktree)
-            rc2, o2 = self._sh("make -C engine cover 2>&1 | tail -n 8", self.worktree)
+            rc1, o1 = self._run("make -C engine fmt-check 2>&1 | tail -n 5", self.worktree)
+            rc2, o2 = self._run("make -C engine cover 2>&1 | tail -n 8", self.worktree)
             tracks.append(TrackResult("go", "pass" if rc1 == 0 and rc2 == 0 else "fail", o1 + o2))
         else:
             tracks.append(TrackResult("go", "skipped"))
         if cls.has_shell:
-            rc, out = self._sh(
+            rc, out = self._run(
                 "bin/lib/shell-scripts.sh --full"
                 " | xargs shellcheck --severity=warning --shell=bash"
                 " --exclude=SC2034,SC1090,SC2207 2>&1 | tail -n 20",

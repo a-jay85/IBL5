@@ -69,7 +69,7 @@ from harness.adapters.gitad import (LiveGit, ReplayGit, classify_local_gate_deni
                                     is_stale_base, is_stale_lease)
 from harness.adapters.llm import ClaudeCli, FixtureLlm, TOOLED_TIMEOUT
 from harness.adapters.probe import FixtureProbe, LiveProbe
-from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate
+from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate, tracks_log_line
 
 _BADGE_FALLBACK = (
     "<!-- postplan-status -->\n**post-plan is running**\n\n"
@@ -578,11 +578,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # ---- Phase 5 + 5.0: verify + conformance -----------------------
         tracks = verifier.run(cls)
         phase5 = aggregate(tracks)
-        unavailable = [t.name for t in tracks if t.status == "unavailable"]
         res.phase5 = phase5
-        log("phase5 tracks: " + ", ".join(f"{t.name}={t.status}" for t in tracks)
-            + f" -> PHASE5_VERIFY_STATUS={phase5}"
-            + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
+        log(tracks_log_line(tracks, phase5))
         resolutions: dict[str, str] = {}
         unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                        resolutions=resolutions,

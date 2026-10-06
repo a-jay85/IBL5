@@ -146,6 +146,7 @@ def test_live_state_gates_stay_not_replayable():
 
 
 def test_registry_specs_use_only_allowed_placeholders():
+    # A typo such as `{bodyfile}` is not in ALLOWED_PLACEHOLDERS and fails here.
     for path, entry in REPLAY_SPECS.items():
         if not isinstance(entry, ReplaySpec):
             continue

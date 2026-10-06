@@ -254,6 +254,8 @@ class SeamSkipTest extends TestCase
 SEAM_TS="import { test } from '@playwright/test';
 test.skip('seam', async () => {});"
 
+# The `empty` cases catch the colon-less default `${VAR-origin/master}`, which treats an
+# empty var as a set one and diffs against "".
 PV=PHPUNIT_HYGIENE_BASE_REF
 # Fixtures sit one directory deep: the gates' --pr pathspecs (`ibl5/tests/**/*.php`,
 # `ibl5/tests/e2e/**/*.ts`) need a subdirectory to match.

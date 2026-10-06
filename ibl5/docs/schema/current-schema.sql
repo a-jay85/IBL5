@@ -3453,7 +3453,7 @@ DROP TABLE IF EXISTS `ibl_settings`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ibl_settings` (
   `setting_key` varchar(128) NOT NULL COMMENT 'Setting key',
-  `value` varchar(128) NOT NULL COMMENT 'Setting value',
+  `setting_value` varchar(128) NOT NULL COMMENT 'Setting value',
   `league` varchar(16) NOT NULL DEFAULT 'ibl',
   PRIMARY KEY (`setting_key`,`league`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

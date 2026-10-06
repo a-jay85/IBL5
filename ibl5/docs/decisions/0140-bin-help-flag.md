@@ -51,3 +51,7 @@ Every executable script with a shebang in `bin/` and `bin/automouse/` handles `-
 ## Addendum — bin/watch-run --help exit code (2026-10-05) <!-- slop-ok -->
 
 This ADR originally named `bin/plan-index` as the only script whose `--help` exit code changed. `bin/watch-run` changed too. Its `--help` used to exit 3 through `usage()` and now exits 0. It still exits 3 on a usage error.
+
+## Addendum — scripts outside the --help convention (2026-10-05) <!-- slop-ok -->
+
+The Decision says every executable script with a shebang answers `--help`. That has one exception, `bin/check-composite-contracts`. It is a CI gate with no user-facing arguments, so `bin/test-bin-help` skips it. The `test-*` harnesses were already out of scope.

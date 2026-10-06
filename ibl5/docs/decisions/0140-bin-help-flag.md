@@ -54,4 +54,4 @@ This ADR originally named `bin/plan-index` as the only script whose `--help` exi
 
 ## Addendum — scripts outside the --help convention (2026-10-05) <!-- slop-ok -->
 
-The Decision says every executable script with a shebang answers `--help`. That has one exception, `bin/check-composite-contracts`. It is a CI gate with no user-facing arguments, so `bin/test-bin-help` skips it. The `test-*` harnesses were already out of scope.
+The Decision says every executable script with a shebang answers `--help`. That has one exception, `bin/check-composite-contracts`. It is a CI security-policy gate with no `--help` handler by design, so `bin/test-bin-help` skips it. The `test-*` harnesses were already out of scope.

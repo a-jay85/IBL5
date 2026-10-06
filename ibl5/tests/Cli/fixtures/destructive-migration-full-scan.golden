@@ -11,6 +11,7 @@
 [add-not-null-no-default] ibl5/migrations/043_align_olympics_schemas.sql:71
 [add-not-null-no-default] ibl5/migrations/045_align_olympics_schemas.sql:15
 [add-not-null-no-default] ibl5/migrations/045_align_olympics_schemas.sql:60
+[delete-no-where] ibl5/migrations/077_add_missing_indexes.sql:26
 [delete-no-where] ibl5/migrations/078_add_awards_unique_keys.sql:11
 [delete-no-where] ibl5/migrations/078_add_awards_unique_keys.sql:29
 [delete-no-where] ibl5/migrations/080_add_boxscore_unique_constraints.sql:11
@@ -674,6 +675,7 @@
 [tighten-not-null] ibl5/migrations/003_api_preparation.sql:93
 [tighten-not-null] ibl5/migrations/003_api_preparation.sql:94
 [tighten-not-null] ibl5/migrations/004_data_type_refinements.sql:291
+[tighten-not-null] ibl5/migrations/009_schema_optimization_audit.sql:31
 [tighten-not-null] ibl5/migrations/034_add_column_comments.sql:147
 [tighten-not-null] ibl5/migrations/034_add_column_comments.sql:148
 [tighten-not-null] ibl5/migrations/034_add_column_comments.sql:149
@@ -735,6 +737,7 @@
 [tighten-not-null] ibl5/migrations/120_misc_snake_case_cleanup.sql:79
 [tighten-not-null] ibl5/migrations/137_document_gm_history_name.sql:26
 [update-no-where] ibl5/migrations/009_schema_optimization_audit.sql:217
+[update-no-where] ibl5/migrations/030_drop_team_history.sql:22
 [update-no-where] ibl5/migrations/038_demands_olympics_pid_fk.sql:11
 [update-no-where] ibl5/migrations/038_demands_olympics_pid_fk.sql:5
 [update-no-where] ibl5/migrations/039_fa_offers_pid_tid_fk.sql:12

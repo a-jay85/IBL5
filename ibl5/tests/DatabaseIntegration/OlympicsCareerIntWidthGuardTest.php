@@ -295,6 +295,19 @@ final class OlympicsCareerIntWidthGuardTest extends DatabaseTestCase
         self::assertSame(0, (int) $row['t'], 'Totals gate must find nothing to alter on a re-apply');
         self::assertSame(0, (int) $row['a'], 'Avgs gate must find nothing to alter on a re-apply');
         self::assertSame('mediumint(8) unsigned', $this->columnType(self::TOTALS_TABLE, 'pts'));
+
+        // Control: a gate comparing against 'smallint(5)' (no `unsigned`) would count this column
+        // as needing an ALTER on every re-apply, so the real type must differ from that string.
+        $control = $this->db->query(
+            "SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ibl_olympics_career_totals'
+               AND COLUMN_NAME = 'games' AND COLUMN_TYPE <> 'smallint(5)'"
+        );
+        self::assertNotFalse($control);
+        /** @var array{c: string|int}|null $controlRow */
+        $controlRow = $control->fetch_assoc();
+        self::assertIsArray($controlRow);
+        self::assertSame(1, (int) $controlRow['c'], 'games must carry the unsigned suffix the gate compares against');
     }
 
     private function createTotalsProbe(string $name): void

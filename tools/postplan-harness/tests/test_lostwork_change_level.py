@@ -322,3 +322,36 @@ def test_verdict_tokens_are_the_only_last_line(repo, key, tmp_path):
     rc, out = run_lostwork(repo2, key)
     assert rc == 0
     assert last_line(out) == DIVERGED
+
+
+def test_binary_file_entry_is_equivalent(repo, key):
+    # A binary add has no ---/+++ or @@ lines; the entry takes its paths from the
+    # `diff --git a/P b/P` line, counts as one file, and carries no line-level evidence.
+    (repo / "blob.bin").write_bytes(b"\x00\x01\x02\xff\x00binary\x00")
+    sh(repo, "add", "-A")
+    sh(repo, "commit", "-q", "-m", "feat adds a binary file")
+    capture_pre(repo, key)
+    assert "Binary files" in Path(f"/tmp/pr-ready-diff-pre-{key}.patch").read_text()
+    advance_master(repo, "g.txt", text(BASE_G + ["G6"]), "master edit g")
+    rebase_resolving(repo, {})
+    rc, out = run_lostwork(repo, key)
+    assert rc == 0
+    assert "CHECKED: files=1 added=0 deleted=0" in out
+    assert last_line(out) == "TREE-EQUIVALENT"
+    assert "LOST:" not in out
+
+
+def test_pure_rename_entry_is_equivalent(repo, key):
+    # A 100% rename has no ---/+++ or @@ lines; the entry takes its paths from the
+    # rename from/to headers and only needs the new path to exist at HEAD.
+    sh(repo, "mv", "g.txt", "g-renamed.txt")
+    sh(repo, "commit", "-q", "-m", "feat renames g.txt")
+    capture_pre(repo, key)
+    assert "rename from g.txt" in Path(f"/tmp/pr-ready-diff-pre-{key}.patch").read_text()
+    advance_master(repo, "f.txt", text(f_with(i=["I1"])), "master edit f")
+    rebase_resolving(repo, {})
+    rc, out = run_lostwork(repo, key)
+    assert rc == 0
+    assert "CHECKED: files=1 added=0 deleted=0" in out
+    assert last_line(out) == "TREE-EQUIVALENT"
+    assert "LOST:" not in out

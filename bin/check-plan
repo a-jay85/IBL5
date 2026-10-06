@@ -960,6 +960,9 @@ done < <(grep -iE 'reuse' "$PLAN_FILE" \
 # C: a backticked `name()` on a copy-verbatim line must be defined in a source
 #    file cited by backticked path in the same ##/### section. Silent when the
 #    section cites no existing file. Opt-out for A/B: <!-- literal-ok: <reason> -->.
+# A blocks. B and C are advisory (warn): the corpus diff over ~/claude-plans
+# found false positives for both. The letter is shared with the warn-only
+# line-number-anchor gate [L] further down; the message prefixes differ.
 # Decimal bounds compare as strings (length, then lexical): awk doubles lose
 # precision past 2^53, so a numeric compare on a 19-digit bound can round.
 L_SCHEMA="$REPO_ROOT/ibl5/docs/schema/current-schema.sql"
@@ -970,8 +973,11 @@ if [ -f "$L_SCHEMA" ]; then
     L_NOSCHEMA=0
 fi
 while IFS=$'\t' read -r kind msg; do
+    # Check B is advisory: the Phase 5 corpus diff found Discord ids on lines
+    # that also name teamid (backlog#933).
     case "$kind" in
-        A|B) viol "$msg" ;;
+        A) viol "$msg" ;;
+        B) warn "$msg" ;;
     esac
 done < <(awk -v schema="$L_SCHEMA" -v noschema="$L_NOSCHEMA" -v sq="'" '
     function strip0(s) { sub(/^0+/, "", s); if (s == "") s = "0"; return s "" }
@@ -1094,8 +1100,10 @@ while IFS=$'\t' read -r kind lno name paths; do
             found=1; break
         fi
     done
+    # Advisory: the corpus diff found new helpers and test assertions named on
+    # copy-verbatim lines that the forward-reference cues do not catch.
     if [ "$found" -eq 0 ]; then
-        viol "[L] copy-verbatim line ${lno}: '${name}()' is defined in none of this section's cited source files (${kept})"
+        warn "[L] copy-verbatim line ${lno}: '${name}()' is defined in none of this section's cited source files (${kept})"
     fi
 done < <(awk -v cues="$FWD_REF_CUES" '
     function flush(   i, j, lc, drop, p, paths) {

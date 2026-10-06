@@ -135,6 +135,12 @@ class RecordingGh:
         return n
 
     # -- reads (fixture-backed) ------------------------------------------
+    def merged_pr(self) -> dict | None:
+        """{"number", "url"} of this branch's most recent MERGED PR, else None.
+        Read-only: the run-end `already-shipped` check, never a mutation."""
+        m = self.fixture.get("merged_pr")
+        return dict(m) if m else None
+
     def pr_exists(self) -> bool:
         return bool(self.fixture.get("pr_number"))
 
@@ -582,6 +588,17 @@ class LiveGh(RecordingGh):
             except (HarnessError, json.JSONDecodeError):
                 self._meta = {}
         return self._meta
+
+    def merged_pr(self) -> dict | None:
+        try:
+            out = self._gh("pr", "list", "--head", self.branch, "--state", "merged",
+                           "--json", "number,url", "--limit", "1")
+            rows = json.loads(out or "[]")
+        except (HarnessError, json.JSONDecodeError):
+            return None                             # unknown: keep the failure
+        if isinstance(rows, list) and rows and isinstance(rows[0], dict) and rows[0].get("number"):
+            return {"number": int(rows[0]["number"]), "url": rows[0].get("url") or ""}
+        return None
 
     def pr_exists(self) -> bool:
         return self._fetch_meta().get("state") == "OPEN"

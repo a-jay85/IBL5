@@ -92,13 +92,13 @@ def test_shipped_held_is_not_armed():
 
 
 def test_held_other_condition_line_unchanged():
-    """Pin: a run held by condition (8) with no meta-check failures prints this exact line."""
+    """Pin: a run held by condition (8) with no meta-check failures prints this exact line (ending in the hold= reasons)."""
     r = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
              arm=_held_arm(8))
     line = runner.verdict_line(r, 0)
     assert line == (
         "RESULT: post-plan complete — terminal=shipped-held "
-        "auto-merge=HELD (human merges) PR #7 findings=0"
+        "auto-merge=HELD (human merges) PR #7 findings=0 hold=(8) held"
     )
 
 

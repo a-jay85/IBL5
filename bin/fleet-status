@@ -44,7 +44,7 @@
 # exists, and falls back to `log` when it does not (the first seconds of a run, or a
 # skill-fallback run that never created the harness directory). The word is the
 # link and names the file, so you never guess which one you got. The /tmp log
-# is still the right file AFTER exit — its first line is the RESULT verdict — but
+# is still the right file AFTER exit — its RESULT: line is the verdict — but
 # by then the job is gone from this page.
 #
 # Usage: bin/fleet-status [--watch [SECS]]

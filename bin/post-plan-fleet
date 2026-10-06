@@ -781,6 +781,7 @@ else
     case "$_ppf_terminal" in
         shipped-armed) _ppf_outcome="shipped" ;;
         shipped-held)  _ppf_outcome="held" ;;
+        already-shipped) _ppf_outcome="shipped" ;;
         *)             _ppf_outcome="blocked" ;;
     esac
 fi

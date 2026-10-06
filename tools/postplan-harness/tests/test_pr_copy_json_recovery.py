@@ -5,8 +5,10 @@ Sections:
   2. extract_pr_copy_json unit tests
   3. End-to-end through the real ClaudeCli.call with a bash shim
 """
+import json
 import os
 import re
+import stat
 import sys
 
 import pytest
@@ -16,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runner
 from harness import schemas
 from harness.adapters.llm import ClaudeCli, extract_json
-from harness.schemas import COMMIT_TYPES, normalize_pr_copy, validate_pr_copy
+from harness.schemas import normalize_pr_copy, validate_pr_copy
 from harness.state import Classification, HarnessError, UsageLedger
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -134,3 +136,148 @@ def test_extractor_does_not_unwrap_envelope():
     with pytest.raises(HarnessError) as e:
         validate_pr_copy(d)
     assert e.value.kind == "schema"
+
+
+# ---------------------------------------------------------------------------
+# 3. End-to-end through the real ClaudeCli.call with a bash shim
+# ---------------------------------------------------------------------------
+SHIM = """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$CLAUDE_SHIM_LOG"
+cat > /dev/null
+printf '%s' "${CLAUDE_SHIM_REPLY}"
+exit 0
+"""
+
+# Unescaped inner double quote inside summary_md (same literal as test_pr_copy_normalize).
+BAD_JSON_REPLAY = ('{"type": "chore", "title": "chore(docfix): reap", '
+                   '"commit_subject": "chore(docfix): reap", '
+                   '"summary_md": "## Summary\\n- marks the run as "not merged" and exits\\n"}')
+TRUNCATED_REPLAY = ('{"type": "chore", "title": "chore(docfix): reap", '
+                    '"summary_md": "## Summary\\n- marks')
+GARBAGE_REPLIES = ["I can't produce that.", TRUNCATED_REPLAY]
+GARBAGE_IDS = ["prose-only", "truncated"]
+
+
+class _Gh:
+    def pr_exists(self):
+        return False
+
+    def pr_title(self):
+        return ""
+
+
+class _Git:
+    def has_changes_to_commit(self):
+        return True
+
+    def branch_head_subject(self):
+        return "Pin sonnet for burndown"  # deliberately NOT conventional
+
+
+class _NoPlan:
+    found = False
+    path = None
+
+
+def _cls():
+    return Classification()
+
+
+@pytest.fixture()
+def shim(tmp_path, monkeypatch):
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    claude = bindir / "claude"
+    claude.write_text(SHIM)
+    claude.chmod(claude.stat().st_mode | stat.S_IEXEC)
+    log = tmp_path / "claude-calls.log"
+    log.write_text("")
+    monkeypatch.setenv("PATH", f"{bindir}:{os.environ['PATH']}")
+    monkeypatch.setenv("CLAUDE_SHIM_LOG", str(log))
+    return log
+
+
+def _cli(tmp_path):
+    return ClaudeCli(UsageLedger(), workdir=str(tmp_path))
+
+
+def _call_count(log):
+    return len([ln for ln in log.read_text().splitlines() if ln.strip()])
+
+
+def _envelope(text):
+    return json.dumps({"result": text, "subtype": "success"})
+
+
+def _fenced(text):
+    return "Here is the copy.\n```json\n" + text + "\n```\n"
+
+
+def _call_pr_copy(tmp_path):
+    return _cli(tmp_path).call("pr-copy", "sonnet", "p", validate=schemas.validate_pr_copy,
+                               normalizer=schemas.normalize_pr_copy)
+
+
+def _run_pr_copy_live(tmp_path, logs):
+    return runner._pr_copy(_cli(tmp_path), _Git(), _Gh(), None, "slug", _cls(), _NoPlan(),
+                           logs.append)
+
+
+@pytest.mark.parametrize("label,attempt", STILL_FAILING)
+def test_cli_pr_copy_recovers_real_raw(tmp_path, monkeypatch, shim, label, attempt):
+    raw = _raw(label, attempt)
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", _envelope(raw))
+    data = _call_pr_copy(tmp_path)
+    assert _call_count(shim) == 1
+    assert data["type"] in {_raw_type(raw), "feat"}
+    if _raw_type(raw) == "feat":
+        assert data["type"] == "feat"
+
+
+def test_cli_bad_json_replay_now_recovers(tmp_path, monkeypatch, shim):
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", _envelope(_fenced(BAD_JSON_REPLAY)))
+    data = _call_pr_copy(tmp_path)
+    assert data["type"] == "chore"
+    assert _call_count(shim) == 1
+
+
+@pytest.mark.parametrize("label,attempt", STILL_FAILING)
+def test_pr_copy_runner_recovers_real_raw(tmp_path, monkeypatch, shim, label, attempt):
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", _envelope(_raw(label, attempt)))
+    logs = []
+    out, degraded = _run_pr_copy_live(tmp_path, logs)
+    assert degraded is False
+    assert _call_count(shim) == 1
+    assert not any("DEGRADED" in ln for ln in logs)
+
+
+def test_cli_other_purpose_keeps_extract_json(tmp_path, monkeypatch, shim):
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", _envelope(_raw("nested-fence", 0)))
+    with pytest.raises(HarnessError) as e:
+        _cli(tmp_path).call("score-findings", "haiku", "p", validate=schemas.validate_pr_copy)
+    assert e.value.kind == "llm-invalid-output"
+    assert _call_count(shim) == 2
+    assert "no parseable JSON in model reply" in (e.value.detail or "")
+
+
+@pytest.mark.parametrize("reply", GARBAGE_REPLIES, ids=GARBAGE_IDS)
+def test_cli_garbage_reply_degrades_with_hint(tmp_path, monkeypatch, shim, reply):
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", _envelope(reply))
+    with pytest.raises(HarnessError) as e:
+        _call_pr_copy(tmp_path)
+    assert e.value.kind == "llm-invalid-output"
+    assert _call_count(shim) == 2
+    assert "pr-copy reply" in (e.value.detail or "")
+    assert "summary_md" in (e.value.detail or "")
+
+
+def test_pr_copy_runner_garbage_degrades_with_visible_cause(tmp_path, monkeypatch, shim):
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", _envelope("I can't produce that."))
+    logs = []
+    out, degraded = _run_pr_copy_live(tmp_path, logs)
+    assert degraded is True
+    assert out["title"].startswith("feat: ")
+    hits = [ln for ln in logs if "pr-copy DEGRADED" in ln]
+    assert len(hits) == 1
+    assert "pr-copy reply" in hits[0]
+    assert "summary_md" in hits[0]

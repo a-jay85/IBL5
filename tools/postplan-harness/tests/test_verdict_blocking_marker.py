@@ -93,3 +93,57 @@ def test_ready_with_notes_note_bullets_yield_no_work(tmp_path):
     path = _write(tmp_path, _verdict("READY WITH NOTES", body))
     assert fidelity._verdict_findings(path) == []
     assert fidelity.build_work_list(path, [], [], []) == []
+
+
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
+
+def _flat(rel):
+    with open(os.path.join(REPO, rel), encoding="utf-8") as fh:
+        return " ".join(fh.read().split())
+
+
+def test_def_item_2a_states_marker_grammar():
+    """Catches deleting the severity paragraph or moving it out of item 2a."""
+    text = _flat(".claude/agents/pr-ready-phase6.md")
+    for needle in (
+        "**Severity marker.**",
+        "Open every top-level finding bullet with exactly one marker",
+        "inherits its marker and carries none of its own",
+        "`NOT READY` has at least one `[BLOCKING]` bullet",
+        "`READY WITH NOTES` has only `[NOTE]` bullets",
+        "and `READY` has an empty `## FINDINGS` section",
+        "Keep it out of the finding's title",
+        "treats that finding as blocking",
+    ):
+        assert needle in text, needle
+    i2a = text.index("2a. Emit a `## FINDINGS` section")
+    isev = text.index("**Severity marker.**")
+    i3 = text.index("3. **Append a `## DIGEST` section")
+    assert i2a < isev < i3
+
+
+def test_procedure_6e_points_to_def_item_2a():
+    """Catches deleting the 6e pointer or reverting the writing-style exemption."""
+    text = _flat(".claude/review-shared/_plan-fidelity-review.md")
+    lo = text.index("**6e. Verdict shape.**")
+    hi = text.index("**6e(b). Merge digest")
+    for needle in (
+        "Open each `## FINDINGS` bullet with `[BLOCKING]` or `[NOTE]`",
+        "specified in `.claude/agents/pr-ready-phase6.md` § Output contract item 2a; "
+        "that item is authoritative",
+    ):
+        assert lo < text.index(needle) < hi, needle
+    assert "and the `[BLOCKING]` / `[NOTE]` finding marker" in text
+    assert "Finding titles, without the marker, are copied verbatim" in text
+
+
+def test_procedure_does_not_restate_marker_invariant():
+    """Catches a second copy of the grammar in the procedure (drift)."""
+    text = _flat(".claude/review-shared/_plan-fidelity-review.md")
+    for needle in (
+        "has at least one `[BLOCKING]` bullet",
+        "has only `[NOTE]` bullets",
+        "**Severity marker.**",
+    ):
+        assert needle not in text, needle

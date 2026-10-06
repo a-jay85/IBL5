@@ -63,6 +63,8 @@ def test_declaration_counting_per_language():
     assert _count_declarations("engine/x_test.go", go) == 2
     bash = ["case_one() {", "function case_two() {", "run_case_three"]
     assert _count_declarations(BASH_PATH, bash) == 2
+    # lettered sub-cases (case_5a, case_5b) make the unit ambiguous
+    assert _count_declarations(BASH_PATH, ["case_1() {", "case_5a() {", "case_5b() {"]) is None
     assert _count_declarations("ibl5/tests/fixture.json", ["{}"]) is None
 
 

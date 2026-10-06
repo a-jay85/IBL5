@@ -284,7 +284,8 @@ _PHP_FUNC = re.compile(
 _PY_DEF = re.compile(r"^\s*(?:async\s+)?def\s+test\w*\s*\(")
 _JS_CASE = re.compile(r"^\s*(?:it|test)(?:\.(?:only|skip|fixme|concurrent))?\s*\(")
 _GO_TEST = re.compile(r"^func\s+Test\w*\s*\(")
-_BASH_CASE = re.compile(r"^\s*(?:function\s+)?case_\w+\s*\(\s*\)")
+_BASH_CASE = re.compile(r"^\s*(?:function\s+)?(case_\w+)\s*\(\s*\)")
+_BASH_SUBCASE = re.compile(r"case_\d+[a-z]")
 _DIFF_HEADER = re.compile(r"^diff --git a/.* b/(.*)$")
 _NOTE_MARK = " [harness: measured"
 
@@ -317,7 +318,11 @@ def _count_declarations(path: str, lines: list[str]) -> int | None:
     if path.endswith(".go"):
         return sum(1 for ln in lines if _GO_TEST.match(ln))
     if path.startswith("bin/test-"):
-        return sum(1 for ln in lines if _BASH_CASE.match(ln)) or None
+        names = [m.group(1) for ln in lines if (m := _BASH_CASE.match(ln))]
+        # case_5a/case_5b are sub-cases of one numbered case: the unit is ambiguous
+        if not names or any(_BASH_SUBCASE.fullmatch(n) for n in names):
+            return None
+        return len(names)
     return None
 
 

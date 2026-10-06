@@ -294,7 +294,7 @@ def test_pr_copy_passes_normalizer_to_llm():
 
 def test_pr_copy_source_wires_normalizer():
     src = inspect.getsource(runner._pr_copy)
-    assert 'llm.call("pr-copy", "sonnet"' in src
+    assert 'llm.call(schemas.PR_COPY_PURPOSE, "sonnet"' in src
     assert "normalizer=schemas.normalize_pr_copy" in src
 
 

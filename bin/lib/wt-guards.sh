@@ -120,7 +120,7 @@ get_worktree_path() {
     local branch="$1"
     git worktree list --porcelain | awk -v branch="refs/heads/$branch" '
         /^worktree / { path = substr($0, 10) }
-        $0 == "branch " branch { print path; exit }
+        $0 == "branch " branch && !f { print path; f=1 }
     '
 }
 

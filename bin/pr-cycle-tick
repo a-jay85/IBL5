@@ -120,7 +120,7 @@ worktree_out_dir() {
     local wt
     wt="$(git -C "$ROOT" worktree list --porcelain 2>/dev/null | awk -v want="branch refs/heads/$1" '
         /^worktree / { path = substr($0, 10) }
-        $0 == want { print path; exit }')"
+        $0 == want && !f { print path; f=1 }')"
     [[ -n "$wt" ]] && printf '%s\n' "$wt/tools/postplan-harness/out"
     return 0
 }

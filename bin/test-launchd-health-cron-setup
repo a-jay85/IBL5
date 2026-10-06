@@ -418,6 +418,29 @@ else
     lht_fail "14: --help should mention --print-schedule"
 fi
 
+# ── Case 15: long worktree list must not SIGPIPE the MAIN_WT derivation ──────
+# awk used to `exit` after the first entry; with a producer larger than one pipe
+# buffer git got SIGPIPE (141) and pipefail + set -e killed the script silently.
+mkdir -p "$STUB/biggit"
+cat > "$STUB/biggit/git" <<'BIGGIT_SH'
+#!/bin/sh
+case "$*" in
+    *"worktree list --porcelain"*)
+        awk 'BEGIN { for (i = 0; i < 5000; i++) printf "worktree /stub/main-or-wt-%d\nHEAD 0000000000000000000000000000000000000000\nbranch refs/heads/b%d\n\n", i, i }'
+        ;;
+    *) exit 0 ;;
+esac
+BIGGIT_SH
+chmod +x "$STUB/biggit/git"
+_big_out="$(PATH="$STUB/biggit:$STUB/sbin:$PATH" "$SETUP_BIN" --print-schedule daily 2>/dev/null)"
+_big_rc=$?
+lht_expect_eq "15: --print-schedule daily rc=0 with 5000-entry worktree list" "0" "$_big_rc"
+if printf '%s\n' "$_big_out" | grep -qF -- '/stub/main-or-wt-0/bin/launchd-health-check'; then
+    lht_ok "15: first worktree entry chosen as MAIN_WT"
+else
+    lht_fail "15: expected /stub/main-or-wt-0 as MAIN_WT in plist Program"
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo "Results: $PASSED passed, $FAILED failed"
 [ "$FAILED" -eq 0 ]

@@ -83,7 +83,7 @@ esac
 
 # ── Repo root ─────────────────────────────────────────────────────────────────
 if [ -z "$WT_GC_REPO_ROOT" ]; then
-    WT_GC_REPO_ROOT="$(git -C "$SCRIPT_DIR/.." worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')" || WT_GC_REPO_ROOT=""
+    WT_GC_REPO_ROOT="$(git -C "$SCRIPT_DIR/.." worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')" || WT_GC_REPO_ROOT=""
 fi
 if [ -z "$WT_GC_REPO_ROOT" ]; then
     log "cannot resolve repo root — aborting"
@@ -100,7 +100,7 @@ if [ "$FORCE" = 0 ]; then
     # Validate the raw ns field before any arithmetic. awk's coercion of a
     # non-numeric field varies by implementation. On Linux CI it came out as 0,
     # which read as "operator present" instead of fail-closed.
-    idle_ns="$("$WT_GC_IOREG" -c IOHIDSystem 2>/dev/null | awk '/HIDIdleTime/ {print $NF; exit}' 2>/dev/null)" || idle_ns=""
+    idle_ns="$("$WT_GC_IOREG" -c IOHIDSystem 2>/dev/null | awk '/HIDIdleTime/ && !f {print $NF; f=1}' 2>/dev/null)" || idle_ns=""
     case "$idle_ns" in
         ''|*[!0-9]*)
             log "idle value unreadable ('${idle_ns:-<empty>}') — treating as operator present (fail-closed)"

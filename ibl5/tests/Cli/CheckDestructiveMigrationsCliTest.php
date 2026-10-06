@@ -746,6 +746,8 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
 
     public function testPrepareFromUnsetVariableIsClean(): void
     {
+        // An unresolved variable must produce no virtual statement. A fallback
+        // to statements[-1] would scan an unrelated statement and report a false hit.
         $this->writeMigration('233_prep_unset.sql', "PREPARE st FROM @never_set;\nEXECUTE st;\n");
         $this->runInDir('git add -A');
 

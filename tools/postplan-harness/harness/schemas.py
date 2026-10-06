@@ -3,9 +3,13 @@ validates what the model returns; invalid output is a typed failure, never
 silently accepted."""
 from __future__ import annotations
 
+import json
 import re
 
 from .state import Classification, HarnessError
+
+# LLM purpose name for the PR-copy call; llm.py keys tolerant JSON recovery on it.
+PR_COPY_PURPOSE = "pr-copy"
 
 FINDING_KEYS = {"path", "line", "body"}
 FINDING_ALIASES = (
@@ -237,6 +241,74 @@ def validate_pr_copy(data) -> None:
         raise HarnessError("schema", "title must start with its conventional-commit type")
     if not data["commit_subject"].lower().startswith(data["type"]):
         raise HarnessError("schema", "commit_subject must start with its conventional-commit type")
+
+
+PR_COPY_JSON_HINT = (
+    'escape every " inside summary_md as \\", write newlines as \\n, '
+    "and put no triple-backtick fences inside summary_md"
+)
+_PR_COPY_KEYS = ("type", "title", "commit_subject", "summary_md")
+_SHORT_KEYS = ("type", "title", "commit_subject")
+
+
+def _salvage_pr_copy(body: str):
+    """Key-anchored repair of unescaped interior quotes in summary_md. Returns a dict, or
+    None when the boundaries are ambiguous. type/title/commit_subject are copied verbatim
+    or the salvage gives up."""
+    anchors = []
+    for key in _PR_COPY_KEYS:
+        found = list(re.finditer(r'"%s"\s*:\s*"' % key, body))
+        if len(found) != 1:
+            return None
+        anchors.append((found[0].start(), found[0].end(), key))
+    anchors.sort()
+    final_brace = body.rfind("}")
+    values = {}
+    for i, (_, value_start, key) in enumerate(anchors):
+        last = i == len(anchors) - 1
+        region_end = final_brace if last else anchors[i + 1][0]
+        region = body[value_start:region_end]
+        close = region.rfind('"')
+        if close == -1:
+            return None
+        gap = region[close + 1:]
+        if not re.fullmatch(r"\s*" if last else r"\s*,\s*", gap):
+            return None
+        values[key] = region[:close]
+    for key in _SHORT_KEYS:
+        if any(ch in values[key] for ch in ('"', "\n", "\\")):
+            return None
+    fixed = re.sub(r'(?<!\\)"', r'\\"', values["summary_md"])
+    try:
+        values["summary_md"] = json.loads('"' + fixed + '"', strict=False)
+    except json.JSONDecodeError:
+        return None
+    return {key: values[key] for key in _PR_COPY_KEYS}
+
+
+def extract_pr_copy_json(text: str):
+    """pr-copy-only JSON extraction. Tries the shared extract_json first, then a
+    first-{ .. last-} slice of the whole reply, then a key-anchored salvage that
+    re-escapes interior quotes in summary_md only. Never invents or rewrites
+    type/title/commit_subject: salvage copies them byte-for-byte or gives up."""
+    from .adapters.llm import extract_json  # function-local: no import cycle
+    try:
+        return extract_json(text)
+    except ValueError:
+        pass
+    start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end <= start:
+        raise ValueError(f"no JSON object in pr-copy reply; {PR_COPY_JSON_HINT}")
+    body = text[start:end + 1]
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as e:
+        parse_err = str(e)
+    salvaged = _salvage_pr_copy(body)
+    if salvaged is not None:
+        return salvaged
+    raise ValueError(
+        f"no parseable JSON in pr-copy reply ({parse_err}); {PR_COPY_JSON_HINT}")
 
 
 def validate_body_check(data) -> None:

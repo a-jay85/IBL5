@@ -205,6 +205,10 @@ Omit the field entirely when the phase needs nothing beyond the always-on set. A
 
 The reason is 15 or more characters, free of `(`, `)`, `|` and backticks, so a reviewer can rerun the check by hand. `bin/lib/plan-matrix-assertions` skips a tagged row instead of reporting it unrealised; a malformed tag is ignored fail-closed and the row is checked. `bin/check-plan` gate `[Y]` rejects a bad shape, a tag on a non-`CLI-executable` row, and a matrix with tagged rows above one third of its rows.
 
+## Column-bound literal citations
+
+A column-bound literal is any value a recipe sends to a DB column: a seed id band, a sentinel, a code value. Copy `<sqltype>` from `ibl5/docs/schema/current-schema.sql`. A copy-verbatim recipe names only helpers the new code calls, and cites the defining source file by backticked repo path in the same `##`/`###` section. The citation shape follows the `(per <source>)` citation in `.claude/skills/post-plan/_pr-body-claims.md` § Citation rule. `bin/check-plan` gate `[L]` validates every present citation; `/plan` Step 4 gate 18 owns the presence judgment.
+
 ## Non-diff phase marker shape
 
 Use the `**No diff:** <reason>` line for a phase whose deliverable is not a change to the tree: closing a backlog issue through the PR body, queueing a parked plan, or a post-merge step.

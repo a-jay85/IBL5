@@ -532,7 +532,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             # Unavailable" note, the terminal is DEGRADED, and arming is off — the title a
             # human must sanity-check was never model-reviewed.
             if copy_degraded:
-                degraded_agents = list(degraded_agents) + ["pr-copy"]
+                degraded_agents = list(degraded_agents) + [schemas.PR_COPY_PURPOSE]
             if body_check_degraded:
                 degraded_agents = list(degraded_agents) + ["body-check"]
             res.findings = findings
@@ -1889,7 +1889,7 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     else:
         plan_excerpt = ""
     try:
-        copy = llm.call("pr-copy", "sonnet",
+        copy = llm.call(schemas.PR_COPY_PURPOSE, "sonnet",
                         llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt),
                         schemas.validate_pr_copy,
                         normalizer=schemas.normalize_pr_copy)

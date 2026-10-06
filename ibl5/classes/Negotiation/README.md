@@ -1,6 +1,6 @@
 ---
 description: Contract negotiation demand calculation, eligibility validation, and offer rendering — refactored from a 382-line procedural function.
-last_verified: 2026-09-22
+last_verified: 2026-10-03
 ---
 
 # Contract Negotiation Refactoring - Summary
@@ -264,7 +264,7 @@ This refactoring follows the same patterns as the Extension module refactoring (
 | Classes Created | 4 | 5 |
 | Processor Class | ✅ | ✅ |
 | Validator Class | ✅ | ✅ |
-| View Helper | ❌ (HTML in extension.php) | ✅ |
+| View Helper | ✅ (`ExtensionView` result banner; offer form in `NegotiationOfferView`) | ✅ |
 | Calculator Class | ✅ (OfferEvaluator) | ✅ |
 | Reuses Existing | Team, Player | Player, CommonRepository, PlayerContractValidator |
 | Security Pattern | DatabaseService | DatabaseService |

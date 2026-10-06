@@ -67,6 +67,32 @@ def test_characterize_mixed_attempt1_normalizes_to_feat():
     assert d["type"] == "feat"
 
 
+STILL_FAILING_RAW_IDS = {
+    "raw-pr-copy-unescaped-quote-mixed-0",
+    "raw-pr-copy-unescaped-quote-0",
+    "raw-pr-copy-unescaped-quote-1",
+    "raw-pr-copy-nested-fence-0",
+    "raw-pr-copy-nested-fence-1",
+    "raw-pr-copy-prose-backticks-0",
+    "raw-pr-copy-prose-backticks-1",
+}
+
+
+def test_still_failing_raw_ids_match_table():
+    assert {f"raw-pr-copy-{label}-{attempt}" for label, attempt in STILL_FAILING} \
+        == STILL_FAILING_RAW_IDS
+
+
+def test_purpose_key_matches_peer_tests_and_runner():
+    """_extractor_for dispatches on the literal "pr-copy"; the runner and the peer-owned
+    test_body_check.py (DegradingLlm bad-purpose set) must spell it the same way."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, "test_body_check.py"), encoding="utf-8") as fh:
+        assert '"pr-copy"' in fh.read()
+    with open(os.path.join(os.path.dirname(here), "runner.py"), encoding="utf-8") as fh:
+        assert '"pr-copy"' in fh.read()
+
+
 def test_pr_copy_fixture_set_complete():
     pairs = STILL_FAILING + RECOVERS_TODAY
     assert len(set(pairs)) == 12

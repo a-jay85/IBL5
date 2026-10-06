@@ -354,6 +354,11 @@ BAD_JSON_REPLAY = ('{"type": "chore", "title": "chore(docfix): reap", '
                    '"summary_md": "## Summary\\n- marks the run as "not merged" and exits\\n"}')
 
 
+# No closing brace and no commit_subject: nothing for the pr-copy extractor to salvage.
+TRUNCATED_REPLAY = ('{"type": "chore", "title": "chore(docfix): reap", '
+                    '"summary_md": "## Summary\\n- marks')
+
+
 def _call(tmp_path, normalizer):
     kw = {"normalizer": normalizer} if normalizer else {}
     return _cli(tmp_path).call("pr-copy", "sonnet", "write copy",
@@ -390,8 +395,8 @@ def test_cli_feat_anywhere_ends_feat_end_to_end(tmp_path, monkeypatch, shim):
 
 def test_cli_invalid_json_replay_still_degrades_with_normalizer(tmp_path, monkeypatch, shim):
     with pytest.raises(json.JSONDecodeError):
-        json.loads(BAD_JSON_REPLAY)
-    monkeypatch.setenv("CLAUDE_SHIM_REPLY", _envelope(_fenced(BAD_JSON_REPLAY)))
+        json.loads(TRUNCATED_REPLAY)
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", _envelope(_fenced(TRUNCATED_REPLAY)))
     with pytest.raises(HarnessError) as e:
         _call(tmp_path, schemas.normalize_pr_copy)
     assert e.value.kind == "llm-invalid-output"

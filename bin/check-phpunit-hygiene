@@ -18,7 +18,8 @@ Blocking checks on PHPUnit tests:
 
 Modes:
   (no args)  Scan all ibl5/tests/**/*.php
-  --pr       Scan only files changed vs origin/master
+  --pr       Scan only files changed vs $PHPUNIT_HYGIENE_BASE_REF (default origin/master)
+  Env:       PHPUNIT_HYGIENE_BASE_REF  base ref for --pr (default: origin/master)
 
 Exceptions (inline allow markers, reason >= 20 chars):
   // phpunit-hygiene-allow: <reason>
@@ -30,6 +31,7 @@ EOF
 fi
 
 ROOT=$(git rev-parse --show-toplevel)
+BASE_REF=${PHPUNIT_HYGIENE_BASE_REF:-origin/master}
 TESTS_DIR="$ROOT/ibl5/tests"
 
 usage() {
@@ -50,7 +52,8 @@ Blocking checks on PHPUnit tests:
 
 Modes:
   (no args)  Scan all ibl5/tests/**/*.php
-  --pr       Scan only files changed vs origin/master
+  --pr       Scan only files changed vs $PHPUNIT_HYGIENE_BASE_REF (default origin/master)
+  Env:       PHPUNIT_HYGIENE_BASE_REF  base ref for --pr (default: origin/master)
 
 Exceptions (inline allow markers, reason >= 20 chars):
   // phpunit-hygiene-allow: <reason>             (mark-test-skipped and
@@ -72,12 +75,18 @@ for arg in "$@"; do
   esac
 done
 
+if [ "$MODE" = "pr" ] && [ -n "${PHPUNIT_HYGIENE_BASE_REF:-}" ] \
+  && ! git -C "$ROOT" rev-parse --verify --quiet "${BASE_REF}^{commit}" >/dev/null; then
+  echo "PHPUNIT_HYGIENE_BASE_REF=${PHPUNIT_HYGIENE_BASE_REF} does not resolve to a commit" >&2
+  exit 2
+fi
+
 # --- Build file list ---
 if [ "$MODE" = "pr" ]; then
   SCAN_FILES=()
   while IFS= read -r f; do
     [ -f "$ROOT/$f" ] && SCAN_FILES+=("$ROOT/$f")
-  done < <(git -C "$ROOT" diff origin/master --name-only -- 'ibl5/tests/**/*.php')
+  done < <(git -C "$ROOT" diff "$BASE_REF" --name-only -- 'ibl5/tests/**/*.php')
 else
   SCAN_FILES=()
   while IFS= read -r f; do

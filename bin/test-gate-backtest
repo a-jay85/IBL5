@@ -54,12 +54,13 @@ commit_in() {
     git -C "$r" commit -q -m "$subj"
 }
 
-# record <repo> <entries-file> <number> <title> <merged-at> <head-ref>
+# record <repo> <entries-file> <number> <title> <merged-at> <head-ref> [body-json]
+# body-json is an already JSON-escaped string (write newlines as \n); default empty
 record() {
     local sha
     sha=$(git -C "$1" rev-parse HEAD)
-    printf '{"number":%s,"title":"%s","mergeCommit":{"oid":"%s"},"mergedAt":"%s","headRefName":"%s","body":""}\n' \
-        "$3" "$4" "$sha" "$5" "$6" >> "$2"
+    printf '{"number":%s,"title":"%s","mergeCommit":{"oid":"%s"},"mergedAt":"%s","headRefName":"%s","body":"%s"}\n' \
+        "$3" "$4" "$sha" "$5" "$6" "${7:-}" >> "$2"
 }
 
 # entries_to_json <entries-file> <json-file>
@@ -227,6 +228,63 @@ pma_candidate() {
 run_pma() {
     run_gb "--repo=$P" "--base=master" "--head=$1" "--fixture-history=$PJ" "--now=$NOW" \
         "--plans-dir=$PPLANS"
+}
+
+# --- rp history: replayable PR-body and diff-scoped hygiene gates (backlog#1291) ---
+RP="$T/rp"
+RPJ="$T/rp.json"
+
+setup_rp() {
+    [ -d "$RP" ] && return 0
+    local e="$T/rp.entries" n body_json
+    new_repo "$RP"
+    commit_in "$RP" "root" README "root
+"
+    body_json='## Summary\nrp change\n\n## Manual Testing\nI clicked around and it looked fine to me.'
+    for n in 1 2 3; do
+        # One directory deep: the hygiene gates' --pr pathspecs (`ibl5/tests/**/*.php`,
+        # `ibl5/tests/e2e/**/*.ts`) need a subdirectory to match.
+        mkdir -p "$RP/ibl5/tests/rp" "$RP/ibl5/tests/e2e/rp"
+        printf '%s\n' "<?php
+namespace Tests\\X;
+use PHPUnit\\Framework\\TestCase;
+class RpSkip${n}Test extends TestCase
+{
+    public function testThing(): void
+    {
+        \$this->markTestSkipped(\"nope\");
+    }
+}" > "$RP/ibl5/tests/rp/RpSkip${n}Test.php"
+        printf '%s\n' "import { test } from '@playwright/test';" "test.skip('rp', async () => {});" \
+            > "$RP/ibl5/tests/e2e/rp/rp${n}.spec.ts"
+        git -C "$RP" add -A
+        git -C "$RP" commit -q -m "chore: rp change $n (#$n)"
+        record "$RP" "$e" "$n" "chore: rp change $n" "2026-09-0${n}T12:00:00Z" "rp-branch-$n" "$body_json"
+    done
+    for n in 4 5 6; do
+        commit_in "$RP" "chore: rp change $n (#$n)" "src/rp$n.txt" "plain
+"
+        record "$RP" "$e" "$n" "chore: rp change $n" "2026-09-0${n}T12:00:00Z" "rp-branch-$n"
+    done
+    entries_to_json "$e" "$RPJ"
+    # Load-bearing: makes the hard-coded origin/master resolvable, so a seam that ignores
+    # the env var silently diffs against the tip and flags nothing.
+    git -C "$RP" update-ref refs/remotes/origin/master master
+}
+
+# rp_candidate <branch> <script-basename> — branch off master carrying the working-tree gate.
+rp_candidate() {
+    git -C "$RP" checkout -q -b "$1" master
+    mkdir -p "$RP/bin"
+    cp "$REPO_ROOT/bin/$2" "$RP/bin/$2"
+    chmod 755 "$RP/bin/$2"
+    git -C "$RP" add -A
+    git -C "$RP" commit -q -m "feat: rp gate $2"
+    git -C "$RP" checkout -q master
+}
+
+run_rp() {
+    run_gb "--repo=$RP" "--base=master" "--head=$1" "--fixture-history=$RPJ" "--now=$NOW"
 }
 
 # --- cases ------------------------------------------------------------------------------------
@@ -414,7 +472,42 @@ case_pma_2520_good_clears() {
     fi
 }
 
-CASES="noisy-gate-holds quiet-gate-clears non-gate-zero-cost timeout-unknown unspecified-holds unknown-flag space-form-rejected stacked-base minimal-env cleanup gate-flag-space-form gate-flag-bad-rev gate-flag-replays-old-version pma-2506-noisy-holds pma-2520-good-clears"
+# rp_holds_case <case-name> <script-basename>
+rp_holds_case() {
+    setup_rp
+    rp_candidate "rp-$1" "$2"
+    run_rp "rp-$1"
+    if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD" && has "$OUT" "flagged 3 clean PRs"; then
+        ok "$1"
+    else
+        fail "$1 (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_manual_testing_body_replay_holds() {
+    rp_holds_case manual-testing-body-replay-holds check-pr-manual-testing
+}
+
+case_post_merge_recipe_body_replay_clears() {
+    setup_rp
+    rp_candidate rp-post-merge-recipe check-post-merge-recipe
+    run_rp rp-post-merge-recipe
+    if [ "$RC" -eq 0 ] && has "$OUT" "gate-backtest-state: CLEARED" && ! has "$OUT" "flagged"; then
+        ok "post-merge-recipe-body-replay-clears"
+    else
+        fail "post-merge-recipe-body-replay-clears (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_phpunit_hygiene_base_seam_holds() {
+    rp_holds_case phpunit-hygiene-base-seam-holds check-phpunit-hygiene
+}
+
+case_e2e_hygiene_base_seam_holds() {
+    rp_holds_case e2e-hygiene-base-seam-holds check-e2e-hygiene
+}
+
+CASES="noisy-gate-holds quiet-gate-clears non-gate-zero-cost timeout-unknown unspecified-holds unknown-flag space-form-rejected stacked-base minimal-env cleanup gate-flag-space-form gate-flag-bad-rev gate-flag-replays-old-version pma-2506-noisy-holds pma-2520-good-clears manual-testing-body-replay-holds post-merge-recipe-body-replay-clears phpunit-hygiene-base-seam-holds e2e-hygiene-base-seam-holds"
 
 run_case() {
     case "$1" in
@@ -433,6 +526,10 @@ run_case() {
         gate-flag-replays-old-version) case_gate_flag_replays_old_version ;;
         pma-2506-noisy-holds) case_pma_2506_noisy_holds ;;
         pma-2520-good-clears) case_pma_2520_good_clears ;;
+        manual-testing-body-replay-holds) case_manual_testing_body_replay_holds ;;
+        post-merge-recipe-body-replay-clears) case_post_merge_recipe_body_replay_clears ;;
+        phpunit-hygiene-base-seam-holds) case_phpunit_hygiene_base_seam_holds ;;
+        e2e-hygiene-base-seam-holds) case_e2e_hygiene_base_seam_holds ;;
         *)
             printf 'Unknown case: %s\n' "$1" >&2
             printf 'Valid cases: %s all\n' "$CASES" >&2

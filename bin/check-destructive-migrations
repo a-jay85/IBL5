@@ -15,7 +15,7 @@ ENGINE="$(cd "$(dirname "$0")" && pwd)/lib/destructive-migration-scan.py"
 
 usage() {
     cat <<'EOF'
-Usage: bin/check-destructive-migrations [--staged|--since=<sha>|--full-scan] [--bypass-from-stdin] [--self-test] [--help|-h]
+Usage: bin/check-destructive-migrations [--staged|--since=<sha>|--full-scan] [--schema=<path>] [--bypass-from-stdin] [--self-test] [--help|-h]
 
 Scans added/modified migration files under ibl5/migrations/ (*.sql and *.php)
 for destructive SQL statements and blocks unless a tagged bypass marker names
@@ -29,6 +29,7 @@ Modes:
                      honoured here only. Takes no --since and no stdin.
 
 Options:
+  --schema=<path>       Resolve narrow-type old types from this schema dump instead of ibl5/docs/schema/current-schema.sql.
   --bypass-from-stdin   Read PR body from stdin for PR-wide bypass markers.
   --self-test           Run the engine's inline fixture table.
   --help, -h            Show this message.
@@ -52,8 +53,8 @@ Detected patterns (v2, statement-level):
                           UPDATE ... JOIN without WHERE counts, INSERT ... ON
                           DUPLICATE KEY UPDATE does not
   narrow-type             MODIFY/CHANGE to a narrower type. Old type comes from
-                          ibl5/docs/schema/current-schema.sql, then a same-file
-                          definition; a column the dump does not know fires as
+                          ibl5/docs/schema/current-schema.sql (or --schema), then
+                          a same-file definition; a column the dump does not know fires as
                           unresolved
   drop-recreate-existing  DROP TABLE IF EXISTS + CREATE TABLE of a table that
                           already exists in the schema dump, the baseline, or an
@@ -109,6 +110,8 @@ SINCE_SHA=""
 SINCE_GIVEN=0
 FULL_GIVEN=0
 SELF_TEST=0
+SCHEMA_OVERRIDE=""
+SCHEMA_GIVEN=0
 
 for arg in "$@"; do
     case "$arg" in
@@ -119,6 +122,10 @@ for arg in "$@"; do
             MODE="since"
             SINCE_GIVEN=1
             SINCE_SHA="${arg#--since=}"
+            ;;
+        --schema=*)
+            SCHEMA_GIVEN=1
+            SCHEMA_OVERRIDE="${arg#--schema=}"
             ;;
         --bypass-from-stdin)
             BYPASS_STDIN=1
@@ -145,6 +152,19 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+if [ "$SCHEMA_GIVEN" = "1" ]; then
+    if [ -z "$SCHEMA_OVERRIDE" ]; then
+        echo "--schema requires a path" >&2
+        exit 2
+    fi
+    if [ ! -f "$SCHEMA_OVERRIDE" ]; then
+        echo "schema file not found: $SCHEMA_OVERRIDE" >&2
+        exit 2
+    fi
+    # Absolute before the later cd to the repo root.
+    SCHEMA_OVERRIDE="$(cd "$(dirname "$SCHEMA_OVERRIDE")" && pwd)/$(basename "$SCHEMA_OVERRIDE")"
+fi
 
 if [ "$FULL_GIVEN" = "1" ]; then
     if [ "$SINCE_GIVEN" = "1" ] || [ "$BYPASS_STDIN" = "1" ]; then
@@ -210,7 +230,9 @@ else
 fi
 
 SCHEMA_ARGS=()
-if [ -f "$REPO_ROOT/ibl5/docs/schema/current-schema.sql" ]; then
+if [ -n "$SCHEMA_OVERRIDE" ]; then
+    SCHEMA_ARGS=(--schema "$SCHEMA_OVERRIDE")
+elif [ -f "$REPO_ROOT/ibl5/docs/schema/current-schema.sql" ]; then
     SCHEMA_ARGS=(--schema "$REPO_ROOT/ibl5/docs/schema/current-schema.sql")
 fi
 PR_ARGS=()

@@ -6,6 +6,10 @@ name: Production DB Backup
 #   2. rotates to the most recent 14 daily dumps,
 #   3. pulls the just-produced dump back and PROVES it is restorable by
 #      restoring into an ephemeral MariaDB service and asserting row counts.
+#   4. only after step 3 passes, purges auth_users_audit_log rows older than
+#      DataRetentionService::AUDIT_LOG_RETENTION_DAYS on prod
+#      (php ibl5/bin/purge-audit-log, backlog#1258). The dry_run input turns
+#      this into a count-only run.
 #
 # "The backup works" is therefore a CI assertion, not a hope.
 #
@@ -308,6 +312,59 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           MSG=$(printf 'Production DB backup job FAILED (%s trigger).\n\nThe dump, its restore verification (row floors and the pre-dump row-count comparison), or the boxscore duplicate invariant did not pass. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
           printf '%s' "$MSG" > /tmp/discord-msg.txt
+
+      - name: Send Discord DM
+        continue-on-error: true
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
+          ping: 'true'
+          fail-on-delivery: 'false'
+
+  purge-audit-log:
+    name: Purge auth audit log past retention
+    runs-on: ubuntu-latest
+    needs: backup
+    # Never purge without tonight's verified dump of the real host. A dispatch
+    # with ssh_host_override backed up some other host, so it must not purge prod.
+    if: ${{ needs.backup.result == 'success' && github.event.inputs.ssh_host_override == '' }}
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Run purge-audit-log on prod
+        run: |
+          set -euo pipefail
+          FLAG="${{ inputs.dry_run && '--dry-run' || '' }}"
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            "cd www && if [ -f ibl5/bin/purge-audit-log ]; then php ibl5/bin/purge-audit-log $FLAG; elif [ -f ibl5/bin/migrate ]; then echo 'purge-audit-log: SKIP: script not on prod yet (awaiting promote-to-production)'; else echo 'ERROR: www/ibl5 not found on prod host' >&2; exit 1; fi" \
+            | tee "$RUNNER_TEMP/purge.log"
+          grep -qE '^purge-audit-log: (DRY RUN: |deleted |SKIP: )' "$RUNNER_TEMP/purge.log"
+
+  notify-purge-failure:
+    name: Notify Audit-Log Purge Failure
+    runs-on: ubuntu-latest
+    needs: purge-audit-log
+    if: ${{ always() && needs.purge-audit-log.result == 'failure' }}
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build Discord message
+        continue-on-error: true
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          printf 'Prod auth audit-log purge FAILED (%s trigger). Tonight'"'"'s verified dump is the restore point. Run: %s' "${{ github.event_name }}" "$RUN_URL" > /tmp/discord-msg.txt
 
       - name: Send Discord DM
         continue-on-error: true

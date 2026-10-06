@@ -1369,11 +1369,14 @@ srt_workflow_hygiene() {
                'secrets not configured, skipping' \
                'cancel-in-progress: false' \
                'timeout-minutes: 40' \
-               'SIM_RECAP_HOST_MODE: actions'; do
+               'SIM_RECAP_HOST_MODE: actions' \
+               'id: secrets' \
+               "if: github.event_name != 'pull_request'"; do
         grep -qF -- "$tok" "$f" || { echo "missing: $tok" >&2; rc=1; }
     done
     for tok in 'upload-artifact' 'agent.json' '--dry-run' 'set -x' \
-               'ACTIONS_STEP_DEBUG' '*/5 * * * *'; do
+               'ACTIONS_STEP_DEBUG' '*/5 * * * *' \
+               'EVENT: ${{ github.event_name }}'; do
         grep -qF -- "$tok" "$f" && { echo "forbidden: $tok" >&2; rc=1; }
     done
     # permissions: must be immediately followed by contents: read
@@ -1403,6 +1406,38 @@ srt_workflow_hygiene() {
         }
         END { exit bad ? 1 : 0 }
     ' "$f" || rc=1
+    # Every step that maps `${{ secrets.X }}` is gated: the `id: secrets` step by
+    # `if: github.event_name != 'pull_request'`, every other step by
+    # `steps.secrets.outputs.configured == 'true'` (false whenever the first is
+    # skipped). A step is a `- ` item at the indent of the first item under `steps:`.
+    # Bracket expressions keep the regexes portable across BSD awk and mawk.
+    awk '
+        function indent(l) { match(l, /^[[:space:]]*/); return RLENGTH }
+        function flush() {
+            if (!started || !hassec) return
+            if (!hasif) {
+                print "secret-gating: step maps a secret with no if: guard: " name > "/dev/stderr"; bad = 1
+            } else if (idsec && ifline !~ /github[.]event_name != .pull_request./) {
+                print "secret-gating: Check secrets step is not gated off pull_request: " ifline > "/dev/stderr"; bad = 1
+            } else if (!idsec && ifline !~ /steps[.]secrets[.]outputs[.]configured == .true./ \
+                              && ifline !~ /github[.]event_name != .pull_request./) {
+                print "secret-gating: step maps a secret behind an if: that is not the secrets gate: " name > "/dev/stderr"; bad = 1
+            }
+        }
+        /^[[:space:]]*steps:[[:space:]]*$/ { insteps = 1; stepind = -1; next }
+        insteps && /^[[:space:]]*- / {
+            if (stepind < 0) stepind = indent($0)
+            if (indent($0) == stepind) {
+                flush(); started = 1; hassec = 0; hasif = 0; idsec = 0; ifline = ""; name = $0
+            }
+        }
+        insteps && started {
+            if ($0 ~ /[$][{][{][[:space:]]*secrets[.]/) hassec = 1
+            if ($0 ~ /^[[:space:]]*if:/) { hasif = 1; ifline = $0 }
+            if ($0 ~ /^[[:space:]]*id: secrets[[:space:]]*$/) idsec = 1
+        }
+        END { flush(); exit bad ? 1 : 0 }
+    ' "$f" || rc=1
     [ "$(grep -c '^concurrency:' "$f")" = 1 ] || { echo "concurrency: block count != 1" >&2; rc=1; }
     grep -qE '^[[:space:]]+group: sim-recap[[:space:]]*$' "$f" \
         || { echo "concurrency group is not sim-recap" >&2; rc=1; }
@@ -1426,14 +1461,61 @@ awk -v leak="$wf_leak" '{ print } /bin\/sim-recap-tick \$sim_arg/ { print leak }
     "$SRT_WORKFLOW" > "$STUB/wf-cat.yml"
 cp "$SRT_WORKFLOW" "$STUB/wf-secret.yml"
 printf '      - name: Leak\n        run: echo ${{ secrets.SIM_RECAP_DB_PASSWORD }}\n' >> "$STUB/wf-secret.yml"
+# (d) the event guard deleted from the Check secrets step; (e) the guard pointed
+# at the wrong event; (f) a trailing step that maps a secret with no if: at all.
+grep -vF "if: github.event_name != 'pull_request'" "$SRT_WORKFLOW" > "$STUB/wf-ungated.yml"
+sed "s/!= 'pull_request'/!= 'schedule'/" "$SRT_WORKFLOW" > "$STUB/wf-badgate.yml"
+cp "$SRT_WORKFLOW" "$STUB/wf-stray.yml"
+printf '      - name: Stray\n        env:\n          X: %s\n        run: echo ok\n' \
+    '${{ secrets.HOST }}' >> "$STUB/wf-stray.yml"
 wf_bad=0
-for wf_copy in wf-agent wf-cat wf-secret; do
+for wf_copy in wf-agent wf-cat wf-secret wf-ungated wf-badgate wf-stray; do
     if srt_workflow_hygiene "$STUB/$wf_copy.yml" 2>/dev/null; then
         echo "  hygiene wrongly passed on $wf_copy.yml"
         wf_bad=$((wf_bad + 1))
     fi
 done
 srt_expect_eq "workflow hygiene fails on a leaking copy" 0 "$wf_bad"
+# The three gating copies must fail on the gating check itself, not on a side effect.
+wf_reason_bad=0
+for wf_copy in wf-ungated wf-badgate wf-stray; do
+    srt_workflow_hygiene "$STUB/$wf_copy.yml" 2>"$STUB/$wf_copy.err" || true
+    grep -q '^secret-gating:' "$STUB/$wf_copy.err" || {
+        echo "  $wf_copy.yml failed without a secret-gating: reason"
+        wf_reason_bad=$((wf_reason_bad + 1))
+    }
+done
+srt_expect_eq "gating copies fail with a secret-gating: reason" 0 "$wf_reason_bad"
+srt_expect_eq "NO-WRONG-PASS: none of the six leaking copies passes hygiene" 0 "$wf_bad"
+
+# GUARD-OK: the event guard sits directly under `id: secrets` and no EVENT token
+# remains anywhere in the file.
+wf_guard_ok=0
+wf_after_id=$(grep -A1 'id: secrets' "$SRT_WORKFLOW" || true)
+grep -qF "if: github.event_name != 'pull_request'" <<< "$wf_after_id" || wf_guard_ok=1
+grep -q 'EVENT' "$SRT_WORKFLOW" && wf_guard_ok=1
+srt_expect_eq "GUARD-OK: if: sits under id: secrets and no EVENT token remains" 0 "$wf_guard_ok"
+
+# SMOKE-DONE: the awk fires on a stray ungated step and stays quiet on the committed file.
+wf_stray_hits=$(srt_workflow_hygiene "$STUB/wf-stray.yml" 2>&1 \
+    | grep -c 'secret-gating: step maps a secret with no if' || true)
+wf_committed_hits=$(srt_workflow_hygiene "$SRT_WORKFLOW" 2>&1 | grep -c 'secret-gating:' || true)
+srt_expect_eq "SMOKE-DONE: stray ungated step yields one secret-gating: line" 1 "$wf_stray_hits"
+srt_expect_eq "SMOKE-DONE: committed file yields zero secret-gating: lines" 0 "$wf_committed_hits"
+
+# PR-RUN-DONE: opt-in live check, run after the PR is open and its run has finished.
+# Set SRT_CHECK_PR_RUN=<branch> to read that branch's latest pull_request run.
+if [ -n "${SRT_CHECK_PR_RUN:-}" ]; then
+    pr_run_id=$(gh run list --workflow sim-recap.yml --branch "$SRT_CHECK_PR_RUN" \
+        --event pull_request --limit 1 --json databaseId --jq '.[0].databaseId')
+    pr_run_conclusion=$(gh run view "$pr_run_id" --json conclusion --jq .conclusion)
+    pr_run_step=$(gh run view "$pr_run_id" --json jobs \
+        --jq '.jobs[0].steps[] | select(.name=="Check secrets") | .conclusion')
+    pr_run_masked=$(gh run view "$pr_run_id" --log 2>/dev/null | grep -c 'T7: \*\*\*' || true)
+    srt_expect_eq "PR-RUN-DONE: run concludes success" success "$pr_run_conclusion"
+    srt_expect_eq "PR-RUN-DONE: Check secrets step is skipped" skipped "$pr_run_step"
+    srt_expect_eq "PR-RUN-DONE: log holds no masked T7 line" 0 "$pr_run_masked"
+fi
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

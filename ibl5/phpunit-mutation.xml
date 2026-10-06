@@ -281,6 +281,9 @@
         <testsuite name="PageLayout Module Tests">
             <directory>tests/PageLayout</directory>
         </testsuite>
+        <testsuite name="DataRetention Module Tests">
+            <directory>tests/DataRetention</directory>
+        </testsuite>
     </testsuites>
     <!-- No <groups><exclude> — DB integration tests run for repository coverage -->
     <source>

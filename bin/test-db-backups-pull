@@ -167,7 +167,7 @@ else fail h2 "rc=$RC dm=$(cat "$CASE/dm.log" 2>&1)"; fi
 
 # (i) --print-schedule
 OUT="$("$SCRIPT_DIR/db-backups-pull" --print-schedule 2>&1)"; RC=$?
-MAIN_WT="$(git -C "$SCRIPT_DIR" worktree list --porcelain | awk '/^worktree / {print $2; exit}')"
+MAIN_WT="$(git -C "$SCRIPT_DIR" worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')"
 if [ "$RC" -eq 0 ] && grep -q '<string>com.ibl5.db-backups-pull</string>' <<< "$OUT" \
    && grep -q "<string>$MAIN_WT/bin/db-backups-pull</string>" <<< "$OUT" \
    && grep -q '<integer>10</integer>' <<< "$OUT" && grep -q '<integer>30</integer>' <<< "$OUT"; then

@@ -293,6 +293,9 @@
         <testsuite name="Http Tests">
             <directory>tests/Http</directory>
         </testsuite>
+        <testsuite name="DataRetention Module Tests">
+            <directory>tests/DataRetention</directory>
+        </testsuite>
     </testsuites>
     <groups>
         <exclude>

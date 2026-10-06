@@ -52,12 +52,16 @@ final class RollbackPhantomRepairRunAbortTest extends TestCase
         self::assertFalse(self::backupsProvablyEmpty([]));
 
         foreach (self::BACKUP_TABLES as $table) {
+            $populated = $allZero;
+            $populated[$table] = 1;
             self::assertFalse(
-                self::backupsProvablyEmpty([...$allZero, $table => 1]),
+                self::backupsProvablyEmpty($populated),
                 "A single populated backup ({$table}) must refuse"
             );
+            $missing = $allZero;
+            $missing[$table] = -1;
             self::assertFalse(
-                self::backupsProvablyEmpty([...$allZero, $table => -1]),
+                self::backupsProvablyEmpty($missing),
                 "A missing backup table ({$table}) must refuse"
             );
 

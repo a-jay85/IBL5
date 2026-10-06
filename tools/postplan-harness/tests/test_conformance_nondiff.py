@@ -73,9 +73,12 @@ def test_non_repo_citations_only_is_uncheckable_not_held():
     items = conformance.phase_omission_items(
         _plan(ph), ["ibl5/docs/API_GUIDE.md"], tracked_files=TRACKED, notes=notes)
     assert items == []
-    assert len(notes) == 1
-    assert notes[0].startswith("UNCHECKABLE-PHASE: 1")
-    assert "/proc/self/fd/1, api/v1, a-jay85/ibl5-bugs (+2 more)" in notes[0]
+    drops = [n for n in notes if n.startswith("NON-REPO-CITATION: 1")]
+    assert len(drops) == 2
+    rest = [n for n in notes if not n.startswith("NON-REPO-CITATION:")]
+    assert len(rest) == 1
+    assert rest[0].startswith("UNCHECKABLE-PHASE: 1")
+    assert "/proc/self/fd/1, api/v1, a-jay85/ibl5-bugs (+2 more)" in rest[0]
 
 
 def test_mixed_citations_check_only_repo_ones():
@@ -89,11 +92,12 @@ def test_mixed_citations_check_only_repo_ones():
     notes: list[str] = []
     assert conformance.phase_omission_items(
         _plan(ph), ["bin/wt-up"], tracked_files=TRACKED, notes=notes) == []
-    assert notes == []
+    assert len(notes) == 1
+    assert notes[0].startswith("NON-REPO-CITATION: 1")
 
 
 def test_basename_collision_with_tracked_dir_stays_candidate():
-    ph = PhaseInfo(number=1, heading="Phase 1: Skill", evidence_paths=["/post-plan"])
+    ph = PhaseInfo(number=1, heading="Phase 1: Skill", evidence_paths=["post-plan"])
     items = conformance.phase_omission_items(
         _plan(ph), ["ibl5/docs/API_GUIDE.md"], tracked_files=TRACKED)
     assert len(items) == 1
@@ -142,8 +146,9 @@ def test_check_passes_tracked_and_notes_through():
     items = conformance.check(plan, ["ibl5/docs/API_GUIDE.md"],
                               tracked_files=TRACKED, notes=notes)
     assert not any(i.startswith("MISSING-PHASE") for i in items)
-    assert len(notes) == 1
-    assert notes[0].startswith("UNCHECKABLE-PHASE: 1")
+    assert len(notes) == 2
+    assert notes[0].startswith("NON-REPO-CITATION: 1")
+    assert notes[1].startswith("UNCHECKABLE-PHASE: 1")
 
 
 def test_tracked_files_reads_git_ls_files(tmp_path):

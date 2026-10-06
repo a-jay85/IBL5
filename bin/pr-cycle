@@ -1071,7 +1071,11 @@ _bucket_emoji() {
     esac
 }
 
-# _your_turn_lines — print one markdown line per your-turn.txt row, linked via gh pr list.
+# _your_turn_lines — print the your-turn.txt rows under typed group headers, linked via gh pr list.
+# Groups, in order, empty ones omitted: Conflicts holds DIRTY and NOT-MERGEABLE rows, Awaiting
+# feat sign-off its namesake bucket, Failed the BLOCKED-CHECK rows, Other held everything else
+# (unknown buckets included).
+# Each header carries the group's full row count even when the cap truncates the rows shown.
 # Called only from inside the DM block; never sets HALT, never returns non-zero.
 _your_turn_lines() {
     [ -s "$RUNDIR/your-turn.txt" ] || return 0
@@ -1085,28 +1089,50 @@ _your_turn_lines() {
     set -e
     [ "$_yl_rc" -ne 0 ] && : > "$RUNDIR/prlist.tsv"
 
+    rm -f "$RUNDIR"/yt-g[1-4].txt
+    awk -F'\t' -v d="$RUNDIR" 'NF {
+        b = $2
+        g = (b == "DIRTY" || b == "NOT-MERGEABLE") ? 1 : (b == "FEAT-AWAITING-SIGNOFF") ? 2 : (b == "BLOCKED-CHECK") ? 3 : 4
+        print > (d "/yt-g" g ".txt") }' "$RUNDIR/your-turn.txt" || true
+
     _yt_total="$(wc -l < "$RUNDIR/your-turn.txt" | tr -d ' ')"
     _yt_shown=0
     _yt_running=0
-    while IFS="$(printf '\t')" read -r _yn _ybkt _yact; do
-        [ -n "$_yn" ] || continue
-        _yact="${_yact:-see pr-triage}"
-        _row="$(awk -F'\t' -v n="$_yn" '$1 == n { print; exit }' "$RUNDIR/prlist.tsv" 2>/dev/null || true)"
-        if [ -n "$_row" ]; then
-            _yurl="$(printf '%s\n' "$_row" | cut -f2)"
-            _ytitle="$(printf '%s\n' "$_row" | cut -f3 | tr '[]' '()')"
-            _yl_line="- $(_bucket_emoji "$_ybkt") [#$_yn: $_ytitle](<$_yurl>) — $_ybkt — $_yact"
-        else
-            _yl_line="- $(_bucket_emoji "$_ybkt") #$_yn — $_ybkt — $_yact"
-        fi
-        if [ "$((_yt_running + ${#_yl_line} + 1))" -gt 1700 ]; then
+    for _yg in 1 2 3 4; do
+        [ -s "$RUNDIR/yt-g$_yg.txt" ] || continue
+        case "$_yg" in
+            1) _ygt="Conflicts" ;;
+            2) _ygt="Awaiting feat sign-off" ;;
+            3) _ygt="Failed" ;;
+            *) _ygt="Other held" ;;
+        esac
+        _yt_hdr="**$_ygt ($(wc -l < "$RUNDIR/yt-g$_yg.txt" | tr -d ' '))**"
+        if [ "$((_yt_running + ${#_yt_hdr} + 1))" -gt 1700 ]; then
             echo "- …and $((_yt_total - _yt_shown)) more: $RUNDIR/your-turn.txt"
             return 0
         fi
-        echo "$_yl_line"
-        _yt_running=$((_yt_running + ${#_yl_line} + 1))
-        _yt_shown=$((_yt_shown + 1))
-    done < "$RUNDIR/your-turn.txt"
+        echo "$_yt_hdr"
+        _yt_running=$((_yt_running + ${#_yt_hdr} + 1))
+        while IFS="$(printf '\t')" read -r _yn _ybkt _yact; do
+            [ -n "$_yn" ] || continue
+            _yact="${_yact:-see pr-triage}"
+            _row="$(awk -F'\t' -v n="$_yn" '$1 == n { print; exit }' "$RUNDIR/prlist.tsv" 2>/dev/null || true)"
+            if [ -n "$_row" ]; then
+                _yurl="$(printf '%s\n' "$_row" | cut -f2)"
+                _ytitle="$(printf '%s\n' "$_row" | cut -f3 | tr '[]' '()')"
+                _yl_line="- $(_bucket_emoji "$_ybkt") [#$_yn: $_ytitle](<$_yurl>) — $_ybkt — $_yact"
+            else
+                _yl_line="- $(_bucket_emoji "$_ybkt") #$_yn — $_ybkt — $_yact"
+            fi
+            if [ "$((_yt_running + ${#_yl_line} + 1))" -gt 1700 ]; then
+                echo "- …and $((_yt_total - _yt_shown)) more: $RUNDIR/your-turn.txt"
+                return 0
+            fi
+            echo "$_yl_line"
+            _yt_running=$((_yt_running + ${#_yl_line} + 1))
+            _yt_shown=$((_yt_shown + 1))
+        done < "$RUNDIR/yt-g$_yg.txt"
+    done
 }
 
 # ==========================================================================================

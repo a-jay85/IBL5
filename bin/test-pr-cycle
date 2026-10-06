@@ -1211,9 +1211,11 @@ g_one_arm() {
 }
 g_no_bucket_cond() {
     # _bucket_emoji is a display-mapping function; exclude its body from the guard.
-    # The guard still catches bucket-conditional logic outside that function.
+    # The guard still catches bucket-conditional logic outside that function. The your-turn
+    # grouping awk is the second exempt span: it sorts rows into display groups and decides
+    # nothing about arming (it starts at the yt-g cleanup line and ends at its print redirect).
     ! noncomment "$1" \
-        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} {print}' \
+        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-4\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} {print}' \
         | grep -qE 'FEAT-AWAITING-SIGNOFF|PIPELINE-HELD|UNCLEARED|[^-A-Z_]HELD[^-A-Z_]'
 }
 g_no_sleep()       { ! noncomment "$1" | grep -qE '(^|[^A-Za-z_])sleep[[:space:]]'; }
@@ -1770,6 +1772,70 @@ _dm_len="$(wc -m < "$SCRATCH/dm.argv" | tr -d ' ')"
 [[ "$_dm_len" -le 2000 ]] || fail "case 38: DM exceeds 2000 chars ($_dm_len)"
 grep -qF 'more:' "$SCRATCH/dm.argv" || fail "case 38: DM did not use the overflow line"
 end_case "case 38 your-turn DM length cap"
+
+# ==========================================================================================
+# your-turn grouped — rows sit under typed headers with full counts; empty groups vanish
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+{   printf '#101  DIRTY  rebase\n'
+    printf '#102  NOT-MERGEABLE  fix\n'
+    printf '#103  FEAT-AWAITING-SIGNOFF  sign\n'
+    printf '#104  HELD  look\n'
+    printf '#105  UNCLEARED  look\n'
+    printf '#106  WEIRD  look\n'
+} > "$SCRATCH/triage-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "your-turn grouped: exit $RC, want 0"
+# The dm shim flattens newlines to spaces (one argv line per call), so order is checked by
+# character offset in the single recorded line.
+_dm="$(cat "$SCRATCH/dm.argv")"
+_pos() { local _pre="${_dm%%"$1"*}"; if [[ "$_pre" == "$_dm" ]]; then echo -1; else echo "${#_pre}"; fi; }
+for _h in '**Conflicts (2)**' '**Awaiting feat sign-off (1)**' '**Other held (3)**'; do
+    [[ "$(grep -oF "$_h" <<< "$_dm" | wc -l | tr -d ' ')" == "1" ]] \
+        || fail "your-turn grouped: header '$_h' not exactly once: $_dm"
+done
+! grep -qF 'Failed (' <<< "$_dm" \
+    || fail "your-turn grouped: empty Failed group printed a header"
+_hc="$(_pos '**Conflicts (2)**')"
+_ha="$(_pos '**Awaiting feat sign-off (1)**')"
+_ho="$(_pos '**Other held (3)**')"
+[[ "$_hc" -ge 0 && "$_hc" -lt "$_ha" && "$_ha" -lt "$_ho" ]] \
+    || fail "your-turn grouped: header order wrong ($_hc $_ha $_ho)"
+for _n in 101 102 103 104 105 106; do
+    _rl="$(_pos "#$_n —")"
+    [[ "$_rl" -ge 0 ]] || fail "your-turn grouped: row #$_n missing"
+    case "$_n" in
+        101|102) [[ "$_rl" -gt "$_hc" && "$_rl" -lt "$_ha" ]] || fail "your-turn grouped: #$_n not under Conflicts" ;;
+        103)     [[ "$_rl" -gt "$_ha" && "$_rl" -lt "$_ho" ]] || fail "your-turn grouped: #$_n not under Awaiting" ;;
+        *)       [[ "$_rl" -gt "$_ho" ]] || fail "your-turn grouped: #$_n not under Other held (unknown bucket dropped?)" ;;
+    esac
+done
+end_case "your-turn grouped"
+
+# ==========================================================================================
+# your-turn grouped cap — the header keeps the full count while the rows truncate
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+_act60="$(printf 'x%.0s' $(seq 1 60))"
+: > "$SCRATCH/triage-out"
+_i=1
+while [[ $_i -le 40 ]]; do
+    printf '#%d  HELD  %s\n' "$((300 + _i))" "$_act60" >> "$SCRATCH/triage-out"
+    _i=$((_i + 1))
+done
+run --worker
+[[ $RC -eq 0 ]] || fail "your-turn grouped cap: exit $RC, want 0"
+grep -qF '**Other held (40)**' "$SCRATCH/dm.argv" \
+    || fail "your-turn grouped cap: header lost the full count: $(cat "$SCRATCH/dm.argv")"
+grep -qF -- '- …and ' "$SCRATCH/dm.argv" || fail "your-turn grouped cap: no truncation line"
+_blk="$(sed -n 's/.*\(Your turn:.*\)/\1/p' "$SCRATCH/dm.argv")"
+# Row cap is 1700 chars (the plan said 1800; case 38's 2000-char DM limit needs the lower cap).
+[[ "${#_blk}" -le 2000 ]] || fail "your-turn grouped cap: your-turn block is ${#_blk} chars, want <= 2000"
+end_case "your-turn grouped cap"
 
 # ==========================================================================================
 # 39 — PR-number pattern in _arm_and_classify: accepts #12, rejects #12abc

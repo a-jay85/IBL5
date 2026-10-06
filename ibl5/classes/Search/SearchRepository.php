@@ -207,9 +207,8 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
 
         // Fetch one extra to detect if there are more results. sid breaks time ties
         // so the LIMIT window is stable across pages (ADR-0083). sid is the
-        // AUTO_INCREMENT primary key of nuke_stories, so it is genuinely unique; it
-        // is simply absent from the rule's curated allowlist.
-        // @phpstan-ignore ibl.orderByMissingTiebreaker
+        // AUTO_INCREMENT primary key of nuke_stories, so it is genuinely unique and
+        // is on the rule's UNIQUE_COLUMNS allowlist.
         $sql .= " ORDER BY s.time DESC, s.sid DESC LIMIT ?, ?";
         $types .= 'ii';
         $params[] = $offset;

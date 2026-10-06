@@ -3728,6 +3728,7 @@ Seed pid 200001993000 into the BIGINT shadow column.
 assert "L-overflow-quoted-ok" 0 "$FM$L_MATRIX
 Store pid as the string '200001993000' in the log.
 "
+# A widened `[a-z]+_id` identifier rule would flag this Discord snowflake.
 assert "L-overflow-discord-id-ok" 0 "$FM$L_MATRIX"'
 Post with message_id 1234567890123456789.
 '

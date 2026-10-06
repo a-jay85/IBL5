@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GoogleSheets;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use GoogleSheets\Contracts\GoogleSheetConnectionRepositoryInterface;
 
 /**

@@ -46,7 +46,7 @@ final class CurlGoogleHttpClient implements GoogleHttpClientInterface
         $response = curl_exec($curl);
         $error = curl_error($curl);
         $status = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-        curl_close($curl);
+        // curl_close() is deprecated in PHP 8.0+; the handle is freed when $curl goes out of scope.
 
         if ($response === false || $error !== '') {
             throw new GoogleHttpException('cURL error: ' . $error);

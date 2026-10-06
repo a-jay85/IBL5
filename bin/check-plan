@@ -906,6 +906,7 @@ done < <(awk '
     }
 ' "$PLAN_FILE")
 
+FWD_REF_CUES='create|new (method|class|file)|add(s|ing)? (a )?new|introduce|rename|extract|scaffold'
 # ---------------------------------------------------------------------------
 # Reuse-target existence (new check). PHP Class::method only.
 # ---------------------------------------------------------------------------
@@ -930,7 +931,7 @@ while IFS= read -r token; do
 
     # Forward-reference exemption: the plan creates this symbol itself.
     if grep -F -- "$token" "$PLAN_FILE" \
-        | grep -qiE 'create|new (method|class|file)|add(s|ing)? (a )?new|introduce|rename|extract|scaffold'; then
+        | grep -qiE "$FWD_REF_CUES"; then
         continue
     fi
 
@@ -947,6 +948,205 @@ while IFS= read -r token; do
     fi
 done < <(grep -iE 'reuse' "$PLAN_FILE" \
             | grep -oE '[A-Z][A-Za-z0-9_]*::[a-zA-Z_][A-Za-z0-9_]*')
+
+# ---------------------------------------------------------------------------
+# Gate [L]: literal and symbol provenance (backlog#933). Checks A/B/C.
+# ---------------------------------------------------------------------------
+# A: every `literal-check: <lit-or-range> -> <table>.<column> <sqltype>` citation
+#    must name a column in the checked-in schema dump, cite its exact type, and
+#    fit that type's integer range. Absence of a citation is judgment (gate 18).
+# B: an integer above 2147483647 on a line naming pid/tid/teamid, with no
+#    BIGINT/unsigned cue, no quotes around it, and no passing citation.
+# C: a backticked `name()` on a copy-verbatim line must be defined in a source
+#    file cited by backticked path in the same ##/### section. Silent when the
+#    section cites no existing file. Opt-out for A/B: <!-- literal-ok: <reason> -->.
+# A blocks. B and C are advisory (warn): the corpus diff over ~/claude-plans
+# found false positives for both. The letter is shared with the warn-only
+# line-number-anchor gate [L] further down; the message prefixes differ.
+# Decimal bounds compare as strings (length, then lexical): awk doubles lose
+# precision past 2^53, so a numeric compare on a 19-digit bound can round.
+L_SCHEMA="$REPO_ROOT/ibl5/docs/schema/current-schema.sql"
+L_INPUTS=("$PLAN_FILE")
+L_NOSCHEMA=1
+if [ -f "$L_SCHEMA" ]; then
+    L_INPUTS=("$L_SCHEMA" "$PLAN_FILE")
+    L_NOSCHEMA=0
+fi
+while IFS=$'\t' read -r kind msg; do
+    # Check B is advisory: the Phase 5 corpus diff found Discord ids on lines
+    # that also name teamid (backlog#933).
+    case "$kind" in
+        A) viol "$msg" ;;
+        B) warn "$msg" ;;
+    esac
+done < <(awk -v schema="$L_SCHEMA" -v noschema="$L_NOSCHEMA" -v sq="'" '
+    function strip0(s) { sub(/^0+/, "", s); if (s == "") s = "0"; return s "" }
+    function dcmp(a, b) {
+        a = strip0(a); b = strip0(b)
+        if (length(a) < length(b)) return -1
+        if (length(a) > length(b)) return 1
+        if (a < b) return -1
+        if (a > b) return 1
+        return 0
+    }
+    function fits(v, base, uns,   neg, mag) {
+        neg = (substr(v, 1, 1) == "-")
+        mag = neg ? substr(v, 2) : v
+        if (neg) {
+            if (strip0(mag) == "0") return 1
+            if (uns) return 0
+            return dcmp(mag, MINMAG[base]) <= 0
+        }
+        return dcmp(mag, uns ? UMAX[base] : SMAX[base]) <= 0
+    }
+    BEGIN {
+        SMAX["tinyint"] = "127";   MINMAG["tinyint"] = "128";   UMAX["tinyint"] = "255"
+        SMAX["smallint"] = "32767"; MINMAG["smallint"] = "32768"; UMAX["smallint"] = "65535"
+        SMAX["mediumint"] = "8388607"; MINMAG["mediumint"] = "8388608"; UMAX["mediumint"] = "16777215"
+        SMAX["int"] = "2147483647"; MINMAG["int"] = "2147483648"; UMAX["int"] = "4294967295"
+        SMAX["bigint"] = "9223372036854775807"; MINMAG["bigint"] = "9223372036854775808"
+        UMAX["bigint"] = "18446744073709551615"
+    }
+    !noschema && FILENAME == schema {
+        if ($0 ~ /^CREATE TABLE `/) {
+            t = $0; sub(/^CREATE TABLE `/, "", t); sub(/`.*/, "", t); tbl = tolower(t); next
+        }
+        if ($0 ~ /^\)/) { tbl = ""; next }
+        if (tbl != "" && $0 ~ /^  `[^`]+` /) {
+            rest = substr($0, 4); c = rest; sub(/`.*/, "", c)
+            rest = substr(rest, length(c) + 3)
+            depth = 0; ty = ""
+            for (i = 1; i <= length(rest); i++) {
+                ch = substr(rest, i, 1)
+                if (ch == "(") depth++
+                else if (ch == ")") depth--
+                else if (ch == " " && depth == 0) break
+                ty = ty ch
+            }
+            if (substr(rest, i + 1) ~ /^unsigned/) ty = ty " unsigned"
+            type[tbl "." tolower(c)] = tolower(ty)
+        }
+        next
+    }
+    {
+        if ($0 ~ /^[[:space:]]*(```|~~~)/) { fence = !fence; next }
+        if (fence) next
+        if (index($0, "<!-- literal-ok")) next
+
+        # Check A.
+        line = $0; nc = 0; ok = 1
+        while (match(line, /literal-check:[[:space:]]*-?[0-9]+(\.\.-?[0-9]+)?[[:space:]]*->[[:space:]]*[a-z0-9_]+\.[a-z0-9_]+[[:space:]]+[a-z]+(\([0-9,]+\))?( unsigned)?/)) {
+            hit = substr(line, RSTART, RLENGTH); line = substr(line, RSTART + RLENGTH); nc++
+            sub(/^literal-check:[[:space:]]*/, "", hit)
+            split(hit, lr, "->")
+            lhs = lr[1]; gsub(/[[:space:]]/, "", lhs)
+            rhs = lr[2]; sub(/^[[:space:]]+/, "", rhs)
+            match(rhs, /[[:space:]]+/)
+            tc = substr(rhs, 1, RSTART - 1); cty = substr(rhs, RSTART + RLENGTH)
+            if (noschema) { missing = 1; ok = 0; continue }
+            if (!(tc in type)) {
+                print "A\t[L] literal-check line " FNR ": " tc " not found in ibl5/docs/schema/current-schema.sql"
+                ok = 0; continue
+            }
+            if (type[tc] != cty) {
+                print "A\t[L] literal-check line " FNR ": " tc " is " sq type[tc] sq " in schema, citation says " sq cty sq
+                ok = 0; continue
+            }
+            base = cty; sub(/\(.*/, "", base); uns = (cty ~ / unsigned$/)
+            if (!(base in SMAX)) continue
+            n = split(lhs, ends, /\.\./)
+            for (k = 1; k <= n; k++) {
+                if (fits(ends[k], base, uns)) continue
+                lo = uns ? "0" : "-" MINMAG[base]; hi = uns ? UMAX[base] : SMAX[base]
+                print "A\t[L] literal-check line " FNR ": " ends[k] " does not fit " tc " " cty " (range " lo ".." hi ")"
+                ok = 0
+            }
+        }
+        if (nc > 0 && ok) next
+
+        # Check B.
+        pl = " " $0 " "
+        if (!match(pl, /[^a-z0-9_](pid|pids|tid|tids|teamid|teamids)[^a-z0-9_]/)) next
+        word = substr(pl, RSTART + 1, RLENGTH - 2)
+        if (tolower($0) ~ /bigint|unsigned/) next
+        rest = pl
+        while (match(rest, /[^A-Za-z0-9_][0-9]+[^A-Za-z0-9_]/)) {
+            pre = substr(rest, RSTART, 1); num = substr(rest, RSTART + 1, RLENGTH - 2)
+            post = substr(rest, RSTART + RLENGTH - 1, 1)
+            rest = substr(rest, RSTART + RLENGTH - 1)
+            if ((pre == "\"" || pre == sq) && post == pre) continue
+            if (dcmp(num, "2147483647") > 0) {
+                print "B\t[L] overflow line " FNR ": " num " exceeds int(11) max 2147483647 on a line naming " sq word sq "; add a literal-check: citation or a BIGINT/unsigned cue"
+                break
+            }
+        }
+    }
+    END {
+        if (missing) print "A\t[L] literal-check citations present but ibl5/docs/schema/current-schema.sql is missing"
+    }
+' "${L_INPUTS[@]}")
+
+# Check C: emit one record per copy-verbatim symbol, then resolve in shell.
+while IFS=$'\t' read -r kind lno name paths; do
+    [ "$kind" = "C" ] || continue
+    kept=""
+    for p in $paths; do
+        if [ -f "$REPO_ROOT/$p" ]; then kept="$kept${kept:+ }$p"; fi
+    done
+    [ -n "$kept" ] || continue
+    found=0
+    for p in $kept; do
+        if grep -qE "function[[:space:]]+${name}([^A-Za-z0-9_]|\$)|def[[:space:]]+${name}([^A-Za-z0-9_]|\$)|(^|[[:space:]])${name}[[:space:]]*\(\)" "$REPO_ROOT/$p"; then
+            found=1; break
+        fi
+    done
+    # Advisory: the corpus diff found new helpers and test assertions named on
+    # copy-verbatim lines that the forward-reference cues do not catch.
+    if [ "$found" -eq 0 ]; then
+        warn "[L] copy-verbatim line ${lno}: '${name}()' is defined in none of this section's cited source files (${kept})"
+    fi
+done < <(awk -v cues="$FWD_REF_CUES" '
+    function flush(   i, j, lc, drop, p, paths) {
+        paths = ""
+        for (p in cited) paths = paths (paths == "" ? "" : " ") p
+        for (i = 1; i <= ns; i++) {
+            drop = 0
+            for (j = 1; j <= nl; j++) {
+                lc = tolower(sl[j])
+                if (index(lc, tolower(sname[i])) && lc ~ lcues) { drop = 1; break }
+            }
+            if (!drop) print "C\t" sline[i] "\t" sname[i] "\t" paths
+        }
+        ns = 0; nl = 0; split("", cited)
+    }
+    BEGIN { lcues = tolower(cues) }
+    /^###?[[:space:]]/ { flush() }
+    {
+        sl[++nl] = $0
+        rest = $0
+        while (match(rest, /`[^`]+`/)) {
+            sp = substr(rest, RSTART + 1, RLENGTH - 2); rest = substr(rest, RSTART + RLENGTH)
+            if (sp !~ /^(\.\/)?[A-Za-z0-9_.\/-]+(:[0-9]+(-[0-9]+)?)?$/) continue
+            sub(/^\.\//, "", sp); sub(/:[0-9]+(-[0-9]+)?$/, "", sp)
+            if (sp ~ /\.(php|sh|py|ts|js)$/ || sp ~ /^bin\//) cited[sp] = 1
+        }
+        if ($0 ~ /^[[:space:]]*(```|~~~)/) { fence = !fence; next }
+        if (fence) next
+        l = tolower($0); cand = 0
+        if (index(l, "verbatim from")) cand = 1
+        else if (match(l, /cop(y|ied)[^.]*verbatim/)) {
+            vl = (substr(l, RSTART, 6) == "copied") ? 6 : 4
+            if (RLENGTH - vl - 8 <= 80) cand = 1
+        }
+        if (!cand) next
+        rest = $0
+        while (match(rest, /`[A-Za-z_][A-Za-z0-9_]*\(\)`/)) {
+            sname[++ns] = substr(rest, RSTART + 1, RLENGTH - 4); sline[ns] = FNR
+            rest = substr(rest, RSTART + RLENGTH)
+        }
+    }
+    END { flush() }
+' "$PLAN_FILE")
 
 # ---------------------------------------------------------------------------
 # Gate [F]: Critical Files format — list form only.

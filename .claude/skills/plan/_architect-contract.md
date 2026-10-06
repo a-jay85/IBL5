@@ -1,6 +1,6 @@
 ---
 description: The plan-architect's full output contract, Read on demand from Step 3 of plan/SKILL.md — the MUST-produce list, the conditional-section catalogue, the agent-tiering labels to inject, and the delegation-packet format.
-last_verified: 2026-10-05
+last_verified: 2026-10-06
 ---
 
 The `plan-architect` Reads this file when Step 3 of `plan/SKILL.md` points to it, so this contract lands in the architect's own sub-context and never enters the orchestrator's. Mirrors the on-demand convention of the `.claude/review-shared/_*.md` reference files.
@@ -22,6 +22,7 @@ The same discipline governs the codebase: the orchestrator's findings are author
 - File paths for every test to be written or modified
 - A **Reuse** note in each implementation step that should call existing code: name the exact helper/service/repository method to use (from Step 2 findings) so the impl agent reuses rather than reinvents. Omit only when the step genuinely introduces new infrastructure.
 - An **exact edit anchor** for every step that modifies an existing file: quote the unique surrounding snippet (the exact line(s) the edit lands on or next to) so the impl agent's first `Edit` matches unambiguously. `_architect-contract-detail.md` § Why edit anchors are quoted, not summarized. <!-- slop-ok -->
+- **DB literals cite a column type.** Each one in a recipe carries `literal-check: <literal-or-range> -> <table>.<column> <sqltype> (per ibl5/docs/schema/current-schema.sql)` on its line. The literal must fit `<sqltype>` from the dump; gate `[L]` checks it. `_architect-contract-detail.md` § Column-bound literal citations. <!-- slop-ok -->
 - For every behavior-changing step, at least one **negative-path, boundary, or failure-case** matrix row, such as "rejects over-cap trade", "returns null for unknown player", or "empty roster". Happy-path-only coverage is insufficient.
 - **The mutation statement extends to the whole matrix, not just the negative-path rows above:** every behavioral assertion in the Verification Matrix, negative-path rows included, must name the specific mutation to production code that would make it fail (e.g. "delete the `--model` arm ⇒ this assertion fails"), written into the row's **How** cell as a clause on the command. `_architect-contract-detail.md` § Why negative-path rows name the mutation they catch. `_architect-contract-detail.md` § Mutation-statement counter-examples. <!-- slop-ok -->
 - **One-time-check rows.** A `CLI-executable` row may end its "What to verify" cell with `(one-time-check: <reason>)` only when the check is inherently a single plan-time run: a manual corpus diff over local transcripts, a counterfactual mutation of the working tree, or one command's printed output. Never for behavior a regression test could pin, or a row the diff should realise. The cell still names what was run and what it printed. `bin/check-plan` gate `[Y]` caps tagged rows at one third; past that, write tests. `_architect-contract-detail.md` § One-time-check tag shape. <!-- slop-ok -->

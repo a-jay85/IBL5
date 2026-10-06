@@ -90,7 +90,8 @@ def test_purpose_key_matches_peer_tests_and_runner():
     with open(os.path.join(here, "test_body_check.py"), encoding="utf-8") as fh:
         assert '"pr-copy"' in fh.read()
     with open(os.path.join(os.path.dirname(here), "runner.py"), encoding="utf-8") as fh:
-        assert '"pr-copy"' in fh.read()
+        assert "schemas.PR_COPY_PURPOSE" in fh.read()
+    assert schemas.PR_COPY_PURPOSE == "pr-copy"
 
 
 def test_pr_copy_fixture_set_complete():

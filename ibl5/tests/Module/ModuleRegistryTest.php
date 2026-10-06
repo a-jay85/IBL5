@@ -78,4 +78,16 @@ final class ModuleRegistryTest extends TestCase
             );
         }
     }
+
+    public function testRenamedModulesAreValid(): void
+    {
+        self::assertTrue(ModuleRegistry::isValid('PlayerSearch'));
+        self::assertTrue(ModuleRegistry::isValid('SeasonRosterChanges'));
+    }
+
+    public function testRetiredModuleNamesAreRejected(): void
+    {
+        self::assertFalse(ModuleRegistry::isValid('PlayerDatabase'));
+        self::assertFalse(ModuleRegistry::isValid('PlayerMovement'));
+    }
 }

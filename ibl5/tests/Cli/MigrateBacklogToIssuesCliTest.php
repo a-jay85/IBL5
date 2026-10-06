@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Cli;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -117,7 +118,9 @@ SH;
      * zero-length values before exec. PATH is prefixed with $tmpDir/bin so
      * the fake gh shim is found first.
      *
-     * @param array<string,string> $extraEnv
+     * A null value in $extraEnv removes that variable from the base env.
+     *
+     * @param array<string,string|null> $extraEnv
      * @return array{int, string}
      */
     private function runScript(string $args = '', array $extraEnv = []): array
@@ -126,10 +129,11 @@ SH;
             'PATH'   => $this->tmpDir . '/bin:' . (getenv('PATH') !== false ? getenv('PATH') : '/usr/local/bin:/usr/bin:/bin'),
             'HOME'   => $this->tmpDir,
             'TMPDIR' => sys_get_temp_dir(),
+            'BACKLOG_ISSUES_RATE_SLEEP' => '0',
         ];
 
         $envParts = [];
-        foreach (array_merge($baseEnv, $extraEnv) as $k => $v) {
+        foreach (array_filter(array_merge($baseEnv, $extraEnv), static fn (?string $v): bool => $v !== null) as $k => $v) {
             $envParts[] = $k . '=' . escapeshellarg($v);
         }
         $envStr = implode(' ', $envParts);
@@ -243,6 +247,100 @@ SH;
         [$code, $output] = $this->runScript('', ['BACKLOG_ISSUES_REPO' => '']);
         $this->assertSame(2, $code, $output);
         $this->assertStringContainsString('BACKLOG_ISSUES_REPO is set but empty', $output);
+    }
+
+    // ─── BACKLOG_ISSUES_RATE_SLEEP ────────────────────────────────────────────
+
+    /**
+     * Arrange exactly one open item and run --apply, so the script creates one
+     * issue and paces once. The existing list already holds a closed issue for
+     * every placeholder source file; without it each one is created too, and
+     * the default-pacing test would wait 3.5 s per placeholder.
+     *
+     * @param array<string,string|null> $extraEnv
+     * @return array{int, string, float}
+     */
+    private function applyOneItem(array $extraEnv): array
+    {
+        $this->writeFile('ibl5/docs/backlog/ci-backlog.md', implode("\n", [
+            '# CI Backlog',
+            '',
+            '### 1.1 One open item',
+            '',
+            'Body.',
+            '',
+        ]));
+        $placeholders = [];
+        foreach (['a11y', 'a11y-contrast', 'ci', 'dev-efficiency', 'e2e', 'loop-engineering', 'maintenance', 'token-spend', 'security', 'jsb-native'] as $n => $label) {
+            $placeholders[] = [
+                'number' => 100 + $n,
+                'title'  => 'Placeholder',
+                'labels' => [['name' => $label]],
+                'state'  => 'CLOSED',
+            ];
+        }
+        $json = $this->existingJsonFile($placeholders);
+
+        $start = microtime(true);
+        [$code, $output] = $this->runScript(
+            '--apply --existing-json=' . escapeshellarg($json),
+            $extraEnv
+        );
+
+        return [$code, $output, microtime(true) - $start];
+    }
+
+    #[Test]
+    public function testUnsetRateSleepEnvKeepsDefaultPacing(): void
+    {
+        [$code, $output, $elapsed] = $this->applyOneItem(['BACKLOG_ISSUES_RATE_SLEEP' => null]);
+        $this->assertSame(0, $code, $output);
+        $this->assertGreaterThanOrEqual(3.4, $elapsed, 'default pacing (3.5 s) was skipped');
+    }
+
+    #[Test]
+    public function testZeroRateSleepEnvSkipsPacing(): void
+    {
+        [$code, $output, $elapsed] = $this->applyOneItem([]);
+        $this->assertSame(0, $code, $output);
+        $this->assertLessThan(3.0, $elapsed, 'BACKLOG_ISSUES_RATE_SLEEP=0 still paced');
+    }
+
+    #[Test]
+    public function testEmptyRateSleepEnvExitsTwo(): void
+    {
+        $bodyCapturePath = $this->tmpDir . '/created-body.txt';
+        [$code, $output] = $this->applyOneItem([
+            'BACKLOG_ISSUES_RATE_SLEEP' => '',
+            'FAKE_GH_BODY_OUT'          => $bodyCapturePath,
+        ]);
+        $this->assertSame(2, $code, $output);
+        $this->assertStringContainsString('BACKLOG_ISSUES_RATE_SLEEP', $output);
+        $this->assertFileDoesNotExist($bodyCapturePath, 'an issue was created despite the invalid env');
+    }
+
+    #[Test]
+    #[DataProvider('invalidRateSleepProvider')]
+    public function testInvalidRateSleepEnvExitsTwo(string $value): void
+    {
+        [$code, $output] = $this->applyOneItem(['BACKLOG_ISSUES_RATE_SLEEP' => $value]);
+        $this->assertSame(2, $code, $output);
+        $this->assertStringContainsString('BACKLOG_ISSUES_RATE_SLEEP', $output);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function invalidRateSleepProvider(): array
+    {
+        return [
+            'letters'         => ['abc'],
+            'negative'        => ['-1'],
+            'exponent'        => ['1e3'],
+            'above the cap'   => ['61'],
+            'leading space'   => [' 1'],
+            'NaN'             => ['NaN'],
+        ];
     }
 
     // ─── matrix row 12 ────────────────────────────────────────────────────────

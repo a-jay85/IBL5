@@ -23,6 +23,7 @@ class TerminalState(str, Enum):
     SHIPPED_HELD = "shipped-held"            # PR open, auto-merge deliberately NOT armed
     DEGRADED = "degraded"                    # PR open+held; >=1 review agent unparseable
     NOTHING_TO_SHIP = "nothing-to-ship"      # clean tree, empty diff vs master
+    ALREADY_SHIPPED = "already-shipped"      # diff vs master went empty AND the branch's PR is already MERGED
     FAILED = "failed"                        # typed failure aborted the run
 
 

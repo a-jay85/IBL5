@@ -585,6 +585,11 @@ else
 fi
 write_session_sidecar "$LOG" "$SESSION_ID" \
     || { echo "post-plan-now: could not write the session sidecar next to $LOG." >&2; exit 1; }
+# First line of the log, so a run killed before the harness flushes (SIGKILL, reboot) never
+# leaves an empty file. Append, never truncate: launchd opens StandardOutPath for append, and
+# the foreground tee below uses -a for the same reason. Not a RESULT: line, so every
+# `^RESULT:` reader (HARNESS_RESULT capture, watch-run, bin/automouse/run) skips it.
+printf 'post-plan-now: started %s pid=%s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z')" "$$" >> "$LOG" || true
 
 # Usage gate (ADR-0143). Save the argv so the coordinator can replay it; --foreground is
 # dropped so a resume always goes through the launchd job. In the drain/stop zone a run
@@ -677,7 +682,7 @@ if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ] && [ "${RESUME_ST
     # rc=3 message points at a missing file. Foreground only:
     # under launchd, stdout already IS $LOG, and a tee there would write every line twice.
     [ "$FOREGROUND" -eq 1 ] \
-        && HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG} 2>&1 | tee \"$LOG\"; rc=\${PIPESTATUS[0]}; "
+        && HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG} 2>&1 | tee -a \"$LOG\"; rc=\${PIPESTATUS[0]}; "
     GATE_OPEN="if [ \"\${_sigterm_received:-0}\" -eq 0 ] && should_fallback \"\$rc\" && ! usage_postrun_pause post-plan-now $(shq "$SESSION_ID") $(shq "$ROOT/bin/post-plan-now") \"\$rc\" $(shq "$LOG"); then "
     # The harness has already exited and flushed by the time HARNESS_SEG's `rc=` runs,
     # so $LOG holds its final RESULT: line. The capture now feeds only
@@ -817,7 +822,7 @@ echo "  notify: Discord DM on finish. Do NOT arm a Monitor or ScheduleWakeup for
 echo "          this run: the DM is the completion signal."
 echo "  watch:  $ROOT/bin/watch-run --log $LOG --label $LABEL   (manual use only; never"
 echo "          'tail -f' the log, the harness flushes everything at exit)"
-echo "  log:    $LOG   (first line is the RESULT verdict once the run ends)"
+echo "  log:    $LOG   (its RESULT: line is the verdict once the run ends)"
 echo "  label:  $LABEL   (self-removes when post-plan finishes)"
 echo "  PR / code review / CI / auto-merge progress appears on the PR."
 echo "  Leave this worktree alone — /post-plan rebuilds its Docker stack for E2E."

@@ -3,6 +3,8 @@ import { setPlayerName } from '../helpers/test-state';
 
 // Mutates ibl_plr pid=1 (ci-seed.sql 'Test Player'), so this spec runs only in
 // the serial `mutators` project (playwright.config.ts) and never in sharded chromium.
+// Editing it still triggers CI's e2e-mutators job: `bin/website-affecting:106`
+// carves ibl5/tests/e2e/* out of the tests deny list.
 const XSS = '<script>alert(1)</script>';
 // ci-seed.sql pid=1 name. Used only when a crashed earlier run left XSS in
 // the row, so the observed "previous" value is the hostile string itself.

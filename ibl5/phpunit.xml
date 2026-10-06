@@ -71,7 +71,7 @@
             <directory>tests/Voting</directory>
         </testsuite>
         <testsuite name="Player Search Module Tests">
-            <directory>tests/PlayerDatabase</directory>
+            <directory>tests/PlayerSearch</directory>
         </testsuite>
         <testsuite name="FreeAgency Module Tests">
             <directory>tests/FreeAgency</directory>
@@ -118,8 +118,8 @@
         <testsuite name="ActivityTracker Module Tests">
             <directory>tests/ActivityTracker</directory>
         </testsuite>
-        <testsuite name="PlayerMovement Module Tests">
-            <directory>tests/PlayerMovement</directory>
+        <testsuite name="SeasonRosterChanges Module Tests">
+            <directory>tests/SeasonRosterChanges</directory>
         </testsuite>
         <testsuite name="NextSim Module Tests">
             <directory>tests/NextSim</directory>

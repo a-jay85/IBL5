@@ -12,7 +12,7 @@ const PAGES_URL = 'https://a-jay85.github.io/IBL5/deadbeef/visual-review/';
 
 const FIXTURE_MANIFEST: VrRow[] = [
   { name: 'standings', auth: 'public', url: 'modules.php?name=Standings', anchor: '.t' },
-  { name: 'player-movement', auth: 'public', url: 'modules.php?name=PlayerMovement', anchor: '.t' },
+  { name: 'player-movement', auth: 'public', url: 'modules.php?name=SeasonRosterChanges', anchor: '.t' },
 ];
 
 describe('buildComment', () => {

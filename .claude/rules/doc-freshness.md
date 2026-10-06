@@ -1,6 +1,6 @@
 ---
-description: Operative rules for the frontmatter schema (including `paths:` residency semantics, repo-relative only, never glob an always-loaded rule), 60-day staleness policy, on-touch verification rule, dead-reference rule, and retired-figure rule, and the engine lint-pin rule enforced by bin/check-docs. Rationale, history, and gate mechanics live in doc-freshness-detail.md (Read on demand). Decision-record append-only rule moved to .claude/rules/adr-append-only.md.
-last_verified: 2026-10-05
+description: Operative rules for the frontmatter schema (including `paths:` residency semantics, repo-relative only, never glob an always-loaded rule), 60-day staleness policy, on-touch verification rule, dead-reference rule, and retired-figure rule, the engine lint-pin rule, and required-status claims enforced by bin/check-docs. Rationale, history, and gate mechanics live in doc-freshness-detail.md (Read on demand). Decision-record append-only rule moved to .claude/rules/adr-append-only.md.
+last_verified: 2026-10-06
 paths: "**/*.md"
 ---
 
@@ -61,3 +61,9 @@ Adding an entry is a high bar: only when the retired form is distinctive enough 
 ## Engine Lint-Pin Rule
 
 `.github/workflows/engine.yml` is the source of truth for the two golangci-lint pins: the action ref (`golangci-lint-action@<sha> # vX.Y.Z`) and the linter binary (`with: version:`). The full scan of `bin/check-docs` fails with `FAIL engine lint pin drift` when a doc listed in its `ENGINE_LINT_PIN_DOCS` constant restates a different value. A doc's abbreviated SHA must be a prefix of the workflow SHA and its action tag must match. Every other three-part `v` semver in the doc must equal the binary version. A pin bump edits the workflow and every tracked doc in one PR. A tracked doc that no longer restates the pins also fails, so drop it from the constant when its prose changes.
+
+## Required-Status Claims Rule
+
+Branch-protection contexts are live GitHub state, so a rule doc must not restate the list. Cite the readback command `gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'` and point at `.claude/rules/ci-gotchas.md`, which explains each context. The full scan of `bin/check-docs` fails with `FAIL required-status claims drift` when a doc listed in its `REQUIRED_CLAIMS_DOCS` constant names two or more required contexts or drops the readback command. The same scan checks the offline facts behind `.claude/rules/engine-go.md`: the `Engine` check and its lint job must stay out of the `--ignore=` list in `.github/workflows/all-checks-green.yml`, and `Engine` must stay out of `--anchor=`. The live list itself is never checked here, because a `gh api` call would tie the `Meta checks` job to a token and the network.
+
+When a PR body, commit message, or merge digest describes what a rule file now says, copy the wording from `git diff origin/master -- <file>`. Never write it from memory. No gate checks this half, because PR bodies have no tracked source to compare against.

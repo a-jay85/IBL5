@@ -1677,6 +1677,126 @@ function checkEngineLintPins(string $repoRoot): array
     return engineLintPinIssues($read(ENGINE_LINT_WORKFLOW), $docs);
 }
 
+// Required-status claims (backlog #711). The true required-context list is
+// live branch-protection state, readable only through the GitHub API, so a
+// rule doc must point at the readback command instead of restating it. The
+// offline half that CAN be checked lives in two workflows: the aggregator's
+// --ignore / --anchor CSVs and engine.yml's gate job name.
+const REQUIRED_CLAIMS_AGGREGATOR = '.github/workflows/all-checks-green.yml';
+const REQUIRED_CLAIMS_DOCS = [
+    '.claude/rules/engine-go.md',
+];
+const REQUIRED_CLAIMS_READBACK = "gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'";
+// Required contexts the aggregator never lists as anchors: itself, and the
+// human-signoff context it ignores.
+const REQUIRED_CLAIMS_EXTRA_CONTEXTS = ['All checks green', 'human-signoff'];
+
+/** @return array{anchor: list<string>, ignore: list<string>}|null */
+function parseAggregatorCsvs(string $yaml): ?array
+{
+    $out = [];
+    foreach (['anchor', 'ignore'] as $flag) {
+        if (!preg_match("/--{$flag}='([^']*)'/", $yaml, $m)) {
+            return null;
+        }
+        $out[$flag] = array_values(array_filter(
+            array_map('trim', explode(',', $m[1])),
+            static fn (string $s): bool => $s !== ''
+        ));
+    }
+    return $out;
+}
+
+/** Display name of a top-level job, or null when the job or its name: is absent. */
+function parseWorkflowJobName(string $yaml, string $jobKey): ?string
+{
+    $lines = preg_split('/\R/', $yaml) ?: [];
+    $count = count($lines);
+    foreach ($lines as $i => $line) {
+        if (!preg_match('/^  ' . preg_quote($jobKey, '/') . ':\s*$/', $line)) {
+            continue;
+        }
+        for ($j = $i + 1; $j < $count; $j++) {
+            if (preg_match('/^ {0,2}\S/', $lines[$j])) {
+                return null; // next job or top-level key: this job has no name
+            }
+            if (preg_match('/^    name:\s*[\'"]?(.+?)[\'"]?\s*$/', $lines[$j], $m)) {
+                return $m[1];
+            }
+        }
+        return null;
+    }
+    return null;
+}
+
+/**
+ * Pure over its inputs so --self-test can drive it. $aggregator / $engine
+ * null = workflow absent; $docs maps repo-relative path => content (null = absent).
+ * @param array<string, ?string> $docs
+ * @return list<string>
+ */
+function requiredClaimsIssues(?string $aggregator, ?string $engine, array $docs): array
+{
+    $present = array_filter($docs, static fn ($c): bool => $c !== null);
+    if ($aggregator === null) {
+        return $present === []
+            ? []
+            : [REQUIRED_CLAIMS_AGGREGATOR . ' missing but tracked required-claims docs exist; update REQUIRED_CLAIMS_DOCS in bin/check-docs'];
+    }
+    $csv = parseAggregatorCsvs($aggregator);
+    if ($csv === null) {
+        return [REQUIRED_CLAIMS_AGGREGATOR . ": cannot parse --anchor='<csv>' and --ignore='<csv>'; fix the workflow or this parser"];
+    }
+    $issues = [];
+    $gate = $engine === null ? null : parseWorkflowJobName($engine, 'gate');
+    $lint = $engine === null ? null : parseWorkflowJobName($engine, 'engine');
+    if ($gate === null || $lint === null) {
+        $issues[] = ENGINE_LINT_WORKFLOW . ': cannot parse the `name:` of the `gate` and `engine` jobs; fix the workflow or this parser';
+    } else {
+        foreach ([$gate, $lint] as $check) {
+            if (in_array($check, $csv['ignore'], true)) {
+                $issues[] = REQUIRED_CLAIMS_AGGREGATOR . ": check '{$check}' is in --ignore, so a red or pending engine run no longer blocks auto-merge; engine-go.md claims it does";
+            }
+        }
+        if (in_array($gate, $csv['anchor'], true)) {
+            $issues[] = REQUIRED_CLAIMS_AGGREGATOR . ": check '{$gate}' is in --anchor; engine-go.md claims engine.yml is not a required context, so update the doc and this gate together";
+        }
+    }
+    $contexts = array_values(array_unique(array_merge($csv['anchor'], REQUIRED_CLAIMS_EXTRA_CONTEXTS)));
+    foreach ($docs as $rel => $content) {
+        if ($content === null) {
+            $issues[] = "{$rel}: tracked required-claims doc missing; update REQUIRED_CLAIMS_DOCS in bin/check-docs";
+            continue;
+        }
+        $named = array_values(array_filter($contexts, static fn (string $c): bool => str_contains($content, $c)));
+        if (count($named) >= 2) {
+            $issues[] = "{$rel}: names " . count($named) . ' required-context names (' . implode(', ', $named) . '); a list of live protection state rots, so cite the readback command and .claude/rules/ci-gotchas.md instead';
+        }
+        if (!str_contains($content, REQUIRED_CLAIMS_READBACK)) {
+            $issues[] = "{$rel}: missing the live readback command `" . REQUIRED_CLAIMS_READBACK . '`';
+        }
+    }
+    return $issues;
+}
+
+/** @return list<string> */
+function checkRequiredClaims(string $repoRoot): array
+{
+    $read = static function (string $rel) use ($repoRoot): ?string {
+        $path = $repoRoot . '/' . $rel;
+        if (!is_file($path)) {
+            return null;
+        }
+        $c = file_get_contents($path);
+        return $c === false ? null : $c;
+    };
+    $docs = [];
+    foreach (REQUIRED_CLAIMS_DOCS as $rel) {
+        $docs[$rel] = $read($rel);
+    }
+    return requiredClaimsIssues($read(REQUIRED_CLAIMS_AGGREGATOR), $read(ENGINE_LINT_WORKFLOW), $docs);
+}
+
 function selfTestEngineLintPins(): int
 {
     $yaml = static fn (string $sha, string $tag, string $ver): string =>
@@ -1732,6 +1852,58 @@ function selfTestEngineLintPins(): int
         return 0;
     }
     echo "\nselfTestEngineLintPins: {$failed}/{$total} cases FAILED.\n";
+    return 1;
+}
+
+function selfTestRequiredClaims(): int
+{
+    $agg = "          --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \\\n"
+        . "          --ignore='human-signoff,Infection PHP,notify-fixed' \\\n";
+    $withIgnore = static fn (string $extra): string => str_replace("notify-fixed'", "notify-fixed,{$extra}'", $agg);
+    $eng = "jobs:\n  engine:\n    name: Go build, vet, lint, test\n    runs-on: ubuntu-latest\n"
+        . "  gate:\n    name: Engine\n    if: always()\n";
+    $doc = '`' . REQUIRED_CLAIMS_READBACK . "`\nAuto-merge waits on `All checks green`.\n";
+
+    $engRenamed = str_replace('name: Engine', 'name: Engine CI', $eng);
+    $engShortLint = str_replace('name: Go build, vet, lint, test', 'name: Go build', $eng);
+    $engNoGate = "jobs:\n  engine:\n    name: Go build, vet, lint, test\n    runs-on: ubuntu-latest\n";
+    $aggNoIgnore = "          --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \\\n";
+    $aggAnchored = str_replace("(per-PR diff)'", "(per-PR diff),Engine'", $agg);
+    $enumerates = $doc . "Tests and Analysis and Meta checks gate it.\n";
+
+    // [label, aggregator|null, engine|null, docs, expected issue count, substring of the first issue]
+    $cases = [
+        ['clean', $agg, $eng, ['d.md' => $doc], 0, ''],
+        ['enumerates', $agg, $eng, ['d.md' => $enumerates], 1, 'names 3 required-context names'],
+        ['no-readback', $agg, $eng, ['d.md' => "Auto-merge waits on `All checks green`.\n"], 1, 'missing the live readback command'],
+        ['engine-ignored', $withIgnore('Engine'), $eng, ['d.md' => $doc], 1, "check 'Engine' is in --ignore"],
+        ['lint-job-ignored', $withIgnore('Go build'), $engShortLint, ['d.md' => $doc], 1, "check 'Go build' is in --ignore"],
+        ['renamed-gate-ignored', $withIgnore('Engine CI'), $engRenamed, ['d.md' => $doc], 1, "check 'Engine CI' is in --ignore"],
+        ['engine-anchored', $aggAnchored, $eng, ['d.md' => $doc], 1, 'is in --anchor'],
+        ['no-ignore-flag', $aggNoIgnore, $eng, ['d.md' => $doc], 1, 'cannot parse --anchor'],
+        ['no-gate-job', $agg, $engNoGate, ['d.md' => $doc], 1, 'cannot parse the'],
+        ['no-aggregator-no-docs', null, $eng, ['d.md' => null], 0, ''],
+        ['no-aggregator-doc', null, $eng, ['d.md' => $doc], 1, 'missing but tracked'],
+        ['doc-missing', $agg, $eng, ['d.md' => null], 1, 'tracked required-claims doc missing'],
+    ];
+
+    $failed = 0;
+    foreach ($cases as [$label, $a, $e, $docs, $want, $needle]) {
+        $issues = requiredClaimsIssues($a, $e, $docs);
+        $ok = count($issues) === $want
+            && ($needle === '' || ($issues !== [] && str_contains($issues[0], $needle)));
+        echo ($ok ? 'PASS' : 'FAIL') . ": required claims: {$label}\n";
+        if (!$ok) {
+            $failed++;
+            echo '     got: ' . json_encode($issues, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+        }
+    }
+    $total = count($cases);
+    if ($failed === 0) {
+        echo "\nselfTestRequiredClaims: {$total}/{$total} cases passed.\n";
+        return 0;
+    }
+    echo "\nselfTestRequiredClaims: {$failed}/{$total} cases FAILED.\n";
     return 1;
 }
 
@@ -1795,7 +1967,9 @@ foreach (array_slice($argv, 1) as $arg) {
             echo "\n";
             $rc = max($rc, selfTestGitignoreFilter());
             echo "\n";
-            exit(max($rc, selfTestEngineLintPins()));
+            $rc = max($rc, selfTestEngineLintPins());
+            echo "\n";
+            exit(max($rc, selfTestRequiredClaims()));
         case '--help':
         case '-h':
             echo usage();
@@ -1935,6 +2109,17 @@ $enginePinIssues = checkEngineLintPins($root);
 if ($enginePinIssues !== []) {
     echo "FAIL engine lint pin drift\n";
     foreach ($enginePinIssues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    $failures++;
+}
+
+// Corpus-wide like the lint-pin check: the drift lands as an edit to
+// all-checks-green.yml or engine.yml that touches no doc.
+$requiredClaimIssues = checkRequiredClaims($root);
+if ($requiredClaimIssues !== []) {
+    echo "FAIL required-status claims drift\n";
+    foreach ($requiredClaimIssues as $issue) {
         echo "     - {$issue}\n";
     }
     $failures++;

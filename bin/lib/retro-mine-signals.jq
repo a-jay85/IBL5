@@ -8,9 +8,9 @@
 
 # The only redactor for transcript text. Order matters: specific token shapes
 # first, then emails and home paths, then any long opaque run. redact_known
-# stops before the opaque-run rule. Report tables and issue bodies carry
-# signatures, lowercased slugs that can run past 32 characters, and the next
-# week's dedupe reads them back. Their source text was already redacted.
+# stops before the opaque-run rule. Report tables carry signatures, lowercased
+# slugs that can run past 32 characters, and the next week's dedupe reads them
+# back. Their source text was already redacted.
 def redact_known:
   gsub("https://(canary\\.|ptb\\.)?discord(app)?\\.com/api/webhooks/[^\\s\"')]+"; "[redacted]")
   | gsub("sk-ant-[A-Za-z0-9_-]+"; "[redacted]")

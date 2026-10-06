@@ -35,7 +35,9 @@ tuneup_redact_text() {
 }
 
 # tuneup_redact_known: the same pass without the long-opaque-run rule, for the
-# report and issue bodies, whose signatures would otherwise read back mangled.
+# report only. Next week's dedupe parses its signature tables, which would
+# otherwise read back mangled. Issue bodies carry LLM free text and keep the
+# full redactor.
 tuneup_redact_known() {
     tuneup_jq text-known -R -s -j
 }
@@ -490,7 +492,7 @@ tuneup_file() {
                 "Filed by the bin/retro-mine weekly tune-up for \($day). Transcript evidence stays local.\n\n"
                 + "## Summary\n\n\(.summary)\n\n## Proposed change\n\n\(.proposed_change)\n\n"
                 + "## Signatures\n\n" + ([.signatures[] | "- `\(.)`"] | join("\n"))
-                + "\n\nThreads this week: \(.threads // 0)\n"' | tuneup_redact_known > "$body.tmp" \
+                + "\n\nThreads this week: \(.threads // 0)\n"' | tuneup_redact_text > "$body.tmp" \
                 && mv "$body.tmp" "$body" || { log "ERROR: tune-up: body write failed"; return 1; }
             url="$("$GH_BIN" issue create --repo "$BACKLOG_REPO" --label "$BACKLOG_LABEL" --label "$TUNEUP_LABEL" \
                 --title "Tune-up $DAY: $title [$key]" --body-file "$body")" \

@@ -1116,6 +1116,18 @@ case_tuneup_runlog_fail() {
     rm_has "tuneup_runlog_fail: three failing logs become headless threads" "$RM_OUT" "threads interactive=0 headless=3"
 }
 
+case_tuneup_runlog_symlinked_dir() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_stubs "$t"
+    rm -rf "$t/tmplogs"
+    mkdir "$t/tmplogs-real"
+    ln -s "$t/tmplogs-real" "$t/tmplogs"
+    echo "plan-now: RESULT failed rc=1" > "$t/tmplogs-real/plan-now-20260920-100000.log"
+    rm_tuneup_run "$t" --dry-run
+    rm_has "tuneup_runlog_symlinked_dir: a symlinked log dir is still scanned" "$RM_OUT" "threads interactive=0 headless=1"
+}
+
 case_tuneup_max_threads_cap() {
     local t i
     t="$(rm_tmp)"
@@ -1345,7 +1357,8 @@ case_tuneup_signature_survives_redaction() {
     rm_tuneup_run "$t"
     rm_has "tuneup_signature_survives_redaction: report keeps the long signature" "$(cat "$t"/reports/*-tune-up.md)" "$RM_TSIG"
     rm_lacks "tuneup_signature_survives_redaction: report has no redaction mark" "$(cat "$t"/reports/*-tune-up.md)" "[redacted]"
-    rm_has "tuneup_signature_survives_redaction: issue body keeps the long signature" "$(cat "$t"/gh-body.* 2>/dev/null)" "$RM_TSIG"
+    rm_has "tuneup_signature_survives_redaction: issue body carries the redaction mark" "$(cat "$t"/gh-body.* 2>/dev/null)" "[redacted]"
+    rm_lacks "tuneup_signature_survives_redaction: issue body still gets the full redactor" "$(cat "$t"/gh-body.* 2>/dev/null)" "$RM_TSIG"
     rm_has "tuneup_signature_survives_redaction: full redactor still drops an opaque run" \
         "$(printf 'x %s y' "$(printf 'A%.0s' {1..40})" | jq -R -s -j -f "$SCRIPT_DIR/lib/retro-mine-signals.jq" \
             --argjson cutoff 0 --argjson heavy 0 --argjson maxex 0 --argjson exch 0 --arg marker m --arg mode text)" "[redacted]"

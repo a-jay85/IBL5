@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.gate_backtest import (ALLOWED_PLACEHOLDERS, REPLAY_SPECS, HistoricalPR, ReplaySpec,
                                    _PLACEHOLDER_RE, detect_gate_changes, expand_argv, expand_env,
-                                   resolve_spec)
+                                   expand_stdin, placeholder_names, resolve_spec)
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 T0 = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
@@ -150,10 +150,42 @@ def test_registry_specs_use_only_allowed_placeholders():
     for path, entry in REPLAY_SPECS.items():
         if not isinstance(entry, ReplaySpec):
             continue
-        tokens = list(entry.argv) + [value for _, value in entry.env]
-        for tok in tokens:
-            for name in _PLACEHOLDER_RE.findall(tok):
-                assert name in ALLOWED_PLACEHOLDERS, f"{path}: {{{name}}} in {tok!r}"
+        bad = placeholder_names(entry) - ALLOWED_PLACEHOLDERS
+        assert not bad, f"{path}: unknown placeholder(s) {sorted(bad)}"
+
+
+def test_placeholder_names_covers_stdin_and_rejects_typo():
+    spec = ReplaySpec(argv=("--since={base}",), env=(("X", "{head}"),), stdin="{bodyfile}")
+    assert placeholder_names(spec) == {"base", "head", "bodyfile"}
+    assert {"bodyfile"} <= placeholder_names(spec) - ALLOWED_PLACEHOLDERS
+
+
+def test_destructive_migrations_replays_bypass_from_body_stdin():
+    state, spec, _ = resolve_spec("bin/check-destructive-migrations", "")
+    assert state == "replayable"
+    assert spec.argv == ("--since={base}", "--bypass-from-stdin")
+    assert spec.stdin == "{body_file}"
+    assert expand_stdin(spec, {"base": "abc", "body_file": "/tmp/7.body"}) == "/tmp/7.body"
+
+
+def test_destructive_migrations_script_has_no_header_override():
+    # resolve_spec prefers a `# gate-backtest-argv:` header over the registry entry.
+    with open(os.path.join(REPO_ROOT, "bin", "check-destructive-migrations")) as fh:
+        text = fh.read()
+    _, spec, _ = resolve_spec("bin/check-destructive-migrations", text)
+    assert spec.stdin == "{body_file}"
+
+
+def test_other_registry_specs_keep_devnull_stdin():
+    for path, entry in REPLAY_SPECS.items():
+        if isinstance(entry, ReplaySpec) and path != "bin/check-destructive-migrations":
+            assert entry.stdin == "", path
+    assert expand_stdin(ReplaySpec(argv=()), {"body_file": "/tmp/x"}) == ""
+
+
+def test_expand_stdin_is_literal():
+    hostile = "x;$(touch /tmp/pwn)`"
+    assert expand_stdin(ReplaySpec(argv=(), stdin="{body_file}"), {"body_file": hostile}) == hostile
 
 
 def test_expand_argv_is_literal():

@@ -31,6 +31,7 @@ class ReplaySpec:
     flag_stdout_re: str = ""              # non-empty: a matching stdout line is a flag
     env: tuple[tuple[str, str], ...] = ()
     needs_plan: bool = False
+    stdin: str = ""                       # placeholder-bearing file path fed as the gate's stdin; "" = DEVNULL
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,9 @@ _TREE = ReplaySpec(argv=())
 _PLAN = ReplaySpec(argv=("{plan_file}",), needs_plan=True)
 
 _PR_BODY = ReplaySpec(argv=("--body-file", "{body_file}"))
+# Range-aware AND body-aware: the PR body is fed on stdin so a historical
+# `<!-- destructive-migration[...]: ... -->` marker is honoured on replay (backlog#1339).
+_BYPASS_SINCE = ReplaySpec(argv=("--since={base}", "--bypass-from-stdin"), stdin="{body_file}")
 _LIVE_CI = "reads live CI state through gh"
 
 # A string value is a not-replayable reason. Only an entry here can mark a script
@@ -83,7 +87,7 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-docs": _SINCE,
     "bin/check-prose": _SINCE,
     "bin/check-numbering": _SINCE,
-    "bin/check-destructive-migrations": _SINCE,
+    "bin/check-destructive-migrations": _BYPASS_SINCE,
     # Whole-tree scans with no required argument.
     "bin/check-claude-dir-placement": _TREE,
     "bin/check-composite-contracts": _TREE,
@@ -314,6 +318,23 @@ def expand_env(spec: ReplaySpec, ctx: dict[str, str]) -> dict[str, str]:
                 value = value.replace("{" + name + "}", ctx[name])
         env[key] = value
     return env
+
+
+def expand_stdin(spec: ReplaySpec, ctx: dict[str, str]) -> str:
+    """Literal placeholder replacement for the stdin path. "" means no stdin (DEVNULL)."""
+    path = spec.stdin
+    if not path:
+        return ""
+    for name in ALLOWED_PLACEHOLDERS:
+        if name in ctx:
+            path = path.replace("{" + name + "}", ctx[name])
+    return path
+
+
+def placeholder_names(spec: ReplaySpec) -> set[str]:
+    """Every `{name}` a spec references across argv, env values, and stdin."""
+    tokens = [*spec.argv, *(value for _, value in spec.env), spec.stdin]
+    return {name for tok in tokens for name in _PLACEHOLDER_RE.findall(tok)}
 
 
 def classify_exit(spec: ReplaySpec, rc: int, stdout: str) -> tuple[str, str]:

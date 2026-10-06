@@ -46,6 +46,9 @@ git -C "$MAIN" remote add origin "file://$ORIGIN"
 # ibl5/config.php must be non-empty for materialize_worktree_config ([ -s ] check).
 mkdir -p "$MAIN/bin/lib" "$MAIN/ibl5/themes/IBL/style"
 cp "$REPO/bin/lib/git-helpers.sh" "$MAIN/bin/lib/git-helpers.sh"
+# wt-new also sources the pool and launchd libs; the pool itself stays off here.
+cp "$REPO/bin/lib/wt-pool.sh" "$REPO/bin/lib/launchd-job.sh" "$MAIN/bin/lib/"
+export WT_POOL=0 WT_POOL_KICK=none
 printf '<?php // test config\n' > "$MAIN/ibl5/config.php"
 printf 'placeholder\n' > "$MAIN/ibl5/themes/IBL/style/style.css"
 git -C "$MAIN" add .

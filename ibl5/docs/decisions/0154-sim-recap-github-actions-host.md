@@ -1,6 +1,6 @@
 ---
 description: Sim recaps run on a GitHub Actions runner, triggered by a repository_dispatch from prod with an hourly schedule as fallback, over a dedicated forced-command SSH key; the Mac poller stays as a backup.
-last_verified: 2026-10-01
+last_verified: 2026-10-06
 ---
 
 # ADR-0154: Run the sim-recap pipeline on GitHub Actions
@@ -59,3 +59,11 @@ Extends the sim-recap poller design recorded in ADR-0093 with a second host. ADR
 - `ibl5/classes/Updater/Steps/QueueSimSummaryStep.php`
 - `ibl5/config/github-dispatch.config.example.php`
 - `ibl5/docs/OPERATIONS_RUNBOOK.md`
+
+## Addendum: pull_request event guard moved to a step-level if (2026-10-06)
+
+The Decision section says `pull_request` runs stop at the secrets gate. When this ADR was written the gate was a shell test inside the `Check secrets` step, and the step's `env:` block had already mapped the nine secrets before that test ran, so a same-repo PR run carried the configured secrets in its step environment (run 37445899413 shows `HOST`, `PORT`, and `USERNAME` masked-present). Backlog issue 1267.
+
+The step now carries `if: github.event_name != 'pull_request'` and the `EVENT` mapping is gone. A PR run skips the step, no secret is mapped, and every later step skips because `steps.secrets.outputs.configured` is empty. The run stays green. `bin/test-sim-recap-tick` asserts that every step mapping a secret is gated by that `if:` or by the `configured` output, and fails on a copy where the guard is deleted, points at another event, or a stray step maps a secret with no `if:`.
+
+This guard is defense in depth against a hasty edit. GitHub passes no secrets to fork PRs, and a same-repo author already has write access, so an Environment with deployment-branch rules remains the access boundary; that is a repository setting outside this ADR.

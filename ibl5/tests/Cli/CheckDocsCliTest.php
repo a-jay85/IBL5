@@ -51,14 +51,26 @@ final class CheckDocsCliTest extends TestCase
         // The script's comments also name the engine workflow, so that reference needs a
         // target here too. Once the workflow exists the engine lint pin check reads it
         // and its tracked pin docs, so write a minimal matching set.
-        $pinDoc = "---\ndescription: Engine lint pin fixture.\nlast_verified: " . $this->freshDate() . "\n---\n\n"
-            . "# Pins\n\n`golangci/golangci-lint-action@ba0d7d2… # v9.3.0` with `version: v2.12.2`.\n";
+        // The required-status claims check reads the aggregator workflow, the engine
+        // workflow's `gate` / `engine` job names, and engine-go.md, so those carry a
+        // minimal passing set as well.
+        $pinBody = "# Pins\n\n`golangci/golangci-lint-action@ba0d7d2… # v9.3.0` with `version: v2.12.2`.\n";
+        $pinDoc = "---\ndescription: Engine lint pin fixture.\nlast_verified: " . $this->freshDate() . "\n---\n\n" . $pinBody;
+        $engineGoDoc = $pinDoc
+            . "\nRequired contexts: `gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'`.\n";
         $fixtures = [
-            '.github/workflows/engine.yml' => "      - name: Lint\n"
+            '.github/workflows/engine.yml' => "jobs:\n"
+                . "  gate:\n"
+                . "    name: Engine gate\n"
+                . "  engine:\n"
+                . "    name: Engine lint\n"
+                . "    steps:\n"
+                . "      - name: Lint\n"
                 . "        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0\n"
                 . "        with:\n"
                 . "          version: v2.12.2\n",
-            '.claude/rules/engine-go.md' => $pinDoc,
+            '.github/workflows/all-checks-green.yml' => "        run: bin/aggregate --anchor='Tests and Analysis' --ignore='human-signoff'\n",
+            '.claude/rules/engine-go.md' => $engineGoDoc,
             'engine/.claude/rules/engine-context.md' => $pinDoc,
         ];
         foreach ($fixtures as $rel => $content) {

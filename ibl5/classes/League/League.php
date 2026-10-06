@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace League;
 
 use Database\BaseMysqliRepository;
-use League\JSB;
 use Repositories\PlayerTeamJoinQuery;
 use Season\Season;
 
@@ -86,9 +85,9 @@ class League extends BaseMysqliRepository
      */
     public function getSimLengthInDays(): int
     {
-        /** @var array{value: string}|null $result */
+        /** @var array{setting_value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
             "ss",
             "Sim Length in Days",
             $this->league
@@ -98,7 +97,7 @@ class League extends BaseMysqliRepository
             return 0;
         }
 
-        return (int) $result['value'];
+        return (int) $result['setting_value'];
     }
 
     /**
@@ -195,7 +194,7 @@ class League extends BaseMysqliRepository
               AND name != '(no starter)'
             ORDER BY name ASC",
             "i",
-            JSB::WAIVERS_ORDINAL
+            JsbConstants::WAIVERS_ORDINAL
         );
     }
 

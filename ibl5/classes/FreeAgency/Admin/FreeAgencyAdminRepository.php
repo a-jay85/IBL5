@@ -180,7 +180,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
     {
         $league = $this->resolveLeague();
         $row = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ?",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ?",
             "ss",
             'Current Season Ending Year',
             $league
@@ -192,7 +192,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
             );
         }
 
-        $value = $row['value'];
+        $value = $row['setting_value'];
         if (!is_numeric($value)) {
             // D8: fail closed. A non-numeric setting would key the marker under a
             // value no later run reproduces, silently disabling the guard.

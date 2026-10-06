@@ -55,7 +55,7 @@ class BoxscoreTest extends TestCase
 
     public function testPlayoffGameHackedToJune(): void
     {
-        // Month code "12" → +10 = 22 = JSB::PLAYOFF_MONTH → 22 - 16 = 06
+        // Month code "12" → +10 = 22 = JsbConstants::PLAYOFF_MONTH → 22 - 16 = 06
         $line = $this->makeGameInfoLine(monthCode: '12', dayCode: '00');
         $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 

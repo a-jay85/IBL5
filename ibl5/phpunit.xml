@@ -320,7 +320,7 @@
             <directory>classes/OneOnOneGame</directory>
             <file>classes/Database/PdoConnection.php</file>
             <!-- Legacy god-class files -->
-            <file>classes/League/JSB.php</file>
+            <file>classes/League/JsbConstants.php</file>
         </exclude>
     </source>
 </phpunit>

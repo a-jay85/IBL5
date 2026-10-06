@@ -77,7 +77,7 @@ class PlayerSearchValidator implements PlayerSearchValidatorInterface
         }
 
         $position = strtoupper(trim((string) $value));
-        return in_array($position, \League\JSB::PLAYER_POSITIONS, true) ? $position : null;
+        return in_array($position, \League\JsbConstants::PLAYER_POSITIONS, true) ? $position : null;
     }
 
     /**

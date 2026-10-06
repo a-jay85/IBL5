@@ -142,7 +142,7 @@ job_pid() {
 league_phase() {
     local out rc val
     out="$(DB_QUERY_TARGET=main "$DB_QUERY_BIN" \
-        "SELECT value FROM ibl_settings WHERE setting_key = 'Current Season Phase' AND league = 'ibl'" \
+        "SELECT setting_value FROM ibl_settings WHERE setting_key = 'Current Season Phase' AND league = 'ibl'" \
         2>/dev/null)"
     rc=$?
     [ $rc -ne 0 ] && return 1

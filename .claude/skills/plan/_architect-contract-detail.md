@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-02
+last_verified: 2026-10-05
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -174,6 +174,8 @@ A discharge never replaces a defense — the **Security** bullet (SQL prepared s
 For a phase that is **genuinely verbose or parallelizable**, delegate the **whole phase loop including its own verify/regen/fixup** — the sub-agent's tool output then accumulates in *its* context and returns as one summary, keeping the orchestrator's per-turn context flat. The win is **context localization** (the orchestrator stops re-reading a growing transcript every turn) — not a flat cost-percentage. Reserve packets for phases whose moved work clearly exceeds a sub-agent's fixed startup (~15K tokens); a packet for one tiny edit costs more than it saves, so keep small phases inline.
 
 This does **not** regress the ~15K economics: tiny sub-tier phases still stay inline because a sub-agent's fixed startup exceeds the work a one/two-edit phase moves. The rule changes only that such a phase is now *labeled* `(inline — …)` instead of left bare — zero new delegation is forced, only an explicit decision. The force applies solely to below-run-model phases whose moved work *already* clears ~15K, which the doctrine *already* says should be packets; the rule makes that latent "should" mechanically enforced.
+
+Why the `Assertions:` field exists: two past PRs were blocked by a delegate that tested one property where the plan wrote four. A grep for the property name is green from birth, so it cannot stand in for running the test.
 
 ## Self-apply the Automouse Hold Challenge
 

@@ -21,7 +21,7 @@ class PlayerSearchView implements PlayerSearchViewInterface
      */
     public function renderSearchForm(array $params): string
     {
-        $positions = \League\JSB::PLAYER_POSITIONS;
+        $positions = \League\JsbConstants::PLAYER_POSITIONS;
 
         /**
          * Helper to extract a form field value as string for HTML display

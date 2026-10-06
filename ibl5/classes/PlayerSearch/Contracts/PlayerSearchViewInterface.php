@@ -31,7 +31,7 @@ interface PlayerSearchViewInterface
      * The form includes JavaScript to reset all fields via resetPlayerSearch() function.
      * All numeric input fields accept >= comparison (except age which uses <=).
      * Name and college fields support case-insensitive partial matching with LIKE.
-     * Position field uses dropdown with whitelist from JSB::PLAYER_POSITIONS.
+     * Position field uses dropdown with whitelist from JsbConstants::PLAYER_POSITIONS.
      * 
      * @param array<string, mixed> $params Current filter values for repopulating form fields
      *                                      Keys: all 35 search parameters (pos, age, talent, skill, etc.)

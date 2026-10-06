@@ -278,7 +278,7 @@ class LastSimRecapRepository extends \Database\BaseMysqliRepository implements L
      */
     public function getStarterPidsFromSnapshot(int $tid, string $date): ?array
     {
-        // Use the SavedDepthChart repo to find a chart whose window covers
+        // Use the DepthChartSnapshot repo to find a chart whose window covers
         // the date. This duplicates the lookup but keeps the modules
         // independent of each other's internal table names.
         $depthRepo = new \DepthChartSnapshot\DepthChartSnapshotRepository($this->db);

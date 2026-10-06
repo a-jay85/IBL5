@@ -21,7 +21,13 @@ include $docRoot . '/ibl5/db/db.php';
 $migrationsDir = dirname(__DIR__) . '/migrations';
 $repository = new \Migration\MigrationRepository($mysqli_db);
 $fileResolver = new \Migration\MigrationFileResolver($migrationsDir);
-$runner = new \Migration\MigrationRunner($repository, $fileResolver);
+$runner = new \Migration\MigrationRunner(
+    $repository,
+    $fileResolver,
+    static function (string $filename, string $output): void {
+        echo \Migration\MigrationRunner::formatPhpOutput($filename, $output);
+    },
+);
 
 // --status flag: list pending migrations and exit
 if (in_array('--status', $argv, true)) {

@@ -96,7 +96,13 @@ jobs:
           -e "CREATE TABLE IF NOT EXISTS migrations (id INT AUTO_INCREMENT PRIMARY KEY, migration VARCHAR(255) NOT NULL, batch INT NOT NULL);"
         mysql -h 127.0.0.1 -u root -proot ibl5_php \
           -e "INSERT INTO migrations (migration, batch) VALUES ('000_baseline_schema.sql', 0);"
-        php bin/migrate
+        php bin/migrate 2>&1 | tee "$RUNNER_TEMP/migrate.log"
+        test "${PIPESTATUS[0]}" -eq 0
+        # backlog#987: successful PHP-migration output must reach the log.
+        if ! grep -qE '^    \[[0-9]+_[A-Za-z0-9_]+\.php\] ' "$RUNNER_TEMP/migrate.log"; then
+          echo "::error::bin/migrate printed no [NNN_name.php] output lines; PHP-migration stdout is being dropped (backlog#987)"
+          exit 1
+        fi
 
     - name: Dump and compare schemas
       run: |

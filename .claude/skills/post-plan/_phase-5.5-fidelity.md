@@ -1,6 +1,6 @@
 ---
-description: /post-plan Phase 5.5 — plan-intent fidelity review (one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-09-30
+description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
+last_verified: 2026-10-05
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -11,16 +11,117 @@ Purpose: ask whether the implementation does what the plan *intended*. The seman
 
 ## Step 1 — Pin the run's identifiers
 
-Each block runs in its own shell; nothing is exported between them. Re-derive everything in-block. `REVIEWED_TREE` is captured **before** the spawn so it names the tree the reviewer actually sees. Substitute the printed values as literals into every step below.
+Each block runs in its own shell; nothing is exported between them. Re-derive everything in-block. `REVIEWED_TREE` is captured **before** the spawn so it names the tree the reviewer actually sees. Substitute the printed values as literals into every step below. `PLAN_SHA256` is the sha256 of the plan file Phase 1 resolved, or the literal `none` on a plan-blind run. Step 6 records it in the sticky audit trail so a later run can tell an unchanged tree with an unchanged plan from an unchanged tree with a rewritten plan.
 
 ```bash
 PR_NUM=$(gh pr view --json number --jq '.number')
 MASTER_SHA=$(git rev-parse origin/master)
 REVIEWED_TREE=$(git rev-parse HEAD^{tree})
-echo "PR_NUM=$PR_NUM MASTER_SHA=$MASTER_SHA REVIEWED_TREE=$REVIEWED_TREE"
+source "$(git rev-parse --show-toplevel)/bin/lib/plan-resolve.sh"
+PLAN_SLUG_DRIFT=""
+resolve_plan_file
+PLAN_SHA256=none
+if [ -n "${PLAN_FILE:-}" ] && [ -f "$PLAN_FILE" ]; then
+  PLAN_SHA256=$(shasum -a 256 "$PLAN_FILE" | cut -c1-64)
+fi
+echo "PR_NUM=$PR_NUM MASTER_SHA=$MASTER_SHA REVIEWED_TREE=$REVIEWED_TREE PLAN_SHA256=$PLAN_SHA256"
 ```
 
+## Step 1b — Carry-forward gate <!-- slop-ok -->
+
+Purpose: decide whether the sticky comment already carries a terminal verdict for exactly this tree and this plan. The decision is three checks in sequence, all fail-closed: the pinned `skip-review.sh` (one sticky, well-formed `**Reviewed tree:**`, tree equals `HEAD^{tree}`, no conflicts flag, five digest labels), then the prior verdict word, then plan identity. Any `RUN-REVIEW`, a missing script, a parse doubt, or a plan mismatch means Step 2 runs exactly as before. `<MASTER_SHA>` and `<PLAN_SHA256>` are Step 1 literals. `CONFLICT_FLAG` is the empty string unless `_phase-2-conflict-resolution.md` ran this run (Phase 1 printed `REBASE=conflict`), in which case set it to the literal `conflicts-resolved`.
+
+```bash
+# phase 5.5 carry-forward probe
+PR_NUM=$(gh pr view --json number --jq '.number')
+CONFLICT_FLAG=""
+SR="/tmp/post-plan-skip-review-$PR_NUM.sh"
+OUT="/tmp/post-plan-skip-review-out-$PR_NUM.txt"
+rm -f "$SR" "$OUT"
+if git show <MASTER_SHA>:.claude/review-shared/scripts/skip-review.sh > "$SR" 2>/dev/null && test -s "$SR"; then
+  bash "$SR" "$PR_NUM" "$CONFLICT_FLAG" > "$OUT" 2>/dev/null || printf 'RUN-REVIEW probe-failed\n' > "$OUT"
+else
+  printf 'RUN-REVIEW script-unavailable\n' > "$OUT"
+fi
+cat "$OUT"
+```
+
+```bash
+# phase 5.5 carry-forward decision
+PR_NUM=$(gh pr view --json number --jq '.number')
+PROBE_OUT="${PROBE_OUT:-/tmp/post-plan-skip-review-out-$PR_NUM.txt}"
+PRIOR_BODY="${PRIOR_BODY:-/tmp/pr-ready-prior-verdict-$PR_NUM.md}"
+PRIOR_DIGEST="${PRIOR_DIGEST:-/tmp/pr-ready-digest-lines-$PR_NUM.txt}"
+CUR_PLAN_HASH="${CUR_PLAN_HASH:-<PLAN_SHA256>}"
+HEAD_TREE="${HEAD_TREE:-$(git rev-parse HEAD^{tree})}"
+GATE=spawn; REASON=""; CARRY_WORD=""; CARRY_TREE=""
+SKIP_LINE=$(grep -E '^SKIP-REVIEW [0-9a-f]{40}$' "$PROBE_OUT" 2>/dev/null | tail -1)
+CARRY_TREE="${SKIP_LINE#SKIP-REVIEW }"
+if [ -z "$SKIP_LINE" ]; then
+  REASON=$(grep -E '^RUN-REVIEW ' "$PROBE_OUT" 2>/dev/null | tail -1)
+  REASON="${REASON:-RUN-REVIEW probe-output-missing}"
+elif [ "$CARRY_TREE" != "$HEAD_TREE" ]; then
+  REASON="tree-mismatch-with-head"
+elif [ ! -s "$PRIOR_BODY" ] || [ "$(grep -c . "$PRIOR_DIGEST" 2>/dev/null)" != 5 ]; then
+  REASON="carry-forward-files-missing"
+else
+  TERMINAL=$(awk '{ if ($0=="<!-- pr-ready-verdict -->") {print prev; exit} prev=$0 }' "$PRIOR_BODY" | sed 's/[[:space:]]*$//')
+  BANNER_VETO=$(sed -n '1p' "$PRIOR_BODY" | grep -c 'NOT READY')
+  PLAN_LINE=$(grep -m1 -E '^\*\*Plan hash:\*\* ([0-9a-f]{64}|none)$' "$PRIOR_BODY" | sed 's/^\*\*Plan hash:\*\* //')
+  case "$TERMINAL" in
+    "READY"|"READY WITH NOTES") ;;
+    *) REASON="prior-verdict-not-terminal" ;;
+  esac
+  if [ -z "$REASON" ] && [ "$BANNER_VETO" != 0 ]; then REASON="prior-banner-not-ready"; fi
+  if [ -z "$REASON" ] && { [ -z "$PLAN_LINE" ] || [ "$PLAN_LINE" = none ]; }; then REASON="plan-identity-absent"; fi
+  if [ -z "$REASON" ] && { [ "$CUR_PLAN_HASH" = none ] || [ "$PLAN_LINE" != "$CUR_PLAN_HASH" ]; }; then REASON="plan-changed"; fi
+  if [ -z "$REASON" ]; then GATE=skip; CARRY_WORD="$TERMINAL"; fi
+fi
+echo "FIDELITY_GATE=$GATE"
+echo "FIDELITY_GATE_REASON=${REASON:-carry-forward}"
+if [ "$GATE" = skip ]; then echo "CARRY_WORD=$CARRY_WORD"; echo "CARRY_TREE=$CARRY_TREE"; fi
+```
+
+The `${VAR:-...}` defaults on the five inputs exist so `bin/test-postplan-arm-conditions` can drive the block with fixture files. A live run never sets them.
+
+`CARRY_WORD` can only be the exact string `READY` or `READY WITH NOTES`. A suffixed terminal line (`READY WITH NOTES` plus a remediation suffix, `READY (re-review)` plus a suffix, any `NOT READY` form) never carries. A suffix means that run remediated, so its `**Reviewed tree:**` is the pre-remediation tree and the probe already said `tree-changed`. The exact-match rule is the second lock on the same door.
+
+A sticky with no `**Plan hash:**` line (every sticky written before this gate existed, and every harness sticky whose regex did not fire) never carries. Plan-blind runs (`<PLAN_SHA256>` is `none`) never carry.
+
+On `FIDELITY_GATE=spawn`, continue to Step 2 unchanged and print the reason in the run log. On `FIDELITY_GATE=skip`, run Step 1c, then Step 3, then Step 3b (its guard is a no-op because the carried file already carries `REVIEWED_TREE=`). Skip Steps 2, 4, 4b and 5, and compose Step 6 from the skip-path recipe. `/tmp/post-plan-fidelity-verdict-<N>-2.md` is left alone. Condition (12) already treats a stale `-2` file as fallback-to-verdict-1.
+
+## Step 1c — Materialise the carried verdict (skip path only) <!-- slop-ok -->
+
+Run this step only when Step 1b printed `FIDELITY_GATE=skip`. The block writes the verdict file condition (12) reads, from the sticky comment's own words, with provenance. It refuses anything that is not a terminal word on the current tree, so it can never manufacture an indeterminate or invented verdict. `<CARRY_WORD>` and `<CARRY_TREE>` are the literals Step 1b printed.
+
+```bash
+# phase 5.5 carry-forward materialise
+PR_NUM=$(gh pr view --json number --jq '.number')
+VF="${FIDELITY_VERDICT_FILE:-/tmp/post-plan-fidelity-verdict-$PR_NUM.md}"
+PRIOR_DIGEST="${PRIOR_DIGEST:-/tmp/pr-ready-digest-lines-$PR_NUM.txt}"
+CARRY_WORD="${CARRY_WORD:-<CARRY_WORD>}"
+CARRY_TREE="${CARRY_TREE:-<CARRY_TREE>}"
+HEAD_TREE="${HEAD_TREE:-$(git rev-parse HEAD^{tree})}"
+case "$CARRY_WORD" in "READY"|"READY WITH NOTES") ;; *) echo "STOP: refusing to materialise '$CARRY_WORD'"; exit 0 ;; esac
+[ "$CARRY_TREE" = "$HEAD_TREE" ] || { echo "STOP: carried tree $CARRY_TREE is not HEAD tree $HEAD_TREE"; exit 0; }
+[ "$(grep -c . "$PRIOR_DIGEST" 2>/dev/null)" = 5 ] || { echo "STOP: prior digest lines missing"; exit 0; }
+{
+  printf '%s\n\n' "$CARRY_WORD"
+  printf 'REVIEW-COVERAGE: carried-forward; no reviewer spawned this run; word copied from the PR #%s sticky comment terminal line covering tree %s\n\n' "$PR_NUM" "$CARRY_TREE"
+  printf '## FINDINGS\n\nFindings: carried forward; see the sticky comment body. Nothing was re-assessed this run.\n\n'
+  printf '## DIGEST\n'
+  cat "$PRIOR_DIGEST"
+  printf 'REVIEWED_TREE=%s\n' "$CARRY_TREE"
+} > "$VF"
+cp "$PRIOR_DIGEST" "/tmp/post-plan-digest-lines-$PR_NUM.txt"
+echo "CARRIED=$VF"
+```
+
+The word lands before `## DIGEST`, so Step 3's canonical parse reads it unchanged. `REVIEWED_TREE=` lands after `## DIGEST`, exactly where Step 3b would put it. The `**Machine-authored fixes:**` line is copied as-is, including any `(post-plan remediation: <sha>)` suffix from the prior run.
+
 ## Step 2 — Gather the seven inputs, then spawn exactly one reviewer
+
+Skip this step when Step 1b printed `FIDELITY_GATE=skip`. The spawn budget below applies only to the spawn path.
 
 **Bounded-re-spawn rule:** at most two `Agent` spawns per `/post-plan` run, and never more. Spawn the first reviewer now. **Exactly one re-spawn** is permitted, in step 4b, and only when **both** hold: (a) step 4's remediation addressed **every** `Mode: in-PR` finding, and (b) the plan does **not** declare `auto_merge: false`.
 
@@ -191,6 +292,8 @@ printf 'V2_FINDINGS_PRESENT=%s\n' "$([ -n "$V2_FINDINGS" ] && echo yes || echo n
 
 ## Step 5 — Materialise the digest lines
 
+On the skip path do not run this chain. Step 1c already copied the five prior lines to `/tmp/post-plan-digest-lines-<N>.txt`, and running `digest.sh` here would clobber them.
+
 Mirror `_phase7-verdict.md`'s chain exactly, pointed at post-plan's verdict path. `digest.sh` takes the verdict file as `$1`, so it works unchanged. The **trailing `cat` is load-bearing** — without it the five lines sit on disk and never enter context, so there is nothing to paste into the `Write` call in step 6. `digest.sh` exits 0 on every degrade path and prints five `unavailable — <reason>` lines rather than failing, so this chain never aborts the run.
 
 ```bash
@@ -231,6 +334,7 @@ include-source: line when the fallback fired>
 
 <REVIEW-COVERAGE: line(s) lifted from the verdict file, byte-identical>
 **Reviewed tree:** <REVIEWED_TREE from step 1>
+**Plan hash:** <PLAN_SHA256 from step 1; the literal none on a plan-blind run>
 **Re-reviewed tree:** <tree from step 4b and the re-review's verdict word; omit when step 4b did not run>
 
 </details>
@@ -239,11 +343,27 @@ include-source: line when the fallback fired>
 <!-- pr-ready-verdict -->
 ```
 
+**Skip path (`FIDELITY_GATE=skip`):** do not compose the template above. The body is the prior sticky body with one disclosure line, so every field the next run's gate reads (terminal line, `**Reviewed tree:**`, `**Plan hash:**`, five labels) stays byte-identical to what a reviewer wrote. Post it with the same find-and-update-else-create shape named at the end of this step.
+
+```bash
+# phase 5.5 carry-forward repost body
+PR_NUM=$(gh pr view --json number --jq '.number')
+NOW=$(date '+%Y-%m-%d %H:%M:%S %Z')
+awk -v now="$NOW" '
+  /^\*\*Carried forward:\*\* / { next }
+  { print }
+  /^\*\*Plan hash:\*\* / { printf "**Carried forward:** %s; no reviewer spawned, tree and plan unchanged since the verdict above\n", now }
+' "/tmp/pr-ready-prior-verdict-$PR_NUM.md" > "/tmp/post-plan-fidelity-comment-$PR_NUM.md"
+grep -c '^\*\*Carried forward:\*\* ' "/tmp/post-plan-fidelity-comment-$PR_NUM.md"
+```
+
+The disclosure line sits directly under `**Plan hash:**`. In the skill layout that is inside `<details>` after `---`. In the harness layout it is above `### Merge digest`. Neither position is inside the digest span, so `_digest_labels` and the horizontal-rule stop in `skip-review.sh` never read it. Repeated carries replace the line instead of stacking. The `grep -c` must print `1`.
+
 **Top banner and timestamp fields:** the banner has one timestamp slot. Fill it from `date '+%Y-%m-%d %H:%M:%S %Z'`. The banner word equals the step-3 `FIDELITY` word. The banner carries no auto-merge segment, because this fallback posts before Phase 6.5 decides arming. `bin/pr-cycle`'s `_precheck_verdict` strips `*`, `#` and backticks and reads the LAST verdict-shaped line. That line is the terminal line, so the banner cannot outvote it.
 
 **The `---` after the digest is load-bearing.** `_digest_labels` in `bin/digest-dm-build` folds every later non-label, non-blank line into the LAST label's value until a heading or a horizontal rule stops it. Without the rule, the audit trail, the terminal verdict line and the `<!-- pr-ready-verdict -->` marker all get appended to `**Machine-authored fixes:**` in the Discord merge DM. Emit the rule.
 
-**`**Reviewed tree:**` and `**Re-reviewed tree:**` placement rule:** both lines go inside the `<details>` audit trail AFTER `---`, each at column 0. The carry-forward regexes are line-anchored, so they still match there, and `_digest_labels` has already stopped at the rule, so it never reads them. The digest span stays free of bold-labelled lines. The five digest labels and their order are unchanged.
+**`**Reviewed tree:**`, `**Plan hash:**` and `**Re-reviewed tree:**` placement rule:** all three lines go inside the `<details>` audit trail AFTER `---`, each at column 0. The `**Plan hash:**` value is 64 lowercase hex characters or the literal `none`. The carry-forward regexes are line-anchored, so they still match there, and `_digest_labels` has already stopped at the rule, so it never reads them. The digest span stays free of bold-labelled lines. The five digest labels and their order are unchanged.
 
 **Findings slot placement:** `$V2_FINDINGS` must also stay out of the digest span. When it is non-empty, insert a blank line, then `$V2_FINDINGS` verbatim, then a blank line, between the reviewer findings and the `### Merge digest` heading. Place it above that heading only. Re-review findings routinely carry their own `####` sub-headings and `**Finding N:**` bold labels: below the heading a `#+ ` line truncates the digest block and a bold label becomes a sixth digest label, either of which corrupts `bin/digest-dm-build`'s parse. Above the heading the parser never sees them, so the findings text needs no escaping, no re-wrapping, and no label stripping.
 

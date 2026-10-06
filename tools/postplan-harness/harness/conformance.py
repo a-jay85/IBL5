@@ -404,10 +404,26 @@ def _method_declared(name: str, text: str) -> bool:
     ) is not None
 
 
+def _label_present(name: str, text: str) -> bool:
+    """True when the hyphenated test-case label `name` appears whole in `text`.
+
+    A bash test-case label (`step67-skipped-no-plan`) is never a `function`/`def`
+    declaration; it shows up as a `case` arm, a `run_case` argument, or a fixture name.
+    The match is bounded on both sides by a non-label character so `step67-clean` does
+    not satisfy `step67-clean-extended` and a dash-segment prefix never counts."""
+    return re.search(
+        rf"(?<![A-Za-z0-9_-]){re.escape(name)}(?![A-Za-z0-9_-])", text) is not None
+
+
+def _required_name_present(name: str, text: str) -> bool:
+    """Dispatch: a hyphenated label is checked by literal presence, anything else by declaration."""
+    return _label_present(name, text) if "-" in name else _method_declared(name, text)
+
+
 def _method_in_changed_tree(name: str, changed_files: list[str],
                             read_file: Callable[[str], str | None],
                             cache: dict[str, str | None]) -> str | None:
-    """The first changed path whose PR-tree text declares `name`, else None.
+    """The first changed path whose PR-tree text declares `name` (or, for a hyphenated label, whose text contains it whole), else None.
 
     Reads ONLY paths from `changed_files`: a method that exists untouched elsewhere in
     the repo must still be MISSING-METHOD, or "write new test X" passes when X was never
@@ -421,7 +437,7 @@ def _method_in_changed_tree(name: str, changed_files: list[str],
             except Exception:
                 cache[path] = None
         text = cache[path]
-        if text and _method_declared(name, text):
+        if text and _required_name_present(name, text):
             return path
     return None
 
@@ -461,6 +477,10 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     text from the PR tree; a required method the diff hunks never show but a changed file
     declares is then present (PRs #2708, #2772, #2707). None (the default) disables the
     fallback. Only changed files are read, never the whole repo.
+
+    A required name containing `-` (a bash test-case label from a hyphenated Required Test
+    Methods bullet) is satisfied by its whole-token literal presence in the diff or a
+    changed file; a `function`/`def` declaration is required for every other name.
     """
     if not plan.found:
         return []
@@ -494,7 +514,7 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     if diff_body:
         tree_cache: dict[str, str | None] = {}
         for m in plan.required_test_methods:
-            if _method_declared(m, diff_body):
+            if _required_name_present(m, diff_body):
                 continue
             if read_file is not None:
                 where = _method_in_changed_tree(m, changed_files, read_file, tree_cache)

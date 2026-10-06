@@ -1007,6 +1007,7 @@ jobs:
             bin/test-check-phpunit-hygiene \
             bin/test-test \
             bin/test-refactor-flag \
+            bin/test-rebuild-css-if-source-changed \
             bin/test-automouse-queue \
             bin/test-automouse-self-heal \
             bin/test-automouse-depends-on \

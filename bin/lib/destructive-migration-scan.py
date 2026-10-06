@@ -458,11 +458,12 @@ def _string_literals(clean):
 
 def _ddl_from_literals(clean):
     """Return the literal bodies whose first word (lowercased, after
-    lstrip) is in PREPARED_DDL_HEADS. 'SELECT 1' and any other head
-    return nothing."""
+    leading whitespace and comments) is in PREPARED_DDL_HEADS. 'SELECT 1'
+    and any other head return nothing."""
     out = []
     for body in _string_literals(clean):
-        words = body.lstrip().lower().split(None, 1)
+        virt, _ = Splitter(body).split()
+        words = virt[0].lower.split(None, 1) if virt else []
         if words and words[0] in PREPARED_DDL_HEADS:
             out.append(body)
     return out
@@ -1299,6 +1300,19 @@ SELF_TEST_CASES = [
     ("php concat no where", "x.php", "<?php\n$db->query('DELETE FROM ' . $table);\n", None, ["delete-no-where"]),
     ("php bare words", "x.php", "<?php\n$a = 'update'; $b = 'delete';\n", None, []),
     ("php prepared", "x.php", "<?php\n$stmt = $db->prepare('DELETE FROM t WHERE id = ?');\n", None, []),
+    ("prepare set ddl", "x.sql", "SET @s = IF(@n = 1, 'ALTER TABLE t DROP COLUMN c', 'SELECT 1');\nPREPARE st FROM @s;\nEXECUTE st;\nDEALLOCATE PREPARE st;\n", None, ["drop-column"]),
+    ("prepare literal form", "x.sql", "PREPARE st FROM 'ALTER TABLE t DROP COLUMN c';\n", None, ["drop-column"]),
+    ("prepare doubled quote", "x.sql", "SET @s = 'ALTER TABLE t ADD COLUMN d INT DEFAULT ''0'', DROP COLUMN c';\nPREPARE st FROM @s;\n", None, ["drop-column"]),
+    ("prepare two on one line", "x.sql", "SET @a = 'ALTER TABLE t DROP COLUMN c'; SET @b = 'SELECT 1'; PREPARE s1 FROM @a; PREPARE s2 FROM @b;\n", None, ["drop-column"]),
+    ("prepare select branch only", "x.sql", "SET @s = IF(@n = 1, 'SELECT 1', 'SELECT 2');\nPREPARE st FROM @s;\n", None, []),
+    ("prepare non-ddl literal", "x.sql", "SET @s = 'SHOW TABLES';\nPREPARE st FROM @s;\n", None, []),
+    ("prepare var never set", "x.sql", "PREPARE st FROM @missing;\nEXECUTE st;\n", None, []),
+    ("set ddl without prepare", "x.sql", "SET @s = 'ALTER TABLE t DROP COLUMN c';\nSELECT @s;\n", None, []),
+    ("prepare concat unresolved", "x.sql", "SET @s = CONCAT('ALTER TABLE t DROP COLUMN c', @x);\nPREPARE st FROM @s;\n", None, []),
+    ("prepare select into unresolved", "x.sql", "SET @s = 'ALTER TABLE t DROP COLUMN c';\nSELECT 'SELECT 1' INTO @s;\nPREPARE st FROM @s;\n", None, []),
+    ("prepare range covers set", "x.sql", "SET @s = IF(@n = 1,\n 'ALTER TABLE t DROP COLUMN c',\n 'SELECT 1');\nPREPARE st FROM @s;\n", [(2, 2)], ["drop-column"]),
+    ("prepare range only prepare line", "x.sql", "SET @s = IF(@n = 1,\n 'ALTER TABLE t DROP COLUMN c',\n 'SELECT 1');\nPREPARE st FROM @s;\n", [(4, 4)], []),
+    ("php prepare set ddl", "x.php", "<?php\n$db->query(\"SET @s = 'ALTER TABLE t DROP COLUMN c'\");\n$db->query('PREPARE st FROM @s');\n", None, ["drop-column"]),
 ]
 
 SCHEMA_CASES = [
@@ -1307,6 +1321,8 @@ SCHEMA_CASES = [
     ("schema widen", "CREATE TABLE t (c varchar(32) NOT NULL);", "ALTER TABLE t MODIFY c VARCHAR(64) NULL;\n", []),
     ("schema unresolved", "CREATE TABLE other (c int);", "ALTER TABLE t MODIFY c VARCHAR(32) NULL;\n", ["narrow-type"]),
     ("schema recreate existing", "CREATE TABLE t (id int);", "DROP TABLE IF EXISTS t;\nCREATE TABLE t (id INT);\n", ["drop-recreate-existing"]),
+    ("schema narrow prepared", "CREATE TABLE t (c varchar(255) NOT NULL);", "SET @s = IF(@n = 1, 'ALTER TABLE t MODIFY COLUMN c varchar(35) NULL', 'SELECT 1');\nPREPARE st FROM @s;\n", ["narrow-type"]),
+    ("schema widen prepared", "CREATE TABLE t (c varchar(35) NOT NULL);", "SET @s = IF(@n = 1, 'ALTER TABLE t MODIFY COLUMN c varchar(255) NULL', 'SELECT 1');\nPREPARE st FROM @s;\n", []),
 ]
 
 NARROW_CASES = [
@@ -1341,6 +1357,7 @@ MARKER_CASES = [
     ("short reason", "-- destructive-migration[drop-column]: too short\nALTER TABLE t DROP COLUMN c;\n", "strict", None, 1),
     ("pr body tagged", "ALTER TABLE t DROP COLUMN c;\n", "strict", "<!-- destructive-migration[drop-column]: removing an unused legacy column -->", 0),
     ("pr body untagged", "ALTER TABLE t DROP COLUMN c;\n", "strict", "<!-- destructive-migration: removing an unused legacy column -->", 1),
+    ("marker inside prepared literal ignored", "SET @s = 'ALTER TABLE t /* destructive-migration[drop-column]: reason text long enough to pass */ DROP COLUMN c';\nPREPARE st FROM @s;\n", "strict", None, 1),
 ]
 
 

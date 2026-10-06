@@ -2,7 +2,7 @@
 # One-time setup for the weekly retro-miner cron (backlog#106).
 #
 # Installs a Mac-local launchd LaunchAgent (com.ibl5.retro-mine) that runs
-# bin/retro-mine every Monday at 09:15. The plist Program/WorkingDirectory point
+# bin/retro-mine every Sunday at 09:15. The plist Program/WorkingDirectory point
 # at the durable MAIN checkout (never a worktree, which gets torn down after its
 # PR merges). The job exits non-zero on any drafter, validation, push, or PR
 # failure; com.ibl5.retro-mine is registered `standard` in
@@ -84,7 +84,7 @@ build_plist() {
 	<key>StartCalendarInterval</key>
 	<dict>
 		<key>Weekday</key>
-		<integer>1</integer>
+		<integer>0</integer>
 		<key>Hour</key>
 		<integer>9</integer>
 		<key>Minute</key>
@@ -105,7 +105,7 @@ case "$ACTION" in
     ;;
   install)
     # Refuse before any launchctl call: a plist whose Program does not exist
-    # fails every Monday.
+    # fails every Sunday.
     if [ ! -x "$PROGRAM" ]; then
       echo "Error: $PROGRAM missing; install after this lands on master" >&2
       exit 1
@@ -114,7 +114,7 @@ case "$ACTION" in
     launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent: ignore "not loaded"
     build_plist > "$PLIST_PATH"
     launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
-    echo "Installed ${PLIST_LABEL} (Monday 09:15). Program: $PROGRAM"
+    echo "Installed ${PLIST_LABEL} (Sunday 09:15). Program: $PROGRAM"
     ;;
   uninstall)
     launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent

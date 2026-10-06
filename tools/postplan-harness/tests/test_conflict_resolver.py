@@ -543,6 +543,15 @@ def test_parse_verdict_whitespace_variants_are_stripped(reply):
     assert parse_verdict(reply) == "CONFLICT-REVIEW=CLEAN"
 
 
+def test_nbsp_fixture_survives_editor_normalization():
+    """The raw NBSP in the whitespace-variants fixture above must stay a real U+00A0.
+
+    An editor that normalizes it to a plain space leaves the parametrized case green
+    while it stops testing NBSP stripping."""
+    source = open(__file__, encoding="utf-8").read()
+    assert '"\u00a0CONFLICT-REVIEW=CLEAN"' in source
+
+
 def test_parse_verdict_fenced_token_is_not_skipped():
     assert parse_verdict("```\nCONFLICT-REVIEW=CLEAN\n```\n") == "CONFLICT-REVIEW=CLEAN"
     fenced_plus_real = "```\nCONFLICT-REVIEW=CLEAN\n```\nCONFLICT-REVIEW=FOUND-PROBLEM\n"

@@ -1233,6 +1233,126 @@ RC23=$?
   && ok "(48c) TODAY uses the local date, not UTC" \
   || bad "(48c) bin/docfix-run TODAY must be local date +%Y-%m-%d with no date -u"
 
+# --- Cases 48d-48g: emitted prompt keeps the bin/check-docs verification contract
+# 48b greps the SOURCE of bin/docfix-run. These cases check the prompt the model
+# actually receives (after the shq/XML round-trip) and that every bin/check-docs
+# command it names is real. A live agent skipping the check is caught after the
+# fact by pr-meta-checks.yml (bin/check-docs --since=<base> on every PR).
+CHECK_DOCS_HELP="$("$REPO_ROOT/bin/check-docs" --help 2>&1)"
+VERIF_OPEN='Before reporting any fix done, run a real check that exercises it:'
+VERIF_CLOSE='instead of reporting the fix as done.'
+
+# emitted_prompt_of "$SB" -> prints the prompt text claude -p receives (Case 20 recipe).
+emitted_prompt_of() {
+    local P CMD TOKEN RT RC=0
+    P="$(plist_of "$1")"; [ -n "$P" ] || return 1
+    CMD=$(grep 'claude -p' "$P" | sed 's/&lt;/</g; s/&gt;/>/g; s/&amp;/\&/g')
+    TOKEN=$(printf '%s' "$CMD" | sed -n 's/.*claude -p \(.*\) --dangerously.*/\1/p')
+    [ -n "$TOKEN" ] || return 1
+    RT="$(mktemp -d)"
+    ( cd "$RT" && bash -c "printf '%s' $TOKEN" ) 2>/dev/null || RC=$?
+    rmdir "$RT" 2>/dev/null || true
+    return "$RC"
+}
+
+# prompt_check_contract "$TEXT" -> 0 when the verification contract holds, else 1.
+prompt_check_contract() {
+    local T="$1" REST PARA CMDS FLAG N
+    [ -n "$CHECK_DOCS_HELP" ] || return 1
+    case "$T" in *"$VERIF_OPEN"*"$VERIF_CLOSE"*) ;; *) return 1 ;; esac
+    REST="${T#*"$VERIF_OPEN"}"
+    PARA="${REST%%"$VERIF_CLOSE"*}"
+    # (a) the verification paragraph itself names the tool and the anti-skip clauses
+    case "$PARA" in *'`bin/check-docs`'*) ;; *) return 1 ;; esac
+    case "$PARA" in *'reading their output'*) ;; *) return 1 ;; esac
+    case "$PARA" in *'failed to start does not count'*) ;; *) return 1 ;; esac
+    case "$PARA" in *'which one you did not run'*) ;; *) return 1 ;; esac
+    # (b) the concrete commands: staleness report before AND after, plus fix-dates
+    N=$(( $(printf '%s' "$T" | grep -oF '`bin/check-docs --staleness-report`' | wc -l) ))
+    [ "$N" -ge 2 ] || return 1
+    case "$T" in *'`bin/check-docs --fix-dates --since=master`'*) ;; *) return 1 ;; esac
+    # (c) every --flag in every backticked bin/check-docs command is a real option
+    CMDS=$(printf '%s' "$T" | grep -oE '`bin/check-docs --[^`]*`')
+    [ -n "$CMDS" ] || return 1
+    for FLAG in $(printf '%s\n' "$CMDS" | grep -oE -- '--[a-z][a-z-]*'); do
+        printf '%s\n' "$CHECK_DOCS_HELP" \
+            | grep -qE -- "^[[:space:]]+${FLAG}([[:space:]=]|\$)" || return 1
+    done
+    return 0
+}
+
+# Case 48d: the real emitted prompt satisfies the contract.
+SB="$(build_sandbox)"
+run_docfix "$SB" "" "" "1225" "probe.md" >/dev/null
+PROMPT48="$(emitted_prompt_of "$SB")" || PROMPT48=""
+rm -rf "$SB"
+{ [ -n "$PROMPT48" ] && prompt_check_contract "$PROMPT48"; } \
+  && ok "(48d) emitted prompt: verification paragraph requires bin/check-docs and every named flag exists" \
+  || bad "(48d) emitted docfix prompt breaks the bin/check-docs verification contract"
+
+# Case 48e: the command the prompt starts with really runs, read-only, and emits the
+# JSON shape the prompt tells the agent to split on (reason in {stale, dead-glob}).
+GS48_BEFORE="$(git -C "$REPO_ROOT" status --porcelain)"
+SR48_RC=0
+SR48_OUT="$(cd "$REPO_ROOT" && bin/check-docs --staleness-report 2>/dev/null)" || SR48_RC=$?
+GS48_AFTER="$(git -C "$REPO_ROOT" status --porcelain)"
+{ [ "$SR48_RC" -eq 0 ] \
+    && [ "$GS48_BEFORE" = "$GS48_AFTER" ] \
+    && printf '%s' "$SR48_OUT" \
+        | jq -e 'type == "array" and all(.[]; .reason == "stale" or .reason == "dead-glob")' >/dev/null \
+    && grep -qF "'reason' => 'dead-glob'" "$REPO_ROOT/bin/check-docs"; } \
+  && ok "(48e) bin/check-docs --staleness-report exits 0, read-only, emits a stale/dead-glob JSON array" \
+  || bad "(48e) bin/check-docs --staleness-report failed, wrote to the tree, or changed its JSON shape"
+
+# Cases 48f/48g: the contract must REJECT each broken variant of the real prompt.
+# Each mutation removes exactly one property; a mutation that leaves the prompt
+# unchanged is itself a failure (its anchor text drifted out of bin/docfix-run).
+M48_FAIL=0
+_m48() {   # _m48 CASE LABEL MUTATED_TEXT
+    if [ "$3" = "$PROMPT48" ]; then
+        bad "($1) mutation '$2' did not change the prompt (anchor drifted)"; M48_FAIL=1
+    elif prompt_check_contract "$3"; then
+        bad "($1) contract accepted mutated prompt: $2"; M48_FAIL=1
+    fi
+}
+if [ -z "$PROMPT48" ]; then
+    bad "(48f) no emitted prompt to mutate (48d extraction failed)"
+    bad "(48g) no emitted prompt to mutate (48d extraction failed)"
+else
+    # 48f: verification-paragraph mutations (contract clause a)
+    S_CD='the `bin/check-docs` commands named below, '
+    S_READ='reading their output'
+    S_START='A check command that failed to start does not count. '
+    S_WHICH='say which one you did not run and why'
+    M48_FAIL=0
+    _m48 48f "paragraph no longer names bin/check-docs" "${PROMPT48/"$S_CD"/}"
+    _m48 48f "reading-their-output clause dropped" "${PROMPT48/"$S_READ"/skimming them}"
+    _m48 48f "failed-to-start clause dropped" "${PROMPT48/"$S_START"/}"
+    _m48 48f "which-one-not-run clause dropped" "${PROMPT48/"$S_WHICH"/explain}"
+    _m48 48f "paragraph closing marker removed" "${PROMPT48/"$VERIF_CLOSE"/}"
+    [ "$M48_FAIL" -eq 0 ] \
+      && ok "(48f) contract rejects all 5 verification-paragraph mutations"
+
+    # 48g: command and flag mutations (contract clauses b and c), plus empty --help
+    S_SR='`bin/check-docs --staleness-report`'
+    S_FD='`bin/check-docs --fix-dates --since=master`'
+    M48_FAIL=0
+    _m48 48g "flag renamed to --staleness-reprot" \
+        "${PROMPT48//--staleness-report/--staleness-reprot}"
+    _m48 48g "closing re-run of the staleness report dropped" \
+        "${PROMPT48/"re-run $S_SR"/re-run the report}"
+    _m48 48g "fix-dates command dropped" "${PROMPT48/"$S_FD"/the date fixer}"
+    _m48 48g "unknown flag injected in an extra command" \
+        "$PROMPT48 Also run \`bin/check-docs --staleness-reprot\`."
+    HELP48_SAVED="$CHECK_DOCS_HELP"; CHECK_DOCS_HELP=""
+    if prompt_check_contract "$PROMPT48"; then
+        bad "(48g) contract accepted the real prompt with an empty bin/check-docs --help"; M48_FAIL=1
+    fi
+    CHECK_DOCS_HELP="$HELP48_SAVED"
+    [ "$M48_FAIL" -eq 0 ] \
+      && ok "(48g) contract rejects all 5 command/flag mutations"
+fi
+
 # --- Cases 49-64: bin/docfix-check-veronly numeric-pass + boundary cases ------
 
 # Helper: seed a file in master, re-point the feature branch, check it out.

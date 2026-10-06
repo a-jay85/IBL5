@@ -1076,7 +1076,6 @@ jobs:
             bin/test-sim-recap-ssh-gate \
             bin/test-discord-dm \
             bin/test-post-plan-fail-dm \
-            bin/test-token-report \
             bin/test-automouse-escalation \
             bin/test-automouse-repeat-failure \
             bin/test-automouse-disarm \
@@ -1090,7 +1089,6 @@ jobs:
             bin/test-path-filters \
             ibl5/bin/test-db-sync-now \
             bin/test-architect-contract-split \
-            bin/test-plan-review-digest \
             bin/test-plan-review-seam \
             bin/test-check-registry-trigger-rows \
             bin/test-retro-mine \

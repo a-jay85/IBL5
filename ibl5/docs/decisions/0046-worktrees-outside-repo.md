@@ -1,6 +1,6 @@
 ---
 description: Git worktrees are created OUTSIDE the repo tree (a canonical-case sibling, IBL5-worktrees/<slug>) instead of nested at $REPO_ROOT/worktrees/<slug>. Nesting made the repo-root .claude/rules a filesystem ancestor of every worktree file, so Claude Code's path-conditional rule loader injected each matching rule twice. Records the layout decision, the git-based worktree detection it requires, and the safe migration path.
-last_verified: 2026-08-08
+last_verified: 2026-10-06
 ---
 
 # ADR-0046: Worktrees live outside the repo tree
@@ -42,7 +42,7 @@ layout-independent git check (`is_in_worktree`: a linked worktree's `--git-dir` 
 from its `--git-common-dir`). `cleanup`'s orphan-directory **sweep** stays directory-based
 (it needs the root path), repointed at the external root.
 
-Existing in-repo worktrees are relocated by `bin/wt-migrate-layout`, which gates each
+Existing in-repo worktrees are relocated by bin/wt-migrate-layout (since removed), which gates each
 worktree on the `bin/lib/wt-guards.sh` safety predicates (`is_worktree_in_use`,
 `has_uncommitted_changes`, `has_untracked_files`) and **skips** any that are busy or dirty
 — never a big-bang move. All worktree tooling continues to accept the legacy in-repo

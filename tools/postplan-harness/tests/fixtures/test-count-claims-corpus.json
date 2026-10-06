@@ -96,7 +96,7 @@
    "diff": "diff --git a/bin/test-bug-pipeline-test-env b/bin/test-bug-pipeline-test-env\nnew file mode 100755\nindex 0000000000..85ef649bcc\n--- /dev/null\n+++ b/bin/test-bug-pipeline-test-env\n@@ -1,0 +1,0 @@\n",
    "head_files": {},
    "expected": "unverifiable",
-   "note": "7 claimed, 0 added, total None, unverifiable; 111 claimed, 0 added, total None, unverifiable"
+   "note": "7 claimed, 0 added, total None, unverifiable"
   },
   {
    "number": 2596,

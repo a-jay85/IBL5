@@ -11,7 +11,7 @@ last_verified: 2026-10-06
 
 ## Context
 
-The Phase 2 and Phase 7 lost-work proof (`.claude/review-shared/scripts/lostwork.sh`, ADR-0134 item 3) compared the sorted `git apply --numstat` of the pre-rebase and post-rebase patches. Over 14 days (335 runs) the harness blocked 6 runs on "lost-work proof failed" and 15 on "rebase conflict, human required". Of 12 `TREE DIVERGED` audit logs, 5 were the empty-patch case (owned by the `postplan-merged-noop-hold-reason` work) and 7 were real numstat deltas. Every one of the 7 followed a plain-rebase conflict on the same file. The resolver rewrote hunks, master had edited the same file, and the branch's numstat row legitimately changed. In one run a file's row vanished because master had absorbed the change. In another the run gained a row.
+The Phase 2 and Phase 7 lost-work proof (`.claude/review-shared/scripts/lostwork.sh`, ADR-0134 item 3) compared the sorted `git apply --numstat` of the pre-rebase and post-rebase patches. Over 14 days (335 runs) the harness blocked 6 runs on "lost-work proof failed" and 15 on "rebase conflict, human required". Of 12 `TREE DIVERGED` audit logs, 5 were the empty-patch case (owned by the `postplan-merged-noop-hold-reason` work) and 7 were real numstat deltas. Every one of the 7 followed a plain-rebase conflict on the same file. The resolver rewrote hunks, master had edited the same file, and the branch's numstat row legitimately changed. In one run a file's row vanished from the post-rebase diff. In another the run gained a row.
 
 Numstat equality was the wrong invariant. It measured the diff against a moving base. The question the gate exists to answer is whether the branch's changes survived the rebase.
 
@@ -62,7 +62,7 @@ Per key:
 - **ci-shell-harness-parallel.** Unreconstructible. No pre or post patch was saved for it.
 - **google-sheet-oauth-export** and **leaderboards-hub.** Unreconstructible. Their saved post patches carry PNG snapshot entries that `git apply` rejects without a full index line. A diagnostic retry that excluded `*.png` gave `TREE-EQUIVALENT` for leaderboards-hub (the run that gained a row). It gave a block for google-sheet-oauth-export, with `LOST:` lines in `.claude/rules/codebase-map.md` and `docker-compose.ci.yml`. That block is unconfirmed, because the timestamp-derived master may sit a minute before the real one.
 
-The backtest supports the change. Every numstat block in the corpus was a false positive by construction. Under the new proof, the blocks that remain name specific lines, and two of the three blocked runs carry a line the branch really lost.
+The backtest supports the change. Two of the seven runs the numstat gate blocked did lose branch lines, so those blocks were right, though the numstat delta could not say which lines. The new proof still blocks both and names the lines. Of the rest, one rebuilt run and one diagnostic retry flip to pass, and one block mixes an accepted both-sides edit with the CRLF residual below.
 
 ### Accepted residuals
 

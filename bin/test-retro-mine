@@ -16,6 +16,18 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 RM_DRIVER="${RETRO_MINE_SELF:-$SCRIPT_DIR/retro-mine}"
+# Isolation: no case may read real transcripts or run logs, write a real report,
+# or reach the real DM. Every tune-up seam points into one throwaway dir.
+RM_ISO="$(mktemp -d)"
+mkdir -p "$RM_ISO/projects" "$RM_ISO/tmplogs" "$RM_ISO/amlogs" "$RM_ISO/reports"
+printf '#!/bin/bash\ntouch "%s/dm-called"\nexit 1\n' "$RM_ISO" > "$RM_ISO/dm-sentinel"
+chmod +x "$RM_ISO/dm-sentinel"
+export RETRO_MINE_PROJECTS_DIR="$RM_ISO/projects"
+export RETRO_MINE_TMP_LOG_DIR="$RM_ISO/tmplogs"
+export RETRO_MINE_AUTOMOUSE_LOG_DIR="$RM_ISO/amlogs"
+export RETRO_MINE_REPORT_DIR="$RM_ISO/reports"
+export RETRO_MINE_DM_BIN="$RM_ISO/dm-sentinel"
+RM_GIT_BASELINE="$(git -C "$SCRIPT_DIR/.." status --porcelain --untracked-files=all 2>/dev/null)"
 
 FAILED=0
 RM_RC=0
@@ -41,6 +53,7 @@ rm_lacks() {
 }
 
 RM_TMPS=()
+RM_TMPS+=("$RM_ISO")
 rm_cleanup() {
     local d
     for d in ${RM_TMPS[@]+"${RM_TMPS[@]}"}; do rm -rf "$d"; done
@@ -206,7 +219,9 @@ case_empty_env() {
     RETRO_MINE_REGISTRY="$t/reg.md" RETRO_MINE_STATE_DIR='' "$RM_DRIVER" --dry-run >/dev/null 2>&1
     rc=$?
     rm_expect_eq "empty_env: empty RETRO_MINE_STATE_DIR exits 2" 2 "$rc"
-    err="$(env -i PATH=/usr/bin:/bin RETRO_MINE_REGISTRY="$t/reg.md" "$RM_DRIVER" --dry-run 2>&1 >/dev/null)"
+    err="$(env -i PATH=/usr/bin:/bin RETRO_MINE_REGISTRY="$t/reg.md" \
+        RETRO_MINE_PROJECTS_DIR="$RM_ISO/projects" RETRO_MINE_TMP_LOG_DIR="$RM_ISO/tmplogs" RETRO_MINE_AUTOMOUSE_LOG_DIR="$RM_ISO/amlogs" RETRO_MINE_REPORT_DIR="$RM_ISO/reports" RETRO_MINE_DM_BIN="$RM_ISO/dm-sentinel" \
+        "$RM_DRIVER" --dry-run 2>&1 >/dev/null)"
     rc=$?
     rm_expect_eq "empty_env: no HOME and no state var exits 2" 2 "$rc"
     rm_has "empty_env: error names HOME" "$err" "HOME"
@@ -245,6 +260,7 @@ case_launchd_env_dry_run() {
     local t out rc; t="$(rm_tmp)"
     rm_registry "$t/reg.md" "$(rm_row '#1' 'alpha' 3 .claude/rules/a.md '--')"
     out="$(env -i PATH=/usr/bin:/bin HOME="$t" RETRO_MINE_REGISTRY="$t/reg.md" \
+        RETRO_MINE_PROJECTS_DIR="$RM_ISO/projects" RETRO_MINE_TMP_LOG_DIR="$RM_ISO/tmplogs" RETRO_MINE_AUTOMOUSE_LOG_DIR="$RM_ISO/amlogs" RETRO_MINE_REPORT_DIR="$RM_ISO/reports" RETRO_MINE_DM_BIN="$RM_ISO/dm-sentinel" \
         RETRO_MINE_STATE_DIR="$t/state" /bin/bash "$RM_DRIVER" --dry-run 2>&1)"
     rc=$?
     rm_expect_eq "launchd_env_dry_run: exit 0" 0 "$rc"
@@ -273,6 +289,12 @@ case_cron_print_schedule_env() {
     rm_has "cron_print_schedule_env: PATH covers brew, system, and expanded HOME" "$RM_OUT" \
         "<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$t/home/.local/bin</string>"
     rm_has "cron_print_schedule_env: weekly key" "$RM_OUT" "<key>Weekday</key>"
+    rm_expect_eq "cron_print_schedule_env: Weekday value" "<integer>1</integer>" \
+        "$(printf '%s\n' "$RM_OUT" | grep -A1 '<key>Weekday</key>' | tail -1 | tr -d ' \t')"
+    rm_expect_eq "cron_print_schedule_env: Hour value" "<integer>9</integer>" \
+        "$(printf '%s\n' "$RM_OUT" | grep -A1 '<key>Hour</key>' | tail -1 | tr -d ' \t')"
+    rm_expect_eq "cron_print_schedule_env: Minute value" "<integer>15</integer>" \
+        "$(printf '%s\n' "$RM_OUT" | grep -A1 '<key>Minute</key>' | tail -1 | tr -d ' \t')"
     rm_has "cron_print_schedule_env: ProgramArguments target" "$RM_OUT" "/bin/retro-mine</string>"
     if grep -qF '$' <<< "$RM_OUT"; then rm_fail "cron_print_schedule_env: unexpanded \$ in plist"
     else rm_ok "cron_print_schedule_env: no unexpanded \$"; fi
@@ -776,6 +798,13 @@ case_replay_tampered_kind() {
     rm_validate "$(cat "$t/tampered.json")" "$t/tree"
     rm_expect_eq "replay_tampered_kind: exit 1" 1 "$RM_RC"
     rm_has "replay_tampered_kind: named reason" "$RM_ERR" "kind not allowlisted"
+}
+
+case_zz_isolation_guards() {
+    if [ -e "$RM_ISO/dm-called" ]; then rm_fail "isolation: a case reached the DM binary"
+    else rm_ok "isolation: no case reached the DM binary"; fi
+    rm_expect_eq "isolation: repo tree untouched by the suite" "$RM_GIT_BASELINE" \
+        "$(git -C "$SCRIPT_DIR/.." status --porcelain --untracked-files=all 2>/dev/null)"
 }
 
 # ── Dispatch ──────────────────────────────────────────────────────────────────

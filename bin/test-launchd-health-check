@@ -756,7 +756,9 @@ printf '\ncom.ibl5.fixture-extra standard\n' >> "$CASE/lib/LEJ_EXPECTED_JOBS_app
 # Append to the LEJ_EXPECTED_JOBS variable in the copy
 _EXTRA_LIB="$CASE/lib/launchd-expected-jobs.sh"
 # Re-write: append to the quoted block right before the closing quote
-sed -i.bak "s/^com.ibl5.wt-sync standard'/com.ibl5.wt-sync standard\\ncom.ibl5.fixture-extra standard'/" "$_EXTRA_LIB"
+# Backslash + real newline: portable across BSD and GNU sed (a literal \n is not expanded by BSD sed).
+_NL=$'\n'
+sed -i.bak "s/^com.ibl5.wt-sync standard'/com.ibl5.wt-sync standard\\${_NL}com.ibl5.fixture-extra standard'/" "$_EXTRA_LIB"
 
 OUT="$(LAUNCHD_HEALTH_JOBS_LIB="$_EXTRA_LIB" bash "$SCRIPT_DIR/launchd-health-check" 2>/dev/null)"
 RC=$?

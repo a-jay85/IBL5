@@ -1042,7 +1042,8 @@ MAIN38="$(new_env)"
 WT38="$(add_worktree "$MAIN38" "wt-stale38" stale-copy)"
 HEAD38_BEFORE="$(git -C "$WT38" rev-parse HEAD)"
 run_only "$WT38" --dry-run
-assert_match "only-dry: stale state reported" "RESET-STALE" "$ONLY_OUT"
+assert_eq    "only-dry: stale state reported (exact stdout)" "RESET-STALE" "$ONLY_OUT"
+assert_match "only-dry: stderr notes no git write" "\[dry-run\] no git write performed" "$(cat "$ONLY_ERR" 2>/dev/null)"
 assert_eq    "only-dry: exit 0" "0" "$ONLY_ST"
 assert_eq    "only-dry: HEAD unchanged" "$HEAD38_BEFORE" "$(git -C "$WT38" rev-parse HEAD)"
 if git -C "$WT38" rev-parse --verify -q refs/wt-sync-backup/wt-stale38 >/dev/null 2>&1; then

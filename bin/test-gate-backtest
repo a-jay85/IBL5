@@ -230,6 +230,67 @@ run_pma() {
         "--plans-dir=$PPLANS"
 }
 
+# --- dm history: destructive-migration bypass marker replay (backlog#1339) ---
+# Three squash-merged PRs each add a DROP COLUMN migration, then three plain PRs follow. One
+# fixture tags every drop PR; the other tags PR 1 only. One case asserts both verdicts.
+DM="$T/dm"
+DMJ_TAGGED="$T/dm.tagged.json"
+DMJ_BOTH="$T/dm.both.json"
+
+setup_dm() {
+    [ -d "$DM" ] && return 0
+    local et="$T/dm.tagged.entries" eb="$T/dm.both.entries" tagged plain
+    new_repo "$DM"
+    mkdir -p "$DM/bin/lib"
+    cp "$REPO_ROOT/bin/lib/destructive-migration-scan.py" "$DM/bin/lib/"
+    git -C "$DM" add -A
+    git -C "$DM" commit -q -m "root"
+    tagged='## Summary\nDrop the legacy column.\n\n<!-- destructive-migration[drop-column]: legacy_pos is superseded by pos_v2; data copied in 2026-08 -->'
+    plain='## Summary\nDrop the legacy column.'
+    commit_in "$DM" "chore: dm drop 1 (#1)" "ibl5/migrations/901_dm_drop_1.sql" \
+        "ALTER TABLE ibl_plr DROP COLUMN legacy_pos;
+"
+    record "$DM" "$et" 1 "chore: dm drop 1" "2026-09-01T12:00:00Z" "dm-branch-1" "$tagged"
+    record "$DM" "$eb" 1 "chore: dm drop 1" "2026-09-01T12:00:00Z" "dm-branch-1" "$tagged"
+    # PRs 2 and 3 are untagged in the mixed fixture: HELD needs FALSE_FLAG_THRESHOLD (2) flags.
+    commit_in "$DM" "chore: dm drop 2 (#2)" "ibl5/migrations/902_dm_drop_2.sql" \
+        "ALTER TABLE ibl_plr DROP COLUMN legacy_height;
+"
+    record "$DM" "$et" 2 "chore: dm drop 2" "2026-09-02T12:00:00Z" "dm-branch-2" "$tagged"
+    record "$DM" "$eb" 2 "chore: dm drop 2" "2026-09-02T12:00:00Z" "dm-branch-2" "$plain"
+    commit_in "$DM" "chore: dm drop 3 (#3)" "ibl5/migrations/903_dm_drop_3.sql" \
+        "ALTER TABLE ibl_plr DROP COLUMN legacy_weight;
+"
+    record "$DM" "$et" 3 "chore: dm drop 3" "2026-09-03T12:00:00Z" "dm-branch-3" "$tagged"
+    record "$DM" "$eb" 3 "chore: dm drop 3" "2026-09-03T12:00:00Z" "dm-branch-3" "$plain"
+    # Plain PRs lift the sample past MIN_MATURED_REPLAYS (5); without them the verdict is UNKNOWN.
+    local n
+    for n in 4 5 6; do
+        commit_in "$DM" "chore: dm filler $n (#$n)" "src/dm_filler_$n.txt" "$n
+"
+        record "$DM" "$et" "$n" "chore: dm filler $n" "2026-09-0${n}T12:00:00Z" "dm-branch-$n" "$plain"
+        record "$DM" "$eb" "$n" "chore: dm filler $n" "2026-09-0${n}T12:00:00Z" "dm-branch-$n" "$plain"
+    done
+    entries_to_json "$et" "$DMJ_TAGGED"
+    entries_to_json "$eb" "$DMJ_BOTH"
+    git -C "$DM" update-ref refs/remotes/origin/master master
+}
+
+# dm_candidate <branch> — branch off master carrying the working-tree gate script.
+dm_candidate() {
+    git -C "$DM" checkout -q -b "$1" master
+    cp "$REPO_ROOT/bin/check-destructive-migrations" "$DM/bin/check-destructive-migrations"
+    chmod 755 "$DM/bin/check-destructive-migrations"
+    git -C "$DM" add -A
+    git -C "$DM" commit -q -m "feat: dm gate check-destructive-migrations"
+    git -C "$DM" checkout -q master
+}
+
+# run_dm <head> <fixture-json>
+run_dm() {
+    run_gb "--repo=$DM" "--base=master" "--head=$1" "--fixture-history=$2" "--now=$NOW"
+}
+
 # --- rp history: replayable PR-body and diff-scoped hygiene gates (backlog#1291) ---
 RP="$T/rp"
 RPJ="$T/rp.json"
@@ -507,7 +568,25 @@ case_e2e_hygiene_base_seam_holds() {
     rp_holds_case e2e-hygiene-base-seam-holds check-e2e-hygiene
 }
 
-CASES="noisy-gate-holds quiet-gate-clears non-gate-zero-cost timeout-unknown unspecified-holds unknown-flag space-form-rejected stacked-base minimal-env cleanup gate-flag-space-form gate-flag-bad-rev gate-flag-replays-old-version pma-2506-noisy-holds pma-2520-good-clears manual-testing-body-replay-holds post-merge-recipe-body-replay-clears phpunit-hygiene-base-seam-holds e2e-hygiene-base-seam-holds"
+case_destructive_bypass_body_replay() {
+    setup_dm
+    dm_candidate dm-destructive
+    # Every drop PR tagged: the marker is honoured on replay, so the gate clears.
+    run_dm dm-destructive "$DMJ_TAGGED"
+    if ! { [ "$RC" -eq 0 ] && has "$OUT" "gate-backtest-state: CLEARED" && ! has "$OUT" "flagged"; }; then
+        fail "destructive-bypass-body-replay (tagged: rc=$RC, out=$OUT, err=$ERR)"
+        return
+    fi
+    # PR 1 tagged, PRs 2 and 3 untagged: exactly the untagged PRs flag, so the gate holds.
+    run_dm dm-destructive "$DMJ_BOTH"
+    if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD" && has "$OUT" "flagged 2 clean PRs"; then
+        ok "destructive-bypass-body-replay"
+    else
+        fail "destructive-bypass-body-replay (both: rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+CASES="noisy-gate-holds quiet-gate-clears non-gate-zero-cost timeout-unknown unspecified-holds unknown-flag space-form-rejected stacked-base minimal-env cleanup gate-flag-space-form gate-flag-bad-rev gate-flag-replays-old-version pma-2506-noisy-holds pma-2520-good-clears manual-testing-body-replay-holds post-merge-recipe-body-replay-clears phpunit-hygiene-base-seam-holds e2e-hygiene-base-seam-holds destructive-bypass-body-replay"
 
 run_case() {
     case "$1" in
@@ -530,6 +609,7 @@ run_case() {
         post-merge-recipe-body-replay-clears) case_post_merge_recipe_body_replay_clears ;;
         phpunit-hygiene-base-seam-holds) case_phpunit_hygiene_base_seam_holds ;;
         e2e-hygiene-base-seam-holds) case_e2e_hygiene_base_seam_holds ;;
+        destructive-bypass-body-replay) case_destructive_bypass_body_replay ;;
         *)
             printf 'Unknown case: %s\n' "$1" >&2
             printf 'Valid cases: %s all\n' "$CASES" >&2

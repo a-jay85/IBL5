@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 2 — resolve a rebase conflict, prove no work was lost, and arm the conflict hold. Loaded only when the Phase 2 rebase block prints STOP-AND-RESOLVE.
-last_verified: 2026-09-28
+last_verified: 2026-10-06
 paths:
   - .claude/skills/post-plan/SKILL.md
   - .claude/review-shared/_rebase-and-conflicts.md
@@ -133,12 +133,24 @@ bash /tmp/post-plan-lostwork-<KEY>.sh <KEY> ; echo "LOSTWORK-RC=$?"
 **This is a gate, not a report.** The push in `SKILL.md` Phase 2 step 3 is permitted **only
 if** this prints `TREE-EQUIVALENT` **and** `LOSTWORK-RC=0`. Any other outcome —
 `TREE DIVERGED — inspect before pushing`, a non-zero rc, or no output at all — halts the run
-with a `STOP:` line naming the script and both patch paths. Every failure path inside
-`lostwork.sh` emits `TREE DIVERGED`, but only the early guards (missing arg, absent or empty
-patch, failed `git apply --numstat`, empty pre-numstat) also exit 1 — the final
-differing-numstat branch prints `TREE DIVERGED — inspect before pushing` and exits **0**.
+with a `STOP:` line naming the script and both patch paths. The guards in `lostwork.sh`
+print `TREE DIVERGED` and exit 1. They cover a missing arg, an absent or empty patch, a patch
+`git apply --numstat` cannot parse, a git-quoted path, and zero file entries. The lost-work
+branch prints one `LOST:` line per finding, then `TREE DIVERGED — inspect before pushing`,
+and exits **0**.
 That is exactly why this check is conjunctive on the printed verdict and not on the rc alone:
 gating on `LOSTWORK-RC=0` by itself would wave the commonest divergence straight through.
+
+**What the proof checks.** It reads the post-rebase tree at `HEAD`. It never reads the
+post-rebase diff. Every file the pre-rebase patch touched must still exist at `HEAD`, or
+still be gone if the branch deleted it. Every significant added line (one holding a letter or
+digit) must appear verbatim as a whole line of `HEAD:<path>`. Every significant deleted line
+must appear fewer times at `HEAD` than at `origin/master`; a line the same file entry also
+adds counts as moved and is skipped. A master edit to the same file never trips the proof. A
+change master already landed passes too, because the line is still in the tree. A line both
+sides edited, which the resolution merged into a third version, blocks. That is the accepted
+fail-closed cost, recorded in ADR-0174. The `CHECKED: files=N added=A deleted=D` line
+before the verdict shows the comparison ran over something.
 
 Reviewing a resolution *after* it shipped is exactly what this replaces: an unreviewed
 resolution that dropped a hunk would otherwise reach master through auto-merge.
@@ -270,7 +282,7 @@ diff, which is a precondition for the push that produced this PR.
 
 **(b) Review result.** A dedicated conflict-resolution review read every path in the resolution
 manifest and found no dropped semantics on either side. The lost-work proof also passed
-(`TREE-EQUIVALENT`), so nothing was silently dropped in bytes. Auto-merge is armed. The PR still
+(`TREE-EQUIVALENT`), so nothing was silently dropped from the branch's changes. Auto-merge is armed. The PR still
 has to clear every other Phase 6.5 condition and CI before it merges.
 
 **(c) Files the resolution touched.**

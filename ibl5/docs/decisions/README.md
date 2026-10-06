@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-10-04
+last_verified: 2026-10-06
 ---
 
 # IBL5 Architecture Decision Records
@@ -65,6 +65,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0162](0162-burndown-loop-weekly-pacing.md) | Unattended /burndown loop paced against the weekly window | Accepted | Fresh headless session per batch, straight-line pacing to (100-R)% at the weekly reset, fail-closed on a missing reading, exit 75 pause resumed by the coordinator. |
 | [0165](0165-scheduled-merged-worktree-gc.md) | Scheduled merged-worktree GC | Accepted | `bin/wt-gc-tick` runs `bin/cleanup --all` hourly under launchd (HID-idle gate, 6 h minimum interval, no destructive flags) and logs stalled, unpushed and empty worktrees without deleting them. |
 | [0158](0158-j27-fta-undershoot-attribution.md) | Record the J27 FTA undershoot decomposition and its ruled-out levers | Accepted | `TestRealArchive_FTADecomp` splits the FTA gap into foul volume and yield per foul. The gap is volume: JSB's non-shooting fouls, team-foul bonus, and 3-shot trips need new engine state, so no lever ships. |
+| [0174](0174-lostwork-change-level-proof.md) | Lost-work proof compares branch changes against the post-rebase tree | Accepted | `lostwork.sh` checks every significant line the branch added or deleted against `HEAD` instead of comparing numstat rows. Master edits to the same file and absorbed hunks pass. A line both sides edited still blocks. |
 
 ## When an ADR is Required
 

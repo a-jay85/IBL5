@@ -459,6 +459,7 @@ run_span "$PP_TERMINAL_SPAN"
 RPT=$(skipped_report)
 assert_contains "$(cat "$RPT" 2>/dev/null)" "Why: BLOCKMARK-D reason line." "row 12d: report carries the block text"
 assert_contains "$(cat "$RPT" 2>/dev/null)" "Result line: $RC3_RESULT_LINE" "row 12d: report keeps the RESULT: line"
+assert_contains "$(cat "$RPT" 2>/dev/null)" "  1. cd /wt" "row 12d: report keeps the cd-to-worktree step"
 # The log tail below still shows the raw markers; only the block section must be marker-free.
 assert_eq "$(sed -n '1,/^## Post-plan log tail/p' "$RPT" | grep -c '^=== ')" "0" "row 12d: no marker lines above the log tail"
 rm -rf "$SB"
@@ -468,6 +469,7 @@ rc3_sandbox 3 yes
 run_span "$PP_TERMINAL_SPAN"
 RPT=$(skipped_report)
 assert_contains "$(cat "$RPT" 2>/dev/null)" "test-plan did not ship. No PR opened." "row 12e: fallback block names the plan"
+assert_contains "$(cat "$RPT" 2>/dev/null)" "  1. cd $SB/worktree" "row 12e: fallback block names the worktree to cd into"
 assert_contains "$(cat "$RPT" 2>/dev/null)" "  3. bin/post-plan-now" "row 12e: fallback block has the re-run step"
 assert_contains "$(cat "$RPT" 2>/dev/null)" "Log: $LOG" "row 12e: fallback block names the log"
 rm -rf "$SB"

@@ -61,11 +61,14 @@ def last_part(name):
 
 
 class Statement(object):
-    def __init__(self, start_line, end_line, masked, clean):
+    def __init__(self, start_line, end_line, masked, clean, raw=None):
         self.start_line = start_line
         self.end_line = end_line
         self.masked = masked
         self.clean = clean
+        # Un-collapsed text: literal bodies keep their newlines, so a
+        # `--` comment inside a prepared literal ends at its own line.
+        self.raw = clean if raw is None else raw
         self.lower = masked.lower()
         self.clean_lower = clean.lower()
 
@@ -96,9 +99,10 @@ class Splitter(object):
 
         def finish(end_line):
             m = _collapse("".join(masked))
-            c = _collapse("".join(clean))
+            r = "".join(clean)
+            c = _collapse(r)
             if m and start is not None:
-                statements.append(Statement(start, end_line, m, c))
+                statements.append(Statement(start, end_line, m, c, r))
 
         while i < n:
             ch = text[i]
@@ -456,12 +460,12 @@ def _string_literals(clean):
         i = j + 1
 
 
-def _ddl_from_literals(clean):
+def _ddl_from_literals(raw):
     """Return the literal bodies whose first word (lowercased, after
     leading whitespace and comments) is in PREPARED_DDL_HEADS. 'SELECT 1'
     and any other head return nothing."""
     out = []
-    for body in _string_literals(clean):
+    for body in _string_literals(raw):
         virt, _ = Splitter(body).split()
         words = virt[0].lower.split(None, 1) if virt else []
         if words and words[0] in PREPARED_DDL_HEADS:
@@ -502,7 +506,7 @@ def expand_prepared(statements):
             src = st
         if src is None:
             continue
-        for body in _ddl_from_literals(src.clean):
+        for body in _ddl_from_literals(src.raw):
             virt, _ = Splitter(body).split()
             for v in virt:
                 v.start_line = src.start_line

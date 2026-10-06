@@ -214,6 +214,18 @@ def _touched(tok: str, changed_files: list[str]) -> bool:
     return False
 
 
+def _rooted_match(tok: str, files: list[str]) -> bool:
+    """Exact, path-suffix, or directory-prefix match only. Used for a citation that was
+    written with a leading `/`: `/ibl5/modules.php` and `/modules.php` match tracked
+    `ibl5/modules.php`; `/post-plan` does NOT match `.claude/skills/post-plan/SKILL.md`
+    (a parent-dir-name hit is what _touched accepts and what made a slash command look
+    like a repo path)."""
+    tok = tok.strip().lstrip("/").rstrip("/")
+    if not tok:
+        return False
+    return any(f == tok or f.endswith("/" + tok) or f.startswith(tok + "/") for f in files)
+
+
 @functools.lru_cache(maxsize=4)
 def _tracked_files(repo_root: str = _HARNESS_REPO_ROOT) -> tuple[str, ...] | None:
     """`git ls-files` of repo_root, or None when git is unavailable (fail closed upstream)."""
@@ -225,13 +237,27 @@ def _tracked_files(repo_root: str = _HARNESS_REPO_ROOT) -> tuple[str, ...] | Non
 
 
 def _repo_path_candidates(evidence: list[str], changed_files: list[str],
-                          tracked: tuple[str, ...] | list[str] | None) -> list[str]:
+                          tracked: tuple[str, ...] | list[str] | None,
+                          dropped: list[str] | None = None) -> list[str]:
     """Citations that could name a repo path. tracked=None keeps every citation (fail closed)."""
     if tracked is None:
         return list(evidence)
     tracked_list = list(tracked)
-    return [p for p in evidence
-            if _touched(p, changed_files) or _touched(p, tracked_list)]
+    out: list[str] = []
+    for p in evidence:
+        if p.startswith("~/"):
+            if dropped is not None:
+                dropped.append(p)
+            continue
+        if p.startswith("/"):
+            if _rooted_match(p, changed_files) or _rooted_match(p, tracked_list):
+                out.append(p)
+            elif dropped is not None:
+                dropped.append(p)
+            continue
+        if _touched(p, changed_files) or _touched(p, tracked_list):
+            out.append(p)
+    return out
 
 
 def _note(notes: list[str] | None, line: str) -> None:
@@ -258,7 +284,7 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
     fidelity.build_work_list excludes them from the fixer loop.
 
     `notes` is an out-param like `resolutions` on `check`. Each exemption appends one
-    `NO-DIFF-PHASE:` / `UNCHECKABLE-PHASE:` line, and a rejected marker appends
+    `NO-DIFF-PHASE:` / `UNCHECKABLE-PHASE:` / `NON-REPO-CITATION:` line, and a rejected marker appends
     `NO-DIFF-IGNORED:`. Notes are never returned as items, so they never hold a PR.
     """
     if not plan.found or not plan.phases:
@@ -278,7 +304,11 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
         if not ph.evidence_paths:
             continue
         tracked = tracked_files if tracked_files is not None else _tracked_files()
-        cands = _repo_path_candidates(ph.evidence_paths, changed_files, tracked)
+        dropped: list[str] = []
+        cands = _repo_path_candidates(ph.evidence_paths, changed_files, tracked, dropped)
+        for tok in dropped:
+            _note(notes, f"NON-REPO-CITATION: {ph.number} — {tok[:80]} "
+                         f"(leading / or ~/ and no exact, suffix, or directory match)")
         if not cands:
             sample = ", ".join(ph.evidence_paths[:3])
             more = f" (+{len(ph.evidence_paths) - 3} more)" if len(ph.evidence_paths) > 3 else ""
@@ -395,7 +425,8 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     each token that matched by suffix or basename rather than exactly.
 
     tracked_files and notes are forwarded to phase_omission_items (see there); notes,
-    when a list is passed, collects the phase exemption lines.
+    when a list is passed, collects the phase exemption lines (including one
+    NON-REPO-CITATION: line per dropped citation).
 
     read_file, when given, is called with each path in changed_files to fetch that file's
     text from the PR tree; a required method the diff hunks never show but a changed file

@@ -408,10 +408,115 @@ class PhpExtractor(object):
         return self.fragments, self.comments
 
 
+PREPARED_DDL_HEADS = ("alter", "create", "drop", "rename", "truncate", "delete", "update")
+PREPARE_VAR_RE = re.compile(r"^prepare [a-z0-9_$]+ from @([a-z0-9_$]+)$")
+PREPARE_LIT_RE = re.compile(r"^prepare [a-z0-9_$]+ from ''$")
+
+
+def _string_literals(clean):
+    """Yield the unescaped body of every '...' and "..." literal in `clean`.
+    Doubled quotes ('' inside '...') and backslash escapes are honored;
+    backtick identifiers are skipped. Never raises on an unterminated
+    literal: the tail is dropped."""
+    n = len(clean)
+    i = 0
+    while i < n:
+        ch = clean[i]
+        if ch == "`":
+            j = clean.find("`", i + 1)
+            if j == -1:
+                return
+            i = j + 1
+            continue
+        if ch not in ("'", '"'):
+            i += 1
+            continue
+        quote = ch
+        buf = []
+        j = i + 1
+        closed = False
+        while j < n:
+            c2 = clean[j]
+            if c2 == "\\" and j + 1 < n:
+                buf.append(clean[j + 1])
+                j += 2
+                continue
+            if c2 == quote:
+                if j + 1 < n and clean[j + 1] == quote:
+                    buf.append(quote)
+                    j += 2
+                    continue
+                closed = True
+                break
+            buf.append(c2)
+            j += 1
+        if not closed:
+            return
+        yield "".join(buf)
+        i = j + 1
+
+
+def _ddl_from_literals(clean):
+    """Return the literal bodies whose first word (lowercased, after
+    lstrip) is in PREPARED_DDL_HEADS. 'SELECT 1' and any other head
+    return nothing."""
+    out = []
+    for body in _string_literals(clean):
+        words = body.lstrip().lower().split(None, 1)
+        if words and words[0] in PREPARED_DDL_HEADS:
+            out.append(body)
+    return out
+
+
+def _resolve_set(statements, k, var):
+    """Walk statements[k-1] .. statements[0]. Return the first statement
+    whose `.lower` assigns @var: `set @var =` / `set @var :=` returns
+    that statement; `... into @var` (SELECT ... INTO) returns None. No
+    assignment found returns None."""
+    set_re = re.compile(r"^set @" + re.escape(var) + r" ?:?=")
+    into_re = re.compile(r"\binto @" + re.escape(var) + r"(?![a-z0-9_$])")
+    for idx in range(k - 1, -1, -1):
+        st = statements[idx]
+        if set_re.match(st.lower):
+            return st
+        if into_re.search(st.lower):
+            return None
+    return None
+
+
+def expand_prepared(statements):
+    """Return a new list: every statement in order, and after each
+    `PREPARE n FROM @v` / `PREPARE n FROM '<lit>'` the virtual statements
+    re-split from its DDL literals."""
+    out = []
+    for k, st in enumerate(statements):
+        out.append(st)
+        src = None
+        m = PREPARE_VAR_RE.match(st.lower)
+        if m:
+            src = _resolve_set(statements, k, m.group(1))
+            if src is not None and "concat(" in src.lower:
+                src = None
+        elif PREPARE_LIT_RE.match(st.lower):
+            src = st
+        if src is None:
+            continue
+        for body in _ddl_from_literals(src.clean):
+            virt, _ = Splitter(body).split()
+            for v in virt:
+                v.start_line = src.start_line
+                v.end_line = src.end_line
+                out.append(v)
+    return out
+
+
 def extract_sql(path, text):
     """Return (units, comments). Each unit is (Statement list, select_range,
     report_line_or_None). For .sql there is one unit with per-statement
-    ranges; for .php one unit per fragment, selected as a whole."""
+    ranges; for .php one unit per fragment, selected as a whole.
+    PREPARE n FROM @v / FROM '<lit>' is followed by virtual statements
+    re-split from the DDL literal of the nearest preceding SET @v,
+    reported at the SET's lines."""
     if path.endswith(".php"):
         fragments, comments = PhpExtractor(text).extract()
         units = []
@@ -422,8 +527,9 @@ def extract_sql(path, text):
                 st.start_line = frag.first_line
                 st.end_line = frag.last_line
             units.extend(stmts)
-        return units, comments
-    return Splitter(text).split()
+        return expand_prepared(units), comments
+    statements, comments = Splitter(text).split()
+    return expand_prepared(statements), comments
 
 
 # ---------------------------------------------------------------------------

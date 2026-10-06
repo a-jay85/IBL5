@@ -460,6 +460,21 @@ def _phase_evidence_paths(body: str) -> list[str]:
     return out
 
 
+_HEADING_PREFIX_RE = re.compile(r"^(?:Phase|Step)\s*\d+\s*:?\s*", re.I)
+_HEADING_WORD_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
+
+
+def _heading_words(heading: str) -> list[str]:
+    """Bare tokens of a phase heading, deduped, first-seen order. Backticks and edge
+    punctuation are stripped; a token with `/` is evidence territory, never a word."""
+    out: list[str] = []
+    for raw in _HEADING_PREFIX_RE.sub("", heading).split():
+        w = raw.strip("`").strip("()[]{}<>,:;.!?\"'*")
+        if w and "/" not in w and _HEADING_WORD_RE.match(w) and w not in out:
+            out.append(w)
+    return out
+
+
 def parse_phases(content: str) -> list[PhaseInfo]:
     """One PhaseInfo per `## Phase N:` / `## Step N:` h2 heading, in document order.
 
@@ -471,7 +486,8 @@ def parse_phases(content: str) -> list[PhaseInfo]:
     phase. A repeated phase number merges into the first occurrence (evidence unioned) so
     a plan with a duplicated heading yields one entry per number. A body line
     `**No diff:** <reason>` of NO_DIFF_MIN_REASON or more characters sets `no_diff_reason`;
-    a shorter reason sets `no_diff_rejected` instead.
+    a shorter reason sets `no_diff_rejected` instead. Bare heading tokens land in
+    `heading_words` (see state.PhaseInfo); they are never evidence.
     """
     lines = _strip_fenced(content)
     phases: list[PhaseInfo] = []
@@ -497,9 +513,13 @@ def parse_phases(content: str) -> list[PhaseInfo]:
             heading = line[3:].strip()
             if num in by_number:
                 current = by_number[num]
+                for w in _heading_words(heading):
+                    if w not in current.heading_words:
+                        current.heading_words.append(w)
             else:
                 current = PhaseInfo(number=num, heading=heading,
-                                    bookkeeping=bool(_BOOKKEEPING_MARKER_RE.search(heading)))
+                                    bookkeeping=bool(_BOOKKEEPING_MARKER_RE.search(heading)),
+                                    heading_words=_heading_words(heading))
                 by_number[num] = current
                 phases.append(current)
             buf = [heading]

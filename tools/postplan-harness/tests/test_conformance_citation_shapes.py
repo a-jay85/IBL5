@@ -94,3 +94,91 @@ def test_relative_tokens_unaffected():
     items, notes = _run(1, ["bin/wt-up"], ["bin/wt-up"], ["bin/wt-up"])
     assert items == []
     assert notes == []
+
+
+# --- shape B: heading-named file clearance -------------------------------------------
+
+def _heading_run(words, evidence, changed, tracked):
+    ph = PhaseInfo(number=1, heading="Phase 1: Heading naming a file (" + " ".join(words) + ")",
+                   evidence_paths=evidence, heading_words=list(words))
+    notes: list[str] = []
+    items = conformance.phase_omission_items(_plan(ph), changed, tracked, notes)
+    return items, [n for n in notes if n.startswith("HEADING-NAMED-PHASE:")], notes
+
+
+def test_heading_named_dockerfile_clears_with_note():
+    items, named, _ = _heading_run(
+        ["Mask", "values", "Dockerfile", "ibl5.conf"], ["bin/wt-up", "ibl5/.htaccess"],
+        ["Dockerfile"], ["Dockerfile", "bin/wt-up", "ibl5/.htaccess"])
+    assert items == []
+    assert len(named) == 1
+    assert named[0].startswith("HEADING-NAMED-PHASE: 1 — ")
+    assert "heading names Dockerfile, changed as Dockerfile" in named[0]
+
+
+def test_heading_named_rule_file_clears_by_unique_basename():
+    items, named, _ = _heading_run(
+        ["Rewrite", "workflow-continuity.md"], ["bin/post-plan-now"],
+        [".claude/rules/workflow-continuity.md"],
+        [".claude/rules/workflow-continuity.md", "bin/post-plan-now"])
+    assert items == []
+    assert "changed as .claude/rules/workflow-continuity.md" in named[0]
+
+
+def test_heading_named_root_file_without_dot_clears():
+    items, named, _ = _heading_run(
+        ["Update", "Makefile"], ["bin/q"], ["Makefile"], ["Makefile", "bin/q"])
+    assert items == []
+    assert len(named) == 1
+
+
+def test_heading_named_colliding_basename_still_holds():
+    tracked = ["README.md", "tools/x/README.md", "bin/q"]
+    items, named, _ = _heading_run(["Update", "README.md"], ["bin/q"],
+                                   ["tools/x/README.md"], tracked)
+    assert len(items) == 1 and items[0].startswith("MISSING-PHASE:")
+    assert named == []
+    items, named, _ = _heading_run(["Update", "README.md"], ["bin/q"], ["README.md"], tracked)
+    assert len(items) == 1
+    assert named == []
+
+
+def test_heading_named_file_absent_from_diff_still_holds():
+    items, named, _ = _heading_run(["Dockerfile"], ["bin/q"], ["bin/other"],
+                                   ["Dockerfile", "bin/q"])
+    assert len(items) == 1
+    assert named == []
+
+
+def test_heading_plain_word_never_qualifies():
+    items, named, _ = _heading_run(["Fix", "ship", "backlog"], ["bin/q"], ["scripts/ship"],
+                                   ["scripts/ship", "scripts/backlog", "bin/q"])
+    assert len(items) == 1
+    assert named == []
+
+
+def test_heading_named_duplicate_tracked_dockerfile_holds():
+    items, named, _ = _heading_run(["Dockerfile"], ["bin/q"], ["Dockerfile"],
+                                   ["Dockerfile", "tools/x/Dockerfile", "bin/q"])
+    assert len(items) == 1
+    assert named == []
+
+
+def test_heading_named_untracked_new_file_does_not_clear():
+    items, named, _ = _heading_run(["New.md"], ["bin/q"], ["New.md", "bin/other"], ["bin/q"])
+    assert len(items) == 1
+    assert named == []
+
+
+def test_heading_clearance_skipped_when_tracked_unavailable(monkeypatch):
+    monkeypatch.setattr(conformance, "_tracked_files", lambda *a, **k: None)
+    items, named, _ = _heading_run(["Dockerfile"], ["bin/q"], ["Dockerfile"], None)
+    assert len(items) == 1
+    assert named == []
+
+
+def test_heading_clearance_never_fires_on_a_clean_phase():
+    items, _, notes = _heading_run(["Dockerfile"], ["bin/q"], ["bin/q", "Dockerfile"],
+                                   ["Dockerfile", "bin/q"])
+    assert items == []
+    assert notes == []

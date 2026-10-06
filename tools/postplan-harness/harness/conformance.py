@@ -265,6 +265,28 @@ def _note(notes: list[str] | None, line: str) -> None:
         notes.append(line)
 
 
+def _heading_named_change(words: list[str], changed_files: list[str],
+                          tracked: tuple[str, ...] | list[str] | None) -> tuple[str, str] | None:
+    """(word, tracked_path) when a heading word names a file by a basename that is unique in
+    `tracked` and that unique path is in the diff; else None. A word qualifies only when it
+    carries a `.` or equals a repo-root tracked file name (`Dockerfile`, `Makefile`), so a
+    plain word never names a file. tracked=None (git unavailable) never clears."""
+    if tracked is None or not words:
+        return None
+    by_base: dict[str, list[str]] = {}
+    for f in tracked:
+        by_base.setdefault(PurePosixPath(f).name, []).append(f)
+    root_files = {f for f in tracked if "/" not in f}
+    changed = set(changed_files)
+    for w in words:
+        if "." not in w and w not in root_files:
+            continue
+        paths = by_base.get(w, [])
+        if len(paths) == 1 and paths[0] in changed:
+            return (w, paths[0])
+    return None
+
+
 def phase_omission_items(plan: PlanInfo, changed_files: list[str],
                          tracked_files: list[str] | tuple[str, ...] | None = None,
                          notes: list[str] | None = None) -> list[str]:
@@ -276,7 +298,9 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
     path at all (no evidence = cannot verify = skip), and a phase none of whose citations
     can name a repo path (uncheckable). A citation is a repo-path candidate when `_touched`
     matches it against the diff or against `git ls-files`; a mixed phase is checked on its
-    candidates alone. `tracked_files=None` reads `_tracked_files()` and, when that is
+    candidates alone. A phase that would hold is cleared when a bare word in its HEADING
+    names a tracked file by a basename unique in `git ls-files` and that file is in the
+    diff (`HEADING-NAMED-PHASE:` note); the word must carry a `.` or be a repo-root file name. `tracked_files=None` reads `_tracked_files()` and, when that is
     unavailable, keeps every citation a candidate (fail closed, today's behaviour); an
     explicit empty list means nothing is tracked. Empty when the plan was not found or has
     no parsed phases, so a plan-blind run and every pre-existing PlanInfo literal produce
@@ -316,6 +340,11 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
                          f"(no repo-path citation among {sample}{more})")
             continue
         if any(_touched(p, changed_files) for p in cands):
+            continue
+        named = _heading_named_change(ph.heading_words, changed_files, tracked)
+        if named:
+            _note(notes, f"HEADING-NAMED-PHASE: {ph.number} — {ph.heading[:80]} "
+                         f"(heading names {named[0]}, changed as {named[1]})")
             continue
         sample = ", ".join(cands[:3])
         more = f" (+{len(cands) - 3} more)" if len(cands) > 3 else ""

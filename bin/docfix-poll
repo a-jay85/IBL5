@@ -251,7 +251,7 @@ salvage_wedged_branch() {   # $1 = branch name
     salvage_branch="docs-stale-salvage-$(date +%Y%m%d)"
     local wt changed files
     wt="$(git -C "$MAIN" worktree list --porcelain \
-          | awk -v b="refs/heads/$branch" '/^worktree /{p=$2} $0=="branch "b && !f{print p; f=1}')"
+          | awk -v b="refs/heads/$branch" '/^worktree /{p=$2} !f && $0=="branch "b{print p; f=1}')"
 
     if [ -z "$wt" ] || [ ! -d "$wt" ]; then
         # No worktree ⇒ nothing uncommitted can exist, and named-mode bin/cleanup

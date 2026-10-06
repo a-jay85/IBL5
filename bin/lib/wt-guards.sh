@@ -118,9 +118,11 @@ has_open_pr() {
 # Prints the path to stdout; empty output means no worktree found.
 get_worktree_path() {
     local branch="$1"
+    # awk reads all input (no early exit) so git never takes SIGPIPE under
+    # pipefail. An early `exit` killed wt-remove with 141 on long lists.
     git worktree list --porcelain | awk -v branch="refs/heads/$branch" '
         /^worktree / { path = substr($0, 10) }
-        $0 == "branch " branch && !f { print path; f=1 }
+        !found && $0 == "branch " branch { print path; found = 1 }
     '
 }
 

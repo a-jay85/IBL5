@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-02
+last_verified: 2026-10-05
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -186,6 +186,8 @@ The pressure runs one way only. A *reducible* hold (one a buildable check would 
 The final clause (that every settleable sentence of a justification is an unwritten matrix row) exists because hold justifications drift into instructions. A justification that tells the human to go run something has not identified an irreducible judgment; it has deferred an observable claim. `bin/check-plan` gate `[H]` catches the ask-shaped phrasing, but the gate is a narrow pattern check and passing it is the floor.
 
 **Incident record.** Gate 15's second arm exists because PR #1753 held on 14(b), so arm 1 never ran, and a roster-blind recap could have no-op'd in prod indefinitely with CI green. The decision-only rule for hold justifications exists because `~/claude-plans/maint-2-13-freeagency-admin-split.md` verified a namespace move with matrix rows 9, 10, 14, 30 and 43, then asked the human to confirm those same properties again at the merge button.
+
+Why the `Assertions:` field exists: two past PRs were blocked by a delegate that tested one property where the plan wrote four. A grep for the property name is green from birth, so it cannot stand in for running the test.
 
 ## Delegation packets: the `Rules:` field
 

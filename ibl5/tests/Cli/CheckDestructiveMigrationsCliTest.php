@@ -673,6 +673,143 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
         self::assertStringContainsString('unresolved', $result['output']);
     }
 
+    public function testPreparedNarrowTypeInMigration151IsFlagged(): void
+    {
+        $src = file_get_contents(dirname(__DIR__, 2) . '/migrations/151_downsize_ibl_draft_team.sql');
+        self::assertNotFalse($src);
+        $setLine = null;
+        foreach (explode("\n", $src) as $index => $line) {
+            if (str_contains($line, 'SET @alter_sql')) {
+                $setLine = $index + 1;
+                break;
+            }
+        }
+        self::assertNotNull($setLine, 'SET @alter_sql not found in migration 151');
+
+        $this->writeSchema("CREATE TABLE `ibl_draft` (\n  `team` varchar(255) NOT NULL DEFAULT '',\n  PRIMARY KEY (`team`)\n) ENGINE=InnoDB;\n");
+        $this->writeMigration('151_downsize_ibl_draft_team.sql', $src);
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[narrow-type]', $result['output']);
+        self::assertStringContainsString("151_downsize_ibl_draft_team.sql:{$setLine} ", $result['output']);
+    }
+
+    public function testPreparedDropColumnReportedAtSetLine(): void
+    {
+        $this->writeMigration(
+            '230_prep_drop.sql',
+            "-- header\nSET @s = IF(@n = 1,\n  'ALTER TABLE foo DROP COLUMN bar',\n  'SELECT 1');\nPREPARE st FROM @s;\nEXECUTE st;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[drop-column]', $result['output']);
+        self::assertStringContainsString('230_prep_drop.sql:2 ', $result['output']);
+        self::assertStringNotContainsString('230_prep_drop.sql:5 ', $result['output']);
+    }
+
+    public function testPreparedSelectOnlyBranchesAreClean(): void
+    {
+        $this->writeMigration(
+            '231_prep_select.sql',
+            "SET @s = IF(@n = 1, 'SELECT 1', 'SELECT 2');\nPREPARE st FROM @s;\nEXECUTE st;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('No destructive migration patterns detected', $result['output']);
+    }
+
+    public function testPreparedNonDdlSetLiteralIsClean(): void
+    {
+        $this->writeMigration(
+            '232_prep_nonddl.sql',
+            "SET @msg = 'SHOW TABLES';\nPREPARE st FROM @msg;\nEXECUTE st;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testPrepareFromUnsetVariableIsClean(): void
+    {
+        $this->writeMigration('233_prep_unset.sql', "PREPARE st FROM @never_set;\nEXECUTE st;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testPreparedPrepareLineOnlyEditIsNotRescanned(): void
+    {
+        $base = "SET @s = IF(@n = 1,\n  'ALTER TABLE foo DROP COLUMN bar',\n  'SELECT 1');\nPREPARE st FROM @s;\nEXECUTE st;\n";
+        $this->writeMigration('234_prep_range.sql', $base);
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "base"');
+
+        $this->writeMigration(
+            '234_prep_range.sql',
+            "SET @s = IF(@n = 1,\n  'ALTER TABLE foo DROP COLUMN bar',\n  'SELECT 1');\nPREPARE st2 FROM @s;\nEXECUTE st2;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testPreparedSetLiteralEditIsRescanned(): void
+    {
+        $base = "SET @s = IF(@n = 1,\n  'ALTER TABLE foo DROP COLUMN bar',\n  'SELECT 1');\nPREPARE st FROM @s;\nEXECUTE st;\n";
+        $this->writeMigration('235_prep_range.sql', $base);
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "base"');
+
+        $this->writeMigration(
+            '235_prep_range.sql',
+            "SET @s = IF(@n = 1,\n  'ALTER TABLE foo DROP COLUMN baz',\n  'SELECT 1');\nPREPARE st FROM @s;\nEXECUTE st;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[drop-column]', $result['output']);
+    }
+
+    public function testPreparedDropColumnSuppressedByTaggedMarker(): void
+    {
+        $this->writeMigration(
+            '236_prep_marker.sql',
+            "-- destructive-migration[drop-column]: guarded by information_schema check before the prepared ALTER runs\n"
+            . "SET @s = IF(@n = 1, 'ALTER TABLE foo DROP COLUMN bar', 'SELECT 1');\nPREPARE st FROM @s;\n"
+        );
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('Traceback', $result['output']);
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('PASS (bypass)', $result['output']);
+    }
+
     public function testNarrowTypeResolvedFromSameFileAddColumn(): void
     {
         $this->writeMigration(

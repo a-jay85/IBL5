@@ -341,7 +341,7 @@ bl_run_batch() {
     # shellcheck disable=SC2086
     env CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 IBL5_BURNDOWN_LOOP=1 \
         IBL5_BURNDOWN_EMPTY_SENTINEL="$BL_EMPTY_SENTINEL" \
-        IBL5_USAGE_GATE=1IBL5_USAGE_GATE_RUNNER=burndown-loop \
+        IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=burndown-loop \
         IBL5_USAGE_GATE_MODEL=claude-sonnet-5-5 \
         IBL5_USAGE_GATE_RESUME_BIN="$ROOT/bin/burndown-loop" \
         IBL5_USAGE_GATE_SESSION_ID="$LOOP_SID" \

@@ -37,7 +37,7 @@ The app caps demands and offers at six years in several places:
 
 - The `FreeAgencyOfferValidator` raise-and-gap loop runs years 2 through 6 (`ibl5/classes/FreeAgency/FreeAgencyOfferValidator.php:282`).
 - `OfferType::calculateYears` in `ibl5/classes/FreeAgency/OfferType.php` counts down from `offer6`.
-- The demand CSV import expects the header `name,dem1..dem6` (`ibl5/import-demands.php:92`).
+- The demand CSV import defaults to the columns `name` and `dem1`..`dem6` (`ibl5/import-demands.php:92`).
 
 Several read paths would change shape under normalization. The public API reads `SELECT * FROM vw_player_current` in `ibl5/classes/Api/Repository/ApiPlayerRepository.php`, so the six columns are part of its response rows. `ibl5/classes/Repositories/SalaryCapRepository.php` reads `vw_current_salary`, and `vw_free_agency_offers` selects `fa.offer1` through `fa.offer6`.
 

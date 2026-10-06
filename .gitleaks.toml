@@ -41,6 +41,7 @@ regexes = [
   # Sentinel value used in bin/test-sim-recap-tick to verify passwords are never
   # logged — deliberately fake, never a real credential.
   '''hunter2_sentinel_xyz''',
+  '''PW-SENTINEL-9f3''',
 
   # Verdict-file key fixture in bin/test-postplan-arm-conditions (a filename
   # fragment, not a credential; the VKEY name trips generic-api-key).

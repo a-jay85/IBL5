@@ -554,6 +554,34 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
         self::assertStringContainsString('--full-scan takes no range and no stdin', $result['output']);
     }
 
+    public function testSchemaFlagRejectsMissingFile(): void
+    {
+        $result = $this->runScript(['--schema=' . $this->tmpDir . '/does-not-exist.sql']);
+
+        self::assertSame(2, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('schema file not found', $result['output']);
+    }
+
+    public function testSchemaFlagIsHonouredByFullScan(): void
+    {
+        $narrowHit = '[narrow-type] ibl5/migrations/034_add_column_comments.sql:422';
+
+        // Frozen schema: ibl_settings.`value` exists, so the hit is absent.
+        self::assertStringNotContainsString($narrowHit, $this->runRepoFullScan()['output']);
+
+        // Renamed column: the old type can no longer be resolved, so the hit appears.
+        $frozen = file_get_contents(self::frozenSchemaPath());
+        self::assertNotFalse($frozen);
+        $needle = "  `value` varchar(128) NOT NULL COMMENT 'Setting value',";
+        self::assertStringContainsString($needle, $frozen);
+        $renamed = $this->tmpDir . '/renamed.schema';
+        file_put_contents($renamed, str_replace($needle, "  `setting_value` varchar(128) NOT NULL COMMENT 'Setting value',", $frozen));
+
+        $result = $this->execRepoFullScan($renamed);
+
+        self::assertStringContainsString($narrowHit, $result['output']);
+    }
+
     public function testSelfTestFlagExitsZero(): void
     {
         $result = $this->runScript(['--self-test']);
@@ -1155,7 +1183,10 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
      * Runs --full-scan over the real ibl5/migrations and compares the
      * `[tag] file:line` tokens with the pinned golden. Files numbered above
      * the golden's pinned-through header are ignored, so a new migration
-     * never breaks this test.
+     * never breaks this test. The scan resolves narrow-type old types from the
+     * frozen destructive-migration-full-scan.schema fixture, not the live
+     * current-schema.sql, so a column rename in current-schema.sql never breaks
+     * it. Regenerate the schema fixture and the golden together.
      */
     public function testFullScanMatchesGoldenFixture(): void
     {
@@ -1240,18 +1271,33 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
     private function runRepoFullScan(): array
     {
         if (self::$repoFullScan === null) {
-            $output = [];
-            $exit = 0;
-            $root = dirname(__DIR__, 3);
-            exec(
-                'cd ' . escapeshellarg($root) . ' && bash ' . escapeshellarg($this->scriptPath) . ' --full-scan 2>&1',
-                $output,
-                $exit,
-            );
-            self::$repoFullScan = ['output' => implode("\n", $output), 'exit' => $exit];
+            self::$repoFullScan = $this->execRepoFullScan(self::frozenSchemaPath());
         }
 
         return self::$repoFullScan;
+    }
+
+    private static function frozenSchemaPath(): string
+    {
+        return __DIR__ . '/fixtures/destructive-migration-full-scan.schema';
+    }
+
+    /**
+     * @return array{output: string, exit: int}
+     */
+    private function execRepoFullScan(string $schemaPath): array
+    {
+        $output = [];
+        $exit = 0;
+        $root = dirname(__DIR__, 3);
+        exec(
+            'cd ' . escapeshellarg($root) . ' && bash ' . escapeshellarg($this->scriptPath)
+                . ' --full-scan --schema=' . escapeshellarg($schemaPath) . ' 2>&1',
+            $output,
+            $exit,
+        );
+
+        return ['output' => implode("\n", $output), 'exit' => $exit];
     }
 
     /**

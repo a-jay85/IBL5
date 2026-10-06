@@ -15,7 +15,7 @@ ENGINE="$(cd "$(dirname "$0")" && pwd)/lib/destructive-migration-scan.py"
 
 usage() {
     cat <<'EOF'
-Usage: bin/check-destructive-migrations [--staged|--since=<sha>|--full-scan] [--bypass-from-stdin] [--self-test] [--help|-h]
+Usage: bin/check-destructive-migrations [--staged|--since=<sha>|--full-scan] [--schema=<path>] [--bypass-from-stdin] [--self-test] [--help|-h]
 
 Scans added/modified migration files under ibl5/migrations/ (*.sql and *.php)
 for destructive SQL statements and blocks unless a tagged bypass marker names
@@ -29,6 +29,7 @@ Modes:
                      honoured here only. Takes no --since and no stdin.
 
 Options:
+  --schema=<path>       Resolve narrow-type old types from this schema dump instead of ibl5/docs/schema/current-schema.sql.
   --bypass-from-stdin   Read PR body from stdin for PR-wide bypass markers.
   --self-test           Run the engine's inline fixture table.
   --help, -h            Show this message.
@@ -109,6 +110,7 @@ SINCE_SHA=""
 SINCE_GIVEN=0
 FULL_GIVEN=0
 SELF_TEST=0
+SCHEMA_OVERRIDE=""
 
 for arg in "$@"; do
     case "$arg" in
@@ -119,6 +121,9 @@ for arg in "$@"; do
             MODE="since"
             SINCE_GIVEN=1
             SINCE_SHA="${arg#--since=}"
+            ;;
+        --schema=*)
+            SCHEMA_OVERRIDE="${arg#--schema=}"
             ;;
         --bypass-from-stdin)
             BYPASS_STDIN=1
@@ -145,6 +150,15 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+if [ -n "$SCHEMA_OVERRIDE" ]; then
+    if [ ! -f "$SCHEMA_OVERRIDE" ]; then
+        echo "schema file not found: $SCHEMA_OVERRIDE" >&2
+        exit 2
+    fi
+    # Absolute before the later cd to the repo root.
+    SCHEMA_OVERRIDE="$(cd "$(dirname "$SCHEMA_OVERRIDE")" && pwd)/$(basename "$SCHEMA_OVERRIDE")"
+fi
 
 if [ "$FULL_GIVEN" = "1" ]; then
     if [ "$SINCE_GIVEN" = "1" ] || [ "$BYPASS_STDIN" = "1" ]; then
@@ -210,7 +224,9 @@ else
 fi
 
 SCHEMA_ARGS=()
-if [ -f "$REPO_ROOT/ibl5/docs/schema/current-schema.sql" ]; then
+if [ -n "$SCHEMA_OVERRIDE" ]; then
+    SCHEMA_ARGS=(--schema "$SCHEMA_OVERRIDE")
+elif [ -f "$REPO_ROOT/ibl5/docs/schema/current-schema.sql" ]; then
     SCHEMA_ARGS=(--schema "$REPO_ROOT/ibl5/docs/schema/current-schema.sql")
 fi
 PR_ARGS=()

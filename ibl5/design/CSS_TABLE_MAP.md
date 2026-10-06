@@ -182,6 +182,7 @@ Module-specific table styles live in `design/components/tables/<feature>.css`. E
 
 | File | Covers |
 |------|--------|
+| `tables/player-row-states.css` | Player row-state modifiers: `.ibl-data-table tbody tr.drafted` (Draft board) and `tr.player-fa-expiring-row` (Team page during Draft / Free Agency), with their sticky-column backgrounds. Imported directly after `tables.css` |
 | `tables/season-highs.css` | `.stat-table`, `.season-highs-discrepancy-panel` |
 | `tables/voting.css` | `.voting-results-table`, `.voting-form-table`, `.voting-submission-feedback` |
 | `tables/trading.css` | Trading module: `.ibl-data-table` rosters, `.trade-offer-card*`, `.trading-*` layout/roster selectors |
@@ -189,13 +190,13 @@ Module-specific table styles live in `design/components/tables/<feature>.css`. E
 | `tables/league-stats.css` | `.league-stats-table` |
 | `tables/contact-list.css` | `.contact-table` |
 | `tables/transaction-history.css` | `.txn-table` (on `.ibl-data-table`) |
-| `tables/depth-chart.css` | Depth Chart table mobile rules extracted from `tables.css` |
+| `depth-chart.css` | `.depth-chart-table` and the Depth Chart form. Lives in `components/`, outside `tables/`, since #1286 consolidated it |
 | `tables/draft-pick-locator.css` | `.draft-pick-table` |
 | `tables/record-holders.css` | `.record-table` / `--*col*` variants, `.record-category*`, `.record-section*` |
 | `tables/projected-draft-order.css` | `.projected-draft-order-table` |
 | `tables/player-movement.css` | `.player-movement-table` |
 | `tables/franchise-record-book.css` | `.record-book-section-title`, `.record-book-team-selector`, `.record-book-retired-cell` |
-| `tables/free-agency.css` | `.fa-table`, `.fa-*` selectors |
+| `tables/free-agency.css` | `.fa-table`, `.fa-table__title`, `.fa-*` selectors, including the mobile and desktop title-centering rules for `.fa-table` inside scroll containers |
 | `tables/standings-rows.css` | `.ibl-data-table tbody tr.clinch-league`, `.clinch-conference`, `.clinch-division`, `.clinch-playoffs`, `.bottom-locked` row variants; responsive sticky-col backgrounds for same rows — NEW |
 | `head-to-head-records.css` | Head-to-Head Records matrix: corner-cell arrows, logo-only or rotated-text column headers, win/loss tints via `.series-record-cell`, hover crosshair, and the user row/column accent. Built on Pattern 3a (`.sticky-table`) with `.ibl-team-cell--colored` row labels. |
 
@@ -205,6 +206,7 @@ If a new module needs table styling beyond `.ibl-data-table` base:
 1. Create `design/components/tables/<module>.css` with `@layer components { ... }`.
 2. Add `@import './components/tables/<module>.css';` in `design/input.css` after the existing `tables/` import block.
 3. Add a row to this table.
+4. Moving existing rules out of `tables.css` is different from adding new ones. Import the destination directly after `tables.css` so the moved rules keep their cascade position. A later partial is safe only when no element can match both the moved rules and the rules between the two imports. Everything sits in one `@layer components`, so source order breaks equal-specificity ties. Compare the compiled CSS before and after the move.
 
 ## Key Gotchas
 

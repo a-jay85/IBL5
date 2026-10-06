@@ -92,7 +92,6 @@ class PlayerStatsCardViewTest extends TestCase
             $this->assertMatchesRegularExpression('/<table class="[^"]*\bstats-table\b/', $result, $snapshotFile);
             $this->assertStringContainsString('class="stats-table-header"', $result, $snapshotFile);
             $this->assertStringNotContainsString('class="player-view-table__title"', $result, $snapshotFile);
-            $this->assertStringNotContainsString('class="player-view-table__title"', $result, $snapshotFile);
         }
     }
 

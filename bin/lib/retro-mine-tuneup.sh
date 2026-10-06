@@ -472,7 +472,7 @@ tuneup_file() {
         [ -n "$item" ] || continue
         rank=$((rank + 1))
         key="$(printf '%s' "$item" | jq -r '.key')"
-        title="$(printf '%s' "$item" | jq -r '.title')"
+        title="$(printf '%s' "$item" | jq -r '.title' | tuneup_redact_text)"
         sigs="$(printf '%s' "$item" | jq -r '.signatures | join(" ")')"
         threads="$(printf '%s' "$item" | jq -r '.threads // 0')"
         num="$(jq -r --arg k "[$key]" '[.[] | select(.title | contains($k)) | .number] | .[0] // empty' "$daydir/issues.json")"

@@ -1358,6 +1358,7 @@ MARKER_CASES = [
     ("pr body tagged", "ALTER TABLE t DROP COLUMN c;\n", "strict", "<!-- destructive-migration[drop-column]: removing an unused legacy column -->", 0),
     ("pr body untagged", "ALTER TABLE t DROP COLUMN c;\n", "strict", "<!-- destructive-migration: removing an unused legacy column -->", 1),
     ("marker inside prepared literal ignored", "SET @s = 'ALTER TABLE t /* destructive-migration[drop-column]: reason text long enough to pass */ DROP COLUMN c';\nPREPARE st FROM @s;\n", "strict", None, 1),
+    ("marker inside prepared literal line-comment ignored", "SET @s = '-- destructive-migration[drop-column]: reason text long enough to pass\nALTER TABLE t DROP COLUMN c';\nPREPARE st FROM @s;\n", "strict", None, 1),
 ]
 
 

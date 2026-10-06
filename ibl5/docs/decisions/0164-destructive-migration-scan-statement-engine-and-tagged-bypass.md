@@ -54,4 +54,4 @@ The engine as first shipped masked every string literal before matching, so DDL 
 
 `extract_sql` now follows each `PREPARE n FROM @v` back to the nearest preceding `SET @v = ...` and re-splits that statement's DDL-headed string literals into virtual statements placed after the PREPARE. They carry the SET's line numbers, so added-range selection and marker scope key on the SET. `PREPARE n FROM '<literal>'` is handled the same way. A variable built by `CONCAT(...)` or bound by `SELECT ... INTO @v` stays unscanned, the same class as PHP `sprintf`.
 
-The change only adds hits. The full-scan golden gained tokens in the ten historical migrations that use the idiom, and lost none. An engine-only change now also runs the PHPUnit job, because `.github/workflows/tests.yml` lists the engine, its wrapper and the golden fixtures under the `src:` filter.
+The change only adds hits. Three of the ten historical PREPARE migrations (077, 009 and 030) each gained one golden token; the remaining seven gained none. An engine-only change now also runs the PHPUnit job, because `.github/workflows/tests.yml` lists the engine, its wrapper and the golden fixtures under the `src:` filter.

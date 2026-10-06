@@ -19,6 +19,16 @@ FAILED=0
 ok() { printf 'PASS %s\n' "$1"; }
 fail() { printf 'FAIL %s\n' "$1"; FAILED=1; }
 
+# Remove scratch paths (skips empty args). Used by RETURN traps in the step67-*/prefire-* cases
+# so temp dirs are cleaned on every return path, early `return 1` included.
+_rm_tmp() {
+    local _p
+    for _p in "$@"; do
+        if [ -n "$_p" ]; then rm -rf -- "$_p"; fi
+    done
+    return 0
+}
+
 # Print the standard Verification Matrix header + separator + given rows.
 # Usage: plan_fixture <row> [<row>...] — writes the header and rows to stdout.
 # To get a plan file outside the repo (keeps git status clean), redirect into a temp path:
@@ -146,7 +156,8 @@ extract_step67_block() {
 }
 
 step67-skipped-no-plan() {
-    local repo
+    local repo plan="" stub_checker=""
+    trap '_rm_tmp "$repo" "${plan:+$(dirname "$plan")}" "$stub_checker"; trap - RETURN' RETURN
     repo=$(mktemp -d)
     git -C "$repo" init -q
     git -C "$repo" commit --allow-empty -m "base" -q
@@ -172,7 +183,8 @@ step67-skipped-no-plan() {
 }
 
 step67-unrealised() {
-    local repo
+    local repo plan="" stub_checker=""
+    trap '_rm_tmp "$repo" "${plan:+$(dirname "$plan")}" "$stub_checker"; trap - RETURN' RETURN
     repo=$(mktemp -d)
     git -C "$repo" init -q
     git -C "$repo" commit --allow-empty -m "base" -q
@@ -203,7 +215,8 @@ step67-unrealised() {
 }
 
 step67-clean() {
-    local repo
+    local repo plan="" stub_checker=""
+    trap '_rm_tmp "$repo" "${plan:+$(dirname "$plan")}" "$stub_checker"; trap - RETURN' RETURN
     repo=$(mktemp -d)
     git -C "$repo" init -q
     git -C "$repo" commit --allow-empty -m "base" -q
@@ -234,7 +247,8 @@ step67-clean() {
 }
 
 step67-uncommitted() {
-    local repo
+    local repo plan="" stub_checker=""
+    trap '_rm_tmp "$repo" "${plan:+$(dirname "$plan")}" "$stub_checker"; trap - RETURN' RETURN
     repo=$(mktemp -d)
     git -C "$repo" init -q
     git -C "$repo" commit --allow-empty -m "base" -q
@@ -263,7 +277,8 @@ step67-uncommitted() {
 }
 
 step67-unavailable() {
-    local repo
+    local repo plan="" stub_checker=""
+    trap '_rm_tmp "$repo" "${plan:+$(dirname "$plan")}" "$stub_checker"; trap - RETURN' RETURN
     repo=$(mktemp -d)
     git -C "$repo" init -q
     git -C "$repo" commit --allow-empty -m "base" -q
@@ -290,7 +305,6 @@ step67-unavailable() {
 
     local out
     out=$(cd "$repo" && PLAN_PATH="$plan" MATRIX_SCRIPT="$stub_checker" bash -c "$block" 2>&1)
-    rm -f "$stub_checker"
     if echo "$out" | grep -q 'MATRIX_VERDICT=unavailable'; then
         echo "PASS step67-unavailable"
     else
@@ -311,7 +325,8 @@ prefire-rule-staged-new-file-realised() {
     span=$(extract_prefire_command)
     [ -n "$span" ] || { echo "FAIL prefire-rule-staged-new-file-realised — extracted span is empty"; return 1; }
 
-    local repo
+    local repo plan="" stub_checker=""
+    trap '_rm_tmp "$repo" "${plan:+$(dirname "$plan")}" "$stub_checker"; trap - RETURN' RETURN
     repo=$(mktemp -d)
     git -C "$repo" init -q
     git -C "$repo" commit --allow-empty -m "base" -q
@@ -347,7 +362,8 @@ prefire-rule-missing-token-unrealised() {
     span=$(extract_prefire_command)
     [ -n "$span" ] || { echo "FAIL prefire-rule-missing-token-unrealised — extracted span is empty"; return 1; }
 
-    local repo
+    local repo plan="" stub_checker=""
+    trap '_rm_tmp "$repo" "${plan:+$(dirname "$plan")}" "$stub_checker"; trap - RETURN' RETURN
     repo=$(mktemp -d)
     git -C "$repo" init -q
     git -C "$repo" commit --allow-empty -m "base" -q

@@ -31,11 +31,12 @@
 # Environment (unset and empty both take the default):
 #   IBL5_BURNDOWN_RESERVE_PCT         weekly percent kept free at reset (default 10)
 #   IBL5_BURNDOWN_MAX_FAILS           consecutive failed or aborted batches before giving up (3)
+#   IBL5_BURNDOWN_EMPTY_SLEEP_MIN     minutes between re-checks while the backlog is empty (240)
 #   IBL5_BURNDOWN_REEXEC_*            internal re-exec hand-off; ignored unless this PID set it
 #   IBL5_BURNDOWN_BATCH_TIMEOUT_MIN   per-batch wall clock in minutes (90)
 #   IBL5_BURNDOWN_DISCORD_DM          finish-DM sender (default bin/discord-dm)
 #
-# Exit codes: 0 loop finished (supply exhausted, stop requested, or --once done).
+# Exit codes: 0 loop finished (stop requested, or --once done; an empty --once batch ends here).
 #             1 consecutive-failure cap hit. Failed batches and /burndown exit-3
 #               aborts share the cap; below it a failure retries after 300s and an
 #               abort after 600s.
@@ -83,6 +84,7 @@ BATCH_ITEMS=0
 UNITS=0
 FAILS=0
 LAST_FAIL=""
+EMPTY_STREAK=0
 START_EPOCH=$(date +%s)
 
 # Re-exec hand-off (see bl_maybe_reexec). Read once, then unset, so batch children
@@ -99,9 +101,10 @@ RX_UNITS="${IBL5_BURNDOWN_REEXEC_UNITS:-}"
 RX_FAILS="${IBL5_BURNDOWN_REEXEC_FAILS:-}"
 RX_START="${IBL5_BURNDOWN_REEXEC_START:-}"
 RX_LAST_FAIL="${IBL5_BURNDOWN_REEXEC_LAST_FAIL:-}"
+RX_EMPTY_STREAK="${IBL5_BURNDOWN_REEXEC_EMPTY_STREAK:-}"
 unset IBL5_BURNDOWN_REEXEC_PID IBL5_BURNDOWN_REEXEC_SID IBL5_BURNDOWN_REEXEC_BATCHES \
     IBL5_BURNDOWN_REEXEC_ITEMS IBL5_BURNDOWN_REEXEC_UNITS IBL5_BURNDOWN_REEXEC_FAILS \
-    IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL
+    IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL IBL5_BURNDOWN_REEXEC_EMPTY_STREAK
 
 BL_PROMPT='Invoke the /burndown skill now and run every step to completion. No human is present: never ask questions or wait for input. When the skill says to show or tell the user something, print it and continue. Make the safe choice and continue. If the first selection round in step 4 prints `LEDGER: none`, end your final message with this exact line on its own: BURNDOWN-LOOP: none-selected. If any bin/backlog command in the run exits 3 (fail-closed abort), stop the run and end your final message with this exact line on its own: BURNDOWN-LOOP: abort-exit-3'
 
@@ -257,26 +260,33 @@ bl_sleep() {
 
 # ------------------------------------------------------------ finish
 
+# bl_dm <msg>: one Discord DM, skipped under --no-dm and --once or when the
+# sender is not executable.
+bl_dm() {
+    [ "$NO_DM" -eq 0 ] && [ "$ONCE" -eq 0 ] || return 0
+    if [ ! -x "$DISCORD_DM" ]; then
+        bl_log "no executable discord-dm at $DISCORD_DM; not notifying"
+        return 0
+    fi
+    printf '%s' "$1" | "$DISCORD_DM" - || true
+}
+
 # bl_finish <reason> <rc>: logs, sends the one finish DM, exits <rc>. A paused loop
 # sends nothing (the coordinator DMs once per pause wave), nor do --no-dm and --once.
 bl_finish() {
     local reason="$1" rc="$2" elapsed msg
     elapsed=$(( ($(date +%s) - START_EPOCH) / 60 ))
     bl_log "finish reason=$reason batches=$BATCHES items=$ITEMS"
-    if [ "$reason" != "paused" ] && [ "$NO_DM" -eq 0 ] && [ "$ONCE" -eq 0 ]; then
-        if [ ! -x "$DISCORD_DM" ]; then
-            bl_log "no executable discord-dm at $DISCORD_DM; not notifying"
-        else
-            msg="burndown-loop: finished ($reason)
+    if [ "$reason" != "paused" ]; then
+        msg="burndown-loop: finished ($reason)
 batches=$BATCHES items=$ITEMS elapsed=${elapsed}m"
-            if { [ "$reason" = "failures" ] || [ "$reason" = "fail-closed" ]; } && [ -n "$LAST_FAIL" ]; then
-                msg="$msg
-$LAST_FAIL"
-            fi
+        if { [ "$reason" = "failures" ] || [ "$reason" = "fail-closed" ]; } && [ -n "$LAST_FAIL" ]; then
             msg="$msg
-log: $LOOP_LOG"
-            printf '%s' "$msg" | "$DISCORD_DM" - || true
+$LAST_FAIL"
         fi
+        msg="$msg
+log: $LOOP_LOG"
+        bl_dm "$msg"
     fi
     exit "$rc"
 }
@@ -297,24 +307,32 @@ bl_ledgers() {
     done | sort
 }
 
-# bl_classify <brc> <new_count> <blog>: one word, plus a reason after "failed".
+# bl_classify <brc> <new_count> <blog> <empty_seen>: one word, plus a reason
+# after "failed". "empty" needs the script-written sentinel (empty_seen=1); the
+# model's none-selected marker alone is an unconfirmed claim and counts as failed.
 bl_classify() {
-    local brc="$1" new="$2" blog="$3"
+    local brc="$1" new="$2" blog="$3" seen="${4:-0}"
     if [ "$brc" -eq 142 ]; then echo "failed timeout"; return 0; fi
     if grep -qx 'BURNDOWN-LOOP: abort-exit-3' "$blog" 2>/dev/null; then echo "abort"; return 0; fi
     if [ "$new" -ge 1 ]; then echo "ran"; return 0; fi
-    if [ "$brc" -eq 0 ] && grep -qx 'BURNDOWN-LOOP: none-selected' "$blog" 2>/dev/null; then
-        echo "empty"
+    if [ "$seen" -eq 1 ]; then echo "empty"; return 0; fi
+    if grep -qx 'BURNDOWN-LOOP: none-selected' "$blog" 2>/dev/null; then
+        echo "failed none-selected-unconfirmed rc=$brc"
         return 0
     fi
     echo "failed rc=$brc"
 }
 
-# bl_run_batch: one fresh headless session. Sets BATCH_RC, BLOG, NEW_LEDGERS.
+# bl_run_batch: one fresh headless session. Sets BATCH_RC, BLOG, NEW_LEDGERS, EMPTY_SEEN.
 bl_run_batch() {
     local ts timeout_secs caff=""
     ts=$(date -u +%Y%m%dT%H%M%SZ)
     BLOG="$STATE/batch-$ts.log"
+    # Empty-backlog sentinel: bin/lib/burndown.sh writes this path only on a
+    # first selection round that prints LEDGER: none. Clear leftovers first so
+    # a crashed earlier batch can never vouch for this one.
+    BL_EMPTY_SENTINEL="$STATE/empty-$ts"
+    rm -f "$STATE"/empty-*
     bl_ledgers > "$STATE/ledgers.before"
     timeout_secs=$(bl_timeout_secs)
     if command -v caffeinate >/dev/null 2>&1; then caff="caffeinate -s"; fi
@@ -322,7 +340,8 @@ bl_run_batch() {
     # $caff is expanded unquoted on purpose: empty off macOS.
     # shellcheck disable=SC2086
     env CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 IBL5_BURNDOWN_LOOP=1 \
-        IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=burndown-loop \
+        IBL5_BURNDOWN_EMPTY_SENTINEL="$BL_EMPTY_SENTINEL" \
+        IBL5_USAGE_GATE=1IBL5_USAGE_GATE_RUNNER=burndown-loop \
         IBL5_USAGE_GATE_MODEL=claude-sonnet-5-5 \
         IBL5_USAGE_GATE_RESUME_BIN="$ROOT/bin/burndown-loop" \
         IBL5_USAGE_GATE_SESSION_ID="$LOOP_SID" \
@@ -332,6 +351,9 @@ bl_run_batch() {
         >"$BLOG" 2>&1 || BATCH_RC=$?
     bl_ledgers > "$STATE/ledgers.after"
     NEW_LEDGERS=$(comm -13 "$STATE/ledgers.before" "$STATE/ledgers.after")
+    EMPTY_SEEN=0
+    if [ -f "$BL_EMPTY_SENTINEL" ]; then EMPTY_SEEN=1; fi
+    rm -f "$BL_EMPTY_SENTINEL"
 }
 
 # bl_count_new: adds the new ledgers' items to ITEMS, bumps BATCHES, sets BATCH_ITEMS to
@@ -361,18 +383,30 @@ bl_on_launch() {
     fi
     new=0
     if [ -n "$NEW_LEDGERS" ]; then new=$(printf '%s\n' "$NEW_LEDGERS" | grep -c .); fi
-    class=$(bl_classify "$BATCH_RC" "$new" "$BLOG")
+    class=$(bl_classify "$BATCH_RC" "$new" "$BLOG" "$EMPTY_SEEN")
     reason="${class#* }"
     class="${class%% *}"
     case "$class" in
         ran)
             FAILS=0
+            EMPTY_STREAK=0
             bl_count_new
             bl_log "batch ran ledgers=$new items=$BATCH_ITEMS units=$UNITS rc=$BATCH_RC log=$BLOG"
             ;;
         empty)
-            bl_log "supply exhausted (first round LEDGER: none)"
-            bl_finish exhausted 0
+            FAILS=0
+            if [ "$ONCE" -eq 1 ]; then
+                bl_log "backlog empty (sentinel confirmed first round LEDGER: none); --once ends the run"
+                bl_finish exhausted 0
+            fi
+            bl_log "backlog empty (sentinel confirmed first round LEDGER: none); re-check in ${EMPTY_SLEEP_MIN}m streak=$((EMPTY_STREAK + 1))"
+            if [ "$EMPTY_STREAK" -eq 0 ]; then
+                bl_dm "burndown-loop: backlog empty; re-checking every ${EMPTY_SLEEP_MIN}m until work appears
+batches=$BATCHES items=$ITEMS
+log: $LOOP_LOG"
+            fi
+            EMPTY_STREAK=$((EMPTY_STREAK + 1))
+            bl_sleep $((EMPTY_SLEEP_MIN * 60)) backlog-empty || bl_stopped
             ;;
         abort)
             # An abort batch can still have written ledgers; count them before retrying.
@@ -442,6 +476,10 @@ bl_reexec_apply() {
         FAILS="$RX_FAILS"
         START_EPOCH="$RX_START"
         LAST_FAIL="$RX_LAST_FAIL"
+        # Absent when the exec'ing process ran older code: keep 0, not a reset.
+        if bl_nonneg_int "$RX_EMPTY_STREAK" && [ "$RX_EMPTY_STREAK" -gt 0 ]; then
+            EMPTY_STREAK=1
+        fi
     else
         bl_log "re-exec state invalid; counters reset"
     fi
@@ -481,7 +519,8 @@ bl_maybe_reexec() {
     export IBL5_BURNDOWN_REEXEC_PID="$$" IBL5_BURNDOWN_REEXEC_SID="$LOOP_SID" \
         IBL5_BURNDOWN_REEXEC_BATCHES="$BATCHES" IBL5_BURNDOWN_REEXEC_ITEMS="$ITEMS" \
         IBL5_BURNDOWN_REEXEC_UNITS="$UNITS" IBL5_BURNDOWN_REEXEC_FAILS="$FAILS" \
-        IBL5_BURNDOWN_REEXEC_START="$START_EPOCH" IBL5_BURNDOWN_REEXEC_LAST_FAIL="$LAST_FAIL"
+        IBL5_BURNDOWN_REEXEC_START="$START_EPOCH" IBL5_BURNDOWN_REEXEC_LAST_FAIL="$LAST_FAIL" \
+        IBL5_BURNDOWN_REEXEC_EMPTY_STREAK="$EMPTY_STREAK"
     set -- run "--loop-sid=$LOOP_SID"
     if [ "$NO_DM" -eq 1 ]; then set -- "$@" --no-dm; fi
     # execfail: a failed exec returns here instead of killing the loop.
@@ -490,7 +529,7 @@ bl_maybe_reexec() {
     shopt -u execfail
     unset IBL5_BURNDOWN_REEXEC_PID IBL5_BURNDOWN_REEXEC_SID IBL5_BURNDOWN_REEXEC_BATCHES \
         IBL5_BURNDOWN_REEXEC_ITEMS IBL5_BURNDOWN_REEXEC_UNITS IBL5_BURNDOWN_REEXEC_FAILS \
-        IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL
+        IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL IBL5_BURNDOWN_REEXEC_EMPTY_STREAK
     bl_log "re-exec failed rc=$xrc; continuing on the old code"
     CODE_HASH="$now_hash"
 }
@@ -513,6 +552,7 @@ bl_cmd_run() {
     done
 
     MAX_FAILS=$(bl_posint_env IBL5_BURNDOWN_MAX_FAILS 3)
+    EMPTY_SLEEP_MIN=$(bl_posint_env IBL5_BURNDOWN_EMPTY_SLEEP_MIN 240) || exit 2
     max_fails="$MAX_FAILS"
     timeout_secs=$(bl_timeout_secs)
 

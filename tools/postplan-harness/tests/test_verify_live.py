@@ -12,6 +12,7 @@ from harness.adapters.verify import (LiveVerify, TrackResult, aggregate, fail_lo
                                      timing_log_line, tracks_log_line)
 from harness.state import Classification
 
+# LiveVerify only; the ReplayVerify pin lives in test_verify_shellcheck.py and must stay untouched.
 PHPUNIT = "vendor/bin/phpunit --no-progress"
 PHPSTAN = "composer run analyse -- --no-progress"
 GO_FMT = "make -C engine fmt-check"
@@ -155,6 +156,7 @@ def test_live_evidence_keeps_last_3000_chars(tmp_path, monkeypatch):
                     phpunit='printf "%0.sx" $(seq 1 5000)\necho TAILMARK')
     tracks = _by_name(LiveVerify(wt).run(Classification(has_php=True)))
     evidence = tracks["phpunit"].evidence
+    # Guards the `[-3000:]` slice in `_sh`: a head slice (`[:3000]`) loses TAILMARK.
     assert len(evidence) <= 3000
     assert evidence.rstrip().endswith("TAILMARK")
 
@@ -205,6 +207,8 @@ def test_live_concurrent_preserves_submission_order():
         return 0, ""
 
     tracks = LiveVerify("/wt", run_cmd=runner).run(_all_flags())
+    # The slowest track is submitted first, so reading futures with `as_completed`
+    # would return shellcheck first and break this order.
     assert [t.name for t in tracks] == NAMES
 
 

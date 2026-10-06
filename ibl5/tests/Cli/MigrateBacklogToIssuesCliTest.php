@@ -132,6 +132,7 @@ SH;
             'BACKLOG_ISSUES_RATE_SLEEP' => '0',
         ];
 
+        // Drop null entries first: escapeshellarg(null) raises a TypeError.
         $envParts = [];
         foreach (array_filter(array_merge($baseEnv, $extraEnv), static fn (?string $v): bool => $v !== null) as $k => $v) {
             $envParts[] = $k . '=' . escapeshellarg($v);

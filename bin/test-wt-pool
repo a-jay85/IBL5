@@ -76,8 +76,9 @@ new_pool_env() {
     git_q clone -q "$base/origin.git" "$m" >/dev/null 2>&1
     mkdir -p "$m/bin/lib" "$m/ibl5/design" "$m/ibl5/tests" "$base/IBL5-worktrees" "$base/stub-bin"
     cp "$WTNEW" "$m/bin/wt-new"
+    cp "$SCRIPT_DIR/wt-status" "$m/bin/wt-status"
     cp "$SCRIPT_DIR"/lib/*.sh "$m/bin/lib/" 2>/dev/null
-    chmod +x "$m/bin/wt-new"
+    chmod +x "$m/bin/wt-new" "$m/bin/wt-status"
     echo 'services: {}' > "$m/docker-compose.yml"
     echo '@import "tailwindcss";' > "$m/ibl5/design/input.css"
     echo '<?php $dbname = "example";' > "$m/ibl5/config.php.example"
@@ -126,9 +127,44 @@ EOF
 echo "\$*" >> "$base/launchctl.calls"
 exit 0
 EOF
-    chmod +x "$base/stub-bin/bunx" "$base/stub-bin/launchctl"
+    # gh stub: no PRs anywhere.
+    printf '#!/bin/bash\nexit 1\n' > "$base/stub-bin/gh"
+    chmod +x "$base/stub-bin/bunx" "$base/stub-bin/launchctl" "$base/stub-bin/gh"
     printf '%s\n' "$base"
 }
+
+# pool_sh <base> <code> [args...] — run <code> in a bash that sourced the
+# sandbox libs, with the wt-new globals set; extra args become $1...
+pool_sh() {
+    local base="$1"; shift
+    (cd "$base/IBL5" && PATH="$base/stub-bin:$PATH" REPO_ROOT="$base/IBL5" \
+        WT_PARENT="$base/IBL5-worktrees" MAIN_IBL5="$base/IBL5/ibl5" \
+        bash -c '. bin/lib/git-helpers.sh; . bin/lib/launchd-job.sh; . bin/lib/wt-pool.sh
+                 code="$1"; shift; eval "$code"' _ "$@" 2>&1)
+}
+
+# refill <base> — build the warm slot, output discarded.
+refill() { wtnew "$1" --pool-refill >/dev/null; }
+
+# ready_count <base> — number of guarded, ready _pool-* slots.
+ready_count() {
+    pool_sh "$1" 'n=0; for p in "$WT_PARENT"/_pool-*; do
+        [ -d "$p" ] && pool_is_slot "$WT_PARENT" "$p" && pool_is_ready "$p" && n=$((n + 1))
+    done; echo "$n"'
+}
+
+# hold_lock <base> <pid> <epoch> — plant a pool lock owned by <pid>.
+hold_lock() {
+    local lock="$1/IBL5/.git/wt-pool.lock"
+    rm -rf "$lock"; mkdir -p "$lock"
+    printf '%s\n%s\n' "$2" "$3" > "$lock/owner"
+}
+
+# slot_ready <base> <path> — 0 when <path> is a guarded, ready slot.
+slot_ready() { pool_sh "$1" 'pool_is_slot "$WT_PARENT" "$1" && pool_is_ready "$1"' "$2" >/dev/null; }
+
+# no_pool_dirs <base> — 0 when no _pool-* dir exists.
+no_pool_dirs() { ! ls -d "$1"/IBL5-worktrees/_pool-* >/dev/null 2>&1; }
 
 # bunx_calls <base> — number of real bunx invocations (probe lines excluded).
 bunx_calls() {
@@ -222,10 +258,427 @@ case_unknown_case_rejected() {
 }
 
 # ---------------------------------------------------------------------------
+# Extracted tail (rows 5-6)
+# ---------------------------------------------------------------------------
+
+case_relink_trap() {
+    local base m wt
+    base="$(new_pool_env)"; m="$base/IBL5/ibl5"; wt="$base/IBL5-worktrees/delta/ibl5"
+    wtnew "$base" delta >/dev/null
+    pool_sh "$base" 'wt_link_shared "$1" "$MAIN_IBL5"' "$wt" >/dev/null
+    if [ -e "$m/vendor/vendor" ] || [ -L "$m/vendor/vendor" ] \
+        || [ -e "$m/node_modules/node_modules" ] || [ -L "$m/node_modules/node_modules" ]; then
+        failcase "relink: main gained a nested vendor/node_modules link"
+    else
+        pass "relink: main has no nested vendor/node_modules link"
+    fi
+    assert_eq "relink: vendor still links to main" "$m/vendor" "$(readlink "$wt/vendor")"
+    assert_eq "relink: node_modules still links to main" "$m/node_modules" "$(readlink "$wt/node_modules")"
+}
+
+case_css_fallback() {
+    local base
+    base="$(new_pool_env)"
+    BUNX_FAIL=1 wtnew "$base" echo1 >/dev/null
+    assert_eq "css fallback: main stylesheet copied" "main-css" \
+        "$(cat "$base/IBL5-worktrees/echo1/ibl5/themes/IBL/style/style.css" 2>&1)"
+}
+
+# ---------------------------------------------------------------------------
+# Pool primitives (rows 7-11)
+# ---------------------------------------------------------------------------
+
+case_next_index_skips_collisions() {
+    local base m wp
+    base="$(new_pool_env)"; m="$base/IBL5"; wp="$base/IBL5-worktrees"
+    git_q -C "$m" worktree add -q "$wp/_pool-1" -b wt-pool/1 >/dev/null 2>&1
+    git_q -C "$m" worktree move "$wp/_pool-1" "$wp/moved" >/dev/null 2>&1
+    git_q -C "$m" branch wt-pool/2 >/dev/null 2>&1
+    assert_eq "next index skips dir, branch and admin id" 3 \
+        "$(pool_sh "$base" 'pool_next_index "$REPO_ROOT" "$WT_PARENT"')"
+}
+
+case_is_slot_rejects_nonslot() {
+    local base m wp p
+    base="$(new_pool_env)"; m="$base/IBL5"; wp="$base/IBL5-worktrees"
+    git_q -C "$m" worktree add -q "$wp/alpha" -b alpha >/dev/null 2>&1
+    git_q -C "$m" worktree add -q "$wp/_pool-9" -b feature >/dev/null 2>&1
+    mkdir -p "$wp/_pool-8"
+    git_q -C "$m" worktree add -q "$wp/_pool-1" -b wt-pool/1 >/dev/null 2>&1
+    for p in "$m" "$wp/alpha" "$wp/_pool-9" "$wp/_pool-8"; do
+        if pool_sh "$base" 'pool_is_slot "$WT_PARENT" "$1"' "$p" >/dev/null; then
+            failcase "is_slot rejects $(basename "$p")"
+        else
+            pass "is_slot rejects $(basename "$p")"
+        fi
+    done
+    if pool_sh "$base" 'pool_is_slot "$WT_PARENT" "$1"' "$wp/_pool-1" >/dev/null; then
+        pass "is_slot accepts _pool-1 on wt-pool/1"
+    else
+        failcase "is_slot accepts _pool-1 on wt-pool/1"
+    fi
+}
+
+case_lock_exclusive() {
+    local base spid rc
+    base="$(new_pool_env)"
+    sleep 30 & spid=$!
+    hold_lock "$base" "$spid" "$(date +%s)"
+    pool_sh "$base" 'pool_lock_acquire "$REPO_ROOT"' >/dev/null; rc=$?
+    kill "$spid" 2>/dev/null; wait "$spid" 2>/dev/null
+    assert_eq "lock: second acquire is busy" 1 "$rc"
+    assert_eq "lock: main tree stays clean" "" "$(git -C "$base/IBL5" status --porcelain)"
+}
+
+case_lock_stale_recovered() {
+    local base dpid spid out
+    base="$(new_pool_env)"
+    true & dpid=$!; wait "$dpid"
+    hold_lock "$base" "$dpid" "$(date +%s)"
+    out="$(pool_sh "$base" 'pool_lock_acquire "$REPO_ROOT" && echo ACQUIRED')"
+    assert_match "stale lock (dead pid): acquired" '^ACQUIRED$' "$out"
+    assert_match "stale lock (dead pid): recovered" 'recovered stale lock' "$out"
+    sleep 30 & spid=$!
+    hold_lock "$base" "$spid" "$(( $(date +%s) - 601 ))"
+    out="$(pool_sh "$base" 'pool_lock_acquire "$REPO_ROOT" && echo ACQUIRED')"
+    kill "$spid" 2>/dev/null; wait "$spid" 2>/dev/null
+    assert_match "stale lock (old epoch): acquired" '^ACQUIRED$' "$out"
+    assert_match "stale lock (old epoch): recovered" 'recovered stale lock' "$out"
+}
+
+case_ready_marker_head_bound() {
+    local base slot rc
+    base="$(new_pool_env)"; slot="$base/IBL5-worktrees/_pool-1"
+    git_q -C "$base/IBL5" worktree add -q "$slot" -b wt-pool/1 >/dev/null 2>&1
+    pool_sh "$base" 'pool_mark_ready "$1" && pool_is_ready "$1"' "$slot" >/dev/null; rc=$?
+    assert_eq "marker: ready after mark" 0 "$rc"
+    git_q -C "$slot" commit -q --allow-empty -m moved >/dev/null 2>&1
+    pool_sh "$base" 'pool_is_ready "$1"' "$slot" >/dev/null; rc=$?
+    assert_eq "marker: not ready once HEAD moves" 1 "$rc"
+}
+
+# ---------------------------------------------------------------------------
+# Refill (rows 12-16)
+# ---------------------------------------------------------------------------
+
+case_refill_builds_ready_slot() {
+    local base slot out rc
+    base="$(new_pool_env)"; slot="$base/IBL5-worktrees/_pool-1"
+    out="$(CLAUDE_CODE_SESSION_ID=s wtnew "$base" --pool-refill)"; rc=$?
+    assert_eq "refill: exit 0" 0 "$rc"
+    [ "$rc" = 0 ] || printf '%s\n' "$out" | sed 's/^/    /'
+    assert_eq "refill: _pool-1 on wt-pool/1" "wt-pool/1" "$(git -C "$slot" rev-parse --abbrev-ref HEAD 2>&1)"
+    if slot_ready "$base" "$slot"; then pass "refill: slot ready"; else failcase "refill: slot ready"; fi
+    assert_eq "refill: iblBase" "master" "$(git -C "$slot" config branch.wt-pool/1.iblBase 2>&1)"
+    if [ -e "$(admin_dir "$slot")/wt-new-session" ]; then
+        failcase "refill: no session file"
+    else
+        pass "refill: no session file"
+    fi
+    assert_eq "refill: clean status" "" "$(git -C "$slot" status --porcelain 2>&1)"
+    assert_eq "refill: one bunx call" 1 "$(bunx_calls "$base")"
+    assert_absent "refill: marker written after the CSS build" '^marker-present$' "$(cat "$base/bunx.calls")"
+}
+
+case_refill_reaps_half_built() {
+    local base m wp out
+    base="$(new_pool_env)"; m="$base/IBL5"; wp="$base/IBL5-worktrees"
+    git_q -C "$m" worktree add -q "$wp/_pool-1" -b wt-pool/1 >/dev/null 2>&1
+    git_q -C "$m" worktree add -q "$wp/_pool-9" -b feature >/dev/null 2>&1
+    out="$(wtnew "$base" --pool-refill)"
+    assert_match "reap: half-built slot reaped" 'reaped half-built slot' "$out"
+    assert_match "reap: non-slot named" 'skipping non-slot .*_pool-9' "$out"
+    assert_eq "reap: one ready slot" 1 "$(ready_count "$base")"
+    if [ -d "$wp/_pool-9" ]; then pass "reap: _pool-9 kept"; else failcase "reap: _pool-9 kept"; fi
+}
+
+case_refill_full_and_busy() {
+    local base base2 c out spid
+    base="$(new_pool_env)"
+    refill "$base"; c="$(bunx_calls "$base")"
+    out="$(wtnew "$base" --pool-refill)"
+    assert_match "refill: second run says pool full" 'pool full' "$out"
+    assert_eq "refill: pool full builds nothing" "$c" "$(bunx_calls "$base")"
+    base2="$(new_pool_env)"
+    sleep 30 & spid=$!
+    hold_lock "$base2" "$spid" "$(date +%s)"
+    out="$(wtnew "$base2" --pool-refill)"
+    kill "$spid" 2>/dev/null; wait "$spid" 2>/dev/null
+    assert_match "refill: busy lock skips" 'lock busy' "$out"
+    if no_pool_dirs "$base2"; then pass "refill: busy lock builds nothing"; else failcase "refill: busy lock builds nothing"; fi
+}
+
+case_refill_flag_rejected() {
+    local base out rc a
+    base="$(new_pool_env)"
+    for a in "--pool-refill=x" "--pool-refil" "--pool-refill alpha"; do
+        # shellcheck disable=SC2086
+        out="$(wtnew "$base" $a)"; rc=$?
+        assert_eq "flag '$a': exit 1" 1 "$rc"
+        assert_match "flag '$a': error" 'Unknown option|takes no other arguments' "$out"
+    done
+    if no_pool_dirs "$base"; then pass "flag: nothing built"; else failcase "flag: nothing built"; fi
+}
+
+case_wt_pool_env() {
+    local base out
+    base="$(new_pool_env)"
+    out="$(WT_POOL=0 wtnew "$base" --pool-refill)"
+    assert_match "WT_POOL=0: disabled" 'disabled' "$out"
+    if no_pool_dirs "$base"; then pass "WT_POOL=0: nothing built"; else failcase "WT_POOL=0: nothing built"; fi
+    WT_POOL='' wtnew "$base" --pool-refill >/dev/null
+    assert_eq "WT_POOL empty: slot built" 1 "$(ready_count "$base")"
+}
+
+# ---------------------------------------------------------------------------
+# Claim (rows 17-20)
+# ---------------------------------------------------------------------------
+
+case_claim_postconditions() {
+    local base c out
+    base="$(new_pool_env)"
+    refill "$base"; c="$(bunx_calls "$base")"
+    out="$(CLAUDE_CODE_SESSION_ID=sess-claim wtnew "$base" golf)"
+    assert_match "claim: claimed" 'Claimed warm slot _pool-1' "$out"
+    wt_postconditions "$base" golf
+    assert_eq "claim: session file" "sess-claim" \
+        "$(cat "$(admin_dir "$base/IBL5-worktrees/golf")/wt-new-session" 2>&1)"
+    if [ -e "$(admin_dir "$base/IBL5-worktrees/golf")/wt-pool-ready" ]; then
+        failcase "claim: marker removed"
+    else
+        pass "claim: marker removed"
+    fi
+    assert_absent "claim: no _pool-* left registered" '/_pool-[0-9]+$' \
+        "$(git -C "$base/IBL5" worktree list --porcelain)"
+    assert_eq "claim: CSS reused" "$c" "$(bunx_calls "$base")"
+}
+
+# push_origin <base> <path> — commit <path> through a second clone and push it.
+push_origin() {
+    local pusher="$1/pusher"
+    [ -d "$pusher" ] || git_q clone -q "$1/origin.git" "$pusher" >/dev/null 2>&1
+    git_q -C "$pusher" pull -q origin master >/dev/null 2>&1
+    mkdir -p "$(dirname "$pusher/$2")"
+    echo "change $RANDOM" >> "$pusher/$2"
+    git_q -C "$pusher" add -A >/dev/null 2>&1
+    git_q -C "$pusher" commit -qm "touch $2" >/dev/null 2>&1
+    git_q -C "$pusher" push -q origin master >/dev/null 2>&1
+}
+
+case_claim_css_rebuild_rule() {
+    local base c out
+    base="$(new_pool_env)"
+    refill "$base"; c="$(bunx_calls "$base")"
+    push_origin "$base" ibl5/index.php
+    out="$(wtnew "$base" india)"
+    assert_match "css rule: india claimed" 'Claimed warm slot' "$out"
+    assert_eq "css rule: ibl5 change rebuilds" "$((c + 1))" "$(bunx_calls "$base")"
+    assert_eq "css rule: india at origin/master" "$(git -C "$base/IBL5" rev-parse origin/master)" \
+        "$(git -C "$base/IBL5-worktrees/india" rev-parse HEAD)"
+    refill "$base"; c="$(bunx_calls "$base")"
+    push_origin "$base" ibl5/tests/x
+    out="$(wtnew "$base" juliet)"
+    assert_match "css rule: juliet claimed" 'Claimed warm slot' "$out"
+    assert_eq "css rule: tests-only change reuses" "$c" "$(bunx_calls "$base")"
+}
+
+case_claim_bypass_no_side_effect() {
+    local base m slot out spid
+    base="$(new_pool_env)"; m="$base/IBL5"; slot="$base/IBL5-worktrees/_pool-1"
+    git_q -C "$m" branch feature-x >/dev/null 2>&1
+    git_q -C "$m" push -q origin feature-x >/dev/null 2>&1
+    refill "$base"
+
+    out="$(wtnew "$base" k1 --base feature-x)"
+    assert_match "bypass --base: printed" 'wt-pool: bypass' "$out"
+    if slot_ready "$base" "$slot"; then pass "bypass --base: slot kept"; else failcase "bypass --base: slot kept"; fi
+
+    out="$(WT_POOL=0 wtnew "$base" k2)"
+    assert_match "bypass WT_POOL=0: printed" 'wt-pool: bypass' "$out"
+    if slot_ready "$base" "$slot"; then pass "bypass WT_POOL=0: slot kept"; else failcase "bypass WT_POOL=0: slot kept"; fi
+
+    out="$(wtnew "$base" --existing feature-x)"
+    assert_match "bypass --existing: printed" 'wt-pool: bypass' "$out"
+    if slot_ready "$base" "$slot"; then pass "bypass --existing: slot kept"; else failcase "bypass --existing: slot kept"; fi
+
+    git_q -C "$m" branch hotel >/dev/null 2>&1
+    out="$(wtnew "$base" hotel)"
+    assert_match "bypass branch exists: printed" 'wt-pool: bypass' "$out"
+    if slot_ready "$base" "$slot"; then pass "bypass branch exists: slot kept"; else failcase "bypass branch exists: slot kept"; fi
+
+    sleep 30 & spid=$!
+    hold_lock "$base" "$spid" "$(date +%s)"
+    out="$(wtnew "$base" k3)"
+    kill "$spid" 2>/dev/null; wait "$spid" 2>/dev/null
+    rm -rf "$m/.git/wt-pool.lock"
+    assert_match "bypass lock held: printed" 'wt-pool: bypass' "$out"
+    if slot_ready "$base" "$slot"; then pass "bypass lock held: slot kept"; else failcase "bypass lock held: slot kept"; fi
+}
+
+case_claim_invalid_slot_falls_back() {
+    local base slot out
+    base="$(new_pool_env)"
+    refill "$base"
+    slot="$(pool_sh "$base" 'pool_find_ready "$REPO_ROOT" "$WT_PARENT"')"
+    echo junk > "$slot/untracked.txt"
+    out="$(wtnew "$base" kdirty)"
+    assert_match "dirty slot: bypass" 'bypass \(slot dirty\)' "$out"
+    if [ -d "$slot" ]; then failcase "dirty slot: removed"; else pass "dirty slot: removed"; fi
+    wt_postconditions "$base" kdirty
+
+    refill "$base"
+    slot="$(pool_sh "$base" 'pool_find_ready "$REPO_ROOT" "$WT_PARENT"')"
+    git_q -C "$slot" commit -q --allow-empty -m diverge >/dev/null 2>&1
+    pool_sh "$base" 'pool_mark_ready "$1"' "$slot" >/dev/null
+    out="$(wtnew "$base" kdiv)"
+    assert_match "diverged slot: bypass" 'bypass \(slot diverged\)' "$out"
+    if [ -d "$slot" ]; then failcase "diverged slot: removed"; else pass "diverged slot: removed"; fi
+    wt_postconditions "$base" kdiv
+}
+
+# ---------------------------------------------------------------------------
+# Refill kick (rows 21-23)
+# ---------------------------------------------------------------------------
+
+case_kick_inline_refills() {
+    local base out
+    base="$(new_pool_env)"
+    WT_POOL_KICK=inline wtnew "$base" kilo >/dev/null
+    assert_eq "kick inline: cold run leaves one ready slot" 1 "$(ready_count "$base")"
+    out="$(WT_POOL_KICK=inline wtnew "$base" lima)"
+    assert_match "kick inline: lima claimed" 'Claimed warm slot' "$out"
+    if slot_ready "$base" "$base/IBL5-worktrees/_pool-2"; then
+        pass "kick inline: claim leaves a ready _pool-2"
+    else
+        failcase "kick inline: claim leaves a ready _pool-2"
+    fi
+}
+
+case_kick_env_values() {
+    local base out rc spid
+    base="$(new_pool_env)"
+    WT_POOL_KICK=none wtnew "$base" n1 >/dev/null
+    if no_pool_dirs "$base"; then pass "kick none: no slot"; else failcase "kick none: no slot"; fi
+
+    out="$(WT_POOL_KICK=bogus wtnew "$base" n2)"; rc=$?
+    assert_eq "kick bogus: exit 0" 0 "$rc"
+    assert_match "kick bogus: named" 'unknown WT_POOL_KICK' "$out"
+    if no_pool_dirs "$base"; then pass "kick bogus: no slot"; else failcase "kick bogus: no slot"; fi
+    if [ -e "$base/launchctl.calls" ]; then failcase "kick bogus: no launchctl"; else pass "kick bogus: no launchctl"; fi
+
+    out="$(WT_POOL_KICK='' wtnew "$base" n3)"
+    if [ "$(uname -s)" = Darwin ]; then
+        assert_match "kick empty: launchd bootstrap" "bootstrap gui/$(id -u)" "$(cat "$base/launchctl.calls" 2>&1)"
+        if [ -f "$HOME/Library/LaunchAgents/com.ibl5.wt-pool-refill.plist" ]; then
+            pass "kick empty: plist under sandbox HOME"
+        else
+            failcase "kick empty: plist under sandbox HOME"
+        fi
+        rm -f "$base/launchctl.calls"
+        sleep 30 & spid=$!
+        hold_lock "$base" "$spid" "$(date +%s)"
+        out="$(WT_POOL_KICK='' wtnew "$base" n4)"
+        kill "$spid" 2>/dev/null; wait "$spid" 2>/dev/null
+        rm -rf "$base/IBL5/.git/wt-pool.lock"
+        assert_match "kick empty, lock live: already running" 'refill already running' "$out"
+        if [ -e "$base/launchctl.calls" ]; then
+            failcase "kick empty, lock live: no launchctl"
+        else
+            pass "kick empty, lock live: no launchctl"
+        fi
+    else
+        assert_match "kick empty: not scheduled off macOS" 'not scheduled on this platform' "$out"
+    fi
+}
+
+case_plist_generated() {
+    local base mike odd bun out
+    base="$(new_pool_env)"; mike="$base/IBL5-worktrees/mike"
+    wtnew "$base" mike >/dev/null
+    out="$(cd "$mike" && PATH="$base/stub-bin:$PATH" WT_POOL_KICK=print "$mike/bin/wt-new" november 2>&1)"
+    assert_match "plist: runner is the canonical root" \
+        "exec '$base/IBL5/bin/wt-new' --pool-refill" "$out"
+    # wt-new's own config notice prints a literal $dbname; check the plist text only.
+    out="$(sed -n '/^<?xml/,/<\/plist>/p' <<< "$out")"
+    assert_match "plist: emitted" '<key>Label</key><string>com.ibl5.wt-pool-refill</string>' "$out"
+    assert_absent "plist: no unexpanded \$" '\$' "$out"
+    assert_absent "plist: no empty string" '<string></string>' "$out"
+
+    odd="$TMP/odd"; mkdir -p "$odd"
+    cp "$base/stub-bin/bunx" "$odd/bunx"
+    out="$(cd "$mike" && PATH="$odd:/usr/bin:/bin" \
+        bash -c '. bin/lib/launchd-job.sh; . bin/lib/wt-pool.sh; pool_plist_print "$1"' _ "$base/IBL5" 2>&1)"
+    assert_match "plist: odd bunx warned" 'bunx at .* is outside the job PATH' "$out"
+
+    bun="$HOME/.bun/bin"; mkdir -p "$bun"
+    cp "$base/stub-bin/bunx" "$bun/bunx"
+    out="$(cd "$mike" && PATH="$bun:/usr/bin:/bin" \
+        bash -c '. bin/lib/launchd-job.sh; . bin/lib/wt-pool.sh; pool_plist_print "$1"' _ "$base/IBL5" 2>&1)"
+    assert_absent "plist: ~/.bun/bin bunx not warned" 'bunx at .* is outside the job PATH' "$out"
+    rm -rf "$odd" "$bun"
+}
+
+# ---------------------------------------------------------------------------
+# Consumers and the bare launchd env (rows 25-27)
+# ---------------------------------------------------------------------------
+
+case_consumer_wt_status() {
+    local base out rc
+    base="$(new_pool_env)"
+    refill "$base"
+    out="$(cd "$base/IBL5" && PATH="$base/stub-bin:$PATH" bin/wt-status 2>&1)"
+    assert_match "wt-status: slot is EMPTY" 'EMPTY +_pool-1 ' "$out"
+    out="$(cd "$base/IBL5" && PATH="$base/stub-bin:$PATH" bin/wt-status --stalled-only 2>&1)"; rc=$?
+    assert_eq "wt-status --stalled-only: exit 0" 0 "$rc"
+    assert_absent "wt-status --stalled-only: slot not named" '_pool-1' "$out"
+}
+
+case_consumer_slot_invariants() {
+    local base m rc
+    base="$(new_pool_env)"; m="$base/IBL5"
+    refill "$base"
+    assert_match "slot: registered" '/_pool-1$' "$(git -C "$m" worktree list --porcelain)"
+    assert_eq "slot: zero own commits" 0 "$(git -C "$m" rev-list --count master..wt-pool/1)"
+    git -C "$m" rev-parse --abbrev-ref 'wt-pool/1@{upstream}' >/dev/null 2>&1; rc=$?
+    if [ "$rc" != 0 ]; then pass "slot: no upstream"; else failcase "slot: no upstream"; fi
+}
+
+case_refill_empty_env() {
+    local base out rc
+    base="$(new_pool_env)"
+    out="$(cd "$base/IBL5" && env -i PATH="$base/stub-bin:/usr/bin:/bin" HOME="$HOME" \
+        GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t \
+        GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
+        WT_POOL_KICK=none "$base/IBL5/bin/wt-new" --pool-refill 2>&1)"; rc=$?
+    assert_eq "empty env refill: exit 0" 0 "$rc"
+    [ "$rc" = 0 ] || printf '%s\n' "$out" | sed 's/^/    /'
+    assert_eq "empty env refill: one ready slot" 1 "$(ready_count "$base")"
+}
+
+# ---------------------------------------------------------------------------
+# Help (row 29)
+# ---------------------------------------------------------------------------
+
+case_help_mentions_pool() {
+    local out rc
+    out="$("$WTNEW" --help 2>&1)"; rc=$?
+    assert_eq "help: exit 0" 0 "$rc"
+    assert_match "help: --pool-refill" '--pool-refill' "$out"
+    assert_match "help: WT_POOL=0" 'WT_POOL=0' "$out"
+}
+
+# ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
 
-ALL_CASES="cold_postconditions cold_session_absent"
+ALL_CASES="cold_postconditions cold_session_absent relink_trap css_fallback
+next_index_skips_collisions is_slot_rejects_nonslot lock_exclusive
+lock_stale_recovered ready_marker_head_bound refill_builds_ready_slot
+refill_reaps_half_built refill_full_and_busy refill_flag_rejected wt_pool_env
+claim_postconditions claim_css_rebuild_rule claim_bypass_no_side_effect
+claim_invalid_slot_falls_back kick_inline_refills kick_env_values
+plist_generated consumer_wt_status consumer_slot_invariants refill_empty_env
+help_mentions_pool"
 
 if [ $# -eq 0 ]; then
     # shellcheck disable=SC2086

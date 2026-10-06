@@ -6,6 +6,9 @@
 # Run: bin/test-gate-backtest [case-name|all]
 #   exit 0 = all selected cases pass, 1 = at least one failed, 2 = unknown case
 #
+# CI: the harness-tests job in .github/workflows/tests.yml runs this script (tests.yml:1036 when
+# the destructive-bypass-body-replay case landed; the call has since moved down a few lines).
+#
 # Everything runs against throwaway scratch repos with a fixture PR history and a fixed
 # --now, so no network, no `gh`, and no real clock are involved. The two pma-* cases replay the
 # real bin/lib/plan-matrix-assertions at two revisions (the #2506-era noisy one and the #2520

@@ -30,7 +30,7 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Skip the between-plans master canary | `AUTOMOUSE_SKIP_CANARY=1 bin/automouse/run` |
 | Self-heal staleness-FP skips | `bin/automouse/self-heal` |
 | Preview self-heal (no changes) | `bin/automouse/self-heal --dry-run` |
-| Check logs (all of today's runners) | `cat ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/$(date +%Y-%m-%d)*.log` |
+| Check logs (all of today's runners; older days like 2000-01-01.log stay out) | `cat ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/$(date +%Y-%m-%d)*.log` |
 | Today's logs, newest first (suffix = runner pid) | `ls -t ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/$(date +%Y-%m-%d)-*.log` |
 
 ### Disarm ordering and safety

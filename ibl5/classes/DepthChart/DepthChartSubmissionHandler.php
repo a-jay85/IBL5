@@ -112,7 +112,7 @@ class DepthChartSubmissionHandler implements DepthChartSubmissionHandlerInterfac
             return [
                 'success' => false,
                 'fileOk' => false,
-                'errorsHtml' => DepthChartEntryErrorHtmlRenderer::render($rosterResult->getErrors()),
+                'errorsHtml' => DepthChartErrorHtmlRenderer::render($rosterResult->getErrors()),
                 'postData' => $postData,
             ];
         }
@@ -122,7 +122,7 @@ class DepthChartSubmissionHandler implements DepthChartSubmissionHandlerInterfac
             return [
                 'success' => false,
                 'fileOk' => false,
-                'errorsHtml' => DepthChartEntryErrorHtmlRenderer::render($validation->getErrors()),
+                'errorsHtml' => DepthChartErrorHtmlRenderer::render($validation->getErrors()),
                 'postData' => $postData,
             ];
         }

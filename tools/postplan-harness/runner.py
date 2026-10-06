@@ -36,8 +36,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gitutil, holdrepeat, llm_calls,
-                     manual_rows, manual_testing, outofscope, prosefix, schemas, scope_conformance,
-                     statefile, usage_pause)
+                     manual_rows, manual_testing, outofscope, prosefix, rebase_cause, schemas,
+                     scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
@@ -247,6 +247,24 @@ def _discharge_hold_sentences(llm, probe, justification: str, log) -> tuple[str,
     return residual, discharged
 
 
+_rebase_cause_runners = rebase_cause.live_runners   # tests monkeypatch this to inject a fake gh
+
+
+def _classify_rebase_block(git, head_sha, plain, onto, reason) -> str:
+    """Render the cause of a declined rebase. Never raises; never changes the exit code."""
+    try:
+        worktree = getattr(git, "worktree", "") or os.getcwd()
+        run_git, run_gh = _rebase_cause_runners(worktree)
+        cause = rebase_cause.classify_rebase_block(
+            tuple(plain) or tuple(onto), reason, head_sha=head_sha,
+            branch=git.branch(), run_git=run_git, run_gh=run_gh)
+    except Exception as exc:  # the classifier is advisory; the block must still raise
+        cause = rebase_cause.RebaseBlockCause(
+            rebase_cause.CAUSE_UNKNOWN, tuple(plain) or tuple(onto),
+            note=f"classifier error: {type(exc).__name__}")
+    return cause.render()
+
+
 def _record_failure_context(res: RunResult, e: HarnessError) -> None:
     """Copy the failing command and its output tail from a HarnessError onto the result.
     Both fields are redacted before storage; res.error stays raw."""
@@ -428,10 +446,16 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     log(f"phase2: conflict auto-resolution declined -- {conflict_resolved.reason}")
                     onto_conflicted = getattr(git, "last_conflict_files", ())
                     log(f"phase2: conflicted paths (--onto) = {', '.join(onto_conflicted) or '-'}")
-                    raise HarnessError(
+                    block_cause = _classify_rebase_block(
+                        git, pre_rebase, plain_conflicted, onto_conflicted,
+                        conflict_resolved.reason)
+                    log(f"phase2: rebase block {block_cause}")
+                    err = HarnessError(
                         "rebase-conflict",
                         f"{e.detail} | auto-resolve declined: {conflict_resolved.reason}",
-                    ) from e
+                    )
+                    err.block_cause = block_cause
+                    raise err from e
                 log("phase2: conflict auto-resolved via --onto "
                     f"{conflict_resolved.base_sha[:8]}; TREE-EQUIVALENT proved; "
                     f"manifest={conflict_resolved.manifest_path} "
@@ -949,6 +973,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             res.terminal = TerminalState.FAILED
             res.error = f"{e.kind}: {e.detail}"
             res.error_kind = e.kind
+            res.block_cause = getattr(e, "block_cause", None)
             _record_failure_context(res, e)
             log(f"FAILED: {res.error}")
     except usage_pause.UsagePause as p:
@@ -2844,8 +2869,10 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
             n += 1
             lines.append(f"  {n}. {s}")
         lines += [f"  {n + 1}. bin/post-plan-now", "",
-                  "Or open Claude in that folder and ask it to fix the ship block.",
-                  f"Log: {log}"]
+                  "Or open Claude in that folder and ask it to fix the ship block."]
+        if res.error_kind == "rebase-conflict" and res.block_cause:
+            lines.append("Cause: " + " ".join(res.block_cause.split()))
+        lines.append(f"Log: {log}")
         return "\n".join(lines)
 
     block = render(_BLOCK_MAX_PATHS, True)
@@ -2990,9 +3017,11 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             # file master edited and the branch deleted, too), so "stacked" would mislead.
             detail = _flat(res.error)
             detail = f" {detail}" if detail else ""
+            cause = _flat(res.block_cause or "")
+            cause = f" Cause: {cause}." if cause else ""
             return ("RESULT: post-plan BLOCKED — rebase conflict, "
                     "human required; ERROR terminal=failed, no PR opened."
-                    f"{detail} Resolve the rebase, then re-run bin/post-plan-now.")
+                    f"{detail}{cause} Resolve the rebase, then re-run bin/post-plan-now.")
         if res.error_kind == "local-gate":
             tail = " ".join(_error_tail(res.error_output_tail or res.error)) or "see gate output"
             cmd = _cmd_text(res.error_cmd)

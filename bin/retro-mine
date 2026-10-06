@@ -46,6 +46,7 @@ TOP_N=5
 TUNEUP_MARKER='retro-mine tune-up call'
 BACKLOG_REPO=a-jay85/IBL5-backlog
 BACKLOG_LABEL=dev-efficiency
+TUNEUP_LABEL=tune-up
 DRAFT_TIMEOUT=600
 DRAFT_SCHEMA='{"type":"object","additionalProperties":false,"required":["kind","slug","description","pr_summary"],"properties":{"kind":{"enum":["rule_doc","trigger_row"]},"slug":{"type":"string","pattern":"^[a-z0-9]+(-[a-z0-9]+)*$","maxLength":48},"description":{"type":"string","maxLength":160},"pr_summary":{"type":"string","maxLength":1200},"body":{"type":"string","maxLength":6000},"trigger_if":{"type":"string","maxLength":300},"must_assert":{"type":"string","maxLength":600}}}'
 TUNEUP_DIGEST_SCHEMA='{"type":"object","additionalProperties":false,"required":["findings"],"properties":{"findings":{"type":"array","maxItems":4,"items":{"type":"object","additionalProperties":false,"required":["signature","summary"],"properties":{"signature":{"type":"string"},"summary":{"type":"string","maxLength":300}}}}}}'

@@ -780,8 +780,9 @@ rm_iso() {
 #     ([arg] per line), the -p text in prompt.N, cwd in claude.cwd; serves
 #     prosefix-env.json when the prompt holds "prose fix", digest-env.json for
 #     --model claude-sonnet-5-5, rank-env.json otherwise; exits claude.rc.
-#   gh: every call appended to gh.log; "issue list" prints issues.json (exits
-#     gh.rc); "issue create" appends an OPEN issue to issues.json, copies the
+#   gh: every call appended to gh.log; "issue list" prints issues.json, kept
+#     to the --label when one is given (exits gh.rc); "issue create" appends
+#     an OPEN issue with its --label values to issues.json, copies the
 #     body to gh-body.N and prints its URL.
 #   dm: stdin saved to dm.N; exits dm.rc.
 rm_tuneup_stubs() {
@@ -815,19 +816,28 @@ EOF
 echo "\$*" >> "$t/gh.log"
 rc=\$(cat "$t/gh.rc" 2>/dev/null || echo 0)
 [ "\$rc" -eq 0 ] || exit "\$rc"
-if [ "\$1 \$2" = "issue list" ]; then cat "$t/issues.json"; exit 0; fi
+if [ "\$1 \$2" = "issue list" ]; then
+    label=""
+    while [ \$# -gt 0 ]; do
+        case "\$1" in --label) label="\$2"; shift ;; esac
+        shift
+    done
+    jq --arg l "\$label" 'map(select(\$l == "" or ((.labels // []) | index(\$l))))' "$t/issues.json"
+    exit 0
+fi
 if [ "\$1 \$2" = "issue create" ]; then
-    title=""; body=""
+    title=""; body=""; labels='[]'
     while [ \$# -gt 0 ]; do
         case "\$1" in
             --title) title="\$2"; shift ;;
             --body-file) body="\$2"; shift ;;
+            --label) labels="\$(jq -c --arg l "\$2" '. + [\$l]' <<< "\$labels")"; shift ;;
         esac
         shift
     done
     n=\$(( 100 + \$(jq 'length' "$t/issues.json") ))
     cp "\$body" "$t/gh-body.\$n"
-    jq --argjson n "\$n" --arg t "\$title" '. + [{number: \$n, title: \$t, state: "OPEN"}]' \
+    jq --argjson n "\$n" --arg t "\$title" --argjson lb "\$labels" '. + [{number: \$n, title: \$t, state: "OPEN", labels: \$lb}]' \
         "$t/issues.json" > "$t/issues.json.tmp" && mv "$t/issues.json.tmp" "$t/issues.json"
     echo "https://github.com/a-jay85/IBL5-backlog/issues/\$n"
 fi
@@ -1203,7 +1213,7 @@ case_tuneup_dedupe_open_prior() {
     items="[{\"title\":\"Cd guard\",\"summary\":\"S.\",\"proposed_change\":\"C.\",\"signatures\":[\"$RM_TSIG\"]},{\"title\":\"Other\",\"summary\":\"S.\",\"proposed_change\":\"C.\",\"signatures\":[]}]"
     rm_tuneup_env "{\"items\":$items}" 1.0 > "$t/rank-env.json"
     rm_prior_report "$t" "| 1 | [backlog#7](https://github.com/a-jay85/IBL5-backlog/issues/7) | tuneup-0000beef | $RM_TSIG | 2 | Old cd guard |"
-    echo '[{"number":7,"title":"Tune-up 2026-09-14: Old cd guard [tuneup-0000beef]","state":"OPEN"}]' > "$t/issues.json"
+    echo '[{"number":7,"title":"Tune-up 2026-09-14: Old cd guard [tuneup-0000beef]","state":"OPEN","labels":["tune-up"]}]' > "$t/issues.json"
     rm_tuneup_run "$t"
     rm_has "tuneup_dedupe_open_prior: logged still open" "$RM_ERR" "still open: backlog#7 Cd guard"
     rm_lacks "tuneup_dedupe_open_prior: not filed" "$(cat "$t/gh.log")" "Cd guard"
@@ -1219,7 +1229,7 @@ case_tuneup_adopted_followup() {
         "| 1 | [backlog#8](https://github.com/a-jay85/IBL5-backlog/issues/8) | tuneup-0000aaaa | $RM_TSIG | 5 | Cd guard |" \
         "| 2 | [backlog#9](https://github.com/a-jay85/IBL5-backlog/issues/9) | tuneup-0000bbbb | other:sig | 3 | Other |")" \
         "| $RM_TSIG | 5 | 9 |"
-    echo '[{"number":8,"title":"x [tuneup-0000aaaa]","state":"CLOSED"},{"number":9,"title":"y [tuneup-0000bbbb]","state":"OPEN"}]' > "$t/issues.json"
+    echo '[{"number":8,"title":"x [tuneup-0000aaaa]","state":"CLOSED","labels":["tune-up"]},{"number":9,"title":"y [tuneup-0000bbbb]","state":"OPEN","labels":["tune-up"]}]' > "$t/issues.json"
     rm_tuneup_run "$t"
     rm_has "tuneup_adopted_followup: closed item gets then/now counts" "$(cat "$t/dm.1")" \
         "backlog#8 (closed): signal 5 threads then, 1 now"
@@ -1373,8 +1383,10 @@ case_tuneup_dry_run_no_writes() {
     local t
     t="$(rm_tmp)"
     rm_tuneup_week "$t"
+    echo '[{"number":5,"title":"Hand-filed","state":"OPEN"},{"number":6,"title":"t [tuneup-0000cafe]","state":"CLOSED","labels":["tune-up"]}]' > "$t/issues.json"
     rm_tuneup_run "$t" --dry-run
     rm_expect_eq "tuneup_dry_run_no_writes: exits 0" 0 "$RM_RC"
+    rm_has "tuneup_dry_run_no_writes: reads only tune-up-labelled issues" "$RM_OUT" "tune-up issues visible=1"
     rm_has "tuneup_dry_run_no_writes: prints the summary" "$RM_OUT" "tune-up dry-run: threads interactive=2"
     [ ! -e "$t/claude.calls" ] && rm_ok "tuneup_dry_run_no_writes: no claude call" || rm_fail "tuneup_dry_run_no_writes: claude called"
     if grep -qv '^issue list ' "$t/gh.log"; then rm_fail "tuneup_dry_run_no_writes: gh did more than list"

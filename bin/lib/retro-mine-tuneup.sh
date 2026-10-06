@@ -378,9 +378,11 @@ tuneup_key() {
     printf 'tuneup-%s\n' "$(printf '%s' "$src" | cksum | awk '{printf "%08x", $1}')"
 }
 
-# tuneup_issue_list <dest>: the one read of every backlog issue.
+# tuneup_issue_list <dest>: the one read of the issues this stage filed.
+# Dedupe only matches its own [tuneup-*] titles, so the label keeps the read
+# small as the hand-filed backlog grows.
 tuneup_issue_list() {
-    "$GH_BIN" issue list --repo "$BACKLOG_REPO" --state all --limit 1000 \
+    "$GH_BIN" issue list --repo "$BACKLOG_REPO" --label "$TUNEUP_LABEL" --state all --limit 1000 \
         --json number,title,state > "$1"
 }
 
@@ -484,7 +486,7 @@ tuneup_file() {
                 + "## Signatures\n\n" + ([.signatures[] | "- `\(.)`"] | join("\n"))
                 + "\n\nThreads this week: \(.threads // 0)\n"' | tuneup_redact_text > "$body.tmp" \
                 && mv "$body.tmp" "$body" || { log "ERROR: tune-up: body write failed"; return 1; }
-            url="$("$GH_BIN" issue create --repo "$BACKLOG_REPO" --label "$BACKLOG_LABEL" \
+            url="$("$GH_BIN" issue create --repo "$BACKLOG_REPO" --label "$BACKLOG_LABEL" --label "$TUNEUP_LABEL" \
                 --title "Tune-up $DAY: $title [$key]" --body-file "$body")" \
                 || { log "ERROR: tune-up: gh issue create failed for $key"; return 1; }
             num="$(printf '%s\n' "$url" | grep -oE '[0-9]+$' | tail -1 || true)"
@@ -645,7 +647,7 @@ tuneup_dry_run() {
     printf 'dropped_by_cap=%s\n' "${TUNEUP_DROPPED:-0}"
     printf 'sonnet_input_bytes=%s\n' "$(wc -c < "$work/selected.jsonl" | tr -d ' ')"
     if tuneup_issue_list "$work/issues.json" 2>/dev/null; then
-        printf 'backlog issues visible=%s\n' "$(jq 'length' "$work/issues.json" 2>/dev/null || echo 0)"
+        printf 'tune-up issues visible=%s\n' "$(jq 'length' "$work/issues.json" 2>/dev/null || echo 0)"
     else
         log "tune-up: gh unavailable, skipping issue list"
     fi

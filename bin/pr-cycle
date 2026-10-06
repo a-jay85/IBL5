@@ -917,25 +917,63 @@ EOF
     fi
 }
 
+# _fleet_outcome N — print "<outcome><TAB><reason>" for PR N from its post-plan-fleet log.
+# A legacy `blocked`, an unknown word, or a missing outcome line normalizes to failed; a
+# missing log gives failed/no-log.
+_fleet_outcome() {
+    local _fo_log="${PR_CYCLE_FLEET_LOG_DIR}/post-plan-fleet-$1.log" _fo_o _fo_r
+    if [ ! -f "$_fo_log" ]; then printf 'failed\tno-log\n'; return 0; fi
+    _fo_o=$(grep -m1 '^post-plan-fleet: outcome=' "$_fo_log" 2>/dev/null \
+        | sed 's/^post-plan-fleet: outcome=//' || true)
+    _fo_r=$(grep -m1 '^post-plan-fleet: reason=' "$_fo_log" 2>/dev/null \
+        | sed 's/^post-plan-fleet: reason=//' || true)
+    case "$_fo_o" in
+        shipped|held|declined|paused|conflict|failed|timed-out) ;;
+        *) _fo_o=failed ;;   # legacy `blocked`, a missing line, or an unknown word
+    esac
+    printf '%s\t%s\n' "$_fo_o" "$_fo_r"
+}
+
 # _stage1_outcome_summary — read per-PR outcome lines from post-plan-fleet logs and
-# return a summary, e.g. "shipped 1, held 2, blocked 4, timed out 1". A PR with no
-# outcome line counts as blocked. Reads $PR_CYCLE_FLEET_LOG_DIR/post-plan-fleet-<PR>.log.
+# return a summary, e.g. "shipped 1, held 2, declined 0, paused 0, conflict 1, failed 3,
+# timed out 1". A PR with no outcome line counts as failed.
+# Reads $PR_CYCLE_FLEET_LOG_DIR/post-plan-fleet-<PR>.log.
 _stage1_outcome_summary() {
     [ -s "$RUNDIR/stage1.txt" ] || return 0
-    local _s_shipped=0 _s_held=0 _s_blocked=0 _s_timed=0 _s_pr _s_log _s_outcome
+    local _s_shipped=0 _s_held=0 _s_declined=0 _s_paused=0 _s_conflict=0 _s_failed=0 _s_timed=0
+    local _s_pr _s_outcome _s_reason
     while IFS= read -r _s_pr; do
-        _s_log="${PR_CYCLE_FLEET_LOG_DIR}/post-plan-fleet-${_s_pr}.log"
-        _s_outcome=$(grep -m1 '^post-plan-fleet: outcome=' "$_s_log" 2>/dev/null \
-            | sed 's/post-plan-fleet: outcome=//' || true)
-        case "${_s_outcome:-blocked}" in
+        IFS=$'\t' read -r _s_outcome _s_reason <<< "$(_fleet_outcome "$_s_pr")"
+        case "$_s_outcome" in
             shipped)   _s_shipped=$(( _s_shipped + 1 )) ;;
             held)      _s_held=$(( _s_held + 1 )) ;;
+            declined)  _s_declined=$(( _s_declined + 1 )) ;;
+            paused)    _s_paused=$(( _s_paused + 1 )) ;;
+            conflict)  _s_conflict=$(( _s_conflict + 1 )) ;;
             timed-out) _s_timed=$(( _s_timed + 1 )) ;;
-            *)         _s_blocked=$(( _s_blocked + 1 )) ;;
+            *)         _s_failed=$(( _s_failed + 1 )) ;;
         esac
     done < "$RUNDIR/stage1.txt"
-    printf 'shipped %d, held %d, blocked %d, timed out %d' \
-        "$_s_shipped" "$_s_held" "$_s_blocked" "$_s_timed"
+    printf 'shipped %d, held %d, declined %d, paused %d, conflict %d, failed %d, timed out %d' \
+        "$_s_shipped" "$_s_held" "$_s_declined" "$_s_paused" "$_s_conflict" "$_s_failed" "$_s_timed"
+}
+
+# _stage1_result_lines — one "#N <outcome>[ <reason>]" line per fired PR, then one
+# "#N skipped holdrepeat" line per PR the pre-fire holdrepeat skip removed.
+_stage1_result_lines() {
+    local _rl_pr _rl_outcome _rl_reason
+    if [ -n "${READIED:-}" ] && [ -s "$RUNDIR/stage1.txt" ]; then
+        while IFS= read -r _rl_pr; do
+            IFS=$'\t' read -r _rl_outcome _rl_reason <<< "$(_fleet_outcome "$_rl_pr")"
+            echo "#$_rl_pr $_rl_outcome${_rl_reason:+ $_rl_reason}"
+        done < "$RUNDIR/stage1.txt"
+    fi
+    if [ -f "$RUNDIR/stage1-holdrepeat.txt" ]; then
+        while IFS= read -r _rl_pr; do
+            [ -n "$_rl_pr" ] || continue
+            echo "#$_rl_pr skipped holdrepeat"
+        done < "$RUNDIR/stage1-holdrepeat.txt"
+    fi
 }
 
 # _stage1_fire — run post-plan-fleet with the stage1.txt list. Returns 0 on empty or
@@ -1058,7 +1096,7 @@ _your_turn_lines() {
         else
             _yl_line="- $(_bucket_emoji "$_ybkt") #$_yn — $_ybkt — $_yact"
         fi
-        if [ "$((_yt_running + ${#_yl_line} + 1))" -gt 1800 ]; then
+        if [ "$((_yt_running + ${#_yl_line} + 1))" -gt 1700 ]; then
             echo "- …and $((_yt_total - _yt_shown)) more: $RUNDIR/your-turn.txt"
             return 0
         fi
@@ -1114,6 +1152,7 @@ _worker() {
     _cleanup_fetch_refs
 
     _reason="${HALT:-done}"
+    _stage1_result_lines
     _OUTCOME_SUMMARY="$(_stage1_outcome_summary)"
     _FIRED_SUMMARY="${READIED:+fired $READIED (${_OUTCOME_SUMMARY})}"
     _FIRED_SUMMARY="${_FIRED_SUMMARY:-fired 0}"

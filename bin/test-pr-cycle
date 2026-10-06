@@ -589,14 +589,63 @@ triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 rm -rf "$SCRATCH/fleetlogs"; mkdir -p "$SCRATCH/fleetlogs"
 echo 'post-plan-fleet: outcome=shipped' > "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
 echo 'post-plan-fleet: outcome=held'    > "$SCRATCH/fleetlogs/post-plan-fleet-102.log"
-# 103 has no log at all: it counts as blocked.
+# 103 has no log at all: it counts as failed.
 run --worker
 [[ $RC -eq 0 ]] || fail "case 11b: exit $RC, want 0"
-_want11b='fired 3 (shipped 1, held 1, blocked 1, timed out 0)'
+_want11b='fired 3 (shipped 1, held 1, declined 0, paused 0, conflict 0, failed 1, timed out 0)'
 grep -qF "$_want11b" <<< "$OUT" || fail "case 11b: finish line lacks '$_want11b'"
 grep -qF "$_want11b" "$SCRATCH/dm.argv" || fail "case 11b: DM lacks '$_want11b'"
 grep -qF 'readied' <<< "$OUT" && fail "case 11b: finish line still says readied"
+grep -qxF '#103 failed no-log' <<< "$OUT" || fail "case 11b: per-PR line '#103 failed no-log' missing"
 end_case "case 11b outcome counts"
+
+# ==========================================================================================
+# 11c — every outcome bucket, per-PR result lines, legacy `blocked` and a missing log
+# ==========================================================================================
+begin_case
+reset_state
+_atk11c='# Plan of attack
+
+| # | PR | Constraint | Needs you? |
+|---|----|-----------|------------|
+'
+_tri11c=()
+for _p in 101 102 103 104 105 106 107 108 109; do
+    _atk11c+="| $((_p - 100)) | #$_p slug-$_p | none | no |"$'\n'
+    _tri11c+=("$_p NEEDS-WORK rebase")
+done
+printf '%s' "$_atk11c" > "$SCRATCH/attack-out"
+triage_report "${_tri11c[@]}" > "$SCRATCH/triage-out"
+rm -rf "$SCRATCH/fleetlogs"; mkdir -p "$SCRATCH/fleetlogs"
+_fl11c() {  # $1 = PR, rest = log lines
+    local _pr="$1"; shift
+    printf 'post-plan-fleet: %s\n' "$@" > "$SCRATCH/fleetlogs/post-plan-fleet-$_pr.log"
+}
+_fl11c 101 outcome=shipped 'reason=PR #101'
+_fl11c 102 outcome=held 'reason=PR #102'
+_fl11c 103 outcome=declined reason=holdrepeat
+_fl11c 104 outcome=paused reason=usage-gate
+_fl11c 105 outcome=conflict reason=.claude/rules/codebase-map.md
+_fl11c 106 outcome=failed reason=lostwork-unproved
+_fl11c 107 outcome=blocked
+# 108 has no log file.
+_fl11c 109 outcome=timed-out reason=timeout
+run --worker --max-ready 9
+[[ $RC -eq 0 ]] || fail "case 11c: exit $RC, want 0"
+_want11c='fired 9 (shipped 1, held 1, declined 1, paused 1, conflict 1, failed 3, timed out 1)'
+grep -qF "$_want11c" <<< "$OUT" || fail "case 11c: finish line lacks '$_want11c' (out: $OUT)"
+grep -qF "$_want11c" "$SCRATCH/dm.argv" || fail "case 11c: DM lacks '$_want11c'"
+for _l in '#101 shipped PR #101' '#102 held PR #102' '#103 declined holdrepeat' \
+          '#104 paused usage-gate' '#105 conflict .claude/rules/codebase-map.md' \
+          '#106 failed lostwork-unproved' '#107 failed' '#108 failed no-log' \
+          '#109 timed-out timeout'; do
+    [[ "$(grep -cxF "$_l" <<< "$OUT")" == 1 ]] || fail "case 11c: want exactly one '$_l' line (out: $OUT)"
+done
+_ln_pr="$(grep -nxF '#109 timed-out timeout' <<< "$OUT" | cut -d: -f1)"
+_ln_fin="$(grep -n 'pr-cycle finished' <<< "$OUT" | head -1 | cut -d: -f1)"
+[[ -n "$_ln_pr" && -n "$_ln_fin" && "$_ln_pr" -lt "$_ln_fin" ]] \
+    || fail "case 11c: per-PR lines do not precede the finish line ($_ln_pr vs $_ln_fin)"
+end_case "case 11c all outcome buckets"
 
 # --- rescue: baseline characterization -----------------------------------------------------
 # Passes BEFORE the rescue path exists (the driver ignores an unknown seam) and AFTER it
@@ -2127,6 +2176,7 @@ echo changed >> "$SCRATCH/wt-first-slug/hrfile"
 HRHARNESS="$HRH" run --worker
 [[ "$(calls ready)" == "1" ]] || fail "holdrepeat D: changed diff did not fire (ready calls $(calls ready))"
 grep -qxF 101 "$(rundir)/stage1.txt" || fail "holdrepeat D: 101 missing from stage1.txt"
+grep -qF '#101 skipped holdrepeat' <<< "$OUT" && fail "holdrepeat D: changed-diff run still printed the skipped line"
 hr_cleanup
 
 # E: no worktree for the branch fires.
@@ -2188,6 +2238,8 @@ HRHARNESS="$HRH" run --worker --max-ready 1
 [[ "$(cat "$(rundir)/stage1.txt")" == "102" ]] || fail "holdrepeat I: stage1.txt is '$(cat "$(rundir)/stage1.txt")', want just 102"
 grep -qF '#101 — holdrepeat would decline' <<< "$OUT" || fail "holdrepeat I: 101 skip line missing"
 grep -qF '#102 — over --max-ready cap' <<< "$OUT" && fail "holdrepeat I: 102 was capped out"
+grep -qxF '#101 skipped holdrepeat' <<< "$OUT" || fail "holdrepeat I: per-PR '#101 skipped holdrepeat' line missing"
+grep -qF '#102 skipped' <<< "$OUT" && fail "holdrepeat I: 102 reported as skipped"
 hr_cleanup
 unset HRHARNESS HRSTATE
 end_case "case holdrepeat pre-fire skip"

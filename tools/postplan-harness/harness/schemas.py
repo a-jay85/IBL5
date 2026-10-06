@@ -8,6 +8,9 @@ import re
 
 from .state import Classification, HarnessError
 
+# LLM purpose name for the PR-copy call; llm.py keys tolerant JSON recovery on it.
+PR_COPY_PURPOSE = "pr-copy"
+
 FINDING_KEYS = {"path", "line", "body"}
 FINDING_ALIASES = (
     ("path", ("file",)),

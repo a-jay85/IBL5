@@ -234,5 +234,5 @@ def test_pr_copy_tier_is_sonnet_4_6():
     """MODEL_MAP['sonnet'] resolves to claude-sonnet-4-6, and _pr_copy uses 'sonnet'."""
     assert MODEL_MAP["sonnet"] == "claude-sonnet-4-6"
     src = inspect.getsource(runner._pr_copy)
-    assert 'llm.call("pr-copy", "sonnet"' in src
-    assert 'llm.call("pr-copy", "haiku"' not in src
+    assert 'llm.call(schemas.PR_COPY_PURPOSE, "sonnet"' in src
+    assert 'llm.call(schemas.PR_COPY_PURPOSE, "haiku"' not in src

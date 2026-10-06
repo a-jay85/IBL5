@@ -27,6 +27,10 @@ export RETRO_MINE_TMP_LOG_DIR="$RM_ISO/tmplogs"
 export RETRO_MINE_AUTOMOUSE_LOG_DIR="$RM_ISO/amlogs"
 export RETRO_MINE_REPORT_DIR="$RM_ISO/reports"
 export RETRO_MINE_DM_BIN="$RM_ISO/dm-sentinel"
+# gh defaults to the real binary; a dry-run lists issues, so fence it off too.
+printf '#!/bin/bash\nexit 127\n' > "$RM_ISO/gh-sentinel"
+chmod +x "$RM_ISO/gh-sentinel"
+export RETRO_MINE_GH_BIN="$RM_ISO/gh-sentinel"
 RM_GIT_BASELINE="$(git -C "$SCRIPT_DIR/.." status --porcelain --untracked-files=all 2>/dev/null)"
 
 FAILED=0
@@ -752,8 +756,123 @@ case_dry_run_no_side_effects() {
     rm_expect_eq "dry_run_no_side_effects: worktrees unchanged" "$wts" "$(git -C "$t/repo" worktree list)"
     if [ -e "$t/state" ]; then rm_fail "dry_run_no_side_effects: state dir created"
     else rm_ok "dry_run_no_side_effects: no state dir"; fi
-    if [ -e "$t/gh.log" ] || [ -e "$t/claude.argv" ]; then rm_fail "dry_run_no_side_effects: a stub was invoked"
-    else rm_ok "dry_run_no_side_effects: gh and claude never invoked"; fi
+    # The tune-up dry-run may make one read-only gh issue list; nothing else.
+    if [ -e "$t/claude.argv" ] || { [ -e "$t/gh.log" ] && grep -qv '^issue list ' "$t/gh.log"; }; then
+        rm_fail "dry_run_no_side_effects: a stub was invoked"
+    else rm_ok "dry_run_no_side_effects: claude never invoked, gh only listed issues"; fi
+}
+
+# ── Tune-up helpers ───────────────────────────────────────────────────────────
+RM_FIXTURE_DIR="$SCRIPT_DIR/fixtures/retro-mine"
+RM_NOW=1790000000   # fixed clock for every tune-up case (2026-09-21 UTC)
+
+# rm_iso <epoch>: ISO-8601 UTC with ms, portable across BSD and GNU date.
+rm_iso() {
+    date -u -r "$1" +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null || date -u -d "@$1" +%Y-%m-%dT%H:%M:%S.000Z
+}
+
+# rm_tuneup_stubs <t>: claude, gh and DM recorders for tune-up cases.
+#   claude: one "call N" line per call in claude.calls, argv in claude.argv.N
+#     ([arg] per line), the -p text in prompt.N, cwd in claude.cwd; serves
+#     prosefix-env.json when the prompt holds "prose fix", digest-env.json for
+#     --model claude-sonnet-5-5, rank-env.json otherwise; exits claude.rc.
+#   gh: every call appended to gh.log; "issue list" prints issues.json (exits
+#     gh.rc); "issue create" appends an OPEN issue to issues.json, copies the
+#     body to gh-body.N and prints its URL.
+#   dm: stdin saved to dm.N; exits dm.rc.
+rm_tuneup_stubs() {
+    local t="$1"
+    mkdir -p "$t/projects" "$t/tmplogs" "$t/amlogs" "$t/reports"
+    [ -f "$t/issues.json" ] || echo '[]' > "$t/issues.json"
+    rm_registry "$t/reg.md" "$(rm_row '#1' 'alpha' 3 .claude/rules/a.md '--')"
+    cat > "$t/claude" <<EOF
+#!/bin/bash
+n=\$(( \$(cat "$t/claude.n" 2>/dev/null || echo 0) + 1 ))
+echo "\$n" > "$t/claude.n"
+echo "call \$n" >> "$t/claude.calls"
+pwd > "$t/claude.cwd"
+printf '[%s]\n' "\$@" > "$t/claude.argv.\$n"
+model=""; prompt=""
+while [ \$# -gt 0 ]; do
+    case "\$1" in
+        -p) prompt="\$2"; shift ;;
+        --model) model="\$2"; shift ;;
+    esac
+    shift
+done
+printf '%s' "\$prompt" > "$t/prompt.\$n"
+rc=\$(cat "$t/claude.rc" 2>/dev/null || echo 0)
+[ "\$rc" -eq 0 ] || exit "\$rc"
+case "\$prompt" in *"prose fix"*) cat "$t/prosefix-env.json"; exit 0 ;; esac
+if [ "\$model" = claude-sonnet-5-5 ]; then cat "$t/digest-env.json"; else cat "$t/rank-env.json"; fi
+EOF
+    cat > "$t/gh" <<EOF
+#!/bin/bash
+echo "\$*" >> "$t/gh.log"
+rc=\$(cat "$t/gh.rc" 2>/dev/null || echo 0)
+[ "\$rc" -eq 0 ] || exit "\$rc"
+if [ "\$1 \$2" = "issue list" ]; then cat "$t/issues.json"; exit 0; fi
+if [ "\$1 \$2" = "issue create" ]; then
+    title=""; body=""
+    while [ \$# -gt 0 ]; do
+        case "\$1" in
+            --title) title="\$2"; shift ;;
+            --body-file) body="\$2"; shift ;;
+        esac
+        shift
+    done
+    n=\$(( 100 + \$(jq 'length' "$t/issues.json") ))
+    cp "\$body" "$t/gh-body.\$n"
+    jq --argjson n "\$n" --arg t "\$title" '. + [{number: \$n, title: \$t, state: "OPEN"}]' \
+        "$t/issues.json" > "$t/issues.json.tmp" && mv "$t/issues.json.tmp" "$t/issues.json"
+    echo "https://github.com/a-jay85/IBL5-backlog/issues/\$n"
+fi
+EOF
+    cat > "$t/dm" <<EOF
+#!/bin/bash
+n=\$(( \$(cat "$t/dm.n" 2>/dev/null || echo 0) + 1 ))
+echo "\$n" > "$t/dm.n"
+cat > "$t/dm.\$n"
+exit "\$(cat "$t/dm.rc" 2>/dev/null || echo 0)"
+EOF
+    chmod +x "$t/claude" "$t/gh" "$t/dm"
+}
+
+# rm_tuneup_env <structured-json> [cost]: a claude -p --output-format json envelope.
+rm_tuneup_env() {
+    jq -n -c --argjson s "$1" --argjson c "${2:-0.5}" '{type: "result", is_error: false,
+        stop_reason: "end_turn", total_cost_usd: $c, structured_output: $s,
+        usage: {input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 0, cache_creation_input_tokens: 0}}'
+}
+
+# rm_tuneup_run <t> [args...]: the driver with every seam pointed into <t>.
+# Override the clock per call with RM_RUN_NOW.
+rm_tuneup_run() {
+    local t="$1" errf
+    shift
+    errf="$(mktemp)"
+    RM_OUT="$(RETRO_MINE_REGISTRY="$t/reg.md" RETRO_MINE_STATE_DIR="$t/state" \
+        RETRO_MINE_CLAUDE_BIN="$t/claude" RETRO_MINE_GH_BIN="$t/gh" RETRO_MINE_DM_BIN="$t/dm" \
+        RETRO_MINE_PROJECTS_DIR="$t/projects" RETRO_MINE_TMP_LOG_DIR="$t/tmplogs" \
+        RETRO_MINE_AUTOMOUSE_LOG_DIR="$t/amlogs" RETRO_MINE_REPORT_DIR="$t/reports" \
+        RETRO_MINE_NOW="${RM_RUN_NOW:-$RM_NOW}" "$RM_DRIVER" "$@" 2>"$errf")"
+    RM_RC=$?
+    RM_ERR="$(cat "$errf")"
+    rm -f "$errf"
+}
+
+# rm_tuneup_thread <t> <dir-suffix> <sid> <age-seconds> — one interactive session
+# with a hook deny and a correction, written to <t>/projects/-Users-x-GitHub-IBL5<suffix>/<sid>.jsonl.
+rm_tuneup_thread() {
+    local t="$1" sid="$3" d ts
+    d="$t/projects/-Users-x-GitHub-IBL5$2"
+    ts="$(rm_iso $((RM_NOW - $4)))"
+    mkdir -p "$d"
+    {
+        jq -n -c --arg s "$sid" --arg ts "$ts" '{type: "user", sessionId: $s, entrypoint: "cli", cwd: "/repo", gitBranch: "b", timestamp: $ts, uuid: "u1", message: {content: "please fix the build"}}'
+        jq -n -c --arg s "$sid" --arg ts "$ts" '{type: "user", sessionId: $s, entrypoint: "cli", timestamp: $ts, uuid: "u2", message: {content: [{type: "tool_result", is_error: true, content: "PreToolUse:Bash hook error: BLOCKED cd into sibling worktree 12"}]}}'
+        jq -n -c --arg s "$sid" --arg ts "$ts" '{type: "user", sessionId: $s, entrypoint: "cli", timestamp: $ts, uuid: "u3", message: {content: "no, run it in the worktree"}}'
+    } > "$d/$sid.jsonl"
 }
 
 # ── Real registry and replay cases ───────────────────────────────────────────

@@ -695,7 +695,7 @@ group_schedule() {
     git -C "$main" -c user.name=t -c user.email=t@example.com commit -q -m init 2>/dev/null
     git -C "$main" worktree add -q "$wt" -b wt-branch 2>/dev/null
     local main_real
-    main_real="$(git -C "$main" worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
+    main_real="$(git -C "$main" worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')"
 
     local out
     sched_env

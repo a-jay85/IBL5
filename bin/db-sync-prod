@@ -146,7 +146,7 @@ if [ -z "$SNAPSHOT" ]; then
   # in that case so `bin/wt-up --prod` works from any CWD.
   ENV_FILE="$REPO_ROOT/.env"
   if [ ! -f "$ENV_FILE" ]; then
-      MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+      MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
       if [ -n "$MAIN_WT" ] && [ -f "$MAIN_WT/.env" ]; then
           ENV_FILE="$MAIN_WT/.env"
       else

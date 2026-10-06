@@ -250,7 +250,7 @@ assert_contains "row15: /opt/homebrew/bin" "/opt/homebrew/bin" "$SCHEDULE_OUT"
 assert_contains "row15: /usr/local/bin" "/usr/local/bin" "$SCHEDULE_OUT"
 assert_contains "row15: /usr/bin" "/usr/bin" "$SCHEDULE_OUT"
 assert_contains "row15: /bin" "/bin" "$SCHEDULE_OUT"
-REPO_BIN_LABEL="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')/bin"
+REPO_BIN_LABEL="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')/bin"
 assert_contains "row15: repo bin dir" "$REPO_BIN_LABEL" "$SCHEDULE_OUT"
 echo "ok: row15 — PATH contains required dirs"
 

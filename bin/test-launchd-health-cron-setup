@@ -364,10 +364,11 @@ else
     else
         lht_fail "12: should have written 2 plists on main-checkout install — found $_plist_found"
     fi
-    if grep -q "bootstrap" "$STUB/launchctl.log" 2>/dev/null; then
-        lht_ok "12: launchctl bootstrap was called"
+    _bootstrap_count="$(grep -c '^bootstrap ' "$STUB/launchctl.log" 2>/dev/null || true)"
+    if [ "${_bootstrap_count:-0}" -eq 2 ]; then
+        lht_ok "12: launchctl called with exactly 2 bootstrap calls"
     else
-        lht_fail "12: launchctl should have been called with bootstrap"
+        lht_fail "12: launchctl should have exactly 2 bootstrap calls (login + daily) — got ${_bootstrap_count:-0}"
     fi
 fi
 

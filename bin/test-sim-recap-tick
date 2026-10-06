@@ -1503,6 +1503,20 @@ wf_committed_hits=$(srt_workflow_hygiene "$SRT_WORKFLOW" 2>&1 | grep -c 'secret-
 srt_expect_eq "SMOKE-DONE: stray ungated step yields one secret-gating: line" 1 "$wf_stray_hits"
 srt_expect_eq "SMOKE-DONE: committed file yields zero secret-gating: lines" 0 "$wf_committed_hits"
 
+# PR-RUN-DONE: opt-in live check, run after the PR is open and its run has finished.
+# Set SRT_CHECK_PR_RUN=<branch> to read that branch's latest pull_request run.
+if [ -n "${SRT_CHECK_PR_RUN:-}" ]; then
+    pr_run_id=$(gh run list --workflow sim-recap.yml --branch "$SRT_CHECK_PR_RUN" \
+        --event pull_request --limit 1 --json databaseId --jq '.[0].databaseId')
+    pr_run_conclusion=$(gh run view "$pr_run_id" --json conclusion --jq .conclusion)
+    pr_run_step=$(gh run view "$pr_run_id" --json jobs \
+        --jq '.jobs[0].steps[] | select(.name=="Check secrets") | .conclusion')
+    pr_run_masked=$(gh run view "$pr_run_id" --log 2>/dev/null | grep -c 'T7: \*\*\*' || true)
+    srt_expect_eq "PR-RUN-DONE: run concludes success" success "$pr_run_conclusion"
+    srt_expect_eq "PR-RUN-DONE: Check secrets step is skipped" skipped "$pr_run_step"
+    srt_expect_eq "PR-RUN-DONE: log holds no masked T7 line" 0 "$pr_run_masked"
+fi
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 exit "$FAILED"

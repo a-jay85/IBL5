@@ -314,10 +314,13 @@ _attack_plan() {
 
     # Nominees exist. The driver never invents a gate edge, so it re-runs pr-attack with the
     # documented judged-empty form (--gate-edges /dev/null): every nominee is re-admitted and
-    # ordered like any other PR. These lines are a heads-up for the log reader, not a skip.
-    grep -E '^### #[0-9]+' "$RUNDIR/attack.md" 2>/dev/null | while read -r _line; do
-        echo "  $_line — ordered with no gate edges (gate nominee, judged-empty)"
-    done || true
+    # ordered like any other PR. One collapsed line is a heads-up for the log reader, not a
+    # skip. The once-flag keeps the stale-WORK retry (which re-enters here) from repeating it.
+    if [ ! -f "$RUNDIR/nominees-logged" ]; then
+        _noms="$(grep -oE '^### #[0-9]+' "$RUNDIR/attack.md" 2>/dev/null | sed 's/^### //' | paste -sd' ' - || true)"
+        [ -z "$_noms" ] || echo "  gate nominees (ordered, judged-empty): $_noms"
+        touch "$RUNDIR/nominees-logged"
+    fi
 
     # LAST match, so a slug containing the literal WORK= cannot spoof the real trailer.
     _work="$(sed -n 's/^WORK=//p' "$RUNDIR/attack.md" | tail -n 1)"

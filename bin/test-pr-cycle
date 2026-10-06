@@ -484,6 +484,7 @@ begin_case
 reset_state
 cat > "$SCRATCH/attack-out-1" <<'NOM_EOF'
 ### #999 dangling-gate
+### #998 other-gate
 WORK=decoy-must-be-ignored
 Nominated for a gate edge; unjudged.
 WORK=abc123
@@ -497,14 +498,37 @@ run --worker
     || fail "first attack call: $(sed -n '1p' "$SCRATCH/attack.argv")"
 [[ "$(sed -n '2p' "$SCRATCH/attack.argv")" == "--work abc123 --gate-edges /dev/null" ]] \
     || fail "second attack call: $(sed -n '2p' "$SCRATCH/attack.argv")"
-grep -qF '#999 dangling-gate — ordered with no gate edges (gate nominee, judged-empty)' <<< "$OUT" \
-    || fail "gate nominee log line missing or misworded: $(grep -F '#999' <<< "$OUT")"
+grep -qxF '  gate nominees (ordered, judged-empty): #999 #998' <<< "$OUT" \
+    || fail "collapsed gate nominee line missing or misworded: $(grep -F 'nominee' <<< "$OUT")"
+! grep -qF 'ordered with no gate edges' <<< "$OUT" \
+    || fail "per-nominee lines are back: $(grep -F 'no gate edges' <<< "$OUT")"
 ! grep -qF 'excluded this run' <<< "$OUT" \
     || fail "driver still claims nominees are excluded; --gate-edges /dev/null re-admits every one"
 [[ "$(calls ready)" == "1" ]] || fail "want 1 fleet call after nominee re-admission, got $(calls ready)"
 _a6="$(sed -n '1p' "$SCRATCH/ready.argv")"
 [[ "$_a6" == *'101'*'102'*'103'* ]] || fail "case 6: all 3 PRs not in --pr-list: $_a6"
 end_case "case 6 gate nominees"
+
+# 6b — stale-WORK retry re-enters _attack_plan; the nominee line still prints once
+begin_case
+reset_state
+cat > "$SCRATCH/attack-out-1" <<'NOM_EOF'
+### #999 dangling-gate
+### #998 other-gate
+WORK=abc123
+NOM_EOF
+echo 3 > "$SCRATCH/attack-rc-2"
+cp "$SCRATCH/attack-out-1" "$SCRATCH/attack-out-3"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out-4"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker
+[[ "$(grep -cF 'gate nominees (ordered' <<< "$OUT")" == "1" ]] \
+    || fail "case 6b: want exactly one nominee line, got $(grep -cF 'gate nominees (ordered' <<< "$OUT")"
+[[ "$(calls attack)" == "4" ]] || fail "case 6b: want 4 attack calls, got $(calls attack)"
+[[ "$(calls ready)" == "1" ]] || fail "case 6b: want 1 fleet call, got $(calls ready)"
+end_case "case 6b nominee line once on retry"
 
 # ==========================================================================================
 # 7 — pr-attack failure handling

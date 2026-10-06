@@ -70,7 +70,7 @@ if [ -n "${RETRO_MINE_LIB_DIR+set}" ] && [ -z "$RETRO_MINE_LIB_DIR" ]; then
     exit 2
 fi
 RM_LIB_DIR="${RETRO_MINE_LIB_DIR-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib}"
-# A missing file makes `.` exit the shell before any `||` runs, so test first.
+# Test first so a bad RETRO_MINE_LIB_DIR fails with a message that names the path.
 if [ ! -r "$RM_LIB_DIR/retro-mine-tuneup.sh" ]; then
     log "ERROR: cannot source $RM_LIB_DIR/retro-mine-tuneup.sh"
     exit 2

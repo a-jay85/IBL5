@@ -407,10 +407,6 @@ rm_validate() {
     errf="$(mktemp)"
     (
         # shellcheck source=/dev/null
-        # shellcheck source=/dev/null
-        # shellcheck source=/dev/null
-        # shellcheck source=/dev/null
-        # shellcheck source=/dev/null
         . "$RM_DRIVER"
         set +e
         validate_draft "$env" "$tree" || exit 1
@@ -1338,6 +1334,23 @@ case_tuneup_redaction() {
     rm_lacks "tuneup_redaction: no email in issue titles" "$(cat "$t/gh.log")" "jo@example.com"
 }
 
+# The report and issue body are next week's dedupe input, so a signature past 32
+# characters must survive the outbound pass that redacts long opaque runs.
+case_tuneup_signature_survives_redaction() {
+    local t
+    t="$(rm_tmp)"
+    rm_tuneup_week "$t"
+    rm_tuneup_env "$(jq -n -c --arg s "$RM_TSIG" '{items:[{title:"Long signature",summary:"S.",proposed_change:"C.",signatures:[$s]}]}')" 1.0 \
+        > "$t/rank-env.json"
+    rm_tuneup_run "$t"
+    rm_has "tuneup_signature_survives_redaction: report keeps the long signature" "$(cat "$t"/reports/*-tune-up.md)" "$RM_TSIG"
+    rm_lacks "tuneup_signature_survives_redaction: report has no redaction mark" "$(cat "$t"/reports/*-tune-up.md)" "[redacted]"
+    rm_has "tuneup_signature_survives_redaction: issue body keeps the long signature" "$(cat "$t"/gh-body.* 2>/dev/null)" "$RM_TSIG"
+    rm_has "tuneup_signature_survives_redaction: full redactor still drops an opaque run" \
+        "$(printf 'x %s y' "$(printf 'A%.0s' {1..40})" | jq -R -s -j -f "$SCRIPT_DIR/lib/retro-mine-signals.jq" \
+            --argjson cutoff 0 --argjson heavy 0 --argjson maxex 0 --argjson exch 0 --arg marker m --arg mode text)" "[redacted]"
+}
+
 case_tuneup_cap_proposal() {
     local t i
     t="$(rm_tmp)"
@@ -1407,9 +1420,6 @@ case_tuneup_replay_real_digest_envelope() {
     (
         export STATE_DIR="$t" REPO_ROOT="$SCRIPT_DIR/.."
         # shellcheck source=/dev/null
-        # shellcheck source=/dev/null
-        # shellcheck source=/dev/null
-        # shellcheck source=/dev/null
         . "$RM_DRIVER"
         set +e
         jq -c . "$th" > "$t/thread.jsonl"
@@ -1431,9 +1441,6 @@ case_tuneup_replay_real_rank_envelope() {
     env="$RM_FIXTURE_DIR/tuneup-rank-envelope.json"
     (
         export STATE_DIR="$t" REPO_ROOT="$SCRIPT_DIR/.."
-        # shellcheck source=/dev/null
-        # shellcheck source=/dev/null
-        # shellcheck source=/dev/null
         # shellcheck source=/dev/null
         . "$RM_DRIVER"
         set +e

@@ -1,6 +1,6 @@
 ---
 description: One-time Google Cloud, environment, key-rotation, and prod-cron setup for the Google Sheets player export, plus what each broken state means.
-last_verified: 2026-09-30
+last_verified: 2026-10-06
 ---
 
 # Google Sheets Export Setup
@@ -38,7 +38,7 @@ Where to set them:
 
 - **Prod.** In the same place the `MAIL_*` variables live.
 - **Local worktrees.** In `ibl5/.env.test`, beside `DEV_AUTO_LOGIN`.
-- **CI E2E.** The placeholder values in `.github/workflows/e2e-tests.yml`.
+- **CI E2E.** The placeholder values on the `php` service in `docker-compose.ci.yml`. The same values in `.github/workflows/e2e-tests.yml` go to the Playwright container, which PHP does not read.
 
 ## 4. Key rotation
 

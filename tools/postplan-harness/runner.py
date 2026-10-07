@@ -71,12 +71,6 @@ from harness.adapters.llm import ClaudeCli, FixtureLlm, TOOLED_TIMEOUT
 from harness.adapters.probe import FixtureProbe, LiveProbe
 from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate, fail_log_lines, timing_log_line, tracks_log_line
 
-_BADGE_FALLBACK = (
-    "<!-- postplan-status -->\n**post-plan is running**\n\n"
-    "Started outside `bin/post-plan-now`, so there is no launchd job to probe.\n"
-    "<!-- postplan-label:  -->\n"
-)
-
 # ── SIGTERM handler — abort any in-progress rebase before the process dies ───
 _active_git: "LiveGit | None" = None  # set once in run() for the isolated/live path
 _active_audit: "list[str] | None" = None  # the live run's audit list; read by the SIGTERM handler
@@ -127,12 +121,16 @@ def _install_sigterm_handler() -> None:
     signal.signal(signal.SIGTERM, _sigterm_handler)
 
 
-def _post_status_badge(gh, pr):
+def _post_status_label(gh, pr):
     if not pr:
         return
-    body = os.environ.get("POSTPLAN_BADGE_BODY") or _BADGE_FALLBACK
+    # Set only by bin/post-plan-now; runs outside it never mark the PR, so nothing
+    # is left orphaned when no wrapper exists to remove the label.
+    label = os.environ.get("POSTPLAN_STATUS_LABEL")
+    if not label:
+        return
     try:
-        gh.pr_status_badge(pr, body)
+        gh.pr_status_label(pr, label)
     except Exception:
         pass
 
@@ -510,7 +508,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             if bg_ci is not None:
                 log(f"phase2: background CI watch started for {sha[:8]} "
                     f"-> {os.path.basename(bg_ci.path)}")
-        _post_status_badge(gh, pr)
+        _post_status_label(gh, pr)
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
 
         # ---- Phase 4: review + security (gated bounded calls) ---------

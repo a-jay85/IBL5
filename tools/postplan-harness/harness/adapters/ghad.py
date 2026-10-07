@@ -33,7 +33,6 @@ STICKY_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "pr-sticky.sh
 ARMABLE_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "pr-armable.sh"
 PRF_LIB = ARMABLE_LIB.parent / "post-review-findings.sh"
 
-POSTPLAN_BADGE_MARKER = "<!-- postplan-status -->"
 # Duplicated from fidelity.STICKY_MARKER on purpose: adapters must not import the core
 # phase modules. tests/test_fidelity_carryforward.py asserts the two stay equal.
 PR_STICKY_MARKER = "<!-- pr-ready-verdict -->"
@@ -41,7 +40,7 @@ PR_STICKY_MARKER = "<!-- pr-ready-verdict -->"
 
 class RecordingGh:
     MUTATIONS = ("pr_create", "pr_comment", "pr_review_findings", "pr_edit_body",
-                 "pr_merge_auto", "label_add", "pr_status_badge",
+                 "pr_merge_auto", "label_add", "pr_status_label",
                  "pr_sticky_verdict", "issue_create", "followup_create",
                  "pr_disable_auto_merge",
                  "pr_checks_json", "run_log_failed", "run_rerun_failed",
@@ -114,8 +113,8 @@ class RecordingGh:
     def post_review_summary(self, pr: int, title: str, body: str) -> None:
         self.record("pr_comment", pr=pr, title=title, body=body[:4000])
 
-    def pr_status_badge(self, pr: int, body: str) -> None:
-        self.record("pr_status_badge", pr=pr, body=body[:4000])
+    def pr_status_label(self, pr: int, label: str) -> None:
+        self.record("pr_status_label", pr=pr, label=label)
 
     def issue_create(self, title: str, body: str, label: str) -> int | None:
         existing = sum(1 for a in self.actions() if a.get("action") == "issue_create")
@@ -473,34 +472,21 @@ class LiveGh(RecordingGh):
         self._gh("pr", "comment", str(pr), "--body", f"## {title}\n\n{body}")
         self.record("pr_comment", pr=pr, title=title, body=body[:4000])
 
-    def pr_status_badge(self, pr: int, body: str) -> None:
+    def pr_status_label(self, pr: int, label: str) -> None:
+        """Best-effort: mark the PR with the yellow in-flight label."""
         try:
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
-                f.write(body)
-                fname = f.name
-            try:
-                existing = self._gh(
-                    "api", f"repos/{{owner}}/{{repo}}/issues/{pr}/comments",
-                    "--paginate", "--jq",
-                    f'.[] | select(.body | contains("{POSTPLAN_BADGE_MARKER}")) | .id',
-                )
-                existing_id = existing.strip().splitlines()[0] if existing.strip() else ""
-            except HarnessError:
-                existing_id = ""
-            if existing_id:
-                self._gh("api", "--method", "PATCH",
-                         f"repos/{{owner}}/{{repo}}/issues/comments/{existing_id}",
-                         "-F", f"body=@{fname}")
-            else:
-                self._gh("pr", "comment", str(pr), "--body-file", fname)
-            self.record("pr_status_badge", pr=pr, body=body[:4000])
+            self._gh("label", "create", label, "--color", "FBCA04",
+                     "--description",
+                     "post-plan is running on this PR; removed when the run ends")
         except HarnessError:
             pass
-        finally:
-            try:
-                os.unlink(fname)
-            except Exception:
-                pass
+        try:
+            self._gh("api", "--method", "POST",
+                     f"repos/{{owner}}/{{repo}}/issues/{pr}/labels",
+                     "-f", f"labels[]={label}")
+        except HarnessError:
+            pass
+        self.record("pr_status_label", pr=pr, label=label)
 
     def branch_protection_strict(self) -> bool:
         """Fail closed: an unreadable or null protection config is treated as strict."""

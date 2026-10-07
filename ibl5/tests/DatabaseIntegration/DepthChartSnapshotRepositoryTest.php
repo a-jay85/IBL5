@@ -1,0 +1,377 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\DatabaseIntegration;
+
+use PHPUnit\Framework\Attributes\Group;
+
+use DepthChartSnapshot\DepthChartSnapshotRepository;
+
+#[Group('database')]
+class DepthChartSnapshotRepositoryTest extends DatabaseTestCase
+{
+    private DepthChartSnapshotRepository $repo;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->repo = new DepthChartSnapshotRepository($this->db);
+    }
+
+    public function testCreateSavedDepthChartReturnsInsertId(): void
+    {
+        $id = $this->repo->createSavedDepthChart(
+            1, 'testgm', 'My DC', 'Regular Season', 2024, '2024-01-15', 10
+        );
+
+        self::assertGreaterThan(0, $id);
+    }
+
+    public function testCreateSavedDepthChartWithoutNameSucceeds(): void
+    {
+        $id = $this->repo->createSavedDepthChart(
+            1, 'testgm', null, 'Regular Season', 2024, '2024-01-15', 10
+        );
+
+        self::assertGreaterThan(0, $id);
+
+        $chart = $this->repo->getSavedDepthChartById($id, 1);
+        self::assertNotNull($chart);
+        self::assertNull($chart['name']);
+    }
+
+    public function testGetSavedDepthChartsForTeamReturnsRows(): void
+    {
+        $this->repo->createSavedDepthChart(1, 'testgm', 'DC One', 'Regular Season', 2024, '2024-01-15', 10);
+        $this->repo->createSavedDepthChart(1, 'testgm', 'DC Two', 'Regular Season', 2024, '2024-02-15', 20);
+
+        $charts = $this->repo->getSavedDepthChartsForTeam(1);
+
+        self::assertGreaterThanOrEqual(2, count($charts));
+        // Ordered by created_at DESC — most recent first
+        self::assertSame('DC Two', $charts[0]['name']);
+    }
+
+    public function testGetSavedDepthChartByIdReturnsRow(): void
+    {
+        $id = $this->repo->createSavedDepthChart(1, 'testgm', 'Test DC', 'Regular Season', 2024, '2024-01-15', 10);
+
+        $chart = $this->repo->getSavedDepthChartById($id, 1);
+
+        self::assertNotNull($chart);
+        self::assertSame('Test DC', $chart['name']);
+        self::assertSame(1, $chart['teamid']);
+        self::assertSame('testgm', $chart['username']);
+    }
+
+    public function testGetSavedDepthChartByIdReturnsNullForWrongTeam(): void
+    {
+        $id = $this->repo->createSavedDepthChart(1, 'testgm', 'Test DC', 'Regular Season', 2024, '2024-01-15', 10);
+
+        $chart = $this->repo->getSavedDepthChartById($id, 2);
+
+        self::assertNull($chart);
+    }
+
+    public function testSaveDepthChartPlayersInsertsRows(): void
+    {
+        $dcId = $this->repo->createSavedDepthChart(1, 'testgm', 'DC', 'Regular Season', 2024, '2024-01-15', 10);
+
+        $snapshots = [
+            [
+                'pid' => 1,
+                'player_name' => 'Test Player One',
+                'ordinal' => 1,
+                'dc_pg_depth' => 1,
+                'dc_sg_depth' => 0,
+                'dc_sf_depth' => 0,
+                'dc_pf_depth' => 0,
+                'dc_c_depth' => 0,
+                'dc_can_play_in_game' => 1,
+                'dc_minutes' => 32,
+                'dc_of' => 5,
+                'dc_df' => 5,
+                'dc_oi' => 3,
+                'dc_di' => 3,
+                'dc_bh' => 4,
+            ],
+        ];
+
+        $this->repo->saveDepthChartPlayers($dcId, $snapshots);
+
+        $players = $this->repo->getPlayersForDepthChart($dcId);
+
+        self::assertCount(1, $players);
+        self::assertSame(1, $players[0]['pid']);
+        self::assertSame('Test Player One', $players[0]['player_name']);
+        self::assertSame(32, $players[0]['dc_minutes']);
+    }
+
+    public function testUpdateDepthChartPlayersReplacesRows(): void
+    {
+        $dcId = $this->repo->createSavedDepthChart(1, 'testgm', 'DC', 'Regular Season', 2024, '2024-01-15', 10);
+
+        $original = [
+            [
+                'pid' => 1, 'player_name' => 'Test Player One', 'ordinal' => 1,
+                'dc_pg_depth' => 1, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0, 'dc_pf_depth' => 0, 'dc_c_depth' => 0,
+                'dc_can_play_in_game' => 1, 'dc_minutes' => 32, 'dc_of' => 5, 'dc_df' => 5, 'dc_oi' => 3, 'dc_di' => 3, 'dc_bh' => 4,
+            ],
+        ];
+        $this->repo->saveDepthChartPlayers($dcId, $original);
+
+        $updated = [
+            [
+                'pid' => 1, 'player_name' => 'Test Player One', 'ordinal' => 1,
+                'dc_pg_depth' => 1, 'dc_sg_depth' => 2, 'dc_sf_depth' => 0, 'dc_pf_depth' => 0, 'dc_c_depth' => 0,
+                'dc_can_play_in_game' => 1, 'dc_minutes' => 36, 'dc_of' => 6, 'dc_df' => 4, 'dc_oi' => 3, 'dc_di' => 3, 'dc_bh' => 4,
+            ],
+        ];
+        $this->repo->updateDepthChartPlayers($dcId, $updated);
+
+        $players = $this->repo->getPlayersForDepthChart($dcId);
+
+        self::assertCount(1, $players);
+        self::assertSame(36, $players[0]['dc_minutes']);
+        self::assertSame(2, $players[0]['dc_sg_depth']);
+    }
+
+    public function testDeactivateForTeamSetsInactive(): void
+    {
+        $id = $this->repo->createSavedDepthChart(1, 'testgm', 'DC', 'Regular Season', 2024, '2024-01-15', 10);
+
+        $chart = $this->repo->getSavedDepthChartById($id, 1);
+        self::assertNotNull($chart);
+        self::assertSame(1, $chart['is_active']);
+
+        $this->repo->deactivateForTeam(1, '2024-02-15', 20);
+
+        $chart = $this->repo->getSavedDepthChartById($id, 1);
+        self::assertNotNull($chart);
+        self::assertSame(0, $chart['is_active']);
+    }
+
+    public function testDeactivateOthersForTeamKeepsOneActive(): void
+    {
+        $id1 = $this->repo->createSavedDepthChart(1, 'testgm', 'DC One', 'Regular Season', 2024, '2024-01-15', 10);
+        $id2 = $this->repo->createSavedDepthChart(1, 'testgm', 'DC Two', 'Regular Season', 2024, '2024-02-15', 20);
+
+        $this->repo->deactivateOthersForTeam(1, $id2, '2024-03-15', 30);
+
+        $chart1 = $this->repo->getSavedDepthChartById($id1, 1);
+        $chart2 = $this->repo->getSavedDepthChartById($id2, 1);
+
+        self::assertNotNull($chart1);
+        self::assertNotNull($chart2);
+        self::assertSame(0, $chart1['is_active']);
+        self::assertSame(1, $chart2['is_active']);
+    }
+
+    public function testUpdateNameChangesName(): void
+    {
+        $id = $this->repo->createSavedDepthChart(1, 'testgm', 'Old Name', 'Regular Season', 2024, '2024-01-15', 10);
+
+        $result = $this->repo->updateName($id, 1, 'New Name');
+
+        self::assertTrue($result);
+
+        $chart = $this->repo->getSavedDepthChartById($id, 1);
+        self::assertNotNull($chart);
+        self::assertSame('New Name', $chart['name']);
+    }
+
+    public function testUpdateNameReturnsFalseForWrongTeam(): void
+    {
+        $id = $this->repo->createSavedDepthChart(1, 'testgm', 'Name', 'Regular Season', 2024, '2024-01-15', 10);
+
+        $result = $this->repo->updateName($id, 2, 'New Name');
+
+        self::assertFalse($result);
+    }
+
+    public function testGetMostRecentDepthChartReturnsLatest(): void
+    {
+        $this->repo->createSavedDepthChart(1, 'testgm', 'DC Old', 'Regular Season', 2024, '2024-01-15', 10);
+        $id2 = $this->repo->createSavedDepthChart(1, 'testgm', 'DC New', 'Regular Season', 2024, '2024-02-15', 20);
+
+        $latest = $this->repo->getMostRecentDepthChart(1);
+
+        self::assertNotNull($latest);
+        self::assertSame($id2, $latest['id']);
+        self::assertSame('DC New', $latest['name']);
+    }
+
+    public function testGetActiveDepthChartForTeamReturnsActive(): void
+    {
+        $id = $this->repo->createSavedDepthChart(1, 'testgm', 'Active DC', 'Regular Season', 2024, '2024-01-15', 10);
+
+        $active = $this->repo->getActiveDepthChartForTeam(1);
+
+        self::assertNotNull($active);
+        self::assertSame($id, $active['id']);
+        self::assertSame(1, $active['is_active']);
+    }
+
+    public function testGetActiveDepthChartReturnsNullWhenAllInactive(): void
+    {
+        $this->repo->createSavedDepthChart(1, 'testgm', 'DC', 'Regular Season', 2024, '2024-01-15', 10);
+        $this->repo->deactivateForTeam(1, '2024-02-15', 20);
+
+        $active = $this->repo->getActiveDepthChartForTeam(1);
+
+        self::assertNull($active);
+    }
+
+    public function testExtendActiveDepthChartsUpdatesExpiry(): void
+    {
+        $id = $this->repo->createSavedDepthChart(1, 'testgm', 'DC', 'Regular Season', 2024, '2024-01-15', 10);
+
+        $affected = $this->repo->extendActiveDepthCharts('2024-03-01', 30);
+
+        self::assertGreaterThan(0, $affected);
+
+        $chart = $this->repo->getSavedDepthChartById($id, 1);
+        self::assertNotNull($chart);
+        self::assertSame('2024-03-01', $chart['sim_end_date']);
+        self::assertSame(30, $chart['sim_number_end']);
+    }
+
+    public function testReactivateSetsActive(): void
+    {
+        $id = $this->repo->createSavedDepthChart(1, 'testgm', 'DC', 'Regular Season', 2024, '2024-01-15', 10);
+        $this->repo->deactivateForTeam(1, '2024-02-15', 20);
+
+        $result = $this->repo->reactivate($id, 1);
+
+        self::assertTrue($result);
+
+        $chart = $this->repo->getSavedDepthChartById($id, 1);
+        self::assertNotNull($chart);
+        self::assertSame(1, $chart['is_active']);
+    }
+
+    public function testReactivateReturnsFalseForWrongTeam(): void
+    {
+        $id = $this->repo->createSavedDepthChart(1, 'testgm', 'DC', 'Regular Season', 2024, '2024-01-15', 10);
+        $this->repo->deactivateForTeam(1, '2024-02-15', 20);
+
+        $result = $this->repo->reactivate($id, 2);
+
+        self::assertFalse($result);
+    }
+
+    // ── getLiveRosterSettings ───────────────────────────────────
+
+    public function testGetLiveRosterSettingsReturnsPlayersForTeam(): void
+    {
+        $this->insertTestPlayer(200100020, 'Live Roster P1', ['teamid' => 1, 'retired' => 0, 'ordinal' => 100]);
+
+        $result = $this->repo->getLiveRosterSettings(1);
+
+        self::assertNotEmpty($result);
+        $names = array_column($result, 'name');
+        self::assertContains('Live Roster P1', $names);
+
+        $first = $result[0];
+        self::assertArrayHasKey('dc_pg_depth', $first);
+        self::assertArrayHasKey('dc_minutes', $first);
+        self::assertArrayHasKey('dc_of', $first);
+        self::assertArrayHasKey('dc_bh', $first);
+    }
+
+    // ── findActiveChartForTeamOnDate ───────────────────────────────
+
+    public function testFindActiveChartForTeamOnDateReturnsChartCoveringDate(): void
+    {
+        $id = $this->repo->createSavedDepthChart(1, 'testgm', 'In Window', 'Regular Season', 2024, '2024-01-10', 10);
+        $this->repo->extendActiveDepthCharts('2024-01-20', 11);
+
+        $result = $this->repo->findActiveChartForTeamOnDate(1, '2024-01-15');
+
+        self::assertNotNull($result);
+        self::assertSame($id, $result['header']['id']);
+    }
+
+    public function testFindActiveChartForTeamOnDateReturnsNullWhenDateOutsideWindow(): void
+    {
+        $this->repo->createSavedDepthChart(1, 'testgm', 'Old Chart', 'Regular Season', 2024, '2024-01-10', 10);
+        $this->repo->extendActiveDepthCharts('2024-01-12', 11);
+
+        $result = $this->repo->findActiveChartForTeamOnDate(1, '2024-01-15');
+
+        self::assertNull($result);
+    }
+
+    public function testFindActiveChartForTeamOnDateExtractsStarters(): void
+    {
+        $id = $this->repo->createSavedDepthChart(1, 'testgm', 'With Starters', 'Regular Season', 2024, '2024-01-10', 10);
+        $this->repo->saveDepthChartPlayers($id, [
+            ['pid' => 101, 'player_name' => 'PG One', 'ordinal' => 1,
+             'dc_pg_depth' => 1, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0, 'dc_pf_depth' => 0, 'dc_c_depth' => 0,
+             'dc_can_play_in_game' => 1, 'dc_minutes' => 32, 'dc_of' => 0, 'dc_df' => 0, 'dc_oi' => 0, 'dc_di' => 0, 'dc_bh' => 0],
+            ['pid' => 102, 'player_name' => 'SG One', 'ordinal' => 2,
+             'dc_pg_depth' => 0, 'dc_sg_depth' => 1, 'dc_sf_depth' => 0, 'dc_pf_depth' => 0, 'dc_c_depth' => 0,
+             'dc_can_play_in_game' => 1, 'dc_minutes' => 30, 'dc_of' => 0, 'dc_df' => 0, 'dc_oi' => 0, 'dc_di' => 0, 'dc_bh' => 0],
+            ['pid' => 103, 'player_name' => 'Bench', 'ordinal' => 3,
+             'dc_pg_depth' => 2, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0, 'dc_pf_depth' => 0, 'dc_c_depth' => 0,
+             'dc_can_play_in_game' => 1, 'dc_minutes' => 12, 'dc_of' => 0, 'dc_df' => 0, 'dc_oi' => 0, 'dc_di' => 0, 'dc_bh' => 0],
+        ]);
+
+        $result = $this->repo->findActiveChartForTeamOnDate(1, '2024-01-15');
+
+        self::assertNotNull($result);
+        self::assertSame(101, $result['starters']['PG']);
+        self::assertSame(102, $result['starters']['SG']);
+        self::assertNull($result['starters']['SF']);
+    }
+
+    // ── getWinLossRecord ───────────────────────────────────────────
+
+    public function testGetWinLossRecordCountsWinsAndLossesHomeAndAway(): void
+    {
+        // Team 1 within Jan 1–31: 2 wins (one away, one home), 2 losses (one away, one home).
+        $this->insertScheduleRow(2024, '2024-01-05', 1, 110, 2, 100); // away win
+        $this->insertScheduleRow(2024, '2024-01-10', 2, 90, 1, 120);  // home win
+        $this->insertScheduleRow(2024, '2024-01-15', 1, 80, 2, 95);   // away loss
+        $this->insertScheduleRow(2024, '2024-01-20', 2, 88, 1, 70);   // home loss
+
+        $record = $this->repo->getWinLossRecord(1, '2024-01-01', '2024-01-31');
+
+        // Regression guard: mysqli returns SUM() as strings, so an is_int()
+        // guard wrongly collapsed every record to 0-0 (see issue).
+        self::assertSame(2, $record['wins']);
+        self::assertSame(2, $record['losses']);
+    }
+
+    public function testGetWinLossRecordReturnsZeroZeroWhenNoGamesInWindow(): void
+    {
+        $record = $this->repo->getWinLossRecord(1, '2024-01-01', '2024-01-31');
+
+        self::assertSame(0, $record['wins']);
+        self::assertSame(0, $record['losses']);
+    }
+
+    public function testGetWinLossRecordExcludesGamesOutsideDateWindow(): void
+    {
+        $this->insertScheduleRow(2024, '2024-01-10', 1, 110, 2, 100); // in window, win
+        $this->insertScheduleRow(2024, '2024-03-01', 1, 115, 2, 100); // after window
+        $this->insertScheduleRow(2023, '2023-12-15', 2, 90, 1, 130);  // before window
+
+        $record = $this->repo->getWinLossRecord(1, '2024-01-01', '2024-01-31');
+
+        self::assertSame(1, $record['wins']);
+        self::assertSame(0, $record['losses']);
+    }
+
+    public function testGetWinLossRecordExcludesUnplayedGames(): void
+    {
+        $this->insertScheduleRow(2024, '2024-01-10', 1, 110, 2, 100); // played, win
+        $this->insertScheduleRow(2024, '2024-01-25', 1, 0, 2, 0);     // unplayed (0-0)
+
+        $record = $this->repo->getWinLossRecord(1, '2024-01-01', '2024-01-31');
+
+        self::assertSame(1, $record['wins']);
+        self::assertSame(0, $record['losses']);
+    }
+}

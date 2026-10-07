@@ -334,7 +334,7 @@ class BoxscoreRepository extends \Database\BaseMysqliRepository implements Boxsc
     public function insertTeamBoxscore(array $row): int
     {
         return $this->execute(
-            Boxscore::teamInsertSql('`ibl_box_scores_teams`'),
+            Boxscore::teamInsertSql(),
             "ssiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii",
             $row['game_date'],
             $row['name'],
@@ -408,7 +408,7 @@ class BoxscoreRepository extends \Database\BaseMysqliRepository implements Boxsc
         int $personalFouls,
     ): int {
         return $this->execute(
-            Boxscore::playerInsertSql('`ibl_box_scores`'),
+            Boxscore::playerInsertSql(),
             "ssssiiiiiiiiiiiiiiiiiiiiiiiii",
             $date,
             $uuid,

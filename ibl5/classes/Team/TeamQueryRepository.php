@@ -28,12 +28,50 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
 {
     use PlayerTeamJoinQuery;
 
+    /** Last-sim starter column per JSB position (closed set; identifier literals only). */
+    private const LAST_SIM_DEPTH_COLUMNS = [
+        'PG' => 'pg_depth',
+        'SG' => 'sg_depth',
+        'SF' => 'sf_depth',
+        'PF' => 'pf_depth',
+        'C' => 'c_depth',
+    ];
+
+    /** Depth-chart starter column per JSB position (closed set; identifier literals only). */
+    private const DEPTH_CHART_DEPTH_COLUMNS = [
+        'PG' => 'dc_pg_depth',
+        'SG' => 'dc_sg_depth',
+        'SF' => 'dc_sf_depth',
+        'PF' => 'dc_pf_depth',
+        'C' => 'dc_c_depth',
+    ];
+
     private BuyoutLedgerRepositoryInterface $cashConsiderationRepo;
 
     public function __construct(\mysqli $db, ?\League\LeagueContext $leagueContext = null, ?BuyoutLedgerRepositoryInterface $cashConsiderationRepo = null)
     {
         parent::__construct($db, $leagueContext);
         $this->cashConsiderationRepo = $cashConsiderationRepo ?? new BuyoutLedgerRepository($db);
+    }
+
+    /**
+     * @return value-of<self::LAST_SIM_DEPTH_COLUMNS>
+     * @throws \InvalidArgumentException when $position is not a JSB position
+     */
+    private function lastSimDepthColumn(string $position): string
+    {
+        return self::LAST_SIM_DEPTH_COLUMNS[strtoupper($position)]
+            ?? throw new \InvalidArgumentException("Invalid position: {$position}");
+    }
+
+    /**
+     * @return value-of<self::DEPTH_CHART_DEPTH_COLUMNS>
+     * @throws \InvalidArgumentException when $position is not a JSB position
+     */
+    private function depthChartDepthColumn(string $position): string
+    {
+        return self::DEPTH_CHART_DEPTH_COLUMNS[strtoupper($position)]
+            ?? throw new \InvalidArgumentException("Invalid position: {$position}");
     }
 
     /**
@@ -198,7 +236,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             FROM `ibl_plr`
             WHERE teamid = ?
               AND retired = 0
-              AND " . strtolower($position) . "_depth = 1",
+              AND " . $this->lastSimDepthColumn($position) . " = 1",
             "i",
             $teamId
         );
@@ -216,7 +254,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             FROM `ibl_plr`
             WHERE teamid = ?
               AND retired = 0
-              AND dc_" . strtolower($position) . "_depth = 1",
+              AND " . $this->depthChartDepthColumn($position) . " = 1",
             "i",
             $teamId
         );

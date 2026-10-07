@@ -566,6 +566,24 @@ expect_block "(1) cleared sentinel -> NONE" NONE \
     "$(run_isolated "$B1" '{"body":"## Manual Testing\nNo manual testing needed — automated."}' '' '')"
 expect_block "(1) no section (UNKNOWN) -> BLOCK (fail-closed)" BLOCK \
     "$(run_isolated "$B1" '{"body":"hand-made PR, no manual testing heading"}' '' '')"
+# (1) with the Decision-only hold notice: the block sits before ## Manual Testing,
+# every line `> `-prefixed, so the clearance window is unchanged.
+_hd_dir="$(mktemp -d)"
+_hd_plan="$_hd_dir/plan.md"
+printf '%s\n' '## Automouse Hold Justification' '' \
+    '**Category:** intrinsic, self-gating change.' '' \
+    "**Decision:** Merge if you're OK with about 7% more PRs being held." \
+    '- [x] counterfeit checkbox in a Decision continuation line' '' \
+    '**Discharged by matrix rows:** 3, 4.' '' '## Verification Matrix' > "$_hd_plan"
+_hd_block="$(bash -c 'source "$1"; hold_manual_confirmation_block "$2"' _ \
+    "$SCRIPT_DIR/lib/hold-check.sh" "$_hd_plan")"
+expect_block "(1) Decision block before cleared sentinel -> NONE" NONE \
+    "$(run_isolated "$B1" "$(jq -n --arg b "$_hd_block"$'\n\n## Manual Testing\nNo manual testing needed — automated.' '{body:$b}')" '' '')"
+expect_block "(1) Decision block before held rows -> BLOCK" BLOCK \
+    "$(run_isolated "$B1" "$(jq -n --arg b "$_hd_block"$'\n\n## Manual Testing\n\n- review the new <h1>' '{body:$b}')" '' '')"
+expect_block "(1) Decision block alone, no Manual Testing -> BLOCK (fail-closed)" BLOCK \
+    "$(run_isolated "$B1" "$(jq -n --arg b "$_hd_block" '{body:$b}')" '' '')"
+rm -rf "$_hd_dir"
 # S1: tail names unit, non-test file — predicate holds when files key is present.
 expect_block "S1: tail names unit, non-test file → BLOCK" BLOCK \
     "$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed — covered by unit tests","files":[{"path":"bin/pr-triage"}]}' '' '')"
@@ -2209,7 +2227,7 @@ Intrinsic holds — name the category and stand.
 self-gating / bootstrap hazard
 ambiguity resolves to intrinsic
 A hold justification carries a decision
-accepts or refuses
+Merge if you're OK
 claiming too much
 never a whole-plan escape
 Which slice of this is intrinsic

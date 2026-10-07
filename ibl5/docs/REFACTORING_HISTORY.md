@@ -629,8 +629,8 @@ $stmt->bind_param('ss', $searchTerm, $searchTerm);
 **Status:** ✅ Complete (6 classes, 2 tests)
 
 **Documentation:**
-- `ibl5/classes/DepthChartEntry/README.md`
-- `ibl5/classes/DepthChartEntry/SECURITY.md` - Security best practices
+- `ibl5/classes/DepthChart/README.md`
+- `ibl5/classes/DepthChart/SECURITY.md` - Security best practices
 
 ---
 
@@ -797,7 +797,7 @@ All IBL5 modules (31 total) have been refactored to the interface-driven archite
 
 ### Component Documentation
 - [Player README](../classes/Player/README.md) - Player module architecture
-- [DepthChartEntry SECURITY](../classes/DepthChartEntry/SECURITY.md) - Security patterns
+- [DepthChartEntry SECURITY](../classes/DepthChart/SECURITY.md) - Security patterns
 - [ComparePlayers README](../classes/ComparePlayers/README.md) - Compare module architecture
 - [Standings README](../classes/Standings/README.md) - Standings module architecture
 

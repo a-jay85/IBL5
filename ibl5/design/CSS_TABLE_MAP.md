@@ -71,7 +71,7 @@ Affects ALL data tables site-wide:
 | Selector | View |
 |----------|------|
 | `.league-stats-table` | TeamOffDefStatsView |
-| `.depth-chart-table` | DepthChartEntryView |
+| `.depth-chart-table` | DepthChartView |
 | `.draft-pick-table` | DraftPickLocatorView (styled to match `.ibl-data-table`, uses `.sticky-table`) |
 | `.contact-table` | GMContactListView |
 | `.voting-form-table` | Voting views |

@@ -15,6 +15,60 @@ use PlrParser\PlrParserRepository;
 #[Group('database')]
 class PlrParserRepositoryTest extends DatabaseTestCase
 {
+    /**
+     * `ibl_plr` column => upsertPlayer() data key, kept apart from the repository on
+     * purpose so a swapped or dropped column fails a test. `retired` is left out:
+     * upsertPlayer() inserts it as 0 and never updates it.
+     */
+    private const PLAYER_COLUMNS = [
+        'ordinal' => 'ordinal', 'name' => 'name', 'age' => 'age', 'pid' => 'pid',
+        'teamid' => 'teamid', 'peak' => 'peak', 'pos' => 'pos',
+        'oo' => 'ratingOO', 'od' => 'ratingOD', 'r_drive_off' => 'ratingDO', 'dd' => 'ratingDD',
+        'po' => 'ratingPO', 'pd' => 'ratingPD', 'r_trans_off' => 'ratingTO', 'td' => 'ratingTD',
+        'clutch' => 'clutch', 'consistency' => 'consistency',
+        'pg_depth' => 'PGDepth', 'sg_depth' => 'SGDepth', 'sf_depth' => 'SFDepth',
+        'pf_depth' => 'PFDepth', 'c_depth' => 'CDepth', 'dc_can_play_in_game' => 'canPlayInGame',
+        'stats_gs' => 'seasonGamesStarted', 'stats_gm' => 'seasonGamesPlayed',
+        'stats_min' => 'seasonMIN', 'stats_fgm' => 'seasonFGM', 'stats_fga' => 'seasonFGA',
+        'stats_ftm' => 'seasonFTM', 'stats_fta' => 'seasonFTA',
+        'stats_3gm' => 'season3GM', 'stats_3ga' => 'season3GA',
+        'stats_orb' => 'seasonORB', 'stats_drb' => 'seasonDRB', 'stats_ast' => 'seasonAST',
+        'stats_stl' => 'seasonSTL', 'stats_tvr' => 'seasonTVR', 'stats_blk' => 'seasonBLK',
+        'stats_pf' => 'seasonPF',
+        'talent' => 'talent', 'skill' => 'skill', 'intangibles' => 'intangibles', 'coach' => 'coach',
+        'loyalty' => 'loyalty', 'playing_time' => 'playingTime', 'winner' => 'playForWinner',
+        'tradition' => 'tradition', 'security' => 'security',
+        'exp' => 'exp', 'bird' => 'bird', 'cy' => 'currentContractYear', 'cyt' => 'totalContractYears',
+        'salary_yr1' => 'contractYear1', 'salary_yr2' => 'contractYear2', 'salary_yr3' => 'contractYear3',
+        'salary_yr4' => 'contractYear4', 'salary_yr5' => 'contractYear5', 'salary_yr6' => 'contractYear6',
+        'fa_signing_flag' => 'freeAgentSigningFlag',
+        'sh_pts' => 'seasonHighPTS', 'sh_reb' => 'seasonHighREB', 'sh_ast' => 'seasonHighAST',
+        'sh_stl' => 'seasonHighSTL', 'sh_blk' => 'seasonHighBLK',
+        's_dd' => 'seasonHighDoubleDoubles', 's_td' => 'seasonHighTripleDoubles',
+        'sp_pts' => 'seasonPlayoffHighPTS', 'sp_reb' => 'seasonPlayoffHighREB',
+        'sp_ast' => 'seasonPlayoffHighAST', 'sp_stl' => 'seasonPlayoffHighSTL',
+        'sp_blk' => 'seasonPlayoffHighBLK',
+        'ch_pts' => 'careerSeasonHighPTS', 'ch_reb' => 'careerSeasonHighREB',
+        'ch_ast' => 'careerSeasonHighAST', 'ch_stl' => 'careerSeasonHighSTL',
+        'ch_blk' => 'careerSeasonHighBLK',
+        'c_dd' => 'careerSeasonHighDoubleDoubles', 'c_td' => 'careerSeasonHighTripleDoubles',
+        'cp_pts' => 'careerPlayoffHighPTS', 'cp_reb' => 'careerPlayoffHighREB',
+        'cp_ast' => 'careerPlayoffHighAST', 'cp_stl' => 'careerPlayoffHighSTL',
+        'cp_blk' => 'careerPlayoffHighBLK',
+        'car_gm' => 'careerGP', 'car_min' => 'careerMIN', 'car_fgm' => 'careerFGM', 'car_fga' => 'careerFGA',
+        'car_ftm' => 'careerFTM', 'car_fta' => 'careerFTA', 'car_3gm' => 'career3GM', 'car_3ga' => 'career3GA',
+        'car_orb' => 'careerORB', 'car_drb' => 'careerDRB', 'car_reb' => 'careerREB',
+        'car_ast' => 'careerAST', 'car_stl' => 'careerSTL', 'car_tvr' => 'careerTVR',
+        'car_blk' => 'careerBLK', 'car_pf' => 'careerPF', 'car_pts' => 'careerPTS',
+        'r_fga' => 'rating2GA', 'r_fgp' => 'rating2GP', 'r_fta' => 'ratingFTA', 'r_ftp' => 'ratingFTP',
+        'r_3ga' => 'rating3GA', 'r_3gp' => 'rating3GP',
+        'r_orb' => 'ratingORB', 'r_drb' => 'ratingDRB', 'r_ast' => 'ratingAST',
+        'r_stl' => 'ratingSTL', 'r_tvr' => 'ratingTVR', 'r_blk' => 'ratingBLK',
+        'draftround' => 'draftRound', 'draftpickno' => 'draftPickNumber', 'injured' => 'injuryDaysLeft',
+        'htft' => 'heightFT', 'htin' => 'heightIN', 'wt' => 'weight', 'draftyear' => 'draftYear',
+        'r_foul' => 'ratingFOUL',
+    ];
+
     private PlrParserRepository $repo;
 
     protected function setUp(): void
@@ -94,6 +148,34 @@ class PlrParserRepositoryTest extends DatabaseTestCase
         $row2 = $stmt2->get_result()->fetch_assoc();
         $stmt2->close();
         self::assertSame(1, $row2['retired'], 'Re-upsert must not clobber retired = 1');
+    }
+
+    public function testUpsertPlayerWritesEveryFieldToItsColumn(): void
+    {
+        $data = $this->buildDistinctPlrData(200130003, 1);
+
+        $this->repo->upsertPlayer($data);
+
+        $row = $this->fetchPlayerColumns(200130003);
+        foreach (self::PLAYER_COLUMNS as $column => $key) {
+            self::assertSame($data[$key], $row[$column], "Column `$column` should hold data key '$key'");
+        }
+        self::assertSame(0, $row['retired'], 'Fresh insert should have retired = 0');
+    }
+
+    public function testUpsertPlayerUpdatesEveryColumnExceptRetired(): void
+    {
+        $this->repo->upsertPlayer($this->buildDistinctPlrData(200130004, 1));
+        $this->db->query('UPDATE ibl_plr SET retired = 1 WHERE pid = 200130004');
+
+        $data = $this->buildDistinctPlrData(200130004, 2);
+        $this->repo->upsertPlayer($data);
+
+        $row = $this->fetchPlayerColumns(200130004);
+        foreach (self::PLAYER_COLUMNS as $column => $key) {
+            self::assertSame($data[$key], $row[$column], "Column `$column` should update from data key '$key'");
+        }
+        self::assertSame(1, $row['retired'], 'Re-upsert must not clobber retired = 1');
     }
 
     // ── getSnapshotsByPhase ─────────────────────────────────────
@@ -179,6 +261,51 @@ class PlrParserRepositoryTest extends DatabaseTestCase
         ];
 
         return array_merge($defaults, $overrides);
+    }
+
+    /**
+     * Build upsertPlayer() data where every int field holds its own value ($base + position),
+     * so a swapped column shows up as a wrong number in exactly that column.
+     *
+     * @return array<string, int|string>
+     */
+    private function buildDistinctPlrData(int $pid, int $base): array
+    {
+        $data = [];
+        $i = 0;
+        foreach (self::PLAYER_COLUMNS as $key) {
+            $data[$key] = $base + $i;
+            $i++;
+        }
+        $data['pid'] = $pid;
+        $data['teamid'] = $base;
+        $data['name'] = 'PLR Distinct ' . $pid . '-' . $base;
+        $data['pos'] = $base === 1 ? 'SF' : 'C';
+        // chk_plr_cy / chk_plr_cyt allow 0-6 only.
+        $data['currentContractYear'] = $base;
+        $data['totalContractYears'] = $base + 3;
+
+        return $data;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fetchPlayerColumns(int $pid): array
+    {
+        $columns = implode(', ', array_map(
+            static fn (string $c): string => '`' . $c . '`',
+            [...array_keys(self::PLAYER_COLUMNS), 'retired'],
+        ));
+        $stmt = $this->db->prepare('SELECT ' . $columns . ' FROM ibl_plr WHERE pid = ?');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $pid);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        self::assertIsArray($row);
+
+        return $row;
     }
 
     private function insertSnapshotRow(

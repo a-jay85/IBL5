@@ -781,6 +781,8 @@ jobs:
         run: bin/test-automouse-login-preflight
       - name: Run headless elapsed-clock hook regression test
         run: bin/test-headless-elapsed-hook
+      - name: Run post-merge hook change-detection regression test
+        run: bin/test-post-merge-hook
       - name: Run automouse impl cap-timeout regression test
         run: bin/test-automouse-impl-cap-timeout
       - name: Run automouse postplan terminal-disposition regression test

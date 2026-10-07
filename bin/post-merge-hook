@@ -1,0 +1,172 @@
+#!/bin/bash
+# shellcheck shell=bash
+#
+# bin/post-merge-hook — post-merge automation body, exec'd by the post-merge
+# shim that bin/install-git-hooks writes into the common git hooks dir.
+#
+# - Runs only after merges into master (skip on feature branches).
+# - Gates expensive subprocesses on whether their inputs actually changed
+#   between ORIG_HEAD (pre-merge) and HEAD (post-merge).
+# - Logs to $HOOK_LOG_DIR (outside .git/) with simple size-based rotation.
+#
+# IBL5_POST_MERGE_DRY_RUN=1 prints the change-detection result and exits
+# before any side effect (used by bin/test-post-merge-hook).
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/post-merge-hook [squash-flag]
+
+Post-merge automation for the main checkout's master branch. Invoked by the
+post-merge shim that bin/install-git-hooks installs; not run by hand.
+
+On master, after a pull or merge, it runs bin/cleanup, refreshes the prod
+seed (at most once per 5 minutes), applies migrations when ibl5/migrations/
+changed, warms caches when ibl5/ PHP changed, and rebuilds IBL6 when IBL6/
+changed. Changes are measured from the ORIG_HEAD ref to HEAD, so a pull that
+brings in many commits sees all of them.
+
+Environment:
+  SKIP_WT_CLEANUP=1          Skip everything.
+  IBL5_POST_MERGE_DRY_RUN=1  Print the detected changes and exit.
+EOF
+    exit 0
+fi
+
+CURRENT_BRANCH=$(git branch --show-current)
+if [ "$CURRENT_BRANCH" != "master" ] || [ -n "${SKIP_WT_CLEANUP:-}" ]; then
+    exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# --- change detection --------------------------------------------------------
+# git sets the ORIG_HEAD *ref* (not an environment variable) to the pre-merge
+# tip on pull/merge, fast-forwards included. Diffing from HEAD~1 instead would
+# see only the newest commit of a multi-commit pull and miss the rest.
+OLD_REF=$(git rev-parse --verify --quiet ORIG_HEAD) || OLD_REF="HEAD"
+if [ "$OLD_REF" = "$(git rev-parse HEAD)" ]; then
+    OLD_REF="HEAD"  # degenerate: treat as no-op
+fi
+
+# Emits the list of files changed between OLD_REF and HEAD under a given path.
+changed_files_under() {
+    [ "$OLD_REF" = "HEAD" ] && return 0
+    git diff --name-only "$OLD_REF" HEAD -- "$1" 2>/dev/null
+}
+
+MIGRATIONS_CHANGED=false
+PHP_CHANGED=false
+IBL6_CHANGED=false
+changed_files_under 'ibl5/migrations/' | grep -q '\.sql$' && MIGRATIONS_CHANGED=true
+changed_files_under 'ibl5/'            | grep -q '\.php$' && PHP_CHANGED=true
+changed_files_under 'IBL6/'            | grep -q .        && IBL6_CHANGED=true
+
+if [ -n "${IBL5_POST_MERGE_DRY_RUN:-}" ]; then
+    echo "MIGRATIONS_CHANGED=$MIGRATIONS_CHANGED"
+    echo "PHP_CHANGED=$PHP_CHANGED"
+    echo "IBL6_CHANGED=$IBL6_CHANGED"
+    exit 0
+fi
+
+# --- log location and rotation -----------------------------------------------
+HOOK_LOG_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/ibl5-hooks"
+mkdir -p "$HOOK_LOG_DIR"
+
+# Truncate a log to its last 500 lines once it exceeds 100KB.
+rotate_log() {
+    local f="$1"
+    [ -f "$f" ] || return 0
+    local size
+    size=$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f" 2>/dev/null || echo 0)
+    if [ "$size" -gt 102400 ]; then
+        local tmp="$f.rot.$$"
+        tail -n 500 "$f" > "$tmp" && mv "$tmp" "$f"
+    fi
+}
+
+POST_MERGE_LOG="$HOOK_LOG_DIR/post-merge.log"
+DB_EXPORT_LOG="$HOOK_LOG_DIR/db-export-prod.log"
+rotate_log "$POST_MERGE_LOG"
+rotate_log "$DB_EXPORT_LOG"
+
+# --- wt-cleanup (always; fast + idempotent) ----------------------------------
+if [ -x "$REPO_ROOT/bin/cleanup" ]; then
+    nohup "$REPO_ROOT/bin/cleanup" --all >>"$HOOK_LOG_DIR/cleanup.log" 2>&1 </dev/null &
+fi
+
+# --- db-export-prod (gated on "last run age >= 5 min") -----------------------
+# Prod DB state is independent of git, so we can't diff it. Instead, throttle
+# to at most once per 5 minutes to avoid re-exporting on back-to-back pulls.
+if [ -x "$REPO_ROOT/bin/db-export-prod" ]; then
+    LAST_RUN="$HOOK_LOG_DIR/db-export-prod.last"
+    NOW=$(date +%s)
+    SKIP_EXPORT=false
+    if [ -f "$LAST_RUN" ]; then
+        LAST=$(cat "$LAST_RUN" 2>/dev/null || echo 0)
+        if [ $((NOW - LAST)) -lt 300 ]; then
+            SKIP_EXPORT=true
+        fi
+    fi
+
+    if [ "$SKIP_EXPORT" = "false" ]; then
+        (
+            LOG="$DB_EXPORT_LOG"
+            LOCK="$HOOK_LOG_DIR/db-export-prod.pid"
+            if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK")" 2>/dev/null; then
+                echo "$(date): Export already running, skipping" >> "$LOG"
+                exit 0
+            fi
+            echo $$ > "$LOCK"
+            trap 'rm -f "$LOCK"' EXIT
+            echo "$NOW" > "$LAST_RUN"
+
+            PROD_SEED="$REPO_ROOT/ibl5/fixtures/prod-seed.sql"
+            OLD_CKSUM=$(cksum "$PROD_SEED" 2>/dev/null | cut -d' ' -f1)
+
+            echo "$(date): Starting production DB export..." >> "$LOG"
+            "$REPO_ROOT/bin/db-export-prod" >> "$LOG" 2>&1
+            echo "$(date): Export complete." >> "$LOG"
+
+            NEW_CKSUM=$(cksum "$PROD_SEED" 2>/dev/null | cut -d' ' -f1)
+
+            if [ "$OLD_CKSUM" != "$NEW_CKSUM" ] && docker ps --format '{{.Names}}' | grep -q '^ibl5-mariadb$'; then
+                echo "$(date): Prod data changed — reimporting into Docker DB..." >> "$LOG"
+                sed 's/ DEFINER=[^ ]* / /g' "$PROD_SEED" | \
+                    docker exec -i ibl5-mariadb mariadb -u root -proot iblhoops_ibl5 >> "$LOG" 2>&1
+                echo "$(date): Reimport complete." >> "$LOG"
+            fi
+        ) &
+    else
+        echo "$(date): db-export-prod skipped (last run < 5 min ago)" >> "$DB_EXPORT_LOG"
+    fi
+fi
+
+# --- migrate + warm-cache (gated on their inputs) ----------------------------
+if docker ps --format '{{.Names}}' | grep -q '^ibl5-php$'; then
+    (
+        LOG="$POST_MERGE_LOG"
+        if [ "$MIGRATIONS_CHANGED" = "true" ]; then
+            echo "$(date): Migrations changed — applying..." >> "$LOG"
+            docker exec ibl5-php php /var/www/html/ibl5/bin/migrate >> "$LOG" 2>&1
+        else
+            echo "$(date): No migration changes, skipping migrate." >> "$LOG"
+        fi
+        if [ "$PHP_CHANGED" = "true" ]; then
+            echo "$(date): PHP changed — warming caches..." >> "$LOG"
+            docker exec ibl5-php php /var/www/html/ibl5/bin/warm-cache >> "$LOG" 2>&1
+        else
+            echo "$(date): No PHP changes, skipping warm-cache." >> "$LOG"
+        fi
+    ) &
+fi
+
+# --- ibl6 rebuild (gated on IBL6/ changes) -----------------------------------
+if [ "$IBL6_CHANGED" = "true" ] && docker ps --format '{{.Names}}' | grep -q '^ibl5-ibl6$'; then
+    (
+        cd "$REPO_ROOT" || exit 1
+        echo "$(date): IBL6 changed — rebuilding..." >> "$POST_MERGE_LOG"
+        docker compose up -d --build ibl6 >> "$POST_MERGE_LOG" 2>&1
+    ) &
+elif docker ps --format '{{.Names}}' | grep -q '^ibl5-ibl6$'; then
+    echo "$(date): No IBL6 changes, skipping rebuild." >> "$POST_MERGE_LOG"
+fi

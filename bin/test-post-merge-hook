@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-post-merge-hook — regression tests for bin/post-merge-hook change
+# detection and the post-merge shim written by bin/install-git-hooks.
+#
+# Run: bin/test-post-merge-hook  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+HOOK="$SCRIPT_DIR/post-merge-hook"
+INSTALLER="$SCRIPT_DIR/install-git-hooks"
+FAILED=0
+
+ok()        { echo "ok: $1"; }
+fail()      { echo "FAIL: $1"; FAILED=1; }
+assert_eq() { local d="$1" g="$2" e="$3"
+              if [ "$g" = "$e" ]; then ok "$d"
+              else fail "$d — expected [$e], got [$g]"; fi; }
+want()      { local d="$1" h="$2" n="$3"
+              case "$h" in *"$n"*) ok "$d" ;;
+              *) fail "$d — missing token [$n]"; esac; }
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+g() { git -c user.email=t@t -c user.name=t -c core.hooksPath=/dev/null "$@"; }
+
+commit_file() {  # <repo> <path> <message>
+    mkdir -p "$1/$(dirname "$2")"
+    echo "$3" > "$1/$2"
+    g -C "$1" add "$2" && g -C "$1" commit -qm "$3"
+}
+
+dry_run() { (cd "$1" && IBL5_POST_MERGE_DRY_RUN=1 "$HOOK"); }
+
+# --- setup: upstream + clone on master -----------------------------------------
+UP="$TMP/up"; CL="$TMP/clone"
+g init -q -b master "$UP"
+commit_file "$UP" README "init"
+g clone -q "$UP" "$CL"
+
+# --- case 1: multi-commit fast-forward; migration + PHP sit in OLDER commits ---
+# The bug: the hook diffed HEAD~1..HEAD, so only the newest commit counted.
+commit_file "$UP" ibl5/migrations/192_x.sql "migration"
+commit_file "$UP" ibl5/classes/X.php "php"
+commit_file "$UP" docs/notes.md "unrelated newest commit"
+g -C "$CL" pull -q --ff-only
+OUT="$(dry_run "$CL")"
+want "multi-commit pull: migration in older commit detected" "$OUT" "MIGRATIONS_CHANGED=true"
+want "multi-commit pull: PHP in older commit detected" "$OUT" "PHP_CHANGED=true"
+want "multi-commit pull: untouched IBL6 stays false" "$OUT" "IBL6_CHANGED=false"
+
+# --- case 2: pull with only non-matching changes -------------------------------
+commit_file "$UP" docs/more.md "docs only"
+g -C "$CL" pull -q --ff-only
+OUT="$(dry_run "$CL")"
+want "docs-only pull: no migration change" "$OUT" "MIGRATIONS_CHANGED=false"
+want "docs-only pull: no PHP change" "$OUT" "PHP_CHANGED=false"
+
+# --- case 3: ORIG_HEAD == HEAD is a no-op ---------------------------------------
+g -C "$CL" update-ref ORIG_HEAD HEAD
+OUT="$(dry_run "$CL")"
+want "ORIG_HEAD at HEAD: no migration change" "$OUT" "MIGRATIONS_CHANGED=false"
+
+# --- case 4: feature branch exits silently --------------------------------------
+g -C "$CL" checkout -q -b feature
+OUT="$(dry_run "$CL")"
+assert_eq "feature branch: no output" "$OUT" ""
+
+# --- case 5: installer writes the shim, backs up a foreign hook once ----------
+INST="$TMP/inst"
+g init -q -b master "$INST"
+mkdir -p "$INST/.git/hooks"
+printf '#!/bin/sh\necho old-hook\n' > "$INST/.git/hooks/post-merge"
+(cd "$INST" && "$INSTALLER" >/dev/null)
+SHIM="$(cat "$INST/.git/hooks/post-merge")"
+want "shim has its sentinel" "$SHIM" "# IBL5-POSTMERGE-HOOK"
+# shellcheck disable=SC2016  # literal token, not an expansion
+want "shim exec's the version-controlled body" "$SHIM" 'exec "$REPO_ROOT/bin/post-merge-hook"'
+want "shim chains git-lfs" "$SHIM" "git lfs post-merge"
+BAK="$(cat "$INST/.git/hooks/post-merge.pre-shim.bak" 2>/dev/null)"
+want "foreign hook backed up" "$BAK" "old-hook"
+
+(cd "$INST" && "$INSTALLER" >/dev/null)
+assert_eq "re-run: shim unchanged" "$(cat "$INST/.git/hooks/post-merge")" "$SHIM"
+assert_eq "re-run: backup untouched" "$(cat "$INST/.git/hooks/post-merge.pre-shim.bak")" "$BAK"
+CSS_COUNT="$(grep -c 'IBL5-CSS-REBUILD' "$INST/.git/hooks/post-merge")"
+assert_eq "re-run: CSS auto-heal present once" "$CSS_COUNT" "1"
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "bin/test-post-merge-hook: FAILED"
+    exit 1
+fi
+echo "bin/test-post-merge-hook: all cases passed"

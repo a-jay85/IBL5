@@ -79,8 +79,11 @@ jobs:
               - 'ibl5/tests/Cli/fixtures/**'
               # Every other bin/ script a PHPUnit test runs. A bin-only edit to one
               # of these must flip src, or the test that covers it never runs and
-              # the break lands on master (#2907). bin/test-path-filters derives
-              # this set from ibl5/tests and fails when an entry is missing.
+              # the break lands on master (#2907). bin/test-path-filters scans
+              # ibl5/tests for `__DIR__ . '/../bin/...'` loads and fails when one
+              # is missing. Three paths load another way and are hand-added, so
+              # the self-test does not catch their omission: bin/lib/db-helpers.sh,
+              # bin/pre-commit-hook, bin/lib/shell-scripts.sh.
               - 'bin/adr-check'
               - 'bin/check-boxscore-schedule'
               - 'bin/check-column-rename-sweep'

@@ -211,7 +211,7 @@ if [ "$c10_open" = 1 ] && [ "$c10_close" = 1 ] && grep -qF 'write_stop_file() {'
     echo "ok: case10 writer anchors unique and extract defines write_stop_file"
     C10_DIR="$ROOT/w"
     C10_STOPS="$C10_DIR/stops"
-    C10_FILE="$C10_STOPS/2026-10-06-4242.stop"
+    C10_FILE="$C10_DIR/stops/2026-10-06-4242.stop"
     C10_LOG="$C10_DIR/logs/2026-10-06-4242.log"
     mkdir -p "$C10_DIR/logs"
 

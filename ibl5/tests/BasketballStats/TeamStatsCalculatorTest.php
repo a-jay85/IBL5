@@ -659,4 +659,14 @@ class TeamStatsCalculatorTest extends TestCase
             $this->assertMatchesRegularExpression('/FROM ibl_olympics_standings(\s|$)/', $query);
         }
     }
+
+    public function testStandingsTablesMatchLeagueContextTableMap(): void
+    {
+        $value = (new \ReflectionClassConstant(TeamStatsCalculator::class, 'STANDINGS_TABLES'))->getValue();
+
+        $this->assertSame(
+            ['ibl' => 'ibl_standings', 'olympics' => LeagueContext::TABLE_MAP['ibl_standings']],
+            $value
+        );
+    }
 }

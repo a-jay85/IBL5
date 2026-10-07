@@ -250,4 +250,19 @@ class PlayerIdResolverTest extends TestCase
         $second = $resolver->resolve('Clearing', 'TeamY', 2025, 2);
         $this->assertSame(20, $second);
     }
+
+    public function testPlayerTablesMatchLeagueContextTableMap(): void
+    {
+        $plr = (new \ReflectionClassConstant(PlayerIdResolver::class, 'PLR_TABLES'))->getValue();
+        $snapshots = (new \ReflectionClassConstant(PlayerIdResolver::class, 'SNAPSHOT_TABLES'))->getValue();
+
+        $this->assertSame(
+            ['ibl' => 'ibl_plr', 'olympics' => LeagueContext::TABLE_MAP['ibl_plr']],
+            $plr
+        );
+        $this->assertSame(
+            ['ibl' => 'ibl_plr_snapshots', 'olympics' => LeagueContext::TABLE_MAP['ibl_plr_snapshots']],
+            $snapshots
+        );
+    }
 }

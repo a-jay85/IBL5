@@ -25,7 +25,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # A `labeled` event for any label other than `update-baselines` gets its own group so it
+  # can never cancel the real E2E run. post-plan adds the `post-plan-running` label right
+  # after its push; with one shared group, that label event would cancel the in-flight E2E
+  # run, and the labeled run itself skips the full suite.
+  group: ${{ github.workflow }}-${{ github.ref }}${{ (github.event.action == 'labeled' && github.event.label.name != 'update-baselines') && format('-label-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 jobs:

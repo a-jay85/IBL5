@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace Updater\Steps;
 
-use SavedDepthChart\SavedDepthChartRepository;
+use DepthChartSnapshot\DepthChartSnapshotRepository;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\StepResult;
 
 /**
  * Step 7: Extend active saved depth charts.
  *
- * Wraps SavedDepthChartRepository::extendActiveDepthCharts() and captures output.
+ * Wraps DepthChartSnapshotRepository::extendActiveDepthCharts() and captures output.
  */
 class ExtendDepthChartsStep implements PipelineStepInterface
 {
     public function __construct(
-        private readonly SavedDepthChartRepository $repository,
+        private readonly DepthChartSnapshotRepository $repository,
         private readonly string $lastSimEndDate,
         private readonly int $lastSimNumber,
     ) {

@@ -42,8 +42,8 @@ Component-specific docs live next to their code in `ibl5/classes/`:
 
 - [Player/README.md](../classes/Player/README.md) - Player module architecture
 - [Statistics/README.md](../classes/Statistics/README.md) - StatsFormatter usage
-- [DepthChartEntry/README.md](../classes/DepthChartEntry/README.md) - DepthChartEntry architecture
-- [DepthChartEntry/SECURITY.md](../classes/DepthChartEntry/SECURITY.md) - Security patterns
+- [DepthChart/README.md](../classes/DepthChart/README.md) - DepthChart architecture
+- [DepthChart/SECURITY.md](../classes/DepthChart/SECURITY.md) - Security patterns
 - [Draft/README.md](../classes/Draft/README.md) - Draft module
 - [Negotiation/README.md](../classes/Negotiation/README.md) - Negotiation module
 - [ComparePlayers/README.md](../classes/ComparePlayers/README.md) - Compare module

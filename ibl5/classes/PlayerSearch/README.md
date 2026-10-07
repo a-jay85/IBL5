@@ -136,5 +136,5 @@ cd ibl5 && vendor/bin/phpunit tests/PlayerSearch/
 ## Related Documentation
 
 - [DEVELOPMENT_GUIDE.md](../../docs/DEVELOPMENT_GUIDE.md) - Overall development standards
-- [DepthChartEntry SECURITY.md](../DepthChartEntry/SECURITY.md) - Security patterns reference
+- [DepthChart SECURITY.md](../DepthChart/SECURITY.md) - Security patterns reference
 - [Leaderboards README](../Leaderboards/) - Similar refactoring pattern

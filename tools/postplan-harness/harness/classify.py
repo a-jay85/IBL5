@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import re
 
-from .adapters.probe import _validate as _probe_validate
 from .state import Classification
 
 FILES_CHANGED_BEGIN = "<!-- files-changed:begin -->"
@@ -495,16 +494,51 @@ def render_manual_confirmation(justification: str) -> str:
     Empty/whitespace-only input returns "" — never an empty heading. Every line
     of the justification is emitted as a blockquote so no line of plan prose can
     present as a markdown heading in the PR body (see _neutralize_headings).
+    The block carries one heading and no bold header line.
     """
     text = (justification or "").strip()
     if not text:
         return ""
-    header = ("**Manual confirmation needed** (from the plan's "
-              "`## Automouse Hold Justification` — auto-merge is held):")
-    parts = [MANUAL_CONFIRMATION_BEGIN, "## Manual confirmation needed", "", header, ""]
+    parts = [MANUAL_CONFIRMATION_BEGIN, "## Manual confirmation needed", ""]
     parts.extend(_neutralize_headings(text))
     parts.append(MANUAL_CONFIRMATION_END)
     return "\n".join(parts)
+
+
+def decision_paragraphs(justification: str) -> str:
+    """Raw `**Decision:**` paragraph(s) of a hold justification body.
+
+    Byte-identical to `bin/lib/hold-check.sh::hold_decision_paragraphs` run on
+    the same plan (pinned by tests/test_decision_render_parity.py): blocks
+    joined by one empty line, no trailing newline, "" when there is none.
+    """
+    # Local import: keeps classify.py free of a module-level planfile import.
+    from harness.planfile import split_hold_justification
+    decision_block, _ = split_hold_justification(justification or "")
+    return decision_block.rstrip("\n")
+
+
+def manual_confirmation_text(justification: str) -> str:
+    """What the merger reads: the Decision paragraph(s), else the full text.
+
+    Category, `Discharged by matrix rows`, and the why-line are plan-gate
+    bookkeeping and never reach the PR body. A section with no Decision line
+    falls back to the whole justification so a held PR never loses its notice.
+    """
+    decision = decision_paragraphs(justification)
+    return decision if decision.strip() else (justification or "")
+
+
+def upsert_hold_notice(body: str, justification: str) -> str:
+    """Phase 6 hold-notice composition, one call for the runner.
+
+    Upserts the Decision-only manual-confirmation block (positioned before
+    `## Manual Testing` by upsert_manual_confirmation), then clears any
+    `## Reviewer verification` block an earlier run left behind.
+    """
+    body = upsert_manual_confirmation(
+        body, render_manual_confirmation(manual_confirmation_text(justification)))
+    return upsert_reviewer_verification(body, "")
 
 
 def upsert_manual_confirmation(body: str, block: str) -> str:
@@ -552,54 +586,6 @@ def _neutralize_checkboxes(text: str) -> str:
     def _replace(m: re.Match) -> str:
         return "- ( )" if m.group(1) == " " else "- (x)"
     return _CB_RE.sub(_replace, text)
-
-
-def render_reviewer_verification(discharged: list) -> str:
-    """Marker-delimited `## Reviewer verification` block, or "" when empty.
-
-    Each discharged entry is a dict with keys `text`, `category`, and
-    optionally `probe` (list[str]) and `rationale` (str).  For cli-executable
-    entries the probe is included in the bullet only when it passes the probe
-    allowlist; an invalid probe is silently omitted rather than rendered.
-
-    No emitted line starts with `#` (headings are not injected by this block),
-    and source text containing `- [ ]` or `- [x]` is rewritten to `- ( )` /
-    `- (x)` so clearance scanners cannot be confused.
-    """
-    if not discharged:
-        return ""
-    parts = [REVIEWER_VERIFICATION_BEGIN, "## Reviewer verification", ""]
-    parts.append("These claims came from the plan's hold justification and are settleable without you.")
-    parts.append("Each names its instrument; nothing here needs a human at the merge button.")
-    parts.append("")
-    for entry in discharged:
-        cat = entry.get("category", "unknown")
-        raw_text = _neutralize_checkboxes(entry.get("text", ""))
-        # Arming-gate defense: neutralize any line in the text that starts with
-        # '#' so no emitted line can be misread as a markdown heading by the
-        # clearance scanners.
-        text = "\n".join(
-            ("> " + ln) if ln.startswith("#") else ln
-            for ln in raw_text.splitlines()
-        )
-        probe = entry.get("probe")
-        rationale = entry.get("rationale", "")
-        if cat == "cli-executable" and probe:
-            rejection = _probe_validate(probe)
-            if rejection is None:
-                probe_str = " ".join(probe)
-                bullet = f'- "{text}" — `{cat}`: `{probe_str}`'
-            elif rationale:
-                bullet = f'- "{text}" — `{cat}`: {rationale}'
-            else:
-                bullet = f'- "{text}" — `{cat}`'
-        elif rationale:
-            bullet = f'- "{text}" — `{cat}`: {rationale}'
-        else:
-            bullet = f'- "{text}" — `{cat}`'
-        parts.append(bullet)
-    parts.append(REVIEWER_VERIFICATION_END)
-    return "\n".join(parts)
 
 
 def upsert_reviewer_verification(body: str, block: str) -> str:

@@ -5,7 +5,8 @@
 #
 # Consumers:
 #   bin/check-plan      gate [H] (hold_check_violations, hold_decision_paragraphs)
-#   .claude/skills/post-plan/SKILL.md Phase 6 (hold_decision_paragraphs)
+#   .claude/skills/post-plan/SKILL.md Phase 6 (hold_decision_paragraphs,
+#                       hold_manual_confirmation_block)
 #   tools/postplan-harness/harness/classify.py (Python mirror)
 #
 # Usage: source "$(dirname "$0")/lib/hold-check.sh"
@@ -146,6 +147,35 @@ hold_decision_paragraphs() {
             fi
         fi
     done < "$plan_file"
+    return 0
+}
+
+# hold_manual_confirmation_block <plan-file>
+# Prints the marker-delimited `## Manual confirmation needed` PR-body block
+# built from hold_decision_paragraphs. Output equals harness
+# classify.render_manual_confirmation(classify.manual_confirmation_text(...))
+# plus one trailing newline (tools/postplan-harness/tests/test_decision_render_parity.py).
+# Prints nothing and returns 1 when the plan has no Decision line, so the
+# caller takes the no-Decision fallback and never writes an empty block.
+hold_manual_confirmation_block() {
+    local plan_file="$1" text line
+    text="$(hold_decision_paragraphs "$plan_file")"
+    # Mirror Python str.strip() on the whole text (render_manual_confirmation).
+    text="${text#"${text%%[![:space:]]*}"}"
+    text="${text%"${text##*[![:space:]]}"}"
+    if [ -z "$text" ]; then
+        return 1
+    fi
+    printf '%s\n' '<!-- manual-confirmation:begin -->' \
+        '## Manual confirmation needed' ''
+    # Mirror classify._neutralize_headings: "> " + line, or ">" when blank.
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            *[![:space:]]*) printf '> %s\n' "$line" ;;
+            *) printf '>\n' ;;
+        esac
+    done <<< "$text"
+    printf '%s\n' '<!-- manual-confirmation:end -->'
     return 0
 }
 

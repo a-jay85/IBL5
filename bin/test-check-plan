@@ -527,6 +527,98 @@ assert_viol "gateHb-no-hold-section-not-checked" 0 "[H]" "$FM$M"'
 A human must confirm every class reference resolves under the new namespace.
 '
 
+# ---------------------------------------------------------------------------
+# Gate H(c): the Decision paragraph is the only hold text the PR body shows, so
+# it is checked as reader-facing prose (check-prose tells, empty body, 40-word
+# total cap, legacy `The human accepts ...` opener).
+# ---------------------------------------------------------------------------
+FM_HOLD_DOC='---
+auto_merge: false
+impl_model: sonnet
+---'
+# _hc_words <n> — n filler words, so a case hits an exact word count.
+_hc_words() { local i out=""; for ((i = 0; i < $1; i++)); do out="$out held"; done; printf '%s' "${out# }"; }
+HC_W35=$(_hc_words 35)
+HC_W36=$(_hc_words 36)
+HC_W20=$(_hc_words 20)
+
+assert_viol "gateHc-clean-decision-passes" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Category:** intrinsic taste hold, the seamless leveraging of a robust paradigm.
+
+**Decision:** Merge if you'"'"'re OK with about 7% more PRs being held until their body declares scope.
+
+**Discharged by matrix rows:** 3, 4.
+
+Rows 3 and 4 cover the observable part, and the remaining judgment is taste.
+'
+
+assert_viol "gateHc-prose-tell-fails" 1 "[H] Decision line has a prose tell" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if the seamless rollout is worth about 7% more held PRs.
+'
+
+assert_viol "gateHc-over-cap-fails" 1 "[H] Decision line is 41 words" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W36"'
+'
+
+assert_viol "gateHc-exactly-40-words-passes" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W35"'
+'
+
+# The label is not counted: label + 40 body words must still pass.
+assert_viol "gateHc-label-not-counted" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W35"'
+'
+
+assert_viol "gateHc-legacy-opener-fails" 1 "[H] Decision line opens with the legacy" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** The human accepts that about 7% more PRs are held.
+'
+
+assert_viol "gateHc-legacy-opener-reviewer-fails" 1 "[H] Decision line opens with the legacy" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** The reviewer accepts a slower merge queue for safety.
+'
+
+assert_viol "gateHc-accepts-mid-sentence-passes" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you accept that about 7% more PRs are held.
+'
+
+assert_viol "gateHc-empty-decision-fails" 1 "[H] Decision line is empty" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:**
+'
+
+assert_viol "gateHc-two-blocks-total-over-cap-fails" 1 "[H] Decision line is 50 words" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W20"'
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W20"'
+'
+
+assert_viol "gateHc-missing-decision-unchanged" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Category:** taste
+
+The copy tone is a taste call that no test can settle.
+'
+
 # Gate H FP-guard: a plan that merely DOCUMENTS the `auto_merge: false` syntax in
 # its body (not in line-1 frontmatter) must NOT flag (exit 0).
 assert "gateH-body-mentions-syntax-only" 0 "$FM$M"'

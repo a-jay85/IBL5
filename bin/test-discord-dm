@@ -29,16 +29,19 @@ fail() { printf '  FAIL %s\n' "$1"; FAILS=$(( FAILS + 1 )); }
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-discord-dm.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 
-# Shim osascript so the T29 fallback path does not fire a macOS notification
-# banner on every local run. Matches the caffeinate shim in bin/test-plan-now.
+# Shim osascript so the fallback path does not fire a macOS notification banner
+# on every local run. A PATH shim is not enough: discord-dm prepends /usr/bin to
+# PATH, so the real osascript would win. Use the explicit seam instead.
 SHIM="$TMP/bin"
 mkdir -p "$SHIM"
-cat > "$SHIM/osascript" <<'SHIM_EOF'
+OSA_LOG="$TMP/osascript.log"
+cat > "$SHIM/osascript" <<SHIM_EOF
 #!/usr/bin/env bash
+echo called >> "$OSA_LOG"
 exit 0
 SHIM_EOF
 chmod +x "$SHIM/osascript"
-export PATH="$SHIM:$PATH"
+export DISCORD_DM_OSASCRIPT_BIN="$SHIM/osascript"
 
 # Never let a case read the real ~/.iblbot-dev-webhook-url or ~/.iblbot-dm-id.
 # HOME points into $TMP for the whole run; the webhook seam defaults to an
@@ -284,6 +287,11 @@ if [ "$t29_exit" -ne 0 ]; then
     ok "T29: exit non-zero ($t29_exit)"
 else
     fail "T29: exit was 0 (expected non-zero)"
+fi
+if [ -s "$OSA_LOG" ]; then
+    ok "T29: notification went to the osascript shim"
+else
+    fail "T29: osascript shim never ran (real banner would fire)"
 fi
 
 # ssh-fail2 delivers chunk 1 (HTTP 200) then hard-fails chunk 2 (HTTP 400,

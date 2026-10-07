@@ -64,7 +64,7 @@ epoch_fmt() {
     date -r "$1" "+$2" 2>/dev/null || date -d "@$1" "+$2"
 }
 
-# Resolve a `run schedule` time against NOW. A bare "HH:MM [TZ]" that has
+# Resolve a `schedule` or `disarm-until` time against NOW. A bare "HH:MM [TZ]" that has
 # already passed today means tomorrow at that time. A dated time is taken as
 # given, so a past date still fails the caller's past-time check.
 schedule_epoch() {
@@ -375,12 +375,12 @@ if [ "${1:-}" = "disarm-tonight" ] || [ "${1:-}" = "disarm-until" ]; then
         WHEN="${2:-}"
         if [ -z "$WHEN" ]; then
             echo "usage: bin/automouse/run disarm-until \"[YYYY-MM-DD] HH:MM [TZ]\"" >&2
-            echo "example: bin/automouse/run disarm-until \"2026-08-20 09:00 PDT\" (or \"20:00\" for today)" >&2
+            echo "example: bin/automouse/run disarm-until \"2026-08-20 09:00 PDT\" (or \"20:00\" for the next 20:00)" >&2
             exit 1
         fi
-        if ! REARM_EPOCH=$(parse_when_epoch "$WHEN"); then
+        if ! REARM_EPOCH=$(schedule_epoch "$WHEN" "$NOW"); then
             echo "error: could not parse time '$WHEN'" >&2
-            echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-08-20 09:00 PDT, or 20:00 for today)" >&2
+            echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-08-20 09:00 PDT, or 20:00 for the next 20:00)" >&2
             exit 1
         fi
     fi

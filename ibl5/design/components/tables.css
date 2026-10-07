@@ -510,11 +510,13 @@
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
-/* clip (not hidden) so the caption does not become a scroll container
-   and capture the sticky children below */
+/* hidden clips the tab strip's square corners to the caption's rounded
+   top. A <caption> is a sibling of <thead>/<tbody>, so its overflow
+   only affects its own tabs or dropdown and cannot trap their sticky
+   cells. */
 .team-table-caption {
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    overflow: clip;
+    overflow: hidden;
 }
 
 /* Scroll container for wide tables on mobile */

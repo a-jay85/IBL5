@@ -33,7 +33,6 @@ _cleanup() {
           /tmp/pr-review-now-runner-1903.sh \
           /tmp/pr-review-now-prompt-1903.md \
           /tmp/pr-review-now-1903.log
-    rm -f /tmp/prn-keep.*
     [[ ${#TMP_LOGS[@]} -gt 0 ]] && rm -f "${TMP_LOGS[@]}"
 }
 trap _cleanup EXIT

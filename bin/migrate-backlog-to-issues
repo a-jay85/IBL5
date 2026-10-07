@@ -12,11 +12,14 @@ declare(strict_types=1);
  * Pass --apply to perform creation. Safe to re-run: idempotency key is
  * (area-label, leading-ID-token) so an interrupted run resumes from where
  * it left off on the next invocation.
+ *
+ * BACKLOG_ISSUES_RATE_SLEEP sets the seconds waited between GitHub writes
+ * (0-60, default 3.5; tests set 0).
  */
 
 const DEFAULT_REPO = 'a-jay85/IBL5-backlog';
 const BODY_CAP     = 60000;
-const RATE_SLEEP   = 3.5;
+const DEFAULT_RATE_SLEEP = 3.5;
 const DEFERRAL_STOP     = 3;
 const LIST_ATTEMPTS     = 4;
 const LIST_RETRY_SLEEP  = 5;
@@ -730,6 +733,21 @@ if ($envRepo === false) {
 } else {
     $repo = $envRepo;
 }
+
+// ─── env: BACKLOG_ISSUES_RATE_SLEEP ───────────────────────────────────────────
+
+$envRateSleep = getenv('BACKLOG_ISSUES_RATE_SLEEP');
+if ($envRateSleep === false) {
+    $rateSleep = DEFAULT_RATE_SLEEP;
+} elseif (preg_match('/^\d+(\.\d+)?$/D', $envRateSleep) === 1 && (float) $envRateSleep <= 60.0) {
+    $rateSleep = (float) $envRateSleep;
+} else {
+    fwrite(STDERR, "BACKLOG_ISSUES_RATE_SLEEP must be a number of seconds from 0 to 60, got '"
+        . $envRateSleep . "'\n");
+    fwrite(STDERR, usage());
+    exit(2);
+}
+define('RATE_SLEEP', $rateSleep);
 
 // ─── repo root and manifest path validation ───────────────────────────────────
 

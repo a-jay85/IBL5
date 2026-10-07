@@ -338,7 +338,7 @@ test.describe('Depth Chart submission', () => {
     // "Current (Live)" + at least one saved config from seed. The exact
     // count fluctuates within this serial describe because prior submit
     // tests may update the active saved DC to match live settings, which
-    // SavedDepthChartService then hides from the dropdown.
+    // DepthChartSnapshotService then hides from the dropdown.
     expect(await options.count()).toBeGreaterThanOrEqual(2);
   });
 
@@ -397,7 +397,7 @@ test.describe('Depth Chart submission', () => {
     // the session, so the tampered Team_Name is ignored: the submission applies
     // to Monarchs (the legitimate owner), never Metros. The "no victim write"
     // negative is pinned at unit level in
-    // DepthChartEntrySubmissionHandlerOwnershipTest.
+    // DepthChartSubmissionHandlerOwnershipTest.
     await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
 
     const firstPg = page

@@ -141,7 +141,7 @@ func candidatesForSlot(roster []bundle.Player, slot int, taken map[int]bool) []s
 //
 // The 5-pass operates on the depth ordinals dc_pg_depth…dc_c_depth + dc_minutes,
 // the live IBL5 depth fields. The JSB-internal dc_bh/di/oi/df/of fields are dead
-// on IBL5 data (DepthChartEntryRepository forces them to 0) and are deliberately
+// on IBL5 data (DepthChartRepository forces them to 0) and are deliberately
 // not read; reading them would score every candidate identically. The fallback
 // +48 band (dc<=0 + posmatch) is ported for fidelity but is unreachable
 // end-to-end, since posmatch implies dc>0 (see posmatch).

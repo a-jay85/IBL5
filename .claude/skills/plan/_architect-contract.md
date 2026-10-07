@@ -90,16 +90,15 @@ Conditionally — include a section **only when it applies**; never emit an empt
   **Category:** intrinsic — <which Step 4.5 intrinsic bullet, or `reducible-confirmed` + which gate-14/15 trigger>.
 
   **Decision:** <ONE plain yes/no sentence, at most 40 words, for the person pressing merge.
-  Example: "Merge if you're OK with about 7% more PRs being held until their body declares scope.">
+  Example: "Merge if you're OK with about 7% more PRs being held.">
 
-  **Discharged by matrix rows:** <row numbers> — the observable claims a reader might otherwise
-  expect the human to re-run are asserted there, not here.
+  **Discharged by matrix rows:** <row numbers asserting the observable claims>
 
   <One line of why the judgment is irreducible (intrinsic) or why no mechanical check is
   buildable (reducible-confirmed).>
   ```
-  Gate `[H]` fails an ask-shaped sentence outside the `**Decision:**` block (exempt from that line to the next blank line). `**Category:**` and `**Discharged by matrix rows:**` are contract the gate does not check; emit them anyway. The gate is a narrow pattern check over `bin/lib/hold-check-patterns.txt` that stays silent on taste prose, so passing it is only the floor.
-  **Decision wording.** The PR body shows only the Decision paragraph: `/post-plan` renders it alone into the manual-confirmation block. Category, the matrix-row pointer, and the why-line stay in the plan for the gate and the Step 4.5 audit. Write the Decision as one plain sentence the merger answers yes or no, and do not open it with "The human accepts that ...". Keep a blank line between the Decision and each other part. Gate `[H]` runs the Decision body through `bin/check-prose`, caps it at 40 words, and fails the legacy opener.
+  Gate `[H]` fails an ask-shaped sentence outside the `**Decision:**` block (exempt from that line to the next blank line). `**Category:**` and `**Discharged by matrix rows:**` are contract the gate does not check; emit them anyway. Passing its narrow pattern check over `bin/lib/hold-check-patterns.txt` is only the floor.
+  **Decision wording.** Only the Decision reaches the PR body. Do not open it with "The human accepts that ...". Gate `[H]` runs it through `bin/check-prose`, caps it at 40 words, and fails that opener.
 
 ## Self-apply the Automouse Hold Challenge
 

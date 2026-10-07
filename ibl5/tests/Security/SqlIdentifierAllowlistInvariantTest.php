@@ -227,6 +227,17 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
         );
     }
 
+    public function testColumnShapeCheckFlagsInjectedDepthColumnValue(): void
+    {
+        $map = (new \ReflectionClassConstant(TeamQueryRepository::class, 'LAST_SIM_DEPTH_COLUMNS'))->getValue();
+        self::assertIsArray($map);
+        self::assertSame([], self::nonIdentifierValues($map, self::COLUMN_PATTERN, false));
+
+        // Mutation: LAST_SIM_DEPTH_COLUMNS['PG'] set to a free-text value.
+        $map['PG'] = 'pg_depth = 1 OR 1';
+        self::assertSame(['pg_depth = 1 OR 1'], self::nonIdentifierValues($map, self::COLUMN_PATTERN, false));
+    }
+
     private static function isActorIdentity(string $name, ?\ReflectionType $type): bool
     {
         if (preg_match(self::ACTOR_IDENTITY_NAME, $name) === 1) {

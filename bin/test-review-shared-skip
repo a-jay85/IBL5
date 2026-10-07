@@ -121,6 +121,52 @@ git -C "$DELTA_TEMP" push "file://$DELTA_ORIGIN" HEAD:refs/heads/history >/dev/n
 git -C "$DELTA_REPO" remote add origin "file://$DELTA_ORIGIN"
 git -C "$DELTA_REPO" push origin pr-branch >/dev/null 2>&1
 
+# --- real post-plan sticky fixture (captured, see bin/fixtures/review-shared/README.md) ---
+REAL_FIXTURE="$SCRIPT_DIR/fixtures/review-shared/post-plan-sticky-pr2892.json"
+test -s "$REAL_FIXTURE" || { echo "FAIL: real sticky fixture missing at $REAL_FIXTURE"; exit 1; }
+# The recorded tree inside the captured audit trail (first 40-hex after the label).
+REAL_RECORDED_TREE="$(jq -r '[.comments[] | select(.body|contains("<!-- pr-ready-verdict -->"))][0].body' \
+    "$REAL_FIXTURE" | tr -d '\r' | grep -m1 -oE '^\*\*Reviewed tree:\*\* [0-9a-f]{40}$' | awk '{print $NF}')"
+[[ "$REAL_RECORDED_TREE" =~ ^[0-9a-f]{40}$ ]] \
+    || { echo "FAIL: real fixture carries no **Reviewed tree:** <40hex> line"; exit 1; }
+
+# Helper: rewrite the captured fixture for the scratch repo.
+#   $1 = tree to substitute for the captured one (use $TREE for a match, any other 40-hex for stale)
+#   $2 = output path
+#   $3 = optional python3 expression over `body` (the sticky body string) applied AFTER the
+#        tree substitution, e.g. 'body.replace("\nREADY\n", "\nNOT READY\n")'; empty = none
+#   $4 = optional python3 expression over `comments` (the list) applied last; empty = none
+# headRefName is rewritten to pr-branch so Step 5 (branch guard) passes in the scratch repo.
+# eval runs only test-authored string literals from this file, never fixture content.
+_mk_real_fixture() {
+    local new_tree="$1" out_file="$2" body_expr="${3:-}" comments_expr="${4:-}"
+    REAL_NEW_TREE="$new_tree" REAL_OLD_TREE="$REAL_RECORDED_TREE" \
+    REAL_BODY_EXPR="$body_expr" REAL_COMMENTS_EXPR="$comments_expr" \
+    python3 - "$REAL_FIXTURE" "$out_file" <<'PY'
+import json, os, sys
+src, dst = sys.argv[1], sys.argv[2]
+d = json.load(open(src))
+marker = "<!-- pr-ready-verdict -->"
+comments = d["comments"]
+for c in comments:
+    body = c.get("body") or ""
+    if marker in body:
+        body = body.replace(os.environ["REAL_OLD_TREE"], os.environ["REAL_NEW_TREE"])
+        if os.environ["REAL_BODY_EXPR"]:
+            body = eval(os.environ["REAL_BODY_EXPR"])
+        c["body"] = body
+if os.environ["REAL_COMMENTS_EXPR"]:
+    comments = eval(os.environ["REAL_COMMENTS_EXPR"])
+json.dump({"comments": comments, "headRefName": "pr-branch"}, open(dst, "w"))
+PY
+}
+
+# Helper: run skip-review.sh (or a mutant copy) in GIT_REPO against a fixture; sets RS_OUT, RS_LAST.
+_run_skip() {  # $1 = fixture path, $2 = script path (default $SKIP_SCRIPT)
+    RS_OUT="$(cd "$GIT_REPO" && GH_FIXTURE="$1" bash "${2:-$SKIP_SCRIPT}" 9999 "")"
+    RS_LAST="$(printf '%s\n' "$RS_OUT" | tail -1)"
+}
+
 # Helper: write a minimal gh-pr-view fixture for delta-repo (headRefName=pr-branch).
 # The body's first line must be exactly "**Reviewed tree:** <40hex>".
 _mk_delta_fixture() {

@@ -154,6 +154,13 @@ while IFS=$'\t' read -r pr branch sha mstate; do
         log "skip PR $pr: retry cap (head ${sha:0:7})"
         if pcw_dm_due "$STATE" "$pr" "$sha"; then
             msg="pr-cycle-watch: PR #$pr is still $kind on head ${sha:0:7} after one rescue. Skipping it until a new push."
+            # Name why the rescue stopped, so the DM is actionable without opening a log.
+            IFS=$'\t' read -r run_dir why <<< "$(pcw_last_block "$branch" "${out_dirs[@]}")" || true
+            if [[ -n "${why:-}" ]]; then
+                msg+=" Why: $why Fix steps: $run_dir/blocked-ship.txt"
+            elif [[ -n "${run_dir:-}" ]]; then
+                msg+=" Last rescue run: $run_dir"
+            fi
             if [[ "$DRY_RUN" -eq 1 ]]; then
                 log "would DM: $DM_CMD --ping $msg"
             else

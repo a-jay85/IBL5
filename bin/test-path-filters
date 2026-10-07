@@ -5,9 +5,10 @@
 # sim-recap producer/consumer pair coupled: any path under the `both:` group must
 # trigger BOTH db-integration and harness-tests. Greps the workflow only; it never
 # stats the listed paths.
-# Also asserts src: routes the destructive-migration engine to PHPUnit.
+# Also asserts src: routes the destructive-migration engine, and every bin/ script
+# a PHPUnit test loads, to PHPUnit.
 #
-# Run: bin/test-path-filters [workflow.yml]   (exit 0 = all pass, 1 = a case failed)
+# Run: bin/test-path-filters [workflow.yml] [tests-dir]   (exit 0 = all pass, 1 = a case failed)
 set -u
 WF="${1:-.github/workflows/tests.yml}"
 FAILED=0
@@ -44,6 +45,22 @@ for p in 'bin/check-destructive-migrations' 'bin/lib/destructive-migration-scan.
     && ok "src: covers $p" \
     || bad "src: is missing $p — an engine-only PR would skip PHPUnit"
 done
+
+# Every bin/ script a PHPUnit test loads via __DIR__ . '/../…/bin/<path>' is
+# covered only by the PHPUnit job, so src: must list it. Otherwise a bin-only
+# edit skips PHPUnit and breaks master (#2907 broke CheckDocsCliTest this way).
+TESTS_DIR="${2:-ibl5/tests}"
+CLI_BIN="$(grep -rhoE "__DIR__ \. '(/\.\.)+/bin/[A-Za-z0-9_./-]+'" "$TESTS_DIR" \
+  | sed -E "s#.*/bin/#bin/#; s#'\$##" | sort -u)"
+[ -n "$CLI_BIN" ] \
+  && ok "found bin/ scripts loaded by PHPUnit tests" \
+  || bad "found no bin/ scripts in $TESTS_DIR — the scan pattern no longer matches"
+while IFS= read -r p; do
+  [ -n "$p" ] || continue
+  grep -qF -- "- '$p'" <<< "$SRC" \
+    && ok "src: covers PHPUnit-tested $p" \
+    || bad "src: is missing $p — a PHPUnit test runs it, so a bin-only edit would skip that test"
+done <<< "$CLI_BIN"
 
 # Regression guard: src: must never swallow all of bin/, or every shell-only PR
 # would drag the whole DB-integration suite along.

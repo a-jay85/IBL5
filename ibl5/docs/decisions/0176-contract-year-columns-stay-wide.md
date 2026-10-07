@@ -83,7 +83,7 @@ Reopen this decision when any one of these holds:
 
 - Positive: no code, API, or export change. Readers and writers keep matching the engine record one slot to one column.
 - Positive: the reopen thresholds are concrete and checkable against `PlrFileWriter`.
-- Negative: the schema keeps six columns and six CHECK constraints per table for one concept, and new code keeps writing `salary_yr1`..`salary_yr6` by name.
+- Negative: the schema keeps six columns per table, plus six CHECK constraints each on `ibl_plr` and `ibl_olympics_plr`, for one concept, and new code keeps writing `salary_yr1`..`salary_yr6` by name.
 - A future seventh-year change must touch the `.plr` offsets in `PlrFileWriter` and `PlrLineParser`, every table listed in Context, the views, the validator loop, `OfferType::calculateYears`, the demand CSV header, and the dynamic-name sites. Re-run the Context table commands to size it.
 - This decision changes no code, config, migration, or test. The ADR is the only file in the change.
 

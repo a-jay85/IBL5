@@ -17,8 +17,7 @@
 #   3. No argument, not in worktree → main ibl5-mariadb container
 #
 # Worktrees live OUTSIDE the repo (ADR-0046); WT_PARENT is resolved via the
-# worktrees_parent_dir helper. A legacy in-repo path is kept as a fallback for
-# pre-migration worktrees, mirroring bin/db-test-up.
+# worktrees_parent_dir helper.
 #
 # Prereqs: .env with REMOTE_* creds; target container already running.
 
@@ -175,9 +174,6 @@ WORKTREE_PATH=""
 resolve_from_wt_name() {
     local name="$1"
     local wt_path="$WT_PARENT/$name"
-    if [ ! -d "$wt_path" ]; then
-        wt_path="$REPO_ROOT/worktrees/$name"  # legacy fallback (pre-migration)
-    fi
     local slug_file="$wt_path/.wt-slug"
     if [ ! -f "$slug_file" ]; then
         return 1
@@ -192,12 +188,8 @@ if [ -n "$WORKTREE_ARG" ]; then
         echo "Start it first: bin/wt-up $WORKTREE_ARG" >&2
         exit 1
     fi
-elif [[ "$PWD" == "$WT_PARENT/"* || "$PWD" == "$REPO_ROOT/worktrees/"* ]]; then
-    if [[ "$PWD" == "$WT_PARENT/"* ]]; then
-        wt_rel="${PWD#"$WT_PARENT/"}"
-    else
-        wt_rel="${PWD#"$REPO_ROOT/worktrees/"}"  # legacy fallback (pre-migration)
-    fi
+elif [[ "$PWD" == "$WT_PARENT/"* ]]; then
+    wt_rel="${PWD#"$WT_PARENT/"}"
     wt_name="${wt_rel%%/*}"
     if ! resolve_from_wt_name "$wt_name"; then
         echo "Error: CWD is in worktree '$wt_name' but .wt-slug is missing. Start it: bin/wt-up $wt_name" >&2

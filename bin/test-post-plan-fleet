@@ -1445,7 +1445,7 @@ grep -qF 'repo may be missing review assets' "$SCRIPT_DIR/../bin/post-plan-fleet
 end_case post-plan-fleet-digest-gate
 
 # --- case 19: E15 rebase delegate is never told to push ----------------------------------
-# The delegate packet runs under ~/.claude/hooks/plan-gate-commit.sh, which denies `git push`
+# The delegate packet runs under ~/.claude/hooks/bash-guard.sh (Check 22), which denies `git push`
 # for sub-agents. Any positive push instruction in the packet is an instant hard-fail.
 begin_case
 REBASE="$SCRIPT_DIR/../.claude/review-shared/_rebase-and-conflicts.md"

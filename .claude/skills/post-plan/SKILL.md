@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-06
+last_verified: 2026-10-07
 ---
 
 # Post-Plan Orchestrator
@@ -82,15 +82,9 @@ fi
 
 ---
 
-## Phase 1: Clear Plan Gate & Locate Plan
+## Phase 1: Locate Plan
 
-Remove the plan workflow gate so that commits and edits within this skill are not blocked by PreToolUse hooks:
-
-```bash
-rm -f /tmp/claude-plan-active-$PPID
-```
-
-Then locate the plan backing this branch so later phases can verify the implementation against its intent. The plan is the spec; phases 4–6 check conformance to it.
+Locate the plan backing this branch so later phases can verify the implementation against its intent. The plan is the spec; phases 4 to 6 check conformance to it.
 
 ```bash
 # Authoritative when a path was handed to this run (automouse handoff JSON's plan_file, or

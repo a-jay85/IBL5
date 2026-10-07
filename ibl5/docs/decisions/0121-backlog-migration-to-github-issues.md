@@ -1,6 +1,6 @@
 ---
 description: Project work tracking moves from 21 markdown backlog files to GitHub Issues in the private repo a-jay85/IBL5-backlog, retiring the union-merge and duplicate-ID machinery that file-shaped tracking required.
-last_verified: 2026-09-30
+last_verified: 2026-10-06
 ---
 
 # ADR-0121: Backlog migration to GitHub Issues
@@ -14,7 +14,7 @@ IBL5 tracks ~690 open work items across 21 markdown backlog files under `ibl5/do
 
 ## Decision
 
-Project work tracking moves to GitHub Issues in the existing private repo `a-jay85/IBL5-backlog`: one Issue per backlog item, the source area as a label (`dev-efficiency`, `ci`, `maintenance`, `e2e`, `loop-engineering`, `token-spend`, `a11y`, `a11y-contrast`, `security`, `jsb-native`, plus `archived`), and the legacy item ID as a title prefix so existing cross-references stay resolvable. Migration is performed once by `bin/migrate-backlog-to-issues`, an idempotent PHP CLI keyed on (label, leading ID token) read from the live remote rather than a local state file; it authenticates through a developer's local `gh` session, so no cross-repo PAT and no CI secret is introduced. Implementation lands in **two** PRs: this one ships the tool, its `ibl5/tests/Cli/MigrateBacklogToIssuesCliTest.php` coverage, the destination labels, and the real migration run; a follow-up PR deletes the corpus and retires `bin/backlog-open` (example), `bin/check-numbering` check 4, `checkBacklogTransitions()`, and `checkMaintenanceResolved()`, once the open PRs that still append to the backlog files have drained.
+Project work tracking moves to GitHub Issues in the existing private repo `a-jay85/IBL5-backlog`: one Issue per backlog item, the source area as a label (`dev-efficiency`, `ci`, `maintenance`, `e2e`, `loop-engineering`, `token-spend`, `a11y`, `a11y-contrast`, `security`, `jsb-native`, plus `archived`), and the legacy item ID as a title prefix so existing cross-references stay resolvable. Migration is performed once by bin/migrate-backlog-to-issues (since removed), an idempotent PHP CLI keyed on (label, leading ID token) read from the live remote rather than a local state file; it authenticates through a developer's local `gh` session, so no cross-repo PAT and no CI secret is introduced. Implementation lands in **two** PRs: this one ships the tool, its ibl5/tests/Cli/MigrateBacklogToIssuesCliTest.php (since removed) coverage, the destination labels, and the real migration run; a follow-up PR deletes the corpus and retires `bin/backlog-open` (example), `bin/check-numbering` check 4, `checkBacklogTransitions()`, and `checkMaintenanceResolved()`, once the open PRs that still append to the backlog files have drained.
 
 ## Alternatives Considered
 
@@ -33,7 +33,7 @@ Project work tracking moves to GitHub Issues in the existing private repo `a-jay
 
 ## References
 
-- `bin/migrate-backlog-to-issues` — the one-shot idempotent migration CLI.
-- `ibl5/tests/Cli/MigrateBacklogToIssuesCliTest.php` — dry-run coverage of extraction, labelling, state, and idempotency.
+- bin/migrate-backlog-to-issues (since removed) — the one-shot idempotent migration CLI. <!-- slop-ok -->
+- ibl5/tests/Cli/MigrateBacklogToIssuesCliTest.php (since removed) — dry-run coverage of extraction, labelling, state, and idempotency. <!-- slop-ok -->
 - `.gitattributes` — carries the `merge=union` attribute this decision retires for backlog paths.
 - The `backlog-housekeep` rule (file deleted 2026-09-30): the resident rule replaced by a pointer once the corpus is deleted.

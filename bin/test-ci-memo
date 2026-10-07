@@ -289,36 +289,6 @@ if should_run digest-unavailable-miss; then
 fi
 
 # =========================================================================
-# Case: lighthouse-scope-fold
-if should_run lighthouse-scope-fold; then
-    r="$TMP/lh-repo"; mk_repo "$r"
-    lh_env=(CI_MEMO_REPO="$r" CI_MEMO_MANIFEST_DIR="$r/ci-memo" GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="")
-    k_lh_unavail=$(env "${lh_env[@]}" CI_MEMO_DIGEST_CMD=false \
-        "$MEMO" key lighthouse --manifest "$r/ci-memo/e2e.paths" 2>/dev/null | grep '^key=' | sed 's/^key=//')
-    k_lh_stub=$(env "${lh_env[@]}" CI_MEMO_DIGEST_CMD='echo stub-manifest' \
-        "$MEMO" key lighthouse --manifest "$r/ci-memo/e2e.paths" 2>/dev/null | grep '^hash=')
-    k_e2e_stub=$(env "${lh_env[@]}" CI_MEMO_DIGEST_CMD='echo stub-manifest' \
-        "$MEMO" key e2e 2>/dev/null | grep '^hash=')
-    k_tests=$(env "${lh_env[@]}" CI_MEMO_DIGEST_CMD=false \
-        "$MEMO" key tests 2>/dev/null | grep '^key=' | sed 's/^key=//')
-    p_lh=$(env "${lh_env[@]}" "$MEMO" paths lighthouse --manifest "$r/ci-memo/e2e.paths" 2>/dev/null)
-    p_e2e=$(env "${lh_env[@]}" "$MEMO" paths e2e 2>/dev/null)
-    if [[ -n "$k_lh_unavail" ]]; then
-        fail "lighthouse-scope-fold: unreadable manifest must yield empty key, got '$k_lh_unavail'"
-    elif [[ -z "$k_lh_stub" || -z "$k_e2e_stub" ]]; then
-        fail "lighthouse-scope-fold: stub-digest hash is empty (lh='$k_lh_stub' e2e='$k_e2e_stub')"
-    elif [[ "$k_lh_stub" == "$k_e2e_stub" ]]; then
-        fail "lighthouse-scope-fold: lighthouse and e2e keys collide on the same tree"
-    elif [[ -z "$k_tests" ]]; then
-        fail "lighthouse-scope-fold: tests scope must NOT fold the image digest (key went empty)"
-    elif [[ "$p_lh" != "$p_e2e" ]]; then
-        fail "lighthouse-scope-fold: --manifest e2e.paths must list the same pathspecs as scope e2e"
-    else
-        pass "lighthouse-scope-fold"
-    fi
-fi
-
-# =========================================================================
 # Case: manifest-coverage
 # Asserts: every path literal in the memoized dorny filter blocks of each
 # real workflow is covered by the matching scope's manifest.

@@ -97,7 +97,7 @@ done
 | Prod ops | `db-sync-prod`, `log-fetch-prod`, `promote-master-to-production` (the promotion primitive CI runs; `--dry-run` to rehearse), `merge-master-to-prod` (manual/emergency promotion), `smoke-prod` (SSH from host); `iblbot-healthcheck` (pm2 cron watchdog, runs on the prod box) |
 | Dev / Docker env | `dev-up`, `db-test-up`, `db-migrate` |
 | Scaffolding | `next-adr`, `next-migration`, `generate-codebase-map`, `sync-branches` |
-| Lighthouse | `lighthouse-audit-report`, `lighthouse-audit-urls`, `lighthouse-comment` |
+| Lighthouse | `lighthouse-audit-report`, `lighthouse-audit-urls` |
 | Test front door | `test`: `bin/test unit`, `bin/test db`, `bin/test e2e`. Detects context. Inside a worktree `e2e` runs `e2e-wt <slug>`; on the main checkout it runs `ibl5/bin/e2e-local`. Call `e2e-wt <slug>` directly for agent and background runs. |
 | E2E dispatch | `e2e-for-file`, `e2e-for-pr` |
 | Shared helpers | `lib/` (`db-helpers.sh`, `git-helpers.sh`, `wt-guards.sh`, `automouse-stream-filter.sh`) |

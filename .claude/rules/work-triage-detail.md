@@ -1,9 +1,9 @@
 ---
 description: Read-on-demand detail for work-triage — NO auto-attach trigger (its `paths:` entries are all out-of-repo and never match); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, the numeric hard-trigger rule and gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the /plan-verdict routing rationale and gate properties, the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
-last_verified: 2026-09-28
+last_verified: 2026-10-06
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
-  - "~/.claude/hooks/plan-gate-skill.sh"
+  - "~/.claude/hooks/skill-gate.sh"
 ---
 
 # Work Triage — Detail
@@ -92,21 +92,21 @@ The ≥5-file hard trigger in `work-triage.md` still names **one** sub-agent, an
 
 ## /plan verdict routing
 
-**The routing rule:** never execute a `/plan` verdict as inline `Skill(plan)`. It burns the whole orchestrator through every `/plan` phase. Route via `/plan-prompt` → `bin/plan-now` (detached Sonnet 5.5); `~/.claude/hooks/plan-gate-skill.sh` denies it.
+**The routing rule:** never execute a `/plan` verdict as inline `Skill(plan)`. It burns the whole orchestrator through every `/plan` phase. Route via `/plan-prompt` → `bin/plan-now` (detached Sonnet 5.5); `~/.claude/hooks/skill-gate.sh` denies it.
 
 Why prose alone fails and a hook is required: on 2026-07-28, with `work-triage.md` fully resident, a `/plan` verdict on the `bin/wt-rebase` task was executed as an inline `Skill(plan)` call on Opus. It burned the orchestrator through all of Step 3 (one `plan-architect` spawn + section append) before being killed. A warning you can read past is not a control.
 
 ### Gate properties — plan skill
 
-`~/.claude/hooks/plan-gate-skill.sh` is a PreToolUse hook on the `Skill` tool. Key properties:
+`~/.claude/hooks/skill-gate.sh` is a PreToolUse hook on the `Skill` tool. Key properties:
 
 - **Denies unconditionally** (not Opus-specific — `/plan-prompt` → `bin/plan-now` is the better path on ANY interactive model).
-- **Exact skill-name match** — only `plan` is denied. Every other skill, including `post-plan`, `plan-prompt`, and namespaced names like `commit-commands:commit`, passes through untouched.
+- **Exact skill-name match.** `plan` is denied here (`post-plan` has its own override namespace in the same hook, routing to `bin/post-plan-now`). Every other skill, including `plan-prompt`, and namespaced names like `commit-commands:commit`, passes through untouched.
 - **Main thread only** — sub-agent calls (`agent_id` present) pass through; the delegate you spawn is never blocked.
-- **Headless sessions exempt** — when `CLAUDE_HEADLESS=1` is set in the environment, the hook allows the call. `bin/plan-now` sets this env var before its detached `claude -p` invocation; `plan-gate-commit.sh` and `output-guard.sh` both branch on it in production, confirming it reaches hook child processes. This exemption is what keeps `bin/plan-now` and automouse working.
+- **Headless sessions exempt.** When `CLAUDE_HEADLESS=1` is set in the environment, the hook allows the call. `bin/plan-now` sets this env var before its detached `claude -p` invocation; `bash-guard.sh` and `output-guard.sh` both branch on it in production, confirming it reaches hook child processes. This exemption is what keeps `bin/plan-now` and automouse working.
 - **Fails open** on malformed or unrecognised payload — a missing field never blocks a Skill call.
 - **Escape hatch:** `touch /tmp/claude-plan-inline-override-<session_id>` (session-scoped). Legitimate when the session has already paid the context cost or the plan is too entangled with live state to hand off. **Say out loud that you're overriding and why, in the same turn** — using it silently defeats the gate.
 
 The deny message must not tell you to call `/plan-prompt` as a skill: `.claude/skills/plan-prompt/SKILL.md` sets `disable-model-invocation: true`, so a model cannot invoke it. The actionable routes are asking the user to type `/plan-prompt`, or running `bin/plan-now <prompt-file>` directly.
 
-Self-test: `bash ~/.claude/hooks/test-plan-gate-skill.sh`
+Self-test: `bash ~/.claude/hooks/test-skill-gate.sh`

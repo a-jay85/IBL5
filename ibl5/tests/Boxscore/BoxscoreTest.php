@@ -13,13 +13,13 @@ use PHPUnit\Framework\TestCase;
 class BoxscoreTest extends TestCase
 {
     /**
-     * sha1 of Boxscore::playerInsertSql('`ibl_box_scores`') on unmodified master —
+     * sha1 of Boxscore::playerInsertSql() on unmodified master —
      * the exact string BoxscoreRepository passes today.
      */
     private const PLAYER_INSERT_SQL_SHA1 = '63764939f440ad0d3425ed70cf9fbeb23e363e7c';
 
     /**
-     * sha1 of Boxscore::teamInsertSql('`ibl_box_scores_teams`') on unmodified master.
+     * sha1 of Boxscore::teamInsertSql() on unmodified master.
      */
     private const TEAM_INSERT_SQL_SHA1 = '291192773709d42adbc5f87bf1dd02674f5bac04';
 
@@ -310,7 +310,7 @@ class BoxscoreTest extends TestCase
 
     public function testPlayerInsertSqlContainsTableName(): void
     {
-        $sql = Boxscore::playerInsertSql('ibl_box_scores');
+        $sql = Boxscore::playerInsertSql();
 
         $this->assertStringContainsString('ibl_box_scores', $sql);
         $this->assertStringContainsString('INSERT INTO', $sql);
@@ -318,7 +318,7 @@ class BoxscoreTest extends TestCase
 
     public function testPlayerInsertSqlContainsExpectedColumns(): void
     {
-        $sql = Boxscore::playerInsertSql('ibl_box_scores');
+        $sql = Boxscore::playerInsertSql();
 
         $this->assertStringContainsString('game_date', $sql);
         $this->assertStringContainsString('pid', $sql);
@@ -328,7 +328,7 @@ class BoxscoreTest extends TestCase
 
     public function testTeamInsertSqlContainsTableName(): void
     {
-        $sql = Boxscore::teamInsertSql('ibl_box_scores_teams');
+        $sql = Boxscore::teamInsertSql();
 
         $this->assertStringContainsString('ibl_box_scores_teams', $sql);
         $this->assertStringContainsString('INSERT INTO', $sql);
@@ -336,7 +336,7 @@ class BoxscoreTest extends TestCase
 
     public function testTeamInsertSqlContainsExpectedColumns(): void
     {
-        $sql = Boxscore::teamInsertSql('ibl_box_scores_teams');
+        $sql = Boxscore::teamInsertSql();
 
         $this->assertStringContainsString('visitor_teamid', $sql);
         $this->assertStringContainsString('home_teamid', $sql);
@@ -348,7 +348,7 @@ class BoxscoreTest extends TestCase
     {
         $this->assertSame(
             self::PLAYER_INSERT_SQL_SHA1,
-            sha1(Boxscore::playerInsertSql('`ibl_box_scores`'))
+            sha1(Boxscore::playerInsertSql())
         );
     }
 
@@ -356,8 +356,14 @@ class BoxscoreTest extends TestCase
     {
         $this->assertSame(
             self::TEAM_INSERT_SQL_SHA1,
-            sha1(Boxscore::teamInsertSql('`ibl_box_scores_teams`'))
+            sha1(Boxscore::teamInsertSql())
         );
+    }
+
+    public function testInsertSqlTargetsCanonicalBoxScoreTables(): void
+    {
+        $this->assertStringStartsWith('INSERT INTO `ibl_box_scores` (', Boxscore::playerInsertSql());
+        $this->assertStringStartsWith('INSERT INTO `ibl_box_scores_teams` (', Boxscore::teamInsertSql());
     }
 
     // --- Helper to build fixed-width game info lines ---

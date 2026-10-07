@@ -252,7 +252,11 @@ class GoogleSheetExportService
 
     private function error(int $userId, string $sanitized, string $reason, int $started): string
     {
-        $this->connections->markRefreshed($userId, self::RESULT_ERROR, $sanitized);
+        try {
+            $this->connections->markRefreshed($userId, self::RESULT_ERROR, $sanitized);
+        } catch (\Throwable) {
+            // The row write itself failed; the log line below is the only record.
+        }
         $this->log('warning', 'google sheet refresh failed', [
             'user_id' => $userId,
             'status' => self::RESULT_ERROR,

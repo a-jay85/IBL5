@@ -1,11 +1,11 @@
 import { test, expect } from '../fixtures/auth-regular';
-import type { APIRequestContext, Page, Route } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
 
 /**
  * Google Sheets card on the ApiKeys page, driven by seeded connection rows for
  * the E2E regular user (test-state.php seed/get/delete-google-sheet-connection).
- * The seeded refresh token is a fixed fake; every Google API host is
- * route-intercepted and counted, and the count must stay 0.
+ * The seeded refresh token is a fixed fake. PHP makes every Google call
+ * server-side, so these tests assert on the rendered card and the stored row.
  *
  * Runs in the `mutators` project: it rewrites the regular user's connection row,
  * which security/google-sheets-oauth.spec.ts also reads.
@@ -33,17 +33,6 @@ async function clear(request: APIRequestContext): Promise<void> {
 async function connection(request: APIRequestContext): Promise<{ status: number; body: { status?: string } }> {
   const response = await request.get(`test-state.php?action=get-google-sheet-connection&${USER}`);
   return { status: response.status(), body: response.ok() ? await response.json() : {} };
-}
-
-function countGoogleApiRequests(page: Page): { count: number } {
-  const counter = { count: 0 };
-  const handler = async (route: Route) => {
-    counter.count++;
-    await route.fulfill({ status: 500, body: 'unexpected Google API call' });
-  };
-  void page.route('https://oauth2.googleapis.com/**', handler);
-  void page.route('https://sheets.googleapis.com/**', handler);
-  return counter;
 }
 
 /** The `_csrf_token` inside the form posting to `op`, read from a fresh render. */
@@ -75,17 +64,13 @@ test.describe('Google Sheets card', () => {
     'IBL_TEST_USER_REGULAR / IBL_TEST_PASS_REGULAR not set — regular.json is not freshly authenticated',
   );
 
-  let google: { count: number };
-
   test.beforeEach(async ({ page }) => {
     const html = await (await page.request.get(API_KEYS)).text();
     expect(html, 'set GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_TOKEN_KEY for the PHP server').not.toContain('sync is not configured');
     await clear(page.request);
-    google = countGoogleApiRequests(page);
   });
 
   test.afterEach(async ({ page }) => {
-    expect(google.count).toBe(0);
     await clear(page.request);
   });
 

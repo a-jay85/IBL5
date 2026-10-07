@@ -45,7 +45,7 @@ class GoogleSheetExportServiceTest extends TestCase
         $this->service = $this->buildService($this->box);
     }
 
-    private function buildService(SecretBox $box): GoogleSheetExportService
+    private function buildService(SecretBox $box, ?GoogleSheetConnectionRepositoryInterface $repo = null): GoogleSheetExportService
     {
         $players = self::createStub(ApiPlayerRepository::class);
         $players->method('getAllPlayersForExport')->willReturn([['pid' => 1], ['pid' => 2]]);
@@ -56,7 +56,7 @@ class GoogleSheetExportServiceTest extends TestCase
         );
 
         return new GoogleSheetExportService(
-            $this->repo,
+            $repo ?? $this->repo,
             new GoogleOAuthClient(new GoogleOAuthConfig('cid', 'secret', 'http://x.localhost/cb'), $this->http),
             new GoogleSheetsClient($this->http),
             $box,
@@ -195,6 +195,22 @@ class GoogleSheetExportServiceTest extends TestCase
         $error = $this->row()['last_error'];
         self::assertIsString($error);
         self::assertStringStartsWith('429 ', $error);
+    }
+
+    public function testRefreshConnectionDoesNotThrowWhenErrorRowWriteFails(): void
+    {
+        $this->seedConnection();
+        $row = $this->row();
+        $repo = self::createStub(GoogleSheetConnectionRepositoryInterface::class);
+        $repo->method('markRefreshed')->willThrowException(new \RuntimeException('db gone'));
+        $service = $this->buildService($this->box, $repo);
+        $this->queueAccessToken();
+        $this->http->queue(429, ['error' => ['code' => 429, 'status' => 'RESOURCE_EXHAUSTED', 'message' => 'Quota exceeded']]);
+
+        $result = $service->refreshConnection($row);
+
+        self::assertSame(GoogleSheetExportService::RESULT_ERROR, $result);
+        self::assertStringContainsString('google sheet refresh failed', $this->allLogText());
     }
 
     public function testRefreshConnectionReencryptsWhenPreviousKeyUsed(): void

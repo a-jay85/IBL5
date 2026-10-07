@@ -1,12 +1,13 @@
 import { test as regularTest, expect } from '../fixtures/auth-regular';
 import { test as publicTest } from '../fixtures/public';
-import type { APIRequestContext, Page } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
 
 /**
  * Google sign-in hardening for the ApiKeys page: CSRF on `op=google_start`, the
  * session-bound `state` check on `op=google_callback`, the non-POST guard, and
- * the anonymous gate. No test here reaches Google — accounts.google.com is
- * route-stubbed and every other Google host is counted and expected to stay at 0.
+ * the anonymous gate. PHP makes every Google call server-side, so the browser
+ * cannot observe them. These tests prove rejection through the redirect, the flash
+ * alert, and the absence of a stored connection row.
  *
  * CI passes placeholder GOOGLE_OAUTH_* / GOOGLE_TOKEN_KEY values so the feature
  * renders as configured. Local runs need the same three variables.
@@ -19,17 +20,6 @@ const USER = `username=${encodeURIComponent(process.env.IBL_TEST_USER_REGULAR ??
 async function isConfigured(request: APIRequestContext): Promise<boolean> {
   const html = await (await request.get(API_KEYS)).text();
   return html.includes('id="google-sheet-card"') && !html.includes('sync is not configured');
-}
-
-function countGoogleApiRequests(page: Page): { count: number } {
-  const counter = { count: 0 };
-  const handler = async (route: import('@playwright/test').Route) => {
-    counter.count++;
-    await route.fulfill({ status: 500, body: 'unexpected Google API call' });
-  };
-  void page.route('https://oauth2.googleapis.com/**', handler);
-  void page.route('https://sheets.googleapis.com/**', handler);
-  return counter;
 }
 
 regularTest.describe('Google sign-in (regular user)', () => {
@@ -64,13 +54,7 @@ regularTest.describe('Google sign-in (regular user)', () => {
     expect(url).toContain('prompt=consent');
   });
 
-  regularTest('google_start without a token shows the CSRF error and never contacts Google', async ({ page }) => {
-    let googleHits = 0;
-    await page.route('https://accounts.google.com/**', async (route) => {
-      googleHits++;
-      await route.fulfill({ status: 200, body: 'stub' });
-    });
-
+  regularTest('google_start without a token shows the CSRF error and redirects back to the page', async ({ page }) => {
     const response = await page.request.post(`${API_KEYS}&op=google_start`, {
       form: {},
       maxRedirects: 0,
@@ -80,19 +64,15 @@ regularTest.describe('Google sign-in (regular user)', () => {
 
     await page.goto(API_KEYS);
     await expect(page.locator('#apikeys-flash.ibl-alert--error')).toContainText('Invalid or expired form submission');
-    expect(googleHits).toBe(0);
   });
 
   regularTest('google_callback with a bogus state is rejected before any token exchange', async ({ page }) => {
-    const google = countGoogleApiRequests(page);
-
     await page.goto(`${API_KEYS}&op=google_callback&state=bogus&code=x`);
 
     await expect(page).toHaveURL(/modules\.php\?name=ApiKeys$/);
     await expect(page.locator('#apikeys-flash.ibl-alert--error')).toContainText('expired or invalid');
     const conn = await page.request.get(`test-state.php?action=get-google-sheet-connection&${USER}`);
     expect(conn.status()).toBe(404);
-    expect(google.count).toBe(0);
   });
 
   regularTest('GET op=google_start is redirected back without an alert', async ({ page }) => {

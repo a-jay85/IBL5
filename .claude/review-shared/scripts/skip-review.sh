@@ -3,6 +3,8 @@
 # Compares the `**Reviewed tree:**` SHA recorded in the PR's sticky comment to the current
 # HEAD^{tree}. On a match (and no conflicts) writes carry-forward files and prints
 # SKIP-REVIEW <sha>, authorising Phase 6 to omit the Opus fidelity spawn.
+# The tree line is read from line 1 (/pr-ready layout) or from the last Audit-trail block of a
+# post-plan sticky (Step 8 states the exact shape); nothing else is read.
 # Every failure path prints RUN-REVIEW <reason> and exits 0 — the safe direction.
 # Never set -e or set -u: either can abort before a verdict is printed.
 #
@@ -86,10 +88,63 @@ STICKY_COUNT="$(printf '%s' "$GH_OUT" | jq '[.comments[]? | select((.body // "")
 BODY="$(printf '%s' "$GH_OUT" | jq -r '[.comments[]? | select((.body // "") | contains("<!-- pr-ready-verdict -->"))][0].body' 2>/dev/null | tr -d '\r')" || run "jq-failed"
 [ -n "$BODY" ] || run "no-verdict-comment"
 
-# Step 8: parse line 1 only for the tree contract line; anchored to avoid false positives.
-TREE_LINE="$(printf '%s\n' "$BODY" | head -1 | grep -m1 -oE '^\*\*Reviewed tree:\*\* [0-9a-f]{40}$')" || true
-[ -n "$TREE_LINE" ] || run "no-tree-line"
-RECORDED_TREE="${TREE_LINE##* }"
+# Step 8: tree contract line. Two layouts are accepted, nothing else:
+#   (1) /pr-ready: line 1 is exactly `**Reviewed tree:** <40hex>` (unchanged behavior).
+#   (2) post-plan: line 1 is not a tree line; the LAST `<details><summary>Audit trail</summary>`
+#       block closes at the tail `</details>`, blank, READY | READY WITH NOTES, marker (last line),
+#       and holds exactly one `**Reviewed tree:** ` line, which must be `<40hex>`.
+# When both layouts yield a hash they must agree (tree-line-conflict otherwise).
+LINE1_TREE="$(printf '%s\n' "$BODY" | head -1 | grep -m1 -oE '^\*\*Reviewed tree:\*\* [0-9a-f]{40}$')" || true
+LINE1_TREE="${LINE1_TREE##* }"
+[[ "$LINE1_TREE" =~ ^[0-9a-f]{40}$ ]] || LINE1_TREE=""
+
+# audit-trail-anchor-begin
+# Prints exactly one line: `TREE <value>` (value = text after the label, validated in bash)
+# or `REJECT <reason>`. Portable awk: no interval expressions, no gensub, no -v escapes.
+AUDIT_AWK='
+  { sub(/[[:space:]]+$/, ""); L[NR] = $0 }
+  END {
+    P = "**Reviewed tree:** "
+    n = NR
+    if (n < 5)                                     { print "REJECT no-tree-line"; exit }
+    if (L[n] != "<!-- pr-ready-verdict -->")       { print "REJECT no-tree-line"; exit }
+    if (L[n-1] != "READY" && L[n-1] != "READY WITH NOTES") { print "REJECT verdict-not-ready"; exit }
+    if (L[n-2] != "")                              { print "REJECT no-tree-line"; exit }
+    if (L[n-3] != "</details>")                    { print "REJECT no-tree-line"; exit }
+    open = 0
+    for (i = n-4; i >= 1; i--) {
+      if (L[i] == "<details><summary>Audit trail</summary>") { open = i; break }
+      if (index(L[i], "<details") == 1 || index(L[i], "</details") == 1) { print "REJECT no-tree-line"; exit }
+      if (index(L[i], "```") == 1 || index(L[i], "~~~") == 1)             { print "REJECT no-tree-line"; exit }
+    }
+    if (open == 0)                                 { print "REJECT no-tree-line"; exit }
+    c = 0; v = ""
+    for (i = open+1; i < n-3; i++) {
+      if (index(L[i], P) == 1) { c++; v = substr(L[i], length(P) + 1) }
+    }
+    if (c == 0)                                    { print "REJECT no-tree-line"; exit }
+    if (c > 1)                                     { print "REJECT tree-line-conflict"; exit }
+    print "TREE " v
+  }'
+AUDIT_OUT="$(printf '%s\n' "$BODY" | awk "$AUDIT_AWK" 2>/dev/null)" || AUDIT_OUT="REJECT no-tree-line"
+AUDIT_TREE=""
+case "$AUDIT_OUT" in
+  "TREE "*) AUDIT_TREE="${AUDIT_OUT#TREE }"; [[ "$AUDIT_TREE" =~ ^[0-9a-f]{40}$ ]] || AUDIT_TREE="" ;;
+esac
+# audit-trail-anchor-end
+
+if [ -n "$LINE1_TREE" ]; then
+  # Layout (1): line 1 wins; an audit-trail hash may only confirm it.
+  [ -n "$AUDIT_TREE" ] && [ "$AUDIT_TREE" != "$LINE1_TREE" ] && run "tree-line-conflict"
+  RECORDED_TREE="$LINE1_TREE"
+else
+  # Layout (2): every audit-trail rejection is reported with the awk's own reason.
+  case "$AUDIT_OUT" in
+    "REJECT "*) run "${AUDIT_OUT#REJECT }" ;;
+  esac
+  [ -n "$AUDIT_TREE" ] || run "no-tree-line"
+  RECORDED_TREE="$AUDIT_TREE"
+fi
 [[ "$RECORDED_TREE" =~ ^[0-9a-f]{40}$ ]] || run "no-tree-line"
 
 # Step 9: conflicts outrank a matching tree.

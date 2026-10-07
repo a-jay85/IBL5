@@ -969,6 +969,39 @@ ended_runner_logs() {
     return 0
 }
 
+# The newest ended runners and why each stopped, one line per runner. Three is
+# enough to show the latest stop and whether it is repeating, and keeps the
+# section short enough that watch mode does not push the next section off-screen.
+render_last_stops() {
+    local logs log rec epoch cause detail label d when pid tab
+    tab="$(printf '\t')"
+    logs="$(ended_runner_logs 3)"
+    [ -n "$logs" ] || return 0
+    note "last stops  (newest 3 ended runners)"
+    while IFS= read -r log; do
+        [ -n "$log" ] || continue
+        rec="$(runner_stop_reason "$log")"
+        epoch="${rec%%"$tab"*}"; rec="${rec#*"$tab"}"
+        cause="${rec%%"$tab"*}"; detail="${rec#*"$tab"}"
+        pid="${log%.log}"; pid="${pid##*-}"
+        when=''
+        if [ -n "$epoch" ]; then
+            when="$(date -r "$epoch" +'%a %m-%d %H:%M' 2>/dev/null \
+                || date -d "@$epoch" +'%a %m-%d %H:%M' 2>/dev/null || true)"
+        fi
+        [ -n "$when" ] || when='?'
+        [ -n "$cause" ] || cause='unknown'
+        [ -n "$detail" ] || detail="$log"
+        label='log'; [ "$detail" != "$log" ] && label='report'
+        if link_ok "$detail"; then d="$(link_file "$detail" "$label")"; else d="$label: $detail"; fi
+        printf '    %sstopped %s  pid %s%s  %s  %s%s%s\n' \
+            "$DIM" "$when" "$pid" "$R" "$(clip_field "$cause" 160)" "$DIM" "$d" "$R"
+    done <<EOF_LS
+$logs
+EOF_LS
+    return 0
+}
+
 render_queue() {
     local count=0 shown=0 stale=0 f base next ends pad hb rest pid slug slug_ld slug_lb
     local claimed=' ' queue_list meta model merge title reorder
@@ -1090,6 +1123,7 @@ EOF_Q
 
     [ "$count" -eq 0 ] && [ "$shown" -eq 0 ] && note "empty"
     [ "$stale" -gt 0 ] && note "$stale stale heartbeat file(s) from dead runs — ignored"
+    render_last_stops
     return 0
 }
 

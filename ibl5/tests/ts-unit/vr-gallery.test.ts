@@ -23,6 +23,39 @@ function solidPng(width: number, height: number, rgb: [number, number, number]):
 const RED: [number, number, number] = [255, 0, 0];
 const BLUE: [number, number, number] = [0, 0, 255];
 
+function hexRgb(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+}
+
+// A white canvas with one solid, fully-opaque rectangle. A solid block keeps
+// pixelmatch's anti-alias detector from excluding any block pixel, so the
+// changed-pixel counts stay deterministic. Default: 50 px of 20000 (0.0025).
+function blockPng(
+  fg: string,
+  block = { x: 10, y: 10, w: 10, h: 5 },
+  width = 200,
+  height = 100,
+): Buffer {
+  const png = new PNG({ width, height });
+  const [r, g, b] = hexRgb(fg);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const o = (y * width + x) * 4;
+      const inside =
+        x >= block.x && x < block.x + block.w && y >= block.y && y < block.y + block.h;
+      png.data[o] = inside ? r : 255;
+      png.data[o + 1] = inside ? g : 255;
+      png.data[o + 2] = inside ? b : 255;
+      png.data[o + 3] = 255;
+    }
+  }
+  return PNG.sync.write(png);
+}
+
 describe('triageCell', () => {
   it('V3a: afterA missing → infra', () => {
     const res = triageCell({
@@ -132,6 +165,40 @@ describe('triageCell', () => {
     expect(
       triageCell({ before, afterA: afterBuf, afterB: afterBuf }).verdict,
     ).toBe('changed');
+  });
+});
+
+describe('triageCell: #2599 gate-parity characterization', () => {
+  it('C1: gray-400→gray-500 text recolor is invisible to gate-parity triage even at T=0', () => {
+    const res = triageCell({
+      before: blockPng('#9ca3af'),
+      afterA: blockPng('#6b7280'),
+      afterB: blockPng('#6b7280'),
+      maxDiffPixelRatio: 0,
+    });
+    expect(res.verdict).toBe('unchanged');
+  });
+
+  it('C2: accent-500→accent-700 recolor is invisible to gate-parity triage even at T=0', () => {
+    const res = triageCell({
+      before: blockPng('#f97316'),
+      afterA: blockPng('#c2410c'),
+      afterB: blockPng('#c2410c'),
+      maxDiffPixelRatio: 0,
+    });
+    expect(res.verdict).toBe('unchanged');
+  });
+
+  it('C3: accent-600→accent-800 hover pair clears 0.2 but the 0.005 ratio still swallows a small run', () => {
+    const input = {
+      before: blockPng('#ea580c'),
+      afterA: blockPng('#9a3412'),
+      afterB: blockPng('#9a3412'),
+    };
+    const strictRatio = triageCell({ ...input, maxDiffPixelRatio: 0 });
+    expect(strictRatio.verdict).toBe('changed');
+    expect(strictRatio.changedRatio).toBeCloseTo(0.0025, 6);
+    expect(triageCell({ ...input, maxDiffPixelRatio: 0.005 }).verdict).toBe('unchanged');
   });
 });
 

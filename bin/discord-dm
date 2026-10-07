@@ -42,6 +42,7 @@
 #
 # Routing: owner recipient + no --raw + readable webhook file → the #dev channel
 # webhook; anything else → the IBLbot DM path. Test seams: DISCORD_DM_SSH_BIN,
+# DISCORD_DM_OSASCRIPT_BIN,
 # DISCORD_DM_CURL_BIN, DISCORD_DM_WEBHOOK_FILE (default ~/.iblbot-dev-webhook-url).
 #
 # Exit: 0 delivered · 1 undeliverable (spooled) · 2 usage/config error.
@@ -60,6 +61,8 @@ ROUTE="/discordDM"
 RAW=0
 # Transport seam: tests point this at a stub. Production always uses the real ssh.
 SSH_BIN="${DISCORD_DM_SSH_BIN:-ssh}"
+# Notification seam: the PATH prepend above would beat a PATH-based shim.
+OSASCRIPT_BIN="${DISCORD_DM_OSASCRIPT_BIN:-osascript}"
 # Webhook seams (unset and empty both mean the default). The URL lives in a chmod-600
 # host file, never an env var: launchd jobs do not inherit the shell environment.
 CURL_BIN="${DISCORD_DM_CURL_BIN:-curl}"
@@ -344,7 +347,7 @@ if [ "$FALLBACK" = 1 ]; then
     say "spooled to $SPOOL"
 
     NOTE=$(printf '%s' "$FULL_MSG" | head -1 | cut -c1-180 | sed 's/[\\"]/ /g')
-    osascript -e "display notification \"$NOTE\" with title \"Discord DM failed\" subtitle \"spooled — see the log\"" 2>/dev/null || true
+    "$OSASCRIPT_BIN" -e "display notification \"$NOTE\" with title \"Discord DM failed\" subtitle \"spooled — see the log\"" 2>/dev/null || true
 fi
 
 echo "discord-dm: UNDELIVERED after $LAST_ATTEMPTS attempt(s) — spooled to $SPOOL" >&2

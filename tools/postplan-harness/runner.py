@@ -49,18 +49,18 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               modified_files_from_diff,
                               name_status_text, normalize_backlog_closes, numstat_text,
                               qualify_backlog_refs,
-                              render_files_changed, render_manual_confirmation,
+                              render_files_changed,
                               render_tests_changed,
-                              render_residual_phases, render_reviewer_verification,
+                              render_residual_phases,
                               render_scope_notes,
                               restore_manual_testing_section, strip_manual_testing_section,
-                              upsert_files_changed, upsert_manual_confirmation,
+                              upsert_files_changed,
                               upsert_tests_changed,
-                              upsert_residual_phases, upsert_reviewer_verification,
+                              upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
 from harness.gate_backtest_replay import gate_backtest_result
-from harness.planfile import locate_plan, split_hold_justification
+from harness.planfile import locate_plan
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
 from harness.thread_ingestion import run_thread_ingestion
@@ -69,13 +69,7 @@ from harness.adapters.gitad import (LiveGit, ReplayGit, classify_local_gate_deni
                                     is_stale_base, is_stale_lease)
 from harness.adapters.llm import ClaudeCli, FixtureLlm, TOOLED_TIMEOUT
 from harness.adapters.probe import FixtureProbe, LiveProbe
-from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate
-
-_BADGE_FALLBACK = (
-    "<!-- postplan-status -->\n**post-plan is running**\n\n"
-    "Started outside `bin/post-plan-now`, so there is no launchd job to probe.\n"
-    "<!-- postplan-label:  -->\n"
-)
+from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate, fail_log_lines, timing_log_line, tracks_log_line
 
 # ── SIGTERM handler — abort any in-progress rebase before the process dies ───
 _active_git: "LiveGit | None" = None  # set once in run() for the isolated/live path
@@ -127,12 +121,16 @@ def _install_sigterm_handler() -> None:
     signal.signal(signal.SIGTERM, _sigterm_handler)
 
 
-def _post_status_badge(gh, pr):
+def _post_status_label(gh, pr):
     if not pr:
         return
-    body = os.environ.get("POSTPLAN_BADGE_BODY") or _BADGE_FALLBACK
+    # Set only by bin/post-plan-now; runs outside it never mark the PR, so nothing
+    # is left orphaned when no wrapper exists to remove the label.
+    label = os.environ.get("POSTPLAN_STATUS_LABEL")
+    if not label:
+        return
     try:
-        gh.pr_status_badge(pr, body)
+        gh.pr_status_label(pr, label)
     except Exception:
         pass
 
@@ -173,78 +171,6 @@ def _recheck_manual_rows(llm, probe, plan, cls, log, res) -> list:
             log(f"phase6 recheck: row {n} held via {argv} ({detail[:80]})")
             surviving.append(row)
     return surviving
-
-
-def _discharge_hold_sentences(llm, probe, justification: str, log) -> tuple[str, list]:
-    """Split a hold justification into (residual_text, discharged).
-
-    residual_text: str  — the **Decision:** block plus every sentence the
-                          classifier returned as `decision`; equal to the full
-                          input when any fallback fires.
-    discharged:    list — dicts {"text", "category", "probe"|None, "rationale"}
-                          for non-decision sentences.
-
-    Fallback to (justification, []) on: empty input, exception, schema
-    rejection, empty residual from non-empty input.  A decision-only section
-    (no candidate lines) also returns (justification, []) without calling the
-    LLM — the token cost guard this design exists to enforce.
-    """
-    text = (justification or "").strip()
-    if not text:
-        return (justification or ""), []
-
-    decision_block, candidate_lines = split_hold_justification(justification)
-
-    if not candidate_lines:
-        # Decision-only section — skip the LLM call entirely.
-        return justification, []
-
-    try:
-        items = llm.call(
-            "hold-discharge", "sonnet",
-            llm_calls.hold_discharge_prompt(candidate_lines),
-            schemas.validate_hold_discharge,
-        )
-    except Exception as exc:  # noqa: BLE001
-        log(f"phase6 hold-discharge: LLM call failed ({exc!r}) — keeping full justification")
-        return justification, []
-
-    # Build residual: Decision-exempt block + classifier-returned `decision` lines.
-    residual_parts: list[str] = []
-    if decision_block:
-        residual_parts.append(decision_block)
-    discharged: list[dict] = []
-    by_n: dict[int, list] = {}
-    for item in items:
-        by_n.setdefault(item["n"], []).append(item)
-
-    for idx, line in enumerate(candidate_lines, 1):
-        matches = by_n.get(idx, [])
-        if not matches:
-            # Missing entry — count mismatch; fall back.
-            log(f"phase6 hold-discharge: no item for sentence {idx} — keeping full justification")
-            return justification, []
-        for item in matches:
-            if item["category"] == "decision":
-                residual_parts.append(line)
-            else:
-                discharged.append({
-                    "text": line,
-                    "category": item["category"],
-                    "probe": item.get("probe"),
-                    "rationale": item.get("rationale"),
-                })
-
-    residual = "\n".join(residual_parts) if residual_parts else ""
-
-    # Safety: never produce empty residual from non-empty input — that would
-    # cause upsert_manual_confirmation to REMOVE the hold notice from a PR that
-    # is still held.
-    if not residual.strip() and text:
-        log("phase6 hold-discharge: empty residual from non-empty input — keeping full justification")
-        return justification, []
-
-    return residual, discharged
 
 
 _rebase_cause_runners = rebase_cause.live_runners   # tests monkeypatch this to inject a fake gh
@@ -510,7 +436,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             if bg_ci is not None:
                 log(f"phase2: background CI watch started for {sha[:8]} "
                     f"-> {os.path.basename(bg_ci.path)}")
-        _post_status_badge(gh, pr)
+        _post_status_label(gh, pr)
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
 
         # ---- Phase 4: review + security (gated bounded calls) ---------
@@ -578,11 +504,13 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # ---- Phase 5 + 5.0: verify + conformance -----------------------
         tracks = verifier.run(cls)
         phase5 = aggregate(tracks)
-        unavailable = [t.name for t in tracks if t.status == "unavailable"]
+        timing = timing_log_line(tracks, getattr(verifier, "last_wall_seconds", None))
+        if timing:
+            log(timing)
         res.phase5 = phase5
-        log("phase5 tracks: " + ", ".join(f"{t.name}={t.status}" for t in tracks)
-            + f" -> PHASE5_VERIFY_STATUS={phase5}"
-            + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
+        log(tracks_log_line(tracks, phase5))
+        for line in fail_log_lines(tracks):
+            log(line)
         resolutions: dict[str, str] = {}
         unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                        resolutions=resolutions,
@@ -639,20 +567,12 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 log(f"phase6 (plan-blind): {len(manual)} truly-manual steps -> {clearance}")
         else:
             log(f"phase6: PR body already carries clearance state {clearance}")
-        # Hold justification: split into residual (decisions) + discharged
-        # (automatable sentences).  Residual goes to manual_confirmation, which is
-        # positioned by upsert_manual_confirmation ahead of `## Manual Testing` —
-        # appending it after would truncate manual_testing_clearance's scan window.
-        # Discharged sentences get a separate `## Reviewer verification` block
-        # positioned after Manual Testing.  Order of the three upserts is load-
-        # bearing: manual_confirmation first, reviewer_verification second,
-        # files_changed, tests_changed, then gate_backtest; exactly one pr_edit_body call.
-        residual, discharged = _discharge_hold_sentences(
-            llm, probe, plan.hold_justification, log)
-        body = upsert_manual_confirmation(
-            body, render_manual_confirmation(residual))
-        body = upsert_reviewer_verification(
-            body, render_reviewer_verification(discharged))
+        # Hold notice: carries only the plan's Decision paragraph(s) and is
+        # positioned ahead of `## Manual Testing` — appending it after would
+        # truncate manual_testing_clearance's scan window. The order of upserts
+        # that follows (files_changed, tests_changed, gate_backtest) and the
+        # single pr_edit_body call are unchanged.
+        body = upsert_hold_notice(body, plan.hold_justification)
         # files-changed block is machine-generated: refresh it on every run so the
         # PR body's scope can't silently drift from the actual diff.
         body = upsert_files_changed(body, render_files_changed(diff))

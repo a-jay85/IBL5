@@ -42,7 +42,7 @@ source "$(dirname "$0")/lib/wt-guards.sh"
 source "$(dirname "$0")/lib/git-helpers.sh"
 source "$(dirname "$0")/lib/branch-base.sh"
 
-REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+REPO_ROOT="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 DRY_RUN=false
 

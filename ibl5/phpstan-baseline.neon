@@ -123,20 +123,8 @@ parameters:
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
-			count: 2
-			path: classes/BasketballStats/TeamStatsCalculator.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
 			count: 1
 			path: classes/Bootstrap/ConfigBootstrap.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 2
-			path: classes/Boxscore/Boxscore.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
@@ -178,13 +166,13 @@ parameters:
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 1
-			path: classes/DepthChartEntry/DepthChartEntryRepository.php
+			path: classes/DepthChart/DepthChartRepository.php
 
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
 			count: 1
-			path: classes/DepthChartEntry/DepthChartEntryView.php
+			path: classes/DepthChart/DepthChartView.php
 
 		-
 			rawMessage: 'Parameter #3 $pickOwner of method Draft\Contracts\DraftViewInterface::renderDraftInterface() expects string, string|null given.'
@@ -293,12 +281,6 @@ parameters:
 			identifier: ibl.orderByMissingTiebreaker
 			count: 1
 			path: classes/GMContactList/GMContactListRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 4
-			path: classes/JsbParser/PlayerIdResolver.php
 
 		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "injury_date" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
@@ -586,7 +568,7 @@ parameters:
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 2
-			path: classes/SavedDepthChart/SavedDepthChartRepository.php
+			path: classes/DepthChartSnapshot/DepthChartSnapshotRepository.php
 
 		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "time" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
@@ -735,12 +717,6 @@ parameters:
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
-			count: 1
-			path: classes/Standings/StandingsUpdaterRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
 			count: 3
 			path: classes/Team/SplitStatsRepository.php
 
@@ -766,12 +742,6 @@ parameters:
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "teampick" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 1
-			path: classes/Team/TeamQueryRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
-			count: 2
 			path: classes/Team/TeamQueryRepository.php
 
 		-
@@ -1523,31 +1493,31 @@ parameters:
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #1 $action of method SavedDepthChart\SavedDepthChartApiHandler::handle() expects string, mixed given.'
+			rawMessage: 'Parameter #1 $action of method DepthChartSnapshot\DepthChartSnapshotApiHandler::handle() expects string, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class DepthChartEntry\DepthChartEntryApiHandler constructor expects mysqli, mixed given.'
+			rawMessage: 'Parameter #1 $db of class DepthChart\DepthChartApiHandler constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class DepthChartEntry\DepthChartEntryController constructor expects mysqli, mixed given.'
+			rawMessage: 'Parameter #1 $db of class DepthChart\DepthChartController constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 2
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class DepthChartEntry\DepthChartEntryRepository constructor expects mysqli, mixed given.'
+			rawMessage: 'Parameter #1 $db of class DepthChart\DepthChartRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 2
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class DepthChartEntry\DepthChartEntrySubmissionHandler constructor expects mysqli, mixed given.'
+			rawMessage: 'Parameter #1 $db of class DepthChart\DepthChartSubmissionHandler constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 2
 			path: modules/DepthChartEntry/index.php
@@ -1565,7 +1535,7 @@ parameters:
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class SavedDepthChart\SavedDepthChartApiHandler constructor expects mysqli, mixed given.'
+			rawMessage: 'Parameter #1 $db of class DepthChartSnapshot\DepthChartSnapshotApiHandler constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DepthChartEntry/index.php
@@ -1589,73 +1559,73 @@ parameters:
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #1 $leagueContext of class DepthChartEntry\DepthChartEntryView constructor expects League\LeagueContext, mixed given.'
+			rawMessage: 'Parameter #1 $leagueContext of class DepthChart\DepthChartView constructor expects League\LeagueContext, mixed given.'
 			identifier: argument.type
 			count: 2
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #1 $postData of method DepthChartEntry\DepthChartEntryController::handleSubmit() expects array<string, mixed>, array<mixed> given.'
+			rawMessage: 'Parameter #1 $postData of method DepthChart\DepthChartController::handleSubmit() expects array<string, mixed>, array<mixed> given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #1 $username of method DepthChartEntry\DepthChartEntryController::displayForm() expects string, mixed given.'
+			rawMessage: 'Parameter #1 $username of method DepthChart\DepthChartController::displayForm() expects string, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #2 $commonRepo of class DepthChartEntry\DepthChartEntryApiHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
+			rawMessage: 'Parameter #2 $commonRepo of class DepthChart\DepthChartApiHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #2 $commonRepo of class DepthChartEntry\DepthChartEntrySubmissionHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
+			rawMessage: 'Parameter #2 $commonRepo of class DepthChart\DepthChartSubmissionHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
 			identifier: argument.type
 			count: 2
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #2 $commonRepo of class SavedDepthChart\SavedDepthChartApiHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
+			rawMessage: 'Parameter #2 $commonRepo of class DepthChartSnapshot\DepthChartSnapshotApiHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #2 $commonRepository of class DepthChartEntry\DepthChartEntryController constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
+			rawMessage: 'Parameter #2 $commonRepository of class DepthChart\DepthChartController constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
 			identifier: argument.type
 			count: 2
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #2 $sessionUsername of method DepthChartEntry\DepthChartEntryController::handleSubmit() expects string, mixed given.'
+			rawMessage: 'Parameter #2 $sessionUsername of method DepthChart\DepthChartController::handleSubmit() expects string, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #2 $teamid of method SavedDepthChart\SavedDepthChartApiHandler::handle() expects int, mixed given.'
+			rawMessage: 'Parameter #2 $teamid of method DepthChartSnapshot\DepthChartSnapshotApiHandler::handle() expects int, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #3 $leagueContext of class DepthChartEntry\DepthChartEntryApiHandler constructor expects League\LeagueContext, mixed given.'
+			rawMessage: 'Parameter #3 $leagueContext of class DepthChart\DepthChartApiHandler constructor expects League\LeagueContext, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #3 $username of method SavedDepthChart\SavedDepthChartApiHandler::handle() expects string, mixed given.'
+			rawMessage: 'Parameter #3 $username of method DepthChartSnapshot\DepthChartSnapshotApiHandler::handle() expects string, mixed given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DepthChartEntry/index.php
 
 		-
-			rawMessage: 'Parameter #4 $params of method SavedDepthChart\SavedDepthChartApiHandler::handle() expects array<string, mixed>, array<mixed> given.'
+			rawMessage: 'Parameter #4 $params of method DepthChartSnapshot\DepthChartSnapshotApiHandler::handle() expects array<string, mixed>, array<mixed> given.'
 			identifier: argument.type
 			count: 1
 			path: modules/DepthChartEntry/index.php

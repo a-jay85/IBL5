@@ -1,10 +1,10 @@
 ---
 description: bin/retro-mine scans the retrospective class registry weekly and opens a draft PR that proposes one rule edit for each recurring defect family.
-last_verified: 2026-10-03
+last_verified: 2026-10-06
 ---
 # ADR-0166: Weekly retro-miner that drafts rule proposals as draft PRs
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0178 (2026-10-06)
 **Date:** 2026-10-03
 **Deciders:** automouse implementation run (backlog#106)
 
@@ -14,7 +14,7 @@ last_verified: 2026-10-03
 
 ## Decision
 
-Add `bin/retro-mine`, a weekly launchd job (`com.ibl5.retro-mine`, installed by `bin/retro-mine-cron-setup`, registered as `standard` in `bin/lib/launchd-expected-jobs.sh`). A deterministic awk scan tags rows with named keyword facets. It reports a family only at `MIN_ROWS` rows that span `MIN_SPAN` rungs or destinations, and it reports any recurrence that did not escalate. State kept outside the repo stops weekly re-proposals. Each new family gets one deny-all `claude -p` call (`--allowedTools ''`) that returns schema-checked JSON. The trusted script owns every write. It is limited to a new `.claude/rules/<slug>.md` or one row in the forced-trigger table, and it opens a draft PR from a throwaway `git worktree` off `origin/master`. Any drafter, validation, push, or PR failure exits non-zero, so the launchd health check alerts. `bin/test-retro-mine` is the harness and runs in the `tests.yml` shell job.
+Add `bin/retro-mine` (example), a weekly launchd job (`com.ibl5.retro-mine`, installed by `bin/retro-mine-cron-setup` (example), registered as `standard` in `bin/lib/launchd-expected-jobs.sh`). A deterministic awk scan tags rows with named keyword facets. It reports a family only at `MIN_ROWS` rows that span `MIN_SPAN` rungs or destinations, and it reports any recurrence that did not escalate. State kept outside the repo stops weekly re-proposals. Each new family gets one deny-all `claude -p` call (`--allowedTools ''`) that returns schema-checked JSON. The trusted script owns every write. It is limited to a new `.claude/rules/<slug>.md` or one row in the forced-trigger table, and it opens a draft PR from a throwaway `git worktree` off `origin/master`. Any drafter, validation, push, or PR failure exits non-zero, so the launchd health check alerts. `bin/test-retro-mine` (example) is the harness and runs in the `tests.yml` shell job.
 
 ## Alternatives Considered
 
@@ -34,9 +34,9 @@ Add `bin/retro-mine`, a weekly launchd job (`com.ibl5.retro-mine`, installed by 
 
 ## References
 
-- `bin/retro-mine`
-- `bin/retro-mine-cron-setup`
-- `bin/test-retro-mine`
+- `bin/retro-mine` (example)
+- `bin/retro-mine-cron-setup` (example)
+- `bin/test-retro-mine` (example)
 - `bin/check-registry-trigger-rows`
 - `bin/bug-pipeline-tick`
 - `bin/sim-recap-cron-setup`

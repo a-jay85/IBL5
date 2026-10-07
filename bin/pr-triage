@@ -42,6 +42,12 @@
 #                             BEHIND) + all required checks green on the current
 #                             head
 #
+# --held lists only MY open, non-draft PRs with auto-merge NOT enabled, one line
+# each: number, URL, title, and every hold reason. Recorded reasons come first
+# (the pr-ready-verdict sticky comment's "Auto-merge held:" block), then live
+# state (merge conflict, red/pending checks, HOLDS tokens), de-duplicated.
+# "unknown" when nothing explains the hold. Read-only; cannot combine with --arm.
+#
 # Exit codes: 0 = report generated; 1 = an attempted --arm merge or update-branch failed;
 #             2 = usage error or gh not authenticated.
 
@@ -55,10 +61,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/pr-armable.sh"
 # shellcheck source=bin/lib/usage-gate.sh
 source "$SCRIPT_DIR/lib/usage-gate.sh"
+# shellcheck source=bin/lib/held-prs.sh
+source "$SCRIPT_DIR/lib/held-prs.sh"
 
 usage() {
     cat <<'EOF'
-Usage: bin/pr-triage [--arm] [--help|-h]
+Usage: bin/pr-triage [--arm | --held] [--help|-h]
 
 Classifies every OPEN PR into one bucket (first-match-wins) and prints a report.
 
@@ -68,6 +76,12 @@ Options:
                armed and then updated onto master in the same pass
                (gh api PUT pulls/N/update-branch); an update failure is reported
                and exits 1.
+  --held       List only my open, non-draft PRs without auto-merge enabled:
+               number, URL, title, and every hold reason (the pr-ready-verdict
+               sticky's "Auto-merge held:" block, then live state: merge
+               conflict, red/pending checks, HOLDS tokens). Prints "unknown"
+               when nothing explains the hold. Read-only; cannot be combined
+               with --arm (exit 2).
   --help, -h   Show this message.
 
 Environment (test seams):
@@ -92,10 +106,14 @@ EOF
 }
 
 ARM=0
+HELD=0
 for arg in "$@"; do
     case "$arg" in
         --arm)
             ARM=1
+            ;;
+        --held)
+            HELD=1
             ;;
         --help|-h)
             usage
@@ -114,6 +132,12 @@ for arg in "$@"; do
     esac
 done
 
+if [ "$ARM" = "1" ] && [ "$HELD" = "1" ]; then
+    echo "--held and --arm are mutually exclusive (--held is read-only)" >&2
+    usage >&2
+    exit 2
+fi
+
 if ! gh auth status >/dev/null 2>&1; then
     echo "ERROR: GitHub CLI is not authenticated." >&2
     echo "Run 'gh auth login' to authenticate, then retry." >&2
@@ -128,6 +152,17 @@ SLUG="$(echo "$REMOTE_URL" | sed -E 's#^(https://github\.com/|ssh://git@github\.
 if [ -z "$SLUG" ]; then
     echo "ERROR: cannot parse repo slug from origin URL: $REMOTE_URL" >&2
     exit 2
+fi
+
+# --held keeps only the viewer's PRs. An unresolved login would silently filter
+# every PR out and read as "nothing held", so it is a hard error instead.
+ME=""
+if [ "$HELD" = "1" ]; then
+    ME="$($GH_API_CMD user 2>/dev/null | jq -r '.login // ""' 2>/dev/null || true)"
+    if [ -z "$ME" ]; then
+        echo "ERROR: cannot resolve your GitHub login (gh api user); --held needs it." >&2
+        exit 2
+    fi
 fi
 
 # --- required contexts (decision 5): protection API, else hardcoded fallback ---
@@ -173,7 +208,7 @@ EXPECTED_RED_RE='expected[ -]?red|will be RED|Expected CI check.*RED'
 HELD_BODY_RE='auto_merge:[[:space:]]*false|auto_postplan:[[:space:]]*false|human reviewer|human authz|requires human review|do NOT auto-merge|DNM'
 
 PRS_JSON="$("$GH_CMD" pr list --state open --limit 200 \
-    --json number,title,body,labels,mergeStateStatus,headRefOid,headRefName,files 2>/dev/null || echo '[]')"
+    --json number,title,body,labels,mergeStateStatus,headRefOid,headRefName,files,author,isDraft,autoMergeRequest,url 2>/dev/null || echo '[]')"
 
 PR_COUNT="$(echo "$PRS_JSON" | jq 'length')"
 
@@ -216,12 +251,16 @@ for ctx in "${REQUIRED[@]}"; do
 done
 ROW_FMT="%-${W_PR}s  %-${W_BUCKET}s  %-${W_ACTION}s  %-${W_MSS}s  %-${W_CLEAR}s  ${CHECK_FMT}%s\n"
 
-# shellcheck disable=SC2059  # ROW_FMT is built above from constants, never from input
-printf "$ROW_FMT" "PR#" "BUCKET" "NEXT-ACTION" "MSS" "CLEARANCE" \
-    "${CHECK_HDRS[@]}" "HOLDS"
-# shellcheck disable=SC2059
-printf "$ROW_FMT" "$(dashes "$W_PR")" "$(dashes "$W_BUCKET")" "$(dashes "$W_ACTION")" \
-    "$(dashes "$W_MSS")" "$(dashes "$W_CLEAR")" "${CHECK_RULES[@]}" "-----"
+if [ "$HELD" = "0" ]; then
+    # shellcheck disable=SC2059  # ROW_FMT is built above from constants, never from input
+    printf "$ROW_FMT" "PR#" "BUCKET" "NEXT-ACTION" "MSS" "CLEARANCE" \
+        "${CHECK_HDRS[@]}" "HOLDS"
+    # shellcheck disable=SC2059
+    printf "$ROW_FMT" "$(dashes "$W_PR")" "$(dashes "$W_BUCKET")" "$(dashes "$W_ACTION")" \
+        "$(dashes "$W_MSS")" "$(dashes "$W_CLEAR")" "${CHECK_RULES[@]}" "-----"
+else
+    printf '%s\n' "PR#  URL  TITLE  REASONS"
+fi
 
 # mss_blocks_merge <mergeStateStatus>  -> 0 (true) when GitHub will NOT merge this
 # head as-is, whatever the check-runs say.
@@ -322,6 +361,12 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     labels="$(echo "$PR" | jq -c '.labels // []')"
     files="$(echo "$PR" | jq -c '.files // []')"
     head_ref="$(echo "$PR" | jq -r '.headRefName // ""')"
+    if [ "$HELD" = "1" ] && ! hp_is_held "$PR" "$ME"; then
+        # Counted as reported: the post-loop guard compares ROWS to PR_COUNT.
+        ROWS=$((ROWS + 1))
+        continue
+    fi
+    url="$(echo "$PR" | jq -r '.url // ""')"
 
     # --- live check-runs for this PR's head SHA (dedupe: latest run per name) ---
     CR_JSON="$($GH_API_CMD "repos/$SLUG/commits/$sha/check-runs?per_page=100" 2>/dev/null \
@@ -424,6 +469,17 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     if [ -n "$unresolved" ];      then holds="${holds}${unresolved}"; fi
     holds="${holds% }"
     if [ -z "$holds" ]; then holds="-"; fi
+
+    if [ "$HELD" = "1" ]; then
+        # A failed comments read loses only the recorded reasons; live ones still print.
+        sticky="$($GH_API_CMD "repos/$SLUG/issues/$num/comments" --paginate 2>/dev/null \
+            | hp_pick_sticky || true)"
+        reasons="$(hp_sticky_reasons "$sticky"; \
+            hp_live_reasons "$mss" "$clearance" "$holds" "$CR_JSON")"
+        hp_format_line "$num" "${url:--}" "$title" "$reasons"
+        ROWS=$((ROWS + 1))
+        continue
+    fi
 
     # shellcheck disable=SC2059
     printf "$ROW_FMT" "#$num" "$bucket" "$action" "${mss:-?}" "$clearance" \

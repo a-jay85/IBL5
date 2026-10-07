@@ -829,6 +829,179 @@ automouse_run_end() {
         || true
 }
 
+# --- Why did each automouse runner last stop? --------------------------------
+# bin/automouse/run gives every runner its own per-pid log (logs/<date>-<pid>.log).
+# Almost every loop exit writes a distinguishing line into it; the exits that leave
+# no trace (an abnormal exit, single-plan mode) write a stop file instead
+# (stops/<date>-<pid>.stop, "<epoch>\t<cause>"). These helpers only read. Every
+# read is 2>/dev/null and every function returns 0, so a bad read degrades one row.
+
+# One alternative per loop-ending line in bin/automouse/run. Each is pinned by a
+# bin/test-fleet-status case, so rewording a runner line fails a test.
+AM_STOP_LINE_RE='^(Queue empty — nothing to run\.'\
+'|Queue drained after [0-9]+ plan\(s\)\.'\
+'|Time guard: [0-9]+s elapsed \(max [0-9]+s\), stopping\.'\
+'|Login preflight: login expired, parking; queue left intact\.'\
+'|Plan .+ is being processed by another runner — nothing to do\.'\
+'|No claimable plan left\. .+ — stopping\.'\
+'|All queued plans are claimed by a concurrent runner — nothing to do\.'\
+'|Impl paused \(usage gate\) — .+ stopping loop\.'\
+'|Environmental failure during (impl|postplan) — .+ stopping loop\.'\
+'|Time guard between phases — will resume postplan next run\.'\
+'|Post-plan paused \(usage gate\); .+ stopping loop\.'\
+'|\[[0-9:]+\] .+ postplan terminal \(rc=7\) — .+ stopping loop'\
+'|\[[0-9:]+\] canary: (ci-red|smoke-red) — parking, queue left intact'\
+'|\[[0-9:]+\] canary: ci-auth-error — env stop)$'
+
+# mtime of a file in epoch seconds, or nothing. GNU form first: BSD `stat -c`
+# fails cleanly, while GNU `stat -f` means filesystem status and can print
+# non-numeric output.
+file_mtime() {
+    local v
+    v="$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null)" || v=''
+    case "$v" in ''|*[!0-9]*) return 0 ;; esac
+    printf '%s' "$v"
+    return 0
+}
+
+# stop_report_for <cause> <log> — the report file that holds detail for a stop, or
+# nothing. Reports are keyed by plan and date, never by runner pid, so one is cited
+# only when attribution is certain: the login-expired and canary-park reports are
+# one per date; an env-stop report only when it is the date's single one.
+stop_report_for() {
+    local cause="$1" log="$2" base day rep f n=0 hit=''
+    base="${log##*/}"
+    day="${base:0:10}"
+    case "$cause" in
+        'Login preflight: login expired'*)
+            rep="$AUTOMOUSE_DIR/reports/$day-login-expired.md"
+            if [ -f "$rep" ] && [ -r "$rep" ]; then printf '%s' "$rep"; fi ;;
+        *'canary: ci-red'*|*'canary: smoke-red'*)
+            rep="$AUTOMOUSE_DIR/reports/$day-canary-park.md"
+            if [ -f "$rep" ] && [ -r "$rep" ]; then printf '%s' "$rep"; fi ;;
+        'Environmental failure during'*|*'canary: ci-auth-error'*)
+            for f in "$AUTOMOUSE_DIR"/reports/"$day"-env-stop-*.md; do
+                [ -f "$f" ] && [ -r "$f" ] || continue
+                n=$((n + 1))
+                hit="$f"
+            done
+            if [ "$n" -eq 1 ]; then printf '%s' "$hit"; fi ;;
+    esac
+    return 0
+}
+
+# runner_stop_reason <log> — one line, "<epoch>\t<cause>\t<detail path>", always
+# returning 0. First hit wins: the runner's stop file, its own stop line in the
+# log, the session-complete trailer, a started log with no trace (SIGKILL or a
+# crash from before stop files), else "unknown". Never guesses.
+runner_stop_reason() {
+    local log="$1" tab base stop line epoch cause mt report started
+    tab="$(printf '\t')"
+    base="${log##*/}"
+    base="${base%.log}"
+
+    # 1. Stop file. Malformed or unreadable falls through to the log.
+    stop="$AUTOMOUSE_DIR/stops/$base.stop"
+    line=''
+    { IFS= read -r line < "$stop"; } 2>/dev/null || true
+    case "$line" in
+        *"$tab"*)
+            epoch="${line%%"$tab"*}"
+            cause="${line#*"$tab"}"
+            case "$epoch" in
+                ''|*[!0-9]*) ;;
+                *)
+                    if [ -n "$cause" ]; then
+                        printf '%s\t%s\t%s\n' "$epoch" "$cause" "$log"
+                        return 0
+                    fi ;;
+            esac ;;
+    esac
+
+    mt="$(file_mtime "$log")"
+
+    # 2. The runner's own stop line; the last one wins.
+    line="$(grep -E "$AM_STOP_LINE_RE" "$log" 2>/dev/null | tail -n 1)"
+    if [ -n "$line" ]; then
+        cause="$(sed 's/^\[[0-9:]*\] //' <<< "$line")"
+        report="$(stop_report_for "$cause" "$log")"
+        printf '%s\t%s\t%s\n' "$mt" "$cause" "${report:-$log}"
+        return 0
+    fi
+
+    # 3. Session-complete trailer with no stop line (logs from before stop files).
+    line="$(grep -F '=== Automouse session complete' "$log" 2>/dev/null | tail -n 1)"
+    if [ -n "$line" ]; then
+        line="${line#=== }"
+        line="${line% ===}"
+        printf '%s\t%s\t%s\n' "$mt" "$line" "$log"
+        return 0
+    fi
+
+    # 4. Started but left no trace: SIGKILL or a crash. The log cannot tell which.
+    started="$(grep -cF '=== Automouse session starting' "$log" 2>/dev/null)" || started=0
+    case "$started" in ''|*[!0-9]*) started=0 ;; esac
+    if [ "$started" -gt 0 ]; then
+        printf '%s\t%s\t%s\n' "$mt" 'ended without a clean finish (killed or crashed)' "$log"
+        return 0
+    fi
+
+    # 5. Nothing readable to go on.
+    printf '%s\t%s\t%s\n' "$mt" 'unknown' "$log"
+    return 0
+}
+
+# ended_runner_logs [N] — up to N (default 3) per-pid logs of ended runners, newest
+# first. A live automouse runner is never listed. A log whose pid is alive but is
+# not an automouse process is a reused pid and counts as ended, matching the
+# heartbeat rule in render_queue.
+ended_runner_logs() {
+    local max="${1:-3}" n=0 log pid
+    while IFS= read -r log; do
+        [ -f "$log" ] || continue
+        pid="${log%.log}"; pid="${pid##*-}"
+        case "$pid" in ''|*[!0-9]*) continue ;; esac
+        pid_alive_matching "$pid" 'automouse' && continue
+        printf '%s\n' "$log"
+        n=$((n + 1))
+        [ "$n" -ge "$max" ] && break
+    done < <(ls -t "$AUTOMOUSE_DIR"/logs/????-??-??-*.log 2>/dev/null)
+    return 0
+}
+
+# The newest ended runners and why each stopped, one line per runner. Three is
+# enough to show the latest stop and whether it is repeating, and keeps the
+# section short enough that watch mode does not push the next section off-screen.
+render_last_stops() {
+    local logs log rec epoch cause detail label d when pid tab
+    tab="$(printf '\t')"
+    logs="$(ended_runner_logs 3)"
+    [ -n "$logs" ] || return 0
+    note "last stops  (newest 3 ended runners)"
+    while IFS= read -r log; do
+        [ -n "$log" ] || continue
+        rec="$(runner_stop_reason "$log")"
+        epoch="${rec%%"$tab"*}"; rec="${rec#*"$tab"}"
+        cause="${rec%%"$tab"*}"; detail="${rec#*"$tab"}"
+        pid="${log%.log}"; pid="${pid##*-}"
+        when=''
+        if [ -n "$epoch" ]; then
+            when="$(date -r "$epoch" +'%a %m-%d %H:%M' 2>/dev/null \
+                || date -d "@$epoch" +'%a %m-%d %H:%M' 2>/dev/null || true)"
+        fi
+        [ -n "$when" ] || when='?'
+        [ -n "$cause" ] || cause='unknown'
+        [ -n "$detail" ] || detail="$log"
+        label='log'; [ "$detail" != "$log" ] && label='report'
+        if link_ok "$detail"; then d="$(link_file "$detail" "$label")"; else d="$label: $detail"; fi
+        printf '    %sstopped %s  pid %s%s  %s  %s%s%s\n' \
+            "$DIM" "$when" "$pid" "$R" "$(clip_field "$cause" 160)" "$DIM" "$d" "$R"
+    done <<EOF_LS
+$logs
+EOF_LS
+    return 0
+}
+
 render_queue() {
     local count=0 shown=0 stale=0 f base next ends pad hb rest pid slug slug_ld slug_lb
     local claimed=' ' queue_list meta model merge title reorder
@@ -950,6 +1123,7 @@ EOF_Q
 
     [ "$count" -eq 0 ] && [ "$shown" -eq 0 ] && note "empty"
     [ "$stale" -gt 0 ] && note "$stale stale heartbeat file(s) from dead runs — ignored"
+    render_last_stops
     return 0
 }
 

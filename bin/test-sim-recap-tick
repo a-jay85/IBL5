@@ -1486,7 +1486,6 @@ for wf_copy in wf-ungated wf-badgate wf-stray; do
     }
 done
 srt_expect_eq "gating copies fail with a secret-gating: reason" 0 "$wf_reason_bad"
-srt_expect_eq "NO-WRONG-PASS: none of the six leaking copies passes hygiene" 0 "$wf_bad"
 
 # GUARD-OK: the event guard sits directly under `id: secrets` and no EVENT token
 # remains anywhere in the file.

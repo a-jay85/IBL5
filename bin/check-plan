@@ -801,6 +801,11 @@ done < <(awk '
 #   (c) patterns live in bin/lib/hold-check-patterns.txt because harness/classify.py
 #       reads the same file; the parity test in bin/test-check-plan keeps them from
 #       drifting between the two languages.
+#   (d) gate H(c): the **Decision:** paragraph is the only hold text /post-plan
+#       renders into the PR body, so it is checked as reader-facing prose:
+#       bin/check-prose tells, an empty body, more than 40 words in total, and
+#       the legacy "The human/reviewer/owner accepts ..." opener all fail. A hold
+#       section without a Decision line gets no H(c) check (unchanged).
 if [ "$FM_HOLD" -eq 1 ]; then
     if ! grep -qiE '^##[[:space:]]+Automouse Hold Justification[[:space:]]*$' "$PLAN_FILE"; then
         viol "[H] plan declares auto_merge: false but has no '## Automouse Hold Justification' section (Step 4.5 — record why the hold is reducible-confirmed or intrinsic)"
@@ -809,6 +814,29 @@ if [ "$FM_HOLD" -eq 1 ]; then
             [ -n "$hb_hit" ] || continue
             viol "[H] hold justification asks the human to run a check an agent can run (line ${hb_hit%%:*}): ${hb_hit#*:} — move the observable check into the Verification Matrix and keep only the irreducible judgment, on a '**Decision:**' line. See /plan Step 4.5 'Record the outcome'."
         done < <(hold_check_violations "$PLAN_FILE")
+        # Gate H(c): Decision paragraph is reader-facing prose (see (d) above).
+        if command -v hold_decision_paragraphs >/dev/null 2>&1; then
+            HD_TEXT=$(hold_decision_paragraphs "$PLAN_FILE")
+            if [ -n "$HD_TEXT" ]; then
+                HD_BODY=$(sed -E 's/^[ ]*\*\*Decision:\*\*[ ]*//' <<< "$HD_TEXT")
+                HD_WORDS=$(wc -w <<< "$HD_BODY" | tr -d '[:space:]')
+                if [ "$HD_WORDS" -eq 0 ]; then
+                    viol "[H] Decision line is empty — write one plain yes/no sentence for the person pressing merge, e.g. \"Merge if you're OK with about 7% more PRs being held until their body declares scope.\""
+                elif [ "$HD_WORDS" -gt 40 ]; then
+                    viol "[H] Decision line is ${HD_WORDS} words (cap 40) — the PR body shows it to the person pressing merge; cut it to one short yes/no sentence"
+                fi
+                if grep -qiE '^[[:space:]]*the[[:space:]]+(human|reviewer|owner)([[:space:]]+[[:alpha:]-]+){0,2}[[:space:]]+accepts?([[:space:]]|$)' <<< "$HD_BODY"; then
+                    viol "[H] Decision line opens with the legacy 'The human accepts ...' shape — address the person pressing merge directly, e.g. \"Merge if you're OK with ...\""
+                fi
+                if [ -x "$SCRIPT_DIR/check-prose" ]; then
+                    HD_PROSE=$("$SCRIPT_DIR/check-prose" --stdin <<< "$HD_BODY" 2>&1)
+                    HD_PROSE_RC=$?
+                    if [ "$HD_PROSE_RC" -eq 1 ]; then
+                        viol "[H] Decision line has a prose tell: $(head -n 1 <<< "$HD_PROSE") — rewrite it as one plain sentence (bin/check-prose)"
+                    fi
+                fi
+            fi
+        fi
     fi
 fi
 

@@ -87,6 +87,7 @@ STUB
     export DISCORD_DM_BIN="$CASE/bin/fake-dm"
     export LAUNCHD_HEALTH_LOG_DIR="$CASE/logs"
     export LAUNCHD_HEALTH_TODAY=2026-09-28
+    unset LAUNCHD_HEALTH_JOBS_LIB
 
     # Hermeticity abort: stubs must shadow the real binaries
     [ "$(command -v launchctl)" = "$CASE/bin/launchctl" ] || {
@@ -132,6 +133,21 @@ healthy_fixture() {
 +----------------+
 PHASE
     printf '0\n' > "$CASE/db-rc"
+}
+
+# --- phase_gated_fixture <case_dir> --------------------------------------------
+# healthy_fixture plus a synthetic phase-gated job. No real job uses the
+# phase-gated mode today (sim-recap-poll was retired), so the mode logic is
+# exercised through a lib copy that registers com.ibl5.fixture-phase-gated.
+# ------------------------------------------------------------------------------
+phase_gated_fixture() {
+    healthy_fixture "$1"
+    mkdir -p "$CASE/lib"
+    cp "$SCRIPT_DIR/lib/launchd-expected-jobs.sh" "$CASE/lib/launchd-expected-jobs.sh"
+    printf '\nLEJ_EXPECTED_JOBS="${LEJ_EXPECTED_JOBS}\ncom.ibl5.fixture-phase-gated phase-gated"\n' >> "$CASE/lib/launchd-expected-jobs.sh"
+    printf '4242\t0\tcom.ibl5.fixture-phase-gated\n' >> "$CASE/launchctl.out"
+    touch "$CASE/home/Library/LaunchAgents/com.ibl5.fixture-phase-gated.plist"
+    export LAUNCHD_HEALTH_JOBS_LIB="$CASE/lib/launchd-expected-jobs.sh"
 }
 
 # --- teardown_case -------------------------------------------------------------
@@ -226,8 +242,8 @@ fi
 # ---------------------------------------------------------------------------
 # T6: sim-recap-poll absent, phase = Free Agency → exempt, exit 0, INFO line
 # ---------------------------------------------------------------------------
-healthy_fixture T6
-grep -v 'com.ibl5.sim-recap-poll' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
+phase_gated_fixture T6
+grep -v 'com.ibl5.fixture-phase-gated' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
 mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
 cat > "$CASE/phase.txt" <<'PHASE'
 +------------+
@@ -238,8 +254,8 @@ cat > "$CASE/phase.txt" <<'PHASE'
 PHASE
 run_checker
 if [ "$RC" -eq 0 ] \
-    && ! grep -q 'FAIL: missing:com.ibl5.sim-recap-poll' <<< "$OUT" \
-    && grep -q 'INFO.*exempt:com.ibl5.sim-recap-poll' <<< "$OUT" \
+    && ! grep -q 'FAIL: missing:com.ibl5.fixture-phase-gated' <<< "$OUT" \
+    && grep -q 'INFO.*exempt:com.ibl5.fixture-phase-gated' <<< "$OUT" \
     && grep -q 'Free Agency' <<< "$OUT"; then
     ok T6
 else
@@ -249,12 +265,12 @@ fi
 # ---------------------------------------------------------------------------
 # T7: sim-recap-poll absent, phase = Regular Season → PROBLEM
 # ---------------------------------------------------------------------------
-healthy_fixture T7
-grep -v 'com.ibl5.sim-recap-poll' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
+phase_gated_fixture T7
+grep -v 'com.ibl5.fixture-phase-gated' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
 mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
 # phase.txt already has Regular Season from healthy_fixture
 run_checker
-if [ "$RC" -eq 1 ] && grep -q 'FAIL: missing:com.ibl5.sim-recap-poll' <<< "$OUT"; then
+if [ "$RC" -eq 1 ] && grep -q 'FAIL: missing:com.ibl5.fixture-phase-gated' <<< "$OUT"; then
     ok T7
 else
     fail T7 "rc=$RC out=$(printf '%s' "$OUT")"
@@ -263,14 +279,14 @@ fi
 # ---------------------------------------------------------------------------
 # T8: sim-recap-poll absent, db-query exits 3, empty phase → "phase unknown"
 # ---------------------------------------------------------------------------
-healthy_fixture T8
-grep -v 'com.ibl5.sim-recap-poll' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
+phase_gated_fixture T8
+grep -v 'com.ibl5.fixture-phase-gated' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
 mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
 printf '' > "$CASE/phase.txt"
 printf '3\n' > "$CASE/db-rc"
 run_checker
 if [ "$RC" -eq 1 ] \
-    && grep -q 'FAIL: missing:com.ibl5.sim-recap-poll' <<< "$OUT" \
+    && grep -q 'FAIL: missing:com.ibl5.fixture-phase-gated' <<< "$OUT" \
     && grep -q 'phase unknown' <<< "$OUT"; then
     ok T8
 else
@@ -280,8 +296,8 @@ fi
 # ---------------------------------------------------------------------------
 # T9: sim-recap-poll absent, phase = "Garbage" (unrecognized) → PROBLEM + phase unknown
 # ---------------------------------------------------------------------------
-healthy_fixture T9
-grep -v 'com.ibl5.sim-recap-poll' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
+phase_gated_fixture T9
+grep -v 'com.ibl5.fixture-phase-gated' "$CASE/launchctl.out" > "$CASE/launchctl.out.tmp"
 mv "$CASE/launchctl.out.tmp" "$CASE/launchctl.out"
 cat > "$CASE/phase.txt" <<'PHASE'
 +---------+
@@ -292,7 +308,7 @@ cat > "$CASE/phase.txt" <<'PHASE'
 PHASE
 run_checker
 if [ "$RC" -eq 1 ] \
-    && grep -q 'FAIL: missing:com.ibl5.sim-recap-poll' <<< "$OUT" \
+    && grep -q 'FAIL: missing:com.ibl5.fixture-phase-gated' <<< "$OUT" \
     && grep -q 'phase unknown' <<< "$OUT"; then
     ok T9
 else
@@ -302,7 +318,7 @@ fi
 # ---------------------------------------------------------------------------
 # T10: sim-recap-poll present, db-query exits 3 → exit 0, db-query never called
 # ---------------------------------------------------------------------------
-healthy_fixture T10
+phase_gated_fixture T10
 printf '3\n' > "$CASE/db-rc"
 run_checker
 if [ "$RC" -eq 0 ] && [ ! -f "$CASE/db-ran" ]; then

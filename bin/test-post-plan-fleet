@@ -507,6 +507,26 @@ grep -qE 'waiting for [0-9]+ session' <<< "$out_b" \
 [[ "$(plist_count)" -eq 0 ]] || fail "wait-drains/B: drained to $(plist_count) plists, want 0"
 clear_live_labels
 clean_slots
+
+# Sub-case C — N changes 2 -> 1 -> 0; one timestamped line per distinct N.
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9998.plist"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9999.plist"
+set_live_labels "40476	0	com.ibl5.post-plan-fleet-9998" "40477	0	com.ibl5.post-plan-fleet-9999"
+( sleep 2; printf '40477\t0\tcom.ibl5.post-plan-fleet-9999\n' > "$SCRATCH/launchctl-list.txt"
+  sleep 3; : > "$SCRATCH/launchctl-list.txt" ) &
+_wd_bg=$!
+out_c="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_WAIT_POLL=1 \
+         run_driver --go --wait 2>&1)"; rc_c=$?
+wait "$_wd_bg" 2>/dev/null
+[[ $rc_c -eq 0 ]] || fail "wait-drains/C: exit $rc_c (out: $out_c)"
+_ts_re='^\[[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\] waiting for [0-9]+ session\(s\) to finish'
+[[ "$(grep -c 'waiting for 2 session' <<< "$out_c")" == 1 ]] || fail "wait-drains/C: want one N=2 line (out: $out_c)"
+[[ "$(grep -c 'waiting for 1 session' <<< "$out_c")" == 1 ]] || fail "wait-drains/C: want one N=1 line (out: $out_c)"
+[[ "$(grep -c 'waiting for' <<< "$out_c")" == "$(grep -cE "$_ts_re" <<< "$out_c")" ]] \
+    || fail "wait-drains/C: a waiting line lacks the [YYYY-MM-DDTHH:MM:SS] prefix (out: $out_c)"
+clear_live_labels
+clean_slots
 end_case wait-drains
 
 # --- case 21: report-statuses ------------------------------------------------------------
@@ -1710,7 +1730,9 @@ f=".claude/skills/post-plan/SKILL.md"
 grep -qF '.claude/review-shared/_prose-voice-contract.md' "$f" \
     || fail "28t: voice-contract Read instruction missing from post-plan SKILL.md"
 n_cdp=$(grep -cF 'bin/check-digest-prose' "$f" || true)
-[[ $n_cdp -ge 4 ]] || fail "28t: expected >=4 bin/check-digest-prose call sites in post-plan SKILL.md, got $n_cdp"
+# 3 sites: Scope why-paragraph, its follow-on paragraph, and the four narrative elements.
+# The Reviewer verification voice check went away with that section.
+[[ $n_cdp -ge 3 ]] || fail "28t: expected >=3 bin/check-digest-prose call sites in post-plan SKILL.md, got $n_cdp"
 grep -qF '.claude/skills/review-shared/' "$f" \
     && fail "28t: post-plan SKILL.md cites the non-existent .claude/skills/review-shared/ path"
 
@@ -2501,8 +2523,8 @@ _assert_hold() {  # $1 = case label
     ! grep -qF 'RESULT READY' "$_DM_CAPTURE" 2>/dev/null || fail "$c: DM says RESULT READY"
     ! grep -qF "merge when you're ready" "$_DM_CAPTURE" 2>/dev/null \
         || fail "$c: DM says merge when you're ready"
-    grep -qxF 'post-plan-fleet: outcome=blocked' "$_DM_LOG" 2>/dev/null \
-        || fail "$c: log lacks 'post-plan-fleet: outcome=blocked' ($(grep 'outcome=' "$_DM_LOG" 2>/dev/null))"
+    grep -qxF 'post-plan-fleet: outcome=failed' "$_DM_LOG" 2>/dev/null \
+        || fail "$c: log lacks 'post-plan-fleet: outcome=failed' ($(grep 'outcome=' "$_DM_LOG" 2>/dev/null))"
     [[ ! -f "$_HOLD_PLIST" ]] || fail "$c: plist not removed (slot leaked)"
 }
 
@@ -2586,8 +2608,10 @@ else
         || fail "runner-fast-exit-no-timeout: log says TIMED OUT for a fast stub"
     ! grep -qF 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
         || fail "runner-fast-exit-no-timeout: DM says TIMED OUT for a fast stub"
-    grep -qxF 'post-plan-fleet: outcome=blocked' "$_DM_LOG" 2>/dev/null \
-        || fail "runner-fast-exit-no-timeout: want outcome=blocked ($(grep 'outcome=' "$_DM_LOG" 2>/dev/null))"
+    grep -qxF 'post-plan-fleet: outcome=failed' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-fast-exit-no-timeout: want outcome=failed ($(grep 'outcome=' "$_DM_LOG" 2>/dev/null))"
+    grep -qxF 'post-plan-fleet: reason=no-result' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-fast-exit-no-timeout: want reason=no-result ($(grep 'reason=' "$_DM_LOG" 2>/dev/null))"
     _f_dms=$(grep -c '^@@DM@@$' "$_DM_CAPTURE" 2>/dev/null || true)
     [[ "$_f_dms" == 1 ]] || fail "runner-fast-exit-no-timeout: want exactly one DM, got '${_f_dms:-0}'"
     end_case runner-fast-exit-no-timeout
@@ -2605,11 +2629,13 @@ mkdir -p "$SCRATCH/Library/LaunchAgents"
 : > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9999.plist"
 set_live_labels "40477	0	com.ibl5.post-plan-fleet-9999"
 out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" \
-       POST_PLAN_FLEET_CEILING=2 POST_PLAN_FLEET_WAIT_POLL=1 \
+       POST_PLAN_FLEET_CEILING=3 POST_PLAN_FLEET_WAIT_POLL=1 \
        run_driver --go --wait 2>&1)"; rc=$?
 [[ $rc -eq 1 ]] || fail "wait-timeout-exits-nonzero: exit $rc, want 1 (out: $out)"
 grep -qF 'TIMED OUT waiting for' <<< "$out" || \
     fail "wait-timeout-exits-nonzero: TIMED OUT text missing (out: $out)"
+[[ "$(grep -c 'waiting for 1 session(s) to finish' <<< "$out")" == 1 ]] \
+    || fail "wait-timeout-exits-nonzero: unchanged N printed more than once (out: $out)"
 _rpath="$(echo "$out" | tail -1)"
 [[ -f "$_rpath" ]] || fail "wait-timeout-exits-nonzero: report not written (last line: $_rpath)"
 [[ "$_rpath" == *pr-firstpass-*.md ]] || fail "wait-timeout-exits-nonzero: last line is not a report path: $_rpath"
@@ -2701,19 +2727,55 @@ rm -f "$_apf_e" "$_apf_pr" "$_plist_301"
 end_case auth-probe-false
 
 # --- case: fleet-outcome-line ------------------------------------------------------------
-# Each run writes one `post-plan-fleet: outcome=<word>` line that bin/pr-cycle counts.
-# shipped-armed -> shipped, shipped-held -> held, anything else -> blocked, rc 124 -> timed-out.
+# Each run writes one `post-plan-fleet: outcome=<word>` line that bin/pr-cycle counts, plus a
+# `post-plan-fleet: reason=<short>` line. Words: shipped, held, declined, paused, conflict,
+# failed, and timed-out (rc 124).
 begin_case
 _outcome_of() { grep -m1 '^post-plan-fleet: outcome=' "$_DM_LOG" 2>/dev/null | cut -d= -f2; }
+_reason_of() { grep -m1 '^post-plan-fleet: reason=' "$_DM_LOG" 2>/dev/null | cut -d= -f2-; }
 _dm_result_case 91 'RESULT: terminal=shipped-armed' <<< '{"terminal": "shipped-armed"}'
 [[ "$(_outcome_of)" == shipped ]] || fail "fleet-outcome-line: shipped-armed gave '$(_outcome_of)'"
+! grep -q '^post-plan-fleet: reason=' "$_DM_LOG" || fail "fleet-outcome-line: shipped-armed w/o PR printed a reason"
 _dm_result_case 92 'RESULT: terminal=shipped-held' <<< '{"terminal": "shipped-held"}'
 [[ "$(_outcome_of)" == held ]] || fail "fleet-outcome-line: shipped-held gave '$(_outcome_of)'"
+! grep -q '^post-plan-fleet: reason=' "$_DM_LOG" || fail "fleet-outcome-line: shipped-held w/o PR printed a reason"
 _dm_result_case 93 'RESULT: post-plan BLOCKED terminal=failed' <<< '{"terminal": "failed"}'
-[[ "$(_outcome_of)" == blocked ]] || fail "fleet-outcome-line: failed gave '$(_outcome_of)'"
+[[ "$(_outcome_of)" == failed ]] || fail "fleet-outcome-line: failed gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == 'terminal=failed' ]] || fail "fleet-outcome-line: failed reason '$(_reason_of)'"
 # An unparseable result.json falls back to the RESULT: line.
 _dm_result_case 94 'RESULT: post-plan complete terminal=shipped-held' <<< 'not json'
 [[ "$(_outcome_of)" == held ]] || fail "fleet-outcome-line: RESULT-line fallback gave '$(_outcome_of)'"
+_dm_result_case 95 'RESULT: post-plan DECLINED — held twice on the same reason and nothing changed since; rerun with FORCE=1' <<< '{}'
+[[ "$(_outcome_of)" == declined ]] || fail "fleet-outcome-line: DECLINED gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == holdrepeat ]] || fail "fleet-outcome-line: DECLINED reason '$(_reason_of)'"
+_dm_result_case 96 'RESULT: post-plan PAUSED at retrospective (usage gate); resumes automatically' <<< '{}'
+[[ "$(_outcome_of)" == paused ]] || fail "fleet-outcome-line: PAUSED gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == usage-gate ]] || fail "fleet-outcome-line: PAUSED reason '$(_reason_of)'"
+_dm_result_case 97 $'RESULT: post-plan BLOCKED terminal=failed\npost-plan-now: postplan-rc=75 harness-rc=75' <<< '{"terminal": "failed"}'
+[[ "$(_outcome_of)" == paused ]] || fail "fleet-outcome-line: postplan-rc=75 gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == usage-gate ]] || fail "fleet-outcome-line: postplan-rc=75 reason '$(_reason_of)'"
+_dm_result_case 98 'RESULT: post-plan BLOCKED — rebase conflict, human required; ERROR terminal=failed, no PR opened. rebase-conflict: tree proof failed: 17a18 > 2 2 .claude/rules/codebase-map.md 35d35 < 3 3 .claude/rules/codebase-map.md TREE DIVERGED' <<< '{"terminal": "failed"}'
+[[ "$(_outcome_of)" == conflict ]] || fail "fleet-outcome-line: tree-proof conflict gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == '.claude/rules/codebase-map.md' ]] || fail "fleet-outcome-line: conflict reason '$(_reason_of)'"
+_dm_result_case 99 'RESULT: post-plan BLOCKED — rebase conflict, human required; ERROR terminal=failed. rebase-conflict: tree proof failed: 3a4 > 1 1 ibl5/modules/Player/index.php 9d9 < 2 2 .claude/rules/codebase-map.md TREE DIVERGED' <<< '{"terminal": "failed"}'
+[[ "$(_outcome_of)" == conflict ]] || fail "fleet-outcome-line: multi-path conflict gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == 'ibl5/modules/Player/index.php .claude/rules/codebase-map.md' ]] \
+    || fail "fleet-outcome-line: multi-path conflict reason '$(_reason_of)'"
+_dm_result_case 100 'RESULT: post-plan BLOCKED — rebase conflict, human required; ERROR terminal=failed. rebase-conflict: rebase --continue failed: Rebasing (2/14) error: could not apply 25aafa14c... x' <<< '{"terminal": "failed"}'
+[[ "$(_outcome_of)" == conflict ]] || fail "fleet-outcome-line: rebase-continue conflict gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == rebase-continue-failed ]] || fail "fleet-outcome-line: rebase-continue reason '$(_reason_of)'"
+_dm_result_case 101 'RESULT: post-plan BLOCKED — lost-work proof failed on re-rebase; ERROR terminal=failed kind=lostwork-unproved PR #2876' <<< '{"terminal": "failed"}'
+[[ "$(_outcome_of)" == failed ]] || fail "fleet-outcome-line: lostwork gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == lostwork-unproved ]] || fail "fleet-outcome-line: lostwork reason '$(_reason_of)'"
+_dm_result_case 102 'RESULT: post-plan complete — terminal=shipped-armed auto-merge=armed PR #2801' <<< '{"terminal": "shipped-armed"}'
+[[ "$(_outcome_of)" == shipped ]] || fail "fleet-outcome-line: shipped w/ PR gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == 'PR #2801' ]] || fail "fleet-outcome-line: shipped reason '$(_reason_of)'"
+_dm_result_case 103 'RESULT: post-plan complete — terminal=shipped-held auto-merge=HELD (human merges) PR #2802' <<< '{"terminal": "shipped-held"}'
+[[ "$(_outcome_of)" == held ]] || fail "fleet-outcome-line: held w/ PR gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == 'PR #2802' ]] || fail "fleet-outcome-line: held reason '$(_reason_of)'"
+_dm_result_case 104 'RESULT: something unexpected' <<< 'not json'
+[[ "$(_outcome_of)" == failed ]] || fail "fleet-outcome-line: unexpected gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == no-result ]] || fail "fleet-outcome-line: unexpected reason '$(_reason_of)'"
 # rc 124 is what `timeout` returns on expiry.
 _to_stub="$SCRATCH/.local/bin/dm-cs-timeout"
 printf '#!/usr/bin/env bash\nexit 124\n' > "$_to_stub"; chmod +x "$_to_stub"
@@ -2723,6 +2785,7 @@ POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
     run_dm_driver --go >/dev/null 2>&1
 HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
 [[ "$(_outcome_of)" == timed-out ]] || fail "fleet-outcome-line: rc 124 gave '$(_outcome_of)'"
+[[ "$(_reason_of)" == timeout ]] || fail "fleet-outcome-line: rc 124 reason '$(_reason_of)'"
 grep -q 'TIMED OUT after 90m' "$_DM_LOG" || fail "fleet-outcome-line: rc 124 log lacks TIMED OUT"
 grep -q 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
     || fail "fleet-outcome-line: rc 124 DM lacks TIMED OUT ($(cat "$_DM_CAPTURE" 2>/dev/null))"

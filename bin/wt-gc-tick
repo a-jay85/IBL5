@@ -100,7 +100,7 @@ if [ "$FORCE" = 0 ]; then
     # Validate the raw ns field before any arithmetic. awk's coercion of a
     # non-numeric field varies by implementation. On Linux CI it came out as 0,
     # which read as "operator present" instead of fail-closed.
-    idle_ns="$("$WT_GC_IOREG" -c IOHIDSystem 2>/dev/null | awk '/HIDIdleTime/ {print $NF; exit}' 2>/dev/null)" || idle_ns=""
+    idle_ns="$("$WT_GC_IOREG" -c IOHIDSystem 2>/dev/null | awk '/HIDIdleTime/ && !f {print $NF; f=1}' 2>/dev/null)" || idle_ns=""
     case "$idle_ns" in
         ''|*[!0-9]*)
             log "idle value unreadable ('${idle_ns:-<empty>}') — treating as operator present (fail-closed)"

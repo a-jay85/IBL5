@@ -18,8 +18,6 @@ use Standings\Contracts\StandingsRepositoryInterface;
  */
 class StandingsUpdaterRepository extends \Database\BaseMysqliRepository
 {
-    private string $teamAwardsTable;
-
     /**
      * Closed allowlists for the column identifiers that callers may pass into the
      * setters/filters below. A column name is a SQL **identifier**, never a
@@ -50,7 +48,6 @@ class StandingsUpdaterRepository extends \Database\BaseMysqliRepository
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->teamAwardsTable = 'ibl_team_awards';
     }
 
     /**
@@ -190,10 +187,8 @@ class StandingsUpdaterRepository extends \Database\BaseMysqliRepository
      */
     public function upsertTeamAward(int $seasonYear, string $teamName, string $awardName): void
     {
-        // $teamAwardsTable is the fixed property 'ibl_team_awards' (constructor-set,
-        // never user input); concatenate it backticked instead of interpolating.
         $this->execute(
-            "INSERT INTO `" . $this->teamAwardsTable . "` (year, name, award)
+            "INSERT INTO `ibl_team_awards` (year, name, award)
              VALUES (?, ?, ?)
              ON DUPLICATE KEY UPDATE name = VALUES(name)",
             "iss",

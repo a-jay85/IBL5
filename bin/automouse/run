@@ -29,7 +29,7 @@ Subcommands:
   plan <slug>                 Execute exactly one named plan and stop.
   schedule "[YYYY-MM-DD] HH:MM [TZ]"
                               Schedule a one-shot run at the given time
-                              (no date = today, no TZ = local).
+                              (no date = today, or tomorrow if that time has passed; no TZ = local).
   disarm-tonight              Skip tonight's run; auto re-enables afterward.
   disarm-until "[YYYY-MM-DD] HH:MM [TZ]"
                               Pause until the given time.
@@ -64,12 +64,32 @@ epoch_fmt() {
     date -r "$1" "+$2" 2>/dev/null || date -d "@$1" "+$2"
 }
 
+# Resolve a `schedule` or `disarm-until` time against NOW. A bare "HH:MM [TZ]" that has
+# already passed today means tomorrow at that time. A dated time is taken as
+# given, so a past date still fails the caller's past-time check.
+schedule_epoch() {
+    local when="$1" now="$2" epoch midday tomorrow
+    if [[ "$when" =~ ^[0-9]{1,2}:[0-9]{2}([[:space:]]|$) ]]; then
+        epoch=$(parse_when_epoch "$(epoch_fmt "$now" '%Y-%m-%d') $when") || return 1
+        if [ "$epoch" -le "$now" ]; then
+            # Use a midday anchor to find tomorrow's date — raw +86400 skips a day on
+            # DST spring-forward eve when the day is only 23 hours long.
+            midday=$(parse_when_epoch "$(epoch_fmt "$now" '%Y-%m-%d') 12:00") || return 1
+            tomorrow=$(epoch_fmt "$((midday + 86400))" '%Y-%m-%d')
+            epoch=$(parse_when_epoch "$tomorrow $when") || return 1
+        fi
+    else
+        epoch=$(parse_when_epoch "$when") || return 1
+    fi
+    printf '%s\n' "$epoch"
+}
+
 # --- One-shot scheduler subcommand ----------------------------------------
 # Usage: bin/automouse/run schedule "[YYYY-MM-DD] HH:MM [TZ]"
 # Creates a self-cleaning launchd agent that fires bin/automouse/run once at the
 # given time, then removes its own plist and boots itself out. The date is
-# optional and defaults to today; the timezone abbreviation is optional and
-# defaults to the system's local zone.
+# optional and defaults to today, or tomorrow if that time has already passed;
+# the timezone abbreviation is optional and defaults to the system's local zone.
 # Example: bin/automouse/run schedule "2026-05-28 20:00 PDT"
 if [ "${1:-}" = "schedule" ]; then
     WHEN="${2:-}"
@@ -79,9 +99,9 @@ if [ "${1:-}" = "schedule" ]; then
         exit 1
     fi
 
-    if ! EPOCH=$(parse_when_epoch "$WHEN"); then
+    if ! EPOCH=$(schedule_epoch "$WHEN" "$(date +%s)"); then
         echo "error: could not parse time '$WHEN'" >&2
-        echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-05-28 20:00 PDT, or 20:00 for today)" >&2
+        echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-05-28 20:00 PDT, or 20:00 for the next 20:00)" >&2
         exit 1
     fi
 
@@ -185,11 +205,12 @@ daily_fire_hhmm() {
 # Re-parses tomorrow's calendar date instead of adding 86400 so a DST transition
 # doesn't slide the fire time by an hour.
 next_daily_epoch() {
-    local hour="$1" min="$2" now="$3" day cand
+    local hour="$1" min="$2" now="$3" day midday cand
     day=$(epoch_fmt "$now" '%Y-%m-%d')
     cand=$(parse_when_epoch "$(printf '%s %02d:%02d' "$day" "$hour" "$min")") || return 1
     if [ "$cand" -le "$now" ]; then
-        day=$(epoch_fmt "$((now + 86400))" '%Y-%m-%d')
+        midday=$(parse_when_epoch "$day 12:00") || return 1
+        day=$(epoch_fmt "$((midday + 86400))" '%Y-%m-%d')
         cand=$(parse_when_epoch "$(printf '%s %02d:%02d' "$day" "$hour" "$min")") || return 1
     fi
     printf '%s\n' "$cand"
@@ -359,12 +380,12 @@ if [ "${1:-}" = "disarm-tonight" ] || [ "${1:-}" = "disarm-until" ]; then
         WHEN="${2:-}"
         if [ -z "$WHEN" ]; then
             echo "usage: bin/automouse/run disarm-until \"[YYYY-MM-DD] HH:MM [TZ]\"" >&2
-            echo "example: bin/automouse/run disarm-until \"2026-08-20 09:00 PDT\" (or \"20:00\" for today)" >&2
+            echo "example: bin/automouse/run disarm-until \"2026-08-20 09:00 PDT\" (or \"20:00\" for the next 20:00)" >&2
             exit 1
         fi
-        if ! REARM_EPOCH=$(parse_when_epoch "$WHEN"); then
+        if ! REARM_EPOCH=$(schedule_epoch "$WHEN" "$NOW"); then
             echo "error: could not parse time '$WHEN'" >&2
-            echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-08-20 09:00 PDT, or 20:00 for today)" >&2
+            echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-08-20 09:00 PDT, or 20:00 for the next 20:00)" >&2
             exit 1
         fi
     fi
@@ -627,7 +648,45 @@ CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
 COST_LOCK_HELD=0  # set to 1 while append_cost_row holds the cost-report mutex
 CAP_DEFERRED=" "  # space-wrapped basenames cap-refunded or wt-new-failed this run; claim_next_plan skips them
 DEPENDS_HELD=" "  # space-wrapped basenames dependency-held this run; claim_next_plan skips them
+# Stop-file writer: records why this runner stopped, for bin/fleet-status.
+# Called only from cleanup_watcher, the EXIT trap. A clean finish already leaves
+# its own trace (a stop line plus the session-complete line in $LOG), so it writes
+# nothing then. One line, "<epoch>\t<cause>", written to a temp file and renamed
+# so a reader never sees half a line. SIGKILL skips every trap; bin/fleet-status
+# derives that case from a dead pid whose log has no trace. Never fails: it runs
+# inside the EXIT trap under set -e.
+write_stop_file() {
+    local rc=$1 cause dir base tmp
+    [ -n "${LOG:-}" ] || return 0
+    case "$rc" in
+        0)
+            if [ -n "${STOP_CAUSE:-}" ]; then
+                cause="$STOP_CAUSE"
+            elif [ "${STOP_CLEAN:-0}" = 1 ]; then
+                return 0
+            else
+                cause="exited 0 without the session-complete line"
+            fi ;;
+        129) cause="hung up by SIGHUP (exit 129)" ;;
+        130) cause="interrupted by SIGINT (exit 130)" ;;
+        143) cause="terminated by SIGTERM (exit 143)" ;;
+        *)   cause="aborted with exit $rc (a failed command under set -e, or an error exit)" ;;
+    esac
+    dir="$NIGHTLY_DIR/stops"
+    base="$(basename "${LOG%.log}")"
+    mkdir -p "$dir" 2>/dev/null || return 0
+    tmp="$dir/.$base.stop.tmp.$$"
+    if { printf '%s\t%s\n' "$(date +%s)" "$cause" > "$tmp"; } 2>/dev/null \
+        && mv -f "$tmp" "$dir/$base.stop" 2>/dev/null; then
+        return 0
+    fi
+    rm -f "$tmp" 2>/dev/null || true
+    return 0
+}
+# End stop-file writer.
+
 cleanup_watcher() {
+    local stop_rc=$?
     if [ -n "$WATCHER_PID" ]; then
         kill "$WATCHER_PID" 2>/dev/null || true
         wait "$WATCHER_PID" 2>/dev/null || true
@@ -645,8 +704,26 @@ cleanup_watcher() {
         COST_LOCK_HELD=0
         release_cost_lock
     fi
+    write_stop_file "$stop_rc"
 }
 trap cleanup_watcher EXIT
+
+# macOS /bin/bash (3.2) leaves $? at 0 inside the EXIT trap when a signal kills the
+# script, so write_stop_file could not tell a SIGTERM from a clean exit. Catch the
+# three signals and exit with the conventional 128+n status, which the EXIT trap
+# then sees. The impl pipeline runs in the background (see IMPL_BG_PID below) so
+# `wait "$IMPL_BG_PID"` is interruptible — the signal fires the trap immediately.
+# `pkill -TERM -P $$` terminates the background impl subshell (a direct child of
+# this process); claude is a grandchild and cannot be reached here, but the subshell
+# exits and the runner does not hang. The postplan `timeout` shim uses `wait`
+# internally and is also interruptible.
+exit_on_signal() {
+    pkill -TERM -P $$ 2>/dev/null || true
+    exit "$1"
+}
+trap 'exit_on_signal 143' TERM
+trap 'exit_on_signal 130' INT
+trap 'exit_on_signal 129' HUP
 
 run_heartbeat_watcher() {
     local hb_file=$1 log_file=$2 label=$3 pid_file=$4 slug=$5
@@ -1722,6 +1799,8 @@ CAFFEINATE_PID=$!
 
 START=$(date +%s)
 PLANS_RUN=0
+STOP_CAUSE=""
+STOP_CLEAN=0
 
 echo "=== Automouse session starting at $(date) ===" >> "$LOG"
 
@@ -2083,6 +2162,10 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # The impl agent has no clock — bin/lib/headless-elapsed-hook.sh reads
         # these two vars and appends an elapsed-clock line after every tool call
         # so the agent can track the 90% deadline and write a handoff in time.
+        # Run the impl pipeline in the background so `wait` below is signal-
+        # interruptible. A foreground pipeline defers the TERM trap until the
+        # pipeline completes; backgrounding it lets a kill fire the trap at once.
+        (
         IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=automouse IBL5_USAGE_GATE_MODEL="$IMPL_MODEL" \
         IBL5_USAGE_GATE_RESUME_BIN="$AUTOMOUSE_BIN" \
         CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
@@ -2100,7 +2183,10 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 --name "automouse-impl-$(date +%Y-%m-%d-%H%M)" \
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
             | bin/lib/automouse-stream-filter.sh "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" impl "$FAILSIG_FILE" \
-            >> "$LOG" || IMPL_STATUS=$?
+            >> "$LOG"
+        ) &
+        IMPL_BG_PID=$!
+        wait "$IMPL_BG_PID" || IMPL_STATUS=$?
         fi
 
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -2463,7 +2549,10 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
 
     # Single-plan mode: exactly one attempt, then stop — predictable for a
     # watched one-off. A genuine failure does NOT retry to MAX_ATTEMPTS.
-    [ -n "${SINGLE_PLAN:-}" ] && break
+    if [ -n "${SINGLE_PLAN:-}" ]; then
+        STOP_CAUSE="single-plan mode: one attempt of ${SINGLE_PLAN%.md} finished"
+        break
+    fi
 
     # --- Between-plans master health canary dispatch ---
     # Bottom of the loop body on purpose: it never fires before the first plan
@@ -2541,3 +2630,4 @@ for lock in "$QUEUE_DIR"/*.md.lock; do
 done
 
 echo "=== Automouse session complete at $(date) — $PLANS_RUN plan(s) run ===" >> "$LOG"
+STOP_CLEAN=1

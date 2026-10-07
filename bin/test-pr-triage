@@ -417,7 +417,8 @@ assert_absent "H-E1 ROWS guard satisfied"          'ERROR: reported'            
 assert_absent "H-E1 read-only"  'pr merge|update-branch|-X POST|-X PATCH'        "$(cat "$FIX_A/calls.log")"
 assert_match  "H-E2 two reasons, recorded first, dup dropped" \
     '^#44  [^ ]+  chore: fixture #44  \(7\) auto_merge — plan sets auto_merge: false; merge conflict \(DIRTY\)$' "$OUT"
-assert_match  "H-E3 unknown"                       '^#40  https://github.com/a-jay85/IBL5-test/pull/40  chore: fixture #40  unknown$' "$OUT"
+# Mutation check: swapping ${out:-unknown} for ${out:--} in hp_format_line makes this line end "  -".
+assert_match  "H-E3 unknown"                      '^#40  https://github.com/a-jay85/IBL5-test/pull/40  chore: fixture #40  unknown$' "$OUT"
 assert_match  "H-E4 feat awaiting sign-off"        '^#45  .*  feat-awaiting-signoff$'                      "$OUT"
 assert_match  "H-E4 red check"                     '^#46  .*  red checks: Tests and Analysis \(failure\)$' "$OUT"
 assert_match  "H-E4 pending check"                 '^#47  .*  pending checks: E2E Tests$'                  "$OUT"

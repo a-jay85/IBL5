@@ -38,6 +38,26 @@ assert() {
     fi
 }
 
+# assert_msg <name> <expected-exit> <must-include> <must-exclude> <plan-body>
+# Like assert() but also greps combined stdout+stderr. Pass "" to skip a check.
+assert_msg() {
+    name="$1"; want_exit="$2"; msg_inc="$3"; msg_exc="$4"; body="$5"
+    f="$TMP/$name.md"
+    printf '%s\n' "$body" > "$f"
+    out="$("$GUARD" "$f" 2>&1)"; got=$?
+    ok=1
+    if [ "$got" -ne "$want_exit" ]; then
+        echo "FAIL: $name — expected exit $want_exit, got $got"; ok=0
+    fi
+    if [ -n "$msg_inc" ] && ! grep -qF "$msg_inc" <<< "$out"; then
+        echo "FAIL: $name — '$msg_inc' not in output"; ok=0
+    fi
+    if [ -n "$msg_exc" ] && grep -qF "$msg_exc" <<< "$out"; then
+        echo "FAIL: $name — '$msg_exc' unexpectedly in output"; ok=0
+    fi
+    if [ "$ok" -eq 1 ]; then echo "ok: $name (exit $got)"; else FAILED=1; fi
+}
+
 # assert_cf <name> <plan-body> <expected --print-critical-files output>
 # Pins CLASSIFICATION, not exit code. --print-critical-files exits before any
 # gate runs, so these fixtures need no matrix/frontmatter scaffolding.
@@ -505,6 +525,98 @@ assert_viol "gateHb-no-hold-section-not-checked" 0 "[H]" "$FM$M"'
 ## Automouse Hold Justification
 
 A human must confirm every class reference resolves under the new namespace.
+'
+
+# ---------------------------------------------------------------------------
+# Gate H(c): the Decision paragraph is the only hold text the PR body shows, so
+# it is checked as reader-facing prose (check-prose tells, empty body, 40-word
+# total cap, legacy `The human accepts ...` opener).
+# ---------------------------------------------------------------------------
+FM_HOLD_DOC='---
+auto_merge: false
+impl_model: sonnet
+---'
+# _hc_words <n> — n filler words, so a case hits an exact word count.
+_hc_words() { local i out=""; for ((i = 0; i < $1; i++)); do out="$out held"; done; printf '%s' "${out# }"; }
+HC_W35=$(_hc_words 35)
+HC_W36=$(_hc_words 36)
+HC_W20=$(_hc_words 20)
+
+assert_viol "gateHc-clean-decision-passes" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Category:** intrinsic taste hold, the seamless leveraging of a robust paradigm.
+
+**Decision:** Merge if you'"'"'re OK with about 7% more PRs being held until their body declares scope.
+
+**Discharged by matrix rows:** 3, 4.
+
+Rows 3 and 4 cover the observable part, and the remaining judgment is taste.
+'
+
+assert_viol "gateHc-prose-tell-fails" 1 "[H] Decision line has a prose tell" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if the seamless rollout is worth about 7% more held PRs.
+'
+
+assert_viol "gateHc-over-cap-fails" 1 "[H] Decision line is 41 words" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W36"'
+'
+
+assert_viol "gateHc-exactly-40-words-passes" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W35"'
+'
+
+# The label is not counted: label + 40 body words must still pass.
+assert_viol "gateHc-label-not-counted" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W35"'
+'
+
+assert_viol "gateHc-legacy-opener-fails" 1 "[H] Decision line opens with the legacy" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** The human accepts that about 7% more PRs are held.
+'
+
+assert_viol "gateHc-legacy-opener-reviewer-fails" 1 "[H] Decision line opens with the legacy" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** The reviewer accepts a slower merge queue for safety.
+'
+
+assert_viol "gateHc-accepts-mid-sentence-passes" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you accept that about 7% more PRs are held.
+'
+
+assert_viol "gateHc-empty-decision-fails" 1 "[H] Decision line is empty" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:**
+'
+
+assert_viol "gateHc-two-blocks-total-over-cap-fails" 1 "[H] Decision line is 50 words" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W20"'
+
+**Decision:** Merge if you'"'"'re OK with '"$HC_W20"'
+'
+
+assert_viol "gateHc-missing-decision-unchanged" 0 "[H]" "$FM_HOLD_DOC$M"'
+## Automouse Hold Justification
+
+**Category:** taste
+
+The copy tone is a taste call that no test can settle.
 '
 
 # Gate H FP-guard: a plan that merely DOCUMENTS the `auto_merge: false` syntax in
@@ -1190,6 +1302,117 @@ Anchor: change lands at the report block.
 - **Scope:** bin/check-plan
 - **Recipe:** insert the gate
 no-assertions: mechanical rename, no matrix rows
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4b) A "- no-assertions: <reason>" list item clears gate E (faprep-xss-fix.md shape).
+assert "gateE-no-assertions-bullet-clears" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- no-assertions: mechanical rename, no matrix rows
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4c) An indented "<!-- no-assertions: <reason> -->" clears gate E (trim-plan-hold-criteria-lore.md shape).
+assert "gateE-no-assertions-html-comment-clears" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+  <!-- no-assertions: mechanical rename, no matrix rows -->
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4d) A backticked "- \`no-assertions: <reason>\`" list item clears gate E.
+assert "gateE-no-assertions-backtick-clears" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- `no-assertions: mechanical rename, no matrix rows`
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4e) A mid-sentence prose mention of the marker does NOT clear gate E (#947).
+assert "gateE-no-assertions-prose-midsentence-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+We chose not to use no-assertions: here, so list them later.
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4f) A prose mention inside another packet field does NOT clear gate E (#947 live repro).
+assert "gateE-no-assertions-prose-in-bullet-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate; we chose not to use no-assertions: here, so list them later
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4g) A bare marker with no reason does NOT clear gate E.
+assert "gateE-no-assertions-empty-reason-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+no-assertions:
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E4h) An HTML-comment marker whose only "reason" is the closing --> does NOT clear gate E.
+assert "gateE-no-assertions-empty-comment-rejected" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+<!-- no-assertions: -->
 - **Self-verify:** bin/test-check-plan
 - **Report back:** one line
 ````
@@ -2082,6 +2305,107 @@ assert_viol "cf-relative-path-accepted" 0 '[F]' "$FM$CF_MATRIX"'
 '
 
 # ---------------------------------------------------------------------------
+# Gate [VR] fixtures (11 cases) — a VR -snapshots Critical File needs a marker
+# ---------------------------------------------------------------------------
+VR_SNAP='ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots'
+
+# (VR-1) Unmarked -snapshots entry (the PR 2625 shape) — must flag [VR].
+assert_viol "vr-unmarked-snapshots-rejected" 1 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` — VR baselines
+- `bin/check-plan`
+'
+
+# (VR-2) The conditional marker exempts it — clean.
+assert_viol "vr-conditional-marker-accepted" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (conditional — only if VR baselines change)
+'
+
+# (VR-3) Deliberate regen/deletion opt-out token — clean.
+assert_viol "vr-baseline-change-token-accepted" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (vr-baseline-change: deletes the contracts-hub baselines)
+'
+
+# (VR-4) Token match is case-insensitive — clean.
+assert_viol "vr-baseline-change-token-uppercase-accepted" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (VR-Baseline-Change: regenerates the smoke baselines)
+'
+
+# (VR-5) Whole word only: a longer word does not clear — must flag [VR].
+assert_viol "vr-baseline-changes-suffix-rejected" 1 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` — vr-baseline-changes expected
+'
+
+# (VR-6) The token on ANOTHER entry line does not clear this entry — must flag [VR].
+assert_viol "vr-token-on-other-entry-rejected" 1 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` — VR baselines
+- `bin/check-plan` — vr-baseline-change
+'
+
+# (VR-7) The token in phase prose outside Critical Files does not clear — must flag [VR].
+assert_viol "vr-token-in-prose-only-rejected" 1 '[VR]' "$FM$CF_MATRIX"'
+### Notes
+
+This plan is a vr-baseline-change.
+
+## Critical Files
+
+- `'"$VR_SNAP"'` — VR baselines
+'
+
+# (VR-8) A non-snapshot must-appear entry is untouched by [VR] — clean.
+assert_viol "vr-non-snapshot-entry-ignored" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `bin/check-plan` — add gate
+- `ibl5/tests/e2e/smoke/visual-regression.spec.ts` — edit spec
+'
+
+# (VR-9) A (reference)-exempt -snapshots entry is not flagged — clean.
+assert_viol "vr-reference-exempt-snapshots-ignored" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` (reference)
+- `bin/check-plan`
+'
+
+# (VR-10) A fenced example of the unmarked form is not counted — clean.
+assert_viol "vr-fenced-example-ignored" 0 '[VR]' "$FM$CF_MATRIX"'
+## Critical Files
+
+```
+- `'"$VR_SNAP"'` — VR baselines
+```
+
+- `bin/check-plan`
+'
+
+# (VR-11) The [VR] message names both fixes verbatim.
+f="$TMP/vr-message-names-fix.md"
+printf '%s\n' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `'"$VR_SNAP"'` — VR baselines
+' > "$f"
+out="$("$GUARD" "$f" 2>&1)" || true
+if grep -qF 'Mark it (conditional — only if VR baselines change), or (vr-baseline-change: <what changes>)' <<<"$out"; then
+    echo "ok: vr-message-names-fix"
+else
+    echo "FAIL: vr-message-names-fix — [VR] message lost its fix text"; FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
 # Gate [M] fixtures (5 cases)
 # ---------------------------------------------------------------------------
 PU='
@@ -2246,6 +2570,42 @@ assert_viol "gateY-share-over-third-fires" 1 '[Y]' "$FM$YHDR"'
 assert_viol "gateY-all-tagged-fires" 1 '[Y]' "$FM$YHDR"'
 | 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
 | 2 | prints `appeared=0` (one-time-check: one-shot counterfactual mutation run at plan time) | CLI-executable | post-impl | `bin/y` |
+'
+
+# ---------------------------------------------------------------------------
+# Gate [ND] fixtures (4 cases)
+# ---------------------------------------------------------------------------
+# Marker with a 15+ character reason inside a phase body: the honored shape.
+assert_viol "nd-valid-marker-passes" 0 '[ND]' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Queue the parked plan
+
+**No diff:** queues the parked plan after merge
+'
+# Reason under 15 characters: the harness ignores it, so the gate fires.
+assert_viol "nd-short-reason-fails" 1 '[ND]' "$FM"'
+## Phase 1: Queue the parked plan
+
+**No diff:** later
+'
+# Marker under a non-phase heading: the harness never reads it.
+assert_viol "nd-outside-phase-fails" 1 '[ND]' "$FM"'
+## Context
+
+**No diff:** queues the parked plan after merge
+'
+# A code-span mention does not start the line, so it is not a marker.
+assert_viol "nd-code-span-mention-passes" 0 '[ND]' "$FM_OPUS$CF_MATRIX"'
+## Context
+
+A phase can carry `**No diff:** x` to opt out of the omission check.
+'
+# A marker inside a fenced block is stripped before the gate reads $GATEP_BODY.
+assert_viol "nd-fenced-marker-ignored-passes" 0 '[ND]' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Queue the parked plan
+
+```
+**No diff:** queues the parked plan after merge
+```
 '
 
 # ---------------------------------------------------------------------------
@@ -3176,6 +3536,81 @@ if [ "$_parity_failed" -eq 0 ]; then
     echo "ok: gateHb-pattern-file-parity (bash pos=$BASH_POS exc=$BASH_EXC, Python='$PY')"
 fi
 
+# hold_decision_paragraphs — prints only the `**Decision:**` block(s) of the hold
+# section. Each case writes a throwaway plan and compares exact stdout.
+# shellcheck source=lib/hold-check.sh
+. "$SCRIPT_DIR/lib/hold-check.sh"
+# _hdp_case <name> <plan-text> <expected-stdout>
+_hdp_case() {
+    local name="$1" text="$2" expected="$3" f out rc
+    f="$TMP/hdp-$name.md"
+    printf '%s' "$text" > "$f"
+    out="$(hold_decision_paragraphs "$f")"; rc=$?
+    if [ "$rc" -eq 0 ] && [ "$out" = "$expected" ]; then
+        echo "ok: hold_decision_paragraphs-$name"
+    else
+        echo "FAIL: hold_decision_paragraphs-$name — rc=$rc, got: [$out]"
+        FAILED=1
+    fi
+}
+_hdp_case "four-part-skeleton" '# T
+
+## Automouse Hold Justification
+
+**Category:** taste
+
+**Decision:** Merge if you are OK with the new copy.
+
+**Discharged by matrix rows:** 3, 4
+
+Why-line prose.
+' '**Decision:** Merge if you are OK with the new copy.'
+_hdp_case "no-decision" '## Automouse Hold Justification
+
+**Category:** taste
+
+Prose only.
+' ''
+_hdp_case "two-blocks" '## Automouse Hold Justification
+
+**Decision:** D1
+
+middle
+
+**Decision:** D2
+' '**Decision:** D1
+
+**Decision:** D2'
+_hdp_case "two-line-decision" '## Automouse Hold Justification
+
+**Decision:** first
+continued
+
+after
+' '**Decision:** first
+continued'
+_hdp_case "fenced-decision" '## Automouse Hold Justification
+
+```
+**Decision:** hidden
+```
+' ''
+_hdp_case "outside-section" '## Before
+
+**Decision:** early
+
+## Automouse Hold Justification
+
+prose
+
+## After
+
+**Decision:** late
+' ''
+_hdp_case "no-trailing-newline" '## Automouse Hold Justification
+
+**Decision:** last line' '**Decision:** last line'
+
 # regex_canon_divergence — the three call sites must stay byte-identical.
 # Canon lives in bin/check-plan gate [D]; SKILL.md and _architect-contract.md
 # restate it. Any divergence (notably \s for [[:space:]]) fails here.
@@ -3411,6 +3846,153 @@ _z_parity "gate-Z-parity-non-matrix-table" silent "$FM$_Z_HEAD"'| 1 | plain row'
 |------|-----|
 | `*.md` | docs are tooling |' "$_Z_PDIFF_HDR"'
 +unrelated'
+
+# ---------------------------------------------------------------------------
+# Gate [L] checks A/B/C (backlog#933): literal-check citations, pid/tid/teamid
+# overflow backstop, copy-verbatim symbol resolution.
+# ---------------------------------------------------------------------------
+L_MATRIX='| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | E2E | post-impl | `tests/e2e/x.spec.ts` |
+'
+
+# Check A: valid and out-of-scope citations pass.
+assert "L-cite-fits-ok" 0 "$FM$L_MATRIX"'
+Seed literal-check: 200001993..200001999 -> ibl_plr.pid int(11) (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-int-max-ok" 0 "$FM$L_MATRIX"'
+Seed literal-check: 2147483647 -> ibl_plr.pid int(11) (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-in-fence-ignored-ok" 0 "$FM$L_MATRIX"'
+```
+literal-check: 200001993000..200001993099 -> ibl_plr.pid int(11) (per ibl5/docs/schema/current-schema.sql)
+```
+'
+assert "L-cite-template-ignored-ok" 0 "$FM$L_MATRIX"'
+Form: literal-check: <literal-or-range> -> <table>.<column> <sqltype> (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-literal-ok-marker-ok" 0 "$FM$L_MATRIX"'
+Bad: literal-check: 200001993000..200001993099 -> ibl_plr.pid int(11) (per ibl5/docs/schema/current-schema.sql) <!-- literal-ok: negative example -->
+'
+
+# Check A: out-of-range, wrong type, unknown column, unsigned negative all flag.
+assert "L-cite-int-max-plus-one-flags" 1 "$FM$L_MATRIX"'
+Seed literal-check: 2147483648 -> ibl_plr.pid int(11) (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-overflow-band-flags" 1 "$FM$L_MATRIX"'
+Seed literal-check: 200001993000..200001993099 -> ibl_plr.pid int(11) (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-wrong-type-flags" 1 "$FM$L_MATRIX"'
+Seed literal-check: 5 -> ibl_plr.pid bigint(20) (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-unknown-column-flags" 1 "$FM$L_MATRIX"'
+Seed literal-check: 5 -> ibl_plr.no_such_col int(11) (per ibl5/docs/schema/current-schema.sql)
+'
+assert "L-cite-unsigned-negative-flags" 1 "$FM$L_MATRIX"'
+Seed literal-check: -1 -> auth_users.id int(10) unsigned (per ibl5/docs/schema/current-schema.sql)
+'
+
+# Check B: uncited overflow next to pid/teamid prints an advisory, including
+# max+1. Advisory only, so exit 0; assert_msg pins the message too.
+assert_msg "L-overflow-pid-band-flags" 0 "[L] overflow" "" "$FM$L_MATRIX"'
+Seed every pid in 200001993000..200001993099.
+'
+assert_msg "L-overflow-pid-max-plus-one-flags" 0 "[L] overflow" "" "$FM$L_MATRIX"'
+Seed pid 2147483648 as the sentinel.
+'
+assert_msg "L-overflow-teamid-flags" 0 "[L] overflow" "" "$FM$L_MATRIX"'
+Insert teamid 9999999999 for the phantom.
+'
+
+# Check B: the int(11) max, a BIGINT cue, a quoted literal, a Discord id, a
+# substring match, and a fenced line all pass without printing the advisory.
+assert_msg "L-overflow-pid-max-ok" 0 "" "[L] overflow" "$FM$L_MATRIX"'
+Seed pid 2147483647 as the sentinel.
+'
+assert_msg "L-overflow-bigint-cue-ok" 0 "" "[L] overflow" "$FM$L_MATRIX"'
+Seed pid 200001993000 into the BIGINT shadow column.
+'
+assert_msg "L-overflow-quoted-ok" 0 "" "[L] overflow" "$FM$L_MATRIX
+Store pid as the string '200001993000' in the log.
+"
+# A widened `[a-z]+_id` identifier rule would flag this Discord snowflake.
+assert_msg "L-overflow-discord-id-ok" 0 "" "[L] overflow" "$FM$L_MATRIX"'
+Post with message_id 1234567890123456789.
+'
+assert_msg "L-overflow-word-boundary-ok" 0 "" "[L] overflow" "$FM$L_MATRIX"'
+Expect rapid growth past 3000000000 rows.
+'
+assert_msg "L-overflow-in-fence-ok" 0 "" "[L] overflow" "$FM$L_MATRIX"'
+```
+Seed every pid in 200001993000..200001993099.
+```
+'
+
+# Check C: copy-verbatim symbols resolve against the same section's cited files.
+assert_msg "L-verbatim-resolves-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
+## Phase 1: restore
+Copy `bindAndExecute()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+'
+assert_msg "L-verbatim-shell-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
+## Phase 1: gate
+Copy `viol()` verbatim from `bin/check-plan`.
+'
+assert_msg "L-verbatim-python-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
+## Phase 1: harness
+Copy `parse_no_change_test_paths()` verbatim from `tools/postplan-harness/harness/planfile.py`.
+'
+assert_msg "L-verbatim-no-cited-file-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
+## Phase 1: restore
+Copy `madeUpHelperXyz()` verbatim from the 2004 restore class.
+'
+assert_msg "L-verbatim-forward-ref-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
+## Phase 1: restore
+Create a new helper `madeUpHelperXyz()` in `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Then copy `madeUpHelperXyz()` verbatim into the 1993 class.
+'
+assert_msg "L-verbatim-in-fence-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
+## Phase 1: restore
+```
+Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+```
+'
+assert_msg "L-verbatim-gap-over-80-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
+## Phase 1: restore
+Copy `madeUpHelperXyz()` and every caller it needs into the new class without any change at all, keeping it verbatim into `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+'
+
+# Check C: a missing symbol, or one whose file is cited in another section,
+# prints an advisory; assert_msg pins the message too.
+assert_msg "L-verbatim-missing-flags" 0 "[L] copy-verbatim" "" "$FM_OPUS$L_MATRIX"'
+## Phase 1: restore
+Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+'
+assert_msg "L-verbatim-other-section-flags" 0 "[L] copy-verbatim" "" "$FM_OPUS$L_MATRIX"'
+## Phase 1: a
+See `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+## Phase 2: b
+Copy `bindAndExecute()` verbatim from the shell helper in `bin/check-plan`.
+'
+
+# Advisory B and C still print their [L] message.
+for L_CASE in overflow verbatim; do
+    f="$TMP/L-$L_CASE-advisory-prints.md"
+    if [ "$L_CASE" = overflow ]; then
+        printf '%s\n' "$FM$L_MATRIX" 'Seed pid 2147483648 as the sentinel.' > "$f"
+        L_WANT='[L] overflow'
+    else
+        printf '%s\n' "$FM_OPUS$L_MATRIX" '## Phase 1: restore' \
+            'Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.' > "$f"
+        L_WANT='[L] copy-verbatim'
+    fi
+    out="$("$GUARD" "$f" 2>&1)"; got=$?
+    if [ "$got" -eq 0 ] && printf '%s' "$out" | grep -qF "$L_WANT"; then
+        echo "ok: L-$L_CASE-advisory-prints (exit 0)"
+    else
+        echo "FAIL: L-$L_CASE-advisory-prints — expected exit 0 with '$L_WANT', got exit $got"
+        FAILED=1
+    fi
+done
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

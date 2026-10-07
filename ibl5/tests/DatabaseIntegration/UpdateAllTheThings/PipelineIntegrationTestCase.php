@@ -12,7 +12,7 @@ use JsbParser\JsbImportService;
 use JsbParser\PlayerIdResolver;
 use PlrParser\PlrParserRepository;
 use PlrParser\PlrParserService;
-use SavedDepthChart\SavedDepthChartRepository;
+use DepthChartSnapshot\DepthChartSnapshotRepository;
 use Season\Season;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 use Updater\Contracts\JsbSourceResolverInterface;
@@ -64,7 +64,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
 
     protected function updateSetting(string $name, string $value): void
     {
-        $stmt = $this->db->prepare("UPDATE ibl_settings SET value = ? WHERE setting_key = ?");
+        $stmt = $this->db->prepare("UPDATE ibl_settings SET setting_value = ? WHERE setting_key = ?");
         self::assertNotFalse($stmt);
         $stmt->bind_param('ss', $value, $name);
         $stmt->execute();
@@ -291,7 +291,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
         $boxscoreRepo = new BoxscoreRepository($this->db);
         $boxscoreView = new BoxscoreView();
 
-        $savedDcRepo = new SavedDepthChartRepository($this->db);
+        $savedDcRepo = new DepthChartSnapshotRepository($this->db);
 
         $jsbRepo = new JsbImportRepository($this->db);
         $jsbResolver = new PlayerIdResolver($this->db);

@@ -703,6 +703,15 @@ want    "split: the DM downgrades the ok icon"      "$(dm)" "⚠️ plan-now"
 out=$(DISP=--queue STUB_PLAN_SRC="$GOOD_PLAN" STUB_PLANFILE="$SIB" STUB_PLANFILE_SRC="$GOOD_PLAN" \
           run_case "$P" "PLAN_FILE: $P")
 want_no "split: an unnamed new plan is not a sibling" "$out" "did NOT queue"
+# The transcript may name the sibling in a non-absolute form; basename matching catches both.
+out=$(DISP=--queue STUB_PLAN_SRC="$GOOD_PLAN" STUB_PLANFILE="$SIB" STUB_PLANFILE_SRC="$GOOD_PLAN" \
+          run_case "$P" "Also wrote ~/claude-plans/demo-slug-1-base.md
+PLAN_FILE: $P")
+want    "split: a ~/claude-plans/ sibling is reported"  "$out" "did NOT queue: demo-slug-1-base.md"
+out=$(DISP=--queue STUB_PLAN_SRC="$GOOD_PLAN" STUB_PLANFILE="$SIB" STUB_PLANFILE_SRC="$GOOD_PLAN" \
+          run_case "$P" "Also wrote demo-slug-1-base.md
+PLAN_FILE: $P")
+want    "split: a bare-filename sibling is reported"    "$out" "did NOT queue: demo-slug-1-base.md"
 
 echo "── the finish DM: every terminal outcome pings, and says what to do next ──"
 

@@ -1,6 +1,6 @@
 ---
 description: Centralizes shared contract modifier formulas (winner, tradition, loyalty, playing time) into ContractRules static methods, eliminating three divergent implementations.
-last_verified: 2026-09-06
+last_verified: 2026-10-03
 ---
 
 # ADR-0014: Centralize Contract Modifier Formulas
@@ -30,6 +30,6 @@ All shared modifier formulas are centralized as static methods on `ContractRules
 
 ## References
 
-- `ibl5/classes/ContractRules.php` — canonical modifier methods and constants
+- `ibl5/classes/League/ContractRules.php`: canonical modifier methods and constants
 - `ibl5/tests/WideUnit/ModifierConsistencyTest.php` — cross-module divergence guard
 - `ibl5/tests/ContractRulesTest.php` — unit tests for modifier methods

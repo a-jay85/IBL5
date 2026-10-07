@@ -20,7 +20,7 @@
 
 .draft-error a {
     color: var(--error-600);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .draft-table input[type="radio"] {
@@ -34,7 +34,7 @@
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 40;
+    z-index: var(--z-fixed);
     background: var(--page-bg);
     padding: 0.75rem 1rem;
     padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));

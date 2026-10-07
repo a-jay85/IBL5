@@ -1,0 +1,3 @@
+compaction:context_compacted_after_a_long_test_run_output	1	1
+correction:no,_you_edited_the_main_checkout_again;_work_in_the_worktree	1	1
+hook_deny:blocked_(plan-gate-edit):_N_distinct_files_edited_in_one_tur	1	1

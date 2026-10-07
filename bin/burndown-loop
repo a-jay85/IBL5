@@ -1,0 +1,798 @@
+#!/usr/bin/env bash
+# Headless /burndown loop paced against the weekly usage window.
+#
+# Runs one fresh `claude -p` /burndown session per batch. Before each batch it
+# re-reads live usage and paces weekly utilization along a straight line to
+# (100 - IBL5_BURNDOWN_RESERVE_PCT)% at seven_day.resets_at (usage_pace_verdict in
+# bin/lib/usage-gate.sh). Pause and resume reuse the ADR-0143 usage-gate primitives.
+#
+# Each batch runs with CLAUDE_HEADLESS=1, which silences Stop hooks, plus
+# IBL5_BURNDOWN_LOOP=1. The second var is the opt-in that lets the /burndown
+# skill's `bin/post-plan-now --auto` calls ship from inside the batch; without it
+# post-plan-now's headless guard skips them. post-plan-now unsets it before
+# launching its own children.
+#
+# A usage fetch that serves only a stale reading (usage_fetch rc 2) sleeps out the
+# 429 backoff plus 5s, clamped to 30-300s, or 120s when no backoff is active. No
+# reading at all (rc 1) sleeps 1800s. Neither case ever launches a batch.
+#
+# Between batches the loop hashes itself, bin/lib/usage-gate.sh and
+# bin/lib/usage-fetch.sh. When the hash changes (new code checked out where launchd
+# runs it from), it execs the new code with the same PID, lock, SID and counters.
+#
+# Usage:
+#   bin/burndown-loop start [--no-dm]
+#   bin/burndown-loop stop
+#   bin/burndown-loop status
+#   bin/burndown-loop run [--once] [--dry-run] [--no-dm]
+#   bin/burndown-loop --print-plist
+#   bin/burndown-loop --resume-paused <sid>
+# ---
+# Environment (unset and empty both take the default):
+#   IBL5_BURNDOWN_RESERVE_PCT         weekly percent kept free at reset (default 10)
+#   IBL5_BURNDOWN_MAX_FAILS           consecutive failed or aborted batches before giving up (3)
+#   IBL5_BURNDOWN_EMPTY_SLEEP_MIN     minutes between re-checks while the backlog is empty (240)
+#   IBL5_BURNDOWN_REEXEC_*            internal re-exec hand-off; ignored unless this PID set it
+#   IBL5_BURNDOWN_BATCH_TIMEOUT_MIN   per-batch wall clock in minutes (90)
+#   IBL5_BURNDOWN_DISCORD_DM          finish-DM sender (default bin/discord-dm)
+#
+# Exit codes: 0 loop finished (stop requested, or --once done; an empty --once batch ends here).
+#             1 consecutive-failure cap hit. Failed batches and /burndown exit-3
+#               aborts share the cap; below it a failure retries after 300s and an
+#               abort after 600s.
+#             2 usage or environment error.
+#             4 another instance holds the lock.
+#             75 paused by the usage gate (coordinator resumes it).
+#
+# Hard stop: launchctl bootout gui/$(id -u)/com.ibl5.burndown-loop
+#
+# Bash 3.2 / macOS compatible: no declare -A, no mapfile, no date -d/-v, no GNU timeout.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/usage-gate.sh
+. "$ROOT/bin/lib/usage-gate.sh"
+
+[ -n "${HOME:-}" ] || { echo "burndown-loop: HOME is unset" >&2; exit 2; }
+
+STATE="$HOME/.claude/burndown-loop"
+LOCK="$STATE/lock"
+STOP_FLAG="$STATE/stop"
+LOOP_LOG="$STATE/loop.log"
+REPORTS="$HOME/claude-plans/_reports"
+LABEL="com.ibl5.burndown-loop"
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+RUNNER="$STATE/runner.sh"
+BL_SLEEP_CAP=1800
+# rc-2 fetch retry (usage_fetch served stale or nothing fresh): sleep out the 429
+# backoff plus a pad, clamped, or a short fixed retry when no backoff is active.
+BL_BACKOFF_PAD=5
+BL_BACKOFF_FLOOR=30
+BL_BACKOFF_CAP=300
+BL_FETCH_RETRY=120
+BL_PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin:$HOME/.bun/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+DISCORD_DM="${IBL5_BURNDOWN_DISCORD_DM:-$ROOT/bin/discord-dm}"
+
+LOOP_SID=""
+RESUME_SID=""
+NO_DM=0
+ONCE=0
+BATCHES=0
+ITEMS=0
+BATCH_ITEMS=0
+UNITS=0
+FAILS=0
+LAST_FAIL=""
+EMPTY_STREAK=0
+START_EPOCH=$(date +%s)
+
+# Re-exec hand-off (see bl_maybe_reexec). Read once, then unset, so batch children
+# (claude -p) never inherit the values. Honored only when RX_PID is this process's
+# own PID; a stale export in an operator's shell is ignored.
+REEXEC=0
+CODE_HASH=""
+RX_SKIP_HASH=""
+RX_PID="${IBL5_BURNDOWN_REEXEC_PID:-}"
+RX_SID="${IBL5_BURNDOWN_REEXEC_SID:-}"
+RX_BATCHES="${IBL5_BURNDOWN_REEXEC_BATCHES:-}"
+RX_ITEMS="${IBL5_BURNDOWN_REEXEC_ITEMS:-}"
+RX_UNITS="${IBL5_BURNDOWN_REEXEC_UNITS:-}"
+RX_FAILS="${IBL5_BURNDOWN_REEXEC_FAILS:-}"
+RX_START="${IBL5_BURNDOWN_REEXEC_START:-}"
+RX_LAST_FAIL="${IBL5_BURNDOWN_REEXEC_LAST_FAIL:-}"
+RX_EMPTY_STREAK="${IBL5_BURNDOWN_REEXEC_EMPTY_STREAK:-}"
+unset IBL5_BURNDOWN_REEXEC_PID IBL5_BURNDOWN_REEXEC_SID IBL5_BURNDOWN_REEXEC_BATCHES \
+    IBL5_BURNDOWN_REEXEC_ITEMS IBL5_BURNDOWN_REEXEC_UNITS IBL5_BURNDOWN_REEXEC_FAILS \
+    IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL IBL5_BURNDOWN_REEXEC_EMPTY_STREAK
+
+BL_PROMPT='Invoke the /burndown skill now and run every step to completion. No human is present: never ask questions or wait for input. When the skill says to show or tell the user something, print it and continue. Make the safe choice and continue. If the first selection round in step 4 prints `LEDGER: none`, end your final message with this exact line on its own: BURNDOWN-LOOP: none-selected. If any bin/backlog command in the run exits 3 (fail-closed abort), stop the run and end your final message with this exact line on its own: BURNDOWN-LOOP: abort-exit-3'
+
+bl_usage() {
+    cat <<'USAGE_EOF'
+Usage: bin/burndown-loop <subcommand>
+  start [--no-dm]                    launch detached under launchd
+  stop                               finish the current batch, then exit
+  status                             lock pid, liveness, recent log
+  run [--once] [--dry-run] [--no-dm] the loop body (what launchd runs)
+  --print-plist                      emit the launchd unit on stdout
+  --resume-paused <sid>              coordinator entry
+Hard stop: launchctl bootout gui/$(id -u)/com.ibl5.burndown-loop
+USAGE_EOF
+}
+
+bl_unknown() {
+    echo "burndown-loop: unknown argument: $1" >&2
+    bl_usage >&2
+    exit 2
+}
+
+bl_log() {
+    printf '%s burndown-loop %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
+}
+
+# bl_posint_env <NAME> <default>: unset and empty take the default; anything that
+# is not a positive integer exits 2 (these knobs bound runtime, so a typo is loud).
+bl_posint_env() {
+    local name="$1" def="$2" v
+    v="${!name:-}"
+    [ -n "$v" ] || { echo "$def"; return 0; }
+    case "$v" in
+        *[!0-9]*|0*) echo "burndown-loop: $name must be a positive integer (got '$v')" >&2; exit 2 ;;
+    esac
+    echo "$v"
+}
+
+bl_uuid() {
+    if command -v uuidgen >/dev/null 2>&1; then
+        uuidgen | tr 'A-Z' 'a-z'
+    else
+        cat /proc/sys/kernel/random/uuid
+    fi
+}
+
+bl_timeout_secs() {
+    local m
+    m=$(bl_posint_env IBL5_BURNDOWN_BATCH_TIMEOUT_MIN 90) || exit 2
+    echo $((m * 60))
+}
+
+# ------------------------------------------------------------ lock
+
+bl_cleanup() {
+    if [ -n "$LOOP_SID" ]; then usage_token_release "$LOOP_SID" 2>/dev/null || true; fi
+    if [ -f "$LOCK/pid" ] && [ "$(cat "$LOCK/pid" 2>/dev/null)" = "$$" ]; then
+        rm -rf "$LOCK"
+    fi
+}
+
+# bl_lock_live_pid: echoes the pid holding a live lock, nothing otherwise.
+bl_lock_live_pid() {
+    local pid
+    pid=$(cat "$LOCK/pid" 2>/dev/null || true)
+    case "$pid" in ''|*[!0-9]*) return 0 ;; esac
+    if kill -0 "$pid" 2>/dev/null; then echo "$pid"; fi
+    return 0
+}
+
+bl_lock_acquire() {
+    local pid
+    mkdir -p "$STATE"
+    if ! mkdir "$LOCK" 2>/dev/null; then
+        pid=$(bl_lock_live_pid)
+        if [ -n "$pid" ]; then
+            echo "burndown-loop: already running (pid $pid)" >&2
+            exit 4
+        fi
+        bl_log "reclaimed stale lock pid=$(cat "$LOCK/pid" 2>/dev/null || echo none)"
+        rm -rf "$LOCK"
+        mkdir "$LOCK" 2>/dev/null || { echo "burndown-loop: already running" >&2; exit 4; }
+    fi
+    echo "$$" > "$LOCK/pid"
+    trap bl_cleanup EXIT
+}
+
+# ------------------------------------------------------------ pacing decision
+
+# bl_fetch_retry_decision <frc>: the one decision line for usage_fetch rc 2. An active
+# 429 backoff gives (until - now + pad) clamped to [floor, cap]; an absent, expired
+# or garbled backoff file gives the fixed retry. Never prints launch.
+bl_fetch_retry_decision() {
+    local frc="$1" bo bo_until now secs
+    bo=$(_usage_fetch_backoff_read "$(usage_state_dir)/fetch-backoff")
+    bo_until=${bo% *}
+    now=$(date +%s)
+    if [ "$bo_until" -gt "$now" ]; then
+        secs=$(( 10#$bo_until - now + BL_BACKOFF_PAD ))
+        if [ "$secs" -lt "$BL_BACKOFF_FLOOR" ]; then secs=$BL_BACKOFF_FLOOR; fi
+        if [ "$secs" -gt "$BL_BACKOFF_CAP" ]; then secs=$BL_BACKOFF_CAP; fi
+        echo "sleep $secs backoff fetch-rc=$frc until=$bo_until"
+        return 0
+    fi
+    echo "sleep $BL_FETCH_RETRY fetch-retry fetch-rc=$frc"
+}
+
+# bl_decide: prints exactly one line, the single pacing decision for both the live
+# loop and --dry-run. Fails closed on a missing or stale reading: the loop is
+# discretionary work, so a skipped batch costs time while an unpaced one costs the
+# owner's week (unlike usage_prestart_gate, which guards a run the user asked for).
+# A stale reading (fetch rc 2) only shortens the sleep to the backoff or a 120s retry.
+bl_decide() {
+    local body frc=0 v verdict wait
+    body=$(usage_fetch 45) || frc=$?
+    if [ "$frc" -eq 2 ]; then
+        bl_fetch_retry_decision "$frc"
+        return 0
+    fi
+    if [ "$frc" -ne 0 ]; then
+        echo "sleep $BL_SLEEP_CAP blind fetch-rc=$frc"
+        return 0
+    fi
+    v=$(usage_pace_verdict "$body" "$(date +%s)")
+    verdict="${v%% *}"
+    case "$verdict" in
+        go) echo "launch $v" ;;
+        wait)
+            wait=$(printf '%s' "$v" | cut -d' ' -f4)
+            if [ "$wait" -gt "$BL_SLEEP_CAP" ]; then wait=$BL_SLEEP_CAP; fi
+            echo "sleep $wait pace $v"
+            ;;
+        zone) echo "pause $v" ;;
+        *) echo "sleep $BL_SLEEP_CAP blind $v" ;;
+    esac
+}
+
+# bl_sleep <secs> <reason>: logged sleep in chunks of at most 60s. Returns 1 as soon
+# as the stop flag appears, so `stop` lands within a minute.
+bl_sleep() {
+    local left="$1" reason="$2" chunk
+    bl_log "sleep ${left}s reason=$reason"
+    while [ "$left" -gt 0 ]; do
+        [ ! -e "$STOP_FLAG" ] || return 1
+        chunk=60
+        if [ "$left" -lt "$chunk" ]; then chunk=$left; fi
+        sleep "$chunk"
+        left=$((left - chunk))
+    done
+    [ ! -e "$STOP_FLAG" ] || return 1
+    return 0
+}
+
+# ------------------------------------------------------------ finish
+
+# bl_dm <msg>: one Discord DM, skipped under --no-dm and --once or when the
+# sender is not executable.
+bl_dm() {
+    [ "$NO_DM" -eq 0 ] && [ "$ONCE" -eq 0 ] || return 0
+    if [ ! -x "$DISCORD_DM" ]; then
+        bl_log "no executable discord-dm at $DISCORD_DM; not notifying"
+        return 0
+    fi
+    printf '%s' "$1" | "$DISCORD_DM" - || true
+}
+
+# bl_finish <reason> <rc>: logs, sends the one finish DM, exits <rc>. A paused loop
+# sends nothing (the coordinator DMs once per pause wave), nor do --no-dm and --once.
+bl_finish() {
+    local reason="$1" rc="$2" elapsed msg
+    elapsed=$(( ($(date +%s) - START_EPOCH) / 60 ))
+    bl_log "finish reason=$reason batches=$BATCHES items=$ITEMS"
+    if [ "$reason" != "paused" ]; then
+        msg="burndown-loop: finished ($reason)
+batches=$BATCHES items=$ITEMS elapsed=${elapsed}m"
+        if { [ "$reason" = "failures" ] || [ "$reason" = "fail-closed" ]; } && [ -n "$LAST_FAIL" ]; then
+            msg="$msg
+$LAST_FAIL"
+        fi
+        msg="$msg
+log: $LOOP_LOG"
+        bl_dm "$msg"
+    fi
+    exit "$rc"
+}
+
+bl_stopped() {
+    rm -f "$STOP_FLAG"
+    bl_log "stop requested; exiting"
+    bl_finish stopped 0
+}
+
+# ------------------------------------------------------------ batch
+
+bl_ledgers() {
+    local f
+    for f in "$REPORTS"/burndown-batch-*.json; do
+        [ -e "$f" ] || continue
+        basename "$f"
+    done | sort
+}
+
+# bl_classify <brc> <new_count> <blog> <empty_seen>: one word, plus a reason
+# after "failed". "empty" needs the script-written sentinel (empty_seen=1); the
+# model's none-selected marker alone is an unconfirmed claim and counts as failed.
+bl_classify() {
+    local brc="$1" new="$2" blog="$3" seen="${4:-0}"
+    if [ "$brc" -eq 142 ]; then echo "failed timeout"; return 0; fi
+    if grep -qx 'BURNDOWN-LOOP: abort-exit-3' "$blog" 2>/dev/null; then echo "abort"; return 0; fi
+    if [ "$new" -ge 1 ]; then echo "ran"; return 0; fi
+    if [ "$seen" -eq 1 ]; then echo "empty"; return 0; fi
+    if grep -qx 'BURNDOWN-LOOP: none-selected' "$blog" 2>/dev/null; then
+        echo "failed none-selected-unconfirmed rc=$brc"
+        return 0
+    fi
+    echo "failed rc=$brc"
+}
+
+# bl_run_batch: one fresh headless session. Sets BATCH_RC, BLOG, NEW_LEDGERS, EMPTY_SEEN.
+bl_run_batch() {
+    local ts timeout_secs caff=""
+    ts=$(date -u +%Y%m%dT%H%M%SZ)
+    BLOG="$STATE/batch-$ts.log"
+    # Empty-backlog sentinel: bin/lib/burndown.sh writes this path only on a
+    # first selection round that prints LEDGER: none. Clear leftovers first so
+    # a crashed earlier batch can never vouch for this one.
+    BL_EMPTY_SENTINEL="$STATE/empty-$ts"
+    rm -f "$STATE"/empty-*
+    bl_ledgers > "$STATE/ledgers.before"
+    timeout_secs=$(bl_timeout_secs)
+    if command -v caffeinate >/dev/null 2>&1; then caff="caffeinate -s"; fi
+    BATCH_RC=0
+    # $caff is expanded unquoted on purpose: empty off macOS.
+    # shellcheck disable=SC2086
+    env CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 IBL5_BURNDOWN_LOOP=1 \
+        IBL5_BURNDOWN_EMPTY_SENTINEL="$BL_EMPTY_SENTINEL" \
+        IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=burndown-loop \
+        IBL5_USAGE_GATE_MODEL=claude-sonnet-5-5 \
+        IBL5_USAGE_GATE_RESUME_BIN="$ROOT/bin/burndown-loop" \
+        IBL5_USAGE_GATE_SESSION_ID="$LOOP_SID" \
+        perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$timeout_secs" \
+        $caff claude -p "$BL_PROMPT" --dangerously-skip-permissions \
+        --model claude-sonnet-5-5 --effort high --name "burndown-loop-$ts" \
+        >"$BLOG" 2>&1 || BATCH_RC=$?
+    bl_ledgers > "$STATE/ledgers.after"
+    NEW_LEDGERS=$(comm -13 "$STATE/ledgers.before" "$STATE/ledgers.after")
+    EMPTY_SEEN=0
+    if [ -f "$BL_EMPTY_SENTINEL" ]; then EMPTY_SEEN=1; fi
+    rm -f "$BL_EMPTY_SENTINEL"
+}
+
+# bl_count_new: adds the new ledgers' items to ITEMS, bumps BATCHES, sets BATCH_ITEMS to
+# this batch's item count, sets UNITS from each ledger's top-level units_used.
+# Never call it in $(...): the counters would update a subshell copy.
+bl_count_new() {
+    local n units=0 u f c batch_items=0
+    BATCHES=$((BATCHES + 1))
+    for n in $NEW_LEDGERS; do
+        f="$REPORTS/$n"
+        c=$(jq '.items | length' "$f" 2>/dev/null || echo 0)
+        batch_items=$((batch_items + c))
+        ITEMS=$((ITEMS + c))
+        u=$(jq '.units_used // 0' "$f" 2>/dev/null || echo 0)
+        units=$((units + u))
+    done
+    BATCH_ITEMS=$batch_items
+    UNITS=$units
+}
+
+# bl_all_skipped: true when the new ledgers hold at least one item and every item
+# has status "skipped". An unreadable ledger counts as not all-skipped.
+bl_all_skipped() {
+    local n f c total=0
+    for n in $NEW_LEDGERS; do
+        f="$REPORTS/$n"
+        c=$(jq '[.items[] | select(.status != "skipped")] | length' "$f" 2>/dev/null) || return 1
+        [ "$c" = 0 ] || return 1
+        c=$(jq '.items | length' "$f" 2>/dev/null) || return 1
+        total=$((total + c))
+    done
+    [ "$total" -ge 1 ]
+}
+
+bl_on_launch() {
+    local class reason new units tail3
+    bl_run_batch
+    if usage_postrun_pause burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" "$BATCH_RC" "$BLOG"; then
+        bl_log "RESULT paused (usage gate); auto-resumes after reset."
+        bl_finish paused 75
+    fi
+    new=0
+    if [ -n "$NEW_LEDGERS" ]; then new=$(printf '%s\n' "$NEW_LEDGERS" | grep -c .); fi
+    class=$(bl_classify "$BATCH_RC" "$new" "$BLOG" "$EMPTY_SEEN")
+    reason="${class#* }"
+    class="${class%% *}"
+    case "$class" in
+        ran)
+            FAILS=0
+            EMPTY_STREAK=0
+            bl_count_new
+            bl_log "batch ran ledgers=$new items=$BATCH_ITEMS units=$UNITS rc=$BATCH_RC log=$BLOG"
+            # A batch that skipped every pick did no work. The next batch re-picks the
+            # same blocked items, so back off like an empty backlog.
+            if bl_all_skipped; then
+                bl_log "every picked item skipped; re-check in ${EMPTY_SLEEP_MIN}m"
+                if [ "$ONCE" -eq 0 ]; then
+                    bl_sleep $((EMPTY_SLEEP_MIN * 60)) all-skipped || bl_stopped
+                fi
+            fi
+            ;;
+        empty)
+            FAILS=0
+            if [ "$ONCE" -eq 1 ]; then
+                bl_log "backlog empty (sentinel confirmed first round LEDGER: none); --once ends the run"
+                bl_finish exhausted 0
+            fi
+            bl_log "backlog empty (sentinel confirmed first round LEDGER: none); re-check in ${EMPTY_SLEEP_MIN}m streak=$((EMPTY_STREAK + 1))"
+            if [ "$EMPTY_STREAK" -eq 0 ]; then
+                bl_dm "burndown-loop: backlog empty; re-checking every ${EMPTY_SLEEP_MIN}m until work appears
+batches=$BATCHES items=$ITEMS
+log: $LOOP_LOG"
+            fi
+            EMPTY_STREAK=$((EMPTY_STREAK + 1))
+            bl_sleep $((EMPTY_SLEEP_MIN * 60)) backlog-empty || bl_stopped
+            ;;
+        abort)
+            # An abort batch can still have written ledgers; count them before retrying.
+            bl_count_new >/dev/null
+            FAILS=$((FAILS + 1))
+            LAST_FAIL="last fail: reason=abort-exit-3 log=$BLOG"
+            bl_log "batch aborted: burndown exit 3 fails=$FAILS/$MAX_FAILS log=$BLOG"
+            if [ "$FAILS" -ge "$MAX_FAILS" ]; then bl_finish fail-closed 1; fi
+            if [ "$ONCE" -eq 0 ]; then
+                bl_sleep 600 retry-after-abort || bl_stopped
+            fi
+            ;;
+        *)
+            FAILS=$((FAILS + 1))
+            tail3=$(tail -n 3 "$BLOG" 2>/dev/null | tr '\n' ' ' | cut -c1-300)
+            LAST_FAIL="last fail: reason=$reason tail=$tail3"
+            bl_log "batch failed reason=$reason fails=$FAILS/$MAX_FAILS tail=$tail3"
+            if [ "$FAILS" -ge "$MAX_FAILS" ]; then bl_finish failures 1; fi
+            if [ "$ONCE" -eq 0 ]; then
+                bl_sleep 300 retry-after-failure || bl_stopped
+            fi
+            ;;
+    esac
+}
+
+# ------------------------------------------------------------ usage-gate pause
+
+bl_on_pause() {
+    local gate_rc=0 zone
+    usage_prestart_gate burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" || gate_rc=$?
+    if [ "$gate_rc" -eq 10 ]; then
+        zone=$(usage_marker_read "$LOOP_SID" | jq -r '.zone // "unknown"' 2>/dev/null)
+        bl_log "paused zone=$zone"
+        bl_finish paused 75
+    fi
+    # The gate failed open (token held, stale fetch, or marker write failed). The loop
+    # still never starts a batch in the drain or stop zone.
+    zone=$(usage_zone "$(usage_fetch 45 2>/dev/null || true)" 2>/dev/null || true)
+    bl_log "zone=${zone:-unknown} but no marker; sleeping"
+    bl_sleep "$BL_SLEEP_CAP" zone-no-marker || bl_stopped
+}
+
+# ------------------------------------------------------------ re-exec
+
+# bl_nonneg_int <v>: 0, or digits with no leading zero (keeps $(( )) off octal).
+bl_nonneg_int() {
+    case "$1" in
+        0) return 0 ;;
+        ''|*[!0-9]*|0*) return 1 ;;
+    esac
+    return 0
+}
+
+# bl_reexec_apply: when this process was exec'd by a running loop (RX_PID == $$), set
+# REEXEC=1 and restore the carried state; invalid state keeps fresh counters.
+bl_reexec_apply() {
+    if [ -z "$RX_PID" ] || [ "$RX_PID" != "$$" ]; then return 0; fi
+    REEXEC=1
+    if bl_nonneg_int "$RX_BATCHES" && bl_nonneg_int "$RX_ITEMS" \
+        && bl_nonneg_int "$RX_UNITS" && bl_nonneg_int "$RX_FAILS" \
+        && bl_nonneg_int "$RX_START" && [ "$RX_START" -le "$(date +%s)" ] \
+        && usage_valid_sid "$RX_SID"; then
+        LOOP_SID="$RX_SID"
+        BATCHES="$RX_BATCHES"
+        ITEMS="$RX_ITEMS"
+        UNITS="$RX_UNITS"
+        FAILS="$RX_FAILS"
+        START_EPOCH="$RX_START"
+        LAST_FAIL="$RX_LAST_FAIL"
+        # Absent when the exec'ing process ran older code: keep 0, not a reset.
+        if bl_nonneg_int "$RX_EMPTY_STREAK" && [ "$RX_EMPTY_STREAK" -gt 0 ]; then
+            EMPTY_STREAK=1
+        fi
+    else
+        bl_log "re-exec state invalid; counters reset"
+    fi
+}
+
+# bl_code_hash: sha256 over the loop and its two sourced libs; prints nothing when a
+# file is unreadable or shasum fails, which callers treat as "no change".
+bl_code_hash() {
+    local f h
+    for f in "$ROOT/bin/burndown-loop" "$ROOT/bin/lib/usage-gate.sh" "$ROOT/bin/lib/usage-fetch.sh"; do
+        [ -r "$f" ] || return 0
+    done
+    h=$(cat "$ROOT/bin/burndown-loop" "$ROOT/bin/lib/usage-gate.sh" \
+        "$ROOT/bin/lib/usage-fetch.sh" 2>/dev/null | shasum -a 256 2>/dev/null) || return 0
+    h=${h%% *}
+    case "$h" in ''|*[!0-9a-f]*) return 0 ;; esac
+    echo "$h"
+}
+
+# bl_maybe_reexec: between batches only. On a code change, hand the counters to the
+# new image through IBL5_BURNDOWN_REEXEC_* and exec it with the same PID (the lock's
+# pid stays valid; exec skips the EXIT trap, so the lock and usage token survive).
+bl_maybe_reexec() {
+    local now_hash xrc=0
+    now_hash=$(bl_code_hash)
+    [ -n "$now_hash" ] || return 0
+    if [ -z "$CODE_HASH" ]; then CODE_HASH="$now_hash"; return 0; fi
+    [ "$now_hash" != "$CODE_HASH" ] || return 0
+    if [ ! -x "$ROOT/bin/burndown-loop" ] || ! bash -n "$ROOT/bin/burndown-loop" 2>/dev/null; then
+        if [ "$RX_SKIP_HASH" != "$now_hash" ]; then
+            bl_log "re-exec skipped: new code fails syntax check old=${CODE_HASH:0:12} new=${now_hash:0:12}"
+            RX_SKIP_HASH="$now_hash"
+        fi
+        return 0
+    fi
+    bl_log "code changed; re-exec old=${CODE_HASH:0:12} new=${now_hash:0:12} batches=$BATCHES items=$ITEMS fails=$FAILS"
+    export IBL5_BURNDOWN_REEXEC_PID="$$" IBL5_BURNDOWN_REEXEC_SID="$LOOP_SID" \
+        IBL5_BURNDOWN_REEXEC_BATCHES="$BATCHES" IBL5_BURNDOWN_REEXEC_ITEMS="$ITEMS" \
+        IBL5_BURNDOWN_REEXEC_UNITS="$UNITS" IBL5_BURNDOWN_REEXEC_FAILS="$FAILS" \
+        IBL5_BURNDOWN_REEXEC_START="$START_EPOCH" IBL5_BURNDOWN_REEXEC_LAST_FAIL="$LAST_FAIL" \
+        IBL5_BURNDOWN_REEXEC_EMPTY_STREAK="$EMPTY_STREAK"
+    set -- run "--loop-sid=$LOOP_SID"
+    if [ "$NO_DM" -eq 1 ]; then set -- "$@" --no-dm; fi
+    # execfail: a failed exec returns here instead of killing the loop.
+    shopt -s execfail
+    exec "$ROOT/bin/burndown-loop" "$@" || xrc=$?
+    shopt -u execfail
+    unset IBL5_BURNDOWN_REEXEC_PID IBL5_BURNDOWN_REEXEC_SID IBL5_BURNDOWN_REEXEC_BATCHES \
+        IBL5_BURNDOWN_REEXEC_ITEMS IBL5_BURNDOWN_REEXEC_UNITS IBL5_BURNDOWN_REEXEC_FAILS \
+        IBL5_BURNDOWN_REEXEC_START IBL5_BURNDOWN_REEXEC_LAST_FAIL IBL5_BURNDOWN_REEXEC_EMPTY_STREAK
+    bl_log "re-exec failed rc=$xrc; continuing on the old code"
+    CODE_HASH="$now_hash"
+}
+
+# ------------------------------------------------------------ run
+
+bl_cmd_run() {
+    local dry=0 a decision action rest secs reason max_fails timeout_secs
+    for a in "$@"; do
+        case "$a" in
+            --once) ONCE=1 ;;
+            --dry-run) dry=1; ONCE=1 ;;
+            --no-dm) NO_DM=1 ;;
+            --loop-sid=*)
+                LOOP_SID="${a#--loop-sid=}"
+                usage_valid_sid "$LOOP_SID" || { echo "burndown-loop: --loop-sid needs a uuid" >&2; exit 2; }
+                ;;
+            *) bl_unknown "$a" ;;
+        esac
+    done
+
+    MAX_FAILS=$(bl_posint_env IBL5_BURNDOWN_MAX_FAILS 3)
+    EMPTY_SLEEP_MIN=$(bl_posint_env IBL5_BURNDOWN_EMPTY_SLEEP_MIN 240) || exit 2
+    max_fails="$MAX_FAILS"
+    timeout_secs=$(bl_timeout_secs)
+
+    if [ "$dry" -eq 1 ]; then
+        decision=$(bl_decide)
+        echo "burndown-loop: DRY RUN reserve=$(usage_pace_reserve) timeout=$timeout_secs max_fails=$max_fails dm=$DISCORD_DM decision=$decision"
+        return 0
+    fi
+
+    bl_reexec_apply
+    [ -n "$LOOP_SID" ] || LOOP_SID=$(bl_uuid)
+    mkdir -p "$STATE"
+    if [ "$REEXEC" -eq 1 ] && [ "$(cat "$LOCK/pid" 2>/dev/null || true)" = "$$" ]; then
+        # exec kept our PID, so the lock is already ours. exec skipped the old EXIT
+        # trap, so install it again. A stop request made before the exec stays.
+        trap bl_cleanup EXIT
+        bl_log "re-exec resumed pid=$$ sid=$LOOP_SID batches=$BATCHES items=$ITEMS fails=$FAILS"
+    else
+        # An old stop request must not kill a new loop.
+        rm -f "$STOP_FLAG"
+        bl_lock_acquire
+    fi
+    echo "$LOOP_SID" > "$STATE/loop.sid"
+    CODE_HASH=$(bl_code_hash)
+    while :; do
+        if [ -e "$STOP_FLAG" ]; then bl_stopped; fi
+        bl_maybe_reexec
+        decision=$(bl_decide)
+        action="${decision%% *}"
+        bl_log "decision=$decision"
+        case "$action" in
+            sleep)
+                rest="${decision#sleep }"
+                secs="${rest%% *}"
+                rest="${rest#* }"
+                reason="${rest%% *}"
+                bl_sleep "$secs" "$reason" || bl_stopped
+                ;;
+            pause) bl_on_pause ;;
+            launch) bl_on_launch ;;
+        esac
+        [ "$ONCE" -eq 0 ] || return 0
+    done
+}
+
+# ------------------------------------------------------------ launchd
+
+# bl_render_plist: the launchd unit with every value expanded at generation time.
+# Single source for `start` and `--print-plist`.
+bl_render_plist() {
+    cat <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>$LABEL</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-lc</string>
+		<string>exec "$RUNNER"</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>$BL_PATH</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>WorkingDirectory</key>
+	<string>$ROOT</string>
+	<key>StandardOutPath</key>
+	<string>$LOOP_LOG</string>
+	<key>StandardErrorPath</key>
+	<string>$LOOP_LOG</string>
+</dict>
+</plist>
+PLIST_EOF
+}
+
+bl_write_runner() {
+    {
+        printf '#!/usr/bin/env bash\n'
+        printf '# Generated by bin/burndown-loop start at %s.\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf 'export PATH=%q\n' "$BL_PATH"
+        printf 'rc=0\n'
+        printf '%q run --loop-sid=%s' "$ROOT/bin/burndown-loop" "$LOOP_SID"
+        if [ "$NO_DM" -eq 1 ]; then printf ' --no-dm'; fi
+        printf ' || rc=$?\n'
+        printf 'rm -f %q\n' "$PLIST"
+        printf 'launchctl bootout "gui/$(id -u)/%s" 2>/dev/null || true\n' "$LABEL"
+        printf 'exit "$rc"\n'
+    } > "$RUNNER"
+    chmod +x "$RUNNER"
+}
+
+bl_cmd_start() {
+    local a gate_rc=0 pid zone
+    for a in "$@"; do
+        case "$a" in
+            --no-dm) NO_DM=1 ;;
+            *) bl_unknown "$a" ;;
+        esac
+    done
+    pid=$(bl_lock_live_pid)
+    if [ -n "$pid" ]; then
+        echo "burndown-loop: already running (pid $pid); use: bin/burndown-loop stop" >&2
+        exit 4
+    fi
+    [ -n "$LOOP_SID" ] || LOOP_SID=$(bl_uuid)
+    # The saved argv is `start`, never `run`, so a resume always goes through launchd.
+    if [ "$NO_DM" -eq 1 ]; then
+        usage_argv_save "$LOOP_SID" start --no-dm || true
+    else
+        usage_argv_save "$LOOP_SID" start || true
+    fi
+    usage_prestart_gate burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" || gate_rc=$?
+    if [ "$gate_rc" -eq 10 ]; then
+        zone=$(usage_marker_read "$LOOP_SID" | jq -r '.zone // "unknown"' 2>/dev/null)
+        echo "burndown-loop: usage gate ${zone}; paused before start, auto-resumes after reset."
+        exit 75
+    fi
+    [ -z "$RESUME_SID" ] || usage_marker_clear "$RESUME_SID"
+
+    mkdir -p "$STATE" "$(dirname "$PLIST")"
+    bl_write_runner
+    bl_render_plist > "$PLIST"
+    launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+    launchctl bootstrap "gui/$(id -u)" "$PLIST"
+
+    echo "burndown-loop: started under launchd."
+    echo "  label:  $LABEL"
+    echo "  log:    $LOOP_LOG"
+    echo "  stop:   bin/burndown-loop stop"
+    if [ "$NO_DM" -eq 1 ]; then echo "  notify: none (--no-dm)"; else echo "  notify: Discord DM on finish"; fi
+}
+
+# bl_paused_sid: echoes the loop sid when a pause marker exists for it.
+bl_paused_sid() {
+    local sid
+    sid=$(cat "$STATE/loop.sid" 2>/dev/null || true)
+    if [ -n "$sid" ] && usage_marker_exists "$sid"; then echo "$sid"; fi
+    return 0
+}
+
+# Graceful: the running batch completes first, since a kill can leave a ledger with
+# picked-but-unrouted items.
+bl_cmd_stop() {
+    local pid sid
+    pid=$(bl_lock_live_pid)
+    if [ -n "$pid" ]; then
+        mkdir -p "$STATE"
+        : > "$STOP_FLAG"
+        echo "burndown-loop: stop requested (pid $pid); the current batch finishes first."
+        return 0
+    fi
+    sid=$(bl_paused_sid)
+    if [ -n "$sid" ]; then
+        usage_marker_clear "$sid"
+        echo "burndown-loop: cancelled paused loop $sid"
+        return 0
+    fi
+    echo "burndown-loop: not running"
+}
+
+bl_cmd_status() {
+    local pid sid
+    pid=$(bl_lock_live_pid)
+    sid=$(bl_paused_sid)
+    if [ -n "$pid" ]; then
+        echo "running pid=$pid sid=$(cat "$STATE/loop.sid" 2>/dev/null || echo unknown)"
+    elif [ -n "$sid" ]; then
+        echo "paused sid=$sid (resumes after reset)"
+    else
+        echo "not running"
+    fi
+    if [ -f "$LOOP_LOG" ]; then tail -n 5 "$LOOP_LOG"; fi
+    return 0
+}
+
+# ------------------------------------------------------------ dispatch
+
+main() {
+    [ "$#" -gt 0 ] || { echo "burndown-loop: no subcommand" >&2; bl_usage >&2; exit 2; }
+    # --resume-paused <sid>: the coordinator's entry point. Replays the argv saved at
+    # start (always `start [--no-dm]`) under the same loop sid.
+    if [ "$1" = "--resume-paused" ]; then
+        if [ "$#" -ne 2 ]; then
+            echo "--resume-paused takes exactly one session id" >&2
+            exit 2
+        fi
+        local saved_file a
+        saved_file=$(mktemp)
+        if ! usage_resume_paused_args burndown-loop "$2" > "$saved_file"; then
+            rm -f "$saved_file"
+            exit 2
+        fi
+        RESUME_SID="$2"
+        LOOP_SID="$2"
+        local saved=()
+        while IFS= read -r -d '' a; do saved[${#saved[@]}]="$a"; done < "$saved_file"
+        rm -f "$saved_file"
+        set -- ${saved[@]+"${saved[@]}"}
+        [ "$#" -gt 0 ] || { echo "--resume-paused: saved argv is empty" >&2; exit 2; }
+        [ "$1" != "--resume-paused" ] || { echo "--resume-paused: must be the only argument" >&2; exit 2; }
+    fi
+    local cmd="$1"
+    shift
+    case "$cmd" in
+        run) bl_cmd_run "$@" ;;
+        start) bl_cmd_start "$@" ;;
+        stop) [ "$#" -eq 0 ] || bl_unknown "$1"; bl_cmd_stop ;;
+        status) [ "$#" -eq 0 ] || bl_unknown "$1"; bl_cmd_status ;;
+        --print-plist) [ "$#" -eq 0 ] || bl_unknown "$1"; bl_render_plist ;;
+        -h|--help) bl_usage ;;
+        *) bl_unknown "$cmd" ;;
+    esac
+}
+
+main "$@"

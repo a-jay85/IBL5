@@ -1,7 +1,7 @@
 CashTransactionHandler
-DepthChartEntryApiHandler
-DepthChartEntryController
-DepthChartEntrySubmissionHandler
+DepthChartApiHandler
+DepthChartController
+DepthChartSubmissionHandler
 DiscordWebhookHandler
 DraftHistoryApiHandler
 DraftController
@@ -15,7 +15,7 @@ LeadersController
 LeagueStartersApiHandler
 PlayerStatsController
 RookieOptionController
-SavedDepthChartApiHandler
+DepthChartSnapshotApiHandler
 SeriesRecordsController
 StandingsController
 StatisticsController

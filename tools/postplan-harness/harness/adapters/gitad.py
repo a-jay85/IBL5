@@ -185,8 +185,10 @@ class LiveGit:
             blob = f"{proc.stdout}\n{proc.stderr}"
             if any(m in blob for m in _LOCAL_GATE_MARKERS):
                 detail = "\n".join(s for s in (proc.stderr.strip(), proc.stdout.strip()) if s)
-                raise HarnessError("local-gate", f"git {' '.join(args)}: {detail[:600]}")
-            raise HarnessError("git", f"git {' '.join(args)}: {proc.stderr.strip()[:400]}")
+                raise HarnessError("local-gate", f"git {' '.join(args)}: {detail[:600]}",
+                                   cmd=f"git {' '.join(args)}", output=detail)
+            raise HarnessError("git", f"git {' '.join(args)}: {proc.stderr.strip()[:400]}",
+                               cmd=f"git {' '.join(args)}", output=proc.stderr.strip())
         return proc.stdout
 
     def _run_out(self, *args: str) -> tuple[int, str]:
@@ -279,6 +281,27 @@ class LiveGit:
                     out.append(f)
         return out
 
+    def read_worktree_file(self, path: str) -> str | None:
+        """Text of `path` in the WORKING TREE, or None when it cannot be read.
+
+        The working tree is what diff_vs_base() diffs against, so this is the text the
+        hunks were cut from. Read ONLY by conformance.check's MISSING-METHOD fallback,
+        which passes paths from conformance_files(). A path that is absolute, carries
+        `..`, or resolves outside the worktree (symlink) is refused with None, as is a
+        missing or non-UTF-8 file; the caller treats None as "not declared here".
+        """
+        if not path or os.path.isabs(path) or ".." in path.split("/"):
+            return None
+        root = os.path.realpath(self.worktree)
+        full = os.path.realpath(os.path.join(root, path))
+        if full != root and not full.startswith(root + os.sep):
+            return None
+        try:
+            with open(full, encoding="utf-8") as fh:
+                return fh.read()
+        except (OSError, UnicodeDecodeError):
+            return None
+
     def modified_files(self, base: str = "origin/master") -> list[str]:
         out = self._run("diff", "--diff-filter=M", "--name-only",
                         self._merge_base(base)).strip()
@@ -308,7 +331,8 @@ class LiveGit:
         if proc.returncode != 0:
             detail = "\n".join(s for s in (proc.stderr.strip(), proc.stdout.strip()) if s)
             raise HarnessError("local-gate",
-                               detail[:800] or f"git commit exited {proc.returncode}")
+                               detail[:800] or f"git commit exited {proc.returncode}",
+                               cmd="git commit", output=detail)
         return self._run("rev-parse", "HEAD").strip()
 
     def head(self) -> str:
@@ -491,7 +515,16 @@ class LiveGit:
 
         if resolved_files:
             autoresolved_path = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
-            Path(autoresolved_path).write_text("\n".join(resolved_files) + "\n")
+            # Union with any list an earlier rebase in this run wrote (stale lists from a
+            # previous run are cleared once at run start); de-dup, order preserved.
+            prior: list[str] = []
+            try:
+                prior = [l.strip() for l in
+                         Path(autoresolved_path).read_text().splitlines() if l.strip()]
+            except OSError:
+                pass
+            merged = list(dict.fromkeys([*prior, *resolved_files]))
+            Path(autoresolved_path).write_text("\n".join(merged) + "\n")
 
         if resolved_files:
             res_list = ", ".join(resolved_files)
@@ -914,8 +947,12 @@ class LiveGit:
                                 remote, f"HEAD:refs/heads/{branch}")
         if rc != 0:
             if any(m in out for m in _LOCAL_GATE_MARKERS):
-                raise HarnessError("local-gate", f"git push: {out[:600]}")
-            raise HarnessError("push-failed", out[:600])
+                raise HarnessError("local-gate", f"git push: {out[:600]}",
+                                   cmd=f"git push --force-with-lease={branch}:{lease} {remote} HEAD:refs/heads/{branch}",
+                                   output=out)
+            raise HarnessError("push-failed", out[:600],
+                               cmd=f"git push --force-with-lease={branch}:{lease} {remote} HEAD:refs/heads/{branch}",
+                               output=out)
 
     def push_ff(self) -> str:
         if not self.push_remote:
@@ -928,8 +965,10 @@ class LiveGit:
         rc, out = self._run_out("push", remote, f"HEAD:refs/heads/{branch}")
         if rc != 0:
             if any(m in out for m in _LOCAL_GATE_MARKERS):
-                raise HarnessError("local-gate", f"git push: {out[:600]}")
-            raise HarnessError("push-failed", out[:600])
+                raise HarnessError("local-gate", f"git push: {out[:600]}",
+                                   cmd=f"git push {remote} HEAD:refs/heads/{branch}", output=out)
+            raise HarnessError("push-failed", out[:600],
+                               cmd=f"git push {remote} HEAD:refs/heads/{branch}", output=out)
         return self.head()
 
 
@@ -986,6 +1025,10 @@ class ReplayGit:
             if src not in out:
                 out.append(src)
         return out
+
+    def read_worktree_file(self, path: str) -> str | None:
+        """Replay has no tree to read; fail closed so a replayed MISSING-METHOD never clears."""
+        return None
 
     def modified_files(self, base: str = "origin/master") -> list[str]:
         from ..classify import modified_files_from_diff

@@ -510,10 +510,10 @@ else
     FAILED=1
 fi
 
-# e8: discord-dm invoked via SELF_DIR, never hard-coded
+# e8: discord-dm invoked via SELF_DIR, never hard-coded (postplan-hold DM + login preflight)
 e8_self=$(grep -cF '"$SELF_DIR/../discord-dm"' "$RUNNER" || true)
 e8_hard=$(grep -cF 'bin/discord-dm' "$RUNNER" || true)
-if [ "$e8_self" -eq 1 ] && [ "$e8_hard" -eq 0 ]; then
+if [ "$e8_self" -eq 2 ] && [ "$e8_hard" -eq 0 ]; then
     echo "ok: e8-discord-dm-path-relative"
 else
     echo "FAIL: e8-discord-dm-path-relative — self_dir_count=$e8_self hard_count=$e8_hard"
@@ -831,6 +831,18 @@ if [ "$s3_odd" -eq 0 ]; then
     echo "ok: s3-fences-balanced"
 else
     echo "FAIL: s3-fences-balanced — odd number of fences"
+    FAILED=1
+fi
+
+# s4: Step 1 validates the handoff's required keys (same jq -e filter as prompt-impl)
+# Both grep -qF fragments are exact text on purpose: the filter must stay identical to
+# prompt-impl's, so reformatting those prompt lines should be a deliberate, reviewed change.
+# When you reformat them in prompt-postplan, update these two fragments to match.
+if grep -qF "jq -e '[.slug, .worktree, .branch, .plan_file]" "$PROMPT" \
+   && grep -qF '| all(type == "string" and length > 0)'"'"' "$HF" > /dev/null' "$PROMPT"; then
+    echo "ok: s4-handoff-key-filter-present"
+else
+    echo "FAIL: s4-handoff-key-filter-present — jq required-key filter missing from prompt-postplan"
     FAILED=1
 fi
 

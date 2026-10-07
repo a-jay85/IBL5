@@ -12,7 +12,7 @@ use Migration\Contracts\MigrationRepositoryInterface;
  * Extends BaseMysqliRepository to interact with the `migrations` table.
  * Also provides raw SQL execution for applying migration files.
  */
-class MigrationRepository extends \BaseMysqliRepository implements MigrationRepositoryInterface
+class MigrationRepository extends \Database\BaseMysqliRepository implements MigrationRepositoryInterface
 {
     /**
      * @see MigrationRepositoryInterface::getRanMigrations()

@@ -219,7 +219,9 @@ def sync_to_remote(branch, worktree, *, run_git=None) -> str:
         if reset_r.returncode != 0:
             raise HarnessError("remote-head-diverged",
                                 f"sync failed: reset --hard origin/{branch}: "
-                                + (reset_r.stderr or "").strip()[:200])
+                                + (reset_r.stderr or "").strip()[:200],
+                                cmd=f"git reset --hard origin/{branch}",
+                                output=(reset_r.stderr or ""))
         head_r = _run(["rev-parse", "HEAD"], worktree)
         return head_r.stdout.strip()
     except HarnessError:
@@ -228,17 +230,101 @@ def sync_to_remote(branch, worktree, *, run_git=None) -> str:
         raise HarnessError("remote-head-diverged", f"sync failed: {e}") from e
 
 
-def tracking_sha(branch, worktree, *, run_git=None) -> str:
-    """SHA of refs/remotes/origin/<branch>, or "" (first push: no tracking ref yet)."""
+def tracking_sha(branch, worktree, *, run_git=None, remote="origin") -> str:
+    """SHA of refs/remotes/<remote>/<branch>, or "" (first push: no tracking ref yet)."""
     _run = run_git or _default_run_git
     try:
         r = _run(["rev-parse", "--verify", "--quiet",
-                  f"refs/remotes/origin/{branch}"], worktree)
+                  f"refs/remotes/{remote}/{branch}"], worktree)
         if r.returncode != 0:
             return ""
         return r.stdout.strip()
     except (subprocess.TimeoutExpired, OSError):
         return ""
+
+
+_ABSENT_REF = "0" * 40   # update-ref old-value meaning "ref must not exist"
+
+
+def probe_remote_tip(remote, branch, worktree, *, run_git=None) -> tuple[bool, str]:
+    """Live tip of <remote>/refs/heads/<branch>, fetched WITHOUT moving
+    refs/remotes/<remote>/<branch>. `--refmap=` (empty) disables git's
+    opportunistic remote-tracking update, so a tip we have not vetted never
+    becomes the lease of a later push. Returns (True, sha); (True, "") when the
+    remote has no such branch; (False, "") on any git failure, timeout, or when
+    the fetched FETCH_HEAD disagrees with ls-remote (the tip moved mid-probe)."""
+    _run = run_git or _default_run_git
+    try:
+        ls = _run(["ls-remote", remote, f"refs/heads/{branch}"], worktree)
+        if ls.returncode != 0:
+            return False, ""
+        if not ls.stdout.strip():
+            return True, ""
+        ls_sha = ls.stdout.strip().split()[0]
+        f = _run(["fetch", "--no-tags", "--refmap=", remote, f"refs/heads/{branch}"],
+                 worktree)
+        if f.returncode != 0:
+            return False, ""
+        r = _run(["rev-parse", "--verify", "--quiet", "FETCH_HEAD^{commit}"], worktree)
+        sha = r.stdout.strip() if r.returncode == 0 else ""
+        if not sha or sha != ls_sha:
+            return False, ""
+        return True, sha
+    except (subprocess.TimeoutExpired, OSError):
+        return False, ""
+
+
+def owned_remote_tip(lease_sha, local_sha, remote_sha, worktree, *, run_git=None) -> str:
+    """Why remote_sha carries no work this worktree lacks, or "" when it might.
+    local_sha must be the PRE-rebase HEAD. origin/master must already be fresh:
+    the patch-series and update-branch arms read it. lease_sha "" (no tracking
+    ref) skips the lease arms. Every arm is the existing fail-closed helper."""
+    if not remote_sha:
+        return ""
+    if content_equivalent(local_sha, remote_sha, worktree, run_git=run_git):
+        return "tree-equivalent to local HEAD"
+    if patch_series_equivalent(local_sha, remote_sha, worktree, run_git=run_git):
+        return "local HEAD's patch series rebased onto newer master"
+    if lease_sha:
+        if content_equivalent(lease_sha, remote_sha, worktree, run_git=run_git):
+            return "tree-equivalent to the lease"
+        if patch_series_equivalent(lease_sha, remote_sha, worktree, run_git=run_git):
+            return "the lease's patch series rebased onto newer master"
+        if update_branch_merge_equivalent(lease_sha, remote_sha, worktree,
+                                          run_git=run_git):
+            return "update-branch merge of master onto the lease"
+    return ""
+
+
+def adopt_tracking_ref(remote, branch, new_sha, old_sha, worktree, *,
+                       run_git=None) -> bool:
+    """Compare-and-swap refs/remotes/<remote>/<branch> from old_sha ("" = must be
+    absent) to new_sha. False when the ref no longer holds old_sha or git fails."""
+    _run = run_git or _default_run_git
+    try:
+        r = _run(["update-ref", "-m", "postplan: adopt owned remote tip",
+                  f"refs/remotes/{remote}/{branch}", new_sha, old_sha or _ABSENT_REF],
+                 worktree)
+        return r.returncode == 0
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
+def restore_tracking_ref(remote, branch, lease_sha, worktree, *, run_git=None) -> bool:
+    """Put refs/remotes/<remote>/<branch> back to lease_sha, or delete it when
+    lease_sha is "" (it did not exist). content_equivalent, patch_series_equivalent
+    and update_branch_merge_equivalent each run a plain `git fetch origin`, and the
+    default refspec writes the remote tip into the tracking ref as a side effect.
+    A foreign tip must not stay there, or the next push or re-run leases on it.
+    Unconditional on purpose: the caller has just decided the tip is not owned."""
+    _run = run_git or _default_run_git
+    ref = f"refs/remotes/{remote}/{branch}"
+    try:
+        args = (["update-ref", "-m", "postplan: restore lease after rejected tip",
+                 ref, lease_sha] if lease_sha else ["update-ref", "-d", ref])
+        return _run(args, worktree).returncode == 0
+    except (subprocess.TimeoutExpired, OSError):
+        return False
 
 
 @dataclass

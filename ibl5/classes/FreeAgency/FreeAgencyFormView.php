@@ -211,12 +211,12 @@ class FreeAgencyFormView
             ];
         }
 
-        $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
+        $raisePercentage = \League\ContractRules::getMaxRaisePercentage($birdYears);
         $rawPercentage = $raisePercentage * 100;
         $raisePercentageDisplay = ($rawPercentage === floor($rawPercentage))
             ? (string) (int) $rawPercentage
             : rtrim(rtrim(sprintf('%.1f', $rawPercentage), '0'), '.');
-        $hasBirdRights = \ContractRules::hasBirdRights($birdYears);
+        $hasBirdRights = \League\ContractRules::hasBirdRights($birdYears);
         $birdRightsText = $hasBirdRights ? ' with Bird Rights' : '';
 
         $label = "Max Level Contract {$raisePercentageDisplay}%{$birdRightsText} (click the button that corresponds to the final year you wish to offer):";
@@ -256,7 +256,7 @@ class FreeAgencyFormView
         $contractOfferConfigs = [];
         for ($years = 1; $years <= 6; $years++) {
             $contractOfferConfigs[] = [
-                'offers' => \ContractRules::getMLEOffers($years),
+                'offers' => \League\ContractRules::getMLEOffers($years),
                 'offerType' => (string) $years,
             ];
         }
@@ -277,7 +277,7 @@ class FreeAgencyFormView
     {
         $contractOfferConfigs = [
             [
-                'offers' => [\ContractRules::LLE_OFFER],
+                'offers' => [\League\ContractRules::LLE_OFFER],
                 'offerType' => (string) OfferType::LOWER_LEVEL_EXCEPTION,
             ],
         ];
@@ -298,7 +298,7 @@ class FreeAgencyFormView
     {
         $contractOfferConfigs = [
             [
-                'offers' => [\ContractRules::getVeteranMinimumSalary($this->player->getYearsOfExperience() ?? 0)],
+                'offers' => [\League\ContractRules::getVeteranMinimumSalary($this->player->getYearsOfExperience() ?? 0)],
                 'offerType' => (string) OfferType::VETERAN_MINIMUM,
             ],
         ];

@@ -340,9 +340,17 @@ describe('POST /planDecisions/ack — Phase 2 outcome edits', () => {
         await flushDetached(10);
 
         expect(edit).toHaveBeenCalledTimes(1);
-        const editCall = edit.mock.calls[0]![0] as { content: string; components: unknown[] };
+        const editCall = edit.mock.calls[0]![0] as {
+            content: string;
+            components: { components: { data: { disabled?: boolean } }[] }[];
+        };
         expect(editCall.content).toBe('✅ queued');
         expect(editCall.components).toHaveLength(1);
+        const buttons = editCall.components[0]!.components;
+        expect(buttons.length).toBeGreaterThan(0);
+        for (const btn of buttons) {
+            expect(btn.data.disabled).toBe(true);
+        }
     });
 
     it('Row 6: snapshot is taken BEFORE ackDecisions — tombstoned record still has its DM edited', async () => {

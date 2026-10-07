@@ -357,6 +357,8 @@ run_in() {
         PR_CYCLE_PATCH_ID_CMD="$BIN/patchid" \
         PR_CYCLE_HARNESS_OUT="$SCRATCH/harness-out" \
         PR_CYCLE_FLEET_LOG_DIR="$SCRATCH/fleetlogs" \
+        PR_CYCLE_HOLDREPEAT_HARNESS="${HRHARNESS-$SCRATCH/hr-none}" \
+        PR_CYCLE_HOLDREPEAT_STATE_DIR="${HRSTATE-$SCRATCH/hrstate}" \
         "$DRIVER" "$@" 2>"$ERR")"
     RC=$?
     return 0
@@ -482,6 +484,7 @@ begin_case
 reset_state
 cat > "$SCRATCH/attack-out-1" <<'NOM_EOF'
 ### #999 dangling-gate
+### #998 other-gate
 WORK=decoy-must-be-ignored
 Nominated for a gate edge; unjudged.
 WORK=abc123
@@ -495,14 +498,37 @@ run --worker
     || fail "first attack call: $(sed -n '1p' "$SCRATCH/attack.argv")"
 [[ "$(sed -n '2p' "$SCRATCH/attack.argv")" == "--work abc123 --gate-edges /dev/null" ]] \
     || fail "second attack call: $(sed -n '2p' "$SCRATCH/attack.argv")"
-grep -qF '#999 dangling-gate — ordered with no gate edges (gate nominee, judged-empty)' <<< "$OUT" \
-    || fail "gate nominee log line missing or misworded: $(grep -F '#999' <<< "$OUT")"
+grep -qxF '  gate nominees (ordered, judged-empty): #999 #998' <<< "$OUT" \
+    || fail "collapsed gate nominee line missing or misworded: $(grep -F 'nominee' <<< "$OUT")"
+! grep -qF 'ordered with no gate edges' <<< "$OUT" \
+    || fail "per-nominee lines are back: $(grep -F 'no gate edges' <<< "$OUT")"
 ! grep -qF 'excluded this run' <<< "$OUT" \
     || fail "driver still claims nominees are excluded; --gate-edges /dev/null re-admits every one"
 [[ "$(calls ready)" == "1" ]] || fail "want 1 fleet call after nominee re-admission, got $(calls ready)"
 _a6="$(sed -n '1p' "$SCRATCH/ready.argv")"
 [[ "$_a6" == *'101'*'102'*'103'* ]] || fail "case 6: all 3 PRs not in --pr-list: $_a6"
 end_case "case 6 gate nominees"
+
+# 6b — stale-WORK retry re-enters _attack_plan; the nominee line still prints once
+begin_case
+reset_state
+cat > "$SCRATCH/attack-out-1" <<'NOM_EOF'
+### #999 dangling-gate
+### #998 other-gate
+WORK=abc123
+NOM_EOF
+echo 3 > "$SCRATCH/attack-rc-2"
+cp "$SCRATCH/attack-out-1" "$SCRATCH/attack-out-3"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out-4"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker
+[[ "$(grep -cF 'gate nominees (ordered' <<< "$OUT")" == "1" ]] \
+    || fail "case 6b: want exactly one nominee line, got $(grep -cF 'gate nominees (ordered' <<< "$OUT")"
+[[ "$(calls attack)" == "4" ]] || fail "case 6b: want 4 attack calls, got $(calls attack)"
+[[ "$(calls ready)" == "1" ]] || fail "case 6b: want 1 fleet call, got $(calls ready)"
+end_case "case 6b nominee line once on retry"
 
 # ==========================================================================================
 # 7 — pr-attack failure handling
@@ -587,14 +613,63 @@ triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 rm -rf "$SCRATCH/fleetlogs"; mkdir -p "$SCRATCH/fleetlogs"
 echo 'post-plan-fleet: outcome=shipped' > "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
 echo 'post-plan-fleet: outcome=held'    > "$SCRATCH/fleetlogs/post-plan-fleet-102.log"
-# 103 has no log at all: it counts as blocked.
+# 103 has no log at all: it counts as failed.
 run --worker
 [[ $RC -eq 0 ]] || fail "case 11b: exit $RC, want 0"
-_want11b='fired 3 (shipped 1, held 1, blocked 1, timed out 0)'
+_want11b='fired 3 (shipped 1, held 1, declined 0, paused 0, conflict 0, failed 1, timed out 0)'
 grep -qF "$_want11b" <<< "$OUT" || fail "case 11b: finish line lacks '$_want11b'"
 grep -qF "$_want11b" "$SCRATCH/dm.argv" || fail "case 11b: DM lacks '$_want11b'"
 grep -qF 'readied' <<< "$OUT" && fail "case 11b: finish line still says readied"
+grep -qxF '#103 failed no-log' <<< "$OUT" || fail "case 11b: per-PR line '#103 failed no-log' missing"
 end_case "case 11b outcome counts"
+
+# ==========================================================================================
+# 11c — every outcome bucket, per-PR result lines, legacy `blocked` and a missing log
+# ==========================================================================================
+begin_case
+reset_state
+_atk11c='# Plan of attack
+
+| # | PR | Constraint | Needs you? |
+|---|----|-----------|------------|
+'
+_tri11c=()
+for _p in 101 102 103 104 105 106 107 108 109; do
+    _atk11c+="| $((_p - 100)) | #$_p slug-$_p | none | no |"$'\n'
+    _tri11c+=("$_p NEEDS-WORK rebase")
+done
+printf '%s' "$_atk11c" > "$SCRATCH/attack-out"
+triage_report "${_tri11c[@]}" > "$SCRATCH/triage-out"
+rm -rf "$SCRATCH/fleetlogs"; mkdir -p "$SCRATCH/fleetlogs"
+_fl11c() {  # $1 = PR, rest = log lines
+    local _pr="$1"; shift
+    printf 'post-plan-fleet: %s\n' "$@" > "$SCRATCH/fleetlogs/post-plan-fleet-$_pr.log"
+}
+_fl11c 101 outcome=shipped 'reason=PR #101'
+_fl11c 102 outcome=held 'reason=PR #102'
+_fl11c 103 outcome=declined reason=holdrepeat
+_fl11c 104 outcome=paused reason=usage-gate
+_fl11c 105 outcome=conflict reason=.claude/rules/codebase-map.md
+_fl11c 106 outcome=failed reason=lostwork-unproved
+_fl11c 107 outcome=blocked
+# 108 has no log file.
+_fl11c 109 outcome=timed-out reason=timeout
+run --worker --max-ready 9
+[[ $RC -eq 0 ]] || fail "case 11c: exit $RC, want 0"
+_want11c='fired 9 (shipped 1, held 1, declined 1, paused 1, conflict 1, failed 3, timed out 1)'
+grep -qF "$_want11c" <<< "$OUT" || fail "case 11c: finish line lacks '$_want11c' (out: $OUT)"
+grep -qF "$_want11c" "$SCRATCH/dm.argv" || fail "case 11c: DM lacks '$_want11c'"
+for _l in '#101 shipped PR #101' '#102 held PR #102' '#103 declined holdrepeat' \
+          '#104 paused usage-gate' '#105 conflict .claude/rules/codebase-map.md' \
+          '#106 failed lostwork-unproved' '#107 failed' '#108 failed no-log' \
+          '#109 timed-out timeout'; do
+    [[ "$(grep -cxF "$_l" <<< "$OUT")" == 1 ]] || fail "case 11c: want exactly one '$_l' line (out: $OUT)"
+done
+_ln_pr="$(grep -nxF '#109 timed-out timeout' <<< "$OUT" | cut -d: -f1)"
+_ln_fin="$(grep -n 'pr-cycle finished' <<< "$OUT" | head -1 | cut -d: -f1)"
+[[ -n "$_ln_pr" && -n "$_ln_fin" && "$_ln_pr" -lt "$_ln_fin" ]] \
+    || fail "case 11c: per-PR lines do not precede the finish line ($_ln_pr vs $_ln_fin)"
+end_case "case 11c all outcome buckets"
 
 # --- rescue: baseline characterization -----------------------------------------------------
 # Passes BEFORE the rescue path exists (the driver ignores an unknown seam) and AFTER it
@@ -1136,10 +1211,19 @@ g_one_arm() {
 }
 g_no_bucket_cond() {
     # _bucket_emoji is a display-mapping function; exclude its body from the guard.
-    # The guard still catches bucket-conditional logic outside that function.
+    # The guard still catches bucket-conditional logic outside that function. The your-turn
+    # grouping awk is the second exempt span: it sorts rows into display groups and decides
+    # nothing about arming (it starts at the yt-g cleanup line and ends at its print redirect).
     ! noncomment "$1" \
-        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} {print}' \
+        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-4\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} {print}' \
         | grep -qE 'FEAT-AWAITING-SIGNOFF|PIPELINE-HELD|UNCLEARED|[^-A-Z_]HELD[^-A-Z_]'
+}
+# Sibling of g_no_bucket_cond: both of its awk skip spans must open AND close. If the closing
+# line (`}` of _bucket_emoji, or the yt-g print redirect) is reworded, the skip stays open to
+# EOF and g_no_bucket_cond silently stops checking the rest of the file.
+g_bucket_spans_close() {
+    noncomment "$1" \
+        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-4\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} END{exit (skip || gskip) ? 1 : 0}'
 }
 g_no_sleep()       { ! noncomment "$1" | grep -qE '(^|[^A-Za-z_])sleep[[:space:]]'; }
 g_no_poll()        { ! noncomment "$1" | grep -qE -- '--json state|_poll_merge|_reconcile'; }
@@ -1173,11 +1257,65 @@ g_scope_selection_only() {
         | awk -v s="$start" -v e="$end" '$1 > s && $1 < e')"
     [[ -z "$bad" ]]
 }
+# _bucket_emoji is a pure display map in the driver. Extract its text from a driver FILE
+# (header line through the first column-0 closing brace) so cases can eval it in isolation.
+bucket_emoji_src() {
+    awk '/^_bucket_emoji\(\)[[:space:]]*\{/ { on = 1 } on { print } on && /^\}[[:space:]]*$/ { exit }' "$1"
+}
+# Every bucket the map names, plus the fallback. Row = "<bucket>|<emoji>"; "|❓" is the empty string.
+# PAUSED is a real pr-triage bucket with no arm today, so it pins to the fallback.
+BUCKET_EMOJI_TABLE=(
+    'DIRTY|🔀' 'NOT-MERGEABLE|🚫' 'BLOCKED-CHECK|❌' 'HELD|⏸' 'BLOCKED-DEP|🔗'
+    'PIPELINE-HELD|🤖' 'FEAT-AWAITING-SIGNOFF|✍️' 'UNCLEARED|⚠️'
+    'PAUSED|❓' 'NO-SUCH-BUCKET|❓' '|❓'
+)
+BUCKET_EMOJI_ARMS=8   # named (non-*) arms the table above covers
+# $1 = driver file. Prints one line per mismatch; returns 1 on any mismatch or a missing function.
+bucket_emoji_check() {
+    local src arms
+    src="$(bucket_emoji_src "$1")"
+    [[ -n "$src" ]] || { echo "no _bucket_emoji() in $1"; return 1; }
+    arms="$(grep -cE '^[[:space:]]+[A-Z][A-Z-]*\)' <<< "$src")"
+    [[ "$arms" == "$BUCKET_EMOJI_ARMS" ]] \
+        || { echo "_bucket_emoji has $arms named arms, table covers $BUCKET_EMOJI_ARMS"; return 1; }
+    (
+        eval "$src"
+        declare -F _bucket_emoji > /dev/null || { echo "_bucket_emoji not defined after eval"; exit 1; }
+        bad=0
+        for row in "${BUCKET_EMOJI_TABLE[@]}"; do
+            b="${row%%|*}"; want="${row#*|}"
+            got="$(_bucket_emoji "$b")"
+            [[ "$got" == "$want" ]] || { echo "_bucket_emoji '$b' = '$got', want '$want'"; bad=1; }
+        done
+        exit "$bad"
+    )
+}
+# _bucket_emoji must stay a pure map. Allowed body lines: the header, `case "$1" in`,
+# `PATTERN) printf '<text>' ;;` arms, `esac`, the closing brace, blanks and comments.
+# Anything else (if, [ ], &&, a second command in an arm, a pipeline) fails the guard,
+# because g_no_bucket_cond() deliberately skips this body and cannot see logic added here.
+g_bucket_emoji_pure_map() {
+    local src line q="'"
+    local blank_re='^[[:space:]]*(#.*)?$'
+    local head_re='^_bucket_emoji\(\)[[:space:]]*\{[[:space:]]*$'
+    local case_re='^[[:space:]]+case "\$1" in[[:space:]]*$'
+    local arm_re="^[[:space:]]+(\\*|[A-Z][A-Z-]*)\\)[[:space:]]+printf ${q}[^${q}]+${q}[[:space:]]*;;[[:space:]]*\$"
+    local esac_re='^[[:space:]]+esac[[:space:]]*$'
+    local close_re='^\}[[:space:]]*$'
+    src="$(bucket_emoji_src "$1")"
+    [[ -n "$src" ]] || return 1
+    while IFS= read -r line; do
+        [[ "$line" =~ $blank_re || "$line" =~ $head_re || "$line" =~ $case_re \
+            || "$line" =~ $arm_re || "$line" =~ $esac_re || "$line" =~ $close_re ]] || return 1
+    done <<< "$src"
+    return 0
+}
+# end bucket_emoji helpers
 
 begin_case
-for g in g_no_merge g_no_armable_lib g_triage_pin g_one_arm g_no_bucket_cond \
+for g in g_no_merge g_no_armable_lib g_triage_pin g_one_arm g_no_bucket_cond g_bucket_spans_close \
          g_no_sleep g_no_poll g_one_ready g_no_timeout_grep \
-         g_cmd_prefix g_no_digest_fetch g_scope_selection_only; do
+         g_cmd_prefix g_no_digest_fetch g_scope_selection_only g_bucket_emoji_pure_map; do
     "$g" "$DRIVER" || fail "static guard $g fails against the real bin/pr-cycle"
 done
 # Guard 7 — both new files are executable and parse.
@@ -1205,6 +1343,12 @@ mutant; echo 'if [ "$BUCKET" = "FEAT-AWAITING-SIGNOFF" ]; then :; fi' >> "$SCRAT
 g_no_bucket_cond "$SCRATCH/mutant" && fail "vacuous: g_no_bucket_cond passed a sign-off conditional"
 mutant; echo 'if [ "$B" = "HELD" ]; then :; fi' >> "$SCRATCH/mutant"
 g_no_bucket_cond "$SCRATCH/mutant" && fail "vacuous: g_no_bucket_cond passed a bare HELD conditional"
+# Span-close mutants: reword each closing line so the awk skip stays open to EOF.
+mutant; sed -i.bak 's|print > (d "/yt-g"|print >> (d "/yt-g"|' "$SCRATCH/mutant"
+g_bucket_spans_close "$SCRATCH/mutant" && fail "vacuous: g_bucket_spans_close passed an unclosed yt-g span"
+# Reword every column-0 closing brace so no `}` can end the _bucket_emoji skip.
+sed 's/^}[[:space:]]*$/ };/' "$DRIVER" > "$SCRATCH/mutant"
+g_bucket_spans_close "$SCRATCH/mutant" && fail "vacuous: g_bucket_spans_close passed an unclosed _bucket_emoji span"
 mutant; echo 'sleep 1' >> "$SCRATCH/mutant"
 g_no_sleep "$SCRATCH/mutant" && fail "vacuous: g_no_sleep passed a driver with sleep"
 mutant; echo '_poll_merge 1' >> "$SCRATCH/mutant"
@@ -1225,6 +1369,30 @@ awk '/^_arm_and_classify\(\) \{/ { print; print "    _pr_allowed \"$1\" || retur
     "$DRIVER" > "$SCRATCH/mutant"
 g_scope_selection_only "$SCRATCH/mutant" \
     && fail "vacuous: g_scope_selection_only passed a scope filter inside _arm_and_classify"
+# _bucket_emoji mutants. Appending cannot test these: the guard reads only the function body,
+# so each mutation lands inside it (awk after the header, or sed on one arm line).
+awk '/^_bucket_emoji\(\) \{/ { print; print "    if [ \"$1\" = HELD ]; then printf x; return; fi"; next } { print }' \
+    "$DRIVER" > "$SCRATCH/mutant"
+grep -q 'then printf x; return; fi' "$SCRATCH/mutant" || fail "mutant did not land: if inside _bucket_emoji"
+g_bucket_emoji_pure_map "$SCRATCH/mutant" \
+    && fail "vacuous: g_bucket_emoji_pure_map passed an if inside _bucket_emoji"
+mutant; sed -i.bak '/^[[:space:]]*HELD)/s/ ;;$/; echo held >\&2 ;;/' "$SCRATCH/mutant"
+grep -q 'echo held >&2 ;;' "$SCRATCH/mutant" || fail "mutant did not land: second command in HELD arm"
+g_bucket_emoji_pure_map "$SCRATCH/mutant" \
+    && fail "vacuous: g_bucket_emoji_pure_map passed a second command in an arm"
+mutant; sed -i.bak 's/^_bucket_emoji()/_bucket_emoji_gone()/' "$SCRATCH/mutant"
+g_bucket_emoji_pure_map "$SCRATCH/mutant" \
+    && fail "vacuous: g_bucket_emoji_pure_map passed a driver with no _bucket_emoji"
+bucket_emoji_check "$SCRATCH/mutant" > /dev/null \
+    && fail "vacuous: bucket_emoji_check passed a driver with no _bucket_emoji"
+mutant; sed -i.bak '/^[[:space:]]*NOT-MERGEABLE)/d' "$SCRATCH/mutant"
+grep -q 'NOT-MERGEABLE)' "$SCRATCH/mutant" && fail "mutant did not land: NOT-MERGEABLE arm still present"
+bucket_emoji_check "$SCRATCH/mutant" > /dev/null \
+    && fail "vacuous: bucket_emoji_check passed a driver with the NOT-MERGEABLE arm deleted"
+mutant; sed -i.bak "/^[[:space:]]*DIRTY)/s/printf '[^']*'/printf 'X'/" "$SCRATCH/mutant"
+grep -qE "DIRTY\)[[:space:]]+printf 'X'" "$SCRATCH/mutant" || fail "mutant did not land: DIRTY wrong value"
+bucket_emoji_check "$SCRATCH/mutant" > /dev/null \
+    && fail "vacuous: bucket_emoji_check passed a wrong DIRTY emoji"
 end_case "case 26 guards are not vacuous"
 
 # ==========================================================================================
@@ -1476,13 +1644,9 @@ end_case "case 28 skip opt-out and fail-toward-running paths"
 begin_case
 WF="$SCRIPT_DIR/../.github/workflows/tests.yml"
 if [[ -f "$WF" ]]; then
-    [[ "$(grep -c 'run: bin/test-pr-cycle' "$WF")" == "1" ]] \
-        || fail "tests.yml does not run bin/test-pr-cycle exactly once"
-    A="$(grep -n 'run: bin/test-post-plan-fleet' "$WF" | head -1 | cut -d: -f1)"
-    B="$(grep -n 'run: bin/test-pr-cycle' "$WF" | head -1 | cut -d: -f1)"
-    C="$(grep -n 'run: bin/test-check-phpunit-hygiene' "$WF" | head -1 | cut -d: -f1)"
-    [[ -n "$A" && -n "$B" && -n "$C" && "$A" -lt "$B" && "$B" -lt "$C" ]] \
-        || fail "bin/test-pr-cycle is not wired between post-plan-fleet and phpunit-hygiene"
+    # Listed once in the bin/run-shell-harnesses argument list (one script per line).
+    [[ "$(grep -cE '^[[:space:]]+bin/test-pr-cycle( \\)?$' "$WF")" == "1" ]] \
+        || fail "tests.yml does not list bin/test-pr-cycle exactly once in the harness runner"
 else
     fail "workflow file not found at $WF"
 fi
@@ -1623,6 +1787,70 @@ grep -qF 'more:' "$SCRATCH/dm.argv" || fail "case 38: DM did not use the overflo
 end_case "case 38 your-turn DM length cap"
 
 # ==========================================================================================
+# your-turn grouped — rows sit under typed headers with full counts; empty groups vanish
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+{   printf '#101  DIRTY  rebase\n'
+    printf '#102  NOT-MERGEABLE  fix\n'
+    printf '#103  FEAT-AWAITING-SIGNOFF  sign\n'
+    printf '#104  HELD  look\n'
+    printf '#105  UNCLEARED  look\n'
+    printf '#106  WEIRD  look\n'
+} > "$SCRATCH/triage-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "your-turn grouped: exit $RC, want 0"
+# The dm shim flattens newlines to spaces (one argv line per call), so order is checked by
+# character offset in the single recorded line.
+_dm="$(cat "$SCRATCH/dm.argv")"
+_pos() { local _pre="${_dm%%"$1"*}"; if [[ "$_pre" == "$_dm" ]]; then echo -1; else echo "${#_pre}"; fi; }
+for _h in '**Conflicts (2)**' '**Awaiting feat sign-off (1)**' '**Other held (3)**'; do
+    [[ "$(grep -oF "$_h" <<< "$_dm" | wc -l | tr -d ' ')" == "1" ]] \
+        || fail "your-turn grouped: header '$_h' not exactly once: $_dm"
+done
+! grep -qF 'Failed (' <<< "$_dm" \
+    || fail "your-turn grouped: empty Failed group printed a header"
+_hc="$(_pos '**Conflicts (2)**')"
+_ha="$(_pos '**Awaiting feat sign-off (1)**')"
+_ho="$(_pos '**Other held (3)**')"
+[[ "$_hc" -ge 0 && "$_hc" -lt "$_ha" && "$_ha" -lt "$_ho" ]] \
+    || fail "your-turn grouped: header order wrong ($_hc $_ha $_ho)"
+for _n in 101 102 103 104 105 106; do
+    _rl="$(_pos "#$_n —")"
+    [[ "$_rl" -ge 0 ]] || fail "your-turn grouped: row #$_n missing"
+    case "$_n" in
+        101|102) [[ "$_rl" -gt "$_hc" && "$_rl" -lt "$_ha" ]] || fail "your-turn grouped: #$_n not under Conflicts" ;;
+        103)     [[ "$_rl" -gt "$_ha" && "$_rl" -lt "$_ho" ]] || fail "your-turn grouped: #$_n not under Awaiting" ;;
+        *)       [[ "$_rl" -gt "$_ho" ]] || fail "your-turn grouped: #$_n not under Other held (unknown bucket dropped?)" ;;
+    esac
+done
+end_case "your-turn grouped"
+
+# ==========================================================================================
+# your-turn grouped cap — the header keeps the full count while the rows truncate
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+_act60="$(printf 'x%.0s' $(seq 1 60))"
+: > "$SCRATCH/triage-out"
+_i=1
+while [[ $_i -le 40 ]]; do
+    printf '#%d  HELD  %s\n' "$((300 + _i))" "$_act60" >> "$SCRATCH/triage-out"
+    _i=$((_i + 1))
+done
+run --worker
+[[ $RC -eq 0 ]] || fail "your-turn grouped cap: exit $RC, want 0"
+grep -qF '**Other held (40)**' "$SCRATCH/dm.argv" \
+    || fail "your-turn grouped cap: header lost the full count: $(cat "$SCRATCH/dm.argv")"
+grep -qF -- '- …and ' "$SCRATCH/dm.argv" || fail "your-turn grouped cap: no truncation line"
+_blk="$(sed -n 's/.*\(Your turn:.*\)/\1/p' "$SCRATCH/dm.argv")"
+# Row cap is 1700 chars (the plan said 1800; case 38's 2000-char DM limit needs the lower cap).
+[[ "${#_blk}" -le 2000 ]] || fail "your-turn grouped cap: your-turn block is ${#_blk} chars, want <= 2000"
+end_case "your-turn grouped cap"
+
+# ==========================================================================================
 # 39 — PR-number pattern in _arm_and_classify: accepts #12, rejects #12abc
 # ==========================================================================================
 begin_case
@@ -1660,6 +1888,15 @@ _plain40="$(( $(calls triage) - $(arm_calls) ))"
 [[ "$_plain40" == "1" ]] \
     || fail "case 40: want 1 plain triage call (cache hit for PR 2+3), got $_plain40 ($(calls triage) total, $(arm_calls) arm)"
 end_case "case 40 precheck-bucket cache fires triage exactly once"
+
+# ==========================================================================================
+# 41 — _bucket_emoji maps every bucket it names, and unknown/empty/PAUSED fall back to ❓
+# ==========================================================================================
+# Case 35 only sees two emojis end to end. This case evals the extracted function and checks
+# all eight arms plus the fallback, so a swapped or deleted arm fails here.
+begin_case
+_out41="$(bucket_emoji_check "$DRIVER")" || fail "case 41: $_out41"
+end_case "case 41 bucket emoji map covers every arm and the fallback"
 
 # ==========================================================================================
 # Helpers for Fix 3/4 harness fixtures
@@ -1946,6 +2183,170 @@ SKIPHELD=0 run --worker
 unset SKIPHELD
 end_case "case fix4 held-unchanged skip"
 
+# ==========================================================================================
+# Pre-fire holdrepeat skip
+# ==========================================================================================
+# A real copy of the harness, so the fingerprint's harness hash is stable and the copy owns
+# its own out/state. Seed and check both load this copy, so they hash the same bytes.
+HRH="$SCRATCH/hrh/tools/postplan-harness"
+mkdir -p "$HRH"
+cp -R "$SCRIPT_DIR/../tools/postplan-harness/harness" "$HRH/"
+cp "$SCRIPT_DIR/../tools/postplan-harness/runner.py" "$HRH/"
+HR_BRANCHES=()
+
+# hr_fixture <pr> <branch> <conds> [state-dir] [nowt]
+# Builds a PR worktree with a committed change, a plan file, a harness result blocking <conds>,
+# an armed-state entry carrying headRefOid, and a seeded holdrepeat record (DM already sent).
+# With nowt, the worktree is removed after seeding, so the record exists but no worktree does.
+hr_fixture() {
+    local n="$1" branch="$2" conds="$3" sd="${4:-$SCRATCH/hrstate}" nowt="${5:-}"
+    local wt="$SCRATCH/wt-$branch" oid tmp
+    git -C "$REPO" rev-parse --verify -q refs/remotes/origin/master >/dev/null \
+        || git -C "$REPO" update-ref refs/remotes/origin/master HEAD
+    git -C "$REPO" worktree add -q "$wt" -b "$branch" >/dev/null 2>&1
+    HR_BRANCHES+=("$branch")
+    echo "change $branch" > "$wt/hrfile"
+    git -C "$wt" add hrfile
+    git -C "$wt" commit -qm "hr $branch"
+    oid="$(git -C "$wt" rev-parse HEAD)"
+    mkdir -p "$SCRATCH/claude-plans"
+    echo "# plan $branch" > "$SCRATCH/claude-plans/$branch.md"
+    install_harness_result "$n" "$branch" shipped-held "$conds" CLEAN
+    tmp="$SCRATCH/armed-state.tmp"
+    jq --argjson n "$n" --arg oid "$oid" \
+        'map(if .number == $n then . + {headRefOid: $oid} else . end)' \
+        "$SCRATCH/armed-state.json" > "$tmp" && mv "$tmp" "$SCRATCH/armed-state.json"
+    env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 - "$sd" "$branch" "$wt" "$conds" <<'PY'
+import json, os, sys
+from harness.holdrepeat import SCHEMA_VERSION, fingerprint, record_path
+from harness.planfile import locate_plan
+sd, slug, wt, conds = sys.argv[1:5]
+fp = fingerprint(locate_plan(slug).path or "", wt)
+assert fp, "seed fingerprint empty"
+os.makedirs(sd, exist_ok=True)
+rec = {"schema_version": SCHEMA_VERSION, "structural_key": conds, "repeat_count": 3,
+       "dm_sent_key": conds, "fingerprint": fp}
+open(record_path(sd, slug), "w").write(json.dumps(rec))
+PY
+    if [[ "$nowt" == nowt ]]; then
+        git -C "$REPO" worktree remove --force "$wt" >/dev/null 2>&1
+    fi
+}
+
+hr_cleanup() {
+    local b
+    for b in ${HR_BRANCHES[@]+"${HR_BRANCHES[@]}"}; do
+        git -C "$REPO" worktree remove --force "$SCRATCH/wt-$b" >/dev/null 2>&1 || true
+        git -C "$REPO" branch -D "$b" >/dev/null 2>&1 || true
+    done
+    HR_BRANCHES=()
+    rm -rf "$SCRATCH/hrstate" "$HRH/out" "$SCRATCH/claude-plans" "$SCRATCH/hr-empty" "$SCRATCH/hr-boom"
+}
+
+# hr_run_case <label> <branch> <conds> — A-C: held PR is skipped, slot never fires.
+hr_skip_case() {
+    local label="$1" branch="$2" conds="$3"
+    reset_state
+    printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+    triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+    hr_fixture 101 "$branch" "$conds"
+    HRHARNESS="$HRH" run --worker
+    [[ $RC -eq 0 ]] || fail "holdrepeat $label: exit $RC, want 0"
+    [[ "$(calls ready)" == "0" ]] || fail "holdrepeat $label: fleet ran $(calls ready) time(s), want 0"
+    grep -qxF 101 "$(rundir)/stage1.txt" 2>/dev/null && fail "holdrepeat $label: 101 is in stage1.txt"
+    grep -qF '#101 — holdrepeat would decline' <<< "$OUT" || fail "holdrepeat $label: skip line missing (out: $OUT)"
+    grep -qF 'held it for' <<< "$OUT" && fail "holdrepeat $label: Fix 4 skipped it; the case proves nothing"
+    return 0
+}
+
+begin_case
+hr_skip_case "A held {7,8} (#2648 shape)" first-slug "7,8"
+hr_cleanup
+hr_skip_case "B held {8} (#2765 shape)" first-slug "8"
+hr_cleanup
+hr_skip_case "C held {3,7,8} (#2459 shape)" first-slug "3,7,8"
+
+# D: after the diff changes, the same PR fires.
+hr_cleanup
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hr_fixture 101 first-slug "7,8"
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "0" ]] || fail "holdrepeat D: pre-change run fired"
+echo changed >> "$SCRATCH/wt-first-slug/hrfile"
+: > "$SCRATCH/ready.argv"
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "holdrepeat D: changed diff did not fire (ready calls $(calls ready))"
+grep -qxF 101 "$(rundir)/stage1.txt" || fail "holdrepeat D: 101 missing from stage1.txt"
+grep -qF '#101 skipped holdrepeat' <<< "$OUT" && fail "holdrepeat D: changed-diff run still printed the skipped line"
+hr_cleanup
+
+# E: no worktree for the branch fires.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hr_fixture 101 no-wt-slug "7,8" "$SCRATCH/hrstate" nowt
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "holdrepeat E: no-worktree PR did not fire (ready calls $(calls ready))"
+hr_cleanup
+
+# F: worktree HEAD differs from the PR's headRefOid fires.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hr_fixture 101 first-slug "7,8"
+jq 'map(. + {headRefOid: "0000000000000000000000000000000000000000"})' \
+    "$SCRATCH/armed-state.json" > "$SCRATCH/armed-state.tmp" \
+    && mv "$SCRATCH/armed-state.tmp" "$SCRATCH/armed-state.json"
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "holdrepeat F: stale worktree did not fire (ready calls $(calls ready))"
+hr_cleanup
+
+# G: python check errors fire (empty harness dir; stub harness that raises).
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hr_fixture 101 first-slug "7,8"
+mkdir -p "$SCRATCH/hr-empty"
+HRHARNESS="$SCRATCH/hr-empty" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "holdrepeat G: empty harness dir did not fire (ready calls $(calls ready))"
+mkdir -p "$SCRATCH/hr-boom/harness"
+: > "$SCRATCH/hr-boom/harness/__init__.py"
+echo 'raise RuntimeError("boom")' > "$SCRATCH/hr-boom/harness/holdrepeat.py"
+: > "$SCRATCH/ready.argv"
+HRHARNESS="$SCRATCH/hr-boom" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "holdrepeat G: raising harness did not fire (ready calls $(calls ready))"
+hr_cleanup
+
+# H: empty seams fall back to defaults. Empty state dir -> <harness>/out/state (skips);
+# empty harness -> <main checkout>/tools/postplan-harness, absent in the scratch repo (fires).
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hr_fixture 101 first-slug "7,8" "$HRH/out/state"
+HRSTATE="" HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "0" ]] || fail "holdrepeat H: empty state-dir seam did not fall back to <harness>/out/state"
+: > "$SCRATCH/ready.argv"
+HRSTATE="" HRHARNESS="" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "holdrepeat H: empty harness seam did not fall back to the main-checkout default"
+hr_cleanup
+
+# I: a skipped PR frees its --max-ready slot for the next ordered PR.
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hr_fixture 101 first-slug "7,8"
+HRHARNESS="$HRH" run --worker --max-ready 1
+[[ "$(cat "$(rundir)/stage1.txt")" == "102" ]] || fail "holdrepeat I: stage1.txt is '$(cat "$(rundir)/stage1.txt")', want just 102"
+grep -qF '#101 — holdrepeat would decline' <<< "$OUT" || fail "holdrepeat I: 101 skip line missing"
+grep -qF '#102 — over --max-ready cap' <<< "$OUT" && fail "holdrepeat I: 102 was capped out"
+grep -qxF '#101 skipped holdrepeat' <<< "$OUT" || fail "holdrepeat I: per-PR '#101 skipped holdrepeat' line missing"
+grep -qF '#102 skipped' <<< "$OUT" && fail "holdrepeat I: 102 reported as skipped"
+hr_cleanup
+unset HRHARNESS HRSTATE
+end_case "case holdrepeat pre-fire skip"
+
 begin_case
 # Case A: details-shaped sticky, matching diff -> skip pr-ready
 reset_state
@@ -1979,6 +2380,19 @@ run --worker
 _fix5_bare="$(calls ready)"
 [[ "$_fix5_legacy" == "$_fix5_bare" ]] || fail "fix5 READY WITH NOTES: suffix form ran fleet $_fix5_legacy time(s), bare form $_fix5_bare"
 end_case "case fix5 details-shaped harness sticky"
+
+# bin/pr-cycle-tick hands bin/pr-cycle the exact argv shape `--go --only <csv> --max-ready <n>`.
+# Pin the dry-run form of it here, so a _normalize_prs change that drops comma input fails
+# this case before the tick breaks silently.
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+run --dry-run --only 101,102 --max-ready 2
+[[ $RC -eq 0 ]] || fail "tick argv contract: '--dry-run --only 101,102 --max-ready 2' exit $RC, want 0"
+reset_state
+run --dry-run --only 101,abc --max-ready 2
+[[ $RC -eq 2 ]] || fail "tick argv contract: '--only 101,abc' exit $RC, want 2"
+end_case "tick-argv-contract"
 
 # --- summary --------------------------------------------------------------------------------
 if [[ $FAILED -eq 0 ]]; then

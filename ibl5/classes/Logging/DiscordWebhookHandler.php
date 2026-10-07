@@ -78,7 +78,6 @@ class DiscordWebhookHandler extends AbstractProcessingHandler
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 5);
             curl_exec($ch);
-            curl_close($ch);
         };
     }
 }

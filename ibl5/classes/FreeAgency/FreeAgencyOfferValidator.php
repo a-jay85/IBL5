@@ -84,7 +84,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         }
 
         // Check soft cap space (if no Bird Rights and not using exceptions)
-        if (!\ContractRules::hasBirdRights($this->offerData['birdYears']) && $this->offerData['offerType'] === 0) {
+        if (!\League\ContractRules::hasBirdRights($this->offerData['birdYears']) && $this->offerData['offerType'] === 0) {
             $softCapValidation = $this->validateSoftCapSpace();
             if (!$softCapValidation['valid']) {
                 return $softCapValidation;

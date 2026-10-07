@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import re
 import subprocess
+import time
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from ..state import Classification
@@ -20,6 +23,7 @@ class TrackResult:
     name: str
     status: str            # pass | fail | skipped | unavailable
     evidence: str = ""
+    seconds: float | None = None
 
 
 def aggregate(tracks: list[TrackResult]) -> str:
@@ -32,42 +36,100 @@ def aggregate(tracks: list[TrackResult]) -> str:
     return "skipped"
 
 
+def tracks_log_line(tracks: list[TrackResult], phase5: str) -> str:
+    unavailable = [t.name for t in tracks if t.status == "unavailable"]
+    return ("phase5 tracks: " + ", ".join(f"{t.name}={t.status}" for t in tracks)
+            + f" -> PHASE5_VERIFY_STATUS={phase5}"
+            + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
+
+
+def timing_log_line(tracks: list[TrackResult], wall: float | None) -> str | None:
+    ran = [t for t in tracks if t.seconds is not None]
+    if not ran or wall is None:
+        return None
+    return ("phase5 timing: " + " ".join(f"{t.name}={t.seconds:.1f}s" for t in ran)
+            + f" wall={wall:.1f}s")
+
+
+def fail_log_lines(tracks: list[TrackResult]) -> list[str]:
+    lines = []
+    for t in tracks:
+        if t.status != "fail":
+            continue
+        tail = [ln for ln in t.evidence.strip().splitlines() if ln.strip()]
+        lines.append(f"phase5 FAIL {t.name}: {tail[-1][:200] if tail else '(no output)'}")
+    return lines
+
+
 class LiveVerify:
-    def __init__(self, worktree: str, timeout: int = 1800):
+    def __init__(self, worktree: str, timeout: int = 1800,
+                 run_cmd: Callable[[str, str], tuple[int, str]] | None = None):
         self.worktree = worktree
         self.timeout = timeout
+        self._run = run_cmd or self._sh
+        self.last_wall_seconds: float | None = None
 
     def _sh(self, cmd: str, cwd: str) -> tuple[int, str]:
         p = subprocess.run(["bash", "-c", cmd], cwd=cwd, capture_output=True,
                            text=True, timeout=self.timeout)
         return p.returncode, (p.stdout + p.stderr)[-3000:]
 
+    def _guarded(self, name: str, fn: Callable[[], TrackResult]) -> TrackResult:
+        """Run one track; a timeout or exception becomes that track's own `fail`
+        so it cannot hide the other tracks' verdicts. Fail-closed by design."""
+        t0 = time.monotonic()
+        try:
+            result = fn()
+        except subprocess.TimeoutExpired:
+            result = TrackResult(name, "fail", f"timed out after {self.timeout}s")
+        except Exception as e:  # noqa: BLE001 - any failure is this track's fail
+            result = TrackResult(name, "fail", f"{type(e).__name__}: {e}")
+        result.seconds = time.monotonic() - t0
+        return result
+
     def run(self, cls: Classification) -> list[TrackResult]:
-        tracks: list[TrackResult] = []
         ibl5 = f"{self.worktree}/ibl5"
+
+        def _simple(name: str, cmd: str, cwd: str) -> Callable[[], TrackResult]:
+            def job() -> TrackResult:
+                rc, out = self._run(cmd, cwd)
+                return TrackResult(name, "pass" if rc == 0 else "fail", out)
+            return job
+
+        def _go() -> TrackResult:
+            rc1, o1 = self._run("make -C engine fmt-check 2>&1", self.worktree)
+            rc2, o2 = self._run("make -C engine cover 2>&1", self.worktree)
+            return TrackResult("go", "pass" if rc1 == 0 and rc2 == 0 else "fail", o1 + o2)
+
+        jobs: dict[str, Callable[[], TrackResult]] = {}
         if cls.has_php:
-            rc, out = self._sh("vendor/bin/phpunit --no-progress 2>&1 | tail -n 5", ibl5)
-            tracks.append(TrackResult("phpunit", "pass" if rc == 0 else "fail", out))
-            rc, out = self._sh("composer run analyse -- --no-progress 2>&1 | tail -n 5", ibl5)
-            tracks.append(TrackResult("phpstan", "pass" if rc == 0 else "fail", out))
-        else:
-            tracks += [TrackResult("phpunit", "skipped"), TrackResult("phpstan", "skipped")]
+            jobs["phpunit"] = _simple("phpunit", "vendor/bin/phpunit --no-progress 2>&1", ibl5)
+            jobs["phpstan"] = _simple("phpstan", "composer run analyse -- --no-progress 2>&1", ibl5)
         if cls.has_go:
-            rc1, o1 = self._sh("make -C engine fmt-check 2>&1 | tail -n 5", self.worktree)
-            rc2, o2 = self._sh("make -C engine cover 2>&1 | tail -n 8", self.worktree)
-            tracks.append(TrackResult("go", "pass" if rc1 == 0 and rc2 == 0 else "fail", o1 + o2))
-        else:
-            tracks.append(TrackResult("go", "skipped"))
+            jobs["go"] = _go
         if cls.has_shell:
-            rc, out = self._sh(
+            jobs["shellcheck"] = _simple(
+                "shellcheck",
                 "bin/lib/shell-scripts.sh --full"
-                " | xargs shellcheck --severity=warning --shell=bash"
-                " --exclude=SC2034,SC1090,SC2207 2>&1 | tail -n 20",
-                self.worktree
+                ' | xargs -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" -n 20'
+                " shellcheck --severity=warning --shell=bash"
+                " --exclude=SC2034,SC1090,SC2207 2>&1",
+                self.worktree,
             )
-            tracks.append(TrackResult("shellcheck", "pass" if rc == 0 else "fail", out))
-        else:
-            tracks.append(TrackResult("shellcheck", "skipped"))
+
+        results: dict[str, TrackResult] = {}
+        self.last_wall_seconds = None
+        if jobs:
+            t0 = time.monotonic()
+            # Submit every track before reading any result; read in submission order.
+            with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+                futures = {name: pool.submit(self._guarded, name, fn) for name, fn in jobs.items()}
+                for name, fut in futures.items():
+                    results[name] = fut.result()
+            self.last_wall_seconds = time.monotonic() - t0
+
+        tracks = [results.get(name) or TrackResult(name, "skipped")
+                  for name in ("phpunit", "phpstan", "go", "shellcheck")]
         # E2E track intentionally NOT run in the isolated prototype (needs the
         # project Docker stack); labeled unavailable so aggregation stays honest.
         tracks.append(TrackResult("e2e", "unavailable", "isolated mode: E2E requires wt Docker stack"))
@@ -83,7 +145,8 @@ GO_OK = re.compile(r"^ok\s|\bPASS\b|coverage", re.M)
 E2E_FAIL = re.compile(r"\b\d+ failed\b|Error:|timed out", re.I)
 E2E_OK = re.compile(r"\b\d+ passed\b", re.I)
 E2E_NONE = re.compile(r"No E2E tests map|^\s*$")
-SHELLCHECK_OK = re.compile(r"Checking \d+ shell scripts")
+# A clean shellcheck prints nothing, so LiveVerify stores "" (whitespace-only).
+SHELLCHECK_OK = re.compile(r"Checking \d+ shell scripts|^\s*$")
 SHELLCHECK_FAIL = re.compile(r"In .+ line \d+:|SC\d+")
 
 

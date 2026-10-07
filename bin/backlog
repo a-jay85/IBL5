@@ -7,12 +7,13 @@
 #   bin/backlog search <term>            gh issue list --search "<term>"
 #   bin/backlog open [<label>]           gh issue list --state open [--label <label>]
 #   bin/backlog new <label> <title> <body>
-#                                        gh issue create --label <label> --title "<title>" --body "<body>"
+#                                        files under the per-PR cap of 3 (4th+ fold into one roll-up issue)
 #                                        <body> must start with the origin PR URL, cite a
 #                                        file:line, and exceed 100 characters.
 #   bin/backlog for-pr <pr-url>          open issues whose body starts with <pr-url>
 #   bin/backlog close <n> <reason>       gh issue close <n> -c "<reason>"
-#   bin/backlog burndown-delta           open issues new/updated since the last triage report (JSON)
+#   bin/backlog burndown-delta           open issues new/updated since the last triage report, plus
+#                                        the first 5 item lines per P section as calibration (JSON)
 #   bin/backlog burndown-refresh <ranks-file>
 #                                        merge re-ranked lines into a new dated triage report
 #   bin/backlog burndown [--pair A,B]... [--after <ledger>]...
@@ -26,16 +27,22 @@
 #   bin/backlog burndown-status [<ledger>]        read-only live status table
 #   bin/backlog burndown-close-merged [<ledger>]  close backlog issues of merged ad-hoc PRs
 #   bin/backlog burndown-sweep                    sweep all ledgers: record merges, close merged ad-hoc issues, flip zombies
+#   bin/backlog burndown-prompt <ledger> <issue> <slug> [--after <ledger>]... [--evidence <file>]
+#                                        print the bin/plan-now prompt for one ledger item
+#   bin/backlog burndown-launch                   exec claude --model claude-sonnet-5-5 "/burndown" (BURNDOWN_CLAUDE overrides the binary)
 #
 # Flags (must precede subcommand):
 #   --help, -h       Show this help and exit 0
-#   --dry-run        Print the composed gh command; do not execute
+#   --dry-run        Print the composed gh command; do not execute. For `new`, read GitHub and
+#                    print the cap decision (would-create, would-convert, ...) without filing
 #
 # Requires: gh authenticated against the repo.
 set -uo pipefail
 
 REPO="a-jay85/IBL5-backlog"
 GH="${BACKLOG_GH:-gh}"   # test seam: bin/test-backlog Case 9 points this at a stub
+# The per-PR follow-up cap lives in one Python module shared with the post-plan harness.
+HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/tools/postplan-harness"
 
 # Origin-PR anchor shared by `new` body validation and `for-pr` lookup.
 PR_URL_RE='^https://github\.com/a-jay85/IBL5/pull/[0-9]+'
@@ -73,12 +80,13 @@ Usage: bin/backlog [--dry-run] <subcommand> [args...]
   search <term>         List open issues matching <term>
   open [<label>]        List open issues (optionally filtered by label)
   new <label> <title> <body>
-                        Create an issue. <body> must start with the origin PR
-                        URL (https://github.com/a-jay85/IBL5/pull/N), cite a
-                        file:line, state a failure scenario, and exceed 100 chars
+                        File an issue under the per-PR cap of 3 (the 4th and later
+                        fold into one roll-up issue). <body> must start with the
+                        origin PR URL (https://github.com/a-jay85/IBL5/pull/N), cite
+                        a file:line, state a failure scenario, and exceed 100 chars
   for-pr <pr-url>       List open issues filed from <pr-url> (body starts with it)
   close <n> <reason>    Close issue #<n> with a comment
-  burndown-delta        Issues opened/updated since the last triage report (JSON)
+  burndown-delta        Issues opened/updated since the last triage report, plus calibration lines (JSON)
   burndown-refresh <f>  Merge re-ranked lines from <f> into a new dated report
   burndown [--pair A,B] [--after <ledger>]...
                         Pick units up to 5, less what the earlier ledgers of this run hold; prints LEDGER: <path> last
@@ -92,10 +100,14 @@ Usage: bin/backlog [--dry-run] <subcommand> [args...]
                         Close backlog issues whose ad-hoc PR merged
   burndown-sweep
                         Sweep every ledger: record merges and PR URLs, close merged ad-hoc issues, flip zombie plans
+  burndown-prompt <ledger> <n> <slug> [--after <ledger>]... [--evidence <file>]
+                        Print the finished bin/plan-now prompt for ledger item <n>
+  burndown-launch       Start /burndown in claude pinned to Sonnet 5.5 (claude-sonnet-5-5)
 
 Flags:
   --help, -h    Show this help
-  --dry-run     Print the gh command without executing it
+  --dry-run     Print the gh command without executing it. `new --dry-run` reads
+                GitHub and prints the cap decision without filing
 
 Repository: a-jay85/IBL5-backlog
 USAGE
@@ -147,7 +159,10 @@ case "$CMD" in
         fi
         LABEL="$1"; TITLE="$2"; BODY="$3"
         validate_body "$BODY" || exit 2
-        run "$GH" issue create --repo "$REPO" --label "$LABEL" --title "$TITLE" --body "$BODY"
+        SUB="file"
+        [ "$DRY_RUN" -eq 1 ] && SUB="plan"
+        PYTHONPATH="$HARNESS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+            exec python3 -m harness.followcap "$SUB" "$LABEL" "$TITLE" "$BODY"
         ;;
     for-pr)
         if [ $# -ne 1 ]; then

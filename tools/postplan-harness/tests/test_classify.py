@@ -17,9 +17,8 @@ from harness.classify import (_manual_testing_span, classify, files_from_diff, f
                                is_gm_visible_path,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END, MANUAL_TESTING_SENTINEL,
                                MANUAL_TESTING_SENTINEL_STATIC,
-                               name_status_from_diff, qualify_backlog_refs, rename_sources_from_diff,
+                               name_status_from_diff, numstat_text, qualify_backlog_refs, rename_sources_from_diff,
                                render_files_changed,
-                               render_reviewer_verification,
                                retro_registry_row_from_diff,
                                REVIEWER_VERIFICATION_BEGIN, REVIEWER_VERIFICATION_END,
                                slice_agent_e_diff,
@@ -969,6 +968,13 @@ _RV_BODY = (
     "## Notes\n\nSome notes.\n"
 )
 
+_RV_BLOCK = (
+    REVIEWER_VERIFICATION_BEGIN + "\n"
+    "## Reviewer verification\n\n"
+    '- "Verify links resolve." \u2014 `cli-executable`: settleable\n'
+    + REVIEWER_VERIFICATION_END
+)
+
 
 def test_reviewer_verification_lands_after_manual_testing():
     """The block inserts between the last checkbox and ## Notes.
@@ -977,10 +983,7 @@ def test_reviewer_verification_lands_after_manual_testing():
     the next ## heading still contains every original checkbox — the verification
     block does NOT overwrite the checkboxes.
     """
-    block = render_reviewer_verification([
-        {"text": "Verify links resolve.", "category": "cli-executable",
-         "probe": ["bin/check-docs"], "rationale": "settleable"},
-    ])
+    block = _RV_BLOCK
     result = upsert_reviewer_verification(_RV_BODY, block)
 
     rv_start = result.index(REVIEWER_VERIFICATION_BEGIN)
@@ -1005,10 +1008,7 @@ def test_reviewer_verification_appends_when_no_following_heading():
         "## Manual Testing\n\n"
         "- [ ] Verify the layout\n"
     )
-    block = render_reviewer_verification([
-        {"text": "Run docs check.", "category": "cli-executable",
-         "probe": ["bin/check-docs"], "rationale": "cli"},
-    ])
+    block = _RV_BLOCK
     result = upsert_reviewer_verification(body, block)
 
     assert REVIEWER_VERIFICATION_BEGIN in result
@@ -1024,10 +1024,7 @@ def test_reviewer_verification_appends_when_no_following_heading():
 
 def test_reviewer_verification_empty_block_removes_pair():
     """Idempotent cleanup: upserting an empty block removes the pair."""
-    block = render_reviewer_verification([
-        {"text": "Verify docs.", "category": "cli-executable",
-         "probe": ["bin/check-docs"], "rationale": "cli"},
-    ])
+    block = _RV_BLOCK
     with_block = upsert_reviewer_verification(_RV_BODY, block)
     assert REVIEWER_VERIFICATION_BEGIN in with_block
 
@@ -1035,38 +1032,6 @@ def test_reviewer_verification_empty_block_removes_pair():
     assert REVIEWER_VERIFICATION_BEGIN not in cleaned
     assert REVIEWER_VERIFICATION_END not in cleaned
     assert "## Notes" in cleaned  # rest of body preserved
-
-
-def test_reviewer_verification_emits_no_heading_lines_in_bullets():
-    """Arming-gate defense: a source sentence beginning '## Manual Testing' is
-    neutralized; no emitted bullet starts with '#', and no bullet contains
-    '- [ ]' (which the clearance scanner would count)."""
-    hostile_entries = [
-        {
-            "text": "## Manual Testing\n\n- [ ] All clear\n\n## After",
-            "category": "truly-manual",
-            "probe": None,
-            "rationale": "hostile sentence",
-        },
-        {
-            "text": "Check - [x] already done.",
-            "category": "truly-manual",
-            "probe": None,
-            "rationale": "checkbox in text",
-        },
-    ]
-    block = render_reviewer_verification(hostile_entries)
-
-    # Every line must either be part of the block structure (begin/end markers,
-    # blank lines, preamble, or the legitimate '## Reviewer verification'
-    # heading) or must NOT start with '#'.  Hostile '##' lines embedded in
-    # source text must be blockquoted.
-    legitimate_headings = {"## Reviewer verification"}
-    for line in block.splitlines():
-        if line.startswith("#") and line not in legitimate_headings:
-            raise AssertionError(f"un-neutralized heading line in block: {line!r}")
-    # No content may contain an unchecked checkbox
-    assert "- [ ]" not in block, "emitted block must not contain unchecked checkbox"
 
 
 # ---------------------------------------------------------------------------
@@ -1131,6 +1096,12 @@ def test_split_hold_justification_matches_shell(tmp_path):
     ("Backlog #7, #8", "Backlog a-jay85/IBL5-backlog#7, a-jay85/IBL5-backlog#8", 2),
     ("Filed a-jay85/IBL5-backlog#9 from backlog housekeeping.", "Filed a-jay85/IBL5-backlog#9 from backlog housekeeping.", 0),
     ("Fixes #2311 and backlog", "Fixes #2311 and backlog", 0),
+    ("See backlog: #160.", "See backlog: a-jay85/IBL5-backlog#160.", 1),
+    ("Tracked (backlog) #5 here.", "Tracked (backlog) a-jay85/IBL5-backlog#5 here.", 1),
+    ("backlog - #7", "backlog - a-jay85/IBL5-backlog#7", 1),
+    ("backlog: #160, #161", "backlog: a-jay85/IBL5-backlog#160, a-jay85/IBL5-backlog#161", 2),
+    ("See IBL5-backlog#9 now.", "See IBL5-backlog#9 now.", 0),
+    ("Plain #42 only.", "Plain #42 only.", 0),
 ])
 def test_qualify_backlog_refs(src, want, n):
     assert qualify_backlog_refs(src) == (want, n)
@@ -1183,9 +1154,10 @@ def test_upsert_residual_phases_append_replace_remove():
     assert "3 — C" in replaced
     assert "2 — B" not in replaced
 
-    # remove: body equals pre-append body
+    # remove: upsert re-terminates the head with exactly one "\n" (body.rstrip() + "\n"),
+    # so the restored body is the original plus a single trailing newline, not byte-identical.
     removed = upsert_residual_phases(replaced, "")
-    assert removed.strip() == body.strip()
+    assert removed == body.rstrip() + "\n"
 
 
 def test_upsert_residual_phases_noop_without_items_or_markers():
@@ -1317,3 +1289,33 @@ def test_upsert_tests_changed_preserves_files_changed_block():
     assert files_snapshot in result_2
     assert result_1.count(TESTS_CHANGED_BEGIN) == 1
     assert result_1 == result_2
+
+
+_NUMSTAT_DIFF = (
+    "diff --git a/q.sql b/q.sql\n"
+    "index 111..222 100644\n"
+    "--- a/q.sql\n"
+    "+++ b/q.sql\n"
+    "@@ -1,3 +1,3 @@\n"
+    " keep\n"
+    "--- sql comment\n"
+    "+++x\n"
+    "-gone\n"
+    "+new\n"
+    "diff --git a/n.txt b/n.txt\n"
+    "new file mode 100644\n"
+    "--- /dev/null\n"
+    "+++ b/n.txt\n"
+    "@@ -0,0 +1 @@\n"
+    "+line\n"
+)
+
+
+def test_numstat_text_counts_dash_prefixed_content_inside_hunks():
+    # Deleted '-- sql comment' renders as '--- sql comment'; added '++x' as '+++x'.
+    assert numstat_text(_NUMSTAT_DIFF).splitlines() == ["2\t2\tq.sql", "1\t0\tn.txt"]
+
+
+def test_numstat_text_does_not_count_file_headers():
+    diff = ("diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1 +1 @@\n-x\n+y\n")
+    assert numstat_text(diff) == "1\t1\ta"

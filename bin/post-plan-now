@@ -25,8 +25,9 @@
 # Usage:
 #   bin/post-plan-now           # you decided to ship: fire unconditionally
 #   bin/post-plan-now --auto    # impl agent's closing action: always fires
-#                               #   (skips only inside a headless/automouse run, which
-#                               #   owns post-plan itself). post-plan ALWAYS opens the
+#                               #   (skips inside a headless/automouse run, which owns
+#                               #   post-plan itself, unless IBL5_BURNDOWN_LOOP=1 is set
+#                               #   by bin/burndown-loop). post-plan ALWAYS opens the
 #                               #   PR; whether auto-merge ARMS is decided later, at
 #                               #   /post-plan Phase 6.5 (a plan's `auto_merge: false`
 #                               #   holds the merge — it no longer holds post-plan).
@@ -45,6 +46,9 @@
 # Run from anywhere inside the target worktree.
 # Exit 7: refused because $ROOT is the main checkout (ADR-0062); nothing was fired.
 # Callers key on 7 to tell "wrong tree" apart from a generic failure (exit 1).
+# Exit 8: declined because the last run for this slug held on the same structural
+# reasons, the repeat DM was already sent, and plan+diff+harness are unchanged
+# (harness/holdrepeat.py). Nothing was fired. --force overrides.
 #
 # --pr <n> drives the worktree that has PR <n>'s head branch checked out, instead
 # of the current branch. When no worktree has that branch, --pr creates one via
@@ -111,54 +115,50 @@ blocked_ship_block() {
 # shellcheck source=lib/usage-gate.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/usage-gate.sh"
 
+# LEGACY: the old sticky "post-plan is running" comment marker. Only used to delete stale
+# sticky comments; master's harness still posts them until this change merges.
 POSTPLAN_BADGE_MARKER="<!-- postplan-status -->"
+# The in-flight signal is now a PR label; a non-zero exit posts a NEW failure comment.
+POSTPLAN_RUNNING_LABEL="post-plan-running"
+POSTPLAN_FAILURE_MARKER="<!-- postplan-failure -->"
 POSTPLAN_STICKY_LIB="${POSTPLAN_STICKY_LIB:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/pr-sticky.sh}"
 # shellcheck source=/dev/null
 [ -r "$POSTPLAN_STICKY_LIB" ] && source "$POSTPLAN_STICKY_LIB"
 
 # shellcheck disable=SC2016
-postplan_badge_body() {   # <label> <started>
-    local label="$1" started="$2"
-    printf '%s\n' "$POSTPLAN_BADGE_MARKER"
-    printf '**post-plan is running** — started %s\n\n' "${started:-unknown}"
-    if [ -n "$label" ]; then
-        printf 'Detached launchd job `%s`.\n' "$label"
-        printf 'Liveness: `launchctl list %s`\n\n' "$label"
-    else
-        printf 'Run started outside `bin/post-plan-now`, so there is no launchd job to probe.\n\n'
-    fi
-    printf 'This comment is removed automatically when the run finishes cleanly.\n'
-    printf '<!-- postplan-label: %s -->\n' "$label"
-}
-
-# shellcheck disable=SC2016
-postplan_badge_banner_body() {   # <rc> <label> <started>
-    local rc="$1" label="$2" started="$3"
-    printf '%s\n' "$POSTPLAN_BADGE_MARKER"
+postplan_failure_body() {   # <rc> <label> <started>
+    local rc="$1" label="$2" started="$3" log="${POSTPLAN_LOG_FILE:-}" sha
+    printf '%s\n' "$POSTPLAN_FAILURE_MARKER"
     if [ "$rc" = 75 ]; then
         printf '**post-plan paused for usage limit; auto-resumes after reset**\n\n'
+    elif [ "$rc" = stale ]; then
+        printf '**A previous post-plan run ended without cleaning up**\n\n'
+        printf 'The `%s` label was still on this PR, so that run probably crashed or was killed.\n' "$POSTPLAN_RUNNING_LABEL"
     else
         printf '**post-plan did not finish cleanly** (exit %s)\n\n' "$rc"
     fi
-    printf 'Started %s.\n' "${started:-unknown}"
-    case "$rc" in
-        75) printf 'Paused for usage limit; auto-resumes after reset.\n' ;;
-        3) printf 'The harness hit a fail-closed wall and deliberately did not fall back. Cause: %s\n' "${HARNESS_RESULT:-a rebase conflict, or a local pre-commit/pre-push gate denial; the RESULT line in the log names which}" ;;
-        *) printf 'The run ended abnormally — check the log under `/tmp/post-plan-now-*.log`.\n' ;;
-    esac
+    if [ "$rc" != stale ]; then
+        case "$rc" in
+            75) printf 'Paused for usage limit; auto-resumes after reset.\n' ;;
+            3) printf 'The harness hit a fail-closed wall and deliberately did not fall back. Cause: %s\n' "${HARNESS_RESULT:-a rebase conflict, or a local pre-commit/pre-push gate denial; the RESULT line in the log names which}" ;;
+            *) printf 'The run ended abnormally — check the log under `/tmp/post-plan-now-*.log`.\n' ;;
+        esac
+    fi
+    printf '\nStarted %s. Ended %s.\n' "${started:-unknown}" "$(date '+%Y-%m-%d %H:%M:%S %Z')"
+    sha="$(git rev-parse --short HEAD 2>/dev/null || true)"
+    [ -z "$sha" ] || printf 'Head: `%s`\n' "$sha"
+    [ -z "$label" ] || printf 'Launchd job: `%s`\n' "$label"
+    [ -z "$log" ] || printf 'Log: `%s`\n' "$log"
+    if [ "$rc" != stale ] && [ -n "$log" ] && [ -r "$log" ]; then
+        printf '\nLast log lines:\n\n~~~\n'
+        tail -n 5 "$log" 2>/dev/null || true
+        printf '~~~\n'
+    fi
     [ "$rc" = 75 ] || printf '\nRe-run with `bin/post-plan-now --auto` once the cause is addressed.\n'
-    printf '<!-- postplan-label: %s -->\n' "$label"
-}
-
-postplan_badge_label_live() {   # <label> -> 0 when launchd still knows it
-    local label="$1"
-    [ -n "$label" ] || return 1
-    "${LAUNCHCTL_CMD:-launchctl}" list "$label" >/dev/null 2>&1
 }
 
 # Enumerates loaded launchd jobs and echoes the label of a live post-plan-now run for
-# $1 (a SAFE_SLUG), or nothing. Unlike postplan_badge_label_live (a point lookup on one
-# known label), this matches by slug: the caller cannot know the peer's timestamp or PID.
+# $1 (a SAFE_SLUG), or nothing. This matches by slug: the caller cannot know the peer's timestamp or PID.
 # The glob is fully anchored -- the literal "-" after the slug must be followed by
 # YYYYmmdd-HHMMSS-<pid>, so slug "foo" can never match a job for slug "foo-bar".
 # Process substitution, not a pipe: piping into an early-exiting reader SIGPIPEs the
@@ -177,24 +177,75 @@ postplan_inflight_label() {
   return 0
 }
 
+# Prints com.ibl5.post-plan-fleet-<PR> when a fleet rescue for branch $1's open PR is loaded,
+# else nothing. $2 is the PR number when the caller already knows it (--pr). A fleet rescue
+# runs `post-plan-now --pr N --foreground`, which never creates a postplan-now-* label, so
+# postplan_inflight_label cannot see it. The gh lookup runs only when some fleet label is
+# loaded at all, so the common case costs one launchctl call and no network. A gh failure
+# prints nothing (fail-open), the same posture as the open-PR lookup further down.
+# Exact string compare on the label column: PR 189 never matches a job for PR 1892.
+postplan_fleet_slot_label() {
+  local branch="$1" pr="${2-}" snap _pid _status label
+  snap=$("${LAUNCHCTL_CMD:-launchctl}" list 2>/dev/null || true)
+  case "$snap" in *com.ibl5.post-plan-fleet-[0-9]*) ;; *) return 0 ;; esac
+  if [ -z "$pr" ]; then
+    pr=$("${GH_CMD:-gh}" pr list --head "$branch" --state open \
+         --json number --jq '.[0].number // empty' 2>/dev/null || true)
+  fi
+  case "$pr" in ''|*[!0-9]*) return 0 ;; esac
+  while IFS=$'\t' read -r _pid _status label; do
+    if [ "$label" = "com.ibl5.post-plan-fleet-$pr" ]; then
+      printf '%s\n' "$label"
+      return 0
+    fi
+  done <<< "$snap"
+  return 0
+}
+
 postplan_badge_pr_number() {
     "${GH_CMD:-gh}" pr view --json number --jq .number 2>/dev/null || true
 }
 
-postplan_badge_existing_label() {   # <pr> -> prints label; rc 1 when no badge exists
-    local n="$1" body
-    body="$("${GH_CMD:-gh}" api "repos/{owner}/{repo}/issues/$n/comments" --paginate \
-        --jq ".[] | select(.body | contains(\"$POSTPLAN_BADGE_MARKER\")) | .body" 2>/dev/null || true)"
-    [ -n "$body" ] || return 1
-    printf '%s' "$body" | sed -n 's/.*<!-- postplan-label: \(.*\) -->.*/\1/p' | head -1
+postplan_label_add() {   # <pr>  -- best-effort, never fails the caller
+    local n="$1"
+    [ -n "$n" ] || return 0
+    "${GH_CMD:-gh}" label create "$POSTPLAN_RUNNING_LABEL" --color FBCA04 \
+        --description "post-plan is running on this PR; removed when the run ends" \
+        >/dev/null 2>&1 || true
+    "${GH_CMD:-gh}" api --method POST "repos/{owner}/{repo}/issues/$n/labels" \
+        -f "labels[]=$POSTPLAN_RUNNING_LABEL" >/dev/null 2>&1 || true
     return 0
 }
 
-post_status_badge() {   # <pr> [label] [started]
-    local n="$1" label="${2:-${POSTPLAN_LABEL:-}}" started="${3:-${POSTPLAN_STARTED:-}}"
+postplan_label_remove() {   # <pr>  -- best-effort, never fails the caller
+    local n="$1"
     [ -n "$n" ] || return 0
-    pr_sticky_upsert "$n" "$POSTPLAN_BADGE_MARKER" \
-        "$(postplan_badge_body "$label" "$started")" || true
+    "${GH_CMD:-gh}" api --method DELETE \
+        "repos/{owner}/{repo}/issues/$n/labels/$POSTPLAN_RUNNING_LABEL" \
+        >/dev/null 2>&1 || true
+    return 0
+}
+
+postplan_label_present() {   # <pr> -> 0 when the running label is on the PR
+    local n="$1" out
+    [ -n "$n" ] || return 1
+    out="$("${GH_CMD:-gh}" pr view "$n" --json labels \
+        --jq "any(.labels[]; .name == \"$POSTPLAN_RUNNING_LABEL\")" 2>/dev/null || true)"
+    [ "$out" = true ]
+}
+
+postplan_failure_comment() {   # <pr> <rc> [label] [started]  -- a NEW comment each time
+    local n="$1" rc="$2" label="${3:-}" started="${4:-}" tmpfile
+    [ -n "$n" ] || return 0
+    tmpfile="$(mktemp)"
+    postplan_failure_body "$rc" "$label" "$started" > "$tmpfile" || true
+    "${GH_CMD:-gh}" pr comment "$n" --body-file "$tmpfile" >/dev/null 2>&1 || true
+    rm -f "$tmpfile"
+    return 0
+}
+
+post_status_badge() {   # <pr>
+    postplan_label_add "${1:-}"
     return 0
 }
 
@@ -204,22 +255,38 @@ conclude_status_badge() {   # <rc> [pr]
     POSTPLAN_CONCLUDED=1
     [ -n "$n" ] || n="$(postplan_badge_pr_number)"
     [ -n "$n" ] || return 0
-    if [ "$rc" = 0 ]; then
-        pr_sticky_delete "$n" "$POSTPLAN_BADGE_MARKER" || true
-    else
-        pr_sticky_upsert "$n" "$POSTPLAN_BADGE_MARKER" \
-            "$(postplan_badge_banner_body "$rc" "${POSTPLAN_LABEL:-}" "${POSTPLAN_STARTED:-}")" || true
+    postplan_label_remove "$n"
+    # Legacy cleanup: delete any old sticky "running" comment.
+    pr_sticky_delete "$n" "$POSTPLAN_BADGE_MARKER" || true
+    if [ "$rc" != 0 ]; then
+        postplan_failure_comment "$n" "$rc" "${POSTPLAN_LABEL:-}" "${POSTPLAN_STARTED:-}"
     fi
     return 0
 }
 
+# No liveness probe: the in-flight guards (postplan_inflight_label / fleet slot, below)
+# already refuse a second concurrent run, and this sweep runs before THIS run adds its own
+# label. So a running label seen here belongs to a run that is no longer alive.
 postplan_sweep_stale_badge() {   # <pr>
-    local n="$1" label
+    local n="$1"
     [ -n "$n" ] || return 0
-    label="$(postplan_badge_existing_label "$n")" || return 0
-    if postplan_badge_label_live "$label"; then return 0; fi
-    pr_sticky_upsert "$n" "$POSTPLAN_BADGE_MARKER" \
-        "$(postplan_badge_banner_body "stale" "$label" "unknown")" || true
+    postplan_label_present "$n" || return 0
+    postplan_failure_comment "$n" stale "" unknown
+    postplan_label_remove "$n"
+    return 0
+}
+
+# Repeat-hold decline (holdrepeat.py). Returns 0 = DECLINE (prints the reason),
+# 1 = proceed. Fails open: a missing harness, python error, or any exit other
+# than 10 proceeds. --force (FORCE=1) always proceeds.
+postplan_holdrepeat_decline() {
+    local harness="$1" slug="$2" plan="$3" root="$4" out rc
+    [ "${FORCE:-0}" -eq 0 ] || return 1
+    out=$(PYTHONPATH="$harness" python3 -m harness.holdrepeat check \
+            --state-dir "${HOLDREPEAT_STATE_DIR:-$harness/out/state}" \
+            --slug "$slug" --plan "$plan" --worktree "$root" 2>/dev/null) && rc=0 || rc=$?
+    [ "$rc" -eq 10 ] || return 1
+    printf '%s\n' "$out"
     return 0
 }
 
@@ -239,7 +306,8 @@ anywhere inside the target worktree.
 
 Options:
   --auto           Impl agent's closing action: fires unconditionally
-                   (skips inside a headless/automouse run that owns post-plan).
+                   (skips inside a headless/automouse run that owns post-plan,
+                   unless IBL5_BURNDOWN_LOOP=1, which bin/burndown-loop sets).
   --force          Override the "PR already exists and working set touches no
                    production files" guard (exit 5).
   --foreground     Run the engine in this shell instead of detaching via launchd.
@@ -417,11 +485,24 @@ if [ "$AUTO" -eq 1 ]; then
     # workflow-continuity rule that tells the impl agent to call this is
     # globally loaded, so the automouse impl agent sees it too; this is the
     # belt-and-suspenders guard against that.
+    # Exception: a bin/burndown-loop batch runs headless (CLAUDE_HEADLESS=1
+    # silences Stop hooks) but has no runner that ships for it, so the loop
+    # exports IBL5_BURNDOWN_LOOP=1 to opt back in. Only the exact value 1
+    # counts; unset, empty and 0 keep the automouse skip.
     if [ "${CLAUDE_HEADLESS:-}" = "1" ]; then
-        echo "post-plan-now: CLAUDE_HEADLESS=1 — automouse/headless run owns post-plan; skipping auto-fire."
-        exit 0
+        if [ "${IBL5_BURNDOWN_LOOP:-}" = "1" ]; then
+            echo "post-plan-now: CLAUDE_HEADLESS=1 with IBL5_BURNDOWN_LOOP=1 — burndown-loop batch opted in; firing."
+        else
+            echo "post-plan-now: CLAUDE_HEADLESS=1 — automouse/headless run owns post-plan; skipping auto-fire."
+            exit 0
+        fi
     fi
 fi
+
+# The opt-in is consumed by the guard above. Drop it so no child of this run
+# (harness, skill-fallback claude, a nested post-plan-now) inherits it through
+# the --foreground exec and re-fires past its own headless guard.
+unset IBL5_BURNDOWN_LOOP
 
 # Reap abandoned post-plan-now jobs (loaded but idle, or unloaded, with no live
 # process) before adding another. Skipped under the test-only root overrides so a
@@ -446,10 +527,24 @@ if [ "${FORCE:-0}" -eq 0 ]; then
     echo "post-plan-now: refusing to start a second one. Wait for it, or re-run with --force."
     exit 6
   fi
+  # A fleet rescue holds com.ibl5.post-plan-fleet-<PR> and runs this script with
+  # --foreground. Only a detaching run checks for one: the fleet's own runner is the
+  # --foreground caller and must not refuse its own slot.
+  if [ "${FOREGROUND:-0}" -eq 0 ]; then
+    FLEET_LABEL=$(postplan_fleet_slot_label "$SLUG" "${PR_NUM:-}")
+    if [ -n "$FLEET_LABEL" ]; then
+      echo "post-plan-now: a fleet rescue for PR #${FLEET_LABEL##*-} is already in flight ($FLEET_LABEL)."
+      echo "post-plan-now: refusing to race it. Wait for it, or re-run with --force."
+      exit 6
+    fi
+  fi
 fi
 
-# Nothing to ship? Clean tree AND no commits ahead of origin/master.
+# Nothing to ship? Clean tree AND no untracked files AND no commits ahead of origin/master.
+# `git diff` ignores untracked files, so a tree whose only change is a new file needs its
+# own check.
 if git diff --quiet && git diff --cached --quiet \
+   && [ -z "$(git ls-files --others --exclude-standard)" ] \
    && [ -z "$(git log --oneline origin/master..HEAD 2>/dev/null)" ]; then
     echo "post-plan-now: nothing to do — clean tree and no commits ahead of master." >&2
     exit 1
@@ -481,6 +576,15 @@ if [ "${FORCE:-0}" -eq 0 ]; then
     fi
 fi
 
+# Exit 8: declined, repeated hold with unchanged plan+diff+harness (holdrepeat.py).
+if postplan_holdrepeat_decline \
+     "${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}" \
+     "$SLUG" "${PLAN_OVERRIDE:-}" "$ROOT"; then
+  echo "RESULT: post-plan DECLINED — held twice on the same reason and nothing changed" \
+       "since; no tokens spent, no PR change. Override: bin/post-plan-now --force"
+  exit 8
+fi
+
 [ -f "$PLAN_FILE" ] \
     || echo "post-plan-now: warn — no plan at $PLAN_FILE; the harness will try a slug-drift match (<prefix>-$SLUG.md) and otherwise run plan-blind. Pass --plan <abs-path> to name one explicitly." >&2
 
@@ -505,6 +609,11 @@ else
 fi
 write_session_sidecar "$LOG" "$SESSION_ID" \
     || { echo "post-plan-now: could not write the session sidecar next to $LOG." >&2; exit 1; }
+# First line of the log, so a run killed before the harness flushes (SIGKILL, reboot) never
+# leaves an empty file. Append, never truncate: launchd opens StandardOutPath for append, and
+# the foreground tee below uses -a for the same reason. Not a RESULT: line, so every
+# `^RESULT:` reader (HARNESS_RESULT capture, watch-run, bin/automouse/run) skips it.
+printf 'post-plan-now: started %s pid=%s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z')" "$$" >> "$LOG" || true
 
 # Usage gate (ADR-0143). Save the argv so the coordinator can replay it; --foreground is
 # dropped so a resume always goes through the launchd job. In the drain/stop zone a run
@@ -571,10 +680,11 @@ postplan_ci_resume_clause() {
     printf 'CI OUTCOME: indeterminate for head %s (%s) — the background watch did not settle; watch CI yourself at Phase 7.' "$sha" "$f"
 }
 
-BADGE_FN="$(declare -f pr_sticky_find pr_sticky_upsert pr_sticky_delete \
-    postplan_badge_body postplan_badge_banner_body postplan_badge_label_live \
-    postplan_badge_pr_number postplan_badge_existing_label \
-    post_status_badge conclude_status_badge postplan_sweep_stale_badge \
+BADGE_FN="$(declare -f pr_sticky_find pr_sticky_delete \
+    postplan_failure_body postplan_badge_pr_number \
+    postplan_label_add postplan_label_remove postplan_label_present \
+    postplan_failure_comment post_status_badge conclude_status_badge \
+    postplan_sweep_stale_badge \
     postplan_ci_resume_clause || true); "
 FALLBACK_FN=""
 HARNESS_SEG=""
@@ -597,11 +707,11 @@ if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ] && [ "${RESUME_ST
     # rc=3 message points at a missing file. Foreground only:
     # under launchd, stdout already IS $LOG, and a tee there would write every line twice.
     [ "$FOREGROUND" -eq 1 ] \
-        && HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG} 2>&1 | tee \"$LOG\"; rc=\${PIPESTATUS[0]}; "
+        && HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG} 2>&1 | tee -a \"$LOG\"; rc=\${PIPESTATUS[0]}; "
     GATE_OPEN="if [ \"\${_sigterm_received:-0}\" -eq 0 ] && should_fallback \"\$rc\" && ! usage_postrun_pause post-plan-now $(shq "$SESSION_ID") $(shq "$ROOT/bin/post-plan-now") \"\$rc\" $(shq "$LOG"); then "
     # The harness has already exited and flushed by the time HARNESS_SEG's `rc=` runs,
     # so $LOG holds its final RESULT: line. The capture now feeds only
-    # postplan_badge_banner_body; the exit-3 message comes from blocked_ship_block.
+    # postplan_failure_body; the exit-3 message comes from blocked_ship_block.
     POST_HARNESS_SEG="HARNESS_RESULT=\$(grep -m1 '^RESULT:' \"$LOG\" 2>/dev/null || true); HARNESS_RESULT=\${HARNESS_RESULT:0:1200}; "
     GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then msg=\"\$(blocked_ship_block \"$HARNESS_RUN_DIR\" \"$SLUG\" \"$ROOT\" \"$LOG\")\"; printf '%s\n' '=== post-plan blocked ship ===' \"\$msg\" '=== end blocked ship ==='; \"$ROOT/bin/post-plan-fail-dm\" \"$ROOT\" \"$SAFE_SLUG\" \"$LOG\" \"\$msg\" || true; fi"
     ENGINE="compiled post-plan harness (fails CLOSED on a rebase conflict or a local gate denial; falls back to the skill on other failures)"
@@ -687,7 +797,7 @@ else
     SKILL_SESSION_ARG="--session-id $(shq "$SESSION_ID")"
 fi
 
-CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; _sigterm_received=0; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT HUP; trap '_sigterm_received=1; conclude_status_badge \"\${pp_rc:-1}\"' TERM; cd \"$ROOT\" && { . \"$ROOT/bin/lib/usage-gate.sh\"; postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${ACQUIRE_SEG}${FALLBACK_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${GATE_OPEN}${GATE_ENV}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p ${SKILL_PROMPT_ARG} --dangerously-skip-permissions --model claude-sonnet-5-5 ${SKILL_SESSION_ARG} --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${_sigterm_received:-0}\" -eq 1 ]; then pp_rc=143; fi; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; ${PAUSE_SEG}${FAILDM_SEG}${RELEASE_SEG}${CMD_TAIL}"
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER") POSTPLAN_RUNNING_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL") POSTPLAN_FAILURE_MARKER=$(shq "$POSTPLAN_FAILURE_MARKER") POSTPLAN_LOG_FILE=$(shq "$LOG") POSTPLAN_STATUS_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL"); ${BADGE_FN}_sigterm_received=0; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT HUP; trap '_sigterm_received=1; conclude_status_badge \"\${pp_rc:-1}\"' TERM; cd \"$ROOT\" && { . \"$ROOT/bin/lib/usage-gate.sh\"; postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${ACQUIRE_SEG}${FALLBACK_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${GATE_OPEN}${GATE_ENV}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p ${SKILL_PROMPT_ARG} --dangerously-skip-permissions --model claude-sonnet-5-5 ${SKILL_SESSION_ARG} --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${_sigterm_received:-0}\" -eq 1 ]; then pp_rc=143; fi; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; ${PAUSE_SEG}${FAILDM_SEG}${RELEASE_SEG}${CMD_TAIL}"
 
 if [ "$FOREGROUND" -eq 1 ]; then
     echo "post-plan-now: foreground mode on branch '$SLUG' — engine: $ENGINE"
@@ -733,11 +843,11 @@ ljob_bootstrap "$LABEL" "$PLIST"
 echo "post-plan-now: fired a detached post-plan on branch '$SLUG'."
 echo "  engine: $ENGINE"
 echo "  supervised by launchd — survives closing Claude Code / the terminal"
-echo "  watch:  $ROOT/bin/watch-run --log $LOG --label $LABEL"
-echo "          ^ arm THIS in a Monitor. Self-terminating. Never 'tail -f' the log:"
-echo "            the harness flushes everything at exit, so a tail is silent for the"
-echo "            whole run and then silent forever — it can never tell you it finished."
-echo "  log:    $LOG   (first line is the RESULT verdict once the run ends)"
+echo "  notify: Discord DM on finish. Do NOT arm a Monitor or ScheduleWakeup for"
+echo "          this run: the DM is the completion signal."
+echo "  watch:  $ROOT/bin/watch-run --log $LOG --label $LABEL   (manual use only; never"
+echo "          'tail -f' the log, the harness flushes everything at exit)"
+echo "  log:    $LOG   (its RESULT: line is the verdict once the run ends)"
 echo "  label:  $LABEL   (self-removes when post-plan finishes)"
 echo "  PR / code review / CI / auto-merge progress appears on the PR."
 echo "  Leave this worktree alone — /post-plan rebuilds its Docker stack for E2E."

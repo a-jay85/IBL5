@@ -29,13 +29,16 @@ Subcommands:
   plan <slug>                 Execute exactly one named plan and stop.
   schedule "[YYYY-MM-DD] HH:MM [TZ]"
                               Schedule a one-shot run at the given time
-                              (no date = today, no TZ = local).
+                              (no date = today, or tomorrow if that time has passed; no TZ = local).
   disarm-tonight              Skip tonight's run; auto re-enables afterward.
-  disarm-until "YYYY-MM-DD HH:MM [TZ]"
+  disarm-until "[YYYY-MM-DD] HH:MM [TZ]"
                               Pause until the given time.
 
 Environment (key overrides):
   AUTOMOUSE_SKIP_CANARY=1     Skip the between-plans master health canary.
+  AUTOMOUSE_LOGIN_PROBE_CMD   Test seam: command whose first stdout line
+                              (ok | expired:<r> | unknown:<r>) replaces the
+                              real login probe. Unset or empty = real probe.
   CLAUDE_HEADLESS=1           Set automatically; gates /post-plan Phase 10.
 EOF
     exit 0
@@ -61,12 +64,32 @@ epoch_fmt() {
     date -r "$1" "+$2" 2>/dev/null || date -d "@$1" "+$2"
 }
 
+# Resolve a `schedule` or `disarm-until` time against NOW. A bare "HH:MM [TZ]" that has
+# already passed today means tomorrow at that time. A dated time is taken as
+# given, so a past date still fails the caller's past-time check.
+schedule_epoch() {
+    local when="$1" now="$2" epoch midday tomorrow
+    if [[ "$when" =~ ^[0-9]{1,2}:[0-9]{2}([[:space:]]|$) ]]; then
+        epoch=$(parse_when_epoch "$(epoch_fmt "$now" '%Y-%m-%d') $when") || return 1
+        if [ "$epoch" -le "$now" ]; then
+            # Use a midday anchor to find tomorrow's date — raw +86400 skips a day on
+            # DST spring-forward eve when the day is only 23 hours long.
+            midday=$(parse_when_epoch "$(epoch_fmt "$now" '%Y-%m-%d') 12:00") || return 1
+            tomorrow=$(epoch_fmt "$((midday + 86400))" '%Y-%m-%d')
+            epoch=$(parse_when_epoch "$tomorrow $when") || return 1
+        fi
+    else
+        epoch=$(parse_when_epoch "$when") || return 1
+    fi
+    printf '%s\n' "$epoch"
+}
+
 # --- One-shot scheduler subcommand ----------------------------------------
 # Usage: bin/automouse/run schedule "[YYYY-MM-DD] HH:MM [TZ]"
 # Creates a self-cleaning launchd agent that fires bin/automouse/run once at the
 # given time, then removes its own plist and boots itself out. The date is
-# optional and defaults to today; the timezone abbreviation is optional and
-# defaults to the system's local zone.
+# optional and defaults to today, or tomorrow if that time has already passed;
+# the timezone abbreviation is optional and defaults to the system's local zone.
 # Example: bin/automouse/run schedule "2026-05-28 20:00 PDT"
 if [ "${1:-}" = "schedule" ]; then
     WHEN="${2:-}"
@@ -76,9 +99,9 @@ if [ "${1:-}" = "schedule" ]; then
         exit 1
     fi
 
-    if ! EPOCH=$(parse_when_epoch "$WHEN"); then
+    if ! EPOCH=$(schedule_epoch "$WHEN" "$(date +%s)"); then
         echo "error: could not parse time '$WHEN'" >&2
-        echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-05-28 20:00 PDT, or 20:00 for today)" >&2
+        echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-05-28 20:00 PDT, or 20:00 for the next 20:00)" >&2
         exit 1
     fi
 
@@ -150,7 +173,7 @@ fi
 
 # --- Disarm subcommands ----------------------------------------------------
 # Usage: bin/automouse/run disarm-tonight
-#        bin/automouse/run disarm-until "YYYY-MM-DD HH:MM [TZ]"
+#        bin/automouse/run disarm-until "[YYYY-MM-DD] HH:MM [TZ]"
 #
 # Takes the recurring com.ibl5.automouse job out of launchd and arms a one-shot
 # agent that bootstraps the SAME plist back at the given time.
@@ -182,11 +205,12 @@ daily_fire_hhmm() {
 # Re-parses tomorrow's calendar date instead of adding 86400 so a DST transition
 # doesn't slide the fire time by an hour.
 next_daily_epoch() {
-    local hour="$1" min="$2" now="$3" day cand
+    local hour="$1" min="$2" now="$3" day midday cand
     day=$(epoch_fmt "$now" '%Y-%m-%d')
     cand=$(parse_when_epoch "$(printf '%s %02d:%02d' "$day" "$hour" "$min")") || return 1
     if [ "$cand" -le "$now" ]; then
-        day=$(epoch_fmt "$((now + 86400))" '%Y-%m-%d')
+        midday=$(parse_when_epoch "$day 12:00") || return 1
+        day=$(epoch_fmt "$((midday + 86400))" '%Y-%m-%d')
         cand=$(parse_when_epoch "$(printf '%s %02d:%02d' "$day" "$hour" "$min")") || return 1
     fi
     printf '%s\n' "$cand"
@@ -355,13 +379,13 @@ if [ "${1:-}" = "disarm-tonight" ] || [ "${1:-}" = "disarm-until" ]; then
     else
         WHEN="${2:-}"
         if [ -z "$WHEN" ]; then
-            echo "usage: bin/automouse/run disarm-until \"YYYY-MM-DD HH:MM [TZ]\"" >&2
-            echo "example: bin/automouse/run disarm-until \"2026-08-20 09:00 PDT\"" >&2
+            echo "usage: bin/automouse/run disarm-until \"[YYYY-MM-DD] HH:MM [TZ]\"" >&2
+            echo "example: bin/automouse/run disarm-until \"2026-08-20 09:00 PDT\" (or \"20:00\" for the next 20:00)" >&2
             exit 1
         fi
-        if ! REARM_EPOCH=$(parse_when_epoch "$WHEN"); then
+        if ! REARM_EPOCH=$(schedule_epoch "$WHEN" "$NOW"); then
             echo "error: could not parse time '$WHEN'" >&2
-            echo "expected: YYYY-MM-DD HH:MM [TZ]  (e.g. 2026-08-20 09:00 PDT)" >&2
+            echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-08-20 09:00 PDT, or 20:00 for the next 20:00)" >&2
             exit 1
         fi
     fi
@@ -490,6 +514,8 @@ _LIB_DIR="$SELF_DIR/../lib"
 [ -f "$_LIB_DIR/usage-gate.sh" ] || _LIB_DIR="$REPO/bin/lib"
 # shellcheck source=../lib/usage-gate.sh
 . "$_LIB_DIR/usage-gate.sh"
+# shellcheck source=../lib/login-preflight.sh
+. "$_LIB_DIR/login-preflight.sh"
 # shellcheck source=../lib/session-id.sh
 . "$_LIB_DIR/session-id.sh"
 AUTOMOUSE_BIN="$(cd "$(dirname "$0")" && pwd)/run"
@@ -498,7 +524,7 @@ LOG_DIR="$NIGHTLY_DIR/logs"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 PLANS_DIR="${PLANS_DIR:-$HOME/claude-plans}"
 MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
-MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan phases)
+MAX_ATTEMPTS=3     # per-plan retry cap: impl tries until the handoff, which reseeds the count at 1, then post-plan gets MAX_ATTEMPTS runs in total
 # Failure-report caps (ADR-0085): the `.failure` sidecar fed to an escalated
 # retry is at most this many lines AND this many bytes (whichever is smaller),
 # so a multi-hour transcript can never blow the retry's context window.
@@ -622,13 +648,52 @@ CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
 COST_LOCK_HELD=0  # set to 1 while append_cost_row holds the cost-report mutex
 CAP_DEFERRED=" "  # space-wrapped basenames cap-refunded or wt-new-failed this run; claim_next_plan skips them
 DEPENDS_HELD=" "  # space-wrapped basenames dependency-held this run; claim_next_plan skips them
+# Stop-file writer: records why this runner stopped, for bin/fleet-status.
+# Called only from cleanup_watcher, the EXIT trap. A clean finish already leaves
+# its own trace (a stop line plus the session-complete line in $LOG), so it writes
+# nothing then. One line, "<epoch>\t<cause>", written to a temp file and renamed
+# so a reader never sees half a line. SIGKILL skips every trap; bin/fleet-status
+# derives that case from a dead pid whose log has no trace. Never fails: it runs
+# inside the EXIT trap under set -e.
+write_stop_file() {
+    local rc=$1 cause dir base tmp
+    [ -n "${LOG:-}" ] || return 0
+    case "$rc" in
+        0)
+            if [ -n "${STOP_CAUSE:-}" ]; then
+                cause="$STOP_CAUSE"
+            elif [ "${STOP_CLEAN:-0}" = 1 ]; then
+                return 0
+            else
+                cause="exited 0 without the session-complete line"
+            fi ;;
+        129) cause="hung up by SIGHUP (exit 129)" ;;
+        130) cause="interrupted by SIGINT (exit 130)" ;;
+        143) cause="terminated by SIGTERM (exit 143)" ;;
+        *)   cause="aborted with exit $rc (a failed command under set -e, or an error exit)" ;;
+    esac
+    dir="$NIGHTLY_DIR/stops"
+    base="$(basename "${LOG%.log}")"
+    mkdir -p "$dir" 2>/dev/null || return 0
+    tmp="$dir/.$base.stop.tmp.$$"
+    if { printf '%s\t%s\n' "$(date +%s)" "$cause" > "$tmp"; } 2>/dev/null \
+        && mv -f "$tmp" "$dir/$base.stop" 2>/dev/null; then
+        return 0
+    fi
+    rm -f "$tmp" 2>/dev/null || true
+    return 0
+}
+# End stop-file writer.
+
 cleanup_watcher() {
+    local stop_rc=$?
     if [ -n "$WATCHER_PID" ]; then
         kill "$WATCHER_PID" 2>/dev/null || true
         wait "$WATCHER_PID" 2>/dev/null || true
     fi
     rm -f "$NIGHTLY_DIR/.heartbeat-$$-impl" "$NIGHTLY_DIR/.heartbeat-$$-postplan" \
-         "$NIGHTLY_DIR/.cmdpid-$$-impl" "$NIGHTLY_DIR/.cmdpid-$$-postplan" 2>/dev/null || true
+         "$NIGHTLY_DIR/.cmdpid-$$-impl" "$NIGHTLY_DIR/.cmdpid-$$-postplan" \
+         "$NIGHTLY_DIR/.failsig-$$-impl" 2>/dev/null || true
     # Release any plan claim still held (e.g. we broke out of the loop mid-plan on
     # a time guard or env-failure) so a sibling/next run can resume it.
     if [ -n "$CURRENT_LOCK" ]; then
@@ -639,8 +704,26 @@ cleanup_watcher() {
         COST_LOCK_HELD=0
         release_cost_lock
     fi
+    write_stop_file "$stop_rc"
 }
 trap cleanup_watcher EXIT
+
+# macOS /bin/bash (3.2) leaves $? at 0 inside the EXIT trap when a signal kills the
+# script, so write_stop_file could not tell a SIGTERM from a clean exit. Catch the
+# three signals and exit with the conventional 128+n status, which the EXIT trap
+# then sees. The impl pipeline runs in the background (see IMPL_BG_PID below) so
+# `wait "$IMPL_BG_PID"` is interruptible — the signal fires the trap immediately.
+# `pkill -TERM -P $$` terminates the background impl subshell (a direct child of
+# this process); claude is a grandchild and cannot be reached here, but the subshell
+# exits and the runner does not hang. The postplan `timeout` shim uses `wait`
+# internally and is also interruptible.
+exit_on_signal() {
+    pkill -TERM -P $$ 2>/dev/null || true
+    exit "$1"
+}
+trap 'exit_on_signal 143' TERM
+trap 'exit_on_signal 130' INT
+trap 'exit_on_signal 129' HUP
 
 run_heartbeat_watcher() {
     local hb_file=$1 log_file=$2 label=$3 pid_file=$4 slug=$5
@@ -1547,13 +1630,15 @@ run_between_plans_canary() {
 # because the slice can be a multi-hour transcript; a crashed/stall-killed agent
 # may have written nothing structured, so a raw log tail is the reliable,
 # agent-cooperation-free baseline.
-# Args: <plan_name> <log_before> <impl_model> <attempt_num>
+# Args: <plan_name> <log_before> <impl_model> <attempt_num> [<failure_signature>]
 write_failure_report() {
-    _wfr_plan="$1"; _wfr_before="$2"; _wfr_model="$3"; _wfr_attempt="$4"
+    _wfr_plan="$1"; _wfr_before="$2"; _wfr_model="$3"; _wfr_attempt="$4"; _wfr_sig="${5:-}"
     _wfr_file="$QUEUE_DIR/${_wfr_plan}.failure"
     {
-        printf '# Prior attempt %d/%d failed (model: %s) at %s\n\n' \
+        printf '# Prior attempt %d/%d failed (model: %s) at %s\n' \
             "$_wfr_attempt" "$MAX_ATTEMPTS" "$_wfr_model" "$(date)"
+        [ -z "$_wfr_sig" ] || printf 'failure-signature: %s\n' "$_wfr_sig"
+        printf '\n'
         printf 'This is the tail of the previous impl attempt that did NOT complete.\n'
         printf 'Read it to avoid repeating the same failure; it is capped and may be truncated mid-line.\n\n'
         printf '## Last %d lines of the failed attempt log (hard-capped to %d bytes)\n\n```\n' \
@@ -1563,6 +1648,36 @@ write_failure_report() {
             | tail -c "$FAILURE_TAIL_BYTES"
         printf '\n```\n'
     } > "$_wfr_file"
+}
+
+# Print the failure-signature header line of a .failure sidecar, or nothing.
+# Reads only the header region (stops at the first ``` fence), so a log line in
+# the fenced tail that happens to start with "failure-signature:" is never read.
+# Args: <failure_file>
+read_failure_signature() {
+    [ -f "$1" ] || return 0
+    awk '/^```/ { exit } sub(/^failure-signature: /, "") { print; exit }' "$1"
+}
+
+# Exit 0 iff the two signatures are BOTH non-empty and byte-equal. Empty never
+# matches: an attempt with no informative failing tool call keeps today's ladder.
+# Args: <previous_signature> <new_signature>
+failure_signature_repeats() {
+    [ -n "$1" ] && [ -n "$2" ] && [ "$1" = "$2" ]
+}
+
+# Write the skipped report for a plan stopped on a repeated failure. Mirrors
+# the poison-pill report in the plan-claim block; morning-digest surfaces it.
+# Args: <plan_name> <signature> <previous_attempt> <this_attempt>
+write_repeat_failure_report() {
+    local _rfr_dir="$NIGHTLY_DIR/reports" _rfr_slug
+    _rfr_slug=$(basename "$1" .md)
+    mkdir -p "$_rfr_dir"
+    {
+        printf 'Plan "%s" stopped: attempts %s and %s failed the same way, so the escalated retry was not spent. Needs human review; requeue after fixing the cause.\n\n' \
+            "$_rfr_slug" "$3" "$4"
+        printf '## Repeated failure\n\n```\n%s\n```\n' "$2"
+    } > "$_rfr_dir/$(date +%Y-%m-%d)-skipped-$_rfr_slug.md"
 }
 
 # Decide whether to feed the prior-failure report to this attempt's impl prompt.
@@ -1684,6 +1799,8 @@ CAFFEINATE_PID=$!
 
 START=$(date +%s)
 PLANS_RUN=0
+STOP_CAUSE=""
+STOP_CLEAN=0
 
 echo "=== Automouse session starting at $(date) ===" >> "$LOG"
 
@@ -1755,6 +1872,13 @@ while true; do
         break
     fi
 
+    # Login preflight: park (queue intact, no lock taken, no attempt counted)
+    # when the Claude login has expired. One Discord DM per outage.
+    if ! login_preflight "$NIGHTLY_DIR" "$LOG" "$SELF_DIR/../discord-dm"; then
+        echo "Login preflight: login expired, parking; queue left intact." >> "$LOG"
+        break
+    fi
+
     # Atomically claim the oldest queued plan not held by a live sibling runner.
     # If every queued plan is already claimed, there's nothing for us to do.
     NEXT_PLAN=$(claim_next_plan) || NEXT_PLAN=""
@@ -1776,7 +1900,7 @@ while true; do
 
     # Per-plan retry counter — skip poison pills
     ATTEMPT_FILE="$QUEUE_DIR/${PLAN_NAME}.attempts"
-    FAILURE_FILE="$QUEUE_DIR/${PLAN_NAME}.failure"   # capped tail of the last genuine impl failure (ADR-0085); lifecycle-tied to ATTEMPT_FILE
+    FAILURE_FILE="$QUEUE_DIR/${PLAN_NAME}.failure"   # capped tail of the last genuine impl failure (ADR-0085); lifecycle-tied to ATTEMPT_FILE, except at handoff where it is removed and ATTEMPT_FILE is reseeded to 1
     CAP_REFUND_FILE="$QUEUE_DIR/${PLAN_NAME}.cap-refunds"   # wall-clock refunds granted to this plan; lifecycle-tied to ATTEMPT_FILE, NOT reset by refund_attempt
     WT_FAIL_FILE="$QUEUE_DIR/${PLAN_NAME}.wt-fail"   # sentinel prompt-impl Step 5 drops when bin/wt-new fails; cleared before each attempt and after classification
     ATTEMPTS=0
@@ -1914,7 +2038,8 @@ while true; do
         IMPL_LOG_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
         HEARTBEAT_FILE="$NIGHTLY_DIR/.heartbeat-$$-impl"
         CMDPID_FILE="$NIGHTLY_DIR/.cmdpid-$$-impl"
-        rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
+        FAILSIG_FILE="$NIGHTLY_DIR/.failsig-$$-impl"   # last failing tool call of this impl attempt (stream-filter side file; never in $LOG)
+        rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE" "$FAILSIG_FILE"
 
         run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "impl" "$CMDPID_FILE" "$PLAN_SLUG" &
         WATCHER_PID=$!
@@ -2037,6 +2162,10 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # The impl agent has no clock — bin/lib/headless-elapsed-hook.sh reads
         # these two vars and appends an elapsed-clock line after every tool call
         # so the agent can track the 90% deadline and write a handoff in time.
+        # Run the impl pipeline in the background so `wait` below is signal-
+        # interruptible. A foreground pipeline defers the TERM trap until the
+        # pipeline completes; backgrounding it lets a kill fire the trap at once.
+        (
         IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=automouse IBL5_USAGE_GATE_MODEL="$IMPL_MODEL" \
         IBL5_USAGE_GATE_RESUME_BIN="$AUTOMOUSE_BIN" \
         CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
@@ -2053,8 +2182,11 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 --verbose \
                 --name "automouse-impl-$(date +%Y-%m-%d-%H%M)" \
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
-            | bin/lib/automouse-stream-filter.sh "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" impl \
-            >> "$LOG" || IMPL_STATUS=$?
+            | bin/lib/automouse-stream-filter.sh "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" impl "$FAILSIG_FILE" \
+            >> "$LOG"
+        ) &
+        IMPL_BG_PID=$!
+        wait "$IMPL_BG_PID" || IMPL_STATUS=$?
         fi
 
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -2152,10 +2284,14 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             echo "CAP-TIMEOUT BURNED — impl hard-killed at the ${REMAINING_SECS}s wall-clock cap (exit $IMPL_STATUS after ${IMPL_DUR}s); refund budget ${CAP_REFUNDS}/${CAP_REFUND_LIMIT} exhausted, this counts as a genuine attempt." >> "$LOG"
         fi
 
-        # Handoff created → impl succeeded, reset attempt counter
+        # Handoff created → impl succeeded. Seed the counter at 1 rather than
+        # clearing it: this run's post-plan is post-plan attempt 1, so a plan whose
+        # post-plan keeps failing gets exactly MAX_ATTEMPTS post-plan runs. Impl's
+        # own failed attempts are replaced by the 1, never added to it.
         if [ -f "$HANDOFF_FILE" ]; then
             echo "Handoff file created — impl succeeded." >> "$LOG"
-            rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
+            rm -f "$FAILURE_FILE" "$CAP_REFUND_FILE"
+            echo 1 > "$ATTEMPT_FILE"
         elif [ ! -e "$NEXT_PLAN" ]; then
             echo "Impl made a deliberate disposition (plan left queue/, e.g. already-merged → done/ or a stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
         elif [ "$IMPL_WT_FAIL" -eq 1 ]; then
@@ -2176,8 +2312,27 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             # incremented attempt stays in place (→ eventual poison-pill, unchanged).
             # Persist the capped failure report so the NEXT attempt — escalated to
             # Opus on the final retry (ADR-0085) — has this attempt's context.
-            write_failure_report "$PLAN_NAME" "$IMPL_LOG_BEFORE" "$IMPL_MODEL" "$(( ATTEMPTS + 1 ))"
+            # Repeated-failure stop: read the PREVIOUS signature before the
+            # overwrite, compute this attempt's, persist it, compare.
+            PREV_FAILSIG=$(read_failure_signature "$FAILURE_FILE" 2>/dev/null) || PREV_FAILSIG=""
+            PREV_FAILATTEMPT=$(sed -n '1s/^# Prior attempt \([0-9][0-9]*\)\/.*/\1/p' "$FAILURE_FILE" 2>/dev/null) || PREV_FAILATTEMPT=""
+            NEW_FAILSIG=$(bin/lib/automouse-failure-signature "$FAILSIG_FILE" 2>/dev/null) || NEW_FAILSIG=""
+            rm -f "$FAILSIG_FILE" 2>/dev/null || true
+            write_failure_report "$PLAN_NAME" "$IMPL_LOG_BEFORE" "$IMPL_MODEL" "$(( ATTEMPTS + 1 ))" "$NEW_FAILSIG"
             echo "Genuine impl failure — wrote $FAILURE_FILE (attempt $(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS)." >> "$LOG"
+            if [ -n "$NEW_FAILSIG" ]; then
+                echo "failsig: recorded (${#NEW_FAILSIG} chars)" >> "$LOG"
+            else
+                echo "failsig: none (no informative failing tool call; retry ladder unchanged)" >> "$LOG"
+            fi
+            if failure_signature_repeats "$PREV_FAILSIG" "$NEW_FAILSIG"; then
+                echo "REPEATED FAILURE — $PLAN_NAME failed the same way on attempts ${PREV_FAILATTEMPT:-?} and $(( ATTEMPTS + 1 )); moving to skipped/ without the escalated retry." >> "$LOG"
+                mkdir -p "$NIGHTLY_DIR/skipped"
+                mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+                touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
+                write_repeat_failure_report "$PLAN_NAME" "$NEW_FAILSIG" "${PREV_FAILATTEMPT:-?}" "$(( ATTEMPTS + 1 ))"
+                rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
+            fi
         fi
     fi
 
@@ -2394,7 +2549,10 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
 
     # Single-plan mode: exactly one attempt, then stop — predictable for a
     # watched one-off. A genuine failure does NOT retry to MAX_ATTEMPTS.
-    [ -n "${SINGLE_PLAN:-}" ] && break
+    if [ -n "${SINGLE_PLAN:-}" ]; then
+        STOP_CAUSE="single-plan mode: one attempt of ${SINGLE_PLAN%.md} finished"
+        break
+    fi
 
     # --- Between-plans master health canary dispatch ---
     # Bottom of the loop body on purpose: it never fires before the first plan
@@ -2472,3 +2630,4 @@ for lock in "$QUEUE_DIR"/*.md.lock; do
 done
 
 echo "=== Automouse session complete at $(date) — $PLANS_RUN plan(s) run ===" >> "$LOG"
+STOP_CLEAN=1

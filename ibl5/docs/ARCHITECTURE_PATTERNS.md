@@ -1,6 +1,6 @@
 ---
 description: Canonical interface-driven Repository/Service/View patterns for new modules.
-last_verified: 2026-08-25
+last_verified: 2026-10-07
 ---
 
 # IBL5 Architecture Patterns
@@ -55,15 +55,15 @@ Module/
 ```php
 <?php
 
-namespace PlayerDatabase\Contracts;
+namespace PlayerSearch\Contracts;
 
 /**
- * PlayerDatabaseValidatorInterface - Validates player search input
+ * PlayerSearchValidatorInterface - Validates player search input
  * 
  * Enforces whitelist validation and input sanitization for player search operations.
  * All methods return true/false to indicate validation success/failure.
  */
-interface PlayerDatabaseValidatorInterface
+interface PlayerSearchValidatorInterface
 {
     /**
      * Validate and sanitize player name search input
@@ -113,20 +113,20 @@ interface PlayerDatabaseValidatorInterface
 ```php
 <?php
 
-namespace PlayerDatabase;
+namespace PlayerSearch;
 
-use PlayerDatabase\Contracts\PlayerDatabaseValidatorInterface;
+use PlayerSearch\Contracts\PlayerSearchValidatorInterface;
 
 /**
- * @see PlayerDatabaseValidatorInterface
+ * @see PlayerSearchValidatorInterface
  */
-class PlayerDatabaseValidator implements PlayerDatabaseValidatorInterface
+class PlayerSearchValidator implements PlayerSearchValidatorInterface
 {
     private const VALID_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
     private const MAX_NAME_LENGTH = 64;
 
     /**
-     * @see PlayerDatabaseValidatorInterface::validatePlayerName()
+     * @see PlayerSearchValidatorInterface::validatePlayerName()
      */
     public function validatePlayerName(string $playerName): string
     {
@@ -138,7 +138,7 @@ class PlayerDatabaseValidator implements PlayerDatabaseValidatorInterface
     }
 
     /**
-     * @see PlayerDatabaseValidatorInterface::validatePosition()
+     * @see PlayerSearchValidatorInterface::validatePosition()
      */
     public function validatePosition(string $position): bool
     {
@@ -220,7 +220,7 @@ $stmt->close();
 ## Current Implementation Status
 
 **Modules with Complete Interface Architecture:**
-- ✅ **PlayerDatabase** (4 interfaces, 4 implementations, 69 tests)
+- ✅ **PlayerSearch** (4 interfaces, 4 implementations, 69 tests)
 - ✅ **FreeAgency** (17 interfaces, 17 implementations, 271 tests)
 - ✅ **Player** (11 interfaces, 25 implementations, 412 tests)
 
@@ -254,7 +254,7 @@ The codebase has two parallel HTTP-endpoint styles. They are distinct on purpose
 
 | Style | Lives under | Dispatched by | Returns | Use for |
 |-------|-------------|---------------|---------|---------|
-| `*ApiHandler` | a **feature module** namespace (e.g. `DepthChartEntry\DepthChartEntryApiHandler`) | instantiated **directly** in the owning `ibl5/modules/<Module>/index.php` | an **HTML partial** for an HTMX swap into an already-rendered page | in-page interactivity within one module's UI (HTMX `hx-get`/`hx-post` fragment endpoints) |
+| `*ApiHandler` | a **feature module** namespace (e.g. `DepthChart\DepthChartApiHandler`) | instantiated **directly** in the owning `ibl5/modules/<Module>/index.php` | an **HTML partial** for an HTMX swap into an already-rendered page | in-page interactivity within one module's UI (HTMX `hx-get`/`hx-post` fragment endpoints) |
 | `Api\Controller\*Controller` | `ibl5/classes/Api/Controller/` | the central `ibl5/classes/Api/Router.php` route table | a **JSON** REST response | the versioned external REST API (API-key auth, rate limiting, ETag caching — see API_GUIDE.md) |
 
 **Rule of thumb:** if a new endpoint feeds an HTMX fragment swap inside one
@@ -264,12 +264,12 @@ registered in `Api/Router.php`. A `*ApiHandler` is **not** part of the REST API
 and is never registered in `Api/Router.php`.
 
 Current `*ApiHandler` inventory (module-local HTMX):
-`DepthChartEntry\DepthChartEntryApiHandler`,
+`DepthChart\DepthChartApiHandler`,
+`DepthChartSnapshot\DepthChartSnapshotApiHandler`,
 `DraftHistory\DraftHistoryApiHandler`,
 `FranchiseRecordBook\FranchiseRecordBookApiHandler`,
 `LeagueStarters\LeagueStartersApiHandler`,
 `NextSim\NextSimTabApiHandler`,
-`SavedDepthChart\SavedDepthChartApiHandler`,
 `Team\TeamApiHandler`,
 `Trading\TradeRosterPreviewApiHandler`.
 

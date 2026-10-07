@@ -1,6 +1,6 @@
 ---
 description: Bug-pipeline PHP CLI layer — how to exercise it end-to-end against a scratch DB, and the behavioural gotchas (UTC skew, claim-loser semantics, tick sequencing) the shell harnesses cannot prove.
-last_verified: 2026-09-16
+last_verified: 2026-10-05
 ---
 
 # Bug Pipeline CLI
@@ -23,8 +23,12 @@ bin/bug-pipeline-test-env --teardown
 `bin/bug-pipeline-test-env` loads **both** `ibl5/migrations/153_create_bug_pipeline_tables.sql`
 and `ibl5/migrations/158_create_bug_report_attachments.sql` — without 158 the claim's
 attachment join fatals. It exports `DB_HOST`/`DB_USER`/`DB_PASS`/`DB_NAME`, `BOT_BASE_URL`,
-`CLAUDE_BIN`, and `GH_BIN`; `ibl5/config.php` reads the DB vars from the environment, so the
-real CLI scripts in this directory write into the scratch DB with no code change. The
+`CLAUDE_BIN`, and `GH_BIN`. The `DB_*` redirection only takes effect when the `ibl5/config.php`
+that `_bootstrap.php` requires still carries the legacy `getenv('DB_*')` fallback lines, which is
+the shape of the main checkout's untracked file that `bin/wt-new` copies into each worktree. A
+`config.php` built from the current `ibl5/config.php.example` ignores those variables and reads
+`$dbhost`/`$dbuname`/`$dbpass`/`$dbname` from the gitignored `ibl5/config.local.php`; under that
+shape the CLI scripts write into whatever database `config.local.php` names. The
 three-barrier isolation design is
 `ibl5/docs/decisions/0111-bug-pipeline-test-isolation.md`.
 
@@ -58,6 +62,8 @@ require __DIR__ . "/scripts/bug-pipeline/_bootstrap.php";
 $r = new \BugPipeline\BugReportRepository($mysqli_db);
 echo $r->enqueueAuthorizedAndAdvance("<author_snowflake>","<channel>","<message>","bug text"), "\n";'
 ```
+
+The `DB_*` prefix on that command redirects the connection only under the legacy `config.php` shape described above. Under the `config.local.php` shape the variables are ignored and the connection goes to the database `config.local.php` names.
 
 Then walk the row through:
 `transition.php <id> queued --class=bug --thread-id=<snowflake>` →

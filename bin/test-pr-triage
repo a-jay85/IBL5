@@ -71,6 +71,9 @@ case "$1 $2" in
       *protection*)    echo '{"required_status_checks":{"contexts":["Tests and Analysis","E2E Tests","human-signoff"]}}' ;;
       *check-runs*)    sha="$(printf '%s' "$*" | sed -E 's#.*/commits/([0-9a-f]+)/check-runs.*#\1#')"
                        if [ -f "$FIX/checks-$sha.json" ]; then cat "$FIX/checks-$sha.json"; else echo '{"check_runs":[]}'; fi ;;
+      "api user")      if [ -f "$FIX/viewer.json" ]; then cat "$FIX/viewer.json"; else echo '{"login":"fixture-me"}'; fi ;;
+      *issues/*/comments*) n="$(printf '%s' "$*" | sed -E 's#.*/issues/([0-9]+)/comments.*#\1#')"
+                       if [ -f "$FIX/comments-$n.json" ]; then cat "$FIX/comments-$n.json"; else echo '[]'; fi ;;
       *) echo '{}' ;;
     esac ;;
   *) echo '{}' ;;
@@ -278,6 +281,7 @@ for wt in wt-a wt-b; do
     chmod +x "$TMP/$wt/bin/post-plan-now"
 done
 # Marker for wt-a (the runner name is post-plan-now, the resume script lives in wt-a).
+# shellcheck source=bin/lib/usage-gate.sh
 ( . "$GATE_LIB"; usage_marker_write "cccccccc-3333-4333-8333-cccccccccccc" post-plan-now \
     "$TMP/wt-a/bin/post-plan-now" usage-pause drain 94 five_hour "" ) > /dev/null 2>&1 \
     || { failcase "C16 setup: marker write failed"; }
@@ -305,5 +309,154 @@ assert_match  "C18 no marker -> ARMABLE"            "^ARMABLE$"                 
 # --help documents the bucket.
 ST=0; OUT="$("$TRIAGE" --help 2>&1)" || ST=$?
 assert_match  "C19 --help mentions PAUSED"          "PAUSED"                                    "$OUT"
+
+# --- H1-H13: bin/lib/held-prs.sh pure functions (the `--held` view) ---
+# shellcheck source=bin/lib/held-prs.sh
+source "$SCRIPT_DIR/lib/held-prs.sh"
+
+H_PR='{"author":{"login":"me"},"isDraft":false,"autoMergeRequest":null}'
+ST=0; hp_is_held "$H_PR" me || ST=$?
+assert_status "H1 held: mine, non-draft, un-armed"   0 "$ST"
+ST=0; hp_is_held '{"author":{"login":"me"},"isDraft":false,"autoMergeRequest":{"mergeMethod":"SQUASH"}}' me || ST=$?
+assert_status "H2 armed PR left out"                 1 "$ST"
+ST=0; hp_is_held '{"author":{"login":"me"},"isDraft":true,"autoMergeRequest":null}' me || ST=$?
+assert_status "H3 draft left out"                    1 "$ST"
+ST=0; hp_is_held '{"author":{"login":"someone-else"},"isDraft":false,"autoMergeRequest":null}' me || ST=$?
+assert_status "H4 other author left out"             1 "$ST"
+ST=0; hp_is_held '{"author":{"login":""},"isDraft":false,"autoMergeRequest":null}' "" || ST=$?
+assert_status "H5 empty login left out"              1 "$ST"
+
+H_STICKY="$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Fidelity: PASS · auto-merge held' '' \
+    'Auto-merge held:' '- (7) auto_merge — plan sets auto_merge: false' \
+    '- (8) feat — awaiting human-approved' '' '- (99) trailing — after the block')"
+OUT="$(hp_sticky_reasons "$H_STICKY")"
+assert_match  "H6 recorded (7)"                      '^\(7\) auto_merge — plan sets auto_merge: false$' "$OUT"
+assert_match  "H6 recorded (8)"                      '^\(8\) feat — awaiting human-approved$'           "$OUT"
+assert_absent "H6 stops at block end (trailing)"     'trailing'                                         "$OUT"
+OUT="$(hp_sticky_reasons "${H_STICKY/Auto-merge held:/**Auto-merge held:**}")"
+assert_match  "H6 bold header accepted"              '^\(7\) '                                          "$OUT"
+
+OUT="$(hp_sticky_reasons "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Auto-merge held:' '- no arming decision recorded')")"
+assert_status "H7 no-decision bullet -> no reason"   0 "${#OUT}"
+OUT="$(hp_sticky_reasons "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Fidelity: PASS · auto-merge armed')")"
+assert_status "H7 armed banner -> no reason"         0 "${#OUT}"
+
+OUT="$(printf '%s\n%s\n' \
+    '[{"body":"plain"},{"body":"<!-- pr-ready-verdict -->\nold"}]' \
+    '[{"body":"<!-- pr-ready-verdict -->\nnew"}]' | hp_pick_sticky)"
+assert_match  "H8 last marker comment wins"          '^new$' "$OUT"
+assert_absent "H8 older marker comment dropped"      'old'   "$OUT"
+ST=0; OUT="$(printf '[]' | hp_pick_sticky)" || ST=$?
+assert_status "H8 empty page exits 0"                0 "$ST"
+assert_status "H8 empty page prints nothing"         0 "${#OUT}"
+
+H_CHECKS="$(checks_json failure success failure | jq -c '(.check_runs[] | select(.name == "E2E Tests")) |= (.status = "in_progress")')"
+OUT="$(hp_check_reasons <<< "$H_CHECKS")"
+assert_match  "H9 red check named"                   '^red checks: Tests and Analysis \(failure\)$' "$OUT"
+assert_match  "H9 pending check named"               '^pending checks: E2E Tests$'                  "$OUT"
+assert_absent "H9 human-signoff never listed"        'human-signoff'                                "$OUT"
+OUT="$(hp_check_reasons <<< "$(checks_json success success failure)")"
+assert_status "H10 sign-off-only failure -> nothing" 0 "${#OUT}"
+
+H_GREEN="$(checks_json success success success)"
+OUT="$(hp_live_reasons DIRTY HELD "golden-changed feat-awaiting-signoff" "$H_GREEN")"
+assert_match  "H11 DIRTY reason"                     '^merge conflict \(DIRTY\)$'          "$OUT"
+assert_match  "H11 manual-testing reason"            '^manual-testing rows unresolved$'    "$OUT"
+assert_match  "H11 HOLDS token golden-changed"       '^golden-changed$'                    "$OUT"
+assert_match  "H11 HOLDS token feat-awaiting-signoff" '^feat-awaiting-signoff$'            "$OUT"
+OUT="$(hp_live_reasons CLEAN CLEARED - "$H_GREEN")"
+assert_status "H11 clean PR -> nothing"              0 "${#OUT}"
+
+OUT="$(printf 'a\n\nb\na\n' | hp_dedupe | tr '\n' ',')"
+assert_status "H12 dedupe keeps order, drops repeats" 0 "$([ "$OUT" = "a,b," ] && echo 0 || echo 1)"
+
+OUT="$(hp_format_line 5 https://x/5 "fix:  two  spaces" "$(printf 'r1\nr2\nr1')")"
+assert_match  "H13 joined line"                      '^#5  https://x/5  fix: two spaces  r1; r2$' "$OUT"
+OUT="$(hp_format_line 5 https://x/5 "t" "")"
+assert_match  "H13 no reasons -> unknown"            '  unknown$' "$OUT"
+
+# --- H-E1..H-E9: bin/pr-triage --held end to end through the stub gh ---
+# held_pr <num> <mss> <author> <isDraft:true|false> <armed:true|false> [title]
+held_pr() {
+    pr_json "$1" "$2" "$BODY_CLEAR" | jq --arg a "$3" --argjson d "$4" \
+        --argjson am "$5" --arg t "${6:-}" '. + {author: {login: $a}, isDraft: $d,
+          autoMergeRequest: (if $am then {mergeMethod: "SQUASH"} else null end),
+          url: ("https://github.com/a-jay85/IBL5-test/pull/" + (.number|tostring))}
+        | if $t != "" then .title = $t else . end'
+}
+
+FIX_A="$(mktemp -d -p "$TMP")"
+for n in 40 41 42 43 44 45 46 47; do
+    checks_json success success success > "$FIX_A/checks-$(printf '%040d' "$n").json"
+done
+checks_json failure success success > "$FIX_A/checks-$(printf '%040d' 46).json"
+checks_json success success success \
+    | jq -c '(.check_runs[] | select(.name == "E2E Tests")) |= (.status = "in_progress" | .conclusion = null)' \
+    > "$FIX_A/checks-$(printf '%040d' 47).json"
+jq -n --arg b "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Fidelity: PASS · auto-merge held' '' \
+    'Auto-merge held:' '- (7) auto_merge — plan sets auto_merge: false' \
+    '- (7) auto_merge — plan sets auto_merge: false')" '[{body: $b}]' > "$FIX_A/comments-44.json"
+{
+    held_pr 40 CLEAN fixture-me false false
+    held_pr 41 CLEAN fixture-me false true
+    held_pr 42 DRAFT fixture-me true false
+    held_pr 43 CLEAN someone-else false false
+    held_pr 44 DIRTY fixture-me false false
+    held_pr 45 CLEAN fixture-me false false "feat: fixture forty-five"
+    held_pr 46 CLEAN fixture-me false false
+    held_pr 47 CLEAN fixture-me false false
+} | jq -s . > "$FIX_A/prs.json"
+
+run_triage "$FIX_A" --held
+assert_match  "H-E1 header"                        '^PR#  URL  TITLE  REASONS$' "$OUT"
+assert_absent "H-E1 armed PR left out"             '^#41  '                      "$OUT"
+assert_absent "H-E1 draft left out"                '^#42  '                      "$OUT"
+assert_absent "H-E1 other author left out"         '^#43  '                      "$OUT"
+assert_status "H-E1 exit 0"                        0                             "$ST"
+assert_absent "H-E1 ROWS guard satisfied"          'ERROR: reported'             "$OUT"
+assert_absent "H-E1 read-only"  'pr merge|update-branch|-X POST|-X PATCH'        "$(cat "$FIX_A/calls.log")"
+assert_match  "H-E2 two reasons, recorded first, dup dropped" \
+    '^#44  [^ ]+  chore: fixture #44  \(7\) auto_merge — plan sets auto_merge: false; merge conflict \(DIRTY\)$' "$OUT"
+# Mutation check: swapping ${out:-unknown} for ${out:--} in hp_format_line makes this line end "  -".
+assert_match  "H-E3 unknown"                      '^#40  https://github.com/a-jay85/IBL5-test/pull/40  chore: fixture #40  unknown$' "$OUT"
+assert_match  "H-E4 feat awaiting sign-off"        '^#45  .*  feat-awaiting-signoff$'                      "$OUT"
+assert_match  "H-E4 red check"                     '^#46  .*  red checks: Tests and Analysis \(failure\)$' "$OUT"
+assert_match  "H-E4 pending check"                 '^#47  .*  pending checks: E2E Tests$'                  "$OUT"
+
+# H-E9: default mode still lists the armed PR and prints the old header.
+run_triage "$FIX_A"
+assert_match  "H-E9 default mode lists #41"        '^#41 '                           "$OUT"
+assert_absent "H-E9 default mode has no held header" '^PR#  URL  TITLE  REASONS$'     "$OUT"
+
+# H-E5: --held and --arm are exclusive, rejected before any gh call.
+FIX="$(mktemp -d -p "$TMP")"
+run_triage "$FIX" --held --arm
+assert_status "H-E5 --held --arm exit 2"           2                    "$ST"
+assert_match  "H-E5 --held --arm says why"         'mutually exclusive' "$OUT"
+assert_absent "H-E5 --held --arm no gh pr list"    'pr list'            "$(cat "$FIX/calls.log" 2>/dev/null)"
+run_triage "$FIX" --arm --held
+assert_status "H-E5 --arm --held exit 2"           2                    "$ST"
+assert_match  "H-E5 --arm --held says why"         'mutually exclusive' "$OUT"
+assert_absent "H-E5 --arm --held no gh pr list"    'pr list'            "$(cat "$FIX/calls.log" 2>/dev/null)"
+
+# H-E6: --held=yes is an unknown flag.
+FIX="$(mktemp -d -p "$TMP")"
+run_triage "$FIX" --held=yes
+assert_status "H-E6 --held=yes exit 2"             2                              "$ST"
+assert_match  "H-E6 --held=yes unknown flag"       'unknown flag: --held=yes'     "$OUT"
+
+# H-E7: an unresolved viewer login fails closed instead of listing nothing.
+FIX="$(mktemp -d -p "$TMP")"
+cp "$FIX_A/prs.json" "$FIX/prs.json"
+echo '{}' > "$FIX/viewer.json"
+run_triage "$FIX" --held
+assert_status "H-E7 no login exit 2"               2                                  "$ST"
+assert_match  "H-E7 no login says why"             'cannot resolve your GitHub login' "$OUT"
+assert_absent "H-E7 no login lists nothing"        '^#40  '                           "$OUT"
+
+# H-E8: --help documents the flag.
+ST=0; OUT="$("$TRIAGE" --help 2>&1)" || ST=$?
+assert_match  "H-E8 --help mentions --held"        '[-][-]held'                                      "$OUT"
+assert_match  "H-E8 --help mentions the exclusion" 'Read-only; cannot be combined' "$OUT"
 
 [ "$FAILED" = 0 ] && exit 0 || exit 1

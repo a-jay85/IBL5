@@ -9,8 +9,17 @@ use Api\Pagination\Paginator;
 /**
  * @phpstan-type PlayerCurrentRow array{player_uuid: string, pid: int, name: string, nickname: string|null, position: string, age: int, htft: int, htin: int, dc_can_play_in_game: int|null, retired: int, experience: int, bird_rights: int, teamid: int|null, team_uuid: string|null, team_city: string|null, team_name: string|null, owner_name: string|null, full_team_name: string|null, contract_year: int, current_salary: int, year1_salary: int, year2_salary: int, year3_salary: int, year4_salary: int, year5_salary: int, year6_salary: int, games_played: int, minutes_played: int, field_goals_made: int, field_goals_attempted: int, free_throws_made: int, free_throws_attempted: int, three_pointers_made: int, three_pointers_attempted: int, offensive_rebounds: int, defensive_rebounds: int, assists: int, steals: int, turnovers: int, blocks: int, personal_fouls: int, points_per_game: float|null, fg_percentage: float|null, ft_percentage: float|null, three_pt_percentage: float|null, ...<string, mixed>}
  */
-class ApiPlayerRepository extends \BaseMysqliRepository
+class ApiPlayerRepository extends \Database\BaseMysqliRepository
 {
+    /** Public API sort key => SQL column. The controller's allowlist is array_keys() of this map. */
+    public const SORT_COLUMNS = [
+        'name' => 'name',
+        'age' => 'age',
+        'position' => 'position',
+        'points_per_game' => 'points_per_game',
+        'experience' => 'experience',
+    ];
+
     /**
      * Get paginated list of players from the API view.
      *
@@ -42,10 +51,12 @@ class ApiPlayerRepository extends \BaseMysqliRepository
         }
 
         $whereClause = $where !== [] ? 'WHERE ' . implode(' AND ', $where) : '';
-        $orderBy = $paginator->getOrderByClause();
+        $sortColumn = self::SORT_COLUMNS[$paginator->getSort()]
+            ?? throw new \InvalidArgumentException('Invalid sort column: ' . $paginator->getSort());
+        $direction = $paginator->getOrder() === 'desc' ? 'DESC' : 'ASC';
 
-        // IDENTIFIER (already-validated): $whereClause = hardcoded fragments; $orderBy = allowlist-validated by Paginator
-        $query = 'SELECT * FROM vw_player_current ' . $whereClause . ' ORDER BY ' . $orderBy . ' LIMIT ? OFFSET ?';
+        // IDENTIFIER: $whereClause = hardcoded fragments; $sortColumn = SORT_COLUMNS map value; $direction = literal ternary
+        $query = 'SELECT * FROM vw_player_current ' . $whereClause . ' ORDER BY ' . $sortColumn . ' ' . $direction . ' LIMIT ? OFFSET ?';
         $types .= 'ii';
         $params[] = $paginator->getLimit();
         $params[] = $paginator->getOffset();

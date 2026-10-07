@@ -90,7 +90,7 @@
 .trading-card-back .meta-badge {
     background: linear-gradient(135deg, var(--card-border) 0%, var(--card-accent) 100%);
     color: var(--card-grad-mid);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     padding: var(--pc-pad-xs) var(--pc-pad-md);
     border-radius: var(--pc-radius-sm);
     font-size: var(--pc-text-sm);
@@ -145,7 +145,7 @@
 .trading-card .stats-grid .label,
 .trading-card-back .stats-grid .label {
     color: var(--card-accent);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-align: right;
 }
 
@@ -318,7 +318,7 @@
 
 .trading-card .rating-label {
     font-size: var(--pc-text-2xs);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     color: var(--card-accent);
     letter-spacing: 0.5px;
@@ -326,7 +326,7 @@
 
 .trading-card .rating-value {
     font-size: var(--pc-text-lg);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--card-text);
     font-family: 'Monaco', 'Menlo', monospace;
 }
@@ -391,7 +391,7 @@
 
 .trading-card-back .highs-table .highs-header {
     color: var(--card-accent);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-size: var(--pc-text-xs);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -401,21 +401,21 @@
 .trading-card-back .highs-table .category-header {
     color: var(--card-text-muted);
     font-size: var(--pc-text-2xs);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
 }
 
 .trading-card-back .highs-table .stat-label {
     width: 28%;
     color: var(--card-accent);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-align: left;
     font-size: var(--pc-text-sm);
 }
 
 .trading-card-back .highs-table .stat-value {
     color: var(--card-text);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-family: 'Monaco', 'Menlo', monospace;
 }
 
@@ -492,7 +492,7 @@
 .player-stats-card td.stats-table-header {
     background: linear-gradient(135deg, var(--card-border) 0%, var(--card-accent) 100%);
     color: var(--card-grad-mid);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: var(--pc-text-lg);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -506,7 +506,7 @@
 .player-stats-card table th,
 .player-stats-card .stats-table th {
     color: var(--card-accent);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-size: var(--pc-text-sm);
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -554,7 +554,7 @@
 .player-stats-card tr.player-table-row-bold td,
 .player-stats-card .stats-table .career-row td,
 .player-stats-card .stats-table tr.player-table-row-bold td {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--card-text);
     border-top: 2px solid var(--card-border);
     background: linear-gradient(90deg, color-mix(in srgb, var(--card-border) 20%, transparent) 0%, color-mix(in srgb, var(--card-border) 10%, transparent) 100%);
@@ -622,12 +622,12 @@
     background: color-mix(in srgb, var(--card-border) 90%, transparent);
     color: var(--card-grad-mid);
     font-size: var(--pc-text-2xs);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     padding: 3px var(--pc-pad-md);
     border-radius: var(--pc-radius-sm);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    z-index: 5;
+    z-index: var(--z-sticky-col);
 }
 
 /* ==========================================================================
@@ -715,7 +715,7 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    z-index: 10;
+    z-index: var(--z-sticky);
     transition: all var(--transition-slow);
     box-shadow: var(--pc-shadow-sm);
 }
@@ -820,11 +820,11 @@
     margin-left: auto;
     margin-bottom: var(--pc-pad-md);
     position: relative;
-    z-index: 5;
+    z-index: var(--z-sticky-col);
     background: color-mix(in srgb, var(--card-border) 95%, transparent);
     color: var(--card-grad-mid);
     font-size: var(--pc-text-sm);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     padding: var(--pc-pad-md) var(--pc-pad-lg);
     border-radius: var(--pc-radius-md);
     cursor: pointer;

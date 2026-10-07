@@ -449,7 +449,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         // Assert
         $this->assertFalse($result['hasExistingContract']);
         // Veteran minimum for 3 years experience
-        $expectedVetMin = \ContractRules::getVeteranMinimumSalary(3);
+        $expectedVetMin = \League\ContractRules::getVeteranMinimumSalary(3);
         $this->assertSame($expectedVetMin, $result['salary']);
     }
 
@@ -569,7 +569,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->processor->calculateVeteranMinimumSalary(0);
 
         // Assert
-        $expectedVetMin = \ContractRules::getVeteranMinimumSalary(0);
+        $expectedVetMin = \League\ContractRules::getVeteranMinimumSalary(0);
         $this->assertSame($expectedVetMin, $result);
     }
 
@@ -584,7 +584,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->processor->calculateVeteranMinimumSalary(10);
 
         // Assert
-        $expectedVetMin = \ContractRules::getVeteranMinimumSalary(10);
+        $expectedVetMin = \League\ContractRules::getVeteranMinimumSalary(10);
         $this->assertSame($expectedVetMin, $result);
     }
 
@@ -674,7 +674,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertFalse($result['hasExistingContract']);
-        $this->assertSame(\ContractRules::getVeteranMinimumSalary(5), $result['salary']);
+        $this->assertSame(\League\ContractRules::getVeteranMinimumSalary(5), $result['salary']);
     }
 
     /**

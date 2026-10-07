@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand only (no auto-attach trigger) — Fable approval-gate procedure: surface a suggestion, AskUserQuestion gate before any Fable spawn, and the asm-level static-RE exception where Fable is the recommended tier. Parent agent-tiering.md:18 carries the resident stop-text; read this for the full procedure.
-last_verified: 2026-09-23
+description: Read-on-demand only (no auto-attach trigger) — Fable approval-gate procedure: surface a suggestion, AskUserQuestion gate before any Fable spawn (except a def pinned to `model: fable`, a standing yes), and the asm-level static-RE exception where Fable is the recommended tier. Parent agent-tiering.md:18 carries the resident stop-text; read this for the full procedure.
+last_verified: 2026-10-04
 paths: ".claude/rules/agent-tiering-fable-gate.md"
 ---
 

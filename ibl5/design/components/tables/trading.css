@@ -146,7 +146,7 @@
     bottom: 0;
     background: var(--page-bg);
     border-top: 1px solid var(--gray-200);
-    z-index: 10;
+    z-index: var(--z-sticky);
 }
 
 .trading-layout__header {
@@ -210,7 +210,7 @@
         color-mix(in srgb, var(--team-color-primary) 70%, black));
     color: var(--team-color-secondary, white);
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: var(--text-base);
     letter-spacing: var(--tracking-display);
     cursor: pointer;

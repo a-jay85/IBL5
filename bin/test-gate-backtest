@@ -1,0 +1,631 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-gate-backtest — hermetic regression test for bin/gate-backtest.
+#
+# Run: bin/test-gate-backtest [case-name|all]
+#   exit 0 = all selected cases pass, 1 = at least one failed, 2 = unknown case
+#
+# CI: the harness-tests job in .github/workflows/tests.yml runs this script (tests.yml:1036 when
+# the destructive-bypass-body-replay case landed; the call has since moved down a few lines).
+#
+# Everything runs against throwaway scratch repos with a fixture PR history and a fixed
+# --now, so no network, no `gh`, and no real clock are involved. The two pma-* cases replay the
+# real bin/lib/plan-matrix-assertions at two revisions (the #2506-era noisy one and the #2520
+# fix) over a synthetic history, as the proof that the hold separates a noisy gate from a good one.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+GB="$REPO_ROOT/bin/gate-backtest"
+
+T="$(mktemp -d)"
+trap 'rm -rf "$T"' EXIT
+export TMPDIR="$T/tmp"
+mkdir -p "$TMPDIR"
+export GIT_AUTHOR_NAME=T GIT_AUTHOR_EMAIL=t@t.com GIT_COMMITTER_NAME=T GIT_COMMITTER_EMAIL=t@t.com
+# No `gh` fallback when the wrapper resolves a stacked base.
+export BRANCH_BASE_OFFLINE=1
+
+NOW="2026-09-20T00:00:00Z"
+PMA_NOISY_REV="36ae7241de2a477bacb446f192d2722129125ca7"   # #2506 squash merge: the gate as it stood when #2506 shipped
+PMA_GOOD_REV="1174acbdbb5d8c41a87e8e7d3d01c312d18b751d"    # #2520: suppresses 5 token-notation false positives
+
+FAILED=0
+ok() { printf 'PASS %s\n' "$1"; }
+fail() { printf 'FAIL %s\n' "$1"; FAILED=1; }
+
+OUT=""
+ERR=""
+RC=0
+# run_gb <args...> — capture stdout in OUT, stderr in ERR, exit code in RC.
+run_gb() {
+    RC=0
+    OUT=$("$GB" "$@" 2>"$T/err") || RC=$?
+    ERR=$(cat "$T/err")
+}
+
+has() { printf '%s\n' "$1" | grep -qF -- "$2"; }
+
+# commit_in <repo> <subject> <file> <content> [mode]
+commit_in() {
+    local r="$1" subj="$2" file="$3" content="$4" mode="${5:-}"
+    mkdir -p "$(dirname "$r/$file")"
+    printf '%s' "$content" > "$r/$file"
+    if [ -n "$mode" ]; then chmod "$mode" "$r/$file"; fi
+    git -C "$r" add -A
+    git -C "$r" commit -q -m "$subj"
+}
+
+# record <repo> <entries-file> <number> <title> <merged-at> <head-ref> [body-json]
+# body-json is an already JSON-escaped string (write newlines as \n); default empty
+record() {
+    local sha
+    sha=$(git -C "$1" rev-parse HEAD)
+    printf '{"number":%s,"title":"%s","mergeCommit":{"oid":"%s"},"mergedAt":"%s","headRefName":"%s","body":"%s"}\n' \
+        "$3" "$4" "$sha" "$5" "$6" "${7:-}" >> "$2"
+}
+
+# entries_to_json <entries-file> <json-file>
+entries_to_json() {
+    local first=1 line
+    printf '[' > "$2"
+    while IFS= read -r line; do
+        if [ "$first" = 1 ]; then first=0; else printf ',' >> "$2"; fi
+        printf '%s' "$line" >> "$2"
+    done < "$1"
+    printf ']\n' >> "$2"
+}
+
+new_repo() {
+    mkdir -p "$1"
+    git -C "$1" init -q -b master
+    git -C "$1" config commit.gpgsign false
+}
+
+HEADER_GATE_HEAD='#!/bin/sh
+# gate-backtest-argv:
+'
+
+NOISY_GATE="${HEADER_GATE_HEAD}"'if git diff-tree --no-commit-id --name-only -r HEAD | grep -q "^src/noisy.txt$"; then
+    echo flagged
+    exit 1
+fi
+exit 0
+'
+QUIET_GATE="${HEADER_GATE_HEAD}"'if git log -1 --format=%s HEAD | grep -q risky; then
+    echo flagged
+    exit 1
+fi
+exit 0
+'
+SLEEP_GATE="${HEADER_GATE_HEAD}"'sleep 5
+'
+NO_HEADER_GATE='#!/bin/sh
+exit 0
+'
+
+H="$T/hist"
+J="$T/hist.json"
+
+# General history: three clean PRs touch the noisy file, two risky PRs are each repaired by a
+# fix PR within 48h, the rest are plain.
+setup_hist() {
+    [ -d "$H" ] && return 0
+    local e="$T/hist.entries"
+    new_repo "$H"
+    commit_in "$H" "root" README "root
+"
+    commit_in "$H" "chore: noise one (#1)" src/noisy.txt "1
+"; record "$H" "$e" 1 "chore: noise one" 2026-09-01T12:00:00Z branch-1
+    commit_in "$H" "chore: risky tweak (#2)" src/hot.txt "2
+"; record "$H" "$e" 2 "chore: risky tweak" 2026-09-02T12:00:00Z branch-2
+    commit_in "$H" "fix: repair hot (#3)" src/hot.txt "3
+"; record "$H" "$e" 3 "fix: repair hot" 2026-09-02T22:00:00Z branch-3
+    commit_in "$H" "chore: noise two (#4)" src/noisy.txt "4
+"; record "$H" "$e" 4 "chore: noise two" 2026-09-03T12:00:00Z branch-4
+    commit_in "$H" "chore: risky tweak two (#5)" src/hot2.txt "5
+"; record "$H" "$e" 5 "chore: risky tweak two" 2026-09-04T12:00:00Z branch-5
+    commit_in "$H" "fix: repair hot2 (#6)" src/hot2.txt "6
+"; record "$H" "$e" 6 "fix: repair hot2" 2026-09-04T22:00:00Z branch-6
+    commit_in "$H" "chore: noise three (#7)" src/noisy.txt "7
+"; record "$H" "$e" 7 "chore: noise three" 2026-09-05T12:00:00Z branch-7
+    commit_in "$H" "chore: plain (#8)" src/plain.txt "8
+"; record "$H" "$e" 8 "chore: plain" 2026-09-06T12:00:00Z branch-8
+    entries_to_json "$e" "$J"
+
+    git -C "$H" checkout -q -b cand-noisy master
+    commit_in "$H" "feat: noisy gate" bin/check-noisy "$NOISY_GATE" 755
+    git -C "$H" checkout -q -b cand-quiet master
+    commit_in "$H" "feat: quiet gate" bin/check-quiet "$QUIET_GATE" 755
+    git -C "$H" checkout -q -b cand-plain master
+    commit_in "$H" "docs: plain file" src/x.txt "x
+"
+    git -C "$H" checkout -q -b cand-sleep master
+    commit_in "$H" "feat: slow gate" bin/check-sleep "$SLEEP_GATE" 755
+    git -C "$H" checkout -q -b cand-mystery master
+    commit_in "$H" "feat: gate with no spec" bin/check-mystery "$NO_HEADER_GATE" 755
+
+    # Stacked pair: stack-b sits on stack-a, and records stack-a as its base.
+    git -C "$H" checkout -q -b stack-a cand-noisy
+    git -C "$H" checkout -q -b stack-b stack-a
+    commit_in "$H" "docs: stacked plain" src/y.txt "y
+"
+    git -C "$H" update-ref refs/remotes/origin/stack-a stack-a
+    git -C "$H" update-ref refs/remotes/origin/master master
+    git -C "$H" config branch.stack-b.iblBase stack-a
+
+    # Old-version case: a noisy bin/check-fake is tagged, then replaced by a quiet one.
+    git -C "$H" checkout -q -b cand-fake master
+    commit_in "$H" "feat: noisy fake gate" bin/check-fake "$NOISY_GATE" 755
+    git -C "$H" tag fake-noisy
+    commit_in "$H" "fix: quiet fake gate" bin/check-fake "$QUIET_GATE" 755
+    git -C "$H" checkout -q master
+}
+
+
+# run_hist <head-branch> [extra args...]
+run_hist() {
+    local head="$1"; shift
+    run_gb "--repo=$H" "--base=master" "--head=$head" "--fixture-history=$J" "--now=$NOW" "$@"
+}
+
+# --- pma history: six clean PRs whose matrix rows use notations #2520 stopped flagging -------
+P="$T/pma"
+PJ="$T/pma.json"
+PPLANS="$T/plans"
+
+pma_row() {
+    printf '## Verification Matrix\n\n'
+    printf '| # | What to verify | Test type | Timing | Test file / location |\n'
+    printf '|---|---------------|-----------|--------|---------------------|\n'
+    printf '| 1 | %s | CLI-executable | post-impl | `bin/test-it` |\n' "$1"
+}
+
+setup_pma() {
+    [ -d "$P" ] && return 0
+    local e="$T/pma.entries" n=0 token body
+    new_repo "$P"
+    mkdir -p "$PPLANS"
+    commit_in "$P" "root" README "root
+"
+    # Each line: token cell text, then the diff line that realises the token.
+    while IFS='|' read -r token body; do
+        n=$((n + 1))
+        commit_in "$P" "chore: pma change $n (#$n)" "src/p$n.txt" "$body
+"
+        record "$P" "$e" "$n" "chore: pma change $n" "2026-09-0${n}T12:00:00Z" "pma-branch-$n"
+        pma_row "$token" > "$PPLANS/pma-branch-$n.md"
+    done <<'EOF_ROWS'
+method call: `assertCount(3)` present|self::assertCount(3, $this->locate($source));
+shell var: `${MY_TEST_VAR}` set|local x="${MY_TEST_VAR:-}" root
+glob match: `test_digest_xyzzy_*` present|test_digest_xyzzy_something
+scenario: `current_tree=T2`|run(current_tree="$T2")
+env var: `REVIEW_OWED_TIMEOUT=1`|monkeypatch.setattr(fidelity, "REVIEW_OWED_TIMEOUT", 1)
+method call: `assertCount(7)` present|self::assertCount(7, $other);
+EOF_ROWS
+    entries_to_json "$e" "$PJ"
+    git -C "$P" update-ref refs/remotes/origin/master master
+}
+
+# pma_candidate <branch> <rev> — branch off master carrying the gate as it stood at <rev>.
+pma_candidate() {
+    if ! git -C "$REPO_ROOT" cat-file -e "$2^{commit}" 2>/dev/null; then
+        if [ "$(git -C "$REPO_ROOT" rev-parse --is-shallow-repository)" = true ]; then
+            git -C "$REPO_ROOT" fetch --no-tags --depth=1 origin "$2" >/dev/null 2>&1 || true  # shallow-ok
+        else
+            git -C "$REPO_ROOT" fetch --no-tags origin "$2" >/dev/null 2>&1 || true
+        fi
+    fi
+    git -C "$P" checkout -q -b "$1" master
+    mkdir -p "$P/bin/lib"
+    if ! git -C "$REPO_ROOT" show "$2:bin/lib/plan-matrix-assertions" > "$P/bin/lib/plan-matrix-assertions"; then
+        return 1
+    fi
+    chmod 755 "$P/bin/lib/plan-matrix-assertions"
+    git -C "$P" add -A
+    git -C "$P" commit -q -m "feat: pma gate at $2"
+    git -C "$P" checkout -q master
+}
+
+run_pma() {
+    run_gb "--repo=$P" "--base=master" "--head=$1" "--fixture-history=$PJ" "--now=$NOW" \
+        "--plans-dir=$PPLANS"
+}
+
+# --- dm history: destructive-migration bypass marker replay (backlog#1339) ---
+# Three squash-merged PRs each add a DROP COLUMN migration, then three plain PRs follow. One
+# fixture tags every drop PR; the other tags PR 1 only. One case asserts both verdicts.
+DM="$T/dm"
+DMJ_TAGGED="$T/dm.tagged.json"
+DMJ_BOTH="$T/dm.both.json"
+
+setup_dm() {
+    [ -d "$DM" ] && return 0
+    local et="$T/dm.tagged.entries" eb="$T/dm.both.entries" tagged plain
+    new_repo "$DM"
+    mkdir -p "$DM/bin/lib"
+    cp "$REPO_ROOT/bin/lib/destructive-migration-scan.py" "$DM/bin/lib/"
+    git -C "$DM" add -A
+    git -C "$DM" commit -q -m "root"
+    tagged='## Summary\nDrop the legacy column.\n\n<!-- destructive-migration[drop-column]: legacy_pos is superseded by pos_v2; data copied in 2026-08 -->'
+    plain='## Summary\nDrop the legacy column.'
+    commit_in "$DM" "chore: dm drop 1 (#1)" "ibl5/migrations/901_dm_drop_1.sql" \
+        "ALTER TABLE ibl_plr DROP COLUMN legacy_pos;
+"
+    record "$DM" "$et" 1 "chore: dm drop 1" "2026-09-01T12:00:00Z" "dm-branch-1" "$tagged"
+    record "$DM" "$eb" 1 "chore: dm drop 1" "2026-09-01T12:00:00Z" "dm-branch-1" "$tagged"
+    # PRs 2 and 3 are untagged in the mixed fixture: HELD needs FALSE_FLAG_THRESHOLD (2) flags.
+    commit_in "$DM" "chore: dm drop 2 (#2)" "ibl5/migrations/902_dm_drop_2.sql" \
+        "ALTER TABLE ibl_plr DROP COLUMN legacy_height;
+"
+    record "$DM" "$et" 2 "chore: dm drop 2" "2026-09-02T12:00:00Z" "dm-branch-2" "$tagged"
+    record "$DM" "$eb" 2 "chore: dm drop 2" "2026-09-02T12:00:00Z" "dm-branch-2" "$plain"
+    commit_in "$DM" "chore: dm drop 3 (#3)" "ibl5/migrations/903_dm_drop_3.sql" \
+        "ALTER TABLE ibl_plr DROP COLUMN legacy_weight;
+"
+    record "$DM" "$et" 3 "chore: dm drop 3" "2026-09-03T12:00:00Z" "dm-branch-3" "$tagged"
+    record "$DM" "$eb" 3 "chore: dm drop 3" "2026-09-03T12:00:00Z" "dm-branch-3" "$plain"
+    # Plain PRs lift the sample past MIN_MATURED_REPLAYS (5); without them the verdict is UNKNOWN.
+    local n
+    for n in 4 5 6; do
+        commit_in "$DM" "chore: dm filler $n (#$n)" "src/dm_filler_$n.txt" "$n
+"
+        record "$DM" "$et" "$n" "chore: dm filler $n" "2026-09-0${n}T12:00:00Z" "dm-branch-$n" "$plain"
+        record "$DM" "$eb" "$n" "chore: dm filler $n" "2026-09-0${n}T12:00:00Z" "dm-branch-$n" "$plain"
+    done
+    entries_to_json "$et" "$DMJ_TAGGED"
+    entries_to_json "$eb" "$DMJ_BOTH"
+    git -C "$DM" update-ref refs/remotes/origin/master master
+}
+
+# dm_candidate <branch> — branch off master carrying the working-tree gate script.
+dm_candidate() {
+    git -C "$DM" checkout -q -b "$1" master
+    cp "$REPO_ROOT/bin/check-destructive-migrations" "$DM/bin/check-destructive-migrations"
+    chmod 755 "$DM/bin/check-destructive-migrations"
+    git -C "$DM" add -A
+    git -C "$DM" commit -q -m "feat: dm gate check-destructive-migrations"
+    git -C "$DM" checkout -q master
+}
+
+# run_dm <head> <fixture-json>
+run_dm() {
+    run_gb "--repo=$DM" "--base=master" "--head=$1" "--fixture-history=$2" "--now=$NOW"
+}
+
+# --- rp history: replayable PR-body and diff-scoped hygiene gates (backlog#1291) ---
+RP="$T/rp"
+RPJ="$T/rp.json"
+
+setup_rp() {
+    [ -d "$RP" ] && return 0
+    local e="$T/rp.entries" n body_json
+    new_repo "$RP"
+    commit_in "$RP" "root" README "root
+"
+    body_json='## Summary\nrp change\n\n## Manual Testing\nI clicked around and it looked fine to me.'
+    for n in 1 2 3; do
+        # One directory deep: the hygiene gates' --pr pathspecs (`ibl5/tests/**/*.php`,
+        # `ibl5/tests/e2e/**/*.ts`) need a subdirectory to match.
+        mkdir -p "$RP/ibl5/tests/rp" "$RP/ibl5/tests/e2e/rp"
+        printf '%s\n' "<?php
+namespace Tests\\X;
+use PHPUnit\\Framework\\TestCase;
+class RpSkip${n}Test extends TestCase
+{
+    public function testThing(): void
+    {
+        \$this->markTestSkipped(\"nope\");
+    }
+}" > "$RP/ibl5/tests/rp/RpSkip${n}Test.php"
+        printf '%s\n' "import { test } from '@playwright/test';" "test.skip('rp', async () => {});" \
+            > "$RP/ibl5/tests/e2e/rp/rp${n}.spec.ts"
+        git -C "$RP" add -A
+        git -C "$RP" commit -q -m "chore: rp change $n (#$n)"
+        record "$RP" "$e" "$n" "chore: rp change $n" "2026-09-0${n}T12:00:00Z" "rp-branch-$n" "$body_json"
+    done
+    for n in 4 5 6; do
+        commit_in "$RP" "chore: rp change $n (#$n)" "src/rp$n.txt" "plain
+"
+        record "$RP" "$e" "$n" "chore: rp change $n" "2026-09-0${n}T12:00:00Z" "rp-branch-$n"
+    done
+    entries_to_json "$e" "$RPJ"
+    # Load-bearing: makes the hard-coded origin/master resolvable, so a seam that ignores
+    # the env var silently diffs against the tip and flags nothing.
+    git -C "$RP" update-ref refs/remotes/origin/master master
+}
+
+# rp_candidate <branch> <script-basename> — branch off master carrying the working-tree gate.
+rp_candidate() {
+    git -C "$RP" checkout -q -b "$1" master
+    mkdir -p "$RP/bin"
+    cp "$REPO_ROOT/bin/$2" "$RP/bin/$2"
+    chmod 755 "$RP/bin/$2"
+    git -C "$RP" add -A
+    git -C "$RP" commit -q -m "feat: rp gate $2"
+    git -C "$RP" checkout -q master
+}
+
+run_rp() {
+    run_gb "--repo=$RP" "--base=master" "--head=$1" "--fixture-history=$RPJ" "--now=$NOW"
+}
+
+# --- cases ------------------------------------------------------------------------------------
+
+case_noisy_gate_holds() {
+    setup_hist
+    run_hist cand-noisy
+    if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD" && has "$OUT" "flagged 3 clean PRs"; then
+        ok "noisy-gate-holds"
+    else
+        fail "noisy-gate-holds (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_quiet_gate_clears() {
+    setup_hist
+    run_hist cand-quiet
+    if [ "$RC" -eq 0 ] && has "$OUT" "gate-backtest-state: CLEARED" && has "$OUT" "#2" && has "$OUT" "#5"; then
+        ok "quiet-gate-clears"
+    else
+        fail "quiet-gate-clears (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_non_gate_zero_cost() {
+    setup_hist
+    mkdir -p "$T/fakebin"
+    printf '#!/bin/sh\ntouch "%s/gh-called"\nexit 1\n' "$T" > "$T/fakebin/gh"
+    chmod 755 "$T/fakebin/gh"
+    rm -f "$T/gh-called"
+    RC=0
+    OUT=$(PATH="$T/fakebin:$PATH" "$GB" "--repo=$H" "--base=master" "--head=cand-plain" 2>"$T/err") || RC=$?
+    ERR=$(cat "$T/err")
+    local worktrees leftovers
+    worktrees=$(git -C "$H" worktree list | wc -l | tr -d ' ')
+    leftovers=$(find "$TMPDIR" -maxdepth 1 -name 'gate-backtest-*' | wc -l | tr -d ' ')
+    if [ "$RC" -eq 0 ] && [ -z "$OUT" ] && has "$ERR" "NOT-APPLICABLE" && [ ! -e "$T/gh-called" ] \
+        && [ "$worktrees" = 1 ] && [ "$leftovers" = 0 ]; then
+        ok "non-gate-zero-cost"
+    else
+        fail "non-gate-zero-cost (rc=$RC, out=$OUT, err=$ERR, gh=$(ls "$T/gh-called" 2>/dev/null || echo no), worktrees=$worktrees, leftovers=$leftovers)"
+    fi
+}
+
+case_timeout_unknown() {
+    setup_hist
+    run_hist cand-sleep --per-replay-timeout=1 --total-cap=2
+    if [ "$RC" -eq 3 ] && has "$OUT" "gate-backtest-state: UNKNOWN"; then
+        ok "timeout-unknown"
+    else
+        fail "timeout-unknown (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_unspecified_holds() {
+    setup_hist
+    run_hist cand-mystery
+    if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD" && has "$OUT" "no replay spec"; then
+        ok "unspecified-holds"
+    else
+        fail "unspecified-holds (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_unknown_flag() {
+    run_gb --bogus
+    local rc1=$RC err1="$ERR"
+    run_gb positional
+    if [ "$rc1" -eq 2 ] && has "$err1" "unknown flag: --bogus" && [ "$RC" -eq 2 ] \
+        && has "$ERR" "unknown flag: positional"; then
+        ok "unknown-flag"
+    else
+        fail "unknown-flag (rc1=$rc1, err1=$err1, rc=$RC, err=$ERR)"
+    fi
+}
+
+case_space_form_rejected() {
+    run_gb --limit 5
+    if [ "$RC" -eq 2 ] && has "$ERR" "use --limit=<value>"; then
+        ok "space-form-rejected"
+    else
+        fail "space-form-rejected (rc=$RC, err=$ERR)"
+    fi
+}
+
+case_stacked_base() {
+    setup_hist
+    git -C "$H" checkout -q stack-b
+    RC=0
+    OUT=$("$GB" "--repo=$H" "--fixture-history=$J" "--now=$NOW" 2>"$T/err") || RC=$?
+    ERR=$(cat "$T/err")
+    git -C "$H" checkout -q master
+    # Against origin/master the stack would carry stack-a's noisy gate and exit 1.
+    if [ "$RC" -eq 0 ] && has "$ERR" "NOT-APPLICABLE"; then
+        ok "stacked-base"
+    else
+        fail "stacked-base (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_minimal_env() {
+    setup_hist
+    RC=0
+    OUT=$(env -i PATH=/usr/bin:/bin BRANCH_BASE_OFFLINE=1 TMPDIR="$TMPDIR" \
+        GIT_AUTHOR_NAME=T GIT_AUTHOR_EMAIL=t@t.com GIT_COMMITTER_NAME=T GIT_COMMITTER_EMAIL=t@t.com \
+        "$GB" "--repo=$H" "--base=master" "--head=cand-noisy" "--fixture-history=$J" \
+        "--now=$NOW" 2>"$T/err") || RC=$?
+    ERR=$(cat "$T/err")
+    if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD"; then
+        ok "minimal-env"
+    else
+        fail "minimal-env (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_cleanup() {
+    setup_hist
+    run_hist cand-noisy
+    run_hist cand-sleep --per-replay-timeout=1 --total-cap=2
+    local worktrees leftovers
+    worktrees=$(git -C "$H" worktree list | wc -l | tr -d ' ')
+    leftovers=$(find "$TMPDIR" -maxdepth 1 -name 'gate-backtest-*' | wc -l | tr -d ' ')
+    if [ "$worktrees" = 1 ] && [ "$leftovers" = 0 ]; then
+        ok "cleanup"
+    else
+        fail "cleanup (worktrees=$worktrees, leftovers=$leftovers)"
+    fi
+}
+
+case_gate_flag_space_form() {
+    run_gb --gate bin/check-fake
+    if [ "$RC" -eq 2 ] && has "$ERR" "use --gate=<value>"; then
+        ok "gate-flag-space-form"
+    else
+        fail "gate-flag-space-form (rc=$RC, err=$ERR)"
+    fi
+}
+
+case_gate_flag_bad_rev() {
+    setup_hist
+    run_hist cand-fake --gate=bin/check-fake@nosuchrev
+    local rc1=$RC err1="$ERR"
+    run_hist cand-fake --gate=bin/check-fake
+    if [ "$rc1" -eq 2 ] && has "$err1" "cannot read bin/check-fake@nosuchrev" && [ "$RC" -eq 2 ]; then
+        ok "gate-flag-bad-rev"
+    else
+        fail "gate-flag-bad-rev (rc1=$rc1, err1=$err1, rc=$RC, err=$ERR)"
+    fi
+}
+
+case_gate_flag_replays_old_version() {
+    setup_hist
+    # The branch tip carries the quiet gate and would clear. The tagged old version is noisy.
+    run_hist cand-fake
+    local tip_rc=$RC
+    run_hist cand-fake --gate=bin/check-fake@fake-noisy
+    if [ "$tip_rc" -eq 0 ] && [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD"; then
+        ok "gate-flag-replays-old-version"
+    else
+        fail "gate-flag-replays-old-version (tip_rc=$tip_rc, rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_pma_2506_noisy_holds() {
+    setup_pma
+    pma_candidate pma-noisy "$PMA_NOISY_REV" || { fail "pma-2506-noisy-holds (cannot read $PMA_NOISY_REV)"; return; }
+    run_pma pma-noisy
+    local n
+    n=$(printf '%s\n' "$OUT" | sed -n 's/.*flagged \([0-9][0-9]*\) clean PRs.*/\1/p' | head -n 1)
+    if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD" && [ "${n:-0}" -ge 2 ]; then
+        ok "pma-2506-noisy-holds"
+    else
+        fail "pma-2506-noisy-holds (rc=$RC, false-flags=${n:-none}, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_pma_2520_good_clears() {
+    setup_pma
+    pma_candidate pma-good "$PMA_GOOD_REV" || { fail "pma-2520-good-clears (cannot read $PMA_GOOD_REV)"; return; }
+    run_pma pma-good
+    if [ "$RC" -eq 0 ] && has "$OUT" "gate-backtest-state: CLEARED" && ! has "$OUT" "flagged"; then
+        ok "pma-2520-good-clears"
+    else
+        fail "pma-2520-good-clears (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+# rp_holds_case <case-name> <script-basename>
+rp_holds_case() {
+    setup_rp
+    rp_candidate "rp-$1" "$2"
+    run_rp "rp-$1"
+    if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD" && has "$OUT" "flagged 3 clean PRs"; then
+        ok "$1"
+    else
+        fail "$1 (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_manual_testing_body_replay_holds() {
+    rp_holds_case manual-testing-body-replay-holds check-pr-manual-testing
+}
+
+case_post_merge_recipe_body_replay_clears() {
+    setup_rp
+    rp_candidate rp-post-merge-recipe check-post-merge-recipe
+    run_rp rp-post-merge-recipe
+    if [ "$RC" -eq 0 ] && has "$OUT" "gate-backtest-state: CLEARED" && ! has "$OUT" "flagged"; then
+        ok "post-merge-recipe-body-replay-clears"
+    else
+        fail "post-merge-recipe-body-replay-clears (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_phpunit_hygiene_base_seam_holds() {
+    rp_holds_case phpunit-hygiene-base-seam-holds check-phpunit-hygiene
+}
+
+case_e2e_hygiene_base_seam_holds() {
+    rp_holds_case e2e-hygiene-base-seam-holds check-e2e-hygiene
+}
+
+case_destructive_bypass_body_replay() {
+    setup_dm
+    dm_candidate dm-destructive
+    # Every drop PR tagged: the marker is honoured on replay, so the gate clears.
+    run_dm dm-destructive "$DMJ_TAGGED"
+    if ! { [ "$RC" -eq 0 ] && has "$OUT" "gate-backtest-state: CLEARED" && ! has "$OUT" "flagged"; }; then
+        fail "destructive-bypass-body-replay (tagged: rc=$RC, out=$OUT, err=$ERR)"
+        return
+    fi
+    # PR 1 tagged, PRs 2 and 3 untagged: exactly the untagged PRs flag, so the gate holds.
+    run_dm dm-destructive "$DMJ_BOTH"
+    if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD" && has "$OUT" "flagged 2 clean PRs"; then
+        ok "destructive-bypass-body-replay"
+    else
+        fail "destructive-bypass-body-replay (both: rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+CASES="noisy-gate-holds quiet-gate-clears non-gate-zero-cost timeout-unknown unspecified-holds unknown-flag space-form-rejected stacked-base minimal-env cleanup gate-flag-space-form gate-flag-bad-rev gate-flag-replays-old-version pma-2506-noisy-holds pma-2520-good-clears manual-testing-body-replay-holds post-merge-recipe-body-replay-clears phpunit-hygiene-base-seam-holds e2e-hygiene-base-seam-holds destructive-bypass-body-replay"
+
+run_case() {
+    case "$1" in
+        noisy-gate-holds) case_noisy_gate_holds ;;
+        quiet-gate-clears) case_quiet_gate_clears ;;
+        non-gate-zero-cost) case_non_gate_zero_cost ;;
+        timeout-unknown) case_timeout_unknown ;;
+        unspecified-holds) case_unspecified_holds ;;
+        unknown-flag) case_unknown_flag ;;
+        space-form-rejected) case_space_form_rejected ;;
+        stacked-base) case_stacked_base ;;
+        minimal-env) case_minimal_env ;;
+        cleanup) case_cleanup ;;
+        gate-flag-space-form) case_gate_flag_space_form ;;
+        gate-flag-bad-rev) case_gate_flag_bad_rev ;;
+        gate-flag-replays-old-version) case_gate_flag_replays_old_version ;;
+        pma-2506-noisy-holds) case_pma_2506_noisy_holds ;;
+        pma-2520-good-clears) case_pma_2520_good_clears ;;
+        manual-testing-body-replay-holds) case_manual_testing_body_replay_holds ;;
+        post-merge-recipe-body-replay-clears) case_post_merge_recipe_body_replay_clears ;;
+        phpunit-hygiene-base-seam-holds) case_phpunit_hygiene_base_seam_holds ;;
+        e2e-hygiene-base-seam-holds) case_e2e_hygiene_base_seam_holds ;;
+        destructive-bypass-body-replay) case_destructive_bypass_body_replay ;;
+        *)
+            printf 'Unknown case: %s\n' "$1" >&2
+            printf 'Valid cases: %s all\n' "$CASES" >&2
+            exit 2
+            ;;
+    esac
+}
+
+ARG="${1:-all}"
+if [ "$ARG" = "all" ]; then
+    for c in $CASES; do run_case "$c"; done
+else
+    run_case "$ARG"
+fi
+
+exit "$FAILED"

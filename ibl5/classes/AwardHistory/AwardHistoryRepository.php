@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace AwardHistory;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use AwardHistory\Contracts\AwardHistoryRepositoryInterface;
 
 /**

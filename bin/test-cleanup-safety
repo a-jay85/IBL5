@@ -79,8 +79,12 @@ cat > "$STUBBIN/docker" << 'DOCKERSTUB'
 # TSV fixture rows (tab-separated):
 #   project  <name>                             — compose project names (pass-1 stream)
 #   workdir  <project>  <path>                 — working_dir for hole-1 check
-#   unlabeled  <compose-label>  <id>  <name>   — pass-5 stream row (label may be empty)
+#   unlabeled  <compose-label>  <id>  <name>  [status]
+#                                              — pass-5 stream row (label may be empty);
+#                                                status defaults to exited; listed only if
+#                                                it matches a --filter status=<s> arg
 #   created  <id>  <iso8601>                   — docker inspect Created value
+#   inspectfail  <id>                          — docker inspect exits 1 for this id
 #   image    <name>                             — orphaned image name
 #   vol      <name>                             — orphaned volume name
 [ -z "$DOCKER_FIXTURE" ] && exit 0
@@ -89,11 +93,15 @@ if [[ "$args" == *'com.docker.compose.project.working_dir'* ]]; then
     project=$(printf '%s' "$args" | grep -oE 'project=[^"[:space:]]+' | tail -1 | cut -d= -f2)
     awk -F'\t' -v k="workdir" -v p="$project" '$1==k && $2==p {print $3}' "$DOCKER_FIXTURE"
 elif [[ "$args" == *'com.docker.compose.project'* && "$args" == *'status=created'* ]]; then
-    awk -F'\t' '$1=="unlabeled" {printf "%s\t%s\t%s\n",$2,$3,$4}' "$DOCKER_FIXTURE"
+    _sf=" $(printf '%s' "$args" | grep -oE 'status=[a-z]+' | cut -d= -f2 | tr '\n' ' ')"
+    awk -F'\t' -v sf="$_sf" '$1=="unlabeled" { st = ($5=="" ? "exited" : $5); if (index(sf, " " st " ")) printf "%s\t%s\t%s\n",$2,$3,$4 }' "$DOCKER_FIXTURE"
 elif [[ "$args" == *'com.docker.compose.project'* ]]; then
     awk -F'\t' '$1=="project" {print $2}' "$DOCKER_FIXTURE"
 elif [[ "$args" == *inspect* && "$args" == *Created* ]]; then
     for _cid; do true; done
+    if awk -F'\t' -v c="$_cid" '$1=="inspectfail" && $2==c {f=1} END{exit !f}' "$DOCKER_FIXTURE"; then
+        exit 1
+    fi
     awk -F'\t' -v k="created" -v c="$_cid" '$1==k && $2==c {print $3}' "$DOCKER_FIXTURE"
 elif [[ "$args" == *images* ]]; then
     awk -F'\t' '$1=="image" {print $2}' "$DOCKER_FIXTURE"
@@ -786,6 +794,33 @@ out="$(run_cleanup_docker "$e" "$_fx_hole2_recent")"
 assert_absent "hole2-recent-unlabeled-spared" \
     'WOULD remove stale unlabeled container: recent-orphan' "$out"
 
+# Failed docker inspect on one container skips just it: the run completes,
+# the next container is still evaluated, and later passes (sixth) still run.
+_fx_hole2_ifail="$TMP/docker-hole2-ifail.tsv"
+printf 'unlabeled\t\tbad000000000000a\tinspect-fails\n' > "$_fx_hole2_ifail"
+printf 'unlabeled\t\tabc123def456abc1\torphan-sim\n' >> "$_fx_hole2_ifail"
+printf 'inspectfail\tbad000000000000a\n' >> "$_fx_hole2_ifail"
+printf 'created\tabc123def456abc1\t2026-07-01T00:00:00.000000000Z\n' >> "$_fx_hole2_ifail"
+out="$(run_cleanup_docker "$e" "$_fx_hole2_ifail")"
+assert_match "hole2-inspect-fail-run-continues" \
+    'WOULD remove stale unlabeled container: orphan-sim' "$out"
+assert_absent "hole2-inspect-fail-container-skipped" \
+    'inspect-fails' "$out"
+assert_match "hole2-inspect-fail-reaches-sixth-pass" 'build cache' "$out"
+
+# Running unlabeled container, old enough to be stale, is spared: the stub only
+# lists it if cleanup's --filter status=... args include "running" (C3).
+_fx_hole2_running="$TMP/docker-hole2-running.tsv"
+printf 'unlabeled\t\trun000000000000a1\trunning-orphan\trunning\n' > "$_fx_hole2_running"
+printf 'unlabeled\t\tabc123def456abc1\torphan-sim\n' >> "$_fx_hole2_running"
+printf 'created\trun000000000000a1\t2026-07-01T00:00:00.000000000Z\n' >> "$_fx_hole2_running"
+printf 'created\tabc123def456abc1\t2026-07-01T00:00:00.000000000Z\n' >> "$_fx_hole2_running"
+out="$(run_cleanup_docker "$e" "$_fx_hole2_running")"
+assert_match "hole2-running-control-exited-caught" \
+    'WOULD remove stale unlabeled container: orphan-sim' "$out"
+assert_absent "hole2-running-unlabeled-spared" \
+    'running-orphan' "$out"
+
 # Container with compose label "ibl5" (main stack member) is spared — label
 # is non-empty so pass 5 skips it via [ -n "$_proj" ] && continue.
 _fx_hole2_labeled="$TMP/docker-hole2-labeled.tsv"
@@ -916,6 +951,112 @@ else
 fi
 _reap_kill_procs
 wait 2>/dev/null || true
+
+# ----------------------------------------------------------------------------
+# is_worktree_in_use matches the cwd as exact-or-subdirectory, not substring:
+# a sibling `feat-bar` must not block `feat`, a subdirectory of `feat` must.
+# ----------------------------------------------------------------------------
+if ! command -v lsof >/dev/null 2>&1; then
+    echo "SKIP: in-use-exact-path (no lsof)"
+else
+    mkdir -p "$TMP/inuse/feat/sub" "$TMP/inuse/feat-bar"
+    iu="$(cd "$TMP/inuse/feat" && pwd -P)"
+    (cd "$iu-bar" && exec sleep 300) >/dev/null 2>&1 & iu_sib=$!
+    sleep 1
+    if is_worktree_in_use "$iu"; then
+        failcase "in-use-sibling-prefix-does-not-block"
+    else
+        pass "in-use-sibling-prefix-does-not-block"
+    fi
+    (cd "$iu/sub" && exec sleep 300) >/dev/null 2>&1 & iu_sub=$!
+    sleep 1
+    if is_worktree_in_use "$iu"; then
+        pass "in-use-subdirectory-cwd-blocks"
+    else
+        failcase "in-use-subdirectory-cwd-blocks"
+    fi
+    kill -9 "$iu_sub" 2>/dev/null || true
+    sleep 1
+    if is_worktree_in_use "$iu"; then
+        failcase "in-use-released-after-exit"
+    else
+        pass "in-use-released-after-exit"
+    fi
+    kill -9 "$iu_sib" 2>/dev/null || true
+    wait 2>/dev/null || true
+fi
+
+# ----------------------------------------------------------------------------
+# A worktree with a live post-plan run (launchd label
+# com.ibl5.postplan-now-<slug>-<YYYYmmdd-HHMMSS>-<pid>) is in use: kill_infra_processes
+# touches nothing and is_worktree_in_use reports it. The harness `run` wrapper cd's to the
+# harness dir, so no process cwd marks the worktree; the label is the only signal.
+# ----------------------------------------------------------------------------
+mkdir -p "$TMP/ppl/pp-feat" "$TMP/ppl/pp-feat-bar"
+ppw="$(cd "$TMP/ppl/pp-feat" && pwd -P)"
+ppsib="$(cd "$TMP/ppl/pp-feat-bar" && pwd -P)"
+cat > "$STUBBIN/launchctl-pp" <<'LCTL'
+#!/usr/bin/env bash
+printf '123\t0\tcom.apple.something\n'
+[ -n "${PP_LABEL:-}" ] && printf '456\t-\t%s\n' "$PP_LABEL"
+exit 0
+LCTL
+chmod +x "$STUBBIN/launchctl-pp"
+export LAUNCHCTL_CMD="$STUBBIN/launchctl-pp"
+unset PP_LABEL
+if has_live_postplan_run "$ppw"; then
+    failcase "postplan-guard-quiet-without-label"
+else
+    pass "postplan-guard-quiet-without-label"
+fi
+export PP_LABEL="com.ibl5.postplan-now-pp-feat-20260101-120000-4242"
+if has_live_postplan_run "$ppw" && is_worktree_in_use "$ppw"; then
+    pass "postplan-label-marks-worktree-in-use"
+else
+    failcase "postplan-label-marks-worktree-in-use"
+fi
+if has_live_postplan_run "$ppsib"; then
+    failcase "postplan-label-does-not-match-prefix-sibling"
+else
+    pass "postplan-label-does-not-match-prefix-sibling"
+fi
+printf '99999\n' > "$ppw/.bs-sync.pid"
+kill_infra_processes "$ppw"
+if [ -f "$ppw/.bs-sync.pid" ]; then
+    pass "postplan-label-makes-kill-infra-a-noop"
+else
+    failcase "postplan-label-makes-kill-infra-a-noop"
+fi
+unset PP_LABEL
+kill_infra_processes "$ppw"
+if [ -f "$ppw/.bs-sync.pid" ]; then
+    failcase "kill-infra-resumes-without-label"
+else
+    pass "kill-infra-resumes-without-label"
+fi
+unset LAUNCHCTL_CMD
+
+# get_worktree_path must not SIGPIPE git under pipefail. The match is the
+# first entry, so an early-exit awk leaves a long list unread.
+gwp_bin="$(mktemp -d)"
+cat > "$gwp_bin/git" <<'GWP'
+#!/bin/bash
+printf 'worktree /tmp/gwp-first\nHEAD 0\nbranch refs/heads/gwp-target\n\n'
+for i in $(seq 1 5000); do
+    printf 'worktree /tmp/gwp-%d\nHEAD 0\nbranch refs/heads/gwp-%d\n\n' "$i" "$i"
+done
+GWP
+chmod +x "$gwp_bin/git"
+gwp_rc=0
+gwp_out="$(PATH="$gwp_bin:$PATH" bash -c \
+    'set -euo pipefail; . "$1"; get_worktree_path gwp-target' \
+    _ "$SCRIPT_DIR/lib/wt-guards.sh")" || gwp_rc=$?
+if [ "$gwp_rc" -eq 0 ] && [ "$gwp_out" = "/tmp/gwp-first" ]; then
+    pass "get-worktree-path-no-sigpipe"
+else
+    failcase "get-worktree-path-no-sigpipe (rc=$gwp_rc out=$gwp_out)"
+fi
+rm -rf "$gwp_bin"
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

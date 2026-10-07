@@ -16,7 +16,7 @@
 .debug-panel__content {
     margin: 0;
     padding: 8px;
-    background-color: #fff;
+    background-color: var(--white);
     overflow: auto;
 }
 
@@ -35,7 +35,7 @@
 
 .debug-breakdown__summary {
     padding: 0.75rem 1rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     cursor: pointer;
     background: var(--debug-bg-panel);
     border-radius: var(--radius-md);
@@ -58,7 +58,7 @@
 
 .debug-breakdown__heading {
     font-size: var(--text-sm);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--debug-accent);
     margin: 0 0 0.5rem;
     text-transform: uppercase;
@@ -99,7 +99,7 @@
 
 .debug-breakdown__kv dd {
     margin: 0;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-variant-numeric: tabular-nums;
 }
 
@@ -134,7 +134,7 @@
     width: 100%;
     font-family: var(--font-display);
     font-size: var(--text-base);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: white;
 }
 

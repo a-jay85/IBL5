@@ -9,7 +9,7 @@ class TeamOffDefStatsEntryPointTest extends ModuleEntryPointTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', []);
     }
 
@@ -24,7 +24,7 @@ class TeamOffDefStatsEntryPointTest extends ModuleEntryPointTestCase
 
     public function testRendersTeamStatsInPlayoffs(): void
     {
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Playoffs']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Playoffs']]);
         $this->mockDb->setMockData([]);
         $output = $this->runModule('TeamOffDefStats');
 
@@ -34,7 +34,7 @@ class TeamOffDefStatsEntryPointTest extends ModuleEntryPointTestCase
 
     public function testRendersTeamStatsInPreseason(): void
     {
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Preseason']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Preseason']]);
         $this->mockDb->setMockData([]);
         $output = $this->runModule('TeamOffDefStats');
 

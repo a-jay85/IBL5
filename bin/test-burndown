@@ -122,6 +122,12 @@ want "--help: burndown-status listed" "$OUT" "burndown-status"
 want "--help: burndown-close-merged listed" "$OUT" "burndown-close-merged"
 want "--help: burndown-sweep listed" "$OUT" "burndown-sweep"
 want "--help: burndown-tag listed" "$OUT" "burndown-tag"
+want "--help: burndown-prompt listed" "$OUT" "burndown-prompt"
+want "--help: burndown-launch listed" "$OUT" "burndown-launch"
+OUT="$("$SCRIPT" --dry-run burndown-prompt x 1 s 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C1: --dry-run burndown-prompt exits 2" || fail "C1: --dry-run burndown-prompt exits 2 (got $RC)"
+OUT="$(HOME="$T/home" "$SCRIPT" burndown-nope 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C1: unknown burndown subcommand exits 2" || fail "C1: unknown burndown subcommand exits 2 (got $RC)"
 
 # ── C2: unknown burndown subcommand rejected ──────────────────────────────────
 OUT="$(bd burndown-bogus 2>&1)"; RC=$?
@@ -632,6 +638,86 @@ C48F_LEDGER="$(grep '^LEDGER:' <<< "$OUT" | tail -1 | sed 's/^LEDGER: //')"
     && ok "C48f: pair partner bare path in ledger" \
     || fail "C48f: pair partner bare path in ledger (got: $OUT)"
 
+# C50: unique-basename matching (backlog#1248).
+# bd_paths_probe_hook <hook> <body> — like bd_paths_probe, but evals <hook>
+# between bd_load_repo_files and bd_paths_for.
+bd_paths_probe_hook() (
+    eval "$(grep -E '^FILE_LINE_RE=' "$SCRIPT")"
+    # shellcheck source=/dev/null
+    . "$(dirname "$SCRIPT")/lib/burndown.sh"
+    BD_TMP="$(mktemp -d)"
+    trap 'rm -rf "$BD_TMP"' EXIT
+    # shellcheck disable=SC2034  # read by bd_load_repo_files
+    BD_GIT=git
+    # shellcheck disable=SC2034
+    BD_REPO_ROOT="$(cd "$(dirname "$SCRIPT")/.." && pwd)"
+    bd_load_repo_files
+    eval "$1"
+    bd_paths_for "$2"
+    # shellcheck disable=SC2154  # _bd_paths is set by bd_paths_for
+    printf '%s' "$_bd_paths"
+)
+TAB="$(printf '\t')"
+NL='
+'
+
+# Positive fixtures, token shapes taken from the open no-ref issues (C50d's class
+# name is from #995's title; its body is empty).
+[ "$(bd_paths_probe "Fix flaky \`PreseasonContinuityPipelineTest.php\` setup.")" \
+    = "ibl5/tests/DatabaseIntegration/UpdateAllTheThings/PreseasonContinuityPipelineTest.php" ] \
+    && ok "C50a: #1047 unique test basename maps" || fail "C50a: #1047 unique test basename maps"
+[ "$(bd_paths_probe "Reword work-triage.md and workflow-continuity.md.")" \
+    = ".claude/rules/work-triage.md${NL}.claude/rules/workflow-continuity.md" ] \
+    && ok "C50b: #1096 unique rule basenames map" || fail "C50b: #1096 unique rule basenames map"
+[ "$(bd_paths_probe "Touches armable.py, conflict.py, gitad.py and runner.py.")" \
+    = "tools/postplan-harness/harness/adapters/gitad.py${NL}tools/postplan-harness/harness/armable.py${NL}tools/postplan-harness/harness/conflict.py${NL}tools/postplan-harness/runner.py" ] \
+    && ok "C50c: #897 four unique .py basenames map" || fail "C50c: #897 four unique .py basenames map"
+[ "$(bd_paths_probe "VotingBallotView::render() drops the label.")" \
+    = "ibl5/classes/Voting/VotingBallotView.php" ] \
+    && ok "C50d: CamelCase class maps to exact .php only" \
+    || fail "C50d: CamelCase class maps to exact .php only"
+
+# Negative fixtures.
+[ -z "$(bd_paths_probe "Edit index.php, README.md and SKILL.md.")" ] \
+    && ok "C50e: duplicated basenames yield no path" || fail "C50e: duplicated basenames yield no path"
+# Fixture guard: only AnnouncementDispatcherInterface.php is tracked, never AnnouncementDispatcher.php.
+C50F_TRACKED="$(git -C "$(dirname "$SCRIPT")/.." ls-files)"
+grep -qxF "ibl5/classes/RecordHolders/Contracts/AnnouncementDispatcherInterface.php" <<< "$C50F_TRACKED" \
+    && ! grep -qE '(^|/)AnnouncementDispatcher\.php$' <<< "$C50F_TRACKED" \
+    && [ -z "$(bd_paths_probe "AnnouncementDispatcher and VotingBallotVie and backlog")" ] \
+    && ok "C50f: Interface-only, prefix and plain-word tokens yield no path" \
+    || fail "C50f: Interface-only, prefix and plain-word tokens yield no path"
+
+# Index is read, never rebuilt, by bd_paths_for.
+[ "$(bd_paths_probe_hook \
+    "printf 'ZzFakeOnly.php\tbin/fake/ZzFakeOnly.php\n' > \"\$BD_REPO_BASENAMES\"" \
+    "ZzFakeOnly")" = "bin/fake/ZzFakeOnly.php" ] \
+    && ok "C50g: bd_paths_for reads the prebuilt index" \
+    || fail "C50g: bd_paths_for reads the prebuilt index"
+bd_paths_probe_hook 'unset BD_REPO_BASENAMES' "armable.py" >/dev/null 2>&1; RC=$?
+[ "$RC" -eq 3 ] && ok "C50h: bd_paths_for dies 3 without the index" \
+    || fail "C50h: bd_paths_for dies 3 without the index (rc=$RC)"
+
+# awk index filter smoke: unique basename present, duplicated basenames absent.
+C50I_IDX="$(bd_paths_probe_hook 'cat "$BD_REPO_BASENAMES"; exit 0' "")"
+grep -qxF "armable.py${TAB}tools/postplan-harness/harness/armable.py" <<< "$C50I_IDX" \
+    && ! grep -qE "^(index\.php|README\.md|SKILL\.md)${TAB}" <<< "$C50I_IDX" \
+    && ok "C50i: awk index keeps unique, drops duplicated basenames" \
+    || fail "C50i: awk index keeps unique, drops duplicated basenames"
+
+# C50j: a bare basename creates overlap with a full path:line on the same file.
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"tweak armable.py","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"tools/postplan-harness/harness/armable.py:5 fix","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+grep -qE 'SKIP +#101 .*overlap with #100 on tools/postplan-harness/harness/armable.py' <<< "$OUT" \
+    && grep -qE 'PICK +#100' <<< "$OUT" \
+    && ok "C50j: basename overlap reaches the batch" \
+    || fail "C50j: basename overlap reaches the batch (got: $OUT)"
+
 # C48g / C48h: git ls-files failure and empty list die 3
 for kind in lsfail lsempty; do
     cat > "$T/git-$kind" <<STUB
@@ -830,6 +916,82 @@ C26_LAST=$(tail -1 <<< "$OUT")
 C26_FILES=$(ls "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json 2>/dev/null || true)
 [ -z "$C26_FILES" ] && ok "C26: no ledger file created" || fail "C26: no ledger file created"
 echo '[]' > "$T/fx/prs-open.json"
+
+# ── ES: empty-backlog sentinel (IBL5_BURNDOWN_EMPTY_SENTINEL) ─────────────────
+ES_DIR="$T/es"; mkdir -p "$ES_DIR"
+cat > "$T/fx/prs-open.json" <<'JSON'
+[{"number":901,"body":"IBL5-backlog#100 IBL5-backlog#101 IBL5-backlog#102 IBL5-backlog#103 IBL5-backlog#104 IBL5-backlog#105"}]
+JSON
+cp "$T/fx/issues.json" "$ES_DIR/issues.json.orig"
+es_reset() { rm -f "$ES_DIR"/empty-*; }
+
+# ES1: var set, first round, empty
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL="$ES_DIR/empty-1"; bd_b 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+[ "$RC" -eq 0 ] && ok "ES1: exits 0" || fail "ES1: exits 0 (got $RC)"
+[ "$ES_LAST" = "LEDGER: none" ] && ok "ES1: LEDGER: none" || fail "ES1: LEDGER: none (got $ES_LAST)"
+[ -f "$ES_DIR/empty-1" ] && ok "ES1: sentinel written" || fail "ES1: sentinel written"
+ES_BODY=$(cat "$ES_DIR/empty-1" 2>/dev/null || true)
+[ "$ES_BODY" = "LEDGER: none" ] && ok "ES1: sentinel content" || fail "ES1: sentinel content (got $ES_BODY)"
+
+# ES2: var unset is a no-op
+es_reset
+OUT="$(unset IBL5_BURNDOWN_EMPTY_SENTINEL; bd_b 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+ES_FILES=$(ls "$ES_DIR"/empty-* 2>/dev/null || true)
+[ "$RC" -eq 0 ] && ok "ES2: unset exits 0" || fail "ES2: unset exits 0 (got $RC)"
+[ "$ES_LAST" = "LEDGER: none" ] && ok "ES2: unset LEDGER: none" || fail "ES2: unset LEDGER: none (got $ES_LAST)"
+[ -z "$ES_FILES" ] && ok "ES2: unset writes no file" || fail "ES2: unset writes no file"
+[[ "$OUT" != *"cannot write empty sentinel"* ]] \
+    && ok "ES2: unset prints no warning" || fail "ES2: unset prints no warning"
+
+# ES3: var set to the empty string is a no-op
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL=""; bd_b 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+ES_FILES=$(ls "$ES_DIR"/empty-* 2>/dev/null || true)
+[ "$RC" -eq 0 ] && ok "ES3: empty var exits 0" || fail "ES3: empty var exits 0 (got $RC)"
+[ "$ES_LAST" = "LEDGER: none" ] && ok "ES3: empty var LEDGER: none" || fail "ES3: empty var LEDGER: none (got $ES_LAST)"
+[ -z "$ES_FILES" ] && ok "ES3: empty var writes no file" || fail "ES3: empty var writes no file"
+[[ "$OUT" != *"cannot write empty sentinel"* ]] \
+    && ok "ES3: empty var prints no warning" || fail "ES3: empty var prints no warning"
+
+# ES4: --after round that is empty writes no sentinel
+cat > "$ES_DIR/after.json" <<'JSON'
+{
+  "schema": 1,
+  "items": [
+    {"issue_num":60,"also_closes":[],"issue_title":"XHIGH a sixty","rank":"P2","tier":"xhigh","cost":2,"paths":["bin/aa"],"route":"","slug":"","pr_url":"","status":"merged"}
+  ],
+  "skipped": [],
+  "units_used": 2,
+  "budget": 5
+}
+JSON
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL="$ES_DIR/empty-4"; bd_b --after "$ES_DIR/after.json" 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+[ "$RC" -eq 0 ] && ok "ES4: --after exits 0" || fail "ES4: --after exits 0 (got $RC)"
+[ "$ES_LAST" = "LEDGER: none" ] && ok "ES4: --after LEDGER: none" || fail "ES4: --after LEDGER: none (got $ES_LAST)"
+[ ! -e "$ES_DIR/empty-4" ] && ok "ES4: --after writes no sentinel" || fail "ES4: --after writes no sentinel"
+
+# ES5: live-unknown first round writes no sentinel
+jq '(.[0].labels) = [{"name":"blocked"}]' "$ES_DIR/issues.json.orig" > "$T/fx/issues.json"
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL="$ES_DIR/empty-5" GH_FAIL_ON="--json comments"; bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "ES5: live-unknown exits 1" || fail "ES5: live-unknown exits 1 (got $RC)"
+want "ES5: live-unknown prints LEDGER: none" "$OUT" "LEDGER: none"
+[ ! -e "$ES_DIR/empty-5" ] && ok "ES5: live-unknown writes no sentinel" || fail "ES5: live-unknown writes no sentinel"
+cp "$ES_DIR/issues.json.orig" "$T/fx/issues.json"
+
+# ES6: a round that selects work writes no sentinel
+echo '[]' > "$T/fx/prs-open.json"
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL="$ES_DIR/empty-6"; bd_b 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+[ "$RC" -eq 0 ] && ok "ES6: picks exit 0" || fail "ES6: picks exit 0 (got $RC)"
+[[ "$ES_LAST" == "LEDGER: /"* ]] && ok "ES6: LEDGER path printed" || fail "ES6: LEDGER path printed (got $ES_LAST)"
+[ ! -e "$ES_DIR/empty-6" ] && ok "ES6: picks write no sentinel" || fail "ES6: picks write no sentinel"
+
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+echo '[]' > "$T/fx/prs-open.json"
+cp "$ES_DIR/issues.json.orig" "$T/fx/issues.json"
 
 # ── C27: record happy path ────────────────────────────────────────────────────
 # Create ledger directly (4 items: #60 cost=2, #61-#62-#64 cost=1 each; units_used=5)
@@ -1734,18 +1896,22 @@ l12_case() {
     : > "$T/lbl/gh.log"
     local out rc n
     out="$(bdl burndown-record "$L" "$@" 2>&1)"; rc=$?
+    L12_OUT="$out"
     n="$(grep -c 'issue comment' "$T/lbl/gh.log")"
     [ "$rc" -eq 0 ] && [ "$n" -eq "$want_n" ] && ok "L12: $label" || fail "L12: $label (rc=$rc comments=$n want=$want_n: $out)"
 }
 printf '%s' '{"comments":[{"body":"x\n\n<!-- burndown-blocked-by: 77 -->"}]}' > "$T/lbl/fx/issue-42-comments.json"
 l12_case "same PR marker posts nothing" 0 42 status=skipped reason=blocked blocked_by=77
+want "L12: same PR marker posts nothing: stdout says comment already present" "$L12_OUT" "(comment already present)"
 l12_case "different PR posts one" 1 42 status=skipped reason=blocked blocked_by=78
 printf '%s' '{"comments":[{"body":"<!-- burndown-blocked-by: 78 -->"},{"body":"<!-- burndown-blocked-by: 77 -->"}]}' > "$T/lbl/fx/issue-42-comments.json"
 l12_case "last marker wins (77)" 0 42 status=skipped reason=blocked blocked_by=77
+want "L12: last marker wins (77): stdout says comment already present" "$L12_OUT" "(comment already present)"
 l12_case "last marker wins (78 re-posts)" 1 42 status=skipped reason=blocked blocked_by=78
 rm -f "$T/lbl/fx/issue-42-comments.json"
 printf '%s' '{"comments":[{"body":"x\n\n<!-- burndown-out-of-repo -->"}]}' > "$T/lbl/fx/issue-43-comments.json"
 l12_case "out-of-repo marker posts nothing" 0 43 status=skipped reason=out-of-repo
+want "L12: out-of-repo marker posts nothing: stdout says comment already present" "$L12_OUT" "(comment already present)"
 rm -f "$T/lbl/fx/issue-43-comments.json"
 
 # ── L13: gh failures exit 3 and the ledger keeps its record ───────────────────
@@ -1975,6 +2141,201 @@ want "AF9: units 5/5 without --after" "$OUT" "units: 5/5"
 [ "$(jq -c '.after' "$AF9_LP" 2>/dev/null)" = "[]" ] && ok "AF9: ledger after is []" || fail "AF9: ledger after is []"
 OUT="$(bdl burndown-status "$AF9_LP" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && ok "AF9: burndown-status reads the new ledger" || fail "AF9: burndown-status reads the new ledger (got $RC: $OUT)"
+
+# ══ burndown-prompt ═══════════════════════════════════════════════════════════
+# bp_item <num> <status> <route> <tier> <also-json> <paths-json>
+bp_item() {
+    jq -nc --argjson n "$1" --arg s "$2" --arg r "$3" --arg t "$4" --argjson a "$5" --argjson p "$6" \
+        '{issue_num:$n,also_closes:$a,issue_title:"t\($n)",rank:"P2",tier:$t,cost:1,paths:$p,route:$r,slug:"",pr_url:"",status:$s}'
+}
+# bp_slug / bp_arch — bin/plan-now's own parsers, replicated verbatim
+bp_slug() { grep -ioE 'branch slug[^`]{0,24}`[^`]+`' <<< "$1" | head -1 | grep -oE '`[^`]+`' | head -1 | tr -d '`'; }
+bp_arch() { grep -m1 'MUST route to' <<< "$1" | grep -oE 'plan-architect(-xhigh|-sonnet)?' | head -1; }
+# bp_empty_headings <text> — prints "EMPTY <heading>" for any heading with no body
+bp_empty_headings() {
+    awk '/^## /{h=$0; getline; while($0 ~ /^[[:space:]]*$/ && (getline)>0){}; if ($0 ~ /^## / || $0 ~ /^[[:space:]]*$/) print "EMPTY " h}' <<< "$1"
+}
+
+# BP1: one ledger
+BP1_L="$(af_ledger bp1 "[$(bp_item 70 picked plan default '[]' '["bin/a.sh"]'),$(bp_item 71 queued plan default '[]' '["bin/b.sh"]'),$(bp_item 72 closed-fixed '' default '[]' '["bin/c.sh"]'),$(bp_item 73 merged '' default '[]' '["bin/d.sh"]'),$(bp_item 74 skipped '' default '[]' '["bin/e.sh"]'),$(bp_item 75 skipped ad-hoc default '[]' '["bin/f.sh"]')]")"
+OUT="$(bdl burndown-prompt "$BP1_L" 70 bp-one 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "BP1: exits 0" || fail "BP1: exits 0 (got $RC: $OUT)"
+BP1_OUT="$OUT"
+[ "$(head -1 <<< "$OUT" | cut -c1-6)" = "/plan " ] && ok "BP1: first line starts /plan" || fail "BP1: first line starts /plan"
+BP1_DNT="$(grep '^- Do not touch' <<< "$OUT" || true)"
+want "BP1: Do-not-touch lists queued bin/b.sh" "$BP1_DNT" '`bin/b.sh`'
+want "BP1: Do-not-touch lists failed ad-hoc bin/f.sh" "$BP1_DNT" '`bin/f.sh`'
+for p in a c d e; do
+    if grep -qF "bin/$p.sh" <<< "$BP1_DNT"; then fail "BP1: Do-not-touch omits bin/$p.sh"; else ok "BP1: Do-not-touch omits bin/$p.sh"; fi
+done
+want "BP1: Exploration pointers heading" "$OUT" "## Exploration pointers"
+want "BP1: pointers list bin/a.sh" "$(sed -n '/^## Exploration pointers/,/^$/p' <<< "$OUT")" '`bin/a.sh`'
+
+# BP2: --after ledgers
+BP2_L1="$(af_ledger bp2a "[$(bp_item 80 queued plan default '[]' '["bin/g.sh"]'),$(bp_item 81 closed-fixed '' default '[]' '["bin/h.sh"]'),$(bp_item 82 skipped ad-hoc default '[]' '["bin/i.sh"]')]")"
+BP2_L2="$(af_ledger bp2b "[$(bp_item 83 picked plan default '[]' '["bin/j.sh"]'),$(bp_item 84 picked plan default '[]' '["bin/k.sh"]')]")"
+OUT="$(bdl burndown-prompt "$BP2_L2" 83 bp-two --after "$BP2_L1" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "BP2: exits 0" || fail "BP2: exits 0 (got $RC: $OUT)"
+BP2_DNT="$(grep '^- Do not touch' <<< "$OUT" || true)"
+for p in g i k; do want "BP2: Do-not-touch includes bin/$p.sh" "$BP2_DNT" "bin/$p.sh"; done
+for p in h j; do
+    if grep -qF "bin/$p.sh" <<< "$BP2_DNT"; then fail "BP2: Do-not-touch omits bin/$p.sh"; else ok "BP2: Do-not-touch omits bin/$p.sh"; fi
+done
+OUT="$(bdl burndown-prompt "$BP2_L2" 83 bp-two 2>&1)"
+if grep -qF "bin/g.sh" <<< "$OUT"; then fail "BP2: without --after bin/g.sh is absent"; else ok "BP2: without --after bin/g.sh is absent"; fi
+
+# BP3: plan-now's run_slug parser
+[ "$(bp_slug "$BP1_OUT")" = "bp-one" ] && ok "BP3: run_slug pipeline captures bp-one" || fail "BP3: run_slug pipeline captures bp-one (got '$(bp_slug "$BP1_OUT")')"
+
+# BP4: plan-now's tier directive parser
+BP4_L="$(af_ledger bp4 "[$(bp_item 90 picked plan xhigh '[]' '[]'),$(bp_item 91 picked plan sonnet '[]' '[]'),$(bp_item 92 picked plan default '[]' '[]'),$(bp_item 93 picked plan error '[]' '[]')]")"
+BP4_WANT=(plan-architect-xhigh plan-architect-sonnet plan-architect plan-architect)
+BP4_N=90
+for w in "${BP4_WANT[@]}"; do
+    OUT="$(bdl burndown-prompt "$BP4_L" "$BP4_N" bp-four 2>&1)"
+    [ "$(bp_arch "$OUT")" = "$w" ] && ok "BP4: #$BP4_N routes to $w" || fail "BP4: #$BP4_N routes to $w (got '$(bp_arch "$OUT")')"
+    BP4_N=$((BP4_N + 1))
+done
+
+# BP5: also_closes:[96,97] yields a closes span per issue
+BP5_L="$(af_ledger bp5 "[$(bp_item 95 picked plan default '[96,97]' '[]')]")"
+OUT="$(bdl burndown-prompt "$BP5_L" 95 bp-five 2>&1)"
+for n in 95 96 97; do want "BP5: closes span for #$n" "$OUT" "closes a-jay85/IBL5-backlog#$n"; done
+[ "$(grep -o 'closes a-jay85/IBL5-backlog#' <<< "$BP1_OUT" | wc -l | tr -d ' ')" = "1" ] \
+    && ok "BP5: no also_closes yields one closes span" || fail "BP5: no also_closes yields one closes span"
+
+# BP6: pathless item alone in its ledger
+BP6_L="$(af_ledger bp6 "[$(bp_item 98 picked plan default '[]' '[]')]")"
+OUT="$(bdl burndown-prompt "$BP6_L" 98 bp-six 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "BP6: exits 0" || fail "BP6: exits 0 (got $RC: $OUT)"
+if grep -qF "## Exploration pointers" <<< "$OUT"; then fail "BP6: no Exploration pointers heading"; else ok "BP6: no Exploration pointers heading"; fi
+want "BP6: says no other batch item holds files" "$OUT" "- No other batch item holds files."
+if grep -qF ': .' <<< "$OUT"; then fail "BP6: no empty code-span list"; else ok "BP6: no empty code-span list"; fi
+
+# BP7: liveness evidence never produces an empty heading
+bp_empty_headings "$(printf '## A\n\n## B\nx\n')" | grep -qF "EMPTY ## A" \
+    && ok "BP7: detector flags an empty heading" || fail "BP7: detector flags an empty heading"
+: > "$T/bp-empty.txt"
+printf '  \n\n   \n' > "$T/bp-blank.txt"
+printf 'grep -n foo bin/x: 3 hits\n' > "$T/bp-real.txt"
+for ev in none empty blank; do
+    case "$ev" in
+        none)  OUT="$(bdl burndown-prompt "$BP1_L" 70 bp-one 2>&1)" ;;
+        empty) OUT="$(bdl burndown-prompt "$BP1_L" 70 bp-one --evidence "$T/bp-empty.txt" 2>&1)" ;;
+        blank) OUT="$(bdl burndown-prompt "$BP1_L" 70 bp-one --evidence "$T/bp-blank.txt" 2>&1)" ;;
+    esac
+    [ -z "$(bp_empty_headings "$OUT")" ] && ok "BP7: $ev evidence leaves no empty heading" || fail "BP7: $ev evidence leaves no empty heading"
+    if grep -qF "## Liveness evidence" <<< "$OUT"; then fail "BP7: $ev evidence omits the evidence heading"; else ok "BP7: $ev evidence omits the evidence heading"; fi
+done
+OUT="$(bdl burndown-prompt "$BP1_L" 70 bp-one --evidence "$T/bp-real.txt" 2>&1)"
+[ -z "$(bp_empty_headings "$OUT")" ] && ok "BP7: real evidence leaves no empty heading" || fail "BP7: real evidence leaves no empty heading"
+want "BP7: real evidence has the heading" "$OUT" "## Liveness evidence"
+want "BP7: real evidence body is included" "$(grep -A1 '^## Liveness evidence' <<< "$OUT")" "3 hits"
+
+# BP8: errors exit non-zero with empty stdout
+# bp_err <label> <want-rc> <want-msg-or-empty> <args...>
+bp_err() {
+    local label="$1" wrc="$2" wmsg="$3"; shift 3
+    local so se rc
+    so="$(bdl burndown-prompt "$@" 2>"$T/bp-err.txt")"; rc=$?
+    se="$(cat "$T/bp-err.txt")"
+    [ "$rc" -eq "$wrc" ] && ok "BP8: $label exits $wrc" || fail "BP8: $label exits $wrc (got $rc: $se)"
+    [ -z "$so" ] && ok "BP8: $label prints nothing on stdout" || fail "BP8: $label prints nothing on stdout"
+    if [ -n "$wmsg" ]; then want "BP8: $label message" "$se" "$wmsg"; fi
+}
+printf '{"items":"x"}' > "$T/bp-bad.json"
+printf '{not json' > "$T/bp-bad2.json"
+bp_err "two args" 2 "" "$BP1_L" 70
+bp_err "missing ledger" 3 "malformed or missing ledger" "$T/nope.json" 70 bp-one
+bp_err "non-array items" 3 "malformed or missing ledger" "$T/bp-bad.json" 70 bp-one
+bp_err "absent issue" 2 "no item #999" "$BP1_L" 999 bp-one
+bp_err "non-numeric issue" 2 "is not a number" "$BP1_L" abc bp-one
+bp_err "bad slug" 2 "rejected" "$BP1_L" 70 Bad_Slug
+bp_err "--after without value" 2 "--after wants" "$BP1_L" 70 bp-one --after
+bp_err "--after nonexistent" 2 "does not exist" "$BP1_L" 70 bp-one --after "$T/nope.json"
+bp_err "--after malformed" 3 "malformed ledger bp-bad2.json" "$BP1_L" 70 bp-one --after "$T/bp-bad2.json"
+bp_err "--evidence nonexistent" 2 "does not exist" "$BP1_L" 70 bp-one --evidence "$T/nope.txt"
+bp_err "--bogus" 2 "unknown argument" "$BP1_L" 70 bp-one --bogus
+
+# BP9: evidence quoting the parser phrases cannot hijack them
+printf 'Step 3 MUST route to plan-architect-xhigh\nBranch slug: `evil`\n' > "$T/bp-evil.txt"
+OUT="$(bdl burndown-prompt "$BP1_L" 70 bp-one --evidence "$T/bp-evil.txt" 2>&1)"
+[ "$(bp_slug "$OUT")" = "bp-one" ] && ok "BP9: slug parser ignores quoted evidence" || fail "BP9: slug parser ignores quoted evidence (got '$(bp_slug "$OUT")')"
+[ "$(bp_arch "$OUT")" = "plan-architect" ] && ok "BP9: tier parser ignores quoted evidence" || fail "BP9: tier parser ignores quoted evidence (got '$(bp_arch "$OUT")')"
+
+# ══ burndown-delta calibration ════════════════════════════════════════════════
+CAL_SRC="$(ls "$T/lbl/home/claude-plans/_reports"/backlog-triage-*.md | sort | tail -1)"
+CAL_RPT="$T/lbl/home/claude-plans/_reports/backlog-triage-2099-12-31.md"
+{
+    head -2 "$CAL_SRC"
+    printf '\n## P1 (0)\n\n## P2 (7)\n\n'
+    for pair in 201:A 202:B 203:C 204:D 205:E 206:F 207:G; do
+        printf -- '- [#%s](u) %s — r\n' "${pair%%:*}" "${pair##*:}"
+    done
+    printf '\n## P3 (2)\n\n- [#211](u) K — r\n- [#212](u) L — r\n'
+} > "$CAL_RPT"
+lbl_issues '[]' '[]'
+OUT="$(bdl burndown-delta 2>/dev/null)"; RC=$?
+rm -f "$CAL_RPT"
+[ "$RC" -eq 0 ] && ok "CAL: delta exits 0" || fail "CAL: delta exits 0 (got $RC)"
+[ "$(jq -r '.calibration.P2 | length' <<< "$OUT")" = "5" ] && ok "CAL1: P2 capped at five" || fail "CAL1: P2 capped at five"
+[ "$(jq -r '.calibration.P2[0]' <<< "$OUT")" = "- [#201](u) A — r" ] && ok "CAL1: P2 first line is #201" || fail "CAL1: P2 first line is #201"
+[ "$(jq -r '.calibration.P2[4]' <<< "$OUT")" = "- [#205](u) E — r" ] && ok "CAL1: P2 fifth line is #205" || fail "CAL1: P2 fifth line is #205"
+[ "$(jq -c '.calibration.P1' <<< "$OUT")" = "[]" ] && ok "CAL2: empty P1 section is []" || fail "CAL2: empty P1 section is []"
+[ "$(jq -c '.calibration.P4' <<< "$OUT")" = "[]" ] && ok "CAL3: absent P4 section is []" || fail "CAL3: absent P4 section is []"
+[ "$(jq -r '.calibration | keys | join(",")' <<< "$OUT")" = "P1,P2,P3,P4" ] && ok "CAL3: keys are P1..P4" || fail "CAL3: keys are P1..P4"
+[ "$(jq -r '.calibration.P3 | length' <<< "$OUT")" = "2" ] && ok "CAL4: short P3 is not padded" || fail "CAL4: short P3 is not padded"
+[ "$(jq -r 'has("report") and has("since") and has("issues") and has("dropped")' <<< "$OUT")" = "true" ] \
+    && ok "CAL5: existing delta fields survive" || fail "CAL5: existing delta fields survive"
+
+# ══ burndown-launch ═══════════════════════════════════════════════════════════
+mkdir -p "$T/launch/bin" "$T/launch/cwd" "$T/launch/tmp"
+cat > "$T/launch/bin/claude" <<'STUB'
+#!/bin/bash
+{ pwd; printf '%s\n' "$@"; } > "$LAUNCH_LOG"
+exit 7
+STUB
+chmod +x "$T/launch/bin/claude"
+BL_LOG="$T/launch/argv.log"
+# BL1/BL2: argv, cwd, and exec exit code (TMPDIR set for the BL7 leak check)
+rm -f "$BL_LOG"
+( cd "$T/launch/cwd" && HOME="$T/home" LAUNCH_LOG="$BL_LOG" TMPDIR="$T/launch/tmp" \
+    BURNDOWN_CLAUDE="$T/launch/bin/claude" "$SCRIPT" burndown-launch ) >/dev/null 2>&1
+RC=$?
+printf '%s\n' "$(cd "$T/launch/cwd" && pwd -P)" --model claude-sonnet-5-5 /burndown > "$T/launch/want.log"
+BL_GOT="$(cd "$T/launch/cwd" && pwd -P)"
+{ printf '%s\n' "$BL_GOT"; sed -n '2,$p' "$BL_LOG" 2>/dev/null; } > "$T/launch/got.log"
+diff "$T/launch/want.log" "$T/launch/got.log" >/dev/null 2>&1 \
+    && ok "BL1: argv is --model claude-sonnet-5-5 /burndown" || fail "BL1: argv is --model claude-sonnet-5-5 /burndown"
+[ "$(wc -l < "$BL_LOG" | tr -d ' ')" = "4" ] && ok "BL1: stub saw exactly four lines" || fail "BL1: stub saw exactly four lines"
+[ "$(cd "$(head -1 "$BL_LOG")" && pwd -P)" = "$BL_GOT" ] && ok "BL1: stub ran in the caller's cwd" || fail "BL1: stub ran in the caller's cwd"
+[ "$RC" -eq 7 ] && ok "BL2: exit code is the stub's 7 (exec)" || fail "BL2: exit code is the stub's 7 (got $RC)"
+# BL7: no temp dir left behind
+[ "$(find "$T/launch/tmp" -mindepth 1 | wc -l | tr -d ' ')" = "0" ] && ok "BL7: no temp dir leaked" || fail "BL7: no temp dir leaked"
+# BL3: empty value falls back to claude. The ${BURNDOWN_CLAUDE-claude} form
+# would exec an empty name here, so this case fails on that mutation.
+rm -f "$BL_LOG"
+( cd "$T/launch/cwd" && PATH="$T/launch/bin:$PATH" HOME="$T/home" LAUNCH_LOG="$BL_LOG" \
+    BURNDOWN_CLAUDE="" "$SCRIPT" burndown-launch ) >/dev/null 2>&1
+[ "$(sed -n 2p "$BL_LOG" 2>/dev/null)" = "--model" ] && ok "BL3: empty BURNDOWN_CLAUDE falls back to claude" || fail "BL3: empty BURNDOWN_CLAUDE falls back to claude"
+# BL4: unset falls back to claude
+rm -f "$BL_LOG"
+( cd "$T/launch/cwd" && env -u BURNDOWN_CLAUDE PATH="$T/launch/bin:$PATH" HOME="$T/home" LAUNCH_LOG="$BL_LOG" \
+    "$SCRIPT" burndown-launch ) >/dev/null 2>&1
+[ "$(sed -n 2p "$BL_LOG" 2>/dev/null)" = "--model" ] && ok "BL4: unset BURNDOWN_CLAUDE falls back to claude" || fail "BL4: unset BURNDOWN_CLAUDE falls back to claude"
+# BL5: missing binary
+rm -f "$BL_LOG"
+OUT="$(cd "$T/launch/cwd" && HOME="$T/home" LAUNCH_LOG="$BL_LOG" BURNDOWN_CLAUDE="$T/launch/nope" \
+    "$SCRIPT" burndown-launch 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "BL5: missing binary exits 3" || fail "BL5: missing binary exits 3 (got $RC)"
+want "BL5: message names the failure" "$OUT" "not found on PATH"
+[ ! -e "$BL_LOG" ] && ok "BL5: no log written" || fail "BL5: no log written"
+# BL6: extra argument
+rm -f "$BL_LOG"
+OUT="$(cd "$T/launch/cwd" && HOME="$T/home" LAUNCH_LOG="$BL_LOG" BURNDOWN_CLAUDE="$T/launch/bin/claude" \
+    "$SCRIPT" burndown-launch --now 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "BL6: extra argument exits 2" || fail "BL6: extra argument exits 2 (got $RC)"
+[ ! -e "$BL_LOG" ] && ok "BL6: no log written" || fail "BL6: no log written"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

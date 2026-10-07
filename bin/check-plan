@@ -157,8 +157,12 @@
 #                              verbatim) AND every backtick-quoted token in
 #                              that field must appear literally as a substring
 #                              in the packet's **Self-verify:** block. A
-#                              `no-assertions: <reason>` line inside the
-#                              packet clears BOTH sub-checks for that packet
+#                              `no-assertions: <reason>` marker line inside
+#                              the packet clears BOTH sub-checks for that
+#                              packet. The marker must open its line (after
+#                              optional indent, >, a -/* bullet, <!--, or a
+#                              backtick) and carry a non-empty reason; a
+#                              mid-sentence prose mention does not count
 #                              (mirrors no-adr: / context-budget:). Runs for
 #                              ALL plans (not impl_model-gated, unlike gate S).
 #                              Two past PRs were blocked because a delegate
@@ -214,6 +218,11 @@
 #                              after implementation.
 #                              A mention inside a backtick code span, or inside a
 #                              fenced fixture block, is not a marker and is skipped.
+#   ND **No diff:** marker   — a `**No diff:** <reason>` phase marker sits inside a
+#                              `## Phase N:` / `## Step N:` body with a reason of 15+
+#                              characters. The post-plan harness honors it nowhere
+#                              else (planfile.parse_phases), so a short reason or a
+#                              marker outside a phase is a silent no-op.
 #   Z  Leading-star matrix token — a backticked single-word token in a matrix
 #                              "What to verify" cell that starts with '*' (the
 #                              catch-all case arm, a bare extension glob).
@@ -223,6 +232,16 @@
 #                              UNREALISED-ASSERTION at post-plan Step 6.7
 #                              whatever the diff holds. Extraction mirrors the
 #                              checker; bin/test-check-plan pins the parity.
+#   VR VR snapshots marker   — a `## Critical Files` entry that
+#                              cf_parse_section_raw classifies MUST_APPEAR and
+#                              whose path contains `-snapshots` must carry the
+#                              whole-word token `vr-baseline-change` on its
+#                              line (a deliberate regen or deletion). Otherwise
+#                              mark it `(conditional — only if VR baselines
+#                              change)`, which exempts it. CI changes a
+#                              baseline dir only on a screenshot diff, so an
+#                              unmarked entry holds post-plan forever
+#                              (backlog#1277). Fenced examples never count.
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
@@ -782,6 +801,11 @@ done < <(awk '
 #   (c) patterns live in bin/lib/hold-check-patterns.txt because harness/classify.py
 #       reads the same file; the parity test in bin/test-check-plan keeps them from
 #       drifting between the two languages.
+#   (d) gate H(c): the **Decision:** paragraph is the only hold text /post-plan
+#       renders into the PR body, so it is checked as reader-facing prose:
+#       bin/check-prose tells, an empty body, more than 40 words in total, and
+#       the legacy "The human/reviewer/owner accepts ..." opener all fail. A hold
+#       section without a Decision line gets no H(c) check (unchanged).
 if [ "$FM_HOLD" -eq 1 ]; then
     if ! grep -qiE '^##[[:space:]]+Automouse Hold Justification[[:space:]]*$' "$PLAN_FILE"; then
         viol "[H] plan declares auto_merge: false but has no '## Automouse Hold Justification' section (Step 4.5 — record why the hold is reducible-confirmed or intrinsic)"
@@ -790,6 +814,29 @@ if [ "$FM_HOLD" -eq 1 ]; then
             [ -n "$hb_hit" ] || continue
             viol "[H] hold justification asks the human to run a check an agent can run (line ${hb_hit%%:*}): ${hb_hit#*:} — move the observable check into the Verification Matrix and keep only the irreducible judgment, on a '**Decision:**' line. See /plan Step 4.5 'Record the outcome'."
         done < <(hold_check_violations "$PLAN_FILE")
+        # Gate H(c): Decision paragraph is reader-facing prose (see (d) above).
+        if command -v hold_decision_paragraphs >/dev/null 2>&1; then
+            HD_TEXT=$(hold_decision_paragraphs "$PLAN_FILE")
+            if [ -n "$HD_TEXT" ]; then
+                HD_BODY=$(sed -E 's/^[ ]*\*\*Decision:\*\*[ ]*//' <<< "$HD_TEXT")
+                HD_WORDS=$(wc -w <<< "$HD_BODY" | tr -d '[:space:]')
+                if [ "$HD_WORDS" -eq 0 ]; then
+                    viol "[H] Decision line is empty — write one plain yes/no sentence for the person pressing merge, e.g. \"Merge if you're OK with about 7% more PRs being held until their body declares scope.\""
+                elif [ "$HD_WORDS" -gt 40 ]; then
+                    viol "[H] Decision line is ${HD_WORDS} words (cap 40) — the PR body shows it to the person pressing merge; cut it to one short yes/no sentence"
+                fi
+                if grep -qiE '^[[:space:]]*the[[:space:]]+(human|reviewer|owner)([[:space:]]+[[:alpha:]-]+){0,2}[[:space:]]+accepts?([[:space:]]|$)' <<< "$HD_BODY"; then
+                    viol "[H] Decision line opens with the legacy 'The human accepts ...' shape — address the person pressing merge directly, e.g. \"Merge if you're OK with ...\""
+                fi
+                if [ -x "$SCRIPT_DIR/check-prose" ]; then
+                    HD_PROSE=$("$SCRIPT_DIR/check-prose" --stdin <<< "$HD_BODY" 2>&1)
+                    HD_PROSE_RC=$?
+                    if [ "$HD_PROSE_RC" -eq 1 ]; then
+                        viol "[H] Decision line has a prose tell: $(head -n 1 <<< "$HD_PROSE") — rewrite it as one plain sentence (bin/check-prose)"
+                    fi
+                fi
+            fi
+        fi
     fi
 fi
 
@@ -887,6 +934,7 @@ done < <(awk '
     }
 ' "$PLAN_FILE")
 
+FWD_REF_CUES='create|new (method|class|file)|add(s|ing)? (a )?new|introduce|rename|extract|scaffold'
 # ---------------------------------------------------------------------------
 # Reuse-target existence (new check). PHP Class::method only.
 # ---------------------------------------------------------------------------
@@ -911,7 +959,7 @@ while IFS= read -r token; do
 
     # Forward-reference exemption: the plan creates this symbol itself.
     if grep -F -- "$token" "$PLAN_FILE" \
-        | grep -qiE 'create|new (method|class|file)|add(s|ing)? (a )?new|introduce|rename|extract|scaffold'; then
+        | grep -qiE "$FWD_REF_CUES"; then
         continue
     fi
 
@@ -928,6 +976,205 @@ while IFS= read -r token; do
     fi
 done < <(grep -iE 'reuse' "$PLAN_FILE" \
             | grep -oE '[A-Z][A-Za-z0-9_]*::[a-zA-Z_][A-Za-z0-9_]*')
+
+# ---------------------------------------------------------------------------
+# Gate [L]: literal and symbol provenance (backlog#933). Checks A/B/C.
+# ---------------------------------------------------------------------------
+# A: every `literal-check: <lit-or-range> -> <table>.<column> <sqltype>` citation
+#    must name a column in the checked-in schema dump, cite its exact type, and
+#    fit that type's integer range. Absence of a citation is judgment (gate 18).
+# B: an integer above 2147483647 on a line naming pid/tid/teamid, with no
+#    BIGINT/unsigned cue, no quotes around it, and no passing citation.
+# C: a backticked `name()` on a copy-verbatim line must be defined in a source
+#    file cited by backticked path in the same ##/### section. Silent when the
+#    section cites no existing file. Opt-out for A/B: <!-- literal-ok: <reason> -->.
+# A blocks. B and C are advisory (warn): the corpus diff over ~/claude-plans
+# found false positives for both. The letter is shared with the warn-only
+# line-number-anchor gate [L] further down; the message prefixes differ.
+# Decimal bounds compare as strings (length, then lexical): awk doubles lose
+# precision past 2^53, so a numeric compare on a 19-digit bound can round.
+L_SCHEMA="$REPO_ROOT/ibl5/docs/schema/current-schema.sql"
+L_INPUTS=("$PLAN_FILE")
+L_NOSCHEMA=1
+if [ -f "$L_SCHEMA" ]; then
+    L_INPUTS=("$L_SCHEMA" "$PLAN_FILE")
+    L_NOSCHEMA=0
+fi
+while IFS=$'\t' read -r kind msg; do
+    # Check B is advisory: the Phase 5 corpus diff found Discord ids on lines
+    # that also name teamid (backlog#933).
+    case "$kind" in
+        A) viol "$msg" ;;
+        B) warn "$msg" ;;
+    esac
+done < <(awk -v schema="$L_SCHEMA" -v noschema="$L_NOSCHEMA" -v sq="'" '
+    function strip0(s) { sub(/^0+/, "", s); if (s == "") s = "0"; return s "" }
+    function dcmp(a, b) {
+        a = strip0(a); b = strip0(b)
+        if (length(a) < length(b)) return -1
+        if (length(a) > length(b)) return 1
+        if (a < b) return -1
+        if (a > b) return 1
+        return 0
+    }
+    function fits(v, base, uns,   neg, mag) {
+        neg = (substr(v, 1, 1) == "-")
+        mag = neg ? substr(v, 2) : v
+        if (neg) {
+            if (strip0(mag) == "0") return 1
+            if (uns) return 0
+            return dcmp(mag, MINMAG[base]) <= 0
+        }
+        return dcmp(mag, uns ? UMAX[base] : SMAX[base]) <= 0
+    }
+    BEGIN {
+        SMAX["tinyint"] = "127";   MINMAG["tinyint"] = "128";   UMAX["tinyint"] = "255"
+        SMAX["smallint"] = "32767"; MINMAG["smallint"] = "32768"; UMAX["smallint"] = "65535"
+        SMAX["mediumint"] = "8388607"; MINMAG["mediumint"] = "8388608"; UMAX["mediumint"] = "16777215"
+        SMAX["int"] = "2147483647"; MINMAG["int"] = "2147483648"; UMAX["int"] = "4294967295"
+        SMAX["bigint"] = "9223372036854775807"; MINMAG["bigint"] = "9223372036854775808"
+        UMAX["bigint"] = "18446744073709551615"
+    }
+    !noschema && FILENAME == schema {
+        if ($0 ~ /^CREATE TABLE `/) {
+            t = $0; sub(/^CREATE TABLE `/, "", t); sub(/`.*/, "", t); tbl = tolower(t); next
+        }
+        if ($0 ~ /^\)/) { tbl = ""; next }
+        if (tbl != "" && $0 ~ /^  `[^`]+` /) {
+            rest = substr($0, 4); c = rest; sub(/`.*/, "", c)
+            rest = substr(rest, length(c) + 3)
+            depth = 0; ty = ""
+            for (i = 1; i <= length(rest); i++) {
+                ch = substr(rest, i, 1)
+                if (ch == "(") depth++
+                else if (ch == ")") depth--
+                else if (ch == " " && depth == 0) break
+                ty = ty ch
+            }
+            if (substr(rest, i + 1) ~ /^unsigned/) ty = ty " unsigned"
+            type[tbl "." tolower(c)] = tolower(ty)
+        }
+        next
+    }
+    {
+        if ($0 ~ /^[[:space:]]*(```|~~~)/) { fence = !fence; next }
+        if (fence) next
+        if (index($0, "<!-- literal-ok")) next
+
+        # Check A.
+        line = $0; nc = 0; ok = 1
+        while (match(line, /literal-check:[[:space:]]*-?[0-9]+(\.\.-?[0-9]+)?[[:space:]]*->[[:space:]]*[a-z0-9_]+\.[a-z0-9_]+[[:space:]]+[a-z]+(\([0-9,]+\))?( unsigned)?/)) {
+            hit = substr(line, RSTART, RLENGTH); line = substr(line, RSTART + RLENGTH); nc++
+            sub(/^literal-check:[[:space:]]*/, "", hit)
+            split(hit, lr, "->")
+            lhs = lr[1]; gsub(/[[:space:]]/, "", lhs)
+            rhs = lr[2]; sub(/^[[:space:]]+/, "", rhs)
+            match(rhs, /[[:space:]]+/)
+            tc = substr(rhs, 1, RSTART - 1); cty = substr(rhs, RSTART + RLENGTH)
+            if (noschema) { missing = 1; ok = 0; continue }
+            if (!(tc in type)) {
+                print "A\t[L] literal-check line " FNR ": " tc " not found in ibl5/docs/schema/current-schema.sql"
+                ok = 0; continue
+            }
+            if (type[tc] != cty) {
+                print "A\t[L] literal-check line " FNR ": " tc " is " sq type[tc] sq " in schema, citation says " sq cty sq
+                ok = 0; continue
+            }
+            base = cty; sub(/\(.*/, "", base); uns = (cty ~ / unsigned$/)
+            if (!(base in SMAX)) continue
+            n = split(lhs, ends, /\.\./)
+            for (k = 1; k <= n; k++) {
+                if (fits(ends[k], base, uns)) continue
+                lo = uns ? "0" : "-" MINMAG[base]; hi = uns ? UMAX[base] : SMAX[base]
+                print "A\t[L] literal-check line " FNR ": " ends[k] " does not fit " tc " " cty " (range " lo ".." hi ")"
+                ok = 0
+            }
+        }
+        if (nc > 0 && ok) next
+
+        # Check B.
+        pl = " " $0 " "
+        if (!match(pl, /[^a-z0-9_](pid|pids|tid|tids|teamid|teamids)[^a-z0-9_]/)) next
+        word = substr(pl, RSTART + 1, RLENGTH - 2)
+        if (tolower($0) ~ /bigint|unsigned/) next
+        rest = pl
+        while (match(rest, /[^A-Za-z0-9_][0-9]+[^A-Za-z0-9_]/)) {
+            pre = substr(rest, RSTART, 1); num = substr(rest, RSTART + 1, RLENGTH - 2)
+            post = substr(rest, RSTART + RLENGTH - 1, 1)
+            rest = substr(rest, RSTART + RLENGTH - 1)
+            if ((pre == "\"" || pre == sq) && post == pre) continue
+            if (dcmp(num, "2147483647") > 0) {
+                print "B\t[L] overflow line " FNR ": " num " exceeds int(11) max 2147483647 on a line naming " sq word sq "; add a literal-check: citation or a BIGINT/unsigned cue"
+                break
+            }
+        }
+    }
+    END {
+        if (missing) print "A\t[L] literal-check citations present but ibl5/docs/schema/current-schema.sql is missing"
+    }
+' "${L_INPUTS[@]}")
+
+# Check C: emit one record per copy-verbatim symbol, then resolve in shell.
+while IFS=$'\t' read -r kind lno name paths; do
+    [ "$kind" = "C" ] || continue
+    kept=""
+    for p in $paths; do
+        if [ -f "$REPO_ROOT/$p" ]; then kept="$kept${kept:+ }$p"; fi
+    done
+    [ -n "$kept" ] || continue
+    found=0
+    for p in $kept; do
+        if grep -qE "function[[:space:]]+${name}([^A-Za-z0-9_]|\$)|def[[:space:]]+${name}([^A-Za-z0-9_]|\$)|(^|[[:space:]])${name}[[:space:]]*\(\)" "$REPO_ROOT/$p"; then
+            found=1; break
+        fi
+    done
+    # Advisory: the corpus diff found new helpers and test assertions named on
+    # copy-verbatim lines that the forward-reference cues do not catch.
+    if [ "$found" -eq 0 ]; then
+        warn "[L] copy-verbatim line ${lno}: '${name}()' is defined in none of this section's cited source files (${kept})"
+    fi
+done < <(awk -v cues="$FWD_REF_CUES" '
+    function flush(   i, j, lc, drop, p, paths) {
+        paths = ""
+        for (p in cited) paths = paths (paths == "" ? "" : " ") p
+        for (i = 1; i <= ns; i++) {
+            drop = 0
+            for (j = 1; j <= nl; j++) {
+                lc = tolower(sl[j])
+                if (index(lc, tolower(sname[i])) && lc ~ lcues) { drop = 1; break }
+            }
+            if (!drop) print "C\t" sline[i] "\t" sname[i] "\t" paths
+        }
+        ns = 0; nl = 0; split("", cited)
+    }
+    BEGIN { lcues = tolower(cues) }
+    /^###?[[:space:]]/ { flush() }
+    {
+        sl[++nl] = $0
+        rest = $0
+        while (match(rest, /`[^`]+`/)) {
+            sp = substr(rest, RSTART + 1, RLENGTH - 2); rest = substr(rest, RSTART + RLENGTH)
+            if (sp !~ /^(\.\/)?[A-Za-z0-9_.\/-]+(:[0-9]+(-[0-9]+)?)?$/) continue
+            sub(/^\.\//, "", sp); sub(/:[0-9]+(-[0-9]+)?$/, "", sp)
+            if (sp ~ /\.(php|sh|py|ts|js)$/ || sp ~ /^bin\//) cited[sp] = 1
+        }
+        if ($0 ~ /^[[:space:]]*(```|~~~)/) { fence = !fence; next }
+        if (fence) next
+        l = tolower($0); cand = 0
+        if (index(l, "verbatim from")) cand = 1
+        else if (match(l, /cop(y|ied)[^.]*verbatim/)) {
+            vl = (substr(l, RSTART, 6) == "copied") ? 6 : 4
+            if (RLENGTH - vl - 8 <= 80) cand = 1
+        }
+        if (!cand) next
+        rest = $0
+        while (match(rest, /`[A-Za-z_][A-Za-z0-9_]*\(\)`/)) {
+            sname[++ns] = substr(rest, RSTART + 1, RLENGTH - 4); sline[ns] = FNR
+            rest = substr(rest, RSTART + RLENGTH)
+        }
+    }
+    END { flush() }
+' "$PLAN_FILE")
 
 # ---------------------------------------------------------------------------
 # Gate [F]: Critical Files format — list form only.
@@ -955,7 +1202,7 @@ elif [ -n "$(printf '%s' "$CF_SECTION" | tr -d '[:space:]')" ]; then
         # repo-relative and cannot be matched by `git diff --name-only` at Phase
         # 5.0 conformance time. Paths like /Users/.../IBL5/ibl5/... or
         # /Users/.../IBL5-worktrees/<slug>/... must be written as ibl5/... etc.
-        # This is the ONE caller of cf_parse_section_raw: the normalising
+        # Gate [F] and gate [VR] are the callers of cf_parse_section_raw: the normalising
         # cf_parse_section strips exactly these prefixes (so legacy plans can
         # match at Phase 5.0), which would blind this check. Raw already strips
         # fenced code blocks.
@@ -964,6 +1211,36 @@ elif [ -n "$(printf '%s' "$CF_SECTION" | tr -d '[:space:]')" ]; then
             viol "[F] ## Critical Files entry has an absolute path (\`$_f_abs\`) — paths must be repo-relative (e.g. \`ibl5/...\`, \`bin/...\`) because post-plan's Phase 5.0 compares them to \`git diff --name-only\` output"
         fi
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [VR]: a VR `-snapshots` Critical File needs an explicit baseline marker.
+# ---------------------------------------------------------------------------
+# A Visual Regression baseline directory changes only when CI sees a screenshot
+# diff, so a plan that leaves rendered output unchanged never touches it. An
+# unmarked (MUST_APPEAR) `-snapshots` entry then holds post-plan arming
+# condition (3) and Phase 6 check 5 forever (a-jay85/IBL5-backlog#1277).
+# Two clears: `(conditional — only if VR baselines change)` makes the entry
+# EXEMPT in cf_parse_section_raw, so this loop never sees it; the whole-word
+# token `vr-baseline-change` on the entry line accepts a deliberate regen or
+# deletion while Phase 5.0 still requires the path in the diff. Additive only:
+# the lib parser and Phase 5.0 are unchanged. Fence-stripped (cf_section and
+# cf_parse_section_raw both strip fences). Skipped on an unbalanced fence,
+# which gate [F] already rejects. Measured 2026-10-01 on the 1050-plan corpus:
+# fires on 3 plans, all shipped. Herestrings, not printf pipes: pipefail +
+# grep (see .claude/rules/shell-pipefail-grep.md).
+if ! cf_fence_unbalanced "$PLAN_FILE"; then
+    _vr_paths=$(cf_parse_section_raw "$PLAN_FILE" \
+        | sed -n 's/^MUST_APPEAR://p' | grep -F -- '-snapshots' || true)
+    _vr_entry_lines=$(grep -E "$CF_LINE_PATTERN" <<<"$CF_SECTION" || true)
+    while IFS= read -r _vr_path; do
+        [ -n "$_vr_path" ] || continue
+        _vr_lines=$(grep -F -- "\`$_vr_path\`" <<<"$_vr_entry_lines" || true)
+        if ! grep -iE '(^|[^[:alnum:]_-])vr-baseline-change([^[:alnum:]_-]|$)' \
+            <<<"$_vr_lines" >/dev/null; then
+            viol "[VR] ## Critical Files entry \`$_vr_path\` is a Visual Regression baseline directory listed as must-appear. CI changes it only when a screenshot diff regenerates baselines, so post-plan hold (3) blocks forever on a green VR run. Mark it (conditional — only if VR baselines change), or (vr-baseline-change: <what changes>) when the plan deliberately regenerates or deletes baselines."
+        fi
+    done <<<"$_vr_paths"
 fi
 
 # ---------------------------------------------------------------------------
@@ -1044,6 +1321,36 @@ done < "$MATRIX_FILE"
 if [ "$_y_tagged" -gt 0 ] && [ $((_y_tagged * 3)) -gt "$_y_total" ]; then
     viol "[Y] ${_y_tagged} of ${_y_total} matrix rows carry (one-time-check: ...) — more than one third of the matrix is unpinned; a one-time check is for evidence no regression test can hold, so convert rows to tests or split the plan"
 fi
+
+# ---------------------------------------------------------------------------
+# Gate ND: a `**No diff:** <reason>` phase marker. The post-plan harness reads it only
+# from a `## Phase N:` / `## Step N:` body (planfile.parse_phases) and honors it only
+# with a reason of NO_DIFF_MIN_REASON (15) characters or more; anything else is a silent
+# no-op that holds arming condition (3) after implementation. Reads the fence-stripped
+# $GATEP_BODY, so a fenced example never counts; a code-span mention never starts the
+# line, so it never matches. Case-sensitive, like the harness.
+# ---------------------------------------------------------------------------
+_nd_in_phase=0
+_nd_marker_re='^[[:space:]]*([-*][[:space:]]+)?\*\*No diff:\*\*'
+_nd_h2_re='^##[[:space:]]'
+_nd_phase_re='^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]+'
+while IFS= read -r line; do
+    if [[ "$line" =~ $_nd_h2_re ]]; then
+        if [[ "$line" =~ $_nd_phase_re ]]; then _nd_in_phase=1; else _nd_in_phase=0; fi
+        continue
+    fi
+    [[ "$line" =~ $_nd_marker_re ]] || continue
+    if [ "$_nd_in_phase" -eq 0 ]; then
+        viol "[ND] **No diff:** marker outside a ## Phase N / ## Step N section — the harness reads it only from a phase body; move it into the phase it exempts: ${line}"
+        continue
+    fi
+    _nd_reason=$(sed -E 's/^[[:space:]]*([-*][[:space:]]+)?\*\*No diff:\*\*//' <<< "$line")
+    _nd_reason=$(mtrim "$_nd_reason")
+    # 15 mirrors NO_DIFF_MIN_REASON in tools/postplan-harness/harness/planfile.py
+    if [ "${#_nd_reason}" -lt 15 ]; then
+        viol "[ND] **No diff:** reason is under 15 characters — say what the phase delivers instead of a diff (issue closed, plan queued, post-merge step): ${line}"
+    fi
+done < "$GATEP_BODY"
 
 # ---------------------------------------------------------------------------
 # Gate G: a matrix row naming a bin/test-* / bin/check-* script must name one CI
@@ -1293,7 +1600,7 @@ packet_scan() {
                 print "[S] delegation packet " q pname q " lacks a **Self-verify:** line (required for impl_model: sonnet plans)"
             if (!has_no_assertions) {
                 if (!has_assertions)
-                    print "[E] delegation packet " q pname q " lacks an **Assertions:** field (paste the phase" q "s Verification Matrix assertions verbatim, or add a " q "no-assertions: <reason>" q " line)"
+                    print "[E] delegation packet " q pname q " lacks an **Assertions:** field (paste the phase" q "s Verification Matrix assertions verbatim, or add a line that opens with " q "no-assertions: <reason>" q ")"
                 else {
                     s = assert_text
                     while (match(s, /`[^`]+`/)) {
@@ -1320,7 +1627,19 @@ packet_scan() {
                 if (pname == "") pname = "(unnamed)"
             }
             if (in_packet) {
-                if ($0 ~ /no-assertions:/) has_no_assertions=1
+                # Gate E escape. Anchored like the gate T **Tier:** match: the
+                # marker must OPEN its line, after optional indent, an optional
+                # blockquote `>`, an optional `-`/`*` bullet, an optional `<!--`,
+                # and an optional backtick. It must also carry a non-empty reason
+                # once a closing `-->`, backticks, and whitespace are stripped.
+                # An unanchored match let a mid-sentence prose mention clear the
+                # gate (#947).
+                if (match($0, /^[ \t]*>?[ \t]*([-*][ \t]+)?(<!--[ \t]*)?`?no-assertions:/)) {
+                    na_reason = substr($0, RSTART + RLENGTH)
+                    gsub(/-->/, "", na_reason)
+                    gsub(/[` \t]/, "", na_reason)
+                    if (na_reason != "") has_no_assertions=1
+                }
                 if ($0 ~ /\*\*Self-verify:\*\*/) { has_sv=1; in_block="sv" }
                 if ($0 ~ /\*\*Assertions:\*\*/) { has_assertions=1; in_block="assertions" }
                 if ($0 ~ /^[ \t]*[-*][ \t]*\*\*[A-Za-z]/) {
@@ -1383,8 +1702,10 @@ esac
 # ---------------------------------------------------------------------------
 # Every ### Delegate packet must (a) carry an **Assertions:** field and
 # (b) name every backtick-quoted token from that field somewhere in the
-# packet's **Self-verify:** block. A `no-assertions: <reason>` line anywhere
-# inside the packet clears BOTH sub-checks for that packet. Uses the
+# packet's **Self-verify:** block. A `no-assertions: <reason>` marker line
+# inside the packet clears BOTH sub-checks for that packet. The marker must
+# open its line (optional indent, >, -/* bullet, <!--, or backtick) and carry
+# a non-empty reason; a mid-sentence prose mention does not clear it. Uses the
 # _PACKET_SCAN cache populated above.
 while IFS= read -r eviol; do
     [ -n "$eviol" ] && viol "$eviol"

@@ -41,7 +41,7 @@
 .ibl-centerbox__title {
     font-family: var(--font-display);
     font-size: var(--text-2xl);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: white;
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
@@ -49,7 +49,7 @@
 }
 
 .ibl-card__title {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
 }
 
 .ibl-card__subtitle {
@@ -145,7 +145,7 @@
     padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-full);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
 }
@@ -209,7 +209,7 @@
 .team-card__title {
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--team-color-secondary);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
@@ -240,7 +240,7 @@
 /* Section label — uppercase subtitle used inside card bodies to separate
    groups (e.g. playoff rounds, GM History, Team Accomplishments). */
 .team-card__section-label {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: var(--text-sm);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
@@ -269,7 +269,7 @@
 }
 
 .team-info-list__label {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--gray-600);
     text-align: right;
     white-space: nowrap;
@@ -301,7 +301,7 @@
 .team-history-list a {
     color: var(--gray-800);
     text-decoration: none;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     transition: color var(--transition-fast);
 }
 
@@ -326,13 +326,13 @@
     background: var(--gray-50);
     border-top: 1px solid var(--gray-100);
     font-size: var(--text-base);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--gray-700);
 }
 
 /* Bold footer — totals row with extra emphasis */
 .team-card__footer--bold {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
 }
 
 /* Awards list — compact year + award pairs */
@@ -353,7 +353,7 @@
 }
 
 .team-awards-list .award-year {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--gray-800);
     font-variant-numeric: tabular-nums;
 }
@@ -416,7 +416,7 @@
 .draft-picks-list__info a {
     color: var(--gray-800);
     text-decoration: none;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     font-size: var(--text-base);
     transition: color var(--transition-fast);
 }
@@ -453,7 +453,7 @@
 
 .franchise-history-column__title {
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: var(--text-sm);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
@@ -485,7 +485,7 @@
 }
 
 .playoff-result--win {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 /* Team Logo Banner - centered banner image used across team pages */

@@ -53,6 +53,8 @@ if [ "$1" = "pr" ] && [ "$2" = "diff" ]; then
   exit 0
 fi
 if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
+  # GH_PR_FAIL set -> emulate an unreadable PR body (condition (17) fail-closed case).
+  [ -n "${GH_PR_FAIL:-}" ] && exit 1
   if [[ "$3" =~ ^[0-9]+$ ]]; then
     case "$3" in 1100) echo '{"state":"OPEN"}' ;; *) echo '{"state":"MERGED"}' ;; esac
     exit 0
@@ -510,6 +512,7 @@ B10="$(extract_block '# condition (10)')"
 B7="$(extract_block '# condition (7)')"
 B13="$(extract_block '# condition (13)')"
 B15="$(extract_block '# condition (15)')"
+B17="$(extract_block '# condition (17)')"
 BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
 B12="$(extract_block '# condition (12)')"
@@ -552,6 +555,7 @@ else
     echo "FAIL: c11_lib_header_widened — pr-armable.sh header still promises unscored threads never block"; FAILED=1
 fi
 assert_self_contained '# condition (15)' "condition (15)"
+assert_self_contained '# condition (17)' "condition (17)"
 assert_block_sources '# condition (7)' "condition (7)" "plan-resolve.sh" "$SKILL"
 assert_block_sources '# condition (13)' "condition (13)" "plan-resolve.sh" "$SKILL"
 
@@ -562,6 +566,24 @@ expect_block "(1) cleared sentinel -> NONE" NONE \
     "$(run_isolated "$B1" '{"body":"## Manual Testing\nNo manual testing needed — automated."}' '' '')"
 expect_block "(1) no section (UNKNOWN) -> BLOCK (fail-closed)" BLOCK \
     "$(run_isolated "$B1" '{"body":"hand-made PR, no manual testing heading"}' '' '')"
+# (1) with the Decision-only hold notice: the block sits before ## Manual Testing,
+# every line `> `-prefixed, so the clearance window is unchanged.
+_hd_dir="$(mktemp -d)"
+_hd_plan="$_hd_dir/plan.md"
+printf '%s\n' '## Automouse Hold Justification' '' \
+    '**Category:** intrinsic, self-gating change.' '' \
+    "**Decision:** Merge if you're OK with about 7% more PRs being held." \
+    '- [x] counterfeit checkbox in a Decision continuation line' '' \
+    '**Discharged by matrix rows:** 3, 4.' '' '## Verification Matrix' > "$_hd_plan"
+_hd_block="$(bash -c 'source "$1"; hold_manual_confirmation_block "$2"' _ \
+    "$SCRIPT_DIR/lib/hold-check.sh" "$_hd_plan")"
+expect_block "(1) Decision block before cleared sentinel -> NONE" NONE \
+    "$(run_isolated "$B1" "$(jq -n --arg b "$_hd_block"$'\n\n## Manual Testing\nNo manual testing needed — automated.' '{body:$b}')" '' '')"
+expect_block "(1) Decision block before held rows -> BLOCK" BLOCK \
+    "$(run_isolated "$B1" "$(jq -n --arg b "$_hd_block"$'\n\n## Manual Testing\n\n- review the new <h1>' '{body:$b}')" '' '')"
+expect_block "(1) Decision block alone, no Manual Testing -> BLOCK (fail-closed)" BLOCK \
+    "$(run_isolated "$B1" "$(jq -n --arg b "$_hd_block" '{body:$b}')" '' '')"
+rm -rf "$_hd_dir"
 # S1: tail names unit, non-test file — predicate holds when files key is present.
 expect_block "S1: tail names unit, non-test file → BLOCK" BLOCK \
     "$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed — covered by unit tests","files":[{"path":"bin/pr-triage"}]}' '' '')"
@@ -1404,6 +1426,64 @@ else
     fi
 fi
 
+# condition (17) — gate backtest hold. The block reads the PR body: a Gate backtest block
+# is judged by its state line, and a body with no block runs bin/gate-backtest itself.
+# run_cond17 <body|__fail__> [stub-rc] — scratch repo with the real predicate library
+# symlinked and a stub bin/gate-backtest that records the call and exits with stub-rc.
+c17_block() { # state-line-token...  -> a Gate backtest block with one state line per arg
+    printf '%s\n' '<!-- gate-backtest:begin -->'
+    local s
+    for s in "$@"; do printf '<!-- gate-backtest-state: %s -->\n' "$s"; done
+    printf '%s\n' '### Gate backtest' '<!-- gate-backtest:end -->'
+}
+run_cond17() {
+    local c17="$BASE_TMP/c17"
+    rm -rf "$c17"
+    mkdir -p "$c17/bin/lib"
+    git -C "$c17" init -q
+    ln -s "$REPO_ROOT/bin/lib/pr-armable.sh" "$c17/bin/lib/pr-armable.sh"
+    printf '#!/bin/sh\ntouch "%s/called"\nexit %s\n' "$c17" "${2:-0}" > "$c17/bin/gate-backtest"
+    chmod +x "$c17/bin/gate-backtest"
+    local fail=""
+    if [ "$1" = "__fail__" ]; then
+        fail=1
+        printf '{"number":2100,"body":""}' > "$BASE_TMP/fixture.json"
+    else
+        jq -n --arg b "$1" '{number: 2100, body: $b}' > "$BASE_TMP/fixture.json"
+    fi
+    ( cd "$c17" && PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+        GH_PR_FAIL="$fail" bash -c "$B17" 2>&1 )
+}
+c17_called() { [ -e "$BASE_TMP/c17/called" ] && echo yes || echo no; }
+
+if [ -z "$B17" ]; then
+    echo "FAIL: no block matching '# condition (17)' in $SKILL — marker drifted"
+    FAILED=1
+else
+    expect_block "(17) HELD block -> BLOCK" BLOCK "$(run_cond17 "$(c17_block HELD)")"
+    expect_block "(17) UNKNOWN block -> BLOCK" BLOCK "$(run_cond17 "$(c17_block UNKNOWN)")"
+    expect_block "(17) CLEARED block -> NONE" NONE "$(run_cond17 "$(c17_block CLEARED)")"
+    [ "$(c17_called)" = no ] && echo "ok: (17) CLEARED block does not run the stub" \
+        || { echo "FAIL: (17) CLEARED block ran bin/gate-backtest"; FAILED=1; }
+    expect_block "(17) NOT-APPLICABLE block -> NONE" NONE "$(run_cond17 "$(c17_block NOT-APPLICABLE)")"
+    expect_block "(17) block without a state line -> BLOCK" BLOCK "$(run_cond17 "$(c17_block)")"
+    expect_block "(17) two state lines -> BLOCK" BLOCK "$(run_cond17 "$(c17_block CLEARED CLEARED)")"
+    expect_block "(17) no block, stub rc 0 -> NONE" NONE "$(run_cond17 'plain body' 0)"
+    [ "$(c17_called)" = yes ] && echo "ok: (17) no block runs the stub" \
+        || { echo "FAIL: (17) no block did not run bin/gate-backtest"; FAILED=1; }
+    expect_block "(17) no block, stub rc 1 -> BLOCK" BLOCK "$(run_cond17 'plain body' 1)"
+    expect_block "(17) no block, stub rc 3 -> BLOCK" BLOCK "$(run_cond17 'plain body' 3)"
+    expect_block "(17) no block, stub rc 2 -> BLOCK" BLOCK "$(run_cond17 'plain body' 2)"
+    out="$(run_cond17 __fail__)"
+    expect_block "(17) unreadable PR body -> BLOCK" BLOCK "$out"
+    if [[ "$out" == *"cannot read the PR body"* ]]; then
+        echo "ok: (17) unreadable body names the cause"
+    else
+        echo "FAIL: (17) unreadable body should say 'cannot read the PR body', got: '$out'"
+        FAILED=1
+    fi
+fi
+
 # --- Phase 5.0d autonomy contract: run_p50d helper + D1..D6 cases ---------
 # The 5.0d block regenerates /tmp/post-plan-changed-$PPID from
 # `git diff --name-only origin/master...HEAD` when the list is absent. Nothing
@@ -2147,7 +2227,7 @@ Intrinsic holds — name the category and stand.
 self-gating / bootstrap hazard
 ambiguity resolves to intrinsic
 A hold justification carries a decision
-accepts or refuses
+Merge if you're OK
 claiming too much
 never a whole-plan escape
 Which slice of this is intrinsic
@@ -2835,6 +2915,9 @@ have   "§5.9f: the --onto squash-trap recipe is spelled out" "$CRES_TXT" 'git r
 have   "§5.9f: the squash-trap rule is cited"                "$CRES_TXT" '.claude/rules/linear-history-squash-merge.md'
 
 # §5.9g behavioural: lostwork.sh against real fixture repos, in BOTH directions.
+# The proof is change-level: every line the branch changed before the rebase must still
+# be in the HEAD tree. Gained work (an extra commit after the capture) is expected to
+# pass; only a dropped branch line diverges.
 # The fixtures need a real refs/remotes/origin/master — the script hardcodes
 # `git diff origin/master...HEAD` and ignores every seam, so without the ref its
 # post-diff is empty and a DIVERGED case would pass for the wrong reason.
@@ -2861,12 +2944,27 @@ else
     if [ "$LWRC" -eq 0 ]; then echo "ok: §5.9g: TREE-EQUIVALENT exits 0"
     else echo "FAIL: §5.9g: TREE-EQUIVALENT exited $LWRC"; FAILED=1; fi
 
-    # NEGATIVE: a commit added after the capture makes the numstats disagree.
+    # GAINED WORK: a commit added after the capture does not touch any branch line, so
+    # the change-level proof still holds. The old numstat comparison called this DIVERGED.
     LWR2="$(mk_lostwork_repo)"; LWK2="lw-div-$$"
     ( cd "$LWR2" && git diff origin/master...HEAD > "/tmp/pr-ready-diff-pre-$LWK2.patch" )
     ( cd "$LWR2" && printf 'extra\n' >> f.txt && git commit --quiet -am extra )
     LWO2="$( cd "$LWR2" && bash "$LW" "$LWK2" 2>&1 )" || true
-    have "§5.9g: a tree that gained work -> TREE DIVERGED" "$LWO2" 'TREE DIVERGED'
+    have  "§5.9g: a tree that gained work -> TREE-EQUIVALENT (change-level proof)" "$LWO2" 'TREE-EQUIVALENT'
+    lacks "§5.9g: gained work is not reported as LOST" "$LWO2" 'LOST:'
+
+    # NEGATIVE: a commit that drops the branch's added line ('mine') must diverge. The
+    # replacement line keeps the post diff non-empty so the empty-diff guard is not what
+    # trips. rc stays 0 (the conjunctive-gate contract: callers read the verdict string).
+    LWR3="$(mk_lostwork_repo)"; LWK3="lw-lost-$$"
+    ( cd "$LWR3" && git diff origin/master...HEAD > "/tmp/pr-ready-diff-pre-$LWK3.patch" )
+    ( cd "$LWR3" && printf 'base\nother\n' > f.txt && git commit --quiet -am drop-mine )
+    LWRC3=0
+    LWO3="$( cd "$LWR3" && bash "$LW" "$LWK3" 2>&1 )" || LWRC3=$?
+    have "§5.9g: a dropped branch line -> TREE DIVERGED" "$LWO3" 'TREE DIVERGED — inspect before pushing'
+    have "§5.9g: the dropped line is named" "$LWO3" 'LOST: '
+    if [ "$LWRC3" -eq 0 ]; then echo "ok: §5.9g: TREE DIVERGED still exits 0"
+    else echo "FAIL: §5.9g: TREE DIVERGED exited $LWRC3"; FAILED=1; fi
     # The differing-numstat branch is the ONE failure path that exits 0, which is why
     # _phase-2-conflict-resolution.md gates on the printed verdict, not on the rc alone.
     have "§5.9g: the doc gates on the verdict string, not just the rc" "$CRES_TXT" 'exits **0**'
@@ -2880,7 +2978,9 @@ else
     rm -f "/tmp/pr-ready-diff-pre-$LWK.patch" "/tmp/pr-ready-diff-pre-$LWK2.patch" \
           "/tmp/pr-ready-diff-post-$LWK.patch" "/tmp/pr-ready-diff-post-$LWK2.patch" \
           "/tmp/pr-ready-numstat-pre-$LWK.txt" "/tmp/pr-ready-numstat-post-$LWK.txt" \
-          "/tmp/pr-ready-numstat-pre-$LWK2.txt" "/tmp/pr-ready-numstat-post-$LWK2.txt"
+          "/tmp/pr-ready-numstat-pre-$LWK2.txt" "/tmp/pr-ready-numstat-post-$LWK2.txt" \
+          "/tmp/pr-ready-diff-pre-$LWK3.patch" "/tmp/pr-ready-diff-post-$LWK3.patch" \
+          "/tmp/pr-ready-numstat-pre-$LWK3.txt" "/tmp/pr-ready-numstat-post-$LWK3.txt"
 fi
 
 # §5.9h the BEHIND re-rebase loop. The loop body is orchestrator prose interleaved
@@ -2890,7 +2990,9 @@ CIMON_TXT="$(cat "$CIMON")"
 have  "§5.9h: the loop bound is stated as 3"          "$CIMON_TXT" '**Bound: 3 iterations.**'
 have  "§5.9h: iteration 4 is explicitly excluded"     "$CIMON_TXT" 'Iteration 4 does not run.'
 have  "§5.9h: the ceiling halt carries its literal"   "$CIMON_TXT" '3-iteration ceiling'
-have  "§5.9h: the ceiling leaves auto-merge disarmed" "$CIMON_TXT" 'Auto-merge has been left disarmed.'
+have  "§5.9h: the ceiling runs the re-arm gate first"  "$CIMON_TXT" 'The re-arm gate has already run'
+have  "§5.9h: the ceiling hands off to the merge line" "$CIMON_TXT" 'update-behind-prs.yml (ADR-0081)'
+lacks "§5.9h: the ceiling no longer disarms"           "$CIMON_TXT" 'left disarmed'
 # Disarm must precede the rewrite: a reordering rewrites the branch out from under an
 # armed auto-merge, the one sequence that can merge a tree nobody watched land.
 before "§5.9h: --disable-auto precedes the rebase invocation" \

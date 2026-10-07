@@ -16,9 +16,9 @@ use Season\Season;
  * Operates on both ibl_box_scores (player stats) and ibl_box_scores_teams tables.
  *
  * @see BoxscoreRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  */
-class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreRepositoryInterface
+class BoxscoreRepository extends \Database\BaseMysqliRepository implements BoxscoreRepositoryInterface
 {
     /** Hard bound on rows written per run — see plan §12.4. */
     public const MAX_RECORDED_REJECTS = 2000;
@@ -334,7 +334,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     public function insertTeamBoxscore(array $row): int
     {
         return $this->execute(
-            Boxscore::teamInsertSql('`ibl_box_scores_teams`'),
+            Boxscore::teamInsertSql(),
             "ssiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii",
             $row['game_date'],
             $row['name'],
@@ -408,7 +408,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         int $personalFouls,
     ): int {
         return $this->execute(
-            Boxscore::playerInsertSql('`ibl_box_scores`'),
+            Boxscore::playerInsertSql(),
             "ssssiiiiiiiiiiiiiiiiiiiiiiiii",
             $date,
             $uuid,

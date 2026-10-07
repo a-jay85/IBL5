@@ -149,6 +149,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bin/check-pr-manual-testing --pr "${{ github.event.pull_request.number }}"
 
+      # --- PR body post-merge recipe gate: UNCONDITIONAL (no path filter).
+      # Lints fenced shell under any post-merge heading for a wrong repo slug,
+      # a contexts-only branch-protection write (drops app_id), and a
+      # verification step that deletes .checks before comparing.
+      # Blocking: a non-zero exit fails the job. No continue-on-error.
+      # Waiver: <!-- post-merge-recipe-ok: <reason, 15+ chars> --> in the body. ---
+      - name: Run bin/check-post-merge-recipe
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bin/check-post-merge-recipe --pr "${{ github.event.pull_request.number }}"
+
       - name: Run bin/check-registry-trigger-rows
         if: ${{ !cancelled() }}
         run: bin/check-registry-trigger-rows

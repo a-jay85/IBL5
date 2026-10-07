@@ -16,6 +16,8 @@ use Trading\Contracts\TradeProcessorInterface;
 use Trading\Contracts\TradeValidatorInterface;
 use Trading\TradeExecutionService;
 use Trading\TradeItemType;
+use Validation\ValidationError;
+use Validation\ValidationResultWithContext;
 
 /**
  * Unit tests for Trading\TradeExecutionService — the accept-path orchestrator
@@ -149,16 +151,8 @@ class TradeExecutionServiceTest extends TestCase
         $processor->expects($this->never())->method('processTrade');
 
         $validator = self::createStub(TradeValidatorInterface::class);
-        $validator->method('validateSalaryCapsForParties')->willReturn([
-            'valid' => false,
-            'errors' => ['This trade is illegal since it puts the Stars over the hard cap.'],
-            'parties' => [],
-        ]);
-        $validator->method('validateRosterLimitsForParties')->willReturn([
-            'valid' => true,
-            'errors' => [],
-            'parties' => [],
-        ]);
+        $validator->method('validateSalaryCapsForParties')->willReturn(ValidationResultWithContext::fromErrors(array_map(static fn (string $m): ValidationError => new ValidationError('salary_cap', $m), ['This trade is illegal since it puts the Stars over the hard cap.']), []));
+        $validator->method('validateRosterLimitsForParties')->willReturn(ValidationResultWithContext::success([]));
 
         $service = $this->buildService($this->threeTeamRows(), processor: $processor, validator: $validator);
 
@@ -166,6 +160,23 @@ class TradeExecutionServiceTest extends TestCase
 
         $this->assertFalse($result['success']);
         $this->assertContains('This trade is illegal since it puts the Stars over the hard cap.', $result['errors']);
+    }
+
+    public function testValidationErrorsListCapErrorsBeforeRosterErrors(): void
+    {
+        $processor = $this->createMock(TradeProcessorInterface::class);
+        $processor->expects($this->never())->method('processTrade');
+
+        $validator = self::createStub(TradeValidatorInterface::class);
+        $validator->method('validateSalaryCapsForParties')->willReturn(ValidationResultWithContext::fromErrors(array_map(static fn (string $m): ValidationError => new ValidationError('salary_cap', $m), ['CAP']), []));
+        $validator->method('validateRosterLimitsForParties')->willReturn(ValidationResultWithContext::fromErrors(array_map(static fn (string $m): ValidationError => new ValidationError('roster_limit', $m), ['ROSTER']), []));
+
+        $service = $this->buildService($this->threeTeamRows(), processor: $processor, validator: $validator);
+
+        $result = $service->validateAndExecute(1, 'Metros');
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(['CAP', 'ROSTER'], $result['errors']);
     }
 
     /**
@@ -181,8 +192,8 @@ class TradeExecutionServiceTest extends TestCase
             ->willReturn(['success' => true, 'storytext' => 'x', 'storytitle' => 'y']);
 
         $validator = self::createStub(TradeValidatorInterface::class);
-        $validator->method('validateSalaryCapsForParties')->willReturn(['valid' => true, 'errors' => [], 'parties' => []]);
-        $validator->method('validateRosterLimitsForParties')->willReturn(['valid' => true, 'errors' => [], 'parties' => []]);
+        $validator->method('validateSalaryCapsForParties')->willReturn(ValidationResultWithContext::success([]));
+        $validator->method('validateRosterLimitsForParties')->willReturn(ValidationResultWithContext::success([]));
 
         $service = $this->buildService($this->threeTeamRows(), processor: $processor, validator: $validator);
 
@@ -258,12 +269,12 @@ class TradeExecutionServiceTest extends TestCase
         $captured = [];
         $validator = self::createStub(TradeValidatorInterface::class);
         $validator->method('validateSalaryCapsForParties')->willReturnCallback(
-            function (array $deltas) use (&$captured): array {
+            function (array $deltas) use (&$captured): ValidationResultWithContext {
                 $captured = $deltas;
-                return ['valid' => true, 'errors' => [], 'parties' => []];
+                return ValidationResultWithContext::success([]);
             }
         );
-        $validator->method('validateRosterLimitsForParties')->willReturn(['valid' => true, 'errors' => [], 'parties' => []]);
+        $validator->method('validateRosterLimitsForParties')->willReturn(ValidationResultWithContext::success([]));
 
         $processor = self::createStub(TradeProcessorInterface::class);
         $processor->method('processTrade')->willReturn(['success' => true]);
@@ -299,12 +310,12 @@ class TradeExecutionServiceTest extends TestCase
         $captured = [];
         $validator = self::createStub(TradeValidatorInterface::class);
         $validator->method('validateSalaryCapsForParties')->willReturnCallback(
-            function (array $deltas) use (&$captured): array {
+            function (array $deltas) use (&$captured): ValidationResultWithContext {
                 $captured = $deltas;
-                return ['valid' => true, 'errors' => [], 'parties' => []];
+                return ValidationResultWithContext::success([]);
             }
         );
-        $validator->method('validateRosterLimitsForParties')->willReturn(['valid' => true, 'errors' => [], 'parties' => []]);
+        $validator->method('validateRosterLimitsForParties')->willReturn(ValidationResultWithContext::success([]));
 
         $processor = self::createStub(TradeProcessorInterface::class);
         $processor->method('processTrade')->willReturn(['success' => true]);
@@ -442,12 +453,8 @@ class TradeExecutionServiceTest extends TestCase
         $season->method('advancesContractYears')->willReturn(true);
 
         $validator = self::createStub(TradeValidatorInterface::class);
-        $validator->method('validateSalaryCapsForParties')->willReturn([
-            'valid'   => false,
-            'errors'  => ['This trade is illegal since it puts the Metros over the hard cap.'],
-            'parties' => [],
-        ]);
-        $validator->method('validateRosterLimitsForParties')->willReturn(['valid' => true, 'errors' => [], 'parties' => []]);
+        $validator->method('validateSalaryCapsForParties')->willReturn(ValidationResultWithContext::fromErrors(array_map(static fn (string $m): ValidationError => new ValidationError('salary_cap', $m), ['This trade is illegal since it puts the Metros over the hard cap.']), []));
+        $validator->method('validateRosterLimitsForParties')->willReturn(ValidationResultWithContext::success([]));
 
         $processor = self::createMock(TradeProcessorInterface::class);
         $processor->expects(self::never())->method('processTrade');
@@ -488,12 +495,12 @@ class TradeExecutionServiceTest extends TestCase
         $captured = [];
         $validator = self::createStub(TradeValidatorInterface::class);
         $validator->method('validateSalaryCapsForParties')->willReturnCallback(
-            function (array $deltas) use (&$captured): array {
+            function (array $deltas) use (&$captured): ValidationResultWithContext {
                 $captured = $deltas;
-                return ['valid' => true, 'errors' => [], 'parties' => []];
+                return ValidationResultWithContext::success([]);
             }
         );
-        $validator->method('validateRosterLimitsForParties')->willReturn(['valid' => true, 'errors' => [], 'parties' => []]);
+        $validator->method('validateRosterLimitsForParties')->willReturn(ValidationResultWithContext::success([]));
 
         $processor = self::createStub(TradeProcessorInterface::class);
         $processor->method('processTrade')->willReturn(['success' => true]);

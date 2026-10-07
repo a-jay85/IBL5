@@ -22,7 +22,7 @@ final class ControllerSuperglobalFreedomTest extends TestCase
         return [
             ['Player/PlayerPageController.php'],
             ['Team/TeamController.php'],
-            ['DepthChartEntry/DepthChartEntryController.php'],
+            ['DepthChart/DepthChartController.php'],
             ['FreeAgency/FreeAgencyController.php'],
         ];
     }

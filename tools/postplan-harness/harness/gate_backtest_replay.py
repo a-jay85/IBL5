@@ -24,7 +24,7 @@ from harness.gate_backtest import (GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, GateC
                                    HistoricalPR, ReplayResult, Verdict, classify_exit,
                                    changes_from_unified_diff, classify_truth, compute_verdict,
                                    detect_gate_changes,
-                                   expand_argv, expand_env, is_check_script,
+                                   expand_argv, expand_env, expand_stdin, is_check_script,
                                    render_gate_backtest, resolve_spec)
 
 REPO_SLUG = "a-jay85/IBL5"
@@ -239,10 +239,20 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                            "diff_file": diff_file, "plan_file": plan_file, "body_file": body_file}
                     env = dict(os.environ)
                     env.update(expand_env(spec, ctx))
+                    stdin_path = expand_stdin(spec, ctx)
+                    stdin_fh = None
+                    if stdin_path:
+                        try:
+                            stdin_fh = open(stdin_path, "rb")
+                        except OSError as exc:
+                            results.append(ReplayResult(pr.number, gate.path, "error",
+                                                        re.sub(r"\s+", " ", f"stdin: {exc}")[:160]))
+                            continue
                     try:
                         proc = subprocess.run(
                             [os.path.join(scratch.dir, gate.path), *expand_argv(spec, ctx)],
-                            cwd=scratch.dir, env=env, stdin=subprocess.DEVNULL,
+                            cwd=scratch.dir, env=env,
+                            stdin=stdin_fh if stdin_fh is not None else subprocess.DEVNULL,
                             capture_output=True, text=True, timeout=per_replay_timeout)
                     except subprocess.TimeoutExpired:
                         results.append(ReplayResult(pr.number, gate.path, "timeout",
@@ -252,6 +262,9 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                         results.append(ReplayResult(pr.number, gate.path, "error",
                                                     re.sub(r"\s+", " ", str(exc))[:160]))
                         continue
+                    finally:
+                        if stdin_fh is not None:
+                            stdin_fh.close()
                     outcome, detail = classify_exit(spec, proc.returncode, proc.stdout)
                     results.append(ReplayResult(pr.number, gate.path, outcome, detail))
     finally:

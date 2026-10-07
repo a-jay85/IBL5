@@ -71,6 +71,7 @@ class Classification:
     has_shell: bool = False
     has_workflow: bool = False
     has_skill_prose: bool = False
+    has_gm_visible: bool = False     # any changed path a league GM could see (classify._NON_RUNTIME denylist miss)
     count_shell: int = 0
     count_workflow: int = 0
     lines_php_changed: int = 0
@@ -93,7 +94,8 @@ class Classification:
             f"GOLDEN_CHANGED={self.golden_changed} COUNT_GO={self.count_go}\n"
             f"HAS_SHELL={self.has_shell} HAS_WORKFLOW={self.has_workflow} "
             f"HAS_SKILL_PROSE={self.has_skill_prose} COUNT_SHELL={self.count_shell} "
-            f"COUNT_WORKFLOW={self.count_workflow} LINES_SHELL_CHANGED={self.lines_shell_changed}"
+            f"COUNT_WORKFLOW={self.count_workflow} LINES_SHELL_CHANGED={self.lines_shell_changed}\n"
+            f"HAS_GM_VISIBLE={self.has_gm_visible}"
         )
 
 
@@ -101,7 +103,7 @@ class Classification:
 class PhaseInfo:
     """One `## Phase N:` / `## Step N:` section of a plan, as parsed by planfile.parse_phases.
 
-    `evidence_paths` = backticked path tokens found in the phase section's own body.
+    `evidence_paths` = backticked path tokens found in the phase heading and its own body.
     `bookkeeping` is True when the heading carries `[phases: S]` / `[phases: S/S]` (all-S tier
     marker), which exempts the phase from the omission check.
     """
@@ -121,10 +123,18 @@ class PlanInfo:
     has_security: bool = False
     has_reuse: bool = False
     planned_test_paths: list[str] = field(default_factory=list)
+    no_change_test_paths: list[str] = field(default_factory=list)  # planned tokens every VR row marked `(no-change)`; conformance skips these
     critical_files: list[tuple] = field(default_factory=list)  # (path, annotation, exempt)
     required_test_methods: list[str] = field(default_factory=list)
     backlog_issues: list[tuple] = field(default_factory=list)  # (kind, number); kind in {"closes", "refs"}
+    deferral_hits: list[tuple] = field(default_factory=list)  # (text, line_no, key) from ## Out of Scope; see outofscope.py
     truly_manual_rows: list[ManualRow] = field(default_factory=list)
+    # Verification Matrix rows whose Test type is PHPUnit / API-test / E2E /
+    # Visual-regression / CLI-executable (planfile.count_executable_matrix_rows).
+    # None = not parsed: plan-blind run, no matrix, or a PlanInfo(...) literal in a test.
+    # Only an explicit 0 lets the runner write MANUAL_TESTING_SENTINEL_STATIC, so every
+    # pre-existing literal keeps the covered-by sentinel.
+    executable_row_count: Optional[int] = None
     security_section: str = ""
     reuse_section: str = ""
     hold_justification: str = ""
@@ -290,6 +300,8 @@ class RunResult:
                 d["plan"].pop("required_test_methods", None)
             if not d["plan"].get("backlog_issues"):
                 d["plan"].pop("backlog_issues", None)
+            if not d["plan"].get("deferral_hits"):
+                d["plan"].pop("deferral_hits", None)
             if not d["plan"].get("no_adr_markers"):
                 d["plan"].pop("no_adr_markers", None)
             if not d["plan"].get("slug_drift"):

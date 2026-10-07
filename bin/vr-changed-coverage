@@ -15,11 +15,18 @@
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
+const USAGE =
+  'Usage: git diff --name-only "$BASE"...HEAD | bin/vr-changed-coverage > coverage.json';
+
+if (process.argv.slice(2).includes('--help')) {
+  process.stdout.write(USAGE + '\n');
+  process.exit(0);
+}
+
 const __dir = dirname(fileURLToPath(import.meta.url));
 const ibl5Dir = resolve(__dir, '..', 'ibl5');
 
-// Dynamic import so this works when invoked from the repo root (same idiom as
-// bin/check-vr-coverage).
+// Dynamic import so this works when invoked from the repo root.
 const { VR_MANIFEST } = await import(resolve(ibl5Dir, 'tests/e2e/vr-manifest.ts'));
 const { classifyChangedFiles } = await import(
   resolve(ibl5Dir, 'tests/e2e/vr-coverage-map.ts')

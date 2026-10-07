@@ -514,7 +514,8 @@ cat > "$SCRATCH/hookrej-fire.json" <<'JSON'
 [
   {"number": 3005, "title": "hookrej-ready",    "isDraft": false, "headRefName": "branch-hookrej-ready",    "author": {"login": "a-jay85"}},
   {"number": 3006, "title": "hookrej-pfailed",  "isDraft": false, "headRefName": "branch-hookrej-pfailed",  "author": {"login": "a-jay85"}},
-  {"number": 3007, "title": "hookrej-notready", "isDraft": false, "headRefName": "branch-hookrej-notready", "author": {"login": "a-jay85"}}
+  {"number": 3007, "title": "hookrej-notready", "isDraft": false, "headRefName": "branch-hookrej-notready", "author": {"login": "a-jay85"}},
+  {"number": 3008, "title": "hookrej-midline", "isDraft": false, "headRefName": "branch-hookrej-midline", "author": {"login": "a-jay85"}}
 ]
 JSON
 cat > "$SCRATCH/hookrej-wtl.txt" <<EOF
@@ -522,9 +523,10 @@ cat > "$SCRATCH/hookrej-wtl.txt" <<EOF
 /Users/x/IBL5-worktrees/hookrej-ready/ibl5    aaaaaab [branch-hookrej-ready]
 /Users/x/IBL5-worktrees/hookrej-pfailed/ibl5  aaaaaac [branch-hookrej-pfailed]
 /Users/x/IBL5-worktrees/hookrej-notready/ibl5 aaaaaad [branch-hookrej-notready]
+/Users/x/IBL5-worktrees/hookrej-midline/ibl5  aaaaaae [branch-hookrej-midline]
 EOF
-rm -f /tmp/post-plan-fleet-300{5,6,7}.log
-TMP_LOGS+=("/tmp/post-plan-fleet-3005.log" "/tmp/post-plan-fleet-3006.log" "/tmp/post-plan-fleet-3007.log")
+rm -f /tmp/post-plan-fleet-300{5,6,7,8}.log
+TMP_LOGS+=("/tmp/post-plan-fleet-3005.log" "/tmp/post-plan-fleet-3006.log" "/tmp/post-plan-fleet-3007.log" "/tmp/post-plan-fleet-3008.log")
 # 3005: recovered run -- HOOK REJECTED then PUSHED then READY → derive_status must return READY
 printf 'HOOK REJECTED — pre-push-adr-hook refused this push: the branch is not rebased onto origin/master.\nPUSHED PR #7 abc123 (moved: yes, push rc: 0)\nREADY\n' \
     > /tmp/post-plan-fleet-3005.log
@@ -534,11 +536,13 @@ printf 'HOOK REJECTED — pre-push-adr-hook refused this push: the branch is not
 # 3007: hook-only rejection, no recovery -- HOOK REJECTED then NOT READY → NOT READY
 printf 'HOOK REJECTED — pre-push-adr-hook refused this push: the branch is not rebased onto origin/master.\nNOT READY\n' \
     > /tmp/post-plan-fleet-3007.log
+# 3008: PUSH FAILED only mid-line (quoted prose) then READY -> must stay READY (anchor)
+printf 'the doc says PUSH FAILED is non-retriable\nREADY\n' > /tmp/post-plan-fleet-3008.log
 clean_slots  # clear the 4 plist slots from the first run; otherwise the cap fires immediately
 out2="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/hookrej-fire.json" \
         POST_PLAN_FLEET_WTL="$SCRATCH/hookrej-wtl.txt" \
         POST_PLAN_FLEET_DRY_RUN=1 \
-        run_driver --go --jobs 3 2>&1)"; rc2=$?
+        run_driver --go --jobs 4 2>&1)"; rc2=$?
 [[ $rc2 -eq 0 ]] || fail "report-statuses hookrej: exit $rc2 (out: $out2)"
 rp2="$SCRATCH/claude-plans/_reports/ibl5/firstpass/pr-firstpass-${_rdate}.md"
 [[ -f "$rp2" ]] || fail "report-statuses hookrej: report not found at $rp2"
@@ -547,6 +551,8 @@ grep '3005' "$rp2" | grep -qF '| READY |' \
     || fail "PR 3005 HOOK REJECTED+PUSHED+READY log: derive_status returned wrong status (expected READY)"
 grep '3006' "$rp2" | grep -qF '| NOT READY |' \
     || fail "PR 3006 HOOK REJECTED+PUSH FAILED+NOT READY log: derive_status returned wrong status (expected NOT READY)"
+grep '3008' "$rp2" | grep -qF '| READY |' \
+    || fail "PR 3008 mid-line PUSH FAILED+READY log: unanchored PUSH FAILED must not be a hard-stop (expected READY)"
 grep '3007' "$rp2" | grep -qF '| NOT READY |' \
     || fail "PR 3007 HOOK REJECTED+NOT READY log: derive_status returned wrong status (expected NOT READY)"
 # Source-level negative: HOOK REJECTED must never appear as a hard-stop marker in post-plan-fleet.
@@ -1135,6 +1141,53 @@ grep -qF '• manual tests need you: Row 1' "$_DM_CAPTURE" \
 ! grep -q "merge when you're ready" "$_DM_CAPTURE" \
     || fail "dm-held-terminal-reports-held: held run told the user to merge"
 end_case dm-held-terminal-reports-held
+
+# --- case 51a: dm-armed-warns-red-ci --------------------------------------------------------
+# Condition (15) demoted to a warning (the aggregator is required): the run armed, and the
+# DM must name the red check under the READY verdict without turning it into a hold.
+begin_case
+_dm_result_case 511 'RESULT: terminal=shipped-armed' <<'RJSON'
+{
+  "terminal": "shipped-armed",
+  "arm": {"armed": true, "conditions": [
+    {"number": 15, "name": "red-ci-check", "blocked": false, "reason": "",
+     "warning": "red CI check(s): pytest (stdlib harness) — arming anyway; the required 'All checks green' context keeps the merge blocked until green"}
+  ]},
+  "fidelity": {"verdict_1": "READY", "verdict_2": null, "rounds": [],
+    "reviewed_tree_2": null, "error_kind": null, "remediation_sha": null}
+}
+RJSON
+[[ -f "$_DM_CAPTURE" ]] || fail "dm-armed-warns-red-ci: no DM sent"
+grep -qF '⚠ red CI check(s): pytest (stdlib harness)' "$_DM_CAPTURE" \
+    || fail "dm-armed-warns-red-ci: warning line missing ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+grep -q 'RESULT READY' "$_DM_CAPTURE" \
+    || fail "dm-armed-warns-red-ci: armed run not reported READY"
+grep -q "merge when you're ready" "$_DM_CAPTURE" \
+    || fail "dm-armed-warns-red-ci: armed READY missing 'merge when you're ready'"
+! grep -q 'HELD' "$_DM_CAPTURE" \
+    || fail "dm-armed-warns-red-ci: a warning was reported as a hold"
+! grep -qF '• ' "$_DM_CAPTURE" \
+    || fail "dm-armed-warns-red-ci: a warning became a hold bullet"
+end_case dm-armed-warns-red-ci
+
+# --- case 51a2: dm-armed-empty-warning-silent --------------------------------------------
+begin_case
+_dm_result_case 512 'RESULT: terminal=shipped-armed' <<'RJSON'
+{
+  "terminal": "shipped-armed",
+  "arm": {"armed": true, "conditions": [
+    {"number": 15, "name": "red-ci-check", "blocked": false, "reason": "", "warning": ""}
+  ]},
+  "fidelity": {"verdict_1": "READY", "verdict_2": null, "rounds": [],
+    "reviewed_tree_2": null, "error_kind": null, "remediation_sha": null}
+}
+RJSON
+[[ -f "$_DM_CAPTURE" ]] || fail "dm-armed-empty-warning-silent: no DM sent"
+grep -q 'RESULT READY' "$_DM_CAPTURE" \
+    || fail "dm-armed-empty-warning-silent: armed run not reported READY ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -qF '⚠' "$_DM_CAPTURE" \
+    || fail "dm-armed-empty-warning-silent: an empty warning printed a line"
+end_case dm-armed-empty-warning-silent
 
 # --- case 51b: dm-links-pr-and-title-and-bail-fix ----------------------------------------
 # The gh lookup succeeds: PR number and title both link to the PR, with no embed.
@@ -2544,6 +2597,65 @@ grep -q 'TIMED OUT after 90m' "$_DM_LOG" || fail "fleet-outcome-line: rc 124 log
 grep -q 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
     || fail "fleet-outcome-line: rc 124 DM lacks TIMED OUT ($(cat "$_DM_CAPTURE" 2>/dev/null))"
 end_case fleet-outcome-line
+
+# --- case 23: usage-gate-paused ----------------------------------------------------------
+# ADR-0143: a worktree holding a post-plan run paused by the usage gate is skipped (no
+# fire, no slot), and a log ending in "RESULT paused" renders PAUSED in the report.
+begin_case
+clean_slots
+export IBL5_USAGE_GATE_STATE_DIR="$SCRATCH/gate-state"
+rm -rf "$IBL5_USAGE_GATE_STATE_DIR"; mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
+_PW="$SCRATCH/wt-paused"
+mkdir -p "$_PW/bin"; git init -q "$_PW"; : > "$_PW/bin/post-plan-now"; chmod +x "$_PW/bin/post-plan-now"
+( . "$SCRIPT_DIR/lib/usage-gate.sh"; usage_marker_write "dddddddd-4444-4444-8444-dddddddddddd" \
+    post-plan-now "$_PW/bin/post-plan-now" usage-pause drain 94 five_hour "" ) >/dev/null 2>&1 \
+    || fail "usage-gate-paused: could not write the fixture marker"
+cat > "$SCRATCH/gate-wtl.txt" <<EOF
+$_PW                                            5555555 [pp-paused]
+/Users/x/GitHub/IBL5-worktrees/free-slug/ibl5   6666666 [pp-free]
+/Users/x/GitHub/IBL5-worktrees/logp-slug/ibl5   7777777 [pp-logpaused]
+EOF
+cat > "$SCRATCH/gate-open.json" <<'JSON'
+[
+  {"number": 3101, "title": "paused",    "isDraft": false, "headRefName": "pp-paused",    "author": {"login": "a-jay85"}},
+  {"number": 3102, "title": "free",      "isDraft": false, "headRefName": "pp-free",      "author": {"login": "a-jay85"}},
+  {"number": 3103, "title": "log-paused", "isDraft": false, "headRefName": "pp-logpaused", "author": {"login": "a-jay85"}}
+]
+JSON
+_rdate="$(date +%F)"
+rm -f /tmp/post-plan-fleet-310{1,2,3}.log
+TMP_LOGS+=("/tmp/post-plan-fleet-3101.log" "/tmp/post-plan-fleet-3102.log" "/tmp/post-plan-fleet-3103.log")
+printf '%s\n' 'RESULT: post-plan PAUSED at review (usage gate); the usage-gate coordinator resumes it after the reset.' \
+  'post-plan-now: RESULT paused (usage gate); auto-resumes after reset.' > /tmp/post-plan-fleet-3103.log
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/gate-open.json" POST_PLAN_FLEET_WTL="$SCRATCH/gate-wtl.txt" \
+       POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --jobs 5 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "usage-gate-paused: exit $rc (out: $out)"
+grep -E '^3101 ' <<< "$out" | grep -qF 'post-plan paused by usage gate; coordinator resumes it' \
+    || fail "usage-gate-paused: PR 3101 has no paused SKIP line (out: $out)"
+[[ ! -f "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-3101.plist" ]] \
+    || fail "usage-gate-paused: the paused PR 3101 was fired"
+[[ -f "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-3102.plist" ]] \
+    || fail "usage-gate-paused: the free PR 3102 did not fire"
+[[ "$(plist_count)" -eq 2 ]] || fail "usage-gate-paused: $(plist_count) plist(s), want 2 (3102, 3103)"
+rp="$SCRATCH/claude-plans/_reports/ibl5/firstpass/pr-firstpass-${_rdate}.md"
+[[ -f "$rp" ]] || fail "usage-gate-paused: report not found at $rp"
+grep '3101' "$rp" | grep -qF 'SKIPPED (post-plan paused by usage gate' \
+    || fail "usage-gate-paused: report lacks the SKIPPED row for 3101"
+grep '3103' "$rp" | grep -qF '| PAUSED (usage gate; auto-resumes) |' \
+    || fail "usage-gate-paused: a 'RESULT paused' log did not render PAUSED"
+grep '3102' "$rp" | grep -qF 'PAUSED' \
+    && fail "usage-gate-paused: the unpaused PR 3102 rendered PAUSED"
+# Negative: with no marker the same PR fires.
+clean_slots
+rm -rf "$IBL5_USAGE_GATE_STATE_DIR/markers"
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/gate-open.json" POST_PLAN_FLEET_WTL="$SCRATCH/gate-wtl.txt" \
+       POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --jobs 5 2>&1)"; rc=$?
+[[ -f "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-3101.plist" ]] \
+    || fail "usage-gate-paused: with no marker PR 3101 did not fire (out: $out)"
+grep -qF 'paused by usage gate' <<< "$out" && fail "usage-gate-paused: SKIP line printed with no marker"
+clean_slots
+unset IBL5_USAGE_GATE_STATE_DIR
+end_case usage-gate-paused
 
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then

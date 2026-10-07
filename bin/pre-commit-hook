@@ -12,6 +12,27 @@
 # branch's commits UNION the index, so it runs whenever origin/master resolves.
 # codebase-map.md is regenerated on master by the regen-codebase-map job in tests.yml, never here.
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/pre-commit-hook
+
+Git pre-commit gate body (version-controlled). Installed by bin/install-git-hooks
+as a thin shim in the COMMON git hooks directory; exec'd automatically on every
+commit. Not typically invoked directly.
+
+Checks run on every commit (gated on what is staged):
+  - Regenerate codebase map when ibl5/classes/*.php files are staged.
+  - Enforce gofmt on staged Go files.
+  - Validate doc frontmatter and references when .md files are staged.
+  - Enforce on-touch last_verified bump for changed docs.
+  - Enforce rules byte budget.
+  - Check for a required ADR on this branch (scoped to branch commits + index).
+
+Exit codes: 0 all checks passed, 1 a check failed (commit is blocked).
+EOF
+    exit 0
+fi
+
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 # Enforce gofmt on staged Go files.

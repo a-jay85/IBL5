@@ -1,6 +1,6 @@
 ---
-description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; backlog closing keywords come from the plan via the shared normalizer snippet."
-last_verified: 2026-09-28
+description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet."
+last_verified: 2026-09-29
 ---
 
 # PR Body Claims
@@ -58,8 +58,57 @@ fine and normal — say so accurately. The defect is a stale absence assertion, 
 Applies to any residual / out-of-scope / follow-up list under any heading wording, not only
 the literal string "What is NOT in this PR".
 
-**Headless:** applies — an automouse or `/post-plan` run authoring a PR body performs the same
+**Headless.** Applies: an automouse or `/post-plan` run authoring a PR body performs the same
 re-read; there is no human in the loop to catch the stale bullet later.
+
+## Coordinate-citation re-check rule
+
+A PR body that cites a coordinate points at a spot that later commits can move. Coordinates are a `path:line` or `path:start-end` reference and a backlog row or entry ID such as `(see L51)`. A commit that adds or removes lines above the cited spot shifts the line numbers. A commit that renumbers backlog rows changes the IDs. Nothing recomputes the body, so it keeps the stale number.
+
+After every commit pushed to an open PR, re-verify each coordinate the body cites in a file that commit touched. Open the file at the PR head and confirm the cited line still holds what the prose says it holds. Update the number, or replace it with a symbol or heading anchor that does not drift.
+
+| What the commit did | What to do |
+|---|---|
+| Touched a file the body cites by line | Re-read each cited line at the new head; fix any that moved |
+| Renumbered or renamed backlog rows | Re-check every row ID the body and any archive cross-reference cite |
+| Touched no cited file | Nothing to do |
+
+Prefer a function name or heading over a line number when the prose allows it. A symbol survives a rebase and a line number does not.
+
+This rule has no mechanical check. Prose numbers are free-form, and a scan for `:<N>` would flag too many honest lines. Trigger: L59, PR #2083 (row IDs `L51`/`L52` and `push.sh:55` cited after a later commit moved them).
+
+**Headless.** Applies: an automouse or `/post-plan` remediation commit re-verifies the body's coordinates before the push is done.
+
+## Summary re-check rule
+
+The `## Summary` makes claims about files the diff touches. A commit pushed after the body was written can change one of those files and make a Summary sentence false. Nothing re-reads the Summary.
+
+After every commit pushed to an open PR, check whether the commit touched a file the `## Summary` names. If it did, re-read each Summary sentence about that file against the new diff. Fix any sentence that is no longer true.
+
+| What the commit did | What to do |
+|---|---|
+| Touched a file the Summary names | Re-read the Summary sentences about that file; rewrite any the diff overtook |
+| Touched no file the Summary names | Nothing to do |
+
+Trigger: L70, PR #2131.
+
+**Headless.** Applies: an automouse or `/post-plan` post-review commit re-reads the Summary before the push is done.
+
+## Measured-value rule
+
+When a plan phase measures a value that the PR body also states, update the PR body in that same phase. Values include counts, sizes, and durations. Write the measured figure and name it as measured, for example "626 rows (measured by the dry run; the planning estimate was ~772)". Recording the figure only in the archive leaves the body with the stale planning estimate.
+
+Trigger: L51, PR #2108 (dry-run blast radius measured at ~626, body kept the ~772 estimate).
+
+**Headless.** Applies: the phase that takes the measurement edits the body before the phase closes.
+
+## Exact-content deviation rule
+
+A plan can mark content as exact or verbatim. When the diff drops, compresses, or rewrites that content, the PR body declares the deviation in its scope section. Give each deviation one line with the reason, for example "`rule.md` is ~1.2 KB, not the plan's ~4.5 KB recipe; the examples section was dropped to fit the byte budget." An undeclared departure reads as a faithful copy of the recipe.
+
+Trigger: L71, PR #2131 (rule doc compressed to ~1.2 KB against a ~4.5 KB exact-content recipe, one section dropped, body silent).
+
+**Headless.** Applies: an autonomous implementation that departs from an exact recipe states the departure in the body it authors.
 
 ## External-state evidence rule
 
@@ -72,7 +121,7 @@ Every such claim carries its evidence inline, in one of two forms:
 
 If you cannot produce the evidence, drop the claim. Describe what the PR changes, and name the command a reviewer runs after merge to confirm the state: "After merge, `launchctl list | grep <label>` shows the job." A present-tense external-state claim with no evidence is a fabricated claim, and the reviewer treats it as one.
 
-This rule has no mechanical check. The claims it covers are free-form prose, and the same phrases appear in design descriptions and quoted plans, so a pattern match would flag too many honest lines. Facts derivable from the diff are generated for you: the `**Files changed**` and `**Tests changed**` blocks come from `git diff`, so never restate them by hand.
+This rule has no mechanical check. The claims it covers are free-form prose, and the same phrases appear in design descriptions and quoted plans, so a pattern match would flag too many honest lines. Facts derivable from the diff are generated for you: the `**Files changed**` and `**Tests changed**` blocks come from `git diff`, so never restate them by hand. The `<!-- merge-digest:begin -->` block at the top of the body is runner-owned: it mirrors the sticky verdict, so never edit it by hand.
 
 ## Backlog issue references
 
@@ -133,13 +182,24 @@ What the snippet guarantees:
 
 ## Declared scope
 
-A `## Declared scope` section lists `.claude/` paths this PR edits on purpose that the plan's `## Critical Files` section does not name. Phase 5.0's diff→plan conformance check reads this section and dismisses any path it finds there. One path per bullet, backticked or bare, repo-root-relative:
+A `## Declared scope` section lists paths this PR edits on purpose that the plan names nowhere: in neither its `## Critical Files` section nor a Verification Matrix test path. Any directory counts. Phase 5.0's diff→plan conformance check (`bin/lib/plan-scope-conformance`) reads this section and dismisses every path it finds there. One path per bullet, backticked or bare, repo-root-relative. A token of two or more segments ending in `/` (for example `ibl5/classes/Foo/` (example)) declares every path below it; a one-segment token such as `ibl5/` declares nothing.
 
 ```markdown
 ## Declared scope
 
 - `.claude/rules/doc-freshness.md` (frontmatter bump forced by the on-touch rule)
 - `.claude/agents/sonnet-5-5.md` (tool list corrected while adjacent)
+- `ibl5/classes/Updater/ScheduleUpdater.php` (Playoffs-phase guard added while fixing the schedule import)
 ```
 
-The extraction is section-bounded. It starts at the `## Declared scope` heading and stops at the next `## ` heading, so a `.claude/` path mentioned elsewhere in the PR body dismisses nothing. Write a reason on each bullet for the reviewer; the check reads only the path.
+The extraction is section-bounded. It starts at the `## Declared scope` heading and stops at the next `## ` heading, so a path mentioned elsewhere in the PR body dismisses nothing. Generated marker spans (`<!-- files-changed:begin -->` through `<!-- files-changed:end -->`, and every other `<!-- name:begin -->` / `<!-- name:end -->` pair) are stripped before the section is read, so the generated block never declares anything, even when it sits under this heading. Write a reason on each bullet for the reviewer; the check reads only the path.
+
+## Plan gaps
+
+A `## Plan gaps` section lists must-appear `## Critical Files` paths the diff does not touch. Write one bullet per path with the reason: cut from scope, deferred to a named follow-up, or already shipped before the branch was cut (cite the PR). A bullet answers the advisory `SCOPE-NOTE: gap` line for that path. The `MISSING-FILE:` item keeps its own resolution rule in `_phase-5-final-verification.md`.
+
+```markdown
+## Plan gaps
+
+- `ibl5/docs/decisions/0074-example.md` (already refreshed by #2036 before this branch was cut)
+```

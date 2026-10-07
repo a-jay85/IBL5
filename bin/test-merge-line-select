@@ -198,6 +198,28 @@ for pending_ctx in \
     assert_match "N2-pending-not-red skipped empty ($pending_ctx)" '^skipped=$' "$OUT"
 done
 
+# crt <name> <status> <conclusion|null> <completedAt|null> — CheckRun with a timestamp.
+crt() {
+    cr "$1" "$2" "$3" | jq -c --arg at "$4" '. + {completedAt: (if $at == "null" then null else $at end)}'
+}
+
+# N4: a re-run leaves the old failing run in the rollup. The newest run wins,
+# wherever it sits in the rollup order.
+run_sel "$(snapshot "$(pr_node 1 false master "$T6" BEHIND MERGEABLE \
+    "$(ctxs "$(crt human-signoff COMPLETED SUCCESS "$T8")" "$(crt human-signoff COMPLETED FAILURE "$T6")")")")"
+assert_match "N4-superseded-red head" '^head=1$' "$OUT"
+assert_match "N4-superseded-red action" '^action=update$' "$OUT"
+assert_match "N4-superseded-red skipped empty" '^skipped=$' "$OUT"
+
+run_sel "$(snapshot "$(pr_node 1 false master "$T6" BEHIND MERGEABLE \
+    "$(ctxs "$(crt human-signoff COMPLETED FAILURE "$T6")" "$(crt human-signoff IN_PROGRESS null null)")")")"
+assert_match "N4-rerun-in-progress not red" '^skipped=$' "$OUT"
+
+# C9: the reverse. An old pass does not hide a newer failure.
+run_sel "$(snapshot "$(pr_node 1 false master "$T6" BEHIND MERGEABLE \
+    "$(ctxs "$(crt human-signoff COMPLETED FAILURE "$T8")" "$(crt human-signoff COMPLETED SUCCESS "$T6")")")")"
+assert_match "C9-newer-red skipped" '^skipped=1:red$' "$OUT"
+
 N3_SNAP="$(snapshot \
     "$(pr_node 1 true master "$T6" BEHIND MERGEABLE "$NOCTX")" \
     "$(pr_node 2 false feature-x "$T7" BEHIND MERGEABLE "$NOCTX")" \

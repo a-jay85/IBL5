@@ -25,10 +25,30 @@
 #   4. otherwise                                               -> missing
 #   A row is flagged UNREALISED-ASSERTION when any qualifying token is missing.
 #   Qualifying tokens: single-word (no whitespace), no `...` or `<word>` spans,
-#   not already in a tracked file (arm 3 above — tokens found in the tree are pre-existing).
-#   A row with zero qualifying tokens is skipped entirely.
+#   not already in a tracked file (arm 3 above — tokens found in the tree are
+#   pre-existing). A row with zero qualifying tokens is skipped entirely.
+#   Scenario notation `name=value` (`current_tree=T2`, `VAR=1`) is cut at the
+#   first `=` and only `name` is checked; a token starting with `=` is dropped.
+#
+#   Prefix fallbacks (same three arms, run on a prefix of the token):
+#   - glob token `name_*`     -> prefix is the text before the first `*`;
+#                                realised/pre-existing when the prefix is found,
+#                                missing otherwise (checked before arm 1)
+#   - call token `name(a)`    -> after arms 1-3 miss, retry with the trailing `)`
+#                                stripped, so `name(a, b)` in the code realises it
+#   - expansion `${VAR}`      -> after arms 1-3 miss, retry with the trailing `}`
+#                                stripped, so `${VAR:-}` in the code realises it
 #
 # Waiver format: `WAIVE-MATRIX-ROW: <id>` on any line in the PR body file.
+#
+# One-time-check tag: a row whose "What to verify" cell ENDS with
+#   (one-time-check: <reason>)
+# is skipped, and `ONE-TIME-CHECK: row <id> -- skipped (<reason>)` is printed on stdout.
+# Honored only when: the tag is the last text in the cell, <reason> is >= 15 chars with
+# no `(` `)` `|` or backtick, and the row's Test type cell reads exactly CLI-executable.
+# Any other mention of `one-time-check` in the cell is ignored fail-closed: the row is
+# checked as untagged and `ONE-TIME-CHECK-IGNORED: row <id> -- <why>` goes to stderr.
+# Neither line starts with `UNREALISED-ASSERTION:`, which every caller greps for.
 
 set -euo pipefail
 set -f
@@ -93,8 +113,9 @@ fi
 # --- extract rows from the Verification Matrix (awk, BSD-awk safe) ---
 # Skips rows inside fenced blocks (``` or ~~~).
 # Skips duplicate row ids (same row can appear multiple times in the plan).
-# Output: id TAB cell TAB space-joined qualifying tokens
-# Rows with zero qualifying tokens are not printed.
+# Output: id TAB tag TAB cell TAB space-joined qualifying tokens
+# tag is "none", "skip:<reason>" or "warn:<why>" (one-time-check tag, see header).
+# Rows with zero qualifying tokens and no tag are not printed.
 awk -F'|' '
 BEGIN { fence=0; inm=0; }
 /^[[:space:]]*(```|~~~)/ {
@@ -118,6 +139,24 @@ inm && /^[[:space:]]*\|/ {
     # skip already-seen id
     if (seen[id]) next;
     seen[id] = 1;
+    # one-time-check tag: fourth output field, "skip:<reason>" | "warn:<why>" | ""
+    tag = "";
+    if (cell ~ /one-time-check/) {
+        typ = (n >= 4) ? f[4] : ""; gsub(/^[[:space:]]+|[[:space:]]+$/, "", typ);
+        if (match(cell, /\(one-time-check: [^()|`]*\)$/)) {
+            reason = substr(cell, RSTART + 17, RLENGTH - 18);
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", reason);
+            if (length(reason) < 15) {
+                tag = "warn:reason shorter than 15 chars; row checked";
+            } else if (typ != "CLI-executable") {
+                tag = "warn:test type is " typ ", tag honored only on CLI-executable; row checked";
+            } else {
+                tag = "skip:" reason;
+            }
+        } else {
+            tag = "warn:malformed tag (expected trailing \"(one-time-check: <reason>)\"); row checked";
+        }
+    }
     # extract closed single-word backtick tokens
     toks = "";
     n2 = split(cell, parts, "`");
@@ -126,26 +165,68 @@ inm && /^[[:space:]]*\|/ {
         if (t == "") continue;
         # single-word: no whitespace
         if (t ~ /[[:space:]]/) continue;
+        # scenario notation (name=value): check only the name
+        sub(/=.*/, "", t);
+        if (t == "") continue;
         toks = (toks == "") ? t : toks " " t;
     }
-    if (toks != "") print id "\t" cell "\t" toks;
+    # tag is never empty on the wire ("none"): tab is IFS whitespace, so an empty
+    # field would collapse in `read` and shift the later fields left.
+    if (toks != "" || tag != "") print id "\t" (tag == "" ? "none" : tag) "\t" cell "\t" toks;
     next;
 }
 inm && !/^[[:space:]]*\|/ { inm=0; }
 ' "$PLAN_FILE" > "$TMP/rows"
 
+# --- prefix ladder: the same three arms, run on a prefix of a token ---
+# File operands and git-grep only: no pipe into grep -q, so no SIGPIPE under pipefail.
+_prefix_realised() {
+    local p="$1"
+    if grep -qF -e "$p" "$TMP/plus" 2>/dev/null; then return 0; fi
+    if grep -qF -e "$p" "$TMP/ctx" 2>/dev/null; then return 0; fi
+    if [ -n "$ROOT" ]; then
+        if git -C "$ROOT" grep -qF -e "$p" -- 2>/dev/null; then return 0; fi
+    fi
+    return 1
+}
+
 # --- per-row check ---
-while IFS=$'\t' read -r id cell toks; do
+while IFS=$'\t' read -r id tag cell toks; do
     # check waiver
     if grep -qxF -e "$id" "$TMP/waived" 2>/dev/null; then
         continue
     fi
+
+    # one-time-check tag (see header): skip, or warn and fall through fail-closed
+    case "$tag" in
+        skip:*)
+            printf $'ONE-TIME-CHECK: row %s \xe2\x80\x94 skipped (%s)\n' "$id" "${tag#skip:}"
+            continue
+            ;;
+        warn:*)
+            printf $'ONE-TIME-CHECK-IGNORED: row %s \xe2\x80\x94 %s\n' "$id" "${tag#warn:}" >&2
+            ;;
+    esac
+    [ -n "$toks" ] || continue
 
     missing=""
     for tok in $toks; do
         # filter: drop tokens with placeholder chars (... or <word>)
         case "$tok" in
             *...* | *\<*\>* ) continue ;;
+        esac
+
+        # class 3: glob token. Prefix-match the text before the first `*`;
+        # grep -F cannot match a glob, so the whole-token arms never fire here.
+        case "$tok" in
+            *\** )
+                tok_prefix="${tok%%\**}"
+                if [ -n "$tok_prefix" ] && _prefix_realised "$tok_prefix"; then
+                    continue
+                fi
+                missing="$missing $tok"
+                continue
+                ;;
         esac
 
         # arm 1: present in a plus line -> realised
@@ -164,6 +245,26 @@ while IFS=$'\t' read -r id cell toks; do
                 continue
             fi
         fi
+
+        # class 1: multi-arg call. `name(a)` is realised by `name(a, b)`;
+        # retry the three arms with the trailing `)` stripped.
+        case "$tok" in
+            ?*\(*\) )
+                if _prefix_realised "${tok%\)}"; then
+                    continue
+                fi
+                ;;
+        esac
+
+        # class 2: shell default operator. `${VAR}` is realised by `${VAR:-}`;
+        # retry the three arms with the trailing `}` stripped.
+        case "$tok" in
+            \$\{*\} )
+                if _prefix_realised "${tok%\}}"; then
+                    continue
+                fi
+                ;;
+        esac
 
         # arm 4: missing
         missing="$missing $tok"

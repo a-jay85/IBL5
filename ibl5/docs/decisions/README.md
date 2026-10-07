@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-09-29
+last_verified: 2026-10-01
 ---
 
 # IBL5 Architecture Decision Records
@@ -55,6 +55,12 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0131](0131-ci-tree-hash-memoization.md) | CI tree-hash memoization of heavy jobs | Accepted | Heavy jobs in `Tests and Analysis` and `E2E Tests` skip when the HEAD tree over a declared input path set already passed; key from `bin/ci-memo`, sentinel in `actions/cache`, written only by a clean `gate`; PR-only, with the GHCR image manifest folded into the e2e key. |
 | [0138](0138-adr-draft-at-commit-site.md) | ADR auto-draft fires at the Phase 2 commit site | Accepted | `bin/adr-check` gains a `--commit` mode scoped to this branch's commits since the merge-base union the index; `bin/pre-commit-hook` runs it as a hard gate printing `pre-commit-adr-gate:`; the harness drafts a missing ADR before `commit_all()` and stages it into the Phase 2 commit, with the push-site arm kept as the Phase 5.5 backstop. |
 | [0144](0144-baseline-drift-merge-base-gate.md) | Baseline drift gate compares against the merge-base | Accepted | `ibl5/bin/check-baseline-drift` fails when a PR's count exceeds `ceiling = min(snap, baseNeon + max(0, snap - baseSnap))`, so the gate only tightens versus ADR-0018. `--update` only raises the counts JSON, so shrink PRs leave it untouched, and only master's `update-baselines` job lowers it with `--sync`. The `phpstan` job fetches full history and passes `--base`. |
+| [0142](0142-launchd-health-check.md) | Daily and at-login health check for com.ibl5 launchd jobs | Accepted | `bin/launchd-health-check` checks all nine long-lived jobs, Docker, and containers against `bin/lib/launchd-expected-jobs.sh` (the single SSOT), DMing new problems once per day via stamp-file dedup; `bin/launchd-health-cron-setup` installs the two plists; both harnesses run in `.github/workflows/tests.yml`. |
+| [0145](0145-mutation-pr-required-own-workflow.md) | `Infection PHP (per-PR diff)` required, in its own workflow | Accepted | The per-PR mutation job moves to `mutation-pr.yml` with no `labeled` type, no filters, and no job-level `if:`, so it reports on every PR; `bin/check-composite-contracts` M1-M4 pin that; protection gains the context by a manual append-only POST checked by `--protection-readback`. |
+| [0147](0147-auto-mergeable-label.md) | Advisory `auto-mergeable` PR label | Accepted | `.github/workflows/auto-mergeable-label.yml` adds the label when auto-merge is armed and `hs_pr_cleared` passes, and removes it otherwise; it reuses `bin/lib/human-signoff-classifier.sh` so it cannot drift from the gate; no gate reads the label. |
+| [0146](0146-discord-dev-webhook-notify.md) | Owner notices post to a #dev channel webhook with an opt-in ping | Accepted | `bin/discord-dm` and the notify-discord action post owner-bound notices to a private #dev webhook; `--ping` / `ping: true` @mentions the owner on failures only; other recipients and `--raw --route` stay on the IBLbot DM; `bin/test-discord-dm` pins the 15 call sites and the ping set. |
+| [0152](0152-pull-prod-db-dumps-offsite-to-mac.md) | Pull prod DB dumps offsite to the owner's Mac | Accepted | `bin/db-backups-pull` rsyncs the nightly dumps to `~/Backups/ibl5-db` daily without `--delete`. It keeps 30 dailies plus each month's first, and DMs when the newest dump is over 36 hours old. |
+| [0156](0156-postplan-harness-concurrency-disclosure.md) | Disclose fail-fast changes in post-plan harness concurrency PRs | Accepted | A harness change that adds or alters concurrency names the failure-timing change in its PR body and tests every enabled agent path in submission order; path-scoped rule `.claude/rules/post-plan-concurrency-docs.md`, enforced by review only. |
 
 ## When an ADR is Required
 

@@ -65,7 +65,7 @@ final class FreeAgencyUnderContractSectionView implements FreeAgencyUnderContrac
         ?>
         <tr>
             <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
-            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->getPlayerID() ?? 0, $playerName) ?>
+            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->getPlayerID() ?? 0, $playerName, 'sticky-col') ?>
             <td><?= HtmlSanitizer::e($player->getAge() ?? 0) ?></td>
             <?= HtmlSanitizer::trusted($this->tableRenderer->renderPlayerRatings($player)) ?>
             <td class="col-salary"><?= HtmlSanitizer::e($futureSalaries[0]) ?></td>
@@ -103,7 +103,7 @@ final class FreeAgencyUnderContractSectionView implements FreeAgencyUnderContrac
         ?>
         <tr>
             <td></td>
-            <?= PlayerImageHelper::renderFlexiblePlayerCell(0, '| ' . $cashLabel) ?>
+            <?= PlayerImageHelper::renderFlexiblePlayerCell(0, '| ' . $cashLabel, 'sticky-col') ?>
             <td>0</td>
             <?= HtmlSanitizer::trusted($this->tableRenderer->renderPlayerRatings($cashPlayer)) ?>
             <td class="col-salary"><?= HtmlSanitizer::e($cashFutureSalaries[0]) ?></td>

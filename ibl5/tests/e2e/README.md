@@ -75,7 +75,7 @@ Tests that need authentication import from `./fixtures/auth.ts`. Tests for publi
 
 Visual regression tests use `vr-manifest.ts` as the single source of truth for which modules, viewports, states, and HTMX tabs are screenshot-tested. The spec (`smoke/visual-regression.spec.ts`) reads the manifest and generates tests automatically.
 
-To add a module: add a `VrRow` entry to `VR_MANIFEST` in `vr-manifest.ts`. Run `bin/check-vr-coverage` to see coverage gaps.
+To add a module: add a `VrRow` entry to `VR_MANIFEST` in `vr-manifest.ts`. CI reports coverage gaps for changed files through `bin/vr-changed-coverage`.
 
 ## Troubleshooting
 

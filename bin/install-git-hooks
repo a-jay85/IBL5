@@ -31,6 +31,26 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/install-git-hooks
+
+Install the pre-commit gate, pre-push ADR decision-trigger gate, and CSS
+auto-heal trigger into the COMMON git hooks directory. Copies thin shims
+into $(git rev-parse --git-common-dir)/hooks so a single install covers
+every worktree.
+
+No arguments accepted. Idempotent: safe to re-run; existing shims are
+rewritten in place and a pre-existing non-shim hook is backed up once.
+
+Installed hooks:
+  pre-commit    Shim that exec's bin/pre-commit-hook (version-controlled).
+  pre-push      Chains git-lfs then exec's bin/pre-push-adr-hook.
+  post-checkout, post-merge, post-rewrite  CSS auto-heal trigger.
+EOF
+    exit 0
+fi
+
 PRECOMMIT_SENTINEL='# IBL5-PRECOMMIT-HOOK'
 
 HOOKS_DIR="$(git rev-parse --git-common-dir)/hooks"

@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/lib/plan-scope-conformance: plan-vs-diff scope conformance, both directions.
+#
+# Usage:
+#   bin/lib/plan-scope-conformance <plan-file> <changed-file> [<pr-body-file>] [<added-file>]
+#     <changed-file>  one repo-relative changed path per line (git diff --name-only)
+#     <pr-body-file>  absent or "" -> no declarations and no gap explanations (fail-closed)
+#     <added-file>    absent or "" -> no path counts as added, so nothing is exempt
+#   stdout: `UNPLANNED-FILE: <path> (...)` for an unaccounted `.claude/` path (holds),
+#           `SCOPE-NOTE: unplanned <path> (...)` for any other unaccounted path, and
+#           `SCOPE-NOTE: gap <path> (...)` for an unexplained must-appear gap.
+#           SCOPE-NOTE lines are advisory and never hold. A missing must-appear
+#           file already holds through `MISSING-FILE:`.
+#   exit 0 -> ran (with or without report lines; the caller decides severity)
+#   exit 2 -> usage error: $1 empty or unreadable, $2 empty or unreadable,
+#             $3 or $4 non-empty and unreadable
+#
+# Diff to plan: a changed path is accounted for by a `## Critical Files` entry
+# under EITHER parse verdict, a Verification Matrix test path, or a PR-body
+# `## Declared scope` bullet (a two-segment `dir/sub/` token declares its
+# subtree). A path the diff ADDED that matches bin/lib/plan-scope-exempt.txt is
+# exempt, except under `.claude/`. An unaccounted `.claude/` path prints
+# UNPLANNED-FILE:. Any other unaccounted path prints SCOPE-NOTE: unplanned.
+#
+# Plan to diff: a MUST_APPEAR Critical File absent from the changed list prints
+# SCOPE-NOTE: gap unless a PR-body `## Plan gaps` bullet names it. A
+# `## Plan gaps` bullet clears only that label, never MISSING-FILE:.
+#
+# Generated `<!-- name:begin -->` .. `<!-- name:end -->` spans are stripped from
+# the body before either section is read, so the files-changed block can never
+# declare the paths it lists. The helper reads no environment variable.
+
+set -euo pipefail
+set -f
+# Force the C locale: deterministic byte-wise matching across locales.
+export LC_ALL=C
+
+USAGE='Usage: bin/lib/plan-scope-conformance <plan-file> <changed-file> [<pr-body-file>] [<added-file>]'
+
+PLAN_FILE="${1:-}"
+CHANGED_ARG="${2:-}"
+BODY_ARG="${3:-}"
+ADDED_ARG="${4:-}"
+
+if [ -z "$PLAN_FILE" ] || [ ! -r "$PLAN_FILE" ]; then
+    echo "$USAGE" >&2
+    exit 2
+fi
+if [ -z "$CHANGED_ARG" ] || [ ! -r "$CHANGED_ARG" ]; then
+    echo "plan-scope-conformance: changed file not readable: $CHANGED_ARG" >&2
+    echo "$USAGE" >&2
+    exit 2
+fi
+if [ -n "$BODY_ARG" ] && [ ! -r "$BODY_ARG" ]; then
+    echo "plan-scope-conformance: body file not readable: $BODY_ARG" >&2
+    echo "$USAGE" >&2
+    exit 2
+fi
+if [ -n "$ADDED_ARG" ] && [ ! -r "$ADDED_ARG" ]; then
+    echo "plan-scope-conformance: added file not readable: $ADDED_ARG" >&2
+    echo "$USAGE" >&2
+    exit 2
+fi
+
+# Sibling path, so the harness can run this from the main checkout without a
+# `git rev-parse` in the target worktree.
+LIB_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=bin/lib/critical-files.sh
+source "$LIB_DIR/critical-files.sh"
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+strip_wt() { sed -E 's#^IBL5-worktrees/[^/]*/##'; }
+
+# --- planned set: Critical Files entries, BOTH verdicts ---
+# Never call cf_is_exempt here: an entry marked (reference) was still named by
+# the plan author, so filtering on it would report every reference as unplanned.
+cf_parse_section "$PLAN_FILE" > "$TMP/cf" || true
+sed -E 's/^(MUST_APPEAR|EXEMPT)://' "$TMP/cf" | strip_wt > "$TMP/planned-raw"
+
+# --- matrix test paths join the planned set ---
+# cf_section_named strips fenced blocks width-aware, so a scaffold row inside a
+# fence declares nothing. `\|` becomes the same \001 sentinel the Phase 5.0
+# CLI-row executor uses before the row is split.
+cf_section_named "$PLAN_FILE" "Verification Matrix" \
+    | awk -F'|' '
+        { gsub(/\\\|/, "\001") }
+        {
+            n = split($0, f, "|")
+            if (n < 7) next
+            if (f[4] !~ /PHPUnit|API-test|E2E|Visual-regression/) next
+            loc = f[6]
+            gsub(/[` \t]/, "", loc)
+            if (loc != "") print loc
+        }' | strip_wt >> "$TMP/planned-raw"
+sort -u "$TMP/planned-raw" > "$TMP/planned"
+
+# --- clean the body: drop every generated <!-- name:begin --> .. :end span ---
+: > "$TMP/body"
+if [ -n "$BODY_ARG" ]; then
+    awk '
+        !skip && /<!--[[:space:]]*[A-Za-z0-9_-]+:begin[[:space:]]*-->/ {
+            name = $0
+            sub(/^.*<!--[[:space:]]*/, "", name)
+            sub(/:begin.*$/, "", name)
+            skip = 1
+            if ($0 ~ ("<!--[[:space:]]*" name ":end[[:space:]]*-->")) skip = 0
+            next
+        }
+        skip {
+            if ($0 ~ ("<!--[[:space:]]*" name ":end[[:space:]]*-->")) skip = 0
+            next
+        }
+        { print }' "$BODY_ARG" > "$TMP/body"
+fi
+
+# section <heading> -> the body lines between `## <heading>` and the next `## `.
+section() {
+    awk -v want="$1" '
+        $0 ~ ("^##[[:space:]]+" want "[[:space:]]*$") {f=1; next}
+        /^##[[:space:]]/ {f=0}
+        f' "$TMP/body"
+}
+section "Declared scope" > "$TMP/declared"
+section "Plan gaps" > "$TMP/gaps"
+
+# --- directory tokens: two or more segments before the trailing slash ---
+# The slash must END the token. Without the terminator, a declared file bullet
+# `a/b/c.md` would yield `a/b/` and silently declare every sibling of c.md.
+grep -oE '[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)+/([^A-Za-z0-9._/-]|$)' "$TMP/declared" \
+    | sed -E 's#[^/]$##' > "$TMP/dirs" || true
+
+# --- exempt patterns (ADDED paths only, never .claude/) ---
+: > "$TMP/exempt"
+if [ -r "$LIB_DIR/plan-scope-exempt.txt" ]; then
+    grep -vE '^[[:space:]]*(#|$)' "$LIB_DIR/plan-scope-exempt.txt" > "$TMP/exempt" || true
+fi
+
+: > "$TMP/added"
+if [ -n "$ADDED_ARG" ]; then
+    strip_wt < "$ADDED_ARG" > "$TMP/added"
+fi
+
+# --- diff to plan ---
+strip_wt < "$CHANGED_ARG" | sed '/^[[:space:]]*$/d' | sort -u > "$TMP/changed"
+while IFS= read -r D; do
+    grep -qxF -- "$D" "$TMP/planned" && continue
+    grep -qF -- "$D" "$TMP/declared" && continue
+    covered=0
+    while IFS= read -r tok; do
+        case "$D" in "$tok"*) covered=1; break ;; esac
+    done < "$TMP/dirs"
+    [ "$covered" -eq 1 ] && continue
+    case "$D" in
+        .claude/*)
+            echo "UNPLANNED-FILE: $D (changed path that no plan Critical File, no matrix test path and no PR-body '## Declared scope' bullet accounts for)"
+            ;;
+        *)
+            if [ -s "$TMP/exempt" ] && grep -qxF -- "$D" "$TMP/added"; then
+                printf '%s\n' "$D" > "$TMP/probe"
+                grep -qEf "$TMP/exempt" "$TMP/probe" && continue
+            fi
+            echo "SCOPE-NOTE: unplanned $D (changed path that no plan Critical File, no matrix test path and no PR-body '## Declared scope' bullet accounts for)"
+            ;;
+    esac
+done < "$TMP/changed"
+
+# --- plan to diff: must-appear entries only ---
+sed -n 's/^MUST_APPEAR://p' "$TMP/cf" | strip_wt > "$TMP/must"
+while IFS= read -r CF; do
+    [ -z "$CF" ] && continue
+    grep -qF -- "$CF" "$CHANGED_ARG" && continue
+    grep -qF -- "$CF" "$TMP/gaps" && continue
+    echo "SCOPE-NOTE: gap $CF (must-appear plan Critical File absent from the diff, and no PR-body '## Plan gaps' bullet explains why)"
+done < "$TMP/must"

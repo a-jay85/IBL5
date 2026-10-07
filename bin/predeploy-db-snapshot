@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Usage: bin/predeploy-db-snapshot
+# Takes a full prod DB dump before a deploy that brings new migrations.
+# Runs ON the prod host from inside the www checkout, AFTER `git fetch` and
+# BEFORE `git reset --hard origin/production` (shipped + invoked by
+# .github/workflows/main.yml, step "Snapshot database before migrations").
+# Env: REMOTE_DATABASE (required when a dump is needed) PREDEPLOY_SNAPSHOT_DIR
+#      PREDEPLOY_DUMP_BIN PREDEPLOY_KEEP
+set -euo pipefail
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'HELP'
+Usage: bin/predeploy-db-snapshot
+
+Dump the prod database before a deploy applies new migrations, so a bad
+migration can be recovered from minutes-old data instead of the nightly dump.
+
+Run from inside the www checkout after `git fetch origin` and before
+`git reset --hard origin/production`. Does nothing when
+no new .sql files are added to ibl5/migrations/ in origin/production.
+
+Exits non-zero on any failure so the deploy stops before the code reset.
+
+Env vars:
+  REMOTE_DATABASE         Database name to dump (required when a dump is needed).
+  PREDEPLOY_SNAPSHOT_DIR  Output directory (default ~/backups/db-predeploy).
+                          Must not be backups/db: the nightly rotation and
+                          bin/db-sync-now glob ibl5-*.sql.gz there.
+  PREDEPLOY_DUMP_BIN      Dump binary (default mariadb-dump, else mysqldump).
+  PREDEPLOY_KEEP          Number of newest predeploy-*.sql.gz to keep (default 10).
+
+Restore: gunzip -c <file> | mysql <db>
+HELP
+    exit 0
+fi
+
+changed="$(git diff --name-only --diff-filter=A HEAD origin/production -- 'ibl5/migrations/*.sql')"
+if [ -z "$changed" ]; then
+    echo "no new migrations; skipping pre-deploy snapshot"
+    exit 0
+fi
+
+if [ -z "${REMOTE_DATABASE:-}" ]; then
+    echo "ERROR: REMOTE_DATABASE is not set; cannot take pre-deploy snapshot" >&2
+    exit 1
+fi
+
+DIR="${PREDEPLOY_SNAPSHOT_DIR:-$HOME/backups/db-predeploy}"
+KEEP="${PREDEPLOY_KEEP:-10}"
+if [ -n "${PREDEPLOY_DUMP_BIN:-}" ]; then
+    DUMP="$PREDEPLOY_DUMP_BIN"
+elif command -v mariadb-dump >/dev/null 2>&1; then
+    DUMP=mariadb-dump
+else
+    DUMP=mysqldump
+fi
+
+sha="$(git rev-parse --short origin/production)"
+stamp="$(date -u +%Y%m%d-%H%M%S)"
+mkdir -p "$DIR"
+final="$DIR/predeploy-${stamp}-${sha}.sql.gz"
+tmp="$final.tmp"
+trap 'rm -f "$tmp"' EXIT
+
+echo "new migrations detected:"
+printf '  %s\n' "${changed//$'\n'/$'\n  '}"
+echo "dumping $REMOTE_DATABASE to $final"
+
+# Host has local socket/.my.cnf auth. Flags match db-backup.yml.
+"$DUMP" --single-transaction --skip-lock-tables \
+    --routines --triggers "$REMOTE_DATABASE" \
+    | gzip > "$tmp"
+
+gzip -t "$tmp"
+mv "$tmp" "$final"
+
+# Rotation: keep the newest $KEEP, delete older (names sort by UTC timestamp).
+# shellcheck disable=SC2012
+ls -1 "$DIR"/predeploy-*.sql.gz 2>/dev/null | sort -r | tail -n +"$((KEEP + 1))" | while IFS= read -r old; do
+    rm -f "$old"
+done
+
+echo "pre-deploy snapshot complete: $final"

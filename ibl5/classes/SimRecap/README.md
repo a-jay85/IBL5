@@ -1,6 +1,6 @@
 ---
-description: Ingests externally-generated sim recap documents and queues them for the sim recap pipeline; RecapPhasePolicy gates generation to Regular Season only; SimRecapContextRepository precomputes roster context for generation.
-last_verified: 2026-08-10
+description: Ingests externally-generated sim recap documents and queues them for the sim recap pipeline; RecapPhasePolicy gates generation to HEAT and Regular Season; SimRecapContextRepository precomputes roster context for generation.
+last_verified: 2026-09-29
 ---
 
 # SimRecap
@@ -9,7 +9,7 @@ Handles the ingest of externally-generated simulation recap documents into the a
 
 | Class | Role |
 |---|---|
-| `RecapPhasePolicy` | Single source of truth for enabled phases (`ENABLED_PHASES = ['Regular Season']`); `isEnabled(string $phase): bool` |
+| `RecapPhasePolicy` | Single source of truth for enabled phases (`ENABLED_PHASES = ['HEAT', 'Regular Season']`); `isEnabled(string $phase): bool` |
 | `SimRecapPayload` | Parses and validates incoming recap documents |
 | `SimSummaryRepository` | Atomic queue operations, plus the write-time box-score join validation |
 | `SimSummariesView` | Renders sim recap summaries |

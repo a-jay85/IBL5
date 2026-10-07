@@ -29,6 +29,7 @@
 set -u
 
 RUN_SRC="${AUTOMOUSE_RUN_SRC:-$(cd "$(dirname "$0")/.." && pwd)/bin/automouse/run}"
+GATE_LIB="$(cd "$(dirname "$0")/.." && pwd)/bin/lib/usage-gate.sh"
 
 # --- Per-runner log isolation (portable: runs on Linux CI too) --------------
 # Two probe processes each eval the REAL runner's `LOG=` line (distinct $$),
@@ -47,6 +48,8 @@ n=$(grep -cE '^LOG="\$LOG_DIR/' "$RUN_SRC")
 [ "$n" -eq 1 ] || iso_fail "anchor /^LOG=\"\$LOG_DIR\// matched $n times (want 1)"
 {
     echo 'set -u'; echo 'LOG_DIR="$1"'
+    # phase_env_error delegates to the usage gate's predicate (ADR-0143).
+    printf '. "%s"\n' "$GATE_LIB"
     grep -E '^LOG="\$LOG_DIR/' "$RUN_SRC"
     iso_region phase_stalled
     iso_region phase_env_error
@@ -107,9 +110,57 @@ if [ "$(uname)" != "Darwin" ]; then
     exit 0
 fi
 
+# --- Paused-held locks (ADR-0143) -------------------------------------------
+# A claim lock whose owner pid is dead and whose mtime is past LOCK_TTL_SECS is normally
+# stolen. A `paused-held` breadcrumb naming a session that still has a pause marker
+# (or was cleared inside the TTL) keeps the lock: the usage gate will resume that session.
+PH="$(mktemp -d)"
+PH_SID="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"
+ph_probe() { # $1 = setup snippet; prints "claimed=<plan> rc=<n>"
+    (
+        set -u
+        export IBL5_USAGE_GATE_STATE_DIR="$PH/state"
+        rm -rf "$PH/state"
+        mkdir -p "$PH/state/markers" "$PH/state/cleared"
+        # These are read by the claim_next_plan body eval'd below.
+        # shellcheck disable=SC2034
+        QUEUE_DIR="$PH/queue"; LOG="$PH/log"; LOCK_TTL_SECS=60
+        # shellcheck disable=SC2034
+        CAP_DEFERRED=" "; DEPENDS_HELD=" "; SINGLE_PLAN=""; RESUME_PLAN=""; RESUME_SID=""
+        # shellcheck source=/dev/null
+        . "$GATE_LIB"
+        # claim_next_plan iterates queue_entries_ordered from lib-queue-order.
+        # shellcheck source=bin/automouse/lib-queue-order
+        . "$(dirname "$GATE_LIB")/../automouse/lib-queue-order"
+        eval "$(iso_region claim_next_plan)"
+        rm -rf "$QUEUE_DIR"; mkdir -p "$QUEUE_DIR"
+        : > "$QUEUE_DIR/held.md"
+        mkdir "$QUEUE_DIR/held.md.lock"
+        echo 999999 > "$QUEUE_DIR/held.md.lock/pid"
+        printf '%s\n' "$PH_SID" > "$QUEUE_DIR/held.md.lock/paused-held"
+        touch -t 202001010000 "$QUEUE_DIR/held.md.lock"
+        eval "$1"
+        out=$(claim_next_plan); rc=$?
+        printf 'claimed=%s rc=%s\n' "$(basename "$out")" "$rc"
+    )
+}
+out=$(ph_probe 'printf "{}" > "$IBL5_USAGE_GATE_STATE_DIR/markers/$PH_SID.json"')
+[ "$out" = "claimed= rc=1" ] && echo "PASS: paused-held lock with a live marker is not stolen" \
+    || { echo "FAIL: paused-held + marker: got '$out'"; exit 1; }
+out=$(ph_probe 'date +%s > "$IBL5_USAGE_GATE_STATE_DIR/cleared/$PH_SID"')
+[ "$out" = "claimed= rc=1" ] && echo "PASS: paused-held lock cleared inside the TTL is not stolen" \
+    || { echo "FAIL: paused-held + fresh cleared stamp: got '$out'"; exit 1; }
+out=$(ph_probe 'echo 1577836800 > "$IBL5_USAGE_GATE_STATE_DIR/cleared/$PH_SID"')
+[ "$out" = "claimed=held.md rc=0" ] && echo "PASS: paused-held lock cleared past the TTL is stolen" \
+    || { echo "FAIL: paused-held + old cleared stamp: got '$out'"; exit 1; }
+rm -rf "$PH"
+
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT="$(mktemp -d)"
 trap 'rm -rf "$ROOT"' EXIT
+# Never touch the real usage cache, keychain or markers: no token means fail-open.
+export IBL5_USAGE_GATE_STATE_DIR="$ROOT/usage-gate"
+mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
 
 NDIR="$ROOT/automouse"
 PLANS="$ROOT/plans"
@@ -196,10 +247,14 @@ sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
     -e "s#^PLANS_DIR=.*#PLANS_DIR=\"$PLANS\"#" \
     "$RUN_SRC" > "$RUNNER"
 chmod +x "$RUNNER"
+printf '#!/bin/sh\nexit 1\n' > "$STUBDIR/security"
+chmod +x "$STUBDIR/security"
 # The runner reads its impl prompt from $SELF_DIR/prompt-impl (same dir as the
 # run script). Copy the real prompt so `cat "$SELF_DIR/prompt-impl"` succeeds;
 # the stub claude ignores the content and only reads PLAN_FILE= from its args.
 cp "$REPO/bin/automouse/prompt-impl" "$ROOT/automouse/prompt-impl"
+# The runner also sources $SELF_DIR/lib-queue-order (queue_entries_ordered).
+cp "$REPO/bin/automouse/lib-queue-order" "$ROOT/automouse/lib-queue-order"
 
 RUN_DAY=$(date +%Y-%m-%d)
 echo "Seeded $N_PLANS plans. Launching two concurrent runners..."

@@ -35,6 +35,29 @@
 set -u
 export LC_ALL=C
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/pre-push-adr-hook
+
+Local pre-push ADR decision-trigger gate. Invoked by .git/hooks/pre-push.
+
+Checks whether the pushed branch adds a decision-trigger surface (new PHPStan
+rule, .claude/rules/*.md, CI workflow, destructive migration, a >=50-line bin/
+script, or a composer dependency) WITHOUT an accompanying ADR. Hard-blocks
+(exit 1) on a trigger without a resolution.
+
+Exit codes:
+  0  pass (no trigger, ADR present, bypass marker, or origin/master absent)
+  1  trigger found without ADR resolution, or unresolvable stacked base
+
+Bypass options:
+  Add an ADR under ibl5/docs/decisions/ (run: bin/next-adr "kebab-title").
+  Add a bypass marker in a commit message: <!-- no-adr: reason >= 15 chars -->
+  Override locally only: git push --no-verify
+EOF
+    exit 0
+fi
+
 # Resolve the repo root from THIS SCRIPT's own location (walk up for .git), so the
 # hook runs correctly from any worktree regardless of cwd.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

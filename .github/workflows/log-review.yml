@@ -85,8 +85,5 @@ jobs:
       - name: Send Discord DM
         uses: ./.github/actions/notify-discord
         with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
           fail-on-delivery: 'false'

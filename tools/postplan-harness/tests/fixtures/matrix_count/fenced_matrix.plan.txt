@@ -1,0 +1,15 @@
+# Docs only plan with a fenced illustrative matrix
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|----------------|-----------|--------|----------------------|
+| 1 | Wording reads correctly | Doc review | post-impl | `docs/x.md` |
+
+## Appendix
+
+```markdown
+| # | What to verify | Test type | Timing | Test file / location |
+|---|----------------|-----------|--------|----------------------|
+| 1 | Thing works | PHPUnit | pre-impl | `ibl5/tests/Foo/FooTest.php` |
+```

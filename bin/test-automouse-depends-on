@@ -458,6 +458,8 @@ mkdir -p "$E2_NDIR/queue" "$E2_NDIR/handoff" "$E2_NDIR/logs" \
 # file) and calls "$SELF_DIR/../post-plan-now" for postplan. The runner lives
 # in $E2_NDIR, so the post-plan-now stub goes in $E2_ROOT.
 ln -sf "$REPO_ROOT/bin/automouse/prompt-impl" "$E2_NDIR/prompt-impl"
+# The runner also sources $SELF_DIR/lib-queue-order (queue_entries_ordered).
+ln -sf "$REPO_ROOT/bin/automouse/lib-queue-order" "$E2_NDIR/lib-queue-order"
 
 # Rewritten runner: REPO→worktree, NIGHTLY_DIR→temp, PATH→stub first
 E2_RUNNER="$E2_NDIR/run"

@@ -23,7 +23,7 @@ test.describe('Admin page smoke tests', () => {
     // (20) QueueSimSummaryStep ran — its label renders at every phase (skipped
     // results go through renderStepComplete too), so this holds phase-independently.
     expect(body, 'updater output must render the sim recap step').toContain('Sim recap queued');
-    // (21) SimRecap\RecapPhasePolicy gates generation to Regular Season. This test
+    // (21) SimRecap\RecapPhasePolicy gates generation to HEAT and Regular Season. This test
     // deliberately never writes the phase row (see the describe comment), and the
     // preceding mutator spec (league-control-panel.spec.ts) restores it to the CI
     // seed default of Free Agency, so the step short-circuits here — no queue write,

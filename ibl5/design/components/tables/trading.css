@@ -128,53 +128,13 @@
     margin: 0.25rem 0;
 }
 
-/* Trading button variants (base .ibl-btn defined in forms.css) */
-.ibl-btn--primary {
-    background: var(--gradient-navy-header);
-    color: white;
-}
-
-.ibl-btn--primary:hover {
-    background: linear-gradient(135deg, var(--navy-700), var(--navy-800));
-}
-
-/* Submit button uses site accent orange */
+/* Submit button uses site accent orange (scoped override of forms.css .ibl-btn--primary) */
 .trading-layout__submit .ibl-btn--primary {
     background: var(--gradient-accent);
 }
 
 .trading-layout__submit .ibl-btn--primary:hover:not(:disabled) {
     background: linear-gradient(135deg, var(--accent-600), var(--accent-700, var(--accent-600)));
-}
-
-.ibl-btn--success {
-    background: linear-gradient(135deg, var(--success-500), var(--success-600));
-    color: white;
-}
-
-.ibl-btn--success:hover {
-    background: linear-gradient(135deg, var(--success-400), var(--success-500));
-}
-
-.ibl-btn--danger {
-    background: linear-gradient(135deg, var(--error-500), var(--error-600));
-    color: white;
-}
-
-.ibl-btn--danger:hover {
-    background: linear-gradient(135deg, var(--error-400), var(--error-500));
-}
-
-/* Link styling for Trading */
-.ibl-link {
-    color: var(--navy-700);
-    text-decoration: none;
-    font-weight: 500;
-    transition: color var(--transition-fast);
-}
-
-.ibl-link:hover {
-    color: var(--accent-500);
 }
 
 /* ---------- Trading layout: inline-style replacements ---------- */

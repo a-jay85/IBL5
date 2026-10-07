@@ -62,22 +62,11 @@ jobs:
           fi
           echo "alert=$ALERT" >> "$GITHUB_OUTPUT"
 
-      - name: Setup SSH
-        if: steps.build.outputs.alert == 'true'
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
       - name: Send Discord DM
         if: steps.build.outputs.alert == 'true'
         uses: ./.github/actions/notify-discord
         with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
 
   backstop:
     if: github.event_name == 'schedule'
@@ -106,19 +95,8 @@ jobs:
           fi
           echo "alert=$alert" >> "$GITHUB_OUTPUT"
 
-      - name: Setup SSH
-        if: steps.check.outputs.alert == 'true'
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
       - name: Send Discord DM
         if: steps.check.outputs.alert == 'true'
         uses: ./.github/actions/notify-discord
         with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}

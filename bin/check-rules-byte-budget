@@ -29,6 +29,32 @@
 # machine-readable statement of which rules are always-on. ~250 lines bash.
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-rules-byte-budget [--report-mode]
+
+CI gate: cap the byte size of always-loaded .claude/rules/*.md files.
+
+Modes:
+  (no args)      Gate mode — four checks, exits 1 on any violation (CI default).
+  --report-mode  Report mode — repo-wide dead-glob sweep only, JSON on stdout,
+                 always exits 0; no gate semantics.
+
+Checks:
+  1. Per-file cap: resident (no paths:) <= RULES_RESIDENT_BUDGET (default 5200 B);
+                   lazy (has paths:)    <= RULES_LAZY_BUDGET (default 16000 B).
+  2. Aggregate cap: total path-unscoped bytes <= RULES_TOTAL_BUDGET (default 16000 B).
+  3. Glob reachability: every paths: glob in a touched rules file matches a tracked file.
+  4. Resident stub references: every path-scoped rule is named by an always-on file.
+
+Env vars:
+  RULES_RESIDENT_BUDGET  per-file cap for always-loaded rules (default 5200)
+  RULES_LAZY_BUDGET      per-file cap for path-scoped rules (default 16000)
+  RULES_TOTAL_BUDGET     aggregate cap for path-unscoped rules (default 16000)
+EOF
+    exit 0
+fi
+
 # --report-mode: repo-wide dead-glob sweep for the nightly doc-freshness audit.
 # Prints ONE JSON array on stdout and exits 0 — no gate semantics, no exit 1.
 REPORT_MODE=0
@@ -268,6 +294,12 @@ One or more checks failed:
        unreachable). Restore the stub pointer in the always-on file.
 MSG
   exit 1
+fi
+
+# Early warning: resident aggregate >= 90% of budget (still under it). Warning only; exit stays 0.
+if (( total_bytes * 100 >= MAX_TOTAL * 90 )); then
+  printf 'WARNING: resident aggregate %d bytes is >= 90%% of the %d-byte budget; %d bytes of headroom left -- trim resident rules before adding more\n' \
+    "$total_bytes" "$MAX_TOTAL" $(( MAX_TOTAL - total_bytes )) >&2
 fi
 
 echo "OK: .claude/rules/*.md within budgets — resident per-file ${RESIDENT_MAX_BYTES}-byte cap, resident aggregate ${MAX_TOTAL}-byte budget (${total_bytes} bytes total), lazy per-file ${LAZY_MAX_BYTES}-byte cap"

@@ -67,8 +67,14 @@ def frontmatter_autonomy_contract(content: str) -> tuple[str, list[str], str]:
     (a body documenting the syntax can't self-select).
 
     error == "" means well-formed OR entirely absent. Mirror of the shell single
-    source of truth, bin/lib/plan-autonomy-contract; pinned by
-    tests/test_planfile.py::test_contract_lib_sync.
+    source of truth, bin/lib/plan-autonomy-contract, including its bash
+    IFS=',' splitting (one trailing comma tolerated, any other empty token
+    rejected) and its `..`-anywhere rejection. Accept/reject parity is pinned by
+    tests/test_planfile.py::test_contract_lib_sync and
+    test_contract_token_grammar_sweep. Semantic parity of the UNMET-CONTRACT
+    lines against the post-plan Phase 5.0d block is pinned by the "Phase 5.0d
+    TWO-WAY AGREEMENT" section of bin/test-postplan-arm-conditions. Change the
+    shell lib first, then this mirror, and run both.
     """
     lines = content.splitlines()
     if not lines or not re.match(r"^---\s*$", lines[0]):
@@ -96,15 +102,20 @@ def frontmatter_autonomy_contract(content: str) -> tuple[str, list[str], str]:
     # validate stop_condition enum
     if sc_norm not in _LEGAL_STOP_CONDITIONS:
         return ("", [], f"stop_condition: '{sc_norm}' is not a legal value")
-    # split evidence on comma, drop empty tokens
-    tokens = [t for t in ev_norm.split(",") if t]
-    if not tokens:
+    # split evidence on comma the way bash IFS=',' does: one trailing empty
+    # field is dropped ("a," is fine); any other empty field is rejected
+    if not ev_norm:
+        return ("", [], "evidence: is empty")
+    tokens = ev_norm.split(",")
+    if tokens[-1] == "":
+        tokens.pop()
+    if not tokens or any(t == "" for t in tokens):
         return ("", [], "evidence: is empty")
     # validate each token
     for t in tokens:
         if t.startswith("/") or t.startswith("-"):
             return ("", [], f"evidence: token '{t}' is not a repo-relative path")
-        if ".." in t.split("/"):
+        if ".." in t:
             return ("", [], f"evidence: token '{t}' is not a repo-relative path")
         if not _EVIDENCE_TOKEN.match(t):
             return ("", [], f"evidence: token '{t}' is not a repo-relative path")
@@ -135,6 +146,62 @@ def _is_test_path(tok: str) -> bool:
     if "/" not in tok:
         return False
     return True
+
+
+_NO_CHANGE_MARKER = r"\(no-change\)"
+
+
+def _planned_token(row: str) -> str | None:
+    """The row's planned test token, or None when the row plans nothing.
+
+    Single source of truth for "this matrix row plans a test": parse_matrix and
+    parse_no_change_test_paths must agree on it, or a token could be exempted by
+    one parser and planned by the other.
+    """
+    if not re.search(r"\b(PHPUnit|API.?test|E2E|Visual.?regression)\b", row, re.I):
+        return None
+    m = re.search(r"`([^`]*(?:test|spec|Test)[^`]*)`", row)
+    if m and _is_test_path(m.group(1)):
+        return m.group(1)
+    return None
+
+
+def _is_visual_regression_row(cells: list[str]) -> bool:
+    """True only when a WHOLE cell reads Visual-regression (bold allowed).
+
+    A PHPUnit row whose description mentions "visual regression" has no such cell,
+    so the `(no-change)` marker is ignored there; conformance then holds as before.
+    """
+    return any(re.fullmatch(r"visual.?regression", c.strip().strip("*").strip(), re.I)
+               for c in cells)
+
+
+def parse_no_change_test_paths(content: str) -> list[str]:
+    """Planned tokens whose EVERY unfenced planning row is a Visual-regression row
+    carrying `(no-change)` immediately after the token's closing backtick.
+
+    A token also planned by any unmarked row (any type) is NOT returned: the
+    unannotated row wins, so a plan cannot dodge a real MISSING by relabelling one
+    of two rows. Fenced rows are stripped before matching (same _strip_fenced walk
+    as parse_matrix), so an illustrative marker in a fixture block exempts nothing.
+    """
+    marked: list[str] = []
+    unmarked: set[str] = set()
+    for line in _strip_fenced(content):
+        if not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        row = " | ".join(cells)
+        p = _planned_token(row)
+        if p is None:
+            continue
+        has_marker = re.search(r"`" + re.escape(p) + r"`\s*" + _NO_CHANGE_MARKER, row, re.I)
+        if has_marker and _is_visual_regression_row(cells):
+            if p not in marked:
+                marked.append(p)
+        else:
+            unmarked.add(p)
+    return [p for p in marked if p not in unmarked]
 
 
 def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
@@ -173,13 +240,47 @@ def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
         row = " | ".join(cells)
         if re.search(r"truly.?manual", row, re.I):
             manual.append(manual_rows.row_from_cells(cells, len(manual) + 1))
-        if re.search(r"\b(PHPUnit|API.?test|E2E|Visual.?regression)\b", row, re.I):
-            m = re.search(r"`([^`]*(?:test|spec|Test)[^`]*)`", row)
-            if m and _is_test_path(m.group(1)):
-                p = m.group(1)
-                if p not in planned:
-                    planned.append(p)
+        p = _planned_token(row)
+        if p is not None and p not in planned:
+            planned.append(p)
     return planned, manual
+
+
+_EXECUTABLE_TYPE = re.compile(
+    r"\b(PHPUnit|API.?test|E2E|Visual.?regression|CLI.?executable)\b", re.IGNORECASE)
+_TABLE_SEP = re.compile(r"^\s*\|[\s:|-]+\|?\s*$")
+
+
+def count_executable_matrix_rows(content: str) -> int | None:
+    """Count Verification Matrix rows that name an executable test type.
+
+    Scoped to the table rows that follow a `_MATRIX_HEADER` line, outside fenced
+    blocks (`_strip_fenced`), so a Critical Files table naming PHPUnit or a fenced
+    illustrative matrix never counts; parse_matrix's whole-plan scan cannot tell
+    these apart. Within a matrix row the match is WHOLE-ROW, never the Test type
+    cell alone: the 2026-09-29 corpus has matrices with shifted columns (the type
+    in the What cell) and non-taxonomy types (`Automated` on a PHPUnit-suite row),
+    and a cell-scoped match would write the static claim over real executable rows.
+    Whole-row errs toward counting, which keeps the covered-by sentinel.
+    Visual-regression counts as executable so the static wording is never written
+    over a screenshot-diff row. Returns None when no unfenced matrix header exists,
+    so a caller cannot mistake "no matrix" for "zero rows".
+    """
+    count = 0
+    seen_header = False
+    in_matrix = False
+    for line in _strip_fenced(content):
+        if not line.strip().startswith("|"):
+            in_matrix = False
+            continue
+        if _MATRIX_HEADER.match(line):
+            seen_header = in_matrix = True
+            continue
+        if not in_matrix or _TABLE_SEP.match(line):
+            continue
+        if _EXECUTABLE_TYPE.search(line):
+            count += 1
+    return count if seen_header else None
 
 
 def _strip_fenced(content: str) -> list[str]:
@@ -243,12 +344,39 @@ def _strip_fenced(content: str) -> list[str]:
     return out
 
 
+# Regex that strips a leading absolute prefix up to the repo or worktree root.
+# Matches /<anything>/IBL5/ or /<anything>/IBL5-worktrees/<slug>/ and removes
+# everything up to and including that root. Case-sensitive: IBL5 is always caps.
+# Used in parse_critical_files to normalise absolute paths from in-flight plans.
+_ABS_PREFIX_RE = re.compile(r"^.*/IBL5(?:-worktrees/[^/]+)?/")
+
+
+def _normalise_cf_path(path: str) -> str:
+    """Strip an absolute /…/IBL5/… or /…/IBL5-worktrees/<slug>/… prefix.
+
+    Plans already in flight may carry absolute paths authored before
+    bin/check-plan gate [F] enforced repo-relative form. Normalise them so
+    Phase 5.0 conformance matching still works. Relative paths are returned
+    unchanged.
+    """
+    if not path.startswith("/"):
+        return path
+    m = _ABS_PREFIX_RE.match(path)
+    if m:
+        return path[m.end():]
+    return path
+
+
 def parse_critical_files(content: str) -> list[tuple]:
     """[(path, annotation, exempt)] from `## Critical Files` — the Phase 5.0 awk port:
     primary backticked path per bullet; exempt iff the annotation (backticks stripped)
     contains a parenthesized group holding a canonical marker. Fenced code blocks are
     skipped (width-aware fence state machine, see _strip_fenced). Single source of
-    truth for the exemption rule: bin/lib/critical-files.sh."""
+    truth for the exemption rule: bin/lib/critical-files.sh.
+
+    Absolute paths of the form /…/IBL5/… or /…/IBL5-worktrees/<slug>/… are
+    normalised to repo-relative form so in-flight plans authored before gate [F]
+    enforced relative paths still match `git diff --name-only` output."""
     lines = _strip_fenced(content)
     in_section = False
     out: list[tuple] = []
@@ -266,7 +394,7 @@ def parse_critical_files(content: str) -> list[tuple]:
         pm = re.search(r"`([^`]+)`", line)
         if not pm:
             continue
-        path = pm.group(1)
+        path = _normalise_cf_path(pm.group(1))
         rest = re.sub(r"`[^`]*`", "", line)
         exempt = bool(EXEMPT_RE.search(rest))
         out.append((path, rest.strip(" -—"), exempt))
@@ -306,20 +434,23 @@ _PHASE_HEADING_RE = re.compile(r"^##\s+(?:Phase|Step)\s*(\d+)(?!\.\d)\b\s*[:.\-�
 # All-S tier marker = bookkeeping-only phase (close a backlog issue, bump a doc date).
 _BOOKKEEPING_MARKER_RE = re.compile(r"\[phases:\s*S(\s*/\s*S)*\s*\]")
 _EXAMPLE_SUFFIX_RE = re.compile(r"^\s*\(example\)")
+_LINE_SUFFIX_RE = re.compile(r"(?::|#)L?\d+(?:-L?\d+)?$")
 
 
 def _phase_evidence_paths(body: str) -> list[str]:
     """Backticked tokens in a phase body that look like repo paths, deduped, first-seen order.
 
     A token followed by ` (example)` is an intentionally-absent path (staleness-guard idiom)
-    and is skipped. A `path::test_fn` pytest node id contributes its file part only. Glob
-    tokens are skipped because _resolve cannot match them.
+    and is skipped. A `path::test_fn` pytest node id contributes its file part only. A
+    trailing line suffix (`:120`, `:438-457`, `#L12-L20`) is stripped so the token matches
+    the changed file. Glob tokens are skipped because _resolve cannot match them.
     """
     out: list[str] = []
     for m in re.finditer(r"`([^`\n]+)`", body):
         if _EXAMPLE_SUFFIX_RE.match(body[m.end():m.end() + 12]):
             continue
         tok = m.group(1).split("::", 1)[0].strip()
+        tok = _LINE_SUFFIX_RE.sub("", tok)
         if not _is_test_path(tok) or re.search(r"[*?\[\]]", tok):
             continue
         if tok not in out:
@@ -330,7 +461,9 @@ def _phase_evidence_paths(body: str) -> list[str]:
 def parse_phases(content: str) -> list[PhaseInfo]:
     """One PhaseInfo per `## Phase N:` / `## Step N:` h2 heading, in document order.
 
-    The body runs to the next h2 (`## `), so `### Delegate` packets inside a phase are part
+    Backticked paths in the heading itself count as evidence, ahead of body paths: a
+    heading like `## Phase 3: Tests in `tests/test_x.py`` names the phase's target file
+    even when the body only cites fixture strings. The body runs to the next h2 (`## `), so `### Delegate` packets inside a phase are part
     of that phase and their Scope/Recipe paths count as evidence. Fenced blocks are
     stripped first. Sub-numbered headings (`## Phase 5.5:`) and h3 headings never open a
     phase. A repeated phase number merges into the first occurrence (evidence unioned) so
@@ -365,6 +498,7 @@ def parse_phases(content: str) -> list[PhaseInfo]:
                                     bookkeeping=bool(_BOOKKEEPING_MARKER_RE.search(heading)))
                 by_number[num] = current
                 phases.append(current)
+            buf = [heading]
             continue
         if current is not None:
             buf.append(line)
@@ -628,11 +762,19 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
     info.has_reuse = bool(_REUSE.search(content))
     if info.has_matrix:
         info.planned_test_paths, info.truly_manual_rows = parse_matrix(content)
+        info.executable_row_count = count_executable_matrix_rows(content)
+        info.no_change_test_paths = parse_no_change_test_paths(content)
     info.critical_files = parse_critical_files(content)
     info.required_test_methods = parse_required_test_methods(content)
     info.backlog_issues = parse_backlog_issues(content)
     info.phases = parse_phases(content)
     info.deferred_phase_numbers = parse_deferred_phase_numbers(content)
+    try:
+        from .outofscope import extract_deferral_hits  # local import: outofscope imports planfile
+        info.deferral_hits = [(h.text, h.line_no, h.key)
+                              for h in extract_deferral_hits(content, slug)]
+    except Exception:  # additive sweep: a parser bug must never stop plan location
+        info.deferral_hits = []
     if info.has_security:
         info.security_section = _section(content, "Security")[:4000]
     if info.has_reuse:

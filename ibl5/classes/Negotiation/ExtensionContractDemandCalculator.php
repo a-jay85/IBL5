@@ -12,7 +12,7 @@ use Repositories\Contracts\SalaryCapRepositoryInterface;
 /**
  * @see ExtensionContractDemandCalculatorInterface
  *
- * @phpstan-import-type TeamFactors from ExtensionContractDemandCalculatorInterface
+ * @phpstan-import-type TeamFactorsInput from ExtensionContractDemandCalculatorInterface
  * @phpstan-import-type DemandResult from ExtensionContractDemandCalculatorInterface
  * @phpstan-import-type DemandsBreakdown from ExtensionContractDemandCalculatorInterface
  * @phpstan-import-type RatingBreakdown from ExtensionContractDemandCalculatorInterface
@@ -38,7 +38,7 @@ class ExtensionContractDemandCalculator implements ExtensionContractDemandCalcul
      * @see ExtensionContractDemandCalculatorInterface::calculateDemands()
      *
      * @param Player $player The player object with ratings and stats
-     * @param TeamFactors $teamFactors Team factors affecting demands
+     * @param TeamFactorsInput $teamFactors Team factors affecting demands
      * @return DemandResult Demand information
      */
     public function calculateDemands(Player $player, array $teamFactors): array
@@ -97,7 +97,7 @@ class ExtensionContractDemandCalculator implements ExtensionContractDemandCalcul
      * @see ExtensionContractDemandCalculatorInterface::calculateDemandsWithBreakdown()
      *
      * @param Player $player The player object with ratings and stats
-     * @param TeamFactors $teamFactors Team factors affecting demands
+     * @param TeamFactorsInput $teamFactors Team factors affecting demands
      * @return DemandsBreakdown Full breakdown of the calculation
      */
     public function calculateDemandsWithBreakdown(Player $player, array $teamFactors): array
@@ -179,6 +179,14 @@ class ExtensionContractDemandCalculator implements ExtensionContractDemandCalcul
 
         $demands = $this->calculateDemands($player, $teamFactors);
 
+        $resolvedTeamFactors = [
+            'wins' => $teamFactors['wins'] ?? 41,
+            'losses' => $teamFactors['losses'] ?? 41,
+            'tradition_wins' => $teamFactors['tradition_wins'] ?? 41,
+            'tradition_losses' => $teamFactors['tradition_losses'] ?? 41,
+            'money_committed_at_position' => $teamFactors['money_committed_at_position'] ?? 0,
+        ];
+
         return [
             'ratings' => $ratingsBreakdown,
             'totalRawScore' => $totalRawScore,
@@ -194,7 +202,7 @@ class ExtensionContractDemandCalculator implements ExtensionContractDemandCalcul
                 'loyalty' => $loyPref,
                 'playingTime' => $ptPref,
             ],
-            'teamFactors' => $teamFactors,
+            'teamFactors' => $resolvedTeamFactors,
             'modifiers' => $modifiers,
             'totalModifier' => $totalModifier,
             'demands' => $demands,
@@ -302,7 +310,7 @@ class ExtensionContractDemandCalculator implements ExtensionContractDemandCalcul
      * Calculate modifier based on team factors and player preferences
      *
      * @param Player $player The player object
-     * @param TeamFactors $teamFactors Team factors
+     * @param TeamFactorsInput $teamFactors Team factors
      * @return float Modifier value
      */
     private function calculateModifier(Player $player, array $teamFactors): float

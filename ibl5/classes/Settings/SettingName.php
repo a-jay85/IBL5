@@ -23,6 +23,7 @@ enum SettingName: string
     case CurrentSeasonPhase = 'Current Season Phase';
     case CurrentSeasonEndingYear = 'Current Season Ending Year';
     case SimLengthInDays = 'Sim Length in Days';
+    case CashConsiderationsLastAdvancedYear = 'Cash Considerations Last Advanced Year';
 
     /**
      * Whether this setting uses 'Yes'/'No' (true) or 'On'/'Off' (false) for boolean values

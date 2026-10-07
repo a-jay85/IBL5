@@ -20,6 +20,8 @@
 #                 a spend bug; see .claude/rules/work-triage.md). Times out at 7200s and then exits 1 after writing the report.
 #                 A slot is released only when its label is gone AND no process carries it,
 #                 so a run aborted without --stop holds its slot until the ceiling.
+#                 A session paused by the usage gate (ADR-0143) ends its label, so it counts
+#                 as settled here and the report lists it as PAUSED. The exit code is unchanged.
 #   --stop N[,N...]   Abort the fired session(s) for these PRs: bootout the launchd label,
 #                     TERM then KILL anything carrying --name <label>, release the slot
 #                     (remove the plist) and clear the PR's /tmp scratch. Exits nonzero and
@@ -77,6 +79,11 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    sed -n '2,78p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+fi
+
 # --- PATH prelude ------------------------------------------------------------------------
 # A safety net for invocation from a restricted context (cron, a hook) that lacks the
 # usual tool dirs. Appended, not prepended: an interactive caller's own PATH — and the
@@ -104,6 +111,9 @@ ROOT="$(dirname "$GIT_COMMON")"
 # --- session-id helpers ------------------------------------------------------------------
 . "$SCRIPT_DIR/lib/session-id.sh"
 . "$SCRIPT_DIR/lib/launchd-job.sh"
+# Usage-gate markers (ADR-0143): a post-plan session paused by the gate is resumed by the
+# coordinator, so the fleet must not fire a second one into the same worktree.
+. "$SCRIPT_DIR/lib/usage-gate.sh"
 
 # --- defaults ----------------------------------------------------------------------------
 GO=0
@@ -121,7 +131,7 @@ CEILING_SECS="${POST_PLAN_FLEET_CEILING:-7200}"
 WAIT_POLL_SECS="${POST_PLAN_FLEET_WAIT_POLL:-20}"
 
 # --- flag parsing ------------------------------------------------------------------------
-usage() { sed -n '2,76p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,78p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -295,11 +305,20 @@ FIRE_PRS=(); FIRE_BRANCHES=(); FIRE_PRE=(); SKIP_LINES=()
 # _REPORT_MASTER_SHA is always resolved lazily inside write_report when empty.
 _REPORT_MASTER_SHA=""
 
-# derive_status <log-path>
+# derive_status <log-path> [worktree-path]
 # Returns the status string for a single PR log: READY, NOT READY, NOT READY (no log),
-# or MASTER-MOVING-TOO-FAST.
+# MASTER-MOVING-TOO-FAST, or PAUSED (usage gate; auto-resumes). PAUSED wins: a paused
+# session has not finished, so nothing else in its log is a verdict yet.
 derive_status() {
-    local log="$1"
+    local log="$1" wt="${2:-}"
+    if [[ -f "$log" ]] && grep -qE '^post-plan-now: RESULT paused' "$log"; then
+        printf 'PAUSED (usage gate; auto-resumes)'
+        return
+    fi
+    if [[ -n "$wt" ]] && usage_worktree_paused "$wt"; then
+        printf 'PAUSED (usage gate; auto-resumes)'
+        return
+    fi
     # Missing log: session may still be running (e.g. --go without --wait).
     if [[ ! -f "$log" ]]; then
         printf 'NOT READY (no log)'
@@ -314,7 +333,7 @@ derive_status() {
     # STOP: and PUSH FAILED are hard-stop markers; match them as line prefixes to avoid
     # false-positives from quoted instruction text. (Phase 8 tests this predicate; do not
     # weaken the anchor.)
-    if grep -qE '^[[:space:]>*_`-]*STOP:' "$log" || grep -qF 'PUSH FAILED' "$log"; then
+    if grep -qE '^[[:space:]>*_`-]*STOP:' "$log" || grep -qE '^[[:space:]>*_`-]*PUSH FAILED' "$log"; then
         printf 'NOT READY'
         return
     fi
@@ -358,7 +377,7 @@ write_report() {
                 br="${FIRE_BRANCHES[$i]}"
                 pre="${FIRE_PRE[$i]}"
                 log="/tmp/post-plan-fleet-${pr}.log"
-                st="$(derive_status "$log")"
+                st="$(derive_status "$log" "$(wt_path_for_branch "$br")")"
                 printf '| %s | %s | %s | %s | %s |\n' "$pr" "$br" "$pre" "$st" "$log"
             done
         fi
@@ -463,6 +482,13 @@ else
     [[ -f "$_WTL" ]] || { echo "ERROR: POST_PLAN_FLEET_WTL not found: $_WTL" >&2; exit 1; }
 fi
 
+# wt_path_for_branch <branch>: the worktree path from the listing for [branch], or nothing.
+# grep -F: without it, [$branch] is treated as a character class.
+wt_path_for_branch() {
+    [[ -n "${1:-}" && -f "$_WTL" ]] || return 0
+    grep -F "[$1]" "$_WTL" | head -1 | awk '{print $1}'
+}
+
 while read -r pr; do
     [[ -n "$pr" ]] || continue
     # Anchored at end-of-line: the label carries no suffix, so an unanchored match
@@ -485,6 +511,11 @@ while read -r pr; do
     elif [[ -n "$w" ]];            then pre="WT"
     elif [[ -n "$p" ]];            then pre="PLAN"
     else                                pre="—"
+    fi
+    # A post-plan run paused by the usage gate is resumed by the coordinator. Firing another
+    # into the same worktree would race it, so skip; the row takes no slot.
+    if [[ -n "$w" ]] && usage_worktree_paused "$(wt_path_for_branch "$branch")"; then
+        SKIP_LINES+=("$pr|$branch|$pre|post-plan paused by usage gate; coordinator resumes it"); continue
     fi
     if [[ -z "$w" ]]; then
         # Skip unless an explicit --pr was given (allows dry-run with fictional PR numbers).
@@ -583,7 +614,7 @@ timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground > "$LOG" 2>&1 || RC=$?
 notify() {
     ljob_dm_ready post-plan-fleet || return 0
     local DM_ICON="" DM_VERDICT="" DM_NEXT="" msg stop_text=""
-    local verdict="" parsed="" terminal="" latest_unconfirmed="" holds="" sticky=""
+    local verdict="" parsed="" terminal="" latest_unconfirmed="" holds="" warns="" sticky=""
     # STOP: lines take priority (same rule as derive_status)
     local stop_line=""
     stop_line=$(grep -m1 '^[[:space:]>*_`-]*STOP:' "$LOG" 2>/dev/null || true)
@@ -604,6 +635,8 @@ notify() {
             # never verdict_1). No rounds -> verdict_1 (null -> empty, falls through
             # to the RESULT: line exactly as before). Any parse error -> empty.
             # hold= lines turn each blocked Phase 6.5 arm condition into a fix hint.
+            # warn= lines carry a non-blocking condition warning (e.g. (15) once the
+            # aggregator is required); they never change the verdict.
             parsed=$(python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
@@ -641,11 +674,16 @@ for c in (d.get("arm") or {}).get("conditions") or []:
     else:
         h = "%s: %s" % (name, reason)
     print("hold=" + h.replace("\n", " "))
+for c in (d.get("arm") or {}).get("conditions") or []:
+    w = (c.get("warning") or "")[:150]
+    if w:
+        print("warn=" + w.replace("\n", " "))
 ' "$run_dir/result.json" "$PR" 2>/dev/null || true)
             terminal=$(printf '%s\n' "$parsed" | sed -n 's/^terminal=//p')
             verdict=$(printf '%s\n' "$parsed" | sed -n 's/^verdict=//p')
             sticky=$(printf '%s\n' "$parsed" | sed -n 's/^sticky=//p')
             holds=$(printf '%s\n' "$parsed" | sed -n 's/^hold=/• /p')
+            warns=$(printf '%s\n' "$parsed" | sed -n 's/^warn=/⚠ /p')
             if [ "$verdict" = null ]; then
                 verdict=""; latest_unconfirmed=1
             fi
@@ -672,9 +710,12 @@ for c in (d.get("arm") or {}).get("conditions") or []:
     [ -n "$sticky" ] \
         && verdict_link="read the verdict comment: <https://github.com/a-jay85/IBL5/pull/${PR}#issuecomment-${sticky}>"
     case "$verdict" in
-        READY)              DM_ICON="✅"; DM_VERDICT="READY";           DM_NEXT="merge when you're ready" ;;
-        HELD)               DM_ICON="⏸";  DM_VERDICT="HELD";            DM_NEXT="$holds" ;;
-        "READY WITH NOTES") DM_ICON="⚠️"; DM_VERDICT="READY WITH NOTES"; DM_NEXT="$holds" ;;
+        READY)              DM_ICON="✅"; DM_VERDICT="READY"
+                            DM_NEXT="merge when you're ready${warns:+$'\n'}${warns}" ;;
+        HELD)               DM_ICON="⏸";  DM_VERDICT="HELD"
+                            DM_NEXT="${holds}${holds:+${warns:+$'\n'}}${warns}" ;;
+        "READY WITH NOTES") DM_ICON="⚠️"; DM_VERDICT="READY WITH NOTES"
+                            DM_NEXT="${holds}${holds:+${warns:+$'\n'}}${warns}" ;;
         "NOT READY")        DM_ICON="❌"; DM_VERDICT="NOT READY";        DM_NEXT="$verdict_link" ;;
         STOPPED)            DM_ICON="🛑"; DM_VERDICT="STOPPED";          DM_NEXT="$stop_text" ;;
         "TIMED OUT")        DM_ICON="⏱";  DM_VERDICT="TIMED OUT"

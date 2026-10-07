@@ -1,0 +1,17 @@
+# Mixed plan
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|----------------|-----------|--------|----------------------|
+| 1 | Service returns the row | PHPUnit | pre-impl | `ibl5/tests/Foo/FooServiceTest.php` |
+| 2 | Page renders the row | E2E | post-impl | `ibl5/tests/e2e/tests/foo.spec.ts` |
+| 3 | Lint stays clean | CLI-executable | post-impl | `grep -c x f \| wc -l` |
+| 4 | Layout feels right | Truly-manual | post-impl | open the page and look |
+| 5 | Wording reads correctly | Doc review | post-impl | `docs/x.md` |
+
+## Notes
+
+| Item | Detail |
+|------|--------|
+| Coverage | E2E is deferred to a later plan |

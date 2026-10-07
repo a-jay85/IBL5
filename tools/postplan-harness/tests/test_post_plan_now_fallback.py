@@ -107,7 +107,10 @@ def test_plan_blind_prompt_reaches_the_model_intact():
 
 def test_embed_sites_are_shell_quoted():
     src = open(PPN).read()
-    assert 'claude -p $(shq "$PROMPT")' in src      # not \"$PROMPT\" — see shq() header
+    # The prompt is shq()'d into SKILL_PROMPT_ARG, which the claude call splices in
+    # (usage gate resume swaps it); it must never be interpolated inside \"...\".
+    assert 'SKILL_PROMPT_ARG="$(shq "$PROMPT")"' in src   # see shq() header
+    assert 'claude -p ${SKILL_PROMPT_ARG}' in src
     assert r'claude -p \"$PROMPT\"' not in src
     assert '--plan $(shq "$PLAN_OVERRIDE")' in src
 
@@ -373,7 +376,7 @@ def _generate_cmd(tmp_path, extra_env=None):
 def test_generated_cmd_has_no_rc4_arm(tmp_path):
     cmd = _generate_cmd(tmp_path)
     assert '[ "$rc" = 4 ]' not in cmd, "rc=4 arm must be gone after the full-port"
-    assert cmd.index('should_fallback "$rc"; then') < cmd.index('elif [ "$rc" = 3 ]; then')
+    assert cmd.index('should_fallback "$rc" && ! usage_postrun_pause') < cmd.index('elif [ "$rc" = 3 ]; then')
 
 def test_generated_cmd_carries_one_claude_invocation(tmp_path):
     cmd = _generate_cmd(tmp_path)
@@ -382,18 +385,41 @@ def test_generated_cmd_carries_one_claude_invocation(tmp_path):
     assert "then execute every phase" in cmd
 
 
-def _rc3_gate(tmp_path, log_text=""):
-    """The generated gate chain with the claude call stubbed and $LOG repointed
-    at a fixture this test controls. Returns (gate_source, fixture_path)."""
+def _rc3_gate(tmp_path, log_text="", block=None):
+    """The generated gate chain with the claude call stubbed, $LOG repointed at a
+    fixture this test controls, and the harness run dir repointed at a tmp dir.
+    `block` sets what the harness left there: None = no run dir at all, "" = an empty
+    blocked-ship.txt, any other string = that file's text.
+    Returns (gate_source, fixture_path)."""
     cmd = _generate_cmd(tmp_path)
     gate = cmd.split("rc=$?; ", 1)[1].split("; }; pp_rc=", 1)[0]
     gate = re.sub(r'CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0.*?--name "[^"]*"',
                   'echo "RAN-SKILL"', gate)
     real_log = re.search(r"grep -m1 '\^RESULT:' \"([^\"]+)\"", gate).group(1)
-    fixture = tmp_path / "harness-run.log"
+    fixture = tmp_path / "ship-run.log"
     fixture.write_text(log_text)
-    gate = gate.replace(real_log, str(fixture))   # rewrites the grep AND the "See ..." suffix
+    gate = gate.replace(real_log, str(fixture))   # rewrites the grep AND the "Log: ..." arg
+    real_dir = re.search(r'blocked_ship_block "([^"]+)"', gate).group(1)
+    run_dir = tmp_path / "ship-run-dir"
+    if block is not None:
+        run_dir.mkdir()
+        (run_dir / "blocked-ship.txt").write_text(block)
+    gate = gate.replace(real_dir, str(run_dir))
     return gate, fixture
+
+
+def _gate_args(gate):
+    """(slug, root) the generated gate hands to blocked_ship_block."""
+    m = re.search(r'blocked_ship_block "[^"]+" "([^"]+)" "([^"]+)"', gate)
+    return m.group(1), m.group(2)
+
+
+def _marker_section(stdout):
+    """Text between the two marker lines bin/post-plan-now prints around the block."""
+    m = re.search(r"^=== post-plan blocked ship ===\n(.*?)\n=== end blocked ship ===$",
+                  stdout, re.S | re.M)
+    assert m, f"no marker pair in {stdout!r}"
+    return m.group(1)
 
 def _run_gate(gate, rc=3):
     return subprocess.run(
@@ -428,7 +454,8 @@ def test_gate_selects_the_right_arm_per_rc(tmp_path):
         else:
             assert "RAN-" not in r.stdout, f"rc={rc} must launch no session: {r.stdout!r}"
         if rc == 3:
-            assert "fail-closed sentinel" in r.stdout, "rc=3 lost its notice"
+            assert "=== post-plan blocked ship ===" in r.stdout, "rc=3 lost its notice"
+            assert "did not ship. No PR opened." in r.stdout
 
 
 def test_every_other_failure_dms_with_the_rerun_command(tmp_path):
@@ -471,7 +498,7 @@ def test_generated_cmd_captures_the_harness_result_line(tmp_path):
     assert "HARNESS_RESULT=$(grep -m1 '^RESULT:'" in cmd
     assert "HARNESS_RESULT=${HARNESS_RESULT:0:1200}" in cmd
     assert (cmd.index("rc=$?; ") < cmd.index("HARNESS_RESULT=$(grep")
-            < cmd.index('should_fallback "$rc"; then'))
+            < cmd.index('should_fallback "$rc" && ! usage_postrun_pause'))
 
 
 def test_skill_only_cmd_has_no_harness_result_capture(tmp_path):
@@ -493,23 +520,38 @@ _ADR_HOOK_RESULT_LINE = (
 )
 
 
-def test_exit3_message_names_the_specific_gate_denial(tmp_path):
-    gate, fixture = _rc3_gate(tmp_path, _ADR_HOOK_RESULT_LINE + "\n")
+def _harness_block(error, log, **extra):
+    """A block from the real renderer, so these tests follow runner.human_block."""
+    runner = _runner_module()
+    from harness.state import RunResult, TerminalState
+    res = RunResult(terminal=TerminalState.FAILED)
+    res.error_kind = "local-gate"
+    res.error = error
+    res.slug = "feat/x"
+    for k, v in extra.items():
+        setattr(res, k, v)
+    return runner.human_block(res, 3, "/wt/feat-x", str(log))
+
+
+def test_exit3_prints_the_block_file_verbatim(tmp_path):
+    adr_error = ("pre-push-adr-hook: Decision-trigger surfaces detected:\n"
+                 "  - [bin-script] bin/foo — Tool script")
+    block = _harness_block(adr_error, tmp_path / "harness-run.log")
+    gate, fixture = _rc3_gate(tmp_path, _ADR_HOOK_RESULT_LINE + "\n", block=block + "\n")
     r = _run_gate(gate)
     assert r.returncode == 0, r.stderr
-    assert "pre-push-adr-hook" in r.stdout
+    assert _marker_section(r.stdout) == block
     assert "bin/next-adr" in r.stdout
-    assert "fail-closed sentinel" in r.stdout
-    assert f"See {fixture}." in r.stdout
     assert "RAN-" not in r.stdout
 
 
-def test_exit3_result_line_is_inert_data_not_shell(tmp_path):
+def test_exit3_block_file_is_inert_data_not_shell(tmp_path):
     # Use non-overlapping sentinel tokens so count() checks prove no execution.
     # (PWNED / PWNED2 would overlap: "PWNED" appears in both, giving count == 2
     # even when no command ran.)
-    log_text = 'RESULT: gate denied: run bin/next-adr "kebab-title" $(echo INJECT1) `echo INJECT2`\n'
-    gate, fixture = _rc3_gate(tmp_path, log_text)
+    block = ('x did not ship. No PR opened.\n\nWhy: run bin/next-adr "kebab-title" '
+             '$(echo INJECT1) `echo INJECT2`\n\nLog: /tmp/x.log\n')
+    gate, fixture = _rc3_gate(tmp_path, "", block=block)
     r = _run_gate(gate)
     assert r.returncode == 0, r.stderr
     assert '$(echo INJECT1)' in r.stdout
@@ -518,32 +560,70 @@ def test_exit3_result_line_is_inert_data_not_shell(tmp_path):
     assert r.stdout.count("INJECT2") == 1
 
 
-def test_exit3_message_falls_back_when_no_result_line(tmp_path):
-    for i, log_text in enumerate(["", "harness: starting\nharness: done\n"]):
-        sub = tmp_path / str(i)
-        sub.mkdir()
-        gate, fixture = _rc3_gate(sub, log_text)
-        r = _run_gate(gate)
-        assert r.returncode == 0, f"case {i}: {r.stderr!r}"
-        assert "rebase conflict" in r.stdout, f"case {i}: {r.stdout!r}"
-        assert "gate denial" in r.stdout, f"case {i}: {r.stdout!r}"
-        assert "fail-closed sentinel" in r.stdout, f"case {i}: {r.stdout!r}"
-        assert "Cause: ." not in r.stdout, f"case {i}: {r.stdout!r}"
-
-
-def test_exit3_message_stays_under_the_discord_cap_worst_case(tmp_path):
-    gate, fixture = _rc3_gate(tmp_path, "RESULT: " + "x" * 2000 + "\n")
+@pytest.mark.parametrize("block", [None, "", "-dir-only"], ids=["no-run-dir", "empty-file", "run-dir-no-file"])
+@pytest.mark.parametrize("log_text", ["", "harness: starting\n"], ids=["empty-log", "noise-log"])
+def test_exit3_prints_plain_block_when_no_block_file(tmp_path, block, log_text):
+    if block == "-dir-only":
+        gate, fixture = _rc3_gate(tmp_path, log_text, block="")
+        (tmp_path / "ship-run-dir" / "blocked-ship.txt").unlink()   # dir exists, file does not
+    else:
+        gate, fixture = _rc3_gate(tmp_path, log_text, block=block)
     r = _run_gate(gate)
     assert r.returncode == 0, r.stderr
-    msg = r.stdout.rstrip("\n")
-    assert "x" * 1100 in msg and "x" * 1250 not in msg      # the 1200 cap fired
-    slug = re.search(r"on branch (.*?)\. SKIPPING", gate).group(1)
-    root = re.search(r"re-run: cd (.*?) && bin/post-plan-now", gate).group(1)
-    fixed = len(msg) - 1200 - len(slug) - len(root) - len(str(fixture))
-    WORST_SLUG, WORST_ROOT, WORST_LOG = 80, 120, 120
-    assert fixed + 1200 + WORST_SLUG + WORST_ROOT + WORST_LOG < 1900, (
-        "assembled rc=3 msg can exceed bin/discord-dm's 1900-char cap; "
-        f"fixed={fixed}")
+    _slug, root = _gate_args(gate)
+    section = _marker_section(r.stdout)
+    assert "did not ship. No PR opened." in section
+    assert "Why: the ship step stopped and the log has the reason." in section
+    assert f"  1. cd {root}" in section
+    assert "  3. bin/post-plan-now" in section
+    assert section.endswith(f"Log: {fixture}")
+    for word in ("harness", "sentinel", "fallback", "terminal", "rc="):
+        assert word not in section.lower(), word
+    assert "RAN-" not in r.stdout
+
+
+def _deferred_dm_prefix():
+    """The literal prefix bin/post-plan-fail-dm puts before $MSG on the deferred path."""
+    src = open(os.path.join(REPO, "bin", "post-plan-fail-dm")).read()
+    m = re.search(r'send_dm "(Nobody re-ran it[^"]*?)\$MSG"', src)
+    assert m, "deferred send_dm line not found in bin/post-plan-fail-dm"
+    return re.sub(r"\$\(\( DELAY / 60 \)\)", "9999", m.group(1))
+
+
+def test_exit3_dm_keeps_log_line_under_discord_cap(tmp_path):
+    prefix = _deferred_dm_prefix()
+    # (i) worst-case harness block
+    runner = _runner_module()
+    from harness.state import RunResult, TerminalState
+    res = RunResult(terminal=TerminalState.FAILED)
+    res.error_kind = "rebase-conflict"
+    res.slug = "z" * 200
+    res.error = ("n" * 5000) + "\n" + "\n".join(f"Merge conflict in {'p' * 200}{i}" for i in range(20))
+    harness_block = runner.human_block(res, 3, "w" * 200, "l" * 200)
+    assert len(prefix) + len(harness_block) < 1900
+    assert harness_block.split("\n")[-1] in (prefix + harness_block)[:1900]
+    # (ii) worst-case plain block: 80-char slug, 120-char root and log
+    slug, root = "s" * 80, "r" * 120
+    long_log = "l" * 120
+    fn = subprocess.run(
+        ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; blocked_ship_block "{tmp_path}/none" '
+                       f'"{slug}" "{root}" "{long_log}"'],
+        capture_output=True, text=True).stdout.rstrip("\n")
+    assert len(prefix) + len(fn) < 1900
+    assert f"Log: {long_log}" in (prefix + fn)[:1900]
+
+
+def test_harness_seg_exports_log_path(tmp_path):
+    bg = _generate_cmd(tmp_path)
+    m = re.search(r'POSTPLAN_LOG_PATH="([^"]+)" caffeinate', bg)
+    assert m, "background HARNESS_SEG lost POSTPLAN_LOG_PATH"
+    assert m.group(1).endswith(".log")
+    assert "blocked_ship_block ()" in bg,"blocked_ship_block not shipped into the detached job"
+    src = open(PPN).read()
+    segs = [ln for ln in src.splitlines() if ln.lstrip().lstrip("&").lstrip().startswith("HARNESS_SEG=\"CLAUDE_HEADLESS=1")]
+    assert len(segs) == 2, "expected the background and foreground HARNESS_SEG lines"
+    for ln in segs:
+        assert 'POSTPLAN_LOG_PATH=\\"$LOG\\" caffeinate' in ln
 
 
 def test_badge_banner_rc3_carries_the_captured_result():
@@ -635,13 +715,12 @@ def test_foreground_exit3_message_quotes_the_harness_result(tmp_path):
     repo = _fixture_repo(tmp_path)
     r = subprocess.run(["bash", PPN, "--foreground", "--plan", str(plan)], cwd=repo,
                        env=env, capture_output=True, text=True, timeout=120)
-    log = re.search(r"See (/tmp/post-plan-now-\S+\.log)\.", r.stdout)
+    log = re.search(r"^Log: (/tmp/post-plan-now-\S+\.log)$", r.stdout, re.M)
     try:
         assert r.returncode == 3, f"stdout={r.stdout!r} stderr={r.stderr!r}"
-        assert "fail-closed sentinel" in r.stdout
-        assert f"Cause: {result}." in r.stdout, r.stdout
+        assert "did not ship. No PR opened." in r.stdout
         assert "the RESULT line above names it" not in r.stdout
-        assert log, f"no 'See <log>.' pointer: {r.stdout!r}"
+        assert log, f"no 'Log: <log>' line: {r.stdout!r}"
         assert result in pathlib.Path(log.group(1)).read_text(), "the named log lacks RESULT"
     finally:
         if log:
@@ -1354,17 +1433,19 @@ def test_skill_only_leg_also_carries_a_session_id(tmp_path):
     assert len(matches) == 1, f"expected one --session-id in skill-only cmd, got {matches}"
 
 
-def test_exit3_message_is_shell_safe_and_names_both_causes():
+def test_exit3_message_is_shell_safe_and_reads_the_block():
     """GATE_CLOSE is re-parsed by /bin/bash -lc on the far side of the launchd plist:
-    a backtick or $( ) there silently mangles the message (see the file's own comments).
-    It must also no longer claim rebase conflict is the only cause of exit 3."""
+    a backtick there silently mangles the message (see the file's own comments). Its one
+    command substitution must be the escaped call to blocked_ship_block, and it must
+    no longer carry the old fixed wording."""
     src = open(PPN).read()
     line = [l for l in src.splitlines() if l.strip().startswith("GATE_CLOSE=\"; elif")]
     assert len(line) == 1, f"expected one populated GATE_CLOSE, got {len(line)}"
     body = line[0]
     assert "`" not in body, "backtick in GATE_CLOSE survives to a second shell parse"
-    assert "$(" not in body, "command substitution in GATE_CLOSE"
-    assert "gate denial" in body and "rebase conflict" in body
+    assert body.count("$(") == 1 and "\\$(blocked_ship_block " in body, \
+        "the only command substitution must be the far-side blocked_ship_block call"
+    assert "fail-closed sentinel" not in body and "SKIPPING" not in body
 
 
 def test_badge_banner_rc3_names_both_fail_closed_causes():
@@ -1389,7 +1470,7 @@ def test_exit3_dm_and_echo_send_the_same_single_string():
     line = [l for l in src.splitlines() if l.strip().startswith("GATE_CLOSE=\"; elif")]
     assert len(line) == 1, f"expected one populated GATE_CLOSE, got {len(line)}"
     body = line[0]
-    assert 'echo \\"\\$msg\\"' in body
+    assert "'=== post-plan blocked ship ===' \\\"\\$msg\\\" '=== end blocked ship ==='" in body
     assert 'bin/post-plan-fail-dm\\" ' in body and body.rstrip('"').endswith('\\"\\$msg\\" || true; fi')
     assert body.count("msg=") == 1
 
@@ -1488,7 +1569,7 @@ def test_gate_denial_fails_closed_then_allows_a_refire(tmp_path):
     assert re.search(
         r"^post-plan-now: postplan-rc=3 harness-rc=3 harness-run-dir=\S+$",
         r.stdout, re.M), r.stdout
-    assert "fail-closed sentinel" in r.stdout
+    assert "did not ship. No PR opened." in r.stdout
     assert not (tmp_path / "claude-log.txt").exists(), \
         "rc=3 must NOT spawn a /post-plan skill session"
     # Leg 2 -- job B at 14:49:24: job A is gone, so its label is gone, so a re-fire is
@@ -1508,7 +1589,7 @@ def test_generated_cmd_guards_gate_open_with_sigterm_flag(tmp_path):
     """
     cmd = _generate_cmd(tmp_path)
     # The guard appears before should_fallback in the gate expression
-    gate_pos = cmd.index('should_fallback "$rc"; then')
+    gate_pos = cmd.index('should_fallback "$rc" && ! usage_postrun_pause')
     sigterm_guard = '_sigterm_received'
     assert sigterm_guard in cmd[:gate_pos], (
         "GATE_OPEN must check _sigterm_received BEFORE calling should_fallback"

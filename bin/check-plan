@@ -207,6 +207,22 @@
 #                              Truly-manual rows, or whose manual rows are
 #                              non-visual ("the exported CSV opens in Excel"),
 #                              never reaches it.
+#   X  (no-change) marker    — a `(no-change)` matrix marker sits on a Visual-regression
+#                              row, directly after the backticked test token. The
+#                              post-plan harness honors it nowhere else, so a
+#                              misplaced one is a silent no-op that surfaces only
+#                              after implementation.
+#                              A mention inside a backtick code span, or inside a
+#                              fenced fixture block, is not a marker and is skipped.
+#   Z  Leading-star matrix token — a backticked single-word token in a matrix
+#                              "What to verify" cell that starts with '*' (the
+#                              catch-all case arm, a bare extension glob).
+#                              bin/lib/plan-matrix-assertions realises a glob
+#                              token only through its prefix before the first
+#                              '*', so an empty prefix is reported
+#                              UNREALISED-ASSERTION at post-plan Step 6.7
+#                              whatever the diff holds. Extraction mirrors the
+#                              checker; bin/test-check-plan pins the parity.
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
@@ -234,6 +250,24 @@
 # Bash 3.2 / macOS compatible: no mapfile, no declare -A; temp files collect
 # state. `shell=bash` keeps shellcheck's SC3xxx (sh-dialect) warnings quiet on
 # the intentional bashisms.
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: bin/check-plan [--print-critical-files] [--draft] <plan-file>
+
+Mechanical lint for /plan output (the Step-4 deterministic gates).
+
+  --print-critical-files  Print the parsed critical-files section and exit
+  --draft                 Run only gate [D] (phase-count drift) against a draft plan
+  <plan-file>             Path to the plan file to check
+
+Exit codes:
+  0  All gates passed
+  1  One or more gate violations found
+  2  Usage error (missing or non-existent plan file)
+EOF
+    exit 0
+fi
 
 set -u
 
@@ -394,6 +428,39 @@ awk '
     inm && /^[[:space:]]*\|/ { print; next }
     inm && !/^[[:space:]]*\|/ { inm=0 }
 ' "$PLAN_FILE" > "$MATRIX_FILE"
+
+# Fence-aware body + matrix, shared by gates X and P. $MATRIX_FILE above is
+# deliberately fence-blind (gates 3/V/G/Q read it as-is); gates X and P must NOT
+# see rows that sit inside a fenced fixture block, because a fence-blind read
+# makes a plan that DOCUMENTS a marker read as CARRYING it, and lets a fixture's
+# matrix row clear a real declared artifact. Built once, here, because gate X
+# (below) runs before gate P. Fence logic is gate T's, verbatim: a closing fence
+# is backticks-only AND at least as long as the opener.
+awk '
+    function fence_ticks(s,   t) {
+        if (match(s, /^[ \t]*`+/)) {
+            t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
+        }
+        return 0
+    }
+    BEGIN { in_fence = 0; fence_len = 0 }
+    {
+        n = fence_ticks($0)
+        # A closing fence is backticks-only AND at least as long as the opener.
+        if (in_fence) { if (n >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) { in_fence = 0; fence_len = 0 }; next }
+        if (n >= 3)   { in_fence = 1; fence_len = n; next }
+        print
+    }
+' "$PLAN_FILE" > "$GATEP_BODY"
+
+# [P]'s own matrix parse — same shape as :201-205 but over the fence-stripped
+# body. NOT $MATRIX_FILE, which is built from the raw file and would let a
+# fenced fixture row clear a real artifact.
+awk '
+    /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
+    inm && /^[[:space:]]*\|/ { print; next }
+    inm && !/^[[:space:]]*\|/ { inm=0 }
+' "$GATEP_BODY" > "$GATEP_MATRIX"
 
 # The isolation awk consumes the header row, but gate V needs its column count to
 # tell an escaped pipe from a raw one. Grab it separately; 0 means "unknown, skip
@@ -883,6 +950,19 @@ elif [ -n "$(printf '%s' "$CF_SECTION" | tr -d '[:space:]')" ]; then
         viol "[F] ## Critical Files section uses table format — use list form: - \`path\` (annotation)"
     elif [ -z "$(cf_parse_section "$PLAN_FILE")" ]; then
         viol "[F] ## Critical Files section has no parseable entries — each entry must be a list bullet whose first token is a backticked path: - \`path\` (annotation)"
+    else
+        # Absolute-path check: a primary backticked path starting with / is not
+        # repo-relative and cannot be matched by `git diff --name-only` at Phase
+        # 5.0 conformance time. Paths like /Users/.../IBL5/ibl5/... or
+        # /Users/.../IBL5-worktrees/<slug>/... must be written as ibl5/... etc.
+        # This is the ONE caller of cf_parse_section_raw: the normalising
+        # cf_parse_section strips exactly these prefixes (so legacy plans can
+        # match at Phase 5.0), which would blind this check. Raw already strips
+        # fenced code blocks.
+        _f_abs=$(cf_parse_section_raw "$PLAN_FILE" | grep -E '^(MUST_APPEAR|EXEMPT):/' | head -1 | sed -E 's/^[A-Z_]+://')
+        if [ -n "$_f_abs" ]; then
+            viol "[F] ## Critical Files entry has an absolute path (\`$_f_abs\`) — paths must be repo-relative (e.g. \`ibl5/...\`, \`bin/...\`) because post-plan's Phase 5.0 compares them to \`git diff --name-only\` output"
+        fi
     fi
 fi
 
@@ -898,6 +978,71 @@ if grep -qiE '\|[[:space:]]*PHPUnit[[:space:]]*\|' "$MATRIX_FILE"; then
     if [ "$RTM_ITEMS" -eq 0 ] && ! grep -qE 'no-test-methods:[[:space:]]*.{15,}' "$PLAN_FILE"; then
         viol "[M] matrix has a PHPUnit row but no parseable ## Required Test Methods section — list the exact method names (bare name, one per bullet, outside any fence), or add <!-- no-test-methods: reason at least 15 characters -->"
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate X: a `(no-change)` matrix marker is honored by the post-plan harness
+# (tools/postplan-harness/harness/planfile.py parse_no_change_test_paths) ONLY
+# on a Visual-regression row and ONLY directly after the row's backticked test
+# token. Anywhere else it is a silent no-op: the row still plans the test,
+# Phase 5.0 emits MISSING, and arming condition (3) holds after implementation.
+# Catch that at authoring time. Rows come from $GATEP_MATRIX (fence-aware), and a
+# `(no-change)` quoted only inside a backtick code span does not count as a marker.
+# Herestrings, not printf pipes: pipefail + grep -q
+# (see .claude/rules/shell-pipefail-grep.md).
+# ---------------------------------------------------------------------------
+while IFS= read -r row; do
+    # Presence test runs on a copy with balanced backtick spans removed: a
+    # `(no-change)` that is only quoted in a code span is a mention, not a marker.
+    # The checks below still read the original row.
+    bare=$(sed 's/`[^`]*`//g' <<< "$row")
+    grep -qiF '(no-change)' <<< "$bare" || continue
+    if ! awk -F'|' '
+        { for (i = 1; i <= NF; i++) { c = tolower($i); gsub(/[[:space:]*]/, "", c)
+          if (c ~ /^visual-?regression$/) found = 1 } }
+        END { exit found ? 0 : 1 }' <<< "$row"; then
+        viol "[X] (no-change) marker on a non-Visual-regression matrix row — the harness honors it only when a whole cell reads Visual-regression; write the test the row plans, or retype the row: ${row}"
+    elif ! grep -qiE '`[[:space:]]*\(no-change\)' <<< "$row"; then
+        viol "[X] (no-change) marker is not directly after the row's backticked test token — the harness honors only the shape \`path\` (no-change): ${row}"
+    fi
+done < "$GATEP_MATRIX"
+
+# ---------------------------------------------------------------------------
+# Gate Y: the `(one-time-check: <reason>)` matrix tag. bin/lib/plan-matrix-assertions
+# skips a tagged row instead of reporting UNREALISED-ASSERTION, and ignores the tag
+# fail-closed when it is malformed, so a bad tag silently re-arms the gate the author
+# meant to release. Reject the bad shapes here, and cap the tagged share at one third
+# of the matrix: a one-shot check is evidence that cannot be pinned, and a plan that
+# cannot pin more than a third of its rows needs regression tests, not tags.
+# The helper honors the tag only as the TRAILING text of the What-to-verify cell, only
+# with a reason >= 15 chars free of ( ) | and backtick, and only on a CLI-executable row.
+# ---------------------------------------------------------------------------
+_y_total=0; _y_tagged=0
+_y_shape='\(one-time-check: [^()|`]*\)$'
+while IFS= read -r row; do
+    matrix_split "$row" || continue
+    [ "$MC_NUM" != "#" ] || continue
+    _y_total=$((_y_total + 1))
+    grep -qF 'one-time-check' <<< "$row" || continue
+    _y_what="${MC_WHAT//$MSEN/|}"
+    if ! grep -qE "$_y_shape" <<< "$_y_what"; then
+        viol "[Y] one-time-check tag is not the trailing text of the What-to-verify cell, or its reason holds ( ) | or a backtick — the helper ignores it fail-closed and the row is still checked; write the cell as '<what> (one-time-check: <reason>)': ${row}"
+        continue
+    fi
+    _y_reason=$(sed -E 's/.*\(one-time-check: ([^()|`]*)\)$/\1/' <<< "$_y_what")
+    _y_reason=$(mtrim "$_y_reason")
+    if [ "${#_y_reason}" -lt 15 ]; then
+        viol "[Y] one-time-check reason is under 15 characters — say what was run and what it printed: ${row}"
+        continue
+    fi
+    if [ "$MC_TYPE" != "CLI-executable" ]; then
+        viol "[Y] one-time-check tag on a ${MC_TYPE} row — the helper honors it only when the Test type cell reads exactly CLI-executable; a regression test or a human judgment is never a one-shot run: ${row}"
+        continue
+    fi
+    _y_tagged=$((_y_tagged + 1))
+done < "$MATRIX_FILE"
+if [ "$_y_tagged" -gt 0 ] && [ $((_y_tagged * 3)) -gt "$_y_total" ]; then
+    viol "[Y] ${_y_tagged} of ${_y_total} matrix rows carry (one-time-check: ...) — more than one third of the matrix is unpinned; a one-time check is for evidence no regression test can hold, so convert rows to tests or split the plan"
 fi
 
 # ---------------------------------------------------------------------------
@@ -1252,35 +1397,7 @@ done < <(printf '%s\n' "$_PACKET_SCAN" | grep '^\[E\]')
 # only; the only clears are an exercising matrix row and a line-anchored
 # pre-prod-exception: marker.
 
-# Every [P] read is ````-AWARE. This plan file (and the two docs it edits)
-# embed complete plan fixtures inside fences; a fence-blind read makes a plan
-# that DOCUMENTS the marker read as CARRYING it, and lets a fixture's matrix row
-# clear a real declared artifact. Fence logic is gate T's, verbatim.
-awk '
-    function fence_ticks(s,   t) {
-        if (match(s, /^[ \t]*`+/)) {
-            t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
-        }
-        return 0
-    }
-    BEGIN { in_fence = 0; fence_len = 0 }
-    {
-        n = fence_ticks($0)
-        # A closing fence is backticks-only AND at least as long as the opener.
-        if (in_fence) { if (n >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) { in_fence = 0; fence_len = 0 }; next }
-        if (n >= 3)   { in_fence = 1; fence_len = n; next }
-        print
-    }
-' "$PLAN_FILE" > "$GATEP_BODY"
-
-# [P]'s own matrix parse — same shape as :201-205 but over the fence-stripped
-# body. NOT $MATRIX_FILE, which is built from the raw file and would let a
-# fenced fixture row clear a real artifact.
-awk '
-    /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
-    inm && /^[[:space:]]*\|/ { print; next }
-    inm && !/^[[:space:]]*\|/ { inm=0 }
-' "$GATEP_BODY" > "$GATEP_MATRIX"
+# $GATEP_BODY / $GATEP_MATRIX are built once, next to $MATRIX_FILE above (shared with gate X).
 
 # Marker: line-anchored HTML-comment form ONLY (see header) — a bare grep -qF
 # would be cleared by any plan that merely quotes the token in prose.
@@ -1540,6 +1657,66 @@ if [ "${_j_new_class:-0}" -gt 0 ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Gate [O]: "Hub" in module/class names (hard-fail).
+# ---------------------------------------------------------------------------
+# Merged IBL5 modules must never carry "Hub" in their name (user preference,
+# first recorded in memory/feedback_no_hub_in_module_names.md). Fire on:
+#   1. PascalCase identifiers containing Hub: e.g. RecordsHub, HubDraft, DataHub
+#   2. Bare capitalized "Hub" used as a label, e.g. "Records Hub", "Draft Hub"
+#   3. Paths under ibl5/modules/ or ibl5/classes/ whose filename contains Hub
+# Exempt (removed before matching):
+#   - GitHub / github (explicit per-task exemption)
+#   - .github/ paths
+#   - Inline code spans (already exempted by fence-stripping)
+#   - URLs (https?://)
+#   - "Docker Hub", and any line carrying <!-- hub-ok --> (e.g. a non-name use
+#     like a graph label)
+# Fence-aware (tracks open/close of backtick blocks).
+_o_hub_hits=$(awk '
+    function fence_ticks(s,   t) {
+        if (match(s, /^[ \t]*`+/)) {
+            t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
+        }
+        return 0
+    }
+    BEGIN { infence=0; fence_len=0; hits=0 }
+    {
+        nt = fence_ticks($0)
+        if (infence) {
+            if (nt >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) { infence=0; fence_len=0 }
+            next
+        }
+        if (nt >= 3) { infence=1; fence_len=nt; next }
+        line = $0
+        # Strip exempt patterns before Hub-scanning.
+        # Note: inline code spans (single backticks) are NOT exempt — only fenced
+        # blocks are. A plan naming `RecordsHub` in a backtick span still refers to
+        # a Hub-named identifier.
+        if (line ~ /<!-- hub-ok -->/) next
+        gsub(/[Gg]it[Hh]ub/, "", line)
+        gsub(/Docker Hub/, "", line)
+        gsub(/\.github\/[^ \t]*/, "", line)
+        gsub(/https?:\/\/[^ \t]*/, "", line)
+        # Pattern 1a: PascalCase with Hub as suffix/middle: RecordsHub, DataHubStore.
+        if (match(line, /[A-Z][A-Za-z0-9]*Hub[A-Za-z0-9]*/)) { if (!hits) first=NR ": " $0; hits++; next }
+        # Pattern 1b: PascalCase with Hub as prefix: HubDraft, HubManager.
+        if (match(line, /[^A-Za-z0-9]Hub[A-Za-z0-9]+/)) { if (!hits) first=NR ": " $0; hits++; next }
+        if (match(line, /^Hub[A-Za-z0-9]+/))             { if (!hits) first=NR ": " $0; hits++; next }
+        # Pattern 2: Hub as standalone capitalized word (not glued to alnum on left)
+        if (match(line, /[^A-Za-z0-9]Hub([^A-Za-z0-9]|$)/)) { if (!hits) first=NR ": " $0; hits++; next }
+        if (match(line, /^Hub([^A-Za-z0-9]|$)/))             { if (!hits) first=NR ": " $0; hits++; next }
+        # Pattern 3: path under ibl5/modules/ or ibl5/classes/ containing Hub
+        if (match(line, /ibl5\/(modules|classes)\/[^ \t]*Hub/)) { if (!hits) first=NR ": " $0; hits++; next }
+    }
+    END { print hits+0; if (hits) print first }
+' "$PLAN_FILE")
+_o_first=$(printf '%s\n' "$_o_hub_hits" | sed -n 2p)
+_o_hub_hits=$(printf '%s\n' "$_o_hub_hits" | head -1)
+if [ "${_o_hub_hits:-0}" -gt 0 ]; then
+    viol "[O] plan names ${_o_hub_hits} Hub identifier(s) (first at line ${_o_first}) — mark a non-name use with <!-- hub-ok -->, otherwise — rename to a plain noun (e.g. DraftInfo, Records, Leaderboards); \"Hub\" in a module or class name is banned by project convention"
+fi
+
+# ---------------------------------------------------------------------------
 # Gate [U]: ## Backlog issues bullet grammar (hard-fail).
 # ---------------------------------------------------------------------------
 # The post-plan harness (tools/postplan-harness/harness/planfile.py,
@@ -1556,6 +1733,61 @@ if [ -n "$_u_bad" ]; then
         viol "[U] ## Backlog issues line must read '- closes|refs a-jay85/IBL5-backlog#N — <what>' (lowercase tag, full repo path, a description): \"${_u_line}\""
     done <<< "$_u_bad"
 fi
+
+# ---------------------------------------------------------------------------
+# Gate [Z]: leading-star backticked token in a matrix "What to verify" cell.
+# ---------------------------------------------------------------------------
+# >>> gate-Z-leading-star-token
+# bin/lib/plan-matrix-assertions treats a backticked single-word token holding
+# '*' as a glob and realises it only through the text BEFORE the first '*'. A
+# token that STARTS with '*' has an empty prefix, so the checker reports its
+# row UNREALISED-ASSERTION whatever the diff holds, and post-plan Step 6.7
+# fails the run. This awk mirrors the checker's row-extraction awk and its
+# placeholder filter exactly: plain ``` / ~~~ fence toggle, the What-to-verify
+# header, the \| escape, the 2nd table column, separator rows skipped, first
+# row id wins, odd backtick splits, whitespace tokens dropped, name=value cut
+# at the first '=', then tokens holding ... or <x> dropped. bin/test-check-plan
+# pins this mirror to the real checker (its "Gate [Z] parity" block). WAIVE-
+# MATRIX-ROW waivers live in the PR body, which does not exist at lint time,
+# so they are not consulted. A (one-time-check: ...) tagged row is still
+# flagged: the tag does not change how the checker globs the token.
+_z_hits=$(awk -F'|' '
+BEGIN { fence=0; inm=0; }
+/^[[:space:]]*(```|~~~)/ { fence = !fence; inm = 0; next; }
+fence { next; }
+/\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
+inm && /^[[:space:]]*\|/ {
+    line = $0;
+    gsub(/\\\|/, "\001", line);
+    n = split(line, f, "|");
+    if (n < 3) { next; }
+    id = f[2]; gsub(/^[[:space:]]+|[[:space:]]+$/, "", id);
+    cell = f[3]; gsub(/\001/, "|", cell); gsub(/\t/, " ", cell);
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", cell);
+    if (cell ~ /^[[:space:]:-]*$/) next;
+    if (seen[id]) next;
+    seen[id] = 1;
+    n2 = split(cell, parts, "`");
+    for (i = 2; i < n2; i += 2) {
+        t = parts[i];
+        if (t == "") continue;
+        if (t ~ /[[:space:]]/) continue;
+        sub(/=.*/, "", t);
+        if (t == "") continue;
+        if (index(t, "...") > 0) continue;
+        if (t ~ /<.*>/) continue;
+        if (substr(t, 1, 1) == "*") print id "\t" t;
+    }
+    next;
+}
+inm && !/^[[:space:]]*\|/ { inm=0; }
+' "$PLAN_FILE")
+if [ -n "$_z_hits" ]; then
+    while IFS=$'\t' read -r _z_id _z_tok; do
+        viol "[Z] matrix row ${_z_id}: backticked token '${_z_tok}' starts with '*'. bin/lib/plan-matrix-assertions globs on the text before the first '*', so an empty prefix is never realised and post-plan Step 6.7 reports this row UNREALISED-ASSERTION whatever the diff holds. Drop the backticks or reword the token in prose (e.g. the token '*)' becomes \"the catch-all case arm\")"
+    done <<< "$_z_hits"
+fi
+# <<< gate-Z-leading-star-token
 
 # ---------------------------------------------------------------------------
 # Report.

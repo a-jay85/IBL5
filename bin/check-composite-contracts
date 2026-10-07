@@ -16,22 +16,150 @@
 #                   fast-forward push path — force-push flags, permissions, PAT
 #                   credential, kill-switch count, walkback setting, fork guard,
 #                   SKIP_CHECKS/job-name sync, and merge-script parity.
+#   required PR workflows (R1): tests.yml, e2e-tests.yml, human-signoff.yml,
+#                   pr-meta-checks.yml and mutation.yml must keep a block-style
+#                   `on: pull_request:` trigger with no `paths:` or
+#                   `paths-ignore:` under it. push.paths stays legal.
+#   mutation-pr:    four invariants (M1-M4) that keep the required check
+#                   `Infection PHP (per-PR diff)` reporting on every PR: M1 always
+#                   starts (no filters, no `labeled`), M2 exact context shared with
+#                   the ADR and unique, M3 never job-skipped (no job-level `if:` or
+#                   `continue-on-error`), M4 the --min-msi=100 threshold intact.
+#   all-checks-green: four invariants (A1-A4) that keep the required aggregator
+#                   check `All checks green` (ADR-0149) reporting on every PR and
+#                   failing closed: A1 always starts (no filters; synchronize,
+#                   labeled, unlabeled and edited types), A2 one context literal
+#                   shared by the workflow job, bin/lib/pr-armable.sh, the harness
+#                   armable.py and the ADR, and unique across workflows, A3 never
+#                   job-skipped, A4 bounded wait (timeout-minutes, --wait,
+#                   --self, --timeout-seconds) and no write permission.
 #
 # Conditional by design: each check is SKIPPED (visibly) when its target file is
 # absent, so this no-ops on a branch without the file and auto-activates the
 # moment it lands. The visible "skipped" line means a path typo can't silently
 # turn the gate into a vacuous pass.
 #
-# Usage: bin/check-composite-contracts [actions-dir] [workflows-dir] [merge-script] [promote-script]
+# Usage: bin/check-composite-contracts [actions-dir] [workflows-dir] [merge-script] [promote-script] [decisions-dir]
 #   defaults: .github/actions, .github/workflows, bin/merge-master-to-prod,
-#             bin/promote-master-to-production
+#             bin/promote-master-to-production, ibl5/docs/decisions
+#
+# Second mode (read-only, no token, no network):
+#        bin/check-composite-contracts --protection-readback=<post.json> --pre-image=<pre.json> [--context=<name>]
+#   Compares two saved `gh api repos/<owner>/<repo>/branches/master/protection`
+#   responses (R0-R4) to prove the manual activation POST added exactly the
+#   `Infection PHP (per-PR diff)` context (or the --context=<name> one, e.g.
+#   `All checks green` for ADR-0149) and changed nothing else. Exit 0 = OK,
+#   1 = an R check failed, 2 = bad usage or unreadable input.
 set -eu
+
+# Required status-check context emitted by mutation-pr.yml (ADR-0145). The ONE
+# machine-checked copy of this literal; M2 compares the workflow and the ADR to it,
+# and --protection-readback compares branch protection to it.
+MUT_CONTEXT='Infection PHP (per-PR diff)'
+
+# Required aggregator context emitted by all-checks-green.yml (ADR-0149). The same
+# literal lives in bin/lib/pr-armable.sh (PR_ARMABLE_AGGREGATOR_CONTEXT) and
+# tools/postplan-harness/harness/armable.py (AGGREGATOR_CONTEXT); A2 pins all three.
+AGG_CONTEXT='All checks green'
+
+# protection_readback <post.json> <pre.json> [context]
+# Read-only proof that the manual append-only POST to branch protection added
+# exactly the context (default $MUT_CONTEXT) and changed nothing else. Both files are saved
+# `gh api repos/<owner>/<repo>/branches/master/protection` responses. Runs every
+# R check before returning so the operator sees all problems at once.
+# Exit 0 = OK, 1 = an R check failed, 2 = could not evaluate.
+protection_readback() {
+  local post="$1" pre="$2" ctx="${3:-$MUT_CONTEXT}" bad=0 f
+  command -v jq >/dev/null 2>&1 || { echo "protection-readback: jq not found on PATH" >&2; exit 2; }
+  for f in "$post" "$pre"; do
+    [ -f "$f" ] || { echo "protection-readback: $f not found" >&2; exit 2; }
+    jq -e . "$f" >/dev/null 2>&1 || { echo "protection-readback: $f is not valid JSON" >&2; exit 2; }
+    jq -e '.required_status_checks.contexts | type == "array"' "$f" >/dev/null 2>&1 \
+      || { echo "protection-readback: $f has no .required_status_checks.contexts array" >&2; exit 2; }
+  done
+
+  # R0: the pre-image must not already carry the context.
+  if jq -e --arg m "$ctx" '.required_status_checks.contexts | any(. == $m)' "$pre" >/dev/null; then
+    echo "protection-readback: FAIL (R0) — pre-image already contains '$ctx'; the activation was a no-op or ran twice ($pre)" >&2
+    bad=1
+  fi
+
+  # R1: the post state carries the context.
+  if ! jq -e --arg m "$ctx" '.required_status_checks.contexts | any(. == $m)' "$post" >/dev/null; then
+    echo "protection-readback: FAIL (R1) — '$ctx' is absent from the post state; the POST never landed ($post)" >&2
+    bad=1
+  fi
+
+  # R2: post contexts == pre contexts + the new one (catches a dropped context, a
+  # swapped context, and a full-replace PUT), and no existing check changed app_id.
+  local want_ctx got_ctx want_chk got_chk
+  want_ctx="$(jq -c --arg m "$ctx" '.required_status_checks.contexts + [$m] | sort' "$pre")"
+  got_ctx="$(jq -c '.required_status_checks.contexts | sort' "$post")"
+  if [ "$want_ctx" != "$got_ctx" ]; then
+    echo "protection-readback: FAIL (R2) — post contexts $got_ctx, expected pre plus the new context $want_ctx" >&2
+    bad=1
+  fi
+  want_chk="$(jq -c --arg m "$ctx" '(.required_status_checks.checks // []) | map(select(.context != $m)) | sort_by(.context)' "$pre")"
+  got_chk="$(jq -c --arg m "$ctx" '(.required_status_checks.checks // []) | map(select(.context != $m)) | sort_by(.context)' "$post")"
+  if [ "$want_chk" != "$got_chk" ]; then
+    echo "protection-readback: FAIL (R2) — an existing check changed or was dropped: pre $want_chk, post $got_chk" >&2
+    bad=1
+  fi
+
+  # R3: strict stays on.
+  if ! jq -e '.required_status_checks.strict == true' "$post" >/dev/null; then
+    echo "protection-readback: FAIL (R3) — required_status_checks.strict is not true in the post state ($post)" >&2
+    bad=1
+  fi
+
+  # R4: everything except contexts/checks is identical.
+  local pre_rest post_rest
+  pre_rest="$(jq -S 'del(.required_status_checks.contexts, .required_status_checks.checks)' "$pre")"
+  post_rest="$(jq -S 'del(.required_status_checks.contexts, .required_status_checks.checks)' "$post")"
+  if [ "$pre_rest" != "$post_rest" ]; then
+    echo "protection-readback: FAIL (R4) — a protection setting other than contexts/checks changed between pre and post" >&2
+    bad=1
+  fi
+
+  if [ "$bad" -ne 0 ]; then
+    return 1
+  fi
+  local n
+  n="$(jq '.required_status_checks.contexts | length' "$post")"
+  echo "protection-readback: OK — $n contexts (pre $((n - 1)) + \"$ctx\"), strict=true, nothing else changed"
+  return 0
+}
+
+case "${1:-}" in
+  --protection-readback=*)
+    post="${1#--protection-readback=}"
+    case "${2:-}" in
+      --pre-image=?*) pre="${2#--pre-image=}" ;;
+      *) echo "usage: $0 --protection-readback=<post.json> --pre-image=<pre.json> [--context=<name>]" >&2; exit 2 ;;
+    esac
+    rb_ctx="$MUT_CONTEXT"
+    if [ $# -eq 3 ]; then
+      case "$3" in
+        --context=?*) rb_ctx="${3#--context=}" ;;
+        *) echo "usage: $0 --protection-readback=<post.json> --pre-image=<pre.json> [--context=<name>]" >&2; exit 2 ;;
+      esac
+    elif [ $# -ne 2 ]; then
+      echo "composite-contracts: unexpected extra args" >&2; exit 2
+    fi
+    rb_rc=0
+    protection_readback "$post" "$pre" "$rb_ctx" || rb_rc=$?
+    exit "$rb_rc" ;;
+  --*)
+    echo "composite-contracts: unknown or malformed flag '$1' (use --protection-readback=<file> --pre-image=<file>)" >&2
+    exit 2 ;;
+esac
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ACTIONS="${1:-$ROOT/.github/actions}"
 WORKFLOWS="${2:-$ROOT/.github/workflows}"
 MERGE_SCRIPT="${3:-$ROOT/bin/merge-master-to-prod}"
 PROMOTE_SCRIPT="${4:-$ROOT/bin/promote-master-to-production}"
+DECISIONS="${5:-$ROOT/ibl5/docs/decisions}"
 
 fail=0
 
@@ -187,5 +315,296 @@ else
   fi
 
 fi  # end pp_file present
+
+# R1: required PR workflows must not carry a workflow-level pull_request path
+# filter. Branch protection requires "Tests and Analysis", "E2E Tests",
+# "human-signoff" and "Meta checks" (strict=true, no rulesets). A workflow that
+# on.pull_request.paths skips never reports its check, so the PR sits on
+# "Expected" forever. mutation.yml is listed because the sibling plan
+# mutation-required-check makes its check required. push.paths is legal:
+# tests.yml and e2e-tests.yml scope master pushes that way. A file with no
+# block-style pull_request key also fails, so a flow-style rewrite cannot turn
+# this check into a vacuous pass.
+for wf_name in tests.yml e2e-tests.yml human-signoff.yml pr-meta-checks.yml mutation.yml all-checks-green.yml; do
+  wf_file="$WORKFLOWS/$wf_name"
+  if [ ! -f "$wf_file" ]; then
+    echo "composite-contracts: $wf_name absent — R1 skipped"
+    continue
+  fi
+  r1_rc=0
+  r1_hits="$(awk '
+    /^on:[[:space:]]*(#.*)?$/ { inon=1; next }
+    inon && /^[^[:space:]#]/ { inon=0; inpr=0 }
+    inon && /^  pull_request:[[:space:]]*(#.*)?$/ { inpr=1; found=1; next }
+    inpr && /^  [^[:space:]#]/ { inpr=0 }
+    inpr && /^[[:space:]]+(paths|paths-ignore)[[:space:]]*:/ { print NR; bad=1 }
+    END { if (bad) exit 1; if (!found) exit 2 }
+  ' "$wf_file")" || r1_rc=$?
+  case "$r1_rc" in
+    0)
+      echo "composite-contracts: $wf_name pull_request has no workflow-level path filter (R1)"
+      ;;
+    1)
+      echo "composite-contracts: $wf_name (R1) — on.pull_request carries paths/paths-ignore at line(s) $(printf '%s' "$r1_hits" | tr '\n' ','); a required check skipped by a path filter never reports and blocks the PR. Scope with a job-level changes filter instead ($wf_file)" >&2
+      fail=1
+      ;;
+    *)
+      echo "composite-contracts: $wf_name (R1) — no block-style 'on: pull_request:' key found; either the required check no longer runs on PRs or a flow-style trigger hid it from this parser ($wf_file)" >&2
+      fail=1
+      ;;
+  esac
+done
+
+mp_file="$WORKFLOWS/mutation-pr.yml"
+if [ ! -f "$mp_file" ]; then
+  echo "composite-contracts: mutation-pr absent — skipped"
+else
+
+  # on_blk: the `on:` block up to the next top-level key. job_blk: the
+  # mutation-pr job up to the next 2-space job key (or end of file).
+  on_blk="$(awk '
+    { sub(/\r$/, "") }
+    /^on:/ { inblk=1; print; next }
+    inblk && /^[A-Za-z]/ { exit }
+    inblk { print }
+  ' "$mp_file")"
+  job_blk="$(awk '
+    { sub(/\r$/, "") }
+    /^  mutation-pr:[[:space:]]*$/ { inblk=1; print; next }
+    inblk && /^  [A-Za-z0-9_-]+:[[:space:]]*$/ { exit }
+    inblk { print }
+  ' "$mp_file")"
+
+  # M1: always starts. A required check that never starts leaves the PR pending
+  # forever, so the trigger must include pull_request, carry no path/branch
+  # filter, and never list `labeled` (a labeled run shares the concurrency group
+  # and would cancel the real per-PR run).
+  _m1_bad=""
+  if ! grep -q 'pull_request' <<< "$on_blk"; then
+    _m1_bad="on: has no pull_request trigger"
+  elif grep -qE '^[[:space:]]+(paths|paths-ignore|branches|branches-ignore):' <<< "$on_blk"; then
+    _m1_bad="on: carries a paths/branches filter"
+  elif grep -Eq '(^|[^a-z_])labeled([^a-z_]|$)' <<< "$on_blk"; then
+    _m1_bad="on: lists the labeled type"
+  fi
+  if [ -n "$_m1_bad" ]; then
+    echo "composite-contracts: mutation-pr (M1) — $_m1_bad; the required check would not start on every PR event, leaving the PR pending forever ($mp_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: mutation-pr starts on every PR event, no filters, no labeled (M1)"
+  fi
+
+  # M2: the job name must equal the required context, the ADR must carry the same
+  # literal, and no other workflow may emit a second check run under that name.
+  _m2_bad=""
+  if [ -z "$job_blk" ]; then
+    _m2_bad="job mutation-pr is missing or renamed"
+  else
+    job_name="$(sed -n 's/^    name:[[:space:]]*//p' <<< "$job_blk" | head -1 | sed "s/[[:space:]]*\$//; s/^[\"']//; s/[\"']\$//")"
+    if [ "$job_name" != "$MUT_CONTEXT" ]; then
+      _m2_bad="job name is '${job_name:-<unset>}', expected '$MUT_CONTEXT'"
+    fi
+  fi
+  if [ -z "$_m2_bad" ]; then
+    _adr_files=()
+    for _f in "$DECISIONS"/*-mutation-pr-required-own-workflow.md; do
+      [ -f "$_f" ] && _adr_files+=("$_f")
+    done
+    if [ "${#_adr_files[@]}" -ne 1 ]; then
+      _m2_bad="expected exactly one ADR $DECISIONS/*-mutation-pr-required-own-workflow.md, found ${#_adr_files[@]}"
+    elif ! grep -qF -- "$MUT_CONTEXT" "${_adr_files[0]}"; then
+      _m2_bad="ADR ${_adr_files[0]} does not carry the literal '$MUT_CONTEXT'"
+    fi
+  fi
+  if [ -z "$_m2_bad" ]; then
+    for _wf in "$WORKFLOWS"/*.yml; do
+      [ -f "$_wf" ] || continue
+      [ "$_wf" = "$mp_file" ] && continue
+      if awk -v ctx="$MUT_CONTEXT" '
+        { sub(/\r$/, "") }
+        /^[[:space:]]*(- )?name:/ {
+          v=$0; sub(/^[^:]*:[[:space:]]*/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]+$/, "", v)
+          if (v == ctx) found=1
+        }
+        END { exit !found }
+      ' "$_wf"; then
+        _m2_bad="$_wf also names a job '$MUT_CONTEXT'; two check runs would share one required context"
+        break
+      fi
+    done
+  fi
+  if [ -n "$_m2_bad" ]; then
+    echo "composite-contracts: mutation-pr (M2) — $_m2_bad; the required context would not resolve to a single check run ($mp_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: mutation-pr job name matches the ADR and is unique (M2)"
+  fi
+
+  # M3: never job-skipped. A job-level `if:` can skip the job, and a skipped run
+  # may not satisfy the required context; job-level `continue-on-error` would let
+  # a failing job report green. Step-level keys sit at 6 spaces and stay legal.
+  if grep -qE '^    (if|continue-on-error):' <<< "$job_blk"; then
+    echo "composite-contracts: mutation-pr (M3) — job-level 'if:' or 'continue-on-error:' present; the job could be skipped or fail green, so the required check would not gate ($mp_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: mutation-pr has no job-level if/continue-on-error (M3)"
+  fi
+
+  # M4: threshold intact. Every --min-msi token must be exactly --min-msi=100, at
+  # least one must exist, and the step that runs it must not carry
+  # continue-on-error (which would turn an MSI miss into a green run).
+  _m4_bad=""
+  msi_tokens="$(grep -oE -- '--min-msi[= ][^ \\]*' "$mp_file" | tr -d '\r' || true)"
+  if [ -z "$msi_tokens" ]; then
+    _m4_bad="no --min-msi threshold found"
+  elif [ "$(grep -vcx -- '--min-msi=100' <<< "$msi_tokens" || true)" -ne 0 ]; then
+    _m4_bad="a --min-msi token is not exactly --min-msi=100"
+  elif awk '
+    { sub(/\r$/, "") }
+    function flush() { if (step ~ /--min-msi/ && step ~ /continue-on-error/) bad=1; step="" }
+    /^    - / { flush() }
+    { step = step "\n" $0 }
+    END { flush(); exit !bad }
+  ' <<< "$job_blk"; then
+    _m4_bad="the step running --min-msi carries continue-on-error"
+  fi
+  if [ -n "$_m4_bad" ]; then
+    echo "composite-contracts: mutation-pr (M4) — $_m4_bad; the 100% MSI gate would be weakened ($mp_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: mutation-pr keeps --min-msi=100 with no continue-on-error on that step (M4)"
+  fi
+
+fi  # end mp_file present
+
+# ---------------------------------------------------------------------------
+# all-checks-green invariants (A1-A4, ADR-0149). The aggregator is a required
+# context, so a run that never starts or never ends blocks every merge, and a
+# name that drifts from the predicates' literal silently re-arms condition (15).
+# ---------------------------------------------------------------------------
+agg_file="$WORKFLOWS/all-checks-green.yml"
+if [ ! -f "$agg_file" ]; then
+  echo "composite-contracts: all-checks-green absent — skipped"
+else
+  agg_on="$(awk '
+    { sub(/\r$/, "") }
+    /^on:/ { inblk=1; print; next }
+    inblk && /^[A-Za-z]/ { exit }
+    inblk { print }
+  ' "$agg_file")"
+  agg_perms="$(awk '
+    { sub(/\r$/, "") }
+    /^permissions:/ { inblk=1; print; next }
+    inblk && /^[A-Za-z]/ { exit }
+    inblk { print }
+  ' "$agg_file")"
+  agg_jobs="$(awk '
+    { sub(/\r$/, "") }
+    /^jobs:/ { inblk=1; next }
+    inblk && /^[A-Za-z]/ { exit }
+    inblk { print }
+  ' "$agg_file")"
+
+  # A1: always starts, and re-settles on every event that starts a sibling job.
+  _a1_bad=""
+  if ! grep -qE '^  pull_request:' <<< "$agg_on"; then
+    _a1_bad="on: has no block-style pull_request trigger"
+  elif grep -qE '^[[:space:]]+(paths|paths-ignore|branches|branches-ignore):' <<< "$agg_on"; then
+    _a1_bad="on: carries a paths/branches filter"
+  else
+    for _t in synchronize labeled unlabeled edited; do
+      if ! grep -qE "^[[:space:]]+types:.*(\[|[[:space:],])${_t}([],[:space:]]|\$)" <<< "$agg_on"; then
+        _a1_bad="pull_request types lack '$_t'"
+        break
+      fi
+    done
+  fi
+  if [ -n "$_a1_bad" ]; then
+    echo "composite-contracts: all-checks-green (A1) — $_a1_bad; the required aggregator would not report or re-settle on every PR event ($agg_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: all-checks-green starts on every PR event and re-settles on synchronize/labeled/unlabeled/edited (A1)"
+  fi
+
+  # A2: one context literal in every home, and exactly one job emitting it.
+  _a2_bad=""
+  _agg_names="$(sed -n 's/^    name:[[:space:]]*//p' <<< "$agg_jobs" | sed "s/^[\"']//; s/[\"']\$//")"
+  if [ "$(grep -cxF -- "$AGG_CONTEXT" <<< "$_agg_names" || true)" -ne 1 ]; then
+    _a2_bad="expected exactly one job named '$AGG_CONTEXT', job names are: $(tr '\n' '|' <<< "$_agg_names")"
+  elif ! grep -qF "PR_ARMABLE_AGGREGATOR_CONTEXT='$AGG_CONTEXT'" "$ROOT/bin/lib/pr-armable.sh" 2>/dev/null; then
+    _a2_bad="bin/lib/pr-armable.sh does not set PR_ARMABLE_AGGREGATOR_CONTEXT='$AGG_CONTEXT'"
+  elif ! grep -qF "AGGREGATOR_CONTEXT = \"$AGG_CONTEXT\"" "$ROOT/tools/postplan-harness/harness/armable.py" 2>/dev/null; then
+    _a2_bad="tools/postplan-harness/harness/armable.py does not set AGGREGATOR_CONTEXT = \"$AGG_CONTEXT\""
+  fi
+  if [ -z "$_a2_bad" ]; then
+    _agg_adrs=()
+    for _f in "$DECISIONS"/*-required-ci-aggregator*.md; do
+      [ -f "$_f" ] && _agg_adrs+=("$_f")
+    done
+    if [ "${#_agg_adrs[@]}" -ne 1 ]; then
+      _a2_bad="expected exactly one ADR $DECISIONS/*-required-ci-aggregator*.md, found ${#_agg_adrs[@]}"
+    elif ! grep -qF -- "$AGG_CONTEXT" "${_agg_adrs[0]}"; then
+      _a2_bad="ADR ${_agg_adrs[0]} does not carry the literal '$AGG_CONTEXT'"
+    fi
+  fi
+  if [ -z "$_a2_bad" ]; then
+    for _wf in "$WORKFLOWS"/*.yml; do
+      [ -f "$_wf" ] || continue
+      [ "$_wf" = "$agg_file" ] && continue
+      if awk -v ctx="$AGG_CONTEXT" '
+        { sub(/\r$/, "") }
+        /^    name:/ {
+          v=$0; sub(/^[^:]*:[[:space:]]*/, "", v); gsub(/["'"'"']/, "", v)
+          if (v == ctx) found=1
+        }
+        END { exit !found }
+      ' "$_wf"; then
+        _a2_bad="$_wf also names a job '$AGG_CONTEXT'; two check runs would share one required context"
+        break
+      fi
+    done
+  fi
+  if [ -n "$_a2_bad" ]; then
+    echo "composite-contracts: all-checks-green (A2) — $_a2_bad; the required context and the condition (15) predicates would disagree ($agg_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: all-checks-green context literal matches pr-armable.sh, armable.py and the ADR, and is unique (A2)"
+  fi
+
+  # A3: never job-skipped. A skipped or fail-green job would satisfy the context
+  # without checking anything. Step-level keys sit at 6 spaces and stay legal.
+  if grep -qE '^    (if|continue-on-error):' <<< "$agg_jobs"; then
+    echo "composite-contracts: all-checks-green (A3) — job-level 'if:' or 'continue-on-error:' present; the required check could pass without polling ($agg_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: all-checks-green has no job-level if/continue-on-error (A3)"
+  fi
+
+  # A4: fails closed. A bounded job, a waiting poller that ignores only itself by
+  # exact name, a script deadline, and no write scope.
+  _a4_bad=""
+  if ! grep -qE '^    timeout-minutes:[[:space:]]*[0-9]+' <<< "$agg_jobs"; then
+    _a4_bad="job has no timeout-minutes"
+  elif ! grep -qE -- '(^|[[:space:]])--wait([[:space:]\\]|$)' <<< "$agg_jobs"; then
+    _a4_bad="bin/check-pr-checks-green is not called with --wait"
+  elif ! grep -qF -- "--self='$AGG_CONTEXT'" <<< "$agg_jobs"; then
+    _a4_bad="bin/check-pr-checks-green is not called with --self='$AGG_CONTEXT'"
+  elif ! grep -qE -- '--timeout-seconds=[0-9]+' <<< "$agg_jobs"; then
+    _a4_bad="bin/check-pr-checks-green is not called with --timeout-seconds="
+  elif grep -qE ':[[:space:]]*write' <<< "$agg_perms$(printf '\n')$(grep -E '^[[:space:]]+[a-z-]+:[[:space:]]*write' <<< "$agg_jobs" || true)"; then
+    _a4_bad="permissions grant a write scope"
+  # PR-controlled text (github.event.pull_request.title|body|head.ref|labels) must never
+  # reach the workflow: it would be a script-injection path into the run block.
+  elif grep -qE 'github\.event\.pull_request\.(title|body|head\.ref|labels)' "$agg_file"; then
+    _a4_bad="interpolates PR-controlled text (title, body, head.ref or labels)"
+  fi
+  if [ -n "$_a4_bad" ]; then
+    echo "composite-contracts: all-checks-green (A4) — $_a4_bad; the aggregator would not fail closed or would hold more privilege than it reads with ($agg_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: all-checks-green is bounded, waits, ignores only itself, and is read-only (A4)"
+  fi
+
+fi  # end agg_file present
 
 exit "$fail"

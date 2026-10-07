@@ -23,6 +23,7 @@
 #   2. present in a diff context line (leading space or `-`)  -> pre-existing, skip
 #   2b. a `deleted file mode` header's path equals the token, ends with
 #       `/`+token, starts with token+`/`, or holds `/`+token+`/`  -> realised
+#       (a trailing `/` on the token is dropped first)
 #       (a deleted binary has no body lines; the header is the footprint;
 #       quoted-path headers are skipped fail-closed)
 #   3. present in a tracked file via `git grep -F`            -> pre-existing, skip
@@ -221,10 +222,12 @@ _prefix_realised() {
 
 # --- deleted-file arm: a token realised by a deletion header ---
 # Match is path-component aligned: equal, `/`+tok at the end, tok+`/` at the
-# start, or `/`+tok+`/` inside. A quoted "$t" in a case pattern is literal;
+# start, or `/`+tok+`/` inside. A trailing `/` on the token is dropped first, so
+# a directory token (`ibl5/images/hof/`) matches the files beneath it. A quoted "$t" in a case pattern is literal;
 # the bare `*` is the only glob, and `set -f` never touches case patterns.
 _deleted_realised() {
-    local t="$1" p
+    local t="${1%/}" p
+    [ -n "$t" ] || return 1
     [ -s "$TMP/deleted" ] || return 1
     while IFS= read -r p; do
         case "$p" in

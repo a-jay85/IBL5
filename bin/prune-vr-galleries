@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 if [[ "${1:-}" = "--help" || "${1:-}" = "-h" ]]; then
     cat <<'EOF'
-Usage: prune-vr-galleries [--dry-run] [--cutoff-days N] [--max-dirs N]
+Usage: prune-vr-galleries [--dry-run] [--cutoff-days N] [--max-dirs N] [--keep-file PATH]
 
 Prune stale per-SHA VR gallery directories from the gh-pages checkout.
 Operates on cwd (the gh-pages checkout) and never clones.
@@ -12,6 +12,8 @@ Options:
   --cutoff-days N  Age threshold in whole days (default: 7). Must be a positive integer.
   --max-dirs N     After the age pass, keep only the N most recent survivors.
                    Must be a positive integer. Default: unset (no count cap).
+  --keep-file PATH 40-hex dir names (one per line; blank and # lines ignored) exempt from both passes.
+                   Missing/unreadable/malformed file aborts with exit 1.
 
 Directories matching ./<40-hex-char SHA> whose most-recent commit date is
 older than N days are pruned. Directories with no git history are skipped.
@@ -25,16 +27,20 @@ set -euo pipefail
 # Operates on cwd (the gh-pages checkout) and never clones.
 # A fresh checkout resets filesystem mtimes, so `find -mtime` is unreliable;
 # derive each per-SHA dir's age from its newest commit date instead.
+# The --keep-file list is produced by `bin/vr-refresh-targets --mode=keep` in the
+# vr-pages-cleanup job.
 
 usage() {
   cat >&2 <<'EOF'
-Usage: prune-vr-galleries [--dry-run] [--cutoff-days N] [--max-dirs N]
+Usage: prune-vr-galleries [--dry-run] [--cutoff-days N] [--max-dirs N] [--keep-file PATH]
 
 Options:
   --dry-run        Report only, never git rm.
   --cutoff-days N  Age threshold in whole days (default: 7). Must be a positive integer.
   --max-dirs N     After the age pass, keep only the N most recent survivors.
                    Must be a positive integer. Default: unset (no count cap).
+  --keep-file PATH 40-hex dir names (one per line; blank and # lines ignored) exempt from both passes.
+                   Missing/unreadable/malformed file aborts with exit 1.
 
 Directories matching ./<40-hex-char SHA> whose most-recent commit date is
 older than N days are pruned. Directories with no git history are skipped.
@@ -46,6 +52,7 @@ EOF
 dry_run=0
 days=7
 max_dirs=""
+keep_file=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -89,6 +96,16 @@ while [[ $# -gt 0 ]]; do
       max_dirs="$N"
       shift
       ;;
+    --keep-file)
+      shift
+      if [[ $# -eq 0 || -z "${1:-}" ]]; then
+        echo "prune-vr-galleries: --keep-file needs a path" >&2
+        usage
+        exit 1
+      fi
+      keep_file="$1"
+      shift
+      ;;
     *)
       echo "Unknown option: $1" >&2
       usage
@@ -96,6 +113,33 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# Load the keep file (fail closed): a missing, unreadable, or malformed file
+# aborts before any git rm. keep_set is newline-delimited with a leading and
+# trailing newline; no associative array, since macOS ships bash 3.2.
+keep_set=$'\n'
+if [[ -n "$keep_file" ]]; then
+  if [[ ! -r "$keep_file" ]]; then
+    echo "prune-vr-galleries: keep file not readable: $keep_file" >&2
+    exit 1
+  fi
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    [[ -z "$line" ]] && continue
+    [[ "$line" == \#* ]] && continue
+    case "$line" in
+      (*[!0-9a-f]*)
+        echo "prune-vr-galleries: malformed keep-file line: $line" >&2
+        exit 1
+        ;;
+    esac
+    if [ "${#line}" -ne 40 ]; then
+      echo "prune-vr-galleries: malformed keep-file line: $line" >&2
+      exit 1
+    fi
+    keep_set+="$line"$'\n'
+  done < "$keep_file"
+fi
 
 now=$(date +%s)
 cutoff=$(( now - days * 86400 ))
@@ -113,6 +157,18 @@ while IFS= read -r dir; do
   # filter in bash instead — same semantics, portable everywhere.
   [ "${#b}" -eq 40 ] || continue
   case "$b" in (*[!0-9a-f]*) continue ;; esac
+  case "$keep_set" in
+    (*$'\n'"$b"$'\n'*)
+      # Linked by an open PR: exempt from the age pass and, because it never
+      # enters survivors, from the count cap too.
+      if [[ "$dry_run" -eq 1 ]]; then
+        echo "KEEP (linked by open PR) $dir"
+      else
+        echo "KEEP (linked by open PR) $dir" >&2
+      fi
+      continue
+      ;;
+  esac
   ts=$(git log -1 --format=%ct -- "$dir")
   if [[ -z "$ts" ]]; then
     echo "WARN: no git history for $dir, skipping" >&2

@@ -71,6 +71,9 @@ case "$1 $2" in
       *protection*)    echo '{"required_status_checks":{"contexts":["Tests and Analysis","E2E Tests","human-signoff"]}}' ;;
       *check-runs*)    sha="$(printf '%s' "$*" | sed -E 's#.*/commits/([0-9a-f]+)/check-runs.*#\1#')"
                        if [ -f "$FIX/checks-$sha.json" ]; then cat "$FIX/checks-$sha.json"; else echo '{"check_runs":[]}'; fi ;;
+      "api user")      if [ -f "$FIX/viewer.json" ]; then cat "$FIX/viewer.json"; else echo '{"login":"fixture-me"}'; fi ;;
+      *issues/*/comments*) n="$(printf '%s' "$*" | sed -E 's#.*/issues/([0-9]+)/comments.*#\1#')"
+                       if [ -f "$FIX/comments-$n.json" ]; then cat "$FIX/comments-$n.json"; else echo '[]'; fi ;;
       *) echo '{}' ;;
     esac ;;
   *) echo '{}' ;;
@@ -371,5 +374,88 @@ OUT="$(hp_format_line 5 https://x/5 "fix:  two  spaces" "$(printf 'r1\nr2\nr1')"
 assert_match  "H13 joined line"                      '^#5  https://x/5  fix: two spaces  r1; r2$' "$OUT"
 OUT="$(hp_format_line 5 https://x/5 "t" "")"
 assert_match  "H13 no reasons -> unknown"            '  unknown$' "$OUT"
+
+# --- H-E1..H-E9: bin/pr-triage --held end to end through the stub gh ---
+# held_pr <num> <mss> <author> <isDraft:true|false> <armed:true|false> [title]
+held_pr() {
+    pr_json "$1" "$2" "$BODY_CLEAR" | jq --arg a "$3" --argjson d "$4" \
+        --argjson am "$5" --arg t "${6:-}" '. + {author: {login: $a}, isDraft: $d,
+          autoMergeRequest: (if $am then {mergeMethod: "SQUASH"} else null end),
+          url: ("https://github.com/a-jay85/IBL5-test/pull/" + (.number|tostring))}
+        | if $t != "" then .title = $t else . end'
+}
+
+FIX_A="$(mktemp -d -p "$TMP")"
+for n in 40 41 42 43 44 45 46 47; do
+    checks_json success success success > "$FIX_A/checks-$(printf '%040d' "$n").json"
+done
+checks_json failure success success > "$FIX_A/checks-$(printf '%040d' 46).json"
+checks_json success success success \
+    | jq -c '(.check_runs[] | select(.name == "E2E Tests")) |= (.status = "in_progress" | .conclusion = null)' \
+    > "$FIX_A/checks-$(printf '%040d' 47).json"
+jq -n --arg b "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Fidelity: PASS · auto-merge held' '' \
+    'Auto-merge held:' '- (7) auto_merge — plan sets auto_merge: false' \
+    '- (7) auto_merge — plan sets auto_merge: false')" '[{body: $b}]' > "$FIX_A/comments-44.json"
+{
+    held_pr 40 CLEAN fixture-me false false
+    held_pr 41 CLEAN fixture-me false true
+    held_pr 42 DRAFT fixture-me true false
+    held_pr 43 CLEAN someone-else false false
+    held_pr 44 DIRTY fixture-me false false
+    held_pr 45 CLEAN fixture-me false false "feat: fixture forty-five"
+    held_pr 46 CLEAN fixture-me false false
+    held_pr 47 CLEAN fixture-me false false
+} | jq -s . > "$FIX_A/prs.json"
+
+run_triage "$FIX_A" --held
+assert_match  "H-E1 header"                        '^PR#  URL  TITLE  REASONS$' "$OUT"
+assert_absent "H-E1 armed PR left out"             '^#41  '                      "$OUT"
+assert_absent "H-E1 draft left out"                '^#42  '                      "$OUT"
+assert_absent "H-E1 other author left out"         '^#43  '                      "$OUT"
+assert_status "H-E1 exit 0"                        0                             "$ST"
+assert_absent "H-E1 ROWS guard satisfied"          'ERROR: reported'             "$OUT"
+assert_absent "H-E1 read-only"  'pr merge|update-branch|-X POST|-X PATCH'        "$(cat "$FIX_A/calls.log")"
+assert_match  "H-E2 two reasons, recorded first, dup dropped" \
+    '^#44  [^ ]+  chore: fixture #44  \(7\) auto_merge — plan sets auto_merge: false; merge conflict \(DIRTY\)$' "$OUT"
+assert_match  "H-E3 unknown"                       '^#40  https://github.com/a-jay85/IBL5-test/pull/40  chore: fixture #40  unknown$' "$OUT"
+assert_match  "H-E4 feat awaiting sign-off"        '^#45  .*  feat-awaiting-signoff$'                      "$OUT"
+assert_match  "H-E4 red check"                     '^#46  .*  red checks: Tests and Analysis \(failure\)$' "$OUT"
+assert_match  "H-E4 pending check"                 '^#47  .*  pending checks: E2E Tests$'                  "$OUT"
+
+# H-E9: default mode still lists the armed PR and prints the old header.
+run_triage "$FIX_A"
+assert_match  "H-E9 default mode lists #41"        '^#41 '                           "$OUT"
+assert_absent "H-E9 default mode has no held header" '^PR#  URL  TITLE  REASONS$'     "$OUT"
+
+# H-E5: --held and --arm are exclusive, rejected before any gh call.
+FIX="$(mktemp -d -p "$TMP")"
+run_triage "$FIX" --held --arm
+assert_status "H-E5 --held --arm exit 2"           2                    "$ST"
+assert_match  "H-E5 --held --arm says why"         'mutually exclusive' "$OUT"
+assert_absent "H-E5 --held --arm no gh pr list"    'pr list'            "$(cat "$FIX/calls.log" 2>/dev/null)"
+run_triage "$FIX" --arm --held
+assert_status "H-E5 --arm --held exit 2"           2                    "$ST"
+assert_match  "H-E5 --arm --held says why"         'mutually exclusive' "$OUT"
+assert_absent "H-E5 --arm --held no gh pr list"    'pr list'            "$(cat "$FIX/calls.log" 2>/dev/null)"
+
+# H-E6: --held=yes is an unknown flag.
+FIX="$(mktemp -d -p "$TMP")"
+run_triage "$FIX" --held=yes
+assert_status "H-E6 --held=yes exit 2"             2                              "$ST"
+assert_match  "H-E6 --held=yes unknown flag"       'unknown flag: --held=yes'     "$OUT"
+
+# H-E7: an unresolved viewer login fails closed instead of listing nothing.
+FIX="$(mktemp -d -p "$TMP")"
+cp "$FIX_A/prs.json" "$FIX/prs.json"
+echo '{}' > "$FIX/viewer.json"
+run_triage "$FIX" --held
+assert_status "H-E7 no login exit 2"               2                                  "$ST"
+assert_match  "H-E7 no login says why"             'cannot resolve your GitHub login' "$OUT"
+assert_absent "H-E7 no login lists nothing"        '^#40  '                           "$OUT"
+
+# H-E8: --help documents the flag.
+ST=0; OUT="$("$TRIAGE" --help 2>&1)" || ST=$?
+assert_match  "H-E8 --help mentions --held"        '[-][-]held'                                      "$OUT"
+assert_match  "H-E8 --help mentions the exclusion" 'Read-only; cannot be combined' "$OUT"
 
 [ "$FAILED" = 0 ] && exit 0 || exit 1

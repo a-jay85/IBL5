@@ -86,12 +86,14 @@ rotate_log() {
 
 POST_MERGE_LOG="$HOOK_LOG_DIR/post-merge.log"
 DB_EXPORT_LOG="$HOOK_LOG_DIR/db-export-prod.log"
+CLEANUP_LOG="$HOOK_LOG_DIR/cleanup.log"
 rotate_log "$POST_MERGE_LOG"
 rotate_log "$DB_EXPORT_LOG"
+rotate_log "$CLEANUP_LOG"
 
 # --- wt-cleanup (always; fast + idempotent) ----------------------------------
 if [ -x "$REPO_ROOT/bin/cleanup" ]; then
-    nohup "$REPO_ROOT/bin/cleanup" --all >>"$HOOK_LOG_DIR/cleanup.log" 2>&1 </dev/null &
+    nohup "$REPO_ROOT/bin/cleanup" --all >>"$CLEANUP_LOG" 2>&1 </dev/null &
 fi
 
 # --- db-export-prod (gated on "last run age >= 5 min") -----------------------

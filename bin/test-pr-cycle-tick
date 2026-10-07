@@ -389,7 +389,42 @@ no_file "$SCRATCH/pr-cycle.log" || fail "retry-cap-dm-once: launched past the ca
 [[ "$(wc -l < "$SCRATCH/dm.log" 2>/dev/null | tr -d ' ')" == "1" ]] \
     || fail "retry-cap-dm-once: dm.log has $(wc -l < "$SCRATCH/dm.log" 2>/dev/null | tr -d ' ') lines, want 1"
 grep -qF '#101' "$SCRATCH/dm.log" 2>/dev/null || fail "retry-cap-dm-once: DM does not name #101"
+grep -qF 'Why:' "$SCRATCH/dm.log" 2>/dev/null && fail "retry-cap-dm-once: DM has a Why: with no run dir"
 end_case retry-cap-dm-once
+
+# The retry-cap DM quotes the newest rescue run's blocked-ship "Why:" line. An older
+# run's reason must never stand in for the newest one, and a sibling slug never matches.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+mkdir -p "$STATE_DIR/attempts"; echo aaa1111 > "$STATE_DIR/attempts/101"
+OUTD="$REPO/tools/postplan-harness/out"
+mkdir -p "$OUTD/live-branch-one-20261003-120000" "$OUTD/live-branch-one-20261004-120000" \
+    "$OUTD/live-branch-one-extra-20261009-120000"
+printf 'x did not ship.\n\nWhy: old reason\n' > "$OUTD/live-branch-one-20261003-120000/blocked-ship.txt"
+printf 'x did not ship.\n\nWhy: master changed the same lines\n\nFix:\n  1. Why: not this\n' \
+    > "$OUTD/live-branch-one-20261004-120000/blocked-ship.txt"
+printf 'Why: sibling reason\n' > "$OUTD/live-branch-one-extra-20261009-120000/blocked-ship.txt"
+run_tick
+grep -qF 'Why: master changed the same lines Fix steps:' "$SCRATCH/dm.log" 2>/dev/null \
+    || fail "retry-cap-dm-why: DM lacks the newest Why: line: $(cat "$SCRATCH/dm.log" 2>/dev/null)"
+grep -qF 'live-branch-one-20261004-120000/blocked-ship.txt' "$SCRATCH/dm.log" 2>/dev/null \
+    || fail "retry-cap-dm-why: DM lacks the fix-steps path"
+grep -qE 'old reason|sibling reason|not this' "$SCRATCH/dm.log" 2>/dev/null \
+    && fail "retry-cap-dm-why: DM quoted the wrong run or line"
+end_case retry-cap-dm-why
+
+# Newest run left no blocked-ship.txt: the DM names the run dir and quotes no older reason.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+mkdir -p "$STATE_DIR/attempts"; echo aaa1111 > "$STATE_DIR/attempts/101"
+OUTD="$REPO/tools/postplan-harness/out"
+mkdir -p "$OUTD/live-branch-one-20261003-120000" "$OUTD/live-branch-one-20261004-120000"
+printf 'Why: old reason\n' > "$OUTD/live-branch-one-20261003-120000/blocked-ship.txt"
+run_tick
+grep -qF 'Last rescue run: '"$OUTD"'/live-branch-one-20261004-120000' "$SCRATCH/dm.log" 2>/dev/null \
+    || fail "retry-cap-dm-norun: DM lacks the newest run dir: $(cat "$SCRATCH/dm.log" 2>/dev/null)"
+grep -qF 'old reason' "$SCRATCH/dm.log" 2>/dev/null && fail "retry-cap-dm-norun: DM quoted an older run"
+end_case retry-cap-dm-norun
 
 reset; begin_case
 set_prs "$RED101"; set_checks aaa1111 red

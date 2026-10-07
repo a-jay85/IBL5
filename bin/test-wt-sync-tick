@@ -662,7 +662,7 @@ assert_match "stale-lock: log written (tick proceeded)" "synced=" "$(cat "$LOG10
 
 # ── Test 11: cron-setup --print-schedule → Program under MAIN checkout ────────
 PLIST_OUT="$("$CRON_SETUP" --print-schedule 2>&1)"
-MAIN_WT_EXPECTED="$(git worktree list --porcelain | awk '/^worktree / {print $2; exit}')"
+MAIN_WT_EXPECTED="$(git worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')"
 assert_match "cron-setup: plist emitted" "<key>Program</key>" "$PLIST_OUT"
 assert_match "cron-setup: Program is under main checkout" \
     "${MAIN_WT_EXPECTED}/bin/wt-sync-tick" "$PLIST_OUT"

@@ -535,7 +535,7 @@ chk_rc "empty LOG and LOCK_DIR" 0
 fresh
 run_tick WT_GC_REPO_ROOT= -- --dry-run --force
 chk_rc "derived repo root" 0
-expected_root="$(git -C "$(dirname "$TICK")/.." worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+expected_root="$(git -C "$(dirname "$TICK")/.." worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
 recorded_cwd="$(cat "$CD/cwd" 2>/dev/null)"
 if [ -z "$expected_root" ] || [ "$recorded_cwd" != "$expected_root" ]; then
     note_err "derived cwd '$recorded_cwd' != first worktree '$expected_root'"

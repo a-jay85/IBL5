@@ -72,6 +72,31 @@ pcw_recent_finish() {
     return 1
 }
 
+# pcw_last_block <branch> <out-dir>...: for the newest harness run dir for this branch
+# across the out dirs, prints "<run-dir>\t<why>". <why> is the "Why:" line of that run's
+# blocked-ship.txt, capped at 200 chars, or empty when the run left no such file. Prints
+# nothing when no run dir exists. Only the newest run counts, so an older block never
+# stands in for a later failure of another kind.
+pcw_last_block() {
+    local safe d run newest="" why=""
+    safe="$(ljob_safe_slug "$1")"; shift
+    [[ -n "$safe" ]] || return 0
+    for d in "$@"; do
+        [[ -d "$d" ]] || continue
+        while IFS= read -r run; do
+            if [[ -z "$newest" || "${run##*/}" > "${newest##*/}" ]]; then newest="$run"; fi
+        done < <(find "$d" -mindepth 1 -maxdepth 1 -type d \
+            -name "live-$safe-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-*" 2>/dev/null)
+    done
+    [[ -n "$newest" ]] || return 0
+    # sed quits on the first match itself; a `| head -1` would SIGPIPE under pipefail.
+    if [[ -f "$newest/blocked-ship.txt" ]]; then
+        why="$(sed -n '/^Why:/{s/^Why:[[:space:]]*//;p;q;}' "$newest/blocked-ship.txt" \
+            | tr -d '\t\r' | cut -c1-200)"
+    fi
+    printf '%s\t%s\n' "$newest" "$why"
+}
+
 # Retry cap, keyed by (PR, head SHA). attempts/<pr> holds the head SHA of the last
 # rescue the tick launched; dm-sent/<pr> holds the head SHA it last DM'd about.
 pcw_attempted_head() { [[ -f "$1/attempts/$2" && "$(cat "$1/attempts/$2")" == "$3" ]]; }

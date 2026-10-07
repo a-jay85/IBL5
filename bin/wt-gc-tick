@@ -83,7 +83,7 @@ esac
 
 # ── Repo root ─────────────────────────────────────────────────────────────────
 if [ -z "$WT_GC_REPO_ROOT" ]; then
-    WT_GC_REPO_ROOT="$(git -C "$SCRIPT_DIR/.." worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')" || WT_GC_REPO_ROOT=""
+    WT_GC_REPO_ROOT="$(git -C "$SCRIPT_DIR/.." worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')" || WT_GC_REPO_ROOT=""
 fi
 if [ -z "$WT_GC_REPO_ROOT" ]; then
     log "cannot resolve repo root — aborting"

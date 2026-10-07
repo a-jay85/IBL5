@@ -7,11 +7,16 @@ namespace Tests\Security;
 use Api\Repository\ApiGameRepository;
 use Api\Repository\ApiPlayerRepository;
 use Api\Repository\ApiTeamRepository;
+use BasketballStats\TeamStatsCalculator;
+use Boxscore\Boxscore;
+use JsbParser\PlayerIdResolver;
+use League\LeagueContext;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use SeasonLeaderboards\SeasonLeaderboardsRepository;
 use Standings\StandingsRepository;
 use Standings\StandingsUpdaterRepository;
+use Team\TeamQueryRepository;
 use Voting\VotingRepository;
 
 /**
@@ -28,11 +33,16 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
     private const ACTOR_IDENTITY_TYPE = '/(Auth|Session|CurrentUser|Request|ApiKey)/';
 
     private const COLUMN_PATTERN = '/^[a-z_]+$/';
+    private const TABLE_PATTERN = '/^ibl_[a-z_]+$/';
     private const BACKTICKED_COLUMN_PATTERN = '/^`[a-z_]+`$/';
     private const SORT_EXPRESSION_PATTERN = '/^[()`a-z_*+\-\/0-9]+$/';
     private const VOTE_COLUMN_PATTERN = '/^[a-z0-9_]+$/';
 
     /**
+     * Every class whose SQL identifier construction was converted under
+     * BanSqlStringConcatenationRule, repositories and non-repositories alike. The
+     * method name predates the non-repositories; kept so data-set names stay stable.
+     *
      * @return array<string, array{class-string}>
      */
     public static function convertedRepositoryProvider(): array
@@ -45,6 +55,10 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
             'ApiGameRepository' => [ApiGameRepository::class],
             'ApiPlayerRepository' => [ApiPlayerRepository::class],
             'ApiTeamRepository' => [ApiTeamRepository::class],
+            'TeamQueryRepository' => [TeamQueryRepository::class],
+            'TeamStatsCalculator' => [TeamStatsCalculator::class],
+            'PlayerIdResolver' => [PlayerIdResolver::class],
+            'Boxscore' => [Boxscore::class],
         ];
     }
 
@@ -72,6 +86,11 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
             'StandingsUpdaterRepository::CLINCHED_COLUMN_SQL' => [StandingsUpdaterRepository::class, 'CLINCHED_COLUMN_SQL', self::BACKTICKED_COLUMN_PATTERN, false, false],
             'SeasonLeaderboardsRepository::SORT_EXPRESSIONS' => [SeasonLeaderboardsRepository::class, 'SORT_EXPRESSIONS', self::SORT_EXPRESSION_PATTERN, false, false],
             'VotingRepository::ALLOWED_COLUMNS' => [VotingRepository::class, 'ALLOWED_COLUMNS', self::VOTE_COLUMN_PATTERN, false, true],
+            'TeamQueryRepository::LAST_SIM_DEPTH_COLUMNS' => [TeamQueryRepository::class, 'LAST_SIM_DEPTH_COLUMNS', self::COLUMN_PATTERN, false, false],
+            'TeamQueryRepository::DEPTH_CHART_DEPTH_COLUMNS' => [TeamQueryRepository::class, 'DEPTH_CHART_DEPTH_COLUMNS', self::COLUMN_PATTERN, false, false],
+            'TeamStatsCalculator::STANDINGS_TABLES' => [TeamStatsCalculator::class, 'STANDINGS_TABLES', self::TABLE_PATTERN, false, false],
+            'PlayerIdResolver::PLR_TABLES' => [PlayerIdResolver::class, 'PLR_TABLES', self::TABLE_PATTERN, false, false],
+            'PlayerIdResolver::SNAPSHOT_TABLES' => [PlayerIdResolver::class, 'SNAPSHOT_TABLES', self::TABLE_PATTERN, false, false],
         ];
     }
 
@@ -169,6 +188,43 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
         }
 
         return array_values(array_unique($violations));
+    }
+
+    /**
+     * LeagueContext selects a league table set and is not actor identity. Neither regex
+     * matches it today by spelling alone, so this pins the classification.
+     */
+    public function testLeagueContextCollaboratorIsNotClassifiedAsActorIdentity(): void
+    {
+        foreach ([TeamStatsCalculator::class, PlayerIdResolver::class] as $class) {
+            $parameter = new \ReflectionParameter([$class, '__construct'], 'leagueContext');
+            $type = $parameter->getType();
+
+            self::assertInstanceOf(\ReflectionNamedType::class, $type);
+            self::assertSame(LeagueContext::class, $type->getName());
+            self::assertFalse(
+                self::isActorIdentity('leagueContext', $type),
+                "{$class}: LeagueContext selects a league table set and is not actor identity. Re-classify deliberately if the regexes change."
+            );
+        }
+    }
+
+    public function testTableShapeCheckFlagsInjectedTableValue(): void
+    {
+        foreach (
+            [
+                ['ibl' => 'ibl_plr; DROP TABLE ibl_plr'],
+                ['ibl' => 'users'],
+                ['ibl' => '`ibl_plr`'],
+            ] as $map
+        ) {
+            self::assertNotEmpty(self::nonIdentifierValues($map, self::TABLE_PATTERN, false));
+        }
+
+        self::assertSame(
+            [],
+            self::nonIdentifierValues(['ibl' => 'ibl_olympics_plr_snapshots'], self::TABLE_PATTERN, false)
+        );
     }
 
     private static function isActorIdentity(string $name, ?\ReflectionType $type): bool

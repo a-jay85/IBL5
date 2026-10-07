@@ -333,6 +333,7 @@ def test_decision_paragraphs_joins_blocks_with_one_blank():
             "Some prose between.\n\n"
             "**Decision:** D2\n")
     assert decision_paragraphs(text) == "**Decision:** D1\n\n**Decision:** D2"
+    assert decision_paragraphs(text).replace("**Decision:** ", "") == "D1\n\nD2"
     assert decision_paragraphs("no decision here\n") == ""
 
 

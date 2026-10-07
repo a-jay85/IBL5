@@ -165,6 +165,39 @@ EOF_DIFF
     git -C "$dir" commit -q -m "tree tokens"
 }
 
+# replay_calibration_fixture <dir>
+# Writes seven Verification Matrix rows to <dir>/plan.md, copied verbatim from the
+# calibration plans (rows 1-3 and 12 from tables-css-module-split-201, rows 4 and 6
+# from hof-photos-offload-207, row 15 from planfile-test-type-cell-match) with the
+# trailing (one-time-check: ...) tag stripped, since a tagged row is skipped whole
+# and would prove nothing. The diff is a three-file deletion plus one unrelated
+# line, and carries `+` lines for the plain tokens the real PR diffs realised: row
+# 12 needs CSS_TABLE_MAP.md and tables/depth-chart.css; row 15 needs added,
+# typed_loss, dropped>, _TEST_TYPE_LABEL, added>0. Rows 1, 2, 3 stay unrealised
+# (true-positive controls).
+replay_calibration_fixture() {
+    local dir="$1"
+    cat > "$dir/plan.md" <<'EOF_CAL'
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | Each of the five cut anchors occurs exactly once in `tables.css` before any edit; an upstream reflow (for example [#2512](https://github.com/a-jay85/IBL5/pull/2512) merging first) that duplicates or rewrites an anchor prints a count other than 1 and stops the run. Printed five `1` lines on master `1af82a975` | CLI-executable | pre-impl (characterization) | `for a in '/* Drafted/disabled row */' '/* Expiring-contract row (Team page' '    /* Drafted row sticky backgrounds - consolidated */' '/* Drafted row sticky backgrounds */' "/* Mobile: a wide table's caption and title row span"; do grep -cF -- "$a" ibl5/design/components/tables.css; done` |
+| 2 | On the clean tree the harness parses the full stylesheet and reports `before == after`, `order-flips-sharing-a-property=0`, `flags=0`, `RESULT PASS`; a parser that dropped rules or a dirty `ibl5/design/` would show unequal counts or nonzero flips. Printed `rules before=2171 after=2171 order-flips-sharing-a-property=0 flags=0` at plan time | CLI-executable | pre-impl (characterization) | `bash ~/claude-plans/_scripts/tables-css-201/cascade-check.sh` |
+| 3 | The four emitter facts behind `CLOSED` / `NEVER_WITH` still hold: `drafted`, `fa-table__title`, `player-fa-expiring-row` are sole classes; `fa-table` tables use only the closed class set; expiring-row tables are never `.sticky-table`; no `ibl5/jslib/` script touches these classes. Mutation: give `DraftView.php`'s row `class="drafted foo"` ⇒ the first test fails and no `FACTS-OK` prints | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/tables-css-201/facts.sh` |
+| 4 | After the deletion, nothing tracked still points at the removed path. A diff that adds an `images/hof` reference anywhere makes `git grep` match, so this fails. | CLI-executable | post-impl | `! git grep -n 'images/hof' -- ':!ibl5/images/hof'` |
+| 6 | Environment 1 returns 404 for `jordan.jpg` after the change, while the logo control still returns 200. Leaving the file on disk returns 200 for the target, and a down stack returns 000 for the control, so either fails this row. | CLI-executable | post-impl | `test "$(curl -s -o /dev/null -w '%{http_code}' http://hof-photos-offload-207.localhost/ibl5/images/hof/jordan.jpg)" = 404 && test "$(curl -s -o /dev/null -w '%{http_code}' http://hof-photos-offload-207.localhost/ibl5/images/logo/1.jpg)" = 200` |
+| 12 | Every `tables/*.css` path cited in `CSS_TABLE_MAP.md` exists and the new partial is listed. Mutation: keep the `tables/depth-chart.css` row ⇒ `MISSING tables/depth-chart.css` and exit 1 | CLI-executable | post-impl | `! for f in $(grep -oE 'tables/[a-z-]+\.css' ibl5/design/CSS_TABLE_MAP.md \| sort -u); do test -f "ibl5/design/components/$f" \|\| echo "MISSING $f"; done \| grep MISSING && grep -qF 'tables/player-row-states.css' ibl5/design/CSS_TABLE_MAP.md` |
+| 15 | Corpus pass bar (local): old-vs-new over recursive `~/claude-plans/**/*.md` reports `added=0`, `typed_loss=0`, `dropped>=1`, exit 0. Mutation: widen `_TEST_TYPE_LABEL` to accept a trailing space plus any word ⇒ a plan whose description cell is `E2E failures …`-shaped plans a new path ⇒ `added>0` ⇒ exit 1 | CLI-executable | post-impl | `POSTPLAN_CORPUS_DIFF=1 python3 -m pytest tools/postplan-harness/tests/test_planned_paths_corpus_diff.py -q -rs` |
+EOF_CAL
+    {
+        deleted_diff_fixture ibl5/images/hof/jordan.jpg ibl5/images/hof/bird.jpg ibl5/images/hof/magic.jpg
+        printf '+unrelated fixture line\n'
+        printf '+CSS_TABLE_MAP.md tables/depth-chart.css\n'
+        printf '+added typed_loss dropped> _TEST_TYPE_LABEL added>0\n'
+    } > "$dir/diff.txt"
+}
+
 extract_step67_block() {
     # Prints the first bash fence found between ## Step 6.7: and ## Step 7: headings
     local prompt_file
@@ -1095,9 +1128,40 @@ replay-2578-untagged)
     fi
     ;;
 
+replay-calibration-fp)
+    # The four calibration false positives (#2900 row 15, #2896 row 12, #2894 rows 4 and 6)
+    # are silent; rows 1, 2, 3 (true-positive controls) stay flagged.
+    replay_calibration_fixture "$root"
+    if grep -qF 'one-time-check' "$root/plan.md"; then
+        fail "replay-calibration-fp (fixture still carries a one-time-check tag)"
+    else
+        out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>"$root/err.txt")
+        rc=$?
+        total=$(printf '%s\n' "$out" | grep -c '^UNREALISED-ASSERTION:' || true)
+        flagged_ok=1
+        for r in 1 2 3; do
+            c=$(printf '%s\n' "$out" | grep -c "^UNREALISED-ASSERTION: row $r " || true)
+            if [ "$c" -ne 1 ]; then flagged_ok=0; fi
+        done
+        silent_ok=1
+        for r in 4 6 12 15; do
+            c=$(printf '%s\n' "$out" | grep -c "^UNREALISED-ASSERTION: row $r " || true)
+            if [ "$c" -ne 0 ]; then silent_ok=0; fi
+        done
+        star_ok=1
+        if grep -qE '^  missing:.*\*' "$root/err.txt"; then star_ok=0; fi
+        if [ "$rc" -eq 0 ] && [ "$total" -eq 3 ] && [ "$flagged_ok" -eq 1 ] \
+            && [ "$silent_ok" -eq 1 ] && [ "$star_ok" -eq 1 ]; then
+            ok "replay-calibration-fp"
+        else
+            fail "replay-calibration-fp (rc=$rc, total=$total, flagged_ok=$flagged_ok, silent_ok=$silent_ok, star_ok=$star_ok, out=$out)"
+        fi
+    fi
+    ;;
+
 *)
     printf 'Unknown case: %s\n' "$case" >&2
-    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire all\n' >&2
+    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire all\n' >&2
     exit 2
     ;;
 esac
@@ -1109,7 +1173,7 @@ rm -rf "$root"
 
 ARG="${1:-all}"
 
-CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised"
+CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised"
 
 if [ "$ARG" = "all" ]; then
     for c in $CASES; do

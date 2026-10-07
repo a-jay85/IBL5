@@ -8,7 +8,10 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.armable import manual_testing_clearance
-from harness.classify import render_manual_confirmation, upsert_manual_confirmation
+from harness.classify import (MANUAL_CONFIRMATION_BEGIN, MANUAL_CONFIRMATION_END,
+                              decision_paragraphs, manual_confirmation_text,
+                              render_manual_confirmation, upsert_hold_notice,
+                              upsert_manual_confirmation)
 from harness.planfile import locate_plan, parse_hold_justification
 
 # ---------------------------------------------------------------------------
@@ -212,4 +215,133 @@ def test_phase4b_contains_diff_bounds():
 def test_runner_contains_upsert_manual_confirmation():
     """Pin the runner.py wiring — pure-function tests pass even without it."""
     runner_src = (REPO_ROOT / "tools/postplan-harness/runner.py").read_text()
-    assert "upsert_manual_confirmation" in runner_src
+    assert "upsert_hold_notice" in runner_src
+
+
+# ---------------------------------------------------------------------------
+# Decision-only hold notice (harness Phase 6 renders only the Decision paragraph)
+# ---------------------------------------------------------------------------
+
+PLAN_FOUR_PART = """\
+---
+auto_merge: false
+---
+# Four Part Fixture Plan
+
+## Automouse Hold Justification
+
+**Category:** gate-weakening
+
+**Decision:** Merge if you're OK with about 7% more PRs being held until their body declares scope.
+
+**Discharged by matrix rows:** 3, 4.
+
+Plan-gate bookkeeping why-line: rows 3 and 4 carry the executable proof.
+
+## Verification Matrix
+
+| # | Claim |
+|---|-------|
+| 1 | x |
+"""
+
+PLAN_NO_DECISION = """\
+---
+auto_merge: false
+---
+# No Decision Fixture Plan
+
+## Automouse Hold Justification
+
+**Category:** schema-tightening
+
+This branch rewrites a column type in place.
+A human must read the migration before it merges.
+
+## Verification Matrix
+
+| # | Claim |
+|---|-------|
+| 1 | x |
+"""
+
+_STALE_RV_BLOCK = (
+    "<!-- reviewer-verification:begin -->\n"
+    "## Reviewer verification\n\n"
+    '- "**Category:** gate-weakening" — `decision`\n'
+    "<!-- reviewer-verification:end -->"
+)
+
+
+def test_render_decision_only_from_four_part_skeleton():
+    block = render_manual_confirmation(
+        manual_confirmation_text(parse_hold_justification(PLAN_FOUR_PART)))
+    assert block == "\n".join([
+        MANUAL_CONFIRMATION_BEGIN,
+        "## Manual confirmation needed",
+        "",
+        "> **Decision:** Merge if you're OK with about 7% more PRs being held "
+        "until their body declares scope.",
+        MANUAL_CONFIRMATION_END,
+    ])
+
+
+def test_render_has_single_heading_and_no_bold_header():
+    block = render_manual_confirmation(
+        manual_confirmation_text(parse_hold_justification(PLAN_FOUR_PART)))
+    assert block.count("Manual confirmation needed") == 1
+    assert "**Manual confirmation needed**" not in block
+    assert "from the plan's" not in block
+
+
+def test_upsert_hold_notice_strips_bookkeeping_everywhere():
+    body = ("## Summary\nstuff\n\n"
+            + _STALE_RV_BLOCK + "\n\n"
+            "## Manual Testing\n\n- [x] ok\n")
+    result = upsert_hold_notice(body, parse_hold_justification(PLAN_FOUR_PART))
+    assert "**Decision:**" in result
+    for needle in ("**Category:**", "Discharged by matrix rows",
+                   "Plan-gate bookkeeping why-line", "## Reviewer verification"):
+        assert needle not in result, needle
+
+
+def test_upsert_hold_notice_block_precedes_manual_testing():
+    body = "## Summary\nstuff\n\n## Manual Testing\n\n- [x] ok\n"
+    result = upsert_hold_notice(body, parse_hold_justification(PLAN_FOUR_PART))
+    begin = result.index(MANUAL_CONFIRMATION_BEGIN)
+    end = result.index(MANUAL_CONFIRMATION_END)
+    assert begin < result.index("## Manual Testing")
+    inner = result[begin + len(MANUAL_CONFIRMATION_BEGIN):end].splitlines()
+    for line in inner:
+        if line in ("", "## Manual confirmation needed"):
+            continue
+        assert line.startswith(">"), line
+
+
+def test_render_no_decision_falls_back_to_full_prose():
+    justification = parse_hold_justification(PLAN_NO_DECISION)
+    block = render_manual_confirmation(manual_confirmation_text(justification))
+    assert block
+    lines = block.splitlines()
+    for prose in justification.splitlines():
+        expected = ("> " + prose) if prose.strip() else ">"
+        assert expected in lines, prose
+
+
+def test_decision_paragraphs_joins_blocks_with_one_blank():
+    text = ("**Decision:** D1\n\n"
+            "Some prose between.\n\n"
+            "**Decision:** D2\n")
+    assert decision_paragraphs(text) == "**Decision:** D1\n\n**Decision:** D2"
+    assert decision_paragraphs(text).replace("**Decision:** ", "") == "D1\n\nD2"
+    assert decision_paragraphs("no decision here\n") == ""
+
+
+def test_upsert_hold_notice_empty_justification_removes_block():
+    base = "## Summary\nstuff\n\n## Manual Testing\n\n- [x] ok\n"
+    with_block = upsert_hold_notice(base, parse_hold_justification(PLAN_FOUR_PART))
+    assert MANUAL_CONFIRMATION_BEGIN in with_block
+    cleared = upsert_hold_notice(with_block, "")
+    assert MANUAL_CONFIRMATION_BEGIN not in cleared
+    assert "Manual confirmation needed" not in cleared
+    assert "## Manual Testing" in cleared

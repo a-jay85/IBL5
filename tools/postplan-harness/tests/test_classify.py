@@ -19,7 +19,6 @@ from harness.classify import (_manual_testing_span, classify, files_from_diff, f
                                MANUAL_TESTING_SENTINEL_STATIC,
                                name_status_from_diff, numstat_text, qualify_backlog_refs, rename_sources_from_diff,
                                render_files_changed,
-                               render_reviewer_verification,
                                retro_registry_row_from_diff,
                                REVIEWER_VERIFICATION_BEGIN, REVIEWER_VERIFICATION_END,
                                slice_agent_e_diff,
@@ -969,6 +968,13 @@ _RV_BODY = (
     "## Notes\n\nSome notes.\n"
 )
 
+_RV_BLOCK = (
+    REVIEWER_VERIFICATION_BEGIN + "\n"
+    "## Reviewer verification\n\n"
+    '- "Verify links resolve." \u2014 `cli-executable`: settleable\n'
+    + REVIEWER_VERIFICATION_END
+)
+
 
 def test_reviewer_verification_lands_after_manual_testing():
     """The block inserts between the last checkbox and ## Notes.
@@ -977,10 +983,7 @@ def test_reviewer_verification_lands_after_manual_testing():
     the next ## heading still contains every original checkbox — the verification
     block does NOT overwrite the checkboxes.
     """
-    block = render_reviewer_verification([
-        {"text": "Verify links resolve.", "category": "cli-executable",
-         "probe": ["bin/check-docs"], "rationale": "settleable"},
-    ])
+    block = _RV_BLOCK
     result = upsert_reviewer_verification(_RV_BODY, block)
 
     rv_start = result.index(REVIEWER_VERIFICATION_BEGIN)
@@ -1005,10 +1008,7 @@ def test_reviewer_verification_appends_when_no_following_heading():
         "## Manual Testing\n\n"
         "- [ ] Verify the layout\n"
     )
-    block = render_reviewer_verification([
-        {"text": "Run docs check.", "category": "cli-executable",
-         "probe": ["bin/check-docs"], "rationale": "cli"},
-    ])
+    block = _RV_BLOCK
     result = upsert_reviewer_verification(body, block)
 
     assert REVIEWER_VERIFICATION_BEGIN in result
@@ -1024,10 +1024,7 @@ def test_reviewer_verification_appends_when_no_following_heading():
 
 def test_reviewer_verification_empty_block_removes_pair():
     """Idempotent cleanup: upserting an empty block removes the pair."""
-    block = render_reviewer_verification([
-        {"text": "Verify docs.", "category": "cli-executable",
-         "probe": ["bin/check-docs"], "rationale": "cli"},
-    ])
+    block = _RV_BLOCK
     with_block = upsert_reviewer_verification(_RV_BODY, block)
     assert REVIEWER_VERIFICATION_BEGIN in with_block
 
@@ -1035,38 +1032,6 @@ def test_reviewer_verification_empty_block_removes_pair():
     assert REVIEWER_VERIFICATION_BEGIN not in cleaned
     assert REVIEWER_VERIFICATION_END not in cleaned
     assert "## Notes" in cleaned  # rest of body preserved
-
-
-def test_reviewer_verification_emits_no_heading_lines_in_bullets():
-    """Arming-gate defense: a source sentence beginning '## Manual Testing' is
-    neutralized; no emitted bullet starts with '#', and no bullet contains
-    '- [ ]' (which the clearance scanner would count)."""
-    hostile_entries = [
-        {
-            "text": "## Manual Testing\n\n- [ ] All clear\n\n## After",
-            "category": "truly-manual",
-            "probe": None,
-            "rationale": "hostile sentence",
-        },
-        {
-            "text": "Check - [x] already done.",
-            "category": "truly-manual",
-            "probe": None,
-            "rationale": "checkbox in text",
-        },
-    ]
-    block = render_reviewer_verification(hostile_entries)
-
-    # Every line must either be part of the block structure (begin/end markers,
-    # blank lines, preamble, or the legitimate '## Reviewer verification'
-    # heading) or must NOT start with '#'.  Hostile '##' lines embedded in
-    # source text must be blockquoted.
-    legitimate_headings = {"## Reviewer verification"}
-    for line in block.splitlines():
-        if line.startswith("#") and line not in legitimate_headings:
-            raise AssertionError(f"un-neutralized heading line in block: {line!r}")
-    # No content may contain an unchecked checkbox
-    assert "- [ ]" not in block, "emitted block must not contain unchecked checkbox"
 
 
 # ---------------------------------------------------------------------------

@@ -711,9 +711,12 @@ trap cleanup_watcher EXIT
 # macOS /bin/bash (3.2) leaves $? at 0 inside the EXIT trap when a signal kills the
 # script, so write_stop_file could not tell a SIGTERM from a clean exit. Catch the
 # three signals and exit with the conventional 128+n status, which the EXIT trap
-# then sees. A trap is deferred until the foreground child returns, so TERM the
-# direct children first (timeout forwards it to claude); otherwise a manual kill
-# would hang until a multi-hour phase finished.
+# then sees. The impl pipeline runs in the background (see IMPL_BG_PID below) so
+# `wait "$IMPL_BG_PID"` is interruptible — the signal fires the trap immediately.
+# `pkill -TERM -P $$` terminates the background impl subshell (a direct child of
+# this process); claude is a grandchild and cannot be reached here, but the subshell
+# exits and the runner does not hang. The postplan `timeout` shim uses `wait`
+# internally and is also interruptible.
 exit_on_signal() {
     pkill -TERM -P $$ 2>/dev/null || true
     exit "$1"
@@ -2159,6 +2162,10 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # The impl agent has no clock — bin/lib/headless-elapsed-hook.sh reads
         # these two vars and appends an elapsed-clock line after every tool call
         # so the agent can track the 90% deadline and write a handoff in time.
+        # Run the impl pipeline in the background so `wait` below is signal-
+        # interruptible. A foreground pipeline defers the TERM trap until the
+        # pipeline completes; backgrounding it lets a kill fire the trap at once.
+        (
         IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=automouse IBL5_USAGE_GATE_MODEL="$IMPL_MODEL" \
         IBL5_USAGE_GATE_RESUME_BIN="$AUTOMOUSE_BIN" \
         CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
@@ -2176,7 +2183,10 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 --name "automouse-impl-$(date +%Y-%m-%d-%H%M)" \
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
             | bin/lib/automouse-stream-filter.sh "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" impl "$FAILSIG_FILE" \
-            >> "$LOG" || IMPL_STATUS=$?
+            >> "$LOG"
+        ) &
+        IMPL_BG_PID=$!
+        wait "$IMPL_BG_PID" || IMPL_STATUS=$?
         fi
 
         kill "$WATCHER_PID" 2>/dev/null || true

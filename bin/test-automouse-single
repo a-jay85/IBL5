@@ -371,7 +371,7 @@ fi
 echo "--- case 12: SIGTERM stop file ---"
 reset_state
 seed_plan sig-plan
-STUB_CLAUDE_SLEEP=30 PLANS_DIR="$PDIR" "$RUNNER" plan sig-plan > "$ROOT/sig.out" 2>&1 &
+STUB_CLAUDE_SLEEP=120 PLANS_DIR="$PDIR" "$RUNNER" plan sig-plan > "$ROOT/sig.out" 2>&1 &
 c12_pid=$!
 c12_i=0
 while [ ! -d "$NDIR/queue/sig-plan.md.lock" ] && [ "$c12_i" -lt 20 ]; do
@@ -382,7 +382,9 @@ sleep 1
 kill -TERM "$c12_pid" 2>/dev/null || true
 c12_i=0
 c12_stops=()
-while [ "$c12_i" -lt 40 ]; do
+# Poll cap is 20s — the stub claude sleeps 120s; the stop file must appear
+# well before that to confirm the trap fires promptly, not after the sleep ends.
+while [ "$c12_i" -lt 20 ]; do
     c12_stops=("$NDIR"/stops/*-"$c12_pid".stop)
     [ -f "${c12_stops[0]}" ] && break
     sleep 1

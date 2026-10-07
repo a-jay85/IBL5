@@ -254,7 +254,7 @@ The codebase has two parallel HTTP-endpoint styles. They are distinct on purpose
 
 | Style | Lives under | Dispatched by | Returns | Use for |
 |-------|-------------|---------------|---------|---------|
-| `*ApiHandler` | a **feature module** namespace (e.g. `DepthChartEntry\DepthChartEntryApiHandler`) | instantiated **directly** in the owning `ibl5/modules/<Module>/index.php` | an **HTML partial** for an HTMX swap into an already-rendered page | in-page interactivity within one module's UI (HTMX `hx-get`/`hx-post` fragment endpoints) |
+| `*ApiHandler` | a **feature module** namespace (e.g. `DepthChart\DepthChartApiHandler`) | instantiated **directly** in the owning `ibl5/modules/<Module>/index.php` | an **HTML partial** for an HTMX swap into an already-rendered page | in-page interactivity within one module's UI (HTMX `hx-get`/`hx-post` fragment endpoints) |
 | `Api\Controller\*Controller` | `ibl5/classes/Api/Controller/` | the central `ibl5/classes/Api/Router.php` route table | a **JSON** REST response | the versioned external REST API (API-key auth, rate limiting, ETag caching — see API_GUIDE.md) |
 
 **Rule of thumb:** if a new endpoint feeds an HTMX fragment swap inside one
@@ -264,12 +264,12 @@ registered in `Api/Router.php`. A `*ApiHandler` is **not** part of the REST API
 and is never registered in `Api/Router.php`.
 
 Current `*ApiHandler` inventory (module-local HTMX):
-`DepthChartEntry\DepthChartEntryApiHandler`,
+`DepthChart\DepthChartApiHandler`,
 `DraftHistory\DraftHistoryApiHandler`,
 `FranchiseRecordBook\FranchiseRecordBookApiHandler`,
 `LeagueStarters\LeagueStartersApiHandler`,
 `NextSim\NextSimTabApiHandler`,
-`SavedDepthChart\SavedDepthChartApiHandler`,
+`DepthChartSnapshot\DepthChartSnapshotApiHandler`,
 `Team\TeamApiHandler`,
 `Trading\TradeRosterPreviewApiHandler`.
 

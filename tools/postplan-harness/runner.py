@@ -69,13 +69,7 @@ from harness.adapters.gitad import (LiveGit, ReplayGit, classify_local_gate_deni
                                     is_stale_base, is_stale_lease)
 from harness.adapters.llm import ClaudeCli, FixtureLlm, TOOLED_TIMEOUT
 from harness.adapters.probe import FixtureProbe, LiveProbe
-from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate
-
-_BADGE_FALLBACK = (
-    "<!-- postplan-status -->\n**post-plan is running**\n\n"
-    "Started outside `bin/post-plan-now`, so there is no launchd job to probe.\n"
-    "<!-- postplan-label:  -->\n"
-)
+from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate, fail_log_lines, timing_log_line, tracks_log_line
 
 # ── SIGTERM handler — abort any in-progress rebase before the process dies ───
 _active_git: "LiveGit | None" = None  # set once in run() for the isolated/live path
@@ -127,12 +121,16 @@ def _install_sigterm_handler() -> None:
     signal.signal(signal.SIGTERM, _sigterm_handler)
 
 
-def _post_status_badge(gh, pr):
+def _post_status_label(gh, pr):
     if not pr:
         return
-    body = os.environ.get("POSTPLAN_BADGE_BODY") or _BADGE_FALLBACK
+    # Set only by bin/post-plan-now; runs outside it never mark the PR, so nothing
+    # is left orphaned when no wrapper exists to remove the label.
+    label = os.environ.get("POSTPLAN_STATUS_LABEL")
+    if not label:
+        return
     try:
-        gh.pr_status_badge(pr, body)
+        gh.pr_status_label(pr, label)
     except Exception:
         pass
 
@@ -510,7 +508,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             if bg_ci is not None:
                 log(f"phase2: background CI watch started for {sha[:8]} "
                     f"-> {os.path.basename(bg_ci.path)}")
-        _post_status_badge(gh, pr)
+        _post_status_label(gh, pr)
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
 
         # ---- Phase 4: review + security (gated bounded calls) ---------
@@ -578,11 +576,13 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # ---- Phase 5 + 5.0: verify + conformance -----------------------
         tracks = verifier.run(cls)
         phase5 = aggregate(tracks)
-        unavailable = [t.name for t in tracks if t.status == "unavailable"]
+        timing = timing_log_line(tracks, getattr(verifier, "last_wall_seconds", None))
+        if timing:
+            log(timing)
         res.phase5 = phase5
-        log("phase5 tracks: " + ", ".join(f"{t.name}={t.status}" for t in tracks)
-            + f" -> PHASE5_VERIFY_STATUS={phase5}"
-            + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
+        log(tracks_log_line(tracks, phase5))
+        for line in fail_log_lines(tracks):
+            log(line)
         resolutions: dict[str, str] = {}
         unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                        resolutions=resolutions,

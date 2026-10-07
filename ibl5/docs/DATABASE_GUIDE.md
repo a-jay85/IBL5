@@ -1,6 +1,6 @@
 ---
 description: Schema reference and query patterns for IBL5 database work.
-last_verified: 2026-09-20
+last_verified: 2026-10-06
 ---
 
 # IBL5 Database Guide
@@ -208,6 +208,19 @@ ADR-0010 Tier 4 explicitly excluded these columns from the snake_case rename swe
 |--------|---------|
 | `bird` | Consecutive years with team for Bird Rights eligibility (nullable) |
 | `exp` | Years of NBA experience — **not** "expiring contract"; `exp` = experience |
+
+### po_phantom_games contract
+
+`po_phantom_games` (TINYINT UNSIGNED, default 0) lives on `ibl_plr_snapshots` and on its twin `ibl_olympics_plr_snapshots`. Migration 179 added it and set it to 1 on every phase row of 24 pids for season_year 1993. Each of those players has a phantom playoff game counted in the PLR file's playoff games (`po_stats_gm`).
+
+Rules for any code that touches it:
+
+- **Write and promotion paths keep the raw count.** `PlrParserService` writes `po_stats_gm` straight from the PLR file. `PlrParserRepository::promotePriorSeasonSnapshots` copies `po_phantom_games` forward, and the snapshot upsert column list leaves it out so a re-parse never overwrites it.
+- **Subtract only in a derived or display layer.** A reader of `po_stats_gm` computes `CAST(po_stats_gm AS SIGNED) - CAST(po_phantom_games AS SIGNED)`. Both columns are UNSIGNED, so a bare `po_stats_gm - po_phantom_games` raises MariaDB ERROR 1690 when the result would go negative. `RefreshIblHistStep` uses the same cast for the regular-season `stats_gm - phantom_games`.
+- **Never subtract it in a box-score view.** `ibl_playoff_stats` and `ibl_playoff_career_totals` count `ibl_box_scores` rows, and `Season1993PhantomRepair` already deletes the 1993 phantom box rows. Subtracting there would correct the same game twice.
+- **No reader exists yet.** As of this note no class or module reads `po_stats_gm`, and `ibl_hist` has no playoff columns. The olympics twin has no reader either and is exempt until one appears.
+
+`ibl5/tests/PlrParser/PoPhantomGamesConsumerContractTest.php` enforces the second and third rules. A new file under `ibl5/classes` or `ibl5/modules` that reads `po_stats_gm` without the signed correction fails it, and so does a playoff view definition in the schema dump that mentions `po_phantom_games`.
 
 ### Stat Prefix Groups (4.17)
 

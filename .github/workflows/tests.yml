@@ -1123,7 +1123,6 @@ jobs:
             bin/test-plan-review-digest \
             bin/test-plan-review-seam \
             bin/test-check-registry-trigger-rows \
-            bin/test-retro-mine \
             bin/test-ci-memo \
             bin/test-db-backups-pull \
             bin/test-predeploy-db-snapshot

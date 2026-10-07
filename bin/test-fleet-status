@@ -42,6 +42,9 @@
 #  21  queue rows carry MODEL / MERGE from the plan's frontmatter, with
 #      bin/automouse/queue's defaults (opus / true) when there is none, and the
 #      plan's title on its own indented line under the row
+#  22  characterization: the AUTOMOUSE QUEUE section sits between its header and
+#      UNACCOUNTED HEADLESS SESSIONS, still counts the 2 stale heartbeats, never
+#      prints a reused-pid log's raw text, and never lists a LIVE runner as stopped
 #
 # Case 13 points FLEET_STATUS_AUTOMOUSE_PLIST at a fixture. Left defaulted it
 # would read the real plist on macOS and take the missing-file branch on CI —
@@ -608,6 +611,22 @@ assert_has "automouse: 2 stale heartbeats counted" "$OUTPUT" '2 stale heartbeat'
 assert_lacks "automouse: dead-pid heartbeat hidden" "$OUTPUT" "pid $DEAD_PID "
 assert_lacks "automouse: reused-pid heartbeat hidden (PID reuse guard)" \
     "$OUTPUT" "pid $UNRELATED_PID "
+
+# 22 — characterization of the queue section's bounds and its negative guards.
+# The "stopped .*pid <live>" pattern matches the Phase 4 line shape, so it is
+# trivially green today and becomes the live-runner exclusion guard afterwards.
+QUEUE_BLOCK="$(sed -n '/AUTOMOUSE QUEUE/,/UNACCOUNTED HEADLESS SESSIONS/p' <<< "$OUTPUT")"
+assert_has   "queue block: bounded by the next section header" \
+    "$QUEUE_BLOCK" 'UNACCOUNTED HEADLESS SESSIONS'
+assert_has   "queue block: stale heartbeats still counted inside it" \
+    "$QUEUE_BLOCK" '2 stale heartbeat file\(s\) from dead runs'
+assert_lacks "queue block: a reused-pid log's raw text is never printed" \
+    "$QUEUE_BLOCK" 'DECOY-OTHER-RUNNER'
+assert_lacks "queue block: live runner not listed as stopped" \
+    "$QUEUE_BLOCK" "stopped .*pid $LIVE_AUTOMOUSE_PID "
+assert_lacks "queue block: live nodotmd runner not listed as stopped" \
+    "$QUEUE_BLOCK" "stopped .*pid $NODOTMD_PID "
+if [ "$RC" -eq 0 ]; then pass "page: exit 0"; else fail "page: exit 0 (got $RC)"; fi
 
 # 6 — the live runner is shown.
 assert_has "automouse: live runner shown"     "$OUTPUT" "pid $LIVE_AUTOMOUSE_PID "

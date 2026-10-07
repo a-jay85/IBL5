@@ -1119,6 +1119,7 @@ jobs:
     permissions:
       contents: write
       actions: write
+      pull-requests: read
     steps:
       - name: Checkout gh-pages (skip if it does not exist yet)
         id: checkout-pages
@@ -1132,17 +1133,43 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          # Non-cone so only the one pure module rides along. Cone mode would pull all of
+          # ibl5/tests/e2e/, including the VR snapshot PNG trees.
+          sparse-checkout-cone-mode: false
           sparse-checkout: |
-            bin
+            /bin/
+            /ibl5/tests/e2e/vr-refresh.ts
           path: master-scripts
+
+      - name: Setup Bun
+        if: steps.checkout-pages.outcome == 'success'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      # Fail closed: every gallery dir an open PR's comments or body link to is exempt
+      # from both prune passes. If listing PRs or comments fails, this step fails
+      # (continue-on-error keeps the job green) and the prune step below does not run.
+      - name: Compute open-PR gallery keep-list
+        id: vr-keep
+        if: steps.checkout-pages.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ./master-scripts/bin/vr-refresh-targets --mode=keep > "$RUNNER_TEMP/vr-keep.txt"
+          echo "Keep-list: $(wc -l < "$RUNNER_TEMP/vr-keep.txt" | tr -d ' ') gallery dir(s) linked by open PRs."
+
+      - name: Skip pruning (keep-list unavailable)
+        if: steps.checkout-pages.outcome == 'success' && steps.vr-keep.outcome == 'failure'
+        run: echo "::error::Open-PR keep-list failed; pruning skipped this run so no linked gallery is deleted."
 
       - name: Prune per-SHA report dirs (7-day age prune + 300-dir count cap)
         id: prune
-        if: steps.checkout-pages.outcome == 'success'
+        if: steps.checkout-pages.outcome == 'success' && steps.vr-keep.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          removed=$(./master-scripts/bin/prune-vr-galleries --cutoff-days 7 --max-dirs 300)
+          removed=$(./master-scripts/bin/prune-vr-galleries --cutoff-days 7 --max-dirs 300 --keep-file "$RUNNER_TEMP/vr-keep.txt")
           if [ "$removed" -gt 0 ]; then
             git commit -m "chore(vr-pages): prune ${removed} per-SHA report dir(s) (7d age + 300-dir cap)"
             # Same shared-ref contention as the per-SHA deploy above: in-flight PR VR

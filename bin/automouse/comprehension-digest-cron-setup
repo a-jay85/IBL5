@@ -50,7 +50,7 @@ done
 # the assignment fails, and `set -e` aborts before the `||` on the next line can
 # run. `|| true` inside the substitution keeps the status zero so we reach it.
 if [ -z "${MAIN_WT:-}" ]; then
-  MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}' || true)"
+  MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}' || true)"
 fi
 [ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"   # fallback: not in a git tree
 

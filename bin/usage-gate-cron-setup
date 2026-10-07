@@ -49,7 +49,7 @@ done
 
 # The first `git worktree list` entry is the main working tree; a worktree gets
 # torn down, so the plist must never point into one.
-MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
 [ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"
 
 PLIST_LABEL="com.ibl5.usage-gate-coordinator"

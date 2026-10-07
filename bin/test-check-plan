@@ -3444,6 +3444,81 @@ if [ "$_parity_failed" -eq 0 ]; then
     echo "ok: gateHb-pattern-file-parity (bash pos=$BASH_POS exc=$BASH_EXC, Python='$PY')"
 fi
 
+# hold_decision_paragraphs — prints only the `**Decision:**` block(s) of the hold
+# section. Each case writes a throwaway plan and compares exact stdout.
+# shellcheck source=lib/hold-check.sh
+. "$SCRIPT_DIR/lib/hold-check.sh"
+# _hdp_case <name> <plan-text> <expected-stdout>
+_hdp_case() {
+    local name="$1" text="$2" expected="$3" f out rc
+    f="$TMP/hdp-$name.md"
+    printf '%s' "$text" > "$f"
+    out="$(hold_decision_paragraphs "$f")"; rc=$?
+    if [ "$rc" -eq 0 ] && [ "$out" = "$expected" ]; then
+        echo "ok: hold_decision_paragraphs-$name"
+    else
+        echo "FAIL: hold_decision_paragraphs-$name — rc=$rc, got: [$out]"
+        FAILED=1
+    fi
+}
+_hdp_case "four-part-skeleton" '# T
+
+## Automouse Hold Justification
+
+**Category:** taste
+
+**Decision:** Merge if you are OK with the new copy.
+
+**Discharged by matrix rows:** 3, 4
+
+Why-line prose.
+' '**Decision:** Merge if you are OK with the new copy.'
+_hdp_case "no-decision" '## Automouse Hold Justification
+
+**Category:** taste
+
+Prose only.
+' ''
+_hdp_case "two-blocks" '## Automouse Hold Justification
+
+**Decision:** D1
+
+middle
+
+**Decision:** D2
+' '**Decision:** D1
+
+**Decision:** D2'
+_hdp_case "two-line-decision" '## Automouse Hold Justification
+
+**Decision:** first
+continued
+
+after
+' '**Decision:** first
+continued'
+_hdp_case "fenced-decision" '## Automouse Hold Justification
+
+```
+**Decision:** hidden
+```
+' ''
+_hdp_case "outside-section" '## Before
+
+**Decision:** early
+
+## Automouse Hold Justification
+
+prose
+
+## After
+
+**Decision:** late
+' ''
+_hdp_case "no-trailing-newline" '## Automouse Hold Justification
+
+**Decision:** last line' '**Decision:** last line'
+
 # regex_canon_divergence — the three call sites must stay byte-identical.
 # Canon lives in bin/check-plan gate [D]; SKILL.md and _architect-contract.md
 # restate it. Any divergence (notably \s for [[:space:]]) fails here.

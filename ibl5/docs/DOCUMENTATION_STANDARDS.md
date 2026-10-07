@@ -32,7 +32,7 @@ last_verified: 2026-10-04
 - **Location**: Next to the code they document
 - Examples:
   - `ibl5/classes/Player/README.md` - Player module architecture
-  - `ibl5/classes/DepthChartEntry/SECURITY.md` - Security patterns (security-refactor exemplar)
+  - `ibl5/classes/DepthChart/SECURITY.md` - Security patterns (security-refactor exemplar)
   - `ibl5/classes/ComparePlayers/SECURITY.md` - Security patterns (security-refactor exemplar)
   - `ibl5/tests/Trading/README.md` - Trading test documentation
 - **`SECURITY.md` is not a per-module requirement.** Only the two modules above carry one, each documenting a dedicated security refactor. Do **not** create a `SECURITY.md` for a module that has not had such a refactor — these two are exemplars, not a repo-wide convention.

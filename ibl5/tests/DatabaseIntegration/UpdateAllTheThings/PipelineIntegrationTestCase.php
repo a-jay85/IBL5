@@ -12,7 +12,7 @@ use JsbParser\JsbImportService;
 use JsbParser\PlayerIdResolver;
 use PlrParser\PlrParserRepository;
 use PlrParser\PlrParserService;
-use SavedDepthChart\SavedDepthChartRepository;
+use DepthChartSnapshot\DepthChartSnapshotRepository;
 use Season\Season;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 use Updater\Contracts\JsbSourceResolverInterface;
@@ -291,7 +291,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
         $boxscoreRepo = new BoxscoreRepository($this->db);
         $boxscoreView = new BoxscoreView();
 
-        $savedDcRepo = new SavedDepthChartRepository($this->db);
+        $savedDcRepo = new DepthChartSnapshotRepository($this->db);
 
         $jsbRepo = new JsbImportRepository($this->db);
         $jsbResolver = new PlayerIdResolver($this->db);

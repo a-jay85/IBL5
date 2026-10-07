@@ -289,7 +289,7 @@ test.describe('Depth Chart Entry flow', () => {
     // real pids so we can assert exact form-field population. This isolates
     // the client-side populateForm() logic from seed-data variability.
     // The URL shape is: modules.php?name=DepthChartEntry&op=api&action=load&id=N
-    // (apiBaseUrl is wired in DepthChartEntryController.php).
+    // (apiBaseUrl is wired in DepthChartController.php).
     await page.route(
       '**/modules.php?name=DepthChartEntry&op=api&action=load**',
       async (route) => {

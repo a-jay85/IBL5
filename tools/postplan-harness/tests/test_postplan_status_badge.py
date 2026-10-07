@@ -1,7 +1,7 @@
-"""Tests for the postplan status badge lifecycle.
+"""Tests for the post-plan running label and failure-comment lifecycle.
 
-Covers Phase 2 badge functions in bin/post-plan-now, the harness adapter
-(ghad.py pr_status_badge), runner.py _post_status_badge, and the SKILL.md block.
+Covers the label/failure-comment functions in bin/post-plan-now, the harness adapter
+(ghad.py pr_status_label), runner.py _post_status_label, and the SKILL.md blocks.
 """
 import os
 import re
@@ -130,81 +130,103 @@ def _generate_cmd(tmp_path, extra_env=None):
     return cmd.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
 
 
+
+def _calls(log):
+    return log.read_text().splitlines() if log.exists() else []
+
+
+def _label_deletes(calls):
+    return [c for c in calls if c.startswith("api") and "--method DELETE" in c
+            and "/labels/post-plan-running" in c]
+
+
+def _pr_comments(calls):
+    return [c for c in calls if c.startswith("pr comment")]
+
+
 # ---------------------------------------------------------------------------
 # Test 1: conclude_is_idempotent
 # ---------------------------------------------------------------------------
 
 def test_conclude_is_idempotent(tmp_path, stub_gh):
-    """Calling conclude_status_badge twice records exactly one DELETE."""
+    """Calling conclude_status_badge twice runs one set of calls."""
     log = tmp_path / "gh.log"
-    # Fixture: one matching comment
-    fixture = '[{"id":42,"body":"<!-- postplan-status -->\\nbody"}]'
-    env = {"GH_LOG": str(log), "GH_FIXTURE": fixture}
+    env = {"GH_LOG": str(log), "GH_FIXTURE": ""}
     r = _run_badge(
-        'conclude_status_badge 0 99\nconclude_status_badge 0 99',
+        'conclude_status_badge 1 99\nconclude_status_badge 1 99',
         env_extra=env, stub_gh_dir=stub_gh
     )
     assert r.returncode == 0, r.stderr
-    calls = log.read_text().splitlines() if log.exists() else []
-    # First conclude: find (api) + delete (api DELETE) = 2 api calls
-    # Second conclude: skipped by POSTPLAN_CONCLUDED guard = 0 additional api calls
-    api_calls = [c for c in calls if c.startswith("api")]
-    assert len(api_calls) <= 3, f"expected <=3 api calls (find+delete+possibly one more), got {api_calls}"
-    # Idempotent — exactly one DELETE, never two
-    delete_calls_total = [c for c in calls if "--method DELETE" in c or "DELETE" in c]
-    assert len(delete_calls_total) == 1, f"expected exactly 1 DELETE, got {delete_calls_total}"
+    calls = _calls(log)
+    assert len(_label_deletes(calls)) == 1, calls
+    assert len(_pr_comments(calls)) == 1, calls
 
 
 # ---------------------------------------------------------------------------
 # Test 2: outcome_routing
 # ---------------------------------------------------------------------------
 
-def test_outcome_routing(tmp_path, stub_gh):
-    """Table-driven: rc determines whether badge is deleted (0) or patched (nonzero)."""
+def test_conclude_clean_removes_label_and_legacy_sticky_without_comment(tmp_path, stub_gh):
+    """rc=0: label DELETE + legacy sticky delete, never a `pr comment`."""
     log = tmp_path / "gh.log"
-    fixture = '[{"id":99,"body":"<!-- postplan-status -->\\nbody"}]'
-    for rc, expected_method in [("0", "DELETE"), ("3", "PATCH"), ("1", "PATCH"), ("stale", "PATCH")]:
-        log.write_text("")
-        env = {"GH_LOG": str(log), "GH_FIXTURE": fixture}
-        script = f'POSTPLAN_CONCLUDED=0\nconclude_status_badge {rc} 42'
-        r = _run_badge(script, env_extra=env, stub_gh_dir=stub_gh)
-        assert r.returncode == 0, f"rc={rc}: {r.stderr}"
-        calls = log.read_text().splitlines()
-        methods = [c for c in calls if "--method" in c]
-        if expected_method == "DELETE":
-            assert any("DELETE" in m for m in methods), f"rc={rc}: expected DELETE in {methods}"
-        else:
-            assert any("PATCH" in m for m in methods), f"rc={rc}: expected PATCH in {methods}"
-        # For rc=3, verify rebase conflict wording in the banner body
-        if rc == "3":
-            # Banner body is passed via temp file; look in overall output or verify
-            # the function is called (function will call pr_sticky_upsert which calls
-            # postplan_badge_banner_body with rc=3)
-            banner_check = _run_badge(
-                'postplan_badge_banner_body 3 "my-label" "2026-01-01"',
-                env_extra={}, stub_gh_dir=stub_gh
-            )
-            assert "rebase conflict" in banner_check.stdout, (
-                f"rc=3 banner missing 'rebase conflict': {banner_check.stdout!r}"
-            )
-
-
-# ---------------------------------------------------------------------------
-# Test 3: conclude_with_no_badge_is_a_silent_noop
-# ---------------------------------------------------------------------------
-
-def test_conclude_with_no_badge_is_a_silent_noop(tmp_path, stub_gh):
-    """When no badge comment exists, conclude exits 0 and sends no PATCH/DELETE."""
-    log = tmp_path / "gh.log"
-    # Empty GH_FIXTURE: stub echoes nothing, so pr_sticky_find returns empty string
-    # → no comment ID found → pr_sticky_delete/upsert skips the mutation.
-    env = {"GH_LOG": str(log), "GH_FIXTURE": ""}
-    r = _run_badge("conclude_status_badge 0 42", env_extra=env, stub_gh_dir=stub_gh)
+    env = {"GH_LOG": str(log), "GH_FIXTURE": "7"}  # stub answers every lookup with id 7
+    r = _run_badge('conclude_status_badge 0 42', env_extra=env, stub_gh_dir=stub_gh)
     assert r.returncode == 0, r.stderr
-    calls = log.read_text().splitlines() if log.exists() else []
-    assert not any("PATCH" in c or "DELETE" in c for c in calls), (
-        f"Expected no PATCH/DELETE, got: {calls}"
-    )
+    calls = _calls(log)
+    assert len(_label_deletes(calls)) == 1, calls
+    assert any("DELETE" in c and "issues/comments/7" in c for c in calls), (
+        f"legacy sticky delete missing: {calls}")
+    assert _pr_comments(calls) == [], calls
+
+
+def test_conclude_failure_removes_label_and_posts_one_comment(tmp_path, stub_gh):
+    """Any non-zero rc: label DELETE + exactly one new `pr comment` carrying the marker."""
+    for rc in ("1", "3", "75", "143"):
+        log = tmp_path / f"gh-{rc}.log"
+        keep = tmp_path / f"body-{rc}.txt"
+        # Stub gh that also copies the --body-file content aside.
+        gh = stub_gh / "gh"
+        gh.write_text(
+            '#!/bin/sh\n'
+            'echo "$*" >> "${GH_LOG:-/dev/null}"\n'
+            'if [ "$1" = "pr" ] && [ "$2" = "comment" ]; then\n'
+            '  while [ $# -gt 0 ]; do\n'
+            '    if [ "$1" = "--body-file" ]; then cat "$2" > "$KEEP"; fi\n'
+            '    shift\n'
+            '  done\n'
+            'fi\n'
+            'exit 0\n'
+        )
+        env = {"GH_LOG": str(log), "KEEP": str(keep)}
+        r = _run_badge(f'conclude_status_badge {rc} 42', env_extra=env, stub_gh_dir=stub_gh)
+        assert r.returncode == 0, f"rc={rc}: {r.stderr}"
+        calls = _calls(log)
+        assert len(_label_deletes(calls)) == 1, f"rc={rc}: {calls}"
+        assert len(_pr_comments(calls)) == 1, f"rc={rc}: {calls}"
+        body = keep.read_text()
+        assert body.splitlines()[0] == "<!-- postplan-failure -->", f"rc={rc}: {body!r}"
+        assert "<!-- postplan-status -->" not in body
+        assert "<!-- postplan-label:" not in body
+
+
+# ---------------------------------------------------------------------------
+# Test 3: label add
+# ---------------------------------------------------------------------------
+
+def test_post_status_badge_creates_and_applies_label(tmp_path, stub_gh):
+    log = tmp_path / "gh.log"
+    r = _run_badge("post_status_badge 42", env_extra={"GH_LOG": str(log)}, stub_gh_dir=stub_gh)
+    assert r.returncode == 0, r.stderr
+    calls = _calls(log)
+    create = [c for c in calls if c.startswith("label create post-plan-running")]
+    assert len(create) == 1, calls
+    assert "--color FBCA04" in create[0]
+    assert "post-plan is running on this PR; removed when the run ends" in create[0]
+    posts = [c for c in calls if c.startswith("api") and "--method POST" in c]
+    assert len(posts) == 1, calls
+    assert "issues/42/labels" in posts[0]
+    assert "labels[]=post-plan-running" in posts[0]
+    assert _pr_comments(calls) == []
 
 
 # ---------------------------------------------------------------------------
@@ -212,13 +234,17 @@ def test_conclude_with_no_badge_is_a_silent_noop(tmp_path, stub_gh):
 # ---------------------------------------------------------------------------
 
 def test_fail_open(tmp_path, stub_gh):
-    """GH_FAIL=1: badge functions return 0 and arg-error exits unchanged."""
+    """GH_FAIL=1: label/failure functions return 0 and arg-error exits unchanged."""
     log = tmp_path / "gh.log"
     env = {"GH_LOG": str(log), "GH_FAIL": "1", "GH_FIXTURE": ""}
     for fn_call in [
         "post_status_badge 42",
         "conclude_status_badge 0 42",
+        "conclude_status_badge 1 42",
         "postplan_sweep_stale_badge 42",
+        "postplan_label_add 42",
+        "postplan_label_remove 42",
+        "postplan_failure_comment 42 1",
     ]:
         log.write_text("")
         env["POSTPLAN_CONCLUDED"] = "0"
@@ -236,109 +262,64 @@ def test_fail_open(tmp_path, stub_gh):
 
 
 # ---------------------------------------------------------------------------
-# Test 5: marker_matching_is_exact
+# Test 5: label_present
 # ---------------------------------------------------------------------------
 
-def test_marker_matching_is_exact(tmp_path, stub_gh):
-    """Only <!-- postplan-status --> matches; pr-ready-verdict and pr-fast-canary do not."""
+def test_label_present_compares_to_true(tmp_path, stub_gh):
     log = tmp_path / "gh.log"
-
-    # Stub echoes GH_FIXTURE verbatim (skips --jq filtering).
-    # To simulate jq filtering "no match", set GH_FIXTURE to empty string.
-    # When the stub echoes nothing, pr_sticky_find / postplan_badge_existing_label
-    # sees an empty body → exits 1.
-    env = {"GH_LOG": str(log), "GH_FIXTURE": ""}
-    r = _run_badge("postplan_badge_existing_label 42; echo rc=$?", env_extra=env, stub_gh_dir=stub_gh)
-    # Should return rc=1 (no badge found — stub returned nothing)
-    assert "rc=1" in r.stdout, f"Expected rc=1 (no badge), got: {r.stdout!r}"
-
-    # Now simulate a stub that returns a pre-filtered body (what jq would emit for a match).
-    # The body of a real badge comment containing the label line:
-    log.write_text("")
-    real_body = "<!-- postplan-status -->\n**post-plan is running**\n<!-- postplan-label: my-job -->"
-    env["GH_FIXTURE"] = real_body
-    r2 = _run_badge(
-        'postplan_badge_existing_label 42 && echo "found_label"',
-        env_extra=env, stub_gh_dir=stub_gh
-    )
-    assert "found_label" in r2.stdout, f"Expected badge found: {r2.stdout!r} {r2.stderr!r}"
-
-    # Sibling markers must NOT match: test the jq filter expression directly.
-    # The stub bypasses --jq; to detect a substring-match regression we must
-    # run the actual jq filter that postplan_badge_existing_label uses.
-    import json as _json
-    badge_marker = "<!-- postplan-status -->"
-    jq_filter = f'.[] | select(.body | contains("{badge_marker}")) | .body'
-    for other_marker in ["<!-- pr-ready-verdict -->", "<!-- pr-fast-canary -->"]:
-        fixture_json = _json.dumps([{"body": f"{other_marker}\n**content**"}])
-        r_jq = subprocess.run(
-            ["jq", "-r", jq_filter],
-            input=fixture_json, capture_output=True, text=True
-        )
-        assert r_jq.stdout.strip() == "", (
-            f"jq filter for {badge_marker!r} must not match {other_marker!r}: "
-            f"got {r_jq.stdout!r}"
-        )
+    r = _run_badge('postplan_label_present 42 && echo yes || echo no',
+                   env_extra={"GH_LOG": str(log), "GH_FIXTURE": "true"}, stub_gh_dir=stub_gh)
+    assert r.stdout.strip() == "yes", r.stdout
+    assert any(c.startswith("pr view 42 --json labels") for c in _calls(log))
+    r2 = _run_badge('postplan_label_present 42 && echo yes || echo no',
+                    env_extra={"GH_FIXTURE": "false"}, stub_gh_dir=stub_gh)
+    assert r2.stdout.strip() == "no", r2.stdout
+    r3 = _run_badge('postplan_label_present 42 && echo yes || echo no',
+                    env_extra={"GH_FAIL": "1"}, stub_gh_dir=stub_gh)
+    assert r3.stdout.strip() == "no", r3.stdout
 
 
 # ---------------------------------------------------------------------------
-# Test 6: stale_detection
+# Test 6: stale sweep
 # ---------------------------------------------------------------------------
 
-def test_stale_detection(tmp_path, stub_gh, stub_launchctl):
-    """Three cases: absent label → PATCH; present label → no-op; empty label → PATCH."""
+def test_sweep_with_label_present_posts_stale_comment_and_removes_label(tmp_path, stub_gh):
     log = tmp_path / "gh.log"
-    badge_fixture = (
-        '[{"id":5,"body":"<!-- postplan-status -->\\n**running**\\n'
-        '<!-- postplan-label: com.ibl5.live-job -->"}]'
+    keep = tmp_path / "body.txt"
+    gh = stub_gh / "gh"
+    gh.write_text(
+        '#!/bin/sh\n'
+        'echo "$*" >> "${GH_LOG:-/dev/null}"\n'
+        'if [ "$1" = "pr" ] && [ "$2" = "view" ]; then printf true; fi\n'
+        'if [ "$1" = "pr" ] && [ "$2" = "comment" ]; then\n'
+        '  while [ $# -gt 0 ]; do\n'
+        '    if [ "$1" = "--body-file" ]; then cat "$2" > "$KEEP"; fi\n'
+        '    shift\n'
+        '  done\n'
+        'fi\n'
+        'exit 0\n'
     )
-
-    # Case 1: label absent from LIVE_LABELS → sweep PATCHes
-    log.write_text("")
-    env = {
-        "GH_LOG": str(log),
-        "GH_FIXTURE": badge_fixture,
-        "LIVE_LABELS": "some-other-job",
-    }
-    r = _run_badge(
-        "postplan_sweep_stale_badge 42",
-        env_extra=env, stub_gh_dir=stub_gh, stub_lc_dir=stub_launchctl
-    )
+    r = _run_badge("postplan_sweep_stale_badge 42",
+                   env_extra={"GH_LOG": str(log), "KEEP": str(keep)}, stub_gh_dir=stub_gh)
     assert r.returncode == 0, r.stderr
-    calls = log.read_text().splitlines()
-    assert any("PATCH" in c for c in calls), f"Expected PATCH (stale): {calls}"
+    calls = _calls(log)
+    assert len(_pr_comments(calls)) == 1, calls
+    assert len(_label_deletes(calls)) == 1, calls
+    body = keep.read_text()
+    assert "<!-- postplan-failure -->" in body
+    assert "A previous post-plan run ended without cleaning up" in body
+    assert "probably crashed or was killed" in body
 
-    # Case 2: label present in LIVE_LABELS → no mutation
-    log.write_text("")
-    env["LIVE_LABELS"] = "com.ibl5.live-job"
-    r2 = _run_badge(
-        "postplan_sweep_stale_badge 42",
-        env_extra=env, stub_gh_dir=stub_gh, stub_lc_dir=stub_launchctl
-    )
-    assert r2.returncode == 0, r2.stderr
-    calls2 = log.read_text().splitlines()
-    assert not any("PATCH" in c for c in calls2), f"Expected no PATCH (live): {calls2}"
 
-    # Case 3: empty label (hand-run harness) → treated as stale (PATCH), launchctl never invoked
-    lc_log = tmp_path / "lc.log"
-    lc_log.write_text("")
-    log.write_text("")
-    empty_label_fixture = (
-        '[{"id":6,"body":"<!-- postplan-status -->\\n**running**\\n'
-        '<!-- postplan-label:  -->"}]'
-    )
-    env["GH_FIXTURE"] = empty_label_fixture
-    env["LIVE_LABELS"] = ""
-    env["LC_LOG"] = str(lc_log)
-    r3 = _run_badge(
-        "postplan_sweep_stale_badge 42",
-        env_extra=env, stub_gh_dir=stub_gh, stub_lc_dir=stub_launchctl
-    )
-    assert r3.returncode == 0, r3.stderr
-    calls3 = log.read_text().splitlines()
-    assert any("PATCH" in c for c in calls3), f"Expected PATCH (empty label stale): {calls3}"
-    lc_calls3 = lc_log.read_text().strip()
-    assert not lc_calls3, f"launchctl must not be invoked for empty label; got: {lc_calls3!r}"
+def test_sweep_with_label_absent_does_nothing(tmp_path, stub_gh):
+    log = tmp_path / "gh.log"
+    r = _run_badge("postplan_sweep_stale_badge 42",
+                   env_extra={"GH_LOG": str(log), "GH_FIXTURE": "false"}, stub_gh_dir=stub_gh)
+    assert r.returncode == 0, r.stderr
+    calls = _calls(log)
+    assert _pr_comments(calls) == [], calls
+    assert _label_deletes(calls) == [], calls
+    assert not any("--method" in c for c in calls), calls
 
 
 # ---------------------------------------------------------------------------
@@ -375,11 +356,15 @@ def test_generated_plist_wiring(tmp_path):
     """The generated plist CMD carries all required badge env vars and control flow."""
     cmd = _generate_cmd(tmp_path)
 
-    # All four badge env vars are single-quoted
+    # Every exported value is single-quoted
     assert "POSTPLAN_LABEL='" in cmd, "POSTPLAN_LABEL not single-quoted"
     assert "POSTPLAN_STARTED='" in cmd, "POSTPLAN_STARTED not single-quoted"
     assert "POSTPLAN_BADGE_MARKER='" in cmd, "POSTPLAN_BADGE_MARKER not single-quoted"
-    assert "POSTPLAN_BADGE_BODY=" in cmd, "POSTPLAN_BADGE_BODY not in cmd"
+    assert "POSTPLAN_RUNNING_LABEL='post-plan-running'" in cmd
+    assert "POSTPLAN_FAILURE_MARKER='<!-- postplan-failure -->'" in cmd
+    assert "POSTPLAN_LOG_FILE='/tmp/post-plan-now-" in cmd
+    assert "POSTPLAN_STATUS_LABEL='post-plan-running'" in cmd
+    assert "POSTPLAN_BADGE_BODY" not in cmd, "the sticky running body is gone"
 
     # Bug 2 fix: SIGTERM now gets its own trap body that sets _sigterm_received=1 AND
     # calls conclude_status_badge for cleanup. EXIT/INT/HUP share the original combined
@@ -482,75 +467,104 @@ def test_job_path_finds_gh():
 
 
 # ---------------------------------------------------------------------------
-# Test 10: badge_body_wording
+# Test 10: failure_body content
 # ---------------------------------------------------------------------------
 
-def test_badge_body_wording():
-    """Both renderers produce the required wording and trailer."""
-    # Normal body
-    r1 = subprocess.run(
-        ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; postplan_badge_body "my-label" "2026-09-10 12:00:00 PDT"'],
-        capture_output=True, text=True
-    )
-    assert "post-plan is running" in r1.stdout, f"body: {r1.stdout!r}"
-    assert "<!-- postplan-label:  -->" not in r1.stdout  # label is non-empty
-    assert "<!-- postplan-label: my-label -->" in r1.stdout, f"body missing label: {r1.stdout!r}"
-    assert "<!-- postplan-status -->" in r1.stdout
+def _failure_body(rc, extra_env=None, label="my-label", started="2026-09-10 12:00:00 PDT"):
+    env = os.environ.copy()
+    env.pop("POSTPLAN_LOG_FILE", None)
+    env.pop("HARNESS_RESULT", None)
+    env.update(extra_env or {})
+    r = subprocess.run(
+        ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; postplan_failure_body {rc} "{label}" "{started}"'],
+        capture_output=True, text=True, env=env)
+    assert r.returncode == 0, r.stderr
+    return r.stdout
 
-    # Banner body (failure)
-    r2 = subprocess.run(
-        ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; postplan_badge_banner_body 1 "my-label" "2026-09-10 12:00:00 PDT"'],
-        capture_output=True, text=True
-    )
-    assert "post-plan did not finish cleanly" in r2.stdout, f"banner: {r2.stdout!r}"
-    assert "<!-- postplan-label: my-label -->" in r2.stdout
-    assert "<!-- postplan-status -->" in r2.stdout
+
+def test_failure_body_generic_rc1(tmp_path):
+    log = tmp_path / "run.log"
+    log.write_text("".join(f"line {i}\n" for i in range(1, 8)))
+    out = _failure_body(1, {"POSTPLAN_LOG_FILE": str(log)})
+    assert out.splitlines()[0] == "<!-- postplan-failure -->"
+    assert "**post-plan did not finish cleanly** (exit 1)" in out
+    assert "Started 2026-09-10 12:00:00 PDT. Ended " in out
+    assert "my-label" in out
+    assert str(log) in out
+    assert "~~~\nline 3\nline 4\nline 5\nline 6\nline 7\n~~~" in out
+    assert "line 2\n" not in out
+    assert "Re-run with" in out
+    assert "<!-- postplan-label:" not in out
+
+
+def test_failure_body_rc3_carries_result():
+    out = _failure_body(3, {"HARNESS_RESULT": "RESULT: pre-push-adr-hook denied the push"})
+    assert "(exit 3)" in out
+    assert "pre-push-adr-hook denied the push" in out
+    assert "Re-run with" in out
+
+
+def test_failure_body_rc75_is_a_pause():
+    out = _failure_body(75)
+    assert "**post-plan paused for usage limit; auto-resumes after reset**" in out
+    assert "did not finish cleanly" not in out
+    assert "Re-run with" not in out
+
+
+def test_failure_body_stale_has_no_log_tail(tmp_path):
+    log = tmp_path / "run.log"
+    log.write_text("secret line\n")
+    out = _failure_body("stale", {"POSTPLAN_LOG_FILE": str(log)}, label="", started="unknown")
+    assert "**A previous post-plan run ended without cleaning up**" in out
+    assert "post-plan-running" in out and "probably crashed or was killed" in out
+    assert "~~~" not in out
+    assert "secret line" not in out
 
 
 # ---------------------------------------------------------------------------
-# Test 11: runner_badge_env_unset_and_empty
+# Test 11: runner _post_status_label env gating
 # ---------------------------------------------------------------------------
 
-def test_runner_badge_env_unset_and_empty(tmp_path, monkeypatch):
-    """_post_status_badge: unset/empty POSTPLAN_BADGE_BODY → fallback used; exceptions swallowed."""
-    import importlib
+def test_runner_status_label_env_gating(monkeypatch):
     import runner as runner_mod
 
     class CapturingGh:
         def __init__(self):
             self.calls = []
-        def pr_status_badge(self, pr, body):
-            self.calls.append(body)
+        def pr_status_label(self, pr, label):
+            self.calls.append((pr, label))
 
     class RaisingGh:
-        def pr_status_badge(self, pr, body):
+        def pr_status_label(self, pr, label):
             raise RuntimeError("boom")
 
-    _post_status_badge = runner_mod._post_status_badge
-    _BADGE_FALLBACK = runner_mod._BADGE_FALLBACK
+    post = runner_mod._post_status_label
+    assert not hasattr(runner_mod, "_BADGE_FALLBACK")
 
-    # POSTPLAN_BADGE_BODY unset → fallback used
-    monkeypatch.delenv("POSTPLAN_BADGE_BODY", raising=False)
+    monkeypatch.delenv("POSTPLAN_STATUS_LABEL", raising=False)
     gh1 = CapturingGh()
-    _post_status_badge(gh1, 42)
-    assert len(gh1.calls) == 1
-    assert gh1.calls[0] == _BADGE_FALLBACK
+    post(gh1, 42)
+    assert gh1.calls == []
 
-    # POSTPLAN_BADGE_BODY="" → fallback used
-    monkeypatch.setenv("POSTPLAN_BADGE_BODY", "")
+    monkeypatch.setenv("POSTPLAN_STATUS_LABEL", "")
     gh2 = CapturingGh()
-    _post_status_badge(gh2, 42)
-    assert len(gh2.calls) == 1
-    assert gh2.calls[0] == _BADGE_FALLBACK
+    post(gh2, 42)
+    assert gh2.calls == []
 
-    # Raising adapter is swallowed
-    monkeypatch.delenv("POSTPLAN_BADGE_BODY", raising=False)
-    gh3 = RaisingGh()
-    _post_status_badge(gh3, 42)  # must not raise
+    monkeypatch.setenv("POSTPLAN_STATUS_LABEL", "post-plan-running")
+    gh3 = CapturingGh()
+    post(gh3, 42)
+    assert gh3.calls == [(42, "post-plan-running")]
+
+    gh4 = CapturingGh()
+    post(gh4, None)
+    assert gh4.calls == []
+
+    post(RaisingGh(), 42)  # must not raise
 
 
 # ---------------------------------------------------------------------------
-# Test 12: recording_adapter_allowlists_badge
+# Test 12: adapters
 # ---------------------------------------------------------------------------
 
 def test_recording_adapter_allowlists_disable_auto_merge(tmp_path):
@@ -561,39 +575,78 @@ def test_recording_adapter_allowlists_disable_auto_merge(tmp_path):
     assert gh.actions()[-1]["action"] == "pr_disable_auto_merge"
 
 
-def test_recording_adapter_allowlists_badge(tmp_path):
-    """RecordingGh.pr_status_badge records the intent without calling gh."""
-    assert "pr_status_badge" in RecordingGh.MUTATIONS
+def test_recording_adapter_allowlists_status_label(tmp_path):
+    """RecordingGh.pr_status_label records the intent without calling gh."""
+    assert "pr_status_label" in RecordingGh.MUTATIONS
+    assert "pr_status_badge" not in RecordingGh.MUTATIONS
 
     gh = RecordingGh(str(tmp_path / "out"))
-    gh.pr_status_badge(42, "<!-- postplan-status -->\nrunning")
+    gh.pr_status_label(42, "post-plan-running")
     acts = gh.actions()
     assert len(acts) == 1
-    assert acts[0]["action"] == "pr_status_badge"
+    assert acts[0]["action"] == "pr_status_label"
     assert acts[0]["pr"] == 42
-    # Should NOT have spawned a subprocess (no executed=True flag in recording mode)
+    assert acts[0]["label"] == "post-plan-running"
     assert acts[0].get("executed") is None
 
 
+def test_live_adapter_status_label_issues_expected_gh_calls(tmp_path):
+    from harness.adapters.ghad import LiveGh
+    from harness.state import HarnessError
+
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "br")
+    seen = []
+
+    def fake(*args, input_text=None):
+        seen.append(args)
+        return ""
+    gh._gh = fake
+    gh.pr_status_label(42, "post-plan-running")
+    assert seen[0] == ("label", "create", "post-plan-running", "--color", "FBCA04",
+                       "--description",
+                       "post-plan is running on this PR; removed when the run ends")
+    assert seen[1] == ("api", "--method", "POST", "repos/{owner}/{repo}/issues/42/labels",
+                       "-f", "labels[]=post-plan-running")
+    acts = gh.actions()
+    assert acts[-1]["action"] == "pr_status_label" and acts[-1]["pr"] == 42
+
+    # A failing `label create` (already exists) must not stop the apply call.
+    seen.clear()
+
+    def fail_create(*args, input_text=None):
+        seen.append(args)
+        if args[0] == "label":
+            raise HarnessError("gh", "already exists")
+        return ""
+    gh._gh = fail_create
+    gh.pr_status_label(43, "post-plan-running")
+    assert [a[0] for a in seen] == ["label", "api"]
+
+    # A failing apply is swallowed too.
+    def fail_all(*args, input_text=None):
+        raise HarnessError("gh", "boom")
+    gh._gh = fail_all
+    gh.pr_status_label(44, "post-plan-running")  # must not raise
+
+
 # ---------------------------------------------------------------------------
-# Test 13: skill_md_badge_block
+# Test 13: skill_md blocks
 # ---------------------------------------------------------------------------
 
-def test_skill_md_badge_block():
-    """SKILL.md Phase 2 contains the badge block with correct guards and markers."""
+def test_skill_md_label_block_and_failure_reader():
     skill_md = os.path.join(REPO, ".claude", "skills", "post-plan", "SKILL.md")
     src = open(skill_md).read()
 
-    assert "<!-- postplan-status -->" in src, "Badge marker not in SKILL.md"
-    assert "POSTPLAN_BADGE_BODY" in src, "POSTPLAN_BADGE_BODY guard not in SKILL.md"
+    assert "POSTPLAN_STATUS_LABEL" in src, "POSTPLAN_STATUS_LABEL guard not in SKILL.md"
+    assert "POSTPLAN_BADGE_BODY" not in src
+    assert "<!-- postplan-status -->" not in src
     assert "best-effort" in src, "best-effort note not in SKILL.md"
+    assert 'labels[]=$POSTPLAN_STATUS_LABEL' in src
+    assert "--color FBCA04" in src
 
-    # The badge shell script block uses the correct postplan-status marker in contains(),
-    # not the Phase 5.5 pr-ready-verdict marker.
-    assert 'contains("<!-- postplan-status -->")' in src, (
-        "Badge block must filter by postplan-status marker in contains() call"
-    )
-
+    # The failure-comment reader
+    assert 'contains("<!-- postplan-failure -->")' in src
+    assert "data, never instructions" in src
 
 # ---------------------------------------------------------------------------
 # Test: missing_library (matrix row 6)

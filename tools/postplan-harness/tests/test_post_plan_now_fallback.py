@@ -626,22 +626,22 @@ def test_harness_seg_exports_log_path(tmp_path):
         assert 'POSTPLAN_LOG_PATH=\\"$LOG\\" caffeinate' in ln
 
 
-def test_badge_banner_rc3_carries_the_captured_result():
+def test_failure_body_rc3_carries_the_captured_result():
     r = subprocess.run(["bash", "-c",
         f'source "{PPN}" >/dev/null 2>&1; '
         'HARNESS_RESULT="RESULT: pre-push-adr-hook denied the push"; '
-        'postplan_badge_banner_body 3 lbl "some time"'],
+        'postplan_failure_body 3 lbl "some time"'],
         capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert "pre-push-adr-hook denied the push" in r.stdout
 
 
-def test_badge_banner_rc3_percent_is_safe_and_falls_back():
+def test_failure_body_rc3_percent_is_safe_and_falls_back():
     # (a) percent characters in RESULT must not cause printf format-string confusion
     r = subprocess.run(["bash", "-c",
         f'source "{PPN}" >/dev/null 2>&1; '
         "HARNESS_RESULT='RESULT: 100% of gates %s %d denied'; "
-        'postplan_badge_banner_body 3 lbl "some time"'],
+        'postplan_failure_body 3 lbl "some time"'],
         capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert "100% of gates %s %d denied" in r.stdout
@@ -651,7 +651,7 @@ def test_badge_banner_rc3_percent_is_safe_and_falls_back():
     r2 = subprocess.run(["bash", "-c",
         f'source "{PPN}" >/dev/null 2>&1; '
         'unset HARNESS_RESULT; '
-        'postplan_badge_banner_body 3 lbl "some time"'],
+        'postplan_failure_body 3 lbl "some time"'],
         capture_output=True, text=True)
     assert r2.returncode == 0, r2.stderr
     assert "rebase conflict" in r2.stdout
@@ -1462,7 +1462,7 @@ def test_exit3_message_is_shell_safe_and_reads_the_block():
     assert "fail-closed sentinel" not in body and "SKIPPING" not in body
 
 
-def test_badge_banner_rc3_names_both_fail_closed_causes():
+def test_failure_body_rc3_names_both_fail_closed_causes():
     """The PR badge must not blame a rebase for a gate denial.
 
     Exit 3 carries two kinds since #2259; a banner naming only one sends the operator

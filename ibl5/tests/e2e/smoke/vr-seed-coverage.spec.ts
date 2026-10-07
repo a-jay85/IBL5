@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/base';
 import { publicStorageState } from '../helpers/public-storage-state';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 

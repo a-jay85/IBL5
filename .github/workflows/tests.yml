@@ -1135,6 +1135,9 @@ jobs:
       # Needs a scrubbed environment, so it cannot share the runner.
       - name: bin/test-burndown-loop
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-burndown-loop'
+      # Needs a scrubbed environment, so it cannot share the runner.
+      - name: bin/test-wt-pool
+        run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-wt-pool'
 
       - name: bin/test-restore-rowcount-compare
         run: bin/test-restore-rowcount-compare

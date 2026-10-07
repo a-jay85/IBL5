@@ -12,6 +12,17 @@ use PHPUnit\Framework\TestCase;
  */
 class BoxscoreTest extends TestCase
 {
+    /**
+     * sha1 of Boxscore::playerInsertSql('`ibl_box_scores`') on unmodified master —
+     * the exact string BoxscoreRepository passes today.
+     */
+    private const PLAYER_INSERT_SQL_SHA1 = '63764939f440ad0d3425ed70cf9fbeb23e363e7c';
+
+    /**
+     * sha1 of Boxscore::teamInsertSql('`ibl_box_scores_teams`') on unmodified master.
+     */
+    private const TEAM_INSERT_SQL_SHA1 = '291192773709d42adbc5f87bf1dd02674f5bac04';
+
     // --- fillGameInfo() date logic via withGameInfoLine() ---
 
     public function testNovemberGameUsesStartingYear(): void
@@ -331,6 +342,22 @@ class BoxscoreTest extends TestCase
         $this->assertStringContainsString('home_teamid', $sql);
         $this->assertStringContainsString('visitor_q1_points', $sql);
         $this->assertStringContainsString('home_ot_points', $sql);
+    }
+
+    public function testPlayerInsertSqlIsByteIdenticalForRepositoryCaller(): void
+    {
+        $this->assertSame(
+            self::PLAYER_INSERT_SQL_SHA1,
+            sha1(Boxscore::playerInsertSql('`ibl_box_scores`'))
+        );
+    }
+
+    public function testTeamInsertSqlIsByteIdenticalForRepositoryCaller(): void
+    {
+        $this->assertSame(
+            self::TEAM_INSERT_SQL_SHA1,
+            sha1(Boxscore::teamInsertSql('`ibl_box_scores_teams`'))
+        );
     }
 
     // --- Helper to build fixed-width game info lines ---

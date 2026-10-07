@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\JsbParser;
 
 use JsbParser\PlayerIdResolver;
+use League\LeagueContext;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 
@@ -173,6 +174,63 @@ class PlayerIdResolverTest extends TestCase
 
         $second = $resolver->resolve('Ghost', 'Nowhere', 2025, 99);
         $this->assertNull($second);
+    }
+
+    /**
+     * Two-method LeagueContext stub: master calls getTableName(), later phases may call isOlympics().
+     */
+    private function createOlympicsContextStub(): LeagueContext
+    {
+        $context = $this->createStub(LeagueContext::class);
+        $context->method('isOlympics')->willReturn(true);
+        $context->method('getTableName')->willReturnCallback(
+            static fn (string $t): string => LeagueContext::TABLE_MAP[$t] ?? $t
+        );
+
+        return $context;
+    }
+
+    /**
+     * Drive all four strategy queries (no rows anywhere, so the cascade falls through).
+     *
+     * @return list<string> raw SQL text handed to prepare()
+     */
+    private function runFullCascade(?LeagueContext $context): array
+    {
+        $resolver = new PlayerIdResolver($this->mockDb, $context);
+        $resolver->resolve('Nobody Here', 'Nowhere', 2025, 3);
+
+        return $this->mockDb->getPreparedQueries();
+    }
+
+    /**
+     * @param list<string> $queries
+     */
+    private function countContaining(array $queries, string $needle): int
+    {
+        return count(array_filter(
+            $queries,
+            static fn (string $q): bool => str_contains($q, $needle)
+        ));
+    }
+
+    public function testLookupsTargetIblPlayerTablesWithoutLeagueContext(): void
+    {
+        $queries = $this->runFullCascade(null);
+
+        $this->assertCount(4, $queries);
+        $this->assertSame(2, $this->countContaining($queries, 'FROM ibl_plr_snapshots WHERE'));
+        $this->assertSame(2, $this->countContaining($queries, 'FROM ibl_plr WHERE'));
+        $this->assertSame(0, $this->countContaining($queries, 'olympics'));
+    }
+
+    public function testLookupsTargetOlympicsPlayerTablesInOlympicsContext(): void
+    {
+        $queries = $this->runFullCascade($this->createOlympicsContextStub());
+
+        $this->assertCount(4, $queries);
+        $this->assertSame(2, $this->countContaining($queries, 'FROM ibl_olympics_plr_snapshots WHERE'));
+        $this->assertSame(2, $this->countContaining($queries, 'FROM ibl_olympics_plr WHERE'));
     }
 
     public function testClearCacheResetsCache(): void

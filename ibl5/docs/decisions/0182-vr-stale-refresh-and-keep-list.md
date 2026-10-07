@@ -19,7 +19,7 @@ The Visual Regression job publishes each PR's gallery to `gh-pages` under `<sha>
 3. A refresh skips forks, `update-baselines` PRs, drafts in a sweep, non-master bases, and PRs behind master. The refresh runs master's workflow steps against the PR head's scripts. A behind head can lack a flag those steps pass, and its tree may not contain the master tip used as the baseline.
 4. Retention keeps every SHA found in any comment or the body of any open PR, plus each head SHA. The exemption covers both prune passes. A failed keep-list computation skips pruning for that run.
 5. A sweep refreshes at most 10 PRs, 2 at a time, and dispatches `pages-deploy.yml` once.
-6. Every decision lives in `ibl5/tests/e2e/vr-refresh.ts`, which vitest covers. `bin/vr-refresh-targets` only runs `gh` and `git`, and it fails closed: any API error or a truncated PR list exits 1 with empty stdout. `bin/prune-vr-galleries` stays an offline tool that reads a keep file.
+6. Every decision lives in `ibl5/tests/e2e/vr-refresh.ts`, which vitest covers. `bin/vr-refresh-targets` only runs `gh` and `git`. In `--mode=keep`, any API error or a truncated PR list exits 1 with empty stdout. In `--mode=select`, a failed compare call marks that PR `behind-unknown`. `bin/prune-vr-galleries` stays an offline tool that reads a keep file.
 
 ## Alternatives Considered
 

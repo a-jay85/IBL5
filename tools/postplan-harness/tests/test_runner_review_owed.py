@@ -78,7 +78,7 @@ def _run(fx):
 
 
 EXPECTED_ORDER = [
-    ("pr_status_badge", None),
+    ("pr_status_label", None),
     ("pr_comment", "Code review"),
     ("pr_comment", "Security audit"),
     ("pr_sticky_verdict", None),
@@ -158,6 +158,8 @@ def test_seam_is_gated_on_not_live():
 ])
 def test_arming_is_unchanged_by_every_review_owed_outcome(tmp_path, monkeypatch, canned):
     _stub_prn(tmp_path, monkeypatch)
+    # bin/post-plan-now exports this; without it the runner records no label action.
+    monkeypatch.setenv("POSTPLAN_STATUS_LABEL", "post-plan-running")
     base, base_out = _run(_fixture())
     res, out = _run(_fixture(review_owed=canned))
     assert (res.arm.armed, [c.name for c in res.arm.holds]) == \
@@ -165,7 +167,7 @@ def test_arming_is_unchanged_by_every_review_owed_outcome(tmp_path, monkeypatch,
     # ReviewPhase runs on a worker thread, so its pr_comment can land before or after the
     # main thread's pr_edit_body. That pair is the only racing order: pr_edit_body is
     # compared as an unordered count, and every other action keeps its exact order
-    # (badge first, Code review then Security audit, sticky verdict last: runner joins
+    # (status label first, Code review then Security audit, sticky verdict last: runner joins
     # the review thread before posting the sticky).
     assert _ordered_actions(_actions(out)) == _ordered_actions(_actions(base_out))
     acts, base_acts = _actions(out), _actions(base_out)
@@ -175,7 +177,7 @@ def test_arming_is_unchanged_by_every_review_owed_outcome(tmp_path, monkeypatch,
     # reorders both runs the same way.
     assert _ordered_actions(acts) == EXPECTED_ORDER
     names = [a["action"] for a in acts]
-    assert names[0] == "pr_status_badge" and names[-1] == "pr_sticky_verdict"
+    assert names[0] == "pr_status_label" and names[-1] == "pr_sticky_verdict"
     assert res.terminal == base.terminal
 
 

@@ -29,7 +29,7 @@ Subcommands:
   plan <slug>                 Execute exactly one named plan and stop.
   schedule "[YYYY-MM-DD] HH:MM [TZ]"
                               Schedule a one-shot run at the given time
-                              (no date = today, no TZ = local).
+                              (no date = today, or tomorrow if that time has passed; no TZ = local).
   disarm-tonight              Skip tonight's run; auto re-enables afterward.
   disarm-until "[YYYY-MM-DD] HH:MM [TZ]"
                               Pause until the given time.
@@ -64,12 +64,32 @@ epoch_fmt() {
     date -r "$1" "+$2" 2>/dev/null || date -d "@$1" "+$2"
 }
 
+# Resolve a `schedule` or `disarm-until` time against NOW. A bare "HH:MM [TZ]" that has
+# already passed today means tomorrow at that time. A dated time is taken as
+# given, so a past date still fails the caller's past-time check.
+schedule_epoch() {
+    local when="$1" now="$2" epoch midday tomorrow
+    if [[ "$when" =~ ^[0-9]{1,2}:[0-9]{2}([[:space:]]|$) ]]; then
+        epoch=$(parse_when_epoch "$(epoch_fmt "$now" '%Y-%m-%d') $when") || return 1
+        if [ "$epoch" -le "$now" ]; then
+            # Use a midday anchor to find tomorrow's date — raw +86400 skips a day on
+            # DST spring-forward eve when the day is only 23 hours long.
+            midday=$(parse_when_epoch "$(epoch_fmt "$now" '%Y-%m-%d') 12:00") || return 1
+            tomorrow=$(epoch_fmt "$((midday + 86400))" '%Y-%m-%d')
+            epoch=$(parse_when_epoch "$tomorrow $when") || return 1
+        fi
+    else
+        epoch=$(parse_when_epoch "$when") || return 1
+    fi
+    printf '%s\n' "$epoch"
+}
+
 # --- One-shot scheduler subcommand ----------------------------------------
 # Usage: bin/automouse/run schedule "[YYYY-MM-DD] HH:MM [TZ]"
 # Creates a self-cleaning launchd agent that fires bin/automouse/run once at the
 # given time, then removes its own plist and boots itself out. The date is
-# optional and defaults to today; the timezone abbreviation is optional and
-# defaults to the system's local zone.
+# optional and defaults to today, or tomorrow if that time has already passed;
+# the timezone abbreviation is optional and defaults to the system's local zone.
 # Example: bin/automouse/run schedule "2026-05-28 20:00 PDT"
 if [ "${1:-}" = "schedule" ]; then
     WHEN="${2:-}"
@@ -79,9 +99,9 @@ if [ "${1:-}" = "schedule" ]; then
         exit 1
     fi
 
-    if ! EPOCH=$(parse_when_epoch "$WHEN"); then
+    if ! EPOCH=$(schedule_epoch "$WHEN" "$(date +%s)"); then
         echo "error: could not parse time '$WHEN'" >&2
-        echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-05-28 20:00 PDT, or 20:00 for today)" >&2
+        echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-05-28 20:00 PDT, or 20:00 for the next 20:00)" >&2
         exit 1
     fi
 
@@ -185,11 +205,12 @@ daily_fire_hhmm() {
 # Re-parses tomorrow's calendar date instead of adding 86400 so a DST transition
 # doesn't slide the fire time by an hour.
 next_daily_epoch() {
-    local hour="$1" min="$2" now="$3" day cand
+    local hour="$1" min="$2" now="$3" day midday cand
     day=$(epoch_fmt "$now" '%Y-%m-%d')
     cand=$(parse_when_epoch "$(printf '%s %02d:%02d' "$day" "$hour" "$min")") || return 1
     if [ "$cand" -le "$now" ]; then
-        day=$(epoch_fmt "$((now + 86400))" '%Y-%m-%d')
+        midday=$(parse_when_epoch "$day 12:00") || return 1
+        day=$(epoch_fmt "$((midday + 86400))" '%Y-%m-%d')
         cand=$(parse_when_epoch "$(printf '%s %02d:%02d' "$day" "$hour" "$min")") || return 1
     fi
     printf '%s\n' "$cand"
@@ -359,12 +380,12 @@ if [ "${1:-}" = "disarm-tonight" ] || [ "${1:-}" = "disarm-until" ]; then
         WHEN="${2:-}"
         if [ -z "$WHEN" ]; then
             echo "usage: bin/automouse/run disarm-until \"[YYYY-MM-DD] HH:MM [TZ]\"" >&2
-            echo "example: bin/automouse/run disarm-until \"2026-08-20 09:00 PDT\" (or \"20:00\" for today)" >&2
+            echo "example: bin/automouse/run disarm-until \"2026-08-20 09:00 PDT\" (or \"20:00\" for the next 20:00)" >&2
             exit 1
         fi
-        if ! REARM_EPOCH=$(parse_when_epoch "$WHEN"); then
+        if ! REARM_EPOCH=$(schedule_epoch "$WHEN" "$NOW"); then
             echo "error: could not parse time '$WHEN'" >&2
-            echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-08-20 09:00 PDT, or 20:00 for today)" >&2
+            echo "expected: [YYYY-MM-DD] HH:MM [TZ]  (e.g. 2026-08-20 09:00 PDT, or 20:00 for the next 20:00)" >&2
             exit 1
         fi
     fi

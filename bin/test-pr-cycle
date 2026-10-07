@@ -1218,6 +1218,13 @@ g_no_bucket_cond() {
         | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-4\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} {print}' \
         | grep -qE 'FEAT-AWAITING-SIGNOFF|PIPELINE-HELD|UNCLEARED|[^-A-Z_]HELD[^-A-Z_]'
 }
+# Sibling of g_no_bucket_cond: both of its awk skip spans must open AND close. If the closing
+# line (`}` of _bucket_emoji, or the yt-g print redirect) is reworded, the skip stays open to
+# EOF and g_no_bucket_cond silently stops checking the rest of the file.
+g_bucket_spans_close() {
+    noncomment "$1" \
+        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-4\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} END{exit (skip || gskip) ? 1 : 0}'
+}
 g_no_sleep()       { ! noncomment "$1" | grep -qE '(^|[^A-Za-z_])sleep[[:space:]]'; }
 g_no_poll()        { ! noncomment "$1" | grep -qE -- '--json state|_poll_merge|_reconcile'; }
 g_one_ready()      { [[ "$(noncomment "$1" | grep -cE '"\$PR_CYCLE_READY_CMD" --pr-list ')" == 1 ]] \
@@ -1306,7 +1313,7 @@ g_bucket_emoji_pure_map() {
 # end bucket_emoji helpers
 
 begin_case
-for g in g_no_merge g_no_armable_lib g_triage_pin g_one_arm g_no_bucket_cond \
+for g in g_no_merge g_no_armable_lib g_triage_pin g_one_arm g_no_bucket_cond g_bucket_spans_close \
          g_no_sleep g_no_poll g_one_ready g_no_timeout_grep \
          g_cmd_prefix g_no_digest_fetch g_scope_selection_only g_bucket_emoji_pure_map; do
     "$g" "$DRIVER" || fail "static guard $g fails against the real bin/pr-cycle"
@@ -1336,6 +1343,12 @@ mutant; echo 'if [ "$BUCKET" = "FEAT-AWAITING-SIGNOFF" ]; then :; fi' >> "$SCRAT
 g_no_bucket_cond "$SCRATCH/mutant" && fail "vacuous: g_no_bucket_cond passed a sign-off conditional"
 mutant; echo 'if [ "$B" = "HELD" ]; then :; fi' >> "$SCRATCH/mutant"
 g_no_bucket_cond "$SCRATCH/mutant" && fail "vacuous: g_no_bucket_cond passed a bare HELD conditional"
+# Span-close mutants: reword each closing line so the awk skip stays open to EOF.
+mutant; sed -i.bak 's|print > (d "/yt-g"|print >> (d "/yt-g"|' "$SCRATCH/mutant"
+g_bucket_spans_close "$SCRATCH/mutant" && fail "vacuous: g_bucket_spans_close passed an unclosed yt-g span"
+# Reword every column-0 closing brace so no `}` can end the _bucket_emoji skip.
+sed 's/^}[[:space:]]*$/ };/' "$DRIVER" > "$SCRATCH/mutant"
+g_bucket_spans_close "$SCRATCH/mutant" && fail "vacuous: g_bucket_spans_close passed an unclosed _bucket_emoji span"
 mutant; echo 'sleep 1' >> "$SCRATCH/mutant"
 g_no_sleep "$SCRATCH/mutant" && fail "vacuous: g_no_sleep passed a driver with sleep"
 mutant; echo '_poll_merge 1' >> "$SCRATCH/mutant"

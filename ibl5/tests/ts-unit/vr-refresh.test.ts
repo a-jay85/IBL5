@@ -45,6 +45,7 @@ describe('extractGalleryShas', () => {
   });
 
   it('ignores non-40-hex and pr-keyed gallery paths', () => {
+    // The 39- and 41-hex lines fail if the width in GALLERY_SHA_RE widens to {39,41}.
     const text = [
       `https://a-jay85.github.io/IBL5/${'a'.repeat(39)}/visual-review`,
       `https://a-jay85.github.io/IBL5/${'a'.repeat(41)}/visual-review`,

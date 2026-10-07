@@ -120,6 +120,8 @@ jobs:
       actions: write
       packages: read
     uses: ./.github/workflows/e2e-tests.yml
+    # actionlint checks these keys against the workflow_call inputs: a key such as
+    # refresh_sha: (not an input) fails the lint.
     with:
       refresh_pr: ${{ format('{0}', matrix.target.pr) }}
       refresh_head_sha: ${{ matrix.target.head_sha }}

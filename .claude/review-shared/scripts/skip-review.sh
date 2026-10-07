@@ -94,10 +94,15 @@ BODY="$(printf '%s' "$GH_OUT" | jq -r '[.comments[]? | select((.body // "") | co
 #       block closes at the tail `</details>`, blank, READY | READY WITH NOTES, marker (last line),
 #       and holds exactly one `**Reviewed tree:** ` line, which must be `<40hex>`.
 # When both layouts yield a hash they must agree (tree-line-conflict otherwise).
+# In --delta mode, only layout (1) is checked. The audit-trail path is skipped so a READY
+# post-plan sticky cannot silently narrow Phase 4B code review on a post-plan re-run.
 LINE1_TREE="$(printf '%s\n' "$BODY" | head -1 | grep -m1 -oE '^\*\*Reviewed tree:\*\* [0-9a-f]{40}$')" || true
 LINE1_TREE="${LINE1_TREE##* }"
 [[ "$LINE1_TREE" =~ ^[0-9a-f]{40}$ ]] || LINE1_TREE=""
 
+AUDIT_OUT="REJECT no-tree-line"
+AUDIT_TREE=""
+if [ "$DELTA_MODE" = false ]; then
 # audit-trail-anchor-begin
 # Prints exactly one line: `TREE <value>` (value = text after the label, validated in bash)
 # or `REJECT <reason>`. Portable awk: no interval expressions, no gensub, no -v escapes.
@@ -127,11 +132,11 @@ AUDIT_AWK='
     print "TREE " v
   }'
 AUDIT_OUT="$(printf '%s\n' "$BODY" | awk "$AUDIT_AWK" 2>/dev/null)" || AUDIT_OUT="REJECT no-tree-line"
-AUDIT_TREE=""
 case "$AUDIT_OUT" in
   "TREE "*) AUDIT_TREE="${AUDIT_OUT#TREE }"; [[ "$AUDIT_TREE" =~ ^[0-9a-f]{40}$ ]] || AUDIT_TREE="" ;;
 esac
 # audit-trail-anchor-end
+fi
 
 if [ -n "$LINE1_TREE" ]; then
   # Layout (1): line 1 wins; an audit-trail hash may only confirm it.

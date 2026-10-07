@@ -660,17 +660,20 @@ _run_skip "$SCRATCH/l1nr.json"
 [ "$RS_LAST" = "SKIP-REVIEW $TREE" ] || fail "line1-not-ready-still-skips: got '$RS_LAST'"
 end_case line1-not-ready-still-skips
 
-# real-sticky-delta-mode: --delta reads the widened Step 8 too. A READY post-plan sticky now
-# resolves a delta base; a NOT READY one still falls back to the full diff.
+# real-sticky-delta-mode: --delta keeps line-1-only parsing. A post-plan sticky (no tree on
+# line 1) always falls back to the full diff with DELTA-REASON: no-tree-line, regardless of
+# whether the sticky is READY or NOT READY. This pins that the audit-trail path is skipped in
+# delta mode and cannot silently narrow Phase 4B code review on a post-plan re-run.
 begin_case
 D_NOW_TREE="$(git -C "$DELTA_REPO" rev-parse 'HEAD^{tree}')"
 _mk_real_fixture "$D_NOW_TREE" "$SCRATCH/real-delta.json"
 OUT_RD="$(cd "$DELTA_REPO" && GH_FIXTURE="$SCRATCH/real-delta.json" bash "$SKIP_SCRIPT" --delta 9999 "")"
-want "real-sticky-delta-mode READY" "$OUT_RD" "DELTA-STATUS: delta"
+want "real-sticky-delta-mode READY status" "$OUT_RD" "DELTA-STATUS: full"
+want "real-sticky-delta-mode READY reason" "$OUT_RD" "DELTA-REASON: no-tree-line"
 _mk_real_fixture "$D_NOW_TREE" "$SCRATCH/real-delta-nr.json" "body.replace('\nREADY\n', '\nNOT READY\n')"
 OUT_RDN="$(cd "$DELTA_REPO" && GH_FIXTURE="$SCRATCH/real-delta-nr.json" bash "$SKIP_SCRIPT" --delta 9999 "")"
 want "real-sticky-delta-mode NOT READY status" "$OUT_RDN" "DELTA-STATUS: full"
-want "real-sticky-delta-mode NOT READY reason" "$OUT_RDN" "DELTA-REASON: verdict-not-ready"
+want "real-sticky-delta-mode NOT READY reason" "$OUT_RDN" "DELTA-REASON: no-tree-line"
 rm -f "/tmp/post-plan-delta-diff-9999"
 end_case real-sticky-delta-mode
 

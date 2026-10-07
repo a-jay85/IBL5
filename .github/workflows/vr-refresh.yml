@@ -1,0 +1,169 @@
+name: VR Refresh
+
+# Re-captures and republishes the visual-review gallery, sticky comments, and PR-body block
+# for open visual PRs whose gallery went stale, by calling the Visual Regression job of
+# e2e-tests.yml in refresh mode (its workflow_call inputs). A review aid, never a gate:
+# every write runs on master-ref events, so no check run ever lands on a PR head SHA
+# except the read-only dry-run below (only on PRs that edit this tooling).
+# Rules: .claude/rules/visual-review-prs.md section "Refreshing stale galleries".
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'PR number to refresh (blank = every open visual PR, capped at 10)'
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: 'Only list which PRs would refresh and which gallery dirs cleanup would keep'
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    # Odd minute on purpose: GitHub drops or delays top-of-hour crons under load.
+    - cron: '43 9 * * *'
+  pull_request:
+    branches: [master]
+    paths:
+      - '.github/workflows/vr-refresh.yml'
+      - 'bin/vr-refresh-targets'
+      - 'ibl5/tests/e2e/vr-refresh.ts'
+      - 'bin/prune-vr-galleries'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vr-refresh-${{ github.event_name == 'pull_request' && format('dryrun-{0}', github.ref) || (inputs.pr && format('pr-{0}', inputs.pr) || 'sweep') }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  select:
+    name: VR refresh select
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      count: ${{ steps.select.outputs.count }}
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Checkout gh-pages (skip if it does not exist yet)
+        id: checkout-pages
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+          path: gh-pages
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      # The pr input reaches the shell only through env (never ${{ }} inside run:),
+      # so a crafted input cannot inject shell.
+      - name: Select PRs to refresh
+        id: select
+        if: steps.checkout-pages.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PR: ${{ inputs.pr }}
+        run: |
+          args=(--mode=select --pages-dir=gh-pages)
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ -n "$INPUT_PR" ]; then args+=("--pr=$INPUT_PR"); else args+=(--all); fi
+          fi
+          if ! bin/vr-refresh-targets "${args[@]}" > "$RUNNER_TEMP/sel.json" 2> "$RUNNER_TEMP/sel.md"; then
+            cat "$RUNNER_TEMP/sel.md" >&2
+            exit 1
+          fi
+          { echo "### VR refresh selection (${EVENT_NAME})"; cat "$RUNNER_TEMP/sel.md"; } >> "$GITHUB_STEP_SUMMARY"
+          echo "count=$(jq -r .count "$RUNNER_TEMP/sel.json")" >> "$GITHUB_OUTPUT"
+          echo "matrix=$(jq -c .matrix "$RUNNER_TEMP/sel.json")" >> "$GITHUB_OUTPUT"
+
+      # Lists which per-SHA dirs vr-pages-cleanup would keep or prune right now, with the
+      # same flags that job passes. Read-only: --dry-run never runs git rm, nothing is pushed.
+      - name: Dry-run cleanup keep-list
+        if: steps.checkout-pages.outcome == 'success' && (github.event_name == 'pull_request' || inputs.dry_run)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          bin/vr-refresh-targets --mode=keep > "$RUNNER_TEMP/vr-keep.txt"
+          {
+            echo "### Cleanup dry-run ($(wc -l < "$RUNNER_TEMP/vr-keep.txt" | tr -d ' ') linked SHA(s) on the keep-list)"
+            echo '```'
+            (cd gh-pages && ../bin/prune-vr-galleries --dry-run --cutoff-days 7 --max-dirs 300 --keep-file "$RUNNER_TEMP/vr-keep.txt")
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  refresh:
+    name: VR refresh (PR ${{ matrix.target.pr }})
+    needs: select
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && !inputs.dry_run && fromJSON(needs.select.outputs.count || '0') > 0
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        target: ${{ fromJSON(needs.select.outputs.matrix) }}
+    # Union of every job-level permissions block in e2e-tests.yml. A called workflow can
+    # never exceed its caller, and a missing scope fails the whole call at startup, even
+    # for jobs that refresh mode skips.
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+      packages: read
+    uses: ./.github/workflows/e2e-tests.yml
+    with:
+      refresh_pr: ${{ format('{0}', matrix.target.pr) }}
+      refresh_head_sha: ${{ matrix.target.head_sha }}
+      refresh_base_sha: ${{ github.sha }}
+    secrets: inherit
+
+  pages-deploy:
+    name: VR refresh Pages dispatch
+    needs: [select, refresh]
+    if: always() && needs.refresh.result != 'skipped' && needs.refresh.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      # Legs suppress their own dispatch (e2e-tests.yml VRCTX_REFRESH), so one sweep is one
+      # Pages deploy. It still fails open: an extra deploy is harmless, a missed one leaves
+      # the gallery dark.
+      - name: Re-serve the gh-pages tree (dispatch Pages deploy)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # Debounce the push fan-out: one master push can trigger multiple open-PR CI runs, so N PRs each
+          # land a gh-pages push and each dispatches this workflow. A pages-deploy run that has NOT
+          # STARTED yet checks out gh-pages *after* this push landed, so it already serves this
+          # content — a second dispatch only adds a run that the `pages` concurrency group cancels
+          # (one pending slot per group). NEVER debounce on `in_progress`: that run may have checked
+          # out gh-pages before this push and would leave it unserved. Fails OPEN — an extra deploy
+          # is harmless, a missed one leaves the gallery dark.
+          #
+          # The filter is a DENYLIST (not `status == "queued"`) on purpose. GitHub has shipped several
+          # pre-execution statuses (queued/pending/waiting/requested) and a concurrency-blocked run has
+          # used more than one of them (observed 2026-08-18: two back-to-back dispatches cycled through
+          # `waiting`, `queued` AND `pending` across two polls a minute apart); an allowlist that
+          # misses the current spelling makes this a silent no-op that nothing would ever surface.
+          # Over-suppressing costs one push a wait for the next deploy — and since every deploy
+          # re-serves the WHOLE tree, that self-heals on the next PR. Under-suppressing just breaks
+          # the debounce, invisibly.
+          queued=$(gh api "repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20" \
+            --jq '[.workflow_runs[] | select(.status != "completed" and .status != "in_progress")] | length' 2>/dev/null || echo "")
+          if [[ "$queued" =~ ^[0-9]+$ ]] && [ "$queued" -gt 0 ]; then
+            echo "${queued} pages-deploy run(s) already queued — one will publish this push. Skipping dispatch."
+            exit 0
+          fi
+
+          gh workflow run pages-deploy.yml --ref master

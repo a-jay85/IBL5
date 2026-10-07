@@ -1,6 +1,6 @@
 ---
 description: Commit/PR worktree work when finished; amend vs new commit; one-line PR-title decision test.
-last_verified: 2026-10-05
+last_verified: 2026-10-06
 ---
 
 # Auto-Commit

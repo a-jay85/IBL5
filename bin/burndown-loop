@@ -374,6 +374,20 @@ bl_count_new() {
     UNITS=$units
 }
 
+# bl_all_skipped: true when the new ledgers hold at least one item and every item
+# has status "skipped". An unreadable ledger counts as not all-skipped.
+bl_all_skipped() {
+    local n f c total=0
+    for n in $NEW_LEDGERS; do
+        f="$REPORTS/$n"
+        c=$(jq '[.items[] | select(.status != "skipped")] | length' "$f" 2>/dev/null) || return 1
+        [ "$c" = 0 ] || return 1
+        c=$(jq '.items | length' "$f" 2>/dev/null) || return 1
+        total=$((total + c))
+    done
+    [ "$total" -ge 1 ]
+}
+
 bl_on_launch() {
     local class reason new units tail3
     bl_run_batch
@@ -392,6 +406,14 @@ bl_on_launch() {
             EMPTY_STREAK=0
             bl_count_new
             bl_log "batch ran ledgers=$new items=$BATCH_ITEMS units=$UNITS rc=$BATCH_RC log=$BLOG"
+            # A batch that skipped every pick did no work. The next batch re-picks the
+            # same blocked items, so back off like an empty backlog.
+            if bl_all_skipped; then
+                bl_log "every picked item skipped; re-check in ${EMPTY_SLEEP_MIN}m"
+                if [ "$ONCE" -eq 0 ]; then
+                    bl_sleep $((EMPTY_SLEEP_MIN * 60)) all-skipped || bl_stopped
+                fi
+            fi
             ;;
         empty)
             FAILS=0

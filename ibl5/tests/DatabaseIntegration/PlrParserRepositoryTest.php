@@ -264,8 +264,9 @@ class PlrParserRepositoryTest extends DatabaseTestCase
     }
 
     /**
-     * Build upsertPlayer() data where every int field holds its own value ($base + position),
-     * so a swapped column shows up as a wrong number in exactly that column.
+     * Build upsertPlayer() data where most int fields hold their own value ($base + position).
+     * Exceptions: `teamid` and `cy` are overridden to $base (teamid has no distinct constraint;
+     * cy is clamped to 0-6 by chk_plr_cy), so a swap among ordinal/teamid/cy would not be caught.
      *
      * @return array<string, int|string>
      */

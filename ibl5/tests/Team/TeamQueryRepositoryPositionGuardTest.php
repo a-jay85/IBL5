@@ -42,7 +42,7 @@ class TeamQueryRepositoryPositionGuardTest extends TestCase
     public function testLastSimStarterLookupRejectsUnknownPosition(string $position): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid position');
+        $this->expectExceptionMessageMatches('/^Invalid position/');
 
         try {
             $this->repository->getLastSimStarterPlayerIDForPosition(1, $position);
@@ -56,7 +56,7 @@ class TeamQueryRepositoryPositionGuardTest extends TestCase
     public function testDepthChartStarterLookupRejectsUnknownPosition(string $position): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid position');
+        $this->expectExceptionMessageMatches('/^Invalid position/');
 
         try {
             $this->repository->getCurrentlySetStarterPlayerIDForPosition(1, $position);

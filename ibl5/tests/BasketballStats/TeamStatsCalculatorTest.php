@@ -41,8 +41,7 @@ class TeamStatsCalculatorTest extends TestCase
                 return [];
             }
 
-            /** @return array<string, mixed>|null */
-            public function fetchOne(string $query, string $types = '', mixed ...$params): ?array
+            public function fetchOne(string $query, string $types = '', mixed ...$params): null
             {
                 $this->recordedSql[] = $query;
                 return null;
@@ -646,7 +645,7 @@ class TeamStatsCalculatorTest extends TestCase
 
     public function testStandingsQueriesTargetOlympicsStandingsInOlympicsContext(): void
     {
-        $context = $this->createStub(LeagueContext::class);
+        $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
         $context->method('getTableName')->willReturnCallback(
             static fn (string $t): string => LeagueContext::TABLE_MAP[$t] ?? $t

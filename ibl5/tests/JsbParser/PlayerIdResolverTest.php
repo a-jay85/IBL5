@@ -181,7 +181,7 @@ class PlayerIdResolverTest extends TestCase
      */
     private function createOlympicsContextStub(): LeagueContext
     {
-        $context = $this->createStub(LeagueContext::class);
+        $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
         $context->method('getTableName')->willReturnCallback(
             static fn (string $t): string => LeagueContext::TABLE_MAP[$t] ?? $t

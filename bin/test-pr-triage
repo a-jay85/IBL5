@@ -278,6 +278,7 @@ for wt in wt-a wt-b; do
     chmod +x "$TMP/$wt/bin/post-plan-now"
 done
 # Marker for wt-a (the runner name is post-plan-now, the resume script lives in wt-a).
+# shellcheck source=bin/lib/usage-gate.sh
 ( . "$GATE_LIB"; usage_marker_write "cccccccc-3333-4333-8333-cccccccccccc" post-plan-now \
     "$TMP/wt-a/bin/post-plan-now" usage-pause drain 94 five_hour "" ) > /dev/null 2>&1 \
     || { failcase "C16 setup: marker write failed"; }
@@ -305,5 +306,70 @@ assert_match  "C18 no marker -> ARMABLE"            "^ARMABLE$"                 
 # --help documents the bucket.
 ST=0; OUT="$("$TRIAGE" --help 2>&1)" || ST=$?
 assert_match  "C19 --help mentions PAUSED"          "PAUSED"                                    "$OUT"
+
+# --- H1-H13: bin/lib/held-prs.sh pure functions (the `--held` view) ---
+# shellcheck source=bin/lib/held-prs.sh
+source "$SCRIPT_DIR/lib/held-prs.sh"
+
+H_PR='{"author":{"login":"me"},"isDraft":false,"autoMergeRequest":null}'
+ST=0; hp_is_held "$H_PR" me || ST=$?
+assert_status "H1 held: mine, non-draft, un-armed"   0 "$ST"
+ST=0; hp_is_held '{"author":{"login":"me"},"isDraft":false,"autoMergeRequest":{"mergeMethod":"SQUASH"}}' me || ST=$?
+assert_status "H2 armed PR left out"                 1 "$ST"
+ST=0; hp_is_held '{"author":{"login":"me"},"isDraft":true,"autoMergeRequest":null}' me || ST=$?
+assert_status "H3 draft left out"                    1 "$ST"
+ST=0; hp_is_held '{"author":{"login":"someone-else"},"isDraft":false,"autoMergeRequest":null}' me || ST=$?
+assert_status "H4 other author left out"             1 "$ST"
+ST=0; hp_is_held '{"author":{"login":""},"isDraft":false,"autoMergeRequest":null}' "" || ST=$?
+assert_status "H5 empty login left out"              1 "$ST"
+
+H_STICKY="$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Fidelity: PASS · auto-merge held' '' \
+    'Auto-merge held:' '- (7) auto_merge — plan sets auto_merge: false' \
+    '- (8) feat — awaiting human-approved' '' '- (99) trailing — after the block')"
+OUT="$(hp_sticky_reasons "$H_STICKY")"
+assert_match  "H6 recorded (7)"                      '^\(7\) auto_merge — plan sets auto_merge: false$' "$OUT"
+assert_match  "H6 recorded (8)"                      '^\(8\) feat — awaiting human-approved$'           "$OUT"
+assert_absent "H6 stops at block end (trailing)"     'trailing'                                         "$OUT"
+OUT="$(hp_sticky_reasons "${H_STICKY/Auto-merge held:/**Auto-merge held:**}")"
+assert_match  "H6 bold header accepted"              '^\(7\) '                                          "$OUT"
+
+OUT="$(hp_sticky_reasons "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Auto-merge held:' '- no arming decision recorded')")"
+assert_status "H7 no-decision bullet -> no reason"   0 "${#OUT}"
+OUT="$(hp_sticky_reasons "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Fidelity: PASS · auto-merge armed')")"
+assert_status "H7 armed banner -> no reason"         0 "${#OUT}"
+
+OUT="$(printf '%s\n%s\n' \
+    '[{"body":"plain"},{"body":"<!-- pr-ready-verdict -->\nold"}]' \
+    '[{"body":"<!-- pr-ready-verdict -->\nnew"}]' | hp_pick_sticky)"
+assert_match  "H8 last marker comment wins"          '^new$' "$OUT"
+assert_absent "H8 older marker comment dropped"      'old'   "$OUT"
+ST=0; OUT="$(printf '[]' | hp_pick_sticky)" || ST=$?
+assert_status "H8 empty page exits 0"                0 "$ST"
+assert_status "H8 empty page prints nothing"         0 "${#OUT}"
+
+H_CHECKS="$(checks_json failure success failure | jq -c '(.check_runs[] | select(.name == "E2E Tests")) |= (.status = "in_progress")')"
+OUT="$(hp_check_reasons <<< "$H_CHECKS")"
+assert_match  "H9 red check named"                   '^red checks: Tests and Analysis \(failure\)$' "$OUT"
+assert_match  "H9 pending check named"               '^pending checks: E2E Tests$'                  "$OUT"
+assert_absent "H9 human-signoff never listed"        'human-signoff'                                "$OUT"
+OUT="$(hp_check_reasons <<< "$(checks_json success success failure)")"
+assert_status "H10 sign-off-only failure -> nothing" 0 "${#OUT}"
+
+H_GREEN="$(checks_json success success success)"
+OUT="$(hp_live_reasons DIRTY HELD "golden-changed feat-awaiting-signoff" "$H_GREEN")"
+assert_match  "H11 DIRTY reason"                     '^merge conflict \(DIRTY\)$'          "$OUT"
+assert_match  "H11 manual-testing reason"            '^manual-testing rows unresolved$'    "$OUT"
+assert_match  "H11 HOLDS token golden-changed"       '^golden-changed$'                    "$OUT"
+assert_match  "H11 HOLDS token feat-awaiting-signoff" '^feat-awaiting-signoff$'            "$OUT"
+OUT="$(hp_live_reasons CLEAN CLEARED - "$H_GREEN")"
+assert_status "H11 clean PR -> nothing"              0 "${#OUT}"
+
+OUT="$(printf 'a\n\nb\na\n' | hp_dedupe | tr '\n' ',')"
+assert_status "H12 dedupe keeps order, drops repeats" 0 "$([ "$OUT" = "a,b," ] && echo 0 || echo 1)"
+
+OUT="$(hp_format_line 5 https://x/5 "fix:  two  spaces" "$(printf 'r1\nr2\nr1')")"
+assert_match  "H13 joined line"                      '^#5  https://x/5  fix: two spaces  r1; r2$' "$OUT"
+OUT="$(hp_format_line 5 https://x/5 "t" "")"
+assert_match  "H13 no reasons -> unknown"            '  unknown$' "$OUT"
 
 [ "$FAILED" = 0 ] && exit 0 || exit 1

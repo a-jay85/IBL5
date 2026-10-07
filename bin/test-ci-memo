@@ -45,7 +45,7 @@ vr_if_shape() {
     awk '
         /^  e2e:/{in_job=1; next}
         /^  [a-zA-Z]/ && in_job { in_job=0 }
-        in_job && /^    if: \(needs\.changes\.outputs\.src == .true. && needs\.ci-memo-check\.outputs\.hit != .true.\) \|\| needs\.changes\.outputs\.baseline == .true.$/ { found=1; exit }
+        in_job && /^    if: (inputs\.refresh_pr \|\| )?\(needs\.changes\.outputs\.src == .true. && needs\.ci-memo-check\.outputs\.hit != .true.\) \|\| needs\.changes\.outputs\.baseline == .true.$/ { found=1; exit }
         END { exit !found }
     ' "$1"
 }

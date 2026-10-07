@@ -23,13 +23,11 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'draft pick locator',
     'franchise history',
     'franchise record book',
-    'free agency preview',
     'injuries',
     'one on one game',
     'player movement',
     'projected draft order',
     'record holders',
-    'schedule',
     // Search page with a transactions preset (modules.php?name=Search plus a preset).
     // Verified 2026-09-23: every failing node is pre-existing results markup
     // (.search-result__meta-item, .search-result__title, .search-pagination__link, <time>);
@@ -41,6 +39,8 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'team schedule',
     'topics',
     // Pages with team-color contrast failures (ibl-team-cell--colored uses DB-configured team colors)
+    // Re-checked 2026-10-07 (IBL5-backlog#1270): kept, together with 'season leaderboards' below.
+    // Their CI flake (commit 5cd079e6d) depends on ORDER BY ties, so local repeat runs cannot prove them clean.
     'league starters',
     // SeasonLeaderboards renders team-color cells via TeamCellHelper; which low-contrast team
     // surfaces in the top-N depends on ORDER BY tie ordering, so the violation appeared

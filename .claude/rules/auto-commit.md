@@ -21,4 +21,4 @@ A Stop hook (`~/.claude/hooks/auto-commit-reminder.sh`) nudges at turn-end on a 
 
 ## Prose
 
-Docs, PR bodies, and chat replies pass `bin/check-prose` (`.claude/rules/prose-style.md`). In chat, write every PR or backlog item as a clickable link. PRs: `[#12](https://github.com/a-jay85/IBL5/pull/12)`. Backlog items live in a separate repo: `[#12](https://github.com/a-jay85/IBL5-backlog/issues/12)`.
+Docs, PR bodies, and chat replies pass `bin/check-prose` (`.claude/rules/prose-style.md`). In chat, write every PR or backlog item as a clickable link, e.g. `[#12](https://github.com/a-jay85/IBL5/pull/12)`.

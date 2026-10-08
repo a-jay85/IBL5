@@ -295,6 +295,36 @@ def confirm(
     return confirmed, all_ticked_val
 
 
+def upsert_ticked_sentinel(body: str) -> tuple[str, bool]:
+    """Insert MANUAL_TESTING_SENTINEL_TICKED as the first line under `## Manual Testing`.
+
+    Pure. Returns (new_body, changed). The body is returned byte-identical with
+    changed=False unless ALL of: the gate window exists (classify._manual_testing_span),
+    the window carries at least one checkbox row, every row is ticked, and no line in
+    the window already matches armable.SENTINEL_RE. The shape is heading line, blank
+    line, sentinel, blank line, then the untouched remainder of the window.
+    """
+    from harness.armable import SENTINEL_RE
+    from harness.classify import MANUAL_TESTING_SENTINEL_TICKED, _manual_testing_span
+
+    span = _manual_testing_span(body)
+    if span is None:
+        return body, False
+    start, end = span
+    window = body[start:end]
+    if any(SENTINEL_RE.match(line) for line in window.splitlines()):
+        return body, False
+    rows = pending_rows(body)
+    if not rows or any(not is_ticked for _rid, _text, is_ticked in rows):
+        return body, False
+    heading_nl = body.find("\n", start)
+    if heading_nl == -1 or heading_nl >= end:
+        return body, False
+    insert_at = heading_nl + 1
+    return (body[:insert_at] + "\n" + MANUAL_TESTING_SENTINEL_TICKED + "\n"
+            + body[insert_at:]), True
+
+
 def show_blob_for(worktree: str) -> Callable[[str], str]:
     """Pinned-blob reader for the dual-path script loader."""
     def _show(ref: str) -> str:

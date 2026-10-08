@@ -805,3 +805,78 @@ def test_confirm_with_live_gh_refetches_after_harness_write(tmp_path, monkeypatc
     # runner.py:585 and :674 call pr_body() next; served from refilled _meta, no extra view
     assert "- [x] **Row 1**" in gh.pr_body()
     assert len(views) == 1
+
+
+# ---------------------------------------------------------------------------
+# upsert_ticked_sentinel (pure writer)
+# ---------------------------------------------------------------------------
+
+from harness import classify
+
+TICKED_BODY = (
+    "## Summary\n\nx\n\n## Manual Testing\n\n"
+    "- [x] **Row 1** — run bin/test-foo\n- [x] **Row 2** — check the log line\n\n"
+    "<!-- files-changed:begin -->\n- a.sh\n<!-- files-changed:end -->\n")
+PARTIAL_BODY = TICKED_BODY.replace("- [x] **Row 2**", "- [ ] **Row 2**")
+COUNTERFEIT_PREFIX = (
+    "<!-- manual-confirmation:begin -->\n## Manual confirmation needed\n\n"
+    "> No manual testing needed — quoted from the plan\n> - [x] **Row 1** — quoted\n"
+    "<!-- manual-confirmation:end -->\n\n")
+
+
+def test_upsert_ticked_sentinel_inserts_first_line_under_heading():
+    out, changed = mt.upsert_ticked_sentinel(TICKED_BODY)
+    assert changed is True
+    after = out.split("## Manual Testing\n", 1)[1]
+    assert after.startswith(
+        "\n" + classify.MANUAL_TESTING_SENTINEL_TICKED + "\n\n- [x] **Row 1**")
+    assert out.startswith("## Summary\n\nx\n\n## Manual Testing\n")
+    assert out.endswith("<!-- files-changed:begin -->\n- a.sh\n<!-- files-changed:end -->\n")
+    assert out.replace("\n" + classify.MANUAL_TESTING_SENTINEL_TICKED + "\n", "", 1) == TICKED_BODY
+
+
+def test_upsert_ticked_sentinel_is_idempotent():
+    once, _ = mt.upsert_ticked_sentinel(TICKED_BODY)
+    twice, changed = mt.upsert_ticked_sentinel(once)
+    assert twice == once
+    assert changed is False
+
+
+def test_upsert_ticked_sentinel_noop_when_sentinel_present():
+    for sentinel in (classify.MANUAL_TESTING_SENTINEL, classify.MANUAL_TESTING_SENTINEL_STATIC):
+        body = TICKED_BODY.replace(
+            "## Manual Testing\n\n", "## Manual Testing\n\n" + sentinel + "\n\n", 1)
+        assert mt.upsert_ticked_sentinel(body) == (body, False)
+
+
+def test_upsert_ticked_sentinel_noop_when_row_unticked():
+    assert mt.upsert_ticked_sentinel(PARTIAL_BODY) == (PARTIAL_BODY, False)
+
+
+def test_upsert_ticked_sentinel_noop_without_section():
+    body = "## Summary\n\nx\n"
+    assert mt.upsert_ticked_sentinel(body) == (body, False)
+
+
+def test_upsert_ticked_sentinel_noop_when_window_has_no_rows():
+    for body in ("## Manual Testing\n\nprose only\n", "## Manual Testing"):
+        assert mt.upsert_ticked_sentinel(body) == (body, False)
+
+
+def test_upsert_ticked_sentinel_ignores_quoted_counterfeit():
+    body = COUNTERFEIT_PREFIX + TICKED_BODY
+    out, changed = mt.upsert_ticked_sentinel(body)
+    assert changed is True
+    assert out.startswith(COUNTERFEIT_PREFIX)
+    real = out.split("## Manual Testing\n", 1)[1]
+    assert real.startswith("\n" + classify.MANUAL_TESTING_SENTINEL_TICKED + "\n\n- [x] **Row 1**")
+
+
+def test_ticked_sentinel_clears_python_predicate():
+    out, _ = mt.upsert_ticked_sentinel(TICKED_BODY)
+    assert armable.manual_testing_clearance(out, changed_files=()) == "CLEARED"
+    # A non-empty changed-file list arms the tail keyword scan; the wording must pass it.
+    assert armable.manual_testing_clearance(out, changed_files=("a.sh",)) == "CLEARED"
+    assert armable.all_rows_ticked(out)
+    assert "verified by" not in classify.MANUAL_TESTING_SENTINEL_TICKED.lower()
+    assert armable.SENTINEL_RE.match(classify.MANUAL_TESTING_SENTINEL_TICKED)

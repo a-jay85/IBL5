@@ -1596,6 +1596,109 @@ OUT="$(bd burndown-sweep extra 2>&1)"; RC=$?
 [ "$RC" -eq 2 ] && ok "C50o: burndown-sweep with an argument exits 2" \
     || fail "C50o: burndown-sweep with an argument exits 2 (got $RC)"
 
+# ── C51: burndown-sweep flips zombie picked items ─────────────────────────────
+# Private HOME so the C50 fixtures stay untouched. Same clock as C50: cutoff 2026-09-29T00:00:00.
+# 201 = zombie (picked, no route, no slug, old ledger); 202 = picked with a route;
+# 203 = picked with a slug; 204 = zombie shape on a young ledger.
+ZP="$T/zp"
+ZP_OLD="$ZP/claude-plans/_reports/burndown-batch-20260927T100000.json"
+ZP_NEW="$ZP/claude-plans/_reports/burndown-batch-20260929T230000.json"
+ZP_LINE='ZOMBIE-PICK #201 -> skipped (no route, no slug, ledger older than 24h)'
+zp_reset() {
+    rm -rf "$ZP"
+    mkdir -p "$ZP/claude-plans/_reports" \
+        "$ZP/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue"
+    cat > "$ZP_OLD" <<'JSON'
+{
+  "schema": 1,
+  "created": "2026-09-27T10:00:00",
+  "items": [
+    {"issue_num":201,"also_closes":[],"issue_title":"Zombie pick 201","rank":"P2","tier":"default","cost":1,"paths":["bin/a"],"route":"","slug":"","pr_url":"","status":"picked"},
+    {"issue_num":202,"also_closes":[],"issue_title":"Routed 202","rank":"P2","tier":"default","cost":1,"paths":["bin/b"],"route":"plan","slug":"","pr_url":"","status":"picked"},
+    {"issue_num":203,"also_closes":[],"issue_title":"Slugged 203","rank":"P2","tier":"default","cost":1,"paths":["bin/c"],"route":"","slug":"slugged-203","pr_url":"","status":"picked"}
+  ],
+  "skipped": [],
+  "units_used": 3,
+  "budget": 5
+}
+JSON
+    cat > "$ZP_NEW" <<'JSON'
+{
+  "schema": 1,
+  "created": "2026-09-29T23:00:00",
+  "items": [
+    {"issue_num":204,"also_closes":[],"issue_title":"Young pick 204","rank":"P2","tier":"default","cost":1,"paths":["bin/d"],"route":"","slug":"","pr_url":"","status":"picked"}
+  ],
+  "skipped": [],
+  "units_used": 1,
+  "budget": 5
+}
+JSON
+    rm -f "$T/gh.log"
+}
+
+zp_reset
+OUT="$(BURNDOWN_NOW=$SW_NOW bd_home "$ZP" burndown-sweep 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ "$(sw_item "$ZP_OLD" 201 status)" = "skipped" ] \
+    && grep -qxF "$ZP_LINE" <<< "$OUT" \
+    && ok "C51a: zombie picked item flipped to skipped with ZOMBIE-PICK line" \
+    || fail "C51a: zombie picked item flipped to skipped with ZOMBIE-PICK line (got $RC: $OUT)"
+# Guards the status-only patch: {"status":"skipped","route":"ad-hoc"} would fail the route check.
+[ "$(sw_item "$ZP_OLD" 201 route)" = "" ] && [ "$(sw_item "$ZP_OLD" 201 pr_url)" = "" ] \
+    && ! grep -qF 'issue close 201' "$T/gh.log" 2>/dev/null \
+    && ok "C51a: flip writes status only, closes nothing" \
+    || fail "C51a: flip writes status only, closes nothing"
+[ "$(sw_item "$ZP_OLD" 202 status)" = "picked" ] && grep -qxF 'WAIT #202 unrouted' <<< "$OUT" \
+    && ok "C51b: picked item with a route stays picked, WAIT line unchanged" \
+    || fail "C51b: picked item with a route stays picked, WAIT line unchanged (got: $OUT)"
+[ "$(sw_item "$ZP_OLD" 203 status)" = "picked" ] && ! grep -qF 'ZOMBIE-PICK #203' <<< "$OUT" \
+    && ok "C51c: picked item with a slug stays picked" \
+    || fail "C51c: picked item with a slug stays picked (got: $OUT)"
+[ "$(sw_item "$ZP_NEW" 204 status)" = "picked" ] && grep -qxF 'WAIT #204 unrouted' <<< "$OUT" \
+    && ok "C51d: young ledger keeps zombie-shaped item picked, WAIT line unchanged" \
+    || fail "C51d: young ledger keeps zombie-shaped item picked, WAIT line unchanged (got: $OUT)"
+
+# C51h: a second sweep is a no-op (runs on the C51a end state before any reset)
+cp "$ZP_OLD" "$T/zp-old.before"; cp "$ZP_NEW" "$T/zp-new.before"
+OUT2="$(BURNDOWN_NOW=$SW_NOW bd_home "$ZP" burndown-sweep 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && cmp -s "$T/zp-old.before" "$ZP_OLD" && cmp -s "$T/zp-new.before" "$ZP_NEW" \
+    && ! grep -qF '#201' <<< "$OUT2" \
+    && ok "C51h: re-run is idempotent" || fail "C51h: re-run is idempotent (got $RC: $OUT2)"
+
+# C51e: the 24h boundary is strict (created == cutoff is not a zombie)
+zp_reset
+jq '.created = "2026-09-29T00:00:00"' "$ZP_OLD" > "$T/zp-tmp.json" && cp "$T/zp-tmp.json" "$ZP_OLD"
+BURNDOWN_NOW=$SW_NOW bd_home "$ZP" burndown-sweep >/dev/null 2>&1
+S_AT="$(sw_item "$ZP_OLD" 201 status)"
+zp_reset
+jq '.created = "2026-09-28T23:59:59"' "$ZP_OLD" > "$T/zp-tmp.json" && cp "$T/zp-tmp.json" "$ZP_OLD"
+BURNDOWN_NOW=$SW_NOW bd_home "$ZP" burndown-sweep >/dev/null 2>&1
+S_BEFORE="$(sw_item "$ZP_OLD" 201 status)"
+[ "$S_AT" = "picked" ] && [ "$S_BEFORE" = "skipped" ] \
+    && ok "C51e: 24h boundary is strict" || fail "C51e: 24h boundary is strict (at=$S_AT before=$S_BEFORE)"
+
+# C51f: missing or garbled .created is never a zombie (both values sort before the cutoff)
+zp_reset
+jq 'del(.created)' "$ZP_OLD" > "$T/zp-tmp.json" && cp "$T/zp-tmp.json" "$ZP_OLD"
+BURNDOWN_NOW=$SW_NOW bd_home "$ZP" burndown-sweep >/dev/null 2>&1
+S_MISSING="$(sw_item "$ZP_OLD" 201 status)"
+zp_reset
+jq '.created = "1999-01-01 00:00:00"' "$ZP_OLD" > "$T/zp-tmp.json" && cp "$T/zp-tmp.json" "$ZP_OLD"
+BURNDOWN_NOW=$SW_NOW bd_home "$ZP" burndown-sweep >/dev/null 2>&1
+S_GARBLED="$(sw_item "$ZP_OLD" 201 status)"
+[ "$S_MISSING" = "picked" ] && [ "$S_GARBLED" = "picked" ] \
+    && ok "C51f: missing or garbled .created keeps item picked" \
+    || fail "C51f: missing or garbled .created keeps item picked (missing=$S_MISSING garbled=$S_GARBLED)"
+
+# C51g: burndown-close-merged never flips a zombie pick
+zp_reset
+OUT="$(BURNDOWN_NOW=$SW_NOW bd_home "$ZP" burndown-close-merged "$ZP_OLD" 2>&1)"; RC=$?
+[ "$(sw_item "$ZP_OLD" 201 status)" = "picked" ] && ! grep -qF 'ZOMBIE-PICK' <<< "$OUT" \
+    && grep -qxF 'WAIT #201 unrouted' <<< "$OUT" \
+    && ok "C51g: close-merged leaves zombie pick alone" \
+    || fail "C51g: close-merged leaves zombie pick alone (got $RC: $OUT)"
+rm -rf "$ZP" "$T/zp-old.before" "$T/zp-new.before" "$T/zp-tmp.json"
+
 # ── Phase 6: env-seam cases ───────────────────────────────────────────────────
 
 # Restore C14 fixture for C41/C42

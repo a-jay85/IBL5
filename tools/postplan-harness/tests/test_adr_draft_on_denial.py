@@ -1524,6 +1524,93 @@ def test_commit_site_draft_failure_reraises_original_denial(tmp_path, monkeypatc
     assert runner.exit_code_for(res) == 3
 
 
+_DRAFT_TIMEOUT_DETAIL = "step 'bin/check-prose' timed out after 120s"
+
+
+def _patch_commit_gate_denied_and_draft_raises(monkeypatch, exc):
+    monkeypatch.setattr(
+        adr_draft, "commit_gate",
+        lambda wt, base="origin/master": (1, "pre-commit-adr-gate: needs ADR"),
+    )
+    monkeypatch.setattr(
+        adr_draft, "draft",
+        lambda *a, **k: (_ for _ in ()).throw(exc),
+    )
+
+
+def test_commit_with_adr_draft_reraises_timeout_as_is(tmp_path, monkeypatch):
+    """A drafter step timeout keeps kind subprocess-timeout instead of being rewritten
+    into the synthesised local-gate denial.
+
+    Mutation caught: delete the SUBPROCESS_TIMEOUT guard in _commit_with_adr_draft and
+    the raised kind becomes local-gate."""
+    _patch_commit_gate_denied_and_draft_raises(
+        monkeypatch, HarnessError(SUBPROCESS_TIMEOUT, _DRAFT_TIMEOUT_DETAIL))
+    res = RunResult(terminal=TerminalState.FAILED)
+    logged: list[str] = []
+
+    with pytest.raises(HarnessError) as exc_info:
+        runner._commit_with_adr_draft(
+            FakeGit(), logged.append, "phase2",
+            llm=None, worktree="/fake/wt", out_dir=str(tmp_path), res=res,
+        )
+
+    exc = exc_info.value
+    assert exc.kind == SUBPROCESS_TIMEOUT
+    assert exc.detail == _DRAFT_TIMEOUT_DETAIL
+    assert not (isinstance(exc.__cause__, HarnessError) and exc.__cause__.kind == "local-gate")
+    assert res.adr_drafted is False
+    assert any("ADR draft step timed out" in m for m in logged), logged
+
+
+def test_commit_with_adr_draft_still_wraps_other_draft_failures(tmp_path, monkeypatch):
+    """Negative path: any other drafter failure is still wrapped in the local-gate denial.
+
+    Mutation caught: a guard that re-raises every kind."""
+    _patch_commit_gate_denied_and_draft_raises(
+        monkeypatch, HarnessError("adr-draft-invalid", "bad"))
+    res = RunResult(terminal=TerminalState.FAILED)
+
+    with pytest.raises(HarnessError) as exc_info:
+        runner._commit_with_adr_draft(
+            FakeGit(), _noop_log, "phase2",
+            llm=None, worktree="/fake/wt", out_dir=str(tmp_path), res=res,
+        )
+
+    assert exc_info.value.kind == "local-gate"
+    assert res.adr_drafted is False
+
+
+def test_push_with_adr_draft_reraises_timeout_as_is(tmp_path, monkeypatch):
+    """A drafter step timeout at the push site surfaces as subprocess-timeout, not the
+    original push local-gate error.
+
+    Mutation caught: delete the SUBPROCESS_TIMEOUT guard in _push_with_adr_draft and
+    `raise e from e2` surfaces the push local-gate error instead."""
+    def _denied(*a, **k):
+        raise HarnessError("local-gate", _ADR_TEXT)
+
+    monkeypatch.setattr(runner, "_push_with_lease_retry", _denied)
+    monkeypatch.setattr(
+        adr_draft, "draft",
+        lambda *a, **k: (_ for _ in ()).throw(
+            HarnessError(SUBPROCESS_TIMEOUT, _DRAFT_TIMEOUT_DETAIL)),
+    )
+    res = RunResult(terminal=TerminalState.FAILED)
+    logged: list[str] = []
+
+    with pytest.raises(HarnessError) as exc_info:
+        runner._push_with_adr_draft(
+            FakeGit(), logged.append, "phase2",
+            llm=None, worktree="/fake/wt", out_dir=str(tmp_path), res=res,
+        )
+
+    assert exc_info.value.kind == SUBPROCESS_TIMEOUT
+    assert exc_info.value.detail == _DRAFT_TIMEOUT_DETAIL
+    assert res.adr_drafted is False
+    assert any("ADR draft step timed out" in m for m in logged), logged
+
+
 # ---------------------------------------------------------------------------
 # Commit-site revalidation failure: sha is empty in stage-only mode
 # ---------------------------------------------------------------------------

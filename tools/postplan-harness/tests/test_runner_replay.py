@@ -2269,3 +2269,54 @@ def test_replay_runner_missing_method_stays_held(tmp_path):
                      FixtureLlm(UsageLedger(), CANNED), mode="replay")
     assert any(i.startswith("MISSING-METHOD: test_never_declared_anywhere")
                for i in res.unresolved_conformance)
+
+
+_PHASE2_STARTS = ("phase2: starting scope check",
+                  "phase2: starting commit ADR gate",
+                  "phase2: starting commit (pre-commit hook)")
+
+
+def test_phase2_logs_step_starts_in_order(tmp_path):
+    """audit.log names each Phase 2 step before it runs, in execution order, so a hang
+    is attributable to the last `phase2: starting` line.
+
+    Mutation caught: delete or reorder any of the three `log(...)` calls in runner.run.
+    """
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    audit = _audit(out)
+    positions = [audit.find(line) for line in _PHASE2_STARTS]
+    assert all(p >= 0 for p in positions), (positions, audit)
+    assert positions == sorted(positions), positions
+    # REBASE= is not an audit.log line in replay mode; the PR-exists/create line is the
+    # first later Phase 2 log, so the three starts must precede whichever of these exist.
+    later = [p for p in (audit.find("REBASE="), audit.find("phase2: PR #")) if p >= 0]
+    assert all(p > positions[-1] for p in later), (positions, later)
+
+
+def test_scope_check_timeout_fails_run_closed_with_named_step(tmp_path, monkeypatch):
+    """A scope-check hang fails the run closed (exit 3), and audit.log's last
+    `phase2: starting` line names the scope check.
+
+    Mutation caught: drop SUBPROCESS_TIMEOUT from _FAIL_CLOSED_KINDS (exit 1), or swallow
+    the error in _inject_scope_notes (the run proceeds and the terminal is not FAILED).
+    """
+    def _hang(*a, **kw):
+        raise HarnessError(runner.SUBPROCESS_TIMEOUT,
+                           "step 'scope-check' timed out after 120s",
+                           cmd="bin/lib/plan-scope-conformance")
+
+    monkeypatch.setattr(runner.scope_conformance, "scope_notes", _hang)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert res.terminal == TerminalState.FAILED
+    assert res.error_kind == runner.SUBPROCESS_TIMEOUT
+    assert runner.exit_code_for(res) == 3
+    assert "scope-check" in runner.verdict_line(res, 3)
+    starts = [ln for ln in _audit(out).splitlines() if "phase2: starting" in ln]
+    assert starts, "no phase2 step-start line was logged"
+    assert starts[-1].endswith("phase2: starting scope check"), starts
+    assert not any("phase2: starting commit" in ln for ln in starts), starts

@@ -1,0 +1,158 @@
+## 🖼️ Visual review
+
+These views render differently from master's committed baseline. Review the before/after/diff below. If the change is intended, **apply the `update-baselines` label** — the regenerated-baseline auto-commit is the durable sign-off. (The VR check may already be green if baselines were regenerated in-branch; this gallery compares against master's committed baseline regardless of the check color.)
+
+### 34 changed view(s) across 20 module(s)
+
+<details><summary><strong>cap-space</strong> — 2 view(s)</summary>
+
+- [cap-space — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#cap-space)
+- [cap-space-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#cap-space-mobile)
+
+</details>
+
+<details><summary><strong>error-invalid-module</strong> — 1 view(s)</summary>
+
+- [error-invalid-module — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#error-invalid-module)
+
+</details>
+
+<details><summary><strong>franchise-history</strong> — 2 view(s)</summary>
+
+- [franchise-history — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#franchise-history)
+- [franchise-history-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#franchise-history-mobile)
+
+</details>
+
+<details><summary><strong>head-to-head-records</strong> — 1 view(s)</summary>
+
+- [head-to-head-records — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#head-to-head-records)
+
+</details>
+
+<details><summary><strong>index</strong> — 1 view(s)</summary>
+
+- [index — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#index)
+
+</details>
+
+<details><summary><strong>last-sim-recap</strong> — 2 view(s)</summary>
+
+- [last-sim-recap — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#last-sim-recap)
+- [last-sim-recap-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#last-sim-recap-mobile)
+
+</details>
+
+<details><summary><strong>league-starters</strong> — 1 view(s)</summary>
+
+- [league-starters-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#league-starters-mobile)
+
+</details>
+
+<details><summary><strong>negotiation</strong> — 2 view(s)</summary>
+
+- [negotiation — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#negotiation)
+- [negotiation-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#negotiation-mobile)
+
+</details>
+
+<details><summary><strong>news</strong> — 2 view(s)</summary>
+
+- [news — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#news)
+- [news-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#news-mobile)
+
+</details>
+
+<details><summary><strong>news-article</strong> — 2 view(s)</summary>
+
+- [news-article — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#news-article)
+- [news-article-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#news-article-mobile)
+
+</details>
+
+<details><summary><strong>news-categories</strong> — 2 view(s)</summary>
+
+- [news-categories — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#news-categories)
+- [news-categories-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#news-categories-mobile)
+
+</details>
+
+<details><summary><strong>next-sim-non-admin</strong> — 1 view(s)</summary>
+
+- [next-sim-non-admin — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#next-sim-non-admin)
+
+</details>
+
+<details><summary><strong>search</strong> — 2 view(s)</summary>
+
+- [search — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#search)
+- [search-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#search-mobile)
+
+</details>
+
+<details><summary><strong>search-transactions-preset</strong> — 2 view(s)</summary>
+
+- [search-transactions-preset — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#search-transactions-preset)
+- [search-transactions-preset-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#search-transactions-preset-mobile)
+
+</details>
+
+<details><summary><strong>season-archive</strong> — 2 view(s)</summary>
+
+- [season-archive — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#season-archive)
+- [season-archive-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#season-archive-mobile)
+
+</details>
+
+<details><summary><strong>season-leaderboards</strong> — 2 view(s)</summary>
+
+- [season-leaderboards — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#season-leaderboards)
+- [season-leaderboards-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#season-leaderboards-mobile)
+
+</details>
+
+<details><summary><strong>team</strong> — 1 view(s)</summary>
+
+- [team-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#team-mobile)
+
+</details>
+
+<details><summary><strong>team-contracts</strong> — 2 view(s)</summary>
+
+- [team-contracts — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#team-contracts)
+- [team-contracts-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#team-contracts-mobile)
+
+</details>
+
+<details><summary><strong>topics</strong> — 2 view(s)</summary>
+
+- [topics — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#topics)
+- [topics-mobile — mobile](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#topics-mobile)
+
+</details>
+
+<details><summary><strong>waivers</strong> — 2 view(s)</summary>
+
+- [waivers — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#waivers)
+- [waivers-empty — desktop](https://a-jay85.github.io/IBL5/pr/2943/visual-review/#waivers-empty)
+
+</details>
+
+### ⚠️ Changed but NOT covered by the VR manifest — review manually / add a row
+
+These changed paths affect the website but match no `vr-manifest.ts` row, so they have **no before/after above**. Review them by hand, or add a manifest row:
+
+- `.github/workflows/e2e-tests.yml`
+- `.github/workflows/pages-deploy.yml`
+- `.github/workflows/tests.yml`
+- `.github/workflows/vr-pr-screens.yml`
+- `.gitleaks.toml`
+- `ibl5/tests/e2e/manual-rows.spec.ts`
+- `ibl5/tests/e2e/vr-pr-screens.ts`
+- `ibl5/tests/ts-unit/fixtures/vr-screens/cells.json`
+- `ibl5/tests/ts-unit/fixtures/vr-screens/prev/manifest.json`
+- `ibl5/tests/ts-unit/fixtures/vr-screens/prev/rows.json`
+- `ibl5/tests/ts-unit/vr-pr-screens-cli.test.ts`
+- `ibl5/tests/ts-unit/vr-pr-screens.test.ts`
+
+<!-- Sticky Pull Request Commentvisual-review -->

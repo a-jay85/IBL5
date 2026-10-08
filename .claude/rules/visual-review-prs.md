@@ -14,7 +14,7 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-10-07
+last_verified: 2026-10-08
 ---
 
 # Visual-review PRs
@@ -52,14 +52,13 @@ They are skipped only during baseline regen (the `update-baselines` label).
    whole tree. That dispatch is **debounced**: it is skipped when a `pages-deploy` run exists that has
    not started yet, because such a run checks out `gh-pages` *after* this push landed and therefore
    already serves it. The status filter is a **denylist** (anything that is neither `completed` nor
-   `in_progress`) rather than an allowlist of the pre-execution spellings — a missed spelling would
-   make the guard a silent no-op nothing would surface, whereas over-suppressing just makes one push
-   wait for the next deploy, which re-serves the whole tree anyway. The debounce never fires on an
-   `in_progress` run (that one may have checked out `gh-pages` first) and fails **open** — an API
-   error dispatches anyway. This is what stops a push fan-out (one master push → multiple open-PR
+   `in_progress`), so a missed spelling over-suppresses one push
+   instead of silently no-opping. The debounce never fires on an
+   `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API
+   error dispatches. This is what stops a push fan-out (one master push → multiple open-PR
    updates → N gh-pages pushes) from producing N deploys, most of which the `pages`
-   concurrency group would just cancel; the fan-out collapses to roughly **two** deploys (one
-   in-flight plus one pending), not one. Because every open PR's VR job pushes to the same `gh-pages` ref, concurrent runs
+   concurrency group would cancel. It collapses to roughly **two** deploys (one
+   in-flight plus one pending). Because every open PR's VR job pushes to the same `gh-pages` ref, concurrent runs
    collide on the ref lock; the deploy is spelled out as **one attempt plus two retries** (the
    action re-clones `gh-pages` each time, so a retry sees the ref that beat it). An **assert step**
    fails the job if all three are exhausted — the retries absorb contention, they never soften the
@@ -80,12 +79,12 @@ It keeps every dir an open PR still links to. See [Refreshing stale galleries](#
 
 - **Daily schedule.** Refreshes each open visual PR whose linked gallery dir is older than 7 days. At most 10 PRs per sweep, 2 at a time.
 - **Manual dispatch.** `gh workflow run vr-refresh.yml -f pr=<N>` refreshes one PR. A blank `pr` refreshes every open visual PR, with the same cap. Add `-f dry_run=true` to list what would refresh and what cleanup would keep.
-- **Visual PR.** A PR whose `visual-review` sticky comment links a gallery. The banner-only comment links none and is never refreshed.
-- **Age.** The `gh-pages` commit time of the dir that comment links to. Every publish writes `refreshed-at.txt` into the dir, so a refresh always moves the age forward.
+- **Visual PR.** A PR whose `visual-review` sticky comment links a gallery, as `<sha>/visual-review` or `pr/<N>/visual-review`. The first link wins. The banner-only comment links none and is never refreshed.
+- **Age.** The `gh-pages` commit time of the dir that comment links to (`<sha>` or `pr/<N>/visual-review`). Every publish writes `refreshed-at.txt` into the dir, so a refresh always moves the age forward.
 - **Skipped PRs.** Forks, PRs labeled `update-baselines`, drafts (unless named by `pr`), PRs whose base is not `master`, and PRs behind `master`. A push republishes a behind PR anyway (ADR-0182 gives the reason).
 - **Publish key.** A refresh publishes under the PR head SHA and rewrites the links to it. A push to the PR still publishes under the test-merge SHA.
 - **Never a gate.** Every write runs on a master-ref event, so a refresh adds no check run to a PR head and a failed refresh leaves required checks alone. One sweep dispatches `pages-deploy.yml` once.
-- **Retention.** `vr-pages-cleanup` keeps every per-SHA dir that any open PR's comments or body link to, plus each open PR's head SHA, through both the 7-day age pass and the 300-dir cap. When the keep-list cannot be computed, that run prunes nothing.
+- **Retention.** `vr-pages-cleanup` keeps every per-SHA dir that any open PR's comments or body link to, plus each open PR's head SHA, through both the 7-day age pass and the 300-dir cap. When the keep-list cannot be computed, that run prunes nothing. The keep-list holds 40-hex SHAs only, since `bin/prune-vr-galleries` never prunes `pr/<N>/` dirs.
 - **Pull-request dry-run.** A PR that edits the refresh workflow, `bin/vr-refresh-targets`, `ibl5/tests/e2e/vr-refresh.ts`, or `bin/prune-vr-galleries` runs the read-only `VR refresh select` job, which prints both lists.
 
 ## Reading the comment

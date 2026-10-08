@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-07
+last_verified: 2026-10-08
 ---
 
 # Post-Plan Orchestrator
@@ -452,6 +452,8 @@ Using the Sonnet agent's classifications:
 3. **Truly manual:** Keep in PR description.
 4. **Update PR:** Tick verified/automated steps and keep them as an audit trail. Run the tick block below first, then compose the new body from the file it names in `TICK_BODY=`. When it prints `SENTINEL=write`, put this sentinel as the first line under `## Manual Testing`, above the ticked rows: `No manual testing needed — remaining steps are covered by automated checks run in Phase 6; <derived clause from Phase 2: either "verification is automated: <comma-separated classes>" or "verification is static; the plan's Verification Matrix has no executable rows">`. Use the same class list derived in Phase 2 step 3. Do not invent a class absent from the Verification Matrix.
 
+   **Compiled harness.** The harness engine has no equivalent of this step. Its Phase 6.7 (`tools/postplan-harness/harness/manual_testing.py`, `run()`) ticks the rows itself and, once a fresh re-read of the body confirms every row ticked, inserts `MANUAL_TESTING_SENTINEL_TICKED` (`harness/classify.py`) as the first line under `## Manual Testing`. Both engines therefore leave the same shape: sentinel above ticked audit rows.
+
    **Tick verified rows FIRST.** Write `$TICK_IDS_FILE` with one line per verified step whose Mode A `row` is non-null, copied from `row` byte for byte. Write `$TICK_DELETE_FILE` with the verbatim `step` line of each verified step whose `row` is null. A verified step is one whose category is not `truly-manual` and whose test or command went green in items 1 and 2. Treat the block's stdout as the contract. Each `TICK-CONFIRMED` row stays as `- [x]` audit trail. Each `TICK-FALLBACK-DELETE` row and each verbatim line is already removed from the `TICK_BODY=` file. The block decides `SENTINEL=` from that file with the predicate's own window and checkbox regex, so trust its verdict over your own reading. When the block prints `SENTINEL=withhold`, write no sentinel; the remaining `- [ ]` rows hold condition (1), which is correct. On `TICK_MODE=legacy-delete`, compose the body exactly as before this change: delete the verified rows, and write the sentinel only when none remain.
 
 ```bash
@@ -563,7 +565,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **All fifteen conditions** must be true. It is an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
 
-1. Manual testing cleared — the PR body carries the `No manual testing needed` sentinel Phase 6 writes.
+1. Manual testing is cleared. The PR body carries the `No manual testing needed` sentinel. The skill writes it in Phase 6 step 4; the compiled harness writes `MANUAL_TESTING_SENTINEL_TICKED` in Phase 6.7 once every row it ticked is confirmed on a fresh read.
 2. No review/audit finding scored `>= 80` (scored in Phase 4).
 3. No unresolved `MISSING:` planned-test, `MISSING-FILE:` planned-file, `MISSING-PHASE:` phase-omission, `UNPLANNED-FILE:` unplanned-path, `UNREALISED-ASSERTION:` assertion-footprint **or** `UNMET-CONTRACT:` autonomy-contract items from Phase 5.0, **and Phase 5.0 provably finished:** the done-marker `/tmp/post-plan-conformance-done-$PPID` exists AND the bridge `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Marker absent = indeterminate = BLOCKED (an empty bridge file alone means nothing; 5.0 truncates it at START).
 4. Phase 5 did not deterministically fail — `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`.

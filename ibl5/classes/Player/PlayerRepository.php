@@ -203,7 +203,9 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     {
         /** @var list<AwardRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_awards` WHERE name = ? ORDER BY year ASC",
+            // ORDER BY is total: UNIQUE uk_year_award_name (year, award, name) and name is bound; award is not on the rule allowlist.
+            // @phpstan-ignore ibl.orderByMissingTiebreaker
+            "SELECT * FROM `ibl_awards` WHERE name = ? ORDER BY year ASC, award ASC",
             "s",
             $playerName
         );
@@ -228,7 +230,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
             "SELECT sid, title, time FROM nuke_stories 
              WHERE (hometext LIKE ? OR bodytext LIKE ?) 
              AND (hometext NOT LIKE ? OR bodytext NOT LIKE ?) 
-             ORDER BY time DESC",
+             ORDER BY time DESC, sid DESC",
             "ssss",
             $searchPattern,
             $searchPattern,
@@ -252,7 +254,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
              FROM `ibl_one_on_one` o 
              LEFT JOIN `ibl_plr` p ON o.loser = p.name 
              WHERE o.winner = ? 
-             ORDER BY o.gameid ASC",
+             ORDER BY o.gameid ASC, p.pid ASC",
             "s",
             $playerName
         );
@@ -273,7 +275,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
              FROM `ibl_one_on_one` o
              LEFT JOIN `ibl_plr` p ON o.winner = p.name
              WHERE o.loser = ?
-             ORDER BY o.gameid ASC",
+             ORDER BY o.gameid ASC, p.pid ASC",
             "s",
             $playerName
         );

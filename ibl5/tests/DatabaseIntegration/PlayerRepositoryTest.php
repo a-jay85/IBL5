@@ -187,6 +187,59 @@ class PlayerRepositoryTest extends DatabaseTestCase
         self::assertSame([], $this->repo->getOneOnOneWins('PLR NoWins'));
     }
 
+    public function testGetOneOnOneWinsBreaksSameNameLoserFanOutByPidAscending(): void
+    {
+        $this->insertTestPlayer(200010020, 'PLR DupWinner', ['teamid' => 1]);
+        // Higher pid inserted first so insertion order disagrees with pid ASC
+        $this->insertTestPlayer(200010022, 'PLR DupLoser', ['teamid' => 2]);
+        $this->insertTestPlayer(200010021, 'PLR DupLoser', ['teamid' => 3]);
+
+        foreach ([900006, 900003] as $gameid) {
+            $this->insertRow('ibl_one_on_one', [
+                'gameid' => $gameid,
+                'playbyplay' => 'test',
+                'winner' => 'PLR DupWinner',
+                'loser' => 'PLR DupLoser',
+                'winscore' => 21,
+                'lossscore' => 15,
+                'owner' => 'testgm',
+            ]);
+        }
+
+        $wins = $this->repo->getOneOnOneWins('PLR DupWinner');
+
+        self::assertCount(4, $wins);
+        // gameid stays the primary key; pid only orders the name fan-out within a game
+        self::assertSame([900003, 900003, 900006, 900006], array_column($wins, 'gameid'));
+        self::assertSame(
+            [200010021, 200010022, 200010021, 200010022],
+            array_column($wins, 'loser_pid'),
+        );
+    }
+
+    public function testGetOneOnOneLossesBreaksSameNameWinnerFanOutByPidAscending(): void
+    {
+        $this->insertTestPlayer(200010023, 'PLR DupLoser2', ['teamid' => 1]);
+        // Higher pid inserted first so insertion order disagrees with pid ASC
+        $this->insertTestPlayer(200010025, 'PLR DupWin2', ['teamid' => 2]);
+        $this->insertTestPlayer(200010024, 'PLR DupWin2', ['teamid' => 3]);
+
+        $this->insertRow('ibl_one_on_one', [
+            'gameid' => 900004,
+            'playbyplay' => 'test',
+            'winner' => 'PLR DupWin2',
+            'loser' => 'PLR DupLoser2',
+            'winscore' => 21,
+            'lossscore' => 12,
+            'owner' => 'testgm',
+        ]);
+
+        $losses = $this->repo->getOneOnOneLosses('PLR DupLoser2');
+
+        self::assertCount(2, $losses);
+        self::assertSame([200010024, 200010025], array_column($losses, 'winner_pid'));
+    }
+
     // ── getPlayerIdByUuid ───────────────────────────────────────
 
     public function testGetPlayerIdByUuidReturnsPid(): void
@@ -241,6 +294,46 @@ class PlayerRepositoryTest extends DatabaseTestCase
         self::assertSame('Player Spotlight', $news[0]['title']);
         self::assertSame('2023-11-14 22:36:40', $news[0]['time']);
         self::assertSame(9002, $news[1]['sid']);
+    }
+
+    public function testGetPlayerNewsBreaksSameTimeTiesBySidDescending(): void
+    {
+        $rows = [
+            [9011, '2023-11-14 22:30:00'],
+            [9012, '2023-11-14 22:40:00'],
+            [9013, '2023-11-14 22:30:00'],
+        ];
+        foreach ($rows as [$sid, $time]) {
+            $this->insertRow('nuke_stories', [
+                'sid' => $sid, 'catid' => 1, 'aid' => 'admin',
+                'title' => 'Tie Story ' . $sid, 'time' => $time,
+                'hometext' => 'Article about PLR NewsTie in the lineup.',
+                'bodytext' => '',
+                'comments' => 0, 'counter' => 0, 'topic' => 1,
+                'informant' => '', 'ihome' => 0, 'acomm' => 0,
+                'haspoll' => 0, 'poll_id' => 0, 'score' => 0, 'ratings' => 0,
+            ]);
+        }
+
+        $news = $this->repo->getPlayerNews('PLR NewsTie');
+
+        // 9012 leads on newer time; 9013 beats 9011 on sid DESC at the same time
+        self::assertSame([9012, 9013, 9011], array_column($news, 'sid'));
+    }
+
+    public function testGetAwardsBreaksSameYearTiesByAwardAscending(): void
+    {
+        $this->insertAwardRow('PLR AwardTie', 'Sixth Man of the Year', 2024);
+        $this->insertAwardRow('PLR AwardTie', 'MVP', 2024);
+        $this->insertAwardRow('PLR AwardTie', 'Defensive Player of the Year', 2023);
+
+        $awards = $this->repo->getAwards('PLR AwardTie');
+
+        // year stays primary; award ASC orders the 2024 pair against insertion order
+        self::assertSame(
+            ['Defensive Player of the Year', 'MVP', 'Sixth Man of the Year'],
+            array_column($awards, 'award'),
+        );
     }
 
     public function testGetPlayerNewsExcludesUnrelatedRows(): void

@@ -1,6 +1,6 @@
 ---
 description: A daily and on-demand workflow republishes stale visual-review galleries through a workflow_call entry into e2e-tests.yml, and gh-pages retention keeps every dir an open PR links to.
-last_verified: 2026-10-07
+last_verified: 2026-10-08
 ---
 
 # ADR-0182: VR stale-gallery refresh and open-PR keep-list
@@ -42,3 +42,11 @@ The Visual Regression job publishes each PR's gallery to `gh-pages` under `<sha>
 - `bin/vr-refresh-targets`: PR listing, gallery ages, and fail-closed exits.
 - `bin/prune-vr-galleries`: the `--keep-file` exemption.
 - `ibl5/tests/e2e/vr-refresh.ts`: selection, keep-list, and argument parsing.
+
+## Addendum — PR-keyed gallery links (2026-10-08) <!-- slop-ok -->
+
+Decisions 2 and 4 keyed every gallery by a 40-hex SHA, because every sticky comment then linked `<sha>/visual-review`. PR #2943 moves galleries to `pr/<N>/visual-review/`. Under the SHA-only parser, a PR-keyed comment linked nothing, so every such PR would be skipped as `not-visual`.
+
+Refresh selection now identifies a gallery by its dir relative to the gh-pages root: `<sha>` for a legacy link, `pr/<N>/visual-review` for a PR-keyed one. `<N>` must be a positive integer with no leading zero. `linkedGallerySha` became `linkedGalleryDir`, and the select-mode JSON field `gallery_sha` became `gallery_dir`. `bin/vr-refresh-targets` ages a PR-keyed gallery with `git log -- pr/<N>/visual-review`. Both shapes are accepted, so the tool works before and after PR #2943 merges and while old per-SHA dirs age out.
+
+The keep-list is unchanged and stays SHA-only. `bin/prune-vr-galleries` only considers top-level 40-hex dirs, so `pr/<N>/` dirs never need a keep entry.

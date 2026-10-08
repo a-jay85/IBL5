@@ -1034,10 +1034,14 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker --only 102
 [[ $RC -eq 0 ]] || fail "--only run exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "--only 102 made $(calls ready) ready calls, want 1"
-[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait" ]] \
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "--only 102 readied: $(sed -n 1p "$SCRATCH/ready.argv")"
 grep -qF 'done' <<< "$OUT" || fail "--only run did not finish normally"
 grep -qF -- '--only 102' <<< "$OUT" || fail "worker did not announce its scope"
+# Stage 1 is the only caller that exempts the fleet from the test-only exit-5 refusal.
+grep -qF -- '--allow-test-only' "$SCRATCH/ready.argv" \
+    || fail "stage1-passes-allow-test-only: fleet argv lacks --allow-test-only: $(sed -n 1p "$SCRATCH/ready.argv")"
+echo "stage1-passes-allow-test-only OK"
 
 # The hash form is the same set: normalization happens at parse time, not at match time.
 reset_state
@@ -1045,7 +1049,7 @@ printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
     > "$SCRATCH/triage-out"
 run --worker --only '#102'
-[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait" ]] \
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "--only '#102' readied: $(sed -n 1p "$SCRATCH/ready.argv")"
 
 # Two of three, in pr-attack's order — the filter drops rows, it never reorders them.
@@ -1056,7 +1060,7 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker --only 103,101
 [[ "$(calls ready)" == "1" ]] || fail "--only 103,101 made $(calls ready) ready calls, want 1"
 _a27a="$(sed -n 1p "$SCRATCH/ready.argv")"
-[[ "$_a27a" == "--pr-list 101,103 --jobs 3 --go --wait" ]] \
+[[ "$_a27a" == "--pr-list 101,103 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "--only 103,101 argv: $_a27a"
 end_case "case 27a --only selects and preserves order"
 
@@ -1069,7 +1073,7 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker --skip 101,103
 [[ $RC -eq 0 ]] || fail "--skip run exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "--skip 101,103 made $(calls ready) ready calls, want 1"
-[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait" ]] \
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "--skip readied: $(sed -n 1p "$SCRATCH/ready.argv")"
 grep -qF -- '--skip 101,103' <<< "$OUT" || fail "worker did not announce its --skip scope"
 # No flag at all is the unfiltered baseline — the predicate must be a no-op by default.
@@ -1080,7 +1084,7 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker
 [[ "$(calls ready)" == "1" ]] || fail "unfiltered run made $(calls ready) ready calls, want 1"
 _a27b="$(sed -n 1p "$SCRATCH/ready.argv")"
-[[ "$_a27b" == "--pr-list 101,102,103 --jobs 3 --go --wait" ]] \
+[[ "$_a27b" == "--pr-list 101,102,103 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "unfiltered batch argv: $_a27b"
 end_case "case 27b --skip and the unfiltered baseline"
 
@@ -1663,14 +1667,14 @@ triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" "2103 NEEDS-WORK
 run --worker
 [[ $RC -eq 0 ]] || fail "case 30 exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "case 30: want 1 fleet call, got $(calls ready)"
-[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait" ]] \
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "case 30: argv line 1: $(sed -n '1p' "$SCRATCH/ready.argv")"
 
 reset_state
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
 triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker --jobs 2
-[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 2 --go --wait" ]] \
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 2 --go --wait --allow-test-only" ]] \
     || fail "case 30 --jobs 2: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
 end_case "case 30 stage-1 batch argv"
 
@@ -1706,7 +1710,7 @@ printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
 triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker --max-ready 2
 [[ $RC -eq 0 ]] || fail "case 32 exit $RC, want 0"
-[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102 --jobs 3 --go --wait" ]] \
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "case 32 cap 2: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
 run --dry-run --max-ready 2
 grep -qF '2103' <<< "$OUT" && grep -qF 'max-ready cap' <<< "$OUT" \
@@ -1719,7 +1723,7 @@ reset_state
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
 triage_report "2101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker --max-ready 10
-[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait" ]] \
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "case 32 no-cap: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
 end_case "case 32 max-ready cap"
 

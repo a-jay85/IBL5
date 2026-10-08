@@ -994,7 +994,7 @@ _stage1_fire() {
     set +e
     # pr-cycle's own auth probe already passed — bypass the duplicate probe in post-plan-fleet.
     env POST_PLAN_FLEET_AUTH_PROBE_CMD=true \
-        "$PR_CYCLE_READY_CMD" --pr-list "$_csv" --jobs "$JOBS" --go --wait \
+        "$PR_CYCLE_READY_CMD" --pr-list "$_csv" --jobs "$JOBS" --go --wait --allow-test-only \
         > "$RUNDIR/ready.out" 2> "$RUNDIR/ready.err"
     _rc=$?
     set -e
@@ -1234,7 +1234,7 @@ _report_dry_run() {
     fi
     if [ "$_s1_cnt" -gt 0 ]; then
         _s1_csv="$(paste -sd, "$RUNDIR/stage1.txt")"
-        echo "would run: post-plan-fleet --pr-list $_s1_csv --jobs $JOBS --go --wait"
+        echo "would run: post-plan-fleet --pr-list $_s1_csv --jobs $JOBS --go --wait --allow-test-only"
     fi
     if [ "$PR_CYCLE_RESCUE" = "0" ]; then
         echo "DIRTY rescue: disabled (PR_CYCLE_RESCUE=0) — excluded PRs stay unreachable."

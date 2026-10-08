@@ -47,9 +47,7 @@ test.describe('ASG Voting', () => {
   });
 
   test('submit button visible', async ({ page }) => {
-    const submitBtn = page.locator('button, input[type="submit"]').filter({
-      hasText: /submit votes/i,
-    });
+    const submitBtn = page.getByRole('button', { name: /submit votes/i });
     await expect(submitBtn.first()).toBeVisible();
   });
 
@@ -143,7 +141,7 @@ test.describe('EOY Voting', () => {
     const header = page.locator('.voting-category').first();
     await header.click();
 
-    const firstTable = page.locator('#MVP, #Six, #ROY, #GM').first();
+    const firstTable = page.locator('#MVP');
     await expect(firstTable).toBeVisible();
 
     const radios = firstTable.locator('input[type="radio"]');
@@ -151,9 +149,7 @@ test.describe('EOY Voting', () => {
   });
 
   test('submit button visible', async ({ page }) => {
-    const submitBtn = page.locator('button, input[type="submit"]').filter({
-      hasText: /submit votes/i,
-    });
+    const submitBtn = page.getByRole('button', { name: /submit votes/i });
     await expect(submitBtn.first()).toBeVisible();
   });
 

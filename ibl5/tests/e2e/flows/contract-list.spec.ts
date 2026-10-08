@@ -45,7 +45,7 @@ test.describe('Contract List flow', () => {
   });
 
   test('totals row exists', async ({ page }) => {
-    const totalsRow = page.locator('.totals-row, tr.totals-row');
+    const totalsRow = page.locator('tr.totals-row');
     await expect(totalsRow.first()).toBeVisible();
   });
 

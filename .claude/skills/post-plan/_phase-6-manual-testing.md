@@ -25,9 +25,11 @@ Purpose: the Senior-QA-Engineer manual-testing classification prompt for Phase 6
 > For each step, return a JSON array:
 > ```json
 > [
->   {"step": "original step text", "category": "cli-executable|phpunit|api-test|e2e|visual-regression|truly-manual", "rationale": "why this category", "test_hint": "what the test should assert (omit for cli-executable and truly-manual)"}
+>   {"step": "original step text", "row": "Row 3", "category": "cli-executable|phpunit|api-test|e2e|visual-regression|truly-manual", "rationale": "why this category", "test_hint": "what the test should assert (omit for cli-executable and truly-manual)"}
 > ]
 > ```
+>
+> **`row` is a copy, never a judgment.** When the step line begins with `- [ ] **<id>**`, set `row` to the exact text between that first `**` pair, byte for byte (for `- [ ] **Row 3** — run bin/test-foo` it is `Row 3`). When the step line has no such leading bold token, set `row` to `null`. Never invent, renumber, merge, or split ids. One output object per input step line, in input order. Phase 6 uses `row` to tick the checkbox for a verified step and deletes any verified step whose `row` is `null`.
 >
 > **Bias toward automation.** If a step says "verify X works" or "check that Y returns Z", that is automatable — not manual. "Compare against production" is visual-regression-replaceable (screenshot diff) unless UI/UX was intentionally redesigned — it is NOT truly manual. Only subjective judgment on new/redesigned UI/UX is truly manual.
 >

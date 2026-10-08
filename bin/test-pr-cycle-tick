@@ -104,6 +104,11 @@ CL_EOF
 cat > "$SCRATCH/pr-cycle-stub" <<PC_EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$SCRATCH/pr-cycle.log"
+# The real worker writes its result file at the end. A case stages the file with set_result.
+if [[ -n "\${PR_CYCLE_RESULT_FILE:-}" && -f "$SCRATCH/result-canned" ]]; then
+    mkdir -p "\$(dirname "\$PR_CYCLE_RESULT_FILE")"
+    cp "$SCRATCH/result-canned" "\$PR_CYCLE_RESULT_FILE"
+fi
 exit "\${STUB_RC:-0}"
 PC_EOF
 
@@ -121,7 +126,7 @@ E_PRCMD="$SCRATCH/pr-cycle-stub"; E_DMCMD="$SCRATCH/dm-stub"
 E_HOME="set"; E_STUB_RC=0
 
 reset() {
-    rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json
+    rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json "$SCRATCH/result-canned"
     rm -rf "$HOME_DIR" "$REPO/tools" "$WT/tools" "$SCRATCH/usage-gate"
     mkdir -p "$HOME_DIR"
     : > "$SCRATCH/launchctl-list.txt"
@@ -192,6 +197,14 @@ out_has() { grep -qF -- "$1" <<< "$OUT"; }
 err_has() { grep -qF -- "$1" "$ERR"; }
 no_file() { [[ ! -e "$1" ]]; }
 attempt() { cat "$STATE_DIR/attempts/$1" 2>/dev/null; }
+pending_count() { find "$STATE_DIR/pending" -type f 2>/dev/null | wc -l | tr -d ' '; }
+dm_count() { if [[ -f "$SCRATCH/dm.log" ]]; then wc -l < "$SCRATCH/dm.log" | tr -d ' '; else echo 0; fi; }
+launch_count() { if [[ -f "$SCRATCH/pr-cycle.log" ]]; then wc -l < "$SCRATCH/pr-cycle.log" | tr -d ' '; else echo 0; fi; }
+strikes() { cat "$STATE_DIR/strikes/$1" 2>/dev/null; }
+# set_result "<pr>\t<status>\t<outcome>\t<reason>" ...: the file the stub hands the tick.
+set_result() {
+    { echo "# pr-cycle-result v1"; printf '%b\n' "$@"; } > "$SCRATCH/result-canned"
+}
 RED101='101|branch-one|aaa1111|BLOCKED|false'
 
 # ===========================================================================================
@@ -323,7 +336,10 @@ run_tick
 [[ $RC -eq 0 ]] || fail "red-qualifies: rc $RC, want 0"
 [[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
     || fail "red-qualifies: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
-[[ "$(attempt 101)" == "aaa1111" ]] || fail "red-qualifies: attempts/101 is '$(attempt 101)', want aaa1111"
+[[ "$(attempt 101)" == "" ]] || fail "red-qualifies: launch recorded attempts/101; only reconcile may"
+[[ "$(pending_count)" == "1" ]] || fail "red-qualifies: want one pending entry, got $(pending_count)"
+grep -qF "$(printf '101\taaa1111')" "$STATE_DIR"/pending/* 2>/dev/null \
+    || fail "red-qualifies: pending entry lacks the 101/aaa1111 line"
 end_case red-qualifies
 
 reset; begin_case
@@ -443,7 +459,9 @@ mkdir -p "$STATE_DIR/attempts"; echo old0000 > "$STATE_DIR/attempts/101"
 run_tick
 [[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
     || fail "new-head-eligible: did not launch on a new head: $OUT"
-[[ "$(attempt 101)" == "aaa1111" ]] || fail "new-head-eligible: attempts/101 is '$(attempt 101)', want aaa1111"
+[[ "$(pending_count)" == "1" ]] || fail "new-head-eligible: want one pending entry, got $(pending_count)"
+grep -qF "$(printf '101\taaa1111')" "$STATE_DIR"/pending/* 2>/dev/null \
+    || fail "new-head-eligible: pending entry lacks the 101/aaa1111 line"
 end_case new-head-eligible
 
 reset; begin_case
@@ -452,7 +470,185 @@ E_STUB_RC=1
 run_tick
 [[ -e "$SCRATCH/pr-cycle.log" ]] || fail "launch-failure-no-record: stub was not launched"
 no_file "$STATE_DIR/attempts/101" || fail "launch-failure-no-record: recorded an attempt after a failed launch"
+[[ "$(pending_count)" == "0" ]] || fail "launch-failure-no-record: a failed launch left a pending entry"
 end_case launch-failure-no-record
+
+# --- pending launches, reconcile, and the declined / strike states -------------------------
+# Tick 1 launches. The stub writes the canned result at once, as a finished worker would, and
+# the fake job list shows no live worker, so tick 2 reconciles it.
+reset; begin_case
+set_prs '112|b12|bbb2222|BLOCKED|false'; set_checks bbb2222 red
+set_result "112\tholdrepeat\t-\t-"
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "holdrepeat-skip-no-attempt: tick 1 did not launch"
+run_tick
+[[ "$(cat "$STATE_DIR/declined/112" 2>/dev/null)" == "bbb2222" ]] \
+    || fail "holdrepeat-skip-no-attempt: declined/112 is '$(cat "$STATE_DIR/declined/112" 2>/dev/null)'"
+no_file "$STATE_DIR/attempts/112" || fail "holdrepeat-skip-no-attempt: a declined PR was charged an attempt"
+[[ "$(dm_count)" == "1" ]] || fail "holdrepeat-skip-no-attempt: want 1 DM, got $(dm_count)"
+grep -qF 'pr-cycle-watch: PR #112 on head bbb2222 was not rescued: post-plan holdrepeat declines it (held twice on the same reason, nothing changed). Skipping it until a new push.' "$SCRATCH/dm.log" \
+    || fail "holdrepeat-skip-no-attempt: declined DM wording: $(cat "$SCRATCH/dm.log")"
+[[ "$(pending_count)" == "0" ]] || fail "holdrepeat-skip-no-attempt: settled entry still pending"
+run_tick
+[[ "$(launch_count)" == "1" ]] || fail "holdrepeat-skip-no-attempt: relaunched a declined head"
+[[ "$(dm_count)" == "1" ]] || fail "holdrepeat-skip-no-attempt: second DM for the same head"
+out_has 'holdrepeat declined (head bbb2222)' || fail "holdrepeat-skip-no-attempt: no skip log line: $OUT"
+end_case holdrepeat-skip-no-attempt
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+set_result "101\tfired\tfailed\tno-result"
+run_tick
+run_tick
+[[ "$(strikes 101)" == "aaa1111 1" ]] || fail "fleet-no-result-strike: tick 2 strikes/101 is '$(strikes 101)'"
+[[ "$(attempt 101)" == "" ]] || fail "fleet-no-result-strike: a no-op rescue was charged an attempt"
+[[ "$(dm_count)" == "0" ]] || fail "fleet-no-result-strike: DM on the first strike"
+[[ "$(launch_count)" == "2" ]] || fail "fleet-no-result-strike: want a relaunch on tick 2, got $(launch_count) launches"
+run_tick
+[[ "$(strikes 101)" == "aaa1111 2" ]] || fail "fleet-no-result-strike: tick 3 strikes/101 is '$(strikes 101)'"
+[[ "$(dm_count)" == "1" ]] || fail "fleet-no-result-strike: want 1 cap DM on tick 3, got $(dm_count)"
+grep -qF 'pr-cycle-watch: PR #101 on head aaa1111: the rescue never reached post-plan 2 times (last: fired failed no-result). Skipping it until a new push.' "$SCRATCH/dm.log" \
+    || fail "fleet-no-result-strike: cap DM wording: $(cat "$SCRATCH/dm.log")"
+[[ "$(launch_count)" == "2" ]] || fail "fleet-no-result-strike: relaunched at the cap"
+run_tick
+[[ "$(launch_count)" == "2" ]] || fail "fleet-no-result-strike: tick 4 launched past the cap"
+[[ "$(dm_count)" == "1" ]] || fail "fleet-no-result-strike: second cap DM"
+out_has 'no-op rescue cap (head aaa1111)' || fail "fleet-no-result-strike: no cap log line: $OUT"
+end_case fleet-no-result-strike
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+set_result "101\tfired\tfailed\tkind=test"
+run_tick
+run_tick
+[[ "$(attempt 101)" == "aaa1111" ]] || fail "real-run-still-red-attempt: attempts/101 is '$(attempt 101)'"
+no_file "$STATE_DIR/strikes/101" || fail "real-run-still-red-attempt: a real run was struck"
+[[ "$(launch_count)" == "1" ]] || fail "real-run-still-red-attempt: relaunched after a real run"
+grep -qF 'pr-cycle-watch: PR #101 is still red on head aaa1111 after one rescue. Skipping it until a new push.' "$SCRATCH/dm.log" \
+    || fail "real-run-still-red-attempt: still-red DM wording: $(cat "$SCRATCH/dm.log" 2>/dev/null)"
+run_tick
+[[ "$(dm_count)" == "1" ]] || fail "real-run-still-red-attempt: still-red DM sent twice"
+end_case real-run-still-red-attempt
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick
+run_tick
+[[ "$(pending_count)" == "1" ]] || fail "young-pending-no-strike: pending entry dropped early"
+no_file "$STATE_DIR/strikes/101" || fail "young-pending-no-strike: struck a launch still inside the age bound"
+[[ "$(launch_count)" == "1" ]] || fail "young-pending-no-strike: relaunched a PR with a pending rescue"
+out_has 'rescue pending' || fail "young-pending-no-strike: no skip log line: $OUT"
+end_case young-pending-no-strike
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+run_tick
+pf="$(find "$STATE_DIR/pending" -type f | head -1)"
+rf="$(sed -n '1s/^# result=\(.*\) started=.*$/\1/p' "$pf")"
+{ printf '# result=%s started=%s\n' "$rf" "$(( $(date +%s) - 14400 ))"; tail -n +2 "$pf"; } > "$pf.new" \
+    && mv "$pf.new" "$pf"
+run_tick
+[[ "$(strikes 101)" == "aaa1111 1" ]] || fail "stale-pending-strikes: strikes/101 is '$(strikes 101)'"
+no_file "$pf" || fail "stale-pending-strikes: the stale entry was not removed"
+out_has 'no result file after' || fail "stale-pending-strikes: no stale log line: $OUT"
+end_case stale-pending-strikes
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+set_result "101\tfired\tpaused\tusage-gate"
+run_tick
+run_tick
+[[ "$(attempt 101)" == "" ]] || fail "paused-no-burn: a paused run was charged an attempt"
+no_file "$STATE_DIR/strikes/101" || fail "paused-no-burn: a paused run was struck"
+out_has 'paused by usage gate, retry later' || fail "paused-no-burn: no paused log line: $OUT"
+[[ "$(launch_count)" == "2" ]] || fail "paused-no-burn: want a retry on tick 2, got $(launch_count) launches"
+end_case paused-no-burn
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+set_result "101\tfired\tfailed\tno-result"
+run_tick
+before="$(find "$STATE_DIR" -type f -exec shasum {} + | sort)"
+run_tick --dry-run
+after="$(find "$STATE_DIR" -type f -exec shasum {} + | sort)"
+[[ "$before" == "$after" ]] || fail "dry-run-inert-with-pending: --dry-run changed the state dir"
+out_has 'dry-run: 1 pending launch(es) not reconciled' || fail "dry-run-inert-with-pending: no dry-run log line: $OUT"
+[[ "$(launch_count)" == "1" ]] || fail "dry-run-inert-with-pending: launched"
+[[ "$(dm_count)" == "0" ]] || fail "dry-run-inert-with-pending: sent a DM"
+end_case dry-run-inert-with-pending
+
+reset; begin_case
+set_prs '101|branch-one|aaa1111|BLOCKED|false'; set_checks aaa1111 green
+for d in attempts dm-sent declined strikes dm-declined dm-strikes; do
+    mkdir -p "$STATE_DIR/$d"
+    echo x > "$STATE_DIR/$d/999"; echo x > "$STATE_DIR/$d/101"
+done
+mkdir -p "$STATE_DIR/results"
+echo x > "$STATE_DIR/results/old.tsv"; touch -t 202601010000 "$STATE_DIR/results/old.tsv"
+echo x > "$STATE_DIR/results/new.tsv"
+run_tick
+for d in attempts dm-sent declined strikes dm-declined dm-strikes; do
+    no_file "$STATE_DIR/$d/999" || fail "prune-cleans-new-dirs: $d/999 (closed PR) survived"
+    [[ -f "$STATE_DIR/$d/101" ]] || fail "prune-cleans-new-dirs: $d/101 (open PR) was pruned"
+done
+no_file "$STATE_DIR/results/old.tsv" || fail "prune-cleans-new-dirs: a day-old stray result file survived"
+[[ -f "$STATE_DIR/results/new.tsv" ]] || fail "prune-cleans-new-dirs: a fresh result file was pruned"
+end_case prune-cleans-new-dirs
+
+# The wrapper runs the REAL bin/pr-cycle --worker, synchronously, with fake attack, triage,
+# ready and gh tools. 101 fires and its fleet log says failed/kind=test; 102's says declined.
+# Tick 2 must read the file the real worker wrote, not one the stub invented.
+reset; begin_case
+RW="$SCRATCH/rw"; rm -rf "$RW"; mkdir -p "$RW/repo" "$RW/bin" "$RW/home"
+git -C "$RW/repo" init -q 2>/dev/null
+git -C "$RW/repo" config user.email t@t.invalid
+git -C "$RW/repo" config user.name t
+: > "$RW/repo/seed"; git -C "$RW/repo" add -A >/dev/null 2>&1; git -C "$RW/repo" commit -qm seed >/dev/null 2>&1
+RW_TOP="$(cd "$RW/repo" && git rev-parse --show-toplevel)"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "# Plan of attack" "" "| # | PR | Constraint | Needs you? |" "|---|----|-----------|------------|" "| 1 | #101 slug-101 | none | no |" "| 2 | #102 slug-102 | none | no |"\n' > "$RW/bin/attack"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "PR#      BUCKET             NEXT-ACTION" "-------- ------------------ ------------------------" "#101     NEEDS-WORK         rebase" "#102     NEEDS-WORK         rebase"\n' > "$RW/bin/triage"
+cat > "$RW/bin/ready" <<RDY_EOF
+#!/usr/bin/env bash
+mkdir -p "$RW/fleetlogs"
+printf 'post-plan-fleet: %s\n' outcome=failed reason=kind=test > "$RW/fleetlogs/post-plan-fleet-101.log"
+printf 'post-plan-fleet: %s\n' outcome=declined reason=holdrepeat > "$RW/fleetlogs/post-plan-fleet-102.log"
+exit 0
+RDY_EOF
+printf '#!/usr/bin/env bash\ncase "$*" in *autoMergeRequest*) echo "[]" ;; esac\nexit 0\n' > "$RW/bin/gh"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$RW/bin/dm"
+cat > "$RW/wrapper" <<WR_EOF
+#!/usr/bin/env bash
+args=()
+for a in "\$@"; do
+    if [[ "\$a" == --go ]]; then args+=(--worker --no-dm); else args+=("\$a"); fi
+done
+cd "$RW/repo" || exit 1
+exec env HOME="$RW/home" \\
+    PR_CYCLE_ATTACK_CMD="$RW/bin/attack" PR_CYCLE_TRIAGE_CMD="$RW/bin/triage" \\
+    PR_CYCLE_READY_CMD="$RW/bin/ready" PR_CYCLE_DM_CMD="$RW/bin/dm" \\
+    PR_CYCLE_GH_CMD="$RW/bin/gh" PR_CYCLE_MAIN_CHECKOUT="$RW_TOP" \\
+    PR_CYCLE_STOP_FILE="$RW/stop" PR_CYCLE_TS="tpt\$\$" PR_CYCLE_AUTH_PROBE_CMD=true \\
+    PR_CYCLE_PATCH_ID_CMD=false PR_CYCLE_HARNESS_OUT="$RW/harness-out" \\
+    PR_CYCLE_FLEET_LOG_DIR="$RW/fleetlogs" PR_CYCLE_HOLDREPEAT_HARNESS="$RW/hr-none" \\
+    PR_CYCLE_HOLDREPEAT_STATE_DIR="$RW/hrstate" \\
+    "$SCRIPT_DIR/pr-cycle" "\${args[@]}"
+WR_EOF
+chmod +x "$RW/bin"/* "$RW/wrapper"
+set_prs "$RED101" '102|branch-two|bbb2222|BLOCKED|false'
+set_checks aaa1111 red; set_checks bbb2222 red
+E_PRCMD="$RW/wrapper"
+run_tick
+[[ "$(pending_count)" == "1" ]] || fail "integration-real-worker-reconcile: tick 1 left $(pending_count) pending entries (out: $OUT)"
+rf="$(find "$STATE_DIR/results" -type f 2>/dev/null | head -1)"
+[[ -n "$rf" && "$(sed -n 1p "$rf")" == "# pr-cycle-result v1" ]] \
+    || fail "integration-real-worker-reconcile: the real worker wrote no result file (out: $OUT)"
+run_tick
+[[ "$(attempt 101)" == "aaa1111" ]] || fail "integration-real-worker-reconcile: attempts/101 is '$(attempt 101)' (file: $(cat "$rf" 2>/dev/null))"
+[[ "$(cat "$STATE_DIR/declined/102" 2>/dev/null)" == "bbb2222" ]] \
+    || fail "integration-real-worker-reconcile: declined/102 is '$(cat "$STATE_DIR/declined/102" 2>/dev/null)'"
+no_file "$STATE_DIR/strikes/101" || fail "integration-real-worker-reconcile: 101 was struck"
+rm -rf "$RW" /tmp/pr-cycle-tpt*
+end_case integration-real-worker-reconcile
 
 reset; begin_case
 set_prs '105|b5|eee5555|BLOCKED|false' '103|b3|ccc3333|BLOCKED|false' '101|branch-one|aaa1111|BLOCKED|false' \
@@ -491,7 +687,7 @@ for sd in "$UNSET" ""; do
     rm -rf "$STATE_DIR" "$SCRATCH/pr-cycle.log"
     E_STATE="$sd"
     run_tick
-    [[ "$(attempt 101)" == "aaa1111" ]] || fail "state-dir-outside-repo('$sd'): attempts/101 not under \$HOME/.ibl5-pr-cycle-watch"
+    [[ "$(pending_count)" == "1" ]] || fail "state-dir-outside-repo('$sd'): pending entry not under \$HOME/.ibl5-pr-cycle-watch"
     [[ -z "$REAL_TOP" || "$STATE_DIR" != "$REAL_TOP"* ]] || fail "state-dir-outside-repo('$sd'): state dir is inside the real repo"
     [[ ! -e "$REPO/.ibl5-pr-cycle-watch" ]] || fail "state-dir-outside-repo('$sd'): state landed under ROOT"
 done

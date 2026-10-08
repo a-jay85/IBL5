@@ -41,22 +41,22 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
-      - name: Assert a per-SHA gallery serves HTTP 200
+      - name: Assert a VR gallery serves HTTP 200
         shell: bash
         run: |
           set -euo pipefail
           base="${{ steps.deployment.outputs.page_url }}"
           base="${base%/}"
-          # newest committed <sha>/visual-review/ dir on the checked-out gh-pages tree
+          # newest committed <sha>/ or pr/<N>/ visual-review dir on the checked-out gh-pages tree
           newest=""
           newest_ct=0
-          for d in */ ; do
+          for d in */ pr/*/ ; do
             [ -f "${d}visual-review/index.html" ] || continue
             ct=$(git log -1 --format=%ct -- "$d" 2>/dev/null || echo 0)
             if [ "$ct" -gt "$newest_ct" ]; then newest_ct="$ct"; newest="${d%/}"; fi
           done
           if [ -z "$newest" ]; then
-            echo "No <sha>/visual-review/index.html present yet — nothing to assert."
+            echo "No <sha>/ or pr/<N>/ visual-review/index.html present yet — nothing to assert."
             exit 0
           fi
           url="${base}/${newest}/visual-review/index.html"

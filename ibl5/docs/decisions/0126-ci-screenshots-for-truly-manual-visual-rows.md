@@ -1,6 +1,6 @@
 ---
 description: Truly-manual look-and-feel rows carry a `vr:` cell; CI reaches the state via test-state.php, publishes the PNG to the per-SHA Pages tree, and splices it under the matching Manual Testing bullet.
-last_verified: 2026-09-14
+last_verified: 2026-10-07
 ---
 
 # ADR-0126: CI screenshots for truly-manual visual rows
@@ -148,3 +148,7 @@ a missing entry makes the new action 400 immediately, which is loud rather than 
 **What the `## Consequences` bullet now means.** "A reviewer judges a newly built screen from the PR
 page itself" holds from this PR forward, for any row whose `vr:` cell captures successfully; a row
 that fails capture is reported as a failed row in the sticky comment rather than silently omitted.
+
+## Addendum (2026-10-07): body block replaces the sticky comment
+
+Capture moved to `vr-pr-screens.yml` at phone and desktop widths. Results render in the PR body's `vr-screens` block (ADR-0179). The `vr:` grammar is unchanged.

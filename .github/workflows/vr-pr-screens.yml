@@ -1,0 +1,636 @@
+name: VR PR Screens
+
+# Phone-reviewable before/after screenshots for a PR's truly-manual `vr:` rows
+# (ADR-0179). Every artifact lives under one stable gh-pages key, `pr/<N>/`, and
+# the result is a block spliced into the PR body just above `## Manual Testing`.
+#
+#   plan    → validate the PR, wait for a fresh merge ref, decide which sides re-render
+#   render  → one stack per needed side, shot at phone and desktop width
+#   publish → put meta + PNGs via bin/vr-pages-publish, wait for served bytes, splice
+#   cleanup → `closed` deletes pr/<N>/
+#   backfill→ a master push touching this pipeline re-dispatches every open vr: PR
+#
+# Fork PRs are skipped in every event-entry job before any checkout or write.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited, closed]
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/vr-pr-screens.yml
+      - bin/vr-pages-publish
+      - bin/vr-review-comment
+      - ibl5/tests/e2e/vr-pr-screens.ts
+      - ibl5/tests/e2e/manual-rows.spec.ts
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Push-driven runs share one cancellable group per PR, so a superseded head's
+# render is cancelled (the latest-wins dedupe in bin/lib/ci-checks-green.sh keeps
+# the cancelled run from reddening the current head). Body edits, dispatches,
+# backfills and closes each get their own group, so they never cancel a render.
+concurrency:
+  group: vr-pr-screens-${{ github.event.pull_request.number || inputs.pr || 'backfill' }}-${{ github.event.action == 'closed' && 'close' || ((github.event_name == 'pull_request' && github.event.action != 'edited') && 'render' || github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action != 'edited' && github.event.action != 'closed' }}
+
+jobs:
+  plan:
+    name: Screens plan
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      skip: ${{ steps.decide.outputs.skip }}
+      pr: ${{ steps.pr.outputs.pr }}
+      head_sha: ${{ steps.pr.outputs.head_sha }}
+      merge_sha: ${{ steps.merge.outputs.merge_sha }}
+      base_sha: ${{ steps.merge.outputs.base_sha }}
+      before_tree: ${{ steps.merge.outputs.before_tree }}
+      after_tree: ${{ steps.merge.outputs.after_tree }}
+      gallery: ${{ steps.prev.outputs.gallery }}
+      sides: ${{ steps.decide.outputs.render_sides }}
+      noop: ${{ steps.plan.outputs.noop }}
+      publish: ${{ steps.decide.outputs.publish }}
+    steps:
+      # Only gives the runner a git dir; the merge ref is fetched and checked out below.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Resolve PR
+        id: pr
+        env:
+          PR_IN: ${{ github.event.pull_request.number || inputs.pr }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$PR_IN" =~ ^[1-9][0-9]{0,6}$ ]] || { echo "::error::invalid pr input"; exit 1; }
+          info=$(gh pr view "$PR_IN" --json state,isCrossRepository,headRefOid \
+            -q '.state + " " + (.isCrossRepository | tostring) + " " + .headRefOid')
+          read -r state cross head <<<"$info"
+          [[ "$head" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::invalid headRefOid for PR #$PR_IN"; exit 1; }
+          echo "pr=$PR_IN" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head" >> "$GITHUB_OUTPUT"
+          if [ "$state" != "OPEN" ] || [ "$cross" = "true" ]; then
+            echo "::notice::vr-pr-screens: PR #$PR_IN is $state (cross-repo=$cross); skipping"
+            echo "SKIP=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Fetch merge ref
+        id: merge
+        if: env.SKIP != 'true'
+        env:
+          PR: ${{ steps.pr.outputs.pr }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          # refs/pull/N/merge is recomputed asynchronously after a push or a master
+          # move; wait until its second parent is the head we were triggered for.
+          # A dispatch also requires the first parent to be current master, so a
+          # backfill never renders against a merge ref that lags master's tooling.
+          fresh=false
+          for attempt in 1 2 3 4 5 6; do
+            if git fetch -q --depth=2 origin "+refs/pull/$PR/merge:refs/remotes/pr/merge" 2>/dev/null \
+              && [ "$(git rev-parse refs/remotes/pr/merge^2)" = "$HEAD_SHA" ]; then
+              if [ "$EVENT" != "workflow_dispatch" ] \
+                || [ "$(git rev-parse refs/remotes/pr/merge^1)" = "$(git ls-remote origin refs/heads/master | cut -f1)" ]; then
+                fresh=true
+                break
+              fi
+            fi
+            echo "merge ref not fresh yet (attempt $attempt/6)"
+            [ "$attempt" -lt 6 ] && sleep 10
+          done
+          if [ "$fresh" != "true" ]; then
+            if [ "$EVENT" = "workflow_dispatch" ]; then
+              echo "::error::vr-pr-screens: merge ref unavailable or stale for PR #$PR"
+              exit 1
+            fi
+            echo "::notice::vr-pr-screens: merge ref unavailable or stale; next event retries"
+            echo "SKIP=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          git checkout -q --detach refs/remotes/pr/merge
+          {
+            echo "merge_sha=$(git rev-parse HEAD)"
+            echo "base_sha=$(git rev-parse HEAD^1)"
+            echo "after_tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "before_tree=$(git rev-parse 'HEAD^1^{tree}')"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Tooling guard
+        if: env.SKIP != 'true'
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ ! -f ibl5/tests/e2e/vr-pr-screens.ts ]; then
+            if [ "$EVENT" = "workflow_dispatch" ]; then
+              echo "::error::vr-pr-screens: the merge ref predates the screens tooling"
+              exit 1
+            fi
+            echo "::notice::vr-pr-screens: the merge ref predates the screens tooling; skipping"
+            echo "SKIP=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Setup Bun
+        if: env.SKIP != 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Install JS dependencies
+        if: env.SKIP != 'true'
+        working-directory: ibl5
+        run: bun install --frozen-lockfile
+
+      - name: Extract cells
+        if: env.SKIP != 'true'
+        env:
+          PR: ${{ steps.pr.outputs.pr }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p plan/prev
+          bin/vr-review-comment --manual-rows-from-pr="$PR" --out-json=plan/cells.json
+
+      - name: Previous meta
+        id: prev
+        if: env.SKIP != 'true'
+        env:
+          PR: ${{ steps.pr.outputs.pr }}
+        run: |
+          # A missing gh-pages branch leaves prev/ empty and gallery=false.
+          if git fetch -q --depth=1 origin gh-pages 2>/dev/null; then
+            for f in manifest.json rows.json block.md; do
+              git show "FETCH_HEAD:pr/$PR/meta/$f" > "plan/prev/$f" 2>/dev/null || rm -f "plan/prev/$f"
+            done
+            gallery=$(git cat-file -e "FETCH_HEAD:pr/$PR/visual-review/index.html" 2>/dev/null && echo true || echo false)
+          else
+            gallery=false
+          fi
+          echo "gallery=$gallery" >> "$GITHUB_OUTPUT"
+
+      - name: Plan
+        id: plan
+        if: env.SKIP != 'true'
+        env:
+          PR: ${{ steps.pr.outputs.pr }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          BEFORE_TREE: ${{ steps.merge.outputs.before_tree }}
+          AFTER_TREE: ${{ steps.merge.outputs.after_tree }}
+          GALLERY: ${{ steps.prev.outputs.gallery }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bin/vr-review-comment --screens-plan --pr="$PR" --head-sha="$HEAD_SHA" \
+            --cells-json=plan/cells.json --prev-dir=plan/prev \
+            --before-tree="$BEFORE_TREE" --after-tree="$AFTER_TREE" \
+            --gallery-present="$GALLERY" --run-url="$RUN_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Decide
+        id: decide
+        if: always()
+        env:
+          PR: ${{ steps.pr.outputs.pr }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          SIDES: ${{ steps.plan.outputs.sides }}
+          CELLS: ${{ steps.plan.outputs.cells }}
+          NOOP: ${{ steps.plan.outputs.noop }}
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
+          ACTION: ${{ github.event.action }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          publish=true
+          render_sides="$SIDES"
+          if [ "${SKIP:-}" = "true" ] || [ "$PLAN_OUTCOME" != "success" ]; then
+            publish=false
+            render_sides='[]'
+          elif [ "$NOOP" = "true" ]; then
+            publish=false
+          elif [ "$CELLS" = "0" ]; then
+            # Zero cells: never boot a stack. Publish only to remove a block a
+            # previous run left; a PR that never had cells writes nothing.
+            render_sides='[]'
+            if [ ! -s plan/prev/block.md ]; then
+              publish=false
+            fi
+          elif [ "$ACTION" = "edited" ] && [ "$SIDES" = "[]" ]; then
+            publish=false
+            if [ -f plan/prev/block.md ] && grep -qF "sha=$HEAD_SHA" plan/prev/block.md; then
+              # Heal path: the stored block is current but the body lost it.
+              bin/vr-review-comment --splice-screens="$PR" --block-file=plan/prev/block.md
+            else
+              echo "::notice::vr-pr-screens: stored block is for an older head; the in-flight push run owns this head"
+            fi
+          fi
+          echo "skip=${SKIP:-false}" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "render_sides=$render_sides" >> "$GITHUB_OUTPUT"
+
+      - name: Upload plan
+        if: steps.decide.outputs.publish == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: screens-plan
+          path: plan/
+          retention-days: 3
+
+  render:
+    name: Screens render (${{ matrix.side }})
+    needs: plan
+    # An empty matrix errors at expansion, hence the sides guard.
+    if: needs.plan.outputs.publish == 'true' && needs.plan.outputs.sides != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        side: ${{ fromJSON(needs.plan.outputs.sides) }}
+    steps:
+      # The root tree is the side being shot: setup-docker-e2e mounts ./ibl5 into
+      # the php container and builds CSS from it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.side == 'before' && needs.plan.outputs.base_sha || needs.plan.outputs.merge_sha }}
+          fetch-depth: 1
+
+      # Both sides run the merge ref's capture spec and config; master's tree
+      # would lack the dual-viewport spec.
+      - name: Checkout tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.merge_sha }}
+          path: tooling
+          fetch-depth: 1
+
+      - name: Download plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: screens-plan
+          path: plan/
+
+      - name: Stage cells
+        run: cp plan/cells.json tooling/ibl5/vr-manual-rows.json
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Install tooling JS dependencies
+        working-directory: tooling/ibl5
+        run: bun install --frozen-lockfile
+
+      - name: Cache vendor directory
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: vendor-cache
+        with:
+          path: ibl5/vendor
+          key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-vendor-
+
+      - name: Cache node_modules
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: node-modules-cache
+        with:
+          path: ibl5/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install JS dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        working-directory: ibl5
+        run: bun install
+
+      - name: Install Composer dependencies
+        if: steps.vendor-cache.outputs.cache-hit != 'true'
+        working-directory: ibl5
+        run: composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+
+      # A broken stack or capture leaves this job green: the rows file then has
+      # no `ok` statuses and the block shows "capture failed" cells.
+      - uses: ./.github/actions/setup-docker-e2e
+        id: stack
+        continue-on-error: true
+        timeout-minutes: 7
+        with:
+          php-image: ${{ matrix.side == 'before' && 'pull' || 'build' }}
+          build-css: 'true'
+          with-playwright: 'true'
+          test-user: ${{ secrets.IBL_TEST_USER || 'ci-e2e-user' }}
+          test-pass: ${{ secrets.IBL_TEST_PASS || 'ci-e2e-pass-not-secret' }}
+          test-user-regular: ${{ secrets.IBL_TEST_USER_REGULAR || 'ci-e2e-regular' }}
+          test-pass-regular: ${{ secrets.IBL_TEST_PASS_REGULAR || 'e2e-regular-pass' }}
+
+      - name: Capture
+        if: steps.stack.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER || 'ci-e2e-user' }}
+          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS || 'ci-e2e-pass-not-secret' }}
+          IBL_TEST_USER_REGULAR: ${{ secrets.IBL_TEST_USER_REGULAR || 'ci-e2e-regular' }}
+          IBL_TEST_PASS_REGULAR: ${{ secrets.IBL_TEST_PASS_REGULAR || 'e2e-regular-pass' }}
+        run: |
+          docker run --rm \
+            --network ibl5-e2e \
+            --user "$(id -u):$(id -g)" \
+            -v "${{ github.workspace }}/tooling/ibl5:/ibl5" \
+            -w /ibl5 \
+            -e "BASE_URL=http://php/ibl5/" \
+            -e "IBL_TEST_USER=$IBL_TEST_USER" \
+            -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
+            -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
+            -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
+            -e "CI=true" \
+            -e "HOME=/tmp" \
+            "$PW_IMAGE" \
+            npx playwright test --config=playwright.manual-rows.config.ts
+
+      - name: Upload captures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: screens-${{ matrix.side }}
+          path: |
+            tooling/ibl5/vr-manual-rows.json
+            tooling/ibl5/vr-manual-shots/
+          if-no-files-found: warn
+          retention-days: 3
+
+  publish:
+    name: Screens publish
+    needs: [plan, render]
+    if: always() && needs.plan.result == 'success' && needs.plan.outputs.publish == 'true' && needs.render.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    env:
+      PR: ${{ needs.plan.outputs.pr }}
+      HEAD_SHA: ${{ needs.plan.outputs.head_sha }}
+      SIDES: ${{ needs.plan.outputs.sides }}
+      BEFORE_TREE: ${{ needs.plan.outputs.before_tree }}
+      AFTER_TREE: ${{ needs.plan.outputs.after_tree }}
+      GALLERY: ${{ needs.plan.outputs.gallery }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.merge_sha }}
+          fetch-depth: 1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Install JS dependencies
+        working-directory: ibl5
+        run: bun install --frozen-lockfile
+
+      - name: Download plan and captures
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: screens-*
+          path: art/
+
+      - name: Recheck head
+        id: fresh
+        run: |
+          now=$(gh pr view "$PR" --json state,headRefOid -q '.state + " " + .headRefOid')
+          if [ "$now" != "OPEN $HEAD_SHA" ]; then
+            echo "::notice::vr-pr-screens: PR #$PR moved on ($now); this run is superseded"
+            echo "superseded=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Assemble
+        if: steps.fresh.outputs.superseded != 'true'
+        run: |
+          bin/vr-review-comment --screens-assemble --pr="$PR" --head-sha="$HEAD_SHA" \
+            --cells-json=art/screens-plan/cells.json --prev-dir=art/screens-plan/prev \
+            --before-tree="$BEFORE_TREE" --after-tree="$AFTER_TREE" \
+            --gallery-present="$GALLERY" --run-url="$RUN_URL" \
+            --sides="$SIDES" \
+            --before-rows=art/screens-before/vr-manual-rows.json \
+            --after-rows=art/screens-after/vr-manual-rows.json \
+            --out-dir=out/meta
+          # An empty dir is deliberate: putting it clears stale PNGs for a side
+          # whose capture failed.
+          for side in $(jq -r '.[]' <<<"$SIDES"); do
+            mkdir -p "art/screens-$side/vr-manual-shots"
+          done
+
+      - name: Checkout gh-pages
+        if: steps.fresh.outputs.superseded != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: gh-pages
+          path: pages
+          fetch-depth: 1
+
+      - name: Put
+        id: put
+        if: steps.fresh.outputs.superseded != 'true'
+        run: |
+          args=(--put="out/meta:pr/$PR/meta")
+          for side in $(jq -r '.[]' <<<"$SIDES"); do
+            args+=(--put="art/screens-$side/vr-manual-shots:pr/$PR/manual/$side")
+          done
+          out=$(bin/vr-pages-publish --repo-dir=pages --message="vr-pr-screens: PR #$PR @ ${HEAD_SHA:0:12}" "${args[@]}")
+          echo "$out"
+          echo "${out##*$'\n'}" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch pages-deploy
+        if: steps.fresh.outputs.superseded != 'true' && steps.put.outputs.changed == '1'
+        run: |
+          # Debounce the push fan-out: one master push can trigger multiple open-PR CI runs, so N PRs each
+          # land a gh-pages push and each dispatches this workflow. A pages-deploy run that has NOT
+          # STARTED yet checks out gh-pages *after* this push landed, so it already serves this
+          # content — a second dispatch only adds a run that the `pages` concurrency group cancels
+          # (one pending slot per group). NEVER debounce on `in_progress`: that run may have checked
+          # out gh-pages before this push and would leave it unserved. Fails OPEN — an extra deploy
+          # is harmless, a missed one leaves the gallery dark.
+          #
+          # The filter is a DENYLIST (not `status == "queued"`) on purpose. GitHub has shipped several
+          # pre-execution statuses (queued/pending/waiting/requested) and a concurrency-blocked run has
+          # used more than one of them (observed 2026-08-18: two back-to-back dispatches cycled through
+          # `waiting`, `queued` AND `pending` across two polls a minute apart); an allowlist that
+          # misses the current spelling makes this a silent no-op that nothing would ever surface.
+          # Over-suppressing costs one push a wait for the next deploy — and since every deploy
+          # re-serves the WHOLE tree, that self-heals on the next PR. Under-suppressing just breaks
+          # the debounce, invisibly.
+          queued=$(gh api "repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20" \
+            --jq '[.workflow_runs[] | select(.status != "completed" and .status != "in_progress")] | length' 2>/dev/null || echo "")
+          if [[ "$queued" =~ ^[0-9]+$ ]] && [ "$queued" -gt 0 ]; then
+            echo "${queued} pages-deploy run(s) already queued — one will publish this push. Skipping dispatch."
+            exit 0
+          fi
+
+          # --ref pins the DEFAULT branch on purpose: workflow_run always ran the deploy job body
+          # from the default branch, and a PR branch must not get its own pages:write/id-token:write
+          # job onto the live site. The deploy job checks out `ref: gh-pages` for content, so this
+          # ref never affects what is published.
+          for attempt in 1 2 3; do
+            if gh workflow run pages-deploy.yml --ref "${{ github.event.repository.default_branch }}"; then
+              exit 0
+            fi
+            echo "workflow dispatch failed (attempt ${attempt}/3) — retrying."
+            sleep 5
+          done
+          echo "::error::Could not dispatch pages-deploy.yml after 3 attempts — the gallery is pushed to gh-pages but not served. Re-run it manually: gh workflow run pages-deploy.yml"
+          exit 1
+
+      - name: Wait for served bytes
+        if: steps.fresh.outputs.superseded != 'true' && steps.put.outputs.changed == '1' && env.SIDES != '[]'
+        continue-on-error: true
+        timeout-minutes: 6
+        run: |
+          side=$(jq -r '.[0]' <<<"$SIDES")
+          url=$(bin/vr-review-comment --screens-urls --block-file=out/meta/block.md | grep -m1 "/manual/$side/" || true)
+          if [ -z "$url" ]; then
+            echo "::notice::vr-pr-screens: no $side image in the block to wait for"
+            exit 0
+          fi
+          local_png="art/screens-$side/vr-manual-shots/$(basename "${url%%\?*}")"
+          if [ ! -f "$local_png" ]; then
+            echo "::notice::vr-pr-screens: $local_png was not captured; nothing to wait for"
+            exit 0
+          fi
+          want=$(git hash-object "$local_png")
+          for attempt in $(seq 1 30); do
+            got=$(curl -fsSL --max-time 20 "$url" 2>/dev/null | git hash-object --stdin) || got=none
+            if [ "$got" = "$want" ]; then
+              echo "served after $attempt poll(s)"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::warning::vr-pr-screens: images not live after 5 min; splicing anyway"
+
+      - name: Splice
+        if: steps.fresh.outputs.superseded != 'true'
+        run: bin/vr-review-comment --splice-screens="$PR" --block-file=out/meta/block.md
+
+      # A non-200 image warns on a PR run and fails a dispatched run, which is how
+      # the backfill proves its targets.
+      - name: Live check
+        if: steps.fresh.outputs.superseded != 'true' && github.event.action != 'edited'
+        continue-on-error: ${{ github.event_name != 'workflow_dispatch' }}
+        run: bin/vr-review-comment --screens-live-check="$PR"
+
+  cleanup:
+    name: Screens cleanup
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      # The PR head carries the script whether or not it merged; the default
+      # branch would lack it on this PR's own pre-merge test close.
+      - name: Checkout tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          sparse-checkout: bin
+          path: tooling
+
+      - name: Checkout gh-pages
+        id: pages
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: gh-pages
+          path: pages
+          fetch-depth: 1
+
+      - name: Delete
+        id: del
+        if: steps.pages.outcome == 'success'
+        continue-on-error: true
+        env:
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          [[ "$PR" =~ ^[1-9][0-9]{0,6}$ ]] || { echo "::error::invalid PR number"; exit 1; }
+          if ! test -x tooling/bin/vr-pages-publish; then
+            echo "::notice::vr-pr-screens: PR #$PR predates bin/vr-pages-publish; the master-push sweep removes its dir"
+            exit 0
+          fi
+          out=$(tooling/bin/vr-pages-publish --repo-dir=pages --delete="pr/$PR" --message="vr-pr-screens: remove PR #$PR (closed)")
+          echo "$out"
+          echo "${out}" >> "$GITHUB_OUTPUT"
+
+      - name: Notice missing gh-pages
+        if: steps.pages.outcome != 'success'
+        run: |
+          echo "::notice::vr-pr-screens: no gh-pages branch; nothing to clean up"
+
+      - name: Dispatch pages-deploy
+        if: steps.del.outputs.changed == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Same debounced dispatch as the publish job: skip when a not-yet-started
+          # pages-deploy run already exists (it will check out this push), never on
+          # `in_progress`. Fails open.
+          queued=$(gh api "repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20" \
+            --jq '[.workflow_runs[] | select(.status != "completed" and .status != "in_progress")] | length' 2>/dev/null || echo "")
+          if [[ "$queued" =~ ^[0-9]+$ ]] && [ "$queued" -gt 0 ]; then
+            echo "${queued} pages-deploy run(s) already queued — one will publish this push. Skipping dispatch."
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            if gh workflow run pages-deploy.yml --ref "${{ github.event.repository.default_branch }}"; then
+              exit 0
+            fi
+            echo "workflow dispatch failed (attempt ${attempt}/3) — retrying."
+            sleep 5
+          done
+          echo "::error::Could not dispatch pages-deploy.yml after 3 attempts. Re-run it manually: gh workflow run pages-deploy.yml"
+          exit 1
+
+  backfill:
+    name: Screens backfill
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+      pull-requests: read
+    steps:
+      - name: Dispatch a render for every open PR with vr cells
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr list --state open --limit 500 --json number,isCrossRepository,body > "$RUNNER_TEMP/prs.json"
+          total=$(jq 'length' "$RUNNER_TEMP/prs.json")
+          if [ "$total" -ge 500 ]; then
+            echo "::error::open-PR list reached --limit 500; backfill incomplete"
+            exit 1
+          fi
+          mapfile -t targets < <(jq -r '.[] | select(.isCrossRepository == false) | select((.body // "") | contains("vr:")) | .number' "$RUNNER_TEMP/prs.json")
+          # Reading `mergeable` asks GitHub to recompute each stale refs/pull/N/merge,
+          # so the dispatched plan sees master's new tooling.
+          for n in "${targets[@]}"; do
+            [[ "$n" =~ ^[1-9][0-9]{0,6}$ ]] || continue
+            gh pr view "$n" --json mergeable -q .mergeable >/dev/null
+          done
+          sleep 30
+          for n in "${targets[@]}"; do
+            [[ "$n" =~ ^[1-9][0-9]{0,6}$ ]] || continue
+            gh workflow run vr-pr-screens.yml --ref "${{ github.event.repository.default_branch }}" -f pr="$n"
+            echo "dispatched PR #$n"
+          done

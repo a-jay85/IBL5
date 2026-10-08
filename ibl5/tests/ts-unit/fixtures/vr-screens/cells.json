@@ -1,0 +1,13 @@
+{
+  "rows": [
+    {
+      "row": "?",
+      "label": "team-page-header",
+      "role": "anon",
+      "url": "modules.php?name=Team",
+      "anchor": ".x",
+      "setup": []
+    }
+  ],
+  "errors": []
+}

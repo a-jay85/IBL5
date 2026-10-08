@@ -1918,11 +1918,11 @@ while true; do
         break
     fi
 
-    # Time guard: don't start a new plan if >4h elapsed
+    # Time guard: don't start a new plan if >4h45m elapsed
     ELAPSED=$(( $(date +%s) - START ))
     if [ "$ELAPSED" -gt "$MAX_ELAPSED" ]; then
         echo "Time guard: ${ELAPSED}s elapsed (max ${MAX_ELAPSED}s), stopping." >> "$LOG"
-        note_failure "The 4-hour time limit was reached, so no more plans were started. Plans still in queue/ will run next time."
+        note_failure "The time limit (about 4h45m) was reached, so no more plans were started. Plans still in queue/ will run next time."
         break
     fi
 

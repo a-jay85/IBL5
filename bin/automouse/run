@@ -1922,6 +1922,7 @@ while true; do
     ELAPSED=$(( $(date +%s) - START ))
     if [ "$ELAPSED" -gt "$MAX_ELAPSED" ]; then
         echo "Time guard: ${ELAPSED}s elapsed (max ${MAX_ELAPSED}s), stopping." >> "$LOG"
+        note_failure "The 4-hour time limit was reached, so no more plans were started. Plans still in queue/ will run next time."
         break
     fi
 
@@ -2035,6 +2036,7 @@ while true; do
             printf 'unmet:%s\n' "$DEP" > "$DEPENDS_HOLD_FILE"
             echo "[depends-hold] $PLAN_NAME: waiting on $DEP" >> "$LOG"
             DEPENDS_HELD="$DEPENDS_HELD$PLAN_NAME "
+            note_failure "Plan ${PLAN_NAME%.md} is waiting for $DEP to merge before it can run."
             rm -rf "$CURRENT_LOCK" 2>/dev/null || true
             CURRENT_LOCK=""
             continue
@@ -2046,6 +2048,7 @@ while true; do
             printf '%s\n' "$DEP_STATUS" > "$DEPENDS_HOLD_FILE"
             echo "[depends-unresolvable] $PLAN_NAME: $DEP — $DEP_REASON" >> "$LOG"
             DEPENDS_HELD="$DEPENDS_HELD$PLAN_NAME "
+            note_failure "Plan ${PLAN_NAME%.md} has a dependency ($DEP) that cannot be resolved automatically ($DEP_REASON). A human needs to fix this before the plan can run."
             rm -rf "$CURRENT_LOCK" 2>/dev/null || true
             CURRENT_LOCK=""
             continue
@@ -2407,6 +2410,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         ELAPSED=$(( $(date +%s) - START ))
         if [ "$ELAPSED" -gt "$MAX_ELAPSED" ]; then
             echo "Time guard between phases — will resume postplan next run." >> "$LOG"
+            note_failure "The time limit was reached before shipping ${PLAN_NAME%.md}. Post-plan will run next time."
             break
         fi
 

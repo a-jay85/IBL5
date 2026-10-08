@@ -220,6 +220,55 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
         self::assertSame(200090107, $result);
     }
 
+    /**
+     * @return list<array{string}>
+     */
+    public static function jsbPositionProvider(): array
+    {
+        return array_map(
+            static fn (string $pos): array => [$pos],
+            \League\JsbConstants::PLAYER_POSITIONS
+        );
+    }
+
+    #[DataProvider('jsbPositionProvider')]
+    public function testStarterLookupsResolveEveryJsbPosition(string $pos): void
+    {
+        $pid = 200090310;
+        $col = strtolower($pos) . '_depth';
+        $this->insertTestPlayer($pid, $pos . ' Every Position Starter', [
+            $col => 1,
+            'dc_' . $col => 1,
+            'pos' => $pos,
+        ]);
+        // Clear other starters for this position so only the seeded row matches
+        $this->db->query("UPDATE ibl_plr SET {$col} = 0 WHERE teamid = " . self::TEST_TID . " AND pid != {$pid} AND {$col} = 1");
+        $this->db->query("UPDATE ibl_plr SET dc_{$col} = 0 WHERE teamid = " . self::TEST_TID . " AND pid != {$pid} AND dc_{$col} = 1");
+
+        self::assertSame($pid, $this->repo->getLastSimStarterPlayerIDForPosition(self::TEST_TID, $pos));
+        self::assertSame($pid, $this->repo->getCurrentlySetStarterPlayerIDForPosition(self::TEST_TID, $pos));
+    }
+
+    public function testStarterLookupsAcceptLowercasePosition(): void
+    {
+        $pid = 200090311;
+        $this->insertTestPlayer($pid, 'Lowercase Position Starter', [
+            'pg_depth' => 1,
+            'dc_pg_depth' => 1,
+            'pos' => 'PG',
+        ]);
+        $this->db->query("UPDATE ibl_plr SET pg_depth = 0 WHERE teamid = " . self::TEST_TID . " AND pid != {$pid} AND pg_depth = 1");
+        $this->db->query("UPDATE ibl_plr SET dc_pg_depth = 0 WHERE teamid = " . self::TEST_TID . " AND pid != {$pid} AND dc_pg_depth = 1");
+
+        $upperLastSim = $this->repo->getLastSimStarterPlayerIDForPosition(self::TEST_TID, 'PG');
+        $upperCurrent = $this->repo->getCurrentlySetStarterPlayerIDForPosition(self::TEST_TID, 'PG');
+
+        self::assertSame($pid, $upperLastSim);
+        self::assertSame($pid, $upperCurrent);
+        self::assertSame($upperLastSim, $this->repo->getLastSimStarterPlayerIDForPosition(self::TEST_TID, 'pg'));
+        self::assertSame($upperCurrent, $this->repo->getCurrentlySetStarterPlayerIDForPosition(self::TEST_TID, 'pg'));
+    }
+
     public function testGetCurrentlySetStarterPlayerIDForPosition(): void
     {
         $this->insertTestPlayer(200090108, 'DC PG Starter', [

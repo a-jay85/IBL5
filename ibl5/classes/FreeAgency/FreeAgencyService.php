@@ -208,8 +208,8 @@ class FreeAgencyService implements FreeAgencyServiceInterface
         $amendedCapSpace = $capMetrics['softCapSpace'][0];
         $hasExistingOffer = $existingOffer['offer1'] > 0;
 
-        $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->getYearsOfExperience() ?? 0);
-        $maxContract = \ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
+        $veteranMinimum = \League\ContractRules::getVeteranMinimumSalary($player->getYearsOfExperience() ?? 0);
+        $maxContract = \League\ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
 
         return [
             'player' => $player,

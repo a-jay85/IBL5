@@ -77,6 +77,7 @@ interface TeamQueryRepositoryInterface
      *
      * @param string $position Position code (e.g., 'PG', 'SG', 'SF', 'PF', 'C')
      * @return int Player ID (0 if not found)
+     * @throws \InvalidArgumentException when $position is not one of PG, SG, SF, PF, C (case-insensitive)
      */
     public function getLastSimStarterPlayerIDForPosition(int $teamId, string $position): int;
 
@@ -85,6 +86,7 @@ interface TeamQueryRepositoryInterface
      *
      * @param string $position Position code (e.g., 'PG', 'SG', 'SF', 'PF', 'C')
      * @return int Player ID (0 if not found)
+     * @throws \InvalidArgumentException when $position is not one of PG, SG, SF, PF, C (case-insensitive)
      */
     public function getCurrentlySetStarterPlayerIDForPosition(int $teamId, string $position): int;
 

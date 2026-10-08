@@ -1,6 +1,6 @@
 ---
-description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet."
-last_verified: 2026-09-29
+description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet."
+last_verified: 2026-10-06
 ---
 
 # PR Body Claims
@@ -122,6 +122,16 @@ Every such claim carries its evidence inline, in one of two forms:
 If you cannot produce the evidence, drop the claim. Describe what the PR changes, and name the command a reviewer runs after merge to confirm the state: "After merge, `launchctl list | grep <label>` shows the job." A present-tense external-state claim with no evidence is a fabricated claim, and the reviewer treats it as one.
 
 This rule has no mechanical check. The claims it covers are free-form prose, and the same phrases appear in design descriptions and quoted plans, so a pattern match would flag too many honest lines. Facts derivable from the diff are generated for you: the `**Files changed**` and `**Tests changed**` blocks come from `git diff`, so never restate them by hand. The `<!-- merge-digest:begin -->` block at the top of the body is runner-owned: it mirrors the sticky verdict, so never edit it by hand.
+
+## Test-count claims rule
+
+A PR body that says how many tests a change adds takes the number from a measurement and names its unit. Do not count test functions by hand. Copy the count from the runner's own summary line (`N passed` from pytest, `Tests: N` from PHPUnit, the total a `bin/test-*` harness prints) or from a grep of the diff for the declarations you added. Say which unit the number counts: tests the diff adds, or the file's total after the change. Put the number in the same bullet as the one test file it describes, with the path in backticks, so the harness can check it.
+
+The post-plan harness checks these claims in `body_numbers.py`. It checks a claim when the claim's line backticks exactly one test file whose declarations it can count: PHPUnit `test*` methods and `#[Test]` methods, pytest `def test_*`, vitest and Playwright `it(` and `test(`, Go `func Test*`, and `bin/test-*` harnesses that define `case_*()` functions. The claim passes when it equals the declarations the diff adds to that file or the file's total. A claim that matches neither gets a `[harness: measured A added / T total in <path>]` note beside it in the body, and the run logs a finding. The harness never rewrites the number. A claim it cannot ground stays as written with no note. That covers a line naming two test files, a `bin/test-*` harness with no `case_*()` functions or with lettered sub-cases such as `case_5a`, and a count of assertions.
+
+Trigger: backlog#1060 (a scan of 23 merged PR bodies with test counts found 5 whose number disagreed with the declarations the diff added).
+
+**Headless.** Applies: an automouse or `/post-plan` run that writes a test count into a PR body takes it from a test run or a diff grep in the same session.
 
 ## Backlog issue references
 

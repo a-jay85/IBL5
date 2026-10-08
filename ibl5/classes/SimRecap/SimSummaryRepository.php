@@ -11,7 +11,7 @@ namespace SimRecap;
  * execute(...) === 1 is the single-flight primitive — a losing racer gets 0.
  * No caller anywhere composes SQL against ibl_sim_summaries directly.
  */
-class SimSummaryRepository extends \BaseMysqliRepository
+class SimSummaryRepository extends \Database\BaseMysqliRepository
 {
     /** PK arm: gr.box_id points at a live ibl_box_scores_teams row. `bst.id = NULL` is never true, so this arm self-disables on legacy NULL rows — no IS NOT NULL guard is needed. */
     private const BOX_MATCH_BY_ID = "EXISTS (SELECT 1 FROM `ibl_box_scores_teams` bst WHERE bst.`id` = gr.`box_id`)";

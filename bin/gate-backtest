@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/gate-backtest — replay the ship-pipeline gates a branch adds or changes against the last
-# ~30 merged PRs, and print the catch-list block.
+# bin/gate-backtest — replay the ship-pipeline gates a branch adds or changes against the newest
+# ~30 settled merged PRs (older than 48h), and print the catch-list block.
 #
 # Usage: bin/gate-backtest [--base=<ref>] [--head=<ref>] [--limit=<N>] [--gate=<path>@<rev>] ...
 #   exit 0 = NOT-APPLICABLE or CLEARED, 1 = HELD, 2 = usage error, 3 = UNKNOWN

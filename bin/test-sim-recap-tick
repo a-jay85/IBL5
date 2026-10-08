@@ -17,11 +17,12 @@ SRT_PROMPT_BIN="$SCRIPT_DIR/sim-recap-prompt"
 SRT_EXEMPLAR="$SCRIPT_DIR/lib/sim-recap-exemplar.txt"
 
 FAILED=0
+SRT_NFAIL=0
 SRT_RC=0
 SRT_PROMPT_RC=0
 
 srt_ok()   { echo "ok: $1"; }
-srt_fail() { echo "FAIL: $1"; FAILED=1; }
+srt_fail() { echo "FAIL: $1"; FAILED=1; SRT_NFAIL=$((SRT_NFAIL + 1)); }
 
 # srt_expect_eq <name> <want> <got>
 srt_expect_eq() {
@@ -96,6 +97,8 @@ if printf '%s' "$cmd" | grep -q 'simRecapContext\.php'; then
     fi
     if [ -f "$STUB/resp.simRecapContext" ]; then
         cat "$STUB/resp.simRecapContext"
+    elif [ "${STUB_SENTINEL:-0}" = 1 ]; then
+        printf '{"sim":42,"start_date":"2026-01-01","end_date":"2026-01-07","roster":{"ROSTER-SENTINEL":[]},"active_injuries":[],"sim_trades":[]}\n'
     else
         printf '{"sim":42,"start_date":"2026-01-01","end_date":"2026-01-07","roster":{},"active_injuries":[],"sim_trades":[]}\n'
     fi
@@ -113,7 +116,13 @@ if [ -f "$STUB/resp.$verb" ]; then
 else
     case "$verb" in
         reclaim-stale) printf '{"ok":true,"cmd":"reclaim-stale","sim":null}\n' ;;
-        claim-next)    printf '{"ok":true,"cmd":"claim-next","sim":null}\n' ;;
+        claim-next)
+            if [ "${STUB_SENTINEL:-0}" = 1 ]; then
+                printf '{"ok":true,"cmd":"claim-next","sim":"42","phase":"PHASE-SENTINEL"}\n'
+            else
+                printf '{"ok":true,"cmd":"claim-next","sim":null}\n'
+            fi ;;
+        claim)         printf '{"ok":true,"cmd":"claim","sim":null}\n' ;;
         mention-map)   printf '{"ok":true,"cmd":"mention-map","teams":{}}\n' ;;
         recent-themes) printf '{"ok":true,"cmd":"recent-themes","themes":[]}\n' ;;
         park)          printf '{"ok":true,"cmd":"park","sim":42,"outcome":"pending"}\n' ;;
@@ -130,7 +139,12 @@ SH
     cat > "$STUB/claude" <<'SH'
 #!/usr/bin/env bash
 echo "claude $*" >> "$STUB/claude.log"
+printf '%s\n' "$@" > "$STUB/claude.argv"
 touch "$STUB/claude.sentinel"
+if [ "${STUB_SENTINEL:-0}" = 1 ]; then
+    printf 'AGENT-STDOUT-SENTINEL\n'
+    printf 'AGENT-STDERR-SENTINEL\n' >&2
+fi
 if [ -f "$STUB/agent-usage-limit" ]; then
     printf 'api error: 429 rate_limit_error\n'
     exit 0
@@ -138,6 +152,14 @@ fi
 if [ ! -f "$STUB/agent-fails" ]; then
     if [ -f "$STUB/resp.payload" ]; then
         cat "$STUB/resp.payload" > payload.json
+    elif [ "${STUB_SENTINEL:-0}" = 1 ]; then
+        printf '%s\n' \
+            '{"intro_text":"intro","outro_text":"outro","recap_text":"recap PAYLOAD-SENTINEL",' \
+            '"themes":["theme1"],' \
+            '"games":[{"season_year":2008,"game_date":"2026-07-23",' \
+            '"visitor_teamid":1,"home_teamid":2,"game_of_that_day":1,' \
+            '"box_id":null,"sort_order":1,"recap_text":"game recap"}]}' \
+            | tr -d '\n' > payload.json
     else
         printf '%s\n' \
             '{"intro_text":"intro","outro_text":"outro","recap_text":"recap",' \
@@ -164,12 +186,16 @@ SH
     # happens to have mysql@8.4 installed.
     cat > "$STUB/mysql" <<'SH'
 #!/usr/bin/env bash
+[ "${STUB_SENTINEL:-0}" = 1 ] && printf 'DB-OUTPUT-SENTINEL\n'
 exit 0
 SH
 
     cat > "$STUB/curl" <<'SH'
 #!/usr/bin/env bash
 echo "$*" >> "$STUB/curl.log"
+case " $* " in *" -K - "*) cat >> "$STUB/curl.stdin" ;; esac
+[ "${STUB_CURL_FAIL:-0}" = 1 ] && exit 7
+exit 0
 SH
 
     # launchctl stub: log every call; always exit 0 (real bootout would SIGTERM
@@ -221,8 +247,8 @@ srt_reset() {
           "$STUB"/tick.out "$STUB"/agent-fails "$STUB"/agent-usage-limit \
           "$STUB"/store-fails "$STUB"/store-banner "$STUB"/resp.* "$STUB"/fail.* \
           "$STUB"/record-stdin "$STUB"/store.cmd "$STUB"/store.stdin \
-          "$STUB"/curl.log "$STUB"/prompt.argv "$STUB"/launchctl.log "$STUB"/launchctl.sentinel \
-          "$STUB"/ops-alert.json "$STUB"/ops-alert.json.tmp* \
+          "$STUB"/curl.log "$STUB"/prompt.argv "$STUB"/claude.argv "$STUB"/tick.stdout "$STUB"/tick.stderr "$STUB"/launchctl.log "$STUB"/launchctl.sentinel \
+          "$STUB"/ops-alert.json "$STUB"/ops-alert.json.tmp* "$STUB"/curl.stdin \
           "$STUB_CALLS" \
           2>/dev/null
     export SIM_RECAP_DB_PASSWORD="test_db_password"
@@ -902,17 +928,17 @@ srt_expect_eq "phase_gate_no_bootout_in_dry_run — exit 0" 0 "$SRT_RC"
 srt_file_absent "$STUB/launchctl.log" \
     "phase_gate_no_bootout_in_dry_run — launchctl never called in dry-run mode"
 
-# ── phase_gate_no_bootout_when_sim_flag ──────────────────────────────────────
-# When --sim=N is supplied (DRY_SIM non-empty) and recaps_enabled:false, the
-# bootout guard must be skipped — a human explicitly invoked the tick for a
-# specific sim and we must never pull the rug out from under them.
+# ── unclaimed_sim_aborts_before_bootout_gate ──────────────────────────────────
+# When --sim=N is supplied and the queue returns claimed:false, the
+# unclaimable-sim guard exits 1 before the bootout gate runs. The launchctl
+# assertion confirms the bootout never fires even though recaps_enabled:false.
 srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":null,"phase":"Playoffs","recaps_enabled":false}\n' \
-    > "$STUB/resp.claim-next"
+    > "$STUB/resp.claim"
 srt_run --sim=42
-srt_expect_eq "phase_gate_no_bootout_when_sim_flag — exit 0" 0 "$SRT_RC"
+srt_expect_eq "unclaimed_sim_aborts_before_bootout_gate — exit 1" 1 "$SRT_RC"
 srt_file_absent "$STUB/launchctl.log" \
-    "phase_gate_no_bootout_when_sim_flag — launchctl not called when --sim=N supplied"
+    "unclaimed_sim_aborts_before_bootout_gate — launchctl not called"
 
 # ── phase_gate_fail_safe_missing_field ────────────────────────────────────────
 # If claim-next returns a response without the recaps_enabled field (e.g. the
@@ -959,6 +985,9 @@ srt_log_lacks "$STUB" ssh.log "simRecapQueue.php park" \
 cat > "$STUB/curl" <<'SH'
 #!/usr/bin/env bash
 echo "$*" >> "$STUB/curl.log"
+case " $* " in *" -K - "*) cat >> "$STUB/curl.stdin" ;; esac
+[ "${STUB_CURL_FAIL:-0}" = 1 ] && exit 7
+exit 0
 SH
 chmod +x "$STUB/curl"
 
@@ -1110,6 +1139,382 @@ if [ "$elapsed" -lt 10 ]; then srt_ok "DB-SYNC-7: non-blocking (${elapsed}s)"
 else srt_fail "DB-SYNC-7: tick blocked (${elapsed}s >= 10s)"; fi
 # Kill any lingering sleeper so the suite does not hand a 30s child to the caller.
 pkill -f "$STUB/db-sync-slow" 2>/dev/null || true
+
+# ── Host mode (Phase 1, sim-recap-github-actions) ──
+HM_DISABLED='{"ok":true,"sim":null,"recaps_enabled":false,"phase":"Playoffs"}'
+
+# 1. actions bootout no-op
+srt_reset
+printf '%s\n' "$HM_DISABLED" > "$STUB/resp.claim-next"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "HM-1 exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" tick.out "leaving the hourly schedule armed" "actions bootout no-op"
+srt_file_absent "$STUB/launchctl.log" "HM-1 launchctl never called"
+
+# 2. launchd bootout unchanged (seam unset)
+srt_reset
+printf '%s\n' "$HM_DISABLED" > "$STUB/resp.claim-next"
+( unset SIM_RECAP_HOST_MODE; srt_run; echo "$SRT_RC" > "$STUB/hm.rc" )
+srt_expect_eq "HM-2 exit 0" 0 "$(cat "$STUB/hm.rc")"
+srt_log_has "$STUB" tick.out "booting out poller" "launchd bootout unchanged (unset)"
+srt_log_has "$STUB" launchctl.log "bootout" "HM-2 launchctl bootout called"
+
+# 3. empty seam = launchd
+srt_reset
+printf '%s\n' "$HM_DISABLED" > "$STUB/resp.claim-next"
+SIM_RECAP_HOST_MODE="" srt_run
+srt_log_has "$STUB" tick.out "booting out poller" "empty seam = launchd"
+srt_log_has "$STUB" launchctl.log "bootout" "HM-3 launchctl bootout called"
+
+# 4. bogus seam aborts before any ssh call
+srt_reset
+SIM_RECAP_HOST_MODE=cron srt_run
+srt_expect_eq "HM-4 exit 2" 2 "$SRT_RC"
+srt_log_has "$STUB" tick.out "unknown SIM_RECAP_HOST_MODE" "bogus seam aborts"
+srt_file_absent "$STUB/ssh.log" "HM-4 no ssh call made"
+
+# 5. actions db-sync skipped
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+SIM_RECAP_HOST_MODE=actions SIM_RECAP_DB_SYNC_BIN="$STUB/db-sync-now" \
+    SIM_RECAP_DB_SYNC_LOG="$STUB/db-sync.log" srt_run
+srt_file_absent "$STUB_CALLS" "HM-5 db-sync-now never fired"
+srt_log_has "$STUB" tick.out "db-sync skipped (host mode: actions)" "actions db-sync skipped"
+
+# 6. actions empty tick spawns zero claude
+srt_reset
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "HM-6 exit 0" 0 "$SRT_RC"
+srt_count "actions empty tick spawns zero claude" 0 "$STUB/claude.log"
+srt_log_has "$STUB" tick.out "no pending sim — exiting cheap" "HM-6 exits cheap"
+
+# 7. actions queue failure still errors
+srt_reset
+touch "$STUB/fail.claim-next"
+SIM_RECAP_HOST_MODE=actions srt_run
+srt_expect_eq "HM-7 exit 1" 1 "$SRT_RC"
+srt_log_has "$STUB" tick.out "claim-next did not complete" "actions queue failure still errors"
+srt_count "HM-7 zero claude" 0 "$STUB/claude.log"
+
+# 8. live --sim=N uses the claim verb
+srt_reset
+printf '{"ok":true,"cmd":"claim","sim":null}\n' > "$STUB/resp.claim"
+srt_run --sim=7
+srt_log_has "$STUB" ssh.log "claim --sim=7" "live --sim=N uses claim verb"
+srt_log_lacks "$STUB" ssh.log "claim-next" "HM-8 no claim-next call"
+
+# 9. live --sim=N on a sim that is not pending: claim echoes the sim with
+# claimed:false; the tick must not generate (would overwrite + re-post)
+srt_reset
+printf '{"ok":true,"cmd":"claim","sim":7,"claimed":false}\n' > "$STUB/resp.claim"
+srt_run --sim=7
+srt_expect_eq "HM-9 unclaimed sim exits non-zero" 1 "$SRT_RC"
+srt_log_has "$STUB" tick.out "sim 7 was not claimable" "HM-9 logs unclaimable sim"
+srt_count "HM-9 zero claude" 0 "$STUB/claude.log"
+srt_log_lacks "$STUB" ssh.log "storeSimRecap" "HM-9 no store call"
+
+# 10. live --sim=N with claimed:true generates
+srt_reset
+printf '{"ok":true,"cmd":"claim","sim":7,"claimed":true}\n' > "$STUB/resp.claim"
+srt_run --sim=7
+srt_log_has "$STUB" tick.out "claimed sim 7" "HM-10 claimed sim proceeds"
+srt_count "HM-10 one claude" 1 "$STUB/claude.log"
+
+# ── Webhook ops transport (Phase 2) ──
+WH_URL="https://discord.test/api/webhooks/1/SECRET-WEBHOOK-TOKEN"
+WH_CLAIM='{"ok":true,"cmd":"claim-next","sim":42}'
+
+# 1. exactly two pings across onset and recovery; 2-4 reuse this run's artifacts
+srt_reset
+export SIM_RECAP_OPS_WEBHOOK_URL="$WH_URL"
+printf '%s\n' "$WH_CLAIM" > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+srt_run
+cp "$STUB/tick.out" "$STUB/wh.out1"
+srt_run
+cat "$STUB/tick.out" >> "$STUB/wh.out1"
+rm -f "$STUB/fail.simRecapContext"
+srt_run
+cat "$STUB/tick.out" >> "$STUB/wh.out1"
+srt_count "webhook: exactly two pings across onset and recovery" 2 "$STUB/curl.log"
+srt_expect_eq "webhook: exactly two pings — two url lines on stdin" \
+    2 "$(srt_matches curl.stdin '^url = ')"
+srt_log_has "$STUB" curl.log "roster-blind" "webhook: onset body is roster-blind"
+srt_log_has "$STUB" curl.log "RECOVERED" "webhook: recovery body is RECOVERED"
+srt_expect_eq "webhook: first ping is the onset" 1 \
+    "$(sed -n 1p "$STUB/curl.log" | grep -c 'roster-blind')"
+srt_expect_eq "webhook: second ping is the recovery" 1 \
+    "$(sed -n 2p "$STUB/curl.log" | grep -c 'RECOVERED')"
+
+# 2. URL never in argv
+srt_log_lacks "$STUB" curl.log "discord.test" "webhook URL never in argv"
+srt_expect_eq "webhook argv carries -K - on every call" \
+    2 "$(srt_matches curl.log ' -K - ')"
+
+# 3. URL never in tick output (all three ticks, stdout+stderr)
+srt_log_lacks "$STUB" wh.out1 "SECRET-WEBHOOK-TOKEN" "webhook URL never in tick output"
+
+# 4. thread id appended
+srt_log_has "$STUB" curl.stdin \
+    'url = "https://discord.test/api/webhooks/1/SECRET-WEBHOOK-TOKEN?thread_id=test-ops-thread"' \
+    "webhook thread id appended"
+
+# 5. existing query string uses &
+srt_reset
+export SIM_RECAP_OPS_WEBHOOK_URL="${WH_URL}?wait=true"
+printf '%s\n' "$WH_CLAIM" > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+srt_run
+srt_log_has "$STUB" curl.stdin "?wait=true&thread_id=test-ops-thread" \
+    "webhook with existing query uses &"
+
+# 6. curl failure never fails the tick
+srt_reset
+export SIM_RECAP_OPS_WEBHOOK_URL="$WH_URL"
+printf '%s\n' "$WH_CLAIM" > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+STUB_CURL_FAIL=1 srt_run
+srt_expect_eq "webhook curl failure never fails the tick — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" tick.out "stored" "webhook curl failure never fails the tick"
+
+# 7. unset and empty both use the bot path
+srt_reset
+unset SIM_RECAP_OPS_WEBHOOK_URL
+printf '%s\n' "$WH_CLAIM" > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+srt_run
+srt_log_has "$STUB" curl.log "post-to-thread" "webhook unset uses bot path"
+srt_file_absent "$STUB/curl.stdin" "webhook unset leaves no curl stdin"
+srt_reset
+export SIM_RECAP_OPS_WEBHOOK_URL=""
+printf '%s\n' "$WH_CLAIM" > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+srt_run
+srt_log_has "$STUB" curl.log "post-to-thread" "webhook unset and empty both use bot path"
+srt_file_absent "$STUB/curl.stdin" "webhook empty leaves no curl stdin"
+unset SIM_RECAP_OPS_WEBHOOK_URL
+
+# ── Public-log hygiene (Phase 7) ──
+# The workflow runs in a PUBLIC repo, so job logs are world-readable. These cases
+# pin what the tick lets onto its own stdout/stderr (the only streams the runner
+# captures); everything the agent, ssh and mysql emit must stay off them.
+
+# srt_run_split [args…] — like srt_run but stdout and stderr stay separate.
+# shellcheck disable=SC2120  # optional args, forwarded to the driver
+srt_run_split() {
+    "$SRT_DRIVER" "$@" > "$STUB/tick.stdout" 2> "$STUB/tick.stderr"
+    SRT_RC=$?
+}
+
+# srt_lacks_both <token> <name> — token absent from stdout AND stderr.
+srt_lacks_both() {
+    srt_log_lacks "$STUB" tick.stdout "$1" "hygiene sub-check: $2 (stdout)"
+    srt_log_lacks "$STUB" tick.stderr "$1" "hygiene sub-check: $2 (stderr)"
+}
+
+# srt_group_ok <name> <nfail-before> — summary line that stays honest: ok only
+# when no sub-check since <nfail-before> failed.
+srt_group_ok() {
+    if [ "$SRT_NFAIL" -eq "$2" ]; then srt_ok "$1"; else srt_fail "$1"; fi
+}
+
+srt_reset
+SIM_RECAP_HOST_MODE=actions STUB_SENTINEL=1 SIM_RECAP_DB_PASSWORD=PW-SENTINEL-9f3 srt_run_split
+srt_log_has "$STUB" tick.stderr "stored" "hygiene sub-check: fixture reaches the store path"
+
+n0=$SRT_NFAIL
+# 1.
+srt_lacks_both "AGENT-STDOUT-SENTINEL" "agent stdout"
+srt_group_ok "actions: agent stdout never reaches job streams" "$n0"
+# 2.
+n0=$SRT_NFAIL
+srt_lacks_both "AGENT-STDERR-SENTINEL" "agent stderr"
+srt_group_ok "actions: agent stderr never reaches job streams" "$n0"
+# 3.
+n0=$SRT_NFAIL
+srt_lacks_both "PAYLOAD-SENTINEL" "payload"
+srt_lacks_both "ROSTER-SENTINEL" "roster"
+srt_lacks_both "DB-OUTPUT-SENTINEL" "db output"
+srt_group_ok "actions: payload, roster, db output never reach job streams" "$n0"
+# 4.
+n0=$SRT_NFAIL
+srt_lacks_both "PW-SENTINEL-9f3" "db password"
+srt_log_lacks "$STUB" ssh.log "PW-SENTINEL-9f3" "hygiene sub-check: db password never in ssh argv"
+srt_log_has "$STUB" claude.argv "--model" "hygiene sub-check: claude argv was recorded"
+srt_log_lacks "$STUB" claude.argv "PW-SENTINEL-9f3" "hygiene sub-check: db password never in claude argv"
+srt_group_ok "actions: db password never reaches job streams or ssh argv" "$n0"
+# 5.
+srt_expect_eq "actions: tick stdout is empty on the live path" 0 \
+    "$(wc -c < "$STUB/tick.stdout" | tr -d '[:space:]')"
+# 6.
+n0=$SRT_NFAIL
+srt_log_lacks "$STUB" tick.stderr "PHASE-SENTINEL" "hygiene sub-check: phase absent when recaps are enabled"
+srt_reset
+printf '%s\n' '{"ok":true,"cmd":"claim-next","sim":null,"recaps_enabled":false,"phase":"PHASE-SENTINEL"}' \
+    > "$STUB/resp.claim-next"
+SIM_RECAP_HOST_MODE=actions STUB_SENTINEL=1 SIM_RECAP_DB_PASSWORD=PW-SENTINEL-9f3 srt_run_split
+srt_log_has "$STUB" tick.stderr "PHASE-SENTINEL" "hygiene sub-check: phase echoed on the recaps-disabled fixture"
+srt_log_lacks "$STUB" tick.stderr '"ok":true' "hygiene sub-check: raw claim JSON not echoed (stderr)"
+srt_log_lacks "$STUB" tick.stdout '"ok":true' "hygiene sub-check: raw claim JSON not echoed (stdout)"
+srt_group_ok "actions: phase value is the only claim field echoed" "$n0"
+
+# ── Static hygiene over the workflow file ──
+SRT_WORKFLOW="$SCRIPT_DIR/../.github/workflows/sim-recap.yml"
+
+# srt_workflow_hygiene <file> — return 0 when the workflow cannot leak to a public log.
+srt_workflow_hygiene() {
+    local f="$1" rc=0 tok
+    [ -f "$f" ] || return 1
+    for tok in 'bin/sim-recap-tick $sim_arg >/dev/null' \
+               'secrets not configured, skipping' \
+               'cancel-in-progress: false' \
+               'timeout-minutes: 40' \
+               'SIM_RECAP_HOST_MODE: actions' \
+               'id: secrets' \
+               "if: github.event_name != 'pull_request'"; do
+        grep -qF -- "$tok" "$f" || { echo "missing: $tok" >&2; rc=1; }
+    done
+    for tok in 'upload-artifact' 'agent.json' '--dry-run' 'set -x' \
+               'ACTIONS_STEP_DEBUG' '*/5 * * * *' \
+               'EVENT: ${{ github.event_name }}'; do
+        grep -qF -- "$tok" "$f" && { echo "forbidden: $tok" >&2; rc=1; }
+    done
+    # permissions: must be immediately followed by contents: read
+    awk '/^permissions:/ { getline nxt; if (nxt ~ /^[[:space:]]+contents: read[[:space:]]*$/) ok=1 }
+         END { exit ok ? 0 : 1 }' "$f" || { echo "permissions: not followed by contents: read" >&2; rc=1; }
+    # `secrets.` appears only on env:/with: mapping lines, never inside a run block
+    # (a block is `run: |` up to the next line at an indent <= the run key's); and
+    # no run block holds `cat `.
+    awk '
+        function indent(l) { match(l, /^[[:space:]]*/); return RLENGTH }
+        {
+            ind = indent($0)
+            if (inrun && $0 !~ /^[[:space:]]*$/ && ind <= runind) inrun = 0
+            if (inrun) {
+                if ($0 ~ /secrets\./) { print "secrets. inside run block: " $0 > "/dev/stderr"; bad = 1 }
+                if ($0 ~ /cat /)      { print "cat inside run block: " $0 > "/dev/stderr"; bad = 1 }
+                next
+            }
+            if ($0 ~ /^[[:space:]]*(- )?run:/) {
+                if ($0 ~ /secrets\./ || $0 ~ /run:.*cat /) { print "leak on run line: " $0 > "/dev/stderr"; bad = 1 }
+                if ($0 ~ /run:[[:space:]]*[|>]/) { inrun = 1; runind = ind }
+                next
+            }
+            if ($0 ~ /secrets\./ && $0 !~ /^[[:space:]]+[A-Za-z0-9_-]+: .*secrets\./) {
+                print "secrets. outside a mapping line: " $0 > "/dev/stderr"; bad = 1
+            }
+        }
+        END { exit bad ? 1 : 0 }
+    ' "$f" || rc=1
+    # Every step that maps `${{ secrets.X }}` is gated: the `id: secrets` step by
+    # `if: github.event_name != 'pull_request'`, every other step by
+    # `steps.secrets.outputs.configured == 'true'` (false whenever the first is
+    # skipped). A step is a `- ` item at the indent of the first item under `steps:`.
+    # Bracket expressions keep the regexes portable across BSD awk and mawk.
+    awk '
+        function indent(l) { match(l, /^[[:space:]]*/); return RLENGTH }
+        function flush() {
+            if (!started || !hassec) return
+            if (!hasif) {
+                print "secret-gating: step maps a secret with no if: guard: " name > "/dev/stderr"; bad = 1
+            } else if (idsec && ifline !~ /github[.]event_name != .pull_request./) {
+                print "secret-gating: Check secrets step is not gated off pull_request: " ifline > "/dev/stderr"; bad = 1
+            } else if (!idsec && ifline !~ /steps[.]secrets[.]outputs[.]configured == .true./ \
+                              && ifline !~ /github[.]event_name != .pull_request./) {
+                print "secret-gating: step maps a secret behind an if: that is not the secrets gate: " name > "/dev/stderr"; bad = 1
+            }
+        }
+        /^[[:space:]]*steps:[[:space:]]*$/ { insteps = 1; stepind = -1; next }
+        insteps && /^[[:space:]]*- / {
+            if (stepind < 0) stepind = indent($0)
+            if (indent($0) == stepind) {
+                flush(); started = 1; hassec = 0; hasif = 0; idsec = 0; ifline = ""; name = $0
+            }
+        }
+        insteps && started {
+            if ($0 ~ /[$][{][{][[:space:]]*secrets[.]/) hassec = 1
+            if ($0 ~ /^[[:space:]]*if:/) { hasif = 1; ifline = $0 }
+            if ($0 ~ /^[[:space:]]*id: secrets[[:space:]]*$/) idsec = 1
+        }
+        END { flush(); exit bad ? 1 : 0 }
+    ' "$f" || rc=1
+    [ "$(grep -c '^concurrency:' "$f")" = 1 ] || { echo "concurrency: block count != 1" >&2; rc=1; }
+    grep -qE '^[[:space:]]+group: sim-recap[[:space:]]*$' "$f" \
+        || { echo "concurrency group is not sim-recap" >&2; rc=1; }
+    return "$rc"
+}
+
+if srt_workflow_hygiene "$SRT_WORKFLOW" 2>"$STUB/wf.err"; then
+    srt_ok "workflow hygiene passes on the committed file"
+else
+    srt_fail "workflow hygiene passes on the committed file — $(tr '\n' ';' < "$STUB/wf.err")"
+fi
+
+# Leaking copies. (a) agent.json cat spliced INTO the Run tick step's run block;
+# (b) a bare `cat` with no forbidden filename, to pin the run-block `cat ` rule
+# on its own; (c) a secret on a run: line.
+wf_leak='          cat "$RUNNER_TEMP"/sim-recap-*/agent.json'
+awk -v leak="$wf_leak" '{ print } /bin\/sim-recap-tick \$sim_arg/ { print leak }' \
+    "$SRT_WORKFLOW" > "$STUB/wf-agent.yml"
+wf_leak='          cat /etc/hostname'
+awk -v leak="$wf_leak" '{ print } /bin\/sim-recap-tick \$sim_arg/ { print leak }' \
+    "$SRT_WORKFLOW" > "$STUB/wf-cat.yml"
+cp "$SRT_WORKFLOW" "$STUB/wf-secret.yml"
+printf '      - name: Leak\n        run: echo ${{ secrets.SIM_RECAP_DB_PASSWORD }}\n' >> "$STUB/wf-secret.yml"
+# (d) the event guard deleted from the Check secrets step; (e) the guard pointed
+# at the wrong event; (f) a trailing step that maps a secret with no if: at all.
+grep -vF "if: github.event_name != 'pull_request'" "$SRT_WORKFLOW" > "$STUB/wf-ungated.yml"
+sed "s/!= 'pull_request'/!= 'schedule'/" "$SRT_WORKFLOW" > "$STUB/wf-badgate.yml"
+cp "$SRT_WORKFLOW" "$STUB/wf-stray.yml"
+printf '      - name: Stray\n        env:\n          X: %s\n        run: echo ok\n' \
+    '${{ secrets.HOST }}' >> "$STUB/wf-stray.yml"
+wf_bad=0
+for wf_copy in wf-agent wf-cat wf-secret wf-ungated wf-badgate wf-stray; do
+    if srt_workflow_hygiene "$STUB/$wf_copy.yml" 2>/dev/null; then
+        echo "  hygiene wrongly passed on $wf_copy.yml"
+        wf_bad=$((wf_bad + 1))
+    fi
+done
+srt_expect_eq "workflow hygiene fails on a leaking copy" 0 "$wf_bad"
+# The three gating copies must fail on the gating check itself, not on a side effect.
+wf_reason_bad=0
+for wf_copy in wf-ungated wf-badgate wf-stray; do
+    srt_workflow_hygiene "$STUB/$wf_copy.yml" 2>"$STUB/$wf_copy.err" || true
+    grep -q '^secret-gating:' "$STUB/$wf_copy.err" || {
+        echo "  $wf_copy.yml failed without a secret-gating: reason"
+        wf_reason_bad=$((wf_reason_bad + 1))
+    }
+done
+srt_expect_eq "gating copies fail with a secret-gating: reason" 0 "$wf_reason_bad"
+
+# GUARD-OK: the event guard sits directly under `id: secrets` and no EVENT token
+# remains anywhere in the file.
+wf_guard_ok=0
+wf_after_id=$(grep -A1 'id: secrets' "$SRT_WORKFLOW" || true)
+grep -qF "if: github.event_name != 'pull_request'" <<< "$wf_after_id" || wf_guard_ok=1
+grep -q 'EVENT' "$SRT_WORKFLOW" && wf_guard_ok=1
+srt_expect_eq "GUARD-OK: if: sits under id: secrets and no EVENT token remains" 0 "$wf_guard_ok"
+
+# SMOKE-DONE: the awk fires on a stray ungated step and stays quiet on the committed file.
+wf_stray_hits=$(srt_workflow_hygiene "$STUB/wf-stray.yml" 2>&1 \
+    | grep -c 'secret-gating: step maps a secret with no if' || true)
+wf_committed_hits=$(srt_workflow_hygiene "$SRT_WORKFLOW" 2>&1 | grep -c 'secret-gating:' || true)
+srt_expect_eq "SMOKE-DONE: stray ungated step yields one secret-gating: line" 1 "$wf_stray_hits"
+srt_expect_eq "SMOKE-DONE: committed file yields zero secret-gating: lines" 0 "$wf_committed_hits"
+
+# PR-RUN-DONE: opt-in live check, run after the PR is open and its run has finished.
+# Set SRT_CHECK_PR_RUN=<branch> to read that branch's latest pull_request run.
+if [ -n "${SRT_CHECK_PR_RUN:-}" ]; then
+    pr_run_id=$(gh run list --workflow sim-recap.yml --branch "$SRT_CHECK_PR_RUN" \
+        --event pull_request --limit 1 --json databaseId --jq '.[0].databaseId')
+    pr_run_conclusion=$(gh run view "$pr_run_id" --json conclusion --jq .conclusion)
+    pr_run_step=$(gh run view "$pr_run_id" --json jobs \
+        --jq '.jobs[0].steps[] | select(.name=="Check secrets") | .conclusion')
+    pr_run_masked=$(gh run view "$pr_run_id" --log 2>/dev/null | grep -c 'T7: \*\*\*' || true)
+    srt_expect_eq "PR-RUN-DONE: run concludes success" success "$pr_run_conclusion"
+    srt_expect_eq "PR-RUN-DONE: Check secrets step is skipped" skipped "$pr_run_step"
+    srt_expect_eq "PR-RUN-DONE: log holds no masked T7 line" 0 "$pr_run_masked"
+fi
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

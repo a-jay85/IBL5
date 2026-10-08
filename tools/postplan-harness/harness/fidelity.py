@@ -348,19 +348,28 @@ def _find_procedure(worktree: str, master_sha: str, paths, kind: str) -> str:
 
 
 PLAN_INDEX_BLIND = "(plan-blind run: no plan, so no index)\n"
+PLAN_INDEX_TIMEOUT = 30
 
 
-def _plan_index(worktree: str, plan_path: str) -> str:
+def _plan_index(worktree: str, plan_path: str, timeout: float | None = None) -> str:
     """`bin/plan-index` output for the packet's plan copy.
 
     The reviewer has no Bash, so the harness runs the index for it. Any failure becomes a
     marker telling the reviewer to find `## ` headings with Grep instead; it never
-    aborts the packet.
+    aborts the packet. A hung script is cut off after `timeout` seconds (default
+    PLAN_INDEX_TIMEOUT); non-UTF-8 output is a marker too.
     """
     script = os.path.join(worktree, "bin", "plan-index")
+    limit = PLAN_INDEX_TIMEOUT if timeout is None else timeout
     try:
         proc = subprocess.run([script, plan_path], cwd=worktree,
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, timeout=limit)
+    except subprocess.TimeoutExpired:
+        return (f"(bin/plan-index timed out after {limit}s; "
+                "Grep plan.md for '^## ' instead)\n")
+    except UnicodeDecodeError as e:
+        return (f"(bin/plan-index output was not valid UTF-8: {e}; "
+                "Grep plan.md for '^## ' instead)\n")
     except OSError as e:
         return f"(bin/plan-index unavailable: {e}; Grep plan.md for '^## ' instead)\n"
     if proc.returncode != 0:
@@ -390,10 +399,16 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
         try:
             with open(plan.path) as fh:
                 _write("plan.md", fh.read())
-            _write("plan-index.txt", _plan_index(worktree, os.path.join(packet, "plan.md")))
         except OSError:
             _write("plan.md", PLAN_BLIND_MARKER)
             _write("plan-index.txt", PLAN_INDEX_BLIND)
+        else:
+            # plan.md is on disk and intact; an index failure must not blind it.
+            try:
+                _write("plan-index.txt",
+                       _plan_index(worktree, os.path.join(packet, "plan.md")))
+            except OSError:
+                _write("plan-index.txt", PLAN_INDEX_BLIND)
     else:
         _write("plan.md", PLAN_BLIND_MARKER)
         _write("plan-index.txt", PLAN_INDEX_BLIND)
@@ -835,7 +850,8 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[in
         try:
             n = gh.followup_create(title, body, "maintenance")
             if n is not None:
-                nums.append(n)
+                if n not in nums:
+                    nums.append(n)
                 seen.add(key)
                 log(f"phase5.5 notes: filed issue #{n} '{title[:50]}'")
         except (HarnessError, OSError) as exc:
@@ -1060,7 +1076,7 @@ def carry_forward_predicate(sticky_body, diff_id: str,
 # Status lines the runner builds on every clean run. The composer prints only a line that
 # deviates from these, so a clean sticky carries no REBASE= or CI: line at all.
 _EXPECTED_REBASE = ("REBASE=clean (HEAD already contains origin/master)",
-                    "REBASE=rebased onto origin/master")
+                    "REBASE=merged origin/master")
 _EXPECTED_CI_RE = re.compile(
     r"^CI: local verification pass; GitHub checks are watched after this comment"
     r"(; remediation commit [0-9a-f]+ is inside that watch)?$")

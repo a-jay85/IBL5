@@ -19,7 +19,7 @@ set -euo pipefail
 #   - Dir/glob excludes ("Bootstrap", "Database", "*/Contracts/*")
 #     are auto-exempt from ALL gates: the extractor grep -oE '"[^"]+\.php"' only
 #     matches entries ending in .php, so non-.php entries never reach any gate.
-#   - "infra-exclude"-marked files (permanent low-level infra such as JSB.php) are
+#   - "infra-exclude"-marked files (permanent low-level infra such as League/JsbConstants.php) are
 #     exempt from Gate 2 ONLY; they still satisfy Gate 1 (must carry a reason).
 
 CONFIG="infection.json5"

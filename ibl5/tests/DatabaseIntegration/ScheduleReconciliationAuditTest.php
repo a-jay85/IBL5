@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration;
 
 use Boxscore\AuditFinding;
+use Boxscore\BoxscoreAuditRepository;
 use Boxscore\BoxscoreRepository;
 use Boxscore\ScheduleReconciliationAudit;
 use PHPUnit\Framework\Attributes\Group;
@@ -37,7 +38,7 @@ class ScheduleReconciliationAuditTest extends DatabaseTestCase
     {
         parent::setUp();
         $this->repo  = new BoxscoreRepository($this->db);
-        $this->audit = new ScheduleReconciliationAudit($this->repo);
+        $this->audit = new ScheduleReconciliationAudit($this->repo, new BoxscoreAuditRepository($this->db));
     }
 
     // ── Matrix row 8: audit fails on a seeded orphan ────────────────────────

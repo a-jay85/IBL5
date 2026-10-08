@@ -19,7 +19,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testQueuesTheLatestSim(): void
     {
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 412, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
         $this->mockDb->setAffectedRows(1);
 
@@ -42,7 +42,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testSkipsWhenARowAlreadyExists(): void
     {
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 412, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
         $this->mockDb->setAffectedRows(0);
 
@@ -55,7 +55,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testSkipsWhenNoSimDatesExist(): void
     {
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', []);
 
         $step = $this->buildStep();
@@ -95,7 +95,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testQueuedInlineHtmlContainsSimAndLink(): void
     {
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 412, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
         $this->mockDb->setAffectedRows(1);
 
@@ -107,7 +107,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testStateBLinksLastDoneSimNotCurrentSim(): void
     {
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 412, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
         $this->mockDb->setAffectedRows(0);
         $this->mockDb->onQuery('ibl_sim_summaries', [
@@ -124,7 +124,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testStateBRendersTextOnlyWhenNoDoneRecapExists(): void
     {
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 412, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
         $this->mockDb->setAffectedRows(0);
         $this->mockDb->onQuery('ibl_sim_summaries', []);
@@ -139,7 +139,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testSentinelSimZeroProducesEmptyInlineHtml(): void
     {
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', []);
 
         $result = $this->buildStep()->execute();
@@ -149,7 +149,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testSkippedWhenPhaseIsPlayoffs(): void
     {
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Playoffs']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Playoffs']]);
 
         $result = $this->buildStep()->execute();
 
@@ -171,7 +171,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testPhaseGateSkipDoesNotTouchSimDatesOrSummaries(): void
     {
-        $this->mockDb->onQuery('ibl_settings', [['value' => 'Draft']]);
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Draft']]);
 
         $this->buildStep()->execute();
 
@@ -203,10 +203,82 @@ class QueueSimSummaryStepTest extends TestCase
         self::assertStringNotContainsString('"', $escaped);
     }
 
-    private function buildStep(): QueueSimSummaryStep
+    public function testQueuedSimDispatchesOnce(): void
+    {
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 731, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
+        $this->mockDb->setAffectedRows(1);
+
+        $bodies = [];
+        $dispatcher = $this->buildDispatcher(static function (string $url, array $headers, string $body) use (&$bodies): int {
+            $bodies[] = $body;
+            return 204;
+        });
+
+        $result = $this->buildStep($dispatcher)->execute();
+
+        self::assertCount(1, $bodies);
+        $decoded = json_decode($bodies[0], true);
+        self::assertIsArray($decoded);
+        self::assertSame(['sim' => '731'], $decoded['client_payload']);
+        self::assertStringEndsWith('GitHub Actions run dispatched.', $result->detail);
+    }
+
+    public function testDispatchFailureDoesNotChangeStepResult(): void
+    {
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 731, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
+        $this->mockDb->setAffectedRows(1);
+
+        $dispatcher = $this->buildDispatcher(static function (string $url, array $headers, string $body): int {
+            throw new \RuntimeException('network down');
+        });
+
+        $result = $this->buildStep($dispatcher)->execute();
+
+        self::assertTrue($result->success);
+        self::assertStringEndsWith('Dispatch failed; the hourly fallback will pick it up.', $result->detail);
+    }
+
+    public function testExistingRowDoesNotDispatch(): void
+    {
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 731, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
+        $this->mockDb->setAffectedRows(0);
+
+        $calls = 0;
+        $dispatcher = $this->buildDispatcher(static function (string $url, array $headers, string $body) use (&$calls): int {
+            $calls++;
+            return 204;
+        });
+
+        $result = $this->buildStep($dispatcher)->execute();
+
+        self::assertSame(0, $calls);
+        self::assertSame('Sim 731 already has a summary row.', $result->detail);
+    }
+
+    public function testNoDispatcherKeepsLegacyMessage(): void
+    {
+        $this->mockDb->onQuery('ibl_settings', [['setting_value' => 'Regular Season']]);
+        $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 731, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
+        $this->mockDb->setAffectedRows(1);
+
+        $result = $this->buildStep()->execute();
+
+        self::assertSame('Queued sim 731 for recap generation.', $result->detail);
+    }
+
+    /** @param callable(string, list<string>, string): int $transport */
+    private function buildDispatcher(callable $transport): \SimRecap\GitHubDispatchClient
+    {
+        return new \SimRecap\GitHubDispatchClient('t0k', 'a-jay85/IBL5', 'sim-recap', $transport);
+    }
+
+    private function buildStep(?\SimRecap\GitHubDispatchClient $dispatcher = null): QueueSimSummaryStep
     {
         $summaries = new \SimRecap\SimSummaryRepository($this->mockDb);
         $seasonQuery = new \Season\SeasonQueryRepository($this->mockDb);
-        return new QueueSimSummaryStep($summaries, $seasonQuery);
+        return new QueueSimSummaryStep($summaries, $seasonQuery, $dispatcher);
     }
 }

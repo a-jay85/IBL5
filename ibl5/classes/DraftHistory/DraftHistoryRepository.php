@@ -12,12 +12,12 @@ use DraftHistory\Contracts\DraftHistoryRepositoryInterface;
  * Retrieves draft pick information from the ibl_plr table.
  *
  * @see DraftHistoryRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  *
  * @phpstan-import-type DraftPickByYearRow from DraftHistoryRepositoryInterface
  * @phpstan-import-type DraftPickByTeamRow from DraftHistoryRepositoryInterface
  */
-class DraftHistoryRepository extends \BaseMysqliRepository implements DraftHistoryRepositoryInterface
+class DraftHistoryRepository extends \Database\BaseMysqliRepository implements DraftHistoryRepositoryInterface
 {
     /**
      * @see DraftHistoryRepositoryInterface::getFirstDraftYear()

@@ -35,10 +35,7 @@ while (!feof($plrFile)) {
         echo "bird check = " . fread($plrFile, 2) . "<br>";
         fseek($plrFile, -2, SEEK_CUR);
 
-        $bird++;
-        if ($bird < 10) {
-            $bird = " " . $bird;
-        }
+        $bird = sprintf("%2d", (int) $bird + 1);
         fwrite($plrFile, $bird, 2);
         echo "$name's new bird years = " . $bird . "<br>";
         echo "<br>";

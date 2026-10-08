@@ -23,7 +23,7 @@ use Team\Contracts\TeamRepositoryInterface;
  *
  * @see TeamRepositoryInterface
  */
-class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInterface
+class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepositoryInterface
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {

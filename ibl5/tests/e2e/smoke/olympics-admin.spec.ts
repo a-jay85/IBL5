@@ -15,13 +15,13 @@ test.describe('Olympics admin smoke tests', () => {
   });
 
   test('Olympics LCP loads with sim length visible', async ({ page }) => {
-    await page.goto('leagueControlPanel.php?league=olympics');
+    await page.goto('modules.php?name=LeagueControlPanel&league=olympics');
     await expect(page.locator('input[name="SimLengthInDays"]')).toBeVisible();
     await assertNoPhpErrors(page, 'on Olympics LCP');
   });
 
   test('Olympics LCP hides IBL-only buttons', async ({ page }) => {
-    await page.goto('leagueControlPanel.php?league=olympics');
+    await page.goto('modules.php?name=LeagueControlPanel&league=olympics');
     await expect(page.locator('button[value="set_sim_length"]')).toBeVisible();
     const body = await page.locator('body').textContent();
     expect(body).not.toContain('Trivia');

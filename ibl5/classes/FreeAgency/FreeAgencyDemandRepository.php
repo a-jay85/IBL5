@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
 
 /**

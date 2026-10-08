@@ -1,6 +1,6 @@
 ---
-description: Every user-facing script in bin/ and bin/automouse/ answers --help on stdout with exit 0 before any side effect, and bin/test-bin-help enforces it in CI by running each script with stubbed tools.
-last_verified: 2026-09-28
+description: Every user-facing script in bin/ and bin/automouse/ answers --help on stdout with exit 0 before any git, network, DB, or paid-session call, and bin/test-bin-help checks in CI that no stubbed tool is called.
+last_verified: 2026-10-05
 ---
 
 > This ADR was drafted by the post-plan harness for this PR. A human must review and approve it before merging.
@@ -17,7 +17,7 @@ last_verified: 2026-09-28
 
 ## Decision
 
-Every executable script with a shebang in `bin/` and `bin/automouse/` handles `--help` (and `-h` where that letter is free) as its first action. The check sits at the top of the script, ahead of any `source`, `git`, `cd`, or network call. It prints usage to stdout and exits 0. Scripts whose header comment already documents usage may print that comment with `sed` or `awk` instead of a heredoc. Three scripts accept only `--help`: `bin/regen-schema-dump` (where `-h` means host), `bin/post-plan-fail-dm`, and `bin/vr-changed-coverage`. `bin/plan-index` now exits 0 on `--help` and still exits 1, with usage on stderr, on a wrong argument count. The convention is written down in `bin/README.md`. Enforcement is `bin/test-bin-help`, run as a step in `.github/workflows/tests.yml`. It copies `bin/` to a temp dir, sets `HOME` to a temp dir, and puts stubs first on `PATH` for every tool that could reach the network, the repo, or a paid session (`git`, `gh`, `docker`, `mysql`, `ssh`, `launchctl`, `claude`, and others). Each stub logs its name and exits 1. For each script the test asserts exit 0, non-empty stdout, and an empty stub log. `bin/test-*` harnesses are out of scope.
+Every executable script with a shebang in `bin/` and `bin/automouse/` handles `--help` (and `-h` where that letter is free) as its first action. The check runs before any `git`, network, DB, or paid-session call. Path resolution with `cd`/`dirname` and sourcing a lib may precede it. It prints usage to stdout and exits 0. Scripts whose header comment already documents usage may print that comment with `sed` or `awk` instead of a heredoc. Three scripts accept only `--help`: `bin/regen-schema-dump` (where `-h` means host), `bin/post-plan-fail-dm`, and `bin/vr-changed-coverage`. `bin/plan-index` now exits 0 on `--help` and still exits 1, with usage on stderr, on a wrong argument count. The convention is written down in `bin/README.md`. Enforcement is `bin/test-bin-help`, run as a step in `.github/workflows/tests.yml`. It copies `bin/` to a temp dir, sets `HOME` to a temp dir, and puts stubs first on `PATH` for every tool that could reach the network, the repo, or a paid session (`git`, `gh`, `docker`, `mysql`, `ssh`, `launchctl`, `claude`, and others). Each stub logs its name and exits 1. For each script the test asserts exit 0, non-empty stdout, a `Usage` line in stdout (case-insensitive), and an empty stub log. It does not detect `cd`, `source`, or other side effects. `bin/test-*` harnesses are out of scope.
 
 ## Alternatives Considered
 
@@ -47,3 +47,11 @@ Every executable script with a shebang in `bin/` and `bin/automouse/` handles `-
 - `.claude/rules/bin-help-span-and-secondary-assertions.md`: the earlier rule on help text read from header comments.
 - `.claude/rules/meta-tooling-bar.md`: the extend-before-add bar applied to this new tool.
 - `ibl5/docs/decisions/README.md`: the decision-record policy `bin/adr-check` enforces.
+
+## Addendum — bin/watch-run --help exit code (2026-10-05) <!-- slop-ok -->
+
+This ADR originally named `bin/plan-index` as the only script whose `--help` exit code changed. `bin/watch-run` changed too. Its `--help` used to exit 3 through `usage()` and now exits 0. It still exits 3 on a usage error.
+
+## Addendum — scripts outside the --help convention (2026-10-05) <!-- slop-ok -->
+
+The Decision says every executable script with a shebang answers `--help`. That has one exception, `bin/check-composite-contracts`. It is a CI security-policy gate with no `--help` handler by design, so `bin/test-bin-help` skips it. The `test-*` harnesses were already out of scope.

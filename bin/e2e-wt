@@ -8,8 +8,11 @@
 #   bin/e2e-wt my-feature --grep "trading"
 #
 # Prerequisites:
-#   1. Worktree exists at IBL5-worktrees/<name> (or legacy worktrees/<name>)
+#   1. Worktree exists at IBL5-worktrees/<name>
 #   2. Docker env running via: bin/wt-up <name> --seed
+#
+# Front door: bin/test e2e run from inside the worktree derives <name> and calls
+# this script. Call bin/e2e-wt <name> directly for agent and background runs.
 
 set -euo pipefail
 
@@ -31,6 +34,11 @@ Examples:
 Prerequisites:
   1. Worktree exists at IBL5-worktrees/<name>
   2. Docker env running via: bin/wt-up <name> --seed
+
+Front door:
+  bin/test e2e      From inside the worktree, derives <worktree-name> and runs
+                    this script. On the main checkout it runs ibl5/bin/e2e-local.
+  Call bin/e2e-wt <worktree-name> directly for agent and background runs.
 EOF
     exit 0
 fi

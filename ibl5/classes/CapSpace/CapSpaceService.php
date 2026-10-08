@@ -98,7 +98,7 @@ class CapSpaceService
             $playersByPosition[$pos][] = $playerRow;
         }
         $positionSalaries = [];
-        foreach (\JSB::PLAYER_POSITIONS as $position) {
+        foreach (\League\JsbConstants::PLAYER_POSITIONS as $position) {
             $positionPlayers = $playersByPosition[$position] ?? [];
             $positionSalaries[$position] = $this->teamCapCalculator->getTotalNextSeasonSalaries($positionPlayers);
         }

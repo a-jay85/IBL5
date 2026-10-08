@@ -1,6 +1,6 @@
 ---
 description: Class registry for /post-plan Phase 9 retrospective routing — one row per defect class, written by /post-plan, never edited by hand.
-last_verified: 2026-09-23
+last_verified: 2026-10-06
 ---
 
 # Retrospective Class Registry
@@ -15,8 +15,7 @@ learning up the escalation ladder. Never edit or delete a line — the value is 
 The `prior:` field is the anti-recurrence lever: when a new line's class matches an existing one,
 record the earlier PR numbers there. A non-empty `prior:` means the class has recurred, and recurrence
 is the signal that the previously chosen rung was too weak — escalate one rung rather than re-routing
-to the same place. This is a **prompted** loop, not an automated one: nothing scans this table on a
-schedule, and no gate fails on it.
+to the same place. Recording a row is a **prompted** step. No gate fails on the table.
 
 The table is fenced and every path inside it is written bare — no backticks, no link syntax. The
 bare paths are what keep a row naming a destination that does not exist yet from failing the

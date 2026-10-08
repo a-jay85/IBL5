@@ -54,8 +54,8 @@ if [ -n "$PHASE_OVERRIDE" ]; then
     CURRENT_PHASE="$PHASE_OVERRIDE"
     SEASON="${SEASON_OVERRIDE:-}"
 else
-    CURRENT_PHASE="$(mysql -N -e "SELECT value FROM \`ibl_settings\` WHERE setting_key = 'Current Season Phase' AND league = '$LEAGUE'" "$REMOTE_DATABASE")"
-    SEASON="$(mysql -N -e "SELECT value FROM \`ibl_settings\` WHERE setting_key = 'Current Season Ending Year' AND league = '$LEAGUE'" "$REMOTE_DATABASE")"
+    CURRENT_PHASE="$(mysql -N -e "SELECT setting_value FROM \`ibl_settings\` WHERE setting_key = 'Current Season Phase' AND league = '$LEAGUE'" "$REMOTE_DATABASE")"
+    SEASON="$(mysql -N -e "SELECT setting_value FROM \`ibl_settings\` WHERE setting_key = 'Current Season Ending Year' AND league = '$LEAGUE'" "$REMOTE_DATABASE")"
 fi
 
 if [ -z "$CURRENT_PHASE" ]; then

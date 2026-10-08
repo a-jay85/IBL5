@@ -370,7 +370,7 @@ final class Season2008Finals4Restore
     private function insertTeamRows(): int
     {
         $inserted = 0;
-        $stmt = $this->db->prepare(Boxscore::teamInsertSql(self::TEAM_TABLE));
+        $stmt = $this->db->prepare(Boxscore::teamInsertSql());
         if ($stmt === false) {
             throw new RuntimeException('Failed to prepare team insert: ' . $this->db->error);
         }
@@ -401,7 +401,7 @@ final class Season2008Finals4Restore
     private function insertPlayerRows(): int
     {
         $inserted = 0;
-        $stmt = $this->db->prepare(Boxscore::playerInsertSql(self::PLAYER_TABLE));
+        $stmt = $this->db->prepare(Boxscore::playerInsertSql());
         if ($stmt === false) {
             throw new RuntimeException('Failed to prepare player insert: ' . $this->db->error);
         }

@@ -10,11 +10,6 @@ class PageLayout
 {
     public static function header(): void
     {
-        // Populate $cookie/$user globals for all request types.
-        /** @var string $user */
-        global $user;
-        cookiedecode($user);
-
         if (HtmxHelper::isBoostedRequest()) {
             self::renderBoostedHeader();
             return;

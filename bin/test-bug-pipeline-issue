@@ -28,7 +28,7 @@ bpt_log_has "$STUB" transition.log "--issue=4242" "created number persisted via 
 
 # ── ★ idempotent: row already has an issue_number → ZERO issue create ─────────
 bpt_reset
-NOW="$(date '+%Y-%m-%d %H:%M:%S')"; OLD='2020-01-01 00:00:00'
+NOW="$(TZ=UTC date '+%Y-%m-%d %H:%M:%S')"; OLD='2020-01-01 00:00:00'
 bpt_set_actionable '[{"id":7,"status":"awaiting_info","class":"bug","original_text":"x","thread_id":"88","issue_number":99,"last_gm_reply_at":"'"$NOW"'","last_processed_at":"'"$OLD"'"}]'
 bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true}'
 bpt_run
@@ -61,7 +61,7 @@ bpt_log_has "$STUB" transition.log "--issue=4242" "create-thread failure → num
 # claimNextHuntable()'s `status='queued' AND class IS NOT NULL` and dispatch a hunt on a
 # report still waiting on the GM.
 bpt_reset
-NOW="$(date '+%Y-%m-%d %H:%M:%S')"; OLD='2020-01-01 00:00:00'
+NOW="$(TZ=UTC date '+%Y-%m-%d %H:%M:%S')"; OLD='2020-01-01 00:00:00'
 AWAITING_NO_ISSUE='[{"id":7,"status":"awaiting_info","class":"bug","original_text":"x","thread_id":null,"issue_number":null,"last_gm_reply_at":"'"$NOW"'","last_processed_at":"'"$OLD"'"}]'
 bpt_set_actionable "$AWAITING_NO_ISSUE"
 bpt_set_claude_result '{"class":"bug","bug_has_enough_info":false,"clarifying_question":"which team?","issue_title":"t","severity":"low"}'

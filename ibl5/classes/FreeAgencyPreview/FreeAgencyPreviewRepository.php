@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FreeAgencyPreview;
 
 use FreeAgencyPreview\Contracts\FreeAgencyPreviewRepositoryInterface;
+use Repositories\PlayerTeamJoinQuery;
 
 /**
  * FreeAgencyPreviewRepository - Data access layer for free agency preview
@@ -12,12 +13,14 @@ use FreeAgencyPreview\Contracts\FreeAgencyPreviewRepositoryInterface;
  * Retrieves player contract and rating information from the ibl_plr table.
  *
  * @see FreeAgencyPreviewRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  *
  * @phpstan-import-type ActivePlayerRow from FreeAgencyPreviewRepositoryInterface
  */
-class FreeAgencyPreviewRepository extends \BaseMysqliRepository implements FreeAgencyPreviewRepositoryInterface
+class FreeAgencyPreviewRepository extends \Database\BaseMysqliRepository implements FreeAgencyPreviewRepositoryInterface
 {
+    use PlayerTeamJoinQuery;
+
     /**
      * @see FreeAgencyPreviewRepositoryInterface::getActivePlayers()
      *
@@ -34,7 +37,7 @@ class FreeAgencyPreviewRepository extends \BaseMysqliRepository implements FreeA
                          p.loyalty, p.winner, p.playing_time, p.security, p.tradition,
                          t.team_city, t.color1, t.color2
             FROM `ibl_plr` p
-            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            " . $this->playerTeamLeftJoin() . "
             WHERE p.retired = 0
             ORDER BY p.ordinal ASC";
 

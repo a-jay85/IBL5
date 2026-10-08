@@ -1,6 +1,6 @@
 ---
-description: /post-plan Phase 2 — resolve a rebase conflict, prove no work was lost, and arm the conflict hold. Loaded only when the Phase 2 rebase block prints STOP-AND-RESOLVE.
-last_verified: 2026-09-28
+description: /post-plan Phase 2 conflict resolution. Resolves a merge conflict, proves no work was lost, and arms the conflict hold. Loaded only when the Phase 2 merge block prints STOP-AND-RESOLVE.
+last_verified: 2026-10-07
 paths:
   - .claude/skills/post-plan/SKILL.md
   - .claude/review-shared/_rebase-and-conflicts.md
@@ -11,8 +11,8 @@ paths:
 
 # /post-plan Phase 2 — Rebase Conflict Resolution
 
-Loaded **only** when the Phase 2 rebase block printed `STOP-AND-RESOLVE:`. On a clean or
-already-rebased run this file is never read.
+Loaded **only** when the Phase 2 merge block printed `STOP-AND-RESOLVE:`. On a clean or
+already-merged run this file is never read.
 
 `<MASTER_SHA>`, `<KEY>` and `<BRANCH>` are **literals the orchestrator substitutes** — the
 SHA and `key=` value printed by the Phase 2 pre-rebase capture block and recorded as run
@@ -48,19 +48,20 @@ improvise a resolution from memory.
 
 ## Step 2 — Read the guide, selectively
 
-Read `/tmp/post-plan-rebase-guide-<KEY>.md`. Apply **§2c** (hook-safe squash), **§2d**
-(`--onto` rebase) and **§2e** (three-way resolution).
+Read `/tmp/post-plan-rebase-guide-<KEY>.md`. Apply **§2e** (three-way resolution) only.
+Skip **§2c** and **§2d**: post-plan merges master in and never rewrites history, so there is
+nothing to squash or replay.
 
 - **Skip §2b entirely.** It hands the rebase chore to a `/pr-ready` sub-agent packet, which
   assumes that skill's Phase 0 worktree entry and an interactive turn boundary. post-plan is
   already in the worktree and runs headless under `claude -p`, where work handed off past the
-  turn boundary is unrecoverable. The orchestrator does §2c/§2d/§2e itself, inline.
+  turn boundary is unrecoverable. The orchestrator does §2e itself, inline.
 - **Skip §2a's re-capture.** The Phase 2 pre-rebase capture block in
   `.claude/skills/post-plan/SKILL.md` already performed it, at the only moment it was still
   pre-rewrite. Re-running it now would overwrite the pre-diff with post-conflict state and
   make the proof in step 6 vacuous. Read §2a for rationale only.
 
-## Step 3 — Collapse guard, before any `--onto`-shaped rebase
+## Step 3: Collapse guard, before the merge
 
 An `--onto` rebase is the one shape that can silently drop commits, and this guard is the
 only thing that notices a *prior* run already did so. Run `check` first:
@@ -75,7 +76,7 @@ bash /tmp/post-plan-collapse-guard-<KEY>.sh check <KEY> <BRANCH> ; echo "CG-CHEC
   proceed. **Record the `WARN` text in a run note** — it becomes part of the sticky PR
   comment posted at the top of Phase 6.5.
 
-Then, immediately before the rebase:
+Then, immediately before the merge:
 
 ```bash
 bash /tmp/post-plan-collapse-guard-<KEY>.sh record <KEY> <BRANCH> ; echo "CG-RECORD-RC=$?"
@@ -85,44 +86,55 @@ bash /tmp/post-plan-collapse-guard-<KEY>.sh record <KEY> <BRANCH> ; echo "CG-REC
 is what gives a *future* run a recorded head to compare against. `<KEY>` is the sanitized
 slug from the capture block; the script sanitizes the branch itself via `tr '/' '-'`.
 
-## Step 4 — Re-run the rebase in the `--onto` form
+## Step 4: Re-run the merge against the pinned SHA
 
-The Phase 2 conflict arm already ran `git rebase --abort`, so the tree is clean and history
+The Phase 2 conflict arm already ran `git merge --abort`, so the tree is clean and history
 is untouched.
 
-> **Squash trap.** If this branch was stacked on a now-merged parent: `master` is linear, so
+> **Squash trap.** A merge does not hit this; it is here for anyone who hand-rebases instead.
+> If this branch was stacked on a now-merged parent: `master` is linear, so
 > the parent's SHAs never landed in it, and a plain `git rebase origin/master` tries to replay
 > the parent's commits too — which conflicts every time. Replay only your own commits with
 > `git rebase --onto origin/master <parent-tip-before-merge> <branch>`. See
 > `.claude/rules/linear-history-squash-merge.md`. Determine `<parent-tip-before-merge>` from
 > the `Depends-on:` parent's pre-merge tip, not by guessing a merge-base.
 
-For the ordinary (non-stacked) case use the pinned-SHA form, matching §2d:
+Merge the recorded master SHA into the branch:
 
 ```bash
-git rebase --onto <MASTER_SHA> <merge-base> <BRANCH>
+git -c core.editor=true merge --no-edit <MASTER_SHA>
 ```
 
-Pinning to the recorded literal rather than to `origin/master` guarantees Phase 4 review,
+Merging the recorded literal rather than `origin/master` guarantees Phase 4 review,
 Phase 5.0 conformance and Phase 5.5 fidelity all judge the same base even if master moves
 mid-run.
 
 ## Step 5 — Resolve three-way, per §2e
 
-Inspect each conflicted path with `git show :1:<path>` (base), `:2:<path>` (ours),
-`:3:<path>` (theirs). **Never** take `--ours` / `--theirs` wholesale unless every hunk in
-that file genuinely takes that side. `git add` each resolved path, then:
+Inspect each conflicted path with `git show :1:<path>` (base), `:2:<path>` (ours, this branch),
+`:3:<path>` (theirs, master). **Never** take `--ours` / `--theirs` wholesale unless every hunk in
+that file genuinely takes that side.
+
+For a modify/delete conflict, one side has no stage. Keep a deletion this branch made unless
+a file master changed since the fork newly mentions the path. List those files with
+`git diff --name-only <merge-base> <MASTER_SHA>`, where `<merge-base>` is the SHA
+`git merge-base HEAD <MASTER_SHA>` prints, then search them with
+`git grep -l -F -e <path> <MASTER_SHA> -- <listed files>`. For a deletion master made, read
+master's commit that removed the file and keep the deletion unless the branch's edit is the
+reason the file must stay. Record the choice in the run note either way.
+
+`git add` each resolved path, or `git rm` a path whose deletion you kept, then:
 
 ```bash
-GIT_EDITOR=true git rebase --continue
+git -c core.editor=true commit --no-edit
 ```
 
 **Record every resolved path and a one-line description of each resolution in a run note.**
 Conflict-resolution output is new code that no code review has ever seen, and the sticky
 comment in Phase 6.5 must name those files.
 
-If the rebase re-conflicts on a later commit, repeat this step. If a resolution is genuinely
-ambiguous, `git rebase --abort` and halt with a `STOP:` line rather than guessing.
+A merge stops once; there is no later commit to re-conflict. If a resolution is genuinely
+ambiguous, `git merge --abort` and halt with a `STOP:` line rather than guessing.
 
 ## Step 6 — The lost-work proof, as a precondition for the push
 
@@ -133,12 +145,24 @@ bash /tmp/post-plan-lostwork-<KEY>.sh <KEY> ; echo "LOSTWORK-RC=$?"
 **This is a gate, not a report.** The push in `SKILL.md` Phase 2 step 3 is permitted **only
 if** this prints `TREE-EQUIVALENT` **and** `LOSTWORK-RC=0`. Any other outcome —
 `TREE DIVERGED — inspect before pushing`, a non-zero rc, or no output at all — halts the run
-with a `STOP:` line naming the script and both patch paths. Every failure path inside
-`lostwork.sh` emits `TREE DIVERGED`, but only the early guards (missing arg, absent or empty
-patch, failed `git apply --numstat`, empty pre-numstat) also exit 1 — the final
-differing-numstat branch prints `TREE DIVERGED — inspect before pushing` and exits **0**.
+with a `STOP:` line naming the script and both patch paths. The guards in `lostwork.sh`
+print `TREE DIVERGED` and exit 1. They cover a missing arg, an absent or empty patch, a patch
+`git apply --numstat` cannot parse, a git-quoted path, and zero file entries. The lost-work
+branch prints one `LOST:` line per finding, then `TREE DIVERGED — inspect before pushing`,
+and exits **0**.
 That is exactly why this check is conjunctive on the printed verdict and not on the rc alone:
 gating on `LOSTWORK-RC=0` by itself would wave the commonest divergence straight through.
+
+**What the proof checks.** It reads the post-merge tree at `HEAD`. It never reads the
+post-merge diff. Every file the pre-rebase patch touched must still exist at `HEAD`, or
+still be gone if the branch deleted it. Every significant added line (one holding a letter or
+digit) must appear verbatim as a whole line of `HEAD:<path>`. Every significant deleted line
+must appear fewer times at `HEAD` than at `origin/master`; a line the same file entry also
+adds counts as moved and is skipped. A master edit to the same file never trips the proof. A
+change master already landed passes too, because the line is still in the tree. A line both
+sides edited, which the resolution merged into a third version, blocks. That is the accepted
+fail-closed cost, recorded in ADR-0174. The `CHECKED: files=N added=A deleted=D` line
+before the verdict shows the comparison ran over something.
 
 Reviewing a resolution *after* it shipped is exactly what this replaces: an unreviewed
 resolution that dropped a hunk would otherwise reach master through auto-merge.
@@ -270,7 +294,7 @@ diff, which is a precondition for the push that produced this PR.
 
 **(b) Review result.** A dedicated conflict-resolution review read every path in the resolution
 manifest and found no dropped semantics on either side. The lost-work proof also passed
-(`TREE-EQUIVALENT`), so nothing was silently dropped in bytes. Auto-merge is armed. The PR still
+(`TREE-EQUIVALENT`), so nothing was silently dropped from the branch's changes. Auto-merge is armed. The PR still
 has to clear every other Phase 6.5 condition and CI before it merges.
 
 **(c) Files the resolution touched.**

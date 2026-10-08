@@ -16,6 +16,15 @@ ENV = dict(os.environ, GIT_AUTHOR_NAME="T", GIT_AUTHOR_EMAIL="t@t.com",
            GIT_COMMITTER_NAME="T", GIT_COMMITTER_EMAIL="t@t.com")
 
 OLD_GATE = "#!/bin/sh\nexit 0\n"
+# Passes only when stdin carries a tagged marker; stands in for
+# `bin/check-destructive-migrations --bypass-from-stdin` without a migration tree.
+STDIN_GATE = """#!/bin/sh
+body=$(cat)
+case "$body" in *"destructive-migration["*) exit 0 ;; esac
+exit 1
+"""
+STDIN_SPEC = ReplaySpec(argv=(), stdin="{body_file}")
+TAGGED = "## Summary\n<!-- destructive-migration[drop-column]: column superseded by players.pos_v2 -->\n"
 NEW_GATE = ("#!/bin/sh\n"
             "if git diff-tree --no-commit-id --name-only -r HEAD | grep -q '^src/noisy.txt$'; "
             "then echo flagged; exit 1; fi\nexit 0\n")
@@ -82,6 +91,34 @@ def run(repo, shas, tmp_path, gates=None, script=NEW_GATE, **kw):
     history = fetch_history(fake_gh(shas), git)
     return run_backtest(str(repo), "HEAD", gates or [gate()], history, overlay(script),
                         str(tmp_path / "plans"), **kw)
+
+
+def test_stdin_spec_feeds_pr_body(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    results = run(repo, shas[:2], tmp_path, gates=[gate(STDIN_SPEC)], script=STDIN_GATE,
+                  bodies={1: TAGGED, 2: "no marker here"})
+    assert {r.pr: r.outcome for r in results} == {1: "pass", 2: "flag"}
+
+
+def test_stdin_spec_empty_body_still_flags(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    results = run(repo, shas[:2], tmp_path, gates=[gate(STDIN_SPEC)], script=STDIN_GATE)
+    assert {r.pr: r.outcome for r in results} == {1: "flag", 2: "flag"}
+
+
+def test_missing_stdin_file_is_error_not_crash(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    spec = ReplaySpec(argv=(), stdin="{tree}/no-such-file.body")
+    results = run(repo, shas[:2], tmp_path, gates=[gate(spec)], script=STDIN_GATE)
+    assert len(results) == 2
+    assert all(r.outcome == "error" and "stdin:" in r.detail for r in results)
+
+
+def test_default_spec_keeps_devnull_even_with_body(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    results = run(repo, shas[:2], tmp_path, gates=[gate(ReplaySpec(argv=()))], script=STDIN_GATE,
+                  bodies={1: TAGGED, 2: TAGGED})
+    assert {r.pr: r.outcome for r in results} == {1: "flag", 2: "flag"}
 
 
 def test_classify_exit_table():

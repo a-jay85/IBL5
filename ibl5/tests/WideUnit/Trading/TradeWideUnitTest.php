@@ -353,10 +353,10 @@ class TradeWideUnitTest extends WideUnitTestCase
         $result = $validator->validateSalaryCaps($tradeData);
 
         // Assert
-        $this->assertFalse($result['valid'], 'Trade should be rejected when user exceeds hard cap');
-        $this->assertNotEmpty($result['errors']);
-        $this->assertStringContainsString('hard cap', $result['errors'][0]);
-        $this->assertSame(7500, $result['userPostTradeCapTotal']);
+        $this->assertFalse($result->isValid(), 'Trade should be rejected when user exceeds hard cap');
+        $this->assertNotEmpty($result->getErrorMessages());
+        $this->assertStringContainsString('hard cap', $result->getErrorMessages()[0]);
+        $this->assertSame(7500, $result->getContext()['userPostTradeCapTotal']);
     }
 
     // ========== ROSTER LIMIT VALIDATION ==========
@@ -381,9 +381,9 @@ class TradeWideUnitTest extends WideUnitTestCase
         $result = $validator->validateRosterLimits(1, 2, 0, 1);
 
         // Assert
-        $this->assertFalse($result['valid'], 'Trade should be rejected when team exceeds 15-player roster limit');
-        $this->assertNotEmpty($result['errors']);
-        $this->assertStringContainsString('roster limit', $result['errors'][0]);
+        $this->assertFalse($result->isValid(), 'Trade should be rejected when team exceeds 15-player roster limit');
+        $this->assertNotEmpty($result->getErrors());
+        $this->assertStringContainsString('roster limit', $result->getErrors()[0]);
     }
 
     // ========== PLAYER TRANSFER DETAILS ==========
@@ -517,7 +517,7 @@ class TradeWideUnitTest extends WideUnitTestCase
      */
     public function testUntradablePlayerOnWaiversRejected(): void
     {
-        // Arrange - TradeValidator.canPlayerBeTraded() checks ordinal <= JSB::WAIVERS_ORDINAL (960)
+        // Arrange - TradeValidator.canPlayerBeTraded() checks ordinal <= JsbConstants::WAIVERS_ORDINAL (960)
         // Players with ordinal > 960 are on waivers and cannot be traded
         $validator = new \Trading\TradeValidator($this->mockDb);
 

@@ -13,9 +13,9 @@ use League\League;
  * Retrieves team and GM contact info from the ibl_team_info table.
  *
  * @see GMContactListRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  */
-class GMContactListRepository extends \BaseMysqliRepository implements GMContactListRepositoryInterface
+class GMContactListRepository extends \Database\BaseMysqliRepository implements GMContactListRepositoryInterface
 {
     /**
      * @see GMContactListRepositoryInterface::getAllTeamContacts()

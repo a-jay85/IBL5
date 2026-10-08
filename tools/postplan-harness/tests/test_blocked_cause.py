@@ -101,6 +101,56 @@ def test_result_json_redacts_credentials():
     assert secret not in d.get("error_output_tail", "")
 
 
+def test_finish_redacts_error_in_result_json(tmp_path):
+    secret = "ghp_" + _ALNUM36
+    res = RunResult(terminal=TerminalState.FAILED,
+                    error=f"push-failed: remote: https://x:{secret}@github.com/a/b.git")
+    runner._finish(res, str(tmp_path))
+    blob = json.loads((tmp_path / "result.json").read_text())
+    assert secret not in blob["error"]
+    assert blob["error"].startswith("push-failed: remote: https://")
+
+
+def test_finish_redacts_audit_lines(tmp_path):
+    secret = "ghp_" + _ALNUM36
+    res = RunResult(terminal=TerminalState.FAILED, audit=[
+        f"[12:00:00] FAILED: push-failed: https://x:{secret}@github.com/a/b.git",
+        "[12:00:01] phase2: ok",
+    ])
+    runner._finish(res, str(tmp_path))
+    result_text = (tmp_path / "result.json").read_text()
+    audit_text = (tmp_path / "audit.log").read_text()
+    assert secret not in result_text
+    assert secret not in audit_text
+    assert "[12:00:01] phase2: ok" in json.loads(result_text)["audit"]
+    assert "[12:00:01] phase2: ok" in audit_text
+    assert secret in res.audit[0]
+
+
+def test_finish_keeps_in_memory_error_raw(tmp_path):
+    secret = "ghp_" + _ALNUM36
+    res = RunResult(terminal=TerminalState.FAILED,
+                    error=f"push-failed: remote: https://x:{secret}@github.com/a/b.git")
+    out = runner._finish(res, str(tmp_path))
+    assert out is res
+    assert secret in res.error
+
+
+def test_finish_clean_error_is_byte_identical(tmp_path):
+    res = RunResult(terminal=TerminalState.FAILED,
+                    error="rebase-conflict: CONFLICT (content) in foo.py")
+    runner._finish(res, str(tmp_path))
+    assert (tmp_path / "result.json").read_text() == res.to_json()
+
+    none_dir = tmp_path / "none"
+    none_dir.mkdir()
+    res_none = RunResult(terminal=TerminalState.FAILED, error=None)
+    runner._finish(res_none, str(none_dir))
+    text = (none_dir / "result.json").read_text()
+    assert text == res_none.to_json()
+    assert json.loads(text)["error"] is None
+
+
 # --- tail / redaction helpers -------------------------------------------------
 
 def test_error_tail_keeps_last_three_lines_of_10kb():

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import dataclasses
 import datetime
 import hashlib
 import json
@@ -195,7 +196,8 @@ def _classify_rebase_block(git, head_sha, plain, onto, reason) -> str:
 
 def _record_failure_context(res: RunResult, e: HarnessError) -> None:
     """Copy the failing command and its output tail from a HarnessError onto the result.
-    Both fields are redacted before storage; res.error stays raw."""
+    Both fields are redacted before storage. res.error stays raw in memory for the
+    classifiers; _finish redacts it when writing result.json."""
     res.error_cmd = _redact(e.cmd) or None
     res.error_output_tail = _redact(e.output) or None
 
@@ -1122,11 +1124,11 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
         log(f"phase4.5: thread ingestion failed ({e.kind}: {e.detail}); continuing, "
             "condition (11) keeps the hold")
         out = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None,
-               "error": f"{e.kind}: {e.detail}"}
+               "error": _redact(f"{e.kind}: {e.detail}")}
     except Exception as e:  # noqa: BLE001 - never block the run on this step
         log(f"phase4.5: thread ingestion failed ({e!r}); continuing")
         out = {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None,
-               "error": repr(e)}
+               "error": _redact(repr(e))}
     log(f"phase4.5: {out.get('found', 0)} trusted thread(s) found, {out.get('fixed', 0)} fixed, "
         f"{out.get('declined', 0)} declined, {out.get('skipped', 0)} skipped (error) "
         f"in {time.monotonic() - t0:.2f}s")
@@ -2545,10 +2547,15 @@ def _state_dir(out_dir: str, live: bool, override) -> str:
 def _finish(res: RunResult, out_dir: str) -> RunResult:
     if res.ledger:
         res.ledger.finished_at = time.time()
+    stored = dataclasses.replace(
+        res,
+        error=_redact(res.error) if res.error else res.error,
+        audit=[_redact(ln) for ln in res.audit],
+    )
     with open(os.path.join(out_dir, "result.json"), "w") as fh:
-        fh.write(res.to_json())
+        fh.write(stored.to_json())
     with open(os.path.join(out_dir, "audit.log"), "w") as fh:
-        fh.write("\n".join(res.audit) + "\n")
+        fh.write("\n".join(stored.audit) + "\n")
     return res
 
 

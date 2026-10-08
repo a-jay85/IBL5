@@ -143,7 +143,7 @@ FreeAgency -> Auth Database Discord EventLog Http League Player Repositories Sea
 FreeAgencyPreview -> Player Repositories Security UI
 GMContactList -> League Security UI
 GameBoxscore -> League Player Security UI
-HeadToHeadRecords -> Cache League Security UI
+HeadToHeadRecords -> Cache League Repositories Security UI
 Injuries -> League Player Season Security Team UI
 JsbParser -> League PlrParser
 LastSimRecap -> League Player Repositories Security UI Utilities

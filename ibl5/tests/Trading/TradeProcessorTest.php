@@ -161,6 +161,19 @@ class TradeProcessorTest extends TestCase
         $this->assertIsObject($processor);
     }
 
+    public function testTradeProcessorHasNoQueueSurface(): void
+    {
+        $processor = new \ReflectionClass(TradeProcessor::class);
+        foreach (['shouldQueueTrades', 'queuePlayerTransfer', 'queuePickTransfer'] as $method) {
+            self::assertFalse($processor->hasMethod($method), "TradeProcessor::$method() must not exist");
+        }
+        self::assertFalse($processor->hasProperty('executionRepository'));
+
+        $interface = new \ReflectionClass(\Trading\Contracts\TradeExecutionRepositoryInterface::class);
+        $declared = array_map(static fn(\ReflectionMethod $m) => $m->getName(), $interface->getMethods());
+        self::assertSame(['clearTradeInfo'], $declared, 'TradeExecutionRepositoryInterface must expose only clearTradeInfo');
+    }
+
     // ============================================
     // PARTY-NAME JOINING (Matrix #8)
     // ============================================

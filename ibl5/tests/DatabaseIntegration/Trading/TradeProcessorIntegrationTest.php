@@ -40,7 +40,6 @@ class TradeProcessorIntegrationTest extends DatabaseTestCase
             return;
         }
 
-        $this->db->query("DELETE FROM ibl_trade_queue");
         $this->db->query("DELETE FROM ibl_cash_considerations WHERE label LIKE 'Cash to%' OR label LIKE 'Cash from%'");
         $this->db->query("DELETE FROM nuke_stories WHERE sid > 2");
 

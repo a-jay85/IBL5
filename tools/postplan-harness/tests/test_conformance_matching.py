@@ -289,6 +289,13 @@ def test_node_id_tokens_resolve_through_real_plan_parse(tmp_path):
     `planfile._phase_evidence_paths` keeps `::test_fixture_case` on the phase evidence
     path (spurious MISSING-PHASE:). Resolving unconditionally on `::` fails the negative
     half, which must report both items for a diff that lacks the file.
+
+    Real-plan evidence (2026-10-07, backlog#1103): Phase 5.0 `conformance.check` on
+    manual-testing-clearance-pass-files @ 61cbd8aec and postplan-phase-omission-hold @
+    d23913ac1 both returned RESOLVES; neither plan printed NOT-EXERCISED or
+    DOES-NOT-RESOLVE. Those plans cite the node id only in phase bodies (CLI-executable
+    matrix rows never reach `planned_test_paths`), so this fixture adds the PHPUnit row
+    that routes the same token through `_resolve` as well.
     """
     from harness.planfile import locate_plan
 

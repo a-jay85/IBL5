@@ -1174,16 +1174,28 @@ replay-calibration-fp)
 
 removed-line-token)
     # Token appears only on a removed (-) line; root lacks it. Removed lines count as pre-existing.
+    # Calibration 2026-10-07 (10 merged plan-driven PRs, rows classified in verdicts.tsv): 0 FP,
+    # 3 arm-2-only rescues, all absence assertions whose token sat only on removed lines.
+    # The knockout canary below proves the `grep -vE '^[ -]'` instrument that calibration used:
+    # stripping context and removed lines turns the arm-2 rescue into an UNREALISED report.
     plan_fixture '| 13 | `FIXTURE_RM_SYMBOL` is checked | CLI-executable | post-impl | `bin/test-it` |' \
         > "$root/plan.md"
     printf '%s\n' '-FIXTURE_RM_SYMBOL=old' '+replacement' > "$root/diff.txt"
     err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
     out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
     rc=$?
-    if [ "$rc" -eq 0 ] && [ -z "$out" ] && [ -z "$err" ]; then
+    plan_fixture '| 1 | `gone_token_zz` removed | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/canary-plan.md"
+    printf '%s\n' '-gone_token_zz' '+other' > "$root/canary-diff.txt"
+    grep -vE '^[ -]' "$root/canary-diff.txt" > "$root/canary-noctx.txt" || true
+    canary_full=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/canary-plan.md" "$root/canary-diff.txt" 2>/dev/null)
+    canary_noctx=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/canary-plan.md" "$root/canary-noctx.txt" 2>/dev/null)
+    if [ "$rc" -eq 0 ] && [ -z "$out" ] && [ -z "$err" ] \
+        && [ -z "$canary_full" ] \
+        && grep -qF -- 'UNREALISED-ASSERTION: row 1' <<< "$canary_noctx"; then
         ok "removed-line-token"
     else
-        fail "removed-line-token (rc=$rc, out=$out, err=$err)"
+        fail "removed-line-token (rc=$rc, out=$out, err=$err, canary_full=$canary_full, canary_noctx=$canary_noctx)"
     fi
     ;;
 

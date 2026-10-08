@@ -1643,6 +1643,7 @@ OUT="$(BURNDOWN_NOW=$SW_NOW bd_home "$ZP" burndown-sweep 2>&1)"; RC=$?
     && grep -qxF "$ZP_LINE" <<< "$OUT" \
     && ok "C51a: zombie picked item flipped to skipped with ZOMBIE-PICK line" \
     || fail "C51a: zombie picked item flipped to skipped with ZOMBIE-PICK line (got $RC: $OUT)"
+# Guards the status-only patch: {"status":"skipped","route":"ad-hoc"} would fail the route check.
 [ "$(sw_item "$ZP_OLD" 201 route)" = "" ] && [ "$(sw_item "$ZP_OLD" 201 pr_url)" = "" ] \
     && ! grep -qF 'issue close 201' "$T/gh.log" 2>/dev/null \
     && ok "C51a: flip writes status only, closes nothing" \

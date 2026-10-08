@@ -24,6 +24,8 @@ import {
 
 const PAGES_URL = 'https://a-jay85.github.io/IBL5/deadbeef/visual-review/';
 
+const readFixture = (relPath: string) => readFileSync(resolve(__dirname, relPath), 'utf-8');
+
 describe('newScreenUrl', () => {
   it('1a: appends new-screens/<title>.png under the pages URL', () => {
     expect(newScreenUrl(PAGES_URL, 'standings')).toBe(`${PAGES_URL}new-screens/standings.png`);
@@ -205,15 +207,29 @@ describe('spliceBody', () => {
   });
 
   it('5j: the real PR #2950 two-block shape collapses to one block above the human text', () => {
-    const read = (name: string) => readFileSync(resolve(__dirname, 'fixtures/vr-pr-body', name), 'utf-8');
-    const human = normalizeBody(read('multi-block-human.md'));
-    const bodyIn = normalizeBody(read('multi-block-body-in.md'));
+    const human = normalizeBody(readFixture('fixtures/vr-pr-body/multi-block-human.md'));
+    const bodyIn = normalizeBody(readFixture('fixtures/vr-pr-body/multi-block-body-in.md'));
     const section = sectionFor('roster');
     const result = spliceBody(bodyIn, section);
     expect(result).toBe(`${section}\n\n${human}`);
     expect(findManagedBlocks(result).length).toBe(1);
     expect(spliceBody(bodyIn, '')).toBe(human);
     expect(result).not.toContain('721513f');
+  });
+
+  it('5k: golden: body-in.md spliced with the built block equals expected-body.md (offset-0 output is unchanged)', () => {
+    const bodyIn = normalizeBody(readFixture('fixtures/vr-pr-body/body-in.md'));
+    const gallery = JSON.parse(readFixture('fixtures/vr-pr-body/gallery.json')) as { newCells: LeanCell[] };
+    const spots = JSON.parse(readFixture('fixtures/vr-pr-body/spots.json')) as ChangedSpot[];
+    const section = buildPrBodyBlock({
+      newCells: gallery.newCells,
+      spots,
+      pagesUrl: PAGES_URL,
+      headSha: SHA,
+      runTime: RUN_TIME,
+      agentShots: extractAgentShots(bodyIn),
+    });
+    expect(spliceBody(bodyIn, section)).toBe(normalizeBody(readFixture('fixtures/vr-pr-body/expected-body.md')));
   });
 });
 
@@ -390,6 +406,7 @@ describe('extractAgentShots', () => {
     expect(extractAgentShots(`Prose\n\n${X}`)).toBe('');
   });
 
+  // The old body.startsWith(PR_BODY_MARKER_BEGIN) guard returned '' here.
   it('7c: reads the agent-shot sub-block from a block that is not at offset 0', () => {
     const withShots = block({ spots: [makeSpot()], agentShots: X });
     expect(extractAgentShots(`Intro.\n\n${withShots}`)).toBe(X);
@@ -478,6 +495,8 @@ describe('upsertAgentShots', () => {
     expect(e).not.toContain(agentShotUrl(SHOT_SHA, 'a', 'before'));
   });
 
+  // The old hasBlock check used startsWith and so prepended a second block here. 10h pins the
+  // insert point to the first block: body.lastIndexOf(PR_BODY_MARKER_END) would edit the stale one.
   it('10g: upsert into a block at offset > 0 edits that block and adds none', () => {
     const body = `Intro.\n\n${block({ spots: [makeSpot()] })}\n\nOutro.`;
     const out = upsertAgentShots(body, [entry('a')]);

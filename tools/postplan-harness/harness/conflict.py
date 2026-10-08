@@ -5,7 +5,7 @@ import glob
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional, NoReturn
 
@@ -18,8 +18,11 @@ _CONFLICT_MARKER_PAT = _re.compile(
 # ── Unresolvable class labels ─────────────────────────────────────────────────
 UNRESOLVABLE_MIGRATION = "migration file"
 UNRESOLVABLE_LOCKFILE  = "lockfile"
-UNRESOLVABLE_STAGES    = "incomplete merge stages (delete/add vs modify)"
+UNRESOLVABLE_STAGES    = "incomplete merge stages (add/add, no base)"
 UNRESOLVABLE_EMPTY     = "no unmerged paths reported"
+
+# A base stage plus exactly one side: one side modified, the other deleted.
+MODIFY_DELETE_STAGES = (frozenset({1, 2}), frozenset({1, 3}))
 
 # ── Resolution cap ────────────────────────────────────────────────────────────
 MAX_RESOLVE_ROUNDS = 3
@@ -30,6 +33,7 @@ STAGE_NAMES = {1: "base", 2: "ours", 3: "theirs"}
 class ConflictInventory:
     files: tuple[str, ...] = ()
     unresolvable_reason: Optional[str] = None
+    stage_sets: dict[str, frozenset[int]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -63,7 +67,7 @@ def classify(path: str, stages: set[int]) -> Optional[str]:
     if (os.path.basename(path) in {"composer.lock", "package-lock.json"}
             or path.endswith(".lock")):
         return f"{UNRESOLVABLE_LOCKFILE}: {path}"
-    if stages != {1, 2, 3}:
+    if stages != {1, 2, 3} and frozenset(stages) not in MODIFY_DELETE_STAGES:
         return f"{UNRESOLVABLE_STAGES}: {path} (stages {sorted(stages)})"
     return None
 
@@ -78,14 +82,26 @@ def inventory_conflicts(run: Callable[..., str]) -> ConflictInventory:
         reason = classify(path, stages[path])
         if reason:
             return ConflictInventory(files=(), unresolvable_reason=reason)
-    return ConflictInventory(files=tuple(sorted(stages)), unresolvable_reason=None)
+    return ConflictInventory(
+        files=tuple(sorted(stages)),
+        unresolvable_reason=None,
+        stage_sets={p: frozenset(s) for p, s in stages.items()},
+    )
 
 
-def extract_stages(run: Callable[..., str], key: str, path: str) -> dict[int, Path]:
-    """Extract the three merge stages into /tmp files. Returns {stage_int: Path}."""
+def extract_stages(
+    run: Callable[..., str],
+    key: str,
+    path: str,
+    present: frozenset[int] = frozenset({1, 2, 3}),
+) -> dict[int, Path]:
+    """Extract the present merge stages into /tmp files. Returns {stage_int: Path}.
+    A modify/delete conflict passes the two stages it has; an absent stage is skipped."""
     stage_dir = Path(f"/tmp/postplan-conflict-stages-{key}")
     result: dict[int, Path] = {}
     for stage, name in STAGE_NAMES.items():
+        if stage not in present:
+            continue
         subdir = stage_dir / name
         subdir.mkdir(parents=True, exist_ok=True)
         flat = path.replace("/", "__")
@@ -100,17 +116,63 @@ def extract_stages(run: Callable[..., str], key: str, path: str) -> dict[int, Pa
     return result
 
 
+def master_references(run, *, path, master_sha, merge_base) -> tuple[str, ...]:
+    """Files master changed since the fork that newly mention `path` verbatim."""
+    changed = [p for p in run("diff", "--name-only", merge_base, master_sha).splitlines()
+               if p and p != path]
+    if not changed:
+        return ()
+
+    def refs(rev):
+        out = run("grep", "-l", "-F", "-e", path, rev, "--", *changed, check=False)
+        return {line.split(":", 1)[1] for line in out.splitlines() if ":" in line}
+    return tuple(sorted(refs(master_sha) - refs(merge_base)))
+
+
+_ABSENT = "(absent: this side deleted the file)"
+
+
 def resolve_one(
-    llm, run: Callable[..., str], *, worktree: str, key: str, path: str
+    llm,
+    run: Callable[..., str],
+    *,
+    worktree: str,
+    key: str,
+    path: str,
+    stages: frozenset[int] = frozenset({1, 2, 3}),
+    branch_stage: int = 2,
+    master_sha: str = "origin/master",
+    pre_sha: str = "HEAD",
 ) -> tuple[bool, str]:
-    """Resolve a single conflicted path. Returns (success, reason)."""
+    """Resolve a single conflicted path. Returns (success, reason).
+
+    `stages` is the path's unmerged stage set. `branch_stage` names the stage holding the
+    branch's copy: 2 under `git merge origin/master`, 3 under a rebase. The missing stage
+    of a modify/delete conflict names the side that deleted the file."""
     from .adapters.llm import TOOLED_MAX_TURNS
 
-    stage_paths = extract_stages(run, key, path)
+    if stages != {1, 2, 3}:
+        deleted_side = ({1, 2, 3} - set(stages)).pop()
+        if deleted_side == branch_stage:
+            # The branch deleted it: keep the deletion unless master newly points at it.
+            merge_base = run("merge-base", pre_sha, master_sha).strip()
+            refs = master_references(
+                run, path=path, master_sha=master_sha, merge_base=merge_base
+            )
+            if refs:
+                return False, (f"deleted on branch but newly referenced on master: {path}"
+                               f" <- {', '.join(refs)}")
+            run("rm", "-q", "--", path)
+            return True, ""
+
+    stage_paths = extract_stages(run, key, path, present=frozenset(stages))
     base_path = stage_paths[1]
-    ours_path = stage_paths[2]
-    theirs_path = stage_paths[3]
+    ours_path = stage_paths.get(2, _ABSENT)
+    theirs_path = stage_paths.get(3, _ABSENT)
     stage_dir = str(stage_paths[1].parent.parent)
+    ours_is, theirs_is = (
+        ("the branch", "master") if branch_stage == 2 else ("master", "the branch")
+    )
 
     pre_snapshot = run("status", "--porcelain")
     last_error = ""
@@ -124,9 +186,15 @@ def resolve_one(
             f"  theirs: {theirs_path}\n"
             f"Read all three before deciding. Write the merged result to "
             f"`{worktree}/{path}` with Write.\n"
+            f"Stage 2 (ours) is {ours_is}; stage 3 (theirs) is {theirs_is}.\n"
             f"Never wholesale-take one side. Touch no other file.\n"
             f"End your reply with a line that is exactly `RESOLVED` or exactly `FAILED`."
         )
+        if stages != {1, 2, 3}:
+            prompt += (
+                "\nOne side deleted this file. Either Write the merged result to the path "
+                "and end with RESOLVED, or end with DELETED to keep the deletion."
+            )
         if last_error:
             prompt += f"\n\nPrevious round failed: {last_error}"
 
@@ -150,6 +218,12 @@ def resolve_one(
         )
         if last_line == "FAILED":
             return False, f"resolver declined: {path}"
+        if last_line == "DELETED":
+            if stages == {1, 2, 3}:
+                last_error = "DELETED is only valid for a modify/delete conflict"
+                continue
+            run("rm", "-q", "--", path)
+            return True, ""
 
         full_path = os.path.join(worktree, path)
         if not os.path.exists(full_path) or os.path.getsize(full_path) == 0:
@@ -194,10 +268,17 @@ def resolve_all(
     worktree: str,
     key: str,
     inventory: ConflictInventory,
+    branch_stage: int = 2,
+    master_sha: str = "origin/master",
+    pre_sha: str = "HEAD",
 ) -> ConflictResolutionResult:
     """Attempt to resolve all conflicted files. Returns ConflictResolutionResult."""
     for path in inventory.files:
-        success, reason = resolve_one(llm, run, worktree=worktree, key=key, path=path)
+        success, reason = resolve_one(
+            llm, run, worktree=worktree, key=key, path=path,
+            stages=inventory.stage_sets.get(path, frozenset({1, 2, 3})),
+            branch_stage=branch_stage, master_sha=master_sha, pre_sha=pre_sha,
+        )
         if not success:
             return ConflictResolutionResult(False, reason)
     return ConflictResolutionResult(True, "", tuple(inventory.files))
@@ -210,9 +291,11 @@ def abort_and_restore(
     pre_rebase_sha: str,
     reason: str,
 ) -> NoReturn:
-    """Abort any in-progress rebase, hard-reset to pre_rebase_sha, then raise HarnessError."""
+    """Abort any in-progress merge or rebase, hard-reset to pre_rebase_sha, then raise
+    HarnessError."""
     from .state import HarnessError
 
+    run("merge", "--abort", check=False)
     run("rebase", "--abort", check=False)
 
     for subdir in ("rebase-merge", "rebase-apply"):
@@ -222,6 +305,11 @@ def abort_and_restore(
                 "rebase-conflict",
                 f"RESTORE-FAILED: {subdir} still present after abort; {reason}",
             )
+    if run("rev-parse", "-q", "--verify", "MERGE_HEAD", check=False).strip():
+        raise HarnessError(
+            "rebase-conflict",
+            f"RESTORE-FAILED: MERGE_HEAD still present after abort; {reason}",
+        )
 
     run("reset", "--hard", pre_rebase_sha)
 

@@ -43,7 +43,7 @@ test.describe('Season Highs flow', () => {
   });
 
   test('player links navigate to valid player pages', async ({ page }) => {
-    const playerLinks = page.locator('.stat-table a[href*="pid="], .ibl-data-table a[href*="pid="]');
+    const playerLinks = page.locator('.stat-table a[href*="pid="]');
     await expect(playerLinks.first()).toBeVisible();
 
     const href = await playerLinks.first().getAttribute('href');

@@ -33,7 +33,7 @@ test.describe('Player Movement flow', () => {
   });
 
   test('player links navigate to player page', async ({ page }) => {
-    const playerLinks = page.locator('.player-movement-table a[href*="pid="], .ibl-data-table a[href*="pid="]');
+    const playerLinks = page.locator('.player-movement-table a[href*="pid="]');
     await expect(playerLinks.first()).toBeVisible();
 
     const href = await playerLinks.first().getAttribute('href');

@@ -319,6 +319,11 @@ class TestRealScripts:
         assert not c.active and c.reason == "local byte budget passes"
 
     def test_post_checks_pass_on_clean_worktree(self):
+        # check-prose/check-docs diff against origin/master; a shallow CI checkout lacks it.
+        probe = subprocess.run(["git", "rev-parse", "--verify", "--quiet", "origin/master"],
+                               cwd=self.ROOT, capture_output=True)
+        if probe.returncode != 0:
+            pytest.skip("origin/master unavailable")
         assert post_check_failures(self.ROOT) == []
 
 

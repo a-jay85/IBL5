@@ -1,5 +1,5 @@
 ---
-description: On a visual-change PR, the visual-regression run builds a change-driven before/after gallery (rows whose render differs from master's committed baseline) and posts a sticky visual-review PR comment grouped by module, with a "changed but NOT covered" coverage-gap section. A daily and on-demand refresh workflow republishes stale galleries, and retention cleanup keeps every gallery dir an open PR links to.
+description: On a visual-change PR, the visual-regression run builds a change-driven before/after gallery (rows whose render differs from master's committed baseline) and posts a sticky visual-review PR comment grouped by module, with a "changed but NOT covered" coverage-gap section. A daily and on-demand refresh workflow republishes stale galleries, and retention cleanup keeps every gallery dir an open PR links to. Changed cells and agent shots are also published as cropped before/after pairs at the top of the PR body.
 paths:
   - ".github/workflows/e2e-tests.yml"
   - ".github/workflows/pages-deploy.yml"
@@ -8,6 +8,8 @@ paths:
   - "ibl5/tests/e2e/vr-gallery.ts"
   - "ibl5/tests/e2e/vr-review-comment.ts"
   - "ibl5/tests/e2e/vr-pr-body.ts"
+  - "ibl5/tests/e2e/vr-crop.ts"
+  - "ibl5/tests/e2e/vr-crop-png.ts"
   - "bin/vr-changed-coverage"
   - "bin/vr-build-gallery"
   - "bin/vr-review-comment"
@@ -23,7 +25,7 @@ See ADR-0068, ADR-0069, ADR-0073, ADR-0074, and ADR-0076 for the decisions and r
 is the current gallery-selection model: the gallery is **change-driven** (built from rows whose PR
 render differs from master's committed baseline), not failure-driven. ADR-0076 extends it: brand-new
 views (`gallery.newCells`) are additionally published inline at the top of the PR body, not only in
-the sticky comment.
+the sticky comment. ADR-0181 extends ADR-0076 to changed cells, agent shots and manual-row befores.
 
 ## What runs
 
@@ -32,6 +34,8 @@ On a PR run of the visual-regression (VR) step in `.github/workflows/e2e-tests.y
 in order, AFTER the VR run and BEFORE baseline regen. They fire on **pass OR fail**: selection is
 decoupled from the VR check outcome (ADR-0074), so the gallery publishes even when VR is green.
 They are skipped only during baseline regen (the `update-baselines` label).
+
+Under that label the publish steps still run (ADR-0181): gallery build, crop, deploy and retries, assert, re-serve and splice. Each has label-true `continue-on-error`, so regen always runs. Guard: `ibl5/tests/ts-unit/vr-workflow-guard.test.ts`.
 
 1. **Compute coverage** — `git diff --name-only <base>...HEAD | bin/vr-changed-coverage`
    maps the changed files onto `vr-manifest.ts` rows (uncovered website paths and a global-change
@@ -153,6 +157,25 @@ fails the VR job or blocks the sticky comment. The pure splice/copy-plan logic l
 `ibl5/tests/e2e/vr-pr-body.ts` (unit-tested in `ibl5/tests/ts-unit/vr-pr-body.test.ts`); only `gh`/
 `fetch`/`fs` I/O lives in the `bin/vr-review-comment` glue layer.
 
+## Changed screens in the PR body
+
+Changed cells get cropped before/after pairs in the same block (ADR-0181). `--crop-changed` runs
+pixelmatch at the gate threshold (0.2) with `diffMask`, clusters changed pixels into at most three
+padded spots, and crops both sides to one box. A size change or a sub-threshold change publishes
+uncropped, labelled. Output: `changed/<title>.<i>.{before,after}.png` plus `changed/spots.json`.
+One `###` per spot (module, cell, region), before above after, desktop first, mobile in one
+`<details>` per module. A short-SHA and UTC stamp opens the block. Cap: 40 spots or 40,000 chars,
+then a gallery link. Code: `ibl5/tests/e2e/vr-crop.ts`, `ibl5/tests/e2e/vr-crop-png.ts`,
+`ibl5/tests/e2e/vr-pr-body.ts`.
+
+## Publishing agent shots
+
+`bin/vr-review-comment --publish-agent-shots=<PR#> --agent-shots=<shots.json> [--dry-run]`.
+JSON: 1 to 20 of `{"label": "nav-bar", "before": "a.png", "after": "b.png"}` (`before` optional,
+PNG under 5 MB). Files go to `<head-sha>/visual-review/agent-shots/` on `gh-pages`, then an
+agent-shot sub-block is upserted, which the CI refresh keeps. Never put a local file path in a PR
+body. Labels are sanitized to `[a-z0-9-]`. `bin/prune-vr-galleries` prunes the per-SHA tree.
+
 ## Modifying the selection logic
 
 Gallery cell selection lives in `bin/vr-build-gallery` and `ibl5/tests/e2e/vr-gallery.ts`
@@ -165,7 +188,9 @@ source overrides use the optional `sourceGlobs` field on `VrRow`. **Changing thi
 a mechanical-enforcement surface and requires an ADR** (current: ADR-0074, amended by ADR-0180 for the review-only strict pass). The PR-body new-screens
 publishing surface (`--copy-new-screens`/`--update-pr-body` on `bin/vr-review-comment`,
 `ibl5/tests/e2e/vr-pr-body.ts`, `ibl5/tests/ts-unit/vr-pr-body.test.ts`) is likewise a
-mechanical-enforcement surface, covered by **ADR-0076**.
+mechanical-enforcement surface, covered by **ADR-0076**. The crop modules (`ibl5/tests/e2e/vr-crop.ts`,
+`ibl5/tests/e2e/vr-crop-png.ts`), `--crop-changed` and `--publish-agent-shots` are covered by
+**ADR-0076** and **ADR-0181**.
 
 ## Manual-row screenshots
 
@@ -197,6 +222,10 @@ runs in its own config so a bad `vr:` cell can never turn the baseline-diff step
 Capture runs **after** the baseline diff has shot its actuals, so a `setup=` mutation cannot
 invalidate a baseline; the pure grammar/markup helpers live in `ibl5/tests/e2e/vr-manual-rows.ts`
 (unit-tested in `ibl5/tests/ts-unit/vr-manual-rows.test.ts`). Both output paths are gitignored.
+
+A base-SHA pass (ADR-0181) serves the base from a second PHP container, runs with
+`VR_MANUAL_SIDE=before`, writes `<label>.before.png` and sets `beforeStatus`. The before shows above
+the after only when `beforeStatus` is `ok`; otherwise the row stays after-only.
 
 ## One-time deployment prerequisite
 

@@ -7,6 +7,15 @@ import {
   buildNewScreensSection,
   normalizeBody,
   spliceBody,
+  AGENT_SHOTS_BEGIN,
+  AGENT_SHOTS_END,
+  buildPrBodyBlock,
+  extractAgentShots,
+  sanitizeLabel,
+  agentShotUrl,
+  buildAgentShotEntry,
+  upsertAgentShots,
+  type ChangedSpot,
   type LeanCell,
 } from '../e2e/vr-pr-body';
 
@@ -60,9 +69,9 @@ describe('buildNewScreensSection', () => {
       { module: 'standings', viewport: 'mobile', title: 'standings-mobile' },
     ];
     const section = buildNewScreensSection(cells, PAGES_URL);
-    expect(section).toContain(`![standings — desktop](${newScreenUrl(PAGES_URL, 'standings')})`);
+    expect(section).toContain(`![standings · desktop](${newScreenUrl(PAGES_URL, 'standings')})`);
     expect(section).toContain(
-      `![standings-mobile — mobile](${newScreenUrl(PAGES_URL, 'standings-mobile')})`
+      `![standings-mobile · mobile](${newScreenUrl(PAGES_URL, 'standings-mobile')})`
     );
   });
 
@@ -146,5 +155,211 @@ describe('spliceBody', () => {
     const prose = 'Human prose here.';
     const withBlock = spliceBody(prose, section);
     expect(spliceBody(withBlock, '')).toBe(prose);
+  });
+});
+
+function makeSpot(over: Partial<ChangedSpot> = {}): ChangedSpot {
+  const title = over.title ?? 'standings';
+  const index = over.index ?? 1;
+  return {
+    module: 'standings',
+    viewport: 'desktop',
+    title,
+    index,
+    count: 1,
+    kind: 'spot',
+    region: 'top, y 0-100 px',
+    beforeFile: `changed/${title}.${index}.before.png`,
+    afterFile: `changed/${title}.${index}.after.png`,
+    ...over,
+  };
+}
+
+const RUN_TIME = new Date('2026-10-06T20:23:45.000Z');
+const SHA = 'abc1234def5678';
+
+function block(over: Partial<Parameters<typeof buildPrBodyBlock>[0]> = {}): string {
+  return buildPrBodyBlock({
+    newCells: [],
+    spots: [],
+    pagesUrl: PAGES_URL,
+    headSha: SHA,
+    runTime: RUN_TIME,
+    agentShots: '',
+    ...over,
+  });
+}
+
+describe('buildPrBodyBlock', () => {
+  it('6a: emits one ### heading per spot', () => {
+    const spots = [makeSpot({ title: 'a', index: 1 }), makeSpot({ title: 'b', index: 1 }), makeSpot({ title: 'b', index: 2 })];
+    const headings = block({ spots }).split('\n').filter((l) => l.startsWith('### '));
+    expect(headings).toHaveLength(3);
+  });
+
+  it('6b: **Before** precedes **After** within each spot', () => {
+    const lines = block({ spots: [makeSpot({ title: 'a' }), makeSpot({ title: 'b' })] }).split('\n');
+    const befores = lines.flatMap((l, i) => (l === '**Before**' ? [i] : []));
+    const afters = lines.flatMap((l, i) => (l === '**After**' ? [i] : []));
+    expect(befores).toHaveLength(2);
+    expect(afters).toHaveLength(2);
+    befores.forEach((b, i) => expect(b).toBeLessThan(afters[i]));
+    expect(afters[0]).toBeLessThan(befores[1]);
+  });
+
+  it('6c: mobile spots sit inside <details>, desktop spots do not', () => {
+    const out = block({
+      spots: [
+        makeSpot({ title: 'desk', viewport: 'desktop' }),
+        makeSpot({ title: 'mob', viewport: 'mobile' }),
+      ],
+    });
+    const open = out.indexOf('<details>');
+    const close = out.indexOf('</details>');
+    expect(open).toBeGreaterThan(-1);
+    expect(close).toBeGreaterThan(open);
+    expect(out).toContain('standings: mobile (1 spots)</summary>\n\n');
+    const mobIdx = out.indexOf('· mob ·');
+    const deskIdx = out.indexOf('· desk ·');
+    expect(mobIdx).toBeGreaterThan(open);
+    expect(mobIdx).toBeLessThan(close);
+    expect(deskIdx).toBeLessThan(open);
+  });
+
+  it('6d: stamp holds the 7-char sha and UTC; non-hex sha renders unknown', () => {
+    const out = block({ spots: [makeSpot()] });
+    const stamp = out.split('\n').find((l) => l.startsWith('_VR screens for head'))!;
+    expect(stamp).toContain('`abc1234`');
+    expect(stamp).toContain('UTC');
+    expect(stamp).toContain('2026-10-06 20:23');
+    const bad = block({ spots: [makeSpot()], headSha: 'not-a-sha!' });
+    expect(bad).toContain('`unknown`');
+  });
+
+  it('6e: all-empty input returns "" and splice strips the block leaving human text', () => {
+    expect(block()).toBe('');
+    const prose = 'Human prose here.';
+    const withBlock = spliceBody(prose, block({ spots: [makeSpot()] }));
+    expect(withBlock.startsWith(PR_BODY_MARKER_BEGIN)).toBe(true);
+    expect(spliceBody(withBlock, block())).toBe(prose);
+  });
+
+  it('6f: 45 spots with the default cap emit 40 headings plus the overflow line and gallery link', () => {
+    const spots = Array.from({ length: 45 }, (_, i) => makeSpot({ title: `t${String(i).padStart(2, '0')}` }));
+    const out = block({ spots });
+    const headings = out.split('\n').filter((l) => l.startsWith('### '));
+    expect(headings).toHaveLength(40);
+    expect(out).toContain('5 more changed spots');
+    expect(out).toContain(`[Full gallery](${PAGES_URL})`);
+  });
+
+  it('6g: maxChars stops before the limit; length stays within it plus the overflow line', () => {
+    const spots = Array.from({ length: 30 }, (_, i) => makeSpot({ title: `t${String(i).padStart(2, '0')}` }));
+    const out = block({ spots, maxChars: 2000 });
+    const overflow = out.split('\n').find((l) => l.includes('more changed spots'))!;
+    expect(overflow).toBeDefined();
+    expect(out.split('\n').filter((l) => l.startsWith('### ')).length).toBeLessThan(30);
+    expect(out.length).toBeLessThanOrEqual(2000 + overflow.length);
+  });
+
+  it('6h: uncropped spot heading reads "full page (size changed)"', () => {
+    const out = block({
+      spots: [makeSpot({ kind: 'uncropped', reason: 'dimensions-changed', region: '' })],
+    });
+    const heading = out.split('\n').find((l) => l.startsWith('### '))!;
+    expect(heading).toContain('full page (size changed)');
+  });
+});
+
+describe('extractAgentShots', () => {
+  const X = `${AGENT_SHOTS_BEGIN}\n![shot](https://example.test/x.png)\n${AGENT_SHOTS_END}`;
+
+  it('7a: round-trips an agent-shot sub-block through buildPrBodyBlock', () => {
+    const out = block({ spots: [makeSpot()], agentShots: X });
+    expect(extractAgentShots(out)).toBe(X);
+  });
+
+  it('7b: sub-block markers outside the managed block return ""', () => {
+    const managed = block({ spots: [makeSpot()] });
+    const outside = `${managed}\n\n${X}`;
+    expect(extractAgentShots(outside)).toBe('');
+    expect(extractAgentShots(`Prose\n\n${X}`)).toBe('');
+  });
+});
+
+describe('sanitizeLabel', () => {
+  it('8a: neutralises markdown and html characters', () => {
+    expect(sanitizeLabel('Hi ](javascript:x) <img>')).toBe('hi-javascript-x-img');
+  });
+
+  it('8c: a hostile agent-shot label becomes a safe gh-pages path', () => {
+    const label = sanitizeLabel('Nav Bar ](x)');
+    expect(label).toBe('nav-bar-x');
+    expect(agentShotUrl('a'.repeat(40), label as string, 'after')).toBe(
+      `https://a-jay85.github.io/IBL5/${'a'.repeat(40)}/visual-review/agent-shots/nav-bar-x.after.png`,
+    );
+  });
+
+  it('8b: returns null when nothing survives', () => {
+    expect(sanitizeLabel('!!!')).toBeNull();
+  });
+});
+
+describe('upsertAgentShots', () => {
+  const SHOT_SHA = 'a'.repeat(40);
+  const entry = (label: string, hasBefore = true, sha = SHOT_SHA) => ({
+    label,
+    entry: buildAgentShotEntry(sha, label, hasBefore),
+  });
+  const markers = (body: string, label: string) =>
+    body.split('\n').filter((l) => l === `<!-- vr-agent-shot:${label} -->`).length;
+
+  it('10a: a body with no managed block gains one; human text survives below', () => {
+    const out = upsertAgentShots('Human prose.', [entry('a')]);
+    expect(out.startsWith(PR_BODY_MARKER_BEGIN)).toBe(true);
+    expect(out.endsWith('Human prose.')).toBe(true);
+    expect(out.indexOf(PR_BODY_MARKER_END)).toBeLessThan(out.indexOf('Human prose.'));
+    expect(extractAgentShots(out)).toContain('<!-- vr-agent-shot:a -->');
+  });
+
+  it('10b: upserting the same label twice leaves one entry holding the second URLs', () => {
+    const once = upsertAgentShots('Prose', [entry('a')]);
+    const otherSha = 'b'.repeat(40);
+    const twice = upsertAgentShots(once, [entry('a', true, otherSha)]);
+    expect(markers(twice, 'a')).toBe(1);
+    expect(twice).toContain(agentShotUrl(otherSha, 'a', 'after'));
+    expect(twice).not.toContain(agentShotUrl(SHOT_SHA, 'a', 'after'));
+  });
+
+  it('10c: a second label appends after the first', () => {
+    const out = upsertAgentShots(upsertAgentShots('Prose', [entry('a')]), [entry('b')]);
+    expect(markers(out, 'a')).toBe(1);
+    expect(markers(out, 'b')).toBe(1);
+    expect(out.indexOf('<!-- vr-agent-shot:a -->')).toBeLessThan(out.indexOf('<!-- vr-agent-shot:b -->'));
+  });
+
+  it('10d: CI spot headings stay byte-identical after an upsert', () => {
+    const body = spliceBody('Prose', block({ spots: [makeSpot({ title: 'x' }), makeSpot({ title: 'y' })] }));
+    const ciHeadings = (b: string) =>
+      b.split('\n').filter((l) => l.startsWith('### ') && !l.startsWith('### Agent shot'));
+    const out = upsertAgentShots(body, [entry('a')]);
+    expect(ciHeadings(out)).toEqual(ciHeadings(body));
+    expect(ciHeadings(out)).toHaveLength(2);
+    expect(out.endsWith('Prose')).toBe(true);
+  });
+
+  it('10e: a CI rebuild round-trip keeps the agent entry', () => {
+    const withShot = upsertAgentShots('Prose', [entry('a')]);
+    const rebuilt = spliceBody(withShot, block({ spots: [makeSpot()], agentShots: extractAgentShots(withShot) }));
+    expect(markers(rebuilt, 'a')).toBe(1);
+    expect(rebuilt).toContain(agentShotUrl(SHOT_SHA, 'a', 'after'));
+    expect(rebuilt.endsWith('Prose')).toBe(true);
+  });
+
+  it('10f: hasBefore=false renders no **Before**', () => {
+    const e = buildAgentShotEntry(SHOT_SHA, 'a', false);
+    expect(e).not.toContain('**Before**');
+    expect(e).toContain('**After**');
+    expect(e).not.toContain(agentShotUrl(SHOT_SHA, 'a', 'before'));
   });
 });

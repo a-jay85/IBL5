@@ -171,6 +171,8 @@ jobs:
               - 'ibl5/package.json'
               - 'ibl5/bun.lock'
               - '.github/workflows/tests.yml'
+              # vr-workflow-guard.test.ts reads the e2e job's publish-step guards.
+              - '.github/workflows/e2e-tests.yml'
 
             iblbot:
               # IBLbot has its own npm package + tsconfig + vitest suite

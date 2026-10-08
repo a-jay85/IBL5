@@ -470,6 +470,45 @@ abstract class BaseMysqliRepository
     }
 
     /**
+     * Narrow a mixed fetchAll() column value to int.
+     *
+     * Returns ints unchanged, truncates floats, and casts numeric strings.
+     * Anything else (null, bool, array, non-numeric string) yields 0. For
+     * INT NOT NULL columns the fallback is defensive only: 0 never matches a
+     * real id, so it cannot produce a malformed index key.
+     */
+    protected static function scalarToInt(mixed $value): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_float($value)) {
+            return (int) $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+        return 0;
+    }
+
+    /**
+     * Narrow a mixed fetchAll() column value to string.
+     *
+     * Returns strings unchanged and stringifies ints and floats. Anything else
+     * (null, bool, array) yields ''.
+     */
+    protected static function scalarToString(mixed $value): string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+        return '';
+    }
+
+    /**
      * Canonical derived-table subquery deduplicating `ibl_box_scores_teams` rows
      * where the same (game_date, visitor_teamid, home_teamid) tuple has multiple
      * `game_of_that_day` values. Picks the smallest value (deterministic).

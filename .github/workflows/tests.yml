@@ -126,6 +126,7 @@ jobs:
               - '.claude/skills/post-plan/SKILL.md'
               - '.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md'
               - '.claude/skills/post-plan/_phase-5.5-fidelity.md'
+              - '.claude/skills/post-plan/_phase-6-manual-testing.md'  # Mode A `row` contract pin
               - '.claude/review-shared/scripts/digest.sh'
               # bin/test-post-review-findings reads the Step 7 / Step 1 blocks here,
               # so a skill-only edit must run the harness job too.

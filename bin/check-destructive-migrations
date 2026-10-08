@@ -15,7 +15,7 @@ ENGINE="$(cd "$(dirname "$0")" && pwd)/lib/destructive-migration-scan.py"
 
 usage() {
     cat <<'EOF'
-Usage: bin/check-destructive-migrations [--staged|--since=<sha>|--full-scan] [--schema=<path>] [--bypass-from-stdin] [--self-test] [--help|-h]
+Usage: bin/check-destructive-migrations [--staged|--since=<sha>|--full-scan] [--schema=<path>] [--exclude-from=<file>] [--bypass-from-stdin] [--self-test] [--help|-h]
 
 Scans added/modified migration files under ibl5/migrations/ (*.sql and *.php)
 for destructive SQL statements and blocks unless a tagged bypass marker names
@@ -30,6 +30,11 @@ Modes:
 
 Options:
   --schema=<path>       Resolve narrow-type old types from this schema dump instead of ibl5/docs/schema/current-schema.sql.
+  --exclude-from=<file> Skip every migration path listed in <file> (one repo-relative
+                        path per line, as git diff --name-only prints it; blank
+                        lines ignored). Equals form only; an unreadable <file>
+                        exits 2. bin/pre-commit-hook passes the paths a merge
+                        commit stages byte-identical to origin/master.
   --bypass-from-stdin   Read PR body from stdin for PR-wide bypass markers.
   --self-test           Run the engine's inline fixture table.
   --help, -h            Show this message.
@@ -112,6 +117,8 @@ FULL_GIVEN=0
 SELF_TEST=0
 SCHEMA_OVERRIDE=""
 SCHEMA_GIVEN=0
+EXCLUDE_FROM=""
+EXCLUDE_GIVEN=0
 
 for arg in "$@"; do
     case "$arg" in
@@ -126,6 +133,10 @@ for arg in "$@"; do
         --schema=*)
             SCHEMA_GIVEN=1
             SCHEMA_OVERRIDE="${arg#--schema=}"
+            ;;
+        --exclude-from=*)
+            EXCLUDE_GIVEN=1
+            EXCLUDE_FROM="${arg#--exclude-from=}"
             ;;
         --bypass-from-stdin)
             BYPASS_STDIN=1
@@ -166,6 +177,15 @@ if [ "$SCHEMA_GIVEN" = "1" ]; then
     SCHEMA_OVERRIDE="$(cd "$(dirname "$SCHEMA_OVERRIDE")" && pwd)/$(basename "$SCHEMA_OVERRIDE")"
 fi
 
+if [ "$EXCLUDE_GIVEN" = "1" ]; then
+    if [ -z "$EXCLUDE_FROM" ] || [ -d "$EXCLUDE_FROM" ] || [ ! -r "$EXCLUDE_FROM" ]; then
+        echo "cannot read --exclude-from file: $EXCLUDE_FROM" >&2
+        exit 2
+    fi
+    # Absolute before the later cd to the repo root.
+    EXCLUDE_FROM="$(cd "$(dirname "$EXCLUDE_FROM")" && pwd)/$(basename "$EXCLUDE_FROM")"
+fi
+
 if [ "$FULL_GIVEN" = "1" ]; then
     if [ "$SINCE_GIVEN" = "1" ] || [ "$BYPASS_STDIN" = "1" ]; then
         echo "--full-scan takes no range and no stdin" >&2
@@ -199,6 +219,7 @@ get_migration_files() {
         git ls-files -- 'ibl5/migrations/*.sql' 'ibl5/migrations/*.php' \
             | grep -v '^$' \
             | grep -v "^${BASELINE_FILE}$" \
+            | drop_excluded \
             || true
         return
     fi
@@ -206,7 +227,22 @@ get_migration_files() {
     git diff $RANGE --name-only --diff-filter=AM -- 'ibl5/migrations/*.sql' 'ibl5/migrations/*.php' 2>/dev/null \
         | grep -v '^$' \
         | grep -v "^${BASELINE_FILE}$" \
+        | drop_excluded \
         || true
+}
+
+# drop_excluded — pass stdin through minus every path listed in --exclude-from.
+# grep reads the list file directly (nothing piped into grep -q), so pipefail is safe.
+drop_excluded() {
+    if [ -z "$EXCLUDE_FROM" ]; then
+        cat
+        return
+    fi
+    while IFS= read -r f; do
+        if ! grep -qxF -- "$f" "$EXCLUDE_FROM"; then
+            printf '%s\n' "$f"
+        fi
+    done
 }
 
 FILES="$(get_migration_files)"

@@ -1,6 +1,6 @@
 ---
 description: Linear history — squash/rebase-merge only — path-scoped, loads only for post-plan/rebase surfaces. Read before diagnosing a "SHA not in master" result or rebasing a stacked branch after its parent merged.
-last_verified: 2026-09-18
+last_verified: 2026-10-07
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - "tools/postplan-harness/**"
@@ -36,20 +36,22 @@ git rebase --onto origin/master <parent-tip-before-merge> <your-branch>
 everything after it is yours. Expect a clean replay; conflicts here usually mean the
 range is wrong.
 
-Both `/post-plan` engines rebase with a plain `git rebase origin/master`, which on such a
-branch replays the parent's now-duplicated commits → conflict. What happens next **differs
-by engine**. Establish which engine ran before you act.
+Both `/post-plan` engines now merge `origin/master` into the branch (`git merge --no-edit`).
+A merge sees the squash-merged parent's content on both sides and does not replay it, so the
+trap above does not fire in Phase 2. It still fires for a hand-run `git rebase origin/master`.
+When a Phase 2 conflict does occur, it is a real overlap with master, and what happens next
+**differs by engine**. Establish which engine ran before you act.
 
 **Harness** (the default, `tools/postplan-harness/`). `gitad.py` `rebase_onto` aborts the
-rebase, raises `rebase-conflict`, and `runner.py` `exit_code_for` returns **3**.
+merge when `harness/conflict.py` cannot resolve it, raises `rebase-conflict`, and `runner.py` `exit_code_for` returns **3**.
 `should_fallback` in `bin/post-plan-now` treats 3 as fail-closed and **does NOT escalate to a
 `/post-plan` skill session**. The run stops there and a **human** resolves the branch by hand.
-If that's you: this is the squash trap. Use the `--onto` form above, then re-run
+If that's you: run `git merge origin/master`, resolve three-way, commit, then re-run
 `bin/post-plan-now --auto`.
 
 **Skill** (`POST_PLAN_SKILL=1`, or the harness is absent). Phase 2 prints `STOP-AND-RESOLVE:`
 and the run **continues** into `.claude/skills/post-plan/_phase-2-conflict-resolution.md`,
-which re-runs the rebase in the `--onto` form, resolves three-way, and proves
+which re-runs the merge against the pinned master SHA, resolves three-way, and proves
 `TREE-EQUIVALENT` before any push. A resolved conflict holds auto-merge at Phase 6.5 condition (14) until step 7.5's conflict-resolution review clears it for the current `HEAD`.
 
 No path spawns a skill session *because of* a conflict. Engine split and exit codes:

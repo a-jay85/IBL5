@@ -116,6 +116,7 @@ HARNESS_OUT="${FLEET_STATUS_HARNESS_OUT:-$MAIN_CHECKOUT/tools/postplan-harness/o
 LOG_DIR="${FLEET_STATUS_LOG_DIR:-/tmp}"
 TRANSCRIPT_ROOT="${FLEET_STATUS_TRANSCRIPT_ROOT:-$HOME/.claude/projects}"
 JQ_BIN="${FLEET_STATUS_JQ:-jq}"
+BURNDOWN_LOG="${FLEET_STATUS_BURNDOWN_LOG:-$HOME/.claude/burndown-loop/loop.log}"
 AUTOMOUSE_PLIST="${FLEET_STATUS_AUTOMOUSE_PLIST:-$HOME/Library/LaunchAgents/com.ibl5.automouse.plist}"
 REORDER_APP_DIR="${FLEET_STATUS_REORDER_APP_DIR:-$HOME/Library/Caches/ibl5}"
 OSACOMPILE_BIN="${FLEET_STATUS_OSACOMPILE:-osacompile}"
@@ -529,6 +530,7 @@ render_launchd() {
                 ;;
             post-plan-fleet-*) producer="fleet"; log="$LOG_DIR/${suffix}.log" ;;
             docfix-*)       producer="docfix";   log="$LOG_DIR/${suffix}.log" ;;
+            burndown-loop)  producer="burndown"; log="$BURNDOWN_LOG" ;;
         esac
 
         # PROGRESS, best available. The harness audit.log is the only true
@@ -562,6 +564,12 @@ render_launchd() {
                     progress="(working — no assistant text yet)"
             fi
         fi
+        # burndown-loop is one long-lived process that sleeps between batches.
+        # While it sleeps, show when it wakes instead of the raw sleep line.
+        if [ "$suffix" = "burndown-loop" ]; then
+            ph="$(burndown_next_run "$BURNDOWN_LOG")" || ph=''
+            [ -n "$ph" ] && progress="$ph"
+        fi
         if [ -z "$progress" ]; then
             progress="(no output yet — headless runs flush at exit)"
             progress_tool=''
@@ -582,6 +590,31 @@ EOF
 
     [ "$count" -eq 0 ] && note "none running (labels with a '-' PID are finished jobs, not shown)"
     return 0
+}
+
+# "asleep (<reason>)  ·  next run Www YYYY-MM-DD HH:MM" for a sleeping
+# burndown-loop, or nothing. bin/burndown-loop's bl_sleep logs
+# "<UTC ts> burndown-loop sleep <secs>s reason=<reason>" once, then sleeps in
+# 60s chunks without logging. So when that line is the log's LAST line, the
+# loop is asleep and ts + secs is its wake time. A later line means it woke. A
+# wake time already past means the Mac slept through it, so nothing prints.
+burndown_next_run() {
+    local f="$1" line ts secs reason start wake
+    [ -f "$f" ] || return 0
+    line="$(grep -v '^[[:space:]]*$' "$f" 2>/dev/null | tail -n 1)"
+    [[ "$line" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)\ burndown-loop\ sleep\ ([0-9]+)s\ reason=(.*)$ ]] \
+        || return 0
+    ts="${BASH_REMATCH[1]}"; secs="${BASH_REMATCH[2]}"; reason="${BASH_REMATCH[3]}"
+    # BSD first, GNU (CI) second, as in automouse_oneshot_next.
+    start="$(date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$ts" +%s 2>/dev/null \
+        || date -u -d "$ts" +%s 2>/dev/null)"
+    case "$start" in ''|*[!0-9]*) return 0 ;; esac
+    wake=$(( start + 10#$secs ))
+    [ "$wake" -gt "$(date +%s)" ] || return 0
+    printf 'asleep (%s)  ·  next run ' "$reason"
+    date -r "$wake" +'%a %Y-%m-%d %H:%M' 2>/dev/null \
+        || date -d "@$wake" +'%a %Y-%m-%d %H:%M' 2>/dev/null \
+        || true
 }
 
 # ── automouse runner helpers (rendered inside the queue section) ──────────────

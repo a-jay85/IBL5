@@ -41,4 +41,28 @@ final class BanSqlStringInterpolationRuleTest extends RuleTestCase
             [],
         );
     }
+
+    public function testFlagsInterpolatedSqlStringsInBlocksDirectory(): void
+    {
+        $message = 'SQL string uses variable interpolation. Splicing a variable into query '
+            . 'text risks SQL injection. Use bound parameters (?) for values, and a '
+            . 'validated allowlist/match() for identifiers (table/column names).';
+
+        $this->analyse(
+            [__DIR__ . '/Fixtures/blocks/SqlStringInterpolation.php'],
+            [
+                [$message, 7],
+                [$message, 8],
+                [$message, 9],
+            ],
+        );
+    }
+
+    public function testIgnoresInterpolatedSqlOutsideGatedDirectories(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/subblocks/SqlStringInterpolation.php'],
+            [],
+        );
+    }
 }

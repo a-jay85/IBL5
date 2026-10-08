@@ -142,6 +142,9 @@ def test_finish_clean_error_is_byte_identical(tmp_path):
     runner._finish(res, str(tmp_path))
     assert (tmp_path / "result.json").read_text() == res.to_json()
 
+    # _finish must guard on res.error: _redact(None) raises TypeError.
+    with pytest.raises(TypeError):
+        runner._redact(None)
     none_dir = tmp_path / "none"
     none_dir.mkdir()
     res_none = RunResult(terminal=TerminalState.FAILED, error=None)

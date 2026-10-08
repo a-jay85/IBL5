@@ -11,6 +11,7 @@ use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationService;
 use Negotiation\NegotiationValidator;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * Integration tests for complete contract negotiation workflows
@@ -46,6 +47,7 @@ class NegotiationWideUnitTest extends WideUnitTestCase
             new NegotiationRepository($db, $commonRepo),
             new NegotiationValidator($db, $this->mockSeason),
             new ExtensionContractDemandCalculator($db, $commonRepo),
+            self::createStub(TeamIdentityRepositoryInterface::class),
         );
 
         // Prevent any external calls during tests

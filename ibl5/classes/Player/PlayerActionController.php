@@ -70,6 +70,7 @@ final class PlayerActionController
             new NegotiationRepository($this->mysqliDb, $this->salaryCapRepo),
             new NegotiationValidator($this->mysqliDb),
             new ExtensionContractDemandCalculator($this->mysqliDb, $this->salaryCapRepo),
+            $this->commonRepo,
         );
 
         return $service->processNegotiation($playerID, $userTeamName, $prefix, $bypassOwnership);
@@ -132,7 +133,7 @@ final class PlayerActionController
             $threepointcontests,
             $dunkcontests,
             $rooksoph,
-            $this->mysqliDb
+            $this->commonRepo
         );
 
         // Flip card script must come after the card HTML so elements exist for init

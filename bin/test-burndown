@@ -69,9 +69,25 @@ chmod +x "$T/gh"
 # git stub: porcelain worktree list
 cat > "$T/git" <<'STUB'
 #!/usr/bin/env bash
+# Per-worktree probe fixtures live under $GH_FX_DIR/wt/, keyed by the
+# basename of the `-C <path>` argument:
+#   <key>.fail    present => status/rev-list exit 128 (probe failure)
+#   <key>.status  porcelain status body (absent => clean)
+#   <key>.ahead   commits ahead of origin/master (absent => 0)
+wt_key=""
+[ "${1:-}" = "-C" ] && wt_key="$(basename "${2:-}")"
+wt_fx="${GH_FX_DIR:-/dev/null}/wt/$wt_key"
 case "$*" in
     *"worktree list --porcelain"*)
         cat "${GH_FX_DIR:-/dev/null}/worktrees.txt" 2>/dev/null || true
+        ;;
+    *" status --porcelain"*)
+        [ -e "$wt_fx.fail" ] && exit 128
+        cat "$wt_fx.status" 2>/dev/null || true
+        ;;
+    *"rev-list --count"*)
+        [ -e "$wt_fx.fail" ] && exit 128
+        cat "$wt_fx.ahead" 2>/dev/null || echo 0
         ;;
     *) exec git "$@" ;;
 esac
@@ -326,6 +342,10 @@ cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md" <<'REPORT'
 - [#24](u24) Twenty-four — ref
 - [#25](u25) Twenty-five — ref
 - [#26](u26) Twenty-six — ref
+- [#27](u27) Twenty-seven — ref
+- [#28](u28) Twenty-eight — ref
+- [#29](u29) Twenty-nine — ref
+- [#32](u32) Thirty-two — ref
 - [#30](u30) Thirty — ref
 - [#31](u31) Thirty-one — ref
 - [#35](u35) Thirty-five noref — ref
@@ -457,11 +477,13 @@ cat > "$T/home/claude-plans/_reports/burndown-batch-test.json" <<'LEDGER'
 LEDGER
 # Worktree fixture has branch wt-25
 cat > "$T/fx/worktrees.txt" <<'WT'
-worktree /some/path
+worktree /some/wt-25
 HEAD abc123
 branch refs/heads/wt-25
 
 WT
+mkdir -p "$T/fx/wt"
+printf ' M bin/x\n' > "$T/fx/wt/wt-25.status"
 # Boundary: plan names #260 (NOT #26)
 cat > "$T/home/claude-plans/boundary-plan.md" <<'BPLAN'
 # Boundary
@@ -478,9 +500,92 @@ grep -qE 'PICK\s+#26' <<< "$OUT" && ok "C17: #26 PICK (boundary)" || fail "C17: 
 # Cleanup
 rm -f "$T/home/claude-plans/some-feature.md" "$T/home/claude-plans/boundary-plan.md" \
       "$T/home/claude-plans/_reports/burndown-batch-test.json"
+rm -rf "$T/fx/wt"
 echo '[]' > "$T/fx/prs-open.json"
 cat > "$T/fx/worktrees.txt" <<'WT'
 WT
+
+# ── C51a: committed-ahead skipped worktree stays in-flight (characterization) ──
+cat > "$T/fx/issues.json" <<'JSON'
+[{"number":27,"title":"Twenty-seven","body":"bin/s27:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}]
+JSON
+cat > "$T/home/claude-plans/_reports/burndown-batch-held.json" <<'LEDGER'
+{"items":[
+  {"issue_num":27,"also_closes":[],"slug":"wt-27","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1}
+]}
+LEDGER
+cat > "$T/fx/worktrees.txt" <<'WT'
+worktree /some/wt-27
+HEAD abc123
+branch refs/heads/wt-27
+
+WT
+mkdir -p "$T/fx/wt"
+printf '2\n' > "$T/fx/wt/wt-27.ahead"
+OUT="$(bd_b 2>&1)"; RC=$?
+want "C51a: committed-ahead skipped worktree stays in-flight" "$OUT" "worktree wt-27"
+rm -f "$T/home/claude-plans/_reports/burndown-batch-held.json"
+cat > "$T/fx/worktrees.txt" <<'WT'
+WT
+rm -rf "$T/fx/wt"
+
+# ── C51b-g: Source 5 drops idle worktrees, keeps everything else in-flight ────
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":28,"title":"Twenty-eight","body":"bin/s28:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":29,"title":"Twenty-nine","body":"bin/s29:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":30,"title":"Thirty","body":"bin/s30:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":31,"title":"Thirty-one","body":"bin/s31:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":32,"title":"Thirty-two","body":"bin/s32:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+cat > "$T/home/claude-plans/_reports/burndown-batch-idle.json" <<'LEDGER'
+{"items":[
+  {"issue_num":28,"also_closes":[],"slug":"wt-28","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1},
+  {"issue_num":29,"also_closes":[],"slug":"wt-29","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1},
+  {"issue_num":30,"also_closes":[],"slug":"wt-30","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1},
+  {"issue_num":31,"also_closes":[],"slug":"wt-31","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1}
+]}
+LEDGER
+printf '# Plan\nIBL5-backlog#32\n' > "$T/home/claude-plans/wt-32.md"
+cat > "$T/fx/worktrees.txt" <<'WT'
+worktree /some/wt-28
+HEAD abc123
+branch refs/heads/wt-28
+
+worktree /some/wt-29
+HEAD abc123
+branch refs/heads/wt-29
+
+worktree /some/wt-30
+HEAD abc123
+branch refs/heads/wt-30
+
+worktree /some/wt-31
+HEAD abc123
+branch refs/heads/wt-31
+
+worktree /some/wt-32
+HEAD abc123
+branch refs/heads/wt-32
+
+WT
+mkdir -p "$T/fx/wt"
+touch "$T/fx/wt/wt-30.fail"
+printf '[{"number":901,"state":"CLOSED"}]\n' > "$T/fx/pr-wt-29.json"
+OUT="$(export GH_FAIL_ON="--head wt-31"; bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C51b: idle worktree run exits 0" || fail "C51b: idle worktree run exits 0 (got $RC)"
+grep -qE 'PICK\s+#28' <<< "$OUT" && ok "C51b: idle worktree no longer holds #28" || fail "C51b: idle worktree no longer holds #28"
+grep -qF "worktree wt-28" <<< "$OUT" && fail "C51b: no worktree reason for idle wt-28" || ok "C51b: no worktree reason for idle wt-28"
+want "C51c: closed-PR worktree stays in-flight" "$OUT" "worktree wt-29"
+want "C51e: git probe failure stays in-flight" "$OUT" "worktree wt-30"
+want "C51f: gh probe failure stays in-flight" "$OUT" "worktree wt-31"
+want "C51g: plan-file idle worktree held by the plan" "$OUT" "plan wt-32.md"
+rm -f "$T/home/claude-plans/_reports/burndown-batch-idle.json" "$T/home/claude-plans/wt-32.md" \
+      "$T/fx/pr-wt-29.json"
+cat > "$T/fx/worktrees.txt" <<'WT'
+WT
+rm -rf "$T/fx/wt"
 
 # ── C18: source failures abort ────────────────────────────────────────────────
 cat > "$T/fx/issues.json" <<'JSON'
@@ -741,6 +846,18 @@ STUB
         [ "$RC" -eq 3 ] && grep -qF 'git ls-files listed no files' <<< "$OUT" \
             && ok "C48h: empty file list exits 3" \
             || fail "C48h: empty file list exits 3 (got $RC: $OUT)"
+    fi
+done
+
+# C51h: the second-generation stubs make the per-worktree probes fail or print nothing;
+# the classifier treats both as unknown (in-flight), never idle
+for kind in lsfail lsempty; do
+    WST="$(GH="$T/gh" BD_GIT="$T/git-$kind" bash -c '. "$1"; BD_GIT="$2"; bd_wt_state /wt/probe probe' _ \
+        "$(dirname "$SCRIPT")/lib/burndown.sh" "$T/git-$kind" 2>&1)"
+    if [ "$kind" = lsfail ]; then
+        want "C51h: git-lsfail probe is unknown (git status failed)" "$WST" "unknown"$'\t'"git status failed"
+    else
+        want "C51h: git-lsempty probe is unknown (no count)" "$WST" "unknown"$'\t'"git rev-list printed no count"
     fi
 done
 
@@ -1595,6 +1712,112 @@ rm -rf "$SW" "$T/sw-empty" "$T/sw-old.before" "$T/sw-new.before" "$T/sw-tmp.json
 OUT="$(bd burndown-sweep extra 2>&1)"; RC=$?
 [ "$RC" -eq 2 ] && ok "C50o: burndown-sweep with an argument exits 2" \
     || fail "C50o: burndown-sweep with an argument exits 2 (got $RC)"
+
+# ── C52: HELD reporting (burndown-sweep) and the read-only burndown-held ──────
+# Same clock as C50: cutoff 2026-09-29T00:00:00. #300 dirty, #301 committed-ahead, #302 idle,
+# #303 has a PR, #304 plan route, #305 no worktree, #306 probe failure, #307 young ledger.
+HD="$T/hd"
+HD_OLD="$HD/claude-plans/_reports/burndown-batch-20260927T100000.json"
+HD_DUP="$HD/claude-plans/_reports/burndown-batch-20260926T100000.json"
+HD_NEW="$HD/claude-plans/_reports/burndown-batch-20260929T230000.json"
+c52_reset() {
+    rm -rf "$HD" "$T/fx/wt"
+    mkdir -p "$HD/claude-plans/_reports" "$T/fx/wt"
+    local n slug route
+    {
+        printf '{"schema":1,"created":"2026-09-27T10:00:00","items":['
+        for spec in 300:held-300:ad-hoc 301:held-301:ad-hoc 302:idle-302:ad-hoc 303:pr-303:ad-hoc \
+                    304:plan-304:plan 305:gone-305:ad-hoc 306:probe-306:ad-hoc; do
+            IFS=: read -r n slug route <<< "$spec"
+            [ "$n" = 300 ] || printf ','
+            printf '{"issue_num":%s,"also_closes":[],"slug":"%s","route":"%s","pr_url":"","status":"skipped"}' \
+                "$n" "$slug" "$route"
+        done
+        printf '],"skipped":[],"units_used":1,"budget":5}\n'
+    } > "$HD_OLD"
+    printf '%s\n' '{"schema":1,"created":"2026-09-29T23:00:00","items":[{"issue_num":307,"also_closes":[],"slug":"young-307","route":"ad-hoc","pr_url":"","status":"skipped"}],"skipped":[],"units_used":1,"budget":5}' > "$HD_NEW"
+    : > "$T/fx/worktrees.txt"
+    for slug in held-300 held-301 idle-302 pr-303 plan-304 probe-306 young-307; do
+        printf 'worktree /wt/%s\nHEAD abc123\nbranch refs/heads/%s\n\n' "$slug" "$slug" >> "$T/fx/worktrees.txt"
+    done
+    for slug in held-300 pr-303 plan-304 young-307; do printf ' M x\n' > "$T/fx/wt/$slug.status"; done
+    printf '1\n' > "$T/fx/wt/held-301.ahead"
+    touch "$T/fx/wt/probe-306.fail"
+    printf '[{"number":903,"state":"OPEN"}]\n' > "$T/fx/pr-pr-303.json"
+    rm -f "$T/gh.log"
+}
+
+c52_reset
+cp "$HD_OLD" "$T/hd-old.before"
+OUT="$(BURNDOWN_NOW=$SW_NOW bd_home "$HD" burndown-sweep 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C52: sweep with held items exits 0" || fail "C52: sweep with held items exits 0 (got $RC: $OUT)"
+want "C52a: dirty held worktree reported" "$OUT" "HELD #300 /wt/held-300 (dirty, 0 ahead, no PR)"
+want "C52b: committed-ahead held worktree reported" "$OUT" "HELD #301 /wt/held-301 (clean, 1 ahead, no PR)"
+for spec in 302:C52c:idle 303:C52d:PR-backed 304:C52e:plan-route 305:C52g:worktree-less 307:C52f:young-ledger; do
+    IFS=: read -r n tag what <<< "$spec"
+    grep -qE "HELD(-UNKNOWN)? #$n" <<< "$OUT" && fail "$tag: no HELD line for $what #$n" \
+        || ok "$tag: no HELD line for $what #$n"
+done
+want "C52h: failed probe surfaces as HELD-UNKNOWN" "$OUT" "HELD-UNKNOWN #306 /wt/probe-306 (git status failed)"
+cmp -s "$T/hd-old.before" "$HD_OLD" && ok "C52i: sweep leaves the HELD ledger byte-identical" \
+    || fail "C52i: sweep leaves the HELD ledger byte-identical"
+
+# C52j: burndown-held prints only HELD lines, deduped across ledgers
+cp "$HD_OLD" "$HD_DUP"
+jq '.created = "2026-09-26T10:00:00" | .items |= map(select(.issue_num == 300))' "$HD_OLD" > "$HD_DUP"
+OUT="$(BURNDOWN_NOW=$SW_NOW bd_home "$HD" burndown-held 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C52j: burndown-held exits 0" || fail "C52j: burndown-held exits 0 (got $RC: $OUT)"
+[ "$(wc -l <<< "$OUT" | tr -d ' ')" -eq 3 ] && ok "C52j: exactly three lines, #300 once" \
+    || fail "C52j: exactly three lines, #300 once (got: $OUT)"
+want "C52j: #300 line present" "$OUT" "HELD #300 /wt/held-300"
+want "C52j: #301 line present" "$OUT" "HELD #301 /wt/held-301"
+want "C52j: #306 line present" "$OUT" "HELD-UNKNOWN #306"
+grep -qF 'ledger ' <<< "$OUT" && fail "C52j: no ledger header" || ok "C52j: no ledger header"
+rm -f "$HD_DUP"
+
+# C52k: burndown-held never mutates a ledger or closes an issue
+sw_reset
+cp "$SW_OLD" "$T/hd-sw.before"
+BURNDOWN_NOW=$SW_NOW bd_home "$SW" burndown-held >/dev/null 2>&1
+cmp -s "$T/hd-sw.before" "$SW_OLD" && ok "C52k: burndown-held leaves the ledger byte-identical" \
+    || fail "C52k: burndown-held leaves the ledger byte-identical"
+grep -qF 'issue close' "$T/gh.log" 2>/dev/null && fail "C52k: burndown-held closes nothing" \
+    || ok "C52k: burndown-held closes nothing"
+rm -rf "$SW" "$T/hd-sw.before"
+
+# C52l-m: CLI surface
+OUT="$(bd_home "$HD" burndown-held extra 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "C52l: burndown-held with an argument exits 2" \
+    || fail "C52l: burndown-held with an argument exits 2 (got $RC)"
+OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git-fail" \
+    BURNDOWN_TIER_HINT="$T/tier" BURNDOWN_NOW=$SW_NOW HOME="$HD" TZ=UTC \
+    "$SCRIPT" burndown-held 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "C52m: burndown-held exits 3 when git worktree list fails" \
+    || fail "C52m: burndown-held exits 3 when git worktree list fails (got $RC)"
+want "C52m: failure message" "$OUT" "git worktree list failed"
+
+# C52o: the sweep reports an unavailable scan and keeps going
+OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git-fail" \
+    BURNDOWN_TIER_HINT="$T/tier" BURNDOWN_NOW=$SW_NOW HOME="$HD" TZ=UTC \
+    "$SCRIPT" burndown-sweep 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C52o: sweep exits 0 when the HELD scan is unavailable" \
+    || fail "C52o: sweep exits 0 when the HELD scan is unavailable (got $RC: $OUT)"
+want "C52o: HELD-SCAN unavailable line" "$OUT" "HELD-SCAN unavailable (git worktree list failed)"
+grep -qF 'HELD #' <<< "$OUT" && fail "C52o: no HELD line without a worktree list" \
+    || ok "C52o: no HELD line without a worktree list"
+
+# C52n: no ledgers, no output
+rm -f "$HD"/claude-plans/_reports/burndown-batch-*.json
+OUT="$(BURNDOWN_NOW=$SW_NOW bd_home "$HD" burndown-held 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "C52n: no ledgers prints nothing" \
+    || fail "C52n: no ledgers prints nothing (rc=$RC out=$OUT)"
+
+# C52p: usage lists the subcommand
+OUT="$(bd --help 2>&1)"
+want "C52p: --help lists burndown-held" "$OUT" "burndown-held"
+
+rm -rf "$HD" "$T/fx/wt" "$T/fx/pr-pr-303.json" "$T/hd-old.before"
+: > "$T/fx/worktrees.txt"
 
 # ── C51: burndown-sweep flips zombie picked items ─────────────────────────────
 # Private HOME so the C50 fixtures stay untouched. Same clock as C50: cutoff 2026-09-29T00:00:00.

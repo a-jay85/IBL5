@@ -24,6 +24,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
         $this->stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $this->stubRepo->method('getTeamnameFromUsername')->willReturn('Heat');
         $this->stubRepo->method('getTeamnameFromTeamID')->willReturn('Heat');
+        $this->stubRepo->method('getTeamColorRow')->willReturn(['color1' => 'CE1141', 'color2' => '000000']);
 
         $this->seedInvariantQueries();
         $this->controller = $this->buildController();
@@ -85,9 +86,6 @@ class PlayerPageControllerTest extends WideUnitTestCase
 
         // Player::withPlayerID — matches the LEFT JOIN pattern
         $this->mockDb->onQuery('team_name AS teamname', [$playerRow]);
-
-        // TeamColorHelper::getTeamColors — matches the color SELECT pattern
-        $this->mockDb->onQuery('SELECT color1, color2', [['color1' => 'CE1141', 'color2' => '000000']]);
 
         // PlayerRepository::getAllStarWeekendCounts (SUM(CASE) query)
         $this->mockDb->onQuery('SUM.*CASE.*ibl_awards', [['allStar' => 2, 'threePoint' => 1, 'dunkContest' => 0, 'rookieSoph' => 1]]);
@@ -189,7 +187,6 @@ class PlayerPageControllerTest extends WideUnitTestCase
         $this->mockDb = new \Tests\WideUnit\Mocks\MockDatabase();
         $this->injectGlobalMockDb();
         $this->mockDb->onQuery('team_name AS teamname', [$playerWithRetired]);
-        $this->mockDb->onQuery('SELECT color1, color2', [['color1' => 'D4AF37', 'color2' => '1e3a5f']]);
         $this->mockDb->onQuery('SUM.*CASE.*ibl_awards', [['allStar' => 0, 'threePoint' => 0, 'dunkContest' => 0, 'rookieSoph' => 0]]);
         $this->mockDb->onQuery('ibl_awards.*WHERE name', []);
         $this->mockDb->onQuery('ibl_standings', [[
@@ -207,6 +204,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
 
         $this->stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $this->stubRepo->method('getTeamnameFromUsername')->willReturn('Free Agents');
+        $this->stubRepo->method('getTeamColorRow')->willReturn(['color1' => 'D4AF37', 'color2' => '1e3a5f']);
 
         $controller = $this->buildController();
         $html = $controller->renderPage(1, null, 'nobody');
@@ -416,7 +414,6 @@ class PlayerPageControllerTest extends WideUnitTestCase
         $this->mockDb = new \Tests\WideUnit\Mocks\MockDatabase();
         $this->injectGlobalMockDb();
         $this->mockDb->onQuery('team_name AS teamname', [$playerWithRetired]);
-        $this->mockDb->onQuery('SELECT color1, color2', [['color1' => 'D4AF37', 'color2' => '1e3a5f']]);
         $this->mockDb->onQuery('SUM.*CASE.*ibl_awards', [['allStar' => 0, 'threePoint' => 0, 'dunkContest' => 0, 'rookieSoph' => 0]]);
         $this->mockDb->onQuery('ibl_awards.*WHERE name', []);
         $this->mockDb->onQuery('ibl_standings', [[
@@ -442,6 +439,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
 
         $stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $stubRepo->method('getTeamnameFromUsername')->willReturn('Free Agents');
+        $stubRepo->method('getTeamColorRow')->willReturn(['color1' => 'D4AF37', 'color2' => '1e3a5f']);
         $controller = new PlayerPageController($this->mockDb, $stubRepo, new PlayerPageService($this->mockDb, $stubRepo), new HttpRequest());
 
         $html = $controller->renderPage(1, 999, 'nobody');

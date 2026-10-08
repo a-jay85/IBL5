@@ -65,7 +65,7 @@ $controller = new \HeadToHeadRecords\HeadToHeadRecordsController(
     new \HeadToHeadRecords\HeadToHeadRecordsView(),
     $season,
     $currentUser,
-    $mysqli_db
+    new \Repositories\TeamIdentityRepository($mysqli_db)
 );
 
 \PageLayout\PageLayout::header();

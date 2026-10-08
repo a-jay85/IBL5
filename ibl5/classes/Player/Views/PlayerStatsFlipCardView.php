@@ -12,6 +12,7 @@ use Player\Stats\Views\PlayerPlayoffAveragesView;
 use Player\Stats\Views\PlayerPlayoffTotalsView;
 use Player\Stats\Views\PlayerRegularSeasonAveragesView;
 use Player\Stats\Views\PlayerRegularSeasonTotalsView;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Security\HtmlSanitizer;
 
 /**
@@ -109,10 +110,10 @@ class PlayerStatsFlipCardView
         PlayerRegularSeasonAveragesView $averagesView,
         PlayerRegularSeasonTotalsView $totalsView,
         int $playerID,
-        ?\mysqli $db = null,
+        ?TeamIdentityRepositoryInterface $teamRepo = null,
         int $teamid = 0
     ): string {
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamid);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($teamRepo, $teamid);
         return self::render(
             $averagesView->renderAverages($playerID),
             $totalsView->renderTotals($playerID),
@@ -129,10 +130,10 @@ class PlayerStatsFlipCardView
         PlayerPlayoffAveragesView $averagesView,
         PlayerPlayoffTotalsView $totalsView,
         string $playerName,
-        ?\mysqli $db = null,
+        ?TeamIdentityRepositoryInterface $teamRepo = null,
         int $teamid = 0
     ): string {
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamid);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($teamRepo, $teamid);
         return self::render(
             $averagesView->renderAverages($playerName),
             $totalsView->renderTotals($playerName),
@@ -149,10 +150,10 @@ class PlayerStatsFlipCardView
         PlayerOlympicAveragesView $averagesView,
         PlayerOlympicTotalsView $totalsView,
         int $playerID,
-        ?\mysqli $db = null,
+        ?TeamIdentityRepositoryInterface $teamRepo = null,
         int $teamid = 0
     ): string {
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamid);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($teamRepo, $teamid);
         return self::render(
             $averagesView->renderAverages($playerID),
             $totalsView->renderTotals($playerID),
@@ -169,10 +170,10 @@ class PlayerStatsFlipCardView
         PlayerHeatAveragesView $averagesView,
         PlayerHeatTotalsView $totalsView,
         string $playerName,
-        ?\mysqli $db = null,
+        ?TeamIdentityRepositoryInterface $teamRepo = null,
         int $teamid = 0
     ): string {
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamid);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($teamRepo, $teamid);
         return self::render(
             $averagesView->renderAverages($playerName),
             $totalsView->renderTotals($playerName),

@@ -38,6 +38,7 @@ class PlayerActionControllerTest extends WideUnitTestCase
     {
         $repo = self::createStub(TeamIdentityRepositoryInterface::class);
         $repo->method('getTeamnameFromUsername')->willReturn($teamName);
+        $repo->method('getTeamColorRow')->willReturn(['color1' => 'CE1141', 'color2' => '000000']);
 
         return $repo;
     }
@@ -90,8 +91,6 @@ class PlayerActionControllerTest extends WideUnitTestCase
 
         // Player::withPlayerID
         $this->mockDb->onQuery('team_name AS teamname', [$playerRow]);
-        // TeamColorHelper::getTeamColors
-        $this->mockDb->onQuery('SELECT color1, color2', [['color1' => 'CE1141', 'color2' => '000000']]);
         // PlayerRepository all-star weekend counts
         $this->mockDb->onQuery('SUM.*CASE.*ibl_awards', [['allStar' => 2, 'threePoint' => 1, 'dunkContest' => 0, 'rookieSoph' => 1]]);
         // PlayerStats::withPlayerID

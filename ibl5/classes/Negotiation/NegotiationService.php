@@ -10,6 +10,7 @@ use Negotiation\Contracts\NegotiationServiceInterface;
 use Negotiation\Contracts\NegotiationValidatorInterface;
 use Negotiation\Views\DemandsBreakdownView;
 use Player\Player;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * @see NegotiationServiceInterface
@@ -23,6 +24,7 @@ class NegotiationService implements NegotiationServiceInterface
         private readonly NegotiationRepositoryInterface $repository,
         private readonly NegotiationValidatorInterface $validator,
         private readonly ExtensionContractDemandCalculatorInterface $demandCalculator,
+        private readonly TeamIdentityRepositoryInterface $teamRepo,
     ) {}
     
     public function processNegotiation(int $playerID, string $userTeamName, string $prefix, bool $bypassOwnership = false): string
@@ -80,7 +82,7 @@ class NegotiationService implements NegotiationServiceInterface
             $threepointcontests,
             $dunkcontests,
             $rooksoph,
-            $this->db
+            $this->teamRepo
         );
 
         $output .= NegotiationOfferView::renderNegotiationForm(

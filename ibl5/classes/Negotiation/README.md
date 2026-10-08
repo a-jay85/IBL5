@@ -1,6 +1,6 @@
 ---
 description: Contract negotiation demand calculation, eligibility validation, and offer rendering — refactored from a 382-line procedural function.
-last_verified: 2026-10-06
+last_verified: 2026-10-08
 ---
 
 # Contract Negotiation Refactoring - Summary
@@ -42,6 +42,7 @@ $service = new NegotiationService(
     new NegotiationRepository($this->mysqliDb, $this->salaryCapRepo),
     new NegotiationValidator($this->mysqliDb),
     new ExtensionContractDemandCalculator($this->mysqliDb, $this->salaryCapRepo),
+    $teamIdentityRepo,
 );
 
 return $service->processNegotiation($playerID, $userTeamName, $prefix, $bypassOwnership);
@@ -336,6 +337,7 @@ $processor = new NegotiationService(
     $mockRepository,
     $mockValidator,
     $mockDemandCalculator,
+    $teamIdentityRepo,
 );
 $output = $processor->processNegotiation(123, 'Seattle Supersonics', 'nuke');
 $this->assertStringContainsString('Contract Demands', $output);

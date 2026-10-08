@@ -8,6 +8,7 @@ use ContractList\Contracts\ContractListViewInterface;
 use Player\PlayerImageHelper;
 use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
+use UI\RendersTableEnd;
 
 /**
  * View class for rendering master contract list table.
@@ -20,6 +21,8 @@ use Security\HtmlSanitizer;
  */
 class ContractListView implements ContractListViewInterface
 {
+    use RendersTableEnd;
+
     /**
      * @see ContractListViewInterface::render()
      */
@@ -171,15 +174,5 @@ class ContractListView implements ContractListViewInterface
             $avgCaps['acap5'],
             $avgCaps['acap6']
         );
-    }
-
-    /**
-     * Render the end of the table.
-     *
-     * @return string HTML table end
-     */
-    private function renderTableEnd(): string
-    {
-        return '</tbody></table>';
     }
 }

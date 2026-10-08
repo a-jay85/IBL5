@@ -121,8 +121,18 @@ assert "c7b-full-sonnet-5-5" "claude-sonnet-5-5" '---
 impl_model: claude-sonnet-5-5
 ---'
 
-# c8 — full haiku id accepted and resolves to claude-haiku-4-5
-assert "c8-full-haiku" "claude-haiku-4-5" '---
+# c8 — full haiku id accepted and resolves to claude-haiku-5-5
+assert "c8-full-haiku" "claude-haiku-5-5" '---
+impl_model: claude-haiku-5-5
+---'
+
+# c8b — the bare `haiku` alias resolves to claude-haiku-5-5
+assert "c8b-haiku-alias" "claude-haiku-5-5" '---
+impl_model: haiku
+---'
+
+# c8c — legacy claude-haiku-4-5 is still accepted (haiku-tier -> current Haiku)
+assert "c8c-legacy-haiku-4-5" "claude-haiku-5-5" '---
 impl_model: claude-haiku-4-5
 ---'
 
@@ -159,6 +169,7 @@ assert_tier "sonnet"         "sonnet-tier"
 assert_tier "claude-sonnet-4-6" "sonnet-tier"
 assert_tier "claude-sonnet-5-5" "sonnet-tier"
 assert_tier "haiku"          "haiku-tier"
+assert_tier "claude-haiku-5-5"  "haiku-tier"
 assert_tier "claude-haiku-4-5"  "haiku-tier"
 
 # tier no-arg — plan-model-tier with no argument must exit 2 (usage error)

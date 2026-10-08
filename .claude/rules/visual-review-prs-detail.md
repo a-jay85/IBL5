@@ -15,7 +15,7 @@ Companion to `.claude/rules/visual-review-prs.md`, which points here.
 
 ## Self-stability (flake) vs real change
 
-Each cell is captured twice — render A (`.a.png`) and a reload render B (`.b.png`). A cell is a real
+Each cell is captured twice: render A (`.a.png`) and a reload render B (`.b.png`). A cell is a real
 **changed** cell only when A ≈ B but both differ from master's committed baseline. If A ≠ B
 (differing dimensions or pixels) the render is self-unstable; the cell is demoted to an
 **infra/flake** cell surfaced in a separate `⚠️ … failed to render` section whose remedy is

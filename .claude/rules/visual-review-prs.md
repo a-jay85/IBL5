@@ -47,37 +47,32 @@ They are skipped only during baseline regen (the `update-baselines` label).
    artifacts into `ibl5/vr-gallery`, plus the pre-classified `gallery.json`
    (`changedCells`/`newCells`/`flakeCells`).
 3. **Deploy gallery to PR-keyed Pages**. `bin/vr-pages-publish` writes `ibl5/vr-gallery` to the
-   `gh-pages` branch under `pr/<N>/visual-review/`. It refetches and re-applies on a rejected push,
-   3 attempts, then the job fails. The Playwright HTML report (traces) is preserved under
-   `pr/<N>/visual-review/playwright-report/`. The `gh-pages` branch is only the
-   durable accumulator; the site is **served** by `.github/workflows/pages-deploy.yml` (Pages
+   `gh-pages` branch under `pr/<N>/visual-review/`. It retries a rejected push 3 times, then fails. The
+   Playwright report (traces) lands under `pr/<N>/visual-review/playwright-report/`. The `gh-pages`
+   branch is only the durable accumulator; the site is **served** by `.github/workflows/pages-deploy.yml` (Pages
    source = GitHub Actions, no Jekyll), which is dispatched by the deploy step below once the
    gh-pages push lands (one deploy per real content change, not one per E2E run) and re-publishes the
    whole tree. That dispatch is **debounced**: it is skipped when a `pages-deploy` run exists that has
-   not started yet, because such a run checks out `gh-pages` *after* this push landed and therefore
-   already serves it. The status filter is a **denylist** (anything that is neither `completed` nor
-   `in_progress`), so a missed spelling over-suppresses one push
-   instead of silently no-opping. The debounce never fires on an
-   `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API
-   error dispatches. This is what stops a push fan-out (one master push → multiple open-PR
-   updates → N gh-pages pushes) from producing N deploys, most of which the `pages`
-   concurrency group would cancel. It collapses to roughly **two** deploys (one
-   in-flight plus one pending). Because every open PR's VR job pushes to the same `gh-pages` ref, concurrent runs
-   collide on the ref lock; the deploy is spelled out as **one attempt plus two retries** (the
-   action re-clones `gh-pages` each time, so a retry sees the ref that beat it). An **assert step**
-   fails the job if all three are exhausted — the retries absorb contention, they never soften the
-   gate.
+   not started yet, because that run checks out `gh-pages` *after* this push and already serves it.
+   The status filter is a **denylist** (neither `completed` nor `in_progress`), so an unknown status
+   only over-suppresses one push; the next deploy re-serves the whole tree anyway. The debounce never
+   fires on an `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API
+   error dispatches. This collapses a push fan-out (one master push → N open-PR gh-pages pushes) to
+   roughly **two** deploys (one in-flight plus one pending) instead of N. Concurrent PR jobs also
+   collide on the `gh-pages` ref lock, so the deploy is **one attempt plus two retries** (the action
+   re-clones each time). An **assert step** fails the job if all three are exhausted; retries never
+   soften the gate.
 4. **Build comment** — `bin/vr-review-comment` consumes the pre-classified `gallery.json` and renders
    the sticky markdown.
 5. **Post sticky comment** — `marocchino/sticky-pull-request-comment@v3`, header `visual-review`.
 
 A `vr-pages-cleanup` job (push-to-master only, not part of the required gate) prunes
-per-SHA gallery dirs whose newest commit is older than 7 days. Its `gh-pages` push carries the same
-rebase-and-retry loop for the same ref contention. A prune reaches the served site when
-`pages-deploy.yml` next re-publishes the tree (the cleanup job dispatches `pages-deploy.yml` itself once its prune push lands). A closed PR's `pr/<N>/` is deleted by `vr-pr-screens.yml`, and
-the same master-push job sweeps any numeric `pr/` dir whose PR is not open. That sweep deletes
-nothing if the open-PR list is unreadable, truncated or empty.
-It keeps every dir an open PR still links to. See [Refreshing stale galleries](#refreshing-stale-galleries).
+per-SHA gallery dirs whose newest commit is older than 7 days, with the same `gh-pages` push
+rebase-and-retry loop. A prune reaches the served site when `pages-deploy.yml` next re-publishes the
+tree (cleanup dispatches it). `vr-pr-screens.yml` deletes a closed PR's `pr/<N>/`. The master-push job
+also sweeps any `pr/<N>/` whose PR is not open, and deletes nothing if the open-PR list is
+unreadable, truncated or empty. It keeps every dir an open PR still links to. See
+[Refreshing stale galleries](#refreshing-stale-galleries).
 
 ## Refreshing stale galleries
 
@@ -153,10 +148,10 @@ steps run after "Deploy VR gallery to the PR-keyed GitHub Pages path" and "Post 
   `update-baselines`), so it never goes stale. `--dry-run` exercises the splice without mutating a
   real PR.
 
-Both steps are `continue-on-error: true` — a failure here degrades to "no inline image," it never
-fails the VR job or blocks the sticky comment. The pure splice/copy-plan logic lives in
-`ibl5/tests/e2e/vr-pr-body.ts` (unit-tested in `ibl5/tests/ts-unit/vr-pr-body.test.ts`); only `gh`/
-`fetch`/`fs` I/O lives in the `bin/vr-review-comment` glue layer.
+Both steps are `continue-on-error: true`: a failure degrades to "no inline image" and never fails
+the VR job or blocks the sticky comment. The pure splice/copy-plan logic lives in
+`ibl5/tests/e2e/vr-pr-body.ts` (unit-tested in `ibl5/tests/ts-unit/vr-pr-body.test.ts`); only I/O
+lives in the `bin/vr-review-comment` glue layer.
 
 ## Modifying the selection logic
 
@@ -167,10 +162,9 @@ comment markup lives in `ibl5/tests/e2e/vr-review-comment.ts` (`buildComment`). 
 unit-tested (`ibl5/tests/ts-unit/vr-gallery.test.ts`, `ibl5/tests/ts-unit/vr-coverage-map.test.ts`,
 `ibl5/tests/ts-unit/vr-review-comment.test.ts`, run via `bun run test:unit` from `ibl5/`). Per-row
 source overrides use the optional `sourceGlobs` field on `VrRow`. **Changing this selection logic is
-a mechanical-enforcement surface and requires an ADR** (current: ADR-0074, amended by ADR-0180 for the review-only strict pass). The PR-body new-screens
-publishing surface (`--copy-new-screens`/`--update-pr-body` on `bin/vr-review-comment`,
-`ibl5/tests/e2e/vr-pr-body.ts`, `ibl5/tests/ts-unit/vr-pr-body.test.ts`) is likewise a
-mechanical-enforcement surface, covered by **ADR-0076**.
+a mechanical-enforcement surface and requires an ADR** (current: ADR-0074, amended by ADR-0180). The
+PR-body new-screens surface (`--copy-new-screens`/`--update-pr-body`, `vr-pr-body.ts` and its test)
+is likewise one, covered by **ADR-0076**.
 
 ## Manual-row screenshots
 
@@ -189,23 +183,23 @@ answers **400**, so a typo surfaces in the PR comment as a failed row instead of
 screenshot. Clauses are `;`-separated because `|` would break the matrix table. A row that genuinely
 cannot be shot (print CSS, an email render) uses `no-vr: <reason ≥ 15 chars>` instead.
 
-The pipeline is a review aid. No step can fail a PR on screenshot content; only a gh-pages push
-that fails three times reddens `Screens publish`. It runs in `.github/workflows/vr-pr-screens.yml`
-(ADR-0179), apart from the baseline diff, so a bad `vr:` cell can never turn the baseline-diff step red:
+The pipeline is a review aid. Screenshot content never fails a PR; only a gh-pages push failing 3
+times reddens `Screens publish`. It runs in `.github/workflows/vr-pr-screens.yml` (ADR-0179),
+apart from the baseline diff, so a bad `vr:` cell never reddens that diff:
 
 | Stage | Where |
 |---|---|
 | Parse | `bin/vr-review-comment --manual-rows-from-pr=N` in the `plan` job |
 | Plan | `--screens-plan` decides which sides to render, and when nothing changed |
-| Capture | `ibl5/tests/e2e/manual-rows.spec.ts` at `phone` 375 and `desktop` 1280, for before and after, in the `render` job |
+| Capture | `manual-rows.spec.ts` at `phone` 375 / `desktop` 1280, both sides, in the `render` job |
 | Publish | `bin/vr-pages-publish` to `pr/<N>/manual/<side>/<label>.<viewport>.png` |
 | Post | `--splice-screens=N` splices the `vr-screens` body block |
 
-The block sits just before the `## Manual Testing` heading. Image URLs carry `?sha=<head>&r=<token>`,
-so every push shows the current head. A failed capture shows as a failed cell and never as a red
-check. A body edit that drops the block triggers a cheap re-plan that splices it back. The pure
-helpers live in `ibl5/tests/e2e/vr-manual-rows.ts` (grammar) and `ibl5/tests/e2e/vr-pr-screens.ts`
-(plan, token and block), unit-tested under `ibl5/tests/ts-unit/`. Both output paths are gitignored.
+The block sits just before `## Manual Testing`. Image URLs carry `?sha=<head>&r=<token>`, so each
+push shows the current head. A failed capture shows as a failed cell. A body edit
+that drops the block re-plans and splices it back. Pure helpers: `ibl5/tests/e2e/vr-manual-rows.ts`
+(grammar) and `vr-pr-screens.ts` (plan, token, block), tested under `ibl5/tests/ts-unit/`. Both
+output paths are gitignored.
 
 ## One-time deployment prerequisite
 

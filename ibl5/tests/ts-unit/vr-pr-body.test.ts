@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { describe, it, expect } from 'vitest';
 import {
   PR_BODY_MARKER_BEGIN,
@@ -200,6 +202,18 @@ describe('spliceBody', () => {
       expect(spliceBody(body, section)).toBe(`${section}\n\n${body}`);
       expect(spliceBody(body, '')).toBe(body);
     }
+  });
+
+  it('5j: the real PR #2950 two-block shape collapses to one block above the human text', () => {
+    const read = (name: string) => readFileSync(resolve(__dirname, 'fixtures/vr-pr-body', name), 'utf-8');
+    const human = normalizeBody(read('multi-block-human.md'));
+    const bodyIn = normalizeBody(read('multi-block-body-in.md'));
+    const section = sectionFor('roster');
+    const result = spliceBody(bodyIn, section);
+    expect(result).toBe(`${section}\n\n${human}`);
+    expect(findManagedBlocks(result).length).toBe(1);
+    expect(spliceBody(bodyIn, '')).toBe(human);
+    expect(result).not.toContain('721513f');
   });
 });
 

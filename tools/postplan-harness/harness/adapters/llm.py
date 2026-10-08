@@ -83,7 +83,7 @@ def _extractor_for(purpose: str):
     return extract_json
 
 
-def _run_reaped(argv, stdin_text, timeout, cwd, env):
+def _run_reaped(argv, stdin_text, timeout, cwd, env, errors=None):
     """Run argv with its own process group, always reaping the group on exit.
 
     `claude -p` spawns children that a plain subprocess timeout never touches, so the
@@ -92,7 +92,7 @@ def _run_reaped(argv, stdin_text, timeout, cwd, env):
     """
     proc = subprocess.Popen(
         argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        text=True, cwd=cwd, env=env, start_new_session=True,
+        text=True, cwd=cwd, env=env, start_new_session=True, errors=errors,
     )
     try:
         out, err = proc.communicate(stdin_text, timeout=timeout)
@@ -106,7 +106,7 @@ def _run_reaped(argv, stdin_text, timeout, cwd, env):
             pass
 
 
-def run_bounded(argv, *, step, timeout, cwd=None, stdin_text=None, env=None):
+def run_bounded(argv, *, step, timeout, cwd=None, stdin_text=None, env=None, errors=None):
     """_run_reaped plus the typed timeout contract for deterministic phase-2 steps.
 
     Returns the CompletedProcess unchanged (a nonzero rc is the caller's business).
@@ -115,7 +115,7 @@ def run_bounded(argv, *, step, timeout, cwd=None, stdin_text=None, env=None):
     OSError (missing binary) propagates unchanged; callers keep their own handling.
     """
     try:
-        return _run_reaped(list(argv), stdin_text, timeout, cwd, env)
+        return _run_reaped(list(argv), stdin_text, timeout, cwd, env, errors)
     except subprocess.TimeoutExpired as e:
         partial = e.output if isinstance(e.output, str) else ""
         raise HarnessError(

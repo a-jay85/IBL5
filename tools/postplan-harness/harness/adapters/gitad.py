@@ -9,8 +9,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from ..state import HarnessError
+from ..state import SUBPROCESS_TIMEOUT, HarnessError
 from ..conflict import classify, parse_unmerged
+from .llm import run_bounded
+
+COMMIT_HOOK_TIMEOUT = 300   # seconds for `git commit` incl. bin/pre-commit-hook
 
 # Local gate denials (bin/pre-commit-hook, bin/pre-push-adr-hook) are deterministic:
 # re-running the FULL /post-plan skill hits the identical hook and cannot clear it
@@ -334,14 +337,32 @@ class LiveGit:
         # partial state. BOTH streams are captured: the hook writes its reason to
         # whichever it likes, so rebase_onto's `stderr or stdout` would discard the one
         # line that names the gate.
-        proc = subprocess.run(["git", "-C", self.worktree, "commit", "-m", message],
-                              capture_output=True, text=True, errors="replace")
+        try:
+            proc = run_bounded(["git", "-C", self.worktree, "commit", "-m", message],
+                               step="commit (pre-commit hook)",
+                               timeout=COMMIT_HOOK_TIMEOUT, errors="replace")
+        except HarnessError as e:
+            if e.kind == SUBPROCESS_TIMEOUT:
+                self._clear_stale_index_lock()
+            raise
         if proc.returncode != 0:
             detail = "\n".join(s for s in (proc.stderr.strip(), proc.stdout.strip()) if s)
             raise HarnessError("local-gate",
                                detail[:800] or f"git commit exited {proc.returncode}",
                                cmd="git commit", output=detail)
         return self._run("rev-parse", "HEAD").strip()
+
+    def _clear_stale_index_lock(self) -> None:
+        """After a reaped commit timeout no git process holds the lock; drop it."""
+        try:
+            rel = self._run("rev-parse", "--git-path", "index.lock").strip()
+        except HarnessError:
+            return
+        lock = rel if os.path.isabs(rel) else os.path.join(self.worktree, rel)
+        try:
+            os.remove(lock)
+        except FileNotFoundError:
+            pass
 
     def head(self) -> str:
         return self._run("rev-parse", "HEAD").strip()

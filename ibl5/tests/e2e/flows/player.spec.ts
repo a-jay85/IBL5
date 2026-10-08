@@ -3,6 +3,10 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 import { publicStorageState } from '../helpers/public-storage-state';
 
 // Player page — public, no authentication required.
+// `.player-stats-card` is rendered by PlayerStatsCardView.php and `.plr-nav__pill` by
+// PlayerMenuView.php. Each locator names one element; no comma fallbacks (the nav
+// locator at player.spec.ts:29 was a detector-blind one, as was
+// role-gating-non-admin.spec.ts:132).
 test.use({ storageState: publicStorageState() });
 
 test.describe('Player page flow — active player', () => {

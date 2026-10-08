@@ -3,6 +3,7 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 import { publicStorageState } from '../helpers/public-storage-state';
 
 // Season Highs — public page.
+// `.stat-table` is the module table class rendered by SeasonHighsView.php.
 test.use({ storageState: publicStorageState() });
 
 test.describe('Season Highs flow', () => {

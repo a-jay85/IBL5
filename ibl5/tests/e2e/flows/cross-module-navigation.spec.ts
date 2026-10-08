@@ -3,6 +3,7 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Cross-module navigation — verify links between modules resolve correctly.
 // All read-only — no data mutation.
+// Player destinations assert `.plr-nav`, rendered by PlayerMenuView.php on every player page.
 
 test.describe('Cross-module navigation', () => {
   test.beforeEach(async ({ appState }) => {

@@ -7,6 +7,7 @@ namespace GMContactList;
 use GMContactList\Contracts\GMContactListViewInterface;
 use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
+use UI\RendersTableEnd;
 
 /**
  * View class for rendering GM contact list table.
@@ -15,6 +16,8 @@ use Security\HtmlSanitizer;
  */
 class GMContactListView implements GMContactListViewInterface
 {
+    use RendersTableEnd;
+
     /**
      * @see GMContactListViewInterface::render()
      */
@@ -113,15 +116,5 @@ class GMContactListView implements GMContactListViewInterface
             . $teamCell
             . "<td class=\"gm-cell\">{$gmCell}</td>"
             . '</tr>';
-    }
-
-    /**
-     * Render the end of the table.
-     *
-     * @return string HTML table end
-     */
-    private function renderTableEnd(): string
-    {
-        return '</tbody></table>';
     }
 }

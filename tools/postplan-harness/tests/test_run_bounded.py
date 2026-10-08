@@ -1,4 +1,7 @@
-"""Tests for harness.adapters.llm.run_bounded — the typed-timeout wrapper over _run_reaped."""
+"""Tests for harness.adapters.llm.run_bounded — the typed-timeout wrapper over _run_reaped.
+
+Run: python -m pytest tools/postplan-harness/tests/test_run_bounded.py -q
+"""
 import os
 import sys
 import time

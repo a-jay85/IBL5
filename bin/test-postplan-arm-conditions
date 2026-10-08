@@ -1877,7 +1877,8 @@ expect_clearance "(1) tick shape: all ticked, no sentinel → HELD" "HELD" \
 # (1) harness Phase 6.7 writes MANUAL_TESTING_SENTINEL_TICKED (harness/classify.py) above
 # the rows it ticked (backlog#1360). The wording here must match that constant byte for
 # byte; tests/test_manual_testing.py::test_ticked_sentinel_pinned_in_shell_twin_test
-# fails on drift.
+# fails on drift. The all-ticked/no-sentinel HELD case above (pinned at :1863-1876 when
+# this was written) stays HELD: the shell twin is sentinel-only and is not widened.
 expect_clearance "(1) tick shape: Phase 6.7 ticked sentinel + all ticked → CLEARED" "CLEARED" \
     "$(printf '## Manual Testing\n\nNo manual testing needed — every row below was ticked by the harness in Phase 6.7; each is covered by an automated check that passed.\n\n- [x] **Row 1** — run bin/test-foo\n- [x] **Row 2** — check the log line\n\n<!-- files-changed:begin -->\n- a.sh\n<!-- files-changed:end -->\n')"
 expect_clearance "(1) tick shape: Phase 6.7 ticked sentinel + one row unticked → HELD" "HELD" \

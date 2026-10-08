@@ -22,8 +22,8 @@ test.describe('Cross-module navigation', () => {
 
     await page.goto(href!);
     await assertNoPhpErrors(page, 'on Team page from Standings');
-    // Team page should render content (table or heading)
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    // Team page renders the roster via Ratings.php and Contracts.php, both of which carry `.team-table`.
+    await expect(page.locator('.team-table').first()).toBeVisible();
   });
 
   test('team page roster → click player → player page loads', async ({ page }) => {

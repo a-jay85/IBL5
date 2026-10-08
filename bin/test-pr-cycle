@@ -1034,10 +1034,14 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker --only 102
 [[ $RC -eq 0 ]] || fail "--only run exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "--only 102 made $(calls ready) ready calls, want 1"
-[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait" ]] \
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "--only 102 readied: $(sed -n 1p "$SCRATCH/ready.argv")"
 grep -qF 'done' <<< "$OUT" || fail "--only run did not finish normally"
 grep -qF -- '--only 102' <<< "$OUT" || fail "worker did not announce its scope"
+# Stage 1 is the only caller that exempts the fleet from the test-only exit-5 refusal.
+grep -qF -- '--allow-test-only' "$SCRATCH/ready.argv" \
+    || fail "stage1-passes-allow-test-only: fleet argv lacks --allow-test-only: $(sed -n 1p "$SCRATCH/ready.argv")"
+echo "stage1-passes-allow-test-only OK"
 
 # The hash form is the same set: normalization happens at parse time, not at match time.
 reset_state
@@ -1045,7 +1049,7 @@ printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
     > "$SCRATCH/triage-out"
 run --worker --only '#102'
-[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait" ]] \
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "--only '#102' readied: $(sed -n 1p "$SCRATCH/ready.argv")"
 
 # Two of three, in pr-attack's order — the filter drops rows, it never reorders them.
@@ -1056,7 +1060,7 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker --only 103,101
 [[ "$(calls ready)" == "1" ]] || fail "--only 103,101 made $(calls ready) ready calls, want 1"
 _a27a="$(sed -n 1p "$SCRATCH/ready.argv")"
-[[ "$_a27a" == "--pr-list 101,103 --jobs 3 --go --wait" ]] \
+[[ "$_a27a" == "--pr-list 101,103 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "--only 103,101 argv: $_a27a"
 end_case "case 27a --only selects and preserves order"
 
@@ -1069,7 +1073,7 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker --skip 101,103
 [[ $RC -eq 0 ]] || fail "--skip run exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "--skip 101,103 made $(calls ready) ready calls, want 1"
-[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait" ]] \
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "--skip readied: $(sed -n 1p "$SCRATCH/ready.argv")"
 grep -qF -- '--skip 101,103' <<< "$OUT" || fail "worker did not announce its --skip scope"
 # No flag at all is the unfiltered baseline — the predicate must be a no-op by default.
@@ -1080,7 +1084,7 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker
 [[ "$(calls ready)" == "1" ]] || fail "unfiltered run made $(calls ready) ready calls, want 1"
 _a27b="$(sed -n 1p "$SCRATCH/ready.argv")"
-[[ "$_a27b" == "--pr-list 101,102,103 --jobs 3 --go --wait" ]] \
+[[ "$_a27b" == "--pr-list 101,102,103 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "unfiltered batch argv: $_a27b"
 end_case "case 27b --skip and the unfiltered baseline"
 
@@ -1663,14 +1667,14 @@ triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" "2103 NEEDS-WORK
 run --worker
 [[ $RC -eq 0 ]] || fail "case 30 exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "case 30: want 1 fleet call, got $(calls ready)"
-[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait" ]] \
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "case 30: argv line 1: $(sed -n '1p' "$SCRATCH/ready.argv")"
 
 reset_state
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
 triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker --jobs 2
-[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 2 --go --wait" ]] \
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 2 --go --wait --allow-test-only" ]] \
     || fail "case 30 --jobs 2: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
 end_case "case 30 stage-1 batch argv"
 
@@ -1706,7 +1710,7 @@ printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
 triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker --max-ready 2
 [[ $RC -eq 0 ]] || fail "case 32 exit $RC, want 0"
-[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102 --jobs 3 --go --wait" ]] \
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "case 32 cap 2: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
 run --dry-run --max-ready 2
 grep -qF '2103' <<< "$OUT" && grep -qF 'max-ready cap' <<< "$OUT" \
@@ -1719,7 +1723,7 @@ reset_state
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
 triage_report "2101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker --max-ready 10
-[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait" ]] \
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait --allow-test-only" ]] \
     || fail "case 32 no-cap: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
 end_case "case 32 max-ready cap"
 
@@ -2346,6 +2350,98 @@ grep -qF '#102 skipped' <<< "$OUT" && fail "holdrepeat I: 102 reported as skippe
 hr_cleanup
 unset HRHARNESS HRSTATE
 end_case "case holdrepeat pre-fire skip"
+
+# --- result file: PR_CYCLE_RESULT_FILE holds one TSV row per PR in scope ---------------------
+# 101 is skipped by holdrepeat, 102 fires, 103 is over the --max-ready cap.
+RES="$SCRATCH/res/result.tsv"
+begin_case
+hr_cleanup
+reset_state
+rm -rf "$SCRATCH/res"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+hr_fixture 101 first-slug "7,8"
+rm -rf "$SCRATCH/fleetlogs"; mkdir -p "$SCRATCH/fleetlogs"
+printf 'post-plan-fleet: %s\n' outcome=shipped 'reason=PR #102' > "$SCRATCH/fleetlogs/post-plan-fleet-102.log"
+PR_CYCLE_RESULT_FILE="$RES" HRHARNESS="$HRH" run --worker --only 101,102,103 --max-ready 1
+[[ $RC -eq 0 ]] || fail "result-file-rows: exit $RC, want 0"
+[[ "$(sed -n 1p "$RES" 2>/dev/null)" == "# pr-cycle-result v1" ]] \
+    || fail "result-file-rows: header is '$(sed -n 1p "$RES" 2>/dev/null)'"
+[[ "$(sed -n 2p "$RES" 2>/dev/null)" == "$(printf '101\tholdrepeat\t-\t-')" ]] \
+    || fail "result-file-rows: row 101 is '$(sed -n 2p "$RES" 2>/dev/null)'"
+[[ "$(sed -n 3p "$RES" 2>/dev/null)" == "$(printf '102\tfired\tshipped\tPR #102')" ]] \
+    || fail "result-file-rows: row 102 is '$(sed -n 3p "$RES" 2>/dev/null)'"
+[[ "$(sed -n 4p "$RES" 2>/dev/null)" == "$(printf '103\tnot-fired\t-\tnot-selected')" ]] \
+    || fail "result-file-rows: row 103 is '$(sed -n 4p "$RES" 2>/dev/null)'"
+[[ "$(wc -l < "$RES" | tr -d ' ')" == "4" ]] || fail "result-file-rows: want exactly 4 lines"
+ls "$SCRATCH/res"/*.tmp.* >/dev/null 2>&1 && fail "result-file-rows: temp file left behind"
+hr_cleanup
+end_case "result-file-rows"
+
+# A HALT before Stage 1 fires leaves every PR in scope not-fired with reason halt.
+begin_case
+reset_state
+rm -rf "$SCRATCH/res"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+touch "$SCRATCH/.ibl5-pr-cycle.stop"
+PR_CYCLE_RESULT_FILE="$RES" run --worker --only 101,102
+[[ "$(calls ready)" == "0" ]] || fail "result-file-halt: fleet ran under a stop file"
+[[ "$(sed -n 2p "$RES" 2>/dev/null)" == "$(printf '101\tnot-fired\t-\thalt')" ]] \
+    || fail "result-file-halt: row 101 is '$(sed -n 2p "$RES" 2>/dev/null)'"
+[[ "$(sed -n 3p "$RES" 2>/dev/null)" == "$(printf '102\tnot-fired\t-\thalt')" ]] \
+    || fail "result-file-halt: row 102 is '$(sed -n 3p "$RES" 2>/dev/null)'"
+end_case "result-file-halt"
+
+# A fired PR whose fleet log is missing reads failed/no-log.
+begin_case
+reset_state
+rm -rf "$SCRATCH/res" "$SCRATCH/fleetlogs"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+PR_CYCLE_RESULT_FILE="$RES" run --worker --only 101
+[[ "$(calls ready)" == "1" ]] || fail "result-file-fleet-no-log: fleet did not fire"
+[[ "$(sed -n 2p "$RES" 2>/dev/null)" == "$(printf '101\tfired\tfailed\tno-log')" ]] \
+    || fail "result-file-fleet-no-log: row 101 is '$(sed -n 2p "$RES" 2>/dev/null)'"
+end_case "result-file-fleet-no-log"
+
+# An unset seam and an empty seam both write nothing.
+begin_case
+reset_state
+rm -rf "$SCRATCH/res"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker --only 101
+[[ $RC -eq 0 ]] || fail "result-file-unset: exit $RC, want 0"
+[[ -e "$RES" ]] && fail "result-file-unset: a result file appeared"
+grep -qF 'WARN result file' "$ERR" && fail "result-file-unset: warned about a file nobody asked for"
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+PR_CYCLE_RESULT_FILE="" run --worker --only 101
+[[ $RC -eq 0 ]] || fail "result-file-empty: exit $RC, want 0"
+[[ -e "$SCRATCH/res" ]] && fail "result-file-empty: a result directory appeared"
+grep -qF 'WARN result file' "$ERR" && fail "result-file-empty: warned about a file nobody asked for"
+end_case "result-file-unset and result-file-empty"
+
+# --go bakes the seam into the runner header, %q-quoted, so it survives launchd.
+begin_case
+reset_state
+TSPIN="${TSBASE}3"
+RUNNER="/tmp/pr-cycle-$TSPIN.sh"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+PR_CYCLE_RESULT_FILE="$SCRATCH/res dir/out.tsv" PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
+[[ $RC -eq 0 ]] || fail "launch-passes-result-file-seam: --go exit $RC, want 0"
+grep -qF 'export PR_CYCLE_RESULT_FILE=' "$RUNNER" \
+    || fail "launch-passes-result-file-seam: runner lacks the export"
+_seam="$(bash -c "$(grep -m1 '^export PR_CYCLE_RESULT_FILE=' "$RUNNER"); printf '%s' \"\$PR_CYCLE_RESULT_FILE\"")"
+[[ "$_seam" == "$SCRATCH/res dir/out.tsv" ]] \
+    || fail "launch-passes-result-file-seam: runner holds '$_seam'"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-cycle-$TSPIN.plist"
+unset TSPIN
+end_case "launch-passes-result-file-seam"
 
 begin_case
 # Case A: details-shaped sticky, matching diff -> skip pr-ready

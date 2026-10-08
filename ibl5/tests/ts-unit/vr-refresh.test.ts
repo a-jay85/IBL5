@@ -1,8 +1,10 @@
+import { readFileSync } from 'fs';
 import { describe, it, expect } from 'vitest';
 import {
   VISUAL_REVIEW_MARKER,
   extractGalleryShas,
-  linkedGallerySha,
+  extractGalleryDirs,
+  linkedGalleryDir,
   computeKeepList,
   selectRefreshTargets,
   renderSelectionTable,
@@ -20,6 +22,16 @@ const SHA_E = 'e'.repeat(40);
 
 function galleryComment(sha: string): string {
   return `## 🖼️ Visual review\n\nhttps://a-jay85.github.io/IBL5/${sha}/visual-review/index.html\n${VISUAL_REVIEW_MARKER}`;
+}
+
+// Real sticky comment from PR #2943, which moved galleries to pr/<N>/visual-review/.
+const PR2943_COMMENT = readFileSync(
+  new URL('./fixtures/vr-refresh-pr2943-visual-review-comment.txt', import.meta.url),
+  'utf-8'
+);
+
+function prGalleryComment(n: number): string {
+  return `## Visual review\n\nhttps://a-jay85.github.io/IBL5/pr/${n}/visual-review/#cap-space\n${VISUAL_REVIEW_MARKER}`;
 }
 
 function pr(overrides: Partial<OpenPr> = {}): OpenPr {
@@ -55,16 +67,76 @@ describe('extractGalleryShas', () => {
   });
 });
 
-describe('linkedGallerySha', () => {
+describe('extractGalleryDirs', () => {
+  it('extracts sha and pr-keyed dirs in first-appearance order', () => {
+    const text = [
+      `https://a-jay85.github.io/IBL5/pr/2943/visual-review/#cap-space`,
+      `https://a-jay85.github.io/IBL5/${SHA_A.toUpperCase()}/visual-review/index.html`,
+      `https://a-jay85.github.io/IBL5/pr/2943/visual-review/#standings`,
+      `https://a-jay85.github.io/IBL5/pr/7/visual-review`,
+    ].join('\n');
+    expect(extractGalleryDirs(text)).toEqual(['pr/2943/visual-review', SHA_A, 'pr/7/visual-review']);
+  });
+
+  it('rejects malformed pr-keyed and sha gallery paths', () => {
+    const text = [
+      'https://a-jay85.github.io/IBL5/pr/0/visual-review/',
+      'https://a-jay85.github.io/IBL5/pr/007/visual-review/',
+      'https://a-jay85.github.io/IBL5/pr/12abc/visual-review/',
+      'https://a-jay85.github.io/IBL5/pr-123/visual-review/',
+      'https://a-jay85.github.io/IBL5/pr//visual-review/',
+      'https://a-jay85.github.io/IBL5/pr/5/other-review/',
+      `https://a-jay85.github.io/IBL5/${'a'.repeat(39)}/visual-review/`,
+      `https://a-jay85.github.io/IBL5/${'a'.repeat(41)}/visual-review/`,
+    ].join('\n');
+    expect(extractGalleryDirs(text)).toEqual([]);
+  });
+
+  it('pr-keyed fixture yields the pr 2943 gallery dir', () => {
+    expect(extractGalleryDirs(PR2943_COMMENT)).toEqual(['pr/2943/visual-review']);
+  });
+});
+
+describe('linkedGalleryDir', () => {
   it('linked sha comes from the last visual-review sticky comment', () => {
     const p = pr({ comments: [galleryComment(SHA_A), 'unrelated', galleryComment(SHA_B)] });
-    expect(linkedGallerySha(p)).toBe(SHA_B);
+    expect(linkedGalleryDir(p)).toBe(SHA_B);
   });
 
   it('banner-only visual-review comment is not visual', () => {
     const banner = `No visual changes.\n${VISUAL_REVIEW_MARKER}`;
-    expect(linkedGallerySha(pr({ comments: [banner] }))).toBeNull();
-    expect(linkedGallerySha(pr({ comments: [] }))).toBeNull();
+    expect(linkedGalleryDir(pr({ comments: [banner] }))).toBeNull();
+    expect(linkedGalleryDir(pr({ comments: [] }))).toBeNull();
+  });
+
+  it('linked dir comes from the pr-keyed fixture', () => {
+    expect(linkedGalleryDir(pr({ comments: [PR2943_COMMENT] }))).toBe('pr/2943/visual-review');
+  });
+
+  it('last sticky comment wins across link shapes', () => {
+    expect(linkedGalleryDir(pr({ comments: [galleryComment(SHA_A), prGalleryComment(7)] }))).toBe('pr/7/visual-review');
+    expect(linkedGalleryDir(pr({ comments: [prGalleryComment(7), galleryComment(SHA_A)] }))).toBe(SHA_A);
+  });
+
+  it('pr-keyed link outside the sticky comment is not visual', () => {
+    const unmarked = prGalleryComment(7).replace(VISUAL_REVIEW_MARKER, '');
+    expect(linkedGalleryDir(pr({ comments: [unmarked] }))).toBeNull();
+  });
+});
+
+describe('pr-keyed gallery fixture (PR #2943)', () => {
+  it('pr 2943 fixture carries the sticky marker and a pr-keyed gallery url', () => {
+    expect(PR2943_COMMENT).toContain(VISUAL_REVIEW_MARKER);
+    expect(PR2943_COMMENT).toMatch(/github\.io\/IBL5\/pr\/2943\/visual-review\//);
+  });
+
+  it('pr-keyed fixture yields no keep-list shas', () => {
+    expect(extractGalleryShas(PR2943_COMMENT)).toEqual([]);
+  });
+
+  it('keep list for a pr-keyed-only pr is its head sha alone', () => {
+    const p = pr({ number: 2943, headRefOid: SHA_E, comments: [PR2943_COMMENT] });
+    expect(computeKeepList([p])).toEqual([SHA_E]);
   });
 });
 
@@ -101,7 +173,7 @@ describe('selectRefreshTargets', () => {
     const ts = { [SHA_A]: NOW };
     expect(selectRefreshTargets([pr()], ts, NOW + DAY, stale, 10).targets).toEqual([]);
     const later = selectRefreshTargets([pr()], ts, NOW + 8 * DAY, stale, 10);
-    expect(later.targets).toEqual([{ pr: 1, head_sha: SHA_E, gallery_sha: SHA_A, age_days: 8 }]);
+    expect(later.targets).toEqual([{ pr: 1, head_sha: SHA_E, gallery_dir: SHA_A, age_days: 8 }]);
   });
 
   it('exactly stale-days old is fresh one second later is stale', () => {
@@ -184,14 +256,25 @@ describe('selectRefreshTargets', () => {
       { pr: 4, reason: 'over-cap' },
     ]);
   });
+
+  it('pr-keyed gallery is aged by its dir and reported as gallery_dir', () => {
+    const p = pr({ number: 2943, comments: [PR2943_COMMENT] });
+    const ts = { 'pr/2943/visual-review': NOW };
+    const fresh = selectRefreshTargets([p], ts, NOW + DAY, stale, 10);
+    expect(fresh.skipped).toEqual([{ pr: 2943, reason: 'fresh' }]);
+    const later = selectRefreshTargets([p], ts, NOW + 8 * DAY, stale, 10);
+    expect(later.targets).toEqual([
+      { pr: 2943, head_sha: SHA_E, gallery_dir: 'pr/2943/visual-review', age_days: 8 },
+    ]);
+  });
 });
 
 describe('renderSelectionTable', () => {
   it('renders a table row per target and skip', () => {
     const out = renderSelectionTable({
       targets: [
-        { pr: 3, head_sha: SHA_E, gallery_sha: SHA_A, age_days: 12 },
-        { pr: 4, head_sha: SHA_E, gallery_sha: SHA_B, age_days: null },
+        { pr: 3, head_sha: SHA_E, gallery_dir: SHA_A, age_days: 12 },
+        { pr: 4, head_sha: SHA_E, gallery_dir: SHA_B, age_days: null },
       ],
       skipped: [{ pr: 5, reason: 'draft' }],
     });

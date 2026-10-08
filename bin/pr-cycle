@@ -76,6 +76,10 @@
 #                            $PR_CYCLE_MAIN_CHECKOUT/tools/postplan-harness.
 #   PR_CYCLE_HOLDREPEAT_STATE_DIR
 #                            Holdrepeat state records. Default: <harness>/out/state.
+#   PR_CYCLE_RESULT_FILE     Unset or empty writes nothing. Otherwise the worker atomically
+#                            writes the `# pr-cycle-result v1` TSV (one `<pr> <status> <outcome>
+#                            <reason>` row per in-scope PR) when it finishes, even after a HALT.
+#                            Passed through the launcher env list. Read by bin/pr-cycle-tick.
 #
 #   Every seam is PR_CYCLE_-prefixed on purpose. bin/pr-attack reads a bare PR_TRIAGE_CMD
 #   itself, and this script spawns the real bin/pr-attack as a child — an unprefixed export
@@ -102,8 +106,9 @@
 #   * This script never polls for merges and never sleeps. .github/workflows/update-behind-prs.yml
 #     re-BEHINDs open PRs after each merge, and merge-digest-notify.yml sends the per-merge
 #     digest DM. This script's only DM is the your-turn summary at the end of a run.
-#   * Stage 1 is exactly one post-plan-fleet --pr-list call. Its exit code is the only
-#     readiness signal; no stderr text match of any kind.
+#   * Stage 1 is exactly one post-plan-fleet --pr-list call. The call carries
+#     --allow-test-only. Its exit code is the only readiness signal; no stderr text match
+#     of any kind.
 
 set -euo pipefail
 
@@ -143,6 +148,8 @@ PR_CYCLE_MAIN_CHECKOUT="${PR_CYCLE_MAIN_CHECKOUT:-/Users/ajaynicolas/GitHub/IBL5
 PR_CYCLE_RESCUE="${PR_CYCLE_RESCUE:-1}"
 PR_CYCLE_SKIP_READY_WHEN_ARMABLE="${PR_CYCLE_SKIP_READY_WHEN_ARMABLE:-1}"
 PR_CYCLE_STOP_FILE="${PR_CYCLE_STOP_FILE:-$HOME/.ibl5-pr-cycle.stop}"
+# Machine-readable per-PR result file written by the worker. Unset or empty writes nothing.
+PR_CYCLE_RESULT_FILE="${PR_CYCLE_RESULT_FILE:-}"
 PR_CYCLE_DRY_LAUNCH="${PR_CYCLE_DRY_LAUNCH:-}"
 PR_CYCLE_AUTH_PROBE_CMD="${PR_CYCLE_AUTH_PROBE_CMD:-}"
 PR_CYCLE_PATCH_ID_CMD="${PR_CYCLE_PATCH_ID_CMD:-}"
@@ -280,6 +287,7 @@ fi
 TS="${PR_CYCLE_TS:-$(date +%Y%m%d-%H%M%S)-$$}"
 RUNDIR="/tmp/pr-cycle-$TS"
 HALT=""
+STAGE1_FIRED=""
 ARMED=0
 READIED=0
 LEFT=0
@@ -979,6 +987,43 @@ _stage1_result_lines() {
     fi
 }
 
+# _stage1_result_file — write $PR_CYCLE_RESULT_FILE: a "# pr-cycle-result v1" header, then one
+# "<pr><TAB><status><TAB><outcome><TAB><reason>" row per PR in scope. status is fired (outcome
+# and reason from the fleet log), holdrepeat (both "-"), or not-fired (outcome "-", reason halt
+# when HALT stopped the run before Stage 1 fired, else not-selected). A no-op when the path is
+# unset or empty. Written to a temp name and renamed, so a reader never sees a partial file.
+_stage1_result_file() {
+    [ -n "${PR_CYCLE_RESULT_FILE:-}" ] || return 0
+    local _rf_pr _rf_o _rf_r _rf_status _rf_tmp="$PR_CYCLE_RESULT_FILE.tmp.$$"
+    local _rf_scope="$RUNDIR/result-scope.txt"
+    mkdir -p "$(dirname "$PR_CYCLE_RESULT_FILE")" || return 1
+    if [ -n "$ONLY" ]; then
+        printf '%s\n' "$ONLY" | tr ',' '\n' > "$_rf_scope"
+    else
+        cat "$RUNDIR/stage1.txt" "$RUNDIR/stage1-holdrepeat.txt" 2>/dev/null > "$_rf_scope" || true
+    fi
+    {
+        echo "# pr-cycle-result v1"
+        while IFS= read -r _rf_pr; do
+            [ -n "$_rf_pr" ] || continue
+            _rf_pr="${_rf_pr#\#}"
+            if grep -qxF -- "$_rf_pr" "$RUNDIR/stage1-holdrepeat.txt" 2>/dev/null; then
+                _rf_status=holdrepeat; _rf_o="-"; _rf_r="-"
+            elif [ -n "$STAGE1_FIRED" ] && grep -qxF -- "$_rf_pr" "$RUNDIR/stage1.txt" 2>/dev/null; then
+                _rf_status=fired
+                IFS=$'\t' read -r _rf_o _rf_r <<< "$(_fleet_outcome "$_rf_pr")"
+                _rf_r="$(printf '%s' "$_rf_r" | tr '\t\n' '  ')"
+                [ -n "$_rf_r" ] || _rf_r="-"
+            else
+                _rf_status=not-fired; _rf_o="-"
+                if [ -n "$HALT" ] && [ -z "$STAGE1_FIRED" ]; then _rf_r=halt; else _rf_r=not-selected; fi
+            fi
+            printf '%s\t%s\t%s\t%s\n' "$_rf_pr" "$_rf_status" "$_rf_o" "$_rf_r"
+        done < "$_rf_scope"
+    } > "$_rf_tmp" || return 1
+    mv -f "$_rf_tmp" "$PR_CYCLE_RESULT_FILE"
+}
+
 # _stage1_fire — run post-plan-fleet with the stage1.txt list. Returns 0 on empty or
 # fleet exit 0; sets HALT and returns 1 on failure.
 _stage1_fire() {
@@ -993,8 +1038,9 @@ _stage1_fire() {
     _csv="$(paste -sd, "$RUNDIR/stage1.txt")"
     set +e
     # pr-cycle's own auth probe already passed — bypass the duplicate probe in post-plan-fleet.
+    STAGE1_FIRED=1
     env POST_PLAN_FLEET_AUTH_PROBE_CMD=true \
-        "$PR_CYCLE_READY_CMD" --pr-list "$_csv" --jobs "$JOBS" --go --wait \
+        "$PR_CYCLE_READY_CMD" --pr-list "$_csv" --jobs "$JOBS" --go --wait --allow-test-only \
         > "$RUNDIR/ready.out" 2> "$RUNDIR/ready.err"
     _rc=$?
     set -e
@@ -1182,6 +1228,7 @@ _worker() {
 
     _reason="${HALT:-done}"
     _stage1_result_lines
+    _stage1_result_file || echo "pr-cycle: WARN result file write failed: $PR_CYCLE_RESULT_FILE" >&2
     _OUTCOME_SUMMARY="$(_stage1_outcome_summary)"
     _FIRED_SUMMARY="${READIED:+fired $READIED (${_OUTCOME_SUMMARY})}"
     _FIRED_SUMMARY="${_FIRED_SUMMARY:-fired 0}"
@@ -1234,7 +1281,7 @@ _report_dry_run() {
     fi
     if [ "$_s1_cnt" -gt 0 ]; then
         _s1_csv="$(paste -sd, "$RUNDIR/stage1.txt")"
-        echo "would run: post-plan-fleet --pr-list $_s1_csv --jobs $JOBS --go --wait"
+        echo "would run: post-plan-fleet --pr-list $_s1_csv --jobs $JOBS --go --wait --allow-test-only"
     fi
     if [ "$PR_CYCLE_RESCUE" = "0" ]; then
         echo "DIRTY rescue: disabled (PR_CYCLE_RESCUE=0) — excluded PRs stay unreachable."
@@ -1302,7 +1349,7 @@ _launch() {
                   PR_CYCLE_SKIP_HELD_UNCHANGED PR_CYCLE_HARNESS_OUT PR_CYCLE_FLEET_LOG_DIR \
                   PR_CYCLE_HOLDREPEAT_HARNESS PR_CYCLE_HOLDREPEAT_STATE_DIR \
                   PR_CYCLE_AUTH_PROBE_CMD PR_CYCLE_PATCH_ID_CMD \
-                  PR_CYCLE_STOP_FILE; do
+                  PR_CYCLE_STOP_FILE PR_CYCLE_RESULT_FILE; do
             eval "_val=\${$_v}"
             # shellcheck disable=SC2154  # _val is assigned by the eval above
             printf 'export %s=%q\n' "$_v" "$_val"

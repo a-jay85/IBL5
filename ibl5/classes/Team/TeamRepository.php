@@ -82,7 +82,7 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
             FROM `ibl_standings` s
             JOIN `ibl_power` p ON s.teamid = p.teamid
             WHERE s.division = ?
-            ORDER BY s.div_gb ASC",
+            ORDER BY s.div_gb ASC, s.teamid ASC",
             "s",
             $division
         );
@@ -104,7 +104,7 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
             FROM `ibl_standings` s
             JOIN `ibl_power` p ON s.teamid = p.teamid
             WHERE s.conference = ?
-            ORDER BY s.conf_gb ASC",
+            ORDER BY s.conf_gb ASC, s.teamid ASC",
             "s",
             $conference
         );
@@ -118,7 +118,7 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
     {
         /** @var list<BannerRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_banners` WHERE currentname = ? ORDER BY year ASC",
+            "SELECT * FROM `ibl_banners` WHERE currentname = ? ORDER BY year ASC, id ASC",
             "s",
             $teamName
         );
@@ -132,7 +132,7 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
     {
         /** @var list<GMTenureRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_gm_tenures` WHERE franchise_id = ? ORDER BY start_season_year ASC",
+            "SELECT * FROM `ibl_gm_tenures` WHERE franchise_id = ? ORDER BY start_season_year ASC, id ASC",
             "i",
             $franchiseId
         );
@@ -146,7 +146,8 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
     {
         /** @var list<GMAwardRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_gm_awards` WHERE name = ? ORDER BY year ASC",
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (WHERE fixes name and uk_year_award_name makes (year, award) unique, so award completes a total order)
+            "SELECT * FROM `ibl_gm_awards` WHERE name = ? ORDER BY year ASC, award ASC",
             "s",
             $gmUsername
         );
@@ -202,10 +203,11 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
     {
         /** @var list<WinLossRow> */
         return $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (PK is (team_id, year, game_type) and WHERE fixes game_type, so team_id completes a total order)
             "SELECT `year`, currentname, namethatyear, wins, losses
              FROM `ibl_team_season_records`
              WHERE currentname = ? AND game_type = ?
-             ORDER BY `year` DESC",
+             ORDER BY `year` DESC, team_id ASC",
             "si",
             $teamName,
             $gameType
@@ -277,7 +279,7 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
                     END AS winner_tid,
                     ROW_NUMBER() OVER (
                         PARTITION BY YEAR(bst.game_date)
-                        ORDER BY bst.game_date DESC, bst.game_of_that_day ASC
+                        ORDER BY bst.game_date DESC, bst.game_of_that_day ASC, bst.id ASC
                     ) AS rn
                 FROM `ibl_box_scores_teams` bst
                 WHERE bst.game_type = 3
@@ -317,6 +319,7 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
     {
         /** @var list<PlayoffResultRow> */
         return $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (the appended terms complete the ibl_playoff_series_results PK (year, round, winner_tid, loser_tid); the table has no surrogate id)
             "SELECT pr.`year`, pr.`round`, pr.winner, pr.loser, pr.winner_games, pr.loser_games,
                     COALESCE(wfs.team_name, pr.winner) AS winner_name_that_year,
                     COALESCE(lfs.team_name, pr.loser) AS loser_name_that_year
@@ -324,7 +327,7 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
              LEFT JOIN `ibl_franchise_seasons` wfs ON wfs.franchise_id = pr.winner_tid AND wfs.season_ending_year = pr.`year`
              LEFT JOIN `ibl_franchise_seasons` lfs ON lfs.franchise_id = pr.loser_tid AND lfs.season_ending_year = pr.`year`
              WHERE pr.winner = ? OR pr.loser = ?
-             ORDER BY pr.`year` DESC",
+             ORDER BY pr.`year` DESC, pr.`round` ASC, pr.winner_tid ASC, pr.loser_tid ASC",
             "ss",
             $teamName,
             $teamName
@@ -344,7 +347,7 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
             WHERE teamid = ?
               AND retired = 0
               AND cyt != cy
-            ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC",
+            ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC, pid ASC",
             "i",
             $teamid
         );
@@ -362,7 +365,7 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
             FROM `ibl_plr`
             WHERE teamid = ?
               AND retired = 0
-            ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC",
+            ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC, pid ASC",
             "i",
             $teamid
         );
@@ -377,12 +380,12 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
         if ($includeFreeAgencyActive) {
             /** @var list<PlayerRow> */
             return $this->fetchAll(
-                "SELECT * FROM `ibl_plr` WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC"
+                "SELECT * FROM `ibl_plr` WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC, pid ASC"
             );
         }
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_plr` WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC"
+            "SELECT * FROM `ibl_plr` WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC, pid ASC"
         );
     }
 
@@ -394,7 +397,7 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_plr` WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC"
+            "SELECT * FROM `ibl_plr` WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC, pid ASC"
         );
     }
 
@@ -406,7 +409,7 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
     {
         /** @var list<HistRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_hist` WHERE teamid = ? AND year = ? ORDER BY name ASC",
+            "SELECT * FROM `ibl_hist` WHERE teamid = ? AND year = ? ORDER BY name ASC, pid ASC",
             "is",
             $teamid,
             $year
@@ -421,7 +424,7 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
     {
         /** @var list<FranchiseSeasonRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_franchise_seasons` WHERE franchise_id = ? ORDER BY season_year ASC",
+            "SELECT * FROM `ibl_franchise_seasons` WHERE franchise_id = ? ORDER BY season_year ASC, id ASC",
             "i",
             $franchiseId
         );

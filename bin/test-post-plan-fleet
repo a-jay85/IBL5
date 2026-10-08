@@ -243,6 +243,20 @@ else
 fi
 end_case plist-shape
 
+# Characterization: a hand-started --go run never carries --allow-test-only, so the
+# rescue-only exemption cannot leak into interactive fleet runs.
+begin_case
+if [[ -f /tmp/post-plan-fleet-runner-1901.sh ]]; then
+    grep -qxF 'timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground > "$LOG" 2>&1 || RC=$?' \
+        /tmp/post-plan-fleet-runner-1901.sh \
+        || fail "runner-line-hand-started: runner lacks the plain post-plan-now line"
+    grep -qF -- '--allow-test-only' /tmp/post-plan-fleet-runner-1901.sh \
+        && fail "runner-line-hand-started: a hand-started runner carries --allow-test-only"
+else
+    fail "runner-line-hand-started: no runner to inspect"
+fi
+end_case runner-line-hand-started
+
 # --- case 6.5: session re-fire — sidecar holds SECOND uuid, not first (sweep-ordering) ----
 begin_case
 clean_slots

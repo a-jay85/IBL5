@@ -1293,6 +1293,40 @@ def test_guard_force_flag_overrides_exit_5(tmp_path):
     assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
 
 
+def _holdrepeat_harness(tmp_path):
+    """A stub HARNESS whose `harness.holdrepeat check` exits 10 (decline). Also carries `run`."""
+    h = tmp_path / "hr-harness"
+    (h / "harness").mkdir(parents=True)
+    (h / "harness" / "__init__.py").write_text("")
+    (h / "harness" / "holdrepeat.py").write_text(
+        "import sys\n"
+        "if sys.argv[1:2] == ['check']:\n"
+        "    print('held on the same reason; nothing changed')\n"
+        "    sys.exit(10)\n")
+    (h / "run").write_text("#!/bin/sh\nexit 0\n")
+    (h / "run").chmod(0o755)
+    return h
+
+
+def test_char_unknown_argument_rejected_loudly(tmp_path):
+    """Characterization: an unrecognised flag exits nonzero and names the flag. Catches
+    deleting the `*)` arm's exit."""
+    r = _run_ppn(tmp_path, args=("--bogus",))
+    assert r.returncode != 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "unknown argument '--bogus'" in r.stderr, f"stderr={r.stderr!r}"
+
+
+def test_char_force_bypasses_holdrepeat_decline(tmp_path):
+    """Characterization: --force skips the exit-8 holdrepeat decline, which is why it is too
+    broad for the rescue caller. Catches --force starting to respect the decline."""
+    h = _holdrepeat_harness(tmp_path)
+    plain = _run_ppn(tmp_path / "plain", extra_env={"HARNESS": str(h)})
+    assert plain.returncode == 8, f"stdout={plain.stdout!r} stderr={plain.stderr!r}"
+    assert "post-plan DECLINED" in plain.stdout
+    forced = _run_ppn(tmp_path / "forced", args=("--force",), extra_env={"HARNESS": str(h)})
+    assert forced.returncode != 8, f"stdout={forced.stdout!r} stderr={forced.stderr!r}"
+
+
 def test_guard_proceeds_when_no_pr_exists(tmp_path):
     """The hard stop: the guard must NOT widen to the no-PR case. Catches removing or
     inverting `[ -n "$PR_NUM" ]`."""

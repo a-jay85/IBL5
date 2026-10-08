@@ -392,6 +392,17 @@ grep -qF '#101' "$SCRATCH/dm.log" 2>/dev/null || fail "retry-cap-dm-once: DM doe
 grep -qF 'Why:' "$SCRATCH/dm.log" 2>/dev/null && fail "retry-cap-dm-once: DM has a Why: with no run dir"
 end_case retry-cap-dm-once
 
+# Characterization: the full still-red DM wording. Phase 5 adds a second DM whose wording
+# must stay distinct from this one.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+mkdir -p "$STATE_DIR/attempts"; echo aaa1111 > "$STATE_DIR/attempts/101"
+run_tick
+grep -qF 'pr-cycle-watch: PR #101 is still red on head aaa1111 after one rescue. Skipping it until a new push.' \
+    "$SCRATCH/dm.log" 2>/dev/null \
+    || fail "still-red-dm-full-wording: DM was '$(cat "$SCRATCH/dm.log" 2>/dev/null)'"
+end_case still-red-dm-full-wording
+
 # The retry-cap DM quotes the newest rescue run's blocked-ship "Why:" line. An older
 # run's reason must never stand in for the newest one, and a sibling slug never matches.
 reset; begin_case

@@ -197,6 +197,28 @@ def test_char_successful_push_sets_ci_head_and_rewatches_new_sha(monkeypatch, tm
     assert _has(r.lines, "outcome=fixed")
 
 
+class RerunGh(CiFixGh):
+    """CiFixGh that records which failed runs the rerun probe re-ran."""
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.reruns: list = []
+
+    def run_rerun_failed(self, run_id): self.reruns.append(run_id)
+
+
+def test_char_probe_reruns_failed_run_on_no_change(monkeypatch, tmp_path):
+    """Characterization: a no-change attempt reruns the failed run, then logs the probe
+    outcome. Catches deleting the `gh.run_rerun_failed(run_id)` call."""
+    gh = RerunGh()
+    gh.checks = [{"name": "PHPUnit", "state": "FAILURE",
+                  "link": "https://github.com/a/b/actions/runs/777/job/7779"}]
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, ScriptedLlm(), failed=["PHPUnit"],
+             commit=("",))
+    assert gh.reruns == ["777"]
+    assert _has(r.lines, "phase7 ci-fix rerun probe: outcome=")
+
+
 # ---------------------------------------------------------------------------
 # Phase 2: redacted denial text, distinct commit-time and push-time tags
 # ---------------------------------------------------------------------------

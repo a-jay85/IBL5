@@ -1,7 +1,7 @@
 ---
 name: burndown
 description: Run an automatic backlog burn-down: rank new issues, pick 5 units (backfilling freed units with further selection rounds), route each item to a plan or an ad-hoc worktree, and start it.
-last_verified: 2026-10-06
+last_verified: 2026-10-08
 ---
 
 # /burndown
@@ -48,6 +48,9 @@ bin/backlog burndown-sweep > "$W/sweep.txt"
 Exit 0 and exit 1 both continue, and `$W/sweep.txt` goes into the step 6 report. Exit 1
 means at least one item's live state was unknown; the sweep closed nothing for that item.
 Exit 3 stops the run with stderr shown to the user.
+A `HELD #N <path> (...)` line names a skipped ad-hoc item whose worktree still has unshipped
+work (dirty or ahead of origin/master, no PR, ledger older than 24h). `HELD-UNKNOWN` means
+the probe failed. The sweep never changes either; ship the worktree or remove it.
 
 ```bash
 bin/backlog burndown-delta > "$W/delta.json"

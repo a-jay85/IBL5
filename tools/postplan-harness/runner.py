@@ -62,6 +62,7 @@ from harness.gate_backtest import upsert_gate_backtest
 from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.review import ReviewPhase
+from harness import baseline_guard
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
 from harness.thread_ingestion import run_thread_ingestion
 from harness.adapters.ghad import LiveGh, RecordingGh
@@ -1457,6 +1458,12 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
             if probed:
                 break
             probed = True
+            allow, why = baseline_guard.probe_decision(gh, pr, sha)
+            if not allow:
+                if why == "update-baselines-label":
+                    baseline_guard.maybe_refire(gh, pr, sha, log)
+                log(f"phase7 ci-fix rerun probe skipped: reason={why} sha={str(sha)[:8]}")
+                break
             all_red_names = list(outcome.failed)
             refs = cifix.failed_job_refs(gh.pr_checks_json(pr), all_red_names)
             seen_run_ids = set()

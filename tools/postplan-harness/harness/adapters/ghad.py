@@ -44,7 +44,7 @@ class RecordingGh:
                  "pr_sticky_verdict", "issue_create", "followup_create",
                  "pr_disable_auto_merge",
                  "pr_checks_json", "run_log_failed", "run_rerun_failed",
-                 "pr_resolve_thread")
+                 "pr_resolve_thread", "label_remove")
 
     def __init__(self, out_dir: str, fixture: dict | None = None):
         self.out_dir = out_dir
@@ -208,6 +208,32 @@ class RecordingGh:
 
     def run_rerun_failed(self, run_id) -> bool:
         self.record("run_rerun_failed", run_id=run_id)
+        return True
+
+    # -- baseline guard (harness/baseline_guard.py): fresh reads, never the cached meta --
+    def pr_has_label_fresh(self, pr: int, label: str) -> bool:
+        if self.fixture.get("fresh_labels_error"):
+            raise HarnessError("gh", "replay: fresh label read failed")
+        return label in (self.fixture.get("fresh_labels") or [])
+
+    def e2e_runs_for_sha(self, sha: str) -> list[dict]:
+        if self.fixture.get("e2e_runs_error"):
+            raise HarnessError("gh", "replay: e2e run read failed")
+        return list(self.fixture.get("e2e_runs") or [])
+
+    def pr_comments_text(self, pr: int) -> str:
+        return "\n".join(self.fixture.get("pr_comments") or [])
+
+    def pr_label_remove(self, pr: int, label: str) -> bool:
+        self.record("label_remove", pr=pr, label=label)
+        return True
+
+    def pr_label_add_checked(self, pr: int, label: str) -> bool:
+        failures = int(self.fixture.get("label_add_failures") or 0)
+        if failures > 0:
+            self.fixture["label_add_failures"] = failures - 1
+            return False
+        self.record("label_add", pr=pr, label=label)
         return True
 
     def pr_disable_auto_merge(self, pr: int) -> None:
@@ -556,6 +582,41 @@ class LiveGh(RecordingGh):
             return True
         except (HarnessError, OSError, subprocess.SubprocessError):
             return False
+
+    # -- baseline guard (harness/baseline_guard.py) ------------------------
+    def pr_has_label_fresh(self, pr: int, label: str) -> bool:
+        """Live label read. Bypasses `_fetch_meta`: the label changes during the run."""
+        out = self._gh("api", f"repos/{{owner}}/{{repo}}/issues/{pr}/labels",
+                       "--jq", ".[].name")
+        return any(line.strip() == label for line in out.splitlines())
+
+    def e2e_runs_for_sha(self, sha: str) -> list[dict]:
+        return json.loads(self._gh(
+            "run", "list", "--workflow", "e2e-tests.yml", "--commit", sha,
+            "--json", "databaseId,status,conclusion,event,createdAt", "--limit", "20"))
+
+    def pr_comments_text(self, pr: int) -> str:
+        return self._gh("api", "--paginate", f"repos/{{owner}}/{{repo}}/issues/{pr}/comments",
+                        "--jq", ".[].body")
+
+    def pr_label_remove(self, pr: int, label: str) -> bool:
+        try:
+            self._gh("api", "--method", "DELETE",
+                     f"repos/{{owner}}/{{repo}}/issues/{pr}/labels/{label}")
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            return False
+        self.record("label_remove", pr=pr, label=label)
+        return True
+
+    def pr_label_add_checked(self, pr: int, label: str) -> bool:
+        try:
+            self._gh("api", "--method", "POST",
+                     f"repos/{{owner}}/{{repo}}/issues/{pr}/labels",
+                     "-f", f"labels[]={label}")
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            return False
+        self.record("label_add", pr=pr, label=label)
+        return True
 
     def pr_disable_auto_merge(self, pr: int) -> None:
         try:

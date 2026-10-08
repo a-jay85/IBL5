@@ -292,6 +292,19 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
         self::assertSame([], $this->repo->getOlympicsStats(999999999));
     }
 
+    public function testGetOlympicsStatsBreaksSameYearTiesByIdAscending(): void
+    {
+        $this->insertTestPlayer(200010030, 'DB Oly Tie');
+        $idA = $this->insertRow('ibl_olympics_stats', ['pid' => 200010030, 'name' => 'DB Oly Tie', 'year' => 2096]);
+        $idB = $this->insertRow('ibl_olympics_stats', ['pid' => 200010030, 'name' => 'DB Oly Tie', 'year' => 2096]);
+        $idC = $this->insertRow('ibl_olympics_stats', ['pid' => 200010030, 'name' => 'DB Oly Tie', 'year' => 2095]);
+
+        $rows = $this->repo->getOlympicsStats(200010030);
+
+        // The 2095 row has the highest id yet leads, so year stays primary
+        self::assertSame([$idC, $idA, $idB], array_map('intval', array_column($rows, 'id')));
+    }
+
     public function testGetOlympicsCareerTotalsReturnsNullForNoData(): void
     {
         self::assertNull($this->repo->getOlympicsCareerTotals(999999999));

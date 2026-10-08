@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand detail for agent-tiering: skip-vs-spawn heuristic, fan-out and nesting rationale, task-type boundary, orchestrator context economics, /plan orchestrator evidence, prompt style, extra Sonnet pins. Attaches only on `.claude/agents/*.md`. Fable gate and bounded checklist live in their own files.
-last_verified: 2026-09-30
+description: Read-on-demand detail for agent-tiering: skip-vs-spawn heuristic, fan-out and nesting rationale, task-type boundary, orchestrator context economics, /plan orchestrator evidence, prompt style, Haiku 5.5 measurement and price cliff, extra Sonnet pins. Attaches only on `.claude/agents/*.md`. Fable gate and bounded checklist live in their own files.
+last_verified: 2026-10-08
 paths:
   - ".claude/agents/*.md"
 ---
@@ -22,7 +22,7 @@ Delegatable tool results: 8,292 calls / 4.73 Mtok. p50 result 194 tokens, p90 1,
 
 **This gives the "~50 lines" threshold below a measured basis.** ~50 lines of output lands right around the measured p50 of 194 tokens — roughly 90× cheaper than the 17–23K a spawn costs before it does any work. The figure stands exactly as written; it was an estimate and is now an estimate the data agrees with.
 
-**The fat-tail batching rule names *which* calls are worth a spawn at all.** Not how few spawns to make. `agent-tiering.md` § Fat-tail delegation lets two fat calls per turn through and denies the 3rd, routing it and the rest into a `sonnet-5-5` spawn. A call is **fat** when it is a `Read` ≥ 8 KB, or a Bash command in: bare `cat`, `git log` with no bound, `find` with no limit, a full Playwright run (hook `output-guard.sh` Check F; fails open; the deny message names the one-off override). It identifies the tail worth delegating (the 5.2% carrying 43.6% of the residue). **One spawn is the default for wall-clock, not token, reasons:** those calls are cheap to *run*, so serializing them in one agent costs almost no wall-clock. When a batched item is genuinely long-running and independent (a full Playwright run beside an unbounded log dump), fan out instead. See § Fan out by independence.
+**The fat-tail batching rule names *which* calls are worth a spawn at all.** Not how few spawns to make. `agent-tiering.md` § Fat-tail delegation lets two fat calls per turn through and denies the 3rd, routing it and the rest into one Haiku digest spawn. A call is **fat** when it is a `Read` ≥ 8 KB, or a Bash command in: bare `cat`, `git log` with no bound, `find` with no limit, a full Playwright run (hook `output-guard.sh` Check F; fails open; the deny message names the one-off override). It identifies the tail worth delegating (the 5.2% carrying 43.6% of the residue). **One spawn is the default for wall-clock reasons:** those calls are cheap to *run*, so serializing them in one agent costs almost no wall-clock. When a batched item is genuinely long-running and independent (a full Playwright run beside an unbounded log dump), fan out instead. See § Fan out by independence.
 
 **Treat this as unused headroom.** The 2026-08-25 spawn-count comparison (135 spawns against a ~353 break-even) was corrected on 2026-09-23 by `bin/measure-delegate-cost`: a Sonnet automouse impl session costs $2.65 at p50 against $4.33 for Opus (`work-triage-detail.md` § Inline vs. delegated). The finding is room to route more of the fat tail through a sub-agent, which no token saving has banked.
 
@@ -85,9 +85,25 @@ The context saving from a sub-agent comes from **delegation, not dismissal**. A 
 
 **Automouse:** same rules, headless. It cannot self-clear between phases, so a very long plan pays for its accumulating orchestrator context. If that measurably hurts, split the plan into stacked pieces before reconsidering nesting.
 
+## Haiku 5.5 measurement
+
+A/B on 2026-10-08 (Sonnet twice, Haiku once, bar sealed first): `~/claude-plans/_reports/2026-10-08-haiku-5-5-vs-sonnet-5-5-ab.md`.
+
+| Surface | Tasks | Verdict | $/task S, H |
+|---|---|---|---|
+| `explore` | 8 | PASS | 0.154, 0.010 |
+| `manual_test` | 8 | FAIL | 0.059, 0.003 |
+| `fat_tail_digest` | 6 | PASS | 0.082, 0.005 |
+| `security_probe` | 5 | PASS (on Haiku) | n/a, 0.007 |
+| `backlog_housekeeping` | 0 | NO-LIVE-SURFACE | n/a |
+
+Only parity moves a surface. Cost never offsets a quality drop; a refusal fails it (`case-refusal-fail`, `case-price-cliff`). Agent D stays on Sonnet until its trigger holds (20+ examples per category, 4 weeks of precision data).
+
+**Price cliff.** Haiku bills $0.10/$0.50 per MTok up to 100K prompt tokens per request (cache included) and $0.50/$2.50 above, 0.25 of Sonnet's input rate. Send jobs past ~100K tokens to Sonnet.
+
 ## Prompt Style by Tier
 
-**Haiku** (compensate for its tendency to stop at "enough"): lead with a concrete grep/find command · say "list EVERY match" / "do NOT skip files" when exhaustiveness matters · pre-resolve absolute paths · request structured output (table/list) · for checklists, "check EACH pattern, cite file:line or state not found" · never ask it to judge relevance, trace multi-hop flows, or relate a past event to the current context.
+**Haiku 5.5** (tips checked against the 2026-10-08 A/B, § Haiku 5.5 measurement): lead with a concrete grep/find command · ask for every match when exhaustiveness matters, and for checklists, check each pattern and cite file:line or state not found · pre-resolve absolute paths · name the output block the caller parses · never ask it to judge relevance, trace multi-hop flows, or relate a past event to the current context.
 
 **Sonnet**: open-ended exploration, multi-file synthesis, ambiguous queries where the first grep might miss — current style is fine.
 
@@ -117,3 +133,5 @@ Two actors spawn Explore in a `/plan` run: the orchestrator at Step 2 (≤2) and
 | **Sonnet 5.5** | *omit `model`* | Multi-hop traces, cross-module synthesis, open-ended investigation | "trace the encoding pipeline from .plr read to Team page" |
 
 **Heuristic:** notice connections / judge relevance / trace data flow → omit `model` (Sonnet 5.5). Answerable by grep + format → `model: "haiku"`.
+
+Measured 2026-10-08: Haiku 5.5 matched Sonnet 5.5 on 8 grep-and-list tasks (§ Haiku 5.5 measurement).

@@ -55,6 +55,29 @@ class CachedFakeGh:
         return self.fresh
 
 
+class RecordingGh:
+    """LiveGh stand-in with a writable remote. pr_body_fresh() loads the remote into the
+    cache, pr_body() serves the cache, pr_edit_body() records the call and (unless
+    drop_edits) lands it on the remote."""
+
+    def __init__(self, remote, drop_edits=False):
+        self.remote, self.cache = remote, remote
+        self.drop_edits = drop_edits
+        self.edits = []
+
+    def pr_body(self):
+        return self.cache
+
+    def pr_body_fresh(self):
+        self.cache = self.remote
+        return self.cache
+
+    def pr_edit_body(self, pr, body):
+        self.edits.append((pr, body))
+        if not self.drop_edits:
+            self.remote = body
+
+
 # ---------------------------------------------------------------------------
 # _load_script — blob loading + path preference
 # ---------------------------------------------------------------------------
@@ -567,13 +590,14 @@ def test_all_passing(monkeypatch):
 
     result = mt.run(
         pr=1, worktree="/fake/worktree", body=body,
-        gh=FakeGh([post_body]),
+        gh=RecordingGh(post_body),
         probe=FixtureProbe({}),
         show_blob=_make_scripts_show(),
         master_sha=SHA, head_tree=lambda: "tree1",
         live=True, log=lambda s: None,
     )
     assert result.all_ticked is True
+    assert result.sentinel == "written"
     assert armable.all_rows_ticked(post_body) is True
 
 
@@ -880,3 +904,113 @@ def test_ticked_sentinel_clears_python_predicate():
     assert armable.all_rows_ticked(out)
     assert "verified by" not in classify.MANUAL_TESTING_SENTINEL_TICKED.lower()
     assert armable.SENTINEL_RE.match(classify.MANUAL_TESTING_SENTINEL_TICKED)
+
+
+# ---------------------------------------------------------------------------
+# run() writes the ticked-rows sentinel
+# ---------------------------------------------------------------------------
+
+SENT_PRE_BODY = (
+    "## Manual Testing\n\n"
+    "- [ ] **Row 1** — `bin/test-foo`\n"
+    "- [ ] **Row 2** — /ibl5/page.php returns 200\n"
+)
+SENT_POST_BODY = SENT_PRE_BODY.replace("- [ ]", "- [x]")
+
+
+def _sentinel_run(monkeypatch, gh, *, rows_out="ROW Row 1 PASS\nROW Row 2 PASS\n",
+                  head_tree=lambda: "tree1", live=True, tick_enabled=True, logs=None):
+    def fake_run(path, args, timeout_s, cwd=None):
+        name = str(path)
+        if "bring-up" in name or "wt-bring" in name:
+            return 0, "BRINGUP: UP\nBRINGUP-COMPLETE\n", ""
+        if "tick" in name:
+            return 0, "TICKED: 2\nTICK-COMPLETE\n", ""
+        return 0, rows_out + "MANUAL-ROWS-COMPLETE\n", ""
+
+    monkeypatch.setattr(mt, "_run_script", fake_run)
+    monkeypatch.setattr(mt, "docker_available", lambda: (True, ""))
+    monkeypatch.setattr(mt, "resolve_slug", lambda w: ("harness-manual-rows-execute", ""))
+    return mt.run(
+        pr=1, worktree="/fake/worktree", body=SENT_PRE_BODY,
+        gh=gh, probe=FixtureProbe({}), show_blob=_make_scripts_show(),
+        master_sha=SHA, head_tree=head_tree, live=live,
+        log=(logs.append if logs is not None else (lambda s: None)),
+        tick_enabled=tick_enabled,
+    )
+
+
+def test_run_all_passing_writes_ticked_sentinel(monkeypatch):
+    gh = RecordingGh(SENT_POST_BODY)
+    logs = []
+    res = _sentinel_run(monkeypatch, gh, logs=logs)
+    assert res.sentinel == "written"
+    assert len(gh.edits) == 1
+    edited = gh.edits[0][1]
+    assert edited.split("## Manual Testing\n", 1)[1].startswith(
+        "\n" + classify.MANUAL_TESTING_SENTINEL_TICKED + "\n")
+    assert armable.manual_testing_clearance(edited, changed_files=()) == "CLEARED"
+    assert any("sentinel=written" in l for l in logs)
+
+
+def test_run_partial_pass_writes_no_sentinel(monkeypatch):
+    partial = SENT_POST_BODY.replace("- [x] **Row 2**", "- [ ] **Row 2**")
+    gh = RecordingGh(partial)
+    res = _sentinel_run(monkeypatch, gh, rows_out="ROW Row 1 PASS\nROW Row 2 FAIL http-500\n")
+    assert res.all_ticked is False
+    assert gh.edits == []
+    assert res.sentinel == "not-attempted"
+
+
+def test_run_tree_moved_before_sentinel_skips_write(monkeypatch):
+    calls = [0]
+
+    def _head_tree():
+        calls[0] += 1
+        return "aaa" if calls[0] <= 2 else "bbb"
+
+    gh = RecordingGh(SENT_POST_BODY)
+    res = _sentinel_run(monkeypatch, gh, head_tree=_head_tree)
+    assert res.sentinel == "skipped:tree-moved"
+    assert "tree-moved-before-sentinel" in res.errors
+    assert gh.edits == []
+
+
+def test_run_sentinel_unconfirmed_records_error(monkeypatch):
+    gh = RecordingGh(SENT_POST_BODY, drop_edits=True)
+    res = _sentinel_run(monkeypatch, gh)
+    assert res.sentinel == "unconfirmed"
+    assert "sentinel-unconfirmed" in res.errors
+    assert len(gh.edits) == 1
+
+
+def test_run_sentinel_already_present_is_noop(monkeypatch):
+    remote = SENT_POST_BODY.replace(
+        "## Manual Testing\n\n",
+        "## Manual Testing\n\n" + classify.MANUAL_TESTING_SENTINEL + "\n\n", 1)
+    gh = RecordingGh(remote)
+    res = _sentinel_run(monkeypatch, gh)
+    assert res.sentinel == "skipped:already-present"
+    assert gh.edits == []
+
+
+def test_run_replay_mode_never_edits_body(monkeypatch):
+    gh = RecordingGh(SENT_POST_BODY)
+    res = _sentinel_run(monkeypatch, gh, live=False)
+    assert gh.edits == []
+    assert res.skipped_reason == "replay-mode"
+    assert res.sentinel == "not-attempted"
+
+
+def test_run_tick_disabled_never_edits_body(monkeypatch):
+    gh = RecordingGh(SENT_POST_BODY)
+    res = _sentinel_run(monkeypatch, gh, tick_enabled=False)
+    assert gh.edits == []
+    assert res.sentinel == "not-attempted"
+
+
+def test_run_sentinel_write_refreshes_cached_body(monkeypatch):
+    gh = RecordingGh(SENT_POST_BODY)
+    res = _sentinel_run(monkeypatch, gh)
+    assert res.sentinel == "written"
+    assert classify.MANUAL_TESTING_SENTINEL_TICKED in gh.pr_body()

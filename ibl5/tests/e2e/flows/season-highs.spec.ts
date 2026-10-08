@@ -19,13 +19,13 @@ test.describe('Season Highs flow', () => {
     const grid = page.locator('.ibl-grid');
     await expect(grid.first()).toBeVisible();
 
-    const tables = page.locator('.stat-table, .ibl-data-table');
+    const tables = page.locator('.stat-table');
     await expect(tables.first()).toBeVisible();
   });
 
   test('multiple stat category tables visible', async ({ page }) => {
     // CI seed box scores produce points, rebounds, assists categories at minimum
-    const tables = page.locator('.stat-table, .ibl-data-table');
+    const tables = page.locator('.stat-table');
     const count = await tables.count();
     expect(count).toBeGreaterThanOrEqual(3);
 
@@ -34,7 +34,7 @@ test.describe('Season Highs flow', () => {
   });
 
   test('stat tables have header content', async ({ page }) => {
-    const table = page.locator('.stat-table, .ibl-data-table').first();
+    const table = page.locator('.stat-table').first();
     await expect(table).toBeVisible();
     const headerText = await table.locator('thead').textContent();
     // [rendered] SeasonHighs first table thead: 'POINTS'. PHP-emitted static label — env-independent.
@@ -52,7 +52,7 @@ test.describe('Season Highs flow', () => {
     // Navigate to player page and verify
     await page.goto(href!);
     await assertNoPhpErrors(page, 'on player page from Season Highs');
-    await expect(page.locator('h2, h3').first()).toBeVisible();
+    await expect(page.locator('.plr-nav').first()).toBeVisible();
   });
 
   test('stat values are numeric', async ({ page }) => {

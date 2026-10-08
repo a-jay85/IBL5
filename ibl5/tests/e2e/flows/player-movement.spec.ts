@@ -20,7 +20,7 @@ test.describe('Player Movement flow', () => {
   // Seed rows: ibl5/tests/e2e/fixtures/ci-seed.sql:902-903.
 
   test('player movement table is visible with expected headers', async ({ page }) => {
-    const table = page.locator('.player-movement-table, .ibl-data-table');
+    const table = page.locator('.player-movement-table');
     await expect(table.first()).toBeVisible();
 
     const headerText = await table.first().locator('thead').textContent();

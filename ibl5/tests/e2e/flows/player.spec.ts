@@ -26,13 +26,13 @@ test.describe('Player page flow — active player', () => {
 
   test('player navigation menu has stat view links', async ({ page }) => {
     // The player menu should have links to different stat views
-    const navLinks = page.locator('.plr-nav__pill, .plr-nav a, a[href*="pageView="]');
+    const navLinks = page.locator('.plr-nav__pill');
     await expect(navLinks.first()).toBeVisible();
   });
 
   test('overview shows stats content', async ({ page }) => {
     // Overview page should display stats card with data
-    const statsContent = page.locator('.player-stats-card, .stats-card, .stats-grid, table').first();
+    const statsContent = page.locator('.player-stats-card').first();
     await expect(statsContent).toBeVisible();
   });
 
@@ -44,19 +44,19 @@ test.describe('Player page flow — active player', () => {
 test.describe('Player page flow — stat views', () => {
   test('regular season totals view loads', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1&pageView=3');
-    await expect(page.locator('.player-stats-card, .stats-card, .stats-grid, table').first()).toBeVisible();
+    await expect(page.locator('.player-stats-card').first()).toBeVisible();
     await assertNoPhpErrors(page, 'on regular season totals');
   });
 
   test('regular season averages view loads', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1&pageView=4');
-    await expect(page.locator('.player-stats-card, .stats-card, .stats-grid, table').first()).toBeVisible();
+    await expect(page.locator('.player-stats-card').first()).toBeVisible();
     await assertNoPhpErrors(page, 'on regular season averages');
   });
 
   test('ratings and salary view loads', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1&pageView=9');
-    await expect(page.locator('.player-stats-card, .stats-card, .stats-grid, table').first()).toBeVisible();
+    await expect(page.locator('.player-stats-card').first()).toBeVisible();
     await assertNoPhpErrors(page, 'on ratings and salary');
   });
 
@@ -76,7 +76,7 @@ test.describe('Player page flow — nav pill navigation', () => {
     await page.goto(href!);
     await assertNoPhpErrors(page, 'after nav pill click');
     // Content should have changed — stats table or card visible
-    const content = page.locator('.player-stats-card, .stats-card, table').first();
+    const content = page.locator('.player-stats-card').first();
     await expect(content).toBeVisible();
   });
 

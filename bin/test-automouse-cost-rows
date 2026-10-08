@@ -201,6 +201,22 @@ assert_eq "$iter_peak" 2000 "peak_ctx is the max over ITERATIONS, not incl. the 
 assert_ne "$iter_peak" 100000 "peak_ctx does not fall back to the summed top-level usage"
 assert_ne "$iter_peak" 103000 "peak_ctx is not the sum of usage parts"
 
+# Haiku generation pricing: 1M in + 1M out per model id.
+#   claude-haiku-5-5            -> 0.10 + 0.50 = $0.60
+#   claude-haiku-4-5-20251001   -> 1.00 + 5.00 = $6.00  (old transcripts keep 4.5 rates)
+HKDIR="$TMPROOT/hkproj/proj"
+mkdir -p "$HKDIR"
+cat > "$HKDIR/hk55-session.jsonl" <<'JSONL'
+{"type":"assistant","timestamp":"2026-10-07T00:00:01.000Z","message":{"id":"msg_h55","model":"claude-haiku-5-5","usage":{"input_tokens":1000000,"output_tokens":1000000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
+JSONL
+cat > "$HKDIR/hk45-session.jsonl" <<'JSONL'
+{"type":"assistant","timestamp":"2026-10-07T00:00:01.000Z","message":{"id":"msg_h45","model":"claude-haiku-4-5-20251001","usage":{"input_tokens":1000000,"output_tokens":1000000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
+JSONL
+hk55_cost=$("$PRICER" --session-id hk55-session --proj-dir "$HKDIR" | pj - cost)
+hk45_cost=$("$PRICER" --session-id hk45-session --proj-dir "$HKDIR" | pj - cost)
+assert_near "$hk55_cost" 0.60 0.001 "claude-haiku-5-5 prices at Haiku 5.5 rates"
+assert_near "$hk45_cost" 6.00 0.001 "claude-haiku-4-5-20251001 keeps Haiku 4.5 rates"
+
 # Advisor fixture — discriminates four wrong implementations with one number.
 # Record 1: iterations with mixed types; four candidate peak answers are far apart.
 #   top-level ctx = 4+120000+1705 = 121709  (the old "sum" reading)

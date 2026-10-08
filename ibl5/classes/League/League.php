@@ -129,7 +129,7 @@ class League extends BaseMysqliRepository
           AND p.teamid IN ('" . $this->formatTidsForSqlQuery($conferenceTids) . "')
           AND p.retired = 0
           AND p.stats_gm > '14'
-        ORDER BY p.name";
+        ORDER BY p.name, p.pid ASC";
 
         /** @var list<PlayerRow> */
         return $this->fetchAll($query);
@@ -148,7 +148,7 @@ class League extends BaseMysqliRepository
             FROM `ibl_plr`
             WHERE injured > 0
               AND retired = 0
-            ORDER BY ordinal ASC"
+            ORDER BY ordinal ASC, pid ASC"
         );
     }
 
@@ -174,7 +174,7 @@ class League extends BaseMysqliRepository
                   WHEN 6 THEN salary_yr6
                   ELSE 0
               END = 0
-            ORDER BY name ASC"
+            ORDER BY name ASC, pid ASC"
         );
     }
 
@@ -192,7 +192,7 @@ class League extends BaseMysqliRepository
             WHERE ordinal > ?
               AND retired = 0
               AND name != '(no starter)'
-            ORDER BY name ASC",
+            ORDER BY name ASC, pid ASC",
             "i",
             JsbConstants::WAIVERS_ORDINAL
         );
@@ -213,7 +213,7 @@ class League extends BaseMysqliRepository
             WHERE p.retired = 0
               AND p.stats_gm >= '41'
               AND p.stats_min / p.stats_gm >= '30'
-            ORDER BY p.name"
+            ORDER BY p.name, p.pid ASC"
         );
     }
 
@@ -233,7 +233,7 @@ class League extends BaseMysqliRepository
               AND p.stats_min / p.stats_gm >= 15
               AND p.stats_gs / p.stats_gm <= '.5'
               AND p.stats_gm >= '41'
-            ORDER BY p.name"
+            ORDER BY p.name, p.pid ASC"
         );
     }
 
@@ -252,7 +252,7 @@ class League extends BaseMysqliRepository
             WHERE p.retired = 0
               AND p.exp = '1'
               AND p.stats_gm >= '41'
-            ORDER BY p.name"
+            ORDER BY p.name, p.pid ASC"
         );
     }
 
@@ -267,7 +267,7 @@ class League extends BaseMysqliRepository
             "SELECT owner_name, team_city, team_name
             FROM `ibl_team_info`
             WHERE teamid BETWEEN 1 AND ?
-            ORDER BY owner_name",
+            ORDER BY owner_name, teamid ASC",
             "i",
             self::MAX_REAL_TEAMID
         );

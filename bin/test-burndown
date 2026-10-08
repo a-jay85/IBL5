@@ -849,6 +849,18 @@ STUB
     fi
 done
 
+# C51h: the second-generation stubs make the per-worktree probes fail or print nothing;
+# the classifier treats both as unknown (in-flight), never idle
+for kind in lsfail lsempty; do
+    WST="$(GH="$T/gh" BD_GIT="$T/git-$kind" bash -c '. "$1"; BD_GIT="$2"; bd_wt_state /wt/probe probe' _ \
+        "$(dirname "$SCRIPT")/lib/burndown.sh" "$T/git-$kind" 2>&1)"
+    if [ "$kind" = lsfail ]; then
+        want "C51h: git-lsfail probe is unknown (git status failed)" "$WST" "unknown"$'\t'"git status failed"
+    else
+        want "C51h: git-lsempty probe is unknown (no count)" "$WST" "unknown"$'\t'"git rev-list printed no count"
+    fi
+done
+
 # ── C49: pathless issues share the batch ──────────────────────────────────────
 # C49a: a pathless issue ahead of pathed ones does not close the batch
 cat > "$T/fx/issues.json" <<'JSON'

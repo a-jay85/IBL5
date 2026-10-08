@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs';
 import { describe, it, expect } from 'vitest';
 import {
   VISUAL_REVIEW_MARKER,
@@ -21,6 +22,12 @@ const SHA_E = 'e'.repeat(40);
 function galleryComment(sha: string): string {
   return `## 🖼️ Visual review\n\nhttps://a-jay85.github.io/IBL5/${sha}/visual-review/index.html\n${VISUAL_REVIEW_MARKER}`;
 }
+
+// Real sticky comment from PR #2943, which moved galleries to pr/<N>/visual-review/.
+const PR2943_COMMENT = readFileSync(
+  new URL('./fixtures/vr-refresh-pr2943-visual-review-comment.txt', import.meta.url),
+  'utf-8'
+);
 
 function pr(overrides: Partial<OpenPr> = {}): OpenPr {
   return {
@@ -65,6 +72,22 @@ describe('linkedGallerySha', () => {
     const banner = `No visual changes.\n${VISUAL_REVIEW_MARKER}`;
     expect(linkedGallerySha(pr({ comments: [banner] }))).toBeNull();
     expect(linkedGallerySha(pr({ comments: [] }))).toBeNull();
+  });
+});
+
+describe('pr-keyed gallery fixture (PR #2943)', () => {
+  it('pr 2943 fixture carries the sticky marker and a pr-keyed gallery url', () => {
+    expect(PR2943_COMMENT).toContain(VISUAL_REVIEW_MARKER);
+    expect(PR2943_COMMENT).toMatch(/github\.io\/IBL5\/pr\/2943\/visual-review\//);
+  });
+
+  it('pr-keyed fixture yields no keep-list shas', () => {
+    expect(extractGalleryShas(PR2943_COMMENT)).toEqual([]);
+  });
+
+  it('keep list for a pr-keyed-only pr is its head sha alone', () => {
+    const p = pr({ number: 2943, headRefOid: SHA_E, comments: [PR2943_COMMENT] });
+    expect(computeKeepList([p])).toEqual([SHA_E]);
   });
 });
 

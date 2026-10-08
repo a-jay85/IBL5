@@ -415,6 +415,70 @@ class StandingsRepositoryTest extends DatabaseTestCase
         }
     }
 
+    public function testFetchTeamsByRegionBreaksPctTiesByTeamidAscending(): void
+    {
+        $eastern = $this->teamsByTeamidAscending(true);
+        $ids = array_column($eastern, 'teamid');
+        $highestId = $ids[count($ids) - 1];
+
+        $tied = $this->db->query("UPDATE `ibl_standings` SET pct = 0.500 WHERE conference = 'Eastern'");
+        self::assertNotFalse($tied);
+        $leader = $this->db->query('UPDATE `ibl_standings` SET pct = 0.900 WHERE teamid = ' . $highestId);
+        self::assertNotFalse($leader);
+
+        $result = $this->repo->fetchTeamsByRegion('conference', 'Eastern');
+
+        $expected = [$highestId, ...array_slice($ids, 0, -1)];
+        self::assertSame($expected, array_column($result, 'teamid'));
+    }
+
+    public function testFetchTopTeamsByWinsBreaksTiesByTeamidAscendingInRegion(): void
+    {
+        $update = $this->db->query("UPDATE `ibl_standings` SET home_wins = 10, away_wins = 5 WHERE conference = 'Eastern'");
+        self::assertNotFalse($update);
+
+        $result = $this->repo->fetchTopTeamsByWins('conference', 'Eastern');
+
+        $ids = array_column($this->teamsByTeamidAscending(true), 'teamid');
+        self::assertSame(array_slice($ids, 0, 2), array_column($result, 'teamid'));
+        self::assertSame(15, $result[0]['wins']);
+        self::assertSame(15, $result[1]['wins']);
+    }
+
+    public function testFetchTopTeamsByWinsBreaksTiesByTeamidAscendingLeagueWide(): void
+    {
+        $update = $this->db->query('UPDATE `ibl_standings` SET home_wins = 10, away_wins = 5');
+        self::assertNotFalse($update);
+
+        $result = $this->repo->fetchTopTeamsByWins(null, null);
+
+        $ids = array_column($this->teamsByTeamidAscending(false), 'teamid');
+        self::assertSame(array_slice($ids, 0, 2), array_column($result, 'teamid'));
+    }
+
+    public function testFetchPlayedGamesForSeasonBreaksSameDateTiesByScheduleIdAscending(): void
+    {
+        $this->insertScheduleRow(2099, '2099-06-10', 5, 100, 2, 90);
+        $this->insertScheduleRow(2099, '2099-06-10', 3, 100, 2, 90);
+        $this->insertScheduleRow(2099, '2099-06-10', 1, 100, 2, 90);
+        $this->insertScheduleRow(2099, '2099-06-09', 7, 100, 2, 90);
+
+        $result = $this->repo->fetchPlayedGamesForSeason('2099-01-01', '2099-12-31');
+
+        self::assertSame([7, 5, 3, 1], array_column($result, 'visitor_teamid'));
+    }
+
+    public function testFetchWinningestTeamsBreaksTiesByTeamidAscending(): void
+    {
+        $update = $this->db->query("UPDATE `ibl_standings` SET home_wins = 10, away_wins = 0 WHERE conference = 'Eastern'");
+        self::assertNotFalse($update);
+
+        $result = $this->repo->fetchWinningestTeams('Eastern');
+
+        $expected = array_column(array_slice($this->teamsByTeamidAscending(true), 0, 8), 'team_name');
+        self::assertSame($expected, array_column($result, 'team_name'));
+    }
+
     public function testFetchMostLosingTeamsCapsAtSixPerConference(): void
     {
         // Eastern has 15 teams; setting home_losses = teamid gives unique values ≤ 41
@@ -516,5 +580,21 @@ class StandingsRepositoryTest extends DatabaseTestCase
         $row = $result->fetch_assoc();
         self::assertIsArray($row);
         self::assertSame(1, $row['cnt']);
+    }
+
+    /**
+     * @return list<array{teamid: int, team_name: string}>
+     */
+    private function teamsByTeamidAscending(bool $easternOnly): array
+    {
+        $result = $easternOnly
+            ? $this->db->query("SELECT teamid, team_name FROM `ibl_standings` WHERE conference = 'Eastern' ORDER BY teamid ASC")
+            : $this->db->query('SELECT teamid, team_name FROM `ibl_standings` ORDER BY teamid ASC');
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $rows = [];
+        while (($row = $result->fetch_assoc()) !== null) {
+            $rows[] = ['teamid' => (int) $row['teamid'], 'team_name' => (string) $row['team_name']];
+        }
+        return $rows;
     }
 }

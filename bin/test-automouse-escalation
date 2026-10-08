@@ -36,6 +36,7 @@ assert() {
 # --- escalation fires: non-Opus base on the FINAL attempt -> Opus ---
 assert "c1-sonnet-final-escalates" "claude-opus-5-5" "claude-sonnet-5-5" 3 3
 assert "c2-haiku-final-escalates"  "claude-opus-5-5" "claude-haiku-4-5"  3 3
+assert "c2b-haiku55-final-escalates" "claude-opus-5-5" "claude-haiku-5-5"  3 3
 
 # --- no escalation: earlier attempts leave the declared tier untouched ---
 assert "c3-sonnet-attempt2-unchanged" "claude-sonnet-5-5" "claude-sonnet-5-5" 2 3

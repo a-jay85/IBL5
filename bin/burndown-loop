@@ -73,6 +73,7 @@ BL_BACKOFF_CAP=300
 BL_FETCH_RETRY=120
 BL_PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin:$HOME/.bun/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 DISCORD_DM="${IBL5_BURNDOWN_DISCORD_DM:-$ROOT/bin/discord-dm}"
+BACKLOG_BIN="${IBL5_BURNDOWN_BACKLOG:-$ROOT/bin/backlog}"
 
 LOOP_SID=""
 RESUME_SID=""
@@ -271,6 +272,24 @@ bl_dm() {
     printf '%s' "$1" | "$DISCORD_DM" - || true
 }
 
+# bl_held: print the HELD lines from `backlog burndown-held`. Best effort: a missing
+# binary or a nonzero exit is logged and yields no output, so the finish DM and the
+# loop's exit code never depend on it. Logs go to stderr: the caller captures stdout.
+bl_held() {
+    local out rc=0
+    bl_log "held scan via $BACKLOG_BIN" >&2
+    if [ ! -x "$BACKLOG_BIN" ]; then
+        bl_log "held scan skipped: no executable backlog at $BACKLOG_BIN" >&2
+        return 0
+    fi
+    out="$("$BACKLOG_BIN" burndown-held 2>>"$LOOP_LOG")" || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        bl_log "held scan failed rc=$rc" >&2
+        return 0
+    fi
+    printf '%s' "$out"
+}
+
 # bl_finish <reason> <rc>: logs, sends the one finish DM, exits <rc>. A paused loop
 # sends nothing (the coordinator DMs once per pause wave), nor do --no-dm and --once.
 bl_finish() {
@@ -283,6 +302,15 @@ batches=$BATCHES items=$ITEMS elapsed=${elapsed}m"
         if { [ "$reason" = "failures" ] || [ "$reason" = "fail-closed" ]; } && [ -n "$LAST_FAIL" ]; then
             msg="$msg
 $LAST_FAIL"
+        fi
+        if [ "$NO_DM" -eq 0 ] && [ "$ONCE" -eq 0 ]; then
+            local held
+            held="$(bl_held)"
+            if [ -n "$held" ]; then
+                msg="$msg
+held (ad-hoc worktrees with unshipped work, no PR):
+$held"
+            fi
         fi
         msg="$msg
 log: $LOOP_LOG"

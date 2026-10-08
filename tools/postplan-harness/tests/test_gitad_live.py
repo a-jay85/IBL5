@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 
 import pytest
 
@@ -384,6 +385,56 @@ def test_commit_all_still_returns_a_sha_when_no_hook_rejects(repo):
         fh.write("ok\n")
     sha = g.commit_all("chore: accepted")
     assert len(sha) == 40, f"expected a full sha, got {sha!r}"
+
+
+def test_commit_all_timeout_raises_subprocess_timeout_and_reaps(repo, tmp_path, monkeypatch):
+    """A pre-commit hook that hangs is bounded: typed subprocess-timeout (not local-gate),
+    the hook's process group is reaped, and the index.lock git left behind is cleared.
+
+    Mutation caught: drop _clear_stale_index_lock() and the lock assertion fails; drop
+    the run_bounded swap and the elapsed assertion fails (bare run blocks 300s).
+    """
+    _install_reject_hook(repo, f"#!/bin/bash\nsleep 300 &\necho $! > {tmp_path}/grandchild.pid\nsleep 300\n")
+    monkeypatch.setattr(gitad, "COMMIT_HOOK_TIMEOUT", 1)
+    g = LiveGit(repo)
+    with open(os.path.join(repo, "slow.txt"), "w") as fh:
+        fh.write("hangs\n")
+    start = time.monotonic()
+    with pytest.raises(HarnessError) as ei:
+        g.commit_all("chore: hook hangs")
+    assert time.monotonic() - start < 15
+    assert ei.value.kind == "subprocess-timeout", f"kind was {ei.value.kind!r}"
+    assert "commit" in ei.value.detail
+    grandchild = int((tmp_path / "grandchild.pid").read_text().strip())
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(grandchild, 0)
+            time.sleep(0.1)
+        except ProcessLookupError:
+            break
+    else:
+        pytest.fail("grandchild survived the process-group reap")
+    rel = subprocess.run(["git", "-C", repo, "rev-parse", "--git-path", "index.lock"],
+                         check=True, capture_output=True, text=True).stdout.strip()
+    lock = rel if os.path.isabs(rel) else os.path.join(repo, rel)
+    assert not os.path.exists(lock), "a reaped commit must not leave index.lock behind"
+
+
+def test_commit_all_hook_denial_stays_local_gate_under_bounded_run(repo):
+    """Negative path -- the timeout wiring does not swallow an ordinary hook denial.
+
+    Mutation caught: treating every HarnessError as a timeout, or raising
+    subprocess-timeout on a nonzero rc, turns kind into something other than local-gate.
+    """
+    _install_reject_hook(repo, "#!/bin/sh\necho nope\nexit 1\n")
+    g = LiveGit(repo)
+    with open(os.path.join(repo, "denied.txt"), "w") as fh:
+        fh.write("denied\n")
+    with pytest.raises(HarnessError) as ei:
+        g.commit_all("chore: denied")
+    assert ei.value.kind == "local-gate", f"kind was {ei.value.kind!r}"
+    assert "nope" in ei.value.detail
 
 
 # ---------------------------------------------------------------------------

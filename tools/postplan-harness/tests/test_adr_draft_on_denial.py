@@ -20,6 +20,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import types
 
 import pytest
@@ -39,7 +40,7 @@ from harness.adapters.gitad import (
 )
 from harness.adapters.ghad import RecordingGh
 from harness.adapters.llm import MODEL_MAP, FixtureLlm, UsageLedger
-from harness.state import HarnessError, RunResult, TerminalState
+from harness.state import SUBPROCESS_TIMEOUT, HarnessError, RunResult, TerminalState
 
 # ---------------------------------------------------------------------------
 # Hook text fixtures (exact text bin/pre-push-adr-hook emits, as LiveGit wraps it)
@@ -698,6 +699,84 @@ def test_draft_check_prose_failure_is_terminal_and_not_committed(
     assert head_before == head_after
 
     assert os.path.exists(os.path.join(out_dir, adr_draft.REJECTED_DRAFT_NAME))
+
+
+def _script_timeout_error(step):
+    return HarnessError(
+        SUBPROCESS_TIMEOUT, f"step '{step}' timed out after 120s", cmd=step)
+
+
+def test_run_script_timeout_raises_subprocess_timeout_and_reaps(tmp_path, monkeypatch):
+    """A hung bin/* script raises HarnessError(subprocess-timeout) and its group is reaped."""
+    script = tmp_path / "fixture-slow.sh"
+    script.write_text(
+        f"#!/bin/bash\nsleep 300 &\necho $! > {tmp_path}/grandchild.pid\nsleep 300\n")
+    script.chmod(0o755)
+    monkeypatch.setattr(adr_draft, "SCRIPT_TIMEOUT", 1)
+
+    start = time.monotonic()
+    with pytest.raises(HarnessError) as exc_info:
+        adr_draft._run_script(str(tmp_path), "fixture-slow.sh")
+    assert time.monotonic() - start < 15
+
+    assert exc_info.value.kind == SUBPROCESS_TIMEOUT
+    assert "fixture-slow.sh" in exc_info.value.detail
+    grandchild = int((tmp_path / "grandchild.pid").read_text().strip())
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(grandchild, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.1)
+    pytest.fail("grandchild survived the process-group reap")
+
+
+def test_run_script_missing_script_still_returns_127(tmp_path):
+    """A missing script is an OSError path (rc 127), not a timeout or a raise."""
+    rc, out = adr_draft._run_script(str(tmp_path), "bin/absent")
+    assert rc == 127
+    assert "bin/absent" in out
+
+
+def test_draft_gate_timeout_discards_draft_and_keeps_kind(repo, tmp_path, monkeypatch):
+    """A check-prose hang discards the draft and re-raises subprocess-timeout unwrapped."""
+    wt = repo["wt"]
+    git = repo["git"]
+    out_dir = str(tmp_path / "out")
+
+    def _hang(wt_path, rel, *a, stdin=""):
+        raise _script_timeout_error("bin/check-prose")
+
+    fake_scripts(monkeypatch, overrides={"check-prose": _hang})
+
+    head_before = subprocess.run(
+        ["git", "-C", str(wt), "rev-parse", "HEAD"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+
+    with pytest.raises(HarnessError) as exc_info:
+        adr_draft.draft(
+            WritingLlm(lambda rel: valid_adr("0134")),
+            git, str(wt), out_dir, _noop_log,
+            phase="phase2", today="2026-09-20",
+        )
+
+    assert exc_info.value.kind == SUBPROCESS_TIMEOUT
+    assert "bin/check-prose" in (exc_info.value.detail or "")
+
+    head_after = subprocess.run(
+        ["git", "-C", str(wt), "rev-parse", "HEAD"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    assert head_before == head_after
+
+    status = subprocess.run(
+        ["git", "-C", str(wt), "status", "--porcelain"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    assert status == ""
+    assert not os.path.exists(str(wt / "ibl5" / "docs" / "decisions" / "0134-wt-slug.md"))
 
 
 def test_draft_check_docs_failure_is_terminal(repo, tmp_path, monkeypatch):
@@ -1445,6 +1524,93 @@ def test_commit_site_draft_failure_reraises_original_denial(tmp_path, monkeypatc
     assert runner.exit_code_for(res) == 3
 
 
+_DRAFT_TIMEOUT_DETAIL = "step 'bin/check-prose' timed out after 120s"
+
+
+def _patch_commit_gate_denied_and_draft_raises(monkeypatch, exc):
+    monkeypatch.setattr(
+        adr_draft, "commit_gate",
+        lambda wt, base="origin/master": (1, "pre-commit-adr-gate: needs ADR"),
+    )
+    monkeypatch.setattr(
+        adr_draft, "draft",
+        lambda *a, **k: (_ for _ in ()).throw(exc),
+    )
+
+
+def test_commit_with_adr_draft_reraises_timeout_as_is(tmp_path, monkeypatch):
+    """A drafter step timeout keeps kind subprocess-timeout instead of being rewritten
+    into the synthesised local-gate denial.
+
+    Mutation caught: delete the SUBPROCESS_TIMEOUT guard in _commit_with_adr_draft and
+    the raised kind becomes local-gate."""
+    _patch_commit_gate_denied_and_draft_raises(
+        monkeypatch, HarnessError(SUBPROCESS_TIMEOUT, _DRAFT_TIMEOUT_DETAIL))
+    res = RunResult(terminal=TerminalState.FAILED)
+    logged: list[str] = []
+
+    with pytest.raises(HarnessError) as exc_info:
+        runner._commit_with_adr_draft(
+            FakeGit(), logged.append, "phase2",
+            llm=None, worktree="/fake/wt", out_dir=str(tmp_path), res=res,
+        )
+
+    exc = exc_info.value
+    assert exc.kind == SUBPROCESS_TIMEOUT
+    assert exc.detail == _DRAFT_TIMEOUT_DETAIL
+    assert not (isinstance(exc.__cause__, HarnessError) and exc.__cause__.kind == "local-gate")
+    assert res.adr_drafted is False
+    assert any("ADR draft step timed out" in m for m in logged), logged
+
+
+def test_commit_with_adr_draft_still_wraps_other_draft_failures(tmp_path, monkeypatch):
+    """Negative path: any other drafter failure is still wrapped in the local-gate denial.
+
+    Mutation caught: a guard that re-raises every kind."""
+    _patch_commit_gate_denied_and_draft_raises(
+        monkeypatch, HarnessError("adr-draft-invalid", "bad"))
+    res = RunResult(terminal=TerminalState.FAILED)
+
+    with pytest.raises(HarnessError) as exc_info:
+        runner._commit_with_adr_draft(
+            FakeGit(), _noop_log, "phase2",
+            llm=None, worktree="/fake/wt", out_dir=str(tmp_path), res=res,
+        )
+
+    assert exc_info.value.kind == "local-gate"
+    assert res.adr_drafted is False
+
+
+def test_push_with_adr_draft_reraises_timeout_as_is(tmp_path, monkeypatch):
+    """A drafter step timeout at the push site surfaces as subprocess-timeout, not the
+    original push local-gate error.
+
+    Mutation caught: delete the SUBPROCESS_TIMEOUT guard in _push_with_adr_draft and
+    `raise e from e2` surfaces the push local-gate error instead."""
+    def _denied(*a, **k):
+        raise HarnessError("local-gate", _ADR_TEXT)
+
+    monkeypatch.setattr(runner, "_push_with_lease_retry", _denied)
+    monkeypatch.setattr(
+        adr_draft, "draft",
+        lambda *a, **k: (_ for _ in ()).throw(
+            HarnessError(SUBPROCESS_TIMEOUT, _DRAFT_TIMEOUT_DETAIL)),
+    )
+    res = RunResult(terminal=TerminalState.FAILED)
+    logged: list[str] = []
+
+    with pytest.raises(HarnessError) as exc_info:
+        runner._push_with_adr_draft(
+            FakeGit(), logged.append, "phase2",
+            llm=None, worktree="/fake/wt", out_dir=str(tmp_path), res=res,
+        )
+
+    assert exc_info.value.kind == SUBPROCESS_TIMEOUT
+    assert exc_info.value.detail == _DRAFT_TIMEOUT_DETAIL
+    assert res.adr_drafted is False
+    assert any("ADR draft step timed out" in m for m in logged), logged
+
+
 # ---------------------------------------------------------------------------
 # Commit-site revalidation failure: sha is empty in stage-only mode
 # ---------------------------------------------------------------------------
@@ -1625,6 +1791,20 @@ def test_commit_gate_pipes_branch_commit_messages(repo, monkeypatch):
         "bin/adr-check", "--commit", "--bypass-from-stdin", "--base=origin/master",
     )
     assert "add bin/z: decision trigger" in call["stdin"]
+
+
+def test_commit_gate_propagates_script_timeout(repo, monkeypatch):
+    """commit_gate lets an adr-check hang propagate with its kind; it never maps to an rc."""
+    wt = repo["wt"]
+
+    def _hang(wt_path, rel, *args, stdin=""):
+        raise _script_timeout_error("bin/adr-check")
+
+    monkeypatch.setattr(adr_draft, "_run_script", _hang)
+
+    with pytest.raises(HarnessError) as exc_info:
+        adr_draft.commit_gate(str(wt))
+    assert exc_info.value.kind == SUBPROCESS_TIMEOUT
 
 
 # ---------------------------------------------------------------------------

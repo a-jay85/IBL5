@@ -1,6 +1,6 @@
 ---
 description: The plan-architect's full output contract, Read on demand from Step 3 of plan/SKILL.md — the MUST-produce list, the conditional-section catalogue, the agent-tiering labels to inject, and the delegation-packet format.
-last_verified: 2026-10-06
+last_verified: 2026-10-08
 ---
 
 The `plan-architect` Reads this file when Step 3 of `plan/SKILL.md` points to it, so this contract lands in the architect's own sub-context and never enters the orchestrator's. Mirrors the on-demand convention of the `.claude/review-shared/_*.md` reference files.
@@ -114,10 +114,11 @@ Mid-design exploration is governed by your agent def; budget arithmetic, the adv
 
 Apply this guidance verbatim when tiering phases:
 
-> **In Plans.** Explicitly label which implementation phases go to Sonnet / Haiku / self. The tiering decision belongs in the plan, not deferred to execution time. A **below-run-model** tier (below `impl_model`) must be declared on a single parseable **canonical `**Tier:**` line** — the same field the `### Delegate` packet uses — and resolved per the Binding rule above (either a `### Delegate` packet, or an `(inline — <reason>)` marker on that `**Tier:**` line). Same- or above-run-model phases may write `**Tier:** self` or omit the line entirely. This is the exact form `bin/check-plan` gate `[T]` keys on. The gate ranks the **first** model name after `**Tier:**` on the line, so lead with the tier token; a reason clause may then name other tiers freely (`**Tier:** self — too entangled for Sonnet` reads as self, not Sonnet).
+> **In Plans.** Explicitly label which implementation phases go to Sonnet / Haiku / self. A **below-run-model** tier (below `impl_model`) must be declared on a single parseable **canonical `**Tier:**` line** — the same field the `### Delegate` packet uses — and resolved per the Binding rule above (either a `### Delegate` packet, or an `(inline — <reason>)` marker on that `**Tier:**` line). Same- or above-run-model phases may write `**Tier:** self` or omit the line entirely. This is the exact form `bin/check-plan` gate `[T]` keys on. The gate ranks the **first** model name after `**Tier:**` on the line, so lead with the tier token; a reason clause may then name other tiers freely (`**Tier:** self — too entangled for Sonnet` reads as self, not Sonnet).
 >
-> **Mechanical recipe agents.** When a plan phase writes out every action as literal commands (`git mv`, explicit find/replace mappings, `git rm`, config line swaps), the executing agent is Haiku. The prompt already contains the recipe — the agent executes it. Sonnet is only needed when the prompt asks the agent to decide *what* to do, not just *how* to do it.
+> **Mechanical recipe agents.** When a plan phase writes out every action as literal commands (`git mv`, explicit find/replace mappings, `git rm`, config line swaps), the executing agent is Haiku. Sonnet is only needed when the prompt asks the agent to decide *what* to do, not just *how* to do it.
 > - **Haiku:** `git mv` file renames with explicit source→target, namespace find/replace from a provided mapping, `git rm` + config updates, multi-step recipe execution
+> - **Haiku context cap:** a packet reading >~100K tokens per request goes to Sonnet (Haiku's 5x price cliff, `agent-tiering-detail.md`).
 > - **Sonnet:** call-site sweeps where the agent must judge whether a match is a column vs. table name, test-writing, code authoring, debugging failures
 >
 > **Bulk-sweep pattern.**

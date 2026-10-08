@@ -1,13 +1,13 @@
 ---
 description: Triage non-trivial work as ad-hoc vs /plan; ad-hoc bar, safety mirror, Sonnet execution routing, hook-enforced triggers.
-last_verified: 2026-10-06
+last_verified: 2026-10-07
 ---
 
 # Work Triage Rule
 
 ## Triage before non-trivial work
 
-Before starting **any non-trivial unit of work** — whether you proposed it or the user assigned it — decide: implement **ad-hoc** (just do it, then `/ship`) or route through **`/plan`**. State the call and one line of why, then proceed.
+Before starting **any non-trivial unit of work**, whether you proposed it or the user assigned it, decide: implement **ad-hoc** (just do it, then ship or hold per `workflow-continuity.md` § Post-Plan) or route through **`/plan`**. State the call and one line of why, then proceed.
 
 ## The ad-hoc bar
 

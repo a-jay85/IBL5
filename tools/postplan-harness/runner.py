@@ -63,7 +63,8 @@ from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.review import ReviewPhase
 from harness import baseline_guard
-from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
+from harness.state import (SUBPROCESS_TIMEOUT, HarnessError, RunResult, TerminalState,
+                           UsageLedger)
 from harness.thread_ingestion import run_thread_ingestion
 from harness.adapters.ghad import LiveGh, RecordingGh
 from harness.adapters.gitad import (LiveGit, ReplayGit, classify_local_gate_denial,
@@ -345,9 +346,12 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             for f in check.get("findings", []):
                 log(f"phase2 body-check finding: {f}")
         _inject_residual_phases(copy, plan, conf_files, log)
+        log("phase2: starting scope check")
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
+        log("phase2: starting commit ADR gate")
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
+        log("phase2: starting commit (pre-commit hook)")
         sha = _commit_with_gate_remediation(
             git, worktree, f"{copy['commit_subject']}\n\n{copy['summary_md']}", log)
         rebase_line = f"REBASE=not run ({mode} mode)"
@@ -1212,6 +1216,9 @@ def _commit_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res)
                                   plan_path=plan_path, check_mode="commit",
                                   commit=False)
     except HarnessError as e2:
+        if e2.kind == SUBPROCESS_TIMEOUT:
+            log(f"{phase}: ADR draft step timed out: {(e2.detail or '')[:300]}")
+            raise
         if e2.kind == "adr-draft-gate" and "|" in (e2.detail or ""):
             # staged, then adr-check still failed: record the path for the DM
             rel, _sha, _ = e2.detail.split("|", 2)
@@ -1252,6 +1259,9 @@ def _push_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res,
             drafted = adr_draft.draft(llm, git, worktree, out_dir, log,
                                       phase=phase, plan_path=plan_path)
         except HarnessError as e2:
+            if e2.kind == SUBPROCESS_TIMEOUT:
+                log(f"{phase}: ADR draft step timed out: {(e2.detail or '')[:300]}")
+                raise
             if e2.kind == "adr-draft-gate" and "|" in (e2.detail or ""):
                 # committed, then adr-check still failed: record the path for the DM
                 rel, sha, _ = e2.detail.split("|", 2)
@@ -1955,8 +1965,9 @@ def _inject_scope_notes(copy: dict, plan, files: list[str], diff_body: str, pr_b
                         log) -> list[str]:
     """Phase 2: upsert `## Unplanned changes` into copy["summary_md"] from scope notes.
 
-    Runs right after _inject_residual_phases. Advisory only: no hold, no fail-closed
-    path. `pr_body` is the body being authored, so a `## Declared scope` or
+    Runs right after _inject_residual_phases. Advisory only: no hold. The one
+    fail-closed path is a scope-check hang, which raises HarnessError(subprocess-timeout)
+    out of scope_notes. `pr_body` is the body being authored, so a `## Declared scope` or
     `## Plan gaps` section in it clears its own note; the helper strips generated
     marker spans first, so this block never declares itself. Idempotent: an empty note
     list removes a stale block. Returns the notes for the caller's log line.
@@ -2541,9 +2552,11 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
     return res
 
 
-# All four are deterministic walls a full skill re-run cannot climb — see exit_code_for.
+# Deterministic walls a full skill re-run cannot climb — see exit_code_for. A
+# subprocess-timeout is one too: the skill re-run would hang on the same step.
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
-                      "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty")
+                      "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty",
+                      SUBPROCESS_TIMEOUT)
 PAUSE_EXIT = 75   # ADR-0143 reserved pause exit; only with an S marker on disk
 
 # Per-class remedy for a local-gate denial. Every arm is still exit 3 -- naming the
@@ -2973,6 +2986,14 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             return ("RESULT: post-plan BLOCKED — rebase conflict, "
                     "human required; ERROR terminal=failed, no PR opened."
                     f"{detail}{cause} Resolve the rebase, then re-run bin/post-plan-now.")
+        if res.error_kind == SUBPROCESS_TIMEOUT:
+            detail = _flat(res.error) or "a phase-2 subprocess timed out"
+            cmd = _cmd_text(res.error_cmd)
+            cmd = f" Command: {cmd}." if cmd else ""
+            return ("RESULT: post-plan BLOCKED — a phase-2 subprocess hung past its "
+                    f"timeout and was killed; ERROR terminal=failed. {detail}.{cmd} "
+                    "Find why that step hangs (audit.log names it on the last "
+                    "'phase2: starting' line), then re-run bin/post-plan-now.")
         if res.error_kind == "local-gate":
             tail = " ".join(_error_tail(res.error_output_tail or res.error)) or "see gate output"
             cmd = _cmd_text(res.error_cmd)

@@ -129,6 +129,8 @@ eval "$ENV_ERR_FN"
 # Timeout passthrough shim: the PP block uses `timeout $secs cmd`, but the
 # unit-test sandbox does not need a real wall-clock limit.
 timeout() { local _s="$1"; shift; "$@"; }
+# The runner's plain-English stop notes are not under test here.
+note_failure() { :; }
 
 echo
 echo "-- row 8: postplan block cd's into worktree and runs post-plan-now --foreground --plan <abs> --"

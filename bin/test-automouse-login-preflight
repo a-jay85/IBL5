@@ -140,6 +140,7 @@ fi
 tick() {
     (
         claim_next_plan() { touch "$T/lock-taken"; echo "$NIGHTLY_DIR/queue/plan-a.md"; }
+        note_failure() { :; }
         eval "while true; do
 $REGION
 touch \"$T/claimed\"

@@ -42,6 +42,16 @@ assert_near() {
     fi
 }
 
+# assert_not_near <actual> <forbidden> <tol> <label>
+assert_not_near() {
+    if awk -v a="$1" -v e="$2" -v t="$3" 'BEGIN{d=a-e; if(d<0)d=-d; exit !(d>t)}'; then
+        printf '  ok   %s (%s not within %s of %s)\n' "$4" "$1" "$3" "$2"
+    else
+        printf '  FAIL %s: got %s, which must NOT be within %s of %s\n' "$4" "$1" "$3" "$2"
+        FAILED=1
+    fi
+}
+
 # assert_gt <actual> <threshold> <label> [why]
 assert_gt() {
     if awk -v a="$1" -v t="$2" 'BEGIN{exit !(a>t)}'; then
@@ -704,7 +714,7 @@ fable51_cost=$(pj "$TMPROOT/fable51.json" cost)
 assert_near "$fable51_cost" 1.0000 0.0001 \
     "fable-5-1 key() resolves to fable-5-1, cache_read at \$0.25/M"
 # Without the fable-5-1 row (or with wrong prefix match), generic fable gives $4.00.
-assert_ne "$fable51_cost" "4.0" \
+assert_not_near "$fable51_cost" 4.0 0.0001 \
     "fable-5-1 is not priced as generic fable (\$1.00/M cache_read)"
 
 

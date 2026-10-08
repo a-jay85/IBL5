@@ -566,7 +566,7 @@ if [ -z "$B58F" ]; then
     echo "FAIL: no block matching '# phase 5.8 findings render' in $P55_SKILL — marker drifted"
     FAILED=1
 fi
-BREB="$(extract_block '# phase 2 rebase' "$P25_SKILL")"
+BREB="$(extract_block '# phase 2 merge' "$P25_SKILL")"
 
 # --- structural: every predicate-using block must source the lib itself ---
 assert_self_contained '# condition (1)' "condition (1)"
@@ -2698,8 +2698,12 @@ for tok in "${PARSE_TOKENS[@]}"; do
     done
 done
 
-# --- §5.8 phase 2 rebase gate behavioural cases ----------------------------------
-# mk_rebase_repo <kind: clean|behind|conflict> — echo the path of a throwaway repo.
+# --- §5.8 phase 2 merge gate behavioural cases ----------------------------------
+# mk_rebase_repo <kind: clean|behind|conflict|hookdeny> — echo the path of a throwaway repo.
+# hookdeny is the behind shape plus a pre-merge-commit hook that exits 1. git merge runs
+# pre-merge-commit (never pre-commit) before it writes the merge commit, so this is the
+# hook that can refuse a conflict-free merge. core.hooksPath is pinned to the fixture's
+# own hooks dir so a developer's global hooksPath cannot bypass it.
 # CI has no global git identity; set it per-repo or every commit here aborts.
 mk_rebase_repo() {
     local d; d="$(mktemp -d "$BASE_TMP/rebase-XXXXXX")"
@@ -2712,7 +2716,7 @@ mk_rebase_repo() {
     git -C "$d" branch fakebase
     case "$1" in
         clean) ;;                                  # HEAD already contains fakebase
-        behind)                                    # base moves on a DIFFERENT file
+        behind|hookdeny)                           # base moves on a DIFFERENT file
             git -C "$d" checkout --quiet fakebase
             printf 'other\n' > "$d/g.txt"; git -C "$d" add g.txt
             git -C "$d" commit --quiet -m advance
@@ -2725,6 +2729,12 @@ mk_rebase_repo() {
             git -C "$d" checkout --quiet main
             printf 'mine\n'   > "$d/f.txt"; git -C "$d" commit --quiet -am mine ;;
     esac
+    if [ "$1" = hookdeny ]; then
+        git -C "$d" config core.hooksPath "$d/.git/hooks"
+        mkdir -p "$d/.git/hooks"
+        printf '#!/bin/sh\nexit 1\n' > "$d/.git/hooks/pre-merge-commit"
+        chmod +x "$d/.git/hooks/pre-merge-commit"
+    fi
     printf '%s' "$d"
 }
 
@@ -2750,56 +2760,93 @@ expect_reb() {
 }
 
 if [ -z "$BREB" ]; then
-    echo "FAIL: phase 2 rebase — no block matching '# phase 2 rebase' in $P25_SKILL"
+    echo "FAIL: phase 2 merge — no block matching '# phase 2 merge' in $P25_SKILL"
     FAILED=1
 else
     # Already up to date -> clean, no STOP. Also the empty-range boundary for the
     # pre-existing `git diff origin/master...HEAD` check whose base this step moves.
     R="$(mk_rebase_repo clean)"
-    expect_reb "phase 2 rebase: already contains base -> REBASE=clean, no STOP" \
+    expect_reb "phase 2 merge: already contains base -> REBASE=clean, no STOP" \
         "REBASE=clean" nostop "$(run_rebase "$BREB" "$R" fakebase)"
 
-    # Behind, non-conflicting -> rebased, no STOP, HEAD advances.
+    # Behind, non-conflicting -> merged, no STOP, HEAD advances to a merge commit.
     R="$(mk_rebase_repo behind)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
-    expect_reb "phase 2 rebase: behind, no conflict -> REBASE=rebased, no STOP" \
-        "REBASE=rebased" nostop "$(run_rebase "$BREB" "$R" fakebase)"
+    expect_reb "phase 2 merge: behind, no conflict -> REBASE=merged, no STOP" \
+        "REBASE=merged" nostop "$(run_rebase "$BREB" "$R" fakebase)"
     [ "$(git -C "$R" rev-parse HEAD)" != "$BEFORE" ] \
-        && echo "ok: phase 2 rebase: HEAD advanced onto the base" \
-        || { echo "FAIL: phase 2 rebase: HEAD unchanged after a reported rebase"; FAILED=1; }
+        && echo "ok: phase 2 merge: HEAD advanced onto the base" \
+        || { echo "FAIL: phase 2 merge: HEAD unchanged after a reported merge"; FAILED=1; }
+    # A rebase also advances HEAD, so only a second parent proves the block merged.
+    # Mutation: swap the block back to `git rebase` and HEAD^2 does not resolve.
+    git -C "$R" rev-parse -q --verify HEAD^2 >/dev/null \
+        && git -C "$R" merge-base --is-ancestor fakebase HEAD \
+        && echo "ok: phase 2 merge: HEAD is a merge commit containing the base" \
+        || { echo "FAIL: phase 2 merge: HEAD has no second parent containing the base"; FAILED=1; }
+    [ "$(git -C "$R" rev-parse HEAD^1)" = "$BEFORE" ] \
+        && echo "ok: phase 2 merge: the branch tip is the merge commit's first parent" \
+        || { echo "FAIL: phase 2 merge: the first parent is not the pre-merge branch tip"; FAILED=1; }
 
     # NEGATIVE: conflict -> STOP, and the tree is left exactly as found.
     R="$(mk_rebase_repo conflict)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
     OUT="$(run_rebase "$BREB" "$R" fakebase)"
-    expect_reb "phase 2 rebase: conflicting base -> REBASE=conflict + STOP-AND-RESOLVE" \
+    expect_reb "phase 2 merge: conflicting base -> REBASE=conflict + STOP-AND-RESOLVE" \
         "REBASE=conflict" resolve "$OUT"
-    printf '%s' "$OUT" | grep -qF 'linear-history-squash-merge.md' \
-        && echo "ok: phase 2 rebase: STOP text names the squash-trap escape route" \
-        || { echo "FAIL: phase 2 rebase: STOP text omits the squash-trap guidance the label promises"; FAILED=1; }
+    grep -qF 'linear-history-squash-merge.md' <<< "$OUT" \
+        && echo "ok: phase 2 merge: STOP text names the linear-history rule" \
+        || { echo "FAIL: phase 2 merge: STOP text omits the linear-history rule the label promises"; FAILED=1; }
     [ "$(git -C "$R" rev-parse HEAD)" = "$BEFORE" ] \
-        && echo "ok: phase 2 rebase: HEAD unchanged after a conflict" \
-        || { echo "FAIL: phase 2 rebase: HEAD moved despite a conflict — --abort did not restore"; FAILED=1; }
+        && echo "ok: phase 2 merge: HEAD unchanged after a conflict" \
+        || { echo "FAIL: phase 2 merge: HEAD moved despite a conflict — --abort did not restore"; FAILED=1; }
     [ -z "$(git -C "$R" status --porcelain)" ] \
-        && echo "ok: phase 2 rebase: working tree clean after a conflict" \
-        || { echo "FAIL: phase 2 rebase: tree left dirty after a conflict"; FAILED=1; }
+        && echo "ok: phase 2 merge: working tree clean after a conflict" \
+        || { echo "FAIL: phase 2 merge: tree left dirty after a conflict"; FAILED=1; }
     [ ! -d "$R/.git/rebase-merge" ] && [ ! -d "$R/.git/rebase-apply" ] \
-        && echo "ok: phase 2 rebase: no rebase left in progress" \
-        || { echo "FAIL: phase 2 rebase: left an in-progress rebase behind"; FAILED=1; }
+        && echo "ok: phase 2 merge: no rebase left in progress" \
+        || { echo "FAIL: phase 2 merge: left an in-progress rebase behind"; FAILED=1; }
+    # Mutation: delete `git merge --abort` from the conflict arm and MERGE_HEAD survives.
+    [ ! -f "$R/.git/MERGE_HEAD" ] \
+        && echo "ok: phase 2 merge: no merge left in progress" \
+        || { echo "FAIL: phase 2 merge: left an in-progress merge (MERGE_HEAD) behind"; FAILED=1; }
 
-    # NEGATIVE: unresolvable base ref -> indeterminate + STOP, nothing rebased.
+    # NEGATIVE: a hook refuses the merge commit of a conflict-free merge. MERGE_HEAD
+    # exists but no path is unmerged, so the --diff-filter=U arm must NOT claim a
+    # conflict. Mutation: remove that arm and this case reports REBASE=conflict.
+    R="$(mk_rebase_repo hookdeny)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
+    mkdir -p "$BASE_TMP/hookdeny-flag"
+    OUT="$(PPCAP_TMP="$BASE_TMP/hookdeny-flag" run_rebase "$BREB" "$R" fakebase)"
+    expect_reb "phase 2 merge: hook refuses the merge commit -> REBASE=indeterminate + STOP" \
+        "REBASE=indeterminate" stop "$OUT"
+    grep -qF 'REBASE=conflict' <<< "$OUT" \
+        && { echo "FAIL: phase 2 merge: a hook refusal was reported as REBASE=conflict"; FAILED=1; } \
+        || echo "ok: phase 2 merge: a hook refusal is not reported as REBASE=conflict"
+    ls "$BASE_TMP/hookdeny-flag"/postplan-conflict-resolved-* >/dev/null 2>&1 \
+        && { echo "FAIL: phase 2 merge: a hook refusal wrote the conflict flag"; FAILED=1; } \
+        || echo "ok: phase 2 merge: a hook refusal writes no conflict flag"
+    [ "$(git -C "$R" rev-parse HEAD)" = "$BEFORE" ] \
+        && echo "ok: phase 2 merge: HEAD unchanged after a hook refusal" \
+        || { echo "FAIL: phase 2 merge: HEAD moved despite a hook refusal"; FAILED=1; }
+    [ ! -f "$R/.git/MERGE_HEAD" ] \
+        && echo "ok: phase 2 merge: no merge left in progress after a hook refusal" \
+        || { echo "FAIL: phase 2 merge: left MERGE_HEAD behind after a hook refusal"; FAILED=1; }
+    [ -z "$(git -C "$R" status --porcelain)" ] \
+        && echo "ok: phase 2 merge: working tree clean after a hook refusal" \
+        || { echo "FAIL: phase 2 merge: tree left dirty after a hook refusal"; FAILED=1; }
+
+    # NEGATIVE: unresolvable base ref -> indeterminate + STOP, nothing merged.
     R="$(mk_rebase_repo clean)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
-    expect_reb "phase 2 rebase: unresolvable base ref -> REBASE=indeterminate + STOP" \
+    expect_reb "phase 2 merge: unresolvable base ref -> REBASE=indeterminate + STOP" \
         "REBASE=indeterminate" stop "$(run_rebase "$BREB" "$R" refs/heads/no-such-ref)"
     [ "$(git -C "$R" rev-parse HEAD)" = "$BEFORE" ] \
-        && echo "ok: phase 2 rebase: HEAD unchanged on an unresolvable base" \
-        || { echo "FAIL: phase 2 rebase: HEAD moved on an unresolvable base"; FAILED=1; }
+        && echo "ok: phase 2 merge: HEAD unchanged on an unresolvable base" \
+        || { echo "FAIL: phase 2 merge: HEAD moved on an unresolvable base"; FAILED=1; }
 
     # NEGATIVE: no override flag exists — a "proceed anyway" branch would be a
     # gate weakening, so assert the block has no escape hatch.
     if printf '%s' "$BREB" | grep -qiE 'FORCE|SKIP_REBASE|proceed anyway|--continue'; then
-        echo "FAIL: phase 2 rebase block grew an override/proceed-anyway path"
+        echo "FAIL: phase 2 merge block grew an override/proceed-anyway path"
         FAILED=1
     else
-        echo "ok: phase 2 rebase has no override path"
+        echo "ok: phase 2 merge has no override path"
     fi
 fi
 
@@ -2835,7 +2882,7 @@ before() {
 }
 
 # §5.9a marker isolation. extract_block matches the FIRST fence whose body contains
-# the literal as a SUBSTRING, so a capture block marked "# phase 2 rebase capture"
+# the literal as a SUBSTRING, so a capture block marked "# phase 2 merge capture"
 # would silently steal $BREB and run every §5.8 assertion against the wrong code
 # while still reporting green. The live marker is "# phase 2 pre-rebase capture"
 # precisely so that substring never matches.
@@ -2844,8 +2891,8 @@ if [ -z "${BREB:-}" ] || [ -z "$BCAP" ]; then
     echo "FAIL: §5.9a — could not extract both the rebase and the pre-rebase capture block"
     FAILED=1
 else
-    have  "§5.9a: '# phase 2 rebase' still binds to the rebase block" "$BREB" 'git rebase --abort'
-    lacks "§5.9a: '# phase 2 rebase' did not bind to the capture block" "$BREB" 'PRECAPTURE=ok'
+    have  "§5.9a: '# phase 2 merge' still binds to the merge block" "$BREB" 'git merge --abort'
+    lacks "§5.9a: '# phase 2 merge' did not bind to the capture block" "$BREB" 'PRECAPTURE=ok'
     have  "§5.9a: the capture block is the one that prints PRECAPTURE=ok" "$BCAP" 'PRECAPTURE=ok'
 
     # §5.9b deliberate asymmetry: lostwork.sh hardcodes `git diff origin/master...HEAD`,
@@ -2978,6 +3025,10 @@ have   "§5.9f: TREE-EQUIVALENT is named as the precondition" "$CRES_TXT" 'TREE-
 before "§5.9f: collapse-guard check precedes collapse-guard record" "$CRES_TXT" 'collapse-guard-<KEY>.sh check' 'collapse-guard-<KEY>.sh record'
 have   "§5.9f: the --onto squash-trap recipe is spelled out" "$CRES_TXT" 'git rebase --onto origin/master <parent-tip-before-merge> <branch>'
 have   "§5.9f: the squash-trap rule is cited"                "$CRES_TXT" '.claude/rules/linear-history-squash-merge.md'
+# Step 4 re-runs the merge against the pinned SHA, and Step 5 finishes it with a commit.
+# Mutation: revert Step 5's fence and the lacks pin fails.
+have   "§5.9f: the merge recipe is spelled out"              "$CRES_TXT" 'git -c core.editor=true merge --no-edit <MASTER_SHA>'
+lacks  "§5.9f: no rebase --continue remains"                 "$CRES_TXT" 'git rebase --continue'
 
 # §5.9g behavioural: lostwork.sh against real fixture repos, in BOTH directions.
 # The proof is change-level: every line the branch changed before the rebase must still
@@ -3060,8 +3111,8 @@ have  "§5.9h: the ceiling hands off to the merge line" "$CIMON_TXT" 'update-beh
 lacks "§5.9h: the ceiling no longer disarms"           "$CIMON_TXT" 'left disarmed'
 # Disarm must precede the rewrite: a reordering rewrites the branch out from under an
 # armed auto-merge, the one sequence that can merge a tree nobody watched land.
-before "§5.9h: --disable-auto precedes the rebase invocation" \
-    "$CIMON_TXT" 'gh pr merge <N> --disable-auto' 'Re-run the `# phase 2 rebase` block'
+before "§5.9h: --disable-auto precedes the merge invocation" \
+    "$CIMON_TXT" 'gh pr merge <N> --disable-auto' 'Re-run the `# phase 2 merge` block'
 before "§5.9h: prior arm state is recorded before the disarm" \
     "$CIMON_TXT" 'postplan-automerge-was-<KEY>.txt' 'gh pr merge <N> --disable-auto'
 # The re-arm gate is the second entry point into the hold — condition (14) cannot

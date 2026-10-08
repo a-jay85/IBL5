@@ -8,11 +8,12 @@
 # self-heal gated OFF in single mode, auto-queue-if-absent, hard-fail on
 # unresolvable slug, and already-queued tolerance.
 #
-# Cases 4, 6 and 10 run on every platform. Cases 1, 2, 3 and 5 drive the run loop,
+# Cases 4, 6, 10 and 13 run on every platform. Cases 1, 2, 3 and 5 drive the run loop,
 # which needs macOS tools inside bin/automouse/run (caffeinate, BSD mktemp,
 # stat -f, BSD date), so off macOS they print a SKIP line and do not run.
 # Case 10 unit-tests write_stop_file (the stop-file writer extracted from the
-# real runner); case 11 (single-plan stop file) and case 12 (SIGTERM stop file)
+# real runner); case 13 unit-tests print_stop_reason (the plain-English stop
+# notice) the same way; case 11 (single-plan stop file) and case 12 (SIGTERM stop file)
 # drive the run loop and are macOS-only.
 # AUTOMOUSE_SINGLE_UNAME overrides the platform check (default: $(uname)).
 #
@@ -71,6 +72,16 @@ check() {
         echo "ok: $desc"
     else
         echo "FAIL: $desc"
+        FAILED=1
+    fi
+}
+
+# want <desc> <haystack> <needle>: pass when the haystack contains the fixed string.
+want() {
+    if grep -qF -- "$3" <<< "$2"; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 (missing: $3; got: $2)"
         FAILED=1
     fi
 }
@@ -315,6 +326,70 @@ else
 fi
 
 # ===========================================================================
+# Case 13 — print_stop_reason explains a bad stop in plain English on stderr
+# (portable: sources the printer extracted from the real runner, no run loop)
+# ===========================================================================
+echo "--- case 13: print_stop_reason ---"
+PRINTER="$ROOT/printer.sh"
+awk '/^# Stop-reason printer:/,/^# End stop-reason printer\./' "$RUNNER_SRC" > "$PRINTER"
+c13_open=$(grep -c '^# Stop-reason printer:' "$RUNNER_SRC")
+c13_close=$(grep -c '^# End stop-reason printer\.' "$RUNNER_SRC")
+if [ "$c13_open" = 1 ] && [ "$c13_close" = 1 ] && grep -qF 'print_stop_reason() {' "$PRINTER"; then
+    echo "ok: case13 printer anchors unique and extract defines print_stop_reason"
+    # c13_call <rc> <STOP_CLEAN> [note] [FAIL_CMD]: stderr of the printer, stdout dropped.
+    # shellcheck disable=SC2069  # on purpose: keep stderr, drop stdout
+    c13_call() {
+        (
+            # shellcheck disable=SC2034  # read by the sourced printer
+            LOG="/tmp/automouse-test.log"
+            # shellcheck disable=SC2034
+            STOP_CLEAN="$2"
+            # shellcheck disable=SC2034
+            FAIL_LINE=42
+            # shellcheck disable=SC2034
+            FAIL_CMD="${4:-}"
+            # shellcheck disable=SC1090
+            . "$PRINTER"
+            [ -z "${3:-}" ] || note_failure "$3"
+            print_stop_reason "$1"
+        ) 2>&1 >/dev/null
+    }
+    c13_out=$(c13_call 0 1)
+    check "case13 clean exit prints nothing" test -z "$c13_out"
+    c13_out=$(c13_call 1 0 "" "git push origin")
+    want "case13 rc 1 says the run did not finish" "$c13_out" "the run did not finish"
+    want "case13 rc 1 names the exit code" "$c13_out" "failed with exit code 1"
+    want "case13 rc 1 names the failing command and line" "$c13_out" "(line 42): git push origin"
+    want "case13 rc 1 points at the log" "$c13_out" "Full log: /tmp/automouse-test.log"
+    c13_out=$(c13_call 143 0)
+    want "case13 rc 143 explains SIGTERM" "$c13_out" "told the run to quit (SIGTERM)"
+    c13_out=$(c13_call 130 0)
+    want "case13 rc 130 explains Ctrl-C" "$c13_out" "pressed Ctrl-C"
+    c13_out=$(c13_call 129 0)
+    want "case13 rc 129 explains the closed terminal" "$c13_out" "terminal window that started the run was closed"
+    c13_out=$(c13_call 0 0)
+    want "case13 rc 0 without the clean ending is explained" "$c13_out" "never reached its normal ending"
+    c13_out=$(c13_call 0 1 "Building p failed (try 1 of 3).")
+    want "case13 clean exit with a note says something went wrong" "$c13_out" "the run finished, but these things went wrong"
+    want "case13 clean exit lists the note" "$c13_out" "  - Building p failed (try 1 of 3)."
+    c13_out=$(c13_call 143 0 "Building p failed (try 1 of 3).")
+    want "case13 signal stop still lists earlier notes" "$c13_out" "Problems before that:"
+    c13_out=$( (
+        # shellcheck disable=SC2034  # read by the sourced printer
+        STOP_CLEAN=0
+        # shellcheck disable=SC1090
+        . "$PRINTER"
+        exec 2>&-
+        print_stop_reason 1
+        echo "rc=$?"
+    ) )
+    want "case13 closed stderr does not fail the printer" "$c13_out" "rc=0"
+else
+    echo "FAIL: case13 printer anchors not unique or extract lacks print_stop_reason() (open=$c13_open close=$c13_close)"
+    FAILED=1
+fi
+
+# ===========================================================================
 # macOS-only run-loop cases (1, 2, 3, 5)
 # ===========================================================================
 if [ "$PLATFORM" != "Darwin" ]; then
@@ -323,7 +398,7 @@ if [ "$PLATFORM" != "Darwin" ]; then
     if [ "$FAILED" -ne 0 ]; then
         echo "RESULT: FAILED"
     else
-        echo "RESULT: cases 4, 6 and 10 passed; cases 1, 2, 3, 5, 7, 8, 9, 11, 12 skipped"
+        echo "RESULT: cases 4, 6, 10 and 13 passed; cases 1, 2, 3, 5, 7, 8, 9, 11, 12 skipped"
     fi
     exit "$FAILED"
 fi
@@ -395,6 +470,9 @@ if [ -f "${c12_stops[0]}" ]; then
         grep -qE '^[0-9]+	terminated by SIGTERM \(exit 143\)$' "${c12_stops[0]}"
     c12_log="$NDIR/logs/$(basename "${c12_stops[0]}" .stop).log"
     check "case12 log lacks the session-complete line" ! grep -qi 'session complete' "$c12_log"
+    wait "$c12_pid" 2>/dev/null || true
+    want "case12 terminal output explains the SIGTERM in plain English" \
+        "$(cat "$ROOT/sig.out")" "told the run to quit (SIGTERM)"
 else
     echo "FAIL: case12 no stop file for runner pid $c12_pid after 40s"
     FAILED=1

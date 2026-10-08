@@ -458,6 +458,32 @@ grep -qE '2011.*SKIP' <<< "$out_fb" || \
     fail "preflight-grep-form: foo-bar-only WTL: PR 2011 (foo) should SKIP (out: $out_fb)"
 end_case preflight-grep-form
 
+# --- case 18b: explicit-pr-no-worktree-live ------------------------------------------------
+# An explicit --pr with no local worktree must SKIP (no worktree) on a live --go run, same as
+# the default path. Only a dry run (POST_PLAN_FLEET_DRY_RUN=1, fictional PR numbers) bypasses.
+begin_case
+clean_slots
+# The shared gh shim only answers `pr list`; swap in one that also answers `pr view`
+# (the live explicit-PR path calls it), then restore.
+cp "$SCRATCH/.local/bin/gh" "$SCRATCH/gh-shim-18b.bak"
+cat > "$SCRATCH/.local/bin/gh" <<'GH_EOF'
+#!/usr/bin/env bash
+printf '{"number":2090,"state":"OPEN","isDraft":false,"headRefName":"no-wt-branch-2090","author":{"login":"a-jay85"}}\n'
+GH_EOF
+out_live="$(run_driver --go --pr 2090 2>&1)"
+cp "$SCRATCH/gh-shim-18b.bak" "$SCRATCH/.local/bin/gh"
+grep -qE '2090.*SKIP \(no worktree\)' <<< "$out_live" || \
+    fail "explicit-pr-no-worktree-live: live --go --pr 2090 should SKIP (no worktree) (out: $out_live)"
+grep -qE '2090.*WOULD FIRE' <<< "$out_live" && \
+    fail "explicit-pr-no-worktree-live: live --go --pr 2090 must not be selected to fire (out: $out_live)"
+[[ "$(plist_count)" -eq 0 ]] || \
+    fail "explicit-pr-no-worktree-live: live run left a plist for a no-worktree PR"
+out_dry="$(POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr 2090 2>&1)"
+grep -qE '2090.*WOULD FIRE' <<< "$out_dry" || \
+    fail "explicit-pr-no-worktree-live: dry run --pr 2090 should still bypass the worktree check (out: $out_dry)"
+clean_slots
+end_case explicit-pr-no-worktree-live
+
 # --- case 19: wait-dry-run-inert ---------------------------------------------------------
 # POST_PLAN_FLEET_DRY_RUN=1 skips the real wait block even with --wait --go:
 # no "waiting for" line, fast exit.

@@ -1356,9 +1356,114 @@ path-token-bare-word-not-path-shaped)
     fi
     ;;
 
+mutation-clause-token-excluded)
+    # Tokens named only inside the Mutation clause are never checked.
+    plan_fixture '| 17 | A fabricated row is rejected. Mutation: drop the `FIXTURE_STRAY_CHECK`/`FIXTURE_ORPHAN_CHECK` checks ⇒ exit 0. | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "mutation-clause-token-excluded"
+    else
+        fail "mutation-clause-token-excluded (rc=$rc, out=$out)"
+    fi
+    ;;
+
+mutation-clause-no-arrow-sentence-end)
+    # No arrow: the clause ends at the sentence-ending period; the next sentence is checked.
+    plan_fixture '| 17 | Verdict text present. Mutation: edit `fixture_memory_note.md` makes the run exit 1. Then `FIXTURE_OUTSIDE_TOK` prints | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if grep -qF 'UNREALISED-ASSERTION: row 17' <<< "$out" \
+        && grep -qF 'FIXTURE_OUTSIDE_TOK' <<< "$err" \
+        && ! grep -qF 'fixture_memory_note.md' <<< "$err"; then
+        ok "mutation-clause-no-arrow-sentence-end"
+    else
+        fail "mutation-clause-no-arrow-sentence-end (out=$out, err=$err)"
+    fi
+    ;;
+
+mutation-clause-token-both-sides-checked)
+    # A token present outside the clause as well as inside it is still checked.
+    plan_fixture '| 17 | `FIXTURE_BOTH_TOK` is printed. Mutation: drop `FIXTURE_BOTH_TOK` ⇒ exit 0 | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if grep -qF 'UNREALISED-ASSERTION: row 17' <<< "$out" \
+        && grep -qF 'FIXTURE_BOTH_TOK' <<< "$err"; then
+        ok "mutation-clause-token-both-sides-checked"
+    else
+        fail "mutation-clause-token-both-sides-checked (out=$out, err=$err)"
+    fi
+    ;;
+
+mutation-clause-after-arrow-checked)
+    # The consequence after the arrow is outside the clause and stays checked.
+    plan_fixture '| 17 | Row rejected. Mutation: drop the check ⇒ `FIXTURE_AFTER_ARROW` never prints | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if grep -qF 'UNREALISED-ASSERTION: row 17' <<< "$out" \
+        && grep -qF 'FIXTURE_AFTER_ARROW' <<< "$err"; then
+        ok "mutation-clause-after-arrow-checked"
+    else
+        fail "mutation-clause-after-arrow-checked (out=$out, err=$err)"
+    fi
+    ;;
+
+mutation-clause-label-variants)
+    # `**Mutation:**` and a lower-case `mutation:` after another word both open a clause;
+    # `=>` and `->` both close one.
+    plan_fixture '| 17 | **Mutation:** drop `FIXTURE_BOLD_TOK` => x. Negative mutation: remove `FIXTURE_LC_TOK` -> exit 1 | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "mutation-clause-label-variants"
+    else
+        fail "mutation-clause-label-variants (rc=$rc, out=$out)"
+    fi
+    ;;
+
+mutation-clause-dot-inside-backticks)
+    # A `.` inside a code span never closes the clause (backtick parity is tracked).
+    plan_fixture '| 17 | Marker scope holds. Mutation: edit `tail.strip().startswith("\|")` ⇒ exit 1 | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "mutation-clause-dot-inside-backticks"
+    else
+        fail "mutation-clause-dot-inside-backticks (rc=$rc, out=$out)"
+    fi
+    ;;
+
+mutation-clause-plain-token-still-flags)
+    # A plain token outside the clause still reports; the clause token stays unreported.
+    plan_fixture '| 17 | `FIXTURE_PLAIN_MISSING` holds. Mutation: delete `fixture_wrong.php` ⇒ fails | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if grep -qF 'UNREALISED-ASSERTION: row 17' <<< "$out" \
+        && grep -qF 'FIXTURE_PLAIN_MISSING' <<< "$err" \
+        && ! grep -qF 'fixture_wrong.php' <<< "$err"; then
+        ok "mutation-clause-plain-token-still-flags"
+    else
+        fail "mutation-clause-plain-token-still-flags (out=$out, err=$err)"
+    fi
+    ;;
+
 *)
     printf 'Unknown case: %s\n' "$case" >&2
-    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped step67 prefire all\n' >&2
+    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped mutation-clause-token-excluded mutation-clause-no-arrow-sentence-end mutation-clause-token-both-sides-checked mutation-clause-after-arrow-checked mutation-clause-label-variants mutation-clause-dot-inside-backticks mutation-clause-plain-token-still-flags step67 prefire all\n' >&2
     exit 2
     ;;
 esac
@@ -1370,7 +1475,7 @@ rm -rf "$root"
 
 ARG="${1:-all}"
 
-CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped"
+CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped mutation-clause-token-excluded mutation-clause-no-arrow-sentence-end mutation-clause-token-both-sides-checked mutation-clause-after-arrow-checked mutation-clause-label-variants mutation-clause-dot-inside-backticks mutation-clause-plain-token-still-flags"
 
 if [ "$ARG" = "all" ]; then
     for c in $CASES; do

@@ -41,6 +41,11 @@
 #   qualifying tokens is skipped entirely.
 #   Scenario notation `name=value` (`current_tree=T2`, `VAR=1`) is cut at the
 #   first `=` and only `name` is checked; a token starting with `=` is dropped.
+#   Mutation clause: tokens whose every occurrence lies between a `Mutation:` label
+#   (also `mutation:`, `**Mutation:**`) and the first `⇒` `→` `=>` `->`, sentence-ending
+#   `.`, or cell end outside backticks are not checked; the clause names the wrong code
+#   a correct diff never contains. A token also present outside the clause, or after
+#   the arrow, is still checked.
 #
 #   Prefix fallbacks (same three arms, run on a prefix of the token):
 #   - call token `name(a)`    -> after arms 1-3 miss, retry with the trailing `)`
@@ -213,9 +218,30 @@ inm && /^[[:space:]]*\|/ {
             tag = "warn:malformed tag (expected trailing \"(one-time-check: <reason>)\"); row checked";
         }
     }
+    # Mutation clause: blank the text between a `Mutation:` label and its closing
+    # arrow / sentence end / cell end, outside backtick spans, so the wrong code the
+    # clause names is never a token the diff must carry. The label and the closer stay;
+    # text after the closer (the consequence) is still tokenized. Multibyte arrows are
+    # compared as bytes; LC_ALL=C above keeps substr() byte-wise on BSD and GNU awk.
+    chk = ""; rest = cell;
+    while (match(rest, /(^|[^A-Za-z])(\*\*)?[Mm]utation:(\*\*)?/)) {
+        chk = chk substr(rest, 1, RSTART + RLENGTH - 1) " ";
+        body = substr(rest, RSTART + RLENGTH);
+        L = length(body); tick = 0; stop = L;
+        for (k = 1; k <= L; k++) {
+            c = substr(body, k, 1);
+            if (c == "`") { tick = !tick; continue; }
+            if (tick) continue;
+            if (substr(body, k, 3) == "⇒" || substr(body, k, 3) == "→") { stop = k - 1; break; }
+            if (substr(body, k, 2) == "=>" || substr(body, k, 2) == "->") { stop = k - 1; break; }
+            if (c == "." && (k == L || substr(body, k + 1, 1) == " ")) { stop = k - 1; break; }
+        }
+        rest = substr(body, stop + 1);
+    }
+    chk = chk rest;
     # extract closed single-word backtick tokens
     toks = "";
-    n2 = split(cell, parts, "`");
+    n2 = split(chk, parts, "`");
     for (i = 2; i < n2; i += 2) {
         t = parts[i];
         if (t == "") continue;

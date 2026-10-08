@@ -10,6 +10,7 @@ use Player\PlayerImageHelper;
 use UI\TableStyles;
 use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
+use UI\RendersTableEnd;
 
 /**
  * View class for rendering free agency preview table.
@@ -20,6 +21,8 @@ use Security\HtmlSanitizer;
  */
 class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
 {
+    use RendersTableEnd;
+
     /**
      * @see FreeAgencyPreviewViewInterface::render()
      *
@@ -155,15 +158,5 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
         }
 
         return $output;
-    }
-
-    /**
-     * Render the end of the table.
-     *
-     * @return string HTML table end
-     */
-    private function renderTableEnd(): string
-    {
-        return '</tbody></table>';
     }
 }

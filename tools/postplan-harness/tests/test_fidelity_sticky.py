@@ -401,6 +401,16 @@ def test_deviating_status_lines_print():
     assert "REBASE=clean" not in skipped
 
 
+def test_fidelity_expects_merged_rebase_label():
+    # Phase 2 merges origin/master in, so the plain merge label is expected and stays
+    # out of the sticky; the retired rebase label now reads as a deviation and prints.
+    merged = _sticky(rebase_line="REBASE=merged origin/master")
+    assert "REBASE=" not in merged
+    old = "REBASE=rebased onto origin/master"
+    stale = _sticky(rebase_line=old)
+    assert stale.index(old) < stale.index(fidelity.MERGE_DIGEST_HEADING)
+
+
 def test_nonempty_findings_are_kept_verbatim():
     body = _sticky(excerpt="## FINDINGS\n\n- [blocking] x missing\n\nNOT READY",
                    fid={"verdict_1": "NOT READY"}, terminal="NOT READY")

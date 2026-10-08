@@ -65,15 +65,27 @@ def test_lockfile_unresolvable():
 
 
 def test_delete_vs_modify():
-    # stages 1 and 2 only — delete/add case
+    # stages 1 and 2 only — modify/delete: resolvable, the resolver settles it
     text = (
         "100644 aabbcc 1\tapp/foo.py\n"
         "100644 aabbcd 2\tapp/foo.py\n"
     )
     inv = inventory_conflicts(_run_with(text))
-    assert inv.unresolvable_reason is not None
-    assert UNRESOLVABLE_STAGES in inv.unresolvable_reason
-    assert inv.files == ()
+    assert inv.unresolvable_reason is None
+    assert inv.files == ("app/foo.py",)
+    assert inv.stage_sets["app/foo.py"] == frozenset({1, 2})
+
+
+def test_modify_vs_delete_branch_side():
+    # stages 1 and 3 only — the other modify/delete orientation is resolvable too
+    text = (
+        "100644 aabbcc 1\tapp/foo.py\n"
+        "100644 aabbce 3\tapp/foo.py\n"
+    )
+    inv = inventory_conflicts(_run_with(text))
+    assert inv.unresolvable_reason is None
+    assert inv.files == ("app/foo.py",)
+    assert inv.stage_sets["app/foo.py"] == frozenset({1, 3})
 
 
 def test_add_add():
@@ -85,6 +97,7 @@ def test_add_add():
     inv = inventory_conflicts(_run_with(text))
     assert inv.unresolvable_reason is not None
     assert UNRESOLVABLE_STAGES in inv.unresolvable_reason
+    assert "add/add" in inv.unresolvable_reason
     assert inv.files == ()
 
 

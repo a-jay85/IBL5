@@ -140,8 +140,8 @@ echo "PRECAPTURE=ok key=$PPCAP_KEY"
 ```
 
 ```bash
-# phase 2 rebase: land the branch on origin/master BEFORE the push, so Phase 4 review,
-# Phase 5.0 conformance and Phase 5.5 fidelity all judge the same post-rebase diff.
+# phase 2 merge: bring origin/master into the branch BEFORE the push, so Phase 4 review,
+# Phase 5.0 conformance and Phase 5.5 fidelity all judge the same post-merge diff.
 # $REBASE_BASE_REF is overridable only so bin/test-postplan-arm-conditions can point
 # this block at a fixture ref; production leaves it unset and takes the default.
 REBASE_BASE_REF="${REBASE_BASE_REF:-origin/master}"
@@ -154,16 +154,20 @@ PPCAP_KEY="${PPCAP_KEY:-$(git rev-parse --abbrev-ref HEAD | tr '/:' '--')}"
 git fetch origin master --quiet 2>/dev/null || true
 if ! git rev-parse --verify --quiet "$REBASE_BASE_REF" >/dev/null; then
   echo "REBASE=indeterminate"
-  echo "STOP: cannot resolve $REBASE_BASE_REF — fail-closed. Nothing was rebased, committed-tree untouched. Fetch origin and re-run /post-plan."
+  echo "STOP: cannot resolve $REBASE_BASE_REF — fail-closed. Nothing was merged, committed-tree untouched. Fetch origin and re-run /post-plan."
 elif git merge-base --is-ancestor "$REBASE_BASE_REF" HEAD; then
   echo "REBASE=clean (HEAD already contains $REBASE_BASE_REF)"
-elif git rebase "$REBASE_BASE_REF" >/dev/null 2>&1; then
-  echo "REBASE=rebased onto $REBASE_BASE_REF"
-else
-  git rebase --abort >/dev/null 2>&1 || true
+elif git -c core.editor=true merge --no-edit "$REBASE_BASE_REF" >/dev/null 2>&1; then
+  echo "REBASE=merged $REBASE_BASE_REF"
+elif [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+  git merge --abort >/dev/null 2>&1 || true
   echo "REBASE=conflict"
   : > "$PPCAP_TMP/postplan-conflict-resolved-$PPCAP_KEY"
-  echo "STOP-AND-RESOLVE: rebase onto $REBASE_BASE_REF conflicted. 'git rebase --abort' has restored the tree; nothing was pushed and the committed tree is untouched. Do not push from here. Go to .claude/skills/post-plan/_phase-2-conflict-resolution.md and follow it end to end: it re-runs the rebase in the --onto form, resolves three-way, and proves no work was lost before any push is allowed. Conflict-resolved lines are code no structured review has seen, so this run will hold auto-merge at Phase 6.5 condition (14) and announce that hold on the PR. If this branch was stacked on a now-merged parent, this is the squash trap — replay only your own commits with 'git rebase --onto origin/master <parent-tip-before-merge> <branch>' (.claude/rules/linear-history-squash-merge.md)."
+  echo "STOP-AND-RESOLVE: merge of $REBASE_BASE_REF conflicted. 'git merge --abort' has restored the tree; nothing was pushed and the committed tree is untouched. Do not push from here. Go to .claude/skills/post-plan/_phase-2-conflict-resolution.md and follow it end to end: it re-runs the merge against the pinned SHA, resolves three-way (stage 2 is this branch, stage 3 is master), and proves no work was lost before any push is allowed. Conflict-resolved lines are code no structured review has seen, so this run will hold auto-merge at Phase 6.5 condition (14) and announce that hold on the PR. A merge sees a squash-merged parent's content on both sides and does not replay it, so the squash trap in .claude/rules/linear-history-squash-merge.md does not apply here; a conflict is a real overlap with master."
+else
+  git merge --abort >/dev/null 2>&1 || true
+  echo "REBASE=indeterminate"
+  echo "STOP: merge of $REBASE_BASE_REF did not conflict but did not complete either: a pre-merge-commit hook refused the merge commit, or local changes blocked the merge. 'git merge --abort' restored the tree. Read git status and run any refusing hook by hand to see the cause, fix it, and re-run /post-plan."
 fi
 ```
 

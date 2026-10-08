@@ -144,16 +144,15 @@ def squash_repo():
     shutil.rmtree(d, ignore_errors=True)
 
 
-def test_plain_rebase_conflicts_on_the_squash_fixture(squash_repo):
-    """Characterization: plain rebase_onto raises rebase-conflict and leaves a clean tree."""
+def test_plain_merge_is_clean_on_the_squash_fixture(squash_repo):
+    """rebase_onto merges origin/master in, so the squashed parent's content sits on both
+    sides and does not replay. The squash trap a plain rebase hits never fires here."""
     d, parent_tip, master_sha, key, branch = squash_repo
     g = LiveGit(d)
-    with pytest.raises(HarnessError) as exc:
-        g.rebase_onto()
-    assert exc.value.kind == "rebase-conflict"
+    g.rebase_onto()
     assert not g.is_dirty()
-    assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
-    assert not os.path.exists(os.path.join(d, ".git", "rebase-apply"))
+    for ref in (parent_tip, master_sha):
+        assert _sh(d, "merge-base", "--is-ancestor", ref, "HEAD", check=False).returncode == 0
 
 
 def test_stacked_conflict_auto_resolves_and_proves_tree_equivalent(squash_repo):
@@ -727,18 +726,22 @@ def test_proof_gate_is_conjunctive():
         shutil.rmtree(d2, ignore_errors=True)
 
 
-def test_simple_path_pre_patch(squash_repo):
+def test_simple_path_pre_patch():
     """rebase_onto() captures the pre-patch before aborting on conflict."""
-    d, parent_tip, master_sha, key, branch = squash_repo
+    d, _base, _master, key, branch = _make_simple_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV)
     patch_path = f"/tmp/pr-ready-diff-pre-{key}.patch"
     if os.path.exists(patch_path):
         os.unlink(patch_path)
-    g = LiveGit(d)
-    with pytest.raises(HarnessError) as exc:
-        g.rebase_onto()
-    assert exc.value.kind == "rebase-conflict"
-    assert os.path.exists(patch_path), "pre-patch was not written before abort"
-    assert "feature.txt" in open(patch_path).read()
+    try:
+        g = LiveGit(d)
+        with pytest.raises(HarnessError) as exc:
+            g.rebase_onto()
+        assert exc.value.kind == "rebase-conflict"
+        assert os.path.exists(patch_path), "pre-patch was not written before abort"
+        assert "feature.txt" in open(patch_path).read()
+    finally:
+        _cleanup_full(key, branch, d)
 
 
 def test_whole_tree_sweep_live():

@@ -189,7 +189,7 @@ class Season
      *
      * During Playoffs, Draft, and Free Agency the contract years have
      * effectively rolled over, so trade-related calculations (roster counting,
-     * queueing, cash considerations, cash-record sums) shift to the next
+     * cash considerations, cash-record sums) shift to the next
      * season's contracts.
      *
      * NOTE: This is a wider set than {@see isOffseasonPhase()} — it INCLUDES

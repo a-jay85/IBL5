@@ -8,7 +8,6 @@ use Trading\Contracts\TradeProcessorInterface;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
-use Trading\Contracts\TradeExecutionRepositoryInterface;
 use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
@@ -33,7 +32,6 @@ class TradeProcessor implements TradeProcessorInterface
     protected TradeAssetRepositoryInterface $assetRepository;
     protected TradeCashRepositoryInterface $cashRepository;
     protected BuyoutLedgerRepositoryInterface $cashConsiderationRepository;
-    protected TradeExecutionRepositoryInterface $executionRepository;
     protected TeamIdentityRepositoryInterface $commonRepository;
     protected Season $season;
     protected CashTransactionHandler $cashHandler;
@@ -53,7 +51,6 @@ class TradeProcessor implements TradeProcessorInterface
         ?TradeAssetRepositoryInterface $assetRepository = null,
         ?TradeCashRepositoryInterface $cashRepository = null,
         ?BuyoutLedgerRepositoryInterface $cashConsiderationRepository = null,
-        ?TradeExecutionRepositoryInterface $executionRepository = null,
         ?Season $season = null,
         ?\Psr\Log\LoggerInterface $auditLogger = null,
         ?\Psr\Log\LoggerInterface $tradeLogger = null
@@ -65,7 +62,6 @@ class TradeProcessor implements TradeProcessorInterface
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = $cashRepository ?? new TradeCashRepository($db);
         $this->cashConsiderationRepository = $cashConsiderationRepository ?? new BuyoutLedgerRepository($db);
-        $this->executionRepository = $executionRepository ?? new TradeExecutionRepository($db);
         $this->season = $season ?? new Season($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->commonRepository, $this->cashConsiderationRepository, $this->cashRepository);
         $this->newsService = new \Topics\News\NewsRepository($db);
@@ -222,7 +218,7 @@ class TradeProcessor implements TradeProcessorInterface
     /**
      * Process draft pick transfer
      *
-     * Updates pick ownership and queues the operation if during certain season phases.
+     * Updates pick ownership.
      *
      * @param int $itemId Pick ID
      * @param string $offeringTeamName Offering team
@@ -249,9 +245,6 @@ class TradeProcessor implements TradeProcessorInterface
         // Update pick ownership using repository
         $affectedRows = $this->assetRepository->updateDraftPickOwnerById($itemId, $listeningTeamName, $listeningTeamId);
 
-        // Queue structured data for deferred execution during certain season phases
-        $this->queuePickTransfer($itemId, $listeningTeamName, $listeningTeamId, $tradeLine);
-
         return [
             'success' => ($affectedRows > 0),
             'tradeLine' => $tradeLine
@@ -261,7 +254,7 @@ class TradeProcessor implements TradeProcessorInterface
     /**
      * Process player transfer
      *
-     * Updates player's team assignment and queues the operation if during certain season phases.
+     * Updates player's team assignment.
      *
      * @param int $itemId Player ID
      * @param string $offeringTeamName Offering team
@@ -286,66 +279,10 @@ class TradeProcessor implements TradeProcessorInterface
         // Update player team using repository
         $affectedRows = $this->assetRepository->updatePlayerTeam($itemId, $listeningTeamId);
 
-        // Queue structured data for deferred execution during certain season phases
-        $this->queuePlayerTransfer($itemId, $listeningTeamId, $tradeLine);
-
         return [
             'success' => ($affectedRows > 0),
             'tradeLine' => $tradeLine
         ];
-    }
-
-    /**
-     * Check if we should queue trades for later execution
-     *
-     * During Playoffs, Draft, or Free Agency phases, trades are queued
-     * instead of executed immediately to prevent roster conflicts.
-     *
-     * @return bool True if in a phase that requires queueing
-     */
-    protected function shouldQueueTrades(): bool
-    {
-        return $this->season->advancesContractYears();
-    }
-
-    /**
-     * Queue player transfer for later execution if in certain season phases
-     *
-     * @param int $playerId Player ID
-     * @param int $teamId New team ID
-     * @param string $tradeLine Trade description for tracking
-     * @return void
-     */
-    protected function queuePlayerTransfer(int $playerId, int $teamId, string $tradeLine): void
-    {
-        if ($this->shouldQueueTrades()) {
-            $params = [
-                'player_id' => $playerId,
-                'team_id' => $teamId,
-            ];
-            $this->executionRepository->insertTradeQueue('player_transfer', $params, $tradeLine);
-        }
-    }
-
-    /**
-     * Queue pick transfer for later execution if in certain season phases
-     *
-     * @param int $pickId Pick ID
-     * @param string $newOwner New owner team name
-     * @param int $newOwnerId New owner team ID
-     * @param string $tradeLine Trade description for tracking
-     * @return void
-     */
-    protected function queuePickTransfer(int $pickId, string $newOwner, int $newOwnerId, string $tradeLine): void
-    {
-        if ($this->shouldQueueTrades()) {
-            $params = [
-                'pick_id' => $pickId,
-                'new_owner' => $newOwner,
-                'new_owner_id' => $newOwnerId,
-            ];
-            $this->executionRepository->insertTradeQueue('pick_transfer', $params, $tradeLine);
-        }
     }
 
     /**

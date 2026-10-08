@@ -63,6 +63,9 @@
 # Any other mention of `one-time-check` in the cell is ignored fail-closed: the row is
 # checked as untagged and `ONE-TIME-CHECK-IGNORED: row <id> -- <why>` goes to stderr.
 # Neither line starts with `UNREALISED-ASSERTION:`, which every caller greps for.
+# bin/check-plan gate Z requires the tag at plan time on a CLI-executable row whose
+# location cell runs only outside the repo (~/, $HOME, /tmp) or against a post-PR CI
+# run (gh run|pr|api); such a row has no footprint a diff can carry.
 
 set -euo pipefail
 set -f

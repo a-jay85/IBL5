@@ -209,7 +209,7 @@ final class PhantomBoxscoreRepair extends \Database\BaseMysqliRepository
         . 'WHERE b2.`game_date` = b.`game_date` AND b2.`visitor_teamid` = b.`visitor_teamid` '
         . 'AND b2.`home_teamid` = b.`home_teamid` AND b2.`game_of_that_day` = b.`game_of_that_day`)';
 
-    private readonly BoxscoreRepository $repository;
+    private readonly BoxscoreAuditRepository $repository;
 
     private readonly bool $manageTransaction;
 
@@ -250,7 +250,7 @@ final class PhantomBoxscoreRepair extends \Database\BaseMysqliRepository
      */
     public function __construct(
         \mysqli $db,
-        BoxscoreRepository $repository,
+        BoxscoreAuditRepository $repository,
         bool $manageTransaction = true,
         ?array $expectedOverride = null,
     ) {

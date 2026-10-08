@@ -183,6 +183,7 @@ try {
 
     $boxscoreRepo = new Boxscore\BoxscoreRepository($mysqli_db, $leagueContext);
     $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db, $boxscoreRepo, $season, $leagueContext);
+    $allStarTeamRepo = new Boxscore\AllStarTeamRepository($mysqli_db, $leagueContext);
     $boxscoreView = new Boxscore\BoxscoreView();
 
     $savedDcRepo = new DepthChartSnapshot\DepthChartSnapshotRepository($mysqli_db, $leagueContext);
@@ -264,7 +265,7 @@ try {
     if (!$isOlympics) {
         $updaterService->addStep(new Updater\Steps\RefreshHeadToHeadRecordsStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(
-            $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $sourceResolver,
+            $boxscoreProcessor, $allStarTeamRepo, $boxscoreView, $sourceResolver,
         ));
         $updaterService->addStep(new Updater\Steps\RefreshPlayoffSeriesResultsStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\RefreshTeamSeasonRecordsStep($mysqli_db));

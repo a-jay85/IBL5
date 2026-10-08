@@ -95,7 +95,11 @@ def snapshot(names, git, worktree, *, run=subprocess.run) -> Carveout:
         return Carveout(False, f"byte budget run failed: {exc}", frozenset())
     if budget_rc == 0:
         return Carveout(False, "local byte budget passes", frozenset())
-    in_diff = frozenset(p for p in git.changed_files("origin/master") if _is_rules_md(p))
+    try:
+        in_diff = frozenset(p for p in git.changed_files("origin/master")
+                            if _is_rules_md(p))
+    except Exception as exc:  # noqa: BLE001 - an unreadable PR diff leaves it inactive
+        return Carveout(False, f"pr diff read failed: {exc}", frozenset())
     if not in_diff:
         return Carveout(False, "no rules file in PR diff", frozenset())
     return Carveout(True, "active", in_diff)

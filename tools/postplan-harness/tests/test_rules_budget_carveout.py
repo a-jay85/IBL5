@@ -17,6 +17,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import harness.fidelity as fidelity
+import runner
 from harness import cifix
 from harness import rules_budget_carveout as rbc
 from harness.rules_budget_carveout import (POST_CHECKS, Carveout, file_verdicts,
@@ -156,6 +157,13 @@ class TestSnapshot:
         c = snapshot(["Static guards"], _git_with(["ibl5/x.php", "bin/check-prose"]),
                      "/wt", run=_run_rc(1))
         assert not c.active and c.reason == "no rules file in PR diff"
+
+    def test_inactive_when_pr_diff_read_raises(self):
+        def boom(base):
+            raise RuntimeError("git down")
+        c = snapshot(["Static guards"], SimpleNamespace(changed_files=boom), "/wt",
+                     run=_run_rc(1))
+        assert not c.active and c.reason == "pr diff read failed: git down"
 
     def test_active_collects_in_diff_rules_files(self):
         seen = []
@@ -307,3 +315,109 @@ class TestRealScripts:
 
     def test_post_checks_pass_on_clean_worktree(self):
         assert post_check_failures(self.ROOT) == []
+
+
+class TestPromptWiring:
+    def _prompt(self, **kw):
+        return cifix.ci_fix_prompt(4242, 1, ["Static guards"],
+                                   {"Static guards": "/tmp/x.log"}, "/tmp/diff.patch",
+                                   [], **kw)
+
+    def test_prompt_lists_allowed_files_after_deny_text(self):
+        prompt = self._prompt(rules_carveout=(BIG,))
+        assert fidelity.GATE_EDIT_DENY_TEXT in prompt
+        assert BIG in prompt
+        assert "bin/check-rules-byte-budget" in prompt
+        assert "-detail.md" in prompt
+        assert prompt.index(fidelity.GATE_EDIT_DENY_TEXT) < prompt.index("ONE exception")
+
+    def test_prompt_omits_carveout_when_empty(self):
+        assert "ONE exception" not in self._prompt(rules_carveout=())
+
+
+class RulesGit(CiFixGit):
+    def changed_files(self, ref): return [BIG]
+
+
+class TestRunnerWiring:
+    def _permit(self, monkeypatch, verdict, calls):
+        def fake_permit(gate_hits, carveout, worktree, sha, log, **kw):
+            calls.append((list(gate_hits), sha))
+            return verdict
+        monkeypatch.setattr(runner.rules_budget_carveout, "permit", fake_permit)
+
+    def test_loop_pushes_when_permit_allows(self, monkeypatch, tmp_path):
+        calls = []
+        monkeypatch.setattr(runner.rules_budget_carveout, "snapshot",
+                            lambda names, git, worktree: ACTIVE)
+        self._permit(monkeypatch, True, calls)
+        git = RulesGit()
+        r = _run(monkeypatch, tmp_path, git, CiFixGh(), ScriptedLlm(),
+                 failed=["Static guards"])
+        assert git.pushes == 1
+        assert calls == [([BIG], "b" * 40)]
+        assert not _has(r.lines, "gate-path edit detected")
+
+    def test_loop_discards_when_permit_refuses(self, monkeypatch, tmp_path):
+        calls = []
+        monkeypatch.setattr(runner.rules_budget_carveout, "snapshot",
+                            lambda names, git, worktree: ACTIVE)
+        self._permit(monkeypatch, False, calls)
+        git = RulesGit()
+        r = _run(monkeypatch, tmp_path, git, CiFixGh(), ScriptedLlm(),
+                 failed=["Static guards"])
+        assert git.pushes == 0
+        assert _has(r.lines, "gate-path edit detected in fix commit")
+        assert _has(r.lines, "outcome=error:gate-path-edit")
+
+    def test_permit_not_called_without_gate_hits(self, monkeypatch, tmp_path):
+        calls = []
+        self._permit(monkeypatch, True, calls)
+        git = CiFixGit()
+        _run(monkeypatch, tmp_path, git, CiFixGh(), ScriptedLlm(),
+             failed=["Static guards"])
+        assert calls == []
+        assert git.pushes == 1
+
+    def test_snapshot_sees_triaged_names_before_fixer(self, monkeypatch, tmp_path):
+        events, seen = [], []
+
+        def fake_snapshot(names, git, worktree):
+            events.append("snapshot")
+            seen.append(list(names))
+            return Carveout(False, "no worktree", frozenset())
+
+        class OrderLlm(ScriptedLlm):
+            def call_tooled(self, purpose, model, prompt, **kw):
+                events.append("llm")
+                return super().call_tooled(purpose, model, prompt, **kw)
+
+        monkeypatch.setattr(runner.rules_budget_carveout, "snapshot", fake_snapshot)
+        _run(monkeypatch, tmp_path, CiFixGit(), CiFixGh(), OrderLlm(),
+             failed=["Static guards", "Tests and Analysis", "human-signoff"])
+        assert seen == [["Static guards"]]
+        assert events.index("snapshot") < events.index("llm")
+
+    def test_prompt_kwarg_tracks_snapshot(self, monkeypatch, tmp_path):
+        kwargs = []
+
+        def fake_prompt(*a, **kw):
+            kwargs.append(kw.get("rules_carveout"))
+            return "p"
+
+        monkeypatch.setattr(runner.cifix, "ci_fix_prompt", fake_prompt)
+        for carveout, expected in ((ACTIVE, (BIG,)),
+                                   (Carveout(False, "no worktree", frozenset({BIG})), ())):
+            monkeypatch.setattr(runner.rules_budget_carveout, "snapshot",
+                                lambda names, git, worktree, c=carveout: c)
+            _run(monkeypatch, tmp_path, CiFixGit(), CiFixGh(), ScriptedLlm(),
+                 failed=["Static guards"])
+            assert kwargs[-1] == expected
+
+    def test_real_snapshot_inactive_without_worktree_logs_reason(self, monkeypatch,
+                                                                 tmp_path):
+        git = RulesGit()
+        r = _run(monkeypatch, tmp_path, git, CiFixGh(), ScriptedLlm(),
+                 failed=["Static guards"])
+        assert _has(r.lines, "rules-budget carve-out inactive (no worktree)")
+        assert git.pushes == 0

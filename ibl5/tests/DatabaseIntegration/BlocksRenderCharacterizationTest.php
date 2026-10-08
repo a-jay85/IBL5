@@ -35,10 +35,17 @@ final class BlocksRenderCharacterizationTest extends DatabaseTestCase
         $GLOBALS['mysqli_db'] = $this->db;
         $GLOBALS['leagueContext'] = new \League\LeagueContext();
 
-        $content = null;
-        include __DIR__ . '/../../blocks/' . $blockFile;
+        $content = $this->includeBlock($blockFile);
 
         self::assertIsString($content);
+
+        return $content;
+    }
+
+    private function includeBlock(string $blockFile): mixed
+    {
+        $content = null;
+        include __DIR__ . '/../../blocks/' . $blockFile;
 
         return $content;
     }
@@ -93,8 +100,7 @@ final class BlocksRenderCharacterizationTest extends DatabaseTestCase
         $GLOBALS['mysqli_db'] = null;
         $GLOBALS['leagueContext'] = new \League\LeagueContext();
 
-        $content = null;
-        include __DIR__ . '/../../blocks/block-Chunk_Leaders.php';
+        $content = $this->includeBlock('block-Chunk_Leaders.php');
 
         self::assertSame('', $content);
     }

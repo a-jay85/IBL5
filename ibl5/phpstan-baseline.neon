@@ -619,42 +619,6 @@ parameters:
 			path: classes/Season/SeasonQueryRepository.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "game_of_that_day" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/SeasonArchive/SeasonArchiveRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "losses" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/SeasonArchive/SeasonArchiveRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "start_season_year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/SeasonArchive/SeasonArchiveRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "table_id" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/SeasonArchive/SeasonArchiveRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "winner" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/SeasonArchive/SeasonArchiveRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/SeasonArchive/SeasonArchiveRepository.php
-
-		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 2

@@ -11,8 +11,8 @@ on:
       # IBLbot (Discord bot + bug-bot HTTP server) has no other CI host — without
       # this line an IBLbot-only push to master never triggers this workflow, so
       # the iblbot job would gate PRs but not master. Every `changes` output is
-      # blanket-true on push, so such a push also fans out to the PHP jobs;
-      # that is pre-existing sibling behaviour (`bin/**` does the same), not new.
+      # blanket-true on push, and the memo is bypassed on push, so such a push
+      # also runs every test job. `bin/**` does the same.
       - 'ibl5/IBLbot/**'
       # audit-js has no other CI host either, and a dependency bump lands on
       # master as a manifest/lockfile-only commit — so without these lines the
@@ -42,137 +42,24 @@ jobs:
       pull-requests: read
     outputs:
       src: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
-      shell: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.shell == 'true' }}
-      ibl5ts: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.ibl5ts == 'true' }}
       iblbot: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.iblbot == 'true' }}
       jsdeps: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.jsdeps == 'true' }}
-      workflows: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.workflows == 'true' }}
-      both: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.both == 'true' }}
     steps:
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         if: github.event_name == 'pull_request'
         with:
           filters: |
-            # `both:` is the producer/consumer coupling group: every path listed
-            # here triggers BOTH db-integration (PHP/DB side) and harness-tests
-            # (shell side), because the two sides share a wire contract that only
-            # breaks when one is changed without the other. Declare a new coupling
-            # by adding its paths here once — never by duplicating them into src:
-            # and shell:. Guarded by bin/test-path-filters.
-            both:
-              - 'bin/sim-recap-*'
-              - '.github/workflows/sim-recap.yml'
-              - 'ibl5/scripts/simRecapQueue.php'
-              - 'ibl5/scripts/storeSimRecap.php'
-              - 'ibl5/scripts/simRecapContext.php'
-              - 'ibl5/classes/SimRecap/**'
+            # src now gates only audit-php and audit-js (ADR-0186). It lists what
+            # those two audits read. Every test and analysis job runs on any memo
+            # miss instead of on a path filter, so never add a path here to make a
+            # test job run: a hand-kept list is how bin-only PRs merged untested.
             src:
               - '**.php'
               - 'ibl5/migrations/**.sql'
-              # The destructive-migration engine, its wrapper and the full-scan
-              # golden are tested only by the PHPUnit Cli suite (`test` job), so
-              # an engine-only or golden-only PR must flip src. Exact paths, never
-              # bin/**: bin/test-path-filters forbids src swallowing bin/.
-              - 'bin/check-destructive-migrations'
-              - 'bin/lib/destructive-migration-scan.py'
-              - 'ibl5/tests/Cli/fixtures/**'
-              # Every other bin/ script a PHPUnit test runs. A bin-only edit to one
-              # of these must flip src, or the test that covers it never runs and
-              # the break lands on master (#2907). bin/test-path-filters scans
-              # ibl5/tests for `__DIR__ . '/../bin/...'` loads and fails when one
-              # is missing. Three paths load another way and are hand-added, so
-              # the self-test does not catch their omission: bin/lib/db-helpers.sh,
-              # bin/pre-commit-hook, bin/lib/shell-scripts.sh.
-              - 'bin/adr-check'
-              - 'bin/check-boxscore-schedule'
-              - 'bin/check-column-rename-sweep'
-              - 'bin/check-docs'
-              - 'bin/check-e2e-hygiene'
-              - 'bin/check-infection-excludes'
-              - 'bin/check-master-ci-green'
-              - 'bin/check-phpunit-hygiene'
-              - 'bin/lib/db-helpers.sh'
-              - 'bin/lib/git-helpers.sh'
-              - 'bin/lib/pr-armable.sh'
-              - 'bin/lib/shell-scripts.sh'
-              - 'bin/lighthouse-audit-report'
-              - 'bin/lighthouse-audit-urls'
-              - 'bin/merge-master-to-prod'
-              - 'bin/next-adr'
-              - 'bin/next-migration'
-              - 'bin/pr-triage'
-              - 'bin/pre-commit-hook'
-              - 'bin/refactor-flag'
-              - 'bin/rollback-phantom-repair'
-              - 'bin/smoke-prod'
-              - 'bin/website-affecting'
               - 'ibl5/composer.json'
               - 'ibl5/composer.lock'
-              - 'ibl5/phpunit.xml'
-              - 'ibl5/phpstan.neon'
-              - 'ibl5/phpstan-tests.neon'
-              - 'ibl5/phpstan-tests-baseline.neon'
-              - 'ibl5/phpstan-rules/**'
-              - 'ibl5/tests/DatabaseIntegration/Fixtures/**'
               - '.github/workflows/tests.yml'
-            shell:
-              - 'bin/**'
-              - 'ibl5/bin/**'
-              - '.github/workflows/tests.yml'
-              # bin/test-postplan-arm-conditions reads the Phase 6.5 condition
-              # blocks AND the Phase 2.5 backlog trigger block from these two
-              # files, so an edit to either alone must run the harness job.
-              - '.claude/skills/post-plan/SKILL.md'
-              - '.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md'
-              - '.claude/skills/post-plan/_phase-5.5-fidelity.md'
-              - '.claude/skills/post-plan/_phase-6-manual-testing.md'  # Mode A `row` contract pin
-              - '.claude/review-shared/scripts/digest.sh'
-              # bin/test-post-review-findings reads the Step 7 / Step 1 blocks here,
-              # so a skill-only edit must run the harness job too.
-              - '.claude/skills/pr-review/SKILL.md'
-              - '.claude/skills/security-audit/SKILL.md'
-              # bin/test-check-plan and bin/test-postplan-arm-conditions read the
-              # gate definitions and the Phase 5.0 conformance blocks from these
-              # three files, so a skill-only edit must run the harness job too.
-              - '.claude/skills/plan/SKILL.md'
-              - '.claude/review-shared/_plan-verification.md'
-              - '.claude/review-shared/_plan-verification-detail.md'
-              - '.claude/skills/plan/_architect-contract.md'
-              - '.claude/skills/plan/_architect-contract-detail.md'
-              - '.claude/skills/post-plan/_phase-5-final-verification.md'
-              # bin/test-human-signoff-classifier guards the classifier lib that
-              # human-signoff.yml sources, so a workflow-only edit must run it too.
-              - '.github/workflows/human-signoff.yml'
-              # review-shared runtime blocks trigger shellcheck + fleet harness tests.
-              - '.claude/review-shared/**'
-              # Agent defs are asserted by bin/test-post-plan-fleet, bin/test-plan-tier-hint and
-              # bin/test-architect-contract-split, so an agent-def-only PR must run harness-tests too.
-              - '.claude/agents/**'
-              # bin/test-plan-tier-hint statically asserts the five copies of the
-              # /plan Step 3 check-1 trigger still agree, so an edit to any of them
-              # alone must run the harness job. Two of the five are already listed
-              # above ('.claude/skills/plan/SKILL.md' and '.claude/agents/**').
-              - '.claude/skills/plan-prompt/SKILL.md'
-              - '.claude/rules/agent-tiering.md'
-              - '.claude/rules/work-triage.md'
-            ibl5ts:
-              # Everything the ibl5 TS unit suite executes or reads
-              # (tests/ts-unit/ specs cover the pure VR-review helpers, the
-              # E2E summarizer script, and the component CSS hex ratchet,
-              # which reads design/components, tokens.css and input.css;
-              # see ibl5/vitest.unit.config.ts).
-              - 'ibl5/tests/ts-unit/**'
-              - 'ibl5/tests/e2e/vr-*.ts'
-              - 'ibl5/design/components/**'
-              - 'ibl5/design/tokens/tokens.css'
-              - 'ibl5/design/input.css'
-              - '.github/scripts/summarize-e2e-results.mjs'
-              - 'ibl5/vitest.unit.config.ts'
-              - 'ibl5/package.json'
-              - 'ibl5/bun.lock'
-              - '.github/workflows/tests.yml'
-
             iblbot:
               # IBLbot has its own npm package + tsconfig + vitest suite
               # (src/bug-bot/*.test.ts). Whole-directory glob: every source file
@@ -190,23 +77,14 @@ jobs:
               # package.json + bun.lock are its literal inputs — and they are now
               # the ONLY dependency manifests for ibl5 (package-lock.json is gone;
               # ADR-0101). Deliberately its OWN output rather than added to `src`:
-              # `src` also gates PHPUnit, PHPStan and Database Integration Tests,
-              # which a lockfile-only PR has no reason to run.
+              # `src` also gates audit-php, which a lockfile-only PR has no reason to run.
               - 'ibl5/package.json'
               - 'ibl5/bun.lock'
               - '.github/workflows/tests.yml'
 
-            workflows:
-              # Everything actionlint reads. .github/actions/** is NOT optional
-              # here: actionlint validates each caller's `with:` keys against the
-              # called composite's action.yml, so "changed setup-php-env's inputs,
-              # broke a caller" is a composite-only diff that must still run it.
-              - '.github/workflows/**'
-              - '.github/actions/**'
-              - 'bin/lint-workflows'
-
   # Content-hash memo (ADR-0131). Hashes the HEAD tree over .github/ci-memo/tests.paths;
   # a hit means this exact input set already passed, so every heavy job below skips.
+  # On a miss, it is the only skip gate for the test and analysis jobs (ADR-0186).
   # Memoization is PR-only: push runs, re-runs, and dispatches bypass it, so master and
   # update-baselines behave exactly as before. A failure here reds the gate (it is in
   # gate.needs), so a broken memo can only cost a real run.
@@ -243,8 +121,8 @@ jobs:
 
   test:
     name: PHPUnit Tests
-    needs: [changes, ci-memo-check]
-    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
+    needs: [ci-memo-check]
+    if: needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -431,8 +309,8 @@ jobs:
 
   ibl5-ts-unit:
     name: IBL5 TS Unit Tests
-    needs: [changes, ci-memo-check]
-    if: needs.changes.outputs.ibl5ts == 'true' && needs.ci-memo-check.outputs.hit != 'true'
+    needs: [ci-memo-check]
+    if: needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -487,8 +365,8 @@ jobs:
 
   db-integration:
     name: Database Integration Tests
-    needs: [changes, ci-memo-check]
-    if: (needs.changes.outputs.src == 'true' || needs.changes.outputs.both == 'true') && needs.ci-memo-check.outputs.hit != 'true'
+    needs: [ci-memo-check]
+    if: needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -532,8 +410,8 @@ jobs:
 
   phpstan:
     name: PHPStan Analysis
-    needs: [changes, ci-memo-check]
-    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
+    needs: [ci-memo-check]
+    if: needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -615,8 +493,6 @@ jobs:
 
   phpunit-hygiene:
     name: PHPUnit hygiene gate
-    needs: [changes]
-    if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -628,8 +504,8 @@ jobs:
 
   shellcheck:
     name: ShellCheck (bash 3.2 compat)
-    needs: [changes, ci-memo-check]
-    if: needs.changes.outputs.shell == 'true' && needs.ci-memo-check.outputs.hit != 'true'
+    needs: [ci-memo-check]
+    if: needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -688,8 +564,6 @@ jobs:
 
   actionlint:
     name: Workflow lint (actionlint)
-    needs: [changes]
-    if: needs.changes.outputs.workflows == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -726,8 +600,6 @@ jobs:
 
   host-mariadb-guard:
     name: Host mariadb grep guard
-    needs: [changes]
-    if: needs.changes.outputs.shell == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -767,8 +639,6 @@ jobs:
 
   automouse-impl-model-test:
     name: Automouse impl-model parser test
-    needs: [changes]
-    if: needs.changes.outputs.shell == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -899,7 +769,7 @@ jobs:
     # Folds three unconditional micro-guards into one sequential job to save runner
     # startup overhead (mirrors the PR #1269 meta-checks fold). NO `if:` and NO
     # `needs:` — every check below runs unconditionally because none is covered by a
-    # path-filter, so gating on `src`/`shell` would skip exactly when the bug lands.
+    # path filter, so a filter gate would skip exactly when the bug lands (ADR-0186).
     # Each check is a few seconds of grep/bash with no dependencies.
     steps:
       - name: Checkout code
@@ -952,7 +822,7 @@ jobs:
         run: bin/check-composite-contracts
       # rules-byte-budget: a path-unscoped .claude/rules/*.md file (always loaded
       # into every session's context) can grow past its token budget via an edit
-      # that no src/shell path-filter covers. bin/check-rules-byte-budget (NEW,
+      # that no path filter covers. bin/check-rules-byte-budget (NEW,
       # Phase 1) caps it. Backlog: token-spend-backlog T2.
       - name: Check path-unscoped rules byte budget
         run: bin/check-rules-byte-budget
@@ -1002,8 +872,8 @@ jobs:
 
   harness-tests:
     name: Shell harness regression tests
-    needs: [changes, ci-memo-check]
-    if: (needs.changes.outputs.shell == 'true' || needs.changes.outputs.both == 'true') && needs.ci-memo-check.outputs.hit != 'true'
+    needs: [ci-memo-check]
+    if: needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Each harness builds its own throwaway git repos under mktemp, so the
@@ -1119,7 +989,6 @@ jobs:
             bin/test-watch-run \
             bin/test-watch-automouse-plan \
             ibl5/bin/test-flake-ledger \
-            bin/test-path-filters \
             ibl5/bin/test-db-sync-now \
             bin/test-architect-contract-split \
             bin/test-plan-review-seam \

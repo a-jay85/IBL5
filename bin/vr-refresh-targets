@@ -31,7 +31,7 @@ const {
   computeKeepList,
   selectRefreshTargets,
   renderSelectionTable,
-  linkedGallerySha,
+  linkedGalleryDir,
 } = await import(modulePath);
 
 type OpenPr = import('../ibl5/tests/e2e/vr-refresh').OpenPr;
@@ -128,16 +128,17 @@ try {
         pr.baseRefName === 'master' &&
         !pr.isCrossRepository &&
         !pr.labels.includes('update-baselines') &&
-        linkedGallerySha(pr) !== null;
+        linkedGalleryDir(pr) !== null;
       if (eligible) pr.behindBy = fetchBehindBy(pr.headRefOid);
     }
 
     const ages: Record<string, number | null> = {};
     for (const pr of prs) {
-      const sha = linkedGallerySha(pr);
-      if (sha === null || sha in ages) continue;
-      const ct = run(['git', '-C', opts.pagesDir, 'log', '-1', '--format=%ct', '--', sha]).trim();
-      ages[sha] = ct === '' ? null : parseInt(ct, 10);
+      // dir is `<sha>` or `pr/<N>/visual-review`, relative to the gh-pages root.
+      const dir = linkedGalleryDir(pr);
+      if (dir === null || dir in ages) continue;
+      const ct = run(['git', '-C', opts.pagesDir, 'log', '-1', '--format=%ct', '--', dir]).trim();
+      ages[dir] = ct === '' ? null : parseInt(ct, 10);
     }
 
     const nowSec = Math.floor(Date.now() / 1000);

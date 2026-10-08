@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-HELPER="$(cd "$(dirname "$0")/.." && pwd)/bin/lib/plan-matrix-assertions"
+HELPER="${HELPER:-$(cd "$(dirname "$0")/.." && pwd)/bin/lib/plan-matrix-assertions}"
 MATRIX_ASSERTIONS_SCRIPT="$HELPER"
 
 # Scratch-repo commits need an identity; CI runners have none configured.
@@ -906,7 +906,10 @@ deleted-file-substring-not-aligned)
     ;;
 
 deleted-file-not-deleted)
-    plan_fixture '| 1 | offloaded `ibl5/images/hof/jordan.jpg` file | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
+    # Directory token: arm 2c realises a modified file's own path (by design), so the
+    # modification-is-not-a-deletion check cites the directory, which only arm 2b's
+    # prefix form could realise.
+    plan_fixture '| 1 | offloaded `ibl5/images/hof/` directory | CLI-executable | post-impl | `bin/lib/plan-matrix-assertions` |' \
         > "$root/plan.md"
     p=ibl5/images/hof/jordan.jpg
     {
@@ -1244,9 +1247,118 @@ ctx-mixed-row)
     fi
     ;;
 
+path-token-tracked-exact)
+    # A tracked file cited by its full path: arm 2c realises it from the index.
+    mkdir -p "$root/ibl5/blocks"
+    printf 'x\n' > "$root/ibl5/blocks/block-Chunk_Leaders.php"
+    git -C "$root" add ibl5/blocks/block-Chunk_Leaders.php
+    plan_fixture '| 1 | `ibl5/blocks/block-Chunk_Leaders.php` untouched | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "path-token-tracked-exact"
+    else
+        fail "path-token-tracked-exact (rc=$rc, out=$out)"
+    fi
+    ;;
+
+path-token-tracked-suffix)
+    # A bare basename cited for a tracked baseline: `/`-aligned suffix of an index path.
+    snap="ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots"
+    mkdir -p "$root/$snap"
+    printf 'x\n' > "$root/$snap/team-mobile.png"
+    git -C "$root" add "$snap/team-mobile.png"
+    plan_fixture '| 1 | baseline `team-mobile.png` unchanged | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "path-token-tracked-suffix"
+    else
+        fail "path-token-tracked-suffix (rc=$rc, out=$out)"
+    fi
+    ;;
+
+path-token-diff-header-binary)
+    # A modified binary leaves only a `diff --git` header: no `+`, no `deleted file mode`.
+    snap="ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/team.png"
+    plan_fixture '| 1 | baseline `team.png` regenerated | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    {
+        printf 'diff --git a/%s b/%s\n' "$snap" "$snap"
+        printf 'index 3b18e51..9a0b1c2 100644\n'
+        printf 'Binary files a/%s and b/%s differ\n' "$snap" "$snap"
+    } > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+        ok "path-token-diff-header-binary"
+    else
+        fail "path-token-diff-header-binary (rc=$rc, out=$out)"
+    fi
+    ;;
+
+path-token-absent-still-flags)
+    # A path in neither the diff headers nor the index still reports missing.
+    mkdir -p "$root/ibl5/blocks"
+    printf 'x\n' > "$root/ibl5/blocks/block-Chunk_Leaders.php"
+    git -C "$root" add ibl5/blocks/block-Chunk_Leaders.php
+    plan_fixture '| 1 | `ibl5/blocks/block-Nope.php` untouched | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1' \
+        && grep -qF 'ibl5/blocks/block-Nope.php' <<< "$err"; then
+        ok "path-token-absent-still-flags"
+    else
+        fail "path-token-absent-still-flags (out=$out, err=$err)"
+    fi
+    ;;
+
+path-token-not-aligned-still-flags)
+    # A substring that is not on a `/` boundary does not match the tracked path.
+    mkdir -p "$root/ibl5/blocks"
+    printf 'x\n' > "$root/ibl5/blocks/block-Chunk_Leaders.php"
+    git -C "$root" add ibl5/blocks/block-Chunk_Leaders.php
+    plan_fixture '| 1 | `Chunk_Leaders.php` and `lock-Chunk_Leaders.php` untouched | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1' \
+        && grep -qF 'Chunk_Leaders.php' <<< "$err" \
+        && grep -qF 'lock-Chunk_Leaders.php' <<< "$err"; then
+        ok "path-token-not-aligned-still-flags"
+    else
+        fail "path-token-not-aligned-still-flags (out=$out, err=$err)"
+    fi
+    ;;
+
+path-token-bare-word-not-path-shaped)
+    # A bare word never enters arm 2c, even when a tracked file has that exact name.
+    mkdir -p "$root/dir"
+    printf 'x\n' > "$root/dir/STRAYFILE"
+    git -C "$root" add dir/STRAYFILE
+    plan_fixture '| 1 | `STRAYFILE` is gone | CLI-executable | post-impl | `bin/x` |' \
+        > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    if printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1' \
+        && grep -qF 'STRAYFILE' <<< "$err"; then
+        ok "path-token-bare-word-not-path-shaped"
+    else
+        fail "path-token-bare-word-not-path-shaped (out=$out, err=$err)"
+    fi
+    ;;
+
 *)
     printf 'Unknown case: %s\n' "$case" >&2
-    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row step67 prefire all\n' >&2
+    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped step67 prefire all\n' >&2
     exit 2
     ;;
 esac
@@ -1258,7 +1370,7 @@ rm -rf "$root"
 
 ARG="${1:-all}"
 
-CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row"
+CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped"
 
 if [ "$ARG" = "all" ]; then
     for c in $CASES; do

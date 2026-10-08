@@ -26,6 +26,11 @@
 #       (a trailing `/` on the token is dropped first)
 #       (a deleted binary has no body lines; the header is the footprint;
 #       quoted-path headers are skipped fail-closed)
+#   2c. a path-shaped token (holds `/` or `.` after a trailing `/` is dropped) that
+#       equals, or is a `/`-aligned suffix of, a `diff --git` header path or a
+#       `git ls-files` entry                                   -> realised
+#       (file names never appear in file contents; `Chunk_Leaders.php` does not
+#       match `block-Chunk_Leaders.php`, and a bare word never enters this arm)
 #   3. present in a tracked file via `git grep -F`            -> pre-existing, skip
 #   4. otherwise                                               -> missing
 #   A row is flagged UNREALISED-ASSERTION when any qualifying token is missing.
@@ -123,6 +128,24 @@ awk '
 { hdr = "" }
 ' "$TMP/diff" > "$TMP/deleted"
 
+# --- PATHS set: every `diff --git` header path, plus the index when a root is active ---
+# Same length-split as the DELETED set, without the `deleted file mode` pairing, so a
+# modified binary (a regenerated png baseline) whose diff has no body lines still names
+# its path. Quoted headers are skipped fail-closed. `ls-files` is appended after the
+# tree-grep root resolves (see below); a path listed there is pre-existing, like arm 3.
+awk '
+/^diff --git / {
+    r = substr($0, 12);
+    if (substr(r, 1, 1) == "\"" || substr(r, 1, 2) != "a/") next;
+    r = substr(r, 3);
+    n = length(r);
+    if (n < 4 || (n - 3) % 2 != 0) next;
+    len = (n - 3) / 2;
+    p = substr(r, 1, len);
+    if (substr(r, len + 1, 3) == " b/" && substr(r, len + 4) == p) print p;
+}
+' "$TMP/diff" > "$TMP/paths"
+
 # --- WAIVERS ---
 if [ -n "$BODY_ARG" ]; then
     grep -oE 'WAIVE-MATRIX-ROW:[[:space:]]*[0-9A-Za-z.-]+' "$BODY_ARG" \
@@ -138,6 +161,9 @@ if [ "${MATRIX_ASSERT_ROOT+set}" = "set" ]; then
 else
     # Variable unset: try to resolve from cwd
     ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || ROOT=""
+fi
+if [ -n "$ROOT" ]; then
+    git -C "$ROOT" -c core.quotePath=false ls-files >> "$TMP/paths" 2>/dev/null || true
 fi
 
 # --- extract rows from the Verification Matrix (awk, BSD-awk safe) ---
@@ -237,6 +263,26 @@ _deleted_realised() {
     return 1
 }
 
+# --- path arm (2c): a path-shaped token realised by the diff's file list or the index ---
+# Shape gate first: after one trailing `/` is dropped the token must hold `/` or `.`;
+# a bare word never enters. Match is `/`-aligned: equal, or `/`+tok at the end. No
+# tok+`/` prefix form (ls-files lists files, so a directory token stays unrealised).
+_path_realised() {
+    local t="${1%/}" p
+    [ -n "$t" ] || return 1
+    case "$t" in
+        */* | *.* ) ;;
+        * ) return 1 ;;
+    esac
+    [ -s "$TMP/paths" ] || return 1
+    while IFS= read -r p; do
+        case "$p" in
+            "$t" | */"$t" ) return 0 ;;
+        esac
+    done < "$TMP/paths"
+    return 1
+}
+
 # --- per-row check ---
 while IFS=$'\t' read -r id tag cell toks; do
     # check waiver
@@ -284,6 +330,13 @@ while IFS=$'\t' read -r id tag cell toks; do
         # arm 2b: named by a `deleted file mode` header -> realised. A deleted
         # binary leaves no body lines, so the header is the only footprint.
         if _deleted_realised "$tok"; then
+            continue
+        fi
+
+        # arm 2c: a path-shaped token names a file in the diff's header list or
+        # the index. File names never appear in file contents, so arms 1-3 miss
+        # a png baseline or a tracked .php path cited by its path.
+        if _path_realised "$tok"; then
             continue
         fi
 

@@ -685,6 +685,53 @@ write_stop_file() {
 }
 # End stop-file writer.
 
+# Stop-reason printer: tells whoever started the run, in plain English, why it did
+# not finish cleanly. note_failure collects one line per problem the loop handled
+# without crashing (an env stop, a failed plan); print_stop_reason runs last in
+# cleanup_watcher and reads those notes plus FAIL_LINE / FAIL_CMD from the ERR
+# trap. Stderr only, never $LOG: day_exit_lines and the digests grep $LOG. A clean
+# run with no notes prints nothing. Never fails: a closed stderr (SIGHUP, a dead
+# pipe) must not abort the EXIT trap.
+note_failure() {
+    FAIL_NOTES="${FAIL_NOTES:-}  - $1
+"
+}
+
+print_stop_reason() {
+    local rc=$1 why="" detail=""
+    case "$rc" in
+        0)
+            if [ "${STOP_CLEAN:-0}" = 1 ]; then
+                [ -n "${FAIL_NOTES:-}" ] || return 0
+            else
+                why="The script quit partway through without an error code, so it never reached its normal ending."
+            fi ;;
+        129) why="The terminal window that started the run was closed, so the run stopped." ;;
+        130) why="Someone pressed Ctrl-C, so the run stopped." ;;
+        143) why="Another program told the run to quit (SIGTERM), so it stopped." ;;
+        *)
+            why="A command in the script failed with exit code $rc, so the script stopped right there."
+            if [ -n "${FAIL_CMD:-}" ]; then
+                detail="The command that failed (line ${FAIL_LINE:-?}): ${FAIL_CMD}"
+            fi ;;
+    esac
+    trap '' PIPE 2>/dev/null || true
+    {
+        if [ -n "$why" ]; then
+            printf '\nautomouse: the run did not finish.\n'
+            printf '  Why: %s\n' "$why"
+            [ -z "$detail" ] || printf '  %s\n' "$detail"
+            [ -z "${FAIL_NOTES:-}" ] || printf '  Problems before that:\n'
+        else
+            printf '\nautomouse: the run finished, but these things went wrong:\n'
+        fi
+        printf '%s' "${FAIL_NOTES:-}"
+        [ -z "${LOG:-}" ] || printf '  Full log: %s\n' "$LOG"
+    } >&2 2>/dev/null || true
+    return 0
+}
+# End stop-reason printer.
+
 cleanup_watcher() {
     local stop_rc=$?
     if [ -n "$WATCHER_PID" ]; then
@@ -705,8 +752,13 @@ cleanup_watcher() {
         release_cost_lock
     fi
     write_stop_file "$stop_rc"
+    print_stop_reason "$stop_rc"
 }
 trap cleanup_watcher EXIT
+# Record the last failing command so print_stop_reason can name it after a set -e
+# abort. -E makes functions and subshells inherit the trap. Assignments only.
+set -E
+trap 'FAIL_LINE=$LINENO; FAIL_CMD=$BASH_COMMAND' ERR
 
 # macOS /bin/bash (3.2) leaves $? at 0 inside the EXIT trap when a signal kills the
 # script, so write_stop_file could not tell a SIGTERM from a clean exit. Catch the
@@ -1801,6 +1853,7 @@ START=$(date +%s)
 PLANS_RUN=0
 STOP_CAUSE=""
 STOP_CLEAN=0
+FAIL_NOTES=""
 
 echo "=== Automouse session starting at $(date) ===" >> "$LOG"
 
@@ -1876,6 +1929,7 @@ while true; do
     # when the Claude login has expired. One Discord DM per outage.
     if ! login_preflight "$NIGHTLY_DIR" "$LOG" "$SELF_DIR/../discord-dm"; then
         echo "Login preflight: login expired, parking; queue left intact." >> "$LOG"
+        note_failure "Your Claude login has expired, so no plan was started. Run claude, sign in again, then rerun. The queue was not touched."
         break
     fi
 
@@ -1922,6 +1976,7 @@ while true; do
             tail -30 "$LOG"
             printf '\n```\n'
         } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+        note_failure "Plan $SLUG failed $ATTEMPTS times, so it was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$SLUG.md"
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
         CURRENT_LOCK=""
         continue
@@ -1950,6 +2005,7 @@ while true; do
             printf '%s\n\n' "$BASE_MODEL"
             printf 'Fix the line-1 frontmatter to one of: opus, sonnet, haiku, claude-opus-5-5, claude-sonnet-5-5, claude-sonnet-4-6, claude-haiku-4-5 — then `bin/automouse/queue add %s`.\n' "$SLUG"
         } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+        note_failure "Plan $SLUG names a model automouse does not know (impl_model:), so it was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$SLUG.md"
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
         CURRENT_LOCK=""
         continue
@@ -2079,6 +2135,7 @@ while true; do
                             "$SLUG" "$WT_VERDICT"
                         printf 'Resolve conflicts in %s, then requeue.\n' "$IMPL_WT"
                     } > "$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+                    note_failure "The worktree for $SLUG has merge conflicts or unsaved changes ($WT_VERDICT), so it was skipped. Fix $IMPL_WT, then requeue it."
                     rm -rf "$CURRENT_LOCK" 2>/dev/null || true
                     CURRENT_LOCK=""
                     continue ;;
@@ -2236,6 +2293,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 || usage_postrun_pause automouse "$IMPL_SID" "$AUTOMOUSE_BIN" any "$LOG" "$IMPL_LOG_BEFORE"; }; then
             printf '%s\n' "$IMPL_SID" > "$CURRENT_LOCK/paused-held"
             echo "Impl paused (usage gate) — session $IMPL_SID; coordinator resumes it. Refunding attempt, stopping loop." >> "$LOG"
+            note_failure "You hit your Claude usage limit while building ${PLAN_NAME%.md}. It is paused and resumes on its own when the limit resets. The try was not counted."
             refund_attempt
             CURRENT_LOCK=""
             break
@@ -2253,6 +2311,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 REASON="$REASON (impl exited in ${IMPL_DUR}s)"
             fi
             echo "Environmental failure during impl — $REASON. Refunding attempt, stopping loop." >> "$LOG"
+            note_failure "Building ${PLAN_NAME%.md} hit a problem that was not the plan's fault ($REASON). The run stopped, the try was not counted, and the queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
             refund_attempt
             write_env_stop_report "$PLAN_NAME" impl "$REASON" "$IMPL_LOG_BEFORE"
             break
@@ -2294,6 +2353,9 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             echo 1 > "$ATTEMPT_FILE"
         elif [ ! -e "$NEXT_PLAN" ]; then
             echo "Impl made a deliberate disposition (plan left queue/, e.g. already-merged → done/ or a stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
+            if [ -e "$NIGHTLY_DIR/skipped/$PLAN_NAME" ]; then
+                note_failure "The agent chose to skip ${PLAN_NAME%.md} and moved it to skipped/. Look in $NIGHTLY_DIR/reports/ for today's report on it."
+            fi
         elif [ "$IMPL_WT_FAIL" -eq 1 ]; then
             # bin/wt-new failed at prompt-impl Step 5 (e.g. git lock contention
             # with a concurrent run). The plan stayed in queue/ and the incremented
@@ -2305,6 +2367,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             echo "WT-NEW FAILURE — bin/wt-new failed for $PLAN_NAME; plan kept in queue/, attempt counted ($(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS), deferred to the next run." >> "$LOG"
             rm -f "$WT_FAIL_FILE"
             CAP_DEFERRED="$CAP_DEFERRED$PLAN_NAME "
+            note_failure "Could not create a worktree for ${PLAN_NAME%.md} (bin/wt-new failed). It stays queued and tries again next run."
         elif [ "$IMPL_CAP_REFUNDED" -eq 0 ]; then
             # Genuine (non-environmental) failure: handoff absent, plan STILL in
             # queue/, the env-stop guard did NOT fire (it breaks above), and the
@@ -2320,6 +2383,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             rm -f "$FAILSIG_FILE" 2>/dev/null || true
             write_failure_report "$PLAN_NAME" "$IMPL_LOG_BEFORE" "$IMPL_MODEL" "$(( ATTEMPTS + 1 ))" "$NEW_FAILSIG"
             echo "Genuine impl failure — wrote $FAILURE_FILE (attempt $(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS)." >> "$LOG"
+            note_failure "Building ${PLAN_NAME%.md} failed (try $(( ATTEMPTS + 1 )) of $MAX_ATTEMPTS). It stays queued for another try. Read $FAILURE_FILE"
             if [ -n "$NEW_FAILSIG" ]; then
                 echo "failsig: recorded (${#NEW_FAILSIG} chars)" >> "$LOG"
             else
@@ -2331,6 +2395,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
                 touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
                 write_repeat_failure_report "$PLAN_NAME" "$NEW_FAILSIG" "${PREV_FAILATTEMPT:-?}" "$(( ATTEMPTS + 1 ))"
+                note_failure "${PLAN_NAME%.md} failed the same way twice in a row, so it was moved to skipped/ instead of trying again."
                 rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
             fi
         fi
@@ -2427,6 +2492,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         if [ "$PP_STATUS" -eq 3 ]; then
             PP_TERMINAL=1
             dispose_plan_postplan_blocked "$PLAN_NAME" "$PLAN_SLUG" "$PP_LOG_BEFORE"
+            note_failure "Shipping $PLAN_SLUG was blocked, so no PR was opened. It was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$PLAN_SLUG.md"
         fi
         # postplan-no-worktree-merged: begin
         # A no-worktree postplan exit (pre-call resolver miss, or post-plan-now rc=7)
@@ -2447,6 +2513,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 write_env_stop_report "$PLAN_NAME" postplan \
                     "post-plan-now exited 7 (no worktree) and the branch PR is not MERGED" \
                     "$PP_LOG_BEFORE"
+                note_failure "Shipping $PLAN_SLUG could not find its worktree, and its PR has not merged. The run stopped and the try was not counted. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
                 rm -f "$PP_START_MARKER"
                 break
             fi
@@ -2461,6 +2528,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 CURRENT_LOCK=""
             fi
             echo "Post-plan paused (usage gate); post-plan-now owns the resume. Refunding attempt, stopping loop." >> "$LOG"
+            note_failure "You hit your Claude usage limit while shipping $PLAN_SLUG. It is paused and resumes on its own when the limit resets. The try was not counted."
             refund_attempt
             break
         fi
@@ -2480,6 +2548,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 REASON="$REASON (postplan exited in ${PP_DUR}s)"
             fi
             echo "Environmental failure during postplan — $REASON. Refunding attempt, stopping loop." >> "$LOG"
+            note_failure "Shipping $PLAN_SLUG hit a problem that was not the plan's fault ($REASON). The run stopped, the try was not counted, and the queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
             refund_attempt
             write_env_stop_report "$PLAN_NAME" postplan "$REASON" "$PP_LOG_BEFORE"
             break
@@ -2492,6 +2561,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # held-open PR is post-plan's normal terminal state, not a failure. The
         # loop dispositions it rather than re-claiming the plan next iteration.
         # Fail-closed: gh error, no PR, or CLOSED-only ⇒ today's behaviour.
+        PP_PR_URL=""
         if [ -e "$NEXT_PLAN" ]; then
             PP_BRANCH=$(automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG")
             if PP_PR=$(automouse_pr_state "$PP_BRANCH"); then
@@ -2522,11 +2592,16 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 if should_hold_postplan_disposal "$PP_CAP" "$PP_PR_STATE" "$PP_VERDICT_FRESH"; then
                     notify_postplan_hold "$PLAN_NAME" "$PLAN_SLUG" "$PP_PR_URL" \
                         "$PP_DUR" "$REMAINING_SECS" "$PP_STATUS"
+                    note_failure "Shipping $PLAN_SLUG ran out of time before its review finished. Its PR ($PP_PR_URL) is open but unreviewed, and the plan stays queued."
                 else
                     dispose_plan_done "$PLAN_NAME" "$PLAN_SLUG" \
                         "$PP_PR_STATE" "$PP_PR_URL" post-postplan
                 fi
             fi
+        fi
+        if [ "$PP_STATUS" -ne 0 ] && [ "$PP_TERMINAL" -eq 0 ] && [ -e "$NEXT_PLAN" ] \
+           && [ -z "$PP_PR_URL" ]; then
+            note_failure "Shipping $PLAN_SLUG stopped with exit code $PP_STATUS and opened no PR. It stays queued for another try. The full log has the details."
         fi
         rm -f "$PP_START_MARKER"
         # (Known, accepted: this line is not reached when the environmental-breaker arm is
@@ -2569,12 +2644,15 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                    "$(date +%H:%M:%S)" >> "$LOG" ;;
             1) printf '[%s] canary: ci-red — parking, queue left intact\n' "$(date +%H:%M:%S)" >> "$LOG"
                write_canary_park_report "ci-red" "$CANARY_DETAIL"
+               note_failure "The tests on master are failing (CI is red), so no more plans were started. The queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-canary-park.md"
                break ;;
             3) printf '[%s] canary: smoke-red — parking, queue left intact\n' "$(date +%H:%M:%S)" >> "$LOG"
                write_canary_park_report "smoke-red" "$CANARY_DETAIL"
+               note_failure "The quick health check on master failed, so no more plans were started. The queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-canary-park.md"
                break ;;
             2) printf '[%s] canary: ci-auth-error — env stop\n' "$(date +%H:%M:%S)" >> "$LOG"
                write_env_stop_report "canary" "canary" "CI auth error: $CANARY_DETAIL" "$CANARY_LOG_BEFORE"
+               note_failure "Could not check master's CI because GitHub refused the login. The run stopped and the queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-canary.md"
                break ;;
         esac
     fi

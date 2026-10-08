@@ -38,6 +38,11 @@ mkdir -p "$NDIR/queue" "$NDIR/handoff" "$NDIR/logs" "$NDIR/reports" \
 
 FAILED=0
 
+# Hermetic login probe. The real login_preflight probe reads the keychain and
+# calls api.anthropic.com in the foreground, which defers the runner's SIGTERM
+# trap and makes case 12 time out. The runner's own seam replaces it.
+export AUTOMOUSE_LOGIN_PROBE_CMD="echo ok"
+
 assert_present() {
     local desc="$1" path="$2"
     if [ ! -e "$path" ] && [ ! -L "$path" ]; then
@@ -144,7 +149,7 @@ chmod +x "$RUNNER"
 # --- Helpers ---------------------------------------------------------------
 seed_plan() {
     local slug="$1"
-    printf '# %s\n\nimpl_model: sonnet\n' "$slug" > "$PDIR/$slug.md"
+    printf -- '---\nimpl_model: sonnet\n---\n\n# %s\n' "$slug" > "$PDIR/$slug.md"
     ln -s "$PDIR/$slug.md" "$NDIR/queue/$slug.md"
 }
 
@@ -488,7 +493,7 @@ reset_state
 seed_plan plan-run
 # plan-skip: no repo-path tokens → check-plan-staleness exits 0 → self-heal
 # would requeue it if not gated. Positive control proves this below.
-printf '# plan-skip\n\nimpl_model: sonnet\n' > "$PDIR/plan-skip.md"
+printf -- '---\nimpl_model: sonnet\n---\n\n# plan-skip\n' > "$PDIR/plan-skip.md"
 ln -s "$PDIR/plan-skip.md" "$NDIR/skipped/plan-skip.md"
 touch "$NDIR/skipped/plan-skip.md.staleness"
 
@@ -519,13 +524,31 @@ assert_absent  "case2 skip NOT resurrected"  "$NDIR/queue/plan-skip.md"
 echo "--- case 3: auto-queue-if-absent ---"
 reset_state
 seed_plan plan-other
-printf '# plan-x\n\nimpl_model: sonnet\n' > "$PDIR/plan-x.md"   # NOT in queue/
+printf -- '---\nimpl_model: sonnet\n---\n\n# plan-x\n' > "$PDIR/plan-x.md"   # NOT in queue/
 run_single plan-x
 
 assert_present "case3 plan-x auto-queued+ran" "$NDIR/done/plan-x.md"
 assert_present "case3 plan-other untouched"   "$NDIR/queue/plan-other.md"
 assert_absent  "case3 plan-other not done"    "$NDIR/done/plan-other.md"
 assert_absent  "case3 plan-other no lock"     "$NDIR/queue/plan-other.md.lock"
+
+# ===========================================================================
+# Case 3b — the queue gate refuses a plan without line-1 impl_model
+# ===========================================================================
+echo "--- case 3b: queue gate refuses a body-only impl_model ---"
+reset_state
+# Body-only marker, the pre-#2141 fixture shape. NOT in queue/.
+printf '# plan-nomark\n\nimpl_model: sonnet\n' > "$PDIR/plan-nomark.md"
+errexit_off
+out=$(PLANS_DIR="$PDIR" "$RUNNER" plan plan-nomark 2>&1); exit_code=$?
+errexit_restore
+[ "$exit_code" -ne 0 ] \
+    || { echo "FAIL: case3b expected non-zero exit, got 0"; FAILED=1; }
+want "case3b names the missing impl_model marker" "$out" "no usable impl_model"
+assert_absent "case3b plan-nomark not queued" "$NDIR/queue/plan-nomark.md"
+assert_absent "case3b plan-nomark not done"   "$NDIR/done/plan-nomark.md"
+check "case3b queue/ left empty" test -z "$(ls -A "$NDIR/queue")"
+check "case3b done/ left empty"  test -z "$(ls -A "$NDIR/done")"
 
 # ===========================================================================
 # Case 5 — already-queued tolerance (Phase 1 pre-check)
@@ -584,12 +607,10 @@ drive_attempts() {
 stub_calls() { wc -l < "$NDIR/stub-calls" 2>/dev/null | tr -d ' '; }
 check_present() { check "$1" test -e "$2" -o -L "$2"; }
 check_absent() { check "$1" test ! -e "$2" -a ! -L "$2"; }
-# seed_plan_sonnet <slug>: seed_plan, then rewrite the plan with a line-1 frontmatter
-# impl_model. bin/lib/plan-impl-model reads ONLY a frontmatter block, so the bare
-# line seed_plan writes resolves to the Opus default and would never escalate.
+# seed_plan_sonnet <slug>: alias for seed_plan, which already writes line-1
+# frontmatter `impl_model: sonnet`. Cases 7-9 rely on that Sonnet first attempt.
 seed_plan_sonnet() {
     seed_plan "$1"
-    printf -- '---\nimpl_model: sonnet\n---\n\n# %s\n' "$1" > "$PDIR/$1.md"
 }
 calls_are() { [ "$(stub_calls)" = "$1" ]; }
 attempt_is_opus() { sed -n "${1}p" "$NDIR/stub-calls" | grep -q opus; }

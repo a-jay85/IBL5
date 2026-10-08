@@ -39,6 +39,10 @@
 #                               #   touches no production files" guard (exit 5), which
 #                               #   otherwise points you at the cheaper
 #                               #   /commit-commands:commit-push-pr. Bare flag only.
+#   bin/post-plan-now --allow-test-only  # skip only the test-only exit-5 guard; keeps the
+#                               #   in-flight, fleet-slot and holdrepeat (exit 8) guards that
+#                               #   --force bypasses. Passed by bin/pr-cycle rescues via
+#                               #   bin/post-plan-fleet. Bare flag only.
 #   bin/post-plan-now --pr 123  # drive the worktree holding PR 123's head branch,
 #                               #   creating it with bin/wt-new --existing when no
 #                               #   worktree has that branch. Refuses a fork PR.

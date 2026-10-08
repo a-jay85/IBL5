@@ -27,7 +27,9 @@
 #
 # Env seams (unset and empty both take the default):
 #   PR_CYCLE_STOP_FILE         default $HOME/.ibl5-pr-cycle.stop (same name bin/pr-cycle reads)
-#   PR_CYCLE_WATCH_STATE_DIR   default $HOME/.ibl5-pr-cycle-watch
+#   PR_CYCLE_WATCH_STATE_DIR   default $HOME/.ibl5-pr-cycle-watch. Holds attempts/, dm-sent/,
+#                              pending/, results/, declined/, strikes/, dm-declined/ and
+#                              dm-strikes/.
 #   PR_CYCLE_TICK_PR_CYCLE_CMD default $ROOT/bin/pr-cycle
 #   PR_CYCLE_TICK_DM_CMD       default $ROOT/bin/discord-dm
 #   PR_CYCLE_TICK_USAGE_ZONE   empty means read the live usage zone

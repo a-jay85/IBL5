@@ -76,6 +76,10 @@
 #                            $PR_CYCLE_MAIN_CHECKOUT/tools/postplan-harness.
 #   PR_CYCLE_HOLDREPEAT_STATE_DIR
 #                            Holdrepeat state records. Default: <harness>/out/state.
+#   PR_CYCLE_RESULT_FILE     Unset or empty writes nothing. Otherwise the worker atomically
+#                            writes the `# pr-cycle-result v1` TSV (one `<pr> <status> <outcome>
+#                            <reason>` row per in-scope PR) when it finishes, even after a HALT.
+#                            Passed through the launcher env list. Read by bin/pr-cycle-tick.
 #
 #   Every seam is PR_CYCLE_-prefixed on purpose. bin/pr-attack reads a bare PR_TRIAGE_CMD
 #   itself, and this script spawns the real bin/pr-attack as a child — an unprefixed export
@@ -102,8 +106,9 @@
 #   * This script never polls for merges and never sleeps. .github/workflows/update-behind-prs.yml
 #     re-BEHINDs open PRs after each merge, and merge-digest-notify.yml sends the per-merge
 #     digest DM. This script's only DM is the your-turn summary at the end of a run.
-#   * Stage 1 is exactly one post-plan-fleet --pr-list call. Its exit code is the only
-#     readiness signal; no stderr text match of any kind.
+#   * Stage 1 is exactly one post-plan-fleet --pr-list call. The call carries
+#     --allow-test-only. Its exit code is the only readiness signal; no stderr text match
+#     of any kind.
 
 set -euo pipefail
 

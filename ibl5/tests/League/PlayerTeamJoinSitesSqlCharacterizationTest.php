@@ -141,7 +141,7 @@ class PlayerTeamJoinSitesSqlCharacterizationTest extends TestCase
                     (new \League\League($db))->getAllStarCandidatesResult('EC');
                 },
                 [
-                    'SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2 FROM ibl_plr p JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.pos IN (\'PG\', \'SG\') AND p.teamid IN (\'1\',\'2\',\'3\',\'4\',\'5\',\'7\',\'8\',\'9\',\'10\',\'11\',\'12\',\'22\',\'25\',\'27\') AND p.retired = 0 AND p.stats_gm > \'14\' ORDER BY p.name',
+                    'SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2 FROM ibl_plr p JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.pos IN (\'PG\', \'SG\') AND p.teamid IN (\'1\',\'2\',\'3\',\'4\',\'5\',\'7\',\'8\',\'9\',\'10\',\'11\',\'12\',\'22\',\'25\',\'27\') AND p.retired = 0 AND p.stats_gm > \'14\' ORDER BY p.name, p.pid ASC',
                 ],
             ],
             'League-getMVPCandidatesResult' => [
@@ -150,7 +150,7 @@ class PlayerTeamJoinSitesSqlCharacterizationTest extends TestCase
                     (new \League\League($db))->getMVPCandidatesResult();
                 },
                 [
-                    'SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2 FROM ibl_plr p JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.retired = 0 AND p.stats_gm >= \'41\' AND p.stats_min / p.stats_gm >= \'30\' ORDER BY p.name',
+                    'SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2 FROM ibl_plr p JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.retired = 0 AND p.stats_gm >= \'41\' AND p.stats_min / p.stats_gm >= \'30\' ORDER BY p.name, p.pid ASC',
                 ],
             ],
             'League-getSixthPersonOfTheYearCandidatesResult' => [
@@ -159,7 +159,7 @@ class PlayerTeamJoinSitesSqlCharacterizationTest extends TestCase
                     (new \League\League($db))->getSixthPersonOfTheYearCandidatesResult();
                 },
                 [
-                    'SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2 FROM ibl_plr p JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.retired = 0 AND p.stats_min / p.stats_gm >= 15 AND p.stats_gs / p.stats_gm <= \'.5\' AND p.stats_gm >= \'41\' ORDER BY p.name',
+                    'SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2 FROM ibl_plr p JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.retired = 0 AND p.stats_min / p.stats_gm >= 15 AND p.stats_gs / p.stats_gm <= \'.5\' AND p.stats_gm >= \'41\' ORDER BY p.name, p.pid ASC',
                 ],
             ],
             'League-getRookieOfTheYearCandidatesResult' => [
@@ -168,7 +168,7 @@ class PlayerTeamJoinSitesSqlCharacterizationTest extends TestCase
                     (new \League\League($db))->getRookieOfTheYearCandidatesResult();
                 },
                 [
-                    'SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2 FROM ibl_plr p JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.retired = 0 AND p.exp = \'1\' AND p.stats_gm >= \'41\' ORDER BY p.name',
+                    'SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2 FROM ibl_plr p JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.retired = 0 AND p.exp = \'1\' AND p.stats_gm >= \'41\' ORDER BY p.name, p.pid ASC',
                 ],
             ],
             'ApiInjuries-getInjuredPlayers' => [

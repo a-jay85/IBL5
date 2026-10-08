@@ -45,6 +45,17 @@ usage_cache_path() {
     printf '%s/cache.json\n' "$(usage_state_dir)"
 }
 
+# _usage_cred_fp
+# Echoes a short sha256 of the keychain OAuth access token, or nothing when the
+# keychain is unreadable (the launchd coordinator). Never the token itself.
+_usage_cred_fp() {
+    local tok
+    tok=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null \
+        | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+    [ -n "$tok" ] || return 0
+    printf '%s' "$tok" | shasum -a 256 2>/dev/null | cut -c1-16
+}
+
 # usage_cache_age
 # Echoes now - .fetched_at, or -1 when the cache is missing or unparseable.
 usage_cache_age() {
@@ -146,7 +157,7 @@ _usage_fetch_lock_release() {
 # _usage_fetch_serve_stale <age> <cache>: rc 2 with the cached body, or rc 1 when there is none.
 _usage_fetch_serve_stale() {
     if [ "$1" -ge 0 ] && [ -s "$2" ]; then
-        jq 'del(.fetched_at)' "$2" 2>/dev/null
+        jq 'del(.fetched_at, .cred_fp)' "$2" 2>/dev/null
         return 2
     fi
     return 1
@@ -167,11 +178,25 @@ usage_fetch() {
             ;;
     esac
 
-    local cache age
+    local cache age fp cfp
     cache=$(usage_cache_path)
     age=$(usage_cache_age)
+    # A login switch (`/login` to another account) changes the token. The cached
+    # reading and any 429 backoff belong to the old account, so drop both. A cache
+    # with no cred_fp, or a caller that cannot read the keychain, keeps today's path.
+    fp=$(_usage_cred_fp)
+    if [ -n "$fp" ] && [ "$age" -ge 0 ]; then
+        cfp=$(jq -r '.cred_fp // empty' "$cache" 2>/dev/null)
+        if [ -n "$cfp" ] && [ "$cfp" != "$fp" ]; then
+            local sd
+            sd=$(usage_state_dir)
+            rm -f "$cache" "$sd/fetch-backoff" "$sd/fetch-backoff.logged" "$sd"/fetch-backoff.logged.*
+            usage_log "cred-switch cache-dropped"
+            age=-1
+        fi
+    fi
     if [ "$age" -ge 0 ] && [ "$age" -lt "$max_age" ]; then
-        jq 'del(.fetched_at)' "$cache" 2>/dev/null && return 0
+        jq 'del(.fetched_at, .cred_fp)' "$cache" 2>/dev/null && return 0
     fi
 
     local d now bo bo_until
@@ -193,7 +218,7 @@ usage_fetch() {
     age=$(usage_cache_age)
     if [ "$age" -ge 0 ] && [ "$age" -lt "$max_age" ]; then
         _usage_fetch_lock_release "$d"
-        jq 'del(.fetched_at)' "$cache" 2>/dev/null
+        jq 'del(.fetched_at, .cred_fp)' "$cache" 2>/dev/null
         return 0
     fi
     bo=$(_usage_fetch_backoff_read "$d/fetch-backoff"); bo_until=${bo% *}
@@ -228,11 +253,11 @@ usage_fetch() {
 
     if [ -z "$reason" ]; then
         local tmp="$cache.tmp.$$"
-        if printf '%s' "$body" | jq --argjson t "$(date +%s)" '. + {fetched_at:$t}' > "$tmp" 2>/dev/null \
+        if printf '%s' "$body" | jq --argjson t "$(date +%s)" --arg fp "$fp" '. + {fetched_at:$t, cred_fp:$fp}' > "$tmp" 2>/dev/null \
             && mv "$tmp" "$cache"; then
             rm -f "$d/fetch-backoff" "$d/fetch-backoff.logged" "$d"/fetch-backoff.logged.*
             _usage_fetch_lock_release "$d"
-            printf '%s' "$body" | jq 'del(.fetched_at)'
+            printf '%s' "$body" | jq 'del(.fetched_at, .cred_fp)'
             return 0
         fi
         rm -f "$tmp"

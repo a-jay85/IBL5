@@ -119,6 +119,7 @@ class DepthChartLabelBuilderTest extends TestCase
         $season->lastSimEndDate = '2024-01-20';
         $season->projectedNextSimEndDate = new \DateTimeImmutable('2024-01-27');
         $season->method('getPhaseSpecificSimNumber')->willReturn(4);
+        // Both sim ends must route through Season::calculatePhaseSimNumber, never print the raw overall number.
         $season->method('calculatePhaseSimNumber')->willReturnMap([
             [3, 'Regular Season', 2024, 1],
             [5, 'Regular Season', 2024, 3],

@@ -685,6 +685,7 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
     {
         $repo = $this->createMock(DepthChartSnapshotRepositoryInterface::class);
         $repo->method('getActiveDepthChartForTeam')->willReturn(null);
+        // expects(never()): with no active DC there is no record span to query.
         $repo->expects(self::never())->method('getWinLossRecord');
 
         $service = new DepthChartSnapshotService($this->mockDb, $repo);

@@ -1076,7 +1076,7 @@ def carry_forward_predicate(sticky_body, diff_id: str,
 # Status lines the runner builds on every clean run. The composer prints only a line that
 # deviates from these, so a clean sticky carries no REBASE= or CI: line at all.
 _EXPECTED_REBASE = ("REBASE=clean (HEAD already contains origin/master)",
-                    "REBASE=rebased onto origin/master")
+                    "REBASE=merged origin/master")
 _EXPECTED_CI_RE = re.compile(
     r"^CI: local verification pass; GitHub checks are watched after this comment"
     r"(; remediation commit [0-9a-f]+ is inside that watch)?$")

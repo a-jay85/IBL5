@@ -354,7 +354,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pre_rebase = git.head()
             conflict_resolved = None
             try:
-                git.rebase_onto()  # pre-push policy: branch must sit on origin/master
+                git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); merge, never rebase
             except HarnessError as e:
                 if e.kind != "rebase-conflict":
                     raise
@@ -396,10 +396,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 rebase_line = ("REBASE=conflict auto-resolved via --onto; TREE-EQUIVALENT; "
                                f"manifest={conflict_resolved.manifest_path}{auto_files}")
             else:
-                log("phase2: rebased onto origin/master")
+                log("phase2: merged origin/master")
                 # the skill's two success spellings, verbatim
                 rebase_line = ("REBASE=clean (HEAD already contains origin/master)"
-                               if sha == pre_rebase else "REBASE=rebased onto origin/master")
+                               if sha == pre_rebase else "REBASE=merged origin/master")
         res.meta_checks_ok = run_meta_checks_local(
             git, worktree or "", "origin/master", log, live=live,
             failures_out=res.meta_check_failures, llm=llm)

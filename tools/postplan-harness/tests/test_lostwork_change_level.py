@@ -135,6 +135,15 @@ def rebase_resolving(repo, resolver):
         sh(repo, "rebase", "--continue", env={"GIT_EDITOR": "true"})
 
 
+def merge_resolving(repo, resolver):
+    r = sh(repo, "-c", "rerere.enabled=false", "merge", "--no-edit", "origin/master", check=False)
+    if r.returncode != 0:
+        for path, body in resolver.items():
+            (Path(repo) / path).write_text(body)
+            sh(repo, "add", path)
+        sh(repo, "-c", "core.editor=true", "commit", "--no-edit")
+
+
 def f_with(**edits):
     """BASE_F with `edits` mapping a line to its replacement (a list of lines)."""
     out = []
@@ -355,3 +364,79 @@ def test_pure_rename_entry_is_equivalent(repo, key):
     assert "CHECKED: files=1 added=0 deleted=0" in out
     assert last_line(out) == "TREE-EQUIVALENT"
     assert "LOST:" not in out
+
+
+def lv_doc(date, body):
+    return text(["---", "description: x", f"last_verified: {date}", "---"] + body)
+
+
+def seed_base(repo, path, body):
+    """Land `path` on master before any branch work, so it sits at the fork point."""
+    advance_master(repo, path, body, "seed base")
+    sh(repo, "merge", "-q", "--ff-only", "origin/master")
+
+
+def last_verified_case(repo, key, branch_date, master_date, resolved):
+    # The branch also edits g.txt so the post-merge diff is never empty, even when the
+    # resolution of d.md happens to equal master's copy.
+    seed_base(repo, "d.md", lv_doc("2026-09-30", ["A1"]))
+    _commit(repo, "g.txt", text(BASE_G + ["G-FEAT"]), "feat edits g")
+    _commit(repo, "d.md", lv_doc(branch_date, ["A1", "B1"]), "feat bumps d.md")
+    capture_pre(repo, key)
+    advance_master(repo, "d.md", lv_doc(master_date, ["A1", "M1"]), "master bumps d.md")
+    merge_resolving(repo, {"d.md": resolved})
+    return run_lostwork(repo, key)
+
+
+def test_last_verified_newer_on_master_is_equivalent(repo, key):
+    rc, out = last_verified_case(
+        repo, key, "2026-10-04", "2026-10-05", lv_doc("2026-10-05", ["A1", "B1", "M1"])
+    )
+    assert rc == 0, out
+    assert "TREE-EQUIVALENT" in out
+
+
+def test_last_verified_equal_both_sides_is_equivalent(repo, key):
+    rc, out = last_verified_case(
+        repo, key, "2026-10-05", "2026-10-05", lv_doc("2026-10-05", ["A1", "B1", "M1"])
+    )
+    assert rc == 0, out
+    assert "TREE-EQUIVALENT" in out
+
+
+def test_last_verified_regressed_to_older_is_lost(repo, key):
+    rc, out = last_verified_case(
+        repo, key, "2026-10-05", "2026-10-04", lv_doc("2026-10-04", ["A1", "B1", "M1"])
+    )
+    # lostwork.sh exits 0 when it completes a comparison; the verdict is the last line.
+    assert rc == 0
+    assert "LOST: d.md: +last_verified: 2026-10-05" in out
+    assert "TREE DIVERGED" in out
+    assert last_line(out) == DIVERGED
+
+
+def test_last_verified_exemption_keeps_body_line_strict(repo, key):
+    rc, out = last_verified_case(
+        repo, key, "2026-10-04", "2026-10-05", lv_doc("2026-10-05", ["A1", "M1"])
+    )
+    assert rc == 0
+    assert "LOST: d.md: +B1" in out
+    assert "+last_verified" not in out
+    assert last_line(out) == DIVERGED
+
+
+def test_last_verified_outside_frontmatter_is_not_exempt(repo, key):
+    # No leading `---`: HEAD carries a newer body `last_verified:` line, but the
+    # exemption reads frontmatter only, so the branch's dropped line stays lost.
+    seed_base(repo, "d.md", text(["A1", "Z1"]))
+    _commit(repo, "g.txt", text(BASE_G + ["G-FEAT"]), "feat edits g")
+    _commit(repo, "d.md", text(["A1", "last_verified: 2026-10-04", "Z1"]), "feat adds line")
+    capture_pre(repo, key)
+    advance_master(
+        repo, "d.md", text(["A1", "last_verified: 2026-10-05", "Z1"]), "master adds line"
+    )
+    merge_resolving(repo, {"d.md": text(["A1", "last_verified: 2026-10-05", "Z1"])})
+    rc, out = run_lostwork(repo, key)
+    assert rc == 0
+    assert "LOST: d.md: +last_verified: 2026-10-04" in out
+    assert last_line(out) == DIVERGED

@@ -57,7 +57,7 @@ test.describe('Module routing & error handling', () => {
 
   test('serves known module', async ({ page }) => {
     await page.goto('modules.php?name=Standings');
-    await expect(page.locator('h1, h2, .ibl-title').first()).toBeVisible();
+    await expect(page.locator('h1.ibl-title').first()).toBeVisible();
     await assertNoPhpErrors(page, 'on Standings module');
   });
 });

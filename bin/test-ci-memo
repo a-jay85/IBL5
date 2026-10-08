@@ -414,6 +414,7 @@ if should_run manifest-coverage; then
         fi
     }
 
+    # ADR-0186 retired the both|shell|ibl5ts filter blocks; listing them here fails extraction.
     check_coverage tests "$WF_TESTS" "src|iblbot|jsdeps"
     check_coverage e2e   "$WF_E2E"   "runtime"
 

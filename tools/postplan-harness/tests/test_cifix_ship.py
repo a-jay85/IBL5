@@ -228,6 +228,8 @@ def test_char_probe_reruns_failed_run_on_no_change(monkeypatch, tmp_path):
     assert _has(r.lines, "phase7 ci-fix rerun probe: outcome=")
 
 
+# The probe-guard tests below run with the rest of tools/postplan-harness/tests/test_cifix_ship.py
+# and tests/test_cifix.py: pytest -q tests/test_cifix_ship.py tests/test_cifix.py
 def test_cifix_probe_skipped_with_update_baselines_label(monkeypatch, tmp_path):
     """The label still on the PR with no e2e run means no regen reached its removal step.
     Rerunning the failed jobs would fight the label, so the probe stands down."""

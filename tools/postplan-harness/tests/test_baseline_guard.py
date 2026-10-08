@@ -1,4 +1,8 @@
-"""Unit tests for harness/baseline_guard.py and the gh adapter methods it reads."""
+"""Unit tests for harness/baseline_guard.py and the gh adapter methods it reads.
+
+Run: cd tools/postplan-harness && python3 -m pytest -q tests/test_baseline_guard.py
+(repo path: tools/postplan-harness/tests/test_baseline_guard.py).
+"""
 from __future__ import annotations
 
 import pytest

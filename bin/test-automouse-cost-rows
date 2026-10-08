@@ -93,6 +93,7 @@ eval "$(awk '/^model_tier\(\)/,/^}/'             "$REPO_ROOT/bin/automouse/run")
 eval "$(awk '/^_date_ago\(\)/,/^}/'              "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^acquire_cost_lock\(\)/,/^}/'      "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^release_cost_lock\(\)/,/^}/'      "$REPO_ROOT/bin/automouse/run")"
+# shellcheck disable=SC2034
 COST_LOCK_HELD=0  # global read by append_cost_row; set by the driver in bin/automouse/run
 eval "$(awk '/^append_cost_row\(\)/,/^}/'        "$REPO_ROOT/bin/automouse/run")"
 eval "$(awk '/^strip_weekly_section\(\)/,/^}/'   "$REPO_ROOT/bin/automouse/run")"
@@ -306,6 +307,63 @@ assert_eq "$(cmp -s "$BF_REPORT" "$TMPROOT/bf-report.snap" && echo same || echo 
     "second backfill run leaves the report byte-identical"
 assert_eq "$(cmp -s "$BF_BAK" "$TMPROOT/bf-bak.snap" && echo same || echo differs)" "same" \
     "second backfill run does not overwrite the .bak"
+
+printf '\n-- backfill: log_paths / parse_day gather per-runner and archived logs --\n'
+
+# bf_variant <name> — fresh copy of the fixture nightly tree; echoes its path.
+bf_variant() {
+    local d="$TMPROOT/bfv-$1"
+    rm -rf "$d"; cp -R "$FIXROOT/nightly" "$d"; printf '%s' "$d"
+}
+# bf_join <nightly-dir> — the dry-run's join line only.
+bf_join() {
+    NIGHTLY_DIR="$1" "$BACKFILL" --dry-run --proj-dir "$FIXROOT" 2>/dev/null | grep '^join:'
+}
+LEGACY=logs/2026-08-18.log
+IMPL_EXIT='db-query-worktree-routing/impl exit:'
+
+# Per-runner name only (bin/automouse/run names its log <date>-$$.log).
+V=$(bf_variant pid); mv "$V/$LEGACY" "$V/logs/2026-08-18-4242.log"
+assert_eq "$(bf_join "$V")" "join: 2 matched, 0 ambiguous, 0 missed" \
+    "log_paths finds a per-runner <date>-<pid>.log"
+
+# Archived per-runner log only: gathered from logs.archive/, and the sidecar
+# follows the first dir holding a match.
+V=$(bf_variant arch); mkdir "$V/logs.archive"
+mv "$V/$LEGACY" "$V/logs.archive/2026-08-18-4242.log"
+assert_eq "$(bf_join "$V")" "join: 2 matched, 0 ambiguous, 0 missed" \
+    "log_paths finds a per-runner log in logs.archive/"
+NIGHTLY_DIR="$V" "$BACKFILL" --proj-dir "$FIXROOT" > "$TMPROOT/bfv-arch.out"
+assert_eq "$([ -e "$V/logs.archive/2026-08-18.costs.jsonl" ] && echo yes || echo no)" "yes" \
+    "archived-only day writes its sidecar into logs.archive/"
+assert_eq "$([ -e "$V/logs/2026-08-18.costs.jsonl" ] && echo yes || echo no)" "no" \
+    "archived-only day writes no sidecar into logs/"
+
+# Duplicate (plan, phase) key across two runner logs: the later sorted path wins.
+# The corrupt copy moves the impl exit line to 23:59:59 so its window cannot join.
+V=$(bf_variant dup-later); mv "$V/$LEGACY" "$V/logs/2026-08-18-1.log"
+sed "s|^\[[0-9:]*\] \($IMPL_EXIT\)|[23:59:59] \1|" "$V/logs/2026-08-18-1.log" \
+    > "$V/logs/2026-08-18-2.log"
+assert_eq "$(grep -c "^\[23:59:59\] $IMPL_EXIT" "$V/logs/2026-08-18-2.log")" 1 \
+    "corrupt copy really moved the impl exit line"
+assert_eq "$(bf_join "$V")" "join: 1 matched, 0 ambiguous, 1 missed" \
+    "parse_day: later sorted path wins (corrupt copy sorts last)"
+
+V=$(bf_variant dup-earlier); mv "$V/$LEGACY" "$V/logs/2026-08-18-2.log"
+sed "s|^\[[0-9:]*\] \($IMPL_EXIT\)|[23:59:59] \1|" "$V/logs/2026-08-18-2.log" \
+    > "$V/logs/2026-08-18-1.log"
+assert_eq "$(grep -c "^\[23:59:59\] $IMPL_EXIT" "$V/logs/2026-08-18-1.log")" 1 \
+    "corrupt copy (sorts first) really moved the impl exit line"
+assert_eq "$(bf_join "$V")" "join: 2 matched, 0 ambiguous, 0 missed" \
+    "parse_day: later sorted path wins (good copy sorts last)"
+
+# Boundaries: a non-numeric suffix and a date-prefix look-alike are not runner logs.
+V=$(bf_variant nonnum); mv "$V/$LEGACY" "$V/logs/2026-08-18-x.log"
+assert_eq "$(bf_join "$V")" "join: 0 matched, 0 ambiguous, 2 missed" \
+    "log_paths ignores <date>-<non-numeric>.log"
+V=$(bf_variant lookalike); mv "$V/$LEGACY" "$V/logs/2026-08-180-1.log"
+assert_eq "$(bf_join "$V")" "join: 0 matched, 0 ambiguous, 2 missed" \
+    "log_paths ignores a <date>0-<pid>.log look-alike"
 
 printf '\n-- backfill: legacy 3- and 6-column reports migrate without corruption --\n'
 
@@ -523,6 +581,7 @@ echo "-- append_cost_row: harness-ledger path (rows 13-15) --"
 
 # Restore S2 context (S3 stanza above overwrote NIGHTLY_DIR/SELF_DIR/LOG).
 NIGHTLY_DIR="$S2"
+# shellcheck disable=SC2034
 SELF_DIR="$S2/bin/automouse"
 LOG="$S2/logs/$(date +%F).log"
 
@@ -585,6 +644,7 @@ echo "-- weekly aggregate: legacy logs without a sidecar still contribute tokens
 # diagnostics on stderr, and the numbers actually land.
 S4=$(mktemp -d)
 mkdir -p "$S4/reports" "$S4/logs"
+# shellcheck disable=SC2034
 NIGHTLY_DIR="$S4"
 S4_REPORT="$S4/reports/$(date +%F)-costs.md"
 printf '# Automouse cost roll-up — %s\n\n' "$(date +%F)" > "$S4_REPORT"

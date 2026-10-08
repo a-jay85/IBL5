@@ -42,7 +42,7 @@ _date_ago() { date -v-"$1"d +%F 2>/dev/null || date -d "$1 days ago" +%F; }
 
 # Resolve to the main repo root, even when run from a worktree.
 # git worktree list always shows the main checkout first.
-REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+REPO_ROOT="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 source "$(dirname "$0")/lib/git-helpers.sh"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 TARGET_NAME=""

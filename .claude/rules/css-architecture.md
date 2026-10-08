@@ -3,7 +3,7 @@ description: CSS architecture: all styles live in ibl5/design/components/; inlin
 paths:
   - "**/design/**/*.css"
   - "**/*View.php"
-last_verified: 2026-09-16
+last_verified: 2026-10-06
 ---
 
 # CSS Architecture Reference
@@ -30,6 +30,8 @@ Tailwind 4 owns the layer order — only four layers exist: `@layer theme, base,
 `design/input.css` declares 62 `--color-*` variables in a `@theme` block; `design/tokens/tokens.css` re-exports each as a bare alias (`--navy-900: var(--color-navy-900);`).
 
 **Rule:** component CSS under `design/components/` must reference the **bare aliases** (`--navy-900`), never `--color-*` directly. Tailwind controls the `--color-*` namespace; the aliases are the stable contract and don't break on version bumps.
+
+Font weights and stacking levels follow the same rule. Write `var(--font-weight-semibold)` or `var(--z-sticky)` in place of a numeric `font-weight` or `z-index`; the `--font-weight-*` and `--z-*` tokens live in `design/tokens/tokens.css`. The keywords `bold` and `inherit` stay as written. A stylesheet that a page links without `themes/IBL/style/style.css` gets no `:root` tokens, so a bare `var(--z-modal)` there computes to `auto`. Such a file must use the fallback form, `var(--z-modal, 1000)`. Today that applies only to `design/components/block-fa-admin.css`, which `ibl5/block.php` links on its own.
 
 ## Table Patterns
 

@@ -626,22 +626,22 @@ def test_harness_seg_exports_log_path(tmp_path):
         assert 'POSTPLAN_LOG_PATH=\\"$LOG\\" caffeinate' in ln
 
 
-def test_badge_banner_rc3_carries_the_captured_result():
+def test_failure_body_rc3_carries_the_captured_result():
     r = subprocess.run(["bash", "-c",
         f'source "{PPN}" >/dev/null 2>&1; '
         'HARNESS_RESULT="RESULT: pre-push-adr-hook denied the push"; '
-        'postplan_badge_banner_body 3 lbl "some time"'],
+        'postplan_failure_body 3 lbl "some time"'],
         capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert "pre-push-adr-hook denied the push" in r.stdout
 
 
-def test_badge_banner_rc3_percent_is_safe_and_falls_back():
+def test_failure_body_rc3_percent_is_safe_and_falls_back():
     # (a) percent characters in RESULT must not cause printf format-string confusion
     r = subprocess.run(["bash", "-c",
         f'source "{PPN}" >/dev/null 2>&1; '
         "HARNESS_RESULT='RESULT: 100% of gates %s %d denied'; "
-        'postplan_badge_banner_body 3 lbl "some time"'],
+        'postplan_failure_body 3 lbl "some time"'],
         capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert "100% of gates %s %d denied" in r.stdout
@@ -651,7 +651,7 @@ def test_badge_banner_rc3_percent_is_safe_and_falls_back():
     r2 = subprocess.run(["bash", "-c",
         f'source "{PPN}" >/dev/null 2>&1; '
         'unset HARNESS_RESULT; '
-        'postplan_badge_banner_body 3 lbl "some time"'],
+        'postplan_failure_body 3 lbl "some time"'],
         capture_output=True, text=True)
     assert r2.returncode == 0, r2.stderr
     assert "rebase conflict" in r2.stdout
@@ -713,11 +713,25 @@ def test_foreground_exit3_message_quotes_the_harness_result(tmp_path):
                GH_CMD=str(shim / "gh"), PATH=f"{shim}:{os.environ['PATH']}")
     env.pop("POST_PLAN_SKILL", None)
     repo = _fixture_repo(tmp_path)
+    # $ROOT is `git rev-parse --show-toplevel` of the cwd, i.e. the linked worktree `repo`.
+    # On rc=3 post-plan-now runs "$ROOT/bin/post-plan-fail-dm" "$ROOT" "$SAFE_SLUG" "$LOG" "$msg";
+    # the fixture ships no such file, so record its 4th argument to observe the DM payload.
+    dm_msg = tmp_path / "fail-dm-msg.txt"
+    dm_stub = repo / "bin" / "post-plan-fail-dm"
+    dm_stub.write_text(f'#!/bin/sh\nprintf \'%s\' "$4" > "{dm_msg}"\n')
+    dm_stub.chmod(0o755)
     r = subprocess.run(["bash", PPN, "--foreground", "--plan", str(plan)], cwd=repo,
                        env=env, capture_output=True, text=True, timeout=120)
     log = re.search(r"^Log: (/tmp/post-plan-now-\S+\.log)$", r.stdout, re.M)
     try:
         assert r.returncode == 3, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+        assert dm_msg.exists(), f"post-plan-fail-dm stub was never called: {r.stdout!r}"
+        dm_text = dm_msg.read_text()
+        # The DM body is the generic blocked-ship block (no blocked-ship.txt in the fake
+        # harness): the RESULT line lives in the log, and the DM must name THAT log.
+        assert "did not ship. No PR opened." in dm_text
+        assert log and f"Log: {log.group(1)}" in dm_text, f"DM does not name the log: {dm_text!r}"
+        assert "the RESULT line above names it" not in dm_text
         assert "did not ship. No PR opened." in r.stdout
         assert "the RESULT line above names it" not in r.stdout
         assert log, f"no 'Log: <log>' line: {r.stdout!r}"
@@ -1448,7 +1462,7 @@ def test_exit3_message_is_shell_safe_and_reads_the_block():
     assert "fail-closed sentinel" not in body and "SKIPPING" not in body
 
 
-def test_badge_banner_rc3_names_both_fail_closed_causes():
+def test_failure_body_rc3_names_both_fail_closed_causes():
     """The PR badge must not blame a rebase for a gate denial.
 
     Exit 3 carries two kinds since #2259; a banner naming only one sends the operator

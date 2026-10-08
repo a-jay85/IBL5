@@ -75,6 +75,14 @@ def extract_json(text: str):
     raise ValueError("no parseable JSON in model reply")
 
 
+def _extractor_for(purpose: str):
+    """pr-copy gets its own tolerant extractor; every other purpose keeps extract_json."""
+    from ..schemas import PR_COPY_PURPOSE, extract_pr_copy_json  # function-local: no import cycle
+    if purpose == PR_COPY_PURPOSE:
+        return extract_pr_copy_json
+    return extract_json
+
+
 def _run_reaped(argv, stdin_text, timeout, cwd, env):
     """Run argv with its own process group, always reaping the group on exit.
 
@@ -251,7 +259,7 @@ class ClaudeCli:
             result_text = envelope.get("result", "") or ""
             self._persist_raw(purpose, attempt, result_text)
             try:
-                data = extract_json(result_text)
+                data = _extractor_for(purpose)(result_text)
                 if normalizer is not None:
                     data = normalizer(data)
                 validate(data)

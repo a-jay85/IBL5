@@ -63,7 +63,12 @@ final class RefreshIblHistStep implements PipelineStepInterface
 
     /**
      * The canonical SELECT that deduplicates ibl_plr_snapshots into one row
-     * per (pid, season_year). Identical to the query in migration 109.
+     * per (pid, season_year). Derived from migration 109; the phase-rank CASE
+     * has since diverged from it ('playoffs' rank 0, and conf-finals ranked
+     * above playoffs-rd2/rd1 so the latest playoff round wins a stats_gm tie).
+     * PhaseRankOrderConsistencyTest pins the playoff-round order against
+     * TrainingCampRatingsDiffRepository::getBaselinePhase() and the CASE copies in
+     * ci-seed.sql and PromotePriorSeasonSnapshotTest.
      */
     private const string SELECT_SQL = <<<'SQL'
 SELECT
@@ -142,12 +147,12 @@ FROM (
           WHEN 'post-heat'           THEN  3
           WHEN 'heat-finals'         THEN  4
           WHEN 'heat-end'            THEN  5
-          WHEN 'playoffs-rd2-gm4-7'  THEN  6
-          WHEN 'playoffs-rd2-gm1-3'  THEN  7
-          WHEN 'playoffs-rd1-gm4-7'  THEN  8
-          WHEN 'playoffs-rd1-gm1-3'  THEN  9
-          WHEN 'conf-finals-gm4-7'   THEN 10
-          WHEN 'conf-finals-gm1-3'   THEN 11
+          WHEN 'conf-finals-gm4-7'   THEN  6
+          WHEN 'conf-finals-gm1-3'   THEN  7
+          WHEN 'playoffs-rd2-gm4-7'  THEN  8
+          WHEN 'playoffs-rd2-gm1-3'  THEN  9
+          WHEN 'playoffs-rd1-gm4-7'  THEN 10
+          WHEN 'playoffs-rd1-gm1-3'  THEN 11
           WHEN 'heat-wb'             THEN 12
           WHEN 'heat-lb'             THEN 13
           ELSE 99

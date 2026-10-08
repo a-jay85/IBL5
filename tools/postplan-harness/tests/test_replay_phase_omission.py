@@ -43,8 +43,9 @@ def test_replay_skips_null_and_missing_plans(tmp_path):
     assert res["skipped"] == {"plan-null": 1, "plan-missing": 1, "no-files": 1}
     run = res["runs"]["live-d"]
     assert run["items"] == []
-    assert len(run["notes"]) == 1
-    assert run["notes"][0].startswith("UNCHECKABLE-PHASE: 1")
+    assert len(run["notes"]) == 2
+    assert run["notes"][0].startswith("NON-REPO-CITATION: 1")
+    assert run["notes"][1].startswith("UNCHECKABLE-PHASE: 1")
 
 
 def _side(runs: dict) -> dict:

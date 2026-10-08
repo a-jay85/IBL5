@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E gotchas: CSRF/session isolation, hx-boost waits, PRG races, hidden-element fill, axe a11y, URL-flip blast radius, global-table ownership, seed/test-state traps, CI shard load.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-09-16
+last_verified: 2026-10-03
 ---
 
 # Playwright E2E Gotchas
@@ -21,7 +21,7 @@ Hard-won pitfalls, each one broke a real PR. Core rules and templates: `playwrig
 - **`form[action*="op=mark"]` also matches `op=mark_all`.** With sibling op values where one prefixes the other, `.first()` follows DOM order and can click the wrong form. Use ends-with `form[action$="op=mark"]` or a class-scoped selector.
 - **Nav dropdowns carry standings text.** The hidden "Season" menu includes team names and "Eastern Conference"/"Western Conference", so `body.textContent()` negative assertions fail on Olympics pages. Scope absence checks to the content element (`.ibl-data-table`, the module's class), never `body`.
 - **`assertNoPhpErrors` false-positives on `.ibl-alert--warning` pages.** It substring-matches `Warning:`. On pages that legitimately render a warning alert, check only fatal markers instead: `not.toContain('Fatal error')` and `not.toContain('Stack trace:')`, plus a module-specific render assertion.
-- **`sorttable.js` sorts DESCENDING on the first header click.** `ibl5/jslib/sorttable.js` (behind `table.sortable` / `data-sorttable="true"` — PlayerDatabase, Draft, ContractList, ComparePlayers, SeasonLeaderboards) sorts ascending, then appends the rows in reverse and tags the `<th>` `sorttable_sorted_reverse` + `aria-sort="descending"`. A second click gives ascending (`sorttable_sorted`). So after ONE click assert **non-increasing** values, and match `/sorttable_sorted_reverse/` — `/sorttable_sorted/` is a substring of both classes and cannot distinguish direction.
+- `sorttable.js` sorts DESCENDING on the first header click. `ibl5/jslib/sorttable.js` runs behind `table.sortable` / `data-sorttable="true"` on PlayerSearch, Draft, ContractList, ComparePlayers, and SeasonLeaderboards. It sorts ascending, then appends the rows in reverse and tags the `<th>` `sorttable_sorted_reverse` + `aria-sort="descending"`. A second click gives ascending (`sorttable_sorted`). So after ONE click assert **non-increasing** values, and match `/sorttable_sorted_reverse/`. `/sorttable_sorted/` is a substring of both classes and cannot distinguish direction.
 
 ## Auth & state
 

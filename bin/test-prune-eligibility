@@ -664,4 +664,162 @@ else
          "capped dir only in WOULD PRUNE, no dir in both lists, stdout=2"
 fi
 
+# ---------------------------------------------------------------------------
+# --keep-file cases. A keep file lists 40-hex dirs that open PRs still link.
+# ---------------------------------------------------------------------------
+
+# mk_gallery_repo <dir> <sha:age-days>…  — one commit per dir, dated NOW-age
+mk_gallery_repo() {
+    local d="$1" pair sha age
+    shift
+    git_init "$d"
+    for pair in "$@"; do
+        sha="${pair%%:*}"; age="${pair##*:}"
+        mkdir -p "$d/$sha"
+        echo "content" > "$d/$sha/index.html"
+        git -C "$d" add .
+        git_commit_at "$d" $(( NOW - age*86400 )) "$sha"
+    done
+}
+
+KF_A="1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a"
+KF_B="2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b"
+KF_C="3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c"
+
+# ---------------------------------------------------------------------------
+# Case: keep-file-exempts-age-pass
+# Two dirs past the cutoff; the listed one survives and logs its KEEP line.
+# ---------------------------------------------------------------------------
+REPO="$TMP/case-kf-age"
+mk_gallery_repo "$REPO" "$KF_A:10" "$KF_B:12"
+printf '%s\n' "$KF_A" > "$TMP/kf-age.txt"
+run_prune "$REPO" --cutoff-days 7 --keep-file "$TMP/kf-age.txt"
+KF_STAGED="$(git -C "$REPO" diff --cached --name-only)"
+CASE_PASS=1
+[ "$RC" -eq 0 ] || CASE_PASS=0
+[ "$OUT" = "1" ] || CASE_PASS=0
+echo "$ERR" | grep -qF "KEEP (linked by open PR) ./$KF_A" || CASE_PASS=0
+echo "$KF_STAGED" | grep -qF "$KF_A/" && CASE_PASS=0
+echo "$KF_STAGED" | grep -qF "$KF_B/" || CASE_PASS=0
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "keep-file-exempts-age-pass"
+else
+    fail "keep-file-exempts-age-pass" \
+         "RC=$RC OUT='$OUT' ERR='$ERR' STAGED='$KF_STAGED'" \
+         "count 1, KEEP line for listed dir, only the unlisted dir staged"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: keep-file-exempts-cap-pass
+# Three young dirs, --max-dirs 1, oldest listed. The listed dir survives
+# outside the cap; of the other two the newer survives and the older is pruned.
+# ---------------------------------------------------------------------------
+REPO="$TMP/case-kf-cap"
+mk_gallery_repo "$REPO" "$KF_A:5" "$KF_B:3" "$KF_C:2"
+printf '%s\n' "$KF_A" > "$TMP/kf-cap.txt"
+run_prune "$REPO" --cutoff-days 7 --max-dirs 1 --keep-file "$TMP/kf-cap.txt"
+KF_STAGED="$(git -C "$REPO" diff --cached --name-only)"
+CASE_PASS=1
+[ "$RC" -eq 0 ] || CASE_PASS=0
+[ "$OUT" = "1" ] || CASE_PASS=0
+echo "$KF_STAGED" | grep -qF "$KF_A/" && CASE_PASS=0
+echo "$KF_STAGED" | grep -qF "$KF_B/" || CASE_PASS=0
+echo "$KF_STAGED" | grep -qF "$KF_C/" && CASE_PASS=0
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "keep-file-exempts-cap-pass"
+else
+    fail "keep-file-exempts-cap-pass" \
+         "RC=$RC OUT='$OUT' STAGED='$KF_STAGED'" \
+         "count 1, listed oldest dir kept, middle dir cap-pruned, newest kept"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: keep-file-missing-fails-closed
+# ---------------------------------------------------------------------------
+REPO="$TMP/case-kf-missing"
+mk_gallery_repo "$REPO" "$KF_A:10"
+run_prune "$REPO" --cutoff-days 7 --keep-file /nonexistent/keep.txt
+CASE_PASS=1
+[ "$RC" -ne 0 ] || CASE_PASS=0
+[ -d "$REPO/$KF_A" ] || CASE_PASS=0
+git -C "$REPO" diff --cached --quiet || CASE_PASS=0
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "keep-file-missing-fails-closed"
+else
+    fail "keep-file-missing-fails-closed" "RC=$RC OUT='$OUT'" \
+         "non-zero exit, old dir present, nothing staged"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: keep-file-malformed-line-fails-closed
+# ---------------------------------------------------------------------------
+REPO="$TMP/case-kf-malformed"
+mk_gallery_repo "$REPO" "$KF_A:10"
+printf 'pr-123\n' > "$TMP/kf-bad.txt"
+run_prune "$REPO" --cutoff-days 7 --keep-file "$TMP/kf-bad.txt"
+CASE_PASS=1
+[ "$RC" -ne 0 ] || CASE_PASS=0
+[ -d "$REPO/$KF_A" ] || CASE_PASS=0
+git -C "$REPO" diff --cached --quiet || CASE_PASS=0
+echo "$ERR" | grep -qF "malformed keep-file line" || CASE_PASS=0
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "keep-file-malformed-line-fails-closed"
+else
+    fail "keep-file-malformed-line-fails-closed" "RC=$RC ERR='$ERR'" \
+         "non-zero exit, malformed message, nothing removed"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: keep-file-missing-value-rejected
+# ---------------------------------------------------------------------------
+REPO="$TMP/case-kf-novalue"
+mk_gallery_repo "$REPO" "$KF_A:10"
+run_prune "$REPO" --cutoff-days 7 --keep-file
+CASE_PASS=1
+[ "$RC" -ne 0 ] || CASE_PASS=0
+git -C "$REPO" diff --cached --quiet || CASE_PASS=0
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "keep-file-missing-value-rejected"
+else
+    fail "keep-file-missing-value-rejected" "RC=$RC" "non-zero exit, nothing staged"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: keep-file-empty-matches-no-keep
+# An empty keep file prunes exactly what a run without the flag prunes.
+# ---------------------------------------------------------------------------
+REPO="$TMP/case-kf-empty-a"
+mk_gallery_repo "$REPO" "$KF_A:10" "$KF_B:2"
+run_prune "$REPO" --dry-run --cutoff-days 7
+KF_PLAIN="$(echo "$OUT" | tail -n 1)"
+REPO="$TMP/case-kf-empty-b"
+mk_gallery_repo "$REPO" "$KF_A:10" "$KF_B:2"
+: > "$TMP/kf-empty.txt"
+run_prune "$REPO" --dry-run --cutoff-days 7 --keep-file "$TMP/kf-empty.txt"
+KF_EMPTY="$(echo "$OUT" | tail -n 1)"
+if [ "$RC" -eq 0 ] && [ "$KF_PLAIN" = "1" ] && [ "$KF_EMPTY" = "$KF_PLAIN" ]; then
+    pass "keep-file-empty-matches-no-keep"
+else
+    fail "keep-file-empty-matches-no-keep" \
+         "RC=$RC plain='$KF_PLAIN' empty='$KF_EMPTY'" "same count (1) with and without an empty file"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: keep-file-ignores-comments-and-blanks
+# ---------------------------------------------------------------------------
+REPO="$TMP/case-kf-comments"
+mk_gallery_repo "$REPO" "$KF_A:10"
+printf '# note\n\n%s\n' "$KF_A" > "$TMP/kf-comments.txt"
+run_prune "$REPO" --cutoff-days 7 --keep-file "$TMP/kf-comments.txt"
+CASE_PASS=1
+[ "$RC" -eq 0 ] || CASE_PASS=0
+[ "$OUT" = "0" ] || CASE_PASS=0
+git -C "$REPO" diff --cached --quiet || CASE_PASS=0
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "keep-file-ignores-comments-and-blanks"
+else
+    fail "keep-file-ignores-comments-and-blanks" "RC=$RC OUT='$OUT' ERR='$ERR'" \
+         "exit 0, count 0, listed old dir kept"
+fi
+
 exit "$FAILED"

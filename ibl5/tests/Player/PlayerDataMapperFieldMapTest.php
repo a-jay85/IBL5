@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Player\PlayerData;
 use Player\PlayerDataMapper;
 
+/** @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface */
 class PlayerDataMapperFieldMapTest extends TestCase
 {
     private PlayerDataMapper $mapper;
@@ -275,7 +276,7 @@ class PlayerDataMapperFieldMapTest extends TestCase
     }
 
     /**
-     * @return array<string, mixed>
+     * @return PlayerRow
      */
     private function buildFullCurrentRow(): array
     {
@@ -343,6 +344,75 @@ class PlayerDataMapperFieldMapTest extends TestCase
             'injured' => 0,
             'retired' => 0,
             'droptime' => 0,
+            'stamina' => 0,
+            'stats_gs' => 0,
+            'stats_gm' => 0,
+            'stats_min' => 0,
+            'stats_fgm' => 0,
+            'stats_fga' => 0,
+            'stats_ftm' => 0,
+            'stats_fta' => 0,
+            'stats_3gm' => 0,
+            'stats_3ga' => 0,
+            'stats_orb' => 0,
+            'stats_drb' => 0,
+            'stats_ast' => 0,
+            'stats_stl' => 0,
+            'stats_tvr' => 0,
+            'stats_blk' => 0,
+            'stats_pf' => 0,
+            'sh_pts' => 0,
+            'sh_reb' => 0,
+            'sh_ast' => 0,
+            'sh_stl' => 0,
+            'sh_blk' => 0,
+            's_dd' => 0,
+            's_td' => 0,
+            'sp_pts' => 0,
+            'sp_reb' => 0,
+            'sp_ast' => 0,
+            'sp_stl' => 0,
+            'sp_blk' => 0,
+            'ch_pts' => 0,
+            'ch_reb' => 0,
+            'ch_ast' => 0,
+            'ch_stl' => 0,
+            'ch_blk' => 0,
+            'c_dd' => 0,
+            'c_td' => 0,
+            'cp_pts' => 0,
+            'cp_reb' => 0,
+            'cp_ast' => 0,
+            'cp_stl' => 0,
+            'cp_blk' => 0,
+            'car_gm' => 0,
+            'car_min' => 0,
+            'car_fgm' => 0,
+            'car_fga' => 0,
+            'car_ftm' => 0,
+            'car_fta' => 0,
+            'car_3gm' => 0,
+            'car_3ga' => 0,
+            'car_orb' => 0,
+            'car_drb' => 0,
+            'car_reb' => 0,
+            'car_ast' => 0,
+            'car_stl' => 0,
+            'car_tvr' => 0,
+            'car_blk' => 0,
+            'car_pf' => 0,
+            'dc_pg_depth' => 0,
+            'dc_sg_depth' => 0,
+            'dc_sf_depth' => 0,
+            'dc_pf_depth' => 0,
+            'dc_c_depth' => 0,
+            'dc_can_play_in_game' => 0,
+            'dc_minutes' => 0,
+            'dc_of' => 0,
+            'dc_df' => 0,
+            'dc_oi' => 0,
+            'dc_di' => 0,
+            'dc_bh' => 0,
         ];
     }
 

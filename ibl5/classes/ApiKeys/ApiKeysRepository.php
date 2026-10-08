@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace ApiKeys;
 
 use ApiKeys\Contracts\ApiKeysRepositoryInterface;
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 
 /**
  * ApiKeysRepository - Database operations for self-service API key management

@@ -1,6 +1,6 @@
 ---
 description: Run the Discord bug/feature pipeline orchestrator as a Mac-local launchd LaunchAgent firing a poll-only bash driver every 180s via StartInterval — not a daemon, tmux, or persistent claude — with single-flight enforced by an atomic DB lease and no prod credentials in its environment.
-last_verified: 2026-09-15
+last_verified: 2026-10-05
 ---
 
 # ADR-0080: Mac-local launchd cron topology for the Discord bug/feature pipeline
@@ -199,3 +199,12 @@ bypassable: XML comments are stripped and the remainder scanned for credential-s
 blacklist), *and* `EnvironmentVariables` is asserted to hold exactly one key, `PATH` (a whitelist,
 which catches a future variable whatever it is named). Both harnesses run in the
 `Shell harness regression tests` job.
+
+## Addendum (2026-10-05): the Decision's config.php credential path describes the pre-#2369 template
+
+The Decision above says the cron reaches the Dockerized MySQL on `127.0.0.1` via `config.php` defaults with only `DB_NAME` overridden through the plist `EnvironmentVariables`. Two later changes bear on that sentence:
+
+- The 2026-09-15 addendum above already narrowed the plist. `EnvironmentVariables` holds exactly one key, `PATH`, so no `DB_NAME` override comes from the plist any more.
+- PR #2369 (merged 2026-09-25) changed the tracked template. `ibl5/config.php.example` now requires the gitignored `ibl5/config.local.php` for `$dbhost`, `$dbuname`, `$dbpass`, and `$dbname`, with no `getenv()` fallback and no `127.0.0.1` default. The 2026-09-22 addendum of `ibl5/docs/decisions/0034-secret-scanning-gate.md` records the move.
+
+The Mac cron host runs the untracked `ibl5/config.php` in its checkout. That file is migrated by hand and may still be the older shape with `getenv('DB_*')` fallbacks. This addendum does not claim it was migrated. Whichever shape it has, the database the cron reaches is the one that file (or the `config.local.php` it requires) names. The topology decision (launchd, poll-only driver, atomic lease, no prod credentials in the plist) is unchanged.

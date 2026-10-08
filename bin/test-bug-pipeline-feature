@@ -23,6 +23,21 @@ bpt_run
 bpt_log_has  "$STUB" curl.log "which season?" "gather posts the follow-up question"
 bpt_log_has  "$STUB" transition.log "gathering --last-processed-now" "gather stamps last_processed, stays gathering"
 bpt_log_lacks "$STUB" calls.log "MENTION" "gather (not enough) does not ping A-Jay"
+# bpt_reset clears claude.log, so it holds ONLY the gather call here (no /plan call can satisfy these).
+bpt_log_has  "$STUB" claude.log "--effort high" "gather pins --effort high"
+bpt_log_has  "$STUB" claude.log "Think the problem through before you answer." "gather appends the think-first line"
+bpt_log_has  "$STUB" claude.log "--json-schema" "gather is schema-constrained (--json-schema)"
+bpt_log_has  "$STUB" claude.log "--append-system-prompt" "gather passes --append-system-prompt"
+bpt_log_lacks "$STUB" claude.log "/plan" "gather call is not the /plan call"
+
+# ── ★ NEG: gather envelope cut off (stop_reason=max_tokens) with a parseable result → safe fallback ──
+bpt_reset; bpt_set_actionable "$GATHERING"
+bpt_set_claude_raw '{"type":"result","is_error":false,"stop_reason":"max_tokens","result":"{\"enough_info\":false,\"next_question\":\"which season?\"}"}'
+bpt_run
+bpt_expect_eq "gather max_tokens exits 0" 0 "$BPT_RC"
+bpt_file_absent "$STUB/transition.log" "gather max_tokens → no transition (row stays gathering)"
+bpt_log_lacks "$STUB" curl.log "which season?" "gather max_tokens posts no follow-up question"
+bpt_log_lacks "$STUB" calls.log "MENTION" "gather max_tokens does not ping A-Jay"
 
 # ── Case A: enough_info → mention approver + record approval_message_id (byte-for-byte) ──
 bpt_reset; bpt_set_actionable "$GATHERING"

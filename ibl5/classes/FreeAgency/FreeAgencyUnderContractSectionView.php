@@ -51,7 +51,7 @@ final class FreeAgencyUnderContractSectionView implements FreeAgencyUnderContrac
             if (!$player->isPlayerFreeAgent($season) || $player->isSalaryPlaceholder()):
                 $futureSalaries = $player->getFutureSalaries();
                 $playerName = $player->getName() ?? '';
-                if (($player->getOrdinal() ?? 0) > \JSB::WAIVERS_ORDINAL) {
+                if (($player->getOrdinal() ?? 0) > \League\JsbConstants::WAIVERS_ORDINAL) {
                     $playerName .= "*";
                 }
             ?>

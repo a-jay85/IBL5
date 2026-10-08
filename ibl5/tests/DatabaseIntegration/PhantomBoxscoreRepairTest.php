@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
-use Boxscore\BoxscoreRepository;
+use Boxscore\BoxscoreAuditRepository;
 use Boxscore\PhantomBoxscoreRepair;
 use PHPUnit\Framework\Attributes\Group;
 
@@ -51,7 +51,7 @@ final class PhantomBoxscoreRepairTest extends DatabaseTestCase
         'recap_rows' => 3,
     ];
 
-    private BoxscoreRepository $repository;
+    private BoxscoreAuditRepository $repository;
 
     protected function setUp(): void
     {
@@ -61,7 +61,7 @@ final class PhantomBoxscoreRepairTest extends DatabaseTestCase
         // leak this fixture into the shared test database.
         parent::setUp();
 
-        $this->repository = new BoxscoreRepository($this->db);
+        $this->repository = new BoxscoreAuditRepository($this->db);
     }
 
     /**

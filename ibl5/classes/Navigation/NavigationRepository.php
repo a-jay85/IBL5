@@ -12,7 +12,7 @@ use Navigation\Contracts\NavigationRepositoryInterface;
  *
  * @phpstan-import-type NavTeamsData from NavigationConfig
  */
-class NavigationRepository extends \BaseMysqliRepository implements NavigationRepositoryInterface
+class NavigationRepository extends \Database\BaseMysqliRepository implements NavigationRepositoryInterface
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {

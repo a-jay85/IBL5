@@ -1019,7 +1019,7 @@ class CommonContractValidatorTest extends TestCase
      */
     public function testValidateMaxYearOneRookieAtMaxSucceeds(): void
     {
-        $maxSalary = \ContractRules::getMaxContractSalary(0);
+        $maxSalary = \League\ContractRules::getMaxContractSalary(0);
         $offer = ['year1' => $maxSalary];
 
         $result = $this->validator->validateMaximumYearOne($offer, 0);
@@ -1032,7 +1032,7 @@ class CommonContractValidatorTest extends TestCase
      */
     public function testValidateMaxYearOneRookieOneOverMaxFails(): void
     {
-        $maxSalary = \ContractRules::getMaxContractSalary(0);
+        $maxSalary = \League\ContractRules::getMaxContractSalary(0);
         $offer = ['year1' => $maxSalary + 1];
 
         $result = $this->validator->validateMaximumYearOne($offer, 0);
@@ -1045,7 +1045,7 @@ class CommonContractValidatorTest extends TestCase
      */
     public function testValidateMaxYearOneSevenYearVetAtMaxSucceeds(): void
     {
-        $maxSalary = \ContractRules::getMaxContractSalary(7);
+        $maxSalary = \League\ContractRules::getMaxContractSalary(7);
         $offer = ['year1' => $maxSalary];
 
         $result = $this->validator->validateMaximumYearOne($offer, 7);
@@ -1058,7 +1058,7 @@ class CommonContractValidatorTest extends TestCase
      */
     public function testValidateMaxYearOneTenYearVetAtMaxSucceeds(): void
     {
-        $maxSalary = \ContractRules::getMaxContractSalary(10);
+        $maxSalary = \League\ContractRules::getMaxContractSalary(10);
         $offer = ['year1' => $maxSalary];
 
         $result = $this->validator->validateMaximumYearOne($offer, 10);
@@ -1269,7 +1269,7 @@ class CommonContractValidatorTest extends TestCase
     #[DataProvider('yearsExperienceMaxProvider')]
     public function testMaxContractByExperience(int $yearsExperience): void
     {
-        $maxSalary = \ContractRules::getMaxContractSalary($yearsExperience);
+        $maxSalary = \League\ContractRules::getMaxContractSalary($yearsExperience);
         $offer = ['year1' => $maxSalary];
 
         $resultAtMax = $this->validator->validateMaximumYearOne($offer, $yearsExperience);

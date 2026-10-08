@@ -17,7 +17,7 @@ class SeasonConstructorTest extends TestCase
         $repo = new SeasonQueryRepository($mockDb);
 
         $mockDb->onQuery('ibl_settings', [
-            ['setting_key' => 'Current Season Phase', 'value' => 'Regular Season'],
+            ['setting_key' => 'Current Season Phase', 'setting_value' => 'Regular Season'],
         ]);
 
         $settings = $repo->getBulkSettings(['Current Season Phase']);

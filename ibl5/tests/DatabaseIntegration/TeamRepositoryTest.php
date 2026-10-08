@@ -422,7 +422,7 @@ class TeamRepositoryTest extends DatabaseTestCase
      * getFreeAgencyRoster() is still the roster source for
      * TeamTableService::getRosterAndStarters(), and therefore for both
      * Trading\TradeRosterPreviewApiHandler and
-     * DepthChartEntry\DepthChartEntryController. Those two consumers must NOT
+     * DepthChart\DepthChartController. Those two consumers must NOT
      * show expiring players. Removing this filter or this test changes their
      * rendered output.
      *

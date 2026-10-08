@@ -42,15 +42,15 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
 
         // Calculate max raises
         $birdYears = $player->getBirdYears() ?? 0;
-        $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
-        $maxRaise = \ContractRules::calculateMaxRaise($maxYearOneSalary, $birdYears);
+        $raisePercentage = \League\ContractRules::getMaxRaisePercentage($birdYears);
+        $maxRaise = \League\ContractRules::calculateMaxRaise($maxYearOneSalary, $birdYears);
         $rawPercentage = $raisePercentage * 100;
         $raisePercentageDisplay = ($rawPercentage === floor($rawPercentage))
             ? (string) (int) $rawPercentage
             : rtrim(rtrim(sprintf('%.1f', $rawPercentage), '0'), '.');
-        $hasBirdRights = \ContractRules::hasBirdRights($birdYears);
+        $hasBirdRights = \League\ContractRules::hasBirdRights($birdYears);
         $exampleSalary = 500;
-        $exampleRaise = \ContractRules::calculateMaxRaise($exampleSalary, $birdYears);
+        $exampleRaise = \League\ContractRules::calculateMaxRaise($exampleSalary, $birdYears);
 
         ob_start();
 

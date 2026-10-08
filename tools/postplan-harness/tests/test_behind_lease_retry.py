@@ -11,6 +11,7 @@ Covers Phases 1-6 of the harness-behind-lease-retry plan:
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import types
@@ -20,6 +21,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
+from harness import gitutil
 from harness.adapters.gitad import LiveGit, is_stale_lease
 from harness.adapters.ghad import LiveGh
 from harness.ciwatch import CiOutcome
@@ -188,17 +190,40 @@ def test_behind_once_then_clean(monkeypatch):
 
 
 def test_behind_three_times_cap(monkeypatch):
+    """At the cap the PR stays armed: no disarm, no retry_cap, three re-rebases,
+    and the hand-off line naming update-behind-prs / ADR-0081 is logged."""
     git = FakeGit(head_shas=["sha" + "0" * 37] * 4)
     gh = FakeGh(states=["BEHIND"] * 10, strict=True)
     res = RunResult(terminal=TerminalState.SHIPPED_ARMED)
     _make_ci_patches(monkeypatch, outcomes=[CiOutcome(0, [])] * 4)
     initial_outcome = CiOutcome(0, [])
+    logs = []
     runner._resolve_behind(
-        git, gh, _noop_log, res, "/wt", 1, "sha" + "0" * 37, initial_outcome, "/out"
+        git, gh, logs.append, res, "/wt", 1, "sha" + "0" * 37, initial_outcome, "/out"
     )
     assert git.rebases == 3
-    assert res.retry_cap == "behind-retry-cap"
-    assert gh.disarms == 1
+    assert gh.disarms == 0
+    assert res.retry_cap is None
+    assert ("phase7: BEHIND cap hit after 3 re-rebases — leaving auto-merge armed; "
+            ".github/workflows/update-behind-prs.yml (ADR-0081) carries the PR to merge"
+            ) in logs
+
+
+def test_behind_cap_terminal_is_shipped_armed(monkeypatch):
+    """A run that spent the BEHIND cap still resolves to SHIPPED_ARMED and its
+    verdict line reports the PR as armed, never BLOCKED."""
+    git = FakeGit(head_shas=["sha" + "0" * 37] * 4)
+    gh = FakeGh(states=["BEHIND"] * 10, strict=True)
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED, arm=ArmDecision(armed=True))
+    _make_ci_patches(monkeypatch, outcomes=[CiOutcome(0, [])] * 4)
+    runner._resolve_behind(
+        git, gh, _noop_log, res, "/wt", 1, "sha" + "0" * 37, CiOutcome(0, []), "/out"
+    )
+    assert runner._compute_terminal(res, armed=True) == TerminalState.SHIPPED_ARMED
+    res.terminal = runner._compute_terminal(res, armed=True)
+    line = runner.verdict_line(res, rc=0)
+    assert "BLOCKED" not in line
+    assert "auto-merge=armed" in line
 
 
 def test_behind_non_strict_no_rebase(monkeypatch):
@@ -311,21 +336,10 @@ def test_verdict_push_retry_cap():
     assert "push retry cap reached" in line
 
 
-def test_verdict_behind_retry_cap():
-    res = RunResult(
-        terminal=TerminalState.SHIPPED_HELD,
-        retry_cap="behind-retry-cap",
-        findings=[],
-    )
-    line = runner.verdict_line(res, rc=0)
-    assert "BLOCKED" in line
-    assert "BEHIND retry cap reached" in line
-    assert "auto-merge=armed" not in line
-
-
 def test_retry_cap_beats_armed():
-    """_compute_terminal returns SHIPPED_HELD when retry_cap is set, even when armed=True."""
-    res = RunResult(terminal=TerminalState.SHIPPED_ARMED, retry_cap="behind-retry-cap")
+    """_compute_terminal returns SHIPPED_HELD when retry_cap is set, even when armed=True.
+    retry_cap has no production writer today; this pins the reserved fail-closed seam."""
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED, retry_cap="push-retry-cap")
     assert runner._compute_terminal(res, armed=True) == TerminalState.SHIPPED_HELD
     res_no_cap = RunResult(terminal=TerminalState.SHIPPED_ARMED)
     assert runner._compute_terminal(res_no_cap, armed=True) == TerminalState.SHIPPED_ARMED
@@ -507,6 +521,249 @@ def test_stale_lease_three_times_cap_real_remote(tmp_path):
     probe = subprocess.run(["git", "-C", str(bare), "rev-parse", "--verify", "--quiet",
                             "refs/heads/feature"], capture_output=True, text=True)
     assert probe.returncode != 0, "capped push must leave the remote untouched"
+
+
+def _publish_feature(wt):
+    """Push `feature` so the worktree holds refs/remotes/origin/feature (lease Y)."""
+    _sh("git", "-C", str(wt), "push", "origin", "feature")
+    return _sh("git", "-C", str(wt), "rev-parse", "refs/remotes/origin/feature")
+
+
+def _rival_push(tmp_path, bare, *, from_branch, files=None, merge_master=False):
+    """Second clone moves origin/feature. Returns the new remote tip Z."""
+    rival = tmp_path / "rival"
+    _sh("git", "clone", "-b", from_branch, str(bare), str(rival))
+    _sh("git", "-C", str(rival), "config", "user.email", "r@r")
+    _sh("git", "-C", str(rival), "config", "user.name", "r")
+    if from_branch != "feature":
+        _sh("git", "-C", str(rival), "checkout", "-b", "feature")
+    if merge_master:
+        _sh("git", "-C", str(rival), "merge", "--no-ff", "--no-edit", "origin/master")
+    rival_env = {**_GIT_ENV, "GIT_AUTHOR_NAME": "rival", "GIT_COMMITTER_NAME": "rival"}
+    for name, text in (files or {}).items():
+        # a distinct author keeps an identical-content commit from hashing to our HEAD
+        (rival / name).write_text(text)
+        _sh("git", "-C", str(rival), "add", "-A")
+        subprocess.run(["git", "-C", str(rival), "commit", "-m", name], check=True,
+                       capture_output=True, text=True, env=rival_env)
+    _sh("git", "-C", str(rival), "push", "origin", "HEAD:refs/heads/feature")
+    return _sh("git", "-C", str(bare), "rev-parse", "refs/heads/feature")
+
+
+def _tracking(wt):
+    r = subprocess.run(["git", "-C", str(wt), "rev-parse", "--verify", "--quiet",
+                        "refs/remotes/origin/feature"], capture_output=True, text=True)
+    return r.stdout.strip()
+
+
+def _bare_feature(bare):
+    return _sh("git", "-C", str(bare), "rev-parse", "refs/heads/feature")
+
+
+def test_lease_owner_update_branch_merge_adopted_real_remote(tmp_path):
+    """backlog#1286: the remote branch moved by a GitHub "Update branch" merge of a newer
+    master is ours; the retry adopts it as the lease and lands HEAD."""
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    _advance_origin_master(tmp_path, bare)
+    z = _rival_push(tmp_path, bare, from_branch="feature", merge_master=True)
+    _commit(wt, "local.txt", "mine\n")
+    git, argvs = _spy_live_git(wt)
+    result = runner._push_with_lease_retry(git, _noop_log, "phase2")
+    local_head = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    assert result == local_head
+    assert _bare_feature(bare) == local_head
+    pushes = _push_argvs(argvs)
+    assert f"--force-with-lease=feature:{y}" in pushes[0]
+    assert f"--force-with-lease=feature:{z}" in pushes[-1]
+
+
+def test_lease_owner_tree_equivalent_adopted_real_remote(tmp_path):
+    """backlog#1286: a remote tip with our exact tree is ours; the retry leases on it."""
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    _commit(wt, "local.txt", "same\n")
+    z = _rival_push(tmp_path, bare, from_branch="feature", files={"local.txt": "same\n"})
+    git, argvs = _spy_live_git(wt)
+    result = runner._push_with_lease_retry(git, _noop_log, "phase2")
+    local_head = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    assert result == local_head
+    assert _bare_feature(bare) == local_head
+    pushes = _push_argvs(argvs)
+    assert f"--force-with-lease=feature:{y}" in pushes[0]
+    assert f"--force-with-lease=feature:{z}" in pushes[-1]
+
+
+def test_lease_owner_foreign_tip_fails_closed_real_remote(tmp_path):
+    """backlog#1286: a foreign commit on the remote branch is never overwritten and never
+    becomes the lease: one rejected push, then remote-head-diverged."""
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    z = _rival_push(tmp_path, bare, from_branch="feature", files={"foreign.txt": "theirs\n"})
+    _commit(wt, "local.txt", "mine\n")
+    git, argvs = _spy_live_git(wt)
+    with pytest.raises(HarnessError) as exc_info:
+        runner._push_with_lease_retry(git, _noop_log, "phase2")
+    assert exc_info.value.kind == "remote-head-diverged"
+    assert len(_push_argvs(argvs)) == 1
+    assert _bare_feature(bare) == z
+    assert _tracking(wt) == y
+
+
+def test_lease_owner_no_tracking_equivalent_adopted_real_remote(tmp_path):
+    """backlog#1286: no tracking ref, remote holds our tree already (pushed elsewhere):
+    adopt it from an absent ref and land with one push."""
+    wt, bare = _feature_repo(tmp_path)
+    z = _rival_push(tmp_path, bare, from_branch="master", files={"feat.txt": "x\n"})
+    git, argvs = _spy_live_git(wt)
+    result = runner._push_with_lease_retry(git, _noop_log, "phase2")
+    local_head = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    assert result == local_head
+    assert _bare_feature(bare) == local_head
+    pushes = _push_argvs(argvs)
+    assert len(pushes) == 1
+    assert f"--force-with-lease=feature:{z}" in pushes[0]
+
+
+def test_lease_owner_no_tracking_foreign_fails_closed_real_remote(tmp_path):
+    """backlog#1286: no tracking ref and a foreign remote branch: zero pushes, remote
+    untouched, tracking ref still absent."""
+    wt, bare = _feature_repo(tmp_path)
+    z = _rival_push(tmp_path, bare, from_branch="master", files={"foreign.txt": "theirs\n"})
+    git, argvs = _spy_live_git(wt)
+    with pytest.raises(HarnessError) as exc_info:
+        runner._push_with_lease_retry(git, _noop_log, "phase2")
+    assert exc_info.value.kind == "remote-head-diverged"
+    assert _push_argvs(argvs) == []
+    assert _bare_feature(bare) == z
+    assert _tracking(wt) == ""
+
+
+def test_lease_owner_remote_branch_deleted_fails_closed_real_remote(tmp_path):
+    """backlog#1286: the remote branch was deleted after we published it; recreating a
+    deleted PR branch is never the harness's call."""
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    _sh("git", "-C", str(bare), "update-ref", "-d", "refs/heads/feature")
+    _commit(wt, "local.txt", "mine\n")
+    git, argvs = _spy_live_git(wt)
+    with pytest.raises(HarnessError) as exc_info:
+        runner._push_with_lease_retry(git, _noop_log, "phase2")
+    assert exc_info.value.kind == "remote-head-diverged"
+    assert len(_push_argvs(argvs)) == 1
+    gone = subprocess.run(["git", "-C", str(bare), "rev-parse", "--verify", "--quiet",
+                           "refs/heads/feature"], capture_output=True, text=True)
+    assert gone.returncode != 0
+    assert _tracking(wt) == y
+
+
+def test_lease_owner_unmoved_tip_falls_through_real_remote(tmp_path):
+    """backlog#1286: a rejection with no remote movement (Z == Y) keeps today's path."""
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    _commit(wt, "local.txt", "mine\n")
+    _reject_hook(bare, once=True)
+    git, argvs = _spy_live_git(wt)
+    result = runner._push_with_lease_retry(git, _noop_log, "phase2")
+    local_head = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    assert result == local_head
+    assert _bare_feature(bare) == local_head
+    pushes = _push_argvs(argvs)
+    assert len(pushes) == 2
+    for argv in pushes:
+        assert f"--force-with-lease=feature:{y}" in argv
+
+
+def test_verdict_remote_head_diverged_no_pr():
+    res = RunResult(
+        terminal=TerminalState.FAILED,
+        error_kind="remote-head-diverged",
+        error="remote-head-diverged: phase2: remote head 1234abcd diverged from lease 5678ef01",
+    )
+    line = runner.verdict_line(res, rc=3)
+    assert "\n" not in line
+    assert "remote-head-diverged" in line
+    assert "1234abcd" in line
+
+
+def test_lease_snapshot_skips_non_livegit_doubles():
+    """The `isinstance(git, LiveGit)` gate keeps every test double on today's path:
+    the doubles in test_adr_draft_on_denial.py, test_cifix_ship.py and
+    test_fidelity_carryforward.py have no push_remote or worktree."""
+    assert runner._lease_snapshot(types.SimpleNamespace()) is None
+    assert runner._lease_snapshot(types.SimpleNamespace(push_remote="origin")) is None
+
+
+def test_lease_snapshot_skips_push_disabled_livegit(tmp_path):
+    wt, _bare = _feature_repo(tmp_path)
+    assert runner._lease_snapshot(LiveGit(str(wt), push_remote=None)) is None
+
+
+def test_probe_remote_tip_leaves_tracking_ref(tmp_path):
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    z = _rival_push(tmp_path, bare, from_branch="feature", files={"foreign.txt": "theirs\n"})
+    assert gitutil.probe_remote_tip("origin", "feature", str(wt)) == (True, z)
+    assert _tracking(wt) == y
+
+
+def test_probe_remote_tip_absent_branch(tmp_path):
+    wt, _bare = _feature_repo(tmp_path)
+    assert gitutil.probe_remote_tip("origin", "feature", str(wt)) == (True, "")
+
+
+def test_probe_remote_tip_bad_remote(tmp_path):
+    wt, _bare = _feature_repo(tmp_path)
+    assert gitutil.probe_remote_tip("no-such-remote", "feature", str(wt)) == (False, "")
+
+
+def test_adopt_tracking_ref_cas(tmp_path):
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    z = _rival_push(tmp_path, bare, from_branch="feature", files={"other.txt": "o\n"})
+    assert gitutil.probe_remote_tip("origin", "feature", str(wt)) == (True, z)
+    assert gitutil.adopt_tracking_ref("origin", "feature", z, "0123" * 10, str(wt)) is False
+    assert _tracking(wt) == y
+    assert gitutil.adopt_tracking_ref("origin", "feature", z, y, str(wt)) is True
+    assert _tracking(wt) == z
+
+
+def test_restore_tracking_ref(tmp_path):
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    z = _rival_push(tmp_path, bare, from_branch="feature", files={"other.txt": "o\n"})
+    head = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    gitutil.content_equivalent(head, z, str(wt))
+    assert _tracking(wt) == z, "content_equivalent's plain fetch moves the tracking ref"
+    assert gitutil.restore_tracking_ref("origin", "feature", y, str(wt)) is True
+    assert _tracking(wt) == y
+
+
+def test_restore_tracking_ref_no_lease_deletes(tmp_path):
+    wt, bare = _feature_repo(tmp_path)
+    z = _rival_push(tmp_path, bare, from_branch="master", files={"other.txt": "o\n"})
+    head = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    gitutil.content_equivalent(head, z, str(wt))
+    assert _tracking(wt) == z
+    assert gitutil.restore_tracking_ref("origin", "feature", "", str(wt)) is True
+    assert _tracking(wt) == ""
+
+
+def test_owned_remote_tip_arms(tmp_path):
+    wt, bare = _feature_repo(tmp_path)
+    y = _publish_feature(wt)
+    _commit(wt, "local.txt", "same\n")
+    h = _sh("git", "-C", str(wt), "rev-parse", "HEAD")
+    z_same = _rival_push(tmp_path, bare, from_branch="feature", files={"local.txt": "same\n"})
+    assert gitutil.probe_remote_tip("origin", "feature", str(wt)) == (True, z_same)
+    assert gitutil.owned_remote_tip(y, h, z_same, str(wt))
+    _sh("git", "-C", str(bare), "update-ref", "refs/heads/feature", y)
+    shutil.rmtree(tmp_path / "rival")
+    z_foreign = _rival_push(tmp_path, bare, from_branch="feature",
+                            files={"foreign.txt": "theirs\n"})
+    assert gitutil.probe_remote_tip("origin", "feature", str(wt)) == (True, z_foreign)
+    assert gitutil.owned_remote_tip(y, h, z_foreign, str(wt)) == ""
+    assert gitutil.owned_remote_tip(y, h, "", str(wt)) == ""
 
 
 def test_push_disabled_and_detached_head_record_no_push_argv(tmp_path):

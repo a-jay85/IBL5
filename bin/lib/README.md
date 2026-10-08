@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-10-01
+last_verified: 2026-10-06
 ---
 
 # bin/lib — Shared Library Files
@@ -18,12 +18,12 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `db-helpers.sh` | Shared database helper functions for Docker MariaDB interactions (password-warning suppression, exec wrappers, and `db_resolve_target` / `db_container_running` — the main-stack-vs-worktree-container routing used by `ibl5/bin/db-query`) |
 | `restore-rowcount-compare.sh` | Pre-dump vs restored `COUNT(*)` check for the nightly backup in `.github/workflows/db-backup.yml`; subcommands `snapshot` / `extract` / `compare`, also piped to prod over `bash -s` (functions only, `main` is guarded) |
 | `hold-check-patterns.txt` | Ask-shaped-sentence patterns for `## Automouse Hold Justification` sections; one pattern per line, read by both `bin/lib/hold-check.sh` (POSIX ERE via `grep -E`) and `harness/planfile.py` (Python `re`) — see the file header for the two-language portable subset |
-| `hold-check.sh` | Hold-section extraction and ask-shaped-sentence detection; sourced by `bin/check-plan` gate `[H]` and by `/post-plan` Phase 6's hold-sentence discharge step |
+| `hold-check.sh` | Hold-section extraction (`hold_check_section`), ask-shaped-sentence detection (`hold_check_violations`), the Decision paragraph reader (`hold_decision_paragraphs`), and the manual-confirmation block renderer (`hold_manual_confirmation_block`); sourced by `bin/check-plan` gate `[H]` and by `/post-plan` Phase 6's hold-notice step |
 | `docfix-dm.sh` | Compose the docs-refreshed Discord DM for a docfix PR; holds the numeric-input, OPEN-state, and `docs-stale-refresh-` head-ref guards lifted out of `docs-refreshed-notify.yml` so they are exercisable by `bin/test-docfix-run` |
 | `git-helpers.sh` | Shared git-layout helpers: canonical repo root resolution and related utilities |
 | `human-signoff-classifier.sh` | Single source of truth for the feature-PR human sign-off classifier (ADR-0062), sourced by both the workflow and its regression harness |
 | `launchd-job.sh` | Shared launchd background-job plumbing: one-shot `launchctl list` snapshot and label lookup, fail-closed pgrep liveness probe, TERM-then-KILL stop and slot release, compact runner plist emission, bootout/bootstrap, slot count / stale reap / wait-for-slot, the loaded-idle job reaper, runner-embeddable finish-DM helpers, and `xml_escape` / `shq`. Sourced by `bin/post-plan-fleet`, `bin/pr-review-now`, `bin/post-plan-now` and `bin/pr-cycle`; tested by `bin/test-launchd-job` |
-| `launchd-expected-jobs.sh` | Single source of truth for the launchd health check: the expected long-lived `com.ibl5.*` labels with their check mode (`standard` / `keepalive` / `phase-gated`), the one-shot label prefixes, the required main-stack containers, and the plist-to-`/tmp`-runner lookup used for stale one-shot detection. Sourced by `bin/launchd-health-check` (example) and `bin/test-launchd-health-check` (example) |
+| `launchd-expected-jobs.sh` | Single source of truth for the launchd health check: the expected long-lived `com.ibl5.*` labels with their check mode (`standard` / `keepalive` / `phase-gated`), the one-shot label prefixes, and the required main-stack containers. Sourced by `bin/launchd-health-check` (example) and `bin/test-launchd-health-check` (example) |
 | `pr-sticky.sh` | Canonical find-by-HTML-marker sticky PR comment helpers (upsert / delete); sourced by `bin/pr-canary-check`, `bin/check-pr-collisions`, and `bin/post-plan-now` |
 | `session-id.sh` | Mint, validate and persist the `claude -p --session-id` uuid for detached headless runs; writes the `${LOG%.log}.session` sidecar that `bin/fleet-status` reads to locate a live run's transcript. Sourced by `bin/plan-now`, `bin/docfix-run`, `bin/post-plan-now` and `bin/fleet-status` |
 | `plan-autonomy-contract` | Shared `stop_condition:` / `evidence:` frontmatter validator; invoked by `bin/check-plan` gate `[K]` and the `/post-plan` Phase 5.0d skill path |

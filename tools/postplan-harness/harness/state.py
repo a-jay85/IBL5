@@ -23,6 +23,7 @@ class TerminalState(str, Enum):
     SHIPPED_HELD = "shipped-held"            # PR open, auto-merge deliberately NOT armed
     DEGRADED = "degraded"                    # PR open+held; >=1 review agent unparseable
     NOTHING_TO_SHIP = "nothing-to-ship"      # clean tree, empty diff vs master
+    ALREADY_SHIPPED = "already-shipped"      # diff vs master went empty AND the branch's PR is already MERGED
     FAILED = "failed"                        # typed failure aborted the run
 
 
@@ -115,6 +116,9 @@ class PhaseInfo:
     marker), which exempts the phase from the omission check.
     `no_diff_reason` holds the reason of an honoured `**No diff:**` body marker, which also exempts
     the phase. `no_diff_rejected` is True when such a marker was seen with a reason under the floor.
+    `heading_words` holds every whitespace token of the heading after the `Phase N:` prefix, with
+    backticks and edge punctuation stripped, no `/`; conformance uses them for the heading-named-file
+    clearance.
     """
     number: int = 0
     heading: str = ""                                          # heading text after `## `, marker included
@@ -122,6 +126,7 @@ class PhaseInfo:
     bookkeeping: bool = False
     no_diff_reason: str = ""      # honoured `**No diff:** <reason>` body marker (reason >= 15 chars); "" = none
     no_diff_rejected: bool = False  # a `**No diff:**` line was seen but its reason was under the floor
+    heading_words: list[str] = field(default_factory=list)  # bare heading tokens (backticks and edge punctuation stripped); conformance decides which name a file
 
 
 @dataclass
@@ -281,9 +286,10 @@ class RunResult:
     error_kind: Optional[str] = None   # stable HarnessError.kind of a FAILED run ("rebase-conflict", "local-gate", "git", "push-disabled", "push-retry-cap", "lostwork-unproved")
     error_cmd: Optional[str] = None            # command that failed (HarnessError.cmd); omitted from result.json when unset
     error_output_tail: Optional[str] = None    # last 4000 chars of that command's output (HarnessError.output)
+    block_cause: Optional[str] = None          # RebaseBlockCause.render() of a rebase-conflict block; omitted from result.json when unset
     sticky_comment_id: Optional[str] = None  # numeric id read back after the upsert; None = unconfirmed
     sticky_error: Optional[str] = None       # "sticky-post-failed" when the read-back found no comment
-    retry_cap: Optional[str] = None  # "push-retry-cap" | "behind-retry-cap" when a bounded loop spent its cap
+    retry_cap: Optional[str] = None  # reserved fail-closed seam: no production writer since the BEHIND cap stopped disarming (2026-10-04); any value still forces SHIPPED_HELD in _compute_terminal
     adr_drafted: bool = False               # Phase 2 commit gate (or the 5.5 push backstop): harness drafted a missing ADR
     adr_path: Optional[str] = None          # repo-relative path of the drafted ADR; set even when the re-push was denied
     adr_draft_model: Optional[str] = None   # MODEL_MAP id the drafter ran on
@@ -303,7 +309,7 @@ class RunResult:
 
     def to_json(self) -> str:
         d = asdict(self)
-        for key in ("error_cmd", "error_output_tail"):   # unset → result.json byte-identical
+        for key in ("error_cmd", "error_output_tail", "block_cause"):   # unset → result.json byte-identical
             if not d.get(key):
                 d.pop(key, None)
         if self.classification:

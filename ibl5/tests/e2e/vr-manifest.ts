@@ -97,9 +97,10 @@ export const VR_MANIFEST: VrRow[] = [
     anchor: '.ibl-title', extraMask: ['article time'], viewports: ['desktop', 'mobile'] },
   { name: 'player', auth: 'public', url: 'modules.php?name=Player&pa=showpage&pid=1',
     anchor: '.stats-grid', viewports: ['desktop', 'mobile'] },
-  { name: 'player-database', auth: 'public', url: 'modules.php?name=PlayerDatabase',
-    anchor: 'form[action*="PlayerDatabase"]', viewports: ['desktop', 'mobile'] },
-  { name: 'player-movement', auth: 'public', url: 'modules.php?name=PlayerMovement',
+  // Baselines are keyed by name, so player-database and player-movement keep their names (not season-roster-changes).
+  { name: 'player-database', auth: 'public', url: 'modules.php?name=PlayerSearch',
+    anchor: 'form[action*="PlayerSearch"]', viewports: ['desktop', 'mobile'] },
+  { name: 'player-movement', auth: 'public', url: 'modules.php?name=SeasonRosterChanges',
     anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'],
     states: [
       { name: 'default', appState: {} },

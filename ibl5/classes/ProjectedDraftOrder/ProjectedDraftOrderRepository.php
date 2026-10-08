@@ -9,9 +9,9 @@ use ProjectedDraftOrder\Contracts\ProjectedDraftOrderRepositoryInterface;
 
 /**
  * @see ProjectedDraftOrderRepositoryInterface
- * @see \BaseMysqliRepository
+ * @see \Database\BaseMysqliRepository
  */
-class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements ProjectedDraftOrderRepositoryInterface
+class ProjectedDraftOrderRepository extends \Database\BaseMysqliRepository implements ProjectedDraftOrderRepositoryInterface
 {
     /** @return list<array{teamid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, conf_wins: int|null, conf_losses: int|null, div_wins: int|null, div_losses: int|null, clinched_division: int|null, color1: string, color2: string}> */
     public function getAllTeamsWithStandings(): array
@@ -76,10 +76,10 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
     public function isDraftOrderFinalized(): bool
     {
         $row = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'",
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'",
         );
 
-        return $row !== null && $row['value'] === 'Yes';
+        return $row !== null && $row['setting_value'] === 'Yes';
     }
 
     /**
@@ -122,7 +122,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
             }
 
             $this->execute(
-                "UPDATE `ibl_settings` SET value = 'Yes' WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'",
+                "UPDATE `ibl_settings` SET setting_value = 'Yes' WHERE setting_key = 'Draft Order Finalized' AND league = 'ibl'",
             );
         });
     }

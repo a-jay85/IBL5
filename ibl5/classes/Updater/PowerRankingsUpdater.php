@@ -12,7 +12,7 @@ use Season\Season;
 /**
  * @phpstan-import-type TeamStats from TeamStatsCalculator
  */
-class PowerRankingsUpdater extends \BaseMysqliRepository {
+class PowerRankingsUpdater extends \Database\BaseMysqliRepository {
     private Season $season;
     private TeamStatsCalculator $statsCalculator;
 

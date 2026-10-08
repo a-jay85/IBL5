@@ -64,7 +64,7 @@
 
 .game-boxscore__team-name {
     font-family: var(--font-display);
-    font-weight: 800;
+    font-weight: var(--font-weight-extrabold);
     font-size: 1.1rem;
     letter-spacing: .03em;
     text-transform: uppercase;
@@ -72,14 +72,14 @@
 
 .game-boxscore__score {
     font-family: var(--font-display);
-    font-weight: 800;
+    font-weight: var(--font-weight-extrabold);
     font-size: 2rem;
     line-height: 1;
 }
 
 .game-boxscore__at {
     font-size: .9rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     opacity: .75;
 }
 
@@ -111,7 +111,7 @@
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
     background: var(--white);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: .9rem;
     letter-spacing: .03em;
     text-transform: uppercase;
@@ -149,13 +149,13 @@
 }
 
 .game-boxscore__cell--pts {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
 }
 
 /* Background comes from .team-table tfoot tr (--team-row-highlight-bg), which
    outspecifies this rule anyway — only the weight belongs here. */
 .game-boxscore__totals {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
 }
 
 .game-boxscore__empty {

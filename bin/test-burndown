@@ -69,9 +69,25 @@ chmod +x "$T/gh"
 # git stub: porcelain worktree list
 cat > "$T/git" <<'STUB'
 #!/usr/bin/env bash
+# Per-worktree probe fixtures live under $GH_FX_DIR/wt/, keyed by the
+# basename of the `-C <path>` argument:
+#   <key>.fail    present => status/rev-list exit 128 (probe failure)
+#   <key>.status  porcelain status body (absent => clean)
+#   <key>.ahead   commits ahead of origin/master (absent => 0)
+wt_key=""
+[ "${1:-}" = "-C" ] && wt_key="$(basename "${2:-}")"
+wt_fx="${GH_FX_DIR:-/dev/null}/wt/$wt_key"
 case "$*" in
     *"worktree list --porcelain"*)
         cat "${GH_FX_DIR:-/dev/null}/worktrees.txt" 2>/dev/null || true
+        ;;
+    *" status --porcelain"*)
+        [ -e "$wt_fx.fail" ] && exit 128
+        cat "$wt_fx.status" 2>/dev/null || true
+        ;;
+    *"rev-list --count"*)
+        [ -e "$wt_fx.fail" ] && exit 128
+        cat "$wt_fx.ahead" 2>/dev/null || echo 0
         ;;
     *) exec git "$@" ;;
 esac
@@ -326,6 +342,7 @@ cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md" <<'REPORT'
 - [#24](u24) Twenty-four — ref
 - [#25](u25) Twenty-five — ref
 - [#26](u26) Twenty-six — ref
+- [#27](u27) Twenty-seven — ref
 - [#30](u30) Thirty — ref
 - [#31](u31) Thirty-one — ref
 - [#35](u35) Thirty-five noref — ref
@@ -457,11 +474,13 @@ cat > "$T/home/claude-plans/_reports/burndown-batch-test.json" <<'LEDGER'
 LEDGER
 # Worktree fixture has branch wt-25
 cat > "$T/fx/worktrees.txt" <<'WT'
-worktree /some/path
+worktree /some/wt-25
 HEAD abc123
 branch refs/heads/wt-25
 
 WT
+mkdir -p "$T/fx/wt"
+printf ' M bin/x\n' > "$T/fx/wt/wt-25.status"
 # Boundary: plan names #260 (NOT #26)
 cat > "$T/home/claude-plans/boundary-plan.md" <<'BPLAN'
 # Boundary
@@ -478,9 +497,34 @@ grep -qE 'PICK\s+#26' <<< "$OUT" && ok "C17: #26 PICK (boundary)" || fail "C17: 
 # Cleanup
 rm -f "$T/home/claude-plans/some-feature.md" "$T/home/claude-plans/boundary-plan.md" \
       "$T/home/claude-plans/_reports/burndown-batch-test.json"
+rm -rf "$T/fx/wt"
 echo '[]' > "$T/fx/prs-open.json"
 cat > "$T/fx/worktrees.txt" <<'WT'
 WT
+
+# ── C51a: committed-ahead skipped worktree stays in-flight (characterization) ──
+cat > "$T/fx/issues.json" <<'JSON'
+[{"number":27,"title":"Twenty-seven","body":"bin/s27:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}]
+JSON
+cat > "$T/home/claude-plans/_reports/burndown-batch-held.json" <<'LEDGER'
+{"items":[
+  {"issue_num":27,"also_closes":[],"slug":"wt-27","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1}
+]}
+LEDGER
+cat > "$T/fx/worktrees.txt" <<'WT'
+worktree /some/wt-27
+HEAD abc123
+branch refs/heads/wt-27
+
+WT
+mkdir -p "$T/fx/wt"
+printf '2\n' > "$T/fx/wt/wt-27.ahead"
+OUT="$(bd_b 2>&1)"; RC=$?
+want "C51a: committed-ahead skipped worktree stays in-flight" "$OUT" "worktree wt-27"
+rm -f "$T/home/claude-plans/_reports/burndown-batch-held.json"
+cat > "$T/fx/worktrees.txt" <<'WT'
+WT
+rm -rf "$T/fx/wt"
 
 # ── C18: source failures abort ────────────────────────────────────────────────
 cat > "$T/fx/issues.json" <<'JSON'

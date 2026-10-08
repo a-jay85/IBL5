@@ -1358,6 +1358,27 @@ bd_sweep_queued() {
     printf 'WAIT #%s queued\n' "$issue_num"
 }
 
+# bd_sweep_picked <ledger> <item> <issue_num> — flip a zombie picked item to skipped,
+# else WAIT. Zombie: status picked, empty route, empty slug, ledger .created valid and
+# strictly older than BD_SWEEP_CUTOFF. A picked row with no route and no slug was never
+# routed by /burndown and holds its issue in bd_inflight forever.
+bd_sweep_picked() {
+    local ledger="$1" item="$2" issue_num="$3" slug route status created
+    slug="$(jq -r '.slug // ""' <<< "$item")"
+    route="$(jq -r '.route // ""' <<< "$item")"
+    status="$(jq -r '.status // ""' <<< "$item")"
+    created="$(jq -r '.created // ""' "$ledger")"
+    if [ "$status" = "picked" ] && [ -z "$route" ] && [ -z "$slug" ] \
+        && [[ "$created" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] \
+        && [[ "$created" < "$BD_SWEEP_CUTOFF" ]]; then
+        bd_record_apply "$ledger" "$issue_num" '{"status":"skipped"}'
+        printf 'ZOMBIE-PICK #%s -> skipped (no route, no slug, ledger older than 24h)\n' \
+            "$issue_num"
+        return 0
+    fi
+    printf 'WAIT #%s unrouted\n' "$issue_num"
+}
+
 # bd_close_ledger <ledger> <caller> <mode> — per-ledger merge handling shared by
 # burndown-close-merged (mode=close) and burndown-sweep (mode=sweep).
 bd_close_ledger() {
@@ -1409,6 +1430,10 @@ bd_close_ledger() {
                     ;;
                 queued)
                     bd_sweep_queued "$ledger" "$item" "$issue_num"
+                    continue
+                    ;;
+                unrouted)
+                    bd_sweep_picked "$ledger" "$item" "$issue_num"
                     continue
                     ;;
             esac

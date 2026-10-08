@@ -27,7 +27,7 @@
 #   bin/backlog burndown-status [<ledger>]        read-only live status table
 #   bin/backlog burndown-close-merged [<ledger>]  close backlog issues of merged ad-hoc PRs
 #   bin/backlog burndown-sweep                    sweep all ledgers: record merges, close merged ad-hoc issues, flip zombies, report HELD worktrees
-#   bin/backlog burndown-held                     read-only: print HELD lines for skipped ad-hoc items with unshipped work
+#   bin/backlog burndown-held                     read-only: HELD lines for skipped ad-hoc worktrees with unshipped work
 #   bin/backlog burndown-prompt <ledger> <issue> <slug> [--after <ledger>]... [--evidence <file>]
 #                                        print the bin/plan-now prompt for one ledger item
 #   bin/backlog burndown-launch                   exec claude --model claude-sonnet-5-5 "/burndown" (BURNDOWN_CLAUDE overrides the binary)
@@ -101,7 +101,8 @@ Usage: bin/backlog [--dry-run] <subcommand> [args...]
                         Close backlog issues whose ad-hoc PR merged
   burndown-sweep
                         Sweep every ledger: record merges and PR URLs, close merged ad-hoc issues, flip zombie plans, report HELD worktrees
-  burndown-held         Read-only: print HELD lines for skipped ad-hoc items whose worktree has unshipped work and no PR
+  burndown-held
+                        Print HELD lines for skipped ad-hoc worktrees that are dirty or ahead with no PR (read-only)
   burndown-prompt <ledger> <n> <slug> [--after <ledger>]... [--evidence <file>]
                         Print the finished bin/plan-now prompt for ledger item <n>
   burndown-launch       Start /burndown in claude pinned to Sonnet 5.5 (claude-sonnet-5-5)

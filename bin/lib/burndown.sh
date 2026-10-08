@@ -1422,6 +1422,39 @@ bd_sweep_picked() {
     printf 'WAIT #%s unrouted\n' "$issue_num"
 }
 
+# bd_held_item <ledger> <item> <issue_num> — print a HELD line for a skipped ad-hoc item
+# whose live worktree still carries unshipped work (dirty or ahead of origin/master, no PR)
+# and whose ledger is older than 24h. Prints HELD-UNKNOWN when the probe fails, so a
+# held tree is never silently dropped. Read-only: never writes the ledger.
+# Needs BD_SWEEP_CUTOFF (bd_sweep_cutoff) and BD_WT_LIST / BD_WT_LIST_RC (bd_wt_list).
+bd_held_item() {
+    local ledger="$1" item="$2" issue_num="$3" route slug created
+    local wpath="" p b state dirty ahead
+    [ "${BD_WT_LIST_RC:-1}" -eq 0 ] || return 0
+    route="$(jq -r '.route // ""' <<< "$item")"
+    slug="$(jq -r '.slug // ""' <<< "$item")"
+    [ "$route" = ad-hoc ] && [ -n "$slug" ] || return 0
+    created="$(jq -r '.created // ""' "$ledger")"
+    [[ "$created" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] \
+        && [[ "$created" < "$BD_SWEEP_CUTOFF" ]] || return 0
+    while IFS=$'\t' read -r p b; do
+        [ "$b" = "$slug" ] && wpath="$p"
+    done <<< "$BD_WT_LIST"
+    [ -n "$wpath" ] || return 0
+    state="$(bd_wt_state "$wpath" "$slug")"
+    case "$state" in
+        held*)
+            IFS=$'\t' read -r _ dirty ahead <<< "$state"
+            printf 'HELD #%s %s (%s, %s ahead, no PR)\n' "$issue_num" "$wpath" \
+                "$([ "$dirty" = 1 ] && echo dirty || echo clean)" "$ahead"
+            ;;
+        unknown*)
+            printf 'HELD-UNKNOWN #%s %s (%s)\n' "$issue_num" "$wpath" "${state#unknown$'\t'}"
+            ;;
+    esac
+    return 0
+}
+
 # bd_close_ledger <ledger> <caller> <mode> — per-ledger merge handling shared by
 # burndown-close-merged (mode=close) and burndown-sweep (mode=sweep).
 bd_close_ledger() {
@@ -1437,6 +1470,9 @@ bd_close_ledger() {
         route="$(jq -r '.route // ""' <<< "$item")"
         n=$((n + 1))
 
+        if [ "$mode" = sweep ] && [ "$ledger_status" = skipped ]; then
+            bd_held_item "$ledger" "$item" "$issue_num"
+        fi
         case "$ledger_status" in merged|closed-fixed|skipped) continue ;; esac
 
         local live_line live_state live_pr
@@ -1574,11 +1610,38 @@ bd_cmd_sweep() {
         jq -e '.items | type == "array"' "$f" >/dev/null 2>&1 \
             || bd_die 3 "malformed ledger $f"
     done
+    BD_WT_LIST_RC=0
+    BD_WT_LIST="$(bd_wt_list)" || BD_WT_LIST_RC=$?
+    [ "$BD_WT_LIST_RC" -eq 0 ] \
+        || printf 'HELD-SCAN unavailable (git worktree list failed)\n'
     for f in "${files[@]}"; do
         printf 'ledger %s\n' "$(basename "$f")"
         bd_close_ledger "$f" burndown-sweep sweep || any_fail=1
     done
     [ "$any_fail" -eq 0 ]
+}
+
+# bd_cmd_held — read-only: print HELD / HELD-UNKNOWN lines across every ledger and nothing
+# else (no ledger headers, no merges, no closes). Empty output means nothing is held.
+bd_cmd_held() {
+    [ $# -eq 0 ] || bd_die 2 "burndown-held takes no arguments"
+    bd_sweep_cutoff
+    BD_WT_LIST_RC=0
+    BD_WT_LIST="$(bd_wt_list)" || BD_WT_LIST_RC=$?
+    [ "$BD_WT_LIST_RC" -eq 0 ] || bd_die 3 "git worktree list failed"
+    local f item issue_num lines=""
+    for f in "$BD_REPORTS_DIR"/burndown-batch-*.json; do
+        [ -f "$f" ] || continue
+        jq -e '.items | type == "array"' "$f" >/dev/null 2>&1 \
+            || bd_die 3 "malformed ledger $f"
+        while IFS= read -r item; do
+            [ -n "$item" ] || continue
+            issue_num="$(jq -r '.issue_num' <<< "$item")"
+            lines+="$(bd_held_item "$f" "$item" "$issue_num")"$'\n'
+        done < <(jq -c '.items[] | select(.status == "skipped")' "$f")
+    done
+    printf '%s' "$lines" | awk 'NF && !seen[$0]++'
+    return 0
 }
 
 bd_main() {
@@ -1594,6 +1657,7 @@ bd_main() {
         burndown-status)       bd_cmd_status       "$@" ;;
         burndown-close-merged) bd_cmd_close_merged "$@" ;;
         burndown-sweep)        bd_cmd_sweep        "$@" ;;
+        burndown-held)         bd_cmd_held         "$@" ;;
         burndown-launch)       bd_cmd_launch       "$@" ;;
         *)                     bd_die 2 "unknown burndown subcommand: $cmd" ;;
     esac

@@ -1172,9 +1172,69 @@ replay-calibration-fp)
     fi
     ;;
 
+removed-line-token)
+    # Token appears only on a removed (-) line; root lacks it. Removed lines count as pre-existing.
+    plan_fixture '| 13 | `FIXTURE_RM_SYMBOL` is checked | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    printf '%s\n' '-FIXTURE_RM_SYMBOL=old' '+replacement' > "$root/diff.txt"
+    err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$out" ] && [ -z "$err" ]; then
+        ok "removed-line-token"
+    else
+        fail "removed-line-token (rc=$rc, out=$out, err=$err)"
+    fi
+    ;;
+
+diff-header-not-context)
+    # A `--- a/<path>` header is never a context line, even though it starts with `-`.
+    plan_fixture '| 14 | `FIXTURE_HDR_SYMBOL` is checked | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    printf '%s\n' '--- a/FIXTURE_HDR_SYMBOL' '+++ b/other' '+unrelated' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && grep -qF -- 'UNREALISED-ASSERTION: row 14' <<< "$out"; then
+        ok "diff-header-not-context"
+    else
+        fail "diff-header-not-context (rc=$rc, out=$out)"
+    fi
+    ;;
+
+plus-header-not-realised)
+    # A `+++ b/<path>` header is never an added line.
+    plan_fixture '| 15 | `FIXTURE_PLUSHDR_SYMBOL` is checked | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    printf '%s\n' '--- a/other' '+++ b/FIXTURE_PLUSHDR_SYMBOL' '+unrelated' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && grep -qF -- 'UNREALISED-ASSERTION: row 15' <<< "$out"; then
+        ok "plus-header-not-realised"
+    else
+        fail "plus-header-not-realised (rc=$rc, out=$out)"
+    fi
+    ;;
+
+ctx-mixed-row)
+    # One token on a context line, one absent: row fires, stderr names only the absent one.
+    plan_fixture '| 16 | `FIXTURE_CTX_KEEP` and `FIXTURE_ABSENT_ONE` | CLI-executable | post-impl | `bin/test-it` |' \
+        > "$root/plan.md"
+    printf '%s\n' ' FIXTURE_CTX_KEEP=1' '+unrelated' > "$root/diff.txt"
+    err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && grep -qF -- 'UNREALISED-ASSERTION: row 16' <<< "$out" \
+        && grep -qF -- 'FIXTURE_ABSENT_ONE' <<< "$err" \
+        && ! grep -qF -- 'FIXTURE_CTX_KEEP' <<< "$err"; then
+        ok "ctx-mixed-row"
+    else
+        fail "ctx-mixed-row (rc=$rc, out=$out, err=$err)"
+    fi
+    ;;
+
 *)
     printf 'Unknown case: %s\n' "$case" >&2
-    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised step67 prefire all\n' >&2
+    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row step67 prefire all\n' >&2
     exit 2
     ;;
 esac
@@ -1186,7 +1246,7 @@ rm -rf "$root"
 
 ARG="${1:-all}"
 
-CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised"
+CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row"
 
 if [ "$ARG" = "all" ]; then
     for c in $CASES; do

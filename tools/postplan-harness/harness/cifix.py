@@ -2,6 +2,7 @@ from __future__ import annotations
 import re
 from .adapters.llm import MODEL_MAP
 from .fidelity import GATE_EDIT_DENY_TEXT, REMEDIATION_ALLOWED_TOOLS, REMEDIATION_DENIED_TOOLS
+from .rules_budget_carveout import carveout_prompt_text
 
 CI_FIX_MODEL = "opus"                       # alias; call_tooled allowlists it
 CI_FIX_MODEL_ID = MODEL_MAP[CI_FIX_MODEL]   # "claude-opus-5-5", used in the audit line
@@ -74,7 +75,7 @@ def failed_job_refs(checks: list[dict], names: list[str]) -> dict[str, tuple[str
 
 def ci_fix_prompt(pr_number, attempt: int, names: list[str], log_paths: dict[str, str],
                   diff_path: str, prior: list[str], *, dep_advisory: bool = False,
-                  proposal_path: str = "") -> str:
+                  proposal_path: str = "", rules_carveout: tuple[str, ...] = ()) -> str:
     """Build the Opus prompt for a CI fix attempt."""
     lines = [
         f"Fix the failing CI checks for PR #{pr_number}.",
@@ -98,6 +99,7 @@ def ci_fix_prompt(pr_number, attempt: int, names: list[str], log_paths: dict[str
         "Reply FLAKY (and make NO edits) only for an infrastructure failure: runner outage, network timeout, cancelled job. A dependency security advisory is never FLAKY, even when this diff did not touch the dependency.",
         "",
         GATE_EDIT_DENY_TEXT,
+        *(["", carveout_prompt_text(rules_carveout)] if rules_carveout else []),
         "",
         "The following Bash commands are denied: git push, git commit, gh pr merge, gh pr review, gh api, gh pr edit are denied; the harness commits and pushes.",
         "",

@@ -15,6 +15,12 @@ source "$_PCW_LIB/ci-checks-green.sh"
 PCW_GRACE_MIN=30       # skip a PR whose last post-plan run finished this recently
 # shellcheck disable=SC2034  # read by bin/pr-cycle-tick
 PCW_MAX_PER_TICK=3     # PRs handed to one pr-cycle run (also its --max-ready)
+# shellcheck disable=SC2034  # read by bin/pr-cycle-tick
+PCW_STRIKE_CAP=2       # no-op rescues per (PR, head SHA) before the tick stops relaunching
+# shellcheck disable=SC2034  # read by bin/pr-cycle-tick
+# A launched worker's result file is overdue after 180 min: post-plan-fleet --wait tops out
+# at 7200 s and each session at timeout 5400, plus Stage 2 and launchd start-up margin.
+PCW_PENDING_MAX_AGE_S=10800
 
 # State dir: PR_CYCLE_WATCH_STATE_DIR when non-empty, else $HOME/.ibl5-pr-cycle-watch.
 # Unset and empty both mean "use the default". rc 1 when neither it nor HOME is set.
@@ -103,6 +109,34 @@ pcw_attempted_head() { [[ -f "$1/attempts/$2" && "$(cat "$1/attempts/$2")" == "$
 pcw_record_attempt() { _pcw_write "$1/attempts/$2" "$3"; }
 pcw_dm_due()         { ! [[ -f "$1/dm-sent/$2" && "$(cat "$1/dm-sent/$2")" == "$3" ]]; }
 pcw_mark_dm()        { _pcw_write "$1/dm-sent/$2" "$3"; }
+# declined/<pr> holds the head SHA that post-plan holdrepeat declined. A declined head is not
+# an attempt: nothing ran, and a new push clears it by changing the SHA.
+pcw_declined_head()  { [[ -f "$1/declined/$2" && "$(cat "$1/declined/$2")" == "$3" ]]; }
+pcw_record_declined() { _pcw_write "$1/declined/$2" "$3"; }
+# strikes/<pr> holds "<sha> <n>": rescues that never reached post-plan for that head.
+pcw_strike_count() {   # prints n when strikes/<pr> holds this SHA, else 0
+    local f="$1/strikes/$2" s="" n=""
+    if [[ -f "$f" ]]; then read -r s n < "$f" || true; fi
+    if [[ "$s" == "$3" && "$n" =~ ^[0-9]+$ ]]; then printf '%s\n' "$n"; else printf '0\n'; fi
+}
+pcw_add_strike() {     # writes "<sha> <count+1>" and prints the new count
+    local n
+    n=$(( $(pcw_strike_count "$1" "$2" "$3") + 1 ))
+    _pcw_write "$1/strikes/$2" "$3 $n" && printf '%s\n' "$n"
+}
+# Per-kind DM ledger, same shape as dm-sent/: dm-<kind>/<pr> holds the SHA last DM'd about.
+pcw_kind_dm_due()    { ! [[ -f "$1/dm-$2/$3" && "$(cat "$1/dm-$2/$3")" == "$4" ]]; }
+pcw_kind_mark_dm()   { _pcw_write "$1/dm-$2/$3" "$4"; }
+# pcw_pending_has <state-dir> <pr>: 0 when a launched, not yet settled rescue lists the PR.
+# pending/<id> is "# result=<path> started=<epoch>" then one "<pr><TAB><sha>" line per PR.
+pcw_pending_has() {
+    local f
+    for f in "$1"/pending/*; do
+        [[ -f "$f" ]] || continue
+        awk -F'\t' -v p="$2" 'NR > 1 && $1 == p { found = 1 } END { exit !found }' "$f" && return 0
+    done
+    return 1
+}
 _pcw_write() {   # atomic: temp file then rename, so a killed tick never leaves half a SHA
     mkdir -p "$(dirname "$1")" && printf '%s\n' "$2" > "$1.tmp.$$" && mv -f "$1.tmp.$$" "$1"
 }
@@ -110,8 +144,13 @@ _pcw_write() {   # atomic: temp file then rename, so a killed tick never leaves 
 # pcw_prune <state-dir> <newline-separated open PR numbers>: drop state for closed PRs.
 pcw_prune() {
     local dir="$1" open="$2" f
-    for f in "$dir"/attempts/* "$dir"/dm-sent/*; do
+    for f in "$dir"/attempts/* "$dir"/dm-sent/* "$dir"/declined/* "$dir"/strikes/* \
+             "$dir"/dm-declined/* "$dir"/dm-strikes/*; do
         [[ -f "$f" ]] || continue
         grep -qxF "$(basename "$f")" <<< "$open" || rm -f "$f"
     done
+    # Result files of a settled entry are removed by reconcile. Sweep strays a day old; pending
+    # entries are never pruned here, only settled by reconcile.
+    [[ -d "$dir/results" ]] && find "$dir/results" -type f -mmin +1440 -delete 2>/dev/null
+    return 0
 }

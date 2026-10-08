@@ -36,8 +36,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gitutil, holdrepeat, llm_calls,
-                     manual_rows, manual_testing, outofscope, prosefix, rebase_cause, schemas,
-                     scope_conformance, statefile, usage_pause)
+                     manual_rows, manual_testing, outofscope, prosefix, rebase_cause, rules_budget_carveout,
+                     schemas, scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
@@ -62,6 +62,7 @@ from harness.gate_backtest import upsert_gate_backtest
 from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.review import ReviewPhase
+from harness import baseline_guard
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
 from harness.thread_ingestion import run_thread_ingestion
 from harness.adapters.ghad import LiveGh, RecordingGh
@@ -1457,6 +1458,12 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
             if probed:
                 break
             probed = True
+            allow, why = baseline_guard.probe_decision(gh, pr, sha)
+            if not allow:
+                if why == "update-baselines-label":
+                    baseline_guard.maybe_refire(gh, pr, sha, log)
+                log(f"phase7 ci-fix rerun probe skipped: reason={why} sha={str(sha)[:8]}")
+                break
             all_red_names = list(outcome.failed)
             refs = cifix.failed_job_refs(gh.pr_checks_json(pr), all_red_names)
             seen_run_ids = set()
@@ -1574,12 +1581,18 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
         stage = "llm"
         try:
             remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+            carveout = rules_budget_carveout.snapshot(names, git, worktree)
+            log(f"phase7 ci-fix attempt {attempt}: rules-budget carve-out "
+                + (f"active for {', '.join(sorted(carveout.in_diff))}" if carveout.active
+                   else f"inactive ({carveout.reason})"))
             llm.call_tooled("ci-fix", cifix.CI_FIX_MODEL,
                             cifix.ci_fix_prompt(pr, attempt, names, log_paths,
                                                 diff_path, trail,
                                                 dep_advisory=cifix_ship.bun_audit_failed(names),
                                                 proposal_path=os.path.join(
-                                                    fix_dir, cifix_ship.PROPOSAL_FILENAME)),
+                                                    fix_dir, cifix_ship.PROPOSAL_FILENAME),
+                                                rules_carveout=(tuple(sorted(carveout.in_diff))
+                                                                if carveout.active else ())),
                             cwd=worktree or ".", allowed_tools=cifix.CI_FIX_ALLOWED_TOOLS,
                             denied_tools=cifix.CI_FIX_DENIED_TOOLS, add_dirs=(fix_dir,),
                             timeout=int(min(TOOLED_TIMEOUT, remaining / 2)))
@@ -1629,6 +1642,9 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
             last = "no-change"
         else:
             gate_hits = fidelity.denied_gate_edits(git.changed_files(f"{new}^"))
+            if gate_hits and rules_budget_carveout.permit(gate_hits, carveout, worktree,
+                                                          new, log):
+                gate_hits = []
             if gate_hits:
                 last = "error:gate-path-edit"
                 log(f"phase7 ci-fix: gate-path edit detected in fix commit {new[:12]}; "

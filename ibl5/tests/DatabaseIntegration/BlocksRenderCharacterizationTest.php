@@ -83,4 +83,19 @@ final class BlocksRenderCharacterizationTest extends DatabaseTestCase
         self::assertNotSame('', $content);
         self::assertStringContainsString('<div class="leaders-tabbed" id="season-leaders-', $content);
     }
+
+    public function testChunkLeadersRendersEmptyWhenDatabaseGlobalMissing(): void
+    {
+        if (!defined('BLOCK_FILE')) {
+            define('BLOCK_FILE', true);
+        }
+
+        $GLOBALS['mysqli_db'] = null;
+        $GLOBALS['leagueContext'] = new \League\LeagueContext();
+
+        $content = null;
+        include __DIR__ . '/../../blocks/block-Chunk_Leaders.php';
+
+        self::assertSame('', $content);
+    }
 }

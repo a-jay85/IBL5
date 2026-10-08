@@ -14,7 +14,7 @@ use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
  * @phpstan-import-type FranchiseTitleRecord from RecordHoldersRepositoryInterface
  * @phpstan-import-type PlayoffAppearanceRecord from RecordHoldersRepositoryInterface
  */
-final class FranchiseRecordRepository extends \BaseMysqliRepository
+final class FranchiseRecordRepository extends \Database\BaseMysqliRepository
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {

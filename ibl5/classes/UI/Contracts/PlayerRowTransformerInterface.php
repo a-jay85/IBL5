@@ -14,7 +14,7 @@ interface PlayerRowTransformerInterface
      * Filters out '|'-prefixed placeholder names.
      *
      * @param \mysqli $db Database connection
-     * @param iterable<int, \Player\Player|array<string, mixed>> $result Player result set
+     * @param iterable<int, \Player\Player|array<string, mixed>|object> $result Player rows; any other object is skipped
      * @param string $yr Year filter (empty for current season)
      * @return list<array{player: \Player\Player, playerStats: \Player\Stats\PlayerStats}>
      */
@@ -25,7 +25,7 @@ interface PlayerRowTransformerInterface
      * Filters out '|'-prefixed placeholder names.
      *
      * @param \mysqli $db Database connection
-     * @param iterable<int, \Player\Player|array<string, mixed>> $result Player result set
+     * @param iterable<int, \Player\Player|array<string, mixed>|object> $result Player rows; any other object is skipped
      * @param string $yr Year filter (empty for current season)
      * @return list<\Player\Player>
      */

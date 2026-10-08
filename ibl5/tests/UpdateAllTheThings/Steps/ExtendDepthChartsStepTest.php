@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Tests\UpdateAllTheThings\Steps;
 
 use PHPUnit\Framework\TestCase;
-use SavedDepthChart\SavedDepthChartRepository;
+use DepthChartSnapshot\DepthChartSnapshotRepository;
 use Updater\Steps\ExtendDepthChartsStep;
 
 class ExtendDepthChartsStepTest extends TestCase
 {
     public function testGetLabelReturnsExpectedLabel(): void
     {
-        $stubRepo = self::createStub(SavedDepthChartRepository::class);
+        $stubRepo = self::createStub(DepthChartSnapshotRepository::class);
         $step = new ExtendDepthChartsStep($stubRepo, '2026-02-27', 15);
 
         $this->assertSame('Saved depth charts updated', $step->getLabel());
@@ -20,7 +20,7 @@ class ExtendDepthChartsStepTest extends TestCase
 
     public function testExecuteReturnsSuccessWithCount(): void
     {
-        $mockRepo = $this->createMock(SavedDepthChartRepository::class);
+        $mockRepo = $this->createMock(DepthChartSnapshotRepository::class);
         $mockRepo->expects($this->once())
             ->method('extendActiveDepthCharts')
             ->with('2026-02-27', 15)
@@ -35,7 +35,7 @@ class ExtendDepthChartsStepTest extends TestCase
 
     public function testExecuteCapturesOutputBufferLog(): void
     {
-        $stubRepo = self::createStub(SavedDepthChartRepository::class);
+        $stubRepo = self::createStub(DepthChartSnapshotRepository::class);
         $stubRepo->method('extendActiveDepthCharts')->willReturnCallback(static function (): int {
             echo '<p>Extending DCs...</p>';
             return 3;

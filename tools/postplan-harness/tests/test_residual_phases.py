@@ -84,4 +84,6 @@ def test_inject_is_idempotent_across_reruns():
 
     # phase now shipped
     _inject_residual_phases(copy, plan, ["harness/b.py"], [].append)
-    assert copy["summary_md"].strip() == orig_body.strip()
+    # Removal re-terminates the head with exactly one "\n" (orig_body.rstrip() + "\n"),
+    # so the restored body is the original plus a single trailing newline.
+    assert copy["summary_md"] == orig_body.rstrip() + "\n"

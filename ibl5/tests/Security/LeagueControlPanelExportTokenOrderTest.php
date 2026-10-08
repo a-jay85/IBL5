@@ -9,12 +9,12 @@ use PHPUnit\Framework\TestCase;
 /**
  * Locks the ordering invariant that makes issuing a CSRF token from the
  * export handler's 403 branch safe: the admin guard must run before any
- * generateRawToken() call in leagueControlPanel.php (backlog #789).
+ * generateRawToken() call in modules/LeagueControlPanel/index.php (backlog #789).
  */
 class LeagueControlPanelExportTokenOrderTest extends TestCase
 {
-    private const SCRIPT = __DIR__ . '/../../leagueControlPanel.php';
-    private const ADMIN_GUARD = '/if\s*\(\s*!\s*is_admin\(\)\s*\)/';
+    private const SCRIPT = __DIR__ . '/../../modules/LeagueControlPanel/index.php';
+    private const ADMIN_GUARD = '/if\s*\(\s*!\s*\$authService->isAdmin\(\)\s*\)/';
     private const TOKEN_CALL = '/generateRawToken\(\s*\'lcp_export_active_players\'\s*\)/';
 
     /** @return array{guard: int, tokens: list<int>} byte offsets */
@@ -30,7 +30,7 @@ class LeagueControlPanelExportTokenOrderTest extends TestCase
     private function assertGuardPrecedesEveryTokenIssue(string $source): void
     {
         $found = $this->locate($source);
-        self::assertGreaterThanOrEqual(0, $found['guard'], 'is_admin() guard missing');
+        self::assertGreaterThanOrEqual(0, $found['guard'], 'isAdmin() guard missing');
         self::assertNotEmpty($found['tokens'], 'no lcp_export_active_players token issue found');
         foreach ($found['tokens'] as $offset) {
             self::assertGreaterThan($found['guard'], $offset, 'token issued before the admin guard');
@@ -55,7 +55,7 @@ class LeagueControlPanelExportTokenOrderTest extends TestCase
 
     public function testCheckerFailsWhenTokenIsIssuedBeforeGuard(): void
     {
-        $planted = "<?php\n\$t = \\Security\\CsrfGuard::generateRawToken('lcp_export_active_players');\nif (!is_admin()) { exit; }\n";
+        $planted = "<?php\n\$t = \\Security\\CsrfGuard::generateRawToken('lcp_export_active_players');\nif (!\$authService->isAdmin()) { exit; }\n";
         $this->expectException('PHPUnit\Framework\AssertionFailedError');
         $this->assertGuardPrecedesEveryTokenIssue($planted);
     }

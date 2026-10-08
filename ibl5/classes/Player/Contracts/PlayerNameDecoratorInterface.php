@@ -26,7 +26,7 @@ interface PlayerNameDecoratorInterface
      * Get the CSS class for a player's contract status indicator
      *
      * Status classes drive ::after pseudo-element indicators via CSS:
-     * - "player-waived" — ordinal > JSB::WAIVERS_ORDINAL (shows * via CSS)
+     * - "player-waived" — ordinal > JsbConstants::WAIVERS_ORDINAL (shows * via CSS)
      * - "player-expiring" — contractCurrentYear == contractTotalYears (shows ^ via CSS)
      * - "" — no indicator
      *

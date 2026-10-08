@@ -7,7 +7,7 @@ namespace Search;
 use Search\Contracts\SearchViewInterface;
 use Security\HtmlSanitizer;
 
-// PHP-Nuke Search language constants used by this view (loaded at runtime by mainfile.php)
+// PHP-Nuke Search language constants used by this view (defined here if not already defined)
 if (!defined('_ALLTOPICS')) {
     define('_ALLTOPICS', 'All Topics');
 }

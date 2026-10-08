@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Negotiation;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use Negotiation\Contracts\NegotiationRepositoryInterface;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
 

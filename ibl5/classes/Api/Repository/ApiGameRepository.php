@@ -12,7 +12,7 @@ use League\LeagueContext;
  * @phpstan-type BoxscoreTeamRow array{name: string, visitor_q1_points: int, visitor_q2_points: int, visitor_q3_points: int, visitor_q4_points: int, visitor_ot_points: int, home_q1_points: int, home_q2_points: int, home_q3_points: int, home_q4_points: int, home_ot_points: int, game_min: int|null, game_2gm: int, game_2ga: int, game_ftm: int, game_fta: int, game_3gm: int, game_3ga: int, game_orb: int, game_drb: int, game_ast: int, game_stl: int, game_tov: int, game_blk: int, game_pf: int, attendance: int, capacity: int, visitor_wins: int, visitor_losses: int, home_wins: int, home_losses: int, calc_points: int, calc_rebounds: int, calc_fg_made: int, ...<string, mixed>}
  * @phpstan-type BoxscorePlayerRow array{player_uuid: string|null, name: string, pos: string, game_min: int, game_2gm: int, game_2ga: int, game_ftm: int, game_fta: int, game_3gm: int, game_3ga: int, game_orb: int, game_drb: int, game_ast: int, game_stl: int, game_tov: int, game_blk: int, game_pf: int, calc_points: int, calc_rebounds: int, calc_fg_made: int, player_tid: int|null, ...<string, mixed>}
  */
-class ApiGameRepository extends \BaseMysqliRepository
+class ApiGameRepository extends \Database\BaseMysqliRepository
 {
     /** Public API sort key => SQL column. The controller's allowlist is array_keys() of this map. */
     public const SORT_COLUMNS = [

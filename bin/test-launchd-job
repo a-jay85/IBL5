@@ -921,6 +921,56 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Case: safe_slug_squeezes
+# ljob_safe_slug maps every run of chars outside [A-Za-z0-9._-] to one dash.
+# ---------------------------------------------------------------------------
+SS_OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_safe_slug 'feat/x.y z'
+)"
+if [[ "$SS_OUT" == "feat-x.y-z" ]]; then
+    pass "safe_slug_squeezes"
+else
+    fail "safe_slug_squeezes" "got '$SS_OUT'"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: postplan_now_live_exact_slug
+# ljob_postplan_now_live matches the exact slug between the fixed prefix and the
+# timestamp. branch-one-extra must not match branch-one, and an empty slug is rc 1.
+# ---------------------------------------------------------------------------
+PNL_SNAP="$(printf '%s\t%s\t%s\n' '-' '0' 'com.ibl5.postplan-now-branch-one-extra-20260101-120000-99')"
+PNL_SNAP_HIT="$(printf '%s\t%s\t%s\n' '4242' '0' 'com.ibl5.postplan-now-branch-one-20260101-120000-99')"
+PNL_RC="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    hit=0 miss=0 empty=0
+    ljob_postplan_now_live branch-one "$PNL_SNAP_HIT" >/dev/null && hit=1
+    ljob_postplan_now_live branch-one "$PNL_SNAP" >/dev/null || miss=1
+    ljob_postplan_now_live '' "$PNL_SNAP_HIT" >/dev/null || empty=1
+    echo "hit=$hit miss=$miss empty=$empty"
+)"
+if [[ "$PNL_RC" == "hit=1 miss=1 empty=1" ]]; then
+    pass "postplan_now_live_exact_slug"
+else
+    fail "postplan_now_live_exact_slug" "got '$PNL_RC'"
+fi
+PNL_LABEL_OUT="$(
+    HOME="$T/home"
+    PATH="$SHIM_PATH"
+    . "$LIB"
+    ljob_postplan_now_live branch-one "$PNL_SNAP_HIT"
+)"
+if [[ "$PNL_LABEL_OUT" == "com.ibl5.postplan-now-branch-one-20260101-120000-99" ]]; then
+    pass "postplan_now_live_exact_slug: prints label"
+else
+    fail "postplan_now_live_exact_slug: prints label" "got '$PNL_LABEL_OUT'"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 TOTAL=$((PASSED + FAILED))

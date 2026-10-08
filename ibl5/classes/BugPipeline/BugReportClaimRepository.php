@@ -16,7 +16,7 @@ use BugPipeline\Contracts\BugReportClaimRepositoryInterface;
  *
  * @phpstan-import-type BugReportRow from \BugPipeline\BugReportRowCasting
  */
-class BugReportClaimRepository extends \BaseMysqliRepository implements BugReportClaimRepositoryInterface
+class BugReportClaimRepository extends \Database\BaseMysqliRepository implements BugReportClaimRepositoryInterface
 {
     use BugReportRowCasting;
 

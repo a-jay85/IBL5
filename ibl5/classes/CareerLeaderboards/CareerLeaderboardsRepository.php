@@ -12,7 +12,7 @@ use CareerLeaderboards\Contracts\CareerLeaderboardsRepositoryInterface;
  * @phpstan-import-type CareerStatsRow from CareerLeaderboardsRepositoryInterface
  * @phpstan-import-type LeaderboardResult from CareerLeaderboardsRepositoryInterface
  */
-class CareerLeaderboardsRepository extends \BaseMysqliRepository implements CareerLeaderboardsRepositoryInterface
+class CareerLeaderboardsRepository extends \Database\BaseMysqliRepository implements CareerLeaderboardsRepositoryInterface
 {
     /**
      * Default safety limit when $limit = 0 (fetch all rows).

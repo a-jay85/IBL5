@@ -58,7 +58,7 @@ fi
 # names, so the directory slug and the branch name can diverge.
 path="$(git worktree list --porcelain | awk -v b="refs/heads/$branch" '
     /^worktree / { p = substr($0, 10) }
-    /^branch /   { if (substr($0, 8) == b) { print p; exit } }
+    /^branch /   { if (substr($0, 8) == b && !f) { print p; f=1 } }
 ')"
 
 # Fallback: a detached-HEAD worktree has no branch line, so match its directory name.

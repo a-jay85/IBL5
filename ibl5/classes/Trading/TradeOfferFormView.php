@@ -230,7 +230,7 @@ $tradeConfig = [
             $contractAmount = ($contractYear < 7) ? ($row["salary_yr{$contractYear}"] ?? 0) : 0;
             ?>
 <tr>
-<?php if ($contractAmount !== 0 && $ordinal <= \JSB::WAIVERS_ORDINAL):
+<?php if ($contractAmount !== 0 && $ordinal <= \League\JsbConstants::WAIVERS_ORDINAL):
     $wasChecked = isset($checkedItems['1:' . $pid]);
 ?>
     <td>

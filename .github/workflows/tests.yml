@@ -62,6 +62,7 @@ jobs:
             # and shell:. Guarded by bin/test-path-filters.
             both:
               - 'bin/sim-recap-*'
+              - '.github/workflows/sim-recap.yml'
               - 'ibl5/scripts/simRecapQueue.php'
               - 'ibl5/scripts/storeSimRecap.php'
               - 'ibl5/scripts/simRecapContext.php'
@@ -69,6 +70,43 @@ jobs:
             src:
               - '**.php'
               - 'ibl5/migrations/**.sql'
+              # The destructive-migration engine, its wrapper and the full-scan
+              # golden are tested only by the PHPUnit Cli suite (`test` job), so
+              # an engine-only or golden-only PR must flip src. Exact paths, never
+              # bin/**: bin/test-path-filters forbids src swallowing bin/.
+              - 'bin/check-destructive-migrations'
+              - 'bin/lib/destructive-migration-scan.py'
+              - 'ibl5/tests/Cli/fixtures/**'
+              # Every other bin/ script a PHPUnit test runs. A bin-only edit to one
+              # of these must flip src, or the test that covers it never runs and
+              # the break lands on master (#2907). bin/test-path-filters scans
+              # ibl5/tests for `__DIR__ . '/../bin/...'` loads and fails when one
+              # is missing. Three paths load another way and are hand-added, so
+              # the self-test does not catch their omission: bin/lib/db-helpers.sh,
+              # bin/pre-commit-hook, bin/lib/shell-scripts.sh.
+              - 'bin/adr-check'
+              - 'bin/check-boxscore-schedule'
+              - 'bin/check-column-rename-sweep'
+              - 'bin/check-docs'
+              - 'bin/check-e2e-hygiene'
+              - 'bin/check-infection-excludes'
+              - 'bin/check-master-ci-green'
+              - 'bin/check-phpunit-hygiene'
+              - 'bin/lib/db-helpers.sh'
+              - 'bin/lib/git-helpers.sh'
+              - 'bin/lib/pr-armable.sh'
+              - 'bin/lib/shell-scripts.sh'
+              - 'bin/lighthouse-audit-report'
+              - 'bin/lighthouse-audit-urls'
+              - 'bin/merge-master-to-prod'
+              - 'bin/next-adr'
+              - 'bin/next-migration'
+              - 'bin/pr-triage'
+              - 'bin/pre-commit-hook'
+              - 'bin/refactor-flag'
+              - 'bin/rollback-phantom-repair'
+              - 'bin/smoke-prod'
+              - 'bin/website-affecting'
               - 'ibl5/composer.json'
               - 'ibl5/composer.lock'
               - 'ibl5/phpunit.xml'
@@ -88,6 +126,7 @@ jobs:
               - '.claude/skills/post-plan/SKILL.md'
               - '.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md'
               - '.claude/skills/post-plan/_phase-5.5-fidelity.md'
+              - '.claude/skills/post-plan/_phase-6-manual-testing.md'  # Mode A `row` contract pin
               - '.claude/review-shared/scripts/digest.sh'
               # bin/test-post-review-findings reads the Step 7 / Step 1 blocks here,
               # so a skill-only edit must run the harness job too.
@@ -118,11 +157,16 @@ jobs:
               - '.claude/rules/agent-tiering.md'
               - '.claude/rules/work-triage.md'
             ibl5ts:
-              # Everything the ibl5 TS unit suite executes or imports
-              # (tests/ts-unit/ specs cover the pure VR-review helpers and
-              # the E2E summarizer script — see ibl5/vitest.unit.config.ts).
+              # Everything the ibl5 TS unit suite executes or reads
+              # (tests/ts-unit/ specs cover the pure VR-review helpers, the
+              # E2E summarizer script, and the component CSS hex ratchet,
+              # which reads design/components, tokens.css and input.css;
+              # see ibl5/vitest.unit.config.ts).
               - 'ibl5/tests/ts-unit/**'
               - 'ibl5/tests/e2e/vr-*.ts'
+              - 'ibl5/design/components/**'
+              - 'ibl5/design/tokens/tokens.css'
+              - 'ibl5/design/input.css'
               - '.github/scripts/summarize-e2e-results.mjs'
               - 'ibl5/vitest.unit.config.ts'
               - 'ibl5/package.json'
@@ -738,6 +782,8 @@ jobs:
         run: bin/test-automouse-login-preflight
       - name: Run headless elapsed-clock hook regression test
         run: bin/test-headless-elapsed-hook
+      - name: Run post-merge hook change-detection regression test
+        run: bin/test-post-merge-hook
       - name: Run automouse impl cap-timeout regression test
         run: bin/test-automouse-impl-cap-timeout
       - name: Run automouse postplan terminal-disposition regression test
@@ -977,6 +1023,7 @@ jobs:
             bin/test-check-plan \
             bin/test-plan-now \
             bin/test-wt-sync-tick \
+            bin/test-wt-gc-tick \
             bin/test-bin-help \
             bin/test-check-old-code-compat \
             bin/test-cleanup-safety \
@@ -994,12 +1041,14 @@ jobs:
             bin/test-post-plan-now-untracked-only \
             bin/test-review-shared-skip \
             bin/test-pr-cycle \
+            bin/test-pr-cycle-tick \
             bin/test-digest-dm-build \
             bin/test-pr-review-now \
             bin/test-launchd-job \
             bin/test-check-phpunit-hygiene \
             bin/test-test \
             bin/test-refactor-flag \
+            bin/test-rebuild-css-if-source-changed \
             bin/test-automouse-queue \
             bin/test-automouse-self-heal \
             bin/test-automouse-depends-on \
@@ -1009,11 +1058,13 @@ jobs:
             bin/test-automouse-cost-rows \
             bin/test-automouse-measure-delegate-cost \
             bin/test-automouse-morning-digest \
+            bin/test-automouse-comprehension-digest \
             bin/test-automouse-postplan-engine \
             bin/test-automouse-canary \
             bin/test-fleet-status \
             bin/test-wt-status \
             bin/test-wt-new-root \
+            bin/test-wt-pool \
             bin/test-wt-rebase \
             bin/test-check-plan-staleness \
             bin/test-matrix-assertion-check \
@@ -1054,9 +1105,10 @@ jobs:
             bin/test-launchd-health-cron-setup \
             bin/test-bug-pipeline-ci-autofix \
             bin/test-sim-recap-tick \
+            bin/test-events-review \
+            bin/test-sim-recap-ssh-gate \
             bin/test-discord-dm \
             bin/test-post-plan-fail-dm \
-            bin/test-token-report \
             bin/test-automouse-escalation \
             bin/test-automouse-repeat-failure \
             bin/test-automouse-disarm \
@@ -1065,11 +1117,11 @@ jobs:
             bin/test-scrub-log-credentials \
             bin/test-db-query-routing \
             bin/test-watch-run \
+            bin/test-watch-automouse-plan \
             ibl5/bin/test-flake-ledger \
             bin/test-path-filters \
             ibl5/bin/test-db-sync-now \
             bin/test-architect-contract-split \
-            bin/test-plan-review-digest \
             bin/test-plan-review-seam \
             bin/test-check-registry-trigger-rows \
             bin/test-ci-memo \
@@ -1084,6 +1136,9 @@ jobs:
       # Needs a scrubbed environment, so it cannot share the runner.
       - name: bin/test-burndown-loop
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-burndown-loop'
+      # Needs a scrubbed environment, so it cannot share the runner.
+      - name: bin/test-wt-pool
+        run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-wt-pool'
 
       - name: bin/test-restore-rowcount-compare
         run: bin/test-restore-rowcount-compare

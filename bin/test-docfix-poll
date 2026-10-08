@@ -701,8 +701,9 @@ SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
     run_poll_err "$SB"
 { grep -q "$B_OLD" "$SB/wt-remove-calls" 2>/dev/null \
     && grep -q "$B_OLD" "$SB/git-branch-d-calls" 2>/dev/null \
-    && ! grep -q "Could not reap" "$POLL_STDERR_FILE"; } \
-  && ok "(23a) zero-own-commit clean wedged branch: wt-remove + branch -D, no 'Could not reap'" \
+    && ! grep -q "Could not reap" "$POLL_STDERR_FILE" \
+    && ! grep -q "salvage failed" "$POLL_STDERR_FILE"; } \
+  && ok "(23a) zero-own-commit clean wedged branch: wt-remove + branch -D, no 'Could not reap', no 'salvage failed'" \
   || bad "(23a) zero-own-commit clean wedged branch not removed"
 
 # (23b) negative: branch has own commits (not an ancestor) → left in place.
@@ -715,9 +716,10 @@ SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
     SHIM_SHOWREF_RC=0 SHIM_MERGEBASE_RC=1 \
     run_poll_err "$SB"
 { [ ! -f "$SB/wt-remove-calls" ] && [ ! -f "$SB/git-branch-d-calls" ] \
-    && grep -q "Could not reap" "$POLL_STDERR_FILE"; } \
-  && ok "(23b) clean branch with own commits: not force-removed, left in place" \
-  || bad "(23b) branch with own commits must not be force-removed"
+    && grep -q "Could not reap" "$POLL_STDERR_FILE" \
+    && grep -qF "salvage failed for '$B_OLD'" "$POLL_STDERR_FILE"; } \
+  && ok "(23b) clean branch with own commits: not force-removed, left in place, salvage reported failed" \
+  || bad "(23b) branch with own commits must not be force-removed and salvage must return non-zero"
 
 # (23c) dirty wedged branch salvaged + pushed, but bin/cleanup SKIPs it (the salvage
 # commit is on no merged PR). The ref must still be removed, or it re-wedges nightly.
@@ -735,6 +737,39 @@ SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
     && ! grep -q "could not remove" "$POLL_STDERR_FILE"; } \
   && ok "(23c) salvaged branch left by cleanup: wt-remove + branch -D after push" \
   || bad "(23c) salvaged branch must be removed after a successful push"
+
+# (23d) clean arm, ancestor of master, but wt-remove fails: branch -D must NOT run
+# (the && chain short-circuits) and the "Could not reap" message must be printed.
+SB="$(_wt_sandbox)"
+WL23D="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL23D" SHIM_STATUS_OUT="" SHIM_LAUNCHCTL_OUT="" \
+    SHIM_SHOWREF_RC=0 SHIM_MERGEBASE_RC=0 SHIM_WTREMOVE_RC=1 \
+    run_poll_err "$SB"
+{ grep -q "$B_OLD" "$SB/wt-remove-calls" 2>/dev/null \
+    && [ ! -f "$SB/git-branch-d-calls" ] \
+    && grep -q "Could not reap" "$POLL_STDERR_FILE"; } \
+  && ok "(23d) clean wedged branch, wt-remove fails: no branch -D, 'Could not reap' printed" \
+  || bad "(23d) clean arm must report 'Could not reap' and skip branch -D when wt-remove fails"
+
+# (23e) salvage arm pushed, but wt-remove fails: branch -D must NOT run and the
+# "could not remove" message must be printed.
+SB="$(_wt_sandbox)"
+WL23E="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL23E" SHIM_STATUS_OUT=" M docs/foo.md" SHIM_LAUNCHCTL_OUT="" \
+    SHIM_SHOWREF_RC=0 SHIM_WTREMOVE_RC=1 \
+    run_poll_err "$SB"
+{ [ -f "$SB/git-push-calls" ] \
+    && grep -q "$B_OLD" "$SB/wt-remove-calls" 2>/dev/null \
+    && [ ! -f "$SB/git-branch-d-calls" ] \
+    && grep -q "could not remove" "$POLL_STDERR_FILE"; } \
+  && ok "(23e) salvaged branch, wt-remove fails: no branch -D, 'could not remove' printed" \
+  || bad "(23e) salvage arm must report 'could not remove' and skip branch -D when wt-remove fails"
 
 # Test 24: reaper prints "could not reap" when bin/cleanup exits non-zero
 # (named mode exits 3 on SKIP, IBL5-backlog#1244).

@@ -79,10 +79,10 @@ while IFS= read -r file; do
         exit 2
     fi
 
-    # --- Top-level shared PHP classes ---
-    if [[ "$file" == ibl5/classes/BaseMysqliRepository.php ]] || \
-       [[ "$file" == ibl5/classes/ContractRules.php ]] || \
-       [[ "$file" == ibl5/classes/JSB.php ]] || \
+    # --- Shared base PHP classes ---
+    if [[ "$file" == ibl5/classes/Database/BaseMysqliRepository.php ]] || \
+       [[ "$file" == ibl5/classes/League/ContractRules.php ]] || \
+       [[ "$file" == ibl5/classes/League/JsbConstants.php ]] || \
        [[ "$file" == ibl5/classes/CommonMysqliRepository.php ]]; then
         exit 2
     fi

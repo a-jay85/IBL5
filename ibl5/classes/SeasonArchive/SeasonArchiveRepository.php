@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SeasonArchive;
 
-use BaseMysqliRepository;
+use Database\BaseMysqliRepository;
 use League\League;
 use League\LeagueContext;
 use SeasonArchive\Contracts\SeasonArchiveRepositoryInterface;
@@ -23,7 +23,7 @@ use SeasonArchive\Contracts\SeasonArchiveRepositoryInterface;
  * @phpstan-import-type HeatWinLossRow from \SeasonArchive\Contracts\SeasonArchiveRepositoryInterface
  *
  * @see SeasonArchiveRepositoryInterface For the interface contract
- * @see \BaseMysqliRepository For base class documentation
+ * @see \Database\BaseMysqliRepository For base class documentation
  */
 class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArchiveRepositoryInterface
 {

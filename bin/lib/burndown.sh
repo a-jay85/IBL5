@@ -279,7 +279,7 @@ bd_cost_for() {
     fi
 }
 
-# bd_load_repo_files — one `git ls-files` per run into a C-sorted list at $BD_REPO_FILES
+# bd_load_repo_files — one `git ls-files` per run into a C-sorted list at $BD_REPO_FILES plus a unique-basename index at $BD_REPO_BASENAMES
 bd_load_repo_files() {
     BD_REPO_FILES="$BD_TMP/repo-files.txt"
     local raw="$BD_TMP/repo-files.raw" rc=0
@@ -287,17 +287,32 @@ bd_load_repo_files() {
     [ "$rc" -eq 0 ] || bd_die 3 "git ls-files failed (exit $rc)"
     LC_ALL=C sort -u "$raw" > "$BD_REPO_FILES"
     [ -s "$BD_REPO_FILES" ] || bd_die 3 "git ls-files listed no files"
+    # Unique-basename index: "<basename>\t<path>" for basenames carried by exactly
+    # one tracked file (index.php, README.md, SKILL.md drop out). Built once per run.
+    BD_REPO_BASENAMES="$BD_TMP/repo-basenames.tsv"
+    LC_ALL=C awk -F/ '{ b = $NF; n[b]++; p[b] = $0 }
+        END { for (b in n) if (n[b] == 1) printf "%s\t%s\n", b, p[b] }' \
+        "$BD_REPO_FILES" | LC_ALL=C sort -t "$(printf '\t')" -k1,1 > "$BD_REPO_BASENAMES"
 }
 
 # bd_paths_for <body> — sets _bd_paths (newline-sep file paths, sorted -u)
+# Sources: path:N refs, slash-bearing tracked paths, and slash-free words that
+# name a unique tracked basename (CamelCase words map to <Word>.php).
 bd_paths_for() {
-    [ -n "${BD_REPO_FILES:-}" ] || bd_die 3 "bd_paths_for called before bd_load_repo_files"
-    local fl bare
+    [ -n "${BD_REPO_FILES:-}" ] && [ -n "${BD_REPO_BASENAMES:-}" ] \
+        || bd_die 3 "bd_paths_for called before bd_load_repo_files"
+    local fl bare base tab
+    tab="$(printf '\t')"
     fl="$(grep -oE "$FILE_LINE_RE" <<< "$1" | sed 's/:[0-9]*$//')" || true
     bare="$(grep -oE '[A-Za-z0-9_./-]*/[A-Za-z0-9_./-]*' <<< "$1" \
         | sed -e 's#^\./##' -e 's/[.,;]*$//' | LC_ALL=C sort -u \
         | LC_ALL=C comm -12 - "$BD_REPO_FILES")" || true
-    _bd_paths="$(printf '%s\n%s\n' "$fl" "$bare" | grep -v '^$' | LC_ALL=C sort -u)" || true
+    base="$(tr -cs 'A-Za-z0-9_./-' '\n' <<< "$1" \
+        | sed -e 's/[.-]*$//' -e 's/^[.-]*//' | grep -v / \
+        | grep -E '^[A-Za-z0-9_-]+\.[A-Za-z0-9]+$|^[A-Z][a-z0-9]+([A-Z][a-z0-9]*)+$' \
+        | sed -E '/\./!s/$/.php/' | LC_ALL=C sort -u \
+        | LC_ALL=C join -t "$tab" -o 2.2 - "$BD_REPO_BASENAMES")" || true
+    _bd_paths="$(printf '%s\n%s\n%s\n' "$fl" "$bare" "$base" | grep -v '^$' | LC_ALL=C sort -u)" || true
 }
 
 # bd_has_overlap <paths> <held_tsv_file> — print "path<TAB>holder_num"; exit 1 if none
@@ -725,6 +740,13 @@ bd_cmd_burndown() {
     if [ "$used" -eq 0 ]; then
         printf 'LEDGER: none\n'
         [ "$BD_LIVE_UNKNOWN" -eq 0 ] || return 1
+        # Empty-backlog sentinel: bin/burndown-loop exports a batch-scoped
+        # path and treats a batch as empty only when this file exists. First
+        # selection round only (no --after); unset or empty var = no-op.
+        if [ -n "${IBL5_BURNDOWN_EMPTY_SENTINEL:-}" ] && [ -z "$afters" ]; then
+            printf 'LEDGER: none\n' > "$IBL5_BURNDOWN_EMPTY_SENTINEL" 2>/dev/null \
+                || printf 'burndown: cannot write empty sentinel %s\n' "$IBL5_BURNDOWN_EMPTY_SENTINEL" >&2
+        fi
         return 0
     fi
 

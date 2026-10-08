@@ -280,6 +280,8 @@ class BugPipelineCliTest extends DatabaseTestCase
             [(string) self::ID_QUEUED, 'fixed', '--bogus=1'],
             // A flag given a value is equally a caller bug.
             [(string) self::ID_QUEUED, 'fixed', '--release-lease=1'],
+            // A stray third positional used to be silently ignored.
+            [(string) self::ID_QUEUED, 'fixed', 'stray'],
         ] as $badArgs) {
             $r = $this->runCli('transition.php', $badArgs);
             self::assertSame(1, $r['code'], 'expected exit 1 for: ' . implode(' ', $badArgs));

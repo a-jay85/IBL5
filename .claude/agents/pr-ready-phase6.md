@@ -2,7 +2,7 @@
 name: pr-ready-phase6
 description: Pinned Opus 5.5 plan-intent fidelity reviewer for /pr-ready runtime Phase 6. Spawned exactly once per run by the /pr-ready orchestrator; performs the _plan-fidelity-review.md 6b-6e review over the post-rebase diff and writes a verdict file. Never spawns a delegate, never edits repo files, never pushes.
 model: claude-opus-5-5
-last_verified: 2026-10-03
+last_verified: 2026-10-07
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
@@ -108,6 +108,17 @@ in this review.
    heading is indistinguishable, to a reader, from a truncated or failed review; an empty one
    is unambiguous. Nothing else changes: the terminal verdict word remains the last *bare*
    line of the prose body, and `## DIGEST` still follows it as the last thing in the file.
+   **Severity marker.** Open every top-level finding bullet with exactly one marker,
+   written in upper case right after the bullet dash: `- [BLOCKING] ` for a finding that
+   matched a blocking clause in 6d, `- [NOTE] ` for a finding that matched none. The
+   marker sits on the top-level bullet line only. A nested bullet, a `####` sub-heading,
+   or a `**Finding N:**` continuation under that bullet inherits its marker and carries
+   none of its own. The marker and the verdict word must agree: `NOT READY` has at least
+   one `[BLOCKING]` bullet, `READY WITH NOTES` has only `[NOTE]` bullets, and `READY` has
+   an empty `## FINDINGS` section. The marker is a parsing token. Keep it out of the
+   finding's title, so it never reaches a backlog issue title, the terminal line, or
+   `## DIGEST`. A reader that meets a top-level finding bullet with no marker treats that
+   finding as blocking.
 3. **Append a `## DIGEST` section, and nothing after it.** The terminal verdict word stays
    the last *bare* line of the prose body; `## DIGEST` is a heading that follows it, so the
    Phase 7 composer can find the section with a fixed-string match and the existing

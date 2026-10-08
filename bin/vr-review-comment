@@ -7,7 +7,6 @@
 // coverage JSON (bin/vr-changed-coverage output), and the per-SHA Pages base URL,
 // then writes the comment markdown (consumed by
 // marocchino/sticky-pull-request-comment in .github/workflows/e2e-tests.yml).
-// Models bin/lighthouse-comment.
 //
 // Additive modes (see ADR-0076):
 //   --copy-new-screens=DEST   copy each newCells render into DEST, then exit.

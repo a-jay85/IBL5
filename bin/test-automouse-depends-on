@@ -494,13 +494,17 @@ exit 0
 CLAUDE
 chmod +x "$E2_STUB/claude"
 
-# post-plan-now stub: simulates a successful postplan. Parses the plan name from
-# --plan <path>, moves the queue symlink to done/, removes the handoff.
+# post-plan-now stub. Mode comes from $E2_ROOT/pp.mode (reset to "success" by
+# reset_e2). success: moves the queue symlink to done/, removes the handoff,
+# exits 0. fail: touches nothing in queue/ or handoff/, records a
+# "<plan> postplan-fail" trace line, exits 1 with output that matches no
+# environmental-error signature, so only the runner's own logic decides the path.
 cat > "$E2_ROOT/post-plan-now" <<PPSTUB
 #!/usr/bin/env bash
 set -u
 NDIR="$E2_NDIR"
 TRACE="$E2_TRACE"
+MODE_FILE="$E2_ROOT/pp.mode"
 plan=""
 while [ "\$#" -gt 0 ]; do
     case "\$1" in
@@ -508,6 +512,13 @@ while [ "\$#" -gt 0 ]; do
         *)      shift ;;
     esac
 done
+mode=\$(cat "\$MODE_FILE" 2>/dev/null || echo success)
+if [ "\$mode" = "fail" ]; then
+    [ -n "\$plan" ] && printf '%s postplan-fail\n' "\$plan" >> "\$TRACE"
+    printf 'post-plan stub: simulated plan failure\n'
+    printf 'RESULT: failure\n'
+    exit 1
+fi
 if [ -n "\$plan" ]; then
     mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
     rm -f "\$NDIR/handoff/\$plan.json" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
@@ -530,6 +541,7 @@ esac
 GHSTUB
 chmod +x "$E2_GH"
 echo MERGED > "$E2_ROOT/gh.mode"
+echo success > "$E2_ROOT/pp.mode"
 
 write_e2_plan() {
     local name="$1"; shift
@@ -549,6 +561,18 @@ reset_e2() {
           "$E2_NDIR/done"/*.md "$E2_TRACE"
     : > "$E2_TRACE"
     echo MERGED > "$E2_ROOT/gh.mode"
+    echo success > "$E2_ROOT/pp.mode"
+}
+
+# reset_e2_clean: reset_e2 plus empty logs/, reports/, and skipped/. Used only by
+# the post-plan failure cases (P1-P2). reset_e2 keeps every earlier runner log
+# and report, and e2_logtxt reads all of today's logs, so a negative assertion
+# ("no env-stop report", "no Environmental failure line") would otherwise see a
+# previous case's files. V1-V5 keep calling plain reset_e2, unchanged.
+reset_e2_clean() {
+    reset_e2
+    rm -f "$E2_NDIR/logs"/*.log "$E2_NDIR/reports"/*.md "$E2_NDIR/skipped"/*.md \
+          "$E2_NDIR/skipped"/*.attempts 2>/dev/null || true
 }
 
 run_e2() {  # run exactly one iteration; each caller pre-loads exactly one plan in queue
@@ -661,6 +685,145 @@ want "V5: termination log names held plans, not concurrency" \
     "$LOGTXT_V5" "Dependency-held this run"
 case "$LOGTXT_V5" in *"claimed by a concurrent runner"*) \
     fail "V5: runner logged the false concurrency message" ;; esac
+
+# P1 — post-plan-now exits 1 instantly with the handoff kept: the runner must
+# classify it environmental (sub-MIN_VIABLE_SECS exit, handoff present), refund
+# the attempt, write the env-stop report, and stop without re-claiming.
+reset_e2_clean
+echo fail > "$E2_ROOT/pp.mode"
+write_e2_plan "ppfast"
+run_e2 > /dev/null 2>&1
+LOGTXT_P1="$(e2_logtxt)"
+if grep -q 'ppfast.md postplan-fail' "$E2_TRACE" 2>/dev/null; then
+    ok "P1: runner reached postplan and the stub took its fail branch"
+else
+    fail "P1: post-plan-now fail branch never ran (trace: $(cat "$E2_TRACE" 2>/dev/null))"
+fi
+assert_eq "P1: post-plan-now invoked exactly once (loop stopped, no re-claim)" \
+    "$(grep -c 'ppfast.md postplan-fail' "$E2_TRACE" 2>/dev/null)" "1"
+assert_present "P1: fast failure → plan stays in queue/" "$E2_NDIR/queue/ppfast.md"
+assert_absent  "P1: fast failure → plan NOT moved to done/" "$E2_NDIR/done/ppfast.md"
+assert_absent  "P1: fast failure → plan NOT moved to skipped/" "$E2_NDIR/skipped/ppfast.md"
+# Impl handoff seeds .attempts to 1, so this absence proves refund_attempt ran
+# (a refund of 1 removes the file). The "Refunding attempt, stopping loop" want
+# below pins the log side of the same refund.
+assert_absent  "P1: fast failure → no .attempts counter left behind" \
+    "$E2_NDIR/queue/ppfast.md.attempts"
+P1_REPORT="$(ls "$E2_NDIR/reports"/*-env-stop-*ppfast*.md 2>/dev/null | head -1)"
+if [ -n "$P1_REPORT" ]; then
+    ok "P1: env-stop report written"
+else
+    fail "P1: no env-stop report under $E2_NDIR/reports (have: $(ls "$E2_NDIR/reports" 2>/dev/null))"
+fi
+want "P1: log records the non-zero post-plan exit" \
+    "$LOGTXT_P1" "post-plan-now exited code=1 (postplan phase)"
+want "P1: log carries the environmental breaker line" \
+    "$LOGTXT_P1" "Environmental failure during postplan"
+want "P1: breaker reason names the sub-minute exit" "$LOGTXT_P1" "postplan exited in"
+want "P1: breaker names the refund-and-stop decision" \
+    "$LOGTXT_P1" "Refunding attempt, stopping loop"
+
+# P2 — post-plan-now exits 1 past the viability floor: a genuine plan failure.
+# A second runner copy pins MIN_VIABLE_SECS=0 so the breaker's duration arm
+# cannot fire; the shared $E2_RUNNER stays untouched for V1-V5. Its PATH puts
+# $E2_STUB_SF first: the same claude stub plus a gh stub that prints nothing
+# (no PR), so terminal disposition never reaches the real GitHub CLI.
+# `plan ppslow` is single-plan mode: one attempt, then break before the
+# between-plans canary.
+E2_STUB_SF="$E2_ROOT/stub-sf"
+E2_GH_SF_ARGS="$E2_ROOT/gh-sf.args"
+mkdir -p "$E2_STUB_SF"
+ln -sf "$E2_STUB/claude" "$E2_STUB_SF/claude"
+cat > "$E2_STUB_SF/gh" <<GHSF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$E2_GH_SF_ARGS"
+exit 0
+GHSF
+chmod +x "$E2_STUB_SF/gh"
+E2_RUNNER_SF="$E2_NDIR/run-slowfail"
+sed \
+    -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$E2_NDIR\"#" \
+    -e "s#^REPO=.*#REPO=\"$REPO_ROOT\"#" \
+    -e "s#^export PATH=.*#export PATH=\"$E2_STUB_SF:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
+    -e "s#^MIN_VIABLE_SECS=[0-9][0-9]*#MIN_VIABLE_SECS=0#" \
+    "$REPO_ROOT/bin/automouse/run" > "$E2_RUNNER_SF"
+chmod +x "$E2_RUNNER_SF"
+assert_eq "P2: slow-fail runner copy pins MIN_VIABLE_SECS=0" \
+    "$(grep -c '^MIN_VIABLE_SECS=0' "$E2_RUNNER_SF")" "1"
+
+reset_e2_clean
+: > "$E2_GH_SF_ARGS"
+echo fail > "$E2_ROOT/pp.mode"
+write_e2_plan "ppslow"
+GH="$E2_GH" NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
+CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+timeout 30 "$E2_RUNNER_SF" plan ppslow > /dev/null 2>&1 || true
+LOGTXT_P2="$(e2_logtxt)"
+if grep -q 'ppslow.md postplan-fail' "$E2_TRACE" 2>/dev/null; then
+    ok "P2: runner reached postplan and the stub took its fail branch"
+else
+    fail "P2: post-plan-now fail branch never ran (trace: $(cat "$E2_TRACE" 2>/dev/null); gh calls: $(cat "$E2_GH_SF_ARGS" 2>/dev/null))"
+fi
+assert_eq "P2: post-plan-now invoked exactly once (single-plan mode, no retry)" \
+    "$(grep -c 'ppslow.md postplan-fail' "$E2_TRACE" 2>/dev/null)" "1"
+assert_present "P2: genuine failure → plan stays in queue/ for retry" "$E2_NDIR/queue/ppslow.md"
+assert_absent  "P2: genuine failure → plan NOT filed to done/" "$E2_NDIR/done/ppslow.md"
+assert_absent  "P2: genuine failure → plan NOT moved to skipped/" "$E2_NDIR/skipped/ppslow.md"
+# Impl handoff seeds .attempts to 1 (the impl run's post-plan is attempt 1), so
+# a genuine post-plan failure leaves the counter at 1, never absent. The env-stop
+# report and Environmental line below separate this path from the breaker.
+assert_eq "P2: genuine failure → impl run's post-plan counted as attempt 1" \
+    "$(cat "$E2_NDIR/queue/ppslow.md.attempts" 2>/dev/null)" "1"
+P2_REPORT="$(ls "$E2_NDIR/reports"/*-env-stop-*ppslow*.md 2>/dev/null | head -1)"
+if [ -z "$P2_REPORT" ]; then
+    ok "P2: no env-stop report for a genuine failure"
+else
+    fail "P2: env-stop report written for a genuine failure: $P2_REPORT"
+fi
+want "P2: log records the non-zero post-plan exit" \
+    "$LOGTXT_P2" "post-plan-now exited code=1 (postplan phase)"
+case "$LOGTXT_P2" in
+    *"Environmental failure during postplan"*)
+        fail "P2: genuine failure misclassified as Environmental failure during postplan" ;;
+    *)  ok "P2: no Environmental failure during postplan line" ;;
+esac
+want "P2: terminal disposition queried PR state via the stub gh (pr list --head)" \
+    "$(cat "$E2_GH_SF_ARGS" 2>/dev/null)" "pr list --head"
+
+# P3 — invocation 2 over P2's real output (no hand-built state): a plan that
+# depends on the failed plan must stay held. ppslow is still in queue/, not
+# done/, so the resolver answers unmet without any gh call.
+write_e2_plan "ppdep" "depends_on: ppslow"
+GOT_P3="$( export NIGHTLY_DIR="$E2_NDIR" GH="$E2_GH"
+           . "$REPO_ROOT/bin/lib/plan-depends-on"
+           plan_depends_on_status "$E2_NDIR/queue/ppdep.md" )"
+assert_eq "P3: dependent of a failed post-plan resolves unmet:ppslow" "$GOT_P3" "unmet:ppslow"
+
+# P4 — multi-run cap over P2's real state: ppslow sits in queue/ with its
+# handoff and .attempts=1 after P2. Each `plan ppslow` resumes (impl skipped)
+# and runs post-plan once. MAX_ATTEMPTS=3 must give post-plan exactly 3 runs in
+# total: P2's run, then resumes 2 and 3; the 4th claim files it to skipped/.
+# $E2_TRACE is not reset here, so its postplan-fail count is cumulative.
+rm -f "$E2_NDIR/queue/ppdep.md"
+p4_resume() {
+    GH="$E2_GH" NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
+    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+    timeout 30 "$E2_RUNNER_SF" plan ppslow > /dev/null 2>&1 || true
+}
+p4_resume
+assert_eq "P4: resume 1 → .attempts reads 2" \
+    "$(cat "$E2_NDIR/queue/ppslow.md.attempts" 2>/dev/null)" "2"
+assert_eq "P4: resume 1 → post-plan invoked 2 times in total" \
+    "$(grep -c 'ppslow.md postplan-fail' "$E2_TRACE" 2>/dev/null)" "2"
+p4_resume
+assert_eq "P4: resume 2 → .attempts reads 3" \
+    "$(cat "$E2_NDIR/queue/ppslow.md.attempts" 2>/dev/null)" "3"
+assert_present "P4: resume 2 → plan still in queue/" "$E2_NDIR/queue/ppslow.md"
+p4_resume
+assert_present "P4: claim at cap → plan moved to skipped/" "$E2_NDIR/skipped/ppslow.md"
+assert_absent  "P4: claim at cap → plan gone from queue/" "$E2_NDIR/queue/ppslow.md"
+assert_eq "P4: post-plan invoked exactly MAX_ATTEMPTS=3 times across all runs" \
+    "$(grep -c 'ppslow.md postplan-fail' "$E2_TRACE" 2>/dev/null)" "3"
 
 # ── Final summary ─────────────────────────────────────────────────────────────
 

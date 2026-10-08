@@ -73,7 +73,7 @@
 .trade-roster-preview__title {
     color: var(--gray-700);
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     font-size: var(--text-lg);
     text-align: center;
     letter-spacing: var(--tracking-display);
@@ -252,7 +252,7 @@
 /* Contracts tab: red text, light red background, red glow border */
 .trade-roster-preview__tabs .ibl-tab.cap-warning-tab {
     color: var(--color-error-600);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     background-color: var(--color-error-50);
     box-shadow: 0 0 10px 3px rgba(220, 38, 38, 0.5);
 }
@@ -263,7 +263,7 @@
     background-color: var(--color-error-50);
     box-shadow: 0 0 10px 3px rgba(220, 38, 38, 0.5);
     position: relative;
-    z-index: 1;
+    z-index: var(--z-raised);
 }
 
 /* Hide per-team dropdowns injected by API responses */

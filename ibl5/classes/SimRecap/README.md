@@ -1,6 +1,6 @@
 ---
 description: Ingests externally-generated sim recap documents and queues them for the sim recap pipeline; RecapPhasePolicy gates generation to HEAT and Regular Season; SimRecapContextRepository precomputes roster context for generation.
-last_verified: 2026-09-29
+last_verified: 2026-09-30
 ---
 
 # SimRecap
@@ -15,3 +15,10 @@ Handles the ingest of externally-generated simulation recap documents into the a
 | `SimSummariesView` | Renders sim recap summaries |
 | `RecapDocument` | Assembles the postable document from intro + game rows + outro, shaped like `bin/lib/sim-recap-exemplar.txt`; prefers the stored text when the parts are degraded or incomplete |
 | `SimRecapContextRepository` | Precomputes current rosters, active injuries, and in-window trades for a sim |
+| `GitHubDispatchClient` | Posts a `repository_dispatch` of type `sim-recap` to GitHub; `fromConfig()` returns null when the config file or token is missing, and `dispatch()` never throws |
+
+## Dispatch and hosts
+
+`QueueSimSummaryStep` calls `GitHubDispatchClient::dispatch()` only when it queues a new sim. The client reads `ibl5/config/github-dispatch.config.php` (template: `ibl5/config/github-dispatch.config.example.php`). A null client means dispatch is off, and the step message stays as it was. A failed dispatch changes the message only. The hourly schedule in `.github/workflows/sim-recap.yml` picks up the queued sim.
+
+`bin/sim-recap-tick` runs on either host. `SIM_RECAP_HOST_MODE=actions` makes the launchd bootout and the local db-sync log-only no-ops. The default is `launchd`. Setup and rotation steps are in `ibl5/docs/OPERATIONS_RUNBOOK.md` section 8. The design is in ADR-0154.

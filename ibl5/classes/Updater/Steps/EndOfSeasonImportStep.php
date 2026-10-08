@@ -149,7 +149,7 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
         <h2 class="ibl-card__title">IBL Finals MVP</h2>
     </div>
     <div class="ibl-card__body">
-        <form method="POST" action="/ibl5/leagueControlPanel.php">
+        <form method="POST" action="/ibl5/modules.php?name=LeagueControlPanel">
             <input type="text" name="finals_mvp_name" maxlength="32" placeholder="Finals MVP name" class="ibl-input ibl-input--sm">
             <button type="submit" name="action" value="set_finals_mvp" class="ibl-btn ibl-btn--primary">Set Finals MVP</button>
         </form>

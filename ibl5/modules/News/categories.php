@@ -46,7 +46,7 @@ $cat = $catid;
 
 function theindex($catid)
 {
-    global $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $cookie, $nukeurl, $prefix, $multilingual, $currentlang, $db, $articlecomm, $module_name, $userinfo, $authService, $mysqli_db;
+    global $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $nukeurl, $prefix, $multilingual, $currentlang, $db, $articlecomm, $module_name, $userinfo, $authService, $mysqli_db;
     if (is_user($user)) {$userinfo = $authService->getUserInfo();}
     if ($multilingual == 1) {
         $querylang = "AND (alanguage='$currentlang' OR alanguage='')"; /* the OR is needed to display stories who are posted to ALL languages */

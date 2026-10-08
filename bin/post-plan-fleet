@@ -501,6 +501,12 @@ while read -r pr; do
     else
         branch="$(pr_json | jq -r --arg n "$pr" '.[] | select(.number == ($n|tonumber)) | .headRefName')"
     fi
+    # A worktree-fired post-plan-now for this branch holds com.ibl5.postplan-now-<slug>-*.
+    # A rescue fired now would race it on the same worktree, branch and PR. Skip it here,
+    # before a slot, runner and log are spent on a run post-plan-now would refuse (exit 6).
+    if ljob_postplan_now_live "$(ljob_safe_slug "$branch")" "$LAUNCHCTL_LIST" >/dev/null; then
+        SKIP_LINES+=("$pr|$branch|-|post-plan-now in flight; skipped"); continue
+    fi
     # Pre-flight: worktree + plan check.
     # grep -F is required: without it, [$branch] is treated as a character class.
     # The [branch] form (not path) matches git worktree list's "path  sha [branch]" output.
@@ -762,9 +768,14 @@ log: $LOG"
 # Derive outcome word for pr-cycle summary and write to LOG BEFORE releasing the
 # slot. pr-cycle --wait returns when the plist disappears; the LOG must be fully
 # written before that happens so _stage1_outcome_summary() can read it.
+# Outcome words: shipped, held, declined, paused, conflict, failed, timed-out.
+# A second line `post-plan-fleet: reason=<short>` follows when there is a reason.
 _ppf_outcome=""
+_ppf_reason=""
+_ppf_result=$(grep -m1 '^RESULT:' "$LOG" 2>/dev/null || true)
 if [ "$RC" = 124 ]; then
     _ppf_outcome="timed-out"
+    _ppf_reason="timeout"
 else
     _ppf_run_dir=$(grep -m1 'harness-run-dir=' "$LOG" 2>/dev/null \
         | grep -o 'harness-run-dir=[^[:space:]]*' | cut -d= -f2 || true)
@@ -775,15 +786,47 @@ else
             "$_ppf_run_dir/result.json" 2>/dev/null || true)
     fi
     # result.json is authoritative; the RESULT: line is the fallback when it is absent.
-    [ -n "$_ppf_terminal" ] || _ppf_terminal=$(grep -m1 '^RESULT:' "$LOG" 2>/dev/null \
+    [ -n "$_ppf_terminal" ] || _ppf_terminal=$(printf '%s\n' "$_ppf_result" \
         | grep -o 'terminal=[a-z-]*' | cut -d= -f2 || true)
     case "$_ppf_terminal" in
-        shipped-armed) _ppf_outcome="shipped" ;;
-        shipped-held)  _ppf_outcome="held" ;;
-        *)             _ppf_outcome="blocked" ;;
+        shipped-armed|already-shipped|shipped-held)
+            case "$_ppf_terminal" in
+                shipped-held) _ppf_outcome="held" ;;
+                *)            _ppf_outcome="shipped" ;;
+            esac
+            _ppf_reason=$(printf '%s\n' "$_ppf_result" | grep -oE 'PR #[0-9]+' | head -1 || true)
+            ;;
+        *)
+            if printf '%s\n' "$_ppf_result" | grep -q '^RESULT: post-plan DECLINED'; then
+                _ppf_outcome="declined"
+                _ppf_reason="holdrepeat"
+            elif grep -q 'postplan-rc=75' "$LOG" 2>/dev/null \
+                || printf '%s\n' "$_ppf_result" | grep -q '^RESULT: post-plan PAUSED'; then
+                _ppf_outcome="paused"
+                _ppf_reason="usage-gate"
+            elif printf '%s\n' "$_ppf_result" | grep -qE 'rebase conflict|rebase-conflict:'; then
+                _ppf_outcome="conflict"
+                _ppf_reason=$(printf '%s\n' "$_ppf_result" | sed -n 's/.*tree proof failed://p' \
+                    | grep -oE '(^|[[:space:]])[0-9]+ [0-9]+ [^[:space:]]+' \
+                    | awk '{print $NF}' | awk '!s[$0]++' | paste -sd' ' - || true)
+                [ -n "$_ppf_reason" ] || _ppf_reason="rebase-continue-failed"
+            else
+                _ppf_outcome="failed"
+                _ppf_reason=$(printf '%s\n' "$_ppf_result" \
+                    | grep -oE 'kind=[a-z0-9-]+' | head -1 | cut -d= -f2 || true)
+                if [ -z "$_ppf_reason" ]; then
+                    if [ -n "$_ppf_terminal" ]; then
+                        _ppf_reason="terminal=$_ppf_terminal"
+                    else
+                        _ppf_reason="no-result"
+                    fi
+                fi
+            fi
+            ;;
     esac
 fi
 echo "post-plan-fleet: outcome=$_ppf_outcome" >> "$LOG"
+[ -z "$_ppf_reason" ] || echo "post-plan-fleet: reason=$_ppf_reason" >> "$LOG"
 # Releasing the slot is the FIRST post-run action: "plist present" == "job live"
 # is what the concurrency cap counts.
 rm -f "$PLIST"
@@ -843,11 +886,16 @@ _WAIT_TIMED_OUT=0
 if [[ "$WAIT" -eq 1 && "$GO" -eq 1 ]]; then
     if [[ -z "${POST_PLAN_FLEET_DRY_RUN:-}" ]]; then
         _wait_elapsed=0
+        _wait_last_n=""
         while :; do
             reap_stale
             n="$(live_slots)"
             [ "$n" -eq 0 ] && break
-            echo "waiting for $n session(s) to finish…"
+            if [ "$n" != "$_wait_last_n" ]; then
+                printf '[%s] waiting for %s session(s) to finish…\n' \
+                    "$(date '+%Y-%m-%dT%H:%M:%S')" "$n"
+                _wait_last_n="$n"
+            fi
             sleep "$WAIT_POLL_SECS"
             _wait_elapsed=$((_wait_elapsed + WAIT_POLL_SECS))
             if [[ $_wait_elapsed -ge $CEILING_SECS ]]; then

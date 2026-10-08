@@ -70,6 +70,12 @@
 #                            $ROOT/tools/postplan-harness/out.
 #   PR_CYCLE_FLEET_LOG_DIR   Where post-plan-fleet writes post-plan-fleet-<PR>.log. Read for
 #                            the end-of-run outcome counts. Default: /tmp.
+#   PR_CYCLE_HOLDREPEAT_HARNESS
+#                            postplan-harness dir whose `harness.holdrepeat check` decides
+#                            the pre-fire skip. Default:
+#                            $PR_CYCLE_MAIN_CHECKOUT/tools/postplan-harness.
+#   PR_CYCLE_HOLDREPEAT_STATE_DIR
+#                            Holdrepeat state records. Default: <harness>/out/state.
 #
 #   Every seam is PR_CYCLE_-prefixed on purpose. bin/pr-attack reads a bare PR_TRIAGE_CMD
 #   itself, and this script spawns the real bin/pr-attack as a child — an unprefixed export
@@ -143,6 +149,8 @@ PR_CYCLE_PATCH_ID_CMD="${PR_CYCLE_PATCH_ID_CMD:-}"
 PR_CYCLE_HARNESS_OUT="${PR_CYCLE_HARNESS_OUT:-$ROOT/tools/postplan-harness/out}"
 PR_CYCLE_FLEET_LOG_DIR="${PR_CYCLE_FLEET_LOG_DIR:-/tmp}"
 PR_CYCLE_SKIP_HELD_UNCHANGED="${PR_CYCLE_SKIP_HELD_UNCHANGED:-1}"
+PR_CYCLE_HOLDREPEAT_HARNESS="${PR_CYCLE_HOLDREPEAT_HARNESS:-$PR_CYCLE_MAIN_CHECKOUT/tools/postplan-harness}"
+PR_CYCLE_HOLDREPEAT_STATE_DIR="${PR_CYCLE_HOLDREPEAT_STATE_DIR:-$PR_CYCLE_HOLDREPEAT_HARNESS/out/state}"
 
 # Print the usage header above: every comment line from the shebang to `set -euo pipefail`.
 usage() {
@@ -306,10 +314,13 @@ _attack_plan() {
 
     # Nominees exist. The driver never invents a gate edge, so it re-runs pr-attack with the
     # documented judged-empty form (--gate-edges /dev/null): every nominee is re-admitted and
-    # ordered like any other PR. These lines are a heads-up for the log reader, not a skip.
-    grep -E '^### #[0-9]+' "$RUNDIR/attack.md" 2>/dev/null | while read -r _line; do
-        echo "  $_line — ordered with no gate edges (gate nominee, judged-empty)"
-    done || true
+    # ordered like any other PR. One collapsed line is a heads-up for the log reader, not a
+    # skip. The once-flag keeps the stale-WORK retry (which re-enters here) from repeating it.
+    if [ ! -f "$RUNDIR/nominees-logged" ]; then
+        _noms="$(grep -oE '^### #[0-9]+' "$RUNDIR/attack.md" 2>/dev/null | sed 's/^### //' | paste -sd' ' - || true)"
+        [ -z "$_noms" ] || echo "  gate nominees (ordered, judged-empty): $_noms"
+        touch "$RUNDIR/nominees-logged"
+    fi
 
     # LAST match, so a slug containing the literal WORK= cannot spoof the real trailer.
     _work="$(sed -n 's/^WORK=//p' "$RUNDIR/attack.md" | tail -n 1)"
@@ -471,7 +482,7 @@ _ensure_armed_state() {
     [ -f "$RUNDIR/armed-state.json" ]   && return 0
     set +e
     "$PR_CYCLE_GH_CMD" pr list --state open --limit 200 \
-        --json number,headRefName,autoMergeRequest,mergeStateStatus \
+        --json number,headRefName,autoMergeRequest,mergeStateStatus,headRefOid \
         > "$RUNDIR/armed-state.json" 2> "$RUNDIR/armed-state.err"
     _easrc=$?
     set -e
@@ -670,6 +681,34 @@ _check_held_unchanged() {
     return 0
 }
 
+# _holdrepeat_would_decline N — exit 0 only when `harness.holdrepeat check` returns 10 (DECLINE)
+# for PR N's worktree. Every other path returns 1, so the skip fails open. Runs only when the
+# PR's worktree exists and its HEAD equals the PR's headRefOid; a stale worktree would
+# fingerprint an old diff. Never sets FORCE.
+_holdrepeat_would_decline() {
+    local _hr_n="$1" _hr_ref _hr_oid _hr_wt _hr_h="$PR_CYCLE_HOLDREPEAT_HARNESS" _hr_rc
+    _ensure_armed_state
+    [ -f "$RUNDIR/armed-state.json" ] || return 1
+    _hr_ref="$(jq -r --argjson n "$_hr_n" '.[] | select(.number == $n) | .headRefName // ""' \
+        "$RUNDIR/armed-state.json" 2>/dev/null || true)"
+    _hr_oid="$(jq -r --argjson n "$_hr_n" '.[] | select(.number == $n) | .headRefOid // ""' \
+        "$RUNDIR/armed-state.json" 2>/dev/null || true)"
+    [ -n "$_hr_ref" ] && [ -n "$_hr_oid" ] || return 1
+    [ -d "$_hr_h/harness" ] || return 1
+    _hr_wt="$(git -C "$PR_CYCLE_MAIN_CHECKOUT" worktree list --porcelain 2>/dev/null \
+        | awk -v b="branch refs/heads/$_hr_ref" '/^worktree /{w=substr($0,10)} $0==b{print w; exit}' \
+        || true)"
+    [ -n "$_hr_wt" ] || return 1
+    [ "$(git -C "$_hr_wt" rev-parse HEAD 2>/dev/null || true)" = "$_hr_oid" ] || return 1
+    set +e
+    PYTHONPATH="$_hr_h" python3 -m harness.holdrepeat check \
+        --state-dir "$PR_CYCLE_HOLDREPEAT_STATE_DIR" --slug "$_hr_ref" --worktree "$_hr_wt" \
+        > /dev/null 2> "$RUNDIR/holdrepeat-$_hr_n.err"
+    _hr_rc=$?
+    set -e
+    [ "$_hr_rc" -eq 10 ]
+}
+
 # _precheck_bucket N — echo PR N's current bucket, or "" when it cannot be determined.
 # Read-only: this invocation deliberately omits --arm, so it reports and changes nothing.
 # Never sets HALT and never returns non-zero: an unknown bucket must fall through to the
@@ -799,6 +838,7 @@ _precheck_verdict() {
 _stage1_list() {
     : > "$RUNDIR/stage1.txt"
     : > "$RUNDIR/stage1-skipped.txt"
+    : > "$RUNDIR/stage1-holdrepeat.txt"
     while IFS=$'\t' read -r _sl_n _sl_needs; do
         [ -n "$_sl_n" ] || continue
         if ! _pr_allowed "$_sl_n"; then continue; fi
@@ -832,6 +872,15 @@ _stage1_list() {
             fi
         fi
 
+        # Pre-fire holdrepeat skip: post-plan-now would DECLINE this PR at zero tokens
+        # (same structural hold, DM already sent, plan+diff+harness unchanged). Skipping
+        # frees the --max-ready slot for the next ordered PR. Fails open: any doubt fires.
+        if _holdrepeat_would_decline "$_sl_n"; then
+            echo "#$_sl_n — holdrepeat would decline (held on the same reason, nothing changed since), skipping" >> "$RUNDIR/stage1-skipped.txt"
+            echo "$_sl_n" >> "$RUNDIR/stage1-holdrepeat.txt"
+            continue
+        fi
+
         echo "$_sl_n" >> "$RUNDIR/stage1.txt"
     done <<EOF
 $(_attack_rows)
@@ -846,6 +895,7 @@ EOF
                 continue
             fi
             if grep -qxF "$_sl_dn" "$RUNDIR/stage1.txt" 2>/dev/null; then continue; fi
+            if grep -qxF "$_sl_dn" "$RUNDIR/stage1-holdrepeat.txt" 2>/dev/null; then continue; fi
             echo "$_sl_dn" >> "$RUNDIR/stage1.txt"
         done <<EOF
 $(_excluded_dirty_rows)
@@ -870,25 +920,63 @@ EOF
     fi
 }
 
+# _fleet_outcome N — print "<outcome><TAB><reason>" for PR N from its post-plan-fleet log.
+# A legacy `blocked`, an unknown word, or a missing outcome line normalizes to failed; a
+# missing log gives failed/no-log.
+_fleet_outcome() {
+    local _fo_log="${PR_CYCLE_FLEET_LOG_DIR}/post-plan-fleet-$1.log" _fo_o _fo_r
+    if [ ! -f "$_fo_log" ]; then printf 'failed\tno-log\n'; return 0; fi
+    _fo_o=$(grep -m1 '^post-plan-fleet: outcome=' "$_fo_log" 2>/dev/null \
+        | sed 's/^post-plan-fleet: outcome=//' || true)
+    _fo_r=$(grep -m1 '^post-plan-fleet: reason=' "$_fo_log" 2>/dev/null \
+        | sed 's/^post-plan-fleet: reason=//' || true)
+    case "$_fo_o" in
+        shipped|held|declined|paused|conflict|failed|timed-out) ;;
+        *) _fo_o=failed ;;   # legacy `blocked`, a missing line, or an unknown word
+    esac
+    printf '%s\t%s\n' "$_fo_o" "$_fo_r"
+}
+
 # _stage1_outcome_summary — read per-PR outcome lines from post-plan-fleet logs and
-# return a summary, e.g. "shipped 1, held 2, blocked 4, timed out 1". A PR with no
-# outcome line counts as blocked. Reads $PR_CYCLE_FLEET_LOG_DIR/post-plan-fleet-<PR>.log.
+# return a summary, e.g. "shipped 1, held 2, declined 0, paused 0, conflict 1, failed 3,
+# timed out 1". A PR with no outcome line counts as failed.
+# Reads $PR_CYCLE_FLEET_LOG_DIR/post-plan-fleet-<PR>.log.
 _stage1_outcome_summary() {
     [ -s "$RUNDIR/stage1.txt" ] || return 0
-    local _s_shipped=0 _s_held=0 _s_blocked=0 _s_timed=0 _s_pr _s_log _s_outcome
+    local _s_shipped=0 _s_held=0 _s_declined=0 _s_paused=0 _s_conflict=0 _s_failed=0 _s_timed=0
+    local _s_pr _s_outcome _s_reason
     while IFS= read -r _s_pr; do
-        _s_log="${PR_CYCLE_FLEET_LOG_DIR}/post-plan-fleet-${_s_pr}.log"
-        _s_outcome=$(grep -m1 '^post-plan-fleet: outcome=' "$_s_log" 2>/dev/null \
-            | sed 's/post-plan-fleet: outcome=//' || true)
-        case "${_s_outcome:-blocked}" in
+        IFS=$'\t' read -r _s_outcome _s_reason <<< "$(_fleet_outcome "$_s_pr")"
+        case "$_s_outcome" in
             shipped)   _s_shipped=$(( _s_shipped + 1 )) ;;
             held)      _s_held=$(( _s_held + 1 )) ;;
+            declined)  _s_declined=$(( _s_declined + 1 )) ;;
+            paused)    _s_paused=$(( _s_paused + 1 )) ;;
+            conflict)  _s_conflict=$(( _s_conflict + 1 )) ;;
             timed-out) _s_timed=$(( _s_timed + 1 )) ;;
-            *)         _s_blocked=$(( _s_blocked + 1 )) ;;
+            *)         _s_failed=$(( _s_failed + 1 )) ;;
         esac
     done < "$RUNDIR/stage1.txt"
-    printf 'shipped %d, held %d, blocked %d, timed out %d' \
-        "$_s_shipped" "$_s_held" "$_s_blocked" "$_s_timed"
+    printf 'shipped %d, held %d, declined %d, paused %d, conflict %d, failed %d, timed out %d' \
+        "$_s_shipped" "$_s_held" "$_s_declined" "$_s_paused" "$_s_conflict" "$_s_failed" "$_s_timed"
+}
+
+# _stage1_result_lines — one "#N <outcome>[ <reason>]" line per fired PR, then one
+# "#N skipped holdrepeat" line per PR the pre-fire holdrepeat skip removed.
+_stage1_result_lines() {
+    local _rl_pr _rl_outcome _rl_reason
+    if [ -n "${READIED:-}" ] && [ -s "$RUNDIR/stage1.txt" ]; then
+        while IFS= read -r _rl_pr; do
+            IFS=$'\t' read -r _rl_outcome _rl_reason <<< "$(_fleet_outcome "$_rl_pr")"
+            echo "#$_rl_pr $_rl_outcome${_rl_reason:+ $_rl_reason}"
+        done < "$RUNDIR/stage1.txt"
+    fi
+    if [ -f "$RUNDIR/stage1-holdrepeat.txt" ]; then
+        while IFS= read -r _rl_pr; do
+            [ -n "$_rl_pr" ] || continue
+            echo "#$_rl_pr skipped holdrepeat"
+        done < "$RUNDIR/stage1-holdrepeat.txt"
+    fi
 }
 
 # _stage1_fire — run post-plan-fleet with the stage1.txt list. Returns 0 on empty or
@@ -983,7 +1071,11 @@ _bucket_emoji() {
     esac
 }
 
-# _your_turn_lines — print one markdown line per your-turn.txt row, linked via gh pr list.
+# _your_turn_lines — print the your-turn.txt rows under typed group headers, linked via gh pr list.
+# Groups, in order, empty ones omitted: Conflicts holds DIRTY and NOT-MERGEABLE rows, Awaiting
+# feat sign-off its namesake bucket, Failed the BLOCKED-CHECK rows, Other held everything else
+# (unknown buckets included).
+# Each header carries the group's full row count even when the cap truncates the rows shown.
 # Called only from inside the DM block; never sets HALT, never returns non-zero.
 _your_turn_lines() {
     [ -s "$RUNDIR/your-turn.txt" ] || return 0
@@ -997,28 +1089,50 @@ _your_turn_lines() {
     set -e
     [ "$_yl_rc" -ne 0 ] && : > "$RUNDIR/prlist.tsv"
 
+    rm -f "$RUNDIR"/yt-g[1-4].txt
+    awk -F'\t' -v d="$RUNDIR" 'NF {
+        b = $2
+        g = (b == "DIRTY" || b == "NOT-MERGEABLE") ? 1 : (b == "FEAT-AWAITING-SIGNOFF") ? 2 : (b == "BLOCKED-CHECK") ? 3 : 4
+        print > (d "/yt-g" g ".txt") }' "$RUNDIR/your-turn.txt" || true
+
     _yt_total="$(wc -l < "$RUNDIR/your-turn.txt" | tr -d ' ')"
     _yt_shown=0
     _yt_running=0
-    while IFS="$(printf '\t')" read -r _yn _ybkt _yact; do
-        [ -n "$_yn" ] || continue
-        _yact="${_yact:-see pr-triage}"
-        _row="$(awk -F'\t' -v n="$_yn" '$1 == n { print; exit }' "$RUNDIR/prlist.tsv" 2>/dev/null || true)"
-        if [ -n "$_row" ]; then
-            _yurl="$(printf '%s\n' "$_row" | cut -f2)"
-            _ytitle="$(printf '%s\n' "$_row" | cut -f3 | tr '[]' '()')"
-            _yl_line="- $(_bucket_emoji "$_ybkt") [#$_yn: $_ytitle](<$_yurl>) — $_ybkt — $_yact"
-        else
-            _yl_line="- $(_bucket_emoji "$_ybkt") #$_yn — $_ybkt — $_yact"
-        fi
-        if [ "$((_yt_running + ${#_yl_line} + 1))" -gt 1800 ]; then
+    for _yg in 1 2 3 4; do
+        [ -s "$RUNDIR/yt-g$_yg.txt" ] || continue
+        case "$_yg" in
+            1) _ygt="Conflicts" ;;
+            2) _ygt="Awaiting feat sign-off" ;;
+            3) _ygt="Failed" ;;
+            *) _ygt="Other held" ;;
+        esac
+        _yt_hdr="**$_ygt ($(wc -l < "$RUNDIR/yt-g$_yg.txt" | tr -d ' '))**"
+        if [ "$((_yt_running + ${#_yt_hdr} + 1))" -gt 1700 ]; then
             echo "- …and $((_yt_total - _yt_shown)) more: $RUNDIR/your-turn.txt"
             return 0
         fi
-        echo "$_yl_line"
-        _yt_running=$((_yt_running + ${#_yl_line} + 1))
-        _yt_shown=$((_yt_shown + 1))
-    done < "$RUNDIR/your-turn.txt"
+        echo "$_yt_hdr"
+        _yt_running=$((_yt_running + ${#_yt_hdr} + 1))
+        while IFS="$(printf '\t')" read -r _yn _ybkt _yact; do
+            [ -n "$_yn" ] || continue
+            _yact="${_yact:-see pr-triage}"
+            _row="$(awk -F'\t' -v n="$_yn" '$1 == n { print; exit }' "$RUNDIR/prlist.tsv" 2>/dev/null || true)"
+            if [ -n "$_row" ]; then
+                _yurl="$(printf '%s\n' "$_row" | cut -f2)"
+                _ytitle="$(printf '%s\n' "$_row" | cut -f3 | tr '[]' '()')"
+                _yl_line="- $(_bucket_emoji "$_ybkt") [#$_yn: $_ytitle](<$_yurl>) — $_ybkt — $_yact"
+            else
+                _yl_line="- $(_bucket_emoji "$_ybkt") #$_yn — $_ybkt — $_yact"
+            fi
+            if [ "$((_yt_running + ${#_yl_line} + 1))" -gt 1700 ]; then
+                echo "- …and $((_yt_total - _yt_shown)) more: $RUNDIR/your-turn.txt"
+                return 0
+            fi
+            echo "$_yl_line"
+            _yt_running=$((_yt_running + ${#_yl_line} + 1))
+            _yt_shown=$((_yt_shown + 1))
+        done < "$RUNDIR/yt-g$_yg.txt"
+    done
 }
 
 # ==========================================================================================
@@ -1067,6 +1181,7 @@ _worker() {
     _cleanup_fetch_refs
 
     _reason="${HALT:-done}"
+    _stage1_result_lines
     _OUTCOME_SUMMARY="$(_stage1_outcome_summary)"
     _FIRED_SUMMARY="${READIED:+fired $READIED (${_OUTCOME_SUMMARY})}"
     _FIRED_SUMMARY="${_FIRED_SUMMARY:-fired 0}"
@@ -1185,6 +1300,7 @@ _launch() {
                   PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
                   PR_CYCLE_RESCUE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
                   PR_CYCLE_SKIP_HELD_UNCHANGED PR_CYCLE_HARNESS_OUT PR_CYCLE_FLEET_LOG_DIR \
+                  PR_CYCLE_HOLDREPEAT_HARNESS PR_CYCLE_HOLDREPEAT_STATE_DIR \
                   PR_CYCLE_AUTH_PROBE_CMD PR_CYCLE_PATCH_ID_CMD \
                   PR_CYCLE_STOP_FILE; do
             eval "_val=\${$_v}"

@@ -29,16 +29,19 @@ fail() { printf '  FAIL %s\n' "$1"; FAILS=$(( FAILS + 1 )); }
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-discord-dm.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 
-# Shim osascript so the T29 fallback path does not fire a macOS notification
-# banner on every local run. Matches the caffeinate shim in bin/test-plan-now.
+# Shim osascript so the fallback path does not fire a macOS notification banner
+# on every local run. A PATH shim is not enough: discord-dm prepends /usr/bin to
+# PATH, so the real osascript would win. Use the explicit seam instead.
 SHIM="$TMP/bin"
 mkdir -p "$SHIM"
-cat > "$SHIM/osascript" <<'SHIM_EOF'
+OSA_LOG="$TMP/osascript.log"
+cat > "$SHIM/osascript" <<SHIM_EOF
 #!/usr/bin/env bash
+echo called >> "$OSA_LOG"
 exit 0
 SHIM_EOF
 chmod +x "$SHIM/osascript"
-export PATH="$SHIM:$PATH"
+export DISCORD_DM_OSASCRIPT_BIN="$SHIM/osascript"
 
 # Never let a case read the real ~/.iblbot-dev-webhook-url or ~/.iblbot-dm-id.
 # HOME points into $TMP for the whole run; the webhook seam defaults to an
@@ -284,6 +287,11 @@ if [ "$t29_exit" -ne 0 ]; then
     ok "T29: exit non-zero ($t29_exit)"
 else
     fail "T29: exit was 0 (expected non-zero)"
+fi
+if [ -s "$OSA_LOG" ]; then
+    ok "T29: notification went to the osascript shim"
+else
+    fail "T29: osascript shim never ran (real banner would fire)"
 fi
 
 # ssh-fail2 delivers chunk 1 (HTTP 200) then hard-fails chunk 2 (HTTP 400,
@@ -734,6 +742,7 @@ NOTIFY_SITES_WANT=$(cat <<'EXPECT_EOF'
 db-backup.yml#1 webhook=1 ping='true'
 db-backup.yml#2 webhook=1 ping='true'
 db-backup.yml#3 webhook=1 ping='true'
+db-backup.yml#4 webhook=1 ping='true'
 docfix-health.yml#1 webhook=1 ping=-
 docfix-health.yml#2 webhook=1 ping=-
 docs-refreshed-notify.yml#1 webhook=1 ping=-
@@ -754,7 +763,7 @@ printf '\n-- notify-discord call sites --\n'
 # G1: the live workflows match the table.
 G1_GOT=$(notify_sites "$ROOT/.github/workflows")
 if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
-    ok "G1: 15 sites pass webhook-url; ping only on the chosen sites"
+    ok "G1: 16 sites pass webhook-url; ping only on the chosen sites"
 else
     fail "G1: call sites differ from the table"
     diff <(printf '%s\n' "$NOTIFY_SITES_WANT") <(printf '%s\n' "$G1_GOT") | sed 's/^/       /'
@@ -815,14 +824,14 @@ grep -qF -- "main.yml::build-and-deploy" <<< "$G5_GOT" \
     && ok "G5: the flagged job is main.yml::build-and-deploy" \
     || fail "G5: expected main.yml::build-and-deploy, got: $(tr '\n' ' ' <<< "$G5_GOT")"
 
-# G6: --ping (the @-mention) is allowed only in the four PING host callers. Tests, the
+# G6: --ping (the @-mention) is allowed only in the five PING host callers. Tests, the
 # README and discord-dm itself mention it and are excluded; any other bin/ caller is QUIET.
 G6_GOT=$(grep -rlF -- '--ping' "$ROOT/bin" 2>/dev/null \
     | grep -v -e '/bin/discord-dm$' -e '/bin/test-' -e '/bin/README.md$' \
     | sed "s|^$ROOT/||" | sort || true)
-G6_WANT=$(printf '%s\n' bin/db-backups-pull bin/launchd-health-check bin/post-plan-fail-dm bin/pr-cycle)
+G6_WANT=$(printf '%s\n' bin/db-backups-pull bin/launchd-health-check bin/post-plan-fail-dm bin/pr-cycle bin/pr-cycle-tick)
 [ "$G6_GOT" = "$G6_WANT" ] \
-    && ok "G6: only the four PING callers contain --ping" \
+    && ok "G6: only the five PING callers contain --ping" \
     || fail "G6: --ping callers differ from the PING set; got: $(tr '\n' ' ' <<< "$G6_GOT")"
 
 # ── Summary ───────────────────────────────────────────────────────────────────

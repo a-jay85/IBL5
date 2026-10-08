@@ -8,6 +8,9 @@ use PHPUnit\Framework\Attributes\Group;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 use Trading\TradeOffer;
 use Trading\TradeValidator;
+use Validation\ValidationError;
+use Validation\ValidationResult;
+use Validation\ValidationResultWithContext;
 
 /**
  * Seam-B characterization net: pins the cash-record contribution to the trade
@@ -99,7 +102,7 @@ class TradeOfferCapDataIntegrationTest extends DatabaseTestCase
     private function captureCapData(?\Season\Season $season = null): array
     {
         $validator = $this->createMock(TradeValidator::class);
-        $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
+        $validator->method('validateMinimumCashAmounts')->willReturn(ValidationResult::success());
         $validator->method('getCurrentSeasonCashConsiderations')->willReturn([
             'cashSentToThem' => 0,
             'cashSentToMe' => 0,
@@ -110,12 +113,10 @@ class TradeOfferCapDataIntegrationTest extends DatabaseTestCase
                 $this->capturedCapData = $capData;
                 return true;
             }))
-            ->willReturn([
-                'valid' => false,
-                'errors' => ['characterization stop'],
-                'userPostTradeCapTotal' => 0,
-                'partnerPostTradeCapTotal' => 0,
-            ]);
+            ->willReturn(ValidationResultWithContext::fromErrors(
+                [new ValidationError('salary_cap', 'characterization stop')],
+                ['userPostTradeCapTotal' => 0, 'partnerPostTradeCapTotal' => 0],
+            ));
 
         $offer = new TradeOffer(
             $this->db,

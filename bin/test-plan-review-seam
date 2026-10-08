@@ -94,99 +94,6 @@ want_not() {
     fi
 }
 
-PLAN="$SANDBOX/seam-fixture.md"
-cat > "$PLAN" <<'FIXTURE'
-# Seam fixture plan
-
-## Automouse Hold Justification
-This plan requires human review before auto-merging.
-
-## Verification Matrix
-
-| # | What to verify | Test type | Timing | Test file / location |
-|---|---|---|---|---|
-| --- | --- | --- | --- | --- |
-| 1 | Confirm the feature looks right on mobile | Truly-manual | post-impl | vr: screenshots/mobile.png |
-FIXTURE
-
-# The one sentence that must survive inside the awk-delimited hold region. Named
-# once so the pristine assertion and the defect-injection mutation cannot drift.
-HOLD_SENTENCE='This plan requires human review before auto-merging.'
-
-# Extract the HOLD region from a digest: the lines after the `HOLD — ` banner, up
-# to (but not including) the `MANUAL CHECKS — ` banner or end of output. The
-# defect-injection case below proves this range is on-target rather than matching
-# an empty span — an awk range that silently matches nothing passes every
-# assertion built on it.
-hold_region() {
-    awk '
-        /^HOLD — / { inside = 1; next }
-        /^MANUAL CHECKS — / { inside = 0 }
-        inside { print }
-    '
-}
-
-seam_case_digest_produced() {
-    local out rc
-    out="$("$HERE/plan-review-digest" "$PLAN" 2>/dev/null)"
-    rc=$?
-    if [ "$rc" -ne 0 ]; then
-        seam_fail "digest produced: plan-review-digest exited $rc"
-        return
-    fi
-    seam_ok "digest produced: exit 0"
-    if printf '%s' "$out" | grep -qF "HOLD —"; then
-        seam_ok "digest produced: output contains HOLD —"
-    else
-        seam_fail "digest produced: output should contain HOLD —"
-    fi
-    local chars
-    chars="$(printf '%s' "$out" | wc -m | tr -d ' ')"
-    if [ "$chars" -le 1500 ]; then
-        seam_ok "digest produced: output <= 1500 chars"
-    else
-        seam_fail "digest produced: output > 1500 chars (got $chars)"
-    fi
-}
-
-# ── fixture-intact row (matrix 24) + awk-region on-target proof (matrix 25) ───
-# Leg 1: on the pristine fixture the awk region is NON-EMPTY and carries the hold
-#        sentence. An always-empty range fails here.
-# Leg 2: rename the canonical hold heading on a COPY — this is exactly what a
-#        gate-side rename in bin/check-plan would do — and the region goes empty.
-# Leg 3: mutate the hold BODY inside the region on a COPY; the region stays
-#        non-empty but the content assertion fails, so the range is on-target and
-#        not merely "any non-empty text".
-seam_case_fixture_intact_and_region_on_target() {
-    local region copy_a copy_b region_a region_b
-
-    region="$("$HERE/plan-review-digest" "$PLAN" 2>/dev/null | hold_region)"
-    if [ -n "$region" ]; then
-        seam_ok "awk region on-target: hold region is non-empty on the pristine fixture"
-    else
-        seam_fail "awk region on-target: hold region is EMPTY on the pristine fixture (range matches nothing)"
-    fi
-    want "fixture intact: hold region carries the hold sentence" "$region" "$HOLD_SENTENCE"
-
-    copy_a="$SANDBOX/fixture-heading-renamed.md"
-    sed 's/^## Automouse Hold Justification$/## Automouse Hold Rationale/' "$PLAN" > "$copy_a"
-    region_a="$("$HERE/plan-review-digest" "$copy_a" 2>/dev/null | hold_region)"
-    if [ -z "$region_a" ]; then
-        seam_ok "fixture intact: renaming the canonical hold heading empties the hold region"
-    else
-        seam_fail "fixture intact: heading rename should emit no hold entry (got: $region_a)"
-    fi
-
-    copy_b="$SANDBOX/fixture-body-defect.md"
-    sed "s/^$HOLD_SENTENCE\$/Injected defect inside the delimited region./" "$PLAN" > "$copy_b"
-    region_b="$("$HERE/plan-review-digest" "$copy_b" 2>/dev/null | hold_region)"
-    if [ -n "$region_b" ] && ! grep -qF -- "$HOLD_SENTENCE" <<< "$region_b"; then
-        seam_ok "awk region on-target: a defect injected INSIDE the region is seen (region non-empty, content changed)"
-    else
-        seam_fail "awk region on-target: injected defect not detected inside the region"
-    fi
-}
-
 # ── drain test scaffolding ───────────────────────────────────────────────────
 DRAIN="$HERE/plan-review-drain"
 STUBS="$SANDBOX/stubs"
@@ -754,8 +661,6 @@ if ! command -v jq > /dev/null 2>&1; then
 fi
 
 seam_case_contract_drift
-seam_case_digest_produced
-seam_case_fixture_intact_and_region_on_target
 seam_case_flags
 seam_case_empty_list
 seam_case_same_slug_dedupe

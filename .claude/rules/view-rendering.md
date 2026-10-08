@@ -1,7 +1,7 @@
 ---
 description: HTML View class standards: output buffering, HtmlSanitizer::e(), and structural conventions.
 paths: "**/*View.php"
-last_verified: 2026-09-16
+last_verified: 2026-10-04
 ---
 
 # View Rendering Rules
@@ -56,7 +56,7 @@ Delegate to UI helpers instead of building markup inline:
 **Before writing new CSS**, check if a style already exists in `ibl5/design/`. Key files:
 - `components/tables.css`, `components/cards.css`, `tokens/tokens.css`
 - Reuse existing classes (`.ibl-card`, `.ibl-stat-highlight`, `.ibl-title`, `.ibl-data-table`) instead of creating duplicates
-- Module-specific table overrides go in `tables.css` as new sections (pattern: `.allstar-table`, `.contact-table`, `.record-table`)
+- Module-specific table overrides go in their own partial, `design/components/tables/<module>.css` (for example `tables/contact-list.css`, `tables/record-holders.css`). `tables.css` holds only the shared base. Recipe: `ibl5/design/CSS_TABLE_MAP.md` § When to add a new module file
 
 ## Statistics Display
 Use `BasketballStats\StatsFormatter` — see `php-classes.md` for method list.

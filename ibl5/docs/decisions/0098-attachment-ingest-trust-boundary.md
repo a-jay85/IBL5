@@ -1,6 +1,6 @@
 ---
 description: Discord bug-report attachments are captured through a strict trust boundary — untrusted bytes and metadata, filenames never form paths, snowflakes stay strings, capped downloads against an https allowlist, cache outside the repo pruned at 7 days, and only a sanitized text reference reaches the model.
-last_verified: 2026-08-05
+last_verified: 2026-10-04
 ---
 
 # ADR-0098: The attachment-ingest trust boundary

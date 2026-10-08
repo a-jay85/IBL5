@@ -223,15 +223,6 @@
 #                              characters. The post-plan harness honors it nowhere
 #                              else (planfile.parse_phases), so a short reason or a
 #                              marker outside a phase is a silent no-op.
-#   Z  Leading-star matrix token — a backticked single-word token in a matrix
-#                              "What to verify" cell that starts with '*' (the
-#                              catch-all case arm, a bare extension glob).
-#                              bin/lib/plan-matrix-assertions realises a glob
-#                              token only through its prefix before the first
-#                              '*', so an empty prefix is reported
-#                              UNREALISED-ASSERTION at post-plan Step 6.7
-#                              whatever the diff holds. Extraction mirrors the
-#                              checker; bin/test-check-plan pins the parity.
 #   VR VR snapshots marker   — a `## Critical Files` entry that
 #                              cf_parse_section_raw classifies MUST_APPEAR and
 #                              whose path contains `-snapshots` must carry the
@@ -801,6 +792,11 @@ done < <(awk '
 #   (c) patterns live in bin/lib/hold-check-patterns.txt because harness/classify.py
 #       reads the same file; the parity test in bin/test-check-plan keeps them from
 #       drifting between the two languages.
+#   (d) gate H(c): the **Decision:** paragraph is the only hold text /post-plan
+#       renders into the PR body, so it is checked as reader-facing prose:
+#       bin/check-prose tells, an empty body, more than 40 words in total, and
+#       the legacy "The human/reviewer/owner accepts ..." opener all fail. A hold
+#       section without a Decision line gets no H(c) check (unchanged).
 if [ "$FM_HOLD" -eq 1 ]; then
     if ! grep -qiE '^##[[:space:]]+Automouse Hold Justification[[:space:]]*$' "$PLAN_FILE"; then
         viol "[H] plan declares auto_merge: false but has no '## Automouse Hold Justification' section (Step 4.5 — record why the hold is reducible-confirmed or intrinsic)"
@@ -809,6 +805,29 @@ if [ "$FM_HOLD" -eq 1 ]; then
             [ -n "$hb_hit" ] || continue
             viol "[H] hold justification asks the human to run a check an agent can run (line ${hb_hit%%:*}): ${hb_hit#*:} — move the observable check into the Verification Matrix and keep only the irreducible judgment, on a '**Decision:**' line. See /plan Step 4.5 'Record the outcome'."
         done < <(hold_check_violations "$PLAN_FILE")
+        # Gate H(c): Decision paragraph is reader-facing prose (see (d) above).
+        if command -v hold_decision_paragraphs >/dev/null 2>&1; then
+            HD_TEXT=$(hold_decision_paragraphs "$PLAN_FILE")
+            if [ -n "$HD_TEXT" ]; then
+                HD_BODY=$(sed -E 's/^[ ]*\*\*Decision:\*\*[ ]*//' <<< "$HD_TEXT")
+                HD_WORDS=$(wc -w <<< "$HD_BODY" | tr -d '[:space:]')
+                if [ "$HD_WORDS" -eq 0 ]; then
+                    viol "[H] Decision line is empty — write one plain yes/no sentence for the person pressing merge, e.g. \"Merge if you're OK with about 7% more PRs being held until their body declares scope.\""
+                elif [ "$HD_WORDS" -gt 40 ]; then
+                    viol "[H] Decision line is ${HD_WORDS} words (cap 40) — the PR body shows it to the person pressing merge; cut it to one short yes/no sentence"
+                fi
+                if grep -qiE '^[[:space:]]*the[[:space:]]+(human|reviewer|owner)([[:space:]]+[[:alpha:]-]+){0,2}[[:space:]]+accepts?([[:space:]]|$)' <<< "$HD_BODY"; then
+                    viol "[H] Decision line opens with the legacy 'The human accepts ...' shape — address the person pressing merge directly, e.g. \"Merge if you're OK with ...\""
+                fi
+                if [ -x "$SCRIPT_DIR/check-prose" ]; then
+                    HD_PROSE=$("$SCRIPT_DIR/check-prose" --stdin <<< "$HD_BODY" 2>&1)
+                    HD_PROSE_RC=$?
+                    if [ "$HD_PROSE_RC" -eq 1 ]; then
+                        viol "[H] Decision line has a prose tell: $(head -n 1 <<< "$HD_PROSE") — rewrite it as one plain sentence (bin/check-prose)"
+                    fi
+                fi
+            fi
+        fi
     fi
 fi
 
@@ -906,6 +925,7 @@ done < <(awk '
     }
 ' "$PLAN_FILE")
 
+FWD_REF_CUES='create|new (method|class|file)|add(s|ing)? (a )?new|introduce|rename|extract|scaffold'
 # ---------------------------------------------------------------------------
 # Reuse-target existence (new check). PHP Class::method only.
 # ---------------------------------------------------------------------------
@@ -930,7 +950,7 @@ while IFS= read -r token; do
 
     # Forward-reference exemption: the plan creates this symbol itself.
     if grep -F -- "$token" "$PLAN_FILE" \
-        | grep -qiE 'create|new (method|class|file)|add(s|ing)? (a )?new|introduce|rename|extract|scaffold'; then
+        | grep -qiE "$FWD_REF_CUES"; then
         continue
     fi
 
@@ -947,6 +967,205 @@ while IFS= read -r token; do
     fi
 done < <(grep -iE 'reuse' "$PLAN_FILE" \
             | grep -oE '[A-Z][A-Za-z0-9_]*::[a-zA-Z_][A-Za-z0-9_]*')
+
+# ---------------------------------------------------------------------------
+# Gate [L]: literal and symbol provenance (backlog#933). Checks A/B/C.
+# ---------------------------------------------------------------------------
+# A: every `literal-check: <lit-or-range> -> <table>.<column> <sqltype>` citation
+#    must name a column in the checked-in schema dump, cite its exact type, and
+#    fit that type's integer range. Absence of a citation is judgment (gate 18).
+# B: an integer above 2147483647 on a line naming pid/tid/teamid, with no
+#    BIGINT/unsigned cue, no quotes around it, and no passing citation.
+# C: a backticked `name()` on a copy-verbatim line must be defined in a source
+#    file cited by backticked path in the same ##/### section. Silent when the
+#    section cites no existing file. Opt-out for A/B: <!-- literal-ok: <reason> -->.
+# A blocks. B and C are advisory (warn): the corpus diff over ~/claude-plans
+# found false positives for both. The letter is shared with the warn-only
+# line-number-anchor gate [L] further down; the message prefixes differ.
+# Decimal bounds compare as strings (length, then lexical): awk doubles lose
+# precision past 2^53, so a numeric compare on a 19-digit bound can round.
+L_SCHEMA="$REPO_ROOT/ibl5/docs/schema/current-schema.sql"
+L_INPUTS=("$PLAN_FILE")
+L_NOSCHEMA=1
+if [ -f "$L_SCHEMA" ]; then
+    L_INPUTS=("$L_SCHEMA" "$PLAN_FILE")
+    L_NOSCHEMA=0
+fi
+while IFS=$'\t' read -r kind msg; do
+    # Check B is advisory: the Phase 5 corpus diff found Discord ids on lines
+    # that also name teamid (backlog#933).
+    case "$kind" in
+        A) viol "$msg" ;;
+        B) warn "$msg" ;;
+    esac
+done < <(awk -v schema="$L_SCHEMA" -v noschema="$L_NOSCHEMA" -v sq="'" '
+    function strip0(s) { sub(/^0+/, "", s); if (s == "") s = "0"; return s "" }
+    function dcmp(a, b) {
+        a = strip0(a); b = strip0(b)
+        if (length(a) < length(b)) return -1
+        if (length(a) > length(b)) return 1
+        if (a < b) return -1
+        if (a > b) return 1
+        return 0
+    }
+    function fits(v, base, uns,   neg, mag) {
+        neg = (substr(v, 1, 1) == "-")
+        mag = neg ? substr(v, 2) : v
+        if (neg) {
+            if (strip0(mag) == "0") return 1
+            if (uns) return 0
+            return dcmp(mag, MINMAG[base]) <= 0
+        }
+        return dcmp(mag, uns ? UMAX[base] : SMAX[base]) <= 0
+    }
+    BEGIN {
+        SMAX["tinyint"] = "127";   MINMAG["tinyint"] = "128";   UMAX["tinyint"] = "255"
+        SMAX["smallint"] = "32767"; MINMAG["smallint"] = "32768"; UMAX["smallint"] = "65535"
+        SMAX["mediumint"] = "8388607"; MINMAG["mediumint"] = "8388608"; UMAX["mediumint"] = "16777215"
+        SMAX["int"] = "2147483647"; MINMAG["int"] = "2147483648"; UMAX["int"] = "4294967295"
+        SMAX["bigint"] = "9223372036854775807"; MINMAG["bigint"] = "9223372036854775808"
+        UMAX["bigint"] = "18446744073709551615"
+    }
+    !noschema && FILENAME == schema {
+        if ($0 ~ /^CREATE TABLE `/) {
+            t = $0; sub(/^CREATE TABLE `/, "", t); sub(/`.*/, "", t); tbl = tolower(t); next
+        }
+        if ($0 ~ /^\)/) { tbl = ""; next }
+        if (tbl != "" && $0 ~ /^  `[^`]+` /) {
+            rest = substr($0, 4); c = rest; sub(/`.*/, "", c)
+            rest = substr(rest, length(c) + 3)
+            depth = 0; ty = ""
+            for (i = 1; i <= length(rest); i++) {
+                ch = substr(rest, i, 1)
+                if (ch == "(") depth++
+                else if (ch == ")") depth--
+                else if (ch == " " && depth == 0) break
+                ty = ty ch
+            }
+            if (substr(rest, i + 1) ~ /^unsigned/) ty = ty " unsigned"
+            type[tbl "." tolower(c)] = tolower(ty)
+        }
+        next
+    }
+    {
+        if ($0 ~ /^[[:space:]]*(```|~~~)/) { fence = !fence; next }
+        if (fence) next
+        if (index($0, "<!-- literal-ok")) next
+
+        # Check A.
+        line = $0; nc = 0; ok = 1
+        while (match(line, /literal-check:[[:space:]]*-?[0-9]+(\.\.-?[0-9]+)?[[:space:]]*->[[:space:]]*[a-z0-9_]+\.[a-z0-9_]+[[:space:]]+[a-z]+(\([0-9,]+\))?( unsigned)?/)) {
+            hit = substr(line, RSTART, RLENGTH); line = substr(line, RSTART + RLENGTH); nc++
+            sub(/^literal-check:[[:space:]]*/, "", hit)
+            split(hit, lr, "->")
+            lhs = lr[1]; gsub(/[[:space:]]/, "", lhs)
+            rhs = lr[2]; sub(/^[[:space:]]+/, "", rhs)
+            match(rhs, /[[:space:]]+/)
+            tc = substr(rhs, 1, RSTART - 1); cty = substr(rhs, RSTART + RLENGTH)
+            if (noschema) { missing = 1; ok = 0; continue }
+            if (!(tc in type)) {
+                print "A\t[L] literal-check line " FNR ": " tc " not found in ibl5/docs/schema/current-schema.sql"
+                ok = 0; continue
+            }
+            if (type[tc] != cty) {
+                print "A\t[L] literal-check line " FNR ": " tc " is " sq type[tc] sq " in schema, citation says " sq cty sq
+                ok = 0; continue
+            }
+            base = cty; sub(/\(.*/, "", base); uns = (cty ~ / unsigned$/)
+            if (!(base in SMAX)) continue
+            n = split(lhs, ends, /\.\./)
+            for (k = 1; k <= n; k++) {
+                if (fits(ends[k], base, uns)) continue
+                lo = uns ? "0" : "-" MINMAG[base]; hi = uns ? UMAX[base] : SMAX[base]
+                print "A\t[L] literal-check line " FNR ": " ends[k] " does not fit " tc " " cty " (range " lo ".." hi ")"
+                ok = 0
+            }
+        }
+        if (nc > 0 && ok) next
+
+        # Check B.
+        pl = " " $0 " "
+        if (!match(pl, /[^a-z0-9_](pid|pids|tid|tids|teamid|teamids)[^a-z0-9_]/)) next
+        word = substr(pl, RSTART + 1, RLENGTH - 2)
+        if (tolower($0) ~ /bigint|unsigned/) next
+        rest = pl
+        while (match(rest, /[^A-Za-z0-9_][0-9]+[^A-Za-z0-9_]/)) {
+            pre = substr(rest, RSTART, 1); num = substr(rest, RSTART + 1, RLENGTH - 2)
+            post = substr(rest, RSTART + RLENGTH - 1, 1)
+            rest = substr(rest, RSTART + RLENGTH - 1)
+            if ((pre == "\"" || pre == sq) && post == pre) continue
+            if (dcmp(num, "2147483647") > 0) {
+                print "B\t[L] overflow line " FNR ": " num " exceeds int(11) max 2147483647 on a line naming " sq word sq "; add a literal-check: citation or a BIGINT/unsigned cue"
+                break
+            }
+        }
+    }
+    END {
+        if (missing) print "A\t[L] literal-check citations present but ibl5/docs/schema/current-schema.sql is missing"
+    }
+' "${L_INPUTS[@]}")
+
+# Check C: emit one record per copy-verbatim symbol, then resolve in shell.
+while IFS=$'\t' read -r kind lno name paths; do
+    [ "$kind" = "C" ] || continue
+    kept=""
+    for p in $paths; do
+        if [ -f "$REPO_ROOT/$p" ]; then kept="$kept${kept:+ }$p"; fi
+    done
+    [ -n "$kept" ] || continue
+    found=0
+    for p in $kept; do
+        if grep -qE "function[[:space:]]+${name}([^A-Za-z0-9_]|\$)|def[[:space:]]+${name}([^A-Za-z0-9_]|\$)|(^|[[:space:]])${name}[[:space:]]*\(\)" "$REPO_ROOT/$p"; then
+            found=1; break
+        fi
+    done
+    # Advisory: the corpus diff found new helpers and test assertions named on
+    # copy-verbatim lines that the forward-reference cues do not catch.
+    if [ "$found" -eq 0 ]; then
+        warn "[L] copy-verbatim line ${lno}: '${name}()' is defined in none of this section's cited source files (${kept})"
+    fi
+done < <(awk -v cues="$FWD_REF_CUES" '
+    function flush(   i, j, lc, drop, p, paths) {
+        paths = ""
+        for (p in cited) paths = paths (paths == "" ? "" : " ") p
+        for (i = 1; i <= ns; i++) {
+            drop = 0
+            for (j = 1; j <= nl; j++) {
+                lc = tolower(sl[j])
+                if (index(lc, tolower(sname[i])) && lc ~ lcues) { drop = 1; break }
+            }
+            if (!drop) print "C\t" sline[i] "\t" sname[i] "\t" paths
+        }
+        ns = 0; nl = 0; split("", cited)
+    }
+    BEGIN { lcues = tolower(cues) }
+    /^###?[[:space:]]/ { flush() }
+    {
+        sl[++nl] = $0
+        rest = $0
+        while (match(rest, /`[^`]+`/)) {
+            sp = substr(rest, RSTART + 1, RLENGTH - 2); rest = substr(rest, RSTART + RLENGTH)
+            if (sp !~ /^(\.\/)?[A-Za-z0-9_.\/-]+(:[0-9]+(-[0-9]+)?)?$/) continue
+            sub(/^\.\//, "", sp); sub(/:[0-9]+(-[0-9]+)?$/, "", sp)
+            if (sp ~ /\.(php|sh|py|ts|js)$/ || sp ~ /^bin\//) cited[sp] = 1
+        }
+        if ($0 ~ /^[[:space:]]*(```|~~~)/) { fence = !fence; next }
+        if (fence) next
+        l = tolower($0); cand = 0
+        if (index(l, "verbatim from")) cand = 1
+        else if (match(l, /cop(y|ied)[^.]*verbatim/)) {
+            vl = (substr(l, RSTART, 6) == "copied") ? 6 : 4
+            if (RLENGTH - vl - 8 <= 80) cand = 1
+        }
+        if (!cand) next
+        rest = $0
+        while (match(rest, /`[A-Za-z_][A-Za-z0-9_]*\(\)`/)) {
+            sname[++ns] = substr(rest, RSTART + 1, RLENGTH - 4); sline[ns] = FNR
+            rest = substr(rest, RSTART + RLENGTH)
+        }
+    }
+    END { flush() }
+' "$PLAN_FILE")
 
 # ---------------------------------------------------------------------------
 # Gate [F]: Critical Files format — list form only.
@@ -1826,61 +2045,6 @@ if [ -n "$_u_bad" ]; then
         viol "[U] ## Backlog issues line must read '- closes|refs a-jay85/IBL5-backlog#N — <what>' (lowercase tag, full repo path, a description): \"${_u_line}\""
     done <<< "$_u_bad"
 fi
-
-# ---------------------------------------------------------------------------
-# Gate [Z]: leading-star backticked token in a matrix "What to verify" cell.
-# ---------------------------------------------------------------------------
-# >>> gate-Z-leading-star-token
-# bin/lib/plan-matrix-assertions treats a backticked single-word token holding
-# '*' as a glob and realises it only through the text BEFORE the first '*'. A
-# token that STARTS with '*' has an empty prefix, so the checker reports its
-# row UNREALISED-ASSERTION whatever the diff holds, and post-plan Step 6.7
-# fails the run. This awk mirrors the checker's row-extraction awk and its
-# placeholder filter exactly: plain ``` / ~~~ fence toggle, the What-to-verify
-# header, the \| escape, the 2nd table column, separator rows skipped, first
-# row id wins, odd backtick splits, whitespace tokens dropped, name=value cut
-# at the first '=', then tokens holding ... or <x> dropped. bin/test-check-plan
-# pins this mirror to the real checker (its "Gate [Z] parity" block). WAIVE-
-# MATRIX-ROW waivers live in the PR body, which does not exist at lint time,
-# so they are not consulted. A (one-time-check: ...) tagged row is still
-# flagged: the tag does not change how the checker globs the token.
-_z_hits=$(awk -F'|' '
-BEGIN { fence=0; inm=0; }
-/^[[:space:]]*(```|~~~)/ { fence = !fence; inm = 0; next; }
-fence { next; }
-/\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
-inm && /^[[:space:]]*\|/ {
-    line = $0;
-    gsub(/\\\|/, "\001", line);
-    n = split(line, f, "|");
-    if (n < 3) { next; }
-    id = f[2]; gsub(/^[[:space:]]+|[[:space:]]+$/, "", id);
-    cell = f[3]; gsub(/\001/, "|", cell); gsub(/\t/, " ", cell);
-    gsub(/^[[:space:]]+|[[:space:]]+$/, "", cell);
-    if (cell ~ /^[[:space:]:-]*$/) next;
-    if (seen[id]) next;
-    seen[id] = 1;
-    n2 = split(cell, parts, "`");
-    for (i = 2; i < n2; i += 2) {
-        t = parts[i];
-        if (t == "") continue;
-        if (t ~ /[[:space:]]/) continue;
-        sub(/=.*/, "", t);
-        if (t == "") continue;
-        if (index(t, "...") > 0) continue;
-        if (t ~ /<.*>/) continue;
-        if (substr(t, 1, 1) == "*") print id "\t" t;
-    }
-    next;
-}
-inm && !/^[[:space:]]*\|/ { inm=0; }
-' "$PLAN_FILE")
-if [ -n "$_z_hits" ]; then
-    while IFS=$'\t' read -r _z_id _z_tok; do
-        viol "[Z] matrix row ${_z_id}: backticked token '${_z_tok}' starts with '*'. bin/lib/plan-matrix-assertions globs on the text before the first '*', so an empty prefix is never realised and post-plan Step 6.7 reports this row UNREALISED-ASSERTION whatever the diff holds. Drop the backticks or reword the token in prose (e.g. the token '*)' becomes \"the catch-all case arm\")"
-    done <<< "$_z_hits"
-fi
-# <<< gate-Z-leading-star-token
 
 # ---------------------------------------------------------------------------
 # Report.

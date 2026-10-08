@@ -49,16 +49,16 @@ class ModuleAccessControl
 
         $this->settings = [];
         $settingName = 'Trivia Mode';
-        $stmt = $db->prepare("SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = 'ibl' LIMIT 1");
+        $stmt = $db->prepare("SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = 'ibl' LIMIT 1");
         if ($stmt !== false) {
             $stmt->bind_param('s', $settingName);
             $stmt->execute();
             $result = $stmt->get_result();
             if ($result !== false) {
-                /** @var array{value: string}|null $row */
+                /** @var array{setting_value: string}|null $row */
                 $row = $result->fetch_assoc();
                 if ($row !== null) {
-                    $this->settings[$settingName] = $row['value'];
+                    $this->settings[$settingName] = $row['setting_value'];
                 }
             }
             $stmt->close();

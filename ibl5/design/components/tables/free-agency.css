@@ -8,6 +8,51 @@
    border-based separators instead of empty separator cells.
    ========================================================================== */
 
+/* Mobile: a wide table's caption and title row span the full table width,
+   so centered content lands off-screen. Pin it to the visible scroll area
+   (100cqw = the scroll container's width). */
+@media (max-width: 768px) {
+    .table-scroll-container:has(.fa-table),
+    .sticky-scroll-wrapper:has(.fa-table) {
+        container-type: inline-size;
+    }
+
+    /* Scoped to the same ancestors: outside a container, cqw falls back
+       to the viewport width */
+    .table-scroll-container .fa-table__title,
+    .sticky-scroll-wrapper .fa-table__title {
+        position: sticky;
+        left: 0;
+        width: 100cqw;
+        box-sizing: border-box;
+    }
+
+    .fa-table__title {
+        display: block;
+        text-align: center;
+    }
+}
+
+/* Desktop: the wrappers shrink to fit here, so container units would
+   collapse them. Instead, sticky offsets are a percent of the scroll area:
+   left and right at 50% conflict, left wins, so the title's left edge
+   sits at the visible center and the transform centers it. */
+@media (min-width: 769px) {
+    /* clip (not hidden): .ibl-data-table's overflow: hidden would make the
+       table the sticky title's scroll box */
+    .table-scroll-container .fa-table {
+        overflow: clip;
+    }
+
+    .fa-table__title {
+        display: inline-block;
+        position: sticky;
+        left: 50%;
+        right: 50%;
+        transform: translateX(-50%);
+    }
+}
+
 .fa-table {
     max-width: none;
 }
@@ -84,7 +129,7 @@
 /* Cap space footer */
 .ibl-data-table td.cap-footer-label {
     text-align: right;
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
 }
 .cap-footer-spacer {
     background-color: var(--team-row-highlight-bg);
@@ -167,11 +212,11 @@ table.sortable thead th {
     top: 0;
     bottom: 0;
     left: 0;
-    z-index: 0;
+    z-index: var(--z-base);
     background-color: inherit;
     color: var(--accent-700);
     text-decoration-line: none;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     white-space: nowrap;
     align-items: center;
     justify-content: center;
@@ -193,7 +238,7 @@ table.sortable thead th {
         display: flex;
     }
     tr:has(.contract-hint-cell):hover .contract-hint-cell:has(.contract-hint-link) {
-        z-index: 1;
+        z-index: var(--z-raised);
     }
     tr:has(.contract-hint-cell):hover .contract-hint-cell {
         color: transparent;
@@ -206,7 +251,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-link {
     display: flex;
 }
 tr:has(.contract-hint-cell):focus-within .contract-hint-cell:has(.contract-hint-link) {
-    z-index: 1;
+    z-index: var(--z-raised);
 }
 tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     color: transparent;

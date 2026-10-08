@@ -1,6 +1,6 @@
 ---
 description: The AI-tell sentence shapes ("Claude slop") that must not land in repo prose, PR bodies, or chat replies. Lists each tell with its fix, the on-touch policy, and the escape hatches. Enforced by bin/check-prose in CI and by two hooks.
-last_verified: 2026-09-30
+last_verified: 2026-10-05
 paths: "**/*.md"
 ---
 
@@ -57,7 +57,7 @@ Nothing here restricts what goes inside a code span. Quote a tell inside backtic
 
 ## Escape hatches
 
-- A line that carries `<!-- slop-ok -->` is skipped. Use it when a line quotes someone verbatim or shows a tell as an example.
+- `<!-- slop-ok -->` exempts the text up to and including the marker. A marker at the end of a line, or one followed only by a table-cell `|`, skips the whole line. Prose after a mid-line marker is still scanned, so put the marker after the sentence it covers. Use it when a line quotes someone verbatim or shows a tell as an example.
 - The Edit and Write gate accepts a one-shot override. The deny message prints the exact `touch` command. The file is consumed on the next call.
 - The chat gate never blocks twice in one turn. If the rewrite still trips a pattern, the turn ends normally.
 

@@ -25,8 +25,8 @@
         <testsuite name="UpdateAllTheThings Tests">
             <directory>tests/UpdateAllTheThings</directory>
         </testsuite>
-        <testsuite name="DepthChartEntry Module Tests">
-            <directory>tests/DepthChartEntry</directory>
+        <testsuite name="DepthChart Module Tests">
+            <directory>tests/DepthChart</directory>
         </testsuite>
         <testsuite name="Waivers Module Tests">
             <directory>tests/Waivers</directory>
@@ -71,7 +71,7 @@
             <directory>tests/Voting</directory>
         </testsuite>
         <testsuite name="Player Search Module Tests">
-            <directory>tests/PlayerDatabase</directory>
+            <directory>tests/PlayerSearch</directory>
         </testsuite>
         <testsuite name="FreeAgency Module Tests">
             <directory>tests/FreeAgency</directory>
@@ -118,8 +118,8 @@
         <testsuite name="ActivityTracker Module Tests">
             <directory>tests/ActivityTracker</directory>
         </testsuite>
-        <testsuite name="PlayerMovement Module Tests">
-            <directory>tests/PlayerMovement</directory>
+        <testsuite name="SeasonRosterChanges Module Tests">
+            <directory>tests/SeasonRosterChanges</directory>
         </testsuite>
         <testsuite name="NextSim Module Tests">
             <directory>tests/NextSim</directory>
@@ -187,8 +187,8 @@
         <testsuite name="FreeAgencyPreview Module Tests">
             <directory>tests/FreeAgencyPreview</directory>
         </testsuite>
-        <testsuite name="SavedDepthChart Module Tests">
-            <directory>tests/SavedDepthChart</directory>
+        <testsuite name="DepthChartSnapshot Module Tests">
+            <directory>tests/DepthChartSnapshot</directory>
         </testsuite>
         <testsuite name="LastSimRecap Module Tests">
             <directory>tests/LastSimRecap</directory>
@@ -293,6 +293,9 @@
         <testsuite name="Http Tests">
             <directory>tests/Http</directory>
         </testsuite>
+        <testsuite name="DataRetention Module Tests">
+            <directory>tests/DataRetention</directory>
+        </testsuite>
     </testsuites>
     <groups>
         <exclude>
@@ -318,9 +321,9 @@
             <directory suffix="Handler.php">classes</directory>
             <!-- Legacy modules not under active development -->
             <directory>classes/OneOnOneGame</directory>
-            <directory>classes/Database</directory>
+            <file>classes/Database/PdoConnection.php</file>
             <!-- Legacy god-class files -->
-            <file>classes/JSB.php</file>
+            <file>classes/League/JsbConstants.php</file>
         </exclude>
     </source>
 </phpunit>

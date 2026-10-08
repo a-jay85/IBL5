@@ -307,7 +307,7 @@ if [ "$FORCE" = false ]; then
         log "idle reader missing or not executable ('$WT_SYNC_IOREG') — treating as operator present (fail-closed)"
         exit 0
     fi
-    idle="$("$WT_SYNC_IOREG" -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}' 2>/dev/null)"
+    idle="$("$WT_SYNC_IOREG" -c IOHIDSystem | awk '/HIDIdleTime/ && !f {print int($NF/1000000000); f=1}' 2>/dev/null)"
     case "$idle" in
         ''|*[!0-9]*)
             log "idle value unreadable ('${idle:-<empty>}') — treating as operator present (fail-closed)"

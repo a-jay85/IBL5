@@ -46,7 +46,7 @@
 .next-sim-schedule-strip .next-sim-day-label {
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--navy-800);
     text-align: center;
     white-space: nowrap;
@@ -55,7 +55,7 @@
 .next-sim-schedule-strip .next-sim-record {
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--navy-700);
     text-align: center;
     display: flex;
@@ -117,7 +117,7 @@
 td.next-sim-game-info-cell {
     white-space: nowrap;
     font-size: var(--text-sm);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     padding: var(--space-1) var(--space-2);
     height: 100%;
 }

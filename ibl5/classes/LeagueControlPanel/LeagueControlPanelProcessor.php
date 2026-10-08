@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LeagueControlPanel;
 
 use League\LeagueContext;
-use LeagueControlPanel\Contracts\AwardGenerationServiceInterface;
+use LeagueControlPanel\Contracts\LeagueControlPanelAwardGenerationServiceInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelProcessorInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use Maintenance\Contracts\MaintenanceRepositoryInterface;
@@ -34,7 +34,7 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
     private const OLYMPICS_ALLOWED_ACTIONS = ['set_sim_length', 'set_season_phase'];
 
     private LeagueControlPanelRepositoryInterface $repository;
-    private AwardGenerationServiceInterface $awardGenerationService;
+    private LeagueControlPanelAwardGenerationServiceInterface $awardGenerationService;
     private string $league;
     private ?MaintenanceRepositoryInterface $maintenanceRepository;
 
@@ -45,7 +45,7 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
 
     public function __construct(
         LeagueControlPanelRepositoryInterface $repository,
-        AwardGenerationServiceInterface $awardGenerationService,
+        LeagueControlPanelAwardGenerationServiceInterface $awardGenerationService,
         string $league = LeagueContext::LEAGUE_IBL,
         ?MaintenanceRepositoryInterface $maintenanceRepository = null,
         ?\Psr\Log\LoggerInterface $logger = null,

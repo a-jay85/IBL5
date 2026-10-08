@@ -18,3 +18,6 @@ $compoundHomeTeam = "SELECT `homeTeamID` FROM ibl_box_scores_teams";
 $compoundVisitorTeam = "SELECT `visitorTeamID` FROM ibl_box_scores_teams";
 $ownerTid = "SELECT `owner_tid` FROM ibl_draft_picks";
 $teampickTid = "SELECT `teampick_tid` FROM ibl_draft_picks";
+$awardCol = "SELECT `Award` FROM ibl_awards";
+$tableIdCol = "SELECT `table_ID` FROM ibl_team_awards";
+$idCol = "SELECT `ID` FROM ibl_team_awards";

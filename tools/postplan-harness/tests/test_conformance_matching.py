@@ -280,6 +280,52 @@ def test_pytest_node_id_token_missing_when_file_absent():
     assert any(i.startswith("MISSING:") for i in items)
 
 
+def test_node_id_tokens_resolve_through_real_plan_parse(tmp_path):
+    """A `test_armable.py::test_name` token cited in a phase body and a PHPUnit matrix row
+    resolves through the real parse path, and stays MISSING when the file is absent.
+
+    Mutation caught: A) dropping the `::` strip in `_resolve` leaves the matrix token
+    unmatchable (spurious MISSING:). B) dropping the `.split("::", 1)[0]` in
+    `planfile._phase_evidence_paths` keeps `::test_fixture_case` on the phase evidence
+    path (spurious MISSING-PHASE:). Resolving unconditionally on `::` fails the negative
+    half, which must report both items for a diff that lacks the file.
+
+    Real-plan evidence (2026-10-07, backlog#1103): Phase 5.0 `conformance.check` on
+    manual-testing-clearance-pass-files @ 61cbd8aec and postplan-phase-omission-hold @
+    d23913ac1 both returned RESOLVES; neither plan printed NOT-EXERCISED or
+    DOES-NOT-RESOLVE. Those plans cite the node id only in phase bodies (CLI-executable
+    matrix rows never reach `planned_test_paths`), so this fixture adds the PHPUnit row
+    that routes the same token through `_resolve` as well.
+    """
+    from harness.planfile import locate_plan
+
+    node = "tools/postplan-harness/tests/test_armable.py::test_fixture_case"
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text(
+        "# Fixture plan\n"
+        "\n"
+        "## Phase 1: Add armable test\n"
+        "\n"
+        f"Add `{node}` to cover the armable path.\n"
+        "\n"
+        "## Verification Matrix\n"
+        "\n"
+        "| # | What to verify | Test type | Timing | Test file / location |\n"
+        "|---|---------------|-----------|--------|---------------------|\n"
+        f"| 1 | The fixture case passes | PHPUnit | post-impl | `{node}` |\n"
+    )
+    plan = locate_plan("fixture", explicit_path=str(plan_file))
+    assert plan.found
+    assert node in plan.planned_test_paths
+    assert "tools/postplan-harness/tests/test_armable.py" in plan.phases[0].evidence_paths
+
+    assert check(plan, ["tools/postplan-harness/tests/test_armable.py"]) == []
+
+    items = check(plan, ["tools/postplan-harness/tests/test_other.py"])
+    assert any(i.startswith("MISSING:") for i in items), items
+    assert any(i.startswith("MISSING-PHASE:") for i in items), items
+
+
 # ---------------------------------------------------------------------------
 # Migration renumber tolerance (backlog#937) — Tier 3 of _resolve
 # ---------------------------------------------------------------------------

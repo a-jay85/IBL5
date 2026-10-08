@@ -13,9 +13,11 @@
 #   1. No-loss    : every baseline token survives in rules ∪ detail
 #   2. Residency  : every operative token (bold/gate/fenced) survives in rules file specifically
 #   3. Orphans    : every Why: _…-detail.md § <heading> pointer in rules resolves
-#   4. Size caps  : _architect-contract.md ≤ 30720 B (raised from 29696 to fit number-placeholder bullet), _plan-verification.md ≤ 21504 B
+#   4. Size caps  : _architect-contract.md ≤ 29696 B, _plan-verification.md ≤ 21504 B
 #   5. Read budget: every plan-architect def carries the no-re-read bounds (check_read_budget)
+#   6. Added rules: every post-split bold lead-in in ADDED_RULES is resident in the contract (check_added_rules)
 #                   (only enforced when the detail file exists — skipped on the un-split tree)
+#   7. Mutation rule: the whole-matrix mutation bullet, its detail pointer, the detail heading and the SKILL.md gate-9 pointer all stay resident (check_mutation_rule)
 #
 # Run: bin/test-architect-contract-split              (exit 0 = pass, 1 = rule missing)
 #      bin/test-architect-contract-split --self-test  (also proves checker catches a deletion)
@@ -52,6 +54,12 @@ EXPECTED_ABSENT=(
 # Waives residency for the token, but tightens no-loss: token must be in the named detail file.
 # A named detail file that does not yet exist is a hard failure.
 EXPECTED_MOVED=(
+)
+
+# Format: "token<TAB>reason" — bold lead-ins added to _architect-contract.md AFTER the split.
+# The presplit fixture cannot see them, so assertions 1-2 do not protect them; check_added_rules does.
+ADDED_RULES=(
+  "**Existing tests the spec forces to edit.**	backlog#912: plans omitted existing test files their own spec changes forced to edit (PR #2336), and fidelity review flagged them as scope creep"
 )
 
 # ── Validate allowlists ───────────────────────────────────────────────────────
@@ -402,6 +410,65 @@ run_selftest() {
     printf 'FAIL: self-test did not detect dropped rule — checker is vacuous\n'
     FAILED=$((old_failed + 1))
   fi
+
+  # Mutation 2: drop the first ADDED_RULES bullet; check_added_rules must fail.
+  local added_mut="$tmpdir/_architect-contract-added.md"
+  local first_token="${ADDED_RULES[0]%%$'\t'*}"
+  grep -vF -- "$first_token" "$rules_src" > "$added_mut"
+  if grep -qF -- "$first_token" "$added_mut"; then
+    printf 'FAIL: self-test mutation 2 did not remove the added-rule bullet\n' >&2
+    exit 1
+  fi
+  old_failed=$FAILED
+  FAILED=0
+  check_added_rules "$added_mut"
+  if [[ "$FAILED" -gt 0 ]]; then
+    printf 'PASS: self-test detected dropped added rule (%d failure(s))\n' "$FAILED"
+    FAILED=$old_failed
+  else
+    printf 'FAIL: check_added_rules did not detect dropped bullet — checker is vacuous\n'
+    FAILED=$((old_failed + 1))
+  fi
+
+  # Mutations 3-6: check_mutation_rule must fail when any one of its four anchors is removed.
+  local detail_src="$REPO_ROOT/.claude/skills/plan/_architect-contract-detail.md"
+  local skill_src="$REPO_ROOT/.claude/skills/plan/SKILL.md"
+
+  # Mutation 3 (A): delete the contract line carrying the bold lead-in.
+  local mut_a="$tmpdir/contract-no-lead.md"
+  grep -vF -- "$MUTATION_LEAD" "$rules_src" > "$mut_a"
+  if grep -qF -- "$MUTATION_LEAD" "$mut_a"; then
+    printf 'FAIL: self-test mutation 3 did not remove the mutation bullet\n' >&2
+    exit 1
+  fi
+  expect_mutation_rule_fails "deleted mutation bullet" "$mut_a" "$detail_src" "$skill_src"
+
+  # Mutation 4 (B): strip only the pointer text; the lead-in must survive so the pointer probe is what fails.
+  local mut_b="$tmpdir/contract-no-pointer.md"
+  sed 's/Mutation-statement counter-examples//' "$rules_src" > "$mut_b"
+  if grep -qF -- "$MUTATION_POINTER" "$mut_b" || ! grep -qF -- "$MUTATION_LEAD" "$mut_b"; then
+    printf 'FAIL: self-test mutation 4 did not isolate the pointer text\n' >&2
+    exit 1
+  fi
+  expect_mutation_rule_fails "stripped contract pointer" "$mut_b" "$detail_src" "$skill_src"
+
+  # Mutation 5 (C): delete the heading line from a detail copy.
+  local mut_c="$tmpdir/detail-no-heading.md"
+  grep -vF -- "$MUTATION_HEADING" "$detail_src" > "$mut_c"
+  if grep -qF -- "$MUTATION_HEADING" "$mut_c"; then
+    printf 'FAIL: self-test mutation 5 did not remove the detail heading\n' >&2
+    exit 1
+  fi
+  expect_mutation_rule_fails "deleted detail heading" "$rules_src" "$mut_c" "$skill_src"
+
+  # Mutation 6 (D): strip the gate-9 pointer sentence from a SKILL.md copy.
+  local mut_d="$tmpdir/skill-no-pointer.md"
+  sed 's/ Every behavioral row also names the production-code mutation.*$//' "$skill_src" > "$mut_d"
+  if grep -qF 'Mutation-statement counter-examples' "$mut_d"; then
+    printf 'FAIL: self-test mutation 6 did not remove the gate-9 sentence\n' >&2
+    exit 1
+  fi
+  expect_mutation_rule_fails "stripped gate-9 pointer" "$rules_src" "$detail_src" "$mut_d"
 }
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -466,6 +533,77 @@ check_read_budget() {
   fi
 }
 
+# -- Assertion 6: post-split rules stay resident -----------------------------
+check_added_rules() {
+  local rules_file="$1" entry token reason
+  printf '\n=== added rules ===\n'
+  for entry in "${ADDED_RULES[@]}"; do
+    token="${entry%%$'\t'*}"
+    reason="${entry#*$'\t'}"
+    if [[ "${#reason}" -lt 15 || "$reason" == "$entry" ]]; then
+      printf 'FAIL [added rules]: entry for %s lacks a reason of at least 15 chars\n' "$token"
+      FAILED=$((FAILED + 1))
+      continue
+    fi
+    if ! grep -qF -- "$token" "$rules_file"; then
+      printf 'FAIL [added rules]: %s missing from %s\n' "$token" "$(basename "$rules_file")"
+      FAILED=$((FAILED + 1))
+    fi
+  done
+}
+
+# -- Assertion 7: the whole-matrix mutation rule stays resident ---------------
+# The bullet and its pointer live in _architect-contract.md (29645 of 29696 B), the counter-example
+# section lives in _architect-contract-detail.md, and SKILL.md gate 9 points at both. Losing
+# any one leaves the mutation rule unreachable from the place a plan author reads.
+MUTATION_LEAD='**The mutation statement extends to the whole matrix, not just the negative-path rows above:**'
+MUTATION_POINTER='`_architect-contract-detail.md` § Mutation-statement counter-examples'
+MUTATION_HEADING='### Mutation-statement counter-examples'
+MUTATION_SKILL_RE='^9\. \*\*Negative-path coverage\*\*.*Mutation-statement counter-examples'
+
+check_mutation_rule() {
+  local contract="$1" detail="$2" skill="$3" f before
+  printf '\n=== mutation rule ===\n'
+  for f in "$contract" "$detail" "$skill"; do
+    if [[ ! -f "$f" ]]; then
+      printf 'FAIL [mutation rule]: missing file %s\n' "$f"
+      FAILED=$((FAILED + 1)); return 0
+    fi
+  done
+  before=$FAILED
+  if ! grep -qF -- "$MUTATION_LEAD" "$contract"; then
+    printf 'FAIL [mutation rule]: %s lost the bullet lead-in: %s\n' "$(basename "$contract")" "$MUTATION_LEAD"
+    FAILED=$((FAILED + 1))
+  fi
+  if ! grep -qF -- "$MUTATION_POINTER" "$contract"; then
+    printf 'FAIL [mutation rule]: %s lost the pointer: %s\n' "$(basename "$contract")" "$MUTATION_POINTER"
+    FAILED=$((FAILED + 1))
+  fi
+  if ! grep -qF -- "$MUTATION_HEADING" "$detail"; then
+    printf 'FAIL [mutation rule]: %s lost the heading: %s\n' "$(basename "$detail")" "$MUTATION_HEADING"
+    FAILED=$((FAILED + 1))
+  fi
+  if ! grep -qE -- "$MUTATION_SKILL_RE" "$skill"; then
+    printf 'FAIL [mutation rule]: %s gate 9 lost the mutation-rule pointer\n' "$(basename "$skill")"
+    FAILED=$((FAILED + 1))
+  fi
+  [[ "$FAILED" -eq "$before" ]] && printf 'mutation rule: all 4 probes present\n'
+}
+
+# Runs check_mutation_rule on (contract, detail, skill) and expects it to fail.
+expect_mutation_rule_fails() {
+  local label="$1" old_failed=$FAILED
+  FAILED=0
+  check_mutation_rule "$2" "$3" "$4"
+  if [[ "$FAILED" -gt 0 ]]; then
+    printf 'PASS: self-test detected %s (%d failure(s))\n' "$label" "$FAILED"
+    FAILED=$old_failed
+  else
+    printf 'FAIL: check_mutation_rule did not detect %s — checker is vacuous\n' "$label"
+    FAILED=$((old_failed + 1))
+  fi
+}
+
 if [[ "$MODE" == selftest ]]; then
   run_selftest
 else
@@ -474,10 +612,12 @@ else
     "$CONTRACT_RULES" \
     "$CONTRACT_DETAIL" \
     "architect-contract" \
-    30720 \
+    29696 \
     true
 
   check_read_budget
+  check_added_rules "$CONTRACT_RULES"
+  check_mutation_rule "$CONTRACT_RULES" "$CONTRACT_DETAIL" "$REPO_ROOT/.claude/skills/plan/SKILL.md"
 
   # Cap is 21504 (21 KB), not the plan's 19456 (19 KB). The plan's movable-rationale
   # inventory was right: "## Required format" measures 11197 B in

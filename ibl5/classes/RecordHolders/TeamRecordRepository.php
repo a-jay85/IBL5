@@ -23,7 +23,7 @@ use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
  * @phpstan-import-type StreakRecord from RecordHoldersRepositoryInterface
  * @phpstan-import-type SeasonStartRecord from RecordHoldersRepositoryInterface
  */
-final class TeamRecordRepository extends \BaseMysqliRepository
+final class TeamRecordRepository extends \Database\BaseMysqliRepository
 {
     /**
      * Per-request memoization of regular-season game rows.

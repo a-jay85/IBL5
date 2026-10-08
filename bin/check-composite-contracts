@@ -33,6 +33,13 @@
 #                   armable.py and the ADR, and unique across workflows, A3 never
 #                   job-skipped, A4 bounded wait (timeout-minutes, --wait,
 #                   --self, --timeout-seconds) and no write permission.
+#   step DB env (D1): every step-scoped DB_HOST/DB_USER/DB_PASS/DB_NAME value
+#                   in any workflow must equal the ${DB_*:-default} that
+#                   setup-php-env writes into config.local.php, so DatabaseIntegration
+#                   tests (getenv) and app code (config.local.php) hit the same DB.
+#                   tests.yml, mutation.yml and mutation-pr.yml must each keep at
+#                   least one such block (no vacuous pass). Job-level DB_* env is
+#                   the sanctioned override path and is never inspected.
 #
 # Conditional by design: each check is SKIPPED (visibly) when its target file is
 # absent, so this no-ops on a branch without the file and auto-activates the
@@ -606,5 +613,110 @@ else
   fi
 
 fi  # end agg_file present
+
+# D1: step-scoped DB_* env must equal the setup-php-env config.local.php
+# defaults. The composite's "Create config.php" step reads JOB-level env only,
+# so a step-scoped value that differs from its default silently points the
+# getenv()-based DatabaseIntegration tests at a different DB than the app.
+D1_COMPOSITE="$ACTIONS/setup-php-env/action.yml"
+D1_REQUIRED="tests.yml mutation.yml mutation-pr.yml"
+if [ ! -f "$D1_COMPOSITE" ]; then
+  echo "composite-contracts: setup-php-env absent — D1 skipped"
+else
+  d1_parsed=1
+  d1_def_HOST=""; d1_def_USER=""; d1_def_PASS=""; d1_def_NAME=""
+  for d1_key in HOST USER PASS NAME; do
+    d1_vals=$(tr -d '\r' < "$D1_COMPOSITE" \
+      | { grep -oE '\$\{DB_'"$d1_key"':-[^}]*\}' || true; } \
+      | sed -E 's/^\$\{DB_[A-Z]+:-//; s/\}$//' | sort -u)
+    if [ -z "$d1_vals" ] || [ "$(printf '%s\n' "$d1_vals" | wc -l | tr -d ' ')" -ne 1 ]; then
+      echo "composite-contracts: setup-php-env (D1) — expected exactly one \${DB_${d1_key}:-default} in the composite, found: ${d1_vals:-none} ($D1_COMPOSITE)" >&2
+      fail=1
+      d1_parsed=0
+    fi
+    case "$d1_key" in
+      HOST) d1_def_HOST=$d1_vals ;;
+      USER) d1_def_USER=$d1_vals ;;
+      PASS) d1_def_PASS=$d1_vals ;;
+      NAME) d1_def_NAME=$d1_vals ;;
+    esac
+  done
+
+  for d1_req in $D1_REQUIRED; do
+    [ -f "$WORKFLOWS/$d1_req" ] || echo "composite-contracts: $d1_req absent — D1 skipped"
+  done
+
+  if [ "$d1_parsed" -eq 1 ]; then
+    d1_na=""
+    for d1_wf in "$WORKFLOWS"/*.yml; do
+      [ -f "$d1_wf" ] || continue
+      d1_name=$(basename "$d1_wf")
+      # Emits "K <line> <KEY> <value>" per step-scoped DB_* key and
+      # "B <env-line> <KEY,KEY,...>" per step env block that holds any of them.
+      # Step-scoped = 8-space key under a 6-space `env:` (a step key). Job-level
+      # env (6-space keys) and service env (10-space keys) never match.
+      d1_rows=$(awk '
+        function flush() { if (blk && seen != "") print "B " blk " " seen; blk = 0; seen = "" }
+        { sub(/\r$/, "") }
+        /^[[:space:]]*(#.*)?$/ { next }
+        {
+          match($0, /^ */); ind = RLENGTH
+          if (blk && ind <= 6) flush()
+          if ($0 ~ /^      env:[[:space:]]*(#.*)?$/) { blk = NR; seen = ""; next }
+          if (blk && $0 ~ /^        DB_(HOST|USER|PASS|NAME):/) {
+            key = $1; sub(/^DB_/, "", key); sub(/:$/, "", key)
+            val = $0; sub(/^        DB_[A-Z]+:[[:space:]]*/, "", val)
+            sub(/[[:space:]]+#.*$/, "", val); sub(/[[:space:]]+$/, "", val)
+            if (val ~ /^".*"$/ || val ~ /^\047.*\047$/) val = substr(val, 2, length(val) - 2)
+            print "K " NR " " key " " val
+            seen = seen key ","
+          }
+        }
+        END { flush() }' "$d1_wf")
+      if [ -z "$d1_rows" ]; then
+        case " $D1_REQUIRED " in
+          *" $d1_name "*)
+            echo "composite-contracts: $d1_name (D1) — no step-scoped DB_* env block found; this workflow is expected to pin DB_HOST/DB_USER/DB_PASS/DB_NAME on its DB step, so a missing block means the gate would pass vacuously ($d1_wf)" >&2
+            fail=1 ;;
+          *) d1_na="$d1_na $d1_name" ;;
+        esac
+        continue
+      fi
+      d1_bad=0; d1_blocks=0
+      while read -r d1_tag d1_line d1_k d1_v; do
+        case "$d1_tag" in
+          B)
+            d1_blocks=$((d1_blocks + 1))
+            for d1_need in HOST USER PASS NAME; do
+              case ",$d1_k" in
+                *",$d1_need,"*) ;;
+                *) echo "composite-contracts: $d1_name:$d1_line (D1) — step env block sets some DB_* keys but omits DB_$d1_need; getenv('DB_$d1_need') would not match config.local.php. Set all four or move the block to job-level env ($d1_wf)" >&2
+                   d1_bad=1 ;;
+              esac
+            done ;;
+          K)
+            case "$d1_k" in
+              HOST) d1_want=$d1_def_HOST ;;
+              USER) d1_want=$d1_def_USER ;;
+              PASS) d1_want=$d1_def_PASS ;;
+              NAME) d1_want=$d1_def_NAME ;;
+            esac
+            if [ "$d1_v" != "$d1_want" ]; then
+              echo "composite-contracts: $d1_name:$d1_line (D1) — step-scoped DB_$d1_k is '$d1_v' but setup-php-env writes config.local.php with default '$d1_want'; tests and app would hit different databases. Align the value, or override at job level so the composite sees it ($d1_wf)" >&2
+              d1_bad=1
+            fi ;;
+        esac
+      done <<< "$d1_rows"
+      if [ "$d1_bad" -eq 0 ]; then
+        echo "composite-contracts: $d1_name step-scoped DB_* env matches setup-php-env defaults ($d1_blocks block(s)) (D1)"
+      else
+        fail=1
+      fi
+    done
+    if [ -n "$d1_na" ]; then
+      echo "composite-contracts: D1 n/a (no step-scoped DB_* env):$d1_na"
+    fi
+  fi
+fi  # end D1
 
 exit "$fail"

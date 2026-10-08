@@ -30,4 +30,9 @@ final class OrderByWithTiebreaker
     {
         return "SELECT pid, name FROM ibl_plr WHERE tid = 1";
     }
+
+    public function getStoriesBySid(): string
+    {
+        return "SELECT s.sid, s.title FROM nuke_stories s ORDER BY s.time DESC, s.sid DESC LIMIT ?, ?";
+    }
 }

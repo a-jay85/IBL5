@@ -39,7 +39,7 @@ class FreeAgencyOfferView
 
         // Bird years are 0 unless the offering team is the player's current team
         $birdYears = $player->getTeamName() === $team->name ? ($player->getBirdYears() ?? 0) : 0;
-        $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
+        $raisePercentage = \League\ContractRules::getMaxRaisePercentage($birdYears);
 
         // Generate a single CSRF token for all forms on this page.
         // The negotiate page has 16+ forms (custom, delete, quick-offer buttons).
@@ -151,11 +151,11 @@ class FreeAgencyOfferView
     private function renderOfferButtons(Player $player, Team $team): string
     {
         // Calculate max contract salary and raises based on bird years
-        $maxContract = \ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
+        $maxContract = \League\ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
         // Only use player's bird years if offering team is player's current team
         $birdYears = $player->getTeamName() === $team->name ? ($player->getBirdYears() ?? 0) : 0;
-        $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
-        $maxRaise = \ContractRules::calculateMaxRaise($maxContract, $birdYears);
+        $raisePercentage = \League\ContractRules::getMaxRaisePercentage($birdYears);
+        $maxRaise = \League\ContractRules::calculateMaxRaise($maxContract, $birdYears);
 
         $maxSalaries = [
             0 => $maxContract,
@@ -195,15 +195,15 @@ class FreeAgencyOfferView
         $hardCapSpace = $capMetrics['hardCapSpace'];
 
         // Calculate raise percentage and example based on bird years (matching validator logic)
-        $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
+        $raisePercentage = \League\ContractRules::getMaxRaisePercentage($birdYears);
         $rawPercentage = $raisePercentage * 100;
         $raisePercentageDisplay = ($rawPercentage === floor($rawPercentage))
             ? (string) (int) $rawPercentage
             : rtrim(rtrim(sprintf('%.1f', $rawPercentage), '0'), '.');
         $exampleSalary = 500;
-        $exampleRaise = \ContractRules::calculateMaxRaise($exampleSalary, $birdYears);
+        $exampleRaise = \League\ContractRules::calculateMaxRaise($exampleSalary, $birdYears);
 
-        $hasBirdRights = \ContractRules::hasBirdRights($birdYears);
+        $hasBirdRights = \League\ContractRules::hasBirdRights($birdYears);
         if ($hasBirdRights) {
             $birdRightsText = "<strong>Bird Rights Player on Your Team:</strong> You may add no more than {$raisePercentageDisplay}% of the amount you offer in the first year as a raise between years (for instance, if you offer {$exampleSalary} in Year 1, you cannot offer a raise of more than {$exampleRaise} between any two subsequent years.)";
         } else {

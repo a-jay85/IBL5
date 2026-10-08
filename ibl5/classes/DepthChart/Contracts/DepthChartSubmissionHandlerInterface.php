@@ -1,0 +1,42 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DepthChart\Contracts;
+
+/**
+ * DepthChartSubmissionHandlerInterface - Contract for depth chart submission orchestration
+ *
+ * Orchestrates the complete depth chart submission workflow:
+ * processing user input, validating against business rules,
+ * and persisting to database. Emits no direct output — the caller
+ * uses the returned result array to drive session flash and
+ * Post-Redirect-Get response.
+ *
+ * @phpstan-type SubmissionResult array{
+ *     success: bool,
+ *     fileOk: bool,
+ *     errorsHtml: string,
+ *     postData: array<string, mixed>
+ * }
+ */
+interface DepthChartSubmissionHandlerInterface
+{
+    /**
+     * Handle complete depth chart form submission.
+     *
+     * Flow:
+     * 1. Derive the authoritative team from the session username (POST `Team_Name`
+     *    is never trusted as the write target — IDOR fix D-09). Reject null/empty/
+     *    Free-Agents session teams with the empty-team failure result.
+     * 2. Process raw form data via DepthChartProcessor.
+     * 3. Validate against current season phase via DepthChartValidator.
+     * 4. On success: save to DB, write CSV file, email confirmation, snapshot.
+     * 5. On failure: return errorsHtml and postData for the caller to stash as flash.
+     *
+     * @param array<string, mixed> $postData Raw POST data from form submission ($_POST).
+     * @param string $sessionUsername Authenticated username; the write target is derived from it.
+     * @return array{success: bool, fileOk: bool, errorsHtml: string, postData: array<string, mixed>}
+     */
+    public function handleSubmission(array $postData, string $sessionUsername): array;
+}

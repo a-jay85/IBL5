@@ -1,0 +1,76 @@
+@layer components {
+
+/* ==========================================================================
+   Player Row States (.ibl-data-table tbody tr.drafted, tr.player-fa-expiring-row)
+
+   Row-state modifiers for player rows: drafted prospects on the Draft
+   board, expiring contracts on the Team page during Draft / Free Agency.
+   Imported directly after tables.css and before every other tables/
+   partial (design/input.css) so these rules keep the cascade position
+   they had inside tables.css.
+   ========================================================================== */
+
+/* Drafted/disabled row */
+.ibl-data-table tbody tr.drafted {
+    opacity: 0.5;
+}
+
+.ibl-data-table tbody tr.drafted td {
+    text-decoration: line-through;
+    font-style: italic;
+}
+
+/* Expiring-contract row (Team page, Draft / Free Agency) — faded to mirror the
+   Trading module's outgoing-player treatment: "this player may not be on this
+   roster next season". Uses the same :nth-child pair as .highlight/.totals-row
+   above to outrank striping without !important. Values duplicated from
+   components/trade-roster-preview.css tr.trade-outgoing-row by design — see the
+   plan's Architectural trade-offs (c). */
+.ibl-data-table tbody tr.player-fa-expiring-row:nth-child(odd),
+.ibl-data-table tbody tr.player-fa-expiring-row:nth-child(even) {
+    background-color: var(--gray-100);
+    color: var(--gray-400);
+}
+
+.ibl-data-table tbody tr.player-fa-expiring-row:nth-child(odd):hover,
+.ibl-data-table tbody tr.player-fa-expiring-row:nth-child(even):hover {
+    background-color: var(--gray-200);
+}
+
+.ibl-data-table tbody tr.player-fa-expiring-row td {
+    color: var(--gray-400);
+}
+
+.ibl-data-table tbody tr.player-fa-expiring-row a {
+    color: var(--gray-400);
+}
+
+.ibl-data-table tbody tr.player-fa-expiring-row img {
+    filter: grayscale(100%);
+    opacity: 0.45;
+}
+
+@media (max-width: 768px) {
+    /* Drafted row sticky backgrounds - consolidated */
+    .responsive-table tbody tr.drafted td[class*="sticky-col"] {
+        background-color: var(--gray-100);
+    }
+
+    /* Expiring-contract row sticky backgrounds — keeps the frozen Player cell
+       in step with the faded row instead of retaining its stripe colour. */
+    .responsive-table tbody tr.player-fa-expiring-row td[class*="sticky-col"] {
+        background-color: var(--gray-100);
+        color: var(--gray-400);
+    }
+
+    .responsive-table tbody tr.player-fa-expiring-row:hover td[class*="sticky-col"] {
+        background-color: var(--gray-200);
+    }
+}
+
+/* Drafted row sticky backgrounds */
+.sticky-table tbody tr.drafted td[class*="sticky-col"] {
+    background-color: var(--gray-100);
+}
+
+} /* end @layer components */

@@ -21,8 +21,8 @@ export async function runUpdater(
 ): Promise<void> {
   const path =
     options.league === 'olympics'
-      ? 'leagueControlPanel.php?league=olympics'
-      : 'leagueControlPanel.php';
+      ? 'modules.php?name=LeagueControlPanel&league=olympics'
+      : 'modules.php?name=LeagueControlPanel';
   await page.goto(path);
   await Promise.all([
     page.waitForLoadState('load'),
@@ -49,8 +49,8 @@ export async function triggerUpdater(
 ): Promise<string> {
   const lcpPath =
     options.league === 'olympics'
-      ? 'leagueControlPanel.php?league=olympics'
-      : 'leagueControlPanel.php';
+      ? 'modules.php?name=LeagueControlPanel&league=olympics'
+      : 'modules.php?name=LeagueControlPanel';
 
   const lcpResp = await request.get(lcpPath);
   if (!lcpResp.ok()) {

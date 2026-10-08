@@ -430,7 +430,7 @@ final class Season2004BoxscoreRestore
     private function insertRecoveredGame(): array
     {
         $teams = 0;
-        $stmt = $this->db->prepare(Boxscore::teamInsertSql(self::TEAM_TABLE));
+        $stmt = $this->db->prepare(Boxscore::teamInsertSql());
         if ($stmt === false) {
             throw new RuntimeException('Failed to prepare team insert: ' . $this->db->error);
         }
@@ -456,7 +456,7 @@ final class Season2004BoxscoreRestore
         $stmt->close();
 
         $players = 0;
-        $stmt = $this->db->prepare(Boxscore::playerInsertSql(self::PLAYER_TABLE));
+        $stmt = $this->db->prepare(Boxscore::playerInsertSql());
         if ($stmt === false) {
             throw new RuntimeException('Failed to prepare player insert: ' . $this->db->error);
         }

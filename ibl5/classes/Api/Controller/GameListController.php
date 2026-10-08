@@ -20,8 +20,6 @@ class GameListController implements ControllerInterface
         $this->repo = $repo;
     }
 
-    private const ALLOWED_SORT_COLUMNS = ['game_date', 'visitor_score', 'home_score'];
-
     /**
      * @see ControllerInterface::handle()
      */
@@ -30,7 +28,7 @@ class GameListController implements ControllerInterface
         if (!isset($query['order'])) {
             $query['order'] = 'desc';
         }
-        $paginator = new Paginator($query, 'game_date', self::ALLOWED_SORT_COLUMNS);
+        $paginator = new Paginator($query, 'game_date', array_keys(ApiGameRepository::SORT_COLUMNS));
         $repo = $this->repo;
         $transformer = new GameTransformer();
         $etag = new ETagHandler();

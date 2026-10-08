@@ -17,7 +17,7 @@ use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
  * @phpstan-import-type QuadrupleDoubleRecord from RecordHoldersRepositoryInterface
  * @phpstan-import-type AllStarRecord from RecordHoldersRepositoryInterface
  */
-final class PlayerRecordRepository extends \BaseMysqliRepository
+final class PlayerRecordRepository extends \Database\BaseMysqliRepository
 {
     private const SEASON_YEAR_EXPRESSION = 'bs.season_year';
 

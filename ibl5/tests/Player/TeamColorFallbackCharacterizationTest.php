@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Player;
 
+use Player\Views\TeamColorHelper;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -35,6 +36,8 @@ final class TeamColorFallbackCharacterizationTest extends TestCase
     #[DataProvider('colorFallbackCases')]
     public function testColorFallbackMatchesCharacterizedTable(array $mockRows, array $expected): void
     {
-        self::assertSame($expected, \Player\Views\TeamColorHelper::resolveTeamColors($mockRows[0] ?? null));
+        $row = $mockRows[0] ?? null;
+
+        self::assertSame($expected, TeamColorHelper::resolveTeamColors($row));
     }
 }

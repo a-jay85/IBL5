@@ -56,6 +56,10 @@ class TeamIdentityRepositoryTest extends DatabaseTestCase
         self::assertNull($this->repo->getTeamColorRow(999999));
     }
 
+    /**
+     * The fallback lives in TeamColorHelper, not SQL: a query that adds
+     * COALESCE(NULLIF(color1,''),'D4AF37') would turn '' into gold here.
+     */
     public function testGetTeamColorRowReturnsEmptyColorsUnchanged(): void
     {
         self::assertNotNull($this->repo->getTeamnameFromTeamID(1));

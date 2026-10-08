@@ -364,6 +364,8 @@ cat <<'ROWS'
 99999	0	com.apple.something.unrelated
 ROWS
 [ -n "\${STUB_NO_AUTOMOUSE:-}" ] || printf -- '-\t0\tcom.ibl5.automouse\n'
+# Case 26: a live burndown-loop, shown only when asked for.
+[ -z "\${STUB_BURNDOWN:-}" ] || printf -- '7007\t0\tcom.ibl5.burndown-loop\n'
 # Case 19: space-separated epochs, one loaded-but-idle one-shot label each.
 for e in \${STUB_ONESHOT_EPOCHS:-}; do
     printf -- '-\t0\tcom.ibl5.automouse-oneshot-%s\n' "\$e"
@@ -1206,6 +1208,34 @@ else
     printf '  skip  %s\n' "watch: frame-swap clear-screen escape in first frame (no timeout/gtimeout)"
     printf '  skip  %s\n' "watch: refresh footer in first frame (no timeout/gtimeout)"
 fi
+
+# Case 26 — a sleeping burndown-loop row shows its wake time. bin/burndown-loop
+# logs "<UTC ts> burndown-loop sleep <secs>s reason=<r>" when it falls asleep, so
+# the wake time is ts + secs. A sleep that already ended, or a later log line,
+# means it is awake and no time prints. BSD `date -r` first, GNU `date -d @` second.
+bd_utc() { date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+    || date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
+BD_START=$(( $(date +%s) - 60 ))
+BD_WAKE_HM="$(date -r $(( BD_START + 3600 )) +%H:%M 2>/dev/null \
+    || date -d "@$(( BD_START + 3600 ))" +%H:%M)"
+BD_ASLEEP="$TMP/bd-asleep.log"; BD_AWAKE="$TMP/bd-awake.log"; BD_PAST="$TMP/bd-past.log"
+printf '%s burndown-loop sleep 3600s reason=all-skipped\n' "$(bd_utc "$BD_START")" > "$BD_ASLEEP"
+{ cat "$BD_ASLEEP"
+  printf '%s burndown-loop decision=launch go 29.0 54.3 0\n' "$(bd_utc "$BD_START")"; } > "$BD_AWAKE"
+printf '%s burndown-loop sleep 30s reason=pace\n' "$(bd_utc "$BD_START")" > "$BD_PAST"
+OUT_BD_ASLEEP="$(run_fleet STUB_BURNDOWN=1 FLEET_STATUS_BURNDOWN_LOG="$BD_ASLEEP")"
+OUT_BD_AWAKE="$(run_fleet STUB_BURNDOWN=1 FLEET_STATUS_BURNDOWN_LOG="$BD_AWAKE")"
+OUT_BD_PAST="$(run_fleet STUB_BURNDOWN=1 FLEET_STATUS_BURNDOWN_LOG="$BD_PAST")"
+assert_has "burndown: the row is listed under its own name" \
+    "$OUT_BD_ASLEEP" '● burndown +burndown-loop'
+assert_has "burndown: asleep shows the reason and next run" \
+    "$OUT_BD_ASLEEP" "asleep \\(all-skipped\\)  ·  next run [A-Z][a-z]{2} [0-9-]{10} $BD_WAKE_HM"
+assert_lacks "burndown: a later log line means awake, no next run" \
+    "$OUT_BD_AWAKE" 'asleep \('
+assert_has "burndown: awake shows the last log line" \
+    "$OUT_BD_AWAKE" 'decision=launch go'
+assert_lacks "burndown: a sleep that already ended shows no next run" \
+    "$OUT_BD_PAST" 'asleep \('
 
 # Case 23 — unknown option: exit 2, one-line complaint on stderr, no page rendered.
 # stderr is captured apart from stdout so the message is pinned to the right stream.

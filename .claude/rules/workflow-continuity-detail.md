@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-03
+last_verified: 2026-10-06
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -45,6 +45,11 @@ gate denial, so a hook message nobody enumerated in `_LOCAL_GATE_MARKERS` is sti
 `bin/post-plan-now` additionally exits **6** from its own in-flight duplicate-run guard.
 That code is caller-side and has no harness meaning: it refuses to start a second
 supervised run for a slug whose launchd job is still loaded, and `--force` bypasses it.
+It also exits **7** when run from the main checkout (ADR-0062). Nothing was fired and the
+skill fallback is suppressed. `cd` into the target worktree and re-run.
+It exits **8** when it declines a repeat hold: the last run for this slug held on the same
+structural reasons, the repeat DM was already sent, and plan, diff and harness are unchanged
+(`harness/holdrepeat.py`). Nothing was fired. `--force` overrides.
 
 ## What `--auto` adds
 

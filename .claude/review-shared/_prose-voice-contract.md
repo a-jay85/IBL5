@@ -1,6 +1,6 @@
 ---
 description: The written-voice contract for machine-authored merge-digest lines and PR-body prose — five rules, the sentence-tokenizing definition bin/check-digest-prose implements, and two annotated failure samples.
-last_verified: 2026-09-22
+last_verified: 2026-10-07
 ---
 
 # Prose Voice Contract
@@ -10,13 +10,13 @@ last_verified: 2026-09-22
 This contract governs **machine-authored prose** in two places:
 
 - The five `### Merge digest` label lines authored by `.claude/agents/pr-ready-phase6.md`.
-- The PR-body prose the `/post-plan` orchestrator composes per `.claude/skills/post-plan/SKILL.md`: the `## Scope` why-paragraph, `**Scope expansion:**`, `## Why this PR exists`, and `## Reviewer verification`.
+- The PR-body prose the `/post-plan` orchestrator composes per `.claude/skills/post-plan/SKILL.md`: the `## Scope` why-paragraph, `**Scope expansion:**`, and `## Why this PR exists`.
 
 It is **read on demand**, never auto-attached. Both callers carry an explicit `Read` instruction pointing here.
 
 It **adds nothing to the digest's structural contract**. The digest stays exactly five lines, one per label, labels unchanged, no blank lines between them. That structure is owned by `.claude/agents/pr-ready-phase6.md` and `.claude/review-shared/scripts/digest.sh`; this file governs only how the sentence reads, never how many lines there are.
 
-**Why sentence length matters here.** `bin/digest-dm-build` truncates `**Watch:**` at `WATCH_MAX=700` characters and `**What changed:**` at `WHAT_MAX=1000` characters for the Discord DM. A long sentence's tail can be the part that vanishes. <!-- slop-ok -->
+**Why sentence length matters here.** `bin/digest-dm-build` truncates `**Watch:**` at `WATCH_MAX=650` characters and `**What changed:**` at `WHAT_MAX=1000` characters for the Discord DM. A long sentence's tail can be the part that vanishes. <!-- slop-ok -->
 
 ## The five rules
 

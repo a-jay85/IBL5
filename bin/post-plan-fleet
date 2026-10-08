@@ -281,7 +281,7 @@ _fleet_auth_probe() {
     set +e
     # Same isolated probe as bin/pr-cycle's _auth_probe (see the comment there).
     _out="$(cd /tmp && timeout 90 claude -p 'Reply with the single word OK.' \
-        --model claude-haiku-4-5-20251001 --tools "" --setting-sources "" \
+        --model claude-haiku-5-5 --tools "" --setting-sources "" \
         --strict-mcp-config --system-prompt 'You reply with exactly the word OK.' 2>/dev/null)"
     _rc=$?
     set -e
@@ -524,8 +524,13 @@ while read -r pr; do
         SKIP_LINES+=("$pr|$branch|$pre|post-plan paused by usage gate; coordinator resumes it"); continue
     fi
     if [[ -z "$w" ]]; then
-        # Skip unless an explicit --pr was given (allows dry-run with fictional PR numbers).
-        [[ ${#EXPLICIT_PRS[@]} -gt 0 ]] || { SKIP_LINES+=("$pr|$branch|$pre|no worktree"); continue; }
+        # Skip, except under --dry-run / POST_PLAN_FLEET_DRY_RUN=1 with an explicit --pr: a
+        # dry run uses fictional PR numbers that have no worktree, so it must bypass this
+        # check. A live --go run (and a plain preview, which must predict the live result)
+        # skips an explicit PR with no worktree the same as the default path.
+        if ! [[ ${#EXPLICIT_PRS[@]} -gt 0 && "${POST_PLAN_FLEET_DRY_RUN:-}" == "1" ]]; then
+            SKIP_LINES+=("$pr|$branch|$pre|no worktree"); continue
+        fi
     fi
     FIRE_PRS+=("$pr"); FIRE_BRANCHES+=("$branch"); FIRE_PRE+=("$pre")
 done <<< "$PR_LIST"

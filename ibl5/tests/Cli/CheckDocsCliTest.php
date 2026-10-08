@@ -85,6 +85,10 @@ final class CheckDocsCliTest extends TestCase
         $this->runGit('config user.email test@example.com');
         $this->runGit('config user.name Test');
         $this->runGit('config commit.gpgsign false');
+        // Commits trigger git's detached auto-maintenance, which can still be writing
+        // .git/objects when tearDown() deletes the repo ("Directory not empty").
+        $this->runGit('config maintenance.auto false');
+        $this->runGit('config gc.auto 0');
     }
 
     protected function tearDown(): void

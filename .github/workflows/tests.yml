@@ -79,8 +79,11 @@ jobs:
               - 'ibl5/tests/Cli/fixtures/**'
               # Every other bin/ script a PHPUnit test runs. A bin-only edit to one
               # of these must flip src, or the test that covers it never runs and
-              # the break lands on master (#2907). bin/test-path-filters derives
-              # this set from ibl5/tests and fails when an entry is missing.
+              # the break lands on master (#2907). bin/test-path-filters scans
+              # ibl5/tests for `__DIR__ . '/../bin/...'` loads and fails when one
+              # is missing. Three paths load another way and are hand-added, so
+              # the self-test does not catch their omission: bin/lib/db-helpers.sh,
+              # bin/pre-commit-hook, bin/lib/shell-scripts.sh.
               - 'bin/adr-check'
               - 'bin/check-boxscore-schedule'
               - 'bin/check-column-rename-sweep'
@@ -95,10 +98,7 @@ jobs:
               - 'bin/lib/shell-scripts.sh'
               - 'bin/lighthouse-audit-report'
               - 'bin/lighthouse-audit-urls'
-              - 'bin/lighthouse-comment'
-              - 'bin/lighthouse-pr-urls'
               - 'bin/merge-master-to-prod'
-              - 'bin/migrate-backlog-to-issues'
               - 'bin/next-adr'
               - 'bin/next-migration'
               - 'bin/pr-triage'
@@ -126,6 +126,7 @@ jobs:
               - '.claude/skills/post-plan/SKILL.md'
               - '.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md'
               - '.claude/skills/post-plan/_phase-5.5-fidelity.md'
+              - '.claude/skills/post-plan/_phase-6-manual-testing.md'  # Mode A `row` contract pin
               - '.claude/review-shared/scripts/digest.sh'
               # bin/test-post-review-findings reads the Step 7 / Step 1 blocks here,
               # so a skill-only edit must run the harness job too.
@@ -781,6 +782,8 @@ jobs:
         run: bin/test-automouse-login-preflight
       - name: Run headless elapsed-clock hook regression test
         run: bin/test-headless-elapsed-hook
+      - name: Run post-merge hook change-detection regression test
+        run: bin/test-post-merge-hook
       - name: Run automouse impl cap-timeout regression test
         run: bin/test-automouse-impl-cap-timeout
       - name: Run automouse postplan terminal-disposition regression test
@@ -1106,7 +1109,6 @@ jobs:
             bin/test-sim-recap-ssh-gate \
             bin/test-discord-dm \
             bin/test-post-plan-fail-dm \
-            bin/test-token-report \
             bin/test-automouse-escalation \
             bin/test-automouse-repeat-failure \
             bin/test-automouse-disarm \
@@ -1120,7 +1122,6 @@ jobs:
             bin/test-path-filters \
             ibl5/bin/test-db-sync-now \
             bin/test-architect-contract-split \
-            bin/test-plan-review-digest \
             bin/test-plan-review-seam \
             bin/test-check-registry-trigger-rows \
             bin/test-ci-memo \
@@ -1135,6 +1136,9 @@ jobs:
       # Needs a scrubbed environment, so it cannot share the runner.
       - name: bin/test-burndown-loop
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-burndown-loop'
+      # Needs a scrubbed environment, so it cannot share the runner.
+      - name: bin/test-wt-pool
+        run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-wt-pool'
 
       - name: bin/test-restore-rowcount-compare
         run: bin/test-restore-rowcount-compare

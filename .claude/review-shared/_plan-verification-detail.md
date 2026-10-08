@@ -74,7 +74,7 @@ Minimal section — specific counter-examples are embedded inline in the rules t
 
 ### What the plan must NOT do
 
-Folded into the positive rules on 2026-09-28. The four retired bullets, kept for the record: a "verify manually" item that PHPUnit, an API test, E2E, or visual-regression can assert; classification deferred to post-plan Phase 6; a standalone Testing or Verification prose section in place of the matrix; a "run X and check Y" row with no test type and no file path. Each now lives beside the rule it negated: § Classification rules, § Required format, and § Weave tests inline.
+Folded into the positive rules on 2026-09-28. Each former prohibition now lives beside the rule it negated: § Classification rules, § Required format, and § Weave tests inline.
 
 ### HTTP response shape changes
 

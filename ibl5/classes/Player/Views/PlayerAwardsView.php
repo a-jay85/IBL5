@@ -10,9 +10,9 @@ use Security\HtmlSanitizer;
 
 /**
  * PlayerAwardsView - Renders player awards and All-Star activity
- * 
+ *
  * Pure rendering with no database logic - all data fetched via PlayerRepository
- * 
+ *
  * @see PlayerAwardsViewInterface
  */
 class PlayerAwardsView implements PlayerAwardsViewInterface

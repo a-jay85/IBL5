@@ -297,15 +297,6 @@ def test_runner_manual_recheck_site_propagates_pause():
     assert llm.purposes == ["manual-recheck"]
 
 
-def test_runner_hold_discharge_site_propagates_pause():
-    justification = ("Why held.\n- the diff is visual only, a probe could check it\n\n"
-                     "**Decision:** hold for a human.\n")
-    llm = PausingLlm()
-    with pytest.raises(UsagePause):
-        runner._discharge_hold_sentences(llm, None, justification, _NOOP)
-    assert llm.purposes == ["hold-discharge"]
-
-
 _CANNED_RUN = {
     "pr-copy": {"type": "chore", "title": "chore: pause-test",
                 "commit_subject": "chore: test commit", "summary_md": "## Summary\n- x\n"},

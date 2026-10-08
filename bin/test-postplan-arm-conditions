@@ -515,6 +515,47 @@ B15="$(extract_block '# condition (15)')"
 B17="$(extract_block '# condition (17)')"
 BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
+S1X="$(extract_block '# phase 6 step 1 extract' "$P25_SKILL")"
+TICKB="$(extract_block '# phase 6 manual-row tick' "$P25_SKILL")"
+for _m in '# phase 6 step 1 extract' '# phase 6 manual-row tick'; do
+    _n=$(grep -cF "$_m" "$P25_SKILL")
+    if [ "$_n" -eq 1 ]; then echo "ok: marker '$_m' is unique"
+    else echo "FAIL: marker '$_m' appears $_n times in SKILL.md (want 1)"; FAILED=1; fi
+done
+# tick-ok: portable twin of tick-rows.sh. Reads the same PASS file, flips the
+# same `- [ ] **<id>**` shape in the fixture body, records the write.
+cat > "$SHIMD/tick-ok" <<'STUB'
+#!/usr/bin/env bash
+pass="/tmp/pr-ready-manual-rows-$1.txt"
+cp "$pass" "${TICK_PASS_SEEN:-/dev/null}" 2>/dev/null || true
+body="$(jq -r '.body' "$GH_PR_FIXTURE")"
+while IFS= read -r l; do
+  id="${l#ROW }"; id="${id% PASS}"; old="- [ ] **${id}**"; new="- [x] **${id}**"
+  body="${body//"$old"/$new}"
+done < <(grep -E '^ROW .+ PASS$' "$pass" 2>/dev/null)
+jq --arg b "$body" '.body = $b' "$GH_PR_FIXTURE" > "$GH_PR_FIXTURE.t" && mv "$GH_PR_FIXTURE.t" "$GH_PR_FIXTURE"
+printf '%s' "$body" >> "${GH_EDIT_RECORD:-/dev/null}"
+STUB
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SHIMD/tick-noop"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$SHIMD/tick-fail"
+chmod +x "$SHIMD/tick-ok" "$SHIMD/tick-noop" "$SHIMD/tick-fail"
+
+# run_tick <body> <ids-text> <delete-text> <stub> — run the Phase 6 tick block
+# in its own shell against a fixture PR 99691; body file lands at $TB.
+TB="$BASE_TMP/tick-body.md"
+run_tick() {
+    jq -n --arg b "$1" '{number: 99691, body: $b}' > "$BASE_TMP/fixture.json"
+    printf '%s' "$2" > "$BASE_TMP/tick-ids"; printf '%s' "$3" > "$BASE_TMP/tick-del"
+    rm -f "$TB" "$BASE_TMP/pass-seen"; : > "$BASE_TMP/edit-record"
+    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+        TICK_IDS_FILE="$BASE_TMP/tick-ids" TICK_DELETE_FILE="$BASE_TMP/tick-del" \
+        TICK_ROWS_SCRIPT="$SHIMD/$4" TICK_PR=99691 TICK_SLUG=fixture \
+        TICK_BODY_OUT="$TB" TICK_PASS_SEEN="$BASE_TMP/pass-seen" \
+        GH_EDIT_RECORD="$BASE_TMP/edit-record" GH_PR_FAIL="${TICK_GH_FAIL:-}" \
+        bash -c "$TICKB" 2>&1
+    rm -f /tmp/pr-ready-manual-rows-99691.txt
+}
+with_sentinel() { awk '{print} /^## Manual Testing/ && !d {print ""; print "No manual testing needed — remaining steps are covered by automated checks run in Phase 6; verification is automated: bin/test-foo"; d=1}' "$1"; }
 B12="$(extract_block '# condition (12)')"
 B55="$(extract_block '# phase 5.5 verdict parse' "$P55_SKILL")"
 # The findings-render block added in Phase 2. The literal marker is the ONLY binding
@@ -525,7 +566,7 @@ if [ -z "$B58F" ]; then
     echo "FAIL: no block matching '# phase 5.8 findings render' in $P55_SKILL — marker drifted"
     FAILED=1
 fi
-BREB="$(extract_block '# phase 2 rebase' "$P25_SKILL")"
+BREB="$(extract_block '# phase 2 merge' "$P25_SKILL")"
 
 # --- structural: every predicate-using block must source the lib itself ---
 assert_self_contained '# condition (1)' "condition (1)"
@@ -566,6 +607,24 @@ expect_block "(1) cleared sentinel -> NONE" NONE \
     "$(run_isolated "$B1" '{"body":"## Manual Testing\nNo manual testing needed — automated."}' '' '')"
 expect_block "(1) no section (UNKNOWN) -> BLOCK (fail-closed)" BLOCK \
     "$(run_isolated "$B1" '{"body":"hand-made PR, no manual testing heading"}' '' '')"
+# (1) with the Decision-only hold notice: the block sits before ## Manual Testing,
+# every line `> `-prefixed, so the clearance window is unchanged.
+_hd_dir="$(mktemp -d)"
+_hd_plan="$_hd_dir/plan.md"
+printf '%s\n' '## Automouse Hold Justification' '' \
+    '**Category:** intrinsic, self-gating change.' '' \
+    "**Decision:** Merge if you're OK with about 7% more PRs being held." \
+    '- [x] counterfeit checkbox in a Decision continuation line' '' \
+    '**Discharged by matrix rows:** 3, 4.' '' '## Verification Matrix' > "$_hd_plan"
+_hd_block="$(bash -c 'source "$1"; hold_manual_confirmation_block "$2"' _ \
+    "$SCRIPT_DIR/lib/hold-check.sh" "$_hd_plan")"
+expect_block "(1) Decision block before cleared sentinel -> NONE" NONE \
+    "$(run_isolated "$B1" "$(jq -n --arg b "$_hd_block"$'\n\n## Manual Testing\nNo manual testing needed — automated.' '{body:$b}')" '' '')"
+expect_block "(1) Decision block before held rows -> BLOCK" BLOCK \
+    "$(run_isolated "$B1" "$(jq -n --arg b "$_hd_block"$'\n\n## Manual Testing\n\n- review the new <h1>' '{body:$b}')" '' '')"
+expect_block "(1) Decision block alone, no Manual Testing -> BLOCK (fail-closed)" BLOCK \
+    "$(run_isolated "$B1" "$(jq -n --arg b "$_hd_block" '{body:$b}')" '' '')"
+rm -rf "$_hd_dir"
 # S1: tail names unit, non-test file — predicate holds when files key is present.
 expect_block "S1: tail names unit, non-test file → BLOCK" BLOCK \
     "$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed — covered by unit tests","files":[{"path":"bin/pr-triage"}]}' '' '')"
@@ -1804,6 +1863,30 @@ expect_clearance "(1) checked evidence box + sentinel → still CLEARED" "CLEARE
 expect_clearance "shell twin stays sentinel-only: all-ticked body is HELD (harness-only widening)" "HELD" \
     "$(printf '## Manual Testing\n\n- [x] **Row 1** - executed\n')"
 
+# --- (1) post-plan tick shape (backlog#691) ---------------------------------
+# Phase 6 Step 3 item 4 now TICKS verified rows and keeps them under the
+# sentinel as an audit trail. These cases pin the three verdict shapes that
+# change relies on, using the exact row shape bin/normalize-manual-testing
+# emits. They must pass BEFORE the skill edit (characterization) and after it.
+expect_clearance "(1) tick shape: sentinel + all **Row N** ticked → CLEARED" "CLEARED" \
+    "$(printf '## Manual Testing\n\nNo manual testing needed — remaining steps are covered by automated checks run in Phase 6; verification is automated: bin/test-foo\n\n- [x] **Row 1** — run bin/test-foo\n- [x] **Row 2** — check the log line\n\n<!-- files-changed:begin -->\n- a.sh\n<!-- files-changed:end -->\n')"
+expect_clearance "(1) tick shape: sentinel + one Truly-manual row unticked → HELD" "HELD" \
+    "$(printf '## Manual Testing\n\nNo manual testing needed — remaining steps are covered by automated checks run in Phase 6; verification is automated: bin/test-foo\n\n- [x] **Row 1** — run bin/test-foo\n- [ ] **Row 2** — does the new page look right?\n')"
+expect_clearance "(1) tick shape: all ticked, no sentinel → HELD" "HELD" \
+    "$(printf '## Manual Testing\n\n- [x] **Row 1** — run bin/test-foo\n- [x] **Row 2** — check the log line\n\n<!-- files-changed:begin -->\n- a.sh\n<!-- files-changed:end -->\n')"
+expect_clearance "(1) counterfeit: quoted > sentinel and > - [x] before heading, real window unticked → HELD" "HELD" \
+    "$(printf '<!-- manual-confirmation:begin -->\n## Manual confirmation needed\n\n> No manual testing needed — quoted from the plan\n> - [x] **Row 1** — quoted from the plan\n<!-- manual-confirmation:end -->\n\n## Manual Testing\n\n- [ ] **Row 1** — run bin/test-foo\n')"
+expect_clearance "(1) counterfeit: quoted > sentinel before heading, real window all ticked → HELD" "HELD" \
+    "$(printf '<!-- manual-confirmation:begin -->\n## Manual confirmation needed\n\n> No manual testing needed — quoted from the plan\n<!-- manual-confirmation:end -->\n\n## Manual Testing\n\n- [x] **Row 1** — run bin/test-foo\n')"
+
+# backlog#691 relies on the predicate staying sentinel-driven. The tick path
+# must never widen bash condition (1) the way armable.py's all_rows_ticked does.
+if grep -q 'all_rows_ticked\|ticked_clear' "$REPO_ROOT/bin/lib/pr-armable.sh"; then
+    echo "FAIL: bin/lib/pr-armable.sh grew a ticked-only clear (gate weakening)"; FAILED=1
+else
+    echo "ok: bin/lib/pr-armable.sh has no ticked-only clear"
+fi
+
 # --- (1) clearance tail clause: callers must pass the PR's changed files ------
 # pr_manual_testing_clearance takes <body> [changed_files]. With changed_files
 # empty it returns CLEARED on the bare sentinel and never checks the tail
@@ -2209,7 +2292,7 @@ Intrinsic holds — name the category and stand.
 self-gating / bootstrap hazard
 ambiguity resolves to intrinsic
 A hold justification carries a decision
-accepts or refuses
+Merge if you're OK
 claiming too much
 never a whole-plan escape
 Which slice of this is intrinsic
@@ -2615,8 +2698,12 @@ for tok in "${PARSE_TOKENS[@]}"; do
     done
 done
 
-# --- §5.8 phase 2 rebase gate behavioural cases ----------------------------------
-# mk_rebase_repo <kind: clean|behind|conflict> — echo the path of a throwaway repo.
+# --- §5.8 phase 2 merge gate behavioural cases ----------------------------------
+# mk_rebase_repo <kind: clean|behind|conflict|hookdeny> — echo the path of a throwaway repo.
+# hookdeny is the behind shape plus a pre-merge-commit hook that exits 1. git merge runs
+# pre-merge-commit (never pre-commit) before it writes the merge commit, so this is the
+# hook that can refuse a conflict-free merge. core.hooksPath is pinned to the fixture's
+# own hooks dir so a developer's global hooksPath cannot bypass it.
 # CI has no global git identity; set it per-repo or every commit here aborts.
 mk_rebase_repo() {
     local d; d="$(mktemp -d "$BASE_TMP/rebase-XXXXXX")"
@@ -2629,7 +2716,7 @@ mk_rebase_repo() {
     git -C "$d" branch fakebase
     case "$1" in
         clean) ;;                                  # HEAD already contains fakebase
-        behind)                                    # base moves on a DIFFERENT file
+        behind|hookdeny)                           # base moves on a DIFFERENT file
             git -C "$d" checkout --quiet fakebase
             printf 'other\n' > "$d/g.txt"; git -C "$d" add g.txt
             git -C "$d" commit --quiet -m advance
@@ -2642,6 +2729,12 @@ mk_rebase_repo() {
             git -C "$d" checkout --quiet main
             printf 'mine\n'   > "$d/f.txt"; git -C "$d" commit --quiet -am mine ;;
     esac
+    if [ "$1" = hookdeny ]; then
+        git -C "$d" config core.hooksPath "$d/.git/hooks"
+        mkdir -p "$d/.git/hooks"
+        printf '#!/bin/sh\nexit 1\n' > "$d/.git/hooks/pre-merge-commit"
+        chmod +x "$d/.git/hooks/pre-merge-commit"
+    fi
     printf '%s' "$d"
 }
 
@@ -2667,56 +2760,93 @@ expect_reb() {
 }
 
 if [ -z "$BREB" ]; then
-    echo "FAIL: phase 2 rebase — no block matching '# phase 2 rebase' in $P25_SKILL"
+    echo "FAIL: phase 2 merge — no block matching '# phase 2 merge' in $P25_SKILL"
     FAILED=1
 else
     # Already up to date -> clean, no STOP. Also the empty-range boundary for the
     # pre-existing `git diff origin/master...HEAD` check whose base this step moves.
     R="$(mk_rebase_repo clean)"
-    expect_reb "phase 2 rebase: already contains base -> REBASE=clean, no STOP" \
+    expect_reb "phase 2 merge: already contains base -> REBASE=clean, no STOP" \
         "REBASE=clean" nostop "$(run_rebase "$BREB" "$R" fakebase)"
 
-    # Behind, non-conflicting -> rebased, no STOP, HEAD advances.
+    # Behind, non-conflicting -> merged, no STOP, HEAD advances to a merge commit.
     R="$(mk_rebase_repo behind)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
-    expect_reb "phase 2 rebase: behind, no conflict -> REBASE=rebased, no STOP" \
-        "REBASE=rebased" nostop "$(run_rebase "$BREB" "$R" fakebase)"
+    expect_reb "phase 2 merge: behind, no conflict -> REBASE=merged, no STOP" \
+        "REBASE=merged" nostop "$(run_rebase "$BREB" "$R" fakebase)"
     [ "$(git -C "$R" rev-parse HEAD)" != "$BEFORE" ] \
-        && echo "ok: phase 2 rebase: HEAD advanced onto the base" \
-        || { echo "FAIL: phase 2 rebase: HEAD unchanged after a reported rebase"; FAILED=1; }
+        && echo "ok: phase 2 merge: HEAD advanced onto the base" \
+        || { echo "FAIL: phase 2 merge: HEAD unchanged after a reported merge"; FAILED=1; }
+    # A rebase also advances HEAD, so only a second parent proves the block merged.
+    # Mutation: swap the block back to `git rebase` and HEAD^2 does not resolve.
+    git -C "$R" rev-parse -q --verify HEAD^2 >/dev/null \
+        && git -C "$R" merge-base --is-ancestor fakebase HEAD \
+        && echo "ok: phase 2 merge: HEAD is a merge commit containing the base" \
+        || { echo "FAIL: phase 2 merge: HEAD has no second parent containing the base"; FAILED=1; }
+    [ "$(git -C "$R" rev-parse HEAD^1)" = "$BEFORE" ] \
+        && echo "ok: phase 2 merge: the branch tip is the merge commit's first parent" \
+        || { echo "FAIL: phase 2 merge: the first parent is not the pre-merge branch tip"; FAILED=1; }
 
     # NEGATIVE: conflict -> STOP, and the tree is left exactly as found.
     R="$(mk_rebase_repo conflict)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
     OUT="$(run_rebase "$BREB" "$R" fakebase)"
-    expect_reb "phase 2 rebase: conflicting base -> REBASE=conflict + STOP-AND-RESOLVE" \
+    expect_reb "phase 2 merge: conflicting base -> REBASE=conflict + STOP-AND-RESOLVE" \
         "REBASE=conflict" resolve "$OUT"
-    printf '%s' "$OUT" | grep -qF 'linear-history-squash-merge.md' \
-        && echo "ok: phase 2 rebase: STOP text names the squash-trap escape route" \
-        || { echo "FAIL: phase 2 rebase: STOP text omits the squash-trap guidance the label promises"; FAILED=1; }
+    grep -qF 'linear-history-squash-merge.md' <<< "$OUT" \
+        && echo "ok: phase 2 merge: STOP text names the linear-history rule" \
+        || { echo "FAIL: phase 2 merge: STOP text omits the linear-history rule the label promises"; FAILED=1; }
     [ "$(git -C "$R" rev-parse HEAD)" = "$BEFORE" ] \
-        && echo "ok: phase 2 rebase: HEAD unchanged after a conflict" \
-        || { echo "FAIL: phase 2 rebase: HEAD moved despite a conflict — --abort did not restore"; FAILED=1; }
+        && echo "ok: phase 2 merge: HEAD unchanged after a conflict" \
+        || { echo "FAIL: phase 2 merge: HEAD moved despite a conflict — --abort did not restore"; FAILED=1; }
     [ -z "$(git -C "$R" status --porcelain)" ] \
-        && echo "ok: phase 2 rebase: working tree clean after a conflict" \
-        || { echo "FAIL: phase 2 rebase: tree left dirty after a conflict"; FAILED=1; }
+        && echo "ok: phase 2 merge: working tree clean after a conflict" \
+        || { echo "FAIL: phase 2 merge: tree left dirty after a conflict"; FAILED=1; }
     [ ! -d "$R/.git/rebase-merge" ] && [ ! -d "$R/.git/rebase-apply" ] \
-        && echo "ok: phase 2 rebase: no rebase left in progress" \
-        || { echo "FAIL: phase 2 rebase: left an in-progress rebase behind"; FAILED=1; }
+        && echo "ok: phase 2 merge: no rebase left in progress" \
+        || { echo "FAIL: phase 2 merge: left an in-progress rebase behind"; FAILED=1; }
+    # Mutation: delete `git merge --abort` from the conflict arm and MERGE_HEAD survives.
+    [ ! -f "$R/.git/MERGE_HEAD" ] \
+        && echo "ok: phase 2 merge: no merge left in progress" \
+        || { echo "FAIL: phase 2 merge: left an in-progress merge (MERGE_HEAD) behind"; FAILED=1; }
 
-    # NEGATIVE: unresolvable base ref -> indeterminate + STOP, nothing rebased.
+    # NEGATIVE: a hook refuses the merge commit of a conflict-free merge. MERGE_HEAD
+    # exists but no path is unmerged, so the --diff-filter=U arm must NOT claim a
+    # conflict. Mutation: remove that arm and this case reports REBASE=conflict.
+    R="$(mk_rebase_repo hookdeny)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
+    mkdir -p "$BASE_TMP/hookdeny-flag"
+    OUT="$(PPCAP_TMP="$BASE_TMP/hookdeny-flag" run_rebase "$BREB" "$R" fakebase)"
+    expect_reb "phase 2 merge: hook refuses the merge commit -> REBASE=indeterminate + STOP" \
+        "REBASE=indeterminate" stop "$OUT"
+    grep -qF 'REBASE=conflict' <<< "$OUT" \
+        && { echo "FAIL: phase 2 merge: a hook refusal was reported as REBASE=conflict"; FAILED=1; } \
+        || echo "ok: phase 2 merge: a hook refusal is not reported as REBASE=conflict"
+    ls "$BASE_TMP/hookdeny-flag"/postplan-conflict-resolved-* >/dev/null 2>&1 \
+        && { echo "FAIL: phase 2 merge: a hook refusal wrote the conflict flag"; FAILED=1; } \
+        || echo "ok: phase 2 merge: a hook refusal writes no conflict flag"
+    [ "$(git -C "$R" rev-parse HEAD)" = "$BEFORE" ] \
+        && echo "ok: phase 2 merge: HEAD unchanged after a hook refusal" \
+        || { echo "FAIL: phase 2 merge: HEAD moved despite a hook refusal"; FAILED=1; }
+    [ ! -f "$R/.git/MERGE_HEAD" ] \
+        && echo "ok: phase 2 merge: no merge left in progress after a hook refusal" \
+        || { echo "FAIL: phase 2 merge: left MERGE_HEAD behind after a hook refusal"; FAILED=1; }
+    [ -z "$(git -C "$R" status --porcelain)" ] \
+        && echo "ok: phase 2 merge: working tree clean after a hook refusal" \
+        || { echo "FAIL: phase 2 merge: tree left dirty after a hook refusal"; FAILED=1; }
+
+    # NEGATIVE: unresolvable base ref -> indeterminate + STOP, nothing merged.
     R="$(mk_rebase_repo clean)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
-    expect_reb "phase 2 rebase: unresolvable base ref -> REBASE=indeterminate + STOP" \
+    expect_reb "phase 2 merge: unresolvable base ref -> REBASE=indeterminate + STOP" \
         "REBASE=indeterminate" stop "$(run_rebase "$BREB" "$R" refs/heads/no-such-ref)"
     [ "$(git -C "$R" rev-parse HEAD)" = "$BEFORE" ] \
-        && echo "ok: phase 2 rebase: HEAD unchanged on an unresolvable base" \
-        || { echo "FAIL: phase 2 rebase: HEAD moved on an unresolvable base"; FAILED=1; }
+        && echo "ok: phase 2 merge: HEAD unchanged on an unresolvable base" \
+        || { echo "FAIL: phase 2 merge: HEAD moved on an unresolvable base"; FAILED=1; }
 
     # NEGATIVE: no override flag exists — a "proceed anyway" branch would be a
     # gate weakening, so assert the block has no escape hatch.
     if printf '%s' "$BREB" | grep -qiE 'FORCE|SKIP_REBASE|proceed anyway|--continue'; then
-        echo "FAIL: phase 2 rebase block grew an override/proceed-anyway path"
+        echo "FAIL: phase 2 merge block grew an override/proceed-anyway path"
         FAILED=1
     else
-        echo "ok: phase 2 rebase has no override path"
+        echo "ok: phase 2 merge has no override path"
     fi
 fi
 
@@ -2752,7 +2882,7 @@ before() {
 }
 
 # §5.9a marker isolation. extract_block matches the FIRST fence whose body contains
-# the literal as a SUBSTRING, so a capture block marked "# phase 2 rebase capture"
+# the literal as a SUBSTRING, so a capture block marked "# phase 2 merge capture"
 # would silently steal $BREB and run every §5.8 assertion against the wrong code
 # while still reporting green. The live marker is "# phase 2 pre-rebase capture"
 # precisely so that substring never matches.
@@ -2761,8 +2891,8 @@ if [ -z "${BREB:-}" ] || [ -z "$BCAP" ]; then
     echo "FAIL: §5.9a — could not extract both the rebase and the pre-rebase capture block"
     FAILED=1
 else
-    have  "§5.9a: '# phase 2 rebase' still binds to the rebase block" "$BREB" 'git rebase --abort'
-    lacks "§5.9a: '# phase 2 rebase' did not bind to the capture block" "$BREB" 'PRECAPTURE=ok'
+    have  "§5.9a: '# phase 2 merge' still binds to the merge block" "$BREB" 'git merge --abort'
+    lacks "§5.9a: '# phase 2 merge' did not bind to the capture block" "$BREB" 'PRECAPTURE=ok'
     have  "§5.9a: the capture block is the one that prints PRECAPTURE=ok" "$BCAP" 'PRECAPTURE=ok'
 
     # §5.9b deliberate asymmetry: lostwork.sh hardcodes `git diff origin/master...HEAD`,
@@ -2895,6 +3025,10 @@ have   "§5.9f: TREE-EQUIVALENT is named as the precondition" "$CRES_TXT" 'TREE-
 before "§5.9f: collapse-guard check precedes collapse-guard record" "$CRES_TXT" 'collapse-guard-<KEY>.sh check' 'collapse-guard-<KEY>.sh record'
 have   "§5.9f: the --onto squash-trap recipe is spelled out" "$CRES_TXT" 'git rebase --onto origin/master <parent-tip-before-merge> <branch>'
 have   "§5.9f: the squash-trap rule is cited"                "$CRES_TXT" '.claude/rules/linear-history-squash-merge.md'
+# Step 4 re-runs the merge against the pinned SHA, and Step 5 finishes it with a commit.
+# Mutation: revert Step 5's fence and the lacks pin fails.
+have   "§5.9f: the merge recipe is spelled out"              "$CRES_TXT" 'git -c core.editor=true merge --no-edit <MASTER_SHA>'
+lacks  "§5.9f: no rebase --continue remains"                 "$CRES_TXT" 'git rebase --continue'
 
 # §5.9g behavioural: lostwork.sh against real fixture repos, in BOTH directions.
 # The proof is change-level: every line the branch changed before the rebase must still
@@ -2977,8 +3111,8 @@ have  "§5.9h: the ceiling hands off to the merge line" "$CIMON_TXT" 'update-beh
 lacks "§5.9h: the ceiling no longer disarms"           "$CIMON_TXT" 'left disarmed'
 # Disarm must precede the rewrite: a reordering rewrites the branch out from under an
 # armed auto-merge, the one sequence that can merge a tree nobody watched land.
-before "§5.9h: --disable-auto precedes the rebase invocation" \
-    "$CIMON_TXT" 'gh pr merge <N> --disable-auto' 'Re-run the `# phase 2 rebase` block'
+before "§5.9h: --disable-auto precedes the merge invocation" \
+    "$CIMON_TXT" 'gh pr merge <N> --disable-auto' 'Re-run the `# phase 2 merge` block'
 before "§5.9h: prior arm state is recorded before the disarm" \
     "$CIMON_TXT" 'postplan-automerge-was-<KEY>.txt' 'gh pr merge <N> --disable-auto'
 # The re-arm gate is the second entry point into the hold — condition (14) cannot
@@ -3102,6 +3236,68 @@ have  "§cond4: fail -> BLOCKED"       "$(run_cond4 "$F4_FAIL")"                
 lacks "§cond4: pass -> no BLOCKED"    "$(run_cond4 "$F4_PASS")"                    'BLOCKED'
 have  "§cond4: absent -> BLOCKED"     "$(run_cond4 "$BASE_TMP/cond4-nonexistent")" 'BLOCKED'
 lacks "§cond4: skipped -> no BLOCKED" "$(run_cond4 "$F4_SKIP")"                   'BLOCKED'
+
+# --- Phase 6 tick block (backlog#691) ----------------------------------------
+TWO="$(printf '## Manual Testing\n\n- [ ] **Row 1** — run bin/test-foo\n- [ ] **Row 2** — does the page look right?\n\n## Reviewer verification\n')"
+o="$(run_tick "$TWO" $'Row 1\nRow 2\n' '' tick-ok)"
+expect_out 'tick_all_confirmed (Row 1)' 'TICK-CONFIRMED Row 1' "$o"
+expect_out 'tick_all_confirmed (sentinel)' 'SENTINEL=write' "$o"
+expect_out 'tick_all_confirmed (audit trail kept)' '- [x] **Row 2**' "$(cat "$TB")"
+expect_out 'tick_writes_pass_file' 'ROW Row 2 PASS' "$(cat "$BASE_TMP/pass-seen")"
+expect_clearance 'tick_all_confirmed composed body → CLEARED' 'CLEARED' "$(with_sentinel "$TB")"
+
+o="$(run_tick "$TWO" $'Row 1\n' '' tick-ok)"
+expect_out 'tick_truly_manual_left (withhold)' 'SENTINEL=withhold' "$o"
+expect_out 'tick_truly_manual_left (count)' 'UNTICKED_AFTER=1' "$o"
+expect_clearance 'tick_truly_manual_left even with a stray sentinel → HELD' 'HELD' "$(with_sentinel "$TB")"
+
+ONE="$(printf '## Manual Testing\n\n- [ ] **Row 1** — run bin/test-foo\n')"
+o="$(run_tick "$ONE" $'Row 1\n' '' tick-noop)"
+expect_out 'tick_unconfirmed_falls_back (verdict)' 'TICK-FALLBACK-DELETE Row 1' "$o"
+lacks 'tick_unconfirmed_falls_back (row deleted)' "$(cat "$TB")" '**Row 1**'
+expect_out 'tick_unconfirmed_falls_back (sentinel)' 'SENTINEL=write' "$o"
+
+o="$(run_tick "$ONE" $'Row 1\n' '' tick-fail)"
+expect_out 'tick_script_fails (flagged)' 'TICK-SCRIPT-FAILED' "$o"
+expect_out 'tick_script_fails (fallback)' 'TICK-FALLBACK-DELETE Row 1' "$o"
+
+UNSHAPED="$(printf '## Manual Testing\n\n- [ ] Check the log line by hand\n')"
+o="$(run_tick "$UNSHAPED" '' $'- [ ] Check the log line by hand\n' tick-ok)"
+expect_out 'tick_unshaped_row_verbatim_delete (deleted)' 'DELETED=1' "$o"
+expect_out 'tick_unshaped_row_verbatim_delete (sentinel)' 'SENTINEL=write' "$o"
+o="$(run_tick "$UNSHAPED" '' $'- [ ] Check the log line\n' tick-ok)"
+expect_out 'tick_verbatim_mismatch_fails_closed' 'SENTINEL=withhold' "$o"
+
+o="$(TICK_GH_FAIL=1 run_tick "$ONE" $'Row 1\n' '' tick-ok)"
+expect_out 'tick_unreadable_body_legacy' 'TICK_MODE=legacy-delete' "$o"
+
+printf 'ROW Row 2 PASS\n' > /tmp/pr-ready-manual-rows-99691.txt
+o="$(run_tick "$TWO" $'Row 1\n' '' tick-ok)"
+expect_out 'tick_stale_pass_line_truncated' 'SENTINEL=withhold' "$o"
+expect_out 'tick_stale_pass_line_truncated (Row 2 still open)' '- [ ] **Row 2**' "$(cat "$TB")"
+
+TEN="$(printf '## Manual Testing\n\n- [x] **Row 10** — done\n- [ ] **Row 1** — run bin/test-foo\n')"
+o="$(run_tick "$TEN" $'Row 1\n' '' tick-noop)"
+expect_out 'tick_row1_never_matches_row10' 'TICK-FALLBACK-DELETE Row 1' "$o"
+
+o="$(run_tick "$TWO" $'Row 1\nRow 2' '' tick-ok)"
+expect_out 'tick_unterminated_ids' 'TICK-CONFIRMED Row 2' "$o"
+
+# --- Phase 6 Step 1 extract: re-run skip --------------------------------------
+run_s1x() { jq -n --arg b "$1" '{body: $b}' > "$BASE_TMP/fixture.json"
+    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" bash -c "$S1X" 2>&1; }
+o="$(run_s1x "$(printf '## Manual Testing\n\nNo manual testing needed — x\n\n- [x] **Row 1** — done\n- [ ] **Row 2** — open\n')")"
+expect_out 'extract_rerun_keeps_open_row' '**Row 2**' "$o"
+lacks 'extract_rerun_skips_ticked_row' "$o" '**Row 1**'
+o="$(run_s1x "$(printf '## Manual confirmation needed\n\n> ## Manual Testing\n> - [ ] **Row 9** — quoted\n\n## Manual Testing\n\n- [ ] **Row 2** — open\n')")"
+lacks 'extract_quoted_heading_ignored' "$o" '**Row 9**'
+expect_out 'extract_quoted_heading_real_rows_kept' '**Row 2**' "$o"
+
+# --- Mode A contract carries the row id ---------------------------------------
+P6M="$REPO_ROOT/.claude/skills/post-plan/_phase-6-manual-testing.md"
+if grep -qF '"row": "Row 3"' "$P6M" && grep -qF 'is a copy, never a judgment' "$P6M"; then
+    echo "ok: mode_a_contract_has_row_field"
+else echo "FAIL: mode_a_contract_has_row_field"; FAILED=1; fi
 
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-plan block checks passed."

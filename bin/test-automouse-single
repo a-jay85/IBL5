@@ -8,9 +8,13 @@
 # self-heal gated OFF in single mode, auto-queue-if-absent, hard-fail on
 # unresolvable slug, and already-queued tolerance.
 #
-# Cases 4 and 6 run on every platform. Cases 1, 2, 3 and 5 drive the run loop,
+# Cases 4, 6, 10 and 13 run on every platform. Cases 1, 2, 3 and 5 drive the run loop,
 # which needs macOS tools inside bin/automouse/run (caffeinate, BSD mktemp,
 # stat -f, BSD date), so off macOS they print a SKIP line and do not run.
+# Case 10 unit-tests write_stop_file (the stop-file writer extracted from the
+# real runner); case 13 unit-tests print_stop_reason (the plain-English stop
+# notice) the same way; case 11 (single-plan stop file) and case 12 (SIGTERM stop file)
+# drive the run loop and are macOS-only.
 # AUTOMOUSE_SINGLE_UNAME overrides the platform check (default: $(uname)).
 #
 # Run: bin/test-automouse-single
@@ -72,6 +76,16 @@ check() {
     fi
 }
 
+# want <desc> <haystack> <needle>: pass when the haystack contains the fixed string.
+want() {
+    if grep -qF -- "$3" <<< "$2"; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 (missing: $3; got: $2)"
+        FAILED=1
+    fi
+}
+
 # --- Stub claude ------------------------------------------------------------
 # First call per plan (no handoff) = impl: writes handoff JSON.
 # Second call (handoff present) = postplan: moves plan to done/, clears handoff.
@@ -84,11 +98,11 @@ cat > "$STUBDIR/claude" <<STUB
 set -u
 NDIR="$NDIR"
 plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
-sleep 2
+sleep "\${STUB_CLAUDE_SLEEP:-2}"
 if [ -n "\$plan" ]; then
     hf="\$NDIR/handoff/\$plan.json"
     if [ ! -f "\$hf" ]; then
-        printf '{"branch":"x","plan":"%s"}\n' "\$plan" > "\$hf"
+        printf '{"branch":"x","plan":"%s","worktree":"%s"}\n' "\$plan" "$ROOT/wt" > "\$hf"
     else
         mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
         rm -f "\$hf" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
@@ -99,12 +113,31 @@ exit 0
 STUB
 chmod +x "$STUBDIR/claude"
 
+# Stub post-plan-now: the runner's postplan phase runs "$SELF_DIR/../post-plan-now
+# --foreground --plan <path>" in the handoff's worktree (not claude). The stub does
+# what the stub claude's second call used to: dispose the plan and clear the handoff.
+mkdir -p "$ROOT/wt"
+cat > "$STUBDIR/post-plan-now" <<PPSTUB
+#!/usr/bin/env bash
+set -u
+NDIR="$NDIR"
+plan="\$(basename "\${3:-}")"
+sleep 2
+if [ -n "\$plan" ]; then
+    mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
+    rm -f "\$NDIR/handoff/\$plan.json" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
+fi
+exit 0
+PPSTUB
+chmod +x "$STUBDIR/post-plan-now"
+
 # --- Copy real runner; redirect NIGHTLY_DIR + stub PATH --------------------
 RUNNER="$ROOT/automouse/run"
 sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
     -e "s#^REPO=.*#REPO=\"$REPO\"#" \
     -e "s#^SELF_DIR=.*#SELF_DIR=\"$REPO/bin/automouse\"#" \
     -e "s#^export PATH=.*#export PATH=\"$STUBDIR:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
+    -e "s#\"\$SELF_DIR/../post-plan-now\"#\"$STUBDIR/post-plan-now\"#" \
     "$REPO/bin/automouse/run" > "$RUNNER"
 chmod +x "$RUNNER"
 
@@ -121,7 +154,7 @@ run_single() {
 
 reset_state() {
     rm -rf "$NDIR/queue" "$NDIR/handoff" "$NDIR/done" "$NDIR/skipped" \
-           "$NDIR/logs" "$NDIR/reports" "$PDIR"
+           "$NDIR/logs" "$NDIR/reports" "$NDIR/stops" "$PDIR"
     mkdir -p "$NDIR/queue" "$NDIR/handoff" "$NDIR/logs" "$NDIR/reports" \
              "$NDIR/done" "$NDIR/skipped" "$PDIR"
 }
@@ -176,15 +209,196 @@ grep -qF 'is not a recognized model' "$NDIR/reports/$(date +%Y-%m-%d)-skipped-pl
     || { echo "FAIL: case6 report lacks the rejection reason"; FAILED=1; }
 
 # ===========================================================================
+# Case 10 — write_stop_file records one atomic line per stop cause
+# (portable: sources the writer extracted from the real runner, no run loop)
+# ===========================================================================
+echo "--- case 10: write_stop_file ---"
+RUNNER_SRC="$REPO/bin/automouse/run"
+WRITER="$ROOT/writer.sh"
+awk '/^# Stop-file writer:/,/^# End stop-file writer\./' "$RUNNER_SRC" > "$WRITER"
+c10_open=$(grep -c '^# Stop-file writer:' "$RUNNER_SRC")
+c10_close=$(grep -c '^# End stop-file writer\.' "$RUNNER_SRC")
+if [ "$c10_open" = 1 ] && [ "$c10_close" = 1 ] && grep -qF 'write_stop_file() {' "$WRITER"; then
+    echo "ok: case10 writer anchors unique and extract defines write_stop_file"
+    C10_DIR="$ROOT/w"
+    C10_STOPS="$C10_DIR/stops"
+    C10_FILE="$C10_DIR/stops/2026-10-06-4242.stop"
+    C10_LOG="$C10_DIR/logs/2026-10-06-4242.log"
+    mkdir -p "$C10_DIR/logs"
+
+    # c10_call <rc> [STOP_CAUSE] [STOP_CLEAN]: run the writer in a subshell.
+    c10_call() {
+        (
+            # shellcheck disable=SC2034  # read by the sourced writer
+            NIGHTLY_DIR="$C10_DIR"
+            # shellcheck disable=SC2034
+            LOG="$C10_LOG"
+            # shellcheck disable=SC2034
+            STOP_CAUSE="${2:-}"
+            # shellcheck disable=SC2034
+            STOP_CLEAN="${3:-0}"
+            # shellcheck disable=SC1090
+            . "$WRITER"
+            write_stop_file "$1"
+        )
+    }
+    # c10_expect <desc> <regex>: the stop file is exactly one line matching regex.
+    c10_expect() {
+        local lines
+        lines=$(wc -l < "$C10_FILE" 2>/dev/null | tr -d ' ')
+        if [ "$lines" = 1 ] && grep -qE "$2" < "$C10_FILE"; then
+            echo "ok: $1"
+        else
+            echo "FAIL: $1 (lines=${lines:-none}, got: $(cat "$C10_FILE" 2>/dev/null))"
+            FAILED=1
+        fi
+    }
+    TAB="$(printf '\t')"
+
+    rm -rf "$C10_STOPS"; c10_call 143
+    c10_expect "case10 SIGTERM line" "^[0-9]+${TAB}terminated by SIGTERM \\(exit 143\\)\$"
+    rm -rf "$C10_STOPS"; c10_call 130
+    c10_expect "case10 SIGINT line" "^[0-9]+${TAB}interrupted by SIGINT \\(exit 130\\)\$"
+    rm -rf "$C10_STOPS"; c10_call 1
+    c10_expect "case10 set -e abort line" \
+        "^[0-9]+${TAB}aborted with exit 1 \\(a failed command under set -e, or an error exit\\)\$"
+    rm -rf "$C10_STOPS"; c10_call 0 "single-plan mode: one attempt of p finished"
+    c10_expect "case10 STOP_CAUSE line" "^[0-9]+${TAB}single-plan mode: one attempt of p finished\$"
+    rm -rf "$C10_STOPS"; c10_call 0
+    c10_expect "case10 bare exit 0 line" "^[0-9]+${TAB}exited 0 without the session-complete line\$"
+
+    # Negative: a clean finish writes nothing.
+    rm -rf "$C10_STOPS"; c10_call 0 "" 1
+    check "case10 STOP_CLEAN=1 with exit 0 writes no file" ! test -e "$C10_FILE"
+    check "case10 STOP_CLEAN=1 leaves the stops dir empty or absent" \
+        test -z "$(ls -A "$C10_STOPS" 2>/dev/null)"
+
+    # Negative: LOG unset returns 0 and touches nothing.
+    rm -rf "$C10_STOPS"
+    (
+        # shellcheck disable=SC2034  # read by the sourced writer
+        NIGHTLY_DIR="$C10_DIR"
+        unset LOG
+        # shellcheck disable=SC1090
+        . "$WRITER"
+        write_stop_file 143
+    )
+    c10_rc=$?
+    if [ "$c10_rc" -eq 0 ]; then echo "ok: case10 unset LOG returns 0"; else echo "FAIL: case10 unset LOG returns 0 (got $c10_rc)"; FAILED=1; fi
+    check "case10 unset LOG creates no stops dir" ! test -e "$C10_STOPS"
+
+    # Atomic: a failing mv leaves neither the final file nor a temp file.
+    rm -rf "$C10_STOPS"
+    mkdir -p "$ROOT/c10bin"
+    printf '#!/bin/sh\nexit 1\n' > "$ROOT/c10bin/mv"
+    chmod +x "$ROOT/c10bin/mv"
+    (
+        PATH="$ROOT/c10bin:$PATH"
+        c10_call 143
+    )
+    c10_rc=$?
+    if [ "$c10_rc" -eq 0 ]; then echo "ok: case10 failing mv returns 0"; else echo "FAIL: case10 failing mv returns 0 (got $c10_rc)"; FAILED=1; fi
+    check "case10 failing mv leaves no .stop and no .stop.tmp.* file" \
+        test -z "$(ls -A "$C10_STOPS" 2>/dev/null)"
+
+    # Atomic: a normal call leaves exactly one entry; a second call replaces the line.
+    rm -rf "$C10_STOPS"; c10_call 143; c10_call 130
+    check "case10 two writes leave exactly one stops entry" \
+        test "$(ls -A "$C10_STOPS" | wc -l | tr -d ' ')" = 1
+    c10_expect "case10 second write replaces the first" \
+        "^[0-9]+${TAB}interrupted by SIGINT \\(exit 130\\)\$"
+
+    # Unwritable stops dir: returns 0 and leaves no file (root ignores chmod).
+    if [ "$(id -u)" = 0 ]; then
+        echo "SKIP: case10 unwritable stops dir (running as root, chmod is not enforced)"
+    else
+        rm -rf "$C10_STOPS"; mkdir -p "$C10_STOPS"; chmod 500 "$C10_STOPS"
+        c10_call 143
+        c10_rc=$?
+        chmod 700 "$C10_STOPS"
+        if [ "$c10_rc" -eq 0 ]; then echo "ok: case10 unwritable stops dir returns 0"; else echo "FAIL: case10 unwritable stops dir returns 0 (got $c10_rc)"; FAILED=1; fi
+        check "case10 unwritable stops dir leaves no file" \
+            test -z "$(ls -A "$C10_STOPS" 2>/dev/null)"
+    fi
+else
+    echo "FAIL: case10 writer anchors not unique or extract lacks write_stop_file() (open=$c10_open close=$c10_close)"
+    FAILED=1
+fi
+
+# ===========================================================================
+# Case 13 — print_stop_reason explains a bad stop in plain English on stderr
+# (portable: sources the printer extracted from the real runner, no run loop)
+# ===========================================================================
+echo "--- case 13: print_stop_reason ---"
+PRINTER="$ROOT/printer.sh"
+awk '/^# Stop-reason printer:/,/^# End stop-reason printer\./' "$RUNNER_SRC" > "$PRINTER"
+c13_open=$(grep -c '^# Stop-reason printer:' "$RUNNER_SRC")
+c13_close=$(grep -c '^# End stop-reason printer\.' "$RUNNER_SRC")
+if [ "$c13_open" = 1 ] && [ "$c13_close" = 1 ] && grep -qF 'print_stop_reason() {' "$PRINTER"; then
+    echo "ok: case13 printer anchors unique and extract defines print_stop_reason"
+    # c13_call <rc> <STOP_CLEAN> [note] [FAIL_CMD]: stderr of the printer, stdout dropped.
+    # shellcheck disable=SC2069  # on purpose: keep stderr, drop stdout
+    c13_call() {
+        (
+            # shellcheck disable=SC2034  # read by the sourced printer
+            LOG="/tmp/automouse-test.log"
+            # shellcheck disable=SC2034
+            STOP_CLEAN="$2"
+            # shellcheck disable=SC2034
+            FAIL_LINE=42
+            # shellcheck disable=SC2034
+            FAIL_CMD="${4:-}"
+            # shellcheck disable=SC1090
+            . "$PRINTER"
+            [ -z "${3:-}" ] || note_failure "$3"
+            print_stop_reason "$1"
+        ) 2>&1 >/dev/null
+    }
+    c13_out=$(c13_call 0 1)
+    check "case13 clean exit prints nothing" test -z "$c13_out"
+    c13_out=$(c13_call 1 0 "" "git push origin")
+    want "case13 rc 1 says the run did not finish" "$c13_out" "the run did not finish"
+    want "case13 rc 1 names the exit code" "$c13_out" "failed with exit code 1"
+    want "case13 rc 1 names the failing command and line" "$c13_out" "(line 42): git push origin"
+    want "case13 rc 1 points at the log" "$c13_out" "Full log: /tmp/automouse-test.log"
+    c13_out=$(c13_call 143 0)
+    want "case13 rc 143 explains SIGTERM" "$c13_out" "told the run to quit (SIGTERM)"
+    c13_out=$(c13_call 130 0)
+    want "case13 rc 130 explains Ctrl-C" "$c13_out" "pressed Ctrl-C"
+    c13_out=$(c13_call 129 0)
+    want "case13 rc 129 explains the closed terminal" "$c13_out" "terminal window that started the run was closed"
+    c13_out=$(c13_call 0 0)
+    want "case13 rc 0 without the clean ending is explained" "$c13_out" "never reached its normal ending"
+    c13_out=$(c13_call 0 1 "Building p failed (try 1 of 3).")
+    want "case13 clean exit with a note says something went wrong" "$c13_out" "the run finished, but these things went wrong"
+    want "case13 clean exit lists the note" "$c13_out" "  - Building p failed (try 1 of 3)."
+    c13_out=$(c13_call 143 0 "Building p failed (try 1 of 3).")
+    want "case13 signal stop still lists earlier notes" "$c13_out" "Problems before that:"
+    c13_out=$( (
+        # shellcheck disable=SC2034  # read by the sourced printer
+        STOP_CLEAN=0
+        # shellcheck disable=SC1090
+        . "$PRINTER"
+        exec 2>&-
+        print_stop_reason 1
+        echo "rc=$?"
+    ) )
+    want "case13 closed stderr does not fail the printer" "$c13_out" "rc=0"
+else
+    echo "FAIL: case13 printer anchors not unique or extract lacks print_stop_reason() (open=$c13_open close=$c13_close)"
+    FAILED=1
+fi
+
+# ===========================================================================
 # macOS-only run-loop cases (1, 2, 3, 5)
 # ===========================================================================
 if [ "$PLATFORM" != "Darwin" ]; then
     echo ""
-    echo "SKIP: cases 1, 2, 3, 5, 7, 8, 9 (run loop) need macOS: bin/automouse/run calls caffeinate, BSD mktemp, stat -f and BSD date. macOS coverage for them comes from running bin/test-automouse-single locally on a Mac (there is no macOS CI job). Platform: $PLATFORM."
+    echo "SKIP: cases 1, 2, 3, 5, 7, 8, 9, 11, 12 (run loop) need macOS: bin/automouse/run calls caffeinate, BSD mktemp, stat -f and BSD date. macOS coverage for them comes from running bin/test-automouse-single locally on a Mac (there is no macOS CI job). Platform: $PLATFORM."
     if [ "$FAILED" -ne 0 ]; then
         echo "RESULT: FAILED"
     else
-        echo "RESULT: cases 4 and 6 passed; cases 1, 2, 3, 5, 7, 8, 9 skipped"
+        echo "RESULT: cases 4, 6, 10 and 13 passed; cases 1, 2, 3, 5, 7, 8, 9, 11, 12 skipped"
     fi
     exit "$FAILED"
 fi
@@ -208,6 +422,63 @@ for other in plan-1 plan-3; do
     assert_absent  "case1 $other no attempts"     "$NDIR/queue/$other.md.attempts"
     assert_absent  "case1 $other no handoff"      "$NDIR/handoff/$other.md.json"
 done
+
+# ===========================================================================
+# Case 11 — a completed single-plan run leaves one stop file naming the plan
+# ===========================================================================
+echo "--- case 11: single-plan stop file ---"
+c11_stops=("$NDIR"/stops/*.stop)
+if [ "${#c11_stops[@]}" -eq 1 ] && [ -f "${c11_stops[0]}" ]; then
+    echo "ok: case11 exactly one stop file"
+    check "case11 stop file names the finished plan" \
+        grep -qE '^[0-9]+	single-plan mode: one attempt of plan-2 finished$' "${c11_stops[0]}"
+    c11_log="$NDIR/logs/$(basename "${c11_stops[0]}" .stop).log"
+    check "case11 matching log carries the session-complete line" \
+        grep -qF '=== Automouse session complete' "$c11_log"
+else
+    echo "FAIL: case11 expected exactly one stop file, got ${#c11_stops[@]} (${c11_stops[*]})"
+    FAILED=1
+fi
+
+# ===========================================================================
+# Case 12 — SIGTERM mid-run leaves a stop file and no session-complete line
+# ===========================================================================
+echo "--- case 12: SIGTERM stop file ---"
+reset_state
+seed_plan sig-plan
+STUB_CLAUDE_SLEEP=120 PLANS_DIR="$PDIR" "$RUNNER" plan sig-plan > "$ROOT/sig.out" 2>&1 &
+c12_pid=$!
+c12_i=0
+while [ ! -d "$NDIR/queue/sig-plan.md.lock" ] && [ "$c12_i" -lt 20 ]; do
+    sleep 1
+    c12_i=$((c12_i + 1))
+done
+sleep 1
+kill -TERM "$c12_pid" 2>/dev/null || true
+c12_i=0
+c12_stops=()
+# Poll cap is 20s — the stub claude sleeps 120s; the stop file must appear
+# well before that to confirm the trap fires promptly, not after the sleep ends.
+while [ "$c12_i" -lt 20 ]; do
+    c12_stops=("$NDIR"/stops/*-"$c12_pid".stop)
+    [ -f "${c12_stops[0]}" ] && break
+    sleep 1
+    c12_i=$((c12_i + 1))
+done
+if [ -f "${c12_stops[0]}" ]; then
+    check "case12 stop file says terminated by SIGTERM" \
+        grep -qE '^[0-9]+	terminated by SIGTERM \(exit 143\)$' "${c12_stops[0]}"
+    c12_log="$NDIR/logs/$(basename "${c12_stops[0]}" .stop).log"
+    check "case12 log lacks the session-complete line" ! grep -qi 'session complete' "$c12_log"
+    wait "$c12_pid" 2>/dev/null || true
+    want "case12 terminal output explains the SIGTERM in plain English" \
+        "$(cat "$ROOT/sig.out")" "told the run to quit (SIGTERM)"
+else
+    echo "FAIL: case12 no stop file for runner pid $c12_pid after 40s"
+    FAILED=1
+fi
+wait "$c12_pid" 2>/dev/null || true
+pkill -f "$STUBDIR/claude" 2>/dev/null || true
 
 # ===========================================================================
 # Case 2 — self-heal gated OFF in single mode (Phase 3)

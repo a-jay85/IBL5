@@ -20,6 +20,19 @@ on:
       - '.github/workflows/e2e-tests.yml'
       - '.github/actions/setup-docker-e2e/**'
       - '.github/scripts/**'
+  # Refresh mode (see the VR refresh ADR): .github/workflows/vr-refresh.yml calls this
+  # workflow once per stale open visual PR. Only the `e2e` job does work in this mode.
+  workflow_call:
+    inputs:
+      refresh_pr:
+        type: string
+        required: true
+      refresh_head_sha:
+        type: string
+        required: true
+      refresh_base_sha:
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -29,7 +42,9 @@ concurrency:
   # can never cancel the real E2E run. post-plan adds the `post-plan-running` label right
   # after its push; with one shared group, that label event would cancel the in-flight E2E
   # run, and the labeled run itself skips the full suite.
-  group: ${{ github.workflow }}-${{ github.ref }}${{ (github.event.action == 'labeled' && github.event.label.name != 'update-baselines') && format('-label-{0}', github.run_id) || '' }}
+  # Refresh mode appends a per-PR suffix: in a called workflow github.workflow and github.ref
+  # are the caller's, so without it every matrix leg would share one group and cancel the rest.
+  group: ${{ github.workflow }}-${{ github.ref }}${{ (github.event.action == 'labeled' && github.event.label.name != 'update-baselines') && format('-label-{0}', github.run_id) || '' }}${{ inputs.refresh_pr && format('-vr-refresh-{0}', inputs.refresh_pr) || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -170,7 +185,7 @@ jobs:
   e2e:
     name: Visual Regression
     needs: [changes, ci-memo-check]
-    if: (needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true') || needs.changes.outputs.baseline == 'true'
+    if: inputs.refresh_pr || (needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true') || needs.changes.outputs.baseline == 'true'
     runs-on: ubuntu-latest
     # 30 min (was 20) — full-page matrix over 49 modules is ~4-6x the
     # wall-clock of the prior 13 element crops.
@@ -184,13 +199,25 @@ jobs:
       pull-requests: write
       actions: write
 
+    # One resolved VR context for both modes. pull_request: this PR, its base SHA, and
+    # the test-merge SHA as the Pages key (unchanged). Refresh: the inputs, with the PR
+    # HEAD SHA as the key, which keeps one dir per PR and stays 40-hex so
+    # bin/prune-vr-galleries still manages it.
+    env:
+      VRCTX_REFRESH: ${{ inputs.refresh_pr && 'true' || 'false' }}
+      VRCTX_PUBLISH: ${{ (github.event_name == 'pull_request' || inputs.refresh_pr) && 'true' || 'false' }}
+      VRCTX_SAME_REPO: ${{ (inputs.refresh_pr || github.event.pull_request.head.repo.full_name == github.repository) && 'true' || 'false' }}
+      VRCTX_PR: ${{ inputs.refresh_pr || github.event.pull_request.number }}
+      VRCTX_BASE_SHA: ${{ inputs.refresh_base_sha || github.event.pull_request.base.sha }}
+      VRCTX_KEY: ${{ inputs.refresh_head_sha || github.sha }}
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # PAT is needed when update-baselines label is present so the push triggers a new CI run.
           # Default GITHUB_TOKEN pushes don't trigger workflows (GitHub's anti-loop protection).
           token: ${{ contains(github.event.pull_request.labels.*.name, 'update-baselines') && secrets.CI_PAT || github.token }}
-          ref: ${{ github.head_ref || github.sha }}
+          ref: ${{ inputs.refresh_head_sha || github.head_ref || github.sha }}
           # Full history so `git diff <base>...HEAD` (changed-file coverage) resolves the base SHA.
           fetch-depth: 0
 
@@ -279,17 +306,17 @@ jobs:
       # /post-plan's PR-open write), step 1 extracts zero rows and the rest no-op —
       # the whole chain is idempotent and re-derived from the body on every run.
       - name: Extract manual-row VR specs from PR body
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           bin/vr-review-comment \
-            --manual-rows-from-pr=${{ github.event.pull_request.number }} \
+            --manual-rows-from-pr=${{ env.VRCTX_PR }} \
             --out-json=ibl5/vr-manual-rows.json
 
       - name: Capture manual-row screenshots
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         continue-on-error: true
         env:
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER || 'ci-e2e-user' }}
@@ -321,24 +348,24 @@ jobs:
       # Fork PRs receive a read-only token with no secrets, so these steps no-op there.
       - name: Compute VR coverage from changed files
         id: vr-coverage
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         run: |
-          git diff --name-only "${{ github.event.pull_request.base.sha }}"...HEAD \
+          git diff --name-only "${{ env.VRCTX_BASE_SHA }}"...HEAD \
             | bin/vr-changed-coverage > coverage.json
           cat coverage.json
 
       - name: Build VR gallery
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         run: |
           bin/vr-build-gallery \
             --actuals=ibl5/vr-actuals \
-            --base-sha=${{ github.event.pull_request.base.sha }} \
+            --base-sha=${{ env.VRCTX_BASE_SHA }} \
             --out-dir=ibl5/vr-gallery \
             --gallery-json=ibl5/vr-gallery.json
           cat ibl5/vr-gallery.json
 
       - name: Copy new-screen renders into gallery deploy tree
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         continue-on-error: true
         run: |
           bin/vr-review-comment \
@@ -348,11 +375,24 @@ jobs:
       # Copies INTO the gallery tree after "Build VR gallery" owns and may rebuild it —
       # same pattern as the new-screen copy above. Must stay before the deploy step.
       - name: Copy manual-row screenshots into gallery deploy tree
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         continue-on-error: true
         run: |
           mkdir -p ibl5/vr-gallery/manual-rows
           cp -f ibl5/vr-manual-shots/*.png ibl5/vr-gallery/manual-rows/ 2>/dev/null || true
+
+      # Every publish must change a file under <key>/visual-review/, so the gh-pages commit
+      # for the dir always lands and its age (git log -1 %ct, read by bin/prune-vr-galleries
+      # and bin/vr-refresh-targets) always advances. A byte-identical re-render otherwise
+      # commits nothing and the same PR is re-selected every day. No mkdir: a missing tree
+      # means "Build VR gallery" failed, and the deploy chain must keep failing loudly.
+      - name: Stamp VR gallery publish time
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && env.VRCTX_SAME_REPO == 'true'
+        continue-on-error: true
+        run: |
+          if [ -d ibl5/vr-gallery ]; then
+            date -u +%Y-%m-%dT%H:%M:%SZ > ibl5/vr-gallery/refreshed-at.txt
+          fi
 
       # gh-pages is a single shared ref and EVERY open PR's VR job pushes its own
       # <sha>/visual-review/ dir to it, so runs that finish together collide on the
@@ -368,7 +408,7 @@ jobs:
       # PR skip the whole chain instead of failing the job on the assert.
       - name: Deploy VR gallery to per-SHA GitHub Pages
         id: vr-pages
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && github.event.pull_request.head.repo.full_name == github.repository
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && env.VRCTX_SAME_REPO == 'true'
         continue-on-error: true
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
@@ -377,37 +417,37 @@ jobs:
           # <sha>/visual-review/playwright-report/ (copied in by bin/vr-build-gallery).
           publish_dir: ibl5/vr-gallery
           # One subdirectory per commit SHA so multiple open PRs/SHAs coexist.
-          destination_dir: ${{ github.sha }}/visual-review
+          destination_dir: ${{ env.VRCTX_KEY }}/visual-review
           keep_files: true
 
       # Retries: identical inputs, guarded on the previous attempt having FAILED (a
       # `skipped` outcome — fork PR, update-baselines run — never triggers one).
       - name: Deploy VR gallery to per-SHA GitHub Pages (retry 1)
         id: vr-pages-retry-1
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && github.event.pull_request.head.repo.full_name == github.repository
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && env.VRCTX_SAME_REPO == 'true'
         continue-on-error: true
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ibl5/vr-gallery
-          destination_dir: ${{ github.sha }}/visual-review
+          destination_dir: ${{ env.VRCTX_KEY }}/visual-review
           keep_files: true
 
       - name: Deploy VR gallery to per-SHA GitHub Pages (retry 2)
         id: vr-pages-retry-2
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && steps.vr-pages-retry-1.outcome == 'failure' && github.event.pull_request.head.repo.full_name == github.repository
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && steps.vr-pages-retry-1.outcome == 'failure' && env.VRCTX_SAME_REPO == 'true'
         continue-on-error: true
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ibl5/vr-gallery
-          destination_dir: ${{ github.sha }}/visual-review
+          destination_dir: ${{ env.VRCTX_KEY }}/visual-review
           keep_files: true
 
       # Restores the pre-retry failure semantics: three exhausted attempts is not a
       # lock collision, it is a real deploy break (bad token, Pages misconfigured).
       - name: Assert VR gallery deploy succeeded
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && steps.vr-pages-retry-1.outcome == 'failure' && steps.vr-pages-retry-2.outcome == 'failure' && github.event.pull_request.head.repo.full_name == github.repository
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && steps.vr-pages-retry-1.outcome == 'failure' && steps.vr-pages-retry-2.outcome == 'failure' && env.VRCTX_SAME_REPO == 'true'
         run: |
           echo "::error::Deploying the VR gallery to gh-pages failed on all 3 attempts — see the deploy step logs above."
           exit 1
@@ -420,7 +460,7 @@ jobs:
       # fork PR's read-only token never yields `success`, and an exhausted chain leaves all three at
       # `failure`, so both skip this step.
       - name: Re-serve the gh-pages tree (dispatch Pages deploy)
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && (steps.vr-pages.outcome == 'success' || steps.vr-pages-retry-1.outcome == 'success' || steps.vr-pages-retry-2.outcome == 'success')
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && (steps.vr-pages.outcome == 'success' || steps.vr-pages-retry-1.outcome == 'success' || steps.vr-pages-retry-2.outcome == 'success') && env.VRCTX_REFRESH != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -462,51 +502,53 @@ jobs:
           exit 1
 
       - name: Build visual-review comment
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         run: |
           bin/vr-review-comment \
             --gallery=ibl5/vr-gallery.json \
             --coverage=coverage.json \
-            --pages-url=https://a-jay85.github.io/IBL5/${{ github.sha }}/visual-review/ \
+            --pages-url=https://a-jay85.github.io/IBL5/${{ env.VRCTX_KEY }}/visual-review/ \
             --out=vr-review-comment.md
           cat vr-review-comment.md
 
       - name: Build manual-row screenshot comment
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         continue-on-error: true
         run: |
           bin/vr-review-comment \
             --manual-gallery=ibl5/vr-manual-rows.json \
-            --pages-url=https://a-jay85.github.io/IBL5/${{ github.sha }}/visual-review/ \
+            --pages-url=https://a-jay85.github.io/IBL5/${{ env.VRCTX_KEY }}/visual-review/ \
             --out=vr-manual-comment.md
 
       - name: Post sticky visual-review comment
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: visual-review
+          number: ${{ env.VRCTX_PR }}
           path: vr-review-comment.md
 
       # hashFiles() guard: a PR with zero `vr:` rows produces no comment file, and must
       # post nothing rather than an empty sticky comment.
       - name: Post sticky manual-row screenshot comment
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && hashFiles('vr-manual-comment.md') != ''
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && hashFiles('vr-manual-comment.md') != ''
         continue-on-error: true
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: manual-row-screenshots
+          number: ${{ env.VRCTX_PR }}
           path: vr-manual-comment.md
 
       - name: Splice new-screen images into PR body
-        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           bin/vr-review-comment \
             --gallery=ibl5/vr-gallery.json \
-            --pages-url=https://a-jay85.github.io/IBL5/${{ github.sha }}/visual-review/ \
-            --update-pr-body=${{ github.event.pull_request.number }}
+            --pages-url=https://a-jay85.github.io/IBL5/${{ env.VRCTX_KEY }}/visual-review/ \
+            --update-pr-body=${{ env.VRCTX_PR }}
 
       # --- Auto-update baselines when label is present ---
       - name: Regenerate visual regression baselines
@@ -553,7 +595,7 @@ jobs:
         run: gh pr edit ${{ github.event.pull_request.number }} --remove-label update-baselines
 
       - name: Upload visual regression report
-        if: always()
+        if: always() && env.VRCTX_REFRESH != 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: visual-regression-report
@@ -561,7 +603,7 @@ jobs:
           retention-days: 7
 
       - name: Upload visual regression JSON and screenshots
-        if: always()
+        if: always() && env.VRCTX_REFRESH != 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: visual-regression-results
@@ -577,7 +619,7 @@ jobs:
   api-e2e:
     name: API E2E Tests (Vitest)
     needs: [changes, ci-memo-check]
-    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
+    if: ${{ !inputs.refresh_pr && needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -636,7 +678,7 @@ jobs:
     # "(1, 1)" suffix; the suffix only reappears (as "(N/M)") if ever re-sharded.
     name: E2E Tests${{ matrix.total-shards == 1 && '' || format(' ({0}/{1})', matrix.shard-index, matrix.total-shards) }}
     needs: [changes, ci-memo-check]
-    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
+    if: ${{ !inputs.refresh_pr && needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -771,7 +813,7 @@ jobs:
   e2e-mutators:
     name: E2E Mutators (non-sharded, dedicated DB)
     needs: [changes, ci-memo-check]
-    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
+    if: ${{ !inputs.refresh_pr && needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -878,7 +920,7 @@ jobs:
   merge-reports:
     name: Merge E2E Reports
     needs: [changes, ci-memo-check, e2e, e2e-shards, e2e-mutators, api-e2e]
-    if: always() && (needs.changes.outputs.src == 'true') && needs.ci-memo-check.outputs.hit != 'true'
+    if: always() && !inputs.refresh_pr && (needs.changes.outputs.src == 'true') && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -1013,7 +1055,7 @@ jobs:
           if [ ! -f ~/.cml/node_modules/.bin/cml ]; then
             npm install --prefix ~/.cml @dvcorg/cml@0.20.6
           fi
-          echo "$HOME/.cml/node_modules/.bin" >> $GITHUB_PATH
+          echo "$HOME/.cml/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Generate E2E report with screenshots
         if: always() && github.event_name == 'pull_request'
@@ -1036,7 +1078,7 @@ jobs:
 
   gate:
     name: E2E Tests
-    if: always()
+    if: always() && !inputs.refresh_pr
     needs: [changes, ci-memo-check, e2e, api-e2e, e2e-shards, e2e-mutators]
     runs-on: ubuntu-latest
     # The memo is written only here: after a clean aggregate, on a run that was a miss.
@@ -1077,6 +1119,7 @@ jobs:
     permissions:
       contents: write
       actions: write
+      pull-requests: read
     steps:
       - name: Checkout gh-pages (skip if it does not exist yet)
         id: checkout-pages
@@ -1090,17 +1133,43 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          # Non-cone so only the one pure module rides along. Cone mode would pull all of
+          # ibl5/tests/e2e/, including the VR snapshot PNG trees.
+          sparse-checkout-cone-mode: false
           sparse-checkout: |
-            bin
+            /bin/
+            /ibl5/tests/e2e/vr-refresh.ts
           path: master-scripts
+
+      - name: Setup Bun
+        if: steps.checkout-pages.outcome == 'success'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      # Fail closed: every gallery dir an open PR's comments or body link to is exempt
+      # from both prune passes. If listing PRs or comments fails, this step fails
+      # (continue-on-error keeps the job green) and the prune step below does not run.
+      - name: Compute open-PR gallery keep-list
+        id: vr-keep
+        if: steps.checkout-pages.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ./master-scripts/bin/vr-refresh-targets --mode=keep > "$RUNNER_TEMP/vr-keep.txt"
+          echo "Keep-list: $(wc -l < "$RUNNER_TEMP/vr-keep.txt" | tr -d ' ') gallery dir(s) linked by open PRs."
+
+      - name: Skip pruning (keep-list unavailable)
+        if: steps.checkout-pages.outcome == 'success' && steps.vr-keep.outcome == 'failure'
+        run: echo "::error::Open-PR keep-list failed; pruning skipped this run so no linked gallery is deleted."
 
       - name: Prune per-SHA report dirs (7-day age prune + 300-dir count cap)
         id: prune
-        if: steps.checkout-pages.outcome == 'success'
+        if: steps.checkout-pages.outcome == 'success' && steps.vr-keep.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          removed=$(./master-scripts/bin/prune-vr-galleries --cutoff-days 7 --max-dirs 300)
+          removed=$(./master-scripts/bin/prune-vr-galleries --cutoff-days 7 --max-dirs 300 --keep-file "$RUNNER_TEMP/vr-keep.txt")
           if [ "$removed" -gt 0 ]; then
             git commit -m "chore(vr-pages): prune ${removed} per-SHA report dir(s) (7d age + 300-dir cap)"
             # Same shared-ref contention as the per-SHA deploy above: in-flight PR VR

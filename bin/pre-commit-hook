@@ -29,6 +29,10 @@ Checks run on every commit (gated on what is staged):
   - Scan staged ibl5/migrations/*.sql and *.php for destructive SQL (skips loudly without python3).
   - Check for a required ADR on this branch (scoped to branch commits + index).
 
+During a merge commit (MERGE_HEAD exists), staged paths byte-identical to
+origin/master are passed to the on-touch, destructive-migration, and ADR gates
+via --exclude-from=<file>; every other path is checked as usual.
+
 Exit codes: 0 all checks passed, 1 a check failed (commit is blocked).
 EOF
     exit 0
@@ -45,6 +49,34 @@ if [ -n "$staged_go" ]; then
         echo "$unformatted"
         exit 1
     fi
+fi
+
+# Merge-commit exclusion. While a merge commit is being concluded (MERGE_HEAD exists)
+# the index carries every file origin/master changed since the fork. A staged path
+# whose index content is byte-identical to origin/master is master's own content,
+# gated when it merged, and must not trip the doc on-touch, destructive-migration, or
+# ADR gates below. A path that differs from origin/master (a conflict resolution, a
+# branch edit, a path master deleted) stays in every gate. Outside a merge, or
+# without origin/master, nothing is excluded. CI runs the same scans against its own
+# base as the backstop.
+# The list file lives under the git dir, never in the tracked tree, and is rewritten
+# on every merge commit. git rev-parse --git-path prints a cwd-relative path in a
+# plain clone, so it is made absolute here for the gates that cd elsewhere.
+EXCLUDE_FLAG=""
+if git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 \
+   && git rev-parse -q --verify origin/master >/dev/null 2>&1; then
+    merge_exclude=$(git rev-parse --git-path pre-commit-merge-exclude)
+    case "$merge_exclude" in
+        /*) ;;
+        *) merge_exclude="$PWD/$merge_exclude" ;;
+    esac
+    : > "$merge_exclude"
+    git diff --cached --name-only --diff-filter=AM | while IFS= read -r p; do
+        if git diff --cached --quiet origin/master -- "$p"; then
+            printf '%s\n' "$p" >> "$merge_exclude"
+        fi
+    done
+    EXCLUDE_FLAG="--exclude-from=$merge_exclude"
 fi
 
 # Validate doc frontmatter and references when .md files are staged.
@@ -67,7 +99,7 @@ if git diff --cached --name-only | grep -qE '\.md$'; then
     # Skipped when origin/master is unresolvable, so a fetch-less clone still commits.
     doc_base=$(git merge-base HEAD origin/master 2>/dev/null) || doc_base=""
     if [ -n "$doc_base" ]; then
-        if ! "$REPO_ROOT/bin/check-docs" --since="$doc_base" 2>&1; then
+        if ! "$REPO_ROOT/bin/check-docs" --since="$doc_base" ${EXCLUDE_FLAG:+"$EXCLUDE_FLAG"} 2>&1; then
             echo ""
             echo "Bump last_verified on the doc(s) above (and confirm the content is"
             echo "still accurate) before committing."
@@ -110,7 +142,7 @@ fi
 # must still be able to commit, so this block skips LOUDLY instead.
 if git diff --cached --name-only | grep -qE '^ibl5/migrations/.*\.(sql|php)$'; then
     if command -v python3 >/dev/null 2>&1; then
-        if ! "$REPO_ROOT/bin/check-destructive-migrations" --staged 2>&1; then
+        if ! "$REPO_ROOT/bin/check-destructive-migrations" --staged ${EXCLUDE_FLAG:+"$EXCLUDE_FLAG"} 2>&1; then
             echo ""
             echo "Add a tagged marker (-- destructive-migration[<trigger>]: <reason>) or"
             echo "remove the destructive statement before committing. CI runs the same scan."
@@ -138,7 +170,7 @@ fi
 adr_base=$(git merge-base HEAD origin/master 2>/dev/null) || adr_base=""
 if [ -n "$adr_base" ]; then
     if ! git log --format=%B "$adr_base..HEAD" 2>/dev/null \
-        | "$REPO_ROOT/bin/adr-check" --commit --bypass-from-stdin 2>&1; then
+        | "$REPO_ROOT/bin/adr-check" --commit --bypass-from-stdin ${EXCLUDE_FLAG:+"$EXCLUDE_FLAG"} 2>&1; then
         echo ""
         echo "pre-commit-adr-gate: write the ADR (bin/next-adr \"kebab-title\") and stage it,"
         echo "or add a <!-- no-adr: reason at least 15 characters --> marker to a commit"

@@ -3,8 +3,7 @@
 // (bin/vr-build-gallery output) + coverage JSON and calls these functions, so
 // the markup is unit-testable (tests/ts-unit/vr-review-comment.test.ts).
 //
-// Models the "script writes a .md consumed by marocchino" pattern of
-// bin/lighthouse-comment (written for the retired PR Lighthouse workflow).
+// Follows the "script writes a .md consumed by marocchino" sticky-comment pattern.
 import type { VrRow, Viewport } from './vr-manifest';
 
 export const COMMENT_HEADER = '🖼️ Visual review';

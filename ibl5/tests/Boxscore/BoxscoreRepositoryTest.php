@@ -264,7 +264,7 @@ class BoxscoreRepositoryTest extends TestCase
 
     public function testTeamInsertTemplateIsFullyParameterized(): void
     {
-        $sql = Boxscore::teamInsertSql('`ibl_box_scores_teams`');
+        $sql = Boxscore::teamInsertSql();
         self::assertSame(34, substr_count($sql, '?'));
         self::assertStringContainsString('VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', $sql);
         self::assertStringContainsString('INSERT INTO `ibl_box_scores_teams`', $sql);

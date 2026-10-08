@@ -20,8 +20,19 @@ use League\LeagueContext;
 class PlayerIdResolver
 {
     private \mysqli $db;
-    private string $plrTable;
-    private string $snapshotTable;
+    /** Player table per league; values pinned to LeagueContext::TABLE_MAP by PlayerIdResolverTest. */
+    private const PLR_TABLES = [
+        'ibl' => 'ibl_plr',
+        'olympics' => 'ibl_olympics_plr',
+    ];
+
+    /** Snapshot table per league; values pinned to LeagueContext::TABLE_MAP by PlayerIdResolverTest. */
+    private const SNAPSHOT_TABLES = [
+        'ibl' => 'ibl_plr_snapshots',
+        'olympics' => 'ibl_olympics_plr_snapshots',
+    ];
+
+    private bool $isOlympics;
 
     /**
      * Cache of resolved name+team+year → pid.
@@ -32,15 +43,19 @@ class PlayerIdResolver
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         $this->db = $db;
-        $this->plrTable = self::resolveTable($leagueContext, 'ibl_plr');
-        $this->snapshotTable = self::resolveTable($leagueContext, 'ibl_plr_snapshots');
+        $this->isOlympics = $leagueContext !== null && $leagueContext->isOlympics();
     }
 
-    private static function resolveTable(?LeagueContext $leagueContext, string $iblTableName): string
+    /** @return value-of<self::PLR_TABLES> */
+    private function plrTable(): string
     {
-        return $leagueContext !== null
-            ? $leagueContext->getTableName($iblTableName)
-            : $iblTableName;
+        return self::PLR_TABLES[$this->isOlympics ? 'olympics' : 'ibl'];
+    }
+
+    /** @return value-of<self::SNAPSHOT_TABLES> */
+    private function snapshotTable(): string
+    {
+        return self::SNAPSHOT_TABLES[$this->isOlympics ? 'olympics' : 'ibl'];
     }
 
     /**
@@ -101,7 +116,7 @@ class PlayerIdResolver
     private function findInSnapshots(string $name, int $teamId, int $year): ?int
     {
         $stmt = $this->db->prepare(
-            "SELECT pid FROM " . $this->snapshotTable . " WHERE name = ? AND teamid = ? AND season_year = ? LIMIT 1"
+            "SELECT pid FROM " . $this->snapshotTable() . " WHERE name = ? AND teamid = ? AND season_year = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;
@@ -123,7 +138,7 @@ class PlayerIdResolver
     private function findInPlr(string $name, int $teamId): ?int
     {
         $stmt = $this->db->prepare(
-            "SELECT pid FROM " . $this->plrTable . " WHERE name = ? AND teamid = ? LIMIT 1"
+            "SELECT pid FROM " . $this->plrTable() . " WHERE name = ? AND teamid = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;
@@ -145,7 +160,7 @@ class PlayerIdResolver
     private function findInSnapshotsByNameOnly(string $name, int $year): ?int
     {
         $stmt = $this->db->prepare(
-            "SELECT pid FROM " . $this->snapshotTable . " WHERE name = ? AND season_year = ? LIMIT 1"
+            "SELECT pid FROM " . $this->snapshotTable() . " WHERE name = ? AND season_year = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;
@@ -167,7 +182,7 @@ class PlayerIdResolver
     private function findInPlrByNameOnly(string $name): ?int
     {
         $stmt = $this->db->prepare(
-            "SELECT pid FROM " . $this->plrTable . " WHERE name = ? LIMIT 1"
+            "SELECT pid FROM " . $this->plrTable() . " WHERE name = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;

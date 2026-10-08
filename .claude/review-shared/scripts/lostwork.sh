@@ -107,6 +107,26 @@ check_entry() {
   git cat-file -e "HEAD:$NEWP" 2>/dev/null || { lost "file missing at HEAD: $NEWP"; return 0; }
   [ "$BIN" -eq 0 ] || return 0
   git show "HEAD:$NEWP" > "$HF" 2>/dev/null || { lost "could not read HEAD:$NEWP"; return 0; }
+  # One exemption, one key: an added `last_verified: YYYY-MM-DD` line is not lost when
+  # HEAD's own frontmatter carries an equal or newer date (both sides bumped the doc and
+  # the resolver kept the newer stamp). Only a file opening with `---` qualifies, only
+  # the first `last_verified:` inside that frontmatter is read, and every other added
+  # line stays strict.
+  if [ -s "$ADDS" ] && [ "$(sed -n '1p' "$HF")" = "---" ]; then
+    head_lv=$(LC_ALL=C sed -n '2,/^---$/{s/^last_verified: \([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)$/\1/p;}' "$HF" | sed -n '1p')
+    if [ -n "$head_lv" ]; then
+      : > "$TMPD/adds-kept"
+      while IFS= read -r L; do
+        case "$L" in
+          "last_verified: "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9])
+            pre_lv=${L#last_verified: }
+            if [ "$pre_lv" \< "$head_lv" ] || [ "$pre_lv" = "$head_lv" ]; then continue; fi ;;
+        esac
+        printf '%s\n' "$L" >> "$TMPD/adds-kept"
+      done < "$ADDS"
+      mv "$TMPD/adds-kept" "$ADDS"
+    fi
+  fi
   # Added lines: each must be a whole line of HEAD's copy. The pattern file holds only
   # significant lines, so no empty pattern can match everything.
   if [ -s "$ADDS" ]; then

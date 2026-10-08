@@ -7,6 +7,7 @@
 // (regen-immune), and triages each cell (tests/e2e/vr-gallery.ts → triageCell):
 //
 //   changed   — render differs from master's baseline (both PR renders agree)
+//               (also, review-only: a sub-gate change the strict pass sees; ADR 0180)
 //   unchanged — render matches master (dropped from the gallery)
 //   new       — no committed baseline at base.sha
 //   flake     — the two PR renders self-disagree (surfaced as infra)
@@ -114,6 +115,18 @@ function toleranceFor(title: string): number {
   return row?.extraMaxDiffPixelRatio ?? GATE_MAX_DIFF_PIXEL_RATIO;
 }
 
+/**
+ * Whether the review-only strict pass (vr-gallery.ts STRICT_PIXEL_THRESHOLD +
+ * STRICT_MIN_CHANGED_PIXELS) runs for this cell. A row that declares its own
+ * extraMaxDiffPixelRatio is known-noisy, so it keeps gate-parity triage only.
+ * The strict pass can only add changed cells; it never changes the VR check.
+ */
+function strictReviewFor(title: string): boolean {
+  const module = titleToModule(title, VR_MANIFEST);
+  const row = module === null ? undefined : VR_MANIFEST.find((r: { name: string }) => r.name === module);
+  return row !== undefined && row.extraMaxDiffPixelRatio === undefined;
+}
+
 // ── Enumerate the PR's rendered cells from <actuals>/*.a.png ──────────────────
 const actualsAbs = resolve(repoRoot, actualsDir);
 let aFiles: string[] = [];
@@ -186,6 +199,7 @@ for (const title of titles.sort()) {
     afterA,
     afterB,
     maxDiffPixelRatio: toleranceFor(title),
+    strictReview: strictReviewFor(title),
   });
 
   if (res.verdict === 'unchanged') continue; // nothing to show

@@ -458,6 +458,32 @@ grep -qE '2011.*SKIP' <<< "$out_fb" || \
     fail "preflight-grep-form: foo-bar-only WTL: PR 2011 (foo) should SKIP (out: $out_fb)"
 end_case preflight-grep-form
 
+# --- case 18b: explicit-pr-no-worktree-live ------------------------------------------------
+# An explicit --pr with no local worktree must SKIP (no worktree) on a live --go run, same as
+# the default path. Only a dry run (POST_PLAN_FLEET_DRY_RUN=1, fictional PR numbers) bypasses.
+begin_case
+clean_slots
+# The shared gh shim only answers `pr list`; swap in one that also answers `pr view`
+# (the live explicit-PR path calls it), then restore.
+cp "$SCRATCH/.local/bin/gh" "$SCRATCH/gh-shim-18b.bak"
+cat > "$SCRATCH/.local/bin/gh" <<'GH_EOF'
+#!/usr/bin/env bash
+printf '{"number":2090,"state":"OPEN","isDraft":false,"headRefName":"no-wt-branch-2090","author":{"login":"a-jay85"}}\n'
+GH_EOF
+out_live="$(run_driver --go --pr 2090 2>&1)"
+cp "$SCRATCH/gh-shim-18b.bak" "$SCRATCH/.local/bin/gh"
+grep -qE '2090.*SKIP \(no worktree\)' <<< "$out_live" || \
+    fail "explicit-pr-no-worktree-live: live --go --pr 2090 should SKIP (no worktree) (out: $out_live)"
+grep -qE '2090.*WOULD FIRE' <<< "$out_live" && \
+    fail "explicit-pr-no-worktree-live: live --go --pr 2090 must not be selected to fire (out: $out_live)"
+[[ "$(plist_count)" -eq 0 ]] || \
+    fail "explicit-pr-no-worktree-live: live run left a plist for a no-worktree PR"
+out_dry="$(POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr 2090 2>&1)"
+grep -qE '2090.*WOULD FIRE' <<< "$out_dry" || \
+    fail "explicit-pr-no-worktree-live: dry run --pr 2090 should still bypass the worktree check (out: $out_dry)"
+clean_slots
+end_case explicit-pr-no-worktree-live
+
 # --- case 19: wait-dry-run-inert ---------------------------------------------------------
 # POST_PLAN_FLEET_DRY_RUN=1 skips the real wait block even with --wait --go:
 # no "waiting for" line, fast exit.
@@ -1445,7 +1471,7 @@ grep -qF 'repo may be missing review assets' "$SCRIPT_DIR/../bin/post-plan-fleet
 end_case post-plan-fleet-digest-gate
 
 # --- case 19: E15 rebase delegate is never told to push ----------------------------------
-# The delegate packet runs under ~/.claude/hooks/plan-gate-commit.sh, which denies `git push`
+# The delegate packet runs under ~/.claude/hooks/bash-guard.sh (Check 22), which denies `git push`
 # for sub-agents. Any positive push instruction in the packet is an instant hard-fail.
 begin_case
 REBASE="$SCRIPT_DIR/../.claude/review-shared/_rebase-and-conflicts.md"
@@ -1730,7 +1756,9 @@ f=".claude/skills/post-plan/SKILL.md"
 grep -qF '.claude/review-shared/_prose-voice-contract.md' "$f" \
     || fail "28t: voice-contract Read instruction missing from post-plan SKILL.md"
 n_cdp=$(grep -cF 'bin/check-digest-prose' "$f" || true)
-[[ $n_cdp -ge 4 ]] || fail "28t: expected >=4 bin/check-digest-prose call sites in post-plan SKILL.md, got $n_cdp"
+# 3 sites: Scope why-paragraph, its follow-on paragraph, and the four narrative elements.
+# The Reviewer verification voice check went away with that section.
+[[ $n_cdp -ge 3 ]] || fail "28t: expected >=3 bin/check-digest-prose call sites in post-plan SKILL.md, got $n_cdp"
 grep -qF '.claude/skills/review-shared/' "$f" \
     && fail "28t: post-plan SKILL.md cites the non-existent .claude/skills/review-shared/ path"
 

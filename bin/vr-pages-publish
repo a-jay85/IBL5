@@ -1,0 +1,240 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/vr-pages-publish — the single gh-pages writer for every pr/ subtree.
+#
+# Usage: bin/vr-pages-publish --repo-dir=DIR --message=MSG [--branch=gh-pages] [--attempts=3] [--dry-run] (--put=SRC:DEST ... [--delete=DEST ...] | --delete=DEST ... | --sweep-closed --open-prs=FILE)
+# ---
+# --put=SRC:DEST       Replace DEST with the contents of directory SRC.
+#                      DEST: pr/<N>/(visual-review|meta|manual/before|manual/after)
+# --delete=DEST        Remove DEST. DEST: pr/<N>
+# --sweep-closed       Remove every pr/<N> whose N is absent from --open-prs=FILE
+#                      (one PR number per line). An empty list refuses to sweep.
+# --attempts=N         Push attempts (default 3). Each retry re-fetches the tip
+#                      and re-applies the operation (a subtree replace is
+#                      idempotent on any tip, so no rebase conflict is possible).
+# --dry-run            Stage and print the stat to stderr; never commit or push.
+# ---
+# Only --flag=value forms are accepted; anything else exits 2.
+# stdout: one line, changed=0|1 (put/delete) or swept=<count> (sweep).
+# Exit: 0 ok, 1 push failed after all attempts, 2 usage error.
+# Needs only bash (3.2 ok), git and coreutils; reads no environment variables.
+
+set -euo pipefail
+
+usage() {
+    sed -n '/^# Usage:/,/^$/p' "$0" | sed 's/^# \{0,1\}//' >&2
+    exit 2
+}
+
+die() {
+    echo "vr-pages-publish: $1" >&2
+    exit 2
+}
+
+REPO_DIR=""
+MESSAGE=""
+HAVE_MESSAGE=0
+BRANCH="gh-pages"
+ATTEMPTS=3
+DRY_RUN=0
+SWEEP=0
+OPEN_FILE=""
+PUT_SRCS=()
+PUT_DESTS=()
+DELETES=()
+
+PUT_DEST_RE='^pr/[1-9][0-9]{0,6}/(visual-review|meta|manual/before|manual/after)$'
+DEL_DEST_RE='^pr/[1-9][0-9]{0,6}$'
+PR_NUM_RE='^[1-9][0-9]{0,6}$'
+ATTEMPTS_RE='^[1-9][0-9]?$'
+
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help)
+            sed -n '/^# Usage:/,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        --repo-dir=*) REPO_DIR="${arg#--repo-dir=}" ;;
+        --message=*) MESSAGE="${arg#--message=}"; HAVE_MESSAGE=1 ;;
+        --branch=*) BRANCH="${arg#--branch=}" ;;
+        --attempts=*) ATTEMPTS="${arg#--attempts=}" ;;
+        --dry-run) DRY_RUN=1 ;;
+        --sweep-closed) SWEEP=1 ;;
+        --open-prs=*) OPEN_FILE="${arg#--open-prs=}" ;;
+        --put=*)
+            spec="${arg#--put=}"
+            case "$spec" in
+                *:*) ;;
+                *) die "--put needs SRC:DEST, got '$spec'" ;;
+            esac
+            src="${spec%:*}"
+            dest="${spec##*:}"
+            if [[ ! "$dest" =~ $PUT_DEST_RE ]]; then
+                die "invalid --put destination '$dest'"
+            fi
+            if [ ! -d "$src" ]; then
+                die "--put source is not a directory: '$src'"
+            fi
+            src="$(cd "$src" && pwd)"
+            PUT_SRCS+=("$src")
+            PUT_DESTS+=("$dest")
+            ;;
+        --delete=*)
+            dest="${arg#--delete=}"
+            if [[ ! "$dest" =~ $DEL_DEST_RE ]]; then
+                die "invalid --delete destination '$dest'"
+            fi
+            DELETES+=("$dest")
+            ;;
+        *) echo "vr-pages-publish: unknown argument '$arg'" >&2; usage ;;
+    esac
+done
+
+[ -n "$REPO_DIR" ] || die "--repo-dir is required"
+{ [ "$HAVE_MESSAGE" = 1 ] && [ -n "$MESSAGE" ]; } || die "--message is required"
+[ -n "$BRANCH" ] || die "--branch must not be empty"
+if [[ ! "$ATTEMPTS" =~ $ATTEMPTS_RE ]]; then
+    die "invalid --attempts '$ATTEMPTS'"
+fi
+
+NUM_PUTS=${#PUT_DESTS[@]}
+NUM_DELS=${#DELETES[@]}
+OPEN_COUNT=0
+
+if [ "$SWEEP" = 1 ]; then
+    if [ "$NUM_PUTS" -gt 0 ] || [ "$NUM_DELS" -gt 0 ]; then
+        die "--sweep-closed cannot be combined with --put or --delete"
+    fi
+    [ -n "$OPEN_FILE" ] || die "--sweep-closed requires --open-prs=FILE"
+    [ -f "$OPEN_FILE" ] || die "open-PR file not found: '$OPEN_FILE'"
+    while IFS= read -r line || [ -n "$line" ]; do
+        if [[ "$line" =~ ^[[:space:]]*$ ]]; then
+            continue
+        fi
+        if [[ ! "$line" =~ $PR_NUM_RE ]]; then
+            die "invalid line in open-PR file: '$line'"
+        fi
+        OPEN_COUNT=$((OPEN_COUNT + 1))
+    done < "$OPEN_FILE"
+else
+    [ -z "$OPEN_FILE" ] || die "--open-prs requires --sweep-closed"
+    if [ "$NUM_PUTS" -eq 0 ] && [ "$NUM_DELS" -eq 0 ]; then
+        echo "vr-pages-publish: nothing to do (need --put, --delete or --sweep-closed)" >&2
+        usage
+    fi
+fi
+
+[ -d "$REPO_DIR" ] || die "--repo-dir is not a directory: '$REPO_DIR'"
+REPO="$(cd "$REPO_DIR" && pwd)"
+if ! git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    die "--repo-dir is not a git work tree: '$REPO'"
+fi
+if ! git -C "$REPO" remote get-url origin >/dev/null 2>&1; then
+    die "--repo-dir has no 'origin' remote: '$REPO'"
+fi
+
+# An empty open-PR list is what a silent listing failure looks like. Never
+# sweep on it (.claude/rules/shell-fail-open-probe.md).
+if [ "$SWEEP" = 1 ] && [ "$OPEN_COUNT" -eq 0 ]; then
+    echo "vr-pages-publish: refusing to sweep: open-PR list is empty" >&2
+    echo "swept=0"
+    exit 0
+fi
+
+SWEPT=0
+
+apply_ops() {
+    local i dest base d
+    i=0
+    while [ "$i" -lt "$NUM_PUTS" ]; do
+        dest="${PUT_DESTS[$i]}"
+        rm -rf "${REPO:?}/$dest"
+        mkdir -p "$REPO/$dest"
+        cp -R "${PUT_SRCS[$i]}"/. "$REPO/$dest"/
+        i=$((i + 1))
+    done
+    for dest in ${DELETES[@]+"${DELETES[@]}"}; do
+        rm -rf "${REPO:?}/$dest"
+    done
+    if [ "$SWEEP" = 1 ]; then
+        SWEPT=0
+        for d in "$REPO"/pr/*/; do
+            [ -d "$d" ] || continue
+            base="$(basename "$d")"
+            if [[ ! "$base" =~ $PR_NUM_RE ]]; then
+                continue
+            fi
+            if grep -qxF "$base" "$OPEN_FILE"; then
+                continue
+            fi
+            rm -rf "${d:?}"
+            SWEPT=$((SWEPT + 1))
+        done
+    fi
+}
+
+# Stage only pr/. `git add -A -- pr` errors when pr/ is neither on disk nor tracked.
+stage_pr() {
+    local tracked
+    tracked="$(git -C "$REPO" ls-files -- pr)"
+    if [ -d "$REPO/pr" ] || [ -n "$tracked" ]; then
+        git -C "$REPO" add -A -- pr
+    fi
+}
+
+result_line() {
+    # $1 = 1 when the tree changed, 0 otherwise
+    if [ "$SWEEP" = 1 ]; then
+        if [ "$1" = 1 ]; then echo "swept=$SWEPT"; else echo "swept=0"; fi
+    else
+        echo "changed=$1"
+    fi
+}
+
+fetch_tip() {
+    # A shallow fetch into a full clone corrupts its .git, so only stay
+    # shallow when the clone already is (the CI gh-pages checkout).
+    if [ "$(git -C "$REPO" rev-parse --is-shallow-repository)" = true ]; then
+        git -C "$REPO" fetch -q --depth=1 origin "$BRANCH"  # shallow-ok
+    else
+        git -C "$REPO" fetch -q origin "$BRANCH"
+    fi
+}
+
+i=1
+while [ "$i" -le "$ATTEMPTS" ]; do
+    if fetch_tip >&2; then
+        git -C "$REPO" reset -q --hard FETCH_HEAD
+        git -C "$REPO" clean -qffd
+        apply_ops
+        stage_pr
+        if git -C "$REPO" diff --cached --quiet; then
+            result_line 0
+            exit 0
+        fi
+        if [ "$DRY_RUN" = 1 ]; then
+            git -C "$REPO" diff --cached --stat >&2
+            result_line 1
+            exit 0
+        fi
+        git -C "$REPO" \
+            -c user.name='github-actions[bot]' \
+            -c user.email='github-actions[bot]@users.noreply.github.com' \
+            commit -q -m "$MESSAGE"
+        if git -C "$REPO" push -q origin "HEAD:refs/heads/$BRANCH" >&2; then
+            result_line 1
+            exit 0
+        fi
+        echo "vr-pages-publish: push rejected (attempt $i/$ATTEMPTS), refetching" >&2
+    else
+        echo "vr-pages-publish: fetch failed (attempt $i/$ATTEMPTS), retrying" >&2
+    fi
+    if [ "$i" -lt "$ATTEMPTS" ]; then
+        sleep "$i"
+    fi
+    i=$((i + 1))
+done
+
+echo "::error::vr-pages-publish: push to $BRANCH failed after $ATTEMPTS attempts" >&2
+exit 1

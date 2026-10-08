@@ -72,6 +72,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0190](0190-db-root-credentials-env-overridable.md) | Env-overridable DB root credentials and default database name | Accepted | `bin/lib/db-helpers.sh` defines `DB_ROOT_USER`, `DB_ROOT_PASS` and `DB_DEFAULT_NAME` with env overrides and a `db_cmd` wrapper; `bin/test-db-sync-prod-argv` pins the `docker exec` argv the DB scripts send. |
 | [0196](0196-sim-recap-self-healing-routing.md) | Self-healing sim-recap routing across GitHub Actions and the Mac | Accepted | The prod queue routes each failed recap by cause (`ParkPolicy`, `SimSummaryRepository::parkByCause`): retry, wait for the usage reset, hand to the other host, back off, or stop; claims are host-scoped in SQL; prod posts one #admin-chat line per state change. |
 | [0194](0194-engine-freeze-gates.md) | Freeze engine/ and gate new decompile tokens | Accepted | `bin/check-engine-freeze` runs in the required meta-checks job on every PR; it fails additions to `engine/` and any added line carrying a decompile token; the cutover PR retires it. |
+| [0179](0179-vr-pr-keyed-screens.md) | PR-keyed visual-review storage and phone-readable manual-row screens | Accepted | Galleries and manual-row screens live at gh-pages pr/<N>/, overwritten each push and removed on close. Manual rows render at phone and desktop width, before and after, in a PR-body block. |
 
 ## When an ADR is Required
 

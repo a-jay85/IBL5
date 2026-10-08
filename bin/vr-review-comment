@@ -23,9 +23,10 @@
 // Usage:
 //   bin/vr-review-comment --gallery=ibl5/vr-gallery.json --coverage=coverage.json \
 //     --pages-url=https://a-jay85.github.io/IBL5/<sha>/visual-review/ --out=vr-review-comment.md
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 import { execFileSync } from 'child_process';
-import { resolve, dirname } from 'path';
+import { resolve, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -36,13 +37,31 @@ const { buildCopyPlan, buildNewScreensSection, newScreenUrl, normalizeBody, spli
   await import(resolve(ibl5Dir, 'tests/e2e/vr-pr-body.ts'));
 const { parseManualBullets, buildManualSection, manualShotUrl } =
   await import(resolve(ibl5Dir, 'tests/e2e/vr-manual-rows.ts'));
+const {
+  parsePrNumber,
+  isHeadSha,
+  cellsHash,
+  renderToken,
+  planRender,
+  assembleMeta,
+  buildScreensBlock,
+  extractScreensBlock,
+  spliceWithRetry,
+  blockImageUrls,
+  isNoop,
+} = await import(resolve(ibl5Dir, 'tests/e2e/vr-pr-screens.ts'));
 
 const USAGE =
   'Usage: bin/vr-review-comment --gallery=PATH --coverage=PATH --pages-url=URL [--out=PATH]\n' +
   '   or: bin/vr-review-comment --gallery=PATH --copy-new-screens=DEST [--renders-dir=SRC]\n' +
   '   or: bin/vr-review-comment --gallery=PATH --pages-url=URL --update-pr-body=N [--dry-run] [--body-file-in=PATH]\n' +
   '   or: bin/vr-review-comment --manual-rows-from-pr=N [--out-json=PATH] [--body-file-in=PATH]\n' +
-  '   or: bin/vr-review-comment --manual-gallery=PATH --pages-url=URL [--out=PATH]';
+  '   or: bin/vr-review-comment --manual-gallery=PATH --pages-url=URL [--out=PATH]\n' +
+  '   or: bin/vr-review-comment --screens-plan --pr=N --head-sha=SHA --cells-json=PATH --prev-dir=DIR --before-tree=SHA --after-tree=SHA --gallery-present=true|false --run-url=URL [--body-file-in=PATH]\n' +
+  '   or: bin/vr-review-comment --screens-assemble <plan flags> --sides=JSON --before-rows=PATH --after-rows=PATH --out-dir=DIR\n' +
+  '   or: bin/vr-review-comment --splice-screens=N --block-file=PATH [--dry-run] [--body-file-in=PATH]\n' +
+  '   or: bin/vr-review-comment --screens-urls --block-file=PATH\n' +
+  '   or: bin/vr-review-comment --screens-live-check=N [--body-file-in=PATH]';
 
 let galleryPath: string | null = null;
 let coveragePath: string | null = null;
@@ -56,6 +75,24 @@ let bodyFileIn: string | null = null;
 let manualRowsFromPr: string | null = null;
 let outJson = 'ibl5/vr-manual-rows.json';
 let manualGallery: string | null = null;
+let screensPlan = false;
+let screensAssemble = false;
+let spliceScreens: string | null = null;
+let screensUrls = false;
+let screensLiveCheck: string | null = null;
+let prFlag: string | null = null;
+let headShaFlag: string | null = null;
+let cellsJson: string | null = null;
+let prevDir: string | null = null;
+let beforeTreeFlag: string | null = null;
+let afterTreeFlag: string | null = null;
+let galleryPresentFlag: string | null = null;
+let runUrlFlag: string | null = null;
+let sidesFlag: string | null = null;
+let beforeRowsPath: string | null = null;
+let afterRowsPath: string | null = null;
+let outDir: string | null = null;
+let blockFile: string | null = null;
 
 for (const arg of process.argv.slice(2)) {
   if (arg.startsWith('--gallery=')) galleryPath = arg.slice('--gallery='.length);
@@ -71,6 +108,26 @@ for (const arg of process.argv.slice(2)) {
     manualRowsFromPr = arg.slice('--manual-rows-from-pr='.length);
   else if (arg.startsWith('--out-json=')) outJson = arg.slice('--out-json='.length);
   else if (arg.startsWith('--manual-gallery=')) manualGallery = arg.slice('--manual-gallery='.length);
+  else if (arg === '--screens-plan') screensPlan = true;
+  else if (arg === '--screens-assemble') screensAssemble = true;
+  else if (arg.startsWith('--splice-screens=')) spliceScreens = arg.slice('--splice-screens='.length);
+  else if (arg === '--screens-urls') screensUrls = true;
+  else if (arg.startsWith('--screens-live-check='))
+    screensLiveCheck = arg.slice('--screens-live-check='.length);
+  else if (arg.startsWith('--pr=')) prFlag = arg.slice('--pr='.length);
+  else if (arg.startsWith('--head-sha=')) headShaFlag = arg.slice('--head-sha='.length);
+  else if (arg.startsWith('--cells-json=')) cellsJson = arg.slice('--cells-json='.length);
+  else if (arg.startsWith('--prev-dir=')) prevDir = arg.slice('--prev-dir='.length);
+  else if (arg.startsWith('--before-tree=')) beforeTreeFlag = arg.slice('--before-tree='.length);
+  else if (arg.startsWith('--after-tree=')) afterTreeFlag = arg.slice('--after-tree='.length);
+  else if (arg.startsWith('--gallery-present='))
+    galleryPresentFlag = arg.slice('--gallery-present='.length);
+  else if (arg.startsWith('--run-url=')) runUrlFlag = arg.slice('--run-url='.length);
+  else if (arg.startsWith('--sides=')) sidesFlag = arg.slice('--sides='.length);
+  else if (arg.startsWith('--before-rows=')) beforeRowsPath = arg.slice('--before-rows='.length);
+  else if (arg.startsWith('--after-rows=')) afterRowsPath = arg.slice('--after-rows='.length);
+  else if (arg.startsWith('--out-dir=')) outDir = arg.slice('--out-dir='.length);
+  else if (arg.startsWith('--block-file=')) blockFile = arg.slice('--block-file='.length);
   else if (arg === '--help') {
     process.stdout.write(USAGE + '\n');
     process.exit(0);
@@ -78,6 +135,243 @@ for (const arg of process.argv.slice(2)) {
     process.stderr.write(`Unknown argument: ${arg}\n${USAGE}\n`);
     process.exit(2);
   }
+}
+
+// Screens modes (PR-keyed phone review) — all logic lives in
+// tests/e2e/vr-pr-screens.ts; this layer only does gh / fetch / fs I/O.
+function invalidFlag(flag: string): never {
+  process.stderr.write(`vr-review-comment: invalid ${flag}\n`);
+  process.exit(2);
+}
+
+function readPrBody(pr: string): string {
+  const raw =
+    bodyFileIn !== null && existsSync(bodyFileIn)
+      ? readFileSync(bodyFileIn, 'utf-8')
+      : execFileSync('gh', ['pr', 'view', pr, '--json', 'body', '-q', '.body'], { encoding: 'utf-8' });
+  return normalizeBody(raw);
+}
+
+function readJsonOrNull(path: string | null): unknown {
+  if (path === null || !existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+function readTextOrEmpty(path: string | null): string {
+  if (path === null || !existsSync(path)) return '';
+  try {
+    return readFileSync(path, 'utf-8');
+  } catch {
+    return '';
+  }
+}
+
+function loadPrevManifest(dir: string): { schema: 1; cellsHash: string; beforeTree: string; afterTree: string } | null {
+  const m = readJsonOrNull(join(dir, 'manifest.json')) as Record<string, unknown> | null;
+  if (
+    m !== null &&
+    typeof m === 'object' &&
+    m.schema === 1 &&
+    typeof m.cellsHash === 'string' &&
+    typeof m.beforeTree === 'string' &&
+    typeof m.afterTree === 'string'
+  ) {
+    return { schema: 1, cellsHash: m.cellsHash, beforeTree: m.beforeTree, afterTree: m.afterTree };
+  }
+  return null;
+}
+
+function loadPrevRows(dir: string): { cells: string[]; before: object; after: object } | null {
+  const r = readJsonOrNull(join(dir, 'rows.json')) as Record<string, unknown> | null;
+  if (
+    r !== null &&
+    typeof r === 'object' &&
+    Array.isArray(r.cells) &&
+    typeof r.before === 'object' &&
+    r.before !== null &&
+    typeof r.after === 'object' &&
+    r.after !== null
+  ) {
+    return r as unknown as { cells: string[]; before: object; after: object };
+  }
+  return null;
+}
+
+function loadCapturedRows(path: string | null): unknown[] | null {
+  const parsed = readJsonOrNull(path) as unknown;
+  if (parsed === null) return null;
+  const rows = Array.isArray(parsed)
+    ? parsed
+    : ((parsed as { results?: unknown; rows?: unknown }).results ?? (parsed as { rows?: unknown }).rows);
+  return Array.isArray(rows) ? rows : null;
+}
+
+function parseSidesFlag(raw: string): Array<'before' | 'after'> {
+  let v: unknown;
+  try {
+    v = JSON.parse(raw);
+  } catch {
+    return invalidFlag('--sides');
+  }
+  if (!Array.isArray(v) || !v.every((x) => x === 'before' || x === 'after')) invalidFlag('--sides');
+  return v as Array<'before' | 'after'>;
+}
+
+function buildPlanContext() {
+  const pr = parsePrNumber(prFlag ?? '');
+  if (pr === null) invalidFlag('--pr');
+  if (!isHeadSha(headShaFlag ?? '')) invalidFlag('--head-sha');
+  if (!isHeadSha(beforeTreeFlag ?? '')) invalidFlag('--before-tree');
+  if (!isHeadSha(afterTreeFlag ?? '')) invalidFlag('--after-tree');
+  if (galleryPresentFlag !== 'true' && galleryPresentFlag !== 'false') invalidFlag('--gallery-present');
+  if (cellsJson === null) invalidFlag('--cells-json');
+  if (prevDir === null) invalidFlag('--prev-dir');
+  if (runUrlFlag === null) invalidFlag('--run-url');
+
+  const parsedCells = readJsonOrNull(cellsJson) as { rows?: unknown } | null;
+  const cells = Array.isArray(parsedCells?.rows) ? (parsedCells.rows as any[]) : [];
+  const prevManifest = loadPrevManifest(prevDir as string);
+  const prevRows = loadPrevRows(prevDir as string);
+  const cur = {
+    cellsHash: cellsHash(cells),
+    beforeTree: beforeTreeFlag as string,
+    afterTree: afterTreeFlag as string,
+  };
+  return {
+    pr: pr as number,
+    headSha: headShaFlag as string,
+    galleryPresent: galleryPresentFlag === 'true',
+    runUrl: runUrlFlag as string,
+    cells,
+    prevManifest,
+    prevRows,
+    cur,
+  };
+}
+
+if (screensPlan || screensAssemble) {
+  const ctx = buildPlanContext();
+  const buildBlock = (meta: { rows: any; manifest: any }): string =>
+    buildScreensBlock({
+      pr: ctx.pr,
+      headSha: ctx.headSha,
+      token: renderToken(meta.manifest),
+      rows: meta.rows,
+      galleryPresent: ctx.galleryPresent,
+      runUrl: ctx.runUrl,
+    });
+
+  if (screensPlan) {
+    const sides = planRender(ctx.prevManifest, ctx.cur);
+    const expected = assembleMeta({
+      cells: ctx.cells,
+      sides: [],
+      captured: { before: null, after: null },
+      prevRows: ctx.prevRows,
+      prevManifest: ctx.prevManifest,
+      cur: ctx.cur,
+    });
+    const bodyBlock = extractScreensBlock(readPrBody(String(ctx.pr)));
+    const noop = isNoop({
+      sides,
+      expectedBlock: buildBlock(expected),
+      bodyBlock,
+      prevBlock: readTextOrEmpty(join(prevDir as string, 'block.md')),
+    });
+    process.stdout.write(
+      `sides=${JSON.stringify(sides)}\ncells=${ctx.cells.length}\ncells_hash=${ctx.cur.cellsHash}\nnoop=${noop}\n`
+    );
+    process.exit(0);
+  }
+
+  if (sidesFlag === null) invalidFlag('--sides');
+  if (outDir === null) invalidFlag('--out-dir');
+  const sides = parseSidesFlag(sidesFlag as string);
+  const meta = assembleMeta({
+    cells: ctx.cells,
+    sides,
+    captured: { before: loadCapturedRows(beforeRowsPath), after: loadCapturedRows(afterRowsPath) },
+    prevRows: ctx.prevRows,
+    prevManifest: ctx.prevManifest,
+    cur: ctx.cur,
+  });
+  mkdirSync(outDir as string, { recursive: true });
+  writeFileSync(join(outDir as string, 'manifest.json'), JSON.stringify(meta.manifest, null, 2) + '\n');
+  writeFileSync(join(outDir as string, 'rows.json'), JSON.stringify(meta.rows, null, 2) + '\n');
+  writeFileSync(join(outDir as string, 'block.md'), buildBlock(meta));
+  process.stdout.write(`vr-review-comment: assembled screens block -> ${outDir}\n`);
+  process.exit(0);
+}
+
+if (spliceScreens !== null) {
+  const pr = parsePrNumber(spliceScreens);
+  if (pr === null) invalidFlag('--splice-screens');
+  if (blockFile === null) invalidFlag('--block-file');
+  const block = readFileSync(blockFile as string, 'utf-8');
+  const prStr = String(pr);
+  let dryState: string | null = null;
+  const tmpRoot = mkdtempSync(join(tmpdir(), 'vr-screens-'));
+  const readLive = (): string =>
+    bodyFileIn !== null && existsSync(bodyFileIn)
+      ? readFileSync(bodyFileIn, 'utf-8')
+      : execFileSync('gh', ['pr', 'view', prStr, '--json', 'body', '-q', '.body'], { encoding: 'utf-8' });
+  const io = {
+    read: (): string => (dryRun && dryState !== null ? dryState : readLive()),
+    write: (body: string): void => {
+      if (dryRun) {
+        dryState = body;
+        return;
+      }
+      const tmp = join(tmpRoot, 'body.md');
+      writeFileSync(tmp, body + '\n');
+      execFileSync('gh', ['pr', 'edit', prStr, '--body-file', tmp], { stdio: 'inherit' });
+    },
+  };
+  const res = spliceWithRetry(io, block.replace(/\n+$/, ''));
+  rmSync(tmpRoot, { recursive: true, force: true });
+  process.stderr.write(`screens-splice: ${res.outcome} after ${res.attempts} attempt(s)\n`);
+  if (res.outcome === 'too-large' || res.outcome === 'malformed' || res.outcome === 'lost') {
+    const warn = `::warning::screens-splice: ${res.outcome}; PR body left unchanged\n`;
+    (dryRun ? process.stderr : process.stdout).write(warn);
+  }
+  if (dryRun) process.stdout.write((dryState ?? normalizeBody(readLive())) + '\n');
+  process.exit(0);
+}
+
+if (screensUrls) {
+  if (blockFile === null) invalidFlag('--block-file');
+  const urls: string[] = blockImageUrls(readFileSync(blockFile as string, 'utf-8'));
+  if (urls.length > 0) process.stdout.write(urls.join('\n') + '\n');
+  process.exit(0);
+}
+
+if (screensLiveCheck !== null) {
+  const pr = parsePrNumber(screensLiveCheck);
+  if (pr === null) invalidFlag('--screens-live-check');
+  const block = extractScreensBlock(readPrBody(String(pr)));
+  if (block === '') {
+    process.stdout.write('screens-live-check: no block\n');
+    process.exit(0);
+  }
+  const urls: string[] = blockImageUrls(block);
+  let bad = urls.length === 0;
+  if (urls.length === 0) process.stdout.write('screens-live-check: block has no image urls\n');
+  for (const url of urls) {
+    let status = 0;
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      status = r.status;
+    } catch {
+      status = 0;
+    }
+    if (status !== 200) bad = true;
+    process.stdout.write(`${status} ${url}\n`);
+  }
+  process.exit(bad ? 1 : 0);
 }
 
 // Manual-row extraction mode (ADR-0126) — read PR #N's body, pull the `vr:`

@@ -28,6 +28,7 @@ class TerminalState(str, Enum):
 
 
 OUTPUT_KEEP = 4000   # HarnessError.output keeps this many trailing characters
+SUBPROCESS_TIMEOUT = "subprocess-timeout"   # HarnessError.kind for a bounded subprocess that hung
 
 
 class HarnessError(Exception):

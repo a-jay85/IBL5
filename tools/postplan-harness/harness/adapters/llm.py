@@ -25,7 +25,7 @@ import tempfile
 import threading
 
 from .. import usage_pause
-from ..state import HarnessError, LlmCallRecord, UsageLedger
+from ..state import SUBPROCESS_TIMEOUT, HarnessError, LlmCallRecord, UsageLedger
 from ..usage_pause import UsagePause
 
 MAX_PROMPT_BYTES = 120_000        # hard cap on any single call's input packet
@@ -104,6 +104,26 @@ def _run_reaped(argv, stdin_text, timeout, cwd, env):
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
             pass
+
+
+def run_bounded(argv, *, step, timeout, cwd=None, stdin_text=None, env=None):
+    """_run_reaped plus the typed timeout contract for deterministic phase-2 steps.
+
+    Returns the CompletedProcess unchanged (a nonzero rc is the caller's business).
+    A hang past `timeout` reaps the whole process group (via _run_reaped's finally)
+    and raises HarnessError(SUBPROCESS_TIMEOUT) naming the step, so runner.run exits 3.
+    OSError (missing binary) propagates unchanged; callers keep their own handling.
+    """
+    try:
+        return _run_reaped(list(argv), stdin_text, timeout, cwd, env)
+    except subprocess.TimeoutExpired as e:
+        partial = e.output if isinstance(e.output, str) else ""
+        raise HarnessError(
+            SUBPROCESS_TIMEOUT,
+            f"step '{step}' timed out after {timeout}s",
+            cmd=" ".join(str(a) for a in argv),
+            output=partial,
+        ) from None
 
 
 # Tools that let a session persist a file. A tooled call granted none of them cannot

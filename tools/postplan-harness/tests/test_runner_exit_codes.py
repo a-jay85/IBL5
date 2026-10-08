@@ -22,6 +22,10 @@ def test_local_gate_denial_exits_3():
     """A pre-commit/pre-push hook denial is deterministic — no ~1M skill fallback."""
     assert runner.exit_code_for(_res(TerminalState.FAILED, "local-gate")) == 3
 
+def test_subprocess_timeout_exits_3():
+    """A hung phase-2 subprocess would hang again on a skill re-run — fail closed."""
+    assert runner.exit_code_for(_res(TerminalState.FAILED, "subprocess-timeout")) == 3
+
 def test_usage_limit_exits_3():
     """A Claude usage/rate limit is environmental — re-running the skill immediately
     would hit the same wall, so the harness stops for a human to retry later."""
@@ -34,7 +38,8 @@ def test_other_typed_failure_exits_1():          # negative path: not everything
 _EXIT_CODE_TABLE = (
     [(TerminalState.FAILED, k, 3) for k in (
         "rebase-conflict", "local-gate", "remote-head-diverged",
-        "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty")]
+        "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty",
+        "subprocess-timeout")]
     + [(TerminalState.FAILED, "usage-pause", 75)]
     + [(TerminalState.FAILED, k, 1) for k in (
         "push-disabled", "push-failed", "push-retry-cap",

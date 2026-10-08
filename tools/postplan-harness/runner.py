@@ -63,7 +63,8 @@ from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.review import ReviewPhase
 from harness import baseline_guard
-from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
+from harness.state import (SUBPROCESS_TIMEOUT, HarnessError, RunResult, TerminalState,
+                           UsageLedger)
 from harness.thread_ingestion import run_thread_ingestion
 from harness.adapters.ghad import LiveGh, RecordingGh
 from harness.adapters.gitad import (LiveGit, ReplayGit, classify_local_gate_denial,
@@ -2541,9 +2542,11 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
     return res
 
 
-# All four are deterministic walls a full skill re-run cannot climb — see exit_code_for.
+# Deterministic walls a full skill re-run cannot climb — see exit_code_for. A
+# subprocess-timeout is one too: the skill re-run would hang on the same step.
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
-                      "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty")
+                      "llm-usage-limit", "usage-pause-unconfirmed", "usage-pause-dirty",
+                      SUBPROCESS_TIMEOUT)
 PAUSE_EXIT = 75   # ADR-0143 reserved pause exit; only with an S marker on disk
 
 # Per-class remedy for a local-gate denial. Every arm is still exit 3 -- naming the
@@ -2973,6 +2976,14 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             return ("RESULT: post-plan BLOCKED — rebase conflict, "
                     "human required; ERROR terminal=failed, no PR opened."
                     f"{detail}{cause} Resolve the rebase, then re-run bin/post-plan-now.")
+        if res.error_kind == SUBPROCESS_TIMEOUT:
+            detail = _flat(res.error) or "a phase-2 subprocess timed out"
+            cmd = _cmd_text(res.error_cmd)
+            cmd = f" Command: {cmd}." if cmd else ""
+            return ("RESULT: post-plan BLOCKED — a phase-2 subprocess hung past its "
+                    f"timeout and was killed; ERROR terminal=failed. {detail}.{cmd} "
+                    "Find why that step hangs (audit.log names it on the last "
+                    "'phase2: starting' line), then re-run bin/post-plan-now.")
         if res.error_kind == "local-gate":
             tail = " ".join(_error_tail(res.error_output_tail or res.error)) or "see gate output"
             cmd = _cmd_text(res.error_cmd)

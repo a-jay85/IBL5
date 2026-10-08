@@ -1,4 +1,4 @@
-"""Phase 7 ci-fix carve-out for the .claude/rules byte budget (ADR-NNNN; see tools/postplan-harness/README.md).
+"""Phase 7 ci-fix carve-out for the .claude/rules byte budget (ADR-0184; see tools/postplan-harness/README.md).
 
 When the only failing CI check is `Static guards` and `bin/check-rules-byte-budget`
 fails locally, the ci-fix fixer may shrink rules files the PR already changes and may

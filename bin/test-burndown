@@ -343,6 +343,9 @@ cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md" <<'REPORT'
 - [#25](u25) Twenty-five — ref
 - [#26](u26) Twenty-six — ref
 - [#27](u27) Twenty-seven — ref
+- [#28](u28) Twenty-eight — ref
+- [#29](u29) Twenty-nine — ref
+- [#32](u32) Thirty-two — ref
 - [#30](u30) Thirty — ref
 - [#31](u31) Thirty-one — ref
 - [#35](u35) Thirty-five noref — ref
@@ -522,6 +525,64 @@ printf '2\n' > "$T/fx/wt/wt-27.ahead"
 OUT="$(bd_b 2>&1)"; RC=$?
 want "C51a: committed-ahead skipped worktree stays in-flight" "$OUT" "worktree wt-27"
 rm -f "$T/home/claude-plans/_reports/burndown-batch-held.json"
+cat > "$T/fx/worktrees.txt" <<'WT'
+WT
+rm -rf "$T/fx/wt"
+
+# ── C51b-g: Source 5 drops idle worktrees, keeps everything else in-flight ────
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":28,"title":"Twenty-eight","body":"bin/s28:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":29,"title":"Twenty-nine","body":"bin/s29:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":30,"title":"Thirty","body":"bin/s30:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":31,"title":"Thirty-one","body":"bin/s31:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":32,"title":"Thirty-two","body":"bin/s32:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+cat > "$T/home/claude-plans/_reports/burndown-batch-idle.json" <<'LEDGER'
+{"items":[
+  {"issue_num":28,"also_closes":[],"slug":"wt-28","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1},
+  {"issue_num":29,"also_closes":[],"slug":"wt-29","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1},
+  {"issue_num":30,"also_closes":[],"slug":"wt-30","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1},
+  {"issue_num":31,"also_closes":[],"slug":"wt-31","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1}
+]}
+LEDGER
+printf '# Plan\nIBL5-backlog#32\n' > "$T/home/claude-plans/wt-32.md"
+cat > "$T/fx/worktrees.txt" <<'WT'
+worktree /some/wt-28
+HEAD abc123
+branch refs/heads/wt-28
+
+worktree /some/wt-29
+HEAD abc123
+branch refs/heads/wt-29
+
+worktree /some/wt-30
+HEAD abc123
+branch refs/heads/wt-30
+
+worktree /some/wt-31
+HEAD abc123
+branch refs/heads/wt-31
+
+worktree /some/wt-32
+HEAD abc123
+branch refs/heads/wt-32
+
+WT
+mkdir -p "$T/fx/wt"
+touch "$T/fx/wt/wt-30.fail"
+printf '[{"number":901,"state":"CLOSED"}]\n' > "$T/fx/pr-wt-29.json"
+OUT="$(export GH_FAIL_ON="--head wt-31"; bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "C51b: idle worktree run exits 0" || fail "C51b: idle worktree run exits 0 (got $RC)"
+grep -qE 'PICK\s+#28' <<< "$OUT" && ok "C51b: idle worktree no longer holds #28" || fail "C51b: idle worktree no longer holds #28"
+grep -qF "worktree wt-28" <<< "$OUT" && fail "C51b: no worktree reason for idle wt-28" || ok "C51b: no worktree reason for idle wt-28"
+want "C51c: closed-PR worktree stays in-flight" "$OUT" "worktree wt-29"
+want "C51e: git probe failure stays in-flight" "$OUT" "worktree wt-30"
+want "C51f: gh probe failure stays in-flight" "$OUT" "worktree wt-31"
+want "C51g: plan-file idle worktree held by the plan" "$OUT" "plan wt-32.md"
+rm -f "$T/home/claude-plans/_reports/burndown-batch-idle.json" "$T/home/claude-plans/wt-32.md" \
+      "$T/fx/pr-wt-29.json"
 cat > "$T/fx/worktrees.txt" <<'WT'
 WT
 rm -rf "$T/fx/wt"

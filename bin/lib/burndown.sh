@@ -143,6 +143,54 @@ bd_cmd_delta() {
     printf '%s\n' "$out"
 }
 
+# bd_wt_list — print "<path><TAB><branch>" for every worktree that has a branch.
+# Returns 1 when `git worktree list` fails; callers decide fail-closed handling.
+bd_wt_list() {
+    local raw rc=0 line wpath=""
+    raw="$("$BD_GIT" -C "$BD_REPO_ROOT" worktree list --porcelain 2>/dev/null)" || rc=$?
+    [ "$rc" -eq 0 ] || return 1
+    while IFS= read -r line; do
+        case "$line" in
+            "worktree "*) wpath="${line#worktree }" ;;
+            "branch refs/heads/"*) printf '%s\t%s\n' "$wpath" "${line#branch refs/heads/}" ;;
+        esac
+    done <<< "$raw"
+}
+
+# bd_wt_state <path> <branch> — classify a live worktree. Prints exactly one of:
+#   idle                          clean, 0 commits ahead of origin/master, zero PRs for head
+#   pr                            at least one PR (any state) exists for head <branch>
+#   held<TAB><0|1 dirty><TAB><N>  dirty or N>0 ahead, zero PRs for head
+#   unknown<TAB><reason>          a git or gh probe failed (callers treat as in-flight)
+# Fail-closed by design (.claude/rules/shell-fail-open-probe.md): no probe failure
+# ever yields "idle", because "idle" releases the issue back into selection.
+bd_wt_state() {
+    local path="$1" branch="$2" st ahead raw dirty=0 prs
+    if ! st="$("$BD_GIT" -C "$path" status --porcelain 2>/dev/null)"; then
+        printf 'unknown\tgit status failed\n'; return 0
+    fi
+    if ! ahead="$("$BD_GIT" -C "$path" rev-list --count origin/master..HEAD 2>/dev/null)"; then
+        printf 'unknown\tgit rev-list failed\n'; return 0
+    fi
+    if ! [[ "$ahead" =~ ^[0-9]+$ ]]; then
+        printf 'unknown\tgit rev-list printed no count\n'; return 0
+    fi
+    [ -z "$st" ] || dirty=1
+    if ! raw="$("$GH" pr list --repo "$BD_CODE_REPO" --head "$branch" --state all \
+        --limit 5 --json number 2>/dev/null)" \
+        || ! jq -e 'type=="array"' <<< "$raw" >/dev/null 2>&1; then
+        printf 'unknown\tgh failed\n'; return 0
+    fi
+    prs="$(jq 'length' <<< "$raw")"
+    if [ "$prs" -gt 0 ]; then
+        printf 'pr\n'
+    elif [ "$dirty" -eq 0 ] && [ "$ahead" -eq 0 ]; then
+        printf 'idle\n'
+    else
+        printf 'held\t%s\t%s\n' "$dirty" "$ahead"
+    fi
+}
+
 # bd_inflight <out-tsv> — write num<TAB>reason lines for every in-flight issue
 bd_inflight() {
     local out="$1"
@@ -211,37 +259,32 @@ bd_inflight() {
             "$ledger" >> "$out"
     done
 
-    # Source 5: live worktrees
-    local wt_out wt_rc=0
-    wt_out="$("$BD_GIT" -C "$BD_REPO_ROOT" worktree list --porcelain 2>/dev/null)" || wt_rc=$?
+    # Source 5: live worktrees. A worktree whose state is "idle" (clean, 0 ahead,
+    # no PR) no longer holds its issue; every other state, including a failed
+    # probe, keeps it in-flight.
+    local wt_list wt_rc=0 wpath wbranch
+    wt_list="$(bd_wt_list)" || wt_rc=$?
     [ "$wt_rc" -eq 0 ] || bd_die 3 "git worktree list failed"
-    if [ -n "$wt_out" ]; then
-        local wbranch=""
-        while IFS= read -r wline; do
-            if [[ "$wline" =~ ^branch\ refs/heads/(.+)$ ]]; then
-                wbranch="${BASH_REMATCH[1]}"
-                # Issues from any ledger item (any status) whose slug matches this branch
-                for ledger in "$BD_REPORTS_DIR"/burndown-batch-*.json; do
-                    [ -e "$ledger" ] || continue
-                    jq -r --arg b "$wbranch" \
-                        '.items[] | select(.slug == $b) | .issue_num | tostring' \
-                        "$ledger" 2>/dev/null | \
-                    while IFS= read -r wn; do
-                        [ -n "$wn" ] && printf '%s\tworktree %s\n' "$wn" "$wbranch" >> "$out"
-                    done
-                done
-                # Issues from ~/claude-plans/<branch>.md
-                local wplan="$BD_PLANS_DIR/$wbranch.md"
-                if [ -f "$wplan" ]; then
-                    grep -oE 'IBL5-backlog#[0-9]+' "$wplan" 2>/dev/null | \
-                    while IFS= read -r wmatch; do
-                        local wn="${wmatch##*#}"
-                        [ -n "$wn" ] && printf '%s\tworktree %s\n' "$wn" "$wbranch" >> "$out"
-                    done
-                fi
-            fi
-        done <<< "$wt_out"
-    fi
+    while IFS=$'\t' read -r wpath wbranch; do
+        [ -n "$wbranch" ] || continue
+        local wnums="" wplan="$BD_PLANS_DIR/$wbranch.md" wstate
+        for ledger in "$BD_REPORTS_DIR"/burndown-batch-*.json; do
+            [ -e "$ledger" ] || continue
+            wnums+="$(jq -r --arg b "$wbranch" \
+                '.items[] | select(.slug == $b) | .issue_num | tostring' \
+                "$ledger" 2>/dev/null)"$'\n'
+        done
+        if [ -f "$wplan" ]; then
+            wnums+="$(grep -oE 'IBL5-backlog#[0-9]+' "$wplan" 2>/dev/null \
+                | sed 's/.*#//')"$'\n' || true
+        fi
+        grep -q '[0-9]' <<< "$wnums" || continue
+        wstate="$(bd_wt_state "$wpath" "$wbranch")"
+        [ "$wstate" = idle ] && continue
+        while IFS= read -r wn; do
+            [ -n "$wn" ] && printf '%s\tworktree %s\n' "$wn" "$wbranch" >> "$out"
+        done <<< "$wnums"
+    done <<< "$wt_list"
 }
 
 # bd_issue_is_open <num> <issues_file> — exit 0 if open

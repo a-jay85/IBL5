@@ -48,6 +48,10 @@ class TestCharacterizationTodayDeny:
         assert fidelity.GATE_EDIT_DENY_TEXT in prompt
         assert "byte budget" not in prompt.lower()
 
+    def test_existing_prompt_deny_text_assertion_still_present(self):
+        text = pathlib.Path(__file__).with_name("test_cifix.py").read_text()
+        assert "def test_prompt_carries_gate_edit_deny_text" in text  # test_cifix.py::test_prompt_carries_gate_edit_deny_text
+
     def test_non_cifix_call_sites_have_no_carveout_hook(self):
         base = pathlib.Path(fidelity.__file__)
         for name in ("fidelity.py", "thread_ingestion.py", "prosefix.py"):
@@ -171,9 +175,10 @@ class TestSnapshot:
         def run(argv, **kw):
             seen.append((argv, kw["cwd"]))
             return SimpleNamespace(returncode=1, stdout="", stderr="")
-        c = snapshot(["Static guards"], _git_with([BIG, "ibl5/x.php"]), "/wt", run=run)
+        c = snapshot(["Static guards"],
+                     _git_with([BIG, "ibl5/x.php", ".claude/rules/x.txt"]), "/wt", run=run)
         assert c.active and c.reason == "active"
-        assert c.in_diff == frozenset({BIG})
+        assert c.in_diff == frozenset({".claude/rules/big.md"})
         assert seen == [([rbc.BUDGET_SCRIPT], "/wt")]
 
 
@@ -206,7 +211,7 @@ class TestFileVerdicts:
         assert self._verdicts(repo, [BIG, DETAIL]) == [(DETAIL, "new companion has no paths: list")]
 
     def test_denies_new_non_detail_file(self, repo):
-        new = ".claude/rules/extra.md"
+        new = ".claude/rules/newrule.md"
         _commit(repo, "fix", {BIG: SMALL, new: DETAIL_TEXT})
         assert self._verdicts(repo, [BIG, new]) == [
             (new, "a new rules file must be a *-detail.md companion")]

@@ -36,8 +36,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gitutil, holdrepeat, llm_calls,
-                     manual_rows, manual_testing, outofscope, prosefix, schemas, scope_conformance,
-                     statefile, usage_pause)
+                     manual_rows, manual_testing, outofscope, prosefix, rebase_cause, schemas,
+                     scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
@@ -49,18 +49,18 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               modified_files_from_diff,
                               name_status_text, normalize_backlog_closes, numstat_text,
                               qualify_backlog_refs,
-                              render_files_changed, render_manual_confirmation,
+                              render_files_changed,
                               render_tests_changed,
-                              render_residual_phases, render_reviewer_verification,
+                              render_residual_phases,
                               render_scope_notes,
                               restore_manual_testing_section, strip_manual_testing_section,
-                              upsert_files_changed, upsert_manual_confirmation,
+                              upsert_files_changed,
                               upsert_tests_changed,
-                              upsert_residual_phases, upsert_reviewer_verification,
+                              upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
 from harness.gate_backtest_replay import gate_backtest_result
-from harness.planfile import locate_plan, split_hold_justification
+from harness.planfile import locate_plan
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
 from harness.thread_ingestion import run_thread_ingestion
@@ -69,16 +69,39 @@ from harness.adapters.gitad import (LiveGit, ReplayGit, classify_local_gate_deni
                                     is_stale_base, is_stale_lease)
 from harness.adapters.llm import ClaudeCli, FixtureLlm, TOOLED_TIMEOUT
 from harness.adapters.probe import FixtureProbe, LiveProbe
-from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate
-
-_BADGE_FALLBACK = (
-    "<!-- postplan-status -->\n**post-plan is running**\n\n"
-    "Started outside `bin/post-plan-now`, so there is no launchd job to probe.\n"
-    "<!-- postplan-label:  -->\n"
-)
+from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate, fail_log_lines, timing_log_line, tracks_log_line
 
 # ── SIGTERM handler — abort any in-progress rebase before the process dies ───
 _active_git: "LiveGit | None" = None  # set once in run() for the isolated/live path
+_active_audit: "list[str] | None" = None  # the live run's audit list; read by the SIGTERM handler
+
+
+def _last_audit_phase(audit) -> str:
+    """The most recent `phaseN[.x]` token in the audit trail, or "start"."""
+    for line in reversed(list(audit or [])[-200:]):
+        m = re.search(r"\bphase\d+(?:\.\d+)?[a-z]?\b", line)
+        if m:
+            return m.group(0)
+    return "start"
+
+
+def _write_killed_line(signum: int) -> None:
+    """Append one `RESULT: post-plan KILLED` line to $POSTPLAN_LOG_PATH. stdout is only
+    flushed at exit, so without this a killed run leaves an empty log. One os.write on an
+    O_APPEND fd (no buffered file object); never raises."""
+    path = os.environ.get("POSTPLAN_LOG_PATH")
+    if not path:
+        return
+    try:
+        line = (f"RESULT: post-plan KILLED (signal {signum}) at "
+                f"{_last_audit_phase(_active_audit)}\n")
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(fd, line.encode())
+        finally:
+            os.close(fd)
+    except Exception:
+        pass
 
 
 def _install_sigterm_handler() -> None:
@@ -92,17 +115,22 @@ def _install_sigterm_handler() -> None:
                 git.emergency_abort()
             except Exception:
                 pass
+        _write_killed_line(signum)
         os._exit(128 + signum)
 
     signal.signal(signal.SIGTERM, _sigterm_handler)
 
 
-def _post_status_badge(gh, pr):
+def _post_status_label(gh, pr):
     if not pr:
         return
-    body = os.environ.get("POSTPLAN_BADGE_BODY") or _BADGE_FALLBACK
+    # Set only by bin/post-plan-now; runs outside it never mark the PR, so nothing
+    # is left orphaned when no wrapper exists to remove the label.
+    label = os.environ.get("POSTPLAN_STATUS_LABEL")
+    if not label:
+        return
     try:
-        gh.pr_status_badge(pr, body)
+        gh.pr_status_label(pr, label)
     except Exception:
         pass
 
@@ -145,76 +173,22 @@ def _recheck_manual_rows(llm, probe, plan, cls, log, res) -> list:
     return surviving
 
 
-def _discharge_hold_sentences(llm, probe, justification: str, log) -> tuple[str, list]:
-    """Split a hold justification into (residual_text, discharged).
+_rebase_cause_runners = rebase_cause.live_runners   # tests monkeypatch this to inject a fake gh
 
-    residual_text: str  — the **Decision:** block plus every sentence the
-                          classifier returned as `decision`; equal to the full
-                          input when any fallback fires.
-    discharged:    list — dicts {"text", "category", "probe"|None, "rationale"}
-                          for non-decision sentences.
 
-    Fallback to (justification, []) on: empty input, exception, schema
-    rejection, empty residual from non-empty input.  A decision-only section
-    (no candidate lines) also returns (justification, []) without calling the
-    LLM — the token cost guard this design exists to enforce.
-    """
-    text = (justification or "").strip()
-    if not text:
-        return (justification or ""), []
-
-    decision_block, candidate_lines = split_hold_justification(justification)
-
-    if not candidate_lines:
-        # Decision-only section — skip the LLM call entirely.
-        return justification, []
-
+def _classify_rebase_block(git, head_sha, plain, onto, reason) -> str:
+    """Render the cause of a declined rebase. Never raises; never changes the exit code."""
     try:
-        items = llm.call(
-            "hold-discharge", "sonnet",
-            llm_calls.hold_discharge_prompt(candidate_lines),
-            schemas.validate_hold_discharge,
-        )
-    except Exception as exc:  # noqa: BLE001
-        log(f"phase6 hold-discharge: LLM call failed ({exc!r}) — keeping full justification")
-        return justification, []
-
-    # Build residual: Decision-exempt block + classifier-returned `decision` lines.
-    residual_parts: list[str] = []
-    if decision_block:
-        residual_parts.append(decision_block)
-    discharged: list[dict] = []
-    by_n: dict[int, list] = {}
-    for item in items:
-        by_n.setdefault(item["n"], []).append(item)
-
-    for idx, line in enumerate(candidate_lines, 1):
-        matches = by_n.get(idx, [])
-        if not matches:
-            # Missing entry — count mismatch; fall back.
-            log(f"phase6 hold-discharge: no item for sentence {idx} — keeping full justification")
-            return justification, []
-        for item in matches:
-            if item["category"] == "decision":
-                residual_parts.append(line)
-            else:
-                discharged.append({
-                    "text": line,
-                    "category": item["category"],
-                    "probe": item.get("probe"),
-                    "rationale": item.get("rationale"),
-                })
-
-    residual = "\n".join(residual_parts) if residual_parts else ""
-
-    # Safety: never produce empty residual from non-empty input — that would
-    # cause upsert_manual_confirmation to REMOVE the hold notice from a PR that
-    # is still held.
-    if not residual.strip() and text:
-        log("phase6 hold-discharge: empty residual from non-empty input — keeping full justification")
-        return justification, []
-
-    return residual, discharged
+        worktree = getattr(git, "worktree", "") or os.getcwd()
+        run_git, run_gh = _rebase_cause_runners(worktree)
+        cause = rebase_cause.classify_rebase_block(
+            tuple(plain) or tuple(onto), reason, head_sha=head_sha,
+            branch=git.branch(), run_git=run_git, run_gh=run_gh)
+    except Exception as exc:  # the classifier is advisory; the block must still raise
+        cause = rebase_cause.RebaseBlockCause(
+            rebase_cause.CAUSE_UNKNOWN, tuple(plain) or tuple(onto),
+            note=f"classifier error: {type(exc).__name__}")
+    return cause.render()
 
 
 def _record_failure_context(res: RunResult, e: HarnessError) -> None:
@@ -277,6 +251,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         global _active_git
         _active_git = git
         slug = git.branch()
+        # Once per run, before the first rebase: clear a stale auto-resolved list from a
+        # previous run of this branch. Per-rebase purges must not touch it (BEHIND retries).
+        from harness.conflict import purge_autoresolved_list
+        purge_autoresolved_list(slug.replace("/", "-"))
         gh = LiveGh(out_dir, worktree, slug) if live else RecordingGh(out_dir)
         gh = usage_pause.dedupe_on_resume(gh, worktree, out_dir)   # ADR-0143 addendum: no double post on resume
         verifier = LiveVerify(worktree)
@@ -286,6 +264,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 
     res = RunResult(terminal=TerminalState.FAILED, slug=slug, plan=plan,
                     ledger=ledger, audit=audit)
+    global _active_audit
+    _active_audit = audit
     state = statefile.StateFile(os.path.join(_state_dir(out_dir, live, state_dir), statefile.safe_slug(slug) + ".json"), slug, git, out_dir, log)
     log(f"phase1 plan: found={plan.found} auto_merge_false={plan.auto_merge_false} "
         f"matrix={plan.has_matrix} critical_files={len(plan.critical_files)} "
@@ -358,7 +338,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             log(f"phase2: qualified {qualified} bare backlog ref(s) as {BACKLOG_REPO}#N")
         copy["commit_subject"] = schemas.coerce_commit_subject(copy["commit_subject"], cls)
         check, body_check_degraded = _body_check(
-            llm, git, gh, copy, copy_degraded, cls, log)
+            llm, git, gh, copy, copy_degraded, cls, log, worktree=worktree)
         if copy["summary_md"] and check.get("corrected_body"):
             copy["summary_md"] = check["corrected_body"]
             for f in check.get("findings", []):
@@ -374,7 +354,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pre_rebase = git.head()
             conflict_resolved = None
             try:
-                git.rebase_onto()  # pre-push policy: branch must sit on origin/master
+                git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); merge, never rebase
             except HarnessError as e:
                 if e.kind != "rebase-conflict":
                     raise
@@ -392,10 +372,16 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     log(f"phase2: conflict auto-resolution declined -- {conflict_resolved.reason}")
                     onto_conflicted = getattr(git, "last_conflict_files", ())
                     log(f"phase2: conflicted paths (--onto) = {', '.join(onto_conflicted) or '-'}")
-                    raise HarnessError(
+                    block_cause = _classify_rebase_block(
+                        git, pre_rebase, plain_conflicted, onto_conflicted,
+                        conflict_resolved.reason)
+                    log(f"phase2: rebase block {block_cause}")
+                    err = HarnessError(
                         "rebase-conflict",
                         f"{e.detail} | auto-resolve declined: {conflict_resolved.reason}",
-                    ) from e
+                    )
+                    err.block_cause = block_cause
+                    raise err from e
                 log("phase2: conflict auto-resolved via --onto "
                     f"{conflict_resolved.base_sha[:8]}; TREE-EQUIVALENT proved; "
                     f"manifest={conflict_resolved.manifest_path} "
@@ -410,10 +396,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 rebase_line = ("REBASE=conflict auto-resolved via --onto; TREE-EQUIVALENT; "
                                f"manifest={conflict_resolved.manifest_path}{auto_files}")
             else:
-                log("phase2: rebased onto origin/master")
+                log("phase2: merged origin/master")
                 # the skill's two success spellings, verbatim
                 rebase_line = ("REBASE=clean (HEAD already contains origin/master)"
-                               if sha == pre_rebase else "REBASE=rebased onto origin/master")
+                               if sha == pre_rebase else "REBASE=merged origin/master")
         res.meta_checks_ok = run_meta_checks_local(
             git, worktree or "", "origin/master", log, live=live,
             failures_out=res.meta_check_failures, llm=llm)
@@ -450,7 +436,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             if bg_ci is not None:
                 log(f"phase2: background CI watch started for {sha[:8]} "
                     f"-> {os.path.basename(bg_ci.path)}")
-        _post_status_badge(gh, pr)
+        _post_status_label(gh, pr)
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
 
         # ---- Phase 4: review + security (gated bounded calls) ---------
@@ -496,7 +482,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             # Unavailable" note, the terminal is DEGRADED, and arming is off — the title a
             # human must sanity-check was never model-reviewed.
             if copy_degraded:
-                degraded_agents = list(degraded_agents) + ["pr-copy"]
+                degraded_agents = list(degraded_agents) + [schemas.PR_COPY_PURPOSE]
             if body_check_degraded:
                 degraded_agents = list(degraded_agents) + ["body-check"]
             res.findings = findings
@@ -518,15 +504,18 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # ---- Phase 5 + 5.0: verify + conformance -----------------------
         tracks = verifier.run(cls)
         phase5 = aggregate(tracks)
-        unavailable = [t.name for t in tracks if t.status == "unavailable"]
+        timing = timing_log_line(tracks, getattr(verifier, "last_wall_seconds", None))
+        if timing:
+            log(timing)
         res.phase5 = phase5
-        log("phase5 tracks: " + ", ".join(f"{t.name}={t.status}" for t in tracks)
-            + f" -> PHASE5_VERIFY_STATUS={phase5}"
-            + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
+        log(tracks_log_line(tracks, phase5))
+        for line in fail_log_lines(tracks):
+            log(line)
         resolutions: dict[str, str] = {}
         unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                        resolutions=resolutions,
-                                       pr_body=gh.pr_body() or meta.get("body", ""))
+                                       pr_body=gh.pr_body() or meta.get("body", ""),
+                                       read_file=git.read_worktree_file)
         res.unresolved_conformance = unresolved
         _write_conformance_handoff(out_dir, unresolved)
         log(f"phase5.0 conformance: {unresolved or 'clean'}"
@@ -578,20 +567,12 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 log(f"phase6 (plan-blind): {len(manual)} truly-manual steps -> {clearance}")
         else:
             log(f"phase6: PR body already carries clearance state {clearance}")
-        # Hold justification: split into residual (decisions) + discharged
-        # (automatable sentences).  Residual goes to manual_confirmation, which is
-        # positioned by upsert_manual_confirmation ahead of `## Manual Testing` —
-        # appending it after would truncate manual_testing_clearance's scan window.
-        # Discharged sentences get a separate `## Reviewer verification` block
-        # positioned after Manual Testing.  Order of the three upserts is load-
-        # bearing: manual_confirmation first, reviewer_verification second,
-        # files_changed, tests_changed, then gate_backtest; exactly one pr_edit_body call.
-        residual, discharged = _discharge_hold_sentences(
-            llm, probe, plan.hold_justification, log)
-        body = upsert_manual_confirmation(
-            body, render_manual_confirmation(residual))
-        body = upsert_reviewer_verification(
-            body, render_reviewer_verification(discharged))
+        # Hold notice: carries only the plan's Decision paragraph(s) and is
+        # positioned ahead of `## Manual Testing` — appending it after would
+        # truncate manual_testing_clearance's scan window. The order of upserts
+        # that follows (files_changed, tests_changed, gate_backtest) and the
+        # single pr_edit_body call are unchanged.
+        body = upsert_hold_notice(body, plan.hold_justification)
         # files-changed block is machine-generated: refresh it on every run so the
         # PR body's scope can't silently drift from the actual diff.
         body = upsert_files_changed(body, render_files_changed(diff))
@@ -634,7 +615,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             resolutions = {}
             unresolved = conformance.check(plan, conf_files, diff, phase5_status=phase5,
                                            resolutions=resolutions,
-                                           pr_body=gh.pr_body() or body)
+                                           pr_body=gh.pr_body() or body,
+                                           read_file=git.read_worktree_file)
             res.unresolved_conformance = unresolved
             _write_conformance_handoff(out_dir, unresolved)
             log(f"phase5.0 conformance (post-remediation): {unresolved or 'clean'}"
@@ -900,11 +882,20 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # ---- Phase 10: preview environment ------------------------------
         log("phase10: preview environment skipped — headless harness")
     except HarnessError as e:
-        res.terminal = TerminalState.FAILED
-        res.error = f"{e.kind}: {e.detail}"
-        res.error_kind = e.kind
-        _record_failure_context(res, e)
-        log(f"FAILED: {res.error}")
+        merged = _already_shipped(e, git, gh, log)
+        if merged is not None:
+            res.terminal = TerminalState.ALREADY_SHIPPED
+            res.pr_number = int(merged["number"])
+            res.final_pr_state = "MERGED"
+            log(f"already-shipped: diff vs origin/master is empty and PR "
+                f"#{res.pr_number} is MERGED; suppressing {e.kind} ({(e.detail or '')[:120]})")
+        else:
+            res.terminal = TerminalState.FAILED
+            res.error = f"{e.kind}: {e.detail}"
+            res.error_kind = e.kind
+            res.block_cause = getattr(e, "block_cause", None)
+            _record_failure_context(res, e)
+            log(f"FAILED: {res.error}")
     except usage_pause.UsagePause as p:
         res.terminal = TerminalState.FAILED
         res.error_kind = "usage-pause-dirty" if p.dirty else "usage-pause"
@@ -1015,6 +1006,29 @@ def _retry_key(branch: str, attempt: int) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "-", f"postplan-{branch}-r{attempt}")
 
 
+# Failure shapes that mean "the branch diff vs origin/master is empty". On their own they
+# are lost work; with the branch's PR already MERGED they are a finished run.
+_EMPTY_DIFF_MARKERS = ("diff vs origin/master is empty", "nothing was compared",
+                       "No commits between")
+
+
+def _already_shipped(e: HarnessError, git, gh, log) -> dict | None:
+    """{"number", "url"} of the merged PR when `e` is an empty-diff failure on a branch
+    whose PR already merged, else None. Never relaxes the proof for a non-empty diff:
+    the live diff vs origin/master must itself be empty, and a merged PR must exist."""
+    if e.kind not in ("lostwork-unproved", "gh"):
+        return None
+    if not any(m in (e.detail or "") for m in _EMPTY_DIFF_MARKERS):
+        return None
+    try:
+        if git.diff_vs_base("origin/master").strip():
+            return None
+        return gh.merged_pr()
+    except Exception as exc:  # noqa: BLE001 - unknown means keep the original failure
+        log(f"already-shipped: probe failed ({exc!r}); keeping {e.kind}")
+        return None
+
+
 def _refresh_and_reprove(git, log, phase: str, attempt: int) -> None:
     """Fetch remote tip, rebase, and re-prove no work was lost. Never pushes."""
     key = _retry_key(git.branch(), attempt)
@@ -1028,6 +1042,57 @@ def _refresh_and_reprove(git, log, phase: str, attempt: int) -> None:
         raise HarnessError("lostwork-unproved",
                            f"{phase}: lost-work proof failed after re-rebase {attempt}: {evidence}")
     log(f"{phase}: re-rebase {attempt} TREE-EQUIVALENT at {git.head()[:8]}")
+
+
+def _lease_snapshot(git, *, run_git=None):
+    """(remote, branch, lease, pre_rebase_head) for a LiveGit push, else None.
+    Must be taken BEFORE _refresh_and_reprove rewrites HEAD."""
+    if not isinstance(git, LiveGit) or not git.push_remote:
+        return None
+    branch = git.branch()
+    lease = gitutil.tracking_sha(branch, git.worktree, run_git=run_git,
+                                 remote=git.push_remote)
+    return git.push_remote, branch, lease, git.head()
+
+
+def _reclaim_stale_lease(git, log, phase: str, snap, *, run_git=None) -> None:
+    """Stale lease: refs/remotes/<remote>/<branch> no longer matches the remote.
+    Probe the live tip and adopt it as the lease only when it carries no work this
+    worktree lacks; otherwise fail closed. Runs AFTER _refresh_and_reprove so the
+    ownership arms read a fresh origin/master. Never pushes."""
+    remote, branch, lease, pre_head = snap
+    ok, tip = gitutil.probe_remote_tip(remote, branch, git.worktree, run_git=run_git)
+    if not ok:
+        log(f"{phase}: could not probe {remote}/{branch}; keeping lease "
+            f"{lease[:8] or 'none'}")
+        return
+    if tip == lease:
+        log(f"{phase}: {remote}/{branch} still at lease {lease[:8] or 'none'}; "
+            "rejection was not remote movement")
+        return
+    if not tip:
+        _fail_closed_on_divergence(
+            None, log, None, phase,
+            f"{remote}/{branch} was deleted (lease {lease[:8]}); refusing to recreate it",
+            disarm=False)
+    why = gitutil.owned_remote_tip(lease, pre_head, tip, git.worktree, run_git=run_git)
+    if not why:
+        # the ownership helpers' `git fetch origin` may have moved the tracking ref to
+        # the foreign tip; put it back before failing closed
+        gitutil.restore_tracking_ref(remote, branch, lease, git.worktree, run_git=run_git)
+        _fail_closed_on_divergence(
+            None, log, None, phase,
+            f"remote head {tip[:8]} diverged from lease {lease[:8] or 'none'} and "
+            f"local {pre_head[:8]} with different content; refusing to push over it",
+            disarm=False)
+    # the ownership helpers' fetch may already have moved the tracking ref to tip
+    cur = gitutil.tracking_sha(branch, git.worktree, run_git=run_git, remote=remote)
+    if cur != tip and not gitutil.adopt_tracking_ref(remote, branch, tip, cur,
+                                                     git.worktree, run_git=run_git):
+        log(f"{phase}: refs/remotes/{remote}/{branch} moved during adopt; keeping lease")
+        return
+    log(f"{phase}: {remote}/{branch} moved {lease[:8] or 'none'} -> {tip[:8]} "
+        f"({why}); lease refreshed")
 
 
 def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out_dir,
@@ -1067,6 +1132,10 @@ def _push_with_lease_retry(git, log, phase: str, *, pr=None, worktree=None,
                            gh_cmd=None, run_git=None) -> str:
     """Push with bounded stale-lease / stale-base retry. Returns pushed HEAD sha, or ""
     when disabled. Raises HarnessError("push-retry-cap") once the cap is spent.
+    A stale lease on a LiveGit push also probes the branch's own remote tip after the
+    re-rebase: an owned tip (tree-equivalent or patch-series-equivalent to HEAD, or
+    equivalent to / an update-branch merge onto the old lease) becomes the new lease; a
+    foreign or deleted tip raises remote-head-diverged without pushing.
 
     Two rejections get the same fetch + clean-rebase + lost-work-proof recovery: a
     stale lease (origin/<branch> moved) and a stale base (bin/pre-push-adr-hook refusing
@@ -1106,7 +1175,11 @@ def _push_with_lease_retry(git, log, phase: str, *, pr=None, worktree=None,
                     f"{(e.detail or '')[:300]}")
             log(f"{phase}: {why} (attempt {attempt}/{_MAX_PUSH_RETRIES}) — "
                 "refetch, re-rebase, re-prove")
+            snap = (_lease_snapshot(git, run_git=run_git)
+                    if why == "stale lease" else None)
             _refresh_and_reprove(git, log, phase, attempt)
+            if snap is not None:
+                _reclaim_stale_lease(git, log, phase, snap, run_git=run_git)
     return ""  # unreachable
 
 
@@ -1226,8 +1299,11 @@ def _reconcile_before_arm(git, log, gh, worktree, pr, sha, bg_ci, out_dir, *,
 
 
 def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
-    """Bounded BEHIND resolution. Returns (sha, outcome). Sets res.retry_cap and
-    disarms auto-merge when the cap is spent."""
+    """Bounded BEHIND resolution. Returns (sha, outcome). When the cap is spent
+    and the branch is still BEHIND, auto-merge stays armed and the PR is handed
+    to .github/workflows/update-behind-prs.yml (ADR-0081); retry_cap is never
+    set here. Divergence inside the loop still disarms (see the disarm=True
+    call sites below)."""
     strict = gh.branch_protection_strict()
     for attempt in range(1, _MAX_BEHIND_RETRIES + 1):
         mss = gh.merge_state_status(pr)
@@ -1264,10 +1340,9 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
         if outcome.exit_code != 0:
             return sha, outcome
     if gh.merge_state_status(pr) == "BEHIND":
-        res.retry_cap = "behind-retry-cap"
         log(f"phase7: BEHIND cap hit after {_MAX_BEHIND_RETRIES} re-rebases — "
-            "disarming auto-merge")
-        gh.pr_disable_auto_merge(pr)
+            "leaving auto-merge armed; .github/workflows/update-behind-prs.yml "
+            "(ADR-0081) carries the PR to merge")
     return sha, outcome
 
 
@@ -1279,9 +1354,10 @@ _CI_FIX_REWATCH_FLOOR_SECS = 300   # less than this after a push: record the hea
 
 
 def _phase7_stop(log, trail: list[str], attempt: int, sha, stage: str,
-                 e: HarnessError) -> str:
+                 e: HarnessError, local_sha=None) -> str:
     """Log and record a Phase 7 attempt that stopped on an error. `stage` is
-    "llm", "commit" or "push". Returns the `last` outcome token."""
+    "llm", "commit" or "push". `local_sha` is the local ci-fix commit, named in
+    the unpushed-commit line. Returns the `last` outcome token."""
     last = f"error:{e.kind}"
     tail = " | ".join(_error_tail(e.output or e.detail))
     log(f"phase7 ci-fix attempt {attempt}: model={cifix.CI_FIX_MODEL_ID} "
@@ -1290,7 +1366,8 @@ def _phase7_stop(log, trail: list[str], attempt: int, sha, stage: str,
     trail.append(f"attempt {attempt}: {last} ({stage}-time): {tail or 'no output captured'}")
     if stage in ("commit", "push"):
         log("ci-fix commit is LOCAL and unpushed; "
-            "the next bin/post-plan-now run ships it")
+            "the next bin/post-plan-now run ships it"
+            + (f" ({str(local_sha)[:12]})" if local_sha else ""))
     return last
 
 
@@ -1527,9 +1604,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 log(f"phase7 ci-fix: body proposal refused ({verdict.reason})")
                 refused.append((attempt, verdict.reason, proposal or ""))
             elif verdict.action == "apply":
-                baseline = cifix.failed_job_refs(
-                    gh.pr_checks_json(pr), [cifix_ship.META_CHECK_NAME]
-                ).get(cifix_ship.META_CHECK_NAME, (None, None))[0]
+                baseline = cifix_ship.meta_run_id(gh.pr_checks_json(pr))
                 gh.pr_edit_body(pr, verdict.body)
                 body_applied = True
                 log("phase7 ci-fix: body proposal applied")
@@ -1575,7 +1650,8 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 except HarnessError as push_err:
                     if push_err.kind == "remote-head-diverged":
                         raise
-                    last = _phase7_stop(log, trail, attempt, sha, "push", push_err)
+                    last = _phase7_stop(log, trail, attempt, sha, "push", push_err,
+                                         local_sha=new)
                     break
                 if sha != pre_push_head:
                     log(f"phase7 ci-fix: push caught up to origin/master; "
@@ -1758,7 +1834,7 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     else:
         plan_excerpt = ""
     try:
-        copy = llm.call("pr-copy", "sonnet",
+        copy = llm.call(schemas.PR_COPY_PURPOSE, "sonnet",
                         llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt),
                         schemas.validate_pr_copy,
                         normalizer=schemas.normalize_pr_copy)
@@ -1876,13 +1952,15 @@ def _inject_scope_notes(copy: dict, plan, files: list[str], diff_body: str, pr_b
     return notes
 
 
-def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool]:
+def _body_check(llm, git, gh, copy, copy_degraded, cls, log, worktree=None) -> tuple[dict, bool]:
     """Phase 2 body-vs-diff verification: (result, body_check_degraded).
 
     Returns ({}, False) without calling the LLM when pr-copy was degraded (the
     fallback body is a one-line stub with nothing to reconcile) or when the subject
     text resolves to empty.  On a degraded model reply, returns the mechanically-
-    corrected body so number corrections survive the model failure.
+    corrected body so number corrections survive the model failure.  Test-count
+    mismatches are annotated in the returned corrected_body and appended to
+    findings on both the LLM and degraded paths.
     """
     if copy_degraded:
         log("phase2: body-check skipped (pr-copy degraded)")
@@ -1907,6 +1985,7 @@ def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool
         log("phase2: body-check corrected numbers mechanically")
 
     # LLM pass
+    degraded = False
     try:
         result = llm.call(
             "body-check", "sonnet",
@@ -1914,12 +1993,24 @@ def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool
                 body_numbers.body_prose_for_check(mechanically_corrected), ns),
             schemas.validate_body_check)
         log(f"phase2: body-check findings: {len(result.get('findings', []))}")
-        return result, False
     except HarnessError as e:
         if e.kind not in ("llm-invalid-output", "llm-fixture-missing"):
             raise
         log(f"phase2: body-check DEGRADED ({(e.detail or '')[:200]})")
-        return {"corrected_body": mechanically_corrected, "findings": []}, True
+        result = {"corrected_body": mechanically_corrected, "findings": []}
+        degraded = True
+
+    # Test-count pass: mechanical, after the LLM so its rewrite cannot drop the note
+    read_file = (None if worktree is None
+                 else (lambda p: body_numbers.read_worktree_file(worktree, p)))
+    annotated, tc_findings = body_numbers.annotate_test_count_mismatches(
+        result.get("corrected_body", ""), diff, read_file)
+    if tc_findings:
+        result = {**result, "corrected_body": annotated,
+                  "findings": list(result.get("findings", [])) + tc_findings}
+        for f in tc_findings:
+            log(f"phase2: body-check {f}")
+    return result, degraded
 
 
 def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True,
@@ -2713,8 +2804,10 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
             n += 1
             lines.append(f"  {n}. {s}")
         lines += [f"  {n + 1}. bin/post-plan-now", "",
-                  "Or open Claude in that folder and ask it to fix the ship block.",
-                  f"Log: {log}"]
+                  "Or open Claude in that folder and ask it to fix the ship block."]
+        if res.error_kind == "rebase-conflict" and res.block_cause:
+            lines.append("Cause: " + " ".join(res.block_cause.split()))
+        lines.append(f"Log: {log}")
         return "\n".join(lines)
 
     block = render(_BLOCK_MAX_PATHS, True)
@@ -2795,6 +2888,22 @@ def _hold_repeat_note(res: RunResult) -> str:
     return f" hold-repeat={hr.get('repeat_count')}x ({nums}) dm={hr.get('dm')}"
 
 
+HOLD_REASONS_CAP = 300
+
+
+def _hold_reasons_note(res: RunResult) -> str:
+    """Display-only RESULT-line suffix ` hold=(7) reason; (8) reason` for a held run.
+    Same text as the audit.log `phase6.5: HELD` line, flattened, redacted, capped."""
+    arm = res.arm
+    if arm is None or arm.armed or not arm.holds:
+        return ""
+    text = "; ".join(f"({c.number}) {c.reason or c.name}" for c in arm.holds)
+    text = " ".join(_redact(text).split())
+    if len(text) > HOLD_REASONS_CAP:
+        text = text[:HOLD_REASONS_CAP - 1] + "…"
+    return f" hold={text}"
+
+
 def _prose_hold_note(res: RunResult) -> str:
     """Display-only RESULT-line suffix naming the prose check as a hold cause.
 
@@ -2843,9 +2952,11 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             # file master edited and the branch deleted, too), so "stacked" would mislead.
             detail = _flat(res.error)
             detail = f" {detail}" if detail else ""
+            cause = _flat(res.block_cause or "")
+            cause = f" Cause: {cause}." if cause else ""
             return ("RESULT: post-plan BLOCKED — rebase conflict, "
                     "human required; ERROR terminal=failed, no PR opened."
-                    f"{detail} Resolve the rebase, then re-run bin/post-plan-now.")
+                    f"{detail}{cause} Resolve the rebase, then re-run bin/post-plan-now.")
         if res.error_kind == "local-gate":
             tail = " ".join(_error_tail(res.error_output_tail or res.error)) or "see gate output"
             cmd = _cmd_text(res.error_cmd)
@@ -2916,6 +3027,9 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
         return (f"RESULT: post-plan FAILED — ERROR terminal=failed "
                 f"kind={res.error_kind or 'unknown'}: "
                 f"{_flat(res.error) or 'no detail'}{pr}")
+    if res.terminal == TerminalState.ALREADY_SHIPPED:
+        return (f"RESULT: post-plan complete — terminal=already-shipped{pr} "
+                "(PR already merged; branch diff vs master is empty); no action needed.")
     if res.terminal == TerminalState.NOTHING_TO_SHIP:
         return ("RESULT: post-plan complete — nothing to ship "
                 "(clean tree, empty diff vs master); no PR opened.")
@@ -2935,14 +3049,11 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                 tail += f" auto-resolved conflict in {', '.join(files)}"
         except OSError:
             pass
-    if res.retry_cap == "behind-retry-cap":
-        return ("RESULT: post-plan BLOCKED — BEHIND retry cap reached (branch still "
-                "behind master after 3 re-rebases); auto-merge disarmed, human "
-                f"merges{pr}{tail} findings={len(res.findings)}")
     tail += _prose_hold_note(res)
     tail += _hold_repeat_note(res)
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
-            f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}")
+            f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}"
+            f"{_hold_reasons_note(res)}")
 
 
 def _settle_pause_marker(res: RunResult, rc: int) -> int:
@@ -3010,8 +3121,8 @@ def main() -> int:
     rc = _settle_pause_marker(res, rc)
     if rc != PAUSE_EXIT:
         usage_pause.ledger_clear()
-    # First line, so `head -1 <log>` is the whole verdict and bin/watch-run can
-    # terminate on it without waiting for the launchd label to disappear.
+    # First harness line (the launcher may write a `started` line above it), so
+    # bin/watch-run can terminate on it without waiting for the launchd label to disappear.
     print(verdict_line(res, rc, _pull_url_base(args.worktree)))
     write_blocked_ship(args.out, res, rc, args.worktree)
     print(f"terminal={res.terminal.value} phase5={res.phase5} "

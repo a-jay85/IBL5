@@ -1,5 +1,5 @@
 ---
-description: On a visual-change PR, the visual-regression run builds a change-driven before/after gallery (rows whose render differs from master's committed baseline) and posts a sticky visual-review PR comment grouped by module, with a "changed but NOT covered" coverage-gap section.
+description: On a visual-change PR, the visual-regression run builds a change-driven before/after gallery (rows whose render differs from master's committed baseline) and posts a sticky visual-review PR comment grouped by module, with a "changed but NOT covered" coverage-gap section. A daily and on-demand refresh workflow republishes stale galleries, and retention cleanup keeps every gallery dir an open PR links to.
 paths:
   - ".github/workflows/e2e-tests.yml"
   - ".github/workflows/pages-deploy.yml"
@@ -14,7 +14,7 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-09-14
+last_verified: 2026-10-07
 ---
 
 # Visual-review PRs
@@ -72,6 +72,21 @@ A `vr-pages-cleanup` job (push-to-master only, not part of the required gate) pr
 per-SHA gallery dirs whose newest commit is older than 7 days. Its `gh-pages` push carries the same
 rebase-and-retry loop for the same ref contention. A prune reaches the served site when
 `pages-deploy.yml` next re-publishes the tree (the cleanup job dispatches `pages-deploy.yml` itself once its prune push lands).
+It keeps every dir an open PR still links to. See [Refreshing stale galleries](#refreshing-stale-galleries).
+
+## Refreshing stale galleries
+
+`.github/workflows/vr-refresh.yml` republishes the gallery, both sticky comments, and the PR-body block for open visual PRs whose screenshots went stale. It calls the `Visual Regression` job of `e2e-tests.yml` through its `workflow_call` inputs.
+
+- **Daily schedule.** Refreshes each open visual PR whose linked gallery dir is older than 7 days. At most 10 PRs per sweep, 2 at a time.
+- **Manual dispatch.** `gh workflow run vr-refresh.yml -f pr=<N>` refreshes one PR. A blank `pr` refreshes every open visual PR, with the same cap. Add `-f dry_run=true` to list what would refresh and what cleanup would keep.
+- **Visual PR.** A PR whose `visual-review` sticky comment links a gallery. The banner-only comment links none and is never refreshed.
+- **Age.** The `gh-pages` commit time of the dir that comment links to. Every publish writes `refreshed-at.txt` into the dir, so a refresh always moves the age forward.
+- **Skipped PRs.** Forks, PRs labeled `update-baselines`, drafts (unless named by `pr`), PRs whose base is not `master`, and PRs behind `master`. A push republishes a behind PR anyway (ADR-0182 gives the reason).
+- **Publish key.** A refresh publishes under the PR head SHA and rewrites the links to it. A push to the PR still publishes under the test-merge SHA.
+- **Never a gate.** Every write runs on a master-ref event, so a refresh adds no check run to a PR head and a failed refresh leaves required checks alone. One sweep dispatches `pages-deploy.yml` once.
+- **Retention.** `vr-pages-cleanup` keeps every per-SHA dir that any open PR's comments or body link to, plus each open PR's head SHA, through both the 7-day age pass and the 300-dir cap. When the keep-list cannot be computed, that run prunes nothing.
+- **Pull-request dry-run.** A PR that edits the refresh workflow, `bin/vr-refresh-targets`, `ibl5/tests/e2e/vr-refresh.ts`, or `bin/prune-vr-galleries` runs the read-only `VR refresh select` job, which prints both lists.
 
 ## Reading the comment
 
@@ -116,6 +131,8 @@ Each cell is captured twice — render A (`.a.png`) and a reload render B (`.b.p
 whose reload `.b.png` is missing is likewise demoted to infra. See ADR-0073 for the
 infra-vs-pixel-diff labeling this reuses.
 
+A second, review-only strict pass (ADR-0180) runs after this triage. It uses per-pixel threshold `STRICT_PIXEL_THRESHOLD` (0.05) and an absolute floor `STRICT_MIN_CHANGED_PIXELS` (25), both in `ibl5/tests/e2e/vr-gallery.ts`. It can only upgrade an `unchanged` cell to `changed`, and only when the reload render exists and A and B agree under the strict threshold. It never creates a flake cell and never touches the VR check, whose 0.2 threshold and 0.005 ratio are unchanged. Rows that set `extraMaxDiffPixelRatio` skip it.
+
 ## New screens in the PR body
 
 In addition to the sticky comment, brand-new views (`gallery.newCells`) are published inline at the
@@ -145,7 +162,7 @@ comment markup lives in `ibl5/tests/e2e/vr-review-comment.ts` (`buildComment`). 
 unit-tested (`ibl5/tests/ts-unit/vr-gallery.test.ts`, `ibl5/tests/ts-unit/vr-coverage-map.test.ts`,
 `ibl5/tests/ts-unit/vr-review-comment.test.ts`, run via `bun run test:unit` from `ibl5/`). Per-row
 source overrides use the optional `sourceGlobs` field on `VrRow`. **Changing this selection logic is
-a mechanical-enforcement surface and requires an ADR** (current: ADR-0074). The PR-body new-screens
+a mechanical-enforcement surface and requires an ADR** (current: ADR-0074, amended by ADR-0180 for the review-only strict pass). The PR-body new-screens
 publishing surface (`--copy-new-screens`/`--update-pr-body` on `bin/vr-review-comment`,
 `ibl5/tests/e2e/vr-pr-body.ts`, `ibl5/tests/ts-unit/vr-pr-body.test.ts`) is likewise a
 mechanical-enforcement surface, covered by **ADR-0076**.

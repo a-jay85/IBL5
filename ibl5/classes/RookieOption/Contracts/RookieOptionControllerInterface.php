@@ -50,4 +50,19 @@ interface RookieOptionControllerInterface
      * - success=false: Validation or database error, includes error message
      */
     public function processRookieOption(string $teamName, int $playerID, int $extensionAmount, ?string $sessionTeam): array;
+
+    /**
+     * Run the rookie-option POST gates in order and return the PRG target.
+     *
+     * Gate order (do not reorder): $isUser -> $csrfValid -> $resolveUsername
+     * -> session-team lookup -> processRookieOption(). A failing gate never
+     * invokes a later one.
+     *
+     * @param \Closure(): bool $isUser Auth gate (is_user)
+     * @param \Closure(): bool $csrfValid CSRF gate (CsrfGuard 'rookie_option')
+     * @param \Closure(): string $resolveUsername cookiedecode() + current username
+     * @param array<array-key, mixed> $post Raw POST body
+     * @return string|null Redirect URL, or null when the caller must render loginbox()
+     */
+    public function handleSubmission(\Closure $isUser, \Closure $csrfValid, \Closure $resolveUsername, array $post): ?string;
 }

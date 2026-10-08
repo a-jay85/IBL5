@@ -567,6 +567,29 @@ def test_benign_body_proposal_applied_once_and_waits_fresh_meta_run(monkeypatch,
     assert _has(r.lines, "outcome=body-fixed")
 
 
+def test_body_baseline_is_newest_meta_run_when_older_entry_listed_last(monkeypatch, tmp_path):
+    proposed = _BODY.replace("Old summary paragraph.", "New, clearer summary paragraph.")
+    gh = CiFixGh(body=_BODY)
+    stale_order = [_meta(105, "FAILURE"), _meta(100, "FAILURE")]   # older run listed last
+    gh.checks = [[_meta(105, "FAILURE")],    # failed-job log refs
+                 stale_order,                # baseline before the edit
+                 stale_order,                # poll 1: only pre-edit runs
+                 [_meta(106, "SUCCESS")]]    # poll 2: the run the edit fired
+    seen = []
+    real_wait = cifix_ship.wait_for_fresh_meta_run
+
+    def spy(checks_fn, baseline, **kw):
+        seen.append(baseline)
+        return real_wait(checks_fn, baseline, **kw)
+
+    monkeypatch.setattr(cifix_ship, "wait_for_fresh_meta_run", spy)
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, ScriptedLlm([_write_proposal(proposed)]),
+             failed=[_META], commit=("",))
+    assert seen == ["105"]
+    assert r.out[1].exit_code == 0
+    assert _has(r.lines, "outcome=body-fixed")
+
+
 @pytest.mark.parametrize("proposed, reason", [
     (_BODY.replace("**no-adr:** tooling only", "<!-- no-adr: tooling only -->"),
      "refused (waiver change"),

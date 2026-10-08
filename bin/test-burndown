@@ -638,6 +638,86 @@ C48F_LEDGER="$(grep '^LEDGER:' <<< "$OUT" | tail -1 | sed 's/^LEDGER: //')"
     && ok "C48f: pair partner bare path in ledger" \
     || fail "C48f: pair partner bare path in ledger (got: $OUT)"
 
+# C50: unique-basename matching (backlog#1248).
+# bd_paths_probe_hook <hook> <body> — like bd_paths_probe, but evals <hook>
+# between bd_load_repo_files and bd_paths_for.
+bd_paths_probe_hook() (
+    eval "$(grep -E '^FILE_LINE_RE=' "$SCRIPT")"
+    # shellcheck source=/dev/null
+    . "$(dirname "$SCRIPT")/lib/burndown.sh"
+    BD_TMP="$(mktemp -d)"
+    trap 'rm -rf "$BD_TMP"' EXIT
+    # shellcheck disable=SC2034  # read by bd_load_repo_files
+    BD_GIT=git
+    # shellcheck disable=SC2034
+    BD_REPO_ROOT="$(cd "$(dirname "$SCRIPT")/.." && pwd)"
+    bd_load_repo_files
+    eval "$1"
+    bd_paths_for "$2"
+    # shellcheck disable=SC2154  # _bd_paths is set by bd_paths_for
+    printf '%s' "$_bd_paths"
+)
+TAB="$(printf '\t')"
+NL='
+'
+
+# Positive fixtures, token shapes taken from the open no-ref issues (C50d's class
+# name is from #995's title; its body is empty).
+[ "$(bd_paths_probe "Fix flaky \`PreseasonContinuityPipelineTest.php\` setup.")" \
+    = "ibl5/tests/DatabaseIntegration/UpdateAllTheThings/PreseasonContinuityPipelineTest.php" ] \
+    && ok "C50a: #1047 unique test basename maps" || fail "C50a: #1047 unique test basename maps"
+[ "$(bd_paths_probe "Reword work-triage.md and workflow-continuity.md.")" \
+    = ".claude/rules/work-triage.md${NL}.claude/rules/workflow-continuity.md" ] \
+    && ok "C50b: #1096 unique rule basenames map" || fail "C50b: #1096 unique rule basenames map"
+[ "$(bd_paths_probe "Touches armable.py, conflict.py, gitad.py and runner.py.")" \
+    = "tools/postplan-harness/harness/adapters/gitad.py${NL}tools/postplan-harness/harness/armable.py${NL}tools/postplan-harness/harness/conflict.py${NL}tools/postplan-harness/runner.py" ] \
+    && ok "C50c: #897 four unique .py basenames map" || fail "C50c: #897 four unique .py basenames map"
+[ "$(bd_paths_probe "VotingBallotView::render() drops the label.")" \
+    = "ibl5/classes/Voting/VotingBallotView.php" ] \
+    && ok "C50d: CamelCase class maps to exact .php only" \
+    || fail "C50d: CamelCase class maps to exact .php only"
+
+# Negative fixtures.
+[ -z "$(bd_paths_probe "Edit index.php, README.md and SKILL.md.")" ] \
+    && ok "C50e: duplicated basenames yield no path" || fail "C50e: duplicated basenames yield no path"
+# Fixture guard: only AnnouncementDispatcherInterface.php is tracked, never AnnouncementDispatcher.php.
+C50F_TRACKED="$(git -C "$(dirname "$SCRIPT")/.." ls-files)"
+grep -qxF "ibl5/classes/RecordHolders/Contracts/AnnouncementDispatcherInterface.php" <<< "$C50F_TRACKED" \
+    && ! grep -qE '(^|/)AnnouncementDispatcher\.php$' <<< "$C50F_TRACKED" \
+    && [ -z "$(bd_paths_probe "AnnouncementDispatcher and VotingBallotVie and backlog")" ] \
+    && ok "C50f: Interface-only, prefix and plain-word tokens yield no path" \
+    || fail "C50f: Interface-only, prefix and plain-word tokens yield no path"
+
+# Index is read, never rebuilt, by bd_paths_for.
+[ "$(bd_paths_probe_hook \
+    "printf 'ZzFakeOnly.php\tbin/fake/ZzFakeOnly.php\n' > \"\$BD_REPO_BASENAMES\"" \
+    "ZzFakeOnly")" = "bin/fake/ZzFakeOnly.php" ] \
+    && ok "C50g: bd_paths_for reads the prebuilt index" \
+    || fail "C50g: bd_paths_for reads the prebuilt index"
+bd_paths_probe_hook 'unset BD_REPO_BASENAMES' "armable.py" >/dev/null 2>&1; RC=$?
+[ "$RC" -eq 3 ] && ok "C50h: bd_paths_for dies 3 without the index" \
+    || fail "C50h: bd_paths_for dies 3 without the index (rc=$RC)"
+
+# awk index filter smoke: unique basename present, duplicated basenames absent.
+C50I_IDX="$(bd_paths_probe_hook 'cat "$BD_REPO_BASENAMES"; exit 0' "")"
+grep -qxF "armable.py${TAB}tools/postplan-harness/harness/armable.py" <<< "$C50I_IDX" \
+    && ! grep -qE "^(index\.php|README\.md|SKILL\.md)${TAB}" <<< "$C50I_IDX" \
+    && ok "C50i: awk index keeps unique, drops duplicated basenames" \
+    || fail "C50i: awk index keeps unique, drops duplicated basenames"
+
+# C50j: a bare basename creates overlap with a full path:line on the same file.
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"tweak armable.py","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"tools/postplan-harness/harness/armable.py:5 fix","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+grep -qE 'SKIP +#101 .*overlap with #100 on tools/postplan-harness/harness/armable.py' <<< "$OUT" \
+    && grep -qE 'PICK +#100' <<< "$OUT" \
+    && ok "C50j: basename overlap reaches the batch" \
+    || fail "C50j: basename overlap reaches the batch (got: $OUT)"
+
 # C48g / C48h: git ls-files failure and empty list die 3
 for kind in lsfail lsempty; do
     cat > "$T/git-$kind" <<STUB
@@ -836,6 +916,82 @@ C26_LAST=$(tail -1 <<< "$OUT")
 C26_FILES=$(ls "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json 2>/dev/null || true)
 [ -z "$C26_FILES" ] && ok "C26: no ledger file created" || fail "C26: no ledger file created"
 echo '[]' > "$T/fx/prs-open.json"
+
+# ── ES: empty-backlog sentinel (IBL5_BURNDOWN_EMPTY_SENTINEL) ─────────────────
+ES_DIR="$T/es"; mkdir -p "$ES_DIR"
+cat > "$T/fx/prs-open.json" <<'JSON'
+[{"number":901,"body":"IBL5-backlog#100 IBL5-backlog#101 IBL5-backlog#102 IBL5-backlog#103 IBL5-backlog#104 IBL5-backlog#105"}]
+JSON
+cp "$T/fx/issues.json" "$ES_DIR/issues.json.orig"
+es_reset() { rm -f "$ES_DIR"/empty-*; }
+
+# ES1: var set, first round, empty
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL="$ES_DIR/empty-1"; bd_b 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+[ "$RC" -eq 0 ] && ok "ES1: exits 0" || fail "ES1: exits 0 (got $RC)"
+[ "$ES_LAST" = "LEDGER: none" ] && ok "ES1: LEDGER: none" || fail "ES1: LEDGER: none (got $ES_LAST)"
+[ -f "$ES_DIR/empty-1" ] && ok "ES1: sentinel written" || fail "ES1: sentinel written"
+ES_BODY=$(cat "$ES_DIR/empty-1" 2>/dev/null || true)
+[ "$ES_BODY" = "LEDGER: none" ] && ok "ES1: sentinel content" || fail "ES1: sentinel content (got $ES_BODY)"
+
+# ES2: var unset is a no-op
+es_reset
+OUT="$(unset IBL5_BURNDOWN_EMPTY_SENTINEL; bd_b 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+ES_FILES=$(ls "$ES_DIR"/empty-* 2>/dev/null || true)
+[ "$RC" -eq 0 ] && ok "ES2: unset exits 0" || fail "ES2: unset exits 0 (got $RC)"
+[ "$ES_LAST" = "LEDGER: none" ] && ok "ES2: unset LEDGER: none" || fail "ES2: unset LEDGER: none (got $ES_LAST)"
+[ -z "$ES_FILES" ] && ok "ES2: unset writes no file" || fail "ES2: unset writes no file"
+[[ "$OUT" != *"cannot write empty sentinel"* ]] \
+    && ok "ES2: unset prints no warning" || fail "ES2: unset prints no warning"
+
+# ES3: var set to the empty string is a no-op
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL=""; bd_b 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+ES_FILES=$(ls "$ES_DIR"/empty-* 2>/dev/null || true)
+[ "$RC" -eq 0 ] && ok "ES3: empty var exits 0" || fail "ES3: empty var exits 0 (got $RC)"
+[ "$ES_LAST" = "LEDGER: none" ] && ok "ES3: empty var LEDGER: none" || fail "ES3: empty var LEDGER: none (got $ES_LAST)"
+[ -z "$ES_FILES" ] && ok "ES3: empty var writes no file" || fail "ES3: empty var writes no file"
+[[ "$OUT" != *"cannot write empty sentinel"* ]] \
+    && ok "ES3: empty var prints no warning" || fail "ES3: empty var prints no warning"
+
+# ES4: --after round that is empty writes no sentinel
+cat > "$ES_DIR/after.json" <<'JSON'
+{
+  "schema": 1,
+  "items": [
+    {"issue_num":60,"also_closes":[],"issue_title":"XHIGH a sixty","rank":"P2","tier":"xhigh","cost":2,"paths":["bin/aa"],"route":"","slug":"","pr_url":"","status":"merged"}
+  ],
+  "skipped": [],
+  "units_used": 2,
+  "budget": 5
+}
+JSON
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL="$ES_DIR/empty-4"; bd_b --after "$ES_DIR/after.json" 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+[ "$RC" -eq 0 ] && ok "ES4: --after exits 0" || fail "ES4: --after exits 0 (got $RC)"
+[ "$ES_LAST" = "LEDGER: none" ] && ok "ES4: --after LEDGER: none" || fail "ES4: --after LEDGER: none (got $ES_LAST)"
+[ ! -e "$ES_DIR/empty-4" ] && ok "ES4: --after writes no sentinel" || fail "ES4: --after writes no sentinel"
+
+# ES5: live-unknown first round writes no sentinel
+jq '(.[0].labels) = [{"name":"blocked"}]' "$ES_DIR/issues.json.orig" > "$T/fx/issues.json"
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL="$ES_DIR/empty-5" GH_FAIL_ON="--json comments"; bd_b 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "ES5: live-unknown exits 1" || fail "ES5: live-unknown exits 1 (got $RC)"
+want "ES5: live-unknown prints LEDGER: none" "$OUT" "LEDGER: none"
+[ ! -e "$ES_DIR/empty-5" ] && ok "ES5: live-unknown writes no sentinel" || fail "ES5: live-unknown writes no sentinel"
+cp "$ES_DIR/issues.json.orig" "$T/fx/issues.json"
+
+# ES6: a round that selects work writes no sentinel
+echo '[]' > "$T/fx/prs-open.json"
+OUT="$(export IBL5_BURNDOWN_EMPTY_SENTINEL="$ES_DIR/empty-6"; bd_b 2>&1)"; RC=$?
+ES_LAST=$(tail -1 <<< "$OUT")
+[ "$RC" -eq 0 ] && ok "ES6: picks exit 0" || fail "ES6: picks exit 0 (got $RC)"
+[[ "$ES_LAST" == "LEDGER: /"* ]] && ok "ES6: LEDGER path printed" || fail "ES6: LEDGER path printed (got $ES_LAST)"
+[ ! -e "$ES_DIR/empty-6" ] && ok "ES6: picks write no sentinel" || fail "ES6: picks write no sentinel"
+
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+echo '[]' > "$T/fx/prs-open.json"
+cp "$ES_DIR/issues.json.orig" "$T/fx/issues.json"
 
 # ── C27: record happy path ────────────────────────────────────────────────────
 # Create ledger directly (4 items: #60 cost=2, #61-#62-#64 cost=1 each; units_used=5)
@@ -1740,18 +1896,22 @@ l12_case() {
     : > "$T/lbl/gh.log"
     local out rc n
     out="$(bdl burndown-record "$L" "$@" 2>&1)"; rc=$?
+    L12_OUT="$out"
     n="$(grep -c 'issue comment' "$T/lbl/gh.log")"
     [ "$rc" -eq 0 ] && [ "$n" -eq "$want_n" ] && ok "L12: $label" || fail "L12: $label (rc=$rc comments=$n want=$want_n: $out)"
 }
 printf '%s' '{"comments":[{"body":"x\n\n<!-- burndown-blocked-by: 77 -->"}]}' > "$T/lbl/fx/issue-42-comments.json"
 l12_case "same PR marker posts nothing" 0 42 status=skipped reason=blocked blocked_by=77
+want "L12: same PR marker posts nothing: stdout says comment already present" "$L12_OUT" "(comment already present)"
 l12_case "different PR posts one" 1 42 status=skipped reason=blocked blocked_by=78
 printf '%s' '{"comments":[{"body":"<!-- burndown-blocked-by: 78 -->"},{"body":"<!-- burndown-blocked-by: 77 -->"}]}' > "$T/lbl/fx/issue-42-comments.json"
 l12_case "last marker wins (77)" 0 42 status=skipped reason=blocked blocked_by=77
+want "L12: last marker wins (77): stdout says comment already present" "$L12_OUT" "(comment already present)"
 l12_case "last marker wins (78 re-posts)" 1 42 status=skipped reason=blocked blocked_by=78
 rm -f "$T/lbl/fx/issue-42-comments.json"
 printf '%s' '{"comments":[{"body":"x\n\n<!-- burndown-out-of-repo -->"}]}' > "$T/lbl/fx/issue-43-comments.json"
 l12_case "out-of-repo marker posts nothing" 0 43 status=skipped reason=out-of-repo
+want "L12: out-of-repo marker posts nothing: stdout says comment already present" "$L12_OUT" "(comment already present)"
 rm -f "$T/lbl/fx/issue-43-comments.json"
 
 # ── L13: gh failures exit 3 and the ledger keeps its record ───────────────────

@@ -92,13 +92,13 @@ def test_shipped_held_is_not_armed():
 
 
 def test_held_other_condition_line_unchanged():
-    """Pin: a run held by condition (8) with no meta-check failures prints this exact line."""
+    """Pin: a run held by condition (8) with no meta-check failures prints this exact line (ending in the hold= reasons)."""
     r = _res(TerminalState.SHIPPED_HELD, pr_number=7, slug=_PIN_SLUG,
              arm=_held_arm(8))
     line = runner.verdict_line(r, 0)
     assert line == (
         "RESULT: post-plan complete — terminal=shipped-held "
-        "auto-merge=HELD (human merges) PR #7 findings=0"
+        "auto-merge=HELD (human merges) PR #7 findings=0 hold=(8) held"
     )
 
 
@@ -153,16 +153,6 @@ def test_prose_and_other_failure_note_once():
     line = runner.verdict_line(r, 0)
     assert line.count("held-by=prose-check") == 1
     assert "\n" not in line
-
-
-def test_behind_cap_line_unchanged_with_prose_failure():
-    kw = dict(pr_number=7, slug=_PIN_SLUG, arm=_held_arm(16),
-              retry_cap="behind-retry-cap")
-    with_fail = _res(TerminalState.SHIPPED_HELD, meta_check_failures=[_PROSE_FAIL], **kw)
-    without = _res(TerminalState.SHIPPED_HELD, **kw)
-    line = runner.verdict_line(with_fail, 0)
-    assert "held-by=" not in line
-    assert line == runner.verdict_line(without, 0)
 
 
 def test_nothing_to_ship_starts_with_result():
@@ -555,26 +545,6 @@ def test_autoresolved_files_surfaced_slashed_branch():
         assert "auto-resolved conflict in" in line
         assert "harness/conflict.py" in line
         assert "harness/adapters/gitad.py" in line
-        assert "\n" not in line
-    finally:
-        if os.path.exists(autoresolved_path):
-            os.unlink(autoresolved_path)
-
-
-def test_behind_retry_cap_line_carries_autoresolved_files():
-    """The BEHIND-cap BLOCKED line embeds `tail`, so an auto-resolved conflict must
-    still reach the operator on the blocked path — not only the complete path."""
-    slug = "behind-cap-autoresolved-test"
-    autoresolved_path = f"/tmp/postplan-conflict-files-{slug}-autoresolved.txt"
-    try:
-        with open(autoresolved_path, "w") as fh:
-            fh.write("harness/conflict.py\n")
-        r = _res(TerminalState.SHIPPED_HELD, pr_number=77, ci_outcome="green",
-                 retry_cap="behind-retry-cap", arm=_arm(False))
-        r.slug = slug
-        line = runner.verdict_line(r, 0)
-        assert "BEHIND retry cap reached" in line
-        assert "auto-resolved conflict in harness/conflict.py" in line
         assert "\n" not in line
     finally:
         if os.path.exists(autoresolved_path):

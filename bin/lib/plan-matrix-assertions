@@ -17,23 +17,27 @@
 #             $3 non-empty and unreadable
 #   no Verification Matrix header in the plan -> exit 0, no output
 #
-# Token classification (four arms, checked in order):
+# Token classification (five arms, checked in order):
 #   A single-word backtick token from the "What to verify" cell is evaluated as:
 #   1. present in a diff `+` line (excluding `+++` headers)  -> realised
 #   2. present in a diff context line (leading space or `-`)  -> pre-existing, skip
+#   2b. a `deleted file mode` header's path equals the token, ends with
+#       `/`+token, starts with token+`/`, or holds `/`+token+`/`  -> realised
+#       (a trailing `/` on the token is dropped first)
+#       (a deleted binary has no body lines; the header is the footprint;
+#       quoted-path headers are skipped fail-closed)
 #   3. present in a tracked file via `git grep -F`            -> pre-existing, skip
 #   4. otherwise                                               -> missing
 #   A row is flagged UNREALISED-ASSERTION when any qualifying token is missing.
 #   Qualifying tokens: single-word (no whitespace), no `...` or `<word>` spans,
-#   not already in a tracked file (arm 3 above — tokens found in the tree are
-#   pre-existing). A row with zero qualifying tokens is skipped entirely.
+#   no `*` (glob notation names a set of paths and has no literal footprint, so
+#   it is skipped and never reported missing), not already in a tracked file
+#   (arm 3 above — tokens found in the tree are pre-existing). A row with zero
+#   qualifying tokens is skipped entirely.
 #   Scenario notation `name=value` (`current_tree=T2`, `VAR=1`) is cut at the
 #   first `=` and only `name` is checked; a token starting with `=` is dropped.
 #
 #   Prefix fallbacks (same three arms, run on a prefix of the token):
-#   - glob token `name_*`     -> prefix is the text before the first `*`;
-#                                realised/pre-existing when the prefix is found,
-#                                missing otherwise (checked before arm 1)
 #   - call token `name(a)`    -> after arms 1-3 miss, retry with the trailing `)`
 #                                stripped, so `name(a, b)` in the code realises it
 #   - expansion `${VAR}`      -> after arms 1-3 miss, retry with the trailing `}`
@@ -92,6 +96,32 @@ grep -E '^\+' "$TMP/diff" | grep -vE '^\+\+\+' | sed 's/^+//' > "$TMP/plus" || t
 
 # --- CTX set: context/removed lines (strip leading space or -, exclude --- headers) ---
 grep -E '^[ -]' "$TMP/diff" | grep -vE '^---' | sed 's/^[ -]//' > "$TMP/ctx" || true
+
+# --- DELETED set: paths from `deleted file mode` headers ---
+# `git diff` renders a deletion as `diff --git a/<p> b/<p>` followed by
+# `deleted file mode <mode>`; both halves name the same path. The path is
+# recovered by length: after `diff --git a/` the rest is `<p> b/<p>`, so
+# len(p) = (len(rest) - 3) / 2, and both halves must agree. A header whose path
+# is quoted (core.quotePath escaping) starts with `"` and is skipped
+# fail-closed; a spaced path is unquoted by git and parses through the
+# arithmetic. Any other line between the two headers resets the pairing, so a
+# modification header never enters the set.
+awk '
+/^diff --git / { hdr = $0; next }
+/^deleted file mode / && hdr != "" {
+    r = substr(hdr, 12);
+    if (substr(r, 1, 1) == "\"" || substr(r, 1, 2) != "a/") { hdr = ""; next }
+    r = substr(r, 3);
+    n = length(r);
+    if (n < 4 || (n - 3) % 2 != 0) { hdr = ""; next }
+    len = (n - 3) / 2;
+    p = substr(r, 1, len);
+    if (substr(r, len + 1, 3) == " b/" && substr(r, len + 4) == p) print p;
+    hdr = "";
+    next
+}
+{ hdr = "" }
+' "$TMP/diff" > "$TMP/deleted"
 
 # --- WAIVERS ---
 if [ -n "$BODY_ARG" ]; then
@@ -190,6 +220,23 @@ _prefix_realised() {
     return 1
 }
 
+# --- deleted-file arm: a token realised by a deletion header ---
+# Match is path-component aligned: equal, `/`+tok at the end, tok+`/` at the
+# start, or `/`+tok+`/` inside. A trailing `/` on the token is dropped first, so
+# a directory token (`ibl5/images/hof/`) matches the files beneath it. A quoted "$t" in a case pattern is literal;
+# the bare `*` is the only glob, and `set -f` never touches case patterns.
+_deleted_realised() {
+    local t="${1%/}" p
+    [ -n "$t" ] || return 1
+    [ -s "$TMP/deleted" ] || return 1
+    while IFS= read -r p; do
+        case "$p" in
+            "$t" | */"$t" | "$t"/* | */"$t"/* ) return 0 ;;
+        esac
+    done < "$TMP/deleted"
+    return 1
+}
+
 # --- per-row check ---
 while IFS=$'\t' read -r id tag cell toks; do
     # check waiver
@@ -216,17 +263,12 @@ while IFS=$'\t' read -r id tag cell toks; do
             *...* | *\<*\>* ) continue ;;
         esac
 
-        # class 3: glob token. Prefix-match the text before the first `*`;
-        # grep -F cannot match a glob, so the whole-token arms never fire here.
+        # class 3: glob notation. A token holding `*` names a set of paths and
+        # has no literal footprint grep -F could find in a diff or the tree, so
+        # it is neither realised nor missing. Skip it; plain tokens in the same
+        # cell are still checked. (Replaces the prefix-glob arm; see header.)
         case "$tok" in
-            *\** )
-                tok_prefix="${tok%%\**}"
-                if [ -n "$tok_prefix" ] && _prefix_realised "$tok_prefix"; then
-                    continue
-                fi
-                missing="$missing $tok"
-                continue
-                ;;
+            *\** ) continue ;;
         esac
 
         # arm 1: present in a plus line -> realised
@@ -236,6 +278,12 @@ while IFS=$'\t' read -r id tag cell toks; do
 
         # arm 2: present in a context line -> pre-existing
         if grep -qF -e "$tok" "$TMP/ctx" 2>/dev/null; then
+            continue
+        fi
+
+        # arm 2b: named by a `deleted file mode` header -> realised. A deleted
+        # binary leaves no body lines, so the header is the only footprint.
+        if _deleted_realised "$tok"; then
             continue
         fi
 

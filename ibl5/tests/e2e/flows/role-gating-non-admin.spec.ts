@@ -72,9 +72,22 @@ test.describe('Admin entry-point scripts: non-admin gets 403', () => {
     expect(await response.text()).not.toContain('the Cannons erased a nine-point');
   });
 
-  test('leagueControlPanel.php returns 403', async ({ page }) => {
-    const response = await page.goto('leagueControlPanel.php');
+  test('LeagueControlPanel module returns 403 for non-admin', async ({ page }) => {
+    const response = await page.goto('modules.php?name=LeagueControlPanel');
     expect(response?.status()).toBe(403);
+    expect(await response?.text()).toContain('Access denied. Administrator privileges required.');
+  });
+
+  test('LeagueControlPanel module POST export=active_players is denied before the JSON handler', async ({
+    request,
+  }) => {
+    const response = await request.post('modules.php?name=LeagueControlPanel', {
+      form: { export: 'active_players' },
+    });
+    expect(response.status()).toBe(403);
+    expect(await response.text()).toContain('Access denied. Administrator privileges required.');
+    // The export handler sets this header first; seeing it means the gate ran too late.
+    expect(response.headers()['content-type'] ?? '').not.toContain('application/json');
   });
 
   test('faprep.php returns 403', async ({ page }) => {

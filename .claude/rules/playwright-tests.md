@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-09-30
+last_verified: 2026-10-03
 ---
 
 # Playwright E2E Testing Rules
@@ -184,7 +184,8 @@ E2E runs in `.github/workflows/e2e-tests.yml`:
 
 ## Worktree & Environment Gotchas
 
-- **`bin/e2e-wt <name>`** runs Playwright from the worktree's `ibl5/` — test files and `BASE_URL` both resolve to the worktree, so TS changes are picked up with no extra steps.
+- **`bin/test e2e`** is the front door. Inside a worktree it runs `bin/e2e-wt <slug>` with the slug derived for you; on the main checkout it runs `ibl5/bin/e2e-local`. Run `bin/wt-up <slug> --seed` first in a worktree.
+- **`bin/e2e-wt <name>`** runs Playwright from the worktree's `ibl5/`. Test files and `BASE_URL` both resolve to the worktree, so TS changes are picked up with no extra steps. Call it directly for agent and background runs: `bash-guard` allows `run_in_background` only for a command matching `e2e-wt`.
 - **Login/registration tests can trip auth throttling** (`auth_users_throttling` accumulates failures). If `auth.setup.ts` fails with "Too many login attempts": `DELETE FROM auth_users_throttling WHERE 1=1;`. CI is unaffected (fresh DB per run).
 
 ## Completion Criteria

@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-02
+last_verified: 2026-10-05
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -175,6 +175,8 @@ For a phase that is **genuinely verbose or parallelizable**, delegate the **whol
 
 This does **not** regress the ~15K economics: tiny sub-tier phases still stay inline because a sub-agent's fixed startup exceeds the work a one/two-edit phase moves. The rule changes only that such a phase is now *labeled* `(inline — …)` instead of left bare — zero new delegation is forced, only an explicit decision. The force applies solely to below-run-model phases whose moved work *already* clears ~15K, which the doctrine *already* says should be packets; the rule makes that latent "should" mechanically enforced.
 
+Why the `Assertions:` field exists: two past PRs were blocked by a delegate that tested one property where the plan wrote four. A grep for the property name is green from birth, so it cannot stand in for running the test.
+
 ## Self-apply the Automouse Hold Challenge
 
 ### Why the hold challenge is self-applied
@@ -204,6 +206,10 @@ Omit the field entirely when the phase needs nothing beyond the always-on set. A
 ## One-time-check tag shape
 
 The reason is 15 or more characters, free of `(`, `)`, `|` and backticks, so a reviewer can rerun the check by hand. `bin/lib/plan-matrix-assertions` skips a tagged row instead of reporting it unrealised; a malformed tag is ignored fail-closed and the row is checked. `bin/check-plan` gate `[Y]` rejects a bad shape, a tag on a non-`CLI-executable` row, and a matrix with tagged rows above one third of its rows.
+
+## Column-bound literal citations
+
+A column-bound literal is any value a recipe sends to a DB column: a seed id band, a sentinel, a code value. Copy `<sqltype>` from `ibl5/docs/schema/current-schema.sql`. A copy-verbatim recipe names only helpers the new code calls, and cites the defining source file by backticked repo path in the same `##`/`###` section. The citation shape follows the `(per <source>)` citation in `.claude/skills/post-plan/_pr-body-claims.md` § Citation rule. `bin/check-plan` gate `[L]` validates every present citation; `/plan` Step 4 gate 18 owns the presence judgment.
 
 ## Non-diff phase marker shape
 

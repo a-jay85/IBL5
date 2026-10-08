@@ -144,9 +144,10 @@ class LiveGit:
     def emergency_abort(self) -> None:
         """Called from the SIGTERM signal handler.
 
-        Aborts any in-progress rebase and hard-resets to the pre-rebase HEAD. Acts only
-        when `_pre_rebase_sha` is set AND a rebase directory is present; otherwise it is
-        a no-op to avoid destroying committed work during unrelated phases.
+        Aborts any in-progress merge or rebase and hard-resets to the pre-rebase HEAD.
+        Acts only when `_pre_rebase_sha` is set AND a rebase directory or MERGE_HEAD is
+        present; otherwise it is a no-op to avoid destroying committed work during
+        unrelated phases.
         """
         pre = self._pre_rebase_sha
         if pre is None:
@@ -160,16 +161,23 @@ class LiveGit:
                 capture_output=True, text=True,
             ).stdout.strip()
             return os.path.join(self.worktree, out) if out else ""
-        if not any(p and os.path.exists(p)
-                   for p in (_git_path("rebase-merge"), _git_path("rebase-apply"))):
+        merging = subprocess.run(
+            ["git", "-C", self.worktree, "rev-parse", "-q", "--verify", "MERGE_HEAD"],
+            capture_output=True, text=True,
+        ).stdout.strip()
+        if not merging and not any(
+                p and os.path.exists(p)
+                for p in (_git_path("rebase-merge"), _git_path("rebase-apply"))):
             return
+        subprocess.run(["git", "-C", self.worktree, "merge", "--abort"],
+                       capture_output=True)
         subprocess.run(["git", "-C", self.worktree, "rebase", "--abort"],
                        capture_output=True)
         subprocess.run(["git", "-C", self.worktree, "reset", "--hard", pre],
                        capture_output=True)
         import sys as _sys
         _sys.stderr.write(
-            f"post-plan harness: SIGTERM — aborted rebase in {self.worktree},"
+            f"post-plan harness: SIGTERM — aborted merge/rebase in {self.worktree},"
             f" restored to {pre[:12]}\n"
         )
         _sys.stderr.flush()
@@ -280,6 +288,27 @@ class LiveGit:
                 if f and f not in out:
                     out.append(f)
         return out
+
+    def read_worktree_file(self, path: str) -> str | None:
+        """Text of `path` in the WORKING TREE, or None when it cannot be read.
+
+        The working tree is what diff_vs_base() diffs against, so this is the text the
+        hunks were cut from. Read ONLY by conformance.check's MISSING-METHOD fallback,
+        which passes paths from conformance_files(). A path that is absolute, carries
+        `..`, or resolves outside the worktree (symlink) is refused with None, as is a
+        missing or non-UTF-8 file; the caller treats None as "not declared here".
+        """
+        if not path or os.path.isabs(path) or ".." in path.split("/"):
+            return None
+        root = os.path.realpath(self.worktree)
+        full = os.path.realpath(os.path.join(root, path))
+        if full != root and not full.startswith(root + os.sep):
+            return None
+        try:
+            with open(full, encoding="utf-8") as fh:
+                return fh.read()
+        except (OSError, UnicodeDecodeError):
+            return None
 
     def modified_files(self, base: str = "origin/master") -> list[str]:
         out = self._run("diff", "--diff-filter=M", "--name-only",
@@ -494,7 +523,16 @@ class LiveGit:
 
         if resolved_files:
             autoresolved_path = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
-            Path(autoresolved_path).write_text("\n".join(resolved_files) + "\n")
+            # Union with any list an earlier rebase in this run wrote (stale lists from a
+            # previous run are cleared once at run start); de-dup, order preserved.
+            prior: list[str] = []
+            try:
+                prior = [l.strip() for l in
+                         Path(autoresolved_path).read_text().splitlines() if l.strip()]
+            except OSError:
+                pass
+            merged = list(dict.fromkeys([*prior, *resolved_files]))
+            Path(autoresolved_path).write_text("\n".join(merged) + "\n")
 
         if resolved_files:
             res_list = ", ".join(resolved_files)
@@ -545,11 +583,12 @@ class LiveGit:
             self._pre_rebase_sha = None
 
     def _rebase_onto(self, base: str) -> None:
-        """Repo pre-push policy (pre-push-adr-hook) rejects branches not rebased
-        onto origin/master. Conflict → attempt auto-resolution; if that fails or is
-        not applicable, abort, restore the tree, and raise HarnessError.
-        Fail closed: exit_code_for() maps this to exit 3, which bin/post-plan-now
-        refuses to escalate to the skill fallback."""
+        """Repo pre-push policy (bin/pre-push-adr-hook) requires origin/master to be an
+        ancestor of HEAD. This merges `base` in, so every conflict surfaces at one stop
+        and no branch commit is rewritten. Conflict → attempt auto-resolution; if that
+        fails or is not applicable, abort the merge, restore the tree, and raise
+        HarnessError. Fail closed: exit_code_for() maps this to exit 3, which
+        bin/post-plan-now refuses to escalate to the skill fallback."""
         from ..conflict import (
             abort_and_restore, assert_text_only, inventory_conflicts,
             purge_verdict_artifacts, resolve_all,
@@ -568,8 +607,9 @@ class LiveGit:
 
         purge_verdict_artifacts(key)
 
-        proc = subprocess.run(["git", "-C", self.worktree, *_NO_RERERE, "rebase", base],
-                              capture_output=True, text=True, errors="replace")
+        proc = subprocess.run(
+            ["git", "-C", self.worktree, *_NO_RERERE, "merge", "--no-edit", base],
+            capture_output=True, text=True, errors="replace")
         if proc.returncode != 0:
             conflict_detail = (proc.stderr or proc.stdout).strip()[:400]
 
@@ -577,7 +617,7 @@ class LiveGit:
                 # No LLM or no pre-patch: immediate abort-and-restore. Snapshot the
                 # unmerged set FIRST; the abort clears it.
                 files = self._snapshot_conflicted_paths()
-                subprocess.run(["git", "-C", self.worktree, "rebase", "--abort"],
+                subprocess.run(["git", "-C", self.worktree, "merge", "--abort"],
                                capture_output=True, text=True, errors="replace")
                 raise HarnessError(
                     "rebase-conflict",
@@ -593,21 +633,26 @@ class LiveGit:
                                       reason=inventory.unresolvable_reason)
 
                 resolve_result = resolve_all(self.llm, self._run, worktree=self.worktree,
-                                            key=key, inventory=inventory)
+                                            key=key, inventory=inventory,
+                                            branch_stage=2, master_sha=master_sha,
+                                            pre_sha=pre_rebase_sha)
                 if not resolve_result.success:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason=resolve_result.reason)
 
+                # The merge commit runs bin/pre-commit-hook; a hook denial lands here
+                # and restores the tree with the hook's own text in the reason.
                 env = {**os.environ, "GIT_EDITOR": "true"}
                 cont_proc = subprocess.run(
-                    ["git", "-C", self.worktree, *_NO_RERERE, "rebase", "--continue"],
+                    ["git", "-C", self.worktree, "-c", "core.editor=true",
+                     "commit", "--no-edit"],
                     capture_output=True, text=True, errors="replace", env=env,
                 )
                 if cont_proc.returncode != 0:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,
-                                      reason=f"rebase --continue failed: {(cont_proc.stderr or cont_proc.stdout).strip()[:400]}")
+                                      reason=f"merge commit failed: {(cont_proc.stderr or cont_proc.stdout).strip()[:400]}")
 
                 # Whole-tree marker sweep. git grep exits 0 on a match, 1 on no match,
                 # and >=2 on its own failure, so branch on rc: reading stdout alone would
@@ -782,7 +827,9 @@ class LiveGit:
                                       reason=inventory.unresolvable_reason)
 
                 resolve_result = resolve_all(self.llm, self._run, worktree=self.worktree,
-                                            key=key, inventory=inventory)
+                                            key=key, inventory=inventory,
+                                            branch_stage=3, master_sha=master_sha,
+                                            pre_sha=pre_rebase_sha)
                 if not resolve_result.success:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,
@@ -995,6 +1042,10 @@ class ReplayGit:
             if src not in out:
                 out.append(src)
         return out
+
+    def read_worktree_file(self, path: str) -> str | None:
+        """Replay has no tree to read; fail closed so a replayed MISSING-METHOD never clears."""
+        return None
 
     def modified_files(self, base: str = "origin/master") -> list[str]:
         from ..classify import modified_files_from_diff

@@ -31,6 +31,7 @@ class ReplaySpec:
     flag_stdout_re: str = ""              # non-empty: a matching stdout line is a flag
     env: tuple[tuple[str, str], ...] = ()
     needs_plan: bool = False
+    stdin: str = ""                       # placeholder-bearing file path fed as the gate's stdin; "" = DEVNULL
 
 
 @dataclass(frozen=True)
@@ -73,7 +74,11 @@ _SINCE = ReplaySpec(argv=("--since={base}",))
 _TREE = ReplaySpec(argv=())
 _PLAN = ReplaySpec(argv=("{plan_file}",), needs_plan=True)
 
-_PR_STATE = "reads live PR state through gh --pr"
+_PR_BODY = ReplaySpec(argv=("--body-file", "{body_file}"))
+# Range-aware AND body-aware: the PR body is fed on stdin so a historical
+# `<!-- destructive-migration[...]: ... -->` marker is honoured on replay (backlog#1339).
+_BYPASS_SINCE = ReplaySpec(argv=("--since={base}", "--bypass-from-stdin"), stdin="{body_file}")
+_LIVE_CI = "reads live CI state through gh"
 
 # A string value is a not-replayable reason. Only an entry here can mark a script
 # not-replayable, so the choice shows up in a reviewed diff.
@@ -82,7 +87,7 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-docs": _SINCE,
     "bin/check-prose": _SINCE,
     "bin/check-numbering": _SINCE,
-    "bin/check-destructive-migrations": _SINCE,
+    "bin/check-destructive-migrations": _BYPASS_SINCE,
     # Whole-tree scans with no required argument.
     "bin/check-claude-dir-placement": _TREE,
     "bin/check-composite-contracts": _TREE,
@@ -97,15 +102,23 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     # Plan-file gates: the plan resolves from the historical PR's branch name.
     "bin/check-plan": _PLAN,
     "bin/check-plan-staleness": _PLAN,
-    # PR-number-aware: today's PR state is not the state at merge time.
-    "bin/check-hot-files": _PR_STATE,
-    "bin/check-e2e-hygiene": _PR_STATE,
-    "bin/check-phpunit-hygiene": _PR_STATE,
-    "bin/check-pr-collisions": _PR_STATE,
-    "bin/check-pr-manual-testing": _PR_STATE,
-    "bin/check-post-merge-recipe": _PR_STATE,
-    "bin/check-master-ci-green": "reads live CI state through gh",
-    "bin/check-pr-checks-green": "reads live CI state through gh",
+    # PR-body gates: the replay feeds the merged PR's body (as it reads today).
+    "bin/check-pr-manual-testing": _PR_BODY,
+    "bin/check-post-merge-recipe": ReplaySpec(
+        argv=("--body-file", "{body_file}", "--repo-slug", "a-jay85/IBL5"),
+    ),
+    # Diff-scoped hygiene: --pr diffs against the env base, set to the PR's own base.
+    "bin/check-e2e-hygiene": ReplaySpec(
+        argv=("--pr",), env=(("E2E_HYGIENE_BASE_REF", "{base}"),),
+    ),
+    "bin/check-phpunit-hygiene": ReplaySpec(
+        argv=("--pr",), env=(("PHPUNIT_HYGIENE_BASE_REF", "{base}"),),
+    ),
+    # Not reject gates, or read state that only exists live.
+    "bin/check-hot-files": "informational lister with inverted exit (0 = a crossing found); no reject verdict",
+    "bin/check-pr-collisions": "lists live open PRs through gh and always exits 0",
+    "bin/check-master-ci-green": _LIVE_CI,
+    "bin/check-pr-checks-green": _LIVE_CI,
     # Required arguments or services that fit no placeholder.
     "bin/check-boxscore-schedule": "needs a live database",
     "bin/check-column-rename-sweep": "needs a columns file or live database credentials",
@@ -307,6 +320,23 @@ def expand_env(spec: ReplaySpec, ctx: dict[str, str]) -> dict[str, str]:
     return env
 
 
+def expand_stdin(spec: ReplaySpec, ctx: dict[str, str]) -> str:
+    """Literal placeholder replacement for the stdin path. "" means no stdin (DEVNULL)."""
+    path = spec.stdin
+    if not path:
+        return ""
+    for name in ALLOWED_PLACEHOLDERS:
+        if name in ctx:
+            path = path.replace("{" + name + "}", ctx[name])
+    return path
+
+
+def placeholder_names(spec: ReplaySpec) -> set[str]:
+    """Every `{name}` a spec references across argv, env values, and stdin."""
+    tokens = [*spec.argv, *(value for _, value in spec.env), spec.stdin]
+    return {name for tok in tokens for name in _PLACEHOLDER_RE.findall(tok)}
+
+
 def classify_exit(spec: ReplaySpec, rc: int, stdout: str) -> tuple[str, str]:
     """Map a replay's exit code and stdout to (outcome, detail). Exit 2 is an error, never a pass."""
     if spec.flag_stdout_re and rc in spec.ok_exits:
@@ -480,9 +510,10 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
     lines = [GATE_BACKTEST_BEGIN, f"<!-- gate-backtest-state: {verdict.state} -->",
              "### Gate backtest", "",
              f"**State:** {verdict.state}. {verdict.reason}", "",
-             f"Replayed against the last {window_size} merged PRs. Repaired: a `fix` PR touching "
-             "an overlapping file merged within 48h. Clean: older than 48h and not repaired. "
-             "Unsettled: younger than 48h, shown and never counted.", ""]
+             f"Replayed against the newest {window_size} settled merged PRs (older than 48h). "
+             "Repaired: a `fix` PR touching an overlapping file merged within 48h. "
+             "Clean: older than 48h and not repaired. "
+             "Unsettled: younger than 48h, never replayed.", ""]
     catches: list[int] = []
     false_flags: list[int] = []
     unsettled: list[int] = []

@@ -292,6 +292,8 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
 
         (new PlrParserRepository($this->db))->promotePriorSeasonSnapshots(2008);
 
+        // Copy of RefreshIblHistStep's phase-rank CASE, kept because this test reads
+        // snapshot_phase, which SELECT_SQL drops. PhaseRankOrderConsistencyTest fails if it drifts.
         $stmt = $this->db->prepare(
             "SELECT snap.snapshot_phase FROM (
                 SELECT s.*,
@@ -300,17 +302,18 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
                         ORDER BY
                             s.stats_gm DESC,
                             CASE s.snapshot_phase
+                                WHEN 'playoffs'            THEN  0
                                 WHEN 'end-of-season'       THEN  1
                                 WHEN 'finals'              THEN  2
                                 WHEN 'post-heat'           THEN  3
                                 WHEN 'heat-finals'         THEN  4
                                 WHEN 'heat-end'            THEN  5
-                                WHEN 'playoffs-rd2-gm4-7'  THEN  6
-                                WHEN 'playoffs-rd2-gm1-3'  THEN  7
-                                WHEN 'playoffs-rd1-gm4-7'  THEN  8
-                                WHEN 'playoffs-rd1-gm1-3'  THEN  9
-                                WHEN 'conf-finals-gm4-7'   THEN 10
-                                WHEN 'conf-finals-gm1-3'   THEN 11
+                                WHEN 'conf-finals-gm4-7'   THEN  6
+                                WHEN 'conf-finals-gm1-3'   THEN  7
+                                WHEN 'playoffs-rd2-gm4-7'  THEN  8
+                                WHEN 'playoffs-rd2-gm1-3'  THEN  9
+                                WHEN 'playoffs-rd1-gm4-7'  THEN 10
+                                WHEN 'playoffs-rd1-gm1-3'  THEN 11
                                 WHEN 'heat-wb'             THEN 12
                                 WHEN 'heat-lb'             THEN 13
                                 ELSE 99
@@ -385,6 +388,54 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
 
         self::assertNotNull($row);
         self::assertSame(111, (int) $row['pts'], 'Phase rank must pick the playoffs row despite its lower id.');
+    }
+
+    /**
+     * A later playoff round carries more games played, so on a stats_gm tie the latest
+     * round wins (backlog#782). Before the fix conf-finals ranked below rd1 in this CASE.
+     */
+    public function testConfFinalsWinsOverPlayoffsRd2OnEqualStatsGm(): void
+    {
+        $this->seedSnapshot(202099905, 2008, 'conf-finals-gm1-3',  ['stats_gm' => 70, 'stats_pts' => 111, 'phantom_games' => 0]);
+        $this->seedSnapshot(202099905, 2008, 'playoffs-rd2-gm4-7', ['stats_gm' => 70, 'stats_pts' => 222, 'phantom_games' => 0]);
+
+        $row = $this->rankedIblHistRowFor(202099905);
+
+        self::assertNotNull($row);
+        self::assertSame(111, (int) $row['pts'], 'Weakest conf-finals bucket must beat the strongest rd2 bucket on a tie.');
+    }
+
+    public function testConfFinalsWinsOverPlayoffsRd1OnEqualStatsGm(): void
+    {
+        $this->seedSnapshot(202099906, 2008, 'conf-finals-gm4-7',  ['stats_gm' => 70, 'stats_pts' => 111, 'phantom_games' => 0]);
+        $this->seedSnapshot(202099906, 2008, 'playoffs-rd1-gm4-7', ['stats_gm' => 70, 'stats_pts' => 222, 'phantom_games' => 0]);
+
+        $row = $this->rankedIblHistRowFor(202099906);
+
+        self::assertNotNull($row);
+        self::assertSame(111, (int) $row['pts'], 'Conf-finals must beat rd1 on a stats_gm tie.');
+    }
+
+    public function testFinalsWinsOverConfFinalsOnEqualStatsGm(): void
+    {
+        $this->seedSnapshot(202099907, 2008, 'finals',            ['stats_gm' => 70, 'stats_pts' => 111, 'phantom_games' => 0]);
+        $this->seedSnapshot(202099907, 2008, 'conf-finals-gm4-7', ['stats_gm' => 70, 'stats_pts' => 222, 'phantom_games' => 0]);
+
+        $row = $this->rankedIblHistRowFor(202099907);
+
+        self::assertNotNull($row);
+        self::assertSame(111, (int) $row['pts'], 'Finals must still beat conf-finals on a stats_gm tie.');
+    }
+
+    public function testHigherStatsGmPlayoffsRd2WinsOverLowerStatsGmConfFinals(): void
+    {
+        $this->seedSnapshot(202099908, 2008, 'playoffs-rd2-gm4-7', ['stats_gm' => 75, 'stats_pts' => 222, 'phantom_games' => 0]);
+        $this->seedSnapshot(202099908, 2008, 'conf-finals-gm1-3',  ['stats_gm' => 70, 'stats_pts' => 111, 'phantom_games' => 0]);
+
+        $row = $this->rankedIblHistRowFor(202099908);
+
+        self::assertNotNull($row);
+        self::assertSame(222, (int) $row['pts'], 'stats_gm DESC must outrank the phase-rank tie-break.');
     }
 
     /**

@@ -152,6 +152,14 @@ Options:
                      changed file is also run through the full-scan checks
                      (future-date, staleness, dead-ref). Pure base-vs-head
                      value comparison — never date-equality-to-today.
+  --exclude-from=<file>
+                     Requires --since=<ref>. Drops every path listed in
+                     <file> (one repo-relative path per line, as git diff
+                     --name-only prints it; blank lines ignored) from the
+                     changed set, so it gets neither the bump nor the
+                     staleness check. Equals form only; an unreadable <file>
+                     exits 2. bin/pre-commit-hook passes the paths a merge
+                     commit stages byte-identical to origin/master.
   --no-staleness     Full-scan only: suppress the 60-day staleness rule while
                      still failing on frontmatter, future-date, dead-ref, and
                      ADR-transition issues. Used by the PR/push gate so an
@@ -162,8 +170,9 @@ Options:
                      regardless of whether any doc is stale. A report, not a
                      gate. Consumed by the doc-freshness-audit workflow.
   --self-test        Run the offline fixtures and exit — retired-figure
-                     exemptions, plus the changed-doc diff union (in a throwaway
-                     temp repo). Never scans this repo. Both cover logic whose
+                     exemptions, the engine lint-pin fixtures, plus the
+                     changed-doc diff union (in a throwaway
+                     temp repo). Never scans this repo. These cover logic whose
                      bug is a SILENT false negative; the loud failure modes are
                      left to the next PR.
   --verbose, -v      Show passing files too.
@@ -311,8 +320,11 @@ function collectFiles(string $root, bool $includeMemory): array
     return filterGitignored(array_values($filtered), $root);
 }
 
-/** @return array<string, string>|null */
-function parseFrontmatter(string $content): ?array
+/**
+ * Raw YAML body between the opening and closing `---` delimiters, or null when
+ * the content has no complete frontmatter block.
+ */
+function frontmatterBlock(string $content): ?string
 {
     if (!str_starts_with($content, "---\n") && !str_starts_with($content, "---\r\n")) {
         return null;
@@ -322,7 +334,16 @@ function parseFrontmatter(string $content): ?array
     if ($end === false) {
         return null;
     }
-    $yaml = substr($content, $offset, $end - $offset);
+    return substr($content, $offset, $end - $offset);
+}
+
+/** @return array<string, string>|null */
+function parseFrontmatter(string $content): ?array
+{
+    $yaml = frontmatterBlock($content);
+    if ($yaml === null) {
+        return null;
+    }
     $fields = [];
     foreach (preg_split('/\r?\n/', $yaml) ?: [] as $line) {
         if (preg_match('/^([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/', $line, $m) === 1) {
@@ -345,16 +366,12 @@ function parseFrontmatter(string $content): ?array
  */
 function duplicateFrontmatterKeys(string $content): array
 {
-    if (!str_starts_with($content, "---\n") && !str_starts_with($content, "---\r\n")) {
-        return [];
-    }
-    $offset = str_starts_with($content, "---\r\n") ? 5 : 4;
-    $end = strpos($content, "\n---", $offset);
-    if ($end === false) {
+    $yaml = frontmatterBlock($content);
+    if ($yaml === null) {
         return [];
     }
     $counts = [];
-    foreach (preg_split('/\r?\n/', substr($content, $offset, $end - $offset)) ?: [] as $line) {
+    foreach (preg_split('/\r?\n/', $yaml) ?: [] as $line) {
         if (preg_match('/^([a-zA-Z_][a-zA-Z0-9_]*):/', $line, $m) === 1) {
             $counts[$m[1]] = ($counts[$m[1]] ?? 0) + 1;
         }
@@ -929,7 +946,28 @@ function changedDocPaths(string $base, string $escapedRoot, string $escapedBase)
         }
     }
 
+    // --exclude-from: drop the listed paths after the union and before any check.
+    $excluded = excludedDocPaths();
+    $union = array_filter($union, static fn (string $rel): bool => !isset($excluded[$rel]));
+
     return array_values(array_unique($union));
+}
+
+/**
+ * Paths named by --exclude-from (--since mode only), as a set. Set once from main;
+ * changedDocPaths() drops them, so an excluded doc gets neither the bump check nor
+ * the staleness check.
+ *
+ * @param array<string, true>|null $set
+ * @return array<string, true>
+ */
+function excludedDocPaths(?array $set = null): array
+{
+    static $excluded = [];
+    if ($set !== null) {
+        $excluded = $set;
+    }
+    return $excluded;
 }
 
 /**
@@ -1558,6 +1596,346 @@ function selfTestGitignoreFilter(): int
     return 1;
 }
 
+// Engine lint pins: .github/workflows/engine.yml is the source of truth. Each
+// tracked doc restates the action ref and the linter binary version in prose,
+// so a pin bump that skips the docs silently falsifies them (backlog #712).
+const ENGINE_LINT_WORKFLOW = '.github/workflows/engine.yml';
+const ENGINE_LINT_PIN_DOCS = [
+    '.claude/rules/engine-go.md',
+    'engine/.claude/rules/engine-context.md',
+];
+
+/**
+ * Extract the golangci-lint pins from the engine workflow body.
+ * Returns ['sha' => 40-hex, 'tag' => 'vX.Y.Z', 'binary' => 'vX.Y.Z'] or null
+ * when the Lint step's action ref or its `version:` input cannot be parsed.
+ */
+function parseEngineLintPins(string $yaml): ?array
+{
+    $lines = preg_split('/\R/', $yaml) ?: [];
+    $count = count($lines);
+    foreach ($lines as $i => $line) {
+        if (!preg_match('/^\s*(?:-\s+)?uses:\s*golangci\/golangci-lint-action@([0-9a-f]{40})\s+#\s*(v\d+\.\d+\.\d+)\s*$/', $line, $m)) {
+            continue;
+        }
+        for ($j = $i + 1; $j < $count; $j++) {
+            if (preg_match('/^\s*-\s/', $lines[$j])) {
+                break; // next step: this step has no pinned version
+            }
+            if (preg_match('/^\s*version:\s*[\'"]?(v\d+\.\d+\.\d+)[\'"]?\s*$/', $lines[$j], $v)) {
+                return ['sha' => $m[1], 'tag' => $m[2], 'binary' => $v[1]];
+            }
+        }
+        return null;
+    }
+    return null;
+}
+
+/**
+ * Pure over its inputs so --self-test can drive it. $yaml null = workflow
+ * absent; $docs maps repo-relative path => content (null = file absent).
+ */
+function engineLintPinIssues(?string $yaml, array $docs): array
+{
+    $present = array_filter($docs, static fn ($c): bool => $c !== null);
+    if ($yaml === null) {
+        return $present === []
+            ? []
+            : [ENGINE_LINT_WORKFLOW . ' missing but tracked pin docs exist; update ENGINE_LINT_PIN_DOCS in bin/check-docs'];
+    }
+    $pins = parseEngineLintPins($yaml);
+    if ($pins === null) {
+        return [ENGINE_LINT_WORKFLOW . ': cannot parse the golangci-lint-action@<40-hex sha> # vX.Y.Z ref plus its `version: vX.Y.Z` input; fix the workflow or this parser'];
+    }
+    $issues = [];
+    foreach ($docs as $rel => $content) {
+        if ($content === null) {
+            $issues[] = "{$rel}: tracked pin doc missing; update ENGINE_LINT_PIN_DOCS in bin/check-docs";
+            continue;
+        }
+        $sawAction = false;
+        $sawBinary = false;
+        foreach (preg_split('/\R/', $content) ?: [] as $i => $line) {
+            $n = $i + 1;
+            $tagOffsets = [];
+            if (preg_match_all('/golangci-lint-action@([0-9a-f]{7,40})(?:…|\.\.\.)?\s*#\s*(v\d+\.\d+\.\d+)/u', $line, $am, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
+                foreach ($am as $a) {
+                    $sawAction = true;
+                    $tagOffsets[$a[2][1]] = true;
+                    if (!str_starts_with($pins['sha'], $a[1][0])) {
+                        $issues[] = "{$rel}:{$n}: action SHA {$a[1][0]} is not a prefix of engine.yml's {$pins['sha']}";
+                    }
+                    if ($a[2][0] !== $pins['tag']) {
+                        $issues[] = "{$rel}:{$n}: action tag {$a[2][0]} != engine.yml {$pins['tag']}";
+                    }
+                }
+            }
+            if (preg_match_all('/(?<![0-9A-Za-z_.])v\d+\.\d+\.\d+(?![0-9A-Za-z_])/', $line, $vm, PREG_OFFSET_CAPTURE)) {
+                foreach ($vm[0] as [$tok, $off]) {
+                    if (isset($tagOffsets[$off])) {
+                        continue;
+                    }
+                    $sawBinary = true;
+                    if ($tok !== $pins['binary']) {
+                        $issues[] = "{$rel}:{$n}: binary pin {$tok} != engine.yml version: {$pins['binary']}";
+                    }
+                }
+            }
+        }
+        if (!$sawAction || !$sawBinary) {
+            $issues[] = "{$rel}: no golangci-lint " . (!$sawAction ? 'action ref' : 'binary version') . ' found; the doc no longer restates the pin, so drop it from ENGINE_LINT_PIN_DOCS or restore the pin';
+        }
+    }
+    return $issues;
+}
+
+function checkEngineLintPins(string $repoRoot): array
+{
+    $read = static function (string $rel) use ($repoRoot): ?string {
+        $path = $repoRoot . '/' . $rel;
+        if (!is_file($path)) {
+            return null;
+        }
+        $c = file_get_contents($path);
+        return $c === false ? null : $c;
+    };
+    $docs = [];
+    foreach (ENGINE_LINT_PIN_DOCS as $rel) {
+        $docs[$rel] = $read($rel);
+    }
+    return engineLintPinIssues($read(ENGINE_LINT_WORKFLOW), $docs);
+}
+
+// Required-status claims (backlog #711). The true required-context list is
+// live branch-protection state, readable only through the GitHub API, so a
+// rule doc must point at the readback command instead of restating it. The
+// offline half that CAN be checked lives in two workflows: the aggregator's
+// --ignore / --anchor CSVs and engine.yml's gate job name.
+const REQUIRED_CLAIMS_AGGREGATOR = '.github/workflows/all-checks-green.yml';
+const REQUIRED_CLAIMS_DOCS = [
+    '.claude/rules/engine-go.md',
+];
+const REQUIRED_CLAIMS_READBACK = "gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'";
+// Required contexts the aggregator never lists as anchors: itself, and the
+// human-signoff context it ignores.
+const REQUIRED_CLAIMS_EXTRA_CONTEXTS = ['All checks green', 'human-signoff'];
+
+/** @return array{anchor: list<string>, ignore: list<string>}|null */
+function parseAggregatorCsvs(string $yaml): ?array
+{
+    $out = [];
+    foreach (['anchor', 'ignore'] as $flag) {
+        if (!preg_match("/--{$flag}='([^']*)'/", $yaml, $m)) {
+            return null;
+        }
+        $out[$flag] = array_values(array_filter(
+            array_map('trim', explode(',', $m[1])),
+            static fn (string $s): bool => $s !== ''
+        ));
+    }
+    return $out;
+}
+
+/** Display name of a top-level job, or null when the job or its name: is absent. */
+function parseWorkflowJobName(string $yaml, string $jobKey): ?string
+{
+    $lines = preg_split('/\R/', $yaml) ?: [];
+    $count = count($lines);
+    foreach ($lines as $i => $line) {
+        if (!preg_match('/^  ' . preg_quote($jobKey, '/') . ':\s*$/', $line)) {
+            continue;
+        }
+        for ($j = $i + 1; $j < $count; $j++) {
+            if (preg_match('/^ {0,2}\S/', $lines[$j])) {
+                return null; // next job or top-level key: this job has no name
+            }
+            if (preg_match('/^    name:\s*[\'"]?(.+?)[\'"]?\s*$/', $lines[$j], $m)) {
+                return $m[1];
+            }
+        }
+        return null;
+    }
+    return null;
+}
+
+/**
+ * Pure over its inputs so --self-test can drive it. $aggregator / $engine
+ * null = workflow absent; $docs maps repo-relative path => content (null = absent).
+ * @param array<string, ?string> $docs
+ * @return list<string>
+ */
+function requiredClaimsIssues(?string $aggregator, ?string $engine, array $docs): array
+{
+    $present = array_filter($docs, static fn ($c): bool => $c !== null);
+    if ($aggregator === null) {
+        return $present === []
+            ? []
+            : [REQUIRED_CLAIMS_AGGREGATOR . ' missing but tracked required-claims docs exist; update REQUIRED_CLAIMS_DOCS in bin/check-docs'];
+    }
+    $csv = parseAggregatorCsvs($aggregator);
+    if ($csv === null) {
+        return [REQUIRED_CLAIMS_AGGREGATOR . ": cannot parse --anchor='<csv>' and --ignore='<csv>'; fix the workflow or this parser"];
+    }
+    $issues = [];
+    $gate = $engine === null ? null : parseWorkflowJobName($engine, 'gate');
+    $lint = $engine === null ? null : parseWorkflowJobName($engine, 'engine');
+    if ($gate === null || $lint === null) {
+        $issues[] = ENGINE_LINT_WORKFLOW . ': cannot parse the `name:` of the `gate` and `engine` jobs; fix the workflow or this parser';
+    } else {
+        foreach ([$gate, $lint] as $check) {
+            if (in_array($check, $csv['ignore'], true)) {
+                $issues[] = REQUIRED_CLAIMS_AGGREGATOR . ": check '{$check}' is in --ignore, so a red or pending engine run no longer blocks auto-merge; engine-go.md claims it does";
+            }
+        }
+        if (in_array($gate, $csv['anchor'], true)) {
+            $issues[] = REQUIRED_CLAIMS_AGGREGATOR . ": check '{$gate}' is in --anchor; engine-go.md claims engine.yml is not a required context, so update the doc and this gate together";
+        }
+    }
+    $contexts = array_values(array_unique(array_merge($csv['anchor'], REQUIRED_CLAIMS_EXTRA_CONTEXTS)));
+    foreach ($docs as $rel => $content) {
+        if ($content === null) {
+            $issues[] = "{$rel}: tracked required-claims doc missing; update REQUIRED_CLAIMS_DOCS in bin/check-docs";
+            continue;
+        }
+        $named = array_values(array_filter($contexts, static fn (string $c): bool => str_contains($content, $c)));
+        if (count($named) >= 2) {
+            $issues[] = "{$rel}: names " . count($named) . ' required-context names (' . implode(', ', $named) . '); a list of live protection state rots, so cite the readback command and .claude/rules/ci-gotchas.md instead';
+        }
+        if (!str_contains($content, REQUIRED_CLAIMS_READBACK)) {
+            $issues[] = "{$rel}: missing the live readback command `" . REQUIRED_CLAIMS_READBACK . '`';
+        }
+    }
+    return $issues;
+}
+
+/** @return list<string> */
+function checkRequiredClaims(string $repoRoot): array
+{
+    $read = static function (string $rel) use ($repoRoot): ?string {
+        $path = $repoRoot . '/' . $rel;
+        if (!is_file($path)) {
+            return null;
+        }
+        $c = file_get_contents($path);
+        return $c === false ? null : $c;
+    };
+    $docs = [];
+    foreach (REQUIRED_CLAIMS_DOCS as $rel) {
+        $docs[$rel] = $read($rel);
+    }
+    return requiredClaimsIssues($read(REQUIRED_CLAIMS_AGGREGATOR), $read(ENGINE_LINT_WORKFLOW), $docs);
+}
+
+function selfTestEngineLintPins(): int
+{
+    $yaml = static fn (string $sha, string $tag, string $ver): string =>
+        "      - name: Lint\n"
+        . "        uses: golangci/golangci-lint-action@{$sha} # {$tag}\n"
+        . "        with:\n"
+        . "          version: {$ver}\n"
+        . "          working-directory: engine\n"
+        . "      - name: Test\n";
+    $sha = 'ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a';
+    $doc = "golangci-lint **v2.x**\n(`golangci/golangci-lint-action@ba0d7d2… # v9.3.0`)\n`with: version: v2.12.2`\n";
+    $docAscii = "golangci-lint **v2.x**\n(`golangci/golangci-lint-action@ba0d7d2... # v9.3.0`)\n`with: version: v2.12.2`\n";
+    $clean = $yaml($sha, 'v9.3.0', 'v2.12.2');
+    $versionNextStep = "      - name: Lint\n"
+        . "        uses: golangci/golangci-lint-action@{$sha} # v9.3.0\n"
+        . "        with:\n"
+        . "          working-directory: engine\n"
+        . "      - name: Test\n"
+        . "        with:\n"
+        . "          version: v2.12.2\n";
+    $noAction = "      - name: Lint\n        run: golangci-lint run\n        with:\n          version: v2.12.2\n";
+
+    // [label, yaml|null, docs, expected issue count, substring of the issue]
+    $cases = [
+        ['clean', $clean, ['doc-a.md' => $doc], 0, ''],
+        ['ascii-ellipsis', $clean, ['doc-a.md' => $docAscii], 0, ''],
+        ['binary-drift', $yaml($sha, 'v9.3.0', 'v2.13.0'), ['doc-a.md' => $doc], 1, 'binary pin v2.12.2 != engine.yml version: v2.13.0'],
+        ['tag-drift', $yaml($sha, 'v9.4.0', 'v2.12.2'), ['doc-a.md' => $doc], 1, 'action tag v9.3.0 != engine.yml v9.4.0'],
+        ['sha-drift', $yaml(str_repeat('c', 40), 'v9.3.0', 'v2.12.2'), ['doc-a.md' => $doc], 1, 'is not a prefix of'],
+        ['version-latest', $yaml($sha, 'v9.3.0', 'latest'), ['doc-a.md' => $doc], 1, 'cannot parse'],
+        ['version-in-next-step', $versionNextStep, ['doc-a.md' => $doc], 1, 'cannot parse'],
+        ['no-action-line', $noAction, ['doc-a.md' => $doc], 1, 'cannot parse'],
+        ['pins-vanished', $clean, ['doc-a.md' => "golangci-lint **v2.x** only\n"], 1, 'no golangci-lint action ref found'],
+        ['doc-missing', $clean, ['doc-a.md' => null], 1, 'tracked pin doc missing'],
+        ['workflow-missing', null, ['doc-a.md' => $doc], 1, 'missing but tracked pin docs exist'],
+        ['all-absent', null, ['doc-a.md' => null], 0, ''],
+    ];
+
+    $failed = 0;
+    foreach ($cases as [$label, $y, $docs, $want, $needle]) {
+        $issues = engineLintPinIssues($y, $docs);
+        $ok = count($issues) === $want
+            && ($needle === '' || ($issues !== [] && str_contains($issues[0], $needle)));
+        echo ($ok ? 'PASS' : 'FAIL') . ": engine lint pin: {$label}\n";
+        if (!$ok) {
+            $failed++;
+            echo '     got: ' . json_encode($issues, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+        }
+    }
+    $total = count($cases);
+    if ($failed === 0) {
+        echo "\nselfTestEngineLintPins: {$total}/{$total} cases passed.\n";
+        return 0;
+    }
+    echo "\nselfTestEngineLintPins: {$failed}/{$total} cases FAILED.\n";
+    return 1;
+}
+
+function selfTestRequiredClaims(): int
+{
+    $agg = "          --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \\\n"
+        . "          --ignore='human-signoff,Infection PHP,notify-fixed' \\\n";
+    $withIgnore = static fn (string $extra): string => str_replace("notify-fixed'", "notify-fixed,{$extra}'", $agg);
+    $eng = "jobs:\n  engine:\n    name: Go build, vet, lint, test\n    runs-on: ubuntu-latest\n"
+        . "  gate:\n    name: Engine\n    if: always()\n";
+    $doc = '`' . REQUIRED_CLAIMS_READBACK . "`\nAuto-merge waits on `All checks green`.\n";
+
+    $engRenamed = str_replace('name: Engine', 'name: Engine CI', $eng);
+    $engShortLint = str_replace('name: Go build, vet, lint, test', 'name: Go build', $eng);
+    $engNoGate = "jobs:\n  engine:\n    name: Go build, vet, lint, test\n    runs-on: ubuntu-latest\n";
+    $aggNoIgnore = "          --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \\\n";
+    $aggAnchored = str_replace("(per-PR diff)'", "(per-PR diff),Engine'", $agg);
+    $enumerates = $doc . "Tests and Analysis and Meta checks gate it.\n";
+
+    // [label, aggregator|null, engine|null, docs, expected issue count, substring of the first issue]
+    $cases = [
+        ['clean', $agg, $eng, ['d.md' => $doc], 0, ''],
+        ['enumerates', $agg, $eng, ['d.md' => $enumerates], 1, 'names 3 required-context names'],
+        ['no-readback', $agg, $eng, ['d.md' => "Auto-merge waits on `All checks green`.\n"], 1, 'missing the live readback command'],
+        ['engine-ignored', $withIgnore('Engine'), $eng, ['d.md' => $doc], 1, "check 'Engine' is in --ignore"],
+        ['lint-job-ignored', $withIgnore('Go build'), $engShortLint, ['d.md' => $doc], 1, "check 'Go build' is in --ignore"],
+        ['renamed-gate-ignored', $withIgnore('Engine CI'), $engRenamed, ['d.md' => $doc], 1, "check 'Engine CI' is in --ignore"],
+        ['engine-anchored', $aggAnchored, $eng, ['d.md' => $doc], 1, 'is in --anchor'],
+        ['no-ignore-flag', $aggNoIgnore, $eng, ['d.md' => $doc], 1, 'cannot parse --anchor'],
+        ['no-gate-job', $agg, $engNoGate, ['d.md' => $doc], 1, 'cannot parse the'],
+        ['no-aggregator-no-docs', null, $eng, ['d.md' => null], 0, ''],
+        ['no-aggregator-doc', null, $eng, ['d.md' => $doc], 1, 'missing but tracked'],
+        ['doc-missing', $agg, $eng, ['d.md' => null], 1, 'tracked required-claims doc missing'],
+    ];
+
+    $failed = 0;
+    foreach ($cases as [$label, $a, $e, $docs, $want, $needle]) {
+        $issues = requiredClaimsIssues($a, $e, $docs);
+        $ok = count($issues) === $want
+            && ($needle === '' || ($issues !== [] && str_contains($issues[0], $needle)));
+        echo ($ok ? 'PASS' : 'FAIL') . ": required claims: {$label}\n";
+        if (!$ok) {
+            $failed++;
+            echo '     got: ' . json_encode($issues, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+        }
+    }
+    $total = count($cases);
+    if ($failed === 0) {
+        echo "\nselfTestRequiredClaims: {$total}/{$total} cases passed.\n";
+        return 0;
+    }
+    echo "\nselfTestRequiredClaims: {$failed}/{$total} cases FAILED.\n";
+    return 1;
+}
+
 function checkSkillDraftPlaceholder(string $repoRoot): array
 {
     $issues = [];
@@ -1581,7 +1959,7 @@ function checkSkillDraftPlaceholder(string $repoRoot): array
 
 // --- main ---
 
-$opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 'since' => null, 'no_staleness' => false, 'staleness_report' => false];
+$opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 'since' => null, 'no_staleness' => false, 'staleness_report' => false, 'exclude_from' => null];
 foreach (array_slice($argv, 1) as $arg) {
     if (str_starts_with($arg, '--since=')) {
         $opts['since'] = substr($arg, strlen('--since='));
@@ -1590,6 +1968,10 @@ foreach (array_slice($argv, 1) as $arg) {
             fwrite(STDERR, usage());
             exit(2);
         }
+        continue;
+    }
+    if (str_starts_with($arg, '--exclude-from=')) {
+        $opts['exclude_from'] = substr($arg, strlen('--exclude-from='));
         continue;
     }
     switch ($arg) {
@@ -1616,7 +1998,11 @@ foreach (array_slice($argv, 1) as $arg) {
             echo "\n";
             $rc = max($rc, selfTestChangedDocPaths());
             echo "\n";
-            exit(max($rc, selfTestGitignoreFilter()));
+            $rc = max($rc, selfTestGitignoreFilter());
+            echo "\n";
+            $rc = max($rc, selfTestEngineLintPins());
+            echo "\n";
+            exit(max($rc, selfTestRequiredClaims()));
         case '--help':
         case '-h':
             echo usage();
@@ -1626,6 +2012,30 @@ foreach (array_slice($argv, 1) as $arg) {
             fwrite(STDERR, usage());
             exit(2);
     }
+}
+
+if ($opts['exclude_from'] !== null) {
+    // The full scan has no changed set to filter, so the flag is meaningless there.
+    if ($opts['since'] === null) {
+        fwrite(STDERR, "check-docs: --exclude-from requires --since=<ref>\n");
+        exit(2);
+    }
+    $excludeFrom = $opts['exclude_from'];
+    $excludeLines = ($excludeFrom !== '' && !is_dir($excludeFrom) && is_readable($excludeFrom))
+        ? @file($excludeFrom, FILE_IGNORE_NEW_LINES)
+        : false;
+    if ($excludeLines === false) {
+        fwrite(STDERR, "check-docs: cannot read --exclude-from file: {$excludeFrom}\n");
+        exit(2);
+    }
+    $excludeSet = [];
+    foreach ($excludeLines as $line) {
+        $line = trim($line);
+        if ($line !== '') {
+            $excludeSet[$line] = true;
+        }
+    }
+    excludedDocPaths($excludeSet);
 }
 
 $root = repoRoot();
@@ -1745,6 +2155,28 @@ $skillDraftIssues = checkSkillDraftPlaceholder($root);
 if ($skillDraftIssues !== []) {
     echo "FAIL skill DRAFT= command-substitution\n";
     foreach ($skillDraftIssues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    $failures++;
+}
+
+// Corpus-wide like the retired-figure scan: the drift lands as an engine.yml
+// pin bump that touches no doc, so a --since doc filter would never see it.
+$enginePinIssues = checkEngineLintPins($root);
+if ($enginePinIssues !== []) {
+    echo "FAIL engine lint pin drift\n";
+    foreach ($enginePinIssues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    $failures++;
+}
+
+// Corpus-wide like the lint-pin check: the drift lands as an edit to
+// all-checks-green.yml or engine.yml that touches no doc.
+$requiredClaimIssues = checkRequiredClaims($root);
+if ($requiredClaimIssues !== []) {
+    echo "FAIL required-status claims drift\n";
+    foreach ($requiredClaimIssues as $issue) {
         echo "     - {$issue}\n";
     }
     $failures++;

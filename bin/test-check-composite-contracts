@@ -6,8 +6,9 @@
 # skip/active behavior. Verifies the logic even while the live composites are absent
 # on master (the check is dormant there, but its logic must already be correct so it
 # is sound the moment the composites land). Also covers the mutation-pr.yml
-# invariants (M1-M4) and the all-checks-green.yml invariants (A1-A4) with
-# throwaway workflow + ADR fixtures, and the read-only --protection-readback
+# invariants (M1-M4) and the all-checks-green.yml invariants (A1-A4), the
+# step-scoped DB env invariant (D1) with a throwaway setup-php-env composite,
+# with throwaway workflow + ADR fixtures, and the read-only --protection-readback
 # mode (R0-R4, default and --context=) with generated protection JSON fixtures.
 #
 # Run: bin/test-check-composite-contracts  (exit 0 = all pass, 1 = a case failed)
@@ -771,6 +772,174 @@ expect "rb-usage-unknown-flag" 2 $?
 printf 'not json\n' > "$TMP/rb-badjson.json"
 "$CHECK" "--protection-readback=$TMP/rb-badjson.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
 expect "rb-bad-json" 2 $?
+
+# --- D1: step-scoped DB_* env pinned to setup-php-env defaults -----------------
+
+# put_php_env <actions-dir> <host> <user> <pass> <name>: minimal setup-php-env
+# composite whose Create config.php step carries ${DB_<KEY>:-<default>} per key.
+# "-" writes that key as a bare literal with no default expression (unparseable).
+put_php_env() {
+  mkdir -p "$1/setup-php-env"
+  local e="" kv k v
+  for kv in "HOST=$2" "USER=$3" "PASS=$4" "NAME=$5"; do
+    k="${kv%%=*}"; v="${kv#*=}"
+    if [ "$v" = "-" ]; then e="$e \"'x'\""; else e="$e \"'\${DB_$k:-$v}'\""; fi
+  done
+  {
+    printf 'name: setup-php-env\nruns:\n  using: composite\n  steps:\n'
+    printf '    - name: Create config.php\n      shell: bash\n      run: |\n'
+    printf '        printf %s%s > config.local.php\n' "'<?php'" "$e"
+  } > "$1/setup-php-env/action.yml"
+}
+
+# db_env_step <host> <user> <pass> <name> [quoted]: one step (4-space list item,
+# the repo's style) with a step-scoped env block. "-" omits that key; all four
+# "-" omits the env block entirely.
+db_env_step() {
+  printf '    - name: Run database integration tests\n      working-directory: ibl5\n'
+  if [ "$1$2$3$4" != "----" ]; then
+    printf '      env:\n'
+    local kv k v
+    for kv in "HOST=$1" "USER=$2" "PASS=$3" "NAME=$4"; do
+      k="${kv%%=*}"; v="${kv#*=}"
+      [ "$v" = "-" ] && continue
+      if [ "${5:-}" = quoted ]; then printf '        DB_%s: "%s"\n' "$k" "$v"
+      else printf '        DB_%s: %s\n' "$k" "$v"; fi
+    done
+  fi
+  printf '      run: vendor/bin/phpunit --group database\n'
+}
+
+# put_db_wf <wf-dir> <file> <host> <user> <pass> <name> [plain|quoted|crlf|joblevel]
+# mutation-pr.yml is built on put_mutation_pr's passing base so M1-M4 stay green.
+# joblevel adds job-level DB_* env and service-container DB_* env that differ
+# from the defaults; D1 must ignore both. crlf rewrites every line ending to \r\n.
+put_db_wf() {
+  mkdir -p "$1"
+  local f="$1/$2" mode="${7:-plain}" q="" tmp
+  [ "$mode" = quoted ] && q=quoted
+  if [ "$2" = mutation-pr.yml ]; then
+    put_mutation_pr "$1" good
+    db_env_step "$3" "$4" "$5" "$6" "$q" >> "$f"
+  else
+    {
+      printf 'name: fixture\non:\n  pull_request:\n    branches: [master]\n'
+      printf 'jobs:\n  db:\n    runs-on: ubuntu-latest\n'
+      if [ "$mode" = joblevel ]; then
+        printf '    env:\n      DB_NAME: ibl5_override\n      DB_PASS: other\n'
+        printf '    services:\n      mariadb:\n        image: mariadb:11\n'
+        printf '        env:\n          DB_NAME: other\n'
+      fi
+      printf '    steps:\n'
+      db_env_step "$3" "$4" "$5" "$6" "$q"
+    } > "$f"
+  fi
+  if [ "$mode" = crlf ]; then
+    tmp="$(mktemp)"; awk '{printf "%s\r\n", $0}' "$f" > "$tmp" && mv "$tmp" "$f"
+  fi
+}
+
+d1_trio() { # wf-dir: the three required workflows, all aligned to the defaults
+  put_db_wf "$1" tests.yml 127.0.0.1 root root ibl5
+  put_db_wf "$1" mutation.yml 127.0.0.1 root root ibl5
+  put_db_wf "$1" mutation-pr.yml 127.0.0.1 root root ibl5
+}
+
+d1_has() { # name fixed-string output
+  if printf '%s' "$3" | grep -qF -- "$2"; then echo "ok: $1"
+  else echo "FAIL: $1 — output lacks: $2"; FAILED=1; fi
+}
+
+d1_lacks() { # name fixed-string output
+  if printf '%s' "$3" | grep -qF -- "$2"; then echo "FAIL: $1 — output has: $2"; FAILED=1
+  else echo "ok: $1"; fi
+}
+
+d1_dec="$(fresh_decisions)"; put_mut_adr "$d1_dec" "$MUT_LITERAL"
+d1_run() { "$CHECK" "$1" "$2" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d1_dec" 2>&1; }
+
+# d1-aligned-passes: composite + three aligned workflows → exit 0, three D1 passes
+d_a="$(fresh_actions)"; put_php_env "$d_a" 127.0.0.1 root root ibl5
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-aligned-passes" 0 "$rc"
+n=$(printf '%s\n' "$out" | grep -c 'matches setup-php-env defaults (1 block(s)) (D1)')
+expect "d1-aligned-three-pass-lines" 3 "$n"
+
+# d1-drift-<key>-fails: one key drifted in one required workflow → exit 1, key named
+for spec in "HOST tests.yml localhost root root ibl5 localhost" \
+            "USER mutation.yml 127.0.0.1 app root ibl5 app" \
+            "PASS mutation-pr.yml 127.0.0.1 root secret ibl5 secret" \
+            "NAME tests.yml 127.0.0.1 root root ibl5_test ibl5_test"; do
+  # shellcheck disable=SC2086
+  set -- $spec
+  d_wf="$(fresh_workflows)"; d1_trio "$d_wf"; put_db_wf "$d_wf" "$2" "$3" "$4" "$5" "$6"
+  out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+  expect "d1-drift-$1-fails" 1 "$rc"
+  d1_has "d1-drift-$1-names-key" "(D1) — step-scoped DB_$1 is '$7'" "$out"
+done
+
+# d1-missing-block-fails: a required workflow with zero step DB_* blocks → exit 1
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"; put_db_wf "$d_wf" mutation.yml - - - -
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-missing-block-fails" 1 "$rc"
+d1_has "d1-missing-block-named" "mutation.yml (D1) — no step-scoped DB_* env block found" "$out"
+
+# d1-partial-block-fails: a step block omitting DB_NAME → exit 1, key named
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"; put_db_wf "$d_wf" mutation-pr.yml 127.0.0.1 root root -
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-partial-block-fails" 1 "$rc"
+d1_has "d1-partial-block-names-key" "omits DB_NAME" "$out"
+
+# d1-composite-absent-skips: no setup-php-env, drifted workflows → exit 0, visible skip
+d_none="$(fresh_actions)"
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"; put_db_wf "$d_wf" tests.yml localhost root root ibl5
+out="$(d1_run "$d_none" "$d_wf")"; rc=$?
+expect "d1-composite-absent-skips" 0 "$rc"
+d1_has "d1-composite-absent-visible" "setup-php-env absent — D1 skipped" "$out"
+
+# d1-required-absent-skips: only tests.yml present → exit 0, the other two skipped visibly
+d_wf="$(fresh_workflows)"; put_db_wf "$d_wf" tests.yml 127.0.0.1 root root ibl5
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-required-absent-skips" 0 "$rc"
+d1_has "d1-required-absent-visible" "mutation.yml absent — D1 skipped" "$out"
+
+# d1-joblevel-not-flagged: job-level and service DB_* env that differ → exit 0
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"
+put_db_wf "$d_wf" tests.yml 127.0.0.1 root root ibl5 joblevel
+put_db_wf "$d_wf" migration-safety.yml - - - - joblevel
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-joblevel-not-flagged" 0 "$rc"
+d1_has "d1-joblevel-listed-na" "D1 n/a (no step-scoped DB_* env): migration-safety.yml" "$out"
+d1_lacks "d1-joblevel-no-override-value" "ibl5_override" "$out"
+
+# d1-extra-workflow-drift-fails: a 4th workflow's step block is scanned too → exit 1
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"; put_db_wf "$d_wf" extra.yml 127.0.0.1 root root other_db
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-extra-workflow-drift-fails" 1 "$rc"
+d1_has "d1-extra-workflow-named" "extra.yml:" "$out"
+
+# d1-quoted-and-crlf-pass: quoted values and CRLF endings normalize → exit 0
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"
+put_db_wf "$d_wf" tests.yml 127.0.0.1 root root ibl5 quoted
+put_db_wf "$d_wf" extra.yml 127.0.0.1 root root ibl5 crlf
+out="$(d1_run "$d_a" "$d_wf")"; rc=$?
+expect "d1-quoted-and-crlf-pass" 0 "$rc"
+d1_has "d1-crlf-extra-passes" "extra.yml step-scoped DB_* env matches" "$out"
+
+# d1-composite-default-changed-fails: composite default moves, steps unchanged → exit 1
+d_chg="$(fresh_actions)"; put_php_env "$d_chg" 127.0.0.1 root root ibl5_ci
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"
+out="$(d1_run "$d_chg" "$d_wf")"; rc=$?
+expect "d1-composite-default-changed-fails" 1 "$rc"
+d1_has "d1-composite-default-named" "with default 'ibl5_ci'" "$out"
+
+# d1-unparseable-composite-fails: no ${DB_PASS:-...} in the composite → exit 1
+d_bad="$(fresh_actions)"; put_php_env "$d_bad" 127.0.0.1 root - ibl5
+d_wf="$(fresh_workflows)"; d1_trio "$d_wf"
+out="$(d1_run "$d_bad" "$d_wf")"; rc=$?
+expect "d1-unparseable-composite-fails" 1 "$rc"
+d1_has "d1-unparseable-composite-named" "expected exactly one \${DB_PASS:-default}" "$out"
 
 if [ "$FAILED" -ne 0 ]; then
   echo "RESULT: FAILED"

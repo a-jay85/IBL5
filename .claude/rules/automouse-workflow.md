@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-09-30
+last_verified: 2026-10-06
 paths: "bin/automouse/**"
 ---
 
@@ -19,10 +19,10 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Remove a plan from queue | `bin/automouse/queue remove <slug>` |
 | Check morning results | `ls ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/reports/` |
 | Cancel the next run | `rm ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/*.md` |
-| Schedule a one-shot run | `bin/automouse/run schedule "2026-05-28 20:00 PDT"` (self-cleaning; date defaults to today, TZ to local) |
+| Schedule a one-shot run | `bin/automouse/run schedule "2026-05-28 20:00 PDT"` (self-cleaning; date defaults to today, or tomorrow if that time has passed; TZ to local) |
 | Run one plan (one-off, foreground) | `bin/automouse/run plan <slug>` (impl + post-plan for one plan, then stops; auto-queues if absent, rest of queue untouched) |
 | Pause tonight's run (auto re-enables) | `bin/automouse/run disarm-tonight` (re-arms ~1 h after the skipped run; a manual `launchctl unload` stays off until re-armed by hand) |
-| Pause until a given time | `bin/automouse/run disarm-until "2026-08-20 09:00 PDT"` (re-arms at the given time; same caveat) |
+| Pause until a given time | `bin/automouse/run disarm-until "2026-08-20 09:00 PDT"` (re-arms at the given time; a bare time already passed today means tomorrow; same caveat) |
 | Disable the automouse job | `launchctl unload ~/Library/LaunchAgents/com.ibl5.automouse.plist` |
 | Re-enable the automouse job | `launchctl load ~/Library/LaunchAgents/com.ibl5.automouse.plist` |
 | Force-trigger now | `launchctl start com.ibl5.automouse` |
@@ -30,6 +30,7 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Skip the between-plans master canary | `AUTOMOUSE_SKIP_CANARY=1 bin/automouse/run` |
 | Self-heal staleness-FP skips | `bin/automouse/self-heal` |
 | Preview self-heal (no changes) | `bin/automouse/self-heal --dry-run` |
+| Check logs (all of today's runners; older days like 2000-01-01.log stay out) | `cat ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/$(date +%Y-%m-%d)*.log` |
 | Today's logs, newest first (suffix = runner pid) | `ls -t ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/$(date +%Y-%m-%d)-*.log` |
 
 ### Disarm ordering and safety
@@ -65,7 +66,7 @@ Each phase's cost is recorded in two places: the markdown row in `reports/YYYY-M
 
 **Prov column:** `recomputed` (transcript recomputation succeeded, no anomaly flagged), `recomputed-anomalous` (>$0.01 below harness or duration mismatch), `unknown` (no transcript, e.g. aged out after ~30 days; harness figure kept), `harness-ledger` (harness's own `result.json` usage ledger; harness-only runs exiting 0 or 3, no Sonnet session).
 
-**`peak_ctx`:** main transcript occupancy over `usage.iterations[]` (top-level `usage` sums them, so it is no single occupancy), excluding `advisor_message` iterations and sub-agents; pre-2026-08-26 rows read high. Reported cost is a floor: compaction surcharge is separate, a `low–high` range in "Surcharge est ($)".
+**`peak_ctx`:** main transcript occupancy over `usage.iterations[]` (top-level `usage` sums them, so it is no single occupancy), excluding `advisor_message` iterations and sub-agents; pre-2026-08-26 rows read high. Reported cost is a floor: compaction surcharge is separate, a `low–high` range in "Surcharge est ($)" for recomputed or recomputed-anomalous rows with at least one compaction, else an em-dash (—).
 
 ### Startup archival
 
@@ -100,7 +101,7 @@ scans `skipped/`:
    - **Implementation agent** (`bin/automouse/prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, runs a pre-handoff conformance check (Step 6.6), writes a handoff file. Model per-plan via `impl_model:` (six values: `sonnet`/`claude-sonnet-5-5` → Sonnet (legacy: `claude-sonnet-4-6`), `haiku`/`claude-haiku-4-5` → Haiku, `opus`/`claude-opus-5-5` or absent → Opus; validated by `bin/lib/plan-impl-model`; other values rejected before the counter). Declare `sonnet` for uniformly-mechanical plans only. Post-plan runs `bin/post-plan-now` (Sonnet `/post-plan` fallback).
    - **Post-plan** (`bin/post-plan-now --foreground`, run in the handoff's worktree): runs `/post-plan` (code review, security audit, PR, CI monitoring, auto-merge), writes the completion report
 4. **Guards:** The loop stops when the queue is empty or ~4h45m have elapsed. Plans that fail 3 times (after genuine, full-length attempts) are moved to `skipped/` as poison pills.
-   - Environmental failures stop the run cleanly. A usage/rate limit, auth error, or any transient that kills an agent refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run. Each stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report. The watchdog stall threshold is **30 min, not 10**, because an asynchronous `Agent` delegate emits nothing on the parent's stream while it works. A deliberate impl disposition (to `done/` or `skipped/`) is an outcome; the loop continues. A `bin/wt-new` failure is a counted attempt; the agent drops `<plan>.wt-fail` and the loop defers the plan. `MAX_ATTEMPTS` bounds retries. A wall-clock cap-timeout is refunded too, but only a bounded number of times per plan, and does not break the loop. Exact signatures, thresholds and refund limits: `should_impl_env_stop()`, `impl_cap_timeout()`, `should_refund_cap_timeout()`. Locked by `bin/test-automouse-env-breaker` and `bin/test-automouse-impl-cap-timeout`. Post-plan uses `postplan_cap_timeout()` (classifies 124/137/143 against `REMAINING_SECS`) and `should_hold_postplan_disposal()`: a cap-killed OPEN PR whose Phase 5.5 verdict predates the run is held in `queue/`; `notify_postplan_hold()` DMs the PR URL. Locked by `bin/test-automouse-postplan-disposition`.
+   - Environmental failures stop the run cleanly. A usage/rate limit, auth error, or any transient that kills an agent refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run. One dead-budget run cannot grind every queued plan into `skipped/`. Each stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report. The watchdog stall threshold is **30 min, not 10**, because an asynchronous `Agent` delegate emits nothing on the parent's stream while it works. A deliberate impl disposition (to `done/` or `skipped/`) is an outcome; the loop continues. A `bin/wt-new` failure is a counted attempt; the agent drops `<plan>.wt-fail` and the loop defers the plan. `MAX_ATTEMPTS` bounds retries. A wall-clock cap-timeout is refunded too, but only a bounded number of times per plan, and does not break the loop. Exact signatures, thresholds and refund limits: `should_impl_env_stop()`, `impl_cap_timeout()`, `should_refund_cap_timeout()`. Locked by `bin/test-automouse-env-breaker` and `bin/test-automouse-impl-cap-timeout`. Post-plan uses `postplan_cap_timeout()` (classifies 124/137/143 against `REMAINING_SECS`) and `should_hold_postplan_disposal()`: a cap-killed OPEN PR whose Phase 5.5 verdict predates the run is held in `queue/`; `notify_postplan_hold()` DMs the PR URL. Locked by `bin/test-automouse-postplan-disposition`.
 5. **After a run:** Check `gh pr list` for new PRs, read reports for details
 
 ## Headless Mode

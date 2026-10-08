@@ -312,7 +312,7 @@ rm -rf "$HOME/Library/LaunchAgents"
 
 # Mirror the installer's REPO_ROOT/MAIN_WT derivation exactly.
 _chk_repo="$(cd "$SCRIPT_DIR/.." && pwd)"
-_chk_main_wt="$(git -C "$_chk_repo" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+_chk_main_wt="$(git -C "$_chk_repo" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
 [ -n "$_chk_main_wt" ] || _chk_main_wt="$_chk_repo"
 
 if [ "$_chk_repo" != "$_chk_main_wt" ]; then
@@ -364,10 +364,11 @@ else
     else
         lht_fail "12: should have written 2 plists on main-checkout install — found $_plist_found"
     fi
-    if grep -q "bootstrap" "$STUB/launchctl.log" 2>/dev/null; then
-        lht_ok "12: launchctl bootstrap was called"
+    _bootstrap_count="$(grep -c '^bootstrap ' "$STUB/launchctl.log" 2>/dev/null || true)"
+    if [ "${_bootstrap_count:-0}" -eq 2 ]; then
+        lht_ok "12: launchctl called with exactly 2 bootstrap calls"
     else
-        lht_fail "12: launchctl should have been called with bootstrap"
+        lht_fail "12: launchctl should have exactly 2 bootstrap calls (login + daily) — got ${_bootstrap_count:-0}"
     fi
 fi
 
@@ -415,6 +416,29 @@ if printf '%s\n' "$_help_out" | grep -q -- '--print-schedule'; then
     lht_ok "14: --help mentions --print-schedule"
 else
     lht_fail "14: --help should mention --print-schedule"
+fi
+
+# ── Case 15: long worktree list must not SIGPIPE the MAIN_WT derivation ──────
+# awk used to `exit` after the first entry; with a producer larger than one pipe
+# buffer git got SIGPIPE (141) and pipefail + set -e killed the script silently.
+mkdir -p "$STUB/biggit"
+cat > "$STUB/biggit/git" <<'BIGGIT_SH'
+#!/bin/sh
+case "$*" in
+    *"worktree list --porcelain"*)
+        awk 'BEGIN { for (i = 0; i < 5000; i++) printf "worktree /stub/main-or-wt-%d\nHEAD 0000000000000000000000000000000000000000\nbranch refs/heads/b%d\n\n", i, i }'
+        ;;
+    *) exit 0 ;;
+esac
+BIGGIT_SH
+chmod +x "$STUB/biggit/git"
+_big_out="$(PATH="$STUB/biggit:$STUB/sbin:$PATH" "$SETUP_BIN" --print-schedule daily 2>/dev/null)"
+_big_rc=$?
+lht_expect_eq "15: --print-schedule daily rc=0 with 5000-entry worktree list" "0" "$_big_rc"
+if printf '%s\n' "$_big_out" | grep -qF -- '/stub/main-or-wt-0/bin/launchd-health-check'; then
+    lht_ok "15: first worktree entry chosen as MAIN_WT"
+else
+    lht_fail "15: expected /stub/main-or-wt-0 as MAIN_WT in plist Program"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────

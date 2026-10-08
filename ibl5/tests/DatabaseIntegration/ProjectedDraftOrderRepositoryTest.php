@@ -178,7 +178,7 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
     public function testIsDraftOrderFinalizedReturnsFalse(): void
     {
         // Explicitly set to 'No' within the transaction to avoid relying on seed/production state
-        $stmt = $this->db->prepare("UPDATE ibl_settings SET value = 'No' WHERE setting_key = 'Draft Order Finalized'");
+        $stmt = $this->db->prepare("UPDATE ibl_settings SET setting_value = 'No' WHERE setting_key = 'Draft Order Finalized'");
         self::assertNotFalse($stmt);
         $stmt->execute();
         $stmt->close();

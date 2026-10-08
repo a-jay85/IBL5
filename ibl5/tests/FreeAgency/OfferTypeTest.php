@@ -20,8 +20,8 @@ class OfferTypeTest extends TestCase
     public function testMLEOffersConstant(): void
     {
         $expected = [450, 495, 540, 585, 630, 675];
-        $this->assertEquals($expected, \ContractRules::MLE_OFFERS);
-        $this->assertCount(6, \ContractRules::MLE_OFFERS);
+        $this->assertEquals($expected, \League\ContractRules::MLE_OFFERS);
+        $this->assertCount(6, \League\ContractRules::MLE_OFFERS);
     }
 
     /**

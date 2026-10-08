@@ -1,6 +1,6 @@
 ---
 description: Triage non-trivial work as ad-hoc vs /plan; ad-hoc bar, safety mirror, Sonnet execution routing, hook-enforced triggers.
-last_verified: 2026-10-03
+last_verified: 2026-10-07
 ---
 
 # Work Triage Rule
@@ -51,7 +51,7 @@ Hook-enforced by `~/.claude/hooks/plan-gate-edit.sh` § Check 1 — the deny mes
 
 ## Execution routing: a `/plan` verdict routes to `bin/plan-now`, never inline
 
-Hook-enforced by `~/.claude/hooks/plan-gate-skill.sh` — denies inline `Skill(plan)`. Exemptions and escape hatch: `work-triage-detail.md` § `/plan` verdict routing.
+Hook-enforced by `~/.claude/hooks/skill-gate.sh`, which denies inline `Skill(plan)`. Exemptions and escape hatch: `work-triage-detail.md` § `/plan` verdict routing.
 
 ## Execution routing: repeat-polling is a spend bug
 

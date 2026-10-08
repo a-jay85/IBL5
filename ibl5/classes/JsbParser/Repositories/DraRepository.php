@@ -6,7 +6,7 @@ namespace JsbParser\Repositories;
 
 use League\LeagueContext;
 
-class DraRepository extends \BaseMysqliRepository
+class DraRepository extends \Database\BaseMysqliRepository
 {
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {

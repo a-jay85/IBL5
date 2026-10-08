@@ -9,7 +9,7 @@ use RookieOption\Contracts\RookieOptionRepositoryInterface;
 /**
  * @see RookieOptionRepositoryInterface
  */
-class RookieOptionRepository extends \BaseMysqliRepository implements RookieOptionRepositoryInterface
+class RookieOptionRepository extends \Database\BaseMysqliRepository implements RookieOptionRepositoryInterface
 {
     /**
      * @see RookieOptionRepositoryInterface::updatePlayerRookieOption()

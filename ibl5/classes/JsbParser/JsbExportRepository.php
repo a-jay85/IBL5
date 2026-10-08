@@ -12,7 +12,7 @@ use JsbParser\Contracts\JsbExportRepositoryInterface;
  * Gathers player data and transaction data from the database for writing
  * back to .plr and .trn files.
  */
-class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepositoryInterface
+class JsbExportRepository extends \Database\BaseMysqliRepository implements JsbExportRepositoryInterface
 {
     /**
      * @see JsbExportRepositoryInterface::getAllPlayerChangeableFields()

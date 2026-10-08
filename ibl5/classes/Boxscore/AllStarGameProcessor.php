@@ -26,6 +26,7 @@ class AllStarGameProcessor implements GameTypeProcessorInterface
         private GameUpsertResolver $resolver,
         private GameLineWriter $writer,
         private BoxscoreRepository $repository,
+        private AllStarTeamRepository $allStarRepository,
     ) {
     }
 
@@ -49,7 +50,7 @@ class AllStarGameProcessor implements GameTypeProcessorInterface
         );
 
         // Check if team names already exist in DB for this game
-        $existingNames = $this->repository->findAllStarTeamNames($gameDate);
+        $existingNames = $this->allStarRepository->findAllStarTeamNames($gameDate);
 
         if ($existingNames !== null) {
             // Names already set — check if scores match

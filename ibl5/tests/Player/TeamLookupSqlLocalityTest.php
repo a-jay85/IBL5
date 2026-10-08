@@ -74,7 +74,8 @@ final class TeamLookupSqlLocalityTest extends TestCase
     /**
      * Members declared on $ref whose parameter or property type mentions mysqli.
      *
-     * @param \ReflectionClass<object> $ref
+     * @template T of object
+     * @param \ReflectionClass<T> $ref
      * @return list<string>
      */
     private static function mysqliTypedMembers(\ReflectionClass $ref): array

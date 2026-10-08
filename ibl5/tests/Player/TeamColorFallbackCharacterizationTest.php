@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
 final class TeamColorFallbackCharacterizationTest extends TestCase
 {
     /**
-     * @return array<string, array{0: list<array<string, string|null>>, 1: array{color1: string, color2: string}}>
+     * @return array<string, array{0: list<array{color1: string|null, color2: string|null}>, 1: array{color1: string, color2: string}}>
      */
     public static function colorFallbackCases(): array
     {
@@ -30,7 +30,7 @@ final class TeamColorFallbackCharacterizationTest extends TestCase
     }
 
     /**
-     * @param list<array<string, string|null>> $mockRows
+     * @param list<array{color1: string|null, color2: string|null}> $mockRows
      * @param array{color1: string, color2: string} $expected
      */
     #[DataProvider('colorFallbackCases')]

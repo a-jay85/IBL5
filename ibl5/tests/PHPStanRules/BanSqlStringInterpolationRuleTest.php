@@ -65,4 +65,9 @@ final class BanSqlStringInterpolationRuleTest extends RuleTestCase
             [],
         );
     }
+
+    public function testChunkLeadersBlockHasNoInterpolatedSql(): void
+    {
+        $this->analyse([__DIR__ . '/../../blocks/block-Chunk_Leaders.php'], []);
+    }
 }

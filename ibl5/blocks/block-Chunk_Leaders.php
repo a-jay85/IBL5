@@ -34,7 +34,7 @@ FROM (
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
     INNER JOIN ibl_team_info t ON players.teamid = t.teamid
-    WHERE boxes.game_date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    WHERE boxes.game_date BETWEEN ? AND ?
     GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 
     UNION ALL
@@ -50,7 +50,7 @@ FROM (
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
     INNER JOIN ibl_team_info t ON players.teamid = t.teamid
-    WHERE boxes.game_date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    WHERE boxes.game_date BETWEEN ? AND ?
     GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 
     UNION ALL
@@ -66,7 +66,7 @@ FROM (
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
     INNER JOIN ibl_team_info t ON players.teamid = t.teamid
-    WHERE boxes.game_date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    WHERE boxes.game_date BETWEEN ? AND ?
     GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 
     UNION ALL
@@ -82,7 +82,7 @@ FROM (
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
     INNER JOIN ibl_team_info t ON players.teamid = t.teamid
-    WHERE boxes.game_date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    WHERE boxes.game_date BETWEEN ? AND ?
     GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 
     UNION ALL
@@ -98,12 +98,31 @@ FROM (
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
     INNER JOIN ibl_team_info t ON players.teamid = t.teamid
-    WHERE boxes.game_date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    WHERE boxes.game_date BETWEEN ? AND ?
     GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 ) t
 WHERE rn <= 5
 ORDER BY FIELD(stat_type, 'Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'), rn;";
-$resultSimStatLeaders = $mysqli_db->query($querySimStatLeaders);
+$stmtSimStatLeaders = $mysqli_db->prepare($querySimStatLeaders);
+if ($stmtSimStatLeaders === false) {
+    $content = '';
+    return;
+}
+$stmtSimStatLeaders->bind_param(
+    str_repeat('s', 10),
+    $lastSimStartDate, $lastSimEndDate,
+    $lastSimStartDate, $lastSimEndDate,
+    $lastSimStartDate, $lastSimEndDate,
+    $lastSimStartDate, $lastSimEndDate,
+    $lastSimStartDate, $lastSimEndDate
+);
+$stmtSimStatLeaders->execute();
+$resultSimStatLeaders = $stmtSimStatLeaders->get_result();
+$stmtSimStatLeaders->close();
+if ($resultSimStatLeaders === false) {
+    $content = '';
+    return;
+}
 
 $rows = $resultSimStatLeaders->fetch_all(MYSQLI_ASSOC);
 

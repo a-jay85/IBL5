@@ -1014,3 +1014,36 @@ def test_run_sentinel_write_refreshes_cached_body(monkeypatch):
     res = _sentinel_run(monkeypatch, gh)
     assert res.sentinel == "written"
     assert classify.MANUAL_TESTING_SENTINEL_TICKED in gh.pr_body()
+
+
+# ---------------------------------------------------------------------------
+# Real-body fixture (PR 2871) and shell-twin drift
+# ---------------------------------------------------------------------------
+
+from pathlib import Path
+
+_PR2871 = Path(__file__).resolve().parent / "fixtures" / "pr2871_body.txt"
+
+
+def test_pr2871_fixture_is_all_ticked_without_sentinel():
+    body = _PR2871.read_text()
+    assert armable.all_rows_ticked(body)
+    assert armable.manual_testing_clearance(body, changed_files=()) == "HELD"
+
+
+def test_pr2871_fixture_gets_exactly_one_sentinel_line():
+    body = _PR2871.read_text()
+    out, changed = mt.upsert_ticked_sentinel(body)
+    assert changed is True
+    assert armable.manual_testing_clearance(out, changed_files=()) == "CLEARED"
+    lines = body.splitlines()
+    at = next(i for i, l in enumerate(lines) if l.startswith("## Manual Testing"))
+    expected = lines[:at + 1] + ["", classify.MANUAL_TESTING_SENTINEL_TICKED] + lines[at + 1:]
+    assert out.splitlines() == expected
+
+
+def test_ticked_sentinel_pinned_in_shell_twin_test():
+    here = Path(__file__).resolve()
+    root = next(p for p in here.parents if (p / "bin" / "test-postplan-arm-conditions").is_file())
+    text = (root / "bin" / "test-postplan-arm-conditions").read_text()
+    assert text.count(classify.MANUAL_TESTING_SENTINEL_TICKED) >= 2

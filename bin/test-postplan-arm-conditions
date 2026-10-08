@@ -1874,6 +1874,14 @@ expect_clearance "(1) tick shape: sentinel + one Truly-manual row unticked → H
     "$(printf '## Manual Testing\n\nNo manual testing needed — remaining steps are covered by automated checks run in Phase 6; verification is automated: bin/test-foo\n\n- [x] **Row 1** — run bin/test-foo\n- [ ] **Row 2** — does the new page look right?\n')"
 expect_clearance "(1) tick shape: all ticked, no sentinel → HELD" "HELD" \
     "$(printf '## Manual Testing\n\n- [x] **Row 1** — run bin/test-foo\n- [x] **Row 2** — check the log line\n\n<!-- files-changed:begin -->\n- a.sh\n<!-- files-changed:end -->\n')"
+# (1) harness Phase 6.7 writes MANUAL_TESTING_SENTINEL_TICKED (harness/classify.py) above
+# the rows it ticked (backlog#1360). The wording here must match that constant byte for
+# byte; tests/test_manual_testing.py::test_ticked_sentinel_pinned_in_shell_twin_test
+# fails on drift.
+expect_clearance "(1) tick shape: Phase 6.7 ticked sentinel + all ticked → CLEARED" "CLEARED" \
+    "$(printf '## Manual Testing\n\nNo manual testing needed — every row below was ticked by the harness in Phase 6.7; each is covered by an automated check that passed.\n\n- [x] **Row 1** — run bin/test-foo\n- [x] **Row 2** — check the log line\n\n<!-- files-changed:begin -->\n- a.sh\n<!-- files-changed:end -->\n')"
+expect_clearance "(1) tick shape: Phase 6.7 ticked sentinel + one row unticked → HELD" "HELD" \
+    "$(printf '## Manual Testing\n\nNo manual testing needed — every row below was ticked by the harness in Phase 6.7; each is covered by an automated check that passed.\n\n- [x] **Row 1** — run bin/test-foo\n- [ ] **Row 2** — does the new page look right?\n')"
 expect_clearance "(1) counterfeit: quoted > sentinel and > - [x] before heading, real window unticked → HELD" "HELD" \
     "$(printf '<!-- manual-confirmation:begin -->\n## Manual confirmation needed\n\n> No manual testing needed — quoted from the plan\n> - [x] **Row 1** — quoted from the plan\n<!-- manual-confirmation:end -->\n\n## Manual Testing\n\n- [ ] **Row 1** — run bin/test-foo\n')"
 expect_clearance "(1) counterfeit: quoted > sentinel before heading, real window all ticked → HELD" "HELD" \

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Player\Views;
 
 use Player\Player;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Security\HtmlSanitizer;
 
 /**
@@ -39,13 +40,13 @@ class PlayerTradingCardFrontView
      * @param Player $player The player object
      * @param int $playerID The player's ID
      * @param string $contractDisplay Formatted contract string
-     * @param \mysqli|null $db Optional database connection for team colors
+     * @param TeamIdentityRepositoryInterface|null $teamRepo Optional team lookup for team colors
      * @return string HTML for trading card front
      */
-    public static function render(Player $player, int $playerID, string $contractDisplay, ?\mysqli $db = null): string
+    public static function render(Player $player, int $playerID, string $contractDisplay, ?TeamIdentityRepositoryInterface $teamRepo = null): string
     {
         // Get color scheme and prepare player data
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->getTeamid() ?? 0);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($teamRepo, $player->getTeamid() ?? 0);
         $playerData = CardBaseStyles::preparePlayerData($player, $playerID);
 
         $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);

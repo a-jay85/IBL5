@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HeadToHeadRecords;
 
 use HeadToHeadRecords\Contracts\HeadToHeadRecordsRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * HeadToHeadRecordsController - Orchestrates filter resolution and output for the H2H matrix.
@@ -34,20 +35,20 @@ class HeadToHeadRecordsController
     private HeadToHeadRecordsView $view;
     private \Season\Season $season;
     private object $user;
-    private \mysqli $db;
+    private TeamIdentityRepositoryInterface $teamRepo;
 
     public function __construct(
         HeadToHeadRecordsRepositoryInterface $repo,
         HeadToHeadRecordsView $view,
         \Season\Season $season,
         object $user,
-        \mysqli $db
+        TeamIdentityRepositoryInterface $teamRepo
     ) {
         $this->repo   = $repo;
         $this->view   = $view;
         $this->season = $season;
         $this->user   = $user;
-        $this->db     = $db;
+        $this->teamRepo = $teamRepo;
     }
 
     /**
@@ -130,7 +131,7 @@ class HeadToHeadRecordsController
         }
 
         // gms dimension: look up the owner_name for this teamid
-        $ownerName = $this->lookupOwnerName($teamid);
+        $ownerName = $this->teamRepo->getOwnerName($teamid);
         if ($ownerName === null) {
             return [];
         }
@@ -142,25 +143,6 @@ class HeadToHeadRecordsController
         }
 
         return [];
-    }
-
-    /**
-     * Look up the owner_name for a given teamid.
-     * Extracted for testability via anonymous subclass override.
-     */
-    protected function lookupOwnerName(int $teamid): ?string
-    {
-        $stmt = $this->db->prepare('SELECT owner_name FROM `ibl_team_info` WHERE teamid = ?');
-        if ($stmt === false) {
-            return null;
-        }
-        $stmt->bind_param('i', $teamid);
-        $stmt->execute();
-        $stmt->bind_result($ownerName);
-        $fetched = $stmt->fetch();
-        $stmt->close();
-
-        return ($fetched === true && is_string($ownerName)) ? $ownerName : null;
     }
 
     /**

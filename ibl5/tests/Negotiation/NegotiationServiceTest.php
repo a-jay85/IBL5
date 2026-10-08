@@ -10,6 +10,7 @@ use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationValidator;
 use Negotiation\ExtensionContractDemandCalculator;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
@@ -95,6 +96,7 @@ class NegotiationServiceTest extends TestCase
             new NegotiationRepository($this->mockDb, $commonRepo),
             new NegotiationValidator($this->mockDb, $season),
             new ExtensionContractDemandCalculator($this->mockDb, $commonRepo),
+            self::createStub(TeamIdentityRepositoryInterface::class),
         );
     }
 

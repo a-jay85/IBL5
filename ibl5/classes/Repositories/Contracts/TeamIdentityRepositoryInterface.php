@@ -28,6 +28,20 @@ interface TeamIdentityRepositoryInterface
 
     public function getTeamnameFromTeamID(int $teamid): ?string;
 
+    /**
+     * Raw color columns for one team. Fallback colors are presentation policy
+     * and live in TeamColorHelper::resolveTeamColors(), never here.
+     *
+     * @return array{color1: string, color2: string}|null Null when no row exists
+     */
+    public function getTeamColorRow(int $teamid): ?array;
+
+    /**
+     * Owner (GM display) name for one team. Null when no row exists;
+     * an empty owner_name is returned as '' unchanged.
+     */
+    public function getOwnerName(int $teamid): ?string;
+
     public function getTeamDiscordID(string $teamName): ?int;
 
     /**

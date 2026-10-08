@@ -1327,6 +1327,31 @@ def test_char_force_bypasses_holdrepeat_decline(tmp_path):
     assert forced.returncode != 8, f"stdout={forced.stdout!r} stderr={forced.stderr!r}"
 
 
+def test_guard_allow_test_only_skips_exit_5(tmp_path):
+    """Catches: dropping the ALLOW_TEST_ONLY branch from the exit-5 guard."""
+    r = _run_ppn(tmp_path, args=("--allow-test-only",),
+                 extra_env={"FAKE_PR_NUMBER": "2186"}, dirty=_TEST_ONLY_DIRTY)
+    assert r.returncode != 5, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "--allow-test-only: PR #" in r.stderr
+
+
+def test_guard_allow_test_only_rejects_value_form(tmp_path):
+    """--allow-test-only is a BARE flag. Catches a permissive `--allow-test-only=*)` arm."""
+    r = _run_ppn(tmp_path, args=("--allow-test-only=1",),
+                 extra_env={"FAKE_PR_NUMBER": "2186"}, dirty=_TEST_ONLY_DIRTY)
+    assert r.returncode != 0
+    assert "unknown argument '--allow-test-only=1'" in r.stderr, f"got {r.stderr!r}"
+
+
+def test_guard_allow_test_only_does_not_bypass_holdrepeat_decline(tmp_path):
+    """Catches the flag also setting FORCE=1, which would skip the exit-8 decline."""
+    h = _holdrepeat_harness(tmp_path)
+    r = _run_ppn(tmp_path, args=("--allow-test-only",), extra_env={"HARNESS": str(h)})
+    assert r.returncode == 8, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "post-plan DECLINED" in r.stdout
+
+
 def test_guard_proceeds_when_no_pr_exists(tmp_path):
     """The hard stop: the guard must NOT widen to the no-PR case. Catches removing or
     inverting `[ -n "$PR_NUM" ]`."""
@@ -1582,6 +1607,13 @@ def test_guard_force_flag_overrides_inflight_refusal(tmp_path):
     r = _run_ppn(tmp_path, args=("--force",), launchctl_stub=_LAUNCHCTL_LIVE)
     assert r.returncode != 6
     assert "already in flight" not in r.stdout
+
+
+def test_guard_allow_test_only_does_not_bypass_inflight_refusal(tmp_path):
+    """Catches the flag also setting FORCE=1, which would skip the in-flight refusal."""
+    r = _run_ppn(tmp_path, args=("--allow-test-only",), launchctl_stub=_LAUNCHCTL_LIVE)
+    assert r.returncode == 6, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "already in flight" in r.stdout
 
 
 def test_guard_slug_prefix_does_not_match_a_longer_slug(tmp_path):

@@ -299,7 +299,7 @@ set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
-Usage: bin/post-plan-now [--auto] [--force] [--foreground] [--plan <path>] [--pr <n>]
+Usage: bin/post-plan-now [--auto] [--force] [--allow-test-only] [--foreground] [--plan <path>] [--pr <n>]
 
 Fire a detached post-plan run on the current worktree's branch. Run from
 anywhere inside the target worktree.
@@ -310,6 +310,9 @@ Options:
                    unless IBL5_BURNDOWN_LOOP=1, which bin/burndown-loop sets).
   --force          Override the "PR already exists and working set touches no
                    production files" guard (exit 5).
+  --allow-test-only  Skip only the test-only exit-5 guard. Unlike --force it keeps
+                   the in-flight, fleet-slot and holdrepeat (exit 8) guards. Passed
+                   by bin/pr-cycle rescues through bin/post-plan-fleet. Bare flag only.
   --foreground     Run the engine in this shell instead of detaching via launchd.
   --plan <path>    Override the plan file path (default: resolved from branch slug).
   --pr <n>         Drive the worktree holding PR <n>'s head branch; creates the
@@ -323,6 +326,7 @@ fi
 
 AUTO=0
 FORCE=0
+ALLOW_TEST_ONLY=0
 PLAN_OVERRIDE=""
 FOREGROUND=0
 PR_NUM=""
@@ -352,6 +356,7 @@ while [ $# -gt 0 ]; do
         --resume-paused) echo "post-plan-now: --resume-paused must be the only argument" >&2; exit 2 ;;
         --auto)   AUTO=1 ; shift ;;
         --force)  FORCE=1 ; shift ;;
+        --allow-test-only) ALLOW_TEST_ONLY=1 ; shift ;;
         --foreground) FOREGROUND=1 ; shift ;;
         --plan)   [ $# -ge 2 ] || { echo "post-plan-now: --plan requires a path argument" >&2; exit 1; }
                   PLAN_OVERRIDE="$2" ; shift 2 ;;
@@ -359,7 +364,7 @@ while [ $# -gt 0 ]; do
         --pr)     [ $# -ge 2 ] || { echo "post-plan-now: --pr requires a PR number argument" >&2; exit 1; }
                   PR_NUM="$2" ; shift 2 ;;
         --pr=*)   PR_NUM="${1#--pr=}" ; shift ;;
-        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --force, --foreground, --plan <path>, --pr <n>)" >&2
+        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --force, --allow-test-only, --foreground, --plan <path>, --pr <n>)" >&2
                   exit 1 ;;
     esac
 done
@@ -568,10 +573,14 @@ if [ "${FORCE:-0}" -eq 0 ]; then
             | grep -vE '^ibl5/tests/|\.test\.(ts|js|php)$|\.spec\.(ts|js)$' \
             | grep -v '^$' || true)
         if [ -z "$PROD_FILES" ]; then
-            echo "post-plan-now: PR #$OPEN_PR_NUM exists and the working set touches no production files." >&2
-            echo "  Use /commit-commands:commit-push-pr instead — cheaper, and CI already runs those tests on push." >&2
-            echo "  To override: bin/post-plan-now --force" >&2
-            exit 5
+            if [ "$ALLOW_TEST_ONLY" -eq 1 ]; then
+                echo "post-plan-now: --allow-test-only: PR #$OPEN_PR_NUM working set is test-only; proceeding (rescue caller)" >&2
+            else
+                echo "post-plan-now: PR #$OPEN_PR_NUM exists and the working set touches no production files." >&2
+                echo "  Use /commit-commands:commit-push-pr instead — cheaper, and CI already runs those tests on push." >&2
+                echo "  To override: bin/post-plan-now --force" >&2
+                exit 5
+            fi
         fi
     fi
 fi

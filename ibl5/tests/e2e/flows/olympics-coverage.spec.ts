@@ -11,7 +11,7 @@ test.describe('Olympics module coverage', () => {
     await assertNoPhpErrors(page, 'on Olympics Standings');
 
     // Should show group standings with expected columns
-    const tables = page.locator('.ibl-data-table, table');
+    const tables = page.locator('.ibl-data-table');
     await expect(tables.first()).toBeVisible();
 
     // Standings table should have team-related headers

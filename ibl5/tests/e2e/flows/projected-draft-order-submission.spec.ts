@@ -59,7 +59,7 @@ test.describe('save_order: admin happy path', () => {
       readBack: async () => {
         await page.goto('modules.php?name=ProjectedDraftOrder');
         const table = page
-          .locator('.projected-draft-order-table, .ibl-data-table')
+          .locator('.projected-draft-order-table')
           .first();
         await expect(table).toBeVisible();
 
@@ -237,7 +237,7 @@ test.describe('ProjectedDraftOrder: admin drag reorder', () => {
     // Read back: navigate and assert the reordered teamid order persisted
     await page.goto('modules.php?name=ProjectedDraftOrder');
     const table = page
-      .locator('.projected-draft-order-table, .ibl-data-table')
+      .locator('.projected-draft-order-table')
       .first();
     await expect(table).toBeVisible();
 

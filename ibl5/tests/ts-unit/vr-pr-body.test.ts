@@ -7,6 +7,7 @@ import {
   buildNewScreensSection,
   normalizeBody,
   spliceBody,
+  findManagedBlocks,
   AGENT_SHOTS_BEGIN,
   AGENT_SHOTS_END,
   buildPrBodyBlock,
@@ -137,14 +138,22 @@ describe('spliceBody', () => {
     expect(twice).toBe(once);
   });
 
-  it('5d: a BEGIN marker mid-body (not offset 0) is NOT stripped and is preserved verbatim after prepend', () => {
+  it('5d: marker mentions inline, in a code span, and inside a fence are human text and are preserved verbatim', () => {
     const section = buildNewScreensSection(
       [{ module: 'standings', viewport: 'desktop', title: 'standings' }],
       PAGES_URL
     );
-    const midBodyBegin = `Some prose.\n\n${PR_BODY_MARKER_BEGIN}\nnot really a managed block\n${PR_BODY_MARKER_END}`;
-    const result = spliceBody(midBodyBegin, section);
-    expect(result).toBe(`${section}\n\n${midBodyBegin}`);
+    const body = [
+      `Some prose mentioning \`${PR_BODY_MARKER_BEGIN}\` inline.`,
+      '',
+      '```',
+      PR_BODY_MARKER_BEGIN,
+      'example',
+      PR_BODY_MARKER_END,
+      '```',
+    ].join('\n');
+    expect(spliceBody(body, section)).toBe(`${section}\n\n${body}`);
+    expect(spliceBody(body, '')).toBe(body);
   });
 
   it('5e: strip case — block at offset 0 + section === "" removes the block, prose preserved', () => {
@@ -155,6 +164,87 @@ describe('spliceBody', () => {
     const prose = 'Human prose here.';
     const withBlock = spliceBody(prose, section);
     expect(spliceBody(withBlock, '')).toBe(prose);
+  });
+
+  const sectionFor = (module: string) =>
+    buildNewScreensSection([{ module, viewport: 'desktop', title: module }], PAGES_URL);
+
+  it('5f: an own-line block mid-body is replaced in place', () => {
+    const sectionA = sectionFor('standings');
+    const sectionB = sectionFor('roster');
+    const out = spliceBody(`Intro.\n\n${sectionA}\n\nOutro.`, sectionB);
+    expect(out).toBe(`Intro.\n\n${sectionB}\n\nOutro.`);
+    expect(out).not.toContain('standings');
+  });
+
+  it('5g: a stale second block is stripped and the result is idempotent', () => {
+    const sectionA = sectionFor('standings');
+    const sectionB = sectionFor('roster');
+    const sectionStale = sectionFor('stale');
+    const once = spliceBody(`${sectionA}\n\nmiddle\n\n${sectionStale}\n\nsummary`, sectionB);
+    expect(once).toBe(`${sectionB}\n\nmiddle\n\nsummary`);
+    expect(spliceBody(once, sectionB)).toBe(once);
+  });
+
+  it('5h: strip case removes every block', () => {
+    const sectionA = sectionFor('standings');
+    const sectionStale = sectionFor('stale');
+    expect(spliceBody(`${sectionA}\n\nmiddle\n\n${sectionStale}\n\nsummary`, '')).toBe('middle\n\nsummary');
+  });
+
+  it('5i: unterminated BEGIN and stray END are human text', () => {
+    const section = sectionFor('standings');
+    const dangling = `prose\n\n${PR_BODY_MARKER_BEGIN}\ndangling`;
+    const stray = `prose\n\n${PR_BODY_MARKER_END}`;
+    for (const body of [dangling, stray]) {
+      expect(spliceBody(body, section)).toBe(`${section}\n\n${body}`);
+      expect(spliceBody(body, '')).toBe(body);
+    }
+  });
+});
+
+describe('findManagedBlocks', () => {
+  const sectionFor = (module: string) =>
+    buildNewScreensSection([{ module, viewport: 'desktop', title: module }], PAGES_URL);
+
+  it('15a: no blocks in empty or prose bodies', () => {
+    expect(findManagedBlocks('')).toEqual([]);
+    expect(findManagedBlocks('Human prose.')).toEqual([]);
+  });
+
+  it('15b: one block at offset 0 spans the whole section', () => {
+    const section = sectionFor('standings');
+    expect(findManagedBlocks(section)).toEqual([{ start: 0, end: section.length }]);
+  });
+
+  it('15c: two blocks are returned in body order', () => {
+    const one = sectionFor('standings');
+    const two = sectionFor('roster');
+    const body = `Intro.\n\n${one}\n\nmiddle\n\n${two}\n\nOutro.`;
+    const blocks = findManagedBlocks(body);
+    expect(blocks).toHaveLength(2);
+    expect(body.slice(blocks[0].start, blocks[0].end)).toBe(one);
+    expect(body.slice(blocks[1].start, blocks[1].end)).toBe(two);
+  });
+
+  it('15d: markers inside backtick and tilde fences are ignored', () => {
+    const inner = `${PR_BODY_MARKER_BEGIN}\nx\n${PR_BODY_MARKER_END}`;
+    expect(findManagedBlocks(`\`\`\`\n${inner}\n\`\`\``)).toEqual([]);
+    expect(findManagedBlocks(`~~~\n${inner}\n~~~`)).toEqual([]);
+  });
+
+  it('15e: inline and unterminated markers are ignored', () => {
+    expect(findManagedBlocks(`${PR_BODY_MARKER_BEGIN} trailing text\nx\n${PR_BODY_MARKER_END}`)).toEqual([]);
+    expect(findManagedBlocks(`${PR_BODY_MARKER_BEGIN}\nno end`)).toEqual([]);
+    expect(findManagedBlocks(PR_BODY_MARKER_END)).toEqual([]);
+  });
+
+  it('15f: a re-opened BEGIN restarts the block', () => {
+    const body = `${PR_BODY_MARKER_BEGIN}\n${PR_BODY_MARKER_BEGIN}\nx\n${PR_BODY_MARKER_END}`;
+    const blocks = findManagedBlocks(body);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].start).toBe(PR_BODY_MARKER_BEGIN.length + 1);
+    expect(blocks[0].end).toBe(body.length);
   });
 });
 
@@ -285,6 +375,17 @@ describe('extractAgentShots', () => {
     expect(extractAgentShots(outside)).toBe('');
     expect(extractAgentShots(`Prose\n\n${X}`)).toBe('');
   });
+
+  it('7c: reads the agent-shot sub-block from a block that is not at offset 0', () => {
+    const withShots = block({ spots: [makeSpot()], agentShots: X });
+    expect(extractAgentShots(`Intro.\n\n${withShots}`)).toBe(X);
+  });
+
+  it('7d: a sub-block only in a stale second block is not read', () => {
+    const first = block({ spots: [makeSpot()] });
+    const second = block({ spots: [makeSpot({ title: 'other' })], agentShots: X });
+    expect(extractAgentShots(`${first}\n\nmiddle\n\n${second}`)).toBe('');
+  });
 });
 
 describe('sanitizeLabel', () => {
@@ -361,5 +462,25 @@ describe('upsertAgentShots', () => {
     expect(e).not.toContain('**Before**');
     expect(e).toContain('**After**');
     expect(e).not.toContain(agentShotUrl(SHOT_SHA, 'a', 'before'));
+  });
+
+  it('10g: upsert into a block at offset > 0 edits that block and adds none', () => {
+    const body = `Intro.\n\n${block({ spots: [makeSpot()] })}\n\nOutro.`;
+    const out = upsertAgentShots(body, [entry('a')]);
+    expect(findManagedBlocks(out)).toHaveLength(1);
+    expect(out.startsWith('Intro.\n\n')).toBe(true);
+    expect(out.endsWith('\n\nOutro.')).toBe(true);
+    expect(extractAgentShots(out)).toContain('<!-- vr-agent-shot:a -->');
+    expect(markers(out, 'a')).toBe(1);
+  });
+
+  it('10h: upsert with two blocks writes only the first', () => {
+    const first = block({ spots: [makeSpot()] });
+    const second = block({ spots: [makeSpot({ title: 'other' })] });
+    const out = upsertAgentShots(`${first}\n\nmiddle\n\n${second}`, [entry('a')]);
+    expect(out.endsWith(`\n\nmiddle\n\n${second}`)).toBe(true);
+    expect(markers(out, 'a')).toBe(1);
+    expect(findManagedBlocks(out)).toHaveLength(2);
+    expect(extractAgentShots(out)).toContain('<!-- vr-agent-shot:a -->');
   });
 });

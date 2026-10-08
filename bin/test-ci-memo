@@ -107,12 +107,12 @@ mk_repo() {
 
 # Run bin/ci-memo key and capture hash= / key= into globals MEMO_HASH MEMO_KEY
 # Returns the exit code of ci-memo.
-run_key() {  # <repo> <manifest_dir> <scope>
+run_key() {  # <repo> <manifest_dir> <scope> [ci-memo args...]
     local repo="$1" mdir="$2" scope="$3"
     local out rc=0
     out=$(CI_MEMO_REPO="$repo" CI_MEMO_MANIFEST_DIR="$mdir" \
           GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="" \
-          "$MEMO" key "$scope" 2>/dev/null) || rc=$?
+          "$MEMO" key "$scope" "${@:4}" 2>/dev/null) || rc=$?
     MEMO_HASH=$(printf '%s' "$out" | grep '^hash=' | sed 's/^hash=//')
     MEMO_KEY=$(printf '%s'  "$out" | grep '^key='  | sed 's/^key=//')
     return "$rc"
@@ -650,6 +650,31 @@ if should_run gate-topology-mutants; then
     mt_check 7b filter_free_topology "$m/tests-7b.yml"
     mt_check 7c filter_free_topology "$m/tests-7c.yml"
     mt_check 7d filter_free_topology "$m/tests-7d.yml"
+fi
+
+# =========================================================================
+# Case: memo-only-salt (ADR-0186)
+# =========================================================================
+if should_run memo-only-salt; then
+    salt_repo="$TMP/salt-repo"; mk_repo "$salt_repo"
+    plain=""; s1=""; s2=""
+    run_key "$salt_repo" "$salt_repo/ci-memo" tests && plain="$MEMO_KEY"
+    run_key "$salt_repo" "$salt_repo/ci-memo" tests --extra gating=memo-only && s1="$MEMO_KEY"
+    run_key "$salt_repo" "$salt_repo/ci-memo" tests --extra gating=memo-only && s2="$MEMO_KEY"
+    if [[ -z "$plain" || -z "$s1" || -z "$s2" ]]; then
+        fail "memo-only-salt: key computation failed"
+    elif [[ "$s1" != "$s2" ]]; then
+        fail "memo-only-salt: salted key unstable on one tree ($s1 != $s2)"
+    elif [[ "$s1" == "$plain" ]]; then
+        fail "memo-only-salt: --extra gating=memo-only left the key unchanged"
+    else
+        pass "memo-only-salt: salted key stable on re-push and distinct from unsalted"
+    fi
+    if grep -qxF '        run: bin/ci-memo key tests --extra gating=memo-only' "$WF_TESTS"; then
+        pass "memo-only-salt: tests.yml salts the tests key"
+    else
+        fail "memo-only-salt: tests.yml Compute memo key lacks --extra gating=memo-only"
+    fi
 fi
 
 # =========================================================================

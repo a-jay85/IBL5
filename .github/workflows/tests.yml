@@ -105,7 +105,7 @@ jobs:
         id: key
         env:
           CI_MEMO_BYPASS: ${{ (github.event_name != 'pull_request' || github.run_attempt != '1') && 'not_pr_or_rerun' || '' }}
-        run: bin/ci-memo key tests
+        run: bin/ci-memo key tests --extra gating=memo-only
       - name: Look up memo
         id: lookup
         if: steps.key.outputs.hash != ''

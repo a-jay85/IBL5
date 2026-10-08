@@ -1,38 +1,39 @@
 ---
-description: Template for new ADRs. Copy with `bin/next-adr "kebab-title"`; do not fill in place.
-last_verified: 2026-08-11
+description: On pull requests the ci-memo is the only skip gate for every test and analysis job in Tests and Analysis; path filters gate only audit-php, audit-js and iblbot.
+last_verified: 2026-10-08
 ---
 
-# ADR-NNNN: <Title>
+# ADR-0186: Memo-only skip gating for Tests and Analysis on pull requests
 
 **Status:** Accepted
-**Date:** YYYY-MM-DD
-**Deciders:** (optional — names or roles)
+**Date:** 2026-10-08
 
 ## Context
 
-Two to four sentences. What forces were in play, what hurt, what the team had tried. Be concrete about the problem — an ADR is only useful if a future reader can reconstruct why the decision mattered at the time.
+Tests and Analysis gated its heavy PR jobs twice: a dorny/paths-filter output (`src`, `shell`, `ibl5ts`, `workflows`, `both`) and the tree-hash memo of ADR-0131. The filter lists were hand-kept, so a PR that edited a file a test reads but the list omitted skipped that test and merged green. Between 2026-09-29 and 2026-10-07, 8 of 15 master failures of the gate came from such skips: five PHPUnit (PRs 2907, 2891, 2888, 2882, 2811) and three shell harness (PRs 2814, 2682, 2678). Each fix added paths to `src:`, and the next omission broke master again. The memo manifest `.github/ci-memo/tests.paths` already covers whole directories and is a superset of every filter, so it cannot skip a run the filter would have caught.
 
 ## Decision
 
-What we chose, stated as a directive. One paragraph max. If the decision is mechanically enforced, cite the enforcement mechanism (PHPStan rule identifier, CI job, hook, `bin/` script).
+On `pull_request`, a job in `.github/workflows/tests.yml` skips only on a memo hit. `test`, `harness-tests`, `db-integration`, `phpstan`, `shellcheck` and `ibl5-ts-unit` run on every memo miss. `phpunit-hygiene`, `host-mariadb-guard`, `automouse-impl-model-test` and `actionlint` run unconditionally. Path filters remain only where the filter equals the job's whole input or the result depends on an advisory database: `iblbot` (`ibl5/IBLbot/**`), `audit-php` and `audit-js`. The `src` output shrinks to what the two audits read. The tests memo key carries `--extra gating=memo-only`, which retires memos written while a filter-skipped job counted as clean. `bin/test-ci-memo` enforces this: gate-topology assertion 7 pins the allowlist of jobs that read a `changes` output to exactly those three, and case `memo-only-salt` pins the salt.
 
 ## Alternatives Considered
 
-- **<Alternative 1>** — one-line description. Rejected because: <one-line reason>.
-- **<Alternative 2>** — one-line description. Rejected because: <one-line reason>.
-- **<Alternative 3>** — one-line description. Rejected because: <one-line reason>.
+- **Keep adding paths to `src:` and `shell:`.** Rejected because each omission is found only after master breaks, and `bin/test-path-filters` (example) covered one load pattern of many.
+- **Bump the shared memo `FORMAT_VERSION`.** Rejected because it evicts the e2e and lighthouse memos too, and only the tests scope stored unsound entries.
+- **Drop every filter, including the audits.** Rejected because the audits redden on new advisories regardless of PR content, and running them on docs-only PRs spreads unrelated reds.
 
 ## Consequences
 
-- Positive: <tradeoff we accepted>.
-- Positive: <tradeoff we accepted>.
-- Negative: <tradeoff we accepted>.
-
-## Supersedes
-
-(Only present when this ADR replaces an earlier one. Remove this section otherwise.) Reference the superseded ADR by number and summarize what changed.
+- Positive: a PR cannot merge with a test job skipped by a stale path list.
+- Positive: a written tests memo now implies `test` and `harness-tests` ran green on that tree.
+- Negative: a docs-only or `.claude/`-only PR runs full PHPUnit (about 4.5 minutes) and the harness suite on its first push. Re-pushes of the same tree still hit the memo.
+- Negative: every existing tests memo misses once after merge.
 
 ## References
 
-Bulleted list of source files, rules, commits, or prior docs that enforce or illustrate the decision. Use inline backticks for repo paths so `bin/check-docs` validates them.
+- `.github/workflows/tests.yml`
+- `.github/ci-memo/tests.paths`
+- `bin/ci-memo`
+- `bin/test-ci-memo`
+- ADR-0131 (tree-hash memoization)
+- ADR-0017 (dependabot forces surviving filter outputs true)

@@ -420,7 +420,7 @@ jobs:
             --copy-new-screens=ibl5/vr-gallery/new-screens
 
       - name: Crop changed-screen pairs into gallery deploy tree
-        if: always() && github.event_name == 'pull_request'
+        if: always() && env.VRCTX_PUBLISH == 'true'
         continue-on-error: true
         run: |
           bin/vr-review-comment \

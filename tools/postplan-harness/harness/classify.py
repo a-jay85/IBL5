@@ -800,6 +800,15 @@ MANUAL_TESTING_SENTINEL_STATIC = (
     "No manual testing needed — verification is static; "
     "the plan's Verification Matrix has no executable rows.")
 
+# Written by manual_testing.run() after Phase 6.7 confirms every `- [ ]` row in the
+# gate window is ticked. Same `No manual testing needed` prefix, so armable.SENTINEL_RE,
+# bin/lib/pr-armable.sh and bin/check-pr-manual-testing all read it as CLEARED; the
+# tail names no e2e/playwright/unit/phpunit/integration class, so armable.TAIL_TYPE_RULES
+# demands no matching changed file. "covered by", never "verified by" (#2489).
+MANUAL_TESTING_SENTINEL_TICKED = (
+    "No manual testing needed — every row below was ticked by the harness in "
+    "Phase 6.7; each is covered by an automated check that passed.")
+
 
 def _manual_testing_span(body: str) -> tuple[int, int] | None:
     """`(start, end)` of the arming gate's window: the first `_MANUAL_HEADING_RE`

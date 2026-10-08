@@ -156,6 +156,79 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('start_season_year', $first);
     }
 
+    public function testGetAllGmTenuresWithTeamsBreaksStartYearTiesByTenureId(): void
+    {
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => 1,
+            'gm_display_name' => 'SA Tie GM Zed',
+            'start_season_year' => 2098,
+        ]);
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => 2,
+            'gm_display_name' => 'SA Tie GM Abe',
+            'start_season_year' => 2098,
+        ]);
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => 1,
+            'gm_display_name' => 'SA Tie GM Early',
+            'start_season_year' => 2097,
+        ]);
+
+        $names = [];
+        foreach ($this->repo->getAllGmTenuresWithTeams() as $row) {
+            if (str_starts_with($row['gm_display_name'], 'SA Tie GM ')) {
+                $names[] = $row['gm_display_name'];
+            }
+        }
+
+        self::assertSame(['SA Tie GM Early', 'SA Tie GM Zed', 'SA Tie GM Abe'], $names);
+    }
+
+    public function testGetAllGmAwardsWithTeamsOrdersOverlappingTenureRowsByTenureId(): void
+    {
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => 2,
+            'gm_display_name' => 'SA Overlap GM',
+            'start_season_year' => 2097,
+            'end_season_year' => 2099,
+        ]);
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => 1,
+            'gm_display_name' => 'SA Overlap GM',
+            'start_season_year' => 2098,
+        ]);
+        $this->insertRow('ibl_gm_awards', [
+            'year' => 2098,
+            'award' => 'SA Overlap Award',
+            'name' => 'SA Overlap GM',
+        ]);
+
+        $teamNames = [];
+        foreach ($this->repo->getAllGmAwardsWithTeams() as $row) {
+            if ($row['gm_display_name'] === 'SA Overlap GM') {
+                $teamNames[] = $row['team_name'];
+            }
+        }
+
+        self::assertCount(2, $teamNames);
+        self::assertSame([$this->teamNameForId(2), $this->teamNameForId(1)], $teamNames);
+    }
+
+    private function teamNameForId(int $teamId): string
+    {
+        $stmt = $this->db->prepare('SELECT team_name FROM ibl_team_info WHERE teamid = ?');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $teamId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertIsString($row['team_name']);
+
+        return $row['team_name'];
+    }
+
     public function testGetHeatWinLossByYearReturnsRows(): void
     {
         // Insert HEAT games (month=10 → game_type=3) for ibl_heat_win_loss view

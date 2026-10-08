@@ -97,7 +97,8 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             WHERE p.draftedby LIKE ?
             ORDER BY p.draftyear DESC,
                      p.draftround,
-                     p.draftpickno ASC",
+                     p.draftpickno ASC,
+                     p.pid ASC",
             "s",
             $teamName
         );
@@ -112,10 +113,11 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
     {
         /** @var list<DraftPickRow> */
         return $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (pickid is the PK of ibl_draft_picks, inherently unique)
             "SELECT *
             FROM `ibl_draft_picks`
             WHERE owner_teamid = ?
-            ORDER BY year, round, teampick ASC",
+            ORDER BY year, round, teampick ASC, pickid ASC",
             "i",
             $teamId
         );
@@ -133,7 +135,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             "SELECT *
             FROM `ibl_fa_offers`
             WHERE teamid = ?
-            ORDER BY name ASC",
+            ORDER BY name ASC, pid ASC",
             "i",
             $teamId
         );
@@ -152,7 +154,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             WHERE p.teamid = ?
               AND p.retired = 0
               AND p.cyt != p.cy
-            ORDER BY p.name ASC",
+            ORDER BY p.name ASC, p.pid ASC",
             "i",
             $teamId
         );
@@ -185,7 +187,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             WHERE p.teamid = ?
               AND p.retired = 0
               AND p.ordinal <= '" . \League\JsbConstants::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
-            ORDER BY p.name ASC",
+            ORDER BY p.name ASC, p.pid ASC",
             "i",
             $teamId
         );
@@ -219,7 +221,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
               AND p.retired = 0
               AND p.ordinal <= '" . \League\JsbConstants::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
               AND p.injured = '0'
-            ORDER BY p.name ASC",
+            ORDER BY p.name ASC, p.pid ASC",
             "i",
             $teamId
         );
@@ -311,7 +313,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             $this->playerWithTeamSelect() . "
             WHERE p.teamid = ?
               AND p.retired = 0
-            ORDER BY p.name ASC",
+            ORDER BY p.name ASC, p.pid ASC",
             "i",
             $teamId
         );
@@ -329,7 +331,7 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
             $this->playerWithTeamSelect() . "
             WHERE p.teamid = ?
               AND p.retired = 0
-            ORDER BY p.ordinal ASC",
+            ORDER BY p.ordinal ASC, p.pid ASC",
             "i",
             $teamId
         );

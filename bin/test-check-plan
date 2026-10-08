@@ -2590,6 +2590,56 @@ assert_viol "gateY-all-tagged-fires" 1 '[Y]' "$FM$YHDR"'
 '
 
 # ---------------------------------------------------------------------------
+# Gate [Z] fixtures (8 cases)
+# ---------------------------------------------------------------------------
+# Untagged row whose command runs only an out-of-repo scratch script.
+assert_viol "gateZ-untagged-scratch-script-fires" 1 '[Z]' "$FM$YHDR"'
+| 1 | prints `FACTS-OK` | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/tables-css-201/facts.sh` |
+'"$YROW"'
+'
+# The same row with a well-formed tag: released.
+assert_viol "gateZ-tagged-scratch-script-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `FACTS-OK` (one-time-check: asserts an out-of-repo scratch script the diff cannot carry) | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/tables-css-201/facts.sh` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# A repo script run over out-of-repo inputs is in-repo evidence: exempt.
+assert_viol "gateZ-mixed-repo-script-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `UNREALISED-ASSERTION` | CLI-executable | post-impl | `MATRIX_ASSERT_ROOT=/tmp/r bin/lib/plan-matrix-assertions ~/claude-plans/x.md -` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# /tmp/ and $HOME/ both open the out-of-repo signal; both rows fire.
+assert_viol "gateZ-tmp-and-home-fire" 1 '[Z]' "$FM$YHDR"'
+| 1 | prints `TRACE-OK` | CLI-executable | post-impl | `bash /tmp/negproof/run.sh` |
+| 5 | prints `HOOK-OK` | CLI-executable | post-impl | `bash "$HOME/.claude/hooks/x.sh"` |
+'"$YROW"'
+'
+# A post-PR CI query can never be realised by the diff.
+assert_viol "gateZ-gh-run-fires" 1 '[Z]' "$FM$YHDR"'
+| 1 | latest run concludes success; prints `PR-RUN-DONE` | CLI-executable | post-impl | `gh run list --workflow sim-recap.yml --limit 1 && echo PR-RUN-DONE` |
+'"$YROW"'
+'
+# A token-free row is never checked by the helper: silent.
+assert_viol "gateZ-no-token-row-silent" 0 '[Z]' "$FM$YHDR"'
+| 1 | the scratch run exits 0 | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/x.sh` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# curl exercises the worktree stack and only writes its output under /tmp: exempt.
+assert_viol "gateZ-curl-tmp-output-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | page holds `Roster` | CLI-executable | post-impl | `curl -s -o /tmp/page.html http://slug.localhost/ibl5/modules.php?name=Team && grep -q Roster /tmp/page.html` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# Not CLI-executable: the tag remedy does not apply, so gate Z never fires.
+assert_viol "gateZ-phpunit-row-silent" 0 '[Z]' "$FM$YHDR"'
+| 1 | `pinned_thing` works | PHPUnit | post-impl | `~/scratch/tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+
+# ---------------------------------------------------------------------------
 # Gate [ND] fixtures (4 cases)
 # ---------------------------------------------------------------------------
 # Marker with a 15+ character reason inside a phase body: the honored shape.

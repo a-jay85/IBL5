@@ -38,6 +38,8 @@ rel="${src#*:}"
 remote="$CASE_DIR/remote/${rel%/}"
 if [ ! -d "$remote" ]; then
   echo "rsync: change_dir \"$remote\" failed: No such file or directory (2)" >&2
+  # Large trailing output so a printf|grep -q SIGPIPE regression would show.
+  [ -f "$CASE_DIR/rsync-noisy" ] && { yes 'rsync: filler diagnostic line to inflate captured stderr' | head -n 5000 >&2; }
   exit 23
 fi
 for f in "$remote"/*; do [ -f "$f" ] && cp -p "$f" "$dst"; done
@@ -154,9 +156,18 @@ mkgz "$CASE/remote/backups/db/ibl5-2026-03-15.sql.gz"
 run
 if [ "$RC" -eq 0 ] && [ ! -f "$CASE/dm.log" ]; then ok "h missing predeploy dir tolerated"; else fail h "rc=$RC out=$OUT"; fi
 
+# (h2) missing predeploy dir with large rsync output: logs the skip, sends no DM
+setup_case h2
+mkgz "$CASE/remote/backups/db/ibl5-2026-03-15.sql.gz"
+touch "$CASE/rsync-noisy"
+run
+if [ "$RC" -eq 0 ] && [ ! -f "$CASE/dm.log" ] && grep -q 'No remote db-predeploy dir yet; skipping' <<< "$OUT"; then
+  ok "h2 missing predeploy dir (large output) -> skip logged, no DM"
+else fail h2 "rc=$RC dm=$(cat "$CASE/dm.log" 2>&1)"; fi
+
 # (i) --print-schedule
 OUT="$("$SCRIPT_DIR/db-backups-pull" --print-schedule 2>&1)"; RC=$?
-MAIN_WT="$(git -C "$SCRIPT_DIR" worktree list --porcelain | awk '/^worktree / {print $2; exit}')"
+MAIN_WT="$(git -C "$SCRIPT_DIR" worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')"
 if [ "$RC" -eq 0 ] && grep -q '<string>com.ibl5.db-backups-pull</string>' <<< "$OUT" \
    && grep -q "<string>$MAIN_WT/bin/db-backups-pull</string>" <<< "$OUT" \
    && grep -q '<integer>10</integer>' <<< "$OUT" && grep -q '<integer>30</integer>' <<< "$OUT"; then

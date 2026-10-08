@@ -3,9 +3,13 @@ validates what the model returns; invalid output is a typed failure, never
 silently accepted."""
 from __future__ import annotations
 
+import json
 import re
 
 from .state import Classification, HarnessError
+
+# LLM purpose name for the PR-copy call; llm.py keys tolerant JSON recovery on it.
+PR_COPY_PURPOSE = "pr-copy"
 
 FINDING_KEYS = {"path", "line", "body"}
 FINDING_ALIASES = (
@@ -14,8 +18,6 @@ FINDING_ALIASES = (
 )
 MANUAL_CATEGORIES = {"cli-executable", "phpunit", "api-test", "e2e",
                      "visual-regression", "truly-manual"}
-HOLD_DISCHARGE_CATEGORIES = {"decision", "cli-executable", "phpunit", "api-test",
-                              "e2e", "visual-regression", "truly-manual"}
 COMMIT_TYPES = {"feat", "fix", "refactor", "perf", "test", "docs", "build", "ci", "chore"}
 # Conventional-commit prefix: type, optional (scope), optional bang. Case-insensitive on the
 # type token because validate_pr_copy compares lowercased. Same shape coerce_commit_subject uses.
@@ -139,46 +141,6 @@ def validate_manual_recheck(data) -> None:
                 raise HarnessError("schema", f"recheck[{i}].probe elements must be strings")
 
 
-def validate_hold_discharge(data) -> None:
-    """[{n, category, probe?, rationale?}] — Mode B hold-sentence classifier output.
-
-    Each item requires int `n` and `category` in HOLD_DISCHARGE_CATEGORIES.
-    `probe` is a non-empty list of str and is required iff category == "cli-executable".
-    `decision` entries must carry no `probe` and no `test_hint`.
-    Rejects any category outside the closed set — a permissive validator here
-    would silently discharge a hallucinated category.
-    """
-    if not isinstance(data, list):
-        raise HarnessError("schema", "hold discharge must be a JSON array")
-    for i, item in enumerate(data):
-        if not isinstance(item, dict) or "n" not in item or "category" not in item:
-            raise HarnessError("schema", f"discharge[{i}] must have n and category")
-        if not isinstance(item["n"], int):
-            raise HarnessError("schema", f"discharge[{i}].n must be int")
-        cat = item["category"]
-        if cat not in HOLD_DISCHARGE_CATEGORIES:
-            raise HarnessError("schema", f"discharge[{i}].category {cat!r} not in allowed set")
-        has_probe = "probe" in item
-        has_hint = "test_hint" in item
-        is_cli = cat == "cli-executable"
-        is_decision = cat == "decision"
-        if is_decision and has_probe:
-            raise HarnessError("schema", f"discharge[{i}].decision must not have probe")
-        if is_decision and has_hint:
-            raise HarnessError("schema", f"discharge[{i}].decision must not have test_hint")
-        if is_cli and not has_probe:
-            raise HarnessError("schema", f"discharge[{i}].cli-executable must have probe")
-        if not is_cli and has_probe:
-            raise HarnessError("schema",
-                                f"discharge[{i}].probe forbidden for category {cat!r}")
-        if has_probe:
-            probe = item["probe"]
-            if not isinstance(probe, list) or not probe:
-                raise HarnessError("schema", f"discharge[{i}].probe must be non-empty list")
-            if not all(isinstance(s, str) for s in probe):
-                raise HarnessError("schema", f"discharge[{i}].probe elements must be strings")
-
-
 def normalize_pr_copy(data):
     """Reconcile type / title prefix / commit_subject prefix before validate_pr_copy.
 
@@ -237,6 +199,74 @@ def validate_pr_copy(data) -> None:
         raise HarnessError("schema", "title must start with its conventional-commit type")
     if not data["commit_subject"].lower().startswith(data["type"]):
         raise HarnessError("schema", "commit_subject must start with its conventional-commit type")
+
+
+PR_COPY_JSON_HINT = (
+    'escape every " inside summary_md as \\", write newlines as \\n, '
+    "and put no triple-backtick fences inside summary_md"
+)
+_PR_COPY_KEYS = ("type", "title", "commit_subject", "summary_md")
+_SHORT_KEYS = ("type", "title", "commit_subject")
+
+
+def _salvage_pr_copy(body: str):
+    """Key-anchored repair of unescaped interior quotes in summary_md. Returns a dict, or
+    None when the boundaries are ambiguous. type/title/commit_subject are copied verbatim
+    or the salvage gives up."""
+    anchors = []
+    for key in _PR_COPY_KEYS:
+        found = list(re.finditer(r'"%s"\s*:\s*"' % key, body))
+        if len(found) != 1:
+            return None
+        anchors.append((found[0].start(), found[0].end(), key))
+    anchors.sort()
+    final_brace = body.rfind("}")
+    values = {}
+    for i, (_, value_start, key) in enumerate(anchors):
+        last = i == len(anchors) - 1
+        region_end = final_brace if last else anchors[i + 1][0]
+        region = body[value_start:region_end]
+        close = region.rfind('"')
+        if close == -1:
+            return None
+        gap = region[close + 1:]
+        if not re.fullmatch(r"\s*" if last else r"\s*,\s*", gap):
+            return None
+        values[key] = region[:close]
+    for key in _SHORT_KEYS:
+        if any(ch in values[key] for ch in ('"', "\n", "\\")):
+            return None
+    fixed = re.sub(r'(?<!\\)"', r'\\"', values["summary_md"])
+    try:
+        values["summary_md"] = json.loads('"' + fixed + '"', strict=False)
+    except json.JSONDecodeError:
+        return None
+    return {key: values[key] for key in _PR_COPY_KEYS}
+
+
+def extract_pr_copy_json(text: str):
+    """pr-copy-only JSON extraction. Tries the shared extract_json first, then a
+    first-{ .. last-} slice of the whole reply, then a key-anchored salvage that
+    re-escapes interior quotes in summary_md only. Never invents or rewrites
+    type/title/commit_subject: salvage copies them byte-for-byte or gives up."""
+    from .adapters.llm import extract_json  # function-local: no import cycle
+    try:
+        return extract_json(text)
+    except ValueError:
+        pass
+    start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end <= start:
+        raise ValueError(f"no JSON object in pr-copy reply; {PR_COPY_JSON_HINT}")
+    body = text[start:end + 1]
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as e:
+        parse_err = str(e)
+    salvaged = _salvage_pr_copy(body)
+    if salvaged is not None:
+        return salvaged
+    raise ValueError(
+        f"no parseable JSON in pr-copy reply ({parse_err}); {PR_COPY_JSON_HINT}")
 
 
 def validate_body_check(data) -> None:

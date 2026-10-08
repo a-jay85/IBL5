@@ -1,0 +1,8 @@
+```json
+{
+  "type": "fix",
+  "title": "fix(bin): extract titles outside code fences",
+  "commit_subject": "fix(bin): skip code fences when extracting plan titles",
+  "summary_md": "## Summary\n- Updated title extraction to skip code fences (``` and ~~~) in addition to frontmatter\n- Prevents H1 headings inside code blocks from being incorrectly picked as plan titles\n- Applied to queue and fleet-status scripts\n- Added test case with code fence scenario"
+}
+```

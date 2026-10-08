@@ -1,0 +1,909 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-events-review — harness for bin/events-review.
+#
+# Usage: bin/test-events-review [group]
+#   groups: flags env creds digest claude dm schedule e2e   (none = all)
+#
+# Every external binary (ssh, mysql, claude, discord-dm, launchctl) is replaced
+# through the script's env seams; no PATH modification, no network. The e2e group
+# needs the worktree DB container (bin/wt-up) and prints SKIP when it is absent.
+# HOME is never read bare: the `flags` group must pass from an empty env.
+#
+# Exit 0 = all pass, 1 = failures.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ER="$SCRIPT_DIR/events-review"
+CORPUS="$SCRIPT_DIR/fixtures/events-review/corpus.tsv"
+EXPECTED="$SCRIPT_DIR/fixtures/events-review/expected-dry-run.txt"
+SEED_SQL="$SCRIPT_DIR/fixtures/events-review/seed.sql"
+
+FAILED=0
+ok()   { echo "ok: $1"; }
+fail() { echo "FAIL: $1"; FAILED=1; }
+
+expect_eq() { # name want got
+    if [ "$2" = "$3" ]; then ok "$1"; else fail "$1 - want [$2] got [$3]"; fi
+}
+expect_has() { # name haystack needle
+    if grep -qF -- "$3" <<< "$2"; then ok "$1"; else fail "$1 - '$3' absent"; fi
+}
+expect_has_exact() { # name haystack needle - needle must not run on into a longer number/word
+    if EH_NEEDLE="$3" LC_ALL=C awk 'BEGIN { n = ENVIRON["EH_NEEDLE"] }
+        { s = $0
+          while ((i = index(s, n)) > 0) {
+              c = substr(s, i + length(n), 1)
+              if (c == "" || c !~ /[0-9A-Za-z_]/) { f = 1; exit }
+              s = substr(s, i + 1)
+          } }
+        END { exit !f }' <<< "$2"; then ok "$1"; else fail "$1 - '$3' absent (or only as a prefix of a longer token)"; fi
+}
+expect_lacks() { # name haystack needle
+    if grep -qF -- "$3" <<< "$2"; then fail "$1 - '$3' unexpectedly present"; else ok "$1"; fi
+}
+expect_file_has() { # name file needle
+    if [ -f "$2" ] && grep -qF -- "$3" "$2"; then ok "$1"; else fail "$1 - '$3' absent from $2"; fi
+}
+expect_file_lacks() { # name file needle
+    if [ -f "$2" ] && grep -qF -- "$3" "$2"; then fail "$1 - '$3' unexpectedly present in $2"; else ok "$1"; fi
+}
+expect_absent() { # name path
+    if [ -e "$2" ]; then fail "$1 - $2 exists"; else ok "$1"; fi
+}
+
+T="$(mktemp -d "${TMPDIR:-/tmp}/events-review-test-XXXXXX")"
+trap 'rm -rf "$T"' EXIT
+STUBS="$T/stubs"
+mkdir -p "$STUBS"
+
+# ── Stubs ─────────────────────────────────────────────────────────────────────
+cat > "$STUBS/mysql" <<'SH'
+#!/usr/bin/env bash
+# Records argv, MYSQL_PWD and stdin; answers the preflight and the aggregate.
+d="${STUB_DIR:?}"
+{ printf -- '---\n'; for a in "$@"; do printf '[%s]\n' "$a"; done; } >> "$d/mysql.argv"
+printf 'MYSQL_PWD=%s\n' "${MYSQL_PWD-<unset>}" >> "$d/mysql.env"
+sql="$(cat)"
+printf '%s\n===\n' "$sql" >> "$d/mysql.stdin"
+case "$sql" in
+    *"LIMIT 0"*) exit "${STUB_PREFLIGHT_RC:-0}" ;;
+esac
+[ "${STUB_AGG_RC:-0}" = 0 ] || exit "$STUB_AGG_RC"
+cat "${STUB_TSV:?}"
+SH
+cat > "$STUBS/ssh" <<'SH'
+#!/usr/bin/env bash
+d="${STUB_DIR:?}"
+printf '%s\n' "$*" >> "$d/ssh.log"
+case " $* " in
+    *" -O "*) exit "${STUB_SSH_FWD_RC:-0}" ;;
+    *)        exit "${STUB_SSH_NEW_RC:-0}" ;;
+esac
+SH
+cat > "$STUBS/claude" <<'SH'
+#!/usr/bin/env bash
+d="${STUB_DIR:?}"
+printf 'call\n' >> "$d/claude.calls"
+{ for a in "$@"; do printf '[%s]\n' "$a"; done; } > "$d/claude.argv"
+pwd -P > "$d/claude.cwd"
+env > "$d/claude.env"
+cat > "$d/claude.stdin"
+printf 'SECRET-STDERR-TEXT\n' >&2
+if [ -n "${STUB_CLAUDE_OUT:-}" ]; then cat "$STUB_CLAUDE_OUT"; else printf 'Recommendation one. Recommendation two.\n'; fi
+exit "${STUB_CLAUDE_RC:-0}"
+SH
+cat > "$STUBS/dm" <<'SH'
+#!/usr/bin/env bash
+d="${STUB_DIR:?}"
+n=$(( $(cat "$d/dm.n" 2>/dev/null || echo 0) + 1 ))
+printf '%s' "$n" > "$d/dm.n"
+printf '%s\n' "$*" > "$d/dm.$n.argv"
+cat > "$d/dm.$n.stdin"
+exit "${STUB_DM_RC:-0}"
+SH
+cat > "$STUBS/launchctl" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${STUB_DIR:?}/launchctl.log"
+exit 0
+SH
+cat > "$STUBS/curl" <<'SH'
+#!/usr/bin/env bash
+# Webhook-path curl stub: keeps the posted JSON payload, answers HTTP 204.
+d="${STUB_DIR:?}"
+cat > /dev/null
+for a in "$@"; do
+    case "$a" in
+        @*) cp "${a#@}" "$d/curl.payload" ;;
+    esac
+done
+printf 'x\n' >> "$d/curl.calls"
+printf '\nHTTP=204'
+SH
+chmod +x "$STUBS"/*
+
+PW_FILE="$T/pw"
+PW_VALUE="s3cret-pw-value-xyz"
+printf '%s\n' "$PW_VALUE" > "$PW_FILE"
+chmod 600 "$PW_FILE"
+
+# ── Runner ────────────────────────────────────────────────────────────────────
+# ER_ENV holds extra VAR=value pairs for one run; the script always starts from
+# an empty environment (plus PATH) so ambient EVENTS_REVIEW_* never leaks in.
+ER_ENV=()
+ER_SCRIPT=""   # set to a mutant copy of events-review for the mutation cases
+ER_RC=0; ER_OUT=""; ER_ERR=""
+SD=""   # per-case stub dir
+
+new_case() { # name
+    SD="$T/case-$1"
+    rm -rf "$SD"
+    mkdir -p "$SD"
+}
+
+# base_env: stubbed live-mode environment for the current $SD.
+base_env() {
+    ER_ENV=(
+        "STUB_DIR=$SD"
+        "STUB_TSV=$CORPUS"
+        "EVENTS_REVIEW_SSH_HOST=prod.example"
+        "EVENTS_REVIEW_DB_USER=ro_user"
+        "EVENTS_REVIEW_DB_NAME=ibl5"
+        "EVENTS_REVIEW_DB_PASSWORD_FILE=$PW_FILE"
+        "EVENTS_REVIEW_SSH_BIN=$STUBS/ssh"
+        "EVENTS_REVIEW_MYSQL_BIN=$STUBS/mysql"
+        "EVENTS_REVIEW_CLAUDE_BIN=$STUBS/claude"
+        "EVENTS_REVIEW_DM_BIN=$STUBS/dm"
+    )
+}
+# tsv_env: stubbed --from-tsv environment (no DB vars needed).
+tsv_env() {
+    ER_ENV=(
+        "STUB_DIR=$SD"
+        "EVENTS_REVIEW_CLAUDE_BIN=$STUBS/claude"
+        "EVENTS_REVIEW_DM_BIN=$STUBS/dm"
+    )
+}
+
+run_er() { # args...
+    local errf="$T/stderr.$$"
+    ER_OUT="$(env -i PATH="$PATH" ${ER_ENV[@]+"${ER_ENV[@]}"} bash "${ER_SCRIPT:-$ER}" "$@" 2> "$errf")"
+    ER_RC=$?
+    ER_ERR="$(cat "$errf")"
+    rm -f "$errf"
+}
+
+# make_tsv <path> <human-cur> : minimal TSV with a given authenticated count.
+make_tsv() {
+    {
+        printf 'meta\twindow_start\t2026-09-21\t0\n'
+        printf 'meta\twindow_end\t2026-09-28\t0\n'
+        printf 'meta\tdays\tdays\t7\n'
+        printf 'class\tauthenticated\tcur\t%s\n' "$2"
+        printf 'route\tauthenticated\tteam\t%s\n' "$2"
+    } > "$1"
+}
+
+dm_payload() { cat "$SD/dm.$1.stdin" 2>/dev/null; }
+call_count() { # file
+    if [ -f "$1" ]; then grep -c . "$1"; else echo 0; fi
+}
+
+digest_of() { # dry-run output on stdin -> digest block
+    awk '/^--- digest ---$/{f=1;next} /^--- end digest ---$/{f=0} f'
+}
+
+# ── Group: flags (rows 1, 2, 42) ──────────────────────────────────────────────
+group_flags() {
+    echo "# group: flags"
+    new_case flags
+    tsv_env
+    run_er --bogus
+    expect_eq "row1: --bogus exits 2" 2 "$ER_RC"
+    expect_has "row1: --bogus names unknown argument" "$ER_ERR" "unknown argument"
+    run_er --days 7
+    expect_eq "row1: space form exits 2" 2 "$ER_RC"
+    expect_has "row1: space form names unknown argument" "$ER_ERR" "unknown argument"
+
+    local v
+    for v in 0 91 abc "" 1x -5; do
+        run_er "--days=$v" "--from-tsv=$CORPUS" --dry-run
+        expect_eq "row2: --days=$v exits 2" 2 "$ER_RC"
+    done
+    for v in 1 90; do
+        run_er "--days=$v" "--from-tsv=$CORPUS" --dry-run
+        expect_eq "row2: --days=$v accepted" 0 "$ER_RC"
+    done
+
+    run_er "--from-tsv=$T/does-not-exist.tsv"
+    expect_eq "flags: unreadable --from-tsv exits 2" 2 "$ER_RC"
+
+    run_er --help
+    expect_eq "flags: --help exits 0" 0 "$ER_RC"
+    expect_has "flags: --help prints usage" "$ER_OUT" "Usage: bin/events-review"
+}
+
+# ── Group: env (row 3) ────────────────────────────────────────────────────────
+group_env() {
+    echo "# group: env"
+    new_case env
+    local var
+    for var in EVENTS_REVIEW_SSH_HOST EVENTS_REVIEW_DB_USER EVENTS_REVIEW_DB_NAME EVENTS_REVIEW_DB_PASSWORD_FILE; do
+        base_env
+        local kept=() e
+        for e in "${ER_ENV[@]}"; do
+            case "$e" in "$var="*) ;; *) kept+=("$e") ;; esac
+        done
+        ER_ENV=("${kept[@]}")
+        run_er --dry-run
+        expect_eq "row3: $var unset exits 2" 2 "$ER_RC"
+        expect_has "row3: $var unset is named" "$ER_ERR" "$var is required"
+        ER_ENV+=("$var=")
+        run_er --dry-run
+        expect_eq "row3: $var empty exits 2" 2 "$ER_RC"
+        expect_has "row3: $var empty is named" "$ER_ERR" "$var is required"
+    done
+    expect_absent "row3: no mysql call on a missing var" "$SD/mysql.argv"
+
+    # Mutation: a set-check `${VAR+x}` in place of the non-empty check lets the
+    # empty case through. The empty-var rows above exist to catch exactly that.
+    local mut="$T/events-review.mut-set"
+    sed 's/\[ -z "\${!var:-}" ]/[ -z "${!var+x}" ]/' "$ER" > "$mut"
+    if cmp -s "$ER" "$mut"; then fail "row3: mutant was not applied"; else
+        new_case env-mut
+        base_env; ER_ENV+=("EVENTS_REVIEW_DB_USER=")
+        ER_SCRIPT="$mut"
+        run_er --dry-run
+        ER_SCRIPT=""
+        if [ "$ER_RC" -ne 2 ]; then ok "row3: mutant with a set-check lets an empty var through (rc $ER_RC)"
+        else fail "row3: mutant with a set-check still exits 2"; fi
+    fi
+}
+
+# ── Group: creds (rows 4, 5, 41) ──────────────────────────────────────────────
+group_creds() {
+    echo "# group: creds"
+    local loose="$T/pw-644"
+    printf '%s\n' "$PW_VALUE" > "$loose"
+    chmod 644 "$loose"
+
+    new_case creds-644
+    base_env; ER_ENV+=("EVENTS_REVIEW_DB_PASSWORD_FILE=$loose")
+    run_er --dry-run
+    expect_eq "row4: 644 password file exits 2" 2 "$ER_RC"
+    expect_absent "row4: 644 file never reaches mysql" "$SD/mysql.argv"
+
+    new_case creds-600
+    base_env
+    run_er --dry-run
+    expect_eq "row4: 600 password file runs" 0 "$ER_RC"
+    expect_file_has "row4: password is in the mysql env" "$SD/mysql.env" "MYSQL_PWD=$PW_VALUE"
+    expect_file_lacks "row4: password is never in mysql argv" "$SD/mysql.argv" "$PW_VALUE"
+    expect_file_lacks "row4: no -p password flag" "$SD/mysql.argv" "[-p"
+
+    # Mutation: passing `-p"$pw"` in argv puts the password in the recorded argv.
+    local mut="$T/events-review.mut-argv"
+    # shellcheck disable=SC2016  # sed program text, not shell expansions
+    sed 's/MYSQL_PWD="\$DB_PW" "\$EVENTS_REVIEW_MYSQL_BIN"/"$EVENTS_REVIEW_MYSQL_BIN" -p"$DB_PW"/' "$ER" > "$mut"
+    if cmp -s "$ER" "$mut"; then fail "row4: mutant was not applied"; else
+        new_case creds-mut
+        base_env
+        ER_SCRIPT="$mut"
+        run_er --dry-run
+        ER_SCRIPT=""
+        if grep -qF -- "$PW_VALUE" "$SD/mysql.argv" 2>/dev/null; then ok "row4: mutant with -p in argv leaks the password to argv (caught)"
+        else fail "row4: mutant with -p in argv was not caught"; fi
+    fi
+
+    local ro="$T/pw-400"
+    printf '%s\n' "$PW_VALUE" > "$ro"
+    chmod 400 "$ro"
+    new_case creds-400
+    base_env; ER_ENV+=("EVENTS_REVIEW_DB_PASSWORD_FILE=$ro")
+    run_er --dry-run
+    expect_eq "row4: 400 password file runs" 0 "$ER_RC"
+
+    new_case creds-preflight
+    base_env; ER_ENV+=("STUB_PREFLIGHT_RC=1")
+    run_er
+    expect_eq "row5: preflight failure exits 1" 1 "$ER_RC"
+    expect_has "row5: preflight failure is loud" "$ER_ERR" "SELECT on ibl_events denied or unreachable"
+    expect_absent "row5: no claude call after a failed preflight" "$SD/claude.calls"
+
+    new_case creds-tunnel
+    base_env; ER_ENV+=("STUB_SSH_FWD_RC=1" "STUB_SSH_NEW_RC=1")
+    run_er
+    expect_eq "row41: dead tunnel exits 1" 1 "$ER_RC"
+    expect_has "row41: tunnel failure is named" "$ER_ERR" "could not bring up the DB tunnel"
+    expect_absent "row41: no mysql call on a dead tunnel" "$SD/mysql.argv"
+    expect_absent "row41: no claude call on a dead tunnel" "$SD/claude.calls"
+
+    new_case creds-tunnel-attach
+    base_env; ER_ENV+=("STUB_SSH_FWD_RC=1")
+    run_er --dry-run
+    expect_eq "creds: a fresh tunnel is opened when no ControlMaster exists" 0 "$ER_RC"
+    expect_file_has "creds: ExitOnForwardFailure is set" "$SD/ssh.log" "ExitOnForwardFailure=yes"
+}
+
+# sql_region_ok <script>: row 12 predicate over the SQL block.
+sql_region_ok() {
+    local region
+    region="$(awk '/# BEGIN EVENTS SQL/{f=1} f; /# END EVENTS SQL/{f=0}' "$1")"
+    [ -n "$region" ] || return 1
+    if grep -qE 'request_uri|user_agent' <<< "$region"; then return 1; fi
+    local bad
+    # A quoted 'referer' is a section label; any other mention must sit in a CASE/WHEN test.
+    bad="$(grep -E 'referer' <<< "${region//\'referer\'/}" | grep -vE '^[[:space:]]*(CASE[[:space:]]+)?WHEN[[:space:]]' || true)"
+    [ -z "$bad" ]
+}
+
+# ── Group: digest (rows 7-12) ─────────────────────────────────────────────────
+group_digest() {
+    echo "# group: digest"
+    new_case digest
+    tsv_env
+
+    # The three files in bin/fixtures/events-review/ are committed, never
+    # generated. Every scratch file lives under $T, so a run leaves the tree alone.
+    local fx
+    for fx in corpus.tsv expected-dry-run.txt seed.sql; do
+        if [ -f "$SCRIPT_DIR/fixtures/events-review/$fx" ]; then ok "row37: fixture $fx is committed"
+        else fail "row37: fixture $fx is missing"; fi
+    done
+
+    local got
+    got="$(env -i PATH="$PATH" bash "$ER" "--from-tsv=$CORPUS" --dry-run 2>&1)"
+    if [ "$got" = "$(cat "$EXPECTED")" ]; then ok "row7: corpus dry-run matches the committed baseline"
+    else fail "row7: corpus dry-run differs from $EXPECTED"; fi
+
+    run_er "--from-tsv=$CORPUS" --dry-run
+    local digest
+    digest="$(digest_of <<< "$ER_OUT")"
+    local tok
+    for tok in 'ignore_previous' '@everyone' '<@' '?tid=' 'xxxxxxxxxxxxxxxx'; do
+        expect_lacks "row8: digest lacks '$tok'" "$digest" "$tok"
+    done
+    local ctl
+    ctl="$(printf '%s' "$digest" | tr -d '\n\t' | LC_ALL=C tr -d '[:print:]' | wc -c | tr -d ' ')"
+    expect_eq "row8: digest holds no control byte" 0 "$ctl"
+    local longest
+    longest="$(printf '%s\n' "$digest" | LC_ALL=C awk '{ if (length($0) > m) m = length($0) } END { print m + 0 }')"
+    if [ "$longest" -le 200 ]; then ok "row8: longest digest line is $longest bytes"; else fail "row8: a digest line has $longest bytes"; fi
+
+    expect_has_exact "row9: authenticated route team renders" "$digest" "  140  team"
+    expect_has_exact "row9: authenticated route depth_chart renders" "$digest" "  75  depth_chart"
+    expect_has_exact "row9: action trade_offer_submitted renders" "$digest" "  14  trade_offer_submitted"
+    expect_has_exact "row9: folded anonymous count lands in other" "$digest" "  43  other"
+    expect_has_exact "row9: folded action count lands in other" "$digest" "  3  other"
+
+    expect_has_exact "row10: malformed rows are counted" "$digest" "dropped malformed rows: 3"
+    expect_eq "row10: dry-run over malformed rows exits 0" 0 "$ER_RC"
+
+    # Row 11: 2000 routes and 400 actions force the byte cap.
+    local big="$T/big.tsv"
+    {
+        printf 'meta\twindow_start\t2026-09-21\t0\n'
+        printf 'class\tauthenticated\tcur\t900000\n'
+        awk 'BEGIN { for (i = 1; i <= 2000; i++) printf "route\tauthenticated\troute_%d\t%d\n", i, 3000 - i }'
+        awk 'BEGIN { for (i = 1; i <= 400; i++) printf "action\tall\taction_literal_number_%d\t%d\n", i, 500 - i }'
+    } > "$big"
+    run_er "--from-tsv=$big" --dry-run
+    local bigdigest bytes last routes
+    bigdigest="$(digest_of <<< "$ER_OUT")"
+    bytes="$(printf '%s\n' "$bigdigest" | wc -c | tr -d ' ')"
+    last="$(printf '%s\n' "$bigdigest" | tail -n 1)"
+    if [ "$bytes" -le 6000 ]; then ok "row11: digest is $bytes bytes (cap 6000)"; else fail "row11: digest is $bytes bytes"; fi
+    expect_eq "row11: capped digest ends with the marker" "[digest truncated]" "$last"
+    routes="$(printf '%s\n' "$bigdigest" | awk '/^Top routes \(authenticated\):$/{f=1;next} /^[^ ]/{f=0} f' | wc -l | tr -d ' ')"
+    if [ "$routes" -le 16 ]; then ok "row11: route lines per class stay capped ($routes incl. other)"; else fail "row11: $routes route lines"; fi
+
+    # Row 12: the SQL block, and the mutation that must fail the check.
+    if sql_region_ok "$ER"; then ok "row12: SQL region never names request_uri or user_agent"
+    else fail "row12: SQL region check failed on the real script"; fi
+    local mutant="$T/events-review.mutant"
+    awk '{ print } /# BEGIN EVENTS SQL/ { print "        printf \"SELECT request_uri FROM ibl_events;\\n\"" }' "$ER" > "$mutant"
+    if sql_region_ok "$mutant"; then fail "row12: injected request_uri was not detected"; else ok "row12: injected request_uri is detected"; fi
+    awk '{ print } /# BEGIN EVENTS SQL/ { print "        printf \"SELECT referer FROM ibl_events;\\n\"" }' "$ER" > "$mutant"
+    if sql_region_ok "$mutant"; then fail "row12: injected bare referer was not detected"; else ok "row12: injected bare referer is detected"; fi
+}
+
+# ── Group: claude (rows 13-18) ────────────────────────────────────────────────
+group_claude() {
+    echo "# group: claude"
+    local t19="$T/h19.tsv" t20="$T/h20.tsv"
+    make_tsv "$t19" 19
+    make_tsv "$t20" 20
+
+    new_case claude-19
+    tsv_env
+    run_er "--from-tsv=$t19"
+    expect_eq "row13: 19 human rows exits 0" 0 "$ER_RC"
+    expect_absent "row13: no claude call below the minimum" "$SD/claude.calls"
+    expect_eq "row13: exactly one DM" 1 "$(cat "$SD/dm.n" 2>/dev/null || echo 0)"
+    expect_has "row13: DM says no review this week" "$(dm_payload 1)" "no review this week"
+    expect_has "row13: DM names the count" "$(dm_payload 1)" "only 19 human events (minimum 20)"
+
+    new_case claude-20
+    tsv_env
+    run_er "--from-tsv=$t20"
+    expect_eq "row14: 20 human rows exits 0" 0 "$ER_RC"
+    expect_eq "row14: exactly 20 rows invokes claude once" 1 "$(call_count "$SD/claude.calls")"
+
+    new_case claude-argv
+    tsv_env
+    run_er "--from-tsv=$CORPUS"
+    local argv="$SD/claude.argv"
+    expect_file_has "row15: -p" "$argv" "[-p]"
+    expect_file_has "row15: --strict-mcp-config" "$argv" "[--strict-mcp-config]"
+    expect_file_has "row15: pinned model flag" "$argv" "[--model]"
+    expect_file_has "row15: pinned model value" "$argv" "[claude-sonnet-5-5]"
+    local after
+    after="$(awk '/^\[--tools\]$/{getline; print; exit}' "$argv")"
+    expect_eq "row15: --tools is followed by an empty argument" "[]" "$after"
+    local cwd
+    cwd="$(cat "$SD/claude.cwd")"
+    case "$cwd" in
+        "$REPO_ROOT"|"$REPO_ROOT"/*) fail "row15: claude cwd $cwd is inside the repo" ;;
+        *) ok "row15: claude cwd is outside the repo" ;;
+    esac
+    expect_file_has "row15: digest arrives on stdin in tags" "$SD/claude.stdin" "<digest>"
+    expect_file_has "row15: digest closing tag on stdin" "$SD/claude.stdin" "</digest>"
+    expect_file_has "row15: digest content on stdin" "$SD/claude.stdin" "IBL5 product analytics"
+    expect_file_lacks "row15: digest never in argv" "$argv" "IBL5 product analytics"
+    expect_file_lacks "row15: no tag in argv" "$argv" "<digest>"
+
+    new_case claude-env
+    base_env
+    run_er
+    expect_eq "row16: live run exits 0" 0 "$ER_RC"
+    expect_eq "row16: claude ran" 1 "$(call_count "$SD/claude.calls")"
+    expect_file_lacks "row16: claude env has no MYSQL_PWD" "$SD/claude.env" "MYSQL_PWD"
+    expect_file_lacks "row16: claude env has no password" "$SD/claude.env" "$PW_VALUE"
+
+    new_case claude-rc1
+    tsv_env; ER_ENV+=("STUB_CLAUDE_RC=1")
+    run_er "--from-tsv=$CORPUS"
+    expect_eq "row17: claude rc 1 exits 1" 1 "$ER_RC"
+    expect_has "row17: failure DM" "$(dm_payload 1)" "model run failed"
+    expect_lacks "row17: no stub stderr in the DM" "$(dm_payload 1)" "SECRET-STDERR-TEXT"
+    expect_has "row17: stub stderr reaches the launchd log" "$ER_ERR" "SECRET-STDERR-TEXT"
+
+    new_case claude-empty
+    : > "$T/empty.txt"
+    tsv_env; ER_ENV+=("STUB_CLAUDE_OUT=$T/empty.txt")
+    run_er "--from-tsv=$CORPUS"
+    expect_eq "row17: empty output exits 1" 1 "$ER_RC"
+    expect_has "row17: empty output sends the failure DM" "$(dm_payload 1)" "model run failed"
+
+    new_case claude-defaults
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_MODEL=" "EVENTS_REVIEW_MIN_ROWS=")
+    run_er "--from-tsv=$t19"
+    expect_eq "row18: empty MIN_ROWS takes the default 20" 0 "$ER_RC"
+    expect_absent "row18: empty MIN_ROWS skips 19 rows" "$SD/claude.calls"
+    new_case claude-defaults2
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_MODEL=")
+    run_er "--from-tsv=$t20"
+    expect_file_has "row18: empty MODEL takes the default" "$SD/claude.argv" "[claude-sonnet-5-5]"
+    new_case claude-defaults3
+    tsv_env
+    run_er "--from-tsv=$t20"
+    expect_file_has "row18: unset MODEL takes the default" "$SD/claude.argv" "[claude-sonnet-5-5]"
+    new_case claude-minrows
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_MIN_ROWS=19")
+    run_er "--from-tsv=$t19"
+    expect_eq "row18: MIN_ROWS=19 lets 19 rows through" 1 "$(call_count "$SD/claude.calls")"
+    new_case claude-badmin
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_MIN_ROWS=abc")
+    run_er "--from-tsv=$t20"
+    expect_eq "row18: MIN_ROWS=abc exits 2" 2 "$ER_RC"
+}
+
+# ── Group: dm (rows 20-24) ────────────────────────────────────────────────────
+group_dm() {
+    echo "# group: dm"
+    local hostile="$T/hostile.txt"
+    printf 'ping @everyone and @here <@123> <@&789> <#456> see https://evil.example/x bell\a end\n' > "$hostile"
+
+    new_case dm-hostile
+    tsv_env; ER_ENV+=("STUB_CLAUDE_OUT=$hostile")
+    run_er "--from-tsv=$CORPUS"
+    local p tok
+    p="$(dm_payload 1)"
+    expect_eq "row20: hostile output still delivers" 0 "$ER_RC"
+    for tok in '@' '<@' '<#' '://'; do
+        expect_lacks "row20: DM lacks '$tok'" "$p" "$tok"
+    done
+    local ctl
+    ctl="$(printf '%s' "$p" | tr -d '\n\t' | LC_ALL=C tr -d '[:print:]' | wc -c | tr -d ' ')"
+    expect_eq "row20: DM holds no control byte" 0 "$ctl"
+    expect_has "row20: @everyone is defanged" "$p" "(at)everyone"
+    expect_has "row20: mentions are replaced" "$p" "[mention removed]"
+
+    local benign="$T/benign.txt" want
+    printf 'Line one is here.\nLine two is here.\n\tTabbed line three.' > "$benign"
+    new_case dm-benign
+    tsv_env; ER_ENV+=("STUB_CLAUDE_OUT=$benign")
+    run_er "--from-tsv=$CORPUS"
+    want="IBL5 analytics review 2026-09-21..2026-09-28
+$(cat "$benign")"
+    expect_eq "row21: benign multi-line text passes through" "$want" "$(dm_payload 1)"
+
+    # Mutation: widening the `tr` range to include \012 strips the newlines.
+    local mut="$T/events-review.mut-tr"
+    sed 's/\\000-\\010\\013-\\037\\177/\\000-\\037\\177/' "$ER" > "$mut"
+    if cmp -s "$ER" "$mut"; then fail "row21: mutant was not applied"; else
+        new_case dm-mut
+        tsv_env; ER_ENV+=("STUB_CLAUDE_OUT=$benign")
+        ER_SCRIPT="$mut"
+        run_er "--from-tsv=$CORPUS"
+        ER_SCRIPT=""
+        if [ "$(dm_payload 1)" != "$want" ]; then ok "row21: mutant that strips newlines changes the DM (caught)"
+        else fail "row21: mutant that strips newlines was not caught"; fi
+    fi
+
+    # Row 22: boundary at the 1800-byte body cap.
+    local b1800="$T/b1800.txt" b1801="$T/b1801.txt" b5000="$T/b5000.txt" line49
+    line49="$(printf 'a%.0s' $(seq 1 49))"
+    { for _ in $(seq 1 35); do printf '%s\n' "$line49"; done; printf 'b%.0s' $(seq 1 50); } > "$b1800"
+    { cat "$b1800"; printf 'c'; } > "$b1801"
+    for _ in $(seq 1 100); do printf '%s\n' "$line49"; done > "$b5000"
+    expect_eq "row22: fixture is 1800 bytes" 1800 "$(wc -c < "$b1800" | tr -d ' ')"
+
+    new_case dm-1800
+    tsv_env; ER_ENV+=("STUB_CLAUDE_OUT=$b1800")
+    run_er "--from-tsv=$CORPUS"
+    expect_eq "row22: an 1800-byte body is sent unchanged" "IBL5 analytics review 2026-09-21..2026-09-28
+$(cat "$b1800")" "$(dm_payload 1)"
+    expect_lacks "row22: no marker on the 1800-byte body" "$(dm_payload 1)" "[truncated]"
+
+    new_case dm-1801
+    tsv_env; ER_ENV+=("STUB_CLAUDE_OUT=$b1801")
+    run_er "--from-tsv=$CORPUS"
+    expect_has "row22: an 1801-byte body is truncated" "$(dm_payload 1)" "[truncated]"
+
+    new_case dm-5000
+    tsv_env; ER_ENV+=("STUB_CLAUDE_OUT=$b5000")
+    run_er "--from-tsv=$CORPUS"
+    local size lastline
+    size="$(wc -c < "$SD/dm.1.stdin" | tr -d ' ')"
+    lastline="$(tail -n 1 "$SD/dm.1.stdin")"
+    if [ "$size" -le 1900 ]; then ok "row22: a 5000-byte output becomes $size bytes"; else fail "row22: DM is $size bytes"; fi
+    expect_eq "row22: capped DM ends with the marker" "[truncated]" "$lastline"
+
+    new_case dm-rc1
+    tsv_env; ER_ENV+=("STUB_DM_RC=1")
+    run_er "--from-tsv=$CORPUS"
+    expect_eq "row23: DM stub exit 1 exits 1" 1 "$ER_RC"
+    expect_has "row23: DM stub exit 1 logs ERROR" "$ER_ERR" "ERROR: discord-dm undeliverable"
+    new_case dm-rc2
+    tsv_env; ER_ENV+=("STUB_DM_RC=2")
+    run_er "--from-tsv=$CORPUS"
+    expect_eq "row23: DM stub exit 2 exits 1" 1 "$ER_RC"
+    expect_has "row23: DM stub exit 2 logs ERROR" "$ER_ERR" "ERROR: discord-dm usage error"
+    new_case dm-rc0
+    tsv_env
+    run_er "--from-tsv=$CORPUS"
+    expect_eq "row23: DM stub exit 0 exits 0" 0 "$ER_RC"
+
+    # Row 24: the real bin/discord-dm with curl and the webhook file stubbed.
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "SKIP: row24 (jq not installed)"
+        return 0
+    fi
+    new_case dm-real
+    local wh="$T/webhook-url"
+    printf 'https://discord.example/api/webhooks/1/abc\n' > "$wh"
+    chmod 600 "$wh"
+    ER_ENV=(
+        "STUB_DIR=$SD"
+        "HOME=$T"
+        "EVENTS_REVIEW_CLAUDE_BIN=$STUBS/claude"
+        "EVENTS_REVIEW_DM_BIN=$REPO_ROOT/bin/discord-dm"
+        "STUB_CLAUDE_OUT=$hostile"
+        "DISCORD_DM_TO=283183467804491776"
+        "DISCORD_DM_CURL_BIN=$STUBS/curl"
+        "DISCORD_DM_WEBHOOK_FILE=$wh"
+        "DISCORD_DM_SPOOL=$T/spool.log"
+    )
+    run_er "--from-tsv=$CORPUS"
+    expect_eq "row24: real discord-dm delivers" 0 "$ER_RC"
+    expect_eq "row24: one webhook post" 1 "$(call_count "$SD/curl.calls")"
+    local content
+    content="$(jq -r '.content' "$SD/curl.payload" 2>/dev/null)"
+    expect_has "row24: posted content is the sanitized text" "$content" "(at)everyone"
+    expect_has "row24: posted content carries the header" "$content" "IBL5 analytics review 2026-09-21..2026-09-28"
+    expect_lacks "row24: posted content has no @" "$content" "@"
+}
+
+# ── Group: schedule (rows 25-29) ──────────────────────────────────────────────
+sched_env() { # HOME for the run is $SD/home
+    mkdir -p "$SD/home"
+    ER_ENV=(
+        "STUB_DIR=$SD"
+        "HOME=$SD/home"
+        "EVENTS_REVIEW_SSH_HOST=prod.example"
+        "EVENTS_REVIEW_DB_USER=ro_user"
+        "EVENTS_REVIEW_DB_NAME=ibl5"
+        "EVENTS_REVIEW_DB_PASSWORD_FILE=$PW_FILE"
+        "EVENTS_REVIEW_LAUNCHCTL_BIN=$STUBS/launchctl"
+    )
+}
+
+group_schedule() {
+    echo "# group: schedule"
+    new_case sched
+    sched_env
+    run_er --print-schedule
+    expect_eq "row25: --print-schedule exits 0" 0 "$ER_RC"
+    expect_has "row25: PATH holds every directory and an absolute .local/bin" "$ER_OUT" \
+        "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$SD/home/.local/bin"
+    local tok
+    # shellcheck disable=SC2016  # literal tokens, not expansions
+    for tok in '$HOME' '${' '<string></string>'; do
+        expect_lacks "row25: plist lacks '$tok'" "$ER_OUT" "$tok"
+    done
+
+    local keys
+    keys="$(grep -E '<key>[^<]*</key>' <<< "$ER_OUT" | grep -ci 'PASSWORD' || true)"
+    expect_eq "row26: exactly one PASSWORD-named key" 1 "$keys"
+    expect_has "row26: that key is the file path" "$ER_OUT" "<key>EVENTS_REVIEW_DB_PASSWORD_FILE</key>"
+    expect_lacks "row26: plist never holds the password" "$ER_OUT" "$PW_VALUE"
+
+    local var
+    for var in EVENTS_REVIEW_SSH_HOST EVENTS_REVIEW_DB_USER EVENTS_REVIEW_DB_NAME EVENTS_REVIEW_DB_PASSWORD_FILE; do
+        sched_env
+        local kept=() e
+        for e in "${ER_ENV[@]}"; do
+            case "$e" in "$var="*) ;; *) kept+=("$e") ;; esac
+        done
+        ER_ENV=("${kept[@]}")
+        run_er --print-schedule
+        expect_eq "row27: $var unset exits 2" 2 "$ER_RC"
+        expect_eq "row27: $var unset prints nothing" "" "$ER_OUT"
+        ER_ENV+=("$var=")
+        run_er --print-schedule
+        expect_eq "row27: $var empty exits 2" 2 "$ER_RC"
+        expect_eq "row27: $var empty prints nothing" "" "$ER_OUT"
+    done
+    sched_env
+    local kept=()
+    for e in "${ER_ENV[@]}"; do
+        case "$e" in HOME=*) ;; *) kept+=("$e") ;; esac
+    done
+    ER_ENV=("${kept[@]}")
+    run_er --print-schedule
+    expect_eq "row27: HOME unset exits 2" 2 "$ER_RC"
+    expect_eq "row27: HOME unset prints nothing" "" "$ER_OUT"
+    sched_env; ER_ENV+=("HOME=")
+    run_er --print-schedule
+    expect_eq "row27: HOME empty exits 2" 2 "$ER_RC"
+
+    # A throwaway repo with a linked worktree: the plist must point at the main
+    # checkout, and install must refuse to run from the worktree.
+    if ! command -v git >/dev/null 2>&1; then
+        echo "SKIP: rows 28-29 (git not installed)"
+        return 0
+    fi
+    local main="$SD/main" wt="$SD/wt"
+    mkdir -p "$main/bin"
+    cp "$ER" "$main/bin/events-review"
+    git -C "$main" init -q 2>/dev/null
+    git -C "$main" add bin/events-review
+    git -C "$main" -c user.name=t -c user.email=t@example.com commit -q -m init 2>/dev/null
+    git -C "$main" worktree add -q "$wt" -b wt-branch 2>/dev/null
+    local main_real
+    main_real="$(git -C "$main" worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')"
+
+    local out
+    sched_env
+    out="$(env -i PATH="$PATH" "${ER_ENV[@]}" bash "$wt/bin/events-review" --print-schedule 2>&1)"
+    expect_has "row28: plist points at the main checkout" "$out" "<string>$main_real/bin/events-review</string>"
+    expect_lacks "row28: plist never points at the worktree" "$out" "$wt/bin/events-review"
+    expect_has "row28: Label" "$out" "<string>com.ibl5.events-review</string>"
+    expect_has "row28: Weekday 1" "$out" "<key>Weekday</key>
+		<integer>1</integer>"
+    expect_has "row28: Hour 9" "$out" "<key>Hour</key>
+		<integer>9</integer>"
+    expect_has "row28: Minute 17" "$out" "<key>Minute</key>
+		<integer>17</integer>"
+    if command -v plutil >/dev/null 2>&1; then
+        printf '%s\n' "$out" > "$SD/out.plist"
+        if plutil -lint "$SD/out.plist" >/dev/null 2>&1; then ok "row28: plutil -lint passes"; else fail "row28: plutil -lint failed"; fi
+    else
+        echo "SKIP: row28 plutil lint (needs macOS)"
+    fi
+
+    # Row 29: install and uninstall.
+    sched_env
+    env -i PATH="$PATH" "${ER_ENV[@]}" bash "$wt/bin/events-review" --install-schedule >/dev/null 2>&1
+    expect_eq "row29: install from a worktree exits 2" 2 "$?"
+    expect_absent "row29: no launchctl call from a worktree" "$SD/launchctl.log"
+
+    local loose="$T/pw-sched-644"
+    printf '%s\n' "$PW_VALUE" > "$loose"
+    chmod 644 "$loose"
+    sched_env; ER_ENV+=("EVENTS_REVIEW_DB_PASSWORD_FILE=$loose")
+    env -i PATH="$PATH" "${ER_ENV[@]}" bash "$main/bin/events-review" --install-schedule >/dev/null 2>&1
+    expect_eq "row29: install with a 644 file exits 2" 2 "$?"
+    expect_absent "row29: no launchctl call with a 644 file" "$SD/launchctl.log"
+
+    sched_env
+    env -i PATH="$PATH" "${ER_ENV[@]}" bash "$main/bin/events-review" --install-schedule >/dev/null 2>&1
+    expect_eq "row29: install from the main checkout exits 0" 0 "$?"
+    expect_eq "row29: plist is written under the temp HOME" 1 \
+        "$([ -f "$SD/home/Library/LaunchAgents/com.ibl5.events-review.plist" ] && echo 1 || echo 0)"
+    expect_file_has "row29: launchctl bootstrap is called" "$SD/launchctl.log" \
+        "bootstrap gui/$(id -u) $SD/home/Library/LaunchAgents/com.ibl5.events-review.plist"
+    expect_file_lacks "row29: installed plist never holds the password" \
+        "$SD/home/Library/LaunchAgents/com.ibl5.events-review.plist" "$PW_VALUE"
+
+    env -i PATH="$PATH" "${ER_ENV[@]}" bash "$main/bin/events-review" --uninstall-schedule >/dev/null 2>&1
+    expect_eq "row29: first uninstall exits 0" 0 "$?"
+    expect_absent "row29: uninstall removes the plist" "$SD/home/Library/LaunchAgents/com.ibl5.events-review.plist"
+    env -i PATH="$PATH" "${ER_ENV[@]}" bash "$main/bin/events-review" --uninstall-schedule >/dev/null 2>&1
+    expect_eq "row29: second uninstall is idempotent" 0 "$?"
+}
+
+# ── Group: e2e (rows 31-33; worktree Docker stack only) ───────────────────────
+group_e2e() {
+    echo "# group: e2e"
+    local slug container
+    slug="$(basename "$REPO_ROOT")"
+    container="ibl5-db-$slug"
+    if ! command -v docker >/dev/null 2>&1 \
+        || [ "$(docker ps --filter "name=^${container}\$" --format '{{.Names}}' 2>/dev/null)" != "$container" ]; then
+        echo "SKIP: e2e ($container not running; run bin/wt-up)"
+        return 0
+    fi
+
+    # The wrapper drops the -h/-P/-u pairs and execs the client inside the
+    # worktree container (worktree DBs publish no host port; bin/db-query routes
+    # the same way).
+    local dbname dbuser dbpass
+    dbname="$(docker exec "$container" printenv MARIADB_DATABASE 2>/dev/null || true)"
+    dbuser="root"
+    dbpass="$(docker exec "$container" printenv MARIADB_ROOT_PASSWORD 2>/dev/null || true)"
+    [ -n "$dbname" ] || dbname="iblhoops_ibl5"
+    new_case e2e
+    local wrapper="$SD/mariadb-wrapper"
+    cat > "$wrapper" <<SH
+#!/usr/bin/env bash
+args=()
+while [ \$# -gt 0 ]; do
+    case "\$1" in
+        -h|-P|-u) shift 2 ;;
+        *) args+=("\$1"); shift ;;
+    esac
+done
+if [ -n "\${E2E_BROKEN:-}" ]; then exit 1; fi
+exec docker exec -i -e MYSQL_PWD='$dbpass' "$container" mariadb -u "$dbuser" "\${args[@]}"
+SH
+    chmod +x "$wrapper"
+
+    # shellcheck disable=SC2064
+    trap "rm -rf '$T'; '$wrapper' '$dbname' <<< \"DELETE FROM ibl_events WHERE user_agent = 'events-review-fixture';\" >/dev/null 2>&1" EXIT
+
+    local seed_rc=0
+    "$wrapper" "$dbname" < "$SEED_SQL" >/dev/null 2>&1 || seed_rc=$?
+    if [ "$seed_rc" -ne 0 ]; then
+        fail "e2e: seed load failed ($SEED_SQL into $container; rc=$seed_rc)"
+        return 0
+    fi
+
+    ER_ENV=(
+        "STUB_DIR=$SD"
+        "EVENTS_REVIEW_SSH_HOST=local"
+        "EVENTS_REVIEW_DB_USER=$dbuser"
+        "EVENTS_REVIEW_DB_NAME=$dbname"
+        "EVENTS_REVIEW_DB_PASSWORD_FILE=$PW_FILE"
+        "EVENTS_REVIEW_SSH_BIN=/usr/bin/true"
+        "EVENTS_REVIEW_MYSQL_BIN=$wrapper"
+        "EVENTS_REVIEW_CLAUDE_BIN=$STUBS/claude"
+        "EVENTS_REVIEW_DM_BIN=$STUBS/dm"
+        "EVENTS_REVIEW_MIN_ROWS=1"
+    )
+    run_er --dry-run
+    local digest
+    digest="$(digest_of <<< "$ER_OUT")"
+    expect_eq "row31: live dry-run exits 0" 0 "$ER_RC"
+    expect_has "row31: seeded authenticated route team" "$digest" "team"
+    expect_has "row31: seeded authenticated route player" "$digest" "player"
+    expect_has "row31: seeded authenticated route depth_chart" "$digest" "depth_chart"
+    expect_has_exact "row31: active GMs: 3" "$digest" "active GMs: 3"
+    expect_has_exact "row31: NULL-class rows show as unclassified 4" "$digest" "unclassified 4"
+    local tok
+    for tok in 'fixture_gm_' 'deadbeef' 'events-review-fixture' 'secret=leak123' 'evil-referer.example' 'ignore_previous'; do
+        expect_lacks "row32: output lacks '$tok'" "$ER_OUT" "$tok"
+    done
+
+    # Row 33: full live run with the claude stub and the real discord-dm.
+    if command -v jq >/dev/null 2>&1; then
+        local wh="$T/e2e-webhook-url"
+        printf 'https://discord.example/api/webhooks/1/abc\n' > "$wh"
+        chmod 600 "$wh"
+        ER_ENV+=(
+            "HOME=$T"
+            "EVENTS_REVIEW_DM_BIN=$REPO_ROOT/bin/discord-dm"
+            "DISCORD_DM_TO=283183467804491776"
+            "DISCORD_DM_CURL_BIN=$STUBS/curl"
+            "DISCORD_DM_WEBHOOK_FILE=$wh"
+            "DISCORD_DM_SPOOL=$T/e2e-spool.log"
+        )
+        run_er
+        expect_eq "row33: full live run exits 0" 0 "$ER_RC"
+        expect_eq "row33: claude ran once" 1 "$(call_count "$SD/claude.calls")"
+        expect_eq "row33: one webhook post" 1 "$(call_count "$SD/curl.calls")"
+        local actual_digest
+        actual_digest="$(awk '/^<digest>$/{f=1;next} /^<\/digest>$/{f=0} f' "$SD/claude.stdin")"
+        if [ "$actual_digest" = "$digest" ]; then ok "row33: claude stdin holds the dry-run digest"
+        else fail "row33: claude stdin differs from the dry-run digest"; fi
+    else
+        echo "SKIP: row33 full run (jq not installed)"
+    fi
+    new_case e2e-broken
+    local sd_broken="$SD"
+    ER_ENV=(
+        "STUB_DIR=$SD"
+        "E2E_BROKEN=1"
+        "EVENTS_REVIEW_SSH_HOST=local"
+        "EVENTS_REVIEW_DB_USER=$dbuser"
+        "EVENTS_REVIEW_DB_NAME=$dbname"
+        "EVENTS_REVIEW_DB_PASSWORD_FILE=$PW_FILE"
+        "EVENTS_REVIEW_SSH_BIN=/usr/bin/true"
+        "EVENTS_REVIEW_MYSQL_BIN=$wrapper"
+        "EVENTS_REVIEW_CLAUDE_BIN=$STUBS/claude"
+        "EVENTS_REVIEW_DM_BIN=$STUBS/dm"
+    )
+    run_er
+    expect_eq "row33: a broken mysql wrapper exits 1" 1 "$ER_RC"
+
+    # Mutation (row 31): removing COALESCE(traffic_class,'unclassified') drops the
+    # NULL-class rows, so the digest must change against the real run.
+    local mut="$T/events-review.mut-coalesce"
+    sed "s/COALESCE(traffic_class, 'unclassified')/traffic_class/g" "$ER" > "$mut"
+    if cmp -s "$ER" "$mut"; then fail "row31: mutant was not applied"; else
+        new_case e2e-mut
+        ER_ENV=(
+            "STUB_DIR=$SD"
+            "EVENTS_REVIEW_SSH_HOST=local"
+            "EVENTS_REVIEW_DB_USER=$dbuser"
+            "EVENTS_REVIEW_DB_NAME=$dbname"
+            "EVENTS_REVIEW_DB_PASSWORD_FILE=$PW_FILE"
+            "EVENTS_REVIEW_SSH_BIN=/usr/bin/true"
+            "EVENTS_REVIEW_MYSQL_BIN=$wrapper"
+            "EVENTS_REVIEW_MIN_ROWS=1"
+        )
+        run_er --dry-run
+        local real_digest mut_digest
+        real_digest="$digest"
+        ER_SCRIPT="$mut"
+        run_er --dry-run
+        ER_SCRIPT=""
+        mut_digest="$(digest_of <<< "$ER_OUT")"
+        if [ "$real_digest" != "$mut_digest" ]; then ok "row31: mutant without COALESCE changes the digest (caught)"
+        else fail "row31: mutant without COALESCE was not caught"; fi
+    fi
+    expect_absent "row33: a broken mysql wrapper spawns no claude" "$sd_broken/claude.calls"
+}
+
+GROUP="${1:-all}"
+case "$GROUP" in
+    flags)    group_flags ;;
+    env)      group_env ;;
+    creds)    group_creds ;;
+    digest)   group_digest ;;
+    claude)   group_claude ;;
+    dm)       group_dm ;;
+    schedule) group_schedule ;;
+    e2e)      group_e2e ;;
+    all)
+        group_flags; group_env; group_creds; group_digest
+        group_claude; group_dm; group_schedule; group_e2e ;;
+    *) echo "usage: bin/test-events-review [flags|env|creds|digest|claude|dm|schedule|e2e]" >&2; exit 2 ;;
+esac
+
+if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "FAILURES"; fi
+exit "$FAILED"

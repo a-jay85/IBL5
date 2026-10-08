@@ -1,6 +1,6 @@
 ---
 description: The written-voice contract for machine-authored merge-digest lines and PR-body prose — five rules, the sentence-tokenizing definition bin/check-digest-prose implements, and two annotated failure samples.
-last_verified: 2026-09-22
+last_verified: 2026-10-06
 ---
 
 # Prose Voice Contract
@@ -10,7 +10,7 @@ last_verified: 2026-09-22
 This contract governs **machine-authored prose** in two places:
 
 - The five `### Merge digest` label lines authored by `.claude/agents/pr-ready-phase6.md`.
-- The PR-body prose the `/post-plan` orchestrator composes per `.claude/skills/post-plan/SKILL.md`: the `## Scope` why-paragraph, `**Scope expansion:**`, `## Why this PR exists`, and `## Reviewer verification`.
+- The PR-body prose the `/post-plan` orchestrator composes per `.claude/skills/post-plan/SKILL.md`: the `## Scope` why-paragraph, `**Scope expansion:**`, and `## Why this PR exists`.
 
 It is **read on demand**, never auto-attached. Both callers carry an explicit `Read` instruction pointing here.
 

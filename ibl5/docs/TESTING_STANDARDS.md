@@ -1,6 +1,6 @@
 ---
 description: Testing philosophy, conventions, and requirements for IBL5.
-last_verified: 2026-08-11
+last_verified: 2026-10-03
 ---
 
 # IBL5 Testing Standards
@@ -194,7 +194,7 @@ private InterfaceName $mockObject;
 ```
 
 **Examples in codebase:**
-- `tests/PlayerDatabase/PlayerDatabaseServiceTest.php` (line 25)
+- `tests/PlayerSearch/PlayerSearchServiceTest.php` (line 25)
 - `tests/Player/PlayerViewFactoryTest.php` (line 36)
 - `tests/Standings/StandingsViewTest.php` (line 25)
 

@@ -58,6 +58,7 @@ assert_absent() {
 # the functions by name keeps the test on the real implementation without drift.
 eval "$(awk '/^parse_when_epoch\(\)/,/^}/'      "$RUN")"
 eval "$(awk '/^epoch_fmt\(\)/,/^}/'             "$RUN")"
+eval "$(awk '/^schedule_epoch\(\)/,/^}/'        "$RUN")"
 eval "$(awk '/^daily_fire_hhmm\(\)/,/^}/'       "$RUN")"
 eval "$(awk '/^next_daily_epoch\(\)/,/^}/'      "$RUN")"
 eval "$(awk '/^automouse_running_pid\(\)/,/^}/' "$RUN")"
@@ -118,6 +119,30 @@ assert_eq "$(epoch_fmt "$TIME_ONLY" '%Y-%m-%d %H:%M')" "$TODAY 21:15" "time-only
 LOCAL_TZ=$(date '+%Z')
 TIME_TZ=$(parse_when_epoch "21:15 $LOCAL_TZ")
 assert_eq "$(epoch_fmt "$TIME_TZ" '%Y-%m-%d %H:%M')" "$TODAY 21:15" "time-only with TZ defaults to today"
+
+# schedule_epoch: a bare time already passed rolls to tomorrow; a bare time
+# still ahead stays today; a dated time is never moved, even when past.
+NOON_SCHED=$(parse_when_epoch '2026-08-20 12:00')
+SCHED_PAST=$(schedule_epoch '09:00' "$NOON_SCHED")
+SCHED_TOMORROW="2026-08-21"
+assert_eq "$(epoch_fmt "$SCHED_PAST" '%Y-%m-%d %H:%M')" "$SCHED_TOMORROW 09:00" "schedule_epoch rolls a passed bare time to tomorrow"
+SCHED_PAST_TZ=$(schedule_epoch "09:00 $LOCAL_TZ" "$NOON_SCHED")
+assert_eq "$(epoch_fmt "$SCHED_PAST_TZ" '%Y-%m-%d %H:%M')" "$SCHED_TOMORROW 09:00" "schedule_epoch rolls a passed bare time with TZ to tomorrow"
+SCHED_AHEAD=$(schedule_epoch '23:30' "$NOON_SCHED")
+assert_eq "$(epoch_fmt "$SCHED_AHEAD" '%Y-%m-%d %H:%M')" "2026-08-20 23:30" "schedule_epoch keeps a bare time still ahead on today"
+SCHED_DATED=$(schedule_epoch '2026-08-20 09:00' "$NOON_SCHED")
+assert_eq "$(epoch_fmt "$SCHED_DATED" '%Y-%m-%d %H:%M')" "2026-08-20 09:00" "schedule_epoch leaves a past dated time alone"
+assert_eq "$(schedule_epoch 'not a time' 0 >/dev/null 2>&1; echo $?)" "1" "schedule_epoch rejects garbage"
+
+# DST-eve spring-forward: 2027-03-13 23:30 PST. Raw +86400 lands on 2027-03-15;
+# the midday anchor must return 2027-03-14 for both schedule_epoch and next_daily_epoch.
+DST_EVE=$(TZ=America/Los_Angeles parse_when_epoch '2027-03-13 23:30')
+SCHED_DST=$(TZ=America/Los_Angeles schedule_epoch '09:00' "$DST_EVE")
+assert_eq "$(TZ=America/Los_Angeles epoch_fmt "$SCHED_DST" '%Y-%m-%d %H:%M')" \
+    "2027-03-14 09:00" "schedule_epoch: DST-eve spring-forward does not skip a day"
+NEXT_DST=$(TZ=America/Los_Angeles next_daily_epoch 9 0 "$DST_EVE")
+assert_eq "$(TZ=America/Los_Angeles epoch_fmt "$NEXT_DST" '%Y-%m-%d %H:%M')" \
+    "2027-03-14 09:00" "next_daily_epoch: DST-eve spring-forward does not skip a day"
 
 # next_daily_epoch rolls forward when the time has already passed today, and
 # stays on today when it hasn't. Both are checked against the wall clock, not

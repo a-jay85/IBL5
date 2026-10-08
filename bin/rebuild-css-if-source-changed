@@ -64,9 +64,12 @@ fi
     else
         # Fallback: the tailwind container always has the toolchain. Worktree
         # stacks are ibl5-tailwind-<slug>; the main stack is ibl5-tailwind.
+        # Capture once, then grep the variable: `docker ps | grep -q` can SIGPIPE
+        # the producer (141), which pipefail reports as a false failure.
+        running="$(docker ps --format '{{.Names}}' 2>/dev/null || true)"
         container="ibl5-tailwind-$slug"
-        docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container" || container="ibl5-tailwind"
-        if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container" &&
+        grep -qx -- "$container" <<< "$running" || container="ibl5-tailwind"
+        if grep -qx -- "$container" <<< "$running" &&
             docker exec "$container" bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css >> "$LOG" 2>&1; then
             echo "$(date): css rebuilt in $container" >> "$LOG"
         else
@@ -86,7 +89,8 @@ fi
     else
         watcher="ibl5-tailwind-$slug"
     fi
-    if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$watcher"; then
+    running="$(docker ps --format '{{.Names}}' 2>/dev/null || true)"
+    if grep -qx -- "$watcher" <<< "$running"; then
         if docker restart "$watcher" >> "$LOG" 2>&1; then
             echo "$(date): restarted $watcher to drop its stale source graph" >> "$LOG"
         else

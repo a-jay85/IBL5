@@ -1,6 +1,6 @@
 ---
 description: GitHub Actions gotchas learned in production — cascade cancels, payload freezing, required check wiring, mutation gate, Dependabot, ssh-keyscan, VR update-baselines label flow.
-last_verified: 2026-09-30
+last_verified: 2026-10-06
 paths: ".github/workflows/**"
 ---
 
@@ -40,11 +40,11 @@ Branch protection on master names job-level contexts. `Tests and Analysis` is th
 
 A new protection context is a separate decision (ADR-0120, ADR-0145). The workflow that emits it must report on every PR: no `paths` or `branches` filter and no job-level `if:`. A context with no matching check run leaves the PR pending forever. Add it with the append-only `POST .../required_status_checks/contexts` and check it with `bin/check-composite-contracts --protection-readback`. Never use the protection `PUT`, which replaces the whole object. Live list: `gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'`.
 
-`All checks green` (`.github/workflows/all-checks-green.yml`, ADR-0149) is the required cross-workflow aggregator. Once activated, a red check anywhere on the head blocks the merge. After you re-run one flaky job, re-run the aggregator run too: `gh run list --workflow all-checks-green.yml --branch <head-branch> --limit 1 --json databaseId --jq '.[0].databaseId' | xargs gh run rerun`. The excluded names live in the workflow's `--ignore=`. To make a new job advisory, add its name there. Never delete a check to get a merge through.
+`All checks green` (`.github/workflows/all-checks-green.yml`, ADR-0149) is the required cross-workflow aggregator. A red check anywhere on the head blocks the merge, and a pending one holds it until it finishes. After you re-run one flaky job, re-run the aggregator run too: `gh run list --workflow all-checks-green.yml --branch <head-branch> --limit 1 --json databaseId --jq '.[0].databaseId' | xargs gh run rerun`. The excluded names live in the workflow's `--ignore=`. To make a new job advisory, add its name there. Never delete a check to get a merge through.
 
 ## Mutation testing: per-PR diff job required, full suite label-gated
 
-`.github/workflows/mutation-pr.yml` runs `Infection PHP (per-PR diff)` on every PR at `--min-msi=100` on changed lines. There is no waive label. Once the ADR-0145 activation runs, it blocks merge, so a surviving mutant on a changed line needs a test that kills it. `.github/workflows/mutation.yml` runs the full suite only on the `mutation-test` label, Monday's cron, or `workflow_dispatch`, and never blocks merge. Keep `labeled` out of `mutation-pr.yml`: a label run in the same concurrency group cancels the real run. `bin/check-composite-contracts` (M1 to M4) enforces the trigger, name, `if:`, and threshold.
+`.github/workflows/mutation-pr.yml` runs `Infection PHP (per-PR diff)` on every PR at `--min-msi=100` on changed lines. There is no waive label. It is a required context and blocks merge, so a surviving mutant on a changed line needs a test that kills it. `.github/workflows/mutation.yml` runs the full suite only on the `mutation-test` label, Monday's cron, or `workflow_dispatch`, and never blocks merge. Keep `labeled` out of `mutation-pr.yml`: a label run in the same concurrency group cancels the real run. `bin/check-composite-contracts` (M1 to M4) enforces the trigger, name, `if:`, and threshold.
 
 ## `ssh-keyscan` needs `|| true`
 

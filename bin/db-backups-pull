@@ -63,7 +63,7 @@ log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 # --- Scheduling (pattern: bin/db-sync-cron-setup) ------------------------------
 if [ "$ACTION" != "pull" ]; then
   # The plist must point at the durable MAIN checkout, never a worktree.
-  MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+  MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
   [ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"
 
   PLIST_LABEL="com.ibl5.db-backups-pull"
@@ -193,7 +193,7 @@ log "Pulling ${SSH_HOST}:backups/db-predeploy/ -> ${LOCAL_DIR}/predeploy/"
 rc=0
 out="$("$RSYNC_BIN" "${RSYNC_FLAGS[@]}" -e "$SSH_CMD" "${SSH_HOST}:backups/db-predeploy/" "${LOCAL_DIR}/predeploy/" 2>&1)" || rc=$?
 if [ "$rc" -ne 0 ]; then
-  if printf '%s' "$out" | grep -qi 'no such file'; then
+  if grep -qi 'no such file' <<< "$out"; then
     log "No remote db-predeploy dir yet; skipping"
   else
     log "FAILED: rsync of backups/db-predeploy exited $rc: $out"

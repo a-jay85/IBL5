@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Api\Repository;
 
-class ApiKeyRepository extends \BaseMysqliRepository
+class ApiKeyRepository extends \Database\BaseMysqliRepository
 {
     /**
      * Look up an active API key by its SHA-256 hash.

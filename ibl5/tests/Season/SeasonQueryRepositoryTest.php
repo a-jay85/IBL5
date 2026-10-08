@@ -26,7 +26,7 @@ class SeasonQueryRepositoryTest extends TestCase
     public function testGetSeasonPhaseReturnsValue(): void
     {
         $this->mockDb->setMockData([
-            ['value' => 'Regular Season'],
+            ['setting_value' => 'Regular Season'],
         ]);
 
         $result = $this->repository->getSeasonPhase();
@@ -50,7 +50,7 @@ class SeasonQueryRepositoryTest extends TestCase
     public function testGetSeasonEndingYearReturnsValue(): void
     {
         $this->mockDb->setMockData([
-            ['value' => '2025'],
+            ['setting_value' => '2025'],
         ]);
 
         $result = $this->repository->getSeasonEndingYear();
@@ -137,7 +137,7 @@ class SeasonQueryRepositoryTest extends TestCase
     public function testGetAllowTradesStatusReturnsYes(): void
     {
         $this->mockDb->setMockData([
-            ['value' => 'Yes'],
+            ['setting_value' => 'Yes'],
         ]);
 
         $result = $this->repository->getAllowTradesStatus();
@@ -148,7 +148,7 @@ class SeasonQueryRepositoryTest extends TestCase
     public function testGetAllowWaiversStatusReturnsNo(): void
     {
         $this->mockDb->setMockData([
-            ['value' => 'No'],
+            ['setting_value' => 'No'],
         ]);
 
         $result = $this->repository->getAllowWaiversStatus();
@@ -163,7 +163,7 @@ class SeasonQueryRepositoryTest extends TestCase
     public function testGetFreeAgencyNotificationsStateReturnsOn(): void
     {
         $this->mockDb->setMockData([
-            ['value' => 'On'],
+            ['setting_value' => 'On'],
         ]);
 
         $result = $this->repository->getFreeAgencyNotificationsState();
@@ -263,8 +263,8 @@ class SeasonQueryRepositoryTest extends TestCase
     public function testGetBulkSettingsReturnsMap(): void
     {
         $this->mockDb->setMockData([
-            ['setting_key' => 'Allow Trades', 'value' => 'Yes'],
-            ['setting_key' => 'Allow Waiver Moves', 'value' => 'No'],
+            ['setting_key' => 'Allow Trades', 'setting_value' => 'Yes'],
+            ['setting_key' => 'Allow Waiver Moves', 'setting_value' => 'No'],
         ]);
 
         $result = $this->repository->getBulkSettings(['Allow Trades', 'Allow Waiver Moves']);

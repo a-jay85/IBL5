@@ -227,4 +227,17 @@ class StandingsUpdaterRepositoryTest extends WideUnitTestCase
         $this->assertQueryNotExecuted('ibl_standings');
         self::assertSame([2026, 'Sentinels', 'Division Champions'], $this->mockDb->getLastBoundParams());
     }
+
+    public function testUpsertTeamAwardWritesBacktickedTeamAwardsTable(): void
+    {
+        $this->repository->upsertTeamAward(2026, 'Sentinels', 'Division Champions');
+
+        // getExecutedQueries() strips backticks, so assertQueryExecuted() covers the
+        // column list and order; the raw prepared SQL text carries the backticks.
+        $this->assertQueryExecuted('INSERT INTO ibl_team_awards (year, name, award)');
+        self::assertStringContainsString(
+            'INSERT INTO `ibl_team_awards` (year, name, award)',
+            implode("\n", $this->mockDb->getPreparedQueries())
+        );
+    }
 }

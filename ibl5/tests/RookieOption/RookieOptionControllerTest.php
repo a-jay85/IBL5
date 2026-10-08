@@ -221,4 +221,217 @@ class RookieOptionControllerTest extends TestCase
         }
     }
 
+    // ============================================
+    // handleSubmission() GATE + REDIRECT TESTS
+    // ============================================
+
+    /**
+     * Partial mock: only processRookieOption() is replaced; handleSubmission() runs for real.
+     *
+     * @return RookieOptionController&\PHPUnit\Framework\MockObject\MockObject
+     */
+    private function buildSubmissionController(?TeamIdentityRepositoryInterface $teams = null): RookieOptionController
+    {
+        return $this->getMockBuilder(RookieOptionController::class)
+            ->setConstructorArgs([
+                new MockDatabase(),
+                $teams ?? self::createStub(TeamIdentityRepositoryInterface::class),
+                self::createStub(RookieOptionRepositoryInterface::class),
+                self::createStub(NewsRepositoryInterface::class),
+                self::createStub(LoggerInterface::class),
+                self::createStub(LoggerInterface::class),
+                self::createStub(Season::class),
+            ])
+            ->onlyMethods(['processRookieOption'])
+            ->getMock();
+    }
+
+    private function teamsMapping(string $username, ?string $team): TeamIdentityRepositoryInterface
+    {
+        $teams = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teams->method('getTeamnameFromUsername')
+            ->willReturnCallback(static fn (?string $name): ?string => $name === $username ? $team : null);
+
+        return $teams;
+    }
+
+    public function testHandleSubmissionUnauthenticatedReturnsNullAndRunsNoLaterGate(): void
+    {
+        $controller = $this->buildSubmissionController();
+        $controller->expects(self::never())->method('processRookieOption');
+        /** @var list<string> $calls */
+        $calls = [];
+
+        $result = $controller->handleSubmission(
+            static function () use (&$calls): bool {
+                $calls[] = 'isUser';
+                return false;
+            },
+            static function () use (&$calls): bool {
+                $calls[] = 'csrf';
+                return true;
+            },
+            static function () use (&$calls): string {
+                $calls[] = 'username';
+                return 'gm';
+            },
+            [],
+        );
+
+        self::assertNull($result);
+        self::assertSame(['isUser'], $calls);
+    }
+
+    public function testHandleSubmissionInvalidCsrfReturnsExactErrorUrlAndRunsNoLaterGate(): void
+    {
+        $controller = $this->buildSubmissionController();
+        $controller->expects(self::never())->method('processRookieOption');
+        /** @var list<string> $calls */
+        $calls = [];
+
+        $result = $controller->handleSubmission(
+            static function () use (&$calls): bool {
+                $calls[] = 'isUser';
+                return true;
+            },
+            static function () use (&$calls): bool {
+                $calls[] = 'csrf';
+                return false;
+            },
+            static function () use (&$calls): string {
+                $calls[] = 'username';
+                return 'gm';
+            },
+            [],
+        );
+
+        self::assertSame(
+            'modules.php?name=Player&error=Invalid%20or%20expired%20form%20submission.%20Please%20reload%20and%20try%20again.',
+            $result,
+        );
+        self::assertSame(['isUser', 'csrf'], $calls);
+    }
+
+    public function testHandleSubmissionPassesSessionTeamNotPostedTeamAsFourthArgument(): void
+    {
+        $controller = $this->buildSubmissionController($this->teamsMapping('gm', 'Session Team'));
+        $controller->expects(self::once())
+            ->method('processRookieOption')
+            ->with('Posted Team', 5, 100, 'Session Team')
+            ->willReturn(['success' => false, 'type' => 'ownership_error', 'message' => 'x', 'playerID' => 5]);
+
+        $controller->handleSubmission(
+            static fn (): bool => true,
+            static fn (): bool => true,
+            static fn (): string => 'gm',
+            ['teamname' => 'Posted Team', 'playerID' => '5', 'rookieOptionValue' => '100'],
+        );
+    }
+
+    public function testHandleSubmissionNullSessionTeamPassesNull(): void
+    {
+        $controller = $this->buildSubmissionController($this->teamsMapping('gm', null));
+        $controller->expects(self::once())
+            ->method('processRookieOption')
+            ->with('Posted Team', 5, 100, null)
+            ->willReturn(['success' => false, 'type' => 'ownership_error', 'message' => 'x', 'playerID' => 5]);
+
+        $controller->handleSubmission(
+            static fn (): bool => true,
+            static fn (): bool => true,
+            static fn (): string => 'gm',
+            ['teamname' => 'Posted Team', 'playerID' => '5', 'rookieOptionValue' => '100'],
+        );
+    }
+
+    public function testHandleSubmissionSuccessFromFaRedirectsToFreeAgency(): void
+    {
+        $controller = $this->buildSubmissionController($this->teamsMapping('gm', 'Heat'));
+        $controller->expects(self::once())
+            ->method('processRookieOption')
+            ->willReturn(['success' => true, 'type' => 'success', 'message' => 'ok', 'playerID' => 5]);
+
+        $result = $controller->handleSubmission(
+            static fn (): bool => true,
+            static fn (): bool => true,
+            static fn (): string => 'gm',
+            ['teamname' => 'Heat', 'playerID' => '5', 'rookieOptionValue' => '100', 'from' => 'fa'],
+        );
+
+        self::assertSame('modules.php?name=FreeAgency&result=rookie_option_success', $result);
+    }
+
+    public function testHandleSubmissionSuccessDefaultRedirectsToPlayerPage(): void
+    {
+        $controller = $this->buildSubmissionController($this->teamsMapping('gm', 'Heat'));
+        $controller->expects(self::once())
+            ->method('processRookieOption')
+            ->willReturn(['success' => true, 'type' => 'success', 'message' => 'ok', 'playerID' => 5]);
+
+        $result = $controller->handleSubmission(
+            static fn (): bool => true,
+            static fn (): bool => true,
+            static fn (): string => 'gm',
+            ['teamname' => 'Heat', 'playerID' => '5', 'rookieOptionValue' => '100', 'from' => ''],
+        );
+
+        self::assertSame('modules.php?name=Player&pa=showpage&pid=5&result=rookie_option_success', $result);
+    }
+
+    public function testHandleSubmissionSuccessEmailFailedUsesEmailFailedParam(): void
+    {
+        $controller = $this->buildSubmissionController($this->teamsMapping('gm', 'Heat'));
+        $controller->expects(self::once())
+            ->method('processRookieOption')
+            ->willReturn(['success' => true, 'type' => 'success', 'message' => 'ok', 'playerID' => 5, 'emailSuccess' => false]);
+
+        $result = $controller->handleSubmission(
+            static fn (): bool => true,
+            static fn (): bool => true,
+            static fn (): string => 'gm',
+            ['teamname' => 'Heat', 'playerID' => '5', 'rookieOptionValue' => '100'],
+        );
+
+        self::assertNotNull($result);
+        self::assertStringEndsWith('&result=email_failed', $result);
+    }
+
+    public function testHandleSubmissionErrorRedirectsToFormWithEncodedFromAndMessage(): void
+    {
+        $controller = $this->buildSubmissionController($this->teamsMapping('gm', 'Heat'));
+        $controller->expects(self::once())
+            ->method('processRookieOption')
+            ->willReturn(['success' => false, 'type' => 'validation_error', 'message' => 'Bad & wrong', 'playerID' => 5]);
+
+        $result = $controller->handleSubmission(
+            static fn (): bool => true,
+            static fn (): bool => true,
+            static fn (): string => 'gm',
+            ['teamname' => 'Heat', 'playerID' => '5', 'rookieOptionValue' => '100', 'from' => 'a b'],
+        );
+
+        self::assertSame(
+            'modules.php?name=Player&pa=rookieoption&pid=5&from=a%20b&error=Bad%20%26%20wrong',
+            $result,
+        );
+    }
+
+    public function testHandleSubmissionNonStringFromTreatedAsEmpty(): void
+    {
+        $controller = $this->buildSubmissionController($this->teamsMapping('gm', 'Heat'));
+        $controller->expects(self::once())
+            ->method('processRookieOption')
+            ->willReturn(['success' => false, 'type' => 'validation_error', 'message' => 'Bad', 'playerID' => 5]);
+
+        $result = $controller->handleSubmission(
+            static fn (): bool => true,
+            static fn (): bool => true,
+            static fn (): string => 'gm',
+            ['teamname' => 'Heat', 'playerID' => '5', 'rookieOptionValue' => '100', 'from' => ['x']],
+        );
+
+        self::assertNotNull($result);
+        self::assertStringContainsString('&from=&error=', $result);
+    }
+
 }

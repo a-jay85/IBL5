@@ -1,6 +1,6 @@
 ---
 description: Git worktrees are created OUTSIDE the repo tree (a canonical-case sibling, IBL5-worktrees/<slug>) instead of nested at $REPO_ROOT/worktrees/<slug>. Nesting made the repo-root .claude/rules a filesystem ancestor of every worktree file, so Claude Code's path-conditional rule loader injected each matching rule twice. Records the layout decision, the git-based worktree detection it requires, and the safe migration path.
-last_verified: 2026-08-08
+last_verified: 2026-10-06
 ---
 
 # ADR-0046: Worktrees live outside the repo tree
@@ -42,7 +42,7 @@ layout-independent git check (`is_in_worktree`: a linked worktree's `--git-dir` 
 from its `--git-common-dir`). `cleanup`'s orphan-directory **sweep** stays directory-based
 (it needs the root path), repointed at the external root.
 
-Existing in-repo worktrees are relocated by `bin/wt-migrate-layout`, which gates each
+Existing in-repo worktrees are relocated by bin/wt-migrate-layout (since removed), which gates each
 worktree on the `bin/lib/wt-guards.sh` safety predicates (`is_worktree_in_use`,
 `has_uncommitted_changes`, `has_untracked_files`) and **skips** any that are busy or dirty
 — never a big-bang move. All worktree tooling continues to accept the legacy in-repo
@@ -61,4 +61,8 @@ location during the transition.
   `wt-db-test`, `db-test-up`, `e2e-wt`, `cleanup`, `ibl5/bin/e2e-local`, and
   `bin/lib/git-helpers.sh`. Local, non-repo follow-ups (vendor-repair hook in
   `.claude/settings.local.json`, permission globs in `~/.claude/settings.json`, stale
-  `~/.claude.json` project keys) are documented in the PR, not in this diff.
+  `~/.claude.json` project keys) are documented in the PR, not in this diff. <!-- slop-ok -->
+
+## Addendum: legacy in-repo fallback removed (2026-10-06)
+
+`bin/db-sync-prod` and `bin/e2e-wt` previously accepted the legacy `worktrees/<name>` path inside the repo as a fallback alongside the canonical external `IBL5-worktrees/<name>` path. PR [#2919](https://github.com/a-jay85/IBL5/pull/2919) removes those fallback branches. All active worktrees were at the external location before this change.

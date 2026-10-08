@@ -17,7 +17,7 @@
 
 .record-book-team-selector label {
     font-family: var(--font-display);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-size: var(--text-sm);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);

@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree; where plans live (outside the repo); worktree setup; post-plan handoff triggers.
-last_verified: 2026-10-02
+last_verified: 2026-10-03
 ---
 
 # Workflow Continuity Rule
@@ -47,8 +47,8 @@ Never run `/post-plan` **inline**. It re-reads the full implementation context e
 
 **Ad-hoc work** (no plan): if this session created the worktree, shipping is pre-authorized. If it already existed, hold: when verified clean, commit with `/commit-commands:commit`, don't fire post-plan, and end with `cd <abs worktree path> && bin/post-plan-now` to paste. It ships only when the user arms the branch (never arm it or suggest arming) or says ship. A skill ending in shipping is the instruction. To ship, fire `bin/post-plan-now --auto`.
 
-- **Do NOT commit first** when shipping plan-driven work or a fresh ad-hoc branch. Leave it **dirty**.
-- **A held branch ships with its hold commit.** `bin/post-plan-now` runs with commits ahead of master.
+- **Do NOT commit first** when shipping plan-driven work or a fresh ad-hoc branch. Leave it **dirty**. `/post-plan` commits the uncommitted tree in Phase 2 and opens the PR. Committing here changes what it ships.
+- **A held branch ships with its hold commit.** `bin/post-plan-now` runs with commits ahead of `origin/master`. Never reset or squash the hold commit to get a dirty tree back.
 - **Matrix check first.** With a plan, `git add -A` and run `bin/lib/plan-matrix-assertions <plan> <(git diff --cached origin/master)`. Write the test for each `UNREALISED-ASSERTION` row and rerun; if you cannot, do not fire. No plan: skip.
 - **Only fire when verification passed.** If implementation did **not** verify clean (failing tests, unresolved blocker, you stopped to ask the user something), do **not** fire. Leave the worktree dirty and hand off in prose. Turn-end is not done; that judgment is yours.
 - **No watcher after the fire.** When `bin/post-plan-now` or `bin/plan-now` is the last step, end the turn. Do not arm a Monitor or ScheduleWakeup on the run. The finish DM tells the user how it went.

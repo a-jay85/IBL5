@@ -543,6 +543,15 @@ def test_parse_verdict_whitespace_variants_are_stripped(reply):
     assert parse_verdict(reply) == "CONFLICT-REVIEW=CLEAN"
 
 
+def test_nbsp_fixture_survives_editor_normalization():
+    """The raw NBSP in the whitespace-variants fixture above must stay a real U+00A0.
+
+    An editor that normalizes it to a plain space leaves the parametrized case green
+    while it stops testing NBSP stripping."""
+    source = open(__file__, encoding="utf-8").read()
+    assert '"\u00a0CONFLICT-REVIEW=CLEAN"' in source
+
+
 def test_parse_verdict_fenced_token_is_not_skipped():
     assert parse_verdict("```\nCONFLICT-REVIEW=CLEAN\n```\n") == "CONFLICT-REVIEW=CLEAN"
     fenced_plus_real = "```\nCONFLICT-REVIEW=CLEAN\n```\nCONFLICT-REVIEW=FOUND-PROBLEM\n"
@@ -775,6 +784,67 @@ def test_purge_spares_flag(tmp_path):
     assert not os.path.exists(verdict_file)
     assert os.path.exists(flag)
     os.unlink(flag)
+
+
+def test_purge_verdict_artifacts_keeps_autoresolved_file():
+    """purge_verdict_artifacts (per-rebase) must NOT remove the autoresolved list."""
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    autoresolved = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
+    with open(autoresolved, "w") as fh:
+        fh.write("earlier.php\n")
+    try:
+        purge_verdict_artifacts(key)
+        assert os.path.exists(autoresolved)
+    finally:
+        if os.path.exists(autoresolved):
+            os.unlink(autoresolved)
+
+
+def test_purge_autoresolved_list_removes_stale_file():
+    """The run-start purge clears a stale autoresolved list from a previous run."""
+    from harness.conflict import purge_autoresolved_list
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    autoresolved = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
+    with open(autoresolved, "w") as fh:
+        fh.write("stale.php\n")
+    try:
+        purge_autoresolved_list(key)
+        assert not os.path.exists(autoresolved)
+        purge_autoresolved_list(key)  # idempotent when absent
+    finally:
+        if os.path.exists(autoresolved):
+            os.unlink(autoresolved)
+
+
+def test_behind_retry_keeps_first_pass_autoresolved_files(tmp_path):
+    """Two rebase passes in one run: pass 1 auto-resolves a.php; pass 2 (BEHIND retry)
+    runs the per-rebase purge and auto-resolves b.php. The list the RESULT line reads must
+    still carry a.php (union, de-duplicated, order preserved). No hand-created list."""
+    import runner
+    from harness.armable import conflict_flag_path
+    from harness.conflict import purge_autoresolved_list
+    from harness.state import RunResult, TerminalState
+
+    key = f"test-{uuid.uuid4().hex[:8]}"
+    autoresolved = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
+    git = LiveGit(str(tmp_path))
+    git._run = lambda *a, **k: "changed.php\n"
+    try:
+        purge_autoresolved_list(key)  # run start
+        git._record_resolution(key, key, "m1", ("a.php",))
+        purge_verdict_artifacts(key)  # BEHIND retry: start of second rebase
+        git._record_resolution(key, key, "m2", ("b.php", "a.php"))
+        with open(autoresolved) as fh:
+            assert fh.read().split() == ["a.php", "b.php"]
+        res = RunResult(terminal=TerminalState.SHIPPED_ARMED, slug=key)
+        res.pr_number = 1
+        line = runner.verdict_line(res, 0)
+        assert "auto-resolved conflict in a.php, b.php" in line
+    finally:
+        for p in (autoresolved, f"/tmp/postplan-conflict-files-{key}.txt",
+                  f"/tmp/postplan-conflict-resolution-{key}.md", conflict_flag_path(key)):
+            if os.path.exists(p):
+                os.unlink(p)
 
 
 # ── Bug 1: _CONFLICT_MARKER_PAT tightness ─────────────────────────────────────

@@ -12,7 +12,8 @@ test.skip, weak assertions). Comma-fallback locators are advisory.
 
 Modes:
   (no args)  Scan all ibl5/tests/e2e/**/*.ts
-  --pr       Scan only files changed vs origin/master
+  --pr       Scan only files changed vs $E2E_HYGIENE_BASE_REF (default origin/master)
+  Env:       E2E_HYGIENE_BASE_REF  base ref for --pr (default: origin/master)
 
 Exceptions:
   File-level: .e2e-hygiene-skip-allowlist (one glob per line, # comments)
@@ -24,6 +25,7 @@ EOF
 fi
 
 ROOT=$(git rev-parse --show-toplevel)
+BASE_REF=${E2E_HYGIENE_BASE_REF:-origin/master}
 ALLOWLIST="$ROOT/.e2e-hygiene-skip-allowlist"
 E2E_DIR="$ROOT/ibl5/tests/e2e"
 
@@ -36,7 +38,8 @@ test.skip, weak assertions). Comma-fallback locators are advisory.
 
 Modes:
   (no args)  Scan all ibl5/tests/e2e/**/*.ts
-  --pr       Scan only files changed vs origin/master
+  --pr       Scan only files changed vs $E2E_HYGIENE_BASE_REF (default origin/master)
+  Env:       E2E_HYGIENE_BASE_REF  base ref for --pr (default: origin/master)
 
 Exceptions:
   File-level: .e2e-hygiene-skip-allowlist (one glob per line, # comments)
@@ -56,12 +59,18 @@ for arg in "$@"; do
   esac
 done
 
+if [ "$MODE" = "pr" ] && [ -n "${E2E_HYGIENE_BASE_REF:-}" ] \
+  && ! git -C "$ROOT" rev-parse --verify --quiet "${BASE_REF}^{commit}" >/dev/null; then
+  echo "E2E_HYGIENE_BASE_REF=${E2E_HYGIENE_BASE_REF} does not resolve to a commit" >&2
+  exit 2
+fi
+
 # --- Build file list ---
 if [ "$MODE" = "pr" ]; then
   FILES=()
   while IFS= read -r f; do
     [ -f "$ROOT/$f" ] && FILES+=("$ROOT/$f")
-  done < <(git -C "$ROOT" diff origin/master --name-only -- 'ibl5/tests/e2e/**/*.ts')
+  done < <(git -C "$ROOT" diff "$BASE_REF" --name-only -- 'ibl5/tests/e2e/**/*.ts')
 else
   FILES=()
   while IFS= read -r f; do

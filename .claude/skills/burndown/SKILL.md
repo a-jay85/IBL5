@@ -1,7 +1,7 @@
 ---
 name: burndown
 description: Run an automatic backlog burn-down: rank new issues, pick 5 units (backfilling freed units with further selection rounds), route each item to a plan or an ad-hoc worktree, and start it.
-last_verified: 2026-10-03
+last_verified: 2026-10-06
 ---
 
 # /burndown
@@ -17,7 +17,7 @@ candidate fits the last unit.
 | Code | Meaning |
 |------|---------|
 | 0 | success |
-| 1 | completed but at least one item's live state was unknown (reported, never guessed) <!-- slop-ok --> |
+| 1 | completed but at least one item's live state was unknown (reported as unknown and never guessed) |
 | 2 | usage error (bad subcommand, flag, or argument) |
 | 3 | fail-closed abort (missing report, gh/git/jq failure, HOME unset, missing or malformed ledger) |
 
@@ -63,7 +63,7 @@ Otherwise read `.calibration` from `$W/delta.json` as calibration context. It ho
 first five item lines of each `## P<N>` section of the current triage report, and an
 empty section shows as `[]`. Do not open the report itself. Then rank every delta issue
 into a ranks file at `$W/ranks.md` using `## P<N>` headings and lines shaped like the
-report's own (e.g. `- [#42](url) Title — reason`). <!-- slop-ok -->
+report's own (e.g. `- [#42](url) Title — reason`).
 
 ```bash
 bin/backlog burndown-refresh "$W/ranks.md"
@@ -92,6 +92,11 @@ Stderr is left unredirected, so `cleared blocked on #N` lines still show.
 Parse only the final `LEDGER:` line. `LEDGER: none` on the first round means all
 delta issues are in flight or over budget. Show the SKIP rows and stop. On a later
 round it means the run is full or out of candidates. Go to step 6.
+
+Under `bin/burndown-loop`, a first-round `LEDGER: none` also writes the batch's empty
+sentinel (the path in `IBL5_BURNDOWN_EMPTY_SENTINEL`). The loop calls a batch empty only
+when that file exists. A live-unknown round (exit 1) writes no sentinel. Run step 4
+exactly as written; the sentinel needs no action from the skill.
 
 A `SKIP ... skip-label: <label>` row is a tagged item. It consumes no unit. A
 `cleared blocked on #N` line on stderr means the blocking PR closed and the item is

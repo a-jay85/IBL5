@@ -32,20 +32,6 @@ final class BanDbTouchingCallInViewRuleTest extends RuleTestCase
         );
     }
 
-    public function testFlagsTeamColorHelperInView(): void
-    {
-        $this->analyse(
-            [__DIR__ . '/Fixtures/classes/TeamColorHelperInView.php'],
-            [
-                [
-                    'DB-touching construction inside a View class. '
-                    . 'Move to the corresponding Service and pass the pre-built object as a render parameter.',
-                    9,
-                ],
-            ],
-        );
-    }
-
     public function testIgnoresCleanView(): void
     {
         $this->analyse(

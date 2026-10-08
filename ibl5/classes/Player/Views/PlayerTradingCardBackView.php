@@ -6,6 +6,7 @@ namespace Player\Views;
 
 use Player\Player;
 use Player\Stats\PlayerStats;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Security\HtmlSanitizer;
 
 /**
@@ -44,7 +45,7 @@ class PlayerTradingCardBackView
      * @param int $threePointContests Number of Three-Point Contests
      * @param int $dunkContests Number of Slam Dunk Competitions
      * @param int $rookieSophChallenges Number of Rookie-Sophomore Challenges
-     * @param \mysqli|null $db Optional database connection for team colors
+     * @param TeamIdentityRepositoryInterface|null $teamRepo Optional team lookup for team colors
      * @return string HTML for trading card back
      */
     public static function render(
@@ -55,10 +56,10 @@ class PlayerTradingCardBackView
         int $threePointContests = 0,
         int $dunkContests = 0,
         int $rookieSophChallenges = 0,
-        ?\mysqli $db = null
+        ?TeamIdentityRepositoryInterface $teamRepo = null
     ): string {
         // Get color scheme and prepare player data using shared helpers
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->getTeamid() ?? 0);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($teamRepo, $player->getTeamid() ?? 0);
         $playerData = CardBaseStyles::preparePlayerData($player, $playerID);
 
         $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);

@@ -6,8 +6,6 @@ namespace Tests\Player;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Player\Views\TeamColorHelper;
-use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * Pins the team-color fallback table: a full row returns its colors, while a
@@ -37,10 +35,6 @@ final class TeamColorFallbackCharacterizationTest extends TestCase
     #[DataProvider('colorFallbackCases')]
     public function testColorFallbackMatchesCharacterizedTable(array $mockRows, array $expected): void
     {
-        $db = new MockDatabase();
-        $db->onQuery('SELECT color1, color2', $mockRows);
-        $db->setMockData([]);
-
-        self::assertSame($expected, TeamColorHelper::getTeamColors($db, 5));
+        self::assertSame($expected, \Player\Views\TeamColorHelper::resolveTeamColors($mockRows[0] ?? null));
     }
 }

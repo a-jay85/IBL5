@@ -6,6 +6,7 @@ namespace Player\Views;
 
 use Player\Player;
 use Player\Stats\PlayerStats;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * PlayerTradingCardFlipView - Wrapper for flippable trading card
@@ -44,7 +45,7 @@ class PlayerTradingCardFlipView
      * @param int $threePointContests Number of Three-Point Contests
      * @param int $dunkContests Number of Slam Dunk Competitions
      * @param int $rookieSophChallenges Number of Rookie-Sophomore Challenges
-     * @param \mysqli|null $db Optional database connection for team colors
+     * @param TeamIdentityRepositoryInterface|null $teamRepo Optional team lookup for team colors
      * @return string HTML for flippable trading card
      */
     public static function render(
@@ -56,13 +57,13 @@ class PlayerTradingCardFlipView
         int $threePointContests = 0,
         int $dunkContests = 0,
         int $rookieSophChallenges = 0,
-        ?\mysqli $db = null
+        ?TeamIdentityRepositoryInterface $teamRepo = null
     ): string {
         $flipIcon = CardFlipStyles::getFlipIcon();
-        $frontHtml = PlayerTradingCardFrontView::render($player, $playerID, $contractDisplay, $db);
+        $frontHtml = PlayerTradingCardFrontView::render($player, $playerID, $contractDisplay, $teamRepo);
         $backHtml = PlayerTradingCardBackView::render(
             $player, $playerStats, $playerID,
-            $allStarGames, $threePointContests, $dunkContests, $rookieSophChallenges, $db
+            $allStarGames, $threePointContests, $dunkContests, $rookieSophChallenges, $teamRepo
         );
 
         return '<div class="card-flip-container">'

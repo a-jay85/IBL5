@@ -73,6 +73,10 @@ test.describe('ASG Voting', () => {
 
     await expect(table).toBeHidden();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    // aria-allowed-attr: aria-expanded stays off the wrapper div. The wrapper keeps its
+    // onclick, which smoke/mobile-auth.spec.ts still locates (mobile-auth depends on it).
+    await expect(page.locator('.voting-category').first()).not.toHaveAttribute('aria-expanded', /.*/);
   });
 
   test('header toggle inherits the heading look', async ({ page }) => {

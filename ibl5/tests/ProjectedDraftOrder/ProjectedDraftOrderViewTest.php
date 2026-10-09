@@ -277,6 +277,7 @@ class ProjectedDraftOrderViewTest extends TestCase
 
         $result = $this->view->render($order, 2026);
 
+        // Contract: td[onclick] wraps button.projected-draft-order-notes__toggle[type=button][aria-expanded=false][title]
         $this->assertStringContainsString(
             '<td class="projected-draft-order-notes" onclick="this.classList.toggle(\'is-expanded\');this.firstElementChild.setAttribute(\'aria-expanded\', String(this.classList.contains(\'is-expanded\')))"><button type="button" class="projected-draft-order-notes__toggle" aria-expanded="false" title="Click/tap to expand">via trade</button></td>',
             $result

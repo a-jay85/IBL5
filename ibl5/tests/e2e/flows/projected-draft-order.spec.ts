@@ -83,6 +83,7 @@ test.describe('Projected Draft Order flow', () => {
     try {
       await page.reload();
       const toggle = page.locator('.projected-draft-order-notes__toggle');
+      // The expanded state lives on the cell (td.is-expanded), not on the button.
       const expandedCell = page.locator('td.projected-draft-order-notes.is-expanded');
 
       // Every other pick's notes are NULL in the seed: no button on those cells.

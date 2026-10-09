@@ -1006,6 +1006,7 @@ jobs:
             bin/test-check-registry-trigger-rows \
             bin/test-ci-memo \
             bin/test-db-backups-pull \
+            bin/test-wt-compose \
             bin/test-predeploy-db-snapshot
       # Exercises a real lsof port guard, so it cannot share the runner.
       - name: bin/test-bug-pipeline-e2e

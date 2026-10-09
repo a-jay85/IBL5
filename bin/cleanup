@@ -89,8 +89,7 @@ get_branch_for_worktree() {
             # Strip refs/heads/ prefix
             b = substr($0, 8)
             sub(/^refs\/heads\//, "", b)
-            print b
-            exit
+            if (!f) { print b; f = 1 }
         }
     '
 }
@@ -158,7 +157,7 @@ check_worktree() {
     lock_reason=$(git -C "$REPO_ROOT" worktree list --porcelain \
         | awk -v wt="$wt_path" '
             /^worktree / { cur = substr($0, 10) }
-            /^locked/ && cur == wt { print substr($0, 8); exit }
+            /^locked/ && cur == wt && !f { print substr($0, 8); f = 1 }
         ')
     if [ -n "$lock_reason" ]; then
         local lock_pid

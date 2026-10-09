@@ -301,7 +301,7 @@ jobs:
         id: vr-coverage
         if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         run: |
-          git diff --name-only "${{ env.VRCTX_BASE_SHA }}"...HEAD \
+          git diff --name-only "$VRCTX_BASE_SHA"...HEAD \
             | bin/vr-changed-coverage > coverage.json
           cat coverage.json
 
@@ -310,7 +310,7 @@ jobs:
         run: |
           bin/vr-build-gallery \
             --actuals=ibl5/vr-actuals \
-            --base-sha=${{ env.VRCTX_BASE_SHA }} \
+            --base-sha="$VRCTX_BASE_SHA" \
             --out-dir=ibl5/vr-gallery \
             --gallery-json=ibl5/vr-gallery.json
           cat ibl5/vr-gallery.json

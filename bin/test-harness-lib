@@ -309,6 +309,31 @@ h_done"
     fi
 }
 
+# Every bin/test-* that sources harness.sh (directly or through the
+# bug-pipeline stubs lib) must end with exactly one `h_done` and keep no
+# legacy `exit "$FAILED"` tail. A harness that forgets h_done exits 0 even
+# when its checks fail.
+case_consumers_end_with_h_done() {
+    local f last bad=0
+    for f in "$SELF_DIR"/test-*; do
+        [ "$f" = "$SELF_DIR/test-harness-lib" ] && continue
+        grep -qE '^[[:space:]]*(\.|source)[[:space:]].*lib/(harness|bug-pipeline-test-stubs)\.sh' "$f" ||
+            continue
+        last=$(grep -vE '^[[:space:]]*(#|$)' "$f" | tail -n 1)
+        if [ "$last" != "h_done" ] ||
+            [ "$(grep -cE '^[[:space:]]*h_done[[:space:]]*$' "$f")" -ne 1 ] ||
+            grep -qF 'exit "$FAILED"' "$f"; then
+            printf 'NO-H_DONE: %s\n' "${f#"$SELF_DIR"/}"
+            bad=1
+        fi
+    done
+    if [ "$bad" -eq 0 ]; then
+        t_ok "case_consumers_end_with_h_done"
+    else
+        t_bad "case_consumers_end_with_h_done"
+    fi
+}
+
 case_pass_summary
 case_fail_exits_nonzero
 case_zero_assertions
@@ -328,6 +353,7 @@ case_env_i
 case_double_source
 case_tmp_blank_tmpdir
 case_bpt_delegates
+case_consumers_end_with_h_done
 
 if [ "$T_FAIL" -eq 0 ]; then
     echo "test-harness-lib: all cases passed"

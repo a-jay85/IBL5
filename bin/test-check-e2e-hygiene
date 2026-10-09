@@ -1,0 +1,375 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-check-e2e-hygiene — regression test for bin/check-e2e-hygiene.
+#
+# Pins every verdict the gate emits: each blocking pattern, the with-else and
+# inline-allow suppressions, the file-level allowlist, the comma-fallback
+# advisory, the full vs --pr file set, and the argument handling (unknown arg,
+# --help, --help outside git). The --pr base-ref seam (unset / empty / base /
+# head / bogus) is covered by bin/test-check-phpunit-hygiene and not repeated.
+#
+# Each case builds a throwaway git repo under mktemp (the gate resolves its
+# scan root from `git rev-parse --show-toplevel`) with fixtures under
+# ibl5/tests/e2e/, then runs the gate from inside it.
+#
+# Run: bin/test-check-e2e-hygiene  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GATE="$SCRIPT_DIR/check-e2e-hygiene"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+# mk_repo — build a fresh git repo with an ibl5/tests/e2e dir; echo its path.
+mk_repo() {
+    local d
+    d="$(mktemp -d "$TMP/repo.XXXXXX")"
+    git init -q "$d" >/dev/null 2>&1
+    git -C "$d" config user.email t@example.com >/dev/null 2>&1
+    git -C "$d" config user.name tester >/dev/null 2>&1
+    git -C "$d" config commit.gpgsign false >/dev/null 2>&1
+    mkdir -p "$d/ibl5/tests/e2e"
+    echo "$d"
+}
+
+# run_case <name> <want-exit> <want-regex|-> <relpath> <body>
+# One fixture under the repo, gate run in full mode with no args.
+run_case() {
+    local name="$1" want="$2" want_re="$3" relpath="$4" body="$5"
+    local d out rc
+    d="$(mk_repo)"
+    mkdir -p "$d/$(dirname "$relpath")"
+    printf '%s\n' "$body" > "$d/$relpath"
+    out="$( ( cd "$d" && "$GATE" ) 2>&1 )"
+    rc=$?
+    if [ "$rc" -ne "$want" ]; then
+        failcase "$name — expected exit $want, got $rc"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        return
+    fi
+    if [ "$want_re" != "-" ] && ! grep -qE -- "$want_re" <<< "$out"; then
+        failcase "$name — output did not match: $want_re"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        return
+    fi
+    pass "$name (exit $rc)"
+}
+
+# run_absent <name> <want-exit> <absent-regex> <relpath> <body>
+# Same run, but fails if the regex DOES match the output.
+run_absent() {
+    local name="$1" want="$2" absent_re="$3" relpath="$4" body="$5"
+    local d out rc
+    d="$(mk_repo)"
+    mkdir -p "$d/$(dirname "$relpath")"
+    printf '%s\n' "$body" > "$d/$relpath"
+    out="$( ( cd "$d" && "$GATE" ) 2>&1 )"
+    rc=$?
+    if [ "$rc" -ne "$want" ]; then
+        failcase "$name — expected exit $want, got $rc"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        return
+    fi
+    if grep -qE -- "$absent_re" <<< "$out"; then
+        failcase "$name — output unexpectedly matched: $absent_re"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        return
+    fi
+    pass "$name (exit $rc)"
+}
+
+SPEC="ibl5/tests/e2e/x.spec.ts"
+HIT_FOOTER='FAIL: 1 blocking hits across 1 files'
+
+# hit_re <label> — regex for one blocking hit at root-relative path:line.
+hit_re() { printf '%s' "\\[$1\\] ibl5/tests/e2e/x\\.spec\\.ts:[0-9]+:"; }
+
+# --- Blocking patterns ---
+run_case blocking-body-length 1 "$(hit_re 'body\.length')" "$SPEC" \
+    "const n = body.length;"
+run_case blocking-body-tobevisible 1 "$(hit_re 'body-toBeVisible')" "$SPEC" \
+    "await expect(page.locator('body')).toBeVisible();"
+run_case blocking-catch-false 1 "$(hit_re 'catch-false')" "$SPEC" \
+    "const ok = await el.isChecked().catch(() => false);"
+run_case blocking-test-skip 1 "$(hit_re 'test-skip')" "$SPEC" \
+    "test.skip('pending', async () => {});"
+run_case blocking-test-only 1 "$(hit_re 'test-only')" "$SPEC" \
+    "test.only('focus', async () => {});"
+run_case blocking-weak-gte-zero 1 "$(hit_re 'weak-gte-zero')" "$SPEC" \
+    "expect(n).toBeGreaterThanOrEqual(0);"
+run_case blocking-weak-gt-neg1 1 "$(hit_re 'weak-gt-neg1')" "$SPEC" \
+    "expect(n).toBeGreaterThan(-1);"
+
+COUNT_BODY=$(cat <<'TS'
+if ((await page.locator('tr').count()) > 0) {
+  await doThing();
+}
+TS
+)
+VISIBLE_BODY=$(cat <<'TS'
+if (await page.locator('#x').isVisible()) {
+  await doThing();
+}
+TS
+)
+COUNT_ELSE_BODY=$(cat <<'TS'
+if ((await page.locator('tr').count()) > 0) {
+  await doThing();
+} else {
+  throw new Error('empty');
+}
+TS
+)
+VISIBLE_ELSE_BODY=$(cat <<'TS'
+if (await page.locator('#x').isVisible()) {
+  await doThing();
+} else {
+  throw new Error('empty');
+}
+TS
+)
+
+run_case silent-pass-count-no-else 1 "$(hit_re 'silent-pass count>0')" "$SPEC" "$COUNT_BODY"
+run_case silent-pass-visible-no-else 1 "$(hit_re 'silent-pass isVisible')" "$SPEC" "$VISIBLE_BODY"
+
+# Footer line is asserted once on a single-hit fixture.
+run_case blocking-footer 1 "$HIT_FOOTER" "$SPEC" "test.only('focus', async () => {});"
+
+# --- Boundary / negative pairs ---
+run_case count-with-else-ok 0 'PASS: 0 blocking hits' "$SPEC" "$COUNT_ELSE_BODY"
+run_absent count-with-else-label-absent 0 'silent-pass count>0' "$SPEC" "$COUNT_ELSE_BODY"
+run_case visible-with-else-ok 0 'PASS: 0 blocking hits' "$SPEC" "$VISIBLE_ELSE_BODY"
+run_absent visible-with-else-label-absent 0 'silent-pass isVisible' "$SPEC" "$VISIBLE_ELSE_BODY"
+
+run_case inline-allow-same-line 0 'PASS: 0 blocking hits' "$SPEC" \
+    "test.skip('pending', async () => {}); // e2e-hygiene-allow: tracked upstream in the vendor bug"
+run_absent inline-allow-same-line-label-absent 0 'test-skip' "$SPEC" \
+    "test.skip('pending', async () => {}); // e2e-hygiene-allow: tracked upstream in the vendor bug"
+
+PREV_LINE_BODY=$(cat <<'TS'
+// e2e-hygiene-allow: tracked upstream in the vendor bug
+test.skip('pending', async () => {});
+TS
+)
+run_case inline-allow-previous-line 0 'PASS: 0 blocking hits' "$SPEC" "$PREV_LINE_BODY"
+run_absent inline-allow-previous-line-label-absent 0 'test-skip' "$SPEC" "$PREV_LINE_BODY"
+
+run_case inline-allow-short-reason-still-flags 1 "$(hit_re 'test-skip')" "$SPEC" \
+    "test.skip('pending', async () => {}); // e2e-hygiene-allow: short"
+
+# --- Allowlist ---
+# run_allowlist <name> <want-exit> <want-regex> <allowlist-glob>
+run_allowlist() {
+    local name="$1" want="$2" want_re="$3" glob="$4"
+    local d out rc
+    d="$(mk_repo)"
+    mkdir -p "$d/ibl5/tests/e2e/legacy"
+    printf '%s\n' "test.skip('pending', async () => {});" > "$d/ibl5/tests/e2e/legacy/old.spec.ts"
+    printf '%s\n%s\n' "# legacy specs, tracked separately" "$glob" > "$d/.e2e-hygiene-skip-allowlist"
+    out="$( ( cd "$d" && "$GATE" ) 2>&1 )"
+    rc=$?
+    if [ "$rc" -ne "$want" ]; then
+        failcase "$name — expected exit $want, got $rc"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        return
+    fi
+    if ! grep -qE -- "$want_re" <<< "$out"; then
+        failcase "$name — output did not match: $want_re"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        return
+    fi
+    pass "$name (exit $rc)"
+}
+
+run_allowlist allowlist-glob-skips-file 0 'PASS: all files in scope are allowlisted\.' \
+    'ibl5/tests/e2e/legacy/*'
+run_allowlist allowlist-nonmatching-glob-still-flags 1 'test-skip' \
+    'ibl5/tests/e2e/other/*'
+
+# --- Advisory ---
+run_case comma-fallback-advisory 0 '=== Advisory \(non-blocking\) ===' "$SPEC" \
+    "await page.locator('.a, .b').click();"
+run_case comma-fallback-advisory-count 0 'Advisory: 1 comma-fallback locator hits' "$SPEC" \
+    "await page.locator('.a, .b').click();"
+run_case comma-fallback-advisory-still-passes 0 'PASS: 0 blocking hits' "$SPEC" \
+    "await page.locator('.a, .b').click();"
+run_absent comma-in-attribute-selector-excluded 0 'Advisory' "$SPEC" \
+    "await page.locator('[data-x=a,b]').click();"
+
+# --- No files ---
+d="$(mk_repo)"
+out="$( ( cd "$d" && "$GATE" ) 2>&1 )"
+rc=$?
+if [ "$rc" -eq 0 ] && grep -qE -- 'PASS: no E2E files to scan\.' <<< "$out"; then
+    pass "no-e2e-files (exit $rc)"
+else
+    failcase "no-e2e-files — exit $rc"
+    printf '%s\n' "$out" | sed 's/^/    /'
+fi
+
+# --- File set: full vs --pr ---
+# Two committed fixtures, then only a.spec.ts is modified. The --pr pathspec is
+# 'ibl5/tests/e2e/**/*.ts', which needs a subdirectory, so both live in sub/.
+d="$(mk_repo)"
+mkdir -p "$d/ibl5/tests/e2e/sub"
+printf '%s\n' "test.skip('pending', async () => {});" > "$d/ibl5/tests/e2e/sub/a.spec.ts"
+printf '%s\n' "test.skip('pending', async () => {});" > "$d/ibl5/tests/e2e/sub/b.spec.ts"
+git -C "$d" add -A >/dev/null 2>&1
+git -C "$d" commit -q -m init >/dev/null 2>&1
+printf '\n' >> "$d/ibl5/tests/e2e/sub/a.spec.ts"
+
+out="$( ( cd "$d" && "$GATE" ) 2>&1 )"
+rc=$?
+if [ "$rc" -eq 1 ] && grep -qE -- 'sub/a\.spec\.ts' <<< "$out" \
+    && grep -qE -- 'sub/b\.spec\.ts' <<< "$out" \
+    && grep -qE -- 'across 2 files' <<< "$out"; then
+    pass "full-mode-scans-both (exit $rc)"
+else
+    failcase "full-mode-scans-both — exit $rc"
+    printf '%s\n' "$out" | sed 's/^/    /'
+fi
+
+out="$( ( cd "$d" && E2E_HYGIENE_BASE_REF=HEAD "$GATE" --pr ) 2>&1 )"
+rc=$?
+if [ "$rc" -eq 1 ] && grep -qE -- 'sub/a\.spec\.ts' <<< "$out" \
+    && grep -qE -- 'across 1 files' <<< "$out" \
+    && ! grep -qE -- 'sub/b\.spec\.ts' <<< "$out"; then
+    pass "pr-mode-scans-changed-only (exit $rc)"
+else
+    failcase "pr-mode-scans-changed-only — exit $rc"
+    printf '%s\n' "$out" | sed 's/^/    /'
+fi
+
+# Deleting the LAST diffed path must not abort the gate (errexit hazard in the
+# file-list builder): b.spec.ts is deleted, a.spec.ts is changed.
+rm -f "$d/ibl5/tests/e2e/sub/b.spec.ts"
+out="$( ( cd "$d" && E2E_HYGIENE_BASE_REF=HEAD "$GATE" --pr ) 2>&1 )"
+rc=$?
+if [ "$rc" -eq 1 ] && grep -qE -- 'sub/a\.spec\.ts' <<< "$out" \
+    && grep -qE -- 'across 1 files' <<< "$out"; then
+    pass "pr-mode-deleted-last-file-skipped (exit $rc)"
+else
+    failcase "pr-mode-deleted-last-file-skipped — exit $rc"
+    printf '%s\n' "$out" | sed 's/^/    /'
+fi
+
+# --- Arguments ---
+d="$(mk_repo)"
+err="$( ( cd "$d" && "$GATE" --bogus ) 2>&1 >/dev/null )"
+rc=$?
+if [ "$rc" -eq 2 ] && grep -qE -- '^Unknown argument: --bogus$' <<< "$err"; then
+    pass "unknown-arg-exit2 (exit $rc)"
+else
+    failcase "unknown-arg-exit2 — exit $rc"
+    printf '%s\n' "$err" | sed 's/^/    /'
+fi
+
+out="$( ( cd "$d" && "$GATE" --help ) 2>&1 )"
+rc=$?
+if [ "$rc" -eq 0 ] && grep -qE -- '^Usage: bin/check-e2e-hygiene' <<< "$out"; then
+    pass "help-exit0 (exit $rc)"
+else
+    failcase "help-exit0 — exit $rc"
+    printf '%s\n' "$out" | sed 's/^/    /'
+fi
+
+mkdir -p "$TMP/nogit"
+out="$( ( cd "$TMP/nogit" && "$GATE" --help ) 2>&1 )"
+rc=$?
+if [ "$rc" -eq 0 ] && grep -qE -- 'Usage:' <<< "$out"; then
+    pass "help-outside-git-exit0 (exit $rc)"
+else
+    failcase "help-outside-git-exit0 — exit $rc"
+    printf '%s\n' "$out" | sed 's/^/    /'
+fi
+
+out="$( ( cd "$d" && "$GATE" --pr --help ) 2>&1 )"
+rc=$?
+if [ "$rc" -eq 0 ] && grep -qE -- 'Usage:' <<< "$out"; then
+    pass "pr-then-help-exit0 (exit $rc)"
+else
+    failcase "pr-then-help-exit0 — exit $rc"
+    printf '%s\n' "$out" | sed 's/^/    /'
+fi
+
+# --- --base flag ---
+# One committed clean file plus an uncommitted c.spec.ts holding test.skip(.
+d="$(mk_repo)"
+mkdir -p "$d/ibl5/tests/e2e/sub"
+printf '%s\n' "const ok = 1;" > "$d/ibl5/tests/e2e/sub/clean.spec.ts"
+printf '%s\n' "const ok = 1;" > "$d/ibl5/tests/e2e/sub/c.spec.ts"
+git -C "$d" add -A >/dev/null 2>&1
+git -C "$d" commit -q -m init >/dev/null 2>&1
+printf '%s\n' "test.skip('pending', async () => {});" > "$d/ibl5/tests/e2e/sub/c.spec.ts"
+
+# base_err_case <name> <want-stderr-line> <args...> — exit 2 with exact stderr.
+base_err_case() {
+    local name="$1" want_line="$2" err rc
+    shift 2
+    err="$( ( cd "$d" && "$GATE" "$@" ) 2>&1 >/dev/null )"
+    rc=$?
+    if [ "$rc" -eq 2 ] && grep -qxF -- "$want_line" <<< "$err"; then
+        pass "$name (exit $rc)"
+    else
+        failcase "$name — exit $rc"
+        printf '%s\n' "$err" | sed 's/^/    /'
+    fi
+}
+
+base_err_case base-flag-missing-value-exit2 '--base requires a ref value' --pr --base
+base_err_case base-flag-dash-value-exit2 '--base requires a ref value' --base --pr
+base_err_case base-flag-equals-empty-exit2 '--base requires a ref value' --pr --base=
+base_err_case base-flag-bogus-ref-exit2 '--base nosuchref does not resolve to a commit' \
+    --pr --base nosuchref
+
+out="$( ( cd "$d" && "$GATE" --pr --base=HEAD ) 2>&1 )"
+rc=$?
+if [ "$rc" -eq 1 ] && grep -qE -- 'sub/c\.spec\.ts' <<< "$out"; then
+    pass "base-flag-equals-form-scans (exit $rc)"
+else
+    failcase "base-flag-equals-form-scans — exit $rc"
+    printf '%s\n' "$out" | sed 's/^/    /'
+fi
+
+out="$( ( cd "$d" && E2E_HYGIENE_BASE_REF=nosuchref "$GATE" --pr --base HEAD ) 2>&1 )"
+rc=$?
+if [ "$rc" -eq 1 ] && grep -qE -- 'sub/c\.spec\.ts' <<< "$out" \
+    && ! grep -qE -- 'does not resolve' <<< "$out"; then
+    pass "base-flag-overrides-env (exit $rc)"
+else
+    failcase "base-flag-overrides-env — exit $rc"
+    printf '%s\n' "$out" | sed 's/^/    /'
+fi
+
+out="$( ( cd "$d" && "$GATE" --base nosuchref ) 2>&1 )"
+rc=$?
+if [ "$rc" -eq 1 ] && ! grep -qE -- 'does not resolve' <<< "$out"; then
+    pass "base-flag-ignored-in-full-mode (exit $rc)"
+else
+    failcase "base-flag-ignored-in-full-mode — exit $rc"
+    printf '%s\n' "$out" | sed 's/^/    /'
+fi
+
+# Real-repo smoke: --pr against a deep base resolves and scans without a usage
+# error. Skipped on a shallow clone where origin/master~200 does not exist.
+if git -C "$SCRIPT_DIR" rev-parse --verify -q 'origin/master~200' >/dev/null 2>&1; then
+    out="$( ( cd "$SCRIPT_DIR" && "$GATE" --pr --base 'origin/master~200' ) 2>&1 )"
+    rc=$?
+    if [ "$rc" -le 1 ]; then
+        pass "real-repo-deep-base-smoke (exit $rc)"
+    else
+        failcase "real-repo-deep-base-smoke — exit $rc"
+        printf '%s\n' "$out" | sed 's/^/    /'
+    fi
+else
+    echo "SKIP: real-repo-deep-base-smoke (origin/master~200 not available)"
+fi
+
+[ "$FAILED" -eq 0 ] || exit 1
+echo "all cases passed"

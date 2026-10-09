@@ -149,6 +149,104 @@ new_case
 run_sync 'STUB_IOREG_LINE=HIDIdleTime = 700000000000' --
 pin "SYN proceeding" "idle 700s >= threshold 600s — proceeding"
 
+# ── Section 2: lib unit cases (strict child shell) ──────────────────────────
+# Each case runs in `env -i PATH=/usr/bin:/bin bash -euo pipefail`, sources the
+# lib, makes the call in the documented `|| rc=$?` form, and prints a marker
+# line. A missing marker means a nonzero return killed the strict shell.
+
+LIB="$SCRIPT_DIR/lib/tick-guards.sh"
+
+strict() {  # <snippet> <args...>
+    env -i PATH=/usr/bin:/bin bash -euo pipefail -c "$1" _ "${@:2}"
+}
+
+mk_reader() {  # <name> <body> -> path of an executable stub reader
+    local f="$T/reader.$1"
+    printf '#!/bin/sh\n%s\n' "$2" > "$f"
+    chmod +x "$f"
+    printf '%s' "$f"
+}
+
+IDLE_SNIPPET='source "$1"; rc=0; out="$(hid_idle_secs "$2")" || rc=$?; printf "%s|%s\n" "$rc" "$out"'
+
+unit_idle() {  # <label> <expected rc|out> <reader>
+    local got
+    got="$(strict "$IDLE_SNIPPET" "$LIB" "$3")" || got="<child died: ${got:-no output}>"
+    assert_eq "$1" "$2" "$got"
+}
+
+unit_idle "U1 empty reader arg" "1|" ""
+unit_idle "U2 missing reader" "1|" "$T/missing"
+: > "$T/reader.noexec"
+unit_idle "U3 non-executable reader" "1|" "$T/reader.noexec"
+unit_idle "U4 quoted 7200s" "0|7200" "$(mk_reader u4 "echo '\"HIDIdleTime\" = 7200000000000'")"
+unit_idle "U5 unquoted 700s" "0|700" "$(mk_reader u5 "echo 'HIDIdleTime = 700000000000'")"
+unit_idle "U6 nan" "2|nan" "$(mk_reader u6 "echo '\"HIDIdleTime\" = nan'")"
+unit_idle "U7 no line" "2|" "$(mk_reader u7 "echo 'something else'")"
+unit_idle "U8 19 digits" "2|1234567890123456789" "$(mk_reader u8 "echo '\"HIDIdleTime\" = 1234567890123456789'")"
+unit_idle "U9 18 digits" "0|999999999" "$(mk_reader u9 "echo '\"HIDIdleTime\" = 999999999999999999'")"
+unit_idle "U10 first line wins" "0|60" "$(mk_reader u10 "echo '\"HIDIdleTime\" = 60000000000'; echo '\"HIDIdleTime\" = 7200000000000'")"
+unit_idle "U11 leading zero" "0|9" "$(mk_reader u11 "echo '\"HIDIdleTime\" = 09000000000'")"
+unit_idle "U12 sub-second" "0|0" "$(mk_reader u12 "echo '\"HIDIdleTime\" = 500000000'")"
+unit_idle "U13 reader exits 1 after a valid line" "2|" "$(mk_reader u13 "echo '\"HIDIdleTime\" = 7200000000000'; exit 1")"
+
+LOCK_SNIPPET='source "$1"; ev="$3"; rec() { printf "%s %s\n" "$1" "${2-}" >> "$ev"; }; rc=0; tick_lock_acquire "$2" rec || rc=$?; printf "%s|%s\n" "$rc" "$$"'
+REL_SNIPPET='source "$1"; rc=0; tick_lock_release "$2" || rc=$?; printf "%s\n" "$rc"'
+
+lock_case() {  # <label> <lock> <want rc> <want events> <want file: child|unchanged|->
+    local got crc cpid events
+    : > "$D/events"
+    got="$(strict "$LOCK_SNIPPET" "$LIB" "$2" "$D/events" 2>/dev/null)" || got="<child died>"
+    crc="${got%%|*}"
+    cpid="${got#*|}"
+    events="$(cat "$D/events")"
+    assert_eq "$1 rc" "$3" "$crc"
+    assert_eq "$1 events" "$4" "$events"
+    case "$5" in
+        child) assert_eq "$1 lock file" "$cpid" "$(cat "$2" 2>/dev/null)" ;;
+        unchanged) assert_eq "$1 lock file" "$$" "$(cat "$2" 2>/dev/null)" ;;
+    esac
+}
+
+new_case
+lock_case "L1 no lock file" "$D/l.lock" 0 "" child
+
+new_case; printf '%d\n' "$$" > "$D/l.lock"
+lock_case "L2 live lock" "$D/l.lock" 1 "held $$" unchanged
+
+new_case; DEAD="$(dead_pid)"; printf '%s\n' "$DEAD" > "$D/l.lock"
+lock_case "L3 reaped pid" "$D/l.lock" 0 "stale $DEAD" child
+
+new_case; : > "$D/l.lock"
+lock_case "L4 empty file" "$D/l.lock" 0 "stale " child
+
+new_case; printf 'abc\n' > "$D/l.lock"
+lock_case "L5 junk file" "$D/l.lock" 0 "stale abc" child
+
+new_case; mkdir "$D/l.lock"
+lock_case "L6 path is a directory" "$D/l.lock" 2 "write-failed $D/l.lock" -
+
+new_case
+got="$(strict "$REL_SNIPPET" "$LIB" "$D/none.lock")" || got="<child died>"
+assert_eq "L7 release missing path" "0" "$got"
+printf '1\n' > "$D/r.lock"
+got="$(strict "$REL_SNIPPET" "$LIB" "$D/r.lock")" || got="<child died>"
+assert_eq "L7 release existing rc" "0" "$got"
+if [ ! -e "$D/r.lock" ]; then pass "L7 release removes file"; else fail "L7 release removes file"; fi
+
+# ── Section 3: source-level checks on the lib ───────────────────────────────
+if grep -Fq '"$reader" -c IOHIDSystem' "$LIB"; then pass "S1 lib calls reader -c IOHIDSystem"; else fail "S1 lib calls reader -c IOHIDSystem"; fi
+if grep -nE '(^|[[:space:];|(])ioreg -c' "$LIB"; then fail "S1 no bare ioreg -c in lib"; else pass "S1 no bare ioreg -c in lib"; fi
+if grep -nE '^[[:space:]]*(trap|exit|set)[[:space:]]' "$LIB"; then fail "S2 lib has no trap/exit/set"; else pass "S2 lib has no trap/exit/set"; fi
+
+# ── Section 4: real-boundary case (Darwin only) ─────────────────────────────
+if [ "$(uname -s)" = Darwin ] && [ -x /usr/sbin/ioreg ]; then
+    got="$(strict "$IDLE_SNIPPET" "$LIB" /usr/sbin/ioreg)" || got="<child died>"
+    if [[ "$got" =~ ^0\|[0-9]+$ ]]; then pass "R1 real /usr/sbin/ioreg"; else fail "R1 real /usr/sbin/ioreg" "got [$got]"; fi
+else
+    echo "  SKIP: R1 real /usr/sbin/ioreg boundary (Darwin only)"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
 echo "PASS=$PASS FAIL=$FAIL"

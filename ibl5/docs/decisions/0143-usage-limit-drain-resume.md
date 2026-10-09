@@ -1,6 +1,6 @@
 ---
 description: Usage-limit drain, pause, and auto-resume for headless runners via an env-gated PreToolUse hook, pause markers, a drain token, and a launchd coordinator.
-last_verified: 2026-10-01
+last_verified: 2026-10-09
 ---
 
 # ADR-0143: Usage-limit drain, pause, and auto-resume
@@ -58,3 +58,15 @@ This addendum narrows one sentence of the Decision. The post-plan harness now ru
 - Toolless harness calls cannot fire the PreToolUse hook, so the adapter runs the same `usage_gate_decide` before every spawn. A pause stops every harness thread at its next call. The harness exits 75 only while a marker for S is on disk, and it clears that marker on every other exit.
 - A harness pause raised while a tooled edit left the worktree changed is fail-closed. The harness clears the marker and exits 3 for a human, since a resumed run would otherwise commit a partial edit.
 - Resume replays `post-plan-now --resume-paused S`. The harness has no resumable state, so the run re-enters at its start. Git and GitHub steps are already idempotent on re-entry. Review-comment posts are skipped when an earlier launch under the same S already posted them at the same head, using a ledger at `runs/<S>.effects.json` in the gate state dir.
+
+## Addendum (2026-10-08): login switch fast resume
+
+On 2026-10-08 a `/login` to a second account left three paused sessions waiting about 15 minutes. The cache drop from the 2026-10-01 addendum fired. The first fetch under the new token then got a 429 with `retry-after: 3598`, the shared backoff armed for 900 s, and the coordinator's stale branch kept waiting for the old account's `resets_at`.
+
+- **Account identity.** `~/.claude.json` `.oauthAccount.accountUuid` survives a token refresh and changes on a switch. Its 16-hex sha256 (`acct_fp`) is stamped on each marker and kept as `acct-last` beside the cache. The raw id is never stored or logged. Reading it needs no keychain.
+- **Switch signal.** `usage_fetch` writes the `cred-switch` state file at its cache-drop site unless both account fingerprints are known and equal. The coordinator also writes it, and drops the cache, when the cached reading's account differs from the current one.
+- **Short first fetches.** Within 1800 s of the signal, up to 3 rate-limited fetches under the new fingerprint back off for at most 45 s. After that the normal arm applies. A 429 with no signal behaves as before.
+- **Fast resume.** In the stale branch, a marker whose `acct_fp` differs from the current account resumes on the next tick. When either account is unknown, a marker paused before the signal, or one carrying another `cred_fp`, resumes instead. Each marker takes one fast resume per switch (`switch_resumed_for`). `check_runaway` and `usage_marker_eligible` still apply.
+- **Keychain access.** The coordinator may be able to read the keychain (the setup probe reported `ok`), and the design does not depend on it. The library comments claim only that it may lack access.
+
+A switch now resumes paused work within about one coordinator tick, without a fresh reading. The pause hook re-pauses a session if the new account is near its limit too. A same-account token refresh never fast-resumes while `~/.claude.json` is readable. When it is unreadable, a refresh can cost one extra resume per marker, capped by the 5-resume runaway rule. If a Claude Code release stops writing `oauthAccount`, the signal fallback applies. If it writes the field but stops updating it on `/login`, the account test vetoes the fast path and the coordinator waits for `resets_at` as it did before this addendum.

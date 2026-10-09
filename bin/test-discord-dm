@@ -831,7 +831,7 @@ G6_GOT=$(grep -rlE -- '--ping|dm_ping' "$ROOT/bin" 2>/dev/null \
     | sed "s|^$ROOT/||" | sort || true)
 G6_WANT=$(printf '%s\n' bin/db-backups-pull bin/launchd-health-check bin/lib/dm.sh bin/post-plan-fail-dm bin/pr-cycle bin/pr-cycle-tick)
 [ "$G6_GOT" = "$G6_WANT" ] \
-    && ok "G6: only the five PING callers contain --ping" \
+    && ok "G6: only the six PING-allowed paths contain --ping" \
     || fail "G6: --ping callers differ from the PING set; got: $(tr '\n' ' ' <<< "$G6_GOT")"
 
 # G7: bin/lib/dm.sh (dm_bin / dm_ping). Each snippet runs under a bare strict bash.

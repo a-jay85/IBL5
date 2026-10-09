@@ -18,7 +18,9 @@
 #
 # Guards, cheapest first: stop file, usage zone, a live pr-cycle worker, then per PR:
 # post-plan in flight, post-plan finished under 30 minutes ago, checks pending or green,
-# and a one-rescue-per-head-SHA retry cap. At most 3 PRs go to one run.
+# stacked on another open PR's branch, and a one-rescue-per-head-SHA retry cap. At most
+# 3 PRs go to one run. Every skipped open PR is written to a results/<id>.skip-notes TSV
+# that the launch hands to bin/pr-cycle as PR_CYCLE_SKIP_NOTES for its your-turn DM.
 #
 # A launch is recorded as pending, not as an attempt: the detached worker outlives the tick.
 # A later tick with no live worker reads the worker's result file and settles each PR. A run

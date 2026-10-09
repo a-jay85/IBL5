@@ -55,6 +55,9 @@
 #                            0 disables the held-unchanged skip. When 1, PRs whose last
 #                            post-plan run held for conditions {3,7} only and whose diff
 #                            matches the sticky **Reviewed diff:** are skipped.
+#                            A PR whose live bucket is DIRTY or BLOCKED-CHECK is exempt
+#                            from this skip and from the holdrepeat skip: a new conflict
+#                            or red check is a state change those fingerprints miss.
 #                            Default: 1 (enabled)
 #   PR_CYCLE_STOP_FILE       Stop file path.                  Default: $HOME/.ibl5-pr-cycle.stop
 #   PR_CYCLE_DRY_LAUNCH      With --go: emit runner + plist but skip launchctl bootstrap.
@@ -80,6 +83,10 @@
 #                            writes the `# pr-cycle-result v1` TSV (one `<pr> <status> <outcome>
 #                            <reason>` row per in-scope PR) when it finishes, even after a HALT.
 #                            Passed through the launcher env list. Read by bin/pr-cycle-tick.
+#   PR_CYCLE_SKIP_NOTES      Path to a "<pr><TAB><reason>" TSV of PRs the caller skipped.
+#                            Unset, empty, or a missing file all mean no notes. Read only;
+#                            merged with this run's own skip reasons into the your-turn DM.
+#                            Passed through the launcher env list. Written by bin/pr-cycle-tick.
 #
 #   Every seam is PR_CYCLE_-prefixed on purpose. bin/pr-attack reads a bare PR_TRIAGE_CMD
 #   itself, and this script spawns the real bin/pr-attack as a child — an unprefixed export
@@ -107,8 +114,9 @@
 #     re-BEHINDs open PRs after each merge, and merge-digest-notify.yml sends the per-merge
 #     digest DM. This script's only DM is the your-turn summary at the end of a run.
 #   * Stage 1 is exactly one post-plan-fleet --pr-list call. The call carries
-#     --allow-test-only. Its exit code is the only readiness signal; no stderr text match
-#     of any kind.
+#     --allow-test-only, plus --state-changed-prs=<csv> naming the fired PRs whose live
+#     bucket is DIRTY or BLOCKED-CHECK. Its exit code is the only readiness signal; no
+#     stderr text match of any kind.
 
 set -euo pipefail
 
@@ -860,6 +868,7 @@ _stacked_parent() {
 
 # _stage1_list — build $RUNDIR/stage1.txt (one PR per line, final order) and
 # $RUNDIR/stage1-skipped.txt (#N — reason lines).
+# Stacked PRs (base is another open PR's head) are skipped first, as "stacked on #N".
 # Note: _pr_patch_id may fetch git refs into ROOT; call _cleanup_fetch_refs afterwards.
 _stage1_list() {
     : > "$RUNDIR/stage1.txt"

@@ -37,12 +37,7 @@ interface TradeProcessorInterface
      *  - Creates news story with category ID 2, topic ID 31
      *  - Sends email to ibldepthcharts@gmail.com (production only)
      *  - Posts to Discord #trades and #general-chat channels
-     *  - Queues queries during Playoffs/Draft/Free Agency phases
      *  - Deletes trade data from `ibl_trade_info` and ibl_trade_cash
-     *
-     * Trade Queue:
-     *  During certain season phases, trade queries are queued in ibl_trade_queue
-     *  rather than executed immediately to prevent roster conflicts.
      */
     public function processTrade(int $offerId): array;
 }

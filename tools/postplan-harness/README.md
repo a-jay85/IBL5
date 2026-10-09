@@ -21,7 +21,7 @@ Without `--live`, every would-be side effect remains a typed intent record.
 | Phase sequencing + terminal states | `pr-copy`: commit/PR title + summary (haiku). Skipped when the PR is open and the tree is clean |
 | Phase 2 pre-push meta-check gate (rebase → gate → push) | `prose-fix`: rewrites the flagged lines when `check-prose-since` is the only failing check (sonnet, then opus; at most 2 tool-enabled calls with Read/Grep/Glob/Edit). A diff check enforces the line scope, and a re-run of the real gate decides success. Doc-staleness remediation stays mechanical |
 | Phase 3 diff classification (all flags) | `review-agent-a/b/d` — code review judgment (sonnet) |
-| Phase 5 verify aggregation | `security-audit` — security judgment (haiku) |
+| Phase 5 verify aggregation | `security-audit` (sonnet) for security judgment |
 | Phase 5.0 plan→test/file conformance | `score-findings` — rubric confidence scoring (haiku) |
 | All twelve ported arming conditions (numbered 1–12; the skill's condition (11), unresolved review-thread findings, stays skill-only — the harness's 11 is master's plan-slug-drift hold) | `safety-verdict` — condition (9), **add-only** holds (haiku) |
 | CI-watch interpretation | `manual-classify` — plan-blind manual-step triage (haiku) |

@@ -29,7 +29,9 @@ Env vars:
   HOT_FILE_THRESHOLD   line threshold (default: 500)
   HOT_FILE_BASE_REF    base commit ref for --pr mode (default: origin/master)
 
-Exit codes (--pr mode): 0 = at least one crossing, 1 = no crossing
+Exit codes (--pr mode): 0 = at least one crossing, 1 = no crossing,
+                        2 = a non-empty HOT_FILE_BASE_REF or --base value
+                            does not resolve to a commit
 EOF
     exit 0
 }
@@ -38,7 +40,7 @@ scan_scope_parse_args usage lenient "$@"
 
 THRESHOLD=${HOT_FILE_THRESHOLD:-500}
 ROOT=$(git rev-parse --show-toplevel)
-scan_scope_resolve_base HOT_FILE_BASE_REF "${HOT_FILE_BASE_REF:-}" 0 "$ROOT"
+scan_scope_resolve_base HOT_FILE_BASE_REF "${HOT_FILE_BASE_REF:-}" 1 "$ROOT"
 BASE_REF=$SCAN_SCOPE_BASE_REF
 cd "$ROOT/ibl5"
 
@@ -74,5 +76,7 @@ if [ "$SCAN_SCOPE_MODE" = "pr" ]; then
     # Exit status encodes the signal the workflow branches on:
     #   0 = at least one crossing (post the comment)
     #   1 = no crossing (delete any stale comment)
+    #   2 = (raised earlier, by scan_scope_resolve_base) unresolvable base ref;
+    #       the workflow fails the step and keeps any existing comment
     [ "$crossed" = "1" ]
 fi

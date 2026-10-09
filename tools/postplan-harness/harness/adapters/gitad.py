@@ -123,6 +123,7 @@ class StackedRebaseResult:
     collapse_warn: str = ""
     auto_resolved: bool = False
     resolved_files: tuple = ()
+    squash_note: str = ""
 
 
 class LiveGit:
@@ -143,6 +144,8 @@ class LiveGit:
         # HEAD before the current rebase; None outside one. The public rebase methods
         # clear it in `finally`. The SIGTERM handler reads it to abort and restore.
         self._pre_rebase_sha: Optional[str] = None
+        self._squashed_from: Optional[str] = None   # pre-squash HEAD while a squash is live
+        self._last_squash_note: str = ""
 
     def emergency_abort(self) -> None:
         """Called from the SIGTERM signal handler.
@@ -736,6 +739,60 @@ class LiveGit:
                                   pre_rebase_sha=pre_rebase_sha,
                                   reason=f"unexpected error during auto-resolve: {exc}")
 
+    def _squash_merge_range_for_replay(
+        self, ibl_base: str, branch: str, pre_sha: str,
+    ) -> tuple[str, str, bool]:
+        """Collapse a merge-carrying `ibl_base..HEAD` range into one tree-identical commit.
+
+        Returns (new_head, note, fatal). A per-commit --onto replay drops merge commits and
+        the conflict resolutions they recorded, so a branch commit that an earlier merge
+        already reconciled conflicts again. The squash replays the branch's net change
+        instead. A linear range replays faithfully and is never rewritten.
+        """
+        merges = self._run("rev-list", "--merges", "--count", f"{ibl_base}..{pre_sha}").strip()
+        if merges in ("", "0"):
+            return "", "", False
+        mb = self._run("merge-base", ibl_base, pre_sha, check=False).strip()
+        if not mb:
+            return "", "squash skipped: no merge-base between iblBase and HEAD", False
+        count = self._run("rev-list", "--count", f"{mb}..{pre_sha}").strip()
+        tree = self._run("rev-parse", f"{pre_sha}^{{tree}}").strip()
+
+        # --first-parent keeps a master commit that arrived via a merge out of the pick.
+        src = self._run("rev-list", "--first-parent", "--no-merges", "--reverse",
+                        f"{mb}..{pre_sha}").split()
+        if src:
+            msg = self._run("log", "-1", "--format=%B", src[0])
+            name, email, date = self._run(
+                "log", "-1", "--format=%an%x00%ae%x00%ad", "--date=raw", src[0],
+            ).rstrip("\n").split("\x00")
+            env = {**os.environ, "GIT_AUTHOR_NAME": name, "GIT_AUTHOR_EMAIL": email,
+                   "GIT_AUTHOR_DATE": date}
+        else:
+            msg = "chore: squash branch history before replay\n"
+            env = dict(os.environ)
+
+        # commit-tree runs no hooks and touches neither the index nor the worktree.
+        proc = subprocess.run(
+            ["git", "-C", self.worktree, "-c", "commit.gpgsign=false", "commit-tree",
+             tree, "-p", mb, "-F", "-"],
+            input=msg, env=env, capture_output=True, text=True, errors="replace",
+        )
+        if proc.returncode != 0:
+            return "", f"squash skipped: commit-tree failed: {proc.stderr.strip()[:200]}", False
+        new = proc.stdout.strip()
+
+        # The reflog message starts with `postplan:` so collapse-guard.sh, which treats
+        # ^(rebase|reset:|filter-branch|amend) entries as rewrites, does not match it.
+        rc, out = self._run_out(
+            "update-ref", "-m",
+            f"postplan: squash {count} commits ({merges} merges) before --onto replay",
+            f"refs/heads/{branch}", new, pre_sha,
+        )
+        if rc != 0:
+            return "", f"squash aborted: update-ref compare-and-swap failed: {out.strip()[:200]}", True
+        return new, f"squashed {count} commits ({merges} merges) {pre_sha[:12]} -> {new[:12]} onto {mb[:12]}", False
+
     def autoresolve_stacked_rebase(self) -> "StackedRebaseResult":
         try:
             return self._autoresolve_stacked_rebase()
@@ -749,6 +806,8 @@ class LiveGit:
         branch = self.branch()
         key = branch.replace("/", "-")
         self.last_conflict_files = ()
+        self._squashed_from = None
+        self._last_squash_note = ""
 
         # Step 2: iblBase (early return before any network/expensive call)
         ibl_base = self.branch_base()
@@ -818,6 +877,19 @@ class LiveGit:
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
         self._pre_rebase_sha = pre_rebase_sha  # arm SIGTERM handler
         purge_verdict_artifacts(key)
+
+        # Step 6.5: collapse a merge-carrying range into one tree-identical commit, so the
+        # --onto replay sees the branch's net change, not commits whose conflicts a dropped
+        # merge already resolved. Runs AFTER collapse-guard `record` (records the true
+        # pre-squash tip) and AFTER pre_rebase_sha is armed (restore point = pre-squash HEAD).
+        squashed_head, squash_note, squash_fatal = self._squash_merge_range_for_replay(
+            ibl_base, branch, pre_rebase_sha,
+        )
+        self._last_squash_note = squash_note
+        if squash_fatal:
+            return StackedRebaseResult(False, squash_note)
+        if squashed_head:
+            self._squashed_from = pre_rebase_sha
 
         rebase_proc = subprocess.run(
             ["git", "-C", self.worktree, *_NO_RERERE, "rebase", "--onto", master_sha, ibl_base, branch],

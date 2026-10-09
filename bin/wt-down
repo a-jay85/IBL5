@@ -25,6 +25,8 @@ fi
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$(dirname "$0")/lib/wt-guards.sh"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"
+# shellcheck source=bin/lib/gh-pr.sh
+source "$REPO_ROOT/bin/lib/gh-pr.sh"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 WORKTREE_NAME=""
 ALL=false
@@ -166,7 +168,8 @@ if [ ! -d "$WORKTREE_PATH" ]; then
     # Build list of slugs to check: the worktree name itself, plus its
     # PR-based slug (pr-NNN) if the branch has an open PR.
     slugs=("$WORKTREE_NAME")
-    pr_slug=$(gh pr view "$WORKTREE_NAME" --json number --jq '.number' 2>/dev/null || true)
+    pr_info "$WORKTREE_NAME" || true
+    pr_slug="$PR_NUM"
     if [ -n "$pr_slug" ]; then
         slugs+=("pr-$pr_slug")
     fi

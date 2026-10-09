@@ -46,6 +46,7 @@ fi
 # Always resolve to the main repo root, even when run from a worktree.
 REPO_ROOT="$(cd "$(dirname "$0")/.." && dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"
+source "$REPO_ROOT/bin/lib/gh-pr.sh"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 
 # --- Parse arguments ---
@@ -90,7 +91,8 @@ elif docker ps --format '{{.Names}}' | grep -q "^ibl5-php-${WORKTREE_NAME}$"; th
     SLUG="$WORKTREE_NAME"
 else
     # Check for --pr slug by looking up the PR number for this worktree's branch
-    PR_NUMBER=$(cd "$WORKTREE_PATH" && gh pr view --json number -q .number 2>/dev/null || true)
+    pr_info "" "$WORKTREE_PATH" || true
+    PR_NUMBER="$PR_NUM"
     if [ -n "$PR_NUMBER" ] && docker ps --format '{{.Names}}' | grep -q "^ibl5-php-pr-${PR_NUMBER}$"; then
         SLUG="pr-$PR_NUMBER"
     fi

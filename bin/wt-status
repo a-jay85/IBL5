@@ -54,6 +54,8 @@ fi
 
 # shellcheck source=bin/lib/wt-guards.sh
 source "$(dirname "$0")/lib/wt-guards.sh"
+# shellcheck source=bin/lib/gh-pr.sh
+source "$(dirname "$0")/lib/gh-pr.sh"
 REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
 # shellcheck source=bin/lib/git-helpers.sh
 source "$(dirname "$0")/lib/git-helpers.sh"
@@ -145,9 +147,11 @@ classify_worktree() {
     # ---- compute signals ----
 
     # PR state (requires gh)
-    local pr_state=""
+    local pr_state="" pr_num=""
     if command -v gh &>/dev/null; then
-        pr_state="$(cd "$REPO_ROOT" && gh pr view "$branch" --json state -q .state 2>/dev/null || true)"
+        pr_info "$branch" "$REPO_ROOT" || true
+        pr_state="$PR_STATE"
+        pr_num="$PR_NUM"
     fi
 
     # Remote tracking config
@@ -206,10 +210,6 @@ classify_worktree() {
 
     # OPEN-PR
     if [ "$pr_state" = "OPEN" ]; then
-        local pr_num=""
-        if command -v gh &>/dev/null; then
-            pr_num="$(cd "$REPO_ROOT" && gh pr view "$branch" --json number -q .number 2>/dev/null || true)"
-        fi
         if [ -n "$pr_num" ]; then
             echo "OPEN-PR $wt_name (PR #$pr_num)"
         else

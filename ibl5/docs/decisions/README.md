@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-10-06
+last_verified: 2026-10-08
 ---
 
 # IBL5 Architecture Decision Records
@@ -67,6 +67,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0158](0158-j27-fta-undershoot-attribution.md) | Record the J27 FTA undershoot decomposition and its ruled-out levers | Accepted | `TestRealArchive_FTADecomp` splits the FTA gap into foul volume and yield per foul. The gap is volume: JSB's non-shooting fouls, team-foul bonus, and 3-shot trips need new engine state, so no lever ships. |
 | [0174](0174-lostwork-change-level-proof.md) | Lost-work proof compares branch changes against the post-rebase tree | Accepted | `lostwork.sh` checks every significant line the branch added or deleted against `HEAD` instead of comparing numstat rows. Master edits to the same file and absorbed hunks pass. A line both sides edited still blocks. |
 | [0177](0177-wt-new-warm-standby-pool.md) | Warm-standby worktree pool for bin/wt-new | Accepted | `bin/wt-new` claims a ready `_pool-N` spare by branch rename and `git worktree move`, falls back to a cold create on any failed check, and refills the spare through a launchd one-shot. |
+| [0188](0188-workflow-run-interpolation-guard.md) | Ban env and string-input expressions inside workflow run: bodies | Accepted | `bin/check-workflow-run-interpolation` runs in `Static guards` and fails any `${{ env.* }}` or string-typed `${{ inputs.* }}` inside a `run:` body; values go through `env:` and a quoted `"$NAME"`. |
 
 ## When an ADR is Required
 

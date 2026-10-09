@@ -948,6 +948,10 @@ jobs:
       # live in repo-root bin/ and scan repo-root .github/.
       - name: Local-action checkout ordering
         run: bin/check-workflow-checkout
+      # run-body interpolation: ${{ env.* }} / string ${{ inputs.* }} pasted into a
+      # run: script is shell injection (backlog#1387). Route it through env: instead.
+      - name: Run-body expression interpolation
+        run: bin/check-workflow-run-interpolation
       - name: Composite behavior contracts
         run: bin/check-composite-contracts
       # rules-byte-budget: a path-unscoped .claude/rules/*.md file (always loaded
@@ -1088,6 +1092,7 @@ jobs:
             bin/test-merge-line-select \
             bin/test-merge-line-watch \
             bin/test-check-workflow-checkout \
+            bin/test-check-workflow-run-interpolation \
             bin/test-check-composite-contracts \
             bin/test-promote-master-to-production \
             bin/test-check-e2e-mutator-isolation \

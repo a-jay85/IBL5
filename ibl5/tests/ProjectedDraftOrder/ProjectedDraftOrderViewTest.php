@@ -268,6 +268,49 @@ class ProjectedDraftOrderViewTest extends TestCase
         $this->assertStringContainsString('is-expanded', $result);
     }
 
+    public function testNotesCellRendersKeyboardToggleWhenNotesPresent(): void
+    {
+        $order = $this->emptyDraftOrder();
+        $order['round1'] = [
+            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 2, 'Celtics', '007A33', 'FFFFFF', true, 'via trade'),
+        ];
+
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringContainsString(
+            '<td class="projected-draft-order-notes" onclick="this.classList.toggle(\'is-expanded\');this.firstElementChild.setAttribute(\'aria-expanded\', String(this.classList.contains(\'is-expanded\')))"><button type="button" class="projected-draft-order-notes__toggle" aria-expanded="false" title="Click/tap to expand">via trade</button></td>',
+            $result
+        );
+    }
+
+    public function testEmptyNotesCellHasNoToggle(): void
+    {
+        $order = $this->emptyDraftOrder();
+        $order['round1'] = [
+            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 2, 'Celtics', '007A33', 'FFFFFF', true, ''),
+        ];
+
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringContainsString('<td class="projected-draft-order-notes"></td>', $result);
+        $this->assertStringNotContainsString('projected-draft-order-notes__toggle', $result);
+        $this->assertStringNotContainsString('Click/tap to expand', $result);
+        $this->assertStringNotContainsString('is-expanded', $result);
+    }
+
+    public function testNotesToggleEscapesNotesText(): void
+    {
+        $order = $this->emptyDraftOrder();
+        $order['round1'] = [
+            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 2, 'Celtics', '007A33', 'FFFFFF', true, '<script>x</script>'),
+        ];
+
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringNotContainsString('<script>x', $result);
+        $this->assertStringContainsString('title="Click/tap to expand">&lt;script&gt;', $result);
+    }
+
     public function testUsesDataTableClass(): void
     {
         $result = $this->view->render($this->sampleDraftOrder(), 2026);

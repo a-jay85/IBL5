@@ -167,9 +167,15 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
             $html .= '<td>' . HtmlSanitizer::e($slot['player']) . '</td>';
         }
 
-        $titleAttr = $slot['notes'] !== '' ? ' title="Click/tap to expand"' : '';
-        $html .= '<td class="projected-draft-order-notes"' . $titleAttr . ' onclick="this.classList.toggle(\'is-expanded\')">'
-            . HtmlSanitizer::safeHtmlOutput($slot['notes']) . '</td>';
+        if ($slot['notes'] === '') {
+            $html .= '<td class="projected-draft-order-notes"></td>';
+        } else {
+            $html .= '<td class="projected-draft-order-notes" onclick="this.classList.toggle(\'is-expanded\');'
+                . 'this.firstElementChild.setAttribute(\'aria-expanded\', String(this.classList.contains(\'is-expanded\')))">'
+                . '<button type="button" class="projected-draft-order-notes__toggle" aria-expanded="false" title="Click/tap to expand">'
+                . HtmlSanitizer::safeHtmlOutput($slot['notes'])
+                . '</button></td>';
+        }
 
         $html .= '</tr>';
         return $html;

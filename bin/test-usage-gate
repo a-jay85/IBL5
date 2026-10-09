@@ -1711,6 +1711,60 @@ test_runner_priority_burndown_loop() {
     assert_eq prio_burndown_loop:runner burndown-loop "$(jq -r .runner "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json" 2>/dev/null)"
 }
 
+# ---------------------------------------------------------------- cred-switch resume
+
+FP_A=$(printf tokA | shasum -a 256 | cut -c1-16)
+
+# elig_run <token|""> <expr>: run <expr> with the keychain stub returning <token>.
+elig_run() {
+    make_stub_bin "$STUB" "$1" '{}' 1
+    PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; $2"
+}
+
+# elig_marker <reason> <paused_ago> <cred_fp|"">: seed a marker for SID_A.
+elig_marker() {
+    new_env
+    jq -n --arg sid "$SID_A" --arg reason "$1" --argjson at "$(( $(date +%s) - $2 ))" --arg fp "$3" \
+        '{session_id:$sid, reason:$reason, paused_at:$at, resume_count:0,
+          cred_fp:(if $fp == "" then null else $fp end)}' \
+        > "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_cred_switch_marker_records_fp() {
+    new_env
+    local rbin="$T/resume.sh"
+    printf '#!/bin/sh\n' > "$rbin"; chmod +x "$rbin"
+    elig_run tokA "usage_marker_write $SID_A plan-now '$rbin' limit-hit hit 100 five_hour 1790625600"
+    assert_eq cred_switch_write:fp "$FP_A" "$(jq -r '.cred_fp' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    elig_run "" "usage_marker_write $SID_A plan-now '$rbin' limit-hit hit 100 five_hour 1790625600"
+    assert_eq cred_switch_write:null-when-unreadable null "$(jq -r '.cred_fp' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+}
+
+test_cred_switch_same_login_held() {
+    elig_marker limit-hit 60 "$FP_A"
+    elig_run tokA "usage_marker_eligible $SID_A $(date +%s)"
+    assert_eq cred_switch_same:rc 1 "$?"
+}
+
+test_cred_switch_new_login_eligible() {
+    elig_marker limit-hit 60 "$FP_A"
+    elig_run tokB "usage_marker_eligible $SID_A $(date +%s)"
+    assert_eq cred_switch_new:rc 0 "$?"
+    assert_contains cred_switch_new:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "limit-hit-hold-skipped reason=cred-switch sid=$SID_A"
+}
+
+test_cred_switch_null_marker_fp_held() {
+    elig_marker limit-hit 60 ""
+    elig_run tokB "usage_marker_eligible $SID_A $(date +%s)"
+    assert_eq cred_switch_null_fp:rc 1 "$?"
+}
+
+test_cred_switch_unreadable_keychain_held() {
+    elig_marker limit-hit 60 "$FP_A"
+    elig_run "" "usage_marker_eligible $SID_A $(date +%s)"
+    assert_eq cred_switch_no_keychain:rc 1 "$?"
+}
+
 # ---------------------------------------------------------------- runner
 
 TESTS=$(grep -E '^test_[a-z0-9_]+\(\)' "$0" | sed 's/().*//')

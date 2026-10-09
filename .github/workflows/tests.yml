@@ -893,11 +893,13 @@ jobs:
       - name: Shell harnesses (parallel)
         run: |
           bin/run-shell-harnesses \
+            bin/test-main-checkout-root \
             bin/test-post-plan-fleet \
             bin/test-check-plan \
             bin/test-plan-now \
             bin/test-wt-sync-tick \
             bin/test-wt-gc-tick \
+            bin/test-tick-guards \
             bin/test-bin-help \
             bin/test-check-old-code-compat \
             bin/test-cleanup-safety \
@@ -920,6 +922,7 @@ jobs:
             bin/test-pr-review-now \
             bin/test-launchd-job \
             bin/test-check-phpunit-hygiene \
+            bin/test-check-e2e-hygiene \
             bin/test-test \
             bin/test-refactor-flag \
             bin/test-rebuild-css-if-source-changed \

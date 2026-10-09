@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-10-08
+last_verified: 2026-10-09
 ---
 
 # bin/lib — Shared Library Files
@@ -23,9 +23,11 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `git-helpers.sh` | Shared git-layout helpers: canonical repo root resolution and related utilities |
 | `numbering.sh` | Shared ADR and migration numbering grammar: allocator name regexes, gate collision keys, and `numbering_next`. Sourced by `bin/next-number` and `bin/check-numbering`; source-safe (no `set`, no `exit`) |
 | `human-signoff-classifier.sh` | Single source of truth for the feature-PR human sign-off classifier (ADR-0062), sourced by both the workflow and its regression harness |
-| `launchd-job.sh` | Shared launchd background-job plumbing: one-shot `launchctl list` snapshot and label lookup, fail-closed pgrep liveness probe, TERM-then-KILL stop and slot release, compact runner plist emission, bootout/bootstrap, slot count / stale reap / wait-for-slot, the loaded-idle job reaper, runner-embeddable finish-DM helpers, and `xml_escape` / `shq`. Sourced by `bin/post-plan-fleet`, `bin/pr-review-now`, `bin/post-plan-now` and `bin/pr-cycle`; tested by `bin/test-launchd-job` |
+| `dm.sh` | Discord-DM sender helpers. `dm_bin` resolves the `discord-dm` binary from a caller's seam variables, so an empty seam falls back to the default. `dm_ping` sends with `--ping` and puts the message last. Sourced by `bin/pr-cycle`, `bin/pr-cycle-tick`, `bin/post-plan-fail-dm`, `bin/plan-now`, `bin/post-plan-fleet`, `bin/pr-review-now` and `bin/db-backups-pull`; tested by `bin/test-discord-dm` |
+| `launchd-job.sh` | Shared launchd background-job plumbing: one-shot `launchctl list` snapshot and label lookup, fail-closed pgrep liveness probe, TERM-then-KILL stop and slot release, compact runner plist emission, bootout/bootstrap, slot count / stale reap / wait-for-slot, the loaded-idle job reaper, runner-embeddable finish-DM helpers, and `xml_escape` / `shq`. Sourced by `bin/post-plan-fleet`, `bin/pr-review-now`, `bin/post-plan-now`, `bin/plan-now` and `bin/pr-cycle`; tested by `bin/test-launchd-job` |
 | `launchd-expected-jobs.sh` | Single source of truth for the launchd health check: the expected long-lived `com.ibl5.*` labels with their check mode (`standard` / `keepalive` / `phase-gated`), the one-shot label prefixes, and the required main-stack containers. Sourced by `bin/launchd-health-check` (example) and `bin/test-launchd-health-check` (example) |
 | `pr-sticky.sh` | Canonical find-by-HTML-marker sticky PR comment helpers (upsert / delete); sourced by `bin/pr-canary-check`, `bin/check-pr-collisions`, and `bin/post-plan-now` |
+| `scan-scope.sh` | Shared `--pr` / `--base` / `--help` arg parsing, base-ref resolution and changed-file listing for `bin/check-e2e-hygiene`, `bin/check-phpunit-hygiene` and `bin/check-hot-files` |
 | `session-id.sh` | Mint, validate and persist the `claude -p --session-id` uuid for detached headless runs; writes the `${LOG%.log}.session` sidecar that `bin/fleet-status` reads to locate a live run's transcript. Sourced by `bin/plan-now`, `bin/docfix-run`, `bin/post-plan-now` and `bin/fleet-status` |
 | `plan-autonomy-contract` | Shared `stop_condition:` / `evidence:` frontmatter validator; invoked by `bin/check-plan` gate `[K]` and the `/post-plan` Phase 5.0d skill path |
 | `plan-model-tier` | Validate a raw `impl_model:` value against the accepted whitelist and classify it (`absent`/`opus-tier`/`sonnet-tier`/`haiku-tier`); shared by `plan-impl-model` and `plan-model-consistency` |
@@ -35,4 +37,5 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `post-review-findings.sh` | Convert a JSON findings array into resolvable inline GitHub review threads or a fallback issue comment; sourced by `/post-plan` Phase 4D, `/pr-review`, and `/security-audit` |
 | `pr-armable.sh` | Shared auto-merge "live hold" predicate for `/post-plan` Phase 6.5 arming conditions; sourced by `bin/pr-triage` and `/post-plan` |
 | `sim-recap-exemplar.txt` | Exemplar sim-recap text used as a style reference by the sim-recap prompt |
+| `tick-guards.sh` | Single-flight PID lock and fail-closed HID idle read shared by `bin/wt-gc-tick` and `bin/wt-sync-tick`; tested by `bin/test-tick-guards` |
 | `wt-guards.sh` | Shared worktree safety guards for scripts that modify or remove worktrees |

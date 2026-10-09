@@ -56,9 +56,9 @@ fi
 source "$(dirname "$0")/lib/wt-guards.sh"
 # shellcheck source=bin/lib/gh-pr.sh
 source "$(dirname "$0")/lib/gh-pr.sh"
-REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
 # shellcheck source=bin/lib/git-helpers.sh
 source "$(dirname "$0")/lib/git-helpers.sh"
+REPO_ROOT="$(main_checkout_root .)" || REPO_ROOT=""
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 
 STALLED_ONLY=false

@@ -330,6 +330,24 @@ rm -f "$RUNNER" /tmp/pr-review-now-prompt-1901.md /tmp/pr-review-now-1901.log
 clean_slots
 end_case pr-review-now-notify-before-bootout
 
+# The runner's DISCORD_DM= line: a set seam lands verbatim, an empty one falls back to
+# bin/discord-dm, and the declare -f injection of ljob_dm_ready survives.
+begin_case
+PR_REVIEW_NOW_DISCORD_DM="$SCRATCH/dm-stub" PR_REVIEW_NOW_DRY_RUN=1 run_driver 1901 >/dev/null 2>&1
+RUNNER=/tmp/pr-review-now-runner-1901.sh
+grep -qxF "DISCORD_DM=$SCRATCH/dm-stub" "$RUNNER" 2>/dev/null \
+    || fail "dm-seam-runner-line: a set seam did not land as DISCORD_DM=$SCRATCH/dm-stub"
+grep -qx 'ljob_dm_ready () ' "$RUNNER" 2>/dev/null \
+    || fail "dm-seam-runner-line: runner lacks the injected ljob_dm_ready"
+rm -f "$RUNNER" /tmp/pr-review-now-prompt-1901.md /tmp/pr-review-now-1901.log
+clean_slots
+PR_REVIEW_NOW_DISCORD_DM='' PR_REVIEW_NOW_DRY_RUN=1 run_driver 1901 >/dev/null 2>&1
+grep -qE '^DISCORD_DM=.*/bin/discord-dm$' "$RUNNER" 2>/dev/null \
+    || fail "dm-seam-runner-line: an empty seam did not fall back to bin/discord-dm"
+rm -f "$RUNNER" /tmp/pr-review-now-prompt-1901.md /tmp/pr-review-now-1901.log
+clean_slots
+end_case dm-seam-runner-line
+
 # --- case 9: pr-review-now-no-shared-machinery -------------------------------------------
 # bin/pr-review-now must contain no reference to 'pr-ready-now' and no 'PR_READY_NOW_'
 # token. Either would silently re-couple the two siblings, making pr-review-now depend on

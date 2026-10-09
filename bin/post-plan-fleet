@@ -97,12 +97,8 @@ export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/
 # --git-common-dir points at the main .git even from a linked worktree, where
 # --show-toplevel would return the worktree instead.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-GIT_COMMON="$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-if [[ -z "$GIT_COMMON" ]]; then
-    # git < 2.31 has no --path-format; fall back to resolving the relative answer by hand.
-    GIT_COMMON="$(cd "$SCRIPT_DIR" && cd "$(git rev-parse --git-common-dir)" && pwd -P)"
-fi
-ROOT="$(dirname "$GIT_COMMON")"
+. "$SCRIPT_DIR/lib/git-helpers.sh"
+ROOT="$(main_checkout_root "$SCRIPT_DIR")" || ROOT=""
 # POST_PLAN_FLEET_ROOT: test seam allowing tests to override the resolved main checkout path.
 [[ -n "${POST_PLAN_FLEET_ROOT:-}" ]] && ROOT="$POST_PLAN_FLEET_ROOT"
 
@@ -112,6 +108,8 @@ ROOT="$(dirname "$GIT_COMMON")"
 # --- session-id helpers ------------------------------------------------------------------
 . "$SCRIPT_DIR/lib/session-id.sh"
 . "$SCRIPT_DIR/lib/launchd-job.sh"
+# shellcheck source=bin/lib/dm.sh
+. "$SCRIPT_DIR/lib/dm.sh"
 # Usage-gate markers (ADR-0143): a post-plan session paused by the gate is resumed by the
 # coordinator, so the fleet must not fire a second one into the same worktree.
 . "$SCRIPT_DIR/lib/usage-gate.sh"
@@ -617,7 +615,7 @@ fire_pr() {
         printf 'PR=%q\n'         "$PR"
         printf 'NOTIFY=%q\n'     "$NOTIFY"
         printf 'SESSION_ID=%q\n' "$SESSION_ID"
-        printf 'DISCORD_DM=%q\n' "${POST_PLAN_FLEET_DISCORD_DM:-$ROOT/bin/discord-dm}"
+        printf 'DISCORD_DM=%q\n' "$(dm_bin "$ROOT/bin" POST_PLAN_FLEET_DISCORD_DM)"
         printf 'GH_BIN=%q\n'     "${POST_PLAN_FLEET_GH:-gh}"
         printf 'POST_PLAN_NOW_BIN=%q\n' "${POST_PLAN_FLEET_CLAUDE:-$ROOT/bin/post-plan-now}"
         printf 'ALLOW_TEST_ONLY_ARG=%q\n' "$ALLOW_TEST_ONLY_ARG"

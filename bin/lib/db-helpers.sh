@@ -60,9 +60,9 @@ db_cmd() {
 # surprise can never invent a bogus container name.
 #
 # Slug precedence is <root>/.wt-slug first, basename second. They are NOT always
-# equal: bin/wt-up:81 computes SLUG="${WORKTREE_NAME//\//-}" (a branch like
-# feature/x lands at .../feature/x, basename `x`, slug `feature-x`) and
-# bin/wt-up:92 overrides SLUG="pr-<N>" under --pr. The dotfile is what wt-up
+# equal: bin/wt-up computes SLUG with wt_slug in bin/lib/wt-compose.sh, which
+# flattens "/" to "-" (a branch like feature/x lands at .../feature/x, basename
+# `x`, slug `feature-x`) and yields pr-<N> under --pr. The dotfile is what wt-up
 # actually named the container, so it wins whenever it exists and is non-empty.
 #
 # The git-helpers.sh source below is deliberately lazy and guarded by declare -F:

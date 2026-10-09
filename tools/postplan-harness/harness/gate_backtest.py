@@ -99,6 +99,7 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-rules-byte-budget": _TREE,
     "bin/check-skill-arguments": _TREE,
     "bin/check-workflow-checkout": _TREE,
+    "bin/check-workflow-run-interpolation": _TREE,
     # Plan-file gates: the plan resolves from the historical PR's branch name.
     "bin/check-plan": _PLAN,
     "bin/check-plan-staleness": _PLAN,

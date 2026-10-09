@@ -995,6 +995,7 @@ jobs:
             bin/test-prune-eligibility \
             bin/test-scrub-log-credentials \
             bin/test-db-query-routing \
+            bin/test-db-sync-prod-argv \
             bin/test-watch-run \
             bin/test-watch-automouse-plan \
             ibl5/bin/test-flake-ledger \

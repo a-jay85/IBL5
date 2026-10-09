@@ -248,7 +248,7 @@ done
 echo "MariaDB is ready."
 
 DB_CONTAINER="ibl5-db-$SLUG"
-DB_CMD="mariadb -u root -proot iblhoops_ibl5"
+DB_CMD="mariadb -u $DB_ROOT_USER -p$DB_ROOT_PASS $DB_DEFAULT_NAME"
 
 # For --seed/--no-data, run migrations first so the schema exists before any
 # data import. For --prod/--snapshot, db-sync-prod ships its own schema + a backfill +

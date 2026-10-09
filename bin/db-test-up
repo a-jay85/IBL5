@@ -44,7 +44,7 @@ for arg in "$@"; do
 done
 
 TEST_DB="ibl5_test"
-DB_CMD="mariadb -u root -proot"
+DB_CMD="mariadb -u $DB_ROOT_USER -p$DB_ROOT_PASS"
 
 if [ -z "$WORKTREE_NAME" ]; then
     DB_CONTAINER="ibl5-mariadb"

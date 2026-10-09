@@ -277,8 +277,9 @@ run_seam_case "e2e-seam-head-excludes-file"           "$E2E_HYGIENE" "$EV" head 
 run_seam_case "e2e-seam-bogus-ref-exit2"              "$E2E_HYGIENE" "$EV" bogus 2 'does not resolve to a commit' "$EF" "$SEAM_TS"
 
 # === hot-files: scope + arg parsing (bin/check-hot-files) ===
-# Pins the --pr crossing logic, the unvalidated HOT_FILE_BASE_REF, lenient arg
-# parsing and --help. Every case runs with HOT_FILE_THRESHOLD=5; "N lines" is `seq N`.
+# Pins the --pr crossing logic, HOT_FILE_BASE_REF validation (a non-empty value
+# must resolve in --pr mode), lenient arg parsing and --help. Every case runs
+# with HOT_FILE_THRESHOLD=5; "N lines" is `seq N`.
 
 # mk_hot_repo <base-lines (0 = absent at base)> <head-lines> <relpath>
 # Commits the base state, then leaves the head state uncommitted. A file absent
@@ -351,7 +352,13 @@ hot_case hot-full-mode-lists-foo 0 'Foo\.php' 'CROSSED' "$d" "$HOT"
 # crossing list (exit 1) with git's own noise and never the exit-2 guard.
 hot_case hot-env-unset-default-not-validated 1 - 'does not resolve' "$d" "$HOT" --pr
 hot_case hot-env-empty-defaults 1 - 'does not resolve' "$d" HOT_FILE_BASE_REF= "$HOT" --pr
-hot_case hot-env-bogus-exit1-not-2 1 - 'does not resolve' "$d" HOT_FILE_BASE_REF=nosuchref "$HOT" --pr
+# A non-empty HOT_FILE_BASE_REF is validated in --pr mode: a bogus ref exits 2
+# with the shared lib's message, so CI never reads it as "no crossing".
+hot_case hot-env-bogus-exit2 2 '^HOT_FILE_BASE_REF=nosuchref does not resolve to a commit$' 'CROSSED' \
+    "$d" HOT_FILE_BASE_REF=nosuchref "$HOT" --pr
+# Full (listing) mode never resolves a base, so the same bogus value still lists.
+hot_case hot-env-bogus-full-mode-lists 0 "$HOT_HEADER" 'does not resolve' \
+    "$d" HOT_FILE_BASE_REF=nosuchref "$HOT"
 # A bare $HOT_FILE_BASE_REF read (no :- default) dies under set -u in an empty
 # launchd-like environment. `env -i` also drops HOME and every other variable.
 hot_case hot-empty-env-no-unbound-variable 1 - 'unbound variable' "$d" env -i PATH="$PATH" "$HOT" --pr

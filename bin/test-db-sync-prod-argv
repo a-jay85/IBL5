@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# bin/test-db-sync-prod-argv — characterization harness for the mariadb argv that
+# bin/db-sync-prod sends to `docker exec` on the --snapshot path.
+#
+# Pins the five preserve-tables probes, the in-container preserved-tables dump,
+# the two db_import_sql loads, the schema_migrations backfill and the final row
+# count. docker is stubbed on PATH: no Docker, no MariaDB, no prod contact.
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+PASS=0
+FAIL=0
+
+pass()     { echo "PASS: $1"; PASS=$((PASS + 1)); }
+failcase() { echo "FAIL: $1"; echo "      $2"; FAIL=$((FAIL + 1)); }
+
+assert_eq() {  # <label> <expected> <actual>
+    if [ "$2" = "$3" ]; then pass "$1"; else failcase "$1" "expected: [$2] got: [$3]"; fi
+}
+assert_match() {  # <label> <needle> <haystack>
+    case "$3" in *"$2"*) pass "$1" ;; *) failcase "$1" "expected to contain: $2 | got: $3" ;; esac
+}
+count_in() {  # <needle> <haystack> — fixed-string line count, herestring (no pipe SIGPIPE)
+    grep -cF -- "$1" <<<"$2" || true
+}
+
+STUBBIN="$TMP/bin"
+mkdir -p "$STUBBIN"
+export STUB_ARGV_LOG="$TMP/argv"
+
+cat > "$STUBBIN/docker" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "$STUB_ARGV_LOG.docker"
+case "$1" in
+    ps)   printf 'ibl5-mariadb\n'; exit 0 ;;
+    exec)
+        case "$*" in
+            *information_schema.tables*)
+                if [ "${STUB_PROBE_RC:-0}" -ne 0 ]; then
+                    echo "ERROR 2002 (HY000): stub probe failure" >&2
+                    exit "$STUB_PROBE_RC"
+                fi
+                printf '1\n' ;;
+            *mariadb-dump*)
+                [ -n "${STUB_DUMP_STDERR:-}" ] && echo "$STUB_DUMP_STDERR" >&2
+                printf -- '-- stub dump body\nINSERT INTO ibl_api_keys VALUES (1);\n' ;;
+            *--force*)
+                cat >/dev/null
+                [ -n "${STUB_IMPORT_ERROR:-}" ] && echo "$STUB_IMPORT_ERROR" ;;
+            *) : ;;
+        esac
+        exit 0 ;;
+    *) exit 0 ;;
+esac
+STUB
+chmod +x "$STUBBIN/docker"
+
+# Sandbox checkout so REPO_ROOT inside db-sync-prod resolves here and
+# worktrees_parent_dir sees a git repo.
+MAIN="$TMP/IBL5"
+mkdir -p "$MAIN/bin/lib"
+cp "$REPO_ROOT/bin/lib/db-helpers.sh"  "$MAIN/bin/lib/db-helpers.sh"
+cp "$REPO_ROOT/bin/lib/git-helpers.sh" "$MAIN/bin/lib/git-helpers.sh"
+cp "$REPO_ROOT/bin/db-sync-prod"       "$MAIN/bin/db-sync-prod"
+chmod +x "$MAIN/bin/db-sync-prod"
+git -C "$MAIN" init -q -b master
+git -C "$MAIN" config user.email t@example.com
+git -C "$MAIN" config user.name  Test
+git -C "$MAIN" add -A
+git -C "$MAIN" commit -qm init
+
+printf 'SELECT 1;\n' | gzip -c > "$TMP/snap.sql.gz"
+
+run_sync() {   # usage: run_sync [VAR=value ...] — extra env assignments for a case
+    : > "$STUB_ARGV_LOG.docker"
+    set +e
+    OUT=$(cd "$TMP" && env -i PATH="$STUBBIN:/usr/bin:/bin" HOME="$TMP" TMPDIR="$TMP" \
+          STUB_ARGV_LOG="$STUB_ARGV_LOG" "$@" \
+          "$MAIN/bin/db-sync-prod" --snapshot "$TMP/snap.sql.gz" 2>"$TMP/err")
+    RC=$?
+    set -e
+    ERR=$(cat "$TMP/err")
+    LOG=$(cat "$STUB_ARGV_LOG.docker")
+}
+
+# D1: default argv. The expected strings are the pin: they are what the
+# unmodified db-sync-prod logs, and Phases 3-4 must keep them byte-identical.
+run_sync
+assert_eq "D1 exit 0" "0" "$RC"
+assert_eq "D1 probe argv x5" "5" \
+    "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot -N -B -e SELECT COUNT(*) FROM information_schema.tables' "$LOG")"
+assert_eq "D1 probe schema literal" "1" \
+    "$(count_in "WHERE table_schema='iblhoops_ibl5' AND table_name='ibl_bug_reports'" "$LOG")"
+assert_eq "D1 dump argv" "1" \
+    "$(count_in 'exec ibl5-mariadb mariadb-dump -uroot -proot --single-transaction --skip-lock-tables iblhoops_ibl5 ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state' "$LOG")"
+assert_eq "D1 import argv x2" "2" \
+    "$(count_in 'exec -i ibl5-mariadb mariadb --force -uroot -proot iblhoops_ibl5' "$LOG")"
+assert_eq "D1 backfill argv" "1" \
+    "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot iblhoops_ibl5 -e ' "$LOG")"
+assert_eq "D1 rowcount argv" "1" \
+    "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot iblhoops_ibl5 -N -B -e ' "$LOG")"
+assert_eq "D1 exec total" "10" "$(grep -c '^exec ' <<<"$LOG" || true)"
+assert_eq "D1 two-token form absent" "0" "$(count_in '-u root' "$LOG")"
+assert_eq "D1 password not echoed" "0" "$(grep -c proot <<<"$OUT$ERR" || true)"
+assert_match "D1 snapshot banner" "Source: snapshot file" "$OUT"
+
+echo "PASS: $PASS  FAIL: $FAIL"
+[ "$FAIL" -eq 0 ] || exit 1

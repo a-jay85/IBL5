@@ -53,6 +53,7 @@ fi
 # POSIX awk only: Ubuntu's awk is mawk and macOS ships BSD awk.
 read -r -d '' PROG <<'AWK_EOF' || true
 # One file per awk run, passed twice. Pass 1 collects typed inputs, pass 2 scans.
+# typed[] holds only inputs declared type: boolean or type: number.
 FNR == 1 { pass++; inrun = 0; collecting = 1; lastkey = "" }
 
 function scan(s, lineno,    e, rest, off, abs, pc, ref, name) {
@@ -71,7 +72,7 @@ function scan(s, lineno,    e, rest, off, abs, pc, ref, name) {
       if (ref ~ /^inputs\./) {
         name = ref
         sub(/^inputs\./, "", name)
-        if (name in typed) continue
+        if (typed[name]) continue
       }
       printf "%s:%d: ${{ %s }} interpolated into a run: body; pass it through env: and use \"$NAME\" in the shell\n", FILENAME, lineno, ref
       fail = 1

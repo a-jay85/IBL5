@@ -1175,6 +1175,88 @@ else
     failcase "pr-info-empty-ref-omits-arg (got $pi_got, argv: $pi_logged_argv)"
 fi
 
+# ----------------------------------------------------------------------------
+# has_open_pr (bin/lib/wt-guards.sh), rebuilt on pr_info. Sources wt-guards.sh
+# (not gh-pr.sh), so these cases also prove its BASH_SOURCE-relative source line.
+# ----------------------------------------------------------------------------
+hop_run() {
+    local p="$1"; shift
+    GH_FIXTURE="$pi_fx" PATH="$p" "$BASH" -c \
+        'set -euo pipefail; . "$1"; shift; rc=0
+         for b in "$@"; do rc=0; has_open_pr "$b" || rc=$?; done
+         printf "%s|%s\n" "$rc" "$WTG_PR_NUM"' \
+        _ "$SCRIPT_DIR/lib/wt-guards.sh" "$@" 2>"$pi_err"
+}
+
+pi_expect "has-open-pr-open"   "0|11" "$(hop_run "$STUBBIN:$PATH" open-br)"
+pi_expect "has-open-pr-merged" "1|"   "$(hop_run "$STUBBIN:$PATH" merged-br)"
+pi_expect "has-open-pr-no-pr"  "1|"   "$(hop_run "$STUBBIN:$PATH" no-such-br)"
+# wt-guards.sh shells out to dirname for its own source line, so the no-gh PATH
+# carries a dirname symlink and nothing else.
+mkdir -p "$TMP/hop-nogh"
+ln -s "$(command -v dirname)" "$TMP/hop-nogh/dirname"
+pi_got="$(hop_run "$TMP/hop-nogh" open-br)"
+if [ "$pi_got" = "1|" ] && [ ! -s "$pi_err" ]; then
+    pass "has-open-pr-gh-missing"
+else
+    failcase "has-open-pr-gh-missing (got $pi_got, stderr: $(cat "$pi_err"))"
+fi
+pi_expect "has-open-pr-resets" "1|" "$(hop_run "$STUBBIN:$PATH" open-br no-such-br)"
+
+# ----------------------------------------------------------------------------
+# bin/wt-down orphan-container path: which containers get probed for a worktree
+# whose directory is gone. Dedicated docker stub (no inspect succeeds, so the
+# stop/rm path is never reached); exit code is not asserted.
+# ----------------------------------------------------------------------------
+wtd_bin="$TMP/wtd-bin"
+mkdir -p "$wtd_bin"
+cat > "$wtd_bin/docker" <<'DOCKERSTUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${WTD_LOG:?}"
+[ "${1:-}" = inspect ] && exit 1
+exit 0
+DOCKERSTUB
+chmod +x "$wtd_bin/docker"
+wtd_name="pi-orphan-$$"
+wtd_log="$TMP/wtd-log"
+wtd_fx="$TMP/wtd-fixture"
+
+# wtd_run <fixture> [extra env assignment]: run wt-down for the missing worktree.
+wtd_run() {
+    : > "$wtd_log"
+    # cwd must be inside a git repo: get_worktree_path runs `git worktree list`.
+    ( cd "$SCRIPT_DIR" && env GH_FIXTURE="$1" WTD_LOG="$wtd_log" ${2:+"$2"} \
+        PATH="$wtd_bin:$STUBBIN:$PATH" "$SCRIPT_DIR/wt-down" "$wtd_name" ) \
+        >/dev/null 2>&1 || true
+}
+
+printf 'view\t%s\tOPEN\toidx\t7\n' "$wtd_name" > "$wtd_fx"
+wtd_run "$wtd_fx"
+if grep -qxF "inspect ibl5-php-pr-7" "$wtd_log" \
+    && grep -qxF "inspect ibl5-php-$wtd_name" "$wtd_log"; then
+    pass "wt-down-orphan-pr-slug"
+else
+    failcase "wt-down-orphan-pr-slug (log: $(cat "$wtd_log"))"
+fi
+
+printf 'view\tsome-other-branch\tOPEN\toidy\t8\n' > "$wtd_fx"
+wtd_run "$wtd_fx"
+if grep -qxF "inspect ibl5-php-$wtd_name" "$wtd_log" \
+    && ! grep -qF "ibl5-php-pr-" "$wtd_log"; then
+    pass "wt-down-orphan-no-pr"
+else
+    failcase "wt-down-orphan-no-pr (log: $(cat "$wtd_log"))"
+fi
+
+printf 'view\t%s\tOPEN\toidx\t7\n' "$wtd_name" > "$wtd_fx"
+wtd_run "$wtd_fx" "GH_CMD=$TMP/pi-alt/absent"
+if grep -qxF "inspect ibl5-php-$wtd_name" "$wtd_log" \
+    && ! grep -qF "ibl5-php-pr-" "$wtd_log"; then
+    pass "wt-down-orphan-gh-missing"
+else
+    failcase "wt-down-orphan-gh-missing (log: $(cat "$wtd_log"))"
+fi
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

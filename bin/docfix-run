@@ -32,14 +32,15 @@ EOF
     exit 0
 fi
 
-# shq <string> — single-quote for the FAR side of the launchd boundary; xml_escape —
-# entity-escape for the plist <string> element. Both are needed, and for different
-# hazards: the plist text is parsed as XML by launchd AND as shell by `/bin/bash -lc`.
-# Interpolating $PROMPT inside \"…\" left its many `backticks` live at that second
-# parse — every backticked span was EXECUTED and then deleted from what the model
-# received (2026-08-08 run: `bin/post-plan-now` actually fired mid-assembly; see the
-# "command not found" lines in /tmp/docfix-run-*.log). Twin of the same defect in
-# bin/post-plan-now, whose shq() header carries the full rationale.
+# The prompt reaches claude through a generated runner script that bash parses
+# once (section 6). The launchd plist only execs that runner, so the prompt
+# never passes through launchd's XML parser and needs no XML escaping. The bash
+# parse still needs shq (bin/lib/launchd-job.sh): interpolating $PROMPT inside
+# double quotes left its many `backticks` live, so every backticked span was
+# EXECUTED and then deleted from what the model received (2026-08-08 run:
+# `bin/post-plan-now` actually fired mid-assembly; see the "command not found"
+# lines in /tmp/docfix-run-*.log). Twin of the same defect in bin/post-plan-now,
+# whose shq() header carries the full rationale.
 
 # --- 1. Validate args (negative path) -----------------------------------------
 ISSUE_NUM="${1:-}"

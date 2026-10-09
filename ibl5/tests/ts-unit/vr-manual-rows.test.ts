@@ -254,3 +254,46 @@ describe('buildManualSection', () => {
     expect(buildManualSection([], PAGES_URL)).toBe('');
   });
 });
+
+describe('manual-row before/after', () => {
+  const PINNED_AFTER_ONLY = [
+    '### 📸 Manual-row screenshots',
+    '',
+    '**Row 23 — `team-page`**',
+    '',
+    `![team-page](${PAGES_URL}manual-rows/team-page.png)`,
+    '',
+    '_Review aids only — never a gate. See ADR-0126._',
+  ].join('\n');
+
+  it('11a buildManualSection without beforeStatus matches the pinned after-only output', () => {
+    const md = buildManualSection([{ label: 'team-page', row: '23', status: 'ok' }], PAGES_URL);
+    expect(md).toBe(PINNED_AFTER_ONLY);
+  });
+
+  it('11b beforeStatus ok places the before image above the after image', () => {
+    const md = buildManualSection(
+      [{ label: 'team-page', row: '23', status: 'ok', beforeStatus: 'ok' }],
+      PAGES_URL
+    );
+    const before = md.indexOf(`${PAGES_URL}manual-rows/team-page.before.png`);
+    const after = md.indexOf(`${PAGES_URL}manual-rows/team-page.png`);
+    expect(before).toBeGreaterThan(-1);
+    expect(after).toBeGreaterThan(before);
+    expect(md.indexOf('**Before (base)**')).toBeLessThan(md.indexOf('**After (PR)**'));
+  });
+
+  it('11c beforeStatus failed renders byte-identical to the after-only output', () => {
+    const md = buildManualSection(
+      [{ label: 'team-page', row: '23', status: 'ok', beforeStatus: 'failed' }],
+      PAGES_URL
+    );
+    expect(md).toBe(PINNED_AFTER_ONLY);
+  });
+
+  it('11d manualShotFile maps the before side to <label>.before.png', () => {
+    expect(manualShotFile('x', 'before')).toBe('x.before.png');
+    expect(manualShotFile('x')).toBe('x.png');
+    expect(manualShotUrl(PAGES_URL, 'x', 'before')).toBe(`${PAGES_URL}manual-rows/x.before.png`);
+  });
+});

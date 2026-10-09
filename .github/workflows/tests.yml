@@ -997,6 +997,7 @@ jobs:
             ibl5/bin/test-db-sync-now \
             bin/test-architect-contract-split \
             bin/test-plan-review-seam \
+            bin/test-plans-dir \
             bin/test-check-registry-trigger-rows \
             bin/test-ci-memo \
             bin/test-db-backups-pull \

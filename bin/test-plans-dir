@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# bin/test-plans-dir — unit tests for plans_dir in bin/lib/plan-resolve.sh, and the
+# real resolution lines of its callers.
+#
+# Run: bin/test-plans-dir
+
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+export HOME="$TMP/home"; mkdir -p "$HOME"          # env -i has no HOME; set it before sourcing
+unset PLAN_DIR PLANS_DIR PLAN_NOW_PLANS_DIR BUG_PIPELINE_PLANS_DIR
+# shellcheck source=lib/plan-resolve.sh
+source "$ROOT/bin/lib/plan-resolve.sh"
+SEAMS="PLAN_DIR PLANS_DIR PLAN_NOW_PLANS_DIR BUG_PIPELINE_PLANS_DIR"
+# Fresh subshell with all four seams cleared; each case then sets only what it tests.
+clean() { ( unset $SEAMS; "$@" ); }
+
+PASS=0
+FAIL=0
+
+check() {
+    local name="$1" expected="$2" actual="$3"
+    if [ "$expected" = "$actual" ]; then
+        PASS=$((PASS + 1))
+        echo "  ok   $name"
+    else
+        FAIL=$((FAIL + 1))
+        echo "  FAIL $name"
+        echo "       expected: [$expected]"
+        echo "       actual:   [$actual]"
+    fi
+}
+
+DEFAULT="$HOME/claude-plans"
+
+echo "test-plans-dir"
+
+# --- 1. Preflight: the function exists ---------------------------------------
+declare -F plans_dir >/dev/null 2>&1; rc=$?
+check "1 plans_dir is defined" "0" "$rc"
+
+# --- 2. No-arg form ignores every seam ---------------------------------------
+out="$( for s in $SEAMS; do export "$s=/tmp/junk-$s"; done; plans_dir 2>&1 )"
+check "2 no-arg ignores all seams" "$DEFAULT" "$out"
+
+# --- 3-5. Each seam: override, unset, empty -----------------------------------
+for s in $SEAMS; do
+    out="$( unset $SEAMS; export "$s=/tmp/over-$s"; plans_dir "$s" 2>&1 )"
+    check "3 $s overrides" "/tmp/over-$s" "$out"
+    out="$( unset $SEAMS; plans_dir "$s" 2>&1 )"
+    check "4 $s unset falls back" "$DEFAULT" "$out"
+    out="$( unset $SEAMS; export "$s="; plans_dir "$s" 2>&1 )"
+    check "5 $s empty falls back" "$DEFAULT" "$out"
+done
+
+# --- 6. Isolation, positive ---------------------------------------------------
+for s in $SEAMS; do
+    out="$( for t in $SEAMS; do export "$t=/tmp/val-$t"; done; plans_dir "$s" 2>&1 )"
+    check "6 $s returns only its own value" "/tmp/val-$s" "$out"
+done
+
+# --- 7. Isolation, negative (leak check) --------------------------------------
+for s in PLAN_NOW_PLANS_DIR BUG_PIPELINE_PLANS_DIR PLAN_DIR; do
+    out="$( unset $SEAMS; export PLANS_DIR=/tmp/leak; plans_dir "$s" 2>&1 )"
+    check "7 PLANS_DIR does not leak into $s" "$DEFAULT" "$out"
+done
+
+# --- 8. Multiple seams: first non-empty wins ----------------------------------
+out="$( unset $SEAMS; export PLAN_DIR=/tmp/a PLANS_DIR=/tmp/b; plans_dir PLAN_DIR PLANS_DIR 2>&1 )"
+check "8 both set: first wins" "/tmp/a" "$out"
+out="$( unset $SEAMS; export PLAN_DIR='' PLANS_DIR=/tmp/b; plans_dir PLAN_DIR PLANS_DIR 2>&1 )"
+check "8 first empty: second wins" "/tmp/b" "$out"
+out="$( unset $SEAMS; export PLANS_DIR=/tmp/b; plans_dir PLAN_DIR PLANS_DIR 2>&1 )"
+check "8 first unset: second wins" "/tmp/b" "$out"
+out="$( unset $SEAMS; export PLAN_DIR='' PLANS_DIR=''; plans_dir PLAN_DIR PLANS_DIR 2>&1 )"
+check "8 both empty: default" "$DEFAULT" "$out"
+out="$( unset $SEAMS; plans_dir PLAN_DIR PLANS_DIR 2>&1 )"
+check "8 both unset: default" "$DEFAULT" "$out"
+
+# --- 9. HOME is read at call time ---------------------------------------------
+out="$( export HOME="$TMP/h1"; source "$ROOT/bin/lib/plan-resolve.sh"; export HOME="$TMP/h2"; unset $SEAMS; plans_dir 2>&1 )"
+check "9 HOME read at call time" "$TMP/h2/claude-plans" "$out"
+
+# --- 10. set -u safety --------------------------------------------------------
+out="$( set -u; unset HOME $SEAMS; export PLANS_DIR=/tmp/p; plans_dir PLANS_DIR 2>&1 )"; rc=$?
+check "10 HOME unset with seam set: value" "/tmp/p" "$out"
+check "10 HOME unset with seam set: rc" "0" "$rc"
+
+# --- 11. Verbatim values ------------------------------------------------------
+out="$( unset $SEAMS; export PLANS_DIR='/tmp/a b'; plans_dir PLANS_DIR 2>&1 )"
+check "11 space preserved" "/tmp/a b" "$out"
+out="$( unset $SEAMS; export PLANS_DIR='/tmp/a/'; plans_dir PLANS_DIR 2>&1 )"
+check "11 trailing slash preserved" "/tmp/a/" "$out"
+
+# --- 12. Invalid seam name is a loud error ------------------------------------
+for bad in '' 1bad a-b; do
+    stdout="$( plans_dir "$bad" 2>"$TMP/err" )"; rc=$?
+    check "12 '$bad' rc" "2" "$rc"
+    check "12 '$bad' stdout empty" "" "$stdout"
+    err="$(cat "$TMP/err")"
+    check "12 '$bad' stderr names plans_dir" "plans_dir: invalid seam variable name: $bad" "$err"
+done
+
+# --- 13. Bash 3.2 guard -------------------------------------------------------
+BODY="$(awk '/^plans_dir\(\) \{/,/^}/' "$ROOT/bin/lib/plan-resolve.sh")"
+for banned in 'local -n' 'declare -n' 'declare -A' 'typeset -n'; do
+    hit=0; case "$BODY" in *"$banned"*) hit=1 ;; esac
+    check "13 body has no '$banned'" "0" "$hit"
+done
+hit=0; case "$BODY" in *'${!'*) hit=1 ;; esac
+check "13 body uses \${! indirection" "1" "$hit"
+
+# --- 14. File-scope pin: PLAN_DIR after sourcing ------------------------------
+out="$( env -i PATH="$PATH" HOME="$HOME" bash -c 'source "$1"; printf %s "$PLAN_DIR"' _ "$ROOT/bin/lib/plan-resolve.sh" )"
+check "14 PLAN_DIR unset -> default" "$DEFAULT" "$out"
+out="$( env -i PATH="$PATH" HOME="$HOME" PLAN_DIR=/tmp/pre bash -c 'source "$1"; printf %s "$PLAN_DIR"' _ "$ROOT/bin/lib/plan-resolve.sh" )"
+check "14 PLAN_DIR preset kept" "/tmp/pre" "$out"
+out="$( env -i PATH="$PATH" HOME="$HOME" PLAN_DIR= bash -c 'source "$1"; printf %s "$PLAN_DIR"' _ "$ROOT/bin/lib/plan-resolve.sh" )"
+check "14 PLAN_DIR empty -> default" "$DEFAULT" "$out"
+
+echo ""
+echo "$PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

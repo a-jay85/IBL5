@@ -302,9 +302,9 @@ for t in $PRESERVE_TABLES; do
     # No database argument: information_schema needs none, and naming a database that
     # does not exist yet (container still initialising) would error "Unknown database"
     # and trip the fail-closed abort below on the very bootstrap path we support.
-    if ! _exists="$(docker exec "$DB_CONTAINER" mariadb -uroot -proot -N -B \
+    if ! _exists="$(db_cmd "$DB_CONTAINER" mariadb -N -B \
         -e "SELECT COUNT(*) FROM information_schema.tables
-            WHERE table_schema='iblhoops_ibl5' AND table_name='$t'" 2> >(db_strip_warnings >&2))"; then
+            WHERE table_schema='$DB_DEFAULT_NAME' AND table_name='$t'" 2> >(db_strip_warnings >&2))"; then
         printf 'ERROR: preserve-tables probe failed for table %s — aborting sync.\n' "$t" >&2
         printf '  Cannot safely distinguish absent table from unreachable DB container.\n' >&2
         exit 1
@@ -403,9 +403,9 @@ if [ -n "$SNAPSHOT" ]; then
   if [ -n "$PRESERVE_EXISTING" ]; then
       PRESERVE_TMP="$(mktemp)"
       # shellcheck disable=SC2086
-      if ! docker exec "$DB_CONTAINER" mariadb-dump -uroot -proot \
+      if ! db_cmd "$DB_CONTAINER" mariadb-dump \
               --single-transaction --skip-lock-tables \
-              iblhoops_ibl5 $PRESERVE_EXISTING \
+              "$DB_DEFAULT_NAME" $PRESERVE_EXISTING \
               > "$PRESERVE_TMP" 2> >(db_strip_warnings >&2); then
           echo "ERROR: could not back up preserved tables before the snapshot load — aborting." >&2
           echo "  Refusing to load: the snapshot would drop$(printf ' %s' $PRESERVE_EXISTING)." >&2
@@ -480,7 +480,7 @@ fi
 
 echo ""
 echo "Backfilling schema_migrations from prod dump..."
-docker exec "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5 -e "
+db_cmd "$DB_CONTAINER" mariadb "$DB_DEFAULT_NAME" -e "
     CREATE TABLE IF NOT EXISTS schema_migrations (
         version VARCHAR(255) PRIMARY KEY,
         applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -498,7 +498,7 @@ fi
 # Verify row counts on a couple of canonical tables
 echo ""
 echo "=== Sync Complete ==="
-docker exec "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5 -N -B -e "
+db_cmd "$DB_CONTAINER" mariadb "$DB_DEFAULT_NAME" -N -B -e "
 SELECT CONCAT('  ibl_team_info:        ', COUNT(*), ' rows') FROM ibl_team_info;
 SELECT CONCAT('  ibl_plr:              ', COUNT(*), ' rows') FROM ibl_plr;
 SELECT CONCAT('  ibl_box_scores:       ', COUNT(*), ' rows') FROM ibl_box_scores;

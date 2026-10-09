@@ -221,6 +221,10 @@ assert_eq "M1o db-migrate override" "mariadb -u u1 -psekret99 altdb" "$(compose_
 assert_eq "M2o db-test-up override" "mariadb -u u1 -psekret99" "$(compose_db_cmd db-test-up "${OVR[@]}")"
 assert_eq "M3o wt-up override" "mariadb -u u1 -psekret99 altdb" "$(compose_db_cmd wt-up "${OVR[@]}")"
 assert_eq "M3n wt-up ambient DB_NAME" "mariadb -u root -proot iblhoops_ibl5" "$(compose_db_cmd wt-up DB_NAME=other)"
+# The three DB_CMD strings keep the two-token form so the wt-up `DB CLI:` banner
+# stays byte-identical; the single-token -u$DB_ROOT_USER form belongs to db_cmd only.
+M_SRC=$(cat "$REPO_ROOT/bin/db-migrate" "$REPO_ROOT/bin/db-test-up" "$REPO_ROOT/bin/wt-up")
+assert_eq "M3 two-token form kept" "0" "$(count_in '-u$DB_ROOT_USER' "$M_SRC")"
 
 # E1: bin/e2e-wt passes the name through the container env and keeps no literal.
 E2E="$REPO_ROOT/bin/e2e-wt"

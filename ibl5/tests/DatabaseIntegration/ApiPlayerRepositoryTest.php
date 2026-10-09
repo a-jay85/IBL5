@@ -101,6 +101,29 @@ class ApiPlayerRepositoryTest extends DatabaseTestCase
         self::assertContains('DB UniqueSearchName Batch7', $names);
     }
 
+    public function testGetPlayersBreaksNameTiesByPidAcrossPages(): void
+    {
+        // Higher pid inserted first so insertion order disagrees with pid order.
+        $this->insertTestPlayer(200000391, 'DB TieTwin1390', ['stats_gm' => 5]);
+        $this->insertTestPlayer(200000390, 'DB TieTwin1390', ['stats_gm' => 5]);
+
+        $pageOne = $this->repo->getPlayers(
+            new Paginator(['page' => '1', 'per_page' => '1'], 'name', ['name']),
+            ['search' => 'TieTwin1390'],
+        );
+        $pageTwo = $this->repo->getPlayers(
+            new Paginator(['page' => '2', 'per_page' => '1'], 'name', ['name']),
+            ['search' => 'TieTwin1390'],
+        );
+
+        self::assertCount(1, $pageOne);
+        self::assertCount(1, $pageTwo);
+        // @phpstan-ignore cast.useless (production type is int; the test DB path can return a string)
+        self::assertSame(200000390, (int) $pageOne[0]['pid']);
+        // @phpstan-ignore cast.useless (production type is int; the test DB path can return a string)
+        self::assertSame(200000391, (int) $pageTwo[0]['pid']);
+    }
+
     // ── countPlayers ────────────────────────────────────────────
 
     public function testCountPlayersReturnsPositiveCount(): void

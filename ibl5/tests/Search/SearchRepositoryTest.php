@@ -231,6 +231,43 @@ class SearchRepositoryTest extends WideUnitTestCase
         $this->assertSame('Trades', $result[0]['title']);
     }
 
+    public function testSearchStoriesOrdersByTimeThenSid(): void
+    {
+        $this->mockDb->setMockData([]);
+        $this->mockDb->clearQueries();
+
+        $this->repository->searchStories('trade');
+
+        $this->assertQueryExecuted('ORDER BY s.time DESC, s.sid DESC');
+    }
+
+    public function testSearchUsersOrdersByUsernameThenId(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->searchUsers('test');
+
+        $this->assertQueryExecuted('ORDER BY username ASC, id ASC');
+    }
+
+    public function testGetTopicsOrdersByTopictextThenId(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->getTopics();
+
+        $this->assertQueryExecuted('_topics ORDER BY topictext, id ASC');
+    }
+
+    public function testGetCategoriesOrdersByTitleThenCatid(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->getCategories();
+
+        $this->assertQueryExecuted('_stories_cat ORDER BY title, catid ASC');
+    }
+
     public function testGetAuthorsReturnsEmptyArray(): void
     {
         $result = $this->repository->getAuthors();

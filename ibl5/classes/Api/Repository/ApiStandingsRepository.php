@@ -19,7 +19,7 @@ class ApiStandingsRepository extends \Database\BaseMysqliRepository
         if ($conference !== null) {
             /** @var list<StandingsViewRow> */
             return $this->fetchAll(
-                'SELECT * FROM vw_team_standings WHERE conference = ? ORDER BY win_percentage DESC, full_team_name ASC',
+                'SELECT * FROM vw_team_standings WHERE conference = ? ORDER BY win_percentage DESC, full_team_name ASC, teamid ASC',
                 's',
                 $conference
             );
@@ -27,7 +27,7 @@ class ApiStandingsRepository extends \Database\BaseMysqliRepository
 
         /** @var list<StandingsViewRow> */
         return $this->fetchAll(
-            'SELECT * FROM vw_team_standings ORDER BY conference ASC, win_percentage DESC, full_team_name ASC'
+            'SELECT * FROM vw_team_standings ORDER BY conference ASC, win_percentage DESC, full_team_name ASC, teamid ASC'
         );
     }
 }

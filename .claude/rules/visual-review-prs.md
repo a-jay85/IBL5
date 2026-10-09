@@ -58,10 +58,7 @@ They are skipped only during baseline regen (the `update-baselines` label).
    only over-suppresses one push; the next deploy re-serves the whole tree anyway. The debounce never
    fires on an `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API
    error dispatches. This collapses a push fan-out (one master push → N open-PR gh-pages pushes) to
-   roughly **two** deploys (one in-flight plus one pending) instead of N. Concurrent PR jobs also
-   collide on the `gh-pages` ref lock, so the deploy is **one attempt plus two retries** (the action
-   re-clones each time). An **assert step** fails the job if all three are exhausted; retries never
-   soften the gate.
+   roughly **two** deploys (one in-flight plus one pending) instead of N. `bin/vr-pages-publish` handles the ref-lock contention for concurrent PR jobs; see step 3 above.
 4. **Build comment** — `bin/vr-review-comment` consumes the pre-classified `gallery.json` and renders
    the sticky markdown.
 5. **Post sticky comment** — `marocchino/sticky-pull-request-comment@v3`, header `visual-review`.
@@ -178,7 +175,7 @@ vr: label=team-page-header; role=anon; url=modules.php?name=Team&op=view&teamID=
 
 `label=` is a kebab slug, `role=` is `anon|regular|admin`, `url=` is relative to the app root, and
 `anchor=` is the selector waited on before the shot. Zero or more `setup=<GET|POST|DELETE> <path>`
-clauses drive `ibl5/test-state.php` into the state the shot needs — an unknown `action=` there
+clauses drive `ibl5/test-state.php` into the state the shot needs. An unknown `action=` there
 answers **400**, so a typo surfaces in the PR comment as a failed row instead of a silently wrong
 screenshot. Clauses are `;`-separated because `|` would break the matrix table. A row that genuinely
 cannot be shot (print CSS, an email render) uses `no-vr: <reason ≥ 15 chars>` instead.

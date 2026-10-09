@@ -79,12 +79,7 @@ launch_resume() {
     local sid="$1" cwd argv0 pid logf line
     argv0=$(marker_field "$sid" '.resume_argv[0]')
     if [ ! -x "$argv0" ]; then
-        if [ "$DRY" -eq 1 ]; then
-            printf 'ACTION stuck %s resume-bin-not-executable\n' "$sid"
-        else
-            usage_marker_set_stuck "$sid" "resume-bin-not-executable"
-            send_dm "usage-gate: session $sid resume binary missing ($argv0); left paused."
-        fi
+        retire_missing_bin "$sid" "$argv0"
         return 1
     fi
     if [ "$DRY" -eq 1 ]; then
@@ -107,10 +102,30 @@ launch_resume() {
     return 0
 }
 
+# retire_missing_bin <sid> <bin>: the resume binary is gone, usually because its
+# worktree was removed after the PR merged. Nothing can resume it, so clear the
+# marker. A stuck marker would hold the runner's queue lock forever
+# (usage_paused_hold_live); a cleared one lets the runner reclaim the plan.
+retire_missing_bin() {
+    if [ "$DRY" -eq 1 ]; then
+        printf 'ACTION clear %s resume-bin-missing\n' "$1"
+        return 0
+    fi
+    usage_marker_clear "$1"
+    usage_log "marker-retired sid=$1 reason=resume-bin-missing bin=$2"
+    send_dm "usage-gate: session $1 resume binary missing ($2); marker cleared, its plan is released."
+}
+
 # check_runaway <sid>: a marker paused 5+ times is marked stuck with one DM.
-# Returns 0 when the marker is stuck (now or before) and must be skipped.
+# A marker whose resume binary is gone is retired instead (retire_missing_bin).
+# Returns 0 when the marker is stuck or retired and must be skipped.
 check_runaway() {
-    local sid="$1" stuck count runner cwd argv
+    local sid="$1" stuck count runner cwd argv bin
+    bin=$(marker_field "$sid" '.resume_argv[0] // empty')
+    if [ -n "$bin" ] && [ ! -x "$bin" ]; then
+        retire_missing_bin "$sid" "$bin"
+        return 0
+    fi
     stuck=$(marker_field "$sid" '.stuck // false')
     [ "$stuck" = "true" ] && return 0
     count=$(marker_field "$sid" '.resume_count // 0')

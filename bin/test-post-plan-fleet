@@ -1145,8 +1145,8 @@ end_case dm-teardown-order-static
 # Writes stdin to <per-case run dir>/result.json, builds a claude stub that logs
 # `harness-run-dir=<dir>` plus the given RESULT: line, then runs driver + runner so the DM
 # lands in $_DM_CAPTURE. Same driver/runner invocation as cases 37–40.
-_dm_result_case() {  # $1 = case number, $2 = RESULT: line to log; stdin = result.json body
-    local n="$1" result_line="$2"
+_dm_result_case() {  # $1 = case number, $2 = RESULT: line to log; stdin = result.json body; $3 = stub exit code (default 0)
+    local n="$1" result_line="$2" exit_code="${3:-0}"
     local dir="$SCRATCH/harness-run-$n" stub="$SCRATCH/.local/bin/dm-cs-$n"
     clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
     rm -rf "$dir"; mkdir -p "$dir"
@@ -1155,6 +1155,7 @@ _dm_result_case() {  # $1 = case number, $2 = RESULT: line to log; stdin = resul
         printf '#!/usr/bin/env bash\n'
         printf 'echo %q\n' "harness-run-dir=$dir"
         printf 'echo %q\n' "$result_line"
+        printf 'exit %s\n' "$exit_code"
     } > "$stub"
     chmod +x "$stub"
     POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
@@ -2836,9 +2837,15 @@ _dm_result_case 95 'RESULT: post-plan DECLINED — held twice on the same reason
 _dm_result_case 96 'RESULT: post-plan PAUSED at retrospective (usage gate); resumes automatically' <<< '{}'
 [[ "$(_outcome_of)" == paused ]] || fail "fleet-outcome-line: PAUSED gave '$(_outcome_of)'"
 [[ "$(_reason_of)" == usage-gate ]] || fail "fleet-outcome-line: PAUSED reason '$(_reason_of)'"
-_dm_result_case 97 $'RESULT: post-plan BLOCKED terminal=failed\npost-plan-now: postplan-rc=75 harness-rc=75' <<< '{"terminal": "failed"}'
+grep -qF 'resumes on its own' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "fleet-outcome-line: PAUSED DM lacks the no-action hint ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+_dm_result_case 97 $'RESULT: post-plan BLOCKED terminal=failed\npost-plan-now: postplan-rc=75 harness-rc=75' 75 <<< '{"terminal": "failed"}'
 [[ "$(_outcome_of)" == paused ]] || fail "fleet-outcome-line: postplan-rc=75 gave '$(_outcome_of)'"
 [[ "$(_reason_of)" == usage-gate ]] || fail "fleet-outcome-line: postplan-rc=75 reason '$(_reason_of)'"
+grep -qF 'PAUSED (usage gate)' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "fleet-outcome-line: postplan-rc=75 DM lacks PAUSED ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -qF 'runner exited' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "fleet-outcome-line: postplan-rc=75 DM still says runner exited"
 _dm_result_case 98 'RESULT: post-plan BLOCKED — rebase conflict, human required; ERROR terminal=failed, no PR opened. rebase-conflict: tree proof failed: 17a18 > 2 2 .claude/rules/codebase-map.md 35d35 < 3 3 .claude/rules/codebase-map.md TREE DIVERGED' <<< '{"terminal": "failed"}'
 [[ "$(_outcome_of)" == conflict ]] || fail "fleet-outcome-line: tree-proof conflict gave '$(_outcome_of)'"
 [[ "$(_reason_of)" == '.claude/rules/codebase-map.md' ]] || fail "fleet-outcome-line: conflict reason '$(_reason_of)'"

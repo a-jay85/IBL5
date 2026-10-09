@@ -358,6 +358,17 @@ hot_case hot-help-exit0 0 '^Usage: bin/check-hot-files \[--pr\]' - "$d" "$HOT" -
 mkdir -p "$TMP/nogit"
 hot_case hot-help-outside-git-exit0 0 '^Usage: bin/check-hot-files \[--pr\]' - "$TMP/nogit" "$HOT" --help
 
+# Post-migration: the shared arg loop recognises --pr and --help in any position
+# (a deliberate widening: they used to count only as $1), and --base is additive.
+hot_case hot-pr-after-unknown-arg 0 '^CROSSED: ' - \
+    "$(mk_hot_repo 3 10 "$HOT_FOO")" HOT_FILE_BASE_REF=HEAD "$HOT" --bogus --pr
+hot_case hot-help-any-position 0 '^Usage:' - "$d" "$HOT" --pr --help
+hot_case hot-base-flag-missing-exit2 2 '^--base requires a ref value$' - "$d" "$HOT" --pr --base
+hot_case hot-base-flag-bogus-exit2 2 '^--base nosuchref does not resolve to a commit$' - \
+    "$d" "$HOT" --pr --base nosuchref
+hot_case hot-base-flag-scans 0 '^CROSSED: ' - \
+    "$(mk_hot_repo 3 10 "$HOT_FOO")" "$HOT" --pr --base HEAD
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

@@ -135,6 +135,9 @@ echo "ARGV $*" >> "$DOCKER_LOG"
 case "${1:-}" in
     compose)
         exit "${STUB_COMPOSE_RC:-0}" ;;
+    network)
+        if [ "${2:-}" = ls ] && [ -n "${STUB_NETWORKS-}" ]; then printf '%s\n' "$STUB_NETWORKS"; fi
+        exit 0 ;;
     ps)
         if [ -n "${STUB_PS_NAMES-}" ]; then printf '%s\n' "$STUB_PS_NAMES"; fi
         exit 0 ;;
@@ -201,8 +204,8 @@ new_fx() {
     DOCKER_LOG="$BASE/docker.log"
     : > "$DOCKER_LOG"
     export DOCKER_LOG
-    STUB_PS_NAMES="" STUB_LABEL="" STUB_INSPECT_FAIL="" STUB_PR="" STUB_COMPOSE_RC=""
-    export STUB_PS_NAMES STUB_LABEL STUB_INSPECT_FAIL STUB_PR STUB_COMPOSE_RC
+    STUB_PS_NAMES="" STUB_LABEL="" STUB_INSPECT_FAIL="" STUB_PR="" STUB_COMPOSE_RC="" STUB_NETWORKS=""
+    export STUB_PS_NAMES STUB_LABEL STUB_INSPECT_FAIL STUB_PR STUB_COMPOSE_RC STUB_NETWORKS
 }
 
 # new_unit — a scratch REPO_ROOT (UR) holding docker/worktree-compose.yml, for the lib's
@@ -216,8 +219,8 @@ new_unit() {
     DOCKER_LOG="$UR/docker.log"
     : > "$DOCKER_LOG"
     export DOCKER_LOG
-    STUB_PS_NAMES="" STUB_LABEL="" STUB_INSPECT_FAIL="" STUB_PR="" STUB_COMPOSE_RC=""
-    export STUB_PS_NAMES STUB_LABEL STUB_INSPECT_FAIL STUB_PR STUB_COMPOSE_RC
+    STUB_PS_NAMES="" STUB_LABEL="" STUB_INSPECT_FAIL="" STUB_PR="" STUB_COMPOSE_RC="" STUB_NETWORKS=""
+    export STUB_PS_NAMES STUB_LABEL STUB_INSPECT_FAIL STUB_PR STUB_COMPOSE_RC STUB_NETWORKS
 }
 
 # mk_wt <name> — a worktree dir that wt-up's config safety nets skip.
@@ -293,18 +296,24 @@ case_end
 
 new_fx
 STUB_PS_NAMES=ibl5-php-ghost STUB_LABEL=orphan-proj
+STUB_NETWORKS=$'orphan-proj_default\nibl5-ghost_default'
 run_down ghost
 case_begin "down: orphan uses label project"
 chk_eq "exit code" 0 "$RC"
+chk_log_line "ARGV network rm orphan-proj_default"
+chk_log_absent '^ARGV network rm ibl5-ghost_default$'
 chk_log_line "ARGV image inspect orphan-proj-php"
 chk_log_line "ARGV image inspect orphan-proj-browsersync"
 case_end
 
 new_fx
 STUB_PS_NAMES=ibl5-php-ghost STUB_LABEL=""
+STUB_NETWORKS=$'orphan-proj_default\nibl5-ghost_default'
 run_down ghost
 case_begin "down: orphan empty label falls back"
 chk_eq "exit code" 0 "$RC"
+chk_log_line "ARGV network rm ibl5-ghost_default"
+chk_log_absent '^ARGV network rm orphan-proj_default$'
 chk_log_line "ARGV image inspect ibl5-ghost-php"
 chk_log_line "ARGV image inspect ibl5-ghost-browsersync"
 case_end

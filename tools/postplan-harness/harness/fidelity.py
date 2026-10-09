@@ -93,6 +93,10 @@ HOLD_LABELS = {
     "2": "review finding scored >= 80",
 }
 _FINDING_BULLET_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\S")
+# Output contract item 2a (.claude/agents/pr-ready-phase6.md): exactly `[BLOCKING]` or
+# `[NOTE]`, upper case, right after the bullet prefix. Anything else is unmarked, and an
+# unmarked bullet is blocking (fail-closed).
+_FINDING_MARKER_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\[(BLOCKING|NOTE)\](?=\s|$)")
 _WORK_LIST_OPEN = "=== WORK LIST (each item names the arming hold it clears) ==="
 _WORK_LIST_CLOSE = "=== END WORK LIST ==="
 
@@ -141,8 +145,41 @@ def _findings_section(lines: list[str]) -> list[str] | None:
     return section
 
 
+def _group_findings(scope: list[str]) -> list[tuple[str | None, str]]:
+    """Bullet lines of `scope` as (marker, text) items, marker None when unmarked.
+
+    A marked bullet opens a group: every later bullet line indented strictly deeper
+    than it joins the group's text after a newline, stripped, until a bullet at the
+    same or a shallower indent. Bullets nested under an UNMARKED bullet stay separate
+    unmarked items and their own markers are ignored, so a scope with no marker yields
+    exactly the legacy one-item-per-bullet list. Non-bullet lines are skipped.
+    """
+    items: list[tuple[str | None, str]] = []
+    group_indent: int | None = None
+    unmarked_indent: int | None = None
+    for ln in scope:
+        if not _FINDING_BULLET_RE.match(ln):
+            continue
+        indent = len(ln) - len(ln.lstrip())
+        if group_indent is not None and indent > group_indent:
+            marker, text = items[-1]
+            items[-1] = (marker, text + "\n" + ln.strip())
+            continue
+        if unmarked_indent is not None and indent > unmarked_indent:
+            items.append((None, ln.strip()))
+            continue
+        m = _FINDING_MARKER_RE.match(ln)
+        if m:
+            group_indent, unmarked_indent = indent, None
+            items.append((m.group(1), ln.strip()))
+        else:
+            group_indent, unmarked_indent = None, indent
+            items.append((None, ln.strip()))
+    return items
+
+
 def _verdict_findings(verdict_path: str) -> list[str]:
-    """Hold (12): the blocking findings under a NOT READY verdict, one per bullet.
+    """Hold (12): the blocking findings under a NOT READY verdict, one per finding.
 
     A verdict that is not NOT READY, or a missing verdict file, contributes nothing --
     the loop only ever fixes a verdict it is still held on.
@@ -157,6 +194,11 @@ def _verdict_findings(verdict_path: str) -> list[str]:
     Does not fire) never reach the fixer. With no heading, every bullet in the body
     counts (the legacy shape). When the chosen scope has no bullets, the whole body is
     one item, so a finding written as prose is never silently dropped.
+
+    Severity markers (item 2a of .claude/agents/pr-ready-phase6.md): a `[BLOCKING]` or
+    `[NOTE]` bullet carries its nested bullet lines as one item (see `_group_findings`).
+    `[NOTE]` items are dropped; `[BLOCKING]` and unmarked bullets are kept. When every
+    item is `[NOTE]`, all of them are returned so a held verdict never yields no work.
     """
     if parse_verdict(verdict_path) != "NOT READY":
         return []
@@ -169,9 +211,12 @@ def _verdict_findings(verdict_path: str) -> list[str]:
     body = [ln for ln in lines if not VERDICT_RE.match(ln)]
     section = _findings_section(body)
     scope = body if section is None else section
-    bullets = [ln.strip() for ln in scope if _FINDING_BULLET_RE.match(ln)]
-    if bullets:
-        return bullets
+    grouped = _group_findings(scope)
+    if grouped:
+        kept = [text for marker, text in grouped if marker != "NOTE"]
+        # An all-[NOTE] NOT READY verdict breaks the item-2a agreement rule. Hand the
+        # fixer every group rather than an empty list, so the held verdict still gets work.
+        return kept or [text for _, text in grouped]
     whole = "\n".join(body).strip()
     return [whole] if whole else []
 

@@ -1,10 +1,11 @@
 """Corpus check for the `[BLOCKING]` / `[NOTE]` finding marker.
 
 Runs only with `POSTPLAN_CORPUS_DIFF=1` and a local verdict corpus under
-`tools/postplan-harness/out/` (gitignored), so the corpus test skips in CI. It proves the
-marker tokens never occur in recorded verdicts, and that marking every kept bullet of
-every NOT READY verdict leaves the unchanged parser's items equal to marker plus old item.
-Asserts invariants only, because the corpus grows with every harness run.
+`tools/postplan-harness/out/` (gitignored), so the corpus test skips in CI. It diffs the
+marker-aware _verdict_findings over every recorded NOT READY verdict: unmarked verdicts
+match a frozen copy of the pre-change extractor, marked verdicts match an independent
+item-2a reference, and no verdict loses all its work. Asserts invariants only, because the
+corpus grows with every harness run.
 
 Env contract. `POSTPLAN_CORPUS_DIFF` is opt-in: unset and empty both skip, which is legal.
 `POSTPLAN_OUT_DIR` has a safe default: unset and empty both fall back to
@@ -22,10 +23,12 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import fidelity  # noqa: E402
-from harness.fidelity import _FINDING_BULLET_RE  # noqa: E402
 
-_MARK_RE = re.compile(r"^(\s*(?:[-*]|\d+[.)])\s+)")
-_MARK_ITEM_RE = re.compile(r"^((?:[-*]|\d+[.)])\s+)")
+# Frozen copy of the bullet regex as of the pre-#1335 extractor. Do not import it.
+_FROZEN_BULLET_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\S")
+# Item-2a marker, read off an already-stripped bullet line. Written independently of
+# fidelity._FINDING_MARKER_RE on purpose.
+_REF_MARKER_RE = re.compile(r"^(?:[-*]|\d+[.)])\s+\[(BLOCKING|NOTE)\](?:\s|$)")
 
 
 def _out_dir():
@@ -50,35 +53,103 @@ def _corpus_paths():
     return paths
 
 
-def test_marker_tokens_absent_and_prefix_invariant(tmp_path):
-    paths = _corpus_paths()
-    token_hits = 0
-    for p in glob.glob(os.path.join(_out_dir(), "*", "raw-plan-fidelity-*")):
+def _scope(path):
+    """(body, scope) exactly as _verdict_findings cuts them. These helpers are unchanged
+    by #1335, so reusing them keeps the diff focused on bullet extraction."""
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        lines = fh.read().splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == fidelity.DIGEST_CUT:
+            lines = lines[:i]
+            break
+    body = [ln for ln in lines if not fidelity.VERDICT_RE.match(ln)]
+    section = fidelity._findings_section(body)
+    return body, (body if section is None else section)
+
+
+def _whole(body):
+    whole = "\n".join(body).strip()
+    return [whole] if whole else []
+
+
+def _frozen_verdict_findings(path):
+    """Pre-#1335 extractor: one stripped item per bullet line, markers ignored."""
+    if fidelity.parse_verdict(path) != "NOT READY":
+        return []
+    body, scope = _scope(path)
+    bullets = [ln.strip() for ln in scope if _FROZEN_BULLET_RE.match(ln)]
+    return bullets or _whole(body)
+
+
+def _reference_findings(path):
+    """Item-2a reading. Top level is the shallowest bullet indent in scope. A marked
+    top-level bullet owns every deeper bullet up to the next top-level bullet; deeper
+    bullets after an unmarked one stay separate. [NOTE] groups drop unless every group
+    is [NOTE]."""
+    if fidelity.parse_verdict(path) != "NOT READY":
+        return []
+    body, scope = _scope(path)
+    rows = [(len(ln) - len(ln.lstrip()), ln.strip())
+            for ln in scope if _FROZEN_BULLET_RE.match(ln)]
+    if not rows:
+        return _whole(body)
+    top = min(indent for indent, _ in rows)
+    groups = []
+    for indent, text in rows:
+        if indent > top and groups and groups[-1][0] is not None:
+            groups[-1][1].append(text)
+            continue
+        m = _REF_MARKER_RE.match(text) if indent == top else None
+        groups.append([m.group(1) if m else None, [text]])
+    kept = ["\n".join(ls) for mk, ls in groups if mk != "NOTE"]
+    return kept or ["\n".join(ls) for _, ls in groups]
+
+
+def test_reference_and_frozen_extractors_on_fixture(tmp_path):
+    """Runs without a corpus (CI too): pins both oracles so a broken oracle cannot make
+    the corpus test pass vacuously."""
+    p = tmp_path / "v.txt"
+    p.write_text(
+        "## FINDINGS\n\n"
+        "- [BLOCKING] head\n  - nested\n- [NOTE] note\n  - note detail\n- unmarked\n"
+        "\nNOT READY\n\n## DIGEST\nx\n"
+    )
+    path = str(p)
+    expected = ["- [BLOCKING] head\n- nested", "- unmarked"]
+    assert _reference_findings(path) == expected
+    assert fidelity._verdict_findings(path) == expected
+    assert _frozen_verdict_findings(path) == [
+        "- [BLOCKING] head", "- nested", "- [NOTE] note", "- note detail", "- unmarked",
+    ]
+
+
+def test_marked_corpus_invariants():
+    unmarked = marked = frozen_items = new_items = 0
+    unmarked_changed, marked_mismatch, went_empty = [], [], []
+    for p in _corpus_paths():
+        name = os.path.basename(os.path.dirname(p)) + "/" + os.path.basename(p)
         with open(p, encoding="utf-8", errors="replace") as fh:
             text = fh.read()
-        token_hits += text.count("[BLOCKING]") + text.count("[NOTE]")
-    assert token_hits == 0, f"marker tokens already occur in the corpus: {token_hits}"
-
-    bullets = 0
-    for n, path in enumerate(paths):
-        old = fidelity._verdict_findings(path)
-        bullets += len(old)
-        with open(path, encoding="utf-8", errors="replace") as fh:
-            lines = fh.read().splitlines()
-        marked = [
-            _MARK_RE.sub(r"\1[BLOCKING] ", ln, count=1) if _FINDING_BULLET_RE.match(ln) else ln
-            for ln in lines
-        ]
-        mp = tmp_path / f"{n}.txt"
-        mp.write_text("\n".join(marked) + "\n")
-        new = fidelity._verdict_findings(str(mp))
-        assert len(new) == len(old), path
-        for old_item, new_item in zip(old, new):
-            if _FINDING_BULLET_RE.match(old_item):
-                assert new_item == _MARK_ITEM_RE.sub(r"\1[BLOCKING] ", old_item, count=1), path
-            else:
-                assert new_item == old_item, path
-    print(f"verdicts={len(paths)} bullets={bullets} token_hits={token_hits}")
+        frozen = _frozen_verdict_findings(p)
+        new = fidelity._verdict_findings(p)
+        frozen_items += len(frozen)
+        new_items += len(new)
+        if "[BLOCKING]" in text or "[NOTE]" in text:
+            marked += 1
+            if new != _reference_findings(p):
+                marked_mismatch.append(name)
+        else:
+            unmarked += 1
+            if new != frozen:
+                unmarked_changed.append(name)
+        if frozen and not new:
+            went_empty.append(name)
+    print(f"verdicts={unmarked + marked} unmarked={unmarked} marked={marked} "
+          f"frozen_items={frozen_items} new_items={new_items}")
+    assert not unmarked_changed, f"(a) unmarked verdicts changed: {unmarked_changed}"
+    assert not marked_mismatch, f"(b) marked verdicts off the item-2a reference: {marked_mismatch}"
+    assert not went_empty, f"(c) verdicts that lost all work: {went_empty}"
+    assert marked > 0, "corpus has no marked NOT READY verdict; invariant (b) ran on nothing"
 
 
 def test_corpus_gate_skips_when_env_unset(monkeypatch):

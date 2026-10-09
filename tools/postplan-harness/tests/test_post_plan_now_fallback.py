@@ -124,7 +124,7 @@ def test_plist_wiring_regression():
     # New wiring assertions
     assert "PLAN_ARG" in src
     assert "--live${PLAN_ARG}" in src
-    assert "${PLAN_OVERRIDE:-$HOME/claude-plans/$SLUG.md}" in src
+    assert "${PLAN_OVERRIDE:-$(plans_dir)/$SLUG.md}" in src
     assert "do NOT derive the plan from the branch slug" in src
 
 

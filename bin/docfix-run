@@ -51,6 +51,9 @@ if [ -z "$ISSUE_NUM" ] || [ -z "$SIG" ]; then
     exit 1
 fi
 
+# shellcheck source=bin/lib/plan-resolve.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/plan-resolve.sh"
+
 # --- 2. Anchor to the CANONICAL main checkout (NOT $0) ------------------------
 # The poller invokes us from $MAIN itself, but launchd sets an arbitrary cwd, and
 # bin/test-docfix-run needs the IBL5_MAIN override. Anchor to the real main
@@ -83,7 +86,7 @@ bin/wt-new "$SLUG"                                   # cwd is $MAIN (step 2)
 WT_ROOT="$(worktrees_parent_dir "$MAIN")/$SLUG"
 
 # --- 5. Seed the auto_merge:false hold plan (resolved by slug at post-plan) ----
-PLAN_FILE="$HOME/claude-plans/$SLUG.md"
+PLAN_FILE="$(plans_dir)/$SLUG.md"
 cat > "$PLAN_FILE" <<PLAN_EOF
 ---
 auto_merge: false

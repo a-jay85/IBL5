@@ -107,6 +107,9 @@ run
 [ "$(dm_count)" = 1 ] && [ "$(lc_count)" = 0 ] && ok "1 dead session: DM now" || fail "1 dead session: DM now"
 grep -qF -- '--ping' <<< "$(cat "$DM_ARGV" 2>/dev/null)" \
     && ok "1b immediate DM carries --ping" || fail "1b immediate DM lacks --ping"
+[ "$(tail -n 1 "$DM_ARGV")" = "--ping --quiet --attempts 2 the-msg" ] \
+    && ok "1c immediate DM argv is --ping --quiet --attempts 2 <msg>" \
+    || fail "1c immediate DM argv: $(tail -n 1 "$DM_ARGV")"
 
 reset; registry "$WT" $$
 run
@@ -189,6 +192,25 @@ reset; registry "$WT" "$HP"
 PATH="$TMP/psbad:$PATH" run
 [ "$(dm_count)" = 0 ] && [ "$(lc_count)" = 1 ] \
     && ok "14 argv unreadable: DM held" || fail "14 argv unreadable: DM held"
+
+# 15: an empty FAILDM_DM_CMD falls back to $ROOT/bin/discord-dm (:- semantics).
+reset; registry "$WT" 999999
+mkdir -p "$WT/bin"
+cat > "$WT/bin/discord-dm" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$TMP/default-dm.argv"
+EOF
+chmod +x "$WT/bin/discord-dm"
+rm -f "$TMP/default-dm.argv"
+FAILDM_REGISTRY="$TMP/reg.json" FAILDM_DM_CMD="" \
+FAILDM_LAUNCHCTL="$TMP/bin/lc-ok" FAILDM_PLIST_DIR="$PLISTS" \
+FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY=900 \
+    "$SUT" "$WT" foo "$LOG" "the-msg" >/dev/null 2>&1
+[ "$(wc -l < "$TMP/default-dm.argv" 2>/dev/null | tr -d ' ')" = 1 ] \
+    && [ "$(cat "$TMP/default-dm.argv")" = "--ping --quiet --attempts 2 the-msg" ] \
+    && ok '15 empty FAILDM_DM_CMD falls back to $ROOT/bin/discord-dm' \
+    || fail '15 empty FAILDM_DM_CMD falls back to $ROOT/bin/discord-dm'
+rm -rf "${WT:?}/bin" "$TMP/default-dm.argv"
 
 if [ "$FAILS" -gt 0 ]; then
     echo "test-post-plan-fail-dm: $FAILS case(s) failed"

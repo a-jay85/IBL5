@@ -260,6 +260,27 @@ else
 fi
 end_case runner-line-hand-started
 
+# The runner's DISCORD_DM= line: a set seam lands verbatim, an empty one falls back to
+# bin/discord-dm, and the declare -f injection of ljob_dm_ready survives.
+begin_case
+clean_slots
+rm -f /tmp/post-plan-fleet-runner-1901.sh
+POST_PLAN_FLEET_DISCORD_DM="$SCRATCH/dm-stub" POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" \
+    POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr 1901 >/dev/null 2>&1
+grep -qxF "DISCORD_DM=$SCRATCH/dm-stub" /tmp/post-plan-fleet-runner-1901.sh 2>/dev/null \
+    || fail "dm-seam-runner-line: a set seam did not land as DISCORD_DM=$SCRATCH/dm-stub"
+grep -qx 'ljob_dm_ready () ' /tmp/post-plan-fleet-runner-1901.sh 2>/dev/null \
+    || fail "dm-seam-runner-line: runner lacks the injected ljob_dm_ready"
+clean_slots
+rm -f /tmp/post-plan-fleet-runner-1901.sh
+POST_PLAN_FLEET_DISCORD_DM='' POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" \
+    POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr 1901 >/dev/null 2>&1
+grep -qE '^DISCORD_DM=.*/bin/discord-dm$' /tmp/post-plan-fleet-runner-1901.sh 2>/dev/null \
+    || fail "dm-seam-runner-line: an empty seam did not fall back to bin/discord-dm"
+rm -f /tmp/post-plan-fleet-runner-1901.sh
+clean_slots
+end_case dm-seam-runner-line
+
 # --allow-test-only bakes the flag into the runner header; the stub sees it as an argument.
 # Evaluates only the header assignment plus the timeout line, so no launchd or DM is involved.
 _allow_stub_run() {  # $1 = runner path, $2 = stub argv output file

@@ -238,6 +238,7 @@ if [ "$stale" -eq 1 ]; then
     CUR_FP=""
     [ -n "$SWITCH_AT" ] && CUR_FP=$(_usage_cred_fp)
     FAST=0
+    SLOW=0
     for sid in $MARKERS; do
         check_runaway "$sid" && continue
         usage_marker_eligible "$sid" "$NOW" || continue
@@ -252,16 +253,34 @@ if [ "$stale" -eq 1 ]; then
         resets=$(marker_field "$sid" '.resets_at // empty')
         case "$resets" in ''|*[!0-9]*) continue ;; esac
         [ "$resets" -le $(( NOW - 60 )) ] || continue
-        launch_resume "$sid"
+        launch_resume "$sid" && SLOW=$((SLOW + 1))
     done
+    if [ "$FAST" -gt 0 ]; then
+        sw_key="${SWITCH_AT:-acct:$CUR_ACCT}"
+        sw_f="$STATE/dm-switch-for"
+        if [ "$(cat "$sw_f" 2>/dev/null)" != "$sw_key" ]; then
+            send_dm "usage-gate: login switch detected; resumed $FAST session(s) paused under the previous account, without a fresh usage reading. The pause hook stops them again if this account is near its limit too."
+            if [ "$DRY" -ne 1 ]; then printf '%s\n' "$sw_key" > "$sw_f"; fi
+        fi
+    fi
     pending=$(usage_markers_sorted | wc -l | tr -d ' ')
-    if [ "$pending" -gt 0 ]; then
+    waiting=$(( pending - FAST - SLOW ))
+    if [ "$waiting" -gt 0 ]; then
         stale_at_f="$STATE/dm-stale-at"
         last=0
         [ -f "$stale_at_f" ] && last=$(cat "$stale_at_f" 2>/dev/null)
         case "$last" in ''|*[!0-9]*) last=0 ;; esac
         if [ $(( NOW - last )) -gt 1800 ]; then
-            send_dm "usage-gate: usage data stale ${age}s; $pending sessions waiting. Run any interactive claude prompt to refresh the cache."
+            if [ "$age" -lt 0 ]; then reading="no usage reading"; else reading="usage reading ${age}s old"; fi
+            sw_note=""
+            [ -n "$SWITCH_AT" ] && sw_note="login switch detected at $(fmt_epoch "$SWITCH_AT"); "
+            bo=$(_usage_fetch_backoff_read "$STATE/fetch-backoff"); bo_until=${bo% *}
+            if [ "$NOW" -lt "$bo_until" ]; then
+                advice="Usage fetch is backing off after a 429 until $(fmt_epoch "$bo_until"); the cache refreshes on the first fetch after that."
+            else
+                advice="Run any interactive claude prompt to refresh the cache."
+            fi
+            send_dm "usage-gate: ${sw_note}${reading}; $waiting session(s) waiting. $advice"
             if [ "$DRY" -ne 1 ]; then printf '%s\n' "$NOW" > "$stale_at_f"; fi
         fi
     fi

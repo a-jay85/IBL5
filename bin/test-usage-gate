@@ -2035,6 +2035,89 @@ test_coord_account_check_drops_old_cache() {
     assert_contains acct_coord:log "$(fetch_log)" "account-switch cache-dropped"
 }
 
+# ---------------------------------------------------------------- stale / switch DMs
+
+dm_text() { cat "$T/dm.txt" 2>/dev/null; }
+
+test_coord_switch_dm_once() {
+    sw_stale_setup
+    seed_home uuid-B
+    sw_marker "$SID_A" uuid-A
+    sw_marker "$SID_B" uuid-A
+    sw_signal 30 - 1 account
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_B"
+    assert_contains switch_dm:text "$(dm_text)" \
+        "usage-gate: login switch detected; resumed 2 session(s) paused under the previous account"
+    patch_marker "$SID_A" 'del(.resuming_pid)'
+    patch_marker "$SID_B" 'del(.resuming_pid)'
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_eq switch_dm:once 1 "$(grep -c 'login switch detected; resumed' "$T/dm.txt")"
+}
+
+test_coord_switch_dm_ignores_stale_throttle() {
+    sw_stale_setup
+    seed_home uuid-B
+    sw_marker "$SID_A" uuid-A
+    sw_signal 30 - 1 account
+    printf '%s\n' "$(( $(date +%s) - 60 ))" > "$IBL5_USAGE_GATE_STATE_DIR/dm-stale-at"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
+    assert_contains switch_dm_throttle:sent "$(dm_text)" "login switch detected; resumed 1 session(s)"
+}
+
+test_coord_stale_dm_backoff_armed() {
+    coord_setup 97
+    rm -f "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+    seed_home ""
+    sw_marker "$SID_A" ""
+    printf '%s 1\n' "$(( $(date +%s) + 600 ))" > "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+    run_coord --once >/dev/null 2>&1
+    assert_contains stale_dm_bo:text "$(dm_text)" \
+        "usage-gate: no usage reading; 1 session(s) waiting. Usage fetch is backing off after a 429 until"
+    case "$(dm_text)" in
+        *"Run any interactive"*) fail stale_dm_bo:no-prompt-advice "found prompt advice" ;;
+        *) pass stale_dm_bo:no-prompt-advice ;;
+    esac
+}
+
+test_coord_stale_dm_no_backoff() {
+    coord_setup 99
+    seed_home ""
+    seed_cache "$(( $(date +%s) - 400 ))" "$(usage_json 99 0)"
+    sw_marker "$SID_A" ""
+    run_coord --once >/dev/null 2>&1
+    assert_contains stale_dm_nobo:text "$(dm_text)" "s old; 1 session(s) waiting. Run any interactive claude prompt to refresh the cache."
+    case "$(dm_text)" in
+        *"-1s"*) fail stale_dm_nobo:no-minus-one "found -1s" ;;
+        *) pass stale_dm_nobo:no-minus-one ;;
+    esac
+}
+
+test_coord_stale_dm_names_switch() {
+    coord_setup 97
+    rm -f "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+    seed_home ""
+    sw_marker "$SID_A" "" 0
+    sw_signal 60 - 0 token
+    run_coord --once >/dev/null 2>&1
+    assert_contains stale_dm_switch:names "$(dm_text)" "login switch detected at"
+    assert_contains stale_dm_switch:count "$(dm_text)" "1 session(s) waiting"
+}
+
+test_coord_stale_dm_dry_run() {
+    coord_setup 97
+    rm -f "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+    seed_home ""
+    sw_marker "$SID_A" ""
+    printf '%s 1\n' "$(( $(date +%s) + 600 ))" > "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+    local out
+    out=$(run_coord --once --dry-run 2>&1)
+    assert_contains stale_dm_dry:action "$out" "ACTION dm usage-gate: no usage reading;"
+    assert_no_file stale_dm_dry:no-throttle-write "$IBL5_USAGE_GATE_STATE_DIR/dm-stale-at"
+}
+
 # ---------------------------------------------------------------- runner
 
 TESTS=$(grep -E '^test_[a-z0-9_]+\(\)' "$0" | sed 's/().*//')

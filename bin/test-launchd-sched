@@ -241,6 +241,22 @@ got="$(set -euo pipefail; . "$LIB"; lsched_main_wt "$NOGIT")"
 rc=$?
 expect_eq "lib-main-wt-non-git-fallback" "0:$NOGIT" "$rc:$got"
 
+# Deliberate behavior fix (matrix row 12): a wt-gc-cron-setup copy living outside
+# any git tree must still print a plist, not die on the failed git probe.
+# expects the plist to name $T/bin/wt-gc-tick (lsched_main_wt falls back to the dir).
+T="$TMP/nogit-wt-gc"
+mkdir -p "$T/bin/lib"
+cp "$REPO_ROOT/bin/wt-gc-cron-setup" "$T/bin/"
+cp "$REPO_ROOT/bin/lib/launchd-sched.sh" "$REPO_ROOT/bin/lib/launchd-job.sh" "$T/bin/lib/"
+rc=0
+got="$(env -i HOME="$GOLDEN_HOME" PATH=/usr/bin:/bin bash "$T/bin/wt-gc-cron-setup" --print-schedule 2>&1)" || rc=$?
+if [ "$rc" = "0" ] && grep -qF "$T/bin/wt-gc-tick" <<< "$got"; then
+  pass "wt-gc-non-git-tree-prints-plist"
+else
+  printf '  rc=%s\n  output: %s\n' "$rc" "$got" >&2
+  fail "wt-gc-non-git-tree-prints-plist"
+fi
+
 # Emitters print exact tab-indented bytes.
 emit() { ( set -euo pipefail; . "$LIB"; "$@" ); }
 expect_eq "lib-key-string" "${TAB}<key>Label</key>

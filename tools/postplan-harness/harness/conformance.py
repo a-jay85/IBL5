@@ -565,6 +565,19 @@ def _changed_files(repo_root: str) -> list[str]:
     return seen
 
 
+def early_missing_items(plan: PlanInfo, changed_files: list[str]) -> list[str]:
+    """The LLM-free, diff-content-free slice of condition 3.
+
+    Runs `check()` with no diff body and no Phase 5 status, then keeps only
+    `MISSING:` and `MISSING-FILE:` items. `MISSING-METHOD:`, `UNMET-CONTRACT`,
+    `UNREALISED-ASSERTION` and `MISSING-PHASE` need inputs that exist only
+    later in a run, so they are excluded by construction.
+    """
+    raw = check(plan, changed_files, diff_body="", phase5_status=None)
+    return [i for i in raw
+            if i.startswith("MISSING:") or i.startswith("MISSING-FILE:")]
+
+
 def main(argv: list[str] | None = None) -> int:
     """One-shot Phase 5.0 conformance seam for impl-time pre-handoff checking.
 
@@ -619,9 +632,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"conformance: plan not readable as a plan file: {plan_path}",
               file=sys.stderr)
         return 2
-    raw = check(plan, _changed_files(repo_root), diff_body="", phase5_status=None)
-    items = [i for i in raw
-             if i.startswith("MISSING:") or i.startswith("MISSING-FILE:")]
+    items = early_missing_items(plan, _changed_files(repo_root))
     for item in items:
         print(item)
     return 1 if items else 0

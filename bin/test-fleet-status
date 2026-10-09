@@ -275,6 +275,21 @@ printf '1\n' > "$AM/queue/nodotmd-plan.md.attempts"
 mkdir -p "$AM/queue/nightly-plan.md.lock"
 printf '%s\n' "$NIGHTLY_PID" > "$AM/queue/nightly-plan.md.lock/pid"
 printf '3\n' > "$AM/queue/nightly-plan.md.attempts"
+# Three locks whose runner is gone. A usage-gate pause keeps its lock on purpose
+# and names the session in paused-held; the marker file says the pause is still
+# waiting. Without the marker the post-plan resume owns it. Without paused-held
+# the lock is a SIGKILL leftover. None of them may read "in progress".
+USAGE_DIR="$TMP/usage-gate"; mkdir -p "$USAGE_DIR/markers"
+PAUSED_SID='aaaaaaaa-1111-2222-3333-444444444444'
+RESUMED_SID='bbbbbbbb-1111-2222-3333-444444444444'
+for p in paused-plan resumed-plan stale-lock-plan; do
+    printf '# %s\n' "$p" > "$AM/queue/$p.md"
+    mkdir -p "$AM/queue/$p.md.lock"
+    printf '%s\n' "$DEAD_PID" > "$AM/queue/$p.md.lock/pid"
+done
+printf '%s\n' "$PAUSED_SID" > "$AM/queue/paused-plan.md.lock/paused-held"
+printf '{"session_id":"%s"}\n' "$PAUSED_SID" > "$USAGE_DIR/markers/$PAUSED_SID.json"
+printf '%s\n' "$RESUMED_SID" > "$AM/queue/resumed-plan.md.lock/paused-held"
 
 # Runner progress. Impl lines come from each runner's own per-pid log, filtered
 # to that runner's slug and phase. Per-pid logs isolate runners from each other,
@@ -525,6 +540,7 @@ run_fleet() {
         FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
         FLEET_STATUS_REORDER_APP_DIR="$TMP/apps" \
         FLEET_STATUS_OSACOMPILE="$STUBBIN/osacompile" \
+        IBL5_USAGE_GATE_STATE_DIR="$USAGE_DIR" \
         "${_extra[@]+"${_extra[@]}"}" "$FLEET" 2>&1
 }
 
@@ -821,6 +837,15 @@ assert_has "queue: lock dir marks plan in progress" \
     "$OUTPUT" 'live-plan\.md +[^ ]+ +[^ ]+ +in progress'
 assert_has "queue: unlocked plan reads queued" \
     "$OUTPUT" 'idle-plan\.md +[^ ]+ +[^ ]+ +queued'
+# A lock with no live runner is not work in progress.
+assert_has "queue: usage-gate hold with its marker reads paused" \
+    "$OUTPUT" '‖ paused-plan\.md +[^ ]+ +[^ ]+ +paused \(usage limit\)$'
+assert_has "queue: usage-gate hold without its marker reads resumed" \
+    "$OUTPUT" '▶ resumed-plan\.md +[^ ]+ +[^ ]+ +resumed \(post-plan\)$'
+assert_has "queue: lock with a dead runner and no hold reads stale" \
+    "$OUTPUT" '× stale-lock-plan\.md +[^ ]+ +[^ ]+ +stale lock \(runner gone\)$'
+assert_lacks "queue: no dead-runner lock reads in progress" \
+    "$OUTPUT" '(paused|resumed|stale-lock)-plan\.md .*in progress'
 
 # 21 — MODEL / MERGE / TITLE. The bare plan gets bin/automouse/queue's defaults;
 # the frontmatter plan gets its own values and its H1.

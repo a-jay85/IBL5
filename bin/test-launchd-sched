@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
+# shellcheck disable=SC1090,SC2030,SC2031  # libs are sourced by variable path inside subshells on purpose
 # Golden-output harness for the bin/*-cron-setup family and bin/lib/launchd-sched.sh.
 #
 # Every setup script's side-effect-free print mode is captured into
@@ -477,6 +478,115 @@ if [ "$IRC" = "0" ] && [ ! -e "$BPPLIST" ] && grep -qF 'Uninstalled com.ibl5.bug
   pass "uninstall-bug-pipeline"
 else
   fail "uninstall-bug-pipeline"
+fi
+
+# ── Label parity: installed labels vs bin/lib/launchd-expected-jobs.sh ───────
+# extract_labels <plist...> — print each file's Label value, sorted, unique.
+extract_labels() {
+  awk '/<key>Label<\/key>/ {getline; sub(/^[[:space:]]*<string>/, ""); sub(/<\/string>[[:space:]]*$/, ""); print}' "$@" | sort -u
+}
+installed_labels() { extract_labels "$FIXTURES"/*.plist; }
+INSTALLED="$(installed_labels)"
+
+# lej_parity_check <lej_lib_path> — prints "PARITY: <label> ..." lines and
+# returns 1 when installed labels, LEJ_EXPECTED_JOBS and LEJ_EXEMPT_JOBS
+# disagree; returns 0 otherwise. A function named in LEJ_PARITY_HOOK runs
+# after sourcing, so a case can re-assign LEJ_EXEMPT_JOBS.
+lej_parity_check() {
+  (
+    # shellcheck disable=SC1090
+    . "$1"
+    [ -z "${LEJ_PARITY_HOOK:-}" ] || "$LEJ_PARITY_HOOK"
+    prc=0
+    expected="$(lej_expected_labels)"
+    exempt_labels=""
+    while read -r el reason; do
+      [ -n "$el" ] || continue
+      exempt_labels="$exempt_labels$el
+"
+      if [ -z "$reason" ]; then
+        echo "PARITY: $el exempt entry has no reason"; prc=1
+      fi
+      if ! grep -qxF -e "$el" <<< "$INSTALLED"; then
+        echo "PARITY: $el exempt but not installed by any setup script"; prc=1
+      fi
+      if grep -qxF -e "$el" <<< "$expected"; then
+        echo "PARITY: $el is in both the expected and exempt lists"; prc=1
+      fi
+    done <<< "$LEJ_EXEMPT_JOBS"
+    while read -r il; do
+      [ -n "$il" ] || continue
+      if ! grep -qxF -e "$il" <<< "$expected" && ! grep -qxF -e "$il" <<< "$exempt_labels"; then
+        echo "PARITY: $il installed but in neither the expected nor the exempt list"; prc=1
+      fi
+    done <<< "$INSTALLED"
+    exit "$prc"
+  )
+}
+
+LEJ_LIB="$REPO_ROOT/bin/lib/launchd-expected-jobs.sh"
+
+# Live: the real lib agrees with every installed label.
+parity_out="$(lej_parity_check "$LEJ_LIB")"
+parity_rc=$?
+if [ "$parity_rc" = "0" ] && [ -z "$parity_out" ]; then
+  pass "parity-live"
+else
+  printf '%s\n' "$parity_out" >&2
+  fail "parity-live (rc=$parity_rc)"
+fi
+
+# parity_drop_case <name> <exact line to drop> — a copy of the lib minus that
+# line must have exactly one line fewer, then fail parity naming the label.
+parity_drop_case() {
+  local name="$1" line="$2" label="${2%% *}" copy="$TMP/lej.$1.sh" before after out rc
+  grep -v -x -F -e "$line" "$LEJ_LIB" > "$copy"
+  before="$(wc -l < "$LEJ_LIB" | tr -d ' ')"
+  after="$(wc -l < "$copy" | tr -d ' ')"
+  if [ "$((before - after))" != "1" ]; then
+    fail "$name (deletion matched $((before - after)) lines, expected 1)"
+    return
+  fi
+  out="$(lej_parity_check "$copy")"
+  rc=$?
+  if [ "$rc" = "1" ] && grep -qF -e "$label" <<< "$out"; then
+    pass "$name"
+  else
+    printf '%s\n' "$out" >&2
+    fail "$name (rc=$rc)"
+  fi
+}
+parity_drop_case "parity-removed-expected-watch-pr-cycle" "com.ibl5.watch-pr-cycle standard"
+parity_drop_case "parity-removed-expected-wt-gc" "com.ibl5.wt-gc standard"
+parity_drop_case "parity-removed-exempt-health-login" "com.ibl5.launchd-health-login the health checker itself; it cannot report its own absence"
+
+# Reasonless exempt entry: appended after sourcing; fails on checks (b) and (c).
+add_noreason() { LEJ_EXEMPT_JOBS="${LEJ_EXEMPT_JOBS}
+com.ibl5.fixture-noreason"; }
+out="$(LEJ_PARITY_HOOK=add_noreason lej_parity_check "$LEJ_LIB")"
+rc=$?
+if [ "$rc" = "1" ] && grep -qF 'PARITY: com.ibl5.fixture-noreason' <<< "$out"; then
+  pass "parity-reasonless-exempt"
+else
+  printf '%s\n' "$out" >&2
+  fail "parity-reasonless-exempt (rc=$rc)"
+fi
+
+# awk extractor smoke: Label value only, never another <string> value.
+cat > "$TMP/extract.plist" <<'PLISTEOF'
+<dict>
+	<key>Label</key>
+	<string>com.ibl5.x</string>
+	<key>Program</key>
+	<string>/tmp/y</string>
+</dict>
+PLISTEOF
+extracted="$(extract_labels "$TMP/extract.plist")"
+expect_eq "parity-extract-label" "com.ibl5.x" "$extracted"
+if grep -qF '/tmp/y' <<< "$extracted"; then
+  fail "parity-extract-excludes-other-strings"
+else
+  pass "parity-extract-excludes-other-strings"
 fi
 
 # Fixtures hold no machine path.

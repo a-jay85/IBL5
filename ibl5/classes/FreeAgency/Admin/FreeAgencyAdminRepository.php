@@ -23,6 +23,14 @@ use League\LeagueContext;
  */
 class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgencyAdminRepositoryInterface
 {
+    private \Clock\ClockInterface $clock;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null, ?\Clock\ClockInterface $clock = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->clock = $clock ?? new \Clock\SystemClock();
+    }
+
     /**
      * @see FreeAgencyAdminRepositoryInterface::getAllOffersWithBirdYears()
      *
@@ -139,7 +147,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
      */
     public function insertNewsStory(string $title, string $homeText, string $bodyText): int
     {
-        $currentTime = date('Y-m-d H:i:s');
+        $currentTime = date('Y-m-d H:i:s', $this->clock->now());
 
         $affected = $this->execute(
             "INSERT INTO nuke_stories

@@ -4,7 +4,19 @@
 # > THRESHOLD at head. Chronic already-over-THRESHOLD files are not reported.
 set -euo pipefail
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+case "$0" in
+  */*) SCRIPT_DIR="${0%/*}" ;;
+  *) SCRIPT_DIR="." ;;
+esac
+if [ ! -f "$SCRIPT_DIR/lib/scan-scope.sh" ]; then
+  echo "check-hot-files: missing $SCRIPT_DIR/lib/scan-scope.sh" >&2
+  exit 2
+fi
+# shellcheck source=bin/lib/scan-scope.sh disable=SC1091
+source "$SCRIPT_DIR/lib/scan-scope.sh"
+
+# shellcheck disable=SC2329  # invoked by scan_scope_parse_args
+usage() {
     cat <<'EOF'
 Usage: bin/check-hot-files [--pr]
 
@@ -20,18 +32,21 @@ Env vars:
 Exit codes (--pr mode): 0 = at least one crossing, 1 = no crossing
 EOF
     exit 0
-fi
+}
+
+scan_scope_parse_args usage lenient "$@"
 
 THRESHOLD=${HOT_FILE_THRESHOLD:-500}
-BASE_REF=${HOT_FILE_BASE_REF:-origin/master}
 ROOT=$(git rev-parse --show-toplevel)
+scan_scope_resolve_base HOT_FILE_BASE_REF "${HOT_FILE_BASE_REF:-}" 0 "$ROOT"
+BASE_REF=$SCAN_SCOPE_BASE_REF
 cd "$ROOT/ibl5"
 
 echo "=== Hot files (> $THRESHOLD LOC) ==="
 find classes -name '*.php' -exec wc -l {} \; | \
   awk -v t="$THRESHOLD" '$1 > t { printf "%6d %s\n", $1, $2 }' | sort -rn
 
-if [ "${1:-}" = "--pr" ]; then
+if [ "$SCAN_SCOPE_MODE" = "pr" ]; then
     crossed=0
     # Iterate the class files this PR touched.
     while read -r file; do
@@ -55,7 +70,7 @@ if [ "${1:-}" = "--pr" ]; then
     # :(glob) so ** matches zero-or-more path segments, covering both nested
     # (classes/Foo/Foo.php) and top-level (classes/Foo.php) class files —
     # matching the bare snapshot's `find classes` scope above.
-    done < <(git diff --name-only "$BASE_REF" -- ':(glob)classes/**/*.php')
+    done < <(scan_scope_changed_files "$ROOT/ibl5" ':(glob)classes/**/*.php')
     # Exit status encodes the signal the workflow branches on:
     #   0 = at least one crossing (post the comment)
     #   1 = no crossing (delete any stale comment)

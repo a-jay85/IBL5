@@ -78,6 +78,7 @@ jobs:
             hotfiles:
               - 'ibl5/classes/**'
               - 'bin/check-hot-files'
+              - 'bin/lib/scan-scope.sh'
               - '.github/workflows/pr-meta-checks.yml'
             orphancss:
               - 'ibl5/design/**.css'
@@ -103,6 +104,7 @@ jobs:
               - 'ibl5/tests/e2e/**'
               - 'ibl5/playwright.config.ts'
               - 'bin/check-e2e-hygiene'
+              - 'bin/lib/scan-scope.sh'
               - 'bin/check-e2e-fa-offers-owner'
               - 'bin/check-e2e-mutator-isolation'
               - '.e2e-hygiene-skip-allowlist'

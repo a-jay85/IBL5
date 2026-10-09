@@ -130,6 +130,36 @@ check_runaway() {
     return 1
 }
 
+# switch_fast_key <sid>: echoes a switch key and returns 0 when this marker paused under
+# a login the user has since switched away from. Primary test: the marker's acct_fp
+# differs from CUR_ACCT. A match vetoes, because a token refresh keeps the account.
+# Fallback when either account is unknown: an active cred-switch signal (SWITCH_AT)
+# and the marker paused before it, or its cred_fp differs from CUR_FP. Returns 1 when
+# the marker already took its fast resume for this same key.
+switch_fast_key() {
+    local sid="$1" macct key paused mfp done_for
+    macct=$(marker_field "$sid" '.acct_fp // empty')
+    if [ -n "$macct" ] && [ -n "$CUR_ACCT" ]; then
+        [ "$macct" != "$CUR_ACCT" ] || return 1
+        key="acct:$CUR_ACCT"
+    elif [ -n "$SWITCH_AT" ]; then
+        paused=$(marker_field "$sid" '.paused_at // 0')
+        case "$paused" in ''|*[!0-9]*) paused=0 ;; esac
+        mfp=$(marker_field "$sid" '.cred_fp // empty')
+        if [ "$paused" -lt "$SWITCH_AT" ] \
+            || { [ -n "$mfp" ] && [ -n "$CUR_FP" ] && [ "$mfp" != "$CUR_FP" ]; }; then
+            key="sig:$SWITCH_AT"
+        else
+            return 1
+        fi
+    else
+        return 1
+    fi
+    done_for=$(marker_field "$sid" '.switch_resumed_for // empty')
+    [ "$done_for" != "$key" ] || return 1
+    printf '%s\n' "$key"
+}
+
 # pause_wave_dm <zone> <pct>: ONE DM for markers whose sid is not yet in dm-seen.
 pause_wave_dm() {
     local zone="$1" pct="$2" sid n=0 weekly="" resets="" seen="$STATE/dm-seen" new="" w r when="unknown"
@@ -187,7 +217,12 @@ if [ -z "$MARKERS" ] && [ ! -d "$(usage_token_dir)" ]; then
     exit 0
 fi
 
+# Login-switch detection (ADR-0143, 2026-10-08 addendum). The account check reads
+# ~/.claude.json and needs no keychain. usage_fetch signals a switch it sees at its
+# cred-switch drop site, in this process or in any earlier caller.
+if [ "$DRY" -ne 1 ]; then usage_account_switch_check; fi
 body=$(usage_fetch 60); rc=$?
+SWITCH_AT=$(usage_switch_active "$NOW")
 age=$(usage_cache_age)
 stale=0
 if [ "$rc" -eq 1 ] || [ -z "$body" ]; then
@@ -199,9 +234,21 @@ fi
 if [ "$stale" -eq 1 ]; then
     if [ "$DRY" -eq 1 ]; then printf 'ZONE unknown PCT 0 CACHE_AGE %s\n' "$age"; fi
     usage_log "coordinator-stale-usage age=$age"
+    CUR_ACCT=$(_usage_acct_fp)
+    CUR_FP=""
+    [ -n "$SWITCH_AT" ] && CUR_FP=$(_usage_cred_fp)
+    FAST=0
     for sid in $MARKERS; do
         check_runaway "$sid" && continue
         usage_marker_eligible "$sid" "$NOW" || continue
+        if key=$(switch_fast_key "$sid"); then
+            if [ "$DRY" -ne 1 ]; then usage_marker_set_switch_resumed "$sid" "$key" || continue; fi
+            if launch_resume "$sid"; then
+                FAST=$((FAST + 1))
+                usage_log "switch-resume sid=$sid via=${key%%:*}"
+            fi
+            continue
+        fi
         resets=$(marker_field "$sid" '.resets_at // empty')
         case "$resets" in ''|*[!0-9]*) continue ;; esac
         [ "$resets" -le $(( NOW - 60 )) ] || continue

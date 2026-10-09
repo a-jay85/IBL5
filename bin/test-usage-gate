@@ -1896,6 +1896,145 @@ test_account_switch_check() {
     assert_no_file acct_check:no-last-no-signal "$d/cred-switch"
 }
 
+# ---------------------------------------------------------------- coordinator switch fast resume
+
+# sw_marker <sid> <acct_uuid|""> [paused_ago]: marker paused under that account, resets an hour ahead.
+sw_marker() {
+    ( export PATH="$STUB:$ORIG_PATH"; coord_marker "$1" plan-now )
+    patch_marker "$1" ".resets_at = $(( $(date +%s) + 3600 )) | .paused_at = $(( $(date +%s) - ${3:-600} ))"
+    if [ -n "$2" ]; then patch_marker "$1" ".acct_fp = \"$(acct_hash "$2")\""; else patch_marker "$1" 'del(.acct_fp, .cred_fp)'; fi
+}
+
+# sw_signal <age_secs> <fp|-> <count> <kind>: write a cred-switch signal.
+sw_signal() {
+    printf '%s %s %s %s\n' "$(( $(date +%s) - $1 ))" "$2" "$3" "$4" > "$IBL5_USAGE_GATE_STATE_DIR/cred-switch"
+}
+
+# sw_stale_setup: stale tick (no cache), fetch-backoff armed like the incident.
+sw_stale_setup() {
+    coord_setup 97
+    rm -f "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+    printf '%s 1\n' "$(( $(date +%s) + 3598 ))" > "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+}
+
+test_coord_switch_incident_resumes() {
+    sw_stale_setup
+    seed_home uuid-B
+    sw_marker "$SID_A" uuid-A
+    sw_marker "$SID_B" uuid-A
+    sw_signal 30 - 1 account
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"; assert_eq switch_incident:a-launched 0 "$?"
+    wait_file "$T/launched.$SID_B"; assert_eq switch_incident:b-launched 0 "$?"
+    assert_eq switch_incident:stamp "acct:$(acct_hash uuid-B)" \
+        "$(jq -r '.switch_resumed_for' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_contains switch_incident:log "$(fetch_log)" "switch-resume sid=$SID_A via=acct"
+}
+
+test_coord_switch_resume_once() {
+    sw_stale_setup
+    seed_home uuid-B
+    sw_marker "$SID_A" uuid-A
+    sw_signal 30 - 1 account
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"; assert_eq switch_once:first 0 "$?"
+    rm -f "$T/launched.$SID_A"
+    patch_marker "$SID_A" 'del(.resuming_pid)'
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_no_file switch_once:crashed-not-relaunched "$T/launched.$SID_A"
+    sw_marker "$SID_A" uuid-B
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_no_file switch_once:repaused-not-relaunched "$T/launched.$SID_A"
+}
+
+test_coord_same_account_no_fast_resume() {
+    sw_stale_setup
+    seed_home uuid-A
+    sw_marker "$SID_A" uuid-A
+    sw_signal 30 - 1 token
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_no_file same_acct_coord:no-launch "$T/launched.$SID_A"
+}
+
+test_coord_switch_respects_runaway_and_hold() {
+    sw_stale_setup
+    seed_home uuid-B
+    sw_marker "$SID_A" uuid-A
+    patch_marker "$SID_A" '.resume_count = 5'
+    ( export PATH="$STUB:$ORIG_PATH"; coord_marker "$SID_B" plan-now limit-hit )
+    patch_marker "$SID_B" ".resets_at = $(( $(date +%s) + 3600 )) | .acct_fp = \"$(acct_hash uuid-A)\""
+    sw_signal 30 - 1 account
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_eq switch_runaway:stuck true "$(jq -r '.stuck' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_no_file switch_runaway:no-launch "$T/launched.$SID_A"
+    assert_no_file switch_hold:limit-hit-waits "$T/launched.$SID_B"
+}
+
+test_coord_switch_fallback_signal() {
+    sw_stale_setup
+    seed_home ""
+    sw_marker "$SID_A" ""
+    sw_signal 60 "$FP_A" 0 token
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"; assert_eq switch_fallback:launched 0 "$?"
+    assert_contains switch_fallback:log "$(fetch_log)" "switch-resume sid=$SID_A via=sig"
+
+    sw_stale_setup
+    seed_home ""
+    sw_marker "$SID_A" "" 0
+    sw_signal 60 "$FP_A" 0 token
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_no_file switch_fallback:paused-after-signal "$T/launched.$SID_A"
+
+    sw_stale_setup
+    seed_home ""
+    sw_marker "$SID_A" ""
+    sw_signal 1800 "$FP_A" 0 token
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_no_file switch_fallback:expired-signal "$T/launched.$SID_A"
+}
+
+test_coord_switch_fallback_fp_mismatch() {
+    sw_stale_setup
+    seed_home ""
+    make_stub_bin "$STUB" tokB '{}' 1
+    sw_marker "$SID_A" ""
+    patch_marker "$SID_A" ".cred_fp = \"$FP_A\" | .paused_at = $(date +%s)"
+    sw_signal 60 - 0 token
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"; assert_eq switch_fp_mismatch:launched 0 "$?"
+
+    sw_stale_setup
+    seed_home ""
+    make_stub_bin "$STUB" tokB '{}' 1
+    sw_marker "$SID_A" ""
+    patch_marker "$SID_A" ".cred_fp = \"$FP_A\" | .paused_at = $(date +%s)"
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_no_file switch_fp_mismatch:no-signal "$T/launched.$SID_A"
+}
+
+test_coord_account_check_drops_old_cache() {
+    coord_setup 99
+    seed_home uuid-B
+    local d="$IBL5_USAGE_GATE_STATE_DIR" out
+    acct_hash uuid-A > "$d/acct-last"
+    sw_marker "$SID_A" uuid-A
+    out=$(run_coord --once --dry-run 2>&1)
+    assert_contains acct_coord:dry-zone "$out" "ZONE stop"
+    assert_file acct_coord:dry-keeps-cache "$d/cache.json"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"; assert_eq acct_coord:launched 0 "$?"
+    assert_no_file acct_coord:cache-dropped "$d/cache.json"
+    assert_contains acct_coord:log "$(fetch_log)" "account-switch cache-dropped"
+}
+
 # ---------------------------------------------------------------- runner
 
 TESTS=$(grep -E '^test_[a-z0-9_]+\(\)' "$0" | sed 's/().*//')

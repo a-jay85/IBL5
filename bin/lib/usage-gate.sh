@@ -374,6 +374,22 @@ usage_marker_set_resuming() {
     return 1
 }
 
+# usage_marker_set_switch_resumed <sid> <key>: records that this marker took its one
+# fast resume for login switch <key>. usage_marker_write rebuilds the marker on
+# re-pause, so the stamp never carries over to a new pause.
+usage_marker_set_switch_resumed() {
+    usage_valid_sid "${1:-}" || return 1
+    local f tmp
+    f="$(usage_markers_dir)/$1.json"
+    tmp="$f.tmp.$$"
+    [ -s "$f" ] || return 1
+    if jq --arg k "${2:-}" '.switch_resumed_for = $k' "$f" 2>/dev/null > "$tmp" && mv "$tmp" "$f"; then
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
+}
+
 # usage_marker_set_stuck <sid> <reason>: the coordinator leaves a stuck marker paused.
 usage_marker_set_stuck() {
     usage_valid_sid "${1:-}" || return 1

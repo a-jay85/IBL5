@@ -104,7 +104,10 @@
 #   C  Context budget        — a marathon-sized plan (>= 500 lines OR >= 12
 #                              numbered Step/Phase headings) predicts an
 #                              implementation session that breaches the ~150K
-#                              context dumb-zone. Measured 2026-07-07 on the
+#                              context dumb-zone (degradation unmeasured on Opus 5.5
+#                              as of 2026-10-08; method: dz-extract.py drops
+#                              isSidechain lines, dz-score.py bands the rest).
+#                              Measured 2026-07-07 on the
 #                              automouse corpus: Opus implementation runs that
 #                              exceeded 150K peak context executed plans of
 #                              median ~566 lines / ~20 phases, while the runs

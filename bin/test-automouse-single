@@ -136,6 +136,16 @@ exit 0
 PPSTUB
 chmod +x "$STUBDIR/post-plan-now"
 
+# Stub discord-dm: the copied runner's three DM sites point here (never the real
+# transport). It records argv and stdin so cases 11 and 12 can count stop DMs.
+cat > "$ROOT/discord-dm" <<DMSTUB
+#!/usr/bin/env bash
+printf 'ARGV: %s\n' "\$*" >> "$ROOT/dm-calls"
+printf 'STDIN: %s\n' "\$(cat)" >> "$ROOT/dm-calls"
+exit 0
+DMSTUB
+chmod +x "$ROOT/discord-dm"
+
 # --- Copy real runner; redirect NIGHTLY_DIR + stub PATH --------------------
 RUNNER="$ROOT/automouse/run"
 sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
@@ -143,6 +153,7 @@ sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
     -e "s#^SELF_DIR=.*#SELF_DIR=\"$REPO/bin/automouse\"#" \
     -e "s#^export PATH=.*#export PATH=\"$STUBDIR:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
     -e "s#\"\$SELF_DIR/../post-plan-now\"#\"$STUBDIR/post-plan-now\"#" \
+    -e "s#\"\$SELF_DIR/../discord-dm\"#\"$ROOT/discord-dm\"#" \
     "$REPO/bin/automouse/run" > "$RUNNER"
 chmod +x "$RUNNER"
 
@@ -437,6 +448,136 @@ c15_far=$(awk '
 check "case15 every note_stop has a break within 6 lines (far: ${c15_far:-none})" test -z "$c15_far"
 
 # ===========================================================================
+# Case 16 — send_stop_dm sends one DM per early stop, nothing on a clean one
+# (portable: sources the sender extracted from the real runner, DM is a stub)
+# ===========================================================================
+echo "--- case 16: send_stop_dm ---"
+SENDER="$ROOT/sender.sh"
+awk '/^# Stop-DM sender:/,/^# End stop-DM sender\./' "$RUNNER_SRC" > "$SENDER"
+c16_open=$(grep -c '^# Stop-DM sender:' "$RUNNER_SRC")
+c16_close=$(grep -c '^# End stop-DM sender\.' "$RUNNER_SRC")
+if [ "$c16_open" = 1 ] && [ "$c16_close" = 1 ] && grep -qF 'send_stop_dm() {' "$SENDER"; then
+    echo "ok: case16 sender anchors unique and extract defines send_stop_dm"
+    C16="$ROOT/c16"
+    C16_CALLS="$C16/calls"
+    mkdir -p "$C16/bin/automouse" "$C16/nobin/automouse"
+    cat > "$C16/bin/discord-dm" <<C16STUB
+#!/usr/bin/env bash
+printf 'ARGV: %s\n' "\$*" >> "$C16_CALLS"
+printf 'STDIN: %s\n' "\$(cat)" >> "$C16_CALLS"
+exit "\$(cat "$C16/stub-rc" 2>/dev/null || echo 0)"
+C16STUB
+    chmod +x "$C16/bin/discord-dm"
+    echo 0 > "$C16/stub-rc"
+
+    # c16_send <sender-file> <rc> [VAR=value ...]: run send_stop_dm in a fresh subshell
+    # under the trap's conditions (set -euo pipefail). Prints the function's return code.
+    c16_send() {
+        local src="$1" rc="$2" kv
+        shift 2
+        : > "$C16_CALLS"
+        : > "$C16/log"
+        (
+            set -euo pipefail
+            SELF_DIR="$C16/bin/automouse"
+            # shellcheck disable=SC2034  # read by the sourced sender
+            LOG="$C16/log"
+            # shellcheck disable=SC2034
+            STOP_DM_ARMED=1
+            # shellcheck disable=SC2034
+            STOP_CLEAN=0
+            for kv in "$@"; do printf -v "${kv%%=*}" '%s' "${kv#*=}"; done
+            # shellcheck disable=SC1090
+            . "$src"
+            send_stop_dm "$rc"
+            echo "RC=$?"
+        ) 2>/dev/null | grep '^RC=' || echo "RC=aborted"
+    }
+    c16_stdin() { grep '^STDIN: ' "$C16_CALLS" | sed 's/^STDIN: //'; }
+    c16_ncalls() { grep -c '^ARGV: ' "$C16_CALLS" || true; }
+
+    # c16_a_passes <sender-file>: the 16a SIGTERM assertions, reused by the 16i mutations.
+    c16_a_passes() {
+        local r
+        r=$(c16_send "$1" 143)
+        [ "$r" = "RC=0" ] || return 1
+        [ "$(c16_ncalls)" = 1 ] || return 1
+        [ "$(grep '^ARGV: ' "$C16_CALLS")" = "ARGV: - --attempts 2 --quiet" ] || return 1
+        c16_stdin | grep -qE '^Automouse run [0-9]+ ended early: It was stopped by SIGTERM \(a kill, a launchd unload, or a shutdown\)\. Next: Rerun bin/automouse/run if the stop was not intended\. The plan it was on stays in queue/\.$'
+    }
+    check "case16a SIGTERM sends one DM with the exact argv and text" c16_a_passes "$SENDER"
+
+    c16_r=$(c16_send "$SENDER" 129)
+    want "case16b SIGHUP names the signal" "$(c16_stdin)" "stopped by a hangup signal (SIGHUP)"
+    check "case16b SIGHUP sent one DM" test "$(c16_ncalls)" = 1
+    c16_r=$(c16_send "$SENDER" 130)
+    want "case16b SIGINT names the signal" "$(c16_stdin)" "interrupted (SIGINT, Ctrl-C)"
+    check "case16b SIGINT sent one DM" test "$(c16_ncalls)" = 1
+
+    c16_r=$(c16_send "$SENDER" 1 FAIL_LINE=42)
+    want "case16c crash names the exit code and line" "$(c16_stdin)" "It crashed with exit code 1 at line 42."
+    want "case16c crash points at the log" "$(c16_stdin)" "Next: Read $C16/log, then rerun bin/automouse/run."
+
+    c16_r=$(c16_send "$SENDER" 0 STOP_CLEAN=0)
+    want "case16d partway quit is explained" "$(c16_stdin)" "It quit partway with exit code 0 before finishing the loop."
+
+    c16_r=$(c16_send "$SENDER" 0 STOP_CLEAN=1 "STOP_DM_CAUSE=Cause X." "STOP_DM_NEXT=Next X.")
+    check "case16e note_stop cause is sent verbatim" \
+        grep -qE '^STDIN: Automouse run [0-9]+ ended early: Cause X\. Next: Next X\.$' "$C16_CALLS"
+
+    c16_r=$(c16_send "$SENDER" 0 STOP_CLEAN=1)
+    check "case16f clean drain sends nothing" test "$(c16_ncalls)" = 0
+    check "case16f clean drain returns 0" test "$c16_r" = "RC=0"
+    c16_r=$(c16_send "$SENDER" 0 STOP_CLEAN=1 "STOP_CAUSE=single-plan mode: one attempt of x finished")
+    check "case16f single-plan designed stop sends nothing" test "$(c16_ncalls)" = 0
+    c16_r=$(c16_send "$SENDER" 0 STOP_CLEAN=1 "FAIL_NOTES=  - Your Claude login has expired, so no plan was started.")
+    check "case16f login break (plain note_failure) sends nothing" test "$(c16_ncalls)" = 0
+    c16_r=$(c16_send "$SENDER" 143 STOP_DM_ARMED=0)
+    check "case16f unarmed SIGTERM sends nothing" test "$(c16_ncalls)" = 0
+    check "case16f unarmed SIGTERM returns 0" test "$c16_r" = "RC=0"
+
+    echo 1 > "$C16/stub-rc"
+    c16_r=$(c16_send "$SENDER" 143)
+    check "case16g failing DM stub still returns 0" test "$c16_r" = "RC=0"
+    want "case16g failing DM stub is logged as spooled" "$(cat "$C16/log")" "Stop DM undeliverable (spooled)."
+    echo 0 > "$C16/stub-rc"
+    c16_r=$( : > "$C16_CALLS"; : > "$C16/log"; (
+        set -euo pipefail
+        SELF_DIR="$C16/nobin/automouse"
+        # shellcheck disable=SC2034
+        LOG="$C16/log"
+        # shellcheck disable=SC2034
+        STOP_DM_ARMED=1
+        # shellcheck disable=SC1090
+        . "$SENDER"
+        send_stop_dm 143
+        echo "RC=$?"
+    ) 2>/dev/null | grep '^RC=' || echo "RC=aborted" )
+    check "case16g missing discord-dm still returns 0 and does not abort" test "$c16_r" = "RC=0"
+
+    c16_calls=$(grep -c 'send_stop_dm "\$stop_rc"' "$RUNNER_SRC")
+    c16_call_ln=$(grep -n 'send_stop_dm "\$stop_rc"' "$RUNNER_SRC" | cut -d: -f1)
+    c16_print_ln=$(grep -n 'print_stop_reason "\$stop_rc"' "$RUNNER_SRC" | cut -d: -f1)
+    c16_trap_ln=$(grep -n '^trap cleanup_watcher EXIT$' "$RUNNER_SRC" | cut -d: -f1)
+    c16_arm0_ln=$(grep -n '^STOP_DM_ARMED=0$' "$RUNNER_SRC" | cut -d: -f1)
+    c16_arm1_ln=$(grep -n '^STOP_DM_ARMED=1$' "$RUNNER_SRC" | cut -d: -f1)
+    c16_start_ln=$(grep -n 'Automouse session starting at' "$RUNNER_SRC" | cut -d: -f1)
+    check "case16h send_stop_dm is called exactly once" test "$c16_calls" = 1
+    check "case16h the call follows print_stop_reason and precedes the EXIT trap line" \
+        test "${c16_call_ln:-0}" -gt "${c16_print_ln:-999999}" -a "${c16_call_ln:-0}" -lt "${c16_trap_ln:-0}"
+    check "case16h STOP_DM_ARMED=0 sits above the EXIT trap" test "${c16_arm0_ln:-999999}" -lt "${c16_trap_ln:-0}"
+    check "case16h STOP_DM_ARMED=1 follows the session-start line" test "${c16_arm1_ln:-0}" -gt "${c16_start_ln:-999999}"
+
+    awk '{ print } /^send_stop_dm\(\) \{$/ { print "    return 0" }' "$SENDER" > "$SENDER.mut1"
+    sed 's/--attempts 2/--attempts 3/' "$SENDER" > "$SENDER.mut2"
+    check "case16i a sender that returns early fails the 16a check" ! c16_a_passes "$SENDER.mut1"
+    check "case16i a sender with --attempts 3 fails the 16a check" ! c16_a_passes "$SENDER.mut2"
+else
+    echo "FAIL: case16 sender anchors not unique or extract lacks send_stop_dm() (open=$c16_open close=$c16_close)"
+    FAILED=1
+fi
+
+# ===========================================================================
 # macOS-only run-loop cases (1, 2, 3, 5)
 # ===========================================================================
 if [ "$PLATFORM" != "Darwin" ]; then
@@ -458,6 +599,7 @@ reset_state
 seed_plan plan-1
 seed_plan plan-2
 seed_plan plan-3
+rm -f "$ROOT/dm-calls"
 run_single plan-2
 
 assert_present "case1 plan-2 completed"  "$NDIR/done/plan-2.md"
@@ -482,6 +624,7 @@ if [ "${#c11_stops[@]}" -eq 1 ] && [ -f "${c11_stops[0]}" ]; then
     c11_log="$NDIR/logs/$(basename "${c11_stops[0]}" .stop).log"
     check "case11 matching log carries the session-complete line" \
         grep -qF '=== Automouse session complete' "$c11_log"
+    check "case11 designed single-plan stop sends no DM" test ! -s "$ROOT/dm-calls"
 else
     echo "FAIL: case11 expected exactly one stop file, got ${#c11_stops[@]} (${c11_stops[*]})"
     FAILED=1
@@ -493,6 +636,7 @@ fi
 echo "--- case 12: SIGTERM stop file ---"
 reset_state
 seed_plan sig-plan
+rm -f "$ROOT/dm-calls"
 STUB_CLAUDE_SLEEP=120 PLANS_DIR="$PDIR" "$RUNNER" plan sig-plan > "$ROOT/sig.out" 2>&1 &
 c12_pid=$!
 c12_i=0
@@ -520,6 +664,8 @@ if [ -f "${c12_stops[0]}" ]; then
     wait "$c12_pid" 2>/dev/null || true
     want "case12 terminal output explains the SIGTERM in plain English" \
         "$(cat "$ROOT/sig.out")" "told the run to quit (SIGTERM)"
+    check "case12 SIGTERM sent exactly one stop DM" test "$(grep -c '^STDIN: ' "$ROOT/dm-calls")" = 1
+    want "case12 stop DM names the SIGTERM cause" "$(cat "$ROOT/dm-calls")" "ended early: It was stopped by SIGTERM"
 else
     echo "FAIL: case12 no stop file for runner pid $c12_pid after 40s"
     FAILED=1

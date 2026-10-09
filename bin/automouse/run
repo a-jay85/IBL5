@@ -744,6 +744,44 @@ print_stop_reason() {
 }
 # End stop-reason printer.
 
+# Stop-DM sender: one Discord DM, one line, when an armed run ended early: a
+# signal, a crash, a partway quit, or a note_stop break site. Runs once, from
+# cleanup_watcher, after print_stop_reason. Silent for a clean finish, the login
+# break (login_preflight already DMs once per outage), the post-plan hold
+# (notify_postplan_hold already DMs) and the single-plan designed stop. Never
+# fails: DM output and errors go to $LOG, and an undeliverable DM is spooled by
+# discord-dm itself.
+send_stop_dm() {
+    local rc=$1 cause next log="${LOG:-/dev/null}"
+    [ "${STOP_DM_ARMED:-0}" = 1 ] || return 0
+    case "$rc" in
+        129) cause="It was stopped by a hangup signal (SIGHUP), usually a closed terminal or a logout."
+             next="Rerun bin/automouse/run if the stop was not intended. The plan it was on stays in queue/." ;;
+        130) cause="It was interrupted (SIGINT, Ctrl-C)."
+             next="Rerun bin/automouse/run if the stop was not intended. The plan it was on stays in queue/." ;;
+        143) cause="It was stopped by SIGTERM (a kill, a launchd unload, or a shutdown)."
+             next="Rerun bin/automouse/run if the stop was not intended. The plan it was on stays in queue/." ;;
+        0)
+            if [ "${STOP_CLEAN:-0}" != 1 ]; then
+                cause="It quit partway with exit code 0 before finishing the loop."
+                next="Read $log, then rerun bin/automouse/run."
+            elif [ -n "${STOP_DM_CAUSE:-}" ]; then
+                cause="$STOP_DM_CAUSE"
+                next="${STOP_DM_NEXT:-Read $log.}"
+            else
+                return 0
+            fi ;;
+        *)  cause="It crashed with exit code $rc${FAIL_LINE:+ at line $FAIL_LINE}."
+            next="Read $log, then rerun bin/automouse/run." ;;
+    esac
+    printf 'Automouse run %s ended early: %s Next: %s\n' "$$" "$cause" "$next" \
+        | "$SELF_DIR/../discord-dm" - --attempts 2 --quiet >> "$log" 2>&1 \
+        || { echo "Stop DM undeliverable (spooled)." >> "$log"; } 2>/dev/null \
+        || true
+    return 0
+}
+# End stop-DM sender.
+
 cleanup_watcher() {
     local stop_rc=$?
     if [ -n "$WATCHER_PID" ]; then
@@ -765,7 +803,9 @@ cleanup_watcher() {
     fi
     write_stop_file "$stop_rc"
     print_stop_reason "$stop_rc"
+    send_stop_dm "$stop_rc"
 }
+STOP_DM_ARMED=0
 trap cleanup_watcher EXIT
 # Record the last failing command so print_stop_reason can name it after a set -e
 # abort. -E makes functions and subshells inherit the trap. Assignments only.
@@ -1870,6 +1910,7 @@ STOP_DM_CAUSE=""
 STOP_DM_NEXT=""
 
 echo "=== Automouse session starting at $(date) ===" >> "$LOG"
+STOP_DM_ARMED=1
 
 # Freshen the reference checkout's master so the self-heal staleness guard below
 # sees origin's latest — a re-created file or a widened guard only exists locally

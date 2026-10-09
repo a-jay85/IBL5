@@ -119,6 +119,111 @@ check "14 PLAN_DIR preset kept" "/tmp/pre" "$out"
 out="$( env -i PATH="$PATH" HOME="$HOME" PLAN_DIR= bash -c 'source "$1"; printf %s "$PLAN_DIR"' _ "$ROOT/bin/lib/plan-resolve.sh" )"
 check "14 PLAN_DIR empty -> default" "$DEFAULT" "$out"
 
+# --- 15. Static wiring: each caller names its own seam, no old fallback remains ---
+for spec in "bin/lib/plan-resolve.sh:plans_dir PLAN_DIR" \
+            "bin/plan-dup-check:plans_dir PLANS_DIR" \
+            "bin/plan-now:plans_dir PLAN_NOW_PLANS_DIR" \
+            "bin/bug-pipeline-tick:plans_dir BUG_PIPELINE_PLANS_DIR"; do
+    f="${spec%%:*}"; call="${spec#*:}"
+    check "15 $f has one '$call'" "1" "$(grep -cF "$call" "$ROOT/$f")"
+    check "15 $f has no old :-/:= \$HOME/claude-plans fallback" "0" \
+        "$(grep -cE '[:][-=]\$HOME/claude-plans' "$ROOT/$f")"
+done
+for f in bin/plan-dup-check bin/plan-now bin/bug-pipeline-tick; do
+    check "15 $f sources plan-resolve.sh once" "1" \
+        "$(grep -cE '^(\.|source)[[:space:]].*lib/plan-resolve\.sh' "$ROOT/$f")"
+done
+
+# --- 16. Line-eval: the shipped resolution line of each caller ------------------
+# eval_line FILE SEAM MODE -> prints PLANS_DIR after evaluating the script's real line.
+#   MODE: set (SEAM=/tmp/s), unset, empty (SEAM=''), others (SEAM unset, other three junk)
+eval_line() {
+    local file="$1" seam="$2" mode="$3" line s
+    line="$(grep -m1 -E '^PLANS_DIR=' "$ROOT/$file" || true)"
+    (
+        unset $SEAMS
+        case "$mode" in
+            set)    export "$seam=/tmp/s" ;;
+            empty)  export "$seam=" ;;
+            others) for s in $SEAMS; do [ "$s" = "$seam" ] || export "$s=/tmp/junk-$s"; done ;;
+        esac
+        eval "$line"
+        printf '%s\n' "${PLANS_DIR-}"
+    )
+}
+for spec in "bin/plan-dup-check:PLANS_DIR" "bin/plan-now:PLAN_NOW_PLANS_DIR" \
+            "bin/bug-pipeline-tick:BUG_PIPELINE_PLANS_DIR"; do
+    f="${spec%%:*}"; s="${spec#*:}"
+    check "16 $f: $s set wins" "/tmp/s" "$(eval_line "$f" "$s" set)"
+    check "16 $f: $s unset -> default" "$DEFAULT" "$(eval_line "$f" "$s" unset)"
+    check "16 $f: $s empty -> default" "$DEFAULT" "$(eval_line "$f" "$s" empty)"
+    check "16 $f: other seams do not leak" "$DEFAULT" "$(eval_line "$f" "$s" others)"
+done
+
+# --- 17. Real bin/plan-dup-check runs ------------------------------------------
+printf 'Do a thing.\nbranch slug `demo-slug`\n' > "$TMP/prompt.md"
+mkdir -p "$TMP/n" "$TMP/p" "$TMP/home17"
+: > "$TMP/p/demo-slug.md"
+out="$(env -i PATH="$PATH" HOME="$TMP/home17" NIGHTLY_DIR="$TMP/n" PLANS_DIR="$TMP/p" \
+        bash "$ROOT/bin/plan-dup-check" "$TMP/prompt.md" 2>&1)"; rc=$?
+check "17a PLANS_DIR holds slug: rc" "3" "$rc"
+check "17a PLANS_DIR holds slug: names path" "yes" \
+    "$(grep -qF "$TMP/p/demo-slug.md" <<<"$out" && echo yes || echo no)"
+out="$(env -i PATH="$PATH" HOME="$TMP/home17" NIGHTLY_DIR="$TMP/n" PLAN_DIR="$TMP/p" \
+        PLAN_NOW_PLANS_DIR="$TMP/p" BUG_PIPELINE_PLANS_DIR="$TMP/p" \
+        bash "$ROOT/bin/plan-dup-check" "$TMP/prompt.md" 2>&1)"; rc=$?
+check "17b other callers' seams ignored: rc" "0" "$rc"
+check "17b other callers' seams ignored: stdout" "" "$out"
+mkdir -p "$TMP/home17/claude-plans"; : > "$TMP/home17/claude-plans/demo-slug.md"
+out="$(env -i PATH="$PATH" HOME="$TMP/home17" NIGHTLY_DIR="$TMP/n" PLANS_DIR= \
+        bash "$ROOT/bin/plan-dup-check" "$TMP/prompt.md" 2>&1)"; rc=$?
+check "17c empty PLANS_DIR uses HOME default: rc" "3" "$rc"
+check "17c empty PLANS_DIR uses HOME default: names path" "yes" \
+    "$(grep -qF "$TMP/home17/claude-plans/demo-slug.md" <<<"$out" && echo yes || echo no)"
+out="$(env -i PATH="$PATH" NIGHTLY_DIR="$TMP/n" PLANS_DIR="$TMP/p" \
+        bash "$ROOT/bin/plan-dup-check" "$TMP/prompt.md" 2>&1)"; rc=$?
+check "17d HOME unset with seam set: rc" "3" "$rc"
+err="$(env -i PATH="$PATH" HOME="$TMP/home17" bash "$ROOT/bin/plan-dup-check" "$TMP/nope.md" 2>&1 >/dev/null)"; rc=$?
+check "17e missing prompt: rc" "2" "$rc"
+check "17e missing prompt: usage line" "plan-dup-check: usage: plan-dup-check <prompt-file>" "$err"
+
+# --- 18. bin/plan-now dry run never creates a leaked PLANS_DIR -----------------
+printf '#!/bin/sh\nexit 0\n' > "$TMP/stub"; chmod +x "$TMP/stub"
+mkdir -p "$TMP/shim"; printf '#!/bin/sh\nexit 1\n' > "$TMP/shim/security"; chmod +x "$TMP/shim/security"
+printf '/plan Do a thing.\nbranch slug `demo-slug`\n' > "$TMP/plan-prompt.md"
+plan_now_dry() {   # HOME_DIR [extra env assignments...] -> prints runner path
+    local home_dir="$1"; shift
+    mkdir -p "$home_dir"
+    ( cd "$ROOT" && env -i PATH="$TMP/shim:$PATH" HOME="$home_dir" NIGHTLY_DIR="$TMP/n" \
+        IBL5_USAGE_GATE_STATE_DIR="$TMP/gate" PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$TMP/stub" \
+        PLAN_NOW_DISCORD_DM="$TMP/stub" PLAN_NOW_AUTOMOUSE_QUEUE="$TMP/stub" "$@" \
+        bin/plan-now --implement --no-dm "$TMP/plan-prompt.md" 2>&1 )
+}
+cleanup_runner() { local r="$1"; [ -n "$r" ] && rm -f "${r%.sh}".*; }
+dry="$(plan_now_dry "$TMP/home18a" PLAN_NOW_PLANS_DIR="$TMP/pn" PLANS_DIR="$TMP/leak")"; rc=$?
+runner="$(sed -n 's/^  runner: //p' <<<"$dry")"
+check "18a dry run rc" "0" "$rc"
+check "18a PLAN_NOW_PLANS_DIR created" "1" "$([ -d "$TMP/pn" ] && echo 1 || echo 0)"
+check "18a PLANS_DIR leak dir not created" "0" "$([ -e "$TMP/leak" ] && echo 1 || echo 0)"
+check "18a runner PLANS_DIR= names PLAN_NOW_PLANS_DIR" "1" \
+    "$([ -f "$runner" ] && grep '^PLANS_DIR=' "$runner" | grep -cF "$TMP/pn")"
+cleanup_runner "$runner"
+dry="$(plan_now_dry "$TMP/home18b" PLANS_DIR="$TMP/leak")"; rc=$?
+runner="$(sed -n 's/^  runner: //p' <<<"$dry")"
+check "18b dry run rc" "0" "$rc"
+check "18b HOME default created" "1" "$([ -d "$TMP/home18b/claude-plans" ] && echo 1 || echo 0)"
+check "18b PLANS_DIR leak dir not created" "0" "$([ -e "$TMP/leak" ] && echo 1 || echo 0)"
+cleanup_runner "$runner"
+
+# --- 19. File-scope guard: sourcing never aborts on an unset HOME ---------------
+out="$(env -i PATH="$PATH" bash -c 'set -euo pipefail; source "$1"; printf "%s" "${PLAN_DIR-unset}"' \
+        _ "$ROOT/bin/lib/plan-resolve.sh" 2>&1)"; rc=$?
+check "19 HOME unset: sourcing rc" "0" "$rc"
+check "19 HOME unset: PLAN_DIR empty" "" "$out"
+out="$(env -i PATH="$PATH" HOME="$TMP/home" bash -c 'set -euo pipefail; source "$1"; printf "%s" "${PLAN_DIR-unset}"' \
+        _ "$ROOT/bin/lib/plan-resolve.sh" 2>&1)"
+check "19 HOME set: PLAN_DIR is the default" "$TMP/home/claude-plans" "$out"
+
 echo ""
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

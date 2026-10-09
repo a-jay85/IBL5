@@ -53,7 +53,9 @@ plans_dir() {
     printf '%s\n' "$HOME/claude-plans"
 }
 
-PLAN_DIR="${PLAN_DIR:-$HOME/claude-plans}"
+# plans_dir reads $HOME; guard it so sourcing never aborts a caller whose HOME is unset
+# but whose own seam is set. An unset HOME yields an empty PLAN_DIR (plan-blind), as before.
+PLAN_DIR="$(plans_dir PLAN_DIR 2>/dev/null)" || PLAN_DIR=""
 
 # resolve_plan_file
 #   Set PLAN_FILE and PLAN_SLUG_DRIFT in the caller's shell.

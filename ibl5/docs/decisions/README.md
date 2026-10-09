@@ -68,6 +68,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0174](0174-lostwork-change-level-proof.md) | Lost-work proof compares branch changes against the post-rebase tree | Accepted | `lostwork.sh` checks every significant line the branch added or deleted against `HEAD` instead of comparing numstat rows. Master edits to the same file and absorbed hunks pass. A line both sides edited still blocks. |
 | [0177](0177-wt-new-warm-standby-pool.md) | Warm-standby worktree pool for bin/wt-new | Accepted | `bin/wt-new` claims a ready `_pool-N` spare by branch rename and `git worktree move`, falls back to a cold create on any failed check, and refills the spare through a launchd one-shot. |
 | [0188](0188-workflow-run-interpolation-guard.md) | Ban env and string-input expressions inside workflow run: bodies | Accepted | `bin/check-workflow-run-interpolation` runs in `Static guards` and fails any `${{ env.* }}` or string-typed `${{ inputs.* }}` inside a `run:` body; values go through `env:` and a quoted `"$NAME"`. |
+| [0186](0186-memo-only-ci-gating.md) | Memo-only skip gating for Tests and Analysis PR jobs | Accepted | On `pull_request` the tests memo is the only skip gate for every test and analysis job; path filters remain only on `audit-php`, `audit-js` and `iblbot`, pinned by `bin/test-ci-memo` gate-topology assertion 7; the tests key is salted with `--extra gating=memo-only`. |
 
 ## When an ADR is Required
 

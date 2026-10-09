@@ -1185,6 +1185,34 @@ test_coord_runaway_stuck() {
     assert_eq coord_runaway:no-second-dm 1 "$(dm_calls)"
 }
 
+# A resume binary removed after the pause (worktree reaped once its PR merged) gets
+# the marker cleared, so the runner's queue lock is no longer held by it.
+test_coord_missing_bin_retires() {
+    coord_setup 50
+    coord_marker $SID_A plan-now
+    rm -f "$RBIN"
+    local out
+    out=$(run_coord --dry-run --once 2>/dev/null)
+    assert_contains coord_missing_bin:dry-action "$out" "ACTION clear $SID_A resume-bin-missing"
+    assert_file coord_missing_bin:dry-keeps "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    run_coord --once >/dev/null 2>&1
+    assert_no_file coord_missing_bin:marker-gone "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_file coord_missing_bin:cleared-stamp "$IBL5_USAGE_GATE_STATE_DIR/cleared/$SID_A"
+    assert_eq coord_missing_bin:one-dm 1 "$(dm_calls)"
+    assert_contains coord_missing_bin:dm-text "$(cat "$T/dm.txt")" "marker cleared"
+}
+
+# A marker already left stuck by the old code is retired too, even in the stop zone.
+test_coord_missing_bin_retires_stuck_in_stop() {
+    coord_setup 99
+    coord_marker $SID_A post-plan-now
+    patch_marker $SID_A '.stuck = true | .stuck_reason = "resume-bin-not-executable"'
+    rm -f "$RBIN"
+    run_coord --once >/dev/null 2>&1
+    assert_no_file coord_missing_bin_stuck:marker-gone "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_eq coord_missing_bin_stuck:one-dm 1 "$(dm_calls)"
+}
+
 test_coord_in_flight_skip() {
     coord_setup 50
     coord_marker $SID_A plan-now

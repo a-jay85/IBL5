@@ -827,7 +827,7 @@ grep -qF -- "main.yml::build-and-deploy" <<< "$G5_GOT" \
 # G6: --ping (the @-mention), directly or through dm_ping, is allowed only in the five PING host callers and bin/lib/dm.sh. Tests, the
 # README and discord-dm itself mention it and are excluded; any other bin/ caller is QUIET.
 G6_GOT=$(grep -rlE -- '--ping|dm_ping' "$ROOT/bin" 2>/dev/null \
-    | grep -v -e '/bin/discord-dm$' -e '/bin/test-' -e '/bin/README.md$' \
+    | grep -v -e '/bin/discord-dm$' -e '/bin/test-' -e '/bin/README.md$' -e '/bin/lib/README.md$' \
     | sed "s|^$ROOT/||" | sort || true)
 G6_WANT=$(printf '%s\n' bin/db-backups-pull bin/launchd-health-check bin/lib/dm.sh bin/post-plan-fail-dm bin/pr-cycle bin/pr-cycle-tick)
 [ "$G6_GOT" = "$G6_WANT" ] \
@@ -852,6 +852,7 @@ chmod +x "$DM_REC"
 out=$(dmlib 'dm_bin /x/bin FOO_DM'); rc=$?
 [ "$rc" -eq 0 ] && [ "$out" = "/x/bin/discord-dm" ] \
     && ok "G7a unset seam falls back to <bin-dir>/discord-dm" || fail "G7a unset seam (rc=$rc out=$out)"
+# Mutation check: ${!name-} in place of ${!name:-} in dm_bin fails this case.
 out=$(dmlib 'dm_bin /x/bin FOO_DM' FOO_DM=)
 [ "$out" = "/x/bin/discord-dm" ] \
     && ok "G7b empty seam falls back like :-" || fail "G7b empty seam (out=$out)"

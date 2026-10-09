@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import posixpath
 import re
 import subprocess
 import time
@@ -120,6 +121,38 @@ def denied_gate_edits(paths) -> list[str]:
     """The subset of `paths` that lies under a gate-owning prefix."""
     return [p for p in (paths or [])
             if any(str(p).startswith(prefix) for prefix in GATE_OWNING_PREFIXES)]
+
+
+# Local-gate fixer (harness/gatefix.py) deny list. A superset of GATE_OWNING_PREFIXES:
+# the fixer runs at a pre-commit/pre-push denial, so the hook bodies, their installer,
+# their config, the Phase 6.5 arming files, and the whole harness are gate paths too.
+LOCAL_GATE_PATH_PREFIXES = GATE_OWNING_PREFIXES + (
+    ".githooks/",                        # absent today; listed defensively
+    ".claude/hooks/",                    # project-scoped hooks, absent today
+    ".claude/settings",                  # settings.json, settings.local.json
+    ".claude/skills/post-plan/",         # includes _phase-6.5-arm-auto-merge.md
+    "bin/pre-commit-hook",
+    "bin/pre-push-adr-hook",
+    "bin/run-meta-checks-local",
+    "bin/install-git-hooks",
+    "bin/adr-check",
+    "bin/lib/",                          # includes bin/lib/pr-armable.sh
+    "bin/test-postplan-arm-conditions",
+    "bin/post-plan-",                    # post-plan-now, post-plan-fail-dm launchers
+    "tools/postplan-harness/",           # runner.py and every harness module
+)
+
+
+def _norm_repo_path(p) -> str:
+    s = posixpath.normpath(str(p).replace("\\", "/"))
+    return s[2:] if s.startswith("./") else s
+
+
+def denied_local_gate_edits(paths) -> list[str]:
+    """The subset of `paths` (as given) that normalizes under a local-gate prefix."""
+    return [p for p in (paths or [])
+            if any(_norm_repo_path(p).startswith(prefix)
+                   for prefix in LOCAL_GATE_PATH_PREFIXES)]
 
 
 def _findings_section(lines: list[str]) -> list[str] | None:

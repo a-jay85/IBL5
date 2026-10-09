@@ -23,6 +23,8 @@ MANUAL_CONFIRMATION_BEGIN = "<!-- manual-confirmation:begin -->"
 MANUAL_CONFIRMATION_END = "<!-- manual-confirmation:end -->"
 REVIEWER_VERIFICATION_BEGIN = "<!-- reviewer-verification:begin -->"
 REVIEWER_VERIFICATION_END = "<!-- reviewer-verification:end -->"
+GATE_FIX_BEGIN = "<!-- gate-fix:begin -->"
+GATE_FIX_END = "<!-- gate-fix:end -->"
 
 STRIP_RE = re.compile(r"(migrations/|composer\.lock|package-lock\.json|bun\.lock|__snapshots__/|\.snap$)")
 _PHP = re.compile(r"\.php$")
@@ -462,6 +464,62 @@ def upsert_scope_notes(body: str, block: str) -> str:
     well_formed = begin_idx != -1 and end_idx != -1 and begin_idx < end_idx
     if well_formed:
         after_end = end_idx + len(SCOPE_NOTES_END)
+        if not block:
+            head = body[:begin_idx].rstrip("\n")
+            tail = body[after_end:].lstrip("\n")
+            return head + ("\n\n" + tail if tail else "\n") if head else tail
+        return body[:begin_idx] + block + body[after_end:]
+    if not block:
+        return body
+    if not body.strip():
+        return block
+    return body.rstrip() + "\n\n" + block + "\n"
+
+
+def render_gate_fix(rec: dict) -> str:
+    """The `## Local gate auto-fix` block for a PR body, or "" unless a fix shipped.
+
+    Rendered only for a `fixed` outcome whose retry passed. Any other record stays in
+    result.json and audit.log.
+    """
+    if not rec or rec.get("status") != "fixed" or rec.get("retry") != "passed":
+        return ""
+    cost = rec.get("cost_usd")
+    shown = "unknown" if cost is None else f"${cost:.2f}"
+    files = ", ".join(f"`{f}`" for f in rec.get("files") or [])
+    excerpt = (rec.get("gate_excerpt") or "").replace("~~~~", "~ ~ ~ ~")
+    return "\n".join([
+        GATE_FIX_BEGIN,
+        "## Local gate auto-fix",
+        "",
+        f"A local `{rec.get('failed_cmd', '')}` gate denied this branch. The harness ran "
+        "one headless fixer and the retry passed.",
+        "",
+        f"- Model: `{rec.get('model_id', '')}`, cost: {shown}",
+        f"- Gate class: `{rec.get('gate_class', '')}`",
+        f"- Files touched: {files}",
+        "",
+        "<details><summary>Gate output</summary>",
+        "",
+        "~~~~text",
+        excerpt,
+        "~~~~",
+        "</details>",
+        GATE_FIX_END,
+    ])
+
+
+def upsert_gate_fix(body: str, block: str) -> str:
+    """Insert, replace, or remove the gate-fix block in a PR body.
+
+    Same contract as upsert_scope_notes with the GATE_FIX markers.
+    """
+    body = body or ""
+    begin_idx = body.find(GATE_FIX_BEGIN)
+    end_idx = body.find(GATE_FIX_END)
+    well_formed = begin_idx != -1 and end_idx != -1 and begin_idx < end_idx
+    if well_formed:
+        after_end = end_idx + len(GATE_FIX_END)
         if not block:
             head = body[:begin_idx].rstrip("\n")
             tail = body[after_end:].lstrip("\n")

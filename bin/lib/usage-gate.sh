@@ -189,7 +189,9 @@ usage_marker_write() {
     case "$resets" in ''|*[!0-9]*) resets="" ;; esac
     local fp
     fp=$(_usage_cred_fp)
-    if jq -n --arg fp "$fp" --arg sid "$sid" --arg runner "$runner" --argjson prio "$prio" \
+    local acct
+    acct=$(_usage_acct_fp)
+    if jq -n --arg fp "$fp" --arg acct "$acct" --arg sid "$sid" --arg runner "$runner" --argjson prio "$prio" \
         --arg rbin "$rbin" --arg cwd "$cwd" --arg reason "$reason" --arg zone "$zone" \
         --argjson pct "$pct" --arg window "$window" --arg resets "$resets" \
         --argjson now "$(date +%s)" --argjson rc "$prev_count" \
@@ -198,6 +200,7 @@ usage_marker_write() {
           reason:$reason, zone:$zone, pct:$pct, window:$window,
           resets_at:(if $resets == "" then null else ($resets|tonumber) end),
           paused_at:$now, resume_count:$rc,
+          acct_fp:(if $acct == "" then null else $acct end),
           cred_fp:(if $fp == "" then null else $fp end)}' 2>/dev/null > "$tmp" \
         && mv "$tmp" "$file"; then
         return 0

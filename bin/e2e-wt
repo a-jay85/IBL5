@@ -43,9 +43,12 @@ EOF
     exit 0
 fi
 
+source "$(dirname "$0")/lib/git-helpers.sh"
 # Always resolve to the main repo root, even when run from a worktree.
-REPO_ROOT="$(cd "$(dirname "$0")/.." && dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
-source "$REPO_ROOT/bin/lib/git-helpers.sh"
+REPO_ROOT="$(main_checkout_root "$(dirname "$0")/..")" || {
+    echo "ERROR: cannot locate main checkout" >&2
+    exit 1
+}
 source "$REPO_ROOT/bin/lib/gh-pr.sh"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 

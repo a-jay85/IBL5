@@ -515,3 +515,85 @@ def test_collapse_guard_check_not_tripped_after_squash():
     finally:
         _cleanup_tmp(key)
         shutil.rmtree(d, ignore_errors=True)
+
+
+def _setup_pushed_merge_range(push_remote="pub"):
+    """Phase 1 fixture plus a bare remote already holding the pre-squash tip."""
+    d, fork_sha, master_sha, key, branch = _make_merge_range_repo()
+    bare = tempfile.mkdtemp(prefix="postplan-sqb-bare-")
+    subprocess.run(["git", "init", "--bare", bare], check=True, capture_output=True)
+    _sh(d, "remote", "add", push_remote, bare)
+    _sh(d, "push", push_remote, f"{branch}:refs/heads/{branch}")
+    g = LiveGit(d, push_remote=push_remote)
+    pre_tip = g.head()
+    assert _rev(d, f"refs/remotes/{push_remote}/{branch}") == pre_tip
+    return d, fork_sha, master_sha, key, branch, bare, g, pre_tip
+
+
+def test_push_after_squash_leases_against_pre_squash_remote_tip():
+    d, fork_sha, master_sha, key, branch, bare, g, pre_tip = _setup_pushed_merge_range()
+    try:
+        result = g.autoresolve_stacked_rebase()
+        assert result.resolved is True, result.reason
+
+        recorded = []
+        original_run_out = g._run_out
+
+        def spy_run_out(*args):
+            recorded.append(args)
+            return original_run_out(*args)
+
+        g._run_out = spy_run_out
+        g.push()
+
+        push_args = [a for a in recorded if a and a[0] == "push"]
+        assert push_args, "no push argv recorded"
+        assert f"--force-with-lease={branch}:{pre_tip}" in push_args[0]
+        assert f"HEAD:refs/heads/{branch}" in push_args[0]
+        remote_tip = subprocess.run(
+            ["git", "-C", bare, "rev-parse", f"refs/heads/{branch}"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        assert remote_tip == g.head()
+        assert g.head() != pre_tip
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+        shutil.rmtree(bare, ignore_errors=True)
+
+
+def test_push_after_squash_rejects_when_remote_moved():
+    d, fork_sha, master_sha, key, branch, bare, g, pre_tip = _setup_pushed_merge_range()
+    try:
+        result = g.autoresolve_stacked_rebase()
+        assert result.resolved is True, result.reason
+        # Push to the URL so refs/remotes/pub/<branch> stays at pre_tip.
+        _sh(d, "push", "--force", bare, f"{master_sha}:refs/heads/{branch}")
+        with pytest.raises(HarnessError) as ei:
+            g.push()
+        assert ei.value.kind == "push-failed"
+        remote_tip = subprocess.run(
+            ["git", "-C", bare, "rev-parse", f"refs/heads/{branch}"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        assert remote_tip == master_sha
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+        shutil.rmtree(bare, ignore_errors=True)
+
+
+def test_declined_squash_run_leaves_branch_not_diverged_from_remote():
+    d, fork_sha, master_sha, key, branch, bare, g, pre_tip = _setup_pushed_merge_range()
+    try:
+        _add_master_feature_conflict(d, branch)
+        result = g.autoresolve_stacked_rebase()
+        assert result.resolved is False
+        assert result.squash_note.startswith("squashed ")
+        counts = _sh(d, "rev-list", "--left-right", "--count",
+                     f"refs/remotes/pub/{branch}...HEAD").stdout.split()
+        assert counts == ["0", "0"]
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+        shutil.rmtree(bare, ignore_errors=True)

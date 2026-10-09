@@ -174,7 +174,7 @@ class LiveGit:
         if not merging and not any(
                 p and os.path.exists(p)
                 for p in (_git_path("rebase-merge"), _git_path("rebase-apply"))):
-            if self._squashed_from is not None:
+            if getattr(self, "_squashed_from", None) is not None:
                 try:
                     self._restore_pre_squash()
                 except Exception:  # signal handler: never raise

@@ -346,7 +346,7 @@ if [ -n "${WT_SYNC_REPO_ROOT:-}" ]; then
     # paths diverge from git's internal realpath if not resolved here.
     REPO_ROOT="$(cd "${WT_SYNC_REPO_ROOT}" 2>/dev/null && pwd -P || echo "${WT_SYNC_REPO_ROOT}")"
 else
-    REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+    REPO_ROOT="$(main_checkout_root .)" || REPO_ROOT=""
 fi
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 

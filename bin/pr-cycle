@@ -129,20 +129,21 @@ export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/
 # --git-common-dir points at the main .git even from a linked worktree, where
 # --show-toplevel would return the worktree instead. Used only to locate sibling tools.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-GIT_COMMON="$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-if [ -z "$GIT_COMMON" ]; then
-    # git < 2.31 has no --path-format; fall back to resolving the relative answer by hand.
-    GIT_COMMON="$(cd "$SCRIPT_DIR" && cd "$(git rev-parse --git-common-dir)" && pwd -P)"
-fi
-ROOT="$(dirname "$GIT_COMMON")"
+. "$SCRIPT_DIR/lib/git-helpers.sh"
+ROOT="$(main_checkout_root "$SCRIPT_DIR")" || {
+    echo "ERROR: cannot locate main checkout from $SCRIPT_DIR" >&2
+    exit 1
+}
 . "$SCRIPT_DIR/lib/launchd-job.sh"
+# shellcheck source=bin/lib/dm.sh
+. "$SCRIPT_DIR/lib/dm.sh"
 
 # --- env seams ---------------------------------------------------------------------------
 # All :- (not -) so an EMPTY value falls back to the default exactly as an unset one does.
 PR_CYCLE_ATTACK_CMD="${PR_CYCLE_ATTACK_CMD:-$ROOT/bin/pr-attack}"
 PR_CYCLE_TRIAGE_CMD="${PR_CYCLE_TRIAGE_CMD:-$ROOT/bin/pr-triage}"
 PR_CYCLE_READY_CMD="${PR_CYCLE_READY_CMD:-$ROOT/bin/post-plan-fleet}"
-PR_CYCLE_DM_CMD="${PR_CYCLE_DM_CMD:-$ROOT/bin/discord-dm}"
+PR_CYCLE_DM_CMD="$(dm_bin "$ROOT/bin" PR_CYCLE_DM_CMD)"
 PR_CYCLE_GH_CMD="${PR_CYCLE_GH_CMD:-gh}"
 PR_CYCLE_MAIN_CHECKOUT="${PR_CYCLE_MAIN_CHECKOUT:-/Users/ajaynicolas/GitHub/IBL5}"
 PR_CYCLE_RESCUE="${PR_CYCLE_RESCUE:-1}"
@@ -1246,7 +1247,7 @@ $(_your_turn_lines)"
         _msg="pr-cycle finished — $_FIRED_SUMMARY, armed $ARMED, your turn $LEFT — $_reason
 log: ${PR_CYCLE_LOG:-<foreground>}
 $_yt_block"
-        "$PR_CYCLE_DM_CMD" --ping "$_msg" || true
+        DM_CMD="$PR_CYCLE_DM_CMD" dm_ping "$_msg" || true
     fi
 
     case "$_reason" in

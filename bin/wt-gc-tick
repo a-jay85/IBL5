@@ -84,8 +84,10 @@ case "$WT_GC_MIN_INTERVAL_SECS" in
 esac
 
 # ── Repo root ─────────────────────────────────────────────────────────────────
+# shellcheck source=bin/lib/git-helpers.sh disable=SC1091
+source "$SCRIPT_DIR/lib/git-helpers.sh"
 if [ -z "$WT_GC_REPO_ROOT" ]; then
-    WT_GC_REPO_ROOT="$(git -C "$SCRIPT_DIR/.." worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')" || WT_GC_REPO_ROOT=""
+    WT_GC_REPO_ROOT="$(main_checkout_root "$SCRIPT_DIR/..")" || WT_GC_REPO_ROOT=""
 fi
 if [ -z "$WT_GC_REPO_ROOT" ]; then
     log "cannot resolve repo root — aborting"

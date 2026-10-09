@@ -629,13 +629,21 @@ burndown_next_run() {
 # A runner has no section of its own. Its details print under the queue row of the
 # plan it is working on, so the plan and the job driving it read as one block.
 
-# The first heartbeat file for a PID, or nothing. Callers validate the PID first
-# (pid_alive_matching rejects non-digits), so the glob never sees a stray value.
+# The file that names a live runner's current phase, or nothing. Callers validate
+# the PID first (pid_alive_matching rejects non-digits), so the glob never sees a
+# stray value.
+#
+# The heartbeat file wins because it carries the last-event epoch. Only the impl
+# phase ever gets one: bin/lib/automouse-stream-filter.sh writes it, and the
+# post-plan phase runs bin/post-plan-now, which emits no stream-json. A post-plan
+# phase leaves only .cmdpid-<pid>-postplan, so fall back to the cmdpid file. That
+# also covers an impl that has not logged its first event yet.
+#
 # A runner writes one phase at a time. If a leaked -impl file sits beside a live
 # -postplan one, the glob's alphabetical order shows impl.
-runner_heartbeat() {
+runner_phase_file() {
     local hb
-    for hb in "$AUTOMOUSE_DIR/.heartbeat-$1-"*; do
+    for hb in "$AUTOMOUSE_DIR/.heartbeat-$1-"* "$AUTOMOUSE_DIR/.cmdpid-$1-"*; do
         [ -f "$hb" ] && { printf '%s' "$hb"; return 0; }
     done
     return 1
@@ -695,14 +703,14 @@ plan_meta() {
 # yesterday's file: take the newest dated log, never today's by name. The
 # ????-??-??.log glob keeps launchd-rearm.log out.
 render_runner_detail() {
-    local pid="$1" slug="$2" hb="$3" phase now hb_ts hb_age attempts safe d audit='' log progress=''
+    local pid="$1" slug="$2" hb="$3" phase now hb_ts='' hb_age activity='' attempts safe d audit='' log progress=''
 
-    phase="$(basename "$hb")"; phase="${phase#.heartbeat-}"; phase="${phase#*-}"
+    phase="$(basename "$hb")"; phase="${phase#.heartbeat-}"; phase="${phase#.cmdpid-}"; phase="${phase#*-}"
     now="$(date +%s)"
-    hb_ts="$(tr -dc '0-9' < "$hb" 2>/dev/null)"
-    case "$hb_ts" in
-        ''|*[!0-9]*) hb_age='' ;;
-        *) hb_age="$(( now - hb_ts ))" ;;
+    # A heartbeat file holds the last-event epoch. A cmdpid file holds a PID, so
+    # a post-plan phase takes its activity time from the audit.log below.
+    case "$(basename "$hb")" in
+        .heartbeat-*) hb_ts="$(tr -dc '0-9' < "$hb" 2>/dev/null)" ;;
     esac
     attempts=''
     [ -f "$AUTOMOUSE_DIR/queue/$slug.md.attempts" ] && \
@@ -714,8 +722,16 @@ render_runner_detail() {
         if [ -n "$d" ] && [ -f "${d%/}/audit.log" ]; then
             audit="${d%/}/audit.log"
             progress="$(last_line "$audit" 64 '^\[[0-9:]+\] phase')"
+            [ -z "$hb_ts" ] && hb_ts="$(file_mtime "$audit")"
         fi
     fi
+    case "$hb_ts" in
+        ''|*[!0-9]*) hb_age='' ;;
+        *) hb_age="$(( now - hb_ts ))" ;;
+    esac
+    # No timestamp at all (an impl before its first event) drops the field
+    # rather than print "last activity ? ago".
+    [ -n "$hb_age" ] && activity=" last activity $(human_age "$hb_age") ago"
     # Each runner writes its own logs/<date>-<pid>.log (bin/automouse/run). Read
     # THIS runner's file: with two runners live, the newest log overall belongs
     # to the other one, and the slug grep below would come back empty. ls -t
@@ -728,9 +744,9 @@ render_runner_detail() {
     [ -z "$progress" ] && progress="(no activity logged yet)"
 
     track_pid "$pid"
-    printf '      %s●%s %-8s pid %-7s up %-8s last activity %s ago%s%s\n' \
+    printf '      %s●%s %-8s pid %-7s up %-8s%s%s%s\n' \
         "$GRN" "$R" "$phase" "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" \
-        "$(human_age "$hb_age")" "$attempts" "$(log_word "$audit" "$log")"
+        "$activity" "$attempts" "$(log_word "$audit" "$log")"
     printf '      %s%s%s\n' "$DIM" "$progress" "$R"
 }
 
@@ -1099,15 +1115,22 @@ EOF_Q
     # and only counted. A live one is a runner on a plan that is not in queue/
     # (its lock dir outlived the .md, or a one-off run), so it leads the section
     # with its own row rather than vanishing.
-    for hb in "$AUTOMOUSE_DIR"/.heartbeat-*; do
+    #
+    # The cmdpid files follow so a post-plan phase, which has no heartbeat (see
+    # runner_phase_file), still gets its row. Heartbeats go first, and each shown
+    # PID joins $claimed, so a runner holding both files prints once. Only
+    # heartbeats count as stale residue: every run that leaves one also leaves a
+    # cmdpid file, and counting both would double the figure.
+    for hb in "$AUTOMOUSE_DIR"/.heartbeat-* "$AUTOMOUSE_DIR"/.cmdpid-*; do
         [ -f "$hb" ] || continue
-        rest="$(basename "$hb")"; rest="${rest#.heartbeat-}"
+        rest="$(basename "$hb")"; rest="${rest#.heartbeat-}"; rest="${rest#.cmdpid-}"
         pid="${rest%%-*}"
         case "$claimed" in *" $pid "*) continue ;; esac
         if ! pid_alive_matching "$pid" 'automouse'; then
-            stale=$(( stale + 1 ))
+            case "$(basename "$hb")" in .heartbeat-*) stale=$(( stale + 1 )) ;; esac
             continue
         fi
+        claimed="$claimed$pid "
         # Slug: the lock directory holding this PID is authoritative for both
         # queue-draining and one-off (plan <slug>) invocations. Fallback: command-
         # line scrape, which only matches the explicit .md invocation form.
@@ -1176,7 +1199,7 @@ EOF_Q
             printf '  %s %s%s %-17s %-6s %s\n' \
                 "$mark" "$(link_file "$f" "$base")" "$pad" "$model" "$merge" "$state"
             [ -n "$title" ] && printf '      %s%s%s\n' "$DIM" "$title" "$R"
-            [ -n "$pid" ] && hb="$(runner_heartbeat "$pid")" && \
+            [ -n "$pid" ] && hb="$(runner_phase_file "$pid")" && \
                 render_runner_detail "$pid" "${base%.md}" "$hb"
         else
             printf '  %s%2d.%s %s%s %-17s %-6s %s%s%s\n' \

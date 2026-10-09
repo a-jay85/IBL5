@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import time
 from dataclasses import dataclass, field, replace as _dc_replace
 from pathlib import Path
 from typing import Optional
@@ -14,6 +15,8 @@ from ..conflict import classify, parse_unmerged
 from .llm import run_bounded
 
 COMMIT_HOOK_TIMEOUT = 300   # seconds for `git commit` incl. bin/pre-commit-hook
+FETCH_LOCK_RETRIES = 3      # fetch_base retries after a concurrent-fetch ref-lock race
+FETCH_LOCK_BACKOFF = 1.0    # seconds; attempt n sleeps n * this
 
 # Local gate denials (bin/pre-commit-hook, bin/pre-push-adr-hook) are deterministic:
 # re-running the FULL /post-plan skill hits the identical hook and cannot clear it
@@ -384,8 +387,21 @@ class LiveGit:
         """Freshen the base ref so diff/classification and the later rebase see
         the real remote tip, not a stale local origin/master."""
         remote, _, ref = base.partition("/")
-        if ref:
-            self._run("fetch", remote, ref)
+        if not ref:
+            return
+        # Worktrees share refs/remotes, so two runs fetching at once race on the
+        # origin/master ref lock: the loser dies with "cannot lock ref ... is at X but
+        # expected Y". The winner already moved the ref, so a retry succeeds. The
+        # usage-gate coordinator resumes paused runs in one wave, which hit this
+        # (hot-files-base-ref-validate, 2026-10-09).
+        for attempt in range(FETCH_LOCK_RETRIES + 1):
+            try:
+                self._run("fetch", remote, ref)
+                return
+            except HarnessError as e:
+                if attempt == FETCH_LOCK_RETRIES or "cannot lock ref" not in (e.detail or ""):
+                    raise
+                time.sleep(FETCH_LOCK_BACKOFF * (attempt + 1))
 
     def branch_base(self, branch: str | None = None) -> str | None:
         """Stacked-branch parent tip SHA, recorded by bin/wt-new as

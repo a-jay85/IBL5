@@ -921,6 +921,7 @@ jobs:
             bin/test-pr-review-now \
             bin/test-launchd-job \
             bin/test-check-phpunit-hygiene \
+            bin/test-check-e2e-hygiene \
             bin/test-test \
             bin/test-refactor-flag \
             bin/test-rebuild-css-if-source-changed \

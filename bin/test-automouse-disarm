@@ -25,17 +25,16 @@
 # Run: bin/test-automouse-disarm  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 RUN="$REPO_ROOT/bin/automouse/run"
-FAILED=0
 
-pass() { printf '  ok   %s\n' "$1"; }
-fail() { printf '  FAIL %s\n' "$1"; FAILED=1; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
-assert_eq() {
-    if [ "$1" = "$2" ]; then pass "$3 ($1)"; else fail "$3: got '$1', expected '$2'"; fi
-}
+assert_eq() { h_eq "$3" "$2" "$1"; }  # got want label
 
 # assert_before <needle-a> <needle-b> <call-log> <label>
 # Passes only when a's first occurrence precedes b's first occurrence, and both
@@ -64,8 +63,7 @@ eval "$(awk '/^next_daily_epoch\(\)/,/^}/'      "$RUN")"
 eval "$(awk '/^automouse_running_pid\(\)/,/^}/' "$RUN")"
 eval "$(awk '/^disarm_until_epoch\(\)/,/^}/'    "$RUN")"
 
-TMPROOT=$(mktemp -d)
-trap 'rm -rf "$TMPROOT"' EXIT
+h_tmp TMPROOT
 
 # --- The recording launchctl shim ------------------------------------------
 SHIM="$TMPROOT/launchctl"
@@ -244,9 +242,4 @@ else
 fi
 
 echo
-if [ "$FAILED" -eq 0 ]; then
-    echo "All bin/test-automouse-disarm cases passed."
-else
-    echo "bin/test-automouse-disarm FAILED"
-fi
-exit "$FAILED"
+h_done

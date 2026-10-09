@@ -387,7 +387,7 @@ fi
 pr_worktree_root() {
     git -C "$1" worktree list --porcelain | awk -v want="refs/heads/$2" '
         /^worktree / { wt = substr($0, 10) }
-        /^branch /   { if (substr($0, 8) == want) { print wt; exit } }'
+        /^branch /   { if (substr($0, 8) == want && !f) { print wt; f = 1 } }'
 }
 
 # --pr <n>: drive the worktree holding PR <n>'s head branch instead of the current branch.

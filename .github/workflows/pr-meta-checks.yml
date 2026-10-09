@@ -167,6 +167,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bin/check-registry-trigger-rows
 
+      - name: Run bin/check-model-pins
+        if: ${{ !cancelled() }}
+        run: bin/check-model-pins
+
+      - name: Run bin/test-check-model-pins
+        if: ${{ !cancelled() }}
+        run: bin/test-check-model-pins
+
       # --- Hard gates (path-gated): a non-zero exit fails the job, same as the
       # former standalone workflows. `!cancelled()` makes each report
       # independently of an earlier step's failure (no sequential masking). ---

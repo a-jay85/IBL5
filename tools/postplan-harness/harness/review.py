@@ -236,7 +236,7 @@ class ReviewPhase:
             tasks.append(("D", "code-review", "review-agent-d", "sonnet",
                           agent_d_prompt(meta, cls)))
         if gates["security"]:
-            tasks.append(("security", "security-audit", "security-audit", "haiku",
+            tasks.append(("security", "security-audit", "security-audit", "sonnet",
                           security_prompt(meta, cls, plan)))
 
         def _call_agent(task: tuple[str, str, str, str, str]):

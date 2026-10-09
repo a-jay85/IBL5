@@ -75,7 +75,7 @@ def _write(d, name, content):
         fh.write(content)
 
 
-def _make_merge_range_repo(suffix=None):
+def _make_merge_range_repo(suffix=None, lostwork_script=None):
     """Branch whose iblBase..HEAD range holds three merge-master commits.
 
     Returns (d, fork_sha, master_sha, key, branch). Merge 1 resolves a conflict
@@ -97,7 +97,10 @@ def _make_merge_range_repo(suffix=None):
 
     scripts_dir = os.path.join(d, ".claude", "review-shared", "scripts")
     os.makedirs(scripts_dir, exist_ok=True)
-    shutil.copy(_LOSTWORK, os.path.join(scripts_dir, "lostwork.sh"))
+    if lostwork_script is not None:
+        _write(scripts_dir, "lostwork.sh", lostwork_script)
+    else:
+        shutil.copy(_LOSTWORK, os.path.join(scripts_dir, "lostwork.sh"))
     shutil.copy(_COLLAPSE, os.path.join(scripts_dir, "collapse-guard.sh"))
     _sh(d, "add", "-A")
     _sh(d, "commit", "-m", "chore: proof scripts")
@@ -169,6 +172,82 @@ def test_merge_range_squashes_then_onto_resolves_tree_equivalent():
         assert _rev(d, "HEAD^") == master_sha
         assert not g.is_dirty()
         assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def _reflog(d, branch):
+    return _sh(d, "reflog", "--format=%gs", f"refs/heads/{branch}").stdout.splitlines()
+
+
+def test_merge_range_still_conflicts_decline_restores_pre_squash_head():
+    d, fork_sha, master_sha, key, branch = _make_merge_range_repo()
+    try:
+        # add/add conflict on feature.txt survives the squash
+        _sh(d, "checkout", "master")
+        _write(d, "feature.txt", "master version\n")
+        _sh(d, "add", "-A")
+        _sh(d, "commit", "-m", "m4: feature.txt on master")
+        _sh(d, "update-ref", "refs/remotes/origin/master", _rev(d, "HEAD"))
+        _sh(d, "checkout", branch)
+
+        g = LiveGit(d)
+        pre = g.head()
+        result = g.autoresolve_stacked_rebase()
+        assert result.resolved is False
+        assert result.reason.startswith("--onto rebase still conflicts:")
+        assert result.squash_note.startswith("squashed ")
+        assert g.head() == pre
+        assert not g.is_dirty()
+        log = _reflog(d, branch)
+        assert log[0] == "postplan: restore pre-squash HEAD"
+        assert log[1].startswith("postplan: squash")
+        assert not any(e.startswith(("reset:", "rebase")) for e in log)
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_merge_range_proof_decline_restores_pre_squash_head():
+    d, fork_sha, master_sha, key, branch = _make_merge_range_repo(
+        lostwork_script="#!/usr/bin/env bash\necho 'TREE DIVERGED'\nexit 0\n",
+    )
+    try:
+        # clean replay onto a newer master, so the post tree differs from the pre tree
+        _sh(d, "checkout", "master")
+        _write(d, "late.txt", "late\n")
+        _sh(d, "add", "-A")
+        _sh(d, "commit", "-m", "late")
+        _sh(d, "update-ref", "refs/remotes/origin/master", _rev(d, "HEAD"))
+        _sh(d, "checkout", branch)
+
+        g = LiveGit(d)
+        pre = g.head()
+        result = g.autoresolve_stacked_rebase()
+        assert result.resolved is False
+        assert "TREE DIVERGED" in result.reason
+        assert g.head() == pre
+        assert not os.path.exists(os.path.join(d, "late.txt"))
+        assert _sh(d, "status", "--porcelain").stdout == ""
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_sigterm_between_squash_and_rebase_restores_pre_squash_head():
+    d, fork_sha, master_sha, key, branch = _make_merge_range_repo()
+    try:
+        g = LiveGit(d)
+        pre = g.head()
+        g._pre_rebase_sha = pre
+        g._squashed_from = pre
+        new, _note, fatal = g._squash_merge_range_for_replay(fork_sha, branch, pre)
+        assert not fatal
+        assert g.head() != pre
+        g.emergency_abort()
+        assert g.head() == pre
+        assert not g.is_dirty()
     finally:
         _cleanup_tmp(key)
         shutil.rmtree(d, ignore_errors=True)

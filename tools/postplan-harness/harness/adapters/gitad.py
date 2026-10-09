@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace as _dc_replace
 from pathlib import Path
 from typing import Optional
 
@@ -174,6 +174,11 @@ class LiveGit:
         if not merging and not any(
                 p and os.path.exists(p)
                 for p in (_git_path("rebase-merge"), _git_path("rebase-apply"))):
+            if self._squashed_from is not None:
+                try:
+                    self._restore_pre_squash()
+                except Exception:  # signal handler: never raise
+                    pass
             return
         subprocess.run(["git", "-C", self.worktree, "merge", "--abort"],
                        capture_output=True)
@@ -793,10 +798,44 @@ class LiveGit:
             return "", f"squash aborted: update-ref compare-and-swap failed: {out.strip()[:200]}", True
         return new, f"squashed {count} commits ({merges} merges) {pre_sha[:12]} -> {new[:12]} onto {mb[:12]}", False
 
+    def _restore_pre_squash(self) -> None:
+        pre = self._squashed_from
+        if pre is None:
+            return
+        # A live rebase/merge is abort_and_restore's state to own; never move a ref under it.
+        for sub in ("rebase-merge", "rebase-apply"):
+            p = self._run("rev-parse", "--git-path", sub, check=False).strip()
+            if p and os.path.exists(os.path.join(self.worktree, p)):
+                return
+        if self._run("rev-parse", "-q", "--verify", "MERGE_HEAD", check=False).strip():
+            return
+        cur = self._run("rev-parse", "HEAD").strip()
+        if cur == pre:
+            return
+        branch = self._run("rev-parse", "--abbrev-ref", "HEAD").strip()
+        if branch == "HEAD":
+            return  # detached: not a branch tip this run moved
+        # Identical trees need no worktree write and no `reset:` reflog entry (collapse-guard
+        # reads that as a rewrite); differing trees use --keep, which refuses to clobber edits.
+        same_tree = (self._run("rev-parse", f"{cur}^{{tree}}").strip()
+                     == self._run("rev-parse", f"{pre}^{{tree}}").strip())
+        rc, out = (self._run_out("update-ref", "-m", "postplan: restore pre-squash HEAD",
+                                 f"refs/heads/{branch}", pre, cur)
+                   if same_tree else self._run_out("reset", "--keep", pre))
+        if rc != 0:
+            raise HarnessError("rebase-conflict",
+                               f"RESTORE-FAILED: pre-squash HEAD {pre[:12]} not restored: {out.strip()[:300]}")
+
     def autoresolve_stacked_rebase(self) -> "StackedRebaseResult":
+        resolved = False
         try:
-            return self._autoresolve_stacked_rebase()
+            result = self._autoresolve_stacked_rebase()
+            resolved = result.resolved
+            return _dc_replace(result, squash_note=self._last_squash_note)
         finally:
+            if not resolved:
+                self._restore_pre_squash()
+            self._squashed_from = None
             self._pre_rebase_sha = None
 
     def _autoresolve_stacked_rebase(self) -> "StackedRebaseResult":
@@ -882,14 +921,15 @@ class LiveGit:
         # --onto replay sees the branch's net change, not commits whose conflicts a dropped
         # merge already resolved. Runs AFTER collapse-guard `record` (records the true
         # pre-squash tip) and AFTER pre_rebase_sha is armed (restore point = pre-squash HEAD).
+        self._squashed_from = pre_rebase_sha  # armed BEFORE the ref moves; restore is a no-op while HEAD == pre
         squashed_head, squash_note, squash_fatal = self._squash_merge_range_for_replay(
             ibl_base, branch, pre_rebase_sha,
         )
         self._last_squash_note = squash_note
+        if not squashed_head:
+            self._squashed_from = None
         if squash_fatal:
             return StackedRebaseResult(False, squash_note)
-        if squashed_head:
-            self._squashed_from = pre_rebase_sha
 
         rebase_proc = subprocess.run(
             ["git", "-C", self.worktree, *_NO_RERERE, "rebase", "--onto", master_sha, ibl_base, branch],

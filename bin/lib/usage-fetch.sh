@@ -2,9 +2,10 @@
 # Shared plan-usage fetcher with a persistent cache. Sourced by the usage-gate hook,
 # the coordinator, every runner, and the interactive UserPromptSubmit hook.
 #
-# The cache lives under the project state dir (not /tmp) so the launchd coordinator,
-# which has no keychain access, can read usage an interactive or headless session
-# fetched. Freshness comes from the fetched_at field, never file mtime, because
+# The cache lives under the project state dir (not /tmp) so the launchd coordinator
+# can read usage an interactive or headless session fetched, even when its own keychain
+# read fails (the --probe-keychain check in usage-gate-cron-setup is one-shot only).
+# Freshness comes from the fetched_at field, never file mtime, because
 # `stat -f %m` (BSD) breaks on the Linux CI runner. No `date -d` / `date -v`.
 #
 # A shared 429 backoff file and a mkdir fetch lock in the state dir keep concurrent
@@ -53,7 +54,8 @@ usage_cache_path() {
 
 # _usage_cred_fp
 # Echoes a short sha256 of the keychain OAuth access token, or nothing when the
-# keychain is unreadable (the launchd coordinator). Never the token itself.
+# keychain is unreadable (possible under launchd). Never the token itself. A token
+# refresh changes it too, so switch detection pairs it with _usage_acct_fp.
 _usage_cred_fp() {
     local tok
     tok=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null \

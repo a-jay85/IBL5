@@ -2118,6 +2118,48 @@ test_coord_stale_dm_dry_run() {
     assert_no_file stale_dm_dry:no-throttle-write "$IBL5_USAGE_GATE_STATE_DIR/dm-stale-at"
 }
 
+# ---------------------------------------------------------------- marker fingerprints
+
+test_marker_records_cred_fp() {
+    new_env
+    seed_home uuid-A
+    local rbin="$T/resume.sh" f
+    printf '#!/bin/sh\n' > "$rbin"; chmod +x "$rbin"
+    f="$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    elig_run tokA "usage_marker_write $SID_A plan-now '$rbin' usage-pause drain 95 five_hour 1790625600"
+    assert_eq marker_fp:cred "$FP_A" "$(jq -r '.cred_fp' "$f")"
+    assert_eq marker_fp:acct "$(acct_hash uuid-A)" "$(jq -r '.acct_fp' "$f")"
+    assert_eq marker_fp:no-token 0 "$(grep -c -e tokA -e uuid-A "$f")"
+    rm "$HOME/.claude.json"
+    elig_run "" "usage_marker_write $SID_A plan-now '$rbin' usage-pause drain 95 five_hour 1790625600"
+    assert_eq marker_fp:cred-null null "$(jq -r '.cred_fp' "$f")"
+    assert_eq marker_fp:acct-null null "$(jq -r '.acct_fp' "$f")"
+}
+
+test_marker_cred_switched() {
+    elig_marker usage-pause 60 "$FP_A"
+    elig_run tokA "usage_marker_cred_switched $SID_A"
+    assert_eq marker_switched:same 1 "$?"
+    elig_run tokB "usage_marker_cred_switched $SID_A"
+    assert_eq marker_switched:differs 0 "$?"
+    elig_run tokB "usage_marker_cred_switched ../x"
+    assert_eq marker_switched:bad-sid 1 "$?"
+    elig_run "" "usage_marker_cred_switched $SID_A"
+    assert_eq marker_switched:no-keychain 1 "$?"
+}
+
+test_switch_never_stores_secrets() {
+    sw_stale_setup
+    seed_home uuid-B
+    make_stub_http "$STUB" tokB 429 "$RL_BODY" 3598
+    sw_marker "$SID_A" uuid-A
+    acct_hash uuid-A > "$IBL5_USAGE_GATE_STATE_DIR/acct-last"
+    seed_cache_fp "$(date +%s)" "$BODY_A" "$FP_A"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
+    assert_eq never_secrets:state "" "$(grep -rl -e tokB -e uuid-B -e uuid-A "$IBL5_USAGE_GATE_STATE_DIR" 2>/dev/null)"
+}
+
 # ---------------------------------------------------------------- runner
 
 TESTS=$(grep -E '^test_[a-z0-9_]+\(\)' "$0" | sed 's/().*//')

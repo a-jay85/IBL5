@@ -217,11 +217,22 @@ jobs:
         env:
           HOT_FILE_BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: |
-          if bin/check-hot-files --pr | tee hot-files.txt; then
-            echo "crossed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "crossed=false" >> "$GITHUB_OUTPUT"
-          fi
+          # No pipe: the default `bash -e` shell has no pipefail, so
+          # `cmd | tee` would report tee's status. 0 = crossing (post),
+          # 1 = no crossing (delete stale comment), anything else = the
+          # gate failed: fail this step and leave any comment in place.
+          rc=0
+          bin/check-hot-files --pr > hot-files.txt || rc=$?
+          cat hot-files.txt
+          case "$rc" in
+            0) echo "crossed=true" >> "$GITHUB_OUTPUT" ;;
+            1) echo "crossed=false" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "::error title=check-hot-files::exited $rc; keeping any existing hot-files comment"
+              echo "crossed=error" >> "$GITHUB_OUTPUT"
+              exit "$rc"
+              ;;
+          esac
 
       - name: Post hot-file crossing comment
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.hotfiles == 'true' && steps.hotfiles.outputs.crossed == 'true' }}
@@ -231,7 +242,7 @@ jobs:
           path: hot-files.txt
 
       - name: Remove stale hot-file comment
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.hotfiles == 'true' && steps.hotfiles.outputs.crossed != 'true' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.hotfiles == 'true' && steps.hotfiles.outputs.crossed == 'false' }}
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: hot-files

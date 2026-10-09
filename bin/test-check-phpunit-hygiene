@@ -379,6 +379,66 @@ hot_case hot-base-flag-bogus-exit2 2 '^--base nosuchref does not resolve to a co
 hot_case hot-base-flag-scans 0 '^CROSSED: ' - \
     "$(mk_hot_repo 3 10 "$HOT_FOO")" "$HOT" --pr --base HEAD
 
+# === hot-files: pr-meta-checks.yml step mapping ===
+# Runs the workflow's own `run:` block under `bash -e` (GitHub's default shell,
+# no pipefail) against the real gate copied into a fixture repo.
+HOT_WF="$(cd "$(dirname "$HOT")/.." && pwd)/.github/workflows/pr-meta-checks.yml"
+HOT_STEP="$TMP/hot-step.sh"
+sed -n '/^      - name: Run bin\/check-hot-files$/,/^      - name: Post hot-file crossing comment$/p' \
+    "$HOT_WF" | sed -n '/^        run: |$/,$p' | sed '1d;$d' | sed 's/^          //' > "$HOT_STEP"
+if grep -q 'bin/check-hot-files --pr' < "$HOT_STEP"; then
+    pass "hot-wf-step-extracted"
+else
+    failcase "hot-wf-step-extracted — run block not found in $HOT_WF"
+fi
+
+# hot_wf_case <name> <want-step-exit> <want-output-line> <dir> <want-re|-> <out|hot-files.txt> [env assigns...]
+hot_wf_case() {
+    local name="$1" want="$2" want_out="$3" d="$4" want_re="$5" target="$6" out rc got hay
+    shift 6
+    mkdir -p "$d/bin/lib"
+    cp "$HOT" "$d/bin/check-hot-files"
+    cp "$(dirname "$HOT")/lib/scan-scope.sh" "$d/bin/lib/"
+    : > "$d/gh-output"
+    out="$( ( cd "$d" && env -u HOT_FILE_BASE_REF HOT_FILE_THRESHOLD=5 \
+        GITHUB_OUTPUT="$d/gh-output" "$@" bash -e "$HOT_STEP" ) 2>&1 )"
+    rc=$?
+    got="$(cat "$d/gh-output")"
+    if [ "$rc" -ne "$want" ]; then
+        failcase "$name — expected step exit $want, got $rc"; printf '%s\n' "$out" | sed 's/^/    /'; return
+    fi
+    if [ "$got" != "$want_out" ]; then
+        failcase "$name — GITHUB_OUTPUT was [$got], want [$want_out]"; return
+    fi
+    if [ "$want_re" != "-" ]; then
+        if [ "$target" = "out" ]; then hay="$out"; else hay="$(cat "$d/$target" 2>/dev/null)"; fi
+        if ! grep -qE -- "$want_re" <<< "$hay"; then
+            failcase "$name — $target did not match: $want_re"; return
+        fi
+    fi
+    pass "$name (exit $rc, output [$got])"
+}
+
+hot_wf_case hot-wf-step-crossing-true 0 'crossed=true' \
+    "$(mk_hot_repo 3 10 "$HOT_FOO")" '^CROSSED: ibl5/classes/Foo\.php' hot-files.txt HOT_FILE_BASE_REF=HEAD
+hot_wf_case hot-wf-step-no-crossing-false 0 'crossed=false' \
+    "$(mk_hot_repo 10 12 "$HOT_FOO")" - - HOT_FILE_BASE_REF=HEAD
+hot_wf_case hot-wf-step-bogus-ref-fails-keeps-comment 2 'crossed=error' \
+    "$(mk_hot_repo 3 10 "$HOT_FOO")" \
+    'HOT_FILE_BASE_REF=nosuchref does not resolve to a commit' out HOT_FILE_BASE_REF=nosuchref
+hot_wf_case hot-wf-step-bogus-ref-error-annotation 2 'crossed=error' \
+    "$(mk_hot_repo 3 10 "$HOT_FOO")" \
+    '::error title=check-hot-files::exited 2' out HOT_FILE_BASE_REF=nosuchref
+
+# Only an explicit crossed=false may delete the sticky comment.
+if grep -qF "steps.hotfiles.outputs.crossed == 'false' }}" < "$HOT_WF" \
+    && ! grep -qF "steps.hotfiles.outputs.crossed != 'true'" < "$HOT_WF" \
+    && ! grep -qE 'check-hot-files --pr \|' < "$HOT_WF"; then
+    pass "hot-wf-delete-only-on-false"
+else
+    failcase "hot-wf-delete-only-on-false — delete condition or tee pipe regressed in $HOT_WF"
+fi
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

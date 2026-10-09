@@ -356,5 +356,20 @@ else
     printf '%s\n' "$out" | sed 's/^/    /'
 fi
 
+# Real-repo smoke: --pr against a deep base resolves and scans without a usage
+# error. Skipped on a shallow clone where origin/master~200 does not exist.
+if git -C "$SCRIPT_DIR" rev-parse --verify -q 'origin/master~200' >/dev/null 2>&1; then
+    out="$( ( cd "$SCRIPT_DIR" && "$GATE" --pr --base 'origin/master~200' ) 2>&1 )"
+    rc=$?
+    if [ "$rc" -le 1 ]; then
+        pass "real-repo-deep-base-smoke (exit $rc)"
+    else
+        failcase "real-repo-deep-base-smoke — exit $rc"
+        printf '%s\n' "$out" | sed 's/^/    /'
+    fi
+else
+    echo "SKIP: real-repo-deep-base-smoke (origin/master~200 not available)"
+fi
+
 [ "$FAILED" -eq 0 ] || exit 1
 echo "all cases passed"

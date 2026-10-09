@@ -352,6 +352,9 @@ hot_case hot-full-mode-lists-foo 0 'Foo\.php' 'CROSSED' "$d" "$HOT"
 hot_case hot-env-unset-default-not-validated 1 - 'does not resolve' "$d" "$HOT" --pr
 hot_case hot-env-empty-defaults 1 - 'does not resolve' "$d" HOT_FILE_BASE_REF= "$HOT" --pr
 hot_case hot-env-bogus-exit1-not-2 1 - 'does not resolve' "$d" HOT_FILE_BASE_REF=nosuchref "$HOT" --pr
+# A bare $HOT_FILE_BASE_REF read (no :- default) dies under set -u in an empty
+# launchd-like environment. `env -i` also drops HOME and every other variable.
+hot_case hot-empty-env-no-unbound-variable 1 - 'unbound variable' "$d" env -i PATH="$PATH" "$HOT" --pr
 
 hot_case hot-unknown-arg-ignored 0 "$HOT_HEADER" - "$d" "$HOT" --bogus
 hot_case hot-help-exit0 0 '^Usage: bin/check-hot-files \[--pr\]' - "$d" "$HOT" --help

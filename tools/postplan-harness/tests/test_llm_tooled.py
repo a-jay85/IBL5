@@ -183,7 +183,24 @@ def test_toolless_call_still_single_turn_no_tools(shim, tmp_path, monkeypatch):
     logged = shim.read_text()
     assert "--max-turns 1" in logged
     assert "--tools" in logged
-    assert "--model claude-sonnet-4-6" in logged
+    assert "--model claude-sonnet-5-5" in logged
+
+
+def test_haiku_and_sonnet_calls_record_5_5_ids(shim, tmp_path, monkeypatch):
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", json.dumps({"result": '{"ok": true}'}))
+    ledger = UsageLedger()
+    cli = ClaudeCli(ledger, workdir=str(tmp_path))
+    cli.call("probe-haiku", "haiku", "p", validate=lambda d: None)
+    cli.call("probe-sonnet", "sonnet", "p", validate=lambda d: None)
+    assert {r.purpose: r.model for r in ledger.calls} == {
+        "probe-haiku": "claude-haiku-5-5",
+        "probe-sonnet": "claude-sonnet-5-5",
+    }
+    logged = shim.read_text()
+    assert "--model claude-haiku-5-5" in logged
+    assert "--model claude-sonnet-5-5" in logged
+    assert "claude-haiku-4-5" not in logged
+    assert "claude-sonnet-4-6" not in logged
 
 
 # --- envelope degradation (forced integration) --------------------------------

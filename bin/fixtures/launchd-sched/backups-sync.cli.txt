@@ -1,4 +1,2 @@
-args= exit=1
-FAILED: docker is required to build the static rsync.
 args=--bogus-flag exit=1
 Unknown option: --bogus-flag

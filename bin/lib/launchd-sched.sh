@@ -20,7 +20,7 @@
 _LSCHED_SOURCED=1
 
 # shellcheck source=bin/lib/launchd-job.sh
-. "$(dirname "${BASH_SOURCE[0]}")/launchd-job.sh"
+. "${BASH_SOURCE[0]%/*}/launchd-job.sh"
 
 # lsched_main_wt <repo_root> — print the durable MAIN checkout: the first
 # `worktree` entry of `git worktree list`, else <repo_root> when git cannot

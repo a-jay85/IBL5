@@ -101,7 +101,8 @@ run_cli() {
 
 cli_block() {
   local script="$1"
-  run_cli "$script" ""
+  # backups-sync-setup with no args runs the rsync/Docker/SSH build path.
+  case "$script" in bin/backups-sync-setup) ;; *) run_cli "$script" "" ;; esac
   run_cli "$script" "--bogus-flag"
 }
 
@@ -222,7 +223,7 @@ mkdir -p "$REPOBOX/main"
 (
   cd "$REPOBOX/main" || exit 1
   export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
-  git init -q . && git commit -q --allow-empty -m init && git worktree add -q "$REPOBOX/wt" -b lsched-wt
+  git init -q . && git -c user.name=lsched -c user.email=lsched@example.invalid commit -q --allow-empty -m init && git worktree add -q "$REPOBOX/wt" -b lsched-wt
 ) >/dev/null 2>&1
 REPOBOX_MAIN="$(cd "$REPOBOX/main" && pwd -P)"
 got="$(set -euo pipefail; . "$LIB"; lsched_main_wt "$REPOBOX/wt" | cat)"
@@ -322,6 +323,13 @@ expect_eq "lib-uninstall-idempotent" "0" "$?"
 # Source hygiene: sourcing twice leaves shell options unchanged.
 hyg="$( set +e; before="$- $(shopt -po)"; . "$LIB"; . "$LIB"; rc2=$?; after="$- $(shopt -po)"; [ "$before" = "$after" ] && [ "$rc2" = 0 ] && echo ok )"
 expect_eq "lib-source-hygiene" "ok" "$hyg"
+
+# Fixtures hold no machine path.
+if grep -rqE -e '/Users/' -e '/home/' -e '-worktrees' -e 'lsched-golden-home' "$FIXTURES"; then
+  fail "fixtures-no-machine-path"
+else
+  pass "fixtures-no-machine-path"
+fi
 
 echo
 echo "Passed: $PASS  Failed: $FAIL"

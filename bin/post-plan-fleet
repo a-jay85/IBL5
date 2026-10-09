@@ -638,6 +638,10 @@ notify() {
     fi
     if [ "$RC" = 124 ]; then
         verdict="TIMED OUT"
+    elif grep -q 'postplan-rc=75' "$LOG" 2>/dev/null \
+        || grep -q '^RESULT: post-plan PAUSED' "$LOG" 2>/dev/null; then
+        # Usage-gate pause: nothing to fix, the coordinator resumes it after the reset.
+        verdict="PAUSED"
     elif [ -n "$stop_line" ]; then
         verdict="STOPPED"
     else
@@ -732,6 +736,8 @@ for c in (d.get("arm") or {}).get("conditions") or []:
         "READY WITH NOTES") DM_ICON="⚠️"; DM_VERDICT="READY WITH NOTES"
                             DM_NEXT="${holds}${holds:+${warns:+$'\n'}}${warns}" ;;
         "NOT READY")        DM_ICON="❌"; DM_VERDICT="NOT READY";        DM_NEXT="$verdict_link" ;;
+        PAUSED)             DM_ICON="💤"; DM_VERDICT="PAUSED (usage gate)"
+                            DM_NEXT="nothing to fix — it resumes on its own after the usage reset" ;;
         STOPPED)            DM_ICON="🛑"; DM_VERDICT="STOPPED";          DM_NEXT="$stop_text" ;;
         "TIMED OUT")        DM_ICON="⏱";  DM_VERDICT="TIMED OUT"
                             DM_NEXT="re-run with \`bin/post-plan-fleet --pr ${PR} --go\`" ;;

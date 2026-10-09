@@ -27,7 +27,7 @@
         "ibl.echoInNonView": 1,
         "ibl.globalKeyword": 15,
         "ibl.hardcodedEnvString": 8,
-        "ibl.orderByMissingTiebreaker": 50,
+        "ibl.orderByMissingTiebreaker": 40,
         "ibl.sqlStringConcatenation": 26,
         "ibl.trustedVariable": 17,
         "ibl.unknownCliOption": 2,

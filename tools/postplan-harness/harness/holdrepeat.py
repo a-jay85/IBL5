@@ -254,6 +254,40 @@ def fingerprint(plan_path: str, worktree: str, harness_root=None, repo_root=None
         return ""
 
 
+_MISSING_PREFIXES = ("MISSING:", "MISSING-FILE:")
+
+
+def missing_parts(reason: str) -> frozenset[str]:
+    """Normalized `MISSING:` / `MISSING-FILE:` parts of a condition-3 reason."""
+    norm = normalize_reason(reason or "")
+    return frozenset(p for p in norm.split("; ")
+                     if p.startswith(_MISSING_PREFIXES))
+
+
+def early_repeat_reason(state_dir, slug, items) -> str | None:
+    """Return the repeated reason when `items` equal the stored condition-3 MISSING set.
+
+    `items` is the list from `conformance.early_missing_items`. Returns the
+    sorted, `"; "`-joined normalized parts when both sides are non-empty and
+    equal as sets. Returns None for no record, a record with no blocked
+    condition 3, an empty side, a strict subset or a strict superset.
+    """
+    current = missing_parts("; ".join(items or []))
+    if not current:
+        return None
+    rec = load_record(state_dir, slug)
+    if not rec:
+        return None
+    prior: frozenset[str] = frozenset()
+    for entry in rec.get("structural") or []:
+        if isinstance(entry, list) and len(entry) == 3 and entry[0] == 3:
+            prior = missing_parts(entry[2] or "")
+            break
+    if not prior or prior != current:
+        return None
+    return "; ".join(sorted(current))
+
+
 def should_decline(state_dir, slug, current_fp: str):
     record = load_record(state_dir, slug)
     if record is None or not current_fp:

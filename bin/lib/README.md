@@ -39,4 +39,5 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `pr-armable.sh` | Shared auto-merge "live hold" predicate for `/post-plan` Phase 6.5 arming conditions; sourced by `bin/pr-triage` and `/post-plan` |
 | `sim-recap-exemplar.txt` | Exemplar sim-recap text used as a style reference by the sim-recap prompt |
 | `tick-guards.sh` | Single-flight PID lock and fail-closed HID idle read shared by `bin/wt-gc-tick` and `bin/wt-sync-tick`; tested by `bin/test-tick-guards` |
+| `wt-compose.sh` | Worktree docker-compose helpers: slug format, compose file, `--env-file` flag, project label lookup |
 | `wt-guards.sh` | Shared worktree safety guards for scripts that modify or remove worktrees |

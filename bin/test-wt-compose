@@ -133,6 +133,8 @@ if [ "${1:-}" = compose ]; then
 fi
 echo "ARGV $*" >> "$DOCKER_LOG"
 case "${1:-}" in
+    compose)
+        exit "${STUB_COMPOSE_RC:-0}" ;;
     ps)
         if [ -n "${STUB_PS_NAMES-}" ]; then printf '%s\n' "$STUB_PS_NAMES"; fi
         exit 0 ;;
@@ -199,8 +201,23 @@ new_fx() {
     DOCKER_LOG="$BASE/docker.log"
     : > "$DOCKER_LOG"
     export DOCKER_LOG
-    STUB_PS_NAMES="" STUB_LABEL="" STUB_INSPECT_FAIL="" STUB_PR=""
-    export STUB_PS_NAMES STUB_LABEL STUB_INSPECT_FAIL STUB_PR
+    STUB_PS_NAMES="" STUB_LABEL="" STUB_INSPECT_FAIL="" STUB_PR="" STUB_COMPOSE_RC=""
+    export STUB_PS_NAMES STUB_LABEL STUB_INSPECT_FAIL STUB_PR STUB_COMPOSE_RC
+}
+
+# new_unit — a scratch REPO_ROOT (UR) holding docker/worktree-compose.yml, for the lib's
+# unit cases. Sets UR and DOCKER_LOG and resets every STUB_* knob.
+UNIT_N=0
+new_unit() {
+    UNIT_N=$((UNIT_N + 1))
+    UR="$TMP/unit.$UNIT_N"
+    mkdir -p "$UR/docker"
+    printf 'services: {}\n' > "$UR/docker/worktree-compose.yml"
+    DOCKER_LOG="$UR/docker.log"
+    : > "$DOCKER_LOG"
+    export DOCKER_LOG
+    STUB_PS_NAMES="" STUB_LABEL="" STUB_INSPECT_FAIL="" STUB_PR="" STUB_COMPOSE_RC=""
+    export STUB_PS_NAMES STUB_LABEL STUB_INSPECT_FAIL STUB_PR STUB_COMPOSE_RC
 }
 
 # mk_wt <name> — a worktree dir that wt-up's config safety nets skip.
@@ -451,6 +468,114 @@ else
         "$(git -C "$BASE/IBL5-worktrees/feat-x" rev-parse --abbrev-ref HEAD 2>/dev/null)"
 fi
 if [ -e "$BASE/IBL5-worktrees/feat/x" ]; then note_fail "nested IBL5-worktrees/feat/x must not exist"; fi
+case_end
+
+# ---------------------------------------------------------------------------
+# Unit cases for bin/lib/wt-compose.sh. Each runs in a subshell with `set -u`, REPO_ROOT
+# pointing at a scratch dir and the stub docker on PATH.
+# ---------------------------------------------------------------------------
+echo "== wt-compose.sh units"
+
+# unit_run <shell snippet> — source the lib under test, run the snippet, capture stdout in OUT.
+unit_run() {
+    # REPO_ROOT is read by the sourced lib; the lib path is chosen at run time (WT_COMPOSE_LIB).
+    # shellcheck disable=SC2034,SC1090
+    OUT="$( set -u; REPO_ROOT="$UR"; . "$LIB_SRC"; eval "$1" )"
+}
+
+# unit_slug <label> <expected> <snippet>
+unit_slug() {
+    new_unit
+    unit_run "$3"
+    case_begin "$1"
+    chk_eq "output" "$2" "$OUT"
+    case_end
+}
+
+unit_slug "unit: wt_slug plain" "alpha" 'wt_slug alpha'
+unit_slug "unit: wt_slug slash" "feat-x" 'wt_slug feat/x'
+unit_slug "unit: wt_slug multiple slashes" "a-b-c" 'wt_slug a/b/c'
+unit_slug "unit: wt_slug pr number" "pr-4242" 'wt_slug feat/x 4242'
+unit_slug "unit: wt_slug empty pr arg" "feat-x" 'wt_slug feat/x ""'
+
+new_unit
+unit_run 'wt_slug; echo "rc=$?"'
+case_begin "unit: wt_slug no args under set -u"
+chk_eq "output" $'\nrc=0' "$OUT"
+case_end
+
+new_unit
+unit_run 'wt_compose_file'
+case_begin "unit: wt_compose_file"
+chk_eq "output" "$UR/docker/worktree-compose.yml" "$OUT"
+case_end
+
+new_unit
+touch "$UR/.env"
+unit_run 'wt_compose_env_flag'
+case_begin "unit: env flag with .env"
+chk_eq "output" "--env-file $UR/.env" "$OUT"
+case_end
+
+new_unit
+unit_run 'wt_compose_env_flag; echo "rc=$?"'
+case_begin "unit: env flag without .env"
+chk_eq "output (empty, exit 0)" "rc=0" "$OUT"
+case_end
+
+new_unit
+STUB_LABEL=custom-proj
+unit_run 'wt_project_name alpha'
+case_begin "unit: project from label"
+chk_eq "output" "custom-proj" "$OUT"
+chk_log_line 'ARGV inspect ibl5-php-alpha --format {{index .Config.Labels "com.docker.compose.project"}}'
+case_end
+
+new_unit
+STUB_LABEL=""
+unit_run 'wt_project_name alpha'
+case_begin "unit: project empty label falls back"
+chk_eq "output" "ibl5-alpha" "$OUT"
+case_end
+
+new_unit
+STUB_INSPECT_FAIL=1
+unit_run 'wt_project_name alpha'
+case_begin "unit: project inspect failure falls back"
+chk_eq "output" "ibl5-alpha" "$OUT"
+case_end
+
+new_unit
+unit_run 'wt_compose_export alpha /wt/alpha; bash -c '\''printf "%s|%s|%s" "$SLUG" "$WORKTREE_PATH" "$REPO_ROOT"'\'
+case_begin "unit: export"
+chk_eq "output" "alpha|/wt/alpha|$UR" "$OUT"
+case_end
+
+new_unit
+touch "$UR/.env"
+unit_run 'wt_compose ibl5-alpha down -v'
+case_begin "unit: wt_compose with .env"
+chk_log_line "ARGV compose -f $UR/docker/worktree-compose.yml --env-file $UR/.env -p ibl5-alpha down -v"
+case_end
+
+new_unit
+unit_run 'wt_compose ibl5-alpha down -v'
+case_begin "unit: wt_compose without .env"
+chk_log_line "ARGV compose -f $UR/docker/worktree-compose.yml -p ibl5-alpha down -v"
+case_end
+
+new_unit
+STUB_COMPOSE_RC=3
+unit_run 'wt_compose ibl5-alpha up -d; echo "rc=$?"'
+case_begin "unit: wt_compose propagates exit status"
+chk_eq "output" "rc=3" "$OUT"
+case_end
+
+new_unit
+OUT="$(env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; . "$1"; echo sourced' _ "$LIB_SRC" 2>&1)" && RC=$? || RC=$?
+case_begin "unit: sourcing is side-effect free"
+chk_eq "exit code" 0 "$RC"
+chk_eq "output" "sourced" "$OUT"
 case_end
 
 echo "----"

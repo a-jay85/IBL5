@@ -124,6 +124,7 @@ eval "$ENV_ERR_FN"
 timeout() { local _s="$1"; shift; "$@"; }
 # The runner's plain-English stop notes are not under test here.
 note_failure() { :; }
+note_stop() { :; }
 
 echo
 echo "-- row 8: postplan block cd's into worktree and runs post-plan-now --foreground --plan <abs> --"

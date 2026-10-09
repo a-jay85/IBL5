@@ -8,6 +8,7 @@
 #   resolve_plan_file   # sets PLAN_FILE and PLAN_SLUG_DRIFT in the caller's shell
 #
 # Covers:
+#   plans_dir [SEAM_VAR ...] -> prints the plans directory (see the function comment)
 #   resolve_plan_file  -> sets two variables in the caller's shell:
 #       PLAN_FILE        absolute path to the resolved plan, or empty string (plan-blind)
 #       PLAN_SLUG_DRIFT  basename of an adopted drift match, else empty string
@@ -29,6 +30,28 @@
 #   PLAN_SLUG  (default: git rev-parse --abbrev-ref HEAD) — branch slug override for tests.
 #
 # This file is SOURCED, not executed: no `set -euo pipefail` at file scope.
+
+# plans_dir [SEAM_VAR ...]
+#   Print the plans directory. Each SEAM_VAR names an environment variable; they are read
+#   in order by indirection and the first non-empty value wins. With none set (or none
+#   given) the result is $HOME/claude-plans. $HOME is read at call time, never cached.
+#   A bad variable name returns 2. Locals carry a _pd_ prefix so a seam cannot be shadowed.
+plans_dir() {
+    local _pd_name _pd_val
+    for _pd_name in "$@"; do
+        case "$_pd_name" in
+            ''|[0-9]*|*[!A-Za-z0-9_]*)
+                printf 'plans_dir: invalid seam variable name: %s\n' "$_pd_name" >&2
+                return 2 ;;
+        esac
+        _pd_val="${!_pd_name:-}"
+        if [ -n "$_pd_val" ]; then
+            printf '%s\n' "$_pd_val"
+            return 0
+        fi
+    done
+    printf '%s\n' "$HOME/claude-plans"
+}
 
 PLAN_DIR="${PLAN_DIR:-$HOME/claude-plans}"
 

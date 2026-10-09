@@ -1,0 +1,279 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-check-workflow-run-interpolation — regression test for the run-body
+# interpolation gate. Each case writes a throwaway workflow file and asserts the
+# check's exit code (and, where it matters, what it printed).
+#
+# Run: bin/test-check-workflow-run-interpolation  (exit 0 = all pass, 1 = a case failed)
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CHECK="$SCRIPT_DIR/check-workflow-run-interpolation"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILED=0
+
+# write_wf <body>  → echoes the path of a fresh file holding <body>. Uses mktemp
+# (not a counter): this runs in a $(...) subshell, so a counter would not persist.
+write_wf() {
+  local f
+  f="$(mktemp "$TMP/wf.XXXXXX")"
+  printf '%s\n' "$1" > "$f"
+  printf '%s' "$f"
+}
+
+expect() { # name want-exit got-exit
+  if [ "$3" -eq "$2" ]; then
+    echo "ok: $1 (exit $3)"
+  else
+    echo "FAIL: $1 — expected exit $2, got $3"
+    FAILED=1
+  fi
+}
+
+# run_case <name> <want-exit> <file>  → runs the check, sets $out, asserts the exit.
+run_case() {
+  local rc
+  out="$("$CHECK" "$3" 2>/dev/null)"
+  rc=$?
+  expect "$1" "$2" "$rc"
+}
+
+# --- bad: env.VRCTX in a block run ---------------------------------------------
+f="$(write_wf 'name: t
+on: [workflow_call]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Splice
+        run: |
+          echo start
+          x --update-pr-body=${{ env.VRCTX_PR }}')"
+run_case "flags env.VRCTX in block run" 1 "$f"
+if ! grep -qF -- ":10:" <<< "$out"; then
+  echo "FAIL: flags env.VRCTX in block run — output does not name line 10: $out"
+  FAILED=1
+fi
+
+# --- bad: string input in a run body (the #1387 shape) -------------------------
+f="$(write_wf 'name: t
+on:
+  workflow_call:
+    inputs:
+      refresh_head_sha:
+        type: string
+        required: false
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Splice
+        run: |
+          x \
+            --head-sha=${{ inputs.refresh_head_sha || github.event.pull_request.head.sha }}')"
+run_case "flags inputs head-sha in run" 1 "$f"
+
+# --- good: same expression through step env ------------------------------------
+f="$(write_wf 'name: t
+on:
+  workflow_call:
+    inputs:
+      refresh_head_sha:
+        type: string
+        required: false
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Splice
+        env:
+          VR_HEAD_SHA: ${{ inputs.refresh_head_sha || github.event.pull_request.head.sha }}
+        run: |
+          x \
+            --head-sha="$VR_HEAD_SHA"')"
+run_case "accepts step env VR_HEAD_SHA" 0 "$f"
+
+# --- good: with: number ---------------------------------------------------------
+f="$(write_wf 'name: t
+on: [workflow_call]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: some/action@v1
+        with:
+          number: ${{ env.VRCTX_PR }}')"
+run_case "accepts with number" 0 "$f"
+
+# --- good: concurrency group ----------------------------------------------------
+f="$(write_wf 'name: t
+on:
+  workflow_call:
+    inputs:
+      pr_number:
+        type: string
+concurrency:
+  group: x-${{ inputs.pr_number }}
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi')"
+run_case "accepts concurrency group" 0 "$f"
+
+# --- good: boolean input --------------------------------------------------------
+f="$(write_wf 'name: t
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        type: boolean
+        default: false
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Go
+        run: |
+          if [ "${{ inputs.force }}" = "true" ]; then
+            echo forced
+          fi')"
+run_case "accepts boolean input" 0 "$f"
+
+# --- bad: same name, string type ------------------------------------------------
+f="$(write_wf 'name: t
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        type: string
+        default: false
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Go
+        run: |
+          if [ "${{ inputs.force }}" = "true" ]; then
+            echo forced
+          fi')"
+run_case "flags string input of same name" 1 "$f"
+
+# --- good: matrix shard ---------------------------------------------------------
+f="$(write_wf 'name: t
+on: [push]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Shard
+        run: |
+          x --shard=${{ matrix.shard-index }}/${{ matrix.total-shards }}')"
+run_case "accepts matrix shard" 0 "$f"
+
+# --- bad: single-line run -------------------------------------------------------
+f="$(write_wf 'name: t
+on: [push]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ env.FOO }}')"
+run_case "flags single-line run" 1 "$f"
+
+# --- good: block ends at dedent -------------------------------------------------
+f="$(write_wf 'name: t
+on: [push]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: A
+        run: |
+          echo ok
+        name: x ${{ env.FOO }}')"
+run_case "block ends at dedent" 0 "$f"
+
+# --- bad: blank line keeps the block open ---------------------------------------
+f="$(write_wf 'name: t
+on: [push]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: A
+        run: |
+          echo a
+
+          echo ${{ env.FOO }}')"
+run_case "blank line keeps block open" 1 "$f"
+
+# --- bad: shell comment is still expanded ---------------------------------------
+f="$(write_wf 'name: t
+on: [push]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: A
+        run: |
+          # ${{ env.FOO }}
+          echo ok')"
+run_case "flags shell comment" 1 "$f"
+
+# --- bad: composite action input ------------------------------------------------
+f="$(write_wf 'name: act
+inputs:
+  foo:
+    description: x
+runs:
+  using: composite
+  steps:
+    - run: echo ${{ inputs.foo }}
+      shell: bash')"
+run_case "flags composite action input" 1 "$f"
+
+# --- good: dotted prefix is not env./inputs. ------------------------------------
+f="$(write_wf 'name: t
+on: [push]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: A
+        run: |
+          echo ${{ github.event.inputs.x }} ${{ steps.a.outputs.env }}')"
+run_case "skips dotted prefix" 0 "$f"
+
+# --- one report per offending line ----------------------------------------------
+f="$(write_wf 'name: t
+on: [push]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: A
+        run: |
+          echo ${{ env.A }} ${{ env.B }}')"
+run_case "one report per line" 1 "$f"
+lines="$(printf '%s\n' "$out" | grep -c .)"
+if [ "$lines" -ne 1 ]; then
+  echo "FAIL: one report per line — expected 1 output line, got $lines"
+  FAILED=1
+fi
+
+# --- usage errors ---------------------------------------------------------------
+"$CHECK" --bogus >/dev/null 2>"$TMP/err"; rc=$?
+expect "rejects unknown option" 2 "$rc"
+if ! grep -qF -- "unknown option" "$TMP/err"; then
+  echo "FAIL: rejects unknown option — stderr lacks 'unknown option'"
+  FAILED=1
+fi
+
+"$CHECK" "$TMP/does-not-exist.yml" >/dev/null 2>&1; rc=$?
+expect "rejects missing file" 2 "$rc"
+
+exit "$FAILED"

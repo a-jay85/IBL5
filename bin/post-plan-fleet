@@ -97,12 +97,8 @@ export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/
 # --git-common-dir points at the main .git even from a linked worktree, where
 # --show-toplevel would return the worktree instead.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-GIT_COMMON="$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-if [[ -z "$GIT_COMMON" ]]; then
-    # git < 2.31 has no --path-format; fall back to resolving the relative answer by hand.
-    GIT_COMMON="$(cd "$SCRIPT_DIR" && cd "$(git rev-parse --git-common-dir)" && pwd -P)"
-fi
-ROOT="$(dirname "$GIT_COMMON")"
+. "$SCRIPT_DIR/lib/git-helpers.sh"
+ROOT="$(main_checkout_root "$SCRIPT_DIR")" || ROOT=""
 # POST_PLAN_FLEET_ROOT: test seam allowing tests to override the resolved main checkout path.
 [[ -n "${POST_PLAN_FLEET_ROOT:-}" ]] && ROOT="$POST_PLAN_FLEET_ROOT"
 

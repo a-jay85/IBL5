@@ -50,13 +50,10 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               modified_files_from_diff,
                               name_status_text, normalize_backlog_closes, numstat_text,
                               qualify_backlog_refs,
-                              render_files_changed,
-                              render_tests_changed,
                               render_residual_phases,
                               render_scope_notes,
-                              restore_manual_testing_section, strip_manual_testing_section,
-                              upsert_files_changed,
-                              upsert_tests_changed,
+                              restore_manual_testing_section, strip_change_blocks,
+                              strip_manual_testing_section,
                               upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
@@ -424,8 +421,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pr = gh.pr_number()
             log(f"phase2: PR #{pr} exists — updated head to {sha or '(clean)'}")
         else:
-            create_body = upsert_files_changed(copy["summary_md"], render_files_changed(diff))
-            create_body = upsert_tests_changed(create_body, render_tests_changed(diff))
+            create_body = copy["summary_md"] or ""
             create_body = _apply_backlog_closes(create_body, plan, log)
             create_body = _upsert_no_adr_markers(create_body, plan)
             pr = gh.pr_create(copy["title"], create_body, "master")
@@ -580,13 +576,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # Hold notice: carries only the plan's Decision paragraph(s) and is
         # positioned ahead of `## Manual Testing` — appending it after would
         # truncate manual_testing_clearance's scan window. The order of upserts
-        # that follows (files_changed, tests_changed, gate_backtest) and the
+        # that follows (strip_change_blocks, gate_backtest) and the
         # single pr_edit_body call are unchanged.
         body = upsert_hold_notice(body, plan.hold_justification)
-        # files-changed block is machine-generated: refresh it on every run so the
-        # PR body's scope can't silently drift from the actual diff.
-        body = upsert_files_changed(body, render_files_changed(diff))
-        body = upsert_tests_changed(body, render_tests_changed(diff))
+        # Remove files-changed/tests-changed blocks left by older harness runs.
+        body = strip_change_blocks(body)
         _gb = gate_backtest_result(worktree or ".", diff, pr=pr, live=live,
                                    fixture=fixture, log=log)
         if _gb.block:
@@ -983,11 +977,11 @@ def _last_remediation_commit(fid: dict) -> str | None:
 def _body_signature(body: str | None) -> str:
     """The comparable part of a PR body: everything outside the files-changed and merge-digest blocks.
 
-    Phase 5.5 rewrites <!-- files-changed:begin -->..<!-- files-changed:end --> on every
+    Older harness runs wrote <!-- files-changed:begin -->..<!-- files-changed:end --> on every
     round, so that block churns whenever the diff grows and says nothing about whether
     the fixer touched the body. Strip it, then strip surrounding whitespace; what is
     left is the prose a human or an agent wrote. An unbalanced marker pair is left
-    intact rather than guessed at -- the same bounds check upsert_files_changed uses.
+    intact rather than guessed at -- the same bounds check strip_change_blocks uses.
     """
     text = body or ""
     begin = text.find(FILES_CHANGED_BEGIN)
@@ -2442,9 +2436,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         live_body, restored = restore_manual_testing_section(live_body, raw_before_round)
         if restored:
             log(f"phase5.5 round {round_num}: reverted fixer edit to ## Manual Testing")
-        refreshed_diff = git.diff_vs_base()
-        body = upsert_files_changed(live_body, render_files_changed(refreshed_diff))
-        body = upsert_tests_changed(body, render_tests_changed(refreshed_diff))
+        body = strip_change_blocks(live_body)
         body = _apply_backlog_closes(body, plan, log)
         body = _upsert_no_adr_markers(body, plan)
         gh.pr_edit_body(pr, body)

@@ -324,6 +324,114 @@ expect_eq "lib-uninstall-idempotent" "0" "$?"
 hyg="$( set +e; before="$- $(shopt -po)"; . "$LIB"; . "$LIB"; rc2=$?; after="$- $(shopt -po)"; [ "$before" = "$after" ] && [ "$rc2" = 0 ] && echo ok )"
 expect_eq "lib-source-hygiene" "ok" "$hyg"
 
+# ── Install-arm cases (stubbed launchctl, temp HOME) ─────────────────────────
+# Every case asserts the stub log, which proves the stub ran and the real
+# launchctl did not. Scripts run under env -i with the stub first on PATH.
+ISTUB="$TMP/istub"
+IHOME="$TMP/ihome"
+ILOG="$TMP/ilaunchctl.log"
+mkdir -p "$ISTUB" "$IHOME"
+cat > "$ISTUB/launchctl" <<'ISTUBEOF'
+#!/bin/sh
+echo "$*" >> "$LSCHED_ISTUB_LOG"
+exit 0
+ISTUBEOF
+chmod +x "$ISTUB/launchctl"
+
+# run_install <script> <args> [VAR=val ...] — sets IRC, IOUT, IERR; logs to $ILOG.
+run_install() {
+  local script="$1" args="$2"
+  shift 2
+  : > "$ILOG"
+  # shellcheck disable=SC2086
+  env -i HOME="$IHOME" PATH="$ISTUB:/usr/bin:/bin" LSCHED_ISTUB_LOG="$ILOG" "$@" \
+    bash "$REPO_ROOT/$script" $args > "$TMP/iout" 2> "$TMP/ierr"
+  IRC=$?
+  IOUT="$(cat "$TMP/iout")"
+  IERR="$(cat "$TMP/ierr")"
+}
+norm_file() {
+  local out
+  out="$(cat "$1")"
+  out="${out//"$MAIN_WT"/@MAIN_WT@}"
+  out="${out//"$IHOME"/@HOME@}"
+  printf '%s\n' "$out"
+}
+log_order_ok() {
+  # bootout line precedes bootstrap line, both present
+  local o b
+  o="$(grep -n '^bootout ' "$ILOG" | head -1 | cut -d: -f1)"
+  b="$(grep -n '^bootstrap ' "$ILOG" | head -1 | cut -d: -f1)"
+  [ -n "$o" ] && [ -n "$b" ] && [ "$o" -lt "$b" ]
+}
+
+# db-sync install: golden-equal plist, bootout then bootstrap.
+printf 'PROD_SSH_HOST=golden-host\n' > "$TMP/db.env"
+DBPLIST="$IHOME/Library/LaunchAgents/com.ibl5.db-sync-nightly.plist"
+rm -f "$DBPLIST"
+run_install bin/db-sync-cron-setup --install-schedule DB_SYNC_CRON_ENV_FILE="$TMP/db.env"
+norm_file "$DBPLIST" > "$TMP/db.installed" 2>/dev/null
+if [ "$IRC" = "0" ] && log_order_ok && cmp -s "$TMP/db.installed" "$FIXTURES/db-sync.plist"; then
+  pass "install-db-sync-golden"
+else
+  echo "  rc=$IRC err=$IERR" >&2
+  fail "install-db-sync-golden"
+fi
+
+# db-sync install negative: no PROD_SSH_HOST => exit 1, no plist, no launchctl.
+printf 'OTHER=1\n' > "$TMP/db-empty.env"
+rm -f "$DBPLIST"
+run_install bin/db-sync-cron-setup --install-schedule DB_SYNC_CRON_ENV_FILE="$TMP/db-empty.env"
+if [ "$IRC" = "1" ] && grep -qF 'Error: PROD_SSH_HOST is not set in' <<< "$IERR" \
+   && [ ! -e "$DBPLIST" ] && [ ! -s "$ILOG" ]; then
+  pass "install-db-sync-refuses-without-host"
+else
+  fail "install-db-sync-refuses-without-host"
+fi
+
+# db-sync uninstall.
+mkdir -p "$IHOME/Library/LaunchAgents"
+: > "$DBPLIST"
+run_install bin/db-sync-cron-setup --uninstall-schedule
+if [ "$IRC" = "0" ] && [ ! -e "$DBPLIST" ] && grep -qF 'Uninstalled com.ibl5.db-sync-nightly.' <<< "$IOUT" && [ -s "$ILOG" ]; then
+  pass "uninstall-db-sync"
+else
+  fail "uninstall-db-sync"
+fi
+
+# sim-recap install negative: no SIM_RECAP_* => refuses before any launchctl call.
+run_install bin/sim-recap-cron-setup --install-schedule
+if [ "$IRC" = "1" ] && grep -qF 'Error: unset required env var(s): SIM_RECAP_SSH_HOST' <<< "$IERR" && [ ! -s "$ILOG" ]; then
+  pass "install-sim-recap-refuses-unset-env"
+else
+  fail "install-sim-recap-refuses-unset-env"
+fi
+
+# sim-recap resume: refuses a missing plist, then re-arms an existing one.
+SRPLIST="$IHOME/Library/LaunchAgents/com.ibl5.sim-recap-poll.plist"
+rm -f "$SRPLIST"
+run_install bin/sim-recap-cron-setup --resume
+if [ "$IRC" = "1" ] && grep -qF 'does not exist' <<< "$IERR" && [ ! -s "$ILOG" ]; then
+  pass "resume-sim-recap-refuses-missing-plist"
+else
+  fail "resume-sim-recap-refuses-missing-plist"
+fi
+: > "$SRPLIST"
+run_install bin/sim-recap-cron-setup --resume
+if [ "$IRC" = "0" ] && log_order_ok && grep -qF 'Resumed com.ibl5.sim-recap-poll.' <<< "$IOUT"; then
+  pass "resume-sim-recap-rearms"
+else
+  fail "resume-sim-recap-rearms"
+fi
+
+# sim-recap uninstall.
+run_install bin/sim-recap-cron-setup --uninstall-schedule
+if [ "$IRC" = "0" ] && [ ! -e "$SRPLIST" ] && grep -qF 'Uninstalled com.ibl5.sim-recap-poll.' <<< "$IOUT" && [ -s "$ILOG" ]; then
+  pass "uninstall-sim-recap"
+else
+  fail "uninstall-sim-recap"
+fi
+
 # Fixtures hold no machine path.
 if grep -rqE -e '/Users/' -e '/home/' -e '-worktrees' -e 'lsched-golden-home' "$FIXTURES"; then
   fail "fixtures-no-machine-path"

@@ -361,10 +361,10 @@ def _run_ppn(tmp_path, args=(), extra_env=None, dirty=None, launchctl_stub=None)
     return subprocess.run(["bash", PPN, *args], cwd=repo, env=env,
                           capture_output=True, text=True)
 
-def _generate_cmd(tmp_path, extra_env=None):
+def _generate_cmd(tmp_path, extra_env=None, args=()):
     """Run bin/post-plan-now with launchctl stubbed and HOME redirected; return $CMD."""
     home = tmp_path / "home"
-    r = _run_ppn(tmp_path, extra_env=extra_env)
+    r = _run_ppn(tmp_path, args=args, extra_env=extra_env)
     assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
 
     plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
@@ -794,7 +794,8 @@ def test_harness_run_dir_artifacts_are_gitignored():
 # Rows 1-7: --foreground mode (Verification Matrix, Phase 5)
 # ---------------------------------------------------------------------------
 
-def _run_foreground(tmp_path, harness_rc, with_claude_stub=False):
+def _run_foreground(tmp_path, harness_rc, with_claude_stub=False, extra_args=(),
+                    harness_body=None):
     """Run post-plan-now --foreground with a fake harness exiting harness_rc.
 
     Stubs placed in HOME/.bun/bin/ land at position 3 of the CMD-exported PATH
@@ -816,7 +817,8 @@ def _run_foreground(tmp_path, harness_rc, with_claude_stub=False):
     # fake harness: ignore all args, exit with the requested code.
     harness = tmp_path / "fake-harness"
     harness.mkdir(exist_ok=True)
-    (harness / "run").write_text(f"#!/bin/sh\nexit {harness_rc}\n")
+    (harness / "run").write_text(
+        harness_body if harness_body is not None else f"#!/bin/sh\nexit {harness_rc}\n")
     (harness / "run").chmod(0o755)
 
     env = dict(os.environ, HOME=str(home), HARNESS=str(harness))
@@ -832,7 +834,7 @@ def _run_foreground(tmp_path, harness_rc, with_claude_stub=False):
 
     repo = _fixture_repo(tmp_path)
     return subprocess.run(
-        ["bash", PPN, "--foreground"],
+        ["bash", PPN, "--foreground", *extra_args],
         cwd=repo, env=env, capture_output=True, text=True
     )
 
@@ -1690,3 +1692,35 @@ def test_generated_cmd_overrides_pp_rc_to_143_on_sigterm(tmp_path):
     pp_rc_pos = cmd.index("pp_rc=$?")
     override_pos = cmd.index("pp_rc=143")
     assert override_pos > pp_rc_pos, "pp_rc=143 override must appear after pp_rc=$?"
+
+
+_FORCE_PROBE_HARNESS = (
+    '#!/bin/sh\nprintf \'%s\' "${POSTPLAN_FORCE-unset}" > "$FORCE_PROBE"\nexit 0\n')
+
+
+def test_force_threads_postplan_force_to_harness(tmp_path, monkeypatch):
+    """--force reaches the harness process as POSTPLAN_FORCE=1 (foreground path)."""
+    probe = tmp_path / "force-probe.txt"
+    monkeypatch.setenv("FORCE_PROBE", str(probe))
+    monkeypatch.delenv("POSTPLAN_FORCE", raising=False)
+    _run_foreground(tmp_path, 0, with_claude_stub=True, extra_args=("--force",),
+                    harness_body=_FORCE_PROBE_HARNESS)
+    assert probe.read_text() == "1"
+
+
+def test_no_force_passes_postplan_force_zero(tmp_path, monkeypatch):
+    """Without --force the harness sees POSTPLAN_FORCE=0 even if the caller exported 1."""
+    probe = tmp_path / "force-probe.txt"
+    monkeypatch.setenv("FORCE_PROBE", str(probe))
+    monkeypatch.setenv("POSTPLAN_FORCE", "1")
+    _run_foreground(tmp_path, 0, with_claude_stub=True,
+                    harness_body=_FORCE_PROBE_HARNESS)
+    assert probe.read_text() == "0"
+
+
+def test_detached_cmd_carries_postplan_force(tmp_path):
+    """The detached HARNESS_SEG carries POSTPLAN_FORCE too, not only the foreground one."""
+    cmd = _generate_cmd(tmp_path, args=("--force",))
+    assert "POSTPLAN_FORCE=1 POSTPLAN_LOG_PATH=" in cmd
+    plain = _generate_cmd(tmp_path / "plain")
+    assert "POSTPLAN_FORCE=0 POSTPLAN_LOG_PATH=" in plain

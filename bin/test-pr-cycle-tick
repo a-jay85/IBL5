@@ -759,6 +759,7 @@ for s in aaa1111 bbb2222 ccc3333 ddd4444; do set_checks "$s" red; done
 run_tick
 [[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101,102,103 --max-ready 3" ]] \
     || fail "skip-notes-env-and-cap: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+# The seam must point under $PR_CYCLE_WATCH_STATE_DIR/results/, outside the repo tree.
 envv="$(cat "$SCRATCH/pr-cycle-skip-notes-env" 2>/dev/null)"
 case "$envv" in
     "$SCRATCH/watch-state/results/"*.skip-notes) ;;

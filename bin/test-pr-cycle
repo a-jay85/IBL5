@@ -2549,25 +2549,25 @@ end_case "case skip-notes-drop-armed-and-fired"
 
 # 4: the env seam may be unset, empty, or name a missing file. One stage1 reason still shows.
 begin_case
-for _mode in unset empty missing; do
+for _mode in skip-notes-env-unset skip-notes-env-empty skip-notes-env-missing; do
     reset_state
     printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
     triage_report > "$SCRATCH/triage-out"   # no row for 101, so its reason shows under Skipped
     install_harness_verdict 101 "$DIFF_A"
     install_harness_result 101 "first-slug" "shipped-held" "3,7" "CLEAN"
     case "$_mode" in
-        unset)   unset PR_CYCLE_SKIP_NOTES ;;
-        empty)   export PR_CYCLE_SKIP_NOTES= ;;
-        missing) export PR_CYCLE_SKIP_NOTES="$SCRATCH/missing.tsv" ;;
+        *-unset)   unset PR_CYCLE_SKIP_NOTES ;;
+        *-empty)   export PR_CYCLE_SKIP_NOTES= ;;
+        *-missing) export PR_CYCLE_SKIP_NOTES="$SCRATCH/missing.tsv" ;;
     esac
     run --worker
     unset PR_CYCLE_SKIP_NOTES
-    [[ $RC -eq 0 ]] || fail "skip-notes-env-$_mode: exit $RC, want 0"
+    [[ $RC -eq 0 ]] || fail "$_mode: exit $RC, want 0"
     _dm="$(cat "$SCRATCH/dm.argv")"
-    grep -qF '**Skipped (1)**' <<< "$_dm" || fail "skip-notes-env-$_mode: Skipped (1) missing: $_dm"
+    grep -qF '**Skipped (1)**' <<< "$_dm" || fail "$_mode: Skipped (1) missing: $_dm"
     grep -qF 'last post-plan run held it for (3,7)' <<< "$_dm" \
-        || fail "skip-notes-env-$_mode: stage1 reason missing from the DM: $_dm"
-    grep -qF 'No such file' "$ERR" && fail "skip-notes-env-$_mode: 'No such file' on stderr"
+        || fail "$_mode: stage1 reason missing from the DM: $_dm"
+    grep -qF 'No such file' "$ERR" && fail "$_mode: 'No such file' on stderr"
 done
 end_case "case skip-notes-env-unset-empty-missing"
 

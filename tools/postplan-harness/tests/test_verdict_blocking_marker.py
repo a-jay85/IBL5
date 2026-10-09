@@ -95,7 +95,37 @@ def test_ready_with_notes_note_bullets_yield_no_work(tmp_path):
     assert fidelity.build_work_list(path, [], [], []) == []
 
 
-REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+def test_unmarked_parent_keeps_nested_bullets_as_separate_items(tmp_path):
+    """Catches grouping nested lines under an UNMARKED parent (legacy output drift)."""
+    body = (
+        "- Phase 2 never edited a.py.\n"
+        "  - nested detail under an unmarked parent\n"
+        "- second unmarked finding\n"
+    )
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- Phase 2 never edited a.py.",
+        "- nested detail under an unmarked parent",
+        "- second unmarked finding",
+    ]
+
+
+def test_non_exact_marker_is_unmarked_and_kept(tmp_path):
+    """Catches a case-insensitive or bold-tolerant marker regex dropping a finding."""
+    body = (
+        "- [note] lower-case marker is not a marker\n"
+        "  - nested under the lower-case bullet\n"
+        "- **[NOTE]** bold-wrapped marker is not a marker\n"
+    )
+    path = _write(tmp_path, _verdict("NOT READY", body))
+    assert fidelity._verdict_findings(path) == [
+        "- [note] lower-case marker is not a marker",
+        "- nested under the lower-case bullet",
+        "- **[NOTE]** bold-wrapped marker is not a marker",
+    ]
+
+
+REPO =os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 
 def _flat(rel):

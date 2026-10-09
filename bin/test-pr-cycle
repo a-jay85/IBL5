@@ -2353,6 +2353,356 @@ hr_cleanup
 unset HRHARNESS HRSTATE
 end_case "case holdrepeat pre-fire skip"
 
+# ==========================================================================================
+# State-change exemption (DIRTY / BLOCKED-CHECK) and stacked-PR skip
+# ==========================================================================================
+ATTACK_DIRTY_RESCUE='# Plan of attack
+
+| # | PR | Constraint | Needs you? |
+|---|----|-----------|------------|
+| 1 | #2989 stacked-slug | none | no |
+
+## Excluded
+
+- #2990 stacked-dirty-slug — DIRTY (merge conflict; rebase before it can be ordered)
+'
+# armed-state.json: 2950 (head feat-a) is open; 2989 and 2990 are based on feat-a.
+write_stacked_armed_state() {
+    cat > "$SCRATCH/armed-state.json" <<'JSON_EOF'
+[{"number":2950,"headRefName":"feat-a","autoMergeRequest":null,"mergeStateStatus":"CLEAN","baseRefName":"master"},
+ {"number":2989,"headRefName":"feat-b","autoMergeRequest":null,"mergeStateStatus":"CLEAN","baseRefName":"feat-a"},
+ {"number":2990,"headRefName":"feat-c","autoMergeRequest":null,"mergeStateStatus":"DIRTY","baseRefName":"feat-a"}]
+JSON_EOF
+}
+
+# 1: a DIRTY feat PR whose holdrepeat record would decline it still fires, with --state-changed.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 DIRTY rebase" > "$SCRATCH/triage-out"
+hr_fixture 101 first-slug "7,8"
+HRHARNESS="$HRH" run --worker
+[[ $RC -eq 0 ]] || fail "dirty-feat-pr-rescued-unarmed: exit $RC, want 0"
+grep -qxF 101 "$(rundir)/stage1.txt" || fail "dirty-feat-pr-rescued-unarmed: 101 missing from stage1.txt"
+grep -qF -- '--state-changed-prs=101' <<< "$(cat "$SCRATCH/ready.argv")" \
+    || fail "dirty-feat-pr-rescued-unarmed: ready argv lacks --state-changed-prs=101"
+grep -qxF 101 "$(rundir)/armed.txt" 2>/dev/null && fail "dirty-feat-pr-rescued-unarmed: 101 was armed"
+grep -qF 'holdrepeat would decline' <<< "$OUT" && fail "dirty-feat-pr-rescued-unarmed: holdrepeat skip still fired"
+hr_cleanup
+
+# Same rule through the DIRTY rescue loop: 2201 is an Excluded bullet, not an ordered row.
+reset_state
+printf '%s' "$ATTACK_2PR_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" "2201 DIRTY rebase" > "$SCRATCH/triage-out"
+hr_fixture 2201 dirty-slug "7,8"
+HRHARNESS="$HRH" run --worker
+[[ $RC -eq 0 ]] || fail "dirty-feat-pr-rescued-unarmed rescue loop: exit $RC, want 0"
+grep -qxF 2201 "$(rundir)/stage1.txt" || fail "dirty-feat-pr-rescued-unarmed rescue loop: 2201 missing from stage1.txt"
+grep -qF -- '--state-changed-prs=2201' <<< "$(cat "$SCRATCH/ready.argv")" \
+    || fail "dirty-feat-pr-rescued-unarmed rescue loop: ready argv lacks --state-changed-prs=2201"
+grep -qxF 2201 "$(rundir)/armed.txt" 2>/dev/null && fail "dirty-feat-pr-rescued-unarmed rescue loop: 2201 was armed"
+hr_cleanup
+end_case "case dirty-feat-pr-rescued-unarmed"
+
+# 2: a red check (BLOCKED-CHECK) on a PR held for {3,7} with an unchanged diff still fires.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 BLOCKED-CHECK fix-ci" > "$SCRATCH/triage-out"
+install_harness_verdict 101 "$DIFF_A"
+install_harness_result 101 "first-slug" "shipped-held" "3,7" "CLEAN"
+run --worker
+[[ $RC -eq 0 ]] || fail "red-held-37-unchanged-still-fires: exit $RC, want 0"
+grep -qxF 101 "$(rundir)/stage1.txt" || fail "red-held-37-unchanged-still-fires: 101 missing from stage1.txt"
+grep -qF 'diff is unchanged' "$(rundir)/stage1-skipped.txt" \
+    && fail "red-held-37-unchanged-still-fires: held-unchanged skip line written"
+[[ -s "$(rundir)/stage1-holdrepeat.txt" ]] && fail "red-held-37-unchanged-still-fires: stage1-holdrepeat.txt not empty"
+grep -qF -- '--state-changed-prs=101' <<< "$(cat "$SCRATCH/ready.argv")" \
+    || fail "red-held-37-unchanged-still-fires: ready argv lacks --state-changed-prs=101"
+end_case "case red-held-37-unchanged-still-fires"
+
+# 3: a green PR waiting on human sign-off keeps both pre-fire skips and gets no flag.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 FEAT-AWAITING-SIGNOFF sign-off" > "$SCRATCH/triage-out"
+install_harness_verdict 101 "$DIFF_A"
+install_harness_result 101 "first-slug" "shipped-held" "3,7" "CLEAN"
+run --worker
+[[ $RC -eq 0 ]] || fail "feat-awaiting-signoff-no-bypass: exit $RC, want 0"
+grep -qF 'last post-plan run held it for (3,7) and the diff is unchanged' "$(rundir)/stage1-skipped.txt" \
+    || fail "feat-awaiting-signoff-no-bypass: held-unchanged skip line missing"
+grep -qxF 101 "$(rundir)/stage1.txt" 2>/dev/null && fail "feat-awaiting-signoff-no-bypass: 101 is in stage1.txt"
+grep -qF -- '--state-changed-prs' <<< "$(cat "$SCRATCH/ready.argv")" \
+    && fail "feat-awaiting-signoff-no-bypass: --state-changed-prs passed"
+end_case "case feat-awaiting-signoff-no-bypass"
+
+# 4: a stacked PR is skipped on both paths, even when red and held; the flag never names it.
+begin_case
+reset_state
+printf '%s' "$ATTACK_DIRTY_RESCUE" > "$SCRATCH/attack-out"
+triage_report "2989 BLOCKED-CHECK fix-ci" "2990 DIRTY rebase" > "$SCRATCH/triage-out"
+install_harness_verdict 2989 "$DIFF_A"
+install_harness_result 2989 "feat-b" "shipped-held" "3,7" "CLEAN"
+write_stacked_armed_state
+run --worker
+[[ $RC -eq 0 ]] || fail "stacked-pr-skipped-pr-cycle: exit $RC, want 0"
+grep -qF '#2989 — stacked on #2950, skipping' "$(rundir)/stage1-skipped.txt" \
+    || fail "stacked-pr-skipped-pr-cycle: ordered skip line missing"
+grep -qF '#2990 — stacked on #2950, skipping' "$(rundir)/stage1-skipped.txt" \
+    || fail "stacked-pr-skipped-pr-cycle: DIRTY-loop skip line missing"
+grep -qxF 2989 "$(rundir)/stage1.txt" 2>/dev/null && fail "stacked-pr-skipped-pr-cycle: 2989 is in stage1.txt"
+grep -qxF 2990 "$(rundir)/stage1.txt" 2>/dev/null && fail "stacked-pr-skipped-pr-cycle: 2990 is in stage1.txt"
+grep -qxF 2989 "$(rundir)/stage1-state-changed.txt" && fail "stacked-pr-skipped-pr-cycle: 2989 in stage1-state-changed.txt"
+grep -qxF 2990 "$(rundir)/stage1-state-changed.txt" && fail "stacked-pr-skipped-pr-cycle: 2990 in stage1-state-changed.txt"
+grep -qF -- '--state-changed-prs' <<< "$(cat "$SCRATCH/ready.argv")" \
+    && fail "stacked-pr-skipped-pr-cycle: --state-changed-prs passed"
+end_case "case stacked-pr-skipped-pr-cycle"
+
+# 5: a base no open PR has as its head (a deleted branch) is not stacked.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 BLOCKED-CHECK fix-ci" > "$SCRATCH/triage-out"
+cat > "$SCRATCH/armed-state.json" <<'JSON_EOF'
+[{"number":101,"headRefName":"first-slug","autoMergeRequest":null,"mergeStateStatus":"CLEAN","baseRefName":"gone-branch"}]
+JSON_EOF
+run --worker
+[[ $RC -eq 0 ]] || fail "stacked-on-closed-branch-fires: exit $RC, want 0"
+grep -qxF 101 "$(rundir)/stage1.txt" || fail "stacked-on-closed-branch-fires: 101 missing from stage1.txt"
+grep -qF 'stacked on' "$(rundir)/stage1-skipped.txt" && fail "stacked-on-closed-branch-fires: stacked-on line written"
+end_case "case stacked-on-closed-branch-fires"
+
+# 6: when the open-PR list cannot be fetched, stackedness is unknown and the PR fires (fail open).
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 BLOCKED-CHECK fix-ci" > "$SCRATCH/triage-out"
+: > "$SCRATCH/gh-fail-armed"
+run --worker
+[[ $RC -eq 0 ]] || fail "armed-state-failed-fails-open: exit $RC, want 0"
+grep -qxF 101 "$(rundir)/stage1.txt" || fail "armed-state-failed-fails-open: 101 missing from stage1.txt"
+grep -qF 'stacked on' "$(rundir)/stage1-skipped.txt" && fail "armed-state-failed-fails-open: stacked-on line written"
+end_case "case armed-state-failed-fails-open"
+
+# 7: --max-ready trims stage1.txt first; the flag names only survivors, in one fleet call.
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 BLOCKED-CHECK fix-ci" "102 BLOCKED-CHECK fix-ci" "103 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker --max-ready 1
+[[ $RC -eq 0 ]] || fail "state-changed-cap-intersection: exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "state-changed-cap-intersection: want 1 fleet call, got $(calls ready)"
+grep -qF -- '--state-changed-prs=101' <<< "$(cat "$SCRATCH/ready.argv")" \
+    || fail "state-changed-cap-intersection: --state-changed-prs=101 missing"
+grep -qF -- '102' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" \
+    && fail "state-changed-cap-intersection: capped-out 102 named in argv"
+grep -qF '#102 — over --max-ready cap' "$(rundir)/stage1-skipped.txt" \
+    || fail "state-changed-cap-intersection: 102 over-cap line missing"
+end_case "case state-changed-cap-intersection"
+
+# ==========================================================================================
+# Skip reasons in the your-turn DM (PR_CYCLE_SKIP_NOTES)
+# ==========================================================================================
+SKIPIN="$SCRATCH/skip-notes-in.tsv"
+# dm.argv joins the DM's lines with spaces, so row order is checked with an ordered glob.
+
+# 1: tick notes become a Skipped block, ordered stacked, over-cap, then low-value.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 FEAT-AWAITING-SIGNOFF sign-off" > "$SCRATCH/triage-out"
+printf '3001\tchecks green\n2989\tstacked on #2950\n2990\tover the 3-per-run cap; next tick\n' > "$SKIPIN"
+PR_CYCLE_SKIP_NOTES="$SKIPIN" run --worker
+[[ $RC -eq 0 ]] || fail "skip-notes-listed-in-dm: exit $RC, want 0"
+_dm="$(cat "$SCRATCH/dm.argv")"
+grep -qF '**Skipped (3)**' <<< "$_dm" || fail "skip-notes-listed-in-dm: header missing: $_dm"
+[[ "$_dm" == *'- #2989 — stacked on #2950'*'- #2990 — over the 3-per-run cap; next tick'*'- #3001 — checks green'* ]] \
+    || fail "skip-notes-listed-in-dm: rows out of order: $_dm"
+end_case "case skip-notes-listed-in-dm"
+
+# 2: a your-turn row carries its own reason and is not repeated under Skipped; the row of a PR
+# pr-cycle never fired has no rescue suffix.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 BLOCKED-CHECK fix-ci" > "$SCRATCH/triage-out"
+cat > "$SCRATCH/armed-state.json" <<'JSON_EOF'
+[{"number":50,"headRefName":"feat-a","autoMergeRequest":null,"mergeStateStatus":"CLEAN","baseRefName":"master"},
+ {"number":101,"headRefName":"first-slug","autoMergeRequest":null,"mergeStateStatus":"BLOCKED","baseRefName":"feat-a"}]
+JSON_EOF
+run --worker
+[[ $RC -eq 0 ]] || fail "skip-note-suffix-on-your-turn-row: exit $RC, want 0"
+_dm="$(cat "$SCRATCH/dm.argv")"
+grep -qF '(skipped: stacked on #50)' <<< "$_dm" || fail "skip-note-suffix-on-your-turn-row: suffix missing: $_dm"
+grep -qF '**Skipped' <<< "$_dm" && fail "skip-note-suffix-on-your-turn-row: row repeated under Skipped: $_dm"
+grep -qF '(rescue:' <<< "$_dm" && fail "unfired-row-no-suffix: an unfired row carries a rescue suffix: $_dm"
+end_case "case skip-note-suffix-on-your-turn-row"
+
+# 3: armed and fired PRs never appear under Skipped; a PR nothing else mentions does.
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+install_verdict 101 "$TREE_A"
+printf '101\tchecks green\n102\tchecks green\n777\tchecks green\n' > "$SKIPIN"
+PR_CYCLE_SKIP_NOTES="$SKIPIN" run --worker
+[[ $RC -eq 0 ]] || fail "skip-notes-drop-armed-and-fired: exit $RC, want 0"
+grep -qx 101 "$(rundir)/armed.txt" || fail "skip-notes-drop-armed-and-fired: 101 not armed; the case proves nothing"
+grep -qx 102 "$(rundir)/stage1.txt" || fail "skip-notes-drop-armed-and-fired: 102 not fired; the case proves nothing"
+_dm="$(cat "$SCRATCH/dm.argv")"
+_sk="${_dm#*\*\*Skipped}"
+[[ "$_sk" != "$_dm" ]] || fail "skip-notes-drop-armed-and-fired: no Skipped block: $_dm"
+grep -qF ' (1)**' <<< "${_sk:0:8}" || fail "skip-notes-drop-armed-and-fired: Skipped count is not 1: $_sk"
+grep -qF '#777' <<< "$_sk" || fail "skip-notes-drop-armed-and-fired: 777 missing: $_sk"
+grep -qF '#101' <<< "$_sk" && fail "skip-notes-drop-armed-and-fired: armed 101 listed: $_sk"
+grep -qF '#102' <<< "$_sk" && fail "skip-notes-drop-armed-and-fired: fired 102 listed: $_sk"
+end_case "case skip-notes-drop-armed-and-fired"
+
+# 4: the env seam may be unset, empty, or name a missing file. One stage1 reason still shows.
+begin_case
+for _mode in skip-notes-env-unset skip-notes-env-empty skip-notes-env-missing; do
+    reset_state
+    printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+    triage_report > "$SCRATCH/triage-out"   # no row for 101, so its reason shows under Skipped
+    install_harness_verdict 101 "$DIFF_A"
+    install_harness_result 101 "first-slug" "shipped-held" "3,7" "CLEAN"
+    case "$_mode" in
+        *-unset)   unset PR_CYCLE_SKIP_NOTES ;;
+        *-empty)   export PR_CYCLE_SKIP_NOTES= ;;
+        *-missing) export PR_CYCLE_SKIP_NOTES="$SCRATCH/missing.tsv" ;;
+    esac
+    run --worker
+    unset PR_CYCLE_SKIP_NOTES
+    [[ $RC -eq 0 ]] || fail "$_mode: exit $RC, want 0"
+    _dm="$(cat "$SCRATCH/dm.argv")"
+    grep -qF '**Skipped (1)**' <<< "$_dm" || fail "$_mode: Skipped (1) missing: $_dm"
+    grep -qF 'last post-plan run held it for (3,7)' <<< "$_dm" \
+        || fail "$_mode: stage1 reason missing from the DM: $_dm"
+    grep -qF 'No such file' "$ERR" && fail "$_mode: 'No such file' on stderr"
+done
+end_case "case skip-notes-env-unset-empty-missing"
+
+# 5: lines that do not start with a PR number and a tab are ignored.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 FEAT-AWAITING-SIGNOFF sign-off" > "$SCRATCH/triage-out"
+printf 'abc\tbad\n\n2989\tstacked on #2950\n' > "$SKIPIN"
+PR_CYCLE_SKIP_NOTES="$SKIPIN" run --worker
+[[ $RC -eq 0 ]] || fail "skip-notes-malformed-lines-ignored: exit $RC, want 0"
+_dm="$(cat "$SCRATCH/dm.argv")"
+grep -qF '**Skipped (1)**' <<< "$_dm" || fail "skip-notes-malformed-lines-ignored: want Skipped (1): $_dm"
+grep -qF '#2989 — stacked on #2950' <<< "$_dm" || fail "skip-notes-malformed-lines-ignored: 2989 row missing: $_dm"
+grep -qF 'abc' <<< "$_dm" && fail "skip-notes-malformed-lines-ignored: malformed line listed: $_dm"
+end_case "case skip-notes-malformed-lines-ignored"
+
+# 6: 80 notes under a short your-turn list: every your-turn row stays, the Skipped block is
+# cut with a pointer line, and the DM stays inside case 38's length bound.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 FEAT-AWAITING-SIGNOFF sign-off" > "$SCRATCH/triage-out"
+i=1
+while [[ $i -le 80 ]]; do
+    printf '%d\tchecks green\n' "$((5000 + i))"
+    i=$((i + 1))
+done > "$SKIPIN"
+PR_CYCLE_SKIP_NOTES="$SKIPIN" run --worker
+[[ $RC -eq 0 ]] || fail "skip-notes-cap-order: exit $RC, want 0"
+_dm="$(cat "$SCRATCH/dm.argv")"
+grep -qF '#101' <<< "$_dm" || fail "skip-notes-cap-order: your-turn row missing: $_dm"
+grep -qF '**Skipped (80)**' <<< "$_dm" || fail "skip-notes-cap-order: Skipped (80) header missing"
+grep -qF 'more skipped:' <<< "$_dm" || fail "skip-notes-cap-order: no 'more skipped:' pointer"
+_dm_len="$(wc -m < "$SCRATCH/dm.argv" | tr -d ' ')"
+[[ "$_dm_len" -le 2000 ]] || fail "skip-notes-cap-order: DM exceeds 2000 chars ($_dm_len)"
+
+# your-turn rows alone overflow: no Skipped block at all.
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+i=1
+while [[ $i -le 40 ]]; do
+    printf '#%d  UNCLEARED  run manual tests for this very long title PR number %d\n' \
+        "$((2100 + i))" "$i" >> "$SCRATCH/triage-out"
+    printf '%d\thttps://github.com/a-jay85/IBL5/pull/%d\tThis is a very long title for pull request number %d that eats characters\n' \
+        "$((2100 + i))" "$((2100 + i))" "$i" >> "$SCRATCH/prlist.tsv"
+    i=$((i + 1))
+done
+PR_CYCLE_SKIP_NOTES="$SKIPIN" run --worker
+[[ $RC -eq 0 ]] || fail "skip-notes-cap-order overflow: exit $RC, want 0"
+grep -qF 'more:' "$SCRATCH/dm.argv" || fail "skip-notes-cap-order overflow: your-turn rows did not overflow"
+grep -qF '**Skipped' "$SCRATCH/dm.argv" && fail "skip-notes-cap-order overflow: Skipped block printed after the overflow line"
+_dm_len="$(wc -m < "$SCRATCH/dm.argv" | tr -d ' ')"
+[[ "$_dm_len" -le 2000 ]] || fail "skip-notes-cap-order overflow: DM exceeds 2000 chars ($_dm_len)"
+end_case "case skip-notes-cap-order"
+
+# 7: the launcher bakes the seam into the runner header.
+begin_case
+reset_state
+TSPIN="${TSBASE}4"
+RUNNER="/tmp/pr-cycle-$TSPIN.sh"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+PR_CYCLE_SKIP_NOTES="$SCRATCH/notes dir/in.tsv" PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
+[[ $RC -eq 0 ]] || fail "launcher-exports-skip-notes: --go exit $RC, want 0"
+grep -qF 'export PR_CYCLE_SKIP_NOTES=' "$RUNNER" || fail "launcher-exports-skip-notes: runner lacks the export"
+_seam="$(bash -c "$(grep -m1 '^export PR_CYCLE_SKIP_NOTES=' "$RUNNER"); printf '%s' \"\$PR_CYCLE_SKIP_NOTES\"")"
+[[ "$_seam" == "$SCRATCH/notes dir/in.tsv" ]] || fail "launcher-exports-skip-notes: runner holds '$_seam'"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-cycle-$TSPIN.plist"
+PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
+[[ $RC -eq 0 ]] || fail "launcher-exports-skip-notes unset: --go exit $RC, want 0"
+grep -qxF "export PR_CYCLE_SKIP_NOTES=''" "$RUNNER" || fail "launcher-exports-skip-notes: unset var not baked as ''"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-cycle-$TSPIN.plist"
+unset TSPIN
+end_case "case launcher-exports-skip-notes"
+
+# 8: nothing left for the human, one tick note: "Your turn: nothing" then the Skipped block.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+install_verdict 101 "$TREE_A"
+printf '777\tdraft\n' > "$SKIPIN"
+PR_CYCLE_SKIP_NOTES="$SKIPIN" run --worker
+[[ $RC -eq 0 ]] || fail "your-turn-nothing-with-skips: exit $RC, want 0"
+_dm="$(cat "$SCRATCH/dm.argv")"
+[[ "$_dm" == *'Your turn: nothing'*'**Skipped (1)**'*'- #777 — draft'* ]] \
+    || fail "your-turn-nothing-with-skips: wrong DM: $_dm"
+end_case "case your-turn-nothing-with-skips"
+
+# 9: a halted run builds no notes and keeps its stage-2 line.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+printf '777\tdraft\n' > "$SKIPIN"
+PR_CYCLE_SKIP_NOTES="$SKIPIN" AUTHPROBE=false run --worker
+unset AUTHPROBE
+_dm="$(cat "$SCRATCH/dm.argv")"
+grep -qF 'Your turn: unknown — stage 2 did not run' <<< "$_dm" || fail "halt-no-skip-block: stage-2 line missing: $_dm"
+grep -qF '**Skipped' <<< "$_dm" && fail "halt-no-skip-block: Skipped block on a halted run: $_dm"
+[[ -e "$(rundir)/skip-notes.tsv" ]] && fail "halt-no-skip-block: skip-notes.tsv built on a halted run"
+end_case "case halt-no-skip-block"
+
+# 10: a fired PR left in your-turn shows what the rescue did.
+begin_case
+reset_state
+mkdir -p "$SCRATCH/fleetlogs"
+printf 'post-plan-fleet: outcome=held\npost-plan-fleet: reason=plan sets auto_merge false\n' > "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 BLOCKED-CHECK fix-ci" > "$SCRATCH/triage-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "fired-pr-rescue-outcome-suffix: exit $RC, want 0"
+grep -qF '(rescue: held)' "$SCRATCH/dm.argv" || fail "fired-pr-rescue-outcome-suffix: (rescue: held) missing: $(cat "$SCRATCH/dm.argv")"
+rm -f "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 BLOCKED-CHECK fix-ci" > "$SCRATCH/triage-out"
+run --worker
+grep -qF '(rescue: failed)' "$SCRATCH/dm.argv" || fail "fired-pr-rescue-outcome-suffix: (rescue: failed) missing: $(cat "$SCRATCH/dm.argv")"
+end_case "case fired-pr-rescue-outcome-suffix"
+
 # --- result file: PR_CYCLE_RESULT_FILE holds one TSV row per PR in scope ---------------------
 # 101 is skipped by holdrepeat, 102 fires, 103 is over the --max-ready cap.
 RES="$SCRATCH/res/result.tsv"

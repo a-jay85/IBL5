@@ -48,12 +48,14 @@ def _setup(tmp_path, *, dm_sent=True, slug="hr-test-slug"):
 
 
 def _decline(root, plans_dir, state, slug, *, harness=HARNESS, force=None, state_env=None,
-             plan=""):
+             plan="", state_changed=None):
     env = {**os.environ}
     env.pop("FORCE", None)
     env["HOLDREPEAT_STATE_DIR"] = str(state) if state_env is None else state_env
     env["PLANS_DIR"] = str(plans_dir)
     prefix = f"FORCE={force}; " if force is not None else ""
+    if state_changed is not None:
+        prefix += f"STATE_CHANGED={state_changed}; "
     script = (f'. "{PPN}"; {prefix}'
               f'postplan_holdrepeat_decline "{harness}" "{slug}" "{plan}" "{root}"; echo "rc=$?"')
     return subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env)
@@ -89,6 +91,20 @@ def test_force_overrides_decline(tmp_path):
     r = _decline(root, plans_dir, state, slug, force=1)
     assert "rc=1" in r.stdout
     assert "DECLINE" not in r.stdout
+
+
+def test_state_changed_overrides_decline(tmp_path):
+    root, plans_dir, state, slug = _setup(tmp_path)
+    r = _decline(root, plans_dir, state, slug, state_changed=1)
+    assert "rc=1" in r.stdout
+    assert "DECLINE" not in r.stdout
+
+
+def test_state_changed_zero_still_declines(tmp_path):
+    root, plans_dir, state, slug = _setup(tmp_path)
+    r = _decline(root, plans_dir, state, slug, state_changed=0)
+    assert "rc=0" in r.stdout
+    assert "holdrepeat: DECLINE" in r.stdout
 
 
 def test_fails_open_when_check_errors(tmp_path):

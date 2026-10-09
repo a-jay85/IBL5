@@ -81,3 +81,24 @@ def test_early_missing_items_filters_kinds():
     assert all(i.startswith(("MISSING:", "MISSING-FILE:")) for i in items)
     assert any(i.startswith("MISSING:") for i in items)
     assert any(i.startswith("MISSING-FILE:") for i in items)
+
+
+def test_verdict_line_hold_repeat_declined():
+    import runner
+    from harness.state import RunResult, TerminalState
+    res = RunResult(terminal=TerminalState.HOLD_REPEAT_DECLINED)
+    res.hold_repeat = {"early_decline": True, "reason": "MISSING-FILE: a.py (x)",
+                       "structural_key": "3:m", "repeat_count": 2, "dm_sent": True}
+    line = runner.verdict_line(res, 0, "https://github.com/o/r/pull")
+    assert line.startswith("RESULT: post-plan DECLINED")
+    assert "declined: same hold as last run (MISSING-FILE: a.py (x)), no tokens spent" in line
+    assert "PR #" not in line
+
+
+def test_verdict_line_hold_repeat_missing_reason():
+    import runner
+    from harness.state import RunResult, TerminalState
+    res = RunResult(terminal=TerminalState.HOLD_REPEAT_DECLINED)
+    res.hold_repeat = {}
+    line = runner.verdict_line(res, 0)
+    assert "(unknown)" in line

@@ -24,6 +24,7 @@ class TerminalState(str, Enum):
     DEGRADED = "degraded"                    # PR open+held; >=1 review agent unparseable
     NOTHING_TO_SHIP = "nothing-to-ship"      # clean tree, empty diff vs master
     ALREADY_SHIPPED = "already-shipped"      # diff vs master went empty AND the branch's PR is already MERGED
+    HOLD_REPEAT_DECLINED = "hold-repeat-declined"  # condition-3 MISSING set equals the prior hold's; stopped before any LLM call
     FAILED = "failed"                        # typed failure aborted the run
 
 

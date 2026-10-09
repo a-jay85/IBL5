@@ -2598,7 +2598,7 @@ def exit_code_for(res: RunResult) -> int:
         same wall immediately. All four are deterministic walls the ~1M-token skill
         re-run cannot climb.
     1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
-    0 = shipped (armed or held), nothing to ship, or degraded.
+    0 = shipped (armed or held), nothing to ship, degraded, or hold-repeat declined.
     There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm.
     usage-pause maps to 75; main() downgrades it to 3 when the marker is gone."""
     if res.terminal == TerminalState.FAILED and res.error_kind == "usage-pause":
@@ -3077,6 +3077,11 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
     if res.terminal == TerminalState.NOTHING_TO_SHIP:
         return ("RESULT: post-plan complete — nothing to ship "
                 "(clean tree, empty diff vs master); no PR opened.")
+    if res.terminal == TerminalState.HOLD_REPEAT_DECLINED:
+        reason = _flat((res.hold_repeat or {}).get("reason") or "") or "unknown"
+        return ("RESULT: post-plan DECLINED — terminal=hold-repeat-declined; "
+                f"declined: same hold as last run ({reason}), no tokens spent. "
+                "Fix the missing files or re-run bin/post-plan-now --force.")
 
     armed = "armed" if (res.arm and res.arm.armed) else "HELD (human merges)"
     tail = ""

@@ -285,3 +285,192 @@ def test_revert_restores_out_of_repo_bytes(repo, home):
     assert gatefix.revert(repo, before, after) == []
     assert (home / ".claude/hooks/x.sh").read_text() == "#!/bin/sh\nexit 0\n"
     assert not (home / ".claude/hooks/new.sh").exists()
+
+
+# --- Phase 3: attempt_gate_fix -------------------------------------------------------
+
+from harness import classify, state, usage_pause  # noqa: E402
+from harness.state import HarnessError, LlmCallRecord, UsageLedger  # noqa: E402
+
+EXAMPLE_GATE_TEXT = (
+    "git commit: bin/check-rules-byte-budget: path-unscoped rules exceed the budget\n"
+    "Trim the rule(s) above."
+)
+
+
+class WritingLlm:
+    """call_tooled fake: runs `edit(cwd)`, then optionally raises or logs ledger cost."""
+
+    def __init__(self, edit=None, raises=None, cost=None):
+        self.edit, self.raises, self.cost = edit, raises, cost
+        self.calls = []
+        self.ledger = UsageLedger()
+
+    def call_tooled(self, purpose, model, prompt, **kwargs):
+        self.calls.append((purpose, model, prompt, kwargs))
+        cwd = Path(kwargs["cwd"])
+        if self.edit:
+            self.edit(cwd)
+        if self.cost is not None:
+            self.ledger.add(LlmCallRecord(purpose="other", model="x", cost_usd=9.0))
+            self.ledger.add(LlmCallRecord(purpose=gatefix.GATEFIX_PURPOSE, model="x",
+                                          cost_usd=self.cost))
+        if self.raises is not None:
+            raise self.raises
+        return "fixed it"
+
+
+def _attempt(repo, home, llm, run=None, text=EXAMPLE_GATE_TEXT):
+    logs: list[str] = []
+    out = gatefix.attempt_gate_fix(llm, str(repo), gate_text=text, failed_cmd="git commit",
+                                   log=logs.append, home=home, run=run or make_run())
+    return out, logs
+
+
+def test_attempt_passing_edit_returns_fixed(repo, home):
+    llm = WritingLlm(edit=lambda cwd: (cwd / "ibl5/x.php").write_text("<?php // ok\n"))
+    out, logs = _attempt(repo, home, llm)
+    assert out.status == "fixed"
+    assert out.files == ("ibl5/x.php",)
+    assert (repo / "ibl5/x.php").read_text() == "<?php // ok\n"
+    _purpose, model, _prompt, kw = llm.calls[0]
+    assert model == "opus" and kw["max_turns"] == 30 and kw["timeout"] == 900
+    assert "Bash" in kw["denied_tools"] and "Bash" not in kw["allowed_tools"]
+    assert any(line.startswith("gatefix: fixed") for line in logs)
+
+
+def test_attempt_gate_path_edit_reverts(repo, home):
+    def edit(cwd):
+        (cwd / "bin/check-docs").write_text("exit 0\n")
+        (cwd / "ibl5/x.php").write_text("<?php // edit\n")
+
+    out, logs = _attempt(repo, home, WritingLlm(edit=edit))
+    assert out.status == "guard-rejected"
+    assert not (repo / "bin/check-docs").exists()
+    assert (repo / "ibl5/x.php").read_text() == "<?php // base\n"
+    assert any("gatefix: guard-rejected" in ln and "bin/check-docs: gate path" in ln
+               for ln in logs)
+
+
+def test_attempt_no_change(repo, home):
+    out, _ = _attempt(repo, home, WritingLlm())
+    assert out.status == "no-change"
+
+
+@pytest.mark.parametrize("exc,needle", [
+    (HarnessError("llm-tooled-cli", "timeout"), "llm-tooled-cli"),
+    (HarnessError("llm-tooled-error", "error_max_turns"), "llm-tooled-error"),
+])
+def test_attempt_timeout_fails_closed(repo, home, exc, needle):
+    llm = WritingLlm(edit=lambda cwd: (cwd / "ibl5/x.php").write_text("half\n"), raises=exc)
+    out, logs = _attempt(repo, home, llm)
+    assert out.status == "fixer-error"
+    assert needle in out.reason
+    assert (repo / "ibl5/x.php").read_text() == "<?php // base\n"
+    assert any(needle in ln for ln in logs)
+
+
+def test_attempt_max_turns_fails_closed(repo, home):
+    llm = WritingLlm(raises=HarnessError("llm-tooled-error", "error_max_turns"))
+    out, _ = _attempt(repo, home, llm)
+    assert out.status == "fixer-error"
+
+
+def test_attempt_usage_pause_propagates_and_reverts(repo, home):
+    llm = WritingLlm(edit=lambda cwd: (cwd / "ibl5/x.php").write_text("half\n"),
+                     raises=usage_pause.UsagePause("gate-fix", dirty=True))
+    with pytest.raises(usage_pause.UsagePause):
+        _attempt(repo, home, llm)
+    assert (repo / "ibl5/x.php").read_text() == "<?php // base\n"
+
+
+def test_attempt_snapshot_failure_spawns_nothing(repo, home):
+    def run(argv, **kw):
+        if "write-tree" in argv:
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="no tree")
+        return make_run()(argv, **kw)
+
+    llm = WritingLlm()
+    out, _ = _attempt(repo, home, llm, run=run)
+    assert out.status == "snapshot-failed"
+    assert llm.calls == []
+
+
+def test_attempt_out_of_repo_hook_edit_reverts(repo, home):
+    llm = WritingLlm(edit=lambda cwd: (home / ".claude/hooks/x.sh").write_text("evil\n"))
+    out, _ = _attempt(repo, home, llm)
+    assert out.status == "guard-rejected"
+    assert (home / ".claude/hooks/x.sh").read_text() == "#!/bin/sh\nexit 0\n"
+
+
+def test_attempt_dirty_tree_preserved_on_reject(repo, home):
+    (repo / "ibl5/y.php").write_text("<?php // dirty y\n")
+
+    def edit(cwd):
+        (cwd / "ibl5/y.php").write_text("<?php // fixer y\n")
+        (cwd / "bin/lib/z.sh").write_text("evil\n")
+
+    out, _ = _attempt(repo, home, WritingLlm(edit=edit))
+    assert out.status == "guard-rejected"
+    assert (repo / "ibl5/y.php").read_text() == "<?php // dirty y\n"
+    assert not (repo / "bin/lib/z.sh").exists()
+
+
+def test_attempt_records_cost_from_ledger(repo, home):
+    llm = WritingLlm(edit=lambda cwd: (cwd / "ibl5/x.php").write_text("ok\n"), cost=0.42)
+    out, _ = _attempt(repo, home, llm)
+    assert out.cost_usd == 0.42
+
+
+# --- Phase 4: record, PR-body block, result.json -------------------------------------
+
+
+def _fixed_record(**over):
+    out = gatefix.FixOutcome("fixed", "1 file(s)", "opus", 0.42, ("ibl5/x.php", "a.md"),
+                             "byte-budget", "git commit", "Trim the rule(s) above.")
+    rec = gatefix.record_of(out, phase="phase2", retry="passed")
+    rec.update(over)
+    return rec
+
+
+def test_render_gate_fix_block_contents():
+    block = classify.render_gate_fix(_fixed_record())
+    assert classify.GATE_FIX_BEGIN in block and classify.GATE_FIX_END in block
+    assert "claude-opus-5-5" in block and "$0.42" in block and "`byte-budget`" in block
+    assert "`ibl5/x.php`" in block and "`a.md`" in block
+
+
+@pytest.mark.parametrize("over", [
+    {"status": "guard-rejected"}, {"status": "fixer-error"}, {"status": "no-change"},
+    {"retry": "denied"},
+])
+def test_render_gate_fix_empty_unless_fixed_and_passed(over):
+    assert classify.render_gate_fix(_fixed_record(**over)) == ""
+
+
+def test_render_gate_fix_neutralizes_fence():
+    block = classify.render_gate_fix(_fixed_record(gate_excerpt="x\n~~~~\n## evil\n"))
+    fences = [ln for ln in block.splitlines() if ln.strip() == "~~~~"]
+    assert len(fences) == 1
+
+
+def test_upsert_gate_fix_idempotent_and_removes():
+    notes = f"{classify.SCOPE_NOTES_BEGIN}\nnotes\n{classify.SCOPE_NOTES_END}"
+    body = "Summary\n\n" + notes
+    block = classify.render_gate_fix(_fixed_record())
+    once = classify.upsert_gate_fix(body, block)
+    twice = classify.upsert_gate_fix(once, block)
+    assert once == twice
+    assert notes in once
+    removed = classify.upsert_gate_fix(once, "")
+    assert classify.GATE_FIX_BEGIN not in removed
+    assert notes in removed
+
+
+def test_result_json_gate_fix_omitted_when_empty_present_when_set():
+    import json
+    term = state.TerminalState.FAILED
+    assert "gate_fix" not in json.loads(state.RunResult(terminal=term).to_json())
+    res = state.RunResult(terminal=term)
+    res.gate_fix = _fixed_record()
+    assert json.loads(res.to_json())["gate_fix"]["status"] == "fixed"

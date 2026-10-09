@@ -898,6 +898,7 @@ jobs:
             bin/test-plan-now \
             bin/test-wt-sync-tick \
             bin/test-wt-gc-tick \
+            bin/test-tick-guards \
             bin/test-bin-help \
             bin/test-check-old-code-compat \
             bin/test-cleanup-safety \

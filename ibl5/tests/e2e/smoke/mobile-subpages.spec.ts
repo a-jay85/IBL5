@@ -105,6 +105,7 @@ test.describe('Team display mode mobile smoke tests', () => {
       await expect(content).toBeVisible();
       await assertNoHorizontalOverflow(page, `on team ${view.name}`);
 
+      // Wide team views are server-rendered into .table-scroll-container (TeamView.php:87-88).
       if (view.hasWideTables) {
         await assertScrollWrappersPresent(page, `on team ${view.name}`);
       }

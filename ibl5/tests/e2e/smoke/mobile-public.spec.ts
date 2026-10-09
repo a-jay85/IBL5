@@ -9,7 +9,8 @@ test.use({ viewport: { width: 375, height: 812 } });
 // hasWideTables: only true for pages whose tables are always wider than 375px regardless
 // of seed data. responsive-tables.js only wraps tables that overflow, so data-dependent
 // pages may not have scroll wrappers in CI. The overflow check still catches real issues.
-// scrollWrapper: set only for pages whose tables sit in a server-rendered .sticky-scroll-wrapper.
+// scrollWrapper: set only for pages whose tables sit in a server-rendered .sticky-scroll-wrapper
+// (head-to-head: HeadToHeadRecordsView.php:112).
 const PAGES = [
   { name: 'homepage', url: 'index.php', selector: 'article', hasWideTables: false },
   { name: 'standings', url: 'modules.php?name=Standings', selector: '.ibl-data-table', hasWideTables: true },

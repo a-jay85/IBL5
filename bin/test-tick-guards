@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+# Tests for the shared tick guards: bin/lib/tick-guards.sh (lock + HID idle).
+#
+# Section 1 (characterization pins) runs the real bin/wt-gc-tick and
+# bin/wt-sync-tick against a stub ioreg and compares FULL log lines with the
+# timestamp stripped. The existing tick harnesses only match substrings, so a
+# wording drift would pass there. These pins stay green across the refactor
+# that moves both ticks onto the lib.
+#
+# State is always a fresh mktemp dir; the real lock dirs and logs are never
+# touched.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PASS=0
+FAIL=0
+
+pass() { PASS=$((PASS + 1)); echo "  ok   $1"; }
+fail() { FAIL=$((FAIL + 1)); echo "  FAIL $1${2:+ — $2}"; }
+
+assert_eq() {  # name expected actual
+    if [ "$2" = "$3" ]; then pass "$1"; else fail "$1" "expected [$2] got [$3]"; fi
+}
+
+T="$(mktemp -d)"
+trap 'rm -rf "$T"' EXIT
+
+# ── Section 1: characterization pins against the real ticks ──────────────────
+
+mkdir -p "$T/bin"
+# Stub reader: prints STUB_IOREG_LINE only when it is non-empty.
+cat > "$T/bin/ioreg" <<'STUB'
+#!/bin/sh
+if [ -n "${STUB_IOREG_LINE:-}" ]; then printf '%s\n' "$STUB_IOREG_LINE"; fi
+exit 0
+STUB
+chmod +x "$T/bin/ioreg"
+
+OUT=""
+RC=0
+D=""
+
+new_case() { D="$(mktemp -d "$T/case.XXXXXX")"; }
+
+run_gc() {  # <extra-env...> -- <args...>
+    local -a envs=()
+    while [ $# -gt 0 ] && [ "$1" != "--" ]; do envs+=("$1"); shift; done
+    [ $# -gt 0 ] && shift
+    RC=0
+    OUT="$(env WT_GC_ENABLED=1 WT_GC_IOREG="$T/bin/ioreg" WT_GC_LOCK_DIR="$D" \
+        WT_GC_LOG="$D/gc.log" WT_GC_REPO_ROOT="$D" WT_GC_CLEANUP=/usr/bin/true \
+        WT_GC_WT_STATUS=/usr/bin/true "${envs[@]+"${envs[@]}"}" \
+        "$SCRIPT_DIR/wt-gc-tick" "$@" 2>&1)" || RC=$?
+}
+
+run_sync() {  # <extra-env...> -- <args...>
+    local -a envs=()
+    while [ $# -gt 0 ] && [ "$1" != "--" ]; do envs+=("$1"); shift; done
+    [ $# -gt 0 ] && shift
+    git init -q "$D/repo"
+    RC=0
+    OUT="$(env WT_SYNC_ENABLED=1 WT_SYNC_IOREG="$T/bin/ioreg" WT_SYNC_LOCK_DIR="$D" \
+        WT_SYNC_LOG="$D/sync.log" WT_SYNC_REPO_ROOT="$D/repo" \
+        "${envs[@]+"${envs[@]}"}" \
+        "$SCRIPT_DIR/wt-sync-tick" --dry-run "$@" 2>&1)" || RC=$?
+}
+
+# pin <label> <expected-line>: the full line must appear once the timestamp is stripped.
+pin() {
+    local stripped
+    stripped="$(sed -E 's/^\[[^]]*\] //' <<< "$OUT")"
+    if grep -Fxq -- "$2" <<< "$stripped"; then
+        pass "$1"
+    else
+        fail "$1" "expected line [$2]; got:"
+        sed 's/^/        /' <<< "$stripped"
+    fi
+}
+pin_rc() { assert_eq "$1 rc" "$2" "$RC"; }
+
+dead_pid() { ( exit 0 ) & local p=$!; wait "$p"; printf '%s' "$p"; }
+
+# ── gc lock cases ──
+new_case; printf '%d\n' "$$" > "$D/wt-gc.lock"
+run_gc -- --force
+pin "GC held" "previous tick (pid $$) still running — exiting"; pin_rc "GC held" 0
+
+new_case; DEAD="$(dead_pid)"; printf '%s\n' "$DEAD" > "$D/wt-gc.lock"
+run_gc -- --force
+pin "GC stale" "stale lock (pid $DEAD) — reclaiming"
+
+new_case; mkdir "$D/wt-gc.lock"
+run_gc -- --force
+pin "GC write-failed" "could not write lock file $D/wt-gc.lock — aborting"; pin_rc "GC write-failed" 0
+
+# ── gc presence cases ──
+new_case
+run_gc "WT_GC_IOREG=$T/missing" --
+pin "GC missing" "idle reader missing or not executable ('$T/missing') — treating as operator present (fail-closed)"; pin_rc "GC missing" 0
+
+# No tick-level empty-reader pin: both ticks default the seam with ${VAR:-...},
+# so an empty WT_*_IOREG= falls back to the real ioreg and the empty-reader
+# branch is unreachable through the environment. The lib unit case U1 covers it.
+
+new_case
+run_gc 'STUB_IOREG_LINE="HIDIdleTime" = nan' --
+pin "GC unreadable" "idle value unreadable ('nan') — treating as operator present (fail-closed)"; pin_rc "GC unreadable" 0
+
+new_case
+run_gc --
+pin "GC unreadable-0" "idle value unreadable ('<empty>') — treating as operator present (fail-closed)"; pin_rc "GC unreadable-0" 0
+
+new_case
+run_gc 'STUB_IOREG_LINE="HIDIdleTime" = 60000000000' --
+pin "GC present" "operator present (idle 60s < threshold 1800s) — exiting"; pin_rc "GC present" 0
+
+new_case
+run_gc 'STUB_IOREG_LINE="HIDIdleTime" = 7200000000000' --
+pin "GC proceeding" "idle 7200s >= threshold 1800s — proceeding"
+
+# ── sync lock cases ──
+new_case; printf '%d\n' "$$" > "$D/wt-sync.lock"
+run_sync -- --force
+pin "SYN held" "lock held by PID $$ — another tick is running, exiting"; pin_rc "SYN held" 0
+
+new_case; DEAD="$(dead_pid)"; printf '%s\n' "$DEAD" > "$D/wt-sync.lock"
+run_sync -- --force
+pin "SYN stale" "reclaiming stale lock (PID '$DEAD' is dead)"
+
+new_case; mkdir "$D/wt-sync.lock"
+run_sync -- --force
+pin "SYN write-failed" "could not write lock file $D/wt-sync.lock — aborting"; pin_rc "SYN write-failed" 0
+
+# ── sync presence cases ──
+new_case
+run_sync "WT_SYNC_IOREG=$T/missing" --
+pin "SYN missing" "idle reader missing or not executable ('$T/missing') — treating as operator present (fail-closed)"; pin_rc "SYN missing" 0
+
+new_case
+run_sync --
+pin "SYN unreadable-0" "idle value unreadable ('<empty>') — treating as operator present (fail-closed)"; pin_rc "SYN unreadable-0" 0
+
+new_case
+run_sync 'STUB_IOREG_LINE=HIDIdleTime = 50000000000' --
+pin "SYN present" "operator present (idle 50s < threshold 600s) — exiting"; pin_rc "SYN present" 0
+
+new_case
+run_sync 'STUB_IOREG_LINE=HIDIdleTime = 700000000000' --
+pin "SYN proceeding" "idle 700s >= threshold 600s — proceeding"
+
+# ── Summary ──────────────────────────────────────────────────────────────────
+echo ""
+echo "PASS=$PASS FAIL=$FAIL"
+[ "$FAIL" -eq 0 ] || exit 1

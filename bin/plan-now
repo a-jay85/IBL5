@@ -1094,30 +1094,7 @@ chmod +x "$RUNNER"
 # the Linux CI box, where bin/test-plan-now drives this script under PLAN_NOW_DRY_RUN
 # and `set -e` would otherwise abort here before the runner path is printed.
 mkdir -p "$(dirname "$PLIST")"
-cat > "$PLIST" <<PLIST_EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>$LABEL</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/bin/bash</string>
-		<string>-lc</string>
-		<string>exec "$RUNNER"</string>
-	</array>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>WorkingDirectory</key>
-	<string>$ROOT</string>
-	<key>StandardOutPath</key>
-	<string>$LOG</string>
-	<key>StandardErrorPath</key>
-	<string>$LOG</string>
-</dict>
-</plist>
-PLIST_EOF
+ljob_write_runner_plist "$PLIST" "$LABEL" "$RUNNER" "$ROOT" "$LOG"
 
 if [ "${PLAN_NOW_DRY_RUN:-0}" = "1" ]; then
     echo "plan-now: DRY RUN — plist and runner written, not bootstrapped."

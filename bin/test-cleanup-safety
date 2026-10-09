@@ -43,6 +43,8 @@ cat > "$STUBBIN/gh" <<'GH'
 [ -n "${GH_ARGV_LOG:-}" ] && printf '%s\t%s\n' "$PWD" "$*" >> "$GH_ARGV_LOG"
 # Table-driven gh stub. Reads $GH_FIXTURE (TAB-separated rows):
 #   view <ref>       <state> <headRefOid> <number>
+#                    (view answers only the combined pr_info query: any
+#                    single-field `--json state|number|headRefOid` call exits 1)
 #   viewfail <ref>   -> prints `stub-gh: boom` to stderr, exits 4
 #   list <searchSha> <headRefOid> <state> <number>
 # A view with no <ref> (gh infers the PR from the checkout) maps to ref `@current`.
@@ -67,9 +69,6 @@ case "$sub" in
     row="$(awk -F'\t' -v r="$ref" '$1=="view" && $2==r {print; exit}' "$GH_FIXTURE")"
     [ -n "$row" ] || exit 1
     case "$field" in
-      .state)      printf '%s\n' "$(printf '%s' "$row" | cut -f3)" ;;
-      .headRefOid) printf '%s\n' "$(printf '%s' "$row" | cut -f4)" ;;
-      .number)     printf '%s\n' "$(printf '%s' "$row" | cut -f5)" ;;
       '[.state, .number, .headRefOid] | @tsv')
         printf '%s\t%s\t%s\n' "$(printf '%s' "$row" | cut -f3)" \
           "$(printf '%s' "$row" | cut -f5)" "$(printf '%s' "$row" | cut -f4)" ;;
@@ -522,6 +521,23 @@ tip="$(wt_tip "$e" abandoned)"
 fx="$e/ghfx"; printf 'view\tabandoned\tCLOSED\t%s\t7\n' "$tip" > "$fx"
 out="$(run_cleanup_gh "$e" "$fx")"
 assert_match "closed-untracked-still-skipped" 'SKIP abandoned: has untracked files' "$out"
+
+# (e) OPEN PR on a worktree -> SKIP names the PR number (pins the number half of
+# the state+number pair that pr_info now fetches in one call).
+e="$(new_env)"; add_open_wt "$e" abandoned false
+tip="$(wt_tip "$e" abandoned)"
+fx="$e/ghfx"; printf 'view\tabandoned\tOPEN\t%s\t4242\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "cleanup-wt-open-pr-names-number" 'PR #4242 still open' "$out"
+
+# (f) OPEN PR on a bare branch -> SKIP names the PR number.
+e="$(new_env)"; add_open_wt "$e" abandoned false
+tip="$(wt_tip "$e" abandoned)"
+git -C "$e" worktree remove --force "$e/worktrees/abandoned"
+fx="$e/ghfx"; printf 'view\tabandoned\tOPEN\t%s\t4343\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "cleanup-bare-open-pr-names-number" \
+    'SKIP bare branch abandoned: PR #4343 still open' "$out"
 
 # ----------------------------------------------------------------------------
 # Phase 6: detached-HEAD worktrees resolve their PR by tip OID (Check 0). Clean

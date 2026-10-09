@@ -214,11 +214,28 @@ reconcile_pending
 
 # ── (d) Qualifying set ───────────────────────────────────────────────────────
 if ! PRS_JSON="$(gh pr list --state open --author @me --limit 200 \
-        --json number,headRefName,headRefOid,mergeStateStatus,isDraft 2>/dev/null)"; then
+        --json number,headRefName,headRefOid,mergeStateStatus,isDraft,baseRefName 2>/dev/null)"; then
     log "gh pr list failed"; exit 0
 fi
 if [[ "$DRY_RUN" -eq 0 ]]; then
     pcw_prune "$STATE" "$(jq -r '.[].number' <<< "$PRS_JSON")"
+fi
+
+# Every open PR's head branch -> number (drafts included: a PR stacked on a draft is
+# still stacked). Feeds pcw_stacked_on.
+OPEN_HEADS="$(jq -r '.[] | [.headRefName, .number] | @tsv' <<< "$PRS_JSON")"
+
+# Skip notes: one "<pr>\t<reason>" line per open PR this tick did not launch. pr-cycle
+# reads the file through PR_CYCLE_SKIP_NOTES and lists the reasons in its your-turn DM.
+id="$(date +%s)-$$"
+SKIP_NOTES="$STATE/results/$id.skip-notes"
+note() { [[ "$DRY_RUN" -eq 1 ]] || printf '%s\t%s\n' "$1" "$2" >> "$SKIP_NOTES"; }
+skip() { log "skip PR $1: $2"; note "$1" "$2"; }
+if [[ "$DRY_RUN" -eq 0 ]]; then
+    mkdir -p "$STATE/results"
+    find "$STATE/results" -name '*.skip-notes' -mmin +$(( PCW_PENDING_MAX_AGE_S / 60 )) -delete 2>/dev/null || true
+    while IFS= read -r d; do note "$d" "draft"; done \
+        < <(jq -r '.[] | select(.isDraft) | .number' <<< "$PRS_JSON")
 fi
 
 # <wt>/tools/postplan-harness/out for the worktree holding $1, or nothing.
@@ -232,16 +249,16 @@ worktree_out_dir() {
 }
 
 QUALIFY=()      # "<pr>|<sha>"
-while IFS=$'\t' read -r pr branch sha mstate; do
+while IFS=$'\t' read -r pr branch sha mstate base; do
     [[ -n "$pr" ]] || continue
     if pcw_inflight "$pr" "$branch" "$SNAP"; then
-        log "skip PR $pr: post-plan in flight"; continue
+        skip "$pr" "post-plan in flight"; continue
     fi
     out_dirs=("$ROOT/tools/postplan-harness/out")
     wt_out="$(worktree_out_dir "$branch")"
     [[ -n "$wt_out" ]] && out_dirs+=("$wt_out")
     if pcw_recent_finish "$branch" "${out_dirs[@]}"; then
-        log "skip PR $pr: post-plan finished <$PCW_GRACE_MIN min ago"; continue
+        skip "$pr" "post-plan finished <$PCW_GRACE_MIN min ago"; continue
     fi
     if [[ "$mstate" == "DIRTY" ]]; then
         kind=DIRTY
@@ -252,12 +269,17 @@ while IFS=$'\t' read -r pr branch sha mstate; do
             verdict=pending
         fi
         if [[ "$verdict" != "red" ]]; then
-            log "skip PR $pr: checks $verdict"; continue
+            skip "$pr" "checks $verdict"; continue
         fi
         kind=red
     fi
+    # Stacked (base is another open PR's head): its checks run against the parent
+    # branch, so a rescue cannot fix them. Skipped before any attempt is recorded.
+    if parent="$(pcw_stacked_on "$base" "$OPEN_HEADS")"; then
+        skip "$pr" "stacked on #$parent"; continue
+    fi
     if pcw_attempted_head "$STATE" "$pr" "$sha"; then
-        log "skip PR $pr: retry cap (head ${sha:0:7})"
+        skip "$pr" "retry cap (head ${sha:0:7})"
         if pcw_dm_due "$STATE" "$pr" "$sha"; then
             msg="pr-cycle-watch: PR #$pr is still $kind on head ${sha:0:7} after one rescue. Skipping it until a new push."
             # Name why the rescue stopped, so the DM is actionable without opening a log.
@@ -278,24 +300,28 @@ while IFS=$'\t' read -r pr branch sha mstate; do
     fi
     # These three skips send no DM: reconcile already sent the one that matters.
     if pcw_pending_has "$STATE" "$pr"; then
-        log "skip PR $pr: rescue pending"; continue
+        skip "$pr" "rescue pending"; continue
     fi
     if pcw_declined_head "$STATE" "$pr" "$sha"; then
-        log "skip PR $pr: holdrepeat declined (head ${sha:0:7})"; continue
+        skip "$pr" "holdrepeat declined (head ${sha:0:7})"; continue
     fi
     if [[ "$(pcw_strike_count "$STATE" "$pr" "$sha")" -ge "$PCW_STRIKE_CAP" ]]; then
-        log "skip PR $pr: no-op rescue cap (head ${sha:0:7})"; continue
+        skip "$pr" "no-op rescue cap (head ${sha:0:7})"; continue
     fi
     QUALIFY+=("$pr|$sha")
 done < <(jq -r 'sort_by(.number) | .[] | select(.isDraft | not)
-                | [.number, .headRefName, .headRefOid, .mergeStateStatus] | @tsv' <<< "$PRS_JSON")
+                | [.number, .headRefName, .headRefOid, .mergeStateStatus, .baseRefName] | @tsv' <<< "$PRS_JSON")
 
 if [[ ${#QUALIFY[@]} -eq 0 ]]; then
+    rm -f "$SKIP_NOTES"
     log "idle: nothing qualifies"; exit 0
 fi
 
 # ── (e) Launch ───────────────────────────────────────────────────────────────
 LAUNCH=("${QUALIFY[@]:0:$PCW_MAX_PER_TICK}")
+for entry in "${QUALIFY[@]:$PCW_MAX_PER_TICK}"; do
+    note "${entry%%|*}" "over the $PCW_MAX_PER_TICK-per-run cap; next tick"
+done
 csv=""
 for entry in "${LAUNCH[@]}"; do csv="${csv:+$csv,}${entry%%|*}"; done
 count=${#LAUNCH[@]}
@@ -307,13 +333,12 @@ fi
 log "launching: $PR_CYCLE_CMD --go --only $csv --max-ready $count"
 # The worker outlives this tick, so the launch records a pending entry, not an attempt. The
 # entry is written first so a killed tick never loses the launch; a failed launch removes it.
-id="$(date +%s)-$$"
 pending_body="# result=$STATE/results/$id.tsv started=$(date +%s)"
 for entry in "${LAUNCH[@]}"; do
     pending_body+=$'\n'"${entry%%|*}"$'\t'"${entry#*|}"
 done
 _pcw_write "$STATE/pending/$id" "$pending_body"
-if PR_CYCLE_RESULT_FILE="$STATE/results/$id.tsv" "$PR_CYCLE_CMD" --go --only "$csv" --max-ready "$count"; then
+if PR_CYCLE_RESULT_FILE="$STATE/results/$id.tsv" PR_CYCLE_SKIP_NOTES="$SKIP_NOTES" "$PR_CYCLE_CMD" --go --only "$csv" --max-ready "$count"; then
     log "launched; pending $id"
 else
     rm -f "$STATE/pending/$id"

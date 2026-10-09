@@ -104,6 +104,10 @@ CL_EOF
 cat > "$SCRATCH/pr-cycle-stub" <<PC_EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$SCRATCH/pr-cycle.log"
+printf '%s\n' "\${PR_CYCLE_SKIP_NOTES-UNSET}" > "$SCRATCH/pr-cycle-skip-notes-env"
+if [[ -n "\${PR_CYCLE_SKIP_NOTES:-}" && -f "\$PR_CYCLE_SKIP_NOTES" ]]; then
+    cp "\$PR_CYCLE_SKIP_NOTES" "$SCRATCH/pr-cycle-skip-notes-copy"
+fi
 # The real worker writes its result file at the end. A case stages the file with set_result.
 if [[ -n "\${PR_CYCLE_RESULT_FILE:-}" && -f "$SCRATCH/result-canned" ]]; then
     mkdir -p "\$(dirname "\$PR_CYCLE_RESULT_FILE")"
@@ -127,7 +131,8 @@ E_HOME="set"; E_STUB_RC=0
 
 reset() {
     rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json "$SCRATCH/result-canned"
-    rm -rf "$HOME_DIR" "$REPO/tools" "$WT/tools" "$SCRATCH/usage-gate"
+    rm -f "$SCRATCH/pr-cycle-skip-notes-env" "$SCRATCH/pr-cycle-skip-notes-copy"
+    rm -rf "$HOME_DIR" "$REPO/tools" "$WT/tools" "$SCRATCH/usage-gate" "$SCRATCH/watch-state"
     mkdir -p "$HOME_DIR"
     : > "$SCRATCH/launchctl-list.txt"
     echo '[]' > "$SCRATCH/prs.json"
@@ -136,13 +141,13 @@ reset() {
     E_HOME="set"; E_STUB_RC=0
 }
 
-# set_prs "<num>|<branch>|<sha>|<mergeStateStatus>|<isDraft>" ...
+# set_prs "<num>|<branch>|<sha>|<mergeStateStatus>|<isDraft>[|<baseRefName>]" ...
 set_prs() {
-    local e out="[]" n b s m d
+    local e out="[]" n b s m d base
     for e in "$@"; do
-        IFS='|' read -r n b s m d <<< "$e"
-        out="$(jq -c --argjson n "$n" --arg b "$b" --arg s "$s" --arg m "$m" --argjson d "$d" \
-            '. + [{number:$n, headRefName:$b, headRefOid:$s, mergeStateStatus:$m, isDraft:$d}]' <<< "$out")"
+        IFS='|' read -r n b s m d base <<< "$e"
+        out="$(jq -c --argjson n "$n" --arg b "$b" --arg s "$s" --arg m "$m" --argjson d "$d" --arg base "${base:-master}" \
+            '. + [{number:$n, headRefName:$b, headRefOid:$s, mergeStateStatus:$m, isDraft:$d, baseRefName:$base}]' <<< "$out")"
     done
     printf '%s\n' "$out" > "$SCRATCH/prs.json"
 }
@@ -701,6 +706,78 @@ err_has 'HOME is unset' || fail "home-unset: no 'HOME is unset' on stderr"
 run_tick --help
 [[ $RC -eq 0 ]] || fail "home-unset: --help rc $RC, want 0"
 end_case home-unset
+
+reset; begin_case
+# pcw_stacked_on is pure: the lib stays free of gh calls (pre-change count of 'gh ' lines: 2).
+HEADS="$(printf 'feat-a\t2950\nfix-b\t2960\n')"
+LIB="$SCRIPT_DIR/lib/pr-cycle-watch.sh"
+got="$(source "$LIB"; pcw_stacked_on feat-a "$HEADS")"; src=$?
+[[ $src -eq 0 && "$got" == "2950" ]] || fail "pcw-stacked-on-predicate: feat-a gave rc $src '$got', want 0 '2950'"
+for b in master "" gone-branch feat; do
+    got="$(source "$LIB"; pcw_stacked_on "$b" "$HEADS")"; src=$?
+    [[ $src -eq 1 && -z "$got" ]] || fail "pcw-stacked-on-predicate: base '$b' gave rc $src '$got', want 1 with no output"
+done
+[[ "$(grep -c 'gh ' "$LIB")" == "2" ]] || fail "pcw-stacked-on-predicate: lib 'gh ' count changed"
+end_case pcw-stacked-on-predicate
+
+reset; begin_case
+set_prs '2950|feat-a|aaa1111|BLOCKED|false' '2989|feat-b|bbb2222|BLOCKED|false|feat-a'
+set_checks aaa1111 red; set_checks bbb2222 red
+run_tick
+out_has "skip PR 2989: stacked on #2950" || fail "stacked-red-pr-skipped: no stacked log line: $OUT"
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 2950 --max-ready 1" ]] \
+    || fail "stacked-red-pr-skipped: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+grep -qxF "$(printf '2989\tstacked on #2950')" "$SCRATCH/pr-cycle-skip-notes-copy" 2>/dev/null \
+    || fail "stacked-red-pr-skipped: notes file lacks the stacked line: $(cat "$SCRATCH/pr-cycle-skip-notes-copy" 2>/dev/null)"
+end_case stacked-red-pr-skipped
+
+reset; begin_case
+set_prs '2950|feat-a|aaa1111|BLOCKED|false' '2989|feat-b|bbb2222|BLOCKED|false|gone-branch'
+set_checks aaa1111 red; set_checks bbb2222 red
+run_tick
+out_has "stacked on" && fail "stacked-on-closed-branch-not-skipped: logged a stacked skip: $OUT"
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 2950,2989 --max-ready 2" ]] \
+    || fail "stacked-on-closed-branch-not-skipped: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+end_case stacked-on-closed-branch-not-skipped
+
+reset; begin_case
+set_prs '2950|feat-a|aaa1111|CLEAN|false' '2989|feat-b|bbb2222|DIRTY|false|feat-a'
+set_checks aaa1111 green
+run_tick
+out_has "idle: nothing qualifies" || fail "all-qualifying-stacked-idle: no idle line: $OUT"
+out_has "skip PR 2989: stacked on #2950" || fail "all-qualifying-stacked-idle: no stacked log line: $OUT"
+[[ "$(launch_count)" == "0" ]] || fail "all-qualifying-stacked-idle: pr-cycle was invoked"
+[[ -z "$(find "$STATE_DIR" -name '*.skip-notes' 2>/dev/null)" ]] \
+    || fail "all-qualifying-stacked-idle: a skip-notes file remains"
+end_case all-qualifying-stacked-idle
+
+reset; begin_case
+E_STATE="$SCRATCH/watch-state"
+set_prs '101|b1|aaa1111|BLOCKED|false' '102|b2|bbb2222|BLOCKED|false' '103|b3|ccc3333|BLOCKED|false' \
+    '104|b4|ddd4444|BLOCKED|false' '105|b5|eee5555|BLOCKED|true'
+for s in aaa1111 bbb2222 ccc3333 ddd4444; do set_checks "$s" red; done
+run_tick
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101,102,103 --max-ready 3" ]] \
+    || fail "skip-notes-env-and-cap: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+envv="$(cat "$SCRATCH/pr-cycle-skip-notes-env" 2>/dev/null)"
+case "$envv" in
+    "$SCRATCH/watch-state/results/"*.skip-notes) ;;
+    *) fail "skip-notes-env-and-cap: PR_CYCLE_SKIP_NOTES was '$envv'" ;;
+esac
+grep -qxF "$(printf '105\tdraft')" "$SCRATCH/pr-cycle-skip-notes-copy" 2>/dev/null \
+    || fail "skip-notes-env-and-cap: notes lack the draft line"
+grep -qxF "$(printf '104\tover the 3-per-run cap; next tick')" "$SCRATCH/pr-cycle-skip-notes-copy" 2>/dev/null \
+    || fail "skip-notes-env-and-cap: notes lack the over-cap line"
+end_case skip-notes-env-and-cap
+
+reset; begin_case
+set_prs '2950|feat-a|aaa1111|BLOCKED|false' '2989|feat-b|bbb2222|BLOCKED|false|feat-a'
+set_checks aaa1111 red; set_checks bbb2222 red
+run_tick --dry-run
+out_has "skip PR 2989: stacked on #2950" || fail "dry-run-writes-no-skip-notes: no stacked log line: $OUT"
+[[ -z "$(find "$STATE_DIR" -name '*.skip-notes' 2>/dev/null)" ]] \
+    || fail "dry-run-writes-no-skip-notes: a skip-notes file exists"
+end_case dry-run-writes-no-skip-notes
 
 reset; begin_case
 stripped="$(sed 's/^[[:space:]]*#.*$//' "$SRC_TICK")"

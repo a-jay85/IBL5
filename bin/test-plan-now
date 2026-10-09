@@ -1352,7 +1352,7 @@ check("exec form is the helper's unquoted 'exec <runner>'",
       d.get("ProgramArguments") == ["/bin/bash", "-lc", "exec " + runner])
 check("KeepAlive is False and RunAtLoad is True",
       d.get("KeepAlive") is False and d.get("RunAtLoad") is True)
-check("PATH holds /usr/bin, /bin, /opt/homebrew/bin and ~/.local/bin",
+check("EnvironmentVariables.PATH holds /usr/bin, /bin, /opt/homebrew/bin and ~/.local/bin",
       all(p in path_dirs for p in ("/usr/bin", "/bin", "/opt/homebrew/bin", home + "/.local/bin")))
 check("no string value contains an unexpanded $", not any("$" in v for v in vals))
 check("no string value is empty", all(v != "" for v in vals))
@@ -1363,7 +1363,7 @@ check("stdout and stderr share the log path",
 check("WorkingDirectory is an existing directory",
       os.path.isdir(d.get("WorkingDirectory", "")))
 check("runner path is /tmp/plan-now-<ts>.sh with no whitespace (unquoted exec depends on it)",
-      re.fullmatch(r"/tmp/plan-now-[0-9A-Za-z._-]+\.sh", runner) is not None)
+      re.match(r"^/tmp/plan-now-[0-9A-Za-z._-]+\.sh$", runner) is not None)
 PLIST_PY
 )
 while IFS= read -r line; do

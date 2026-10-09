@@ -432,6 +432,53 @@ else
   fail "uninstall-sim-recap"
 fi
 
+# backups-sync install and uninstall (no-arg build path is never run).
+BSPLIST="$IHOME/Library/LaunchAgents/com.ibl5.backups-sync.plist"
+rm -f "$BSPLIST"
+run_install bin/backups-sync-setup --install-schedule
+norm_file "$BSPLIST" > "$TMP/bs.installed" 2>/dev/null
+if [ "$IRC" = "0" ] && log_order_ok && cmp -s "$TMP/bs.installed" "$FIXTURES/backups-sync.plist"; then
+  pass "install-backups-sync-golden"
+else
+  echo "  rc=$IRC err=$IERR" >&2
+  fail "install-backups-sync-golden"
+fi
+run_install bin/backups-sync-setup --uninstall-schedule
+if [ "$IRC" = "0" ] && [ ! -e "$BSPLIST" ] && grep -qF 'Uninstalled com.ibl5.backups-sync.' <<< "$IOUT" && [ -s "$ILOG" ]; then
+  pass "uninstall-backups-sync"
+else
+  fail "uninstall-backups-sync"
+fi
+
+# bug-pipeline install: refuses without the approver id, then installs with a gh stub.
+cat > "$ISTUB/gh" <<'GHEOF'
+#!/bin/sh
+exit 0
+GHEOF
+chmod +x "$ISTUB/gh"
+BPPLIST="$IHOME/Library/LaunchAgents/com.ibl5.bug-pipeline-cron.plist"
+rm -f "$BPPLIST"
+run_install bin/bug-pipeline-cron-setup --install-schedule
+if [ "$IRC" = "1" ] && grep -qF 'unset required env var(s): BUG_PIPELINE_APPROVER_ID' <<< "$IERR" \
+   && [ ! -e "$BPPLIST" ] && [ ! -s "$ILOG" ]; then
+  pass "install-bug-pipeline-refuses-without-approver"
+else
+  fail "install-bug-pipeline-refuses-without-approver"
+fi
+run_install bin/bug-pipeline-cron-setup --install-schedule BUG_PIPELINE_APPROVER_ID=golden-approver
+if [ "$IRC" = "0" ] && log_order_ok && [ -s "$BPPLIST" ] && grep -qF 'golden-approver' "$BPPLIST"; then
+  pass "install-bug-pipeline-writes-plist"
+else
+  echo "  rc=$IRC err=$IERR" >&2
+  fail "install-bug-pipeline-writes-plist"
+fi
+run_install bin/bug-pipeline-cron-setup --uninstall-schedule
+if [ "$IRC" = "0" ] && [ ! -e "$BPPLIST" ] && grep -qF 'Uninstalled com.ibl5.bug-pipeline-cron.' <<< "$IOUT" && [ -s "$ILOG" ]; then
+  pass "uninstall-bug-pipeline"
+else
+  fail "uninstall-bug-pipeline"
+fi
+
 # Fixtures hold no machine path.
 if grep -rqE -e '/Users/' -e '/home/' -e '-worktrees' -e 'lsched-golden-home' "$FIXTURES"; then
   fail "fixtures-no-machine-path"

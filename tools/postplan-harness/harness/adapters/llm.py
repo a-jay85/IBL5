@@ -29,7 +29,7 @@ from ..state import SUBPROCESS_TIMEOUT, HarnessError, LlmCallRecord, UsageLedger
 from ..usage_pause import UsagePause
 
 MAX_PROMPT_BYTES = 120_000        # hard cap on any single call's input packet
-DEFAULT_TIMEOUT = 1500            # sonnet 4.6 thinks long on large diffs; observed >600s
+DEFAULT_TIMEOUT = 1500            # sonnet thinks long on large diffs; observed >600s
 TOOLED_TIMEOUT = 2400             # a repo-reading reviewer needs many turns of tool I/O
 TOOLED_MAX_TURNS = 60             # NEVER 1: a tool-enabled call must be able to iterate
 ENVELOPE_ERROR_TEXT_CAP = 600     # bound result text in error details for diagnosis
@@ -47,8 +47,8 @@ _USAGE_LIMIT_RE = re.compile(
 )
 
 MODEL_MAP = {
-    "haiku": "claude-haiku-4-5-20251001",
-    "sonnet": "claude-sonnet-4-6",     # matches the historical review-agent tier
+    "haiku": "claude-haiku-5-5",
+    "sonnet": "claude-sonnet-5-5",
     "opus": "claude-opus-5-5",
 }
 

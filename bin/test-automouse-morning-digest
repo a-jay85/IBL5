@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$SCRIPT_DIR/automouse/morning-digest"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-NDIR="$TMP/automouse"; BINSTUB="$TMP/stub"; FAILED=0
+h_tmp TMP
+NDIR="$TMP/automouse"; BINSTUB="$TMP/stub"
 setup() { rm -rf "$NDIR"; mkdir -p "$NDIR/queue" "$NDIR/skipped" "$NDIR/done" "$NDIR/reports"; }
 
-assert_contains()     { local desc="$1" needle="$2" hay="$3"; case "$hay" in *"$needle"*) ;; *) echo "FAIL: $desc — missing: $needle"; FAILED=1 ;; esac; }
-assert_not_contains() { local desc="$1" needle="$2" hay="$3"; case "$hay" in *"$needle"*) echo "FAIL: $desc — unexpected: $needle"; FAILED=1 ;; esac; }
+assert_contains()     { local desc="$1" needle="$2" hay="$3"; case "$hay" in *"$needle"*) ;; *) h_fail "$desc" "missing: $needle" ;; esac; }
+assert_not_contains() { local desc="$1" needle="$2" hay="$3"; case "$hay" in *"$needle"*) h_fail "$desc" "unexpected: $needle" ;; esac; }
 
 mkdir -p "$BINSTUB"
 # The stub drains stdin like the real discord-dm. Exiting without reading races
@@ -69,27 +70,24 @@ assert_not_contains "row1: no Reports line"  "Reports:"       "$body"
 assert_not_contains "row1: no automouse label" "label:automouse" "$body"
 assert_contains     "row1: Skipped 1"        "⏭ Skipped 1"   "$body"
 assert_contains     "row1: spend total"      "8.9241"         "$body"
-echo "ok: row1 — dry-run body"
-
+h_pass "row1 — dry-run body"
 # --- row2: dry-run no dm ---
 rm -f "$TMP/dm-calls.log"
 mk_fixture_123
 run_digest --dry-run > /dev/null
-[ ! -f "$TMP/dm-calls.log" ] || { echo "FAIL: row2 — dm-calls.log should not exist after --dry-run"; FAILED=1; }
-echo "ok: row2 — dry-run no send"
-
+[ ! -f "$TMP/dm-calls.log" ] || { h_fail "row2" "dm-calls.log should not exist after --dry-run"; }
+h_pass "row2 — dry-run no send"
 # --- row3: real send ---
 rm -f "$TMP/dm-calls.log"
 mk_fixture_123
 run_digest > /dev/null 2>&1
 status=$?
-[ $status -eq 0 ] || { echo "FAIL: row3 — exit status $status"; FAILED=1; }
-[ -f "$TMP/dm-calls.log" ] || { echo "FAIL: row3 — dm-calls.log not created"; FAILED=1; }
+[ $status -eq 0 ] || { h_fail "row3" "exit status $status"; }
+[ -f "$TMP/dm-calls.log" ] || { h_fail "row3" "dm-calls.log not created"; }
 dm_line=$(cat "$TMP/dm-calls.log" 2>/dev/null || true)
 assert_contains "row3: discord args --chunk" "--chunk" "$dm_line"
 assert_contains "row3: discord args dash"    " -"      "$dm_line"
-echo "ok: row3 — real send"
-
+h_pass "row3 — real send"
 # --- row4: empty dirs ---
 setup
 rm -f "$TMP/dm-calls.log"
@@ -97,10 +95,9 @@ body=$(run_digest --dry-run)
 assert_contains "row4: no-plans body" "no plans ran last night" "$body"
 run_digest > /dev/null 2>&1
 status=$?
-[ $status -eq 0 ] || { echo "FAIL: row4 — exit status $status"; FAILED=1; }
-[ -f "$TMP/dm-calls.log" ] || { echo "FAIL: row4 — dm-calls.log not created for empty run"; FAILED=1; }
-echo "ok: row4 — empty run"
-
+[ $status -eq 0 ] || { h_fail "row4" "exit status $status"; }
+[ -f "$TMP/dm-calls.log" ] || { h_fail "row4" "dm-calls.log not created for empty run"; }
+h_pass "row4 — empty run"
 # --- row5: aggregate not included in spend ---
 setup
 pin "$NDIR/done/plan-a.md" "$NDIR/done/plan-b.md" "$NDIR/done/plan-c.md"
@@ -120,8 +117,7 @@ COSTS
 body=$(run_digest --dry-run)
 assert_contains     "row5: spend total"           "8.9241"    "$body"
 assert_not_contains "row5: aggregate not in body" "331.2400"  "$body"
-echo "ok: row5 — aggregate excluded"
-
+h_pass "row5 — aggregate excluded"
 # --- row6: unpriced rows reported ---
 setup
 pin "$NDIR/done/plan-x.md" "$NDIR/done/plan-y.md" "$NDIR/done/plan-z.md" "$NDIR/done/plan-w.md" "$NDIR/done/plan-dash.md"
@@ -138,16 +134,14 @@ body=$(run_digest --dry-run)
 assert_contains "row6: excludes unpriced" "excludes 3 unpriced rows" "$body"
 spend_line=$(printf '%s\n' "$body" | grep '^Spend:' || true)
 assert_not_contains "row6: spend line no question mark" "?" "$spend_line"
-echo "ok: row6 — unpriced rows"
-
+h_pass "row6 — unpriced rows"
 # --- row7: no costs file ---
 setup
 pin "$NDIR/done/plan-a.md"
 body=$(run_digest --dry-run)
 assert_contains     "row7: spend unavailable" "Spend: unavailable" "$body"
 assert_not_contains "row7: no zero spend"     '$0.00'              "$body"
-echo "ok: row7 — no costs file"
-
+h_pass "row7 — no costs file"
 # --- row8: time window ---
 setup
 pin "$NDIR/done/plan-fresh.md"
@@ -166,8 +160,7 @@ COSTS
 body=$(run_digest --dry-run)
 assert_contains     "row8: fresh plan in body"     "plan-fresh" "$body"
 assert_not_contains "row8: stale plan not in body" "plan-stale" "$body"
-echo "ok: row8 — time window"
-
+h_pass "row8 — time window"
 # --- row9: parked and failed from queue sidecars ---
 setup
 printf '2' > "$NDIR/queue/alpha.md.attempts"
@@ -180,8 +173,7 @@ assert_contains     "row9: alpha parked"              "🅿️ alpha"   "$body"
 assert_contains     "row9: beta failed"               "❌ beta"     "$body"
 assert_contains     "row9: gamma lonely-failure"      "❌ gamma"    "$body"
 assert_not_contains "row9: no sidecar filenames"      ".attempts"  "$body"
-echo "ok: row9 — parked and failed"
-
+h_pass "row9 — parked and failed"
 # --- row10: dedup done-queue ---
 setup
 pin "$NDIR/done/dedup.md"
@@ -191,99 +183,89 @@ pin "$NDIR/queue/dedup.md.attempts"
 body=$(run_digest --dry-run)
 assert_contains     "row10: dedup completed"     "✅ dedup"  "$body"
 assert_not_contains "row10: not double-parked"   "🅿️"        "$body"
-echo "ok: row10 — dedup done-queue"
-
+h_pass "row10 — dedup done-queue"
 # --- row11: unknown option ---
 run_digest --bogus > /dev/null 2>"$TMP/err11"
 status=$?
 err=$(cat "$TMP/err11")
-[ $status -eq 1 ] || { echo "FAIL: row11 — expected exit 1, got $status"; FAILED=1; }
+[ $status -eq 1 ] || { h_fail "row11" "expected exit 1, got $status"; }
 assert_contains "row11: Unknown option in stderr" "Unknown option" "$err"
-echo "ok: row11 — unknown option"
-
+h_pass "row11 — unknown option"
 # --- row12: NIGHTLY_DIR validation ---
 NIGHTLY_DIR="/nonexistent/path/$$" DISCORD_DM_BIN="$BINSTUB/discord-dm" "$SCRIPT" > /dev/null 2>"$TMP/err12a"
 status=$?
 err=$(cat "$TMP/err12a")
-[ $status -eq 1 ] || { echo "FAIL: row12a — expected exit 1 for nonexistent NIGHTLY_DIR, got $status"; FAILED=1; }
+[ $status -eq 1 ] || { h_fail "row12a" "expected exit 1 for nonexistent NIGHTLY_DIR, got $status"; }
 assert_contains "row12a: NIGHTLY_DIR not found" "NIGHTLY_DIR not found" "$err"
 
 NIGHTLY_DIR="" DISCORD_DM_BIN="$BINSTUB/discord-dm" "$SCRIPT" > /dev/null 2>"$TMP/err12b"
 status=$?
 err=$(cat "$TMP/err12b")
-[ $status -eq 1 ] || { echo "FAIL: row12b — expected exit 1 for empty NIGHTLY_DIR, got $status"; FAILED=1; }
+[ $status -eq 1 ] || { h_fail "row12b" "expected exit 1 for empty NIGHTLY_DIR, got $status"; }
 assert_contains "row12b: empty NIGHTLY_DIR error" "NIGHTLY_DIR" "$err"
-echo "ok: row12 — NIGHTLY_DIR validation"
-
+h_pass "row12 — NIGHTLY_DIR validation"
 # --- row13: invalid --date ---
 setup
 run_digest --date 2026-9-5 > /dev/null 2>"$TMP/err13a"
 status=$?
 err=$(cat "$TMP/err13a")
-[ $status -eq 1 ] || { echo "FAIL: row13a — expected exit 1 for invalid date format, got $status"; FAILED=1; }
+[ $status -eq 1 ] || { h_fail "row13a" "expected exit 1 for invalid date format, got $status"; }
 assert_contains "row13a: invalid date message" "Invalid --date" "$err"
 
 run_digest --date > /dev/null 2>"$TMP/err13b"
 status=$?
 err=$(cat "$TMP/err13b")
-[ $status -eq 1 ] || { echo "FAIL: row13b — expected exit 1 for bare --date, got $status"; FAILED=1; }
+[ $status -eq 1 ] || { h_fail "row13b" "expected exit 1 for bare --date, got $status"; }
 assert_contains "row13b: bare --date message" "--date requires a value" "$err"
-echo "ok: row13 — invalid date"
-
+h_pass "row13 — invalid date"
 # --- row14: idempotent read-only ---
 mk_fixture_123
 find "$NDIR" -type f | sort > "$TMP/files_before"
 run_digest --dry-run > /dev/null
 find "$NDIR" -type f | sort > "$TMP/files_after"
-diff "$TMP/files_before" "$TMP/files_after" > /dev/null || { echo "FAIL: row14 — files changed after first run"; FAILED=1; }
+diff "$TMP/files_before" "$TMP/files_after" > /dev/null || { h_fail "row14" "files changed after first run"; }
 touch "$TMP/marker14"
 run_digest --dry-run > /dev/null
 newer=$(find "$NDIR" -type f -newer "$TMP/marker14" 2>/dev/null || true)
-[ -z "$newer" ] || { echo "FAIL: row14 — files modified after second run: $newer"; FAILED=1; }
-echo "ok: row14 — idempotent"
-
+[ -z "$newer" ] || { h_fail "row14" "files modified after second run: $newer"; }
+h_pass "row14 — idempotent"
 # --- row15: PATH contains required dirs ---
 SCHEDULE_OUT=$(bin/automouse/morning-digest-cron-setup --print-schedule 2>&1)
 status=$?
-[ $status -eq 0 ] || { echo "FAIL: row15 — --print-schedule failed with status $status: $SCHEDULE_OUT"; FAILED=1; }
+[ $status -eq 0 ] || { h_fail "row15" "--print-schedule failed with status $status: $SCHEDULE_OUT"; }
 assert_contains "row15: /opt/homebrew/bin" "/opt/homebrew/bin" "$SCHEDULE_OUT"
 assert_contains "row15: /usr/local/bin" "/usr/local/bin" "$SCHEDULE_OUT"
 assert_contains "row15: /usr/bin" "/usr/bin" "$SCHEDULE_OUT"
 assert_contains "row15: /bin" "/bin" "$SCHEDULE_OUT"
 REPO_BIN_LABEL="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')/bin"
 assert_contains "row15: repo bin dir" "$REPO_BIN_LABEL" "$SCHEDULE_OUT"
-echo "ok: row15 — PATH contains required dirs"
-
+h_pass "row15 — PATH contains required dirs"
 # --- row16: no unexpanded variables ---
 assert_not_contains "row16: no \${" '${' "$SCHEDULE_OUT"
 assert_not_contains "row16: no \$HOME" '$HOME' "$SCHEDULE_OUT"
-echo "ok: row16 — no unexpanded variables"
-
+h_pass "row16 — no unexpanded variables"
 # --- row17: no empty string elements ---
 assert_not_contains "row17: no empty string" '<string></string>' "$SCHEDULE_OUT"
-echo "ok: row17 — no empty string elements"
-
+h_pass "row17 — no empty string elements"
 # --- row18: StartCalendarInterval, not StartInterval ---
 assert_contains "row18: StartCalendarInterval" "StartCalendarInterval" "$SCHEDULE_OUT"
 assert_contains "row18: Hour 7" "<integer>7</integer>" "$SCHEDULE_OUT"
 assert_not_contains "row18: no StartInterval" "StartInterval" "$SCHEDULE_OUT"
-echo "ok: row18 — StartCalendarInterval Hour 7"
-
+h_pass "row18 — StartCalendarInterval Hour 7"
 # --- row19: bogus flag and install-refusal from worktree ---
 bin/automouse/morning-digest-cron-setup --bogus > /dev/null 2>"$TMP/err19a"
 status19a=$?
 err19a=$(cat "$TMP/err19a")
-[ $status19a -eq 1 ] || { echo "FAIL: row19a — expected exit 1 for --bogus, got $status19a"; FAILED=1; }
+[ $status19a -eq 1 ] || { h_fail "row19a" "expected exit 1 for --bogus, got $status19a"; }
 assert_contains "row19a: Unknown option" "Unknown option" "$err19a"
 
 # Force REPO_ROOT to a worktree path to test the main-checkout refusal
 PLIST_FILE="$TMP/com.ibl5.automouse-morning-digest.plist"
 REPO_ROOT="$TMP/fake-worktree" MAIN_WT="$TMP/fake-main" bin/automouse/morning-digest-cron-setup --install-schedule > /dev/null 2>"$TMP/err19b"
 status19b=$?
-[ $status19b -ne 0 ] || { echo "FAIL: row19b — expected non-zero exit for install from worktree"; FAILED=1; }
-[ ! -f "$PLIST_FILE" ] || { echo "FAIL: row19b — plist file created despite refusal"; FAILED=1; }
-echo "ok: row19 — bogus flag and install-refusal"
-
+[ $status19b -ne 0 ] || { h_fail "row19b" "expected non-zero exit for install from worktree"; }
+[ ! -f "$PLIST_FILE" ] || { h_fail "row19b" "plist file created despite refusal"; }
+h_pass "row19 — bogus flag and install-refusal"
 # --- row20: --date shifts the collection window ---
 # Regression guard for the `-mmin -1440` bug: the window was anchored to
 # wall-clock NOW, so `--date <past>` collected TODAY's files while reporting the
@@ -300,8 +282,7 @@ assert_not_contains "row20: last-night plan not in --date body" "plan-lastnight"
 body=$(run_digest --dry-run)
 assert_contains     "row20: last-night plan in today body"      "plan-lastnight" "$body"
 assert_not_contains "row20: backdated plan not in today body"   "plan-backdated" "$body"
-echo "ok: row20 — --date shifts the collection window"
-
+h_pass "row20 — --date shifts the collection window"
 # --- row21: cron-setup MAIN_WT fallback outside a git tree ---
 # Regression guard: `MAIN_WT="${MAIN_WT:-$(git ... | awk ...)}"` under
 # `set -euo pipefail` aborted the script here — outside a git tree `git worktree
@@ -311,11 +292,10 @@ NOGIT="$TMP/not-a-git-tree"
 mkdir -p "$NOGIT"
 out21=$(REPO_ROOT="$NOGIT" bin/automouse/morning-digest-cron-setup --print-schedule 2>"$TMP/err21")
 status21=$?
-[ $status21 -eq 0 ] || { echo "FAIL: row21 — expected exit 0 outside a git tree, got $status21: $(cat "$TMP/err21")"; FAILED=1; }
+[ $status21 -eq 0 ] || { h_fail "row21" "expected exit 0 outside a git tree, got $status21: $(cat "$TMP/err21")"; }
 assert_contains "row21: WorkingDirectory falls back to REPO_ROOT" "<string>${NOGIT}</string>" "$out21"
 assert_contains "row21: Program path under REPO_ROOT" "${NOGIT}/bin/automouse/morning-digest" "$out21"
-echo "ok: row21 — MAIN_WT fallback outside a git tree"
-
+h_pass "row21 — MAIN_WT fallback outside a git tree"
 # --- row22: duplicate done/ shapes collapse and cost is summed once ---
 setup
 pin "$NDIR/done/dup-plan.md"
@@ -327,10 +307,9 @@ cat > "$NDIR/reports/${TODAY}-costs.md" <<'COSTS'
 COSTS
 out=$(run_digest --dry-run)
 assert_contains     "row22: one ✅ dup-plan line (dedup collapses two shapes)" "✅ dup-plan" "$out"
-[ "$(grep -c '✅ dup-plan' <<< "$out")" = 1 ] || { echo "FAIL: row22 — dup-plan listed more than once"; FAILED=1; }
+[ "$(grep -c '✅ dup-plan' <<< "$out")" = 1 ] || { h_fail "row22" "dup-plan listed more than once"; }
 assert_contains     "row22: cost appears in output (normalization join)"           "2.5000"      "$out"
-echo "ok: row22 — duplicate done/ shapes collapse; cost appears via normalization join"
-
+h_pass "row22 — duplicate done/ shapes collapse; cost appears via normalization join"
 # --- row23: date-prefixed-only done/ entry joins costs (negative path) ---
 setup
 pin "$NDIR/done/${TODAY}-done-dup-plan.md"
@@ -342,8 +321,7 @@ COSTS
 out=$(run_digest --dry-run)
 assert_contains     "row23: prefixed name joins costs"  "2.5000"    "$out"
 assert_not_contains "row23: not Spend: \$0"             'Spend: $0' "$out"
-echo "ok: row23 — date-prefixed-only done/ entry joins costs"
-
+h_pass "row23 — date-prefixed-only done/ entry joins costs"
 # --- row24: StandardOutPath / StandardErrorPath under LOG_DIR ---
 # Generated with a throwaway HOME so LOG_DIR is deterministic and nothing touches
 # the real ~/Library.  The value is read from the line after each <key>, so a
@@ -352,10 +330,9 @@ FAKE_HOME24="$TMP/fake-home24"
 EXPECT_LOG_DIR="$FAKE_HOME24/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs"
 out24=$(HOME="$FAKE_HOME24" bin/automouse/morning-digest-cron-setup --print-schedule 2>"$TMP/err24")
 status24=$?
-[ $status24 -eq 0 ] || { echo "FAIL: row24 — --print-schedule failed with status $status24: $(cat "$TMP/err24")"; FAILED=1; }
+[ $status24 -eq 0 ] || { h_fail "row24" "--print-schedule failed with status $status24: $(cat "$TMP/err24")"; }
 plist_value() { printf '%s\n' "$2" | awk -v k="<key>$1</key>" '$0 ~ k {getline; print; exit}'; }
 assert_contains "row24: StandardOutPath"   "<string>${EXPECT_LOG_DIR}/morning-digest-stdout.log</string>" "$(plist_value StandardOutPath "$out24")"
 assert_contains "row24: StandardErrorPath" "<string>${EXPECT_LOG_DIR}/morning-digest-stderr.log</string>" "$(plist_value StandardErrorPath "$out24")"
-echo "ok: row24 — StandardOutPath/StandardErrorPath under LOG_DIR"
-
-[ $FAILED -eq 0 ] && echo "All rows passed" || exit 1
+h_pass "row24 — StandardOutPath/StandardErrorPath under LOG_DIR"
+h_done

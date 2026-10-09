@@ -585,4 +585,4 @@ bpt_log_lacks "$STUB" transition.log "filed"  "flag-off gathering never reaches 
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
-exit "$FAILED"
+h_done

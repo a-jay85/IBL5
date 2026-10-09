@@ -112,10 +112,14 @@ case_contains_fixed_string() {
     run_scenario contains "h_contains regex abc a.c
 h_contains bracket 'x[1]y' '[1]'
 h_not_contains negated abc b
+h_contains glob abc 'a?c'
+h_contains globclass x1y '[1]'
 h_done"
     if [ "$RC" -eq 1 ] && has "$OUT" "FAIL: regex — missing [a.c]" &&
         has "$OUT" "ok: bracket" && has "$OUT" "FAIL: negated — unexpected [b]" &&
-        has "$OUT" "RESULT: FAILED (2 of 3 assertions failed)"; then
+        has "$OUT" "FAIL: glob — missing [a?c]" &&
+        has "$OUT" "FAIL: globclass — missing [[1]]" &&
+        has "$OUT" "RESULT: FAILED (4 of 5 assertions failed)"; then
         t_ok "case_contains_fixed_string"
     else
         t_bad "case_contains_fixed_string (rc=$RC out=[$OUT])"
@@ -271,6 +275,40 @@ h_done"
     fi
 }
 
+# A blank TMPDIR must fall back to /tmp. With ${TMPDIR-/tmp} the dir would
+# land at /h.XXXXXX (or mktemp would fail with rc 2).
+case_tmp_blank_tmpdir() {
+    run_scenario tmp_blank 'h_tmp D
+echo "D=$D"
+h_pass a
+h_done' TMPDIR=
+    local d
+    d=$(sed -n 's/^D=//p' <<<"$OUT")
+    case "$d" in
+        /tmp/h.*) [ "$RC" -eq 0 ] && t_ok "case_tmp_blank_tmpdir" ||
+            t_bad "case_tmp_blank_tmpdir (rc=$RC out=[$OUT] err=[$ERR])" ;;
+        *) t_bad "case_tmp_blank_tmpdir (dir=[$d] rc=$RC err=[$ERR])" ;;
+    esac
+}
+
+# bpt_ok/bpt_fail in bin/lib/bug-pipeline-test-stubs.sh delegate to the lib.
+# bpt_ok must still print exactly `ok: <label>` (an `okay:` line would drop
+# the bug-pipeline harnesses' pass counts), and bpt_fail must count in H_FAIL
+# and keep setting the legacy FAILED flag.
+case_bpt_delegates() {
+    run_scenario bpt_delegates ". $(printf '%q' "$SELF_DIR/lib/bug-pipeline-test-stubs.sh")
+bpt_ok x
+bpt_fail y
+echo \"pass=\$H_PASS fail=\$H_FAIL legacy=\$FAILED\"
+h_done"
+    if grep -qxF "ok: x" <<<"$OUT" && grep -qxF "FAIL: y" <<<"$OUT" &&
+        has "$OUT" "pass=1 fail=1 legacy=1" && [ "$RC" -eq 1 ]; then
+        t_ok "case_bpt_delegates"
+    else
+        t_bad "case_bpt_delegates (rc=$RC out=[$OUT] err=[$ERR])"
+    fi
+}
+
 case_pass_summary
 case_fail_exits_nonzero
 case_zero_assertions
@@ -288,6 +326,8 @@ case_git_repo_bare_origin
 case_git_repo_unknown_flag
 case_env_i
 case_double_source
+case_tmp_blank_tmpdir
+case_bpt_delegates
 
 if [ "$T_FAIL" -eq 0 ]; then
     echo "test-harness-lib: all cases passed"

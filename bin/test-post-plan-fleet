@@ -2836,9 +2836,15 @@ _dm_result_case 95 'RESULT: post-plan DECLINED — held twice on the same reason
 _dm_result_case 96 'RESULT: post-plan PAUSED at retrospective (usage gate); resumes automatically' <<< '{}'
 [[ "$(_outcome_of)" == paused ]] || fail "fleet-outcome-line: PAUSED gave '$(_outcome_of)'"
 [[ "$(_reason_of)" == usage-gate ]] || fail "fleet-outcome-line: PAUSED reason '$(_reason_of)'"
+grep -qF 'resumes on its own' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "fleet-outcome-line: PAUSED DM lacks the no-action hint ($(cat "$_DM_CAPTURE" 2>/dev/null))"
 _dm_result_case 97 $'RESULT: post-plan BLOCKED terminal=failed\npost-plan-now: postplan-rc=75 harness-rc=75' <<< '{"terminal": "failed"}'
 [[ "$(_outcome_of)" == paused ]] || fail "fleet-outcome-line: postplan-rc=75 gave '$(_outcome_of)'"
 [[ "$(_reason_of)" == usage-gate ]] || fail "fleet-outcome-line: postplan-rc=75 reason '$(_reason_of)'"
+grep -qF 'PAUSED (usage gate)' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "fleet-outcome-line: postplan-rc=75 DM lacks PAUSED ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -qF 'runner exited' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "fleet-outcome-line: postplan-rc=75 DM still says runner exited"
 _dm_result_case 98 'RESULT: post-plan BLOCKED — rebase conflict, human required; ERROR terminal=failed, no PR opened. rebase-conflict: tree proof failed: 17a18 > 2 2 .claude/rules/codebase-map.md 35d35 < 3 3 .claude/rules/codebase-map.md TREE DIVERGED' <<< '{"terminal": "failed"}'
 [[ "$(_outcome_of)" == conflict ]] || fail "fleet-outcome-line: tree-proof conflict gave '$(_outcome_of)'"
 [[ "$(_reason_of)" == '.claude/rules/codebase-map.md' ]] || fail "fleet-outcome-line: conflict reason '$(_reason_of)'"

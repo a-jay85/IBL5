@@ -1316,6 +1316,74 @@ echo "── the coda still tells the model where to put it ──"
 dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
           "$PLAN_NOW" --implement "$PROMPT" 2>&1)
 coda=$(cat "$(printf '%s\n' "$dry" | sed -n 's/^  prompt: //p')" 2>/dev/null)
+echo "── the generated plist (ljob_write_runner_plist layout) ──"
+
+gen_plist=$(printf '%s\n' "$dry" | sed -n 's/^  plist:  //p')
+gen_runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
+plist_report=$(python3 -I - "$gen_plist" "$gen_runner" "$HOME" <<'PLIST_PY'
+import os
+import plistlib
+import re
+import sys
+
+plist_path, runner, home = sys.argv[1:4]
+with open(plist_path, "rb") as fh:
+    d = plistlib.load(fh)
+
+
+def strings(v):
+    if isinstance(v, str):
+        yield v
+    elif isinstance(v, list):
+        for x in v:
+            yield from strings(x)
+    elif isinstance(v, dict):
+        for x in v.values():
+            yield from strings(x)
+
+
+def check(label, cond):
+    print(("ok   " if cond else "FAIL ") + label)
+
+
+path_dirs = d.get("EnvironmentVariables", {}).get("PATH", "").split(":")
+vals = list(strings(d))
+check("exec form is the helper's unquoted 'exec <runner>'",
+      d.get("ProgramArguments") == ["/bin/bash", "-lc", "exec " + runner])
+check("KeepAlive is False and RunAtLoad is True",
+      d.get("KeepAlive") is False and d.get("RunAtLoad") is True)
+check("PATH holds /usr/bin, /bin, /opt/homebrew/bin and ~/.local/bin",
+      all(p in path_dirs for p in ("/usr/bin", "/bin", "/opt/homebrew/bin", home + "/.local/bin")))
+check("no string value contains an unexpanded $", not any("$" in v for v in vals))
+check("no string value is empty", all(v != "" for v in vals))
+check("Label matches the plist filename",
+      d.get("Label", "") + ".plist" == os.path.basename(plist_path))
+check("stdout and stderr share the log path",
+      d.get("StandardOutPath") and d.get("StandardOutPath") == d.get("StandardErrorPath"))
+check("WorkingDirectory is an existing directory",
+      os.path.isdir(d.get("WorkingDirectory", "")))
+check("runner path is /tmp/plan-now-<ts>.sh with no whitespace (unquoted exec depends on it)",
+      re.fullmatch(r"/tmp/plan-now-[0-9A-Za-z._-]+\.sh", runner) is not None)
+PLIST_PY
+)
+while IFS= read -r line; do
+    case "$line" in
+        "ok   "*) ok "${line#ok   }" ;;
+        *) fail "${line#FAIL }" ;;
+    esac
+done <<< "$plist_report"
+if [ "$(grep -c '<string></string>' "$gen_plist")" = "0" ]; then
+    ok "raw plist has no empty <string></string>"
+else
+    fail "raw plist has an empty <string></string>"
+fi
+if command -v plutil >/dev/null 2>&1; then
+    if plutil -lint "$gen_plist" >/dev/null 2>&1; then
+        ok "plutil -lint accepts the generated plist"
+    else
+        fail "plutil -lint rejects the generated plist"
+    fi
+fi
 # This dry-run's runner is never executed, and the runner is what deletes the plist.
 # Without this, every test run leaves a RunAtLoad plist in ~/Library/LaunchAgents
 # pointing at a /tmp runner that no longer exists.

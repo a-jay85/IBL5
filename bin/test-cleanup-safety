@@ -40,13 +40,18 @@ STUBBIN="$TMP/stubbin"
 mkdir -p "$STUBBIN"
 cat > "$STUBBIN/gh" <<'GH'
 #!/usr/bin/env bash
+[ -n "${GH_ARGV_LOG:-}" ] && printf '%s\t%s\n' "$PWD" "$*" >> "$GH_ARGV_LOG"
 # Table-driven gh stub. Reads $GH_FIXTURE (TAB-separated rows):
 #   view <ref>       <state> <headRefOid> <number>
+#   viewfail <ref>   -> prints `stub-gh: boom` to stderr, exits 4
 #   list <searchSha> <headRefOid> <state> <number>
+# A view with no <ref> (gh infers the PR from the checkout) maps to ref `@current`.
+# When $GH_ARGV_LOG is set, every call appends "<pwd><TAB><argv>" to it.
 # No fixture -> exit 1 (== the legacy always-fail stub), so no-PR cases stay deterministic.
 [ -n "${GH_FIXTURE:-}" ] && [ -f "${GH_FIXTURE:-/nonexistent}" ] || exit 1
 [ "$1" = pr ] || exit 1
 sub="$2"; ref="${3:-}"
+case "$ref" in --*) ref="@current" ;; esac
 args=("$@"); field=""; search=""
 for ((k=0; k<${#args[@]}; k++)); do
   case "${args[k]}" in
@@ -56,12 +61,18 @@ for ((k=0; k<${#args[@]}; k++)); do
 done
 case "$sub" in
   view)
+    if awk -F'\t' -v r="$ref" '$1=="viewfail" && $2==r {f=1} END{exit !f}' "$GH_FIXTURE"; then
+      echo "stub-gh: boom" >&2; exit 4
+    fi
     row="$(awk -F'\t' -v r="$ref" '$1=="view" && $2==r {print; exit}' "$GH_FIXTURE")"
     [ -n "$row" ] || exit 1
     case "$field" in
       .state)      printf '%s\n' "$(printf '%s' "$row" | cut -f3)" ;;
       .headRefOid) printf '%s\n' "$(printf '%s' "$row" | cut -f4)" ;;
       .number)     printf '%s\n' "$(printf '%s' "$row" | cut -f5)" ;;
+      '[.state, .number, .headRefOid] | @tsv')
+        printf '%s\t%s\t%s\n' "$(printf '%s' "$row" | cut -f3)" \
+          "$(printf '%s' "$row" | cut -f5)" "$(printf '%s' "$row" | cut -f4)" ;;
       *)           exit 1 ;;
     esac ;;
   list)
@@ -1057,6 +1068,96 @@ else
     failcase "get-worktree-path-no-sigpipe (rc=$gwp_rc out=$gwp_out)"
 fi
 rm -rf "$gwp_bin"
+
+# ----------------------------------------------------------------------------
+# Helper unit: pr_info (bin/lib/gh-pr.sh). One gh call, TSV parse, reset per
+# call, rc 0 only when a PR resolved.
+# ----------------------------------------------------------------------------
+GHPR_LIB="$SCRIPT_DIR/lib/gh-pr.sh"
+pi_fx="$TMP/pi-fixture"
+printf 'view\topen-br\tOPEN\toidopen\t11\n'    >  "$pi_fx"
+printf 'view\tmerged-br\tMERGED\toidmrg\t12\n' >> "$pi_fx"
+printf 'view\tclosed-br\tCLOSED\toidcls\t13\n' >> "$pi_fx"
+printf 'view\t@current\tOPEN\toidcur\t14\n'    >> "$pi_fx"
+printf 'viewfail\tboom-br\n'                   >> "$pi_fx"
+# pi_run <PATH> <ref> [dir] -> prints "rc|state|num|oid"; stderr to $pi_err
+pi_err="$TMP/pi-stderr"
+pi_run() {
+    local p="$1"; shift
+    GH_FIXTURE="$pi_fx" PATH="$p" "$BASH" -c \
+        'set -euo pipefail; . "$1"; shift; rc=0; pr_info "$@" || rc=$?
+         printf "%s|%s|%s|%s\n" "$rc" "$PR_STATE" "$PR_NUM" "$PR_OID"' \
+        _ "$GHPR_LIB" "$@" 2>"$pi_err"
+}
+# pi_expect <case-name> <expected> <actual>
+pi_expect() {
+    if [ "$3" = "$2" ]; then
+        pass "$1"
+    else
+        failcase "$1 (got $3, want $2)"
+    fi
+}
+
+pi_expect "pr-info-open"   "0|OPEN|11|oidopen"   "$(pi_run "$STUBBIN:$PATH" open-br)"
+pi_expect "pr-info-merged" "0|MERGED|12|oidmrg"  "$(pi_run "$STUBBIN:$PATH" merged-br)"
+pi_expect "pr-info-closed" "0|CLOSED|13|oidcls"  "$(pi_run "$STUBBIN:$PATH" closed-br)"
+pi_expect "pr-info-no-pr"  "1|||"                "$(pi_run "$STUBBIN:$PATH" no-such-br)"
+
+pi_got="$(pi_run "$STUBBIN:$PATH" boom-br)"
+if [ "$pi_got" = "1|||" ] && [ ! -s "$pi_err" ]; then
+    pass "pr-info-gh-failure"
+else
+    failcase "pr-info-gh-failure (got $pi_got, stderr: $(cat "$pi_err"))"
+fi
+
+mkdir -p "$TMP/pi-nogh" "$TMP/pi-alt" "$TMP/pi-dir"
+pi_expect "pr-info-gh-missing" "1|||" "$(pi_run "$TMP/pi-nogh" open-br)"
+
+# The seam shim uses shell builtins only: PATH holds no gh and no coreutils here.
+printf '#!%s\nprintf '"'"'OPEN\\t11\\toidopen\\n'"'"'\n' "$BASH" > "$TMP/pi-alt/fakegh"
+chmod +x "$TMP/pi-alt/fakegh"
+pi_expect "pr-info-gh-cmd-seam" "0|OPEN|11|oidopen" \
+    "$(GH_CMD="$TMP/pi-alt/fakegh" pi_run "$TMP/pi-nogh" open-br)"
+pi_expect "pr-info-gh-cmd-missing" "1|||" \
+    "$(GH_CMD="$TMP/pi-alt/absent" pi_run "$STUBBIN:$PATH" open-br)"
+pi_expect "pr-info-gh-cmd-empty" "0|OPEN|11|oidopen" \
+    "$(GH_CMD="" pi_run "$STUBBIN:$PATH" open-br)"
+
+pi_got="$(GH_FIXTURE="$pi_fx" PATH="$STUBBIN:$PATH" "$BASH" -c \
+    'set -euo pipefail; . "$1"; rc=0
+     pr_info open-br
+     pr_info no-such-br || rc=$?
+     printf "%s|%s|%s|%s\n" "$rc" "$PR_STATE" "$PR_NUM" "$PR_OID"' _ "$GHPR_LIB")"
+pi_expect "pr-info-resets-stale" "1|||" "$pi_got"
+
+pi_log="$TMP/pi-argv"
+pi_dir_real="$(cd "$TMP/pi-dir" && pwd -P)"
+rm -f "$pi_log"
+pi_got="$(GH_ARGV_LOG="$pi_log" pi_run "$STUBBIN:$PATH" open-br "$TMP/pi-dir")"
+pi_logged_dir="$(awk -F'\t' 'END{print $1}' "$pi_log")"
+[ -d "$pi_logged_dir" ] && pi_logged_dir="$(cd "$pi_logged_dir" && pwd -P)"
+pi_pwd_out="$(GH_FIXTURE="$pi_fx" PATH="$STUBBIN:$PATH" "$BASH" -c \
+    'set -euo pipefail; . "$1"; before="$PWD"; pr_info open-br "$2"
+     [ "$PWD" = "$before" ] && echo same || echo moved' _ "$GHPR_LIB" "$TMP/pi-dir")"
+if [ "$pi_got" = "0|OPEN|11|oidopen" ] && [ "$pi_logged_dir" = "$pi_dir_real" ] \
+    && [ "$pi_pwd_out" = "same" ]; then
+    pass "pr-info-dir-arg"
+else
+    failcase "pr-info-dir-arg (got $pi_got, gh ran in $pi_logged_dir, want $pi_dir_real, caller $pi_pwd_out)"
+fi
+
+rm -f "$pi_log"
+pi_got="$(GH_ARGV_LOG="$pi_log" pi_run "$STUBBIN:$PATH" "" "$TMP/pi-dir")"
+pi_logged_argv="$(awk -F'\t' '{print $2}' "$pi_log")"
+case "$pi_logged_argv" in
+    "pr view --json state,number,headRefOid"*) pi_argv_ok=1 ;;
+    *) pi_argv_ok=0 ;;
+esac
+if [ "$pi_got" = "0|OPEN|14|oidcur" ] && [ "$pi_argv_ok" = 1 ]; then
+    pass "pr-info-empty-ref-omits-arg"
+else
+    failcase "pr-info-empty-ref-omits-arg (got $pi_got, argv: $pi_logged_argv)"
+fi
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

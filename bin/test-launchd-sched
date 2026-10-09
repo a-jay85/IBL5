@@ -1,0 +1,206 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# Golden-output harness for the bin/*-cron-setup family and bin/lib/launchd-sched.sh.
+#
+# Every setup script's side-effect-free print mode is captured into
+# bin/fixtures/launchd-sched/ with the main-checkout path normalised to
+# @MAIN_WT@ and $HOME to @HOME@. A migration must leave every fixture
+# byte-identical. The harness never calls a real launchctl and never writes
+# under $HOME.
+#
+# Usage:
+#   bin/test-launchd-sched           # compare every case against its fixture
+#   bin/test-launchd-sched --regen   # rewrite every fixture from current scripts
+
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+FIXTURES="$REPO_ROOT/bin/fixtures/launchd-sched"
+GOLDEN_HOME="/lsched-golden-home"
+DM_TO="100000000000000001"
+SIM_ENV="SIM_RECAP_SSH_HOST=golden-host SIM_RECAP_REMOTE_ROOT=/golden/root SIM_RECAP_DB_USER=golden_user SIM_RECAP_DB_NAME=golden_db SIM_RECAP_DB_PASSWORD=golden-secret"
+NODE_ENV_ASSIGN="NODE_BIN=/opt/lsched-golden/bin/node"
+
+MODE="compare"
+for arg in "$@"; do
+  case "$arg" in
+    --regen) MODE="regen" ;;
+    *) echo "Unknown option: $arg" >&2; exit 2 ;;
+  esac
+done
+
+# <fixture-name>|<script relpath>|<args>|<extra env assignments>
+CASES="wt-gc.plist|bin/wt-gc-cron-setup|--print-schedule|
+wt-sync.plist|bin/wt-sync-cron-setup|--print-schedule|
+db-sync.plist|bin/db-sync-cron-setup|--print-schedule|
+sim-recap.plist|bin/sim-recap-cron-setup|--print-schedule|$SIM_ENV
+pr-cycle-tick.plist|bin/pr-cycle-tick-cron-setup|--print-schedule|
+morning-digest.plist|bin/automouse/morning-digest-cron-setup|--print-schedule|
+morning-digest-discord.plist|bin/automouse/morning-digest-cron-setup|--print-schedule|DISCORD_DM_TO=$DM_TO
+comprehension-digest.plist|bin/automouse/comprehension-digest-cron-setup|--print-schedule|
+comprehension-digest-discord.plist|bin/automouse/comprehension-digest-cron-setup|--print-schedule|DISCORD_DM_TO=$DM_TO
+backups-sync.plist|bin/backups-sync-setup|--print-schedule|
+bug-pipeline-cron.plist|bin/bug-pipeline-cron-setup|--print-schedule|$NODE_ENV_ASSIGN
+bug-bot.plist|bin/bug-pipeline-cron-setup|--print-bot|$NODE_ENV_ASSIGN
+launchd-health-login.plist|bin/launchd-health-cron-setup|--print-schedule login|
+launchd-health-daily.plist|bin/launchd-health-cron-setup|--print-schedule daily|
+usage-gate-coordinator.plist|bin/usage-gate-cron-setup|--print|
+usage-gate-probe.plist|bin/usage-gate-cron-setup|--print-probe|"
+
+# Scripts whose arg-parse failure branches are pinned in <name>.cli.txt.
+CLI_SCRIPTS="wt-gc|bin/wt-gc-cron-setup
+wt-sync|bin/wt-sync-cron-setup
+db-sync|bin/db-sync-cron-setup
+sim-recap|bin/sim-recap-cron-setup
+pr-cycle-tick|bin/pr-cycle-tick-cron-setup
+morning-digest|bin/automouse/morning-digest-cron-setup
+comprehension-digest|bin/automouse/comprehension-digest-cron-setup
+backups-sync|bin/backups-sync-setup
+bug-pipeline|bin/bug-pipeline-cron-setup"
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
+[ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"
+
+PASS=0
+FAIL=0
+pass() { echo "PASS $1"; PASS=$((PASS + 1)); }
+fail() { echo "FAIL $1"; FAIL=$((FAIL + 1)); }
+
+normalise_stdout() {
+  local out="$1"
+  out="${out//"$MAIN_WT"/@MAIN_WT@}"
+  out="${out//"$GOLDEN_HOME"/@HOME@}"
+  printf '%s\n' "$out"
+}
+
+# run_case <script> <args> <extra env> — prints normalised stdout, then a
+# final "exit=<code>" line is NOT emitted; the exit code is stored in RC.
+RC=0
+run_case() {
+  local script="$1" args="$2" extra="$3" out
+  # shellcheck disable=SC2086  # args and extra are deliberately word-split
+  out="$(env -i HOME="$GOLDEN_HOME" PATH=/usr/bin:/bin $extra bash "$REPO_ROOT/$script" $args 2>/dev/null)"
+  RC=$?
+  normalise_stdout "$out"
+}
+
+# run_cli <script> <args> — prints "args=<args> exit=<code>" then normalised stderr.
+run_cli() {
+  local script="$1" args="$2" err code
+  # shellcheck disable=SC2086
+  err="$(env -i HOME="$GOLDEN_HOME" PATH=/usr/bin:/bin bash "$REPO_ROOT/$script" $args 2>&1 >/dev/null)"
+  code=$?
+  err="${err//"$REPO_ROOT"/@REPO_ROOT@}"
+  err="${err//"$MAIN_WT"/@MAIN_WT@}"
+  err="${err//"$GOLDEN_HOME"/@HOME@}"
+  printf 'args=%s exit=%s\n%s\n' "$args" "$code" "$err"
+}
+
+cli_block() {
+  local script="$1"
+  run_cli "$script" ""
+  run_cli "$script" "--bogus-flag"
+}
+
+# compare_fixture <name> <fixture path> <actual file> — returns 0 on byte-equal.
+# A missing fixture is a failure, never a vacuous pass.
+compare_fixture() {
+  local name="$1" fixture="$2" actual="$3"
+  if [ ! -f "$fixture" ]; then
+    echo "  missing fixture: $fixture" >&2
+    return 1
+  fi
+  if cmp -s "$fixture" "$actual"; then
+    return 0
+  fi
+  diff -u "$fixture" "$actual" 2>&1 | head -20 >&2
+  return 1
+}
+
+if [ "$MODE" = "regen" ]; then
+  mkdir -p "$FIXTURES"
+  while IFS='|' read -r name script args extra; do
+    [ -n "$name" ] || continue
+    run_case "$script" "$args" "$extra" > "$FIXTURES/$name"
+    echo "regen $name (exit=$RC)"
+  done <<< "$CASES"
+  while IFS='|' read -r name script; do
+    [ -n "$name" ] || continue
+    cli_block "$script" > "$FIXTURES/$name.cli.txt"
+    echo "regen $name.cli.txt"
+  done <<< "$CLI_SCRIPTS"
+  exit 0
+fi
+
+# ── Golden plist cases ───────────────────────────────────────────────────────
+while IFS='|' read -r name script args extra; do
+  [ -n "$name" ] || continue
+  run_case "$script" "$args" "$extra" > "$TMP/actual.$name"
+  if compare_fixture "$name" "$FIXTURES/$name" "$TMP/actual.$name"; then
+    pass "$name"
+  else
+    fail "$name"
+  fi
+done <<< "$CASES"
+
+# ── CLI fixtures ─────────────────────────────────────────────────────────────
+while IFS='|' read -r name script; do
+  [ -n "$name" ] || continue
+  cli_block "$script" > "$TMP/actual.$name.cli.txt"
+  if compare_fixture "$name.cli.txt" "$FIXTURES/$name.cli.txt" "$TMP/actual.$name.cli.txt"; then
+    pass "$name.cli.txt"
+  else
+    fail "$name.cli.txt"
+  fi
+done <<< "$CLI_SCRIPTS"
+
+# ── Built-in negative cases ──────────────────────────────────────────────────
+# Tamper: a one-byte change to a fixture copy must be reported as a mismatch.
+cp "$FIXTURES/wt-gc.plist" "$TMP/tampered.plist"
+printf 'X' >> "$TMP/tampered.plist"
+run_case bin/wt-gc-cron-setup --print-schedule "" > "$TMP/tamper.actual"
+if compare_fixture tamper "$TMP/tampered.plist" "$TMP/tamper.actual" 2>/dev/null; then
+  fail "harness-tamper-detected"
+else
+  pass "harness-tamper-detected"
+fi
+
+# Missing fixture: must fail, not pass vacuously.
+if compare_fixture missing "$TMP/does-not-exist.plist" "$TMP/tamper.actual" 2>/dev/null; then
+  fail "harness-missing-fixture-fails"
+else
+  pass "harness-missing-fixture-fails"
+fi
+
+# Coverage: every setup script has a golden case.
+uncovered=""
+for s in "$REPO_ROOT"/bin/*-cron-setup "$REPO_ROOT"/bin/automouse/*-cron-setup "$REPO_ROOT"/bin/backups-sync-setup; do
+  [ -e "$s" ] || continue
+  case "$(basename "$s")" in test-*) continue ;; esac
+  rel="${s#"$REPO_ROOT"/}"
+  case "$CASES" in
+    *"|$rel|"*) ;;
+    *) uncovered="$uncovered $rel" ;;
+  esac
+done
+if [ -z "$uncovered" ]; then
+  pass "harness-coverage"
+else
+  echo "  setup scripts without a golden case:$uncovered" >&2
+  fail "harness-coverage"
+fi
+
+# Secret: sim-recap's password is masked in print mode.
+if grep -qF '<string>***</string>' "$FIXTURES/sim-recap.plist" 2>/dev/null \
+   && ! grep -qF 'golden-secret' "$FIXTURES/sim-recap.plist" 2>/dev/null; then
+  pass "sim-recap-secret-masked"
+else
+  fail "sim-recap-secret-masked"
+fi
+
+echo
+echo "Passed: $PASS  Failed: $FAIL"
+[ "$FAIL" -eq 0 ]

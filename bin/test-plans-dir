@@ -224,6 +224,64 @@ out="$(env -i PATH="$PATH" HOME="$TMP/home" bash -c 'set -euo pipefail; source "
         _ "$ROOT/bin/lib/plan-resolve.sh" 2>&1)"
 check "19 HOME set: PLAN_DIR is the default" "$TMP/home/claude-plans" "$out"
 
+# --- 20. Phase 3 wiring: no hardcoded default left outside plans_dir ----------
+code_hits() { grep -vE '^[[:space:]]*#' "$ROOT/$1" | grep -cE '\$\{?HOME\}?/claude-plans'; }
+for f in bin/post-plan-now bin/docfix-run bin/post-plan-fleet; do
+    check "20 $f has no \$HOME/claude-plans code line" "0" "$(code_hits "$f")"
+    check "20 $f sources plan-resolve.sh once" "1" \
+        "$(grep -cE '^(\.|source)[[:space:]].*lib/plan-resolve\.sh' "$ROOT/$f")"
+done
+total=0
+for f in bin/lib/plan-resolve.sh bin/plan-dup-check bin/plan-now bin/bug-pipeline-tick \
+         bin/post-plan-now bin/docfix-run bin/post-plan-fleet; do
+    total=$((total + $(code_hits "$f")))
+done
+check "20 exactly one \$HOME/claude-plans code line across the seven files" "1" "$total"
+hit=0; case "$BODY" in *'$HOME/claude-plans'*) hit=1 ;; esac
+check "20 that line sits inside plans_dir" "1" "$hit"
+check "20 pr-creates-worktree fixture copies plan-resolve.sh" "yes" \
+    "$(grep -qF 'plan-resolve.sh' "$ROOT/bin/test-post-plan-now-pr-creates-worktree" && echo yes || echo no)"
+
+# --- 21-24. Line-eval of the Phase 3 callers (no seam: only HOME counts) ---------
+junk_seams() { local s; for s in $SEAMS; do export "$s=$TMP/seam"; done; }
+mkdir -p "$TMP/seam"; : > "$TMP/seam/demo.md"
+
+line="$(grep -m1 '^PLAN_FILE=' "$ROOT/bin/post-plan-now" || true)"
+check "21i PLAN_OVERRIDE wins verbatim" "/tmp/x.md" \
+    "$( unset $SEAMS; SLUG=demo PLAN_OVERRIDE=/tmp/x.md; eval "$line"; printf '%s' "$PLAN_FILE" )"
+check "21ii PLAN_OVERRIDE unset -> default" "$DEFAULT/demo.md" \
+    "$( unset $SEAMS PLAN_OVERRIDE; SLUG=demo; eval "$line"; printf '%s' "$PLAN_FILE" )"
+check "21iii PLAN_OVERRIDE empty -> default" "$DEFAULT/demo.md" \
+    "$( unset $SEAMS; SLUG=demo PLAN_OVERRIDE=''; eval "$line"; printf '%s' "$PLAN_FILE" )"
+check "21iv seam variables ignored" "$DEFAULT/demo.md" \
+    "$( unset PLAN_OVERRIDE; junk_seams; SLUG=demo; eval "$line"; printf '%s' "$PLAN_FILE" )"
+out="$(env -i PATH="$PATH" SLUG=demo PLAN_OVERRIDE=/tmp/x.md bash -c \
+        'set -u; source "$1"; eval "$2"; printf %s "$PLAN_FILE"' _ "$ROOT/bin/lib/plan-resolve.sh" "$line" 2>&1)"; rc=$?
+check "21v HOME unset with override: value" "/tmp/x.md" "$out"
+check "21v HOME unset with override: rc" "0" "$rc"
+
+line="$(grep -m1 '^PLAN_FILE=' "$ROOT/bin/docfix-run" || true)"
+check "22 docfix-run PLAN_FILE default" "$DEFAULT/docs-stale-refresh-20260101.md" \
+    "$( unset $SEAMS; SLUG=docs-stale-refresh-20260101; eval "$line"; printf '%s' "$PLAN_FILE" )"
+check "22 docfix-run PLAN_FILE ignores seams" "$DEFAULT/docs-stale-refresh-20260101.md" \
+    "$( junk_seams; SLUG=docs-stale-refresh-20260101; eval "$line"; printf '%s' "$PLAN_FILE" )"
+
+line="$(grep -m1 -E '^[[:space:]]*rpath=' "$ROOT/bin/post-plan-fleet" || true)"
+check "23 fleet report path default" "$DEFAULT/_reports/ibl5/firstpass/pr-firstpass-2026-01-01.md" \
+    "$( unset $SEAMS; rpath=''; rdate=2026-01-01; eval "$line"; printf '%s' "$rpath" )"
+check "23 fleet report path ignores seams" "$DEFAULT/_reports/ibl5/firstpass/pr-firstpass-2026-01-01.md" \
+    "$( junk_seams; rpath=''; rdate=2026-01-01; eval "$line"; printf '%s' "$rpath" )"
+
+line="$(grep -m1 -F 'p=PLAN' "$ROOT/bin/post-plan-fleet" || true)"
+mkdir -p "$DEFAULT"; : > "$DEFAULT/demo.md"
+check "24 fleet PLAN column: file present" "PLAN" \
+    "$( unset $SEAMS; p=''; branch=demo; eval "$line"; printf '%s' "$p" )"
+rm -f "$DEFAULT/demo.md"
+check "24 fleet PLAN column: file absent" "" \
+    "$( unset $SEAMS; p=''; branch=demo; eval "$line"; printf '%s' "$p" )"
+check "24 fleet PLAN column: seam-only file ignored" "" \
+    "$( junk_seams; p=''; branch=demo; eval "$line"; printf '%s' "$p" )"
+
 echo ""
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

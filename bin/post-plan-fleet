@@ -115,6 +115,8 @@ ROOT="$(dirname "$GIT_COMMON")"
 # Usage-gate markers (ADR-0143): a post-plan session paused by the gate is resumed by the
 # coordinator, so the fleet must not fire a second one into the same worktree.
 . "$SCRIPT_DIR/lib/usage-gate.sh"
+# shellcheck source=bin/lib/plan-resolve.sh
+. "$SCRIPT_DIR/lib/plan-resolve.sh"
 
 # --- defaults ----------------------------------------------------------------------------
 GO=0
@@ -365,7 +367,7 @@ write_report() {
         master_sha="${POST_PLAN_FLEET_MASTER_SHA:-$(git -C "$ROOT" rev-parse --short origin/master 2>/dev/null || echo unknown)}"
     fi
     rdate="$(date +%F)"
-    rpath="${HOME}/claude-plans/_reports/ibl5/firstpass/pr-firstpass-${rdate}.md"
+    rpath="$(plans_dir)/_reports/ibl5/firstpass/pr-firstpass-${rdate}.md"
     mkdir -p "$(dirname "$rpath")"
 
     {
@@ -515,7 +517,7 @@ while read -r pr; do
     # The [branch] form (not path) matches git worktree list's "path  sha [branch]" output.
     w=""; p=""
     if grep -qF "[$branch]" "$_WTL"; then w=WT; fi
-    if [[ -f "$HOME/claude-plans/$branch.md" ]]; then p=PLAN; fi
+    if [[ -f "$(plans_dir)/$branch.md" ]]; then p=PLAN; fi
     if   [[ -n "$w" && -n "$p" ]]; then pre="WT+PLAN"
     elif [[ -n "$w" ]];            then pre="WT"
     elif [[ -n "$p" ]];            then pre="PLAN"

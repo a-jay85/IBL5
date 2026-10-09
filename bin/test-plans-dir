@@ -282,6 +282,13 @@ check "24 fleet PLAN column: file absent" "" \
 check "24 fleet PLAN column: seam-only file ignored" "" \
     "$( junk_seams; p=''; branch=demo; eval "$line"; printf '%s' "$p" )"
 
+# --- 25. Mutation guard: the indirection is load-bearing ---
+# Shadow plans_dir with a mutated copy of its own body; the cases above must then fail.
+MUT="$(sed 's/\${!_pd_name:-}/${_pd_name:-}/' <<<"$BODY")"
+check "25 mutation drops the indirection" "1" "$([ "$MUT" != "$BODY" ] && echo 1 || echo 0)"
+out="$( unset $SEAMS; eval "$MUT"; export PLANS_DIR=/tmp/over; plans_dir PLANS_DIR 2>&1 )"
+check "25 without indirection the seam value is lost" "no" "$([ "$out" = /tmp/over ] && echo yes || echo no)"
+
 echo ""
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

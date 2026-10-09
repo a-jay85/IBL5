@@ -13,7 +13,10 @@ from harness import gatefix
 
 ROOT = Path(__file__).resolve().parent.parent
 
-_BAD = re.compile(r"--no-verify|no_verify|hookspath|husky", re.IGNORECASE)
+# Hook bypasses: the git flag, its variable form, a hooks-path override, and the HUSKY
+# env switch that disables husky-managed hooks.
+FORBIDDEN = ("--no-verify", "no_verify", "hookspath", "HUSKY")
+_BAD = re.compile("|".join(re.escape(t) for t in FORBIDDEN), re.IGNORECASE)
 _SHORT_N = re.compile(r"""["']commit["']\s*,\s*(?:[^)\]]*,\s*)?["']-n["']""")
 
 # (relative path, stripped line). The replay module re-runs gate history in a scratch

@@ -149,6 +149,23 @@ new_case
 run_sync 'STUB_IOREG_LINE=HIDIdleTime = 700000000000' --
 pin "SYN proceeding" "idle 700s >= threshold 600s — proceeding"
 
+# Intended wording change: the old sync awk coerced `nan` to 0 and logged
+# "operator present (idle 0s ...)". It now fails closed as unreadable, like gc.
+new_case
+run_sync 'STUB_IOREG_LINE=HIDIdleTime = nan' --
+pin "SYN unreadable" "idle value unreadable ('nan') — treating as operator present (fail-closed)"; pin_rc "SYN unreadable" 0
+
+# Both ticks must release the lock on exit through the lib.
+new_case
+run_sync -- --force
+if [ ! -e "$D/wt-sync.lock" ]; then pass "SYN release lock removed"; else fail "SYN release lock removed"; fi
+if grep -Fq 'command not found' <<< "$OUT"; then fail "SYN release no command-not-found" "$OUT"; else pass "SYN release no command-not-found"; fi
+
+new_case
+run_gc -- --force
+if [ ! -e "$D/wt-gc.lock" ]; then pass "GC release lock removed"; else fail "GC release lock removed"; fi
+if grep -Fq 'command not found' <<< "$OUT"; then fail "GC release no command-not-found" "$OUT"; else pass "GC release no command-not-found"; fi
+
 # ── Section 2: lib unit cases (strict child shell) ──────────────────────────
 # Each case runs in `env -i PATH=/usr/bin:/bin bash -euo pipefail`, sources the
 # lib, makes the call in the documented `|| rc=$?` form, and prints a marker

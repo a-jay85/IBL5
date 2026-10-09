@@ -201,6 +201,128 @@ else
   fail "sim-recap-secret-masked"
 fi
 
+# ── Library unit tests: bin/lib/launchd-sched.sh ─────────────────────────────
+LIB="$REPO_ROOT/bin/lib/launchd-sched.sh"
+TAB="$(printf '\t')"
+
+# expect_eq <name> <expected> <actual>
+expect_eq() {
+  if [ "$2" = "$3" ]; then
+    pass "$1"
+  else
+    printf '  expected: %s\n  actual:   %s\n' "$2" "$3" >&2
+    fail "$1"
+  fi
+}
+
+# lsched_main_wt: from an added worktree it prints the main path; outside any
+# git tree it prints the dir and the subshell survives set -euo pipefail.
+REPOBOX="$TMP/repobox"
+mkdir -p "$REPOBOX/main"
+(
+  cd "$REPOBOX/main" || exit 1
+  export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
+  git init -q . && git commit -q --allow-empty -m init && git worktree add -q "$REPOBOX/wt" -b lsched-wt
+) >/dev/null 2>&1
+REPOBOX_MAIN="$(cd "$REPOBOX/main" && pwd -P)"
+got="$(set -euo pipefail; . "$LIB"; lsched_main_wt "$REPOBOX/wt" | cat)"
+got_real="$(cd "$got" 2>/dev/null && pwd -P)"
+expect_eq "lib-main-wt-from-worktree" "$REPOBOX_MAIN" "$got_real"
+if [ "$(printf '%s\n' "$got" | wc -l | tr -d ' ')" = "1" ] && ! grep -qF "$REPOBOX/wt" <<< "$got"; then
+  pass "lib-main-wt-single-line-no-worktree-path"
+else
+  fail "lib-main-wt-single-line-no-worktree-path"
+fi
+NOGIT="$TMP/nogit"
+mkdir -p "$NOGIT"
+got="$(set -euo pipefail; . "$LIB"; lsched_main_wt "$NOGIT")"
+rc=$?
+expect_eq "lib-main-wt-non-git-fallback" "0:$NOGIT" "$rc:$got"
+
+# Emitters print exact tab-indented bytes.
+emit() { ( set -euo pipefail; . "$LIB"; "$@" ); }
+expect_eq "lib-key-string" "${TAB}<key>Label</key>
+${TAB}<string>com.x</string>" "$(emit lsched_key_string Label com.x)"
+expect_eq "lib-key-string-depth2" "${TAB}${TAB}<key>PATH</key>
+${TAB}${TAB}<string>/a:/b</string>" "$(emit lsched_key_string PATH /a:/b 2)"
+expect_eq "lib-key-integer" "${TAB}<key>StartInterval</key>
+${TAB}<integer>3600</integer>" "$(emit lsched_key_integer StartInterval 3600)"
+expect_eq "lib-key-bool" "${TAB}<key>RunAtLoad</key>
+${TAB}<true/>" "$(emit lsched_key_bool RunAtLoad true)"
+expect_eq "lib-program-arguments" "${TAB}<key>ProgramArguments</key>
+${TAB}<array>
+${TAB}${TAB}<string>/bin/a</string>
+${TAB}${TAB}<string>--x</string>
+${TAB}</array>" "$(emit lsched_program_arguments /bin/a --x)"
+expect_eq "lib-calendar" "${TAB}<key>StartCalendarInterval</key>
+${TAB}<dict>
+${TAB}${TAB}<key>Hour</key>
+${TAB}${TAB}<integer>3</integer>
+${TAB}${TAB}<key>Minute</key>
+${TAB}${TAB}<integer>30</integer>
+${TAB}</dict>" "$(emit lsched_calendar Hour=3 Minute=30)"
+expect_eq "lib-env-open-close" "${TAB}<key>EnvironmentVariables</key>
+${TAB}<dict>
+${TAB}</dict>" "$(emit lsched_env_open; emit lsched_env_close)"
+
+# Rejections return 2 and write to stderr.
+for rej in "lsched_program_arguments" "lsched_calendar Hour" "lsched_key_bool RunAtLoad yes"; do
+  # shellcheck disable=SC2086
+  err="$( ( set -uo pipefail; . "$LIB"; $rej ) 2>&1 >/dev/null )"
+  # shellcheck disable=SC2086
+  ( set -uo pipefail; . "$LIB"; $rej ) >/dev/null 2>&1
+  rrc=$?
+  if [ "$rrc" = "2" ] && [ -n "$err" ]; then pass "lib-reject: $rej"; else fail "lib-reject: $rej (rc=$rrc)"; fi
+done
+
+# lsched_plist wraps the body function.
+sample_body() { printf '\t<key>Label</key>\n\t<string>com.x</string>\n'; }
+plist_out="$(set -euo pipefail; . "$LIB"; lsched_plist sample_body)"
+expect_eq "lib-plist-wrapper" '<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+'"${TAB}"'<key>Label</key>
+'"${TAB}"'<string>com.x</string>
+</dict>
+</plist>' "$plist_out"
+
+# lsched_install / lsched_uninstall against a stub launchctl.
+STUB="$TMP/stub"
+mkdir -p "$STUB" "$TMP/lhome"
+cat > "$STUB/launchctl" <<'STUBEOF'
+#!/bin/sh
+echo "$*" >> "$LSCHED_STUB_LOG"
+case "$1" in
+  bootstrap) exit "${STUB_BOOTSTRAP_RC:-0}" ;;
+  bootout) exit 3 ;;
+esac
+exit 0
+STUBEOF
+chmod +x "$STUB/launchctl"
+export LSCHED_STUB_LOG="$TMP/launchctl.log"
+UID_N="$(id -u)"
+PLIST_T="$TMP/lhome/Library/LaunchAgents/com.ibl5.lsched-test.plist"
+: > "$LSCHED_STUB_LOG"
+( set -euo pipefail; . "$LIB"; export PATH="$STUB:$PATH"; lsched_install com.ibl5.lsched-test "$PLIST_T" sample_body "$TMP/lhome/logs" ) >/dev/null 2>&1
+rc=$?
+expect_eq "lib-install-log" "bootout gui/$UID_N/com.ibl5.lsched-test
+bootstrap gui/$UID_N $PLIST_T" "$(cat "$LSCHED_STUB_LOG")"
+expect_eq "lib-install-rc0" "0" "$rc"
+expect_eq "lib-install-plist-equals-lsched_plist" "$plist_out" "$(cat "$PLIST_T")"
+if [ -d "$TMP/lhome/logs" ]; then pass "lib-install-extra-dir"; else fail "lib-install-extra-dir"; fi
+( set -uo pipefail; . "$LIB"; export PATH="$STUB:$PATH" STUB_BOOTSTRAP_RC=5; lsched_install com.ibl5.lsched-test "$PLIST_T" sample_body ) >/dev/null 2>&1
+expect_eq "lib-install-returns-bootstrap-status" "5" "$?"
+( set -euo pipefail; . "$LIB"; export PATH="$STUB:$PATH"; lsched_uninstall com.ibl5.lsched-test "$PLIST_T" ) >/dev/null 2>&1
+rc=$?
+if [ "$rc" = "0" ] && [ ! -e "$PLIST_T" ]; then pass "lib-uninstall"; else fail "lib-uninstall (rc=$rc)"; fi
+( set -euo pipefail; . "$LIB"; export PATH="$STUB:$PATH"; lsched_uninstall com.ibl5.lsched-test "$PLIST_T" ) >/dev/null 2>&1
+expect_eq "lib-uninstall-idempotent" "0" "$?"
+
+# Source hygiene: sourcing twice leaves shell options unchanged.
+hyg="$( set +e; before="$- $(shopt -po)"; . "$LIB"; . "$LIB"; rc2=$?; after="$- $(shopt -po)"; [ "$before" = "$after" ] && [ "$rc2" = 0 ] && echo ok )"
+expect_eq "lib-source-hygiene" "ok" "$hyg"
+
 echo
 echo "Passed: $PASS  Failed: $FAIL"
 [ "$FAIL" -eq 0 ]

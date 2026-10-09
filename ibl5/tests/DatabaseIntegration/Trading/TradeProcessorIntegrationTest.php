@@ -40,7 +40,6 @@ class TradeProcessorIntegrationTest extends DatabaseTestCase
             return;
         }
 
-        $this->db->query("DELETE FROM ibl_trade_queue");
         $this->db->query("DELETE FROM ibl_cash_considerations WHERE label LIKE 'Cash to%' OR label LIKE 'Cash from%'");
         $this->db->query("DELETE FROM nuke_stories WHERE sid > 2");
 
@@ -107,6 +106,57 @@ class TradeProcessorIntegrationTest extends DatabaseTestCase
         self::assertTrue($result['success']);
         self::assertSame(2, $this->getPlayerTeamId($pid));
         self::assertSame(1, $this->getPickOwnerTeamId($pickId));
+    }
+
+    // ── Scenario 2b: Offseason phases write immediately (no deferred replay) ──
+
+    public function testPlayerTradeDuringFreeAgencyPhaseWritesTeamIdImmediately(): void
+    {
+        $processor = $this->processorInPhase('Free Agency');
+        $pidA = 200040011;
+        $pidB = 200040012;
+        $this->seedPlayer($pidA, 'Trade Test FA-A', 1, 'PG');
+        $this->seedPlayer($pidB, 'Trade Test FA-B', 2, 'SF');
+
+        $offerId = $this->seedPendingTrade([
+            ['id' => $pidA, 'type' => TradeItemType::Player->value, 'from' => 'Metros', 'to' => 'Stars'],
+            ['id' => $pidB, 'type' => TradeItemType::Player->value, 'from' => 'Stars', 'to' => 'Metros'],
+        ]);
+
+        $result = $processor->processTrade($offerId);
+
+        self::assertTrue($result['success']);
+        self::assertSame(2, $this->getPlayerTeamId($pidA));
+        self::assertSame(1, $this->getPlayerTeamId($pidB));
+    }
+
+    public function testPickTradeDuringPlayoffsPhaseWritesPickOwnerImmediately(): void
+    {
+        $processor = $this->processorInPhase('Playoffs');
+        $pid = 200040013;
+        $this->seedPlayer($pid, 'Trade Test PO-C', 1, 'SG');
+        $pickId = $this->seedPick(2, 'Stars', 2, 'Stars', 2029, 2);
+
+        $offerId = $this->seedPendingTrade([
+            ['id' => $pid, 'type' => TradeItemType::Player->value, 'from' => 'Metros', 'to' => 'Stars'],
+            ['id' => $pickId, 'type' => TradeItemType::DraftPick->value, 'from' => 'Stars', 'to' => 'Metros'],
+        ]);
+
+        $result = $processor->processTrade($offerId);
+
+        self::assertTrue($result['success']);
+        self::assertSame(2, $this->getPlayerTeamId($pid));
+        self::assertSame(1, $this->getPickOwnerTeamId($pickId));
+    }
+
+    /** Build a processor whose Season reports the given phase; asserts the phase advances contract years. */
+    private function processorInPhase(string $phase): TradeProcessor
+    {
+        $season = new \Season\Season($this->db);
+        $season->phase = $phase;
+        self::assertTrue($season->advancesContractYears(), "Phase '$phase' must advance contract years");
+        $commonRepository = new \Repositories\TeamIdentityRepository($this->db);
+        return new TradeProcessor($this->db, $commonRepository, season: $season);
     }
 
     // ── Scenario 3: Cash consideration ─────────────────────────

@@ -23,7 +23,7 @@ import type { Viewport } from './vr-manifest';
 // inflating the diff ratio above the gate's and re-surfacing sub-gate noise the
 // ratio floor alone can't suppress. See ADR-0074 Consequences for both sync
 // points (this threshold and the ratio floor).
-const GATE_PIXEL_THRESHOLD = 0.2;
+export const GATE_PIXEL_THRESHOLD = 0.2;
 
 // Review-only strict pass (ADR 0180, amends ADR-0074). Never gates: it only
 // feeds the gallery's changed set. 0.05 sits above the faintest anti-alias

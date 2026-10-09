@@ -1,0 +1,8 @@
+{
+  "changedCells": [
+    { "module": "standings", "viewport": "desktop", "title": "standings" },
+    { "module": "standings", "viewport": "mobile", "title": "standings-mobile" }
+  ],
+  "newCells": [{ "module": "draft", "viewport": "desktop", "title": "draft-board" }],
+  "flakeCells": []
+}

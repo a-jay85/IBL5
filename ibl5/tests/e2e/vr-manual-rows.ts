@@ -40,6 +40,9 @@ export type ManualRowResult = {
   row: string;
   status: ManualRowStatus;
   error?: string;
+  // Base-SHA pass outcome; absent or not `ok` renders the after-only markup.
+  beforeStatus?: ManualRowStatus;
+  beforeError?: string;
 };
 
 const ROLES: readonly string[] = ['anon', 'regular', 'admin'];
@@ -178,14 +181,17 @@ export function parseManualBullets(body: string): { rows: ManualVrRow[]; errors:
   return { rows, errors };
 }
 
-export function manualShotFile(label: string): string {
-  return `${label}.png`;
+export type ManualShotSide = 'before' | 'after';
+
+// `before` is the base-SHA pass; `after` (the default) keeps today's filename.
+export function manualShotFile(label: string, side: ManualShotSide = 'after'): string {
+  return side === 'before' ? `${label}.before.png` : `${label}.png`;
 }
 
 // URL under the per-SHA Pages tree; mirrors newScreenUrl's slash-normalization.
-export function manualShotUrl(pagesUrl: string, label: string): string {
+export function manualShotUrl(pagesUrl: string, label: string, side: ManualShotSide = 'after'): string {
   const base = pagesUrl.endsWith('/') ? pagesUrl : pagesUrl + '/';
-  return `${base}manual-rows/${encodeURIComponent(label)}.png`;
+  return `${base}manual-rows/${encodeURIComponent(label)}${side === 'before' ? '.before' : ''}.png`;
 }
 
 // Sticky-comment markdown. Only an `ok` row gets an image; a failed or skipped
@@ -198,6 +204,11 @@ export function buildManualSection(results: ManualRowResult[], pagesUrl: string)
   for (const r of results) {
     if (r.status === 'ok') {
       lines.push(`**Row ${r.row} — \`${r.label}\`**`, '');
+      if (r.beforeStatus === 'ok') {
+        lines.push('**Before (base)**', '');
+        lines.push(`![${r.label} before](${manualShotUrl(pagesUrl, r.label, 'before')})`, '');
+        lines.push('**After (PR)**', '');
+      }
       lines.push(`![${r.label}](${manualShotUrl(pagesUrl, r.label)})`, '');
     } else {
       const why = r.error ? `: ${r.error}` : '';

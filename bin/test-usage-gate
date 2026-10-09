@@ -116,6 +116,49 @@ test_fetch_bad_body_serves_stale() {
     assert_eq fetch_bad_body:cache-unchanged "$before" "$(cat "$IBL5_USAGE_GATE_STATE_DIR/cache.json")"
 }
 
+# seed_cache_fp <fetched_at> <body> <cred_fp>: seed_cache plus a stamped cred_fp.
+seed_cache_fp() {
+    printf '%s' "$2" | jq --argjson t "$1" --arg fp "$3" '. + {fetched_at:$t, cred_fp:$fp}' \
+        > "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+}
+
+test_fetch_cred_switch_drops_cache() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"
+    seed_cache_fp "$(date +%s)" "$BODY_A" "0000000000000000"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" out rc
+    printf '%s\n' "$(( $(date +%s) + 600 )) 1" > "$d/fetch-backoff"
+    out=$(PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq cred_switch:rc 0 "$rc"
+    assert_eq cred_switch:live-body 77.0 "$(printf '%s' "$out" | jq -r '.five_hour.utilization')"
+    assert_eq cred_switch:one-call 1 "$(curl_calls "$STUB")"
+    assert_eq cred_switch:backoff-cleared "" "$(ls "$d/fetch-backoff" 2>/dev/null)"
+    assert_eq cred_switch:no-fp-in-output "null" "$(printf '%s' "$out" | jq -r '.cred_fp')"
+    assert_eq cred_switch:fp-stamped "$(printf tok | shasum -a 256 | cut -c1-16)" "$(jq -r '.cred_fp' "$d/cache.json")"
+    assert_contains cred_switch:log "$(cat "$d/usage-gate.log")" "cred-switch cache-dropped"
+}
+
+test_fetch_same_cred_keeps_cache() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B" 1
+    seed_cache_fp "$(date +%s)" "$BODY_A" "$(printf tok | shasum -a 256 | cut -c1-16)"
+    local out
+    out=$(PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45")
+    assert_eq same_cred:cached 41.0 "$(printf '%s' "$out" | jq -r '.five_hour.utilization')"
+    assert_eq same_cred:no-curl 0 "$(curl_calls "$STUB")"
+}
+
+test_fetch_no_keychain_keeps_cache() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    seed_cache_fp "$(date +%s)" "$BODY_A" "0000000000000000"
+    local out rc
+    out=$(PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq no_keychain:rc 0 "$rc"
+    assert_eq no_keychain:cached 41.0 "$(printf '%s' "$out" | jq -r '.five_hour.utilization')"
+    assert_eq no_keychain:no-curl 0 "$(curl_calls "$STUB")"
+}
+
 # ---------------------------------------------------------------- fetch backoff / single-flight
 
 SECRET_TOK=TESTSECRET-9f3a1c

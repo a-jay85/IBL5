@@ -132,9 +132,10 @@ class ProjectedDraftOrderRepository extends \Database\BaseMysqliRepository imple
     {
         /** @var list<array{pick: int, team: string, teamid: int, player: string}> */
         return $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (draft_id is the ibl_draft primary key; not on the rule allowlist)
             "SELECT pick, team, teamid, player FROM `ibl_draft`
              WHERE year = ? AND round = ?
-             ORDER BY pick",
+             ORDER BY pick, draft_id ASC",
             "ii",
             $year,
             $round,

@@ -14,6 +14,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `automouse-stream-filter.sh` | Filter for `claude -p --output-format stream-json` NDJSON; emits per-phase log lines (tool:/exit:/COMPACTION:) and maintains heartbeat |
 | `headless-elapsed-hook.sh` | PostToolUse hook that appends an elapsed-clock line (`elapsed <E>s / <B>s`) after every tool call in opt-in runs; activated by `IBL5_BUDGET_START_EPOCH` and `IBL5_BUDGET_SECS` set by `bin/automouse/run` on the impl invocation; exits 0 with no output in all other sessions |
 | `bug-pipeline-gh.sh` | Best-effort GitHub issue-tracking seam for the autonomous bug pipeline (§3f) |
+| `harness.sh` | Shared assertion, counter, summary, tmpdir and fake-git-repo helpers (`h_*`) sourced by `bin/test-*` harnesses; exercised by `bin/test-harness-lib` |
 | `bug-pipeline-test-stubs.sh` | Shared stub scaffolding for `bin/test-bug-pipeline-*` harnesses |
 | `db-helpers.sh` | Shared database helper functions for Docker MariaDB interactions (password-warning suppression, exec wrappers, and `db_resolve_target` / `db_container_running` — the main-stack-vs-worktree-container routing used by `ibl5/bin/db-query`) |
 | `restore-rowcount-compare.sh` | Pre-dump vs restored `COUNT(*)` check for the nightly backup in `.github/workflows/db-backup.yml`; subcommands `snapshot` / `extract` / `compare`, also piped to prod over `bash -s` (functions only, `main` is guarded) |

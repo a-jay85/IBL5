@@ -7,19 +7,13 @@
 # Run: bin/test-automouse-measure-delegate-cost  (exit 0 = all pass, 1 = failure)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-FAILED=0
 
 # assert_eq <actual> <expected> <label>
-assert_eq() {
-    if [ "$1" = "$2" ]; then
-        printf '  ok   %s (%s)\n' "$3" "$1"
-    else
-        printf '  FAIL %s: got %s, expected %s\n' "$3" "$1" "$2"
-        FAILED=1
-    fi
-}
+assert_eq() { h_eq "$3" "$2" "$1"; }
 
 # jget <json-file> <dotted.key> -> prints the value
 jget() {
@@ -32,15 +26,13 @@ print(json.dumps(v) if isinstance(v,dict) else v)' "$1" "$2"
 # assert_close <actual> <expected> <label>  (abs tolerance 1e-4)
 assert_close() {
     if python3 -c 'import sys; sys.exit(0 if abs(float(sys.argv[1])-float(sys.argv[2]))<=1e-4 else 1)' "$1" "$2"; then
-        printf '  ok   %s (%s)\n' "$3" "$1"
+        h_pass "$3"
     else
-        printf '  FAIL %s: got %s, expected %s\n' "$3" "$1" "$2"
-        FAILED=1
+        h_fail "$3" "got $1, expected $2"
     fi
 }
 
-TMPROOT=$(mktemp -d)
-trap 'rm -rf "$TMPROOT"' EXIT
+h_tmp TMPROOT
 
 # ---------------------------------------------------------------------------
 # Fixture generation — write all fixture dirs from a single Python block.
@@ -249,8 +241,8 @@ A_GAP=$(jget "$TMPROOT/A/out.json" "gap")
 assert_eq "$A_VERDICT" "sonnet-cheaper" "verdict=sonnet-cheaper"
 assert_close "$A_GAP" "0.333333" "gap=0.333333"
 grep -qx 'verdict: sonnet-cheaper' "$TMPROOT/A/report.md" \
-    && printf '  ok   report.md contains bare verdict line\n' \
-    || { printf '  FAIL report.md missing bare verdict line\n'; FAILED=1; }
+    && h_pass "report.md contains bare verdict line" \
+    || h_fail "report.md missing bare verdict line"
 
 printf '\n=== case_boundary_exact_5pct (Fixture B) ===\n'
 "$SCRIPT" --nightly-dir "$TMPROOT/B" --out "$TMPROOT/B/report.md" --json > "$TMPROOT/B/out.json" 2>/dev/null
@@ -302,14 +294,14 @@ MISS_RC=0
 MISS_ERR=$("$SCRIPT" --nightly-dir "$TMPROOT/nope" --out /dev/null 2>&1) || MISS_RC=$?
 assert_eq "$MISS_RC" "2" "missing-dir exit=2"
 grep -qi 'no ledger files' <<< "$MISS_ERR" \
-    && printf '  ok   missing-dir stderr contains "no ledger files"\n' \
-    || { printf '  FAIL missing-dir stderr missing "no ledger files": %s\n' "$MISS_ERR"; FAILED=1; }
+    && h_pass 'missing-dir stderr contains "no ledger files"' \
+    || h_fail 'missing-dir stderr missing "no ledger files"' "$MISS_ERR"
 
 printf '\n'
-if [ "$FAILED" -eq 0 ]; then
+if [ "$H_FAIL" -eq 0 ]; then
     printf 'PASS: bin/test-automouse-measure-delegate-cost\n'
 else
-    printf 'FAIL: bin/test-automouse-measure-delegate-cost (%d case(s) failed)\n' "$FAILED"
+    printf 'FAIL: bin/test-automouse-measure-delegate-cost (%d case(s) failed)\n' "$H_FAIL"
 fi
 
-exit "$FAILED"
+h_done

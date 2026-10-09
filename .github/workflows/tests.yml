@@ -894,6 +894,7 @@ jobs:
         run: |
           bin/run-shell-harnesses \
             bin/test-main-checkout-root \
+            bin/test-harness-lib \
             bin/test-post-plan-fleet \
             bin/test-check-plan \
             bin/test-plan-now \

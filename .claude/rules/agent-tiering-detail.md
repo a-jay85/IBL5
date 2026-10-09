@@ -1,5 +1,5 @@
 ---
-description: Read-on-demand detail for agent-tiering: skip-vs-spawn heuristic, fan-out and nesting rationale, task-type boundary, orchestrator context economics, /plan orchestrator evidence, prompt style, Haiku 5.5 measurement and price cliff, extra Sonnet pins. Attaches only on `.claude/agents/*.md`. Fable gate and bounded checklist live in their own files.
+description: Read-on-demand detail for agent-tiering: skip-vs-spawn heuristic, fan-out and nesting rationale, task-type boundary, orchestrator context economics, /plan orchestrator evidence, prompt style, Haiku 5.5 measurement and price cliff, extra Sonnet pins. Attaches only on `.claude/agents/*.md`. Fable test and bounded checklist live in their own files.
 last_verified: 2026-10-08
 paths:
   - ".claude/agents/*.md"
@@ -9,8 +9,8 @@ paths:
 
 Read-on-demand companion to `agent-tiering.md` (always-loaded). The parent holds the
 operative Tier table. This file holds the longer rationale: the skip-vs-spawn heuristic,
-flat-fan-out and orchestrator context economics, and prompt style. The Fable gate is in
-`agent-tiering-fable-gate.md`.
+flat-fan-out and orchestrator context economics, and prompt style. The Fable test is in
+`agent-tiering-fable.md`.
 
 ## Skip the Agent — Direct Tool Calls
 
@@ -32,7 +32,7 @@ Delegatable tool results: 8,292 calls / 4.73 Mtok. p50 result 194 tokens, p90 1,
 
 **PHPUnit and PHPStan are always direct Bash calls** — passing output is ~5 lines, failures usually under 50; agent overhead dwarfs it. Use `run_in_background` for parallelism without an agent — **but only in the interactive harness**, where a finished background task re-invokes you. In a **headless** run (`claude -p`, e.g. `/post-plan` under automouse) there is no re-invocation: a live background task at turn-end stall-kills the run — run blocking, or poll `BashOutput` to completion in-turn (post-plan `SKILL.md` Phase 5).
 
-> The Fable tier approval procedure (incl. the asm-level static-RE exception) has moved to `agent-tiering-fable-gate.md`.
+> When to use Fable (incl. the asm-level static-RE default) lives in `agent-tiering-fable.md`.
 
 ### Fan out by independence
 

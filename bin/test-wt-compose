@@ -587,6 +587,43 @@ chk_eq "exit code" 0 "$RC"
 chk_eq "output" "sourced" "$OUT"
 case_end
 
+# ---------------------------------------------------------------------------
+# Mutation self-checks: break the real lib in one place and prove the matching unit
+# assertion notices. Always mutates the real lib, never the WT_COMPOSE_LIB seam.
+# ---------------------------------------------------------------------------
+echo "== wt-compose.sh mutants"
+
+# mutant_lib <old> <new> <outfile>: copy the real lib to outfile with one literal edit.
+# Returns 1 when the edit changed nothing, so a stale mutant cannot pass silently.
+mutant_lib() {
+    local src real_lib="$SCRIPT_DIR/lib/wt-compose.sh"
+    src="$(cat "$real_lib")"
+    printf '%s\n' "${src/"$1"/"$2"}" > "$3"
+    ! cmp -s "$real_lib" "$3"
+}
+
+# mutant_slug <label> <old> <new> <wt_slug args> <healthy output>
+mutant_slug() {
+    local mfile got verdict
+    new_unit
+    mfile="$UR/mutant.sh"
+    case_begin "$1"
+    if ! mutant_lib "$2" "$3" "$mfile"; then
+        note_fail "mutation did not change the lib"
+    else
+        # shellcheck disable=SC2034,SC1090
+        got="$( set -u; REPO_ROOT="$UR"; . "$mfile"; eval "wt_slug $4" )"
+        verdict="same"
+        if [ "$got" != "$5" ]; then verdict="differs"; fi
+        chk_eq "mutant output differs from healthy output" "differs" "$verdict"
+    fi
+    case_end
+}
+
+# shellcheck disable=SC2016 # the mutation tokens are literal source text
+mutant_slug "mutant: wt_slug flattens one slash only" '${name//\//-}' '${name/\//-}' 'a/b/c' 'a-b-c'
+mutant_slug "mutant: wt_slug wrong pr format" 'pr-%s' 'px-%s' 'feat/x 4242' 'pr-4242'
+
 echo "----"
 if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "FAILURES"; fi
 exit "$FAILED"

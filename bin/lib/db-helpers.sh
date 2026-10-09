@@ -4,6 +4,15 @@
 #
 # Usage: source "$(dirname "$0")/lib/db-helpers.sh"
 
+# Local Docker dev credentials and default database. Plain (non-exported)
+# shell variables, env-overridable under their own names. DB_DEFAULT_NAME is
+# deliberately NOT DB_NAME: DB_NAME is an ambient exported variable in the
+# bug-pipeline scripts and CI jobs, and reading it here would retarget
+# bin/db-sync-prod and bin/db-migrate from a developer's shell.
+DB_ROOT_USER="${DB_ROOT_USER:-root}"
+DB_ROOT_PASS="${DB_ROOT_PASS:-root}"
+DB_DEFAULT_NAME="${DB_DEFAULT_NAME:-iblhoops_ibl5}"
+
 # Wrapper to suppress MariaDB "password on command line" warning.
 # Preserves the real exit code from docker exec.
 db_exec() {
@@ -27,6 +36,21 @@ db_exec_stdin() {
 # via a separate error-log-grep pipeline.
 db_exec_stdin_stream() {
     docker exec -i "$@" 2>&1 | grep -v '\[Warning\].*password' || true
+}
+
+# Stream-preserving client wrapper: runs <client> (mariadb or mariadb-dump)
+# in <container> as the root dev user. Unlike db_exec it does NOT merge stderr
+# into stdout and does NOT filter warnings, so a caller may redirect stdout to
+# a file (bin/db-sync-prod's preserved-tables dump) without stderr text landing
+# in it, and a probe failure stays visible on stderr. The exit code is docker's.
+# Credentials use the single-token -uUSER -pPASS form so the argv stays
+# byte-identical to the former inline calls.
+#
+# Usage: db_cmd <container> <client> [client-args...]
+db_cmd() {
+    local container="$1" client="$2"
+    shift 2
+    docker exec "$container" "$client" -u"$DB_ROOT_USER" -p"$DB_ROOT_PASS" "$@"
 }
 
 # Resolve which database a checkout should talk to, from the checkout root alone.
@@ -94,9 +118,9 @@ db_strip_warnings() {
 # Usage: cat dump.sql | db_import_sql <container> [user] [pass] [dbname]
 db_import_sql() {
     local container="$1"
-    local user="${2:-root}"
-    local pass="${3:-root}"
-    local dbname="${4:-iblhoops_ibl5}"
+    local user="${2:-$DB_ROOT_USER}"
+    local pass="${3:-$DB_ROOT_PASS}"
+    local dbname="${4:-$DB_DEFAULT_NAME}"
     local error_log
     error_log=$(mktemp)
 

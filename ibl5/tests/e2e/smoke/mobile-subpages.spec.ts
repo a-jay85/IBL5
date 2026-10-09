@@ -61,7 +61,7 @@ test.describe('Player stat view mobile smoke tests', () => {
       await gotoWithRetry(page, url);
       await assertNoPhpErrors(page, `on player ${view.name} (mobile)`);
 
-      const content = page.locator('.player-stats-card, h2, h3').first();
+      const content = page.locator('.player-stats-card').first();
       await expect(content).toBeVisible();
 
       if (!('skipOverflow' in view)) {
@@ -101,7 +101,7 @@ test.describe('Team display mode mobile smoke tests', () => {
       await gotoWithRetry(page, url);
       await assertNoPhpErrors(page, `on team ${view.name} (mobile)`);
 
-      const content = page.locator('.ibl-data-table, table, h2, h3').first();
+      const content = page.locator('.ibl-data-table').first();
       await expect(content).toBeVisible();
       await assertNoHorizontalOverflow(page, `on team ${view.name}`);
 

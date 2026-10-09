@@ -100,8 +100,8 @@ test.describe('Mobile authenticated page smoke tests', () => {
     await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
     await gotoWithRetry(page, 'modules.php?name=FreeAgency&pa=negotiate&pid=11');
     await assertNoPhpErrors(page, 'on modules.php?name=FreeAgency&pa=negotiate&pid=11 (mobile)');
-    // Verify page rendered (card or alert — depends on roster/demand data)
-    const content = page.locator('.ibl-card__title, .ibl-alert, .ibl-title').first();
+    // Verify page rendered. h1.ibl-title is emitted before any roster/demand branch.
+    const content = page.locator('.ibl-title').first();
     await expect(content).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on free agency negotiate page');
   });

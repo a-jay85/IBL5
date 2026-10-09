@@ -197,6 +197,8 @@ unit_idle "U2 missing reader" "1|" "$T/missing"
 : > "$T/reader.noexec"
 unit_idle "U3 non-executable reader" "1|" "$T/reader.noexec"
 unit_idle "U4 quoted 7200s" "0|7200" "$(mk_reader u4 "echo '\"HIDIdleTime\" = 7200000000000'")"
+# U5 guards the awk pattern: narrowing it to /"HIDIdleTime"/ would miss the
+# unquoted shape that wt-sync-tick's stub (and some ioreg builds) print.
 unit_idle "U5 unquoted 700s" "0|700" "$(mk_reader u5 "echo 'HIDIdleTime = 700000000000'")"
 unit_idle "U6 nan" "2|nan" "$(mk_reader u6 "echo '\"HIDIdleTime\" = nan'")"
 unit_idle "U7 no line" "2|" "$(mk_reader u7 "echo 'something else'")"

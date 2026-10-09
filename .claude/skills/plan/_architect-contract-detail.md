@@ -42,6 +42,8 @@ A bare path OR a path you annotate with a change-description is still checked; o
 
 The gate is a hard fail. Every flagged plan holds deterministically whenever VR is green, and one marker clears it. The 2026-10-01 corpus scan flagged 3 of 1050 plans, all already shipped.
 
+**Glob entries.** To name a file family without listing each member, write one glob entry such as `` `bin/test-automouse-*` (conditional) ``. `bin/lib/plan-scope-conformance` counts every matching path as planned, except a `.claude/` path. Keep a glob entry `(conditional)`, because Phase 5.0's `MISSING-FILE:` check matches entries literally.
+
 ### Phase-count guard — HTML comment mechanism
 
 The orchestrator persists the turn-1 outline into the draft as an HTML comment. The numbered `Phase <N>` or `Step <N>` items in it **fix the plan's phase count for the remainder of the run**. A title that omits the `Phase <N>:`/`Step <N>:` prefix is not counted and silently disables the guard. There is no mid-run outline-revision escape hatch: the count is enforced mechanically by the orchestrator via `bin/check-plan --draft` before Step 5 finalize, and an excess heading is deleted or terminates the run.

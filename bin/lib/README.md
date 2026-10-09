@@ -35,4 +35,5 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `post-review-findings.sh` | Convert a JSON findings array into resolvable inline GitHub review threads or a fallback issue comment; sourced by `/post-plan` Phase 4D, `/pr-review`, and `/security-audit` |
 | `pr-armable.sh` | Shared auto-merge "live hold" predicate for `/post-plan` Phase 6.5 arming conditions; sourced by `bin/pr-triage` and `/post-plan` |
 | `sim-recap-exemplar.txt` | Exemplar sim-recap text used as a style reference by the sim-recap prompt |
+| `tick-guards.sh` | Single-flight PID lock and fail-closed HID idle read shared by `bin/wt-gc-tick` and `bin/wt-sync-tick`; tested by `bin/test-tick-guards` |
 | `wt-guards.sh` | Shared worktree safety guards for scripts that modify or remove worktrees |

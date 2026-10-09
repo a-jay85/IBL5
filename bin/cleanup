@@ -36,6 +36,7 @@ EOF
 fi
 
 source "$(dirname "$0")/lib/wt-guards.sh"
+source "$(dirname "$0")/lib/gh-pr.sh"
 
 # N days ago as YYYY-MM-DD (BSD date first, GNU fallback). Same helper as bin/automouse/run.
 _date_ago() { date -v-"$1"d +%F 2>/dev/null || date -d "$1 days ago" +%F; }
@@ -202,8 +203,10 @@ check_worktree() {
 
     # Check 1: PR state via GitHub CLI (handles squash merges)
     if [ -n "$branch" ] && command -v gh &>/dev/null; then
-        local pr_state
-        pr_state=$(cd "$REPO_ROOT" && gh pr view "$branch" --json state -q .state 2>/dev/null || true)
+        local pr_state pr_num
+        pr_info "$branch" "$REPO_ROOT" || true
+        pr_state="$PR_STATE"
+        pr_num="$PR_NUM"
         if [ "$pr_state" = "MERGED" ]; then
             is_merged=true
         elif [ "$pr_state" = "CLOSED" ]; then
@@ -219,8 +222,6 @@ check_worktree() {
                 return
             fi
         elif [ "$pr_state" = "OPEN" ]; then
-            local pr_num
-            pr_num=$(cd "$REPO_ROOT" && gh pr view "$branch" --json number -q .number 2>/dev/null || true)
             skip_note "$wt_name" "PR #$pr_num still open"
             return
         fi
@@ -487,7 +488,8 @@ if [ "$ALL" = true ]; then
 
         # Check 1: PR state (most authoritative signal)
         if command -v gh &>/dev/null; then
-            bare_pr_state=$(cd "$REPO_ROOT" && gh pr view "$bare_branch" --json state -q .state 2>/dev/null || true)
+            pr_info "$bare_branch" "$REPO_ROOT" || true
+            bare_pr_state="$PR_STATE"
             case "$bare_pr_state" in
                 MERGED)
                     should_delete=true
@@ -498,7 +500,7 @@ if [ "$ALL" = true ]; then
                     delete_reason="PR closed"
                     ;;
                 OPEN)
-                    bare_pr_num=$(cd "$REPO_ROOT" && gh pr view "$bare_branch" --json number -q .number 2>/dev/null || true)
+                    bare_pr_num="$PR_NUM"
                     echo "  SKIP bare branch $bare_branch: PR #$bare_pr_num still open"
                     SKIPPED=$((SKIPPED + 1))
                     continue
@@ -551,9 +553,10 @@ if [ "$ALL" = true ]; then
         if [ "$should_delete" = false ] && command -v gh &>/dev/null \
            && [[ "$bare_branch" =~ ^pr-?([0-9]+) ]]; then
             num_pr="${BASH_REMATCH[1]}"
-            num_pr_state=$(cd "$REPO_ROOT" && gh pr view "$num_pr" --json state -q .state 2>/dev/null || true)
+            pr_info "$num_pr" "$REPO_ROOT" || true
+            num_pr_state="$PR_STATE"
             if [ "$num_pr_state" = "MERGED" ] || [ "$num_pr_state" = "CLOSED" ]; then
-                num_pr_head=$(cd "$REPO_ROOT" && gh pr view "$num_pr" --json headRefOid -q .headRefOid 2>/dev/null || true)
+                num_pr_head="$PR_OID"
                 bare_tip=$(git -C "$REPO_ROOT" rev-parse "$bare_branch" 2>/dev/null || true)
                 if [ -n "$num_pr_head" ] && [ "$num_pr_head" = "$bare_tip" ]; then
                     should_delete=true

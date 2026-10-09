@@ -95,20 +95,21 @@ is_worktree_in_use() {
         END { exit !found }'
 }
 
+# shellcheck source=bin/lib/gh-pr.sh
+source "$(dirname "${BASH_SOURCE[0]}")/gh-pr.sh"
+
 # Check if a branch has an open PR on GitHub.
 # Returns 0 (open PR exists) or 1 (no open PR).
 # Sets WTG_PR_NUM to the PR number if found.
 WTG_PR_NUM=""
+# WTG_PR_NUM is read by callers, not here.
+# shellcheck disable=SC2034
 has_open_pr() {
     local branch="$1"
     WTG_PR_NUM=""
-    if ! command -v gh &>/dev/null; then
-        return 1
-    fi
-    local pr_state
-    pr_state=$(gh pr view "$branch" --json state -q .state 2>/dev/null || true)
-    if [ "$pr_state" = "OPEN" ]; then
-        WTG_PR_NUM=$(gh pr view "$branch" --json number -q .number 2>/dev/null || true)
+    pr_info "$branch" || return 1
+    if [ "$PR_STATE" = "OPEN" ]; then
+        WTG_PR_NUM="$PR_NUM"
         return 0
     fi
     return 1

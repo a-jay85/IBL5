@@ -27,6 +27,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bin/lib/db-helpers.sh"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"
+source "$REPO_ROOT/bin/lib/gh-pr.sh"
 # wt-up manages worktrees FROM the main checkout; every $REPO_ROOT reference below
 # (config.php source, node_modules, --env-file, compose file) must point at main.
 # If invoked from inside a worktree, $0/.. resolves to the worktree — pin it back
@@ -120,7 +121,8 @@ if [ "$USE_PR" = true ]; then
         echo "Error: gh CLI required for --pr flag" >&2
         exit 1
     fi
-    PR_NUMBER=$(cd "$WORKTREE_PATH" && gh pr view --json number -q .number 2>/dev/null || true)
+    pr_info "" "$WORKTREE_PATH" || true
+    PR_NUMBER="$PR_NUM"
     if [ -z "$PR_NUMBER" ]; then
         echo "Error: No PR found for branch in worktree '$WORKTREE_NAME'" >&2
         exit 1

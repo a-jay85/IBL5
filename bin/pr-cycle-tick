@@ -52,6 +52,8 @@ done
 
 # shellcheck source=bin/lib/pr-cycle-watch.sh
 source "$SCRIPT_DIR/lib/pr-cycle-watch.sh"
+# shellcheck source=bin/lib/dm.sh
+source "$SCRIPT_DIR/lib/dm.sh"
 
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*"; }
 
@@ -65,7 +67,7 @@ else
 fi
 STATE="$(pcw_state_dir)" || { echo "pr-cycle-tick: HOME is unset" >&2; exit 2; }
 PR_CYCLE_CMD="${PR_CYCLE_TICK_PR_CYCLE_CMD:-$ROOT/bin/pr-cycle}"
-DM_CMD="${PR_CYCLE_TICK_DM_CMD:-$ROOT/bin/discord-dm}"
+DM_CMD="$(dm_bin "$ROOT/bin" PR_CYCLE_TICK_DM_CMD)"
 
 # shellcheck source=bin/lib/usage-gate.sh
 source "$SCRIPT_DIR/lib/usage-gate.sh"
@@ -128,7 +130,7 @@ strike() {
     if [[ "$n" -eq "$PCW_STRIKE_CAP" ]] && pcw_kind_dm_due "$STATE" strikes "$1" "$2"; then
         # shellcheck disable=SC2059  # the message is a fixed printf template
         msg="$(printf "$STRIKE_MSG" "$1" "${2:0:7}" "$PCW_STRIKE_CAP" "$3" "$4" "$5")"
-        "$DM_CMD" --ping "$msg" || true
+        dm_ping "$msg" || true
         pcw_kind_mark_dm "$STATE" strikes "$1" "$2"
     fi
 }
@@ -153,7 +155,7 @@ settle_row() {
             if pcw_kind_dm_due "$STATE" declined "$pr" "$sha"; then
                 # shellcheck disable=SC2059  # the message is a fixed printf template
                 msg="$(printf "$DECLINED_MSG" "$pr" "${sha:0:7}")"
-                "$DM_CMD" --ping "$msg" || true
+                dm_ping "$msg" || true
                 pcw_kind_mark_dm "$STATE" declined "$pr" "$sha"
             fi ;;
         fired:paused)
@@ -268,7 +270,7 @@ while IFS=$'\t' read -r pr branch sha mstate; do
             if [[ "$DRY_RUN" -eq 1 ]]; then
                 log "would DM: $DM_CMD --ping $msg"
             else
-                "$DM_CMD" --ping "$msg" || true
+                dm_ping "$msg" || true
                 pcw_mark_dm "$STATE" "$pr" "$sha"
             fi
         fi

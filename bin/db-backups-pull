@@ -32,7 +32,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCRIPT_DIR="$REPO_ROOT/bin"
-DISCORD_DM="${DISCORD_DM_BIN:-$SCRIPT_DIR/discord-dm}"
+# shellcheck source=bin/lib/dm.sh
+. "$SCRIPT_DIR/lib/dm.sh"
+DISCORD_DM="$(dm_bin "$SCRIPT_DIR" DISCORD_DM_BIN)"
 RSYNC_BIN="${DB_BACKUPS_PULL_RSYNC_BIN:-rsync}"
 LOCAL_DIR="${IBL5_DB_BACKUP_DIR:-$HOME/Backups/ibl5-db}"
 MAX_AGE_HOURS="${DB_BACKUP_MAX_AGE_HOURS:-36}"
@@ -155,7 +157,7 @@ SSH_CMD="ssh"
 NOW="${DB_BACKUPS_PULL_NOW_EPOCH:-$(date +%s)}"
 
 send_dm() {
-  if printf '%s\n' "$1" | "$DISCORD_DM" --ping --chunk -; then
+  if printf '%s\n' "$1" | DM_CMD="$DISCORD_DM" dm_ping - --chunk; then
     log "DM sent"
   else
     log "WARNING: DM send failed"

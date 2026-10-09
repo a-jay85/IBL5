@@ -70,15 +70,17 @@ fi
 ROOT=$1 SAFE_SLUG=$2 LOG=$3 MSG=$4
 
 SELF=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
+# shellcheck source=bin/lib/dm.sh
+. "$(dirname "$SELF")/lib/dm.sh"
 DELAY=${FAILDM_DELAY:-900}
 REGISTRY=${FAILDM_REGISTRY:-$HOME/.claude/session-registry/active.json}
-DM_CMD=${FAILDM_DM_CMD:-$ROOT/bin/discord-dm}
+DM_CMD=$(dm_bin "$ROOT/bin" FAILDM_DM_CMD)
 LAUNCHCTL=${FAILDM_LAUNCHCTL:-launchctl}
 PLIST_DIR=${FAILDM_PLIST_DIR:-$HOME/Library/LaunchAgents}
 LOG_DIR=${FAILDM_LOG_DIR:-$(dirname "$LOG")}
 
 send_dm() {
-    "$DM_CMD" --ping --quiet --attempts 2 "$1" >/dev/null 2>&1 || true
+    dm_ping "$1" --quiet --attempts 2 >/dev/null 2>&1 || true
 }
 
 # Prints 1 when a live session's repo is $ROOT, else nothing.

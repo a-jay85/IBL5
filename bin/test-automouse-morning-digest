@@ -22,6 +22,19 @@ chmod +x "$BINSTUB/discord-dm"
 # `gh pr list --jq ... @tsv` output looks is all the digest reads.
 printf '#!/bin/sh\nprintf "plan-a\\thttps://github.com/o/r/pull/7\\n"\n' > "$BINSTUB/gh"
 chmod +x "$BINSTUB/gh"
+# pr-triage stub: the real `bin/pr-triage --held` makes several gh calls per open PR
+# and takes minutes, so no row may reach it. The stub is fixture-driven through
+# files under $TMP (held-out = stdout, held-rc = exit code, held-sleep = seconds to
+# sleep first) and logs every call to held-calls.log.
+printf '%s\n' '#!/bin/sh' \
+  "echo \"HELD \$*\" >> \"$TMP/held-calls.log\"" \
+  '[ "$1" = "--held" ] || { echo "stub: expected --held, got $*" >&2; exit 64; }' \
+  "[ -f \"$TMP/held-sleep\" ] && sleep \"\$(cat \"$TMP/held-sleep\")\"" \
+  "[ -f \"$TMP/held-out\" ] && cat \"$TMP/held-out\"" \
+  "exit \"\$(cat \"$TMP/held-rc\" 2>/dev/null || echo 0)\"" > "$BINSTUB/pr-triage"
+chmod +x "$BINSTUB/pr-triage"
+export MORNING_DIGEST_PR_TRIAGE="$BINSTUB/pr-triage"
+held_reset() { rm -f "$TMP/held-out" "$TMP/held-rc" "$TMP/held-sleep" "$TMP/held-calls.log"; }
 run_digest() { NIGHTLY_DIR="$NDIR" DISCORD_DM_BIN="$BINSTUB/discord-dm" MORNING_DIGEST_GH="$BINSTUB/gh" "$SCRIPT" "$@"; }
 
 TODAY="$(date +%F)"
@@ -335,4 +348,139 @@ plist_value() { printf '%s\n' "$2" | awk -v k="<key>$1</key>" '$0 ~ k {getline; 
 assert_contains "row24: StandardOutPath"   "<string>${EXPECT_LOG_DIR}/morning-digest-stdout.log</string>" "$(plist_value StandardOutPath "$out24")"
 assert_contains "row24: StandardErrorPath" "<string>${EXPECT_LOG_DIR}/morning-digest-stderr.log</string>" "$(plist_value StandardErrorPath "$out24")"
 h_pass "row24 — StandardOutPath/StandardErrorPath under LOG_DIR"
+# --- row25: Held PRs bullets in both body shapes ---
+# Report rows follow hp_format_line in bin/lib/held-prs.sh: "#<num>  <url>  <title>
+# <reasons>" with two-space columns. The header row and the `hint:` tail must not
+# become bullets. Row #15 has a two-space run inside its title.
+held_reset
+printf '%s\n' \
+  'PR  URL  TITLE  REASONS' \
+  '#12  https://github.com/o/r/pull/12  Fix thing  needs review; CI red' \
+  '#15  https://github.com/o/r/pull/15  Two  spaces title  sticky hold' \
+  'hint: gh run rerun 99  # x was CANCELLED on PR #12' > "$TMP/held-out"
+mk_fixture_123
+body25a=$(run_digest --dry-run)
+setup
+body25b=$(run_digest --dry-run)
+assert_contains "row25: zero-run body is the no-plans shape" "no plans ran last night" "$body25b"
+for shape in a b; do
+  case "$shape" in a) b25="$body25a" ;; b) b25="$body25b" ;; esac
+  assert_contains     "row25$shape: Held PRs (2) header"      "Held PRs (2)" "$b25"
+  assert_contains     "row25$shape: row 12 bullet"            "• #12 Fix thing: needs review; CI red <https://github.com/o/r/pull/12>" "$b25"
+  assert_contains     "row25$shape: row 15 two-space title"   "• #15 Two  spaces title: sticky hold <https://github.com/o/r/pull/15>" "$b25"
+  assert_not_contains "row25$shape: no hint line"             "hint:" "$b25"
+  assert_not_contains "row25$shape: no report header row"     "PR  URL" "$b25"
+done
+pre_spend=${body25a%%Spend:*}
+pre_held=${body25a%%Held PRs (2)*}
+[ "${#pre_held}" -gt "${#pre_spend}" ] || { h_fail "row25" "Held PRs (2) is not after the Spend: line (offsets ${#pre_held} vs ${#pre_spend})"; }
+h_pass "row25 — Held PRs bullets in both body shapes"
+# --- row26: zero held PRs ---
+held_reset
+: > "$TMP/held-out"
+mk_fixture_123
+body=$(run_digest --dry-run)
+assert_contains     "row26: Held PRs: none"     "Held PRs: none" "$body"
+assert_not_contains "row26: no Held PRs count"  "Held PRs (" "$body"
+h_pass "row26 — zero held PRs"
+# --- row27: pr-triage failure renders unavailable, no bullet, digest exits 0 ---
+held_reset
+printf '%s\n' '#12  https://github.com/o/r/pull/12  Fix thing  needs review' > "$TMP/held-out"
+printf '2' > "$TMP/held-rc"
+mk_fixture_123
+body=$(run_digest --dry-run)
+status=$?
+[ $status -eq 0 ] || { h_fail "row27" "digest exit status $status, want 0"; }
+assert_contains     "row27: unavailable with exit code" "Held PRs: unavailable (pr-triage exit 2)" "$body"
+assert_not_contains "row27: no bullet despite stdout row" "• #" "$body"
+h_pass "row27 — pr-triage failure"
+# --- row28: wall-clock cap ---
+held_reset
+printf '%s\n' '#12  https://github.com/o/r/pull/12  Fix thing  needs review' > "$TMP/held-out"
+printf '30' > "$TMP/held-sleep"
+mk_fixture_123
+t0=$SECONDS
+body=$(MORNING_DIGEST_HELD_TIMEOUT=1 run_digest --dry-run)
+elapsed=$((SECONDS - t0))
+assert_contains     "row28: timed out after 1s" "Held PRs: unavailable (timed out after 1s)" "$body"
+assert_not_contains "row28: no bullet"          "• #" "$body"
+[ "$elapsed" -lt 15 ] || { h_fail "row28" "took ${elapsed}s, the 1s cap should end a 30s stub in well under 15s"; }
+h_pass "row28 — wall-clock cap"
+# --- row29: byte budget and hidden count ---
+held_reset
+title90=$(printf 'T%.0s' $(seq 1 90))
+i=1
+: > "$TMP/held-out"
+while [ "$i" -le 60 ]; do
+  printf '#%s  https://github.com/o/r/pull/%s  %s  needs review\n' "$i" "$i" "$title90" >> "$TMP/held-out"
+  i=$((i + 1))
+done
+mk_fixture_123
+body=$(run_digest --dry-run)
+bytes=$(printf '%s' "$body" | LC_ALL=C wc -c | tr -d ' ')
+[ "$bytes" -le 1900 ] || { h_fail "row29" "body is $bytes bytes, budget is 1900"; }
+shown=$(printf '%s\n' "$body" | grep -c '^• #' || true)
+[ "$shown" -ge 1 ] || { h_fail "row29" "no bullet shown under the budget"; }
+assert_contains "row29: hidden count" "…and $((60 - shown)) more (bin/pr-triage --held)" "$body"
+assert_contains "row29: header counts every row" "Held PRs (60)" "$body"
+# Boundary: 3 short rows all fit and no "…and" line appears.
+held_reset
+printf '%s\n' \
+  '#1  https://github.com/o/r/pull/1  One  r1' \
+  '#2  https://github.com/o/r/pull/2  Two  r2' \
+  '#3  https://github.com/o/r/pull/3  Three  r3' > "$TMP/held-out"
+body=$(run_digest --dry-run)
+assert_not_contains "row29: no …and line for 3 rows" "…and" "$body"
+assert_contains     "row29: bullet 1" "• #1 One: r1 <https://github.com/o/r/pull/1>" "$body"
+assert_contains     "row29: bullet 2" "• #2 Two: r2 <https://github.com/o/r/pull/2>" "$body"
+assert_contains     "row29: bullet 3" "• #3 Three: r3 <https://github.com/o/r/pull/3>" "$body"
+h_pass "row29 — byte budget and hidden count"
+# --- row30: MORNING_DIGEST_PR_TRIAGE unset and empty both select the default ---
+# A sandbox repo makes the default $REPO_ROOT/bin/pr-triage resolve to the stub,
+# never the real script.
+rm -rf "$TMP/repo"
+mkdir -p "$TMP/repo/bin/automouse"
+cp "$SCRIPT" "$TMP/repo/bin/automouse/morning-digest"
+ln -s "$SCRIPT_DIR/lib" "$TMP/repo/bin/lib"
+cp "$BINSTUB/pr-triage" "$TMP/repo/bin/pr-triage"
+SANDBOX_DIGEST="$TMP/repo/bin/automouse/morning-digest"
+held_reset
+mk_fixture_123
+body=$(env -u MORNING_DIGEST_PR_TRIAGE NIGHTLY_DIR="$NDIR" DISCORD_DM_BIN="$BINSTUB/discord-dm" MORNING_DIGEST_GH="$BINSTUB/gh" "$SANDBOX_DIGEST" --dry-run)
+assert_contains "row30: unset renders none" "Held PRs: none" "$body"
+[ "$(cat "$TMP/held-calls.log" 2>/dev/null)" = "HELD --held" ] || { h_fail "row30" "unset: want exactly one 'HELD --held' call, got: $(cat "$TMP/held-calls.log" 2>/dev/null)"; }
+held_reset
+body=$(MORNING_DIGEST_PR_TRIAGE="" NIGHTLY_DIR="$NDIR" DISCORD_DM_BIN="$BINSTUB/discord-dm" MORNING_DIGEST_GH="$BINSTUB/gh" "$SANDBOX_DIGEST" --dry-run)
+assert_contains "row30: empty renders none" "Held PRs: none" "$body"
+[ "$(cat "$TMP/held-calls.log" 2>/dev/null)" = "HELD --held" ] || { h_fail "row30" "empty: want exactly one 'HELD --held' call, got: $(cat "$TMP/held-calls.log" 2>/dev/null)"; }
+h_pass "row30 — MORNING_DIGEST_PR_TRIAGE unset and empty"
+# --- row31: MORNING_DIGEST_HELD_TIMEOUT unset, empty, 0 and non-numeric all select 600 ---
+held_reset
+printf '%s\n' '#12  https://github.com/o/r/pull/12  Fix thing  needs review' > "$TMP/held-out"
+printf '2' > "$TMP/held-sleep"
+mk_fixture_123
+body=$(env -u MORNING_DIGEST_HELD_TIMEOUT NIGHTLY_DIR="$NDIR" DISCORD_DM_BIN="$BINSTUB/discord-dm" MORNING_DIGEST_GH="$BINSTUB/gh" "$SCRIPT" --dry-run)
+assert_contains     "row31 unset: bullet rendered" "• #12" "$body"
+assert_not_contains "row31 unset: no timeout"      "timed out" "$body"
+for tv in "" 0 abc; do
+  body=$(MORNING_DIGEST_HELD_TIMEOUT="$tv" run_digest --dry-run)
+  assert_contains     "row31 [$tv]: bullet rendered" "• #12" "$body"
+  assert_not_contains "row31 [$tv]: no timeout"      "timed out" "$body"
+done
+h_pass "row31 — MORNING_DIGEST_HELD_TIMEOUT unset, empty, 0 and non-numeric"
+# --- row32: call shape and no send under --dry-run ---
+held_reset
+printf '%s\n' '#12  https://github.com/o/r/pull/12  Fix thing  needs review' > "$TMP/held-out"
+rm -f "$TMP/dm-calls.log"
+mk_fixture_123
+body=$(run_digest --dry-run)
+assert_not_contains "row32: stub accepted --held" "unavailable" "$body"
+[ "$(cat "$TMP/held-calls.log" 2>/dev/null)" = "HELD --held" ] || { h_fail "row32" "want exactly one 'HELD --held' call, got: $(cat "$TMP/held-calls.log" 2>/dev/null)"; }
+[ ! -f "$TMP/dm-calls.log" ] || { h_fail "row32" "dm-calls.log should not exist after --dry-run"; }
+run_digest > /dev/null 2>&1
+status=$?
+[ $status -eq 0 ] || { h_fail "row32" "real-mode exit status $status"; }
+[ "$(grep -c '^CALLED' "$TMP/dm-calls.log" 2>/dev/null)" = 1 ] || { h_fail "row32" "want exactly one CALLED line, got: $(cat "$TMP/dm-calls.log" 2>/dev/null)"; }
+assert_contains "row32: real send passes --chunk" "--chunk" "$(cat "$TMP/dm-calls.log" 2>/dev/null)"
+h_pass "row32 — call shape and no send"
 h_done

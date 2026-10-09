@@ -124,7 +124,7 @@ class PlayerSearchRepository extends BaseMysqliRepository implements PlayerSearc
             FROM `ibl_plr`
             LEFT JOIN `ibl_team_info` ON `ibl_plr`.`teamid` = `ibl_team_info`.`teamid`
             WHERE " . $whereClause . "
-            ORDER BY `ibl_plr`.`retired` ASC, `ibl_plr`.`ordinal` ASC";
+            ORDER BY `ibl_plr`.`retired` ASC, `ibl_plr`.`ordinal` ASC, `ibl_plr`.`pid` ASC";
 
         $stmt = $this->executeQuery($query, $qc->getTypes(), ...$qc->getParams());
         $result = $stmt->get_result();

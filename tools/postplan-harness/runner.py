@@ -332,6 +332,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                         f"{', '.join(conflict_files)}; resolver would refuse: {refusal}")
                 log("phase2: LLM resolver active -- probe is advisory, falling through to rebase_onto()")
 
+        if _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, log):
+            return _finish(res, out_dir)
+
         copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)
         summary, stripped = strip_manual_testing_section(copy["summary_md"])
         if stripped:
@@ -2598,7 +2601,7 @@ def exit_code_for(res: RunResult) -> int:
         same wall immediately. All four are deterministic walls the ~1M-token skill
         re-run cannot climb.
     1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
-    0 = shipped (armed or held), nothing to ship, or degraded.
+    0 = shipped (armed or held), nothing to ship, degraded, or hold-repeat declined.
     There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm.
     usage-pause maps to 75; main() downgrades it to 3 when the marker is gone."""
     if res.terminal == TerminalState.FAILED and res.error_kind == "usage-pause":
@@ -2870,6 +2873,48 @@ def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> 
         pass
 
 
+def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, log) -> bool:
+    """Decline before any LLM call when condition 3's MISSING set repeats the prior hold.
+
+    True means `res` now carries the HOLD_REPEAT_DECLINED terminal and the caller
+    returns. Fail-open: any exception, POSTPLAN_FORCE=1, no plan, or no matching
+    record returns False and the run proceeds. Never touches res.pr_number or res.arm.
+    """
+    if os.environ.get("POSTPLAN_FORCE") == "1":
+        log("phase2 early hold-repeat: skipped (POSTPLAN_FORCE=1)")
+        return False
+    if not (live or state_dir is not None) or not (plan and plan.found):
+        return False
+    try:
+        hr_dir = _state_dir(out_dir, live, state_dir)
+        items = conformance.early_missing_items(plan, conf_files)
+        reason = holdrepeat.early_repeat_reason(hr_dir, slug, items)
+        if reason is None:
+            log(f"phase2 early hold-repeat: proceed ({len(items)} MISSING item(s))")
+            return False
+        rec = holdrepeat.load_record(hr_dir, slug) or {}
+        key = rec.get("structural_key") or ""
+        dm_sent = False
+        if key and rec.get("dm_sent_key") != key:
+            dm_sent = _dm(f"post-plan declined before spending tokens: {slug}\n"
+                          f"Same hold as last run: {reason}\n"
+                          "Fix the missing files, or re-fire with:\n"
+                          "  bin/post-plan-now --force")
+            if dm_sent:
+                holdrepeat.mark_dm_sent(hr_dir, slug, key)
+        res.terminal = TerminalState.HOLD_REPEAT_DECLINED
+        res.hold_repeat = {"early_decline": True, "reason": reason,
+                           "structural_key": key,
+                           "repeat_count": rec.get("repeat_count") or 0,
+                           "dm_sent": dm_sent}
+        log(f"phase2 early hold-repeat: DECLINED, same MISSING set as last hold "
+            f"({reason}) dm={'sent' if dm_sent else 'skipped'}")
+        return True
+    except Exception as exc:  # fail-open: a bug here must only cost tokens
+        log(f"phase2 early hold-repeat: skipped ({exc})")
+        return False
+
+
 def _record_hold_repeat(res, decision, slug, worktree, state_dir, log) -> dict | None:
     """Advisory only: never raises, never reads or writes res.arm."""
     try:
@@ -2895,14 +2940,8 @@ def _record_hold_repeat(res, decision, slug, worktree, state_dir, log) -> dict |
         return None
 
 
-def _send_hold_repeat_dm(slug, pr, obs) -> bool:
-    """DM the operator once per repeated structural hold. True only on exit 0."""
-    reasons = "; ".join(f"({n}) {reason}" for n, _name, reason in obs.reasons)
-    msg = (f"post-plan held twice on the same reason: {slug} PR #{pr if pr else 'none'}\n"
-           f"Repeated hold (run {obs.repeat_count}): {reasons}\n"
-           "The next re-run with the same plan, diff, and harness will be declined\n"
-           "before it spends tokens. Fix the reason, or re-fire with:\n"
-           "  bin/post-plan-now --force")
+def _dm(msg: str) -> bool:
+    """Send one operator DM. True only on exit 0. HOLDREPEAT_DM_CMD overrides the command."""
     repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     dm_cmd = os.environ.get("HOLDREPEAT_DM_CMD") or os.path.join(repo_root, "bin", "discord-dm")
     try:
@@ -2911,6 +2950,17 @@ def _send_hold_repeat_dm(slug, pr, obs) -> bool:
     except (OSError, subprocess.SubprocessError):
         return False
     return proc.returncode == 0
+
+
+def _send_hold_repeat_dm(slug, pr, obs) -> bool:
+    """DM the operator once per repeated structural hold. True only on exit 0."""
+    reasons = "; ".join(f"({n}) {reason}" for n, _name, reason in obs.reasons)
+    msg = (f"post-plan held twice on the same reason: {slug} PR #{pr if pr else 'none'}\n"
+           f"Repeated hold (run {obs.repeat_count}): {reasons}\n"
+           "The next re-run with the same plan, diff, and harness will be declined\n"
+           "before it spends tokens. Fix the reason, or re-fire with:\n"
+           "  bin/post-plan-now --force")
+    return _dm(msg)
 
 
 def _hold_repeat_note(res: RunResult) -> str:
@@ -3077,6 +3127,11 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
     if res.terminal == TerminalState.NOTHING_TO_SHIP:
         return ("RESULT: post-plan complete — nothing to ship "
                 "(clean tree, empty diff vs master); no PR opened.")
+    if res.terminal == TerminalState.HOLD_REPEAT_DECLINED:
+        reason = _flat((res.hold_repeat or {}).get("reason") or "") or "unknown"
+        return ("RESULT: post-plan DECLINED — terminal=hold-repeat-declined; "
+                f"declined: same hold as last run ({reason}), no tokens spent. "
+                "Fix the missing files or re-run bin/post-plan-now --force.")
 
     armed = "armed" if (res.arm and res.arm.armed) else "HELD (human merges)"
     tail = ""

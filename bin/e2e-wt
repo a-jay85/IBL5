@@ -49,7 +49,9 @@ REPO_ROOT="$(main_checkout_root "$(dirname "$0")/..")" || {
     echo "ERROR: cannot locate main checkout" >&2
     exit 1
 }
+source "$REPO_ROOT/bin/lib/db-helpers.sh"
 source "$REPO_ROOT/bin/lib/gh-pr.sh"
+source "$REPO_ROOT/bin/lib/wt-compose.sh"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 
 # --- Parse arguments ---
@@ -84,20 +86,22 @@ fi
 
 # --- Detect slug (plain name or pr-NNN) ---
 # wt-up uses the worktree name as slug by default, or pr-NNN with --pr flag.
-# Sanitize slug: Docker project names can't contain slashes.
-# Try both and use whichever has running containers.
-SANITIZED_NAME="${WORKTREE_NAME//\//-}"
+# Probe which slug has live containers: the flattened name first, then
+# pr-<N>. The raw name is never probed: container names cannot hold "/",
+# and without one it equals the flattened name.
+SANITIZED_NAME="$(wt_slug "$WORKTREE_NAME")"
 SLUG=""
 if docker ps --format '{{.Names}}' | grep -q "^ibl5-php-${SANITIZED_NAME}$"; then
     SLUG="$SANITIZED_NAME"
-elif docker ps --format '{{.Names}}' | grep -q "^ibl5-php-${WORKTREE_NAME}$"; then
-    SLUG="$WORKTREE_NAME"
 else
     # Check for --pr slug by looking up the PR number for this worktree's branch
     pr_info "" "$WORKTREE_PATH" || true
     PR_NUMBER="$PR_NUM"
-    if [ -n "$PR_NUMBER" ] && docker ps --format '{{.Names}}' | grep -q "^ibl5-php-pr-${PR_NUMBER}$"; then
-        SLUG="pr-$PR_NUMBER"
+    if [ -n "$PR_NUMBER" ]; then
+        PR_SLUG="$(wt_slug "$WORKTREE_NAME" "$PR_NUMBER")"
+        if docker ps --format '{{.Names}}' | grep -q "^ibl5-php-${PR_SLUG}$"; then
+            SLUG="$PR_SLUG"
+        fi
     fi
 fi
 
@@ -135,8 +139,9 @@ docker exec \
     -e "E2E_USER=$IBL_TEST_USER" \
     -e "E2E_PASS=$IBL_TEST_PASS" \
     -e "E2E_DB_HOST=db" \
+    -e "E2E_DB_NAME=$DB_DEFAULT_NAME" \
     "$PHP_CONTAINER" php -r '
-$db = new mysqli(getenv("E2E_DB_HOST"), "root", "root", "iblhoops_ibl5");
+$db = new mysqli(getenv("E2E_DB_HOST"), "root", "root", getenv("E2E_DB_NAME"));
 if ($db->connect_error) { fwrite(STDERR, "DB connection failed: " . $db->connect_error . "\n"); exit(1); }
 
 $user = getenv("E2E_USER");

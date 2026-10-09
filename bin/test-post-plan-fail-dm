@@ -11,7 +11,7 @@
 #   6. Held job, newer log for the branch: no DM.
 #   7. Held job, no newer log: DM, prefixed so you know nobody re-ran it.
 #   8. Held job, newer log for a longer branch name ("foo-bar" vs "foo"): still DMs.
-#   9. Static: every DM_CMD invocation passes --ping.
+#   9. Static: every DM goes through dm_ping, which passes --ping.
 #  10. Live headless session (argv has -p) in the worktree: DM now, no job.
 #  11. Live headless session (argv has --print): DM now, no job.
 #  12. Live interactive session whose argv only contains "-p" inside other tokens: DM held.
@@ -155,12 +155,13 @@ reset; touch -t 202609261800 "$LOG.faildm-stamp"
 run --deferred
 [ "$(dm_count)" = 1 ] && ok "8 other branch log ignored" || fail "8 other branch log ignored"
 
-# Static: every DM_CMD invocation line (line-leading, so the env-forwarding line is skipped) pings.
-_inv=$(grep -c '^ *"$DM_CMD"' "$SUT")
-_ping=$(grep -c '^ *"$DM_CMD" --ping' "$SUT")
-[ "$_inv" -ge 1 ] && [ "$_inv" = "$_ping" ] \
-    && ok "9 every DM_CMD call passes --ping ($_ping of $_inv)" \
-    || fail "9 DM_CMD calls without --ping ($_ping of $_inv)"
+# Static: the SUT sends only through dm_ping, and dm_ping always passes --ping.
+_bare=$(grep -c '^ *"$DM_CMD"' "$SUT")
+_via=$(grep -c '^ *dm_ping "$1" --quiet --attempts 2' "$SUT")
+_lib=$(grep -cF '"$DM_CMD" --ping "$@" "$msg"' "$(dirname "$SUT")/lib/dm.sh")
+[ "$_bare" = 0 ] && [ "$_via" -ge 1 ] && [ "$_lib" = 1 ] \
+    && ok "9 every DM goes through dm_ping, which passes --ping" \
+    || fail "9 DM path: bare=$_bare via-dm_ping=$_via lib-ping=$_lib"
 
 spawn_stub -p hello;      HP=$STUB_PID
 spawn_stub --print hello; HPRINT=$STUB_PID

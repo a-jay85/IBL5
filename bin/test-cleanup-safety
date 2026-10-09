@@ -1083,6 +1083,25 @@ if [ "$gwp_rc" -eq 0 ] && [ "$gwp_out" = "/tmp/gwp-first" ]; then
 else
     failcase "get-worktree-path-no-sigpipe (rc=$gwp_rc out=$gwp_out)"
 fi
+
+# Same class in bin/cleanup's own readers. A 141 here killed every wt-gc
+# sweep, so merged worktrees and their Docker stacks piled up.
+gbw_fn="$(sed -n '/^get_branch_for_worktree()/,/^}/p' "$CLEANUP")"
+gbw_rc=0
+gbw_out="$(PATH="$gwp_bin:$PATH" bash -c \
+    'set -euo pipefail; REPO_ROOT=/tmp; eval "$1"; get_branch_for_worktree /tmp/gwp-first' \
+    _ "$gbw_fn")" || gbw_rc=$?
+if [ "$gbw_rc" -eq 0 ] && [ "$gbw_out" = "gwp-target" ]; then
+    pass "get-branch-for-worktree-no-sigpipe"
+else
+    failcase "get-branch-for-worktree-no-sigpipe (rc=$gbw_rc out=$gbw_out)"
+fi
+if grep -A8 -- 'worktree list --porcelain' "$CLEANUP" \
+    | grep -qE '^[[:space:]]*exit[[:space:]]*$|;[[:space:]]*exit[[:space:]]*\}'; then
+    failcase "cleanup-worktree-list-awk-no-early-exit"
+else
+    pass "cleanup-worktree-list-awk-no-early-exit"
+fi
 rm -rf "$gwp_bin"
 
 # ----------------------------------------------------------------------------

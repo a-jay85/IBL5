@@ -117,6 +117,25 @@ export async function setPlayerName(
   return body.previous;
 }
 
+export async function setDraftPickNotes(
+  request: APIRequestContext,
+  year: number,
+  round: number,
+  teampick: string,
+  notes: string,
+): Promise<string> {
+  const response = await request.delete(
+    `test-state.php?action=set-draft-pick-notes&year=${year}&round=${round}&teampick=${encodeURIComponent(teampick)}&notes=${encodeURIComponent(notes)}`,
+  );
+  if (!response.ok()) {
+    throw new Error(
+      `test-state.php set-draft-pick-notes failed: ${response.status()} ${await response.text()}`,
+    );
+  }
+  const body = (await response.json()) as { previous: string };
+  return body.previous;
+}
+
 export interface TeamVoteStatus {
   asg_vote: string;
   eoy_vote: string;

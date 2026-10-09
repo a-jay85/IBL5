@@ -30,6 +30,7 @@
 #
 # It also covers the --pr base-ref seam of bin/check-e2e-hygiene (identical
 # E2E_HYGIENE_BASE_REF / PHPUNIT_HYGIENE_BASE_REF contract) via run_seam_case.
+# It also pins bin/check-hot-files' scope and arg parsing (section "hot-files").
 #
 # Run: bin/test-check-phpunit-hygiene  (exit 0 = all pass, 1 = a case failed)
 
@@ -38,6 +39,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HYGIENE="$SCRIPT_DIR/check-phpunit-hygiene"
 E2E_HYGIENE="$SCRIPT_DIR/check-e2e-hygiene"
+HOT="$SCRIPT_DIR/check-hot-files"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP" 2>/dev/null' EXIT
 
@@ -273,6 +275,88 @@ run_seam_case "e2e-seam-empty-defaults-origin-master" "$E2E_HYGIENE" "$EV" empty
 run_seam_case "e2e-seam-base-flags"                   "$E2E_HYGIENE" "$EV" base  1 'skip' "$EF" "$SEAM_TS"
 run_seam_case "e2e-seam-head-excludes-file"           "$E2E_HYGIENE" "$EV" head  0 '-' "$EF" "$SEAM_TS"
 run_seam_case "e2e-seam-bogus-ref-exit2"              "$E2E_HYGIENE" "$EV" bogus 2 'does not resolve to a commit' "$EF" "$SEAM_TS"
+
+# === hot-files: scope + arg parsing (bin/check-hot-files) ===
+# Pins the --pr crossing logic, the unvalidated HOT_FILE_BASE_REF, lenient arg
+# parsing and --help. Every case runs with HOT_FILE_THRESHOLD=5; "N lines" is `seq N`.
+
+# mk_hot_repo <base-lines (0 = absent at base)> <head-lines> <relpath>
+# Commits the base state, then leaves the head state uncommitted. A file absent
+# at base is added with `git add -N` so the diff lists it.
+mk_hot_repo() {
+    local base="$1" head="$2" rel="$3" d
+    d="$(mk_repo)"
+    mkdir -p "$d/ibl5/classes/Sub"
+    : > "$d/ibl5/classes/.keep"
+    if [ "$base" -gt 0 ]; then
+        seq "$base" > "$d/$rel"
+    fi
+    git -C "$d" add -A >/dev/null 2>&1
+    git -C "$d" commit -q -m base >/dev/null 2>&1
+    seq "$head" > "$d/$rel"
+    if [ "$base" -eq 0 ]; then
+        git -C "$d" add -N "$rel" >/dev/null 2>&1
+    fi
+    echo "$d"
+}
+
+# hot_case <name> <want-exit> <want-regex|-> <absent-regex|-> <dir> <env-assigns/cmd...>
+# Runs from <dir> with HOT_FILE_BASE_REF unset and the threshold at 5, stdout and
+# stderr combined. The trailing words are `env` arguments: assignments, then the gate.
+hot_case() {
+    local name="$1" want="$2" want_re="$3" absent_re="$4" d="$5" out rc
+    shift 5
+    out="$( ( cd "$d" && env -u HOT_FILE_BASE_REF HOT_FILE_THRESHOLD=5 "$@" ) 2>&1 )"
+    rc=$?
+    if [ "$rc" -ne "$want" ]; then
+        failcase "$name — expected exit $want, got $rc"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        return
+    fi
+    if [ "$want_re" != "-" ] && ! grep -qE -- "$want_re" <<< "$out"; then
+        failcase "$name — output did not match: $want_re"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        return
+    fi
+    if [ "$absent_re" != "-" ] && grep -qE -- "$absent_re" <<< "$out"; then
+        failcase "$name — output unexpectedly matched: $absent_re"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        return
+    fi
+    pass "$name (exit $rc)"
+}
+
+HOT_HEADER='^=== Hot files \(> 5 LOC\) ===$'
+HOT_FOO="ibl5/classes/Foo.php"
+
+d="$(mk_hot_repo 3 10 "$HOT_FOO")"
+hot_case hot-pr-crossing-exit0 0 \
+    '^CROSSED: ibl5/classes/Foo\.php \(now 10 LOC, was 3 at base\)$' - \
+    "$d" HOT_FILE_BASE_REF=HEAD "$HOT" --pr
+
+d="$(mk_hot_repo 0 10 ibl5/classes/Sub/Bar.php)"
+hot_case hot-pr-nested-new-file-crossing 0 \
+    '^CROSSED: ibl5/classes/Sub/Bar\.php \(now 10 LOC, was 0 at base\)$' - \
+    "$d" HOT_FILE_BASE_REF=HEAD "$HOT" --pr
+
+d="$(mk_hot_repo 10 12 "$HOT_FOO")"
+hot_case hot-pr-chronic-no-crossing-exit1 1 "$HOT_HEADER" 'CROSSED' \
+    "$d" HOT_FILE_BASE_REF=HEAD "$HOT" --pr
+
+d="$(mk_hot_repo 3 10 "$HOT_FOO")"
+hot_case hot-full-mode-lists-exit0 0 "$HOT_HEADER" 'CROSSED' "$d" "$HOT"
+hot_case hot-full-mode-lists-foo 0 'Foo\.php' 'CROSSED' "$d" "$HOT"
+
+# The fixture has no origin/master, so the unvalidated default yields an empty
+# crossing list (exit 1) with git's own noise and never the exit-2 guard.
+hot_case hot-env-unset-default-not-validated 1 - 'does not resolve' "$d" "$HOT" --pr
+hot_case hot-env-empty-defaults 1 - 'does not resolve' "$d" HOT_FILE_BASE_REF= "$HOT" --pr
+hot_case hot-env-bogus-exit1-not-2 1 - 'does not resolve' "$d" HOT_FILE_BASE_REF=nosuchref "$HOT" --pr
+
+hot_case hot-unknown-arg-ignored 0 "$HOT_HEADER" - "$d" "$HOT" --bogus
+hot_case hot-help-exit0 0 '^Usage: bin/check-hot-files \[--pr\]' - "$d" "$HOT" --help
+mkdir -p "$TMP/nogit"
+hot_case hot-help-outside-git-exit0 0 '^Usage: bin/check-hot-files \[--pr\]' - "$TMP/nogit" "$HOT" --help
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

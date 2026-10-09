@@ -152,6 +152,7 @@ PR_CYCLE_SKIP_READY_WHEN_ARMABLE="${PR_CYCLE_SKIP_READY_WHEN_ARMABLE:-1}"
 PR_CYCLE_STOP_FILE="${PR_CYCLE_STOP_FILE:-$HOME/.ibl5-pr-cycle.stop}"
 # Machine-readable per-PR result file written by the worker. Unset or empty writes nothing.
 PR_CYCLE_RESULT_FILE="${PR_CYCLE_RESULT_FILE:-}"
+PR_CYCLE_SKIP_NOTES="${PR_CYCLE_SKIP_NOTES:-}"
 PR_CYCLE_DRY_LAUNCH="${PR_CYCLE_DRY_LAUNCH:-}"
 PR_CYCLE_AUTH_PROBE_CMD="${PR_CYCLE_AUTH_PROBE_CMD:-}"
 PR_CYCLE_PATCH_ID_CMD="${PR_CYCLE_PATCH_ID_CMD:-}"
@@ -1164,6 +1165,68 @@ _bucket_emoji() {
     esac
 }
 
+# _build_skip_notes — merge this run's stage1-skipped.txt reasons with the tick's
+# PR_CYCLE_SKIP_NOTES file into $RUNDIR/skip-notes.tsv as "<pr>\t<rank>\t<reason>".
+# First reason per PR wins (pr-cycle's own before the tick's). PRs armed or fired this
+# run are dropped. Sorted by rank, then PR number; the rank is the DM truncation order.
+# PR_CYCLE_SKIP_NOTES unset, empty, or naming a missing file all mean "no tick notes".
+_build_skip_notes() {
+    {
+        if [ -f "$RUNDIR/stage1-skipped.txt" ]; then
+            while IFS= read -r _bs_l; do
+                case "$_bs_l" in '#'[0-9]*' — '*) ;; *) continue ;; esac
+                _bs_n="${_bs_l%% — *}"
+                _bs_r="${_bs_l#* — }"
+                printf '%s\t%s\n' "${_bs_n#\#}" "${_bs_r%, skipping}"
+            done < "$RUNDIR/stage1-skipped.txt"
+        fi
+        if [ -n "${PR_CYCLE_SKIP_NOTES:-}" ] && [ -f "$PR_CYCLE_SKIP_NOTES" ]; then
+            grep -E '^[0-9]+	' "$PR_CYCLE_SKIP_NOTES" || true
+        fi
+    } | awk -F'\t' -v armed="$RUNDIR/armed.txt" -v fired="$RUNDIR/stage1.txt" '
+        BEGIN { while ((getline l < armed) > 0) drop[l] = 1
+                while ((getline l < fired) > 0) drop[l] = 1 }
+        ($1 in drop) || ($1 in seen) { next }
+        { seen[$1] = 1; r = $2
+          rank = (r ~ /^stacked on/) ? 1 : (r ~ /^over /) ? 2 \
+               : (r ~ /holdrepeat|retry cap|no-op rescue cap|held it for/) ? 3 \
+               : (r ~ /^checks |^draft$/) ? 5 : 4
+          printf "%s\t%d\t%s\n", $1, rank, r }' \
+    | sort -t "$(printf '\t')" -k2,2n -k1,1n > "$RUNDIR/skip-notes.tsv" \
+    || : > "$RUNDIR/skip-notes.tsv"
+}
+
+# _skip_note_lines USED [EXCLUDE] — print "**Skipped (K)**" and one "- #N — reason" row
+# per skip-notes.tsv line whose PR is not listed in EXCLUDE (your-turn rows carry their
+# own reason). Shares the your-turn 1700-char budget: USED is what is already printed.
+# Prints nothing when the header alone would pass the cap.
+_skip_note_lines() {
+    local _sk_used="$1" _sk_ex="${2:-/dev/null}" _sk_rows _sk_total _sk_shown=0 _sk_line _sk_hdr
+    [ -s "$RUNDIR/skip-notes.tsv" ] || return 0
+    _sk_rows="$(awk -F'\t' -v ex="$_sk_ex" '
+        BEGIN { while ((getline l < ex) > 0) { split(l, a, "\t"); x[a[1]] = 1 } }
+        !($1 in x) { print }' "$RUNDIR/skip-notes.tsv")"
+    [ -n "$_sk_rows" ] || return 0
+    _sk_total="$(printf '%s\n' "$_sk_rows" | wc -l | tr -d ' ')"
+    _sk_hdr="**Skipped ($_sk_total)**"
+    [ "$((_sk_used + ${#_sk_hdr} + 1))" -le 1700 ] || return 0
+    echo "$_sk_hdr"
+    _sk_used=$((_sk_used + ${#_sk_hdr} + 1))
+    while IFS="$(printf '\t')" read -r _skn _skrank _skreason; do
+        [ -n "$_skn" ] || continue
+        _sk_line="- #$_skn — $_skreason"
+        if [ "$((_sk_used + ${#_sk_line} + 1))" -gt 1700 ]; then
+            echo "- …and $((_sk_total - _sk_shown)) more skipped: $RUNDIR/skip-notes.tsv"
+            return 0
+        fi
+        echo "$_sk_line"
+        _sk_used=$((_sk_used + ${#_sk_line} + 1))
+        _sk_shown=$((_sk_shown + 1))
+    done <<EOF
+$_sk_rows
+EOF
+}
+
 # _your_turn_lines — print the your-turn.txt rows under typed group headers, linked via gh pr list.
 # Groups, in order, empty ones omitted: Conflicts holds DIRTY and NOT-MERGEABLE rows, Awaiting
 # feat sign-off its namesake bucket, Failed the BLOCKED-CHECK rows, Other held everything else
@@ -1209,6 +1272,11 @@ _your_turn_lines() {
         while IFS="$(printf '\t')" read -r _yn _ybkt _yact; do
             [ -n "$_yn" ] || continue
             _yact="${_yact:-see pr-triage}"
+            _ynote="$(awk -F'\t' -v n="$_yn" '$1 == n { print $3; exit }' "$RUNDIR/skip-notes.tsv" 2>/dev/null || true)"
+            [ -n "$_ynote" ] && _yact="$_yact (skipped: $_ynote)"
+            if grep -qxF "$_yn" "$RUNDIR/stage1.txt" 2>/dev/null; then
+                _yact="$_yact (rescue: $(_fleet_outcome "$_yn" | cut -f1))"
+            fi
             _row="$(awk -F'\t' -v n="$_yn" '$1 == n { print; exit }' "$RUNDIR/prlist.tsv" 2>/dev/null || true)"
             if [ -n "$_row" ]; then
                 _yurl="$(printf '%s\n' "$_row" | cut -f2)"
@@ -1226,6 +1294,7 @@ _your_turn_lines() {
             _yt_shown=$((_yt_shown + 1))
         done < "$RUNDIR/yt-g$_yg.txt"
     done
+    _skip_note_lines "$_yt_running" "$RUNDIR/your-turn.txt"
 }
 
 # ==========================================================================================
@@ -1281,11 +1350,15 @@ _worker() {
     _FIRED_SUMMARY="${_FIRED_SUMMARY:-fired 0}"
     echo "pr-cycle finished — $_FIRED_SUMMARY, armed $ARMED, your turn $LEFT — $_reason"
 
+    [ -n "$HALT" ] || _build_skip_notes
     if [ -z "$NO_DM" ]; then
         if [ -n "$HALT" ]; then
             _yt_block="Your turn: unknown — stage 2 did not run"
         elif [ "$LEFT" -eq 0 ]; then
             _yt_block="Your turn: nothing"
+            _yt_skips="$(_skip_note_lines 0)"
+            [ -z "$_yt_skips" ] || _yt_block="$_yt_block
+$_yt_skips"
         else
             _yt_block="Your turn:
 $(_your_turn_lines)"
@@ -1397,7 +1470,7 @@ _launch() {
                   PR_CYCLE_SKIP_HELD_UNCHANGED PR_CYCLE_HARNESS_OUT PR_CYCLE_FLEET_LOG_DIR \
                   PR_CYCLE_HOLDREPEAT_HARNESS PR_CYCLE_HOLDREPEAT_STATE_DIR \
                   PR_CYCLE_AUTH_PROBE_CMD PR_CYCLE_PATCH_ID_CMD \
-                  PR_CYCLE_STOP_FILE PR_CYCLE_RESULT_FILE; do
+                  PR_CYCLE_STOP_FILE PR_CYCLE_RESULT_FILE PR_CYCLE_SKIP_NOTES; do
             eval "_val=\${$_v}"
             # shellcheck disable=SC2154  # _val is assigned by the eval above
             printf 'export %s=%q\n' "$_v" "$_val"

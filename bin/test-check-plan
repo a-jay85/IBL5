@@ -2945,15 +2945,17 @@ _corpus_guard_ok() {
 # conference-champions-playoff-semantics, bug-pipeline-survive-db-sync,
 # bug-pipeline-test-env, sim-recap-boxid-resolution (gate [A]: migration literals);
 # bug-hunter-escalation-discord-dm (gate [V]: main.localhost);
-# pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags).
+# pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags);
+# narrow-headless-marker-contract-paths, jsb-j7-param-recovery,
+# plan-gate-skill-inline (gate [Z]: untagged out-of-repo rows).
 _n_corpus_pass=1
 for _n_slug in \
     plan-architect-phase-drift-guard \
     automouse-cost-accounting-fix redact-credentials-from-error-logs \
     session-registry-dotclaude-freshness architect-explore-fanout \
-    narrow-headless-marker-contract-paths agent-tiering-detail-trim \
-    postplan-findings-schema-degrade jsb-j7-param-recovery wt-rebase-merge-not-rebase \
-    plan-gate-skill-inline sim-recap-floor-and-cold-open \
+    agent-tiering-detail-trim \
+    postplan-findings-schema-degrade wt-rebase-merge-not-rebase \
+    sim-recap-floor-and-cold-open \
     authz-verdict-refactor-1a-trading-pins authz-verdict-refactor-1b-trading-reject-service \
     authz-verdict-refactor-1c-trading-reject-shim authz-verdict-refactor-1d-trading-accept-service \
     authz-verdict-refactor-1e-trading-accept-shim \

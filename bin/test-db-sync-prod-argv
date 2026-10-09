@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # bin/test-db-sync-prod-argv — characterization harness for the mariadb argv that
-# bin/db-sync-prod sends to `docker exec` on the --snapshot path.
+# bin/db-sync-prod sends to `docker exec` on the --snapshot path, plus the
+# bin/lib/db-helpers.sh constants and db_cmd helper behind it.
 #
 # Pins the five preserve-tables probes, the in-container preserved-tables dump,
 # the two db_import_sql loads, the schema_migrations backfill and the final row
 # count. docker is stubbed on PATH: no Docker, no MariaDB, no prod contact.
+#
+# Cases: D1 default argv, O1 env override, N1 ambient DB_NAME ignored, F1
+# fail-closed probe, S1 dump stdout/stderr separation, L1-L4 db_cmd unit cases,
+# M1-M3 DB_CMD composition in db-migrate/db-test-up/wt-up, E1 e2e-wt pin.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -85,26 +90,144 @@ run_sync() {   # usage: run_sync [VAR=value ...] — extra env assignments for a
     LOG=$(cat "$STUB_ARGV_LOG.docker")
 }
 
-# D1: default argv. The expected strings are the pin: they are what the
-# unmodified db-sync-prod logs, and Phases 3-4 must keep them byte-identical.
+# The default-argv pin. The expected strings are what the unmodified
+# db-sync-prod logged; the refactor must keep them byte-identical.
+assert_default_argv() {  # <label>
+    local l="$1"
+    assert_eq "$l exit 0" "0" "$RC"
+    assert_eq "$l probe argv x5" "5" \
+        "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot -N -B -e SELECT COUNT(*) FROM information_schema.tables' "$LOG")"
+    assert_eq "$l probe schema literal" "1" \
+        "$(count_in "WHERE table_schema='iblhoops_ibl5' AND table_name='ibl_bug_reports'" "$LOG")"
+    assert_eq "$l dump argv" "1" \
+        "$(count_in 'exec ibl5-mariadb mariadb-dump -uroot -proot --single-transaction --skip-lock-tables iblhoops_ibl5 ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state' "$LOG")"
+    assert_eq "$l import argv x2" "2" \
+        "$(count_in 'exec -i ibl5-mariadb mariadb --force -uroot -proot iblhoops_ibl5' "$LOG")"
+    assert_eq "$l backfill argv" "1" \
+        "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot iblhoops_ibl5 -e ' "$LOG")"
+    assert_eq "$l rowcount argv" "1" \
+        "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot iblhoops_ibl5 -N -B -e ' "$LOG")"
+    assert_eq "$l exec total" "10" "$(grep -c '^exec ' <<<"$LOG" || true)"
+    assert_eq "$l two-token form absent" "0" "$(count_in '-u root' "$LOG")"
+    assert_eq "$l password not echoed" "0" "$(grep -c proot <<<"$OUT$ERR" || true)"
+    assert_match "$l snapshot banner" "Source: snapshot file" "$OUT"
+}
+
+# D1: default argv.
 run_sync
-assert_eq "D1 exit 0" "0" "$RC"
-assert_eq "D1 probe argv x5" "5" \
-    "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot -N -B -e SELECT COUNT(*) FROM information_schema.tables' "$LOG")"
-assert_eq "D1 probe schema literal" "1" \
-    "$(count_in "WHERE table_schema='iblhoops_ibl5' AND table_name='ibl_bug_reports'" "$LOG")"
-assert_eq "D1 dump argv" "1" \
-    "$(count_in 'exec ibl5-mariadb mariadb-dump -uroot -proot --single-transaction --skip-lock-tables iblhoops_ibl5 ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state' "$LOG")"
-assert_eq "D1 import argv x2" "2" \
-    "$(count_in 'exec -i ibl5-mariadb mariadb --force -uroot -proot iblhoops_ibl5' "$LOG")"
-assert_eq "D1 backfill argv" "1" \
-    "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot iblhoops_ibl5 -e ' "$LOG")"
-assert_eq "D1 rowcount argv" "1" \
-    "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot iblhoops_ibl5 -N -B -e ' "$LOG")"
-assert_eq "D1 exec total" "10" "$(grep -c '^exec ' <<<"$LOG" || true)"
-assert_eq "D1 two-token form absent" "0" "$(count_in '-u root' "$LOG")"
-assert_eq "D1 password not echoed" "0" "$(grep -c proot <<<"$OUT$ERR" || true)"
-assert_match "D1 snapshot banner" "Source: snapshot file" "$OUT"
+assert_default_argv "D1"
+
+# O1: env override changes every argv. Distinctive values make a leak greppable.
+run_sync DB_ROOT_USER=u1 DB_ROOT_PASS=sekret99 DB_DEFAULT_NAME=altdb
+assert_eq "O1 exit 0" "0" "$RC"
+assert_eq "O1 probe argv x5" "5" \
+    "$(count_in 'exec ibl5-mariadb mariadb -uu1 -psekret99 -N -B -e SELECT COUNT(*)' "$LOG")"
+assert_eq "O1 probe schema altdb x5" "5" "$(count_in "table_schema='altdb'" "$LOG")"
+assert_eq "O1 dump argv" "1" \
+    "$(count_in 'exec ibl5-mariadb mariadb-dump -uu1 -psekret99 --single-transaction --skip-lock-tables altdb ibl_api_keys' "$LOG")"
+assert_eq "O1 import argv x2" "2" \
+    "$(count_in 'exec -i ibl5-mariadb mariadb --force -uu1 -psekret99 altdb' "$LOG")"
+assert_eq "O1 backfill argv" "1" \
+    "$(count_in 'exec ibl5-mariadb mariadb -uu1 -psekret99 altdb -e ' "$LOG")"
+assert_eq "O1 rowcount argv" "1" \
+    "$(count_in 'exec ibl5-mariadb mariadb -uu1 -psekret99 altdb -N -B -e ' "$LOG")"
+assert_eq "O1 no -uroot left" "0" "$(count_in '-uroot' "$LOG")"
+assert_eq "O1 no iblhoops_ibl5 left" "0" "$(count_in 'iblhoops_ibl5' "$LOG")"
+assert_eq "O1 password not echoed" "0" "$(grep -c sekret99 <<<"$OUT$ERR" || true)"
+
+# N1: an ambient DB_NAME must not retarget the destructive sync.
+run_sync DB_NAME=other
+assert_default_argv "N1"
+assert_eq "N1 ambient name absent from argv" "0" "$(count_in 'other' "$LOG")"
+
+# F1: fail-closed probe. A probe error aborts the sync and its cause stays on stderr.
+run_sync STUB_PROBE_RC=1
+assert_eq "F1 exit 1" "1" "$RC"
+assert_match "F1 abort message" "ERROR: preserve-tables probe failed for table ibl_api_keys" "$ERR"
+assert_match "F1 cause on stderr" "ERROR 2002" "$ERR"
+assert_eq "F1 cause not on stdout" "0" "$(grep -c 'ERROR 2002' <<<"$OUT" || true)"
+assert_eq "F1 stopped at first probe" "1" "$(grep -c '^exec ' <<<"$LOG" || true)"
+assert_eq "F1 nothing dumped" "0" "$(count_in 'mariadb-dump' "$LOG")"
+
+# S1: the dump file gets stdout only; a failed load keeps the backup.
+run_sync STUB_DUMP_STDERR="stub dump warning" STUB_IMPORT_ERROR="ERROR 1064 (42000): stub load failure"
+assert_eq "S1 exit 1" "1" "$RC"
+assert_match "S1 backup retained" "Preserved-tables backup retained at: " "$ERR"
+PRESERVED=$(sed -n 's/.*backup retained at: //p' <<<"$ERR" | head -1)
+if [ -n "$PRESERVED" ] && [ -f "$PRESERVED" ]; then
+    pass "S1 backup file exists"
+    BODY=$(cat "$PRESERVED")
+    assert_match "S1 dump body in file" "-- stub dump body" "$BODY"
+    assert_eq "S1 warning absent from file" "0" "$(count_in 'stub dump warning' "$BODY")"
+else
+    failcase "S1 backup file exists" "no file at [$PRESERVED]"
+fi
+assert_match "S1 warning reached stderr" "stub dump warning" "$ERR"
+
+# L1-L4: db_cmd unit cases against the sandbox copy of the library.
+# shellcheck source=/dev/null
+. "$MAIN/bin/lib/db-helpers.sh"
+last_exec() { tail -n 1 "$STUB_ARGV_LOG.docker"; }
+
+: > "$STUB_ARGV_LOG.docker"
+PATH="$STUBBIN:$PATH" db_cmd c1 mariadb -N -e 'SELECT 1' >/dev/null
+assert_eq "L1 default argv" "exec c1 mariadb -uroot -proot -N -e SELECT 1" "$(last_exec)"
+
+: > "$STUB_ARGV_LOG.docker"
+(
+    DB_ROOT_USER=u1
+    DB_ROOT_PASS=sekret99
+    # shellcheck source=/dev/null
+    . "$MAIN/bin/lib/db-helpers.sh"
+    PATH="$STUBBIN:$PATH" db_cmd c1 mariadb-dump altdb t1 >/dev/null
+)
+assert_eq "L2 override argv" "exec c1 mariadb-dump -uu1 -psekret99 altdb t1" "$(last_exec)"
+
+set +e
+L3_OUT=$(PATH="$STUBBIN:$PATH" STUB_PROBE_RC=1 db_cmd c1 mariadb -e 'SELECT COUNT(*) FROM information_schema.tables' 2>"$TMP/l3err")
+L3_RC=$?
+L4_OUT=$(PATH="$STUBBIN:$PATH" STUB_PROBE_RC=3 db_cmd c1 mariadb -e 'SELECT COUNT(*) FROM information_schema.tables' 2>/dev/null)
+L4_RC=$?
+set -e
+assert_eq "L3 exit code" "1" "$L3_RC"
+assert_eq "L3 stdout empty" "" "$L3_OUT"
+assert_match "L3 error on stderr" "ERROR 2002" "$(cat "$TMP/l3err")"
+assert_eq "L4 exit code passthrough" "3" "$L4_RC"
+assert_eq "L4 stdout empty" "" "$L4_OUT"
+
+# Library constants: defaults, override, ambient DB_NAME, not exported.
+assert_eq "L5 defaults" "root|root|iblhoops_ibl5" "$DB_ROOT_USER|$DB_ROOT_PASS|$DB_DEFAULT_NAME"
+L6=$(env -i PATH=/usr/bin:/bin DB_NAME=other DB_DEFAULT_NAME=alt DB_ROOT_USER=u1 \
+    bash -c ". '$MAIN/bin/lib/db-helpers.sh'; printf '%s|%s|%s' \"\$DB_DEFAULT_NAME\" \"\$DB_ROOT_USER\" \"\$DB_ROOT_PASS\"")
+assert_eq "L6 override honored, ambient DB_NAME ignored" "alt|u1|root" "$L6"
+L7=$(env -i PATH=/usr/bin:/bin bash -c ". '$MAIN/bin/lib/db-helpers.sh'; env | grep -c '^DB_ROOT_PASS=' || true")
+assert_eq "L7 constants not exported" "0" "$L7"
+
+# M1-M3: the DB_CMD= line of each script, evaluated against the real library.
+compose_db_cmd() {  # <script> [VAR=value ...]
+    local script="$1" name_line cmd_line body
+    shift
+    name_line=$(grep -m1 '^DB_NAME=' "$REPO_ROOT/bin/$script" || true)
+    cmd_line=$(grep -m1 '^DB_CMD=' "$REPO_ROOT/bin/$script")
+    body=$(printf '%s\n' "set --" ". '$REPO_ROOT/bin/lib/db-helpers.sh'" "$name_line" "$cmd_line" \
+        'printf "%s" "$DB_CMD"')
+    env -i PATH=/usr/bin:/bin "$@" bash -c "$body"
+}
+OVR=(DB_ROOT_USER=u1 DB_ROOT_PASS=sekret99 DB_DEFAULT_NAME=altdb)
+assert_eq "M1 db-migrate" "mariadb -u root -proot iblhoops_ibl5" "$(compose_db_cmd db-migrate)"
+assert_eq "M2 db-test-up" "mariadb -u root -proot" "$(compose_db_cmd db-test-up)"
+assert_eq "M3 wt-up" "mariadb -u root -proot iblhoops_ibl5" "$(compose_db_cmd wt-up)"
+assert_eq "M1o db-migrate override" "mariadb -u u1 -psekret99 altdb" "$(compose_db_cmd db-migrate "${OVR[@]}")"
+assert_eq "M2o db-test-up override" "mariadb -u u1 -psekret99" "$(compose_db_cmd db-test-up "${OVR[@]}")"
+assert_eq "M3o wt-up override" "mariadb -u u1 -psekret99 altdb" "$(compose_db_cmd wt-up "${OVR[@]}")"
+assert_eq "M3n wt-up ambient DB_NAME" "mariadb -u root -proot iblhoops_ibl5" "$(compose_db_cmd wt-up DB_NAME=other)"
+
+# E1: bin/e2e-wt passes the name through the container env and keeps no literal.
+E2E="$REPO_ROOT/bin/e2e-wt"
+assert_eq "E1 passes E2E_DB_NAME" "1" "$(grep -cF -- '-e "E2E_DB_NAME=$DB_DEFAULT_NAME" \' "$E2E" || true)"
+assert_eq "E1 reads getenv" "1" "$(grep -cF -- 'getenv("E2E_DB_NAME")' "$E2E" || true)"
+assert_eq "E1 no literal name" "0" "$(grep -cF -- '"iblhoops_ibl5")' "$E2E" || true)"
+assert_eq "E1 sources db-helpers" "1" "$(grep -cF -- 'source "$REPO_ROOT/bin/lib/db-helpers.sh"' "$E2E" || true)"
 
 echo "PASS: $PASS  FAIL: $FAIL"
 [ "$FAIL" -eq 0 ] || exit 1

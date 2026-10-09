@@ -2,7 +2,8 @@
 # shellcheck shell=bash
 #
 # test-check-numbering — behavioural harness for bin/check-numbering, the widened
-# allocators (bin/next-adr, bin/next-migration) and the merge=union attribute on
+# allocators (bin/next-number behind bin/next-adr and bin/next-migration, sharing
+# bin/lib/numbering.sh with the gate) and the merge=union attribute on
 # the ADR index and the backlog files.
 #
 # Each case builds a throwaway git repo under a temp dir, seeds a fixture, runs
@@ -70,7 +71,9 @@ new_repo() {
     cp "$SCRIPT_DIR/next-adr"           "$REPO/bin/next-adr"
     cp "$SCRIPT_DIR/next-migration"     "$REPO/bin/next-migration"
     cp "$SCRIPT_DIR/lib/git-helpers.sh" "$REPO/bin/lib/git-helpers.sh"
-    chmod +x "$REPO/bin/check-numbering" "$REPO/bin/next-adr" "$REPO/bin/next-migration"
+    cp "$SCRIPT_DIR/next-number"        "$REPO/bin/next-number"
+    cp "$SCRIPT_DIR/lib/numbering.sh"   "$REPO/bin/lib/numbering.sh"
+    chmod +x "$REPO/bin/check-numbering" "$REPO/bin/next-adr" "$REPO/bin/next-migration" "$REPO/bin/next-number"
     git -C "$REPO" init -q
     git -C "$REPO" config user.email test@example.com
     git -C "$REPO" config user.name "test"
@@ -130,7 +133,9 @@ probe_worktree() {
     cp "$SCRIPT_DIR/next-adr"           "$REPO_WT/bin/next-adr"
     cp "$SCRIPT_DIR/next-migration"     "$REPO_WT/bin/next-migration"
     cp "$SCRIPT_DIR/lib/git-helpers.sh" "$REPO_WT/bin/lib/git-helpers.sh"
-    chmod +x "$REPO_WT/bin/next-adr" "$REPO_WT/bin/next-migration"
+    cp "$SCRIPT_DIR/next-number"        "$REPO_WT/bin/next-number"
+    cp "$SCRIPT_DIR/lib/numbering.sh"   "$REPO_WT/bin/lib/numbering.sh"
+    chmod +x "$REPO_WT/bin/next-adr" "$REPO_WT/bin/next-migration" "$REPO_WT/bin/next-number"
 }
 
 echo "== bin/check-numbering =="
@@ -479,6 +484,53 @@ done <<'EOF'
 0|ibl5/migrations|20260818_120000_x.sql|20260818_120000_y.sql
 0|ibl5/migrations|1234_x.sql|1234_y.sql
 EOF
+
+# C8. bin/next-number: usage errors, creates nothing, per-kind refusal, and a
+#     source-safe lib (silent on source, functions return 0 on empty input).
+new_repo
+seed "$ADR_DIR_REL/0000-template.md" "$ADR_DIR_REL/0001-a.md" "$MIG_DIR_REL/001_a.sql"
+gadd "$ADR_DIR_REL" "$MIG_DIR_REL"; gcommit next-number-fixture
+probe_worktree
+USAGE_LINE="Usage: bin/next-number <adr|migration>"
+X="$( ( cd "$REPO_WT" && ./bin/next-number ) 2>"$OUT" )"; RC=$?
+expect "next-number no argument" 2 "$RC"
+expect_eq "next-number no argument stdout" "" "$X"
+expect_line "next-number usage" "$USAGE_LINE"
+X="$( ( cd "$REPO_WT" && ./bin/next-number bogus ) 2>"$OUT" )"; RC=$?
+expect "next-number unknown kind" 2 "$RC"
+expect_line "next-number unknown kind usage" "$USAGE_LINE"
+X="$( ( cd "$REPO_WT" && ./bin/next-number adr extra ) 2>"$OUT" )"; RC=$?
+expect "next-number extra argument" 2 "$RC"
+( cd "$REPO_WT" && ./bin/next-number --help ) > "$OUT" 2>&1; RC=$?
+expect "next-number --help" 0 "$RC"
+expect_line "next-number --help usage" "$USAGE_LINE"
+X="$( ( cd "$REPO_WT" && ./bin/next-number migration ) 2>"$OUT" )"; RC=$?
+expect "next-number migration" 0 "$RC"
+expect_eq "next-number migration number" "002" "$X"
+FILES_BEFORE="$(ls "$REPO_WT/$ADR_DIR_REL" | wc -l | tr -d ' ')"
+X="$( ( cd "$REPO_WT" && ./bin/next-number adr ) 2>"$OUT" )"; RC=$?
+expect "next-number adr" 0 "$RC"
+expect_eq "next-number adr number" "0002" "$X"
+expect_eq "next-number creates no file" "$FILES_BEFORE" "$(ls "$REPO_WT/$ADR_DIR_REL" | wc -l | tr -d ' ')"
+X="$( ( cd "$REPO" && ./bin/next-number adr ) 2>"$OUT" )"; RC=$?
+expect "next-number adr from main checkout" 1 "$RC"
+expect_line "next-number adr main-checkout line 1" "Error: refusing to run from the main checkout — bin/next-adr cp's the"
+X="$( ( cd "$REPO" && ./bin/next-number migration ) 2>"$OUT" )"; RC=$?
+expect "next-number migration from main checkout" 1 "$RC"
+expect_line "next-number migration main-checkout line 1" "Error: refusing to hand out a migration number from the main checkout."
+bash -c '. "$1"' _ "$SCRIPT_DIR/lib/numbering.sh" > "$OUT" 2>&1; RC=$?
+expect "numbering.sh sourced alone" 0 "$RC"
+expect_eq "numbering.sh is silent when sourced" "" "$(cat "$OUT")"
+bash -c 'set -euo pipefail; . "$1"; numbering_max_from_names adr </dev/null; echo "rc=$?"' \
+    _ "$SCRIPT_DIR/lib/numbering.sh" > "$OUT" 2>&1
+expect_eq "numbering_max_from_names adr on empty input" "rc=0" "$(cat "$OUT")"
+bash -c 'set -euo pipefail; . "$1"; numbering_max_from_names migration </dev/null; echo "rc=$?"' \
+    _ "$SCRIPT_DIR/lib/numbering.sh" > "$OUT" 2>&1
+expect_eq "numbering_max_from_names migration on empty input" "rc=0" "$(cat "$OUT")"
+# shellcheck disable=SC2016  # the snippet is for the inner bash, so $1/$(...) must stay literal
+bash -c 'set -euo pipefail; . "$1"; ts=20260818_120000; printf "%s|%s|%s|%s\n" "$(numbering_adr_key 0400.md)" "$(numbering_adr_key 0000-template.md)" "$(numbering_migration_key 044b_x.sql)" "$(numbering_migration_key "${ts}_x.sql")"' \
+    _ "$SCRIPT_DIR/lib/numbering.sh" > "$OUT" 2>&1
+expect_eq "numbering key functions" "0400||044b|" "$(cat "$OUT")"
 
 echo "== CI wiring =="
 

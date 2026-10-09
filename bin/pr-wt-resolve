@@ -64,7 +64,7 @@ path="$(git worktree list --porcelain | awk -v b="refs/heads/$branch" '
 # Fallback: a detached-HEAD worktree has no branch line, so match its directory name.
 if [ -z "$path" ]; then
     path="$(git worktree list --porcelain | awk -v b="$branch" '
-        /^worktree / { p = substr($0, 10); if (p ~ ("/" b "$")) { print p; exit } }
+        /^worktree / { p = substr($0, 10); if (p ~ ("/" b "$") && !f) { print p; f = 1 } }
     ')"
 fi
 

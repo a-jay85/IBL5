@@ -2389,6 +2389,19 @@ grep -qF -- '--state-changed-prs=101' <<< "$(cat "$SCRATCH/ready.argv")" \
 grep -qxF 101 "$(rundir)/armed.txt" 2>/dev/null && fail "dirty-feat-pr-rescued-unarmed: 101 was armed"
 grep -qF 'holdrepeat would decline' <<< "$OUT" && fail "dirty-feat-pr-rescued-unarmed: holdrepeat skip still fired"
 hr_cleanup
+
+# Same rule through the DIRTY rescue loop: 2201 is an Excluded bullet, not an ordered row.
+reset_state
+printf '%s' "$ATTACK_2PR_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" "2201 DIRTY rebase" > "$SCRATCH/triage-out"
+hr_fixture 2201 dirty-slug "7,8"
+HRHARNESS="$HRH" run --worker
+[[ $RC -eq 0 ]] || fail "dirty-feat-pr-rescued-unarmed rescue loop: exit $RC, want 0"
+grep -qxF 2201 "$(rundir)/stage1.txt" || fail "dirty-feat-pr-rescued-unarmed rescue loop: 2201 missing from stage1.txt"
+grep -qF -- '--state-changed-prs=2201' <<< "$(cat "$SCRATCH/ready.argv")" \
+    || fail "dirty-feat-pr-rescued-unarmed rescue loop: ready argv lacks --state-changed-prs=2201"
+grep -qxF 2201 "$(rundir)/armed.txt" 2>/dev/null && fail "dirty-feat-pr-rescued-unarmed rescue loop: 2201 was armed"
+hr_cleanup
 end_case "case dirty-feat-pr-rescued-unarmed"
 
 # 2: a red check (BLOCKED-CHECK) on a PR held for {3,7} with an unchanged diff still fires.
@@ -2669,6 +2682,7 @@ unset AUTHPROBE
 _dm="$(cat "$SCRATCH/dm.argv")"
 grep -qF 'Your turn: unknown — stage 2 did not run' <<< "$_dm" || fail "halt-no-skip-block: stage-2 line missing: $_dm"
 grep -qF '**Skipped' <<< "$_dm" && fail "halt-no-skip-block: Skipped block on a halted run: $_dm"
+[[ -e "$(rundir)/skip-notes.tsv" ]] && fail "halt-no-skip-block: skip-notes.tsv built on a halted run"
 end_case "case halt-no-skip-block"
 
 # 10: a fired PR left in your-turn shows what the rescue did.

@@ -49,6 +49,7 @@ REPO_ROOT="$(main_checkout_root "$(dirname "$0")/..")" || {
     echo "ERROR: cannot locate main checkout" >&2
     exit 1
 }
+source "$REPO_ROOT/bin/lib/db-helpers.sh"
 source "$REPO_ROOT/bin/lib/gh-pr.sh"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 
@@ -135,8 +136,9 @@ docker exec \
     -e "E2E_USER=$IBL_TEST_USER" \
     -e "E2E_PASS=$IBL_TEST_PASS" \
     -e "E2E_DB_HOST=db" \
+    -e "E2E_DB_NAME=$DB_DEFAULT_NAME" \
     "$PHP_CONTAINER" php -r '
-$db = new mysqli(getenv("E2E_DB_HOST"), "root", "root", "iblhoops_ibl5");
+$db = new mysqli(getenv("E2E_DB_HOST"), "root", "root", getenv("E2E_DB_NAME"));
 if ($db->connect_error) { fwrite(STDERR, "DB connection failed: " . $db->connect_error . "\n"); exit(1); }
 
 $user = getenv("E2E_USER");

@@ -14,8 +14,8 @@ use Tests\WideUnit\Mocks\MockDatabase;
  *
  * `assertStringEndsWith` fails if the tiebreaker is dropped, reordered or given
  * the wrong direction. It is the only revert-sensitive check for the sites that
- * carry an `@phpstan-ignore ibl.orderByMissingTiebreaker`, because the ignore
- * silences the rule whether or not the primary-key suffix is present.
+ * carry an inline orderByMissingTiebreaker ignore, because the ignore silences
+ * the rule whether or not the primary-key suffix is present.
  */
 final class OrderByTiebreakerSqlPinTest extends TestCase
 {

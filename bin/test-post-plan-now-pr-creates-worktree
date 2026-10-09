@@ -339,7 +339,8 @@ chmod +x "$SHIMS/launchctl"
 unset GH_PR_JSON
 HOME7="$TMP/home7"
 mkdir -p "$HOME7/Library/LaunchAgents" "$HOME7/.local/bin" "$WT6/bin/lib"
-cp "$REPO/bin/lib/usage-gate.sh" "$REPO/bin/lib/usage-fetch.sh" "$WT6/bin/lib/"
+cp "$REPO/bin/lib/usage-gate.sh" "$REPO/bin/lib/usage-fetch.sh" \
+   "$REPO/bin/lib/plan-resolve.sh" "$WT6/bin/lib/"
 # The gate refuses a marker whose resume binary does not exist, and the far side names
 # $ROOT/bin/post-plan-now (here $WT6), so the fixture needs an executable copy.
 cp "$REPO/bin/post-plan-now" "$WT6/bin/post-plan-now"

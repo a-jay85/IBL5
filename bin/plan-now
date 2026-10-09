@@ -208,9 +208,12 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
 # shellcheck source=bin/lib/session-id.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/session-id.sh"
 
+# shellcheck source=bin/lib/plan-resolve.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/plan-resolve.sh"
+
 # Overridable for the smoke test only — ~/claude-plans is the single source of truth
 # (workflow-continuity.md), same shape as bug-pipeline-tick's BUG_PIPELINE_PLANS_DIR.
-PLANS_DIR="${PLAN_NOW_PLANS_DIR:-$HOME/claude-plans}"
+PLANS_DIR="$(plans_dir PLAN_NOW_PLANS_DIR)"
 mkdir -p "$PLANS_DIR"
 
 # --- resume resolution (--resume only) ---

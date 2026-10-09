@@ -466,6 +466,8 @@ esac
 # this feature and is_in_worktree is meant to judge the caller's tree.
 # shellcheck source=bin/lib/session-id.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/session-id.sh"
+# shellcheck source=bin/lib/plan-resolve.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/plan-resolve.sh"
 if ! is_in_worktree "$ROOT"; then
     echo "post-plan-now: refusing to run in the main checkout ($ROOT) — ADR-0062." >&2
     echo "  cd into the branch's worktree (or use --pr <n>) and re-run." >&2
@@ -480,7 +482,7 @@ fi
 # branch name for the master guard, the plan lookup, and human-facing prose.
 SAFE_SLUG=$(printf '%s' "$SLUG" | tr -cs 'A-Za-z0-9._-' '-')
 
-PLAN_FILE="${PLAN_OVERRIDE:-$HOME/claude-plans/$SLUG.md}"
+PLAN_FILE="${PLAN_OVERRIDE:-$(plans_dir)/$SLUG.md}"
 
 # --auto is the impl agent's automatic closing action. One gate applies only here;
 # a bare (human) invocation always fires, because running it by hand IS the

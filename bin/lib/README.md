@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-10-06
+last_verified: 2026-10-08
 ---
 
 # bin/lib — Shared Library Files
@@ -21,6 +21,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `hold-check.sh` | Hold-section extraction (`hold_check_section`), ask-shaped-sentence detection (`hold_check_violations`), the Decision paragraph reader (`hold_decision_paragraphs`), and the manual-confirmation block renderer (`hold_manual_confirmation_block`); sourced by `bin/check-plan` gate `[H]` and by `/post-plan` Phase 6's hold-notice step |
 | `docfix-dm.sh` | Compose the docs-refreshed Discord DM for a docfix PR; holds the numeric-input, OPEN-state, and `docs-stale-refresh-` head-ref guards lifted out of `docs-refreshed-notify.yml` so they are exercisable by `bin/test-docfix-run` |
 | `git-helpers.sh` | Shared git-layout helpers: canonical repo root resolution and related utilities |
+| `numbering.sh` | Shared ADR and migration numbering grammar: allocator name regexes, gate collision keys, and `numbering_next`. Sourced by `bin/next-number` and `bin/check-numbering`; source-safe (no `set`, no `exit`) |
 | `human-signoff-classifier.sh` | Single source of truth for the feature-PR human sign-off classifier (ADR-0062), sourced by both the workflow and its regression harness |
 | `launchd-job.sh` | Shared launchd background-job plumbing: one-shot `launchctl list` snapshot and label lookup, fail-closed pgrep liveness probe, TERM-then-KILL stop and slot release, compact runner plist emission, bootout/bootstrap, slot count / stale reap / wait-for-slot, the loaded-idle job reaper, runner-embeddable finish-DM helpers, and `xml_escape` / `shq`. Sourced by `bin/post-plan-fleet`, `bin/pr-review-now`, `bin/post-plan-now` and `bin/pr-cycle`; tested by `bin/test-launchd-job` |
 | `launchd-expected-jobs.sh` | Single source of truth for the launchd health check: the expected long-lived `com.ibl5.*` labels with their check mode (`standard` / `keepalive` / `phase-gated`), the one-shot label prefixes, and the required main-stack containers. Sourced by `bin/launchd-health-check` (example) and `bin/test-launchd-health-check` (example) |
@@ -30,7 +31,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `plan-model-tier` | Validate a raw `impl_model:` value against the accepted whitelist and classify it (`absent`/`opus-tier`/`sonnet-tier`/`haiku-tier`); shared by `plan-impl-model` and `plan-model-consistency` |
 | `plan-impl-model` | Resolve the automouse impl-agent model for a given plan file; rejects any value outside the `plan-model-tier` whitelist (exit 1, one line on stderr) instead of defaulting to Opus |
 | `plan-model-consistency` | Shared `impl_model` ↔ Verification-Matrix consistency check, invoked by `bin/check-plan` gate `[13]` and by the `bin/automouse/queue` add-time backstop |
-| `plan-resolve.sh` | Shared plan-file resolver for `/post-plan` Phase 1, condition (7), and condition (13): variant-aware and drift-aware resolution of `$PLAN_FILE` and `$PLAN_SLUG_DRIFT`; mirrors `harness/planfile.py::locate_plan/_resolve_variant/_resolve_drift` |
+| `plan-resolve.sh` | Shared plan-file resolver for `/post-plan` Phase 1, condition (7), and condition (13): variant-aware and drift-aware resolution of `$PLAN_FILE` and `$PLAN_SLUG_DRIFT`; mirrors `harness/planfile.py::locate_plan/_resolve_variant/_resolve_drift`; also exports `plans_dir [SEAM_VAR ...]`, the single resolver for the plans directory (`$HOME/claude-plans`, or the first non-empty named seam variable) |
 | `post-review-findings.sh` | Convert a JSON findings array into resolvable inline GitHub review threads or a fallback issue comment; sourced by `/post-plan` Phase 4D, `/pr-review`, and `/security-audit` |
 | `pr-armable.sh` | Shared auto-merge "live hold" predicate for `/post-plan` Phase 6.5 arming conditions; sourced by `bin/pr-triage` and `/post-plan` |
 | `sim-recap-exemplar.txt` | Exemplar sim-recap text used as a style reference by the sim-recap prompt |

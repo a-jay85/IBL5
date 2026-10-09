@@ -696,6 +696,18 @@ note_failure() {
     FAIL_NOTES="${FAIL_NOTES:-}  - $1
 "
 }
+# note_stop: a loop break site that ends the run early. Same FAIL_NOTES line as
+# note_failure "$1 $2", plus the cause and the next step for the one stop DM that
+# cleanup_watcher sends. First call wins: the loop breaks right after, so a
+# second call can only come from a future edit, and the first cause is the real one.
+# Call it ONLY next to a `break`. Non-stopping problems keep note_failure.
+note_stop() {
+    note_failure "$1 $2"
+    if [ -z "${STOP_DM_CAUSE:-}" ]; then
+        STOP_DM_CAUSE="$1"
+        STOP_DM_NEXT="$2"
+    fi
+}
 
 print_stop_reason() {
     local rc=$1 why="" detail=""
@@ -1854,6 +1866,8 @@ PLANS_RUN=0
 STOP_CAUSE=""
 STOP_CLEAN=0
 FAIL_NOTES=""
+STOP_DM_CAUSE=""
+STOP_DM_NEXT=""
 
 echo "=== Automouse session starting at $(date) ===" >> "$LOG"
 
@@ -1922,7 +1936,7 @@ while true; do
     ELAPSED=$(( $(date +%s) - START ))
     if [ "$ELAPSED" -gt "$MAX_ELAPSED" ]; then
         echo "Time guard: ${ELAPSED}s elapsed (max ${MAX_ELAPSED}s), stopping." >> "$LOG"
-        note_failure "The time limit (about 4h45m) was reached, so no more plans were started. Plans still in queue/ will run next time."
+        note_stop "The time limit (about 4h45m) was reached, so no more plans were started." "Plans still in queue/ will run next time."
         break
     fi
 
@@ -1942,10 +1956,19 @@ while true; do
             echo "Plan ${SINGLE_PLAN%.md} is being processed by another runner — nothing to do." >> "$LOG"
         elif [ "$CAP_DEFERRED" != " " ]; then
             echo "No claimable plan left. Deferred to the next run (cap-refunded or wt-new failure):${CAP_DEFERRED% } — stopping." >> "$LOG"
+            if [ "$PLANS_RUN" -eq 0 ]; then
+                note_stop "No plan was started: every queued plan was deferred to the next run (${CAP_DEFERRED% })." "They retry on the next scheduled run. Read $LOG for why each was deferred."
+            fi
         elif [ "$DEPENDS_HELD" != " " ]; then
             echo "No claimable plan left. Dependency-held this run:${DEPENDS_HELD% } — stopping." >> "$LOG"
+            if [ "$PLANS_RUN" -eq 0 ]; then
+                note_stop "No plan was started: every queued plan is waiting on a dependency (${DEPENDS_HELD% })." "Merge or fix the named dependencies, then rerun."
+            fi
         else
             echo "All queued plans are claimed by a concurrent runner — nothing to do." >> "$LOG"
+            if [ "$PLANS_RUN" -eq 0 ]; then
+                note_stop "No plan was started: another automouse runner has claimed every queued plan." "Nothing to do. Check bin/fleet-status if no other run should be active."
+            fi
         fi
         break
     fi
@@ -2296,7 +2319,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 || usage_postrun_pause automouse "$IMPL_SID" "$AUTOMOUSE_BIN" any "$LOG" "$IMPL_LOG_BEFORE"; }; then
             printf '%s\n' "$IMPL_SID" > "$CURRENT_LOCK/paused-held"
             echo "Impl paused (usage gate) — session $IMPL_SID; coordinator resumes it. Refunding attempt, stopping loop." >> "$LOG"
-            note_failure "You hit your Claude usage limit while building ${PLAN_NAME%.md}. It is paused and resumes on its own when the limit resets. The try was not counted."
+            note_stop "You hit your Claude usage limit while building ${PLAN_NAME%.md}." "It is paused and resumes on its own when the limit resets. The try was not counted."
             refund_attempt
             CURRENT_LOCK=""
             break
@@ -2314,7 +2337,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 REASON="$REASON (impl exited in ${IMPL_DUR}s)"
             fi
             echo "Environmental failure during impl — $REASON. Refunding attempt, stopping loop." >> "$LOG"
-            note_failure "Building ${PLAN_NAME%.md} hit a problem that was not the plan's fault ($REASON). The run stopped, the try was not counted, and the queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
+            note_stop "Building ${PLAN_NAME%.md} hit a problem that was not the plan's fault ($REASON). The run stopped, the try was not counted, and the queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
             refund_attempt
             write_env_stop_report "$PLAN_NAME" impl "$REASON" "$IMPL_LOG_BEFORE"
             break
@@ -2517,7 +2540,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 write_env_stop_report "$PLAN_NAME" postplan \
                     "post-plan-now exited 7 (no worktree) and the branch PR is not MERGED" \
                     "$PP_LOG_BEFORE"
-                note_failure "Shipping $PLAN_SLUG could not find its worktree, and its PR has not merged. The run stopped and the try was not counted. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
+                note_stop "Shipping $PLAN_SLUG could not find its worktree, and its PR has not merged. The run stopped and the try was not counted." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
                 rm -f "$PP_START_MARKER"
                 break
             fi
@@ -2532,7 +2555,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 CURRENT_LOCK=""
             fi
             echo "Post-plan paused (usage gate); post-plan-now owns the resume. Refunding attempt, stopping loop." >> "$LOG"
-            note_failure "You hit your Claude usage limit while shipping $PLAN_SLUG. It is paused and resumes on its own when the limit resets. The try was not counted."
+            note_stop "You hit your Claude usage limit while shipping $PLAN_SLUG." "It is paused and resumes on its own when the limit resets. The try was not counted."
             refund_attempt
             break
         fi
@@ -2552,7 +2575,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 REASON="$REASON (postplan exited in ${PP_DUR}s)"
             fi
             echo "Environmental failure during postplan — $REASON. Refunding attempt, stopping loop." >> "$LOG"
-            note_failure "Shipping $PLAN_SLUG hit a problem that was not the plan's fault ($REASON). The run stopped, the try was not counted, and the queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
+            note_stop "Shipping $PLAN_SLUG hit a problem that was not the plan's fault ($REASON). The run stopped, the try was not counted, and the queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
             refund_attempt
             write_env_stop_report "$PLAN_NAME" postplan "$REASON" "$PP_LOG_BEFORE"
             break
@@ -2648,15 +2671,15 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                    "$(date +%H:%M:%S)" >> "$LOG" ;;
             1) printf '[%s] canary: ci-red — parking, queue left intact\n' "$(date +%H:%M:%S)" >> "$LOG"
                write_canary_park_report "ci-red" "$CANARY_DETAIL"
-               note_failure "The tests on master are failing (CI is red), so no more plans were started. The queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-canary-park.md"
+               note_stop "The tests on master are failing (CI is red), so no more plans were started. The queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-canary-park.md"
                break ;;
             3) printf '[%s] canary: smoke-red — parking, queue left intact\n' "$(date +%H:%M:%S)" >> "$LOG"
                write_canary_park_report "smoke-red" "$CANARY_DETAIL"
-               note_failure "The quick health check on master failed, so no more plans were started. The queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-canary-park.md"
+               note_stop "The quick health check on master failed, so no more plans were started. The queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-canary-park.md"
                break ;;
             2) printf '[%s] canary: ci-auth-error — env stop\n' "$(date +%H:%M:%S)" >> "$LOG"
                write_env_stop_report "canary" "canary" "CI auth error: $CANARY_DETAIL" "$CANARY_LOG_BEFORE"
-               note_failure "Could not check master's CI because GitHub refused the login. The run stopped and the queue was not touched. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-canary.md"
+               note_stop "Could not check master's CI because GitHub refused the login. The run stopped and the queue was not touched." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-canary.md"
                break ;;
         esac
     fi

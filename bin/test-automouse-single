@@ -8,7 +8,7 @@
 # self-heal gated OFF in single mode, auto-queue-if-absent, hard-fail on
 # unresolvable slug, and already-queued tolerance.
 #
-# Cases 4, 6, 10 and 13 run on every platform. Cases 1, 2, 3 and 5 drive the run loop,
+# Cases 4, 6, 10, 13, 14, 15 and 16 run on every platform. Cases 1, 2, 3 and 5 drive the run loop,
 # which needs macOS tools inside bin/automouse/run (caffeinate, BSD mktemp,
 # stat -f, BSD date), so off macOS they print a SKIP line and do not run.
 # Case 10 unit-tests write_stop_file (the stop-file writer extracted from the
@@ -395,6 +395,48 @@ else
 fi
 
 # ===========================================================================
+# Case 14 — note_stop records the cause and next step; first call wins
+# (portable: reuses the printer extract from case 13)
+# ===========================================================================
+echo "--- case 14: note_stop ---"
+if grep -qF 'note_stop() {' "$PRINTER"; then
+    c14_out=$(
+        # shellcheck disable=SC1090
+        . "$PRINTER"
+        note_stop "Cause A." "Next A."
+        note_stop "Cause B." "Next B."
+        printf '%s|%s|%s' "$FAIL_NOTES" "$STOP_DM_CAUSE" "$STOP_DM_NEXT"
+    )
+    c14_want=$(printf '  - Cause A. Next A.\n  - Cause B. Next B.\n|Cause A.|Next A.')
+    check "case14 note_stop appends both notes and keeps the first cause" test "$c14_out" = "$c14_want"
+    c14_out=$(
+        # shellcheck disable=SC1090
+        . "$PRINTER"
+        note_failure "Plain."
+        printf '[%s]' "${STOP_DM_CAUSE:-}"
+    )
+    check "case14 plain note_failure leaves STOP_DM_CAUSE empty" test "$c14_out" = "[]"
+else
+    echo "FAIL: case14 printer extract lacks note_stop()"
+    FAILED=1
+fi
+
+# ===========================================================================
+# Case 15 — note_stop sits only at loop break sites (static census of the runner)
+# ===========================================================================
+echo "--- case 15: note_stop break-site census ---"
+check "case15 exactly 12 note_stop sites" test "$(grep -c 'note_stop "' "$RUNNER_SRC")" = 12
+check "case15 login expiry stays note_failure" test "$(grep -cF 'note_failure "Your Claude login has expired' "$RUNNER_SRC")" = 1
+check "case15 login expiry is never note_stop" test "$(grep -c 'note_stop "Your Claude login' "$RUNNER_SRC")" = 0
+c15_far=$(awk '
+    /note_stop "/ { pending = NR }
+    pending && /break/ { pending = 0 }
+    pending && NR - pending > 6 { print pending; pending = 0 }
+    END { if (pending) print pending }
+' "$RUNNER_SRC")
+check "case15 every note_stop has a break within 6 lines (far: ${c15_far:-none})" test -z "$c15_far"
+
+# ===========================================================================
 # macOS-only run-loop cases (1, 2, 3, 5)
 # ===========================================================================
 if [ "$PLATFORM" != "Darwin" ]; then
@@ -403,7 +445,7 @@ if [ "$PLATFORM" != "Darwin" ]; then
     if [ "$FAILED" -ne 0 ]; then
         echo "RESULT: FAILED"
     else
-        echo "RESULT: cases 4, 6, 10 and 13 passed; cases 1, 2, 3, 5, 7, 8, 9, 11, 12 skipped"
+        echo "RESULT: cases 4, 6, 10, 13, 14, 15 and 16 passed; cases 1, 2, 3, 5, 7, 8, 9, 11, 12 skipped"
     fi
     exit "$FAILED"
 fi

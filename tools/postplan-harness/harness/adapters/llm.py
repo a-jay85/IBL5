@@ -15,6 +15,7 @@ Contract for a retained call:
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -188,6 +189,26 @@ class ClaudeCli:
         self.out_dir = out_dir      # None => raw-attempt persistence disabled
         self.gate, self.gate_reason = usage_pause.context_from_env()
         self.paused = threading.Event()   # one pause stops every thread's next call
+        # Two write-capable calls in flight at once share one worktree, so a pause
+        # record cannot say which call made which edit; the runner then refuses it.
+        self._write_inflight = 0
+        self._write_lock = threading.Lock()
+        self.write_overlap = False
+
+    @contextlib.contextmanager
+    def _write_call(self, can_write: bool):
+        if not can_write:
+            yield
+            return
+        with self._write_lock:
+            self._write_inflight += 1
+            if self._write_inflight >= 2:
+                self.write_overlap = True
+        try:
+            yield
+        finally:
+            with self._write_lock:
+                self._write_inflight -= 1
 
     def close(self) -> None:
         """Phase 11: remove the temp cwd this adapter created. Idempotent; never raises."""
@@ -222,15 +243,14 @@ class ClaudeCli:
             self.paused.set()
             raise UsagePause(purpose)
 
-    def _usage_limit_pause(self, purpose: str, cwd=None, fp_before=None) -> None:
+    def _usage_limit_pause(self, purpose: str, cwd=None, pre=None, can_write=False) -> None:
         """Limit text seen: pause only if a limit-hit marker lands on disk; else return
         so the caller's existing HarnessError('llm-usage-limit') (exit 3) stands."""
         if self.gate is None or not usage_pause.limit_hit_marker(self.gate):
             return
         self.paused.set()
-        dirty = cwd is not None and (fp_before is None
-                                     or usage_pause.worktree_fingerprint(cwd) != fp_before)
-        raise UsagePause(purpose, dirty=dirty)
+        dirty = cwd is not None and can_write and usage_pause.edit_since(cwd, pre)
+        raise UsagePause(purpose, dirty=dirty, prespawn=pre, cwd=cwd)
 
     def call(self, purpose: str, model: str, prompt: str, validate,
              max_retries: int = 1, normalizer=None):
@@ -334,20 +354,23 @@ class ClaudeCli:
                             append_system_prompt=append_system_prompt,
                             setting_sources=setting_sources, max_turns=max_turns)
         rec = LlmCallRecord(purpose=purpose, model=MODEL_MAP[model])
+        # A read-only call cannot edit the worktree, so its pause is never dirty.
+        can_write = usage_pause.tools_can_write(allowed_tools, denied_tools)
         last_err = ""
         for attempt in range(max_retries + 1):
             try:
                 self._gate_before_spawn(purpose, cwd)
-                fp_before = usage_pause.worktree_fingerprint(cwd) if self.gate else None
-                proc = _run_reaped(argv, prompt, timeout, cwd,
-                                   self._child_env(_tooled_env(allowed_tools, denied_tools),
-                                                   MODEL_MAP[model]))
+                pre = usage_pause.capture_prespawn(cwd) if (self.gate and can_write) else None
+                with self._write_call(can_write):
+                    proc = _run_reaped(argv, prompt, timeout, cwd,
+                                       self._child_env(_tooled_env(allowed_tools, denied_tools),
+                                                       MODEL_MAP[model]))
                 if self.gate is not None and usage_pause.marker_exists(self.gate):
                     self.paused.set()   # the hook paused this child (marker keyed on S)
                 if self.paused.is_set():
-                    raise UsagePause(purpose, dirty=(
-                        fp_before is None
-                        or usage_pause.worktree_fingerprint(cwd) != fp_before))
+                    raise UsagePause(purpose,
+                                     dirty=can_write and usage_pause.edit_since(cwd, pre),
+                                     prespawn=pre, cwd=cwd)
             except subprocess.TimeoutExpired:
                 last_err = f"tooled call exceeded {timeout}s wall clock"
                 rec.retries = attempt
@@ -360,7 +383,7 @@ class ClaudeCli:
                     rec.ok = False
                     rec.retries = attempt
                     self.ledger.add(rec)
-                    self._usage_limit_pause(purpose, cwd, fp_before)
+                    self._usage_limit_pause(purpose, cwd, pre=pre, can_write=can_write)
                     raise HarnessError("llm-usage-limit",
                                        f"{purpose}: {raw[:200].strip()}")
                 last_err = (f"CLI non-JSON output (rc={proc.returncode}): "
@@ -387,7 +410,7 @@ class ClaudeCli:
             if (_is_error_env or len(result_text.strip()) < 400) and _USAGE_LIMIT_RE.search(result_text):
                 rec.ok = False
                 self.ledger.add(rec)
-                self._usage_limit_pause(purpose, cwd, fp_before)
+                self._usage_limit_pause(purpose, cwd, pre=pre, can_write=can_write)
                 raise HarnessError("llm-usage-limit",
                                    f"{purpose}: {result_text[:200].strip()}")
             # Content failures are never re-asked: a reviewer that errored out mid-review
@@ -419,6 +442,31 @@ class ClaudeCli:
 
 
 
+def _fake_pause(purpose: str, spec: dict, cwd) -> None:
+    """Raise a fixture pause. With an `edit` spec and a cwd, make a real partial edit
+    first, so the pause carries a real pre-spawn capture. Without one, `dirty` comes
+    straight from the spec and no capture rides along."""
+    edit = spec.get("edit")
+    if not edit or not cwd:
+        raise UsagePause(purpose, dirty=bool(spec.get("dirty")))
+    pre = usage_pause.capture_prespawn(cwd)
+    target = os.path.join(cwd, edit["path"])
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    with open(target, "w") as fh:
+        fh.write(edit["content"])
+    if spec.get("move_head"):
+        subprocess.run(["git", "commit", "-q", "--allow-empty", "-m", "fake"], cwd=cwd,
+                       check=True, capture_output=True)
+    if spec.get("merge_head"):
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=cwd, check=True,
+                              capture_output=True, text=True).stdout.strip()
+        git_dir = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], cwd=cwd,
+                                 check=True, capture_output=True, text=True).stdout.strip()
+        with open(os.path.join(git_dir, "MERGE_HEAD"), "w") as fh:
+            fh.write(head + "\n")
+    raise UsagePause(purpose, dirty=usage_pause.edit_since(cwd, pre), prespawn=pre, cwd=cwd)
+
+
 class FixtureLlm:
     """Test adapter: serves canned responses by purpose; records zero-usage calls."""
 
@@ -433,7 +481,7 @@ class FixtureLlm:
             raise HarnessError("llm-fixture-missing", purpose)
         data = self.canned[purpose]
         if isinstance(data, dict) and data.get("kind") == "usage-pause":
-            raise UsagePause(purpose, dirty=bool(data.get("dirty")))
+            _fake_pause(purpose, data, None)
         if normalizer is not None:
             data = normalizer(data)
         validate(data)
@@ -458,11 +506,11 @@ class FixtureLlm:
             raise HarnessError("llm-fixture-missing", purpose)
         val = self.canned[purpose]
         if isinstance(val, dict) and val.get("kind") == "usage-pause":
-            raise UsagePause(purpose, dirty=bool(val.get("dirty")))
+            _fake_pause(purpose, val, cwd)
         if isinstance(val, dict) and "raise" in val:
             spec = val["raise"]
             if spec["kind"] == "usage-pause":
-                raise UsagePause(purpose, dirty=bool(spec.get("dirty")))
+                _fake_pause(purpose, spec, cwd)
             raise HarnessError(spec["kind"], spec.get("detail", ""))
         self.ledger.add(LlmCallRecord(purpose=purpose, model=f"fixture:{model}"))
         return val

@@ -835,3 +835,117 @@ def test_write_overlap_flag_set_on_concurrent_calls(shim, tmp_path, monkeypatch)
 
     assert both(("Read", "Edit"), ("Read", "Edit")) is True
     assert both(("Read",), ("Read", "Edit")) is False
+
+
+# ---------------------------------------------------------------- dirty-resume Phase 3
+
+@pytest.fixture()
+def rec_gate(gate, tmp_path, monkeypatch):
+    """Gate env plus a state dir, so the pause record has somewhere to live."""
+    state = tmp_path / "gate-state"
+    monkeypatch.setenv("FAKE_STATE_DIR", str(state))
+    ctx, why = usage_pause.context_from_env()
+    assert why == "ok"
+    return ctx, state / "runs" / f"{S}.pause.json"
+
+
+def _edit_repo(tmp_path):
+    """A repo with tracked b.txt, plus a pre-spawn staged change a.txt."""
+    repo = _git_repo(tmp_path / "wt")
+    (repo / "b.txt").write_text("b\n")
+    _sh(repo, "add", "b.txt")
+    _sh(repo, "commit", "-qm", "b")
+    (repo / "a.txt").write_text("staged\n")
+    _sh(repo, "add", "a.txt")
+    return repo
+
+
+def _partial_edit(repo):
+    (repo / "b.txt").write_text("half\n")
+    (repo / "c.txt").write_text("new\n")
+
+
+def _set_merge_head(repo):
+    (repo / ".git" / "MERGE_HEAD").write_text(_sh(repo, "rev-parse", "HEAD") + "\n")
+
+
+def test_pause_record_roundtrip(rec_gate, tmp_path):
+    ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    assert usage_pause.pause_record_write(ctx, "gate-fix", pre, str(repo)) is None
+    status, rec = usage_pause.pause_record_load(ctx)
+    assert status == "ok" and path.exists()
+    assert rec["pre_tree"] == pre.tree
+    assert rec["post_tree"] != pre.tree
+    assert rec["post_tree"] == usage_pause.capture_prespawn(str(repo)).tree
+    assert sorted(p for _, p in rec["changed"]) == ["b.txt", "c.txt"]
+    assert rec["session_id"] == S and rec["head"] == pre.head
+
+
+def test_pause_record_refuses_head_move(rec_gate, tmp_path):
+    ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    _sh(repo, "commit", "-q", "--allow-empty", "-m", "moved")
+    assert usage_pause.pause_record_write(ctx, "ci-fix", pre, str(repo)) == "head-moved"
+    assert not path.exists()
+
+
+def test_pause_record_refuses_merge_head(rec_gate, tmp_path):
+    ctx, path = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    _set_merge_head(repo)
+    assert usage_pause.pause_record_write(ctx, "conflict", pre, str(repo)) == "op-in-progress"
+    assert not path.exists()
+
+
+def _recorded(rec_gate, tmp_path):
+    ctx, _ = rec_gate
+    repo = _edit_repo(tmp_path)
+    pre = usage_pause.capture_prespawn(str(repo))
+    _partial_edit(repo)
+    assert usage_pause.pause_record_write(ctx, "gate-fix", pre, str(repo)) is None
+    return ctx, repo, usage_pause.pause_record_load(ctx)[1]
+
+
+def test_restore_discards_only_the_edit(rec_gate, tmp_path):
+    _ctx, repo, rec = _recorded(rec_gate, tmp_path)
+    assert usage_pause.restore_from_record(str(repo), rec, S) is None
+    assert (repo / "b.txt").read_text() == "b\n"
+    assert not (repo / "c.txt").exists()
+    assert (repo / "a.txt").read_text() == "staged\n"
+    assert "a.txt" in _sh(repo, "diff", "--cached", "--name-only")
+
+
+def test_restore_refuses_unrelated_dirt(rec_gate, tmp_path):
+    _ctx, repo, rec = _recorded(rec_gate, tmp_path)
+    (repo / "d.txt").write_text("stranger\n")
+    before = {n: (repo / n).read_bytes() for n in ("a.txt", "b.txt", "c.txt", "d.txt")}
+    assert usage_pause.restore_from_record(str(repo), rec, S) == "tree-mismatch"
+    assert {n: (repo / n).read_bytes() for n in before} == before
+
+
+def test_restore_refuses_session_mismatch_and_malformed(rec_gate, tmp_path):
+    ctx, repo, rec = _recorded(rec_gate, tmp_path)
+    other = "6b6b6b6b-1111-4222-8333-444444444444"
+    assert usage_pause.restore_from_record(str(repo), rec, other) == "session-mismatch"
+    assert (repo / "b.txt").read_text() == "half\n"
+    _, path = rec_gate
+    path.write_text(json.dumps({"version": 2}))
+    assert usage_pause.pause_record_load(ctx) == ("malformed", None)
+
+
+def test_ledger_clear_removes_pause_record(rec_gate, tmp_path):
+    _ctx, path = rec_gate
+    path.parent.mkdir(parents=True)
+    path.write_text("{}")
+    effects = path.parent / f"{S}.effects.json"
+    effects.write_text("[]")
+    usage_pause.ledger_clear()
+    assert not path.exists()
+    assert not effects.exists()

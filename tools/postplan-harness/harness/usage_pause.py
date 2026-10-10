@@ -328,3 +328,156 @@ def ledger_clear() -> None:
             os.remove(path)
         except OSError:
             pass
+    pause_record_clear(ctx)
+
+
+# ---------------------------------------------------------------- dirty pause record
+# A pause that interrupted a write-capable call leaves a partial edit. runs/<S>.pause.json
+# proves which edit it was, so the resumed run under S can discard exactly that edit
+# and continue. Every refusal leaves the worktree untouched (ADR-0143 addendum
+# 2026-10-10).
+PAUSE_RECORD_VERSION = 1
+
+
+def _pause_record_path_for(ctx: GateContext, sid: str) -> str | None:
+    sd = state_dir(ctx)
+    return None if sd is None else os.path.join(sd, "runs", f"{sid}.pause.json")
+
+
+def _pause_record_path(ctx: GateContext) -> str | None:
+    return _pause_record_path_for(ctx, ctx.session_id)
+
+
+def _changed_between(cwd: str, pre_tree: str, post_tree: str) -> list:
+    """[[status, path], ...] between two trees, status in A/M/D/T."""
+    raw = _git(cwd, "diff-tree", "-r", "-z", "--no-renames", "--name-status",
+               pre_tree, post_tree)
+    toks = raw.split("\0")
+    pairs = []
+    i = 0
+    while i + 1 < len(toks):
+        status, path = toks[i], toks[i + 1]
+        if not status:
+            i += 1
+            continue
+        pairs.append([status[0], path])
+        i += 2
+    return pairs
+
+
+def _unsafe(path: str) -> bool:
+    return os.path.isabs(path) or ".." in path.split("/")
+
+
+def pause_record_write(ctx: GateContext, purpose: str, pre: PreSpawn,
+                       cwd: str) -> str | None:
+    """Record the interrupted edit. None on success, else the refusal reason."""
+    post = capture_prespawn(cwd)
+    if post is None:
+        return "capture-failed"
+    if post.head != pre.head:
+        return "head-moved"
+    if pre.ops or post.ops:
+        return "op-in-progress"
+    if post.tree == pre.tree:
+        return "no-edit"
+    try:
+        changed = _changed_between(cwd, pre.tree, post.tree)
+    except (OSError, subprocess.CalledProcessError):
+        return "capture-failed"
+    if any(_unsafe(p) for _, p in changed):
+        return "unsafe-path"
+    path = _pause_record_path(ctx)
+    if path is None:
+        return "write-failed"
+    rec = {"version": PAUSE_RECORD_VERSION, "session_id": ctx.session_id,
+           "purpose": purpose, "head": pre.head, "pre_tree": pre.tree,
+           "post_tree": post.tree, "changed": changed,
+           "written_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(rec, fh)
+        os.replace(tmp, path)
+    except OSError:
+        return "write-failed"
+    return None
+
+
+def _load_record_at(path: str | None) -> tuple[str, dict | None]:
+    if path is None or not os.path.exists(path):
+        return "missing", None
+    try:
+        with open(path) as fh:
+            rec = json.load(fh)
+    except (OSError, ValueError):
+        return "malformed", None
+    if not isinstance(rec, dict) or rec.get("version") != PAUSE_RECORD_VERSION:
+        return "malformed", None
+    for key in ("session_id", "head", "pre_tree", "post_tree"):
+        if not isinstance(rec.get(key), str) or not rec[key]:
+            return "malformed", None
+    changed = rec.get("changed")
+    if not isinstance(changed, list) or not all(
+            isinstance(c, list) and len(c) == 2 and all(isinstance(x, str) for x in c)
+            for c in changed):
+        return "malformed", None
+    return "ok", rec
+
+
+def pause_record_load(ctx: GateContext) -> tuple[str, dict | None]:
+    """("missing", None), ("malformed", None) or ("ok", rec) for this session's record."""
+    return _load_record_at(_pause_record_path(ctx))
+
+
+def pause_record_exists_for(ctx: GateContext, sid: str) -> bool:
+    path = _pause_record_path_for(ctx, sid)
+    return path is not None and os.path.exists(path)
+
+
+def pause_record_clear(ctx: GateContext) -> None:
+    path = _pause_record_path(ctx)
+    if path is not None:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def restore_from_record(cwd: str, rec: dict, session_id: str) -> str | None:
+    """Discard exactly the recorded edit. None after a verified discard, else a reason.
+
+    Every check runs before any write, so a refusal leaves the worktree untouched.
+    """
+    if rec.get("session_id") != session_id:
+        return "session-mismatch"
+    cur = capture_prespawn(cwd)
+    if cur is None:
+        return "capture-failed"
+    if cur.head != rec["head"]:
+        return "head-moved"
+    if cur.ops:
+        return "op-in-progress"
+    if cur.tree != rec["post_tree"]:
+        return "tree-mismatch"
+    # Same shape as gatefix.revert's tree half: restore M/D/T from the pre-spawn tree
+    # (keeps staged pre-spawn work; never `reset --hard`), unlink what the edit added.
+    try:
+        pairs = _changed_between(cwd, rec["pre_tree"], rec["post_tree"])
+        if any(_unsafe(p) for _, p in pairs):
+            return "restore-failed"
+        restore = [p for s, p in pairs if s in ("M", "D", "T")]
+        remove = [p for s, p in pairs if s == "A"]
+        if restore:
+            _git(cwd, "restore", f"--source={rec['pre_tree']}", "--worktree", "--", *restore)
+        for p in remove:
+            target = os.path.join(cwd, p)
+            if os.path.islink(target) or os.path.exists(target):
+                os.unlink(target)
+    except Exception:  # noqa: BLE001 -- any failure fails closed
+        return "restore-failed"
+    after = capture_prespawn(cwd)
+    if after is None or after.tree != rec["pre_tree"]:
+        return "restore-unverified"
+    return None

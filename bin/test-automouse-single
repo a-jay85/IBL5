@@ -690,7 +690,9 @@ touch "$NDIR/skipped/plan-skip.md.staleness"
 # Clone the state to a temp copy and run self-heal on it.
 CLONE="$ROOT/clone-case2"
 cp -r "$NDIR" "$CLONE"
-if NIGHTLY_DIR="$CLONE" PLANS_DIR="$PDIR" "$REPO/bin/automouse/self-heal" >/dev/null 2>&1; then
+# The ARGV_RE knob keeps the orphan-watcher sweep off real and fixture processes.
+if AUTOMOUSE_ORPHAN_ARGV_RE='^no-orphan-sweep-in-this-test$' \
+   NIGHTLY_DIR="$CLONE" PLANS_DIR="$PDIR" "$REPO/bin/automouse/self-heal" >/dev/null 2>&1; then
     if [ -e "$CLONE/queue/plan-skip.md" ]; then
         echo "positive-control: self-heal WOULD requeue plan-skip — fixture is non-vacuous."
     else

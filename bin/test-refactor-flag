@@ -19,24 +19,21 @@
 # Run: bin/test-refactor-flag  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REFACTOR_FLAG="$SCRIPT_DIR/refactor-flag"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+h_tmp TMP
 
-FAILED=0
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$1"; }
 
 # mk_repo — fresh repo with a committed classes file + matching test file.
 mk_repo() {
     local d
     d="$(mktemp -d "$TMP/repo.XXXXXX")"
-    git init -q "$d" >/dev/null 2>&1
-    git -C "$d" config user.email t@example.com >/dev/null 2>&1
-    git -C "$d" config user.name tester >/dev/null 2>&1
-    git -C "$d" config commit.gpgsign false >/dev/null 2>&1
+    h_git_repo "$d" --no-commit >/dev/null
     # Adverse config: rename detection OFF. The fix must still credit a renamed
     # test, because checkTestCoverage uses diffRenames() which forces `-M`. With the
     # old diffNames(_,'R') approach this would regress to exit 1 under this config.
@@ -98,9 +95,4 @@ printf '<?php\nclass BrandNewTest\n{\n    public function testNew(): void {}\n}\
 git -C "$d" add ibl5/tests/Foo/BrandNewTest.php >/dev/null 2>&1
 assert_rc "trigger-with-added-test-passes" 0 "$d"
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

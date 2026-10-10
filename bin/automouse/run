@@ -2602,6 +2602,8 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         if [ "$PP_STATUS" -eq 75 ]; then
             pp_sid=$(usage_marker_find post-plan-now "${PP_WORKTREE:-}") || pp_sid=""
             if [ -n "$pp_sid" ]; then
+                # Branch breadcrumb for dispose_resumed_postplan_lock: it outlives the handoff.
+                automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG" > "$CURRENT_LOCK/branch" 2>/dev/null || true
                 printf '%s\n' "$pp_sid" > "$CURRENT_LOCK/paused-held"
                 CURRENT_LOCK=""
             fi

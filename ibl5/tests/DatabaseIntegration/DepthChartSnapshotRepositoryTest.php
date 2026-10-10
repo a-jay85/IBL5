@@ -374,4 +374,35 @@ class DepthChartSnapshotRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $record['wins']);
         self::assertSame(0, $record['losses']);
     }
+
+    public function testGetPlayersForDepthChartBreaksOrdinalTiesByIdAscending(): void
+    {
+        $dcId = $this->repo->createSavedDepthChart(1, 'testgm', 'Tie DC', 'Regular Season', 2024, '2024-01-15', 10);
+        $otherId = $this->repo->createSavedDepthChart(1, 'testgm', 'Other DC', 'Regular Season', 2024, '2024-01-15', 10);
+
+        $this->insertRow('ibl_saved_depth_chart_players', ['depth_chart_id' => $dcId, 'pid' => 200139312, 'player_name' => 'Tie B', 'ordinal' => 3]);
+        $this->insertRow('ibl_saved_depth_chart_players', ['depth_chart_id' => $dcId, 'pid' => 200139311, 'player_name' => 'Tie A', 'ordinal' => 3]);
+        $this->insertRow('ibl_saved_depth_chart_players', ['depth_chart_id' => $dcId, 'pid' => 200139313, 'player_name' => 'Tie Lead', 'ordinal' => 2]);
+        $this->insertRow('ibl_saved_depth_chart_players', ['depth_chart_id' => $otherId, 'pid' => 200139314, 'player_name' => 'Other', 'ordinal' => 1]);
+
+        $rows = $this->repo->getPlayersForDepthChart($dcId);
+
+        self::assertSame([200139313, 200139312, 200139311], array_map('intval', array_column($rows, 'pid')));
+    }
+
+    public function testGetLiveRosterSettingsBreaksOrdinalTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200139322, 'Aaa Tie Two', ['teamid' => 1, 'retired' => 0, 'ordinal' => 7]);
+        $this->insertTestPlayer(200139321, 'Aaa Tie One', ['teamid' => 1, 'retired' => 0, 'ordinal' => 7]);
+        $this->insertTestPlayer(200139323, 'Aaa Tie Lead', ['teamid' => 1, 'retired' => 0, 'ordinal' => 6]);
+        $this->insertTestPlayer(200139324, 'Aaa Tie Gone', ['teamid' => 1, 'retired' => 1, 'ordinal' => 7]);
+
+        $testPids = [200139321, 200139322, 200139323, 200139324];
+        $pids = array_values(array_filter(
+            array_map('intval', array_column($this->repo->getLiveRosterSettings(1), 'pid')),
+            static fn (int $pid): bool => in_array($pid, $testPids, true)
+        ));
+
+        self::assertSame([200139323, 200139321, 200139322], $pids);
+    }
 }

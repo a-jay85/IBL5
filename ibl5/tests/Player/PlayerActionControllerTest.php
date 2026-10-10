@@ -213,4 +213,17 @@ class PlayerActionControllerTest extends WideUnitTestCase
         $this->assertNotFalse($stylesPos);
         $this->assertLessThan($stylesPos, $formPos);
     }
+
+    public function testRenderRookieOptionCardUsesTeamColors(): void
+    {
+        $this->seedPlayer();
+        $controller = $this->buildController($this->ownerRepo('Heat'), 'Free Agency');
+
+        $output = $controller->renderRookieOption(1, 'testgm', null, null, 'team-page');
+
+        // The card's gradient endpoints carry color2 ('000000'); the gold default would carry '1e3a5f'.
+        $card = substr($output, (int) strpos($output, 'card-flip-container'));
+        $this->assertStringContainsStringIgnoringCase('--card-grad-start:#000000', $card);
+        $this->assertStringNotContainsStringIgnoringCase('--card-grad-start:#1e3a5f', $card);
+    }
 }

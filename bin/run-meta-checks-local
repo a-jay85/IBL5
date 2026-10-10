@@ -342,6 +342,8 @@ if [ "$STAGE" = "pre-push" ]; then
     run_step "check-prose-self-test"         hard "$BIN/check-prose" --self-test
     run_step "check-prose-since"             hard "$BIN/check-prose" "--since=$BASE"
     run_step "check-registry-trigger-rows"   hard "$BIN/check-registry-trigger-rows"
+    run_step "check-model-pins"              hard "$BIN/check-model-pins"
+    run_step "test-check-model-pins"         hard "$BIN/test-check-model-pins"
 
     # Row 7: pre-push form of manual-testing check
     if [ -n "$BODY_FILE" ]; then

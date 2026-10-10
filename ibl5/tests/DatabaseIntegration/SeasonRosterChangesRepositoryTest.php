@@ -127,6 +127,29 @@ class SeasonRosterChangesRepositoryTest extends DatabaseTestCase
         self::assertSame($pid1, $testResults[1]['pid'], 'Player moving to Sharks should be second');
     }
 
+    public function testSameNewTeamTiesBreakByPidAscending(): void
+    {
+        // Insert the higher pid first so ascending pid differs from insertion order.
+        $this->insertTestPlayer(200110009, 'PMV Tie B', ['teamid' => 2]);
+        $this->insertHistRow(200110009, 'PMV Tie B', 2087, ['teamid' => 1, 'team' => 'Metros']);
+        $this->insertTestPlayer(200110008, 'PMV Tie A', ['teamid' => 2]);
+        $this->insertHistRow(200110008, 'PMV Tie A', 2087, ['teamid' => 1, 'team' => 'Metros']);
+        // Moves to Metros, so team name sorts it ahead of the Sharks pair.
+        $this->insertTestPlayer(200110010, 'PMV Tie C', ['teamid' => 1]);
+        $this->insertHistRow(200110010, 'PMV Tie C', 2087, ['teamid' => 2, 'team' => 'Sharks']);
+
+        $results = $this->repo->getSeasonRosterChanges(2087);
+
+        $testResults = array_values(array_filter(
+            $results,
+            static fn (array $row): bool => str_starts_with($row['name'], 'PMV Tie'),
+        ));
+        self::assertSame(
+            [200110010, 200110008, 200110009],
+            array_column($testResults, 'pid'),
+        );
+    }
+
     public function testCorrectCountMatchesOnlyMovedPlayers(): void
     {
         $pid1 = 200110008;

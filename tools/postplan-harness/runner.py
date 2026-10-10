@@ -36,7 +36,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gitutil, holdrepeat, llm_calls,
+from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, holdrepeat, llm_calls,
                      manual_rows, manual_testing, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      schemas, scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
@@ -52,10 +52,11 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               qualify_backlog_refs,
                               render_files_changed,
                               render_tests_changed,
+                              render_gate_fix,
                               render_residual_phases,
                               render_scope_notes,
                               restore_manual_testing_section, strip_manual_testing_section,
-                              upsert_files_changed,
+                              upsert_files_changed, upsert_gate_fix,
                               upsert_tests_changed,
                               upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
@@ -357,8 +358,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
         log("phase2: starting commit (pre-commit hook)")
-        sha = _commit_with_gate_remediation(
-            git, worktree, f"{copy['commit_subject']}\n\n{copy['summary_md']}", log)
+        sha = _commit_with_gate_fix(
+            git, worktree, f"{copy['commit_subject']}\n\n{copy['summary_md']}", log,
+            llm=llm, res=res)
         rebase_line = f"REBASE=not run ({mode} mode)"
         if live:
             pre_rebase = git.head()
@@ -416,8 +418,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if live:
             sha = git.head()  # refresh — remediation may have committed and moved HEAD
         pr_known = gh.pr_number() if (live and gh.pr_exists()) else None
-        pushed = _push_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
-                                      out_dir=out_dir, res=res, pr=pr_known)
+        pushed = _push_with_gate_fix(git, log, "phase2", llm=llm, worktree=worktree,
+                                     out_dir=out_dir, res=res, pr=pr_known, gh=gh)
         if pushed:
             sha = pushed
         if gh.pr_exists():
@@ -428,6 +430,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             create_body = upsert_tests_changed(create_body, render_tests_changed(diff))
             create_body = _apply_backlog_closes(create_body, plan, log)
             create_body = _upsert_no_adr_markers(create_body, plan)
+            create_body = upsert_gate_fix(create_body, render_gate_fix(res.gate_fix))
             pr = gh.pr_create(copy["title"], create_body, "master")
             log(f"phase2: pr_create intent recorded (title={copy['title']!r})")
         res.pr_number = pr
@@ -593,6 +596,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             body = upsert_gate_backtest(body, _gb.block)
         body = _apply_backlog_closes(body, plan, log)
         body = _upsert_no_adr_markers(body, plan)
+        _gate_fix_block = render_gate_fix(res.gate_fix)
+        if _gate_fix_block:   # never strips a block an earlier run published
+            body = upsert_gate_fix(body, _gate_fix_block)
         gh.pr_edit_body(pr, body)
         _check_backlog_closes(gh, pr, plan, log)
         _sweep_out_of_scope(gh, pr, plan, slug, log)
@@ -1115,12 +1121,12 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
     try:
         out = run_thread_ingestion(
             gh, llm, git, worktree or ".", pr, pre_posting_ids, out_dir, log,
-            commit=lambda msg: _commit_with_gate_remediation(
-                git, worktree, msg, log, phase="phase4.5"),
-            push=lambda: _push_with_adr_draft(git, log, "phase4.5", llm=llm,
-                                              worktree=worktree, out_dir=out_dir,
-                                              res=res,
-                                              pr=(pr if isinstance(git, LiveGit) else None)))
+            commit=lambda msg: _commit_with_gate_fix(
+                git, worktree, msg, log, phase="phase4.5", llm=llm, res=res),
+            push=lambda: _push_with_gate_fix(git, log, "phase4.5", llm=llm,
+                                             worktree=worktree, out_dir=out_dir,
+                                             res=res, gh=gh,
+                                             pr=(pr if isinstance(git, LiveGit) else None)))
     except HarnessError as e:
         if e.kind in ("gate-path-edit", "push-failed"):
             raise
@@ -1287,6 +1293,59 @@ def _push_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res,
                     f"(class={classify_local_gate_denial(e3.detail or '')}) - "
                     f"{drafted.path} stays committed locally; failing closed")
             raise
+
+
+_GATE_FIX_PUSH_SUBJECT = "chore: auto-fix local pre-push gate denial"
+
+
+def _publish_gate_fix(gh, pr, res, log) -> None:
+    """Upsert the gate-fix block into the live PR body. Never raises: the fix and the
+    push already succeeded, and the record is still in result.json and audit.log."""
+    block = render_gate_fix(res.gate_fix)
+    if not block:
+        return
+    try:
+        gh.pr_edit_body(pr, upsert_gate_fix(gh.pr_body_fresh() or "", block))
+        log(f"gatefix: recorded in PR #{pr} body")
+    except Exception as exc:  # noqa: BLE001 - the record is best-effort here
+        log(f"gatefix: PR body record failed: {exc}")
+
+
+def _push_with_gate_fix(git, log, phase, *, llm, worktree, out_dir, res, pr=None,
+                        gh=None) -> str:
+    """Push-site gate fixer, outermost: the ADR wrapper acts first on its own class;
+    any denial that survives it gets one fixer, one fix commit, one re-push."""
+    try:
+        return _push_with_adr_draft(git, log, phase, llm=llm, worktree=worktree,
+                                    out_dir=out_dir, res=res, pr=pr)
+    except HarnessError as e:
+        if e.kind == "local-gate" and worktree and git.is_dirty():
+            log(f"{phase}: gatefix skipped: dirty tree at push site")
+            raise
+        outcome = _attempt_gate_fix(e, llm=llm, worktree=worktree, res=res, log=log,
+                                    phase=phase)
+        if outcome is None:
+            raise
+        if outcome.status != "fixed":
+            res.gate_fix = gatefix.record_of(outcome, phase=phase, retry="not-run")
+            log(f"{phase}: gate fixer {outcome.status} - failing closed")
+            raise
+        try:
+            fix_commit = git.commit_all(f"{_GATE_FIX_PUSH_SUBJECT}\n\n{_GATE_FIX_NOTE}")
+            pushed = _push_with_lease_retry(git, log, phase, pr=pr, worktree=worktree)
+        except HarnessError as e2:
+            res.gate_fix = gatefix.record_of(outcome, phase=phase, retry="denied")
+            if e2.kind == "local-gate":
+                log(f"{phase}: {e2.cmd or 'git'} still denied after the gate fix "
+                    f"(class={classify_local_gate_denial(e2.detail or '')}); the fix "
+                    "stays local - failing closed")
+                raise e from None
+            raise
+        res.gate_fix = gatefix.record_of(outcome, phase=phase, retry="passed")
+        log(f"{phase}: gate fix committed {fix_commit[:12]} and re-push passed")
+        if gh is not None and pr:
+            _publish_gate_fix(gh, pr, res, log)
+        return pushed
 
 
 def _fail_closed_on_divergence(gh, log, pr, phase: str, evidence: str, *,
@@ -1556,9 +1615,10 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
             else:
                 try:
                     _refresh_and_reprove(git, log, "phase7-dep", _DEP_CATCHUP_KEY)
-                    sha = _push_with_adr_draft(
+                    sha = _push_with_gate_fix(
                         git, log, "phase7", llm=llm, worktree=worktree, out_dir=out_dir,
-                        res=res, pr=(pr if isinstance(git, LiveGit) else None)) or git.head()
+                        res=res, gh=gh,
+                        pr=(pr if isinstance(git, LiveGit) else None)) or git.head()
                 except HarnessError as e:
                     if e.kind == "remote-head-diverged":
                         raise
@@ -1613,8 +1673,9 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                             timeout=int(min(TOOLED_TIMEOUT, remaining / 2)))
             remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
             stage = "commit"
-            new = _commit_with_gate_remediation(git, worktree,
-                    cifix.CI_FIX_COMMIT_MSG.format(n=attempt), log, phase="phase7")
+            new = _commit_with_gate_fix(git, worktree,
+                    cifix.CI_FIX_COMMIT_MSG.format(n=attempt), log, phase="phase7",
+                    llm=llm, res=res)
         except HarnessError as e:
             if e.kind == "remote-head-diverged":
                 raise
@@ -1671,9 +1732,9 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
             else:
                 pre_push_head, head_before = new, git.head()
                 try:
-                    pushed = _push_with_adr_draft(
+                    pushed = _push_with_gate_fix(
                         git, log, "phase7", llm=llm, worktree=worktree,
-                        out_dir=out_dir, res=res,
+                        out_dir=out_dir, res=res, gh=gh,
                         pr=(pr if isinstance(git, LiveGit) else None))
                     # Only a head the push path moved (catch-up rebase, ADR draft)
                     # replaces the fix commit's own sha.
@@ -2133,6 +2194,70 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
     return False
 
 
+_GATE_FIX_NOTE = ("Local gate auto-fix: tools/postplan-harness/harness/gatefix.py edited "
+                  "the tree after a local gate denial; see the PR body gate-fix block.")
+
+
+def _attempt_gate_fix(e, *, llm, worktree, res, log, phase):
+    """One headless fixer attempt for a local-gate denial, or None when ineligible.
+
+    Once per run: a non-empty res.gate_fix means this run already spent its attempt.
+    The ADR path owns its class: an `adr` denial after res.adr_drafted is skipped, so
+    the drafter and the fixer never both act on one denial.
+    """
+    if e.kind != "local-gate":
+        return None
+    reason = None
+    if not worktree:
+        reason = "no worktree (replay mode)"
+    elif llm is None or res is None:
+        reason = "call site not wired"
+    elif getattr(res, "gate_fix", None):
+        reason = f"already attempted this run ({res.gate_fix.get('status')})"
+    elif (classify_local_gate_denial(e.detail or "") == "adr"
+          and getattr(res, "adr_drafted", False)):
+        reason = "adr denial after this run's ADR draft"
+    if reason:
+        log(f"{phase}: gatefix skipped: {reason}")
+        return None
+    log(f"{phase}: local-gate denial at {e.cmd or 'git'} - running one headless "
+        f"gate fixer (model={gatefix.GATEFIX_MODEL})")
+    return gatefix.attempt_gate_fix(llm, worktree, gate_text=e.detail or "",
+                                    failed_cmd=e.cmd or "git", log=log, redact=_redact)
+
+
+def _commit_with_gate_fix(git, worktree, message, log, phase="phase2", *, llm=None,
+                          res=None) -> str:
+    """Commit-site gate fixer, outermost: same-commit fix, then ONE plain retry."""
+    try:
+        # Same call shape the unwrapped sites used: phase is passed only when non-default.
+        return (_commit_with_gate_remediation(git, worktree, message, log)
+                if phase == "phase2" else
+                _commit_with_gate_remediation(git, worktree, message, log, phase=phase))
+    except HarnessError as e:
+        outcome = _attempt_gate_fix(e, llm=llm, worktree=worktree, res=res, log=log,
+                                    phase=phase)
+        if outcome is None:
+            raise
+        if outcome.status != "fixed":
+            res.gate_fix = gatefix.record_of(outcome, phase=phase, retry="not-run")
+            log(f"{phase}: gate fixer {outcome.status} - failing closed")
+            raise
+        try:
+            retried = git.commit_all(f"{message}\n\n{_GATE_FIX_NOTE}")
+        except HarnessError as e2:
+            res.gate_fix = gatefix.record_of(outcome, phase=phase, retry="denied")
+            if e2.kind == "local-gate":
+                log(f"{phase}: hook still denied after the gate fix "
+                    f"(class={classify_local_gate_denial(e2.detail or '')}); fixer "
+                    f"edits stay in the tree ({', '.join(outcome.files)}) - failing closed")
+                raise e from None
+            raise
+        res.gate_fix = gatefix.record_of(outcome, phase=phase, retry="passed")
+        log(f"{phase}: gate fix retry passed sha={retried[:12]}")
+        return retried
+
+
 def _commit_with_gate_remediation(git, worktree: str | None, message: str, log,
                                   phase: str = "phase2") -> str:
     """Phase 2 commit with ONE bounded auto-remediation of the mechanical gate class.
@@ -2341,16 +2466,16 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                 sha = fidelity.remediate(
                     llm, git, out_dir, worktree or ".", packet, current_verdict_path,
                     master_sha, log=log,
-                    commit=lambda msg: _commit_with_gate_remediation(
-                        git, worktree, msg, log, phase="phase5.5"),
+                    commit=lambda msg: _commit_with_gate_fix(
+                        git, worktree, msg, log, phase="phase5.5", llm=llm, res=res),
                     # The same retrying push Phase 2 and both Phase 7 pushes (BEHIND, ci-fix) use, so a master that
                     # moved during the review + fix span gets one clean rebase per
                     # attempt instead of ending the loop on the hook's
                     # "does not contain origin/master".
-                    push=lambda: _push_with_adr_draft(git, log, "phase5.5", llm=llm,
-                                                      worktree=worktree, out_dir=out_dir,
-                                                      res=res,
-                                                      pr=(pr if isinstance(git, LiveGit) else None)),
+                    push=lambda: _push_with_gate_fix(git, log, "phase5.5", llm=llm,
+                                                     worktree=worktree, out_dir=out_dir,
+                                                     res=res, gh=gh,
+                                                     pr=(pr if isinstance(git, LiveGit) else None)),
                     pr_number=pr, model=model, work_list=work, outcome=outcome)
             except HarnessError as e:
                 if raw_before_round and "## Manual Testing" in raw_before_round:

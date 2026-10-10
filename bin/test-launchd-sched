@@ -1,0 +1,628 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# shellcheck disable=SC1090,SC2030,SC2031  # libs are sourced by variable path inside subshells on purpose
+# Golden-output harness for the bin/*-cron-setup family and bin/lib/launchd-sched.sh.
+#
+# Every setup script's side-effect-free print mode is captured into
+# bin/fixtures/launchd-sched/ with the main-checkout path normalised to
+# @MAIN_WT@ and $HOME to @HOME@. A migration must leave every fixture
+# byte-identical. The harness never calls a real launchctl and never writes
+# under $HOME.
+#
+# Usage:
+#   bin/test-launchd-sched           # compare every case against its fixture
+#   bin/test-launchd-sched --regen   # rewrite every fixture from current scripts
+
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+FIXTURES="$REPO_ROOT/bin/fixtures/launchd-sched"
+GOLDEN_HOME="/lsched-golden-home"
+DM_TO="100000000000000001"
+SIM_ENV="SIM_RECAP_SSH_HOST=golden-host SIM_RECAP_REMOTE_ROOT=/golden/root SIM_RECAP_DB_USER=golden_user SIM_RECAP_DB_NAME=golden_db SIM_RECAP_DB_PASSWORD=golden-secret"
+NODE_ENV_ASSIGN="NODE_BIN=/opt/lsched-golden/bin/node"
+
+MODE="compare"
+for arg in "$@"; do
+  case "$arg" in
+    --regen) MODE="regen" ;;
+    *) echo "Unknown option: $arg" >&2; exit 2 ;;
+  esac
+done
+
+# <fixture-name>|<script relpath>|<args>|<extra env assignments>
+CASES="wt-gc.plist|bin/wt-gc-cron-setup|--print-schedule|
+wt-sync.plist|bin/wt-sync-cron-setup|--print-schedule|
+db-sync.plist|bin/db-sync-cron-setup|--print-schedule|
+sim-recap.plist|bin/sim-recap-cron-setup|--print-schedule|$SIM_ENV
+pr-cycle-tick.plist|bin/pr-cycle-tick-cron-setup|--print-schedule|
+morning-digest.plist|bin/automouse/morning-digest-cron-setup|--print-schedule|
+morning-digest-discord.plist|bin/automouse/morning-digest-cron-setup|--print-schedule|DISCORD_DM_TO=$DM_TO
+comprehension-digest.plist|bin/automouse/comprehension-digest-cron-setup|--print-schedule|
+comprehension-digest-discord.plist|bin/automouse/comprehension-digest-cron-setup|--print-schedule|DISCORD_DM_TO=$DM_TO
+backups-sync.plist|bin/backups-sync-setup|--print-schedule|
+bug-pipeline-cron.plist|bin/bug-pipeline-cron-setup|--print-schedule|$NODE_ENV_ASSIGN
+bug-bot.plist|bin/bug-pipeline-cron-setup|--print-bot|$NODE_ENV_ASSIGN
+launchd-health-login.plist|bin/launchd-health-cron-setup|--print-schedule login|
+launchd-health-daily.plist|bin/launchd-health-cron-setup|--print-schedule daily|
+usage-gate-coordinator.plist|bin/usage-gate-cron-setup|--print|
+usage-gate-probe.plist|bin/usage-gate-cron-setup|--print-probe|"
+
+# Scripts whose arg-parse failure branches are pinned in <name>.cli.txt.
+CLI_SCRIPTS="wt-gc|bin/wt-gc-cron-setup
+wt-sync|bin/wt-sync-cron-setup
+db-sync|bin/db-sync-cron-setup
+sim-recap|bin/sim-recap-cron-setup
+pr-cycle-tick|bin/pr-cycle-tick-cron-setup
+morning-digest|bin/automouse/morning-digest-cron-setup
+comprehension-digest|bin/automouse/comprehension-digest-cron-setup
+backups-sync|bin/backups-sync-setup
+bug-pipeline|bin/bug-pipeline-cron-setup"
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+# shellcheck source=bin/lib/usage-test-isolation.sh
+. "$REPO_ROOT/bin/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
+
+MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
+[ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"
+
+PASS=0
+FAIL=0
+pass() { echo "PASS $1"; PASS=$((PASS + 1)); }
+fail() { echo "FAIL $1"; FAIL=$((FAIL + 1)); }
+
+normalise_stdout() {
+  local out="$1"
+  out="${out//"$MAIN_WT"/@MAIN_WT@}"
+  out="${out//"$GOLDEN_HOME"/@HOME@}"
+  printf '%s\n' "$out"
+}
+
+# run_case <script> <args> <extra env> — prints normalised stdout, then a
+# Golden runs leave IBL5_USAGE_GATE_STATE_DIR unforwarded: the usage-gate setup
+# script bakes it into its plist, and --print/--help never touch gate state.
+# final "exit=<code>" line is NOT emitted; the exit code is stored in RC.
+RC=0
+run_case() {
+  local script="$1" args="$2" extra="$3" out
+  # shellcheck disable=SC2086  # args and extra are deliberately word-split
+  out="$(env -i HOME="$GOLDEN_HOME" PATH=/usr/bin:/bin $extra bash "$REPO_ROOT/$script" $args 2>/dev/null)"
+  RC=$?
+  normalise_stdout "$out"
+}
+
+# run_cli <script> <args> — prints "args=<args> exit=<code>" then normalised stderr.
+run_cli() {
+  local script="$1" args="$2" err code
+  # shellcheck disable=SC2086
+  err="$(env -i HOME="$GOLDEN_HOME" PATH=/usr/bin:/bin bash "$REPO_ROOT/$script" $args 2>&1 >/dev/null)"
+  code=$?
+  err="${err//"$REPO_ROOT"/@REPO_ROOT@}"
+  err="${err//"$MAIN_WT"/@MAIN_WT@}"
+  err="${err//"$GOLDEN_HOME"/@HOME@}"
+  printf 'args=%s exit=%s\n%s\n' "$args" "$code" "$err"
+}
+
+cli_block() {
+  local script="$1"
+  # backups-sync-setup with no args runs the rsync/Docker/SSH build path.
+  case "$script" in bin/backups-sync-setup) ;; *) run_cli "$script" "" ;; esac
+  run_cli "$script" "--bogus-flag"
+}
+
+# compare_fixture <name> <fixture path> <actual file> — returns 0 on byte-equal.
+# A missing fixture is a failure, never a vacuous pass.
+compare_fixture() {
+  local name="$1" fixture="$2" actual="$3"
+  if [ ! -f "$fixture" ]; then
+    echo "  missing fixture: $fixture" >&2
+    return 1
+  fi
+  if cmp -s "$fixture" "$actual"; then
+    return 0
+  fi
+  diff -u "$fixture" "$actual" 2>&1 | head -20 >&2
+  return 1
+}
+
+if [ "$MODE" = "regen" ]; then
+  mkdir -p "$FIXTURES"
+  while IFS='|' read -r name script args extra; do
+    [ -n "$name" ] || continue
+    run_case "$script" "$args" "$extra" > "$FIXTURES/$name.golden"
+    echo "regen $name (exit=$RC)"
+  done <<< "$CASES"
+  while IFS='|' read -r name script; do
+    [ -n "$name" ] || continue
+    cli_block "$script" > "$FIXTURES/$name.cli.txt"
+    echo "regen $name.cli.txt"
+  done <<< "$CLI_SCRIPTS"
+  exit 0
+fi
+
+# ── Golden plist cases ───────────────────────────────────────────────────────
+while IFS='|' read -r name script args extra; do
+  [ -n "$name" ] || continue
+  run_case "$script" "$args" "$extra" > "$TMP/actual.$name"
+  if compare_fixture "$name" "$FIXTURES/$name.golden" "$TMP/actual.$name"; then
+    pass "$name"
+  else
+    fail "$name"
+  fi
+done <<< "$CASES"
+
+# ── CLI fixtures ─────────────────────────────────────────────────────────────
+while IFS='|' read -r name script; do
+  [ -n "$name" ] || continue
+  cli_block "$script" > "$TMP/actual.$name.cli.txt"
+  if compare_fixture "$name.cli.txt" "$FIXTURES/$name.cli.txt" "$TMP/actual.$name.cli.txt"; then
+    pass "$name.cli.txt"
+  else
+    fail "$name.cli.txt"
+  fi
+done <<< "$CLI_SCRIPTS"
+
+# ── Built-in negative cases ──────────────────────────────────────────────────
+# Tamper: a one-byte change to a fixture copy must be reported as a mismatch.
+cp "$FIXTURES/wt-gc.plist.golden" "$TMP/tampered.plist"
+printf 'X' >> "$TMP/tampered.plist"
+run_case bin/wt-gc-cron-setup --print-schedule "" > "$TMP/tamper.actual"
+if compare_fixture tamper "$TMP/tampered.plist" "$TMP/tamper.actual" 2>/dev/null; then
+  fail "harness-tamper-detected"
+else
+  pass "harness-tamper-detected"
+fi
+
+# Missing fixture: must fail, not pass vacuously.
+if compare_fixture missing "$TMP/does-not-exist.plist" "$TMP/tamper.actual" 2>/dev/null; then
+  fail "harness-missing-fixture-fails"
+else
+  pass "harness-missing-fixture-fails"
+fi
+
+# Coverage: every setup script has a golden case.
+uncovered=""
+for s in "$REPO_ROOT"/bin/*-cron-setup "$REPO_ROOT"/bin/automouse/*-cron-setup "$REPO_ROOT"/bin/backups-sync-setup; do
+  [ -e "$s" ] || continue
+  case "$(basename "$s")" in test-*) continue ;; esac
+  rel="${s#"$REPO_ROOT"/}"
+  case "$CASES" in
+    *"|$rel|"*) ;;
+    *) uncovered="$uncovered $rel" ;;
+  esac
+done
+if [ -z "$uncovered" ]; then
+  pass "harness-coverage"
+else
+  echo "  setup scripts without a golden case:$uncovered" >&2
+  fail "harness-coverage"
+fi
+
+# Secret: sim-recap's password is masked in print mode.
+if grep -qF '<string>***</string>' "$FIXTURES/sim-recap.plist.golden" 2>/dev/null \
+   && ! grep -qF 'golden-secret' "$FIXTURES/sim-recap.plist.golden" 2>/dev/null; then
+  pass "sim-recap-secret-masked"
+else
+  fail "sim-recap-secret-masked"
+fi
+
+# ── Library unit tests: bin/lib/launchd-sched.sh ─────────────────────────────
+LIB="$REPO_ROOT/bin/lib/launchd-sched.sh"
+TAB="$(printf '\t')"
+
+# expect_eq <name> <expected> <actual>
+expect_eq() {
+  if [ "$2" = "$3" ]; then
+    pass "$1"
+  else
+    printf '  expected: %s\n  actual:   %s\n' "$2" "$3" >&2
+    fail "$1"
+  fi
+}
+
+# lsched_main_wt: from an added worktree it prints the main path; outside any
+# git tree it prints the dir and the subshell survives set -euo pipefail.
+REPOBOX="$TMP/repobox"
+mkdir -p "$REPOBOX/main"
+(
+  cd "$REPOBOX/main" || exit 1
+  export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
+  git init -q . && git -c user.name=lsched -c user.email=lsched@example.invalid commit -q --allow-empty -m init && git worktree add -q "$REPOBOX/wt" -b lsched-wt
+) >/dev/null 2>&1
+REPOBOX_MAIN="$(cd "$REPOBOX/main" && pwd -P)"
+got="$(set -euo pipefail; . "$LIB"; lsched_main_wt "$REPOBOX/wt" | cat)"
+got_real="$(cd "$got" 2>/dev/null && pwd -P)"
+expect_eq "lib-main-wt-from-worktree" "$REPOBOX_MAIN" "$got_real"
+if [ "$(printf '%s\n' "$got" | wc -l | tr -d ' ')" = "1" ] && ! grep -qF "$REPOBOX/wt" <<< "$got"; then
+  pass "lib-main-wt-single-line-no-worktree-path"
+else
+  fail "lib-main-wt-single-line-no-worktree-path"
+fi
+NOGIT="$TMP/nogit"
+mkdir -p "$NOGIT"
+got="$(set -euo pipefail; . "$LIB"; lsched_main_wt "$NOGIT")"
+rc=$?
+expect_eq "lib-main-wt-non-git-fallback" "0:$NOGIT" "$rc:$got"
+
+# Deliberate behavior fix (matrix row 12): a wt-gc-cron-setup copy living outside
+# any git tree must still print a plist, not die on the failed git probe.
+# expects the plist to name $T/bin/wt-gc-tick (lsched_main_wt falls back to the dir).
+T="$TMP/nogit-wt-gc"
+mkdir -p "$T/bin/lib"
+cp "$REPO_ROOT/bin/wt-gc-cron-setup" "$T/bin/"
+cp "$REPO_ROOT/bin/lib/launchd-sched.sh" "$REPO_ROOT/bin/lib/launchd-job.sh" "$T/bin/lib/"
+rc=0
+got="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" HOME="$GOLDEN_HOME" PATH=/usr/bin:/bin bash "$T/bin/wt-gc-cron-setup" --print-schedule 2>&1)" || rc=$?
+if [ "$rc" = "0" ] && grep -qF "$T/bin/wt-gc-tick" <<< "$got"; then
+  pass "wt-gc-non-git-tree-prints-plist"
+else
+  printf '  rc=%s\n  output: %s\n' "$rc" "$got" >&2
+  fail "wt-gc-non-git-tree-prints-plist"
+fi
+
+# Emitters print exact tab-indented bytes.
+emit() { ( set -euo pipefail; . "$LIB"; "$@" ); }
+expect_eq "lib-key-string" "${TAB}<key>Label</key>
+${TAB}<string>com.x</string>" "$(emit lsched_key_string Label com.x)"
+expect_eq "lib-key-string-depth2" "${TAB}${TAB}<key>PATH</key>
+${TAB}${TAB}<string>/a:/b</string>" "$(emit lsched_key_string PATH /a:/b 2)"
+expect_eq "lib-key-integer" "${TAB}<key>StartInterval</key>
+${TAB}<integer>3600</integer>" "$(emit lsched_key_integer StartInterval 3600)"
+expect_eq "lib-key-bool" "${TAB}<key>RunAtLoad</key>
+${TAB}<true/>" "$(emit lsched_key_bool RunAtLoad true)"
+expect_eq "lib-program-arguments" "${TAB}<key>ProgramArguments</key>
+${TAB}<array>
+${TAB}${TAB}<string>/bin/a</string>
+${TAB}${TAB}<string>--x</string>
+${TAB}</array>" "$(emit lsched_program_arguments /bin/a --x)"
+expect_eq "lib-calendar" "${TAB}<key>StartCalendarInterval</key>
+${TAB}<dict>
+${TAB}${TAB}<key>Hour</key>
+${TAB}${TAB}<integer>3</integer>
+${TAB}${TAB}<key>Minute</key>
+${TAB}${TAB}<integer>30</integer>
+${TAB}</dict>" "$(emit lsched_calendar Hour=3 Minute=30)"
+expect_eq "lib-env-open-close" "${TAB}<key>EnvironmentVariables</key>
+${TAB}<dict>
+${TAB}</dict>" "$(emit lsched_env_open; emit lsched_env_close)"
+
+# Rejections return 2 and write to stderr.
+for rej in "lsched_program_arguments" "lsched_calendar Hour" "lsched_key_bool RunAtLoad yes"; do
+  # shellcheck disable=SC2086
+  err="$( ( set -uo pipefail; . "$LIB"; $rej ) 2>&1 >/dev/null )"
+  # shellcheck disable=SC2086
+  ( set -uo pipefail; . "$LIB"; $rej ) >/dev/null 2>&1
+  rrc=$?
+  if [ "$rrc" = "2" ] && [ -n "$err" ]; then pass "lib-reject: $rej"; else fail "lib-reject: $rej (rc=$rrc)"; fi
+done
+
+# lsched_plist wraps the body function.
+sample_body() { printf '\t<key>Label</key>\n\t<string>com.x</string>\n'; }
+plist_out="$(set -euo pipefail; . "$LIB"; lsched_plist sample_body)"
+expect_eq "lib-plist-wrapper" '<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+'"${TAB}"'<key>Label</key>
+'"${TAB}"'<string>com.x</string>
+</dict>
+</plist>' "$plist_out"
+
+# lsched_install / lsched_uninstall against a stub launchctl.
+STUB="$TMP/stub"
+mkdir -p "$STUB" "$TMP/lhome"
+cat > "$STUB/launchctl" <<'STUBEOF'
+#!/bin/sh
+echo "$*" >> "$LSCHED_STUB_LOG"
+case "$1" in
+  bootstrap) exit "${STUB_BOOTSTRAP_RC:-0}" ;;
+  bootout) exit 3 ;;
+esac
+exit 0
+STUBEOF
+chmod +x "$STUB/launchctl"
+export LSCHED_STUB_LOG="$TMP/launchctl.log"
+UID_N="$(id -u)"
+PLIST_T="$TMP/lhome/Library/LaunchAgents/com.ibl5.lsched-test.plist"
+: > "$LSCHED_STUB_LOG"
+( set -euo pipefail; . "$LIB"; export PATH="$STUB:$PATH"; lsched_install com.ibl5.lsched-test "$PLIST_T" sample_body "$TMP/lhome/logs" ) >/dev/null 2>&1
+rc=$?
+expect_eq "lib-install-log" "bootout gui/$UID_N/com.ibl5.lsched-test
+bootstrap gui/$UID_N $PLIST_T" "$(cat "$LSCHED_STUB_LOG")"
+expect_eq "lib-install-rc0" "0" "$rc"
+expect_eq "lib-install-plist-equals-lsched_plist" "$plist_out" "$(cat "$PLIST_T")"
+if [ -d "$TMP/lhome/logs" ]; then pass "lib-install-extra-dir"; else fail "lib-install-extra-dir"; fi
+( set -uo pipefail; . "$LIB"; export PATH="$STUB:$PATH" STUB_BOOTSTRAP_RC=5; lsched_install com.ibl5.lsched-test "$PLIST_T" sample_body ) >/dev/null 2>&1
+expect_eq "lib-install-returns-bootstrap-status" "5" "$?"
+( set -euo pipefail; . "$LIB"; export PATH="$STUB:$PATH"; lsched_uninstall com.ibl5.lsched-test "$PLIST_T" ) >/dev/null 2>&1
+rc=$?
+if [ "$rc" = "0" ] && [ ! -e "$PLIST_T" ]; then pass "lib-uninstall"; else fail "lib-uninstall (rc=$rc)"; fi
+( set -euo pipefail; . "$LIB"; export PATH="$STUB:$PATH"; lsched_uninstall com.ibl5.lsched-test "$PLIST_T" ) >/dev/null 2>&1
+expect_eq "lib-uninstall-idempotent" "0" "$?"
+
+# Source hygiene: sourcing twice leaves shell options unchanged.
+hyg="$( set +e; before="$- $(shopt -po)"; . "$LIB"; . "$LIB"; rc2=$?; after="$- $(shopt -po)"; [ "$before" = "$after" ] && [ "$rc2" = 0 ] && echo ok )"
+expect_eq "lib-source-hygiene" "ok" "$hyg"
+
+# ── Install-arm cases (stubbed launchctl, temp HOME) ─────────────────────────
+# Every case asserts the stub log, which proves the stub ran and the real
+# launchctl did not. Scripts run under env -i with the stub first on PATH.
+ISTUB="$TMP/istub"
+IHOME="$TMP/ihome"
+ILOG="$TMP/ilaunchctl.log"
+mkdir -p "$ISTUB" "$IHOME"
+cat > "$ISTUB/launchctl" <<'ISTUBEOF'
+#!/bin/sh
+echo "$*" >> "$LSCHED_ISTUB_LOG"
+exit 0
+ISTUBEOF
+chmod +x "$ISTUB/launchctl"
+
+# run_install <script> <args> [VAR=val ...] — sets IRC, IOUT, IERR; logs to $ILOG.
+run_install() {
+  local script="$1" args="$2"
+  shift 2
+  : > "$ILOG"
+  # shellcheck disable=SC2086
+  env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" HOME="$IHOME" PATH="$ISTUB:/usr/bin:/bin" LSCHED_ISTUB_LOG="$ILOG" "$@" \
+    bash "$REPO_ROOT/$script" $args > "$TMP/iout" 2> "$TMP/ierr"
+  IRC=$?
+  IOUT="$(cat "$TMP/iout")"
+  IERR="$(cat "$TMP/ierr")"
+}
+norm_file() {
+  local out
+  out="$(cat "$1")"
+  out="${out//"$MAIN_WT"/@MAIN_WT@}"
+  out="${out//"$IHOME"/@HOME@}"
+  printf '%s\n' "$out"
+}
+log_order_ok() {
+  # bootout line precedes bootstrap line, both present
+  local o b
+  o="$(grep -n '^bootout ' "$ILOG" | head -1 | cut -d: -f1)"
+  b="$(grep -n '^bootstrap ' "$ILOG" | head -1 | cut -d: -f1)"
+  [ -n "$o" ] && [ -n "$b" ] && [ "$o" -lt "$b" ]
+}
+
+# db-sync install: golden-equal plist, bootout then bootstrap.
+printf 'PROD_SSH_HOST=golden-host\n' > "$TMP/db.env"
+DBPLIST="$IHOME/Library/LaunchAgents/com.ibl5.db-sync-nightly.plist"
+rm -f "$DBPLIST"
+run_install bin/db-sync-cron-setup --install-schedule DB_SYNC_CRON_ENV_FILE="$TMP/db.env"
+norm_file "$DBPLIST" > "$TMP/db.installed" 2>/dev/null
+if [ "$IRC" = "0" ] && log_order_ok && cmp -s "$TMP/db.installed" "$FIXTURES/db-sync.plist.golden"; then
+  pass "install-db-sync-golden"
+else
+  echo "  rc=$IRC err=$IERR" >&2
+  fail "install-db-sync-golden"
+fi
+
+# db-sync install negative: no PROD_SSH_HOST => exit 1, no plist, no launchctl.
+printf 'OTHER=1\n' > "$TMP/db-empty.env"
+rm -f "$DBPLIST"
+run_install bin/db-sync-cron-setup --install-schedule DB_SYNC_CRON_ENV_FILE="$TMP/db-empty.env"
+if [ "$IRC" = "1" ] && grep -qF 'Error: PROD_SSH_HOST is not set in' <<< "$IERR" \
+   && [ ! -e "$DBPLIST" ] && [ ! -s "$ILOG" ]; then
+  pass "install-db-sync-refuses-without-host"
+else
+  fail "install-db-sync-refuses-without-host"
+fi
+
+# db-sync uninstall.
+mkdir -p "$IHOME/Library/LaunchAgents"
+: > "$DBPLIST"
+run_install bin/db-sync-cron-setup --uninstall-schedule
+if [ "$IRC" = "0" ] && [ ! -e "$DBPLIST" ] && grep -qF 'Uninstalled com.ibl5.db-sync-nightly.' <<< "$IOUT" && [ -s "$ILOG" ]; then
+  pass "uninstall-db-sync"
+else
+  fail "uninstall-db-sync"
+fi
+
+# sim-recap install negative: no SIM_RECAP_* => refuses before any launchctl call.
+run_install bin/sim-recap-cron-setup --install-schedule
+if [ "$IRC" = "1" ] && grep -qF 'Error: unset required env var(s): SIM_RECAP_SSH_HOST' <<< "$IERR" && [ ! -s "$ILOG" ]; then
+  pass "install-sim-recap-refuses-unset-env"
+else
+  fail "install-sim-recap-refuses-unset-env"
+fi
+
+# sim-recap resume: refuses a missing plist, then re-arms an existing one.
+SRPLIST="$IHOME/Library/LaunchAgents/com.ibl5.sim-recap-poll.plist"
+rm -f "$SRPLIST"
+run_install bin/sim-recap-cron-setup --resume
+if [ "$IRC" = "1" ] && grep -qF 'does not exist' <<< "$IERR" && [ ! -s "$ILOG" ]; then
+  pass "resume-sim-recap-refuses-missing-plist"
+else
+  fail "resume-sim-recap-refuses-missing-plist"
+fi
+: > "$SRPLIST"
+run_install bin/sim-recap-cron-setup --resume
+if [ "$IRC" = "0" ] && log_order_ok && grep -qF 'Resumed com.ibl5.sim-recap-poll.' <<< "$IOUT"; then
+  pass "resume-sim-recap-rearms"
+else
+  fail "resume-sim-recap-rearms"
+fi
+
+# sim-recap uninstall.
+run_install bin/sim-recap-cron-setup --uninstall-schedule
+if [ "$IRC" = "0" ] && [ ! -e "$SRPLIST" ] && grep -qF 'Uninstalled com.ibl5.sim-recap-poll.' <<< "$IOUT" && [ -s "$ILOG" ]; then
+  pass "uninstall-sim-recap"
+else
+  fail "uninstall-sim-recap"
+fi
+
+# backups-sync install and uninstall (no-arg build path is never run).
+BSPLIST="$IHOME/Library/LaunchAgents/com.ibl5.backups-sync.plist"
+rm -f "$BSPLIST" "$TMP/docker-called"
+# A docker stub on PATH: if the script falls through the schedule case into the
+# build path, the stub leaves a marker. Path is baked in; the stub runs under env -i.
+cat > "$ISTUB/docker" <<DOCKEREOF
+#!/bin/bash
+touch "$TMP/docker-called"
+DOCKEREOF
+chmod +x "$ISTUB/docker"
+run_install bin/backups-sync-setup --install-schedule
+norm_file "$BSPLIST" > "$TMP/bs.installed" 2>/dev/null
+if [ "$IRC" = "0" ] && log_order_ok && [ ! -e "$TMP/docker-called" ] && cmp -s "$TMP/bs.installed" "$FIXTURES/backups-sync.plist.golden"; then
+  pass "install-backups-sync-golden"
+else
+  echo "  rc=$IRC err=$IERR" >&2
+  fail "install-backups-sync-golden"
+fi
+run_install bin/backups-sync-setup --uninstall-schedule
+if [ "$IRC" = "0" ] && [ ! -e "$BSPLIST" ] && grep -qF 'Uninstalled com.ibl5.backups-sync.' <<< "$IOUT" && [ -s "$ILOG" ]; then
+  pass "uninstall-backups-sync"
+else
+  fail "uninstall-backups-sync"
+fi
+
+# bug-pipeline install: refuses without the approver id, then installs with a gh stub.
+cat > "$ISTUB/gh" <<'GHEOF'
+#!/bin/sh
+exit 0
+GHEOF
+chmod +x "$ISTUB/gh"
+BPPLIST="$IHOME/Library/LaunchAgents/com.ibl5.bug-pipeline-cron.plist"
+rm -f "$BPPLIST"
+run_install bin/bug-pipeline-cron-setup --install-schedule
+if [ "$IRC" = "1" ] && grep -qF 'unset required env var(s): BUG_PIPELINE_APPROVER_ID' <<< "$IERR" \
+   && [ ! -e "$BPPLIST" ] && [ ! -s "$ILOG" ]; then
+  pass "install-bug-pipeline-refuses-without-approver"
+else
+  fail "install-bug-pipeline-refuses-without-approver"
+fi
+run_install bin/bug-pipeline-cron-setup --install-schedule BUG_PIPELINE_APPROVER_ID=golden-approver
+if [ "$IRC" = "0" ] && log_order_ok && [ -s "$BPPLIST" ] && grep -qF 'golden-approver' "$BPPLIST"; then
+  pass "install-bug-pipeline-writes-plist"
+else
+  echo "  rc=$IRC err=$IERR" >&2
+  fail "install-bug-pipeline-writes-plist"
+fi
+run_install bin/bug-pipeline-cron-setup --uninstall-schedule
+if [ "$IRC" = "0" ] && [ ! -e "$BPPLIST" ] && grep -qF 'Uninstalled com.ibl5.bug-pipeline-cron.' <<< "$IOUT" && [ -s "$ILOG" ]; then
+  pass "uninstall-bug-pipeline"
+else
+  fail "uninstall-bug-pipeline"
+fi
+
+# ── Label parity: installed labels vs bin/lib/launchd-expected-jobs.sh ───────
+# extract_labels <plist...> — print each file's Label value, sorted, unique.
+extract_labels() {
+  awk '/<key>Label<\/key>/ {getline; sub(/^[[:space:]]*<string>/, ""); sub(/<\/string>[[:space:]]*$/, ""); print}' "$@" | sort -u
+}
+installed_labels() { extract_labels "$FIXTURES"/*.plist.golden; }
+INSTALLED="$(installed_labels)"
+
+# lej_parity_check <lej_lib_path> — prints "PARITY: <label> ..." lines and
+# returns 1 when installed labels, LEJ_EXPECTED_JOBS and LEJ_EXEMPT_JOBS
+# disagree; returns 0 otherwise. A function named in LEJ_PARITY_HOOK runs
+# after sourcing, so a case can re-assign LEJ_EXEMPT_JOBS.
+lej_parity_check() {
+  (
+    # shellcheck disable=SC1090
+    . "$1"
+    [ -z "${LEJ_PARITY_HOOK:-}" ] || "$LEJ_PARITY_HOOK"
+    prc=0
+    expected="$(lej_expected_labels)"
+    exempt_labels=""
+    while read -r el reason; do
+      [ -n "$el" ] || continue
+      exempt_labels="$exempt_labels$el
+"
+      if [ -z "$reason" ]; then
+        echo "PARITY: $el exempt entry has no reason"; prc=1
+      fi
+      if ! grep -qxF -e "$el" <<< "$INSTALLED"; then
+        echo "PARITY: $el exempt but not installed by any setup script"; prc=1
+      fi
+      if grep -qxF -e "$el" <<< "$expected"; then
+        echo "PARITY: $el is in both the expected and exempt lists"; prc=1
+      fi
+    done <<< "$LEJ_EXEMPT_JOBS"
+    while read -r il; do
+      [ -n "$il" ] || continue
+      if ! grep -qxF -e "$il" <<< "$expected" && ! grep -qxF -e "$il" <<< "$exempt_labels"; then
+        echo "PARITY: $il installed but in neither the expected nor the exempt list"; prc=1
+      fi
+    done <<< "$INSTALLED"
+    exit "$prc"
+  )
+}
+
+LEJ_LIB="$REPO_ROOT/bin/lib/launchd-expected-jobs.sh"
+
+# Live: the real lib agrees with every installed label.
+parity_out="$(lej_parity_check "$LEJ_LIB")"
+parity_rc=$?
+if [ "$parity_rc" = "0" ] && [ -z "$parity_out" ]; then
+  pass "parity-live"
+else
+  printf '%s\n' "$parity_out" >&2
+  fail "parity-live (rc=$parity_rc)"
+fi
+
+# parity_drop_case <name> <exact line to drop> — a copy of the lib minus that
+# line must have exactly one line fewer, then fail parity naming the label.
+parity_drop_case() {
+  local name="$1" line="$2" label="${2%% *}" copy="$TMP/lej.$1.sh" before after out rc
+  grep -v -x -F -e "$line" "$LEJ_LIB" > "$copy"
+  before="$(wc -l < "$LEJ_LIB" | tr -d ' ')"
+  after="$(wc -l < "$copy" | tr -d ' ')"
+  if [ "$((before - after))" != "1" ]; then
+    fail "$name (deletion matched $((before - after)) lines, expected 1)"
+    return
+  fi
+  out="$(lej_parity_check "$copy")"
+  rc=$?
+  if [ "$rc" = "1" ] && grep -qF -e "$label" <<< "$out"; then
+    pass "$name"
+  else
+    printf '%s\n' "$out" >&2
+    fail "$name (rc=$rc)"
+  fi
+}
+parity_drop_case "parity-removed-expected-watch-pr-cycle" "com.ibl5.watch-pr-cycle standard"
+parity_drop_case "parity-removed-expected-wt-gc" "com.ibl5.wt-gc standard"
+parity_drop_case "parity-removed-exempt-health-login" "com.ibl5.launchd-health-login the health checker itself; it cannot report its own absence"
+
+# Reasonless exempt entry: appended after sourcing; fails on checks (b) and (c).
+add_noreason() { LEJ_EXEMPT_JOBS="${LEJ_EXEMPT_JOBS}
+com.ibl5.fixture-noreason"; }
+out="$(LEJ_PARITY_HOOK=add_noreason lej_parity_check "$LEJ_LIB")"
+rc=$?
+if [ "$rc" = "1" ] && grep -qF 'PARITY: com.ibl5.fixture-noreason' <<< "$out"; then
+  pass "parity-reasonless-exempt"
+else
+  printf '%s\n' "$out" >&2
+  fail "parity-reasonless-exempt (rc=$rc)"
+fi
+
+# awk extractor smoke: Label value only, never another <string> value.
+cat > "$TMP/extract.plist" <<'PLISTEOF'
+<dict>
+	<key>Label</key>
+	<string>com.ibl5.x</string>
+	<key>Program</key>
+	<string>/tmp/y</string>
+</dict>
+PLISTEOF
+extracted="$(extract_labels "$TMP/extract.plist")"
+expect_eq "parity-extract-label" "com.ibl5.x" "$extracted"
+if grep -qF '/tmp/y' <<< "$extracted"; then
+  fail "parity-extract-excludes-other-strings"
+else
+  pass "parity-extract-excludes-other-strings"
+fi
+
+# Fixtures hold no machine path.
+if grep -rqE -e '/Users/' -e '/home/' -e '-worktrees' -e 'lsched-golden-home' "$FIXTURES"; then
+  fail "fixtures-no-machine-path"
+else
+  pass "fixtures-no-machine-path"
+fi
+
+echo
+echo "Passed: $PASS  Failed: $FAIL"
+[ "$FAIL" -eq 0 ]

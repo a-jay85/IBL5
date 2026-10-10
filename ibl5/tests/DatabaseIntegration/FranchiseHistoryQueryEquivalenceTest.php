@@ -166,6 +166,101 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
         self::assertSame([], $this->runFrozen(self::FROZEN_WINDOW_SQL, 'ii', 1896, 1900));
     }
 
+    public function testWritesExplainAndTimingReport(): void
+    {
+        $stats = $this->seedProdScaleVolume();
+        $year = self::SEED_CURRENT_ENDING_YEAR;
+
+        $versionResult = $this->db->query('SELECT VERSION()');
+        self::assertInstanceOf(\mysqli_result::class, $versionResult);
+        $versionRow = $versionResult->fetch_row();
+        self::assertIsArray($versionRow);
+
+        $metricLines = [];
+        $keyLines = [];
+        $explainBlocks = [];
+        foreach ($this->currentSqlMap($year) as $method => $entry) {
+            $explainRows = $this->runFrozen('EXPLAIN ' . $entry['sql'], $entry['types'], ...$entry['params']);
+            self::assertNotSame([], $explainRows, "$method EXPLAIN empty");
+
+            $keys = [];
+            $block = ["=== EXPLAIN $method", "id\tselect_type\ttable\ttype\tpossible_keys\tkey\tkey_len\tref\trows\tExtra"];
+            foreach ($explainRows as $row) {
+                if ($row['key'] !== null) {
+                    $keys[] = self::stringOf($row['key']);
+                }
+                $block[] = implode("\t", array_map(
+                    static fn (mixed $value): string => $value === null ? 'NULL' : self::stringOf($value),
+                    array_values($row)
+                ));
+            }
+            $keyLines[] = "KEYS $method " . implode(',', $keys);
+            $explainBlocks[] = implode("\n", $block);
+
+            $runs = $this->timeRepositoryMethod($method, $year);
+            $sorted = $runs;
+            sort($sorted);
+            $median = $sorted[intdiv(count($sorted), 2)];
+            self::assertGreaterThan(0.0, $median);
+            $metricLines[] = sprintf(
+                'METRIC %s median_ms=%.1f runs_ms=%s',
+                $method,
+                $median,
+                implode(',', array_map(static fn (float $ms): string => sprintf('%.1f', $ms), $runs))
+            );
+        }
+
+        $text = "# franchise-history perf report\n"
+            . sprintf("SEED boxRows=%d teams=%d version=%s\n", $stats['boxRows'], $stats['teams'], self::stringOf($versionRow[0]))
+            . implode("\n", $metricLines) . "\n"
+            . implode("\n", $keyLines) . "\n"
+            . implode("\n", $explainBlocks) . "\n";
+
+        self::assertNotFalse(file_put_contents('/tmp/franchise-history-perf-report.txt', $text));
+    }
+
+    /**
+     * The SQL each repository method currently executes, keyed by method name.
+     *
+     * @return array<string, array{sql: string, types: string, params: list<int>}>
+     */
+    private function currentSqlMap(int $currentEndingYear): array
+    {
+        return [
+            'getFranchiseSummaryRows' => ['sql' => self::FROZEN_SUMMARY_SQL, 'types' => 'i', 'params' => [League::FREE_AGENTS_TEAMID]],
+            'getFiveSeasonWindowRows' => ['sql' => self::FROZEN_WINDOW_SQL, 'types' => 'ii', 'params' => [$currentEndingYear - 4, $currentEndingYear]],
+            'getRawPlayoffTotals' => ['sql' => self::FROZEN_PLAYOFF_TOTALS_SQL, 'types' => '', 'params' => []],
+            'getRawHeatTotals' => ['sql' => self::FROZEN_HEAT_TOTALS_SQL, 'types' => '', 'params' => []],
+        ];
+    }
+
+    /**
+     * Two untimed warm-ups, then seven timed calls of one repository method.
+     *
+     * @return list<float> elapsed milliseconds per timed call
+     */
+    private function timeRepositoryMethod(string $method, int $currentEndingYear): array
+    {
+        $call = match ($method) {
+            'getFranchiseSummaryRows' => fn (): array => $this->repository->getFranchiseSummaryRows($currentEndingYear),
+            'getFiveSeasonWindowRows' => fn (): array => $this->repository->getFiveSeasonWindowRows($currentEndingYear),
+            'getRawPlayoffTotals' => fn (): array => $this->repository->getRawPlayoffTotals(),
+            'getRawHeatTotals' => fn (): array => $this->repository->getRawHeatTotals(),
+            default => self::fail("unknown repository method $method"),
+        };
+
+        $call();
+        $call();
+        $runs = [];
+        for ($i = 0; $i < 7; $i++) {
+            $start = hrtime(true);
+            $call();
+            $runs[] = (hrtime(true) - $start) / 1e6;
+        }
+
+        return $runs;
+    }
+
     private function assertAllFourMatchFrozen(int $currentEndingYear): void
     {
         self::assertSame(

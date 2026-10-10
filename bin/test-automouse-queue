@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/test-automouse-queue — regression test for evict_dispositions in
-# bin/automouse/queue. Covers the duplicate-disposition symlink bug: queuing a
-# previously-done/skipped plan must evict the stale sibling before creating the
-# new queue/ entry.
+# bin/test-automouse-queue — regression test for bin/automouse/queue and the
+# numeric-prefix queue helper bin/lib/automouse-queue-order.sh.
+#
+# The queue directory owns run order: entries are NNN-<slug>.md symlinks and the
+# order is the lexical order of those names. Every ordering assertion here is a
+# rename assertion; no row reads a plan or entry mtime to decide order. The only
+# mtimes in this file are cutover fixtures (normalize_queue converts a legacy
+# bare-named queue by the symlink's own lstat mtime, once) and "old plan file"
+# inputs that must NOT influence where an enqueue lands.
+#
+# Covers: evict_dispositions (a previously-done/skipped plan is evicted before the
+# new queue/ entry is created), enqueue-appends-last, reorder / remove / dispose /
+# renumber, the helper's unit contracts, the one-shot cutover, and the
+# dispose -> self-heal round trip.
 #
 # Run: bin/test-automouse-queue  (exit 0 = all pass, 1 = any case failed)
 
@@ -13,23 +23,39 @@ set -u
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SCRIPT="$SCRIPT_DIR/automouse/queue"
-# shellcheck source=bin/automouse/lib-queue-order
-source "$SCRIPT_DIR/automouse/lib-queue-order"
+HEAL="$SCRIPT_DIR/automouse/self-heal"
+LIB="$SCRIPT_DIR/lib/automouse-queue-order.sh"
+# shellcheck source=bin/lib/automouse-queue-order.sh
+source "$LIB"
 h_tmp TMP
 
 NDIR="$TMP/automouse"
 PDIR="$TMP/plans"
+HQ="$TMP/hq"   # bare helper-unit fixture dir (never a real NIGHTLY_DIR)
 
 setup() {
     rm -rf "$NDIR"
-    mkdir -p "$NDIR/queue" "$NDIR/skipped" "$NDIR/done"
+    mkdir -p "$NDIR/queue" "$NDIR/skipped" "$NDIR/done" "$NDIR/reports"
     rm -rf "$PDIR"
     mkdir -p "$PDIR"
 }
 
+hq_reset() {
+    rm -rf "$HQ"
+    mkdir -p "$HQ"
+}
+
 run_queue() {
     NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" "$SCRIPT" "$@"
+}
+
+# rq <args…> — run the queue CLI, capturing combined output in $OUT and the exit
+# status in $RC. The harness never runs under `set -e`, so RC is always set.
+rq() {
+    RC=0
+    OUT=$(run_queue "$@" 2>&1) || RC=$?
 }
 
 # Create fixture plans carrying a valid impl_model:, which bin/automouse/queue add
@@ -38,6 +64,14 @@ mkplan() {
     local f
     for f in "$@"; do
         printf -- '---\nimpl_model: sonnet\n---\n\n# fixture plan %s\n' "$f" > "$PDIR/$f"
+    done
+}
+
+# enq <slug…> — enqueue each slug in order, output discarded.
+enq() {
+    local s
+    for s in "$@"; do
+        run_queue "$s" >/dev/null 2>&1
     done
 }
 
@@ -59,6 +93,67 @@ assert_absent() {
     fi
 }
 
+# qls — the raw `ls -1` listing of queue/, space-joined. "Unchanged" now means
+# "no rename", so touch-nothing and idempotence checks compare this verbatim.
+qls() {
+    ls -1 "$NDIR/queue" | tr '\n' ' ' | sed 's/ $//'
+}
+
+# assert_queued <desc> <slug> — the slug has a NNN-<slug>.md entry in queue/.
+assert_queued() {
+    if ! queue_entry_for_slug "$NDIR/queue" "$2" >/dev/null; then
+        h_fail "$1" "expected $2 queued; queue is: $(qls)"
+    fi
+}
+
+# assert_not_queued <desc> <slug> — no entry for the slug in queue/.
+assert_not_queued() {
+    local e
+    if e=$(queue_entry_for_slug "$NDIR/queue" "$2"); then
+        h_fail "$1" "expected $2 NOT queued; found entry $e"
+    fi
+}
+
+# queue_order — bare <slug>.md names in run order. Order comes from queue_entries
+# (the prefixes); entry_to_name drops them so assertions read as plain slugs.
+queue_order() {
+    local out="" f
+    while IFS= read -r f; do out="$out $(entry_to_name "$f")"; done \
+        < <(queue_entries "$NDIR/queue")
+    echo "${out# }"
+}
+assert_order() {
+    local desc="$1" expected="$2" actual
+    actual="$(queue_order)"
+    if [ "$actual" != "$expected" ]; then
+        h_fail "$desc" "expected order [$expected], got [$actual]"
+    fi
+}
+
+# assert_entries <desc> <expected listing> — the raw `ls -1` listing equals the
+# expected space-joined names exactly.
+assert_entries() {
+    local actual
+    actual="$(qls)"
+    if [ "$actual" != "$2" ]; then
+        h_fail "$1" "expected listing [$2], got [$actual]"
+    fi
+}
+
+# snap — full sorted tree of the fixture NIGHTLY_DIR (creation/removal detector).
+snap() {
+    find "$NDIR" | LC_ALL=C sort
+}
+
+hq_reset
+hq_files() {
+    local f
+    hq_reset
+    for f in "$@"; do
+        touch "$HQ/$f"
+    done
+}
+
 # ---------------------------------------------------------------------------
 # Row 1 — plan in skipped/ only → evicted, lands in queue/
 # ---------------------------------------------------------------------------
@@ -67,7 +162,7 @@ mkplan plan-a.md
 ln -s "$PDIR/plan-a.md" "$NDIR/skipped/plan-a.md"
 run_queue plan-a >/dev/null 2>&1
 assert_absent  "row1 skipped gone" "$NDIR/skipped/plan-a.md"
-assert_present "row1 queued"       "$NDIR/queue/plan-a.md"
+assert_queued  "row1 queued"       plan-a
 h_pass "row1 — skipped-only eviction"
 # ---------------------------------------------------------------------------
 # Row 2 — plan in done/ only → evicted, lands in queue/
@@ -77,7 +172,7 @@ mkplan plan-b.md
 ln -s "$PDIR/plan-b.md" "$NDIR/done/plan-b.md"
 run_queue plan-b >/dev/null 2>&1
 assert_absent  "row2 done gone" "$NDIR/done/plan-b.md"
-assert_present "row2 queued"    "$NDIR/queue/plan-b.md"
+assert_queued  "row2 queued"    plan-b
 h_pass "row2 — done-only eviction"
 # ---------------------------------------------------------------------------
 # Row 3 — plan in BOTH skipped/ and done/ → evicted from both, lands in queue/
@@ -90,7 +185,7 @@ ln -s "$PDIR/plan-c.md" "$NDIR/done/plan-c.md"
 run_queue plan-c >/dev/null 2>&1
 assert_absent  "row3 skipped gone" "$NDIR/skipped/plan-c.md"
 assert_absent  "row3 done gone"    "$NDIR/done/plan-c.md"
-assert_present "row3 queued"       "$NDIR/queue/plan-c.md"
+assert_queued  "row3 queued"       plan-c
 h_pass "row3 — both-dirs eviction (core bug)"
 # ---------------------------------------------------------------------------
 # Row 4 — fresh plan in neither sibling → queues normally, no error
@@ -100,7 +195,7 @@ mkplan plan-d.md
 run_queue plan-d >/dev/null 2>&1
 assert_absent  "row4 no skipped" "$NDIR/skipped/plan-d.md"
 assert_absent  "row4 no done"    "$NDIR/done/plan-d.md"
-assert_present "row4 queued"     "$NDIR/queue/plan-d.md"
+assert_entries "row4 queued as the first prefix" "010-plan-d.md"
 h_pass "row4 — fresh plan no-op eviction"
 # ---------------------------------------------------------------------------
 # Row 5 — requeue of a plan that also has a stale done/ entry → done evicted
@@ -113,7 +208,7 @@ ln -s "$PDIR/plan-e.md" "$NDIR/done/plan-e.md"
 run_queue requeue >/dev/null 2>&1
 assert_absent  "row5 done gone"    "$NDIR/done/plan-e.md"
 assert_absent  "row5 skipped gone" "$NDIR/skipped/plan-e.md"
-assert_present "row5 queued"       "$NDIR/queue/plan-e.md"
+assert_queued  "row5 queued"       plan-e
 h_pass "row5 — requeue done-eviction"
 # ---------------------------------------------------------------------------
 # Row 6 — .attempts counter evicted alongside symlink
@@ -129,7 +224,7 @@ assert_absent  "row6 skipped symlink gone"  "$NDIR/skipped/plan-f.md"
 assert_absent  "row6 skipped attempts gone" "$NDIR/skipped/plan-f.md.attempts"
 assert_absent  "row6 done symlink gone"     "$NDIR/done/plan-f.md"
 assert_absent  "row6 done attempts gone"    "$NDIR/done/plan-f.md.attempts"
-assert_present "row6 queued"                "$NDIR/queue/plan-f.md"
+assert_queued  "row6 queued"                plan-f
 h_pass "row6 — .attempts eviction"
 # ---------------------------------------------------------------------------
 # Row 7 — stale entry is a real (non-dangling) symlink; assert ! -e AND ! -L
@@ -143,34 +238,27 @@ if [ ! -e "$NDIR/skipped/plan-g.md" ]; then
 fi
 run_queue plan-g >/dev/null 2>&1
 assert_absent  "row7 symlink gone"  "$NDIR/skipped/plan-g.md"
-assert_present "row7 queued"        "$NDIR/queue/plan-g.md"
+assert_queued  "row7 queued"        plan-g
 h_pass "row7 — real-symlink eviction + dangling guard"
 # ---------------------------------------------------------------------------
 # Row 8 — idempotent re-queue of the same plan (same target): exit 0,
 # "Already queued (no change)", and skipped/ entry left untouched (eviction
 # must not fire before the already-queued check).
-# (plan-h manually linked into queue via ln -s; already-queued check fires first)
+# (plan-h manually linked into queue as 010-plan-h.md; already-queued check fires first)
 # ---------------------------------------------------------------------------
 setup
 touch "$PDIR/plan-h.md"
-ln -s "$PDIR/plan-h.md" "$NDIR/queue/plan-h.md"
+ln -s "$PDIR/plan-h.md" "$NDIR/queue/010-plan-h.md"
 ln -s "$PDIR/plan-h.md" "$NDIR/skipped/plan-h.md"
-set +e
-out=$(run_queue plan-h 2>&1)
-exit_code=$?
-# Restore the top-level state (set -u only, never -e): a leaked `set -e` here
-# would silently abort every row below on any non-zero return instead of
-# recording a FAIL — which is exactly how the CI failure masqueraded as an
-# early exit.
-set +e
-if [ "$exit_code" -ne 0 ]; then
-    h_fail "row8" "expected exit 0 for same-target re-queue, got $exit_code"
+rq plan-h
+if [ "$RC" -ne 0 ]; then
+    h_fail "row8" "expected exit 0 for same-target re-queue, got $RC"
 fi
-if ! echo "$out" | grep -q "Already queued (no change)"; then
-    h_fail "row8" "expected 'Already queued (no change)' in output, got: $out"
+if ! grep -q "Already queued (no change)" <<< "$OUT"; then
+    h_fail "row8" "expected 'Already queued (no change)' in output, got: $OUT"
 fi
 assert_present "row8 skipped untouched" "$NDIR/skipped/plan-h.md"
-assert_present "row8 queued untouched"  "$NDIR/queue/plan-h.md"
+assert_entries "row8 queued entry untouched" "010-plan-h.md"
 h_pass "row8 — same-target re-queue is idempotent (exit 0), skipped/ untouched"
 # ---------------------------------------------------------------------------
 # Row 8a — genuine conflict: same filename, different physical source → error,
@@ -182,24 +270,23 @@ setup
 touch "$PDIR/plan-h.md"
 mkdir -p "$TMP/altplans"
 touch "$TMP/altplans/plan-h.md"
-ln -s "$PDIR/plan-h.md" "$NDIR/queue/plan-h.md"
-set +e
-out=$(NIGHTLY_DIR="$NDIR" PLANS_DIR="$TMP/altplans" "$SCRIPT" plan-h 2>&1)
-ec=$?
-set +e
-if [ "$ec" -eq 0 ]; then
+ln -s "$PDIR/plan-h.md" "$NDIR/queue/010-plan-h.md"
+RC=0
+OUT=$(NIGHTLY_DIR="$NDIR" PLANS_DIR="$TMP/altplans" "$SCRIPT" plan-h 2>&1) || RC=$?
+if [ "$RC" -eq 0 ]; then
     h_fail "row8a" "expected non-zero exit for genuine conflict, got 0"
 fi
-if ! echo "$out" | grep -q "queued:"; then
-    h_fail "row8a" "expected 'queued:' in error output, got: $out"
+if ! grep -q "queued:" <<< "$OUT"; then
+    h_fail "row8a" "expected 'queued:' in error output, got: $OUT"
 fi
-if ! echo "$out" | grep -q "new:"; then
-    h_fail "row8a" "expected 'new:' in error output, got: $out"
+if ! grep -q "new:" <<< "$OUT"; then
+    h_fail "row8a" "expected 'new:' in error output, got: $OUT"
 fi
-link_target=$(readlink "$NDIR/queue/plan-h.md")
+link_target=$(readlink "$NDIR/queue/010-plan-h.md")
 if [ "$link_target" != "$PDIR/plan-h.md" ]; then
     h_fail "row8a" "readlink changed from original: $link_target"
 fi
+assert_entries "row8a queue unchanged" "010-plan-h.md"
 h_pass "row8a — genuine conflict exits 1 with clean error, queue unchanged"
 # ---------------------------------------------------------------------------
 # Row 8b — dangling symlink in queue/ gives a clean error, not a raw "ln: File
@@ -211,111 +298,51 @@ h_pass "row8a — genuine conflict exits 1 with clean error, queue unchanged"
 # ---------------------------------------------------------------------------
 setup
 touch "$PDIR/plan-h.md"
-ln -s "/nonexistent/plan-h.md" "$NDIR/queue/plan-h.md"   # dangling, different target
-set +e
-out=$(run_queue plan-h 2>&1)
-ec=$?
-set +e
-if [ "$ec" -eq 0 ]; then
+ln -s "/nonexistent/plan-h.md" "$NDIR/queue/010-plan-h.md"   # dangling, different target
+rq plan-h
+if [ "$RC" -eq 0 ]; then
     h_fail "row8b" "expected non-zero exit for dangling+different path, got 0"
 fi
-if echo "$out" | grep -qE '^ln:'; then
-    h_fail "row8b" "raw ln error leaked into output: $out"
+if grep -qE '^ln:' <<< "$OUT"; then
+    h_fail "row8b" "raw ln error leaked into output: $OUT"
 fi
-if ! echo "$out" | grep -q "queued:"; then
-    h_fail "row8b" "expected 'queued:' in error output, got: $out"
+if ! grep -q "queued:" <<< "$OUT"; then
+    h_fail "row8b" "expected 'queued:' in error output, got: $OUT"
 fi
+assert_entries "row8b queue unchanged" "010-plan-h.md"
 h_pass "row8b — dangling symlink gives clean error, no raw ln crash"
-# Helpers used by rows 8c, 8d, 10-14, and 17-20.  Defined here so they are
-# available to all callers regardless of which section they are in.
-
-# basenames of queue entries, oldest-first (runs-first), space-joined. Uses
-# queue_entries_ordered (the symlink's own lstat mtime), the same sort key as
-# production. Plain `ls -1tr` sorts by the target's mtime on macOS BSD ls.
-queue_order() {
-    local out="" f
-    while IFS= read -r f; do out="$out $(basename "$f")"; done \
-        < <(queue_entries_ordered "$NDIR/queue")
-    echo "${out# }"
-}
-assert_order() {
-    local desc="$1" expected="$2" actual
-    actual="$(queue_order)"
-    if [ "$actual" != "$expected" ]; then
-        h_fail "$desc" "expected order [$expected], got [$actual]"
-    fi
-}
-# epoch mtime of a queue entry's readlink target, portable: GNU (-c %Y) first
-# for Linux CI, BSD (-f %m) fallback for macOS (mirrors bin/wt-status).
-target_mtime() {
-    local t; t="$(readlink "$NDIR/queue/$1")"
-    stat -c %Y "$t" 2>/dev/null || stat -f %m "$t"
-}
-# lstat mtime of a queue entry itself (the GNU `ls` sort key). Neither GNU nor
-# BSD `stat` dereferences by default, so this reports the symlink's own mtime.
-link_mtime() {
-    stat -c %Y "$NDIR/queue/$1" 2>/dev/null || stat -f %m "$NDIR/queue/$1"
-}
-
 # ---------------------------------------------------------------------------
-# Row 8c — idempotent re-queue preserves run-order position and does not touch
-# the symlink mtimes that queue_entries_ordered sorts by.  If the re-queue mistakenly called
-# stamp_back_of_queue, the plan would jump to the back.
+# Row 8c — idempotent re-queue of an entry in the MIDDLE of the queue leaves
+# every entry filename byte-identical (no rename, so it cannot jump to the back).
 # ---------------------------------------------------------------------------
 setup
 mkplan plan-a.md plan-b.md plan-c.md
-run_queue plan-a >/dev/null 2>&1
-run_queue plan-b >/dev/null 2>&1
-run_queue plan-c >/dev/null 2>&1
-lm_before=$(link_mtime plan-a.md)
-tm_before=$(target_mtime plan-a.md)
-set +e
-out=$(run_queue plan-a 2>&1)
-ec=$?
-set +e
-if [ "$ec" -ne 0 ]; then
-    h_fail "row8c" "expected exit 0 for idempotent re-queue, got $ec"
+enq plan-a plan-b plan-c
+rq plan-b
+if [ "$RC" -ne 0 ]; then
+    h_fail "row8c" "expected exit 0 for idempotent re-queue, got $RC"
 fi
-if ! echo "$out" | grep -q "Already queued (no change)"; then
-    h_fail "row8c" "expected 'Already queued (no change)' in output, got: $out"
+if ! grep -q "Already queued (no change)" <<< "$OUT"; then
+    h_fail "row8c" "expected 'Already queued (no change)' in output, got: $OUT"
 fi
-assert_order "row8c order preserved after re-queue" "plan-a.md plan-b.md plan-c.md"
-lm_after=$(link_mtime plan-a.md)
-tm_after=$(target_mtime plan-a.md)
-if [ "$lm_after" != "$lm_before" ]; then
-    h_fail "row8c" "link mtime changed on idempotent re-queue: $lm_before -> $lm_after"
-fi
-if [ "$tm_after" != "$tm_before" ]; then
-    h_fail "row8c" "target mtime changed on idempotent re-queue: $tm_before -> $tm_after"
-fi
-h_pass "row8c — idempotent re-queue preserves position and mtimes"
+assert_entries "row8c listing unchanged by re-queue" "010-plan-a.md 020-plan-b.md 030-plan-c.md"
+h_pass "row8c — idempotent re-queue keeps its prefix and position"
 # ---------------------------------------------------------------------------
-# Row 8d — a plan already queued with an ancient mtime that is re-queued via
-# the idempotent path stays in its ORIGINAL position (not stamped to the back).
-# If stamp_back_of_queue ran, the ancient plan would move to last.
+# Row 8d — a plan whose FILE is ancient, already queued in the middle, re-queued
+# via the idempotent path: still in its original slot (the file's age is no key).
 # ---------------------------------------------------------------------------
 setup
 mkplan plan-a.md plan-b.md plan-old.md
 touch -t 202001010000.00 "$PDIR/plan-old.md"
-run_queue plan-a >/dev/null 2>&1
-run_queue plan-old >/dev/null 2>&1
-run_queue plan-b >/dev/null 2>&1
-# order: plan-a, plan-old, plan-b (plan-old was stamped to back of a,b,... no:
-# queue was a,old,b — each queued in insertion order with stamp_back_of_queue).
-# Re-queue plan-old (same target) → must stay in its current position, not jump.
-order_before="$(queue_order)"
-set +e
-out=$(run_queue plan-old 2>&1)
-ec=$?
-set +e
-if [ "$ec" -ne 0 ]; then
-    h_fail "row8d" "expected exit 0 for idempotent re-queue of ancient plan, got $ec"
+enq plan-a plan-old plan-b
+before="$(qls)"
+rq plan-old
+if [ "$RC" -ne 0 ]; then
+    h_fail "row8d" "expected exit 0 for idempotent re-queue of ancient plan, got $RC"
 fi
-order_after="$(queue_order)"
-if [ "$order_after" != "$order_before" ]; then
-    h_fail "row8d" "order changed on idempotent re-queue: [$order_before] -> [$order_after]"
-fi
-h_pass "row8d — idempotent re-queue of ancient-mtime plan keeps its position"
+h_eq "row8d listing unchanged" "$before" "$(qls)"
+assert_order "row8d position kept" "plan-a.md plan-old.md plan-b.md"
+h_pass "row8d — idempotent re-queue of an ancient plan file keeps its position"
 # ---------------------------------------------------------------------------
 # Row 9 — .staleness sidecar evicted alongside symlink on (re)queue
 # ---------------------------------------------------------------------------
@@ -326,7 +353,7 @@ touch "$NDIR/skipped/plan-i.md.staleness"
 run_queue plan-i >/dev/null 2>&1
 assert_absent  "row9 skipped symlink gone"   "$NDIR/skipped/plan-i.md"
 assert_absent  "row9 staleness marker gone"  "$NDIR/skipped/plan-i.md.staleness"
-assert_present "row9 queued"                  "$NDIR/queue/plan-i.md"
+assert_queued  "row9 queued"                 plan-i
 h_pass "row9 — .staleness eviction"
 # ===========================================================================
 # impl_model <-> Verification Matrix consistency backstop (bin/lib/
@@ -360,18 +387,15 @@ MANUAL_MATRIX=$(printf '%s\n' \
 # ---------------------------------------------------------------------------
 setup
 printf '%s\n' "$CLEAN_MATRIX" > "$PDIR/plan-j.md"
-set +e
-out=$(run_queue plan-j 2>&1)
-ec=$?
-set +e
-if [ "$ec" -eq 0 ]; then
+rq plan-j
+if [ "$RC" -eq 0 ]; then
     h_fail "row15" "expected non-zero exit for a plan missing impl_model"
 fi
-if ! echo "$out" | grep -q "impl_model: is missing or blank"; then
+if ! grep -q "impl_model: is missing or blank" <<< "$OUT"; then
     h_fail "row15" "expected the impl_model PRESENCE error (which must fire before"
-    echo "      the matrix-consistency error), got: $out"
+    echo "      the matrix-consistency error), got: $OUT"
 fi
-assert_absent "row15 not queued" "$NDIR/queue/plan-j.md"
+assert_not_queued "row15 not queued" plan-j
 h_pass "row15 — refuses to queue a plan missing impl_model"
 # ---------------------------------------------------------------------------
 # Row 16 — the same clean matrix WITH a deliberate `impl_model: sonnet` marker
@@ -380,160 +404,667 @@ h_pass "row15 — refuses to queue a plan missing impl_model"
 setup
 printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$CLEAN_MATRIX" > "$PDIR/plan-k.md"
 run_queue plan-k >/dev/null 2>&1
-assert_present "row16 queued" "$NDIR/queue/plan-k.md"
+assert_queued "row16 queued" plan-k
 h_pass "row16 — queues a clean, correctly-marked plan"
+
 # ===========================================================================
-# reorder subcommand — permutation validation + spaced ascending-mtime touch.
-# Order is asserted via queue_entries_ordered (oldest-first by symlink lstat
-# mtime) — exactly how bin/automouse/run claims the next plan.
+# Enqueue appends LAST (Verification Matrix rows 7-10). Order is the prefix, not
+# the plan file's age or content. Plan files in the rows below are deliberately
+# given ancient or rewritten mtimes as INPUTS; no assertion reads an mtime.
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
-# Row 10 — happy path: reorder >=3 plans -> queue_entries_ordered matches requested order
-# ---------------------------------------------------------------------------
-setup
-mkplan plan-a.md plan-b.md plan-c.md
-run_queue plan-a >/dev/null 2>&1
-run_queue plan-b >/dev/null 2>&1
-run_queue plan-c >/dev/null 2>&1
-run_queue reorder plan-c plan-a plan-b >/dev/null 2>&1
-assert_order "row10 reorder applies requested order" "plan-c.md plan-a.md plan-b.md"
-h_pass "row10 — reorder happy path"
-# ---------------------------------------------------------------------------
-# Row 11 — ordering: mtimes end >=1 min apart, no same-second tie-scramble.
-# Start from an identical-mtime state and request a non-alphabetical order —
-# a same-second touch loop would let `ls` filename-tiebreak and scramble it.
-# ---------------------------------------------------------------------------
-setup
-mkplan plan-a.md plan-b.md plan-c.md
-run_queue plan-a >/dev/null 2>&1
-run_queue plan-b >/dev/null 2>&1
-run_queue plan-c >/dev/null 2>&1
-touch -t 202601010000.00 "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
-run_queue reorder plan-c plan-b plan-a >/dev/null 2>&1
-assert_order "row11 non-alpha order survives identical start" "plan-c.md plan-b.md plan-a.md"
-m1=$(target_mtime plan-c.md); m2=$(target_mtime plan-b.md); m3=$(target_mtime plan-a.md)
-if [ $((m2 - m1)) -lt 60 ] || [ $((m3 - m2)) -lt 60 ]; then
-    h_fail "row11" "target mtimes not >=60s apart: $m1 $m2 $m3"
-fi
-h_pass "row11 — spaced ascending mtimes, no tie-scramble"
-# ---------------------------------------------------------------------------
-# Row 12 — reject a slug not currently queued (non-zero exit, order unchanged)
-# ---------------------------------------------------------------------------
-setup
-mkplan plan-a.md plan-b.md plan-c.md
-run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
-run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
-before="$(queue_order)"
-set +e; out=$(run_queue reorder plan-a plan-b plan-z 2>&1); ec=$?; set +e
-[ "$ec" -eq 0 ] && { h_fail "row12" "expected non-zero exit for unqueued slug"; }
-echo "$out" | grep -q "not in the queue" || { h_fail "row12" "missing not-in-queue error: $out"; }
-assert_order "row12 order unchanged after reject" "$before"
-h_pass "row12 — reject unqueued slug"
-# ---------------------------------------------------------------------------
-# Row 13 — reject a non-permutation: missing entry AND duplicate-as-extra
-# ---------------------------------------------------------------------------
-setup
-mkplan plan-a.md plan-b.md plan-c.md
-run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
-run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
-before="$(queue_order)"
-# (a) missing entry -> count mismatch
-set +e; out=$(run_queue reorder plan-a plan-b 2>&1); ec=$?; set +e
-[ "$ec" -eq 0 ] && { h_fail "row13a" "expected non-zero for missing entry"; }
-assert_order "row13a order unchanged" "$before"
-# (b) duplicate-as-extra -> dup rejection
-set +e; out=$(run_queue reorder plan-a plan-b plan-b 2>&1); ec=$?; set +e
-[ "$ec" -eq 0 ] && { h_fail "row13b" "expected non-zero for duplicate entry"; }
-assert_order "row13b order unchanged" "$before"
-h_pass "row13 — reject non-permutation (missing/extra)"
-# ---------------------------------------------------------------------------
-# Row 14 — touch-nothing-on-rejection: target mtimes unchanged after a reject
-# ---------------------------------------------------------------------------
-setup
-mkplan plan-a.md plan-b.md plan-c.md
-run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
-run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
-a0=$(target_mtime plan-a.md); b0=$(target_mtime plan-b.md); c0=$(target_mtime plan-c.md)
-set +e; run_queue reorder plan-c plan-a plan-z >/dev/null 2>&1; set +e   # rejected: plan-z not queued
-a1=$(target_mtime plan-a.md); b1=$(target_mtime plan-b.md); c1=$(target_mtime plan-c.md)
-if [ "$a0" != "$a1" ] || [ "$b0" != "$b1" ] || [ "$c0" != "$c1" ]; then
-    h_fail "row14" "target mtimes changed on a rejected reorder"
-fi
-h_pass "row14 — touch-nothing on rejection"
-# ===========================================================================
-# Back-of-queue stamping on ENQUEUE. A bare `ln -s`/`mv` leaves the new entry
-# sorting by the plan's AUTHORING mtime, and `reorder` writes its ladder into
-# the PAST — so a plan authored before the last reorder used to jump to the
-# FRONT and run next. Every row below deliberately gives the incoming plan an
-# ANCIENT target mtime; queuing a freshly-created plan would pass even with
-# the bug present.
-# ===========================================================================
-
-# ---------------------------------------------------------------------------
-# Row 17 — the reported bug: queue a plan whose target predates the existing
-# reorder ladder. It must land LAST, not first.
+# Row 17 (matrix 7) — enqueue appends LAST even when the plan file's mtime is the
+# oldest on disk. The old model sorted such a plan to the FRONT, because its
+# file predated every incumbent. Run once after a reorder so the incumbents are
+# canonical 010/020/030, and once into a never-reordered queue.
 # ---------------------------------------------------------------------------
 setup
 mkplan plan-a.md plan-b.md plan-c.md plan-old.md
 touch -t 202001010000.00 "$PDIR/plan-old.md"
-run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
-run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1   # ladder stamped into the past
-run_queue plan-old >/dev/null 2>&1
-assert_order "row17 stale-mtime plan lands at the back" \
-             "plan-a.md plan-b.md plan-c.md plan-old.md"
-h_pass "row17 — enqueue of an old plan goes to the back (core bug)"
+enq plan-a plan-b plan-c
+run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
+enq plan-old
+assert_order   "row17 ancient-file plan lands at the back" \
+               "plan-a.md plan-b.md plan-c.md plan-old.md"
+assert_entries "row17 appended with the next prefix" \
+               "010-plan-a.md 020-plan-b.md 030-plan-c.md 040-plan-old.md"
+h_pass "row17 — enqueue of an oldest-file plan goes last (core bug)"
 # ---------------------------------------------------------------------------
-# Row 18 — platform-agnostic: BOTH sort keys (symlink lstat for GNU ls, target
-# stat for BSD ls) of the new entry are strictly newer than every incumbent.
-# Without both, the test passes on Linux CI while macOS keeps breaking.
-# ---------------------------------------------------------------------------
-setup
-mkplan plan-a.md plan-b.md plan-old.md
-touch -t 202001010000.00 "$PDIR/plan-old.md"
-run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1
-run_queue reorder plan-a plan-b >/dev/null 2>&1
-run_queue plan-old >/dev/null 2>&1
-for incumbent in plan-a.md plan-b.md; do
-    if [ "$(link_mtime plan-old.md)" -le "$(link_mtime "$incumbent")" ]; then
-        h_fail "row18" "new entry's symlink mtime not newer than $incumbent"
-    fi
-    if [ "$(target_mtime plan-old.md)" -le "$(target_mtime "$incumbent")" ]; then
-        h_fail "row18" "new entry's target mtime not newer than $incumbent"
-    fi
-done
-h_pass "row18 — both symlink and target sort keys stamped"
-# ---------------------------------------------------------------------------
-# Row 19 — `requeue` (mv out of skipped/) is the second enqueue path and must
-# stamp too; `mv` otherwise carries the old mtime straight across.
-# (plan-old uses `requeue` path — no impl_model check; plan-a/b use queue add)
+# Row 18 (matrix 8) — THE regression the mtime model could not fix: queue three
+# plans, rewrite the MIDDLE plan's content (append a line, so its mtime changes,
+# then stamp it ancient and another plan far-future) and assert the run order and
+# the raw listing are UNCHANGED. On the old model this reshuffled the run order.
 # ---------------------------------------------------------------------------
 setup
-mkplan plan-a.md plan-b.md
-touch "$PDIR/plan-old.md"; touch -t 202001010000.00 "$PDIR/plan-old.md"
-run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1
-run_queue reorder plan-a plan-b >/dev/null 2>&1
-ln -s "$PDIR/plan-old.md" "$NDIR/skipped/plan-old.md"
-touch -h -t 202001010000.00 "$NDIR/skipped/plan-old.md"
-run_queue requeue >/dev/null 2>&1
-assert_order "row19 requeued plan lands at the back" "plan-a.md plan-b.md plan-old.md"
-h_pass "row19 — requeue stamps to the back"
+mkplan plan-a.md plan-b.md plan-c.md
+enq plan-a plan-b plan-c
+before="$(qls)"
+printf 'an appended line\n' >> "$PDIR/plan-b.md"
+touch -t 200001010000.00 "$PDIR/plan-b.md"
+touch -t 209912312359.59 "$PDIR/plan-a.md"
+rq
+h_eq "row18 show-queue does not rename" "$before" "$(qls)"
+assert_order   "row18 order unchanged after editing the middle plan" \
+               "plan-a.md plan-b.md plan-c.md"
+assert_entries "row18 raw listing unchanged" "010-plan-a.md 020-plan-b.md 030-plan-c.md"
+h_pass "row18 — editing a queued plan's file never moves it"
 # ---------------------------------------------------------------------------
-# Row 20 — two successive enqueues of equally-ancient plans keep INSERTION
-# order and stay >=60s apart (no same-second tie -> no filename tie-scramble;
-# 'y' before 'x' alphabetically would expose one).
+# Row 19 (matrix 9) — successive enqueues keep INSERTION order, including a pair
+# that sorts the other way alphabetically and whose files are equally ancient.
 # ---------------------------------------------------------------------------
 setup
 mkplan plan-a.md plan-y.md plan-x.md
 touch -t 202001010000.00 "$PDIR/plan-y.md" "$PDIR/plan-x.md"
-run_queue plan-a >/dev/null 2>&1
-run_queue plan-y >/dev/null 2>&1
-run_queue plan-x >/dev/null 2>&1
-assert_order "row20 insertion order preserved" "plan-a.md plan-y.md plan-x.md"
-if [ "$(( $(target_mtime plan-x.md) - $(target_mtime plan-y.md) ))" -lt 60 ]; then
-    h_fail "row20" "successive enqueues not >=60s apart"
+enq plan-a plan-y plan-x
+assert_entries "row19 insertion order, step-10 prefixes" \
+               "010-plan-a.md 020-plan-y.md 030-plan-x.md"
+h_pass "row19 — successive enqueues keep insertion order"
+# ---------------------------------------------------------------------------
+# Row 20 (matrix 9) — `requeue` out of skipped/ lands LAST, and two requeues keep
+# the skipped/ iteration (glob) order: r1 then r2 even though r2 was linked first.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md plan-r1.md plan-r2.md
+enq plan-a plan-b
+ln -s "$PDIR/plan-r2.md" "$NDIR/skipped/plan-r2.md"
+ln -s "$PDIR/plan-r1.md" "$NDIR/skipped/plan-r1.md"
+rq requeue
+h_eq "row20 requeue exit 0" "0" "$RC"
+assert_entries "row20 requeued plans land last, in skipped/ glob order" \
+               "010-plan-a.md 020-plan-b.md 030-plan-r1.md 040-plan-r2.md"
+assert_absent "row20 skipped r1 gone" "$NDIR/skipped/plan-r1.md"
+assert_absent "row20 skipped r2 gone" "$NDIR/skipped/plan-r2.md"
+h_pass "row20 — requeue lands last, in skipped/ iteration order"
+# ---------------------------------------------------------------------------
+# Row 21 (matrix 10) — duplicate enqueue as `foo`, `foo.md`, and the full path
+# (the `~/claude-plans/foo.md` form, here under the fixture PLANS_DIR) leaves
+# every entry filename byte-identical. Implemented behavior is exit 0 with
+# "Already queued (no change)"; a DIFFERENT target for the same slug exits 1
+# (row 8a).
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md foo.md plan-b.md
+enq plan-a foo plan-b
+before="$(qls)"
+for form in foo foo.md "$PDIR/foo.md"; do
+    rq "$form"
+    h_eq "row21 [$form] exit 0" "0" "$RC"
+    h_contains "row21 [$form] reports no change" "$OUT" "Already queued (no change)"
+    h_eq "row21 [$form] listing byte-identical" "$before" "$(qls)"
+done
+assert_entries "row21 entries unchanged" "010-plan-a.md 020-foo.md 030-plan-b.md"
+h_pass "row21 — duplicate enqueue in every spelling renames nothing"
+# ---------------------------------------------------------------------------
+# Row 22 — prefix-band exhaustion on enqueue: a queue holding 010 and 890 has no
+# room for a next_prefix, so the enqueue compacts once (renumber_queue) and the
+# new plan still lands LAST, with contiguous prefixes.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md plan-c.md
+ln -s "$PDIR/plan-a.md" "$NDIR/queue/010-plan-a.md"
+ln -s "$PDIR/plan-b.md" "$NDIR/queue/890-plan-b.md"
+rq plan-c
+h_eq "row22 exit 0" "0" "$RC"
+assert_entries "row22 compacted, new plan last" "010-plan-a.md 020-plan-b.md 030-plan-c.md"
+h_pass "row22 — enqueue past the 890 ceiling compacts and appends last"
+
+# ===========================================================================
+# reorder subcommand — exact-permutation validation, then a rename of the whole
+# queue to 010, 020, … in the requested order (never through a mtime).
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Row 10 (matrix 11) — happy path: reorder produces exactly the requested order,
+# with contiguous 010/020/030 and no entry parked in the 9xx staging band.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md plan-c.md
+enq plan-a plan-b plan-c
+rq reorder plan-c plan-a plan-b
+h_eq "row10 exit 0" "0" "$RC"
+assert_order   "row10 reorder applies requested order" "plan-c.md plan-a.md plan-b.md"
+assert_entries "row10 contiguous 010/020/030, no 9xx parked" \
+               "010-plan-c.md 020-plan-a.md 030-plan-b.md"
+h_pass "row10 — reorder happy path"
+# ---------------------------------------------------------------------------
+# Row 11 (matrix 11) — the old "distinct stamps 60 s apart" row: after a reorder
+# to a NON-alphabetical order, with the args spelled as slug / slug.md / path,
+# the prefixes are unique and contiguous (010/020/030) and none is in 9xx.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md plan-c.md
+enq plan-a plan-b plan-c
+rq reorder plan-c.md "$PDIR/plan-b.md" plan-a
+h_eq "row11 exit 0" "0" "$RC"
+assert_order "row11 non-alpha order applied" "plan-c.md plan-b.md plan-a.md"
+prefixes=$(queue_entries "$NDIR/queue" | cut -c1-3 | tr '\n' ' ')
+h_eq "row11 prefixes unique and contiguous" "010 020 030 " "$prefixes"
+if grep -q '^9' <<< "$prefixes"; then
+    h_fail "row11" "an entry was left parked in the 9xx band: $prefixes"
 fi
-h_pass "row20 — successive enqueues stay spaced and ordered"
+h_pass "row11 — reorder prefixes are unique and contiguous"
+# ---------------------------------------------------------------------------
+# Row 12 (matrix 12) — touch-nothing on rejection: an unqueued slug, a duplicated
+# slug, too few args, no args, and a traversal path all exit 1 and leave the
+# full `ls -1` listing (and the whole fixture tree) identical. Start from a
+# non-canonical state (after a reorder) so any stray rename would show.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md plan-c.md
+enq plan-a plan-b plan-c
+run_queue reorder plan-c plan-a plan-b >/dev/null 2>&1
+before="$(qls)"
+tree_before="$(snap)"
+rq reorder plan-c plan-a plan-z
+h_eq "row12 unqueued slug exits 1" "1" "$RC"
+h_contains "row12 unqueued slug names the problem" "$OUT" "not in the queue"
+h_eq "row12 unqueued slug renames nothing" "$before" "$(qls)"
+rq reorder plan-c plan-a plan-a
+h_eq "row12 duplicated slug exits 1" "1" "$RC"
+h_contains "row12 duplicated slug names the problem" "$OUT" "more than once"
+h_eq "row12 duplicated slug renames nothing" "$before" "$(qls)"
+rq reorder plan-c plan-a
+h_eq "row12 too few args exits 1" "1" "$RC"
+h_contains "row12 too few args names the problem" "$OUT" "exact permutation"
+h_eq "row12 too few args renames nothing" "$before" "$(qls)"
+rq reorder
+h_eq "row12 no args exits 1" "1" "$RC"
+h_eq "row12 no args renames nothing" "$before" "$(qls)"
+rq reorder ../../etc/passwd plan-c plan-a
+h_eq "row12 traversal arg exits 1" "1" "$RC"
+h_eq "row12 whole tree untouched by every rejection" "$tree_before" "$(snap)"
+h_pass "row12 — every rejected reorder renames nothing"
+# ---------------------------------------------------------------------------
+# Row 12b — reorder on an empty queue exits 1.
+# ---------------------------------------------------------------------------
+setup
+rq reorder plan-a
+h_eq "row12b reorder of an empty queue exits 1" "1" "$RC"
+h_pass "row12b — empty-queue reorder is refused"
+
+# ===========================================================================
+# remove subcommand (matrix 13)
+# ===========================================================================
+# ---------------------------------------------------------------------------
+# Row 13 — `remove` of an unqueued slug exits 1 and changes nothing; `remove` of a
+# queued slug deletes the prefixed entry plus the slug-keyed .attempts/.failure
+# (and .cap-refunds) sidecars, and ONLY that slug's.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md plan-c.md
+enq plan-a plan-b plan-c
+for sc in attempts failure cap-refunds; do
+    touch "$NDIR/queue/plan-b.md.$sc" "$NDIR/queue/plan-c.md.$sc"
+done
+tree_before="$(snap)"
+rq remove plan-z
+h_eq "row13 remove of an unqueued slug exits 1" "1" "$RC"
+h_contains "row13 remove of an unqueued slug says so" "$OUT" "is not in the queue"
+h_eq "row13 remove of an unqueued slug changes nothing" "$tree_before" "$(snap)"
+rq remove plan-b
+h_eq "row13 remove of a queued slug exits 0" "0" "$RC"
+assert_not_queued "row13 entry deleted" plan-b
+assert_absent "row13 .attempts deleted"    "$NDIR/queue/plan-b.md.attempts"
+assert_absent "row13 .failure deleted"     "$NDIR/queue/plan-b.md.failure"
+assert_absent "row13 .cap-refunds deleted" "$NDIR/queue/plan-b.md.cap-refunds"
+assert_present "row13 other slug's .attempts kept" "$NDIR/queue/plan-c.md.attempts"
+assert_present "row13 other slug's .failure kept"  "$NDIR/queue/plan-c.md.failure"
+assert_order "row13 remaining queue order" "plan-a.md plan-c.md"
+assert_present "row13 original plan untouched" "$PDIR/plan-b.md"
+h_pass "row13 — remove deletes the prefixed entry and its slug-keyed sidecars"
+
+# ===========================================================================
+# dispose subcommand (matrix 14, 23)
+# ===========================================================================
+# ---------------------------------------------------------------------------
+# Row 14a — dispose done lands a BARE <slug>.md in done/ (never the prefixed
+# name), no .staleness marker, and a re-run is an idempotent exit 0.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md
+enq plan-a plan-b
+rq dispose plan-a "done"
+h_eq "row14a dispose done exit 0" "0" "$RC"
+assert_present "row14a bare name in done/" "$NDIR/done/plan-a.md"
+assert_absent  "row14a no prefixed name in done/" "$NDIR/done/010-plan-a.md"
+assert_absent  "row14a no staleness marker without --staleness" "$NDIR/done/plan-a.md.staleness"
+assert_entries "row14a queue keeps the other entry as-is" "020-plan-b.md"
+h_eq "row14a done/ link still points at the plan" "$PDIR/plan-a.md" "$(readlink "$NDIR/done/plan-a.md")"
+tree_before="$(snap)"
+rq dispose plan-a "done"
+h_eq "row14a re-run is exit 0" "0" "$RC"
+h_contains "row14a re-run says already disposed" "$OUT" "Already disposed"
+h_eq "row14a re-run changes nothing" "$tree_before" "$(snap)"
+h_pass "row14a — dispose done lands bare, re-run is a no-op"
+# ---------------------------------------------------------------------------
+# Row 14b — dispose skipped --staleness lands bare <slug>.md in skipped/ plus the
+# <slug>.md.staleness marker self-heal reads; without --staleness there is no marker.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md plan-c.md
+enq plan-a plan-b plan-c
+rq dispose plan-b skipped --staleness
+h_eq "row14b dispose skipped --staleness exit 0" "0" "$RC"
+assert_present "row14b bare name in skipped/" "$NDIR/skipped/plan-b.md"
+assert_absent  "row14b no prefixed name in skipped/" "$NDIR/skipped/020-plan-b.md"
+assert_present "row14b staleness marker written" "$NDIR/skipped/plan-b.md.staleness"
+rq dispose plan-b skipped --staleness
+h_eq "row14b re-run is exit 0" "0" "$RC"
+assert_present "row14b marker still there after re-run" "$NDIR/skipped/plan-b.md.staleness"
+rq dispose plan-c skipped
+h_eq "row14b dispose skipped (no flag) exit 0" "0" "$RC"
+assert_present "row14b plan-c bare name in skipped/" "$NDIR/skipped/plan-c.md"
+assert_absent  "row14b no marker without --staleness" "$NDIR/skipped/plan-c.md.staleness"
+assert_entries "row14b queue holds only plan-a" "010-plan-a.md"
+h_pass "row14b — dispose skipped, with and without --staleness"
+# ---------------------------------------------------------------------------
+# Row 14c — dispose refusals create and change nothing: an unknown slug, an
+# invalid target, --staleness on done, too few args, and a traversal path that
+# basename reduces to an unqueued name (`../../etc/passwd` -> passwd.md).
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md
+enq plan-a
+tree_before="$(snap)"
+rq dispose plan-zzz skipped
+h_eq "row14c unknown slug exits 1" "1" "$RC"
+h_eq "row14c unknown slug creates nothing" "$tree_before" "$(snap)"
+rq dispose plan-a trash
+h_eq "row14c invalid target exits 1" "1" "$RC"
+h_eq "row14c invalid target creates nothing" "$tree_before" "$(snap)"
+rq dispose plan-a "done" --staleness
+h_eq "row14c --staleness on done exits 1" "1" "$RC"
+h_eq "row14c --staleness on done changes nothing" "$tree_before" "$(snap)"
+rq dispose plan-a
+h_eq "row14c too few args exits 1" "1" "$RC"
+h_eq "row14c too few args changes nothing" "$tree_before" "$(snap)"
+rq dispose ../../etc/passwd "done"
+h_eq "row14c traversal path exits 1" "1" "$RC"
+h_contains "row14c traversal path is reduced to the basename" "$OUT" "passwd.md"
+h_eq "row14c traversal path creates nothing" "$tree_before" "$(snap)"
+assert_absent "row14c nothing written outside the fixture" "$TMP/etc"
+h_pass "row14c — dispose refusals create nothing"
+
+# ===========================================================================
+# Helper unit contracts (Verification Matrix rows 4-6): bin/lib/automouse-queue-order.sh
+# ===========================================================================
+# ---------------------------------------------------------------------------
+# Row 30 (matrix 4) — entry_to_slug strips exactly one leading NNN- (three digits)
+# and the .md; a slug that merely starts with digits keeps them. The queue entry
+# `010-2026-roster-audit.md` and the bare `2026-roster-audit.md` both map to the
+# slug `2026-roster-audit`; the 4-digit lookalike `0100-foo.md` is NOT a prefix.
+# ---------------------------------------------------------------------------
+check_slug() {
+    h_eq "row30 entry_to_slug [$1]" "$2" "$(entry_to_slug "$1")"
+}
+check_slug "010-2026-roster-audit.md"    "2026-roster-audit"
+check_slug "2026-roster-audit.md"        "2026-roster-audit"
+check_slug "2026-roster-audit"           "2026-roster-audit"
+check_slug "/some/dir/030-foo.md"        "foo"
+check_slug "foo"                         "foo"
+check_slug "foo.md"                      "foo"
+check_slug "0100-foo.md"                 "0100-foo"
+check_slug "10-foo.md"                   "10-foo"
+check_slug "010-020-foo.md"              "020-foo"
+for entry in "010-2026-roster-audit.md" "2026-roster-audit.md" "030-foo.md" "foo"; do
+    slug=$(entry_to_slug "$entry")
+    h_eq "row30 entry_to_slug is idempotent [$entry]" "$slug" "$(entry_to_slug "$slug")"
+    h_eq "row30 name round-trips [$entry]" "$slug.md" "$(entry_to_name "$entry")"
+    h_eq "row30 name -> slug round-trip [$entry]" "$slug" "$(entry_to_slug "$(entry_to_name "$entry")")"
+done
+h_eq "row30 slug_to_pattern of a bare slug" "[0-9][0-9][0-9]-foo.md" "$(slug_to_pattern foo)"
+h_eq "row30 slug_to_pattern of a prefixed entry" "[0-9][0-9][0-9]-foo.md" "$(slug_to_pattern 010-foo.md)"
+h_pass "row30 — entry_to_slug / entry_to_name / slug_to_pattern contracts"
+# ---------------------------------------------------------------------------
+# Row 31 (matrix 5) — queue_entry_for_slug on an absent slug returns 1, prints
+# nothing, and does NOT abort a `set -euo pipefail` caller (it is sourced into
+# bin/automouse/run and bin/automouse/queue, both under set -e). A present slug
+# prints the entry filename; lookup by slug, slug.md or entry name all agree, and
+# a suffix of a longer slug never matches.
+# ---------------------------------------------------------------------------
+hq_files "010-2026-roster-audit.md" "020-plan-b.md"
+out=$(queue_entry_for_slug "$HQ" "no-such-plan"); rc=$?
+h_eq "row31 absent slug returns 1" "1" "$rc"
+h_eq "row31 absent slug prints nothing" "" "$out"
+# shellcheck disable=SC2016  # the $1/$2 belong to the inner bash -c script
+survived=$(bash -c '
+    set -euo pipefail
+    . "$1"
+    if queue_entry_for_slug "$2" no-such-plan; then echo found; else echo absent; fi
+    r=$(queue_entry_for_slug "$2" no-such-plan) || r=none
+    echo "r=$r"
+    echo survived
+' _ "$LIB" "$HQ" 2>&1); rc=$?
+h_eq "row31 set -euo pipefail caller exits 0" "0" "$rc"
+h_eq "row31 set -euo pipefail caller survives the miss" "absent r=none survived" "$(tr '\n' ' ' <<< "$survived" | sed 's/ $//')"
+h_eq "row31 present slug -> entry filename" "010-2026-roster-audit.md" "$(queue_entry_for_slug "$HQ" 2026-roster-audit)"
+h_eq "row31 lookup by slug.md" "010-2026-roster-audit.md" "$(queue_entry_for_slug "$HQ" 2026-roster-audit.md)"
+h_eq "row31 lookup by entry name" "010-2026-roster-audit.md" "$(queue_entry_for_slug "$HQ" 010-2026-roster-audit.md)"
+out=$(queue_entry_for_slug "$HQ" "roster-audit"); rc=$?
+h_eq "row31 a suffix of a longer slug does not match" "1" "$rc"
+h_pass "row31 — queue_entry_for_slug miss is rc 1, silent, set -e safe"
+# ---------------------------------------------------------------------------
+# Row 32 (matrix 5) — queue_entries on an empty dir prints nothing and exits 0
+# (also under set -euo pipefail, and with only non-entry files present).
+# ---------------------------------------------------------------------------
+hq_reset
+out=$(queue_entries "$HQ"); rc=$?
+h_eq "row32 empty dir prints nothing" "" "$out"
+h_eq "row32 empty dir exits 0" "0" "$rc"
+# shellcheck disable=SC2016  # the $1/$2 belong to the inner bash -c script
+out=$(bash -c 'set -euo pipefail; . "$1"; queue_entries "$2"; echo "rc=$?"' _ "$LIB" "$HQ" 2>&1)
+h_eq "row32 empty dir under set -euo pipefail" "rc=0" "$out"
+hq_files "010-a.md.attempts" ".normalize.lock"
+h_eq "row32 sidecars are not entries" "" "$(queue_entries "$HQ")"
+hq_files "030-c.md" "010-a.md" "020-b.md"
+h_eq "row32 entries come back in prefix order" "010-a.md 020-b.md 030-c.md" "$(queue_entries "$HQ" | tr '\n' ' ' | sed 's/ $//')"
+h_pass "row32 — queue_entries on empty and sidecar-only dirs"
+# ---------------------------------------------------------------------------
+# Row 33 (matrix 6) — next_prefix: 010 on an empty dir, 030 after 010/020, the
+# highest prefix + 10 across gaps, the 900-999 staging band ignored, and rc 1 with
+# no output once the highest non-staging prefix is 890.
+# ---------------------------------------------------------------------------
+hq_reset
+h_eq "row33 next_prefix on empty dir" "010" "$(next_prefix "$HQ")"
+hq_files "010-a.md" "020-b.md"
+h_eq "row33 next_prefix after 010/020" "030" "$(next_prefix "$HQ")"
+hq_files "010-a.md" "340-b.md"
+h_eq "row33 next_prefix steps from the highest prefix across a gap" "350" "$(next_prefix "$HQ")"
+hq_files "010-a.md" "950-staged.md"
+h_eq "row33 next_prefix ignores the 9xx staging band" "020" "$(next_prefix "$HQ")"
+hq_files "010-a.md" "880-b.md"
+h_eq "row33 next_prefix at 880 is the last legal 890" "890" "$(next_prefix "$HQ")"
+hq_files "010-a.md" "890-b.md"
+out=$(next_prefix "$HQ"); rc=$?
+h_eq "row33 next_prefix at 890 returns 1" "1" "$rc"
+h_eq "row33 next_prefix at 890 prints nothing" "" "$out"
+h_pass "row33 — next_prefix boundaries (010, 030, gap, staging band, 890)"
+# ---------------------------------------------------------------------------
+# Row 34 (matrix 25) — order never falls through to locale collation: the same
+# entries sort identically under LC_ALL=C and a UTF-8 locale, mixed case and
+# underscore slugs included.
+# ---------------------------------------------------------------------------
+hq_files "030-_x.md" "010-b.md" "040-a.md" "020-A.md"
+want="010-b.md 020-A.md 030-_x.md 040-a.md"
+got_c=$(LC_ALL=C queue_entries "$HQ" | tr '\n' ' ' | sed 's/ $//')
+got_u=$(LC_ALL=en_US.UTF-8 queue_entries "$HQ" | tr '\n' ' ' | sed 's/ $//')
+h_eq "row34 queue_entries under LC_ALL=C" "$want" "$got_c"
+h_eq "row34 queue_entries under a UTF-8 locale" "$want" "$got_u"
+h_pass "row34 — queue_entries order is locale-independent"
+# ---------------------------------------------------------------------------
+# Row 35 (matrix 22) — the in-queue test bin/automouse/run's SINGLE_PLAN mode and
+# its mid-run sweeps use is queue_entry_for_slug: it accepts `<slug>` and
+# `<slug>.md` against a prefixed entry and rejects a slug that is not queued, even
+# after a reorder renames the entry. (The run-loop side lives in
+# bin/test-automouse-single; this pins the shared predicate.)
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md
+enq plan-a plan-b
+for form in plan-b plan-b.md; do
+    if ! queue_entry_for_slug "$NDIR/queue" "$form" >/dev/null; then
+        h_fail "row35" "queued plan-b not found as [$form]"
+    fi
+done
+if queue_entry_for_slug "$NDIR/queue" "plan-nope" >/dev/null; then
+    h_fail "row35" "unqueued plan-nope reported as queued"
+fi
+run_queue reorder plan-b plan-a >/dev/null 2>&1
+h_eq "row35 renamed entry is still found" "010-plan-b.md" "$(queue_entry_for_slug "$NDIR/queue" plan-b.md)"
+h_pass "row35 — slug membership survives prefixed entries and reorder renames"
+
+# ===========================================================================
+# normalize_queue — the one-shot cutover of a legacy bare-named queue
+# (Verification Matrix rows 15-16). Cutover fixtures are the ONLY place this file
+# reads or sets a symlink mtime: normalize_queue orders bare entries by the
+# symlink's own lstat mtime, oldest first (the order the pre-change code ran).
+# ===========================================================================
+
+# bare_link <slug> <YYYYMMDDhhmm.ss> — a bare <slug>.md queue symlink with a
+# chosen lstat mtime. The TARGET is stamped the opposite way (far future) so a
+# normalize that followed the link would order differently.
+bare_link() {
+    ln -s "$PDIR/$1.md" "$NDIR/queue/$1.md"
+    touch -h -t "$2" "$NDIR/queue/$1.md"
+    touch -t 209912312359.59 "$PDIR/$1.md"
+}
+
+# ---------------------------------------------------------------------------
+# Row 40 (matrix 15) — an all-bare fixture normalizes to the lstat-mtime order.
+# Link stamps run c < b < a; target stamps are all far-future and equal, so only
+# the symlink's own mtime can explain the result. Then a second normalize_queue
+# renames nothing.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md plan-c.md
+bare_link plan-a 202603010000.00
+bare_link plan-b 202602010000.00
+bare_link plan-c 202601010000.00
+normalize_queue "$NDIR/queue"
+h_eq "row40 normalize_queue exit 0" "0" "$?"
+assert_entries "row40 all-bare fixture follows the symlink lstat order" \
+               "010-plan-c.md 020-plan-b.md 030-plan-a.md"
+before="$(qls)"
+normalize_queue "$NDIR/queue"
+h_eq "row40 second normalize_queue renames nothing" "$before" "$(qls)"
+assert_absent "row40 .normalize.lock is gone" "$NDIR/queue/.normalize.lock"
+h_pass "row40 — all-bare queue converts in lstat order; second call is a no-op"
+# ---------------------------------------------------------------------------
+# Row 41 (matrix 15) — equal lstat mtimes tie-break on the entry name, so a
+# same-second batch cannot scramble.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-k.md plan-m.md
+bare_link plan-m 202601010000.00
+bare_link plan-k 202601010000.00
+normalize_queue "$NDIR/queue"
+assert_entries "row41 tied mtimes break on name" "010-plan-k.md 020-plan-m.md"
+h_pass "row41 — normalize tie-break is the entry name"
+# ---------------------------------------------------------------------------
+# Row 42 (matrix 15) — a MIXED fixture (already-prefixed + bare entries) converges:
+# no bare entry survives, no prefix repeats, every plan is present exactly once,
+# and a second normalize_queue renames nothing.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md plan-c.md plan-d.md
+ln -s "$PDIR/plan-a.md" "$NDIR/queue/010-plan-a.md"
+touch -h -t 202602010000.00 "$NDIR/queue/010-plan-a.md"
+ln -s "$PDIR/plan-b.md" "$NDIR/queue/020-plan-b.md"
+touch -h -t 202604010000.00 "$NDIR/queue/020-plan-b.md"
+bare_link plan-c 202601010000.00
+bare_link plan-d 202603010000.00
+normalize_queue "$NDIR/queue"
+bare_left=0
+for e in $(queue_entries "$NDIR/queue"); do
+    case "$e" in
+        [0-9][0-9][0-9]-*.md) ;;
+        *) bare_left=$((bare_left + 1)) ;;
+    esac
+done
+h_eq "row42 no bare entry survives" "0" "$bare_left"
+dups=$(queue_entries "$NDIR/queue" | cut -c1-3 | sort | uniq -d | tr '\n' ' ')
+h_eq "row42 no duplicate prefix" "" "$dups"
+h_eq "row42 each plan present exactly once" "4" "$(queue_entries "$NDIR/queue" | wc -l | tr -d ' ')"
+assert_entries "row42 converged to contiguous prefixes in lstat order" \
+               "010-plan-c.md 020-plan-a.md 030-plan-d.md 040-plan-b.md"
+before="$(qls)"
+normalize_queue "$NDIR/queue"
+h_eq "row42 second normalize_queue renames nothing" "$before" "$(qls)"
+h_pass "row42 — mixed bare + prefixed queue converges"
+# ---------------------------------------------------------------------------
+# Row 43 (matrix 16) — a broken-symlink entry migrates instead of aborting
+# normalize_queue, and bin/automouse/queue still renders it as
+# `(BROKEN LINK -> <target>)` (the CLI runs normalize_queue at start-up, so this
+# also drives the cutover through the real entry point).
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md
+bare_link plan-a 202601010000.00
+ln -s /nonexistent/ghost-target.md "$NDIR/queue/ghost.md"
+touch -h -t 202602010000.00 "$NDIR/queue/ghost.md"
+rq
+h_eq "row43 show-queue exit 0 with a broken link" "0" "$RC"
+h_contains "row43 broken link still rendered" "$OUT" "(BROKEN LINK -> /nonexistent/ghost-target.md)"
+assert_entries "row43 broken entry migrated, in lstat order" "010-plan-a.md 020-ghost.md"
+h_pass "row43 — broken-symlink entry migrates and still renders (BROKEN LINK -> …)"
+# ---------------------------------------------------------------------------
+# Row 44 (matrix 16) — two parallel normalize_queue calls on one bare fixture
+# yield ONE contiguous numbering, both exit 0, and `.normalize.lock` is gone.
+# Repeated so a lucky interleaving does not hide a race.
+# ---------------------------------------------------------------------------
+for iter in 1 2 3; do
+    setup
+    mkplan plan-1.md plan-2.md plan-3.md plan-4.md plan-5.md plan-6.md
+    for i in 1 2 3 4 5 6; do
+        bare_link "plan-$i" "20260${i}010000.00"
+    done
+    # shellcheck disable=SC2016  # the $1/$2 belong to the inner bash -c script
+    bash -c '. "$1"; normalize_queue "$2"' _ "$LIB" "$NDIR/queue" &
+    pid1=$!
+    # shellcheck disable=SC2016  # the $1/$2 belong to the inner bash -c script
+    bash -c '. "$1"; normalize_queue "$2"' _ "$LIB" "$NDIR/queue" &
+    pid2=$!
+    rc1=0; rc2=0
+    wait "$pid1" || rc1=$?
+    wait "$pid2" || rc2=$?
+    h_eq "row44 [$iter] both normalize_queue calls exit 0" "0 0" "$rc1 $rc2"
+    assert_entries "row44 [$iter] one contiguous numbering, lstat order" \
+                   "010-plan-1.md 020-plan-2.md 030-plan-3.md 040-plan-4.md 050-plan-5.md 060-plan-6.md"
+    assert_absent "row44 [$iter] .normalize.lock is gone" "$NDIR/queue/.normalize.lock"
+done
+h_pass "row44 — parallel normalize_queue calls serialize on .normalize.lock"
+
+# ===========================================================================
+# renumber (matrix 17)
+# ===========================================================================
+# ---------------------------------------------------------------------------
+# Row 45 — `renumber` compacts 010/340/890 to 010/020/030 order-preservingly,
+# is a no-op when the queue is already canonical, and exits 0 on an empty queue.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md plan-c.md
+ln -s "$PDIR/plan-a.md" "$NDIR/queue/010-plan-a.md"
+ln -s "$PDIR/plan-b.md" "$NDIR/queue/340-plan-b.md"
+ln -s "$PDIR/plan-c.md" "$NDIR/queue/890-plan-c.md"
+rq renumber
+h_eq "row45 renumber exit 0" "0" "$RC"
+assert_entries "row45 010/340/890 compacts to 010/020/030, order kept" \
+               "010-plan-a.md 020-plan-b.md 030-plan-c.md"
+before="$(qls)"
+rq renumber
+h_eq "row45 renumber of a canonical queue exits 0" "0" "$RC"
+h_eq "row45 renumber of a canonical queue is a no-op" "$before" "$(qls)"
+h_eq "row45 next enqueue after compaction gets 040" "040" "$(next_prefix "$NDIR/queue")"
+setup
+rq renumber
+h_eq "row45 renumber of an empty queue exits 0" "0" "$RC"
+assert_entries "row45 empty queue stays empty" ""
+h_pass "row45 — renumber compacts, is idempotent, and tolerates an empty queue"
+
+# ===========================================================================
+# dispose -> self-heal round trip (matrix 21). self-heal is the unmodified
+# bin/automouse/self-heal; its staleness guard is stubbed (the real one needs git
+# history) and its orphan-watcher sweep is pinned to an argv no process matches.
+# ===========================================================================
+cat > "$TMP/stub-guard-pass" <<'GUARD_EOF'
+#!/usr/bin/env bash
+exit 0
+GUARD_EOF
+chmod +x "$TMP/stub-guard-pass"
+
+run_heal() {
+    NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" STALENESS_GUARD="$TMP/stub-guard-pass" \
+        AUTOMOUSE_ORPHAN_ARGV_RE="__no_process_argv_matches_this__" \
+        AUTOMOUSE_ORPHAN_PPID=1 "$HEAL"
+}
+
+# ---------------------------------------------------------------------------
+# Row 46 — a plan disposed with --staleness is requeued by self-heal and
+# re-enters LAST (behind plans queued after it was disposed). A plan disposed
+# WITHOUT --staleness carries no marker, so self-heal never requeues it.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md plan-c.md
+enq plan-a plan-b plan-c
+run_queue dispose plan-a skipped --staleness >/dev/null 2>&1
+run_queue dispose plan-b skipped >/dev/null 2>&1
+HEAL_RC=0
+HEAL_OUT=$(run_heal 2>&1) || HEAL_RC=$?
+h_eq "row46 self-heal exit 0" "0" "$HEAL_RC"
+h_contains "row46 self-heal reports the heal" "$HEAL_OUT" "healed: plan-a.md"
+assert_order   "row46 healed plan re-enters LAST" "plan-c.md plan-a.md"
+assert_entries "row46 appended with the next prefix" "030-plan-c.md 040-plan-a.md"
+assert_absent  "row46 skipped link gone after heal" "$NDIR/skipped/plan-a.md"
+assert_absent  "row46 staleness marker gone after heal" "$NDIR/skipped/plan-a.md.staleness"
+assert_present "row46 marker-less skip is left in skipped/" "$NDIR/skipped/plan-b.md"
+assert_not_queued "row46 marker-less skip is not requeued" plan-b
+h_pass "row46 — dispose --staleness -> self-heal requeues it last"
+
+# ===========================================================================
+# Prompt recipe (matrix 23): the literal command the implementation agent runs.
+# ===========================================================================
+# ---------------------------------------------------------------------------
+# Row 47 — the literal command `bin/automouse/queue dispose fixture skipped
+# --staleness`, run from the repo root against a fixture NIGHTLY_DIR, yields the
+# bare skipped/fixture.md plus its marker; a second run is a no-op exit 0; and
+# afterwards the plan is no longer queued, so a PLAN_PATH resolution through the
+# queue finds nothing (queue_entry_for_slug returns 1) rather than a stale entry.
+# ---------------------------------------------------------------------------
+setup
+mkplan fixture.md other.md
+enq other fixture
+RC=0
+OUT=$(cd "$REPO_ROOT" && NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" \
+      bin/automouse/queue dispose fixture skipped --staleness 2>&1) || RC=$?
+h_eq "row47 literal dispose command exit 0" "0" "$RC"
+assert_present "row47 bare skipped/fixture.md" "$NDIR/skipped/fixture.md"
+assert_present "row47 skipped/fixture.md.staleness marker" "$NDIR/skipped/fixture.md.staleness"
+assert_absent  "row47 no prefixed name in skipped/" "$NDIR/skipped/020-fixture.md"
+assert_not_queued "row47 PLAN_PATH resolution through the queue finds nothing" fixture
+assert_entries "row47 the other plan keeps its entry" "010-other.md"
+tree_before="$(snap)"
+RC=0
+OUT=$(cd "$REPO_ROOT" && NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" \
+      bin/automouse/queue dispose fixture skipped --staleness 2>&1) || RC=$?
+h_eq "row47 second run is exit 0" "0" "$RC"
+h_contains "row47 second run says already disposed" "$OUT" "Already disposed"
+h_eq "row47 second run changes nothing" "$tree_before" "$(snap)"
+h_pass "row47 — literal dispose recipe lands skipped/fixture.md; second run is a no-op"
+
+# ---------------------------------------------------------------------------
+# Row 48 — the prompts themselves. No site still builds a queue path by
+# concatenating PLAN_FILE (the entry carries an NNN- prefix, so that path never
+# exists). prompt-impl hands the agent the exact dispose command row 47 ran.
+# Its PLAN_PATH block, run as written against a fixture queue, resolves a queued
+# plan to its NNN- entry and fails loudly, with an empty PLAN_PATH, once the
+# plan has been disposed.
+# ---------------------------------------------------------------------------
+PROMPT_IMPL="$SCRIPT_DIR/automouse/prompt-impl"
+PROMPT_PP="$SCRIPT_DIR/automouse/prompt-postplan"
+CONCAT=$(grep -n 'queue/\$PLAN_FILE' "$PROMPT_IMPL" "$PROMPT_PP" || true)
+h_eq "row48 no queue/\$PLAN_FILE concatenation in either prompt" "" "$CONCAT"
+h_contains "row48 prompt-impl carries the staleness dispose command" \
+    "$(cat "$PROMPT_IMPL")" 'bin/automouse/queue dispose "${PLAN_FILE%.md}" skipped --staleness'
+h_contains "row48 prompt-impl carries the done dispose command" \
+    "$(cat "$PROMPT_IMPL")" 'bin/automouse/queue dispose "${PLAN_FILE%.md}" done'
+h_contains "row48 prompt-postplan disposes through the queue script" \
+    "$(cat "$PROMPT_PP")" 'bin/automouse/queue dispose "<plan-filename>" done'
+# The PLAN_PATH block from prompt-impl, minus its PLAN_FILE placeholder line and
+# its absolute-path `source` (the harness sources the worktree's helper instead).
+RESOLVE=$(sed -n '/^PLAN_FILE="<the PLAN_FILE value/,/^fi$/p' "$PROMPT_IMPL" | sed '1d; /^source /d')
+h_contains "row48 PLAN_PATH block resolves through queue_entry_for_slug" "$RESOLVE" 'queue_entry_for_slug'
+resolve_plan_path() {
+    # shellcheck disable=SC1090,SC2034  # both vars are read by the eval-ed block
+    (NIGHTLY_DIR="$NDIR"; PLAN_FILE="$1"; source "$LIB"; eval "$RESOLVE"; printf 'PLAN_PATH=[%s]\n' "$PLAN_PATH")
+}
+OUT=$(resolve_plan_path other.md)
+h_contains "row48 queued plan resolves to its NNN- entry" "$OUT" "PLAN_PATH=[$NDIR/queue/010-other.md]"
+OUT=$(resolve_plan_path fixture.md)
+h_contains "row48 disposed plan leaves PLAN_PATH empty" "$OUT" "PLAN_PATH=[]"
+h_contains "row48 disposed plan fails loudly" "$OUT" "ERROR: no queue entry for fixture.md"
+h_pass "row48 — prompts dispose through the queue script and resolve PLAN_PATH by slug"
+
 # ===========================================================================
 # impl_model presence/validity gate — enforced independently of whether the
 # plan carries a Verification Matrix (L46).  bin/lib/plan-model-consistency
@@ -545,77 +1076,54 @@ h_pass "row20 — successive enqueues stay spaced and ordered"
 # queue, and every $3.. token present in the combined output.
 expect_reject() {
     local row="$1" plan="$2"; shift 2
-    local out ec tok
-    set +e; out=$(run_queue "$plan" 2>&1); ec=$?; set +e
-    if [ "$ec" -eq 0 ]; then
+    local tok
+    rq "$plan"
+    if [ "$RC" -eq 0 ]; then
         h_fail "$row" "expected non-zero exit, got 0"
     fi
     for tok in "$@"; do
-        if ! echo "$out" | grep -q "$tok"; then
-            h_fail "$row" "output missing '$tok', got: $out"
+        if ! grep -q "$tok" <<< "$OUT"; then
+            h_fail "$row" "output missing '$tok', got: $OUT"
         fi
     done
-    assert_absent "$row not queued" "$NDIR/queue/$plan.md"
+    assert_not_queued "$row not queued" "$plan"
     return 0
 }
 
-# Row 21 — NO matrix, valid `impl_model: sonnet` → queues.  Proves the gate does
+# Row 24 — NO matrix, valid `impl_model: sonnet` → queues.  Proves the gate does
 # not over-reject the (common) matrix-less plan.
 setup
 printf -- '---\nimpl_model: sonnet\n---\n\n# no matrix here\n' > "$PDIR/plan-m.md"
 run_queue plan-m >/dev/null 2>&1
-assert_present "row21 queued" "$NDIR/queue/plan-m.md"
-h_pass "row21 — matrix-less plan with a valid impl_model queues"
-# Row 22 — NO matrix, NO impl_model → refused.  The exact L46 hole: before this
+assert_queued "row24 queued" plan-m
+h_pass "row24 — matrix-less plan with a valid impl_model queues"
+# Row 25 — NO matrix, NO impl_model → refused.  The exact L46 hole: before this
 # gate plan-model-consistency exited 0 and the plan queued unvalidated.
 setup
 printf -- '# no frontmatter, no matrix\n' > "$PDIR/plan-n.md"
-expect_reject row22 plan-n "impl_model: is missing or blank"
-h_pass "row22 — matrix-less plan missing impl_model is refused"
-# Row 23 — NO matrix, `impl_model: fable` → refused, message NAMES the value.
+expect_reject row25 plan-n "impl_model: is missing or blank"
+h_pass "row25 — matrix-less plan missing impl_model is refused"
+# Row 26 — NO matrix, `impl_model: fable` → refused, message NAMES the value.
 # plan-model-tier writes its rejection to STDOUT, so a dropped capture or a
 # stray `2>/dev/null` would silence it.
 setup
 printf -- '---\nimpl_model: fable\n---\n\n# no matrix here\n' > "$PDIR/plan-o.md"
-expect_reject row23 plan-o "fable" "not selectable"
-h_pass "row23 — matrix-less plan with an unselectable impl_model is refused"
-# Row 24 — valid matrix + valid `impl_model: sonnet` → still queues.  Regression
+expect_reject row26 plan-o "fable" "not selectable"
+h_pass "row26 — matrix-less plan with an unselectable impl_model is refused"
+# Row 27 — valid matrix + valid `impl_model: sonnet` → still queues.  Regression
 # guard: the presence check must not shadow the accepted path.
 setup
 printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$CLEAN_MATRIX" > "$PDIR/plan-p.md"
 run_queue plan-p >/dev/null 2>&1
-assert_present "row24 queued" "$NDIR/queue/plan-p.md"
-h_pass "row24 — matrixed, correctly-marked plan still queues"
-# Row 26 — a Truly-manual matrix row under `impl_model: sonnet` is STILL refused
+assert_queued "row27 queued" plan-p
+h_pass "row27 — matrixed, correctly-marked plan still queues"
+# Row 28 — a Truly-manual matrix row under `impl_model: sonnet` is STILL refused
 # by bin/lib/plan-model-consistency.  Without this row the whole consistency call
-# could be deleted and rows 15/21/22/23/24 would all stay green.
+# could be deleted and rows 15/24/25/26/27 would all stay green.
 setup
 printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$MANUAL_MATRIX" > "$PDIR/plan-q.md"
-expect_reject row26 plan-q "Truly-manual row forbids impl_model: sonnet"
-h_pass "row26 — consistency backstop still fires under the new gate"
-# ---------------------------------------------------------------------------
-# Row 27 — queue_entries_ordered is unaffected by editing a queued plan's TARGET.
-# queue_entries_ordered sorts by the SYMLINK's own lstat mtime (not the target's
-# mtime), so touching the target never shifts its run position.
-#
-# Sequence: queue a then b, reorder so a is first (the reorder ladder stamps
-# symlinks into the past with a clear gap), then touch a's TARGET to a far-future
-# time. Assert queue_entries_ordered still returns a before b.
-setup
-mkplan plan-lstat-a.md plan-lstat-b.md
-run_queue plan-lstat-a >/dev/null 2>&1
-run_queue plan-lstat-b >/dev/null 2>&1
-# Reorder: a first, b second — stamps symlinks into the past with a clear gap.
-run_queue reorder plan-lstat-a plan-lstat-b >/dev/null 2>&1
-# Edit plan-a's TARGET to a far-future time (simulates authoring/editing the plan).
-touch -t 209912312359.59 "$PDIR/plan-lstat-a.md"
-# queue_entries_ordered must still return a then b (oldest symlink lstat first).
-_r27_order=$(queue_entries_ordered "$NDIR/queue" | xargs -n1 basename | tr '\n' ' ')
-if [ "$_r27_order" = "plan-lstat-a.md plan-lstat-b.md " ]; then
-    h_pass "row27 — queue_entries_ordered unaffected by target edit"
-else
-    h_fail "row27" "wrong order after target edit (got: $_r27_order)"
-fi
+expect_reject row28 plan-q "Truly-manual row forbids impl_model: sonnet"
+h_pass "row28 — consistency backstop still fires under the new gate"
 
 # ---------------------------------------------------------------------------
 h_done

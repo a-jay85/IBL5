@@ -29,6 +29,17 @@ assert_present() {
     fi
 }
 
+# qentry <slug> — the queue entry path for <slug>. Requeue names entries
+# NNN-<slug>.md, so the asserts below resolve through this instead of a bare
+# <slug>.md path. With no entry it prints a path that cannot exist.
+qentry() {
+    local f
+    for f in "$NDIR"/queue/[0-9][0-9][0-9]-"$1".md; do
+        if [ -e "$f" ] || [ -L "$f" ]; then printf '%s\n' "$f"; return 0; fi
+    done
+    printf '%s\n' "$NDIR/queue/(no entry for $1)"
+}
+
 assert_absent() {
     local label=$1 path=$2
     if [ -e "$path" ]; then
@@ -81,7 +92,7 @@ ln -s "$PDIR/plan-fresh.md" "$NDIR/skipped/plan-fresh.md"
 touch "$NDIR/skipped/plan-fresh.md.staleness"
 run_heal >/dev/null 2>&1
 assert_absent  "row1 skipped symlink gone"  "$NDIR/skipped/plan-fresh.md"
-assert_present "row1 queued"                "$NDIR/queue/plan-fresh.md"
+assert_present "row1 queued"                "$(qentry plan-fresh)"
 assert_absent  "row1 staleness marker gone" "$NDIR/skipped/plan-fresh.md.staleness"
 h_pass "row1 — POSITIVE healable"
 # ---------------------------------------------------------------------------
@@ -105,7 +116,7 @@ ln -s "$PDIR/plan-fresh-nomarker.md" "$NDIR/skipped/plan-fresh-nomarker.md"
 # deliberately NO .staleness marker
 run_heal >/dev/null 2>&1
 assert_present "row3 skipped stays"   "$NDIR/skipped/plan-fresh-nomarker.md"
-assert_absent  "row3 not queued"      "$NDIR/queue/plan-fresh-nomarker.md"
+assert_absent  "row3 not queued"      "$(qentry plan-fresh-nomarker)"
 h_pass "row3 — NEGATIVE core safety (no marker, not recovered)"
 # ---------------------------------------------------------------------------
 # Row 4 — DRY-RUN: healable plan listed but not moved, no report written
@@ -116,7 +127,7 @@ ln -s "$PDIR/plan-fresh-dry.md" "$NDIR/skipped/plan-fresh-dry.md"
 touch "$NDIR/skipped/plan-fresh-dry.md.staleness"
 out=$(run_heal --dry-run 2>&1)
 assert_present "row4 skipped still present" "$NDIR/skipped/plan-fresh-dry.md"
-assert_absent  "row4 not queued"            "$NDIR/queue/plan-fresh-dry.md"
+assert_absent  "row4 not queued"            "$(qentry plan-fresh-dry)"
 assert_present "row4 marker still present"  "$NDIR/skipped/plan-fresh-dry.md.staleness"
 if ! echo "$out" | grep -q "would heal"; then
     h_fail "row4" "expected 'would heal' in dry-run output, got: $out"
@@ -147,7 +158,7 @@ run_heal >/dev/null 2>&1
 assert_absent  "row6 skipped symlink gone"  "$NDIR/skipped/plan-fresh-clean.md"
 assert_absent  "row6 attempts gone"         "$NDIR/skipped/plan-fresh-clean.md.attempts"
 assert_absent  "row6 staleness gone"        "$NDIR/skipped/plan-fresh-clean.md.staleness"
-assert_present "row6 queued"                "$NDIR/queue/plan-fresh-clean.md"
+assert_present "row6 queued"                "$(qentry plan-fresh-clean)"
 h_pass "row6 — CLEANUP sidecars evicted"
 # ---------------------------------------------------------------------------
 # Row 7 — TOMBSTONE (real): plan deleted from PLANS_DIR leaves a dangling

@@ -23,6 +23,7 @@ SCRIPT="$(cd "$(dirname "$0")" && pwd)/backlog"
 
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$T/usage"
 
 mkdir -p "$T/home" "$T/fx"
 

@@ -129,7 +129,7 @@ ContractList -> Player Repositories Security UI
 Database -> League
 Debug -> Auth Security Utilities
 DepthChart -> DepthChartSnapshot EventLog Http League NextSim Repositories Season Security Standings Team TeamSchedule UI Validation
-DepthChartSnapshot -> Repositories Season Security Team
+DepthChartSnapshot -> Season Security Team
 Discord -> Repositories
 Draft -> Discord EventLog Repositories Season Security UI Validation
 DraftHistory -> Player Security Team UI

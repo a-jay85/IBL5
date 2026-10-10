@@ -124,13 +124,16 @@ class NewsController implements NewsControllerInterface
         foreach ($stories as $row) {
             $s_sid = intval($row['sid']);
             $catid = intval($row['catid']);
+            /** @var string $aid nuke_stories.aid is NOT NULL varchar */
             $aid = $row['aid'];
             $title = \Security\HtmlSanitizer::safeHtmlOutput($row['title']);
+            /** @var string|null $hometext nuke_stories.hometext is nullable mediumtext */
             $hometext = $row['hometext'];
             $bodytext = $row['bodytext'];
             $comments = intval($row['comments']);
             $counter = intval($row['counter']);
             $topic = intval($row['topic']);
+            /** @var string $informant nuke_stories.informant is NOT NULL varchar */
             $informant = $row['informant'];
             $notes = \Security\HtmlSanitizer::safeHtmlOutput($row['notes']);
             $acomm = intval($row['acomm']);

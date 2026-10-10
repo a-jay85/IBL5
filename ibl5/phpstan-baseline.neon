@@ -3518,6 +3518,12 @@ parameters:
 			path: themes/IBL/theme.php
 
 		-
+			rawMessage: 'Function themearticle() has an unused parameter $topicname.'
+			identifier: function.unusedParameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
 			rawMessage: 'Function themearticle() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -3592,6 +3598,12 @@ parameters:
 		-
 			rawMessage: 'Function themeheader() has no return type specified.'
 			identifier: missingType.return
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has an unused parameter $topicname.'
+			identifier: function.unusedParameter
 			count: 1
 			path: themes/IBL/theme.php
 

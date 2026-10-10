@@ -92,6 +92,8 @@ def _make_crlf_repo(branch_adds: bytes, lf_adds: str = "", move_master: bool = T
     branch = f"feature-crlf-{suffix}"
     d = tempfile.mkdtemp(prefix="postplan-crlf-test-")
     subprocess.run(["git", "init", "-b", "master", d], check=True, capture_output=True)
+    _sh(d, "config", "user.email", "t@t")
+    _sh(d, "config", "user.name", "t")
     _sh(d, "config", "core.autocrlf", "false")
     _write_bytes(d, "ci.yml", CRLF_BASE)
     _write_bytes(d, "rule.md", LF_BASE.encode())

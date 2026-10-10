@@ -1,4 +1,4 @@
-import glob, os, pathlib, re, shlex, shutil, subprocess
+import os, pathlib, re, shlex, shutil, subprocess
 import pytest
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -13,28 +13,16 @@ _LAUNCHCTL_OTHER_SLUG = (
     'printf "%s\\t%s\\t%s\\n" 12345 0 com.ibl5.postplan-now-wt-feature-extra-20260916-144924-99\n'
 )
 
-_TMP_SIDECAR_GLOBS = [
-    "/tmp/post-plan-now-wt-feature-*.session",
-    "/tmp/post-plan-now-wt-feature-*.log",
-]
-
-
-def _tmp_sidecars() -> set[str]:
-    found: set[str] = set()
-    for pattern in _TMP_SIDECAR_GLOBS:
-        found.update(glob.glob(pattern))
-    return found
-
-
 @pytest.fixture(autouse=True)
-def _reap_tmp_sidecars():
-    before = _tmp_sidecars()
-    yield
-    for path in _tmp_sidecars() - before:
-        try:
-            os.remove(path)
-        except OSError:
-            pass
+def _private_log_dir(tmp_path, monkeypatch):
+    """Point post-plan-now's $LOG and .session sidecar at a per-test dir. A reaper that
+    deleted new /tmp/post-plan-now-wt-feature-* files after each test also deleted the
+    logs of a second pytest run going at the same time (another worktree, or a
+    post-plan run's own suite), and that run's test then failed on a missing log."""
+    d = tmp_path / "ppn-logs"
+    d.mkdir()
+    monkeypatch.setenv("POSTPLAN_LOG_DIR", str(d))
+    return d
 
 
 def _fb(code):
@@ -691,7 +679,7 @@ def test_bare_invocation_cmd_has_no_plan_slug_export(tmp_path):
     assert "PLAN_SLUG" not in cmd3, f"ambient PLAN_SLUG must not be injected on bare path; got {cmd3!r}"
 
 
-def test_foreground_exit3_message_quotes_the_harness_result(tmp_path):
+def test_foreground_exit3_message_quotes_the_harness_result(tmp_path, _private_log_dir):
     """--foreground (the automouse path) runs with no plist, so nothing sent the harness's
     stdout to $LOG. The RESULT capture then read a file that never existed, and the rc=3
     DM said only "the RESULT line above names it" plus "See <missing file>". Runs the real
@@ -722,7 +710,8 @@ def test_foreground_exit3_message_quotes_the_harness_result(tmp_path):
     dm_stub.chmod(0o755)
     r = subprocess.run(["bash", PPN, "--foreground", "--plan", str(plan)], cwd=repo,
                        env=env, capture_output=True, text=True, timeout=120)
-    log = re.search(r"^Log: (/tmp/post-plan-now-\S+\.log)$", r.stdout, re.M)
+    log = re.search(rf"^Log: ({re.escape(str(_private_log_dir))}/post-plan-now-\S+\.log)$",
+                    r.stdout, re.M)
     try:
         assert r.returncode == 3, f"stdout={r.stdout!r} stderr={r.stderr!r}"
         assert dm_msg.exists(), f"post-plan-fail-dm stub was never called: {r.stdout!r}"

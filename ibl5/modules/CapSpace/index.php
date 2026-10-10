@@ -18,22 +18,17 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use CapSpace\CapSpaceRepository;
-use CapSpace\CapSpaceService;
-use CapSpace\CapSpaceView;
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\CapSpaceFactory::class);
 
-global $mysqli_db;
-
-$season = new \Season\Season($mysqli_db);
+$season = $factory->season();
 
 $module_name = basename(dirname(__FILE__));
 
 PageLayout\PageLayout::header();
 
 // Initialize services
-$repository = new CapSpaceRepository($mysqli_db);
-$service = new CapSpaceService($repository, $mysqli_db);
-$view = new CapSpaceView();
+$service = $factory->service();
+$view = $factory->view();
 
 // Get data
 $teamsData = $service->getTeamsCapData($season);

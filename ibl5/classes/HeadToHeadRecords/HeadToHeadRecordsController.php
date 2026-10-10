@@ -52,6 +52,21 @@ class HeadToHeadRecordsController
     }
 
     /**
+     * Return a copy that highlights the given team's row, or no row for null.
+     */
+    public function withHighlightedTeam(?int $teamId): static
+    {
+        $copy = clone $this;
+        $user = new \stdClass();
+        if ($teamId !== null) {
+            $user->teamid = $teamId;
+        }
+        $copy->user = $user;
+
+        return $copy;
+    }
+
+    /**
      * Resolve filter values from a raw POST array.
      *
      * Unknown or non-string values fall back to defaults.

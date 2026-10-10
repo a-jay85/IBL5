@@ -86,6 +86,25 @@ class HeadToHeadRecordsControllerTest extends TestCase
     }
 
     // ---------------------------------------------------------------------------
+    // withHighlightedTeam
+    // ---------------------------------------------------------------------------
+
+    public function testWithHighlightedTeamSetsTheHighlightOnACopy(): void
+    {
+        $season = $this->makeSeasonWithPhase('Regular Season');
+        $repo = self::createStub(HeadToHeadRecordsRepositoryInterface::class);
+        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(TeamIdentityRepositoryInterface::class));
+        $payload = $this->makePayload([$this->makeEntry(['franchise_id' => 7])]);
+
+        $highlighted = $ctrl->withHighlightedTeam(7);
+
+        self::assertNotSame($ctrl, $highlighted);
+        self::assertSame(['7'], $highlighted->resolveUserMatchKeys('franchises', $payload));
+        self::assertSame([], $ctrl->resolveUserMatchKeys('franchises', $payload));
+        self::assertSame([], $ctrl->withHighlightedTeam(null)->resolveUserMatchKeys('franchises', $payload));
+    }
+
+    // ---------------------------------------------------------------------------
     // resolveFilters — validation
     // ---------------------------------------------------------------------------
 

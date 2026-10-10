@@ -17,20 +17,14 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use FranchiseHistory\FranchiseHistoryRepository;
-use FranchiseHistory\FranchiseHistoryService;
-use FranchiseHistory\FranchiseHistoryView;
-
-global $mysqli_db;
-
-$season = new \Season\Season($mysqli_db);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\FranchiseHistoryFactory::class);
+$season = $factory->season();
 
 PageLayout\PageLayout::header();
 
 // Initialize services
-$repository = new FranchiseHistoryRepository($mysqli_db);
-$service = new FranchiseHistoryService($repository);
-$view = new FranchiseHistoryView();
+$service = $factory->service();
+$view = $factory->view();
 
 // Get franchise history data
 $franchiseData = $service->getAllFranchiseHistory($season->endingYear);

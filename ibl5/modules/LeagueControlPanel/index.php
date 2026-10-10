@@ -6,8 +6,7 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-global $mysqli_db, $leagueContext, $authService;
-/** @var \mysqli $mysqli_db */
+global $leagueContext, $authService;
 /** @var \League\LeagueContext $leagueContext */
 /** @var \Auth\Contracts\AuthServiceInterface $authService */
 
@@ -30,16 +29,13 @@ if (!$authService->isAdmin()) {
 }
 
 // Wire dependencies
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\LeagueControlPanelFactory::class);
 $currentLeague = $leagueContext->getCurrentLeague();
-$repository = new LeagueControlPanel\LeagueControlPanelRepository($mysqli_db, $leagueContext);
-$service    = new LeagueControlPanel\LeagueControlPanelService($repository, $currentLeague);
-$votingRepository     = new Voting\VotingRepository($mysqli_db);
-$votingResultsService = new Voting\VotingResultsService($votingRepository);
-$awardGenerationService = new LeagueControlPanel\LeagueControlPanelAwardGenerationService($repository, $votingResultsService);
-$maintenanceRepository = new Maintenance\MaintenanceRepository($mysqli_db);
-$processor  = new LeagueControlPanel\LeagueControlPanelProcessor($repository, $awardGenerationService, $currentLeague, $maintenanceRepository);
-$view       = new LeagueControlPanel\LeagueControlPanelView();
-$csvExporter = new LeagueControlPanel\ActivePlayersCsvExporter($repository);
+$repository = $factory->repository();
+$service    = $factory->service();
+$processor  = $factory->processor();
+$view       = $factory->view();
+$csvExporter = $factory->csvExporter();
 
 // POST export=active_players → write CSV to temp dir, reply with its download URL (JSON).
 // Writes a file, so it is POST + CSRF like every other LCP action; the reply carries a
@@ -65,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['export'] ?? null) === 'act
     }
 
     try {
-        $filename = $csvExporter->export(new \DateTimeImmutable());
+        $filename = $csvExporter->export($factory->exportTimestamp());
     } catch (\RuntimeException $e) {
         \Logging\LoggerFactory::getChannel('admin')->error('active_players_csv_export_failed', ['error' => $e->getMessage()]);
         http_response_code(500);

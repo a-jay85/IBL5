@@ -232,5 +232,7 @@ class ConfigBootstrap implements BootstrapStepInterface
                 static fn (): \Psr\Log\LoggerInterface => \Logging\LoggerFactory::getChannel($channel),
             );
         }
+
+        \Module\ModuleServices::registerSharedServices($container);
     }
 }

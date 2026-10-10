@@ -17,30 +17,26 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use LeagueStarters\LeagueStartersService;
-use LeagueStarters\LeagueStartersView;
-
-global $mysqli_db, $authService;
+global $authService;
 
 // Route HTMX API requests (no PageLayout, returns HTML fragment only)
 $op = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';
-$commonRepository = new Repositories\TeamIdentityRepository($mysqli_db);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\LeagueStartersFactory::class);
+$commonRepository = $factory->teamIdentity();
 
 if ($op === 'api') {
-    $handler = new LeagueStarters\LeagueStartersApiHandler($mysqli_db, $commonRepository, $authService);
+    $handler = $factory->apiHandler();
     $handler->handle();
     return;
 }
-$season = new \Season\Season($mysqli_db);
+$season = $factory->season();
 
 $module_name = basename(dirname(__FILE__));
 $pagetitle = "- $module_name";
 
-$league = new \League\League($mysqli_db);
-
 // Initialize services
-$service = new LeagueStartersService($mysqli_db, $league);
-$view = new LeagueStartersView($module_name);
+$service = $factory->service();
+$view = $factory->view($module_name);
 
 // Get starters by position
 $startersByPosition = $service->getAllStartersByPosition();
@@ -58,8 +54,8 @@ $username = $authService->getUsername() ?? '';
 // TypeError under strict_types. Fall back to the same value a logged-out visitor
 // already gets, keeping this read-only page rendering for everyone.
 $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? \League\League::FREE_AGENTS_TEAM_NAME;
-$userTeam = \Team\Team::initialize($mysqli_db, $userTeamName);
+$userTeam = \Team\Team::initialize($factory->db(), $userTeamName);
 
-echo $view->render($mysqli_db, $season, $startersByPosition, $userTeam, $display);
+echo $view->render($factory->db(), $season, $startersByPosition, $userTeam, $display);
 
 PageLayout\PageLayout::footer();

@@ -20,14 +20,14 @@ final class LeagueControlPanelAdminGateTest extends TestCase
     private const DENIAL = 'Access denied. Administrator privileges required.';
     private const GATED = [
         '/\$leagueContext->getCurrentLeague\(\)/',
-        '/\bnew\s+\\\\?[A-Z]\w*\\\\\w+/',
+        '/ModuleServices::current\(\)/',
         '/\$_SERVER\[\'REQUEST_METHOD\'\]/',
         '/\$_POST\b/',
     ];
 
     private const VALID_GUARD = "if (!\$authService->isAdmin()) {\n    http_response_code(403);\n    echo 'Access denied. Administrator privileges required.';\n    exit;\n}\n";
     private const LEAGUE_LINE = "\$l = \$leagueContext->getCurrentLeague();\n";
-    private const WIRING_LINE = "\$r = new LeagueControlPanel\\Repo(\$db);\n";
+    private const WIRING_LINE = "\$r = \\Module\\ModuleServices::current()->factory(\\Module\\Factories\\LeagueControlPanelFactory::class);\n";
     private const POST_LINE = "if (\$_SERVER['REQUEST_METHOD'] === 'POST' && \$_POST['x']) {}\n";
 
     /**

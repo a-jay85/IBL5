@@ -15,20 +15,13 @@ $op = is_string($_REQUEST['op'] ?? null) ? $_REQUEST['op'] : '';
 
 $pagetitle = " - Depth Chart Entry";
 
-global $mysqli_db, $commonRepo;
-$commonRepo = new Repositories\TeamIdentityRepository($mysqli_db);
+global $commonRepo;
+$commonRepo = \Module\ModuleServices::current()->teamIdentity();
 
 function userinfo($username)
 {
-    global $mysqli_db, $commonRepo, $leagueContext;
-
-    $repository = new DepthChart\DepthChartRepository($mysqli_db);
-    $service = new DepthChart\DepthChartService();
-    $view = new DepthChart\DepthChartView($leagueContext, $service);
-    $teamRepository = new Team\TeamRepository($mysqli_db);
-    $teamTableService = new Team\TeamTableService($mysqli_db, $teamRepository);
-    $submissionHandler = new DepthChart\DepthChartSubmissionHandler($mysqli_db, $commonRepo);
-    $controller = new DepthChart\DepthChartController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, \Http\HttpRequest::fromGlobals());
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\DepthChartEntryFactory::class);
+    $controller = $factory->controller();
     $controller->displayForm($username);
 }
 
@@ -52,7 +45,7 @@ function renderInlineSubmitError(): void
 
 function submit($user)
 {
-    global $mysqli_db, $commonRepo, $leagueContext, $authService;
+    global $commonRepo, $authService;
 
     // Auth + ownership gate (IDOR fix D-09). The write target is derived from
     // the session team inside the handler, never from POST `Team_Name`, so an
@@ -80,35 +73,28 @@ function submit($user)
         return;
     }
 
-    $repository = new DepthChart\DepthChartRepository($mysqli_db);
-    $service = new DepthChart\DepthChartService();
-    $view = new DepthChart\DepthChartView($leagueContext, $service);
-    $teamRepository = new Team\TeamRepository($mysqli_db);
-    $teamTableService = new Team\TeamTableService($mysqli_db, $teamRepository);
-    $submissionHandler = new DepthChart\DepthChartSubmissionHandler($mysqli_db, $commonRepo);
-    $controller = new DepthChart\DepthChartController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, \Http\HttpRequest::fromGlobals());
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\DepthChartEntryFactory::class);
+    $controller = $factory->controller();
     $controller->handleSubmit($_POST, $username);
 }
 
 function tabApi()
 {
-    global $mysqli_db, $commonRepo, $leagueContext;
-
-    $handler = new DepthChart\DepthChartApiHandler($mysqli_db, $commonRepo, $leagueContext);
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\DepthChartEntryFactory::class);
+    $handler = $factory->apiHandler();
     $handler->handle();
 }
 
 function nextSimApi()
 {
-    global $mysqli_db;
-
-    $handler = new NextSim\NextSimTabApiHandler($mysqli_db);
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\DepthChartEntryFactory::class);
+    $handler = $factory->nextSimTabApiHandler();
     $handler->handle();
 }
 
 function api($user)
 {
-    global $mysqli_db, $commonRepo, $authService;
+    global $commonRepo, $authService;
 
     if (!is_user($user)) {
         header('Content-Type: application/json; charset=utf-8');
@@ -149,7 +135,8 @@ function api($user)
         $params = $_GET;
     }
 
-    $handler = new DepthChartSnapshot\DepthChartSnapshotApiHandler($mysqli_db);
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\DepthChartEntryFactory::class);
+    $handler = $factory->savedDepthChartApiHandler();
     $handler->handle($action, $teamid, $username, $params);
 }
 

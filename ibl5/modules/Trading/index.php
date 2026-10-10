@@ -16,32 +16,9 @@ $partner = is_string($_REQUEST['partner'] ?? null) ? $_REQUEST['partner'] : null
 
 $pagetitle = "- Team Pages";
 
-global $mysqli_db;
-
-$serverName = $_SERVER['SERVER_NAME'] ?? '';
-$teamIdentityRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
-$offerRepo = new \Trading\TradeOfferRepository($mysqli_db, $serverName);
-$assetRepo = new \Trading\TradeAssetRepository($mysqli_db);
-$formRepo = new \Trading\TradeFormRepository($mysqli_db);
-$cashRepo = new \Trading\TradeCashRepository($mysqli_db);
-$offerGrouper = new \Trading\TradeOfferGrouper($assetRepo, $cashRepo);
-$futureSalaryCalc = new \Trading\FutureSalaryCalculator();
-$service = new \Trading\TradingService($offerRepo, $formRepo, $teamIdentityRepo, $mysqli_db, $offerGrouper, $futureSalaryCalc);
-$processor = new \Trading\TradeProcessor($mysqli_db, $teamIdentityRepo, $serverName, $offerRepo, $assetRepo);
-$tradeOffer = new \Trading\TradeOffer($mysqli_db, $teamIdentityRepo, $serverName);
-$view = new \Trading\TradingView();
-$nukeCompat = new \Utilities\NukeCompat();
-$validator = new \Trading\TradeValidator($mysqli_db);
-$salaryCapRepo = new \Repositories\SalaryCapRepository($mysqli_db);
-$season = new \Season\Season($mysqli_db);
-$executionService = new \Trading\TradeExecutionService(
-    $offerRepo, $processor, $validator, $salaryCapRepo, $teamIdentityRepo, $cashRepo, $season
-);
-global $authService;
-$controller = new \Trading\TradingController(
-    $service, $offerRepo, $tradeOffer, $view,
-    $teamIdentityRepo, $nukeCompat, $mysqli_db, $executionService, $authService
-);
+$serverName = is_string($_SERVER['SERVER_NAME'] ?? null) ? $_SERVER['SERVER_NAME'] : '';
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\TradingFactory::class);
+$controller = $factory->controller($serverName);
 
 switch ($op) {
     case "reviewtrade":

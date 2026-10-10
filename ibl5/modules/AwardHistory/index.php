@@ -19,13 +19,10 @@ $module_name = basename(dirname(__FILE__));
 
 $pagetitle = "- $module_name";
 
-global $mysqli_db;
-
 // Initialize classes
-$validator = new \AwardHistory\AwardHistoryValidator();
-$repository = new \AwardHistory\AwardHistoryRepository($mysqli_db);
-$service = new \AwardHistory\AwardHistoryService($validator, $repository);
-$view = new \AwardHistory\AwardHistoryView($service);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\AwardHistoryFactory::class);
+$service = $factory->service();
+$view = $factory->view($service);
 
 // Get and validate search parameters from POST
 $searchResult = $service->search($_POST);

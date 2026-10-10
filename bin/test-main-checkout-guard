@@ -352,6 +352,113 @@ new_case strict_mode_present
 check "set -euo pipefail present" grep -qx 'set -euo pipefail' "$SRC"
 end_case
 
+stage_only() {
+    local blob
+    blob="$(printf 'other\n' | git -C "$R" hash-object -w --stdin)"
+    git -C "$R" update-index --cacheinfo 100644,"$blob",a.txt
+}
+
+# section <file> <header>: print the lines of one "== header ==" section.
+section() {
+    awk -v h="== $2 ==" '/^== /{on = ($0 == h); next} on' "$1"
+}
+
+# 24
+new_case snapshot_written_and_named
+dirty_a
+run_guard
+body="$(cat "$T/dm.body.1")"
+snap_line="$(grep '^snapshot: ' <<<"$body" || true)"
+snap_path="${snap_line#snapshot: }"
+check "body has snapshot: line" [ -n "$snap_line" ]
+check "snapshot path is in the state dir" [ "$(dirname "$snap_path")" = "$T/state" ]
+check "snapshot file exists" [ -f "$snap_path" ]
+check "snapshot is outside the repo" [ "${snap_path#"$R"}" = "$snap_path" ]
+check "repo status unchanged" [ "$(git -C "$R" status --porcelain)" = " M a.txt" ]
+end_case
+
+# 25
+new_case snapshot_staged_only_index_mtime
+stage_only
+run_guard
+snap_path="$(sed -n 's/^snapshot: //p' "$T/dm.body.1")"
+want_mtime="$(stat -c %Y "$R/.git/index" 2>/dev/null || stat -f %m "$R/.git/index")"
+check "index mtime section holds the epoch" [ "$(section "$snap_path" "index mtime")" = "$want_mtime" ]
+check "staged diff lists a.txt" has "$(section "$snap_path" "staged diff")" "a.txt"
+end_case
+
+# 26
+new_case snapshot_reflog_window
+git -C "$R" worktree add -q "$T/wt" -b wt1
+printf '%s %s t <t@t> 1000000000 +0000\told-entry\n' \
+    "$(git -C "$R" rev-parse HEAD)" "$(git -C "$R" rev-parse HEAD)" \
+    >>"$R/.git/worktrees/wt/logs/HEAD"
+stage_only
+run_guard
+snap_path="$(sed -n 's/^snapshot: //p' "$T/dm.body.1")"
+window="$(section "$snap_path" "reflog within 300s of index mtime")"
+check "in-window worktree entry kept" has "$window" "wt: "
+check "old entry dropped" lacks "$window" "old-entry"
+end_case
+
+# 27
+new_case snapshot_markers
+printf 'y\n' >>"$R/b.txt"
+git -C "$R" -c user.name=t -c user.email=t@t stash -q
+# stash resets the tree and clears MERGE_HEAD, so create the marker after it.
+git -C "$R" rev-parse HEAD >"$R/.git/MERGE_HEAD"
+dirty_a
+run_guard
+snap_path="$(sed -n 's/^snapshot: //p' "$T/dm.body.1")"
+markers="$(section "$snap_path" "markers")"
+check "MERGE_HEAD present" has "$markers" "present: MERGE_HEAD"
+check "stash listed" has "$markers" 'stash@{0}'
+end_case
+
+# 28
+new_case snapshot_kept_on_retry
+dirty_a
+echo 1 >"$T/dm.rc"
+run_guard
+check "first run exits 1" [ "$RC" -eq 1 ]
+snap_path="$(sed -n 's/^snapshot: //p' "$T/dm.body.1")"
+check "snapshot exists after failed send" [ -f "$snap_path" ]
+first_sum="$(cksum_of "$snap_path")"
+echo 0 >"$T/dm.rc"
+run_guard
+check "retry exits 0" [ "$RC" -eq 0 ]
+check "snapshot byte-identical" [ "$(cksum_of "$snap_path")" = "$first_sum" ]
+check "retry body names the same snapshot" has "$(cat "$T/dm.body.2")" "snapshot: $snap_path"
+end_case
+
+# 29
+new_case snapshot_leaves_git_state_untouched
+stage_only
+touch -t 202001010000 "$R/b.txt"
+refs_before="$(git -C "$R" for-each-ref)"
+sum_before="$(cksum_of "$R/.git/index") $(cksum_of "$R/.git/logs/HEAD")"
+run_guard
+sum_after="$(cksum_of "$R/.git/index") $(cksum_of "$R/.git/logs/HEAD")"
+check "snapshot run exits 0" [ "$RC" -eq 0 ]
+check "index and HEAD reflog unchanged" [ "$sum_before" = "$sum_after" ]
+check "refs unchanged" [ "$refs_before" = "$(git -C "$R" for-each-ref)" ]
+end_case
+
+# 30
+new_case snapshot_process_and_launchd_sections
+dirty_a
+run_guard
+snap_path="$(sed -n 's/^snapshot: //p' "$T/dm.body.1")"
+check "processes header" grep -qxF '== processes ==' "$snap_path"
+check "launchd header" grep -qxF '== launchd com.ibl5.* ==' "$snap_path"
+launchd_body="$(section "$snap_path" "launchd com.ibl5.*")"
+launchd_ok() {
+    has "$launchd_body" "launchctl unavailable" || has "$launchd_body" "(none loaded)" \
+        || has "$launchd_body" "com.ibl5."
+}
+check "launchd section has a verdict" launchd_ok
+end_case
+
 echo "$PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then
     exit 1

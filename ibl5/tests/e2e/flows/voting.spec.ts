@@ -51,6 +51,70 @@ test.describe('ASG Voting', () => {
     await expect(submitBtn.first()).toBeVisible();
   });
 
+  test('category header toggles with Enter and Space from the keyboard', async ({ page }) => {
+    const toggle = page.locator('.voting-category-toggle').first();
+    const controls = await toggle.getAttribute('aria-controls');
+    expect(controls).not.toBeNull();
+    const table = page.locator(`#${controls}`);
+
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(table).toBeHidden();
+
+    const urlBefore = page.url();
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(table).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    // type="button" keeps Enter from submitting the ballot form.
+    expect(page.url()).toBe(urlBefore);
+
+    await page.keyboard.press('Space');
+
+    await expect(table).toBeHidden();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    // aria-allowed-attr: aria-expanded stays off the wrapper div. The wrapper keeps its
+    // onclick, which smoke/mobile-auth.spec.ts still locates (mobile-auth depends on it).
+    await expect(page.locator('.voting-category').first()).not.toHaveAttribute('aria-expanded', /.*/);
+  });
+
+  test('header toggle inherits the heading look', async ({ page }) => {
+    const styles = await page.evaluate(() => {
+      const button = document.querySelector('.voting-category-toggle');
+      const heading = button?.closest('h2.voting-category-title');
+      if (button === null || button === undefined || heading === null || heading === undefined) {
+        throw new Error('voting category toggle or its h2 heading not found');
+      }
+      const pick = (el: Element) => {
+        const cs = getComputedStyle(el);
+        return {
+          fontSize: cs.fontSize,
+          fontWeight: cs.fontWeight,
+          fontFamily: cs.fontFamily,
+          lineHeight: cs.lineHeight,
+          textTransform: cs.textTransform,
+          letterSpacing: cs.letterSpacing,
+          color: cs.color,
+          textAlign: cs.textAlign,
+        };
+      };
+      const buttonStyle = getComputedStyle(button);
+      return {
+        button: pick(button),
+        heading: pick(heading),
+        backgroundColor: buttonStyle.backgroundColor,
+        borderTopWidth: buttonStyle.borderTopWidth,
+        paddingTop: buttonStyle.paddingTop,
+      };
+    });
+
+    expect(styles.button).toEqual(styles.heading);
+    expect(styles.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    expect(styles.borderTopWidth).toBe('0px');
+    expect(styles.paddingTop).toBe('0px');
+  });
+
   test('no PHP errors on ASG ballot', async ({ page }) => {
     await assertNoPhpErrors(page, 'on ASG ballot');
   });

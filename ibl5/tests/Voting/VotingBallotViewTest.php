@@ -15,30 +15,36 @@ class VotingBallotViewTest extends TestCase
     private const string PINNED_ASG_HTML = '<form name="ASGVote" method="post" action="action.php"><CSRF><div class="voting-form-container"><img src="images/logo/1.jpg" alt="Team Logo" class="team-logo-banner"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button><script>
 function ShowAndHideGM() {
     var x = document.getElementById(\'GM\');
+    var t = document.querySelector(\'[aria-controls="GM"]\');
     if (x.classList.contains(\'voting-collapsed\')) {
         x.classList.remove(\'voting-collapsed\');
+        t.setAttribute(\'aria-expanded\', \'true\');
         if (typeof window.IBL_refreshResponsiveTables === \'function\') {
             window.IBL_refreshResponsiveTables();
         }
     } else {
         x.classList.add(\'voting-collapsed\');
+        t.setAttribute(\'aria-expanded\', \'false\');
     }
 }
-</script><div class="voting-category" onclick="ShowAndHideGM()"><h2 class="ibl-title voting-category-title">GM of the Year</h2><p class="voting-category-instruction">Select THREE.</p></div><table id="GM" class="sortable ibl-data-table voting-form-table voting-collapsed"><thead><tr><th>Vote</th><th>Name</th><th>Team</th></tr></thead><tbody><tr><td><input type="checkbox" name="GM[]" value="Pat O&apos;Brien, Boston Celtics"></td><td>Pat O&apos;Brien</td><td>Boston Celtics</td></tr><tr><td><input type="checkbox" name="GM[]" value="Jane Roe, Chicago Bulls"></td><td>Jane Roe</td><td>Chicago Bulls</td></tr></tbody></table><input type="hidden" name="teamname" value="Test Team"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button></div></form>';
+</script><div class="voting-category" onclick="ShowAndHideGM()"><h2 class="ibl-title voting-category-title"><button type="button" class="voting-category-toggle" aria-expanded="false" aria-controls="GM">GM of the Year</button></h2><p class="voting-category-instruction">Select THREE.</p></div><table id="GM" class="sortable ibl-data-table voting-form-table voting-collapsed"><thead><tr><th>Vote</th><th>Name</th><th>Team</th></tr></thead><tbody><tr><td><input type="checkbox" name="GM[]" value="Pat O&apos;Brien, Boston Celtics"></td><td>Pat O&apos;Brien</td><td>Boston Celtics</td></tr><tr><td><input type="checkbox" name="GM[]" value="Jane Roe, Chicago Bulls"></td><td>Jane Roe</td><td>Chicago Bulls</td></tr></tbody></table><input type="hidden" name="teamname" value="Test Team"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button></div></form>';
 
     private const string PINNED_EOY_HTML = '<form name="EOYVote" method="post" action="action.php"><CSRF><div class="voting-form-container"><img src="images/logo/1.jpg" alt="Team Logo" class="team-logo-banner"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button><script>
 function ShowAndHideGM() {
     var x = document.getElementById(\'GM\');
+    var t = document.querySelector(\'[aria-controls="GM"]\');
     if (x.classList.contains(\'voting-collapsed\')) {
         x.classList.remove(\'voting-collapsed\');
+        t.setAttribute(\'aria-expanded\', \'true\');
         if (typeof window.IBL_refreshResponsiveTables === \'function\') {
             window.IBL_refreshResponsiveTables();
         }
     } else {
         x.classList.add(\'voting-collapsed\');
+        t.setAttribute(\'aria-expanded\', \'false\');
     }
 }
-</script><div class="voting-category" onclick="ShowAndHideGM()"><h2 class="ibl-title voting-category-title">GM of the Year</h2><p class="voting-category-instruction">Select THREE.</p></div><table id="GM" class="sortable ibl-data-table voting-form-table voting-collapsed"><thead><tr><th>1st</th><th>2nd</th><th>3rd</th><th>Name</th><th>Team</th></tr></thead><tbody><tr><td><input type="radio" name="GM[1]" value="Pat O&apos;Brien, Boston Celtics"></td><td><input type="radio" name="GM[2]" value="Pat O&apos;Brien, Boston Celtics"></td><td><input type="radio" name="GM[3]" value="Pat O&apos;Brien, Boston Celtics"></td><td>Pat O&apos;Brien</td><td>Boston Celtics</td></tr><tr><td><input type="radio" name="GM[1]" value="Jane Roe, Chicago Bulls"></td><td><input type="radio" name="GM[2]" value="Jane Roe, Chicago Bulls"></td><td><input type="radio" name="GM[3]" value="Jane Roe, Chicago Bulls"></td><td>Jane Roe</td><td>Chicago Bulls</td></tr></tbody></table><input type="hidden" name="teamname" value="Test Team"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button></div></form>';
+</script><div class="voting-category" onclick="ShowAndHideGM()"><h2 class="ibl-title voting-category-title"><button type="button" class="voting-category-toggle" aria-expanded="false" aria-controls="GM">GM of the Year</button></h2><p class="voting-category-instruction">Select THREE.</p></div><table id="GM" class="sortable ibl-data-table voting-form-table voting-collapsed"><thead><tr><th>1st</th><th>2nd</th><th>3rd</th><th>Name</th><th>Team</th></tr></thead><tbody><tr><td><input type="radio" name="GM[1]" value="Pat O&apos;Brien, Boston Celtics"></td><td><input type="radio" name="GM[2]" value="Pat O&apos;Brien, Boston Celtics"></td><td><input type="radio" name="GM[3]" value="Pat O&apos;Brien, Boston Celtics"></td><td>Pat O&apos;Brien</td><td>Boston Celtics</td></tr><tr><td><input type="radio" name="GM[1]" value="Jane Roe, Chicago Bulls"></td><td><input type="radio" name="GM[2]" value="Jane Roe, Chicago Bulls"></td><td><input type="radio" name="GM[3]" value="Jane Roe, Chicago Bulls"></td><td>Jane Roe</td><td>Chicago Bulls</td></tr></tbody></table><input type="hidden" name="teamname" value="Test Team"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button></div></form>';
 
     protected function setUp(): void
     {
@@ -336,6 +342,61 @@ function ShowAndHideGM() {
         $this->assertStringContainsString('ShowAndHideMVP', $html);
     }
 
+    public function testCategoryHeaderRendersKeyboardToggleButton(): void
+    {
+        $categories = [
+            [
+                'code' => 'MVP',
+                'title' => 'Most Valuable Player',
+                'instruction' => 'Select THREE.',
+                'candidates' => [],
+            ],
+        ];
+
+        $html = $this->view->renderBallotForm('action.php', 'Test', 1, 'Playoffs', $categories);
+
+        $this->assertStringContainsString(
+            '<h2 class="ibl-title voting-category-title"><button type="button" class="voting-category-toggle" aria-expanded="false" aria-controls="MVP">Most Valuable Player</button></h2>',
+            $html
+        );
+    }
+
+    public function testShowHideScriptFlipsAriaExpandedInBothBranches(): void
+    {
+        $categories = [
+            [
+                'code' => 'MVP',
+                'title' => 'Most Valuable Player',
+                'instruction' => 'Select THREE.',
+                'candidates' => [],
+            ],
+        ];
+
+        $html = $this->view->renderBallotForm('action.php', 'Test', 1, 'Playoffs', $categories);
+
+        $this->assertStringContainsString('document.querySelector(\'[aria-controls="MVP"]\')', $html);
+        $this->assertStringContainsString("t.setAttribute('aria-expanded', 'true');", $html);
+        $this->assertStringContainsString("t.setAttribute('aria-expanded', 'false');", $html);
+        $this->assertSame(2, substr_count($html, "setAttribute('aria-expanded'"));
+    }
+
+    public function testCategoryToggleButtonEscapesTitle(): void
+    {
+        $categories = [
+            [
+                'code' => 'MVP',
+                'title' => '<img src=x onerror=alert(1)>',
+                'instruction' => 'Select THREE.',
+                'candidates' => [],
+            ],
+        ];
+
+        $html = $this->view->renderBallotForm('action.php', 'Test', 1, 'Playoffs', $categories);
+
+        $this->assertStringNotContainsString('<img src=x', $html);
+        $this->assertStringContainsString('aria-controls="MVP">&lt;img', $html);
+    }
+
     public function testShowHideScriptCallsRefreshResponsiveTables(): void
     {
         $categories = [
@@ -417,6 +478,16 @@ function ShowAndHideGM() {
         );
         $this->assertStringNotContainsString('<i>', $html);
         $this->assertStringContainsString('<p>RESULTS</p>', $html);
+    }
+
+    public function testRenderResultsExpanderEmitsKeyboardToggleButton(): void
+    {
+        $html = $this->view->renderResultsExpander('<p>RESULTS</p>');
+
+        $this->assertStringContainsString(
+            '<div class="voting-category" onclick="ShowAndHideResults()"><h2 class="ibl-title voting-category-title"><button type="button" class="voting-category-toggle" aria-expanded="false" aria-controls="Results">Voting Results</button></h2>',
+            $html
+        );
     }
 
     public function testRenderResultsExpanderStartsCollapsed(): void

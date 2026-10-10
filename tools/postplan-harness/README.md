@@ -148,3 +148,24 @@ probes and reports without writing to the PR.
 | 0 | Success: PR opened, held for a manual gate, or already merged. |
 | 1 | Generic harness failure. `bin/post-plan-now` falls back to the Sonnet `/post-plan` skill session. |
 | 3 | Fail-closed sentinel. No skill fallback fires. Two causes: (a) a rebase conflict the auto-resolver declined or could not certify; the harness classifies the conflict, attempts bounded per-file resolution, then requires the TREE-EQUIVALENT proof; rc=3 is returned when any of those refuses; (b) a local pre-commit/pre-push gate denial (missing ADR, stale doc, rules byte budget). A successful auto-resolution holds auto-merge at condition (14) until a `CONFLICT-REVIEW=CLEAN` verdict from the read-only reviewer clears it. See `ibl5/docs/decisions/0134-harness-conflict-autoresolve.md` for the full decision. |
+
+## Retries on LLM output and on the base fetch
+
+`ClaudeCli.call` (`harness/adapters/llm.py`) re-asks once when a reply has no
+parseable JSON or fails its schema. The re-ask sends the original prompt, which
+already holds the JSON schema text, plus the parse error. A second failure raises
+`llm-invalid-output`; the run ends FAILED with exit 1 and `bin/post-plan-now`
+falls back to the skill. The re-ask never substitutes a default value, so an
+invalid safety verdict can never pass as `{"holds": []}`.
+
+When either reply says `Failed to authenticate` or `OAuth session expired`, the
+`llm-invalid-output` detail reads `<purpose>: auth-expired: <reply>`. The fix is
+to log the Claude CLI back in; a JSON repair cannot help. The kind and the exit
+code stay the same.
+
+`LiveGit.fetch_base` (`harness/adapters/gitad.py`) retries once after
+`FETCH_TRANSIENT_DELAY` seconds when the fetch stderr names a network blip:
+`kex_exchange_identification`, `Operation timed out`, `Connection timed out`, or
+`Connection reset by peer`. `Could not read from remote repository` and
+`Could not resolve host` on their own are not retried. The separate
+`cannot lock ref` retry (`FETCH_LOCK_RETRIES`) is unchanged.

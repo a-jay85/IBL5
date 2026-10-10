@@ -11,20 +11,17 @@
 # touched.
 
 set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PASS=0
-FAIL=0
 
-pass() { PASS=$((PASS + 1)); echo "  ok   $1"; }
-fail() { FAIL=$((FAIL + 1)); echo "  FAIL $1${2:+ — $2}"; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
-assert_eq() {  # name expected actual
-    if [ "$2" = "$3" ]; then pass "$1"; else fail "$1" "expected [$2] got [$3]"; fi
-}
+assert_eq() { h_eq "$1" "$2" "$3"; }  # name expected actual
 
-T="$(mktemp -d)"
-trap 'rm -rf "$T"' EXIT
+h_tmp T
 
 # ── Section 1: characterization pins against the real ticks ──────────────────
 
@@ -266,7 +263,4 @@ else
     echo "  SKIP: R1 real /usr/sbin/ioreg boundary (Darwin only)"
 fi
 
-# ── Summary ──────────────────────────────────────────────────────────────────
-echo ""
-echo "PASS=$PASS FAIL=$FAIL"
-[ "$FAIL" -eq 0 ] || exit 1
+h_done

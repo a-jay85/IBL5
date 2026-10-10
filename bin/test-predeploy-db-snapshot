@@ -10,12 +10,13 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$SCRIPT_DIR/predeploy-db-snapshot"
-BASE_TMP="$(mktemp -d)"
-trap 'rm -rf "$BASE_TMP"' EXIT
+h_tmp BASE_TMP
 
-FAILED=0
 OUT="$BASE_TMP/out"
 REPO=""
 SNAP=""
@@ -24,11 +25,10 @@ check() { # name cmd [args...]: passes when the command succeeds
     local name="$1"
     shift
     if "$@"; then
-        echo "ok: $name"
+        h_pass "$name"
     else
-        echo "FAIL: $name"
+        h_fail "$name"
         sed 's/^/      | /' "$OUT" 2>/dev/null | head -20
-        FAILED=1
     fi
 }
 
@@ -118,5 +118,4 @@ check "e: no file created" test "$(count_snaps)" = "0"
 "$SCRIPT" --help > "$OUT" 2>&1
 check "--help prints Usage" grep -q "^Usage" "$OUT"
 
-if [ "$FAILED" -eq 0 ]; then echo "All predeploy-db-snapshot cases passed"; exit 0; fi
-exit 1
+h_done

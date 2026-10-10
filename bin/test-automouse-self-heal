@@ -269,10 +269,12 @@ spawn_orphan() {
 
 # Poll (bounded) until <pid> has a direct `sleep 60` child.
 wait_sleep_child() {
-    local pid=$1 i
-    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    local pid=$1 i=0
+    # 10s budget: under the 4-worker CI runner the fixture's fork can lag 3s+.
+    while [ "$i" -lt 50 ]; do
         if ps -A -o ppid= -o args= | grep -qE "^ *$pid sleep 60\$"; then return 0; fi
         command sleep 0.2
+        i=$(( i + 1 ))
     done
     return 1
 }

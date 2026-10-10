@@ -8,15 +8,15 @@ paths: "bin/automouse/**"
 
 > **"Automouse" (formerly "nightly") is the autonomous plan-execution machinery (`bin/automouse/*`, this rule).** Either term means **`bin/automouse/run` fired by launchd**, draining the queue built by `bin/automouse/queue`. It is not a generic scheduler, so do not hunt through `cron`, `/schedule`, or `CronCreate`.
 
-A headless `claude -p` process runs on a recurring schedule via macOS `launchd`. It loops through queued plans, two `claude -p` invocations per plan (implementation, then post-plan), until the queue is empty or the time guard is exceeded.
+A headless `claude -p` process runs on a recurring schedule via macOS `launchd`. It loops through queued plans, two `claude -p` invocations per plan (implementation, then post-plan), until the queue is empty or the time guard is exceeded. For a single watched run, `bin/automouse/run plan <slug>` executes exactly one named plan (auto-queuing it if absent) with the same guard machinery, then stops.
 
 ## Quick Reference
 
 | Action | Command |
 |--------|---------|
-| Queue a plan (refused if `bin/check-plan` fails; `--force` queues anyway, logged) | `bin/automouse/queue [add] <slug> [--force]` |
+| Queue a plan (`bin/check-plan` must pass; `--force` overrides, logged) | `bin/automouse/queue [add] <slug> [--force]` |
 | Show queue | `bin/automouse/queue` (no args) |
-| Triage skipped, failed, paused, held, forced plans | `bin/automouse/queue status` |
+| Triage skipped/failed/paused/held/forced plans | `bin/automouse/queue status` |
 | Remove a plan from queue | `bin/automouse/queue remove <slug>` |
 | Check morning results | `ls ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/reports/` |
 | Cancel the next run | `rm ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/*.md` |
@@ -68,11 +68,11 @@ Each phase's cost is recorded in the markdown row in `reports/YYYY-MM-DD-costs.m
 
 **Prov column:** `recomputed` (no anomaly flagged), `recomputed-anomalous` (>$0.01 below harness or duration mismatch), `unknown` (no transcript, e.g. aged out after ~30 days; harness figure kept), `harness-ledger` (harness's `result.json` usage ledger; harness-only runs exiting 0 or 3).
 
-**`peak_ctx`:** main transcript occupancy over `usage.iterations[]` (top-level `usage` sums them), excluding `advisor_message` iterations and sub-agents; pre-2026-08-26 rows read high. Reported cost is a floor: compaction surcharge is separate, a `low–high` range in "Surcharge est ($)" for recomputed or recomputed-anomalous rows with a compaction, else an em-dash (—).
+**`peak_ctx`:** main transcript occupancy over `usage.iterations[]` (top-level `usage` sums them), excluding `advisor_message` iterations and sub-agents; pre-2026-08-26 rows read high. Reported cost is a floor: compaction surcharge is separate, a `low–high` range in "Surcharge est ($)" for recomputed(-anomalous) rows with a compaction, else an em-dash (—).
 
 ### Startup archival
 
-At launch, `bin/automouse/run` moves any `logs/`, `reports/`, `done/`, or `skipped/` entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into `<dir>.archive/`. Symlinks are judged on their *own* mtime and keep resolving after the move. `queue/` and `handoff/` are never touched. An archival error never aborts the run.
+At launch, `bin/automouse/run` moves any `logs/`, `reports/`, `done/`, or `skipped/` entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into `<dir>.archive/`. Symlinks are judged by their *own* mtime and still resolve after the move. `queue/` and `handoff/` are never touched. An archival error never aborts the run.
 
 **Run order is the queue symlink's mtime** (lstat, via `queue_entries_ordered` in
 `bin/automouse/lib-queue-order`) on macOS and Linux. Editing the plan file does not
@@ -87,7 +87,7 @@ Then it runs `bin/automouse/self-heal`, a non-fatal step that scans `skipped/`:
 - **Heal** — a plan carrying a `<plan>.md.staleness` marker (skipped by the staleness gate, not
   for ambiguity / poison-pill; already-merged plans land in `done/`) is re-checked with
   `bin/check-plan-staleness`. If it passes, `bin/automouse/queue` requeues it and evicts its
-  sidecars. The requeue runs `bin/check-plan`; a failing plan stays in `skipped/`.
+  sidecars (a plan failing `bin/check-plan` stays in `skipped/`).
 - **Reap** — a symlink whose plan file left `~/claude-plans` is deleted with its sidecars and
   named in the output. Runs before the marker gate, so a dead entry is reaped whatever the
   skip reason, and never requeues.
@@ -101,7 +101,7 @@ Then it runs `bin/automouse/self-heal`, a non-fatal step that scans `skipped/`:
 
 ## How It Works
 
-1. **Daytime:** Work with Claude in plan mode. After approval, queue the plan: `bin/automouse/queue <slug>` The queue runs `bin/check-plan` and refuses a failing plan. `--force` queues it anyway (`queue/<plan>.md.force-override`, `force-overrides.log`) but never bypasses the `impl_model` gates.
+1. **Daytime:** Work with Claude in plan mode. After approval, queue the plan: `bin/automouse/queue <slug>`. It refuses a plan failing `bin/check-plan`; `--force` overrides (`<plan>.md.force-override`, logged), never the `impl_model` gates.
 2. **On schedule:** `launchd` fires `bin/automouse/run`
 3. **Loop:** For each queued plan (oldest first), `bin/automouse/run` fires two `claude -p` invocations sequentially:
    - **Implementation agent** (`bin/automouse/prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, runs a pre-handoff conformance check (Step 6.6), writes a handoff file. Model per-plan via `impl_model:` (six values: `sonnet`/`claude-sonnet-5-5` → Sonnet (legacy: `claude-sonnet-4-6`), `haiku`/`claude-haiku-5-5` (legacy `claude-haiku-4-5`) → Haiku, `opus`/`claude-opus-5-5` or absent → Opus; validated by `bin/lib/plan-impl-model`; other values rejected before the counter). Declare `sonnet` for uniformly-mechanical plans only. Post-plan runs `bin/post-plan-now` (Sonnet `/post-plan` fallback).
@@ -156,7 +156,7 @@ depends_on:
 
 Inline scalar form also works: `depends_on: 2099`.
 
-A slug dependency is checked in two steps. First, `<slug>.md` must be in `done/`. If it is absent the verdict is `unmet` and no `gh` call is made. Second, the most recent PR whose head branch is `<slug>` must be `MERGED`, because a plan reaches `done/` when post-plan finishes, which can be before its PR merges. An `OPEN` PR keeps the verdict `unmet`. A PR closed without merging (`closed-unmerged`), no PR for the branch (`no-pr`), or a failed `gh` query (`gh-error`) makes the verdict `unresolvable`, since each case needs a human to decide whether the dependent plan should still run.
+A slug dependency is checked in two steps. First, `<slug>.md` must be in `done/`; if absent the verdict is `unmet` with no `gh` call. Second, the latest PR with head branch `<slug>` must be `MERGED`, since a plan reaches `done/` when post-plan finishes, possibly before its PR merges. An `OPEN` PR stays `unmet`. A PR closed unmerged (`closed-unmerged`), no PR (`no-pr`), or a failed `gh` query (`gh-error`) is `unresolvable`: a human decides whether the dependent plan still runs.
 
 **Three-state verdict** (from `bin/lib/plan-depends-on`):
 

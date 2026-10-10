@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelf = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelf) ? $phpSelf : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -16,9 +17,13 @@ $partner = is_string($_REQUEST['partner'] ?? null) ? $_REQUEST['partner'] : null
 
 $pagetitle = "- Team Pages";
 
-global $mysqli_db;
+global $mysqli_db, $authService, $user;
+/** @var \mysqli $mysqli_db */
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
 
-$serverName = $_SERVER['SERVER_NAME'] ?? '';
+$httpRequest = \Http\HttpRequest::fromGlobals();
+$serverNameRaw = $httpRequest->server('SERVER_NAME');
+$serverName = is_string($serverNameRaw) ? $serverNameRaw : '';
 $teamIdentityRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
 $offerRepo = new \Trading\TradeOfferRepository($mysqli_db, $serverName);
 $assetRepo = new \Trading\TradeAssetRepository($mysqli_db);
@@ -37,7 +42,6 @@ $season = new \Season\Season($mysqli_db);
 $executionService = new \Trading\TradeExecutionService(
     $offerRepo, $processor, $validator, $salaryCapRepo, $teamIdentityRepo, $cashRepo, $season
 );
-global $authService;
 $controller = new \Trading\TradingController(
     $service, $offerRepo, $tradeOffer, $view,
     $teamIdentityRepo, $nukeCompat, $mysqli_db, $executionService, $authService

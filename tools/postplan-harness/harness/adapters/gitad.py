@@ -229,6 +229,26 @@ class LiveGit:
                               capture_output=True, text=True, errors="replace")
         return proc.returncode, f"{proc.stdout}\n{proc.stderr}".strip()
 
+    def _run_bytes(self, *args: str, check: bool = True) -> bytes:
+        """`_run` without text-mode translation. Use only where the bytes are
+        written back out verbatim (the lostwork PRE patch): text mode strips
+        the CR from CRLF files and replaces non-UTF-8 bytes with U+FFFD, which
+        makes lostwork.sh report every CRLF line as LOST (13 blocked runs,
+        2026-10-09/10)."""
+        proc = subprocess.run(["git", "-C", self.worktree, *args],
+                              capture_output=True)
+        if check and proc.returncode != 0:
+            stdout = proc.stdout.decode("utf-8", errors="replace")
+            stderr = proc.stderr.decode("utf-8", errors="replace")
+            blob = f"{stdout}\n{stderr}"
+            if any(m in blob for m in _LOCAL_GATE_MARKERS):
+                detail = "\n".join(s for s in (stderr.strip(), stdout.strip()) if s)
+                raise HarnessError("local-gate", f"git {' '.join(args)}: {detail[:600]}",
+                                   cmd=f"git {' '.join(args)}", output=detail)
+            raise HarnessError("git", f"git {' '.join(args)}: {stderr.strip()[:400]}",
+                               cmd=f"git {' '.join(args)}", output=stderr.strip())
+        return proc.stdout
+
     def _snapshot_conflicted_paths(self) -> tuple[str, ...]:
         """Record the unmerged paths of a stopped rebase on self.last_conflict_files.
 
@@ -670,9 +690,9 @@ class LiveGit:
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
         self._pre_rebase_sha = pre_rebase_sha  # arm SIGTERM handler
-        pre_patch = self._run("diff", f"{master_sha}...HEAD")
+        pre_patch = self._run_bytes("diff", f"{master_sha}...HEAD")
         if pre_patch.strip():
-            Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_text(pre_patch)
+            Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_bytes(pre_patch)
 
         purge_verdict_artifacts(key)
 
@@ -898,10 +918,10 @@ class LiveGit:
             return StackedRebaseResult(False, "worktree dirty at resolution entry")
 
         # Step 4: pre-side capture — must happen before touching history
-        pre_patch = self._run("diff", f"{ibl_base}...HEAD")
+        pre_patch = self._run_bytes("diff", f"{ibl_base}...HEAD")
         if not pre_patch.strip():
             return StackedRebaseResult(False, "pre-rebase diff vs iblBase is empty")
-        Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_text(pre_patch)
+        Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_bytes(pre_patch)
 
         # Pin master_sha once so a concurrent fetch cannot split the proof across two bases
         master_sha = self._run("rev-parse", "origin/master").strip()
@@ -1090,10 +1110,10 @@ class LiveGit:
 
     def capture_lostwork_pre(self, key: str) -> bool:
         """Pre-side capture for lostwork.sh. Must run BEFORE fetch/rebase."""
-        pre = self.diff_vs_base("origin/master")
+        pre = self._run_bytes("diff", self._merge_base("origin/master"))
         if not pre.strip():
             return False
-        Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_text(pre)
+        Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_bytes(pre)
         return True
 
     def prove_lostwork(self, key: str) -> tuple[bool, str]:

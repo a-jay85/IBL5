@@ -1,0 +1,506 @@
+        <!-- Navigation Bar -->
+        <nav class="fixed top-0 left-0 right-0 z-50 nav-grain h-[72px]">
+            <!-- Background - solid opaque navy matching menus -->
+            <div class="absolute inset-0 nav-bar-bg"></div>
+            <!-- Bottom cover: opaque strip at nav's bottom edge, stacked ABOVE
+                 dropdown panels (which use z-50) so the dropdowns' top edges
+                 appear tucked behind the nav bar instead of rendering on top. -->
+            <div class="absolute left-0 right-0 bottom-0 h-2 nav-bar-bg z-[60] pointer-events-none"></div>
+            <!-- Bottom accent line (above cover) -->
+            <div class="absolute bottom-0 left-0 right-0 h-[1px] z-[61] bg-accent-500"></div>
+
+            
+            <div class="relative max-w-7xl mx-auto px-4 sm:px-6 h-full">
+                <div class="flex items-center justify-between h-full">
+                    <!-- Logo -->
+                    <a href="index.php" class="flex items-center gap-3 py-2 group">
+                        <div class="relative">
+                            <div class="nav-logo-icon">
+                                <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                                    <path d="M12 2C12 12 12 12 12 22" stroke="currentColor" stroke-width="1.5"/>
+                                    <path d="M2 12C12 12 12 12 22 12" stroke="currentColor" stroke-width="1.5"/>
+                                    <path d="M4.5 4.5C8 8 8 16 4.5 19.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                                    <path d="M19.5 4.5C16 8 16 16 19.5 19.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="font-display text-2xl tracking-wider text-white leading-none">IBL</span>
+                            <span class="text-base tracking-[0.2em] text-accent-500 font-semibold uppercase">Sim League</span>
+                        </div>
+                    </a>
+
+                                        <!-- Desktop Navigation (right-aligned) -->
+                    <div class="nav-desktop">
+                                                            <div class="relative group self-stretch flex items-center">
+            <button class="nav-trigger">
+                                    <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></span>
+                                <span>Season</span>
+                <svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+
+            <div class="nav-dropdown nav-dropdown--left">
+                <div class="nav-dropdown__card nav-dropdown__card--narrow">
+                    
+                    <div class="py-1">
+                                                    <a href="modules.php?name=Standings" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Standings</span></span></a>                                                    <a href="modules.php?name=Schedule" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Schedule</span></span></a>                                                    <a href="modules.php?name=Injuries" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Injuries</span></span></a>                                                    <a href="modules.php?name=PlayerSearch" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Player Database</span></span></a>                                                    <a href="modules.php?name=ApiKeys" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Player Export</span></span></a>                                                    <a href="modules.php?name=CapSpace" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Cap Space</span></span></a>                                                    <a href="modules.php?name=ProjectedDraftOrder" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Projected Draft Order</span></span></a>                                                    <a href="modules.php?name=DraftPickLocator" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Draft Pick Locator</span></span></a>                                                    <a href="modules.php?name=TrainingCampRatingsDiff" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Training Camp Ratings Diff</span></span></a>                                                    <a href="modules.php?name=FreeAgencyPreview" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Free Agency Preview</span></span></a>                                                    <a href="modules.php?name=ContractList" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Contract List</span></span></a>                                                    <a href="modules.php?name=SeasonRosterChanges" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Player Movement</span></span></a>                                                    <a href="ibl/IBL" target="_blank" rel="noopener noreferrer" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>JSB Export</span> <svg class="w-3 h-3 opacity-40 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></span></a>                                            </div>
+
+                                                    <div class="px-4 py-3 border-t border-white/10 bg-black/20">
+            <label for="desktop-league-select" class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>
+            <div class="relative">
+                <select id="desktop-league-select" name="league" onchange="window.location.href=this.value" class="nav-select">
+                    <option value="index.php?league=ibl" selected class="bg-navy-800 text-white">IBL</option>
+                    <option value="index.php?league=olympics" class="bg-navy-800 text-white">Olympics</option>
+                </select>
+                <svg class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+        </div>
+                            
+                                    </div>
+            </div>
+        </div>
+                                                                    <div class="relative group self-stretch flex items-center">
+            <button class="nav-trigger">
+                                    <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg></span>
+                                <span>Stats</span>
+                <svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+
+            <div class="nav-dropdown nav-dropdown--left">
+                <div class="nav-dropdown__card nav-dropdown__card--narrow">
+                    
+                    <div class="py-1">
+                                                    <a href="modules.php?name=LeagueStarters" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>League Starters</span></span></a>                                                    <a href="modules.php?name=ComparePlayers" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Compare Players</span></span></a>                                                    <a href="modules.php?name=SeasonHighs" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Season Highs</span></span></a>                                                    <a href="modules.php?name=HeadToHeadRecords" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Head-to-Head Records</span></span></a>                                                    <a href="modules.php?name=TeamOffDefStats" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Team Off/Def Stats</span></span></a>                                            </div>
+
+                    
+                                    </div>
+            </div>
+        </div>
+                                                                    <div class="relative group self-stretch flex items-center">
+            <button class="nav-trigger">
+                                    <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg></span>
+                                <span>History</span>
+                <svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+
+            <div class="nav-dropdown nav-dropdown--left">
+                <div class="nav-dropdown__card nav-dropdown__card--narrow">
+                    
+                    <div class="py-1">
+                                                    <a href="modules.php?name=FranchiseHistory" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Franchise History</span></span></a>                                                    <a href="modules.php?name=Search&amp;preset=transactions" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Transaction History</span></span></a>                                                    <a href="modules.php?name=DraftHistory" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Draft History</span></span></a>                                                    <a href="modules.php?name=AwardHistory" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Award History</span></span></a>                                                    <a href="modules.php?name=RecordHolders" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Record Holders</span></span></a>                                                    <a href="modules.php?name=FranchiseRecordBook" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Franchise Record Book</span></span></a>                                                    <a href="modules.php?name=RecordHolders&amp;op=allstar" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>All-Star Appearances</span></span></a>                                                    <a href="modules.php?name=SeasonLeaderboards" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Season Leaderboards</span></span></a>                                                    <a href="modules.php?name=CareerLeaderboards" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Career Leaderboards</span></span></a>                                                    <a href="modules.php?name=SeasonArchive" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Season Archive</span></span></a>                                                    <a href="modules.php?name=OneOnOneGame" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>1-On-1 Game</span></span></a>                                            </div>
+
+                    
+                                    </div>
+            </div>
+        </div>
+                                                                    <div class="relative group self-stretch flex items-center">
+            <button class="nav-trigger">
+                                    <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg></span>
+                                <span>Community</span>
+                <svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+
+            <div class="nav-dropdown nav-dropdown--left">
+                <div class="nav-dropdown__card nav-dropdown__card--narrow">
+                    
+                    <div class="py-1">
+                                                    <a href="https://discord.com/invite/QXwBQxR" target="_blank" rel="noopener noreferrer" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Discord Server</span> <svg class="w-3 h-3 opacity-40 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></span></a>                                                    <a href="http://www.thakfu.com/ptf/index.php" target="_blank" rel="noopener noreferrer" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Prime Time Football</span> <svg class="w-3 h-3 opacity-40 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></span></a>                                                    <a href="modules.php?name=ActivityTracker" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Activity Tracker</span></span></a>                                                    <a href="modules.php?name=Topics" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Topics (News)</span></span></a>                                            </div>
+
+                    
+                                    </div>
+            </div>
+        </div>
+                                
+                        <!-- Teams + My Team wrapper (positioning context for Teams mega-menu) -->
+                        <div class="relative flex items-center self-stretch">
+                            
+                                                    </div>
+
+                                                    <!-- Divider -->
+                            <div class="w-px h-6 bg-white/10 mx-2"></div>
+
+                            <!-- Account dropdown (right-aligned to stay within viewport) -->
+                                    <div class="relative group self-stretch flex items-center" data-nav-login>
+            <button class="nav-trigger">
+                                    <span class="text-accent-500 group-hover:text-accent-400 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></span>
+                                <span>Login</span>
+                <svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+
+            <div class="nav-dropdown nav-dropdown--right">
+                <div class="nav-dropdown__card nav-dropdown__card--wide">
+                                                    <div class="px-4 pt-4 pb-3">
+            <form action="modules.php?name=YourAccount" method="post" hx-boost="false" class="space-y-3">
+                <div>
+                    <label for="nav-username" class="block text-base font-semibold tracking-widest uppercase text-gray-400 mb-1.5">Username</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
+                        </span>
+                        <input
+                            type="text"
+                            name="username"
+                            id="nav-username"
+                            maxlength="25"
+                            required
+                            placeholder="Enter username"
+                            class="nav-login-input"
+                        >
+                    </div>
+                </div>
+
+                <div>
+                    <label for="nav-password" class="block text-base font-semibold tracking-widest uppercase text-gray-400 mb-1.5">Password</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                        </span>
+                        <input
+                            type="password"
+                            name="user_password"
+                            id="nav-password"
+                            maxlength="20"
+                            required
+                            placeholder="Enter password"
+                            class="nav-login-input"
+                        >
+                    </div>
+                </div>
+
+                <label class="flex items-center gap-2.5 cursor-pointer group/remember py-0.5">
+                    <span class="relative inline-flex items-center justify-center w-4 h-4 shrink-0">
+                        <input
+                            type="checkbox"
+                            name="remember_me"
+                            value="1"
+                            class="peer nav-login-checkbox w-4 h-4"
+                        >
+                        <svg class="absolute w-2.5 h-2.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    </span>
+                    <span class="text-sm text-gray-400 group-hover/remember:text-gray-300 transition-colors duration-150 select-none">Remember me</span>
+                </label>
+
+                <input type="hidden" name="op" value="login">
+                <input type="hidden" name="redirect_query" value="">
+                <input type="hidden" name="_csrf_token" value="TOKEN">
+                <button type="submit" class="nav-login-btn">
+                    Login
+                </button>
+            </form>
+        </div>
+                <div class="border-t border-white/10 mx-4"></div>
+                                
+                    <div class="py-1">
+                                                    <a href="modules.php?name=YourAccount&amp;op=new_user" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Sign Up</span></span></a>                                                    <a href="modules.php?name=YourAccount&amp;op=pass_lost" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="nav-dropdown-item"><span class="flex items-center justify-between"><span>Forgot Password</span></span></a>                                            </div>
+
+                    
+                                    </div>
+            </div>
+        </div>
+                                
+                        <!-- Mobile view toggle (visible only in forced desktop mode) -->
+                        <button id="mobile-view-toggle" class="hidden nav-icon-btn ml-1" aria-label="Switch to mobile view" title="Switch to mobile view">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"/></svg>
+                        </button>
+                    </div>
+        
+                    <!-- Mobile controls -->
+                    <div class="lg:hidden flex items-center gap-1">
+                        <button id="desktop-view-toggle" class="nav-icon-btn" aria-label="Switch to desktop view" title="Switch to desktop view">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z"/></svg>
+                        </button>
+                        <button id="nav-hamburger" class="nav-icon-btn" aria-label="Toggle menu" aria-expanded="false">
+                                                            <div class="w-5 h-4 flex flex-col justify-between">
+                                    <span class="block h-0.5 w-full bg-current rounded-full transition-transform origin-center" id="hamburger-top"></span>
+                                    <span class="block h-0.5 w-full bg-current rounded-full transition-opacity" id="hamburger-middle"></span>
+                                    <span class="block h-0.5 w-full bg-current rounded-full transition-transform origin-center" id="hamburger-bottom"></span>
+                                </div>
+                                                    </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+                <!-- Mobile menu overlay -->
+        <div id="nav-overlay" class="nav-overlay hidden lg:hidden"></div>
+
+        <!-- Mobile menu -->
+        <nav id="nav-mobile-menu" class="fixed top-[71px] right-0 bottom-0 w-[300px] max-w-[85vw] z-50 transform translate-x-full transition-transform duration-300 ease-out lg:hidden">
+            <!-- Background - solid opaque navy matching dropdown menus -->
+            <div class="absolute inset-0 nav-bar-bg"></div>
+            <!-- Left accent line -->
+            <div class="absolute top-0 left-0 bottom-0 w-[1px] bg-gradient-to-b from-accent-500/50 via-accent-500/20 to-transparent"></div>
+
+            <div class="relative h-full flex flex-col mobile-menu-scroll overflow-y-auto">
+                <!-- User greeting -->
+                
+                <!-- My Team section first for thumb reachability (if user has a team) -->
+                
+                <!-- Teams mega-menu -->
+                
+                <!-- Menu sections -->
+                                            <div class="mobile-section">
+            <button class="mobile-dropdown-btn">
+                <span class="flex items-center gap-3">
+                                            <span class="text-accent-500"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></span>
+                                        <span class="font-display text-lg font-semibold">Season</span>
+                </span>
+                <svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+
+            <div class="hidden bg-black/20">
+                
+                                                                                    <a href="modules.php?name=Standings" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Standings</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=Schedule" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Schedule</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=Injuries" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Injuries</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=PlayerSearch" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Player Database</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=ApiKeys" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Player Export</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=CapSpace" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Cap Space</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=ProjectedDraftOrder" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Projected Draft Order</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=DraftPickLocator" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Draft Pick Locator</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=TrainingCampRatingsDiff" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Training Camp Ratings Diff</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=FreeAgencyPreview" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Free Agency Preview</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=ContractList" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Contract List</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=SeasonRosterChanges" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Player Movement</span>
+                                                    </a>
+                                                                                                        <a href="ibl/IBL" target="_blank" rel="noopener noreferrer" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>JSB Export</span>
+                             <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>                        </a>
+                                    
+                                            <div class="px-5 py-3 border-t border-white/10 mt-1">
+            <label for="mobile-league-select" class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>
+            <div class="relative">
+                <select id="mobile-league-select" name="league" onchange="window.location.href=this.value" class="nav-select">
+                    <option value="index.php?league=ibl" selected class="bg-navy-800 text-white">IBL</option>
+                    <option value="index.php?league=olympics" class="bg-navy-800 text-white">Olympics</option>
+                </select>
+                <svg class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+        </div>
+                        
+                            </div>
+        </div>
+                                                    <div class="mobile-section">
+            <button class="mobile-dropdown-btn">
+                <span class="flex items-center gap-3">
+                                            <span class="text-accent-500"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg></span>
+                                        <span class="font-display text-lg font-semibold">Stats</span>
+                </span>
+                <svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+
+            <div class="hidden bg-black/20">
+                
+                                                                                    <a href="modules.php?name=LeagueStarters" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>League Starters</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=ComparePlayers" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Compare Players</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=SeasonHighs" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Season Highs</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=HeadToHeadRecords" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Head-to-Head Records</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=TeamOffDefStats" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Team Off/Def Stats</span>
+                                                    </a>
+                                    
+                
+                            </div>
+        </div>
+                                                    <div class="mobile-section">
+            <button class="mobile-dropdown-btn">
+                <span class="flex items-center gap-3">
+                                            <span class="text-accent-500"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg></span>
+                                        <span class="font-display text-lg font-semibold">History</span>
+                </span>
+                <svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+
+            <div class="hidden bg-black/20">
+                
+                                                                                    <a href="modules.php?name=FranchiseHistory" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Franchise History</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=Search&amp;preset=transactions" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Transaction History</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=DraftHistory" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Draft History</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=AwardHistory" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Award History</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=RecordHolders" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Record Holders</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=FranchiseRecordBook" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Franchise Record Book</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=RecordHolders&amp;op=allstar" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>All-Star Appearances</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=SeasonLeaderboards" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Season Leaderboards</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=CareerLeaderboards" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Career Leaderboards</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=SeasonArchive" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Season Archive</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=OneOnOneGame" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>1-On-1 Game</span>
+                                                    </a>
+                                    
+                
+                            </div>
+        </div>
+                                                    <div class="mobile-section">
+            <button class="mobile-dropdown-btn">
+                <span class="flex items-center gap-3">
+                                            <span class="text-accent-500"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg></span>
+                                        <span class="font-display text-lg font-semibold">Community</span>
+                </span>
+                <svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+
+            <div class="hidden bg-black/20">
+                
+                                                                                    <a href="https://discord.com/invite/QXwBQxR" target="_blank" rel="noopener noreferrer" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Discord Server</span>
+                             <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>                        </a>
+                                                                                                        <a href="http://www.thakfu.com/ptf/index.php" target="_blank" rel="noopener noreferrer" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Prime Time Football</span>
+                             <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>                        </a>
+                                                                                                        <a href="modules.php?name=ActivityTracker" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Activity Tracker</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=Topics" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Topics (News)</span>
+                                                    </a>
+                                    
+                
+                            </div>
+        </div>
+                        
+                                    <!-- Account section -->
+                            <div class="mobile-section">
+            <button class="mobile-dropdown-btn">
+                <span class="flex items-center gap-3">
+                                            <span class="text-accent-500"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></span>
+                                        <span class="font-display text-lg font-semibold">Login</span>
+                </span>
+                <svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+
+            <div class="hidden bg-black/20">
+                                            <div class="px-5 pt-4 pb-4 bg-gradient-to-b from-accent-500/10 to-transparent">
+            <form action="modules.php?name=YourAccount" method="post" hx-boost="false" class="space-y-3">
+                <div>
+                    <label for="mobile-nav-username" class="block text-base font-semibold tracking-widest uppercase text-gray-400 mb-2">Username</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
+                        </span>
+                        <input
+                            type="text"
+                            name="username"
+                            id="mobile-nav-username"
+                            maxlength="25"
+                            required
+                            placeholder="Enter username"
+                            class="nav-login-input"
+                        >
+                    </div>
+                </div>
+
+                <div>
+                    <label for="mobile-nav-password" class="block text-base font-semibold tracking-widest uppercase text-gray-400 mb-2">Password</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                        </span>
+                        <input
+                            type="password"
+                            name="user_password"
+                            id="mobile-nav-password"
+                            maxlength="20"
+                            required
+                            placeholder="Enter password"
+                            class="nav-login-input"
+                        >
+                    </div>
+                </div>
+
+                <label class="flex items-center gap-3 cursor-pointer group/remember py-0.5">
+                    <span class="relative inline-flex items-center justify-center w-5 h-5 shrink-0">
+                        <input
+                            type="checkbox"
+                            name="remember_me"
+                            value="1"
+                            class="peer nav-login-checkbox w-5 h-5"
+                        >
+                        <svg class="absolute w-3 h-3 text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    </span>
+                    <span class="text-base text-gray-400 group-hover/remember:text-gray-300 transition-colors duration-150 select-none">Remember me</span>
+                </label>
+
+                <input type="hidden" name="op" value="login">
+                <input type="hidden" name="redirect_query" value="">
+                <input type="hidden" name="_csrf_token" value="TOKEN">
+                <button type="submit" class="nav-login-btn">
+                    Login
+                </button>
+            </form>
+        </div>
+                            <div class="border-t border-white/10 mx-5 my-2"></div>
+                
+                                                                                    <a href="modules.php?name=YourAccount&amp;op=new_user" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Sign Up</span>
+                                                    </a>
+                                                                                                        <a href="modules.php?name=YourAccount&amp;op=pass_lost" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content" class="mobile-dropdown-link flex items-center justify-between">
+                            <span>Forgot Password</span>
+                                                    </a>
+                                    
+                
+                            </div>
+        </div>
+                                    </div>
+        </nav>
+                <script src="jslib/navigation.js"></script>
+        <body bgcolor="#BBBBBB" style="--page-bg: #BBBBBB;"><div class="site-content" id="site-content" role="main" hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content">

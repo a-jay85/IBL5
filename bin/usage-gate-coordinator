@@ -120,16 +120,31 @@ retire_missing_bin() {
 # A marker whose resume binary is gone is retired instead (retire_missing_bin).
 # Returns 0 when the marker is stuck or retired and must be skipped.
 check_runaway() {
-    local sid="$1" stuck count runner cwd argv bin
+    local sid="$1" stuck count resets runner cwd argv bin
     bin=$(marker_field "$sid" '.resume_argv[0] // empty')
     if [ -n "$bin" ] && [ ! -x "$bin" ]; then
         retire_missing_bin "$sid" "$bin"
         return 0
     fi
     stuck=$(marker_field "$sid" '.stuck // false')
-    [ "$stuck" = "true" ] && return 0
     count=$(marker_field "$sid" '.resume_count // 0')
     case "$count" in ''|*[!0-9]*) count=0 ;; esac
+    # The 5-pause cap counts within one usage window. Once the marker's window has
+    # reset, those pauses were the limit doing its job, so the count starts over.
+    resets=$(marker_field "$sid" '.resets_at // empty')
+    case "$resets" in ''|*[!0-9]*) resets="" ;; esac
+    if [ -n "$resets" ] && [ "$resets" -le "$NOW" ] \
+        && { [ "$count" -ge 5 ] || [ "$(marker_field "$sid" '.stuck_reason // ""')" = "paused-5-times" ]; }; then
+        if [ "$DRY" -eq 1 ]; then
+            printf 'ACTION unstick %s window-reset\n' "$sid"
+            return 1
+        fi
+        usage_marker_reset_runaway "$sid" || return 0
+        usage_log "runaway-reset sid=$sid reason=window-reset resets_at=$resets"
+        send_dm "usage-gate: session $sid ($(marker_field "$sid" '.runner')) usage window reset; pause count cleared, it resumes on its own."
+        return 1
+    fi
+    [ "$stuck" = "true" ] && return 0
     if [ "$count" -ge 5 ]; then
         if [ "$DRY" -eq 1 ]; then
             printf 'ACTION stuck %s paused-5-times\n' "$sid"

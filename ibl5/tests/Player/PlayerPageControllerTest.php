@@ -34,7 +34,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
      * Build the controller under test with an explicit request snapshot, so each
      * test supplies its own input instead of mutating global state.
      */
-    private function buildController(?HttpRequest $request = null, ?PlayerRepositoryInterface $playerRepository = null): PlayerPageController
+    private function buildController(?HttpRequest $request = null, ?PlayerRepositoryInterface $playerRepository = null, ?\Closure $playerLoader = null): PlayerPageController
     {
         return new PlayerPageController(
             $this->mockDb,
@@ -43,6 +43,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
             $request ?? new HttpRequest(),
             null,
             $playerRepository,
+            $playerLoader,
         );
     }
 
@@ -520,5 +521,74 @@ class PlayerPageControllerTest extends WideUnitTestCase
 
         $this->assertSame($this->controller->renderPage(1, 3, 'testuser'), $html);
         $this->assertNotSame($this->controller->renderPage(1, null, 'testuser'), $html);
+    }
+
+    public function testShowPageUnknownPidReturnsNotFoundPanelWith404(): void
+    {
+        $this->mockDb->onQuery('team_name AS teamname', []);
+
+        $html = $this->controller->showPage('99999999|0|4040454', null, '');
+
+        $this->assertSame(404, $this->controller->responseStatus());
+        $this->assertStringContainsString('Player Not Found', $html);
+    }
+
+    public function testShowPageZeroPidReturnsNotFound(): void
+    {
+        $this->mockDb->onQuery('team_name AS teamname', []);
+
+        $html = $this->controller->showPage('0', null, '');
+
+        $this->assertSame(404, $this->controller->responseStatus());
+        $this->assertStringContainsString('Player Not Found', $html);
+    }
+
+    public function testShowPageNegativePidReturnsNotFound(): void
+    {
+        $this->mockDb->onQuery('team_name AS teamname', []);
+
+        $html = $this->controller->showPage('-5', null, '');
+
+        $this->assertSame(404, $this->controller->responseStatus());
+        $this->assertStringContainsString('Player Not Found', $html);
+    }
+
+    public function testShowPageValidPidKeepsStatus200(): void
+    {
+        $html = $this->controller->showPage('1', null, '');
+
+        $this->assertSame(200, $this->controller->responseStatus());
+        $this->assertStringNotContainsString('Player Not Found', $html);
+    }
+
+    public function testNotFoundBodyIsIdenticalForDifferentHostilePids(): void
+    {
+        $this->mockDb->onQuery('team_name AS teamname', []);
+
+        $first = $this->buildController()->showPage('99999999|0|4040454', null, '');
+        $second = $this->buildController()->showPage('<script>alert(1)</script>', null, '');
+
+        $this->assertSame($first, $second);
+        foreach ([$first, $second] as $body) {
+            $this->assertStringNotContainsString('99999999', $body);
+            $this->assertStringNotContainsString('4040454', $body);
+            $this->assertStringNotContainsString('<script>', $body);
+        }
+    }
+
+    public function testRenderPagePropagatesNonNotFoundRuntimeException(): void
+    {
+        $controller = $this->buildController(
+            null,
+            null,
+            static function (int $pid): never {
+                throw new \RuntimeException('connection lost');
+            },
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('connection lost');
+
+        $controller->renderPage(1, null, '');
     }
 }

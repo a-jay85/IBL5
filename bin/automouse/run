@@ -1922,10 +1922,21 @@ claim_next_plan() {
         # A lock held for a usage-gate pause is not stale, whatever its pid or age says.
         held=$(cat "$lock/paused-held" 2>/dev/null) || held=""
         if [ -n "$held" ] && usage_paused_hold_live "$held" "$LOCK_TTL_SECS"; then
+            # Resumed-post-plan disposal (hold window): a resumed post-plan that already
+            # shipped leaves this lock behind. Dispose first, remove the lock last.
+            if dispose_resumed_postplan_lock "$plan_name" "$lock"; then
+                rm -rf "$lock" 2>/dev/null || true
+            fi
             continue
         fi
         if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
            || [ "$(( now - lock_epoch ))" -gt "$LOCK_TTL_SECS" ]; then
+            # Resumed-post-plan disposal (before steal): an expired paused-held lock whose
+            # post-plan shipped is done, so never steal it and re-run the plan.
+            if dispose_resumed_postplan_lock "$plan_name" "$lock"; then
+                rm -rf "$lock" 2>/dev/null || true
+                continue
+            fi
             rm -rf "$lock" 2>/dev/null || true
             # Re-create atomically; the loser of a two-stealer race fails mkdir
             # here and simply falls through to the next plan.

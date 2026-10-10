@@ -948,7 +948,7 @@ fi
 #   H_CLEARED_AGE=<secs>  H_NO_CLEARED_DIR=1  H_HANDOFF_BRANCH=<b>  H_LOCK_BRANCH=<b>
 #   H_PR=open|merged|error  H_LAUNCHCTL=none|inflight|empty|fail|path-unset|path-empty
 #   H_CALL=claim|helper|helper-twice  H_GRACE=<secs> (set, even empty, exports
-#   RESUMED_POSTPLAN_GRACE_SECS)
+#   RESUMED_POSTPLAN_GRACE_SECS)  H_SECOND=1 (adds an unlocked queue/q.md after p.md)
 H_SID_VAL="cccccccc-3333-4333-8333-cccccccccccc"
 
 run_h_case() {
@@ -1001,8 +1001,14 @@ run_h_case() {
             *) export LAUNCHCTL_CMD="$D/launchctl" ;;
         esac
         if [ -n "${H_GRACE+set}" ]; then export RESUMED_POSTPLAN_GRACE_SECS="$H_GRACE"; fi
+        # shellcheck source=bin/lib/usage-gate.sh
         . "$SCRIPT_DIR/lib/usage-gate.sh"
-        queue_entries_ordered() { printf '%s\n' "$QUEUE_DIR/p.md"; }
+        if [ "${H_SECOND:-0}" = 1 ]; then
+            : > "$D/plans/q.md"; ln -s "$D/plans/q.md" "$QUEUE_DIR/q.md"
+            queue_entries_ordered() { printf '%s\n' "$QUEUE_DIR/p.md" "$QUEUE_DIR/q.md"; }
+        else
+            queue_entries_ordered() { printf '%s\n' "$QUEUE_DIR/p.md"; }
+        fi
         stat() {
             if [ "${1:-}" = -f ] && [ "${2:-}" = %m ]; then
                 printf '%s\n' "$(( $(date +%s) - ${H_LOCK_AGE:-0} ))"; return 0
@@ -1217,6 +1223,70 @@ D=$(u_base H_CALL=helper-twice H_LOCK_BRANCH=p)
     && [ -s "$D/report-1" ] && cmp -s "$D/report-1" "$D/report-2" \
     && [ -L "$D/done/p.md" ]
 u_report u11-helper-idempotent "$D" $?
+
+# --- claim_next_plan wiring of the helper (H_CALL=claim) ---
+
+w_base() {  # run_h_case with the shared w-case base; args: KNOB=value overrides, -KNOB unsets
+    (
+        export H_CALL=claim H_OWNER=dead H_SID="$H_SID_VAL" H_MARKER=0 H_HANDOFF_BRANCH=p \
+               H_LOCK_BRANCH=p H_LAUNCHCTL=none
+        local kv
+        for kv in "$@"; do
+            case "$kv" in
+                -*) unset "${kv#-}" ;;
+                *)  declare -x "$kv" ;;
+            esac
+        done
+        run_h_case
+    )
+}
+
+# w_lock_gone_disposed: plan not claimed (rc 1, empty out), done/p.md in place, lock gone,
+# the steal never ran.
+w_lock_gone_disposed() {
+    local D="$1"
+    [ "$(cat "$D/rc" 2>/dev/null)" = "1" ] \
+        && [ -z "$(cat "$D/out" 2>/dev/null)" ] \
+        && [ -L "$D/done/p.md" ] && [ ! -e "$D/queue/p.md.lock" ] \
+        && ! grep -q 'stole stale lock' "$D/run.log"
+}
+
+D=$(w_base H_LOCK_AGE=60 H_CLEARED_AGE=600 H_PR=open)
+w_lock_gone_disposed "$D" \
+    && [ -n "$(find "$D/done/p.md" -newer "$D/ref" 2>/dev/null)" ] \
+    && [ ! -e "$D/handoff/p.md.json" ] \
+    && [ "$(compgen -G "$D/reports/*-done-p.md" | wc -l | tr -d ' ')" = 1 ]
+u_report w1-claim-hold-window-open-disposes "$D" $?
+
+D=$(w_base H_LOCK_AGE=60 H_CLEARED_AGE=600 H_PR=open H_LAUNCHCTL=inflight)
+w_ok=1
+if [ "$(cat "$D/rc" 2>/dev/null)" = "1" ] && [ -z "$(cat "$D/out" 2>/dev/null)" ] \
+   && [ "$(cat "$D/queue/p.md.lock/paused-held" 2>/dev/null)" = "$H_SID_VAL" ] \
+   && [ -L "$D/queue/p.md" ] && [ ! -e "$D/done/p.md" ]; then w_ok=0; fi
+u_report w2-claim-hold-inflight-skips "$D" "$w_ok"
+
+D=$(w_base H_LOCK_AGE=20000 H_CLEARED_AGE=20000 H_PR=merged)
+w_lock_gone_disposed "$D" \
+    && grep -q 'branch PR is MERGED' "$D"/reports/*-done-p.md
+u_report w3-claim-stale-hold-merged-disposes "$D" $?
+
+D=$(w_base H_LOCK_AGE=20000 H_CLEARED_AGE=20000 H_PR=open H_LAUNCHCTL=empty)
+w_ok=1
+if [ "$(cat "$D/rc" 2>/dev/null)" = "0" ] \
+   && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/p.md" ] \
+   && [ -e "$D/handoff/p.md.json" ] && [ ! -e "$D/done/p.md" ]; then w_ok=0; fi
+u_report w4-claim-stale-hold-launchctl-empty-steals "$D" "$w_ok"
+
+D=$(w_base -H_HANDOFF_BRANCH H_LOCK_BRANCH=p-branch H_LOCK_AGE=20000 H_CLEARED_AGE=20000 H_PR=merged)
+w_lock_gone_disposed "$D" \
+    && [ "$(cat "$D/pr-branch" 2>/dev/null)" = "p-branch" ]
+u_report w5-claim-breadcrumb-no-handoff-disposes "$D" $?
+
+D=$(w_base H_SECOND=1 H_LOCK_AGE=60 H_CLEARED_AGE=600 H_PR=open)
+[ "$(cat "$D/rc" 2>/dev/null)" = "0" ] \
+    && [ "$(cat "$D/out" 2>/dev/null)" = "$D/queue/q.md" ] \
+    && [ -L "$D/done/p.md" ] && [ -d "$D/queue/q.md.lock" ]
+u_report w6-claim-disposes-then-claims-next "$D" $?
 
 # ---------------------------------------------------------------------------
 # Group g — CI wiring guard

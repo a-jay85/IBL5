@@ -11,11 +11,13 @@ use PHPUnit\Framework\Attributes\Group;
  *
  * `Season\Season` is class-aliased to the DB-free mock in every PHPUnit run, so the
  * sim window the Chunk_Leaders block sees is the mock's fixed 2024-01-01..2024-01-02.
- * Box rows are seeded around that window.
+ * Box rows are seeded around that window, including one on each window edge so a start/end
+ * binding mix-up (e.g. the end date bound into both slots) drops a scorer and fails the test.
  */
 #[Group('database')]
 final class BlocksRenderCharacterizationTest extends DatabaseTestCase
 {
+    private const IN_WINDOW_START_DATE = '2024-01-01';
     private const IN_WINDOW_DATE = '2024-01-02';
     private const OUT_OF_WINDOW_DATE = '2099-01-20';
 
@@ -53,11 +55,14 @@ final class BlocksRenderCharacterizationTest extends DatabaseTestCase
     public function testChunkLeadersRendersTopScorerFromLastSimWindow(): void
     {
         $this->insertTestPlayer(200137301, 'Chunk InWindow', ['teamid' => 1]);
+        $this->insertTestPlayer(200137303, 'Chunk WinStart', ['teamid' => 1]);
         $this->insertPlayerBoxscoreRow(self::IN_WINDOW_DATE, 200137301, 'Chunk InWindow', 'PG', 2, 1, 1, points2m: 10);
+        $this->insertPlayerBoxscoreRow(self::IN_WINDOW_START_DATE, 200137303, 'Chunk WinStart', 'SG', 2, 1, 1, points2m: 8);
 
         $content = $this->renderBlock('block-Chunk_Leaders.php');
 
         self::assertStringContainsString('Chunk InWindow', $content);
+        self::assertStringContainsString('Chunk WinStart', $content);
         self::assertStringContainsString('leaders-tabbed__leader-name', $content);
         self::assertStringContainsString('>PTS</button>', $content);
     }
@@ -66,12 +71,15 @@ final class BlocksRenderCharacterizationTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200137301, 'Chunk InWindow', ['teamid' => 1]);
         $this->insertTestPlayer(200137302, 'Chunk OutWindow', ['teamid' => 2]);
+        $this->insertTestPlayer(200137303, 'Chunk WinStart', ['teamid' => 1]);
         $this->insertPlayerBoxscoreRow(self::IN_WINDOW_DATE, 200137301, 'Chunk InWindow', 'PG', 2, 1, 1, points2m: 10);
+        $this->insertPlayerBoxscoreRow(self::IN_WINDOW_START_DATE, 200137303, 'Chunk WinStart', 'SG', 2, 1, 1, points2m: 8);
         $this->insertPlayerBoxscoreRow(self::OUT_OF_WINDOW_DATE, 200137302, 'Chunk OutWindow', 'PG', 1, 2, 2, points2m: 40);
 
         $content = $this->renderBlock('block-Chunk_Leaders.php');
 
         self::assertStringContainsString('Chunk InWindow', $content);
+        self::assertStringContainsString('Chunk WinStart', $content);
         self::assertStringNotContainsString('Chunk OutWindow', $content);
     }
 

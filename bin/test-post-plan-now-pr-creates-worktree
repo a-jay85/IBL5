@@ -9,6 +9,9 @@ set -euo pipefail
 
 # ---- environment --------------------------------------------------------
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+# Runner logs and .session sidecars go to a private dir, never the shared /tmp.
+mkdir -p "$TMP/runlog"
+export POSTPLAN_LOG_DIR="$TMP/runlog" PLAN_NOW_LOG_DIR="$TMP/runlog"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ORIGIN="$TMP/origin.git"
 MAIN="$TMP/IBL5"         # named IBL5 so worktrees_parent_dir() derives IBL5-worktrees
@@ -641,6 +644,12 @@ printf '%s\n' "$*" >> "${LAUNCHCTL_LOG:-/dev/null}"
 exit 0
 SHIM_EOF
 chmod +x "$SHIMS/launchctl"
+
+if ls "$TMP/runlog"/post-plan-now-feat-x-*.log >/dev/null 2>&1; then
+    pass "runner log lands in POSTPLAN_LOG_DIR"
+else
+    fail "runner log lands in POSTPLAN_LOG_DIR"
+fi
 
 # ==========================================================================
 # Summary

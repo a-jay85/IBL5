@@ -153,6 +153,19 @@ usage_runner_priority() {  # <runner>
 }
 
 # usage_marker_write <sid> <runner> <resume_bin> <reason> <zone> <pct> <window> <resets_epoch>
+# usage_is_temp_path <path>: 0 when <path> sits under $TMPDIR, /tmp, or /var/folders.
+usage_is_temp_path() {
+    local p="${1:-}" t="${TMPDIR:-}"
+    t="${t%/}"
+    if [ -n "$t" ]; then
+        case "$p" in "$t"/*|/private"$t"/*) return 0 ;; esac
+    fi
+    case "$p" in
+        /tmp/*|/private/tmp/*|/var/folders/*|/private/var/folders/*) return 0 ;;
+    esac
+    return 1
+}
+
 usage_marker_write() {
     local sid="${1:-}" runner="${2:-}" rbin="${3:-}" reason="${4:-}" zone="${5:-}" \
         pct="${6:-0}" window="${7:-}" resets="${8:-}"
@@ -171,6 +184,14 @@ usage_marker_write() {
     esac
     if [ ! -x "$rbin" ]; then
         usage_log "marker-rejected reason=resume-bin-not-executable bin=$rbin"
+        return 1
+    fi
+    # A test harness runs a copy of a runner from a temp dir. Without its own
+    # IBL5_USAGE_GATE_STATE_DIR it would park markers in the real state dir, and the
+    # coordinator would try to resume them after the temp dir is gone. Real runners
+    # never live in a temp dir, so refuse; the caller fails open.
+    if [ -z "${IBL5_USAGE_GATE_STATE_DIR:-}" ] && usage_is_temp_path "$rbin"; then
+        usage_log "marker-rejected reason=temp-resume-bin bin=$rbin"
         return 1
     fi
     local dir file tmp cwd prev_count=0
@@ -398,6 +419,20 @@ usage_marker_set_stuck() {
     tmp="$f.tmp.$$"
     [ -s "$f" ] || return 1
     if jq --arg r "${2:-stuck}" '.stuck = true | .stuck_reason = $r' "$f" 2>/dev/null > "$tmp" && mv "$tmp" "$f"; then
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
+}
+
+# usage_marker_reset_runaway <sid>: zero the resume counter and clear the stuck flag.
+usage_marker_reset_runaway() {
+    usage_valid_sid "${1:-}" || return 1
+    local f tmp
+    f="$(usage_markers_dir)/$1.json"
+    tmp="$f.tmp.$$"
+    [ -s "$f" ] || return 1
+    if jq '.resume_count = 0 | del(.stuck, .stuck_reason)' "$f" 2>/dev/null > "$tmp" && mv "$tmp" "$f"; then
         return 0
     fi
     rm -f "$tmp"

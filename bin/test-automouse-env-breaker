@@ -17,7 +17,7 @@
 # It must NOT env-stop (that would refund + halt the loop on every collision);
 # it falls through as a counted attempt bounded by MAX_ATTEMPTS.
 #
-# should_impl_env_stop <handoff> <in_queue> <env_err> <stalled> <fast> [wt_fail]  (each 0/1; wt_fail defaults 0)
+# should_impl_env_stop <handoff> <in_queue> <env_err> <stalled> <fast> [wt_fail] [wt_refused]  (each 0/1; both optional args default 0)
 #   returns 0 (env-stop) ONLY when: handoff=0 AND in_queue=1 AND wt_fail=0 AND (env_err|stalled|fast)
 #
 # We extract the predicate from bin/automouse/run rather than copy it, so the test
@@ -82,6 +82,21 @@ assert() {
     fi
 }
 
+# assert_wr <name> <handoff> <in_queue> <env_err> <stalled> <fast> <wt_fail> <wt_refused> <expect: stop|continue>
+assert_wr() {
+    name="$1"; h="$2"; q="$3"; e="$4"; s="$5"; f="$6"; wf="$7"; wr="$8"; want="$9"
+    if should_impl_env_stop "$h" "$q" "$e" "$s" "$f" "$wf" "$wr"; then
+        got="stop"
+    else
+        got="continue"
+    fi
+    if [ "$got" != "$want" ]; then
+        h_fail "$name" "expected '$want', got '$got' (h=$h q=$q e=$e s=$s f=$f wf=$wf wr=$wr)"
+    else
+        h_pass "$name ($got)"
+    fi
+}
+
 # --- The bug: legitimate skips left queue/ (in_queue=0) → NEVER env-stop ---
 # A fast skip with no handoff is the exact 2026-06-20 case.
 assert "skip-fast"           0 0 0 0 1 0 continue
@@ -117,6 +132,22 @@ if [ "$got" != "stop" ]; then
     h_fail "five-arg-default" "expected 'stop', got '$got' (wt_fail default must be 0)"
 else
     h_pass "five-arg-default ($got)"
+fi
+
+# --- Worktree-resume refusal: plan STAYS in queue/, fast exit, refusal line → NEVER env-stop ---
+assert_wr "wt-refused-fast"           0 1 0 0 1 0 1 continue   # the exact 2026-10-09 shape
+assert_wr "wt-refused-with-env-sig"   0 1 1 0 1 0 1 continue   # refusal is authoritative over a stray env signature
+assert_wr "wt-refused-stalled"        0 1 0 1 0 0 1 continue
+assert_wr "wt-refused-all-signals"    0 1 1 1 1 0 1 continue
+assert_wr "wt-refused-but-handoff"    1 1 0 0 0 0 1 continue
+# Control: same shape with wt_refused=0 passed explicitly is still a genuine env-stop
+assert_wr "no-wt-refused-fast-control" 0 1 0 0 1 0 0 stop
+# Back-compat: a 6-arg call defaults wt_refused=0 (sub-minute exit still stops)
+if should_impl_env_stop 0 1 0 0 1 0; then got="stop"; else got="continue"; fi
+if [ "$got" != "stop" ]; then
+    h_fail "six-arg-default" "expected 'stop', got '$got' (wt_refused default must be 0)"
+else
+    h_pass "six-arg-default ($got)"
 fi
 
 # --- Contract: prompt-impl and run agree on the sentinel, and wt-new failure no longer skips ---
@@ -195,6 +226,13 @@ printf '#!/bin/sh\nexit 1\n' > "$E2_STUB/security"
 chmod +x "$E2_STUB/security"
 E2_ARGS="$E2_ROOT/stub-args"
 : > "$E2_ARGS"
+# Worktree-resume refusal cases (R1-R4): a fake worktrees root the runner resolves
+# through WORKTREES_ROOT, a per-call cwd log, and a launch counter for STUB_MODE=wtrefuse.
+E2_WTROOT="$E2_ROOT/worktrees"
+E2_PWDS="$E2_ROOT/stub-pwds"
+E2_WTREF_COUNT="$E2_ROOT/wtref-count"
+mkdir -p "$E2_WTROOT"
+: > "$E2_PWDS"
 
 # P6 post-plan pause: the impl hands off to this worktree, and the post-plan-now stub
 # (the runner calls "$SELF_DIR/../post-plan-now", so it sits beside $E2_ROOT) writes a
@@ -221,6 +259,7 @@ set -u
 NDIR="$E2_NDIR"
 TRACE="$E2_TRACE"
 printf 'ARGS %s\n' "\$*" >> "$E2_ARGS"
+printf '%s\n' "\$(pwd -P)" >> "$E2_PWDS"
 sid=""; prev=""
 for a in "\$@"; do [ "\$prev" = "--session-id" ] && sid="\$a"; prev="\$a"; done
 case "\${STUB_MODE:-}" in
@@ -236,6 +275,22 @@ case "\${STUB_MODE:-}" in
             "$E2_PP_WT" "\$plan" > "\$NDIR/handoff/\$plan.json"
         printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":100,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
         exit 0 ;;
+    wtrefuse)
+        # -p calls 1..STUB_WTREF_REFUSALS print Claude Code's resume refusal and exit 1
+        # fast; the next -p call writes a handoff for STUB_WTREF_PLAN and succeeds.
+        # Other calls (the login preflight's `auth status`) take the default path.
+        if [ "\${1:-}" = "-p" ]; then
+            n=\$(( \$(cat "$E2_WTREF_COUNT" 2>/dev/null || echo 0) + 1 ))
+            printf '%s\n' "\$n" > "$E2_WTREF_COUNT"
+            if [ "\$n" -le "\${STUB_WTREF_REFUSALS:-1}" ]; then
+                msg="Error: cannot resume into worktree $E2_WTROOT/stub: Refusing to use $E2_WTROOT/stub as an isolation worktree: it is the checkout this session launched from. This session was not started. The worktree binding has been cleared; re-running will continue in the current directory without worktree isolation."
+                echo "\$msg" >&2; echo "\$msg"; exit 1
+            fi
+            printf '{"slug":"stub","worktree":"%s","branch":"stub","plan_file":"%s","plan_title":"stub","completed_at":"2026-01-01T00:00:00Z"}\n' \
+                "$E2_PP_WT" "\$STUB_WTREF_PLAN" > "\$NDIR/handoff/\$STUB_WTREF_PLAN.json"
+            printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":100,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
+            exit 0
+        fi ;;
 esac
 plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
 if [ -n "\$plan" ]; then
@@ -278,6 +333,9 @@ reset_e2() {
     rm -rf "$E2_NDIR/queue"/*.lock "$E2_GATE"
     mkdir -p "$E2_GATE"
     : > "$E2_ARGS"
+    : > "$E2_PWDS"
+    rm -f "$E2_WTREF_COUNT"
+    rm -rf "$E2_WTROOT"; mkdir -p "$E2_WTROOT"
 }
 
 run_e2() {
@@ -458,6 +516,103 @@ assert_present "P6: plan stays queued"                   "$E2_NDIR/queue/ppausey
 assert_present "P6: post-plan marker survives"           "$E2_GATE/markers/$E2_PP_SID.json"
 assert_eq      "P6: lock branch breadcrumb names the handoff branch" \
                "$(cat "$E2_NDIR/queue/ppausey.md.lock/branch" 2>/dev/null)" "stub"
+
+# ── Worktree-resume refusal cases (Claude Code resume safety check) ─────────
+# wtref_setup <plan>: pause <plan> mid-run (marker mode), give its session a
+# transcript so the resume uses --resume, and clear the launch and runner logs so
+# each case's assertions see only the resumed run. Prints the sid.
+wtref_setup() {
+    write_e2_plan "$1"
+    run_e2_mode marker
+    local sid
+    sid="$(stub_sid)"
+    touch "$E2_PROJECTS/default/$sid.jsonl"
+    : > "$E2_ARGS"; : > "$E2_PWDS"; rm -f "$E2_WTREF_COUNT"
+    rm -f "$E2_NDIR/logs"/*.log
+    printf '%s\n' "$sid"
+}
+# run_wtref <sid> <plan> <refusals> <stub_mode>: resume the paused session.
+run_wtref() {
+    STUB_MODE="$4" STUB_WTREF_PLAN="$2.md" STUB_WTREF_REFUSALS="$3" \
+    WORKTREES_ROOT="$E2_WTROOT" \
+    NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
+    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+    timeout 60 "$E2_RUNNER" --resume-paused "$1" > /dev/null 2>&1 || true
+    rm -f "$E2_PROJECTS/default/$1.jsonl"
+}
+launches()       { grep -c '^ARGS -p ' "$E2_ARGS" 2>/dev/null || true; }  # skips the login preflight's auth call
+env_stop_count() { find "$E2_NDIR/reports" -name "*-env-stop-$1.md" 2>/dev/null | wc -l | tr -d ' '; }
+REPO_REAL="$(cd "$REPO_ROOT" && pwd -P)"
+
+echo ""
+echo "# R1: one refusal → one retry from the main checkout, worktree path in the prompt, no env-stop"
+reset_e2
+R1_SID="$(wtref_setup wtref1)"
+mkdir -p "$E2_WTROOT/wtref1"
+run_wtref "$R1_SID" wtref1 1 wtrefuse
+R1_LOG="$(e2_logtxt)"
+R1_CALL1="$(grep '^ARGS -p ' "$E2_ARGS" | sed -n 1p)"
+R1_CALL2="$(grep '^ARGS -p ' "$E2_ARGS" | sed -n 2p)"
+want_absent    "R1 setup: worktree sync did not skip the plan" "$R1_LOG" "SKIPPING: worktree needs manual resolution"
+assert_eq      "R1: exactly two impl launches"            "$(launches)" "2"
+want           "R1: call 2 resumes the same session"      "$R1_CALL2" "--resume $R1_SID"
+want           "R1: call 2 prompt cds into the worktree"  "$R1_CALL2" "cd $E2_WTROOT/wtref1 && git -C $E2_WTROOT/wtref1 status"
+want           "R1: call 2 prompt forbids main-checkout edits" "$R1_CALL2" "Never edit files under $REPO_ROOT directly"
+want_absent    "R1: call 1 prompt has no refusal wording" "$R1_CALL1" "Claude Code then refused"
+assert_eq      "R1: both launches ran from the main checkout" "$(sort -u "$E2_PWDS")" "$REPO_REAL"
+want           "R1: log records the retry"                "$R1_LOG" "WORKTREE RESUME REFUSED — Claude Code would not resume session $R1_SID"
+want_absent    "R1: no second-refusal line"               "$R1_LOG" "WORKTREE RESUME REFUSED AGAIN"
+want_absent    "R1: no env-stop log line"                 "$R1_LOG" "Environmental failure during impl"
+assert_eq      "R1: no env-stop report"                   "$(env_stop_count wtref1)" "0"
+assert_eq      "R1: both plan headers read Plan #1, attempt 1" \
+               "$(grep -cF -- '--- Plan #1: wtref1.md (attempt 1)' <<<"$R1_LOG")" "2"
+want           "R1: post-plan reached (call 2 handed off)" "$R1_LOG" "Post-plan paused (usage gate)"
+assert_eq      "R1: lock held by the post-plan session, not the impl session" \
+               "$(cat "$E2_NDIR/queue/wtref1.md.lock/paused-held" 2>/dev/null)" "$E2_PP_SID"
+
+echo ""
+echo "# R2: a second refusal is a counted, deferred failure; no third launch, no env-stop"
+reset_e2
+R2_SID="$(wtref_setup wtref2)"
+mkdir -p "$E2_WTROOT/wtref2"
+run_wtref "$R2_SID" wtref2 2 wtrefuse
+R2_LOG="$(e2_logtxt)"
+assert_eq      "R2: exactly two impl launches"            "$(launches)" "2"
+want           "R2: log records the second refusal"       "$R2_LOG" "WORKTREE RESUME REFUSED AGAIN"
+want           "R2: genuine-failure branch ran"           "$R2_LOG" "Genuine impl failure"
+want_absent    "R2: no env-stop log line"                 "$R2_LOG" "Environmental failure during impl"
+assert_eq      "R2: no env-stop report"                   "$(env_stop_count wtref2)" "0"
+assert_eq      "R2: attempt counted (attempts = 1)"       "$(cat "$E2_NDIR/queue/wtref2.md.attempts" 2>/dev/null)" "1"
+assert_present "R2: failure file written"                 "$E2_NDIR/queue/wtref2.md.failure"
+assert_present "R2: plan stays queued"                    "$E2_NDIR/queue/wtref2.md"
+assert_absent  "R2: claim lock released"                  "$E2_NDIR/queue/wtref2.md.lock"
+want           "R2: deferred for the rest of the run"     "$R2_LOG" \
+               "Deferred to the next run (cap-refunded or wt-new failure): wtref2.md"
+
+echo ""
+echo "# R3: refusal with no resolvable worktree → no retry, counted failure, no env-stop"
+reset_e2
+R3_SID="$(wtref_setup wtref3)"
+run_wtref "$R3_SID" wtref3 1 wtrefuse
+R3_LOG="$(e2_logtxt)"
+assert_eq      "R3: exactly one impl launch"              "$(launches)" "1"
+want_absent    "R3: no retry line"                        "$R3_LOG" "Refunding attempt; retrying the resume once"
+want           "R3: counted as a genuine attempt"         "$R3_LOG" "counted as a genuine attempt"
+want_absent    "R3: no env-stop log line"                 "$R3_LOG" "Environmental failure during impl"
+assert_eq      "R3: attempt counted (attempts = 1)"       "$(cat "$E2_NDIR/queue/wtref3.md.attempts" 2>/dev/null)" "1"
+
+echo ""
+echo "# R4: control: a fast resume exit WITHOUT the refusal line still env-stops"
+reset_e2
+R4_SID="$(wtref_setup wtref4)"
+mkdir -p "$E2_WTROOT/wtref4"
+run_wtref "$R4_SID" wtref4 1 ""
+R4_LOG="$(e2_logtxt)"
+assert_eq      "R4: exactly one impl launch"              "$(launches)" "1"
+want           "R4: env-stop log line"                    "$R4_LOG" "Environmental failure during impl"
+assert_eq      "R4: env-stop report written"              "$(env_stop_count wtref4)" "1"
+want_absent    "R4: no refusal classification"            "$R4_LOG" "WORKTREE RESUME REFUSED"
+assert_absent  "R4: attempt refunded"                     "$E2_NDIR/queue/wtref4.md.attempts"
 
 # HB: heartbeat watcher (run_heartbeat_watcher)
 #

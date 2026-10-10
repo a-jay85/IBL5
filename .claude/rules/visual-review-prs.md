@@ -17,7 +17,7 @@ paths:
   - ".github/workflows/vr-pr-screens.yml"
   - "bin/vr-pages-publish"
   - "ibl5/tests/e2e/vr-pr-screens.ts"
-last_verified: 2026-10-08
+last_verified: 2026-10-09
 ---
 
 # Visual-review PRs

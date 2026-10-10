@@ -127,12 +127,6 @@ parameters:
 			path: classes/Debug/DebugSession.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/DepthChart/DepthChartRepository.php
-
-		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
 			count: 1
@@ -199,12 +193,6 @@ parameters:
 			path: classes/FreeAgency/FreeAgencyUnderContractSectionView.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "team_city" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/GMContactList/GMContactListRepository.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 2
@@ -215,18 +203,6 @@ parameters:
 			identifier: ibl.sqlStringConcatenation
 			count: 1
 			path: classes/League/League.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "franchise_id" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/LeagueConfig/LeagueConfigRepository.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "team_slot" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/LeagueConfig/LeagueConfigRepository.php
 
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
@@ -241,12 +217,6 @@ parameters:
 			path: classes/LeagueSchedule/LeagueScheduleRepository.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "year" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Maintenance/MaintenanceRepository.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 1
@@ -257,12 +227,6 @@ parameters:
 			identifier: ibl.directHeader
 			count: 3
 			path: classes/Module/ModuleRedirect.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "team_city" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/Navigation/NavigationRepository.php
 
 		-
 			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
@@ -299,12 +263,6 @@ parameters:
 			identifier: ibl.trustedVariable
 			count: 6
 			path: classes/Negotiation/NegotiationOfferView.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/OneOnOneGame/OneOnOneGameRepository.php
 
 		-
 			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
@@ -389,12 +347,6 @@ parameters:
 			identifier: ibl.trustedVariable
 			count: 1
 			path: classes/RookieOption/RookieOptionView.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/DepthChartSnapshot/DepthChartSnapshotRepository.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
@@ -819,12 +771,6 @@ parameters:
 			identifier: ibl.directHeader
 			count: 1
 			path: classes/Trading/TradingController.php
-
-		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 2
-			path: classes/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepository.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'

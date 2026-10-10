@@ -179,6 +179,7 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'news categories', url: 'modules.php?name=News&file=categories&op=newindex&catid=15' },
   { name: 'news article', url: 'modules.php?name=News&file=article&sid=1' },
   { name: 'team schedule', url: 'modules.php?name=Schedule&teamid=1' },
+  // Seed rows for this game: ibl5/tests/e2e/fixtures/ci-seed.sql:124 and :814-823. An unknown pair 404s.
   { name: 'game boxscore', url: 'modules.php?name=GameBoxscore&date=2026-02-20&game=1' },
 ];
 

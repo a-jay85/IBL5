@@ -16,13 +16,13 @@ const PAGES = [
   { name: 'team page', url: 'modules.php?name=Team&op=team&teamid=1', selector: '.team-page-layout', hasWideTables: true },
   { name: 'season leaderboards', url: 'modules.php?name=SeasonLeaderboards', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'career leaderboards', url: 'modules.php?name=CareerLeaderboards', selector: 'form[name="CareerLeaderboards"]', hasWideTables: false },
-  { name: 'draft history', url: 'modules.php?name=DraftHistory', selector: '.ibl-data-table', hasWideTables: false },
+  { name: 'draft history', url: 'modules.php?name=DraftInfo&tab=history', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'cap space', url: 'modules.php?name=CapSpace', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'schedule', url: 'modules.php?name=Schedule', selector: '.schedule-header', hasWideTables: false },
   { name: 'injuries', url: 'modules.php?name=Injuries', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'player database', url: 'modules.php?name=PlayerSearch', selector: 'form[action*="PlayerSearch"]', hasWideTables: false },
-  { name: 'projected draft order', url: 'modules.php?name=ProjectedDraftOrder', selector: '.ibl-data-table', hasWideTables: false },
-  { name: 'draft pick locator', url: 'modules.php?name=DraftPickLocator', selector: '.draft-pick-locator-container', hasWideTables: false },
+  { name: 'projected draft order', url: 'modules.php?name=DraftInfo&tab=order', selector: '.ibl-data-table', hasWideTables: false },
+  { name: 'draft pick locator', url: 'modules.php?name=DraftInfo&tab=picks', selector: '.draft-pick-locator-container', hasWideTables: false },
   { name: 'free agency preview', url: 'modules.php?name=FreeAgencyPreview', selector: 'th.fa-preview-pos-col', hasWideTables: false },
   { name: 'contract list', url: 'modules.php?name=ContractList', selector: '.totals-row', hasWideTables: true },
   { name: 'player movement', url: 'modules.php?name=SeasonRosterChanges', selector: '.ibl-data-table', hasWideTables: false },
@@ -83,8 +83,8 @@ test.describe('Mobile public page smoke tests', () => {
 
   test('draft history year detail — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
-    await gotoWithRetry(page, 'modules.php?name=DraftHistory&year=2026');
-    await assertNoPhpErrors(page, 'on modules.php?name=DraftHistory&year=2026 (mobile)');
+    await gotoWithRetry(page, 'modules.php?name=DraftInfo&tab=history&year=2026');
+    await assertNoPhpErrors(page, 'on modules.php?name=DraftInfo&tab=history&year=2026 (mobile)');
     const table = page.locator('.ibl-data-table').first();
     await expect(table).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on draft history year detail');
@@ -94,8 +94,8 @@ test.describe('Mobile public page smoke tests', () => {
 
   test('draft history team view — no horizontal overflow on mobile', async ({ page }) => {
     test.setTimeout(60_000);
-    await gotoWithRetry(page, 'modules.php?name=DraftHistory&teamid=1');
-    await assertNoPhpErrors(page, 'on modules.php?name=DraftHistory&teamid=1 (mobile)');
+    await gotoWithRetry(page, 'modules.php?name=DraftInfo&tab=history&teamid=1');
+    await assertNoPhpErrors(page, 'on modules.php?name=DraftInfo&tab=history&teamid=1 (mobile)');
     await expect(page.locator('.ibl-title').first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'on draft history team view');
   });

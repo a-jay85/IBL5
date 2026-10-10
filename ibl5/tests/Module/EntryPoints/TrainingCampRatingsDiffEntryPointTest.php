@@ -48,41 +48,41 @@ class TrainingCampRatingsDiffEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('TrainingCampRatingsDiff', [], [], $this->tcGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testWithYearFilterAppliesYear(): void
     {
         $output = $this->runModule('TrainingCampRatingsDiff', ['year' => '2024'], [], $this->tcGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testRejectsNonDigitYear(): void
     {
         $output = $this->runModule('TrainingCampRatingsDiff', ['year' => 'garbage'], [], $this->tcGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testWithTidFilterAppliesTeam(): void
     {
         $output = $this->runModule('TrainingCampRatingsDiff', ['tid' => '1'], [], $this->tcGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testWithStatusFilterAppliesStatus(): void
     {
         $output = $this->runModule('TrainingCampRatingsDiff', ['status' => 'signed'], [], $this->tcGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testRejectsInvalidStatus(): void
     {
         $output = $this->runModule('TrainingCampRatingsDiff', ['status' => 'garbage'], [], $this->tcGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

@@ -16,7 +16,7 @@ class PlayerStatsFlipCardViewTest extends TestCase
     {
         $result = PlayerStatsFlipCardView::getFlipStyles(null);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame('', $result);
     }
 
     public function testRenderWithShowAveragesFirstSnapshot(): void

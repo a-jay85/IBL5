@@ -25,7 +25,7 @@ class ParseJsbFilesStepTest extends TestCase
 
         self::assertTrue($result->success);
         self::assertSame('No changes', $result->detail);
-        self::assertEmpty($result->messages);
+        self::assertSame([], $result->messages);
     }
 
     public function testOnlyTrnFileProcessedWhenPresent(): void
@@ -92,7 +92,7 @@ class ParseJsbFilesStepTest extends TestCase
 
         self::assertTrue($result->success);
         self::assertSame(1, $result->messageErrorCount);
-        self::assertNotEmpty($result->messages);
+        self::assertNotSame([], $result->messages);
     }
 
     /**

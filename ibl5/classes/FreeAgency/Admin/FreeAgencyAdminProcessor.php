@@ -153,8 +153,6 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             if (!isset($processedPlayers[$playerName])) {
                 // Flush previous player's buffered offer lines (sorted by team name)
                 $discordText .= $this->flushPlayerOfferLines($pendingHeader, $pendingOfferLines, $pendingAcceptanceLine);
-                $pendingHeader = '';
-                $pendingAcceptanceLine = '';
                 $pendingOfferLines = [];
 
                 $processedPlayers[$playerName] = true;

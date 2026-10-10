@@ -334,14 +334,14 @@ class FreeAgencyProcessorTest extends TestCase
             static fn (string $q): bool => stripos($q, 'ibl_team_info') !== false
                 && strpos($q, "'Test Team'") !== false
         );
-        $this->assertNotEmpty($verifiedLookup, 'Team lookup must use the verified session team name');
+        $this->assertNotSame([], $verifiedLookup, 'Team lookup must use the verified session team name');
 
         // The POST-supplied team name must never reach the database.
         $victimReferences = array_filter(
             $queries,
             static fn (string $q): bool => strpos($q, 'Victim Team') !== false
         );
-        $this->assertEmpty($victimReferences, 'POST-supplied team name must be discarded (IDOR D-07)');
+        $this->assertSame([], $victimReferences, 'POST-supplied team name must be discarded (IDOR D-07)');
 
         $this->assertNotNull($capturingRepo->lastSavedOffer, 'A valid offer should still be saved');
     }
@@ -370,7 +370,7 @@ class FreeAgencyProcessorTest extends TestCase
             static fn (string $q): bool => stripos($q, 'ibl_team_info') !== false
                 && strpos($q, "'Test Team'") !== false
         );
-        $this->assertNotEmpty($verifiedLookup, 'Verified team must be used even when POST team is absent');
+        $this->assertNotSame([], $verifiedLookup, 'Verified team must be used even when POST team is absent');
         $this->assertNotNull($capturingRepo->lastSavedOffer);
     }
 
@@ -398,7 +398,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $queries = $this->mockDb->getExecutedQueries();
         $deleteQueries = array_filter($queries, static fn (string $q): bool => stripos($q, 'DELETE') !== false);
-        $this->assertNotEmpty($deleteQueries);
+        $this->assertNotSame([], $deleteQueries);
     }
 
     // ================================================================

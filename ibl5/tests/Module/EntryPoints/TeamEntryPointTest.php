@@ -46,7 +46,7 @@ class TeamEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Team', ['op' => '']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testUnknownOpFallsToMenu(): void
@@ -54,7 +54,7 @@ class TeamEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Team', ['op' => 'bogus']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOpTeamWithValidTeamidRendersTeamPage(): void
@@ -63,7 +63,7 @@ class TeamEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Team', ['op' => 'team', 'teamid' => '1']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_team_info');
     }
 
@@ -93,6 +93,6 @@ class TeamEntryPointTest extends ModuleEntryPointTestCase
             ['op' => 'api', 'teamid' => '1', 'display' => 'ratings'],
         );
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

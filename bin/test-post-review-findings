@@ -31,6 +31,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LIB="$REPO_ROOT/bin/lib/post-review-findings.sh"
 
 h_tmp BASE_TMP
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$BASE_TMP/usage"
 
 # ── gh shim ───────────────────────────────────────────────────────────────────
 SHIMD="$BASE_TMP/shim"

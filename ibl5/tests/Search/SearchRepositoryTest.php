@@ -111,7 +111,7 @@ class SearchRepositoryTest extends WideUnitTestCase
         $this->repository->searchStoriesByPreset(SearchRepositoryInterface::PRESET_TRANSACTIONS);
 
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertNotEmpty($queries);
+        $this->assertNotSame([], $queries);
         $executed = end($queries);
 
         // The mock interpolates bound params, so the six whitelisted category IDs
@@ -127,7 +127,7 @@ class SearchRepositoryTest extends WideUnitTestCase
         $this->repository->searchStoriesByPreset(SearchRepositoryInterface::PRESET_TRANSACTIONS, 'trade');
 
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertNotEmpty($queries);
+        $this->assertNotSame([], $queries);
         $executed = end($queries);
 
         $this->assertStringContainsString('s.catid IN (', $executed);

@@ -91,7 +91,7 @@ final class BlocksFunctionTest extends WideUnitTestCase
                 break;
             }
         }
-        self::assertNotEmpty($selectQuery, 'Expected a SELECT on nuke_blocks to be executed');
+        self::assertNotSame('', $selectQuery, 'Expected a SELECT on nuke_blocks to be executed');
         self::assertStringContainsString("bposition = 'c'", $selectQuery);
     }
 }

@@ -110,7 +110,7 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
     ): void {
         $map = (new \ReflectionClassConstant($class, $const))->getValue();
         self::assertIsArray($map);
-        self::assertNotEmpty($map);
+        self::assertNotSame([], $map);
 
         self::assertSame([], self::nonIdentifierValues($map, $pattern, $allowListKeys));
 
@@ -138,13 +138,13 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
 
         $violations = self::actorIdentityViolations($fixture::class);
 
-        self::assertNotEmpty($violations);
+        self::assertNotSame([], $violations);
         $endsWithLoggedInTeamId = array_filter(
             $violations,
             static fn (string $violation): bool => str_ends_with($violation, '$loggedInTeamID')
                 || str_ends_with($violation, '$loggedInTeamID)'),
         );
-        self::assertNotEmpty($endsWithLoggedInTeamId);
+        self::assertNotSame([], $endsWithLoggedInTeamId);
     }
 
     public function testIdentifierShapeCheckFlagsInjectedMapValue(): void
@@ -218,7 +218,7 @@ final class SqlIdentifierAllowlistInvariantTest extends TestCase
                 ['ibl' => '`ibl_plr`'],
             ] as $map
         ) {
-            self::assertNotEmpty(self::nonIdentifierValues($map, self::TABLE_PATTERN, false));
+            self::assertNotSame([], self::nonIdentifierValues($map, self::TABLE_PATTERN, false));
         }
 
         self::assertSame(

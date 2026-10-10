@@ -36,7 +36,7 @@ class DraftHistoryApiHandlerTest extends WideUnitTestCase
 
         $output = $this->captureOutput(static fn () => $handler->handle());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('draft-no-data', $output);
     }
 
@@ -47,7 +47,7 @@ class DraftHistoryApiHandlerTest extends WideUnitTestCase
 
         $output = $this->captureOutput(static fn () => $handler->handle());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // Falls back to endYear (2024), which also has no picks in mock
         $this->assertStringContainsString('draft-no-data', $output);
     }
@@ -59,7 +59,7 @@ class DraftHistoryApiHandlerTest extends WideUnitTestCase
 
         $output = $this->captureOutput(static fn () => $handler->handle());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // (int)'abc' === 0, which is < startYear (1988), so falls back to endYear
         $this->assertStringContainsString('draft-no-data', $output);
     }

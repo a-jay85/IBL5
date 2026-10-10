@@ -33,7 +33,21 @@ USAGE_SWITCH_RETRY_MAX=3
 # usage_state_dir
 # Echoes the state dir (creating it and markers/). Honors IBL5_USAGE_GATE_STATE_DIR;
 # an empty value falls back to the default.
+# Test mode (IBL5_USAGE_GATE_TEST_MODE non-empty; unset or empty = off): an unset/empty
+# IBL5_USAGE_GATE_STATE_DIR, or one equal to the default real path, is refused. The
+# function then warns on stderr, prints an unwritable sink path, and returns 1, so every
+# later write fails and the gate fails open. Callers use $(usage_state_dir) and ignore
+# rc, so the sink must never be an empty string.
 usage_state_dir() {
+    if [ -n "${IBL5_USAGE_GATE_TEST_MODE:-}" ]; then
+        local real="${HOME:-}/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate"
+        local want="${IBL5_USAGE_GATE_STATE_DIR:-}"
+        if [ -z "$want" ] || [ "${want%/}" = "$real" ]; then
+            echo "USAGE-GATE-TEST: refusing the real state dir $real (set IBL5_USAGE_GATE_STATE_DIR to a temp dir)" >&2
+            printf '%s\n' "/dev/null/usage-gate-refused"
+            return 1
+        fi
+    fi
     local d="${IBL5_USAGE_GATE_STATE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate}"
     mkdir -p "$d/markers" 2>/dev/null
     printf '%s\n' "$d"
@@ -58,6 +72,7 @@ usage_cache_path() {
 # refresh changes it too, so switch detection pairs it with _usage_acct_fp.
 _usage_cred_fp() {
     local tok
+    [ -n "${IBL5_USAGE_GATE_TEST_MODE:-}" ] && return 0
     tok=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null \
         | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
     [ -n "$tok" ] || return 0
@@ -295,6 +310,13 @@ usage_fetch() {
     bo=$(_usage_fetch_backoff_read "$d/fetch-backoff"); bo_until=${bo% *}
     if [ "$now" -lt "$bo_until" ]; then
         _usage_fetch_log_once "$d/fetch-backoff.logged" "$bo_until" "backoff-skip until=$bo_until"
+        _usage_fetch_serve_stale "$age" "$cache"; return $?
+    fi
+
+    # Test mode never reads the keychain or calls the usage API. A fresh seeded cache was
+    # already served above; anything else serves stale (rc 2) or nothing (rc 1).
+    if [ -n "${IBL5_USAGE_GATE_TEST_MODE:-}" ]; then
+        usage_log "fetch-skipped reason=test-mode"
         _usage_fetch_serve_stale "$age" "$cache"; return $?
     fi
 

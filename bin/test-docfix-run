@@ -7,6 +7,9 @@
 # health predicate (all three ALERT branches + every silent one).
 # Run: bin/test-docfix-run  (exit 0 = all pass).
 set -u
+_USAGE_TMP="$(mktemp -d "${TMPDIR:-/tmp}/usage-iso.XXXXXX")"
+[ -n "$(trap -p EXIT)" ] || trap 'rm -rf "$_USAGE_TMP"' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$_USAGE_TMP"
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -1107,7 +1110,7 @@ V7B="$(_hl docfix_health_heartbeat_verdict 'not-a-date' 1000)"; V7BRC=$?
   || bad "(H7) health lib: verdict none got [$V7A] [$V7B]"
 
 # (H8) empty-env source: the lib works under env -i with a minimal PATH.
-V8="$(env -i PATH="/usr/bin:/bin:$(dirname "$(command -v jq)")" REPO_ROOT="$REPO_ROOT" \
+V8="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" PATH="/usr/bin:/bin:$(dirname "$(command -v jq)")" REPO_ROOT="$REPO_ROOT" \
     bash -c 'source "$REPO_ROOT/bin/lib/docfix-health.sh" && docfix_health_heartbeat_verdict "" 0')"; V8RC=$?
 { [ "$V8" = "none" ] && [ "$V8RC" -eq 0 ]; } \
   && ok "(H8) health lib: sources and runs under env -i (empty environment)" \

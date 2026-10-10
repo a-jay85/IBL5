@@ -13,6 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BASE_PATH="$PATH"
 BASE_HOME="$HOME"
 h_tmp TMP
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
 # shellcheck source=bin/lib/launchd-expected-jobs.sh
 . "$SCRIPT_DIR/lib/launchd-expected-jobs.sh"

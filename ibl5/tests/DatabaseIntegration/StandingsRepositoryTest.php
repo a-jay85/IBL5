@@ -29,7 +29,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getStandingsByRegion('Eastern');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('teamid', $first);
         self::assertArrayHasKey('team_name', $first);
@@ -41,7 +41,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getStandingsByRegion('Atlantic');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         // For division queries, gamesBack comes from div_gb
         self::assertArrayHasKey('gamesBack', $first);
@@ -58,7 +58,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getAllStandings();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
 
         $first = $result[0];
         self::assertArrayHasKey('teamid', $first);
@@ -94,7 +94,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getAllStreakData();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         // Should be keyed by teamid (int)
         self::assertArrayHasKey(1, $result);
         self::assertArrayHasKey(2, $result);
@@ -146,7 +146,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getAllPythagoreanStats(2098);
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $firstKey = array_key_first($result);
         self::assertIsInt($firstKey);
         $firstRow = $result[$firstKey];
@@ -167,7 +167,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
         // vw_series_records derives from ibl_schedule
         $result = $this->repo->getSeriesRecords();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $first = $result[0];
         self::assertArrayHasKey('self', $first);
         self::assertArrayHasKey('opponent', $first);
@@ -224,7 +224,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
     public function testFetchTeamsByRegionReturnsRowsForValidGrouping(): void
     {
         $result = $this->repo->fetchTeamsByRegion('conference', 'Eastern');
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         self::assertArrayHasKey('teamid', $result[0]);
     }
 

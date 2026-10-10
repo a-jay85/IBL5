@@ -104,7 +104,7 @@ final class PlayoffPhantomGame1993MigrationTest extends DatabaseTestCase
                 $updates[] = $statement;
             }
         }
-        self::assertNotEmpty($updates, 'no UPDATE statements parsed from migration 179');
+        self::assertNotSame([], $updates, 'no UPDATE statements parsed from migration 179');
         return $updates;
     }
 

@@ -13,7 +13,7 @@ class ProjectedDraftOrderEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('ProjectedDraftOrder');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Projected Draft Order', $output);
     }
 
@@ -24,7 +24,7 @@ class ProjectedDraftOrderEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('ProjectedDraftOrder');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Draft Order', $output);
         $this->assertStringNotContainsString('Projected Draft Order', $output);
     }

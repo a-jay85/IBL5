@@ -57,7 +57,7 @@ class LeagueStartersApiHandlerTest extends WideUnitTestCase
         $output = $this->captureOutput(fn () => $handler->handle());
 
         $this->assertStringContainsString('Point Guards', $output);
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     private function buildHandler(): LeagueStartersApiHandler

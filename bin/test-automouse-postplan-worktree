@@ -35,6 +35,9 @@
 # Run: bin/test-automouse-postplan-worktree (exit 0 = all pass, 1 = a case failed)
 
 set -u
+_USAGE_TMP="$(mktemp -d "${TMPDIR:-/tmp}/usage-iso.XXXXXX")"
+[ -n "$(trap -p EXIT)" ] || trap 'rm -rf "$_USAGE_TMP"' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$_USAGE_TMP"
 
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"

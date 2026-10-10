@@ -34,7 +34,7 @@ class WaiversViewTest extends TestCase
             5
         );
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testRenderWaiverFormContainsTeamName(): void

@@ -82,7 +82,7 @@ class TeamRepositoryTest extends DatabaseTestCase
 
         $standings = $this->repo->getDivisionStandings('Atlantic');
 
-        self::assertNotEmpty($standings);
+        self::assertNotSame([], $standings);
         foreach ($standings as $r) {
             self::assertSame('Atlantic', $r['division']);
             self::assertArrayHasKey('ranking', $r);
@@ -95,7 +95,7 @@ class TeamRepositoryTest extends DatabaseTestCase
 
         $standings = $this->repo->getConferenceStandings('Eastern');
 
-        self::assertNotEmpty($standings);
+        self::assertNotSame([], $standings);
         foreach ($standings as $r) {
             self::assertSame('Eastern', $r['conference']);
         }
@@ -113,7 +113,7 @@ class TeamRepositoryTest extends DatabaseTestCase
 
         $banners = $this->repo->getChampionshipBanners('TestBannerTeam');
 
-        self::assertNotEmpty($banners);
+        self::assertNotSame([], $banners);
         self::assertSame(2099, $banners[0]['year']);
         self::assertSame('TestBannerTeam', $banners[0]['currentname']);
     }
@@ -139,7 +139,7 @@ class TeamRepositoryTest extends DatabaseTestCase
 
         $tenures = $this->repo->getGMTenures(1);
 
-        self::assertNotEmpty($tenures);
+        self::assertNotSame([], $tenures);
         // Find our inserted tenure
         $found = false;
         foreach ($tenures as $tenure) {
@@ -170,7 +170,7 @@ class TeamRepositoryTest extends DatabaseTestCase
 
         $history = $this->repo->getRegularSeasonHistory($teamName);
 
-        self::assertNotEmpty($history);
+        self::assertNotSame([], $history);
         $found = null;
         foreach ($history as $r) {
             if ($r['year'] === 9098) {
@@ -188,7 +188,7 @@ class TeamRepositoryTest extends DatabaseTestCase
         // Team 1 should have players in production data
         $roster = $this->repo->getRosterUnderContract(1);
 
-        self::assertNotEmpty($roster);
+        self::assertNotSame([], $roster);
         foreach ($roster as $player) {
             self::assertSame(1, $player['teamid']);
             self::assertSame(0, $player['retired']);
@@ -219,7 +219,7 @@ class TeamRepositoryTest extends DatabaseTestCase
 
         $freeAgents = $this->repo->getFreeAgents();
 
-        self::assertNotEmpty($freeAgents);
+        self::assertNotSame([], $freeAgents);
         foreach ($freeAgents as $player) {
             self::assertGreaterThan(959, $player['ordinal']);
             self::assertSame(0, $player['retired']);
@@ -242,7 +242,7 @@ class TeamRepositoryTest extends DatabaseTestCase
         $seasons = $this->repo->getFranchiseSeasons(1);
 
         // Production DB should have franchise season data
-        self::assertNotEmpty($seasons);
+        self::assertNotSame([], $seasons);
         self::assertSame(1, $seasons[0]['franchise_id']);
         self::assertArrayHasKey('season_year', $seasons[0]);
         self::assertArrayHasKey('team_city', $seasons[0]);
@@ -256,7 +256,7 @@ class TeamRepositoryTest extends DatabaseTestCase
 
         $roster = $this->repo->getHistoricalRoster(1, '2098');
 
-        self::assertNotEmpty($roster);
+        self::assertNotSame([], $roster);
         self::assertSame(1, $roster[0]['teamid']);
     }
 
@@ -291,7 +291,7 @@ class TeamRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getTeamAccomplishments('B9TestTeam');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         self::assertSame('Atlantic Division Title', $result[0]['award']);
     }
 
@@ -355,7 +355,7 @@ class TeamRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getHEATHistory('Metros');
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $found = null;
         foreach ($result as $r) {
             if ($r['year'] === 9098) {
@@ -386,7 +386,7 @@ class TeamRepositoryTest extends DatabaseTestCase
             static fn (array $r): bool => $r['year'] === 9099,
         ));
 
-        self::assertNotEmpty($series);
+        self::assertNotSame([], $series);
         self::assertSame(3, $series[0]['winner_games']);
         self::assertSame(1, $series[0]['loser_games']);
         self::assertSame('Metros', $series[0]['winner']);
@@ -494,7 +494,7 @@ class TeamRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getEntireLeagueRoster();
 
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         $names = array_column($result, 'name');
         self::assertContains('League Active', $names);
         self::assertNotContains('League Retired', $names);

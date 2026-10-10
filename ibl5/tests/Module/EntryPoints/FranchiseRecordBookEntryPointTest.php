@@ -53,7 +53,7 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('FranchiseRecordBook', ['op' => 'api', 'teamid' => '5']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_rcb');
     }
 
@@ -62,7 +62,7 @@ class FranchiseRecordBookEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('FranchiseRecordBook', ['op' => 'api']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_rcb');
     }
 

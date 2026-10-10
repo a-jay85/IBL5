@@ -73,7 +73,7 @@ class SeasonDetailView implements SeasonDetailViewInterface
         $html = $this->renderStyles();
         $html .= '<div class="season-archive-nav">';
         $html .= '<a href="modules.php?name=SeasonArchive">&larr; Back to Season Archive</a>';
-        $html .= '<a href="modules.php?name=SeasonLeaderboards">Season Leaders &rarr;</a>';
+        $html .= '<a href="modules.php?name=Leaderboards&amp;tab=season">Season Leaders &rarr;</a>';
         $html .= '</div>';
         $html .= '<h1 class="ibl-title">' . self::esc($label) . '</h1>';
         $html .= $this->renderTournaments($tournaments, $playerIds, $teamColors, $year);

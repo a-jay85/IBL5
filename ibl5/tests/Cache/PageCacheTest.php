@@ -65,6 +65,21 @@ final class PageCacheTest extends TestCase
         self::assertFalse(PageCache::isCacheable('Draft'));
     }
 
+    public function testIsCacheableReturnsTrueForLeaderboardsModule(): void
+    {
+        self::assertTrue(PageCache::isCacheable('Leaderboards'));
+    }
+
+    public function testIsCacheableReturnsFalseForRetiredSeasonLeaderboardsModule(): void
+    {
+        self::assertFalse(PageCache::isCacheable('SeasonLeaderboards'));
+    }
+
+    public function testIsCacheableReturnsFalseForRetiredCareerLeaderboardsModule(): void
+    {
+        self::assertFalse(PageCache::isCacheable('CareerLeaderboards'));
+    }
+
     // ── getTtl ─────────────────────────────────────────────────
 
     public function testGetTtlReturnsLongTtlForPlayerModule(): void
@@ -80,6 +95,11 @@ final class PageCacheTest extends TestCase
     public function testGetTtlReturnsDefaultTtlForUnknownModule(): void
     {
         self::assertSame(900, PageCache::getTtl('NonexistentModule'));
+    }
+
+    public function testGetTtlReturnsLongTtlForLeaderboardsModule(): void
+    {
+        self::assertSame(3600, PageCache::getTtl('Leaderboards'));
     }
 
     // ── buildCacheKey ──────────────────────────────────────────

@@ -19,6 +19,14 @@ class ModuleRedirectTest extends TestCase
             'modules.php?name=RecordHolders&op=allstar',
             ModuleRedirect::targetFor('AllStarAppearances')
         );
+        $this->assertSame(
+            'modules.php?name=Leaderboards&tab=season',
+            ModuleRedirect::targetFor('SeasonLeaderboards')
+        );
+        $this->assertSame(
+            'modules.php?name=Leaderboards&tab=career',
+            ModuleRedirect::targetFor('CareerLeaderboards')
+        );
     }
 
     public function testTargetForReturnsNullForUnknownModule(): void
@@ -27,6 +35,12 @@ class ModuleRedirectTest extends TestCase
         $this->assertNull(ModuleRedirect::targetFor(''));
         // Lookup is case-sensitive: a case-insensitive map would resolve this.
         $this->assertNull(ModuleRedirect::targetFor('votingresults'));
+    }
+
+    public function testTargetForNeverRedirectsTheLeaderboardsHost(): void
+    {
+        // The host module mapping to itself would loop the browser forever.
+        $this->assertNull(ModuleRedirect::targetFor('Leaderboards'));
     }
 
     public function testPassthroughUrlIncludesWhitelistedParam(): void

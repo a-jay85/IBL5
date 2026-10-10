@@ -2,27 +2,19 @@
 
 declare(strict_types=1);
 
-use SeasonLeaderboards\CachedSeasonLeaderboardsRepository;
-use SeasonLeaderboards\SeasonLeaderboardsRepository;
-use SeasonLeaderboards\SeasonLeaderboardsService;
-use SeasonLeaderboards\SeasonLeaderboardsView;
-
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
 $module_name = basename(dirname(__FILE__));
 
-global $leagueContext;
-
 $pagetitle = "Season Stats";
 
 // Initialize classes
-$dbCache = new \Cache\DatabaseCache($mysqli_db);
-$innerRepository = new SeasonLeaderboardsRepository($mysqli_db, $leagueContext);
-$repository = new CachedSeasonLeaderboardsRepository($innerRepository, $dbCache);
-$service = new SeasonLeaderboardsService($repository);
-$view = new SeasonLeaderboardsView($service);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\SeasonLeaderboardsFactory::class);
+$repository = $factory->repository();
+$service = $factory->service();
+$view = $factory->view();
 
 // Get filter parameters from POST
 $filters = [

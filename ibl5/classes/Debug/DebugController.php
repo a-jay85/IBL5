@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Debug;
 
-use Auth\AuthService;
+use Auth\Contracts\AuthServiceInterface;
 use Debug\Contracts\DebugControllerInterface;
 use Debug\DebugSession;
 use Security\CsrfGuard;
@@ -15,7 +15,7 @@ use Utilities\HtmxHelper;
  */
 class DebugController implements DebugControllerInterface
 {
-    public function __construct(private AuthService $authService)
+    public function __construct(private AuthServiceInterface $authService)
     {
     }
 

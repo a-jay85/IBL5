@@ -10,6 +10,7 @@
             // infra-exclude marker makes it gate-2-exempt in check-infection-excludes.
             "League/JsbConstants.php", // infra-exclude: low-level JSB engine glue, coverage-excluded — never mutated
             "Database/PdoConnection.php", // infra-exclude: PDO connection bootstrap, coverage-excluded — never mutated
+            "Module/Factories", // infra-exclude: pure composition wiring; every line is a constructor call exercised by tests/Module/EntryPoints
         ]
     },
     "phpUnit": {

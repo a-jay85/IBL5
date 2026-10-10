@@ -10,14 +10,11 @@ $module_name = basename(dirname(__FILE__));
 
 $pagetitle = "- Player Archives";
 
-global $mysqli_db;
-
 // Initialize classes
-$dbCache = new \Cache\DatabaseCache($mysqli_db);
-$innerRepository = new \CareerLeaderboards\CareerLeaderboardsRepository($mysqli_db);
-$repository = new \CareerLeaderboards\CachedCareerLeaderboardsRepository($innerRepository, $dbCache);
-$service = new CareerLeaderboards\CareerLeaderboardsService();
-$view = new \CareerLeaderboards\CareerLeaderboardsView($service);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\CareerLeaderboardsFactory::class);
+$repository = $factory->repository();
+$service = $factory->service();
+$view = $factory->view();
 
 // Get filter parameters from POST
 $filters = [

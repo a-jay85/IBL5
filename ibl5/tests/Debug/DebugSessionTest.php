@@ -20,6 +20,13 @@ class DebugSessionTest extends TestCase
         $_SESSION = [];
     }
 
+    public function testForRequestBuildsSessionWithSameAdminRule(): void
+    {
+        $this->assertTrue(DebugSession::forRequest('A-Jay', 'localhost')->isDebugAdmin());
+        $this->assertFalse(DebugSession::forRequest('A-Jay', 'example.com')->isDebugAdmin());
+        $this->assertFalse(DebugSession::forRequest('someone', 'localhost')->isDebugAdmin());
+    }
+
     public function testIsDebugAdminReturnsTrueForAJayOnLocalhost(): void
     {
         $session = new DebugSession('A-Jay', 'main.localhost');

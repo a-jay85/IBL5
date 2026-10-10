@@ -19,20 +19,14 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use ContractList\ContractListRepository;
-use ContractList\ContractListService;
-use ContractList\ContractListView;
-
 $module_name = basename(dirname(__FILE__));
 
 $pagetitle = "- Master Contract List";
 
-global $mysqli_db;
-
 // Initialize services
-$repository = new ContractListRepository($mysqli_db);
-$service = new ContractListService($repository);
-$view = new ContractListView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\ContractListFactory::class);
+$service = $factory->service();
+$view = $factory->view();
 
 // Get contract data with calculations
 $data = $service->getContractsWithCalculations();

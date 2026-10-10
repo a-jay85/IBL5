@@ -18,31 +18,28 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use DraftHistory\DraftHistoryRepository;
-use DraftHistory\DraftHistoryView;
-
 $module_name = basename(dirname(__FILE__));
-
-global $mysqli_db;
 
 // Route HTMX API requests (no PageLayout, returns HTML fragment only)
 $op = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';
 if ($op === 'api') {
-    $handler = new DraftHistory\DraftHistoryApiHandler($mysqli_db);
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\DraftHistoryFactory::class);
+    $handler = $factory->apiHandler();
     $handler->handle();
     return;
 }
 
 // Initialize services
-$repository = new DraftHistoryRepository($mysqli_db);
-$view = new DraftHistoryView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\DraftHistoryFactory::class);
+$repository = $factory->repository();
+$view = $factory->view();
 
 // Check for team ID parameter
 $teamid = isset($_GET['teamid']) ? (int) $_GET['teamid'] : 0;
 
 $isValidTeam = false;
 if ($teamid > 0) {
-    $team = \Team\Team::initialize($mysqli_db, $teamid);
+    $team = $factory->team($teamid);
     $isValidTeam = ($team->teamid > 0);
 }
 

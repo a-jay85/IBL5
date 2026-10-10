@@ -6,11 +6,7 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository;
-use TrainingCampRatingsDiff\TrainingCampRatingsDiffService;
-use TrainingCampRatingsDiff\TrainingCampRatingsDiffView;
-
-global $mysqli_db, $user;
+global $user;
 
 if (!is_user($user)) {
     loginbox();
@@ -29,10 +25,9 @@ if (isset($_GET['status']) && is_string($_GET['status']) && in_array($_GET['stat
     $filterStatus = $_GET['status'];
 }
 
-$season     = new \Season\Season($mysqli_db);
-$repository = new TrainingCampRatingsDiffRepository($mysqli_db);
-$service    = new TrainingCampRatingsDiffService($repository, $season->endingYear);
-$view       = new TrainingCampRatingsDiffView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\TrainingCampRatingsDiffFactory::class);
+$service = $factory->service();
+$view    = $factory->view();
 
 $baselineYear  = $service->getBaselineYear($overrideYear);
 $baselinePhase = $service->getBaselinePhase($overrideYear);

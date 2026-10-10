@@ -254,7 +254,7 @@ The codebase has two parallel HTTP-endpoint styles. They are distinct on purpose
 
 | Style | Lives under | Dispatched by | Returns | Use for |
 |-------|-------------|---------------|---------|---------|
-| `*ApiHandler` | a **feature module** namespace (e.g. `DepthChart\DepthChartApiHandler`) | instantiated **directly** in the owning `ibl5/modules/<Module>/index.php` | an **HTML partial** for an HTMX swap into an already-rendered page | in-page interactivity within one module's UI (HTMX `hx-get`/`hx-post` fragment endpoints) |
+| `*ApiHandler` | a **feature module** namespace (e.g. `DepthChart\DepthChartApiHandler`) | built by the module's factory in `ibl5/classes/Module/Factories/` and resolved in the owning `ibl5/modules/<Module>/index.php` via `ModuleServices::current()->factory(...)` (see [ADR-0171](decisions/0171-module-services-composition-root.md) and the `## Module composition` section of `ibl5/classes/Module/README.md`) | an **HTML partial** for an HTMX swap into an already-rendered page | in-page interactivity within one module's UI (HTMX `hx-get`/`hx-post` fragment endpoints) |
 | `Api\Controller\*Controller` | `ibl5/classes/Api/Controller/` | the central `ibl5/classes/Api/Router.php` route table | a **JSON** REST response | the versioned external REST API (API-key auth, rate limiting, ETag caching — see API_GUIDE.md) |
 
 **Rule of thumb:** if a new endpoint feeds an HTMX fragment swap inside one

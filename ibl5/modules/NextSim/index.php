@@ -17,24 +17,20 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use NextSim\NextSimService;
-use NextSim\NextSimView;
-use Standings\StandingsRepository;
-use TeamSchedule\TeamScheduleRepository;
-
-global $db, $user, $mysqli_db, $authService;
+global $db, $user, $authService;
 
 if (!is_user($user)) {
     loginbox();
 } else {
-    $commonRepository = new Repositories\TeamIdentityRepository($mysqli_db);
-    $season = new \Season\Season($mysqli_db);
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\NextSimFactory::class);
+    $commonRepository = $factory->teamIdentity();
+    $season = $factory->season();
 
     $module_name = basename(dirname(__FILE__));
     $pagetitle = "- $module_name";
 
     // Load power rankings for SOS tier indicators
-    $standingsRepo = new StandingsRepository($mysqli_db);
+    $standingsRepo = $factory->standingsRepository();
     $allStreakData = $standingsRepo->getAllStreakData();
     /** @var array<int, float> $teamPowerRankings */
     $teamPowerRankings = [];
@@ -46,12 +42,11 @@ if (!is_user($user)) {
 
     $username = $authService->getUsername() ?? '';
     $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
-    $userTeam = \Team\Team::initialize($mysqli_db, $userTeamName);
+    $userTeam = \Team\Team::initialize(\Module\ModuleServices::current()->db(), $userTeamName);
 
     // Initialize services
-    $teamScheduleRepository = new TeamScheduleRepository($mysqli_db);
-    $service = new NextSimService($mysqli_db, $teamScheduleRepository, $teamPowerRankings);
-    $view = new NextSimView($season);
+    $service = $factory->service($teamPowerRankings);
+    $view = $factory->view();
 
     // Get next sim games
     $games = $service->getNextSimGames($userTeam->teamid, $season);

@@ -19,16 +19,11 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use SeasonHighs\SeasonHighsRepository;
-use SeasonHighs\SeasonHighsService;
-use SeasonHighs\SeasonHighsView;
-
 $module_name = basename(dirname(__FILE__));
 
-global $mysqli_db, $leagueContext;
-
 // Get current season info
-$season = new \Season\Season($mysqli_db, $leagueContext);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\SeasonHighsFactory::class);
+$season = $factory->season();
 
 // Determine season phase (from request or current phase)
 $seasonPhase = isset($_GET['seasonPhase']) && !empty($_GET['seasonPhase'])
@@ -38,15 +33,8 @@ $seasonPhase = isset($_GET['seasonPhase']) && !empty($_GET['seasonPhase'])
 $pagetitle = "- $seasonPhase Stat Leaders";
 
 // Initialize services
-$repository = new \SeasonHighs\CachedSeasonHighsRepository(
-    new SeasonHighsRepository($mysqli_db, $leagueContext),
-    new \Cache\DatabaseCache($mysqli_db),
-    $leagueContext instanceof \League\LeagueContext
-        ? $leagueContext->getCurrentLeague()
-        : \League\LeagueContext::LEAGUE_IBL
-);
-$service = new SeasonHighsService($repository, $season);
-$view = new SeasonHighsView();
+$service = $factory->service();
+$view = $factory->view();
 
 // Get season highs data
 $data = $service->getSeasonHighsData($seasonPhase);

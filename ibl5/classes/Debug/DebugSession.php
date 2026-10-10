@@ -27,6 +27,15 @@ class DebugSession implements DebugSessionInterface
         }
     }
 
+    /**
+     * Named constructor for module entry points, which may not use `new`.
+     * The caller passes the acting identity, so no factory can build this.
+     */
+    public static function forRequest(?string $username, ?string $serverName, ?string $cookieValue = null): self
+    {
+        return new self($username, $serverName, $cookieValue);
+    }
+
     public function isDebugAdmin(): bool
     {
         return $this->isAdmin;

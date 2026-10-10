@@ -84,6 +84,7 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
             unset($GLOBALS[$key]);
         }
         $this->injectedGlobalKeys = [];
+        \Module\ModuleServices::clearCurrent();
 
         parent::tearDown();
     }
@@ -120,6 +121,8 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
         // Reset pagetitle for each module run
         $GLOBALS['pagetitle'] = '';
 
+        \Module\ModuleServices::publish(new \Module\ModuleServices($this->buildModuleContainer()));
+
         $modulePath = dirname(__DIR__, 3) . "/modules/{$moduleName}/index.php";
 
         // Module files expect certain variables in local scope (mainfile.php extracts
@@ -151,6 +154,28 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
         }
 
         return (string) ob_get_clean(); // L2
+    }
+
+    /**
+     * Fresh per-run container mirroring the front controller's wiring: the
+     * mocked globals back the base services, and the shared services register
+     * through the production registrar. Entries resolve lazily, so they read
+     * the globals and auth stub as they stand at include time.
+     */
+    private function buildModuleContainer(): \Bootstrap\Contracts\ContainerInterface
+    {
+        $c = new \Bootstrap\Container();
+        $c->set('mysqli_db', static fn (): mixed => $GLOBALS['mysqli_db']);
+        $c->set('season', static function (): \Season\Season {
+            /** @var \mysqli $db */
+            $db = $GLOBALS['mysqli_db'];
+            return new \Season\Season($db);
+        });
+        $c->set('authService', static fn (): mixed => $GLOBALS['authService']);
+        $c->set('leagueContext', static fn (): mixed => $GLOBALS['leagueContext']);
+        \Module\ModuleServices::registerSharedServices($c);
+
+        return $c;
     }
 
     private function setDefaultGlobals(): void
@@ -231,6 +256,20 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
         $authStub = self::createStub(\Auth\Contracts\AuthServiceInterface::class);
         $authStub->method('isAuthenticated')->willReturn(true);
         $authStub->method('isAdmin')->willReturn(false);
+        $authStub->method('getCookieArray')->willReturn([$username, $username, '']);
+        $GLOBALS['authService'] = $authStub;
+        $GLOBALS['user'] = base64_encode("{$username}:{$username}:");
+        $GLOBALS['cookie'] = [$username, $username, ''];
+    }
+
+    /**
+     * Set the auth stub to simulate an authenticated admin.
+     */
+    protected function authenticateAsAdmin(string $username): void
+    {
+        $authStub = self::createStub(\Auth\Contracts\AuthServiceInterface::class);
+        $authStub->method('isAuthenticated')->willReturn(true);
+        $authStub->method('isAdmin')->willReturn(true);
         $authStub->method('getCookieArray')->willReturn([$username, $username, '']);
         $GLOBALS['authService'] = $authStub;
         $GLOBALS['user'] = base64_encode("{$username}:{$username}:");

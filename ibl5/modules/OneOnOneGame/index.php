@@ -20,11 +20,6 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use OneOnOneGame\OneOnOneGameRepository;
-use OneOnOneGame\OneOnOneGameService;
-use OneOnOneGame\OneOnOneGameEngine;
-use OneOnOneGame\OneOnOneGameView;
-
 $module_name = basename(dirname(__FILE__));
 
 $pagetitle = "- $module_name";
@@ -33,7 +28,7 @@ oneonone();
 
 function oneonone(): void
 {
-    global $mysqli_db, $user, $authService;
+    global $user, $authService;
 
     PageLayout\PageLayout::header();
     cookiedecode($user);
@@ -47,10 +42,10 @@ function oneonone(): void
     $gameidGet = isset($_GET['gameid']) ? (int) $_GET['gameid'] : null;
 
     // Initialize services
-    $repository = new OneOnOneGameRepository($mysqli_db);
-    $gameEngine = new OneOnOneGameEngine();
-    $service = new OneOnOneGameService($repository, $gameEngine);
-    $view = new OneOnOneGameView();
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\OneOnOneGameFactory::class);
+    $repository = $factory->repository();
+    $service = $factory->service();
+    $view = $factory->view();
 
     // Render header
     echo $view->renderHeader();

@@ -21,17 +21,14 @@ if ($username !== '' && preg_match('/[^a-zA-Z0-9_-]/', $username) === 1) {
 }
 
 // Wire dependencies
-$commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
-$service = new \YourAccount\YourAccountService(
-    $authService,
-    $commonRepository,
-    \Mail\MailService::fromConfig(),
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\YourAccountFactory::class);
+$service = $factory->service(
     (string) ($nukeurl ?? ''),
     (string) ($sitename ?? ''),
     (string) ($adminmail ?? ''),
     (int) ($minpass ?? 5),
 );
-$accountView = new \YourAccount\YourAccountView();
+$accountView = $factory->view();
 
 switch ($op) {
     case 'logout':

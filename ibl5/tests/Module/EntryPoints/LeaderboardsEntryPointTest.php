@@ -376,11 +376,11 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('Leaderboards', ['tab' => 'career'], [], $this->dbGlobals());
 
-        $this->assertStringContainsString(
-            '<a class="ibl-tab ibl-tab--active"',
+        // The active class and the career href must sit on the same anchor
+        $this->assertMatchesRegularExpression(
+            '/<a class="ibl-tab ibl-tab--active" href="[^"]*tab=career"/',
             $output
         );
-        $this->assertStringContainsString('tab=career', $output);
     }
 
     public function testTabBodyWrappedInPanelDiv(): void

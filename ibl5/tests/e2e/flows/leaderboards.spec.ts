@@ -133,6 +133,25 @@ test.describe('Leaderboards flow', () => {
     await expect(page.locator('.ibl-data-table th.sorted-col').first()).toHaveText('reb');
   });
 
+  test('wide table scroll box stays inside the tab panel padding', async ({ appState, page }) => {
+    await appState({ 'Trivia Mode': 'Off' });
+    // Narrow enough that the career table is wider than the panel
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await page.goto('modules.php?name=Leaderboards&tab=career&submitted=1');
+
+    const wrapper = page.locator('.ibl-tab-panel .table-scroll-wrapper').first();
+    await expect(wrapper).toBeVisible();
+
+    // responsive-tables.js constrainWrapper caps the wrapper at the parent's content box
+    await expect.poll(() => wrapper.evaluate((el) => {
+      const panel = el.closest('.ibl-tab-panel') as HTMLElement;
+      const s = window.getComputedStyle(panel);
+      const contentRight = panel.getBoundingClientRect().right
+        - parseFloat(s.borderRightWidth) - parseFloat(s.paddingRight);
+      return el.getBoundingClientRect().right - contentRight;
+    })).toBeLessThanOrEqual(1);
+  });
+
   test('nav menu links to leaderboards', async ({ appState, page }) => {
     await appState({ 'Trivia Mode': 'Off' });
     await page.goto('modules.php?name=Homepage');

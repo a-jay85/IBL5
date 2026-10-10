@@ -48,7 +48,7 @@ interface CareerLeaderboardsViewInterface
      * @return string HTML table header
      *
      * **Columns:**
-     * Rank, Name, Games, Minutes, FGM, FGA, FG%, FTM, FTA, FT%,
+     * #, Name, G (omitted for one-game phases), MIN, FGM, FGA, FG%, FTM, FTA, FT%,
      * 3GM, 3GA, 3P%, ORB, DRB, REB, AST, STL, TVR, BLK, PF, PTS
      *
      * **Styling:**

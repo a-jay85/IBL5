@@ -1,0 +1,2 @@
+args=--bogus-flag exit=1
+Unknown option: --bogus-flag

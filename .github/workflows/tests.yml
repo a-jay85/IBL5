@@ -947,6 +947,7 @@ jobs:
             bin/test-digest-dm-build \
             bin/test-pr-review-now \
             bin/test-launchd-job \
+            bin/test-launchd-sched \
             bin/test-check-phpunit-hygiene \
             bin/test-check-e2e-hygiene \
             bin/test-test \

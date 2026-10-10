@@ -16,6 +16,8 @@ class ApiKeysController implements ApiKeysControllerInterface
         private ApiKeysViewInterface $view,
         private \Utilities\NukeCompat $nukeCompat,
         private AuthServiceInterface $authService,
+        private ?\GoogleSheets\GoogleOAuthFlowHandler $googleFlow = null,
+        private ?\GoogleSheets\GoogleSheetExportService $googleExport = null,
     ) {}
 
     public function handle(string $op, mixed $user): void
@@ -37,8 +39,53 @@ class ApiKeysController implements ApiKeysControllerInterface
             }
         }
 
-        // Non-POST requests to generate/revoke redirect to main.
-        if (($op === 'generate' || $op === 'revoke') && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+        if ($op === 'google_start' && $_SERVER['REQUEST_METHOD'] === 'POST' && $userId !== null) {
+            if ($this->googleFlow === null) {
+                $this->flash('error', 'Google Sheets sync is not configured on this server.');
+            } elseif (\Security\CsrfGuard::validateSubmittedToken('google_start')) {
+                (new \Api\Response\RedirectResponder())->redirect($this->googleFlow->start($userId));
+                return;
+            } else {
+                $this->flash('error', 'Invalid or expired form submission. Please try again.');
+            }
+            (new \Api\Response\RedirectResponder())->redirect('modules.php?name=ApiKeys');
+            return;
+        }
+        if ($op === 'google_callback' && $userId !== null) {
+            $q = \Http\HttpRequest::fromGlobals();
+            $result = $this->googleFlow === null
+                ? ['type' => 'error', 'text' => 'Google Sheets sync is not configured on this server.']
+                : $this->googleFlow->callback($userId, $q->get('state'), $q->get('code'), $q->get('error'));
+            $this->flash($result['type'], $result['text']);
+            \EventLog\EventLogger::setAction($result['type'] === 'success' ? 'google_sheet_connected' : 'google_sheet_connect_failed');
+            (new \Api\Response\RedirectResponder())->redirect('modules.php?name=ApiKeys');
+            return;
+        }
+        if (($op === 'google_refresh' || $op === 'google_disconnect') && $_SERVER['REQUEST_METHOD'] === 'POST' && $userId !== null) {
+            if ($this->googleExport === null) {
+                $this->flash('error', 'Google Sheets sync is not configured on this server.');
+            } elseif (!\Security\CsrfGuard::validateSubmittedToken($op)) {
+                $this->flash('error', 'Invalid or expired form submission. Please try again.');
+            } elseif ($op === 'google_refresh') {
+                $status = $this->googleExport->refreshForUser($userId);
+                $this->flash($status === 'ok' ? 'success' : 'error', match ($status) {
+                    'ok' => 'Your Google Sheet has been refreshed.',
+                    'broken' => 'Your Google connection needs attention. Use Reconnect Google below.',
+                    'missing' => 'No Google Sheet is connected.',
+                    default => 'Refresh failed. The status below shows why; try again in a minute.',
+                });
+                \EventLog\EventLogger::setAction('google_sheet_refresh_' . $status);
+            } else {
+                $this->googleExport->disconnect($userId);
+                $this->flash('success', 'Google disconnected. The spreadsheet stays in your Drive.');
+                \EventLog\EventLogger::setAction('google_sheet_disconnected');
+            }
+            (new \Api\Response\RedirectResponder())->redirect('modules.php?name=ApiKeys');
+            return;
+        }
+
+        // Non-POST requests to state-changing ops redirect to main.
+        if (in_array($op, ['generate', 'revoke', 'google_start', 'google_refresh', 'google_disconnect'], true) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
             (new \Api\Response\RedirectResponder())->redirect('modules.php?name=ApiKeys');
             return;
         }
@@ -74,12 +121,36 @@ class ApiKeysController implements ApiKeysControllerInterface
     private function doMain(int $userId): void
     {
         $responder = new \Api\Response\HtmlResponder();
+        $responder->html($this->view->renderFlash($this->takeFlash()));
         $keyStatus = $this->service->getUserKeyStatus($userId);
         if ($keyStatus === null) {
             $responder->html($this->view->renderNoKeyState());
         } else {
             $responder->html($this->view->renderActiveKeyState($keyStatus));
         }
+        $responder->html($this->view->renderGoogleSheetCard(
+            $this->googleExport?->connectionSummaryFor($userId),
+            $this->googleExport !== null
+        ));
+    }
+
+    private function flash(string $type, string $text): void
+    {
+        $_SESSION['_apikeys_flash'] = ['type' => $type, 'text' => $text];
+    }
+
+    /**
+     * @return array{type: string, text: string}|null
+     */
+    private function takeFlash(): ?array
+    {
+        $flash = $_SESSION['_apikeys_flash'] ?? null;
+        unset($_SESSION['_apikeys_flash']);
+        if (!is_array($flash) || !is_string($flash['type'] ?? null) || !is_string($flash['text'] ?? null)) {
+            return null;
+        }
+
+        return ['type' => $flash['type'], 'text' => $flash['text']];
     }
 
     private function doGenerate(int $userId): void

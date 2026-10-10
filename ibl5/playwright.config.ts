@@ -58,7 +58,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/, /faprep-xss-escape\.spec\.ts$/],
+      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/, /faprep-xss-escape\.spec\.ts$/, /google-sheet-card\.spec\.ts$/, /google-sheets-oauth\.spec\.ts$/],
     },
     {
       // Destructive full-season updater specs mutate GLOBAL DB rows (schedules,
@@ -100,13 +100,16 @@ export default defineConfig({
       // This move is NOT what fixed the spec's flake — that was a non-idempotency
       // bug in the spec itself (see the restore block at the end of the test). The
       // move stands on the shared-seed-row rule above, on its own.
+      //
+      // google-sheet-card and google-sheets-oauth both rewrite the E2E regular
+      // user's ibl_google_sheet_connections row and assert which card state renders.
       name: 'mutators',
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/, /faprep-xss-escape\.spec\.ts$/],
+      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/, /faprep-xss-escape\.spec\.ts$/, /google-sheet-card\.spec\.ts$/, /google-sheets-oauth\.spec\.ts$/],
     },
   ],
 });

@@ -291,6 +291,9 @@ jobs:
             -e "IBL_TEST_USER=$IBL_TEST_USER" \
             -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
             -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
+            -e "GOOGLE_OAUTH_CLIENT_ID=e2e-placeholder.apps.googleusercontent.com" \
+            -e "GOOGLE_OAUTH_CLIENT_SECRET=e2e-placeholder-secret" \
+            -e "GOOGLE_TOKEN_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" \
             -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
             -e "CI=true" \
             -e "HOME=/tmp" \
@@ -333,6 +336,9 @@ jobs:
             -e "IBL_TEST_USER=$IBL_TEST_USER" \
             -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
             -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
+            -e "GOOGLE_OAUTH_CLIENT_ID=e2e-placeholder.apps.googleusercontent.com" \
+            -e "GOOGLE_OAUTH_CLIENT_SECRET=e2e-placeholder-secret" \
+            -e "GOOGLE_TOKEN_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" \
             -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
             -e "HOME=/tmp" \
             "$PW_IMAGE" \
@@ -579,6 +585,9 @@ jobs:
             -e "IBL_TEST_USER=$IBL_TEST_USER" \
             -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
             -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
+            -e "GOOGLE_OAUTH_CLIENT_ID=e2e-placeholder.apps.googleusercontent.com" \
+            -e "GOOGLE_OAUTH_CLIENT_SECRET=e2e-placeholder-secret" \
+            -e "GOOGLE_TOKEN_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" \
             -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
             -e "CI=true" \
             -e "HOME=/tmp" \
@@ -773,6 +782,9 @@ jobs:
             -e "IBL_TEST_USER=$IBL_TEST_USER" \
             -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
             -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
+            -e "GOOGLE_OAUTH_CLIENT_ID=e2e-placeholder.apps.googleusercontent.com" \
+            -e "GOOGLE_OAUTH_CLIENT_SECRET=e2e-placeholder-secret" \
+            -e "GOOGLE_TOKEN_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" \
             -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
             -e "HOME=/tmp" \
             "$PW_IMAGE" \
@@ -890,6 +902,9 @@ jobs:
             -e "IBL_TEST_USER=$IBL_TEST_USER" \
             -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
             -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
+            -e "GOOGLE_OAUTH_CLIENT_ID=e2e-placeholder.apps.googleusercontent.com" \
+            -e "GOOGLE_OAUTH_CLIENT_SECRET=e2e-placeholder-secret" \
+            -e "GOOGLE_TOKEN_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" \
             -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
             -e "HOME=/tmp" \
             "$PW_IMAGE" \

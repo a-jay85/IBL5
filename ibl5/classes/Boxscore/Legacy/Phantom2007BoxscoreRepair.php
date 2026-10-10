@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Boxscore;
+namespace Boxscore\Legacy;
 
 use mysqli;
 use RuntimeException;

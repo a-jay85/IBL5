@@ -8,6 +8,14 @@ use Topics\News\Contracts\NewsRepositoryInterface;
 
 class NewsRepository extends \Database\BaseMysqliRepository implements NewsRepositoryInterface
 {
+    private \Clock\ClockInterface $clock;
+
+    public function __construct(\mysqli $db, ?\League\LeagueContext $leagueContext = null, ?\Clock\ClockInterface $clock = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->clock = $clock ?? new \Clock\SystemClock();
+    }
+
     public function createNewsStory(
         int $categoryID,
         int $topicID,
@@ -15,7 +23,7 @@ class NewsRepository extends \Database\BaseMysqliRepository implements NewsRepos
         string $hometext,
         string $aid = 'Associated Press'
     ): int {
-        $timestamp = date('Y-m-d H:i:s', time());
+        $timestamp = date('Y-m-d H:i:s', $this->clock->now());
 
         return $this->execute(
             "INSERT INTO `nuke_stories`

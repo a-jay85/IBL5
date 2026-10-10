@@ -9,13 +9,13 @@
 # Run: bin/test-restore-rowcount-compare  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HELPER="${HELPER:-$SCRIPT_DIR/lib/restore-rowcount-compare.sh}"
-BASE_TMP="$(mktemp -d)"
-trap 'rm -rf "$BASE_TMP"' EXIT
+h_tmp BASE_TMP
 
-FAILED=0
 OUT="$BASE_TMP/out"
 ERR="$BASE_TMP/err"
 
@@ -23,12 +23,11 @@ check() { # name cmd [args...]: passes when the command succeeds
     local name="$1"
     shift
     if "$@"; then
-        echo "ok: $name"
+        h_pass "$name"
     else
-        echo "FAIL: $name"
+        h_fail "$name"
         sed 's/^/      | /' "$OUT" 2>/dev/null | head -20
         sed 's/^/      ! /' "$ERR" 2>/dev/null | head -20
-        FAILED=1
     fi
 }
 
@@ -491,4 +490,4 @@ case_17() {
 }
 check "17 empty ROWCOUNT_MYSQL falls back to mysql on PATH" case_17
 
-exit "$FAILED"
+h_done

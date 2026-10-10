@@ -1,6 +1,6 @@
 ---
 description: Owner-bound notices post to a private #dev channel webhook, with an opt-in owner @mention for failures that need action.
-last_verified: 2026-09-29
+last_verified: 2026-10-09
 ---
 
 # ADR-0146: Route Owner-Bound Notices to a #dev Channel Webhook with an Opt-In Ping
@@ -51,6 +51,10 @@ repo: curl reads it from a config on stdin.
 - A `bin/test-discord-dm` assertion pins the 15 action call sites and the ping set, and fails when a new site or a new `--ping` caller appears without an update to its expected table.
 - CI notify jobs no longer need the Setup SSH step unless another step in the job uses ssh.
 - A host with no webhook file keeps sending DMs, so a fresh machine still notifies.
+
+## Addendum: merge notices move to #merged (2026-10-09)
+
+The Decision above sends every action call site to `secrets.DISCORD_DEV_WEBHOOK_URL`. From 2026-10-09, merge-digest-notify.yml posts to the #merged channel through `secrets.DISCORD_MERGED_WEBHOOK_URL` instead, so merge notices stay out of #dev. Its owner ping is unchanged. The end-of-run summary from `bin/pr-cycle` still goes to #dev. The call-site table in `bin/test-discord-dm` now records which webhook each site passes (`webhook=dev` or `webhook=merged`). It holds 16 sites, up from the 15 in Consequences.
 
 ## References
 

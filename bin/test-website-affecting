@@ -13,14 +13,14 @@
 # Run: bin/test-website-affecting  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GUARD="$SCRIPT_DIR/website-affecting"
 
-FAILED=0
-
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$1"; }
 
 # assert_exit <name> <expected-exit> <path> [path...]
 # Feeds each path on its own line (trailing newline each, so `while read` sees
@@ -120,10 +120,4 @@ else
     failcase "pin-empty-stdin — expected exit 0, got $empty_exit"
 fi
 
-# --- Results ---
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

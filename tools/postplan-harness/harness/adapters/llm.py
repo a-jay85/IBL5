@@ -47,6 +47,10 @@ _USAGE_LIMIT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# The CLI's reply when its OAuth login has lapsed. It is not malformed JSON, and a
+# re-ask cannot fix it, so the final llm-invalid-output detail names it plainly.
+_AUTH_FAILURE_RE = re.compile(r"Failed to authenticate|OAuth session expired", re.IGNORECASE)
+
 MODEL_MAP = {
     "haiku": "claude-haiku-5-5",
     "sonnet": "claude-sonnet-5-5",
@@ -260,6 +264,7 @@ class ClaudeCli:
         rec = LlmCallRecord(purpose=purpose, model=model_id)
         attempt_prompt = prompt
         last_err = ""
+        auth_reply = ""
         for attempt in range(max_retries + 1):
             try:
                 self._gate_before_spawn(purpose, self.workdir)
@@ -286,6 +291,8 @@ class ClaudeCli:
                     self._usage_limit_pause(purpose)
                     raise HarnessError("llm-usage-limit",
                                        f"{purpose}: {raw[:200].strip()}")
+                if _AUTH_FAILURE_RE.search(raw):
+                    auth_reply = raw[:200].strip()
                 last_err = f"CLI non-JSON output (rc={proc.returncode}): {proc.stdout[:200]} {proc.stderr[:200]}"
                 rec.retries = attempt
                 continue
@@ -319,12 +326,16 @@ class ClaudeCli:
                     self._usage_limit_pause(purpose)
                     raise HarnessError("llm-usage-limit",
                                        f"{purpose}: {result_text[:200].strip()}")
+                if _AUTH_FAILURE_RE.search(result_text):
+                    auth_reply = result_text[:200].strip()
                 last_err = str(e)
                 attempt_prompt = (prompt + "\n\nYour previous reply was not valid per the "
                                   f"required JSON schema ({e}). Reply with ONLY the JSON.")
         rec.ok = False
         rec.retries = max_retries
         self.ledger.add(rec)
+        if auth_reply:
+            raise HarnessError("llm-invalid-output", f"{purpose}: auth-expired: {auth_reply}")
         raise HarnessError("llm-invalid-output", f"{purpose}: {last_err}")
 
     def call_tooled(self, purpose: str, model: str, prompt: str, *, cwd: str,

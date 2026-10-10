@@ -35,14 +35,12 @@
 # Run: bin/test-automouse-postplan-worktree (exit 0 = all pass, 1 = a case failed)
 
 set -u
-_USAGE_TMP="$(mktemp -d "${TMPDIR:-/tmp}/usage-iso.XXXXXX")"
-[ -n "$(trap -p EXIT)" ] || trap 'rm -rf "$_USAGE_TMP"' EXIT
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$_USAGE_TMP"
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUNNER="$SCRIPT_DIR/automouse/run"
 PROMPT_IMPL="${PROMPT_IMPL:-$SCRIPT_DIR/automouse/prompt-impl}"
-FAILED=0
 
 if [ ! -f "$RUNNER" ]; then
     echo "FAIL: cannot find $RUNNER"
@@ -68,8 +66,7 @@ fi
 eval "$FN_SRC"
 
 # --- Harness --------------------------------------------------------------
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
 HANDOFF_DIR="$TMP/handoff"
 WORKTREES_ROOT="$TMP/IBL5-worktrees"
@@ -77,17 +74,10 @@ LOG="$TMP/run.log"
 mkdir -p "$HANDOFF_DIR" "$WORKTREES_ROOT"
 : > "$LOG"
 
-pass() { printf 'PASS: %s\n' "$1"; }
-fail() { printf 'FAIL: %s\n' "$1"; FAILED=1; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
-check_eq() {
-    local label=$1 want=$2 got=$3
-    if [ "$want" = "$got" ]; then
-        pass "$label"
-    else
-        fail "$label — want [$want], got [$got]"
-    fi
-}
+check_eq() { h_eq "$1" "$2" "$3"; }
 
 reset_state() {
     rm -rf "$HANDOFF_DIR" "$WORKTREES_ROOT"
@@ -301,9 +291,4 @@ expect_reject "e7 unparseable handoff is rejected" \
     '{ this is not json'
 
 # ==========================================================================
-if [ "$FAILED" -eq 0 ]; then
-    echo "All automouse postplan-worktree cases passed."
-else
-    echo "One or more automouse postplan-worktree cases FAILED."
-fi
-exit "$FAILED"
+h_done

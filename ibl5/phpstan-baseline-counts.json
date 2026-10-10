@@ -23,7 +23,6 @@
         "ibl.bannedNukeGlobal": 24,
         "ibl.castFunction": 1,
         "ibl.directHeader": 2,
-        "ibl.directTime": 6,
         "ibl.echoInNonView": 1,
         "ibl.hardcodedEnvString": 8,
         "ibl.orderByMissingTiebreaker": 9,

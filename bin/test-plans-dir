@@ -6,8 +6,11 @@
 
 set -uo pipefail
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 export HOME="$TMP/home"; mkdir -p "$HOME"          # env -i has no HOME; set it before sourcing
 unset PLAN_DIR PLANS_DIR PLAN_NOW_PLANS_DIR BUG_PIPELINE_PLANS_DIR
 # shellcheck source=lib/plan-resolve.sh
@@ -16,21 +19,7 @@ SEAMS="PLAN_DIR PLANS_DIR PLAN_NOW_PLANS_DIR BUG_PIPELINE_PLANS_DIR"
 # Fresh subshell with all four seams cleared; each case then sets only what it tests.
 clean() { ( unset $SEAMS; "$@" ); }
 
-PASS=0
-FAIL=0
-
-check() {
-    local name="$1" expected="$2" actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        PASS=$((PASS + 1))
-        echo "  ok   $name"
-    else
-        FAIL=$((FAIL + 1))
-        echo "  FAIL $name"
-        echo "       expected: [$expected]"
-        echo "       actual:   [$actual]"
-    fi
-}
+check() { h_eq "$1" "$2" "$3"; }
 
 DEFAULT="$HOME/claude-plans"
 
@@ -289,6 +278,4 @@ check "25 mutation drops the indirection" "1" "$([ "$MUT" != "$BODY" ] && echo 1
 out="$( unset $SEAMS; eval "$MUT"; export PLANS_DIR=/tmp/over; plans_dir PLANS_DIR 2>&1 )"
 check "25 without indirection the seam value is lost" "no" "$([ "$out" = /tmp/over ] && echo yes || echo no)"
 
-echo ""
-echo "$PASS passed, $FAIL failed"
-[ "$FAIL" -eq 0 ]
+h_done

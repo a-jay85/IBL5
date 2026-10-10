@@ -13,13 +13,12 @@
 #
 # Run: bin/test-check-composite-contracts  (exit 0 = all pass, 1 = a case failed)
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CHECK="$SCRIPT_DIR/check-composite-contracts"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-
-FAILED=0
+h_tmp TMP
 
 # fresh_actions → echoes a new empty actions dir. Uses mktemp (not a counter): this
 # runs in a $(...) subshell at the call site, so a counter increment would not
@@ -247,10 +246,9 @@ put_mut_adr() {
 
 expect() { # name want got
   if [ "$3" -eq "$2" ]; then
-    echo "ok: $1 (exit $3)"
+    h_pass "$1 (exit $3)"
   else
-    echo "FAIL: $1 — expected exit $2, got $3"
-    FAILED=1
+    h_fail "$1" "expected exit $2, got $3"
   fi
 }
 
@@ -260,9 +258,9 @@ out="$("$CHECK" "$d" 2>&1)"; rc=$?
 expect "both-absent-pass" 0 "$rc"
 if printf '%s' "$out" | grep -q 'setup-ssh absent — skipped' \
    && printf '%s' "$out" | grep -q 'notify-discord absent — skipped'; then
-  echo "ok: absent-skips-are-visible"
+  h_pass "absent-skips-are-visible"
 else
-  echo "FAIL: absent-skips-are-visible — output: $out"; FAILED=1
+  h_fail "absent-skips-are-visible" "output: $out"
 fi
 
 # --- setup-ssh guarded → pass --------------------------------------------------
@@ -395,9 +393,9 @@ d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"
 out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
 expect "pp-absent-skips" 0 "$rc"
 if printf '%s' "$out" | grep -q 'promote-to-production absent — skipped'; then
-  echo "ok: pp-absent-skips-skip-visible"
+  h_pass "pp-absent-skips-skip-visible"
 else
-  echo "FAIL: pp-absent-skips — no skip line in output; output: $out"; FAILED=1
+  h_fail "pp-absent-skips" "no skip line in output; output: $out"
 fi
 
 # pp-merge-script-absent: absent merge script → exit 0 with visible P8 skip line
@@ -405,9 +403,9 @@ d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" good
 out="$("$CHECK" "$d_a" "$d_wf" "$TMP/no-such-merge" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
 expect "pp-merge-script-absent" 0 "$rc"
 if printf '%s' "$out" | grep -q 'P8 skipped'; then
-  echo "ok: pp-merge-script-absent-skip-visible"
+  h_pass "pp-merge-script-absent-skip-visible"
 else
-  echo "FAIL: pp-merge-script-absent — no visible P8 skipped line; output: $out"; FAILED=1
+  h_fail "pp-merge-script-absent" "no visible P8 skipped line; output: $out"
 fi
 
 # put_required_wf <dir> <file> <variant>
@@ -453,9 +451,9 @@ d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_required_wf "$d_wf" tests
 out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
 expect "r1-pr-paths-fails" 1 "$rc"
 if printf '%s' "$out" | grep -q 'tests.yml (R1)'; then
-  echo "ok: r1-pr-paths-fails-names-file"
+  h_pass "r1-pr-paths-fails-names-file"
 else
-  echo "FAIL: r1-pr-paths-fails — no 'tests.yml (R1)' line; output: $out"; FAILED=1
+  h_fail "r1-pr-paths-fails" "no 'tests.yml (R1)' line; output: $out"
 fi
 
 # r1-pr-ignore-fails: paths-ignore under pull_request → exit 1
@@ -473,9 +471,9 @@ d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"
 out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
 expect "r1-absent-skips" 0 "$rc"
 if printf '%s' "$out" | grep -q 'mutation.yml absent — R1 skipped'; then
-  echo "ok: r1-absent-skips-skip-visible"
+  h_pass "r1-absent-skips-skip-visible"
 else
-  echo "FAIL: r1-absent-skips — no visible R1 skip line; output: $out"; FAILED=1
+  h_fail "r1-absent-skips" "no visible R1 skip line; output: $out"
 fi
 
 # r1-real-files-pass: the five real required workflows pass R1 → exit 0
@@ -493,7 +491,7 @@ d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"
 awk '{ print } /^  pull_request:/ { print "    paths:"; print "      - \"**.php\"" }' \
   "$REAL_WF/tests.yml" > "$d_wf/tests.yml"
 if cmp -s "$d_wf/tests.yml" "$REAL_WF/tests.yml"; then
-  echo "FAIL: r1-real-tests-yml-mutant — injection anchor missed (mutant identical)"; FAILED=1
+  h_fail "r1-real-tests-yml-mutant" "injection anchor missed (mutant identical)"
 fi
 "$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
 expect "r1-real-tests-yml-mutant-fails" 1 $?
@@ -542,9 +540,9 @@ d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
 out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" 2>&1)"; rc=$?
 expect "mut-absent-skips" 0 "$rc"
 if printf '%s' "$out" | grep -q 'mutation-pr absent — skipped'; then
-  echo "ok: mut-absent-skips-skip-visible"
+  h_pass "mut-absent-skips-skip-visible"
 else
-  echo "FAIL: mut-absent-skips — no skip line in output; output: $out"; FAILED=1
+  h_fail "mut-absent-skips" "no skip line in output; output: $out"
 fi
 
 # ---------------------------------------------------------------------------
@@ -637,9 +635,9 @@ put_agg "$d_wf" good; put_agg_adr "$d_dec" "$AGG_LITERAL"
 out="$("$LD/bin/check-composite-contracts" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" 2>&1)"; rc=$?
 expect "agg-a2-lib-drift" 1 "$rc"
 if printf '%s' "$out" | grep -qF 'pr-armable.sh does not set'; then
-  echo "ok: agg-a2-lib-drift-names-lib"
+  h_pass "agg-a2-lib-drift-names-lib"
 else
-  echo "FAIL: agg-a2-lib-drift — output does not name pr-armable.sh: $out"; FAILED=1
+  h_fail "agg-a2-lib-drift" "output does not name pr-armable.sh: $out"
 fi
 # Same tree with the shell literal fixed passes, so the case above failed on the drift.
 printf "PR_ARMABLE_AGGREGATOR_CONTEXT='All checks green'\n" > "$LD/bin/lib/pr-armable.sh"
@@ -654,9 +652,9 @@ d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
 out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" 2>&1)"; rc=$?
 expect "agg-absent-skips" 0 "$rc"
 if printf '%s' "$out" | grep -q 'all-checks-green absent — skipped'; then
-  echo "ok: agg-absent-skips-skip-visible"
+  h_pass "agg-absent-skips-skip-visible"
 else
-  echo "FAIL: agg-absent-skips — no skip line in output; output: $out"; FAILED=1
+  h_fail "agg-absent-skips" "no skip line in output; output: $out"
 fi
 
 # ---------------------------------------------------------------------------
@@ -699,18 +697,18 @@ rb_post appid "$RB_PASS_FILTER | .required_status_checks.checks |= map(if .conte
 out="$("$CHECK" "--protection-readback=$TMP/rb-pass5.json" "--pre-image=$RB_PRE" 2>&1)"; rc=$?
 expect "rb-pass-5" 0 "$rc"
 if printf '%s' "$out" | grep -qF 'protection-readback: OK — 5 contexts'; then
-  echo "ok: rb-pass-5-count-visible"
+  h_pass "rb-pass-5-count-visible"
 else
-  echo "FAIL: rb-pass-5 — no 'OK — 5 contexts' line; output: $out"; FAILED=1
+  h_fail "rb-pass-5" "no 'OK — 5 contexts' line; output: $out"
 fi
 
 # rb-fail-4-unchanged: post == pre (the POST never landed) → exit 1 via R1
 out="$("$CHECK" "--protection-readback=$RB_PRE" "--pre-image=$RB_PRE" 2>&1)"; rc=$?
 expect "rb-fail-4-unchanged" 1 "$rc"
 if printf '%s' "$out" | grep -qF '(R1)'; then
-  echo "ok: rb-fail-4-unchanged-names-R1"
+  h_pass "rb-fail-4-unchanged-names-R1"
 else
-  echo "FAIL: rb-fail-4-unchanged — output lacks (R1): $out"; FAILED=1
+  h_fail "rb-fail-4-unchanged" "output lacks (R1): $out"
 fi
 
 "$CHECK" "--protection-readback=$TMP/rb-swapped.json" "--pre-image=$RB_PRE" >/dev/null 2>&1
@@ -737,18 +735,18 @@ jq --arg a "$AGG_LITERAL" '.required_status_checks.contexts += [$a] | .required_
 out="$("$CHECK" "--protection-readback=$TMP/rb-agg6.json" "--pre-image=$RB_PRE5" "--context=$AGG_LITERAL" 2>&1)"; rc=$?
 expect "rb-context-pass-6" 0 "$rc"
 if printf '%s' "$out" | grep -qF "protection-readback: OK — 6 contexts (pre 5 + \"$AGG_LITERAL\")"; then
-  echo "ok: rb-context-pass-6-count-visible"
+  h_pass "rb-context-pass-6-count-visible"
 else
-  echo "FAIL: rb-context-pass-6 — no 'OK — 6 contexts (pre 5 + \"$AGG_LITERAL\")' line; output: $out"; FAILED=1
+  h_fail "rb-context-pass-6" "no 'OK — 6 contexts (pre 5 + \"$AGG_LITERAL\")' line; output: $out"
 fi
 
 # rb-context-missing: the POST never landed → R1 names the requested context
 out="$("$CHECK" "--protection-readback=$RB_PRE5" "--pre-image=$RB_PRE5" "--context=$AGG_LITERAL" 2>&1)"; rc=$?
 expect "rb-context-missing" 1 "$rc"
 if printf '%s' "$out" | grep -qF '(R1)' && printf '%s' "$out" | grep -qF "$AGG_LITERAL"; then
-  echo "ok: rb-context-missing-names-context"
+  h_pass "rb-context-missing-names-context"
 else
-  echo "FAIL: rb-context-missing — output lacks (R1) or the context: $out"; FAILED=1
+  h_fail "rb-context-missing" "output lacks (R1) or the context: $out"
 fi
 
 # rb-context-default: the agg post read without --context checks the mutation
@@ -846,13 +844,11 @@ d1_trio() { # wf-dir: the three required workflows, all aligned to the defaults
 }
 
 d1_has() { # name fixed-string output
-  if printf '%s' "$3" | grep -qF -- "$2"; then echo "ok: $1"
-  else echo "FAIL: $1 — output lacks: $2"; FAILED=1; fi
+  h_contains "$1" "$3" "$2"
 }
 
 d1_lacks() { # name fixed-string output
-  if printf '%s' "$3" | grep -qF -- "$2"; then echo "FAIL: $1 — output has: $2"; FAILED=1
-  else echo "ok: $1"; fi
+  h_not_contains "$1" "$3" "$2"
 }
 
 d1_dec="$(fresh_decisions)"; put_mut_adr "$d1_dec" "$MUT_LITERAL"
@@ -941,9 +937,4 @@ out="$(d1_run "$d_bad" "$d_wf")"; rc=$?
 expect "d1-unparseable-composite-fails" 1 "$rc"
 d1_has "d1-unparseable-composite-named" "expected exactly one \${DB_PASS:-default}" "$out"
 
-if [ "$FAILED" -ne 0 ]; then
-  echo "RESULT: FAILED"
-  exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

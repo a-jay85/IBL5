@@ -8,22 +8,17 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOOK="$SCRIPT_DIR/post-merge-hook"
 INSTALLER="$SCRIPT_DIR/install-git-hooks"
-FAILED=0
 
-ok()        { echo "ok: $1"; }
-fail()      { echo "FAIL: $1"; FAILED=1; }
-assert_eq() { local d="$1" g="$2" e="$3"
-              if [ "$g" = "$e" ]; then ok "$d"
-              else fail "$d — expected [$e], got [$g]"; fi; }
-want()      { local d="$1" h="$2" n="$3"
-              case "$h" in *"$n"*) ok "$d" ;;
-              *) fail "$d — missing token [$n]"; esac; }
+assert_eq() { h_eq "$1" "$3" "$2"; }
+want()      { h_contains "$1" "$2" "$3"; }
 
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 g() { git -c user.email=t@t -c user.name=t -c core.hooksPath=/dev/null "$@"; }
@@ -90,8 +85,4 @@ assert_eq "re-run: backup untouched" "$(cat "$INST/.git/hooks/post-merge.pre-shi
 CSS_COUNT="$(grep -c 'IBL5-CSS-REBUILD' "$INST/.git/hooks/post-merge")"
 assert_eq "re-run: CSS auto-heal present once" "$CSS_COUNT" "1"
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "bin/test-post-merge-hook: FAILED"
-    exit 1
-fi
-echo "bin/test-post-merge-hook: all cases passed"
+h_done

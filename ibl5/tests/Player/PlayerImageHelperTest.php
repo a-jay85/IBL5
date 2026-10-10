@@ -80,6 +80,20 @@ class PlayerImageHelperTest extends TestCase
         $this->assertStringContainsString('data:image/png;base64', $result);
     }
     
+    public function testIsPlaceholderUrlTrueForMissingPhoto(): void
+    {
+        PlayerImageHelper::usePhotoDirectory($this->makePhotoDir());
+
+        $this->assertTrue(PlayerImageHelper::isPlaceholderUrl(PlayerImageHelper::getImageUrl(123)));
+    }
+
+    public function testIsPlaceholderUrlFalseForExistingPhoto(): void
+    {
+        PlayerImageHelper::usePhotoDirectory($this->makePhotoDir(123));
+
+        $this->assertFalse(PlayerImageHelper::isPlaceholderUrl(PlayerImageHelper::getImageUrl(123)));
+    }
+
     /**
      * Test that empty string playerID returns placeholder data URI
      */

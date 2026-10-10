@@ -26,6 +26,14 @@ for a in "$@"; do
   if [ "$a" = "-C" ]; then skip=1; continue; fi
   sub="$a"; break
 done
+for c in $GIT_SHIM_LAND_THEN_FAIL; do
+  if [ "$c" = "$sub" ] && [ ! -e "$GIT_SHIM_STATE/$sub.landed" ]; then
+    "$REAL_GIT" "$@" || exit $?
+    touch "$GIT_SHIM_STATE/$sub.landed"
+    echo "${GIT_SHIM_MSG:-kex_exchange_identification: read: Connection reset by peer}" >&2
+    exit 128
+  fi
+done
 for c in $GIT_SHIM_FAIL_CMDS; do
   if [ "$c" = "$sub" ]; then
     if [ "$GIT_SHIM_ALWAYS" = 1 ] || [ ! -e "$GIT_SHIM_STATE/$sub.failed" ]; then
@@ -76,7 +84,11 @@ def shim_repo(tmp_path, monkeypatch):
     _git(seed, "commit", "-qam", "second")
     _git(seed, "push", "-q", str(bare), "master")
     new_sha = _git(seed, "rev-parse", "HEAD")
+    log = _install_shim(tmp_path, monkeypatch)
+    return LiveGit(str(wt)), wt, new_sha, log
 
+
+def _install_shim(tmp_path, monkeypatch):
     shim_dir = tmp_path / "bin"
     shim_dir.mkdir()
     shim = shim_dir / "git"
@@ -90,7 +102,26 @@ def shim_repo(tmp_path, monkeypatch):
     monkeypatch.setenv("GIT_SHIM_LOG", str(log))
     monkeypatch.setenv("GIT_SHIM_STATE", str(state))
     monkeypatch.setenv("PATH", f"{shim_dir}{os.pathsep}{os.environ['PATH']}")
-    return LiveGit(str(wt)), wt, new_sha, log
+    return log
+
+
+@pytest.fixture
+def push_repo(tmp_path, monkeypatch):
+    """A bare push remote and a clone on branch `feature` one commit ahead."""
+    seed = _git_repo(tmp_path / "seed")
+    bare = tmp_path / "bare.git"
+    subprocess.run([REAL_GIT, "init", "-q", "--bare", "-b", "master", str(bare)], check=True)
+    _git(seed, "push", "-q", str(bare), "master")
+    clone = tmp_path / "clone"
+    subprocess.run([REAL_GIT, "clone", "-q", str(bare), str(clone)], check=True, capture_output=True)
+    _git(clone, "config", "user.email", "t@example.com")
+    _git(clone, "config", "user.name", "T")
+    _git(clone, "checkout", "-qb", "feature")
+    (clone / "g.txt").write_text("feature\n")
+    _git(clone, "add", "-A")
+    _git(clone, "commit", "-qm", "feature")
+    log = _install_shim(tmp_path, monkeypatch)
+    return LiveGit(str(clone), push_remote=str(bare)), clone, bare, log
 
 
 def _count(log, sub):
@@ -126,3 +157,42 @@ def test_shim_fetch_repository_not_found_is_not_retried(shim_repo, monkeypatch, 
 def test_shim_fetch_bare_could_not_read_is_not_retried(shim_repo, monkeypatch, sleeps):
     _assert_fetch_single_attempt(shim_repo, monkeypatch, sleeps,
                                  "fatal: Could not read from remote repository.")
+
+
+def _bare_tip(bare):
+    return subprocess.run([REAL_GIT, "-C", str(bare), "rev-parse", "refs/heads/feature"],
+                          check=True, capture_output=True, text=True).stdout.strip()
+
+
+def test_shim_push_kex_once_then_succeeds(push_repo, monkeypatch, sleeps):
+    git, clone, bare, log = push_repo
+    monkeypatch.setenv("GIT_SHIM_FAIL_CMDS", "push")
+    assert git.push_ff() == _git(clone, "rev-parse", "HEAD")
+    assert _count(log, "push") == 2
+    assert _bare_tip(bare) == _git(clone, "rev-parse", "HEAD")
+    assert sleeps == [5.0]
+
+
+def test_shim_push_lands_then_errors_is_not_repushed(push_repo, monkeypatch, sleeps):
+    git, clone, bare, log = push_repo
+    monkeypatch.setenv("GIT_SHIM_LAND_THEN_FAIL", "push")
+    git.push()
+    lines = log.read_text().splitlines()
+    push_idx = [i for i, line in enumerate(lines)
+                if "push" in line.replace("-C ", "").split()[:3]]
+    assert len(push_idx) == 1
+    assert any("ls-remote" in line for line in lines[push_idx[0] + 1:])
+    assert _bare_tip(bare) == _git(clone, "rev-parse", "HEAD")
+    assert sleeps == []
+
+
+def test_shim_push_repository_not_found_is_not_retried(push_repo, monkeypatch, sleeps):
+    git, clone, bare, log = push_repo
+    monkeypatch.setenv("GIT_SHIM_FAIL_CMDS", "push")
+    monkeypatch.setenv("GIT_SHIM_ALWAYS", "1")
+    monkeypatch.setenv("GIT_SHIM_MSG", "fatal: repository not found")
+    with pytest.raises(HarnessError) as ei:
+        git.push_ff()
+    assert ei.value.kind == "push-failed"
+    assert _count(log, "push") == 1
+    assert sleeps == []

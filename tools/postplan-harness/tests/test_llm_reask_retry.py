@@ -100,3 +100,65 @@ def test_usage_limit_reply_pauses_without_reask(tmp_path, monkeypatch):
     with pytest.raises(_Paused):
         cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
     assert len(seen) == 1
+
+
+AUTH = "Failed to authenticate: OAuth session expired and could not be refreshed"
+
+
+def _raw_stdout(stdouts, seen):
+    """Fake _run_reaped: returns each scripted string as bare stdout, rc=1, no JSON envelope."""
+    def fake(argv, stdin_text, timeout, cwd, env, errors=None):
+        seen.append(stdin_text)
+        return subprocess.CompletedProcess(argv, 1, stdout=stdouts.pop(0), stderr="")
+    return fake
+
+
+def test_auth_expired_reply_relabels_detail(tmp_path, monkeypatch):
+    seen = []
+    cli = _cli(tmp_path, monkeypatch, [AUTH, AUTH], seen)
+    with pytest.raises(HarnessError) as ei:
+        cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
+    assert ei.value.kind == "llm-invalid-output"
+    assert ei.value.detail.startswith("safety-verdict: auth-expired: Failed to authenticate")
+    assert "no parseable JSON" not in ei.value.detail
+    assert len(seen) == 2
+
+
+def test_auth_text_in_non_json_stdout_relabels(tmp_path, monkeypatch):
+    seen = []
+    cli = _cli(tmp_path, monkeypatch, [], seen)
+    monkeypatch.setattr("harness.adapters.llm._run_reaped", _raw_stdout([AUTH, AUTH], seen))
+    with pytest.raises(HarnessError) as ei:
+        cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
+    assert ei.value.kind == "llm-invalid-output"
+    assert ei.value.detail.startswith("safety-verdict: auth-expired: Failed to authenticate")
+    assert "CLI non-JSON output" not in ei.value.detail
+    assert len(seen) == 2
+
+
+def test_auth_expired_then_valid_returns_data(tmp_path, monkeypatch):
+    seen = []
+    cli = _cli(tmp_path, monkeypatch, [AUTH, '{"holds": []}'], seen)
+    data = cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
+    assert data == {"holds": []}
+    assert len(seen) == 2
+
+
+def test_auth_reply_does_not_trigger_usage_pause(tmp_path, monkeypatch):
+    class _Paused(Exception):
+        pass
+
+    def _raise_paused(self, purpose, cwd=None, fp_before=None):
+        raise _Paused()
+
+    seen = []
+    cli = _cli(tmp_path, monkeypatch, [AUTH, AUTH], seen)
+    monkeypatch.setattr(ClaudeCli, "_usage_limit_pause", _raise_paused)
+    with pytest.raises(HarnessError) as ei:
+        cli.call("safety-verdict", "haiku", PROMPT, schemas.validate_safety_verdict)
+    assert ei.value.kind == "llm-invalid-output"
+
+
+def test_invalid_output_kind_stays_out_of_fail_closed_kinds():
+    import runner
+    assert "llm-invalid-output" not in runner._FAIL_CLOSED_KINDS

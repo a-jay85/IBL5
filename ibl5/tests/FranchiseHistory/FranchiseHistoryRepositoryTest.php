@@ -55,12 +55,17 @@ class FranchiseHistoryRepositoryTest extends TestCase
         }
     }
 
-    public function testFiveSeasonWindowFetchQueriesTeamWinLoss(): void
+    public function testFiveSeasonWindowFetchUsesSargableDateRange(): void
     {
         $this->assertStringContainsString(
-            'ibl_team_win_loss',
+            'game_date >= ? AND game_date < ?',
             $this->repositorySource(),
-            'Repository must query ibl_team_win_loss for the rolling 5-season window'
+            'Rolling 5-season window query must filter box scores by a sargable game_date range'
+        );
+        $this->assertStringContainsString(
+            'WHERE year BETWEEN ? AND ?',
+            $this->repositorySource(),
+            'Rolling 5-season window query must keep the outer season-ending year filter'
         );
     }
 

@@ -219,16 +219,42 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
         self::assertNotFalse(file_put_contents('/tmp/franchise-history-perf-report.txt', $text));
     }
 
+    public function testChosenFixAppearsInQueryPlan(): void
+    {
+        $this->seedProdScaleVolume();
+
+        self::assertStringContainsString(
+            'game_date >= ? AND game_date < ?',
+            FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL
+        );
+
+        $window = $this->currentSqlMap(self::SEED_CURRENT_ENDING_YEAR)['getFiveSeasonWindowRows'];
+        $explainRows = $this->runFrozen('EXPLAIN ' . $window['sql'], $window['types'], ...$window['params']);
+        $rangeRows = array_filter($explainRows, static fn (array $row): bool => $row['type'] === 'range');
+        self::assertNotSame([], $rangeRows, 'window EXPLAIN has no range access over box scores');
+    }
+
     /**
      * The SQL each repository method currently executes, keyed by method name.
      *
-     * @return array<string, array{sql: string, types: string, params: list<int>}>
+     * @return array<string, array{sql: string, types: string, params: list<int|string>}>
      */
     private function currentSqlMap(int $currentEndingYear): array
     {
         return [
             'getFranchiseSummaryRows' => ['sql' => self::FROZEN_SUMMARY_SQL, 'types' => 'i', 'params' => [League::FREE_AGENTS_TEAMID]],
-            'getFiveSeasonWindowRows' => ['sql' => self::FROZEN_WINDOW_SQL, 'types' => 'ii', 'params' => [$currentEndingYear - 4, $currentEndingYear]],
+            'getFiveSeasonWindowRows' => [
+                'sql' => FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL,
+                'types' => 'ssssii',
+                'params' => [
+                    sprintf('%04d-10-01', $currentEndingYear - 5),
+                    sprintf('%04d-10-01', $currentEndingYear),
+                    sprintf('%04d-10-01', $currentEndingYear - 5),
+                    sprintf('%04d-10-01', $currentEndingYear),
+                    $currentEndingYear - 4,
+                    $currentEndingYear,
+                ],
+            ],
             'getRawPlayoffTotals' => ['sql' => self::FROZEN_PLAYOFF_TOTALS_SQL, 'types' => '', 'params' => []],
             'getRawHeatTotals' => ['sql' => self::FROZEN_HEAT_TOTALS_SQL, 'types' => '', 'params' => []],
         ];
@@ -288,7 +314,7 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
     /**
      * @return list<array<string, mixed>>
      */
-    private function runFrozen(string $sql, string $types, int ...$params): array
+    private function runFrozen(string $sql, string $types, int|string ...$params): array
     {
         $stmt = $this->db->prepare($sql);
         self::assertNotFalse($stmt, 'prepare failed: ' . $this->db->error);

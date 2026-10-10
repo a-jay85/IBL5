@@ -97,6 +97,14 @@ class PlayerImageHelper implements PlayerImageHelperInterface
     }
 
     /**
+     * @see PlayerImageHelperInterface::isPlaceholderUrl()
+     */
+    public static function isPlaceholderUrl(string $url): bool
+    {
+        return $url === self::PLACEHOLDER_DATA_URI;
+    }
+
+    /**
      * Check if a given playerID is valid
      * 
      * @param int|string|null $playerID The playerID to validate

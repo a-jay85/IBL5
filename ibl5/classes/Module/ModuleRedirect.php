@@ -19,7 +19,6 @@ final class ModuleRedirect
     public const TARGETS = [
         'PlayerExportGuide'  => 'modules.php?name=ApiKeys',
         'VotingResults'      => 'modules.php?name=Voting',
-        'AllStarAppearances' => 'modules.php?name=RecordHolders&op=allstar',
     ];
 
     public static function targetFor(string $moduleName): ?string

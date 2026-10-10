@@ -48,7 +48,7 @@ const PAGES: PageRow[] = [
     rowCount: { selector: '.ibl-data-table tbody tr', minimum: 1 } },
   { name: 'league starters', url: 'modules.php?name=LeagueStarters', anchor: '#league-starters-tables' },
   { name: 'compare players', url: 'modules.php?name=ComparePlayers', anchor: 'form[action*="ComparePlayers"]' },
-  { name: 'season highs', url: 'modules.php?name=SeasonHighs', anchor: '.ibl-data-table',
+  { name: 'season highs', url: 'modules.php?name=Records&tab=thisseason', anchor: '.ibl-data-table',
     rowCount: { selector: '.ibl-data-table tbody tr', minimum: 1 } },
   { name: 'head-to-head records', url: 'modules.php?name=HeadToHeadRecords', anchor: '.h2h-matrix',
     rowCount: { selector: '.h2h-matrix tbody tr', minimum: 1 } },

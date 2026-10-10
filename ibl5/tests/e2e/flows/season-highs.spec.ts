@@ -8,7 +8,7 @@ test.use({ storageState: publicStorageState() });
 
 test.describe('Season Highs flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=SeasonHighs');
+    await page.goto('modules.php?name=Records&tab=thisseason');
   });
 
   test('page loads with title', async ({ page }) => {
@@ -68,14 +68,14 @@ test.describe('Season Highs flow', () => {
   });
 
   test('playoffs phase renders playoff stat leaders', async ({ page }) => {
-    await page.goto('modules.php?name=SeasonHighs&seasonPhase=Playoffs');
+    await page.goto('modules.php?name=Records&tab=thisseason&seasonPhase=Playoffs');
     await expect(page.locator('.ibl-table-title', { hasText: 'Playoffs' }).first()).toBeVisible();
     await expect(page.locator('.value-cell').first()).toBeVisible();
     await assertNoPhpErrors(page, 'SeasonHighs Playoffs');
   });
 
   test('preseason phase reflects phase in section headings', async ({ page }) => {
-    await page.goto('modules.php?name=SeasonHighs&seasonPhase=Preseason');
+    await page.goto('modules.php?name=Records&tab=thisseason&seasonPhase=Preseason');
     await expect(page.locator('.ibl-table-title', { hasText: 'Preseason' }).first()).toBeVisible();
     await assertNoPhpErrors(page, 'SeasonHighs Preseason');
   });

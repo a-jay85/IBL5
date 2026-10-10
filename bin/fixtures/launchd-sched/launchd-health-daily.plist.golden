@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.ibl5.launchd-health-daily</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@MAIN_WT@/bin/launchd-health-check</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>@MAIN_WT@</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- launchd agents start with a minimal PATH that omits Homebrew; git and the
+		     checker must resolve. HOME interpolates HERE, at generation time —
+		     launchd does NOT expand variables in EnvironmentVariables, so a literal
+		     dollar-sign-HOME would bake in a dead path. -->
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/opt/homebrew/opt/mariadb/bin:/usr/local/bin:/usr/bin:/bin:@HOME@/.local/bin</string>
+	</dict>
+	<!-- do NOT "fix" this to StartInterval — that is a repeating interval, not a calendar time -->
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>8</integer>
+		<key>Minute</key>
+		<integer>45</integer>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/launchd-health/logs/launchd-health-daily.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/launchd-health/logs/launchd-health-daily.err.log</string>
+</dict>
+</plist>

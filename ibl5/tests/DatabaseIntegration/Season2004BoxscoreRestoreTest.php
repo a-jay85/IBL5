@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
-use Boxscore\Season2004BoxscoreRestore;
+use Boxscore\Legacy\Season2004BoxscoreRestore;
 use GameBoxscore\GameBoxscoreRepository;
 use GameBoxscore\GameBoxscoreService;
 use PHPUnit\Framework\Attributes\Group;

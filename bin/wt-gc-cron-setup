@@ -22,6 +22,8 @@ set -euo pipefail
 if [ -z "${HOME:-}" ]; then HOME="$(cd ~ 2>/dev/null && pwd)"; export HOME; fi
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=bin/lib/launchd-sched.sh
+. "$REPO_ROOT/bin/lib/launchd-sched.sh"
 ACTION=""
 
 while [ $# -gt 0 ]; do
@@ -40,8 +42,7 @@ done
 # Program/WorkingDirectory MUST point at the main checkout, never this worktree
 # (a worktree gets torn down — the LaunchAgent would then point at a dead path).
 # The first `git worktree list` entry is the main working tree.
-MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
-[ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"   # fallback: not in a git tree
+MAIN_WT="$(lsched_main_wt "$REPO_ROOT")"
 
 PLIST_LABEL="com.ibl5.wt-gc"
 PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
@@ -50,28 +51,19 @@ PROGRAM="$MAIN_WT/bin/wt-gc-tick"
 
 # Single source of truth for the plist — used by both --print-schedule and
 # --install-schedule, so the MAIN-checkout derivation is exercised by tests.
-build_plist() {
+plist_body() {
+  lsched_key_string Label "$PLIST_LABEL"
+  lsched_program_arguments "$PROGRAM"
   cat <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>${PLIST_LABEL}</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>${PROGRAM}</string>
-	</array>
 	<!-- Hourly poll; bin/wt-gc-tick's HID-idle gate (1800s) and 6h min-interval
 	     stamp decide whether a tick sweeps. Hourly fires survive sleep/wake
 	     better than a calendar slot, which would land on wake while the
 	     operator is present and fail the idle gate. -->
-	<key>StartInterval</key>
-	<integer>3600</integer>
-	<key>WorkingDirectory</key>
-	<string>${MAIN_WT}</string>
-	<key>EnvironmentVariables</key>
-	<dict>
+PLIST
+  lsched_key_integer StartInterval 3600
+  lsched_key_string WorkingDirectory "$MAIN_WT"
+  lsched_env_open
+  cat <<PLIST
 		<!-- launchd agents start with a minimal PATH that omits Homebrew and
 		     ~/.local/bin. Every binary the sweep shells out to must resolve
 		     here: git (/usr/bin), gh and docker (Homebrew or /usr/local/bin),
@@ -80,33 +72,24 @@ build_plist() {
 		     HOME interpolates HERE, at generation time — launchd does NOT expand
 		     variables in EnvironmentVariables, so a literal dollar-HOME would
 		     bake in a dead path. -->
-		<key>PATH</key>
-		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME}/.local/bin</string>
-	</dict>
-	<key>StandardOutPath</key>
-	<string>${LOG_DIR}/launchd-stdout.log</string>
-	<key>StandardErrorPath</key>
-	<string>${LOG_DIR}/launchd-stderr.log</string>
-</dict>
-</plist>
 PLIST
+  lsched_key_string PATH "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME}/.local/bin" 2
+  lsched_env_close
+  lsched_key_string StandardOutPath "${LOG_DIR}/launchd-stdout.log"
+  lsched_key_string StandardErrorPath "${LOG_DIR}/launchd-stderr.log"
 }
 
 case "$ACTION" in
   print)
-    build_plist
+    lsched_plist plist_body
     ;;
   install)
     [ -x "$PROGRAM" ] || { echo "Refusing to install: $PROGRAM is missing or not executable (merge to master first)" >&2; exit 1; }
-    mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
-    launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent
-    build_plist > "$PLIST_PATH"
-    launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+    lsched_install "$PLIST_LABEL" "$PLIST_PATH" plist_body "$LOG_DIR"
     echo "Installed ${PLIST_LABEL} (StartInterval 3600s). Program: $PROGRAM"
     ;;
   uninstall)
-    launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent
-    rm -f "$PLIST_PATH"                                                   # idempotent
+    lsched_uninstall "$PLIST_LABEL" "$PLIST_PATH"
     echo "Uninstalled ${PLIST_LABEL}."
     ;;
 esac

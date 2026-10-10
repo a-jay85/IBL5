@@ -11,7 +11,7 @@ declare(strict_types=1);
  * and inserts the recovered Suns @ Heat payload.
  *
  * This file is a thin driver. All selection logic, every SQL statement, and the
- * embedded stat payload live in Boxscore\Season2004BoxscoreRestore, which is
+ * embedded stat payload live in Boxscore\Legacy\Season2004BoxscoreRestore, which is
  * what the DatabaseIntegration suite exercises; nothing is re-literalled here.
  *
  * Migration 170 creates the two backup tables. MigrationFileResolver sorts with
@@ -75,8 +75,8 @@ function countCoordinateRows(mysqli $db, string $table): int
         throw new RuntimeException('Failed to prepare count query for ' . $table);
     }
 
-    $date = Boxscore\Season2004BoxscoreRestore::GAME_DATE;
-    $ordinal = Boxscore\Season2004BoxscoreRestore::GAME_OF_THAT_DAY;
+    $date = Boxscore\Legacy\Season2004BoxscoreRestore::GAME_DATE;
+    $ordinal = Boxscore\Legacy\Season2004BoxscoreRestore::GAME_OF_THAT_DAY;
     $stmt->bind_param('si', $date, $ordinal);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -95,7 +95,7 @@ function countCoordinateRows(mysqli $db, string $table): int
 function countRestoredTeamRows(mysqli $db): int
 {
     $stmt = $db->prepare(
-        'SELECT COUNT(*) FROM `' . Boxscore\Season2004BoxscoreRestore::TEAM_TABLE . '`
+        'SELECT COUNT(*) FROM `' . Boxscore\Legacy\Season2004BoxscoreRestore::TEAM_TABLE . '`
          WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ?
            AND game_of_that_day = ?'
     );
@@ -103,10 +103,10 @@ function countRestoredTeamRows(mysqli $db): int
         throw new RuntimeException('Failed to prepare restored-row count query');
     }
 
-    $date = Boxscore\Season2004BoxscoreRestore::GAME_DATE;
-    $visitor = Boxscore\Season2004BoxscoreRestore::RESTORED_VISITOR_TEAMID;
-    $home = Boxscore\Season2004BoxscoreRestore::RESTORED_HOME_TEAMID;
-    $ordinal = Boxscore\Season2004BoxscoreRestore::GAME_OF_THAT_DAY;
+    $date = Boxscore\Legacy\Season2004BoxscoreRestore::GAME_DATE;
+    $visitor = Boxscore\Legacy\Season2004BoxscoreRestore::RESTORED_VISITOR_TEAMID;
+    $home = Boxscore\Legacy\Season2004BoxscoreRestore::RESTORED_HOME_TEAMID;
+    $ordinal = Boxscore\Legacy\Season2004BoxscoreRestore::GAME_OF_THAT_DAY;
     $stmt->bind_param('siii', $date, $visitor, $home, $ordinal);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -116,11 +116,11 @@ function countRestoredTeamRows(mysqli $db): int
     return (int) ($row[0] ?? 0);
 }
 
-$restore = new Boxscore\Season2004BoxscoreRestore($mysqli_db);
+$restore = new Boxscore\Legacy\Season2004BoxscoreRestore($mysqli_db);
 
 $before = [
-    Boxscore\Season2004BoxscoreRestore::TEAM_TABLE   => countCoordinateRows($mysqli_db, Boxscore\Season2004BoxscoreRestore::TEAM_TABLE),
-    Boxscore\Season2004BoxscoreRestore::PLAYER_TABLE => countCoordinateRows($mysqli_db, Boxscore\Season2004BoxscoreRestore::PLAYER_TABLE),
+    Boxscore\Legacy\Season2004BoxscoreRestore::TEAM_TABLE   => countCoordinateRows($mysqli_db, Boxscore\Legacy\Season2004BoxscoreRestore::TEAM_TABLE),
+    Boxscore\Legacy\Season2004BoxscoreRestore::PLAYER_TABLE => countCoordinateRows($mysqli_db, Boxscore\Legacy\Season2004BoxscoreRestore::PLAYER_TABLE),
 ];
 
 try {

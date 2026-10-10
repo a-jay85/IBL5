@@ -28,7 +28,7 @@ class LeagueConfigServiceTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertSame(28, $result['teams_stored']);
-        $this->assertNotEmpty($result['messages']);
+        $this->assertNotSame([], $result['messages']);
         $this->assertGreaterThan(0, $result['season_ending_year']);
 
         // Verify message content — catches string literal mutations

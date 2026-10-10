@@ -24,7 +24,7 @@ class TopicsEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Topics');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testHandlesEmptyTopicList(): void
@@ -33,6 +33,6 @@ class TopicsEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Topics');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

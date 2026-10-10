@@ -472,7 +472,7 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
         $this->assertCount(1, $result);
         $this->assertSame(42, $result[0]['id']);
         $this->assertTrue($result[0]['isActive']);
-        $this->assertNotEmpty($result[0]['label']);
+        $this->assertNotSame('', $result[0]['label']);
     }
 
     public function testBuildCurrentLiveLabelContainsRecordWithActiveDc(): void

@@ -137,7 +137,7 @@ final class QueueSimSummaryStepDbTest extends DatabaseTestCase
 
         $rows = $this->repo->listAll();
 
-        self::assertNotEmpty($rows, 'listAll() must return at least one row');
+        self::assertNotSame([], $rows, 'listAll() must return at least one row');
 
         $firstRow = $rows[0];
 

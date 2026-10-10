@@ -26,7 +26,7 @@ class FreeAgencyPreviewEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('FreeAgencyPreview');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
 }

@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Boxscore;
+namespace Boxscore\Legacy;
 
+use Boxscore\Boxscore;
 use mysqli;
 use RuntimeException;
 use Updater\Steps\RefreshPlayoffSeriesResultsStep;

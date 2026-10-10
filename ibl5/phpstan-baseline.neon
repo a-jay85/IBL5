@@ -61,12 +61,6 @@ parameters:
 			path: bin/refresh-team-season-records
 
 		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/Api/Controller/HealthController.php
-
-		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 4
@@ -77,12 +71,6 @@ parameters:
 			identifier: ibl.sqlStringConcatenation
 			count: 2
 			path: classes/Api/Repository/ApiLeadersRepository.php
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 2
-			path: classes/Api/Response/JsonResponder.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
@@ -107,18 +95,6 @@ parameters:
 			identifier: ibl.sqlStringConcatenation
 			count: 1
 			path: classes/BugPipeline/BugReportClaimRepository.php
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/Cli/LighthouseAuditReportFormatter.php
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 2
-			path: classes/Debug/DebugSession.php
 
 		-
 			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
@@ -263,12 +239,6 @@ parameters:
 			identifier: ibl.trustedVariable
 			count: 6
 			path: classes/Negotiation/NegotiationOfferView.php
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/PageLayout/PageLayout.php
 
 		-
 			rawMessage: Hardcoded environment string "www.iblhoops.net" is banned. Inject an environment/config flag instead of branching on a literal host name.
@@ -531,12 +501,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/Topics/News/NewsRepository.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
@@ -3852,3 +3816,4 @@ parameters:
 			identifier: encapsedStringPart.nonString
 			count: 6
 			path: themes/IBL/theme.php
+

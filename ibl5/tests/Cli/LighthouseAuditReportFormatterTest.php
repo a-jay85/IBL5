@@ -7,19 +7,28 @@ namespace Tests\Cli;
 use Cli\LighthouseAuditReportFormatter;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
+use Tests\Clock\FixedClock;
 
 #[Group('cli')]
 final class LighthouseAuditReportFormatterTest extends TestCase
 {
     private LighthouseAuditReportFormatter $formatter;
     private string $fixtureDir;
+    private string $savedTimezone;
 
     protected function setUp(): void
     {
+        $this->savedTimezone = date_default_timezone_get();
+        date_default_timezone_set('UTC');
         $this->formatter = new LighthouseAuditReportFormatter();
         $resolved = realpath(__DIR__ . '/../fixtures/lighthouse');
         self::assertNotFalse($resolved, 'Lighthouse fixture directory must exist');
         $this->fixtureDir = $resolved;
+    }
+
+    protected function tearDown(): void
+    {
+        date_default_timezone_set($this->savedTimezone);
     }
 
     public function testRanksWorstFirst(): void
@@ -68,10 +77,44 @@ final class LighthouseAuditReportFormatterTest extends TestCase
     public function testTitleContainsDate(): void
     {
         $manifest = $this->loadJson('audit-manifest-all-pass.json');
+        $formatter = new LighthouseAuditReportFormatter(new FixedClock(1791549296));
+
+        $result = $formatter->format($manifest);
+
+        self::assertSame("Lighthouse Audit \u{2014} Week of 2026-10-09", $result['title']);
+    }
+
+    public function testTitleDateRollsOverAtUtcMidnight(): void
+    {
+        $manifest = $this->loadJson('audit-manifest-all-pass.json');
+        $clock = new FixedClock(1791763199);
+        $formatter = new LighthouseAuditReportFormatter($clock);
+
+        $before = $formatter->format($manifest);
+        $clock->advance(1);
+        $after = $formatter->format($manifest);
+
+        self::assertSame("Lighthouse Audit \u{2014} Week of 2026-10-11", $before['title']);
+        self::assertSame("Lighthouse Audit \u{2014} Week of 2026-10-12", $after['title']);
+    }
+
+    public function testEmptyManifestTitleUsesInjectedClock(): void
+    {
+        $formatter = new LighthouseAuditReportFormatter(new FixedClock(1791549296));
+
+        $result = $formatter->format([]);
+
+        self::assertSame("Lighthouse Audit \u{2014} Week of 2026-10-09", $result['title']);
+        self::assertSame("No pages were audited.\n", $result['body']);
+    }
+
+    public function testTitleHasWeekOfIsoDateShape(): void
+    {
+        $manifest = $this->loadJson('audit-manifest-all-pass.json');
 
         $result = $this->formatter->format($manifest);
 
-        self::assertStringContainsString(date('Y-m-d'), $result['title']);
+        self::assertMatchesRegularExpression('/^Lighthouse Audit \x{2014} Week of \d{4}-\d{2}-\d{2}$/u', $result['title']);
     }
 
     public function testAllPassManifestHasNoFlaggedSection(): void

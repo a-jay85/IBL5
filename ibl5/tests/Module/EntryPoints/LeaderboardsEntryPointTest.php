@@ -30,7 +30,7 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('Leaderboards', ['tab' => 'season'], [], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('<div class="ibl-tab-panel" data-tab="season"', $output);
         $this->assertStringContainsString('<form name="Leaderboards"', $output);
         $this->assertStringNotContainsString('ibl-data-table', $output);
@@ -84,7 +84,7 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'limit' => '50',
         ]), [], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_hist');
     }
 
@@ -97,7 +97,7 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'limit' => '50',
         ]), [], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_hist');
     }
 
@@ -109,7 +109,7 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'limit' => '25',
         ]), [], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('<div class="ibl-tab-panel" data-tab="season"', $output);
     }
 
@@ -117,7 +117,7 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('Leaderboards', ['tab' => 'career'], [], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('<div class="ibl-tab-panel" data-tab="career"', $output);
         $this->assertStringContainsString('<form name="CareerLeaderboards"', $output);
         $this->assertStringNotContainsString('ibl-data-table', $output);
@@ -200,7 +200,7 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'display' => '50',
         ]), [], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted($table);
     }
 
@@ -227,7 +227,7 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
             'display' => 'abc',
         ]), [], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('<div class="ibl-tab-panel" data-tab="career"', $output);
         $this->assertQueryExecuted('ibl_hist');
         $this->assertStringContainsString('<th class="sorted-col">PTS</th>', $output);

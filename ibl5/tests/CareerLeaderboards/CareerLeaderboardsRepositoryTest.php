@@ -187,7 +187,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         $repository->getLeaderboards($table, $sortColumn, 0, 10);
 
         $queries = $mockDb->getExecutedQueries();
-        $this->assertNotEmpty($queries);
+        $this->assertNotSame([], $queries);
 
         return implode("\n", array_map(static fn (mixed $q): string => is_string($q) ? $q : '', $queries));
     }

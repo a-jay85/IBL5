@@ -85,7 +85,7 @@
 # tested logic here is exactly what runs there.
 should_fallback() { case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }
 
-# blocked_ship_block <run-dir> <slug> <root> <log> — the plain-language message for an
+# blocked_ship_block <run-dir> <slug> <root> <log> <main-root> — the plain-language message for an
 # exit-3 stop. The harness writes <run-dir>/blocked-ship.txt (runner.py write_blocked_ship);
 # print it as is. `-s` treats an empty file (a failed write) like a missing one and prints
 # a generic block of the same shape instead. The file is emitted with cat, never eval'd,
@@ -103,8 +103,9 @@ blocked_ship_block() {
     printf 'Fix:\n  1. cd %s\n' "$3"
     printf '  2. Read the log named on the Log line below and fix what it reports\n'
     printf '  3. bin/post-plan-now\n\n'
-    printf 'Or open Claude in that folder and ask it to fix the ship block.\n'
     printf 'Log: %s\n' "$4"
+    printf 'Or paste this to have Claude fix it:\n'
+    printf '%s/bin/postplan-fix %s\n' "$5" "$2"
 }
 
 # shq <string> — single-quote <string> for the FAR side of the launchd boundary.
@@ -774,7 +775,8 @@ if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ] && [ "${RESUME_ST
     # so $LOG holds its final RESULT: line. The capture now feeds only
     # postplan_failure_body; the exit-3 message comes from blocked_ship_block.
     POST_HARNESS_SEG="HARNESS_RESULT=\$(grep -m1 '^RESULT:' \"$LOG\" 2>/dev/null || true); HARNESS_RESULT=\${HARNESS_RESULT:0:1200}; "
-    GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then msg=\"\$(blocked_ship_block \"$HARNESS_RUN_DIR\" \"$SLUG\" \"$ROOT\" \"$LOG\")\"; printf '%s\n' '=== post-plan blocked ship ===' \"\$msg\" '=== end blocked ship ==='; \"$ROOT/bin/post-plan-fail-dm\" \"$ROOT\" \"$SAFE_SLUG\" \"$LOG\" \"\$msg\" || true; fi"
+    FIX_ROOT="$(resolve_canonical_root "$ROOT")"
+    GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then msg=\"\$(blocked_ship_block \"$HARNESS_RUN_DIR\" \"$SLUG\" \"$ROOT\" \"$LOG\" \"$FIX_ROOT\")\"; printf '%s\n' '=== post-plan blocked ship ===' \"\$msg\" '=== end blocked ship ==='; \"$ROOT/bin/post-plan-fail-dm\" \"$ROOT\" \"$SAFE_SLUG\" \"$LOG\" \"\$msg\" || true; fi"
     ENGINE="compiled post-plan harness (fails CLOSED on a rebase conflict or a local gate denial; falls back to the skill on other failures)"
 fi
 

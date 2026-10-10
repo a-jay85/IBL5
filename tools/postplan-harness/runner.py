@@ -30,6 +30,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -2869,6 +2870,12 @@ def _path_lines(paths: list[str], limit: int) -> list[str]:
     return out
 
 
+def _postplan_fix_cmd() -> str:
+    """Absolute path of bin/postplan-fix in the checkout this runner lives in."""
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return os.path.join(root, "bin", "postplan-fix")
+
+
 def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     """Plain-language message for an exit-3 stop: what broke, the exact fix, where the log is.
 
@@ -2878,6 +2885,7 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     if rc != 3:
         return ""
     branch = res.slug or "This branch"
+    fix_arg = str(res.pr_number) if res.pr_number else (res.slug or "")
     leaf = (res.slug or "branch").rsplit("/", 1)[-1]
     wt = worktree or "(the worktree folder)"
     log = log_path or "(see the run log)"
@@ -2976,11 +2984,13 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
         for s in steps:
             n += 1
             lines.append(f"  {n}. {s}")
-        lines += [f"  {n + 1}. bin/post-plan-now", "",
-                  "Or open Claude in that folder and ask it to fix the ship block."]
+        lines += [f"  {n + 1}. bin/post-plan-now", ""]
         if res.error_kind == "rebase-conflict" and res.block_cause:
             lines.append("Cause: " + " ".join(res.block_cause.split()))
         lines.append(f"Log: {log}")
+        if fix_arg:
+            lines += ["Or paste this to have Claude fix it:",
+                      f"{_postplan_fix_cmd()} {shlex.quote(fix_arg)}"]
         return "\n".join(lines)
 
     block = render(_BLOCK_MAX_PATHS, True)

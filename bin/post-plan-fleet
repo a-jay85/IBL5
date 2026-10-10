@@ -783,6 +783,18 @@ Fix: ${DM_NEXT}" ;;
     msg="${DM_ICON} post-plan-fleet: ${head}${title_line}
 RESULT ${DM_VERDICT}${fix_block}
 log: $LOG"
+    # Failure verdicts end with the one-command fix entry point (bin/postplan-fix).
+    # READY / HELD / READY WITH NOTES: nothing failed, so no paste line.
+    local fix_cmd=""
+    case "$DM_VERDICT" in
+        "NOT READY"|STOPPED|"TIMED OUT"|"runner exited rc="*|unconfirmed*)
+            [ -n "$PR" ] && fix_cmd="$ROOT/bin/postplan-fix $PR" ;;
+    esac
+    if [ -n "$fix_cmd" ]; then
+        msg="${msg}
+Or paste this to have Claude fix it:
+${fix_cmd}"
+    fi
     ljob_dm_send post-plan-fleet "$msg"
 }
 # Derive outcome word for pr-cycle summary and write to LOG BEFORE releasing the

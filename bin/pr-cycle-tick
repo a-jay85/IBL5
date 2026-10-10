@@ -291,6 +291,8 @@ while IFS=$'\t' read -r pr branch sha mstate base; do
             elif [[ -n "${run_dir:-}" ]]; then
                 msg+=" Last rescue run: $run_dir"
             fi
+            # End with the one-command fix entry point, on its own line so it copies cleanly.
+            msg+=$'\nOr paste this to have Claude fix it:\n'"$ROOT/bin/postplan-fix $pr"
             if [[ "$DRY_RUN" -eq 1 ]]; then
                 log "would DM: $DM_CMD --ping $msg"
             else

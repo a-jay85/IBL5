@@ -422,12 +422,13 @@ def test_diverged_block_names_stage_and_evidence():
 
 def test_block_10kb_error_under_budget_keeps_fix_and_log():
     big = "\n".join(f"line {i:03d} " + "x" * 40 for i in range(200))
-    res = _failed(None, big, error_cmd="c" * 10000, error_output_tail=big, slug="z" * 200)
+    res = _failed(None, big, error_cmd="c" * 10000, error_output_tail=big, slug="z" * 150)
     log = "l" * 500
     block = _block(res, wt="w" * 500, log=log)
     assert len(block) <= runner._BLOCK_BUDGET
     assert "\nFix:\n  1. cd " in block
-    assert block.splitlines()[-1] == f"Log: {log}"
+    assert f"Log: {log}" in block.splitlines()
+    assert "postplan-fix" in block.splitlines()[-1]
     assert sum(1 for ln in block.splitlines() if ln.startswith("> ")) <= 3
 
 

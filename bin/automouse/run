@@ -2263,6 +2263,14 @@ while true; do
         FAILSIG_FILE="$NIGHTLY_DIR/.failsig-$$-impl"   # last failing tool call of this impl attempt (stream-filter side file; never in $LOG)
         rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE" "$FAILSIG_FILE"
 
+        # Login re-probe before the impl spawn: park (attempt refunded, queue intact, stop)
+        if ! login_preflight "$NIGHTLY_DIR" "$LOG" "$SELF_DIR/../discord-dm"; then
+            echo "Login expired before the impl spawn: refunding attempt, queue intact, stopping loop." >> "$LOG"
+            refund_attempt
+            break
+        fi
+        # End login re-probe before the impl spawn
+
         run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "impl" "$CMDPID_FILE" "$PLAN_SLUG" &
         WATCHER_PID=$!
 
@@ -2628,6 +2636,14 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # --output-format stream-json, which post-plan-now's $CMD never emits. The watcher
         # short-circuits on `[ ! -f "$hb_file" ]`, so it costs one idle sleep loop. The live
         # bound here is `timeout "$REMAINING_SECS"` (MAX_PP_SECS, 5400). Kept deliberately.
+        # Login re-probe before the post-plan spawn: park (attempt refunded, handoff kept, stop)
+        if ! login_preflight "$NIGHTLY_DIR" "$LOG" "$SELF_DIR/../discord-dm"; then
+            echo "Login expired before the post-plan spawn: refunding attempt, handoff kept, stopping loop." >> "$LOG"
+            refund_attempt
+            break
+        fi
+        # End login re-probe before the post-plan spawn
+
         run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "postplan" "$CMDPID_FILE" "$PLAN_SLUG" &
         WATCHER_PID=$!
 

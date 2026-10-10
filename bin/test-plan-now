@@ -56,6 +56,9 @@ export PLANS_DIR="$PLANS"
 RL="$TMP/runlog"
 mkdir -p "$RL"
 export PLAN_NOW_LOG_DIR="$RL" POSTPLAN_LOG_DIR="$RL"
+# The runner probes the Claude login before every model call. Every pre-existing case
+# must never reach the real `claude`, so the probe is stubbed to a healthy login here.
+export AUTOMOUSE_LOGIN_PROBE_CMD='echo ok'
 
 # `caffeinate` is macOS-only and the runner wraps the model call in it. Unshimmed,
 # this test cannot run on Linux CI: command-not-found → rc != 0 → every
@@ -346,7 +349,7 @@ want_no() { case "$2" in *"$3"*) fail "$1 — should NOT have seen: $3" ;; *) ok
 # They live in $RL because bin/plan-now --resume reads $PLAN_NOW_LOG_DIR.
 RES_TS="19700101-000000-$$"
 RES_UUID="0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f"
-resume_fixture() {   # resume_fixture [nosession|norunner|nolog|oklog|noverdict]
+resume_fixture() {   # resume_fixture [nosession|norunner|nolog|oklog|noverdict|parkedlog]
     rm -f "$RL"/plan-now-"$RES_TS".*
     printf 'MODEL=claude-opus-4-1\nDISPOSITION=implement\n' > "$RL/plan-now-$RES_TS.sh"
     printf '%s\n' "$RES_UUID" > "$RL/plan-now-$RES_TS.session"
@@ -359,6 +362,7 @@ resume_fixture() {   # resume_fixture [nosession|norunner|nolog|oklog|noverdict]
         nolog)     rm -f "$RL/plan-now-$RES_TS.log" ;;
         oklog)     printf 'plan-now: RESULT ok — plan written and check-plan PASSED.\n' > "$RL/plan-now-$RES_TS.log" ;;
         noverdict) printf 'transcript only\n' > "$RL/plan-now-$RES_TS.log" ;;
+        parkedlog) printf 'plan-now: RESULT parked — Claude login expired; no model call was made.\n' > "$RL/plan-now-$RES_TS.log" ;;
     esac
 }
 # run_resume <plan-now args...> → RES_RC, RES_OUT, RES_RUNNER (dry run; nothing launched)
@@ -1461,7 +1465,14 @@ want    "R-5 no runner message" "$RES_OUT" "no runner at"
 resume_fixture oklog
 run_resume --resume "$RES_TS"
 [ "$RES_RC" = 2 ] && ok "R-6 oklog rc 2" || fail "R-6 oklog rc 2 (got $RES_RC)"
-want    "R-6 oklog: only failed is resumable" "$RES_OUT" "only a failed or paused run is resumable"
+want    "R-6 oklog: only failed is resumable" "$RES_OUT" "only a failed, paused, or parked run is resumable"
+
+# R-park a parked run never started its session, so it resumes fresh.
+resume_fixture parkedlog
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 0 ] && ok "R-park parked run resumes (rc 0)" || fail "R-park parked run resumes (got $RES_RC: $RES_OUT)"
+want    "R-park parked run resumes fresh" "$(cat "$RES_RUNNER" 2>/dev/null)" "RESUME_FRESH=1"
+preflight_cleanup "$RES_OUT"
 
 resume_fixture noverdict
 run_resume --resume "$RES_TS"
@@ -1753,5 +1764,93 @@ else
     fail "14f NOTIFY=0 stays silent (rc=$rc14 out=$o14)"
 fi
 rm -f "$runner14"
+
+printf '\n--login probe\n'
+
+# The model stub for these cases records that it was called. It prints no PLAN_FILE: line.
+SPY="$TMP/claude-spy"
+cat > "$SPY" <<SPY_EOF
+#!/usr/bin/env bash
+touch "$TMP/model-called"
+echo "spy ran"
+exit 0
+SPY_EOF
+chmod +x "$SPY"
+# A claude whose `auth status` says logged out; the real probe's Tier 1 parks on it.
+AUTH_OUT="$TMP/auth-out"
+printf '#!/bin/sh\necho '"'"'{"loggedIn": false}'"'"'\nexit 1\n' > "$AUTH_OUT"
+chmod +x "$AUTH_OUT"
+
+login_reset() {
+    rm -f "$TMP/model-called" "$NDIR/login-expired.alerted"
+    rm -rf "$NDIR/reports"
+}
+# Unanchored: a DM body has no trailing newline, so the next stub call's ARGV: line
+# lands mid-line after it.
+dm_count() { grep -c 'ARGV:' "$DM_ALL" 2>/dev/null || true; }
+TODAY_L=$(date +%F)
+STUB_SAVE="$STUB"
+STUB="$SPY"
+
+# L-1 an expired login parks before the spawn.
+login_reset
+dm_before=$(dm_count)
+out=$(AUTOMOUSE_LOGIN_PROBE_CMD='echo expired:session-401' run_case "$P" "")
+want    "L-1 expired parks: full RESULT line" "$out" "plan-now: RESULT parked — Claude login expired; no model call was made."
+want    "L-1 expired parks: resume hint" "$out" "bin/plan-now --resume"
+[ ! -e "$TMP/model-called" ] && ok "L-1 no model call" || fail "L-1 no model call"
+want    "L-1 DM names the park" "$(dm)" "parked — Claude login expired"
+[ "$(( $(dm_count) - dm_before ))" = 1 ] && ok "L-1 exactly one DM" || fail "L-1 exactly one DM (got $(( $(dm_count) - dm_before )))"
+want    "L-1 plan-now report" "$(cat "$NDIR/reports/$TODAY_L-login-expired.md" 2>/dev/null)" "plan-now parked"
+[ -e "$NDIR/login-expired.alerted" ] && ok "L-1 marker written" || fail "L-1 marker written"
+want_no "L-1 not failed" "$out" "RESULT failed"
+want_no "L-1 not queued" "$out" "queued for automouse"
+[ "$(printf '%s\n' "$out" | grep -c '^plan-now: RESULT ')" = 1 ] && ok "L-1 exactly one RESULT line" || fail "L-1 exactly one RESULT line"
+
+# L-2 an inconclusive probe fails open.
+login_reset
+out=$(AUTOMOUSE_LOGIN_PROBE_CMD='echo unknown:session-429' run_case "$P" "")
+[ -e "$TMP/model-called" ] && ok "L-2 unknown still spawns" || fail "L-2 unknown still spawns"
+want_no "L-2 unknown does not park" "$out" "RESULT parked"
+want    "L-2 inconclusive report" "$(cat "$NDIR/reports/$TODAY_L-login-probe-inconclusive.md" 2>/dev/null)" "The plan-now run started anyway (fail open)."
+
+# L-3 a healthy login spawns and writes no login report.
+login_reset
+out=$(AUTOMOUSE_LOGIN_PROBE_CMD='echo ok' run_case "$P" "")
+[ -e "$TMP/model-called" ] && ok "L-3 ok spawns" || fail "L-3 ok spawns"
+[ ! -e "$NDIR/reports/$TODAY_L-login-expired.md" ] && [ ! -e "$NDIR/reports/$TODAY_L-login-probe-inconclusive.md" ] \
+    && ok "L-3 no login report" || fail "L-3 no login report"
+
+# L-4 / L-5 an empty or unset seam reaches the real probe through the baked bin seam.
+login_reset
+out=$(AUTOMOUSE_LOGIN_PROBE_CMD='' LOGIN_PROBE_CLAUDE_BIN="$AUTH_OUT" run_case "$P" "")
+want    "L-4 empty seam: parked" "$out" "RESULT parked"
+want    "L-4 empty seam: reason" "$(cat "$NDIR/reports/$TODAY_L-login-expired.md" 2>/dev/null)" "(not-logged-in)"
+[ ! -e "$TMP/model-called" ] && ok "L-4 no model call" || fail "L-4 no model call"
+login_reset
+out=$( unset AUTOMOUSE_LOGIN_PROBE_CMD; LOGIN_PROBE_CLAUDE_BIN="$AUTH_OUT" run_case "$P" "" )
+want    "L-5 unset seam: parked" "$out" "RESULT parked"
+want    "L-5 unset seam: reason" "$(cat "$NDIR/reports/$TODAY_L-login-expired.md" 2>/dev/null)" "(not-logged-in)"
+
+STUB="$STUB_SAVE"
+
+# L-6 the runner bakes the probe.
+l6_out=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$PROMPT" 2>&1)
+l6_runner=$(printf '%s\n' "$l6_out" | sed -n 's/^  runner: //p')
+l6_text=$(cat "$l6_runner" 2>/dev/null)
+want    "L-6 runner bakes LOGIN_PREFLIGHT_LIB" "$l6_text" "LOGIN_PREFLIGHT_LIB="
+want    "L-6 runner bakes LOGIN_NIGHTLY_DIR" "$l6_text" "LOGIN_NIGHTLY_DIR=$NDIR"
+preflight_cleanup "$l6_out"
+
+# L-7 the probe precedes the spawn in the generated runner.
+l7_probe=$(grep -nF 'if ! login_preflight "$LOGIN_NIGHTLY_DIR"' "$PLAN_NOW" | head -1 | cut -d: -f1)
+l7_spawn=$(grep -nF 'timeout "$RUN_TIMEOUT" "$CLAUDE_BIN" -p' "$PLAN_NOW" | head -1 | cut -d: -f1)
+if [ -n "$l7_probe" ] && [ -n "$l7_spawn" ] && [ "$l7_probe" -lt "$l7_spawn" ]; then
+    ok "L-7 probe precedes the spawn"
+else
+    fail "L-7 probe precedes the spawn (probe=$l7_probe spawn=$l7_spawn)"
+fi
 
 h_done

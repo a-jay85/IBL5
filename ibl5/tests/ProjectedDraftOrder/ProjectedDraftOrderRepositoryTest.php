@@ -121,7 +121,7 @@ class ProjectedDraftOrderRepositoryTest extends TestCase
 
         $queries = $this->db->getExecutedQueries();
         $settingsQueries = array_filter($queries, static fn (string $q): bool => str_contains($q, 'ibl_settings'));
-        $this->assertNotEmpty($settingsQueries);
+        $this->assertNotSame([], $settingsQueries);
     }
 
     public function testSaveFinalDraftOrderDeletesOldDraftRows(): void

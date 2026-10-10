@@ -12,7 +12,7 @@ class ActivityTrackerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('ActivityTracker');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_team_info');
     }
 

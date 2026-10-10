@@ -154,7 +154,6 @@ class FreeAgencyOfferView
         $maxContract = \League\ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
         // Only use player's bird years if offering team is player's current team
         $birdYears = $player->getTeamName() === $team->name ? ($player->getBirdYears() ?? 0) : 0;
-        $raisePercentage = \League\ContractRules::getMaxRaisePercentage($birdYears);
         $maxRaise = \League\ContractRules::calculateMaxRaise($maxContract, $birdYears);
 
         $maxSalaries = [

@@ -16,7 +16,7 @@ class InjuriesEntryPointTest extends ModuleEntryPointTestCase
         ]);
         $output = $this->runModule('Injuries');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_plr');
     }
 
@@ -25,6 +25,6 @@ class InjuriesEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Injuries');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

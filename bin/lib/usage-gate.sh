@@ -425,14 +425,17 @@ usage_marker_set_stuck() {
     return 1
 }
 
-# usage_marker_reset_runaway <sid>: zero the resume counter and clear the stuck flag.
+# usage_marker_reset_runaway <sid> [acct_fp]: zero the resume counter and clear the
+# stuck flag. A non-empty acct_fp is recorded as reset_acct, the account the cap was
+# last cleared for. The marker's own acct_fp is left alone: the switch fast-resume
+# still reads it.
 usage_marker_reset_runaway() {
     usage_valid_sid "${1:-}" || return 1
     local f tmp
     f="$(usage_markers_dir)/$1.json"
     tmp="$f.tmp.$$"
     [ -s "$f" ] || return 1
-    if jq '.resume_count = 0 | del(.stuck, .stuck_reason)' "$f" 2>/dev/null > "$tmp" && mv "$tmp" "$f"; then
+    if jq --arg a "${2:-}" '.resume_count = 0 | del(.stuck, .stuck_reason) | if $a != "" then .reset_acct = $a else . end' "$f" 2>/dev/null > "$tmp" && mv "$tmp" "$f"; then
         return 0
     fi
     rm -f "$tmp"

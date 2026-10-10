@@ -54,6 +54,7 @@ if (!function_exists('CloseTable')) {
 if (!function_exists('themeindex')) {
     function themeindex(mixed $aid, mixed $informant, mixed $time, mixed $title, mixed $counter, mixed $topic, mixed $thetext, mixed $notes, mixed $morelink, mixed $topicname, mixed $topicimage, mixed $topictext): void
     {
+        unset($aid, $informant, $time, $counter, $topic, $thetext, $notes, $topicname, $topicimage, $topictext); // params unused by this stub
         echo (string) $title . ' ' . (string) $morelink;
     }
 }
@@ -61,6 +62,7 @@ if (!function_exists('themeindex')) {
 if (!function_exists('themearticle')) {
     function themearticle(mixed $aid, mixed $informant, mixed $datetime, mixed $title, mixed $thetext, mixed $topic, mixed $topicname, mixed $topicimage, mixed $topictext): void
     {
+        unset($aid, $informant, $datetime, $topic, $topicname, $topicimage, $topictext); // params unused by this stub
         echo (string) $title . ' ' . (string) $thetext;
     }
 }

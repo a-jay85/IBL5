@@ -78,7 +78,7 @@ class ApiInjuriesRepositoryTest extends DatabaseTestCase
             static fn (array $row): bool => $row['name'] === 'DB Test Injured With Team',
         );
 
-        self::assertNotEmpty($matching);
+        self::assertNotSame([], $matching);
         $player = array_values($matching)[0];
 
         self::assertArrayHasKey('player_uuid', $player);

@@ -149,7 +149,7 @@ function api($user)
         $params = $_GET;
     }
 
-    $handler = new DepthChartSnapshot\DepthChartSnapshotApiHandler($mysqli_db, $commonRepo);
+    $handler = new DepthChartSnapshot\DepthChartSnapshotApiHandler($mysqli_db);
     $handler->handle($action, $teamid, $username, $params);
 }
 

@@ -205,11 +205,9 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
             'allStarCoaches' => $this->awardExtractor->getAllStarCoaches($gmAwards, $year, $teamConferences),
             'iblChampionCoach' => $this->awardExtractor->getIblChampionCoach($gmTenures, $iblFinals['winner'], $year),
             'teamColors' => $teamColors,
-            'playerIds' => [],
+            'playerIds' => $this->repository->getPlayerIdsByNames(array_keys($collectedPlayerNames)),
             'teamIds' => $teamIds,
         ];
-
-        $seasonData['playerIds'] = $this->repository->getPlayerIdsByNames(array_keys($collectedPlayerNames));
 
         return $seasonData;
     }

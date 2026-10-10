@@ -44,7 +44,7 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
         $carTotals = [
             'gm' => 0, 'min' => 0, 'fgm' => 0, 'fga' => 0, 'ftm' => 0, 'fta' => 0,
             'tgm' => 0, 'tga' => 0, 'orb' => 0, 'reb' => 0, 'ast' => 0, 'stl' => 0,
-            'blk' => 0, 'tvr' => 0, 'pf' => 0, 'pts' => 0
+            'blk' => 0, 'tvr' => 0, 'pf' => 0
         ];
 
         ob_start();
@@ -111,7 +111,6 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
             $carTotals['blk'] += $blk;
             $carTotals['tvr'] += $tvr;
             $carTotals['pf'] += $pf;
-            $carTotals['pts'] += $pts;
             ?>
     <tr>
         <td><?= (int)$row['year'] ?></td>

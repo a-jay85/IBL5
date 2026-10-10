@@ -41,7 +41,7 @@ class YourAccountEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('YourAccount', [], [], $this->accountGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOpPassLostRendersResetForm(): void
@@ -50,7 +50,7 @@ class YourAccountEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('YourAccount', ['op' => 'pass_lost'], [], $this->accountGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOpNewUserRendersRegistrationForm(): void
@@ -59,7 +59,7 @@ class YourAccountEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('YourAccount', ['op' => 'new_user'], [], $this->accountGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOpConfirmEmailWithTokenRendersStatus(): void
@@ -73,7 +73,7 @@ class YourAccountEntryPointTest extends ModuleEntryPointTestCase
             $this->accountGlobals(),
         );
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testUnknownOpFallsToDefault(): void
@@ -82,6 +82,6 @@ class YourAccountEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('YourAccount', ['op' => 'bogus'], [], $this->accountGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 }

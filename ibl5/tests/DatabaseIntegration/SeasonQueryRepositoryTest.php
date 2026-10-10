@@ -27,7 +27,7 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
         $phase = $this->repo->getSeasonPhase();
 
         self::assertIsString($phase);
-        self::assertNotEmpty($phase);
+        self::assertNotSame('', $phase);
     }
 
     public function testGetSeasonEndingYearReturnsString(): void
@@ -35,7 +35,7 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
         $year = $this->repo->getSeasonEndingYear();
 
         self::assertIsString($year);
-        self::assertNotEmpty($year);
+        self::assertNotSame('', $year);
     }
 
     public function testGetBulkSettingsReturnsMappedValues(): void

@@ -479,7 +479,9 @@ sleep() {
     printf '%s\n' "$1" >> "$HB_SLEEP_LOG"
     case "$1" in 60) /bin/sleep 1 ;; *) /bin/sleep "$1" ;; esac
 }
+# shellcheck disable=SC2034  # read by the eval'd run_heartbeat_watcher
 STALL_KILL_SECS=5
+# shellcheck disable=SC2034  # read by the eval'd run_heartbeat_watcher
 KILL_GRACE_SECS=1
 
 # hb_wait_gone <pid> <max_secs>: 0 once the pid is gone, 1 on timeout.
@@ -558,6 +560,7 @@ fi
 mkdir -p "$TMP/hb5"
 hb5_first_sleep() {  # <env-mode: unset|value> [value]
     : > "$HB_SLEEP_LOG"
+    # shellcheck disable=SC2034  # read by the eval'd run_heartbeat_watcher
     if [ "$1" = unset ]; then unset HEARTBEAT_TICK_SECS; else HEARTBEAT_TICK_SECS="$2"; fi
     run_heartbeat_watcher "$TMP/hb5/hb" "$TMP/hb5/log" impl "$TMP/hb5/cmdpid" hb5slug >/dev/null 2>&1 &
     local w=$!

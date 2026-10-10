@@ -580,6 +580,9 @@ HANDOFF_DIR="$NIGHTLY_DIR/handoff"
 # worktree from its slug when the handoff JSON cannot supply the path.
 WORKTREES_ROOT="${WORKTREES_ROOT:-$(dirname "$REPO")/IBL5-worktrees}"
 mkdir -p "$LOG_DIR" "$QUEUE_DIR" "$HANDOFF_DIR"
+# One-shot cutover of a legacy bare-named queue to NNN-<slug>.md entries, before
+# anything reads order. A no-op once every entry is prefixed.
+normalize_queue "$QUEUE_DIR"
 
 # One-off single-plan mode: bin/automouse/run plan <slug>
 # Runs impl + post-plan for exactly ONE named plan, then stops. Reuses all
@@ -605,7 +608,13 @@ if [ "${1:-}" = "--resume-paused" ]; then
     rm -f "$_saved_file"
     RESUME_PLAN=$(cat "$(usage_state_dir)/runs/$2.plan" 2>/dev/null) || RESUME_PLAN=""
     case "$RESUME_PLAN" in
-        "$QUEUE_DIR"/*.md) [ -e "$RESUME_PLAN" ] || RESUME_PLAN="" ;;
+        "$QUEUE_DIR"/*.md)
+            # A reorder may have renamed the entry since the pause; resolve by slug.
+            if _rp_entry=$(queue_entry_for_slug "$QUEUE_DIR" "$RESUME_PLAN"); then
+                RESUME_PLAN="$QUEUE_DIR/$_rp_entry"
+            else
+                RESUME_PLAN=""
+            fi ;;
         *) RESUME_PLAN="" ;;
     esac
     if [ -z "$RESUME_PLAN" ]; then
@@ -624,7 +633,7 @@ if [ "${1:-}" = "plan" ]; then
         exit 1
     fi
     FILENAME="${slug%.md}.md"
-    if [ ! -e "$QUEUE_DIR/$FILENAME" ]; then
+    if ! queue_entry_for_slug "$QUEUE_DIR" "$FILENAME" >/dev/null; then
         # Not already queued — queue it now, reusing automouse-queue's
         # resolution (INPUT / $PLANS_DIR/$INPUT / $PLANS_DIR/$INPUT.md) and its
         # evict_dispositions() cleanup of stale skipped/ + done/ sidecars.
@@ -635,7 +644,7 @@ if [ "${1:-}" = "plan" ]; then
             exit 1
         fi
     fi
-    if [ ! -e "$QUEUE_DIR/$FILENAME" ]; then
+    if ! queue_entry_for_slug "$QUEUE_DIR" "$FILENAME" >/dev/null; then
         echo "automouse-run plan: '$slug' did not land in the queue after " \
              "queuing — aborting" >&2
         exit 1
@@ -1294,7 +1303,7 @@ dispose_plan_postplan_blocked() {
     printf '[%s] %s postplan terminal (rc=3) — moving to skipped/\n' \
         "$(date +%H:%M:%S)" "$plan_slug" >> "$LOG"
     mkdir -p "$NIGHTLY_DIR/skipped" "$NIGHTLY_DIR/reports"
-    mv -f "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+    dispose_entry "$plan_name" skipped
     touch -h -- "$NIGHTLY_DIR/skipped/${plan_name}" 2>/dev/null || true
     rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" \
           "$HANDOFF_DIR/${plan_name}.json"
@@ -1465,6 +1474,29 @@ automouse_worktree_for_plan() {
 
 # Loop-side terminal disposition: the branch has an OPEN or MERGED PR, so this plan
 # is finished regardless of what the agent did or did not do. Moves the plan to done/,
+# queue_path_for <name> — the current queue path of <name> (foo, foo.md, or an
+# NNN-foo.md entry path). Returns 1 when the plan is no longer queued. Entries are
+# renamed by `queue reorder`, so a path captured at claim time can go stale.
+queue_path_for() {
+    local e
+    e=$(queue_entry_for_slug "$QUEUE_DIR" "$1") || return 1
+    printf '%s/%s\n' "$QUEUE_DIR" "$e"
+}
+
+# plan_still_queued — the claimed plan still has a queue entry under any prefix.
+# A reorder rename is not a disposition; only leaving queue/ is.
+plan_still_queued() { queue_entry_for_slug "$QUEUE_DIR" "$PLAN_SLUG" >/dev/null; }
+
+# dispose_entry <name> <done|skipped> — move the plan's queue entry to done/ or
+# skipped/ under its bare <slug>.md name, which self-heal and requeue match on.
+# A no-op when the plan already left queue/.
+dispose_entry() {
+    local e
+    e=$(queue_entry_for_slug "$QUEUE_DIR" "$1") || return 0
+    mkdir -p "$NIGHTLY_DIR/$2"
+    mv -f "$QUEUE_DIR/$e" "$NIGHTLY_DIR/$2/$(entry_to_name "$1")"
+}
+
 # removes the handoff, clears the attempt sidecars, and writes a minimal completion
 # report if the agent did not write one. Caller owns lock release and control flow.
 dispose_plan_done() {
@@ -1473,7 +1505,7 @@ dispose_plan_done() {
     local report
     report="$reports_dir/$(date +%Y-%m-%d)-done-${slug}.md"
     mkdir -p "$NIGHTLY_DIR/done" "$reports_dir"
-    mv -f "$QUEUE_DIR/$plan_name" "$NIGHTLY_DIR/done/" 2>/dev/null || true
+    dispose_entry "$plan_name" "done" 2>/dev/null || true
     # The morning digest selects done/ entries by their OWN mtime — the disposition date
     # (.claude/rules/automouse-workflow.md). `mv` preserves the queue symlink's mtime (queue
     # time), so stamp the moved entry now. -h touches the LINK, never its target, and works on
@@ -1677,7 +1709,7 @@ record_cap_refund() {
 write_env_stop_report() {
     local plan=$1 phase=$2 reason=$3 log_before=$4
     local reports_dir="$NIGHTLY_DIR/reports" slug
-    slug=$(basename "$plan" .md)
+    slug=$(entry_to_slug "$plan")
     mkdir -p "$reports_dir"
     {
         printf 'Automouse run STOPPED during %s of "%s" — %s.\n\n' "$phase" "$slug" "$reason"
@@ -1911,8 +1943,8 @@ archive_stale() {
 claim_next_plan() {
     local plan plan_name lock owner now lock_epoch held rlock rheld
     # Resuming a paused impl: take over that one plan's held lock before anything else.
-    if [ -n "${RESUME_PLAN:-}" ] && [ -e "$RESUME_PLAN" ]; then
-        rlock="$QUEUE_DIR/$(basename "$RESUME_PLAN").lock"
+    if [ -n "${RESUME_PLAN:-}" ] && RESUME_PLAN=$(queue_path_for "$RESUME_PLAN"); then
+        rlock="$QUEUE_DIR/$(entry_to_name "$RESUME_PLAN").lock"
         rheld=$(cat "$rlock/paused-held" 2>/dev/null) || rheld=""
         if [ -n "$rheld" ] && [ "$rheld" = "${RESUME_SID:-}" ]; then
             echo "$$" > "$rlock/pid"
@@ -1924,7 +1956,7 @@ claim_next_plan() {
     fi
     while IFS= read -r plan; do
         [ -n "$plan" ] || continue
-        plan_name=$(basename "$plan")
+        plan_name=$(entry_to_name "$plan")
         [ -n "${SINGLE_PLAN:-}" ] && [ "$plan_name" != "$SINGLE_PLAN" ] && continue
         # Cap-refunded earlier in THIS run → deliberately deferred to a future
         # run. Skip before locking, so a sibling runner stays free to take it and
@@ -2085,7 +2117,7 @@ while true; do
     # If every queued plan is already claimed, there's nothing for us to do.
     NEXT_PLAN=$(claim_next_plan) || NEXT_PLAN=""
     if [ -n "$WT_REFUSE_LOCK" ] && [ -n "$NEXT_PLAN" ] \
-       && [ "$QUEUE_DIR/$(basename "$NEXT_PLAN").lock" = "$WT_REFUSE_LOCK" ]; then
+       && [ "$QUEUE_DIR/$(entry_to_name "$NEXT_PLAN").lock" = "$WT_REFUSE_LOCK" ]; then
         WT_REFUSE_LOCK=""   # re-claimed via the resume takeover; the normal lock lifecycle owns it again
     fi
     if [ -z "$NEXT_PLAN" ]; then
@@ -2109,7 +2141,7 @@ while true; do
         fi
         break
     fi
-    PLAN_NAME=$(basename "$NEXT_PLAN")
+    PLAN_NAME=$(entry_to_name "$NEXT_PLAN")   # NEXT_PLAN is the NNN-<slug>.md entry; every identifier below uses the bare name
     PLAN_SLUG="${PLAN_NAME%.md}"   # tags each interleaved log line with its plan
     CURRENT_LOCK="$QUEUE_DIR/${PLAN_NAME}.lock"
 
@@ -2125,7 +2157,7 @@ while true; do
     if [ "$ATTEMPTS" -ge "$MAX_ATTEMPTS" ]; then
         echo "Plan $PLAN_NAME failed $ATTEMPTS times — moving to skipped/." >> "$LOG"
         mkdir -p "$NIGHTLY_DIR/skipped"
-        mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+        dispose_entry "$PLAN_NAME" skipped
         rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
         REPORTS_DIR="$NIGHTLY_DIR/reports"
         mkdir -p "$REPORTS_DIR"
@@ -2156,7 +2188,7 @@ while true; do
     else
         echo "Plan $PLAN_NAME declares an unusable impl_model — $BASE_MODEL — moving to skipped/." >> "$LOG"
         mkdir -p "$NIGHTLY_DIR/skipped"
-        mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+        dispose_entry "$PLAN_NAME" skipped
         rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
         REPORTS_DIR="$NIGHTLY_DIR/reports"
         mkdir -p "$REPORTS_DIR"
@@ -2466,7 +2498,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # cap itself is refunded by the bounded cap-timeout breaker, up to
         # CAP_REFUND_LIMIT times per plan.
         IMPL_HANDOFF=0;  [ -f "$HANDOFF_FILE" ] && IMPL_HANDOFF=1
-        IMPL_IN_QUEUE=0; [ -e "$NEXT_PLAN" ]   && IMPL_IN_QUEUE=1
+        IMPL_IN_QUEUE=0; if plan_still_queued; then IMPL_IN_QUEUE=1; fi
         # Usage-gate pause: a marker on disk, a pre-start pause, or a limit-hit in this
         # phase's log. No env-stop report, no poison-pill count. The claim lock stays
         # held (paused-held holds the session id) until the coordinator resumes it.
@@ -2559,7 +2591,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             echo "Handoff file created — impl succeeded." >> "$LOG"
             rm -f "$FAILURE_FILE" "$CAP_REFUND_FILE"
             echo 1 > "$ATTEMPT_FILE"
-        elif [ ! -e "$NEXT_PLAN" ]; then
+        elif ! plan_still_queued; then
             echo "Impl made a deliberate disposition (plan left queue/, e.g. already-merged → done/ or a stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
             if [ -e "$NIGHTLY_DIR/skipped/$PLAN_NAME" ]; then
                 note_failure "The agent chose to skip ${PLAN_NAME%.md} and moved it to skipped/. Look in $NIGHTLY_DIR/reports/ for today's report on it."
@@ -2600,7 +2632,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             if failure_signature_repeats "$PREV_FAILSIG" "$NEW_FAILSIG"; then
                 echo "REPEATED FAILURE — $PLAN_NAME failed the same way on attempts ${PREV_FAILATTEMPT:-?} and $(( ATTEMPTS + 1 )); moving to skipped/ without the escalated retry." >> "$LOG"
                 mkdir -p "$NIGHTLY_DIR/skipped"
-                mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+                dispose_entry "$PLAN_NAME" skipped
                 touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
                 write_repeat_failure_report "$PLAN_NAME" "$NEW_FAILSIG" "${PREV_FAILATTEMPT:-?}" "$(( ATTEMPTS + 1 ))"
                 note_failure "${PLAN_NAME%.md} failed the same way twice in a row, so it was moved to skipped/ instead of trying again."
@@ -2789,7 +2821,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # loop dispositions it rather than re-claiming the plan next iteration.
         # Fail-closed: gh error, no PR, or CLOSED-only ⇒ today's behaviour.
         PP_PR_URL=""
-        if [ -e "$NEXT_PLAN" ]; then
+        if plan_still_queued; then
             PP_BRANCH=$(automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG")
             if PP_PR=$(automouse_pr_state "$PP_BRANCH"); then
                 PP_PR_STATE="${PP_PR%% *}"
@@ -2826,7 +2858,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 fi
             fi
         fi
-        if [ "$PP_STATUS" -ne 0 ] && [ "$PP_TERMINAL" -eq 0 ] && [ -e "$NEXT_PLAN" ] \
+        if [ "$PP_STATUS" -ne 0 ] && [ "$PP_TERMINAL" -eq 0 ] && plan_still_queued \
            && [ -z "$PP_PR_URL" ]; then
             note_failure "Shipping $PLAN_SLUG stopped with exit code $PP_STATUS and opened no PR. It stays queued for another try. The full log has the details."
         fi
@@ -2837,7 +2869,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
     fi
 
     # If the plan moved out of queue/ (to done/ or skipped/), clean up its attempt file and failure report
-    if [ ! -e "$NEXT_PLAN" ]; then
+    if ! plan_still_queued; then
         rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
     fi
 
@@ -2892,11 +2924,12 @@ if [ -n "$WT_REFUSE_LOCK" ]; then
     rm -rf "$WT_REFUSE_LOCK" 2>/dev/null || true
 fi
 
-# Clean up any leftover attempt files for plans that completed
+# Clean up any leftover attempt files for plans that completed. Sidecars are
+# keyed on the bare <slug>.md name, so test queue membership by slug: the entry
+# itself is NNN-<slug>.md and may have been renamed by a reorder.
 for af in "$QUEUE_DIR"/*.attempts; do
     [ -e "$af" ] || continue
-    PLAN_FOR_ATTEMPT="${af%.attempts}"
-    if [ ! -e "$PLAN_FOR_ATTEMPT" ]; then
+    if ! queue_entry_for_slug "$QUEUE_DIR" "$(basename "${af%.attempts}")" >/dev/null; then
         rm -f "$af"
     fi
 done
@@ -2905,8 +2938,7 @@ done
 # .attempts sweep above — .failure shares the .attempts lifecycle, ADR-0085)
 for ff in "$QUEUE_DIR"/*.failure; do
     [ -e "$ff" ] || continue
-    PLAN_FOR_FAILURE="${ff%.failure}"
-    if [ ! -e "$PLAN_FOR_FAILURE" ]; then
+    if ! queue_entry_for_slug "$QUEUE_DIR" "$(basename "${ff%.failure}")" >/dev/null; then
         rm -f "$ff"
     fi
 done
@@ -2915,8 +2947,7 @@ done
 # the .attempts sweep above — .cap-refunds shares the .attempts lifecycle)
 for cf in "$QUEUE_DIR"/*.cap-refunds; do
     [ -e "$cf" ] || continue
-    PLAN_FOR_CAP="${cf%.cap-refunds}"
-    if [ ! -e "$PLAN_FOR_CAP" ]; then
+    if ! queue_entry_for_slug "$QUEUE_DIR" "$(basename "${cf%.cap-refunds}")" >/dev/null; then
         rm -f "$cf"
     fi
 done
@@ -2924,8 +2955,7 @@ done
 # Clean up orphaned handoff files (plan no longer in queue)
 for hf in "$HANDOFF_DIR"/*.json; do
     [ -e "$hf" ] || continue
-    PLAN_FOR_HANDOFF="$QUEUE_DIR/$(basename "${hf%.json}")"
-    if [ ! -e "$PLAN_FOR_HANDOFF" ]; then
+    if ! queue_entry_for_slug "$QUEUE_DIR" "$(basename "${hf%.json}")" >/dev/null; then
         rm -f "$hf"
     fi
 done
@@ -2936,7 +2966,7 @@ done
 # in claim_next_plan on the next run.
 for lock in "$QUEUE_DIR"/*.md.lock; do
     [ -e "$lock" ] || continue
-    if [ ! -e "${lock%.lock}" ]; then
+    if ! queue_entry_for_slug "$QUEUE_DIR" "$(basename "${lock%.lock}")" >/dev/null; then
         rm -rf "$lock" 2>/dev/null || true
     fi
 done

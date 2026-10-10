@@ -115,7 +115,8 @@ else fail d "rc=$RC pcount=$pcount out=$OUT"; fi
 setup_case e1
 mkgz "$CASE/remote/backups/db/ibl5-2026-03-13.sql.gz"   # 07:30 on 03-13 is 52.5h before NOW
 run
-if [ "$RC" -eq 1 ] && grep -q 'ibl5-2026-03-13.sql.gz' "$CASE/dm.log" && grep -q 'db-backup.yml' "$CASE/dm.log"; then
+if [ "$RC" -eq 1 ] && grep -q 'ibl5-2026-03-13.sql.gz' "$CASE/dm.log" && grep -q 'db-backup.yml' "$CASE/dm.log" \
+   && grep -qxF 'CALL --ping --chunk -' "$CASE/dm.log"; then
   ok "e stale -> DM, exit 1"
 else fail e1 "rc=$RC dm=$(cat "$CASE/dm.log" 2>&1)"; fi
 setup_case e2

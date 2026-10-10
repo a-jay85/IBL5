@@ -59,7 +59,7 @@ class DraftHistoryRepository extends \Database\BaseMysqliRepository implements D
             FROM `ibl_plr` p
             LEFT JOIN `ibl_team_info` t ON p.draftedby = t.team_name
             WHERE p.draftyear = ? AND p.draftround > 0
-            ORDER BY p.draftround ASC, p.draftpickno ASC",
+            ORDER BY p.draftround ASC, p.draftpickno ASC, p.pid ASC",
             "i",
             $year
         );
@@ -77,7 +77,7 @@ class DraftHistoryRepository extends \Database\BaseMysqliRepository implements D
             "SELECT p.pid, p.name, p.pos, p.draftround, p.draftpickno, p.draftyear, p.college, p.retired
             FROM `ibl_plr` p
             WHERE p.draftedby = ? AND p.draftround > 0
-            ORDER BY p.draftyear DESC, p.draftround ASC, p.draftpickno ASC",
+            ORDER BY p.draftyear DESC, p.draftround ASC, p.draftpickno ASC, p.pid ASC",
             "s",
             $teamName
         );

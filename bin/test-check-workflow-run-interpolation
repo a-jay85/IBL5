@@ -197,6 +197,43 @@ jobs:
         name: x ${{ env.FOO }}')"
 run_case "block ends at dedent" 0 "$f"
 
+# --- good: `- run: |` stops at a sibling key at the run: column (#1397) ---------
+# On a `- run: |` line the leading-space count is 2 less than the column of `run:`;
+# the sibling `env:` sits at the `run:` column, so the guard must end the script
+# there and not flag the expression under env:.
+f="$(write_wf 'name: t
+on:
+  workflow_call:
+    inputs:
+      x:
+        type: string
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "$X"
+        env:
+          X: ${{ inputs.x }}')"
+run_case "dash-run block stops at sibling env" 0 "$f"
+
+# --- bad: same expression inside the `- run: |` script (paired with the above) ---
+f="$(write_wf 'name: t
+on:
+  workflow_call:
+    inputs:
+      x:
+        type: string
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "${{ inputs.x }}"
+        env:
+          Y: ok')"
+run_case "dash-run block flags expression in script" 1 "$f"
+
 # --- bad: blank line keeps the block open ---------------------------------------
 f="$(write_wf 'name: t
 on: [push]

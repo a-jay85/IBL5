@@ -36,10 +36,11 @@ class DraftPickLocatorRepository extends \Database\BaseMysqliRepository implemen
     {
         /** @var list<array{ownerofpick: string, year: int, round: int}> */
         return $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (pickid is the ibl_draft_picks primary key; not on the rule allowlist)
             "SELECT ownerofpick, year, round
              FROM `ibl_draft_picks`
              WHERE teampick_teamid = ?
-             ORDER BY year, round ASC",
+             ORDER BY year, round ASC, pickid ASC",
             "i",
             $teamId
         );
@@ -54,9 +55,10 @@ class DraftPickLocatorRepository extends \Database\BaseMysqliRepository implemen
     {
         /** @var list<array{teampick_teamid: int, ownerofpick: string, year: int, round: int}> $rows */
         $rows = $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (pickid is the ibl_draft_picks primary key; not on the rule allowlist)
             "SELECT teampick_teamid, ownerofpick, year, round
              FROM `ibl_draft_picks`
-             ORDER BY teampick_teamid, year, round ASC"
+             ORDER BY teampick_teamid, year, round ASC, pickid ASC"
         );
 
         /** @var array<int, list<array{ownerofpick: string, year: int, round: int}>> $grouped */

@@ -28,35 +28,30 @@
 # Run: bin/test-automouse-env-breaker  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUNNER="$SCRIPT_DIR/automouse/run"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
 if [ ! -f "$RUNNER" ]; then
     echo "FAIL: cannot find $RUNNER"
     exit 1
 fi
 
-ok()            { echo "ok: $1"; }
-fail()          { echo "FAIL: $1"; FAILED=1; }
-assert_eq()     { local d="$1" g="$2" e="$3"
-                  if [ "$g" = "$e" ]; then ok "$d"
-                  else fail "$d — expected [$e], got [$g]"; fi; }
+ok()            { h_pass "$1"; }
+fail()          { h_fail "$@"; }
+assert_eq()     { h_eq "$1" "$3" "$2"; }  # desc got expected
 assert_present(){ local d="$1" p="$2"
                   if [ -e "$p" ] || [ -L "$p" ]; then ok "$d"
                   else fail "$d — missing: $p"; fi; }
 assert_absent() { local d="$1" p="$2"
                   if [ -e "$p" ] || [ -L "$p" ]; then fail "$d — unexpected: $p"
                   else ok "$d"; fi; }
-want()          { local d="$1" h="$2" n="$3"
-                  case "$h" in *"$n"*) ok "$d" ;;
-                  *) fail "$d — missing token [$n]"; esac; }
-want_absent()   { local d="$1" h="$2" n="$3"
-                  case "$h" in *"$n"*) fail "$d — unexpected token [$n]" ;;
-                  *) ok "$d"; esac; }
+want()          { h_contains "$1" "$2" "$3"; }
+want_absent()   { h_not_contains "$1" "$2" "$3"; }
 
 # Extract `should_impl_env_stop() { ... }` (from its definition line to the first
 # line that is a lone `}`) and define it in this shell.
@@ -72,8 +67,6 @@ if [ -z "$FN_SRC" ]; then
 fi
 eval "$FN_SRC"
 
-FAILED=0
-
 # assert <name> <handoff> <in_queue> <env_err> <stalled> <fast> <wt_fail> <expect: stop|continue>
 assert() {
     name="$1"; h="$2"; q="$3"; e="$4"; s="$5"; f="$6"; wf="$7"; want="$8"
@@ -83,10 +76,9 @@ assert() {
         got="continue"
     fi
     if [ "$got" != "$want" ]; then
-        echo "FAIL: $name — expected '$want', got '$got' (h=$h q=$q e=$e s=$s f=$f wf=$wf)"
-        FAILED=1
+        h_fail "$name" "expected '$want', got '$got' (h=$h q=$q e=$e s=$s f=$f wf=$wf)"
     else
-        echo "ok: $name ($got)"
+        h_pass "$name ($got)"
     fi
 }
 
@@ -122,28 +114,27 @@ assert "no-wt-fail-fast-control"  0 1 0 0 1 0 stop
 # --- Backward compatibility: a five-arg call defaults wt_fail=0 ---
 if should_impl_env_stop 0 1 0 0 1; then got="stop"; else got="continue"; fi
 if [ "$got" != "stop" ]; then
-    echo "FAIL: five-arg-default — expected 'stop', got '$got' (wt_fail default must be 0)"
-    FAILED=1
+    h_fail "five-arg-default" "expected 'stop', got '$got' (wt_fail default must be 0)"
 else
-    echo "ok: five-arg-default ($got)"
+    h_pass "five-arg-default ($got)"
 fi
 
 # --- Contract: prompt-impl and run agree on the sentinel, and wt-new failure no longer skips ---
 PROMPT="$SCRIPT_DIR/automouse/prompt-impl"
 if grep -qF 'touch "$NIGHTLY_DIR/queue/$PLAN_FILE.wt-fail"' "$PROMPT"; then
-    echo "ok: contract-prompt-writes-sentinel"
+    h_pass "contract-prompt-writes-sentinel"
 else
-    echo "FAIL: contract-prompt-writes-sentinel — prompt-impl no longer tells the agent to touch queue/\$PLAN_FILE.wt-fail"; FAILED=1
+    h_fail "contract-prompt-writes-sentinel" "prompt-impl no longer tells the agent to touch queue/\$PLAN_FILE.wt-fail"
 fi
 if grep -qF 'WT_FAIL_FILE="$QUEUE_DIR/${PLAN_NAME}.wt-fail"' "$RUNNER"; then
-    echo "ok: contract-runner-reads-sentinel"
+    h_pass "contract-runner-reads-sentinel"
 else
-    echo "FAIL: contract-runner-reads-sentinel — run no longer reads queue/\${PLAN_NAME}.wt-fail"; FAILED=1
+    h_fail "contract-runner-reads-sentinel" "run no longer reads queue/\${PLAN_NAME}.wt-fail"
 fi
 if grep -E 'If bin/wt-new fails' "$PROMPT" | grep -q 'skipped/'; then
-    echo "FAIL: contract-no-skip-on-wt-fail — prompt-impl's wt-new failure line still moves the plan to skipped/"; FAILED=1
+    h_fail "contract-no-skip-on-wt-fail" "prompt-impl's wt-new failure line still moves the plan to skipped/"
 else
-    echo "ok: contract-no-skip-on-wt-fail"
+    h_pass "contract-no-skip-on-wt-fail"
 fi
 
 # ── Section 2: run-loop wt-fail cases (macOS-only — requires caffeinate) ─────
@@ -153,8 +144,9 @@ if [ "$(uname)" != "Darwin" ]; then
     echo "# Section 2: skipping macOS-only run-loop cases (uname=$(uname))"
     echo "SKIP: run-loop cases skipped on non-Darwin"
     echo ""
-    echo "# Results: $FAILED failed"
-    exit "$FAILED"
+    echo "# Results: $H_FAIL failed"
+    [ "$H_FAIL" -eq 0 ]
+    exit
 fi
 
 echo ""
@@ -356,7 +348,7 @@ write_e2_plan "pausey"
 run_e2_mode marker
 P1_LOG="$(e2_logtxt)"
 P1_SID="$(stub_sid)"
-[ -n "$P1_SID" ] && echo "ok: P1: the impl was launched with --session-id $P1_SID" \
+[ -n "$P1_SID" ] && h_pass "P1: the impl was launched with --session-id $P1_SID" \
     || fail "P1: the impl call carried no --session-id <uuid>"
 want           "P1: log says the impl paused"            "$P1_LOG" "Impl paused (usage gate)"
 want_absent    "P1: no env-stop"                         "$P1_LOG" "Environmental failure"
@@ -415,7 +407,7 @@ printf '{"five_hour":{"utilization":95,"resets_at":null},"seven_day":{"utilizati
     "$(date +%s)" > "$E2_GATE/cache.json"
 run_e2
 P4B_SID="$(cat "$E2_NDIR/queue/pausey.md.lock/paused-held" 2>/dev/null)"
-[ -n "$P4B_SID" ] && echo "ok: P4b setup: prestart gate paused with sid $P4B_SID" \
+[ -n "$P4B_SID" ] && h_pass "P4b setup: prestart gate paused with sid $P4B_SID" \
     || fail "P4b setup: no paused-held after prestart pause"
 assert_present "P4b setup: prestart pause marker exists"   "$E2_GATE/markers/$P4B_SID.json"
 assert_eq      "P4b setup: resume_count starts at 0"       "$(jq -r .resume_count "$E2_GATE/markers/$P4B_SID.json" 2>/dev/null)" "0"
@@ -465,9 +457,4 @@ assert_absent  "P6: attempt refunded"                    "$E2_NDIR/queue/ppausey
 assert_present "P6: plan stays queued"                   "$E2_NDIR/queue/ppausey.md"
 assert_present "P6: post-plan marker survives"           "$E2_GATE/markers/$E2_PP_SID.json"
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

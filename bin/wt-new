@@ -36,6 +36,7 @@ SCRIPT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$SCRIPT_ROOT/bin/lib/git-helpers.sh"
 source "$SCRIPT_ROOT/bin/lib/wt-pool.sh"
 source "$SCRIPT_ROOT/bin/lib/launchd-job.sh"
+source "$SCRIPT_ROOT/bin/lib/wt-compose.sh"
 # Always operate on the MAIN checkout, even when invoked through a worktree's own
 # copy of this script. REPO_ROOT drives the ff-only sync below, which targets the
 # CHECKED-OUT branch of whatever root it is given: from a worktree that is the
@@ -97,7 +98,7 @@ fi
 # slug-vs-branch divergence bin/pr-wt-resolve:41 already accounts for by matching
 # on the porcelain `branch` field rather than the directory name.
 if [ -z "$NAME" ] && [ -n "$EXISTING_BRANCH" ]; then
-    NAME="${EXISTING_BRANCH//\//-}"
+    NAME="$(wt_slug "$EXISTING_BRANCH")"
 fi
 
 if [ -z "$NAME" ]; then

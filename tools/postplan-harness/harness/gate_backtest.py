@@ -89,7 +89,6 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-numbering": _SINCE,
     "bin/check-destructive-migrations": _BYPASS_SINCE,
     # Whole-tree scans with no required argument.
-    "bin/check-ci-image-registry": _TREE,
     "bin/check-claude-dir-placement": _TREE,
     "bin/check-composite-contracts": _TREE,
     "bin/check-digest-prose": _TREE,

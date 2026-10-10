@@ -238,7 +238,7 @@ class PowerRankingsUpdaterTest extends TestCase
             return stripos($q, 'sim_depth') !== false;
         });
         
-        $this->assertNotEmpty($depthChartResetQuery);
+        $this->assertNotSame([], $depthChartResetQuery);
     }
 
     public function testCalculateTeamStatsTracksLast10Games(): void

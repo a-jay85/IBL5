@@ -333,10 +333,15 @@ class SeasonHighsServiceTest extends TestCase
      */
     private static function emptyBatchFor(
         array $stats,
+        // @phpstan-ignore method.unusedParameter (signature must match getSeasonHighsBatch for first-class callable use)
         string $suffix = '',
+        // @phpstan-ignore method.unusedParameter (signature must match getSeasonHighsBatch for first-class callable use)
         string $start = '',
+        // @phpstan-ignore method.unusedParameter (signature must match getSeasonHighsBatch for first-class callable use)
         string $end = '',
+        // @phpstan-ignore method.unusedParameter (signature must match getSeasonHighsBatch for first-class callable use)
         int $limit = 15,
+        // @phpstan-ignore method.unusedParameter (signature must match getSeasonHighsBatch for first-class callable use)
         ?string $locationFilter = null
     ): array {
         $result = [];

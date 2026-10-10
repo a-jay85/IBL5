@@ -90,7 +90,6 @@ class PlrSimDateInferrer implements PlrSimDateInferrerInterface
         $content = PlrFileWriter::readFile($basePlrPath);
         $lines = PlrFileWriter::splitIntoLines($content);
 
-        $bestPid = 0;
         $bestMin = 0;
         $bestRow = null;
 
@@ -111,7 +110,6 @@ class PlrSimDateInferrer implements PlrSimDateInferrerInterface
 
             if ($min > $bestMin) {
                 $bestMin = $min;
-                $bestPid = $pid;
                 $bestRow = [
                     'pid' => $pid,
                     'gp' => PlrFileWriter::readField($line, 'seasonGamesPlayed'),

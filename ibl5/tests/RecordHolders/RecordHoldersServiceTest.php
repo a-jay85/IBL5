@@ -561,8 +561,8 @@ final class RecordHoldersServiceTest extends TestCase
         foreach ($registry as $id => $info) {
             $this->assertArrayHasKey('abbr', $info, "Team {$id} missing 'abbr'");
             $this->assertArrayHasKey('name', $info, "Team {$id} missing 'name'");
-            $this->assertNotEmpty($info['abbr'], "Team {$id} has empty abbreviation");
-            $this->assertNotEmpty($info['name'], "Team {$id} has empty name");
+            $this->assertNotSame('', $info['abbr'], "Team {$id} has empty abbreviation");
+            $this->assertNotSame('', $info['name'], "Team {$id} has empty name");
         }
     }
 

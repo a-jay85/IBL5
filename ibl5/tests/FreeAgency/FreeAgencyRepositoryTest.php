@@ -133,7 +133,7 @@ class FreeAgencyRepositoryTest extends TestCase
         $result = $repository->getAllPlayersExcludingTeam(5);
 
         $this->assertIsArray($result);
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 
     // ============================================

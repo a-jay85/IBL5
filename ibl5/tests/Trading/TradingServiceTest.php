@@ -233,7 +233,7 @@ class TradingServiceTest extends TestCase
 
         $this->assertSame('Lakers', $result['userTeam']);
         $this->assertSame(1, $result['userTeamId']);
-        $this->assertEmpty($result['tradeOffers']);
+        $this->assertSame([], $result['tradeOffers']);
     }
 
     public function testGetTradeReviewPageDataFiltersToUserTeamOnly(): void

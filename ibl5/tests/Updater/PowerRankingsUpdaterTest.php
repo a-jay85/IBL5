@@ -51,7 +51,7 @@ class PowerRankingsUpdaterTest extends TestCase
             $this->db->getExecutedQueries(),
             static fn (string $q): bool => str_contains($q, $needle),
         );
-        $this->assertNotEmpty($hit, "No executed query contained: {$needle}");
+        $this->assertNotSame([], $hit, "No executed query contained: {$needle}");
     }
 
     public function testUpdateWritesComputedRankingToPowerTable(): void

@@ -149,7 +149,7 @@ class NewsRepositoryTest extends TestCase
 
         $result = $this->newsService->getHomePageStories(10);
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertStringContainsString('nuke_stories', $queries[0]);
         $this->assertStringContainsString('LIMIT', $queries[0]);

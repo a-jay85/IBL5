@@ -55,7 +55,7 @@ class DraftHistoryRepositoryTest extends DatabaseTestCase
 
         $picks = $this->repo->getDraftPicksByYear(2098);
 
-        self::assertNotEmpty($picks);
+        self::assertNotSame([], $picks);
 
         $found = false;
         foreach ($picks as $pick) {
@@ -91,7 +91,7 @@ class DraftHistoryRepositoryTest extends DatabaseTestCase
 
         $picks = $this->repo->getDraftPicksByTeam('Metros');
 
-        self::assertNotEmpty($picks);
+        self::assertNotSame([], $picks);
 
         $found = false;
         foreach ($picks as $pick) {

@@ -1288,8 +1288,8 @@ dispose_plan_postplan_blocked() {
         /^=== end blocked ship ===$/       { if (inb) exit }
         inb' || true)
     if [ -z "$pp_block" ]; then
-        pp_block=$(printf '%s did not ship. No PR opened.\n\nWhy: the ship step stopped and the log has the reason.\n\nFix:\n  1. cd %s\n  2. Read the log named on the Log line below and fix what it reports\n  3. bin/post-plan-now\n\nOr open Claude in that folder and ask it to fix the ship block.\nLog: %s' \
-            "$plan_slug" "${PP_WORKTREE:-unknown}" "$LOG")
+        pp_block=$(printf '%s did not ship. No PR opened.\n\nWhy: the ship step stopped and the log has the reason.\n\nFix:\n  1. cd %s\n  2. Read the log named on the Log line below and fix what it reports\n  3. bin/post-plan-now\n\nLog: %s\nOr paste this to have Claude fix it:\n%s/bin/postplan-fix %s' \
+            "$plan_slug" "${PP_WORKTREE:-unknown}" "$LOG" "$REPO" "$plan_slug")
     fi
     printf '[%s] %s postplan terminal (rc=3) — moving to skipped/\n' \
         "$(date +%H:%M:%S)" "$plan_slug" >> "$LOG"

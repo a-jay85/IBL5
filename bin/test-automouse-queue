@@ -635,6 +635,13 @@ fi
 # ---------------------------------------------------------------------------
 # Phase 2 rows — add alias, --force position, unknown flags, usage errors
 # ---------------------------------------------------------------------------
+help_out=$(run_queue --help 2>&1)
+if grep -qF "1 = error or refusal" <<< "$help_out" && grep -qF "AUTOMOUSE_CHECK_PLAN" <<< "$help_out"; then
+    h_pass "row-help-text"
+else
+    h_fail "row-help-text: $help_out"
+fi
+
 setup
 mkplan plan-alias.md
 out=$(run_queue add plan-alias 2>&1); rc=$?
@@ -729,7 +736,8 @@ if [ "$rc" -eq 0 ] && [ -L "$NDIR/queue/plan-force.md" ] && [ -f "$SC" ] \
     && ! grep -qF "check-plan: scanning (stub)" "$SC" \
     && [ "$(wc -l < "$NDIR/force-overrides.log" | tr -d ' ')" = "1" ] \
     && grep -qF "plan-force.md" "$NDIR/force-overrides.log" && grep -qF "exit=1" "$NDIR/force-overrides.log" \
-    && grep -qF "Force override logged" <<< "$out"; then
+    && grep -qF "Force override logged" <<< "$out" \
+    && grep -qF "queuing anyway (--force)" <<< "$out"; then
     h_pass "row-force"
 else
     h_fail "row-force (rc=$rc): $out"

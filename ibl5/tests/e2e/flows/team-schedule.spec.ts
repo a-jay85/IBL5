@@ -277,6 +277,23 @@ test.describe('Team Schedule — SOS tier dot in streak', () => {
 });
 
 // ============================================================
+// Team Schedule — card-header primitive on month headers
+// ============================================================
+
+test.describe('Team Schedule — month header card primitive', () => {
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Regular Season' });
+    await page.goto(TEAM_SCHEDULE_URL);
+  });
+
+  test('schedule-month__header carries ibl-card__header class', async ({ page }) => {
+    await expect(
+      page.locator('.ibl-card__header.schedule-month__header').first(),
+    ).toBeVisible();
+  });
+});
+
+// ============================================================
 // Team Schedule — no SOS data (team with no ibl_power row)
 // ============================================================
 

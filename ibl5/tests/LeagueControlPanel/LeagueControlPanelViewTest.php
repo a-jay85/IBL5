@@ -29,6 +29,13 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringContainsString('league-badge', $html);
     }
 
+    public function testLeagueBadgeCarriesChipClass(): void
+    {
+        $html = $this->renderWithDefaults();
+
+        $this->assertStringContainsString('class="ibl-chip league-badge ', $html);
+    }
+
     public function testRenderShowsSeasonPhaseDropdownForIbl(): void
     {
         $html = $this->renderWithDefaults(['currentLeague' => 'ibl']);

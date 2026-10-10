@@ -1167,4 +1167,11 @@ td.ibl-team-cell--colored {
     box-shadow: var(--ring-accent-strong);
 }
 
+/* Borderless modifier: strips outer chrome for nested/compact tables */
+.ibl-data-table--borderless {
+    box-shadow: none;
+    border: none;
+    border-radius: 0;
+}
+
 } /* end @layer components */

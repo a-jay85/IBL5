@@ -7,7 +7,6 @@
 .txn-badge {
     display: inline-block;
     padding: 0.125rem 0.5rem;
-    border-radius: var(--radius-sm);
     font-size: var(--text-sm);
     font-weight: var(--font-weight-semibold);
     letter-spacing: var(--tracking-display);

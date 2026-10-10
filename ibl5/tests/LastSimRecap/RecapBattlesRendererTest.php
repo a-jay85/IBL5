@@ -8,6 +8,13 @@ use LastSimRecap\RecapBattlesRenderer;
 
 final class RecapBattlesRendererTest extends RecapTestCase
 {
+    public function testPositionChipCarriesChipClasses(): void
+    {
+        $game = $this->makeGame(starters: [$this->makeStarter()]);
+        $html = (new RecapBattlesRenderer())->render($game);
+        $this->assertStringContainsString('<span class="ibl-chip ibl-chip--navy last-sim-recap__pos-chip">', $html);
+    }
+
     public function testEmptyStartersProducesEmptyBattlesDiv(): void
     {
         $game = $this->makeGame(starters: []);

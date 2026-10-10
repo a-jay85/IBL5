@@ -170,7 +170,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $html = '';
         foreach ($gamesByMonth as $monthKey => $data) {
             $html .= '<div class="schedule-month" id="team-month-' . $monthKey . '">';
-            $headerClass = 'schedule-month__header';
+            $headerClass = 'ibl-card__header schedule-month__header';
             if ($isPlayoffPhase && $monthKey === $playoffMonthKey) {
                 $headerClass .= ' schedule-month__header--playoffs';
             }

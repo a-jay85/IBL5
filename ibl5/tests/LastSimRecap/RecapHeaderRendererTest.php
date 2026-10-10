@@ -15,6 +15,12 @@ final class RecapHeaderRendererTest extends RecapTestCase
         $this->assertStringNotContainsString('last-sim-recap__meta', $html);
     }
 
+    public function testHeaderCarriesIblCardHeaderClass(): void
+    {
+        $html = (new RecapHeaderRenderer())->render($this->makeSlate(games: []));
+        $this->assertStringContainsString('<header class="ibl-card__header last-sim-recap__head">', $html);
+    }
+
     public function testNonEmptyGameListShowsWLAndMeta(): void
     {
         $html = (new RecapHeaderRenderer())->render($this->makeSlate(games: [$this->makeGame()]));

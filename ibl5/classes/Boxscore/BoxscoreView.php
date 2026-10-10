@@ -129,7 +129,7 @@ class BoxscoreView implements BoxscoreViewInterface
             </h3>
             <div class="all-star-rename__players">
                 <?php foreach ($entry['players'] as $player): ?>
-                <span class="all-star-rename__chip"><?= HtmlSanitizer::safeHtmlOutput($player) ?></span>
+                <span class="ibl-chip ibl-chip--navy all-star-rename__chip"><?= HtmlSanitizer::safeHtmlOutput($player) ?></span>
                 <?php endforeach; ?>
             </div>
             <div class="all-star-rename__form">

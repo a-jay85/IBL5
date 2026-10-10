@@ -37,7 +37,7 @@ fail() { h_fail "$@"; }
 # A full template, not `mktemp -d -t <prefix>`: GNU mktemp rejects a -t argument
 # with too few X's, so the BSD spelling would fail on the Linux CI runner.
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-plan-now.XXXXXX")
-trap 'rm -rf "$TMP"; rm -f /tmp/plan-now-19700101-000000-$$.*' EXIT
+trap 'rm -rf "$TMP"' EXIT
 
 PLANS="$TMP/plans"
 mkdir -p "$PLANS"
@@ -51,6 +51,11 @@ NDIR="$TMP/automouse"
 mkdir -p "$NDIR/queue" "$NDIR/done" "$NDIR/skipped"
 export NIGHTLY_DIR="$NDIR"
 export PLANS_DIR="$PLANS"
+# Runner artifacts (log, prompt, runner, transcript, sidecar) go to a private
+# dir under $TMP, never the shared /tmp that fleet-status and live runs read.
+RL="$TMP/runlog"
+mkdir -p "$RL"
+export PLAN_NOW_LOG_DIR="$RL" POSTPLAN_LOG_DIR="$RL"
 
 # `caffeinate` is macOS-only and the runner wraps the model call in it. Unshimmed,
 # this test cannot run on Linux CI: command-not-found → rc != 0 → every
@@ -337,23 +342,23 @@ want()    { case "$2" in *"$3"*) ok "$1" ;; *) fail "$1 — expected to see: $3"
 want_no() { case "$2" in *"$3"*) fail "$1 — should NOT have seen: $3" ;; *) ok "$1" ;; esac; }
 
 # ── --resume fixtures ────────────────────────────────────────────────────────
-# A fake failed run's /tmp artifacts, under a TS no real run can collide with.
-# bin/plan-now hard-codes /tmp for its artifacts, so the fixture lives there too.
+# A fake failed run's artifacts, under a TS no real run can collide with.
+# They live in $RL because bin/plan-now --resume reads $PLAN_NOW_LOG_DIR.
 RES_TS="19700101-000000-$$"
 RES_UUID="0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f"
 resume_fixture() {   # resume_fixture [nosession|norunner|nolog|oklog|noverdict]
-    rm -f /tmp/plan-now-"$RES_TS".*
-    printf 'MODEL=claude-opus-4-1\nDISPOSITION=implement\n' > "/tmp/plan-now-$RES_TS.sh"
-    printf '%s\n' "$RES_UUID" > "/tmp/plan-now-$RES_TS.session"
-    printf -- '- Branch slug: `demo-slug`. Base: `master`.\n' > "/tmp/plan-now-$RES_TS.prompt"
+    rm -f "$RL"/plan-now-"$RES_TS".*
+    printf 'MODEL=claude-opus-4-1\nDISPOSITION=implement\n' > "$RL/plan-now-$RES_TS.sh"
+    printf '%s\n' "$RES_UUID" > "$RL/plan-now-$RES_TS.session"
+    printf -- '- Branch slug: `demo-slug`. Base: `master`.\n' > "$RL/plan-now-$RES_TS.prompt"
     printf 'transcript line\nplan-now: claude exited 1 after 5s\nplan-now: RESULT failed — the run did not exit cleanly.\n' \
-        > "/tmp/plan-now-$RES_TS.log"
+        > "$RL/plan-now-$RES_TS.log"
     case "${1:-}" in
-        nosession) rm -f "/tmp/plan-now-$RES_TS.session" ;;
-        norunner)  rm -f "/tmp/plan-now-$RES_TS.sh" ;;
-        nolog)     rm -f "/tmp/plan-now-$RES_TS.log" ;;
-        oklog)     printf 'plan-now: RESULT ok — plan written and check-plan PASSED.\n' > "/tmp/plan-now-$RES_TS.log" ;;
-        noverdict) printf 'transcript only\n' > "/tmp/plan-now-$RES_TS.log" ;;
+        nosession) rm -f "$RL/plan-now-$RES_TS.session" ;;
+        norunner)  rm -f "$RL/plan-now-$RES_TS.sh" ;;
+        nolog)     rm -f "$RL/plan-now-$RES_TS.log" ;;
+        oklog)     printf 'plan-now: RESULT ok — plan written and check-plan PASSED.\n' > "$RL/plan-now-$RES_TS.log" ;;
+        noverdict) printf 'transcript only\n' > "$RL/plan-now-$RES_TS.log" ;;
     esac
 }
 # run_resume <plan-now args...> → RES_RC, RES_OUT, RES_RUNNER (dry run; nothing launched)
@@ -730,7 +735,7 @@ want "queued run DMs the ok icon"        "$(dm)" "✅ plan-now: demo-slug"
 want "queued run DMs the verdict"        "$(dm)" "RESULT ok — check-plan PASSED"
 want "queued run DMs the next action"    "$(dm)" "queued for automouse"
 want "queued run DMs the plan path"      "$(dm)" "$P"
-want "queued run DMs the log path"       "$(dm)" "log: /tmp/plan-now-"
+want "queued run DMs the log path"       "$(dm)" "log: $RL/plan-now-"
 want "queued run DMs the elapsed time"   "$(dm)" "s · "
 
 # 2. ok + --implement: the case the user called out by name. It succeeded, and it
@@ -1364,8 +1369,9 @@ check("stdout and stderr share the log path",
       d.get("StandardOutPath") and d.get("StandardOutPath") == d.get("StandardErrorPath"))
 check("WorkingDirectory is an existing directory",
       os.path.isdir(d.get("WorkingDirectory", "")))
-check("runner path is /tmp/plan-now-<ts>.sh with no whitespace (unquoted exec depends on it)",
-      re.match(r"^/tmp/plan-now-[0-9A-Za-z._-]+\.sh$", runner) is not None)
+check("runner path is $PLAN_NOW_LOG_DIR/plan-now-<ts>.sh with no whitespace (unquoted exec depends on it)",
+      re.match("^" + re.escape(os.environ["PLAN_NOW_LOG_DIR"]) + r"/plan-now-[0-9A-Za-z._-]+\.sh$", runner) is not None
+      and not any(c.isspace() for c in runner))
 PLIST_PY
 )
 while IFS= read -r line; do
@@ -1575,8 +1581,8 @@ run_resume --implement "$RECOVERY_PROMPT"
 RUNNER1="$RES_RUNNER"
 TS1=$(basename "${RUNNER1%.sh}"); TS1="${TS1#plan-now-}"
 : > "$DM_LOG"
-STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER1" > "/tmp/plan-now-$TS1.log" 2>&1
-R12_LOG1=$(cat "/tmp/plan-now-$TS1.log" 2>/dev/null)
+STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER1" > "$RL/plan-now-$TS1.log" 2>&1
+R12_LOG1=$(cat "$RL/plan-now-$TS1.log" 2>/dev/null)
 want    "R-12 failure log has resume hint for TS1"  "$R12_LOG1"  "bin/plan-now --resume $TS1"
 want    "R-12 DM has resume hint for TS1"           "$(dm)"      "resume: bin/plan-now --resume $TS1"
 # Now resume TS1
@@ -1584,7 +1590,7 @@ run_resume --resume "$TS1"
 [ "$RES_RC" = 0 ] && ok "R-12 resume TS1 rc 0" || fail "R-12 resume TS1 rc 0 (got $RES_RC)"
 RUNNER2="$RES_RUNNER"
 TS2=$(basename "${RUNNER2%.sh}"); TS2="${TS2#plan-now-}"
-TS1_SESSION=$(cat "/tmp/plan-now-$TS1.session" 2>/dev/null | tr -d '[:space:]')
+TS1_SESSION=$(cat "$RL/plan-now-$TS1.session" 2>/dev/null | tr -d '[:space:]')
 R2_SIDECAR=$(cat "${RUNNER2%.sh}.session" 2>/dev/null | tr -d '[:space:]')
 [ "$TS1_SESSION" = "$R2_SIDECAR" ] && ok "R-12 RUNNER2 sidecar matches TS1 session" || \
     fail "R-12 RUNNER2 sidecar matches TS1 session (ts1=$TS1_SESSION, r2=$R2_SIDECAR)"
@@ -1593,11 +1599,11 @@ want    "R-12 RUNNER2 has RESUME_FROM TS1"  "$RUNNER2_CONTENT"  "RESUME_FROM=$TS
 want    "R-12 RUNNER2 has DISPOSITION implement" "$RUNNER2_CONTENT" "DISPOSITION=implement"
 # Run RUNNER2 with failure → resume hint mentions TS2, not TS1
 : > "$DM_LOG"
-STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER2" > "/tmp/plan-now-$TS2.log" 2>&1
-R12_LOG2=$(cat "/tmp/plan-now-$TS2.log" 2>/dev/null)
+STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER2" > "$RL/plan-now-$TS2.log" 2>&1
+R12_LOG2=$(cat "$RL/plan-now-$TS2.log" 2>/dev/null)
 want    "R-12 chain: second log mentions TS2"        "$R12_LOG2"  "bin/plan-now --resume $TS2"
 want_no "R-12 chain: second log omits TS1"           "$R12_LOG2"  "--resume $TS1"
-rm -f /tmp/plan-now-"$TS1".* /tmp/plan-now-"$TS2".*
+rm -f "$RL"/plan-now-"$TS1".* "$RL"/plan-now-"$TS2".*
 
 # R-13 unknown flag still loud.
 run_resume --resum "$RES_TS"
@@ -1657,7 +1663,7 @@ want    "G-3 401 → the DM fires"            "$(dm)" "RESULT failed"
 # G-4 --resume against a paused log passes pre-flight and clears the marker.
 gate_reset
 resume_fixture
-printf 'plan-now: RESULT paused — usage gate; auto-resumes after reset.\n' > "/tmp/plan-now-$RES_TS.log"
+printf 'plan-now: RESULT paused — usage gate; auto-resumes after reset.\n' > "$RL/plan-now-$RES_TS.log"
 ( . "$REPO_ROOT_GATE/lib/usage-gate.sh"; usage_marker_write "$RES_UUID" plan-now "$PLAN_NOW" usage-pause drain 94 five_hour "" )
 [ "$(gate_markers)" = 1 ] && ok "G-4 fixture marker written" || fail "G-4 fixture marker written"
 run_resume --resume "$RES_TS"

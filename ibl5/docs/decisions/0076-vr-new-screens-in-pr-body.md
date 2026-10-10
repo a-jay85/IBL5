@@ -1,6 +1,6 @@
 ---
 description: Brand-new VR views (gallery.newCells) are published inline at the top of the PR body — not only inside the sticky visual-review comment — via a marker-delimited, offset-0, idempotent managed block spliced in with `gh pr edit --body-file`, after a bounded readiness poll against the first new-screen image URL.
-last_verified: 2026-09-01
+last_verified: 2026-10-08
 ---
 
 # ADR-0076: Publish first-render screenshots of new VR views in the PR body
@@ -108,3 +108,11 @@ decision-trigger for those files; no `no-adr` bypass is needed.
 - `.github/workflows/e2e-tests.yml` — "Copy new-screen renders into gallery deploy tree" and
   "Splice new-screen images into PR body" steps.
 - `ibl5/docs/decisions/0074-vr-change-driven-review.md` — source of `gallery.json`'s `newCells`.
+
+## Addendum: managed block at any position (2026-10-08)
+
+The Decision bullet "Managed block, offset 0, idempotent" said `spliceBody` leaves a marker found
+elsewhere in the body untouched. ADR-0185 supersedes that clause: an own-line marker pair outside a
+code fence is now a managed block at any position, the first is replaced in place, and later
+stale blocks are stripped. The offset-0 prepend, idempotency and strip-on-empty parts of the
+bullet still hold.

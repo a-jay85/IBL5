@@ -6,30 +6,34 @@ namespace Tests\Player\Views;
 
 use PHPUnit\Framework\TestCase;
 use Player\Player;
+use Player\TeamColorSchemeResolver;
 use Player\Stats\PlayerStats;
+use Player\Views\PlayerTradingCardBackView;
 use Player\Views\PlayerTradingCardFlipView;
+use Player\Views\PlayerTradingCardFrontView;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
-/** @covers \Player\Views\PlayerTradingCardFlipView */
-class PlayerTradingCardFlipViewTest extends TestCase
+/**
+ * Pins the team-colored, teamid-0, and missing-row card renders so the color
+ * scheme can move out of the views without changing a byte of HTML.
+ *
+ * @covers \Player\Views\PlayerTradingCardFlipView
+ * @covers \Player\Views\PlayerTradingCardFrontView
+ * @covers \Player\Views\PlayerTradingCardBackView
+ */
+final class TradingCardColorSchemeCharacterizationTest extends TestCase
 {
     use SnapshotTestTrait;
 
     /**
-     * Build a Player stub with every getter called by both sub-views (FrontView + BackView)
-     * and CardBaseStyles::preparePlayerData().
-     *
-     * FlipView delegates to both sub-views internally, so all FrontView getters
-     * (the superset) must be configured.
-     *
      * @return Player&\PHPUnit\Framework\MockObject\Stub
      */
-    private function makePlayer(): Player
+    private function makePlayer(int $teamid): Player
     {
         /** @var Player&\PHPUnit\Framework\MockObject\Stub $player */
         $player = self::createStub(Player::class);
 
-        // CardBaseStyles::preparePlayerData() getters
-        $player->method('getTeamid')->willReturn(7);
+        $player->method('getTeamid')->willReturn($teamid);
         $player->method('getName')->willReturn('Test Player');
         $player->method('getNickname')->willReturn(null);
         $player->method('getPosition')->willReturn('SF');
@@ -44,7 +48,6 @@ class PlayerTradingCardFlipViewTest extends TestCase
         $player->method('getDraftPickNumber')->willReturn(14);
         $player->method('getDraftTeamOriginalName')->willReturn('Chicago');
 
-        // FrontView rating row 1 — shooting
         $player->method('getRatingFieldGoalAttempts')->willReturn(7);
         $player->method('getRatingFieldGoalPercentage')->willReturn(50);
         $player->method('getRatingFreeThrowAttempts')->willReturn(6);
@@ -52,7 +55,6 @@ class PlayerTradingCardFlipViewTest extends TestCase
         $player->method('getRatingThreePointAttempts')->willReturn(5);
         $player->method('getRatingThreePointPercentage')->willReturn(42);
 
-        // FrontView rating row 2 — rebounding/defense
         $player->method('getRatingOffensiveRebounds')->willReturn(3);
         $player->method('getRatingDefensiveRebounds')->willReturn(7);
         $player->method('getRatingAssists')->willReturn(4);
@@ -61,7 +63,6 @@ class PlayerTradingCardFlipViewTest extends TestCase
         $player->method('getRatingBlocks')->willReturn(1);
         $player->method('getRatingFouls')->willReturn(3);
 
-        // FrontView rating row 3 — offense/defense
         $player->method('getRatingOutsideOffense')->willReturn(6);
         $player->method('getRatingDriveOffense')->willReturn(7);
         $player->method('getRatingPostOffense')->willReturn(4);
@@ -71,21 +72,18 @@ class PlayerTradingCardFlipViewTest extends TestCase
         $player->method('getRatingPostDefense')->willReturn(4);
         $player->method('getRatingTransitionDefense')->willReturn(7);
 
-        // FrontView intangibles pills
         $player->method('getRatingTalent')->willReturn(85);
         $player->method('getRatingSkill')->willReturn(78);
         $player->method('getRatingIntangibles')->willReturn(72);
         $player->method('getRatingClutch')->willReturn(80);
         $player->method('getRatingConsistency')->willReturn(75);
 
-        // FrontView free agency preference pills
         $player->method('getFreeAgencyLoyalty')->willReturn(6);
         $player->method('getFreeAgencyPlayForWinner')->willReturn(8);
         $player->method('getFreeAgencyPlayingTime')->willReturn(7);
         $player->method('getFreeAgencySecurity')->willReturn(5);
         $player->method('getFreeAgencyTradition')->willReturn(4);
 
-        // FrontView contract footer
         $player->method('getYearsOfExperience')->willReturn(5);
         $player->method('getBirdYears')->willReturn(3);
 
@@ -93,8 +91,6 @@ class PlayerTradingCardFlipViewTest extends TestCase
     }
 
     /**
-     * Build a PlayerStats stub with every public property accessed by BackView set.
-     *
      * @return PlayerStats&\PHPUnit\Framework\MockObject\Stub
      */
     private function makePlayerStats(): PlayerStats
@@ -135,44 +131,108 @@ class PlayerTradingCardFlipViewTest extends TestCase
         return $stats;
     }
 
-    public function testGetFlipStylesReturnsNonEmptyString(): void
+    /**
+     * @param array{color1: string, color2: string}|null $row
+     * @return TeamIdentityRepositoryInterface&\PHPUnit\Framework\MockObject\Stub
+     */
+    private function makeRepoStub(?array $row): TeamIdentityRepositoryInterface
     {
-        $result = PlayerTradingCardFlipView::getFlipStyles();
+        /** @var TeamIdentityRepositoryInterface&\PHPUnit\Framework\MockObject\Stub $repo */
+        $repo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $repo->method('getTeamColorRow')->willReturn($row);
 
-        $this->assertNotEmpty($result);
+        return $repo;
     }
 
-    public function testRenderContainsBothFacesSnapshot(): void
+    public function testFlipCardWithTeamColorRowSnapshot(): void
     {
-        $player = $this->makePlayer();
-        $stats  = $this->makePlayerStats();
+        $repo = $this->makeRepoStub(['color1' => 'C8102E', 'color2' => '1D428A']);
 
-        $result = PlayerTradingCardFlipView::render($player, $stats, 42, 'Y3/$12M', 0, 0, 0, 0, null);
+        $html = PlayerTradingCardFlipView::render(
+            $this->makePlayer(7),
+            $this->makePlayerStats(),
+            42,
+            'Y3/$12M',
+            0,
+            0,
+            0,
+            0,
+            TeamColorSchemeResolver::forTradingCard($repo, 7)
+        );
 
-        // Snapshot captures both card-front (ratings) and card-back (season highs) structure.
-        // Any regression in either sub-view breaks this snapshot.
-        $this->assertSnapshotMatches($result, 'PlayerTradingCardFlipView.html');
+        $this->assertSnapshotMatches($html, 'TradingCardFlipView.teamColors.html');
+        // The generated scheme carries color2 as the gradient endpoints, so the snapshot is not the gold default.
+        $this->assertStringContainsStringIgnoringCase('--card-grad-start:#1D428A', $html);
+        $this->assertStringNotContainsStringIgnoringCase('--card-grad-start:#1e3a5f', $html);
     }
 
-    public function testRenderContainsContractDisplay(): void
+    public function testFlipCardForTeamZeroUsesDefaultSchemeSnapshot(): void
     {
-        $player = $this->makePlayer();
-        $stats  = $this->makePlayerStats();
+        $repo = $this->createMock(TeamIdentityRepositoryInterface::class);
+        $repo->expects(self::never())->method('getTeamColorRow');
 
-        $result = PlayerTradingCardFlipView::render($player, $stats, 42, 'Y3/$12M', 0, 0, 0, 0, null);
+        $html = PlayerTradingCardFlipView::render(
+            $this->makePlayer(0),
+            $this->makePlayerStats(),
+            42,
+            'Y3/$12M',
+            0,
+            0,
+            0,
+            0,
+            TeamColorSchemeResolver::forTradingCard($repo, 0)
+        );
 
-        // Confirms the contract string is passed through to FrontView.
-        $this->assertStringContainsString('Y3/$12M', $result);
+        $this->assertSnapshotMatches($html, 'TradingCardFlipView.teamZero.html');
+        // The seeded Free Agents row is gray (888888); the trading card must stay gold.
+        $this->assertStringNotContainsStringIgnoringCase('888888', $html);
     }
 
-    public function testRenderContainsPlayerID(): void
+    public function testFlipCardWithMissingColorRowSnapshot(): void
     {
-        $player = $this->makePlayer();
-        $stats  = $this->makePlayerStats();
+        $repo = $this->makeRepoStub(null);
 
-        $result = PlayerTradingCardFlipView::render($player, $stats, 42, 'Y3/$12M', 0, 0, 0, 0, null);
+        $html = PlayerTradingCardFlipView::render(
+            $this->makePlayer(7),
+            $this->makePlayerStats(),
+            42,
+            'Y3/$12M',
+            0,
+            0,
+            0,
+            0,
+            TeamColorSchemeResolver::forTradingCard($repo, 7)
+        );
 
-        // Separate from contract test — kills independent playerID mutants.
-        $this->assertStringContainsString('42', $result);
+        $this->assertSnapshotMatches($html, 'TradingCardFlipView.missingRow.html');
+        // A missing row falls back to the gold default scheme (navy gradient endpoints).
+        $this->assertStringContainsStringIgnoringCase('--card-grad-start:#1e3a5f', $html);
+    }
+
+    public function testFrontCardWithTeamColorRowSnapshot(): void
+    {
+        $repo = $this->makeRepoStub(['color1' => 'C8102E', 'color2' => '1D428A']);
+
+        $html = PlayerTradingCardFrontView::render($this->makePlayer(7), 42, 'Y3/$12M', TeamColorSchemeResolver::forTradingCard($repo, 7));
+
+        $this->assertSnapshotMatches($html, 'TradingCardFrontView.teamColors.html');
+    }
+
+    public function testBackCardWithTeamColorRowSnapshot(): void
+    {
+        $repo = $this->makeRepoStub(['color1' => 'C8102E', 'color2' => '1D428A']);
+
+        $html = PlayerTradingCardBackView::render(
+            $this->makePlayer(7),
+            $this->makePlayerStats(),
+            42,
+            3,
+            1,
+            1,
+            1,
+            TeamColorSchemeResolver::forTradingCard($repo, 7)
+        );
+
+        $this->assertSnapshotMatches($html, 'TradingCardBackView.teamColors.html');
     }
 }

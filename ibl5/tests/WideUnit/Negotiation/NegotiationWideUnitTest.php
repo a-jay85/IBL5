@@ -101,6 +101,31 @@ class NegotiationWideUnitTest extends WideUnitTestCase
         $this->assertQueryExecuted("vw_current_salary");
     }
 
+    /**
+     * @group integration
+     * @group success-scenarios
+     */
+    public function testProcessNegotiationCardUsesTeamColors(): void
+    {
+        $this->setupSuccessfulNegotiationScenario();
+        $commonRepo = self::createStub(SalaryCapRepositoryInterface::class);
+        $teamRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamRepo->method('getTeamColorRow')->willReturn(['color1' => 'CE1141', 'color2' => '000000']);
+        $service = new NegotiationService(
+            $this->mockDb,
+            new NegotiationRepository($this->mockDb, $commonRepo),
+            new NegotiationValidator($this->mockDb, $this->mockSeason),
+            new ExtensionContractDemandCalculator($this->mockDb, $commonRepo),
+            $teamRepo,
+        );
+
+        $result = $service->processNegotiation(1, 'Miami Cyclones', 'ibl5');
+
+        // The card's gradient endpoints carry color2 ('000000'); the gold default would carry '1e3a5f'.
+        $this->assertStringContainsStringIgnoringCase('--card-grad-start:#000000', $result);
+        $this->assertStringNotContainsStringIgnoringCase('--card-grad-start:#1e3a5f', $result);
+    }
+
     // ========== VALIDATION FAILURE SCENARIOS ==========
 
     /**

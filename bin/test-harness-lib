@@ -401,7 +401,8 @@ case_usage_isolation_lib_env_i() {
         printf 'set -euo pipefail\n'
         printf '. %q\n' "$SELF_DIR/lib/usage-test-isolation.sh"
         printf 'd=$(mktemp -d)\nusage_test_isolate "$d"\n'
-        printf 'echo "TM=$IBL5_USAGE_GATE_TEST_MODE"\necho "SD=$IBL5_USAGE_GATE_STATE_DIR"\nrm -rf "$d"\n'
+        printf 'echo "TM=$IBL5_USAGE_GATE_TEST_MODE"\necho "SD=$IBL5_USAGE_GATE_STATE_DIR"\n'
+        printf 'test "$IBL5_USAGE_GATE_TEST_MODE" = 1 && echo ISOLATE-OK\nrm -rf "$d"\n'
     } >"$WORK/usage_env_i2.sh"
     env -i PATH=/usr/bin:/bin "$BASH_BIN" "$WORK/usage_env_i.sh" >"$WORK/usage_env_i.out" 2>"$WORK/usage_env_i.err" </dev/null || rc1=$?
     env -i PATH=/usr/bin:/bin "$BASH_BIN" "$WORK/usage_env_i2.sh" >"$WORK/usage_env_i2.out" 2>"$WORK/usage_env_i2.err" </dev/null || rc2=$?
@@ -410,7 +411,7 @@ case_usage_isolation_lib_env_i() {
     err1=$(cat "$WORK/usage_env_i.err")
     err2=$(cat "$WORK/usage_env_i2.err")
     if [ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] && has "$out1" "TM=1" && has "$out2" "TM=1" &&
-        has "$out2" "/state" && ! has "$err1" "unbound variable" && ! has "$err2" "unbound variable"; then
+        has "$out2" "/state" && has "$out2" "ISOLATE-OK" && ! has "$err1" "unbound variable" && ! has "$err2" "unbound variable"; then
         t_ok "case_usage_isolation_lib_env_i"
     else
         t_bad "case_usage_isolation_lib_env_i (rc1=$rc1 rc2=$rc2 out1=[$out1] out2=[$out2] err1=[$err1] err2=[$err2])"
@@ -494,7 +495,7 @@ _usage_scan() {
 # regex derives, synthetic fixtures are flagged exactly, a real lib-route file
 # stripped of its call is flagged, and the real corpus is clean.
 case_usage_gate_isolated() {
-    local re fx="$WORK/usage-fx" got want rc ok=1 name canary f nc
+    local re fx="$WORK/usage-fx" got want rc ok=1 name canary f nc first
     re=$(_usage_entry_regex)
     if ! grep -qF 'automouse/run' <<<"$re" || ! grep -qF 'plan-now' <<<"$re"; then
         echo "USAGE-SCAN: entry-point derivation broke"
@@ -553,6 +554,17 @@ case_usage_gate_isolated() {
     if ! _usage_scan "$SELF_DIR" "$re"; then
         ok=0
     fi
+
+    # Every bash bin/test-* parses: a Shape A/B edit with a stray quote fails here.
+    for f in "$SELF_DIR"/test-*; do
+        [ -f "$f" ] || continue
+        first=""; IFS= read -r first <"$f" || true
+        case "$first" in '#!/usr/bin/env bash' | '#!/bin/bash') ;; *) continue ;; esac
+        if ! "$BASH_BIN" -n "$f" 2>/dev/null; then
+            echo "SYNTAX: ${f##*/}"
+            ok=0
+        fi
+    done
 
     if [ "$ok" -eq 1 ]; then
         t_ok "case_usage_gate_isolated"

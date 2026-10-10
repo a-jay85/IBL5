@@ -1,0 +1,358 @@
+#!/usr/bin/env bash
+# bin/test-main-checkout-guard: harness for bin/main-checkout-guard.
+# Usage: bin/test-main-checkout-guard [--help]
+#   Every case builds a throwaway repo and runs the guard under the empty
+#   launchd-like env (env -i PATH=/usr/bin:/bin) with a DM stub.
+#   Exit 0 when all cases pass, 1 on any failure.
+set -euo pipefail
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+    exit 0
+fi
+
+# Keep the developer's git config (signing, hooks, templates) out of the cases.
+export GIT_CONFIG_GLOBAL=/dev/null
+export GIT_CONFIG_NOSYSTEM=1
+
+SRC="$(cd "$(dirname "$0")" && pwd -P)/main-checkout-guard"
+PASS=0
+FAIL=0
+T=""
+R=""
+CASE_NAME=""
+CASE_FAILS=""
+OUT=""
+ERR=""
+RC=0
+STATE_REL=".claude/projects/-Users-ajaynicolas-GitHub-IBL5/main-checkout-guard/state"
+
+cleanup() {
+    if [ -n "$T" ] && [ -d "$T" ]; then
+        rm -rf "$T"
+    fi
+}
+trap cleanup EXIT
+
+write_stub() {
+    cat >"$1" <<EOF
+#!/bin/bash
+echo "\$*" >> "$T/dm.calls"
+n=\$(wc -l < "$T/dm.calls" | tr -d ' ')
+cat > "$T/dm.body.\$n"
+exit "\$(cat "$T/dm.rc")"
+EOF
+    chmod +x "$1"
+}
+
+new_case() {
+    CASE_NAME="$1"
+    CASE_FAILS=""
+    T="$(mktemp -d)"
+    R="$T/repo"
+    mkdir -p "$R" "$T/guard" "$T/home"
+    git -C "$R" init -q -b master
+    printf 'a\n' >"$R/a.txt"
+    printf 'b\n' >"$R/b.txt"
+    printf 'ignored.log\n' >"$R/.gitignore"
+    git -C "$R" add -A
+    git -C "$R" -c user.name=t -c user.email=t@t commit -q -m init
+    cp "$SRC" "$T/guard/main-checkout-guard"
+    chmod +x "$T/guard/main-checkout-guard"
+    write_stub "$T/dm-stub"
+    echo 0 >"$T/dm.rc"
+}
+
+end_case() {
+    if [ -z "$CASE_FAILS" ]; then
+        echo "PASS $CASE_NAME"
+        PASS=$((PASS + 1))
+    else
+        echo "FAIL $CASE_NAME:$CASE_FAILS"
+        FAIL=$((FAIL + 1))
+    fi
+    cleanup
+    T=""
+}
+
+# check <description> <command...>: records the description when the command fails.
+check() {
+    local desc="$1"
+    shift
+    if ! "$@" >/dev/null 2>&1; then
+        CASE_FAILS="$CASE_FAILS [$desc]"
+    fi
+}
+
+has() { grep -qF -- "$2" <<<"$1"; }
+lacks() { ! grep -qF -- "$2" <<<"$1"; }
+
+ncalls() {
+    if [ -f "$T/dm.calls" ]; then
+        wc -l <"$T/dm.calls" | tr -d ' '
+    else
+        echo 0
+    fi
+}
+
+# run_raw <command...>: capture OUT, ERR, RC without tripping set -e.
+run_raw() {
+    RC=0
+    "$@" >"$T/out" 2>"$T/err" || RC=$?
+    OUT="$(cat "$T/out")"
+    ERR="$(cat "$T/err")"
+}
+
+# run_guard <guard args...>: the standard launchd-like invocation.
+run_guard() {
+    run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+        MAIN_CHECKOUT_GUARD_REPO="$R" MAIN_CHECKOUT_GUARD_STATE_DIR="$T/state" \
+        DISCORD_DM_BIN="$T/dm-stub" "$T/guard/main-checkout-guard" "$@"
+}
+
+cksum_of() { cksum <"$1"; }
+
+dirty_a() { printf 'changed\n' >>"$R/a.txt"; }
+
+# 1
+new_case clean_silent
+run_guard
+check "exit 0" [ "$RC" -eq 0 ]
+check "zero DM calls" [ "$(ncalls)" -eq 0 ]
+check "no state file" [ ! -e "$T/state/state" ]
+end_case
+
+# 2
+new_case modified_tracked_dms_once
+dirty_a
+run_guard
+check "exit 0" [ "$RC" -eq 0 ]
+check "one DM call" [ "$(ncalls)" -eq 1 ]
+check "args are --ping --chunk -" [ "$(cat "$T/dm.calls")" = "--ping --chunk -" ]
+check "body names a.txt" has "$(cat "$T/dm.body.1")" "a.txt"
+check "state holds a 40-hex hash" grep -Eq '^[0-9a-f]{40}$' "$T/state/state"
+end_case
+
+# 3
+new_case same_state_silent
+dirty_a
+run_guard
+run_guard
+check "still one call" [ "$(ncalls)" -eq 1 ]
+check "second run says unchanged" has "$OUT" "unchanged"
+end_case
+
+# 4
+new_case new_dirty_set_new_dm
+dirty_a
+run_guard
+printf 'changed\n' >>"$R/b.txt"
+run_guard
+check "two calls" [ "$(ncalls)" -eq 2 ]
+check "second body lists b.txt" has "$(cat "$T/dm.body.2")" "b.txt"
+end_case
+
+# 5
+new_case back_to_clean_clears_state
+dirty_a
+run_guard
+git -C "$R" checkout -q -- .
+run_guard
+check "no new call" [ "$(ncalls)" -eq 1 ]
+check "state file gone" [ ! -e "$T/state/state" ]
+end_case
+
+# 6
+new_case redirty_after_clean_realerts
+dirty_a
+run_guard
+git -C "$R" checkout -q -- .
+run_guard
+dirty_a
+run_guard
+check "third call" [ "$(ncalls)" -eq 2 ]
+end_case
+
+# 7
+new_case detached_clean_dms
+git -C "$R" checkout -q --detach
+run_guard
+check "one call" [ "$(ncalls)" -eq 1 ]
+check "body has HEAD: detached:" has "$(cat "$T/dm.body.1")" "HEAD: detached:"
+end_case
+
+# 8
+new_case other_branch_clean_dms
+git -C "$R" switch -q -c feature
+run_guard
+check "one call" [ "$(ncalls)" -eq 1 ]
+check "body has HEAD: branch:feature" has "$(cat "$T/dm.body.1")" "HEAD: branch:feature"
+end_case
+
+# 9
+new_case staged_only_dms
+blob="$(printf 'other\n' | git -C "$R" hash-object -w --stdin)"
+git -C "$R" update-index --cacheinfo 100644,"$blob",a.txt
+check "index differs from HEAD" [ -n "$(git -C "$R" diff --cached --name-only)" ]
+run_guard
+check "one call" [ "$(ncalls)" -eq 1 ]
+check "body lists a.txt" has "$(cat "$T/dm.body.1")" "a.txt"
+end_case
+
+# 10
+new_case untracked_dms
+printf 'x\n' >"$R/new.txt"
+run_guard
+check "one call" [ "$(ncalls)" -eq 1 ]
+check "body lists ?? new.txt" has "$(cat "$T/dm.body.1")" "?? new.txt"
+end_case
+
+# 11
+new_case ignored_only_silent
+printf 'x\n' >"$R/ignored.log"
+run_guard
+check "zero calls" [ "$(ncalls)" -eq 0 ]
+check "no state file" [ ! -e "$T/state/state" ]
+end_case
+
+# 12
+new_case index_lock_silent
+dirty_a
+touch "$R/.git/index.lock"
+run_guard
+check "exit 0" [ "$RC" -eq 0 ]
+check "zero calls" [ "$(ncalls)" -eq 0 ]
+check "stdout says skipped" has "$OUT" "skipped (index.lock present)"
+check "no state file" [ ! -e "$T/state/state" ]
+end_case
+
+# 13
+new_case dm_failure_no_state_then_retry
+dirty_a
+echo 1 >"$T/dm.rc"
+run_guard
+check "exit 1" [ "$RC" -eq 1 ]
+check "no state file" [ ! -e "$T/state/state" ]
+echo 0 >"$T/dm.rc"
+run_guard
+check "retry sent a second call" [ "$(ncalls)" -eq 2 ]
+check "state file written" [ -f "$T/state/state" ]
+end_case
+
+# 14
+new_case dry_run_writes_nothing
+dirty_a
+run_guard --dry-run
+check "exit 0" [ "$RC" -eq 0 ]
+check "stdout has would DM" has "$OUT" "would DM"
+check "stdout lists a.txt" has "$OUT" "a.txt"
+check "zero calls" [ "$(ncalls)" -eq 0 ]
+check "state dir absent" [ ! -e "$T/state" ]
+end_case
+
+# 15
+new_case status_leaves_index_untouched
+touch -t 202001010000 "$R/a.txt"
+before="$(cksum_of "$R/.git/index")"
+run_guard
+after="$(cksum_of "$R/.git/index")"
+check "index unchanged" [ "$before" = "$after" ]
+check "exit 0" [ "$RC" -eq 0 ]
+end_case
+
+# 16
+new_case path_list_capped
+for i in $(seq 1 35); do printf 'x\n' >"$R/u$i.txt"; done
+run_guard
+body="$(cat "$T/dm.body.1")"
+check "30 ?? lines" [ "$(grep -c '^?? ' <<<"$body" || true)" -eq 30 ]
+check "tail says 5 more" has "$body" "... and 5 more"
+end_case
+
+# 17
+new_case unknown_flag_exit2
+run_guard --bogus
+check "--bogus exit 2" [ "$RC" -eq 2 ]
+check "--bogus stderr" has "$ERR" "Unknown option"
+run_guard --repo
+check "--repo exit 2" [ "$RC" -eq 2 ]
+check "--repo stderr" has "$ERR" "Unknown option"
+end_case
+
+# 18
+new_case help_exit0
+run_guard --help
+check "exit 0" [ "$RC" -eq 0 ]
+check "stdout has Usage:" has "$OUT" "Usage:"
+end_case
+
+# 19
+new_case state_dir_unset_and_empty_default
+dirty_a
+run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+    MAIN_CHECKOUT_GUARD_REPO="$R" DISCORD_DM_BIN="$T/dm-stub" \
+    "$T/guard/main-checkout-guard"
+check "unset: exit 0" [ "$RC" -eq 0 ]
+check "unset: default state file" [ -f "$T/home/$STATE_REL" ]
+rm -rf "$T/home/.claude"
+run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+    MAIN_CHECKOUT_GUARD_REPO="$R" MAIN_CHECKOUT_GUARD_STATE_DIR= \
+    DISCORD_DM_BIN="$T/dm-stub" "$T/guard/main-checkout-guard"
+check "empty: exit 0" [ "$RC" -eq 0 ]
+check "empty: default state file" [ -f "$T/home/$STATE_REL" ]
+end_case
+
+# 20
+new_case no_home_no_state_dir_exit2
+run_raw env -i PATH=/usr/bin:/bin \
+    MAIN_CHECKOUT_GUARD_REPO="$R" MAIN_CHECKOUT_GUARD_STATE_DIR= \
+    DISCORD_DM_BIN="$T/dm-stub" "$T/guard/main-checkout-guard"
+check "exit 2" [ "$RC" -eq 2 ]
+check "stderr says no state dir" has "$ERR" "no state dir"
+end_case
+
+# 21
+new_case repo_and_dm_derived_unset_and_empty
+mkdir -p "$R/bin"
+cp "$SRC" "$R/bin/main-checkout-guard"
+write_stub "$R/bin/discord-dm"
+git -C "$R" add -A
+git -C "$R" -c user.name=t -c user.email=t@t commit -q -m "add guard"
+dirty_a
+HERE="$PWD"
+cd /
+run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+    MAIN_CHECKOUT_GUARD_STATE_DIR="$T/state" "$R/bin/main-checkout-guard"
+check "unset: exit 0" [ "$RC" -eq 0 ]
+check "unset: one DM via repo discord-dm" [ "$(ncalls)" -eq 1 ]
+check "unset: body lists a.txt" has "$(cat "$T/dm.body.1")" "a.txt"
+rm -rf "$T/state"
+rm -f "$T/dm.calls"
+run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+    MAIN_CHECKOUT_GUARD_REPO= DISCORD_DM_BIN= \
+    MAIN_CHECKOUT_GUARD_STATE_DIR="$T/state" "$R/bin/main-checkout-guard"
+check "empty: exit 0" [ "$RC" -eq 0 ]
+check "empty: one DM via repo discord-dm" [ "$(ncalls)" -eq 1 ]
+check "empty: body lists a.txt" has "$(cat "$T/dm.body.1")" "a.txt"
+cd "$HERE"
+end_case
+
+# 22
+new_case not_a_repo_exit2
+mkdir -p "$T/plain-dir"
+run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+    MAIN_CHECKOUT_GUARD_REPO="$T/plain-dir" MAIN_CHECKOUT_GUARD_STATE_DIR="$T/state" \
+    DISCORD_DM_BIN="$T/dm-stub" "$T/guard/main-checkout-guard"
+check "exit 2" [ "$RC" -eq 2 ]
+check "stderr says not a git repo" has "$ERR" "not a git repo"
+end_case
+
+# 23
+new_case strict_mode_present
+check "set -euo pipefail present" grep -qx 'set -euo pipefail' "$SRC"
+end_case
+
+echo "$PASS passed, $FAIL failed"
+if [ "$FAIL" -gt 0 ]; then
+    exit 1
+fi

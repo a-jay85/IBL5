@@ -36,7 +36,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, holdrepeat, llm_calls,
+from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, heldmarker, holdrepeat, llm_calls,
                      manual_rows, manual_testing, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      schemas, scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
@@ -3013,21 +3013,36 @@ def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, lo
             return False
         rec = holdrepeat.load_record(hr_dir, slug) or {}
         key = rec.get("structural_key") or ""
+        try:  # suppression is advisory: a marker failure must never undo the decline
+            marker = heldmarker.write(
+                hr_dir, slug, plan_path=plan.path,
+                now=datetime.datetime.now(datetime.timezone.utc).isoformat())
+        except Exception:  # noqa: BLE001
+            marker = None
+        marker_path, marker_new = marker if marker else ("", False)
         dm_sent = False
-        if key and rec.get("dm_sent_key") != key:
-            dm_sent = _dm(f"post-plan declined before spending tokens: {slug}\n"
-                          f"Same hold as last run: {reason}\n"
-                          "Fix the missing files, or re-fire with:\n"
-                          "  bin/post-plan-now --force")
+        if key and (rec.get("dm_sent_key") != key or marker_new):
+            msg = (f"post-plan declined before spending tokens: {slug}\n"
+                   f"Same hold as last run: {reason}\n"
+                   "Fix the missing files, or re-fire with:\n"
+                   "  bin/post-plan-now --force")
+            if marker_path:
+                msg += ("\nScheduled re-runs (bin/pr-cycle, bin/post-plan-fleet, automouse) now skip"
+                        " this slug until the plan file or this hold changes.\n"
+                        f"Marker: {marker_path}\n"
+                        "To clear it: edit the plan, or delete the marker file."
+                        " bin/post-plan-now --force bypasses it for one run.")
+            dm_sent = _dm(msg)
             if dm_sent:
                 holdrepeat.mark_dm_sent(hr_dir, slug, key)
         res.terminal = TerminalState.HOLD_REPEAT_DECLINED
         res.hold_repeat = {"early_decline": True, "reason": reason,
                            "structural_key": key,
                            "repeat_count": rec.get("repeat_count") or 0,
-                           "dm_sent": dm_sent}
+                           "dm_sent": dm_sent, "marker": marker_path}
         log(f"phase2 early hold-repeat: DECLINED, same MISSING set as last hold "
-            f"({reason}) dm={'sent' if dm_sent else 'skipped'}")
+            f"({reason}) dm={'sent' if dm_sent else 'skipped'} "
+            f"marker={'written' if marker_path else 'skipped'}")
         return True
     except Exception as exc:  # fail-open: a bug here must only cost tokens
         log(f"phase2 early hold-repeat: skipped ({exc})")
@@ -3045,6 +3060,8 @@ def _record_hold_repeat(res, decision, slug, worktree, state_dir, log) -> dict |
                                  now=datetime.datetime.now(datetime.timezone.utc).isoformat())
         out = {"action": obs.action, "key": obs.key,
                "repeat_count": obs.repeat_count, "reasons": obs.reasons, "dm": ""}
+        if obs.action in ("cleared", "recorded"):
+            heldmarker.clear(state_dir, slug)  # new key or no hold: the marker no longer describes this hold
         if obs.action == "repeat-dm":
             ok = _send_hold_repeat_dm(slug, res.pr_number, obs)
             out["dm"] = "sent" if ok else "failed"

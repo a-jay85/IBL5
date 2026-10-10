@@ -33,6 +33,7 @@ fail() { printf '  FAIL %s\n' "$1"; FAILS=$(( FAILS + 1 )); }
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-post-plan-fail-dm.XXXXXX")
 STUBS=""
 trap 'kill $STUBS 2>/dev/null; rm -rf "$TMP"' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
 WT="$TMP/wt"; OTHER="$TMP/other"; LOGS="$TMP/logs"; PLISTS="$TMP/plists"
 mkdir -p "$WT" "$OTHER" "$LOGS" "$TMP/bin"

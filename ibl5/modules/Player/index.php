@@ -100,8 +100,12 @@ switch ($pa) {
             $httpRequest,
         );
         $username = $authService->getUsername() ?? '';
+        $pageHtml = $pageController->showPage($pid, $pageView, $username);
+        if ($pageController->responseStatus() !== 200) {
+            http_response_code($pageController->responseStatus());
+        }
         PageLayout\PageLayout::header();
-        echo $pageController->showPage($pid, $pageView, $username);
+        echo $pageHtml;
         PageLayout\PageLayout::footer();
         break;
 

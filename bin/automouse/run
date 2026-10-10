@@ -2476,7 +2476,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 || usage_postrun_pause automouse "$IMPL_SID" "$AUTOMOUSE_BIN" any "$LOG" "$IMPL_LOG_BEFORE"; }; then
             printf '%s\n' "$IMPL_SID" > "$CURRENT_LOCK/paused-held"
             echo "Impl paused (usage gate) — session $IMPL_SID; coordinator resumes it. Refunding attempt, stopping loop." >> "$LOG"
-            note_stop "You hit your Claude usage limit while building ${PLAN_NAME%.md}." "It is paused and resumes on its own when the limit resets. The try was not counted."
+            note_stop "Paused building ${PLAN_NAME%.md}: your Claude usage is at or near its limit." "It resumes on its own when usage resets. The try was not counted."
             refund_attempt
             CURRENT_LOCK=""
             break
@@ -2747,7 +2747,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 CURRENT_LOCK=""
             fi
             echo "Post-plan paused (usage gate); post-plan-now owns the resume. Refunding attempt, stopping loop." >> "$LOG"
-            note_stop "You hit your Claude usage limit while shipping $PLAN_SLUG." "It is paused and resumes on its own when the limit resets. The try was not counted."
+            note_stop "Paused shipping $PLAN_SLUG: your Claude usage is at or near its limit." "It resumes on its own when usage resets. The try was not counted."
             refund_attempt
             break
         fi

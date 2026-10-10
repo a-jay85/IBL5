@@ -67,6 +67,7 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         $team->method('getTeamnameFromUsername')->willReturn('Lakers');
         $team->method('getTidFromTeamname')->willReturn(5);
 
+        // The controller must ask for buildSlateForTeam(5), the tid resolved above.
         $recapService = self::createMock(\LastSimRecap\Contracts\LastSimRecapServiceInterface::class);
         $recapService->expects($this->once())->method('buildSlateForTeam')->with(5)->willReturn(
             new \LastSimRecap\Dto\RecapSlate(5, 'Los Angeles', 'Lakers', 1, '2026-01-01', '2026-01-07', 3, 1, 10, '+5', '-2', 3, 1, []),

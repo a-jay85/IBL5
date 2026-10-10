@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.ibl5.automouse-morning-digest</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@MAIN_WT@/bin/automouse/morning-digest</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>@MAIN_WT@</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>7</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+	</dict>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- launchd agents start with a minimal PATH that omits Homebrew; discord-dm and git
+		     must resolve. The repo bin/ dir is prepended so morning-digest can reach its
+		     sibling tools. The Claude Code native installer puts the claude binary under
+		     .local/bin — omitting it causes rc=127 inside launchd. HOME interpolates at
+		     generation time; launchd does NOT expand environment variable references, so any
+		     unexpanded reference would bake in a dead path for every invocation. -->
+		<key>PATH</key>
+		<string>@MAIN_WT@/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:@HOME@/.local/bin</string>
+		<key>DISCORD_DM_TO</key>
+		<string>100000000000000001</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/morning-digest-stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>@HOME@/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/morning-digest-stderr.log</string>
+</dict>
+</plist>

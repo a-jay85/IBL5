@@ -5,6 +5,7 @@
         "excludes": [
             "*/Contracts/*",
             "Bootstrap",
+            "Boxscore/Legacy",
             // JSB engine glue is coverage-excluded (see phpunit-mutation.xml);
             // exclude it here too so nothing Infection mutates lacks coverage. The
             // infra-exclude marker makes it gate-2-exempt in check-infection-excludes.

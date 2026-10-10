@@ -32,13 +32,13 @@ test.describe('Draft History flow', () => {
   let dataYear: string = '';
 
   test.beforeAll(async ({ request }) => {
-    const res = await request.get('modules.php?name=DraftHistory');
+    const res = await request.get('modules.php?name=DraftInfo&tab=history');
     const html = await res.text();
     const optionPattern = /<option[^>]+value="(\d{4})"[^>]*>/g;
     let match;
     while ((match = optionPattern.exec(html)) !== null) {
       const year = match[1];
-      const yearRes = await request.get(`modules.php?name=DraftHistory&year=${year}`);
+      const yearRes = await request.get(`modules.php?name=DraftInfo&tab=history&year=${year}`);
       const yearHtml = await yearRes.text();
       if (yearHtml.includes('draft-history-table')) {
         dataYear = year;
@@ -53,7 +53,7 @@ test.describe('Draft History flow', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=DraftHistory');
+    await page.goto('modules.php?name=DraftInfo&tab=history');
   });
 
   test('page loads with title containing Draft', async ({ page }) => {
@@ -78,7 +78,7 @@ test.describe('Draft History flow', () => {
   });
 
   test('selecting a year with data shows draft picks table', async ({ page }) => {
-    await page.goto(`modules.php?name=DraftHistory&year=${dataYear}`);
+    await page.goto(`modules.php?name=DraftInfo&tab=history&year=${dataYear}`);
     await assertNoPhpErrors(page, 'on DraftHistory with data');
 
     const table = page.locator('.draft-history-table');
@@ -88,14 +88,14 @@ test.describe('Draft History flow', () => {
   });
 
   test('draft table has responsive-table class', async ({ page }) => {
-    await page.goto(`modules.php?name=DraftHistory&year=${dataYear}`);
+    await page.goto(`modules.php?name=DraftInfo&tab=history&year=${dataYear}`);
 
     const table = page.locator('.draft-history-table.responsive-table');
     await expect(table.first()).toBeVisible();
   });
 
   test('draft picks table has expected column headers', async ({ page }) => {
-    await page.goto(`modules.php?name=DraftHistory&year=${dataYear}`);
+    await page.goto(`modules.php?name=DraftInfo&tab=history&year=${dataYear}`);
 
     const table = page.locator('.draft-history-table').first();
     const headerText = await table.locator('thead').textContent();
@@ -106,13 +106,13 @@ test.describe('Draft History flow', () => {
   });
 
   test('team history page loads without errors', async ({ page }) => {
-    await page.goto('modules.php?name=DraftHistory&op=team&teamid=1');
+    await page.goto('modules.php?name=DraftInfo&tab=history&op=team&teamid=1');
     await assertNoPhpErrors(page, 'on DraftHistory team view');
     await expect(page.locator('.team-logo-banner').first()).toBeVisible();
   });
 
   test('player links exist in draft table', async ({ page }) => {
-    await page.goto(`modules.php?name=DraftHistory&year=${dataYear}`);
+    await page.goto(`modules.php?name=DraftInfo&tab=history&year=${dataYear}`);
 
     const playerLinks = page.locator('.draft-history-table a[href*="pid="]');
     await expect(playerLinks.first()).toBeVisible();
@@ -122,7 +122,7 @@ test.describe('Draft History flow', () => {
   });
 
   test('player link navigates to player page', async ({ page }) => {
-    await page.goto(`modules.php?name=DraftHistory&year=${dataYear}`);
+    await page.goto(`modules.php?name=DraftInfo&tab=history&year=${dataYear}`);
 
     const playerLink = page.locator('.draft-history-table a[href*="pid="]').first();
     const href = await playerLink.getAttribute('href');
@@ -136,7 +136,7 @@ test.describe('Draft History flow', () => {
     const yearValue = await getFirstDraftYear(page);
     expect(yearValue).toBeTruthy();
 
-    await page.goto(`modules.php?name=DraftHistory&year=${yearValue}`);
+    await page.goto(`modules.php?name=DraftInfo&tab=history&year=${yearValue}`);
     await assertNoPhpErrors(page, `on DraftHistory year=${yearValue}`);
   });
 
@@ -151,12 +151,12 @@ test.describe('HTMX year switching', () => {
   test('year dropdown swaps to the selected year-specific picks', async ({
     page,
   }) => {
-    await page.goto('modules.php?name=DraftHistory');
+    await page.goto('modules.php?name=DraftInfo&tab=history');
 
     await assertHtmxSwap(page, {
       trigger: () =>
         page.locator('#draft-year-select').selectOption(YEAR_WITH_ONE_PICK),
-      apiUrlPattern: (url) => url.includes('DraftHistory'),
+      apiUrlPattern: (url) => url.includes('name=DraftInfo') && url.includes('op=api'),
       expectedUrl: new RegExp('year=' + YEAR_WITH_ONE_PICK),
       contentSelector: '#draft-history-content',
     });
@@ -170,12 +170,12 @@ test.describe('HTMX year switching', () => {
   });
 
   test('year change updates URL', async ({ page }) => {
-    await page.goto('modules.php?name=DraftHistory');
+    await page.goto('modules.php?name=DraftInfo&tab=history');
 
     await assertHtmxSwap(page, {
       trigger: () =>
         page.locator('#draft-year-select').selectOption(YEAR_WITH_ONE_PICK),
-      apiUrlPattern: (url) => url.includes('DraftHistory'),
+      apiUrlPattern: (url) => url.includes('name=DraftInfo') && url.includes('op=api'),
       expectedUrl: new RegExp('year=' + YEAR_WITH_ONE_PICK),
       contentSelector: '#draft-history-content',
     });
@@ -186,20 +186,21 @@ test.describe('browser back/forward after HTMX year switch', () => {
   test.use({ actionTimeout: 15_000, navigationTimeout: 20_000 });
 
   test('back/forward works after year switch', async ({ page }) => {
-    await page.goto('modules.php?name=DraftHistory');
+    await page.goto('modules.php?name=DraftInfo&tab=history');
 
     const yearValue = YEAR_WITH_ONE_PICK;
 
     await assertHtmxSwap(page, {
       trigger: () =>
         page.locator('#draft-year-select').selectOption(yearValue),
-      apiUrlPattern: (url) => url.includes('DraftHistory'),
-      expectedUrl: new RegExp('year=' + yearValue),
+      apiUrlPattern: (url) => url.includes('name=DraftInfo') && url.includes('op=api'),
+      expectedUrl: new RegExp('tab=history&year=' + yearValue),
       contentSelector: '#draft-history-content',
     });
 
     await page.goBack();
-    await page.waitForURL(/DraftHistory/, { timeout: 10000 });
+    // goBack() returns to the initial load URL which has no year param
+    await page.waitForURL(/name=DraftInfo.*tab=history/, { timeout: 10000 });
     expect(page.url()).not.toContain('year=' + yearValue);
 
     await page.goForward();
@@ -213,7 +214,7 @@ test.describe('no-JS fallback', () => {
 
   test('page renders correctly with JavaScript disabled', async ({ page }) => {
     // With JS disabled, onchange can't fire — verify server-side rendering path
-    await page.goto('modules.php?name=DraftHistory');
+    await page.goto('modules.php?name=DraftInfo&tab=history');
     const noData = page.locator('.draft-no-data');
     const table = page.locator('.draft-history-table');
     const noDataCount = await noData.count();
@@ -222,7 +223,7 @@ test.describe('no-JS fallback', () => {
     await assertNoPhpErrors(page, 'on DraftHistory with JS disabled');
 
     // Direct URL with year param also works
-    await page.goto('modules.php?name=DraftHistory&year=9999');
+    await page.goto('modules.php?name=DraftInfo&tab=history&year=9999');
     await assertNoPhpErrors(page, 'on DraftHistory year=9999 with JS disabled');
   });
 });

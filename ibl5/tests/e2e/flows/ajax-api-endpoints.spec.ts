@@ -247,7 +247,7 @@ test.describe('LeagueStarters API', () => {
 test.describe('DraftHistory API', () => {
   test('returns HTML response', async ({ request }) => {
     const response = await request.get(
-      'modules.php?name=DraftHistory&op=api',
+      'modules.php?name=DraftInfo&op=api',
     );
 
     const contentType = response.headers()['content-type'] ?? '';
@@ -257,7 +257,7 @@ test.describe('DraftHistory API', () => {
 
   test('out-of-range year falls back gracefully', async ({ request }) => {
     const response = await request.get(
-      'modules.php?name=DraftHistory&op=api&year=9999',
+      'modules.php?name=DraftInfo&op=api&year=9999',
     );
 
     expect(response.status()).toBe(200);
@@ -270,7 +270,7 @@ test.describe('DraftHistory API', () => {
 
   test('response includes HX-Push-Url header', async ({ request }) => {
     const response = await request.get(
-      'modules.php?name=DraftHistory&op=api&year=2000',
+      'modules.php?name=DraftInfo&op=api&year=2000',
     );
 
     const pushUrl = response.headers()['hx-push-url'] ?? '';

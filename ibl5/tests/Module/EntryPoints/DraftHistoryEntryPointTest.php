@@ -5,94 +5,19 @@ declare(strict_types=1);
 namespace Tests\Module\EntryPoints;
 
 /**
- * Integration tests for modules/DraftHistory/index.php entry point.
+ * Tests for modules/DraftHistory/index.php — now a redirect stub.
  *
- * Exercises (int) $_GET['teamid'] and (int) $_REQUEST['year'] type-casting boundaries,
- * plus the HTMX API handler (op=api) which returns HTML fragments.
+ * The stub serves op=api directly and redirects everything else to
+ * modules.php?name=DraftInfo&tab=history via ModuleRedirect::sendWithPassthrough.
+ * Behavior is fully asserted by DraftInfoEntryPointTest (15 ported methods) and
+ * DraftInfoRedirectTest (passthroughUrl unit tests).
+ *
+ * File-content assertions here verify the stub structure cannot silently regress
+ * (wrong module literal, leftover PageLayout, header() instead of sendWithPassthrough).
  */
 class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
 {
-    public function testNoParamsShowsLatestDraftYear(): void
-    {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory');
-
-        $this->assertNotSame('', $output);
-        $this->assertQueryExecuted('draftyear');
-    }
-
-    public function testValidYearParam(): void
-    {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory', ['year' => '2020']);
-
-        $this->assertNotSame('', $output);
-        $this->assertQueryExecuted('draftyear');
-    }
-
-    public function testYearZeroPassedThroughAsZero(): void
-    {
-        // (int)'0' === 0, but the code does: $year = isset($_REQUEST['year']) ? (int)$_REQUEST['year'] : $endYear
-        // So $year = 0. The repository query runs with year=0 (no draft results).
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory', ['year' => '0']);
-
-        $this->assertNotSame('', $output);
-        $this->assertQueryExecuted('draftyear');
-    }
-
-    public function testNegativeYearParam(): void
-    {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory', ['year' => '-5']);
-
-        $this->assertNotSame('', $output);
-        // (int)'-5' === -5, query runs with year=-5 (no results)
-        $this->assertQueryExecuted('draftyear');
-    }
-
-    public function testNonNumericYearParam(): void
-    {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory', ['year' => 'abc']);
-
-        $this->assertNotSame('', $output);
-        // (int)'abc' === 0
-        $this->assertQueryExecuted('draftyear');
-    }
-
-    public function testValidTeamIdShowsTeamHistory(): void
-    {
-        $this->mockDb->setMockTeamData([self::fullTeamData(['teamid' => 3, 'team_name' => 'TestTeam'])]);
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory', ['teamid' => '3']);
-
-        $this->assertNotSame('', $output);
-        $this->assertQueryExecuted('ibl_team_info');
-    }
-
-    public function testTeamIdTakesPriorityOverYear(): void
-    {
-        // When both teamid and year are set, teamid path wins (checked first)
-        $this->mockDb->setMockTeamData([self::fullTeamData(['teamid' => 3, 'team_name' => 'TestTeam'])]);
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory', ['teamid' => '3', 'year' => '2020']);
-
-        $this->assertNotSame('', $output);
-        $this->assertQueryExecuted('ibl_team_info');
-    }
-
-    public function testTeamIdZeroShowsYearView(): void
-    {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory', ['teamid' => '0']);
-
-        $this->assertNotSame('', $output);
-        // teamid=0 fails > 0 guard, falls to year view
-        $this->assertQueryExecuted('draftyear');
-    }
-
-    public function testOpApiReturnsHtmlFragment(): void
+    public function testStubOpApiServesFragmentDirectly(): void
     {
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftHistory', ['op' => 'api']);
@@ -101,29 +26,23 @@ class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
         $this->assertQueryExecuted('draftyear');
     }
 
-    public function testOpApiWithValidYearReturnsHtml(): void
+    public function testStubRedirectProducesNoPageOutput(): void
     {
         $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory', ['op' => 'api', 'year' => '2020']);
+        $output = $this->runModule('DraftHistory');
 
-        $this->assertNotSame('', $output);
+        $this->assertSame('', $output);
     }
 
-    public function testOpApiWithNonNumericYearFallsBackToLatest(): void
+    public function testStubFileStructure(): void
     {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory', ['op' => 'api', 'year' => 'garbage']);
+        $path = __DIR__ . '/../../../modules/DraftHistory/index.php';
+        $content = file_get_contents($path);
+        $this->assertIsString($content);
 
-        $this->assertNotSame('', $output);
-    }
-
-    public function testNonNumericTeamIdCastsToZero(): void
-    {
-        $this->mockDb->setMockData([]);
-        $output = $this->runModule('DraftHistory', ['teamid' => 'garbage']);
-
-        $this->assertNotSame('', $output);
-        // (int)'garbage' === 0, fails > 0 guard, falls to year view
-        $this->assertQueryExecuted('draftyear');
+        $this->assertStringContainsString('sendWithPassthrough', $content);
+        $this->assertStringContainsString("'modules.php?name=DraftInfo&tab=history'", $content);
+        $this->assertStringNotContainsString('PageLayout', $content);
+        $this->assertStringNotContainsString("header('Location", $content);
     }
 }

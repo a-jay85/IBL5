@@ -27,7 +27,7 @@ interface CareerLeaderboardsViewInterface
      * **Form Fields:**
      * - phase: Dropdown of 7 phases
      * - mode: Totals/Averages radios (averages disabled for phases without an averages table)
-     * - sortby: Dropdown of sort options (percentage options disabled on totals)
+     * - sortby: Dropdown of sort options (all available in both modes)
      * - retirees: Switch, checked = include retirees
      * - display: Number input for results limit
      * - submitted: Hidden field set to "1"

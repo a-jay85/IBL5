@@ -23,6 +23,7 @@ trap cleanup EXIT
 
 WORK=$(mktemp -d)
 TMPS+=("$WORK")
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$WORK/usage"
 
 # rec <file> <tool> <command> <error-text>
 rec() {
@@ -112,7 +113,7 @@ else
 fi
 
 # --- n8: runs under an empty environment (launchd-like PATH)
-SK=$(env -i PATH=/usr/bin:/bin "$SIG" "$WORK/a")
+SK=$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" PATH=/usr/bin:/bin "$SIG" "$WORK/a")
 if [ -n "$SK" ] && [ "$SK" = "$SA" ]; then
     pass "n8-env-i-runs"
 else

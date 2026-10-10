@@ -13,6 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ATTACK="$SCRIPT_DIR/pr-attack"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
 FAILED=0
 

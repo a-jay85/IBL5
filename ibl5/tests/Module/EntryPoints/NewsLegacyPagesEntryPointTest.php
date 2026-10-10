@@ -47,7 +47,7 @@ class NewsLegacyPagesEntryPointTest extends ModuleEntryPointTestCase
                 return $q;
             }
         }
-        $this->fail("No executed query contains: $needle");
+        self::fail("No executed query contains: $needle");
     }
 
     /**

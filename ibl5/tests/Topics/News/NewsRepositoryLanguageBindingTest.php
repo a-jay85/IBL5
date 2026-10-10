@@ -90,7 +90,7 @@ class NewsRepositoryLanguageBindingTest extends TestCase
                 return $query;
             }
         }
-        $this->fail('No prepared query referencing nuke_stories');
+        self::fail('No prepared query referencing nuke_stories');
     }
 
     private function storiesExecuted(): string
@@ -100,6 +100,6 @@ class NewsRepositoryLanguageBindingTest extends TestCase
                 return $query;
             }
         }
-        $this->fail('No executed query referencing nuke_stories');
+        self::fail('No executed query referencing nuke_stories');
     }
 }

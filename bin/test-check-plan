@@ -3902,7 +3902,7 @@ Seed every pid in 200001993000..200001993099.
 # Check C: copy-verbatim symbols resolve against the same section's cited files.
 assert_msg "L-verbatim-resolves-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
-Copy `bindAndExecute()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Copy `bindAndExecute()` verbatim from `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 '
 assert_msg "L-verbatim-shell-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: gate
@@ -3918,29 +3918,29 @@ Copy `madeUpHelperXyz()` verbatim from the 2004 restore class.
 '
 assert_msg "L-verbatim-forward-ref-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
-Create a new helper `madeUpHelperXyz()` in `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Create a new helper `madeUpHelperXyz()` in `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 Then copy `madeUpHelperXyz()` verbatim into the 1993 class.
 '
 assert_msg "L-verbatim-in-fence-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
 ```
-Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 ```
 '
 assert_msg "L-verbatim-gap-over-80-ok" 0 "" "[L] copy-verbatim" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
-Copy `madeUpHelperXyz()` and every caller it needs into the new class without any change at all, keeping it verbatim into `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Copy `madeUpHelperXyz()` and every caller it needs into the new class without any change at all, keeping it verbatim into `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 '
 
 # Check C: a missing symbol, or one whose file is cited in another section,
 # prints an advisory; assert_msg pins the message too.
 assert_msg "L-verbatim-missing-flags" 0 "[L] copy-verbatim" "" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: restore
-Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 '
 assert_msg "L-verbatim-other-section-flags" 0 "[L] copy-verbatim" "" "$FM_OPUS$L_MATRIX"'
 ## Phase 1: a
-See `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.
+See `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.
 ## Phase 2: b
 Copy `bindAndExecute()` verbatim from the shell helper in `bin/check-plan`.
 '
@@ -3953,7 +3953,7 @@ for L_CASE in overflow verbatim; do
         L_WANT='[L] overflow'
     else
         printf '%s\n' "$FM_OPUS$L_MATRIX" '## Phase 1: restore' \
-            'Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Season2004BoxscoreRestore.php`.' > "$f"
+            'Copy `madeUpHelperXyz()` verbatim from `ibl5/classes/Boxscore/Legacy/Season2004BoxscoreRestore.php`.' > "$f"
         L_WANT='[L] copy-verbatim'
     fi
     out="$("$GUARD" "$f" 2>&1)"; got=$?

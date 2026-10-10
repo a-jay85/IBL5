@@ -22,6 +22,7 @@ use Team\Team;
  * @see FreeAgencyAdminProcessorInterface
  *
  * @phpstan-import-type OfferRow from FreeAgencyAdminRepositoryInterface
+ * @phpstan-import-type DemandRow from FreeAgencyAdminRepositoryInterface
  */
 class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
 {
@@ -73,12 +74,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
         /** @var array<int, array{teamName: string, line: string}> */
         $pendingOfferLines = [];
 
-        // Pre-load all demands in a single batch query to avoid N+1
-        $playerIds = array_values(array_unique(array_map(
-            static fn (array $row): int => $row['pid'],
-            $offers
-        )));
-        $demandsMap = $this->repository->getPlayerDemandsBatch($playerIds);
+        $demandsMap = $this->loadDemandsForOffers($offers);
 
         foreach ($offers as $row) {
             /** @var OfferRow $row */
@@ -86,6 +82,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             $playerId = $row['pid'];
             $offeringTeamName = $row['team'];
             $perceivedValue = $row['perceivedvalue'];
+            $amounts = self::offerAmounts($row);
 
             $offer1 = $row['offer1'];
             $offer2 = $row['offer2'];
@@ -110,14 +107,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             $allOffers[] = [
                 'playerName' => $playerName,
                 'teamName' => $offeringTeamName,
-                'offers' => [
-                    'offer1' => $offer1,
-                    'offer2' => $offer2,
-                    'offer3' => $offer3,
-                    'offer4' => $offer4,
-                    'offer5' => $offer5,
-                    'offer6' => $offer6,
-                ],
+                'offers' => $amounts,
                 'birdYears' => $birdYears,
                 'mle' => $mle,
                 'lle' => $lle,
@@ -136,14 +126,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
                 $autoRejections[] = [
                     'playerName' => $playerName,
                     'teamName' => $offeringTeamName,
-                    'offers' => [
-                        'offer1' => $offer1,
-                        'offer2' => $offer2,
-                        'offer3' => $offer3,
-                        'offer4' => $offer4,
-                        'offer5' => $offer5,
-                        'offer6' => $offer6,
-                    ],
+                    'offers' => $amounts,
                     'reason' => 'Offer under half of player demands',
                 ];
                 continue;
@@ -178,14 +161,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
                         'playerId' => $playerId,
                         'teamName' => $offeringTeamName,
                         'teamId' => $offeringTeam->teamid,
-                        'offers' => [
-                            'offer1' => $offer1,
-                            'offer2' => $offer2,
-                            'offer3' => $offer3,
-                            'offer4' => $offer4,
-                            'offer5' => $offer5,
-                            'offer6' => $offer6,
-                        ],
+                        'offers' => $amounts,
                         'offerYears' => $offerYears,
                         'offerTotal' => $offerTotal,
                         'usedMle' => $mle === 1,
@@ -226,6 +202,38 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             'newsBodyText' => $newsBodyText,
             'discordText' => $discordText,
             'processed_at' => $this->repository->getDayProcessedMarker($day),
+        ];
+    }
+
+    /**
+     * Pre-load all demands in a single batch query to avoid N+1.
+     *
+     * @param list<OfferRow> $offers
+     * @return array<int, DemandRow>
+     */
+    private function loadDemandsForOffers(array $offers): array
+    {
+        $playerIds = array_values(array_unique(array_map(
+            static fn (array $row): int => $row['pid'],
+            $offers
+        )));
+
+        return $this->repository->getPlayerDemandsBatch($playerIds);
+    }
+
+    /**
+     * @param OfferRow $row
+     * @return array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}
+     */
+    private static function offerAmounts(array $row): array
+    {
+        return [
+            'offer1' => $row['offer1'],
+            'offer2' => $row['offer2'],
+            'offer3' => $row['offer3'],
+            'offer4' => $row['offer4'],
+            'offer5' => $row['offer5'],
+            'offer6' => $row['offer6'],
         ];
     }
 

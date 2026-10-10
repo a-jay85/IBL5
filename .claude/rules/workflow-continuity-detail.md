@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-09
+last_verified: 2026-10-10
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -35,6 +35,12 @@ branch; it survives you closing Claude Code. Engine selection:
   **usage limit** (`llm-usage-limit`: a model call returned a session, rate, or API limit
   message). A skill re-run would hit the same wall on each one, so the run stops for a human.
   For a usage limit, re-run `bin/post-plan-now` after the limit resets.
+  Before a rebase conflict reaches exit 3, a first resolution that fails the lost-work proof
+  goes through the conflict ladder in `tools/postplan-harness/harness/conflict_ladder.py`.
+  Rung 1 takes master's copy of each generated file and reruns its generator, with no model
+  call. Rung 2 retries the resolver once on Opus with the exact LOST lines. Rung 3 runs one
+  headless `claude -p` session capped at $5, 20 minutes and 80 turns. The harness re-runs the
+  unchanged proof after every rung, and `result.json` records the outcome in `conflict_rung`.
   On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines and prints a plain block of the same shape when the file is missing. The DM below carries the same block. `bin/automouse/run` copies the block into the skip report. When a command failed, the one-line `RESULT:` verdict and the block name it and quote the last few lines of its error, with credentials redacted. When none failed, they name the stage where the run stopped.
   `bin/post-plan-fail-dm` sends the DM. With no live interactive Claude session in the
   worktree it DMs at once. Headless `claude -p` sessions do not count. With an interactive

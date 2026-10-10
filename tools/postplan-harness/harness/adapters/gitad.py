@@ -574,19 +574,35 @@ class LiveGit:
         lostwork_path.chmod(0o755)
         return lostwork_path
 
-    def _prove_tree_equivalent(self, lostwork_path: Path, key: str) -> tuple[bool, str]:
-        """Run the TREE-EQUIVALENT proof. Gate is conjunctive: stdout AND rc==0.
-        A diverged tree exits 0 with TREE DIVERGED — weakening to either operator alone
-        would silently admit lost work."""
+    def _run_proof(self, lostwork_path: Path, key: str) -> tuple[bool, str]:
+        """Run lostwork.sh once. Returns (ok, FULL stdout). Gate is conjunctive:
+        stdout contains TREE-EQUIVALENT AND rc==0. A diverged tree exits 0 with
+        TREE DIVERGED, so weakening to either operator alone admits lost work."""
         proof_proc = subprocess.run(
             ["bash", str(lostwork_path), key],
             capture_output=True, text=True, errors="replace",
             cwd=self.worktree,
         )
         proof_out = proof_proc.stdout
-        if not ("TREE-EQUIVALENT" in proof_out and proof_proc.returncode == 0):
+        return ("TREE-EQUIVALENT" in proof_out and proof_proc.returncode == 0), proof_out
+
+    def _prove_tree_equivalent(self, lostwork_path: Path, key: str) -> tuple[bool, str]:
+        """Wrapper kept for existing callers: on failure returns the 400-char
+        `tree proof failed: ...` reason that rebase_cause.py parses."""
+        ok, proof_out = self._run_proof(lostwork_path, key)
+        if not ok:
             return False, f"tree proof failed: {proof_out.strip()[:400]}"
         return True, proof_out
+
+    def _run_conflict_ladder(self, *, key, branch, master_sha, pre_rebase_sha,
+                             lostwork_path, conflicted, proof_out):
+        from ..conflict_ladder import LadderContext, default_rungs, run_ladder
+        ctx = LadderContext(
+            llm=self.llm, run=self._run, run_out=self._run_out,
+            prove=lambda: self._run_proof(lostwork_path, key),
+            worktree=self.worktree, key=key, master_sha=master_sha,
+            pre_rebase_sha=pre_rebase_sha, conflicted_files=conflicted)
+        return run_ladder(ctx, proof_out, rungs=default_rungs(branch))
 
     def _record_resolution(
         self,
@@ -682,10 +698,12 @@ class LiveGit:
             abort_and_restore, assert_text_only, inventory_conflicts,
             purge_verdict_artifacts, resolve_all,
         )
+        from ..conflict_ladder import ladder_failure_reason
 
         branch = self.branch()
         key = branch.replace("/", "-")
         self.last_conflict_files = ()
+        self.last_conflict_rung = ""
         master_sha = self._run("rev-parse", base).strip()
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
@@ -769,15 +787,37 @@ class LiveGit:
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason="lostwork.sh not found at pinned master SHA")
 
-                proof_ok, proof_out = self._prove_tree_equivalent(lostwork_path, key)
+                proof_ok, proof_out = self._run_proof(lostwork_path, key)
+                resolved_files = resolve_result.resolved_files
+                self.last_conflict_rung = "first-pass"
                 if not proof_ok:
-                    abort_and_restore(self._run, worktree=self.worktree,
-                                      pre_rebase_sha=pre_rebase_sha,
-                                      reason=proof_out)
+                    first_proof = proof_out
+                    try:
+                        outcome = self._run_conflict_ladder(
+                            key=key, branch=branch, master_sha=master_sha,
+                            pre_rebase_sha=pre_rebase_sha, lostwork_path=lostwork_path,
+                            conflicted=tuple(inventory.files), proof_out=first_proof)
+                    except HarnessError as exc:
+                        # The outer `except HarnessError: raise` does not restore, so a
+                        # HarnessError escaping the ladder restores here.
+                        self.last_conflict_rung = "exhausted"
+                        abort_and_restore(self._run, worktree=self.worktree,
+                                          pre_rebase_sha=pre_rebase_sha,
+                                          reason=ladder_failure_reason(
+                                              first_proof,
+                                              (f"ladder error: {exc.kind}: {exc.detail}",)))
+                    if not outcome.rung:
+                        self.last_conflict_rung = "exhausted"
+                        abort_and_restore(self._run, worktree=self.worktree,
+                                          pre_rebase_sha=pre_rebase_sha,
+                                          reason=ladder_failure_reason(first_proof, outcome.trail))
+                    self.last_conflict_rung = outcome.rung
+                    proof_out = outcome.proof_out
+                    resolved_files = outcome.resolved_files
 
                 try:
                     manifest_path, notes_path = self._record_resolution(
-                        key, branch, master_sha, resolve_result.resolved_files,
+                        key, branch, master_sha, resolved_files,
                         proof_out=proof_out,
                     )
                 except HarnessError as exc:
@@ -795,7 +835,7 @@ class LiveGit:
                     manifest_path=manifest_path,
                     notes_path=notes_path,
                     auto_resolved=True,
-                    resolved_files=resolve_result.resolved_files,
+                    resolved_files=resolved_files,
                 )
             except HarnessError:
                 raise

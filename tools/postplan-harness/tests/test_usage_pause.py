@@ -731,3 +731,51 @@ def test_real_lib_prespawn_decide_keys_run_sid(tmp_path, monkeypatch):
     marker = json.loads((state / "markers" / f"{S}.json").read_text())
     assert marker["runner"] == "post-plan-now"
     assert usage_pause.marker_exists(ctx) is True
+
+
+# ---------------------------------------------------------------- dirty-resume Phase 1
+
+def _sh(cwd, *args):
+    return subprocess.run(["git", *args], cwd=str(cwd), check=True, capture_output=True,
+                          text=True).stdout.strip()
+
+
+def test_tools_can_write_allowlist():
+    assert usage_pause.tools_can_write("Read,Grep,Glob") is False
+    assert usage_pause.tools_can_write("Read,Edit") is True
+    assert usage_pause.tools_can_write(["Read", "mcp__x__y"]) is True
+    assert usage_pause.tools_can_write("Bash(git:*)") is True
+    assert usage_pause.tools_can_write("Read,Bash", "Bash") is False
+    assert usage_pause.tools_can_write("") is True
+    assert usage_pause.tools_can_write(("Read", "Grep"), ("Bash", "Agent")) is False
+
+
+def test_capture_prespawn_none_outside_repo(tmp_path):
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    assert usage_pause.capture_prespawn(str(plain)) is None
+    assert usage_pause.edit_since(str(plain), None) is True
+
+
+def test_edit_since_untracked_file_is_edit(tmp_path):
+    repo = _git_repo(tmp_path / "wt")
+    pre = usage_pause.capture_prespawn(str(repo))
+    assert pre is not None
+    (repo / "new.txt").write_text("x\n")
+    assert usage_pause.edit_since(str(repo), pre) is True
+    (repo / "new.txt").unlink()
+    assert usage_pause.edit_since(str(repo), pre) is False
+
+
+def test_edit_since_head_move_is_edit(tmp_path):
+    repo = _git_repo(tmp_path / "wt")
+    pre = usage_pause.capture_prespawn(str(repo))
+    _sh(repo, "commit", "-q", "--allow-empty", "-m", "moved")
+    assert usage_pause.edit_since(str(repo), pre) is True
+
+
+def test_edit_since_merge_head_is_edit(tmp_path):
+    repo = _git_repo(tmp_path / "wt")
+    pre = usage_pause.capture_prespawn(str(repo))
+    (repo / ".git" / "MERGE_HEAD").write_text(_sh(repo, "rev-parse", "HEAD") + "\n")
+    assert usage_pause.edit_since(str(repo), pre) is True

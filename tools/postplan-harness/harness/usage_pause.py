@@ -24,6 +24,28 @@ _SID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 _PAUSE_JSON = {"continue": False, "stopReason": "usage-pause"}
 
+# Closed allowlist: a tooled call limited to these cannot write the worktree. Any tool
+# not listed (Bash, Edit, an MCP tool, a name added later) counts as write-capable.
+READ_ONLY_TOOLS = frozenset({"Read", "Grep", "Glob"})
+
+
+def _tool_names(tools) -> set:
+    if tools is None:
+        return set()
+    items = tools.split(",") if isinstance(tools, str) else list(tools)
+    names = set()
+    for t in items:
+        name = str(t).split("(", 1)[0].strip()
+        if name:
+            names.add(name)
+    return names
+
+
+def tools_can_write(allowed_tools, denied_tools=None) -> bool:
+    """False only when the effective tool set is a non-empty subset of READ_ONLY_TOOLS."""
+    effective = _tool_names(allowed_tools) - _tool_names(denied_tools)
+    return not (effective and effective <= READ_ONLY_TOOLS)
+
 
 class UsagePause(BaseException):
     """The usage gate paused this run. Raised instead of returning a model result.
@@ -33,14 +55,19 @@ class UsagePause(BaseException):
     pause through to `runner.run()`, which maps it to exit 75.
 
     Cost: cleanups that live on an `except` path (e.g. `adr_draft._discard`) do not
-    run on a pause. A tooled call compares a worktree fingerprint taken before the
-    spawn, so a pause that interrupts an edit is reported `dirty` and fails closed.
+    run on a pause. A write-capable tooled call captures the worktree before the
+    spawn, so a pause that interrupts an edit is reported `dirty` and carries that
+    capture. The runner records it and the resumed run restores it (ADR-0143
+    addendum 2026-10-10).
     """
 
-    def __init__(self, purpose: str, dirty: bool = False):
+    def __init__(self, purpose: str, dirty: bool = False,
+                 prespawn: "PreSpawn | None" = None, cwd: str | None = None):
         super().__init__(purpose)
         self.purpose = purpose
         self.dirty = dirty
+        self.prespawn = prespawn
+        self.cwd = cwd
 
 
 @dataclass(frozen=True)
@@ -143,15 +170,51 @@ def worktree_fingerprint(cwd: str) -> str | None:
         blobs = (_git(cwd, "hash-object", "--stdin-paths", stdin="\n".join(untracked) + "\n")
                  .split() if untracked else [])
         pairs = ",".join(f"{p}:{b}" for p, b in zip(untracked, blobs))
-        ops = []
-        for ref in ("REBASE_HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD"):
-            r = subprocess.run(["git", "rev-parse", "-q", "--verify", ref], cwd=cwd,
-                               capture_output=True, text=True)
-            if r.returncode == 0:
-                ops.append(ref)
+        ops = _op_heads(cwd)
     except (OSError, subprocess.CalledProcessError):
         return None
     return hashlib.sha256("\0".join([head, tree, pairs, ",".join(ops)]).encode()).hexdigest()
+
+
+def _op_heads(cwd: str) -> tuple[str, ...]:
+    """In-progress operation heads (rebase, merge, cherry-pick) present in cwd."""
+    ops = []
+    for ref in ("REBASE_HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD"):
+        r = subprocess.run(["git", "rev-parse", "-q", "--verify", ref], cwd=cwd,
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            ops.append(ref)
+    return tuple(ops)
+
+
+@dataclass(frozen=True)
+class PreSpawn:
+    head: str
+    tree: str
+    ops: tuple[str, ...]
+
+
+def capture_prespawn(cwd: str) -> PreSpawn | None:
+    """HEAD, the full worktree tree, and op heads before a spawn. None on any failure.
+
+    The tree comes from `gatefix._tree_of` (tracked plus untracked non-ignored), so it
+    is both a comparison key and a `git restore --source` for the resumed run.
+    """
+    from . import gatefix   # local: gatefix imports the llm adapter, which imports us
+    try:
+        head = _git(cwd, "rev-parse", "HEAD").strip()
+        tree = gatefix._tree_of(cwd, run=subprocess.run)
+        return PreSpawn(head=head, tree=tree, ops=_op_heads(cwd))
+    except Exception:  # noqa: BLE001 -- a failed capture reads as an edit (fail closed)
+        return None
+
+
+def edit_since(cwd: str, pre: PreSpawn | None) -> bool:
+    """True (dirty) unless HEAD, tree, and op heads all still match the capture."""
+    if pre is None:
+        return True
+    now = capture_prespawn(cwd)
+    return now is None or now != pre
 
 
 # ---------------------------------------------------------------- resume dedupe

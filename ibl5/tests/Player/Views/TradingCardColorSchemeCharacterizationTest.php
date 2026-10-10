@@ -6,6 +6,7 @@ namespace Tests\Player\Views;
 
 use PHPUnit\Framework\TestCase;
 use Player\Player;
+use Player\TeamColorSchemeResolver;
 use Player\Stats\PlayerStats;
 use Player\Views\PlayerTradingCardBackView;
 use Player\Views\PlayerTradingCardFlipView;
@@ -156,7 +157,7 @@ final class TradingCardColorSchemeCharacterizationTest extends TestCase
             0,
             0,
             0,
-            $repo
+            TeamColorSchemeResolver::forTradingCard($repo, 7)
         );
 
         $this->assertSnapshotMatches($html, 'TradingCardFlipView.teamColors.html');
@@ -179,7 +180,7 @@ final class TradingCardColorSchemeCharacterizationTest extends TestCase
             0,
             0,
             0,
-            $repo
+            TeamColorSchemeResolver::forTradingCard($repo, 0)
         );
 
         $this->assertSnapshotMatches($html, 'TradingCardFlipView.teamZero.html');
@@ -200,7 +201,7 @@ final class TradingCardColorSchemeCharacterizationTest extends TestCase
             0,
             0,
             0,
-            $repo
+            TeamColorSchemeResolver::forTradingCard($repo, 7)
         );
 
         $this->assertSnapshotMatches($html, 'TradingCardFlipView.missingRow.html');
@@ -212,7 +213,7 @@ final class TradingCardColorSchemeCharacterizationTest extends TestCase
     {
         $repo = $this->makeRepoStub(['color1' => 'C8102E', 'color2' => '1D428A']);
 
-        $html = PlayerTradingCardFrontView::render($this->makePlayer(7), 42, 'Y3/$12M', $repo);
+        $html = PlayerTradingCardFrontView::render($this->makePlayer(7), 42, 'Y3/$12M', TeamColorSchemeResolver::forTradingCard($repo, 7));
 
         $this->assertSnapshotMatches($html, 'TradingCardFrontView.teamColors.html');
     }
@@ -229,7 +230,7 @@ final class TradingCardColorSchemeCharacterizationTest extends TestCase
             1,
             1,
             1,
-            $repo
+            TeamColorSchemeResolver::forTradingCard($repo, 7)
         );
 
         $this->assertSnapshotMatches($html, 'TradingCardBackView.teamColors.html');

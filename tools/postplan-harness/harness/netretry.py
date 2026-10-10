@@ -18,7 +18,7 @@ log = logging.getLogger("harness.netretry")
 
 RETRY_DELAYS: tuple[float, ...] = (5.0, 20.0, 60.0)  # three retries after attempt 1
 OUTAGE_LATCH_SECONDS = 300.0
-# Moved from adapters/gitad.py FETCH_TRANSIENT_MARKERS, plus the Go TLS timeout.
+# The four fetch markers moved from adapters/gitad.py, plus the Go TLS timeout.
 # Bare "Could not read from remote repository" and "Could not resolve host" are
 # auth/config/DNS failures and stay non-retryable.
 TRANSIENT_MARKERS: tuple[str, ...] = (

@@ -99,7 +99,8 @@ class DepthChartSnapshotServiceTest extends WideUnitTestCase
 
     public function testBuildPlayerSnapshotNonNumericPidBecomesZero(): void
     {
-        // '12abc' would be 12 and true would be 1 under sanitizeInt(); toInt() must give 0 for both.
+        // DepthChartSnapshotService::buildPlayerSnapshot coerces the roster pid with toInt():
+        // '12abc' would be 12 and true would be 1 under sanitizeInt(), but both must give 0.
         $dcSettings = ['pg' => 1];
 
         $result = $this->service->buildPlayerSnapshot(['pid' => '12abc', 'name' => 'Junk PID Player'], $dcSettings, 1);

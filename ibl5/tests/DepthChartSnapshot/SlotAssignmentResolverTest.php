@@ -305,7 +305,8 @@ class SlotAssignmentResolverTest extends TestCase
 
     public function testPartiallyNumericPidFieldDoesNotMatchPlayer(): void
     {
-        // pid1 is "12abc" for a player whose pid is 12. toInt('12abc') is 0, so the
+        // A pid{N} field of "12abc" for a player whose pid is 12.
+        // SlotAssignmentResolver::findPidIndex coerces it with toInt('12abc') = 0, so the
         // pid match fails and the resolver falls back to the name on slot 3.
         // Mutant using sanitizeInt() → '12abc' becomes 12 → slot 1 by pid → 101.
         $post = ['pid1' => '12abc', 'Name3' => 'Alice']

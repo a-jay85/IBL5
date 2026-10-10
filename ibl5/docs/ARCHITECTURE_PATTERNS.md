@@ -1,6 +1,6 @@
 ---
 description: Canonical interface-driven Repository/Service/View patterns for new modules.
-last_verified: 2026-10-07
+last_verified: 2026-10-10
 ---
 
 # IBL5 Architecture Patterns

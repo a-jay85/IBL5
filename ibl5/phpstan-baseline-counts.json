@@ -1,6 +1,6 @@
 {
     "phpstan-baseline.neon": {
-        "argument.type": 299,
+        "argument.type": 296,
         "binaryOp.invalid": 18,
         "booleanAnd.leftNotBoolean": 1,
         "booleanNot.alwaysTrue": 1,
@@ -11,13 +11,14 @@
         "constant.notFound": 9,
         "echo.nonString": 1,
         "empty.notAllowed": 7,
-        "encapsedStringPart.nonString": 17,
+        "encapsedStringPart.nonString": 16,
         "equal.alwaysFalse": 1,
         "equal.notAllowed": 10,
         "function.alreadyNarrowedType": 2,
         "function.deprecated": 2,
         "function.nameCase": 2,
         "function.strict": 1,
+        "function.unusedParameter": 2,
         "ibl.bannedAddslashes": 4,
         "ibl.bannedNukeGlobal": 25,
         "ibl.castFunction": 1,
@@ -42,15 +43,14 @@
         "nullCoalesce.offset": 1,
         "offsetAccess.nonArray": 1,
         "offsetAccess.nonOffsetAccessible": 14,
-        "property.nonObject": 2,
+        "property.nonObject": 1,
         "return.type": 1,
         "ternary.condNotBoolean": 1,
         "ternary.shortNotAllowed": 1,
         "varTag.misplaced": 2,
         "varTag.nativeType": 1,
         "varTag.type": 1,
-        "variable.undefined": 40,
-        "function.unusedParameter": 2
+        "variable.undefined": 39
     },
     "phpstan-tests-baseline.neon": {
         "argument.type": 1,

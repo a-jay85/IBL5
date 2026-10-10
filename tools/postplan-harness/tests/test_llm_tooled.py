@@ -444,7 +444,10 @@ def _bounded_argv(**extra):
 
 
 def test_tooled_argv_carries_budget_when_set():
-    argv = _bounded_argv(max_budget_usd=5.0)
+    argv = _tooled_argv(max_budget_usd=5.0, model="opus", agent=None,
+                        allowed_tools=("Read",), denied_tools=(), add_dirs=(),
+                        append_system_prompt=None, setting_sources="user,project",
+                        max_turns=TOOLED_MAX_TURNS)
     i = argv.index("--max-budget-usd")
     assert argv[i + 1] == "5.00"
 

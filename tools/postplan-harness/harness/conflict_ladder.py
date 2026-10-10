@@ -338,6 +338,10 @@ def make_opus_rung() -> Rung:
     def fn(ctx: LadderContext, proof_out: str) -> RungAttempt:
         from .conflict import resolve_one
 
+        # Cleared before any early return, so a stale file never feeds rung 3's prompt.
+        citations = Path(_stage_dir(ctx.key)) / "citations.txt"
+        if citations.exists():
+            citations.unlink()
         lost, _structural = parse_lost_lines(proof_out)
         if not lost:
             return RungAttempt(False, (), "no line-level LOST")
@@ -357,9 +361,6 @@ def make_opus_rung() -> Rung:
         if len(eligible) > OPUS_MAX_FILES:
             return RungAttempt(False, (), f"{len(eligible)} files exceed the cap "
                                           f"OPUS_MAX_FILES={OPUS_MAX_FILES}")
-        citations = Path(_stage_dir(ctx.key)) / "citations.txt"
-        if citations.exists():
-            citations.unlink()
         for path in eligible:
             ok, reason = resolve_one(
                 ctx.llm, ctx.run, worktree=ctx.worktree, key=ctx.key, path=path,

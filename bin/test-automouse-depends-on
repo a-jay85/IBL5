@@ -347,6 +347,8 @@ SELF_HEAL="$REPO_ROOT/bin/automouse/self-heal"
 # reparented bin/automouse/run, including bin/test-automouse-self-heal's
 # fixtures when the CI runner runs both tests in parallel.
 export AUTOMOUSE_ORPHAN_ARGV_RE='^no-orphan-sweep-in-this-test$'
+# Phase 3 seam: skip the real bin/check-plan; these fixtures carry no Verification Matrix.
+export AUTOMOUSE_CHECK_PLAN=/usr/bin/true
 
 heal_setup() {
     rm -rf "$TMP/heal"

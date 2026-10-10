@@ -20,6 +20,21 @@ h_tmp TMP
 
 NDIR="$TMP/automouse"
 PDIR="$TMP/plans"
+# Phase 3 seam: skip the real bin/check-plan; these fixtures carry no Verification Matrix.
+export AUTOMOUSE_CHECK_PLAN=/usr/bin/true
+
+# Phase 3 check-plan stubs (override per call with AUTOMOUSE_CHECK_PLAN=<stub>).
+CP_FAIL="$TMP/cp-fail"
+printf '#!/bin/bash\necho "check-plan: scanning (stub)"\necho "[1] no Verification Matrix (stub)"\necho "[C] plan too long (stub)"\nexit 1\n' > "$CP_FAIL"
+CP_USAGE="$TMP/cp-usage"
+printf '#!/bin/bash\necho "usage: check-plan <plan>"\nexit 2\n' > "$CP_USAGE"
+CP_PASS="$TMP/cp-pass"
+printf '#!/bin/bash\necho "OK (stub)"\nexit 0\n' > "$CP_PASS"
+CP_MANY="$TMP/cp-many"
+printf '#!/bin/bash\nfor n in $(seq 1 50); do echo "[X] stub gate $n"; done\nexit 1\n' > "$CP_MANY"
+CP_RECORD="$TMP/cp-record"
+printf '#!/bin/bash\necho "$1" >> "%s/cp-calls"\nexit 1\n' "$TMP" > "$CP_RECORD"
+chmod +x "$CP_FAIL" "$CP_USAGE" "$CP_PASS" "$CP_MANY" "$CP_RECORD"
 
 setup() {
     rm -rf "$NDIR"
@@ -618,4 +633,365 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Phase 2 rows — add alias, --force position, unknown flags, usage errors
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-alias.md
+out=$(run_queue add plan-alias 2>&1); rc=$?
+if [ "$rc" -eq 0 ] && grep -qF "Queued: plan-alias.md" <<< "$out" && [ -L "$NDIR/queue/plan-alias.md" ]; then
+    h_pass "row-add-alias"
+else
+    h_fail "row-add-alias (rc=$rc): $out"
+fi
+
+setup
+mkplan plan-forcefirst.md
+out=$(run_queue --force plan-forcefirst 2>&1); rc=$?
+if [ "$rc" -eq 0 ] && [ -L "$NDIR/queue/plan-forcefirst.md" ]; then
+    h_pass "row-force-first"
+else
+    h_fail "row-force-first (rc=$rc): $out"
+fi
+
+setup
+mkplan plan-bogus.md
+out=$(run_queue plan-bogus --bogus 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "unknown option: --bogus" <<< "$out" \
+    && [ ! -e "$NDIR/queue/plan-bogus.md" ] && [ ! -L "$NDIR/queue/plan-bogus.md" ]; then
+    h_pass "row-bogus-flag"
+else
+    h_fail "row-bogus-flag (rc=$rc): $out"
+fi
+
+setup
+out=$(run_queue add 2>&1); rc=$?
+out2=$(run_queue --force 2>&1); rc2=$?
+if [ "$rc" -eq 1 ] && grep -qF "no plan given" <<< "$out" \
+    && [ "$rc2" -eq 1 ] && grep -qF "no plan given" <<< "$out2"; then
+    h_pass "row-no-plan"
+else
+    h_fail "row-no-plan (rc=$rc/$rc2): $out / $out2"
+fi
+
+setup
+mkplan plan-two-a.md plan-two-b.md
+out=$(run_queue plan-two-a plan-two-b 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "more than one plan given" <<< "$out" \
+    && [ ! -e "$NDIR/queue/plan-two-a.md" ] && [ ! -e "$NDIR/queue/plan-two-b.md" ]; then
+    h_pass "row-two-plans"
+else
+    h_fail "row-two-plans (rc=$rc): $out"
+fi
+
+# ---------------------------------------------------------------------------
+# Phase 3 rows — full bin/check-plan gate, refusal, --force audit trail
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-refuse.md
+ln -s "$PDIR/plan-refuse.md" "$NDIR/skipped/plan-refuse.md"
+ln -s "$PDIR/plan-refuse.md" "$NDIR/done/plan-refuse.md"
+out=$(AUTOMOUSE_CHECK_PLAN="$CP_FAIL" run_queue plan-refuse 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "fails bin/check-plan" <<< "$out" \
+    && grep -qF "[1] no Verification Matrix (stub)" <<< "$out" && grep -qF -- "--force" <<< "$out" \
+    && [ ! -e "$NDIR/queue/plan-refuse.md" ] && [ ! -L "$NDIR/queue/plan-refuse.md" ] \
+    && [ -L "$NDIR/skipped/plan-refuse.md" ] && [ -L "$NDIR/done/plan-refuse.md" ] \
+    && [ ! -e "$NDIR/queue/plan-refuse.md.force-override" ]; then
+    h_pass "row-cp-refuse"
+else
+    h_fail "row-cp-refuse (rc=$rc): $out"
+fi
+
+setup
+mkplan plan-usage.md
+out=$(AUTOMOUSE_CHECK_PLAN="$CP_USAGE" run_queue plan-usage 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "exit 2" <<< "$out" && [ ! -e "$NDIR/queue/plan-usage.md" ]; then
+    h_pass "row-cp-exit2"
+else
+    h_fail "row-cp-exit2 (rc=$rc): $out"
+fi
+
+setup
+mkplan plan-nobin.md
+out=$(AUTOMOUSE_CHECK_PLAN="$TMP/no-such-check-plan" run_queue plan-nobin 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && [ ! -e "$NDIR/queue/plan-nobin.md" ] && [ ! -L "$NDIR/queue/plan-nobin.md" ]; then
+    h_pass "row-cp-missing-bin"
+else
+    h_fail "row-cp-missing-bin (rc=$rc): $out"
+fi
+
+setup
+mkplan plan-force.md
+out=$(AUTOMOUSE_CHECK_PLAN="$CP_FAIL" run_queue plan-force --force 2>&1); rc=$?
+SC="$NDIR/queue/plan-force.md.force-override"
+if [ "$rc" -eq 0 ] && [ -L "$NDIR/queue/plan-force.md" ] && [ -f "$SC" ] \
+    && grep -qF "forced_at: " "$SC" && grep -qF "user: " "$SC" \
+    && grep -qF "check_plan_exit: 1" "$SC" && grep -qF "[1] no Verification Matrix (stub)" "$SC" \
+    && ! grep -qF "check-plan: scanning (stub)" "$SC" \
+    && [ "$(wc -l < "$NDIR/force-overrides.log" | tr -d ' ')" = "1" ] \
+    && grep -qF "plan-force.md" "$NDIR/force-overrides.log" && grep -qF "exit=1" "$NDIR/force-overrides.log" \
+    && grep -qF "Force override logged" <<< "$out"; then
+    h_pass "row-force"
+else
+    h_fail "row-force (rc=$rc): $out"
+fi
+
+setup
+mkplan plan-many.md
+out=$(AUTOMOUSE_CHECK_PLAN="$CP_MANY" run_queue plan-many --force 2>&1); rc=$?
+SC="$NDIR/queue/plan-many.md.force-override"
+if [ "$rc" -eq 0 ] && [ -f "$SC" ] && [ "$(grep -c '^\[X\]' "$SC")" = "20" ] \
+    && ! grep -qF "stub gate 21" "$SC"; then
+    h_pass "row-force-cap"
+else
+    h_fail "row-force-cap (rc=$rc): $out"
+fi
+
+setup
+mkplan plan-noop.md
+out=$(AUTOMOUSE_CHECK_PLAN="$CP_PASS" run_queue plan-noop --force 2>&1); rc=$?
+if [ "$rc" -eq 0 ] && [ -L "$NDIR/queue/plan-noop.md" ] \
+    && [ ! -e "$NDIR/queue/plan-noop.md.force-override" ] && [ ! -e "$NDIR/force-overrides.log" ] \
+    && grep -qF -- "--force had no effect" <<< "$out"; then
+    h_pass "row-force-noop"
+else
+    h_fail "row-force-noop (rc=$rc): $out"
+fi
+
+setup
+rm -f "$TMP/cp-calls"
+printf '# no frontmatter\n' > "$PDIR/plan-nomodel.md"
+out=$(AUTOMOUSE_CHECK_PLAN="$CP_RECORD" run_queue plan-nomodel --force 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "no usable impl_model" <<< "$out" \
+    && [ ! -e "$NDIR/queue/plan-nomodel.md" ] && [ ! -L "$NDIR/queue/plan-nomodel.md" ] \
+    && [ ! -e "$TMP/cp-calls" ]; then
+    h_pass "row-force-no-model-bypass"
+else
+    h_fail "row-force-no-model-bypass (rc=$rc): $out"
+fi
+
+setup
+out=$(AUTOMOUSE_CHECK_PLAN="$CP_FAIL" run_queue plan-missing --force 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "Plan not found" <<< "$out" && [ ! -e "$NDIR/force-overrides.log" ]; then
+    h_pass "row-force-not-found"
+else
+    h_fail "row-force-not-found (rc=$rc): $out"
+fi
+
+setup
+mkplan plan-stale.md
+touch "$NDIR/queue/plan-stale.md.force-override"
+out=$(AUTOMOUSE_CHECK_PLAN="$CP_PASS" run_queue plan-stale 2>&1); rc=$?
+if [ "$rc" -eq 0 ] && [ ! -e "$NDIR/queue/plan-stale.md.force-override" ]; then
+    h_pass "row-force-stale-cleared"
+else
+    h_fail "row-force-stale-cleared (rc=$rc): $out"
+fi
+
+setup
+mkplan plan-rm.md plan-rq.md plan-ev.md
+AUTOMOUSE_CHECK_PLAN="$CP_FAIL" run_queue plan-rm --force >/dev/null 2>&1
+_fc_pre=0
+[ -f "$NDIR/queue/plan-rm.md.force-override" ] && _fc_pre=1
+run_queue remove plan-rm >/dev/null 2>&1
+ln -s "$PDIR/plan-rq.md" "$NDIR/skipped/plan-rq.md"
+touch "$NDIR/queue/plan-rq.md.force-override"
+run_queue requeue >/dev/null 2>&1
+touch "$NDIR/skipped/plan-ev.md.force-override" "$NDIR/done/plan-ev.md.force-override"
+AUTOMOUSE_CHECK_PLAN="$CP_PASS" run_queue plan-ev >/dev/null 2>&1
+if [ "$_fc_pre" -eq 1 ] && [ ! -e "$NDIR/queue/plan-rm.md.force-override" ] \
+    && [ ! -e "$NDIR/queue/plan-rq.md.force-override" ] \
+    && [ ! -e "$NDIR/skipped/plan-ev.md.force-override" ] && [ ! -e "$NDIR/done/plan-ev.md.force-override" ]; then
+    h_pass "row-force-cleanup"
+else
+    h_fail "row-force-cleanup (pre=$_fc_pre)"
+fi
+
+setup
+mkplan plan-inc.md plan-ancient.md
+AUTOMOUSE_CHECK_PLAN="$CP_PASS" run_queue plan-inc >/dev/null 2>&1
+touch -t 200001010000 "$PDIR/plan-ancient.md"
+AUTOMOUSE_CHECK_PLAN="$CP_FAIL" run_queue plan-ancient --force >/dev/null 2>&1
+assert_order "row-force-ancient-back order" "plan-inc.md plan-ancient.md"
+if [ "$(link_mtime plan-ancient.md)" -gt "$(link_mtime plan-inc.md)" ] \
+    && [ "$(target_mtime plan-ancient.md)" -gt "$(target_mtime plan-inc.md)" ]; then
+    h_pass "row-force-ancient-back"
+else
+    h_fail "row-force-ancient-back — ancient plan not stamped behind plan-inc"
+fi
+
+# Real-gate rows (each costs up to a minute; keep to these two).
+setup
+mkplan plan-realno.md
+out=$(AUTOMOUSE_CHECK_PLAN="" run_queue plan-realno 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qE '^  \[1\]' <<< "$out" && [ ! -e "$NDIR/queue/plan-realno.md" ]; then
+    h_pass "row-real-refuse-empty"
+else
+    h_fail "row-real-refuse-empty (rc=$rc): $out"
+fi
+
+setup
+# Copy of the `clean-minimal` fixture in bin/test-check-plan.
+printf -- '---\nimpl_model: sonnet\n---\n\n# fixture plan realok\n\n| # | What to verify | Test type | Timing | Test file / location |\n|---|---------------|-----------|--------|---------------------|\n| 1 | cap rejects over-cap trade | E2E | pre-impl | `tests/e2e/trade.spec.ts` |\n| 2 | form submits and redirects | E2E | post-impl | `tests/e2e/trade.spec.ts` |\n' > "$PDIR/plan-realok.md"
+out=$(env -u AUTOMOUSE_CHECK_PLAN NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" "$SCRIPT" plan-realok 2>&1); rc=$?
+if [ "$rc" -eq 0 ] && [ -L "$NDIR/queue/plan-realok.md" ]; then
+    h_pass "row-real-pass-unset"
+else
+    h_fail "row-real-pass-unset (rc=$rc): $out"
+fi
+
+# ---------------------------------------------------------------------------
+# Phase 4 rows — read-only `status` subcommand
+# ---------------------------------------------------------------------------
+# st_check <label> <rc> <out> <grep -E pattern>: pass when rc is 0 and the pattern matches.
+st_check() {
+    local label="$1" rc="$2" out="$3" pat="$4"
+    if [ "$rc" -eq 0 ] && grep -qE -- "$pat" <<< "$out"; then
+        h_pass "$label"
+    else
+        h_fail "$label (rc=$rc, pattern: $pat): $out"
+    fi
+}
+
+setup
+out=$(run_queue status 2>&1); rc=$?
+mkplan plan-ok.md
+run_queue plan-ok >/dev/null 2>&1
+out2=$(run_queue status 2>&1); rc2=$?
+if [ "$rc" -eq 0 ] && [ "$out" = "Nothing needs attention." ] \
+    && [ "$rc2" -eq 0 ] && [ "$out2" = "Nothing needs attention." ]; then
+    h_pass "row-status-empty"
+else
+    h_fail "row-status-empty (rc=$rc/$rc2): $out / $out2"
+fi
+
+setup
+mkplan plan-s1.md
+ln -s "$PDIR/plan-s1.md" "$NDIR/skipped/plan-s1.md"
+touch "$NDIR/skipped/plan-s1.md.staleness"
+out=$(run_queue status 2>&1); rc=$?
+st_check "row-status-skipped-stale" "$rc" "$out" '^skipped +plan-s1 +next: fix the stale path in the plan, then bin/automouse/self-heal$'
+
+setup
+mkplan plan-s2.md
+ln -s "$PDIR/plan-s2.md" "$NDIR/skipped/plan-s2.md"
+mkdir -p "$NDIR/reports"
+touch "$NDIR/reports/2026-01-01-skipped-plan-s2.md" "$NDIR/reports/2026-02-01-skipped-plan-s2.md"
+out=$(run_queue status 2>&1); rc=$?
+st_check "row-status-skipped-report" "$rc" "$out" 'read reports/2026-02-01-skipped-plan-s2\.md, fix the cause, then bin/automouse/queue plan-s2$'
+
+setup
+mkplan plan-s3.md
+ln -s "$PDIR/plan-s3.md" "$NDIR/skipped/plan-s3.md"
+out=$(run_queue status 2>&1); rc=$?
+st_check "row-status-skipped-noreport" "$rc" "$out" '^skipped +plan-s3 +next: fix the cause, then bin/automouse/queue plan-s3$'
+
+setup
+ln -s "$PDIR/plan-s4.md" "$NDIR/skipped/plan-s4.md"
+out=$(run_queue status 2>&1); rc=$?
+st_check "row-status-skipped-gone" "$rc" "$out" 'bin/automouse/self-heal reaps it'
+
+setup
+mkplan plan-f1.md
+ln -s "$PDIR/plan-f1.md" "$NDIR/queue/plan-f1.md"
+printf '2\n' > "$NDIR/queue/plan-f1.md.attempts"
+printf '# Prior attempt 2/3 failed\n' > "$NDIR/queue/plan-f1.md.failure"
+out=$(run_queue status 2>&1); rc=$?
+st_check "row-status-failed" "$rc" "$out" '^failed +plan-f1 +next: 2/3 attempts used; retries next run; read queue/plan-f1\.md\.failure; stop it with bin/automouse/queue remove plan-f1$'
+
+setup
+mkplan plan-f2.md
+ln -s "$PDIR/plan-f2.md" "$NDIR/queue/plan-f2.md"
+touch "$NDIR/queue/plan-f2.md.wt-fail"
+out=$(run_queue status 2>&1); rc=$?
+st_check "row-status-wtfail" "$rc" "$out" '^failed +plan-f2 '
+if grep -qF "read queue/" <<< "$out"; then
+    h_fail "row-status-wtfail — unexpected failure-log pointer: $out"
+fi
+
+setup
+mkplan plan-p.md
+ln -s "$PDIR/plan-p.md" "$NDIR/queue/plan-p.md"
+mkdir -p "$NDIR/queue/plan-p.md.lock"
+printf 'sid-123\n' > "$NDIR/queue/plan-p.md.lock/paused-held"
+out=$(run_queue status 2>&1); rc=$?
+st_check "row-status-paused" "$rc" "$out" '^paused +plan-p +next: usage limit pause; resumes by itself, nothing to do$'
+
+setup
+mkplan plan-h2.md
+ln -s "$PDIR/plan-h2.md" "$NDIR/queue/plan-h2.md"
+touch "$NDIR/queue/plan-h2.md.depends-hold"
+out=$(run_queue status 2>&1); rc=$?
+st_check "row-status-held" "$rc" "$out" '^held +plan-h2 +next: waiting on a dependency; nothing to do until it merges$'
+
+setup
+mkplan plan-fo.md plan-fo2.md
+ln -s "$PDIR/plan-fo.md" "$NDIR/queue/plan-fo.md"
+printf 'forced_at: 2026-10-01T09:00:00-0700\nuser: x\n' > "$NDIR/queue/plan-fo.md.force-override"
+ln -s "$PDIR/plan-fo2.md" "$NDIR/queue/plan-fo2.md"
+printf 'user: x\n' > "$NDIR/queue/plan-fo2.md.force-override"
+out=$(run_queue status 2>&1); rc=$?
+st_check "row-status-forced" "$rc" "$out" 'plan-fo +next: queued past a failing check-plan on 2026-10-01; nothing to do$'
+st_check "row-status-forced-nodate" "$rc" "$out" 'plan-fo2 +next: queued past a failing check-plan on an unknown date; nothing to do$'
+
+setup
+mkplan plan-multi.md
+ln -s "$PDIR/plan-multi.md" "$NDIR/queue/plan-multi.md"
+printf '1\n' > "$NDIR/queue/plan-multi.md.attempts"
+mkdir -p "$NDIR/queue/plan-multi.md.lock"
+printf 'sid-1\n' > "$NDIR/queue/plan-multi.md.lock/paused-held"
+touch "$NDIR/queue/plan-multi.md.depends-hold" "$NDIR/queue/plan-multi.md.force-override"
+out=$(run_queue status 2>&1); rc=$?
+if [ "$(wc -l <<< "$out" | tr -d ' ')" = "1" ]; then
+    st_check "row-status-precedence" "$rc" "$out" '^failed +plan-multi '
+else
+    h_fail "row-status-precedence — expected one line: $out"
+fi
+
+# row-status-readonly: full state from the rows above, listing identical around `status`.
+setup
+mkplan plan-s1.md plan-s3.md plan-f1.md plan-p.md plan-h2.md plan-fo.md
+ln -s "$PDIR/plan-s1.md" "$NDIR/skipped/plan-s1.md"; touch "$NDIR/skipped/plan-s1.md.staleness"
+ln -s "$PDIR/plan-s3.md" "$NDIR/skipped/plan-s3.md"
+ln -s "$PDIR/plan-s4.md" "$NDIR/skipped/plan-s4.md"
+ln -s "$PDIR/plan-f1.md" "$NDIR/queue/plan-f1.md"; printf '2\n' > "$NDIR/queue/plan-f1.md.attempts"
+ln -s "$PDIR/plan-p.md" "$NDIR/queue/plan-p.md"; mkdir -p "$NDIR/queue/plan-p.md.lock"
+printf 'sid-123\n' > "$NDIR/queue/plan-p.md.lock/paused-held"
+ln -s "$PDIR/plan-h2.md" "$NDIR/queue/plan-h2.md"; touch "$NDIR/queue/plan-h2.md.depends-hold"
+ln -s "$PDIR/plan-fo.md" "$NDIR/queue/plan-fo.md"
+printf 'forced_at: 2026-10-01T09:00:00-0700\n' > "$NDIR/queue/plan-fo.md.force-override"
+before=$(find "$NDIR" | sort)
+run_queue status >/dev/null 2>&1
+after=$(find "$NDIR" | sort)
+if [ "$before" = "$after" ]; then
+    h_pass "row-status-readonly"
+else
+    h_fail "row-status-readonly — status changed state"
+fi
+
+setup
+out=$(run_queue status --bogus 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "status takes no arguments" <<< "$out"; then
+    h_pass "row-status-bogus-arg"
+else
+    h_fail "row-status-bogus-arg (rc=$rc): $out"
+fi
+
+setup
+mkplan plan-f1.md
+ln -s "$PDIR/plan-f1.md" "$NDIR/queue/plan-f1.md"
+printf '2\n' > "$NDIR/queue/plan-f1.md.attempts"
+out=$(run_queue 2>&1); rc=$?
+if [ "$rc" -eq 0 ] && [ "$(head -1 <<< "$out")" = "Automouse queue (next to run first):" ] \
+    && ! grep -qF "next:" <<< "$out"; then
+    h_pass "row-status-show-queue-unchanged"
+else
+    h_fail "row-status-show-queue-unchanged (rc=$rc): $out"
+fi
+
+if grep -qE '^MAX_ATTEMPTS=3([[:space:]]|$)' "$SCRIPT_DIR/automouse/run"; then
+    h_pass "row-max-attempts-sync"
+else
+    h_fail "row-max-attempts-sync — bin/automouse/run MAX_ATTEMPTS changed; update STATUS_MAX_ATTEMPTS in bin/automouse/queue"
+fi
+
 h_done

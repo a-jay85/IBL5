@@ -58,7 +58,9 @@ assert_gone() {
 # The orphan-watcher sweep scans real processes, so every case pins its argv regex
 # to a token no process matches unless a case sets HB_ARGV_RE to its own fixtures.
 run_heal() {
+    # Phase 3 seam: skip the real bin/check-plan; these fixtures carry no Verification Matrix.
     NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" STALENESS_GUARD="$TMP/stub-guard" \
+        AUTOMOUSE_CHECK_PLAN=/usr/bin/true \
         AUTOMOUSE_ORPHAN_ARGV_RE="${HB_ARGV_RE:-__no_process_argv_matches_this__}" \
         AUTOMOUSE_ORPHAN_PPID="${HB_ORPHAN_PPID:-1}" "$SCRIPT" "$@"
 }

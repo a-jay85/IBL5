@@ -6,10 +6,11 @@
 # is what gets moved to done/ or skipped/ after execution.
 #
 # Usage:
-#   bin/automouse/queue <plan-slug-or-filename>
+#   bin/automouse/queue [add] <plan-slug-or-filename> [--force]
 #   bin/automouse/queue                          # show current queue
 #   bin/automouse/queue requeue                  # move all skipped plans back to queue
 #   bin/automouse/queue remove <plan-slug>       # remove a plan from the queue
+#   bin/automouse/queue status                   # one next-action line per item needing attention
 #
 # Examples:
 #   bin/automouse/queue velvet-brewing-starlight
@@ -23,20 +24,26 @@ set -euo pipefail
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage:
-  bin/automouse/queue <plan-slug-or-filename>   queue a plan for automouse
+  bin/automouse/queue [add] <plan-slug-or-filename> [--force]
+                                                queue a plan; runs bin/check-plan first
   bin/automouse/queue                           show current queue
   bin/automouse/queue requeue                   move all skipped plans back to queue
   bin/automouse/queue remove <plan-slug>        remove a plan from the queue
   bin/automouse/queue reorder <slug1> ...       reorder the full queue
+  bin/automouse/queue status                    one next-action line per item needing attention
 
 Arguments:
   <plan-slug-or-filename>   plan slug or filename (with or without .md), or path
+  --force                   queue even when bin/check-plan fails; logged to
+                            queue/<plan>.md.force-override and force-overrides.log.
+                            Never bypasses the impl_model gates.
 
 Env vars:
   NIGHTLY_DIR   automouse state directory (default: ~/.claude/projects/.../automouse)
   PLANS_DIR     plan files directory (default: ~/claude-plans)
+  AUTOMOUSE_CHECK_PLAN  plan gate executable (default: <repo>/bin/check-plan)
 
-Exit codes: 0 = success, 1 = error
+Exit codes: 0 = success, 1 = error or refusal
 EOF
     exit 0
 fi
@@ -58,8 +65,8 @@ source "$(cd "$(dirname "$0")" && pwd)/lib-queue-order"
 # entry. rm -f is a no-op when nothing is there.
 evict_dispositions() {
     local name=$1
-    rm -f "$SKIPPED_DIR/$name" "$SKIPPED_DIR/${name}.attempts" "$SKIPPED_DIR/${name}.staleness" "$SKIPPED_DIR/${name}.failure" "$SKIPPED_DIR/${name}.cap-refunds" \
-          "$DONE_DIR/$name" "$DONE_DIR/${name}.attempts" "$DONE_DIR/${name}.staleness" "$DONE_DIR/${name}.failure" "$DONE_DIR/${name}.cap-refunds"
+    rm -f "$SKIPPED_DIR/$name" "$SKIPPED_DIR/${name}.attempts" "$SKIPPED_DIR/${name}.staleness" "$SKIPPED_DIR/${name}.failure" "$SKIPPED_DIR/${name}.cap-refunds" "$SKIPPED_DIR/${name}.force-override" \
+          "$DONE_DIR/$name" "$DONE_DIR/${name}.attempts" "$DONE_DIR/${name}.staleness" "$DONE_DIR/${name}.failure" "$DONE_DIR/${name}.cap-refunds" "$DONE_DIR/${name}.force-override"
 }
 
 # --- Run-order stamping -----------------------------------------------------
@@ -146,6 +153,76 @@ if [ $# -eq 0 ]; then
     exit 0
 fi
 
+# Read-only triage: one next-action line per skipped/failed/paused/held/forced
+# item. Touches nothing. A queue/ entry with several sidecars gets ONE line, by
+# precedence failed > paused > held > forced (the most actionable state wins).
+if [ "$1" = "status" ]; then
+    if [ $# -gt 1 ]; then
+        echo "Error: status takes no arguments." >&2
+        echo "Usage: bin/automouse/queue status" >&2
+        exit 1
+    fi
+    # Mirrors MAX_ATTEMPTS in bin/automouse/run; a harness row pins the two
+    # together so a change to one fails loudly.
+    STATUS_MAX_ATTEMPTS=3
+    REPORTS_DIR="$NIGHTLY_DIR/reports"
+    status_found=0
+    status_line() {
+        status_found=1
+        printf '%-7s  %s  next: %s\n' "$1" "$2" "$3"
+    }
+
+    for f in "$SKIPPED_DIR"/*.md; do
+        { [ -L "$f" ] || [ -e "$f" ]; } || continue
+        name=$(basename "$f"); slug="${name%.md}"
+        if [ ! -e "$f" ]; then
+            status_line skipped "$slug" "plan file is gone; bin/automouse/self-heal reaps it"
+        elif [ -e "$SKIPPED_DIR/${name}.staleness" ]; then
+            status_line skipped "$slug" "fix the stale path in the plan, then bin/automouse/self-heal"
+        else
+            report=""
+            for r in "$REPORTS_DIR"/*-skipped-"$slug".md; do
+                if [ -e "$r" ]; then report=$(basename "$r"); fi   # lexical = date order; last is newest
+            done
+            if [ -n "$report" ]; then
+                status_line skipped "$slug" "read reports/$report, fix the cause, then bin/automouse/queue $slug"
+            else
+                status_line skipped "$slug" "fix the cause, then bin/automouse/queue $slug"
+            fi
+        fi
+    done
+
+    for f in "$QUEUE_DIR"/*.md; do
+        { [ -L "$f" ] || [ -e "$f" ]; } || continue
+        name=$(basename "$f"); slug="${name%.md}"
+        attempts=0
+        if [ -f "$QUEUE_DIR/${name}.attempts" ]; then
+            attempts=$(tr -cd '0-9' < "$QUEUE_DIR/${name}.attempts")
+            attempts=${attempts:-0}
+        fi
+        if [ "$attempts" -ge 1 ] || [ -e "$QUEUE_DIR/${name}.wt-fail" ]; then
+            msg="$attempts/$STATUS_MAX_ATTEMPTS attempts used; retries next run"
+            if [ -e "$QUEUE_DIR/${name}.failure" ]; then
+                msg="$msg; read queue/${name}.failure"
+            fi
+            status_line failed "$slug" "$msg; stop it with bin/automouse/queue remove $slug"
+        elif [ -e "$QUEUE_DIR/${name}.lock/paused-held" ]; then
+            status_line paused "$slug" "usage limit pause; resumes by itself, nothing to do"
+        elif [ -e "$QUEUE_DIR/${name}.depends-hold" ]; then
+            status_line held "$slug" "waiting on a dependency; nothing to do until it merges"
+        elif [ -e "$QUEUE_DIR/${name}.force-override" ]; then
+            forced_on=$(awk '/^forced_at: / && !d { print substr($2, 1, 10); d = 1 }' \
+                "$QUEUE_DIR/${name}.force-override")
+            status_line forced "$slug" "queued past a failing check-plan on ${forced_on:-an unknown date}; nothing to do"
+        fi
+    done
+
+    if [ "$status_found" -eq 0 ]; then
+        echo "Nothing needs attention."
+    fi
+    exit 0
+fi
+
 if [ "$1" = "remove" ] || [ "$1" = "rm" ]; then
     if [ $# -lt 2 ]; then
         echo "Error: remove requires a plan slug or filename." >&2
@@ -163,7 +240,7 @@ if [ "$1" = "remove" ] || [ "$1" = "rm" ]; then
         show_queue >&2
         exit 1
     fi
-    rm -f "$QUEUE_DIR/$TARGET" "$QUEUE_DIR/${TARGET}.attempts" "$QUEUE_DIR/${TARGET}.failure" "$QUEUE_DIR/${TARGET}.cap-refunds"
+    rm -f "$QUEUE_DIR/$TARGET" "$QUEUE_DIR/${TARGET}.attempts" "$QUEUE_DIR/${TARGET}.failure" "$QUEUE_DIR/${TARGET}.cap-refunds" "$QUEUE_DIR/${TARGET}.force-override"
     echo "Removed from queue: $TARGET (original plan in $PLANS_DIR is untouched)"
     echo ""
     show_queue
@@ -183,7 +260,7 @@ if [ "$1" = "requeue" ]; then
             continue
         fi
         mv "$f" "$QUEUE_DIR/$name"
-        rm -f "$QUEUE_DIR/${name}.attempts" "$QUEUE_DIR/${name}.failure" "$QUEUE_DIR/${name}.cap-refunds"
+        rm -f "$QUEUE_DIR/${name}.attempts" "$QUEUE_DIR/${name}.failure" "$QUEUE_DIR/${name}.cap-refunds" "$QUEUE_DIR/${name}.force-override"
         evict_dispositions "$name"
         # `mv` carries the skipped/ mtime over; without this the requeued plan
         # would re-enter at its authoring position, not the back.
@@ -288,7 +365,36 @@ if [ "$1" = "reorder" ]; then
     exit 0
 fi
 
-INPUT="$1"
+# Add path: `bin/automouse/queue [add] <plan> [--force]`. `add` is a synonym of
+# the bare form (bin/automouse/run prints `queue add <slug>` as a hint).
+# `--force` may sit anywhere among the args; the check-plan gate below reads it.
+# Any other dash-prefixed token is refused so a typo never becomes a plan name.
+if [ "$1" = "add" ]; then
+    shift
+fi
+FORCE=0
+INPUT=""
+for arg in "$@"; do
+    case "$arg" in
+        --force) FORCE=1 ;;
+        -*)
+            echo "Error: unknown option: $arg" >&2
+            echo "Usage: bin/automouse/queue [add] <plan-slug-or-filename> [--force]" >&2
+            exit 1 ;;
+        *)
+            if [ -n "$INPUT" ]; then
+                echo "Error: more than one plan given: $INPUT $arg" >&2
+                echo "Usage: bin/automouse/queue [add] <plan-slug-or-filename> [--force]" >&2
+                exit 1
+            fi
+            INPUT="$arg" ;;
+    esac
+done
+if [ -z "$INPUT" ]; then
+    echo "Error: no plan given." >&2
+    echo "Usage: bin/automouse/queue [add] <plan-slug-or-filename> [--force]" >&2
+    exit 1
+fi
 
 # Resolve the plan file path
 if [ -f "$INPUT" ]; then
@@ -374,10 +480,59 @@ else
     exit 1
 fi
 
+# (3) Full bin/check-plan gate. A plan that would fail a plan gate is refused
+# here, at queue time, so it never burns a run and lands in skipped/. Fail
+# closed: ANY nonzero exit (1 = violations, 2 = usage/missing file, 126/127 =
+# binary missing) refuses. Runs after (1) and (2), so `--force` never bypasses
+# them. AUTOMOUSE_CHECK_PLAN is a test seam in bin/plan-now's
+# PLAN_NOW_AUTOMOUSE_QUEUE shape; `:-` makes an EMPTY value fall back to the
+# real gate, so a blank override can never disable it.
+CHECK_PLAN="${AUTOMOUSE_CHECK_PLAN:-${LIB_DIR%/lib}/check-plan}"
+CHECK_RC=0
+CHECK_OUT=$("$CHECK_PLAN" "$SOURCE" 2>&1) || CHECK_RC=$?
+FORCE_SIDECAR="$QUEUE_DIR/${FILENAME}.force-override"
+if [ "$CHECK_RC" -ne 0 ]; then
+    if [ "$FORCE" -ne 1 ]; then
+        echo "Error: $FILENAME fails bin/check-plan (exit $CHECK_RC); not queued:" >&2
+        printf '%s\n' "$CHECK_OUT" | sed 's/^/  /' >&2
+        echo "Fix the plan, then requeue: bin/automouse/queue $FILENAME" >&2
+        echo "To queue it anyway (logged): bin/automouse/queue $FILENAME --force" >&2
+        exit 1
+    fi
+    echo "Warning: $FILENAME fails bin/check-plan (exit $CHECK_RC); queuing anyway (--force):" >&2
+    printf '%s\n' "$CHECK_OUT" | sed 's/^/  /' >&2
+else
+    if [ "$FORCE" -eq 1 ]; then
+        echo "Note: --force had no effect; bin/check-plan passed."
+    fi
+    # A stale sidecar from an earlier forced add must not survive a clean add.
+    rm -f "$FORCE_SIDECAR"
+fi
+
 evict_dispositions "$FILENAME"
 
 ln -s "$SOURCE" "$QUEUE_DIR/$FILENAME"
 stamp_back_of_queue "$FILENAME"
+if [ "$CHECK_RC" -ne 0 ]; then
+    FORCED_AT=$(date +%Y-%m-%dT%H:%M:%S%z)
+    # Gate lines are the `[tag] ...` lines; fall back to raw output when none
+    # (exit 2 / 127). Capped at 20 lines x 300 chars. awk reads all input.
+    GATE_LINES=$(awk '/^\[/ && n < 20 { print substr($0, 1, 300); n++ }' <<< "$CHECK_OUT")
+    if [ -z "$GATE_LINES" ]; then
+        GATE_LINES=$(awk 'n < 20 { print substr($0, 1, 300); n++ }' <<< "$CHECK_OUT")
+    fi
+    {
+        echo "forced_at: $FORCED_AT"
+        echo "user: ${USER:-unknown}"
+        echo "check_plan_exit: $CHECK_RC"
+        echo "failing_gates:"
+        printf '%s\n' "$GATE_LINES"
+    } > "$FORCE_SIDECAR"
+    FIRST_GATE=$(awk 'NR == 1 { print substr($0, 1, 200) }' <<< "$GATE_LINES")
+    printf '%s\t%s\t%s\texit=%s\t%s\n' "$FORCED_AT" "${USER:-unknown}" "$FILENAME" \
+        "$CHECK_RC" "$FIRST_GATE" >> "$NIGHTLY_DIR/force-overrides.log"
+    echo "Force override logged: $FORCE_SIDECAR"
+fi
 echo "Queued: $FILENAME -> $(readlink "$QUEUE_DIR/$FILENAME")"
 echo ""
 show_queue

@@ -1,6 +1,6 @@
 ---
 description: Usage-limit drain, pause, and auto-resume for headless runners via an env-gated PreToolUse hook, pause markers, a drain token, and a launchd coordinator.
-last_verified: 2026-10-09
+last_verified: 2026-10-10
 ---
 
 # ADR-0143: Usage-limit drain, pause, and auto-resume
@@ -70,3 +70,9 @@ On 2026-10-08 a `/login` to a second account left three paused sessions waiting 
 - **Keychain access.** The coordinator may be able to read the keychain (the setup probe reported `ok`), and the design does not depend on it. The library comments claim only that it may lack access.
 
 A switch now resumes paused work within about one coordinator tick, without a fresh reading. The pause hook re-pauses a session if the new account is near its limit too. A same-account token refresh never fast-resumes while `~/.claude.json` is readable. When it is unreadable, a refresh can cost one extra resume per marker, capped by the 5-resume runaway rule. If a Claude Code release stops writing `oauthAccount`, the signal fallback applies. If it writes the field but stops updating it on `/login`, the account test vetoes the fast path and the coordinator waits for `resets_at` as it did before this addendum.
+
+## Addendum: account switch clears the runaway cap (2026-10-10)
+
+The addendum above kept `check_runaway` ahead of every resume. A marker paused 5 times under one account was marked stuck, and a later `/login` to a fresh account never resumed it. On 2026-10-10 the burndown loop sat stuck at the old account's 94% weekly reading while the new account read 69%.
+
+`check_runaway` now clears the pause count and the stuck flag when the marker's `acct_fp` and the current account are both known and differ. The 5-pause cap counts pauses within one account's usage window, so a new account starts a new count. The reset records the current account in the marker's `reset_acct`, leaving `acct_fp` for the switch fast-resume, so it fires once per switch even when the resumed run exits without pausing; a run that keeps failing then hits the 5-resume cap under the new account. When either account is unknown, the cap still applies as before. Tests: `test_coord_runaway_account_switch`, `test_coord_runaway_same_account_stays_stuck`, and the updated `test_coord_switch_respects_runaway_and_hold` in `bin/test-usage-gate`.

@@ -1075,6 +1075,7 @@ OLD_S = "7c7c7c7c-1111-4222-8333-444444444444"
 
 
 def test_reconcile_session_mismatch_keeps_witness(rec_gate, tmp_path):
+    """Writes runs/S-old.pause.json first (S-old is OLD_S, a valid session id)."""
     _ctx, path = rec_gate
     old = path.parent / f"{OLD_S}.pause.json"
     old.parent.mkdir(parents=True)

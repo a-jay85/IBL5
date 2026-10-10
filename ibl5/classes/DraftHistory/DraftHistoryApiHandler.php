@@ -36,7 +36,7 @@ class DraftHistoryApiHandler
             }
         }
 
-        header('HX-Push-Url: modules.php?name=DraftHistory&year=' . $year);
+        header('HX-Push-Url: modules.php?name=DraftInfo&tab=history&year=' . $year);
 
         $draftPicks = $repository->getDraftPicksByYear($year);
         $view = new DraftHistoryView();

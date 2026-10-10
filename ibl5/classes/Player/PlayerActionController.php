@@ -133,7 +133,7 @@ final class PlayerActionController
             $threepointcontests,
             $dunkcontests,
             $rooksoph,
-            $this->commonRepo
+            TeamColorSchemeResolver::forTradingCard($this->commonRepo, $player->getTeamid() ?? 0)
         );
 
         // Flip card script must come after the card HTML so elements exist for init

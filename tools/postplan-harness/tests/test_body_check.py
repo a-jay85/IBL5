@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
 from harness.adapters.llm import FixtureLlm, MODEL_MAP
-from harness.classify import FILES_CHANGED_BEGIN, name_status_text, numstat_text
+from harness.classify import FILES_CHANGED_BEGIN, TESTS_CHANGED_BEGIN, name_status_text, numstat_text
 from harness.state import HarnessError, TerminalState, UsageLedger
 
 pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
@@ -225,9 +225,8 @@ def test_corrected_body_reaches_pr_create():
     assert create_actions, "pr_create not found in recorded actions"
     body = create_actions[0].get("body", "")
     assert sentinel in body, f"sentinel not found in pr_create body: {body[:200]!r}"
-    assert FILES_CHANGED_BEGIN in body, (
-        f"files-changed block not regenerated in pr_create body: {body[:200]!r}"
-    )
+    for marker in (FILES_CHANGED_BEGIN, TESTS_CHANGED_BEGIN):
+        assert marker not in body, f"retired block written to pr_create body: {body[:200]!r}"
 
 
 def test_pr_copy_tier_is_sonnet_5_5():

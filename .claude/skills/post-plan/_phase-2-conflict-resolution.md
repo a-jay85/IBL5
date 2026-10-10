@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 2 conflict resolution. Resolves a merge conflict, proves no work was lost, and arms the conflict hold. Loaded only when the Phase 2 merge block prints STOP-AND-RESOLVE.
-last_verified: 2026-10-07
+last_verified: 2026-10-09
 paths:
   - .claude/skills/post-plan/SKILL.md
   - .claude/review-shared/_rebase-and-conflicts.md
@@ -266,9 +266,8 @@ If the sub-agent returns without writing the file, or writes an unreadable one, 
 
 ## Step 8: Return to `SKILL.md`
 
-Proceed to Phase 2 step 3 (push) and step 4 (`gh pr create`). The PR body's files-changed
-block must reflect the post-resolution diff, and per
-`.claude/skills/post-plan/_pr-body-claims.md` every residual / out-of-scope bullet is
+Proceed to Phase 2 step 3 (push) and step 4 (`gh pr create`). Per
+`.claude/skills/post-plan/_pr-body-claims.md`, every residual / out-of-scope bullet is
 re-read against that diff before the PR is opened.
 
 ---

@@ -708,6 +708,30 @@ test_limit_hit_vs_env_error() {
     printf 'API Error: 429\nfine\n' > "$f"
     gate_run "usage_is_limit_hit '$f' 1"; n=$?
     assert_eq after_line:skips 1 "$n"
+    # Worktree-resume refusal (Claude Code resume safety check), verbatim
+    # from automouse log 2026-10-09-74281.log line 17. It is deterministic,
+    # so it must NOT read as an environmental error.
+    WT_REFUSAL='Error: cannot resume into worktree /tmp/wt/demo: Refusing to use /tmp/wt/demo as an isolation worktree: it is the checkout this session launched from. This session was not started. The worktree binding has been cleared; re-running will continue in the current directory without worktree isolation.'
+    printf '%s\n' "$WT_REFUSAL" > "$f"
+    gate_run "usage_is_env_error '$f'"; n=$?
+    assert_eq wt_refusal:not_env_error 1 "$n"
+    gate_run "usage_is_limit_hit '$f'"; n=$?
+    assert_eq wt_refusal:not_limit_hit 1 "$n"
+    gate_run "usage_is_wt_resume_refused '$f'"; n=$?
+    assert_eq wt_refusal:match 0 "$n"
+    printf 'noise\n%s\n' "$WT_REFUSAL" > "$f"
+    gate_run "usage_is_wt_resume_refused '$f' 2"; n=$?
+    assert_eq wt_refusal:after_line_skips 1 "$n"
+    gate_run "usage_is_wt_resume_refused '$f' 1"; n=$?
+    assert_eq wt_refusal:after_line_sees 0 "$n"
+    for line in "API Error: 529" "API Error: 401" "You've hit your weekly limit" "overloaded_error"; do
+        printf '%s\n' "$line" > "$f"
+        gate_run "usage_is_wt_resume_refused '$f'"; n=$?
+        assert_eq "wt_refusal:not:$line" 1 "$n"
+    done
+    printf '{"type":"assistant","text":"Error: cannot resume into worktree /x: refusing"}\n' > "$f"
+    gate_run "usage_is_wt_resume_refused '$f'"; n=$?
+    assert_eq wt_refusal:stream_quote_ignored 1 "$n"
 }
 
 # ---------------------------------------------------------------- Phase 3

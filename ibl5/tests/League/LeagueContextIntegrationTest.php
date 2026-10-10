@@ -105,7 +105,7 @@ class LeagueContextIntegrationTest extends TestCase
         $config = $this->leagueContext->getConfig();
 
         foreach ($config as $key => $value) {
-            $this->assertNotEmpty($value, "Config value for '{$key}' should not be empty");
+            $this->assertNotSame('', $value, "Config value for '{$key}' should not be empty");
         }
     }
 
@@ -119,7 +119,7 @@ class LeagueContextIntegrationTest extends TestCase
         $config = $this->leagueContext->getConfig();
 
         foreach ($config as $key => $value) {
-            $this->assertNotEmpty($value, "Config value for '{$key}' should not be empty");
+            $this->assertNotSame('', $value, "Config value for '{$key}' should not be empty");
         }
     }
 

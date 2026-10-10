@@ -75,7 +75,7 @@ class DepthChartValidatorTest extends TestCase
         $result = $this->validator->validate($depthChartData, 'Regular Season');
 
         $this->assertFalse($result->isValid());
-        $this->assertNotEmpty($result->getErrors());
+        $this->assertNotSame([], $result->getErrors());
         $this->assertSame('active_players_min', $result->getErrors()[0]->type);
     }
 
@@ -96,7 +96,7 @@ class DepthChartValidatorTest extends TestCase
         $result = $this->validator->validate($depthChartData, 'Regular Season');
 
         $this->assertFalse($result->isValid());
-        $this->assertNotEmpty($result->getErrors());
+        $this->assertNotSame([], $result->getErrors());
         $this->assertSame('active_players_max', $result->getErrors()[0]->type);
     }
 

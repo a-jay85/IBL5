@@ -558,7 +558,7 @@ class DepthChartViewTest extends TestCase
 
         foreach (['pg', 'sg', 'sf', 'pf', 'c'] as $field) {
             preg_match('/<select name="' . $field . '1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-            $this->assertNotEmpty($matches, "Position depth select for {$field} not found");
+            $this->assertNotSame([], $matches, "Position depth select for {$field} not found");
             $selectHtml = $matches[1];
 
             foreach ($expectedLabels as $i => $label) {
@@ -580,7 +580,7 @@ class DepthChartViewTest extends TestCase
         $output = (string) ob_get_clean();
 
         preg_match('/<select name="pg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $optionCount = substr_count($matches[1], '<option');
         $this->assertSame(6, $optionCount, 'Position depth should have exactly 6 options (No/1st/2nd/3rd/4th/ok)');
     }
@@ -596,11 +596,11 @@ class DepthChartViewTest extends TestCase
         $output = (string) ob_get_clean();
 
         preg_match('/<select name="sf1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="1" SELECTED[^>]*>1st<\/option>/', $matches[1]);
 
         preg_match('/<select name="pg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="0" SELECTED[^>]*>No<\/option>/', $matches[1]);
     }
 
@@ -618,7 +618,7 @@ class DepthChartViewTest extends TestCase
         $output = (string) ob_get_clean();
 
         preg_match('/<select name="pg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="0" SELECTED[^>]*>No<\/option>/', $matches[1]);
     }
 
@@ -632,7 +632,7 @@ class DepthChartViewTest extends TestCase
         $output = (string) ob_get_clean();
 
         preg_match('/<select name="sg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="5" SELECTED[^>]*>ok<\/option>/', $matches[1]);
     }
 
@@ -647,11 +647,11 @@ class DepthChartViewTest extends TestCase
         $output = (string) ob_get_clean();
 
         preg_match('/<select name="sf1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="3" SELECTED[^>]*>3rd<\/option>/', $matches[1]);
 
         preg_match('/<select name="c1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="5" SELECTED[^>]*>ok<\/option>/', $matches[1]);
     }
 
@@ -667,7 +667,7 @@ class DepthChartViewTest extends TestCase
         // Mobile card uses the same clamp before indexing the depth label and
         // rendering the (disabled) select.
         preg_match('/<select name="sg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
-        $this->assertNotEmpty($matches);
+        $this->assertNotSame([], $matches);
         $this->assertMatchesRegularExpression('/value="5" SELECTED[^>]*>ok<\/option>/', $matches[1]);
     }
 }

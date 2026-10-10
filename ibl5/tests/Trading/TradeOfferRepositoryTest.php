@@ -58,7 +58,7 @@ class TradeOfferRepositoryTest extends WideUnitTestCase
 
         $result = $repo->getAllTradeOffers();
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame([], $result);
         $this->assertQueryExecuted("approval != 'completed'");
     }
 

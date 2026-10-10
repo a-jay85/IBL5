@@ -58,7 +58,7 @@ class NavigationRepositoryTest extends DatabaseTestCase
         self::assertIsArray($result);
 
         // Should have conference keys
-        self::assertNotEmpty($result);
+        self::assertNotSame([], $result);
         foreach ($result as $conference => $divisions) {
             self::assertIsString($conference);
             self::assertIsArray($divisions);

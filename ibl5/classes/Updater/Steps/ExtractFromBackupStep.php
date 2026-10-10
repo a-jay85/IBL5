@@ -59,8 +59,7 @@ final class ExtractFromBackupStep implements PipelineStepInterface
             );
         }
 
-        $missingExtensions = [];
-        $extractedCount = $this->extractFiles($archivePath, $missingExtensions);
+        $extractedCount = $this->extractFiles();
         $renameMessage = $this->autoRenameIfNeeded($archivePath, $backupDir);
 
         $archiveName = basename($archivePath);
@@ -81,9 +80,6 @@ final class ExtractFromBackupStep implements PipelineStepInterface
             $extractedCount,
             count(self::EXTENSIONS),
         );
-        if ($missingExtensions !== []) {
-            $foundMessage .= ' (missing: .' . implode(', .', $missingExtensions) . ')';
-        }
         $messages[] = $foundMessage;
 
         return StepResult::success($this->getLabel(), $detail, messages: $messages);
@@ -95,10 +91,9 @@ final class ExtractFromBackupStep implements PipelineStepInterface
      * All file types are now read directly from archive by JsbSourceResolver,
      * so EXTENSIONS is empty and this always returns 0.
      *
-     * @param list<string> $missingExtensions Populated with extensions not found in archive
      * @return int Number of files successfully extracted
      */
-    private function extractFiles(string $archivePath, array &$missingExtensions): int
+    private function extractFiles(): int
     {
         return 0;
     }

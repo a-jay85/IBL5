@@ -24,6 +24,8 @@ if (!defined('INDEX_FILE')) {
 $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db, $authService, $storyhome, $user_news, $articlecomm, $sitename, $multilingual, $currentlang;
+assert($mysqli_db instanceof \mysqli);
+assert($authService instanceof \Auth\Contracts\AuthServiceInterface);
 
 $newsPageConfig = new \Topics\News\NewsPageConfig(
     storyHome: is_numeric($storyhome) ? (int) $storyhome : 0,

@@ -16,7 +16,7 @@ class DraftPickLocatorEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftPickLocator');
 
-        $this->assertEmpty($output);
+        $this->assertSame('', $output);
     }
 
     public function testStubFileStructure(): void

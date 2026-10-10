@@ -17,7 +17,7 @@ class ProjectedDraftOrderEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('ProjectedDraftOrder');
 
-        $this->assertEmpty($output);
+        $this->assertSame('', $output);
     }
 
     public function testSaveOrderStubProducesNoPageOutput(): void
@@ -25,7 +25,7 @@ class ProjectedDraftOrderEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('ProjectedDraftOrder', ['op' => 'save_order']);
 
-        $this->assertEmpty($output);
+        $this->assertSame('', $output);
     }
 
     public function testStubFileStructure(): void

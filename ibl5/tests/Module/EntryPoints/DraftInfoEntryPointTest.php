@@ -23,7 +23,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftInfo', ['tab' => 'history']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('draftyear');
     }
 
@@ -32,7 +32,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftInfo', ['tab' => 'history', 'year' => '2020']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('draftyear');
     }
 
@@ -41,7 +41,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftInfo', ['tab' => 'history', 'year' => '0']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('draftyear');
     }
 
@@ -50,7 +50,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftInfo', ['tab' => 'history', 'year' => '-5']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('draftyear');
     }
 
@@ -59,7 +59,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftInfo', ['tab' => 'history', 'year' => 'abc']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('draftyear');
     }
 
@@ -69,7 +69,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftInfo', ['tab' => 'history', 'teamid' => '3']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_team_info');
     }
 
@@ -79,7 +79,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftInfo', ['tab' => 'history', 'teamid' => '3', 'year' => '2020']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('ibl_team_info');
     }
 
@@ -88,7 +88,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftInfo', ['tab' => 'history', 'teamid' => '0']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('draftyear');
     }
 
@@ -97,7 +97,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftInfo', ['op' => 'api']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('draftyear');
     }
 
@@ -106,7 +106,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftInfo', ['op' => 'api', 'year' => '2020']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testOpApiWithNonNumericYearFallsBackToLatest(): void
@@ -114,7 +114,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftInfo', ['op' => 'api', 'year' => 'garbage']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     public function testNonNumericTeamIdCastsToZero(): void
@@ -122,7 +122,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftInfo', ['tab' => 'history', 'teamid' => 'garbage']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('draftyear');
     }
 
@@ -134,7 +134,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('DraftInfo', ['tab' => 'picks']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
     }
 
     // --- Ported from ProjectedDraftOrderEntryPointTest (no tab — default order) ---
@@ -146,7 +146,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('DraftInfo');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Projected Draft Order', $output);
     }
 
@@ -157,7 +157,7 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('DraftInfo');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Draft Order', $output);
         $this->assertStringNotContainsString('Projected Draft Order', $output);
     }

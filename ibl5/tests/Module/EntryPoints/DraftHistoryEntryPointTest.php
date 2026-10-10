@@ -22,7 +22,7 @@ class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftHistory', ['op' => 'api']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('draftyear');
     }
 
@@ -31,7 +31,7 @@ class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('DraftHistory');
 
-        $this->assertEmpty($output);
+        $this->assertSame('', $output);
     }
 
     public function testStubFileStructure(): void

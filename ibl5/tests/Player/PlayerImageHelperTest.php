@@ -12,6 +12,43 @@ use Player\PlayerImageHelper;
  */
 class PlayerImageHelperTest extends TestCase
 {
+    private ?string $tmpDir = null;
+
+    protected function tearDown(): void
+    {
+        PlayerImageHelper::usePhotoDirectory(null);
+
+        if ($this->tmpDir !== null) {
+            $entries = scandir($this->tmpDir);
+            if ($entries !== false) {
+                foreach ($entries as $name) {
+                    if ($name !== '.' && $name !== '..') {
+                        unlink($this->tmpDir . $name);
+                    }
+                }
+            }
+            rmdir($this->tmpDir);
+            $this->tmpDir = null;
+        }
+
+        parent::tearDown();
+    }
+
+    /**
+     * Create a temp photo directory holding an empty <pid>.jpg for each pid.
+     */
+    private function makePhotoDir(int ...$pids): string
+    {
+        $dir = sys_get_temp_dir() . '/ibl-photo-helper-' . bin2hex(random_bytes(4)) . '/';
+        mkdir($dir);
+        $this->tmpDir = $dir;
+        foreach ($pids as $pid) {
+            touch($dir . $pid . '.jpg');
+        }
+
+        return $dir;
+    }
+
     /**
      * Test that valid playerID generates correct image URL
      */
@@ -88,9 +125,9 @@ class PlayerImageHelperTest extends TestCase
      */
     public function testCustomBasePathIsRespected(): void
     {
-        $result = PlayerImageHelper::getImageUrl(789, '../images/player/');
-        
-        $this->assertStringContainsString('../images/player/789.jpg', $result);
+        $result = PlayerImageHelper::getImageUrl(123, '../images/player/');
+
+        $this->assertStringContainsString('../images/player/123.jpg', $result);
     }
     
     /**
@@ -176,6 +213,7 @@ class PlayerImageHelperTest extends TestCase
      */
     public function testLargeValidPlayerID(): void
     {
+        PlayerImageHelper::usePhotoDirectory($this->makePhotoDir(999999));
         $result = PlayerImageHelper::getImageUrl(999999);
         
         $this->assertStringContainsString('./images/player/999999.jpg', $result);
@@ -430,5 +468,63 @@ class PlayerImageHelperTest extends TestCase
 
         $this->assertStringNotContainsString('<script>', $result);
         $this->assertStringContainsString('&lt;script&gt;', $result);
+    }
+
+    public function testExistingPhotoFileReturnsFileUrl(): void
+    {
+        $this->assertSame('./images/player/1742.jpg', PlayerImageHelper::getImageUrl(1742));
+    }
+
+    public function testMissingPhotoFileReturnsPlaceholder(): void
+    {
+        $result = PlayerImageHelper::getImageUrl(4040404);
+
+        $this->assertStringStartsWith('data:image/png;base64,', $result);
+        $this->assertStringNotContainsString('4040404.jpg', $result);
+    }
+
+    public function testMissingPhotoFileReturnsPlaceholderWithCustomBasePath(): void
+    {
+        $result = PlayerImageHelper::getImageUrl(4040404, '../images/player/');
+
+        $this->assertStringStartsWith('data:image/png;base64,', $result);
+    }
+
+    public function testExistenceCheckIgnoresBasePath(): void
+    {
+        $this->assertSame('/no/such/dir/123.jpg', PlayerImageHelper::getImageUrl(123, '/no/such/dir/'));
+    }
+
+    public function testPhotoExistenceIsCachedPerRequest(): void
+    {
+        $dir = $this->makePhotoDir(777);
+        PlayerImageHelper::usePhotoDirectory($dir);
+
+        $this->assertSame('./images/player/777.jpg', PlayerImageHelper::getImageUrl(777));
+
+        unlink($dir . '777.jpg');
+
+        $this->assertSame('./images/player/777.jpg', PlayerImageHelper::getImageUrl(777));
+    }
+
+    public function testMissingResultIsCachedUntilDirectoryReset(): void
+    {
+        $dir = $this->makePhotoDir();
+        PlayerImageHelper::usePhotoDirectory($dir);
+
+        $this->assertStringStartsWith('data:image/png;base64,', PlayerImageHelper::getImageUrl(778));
+
+        touch($dir . '778.jpg');
+
+        $this->assertStringStartsWith('data:image/png;base64,', PlayerImageHelper::getImageUrl(778));
+
+        PlayerImageHelper::usePhotoDirectory($dir);
+
+        $this->assertSame('./images/player/778.jpg', PlayerImageHelper::getImageUrl(778));
+    }
+
+    public function testExistingPhotoUrlStaysEscaped(): void
+    {
+        $this->assertSame('./a&amp;b/123.jpg', PlayerImageHelper::getImageUrl(123, './a&b/'));
     }
 }

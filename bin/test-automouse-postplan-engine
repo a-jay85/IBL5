@@ -49,6 +49,14 @@ assert_contains() {
     fi
 }
 
+assert_not_contains() {
+    if printf '%s' "$1" | grep -qF -e "$2"; then
+        h_fail "$3" "$(printf '%q' "$2") unexpectedly found in output"
+    else
+        h_pass "$3"
+    fi
+}
+
 # ---------------------------------------------------------------------------
 # Extract live blocks — never copy them.
 # ---------------------------------------------------------------------------
@@ -342,6 +350,7 @@ rc3_sandbox() {
     # STUB_EXTRA is printed by the stub in the phase (a fresh block).
     if [ -n "${PRE_LOG:-}" ]; then printf '%s\n' "$PRE_LOG" >> "$LOG"; fi
     HANDOFF_DIR="$SB/handoff"
+    REPO="$SB/repo"   # the main checkout the fallback block's paste line points at
     PLAN_NAME="test-plan.md"; PLAN_SLUG="test-plan"
     HANDOFF_FILE="$HANDOFF_DIR/$PLAN_NAME.json"
     WORKTREES_ROOT="$SB/no-such-worktrees-root"
@@ -463,6 +472,8 @@ assert_contains "$(cat "$RPT" 2>/dev/null)" "test-plan did not ship. No PR opene
 assert_contains "$(cat "$RPT" 2>/dev/null)" "  1. cd $SB/worktree" "row 12e: fallback block names the worktree to cd into"
 assert_contains "$(cat "$RPT" 2>/dev/null)" "  3. bin/post-plan-now" "row 12e: fallback block has the re-run step"
 assert_contains "$(cat "$RPT" 2>/dev/null)" "Log: $LOG" "row 12e: fallback block names the log"
+assert_contains "$(cat "$RPT" 2>/dev/null)" "$REPO/bin/postplan-fix test-plan" "row 12e: fallback block ends with the postplan-fix paste line"
+assert_not_contains "$(cat "$RPT" 2>/dev/null)" "Or open Claude in that folder" "row 12e: old open-Claude sentence is gone"
 rm -rf "$SB"
 
 # --- Row 12f: a stale block from before this phase is ignored ---

@@ -41,14 +41,6 @@ interface PlayerImageHelperInterface
     public static function getImageUrl($playerID, string $basePath = './images/player/'): string;
 
     /**
-     * Whether a URL from getImageUrl() is the no-photo placeholder
-     *
-     * @param string $url A URL returned by getImageUrl()
-     * @return bool True when the player has no usable photo
-     */
-    public static function isPlaceholderUrl(string $url): bool;
-
-    /**
      * Render a player thumbnail <img> tag with lazy loading
      *
      * Returns a complete <img> element with class="ibl-player-photo", 24x24 dimensions,

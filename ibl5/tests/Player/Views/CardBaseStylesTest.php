@@ -6,7 +6,6 @@ namespace Tests\Player\Views;
 
 use PHPUnit\Framework\TestCase;
 use Player\Player;
-use Player\PlayerImageHelper;
 use Player\Views\CardBaseStyles;
 use Player\Views\TeamColorHelper;
 
@@ -67,24 +66,6 @@ class CardBaseStylesTest extends TestCase
 
         $this->assertStringContainsString('Test Player', $html);
         $this->assertStringContainsString('<h2>', $html);
-    }
-
-    public function testRenderCardTopShowsPhotoWhenPlayerHasOne(): void
-    {
-        $html = CardBaseStyles::renderCardTop($this->createPlayerData());
-
-        $this->assertStringContainsString('<img src="./images/player/100.png"', $html);
-    }
-
-    public function testRenderCardTopLeavesPhotoFrameEmptyForPlaceholder(): void
-    {
-        $playerData = $this->createPlayerData();
-        $playerData['imageUrl'] = PlayerImageHelper::getImageUrl(null);
-
-        $html = CardBaseStyles::renderCardTop($playerData);
-
-        $this->assertMatchesRegularExpression('#<div class="player-photo-frame">\s*</div>#', $html);
-        $this->assertStringNotContainsString('data:image/png', $html);
     }
 
     public function testRenderCardTopContainsStatsGrid(): void

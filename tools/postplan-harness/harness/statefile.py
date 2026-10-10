@@ -35,6 +35,7 @@ STATE_KEYS = (
     "sticky_comment_id",
     "ci",
     "first_seen_at",
+    "pause_edit_sid",
     "run_started_at",
     "updated_at",
 )
@@ -150,6 +151,8 @@ class StateFile:
                 "sticky_comment_id": res.sticky_comment_id,
                 "ci": ci,
                 "first_seen_at": self.previous.get("first_seen_at") or self.run_started_at,
+                # ADR-0143 addendum 2026-10-10: S whose interrupted edit awaits discard
+                "pause_edit_sid": getattr(res, "pause_edit_sid", None),
                 "run_started_at": self.run_started_at,
                 "updated_at": _now(),
             }

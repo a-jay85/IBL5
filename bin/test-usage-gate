@@ -2008,6 +2008,7 @@ test_fetch_switch_unknown_account_signals_token() {
 test_fetch_429_episode_climbs_across_success() {
     new_env
     local d="$IBL5_USAGE_GATE_STATE_DIR" exp i=0
+    # Labels expand per round: ep_climb:delay1 through ep_climb:delay6, plus success-clears and episode-kept.
     for exp in 30 60 120 240 480 480; do
         i=$((i + 1))
         seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"

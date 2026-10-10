@@ -16,6 +16,9 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SELF="$SCRIPT_DIR/$(basename "$0")"
 WTNEW="$SCRIPT_DIR/wt-new"
@@ -31,9 +34,8 @@ unset CLAUDE_CODE_SESSION_ID WT_POOL BUNX_FAIL
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 export GIT_CONFIG_NOSYSTEM=1
 
-FAILED=0
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$@"; }
 
 # assert_absent <name> <regex> <haystack>
 assert_absent() {
@@ -57,7 +59,7 @@ assert_match() {
 
 # assert_eq <name> <expected> <actual>
 assert_eq() {
-    if [ "$2" = "$3" ]; then pass "$1"; else failcase "$1 — expected '$2', got '$3'"; fi
+    h_eq "$1" "$2" "$3"
 }
 
 git_q() { git -c user.email=t@t -c user.name=t -c init.defaultBranch=master "$@"; }
@@ -703,4 +705,4 @@ for c in "$@"; do
     "case_$c"
 done
 
-exit "$FAILED"
+h_done

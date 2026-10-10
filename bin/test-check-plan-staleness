@@ -16,13 +16,12 @@
 # Run: bin/test-check-plan-staleness  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GUARD="$SCRIPT_DIR/check-plan-staleness"
-TMP="$(mktemp -d)"
-trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null' EXIT
-
-FAILED=0
+h_tmp TMP
 
 # assert <name> <expected-exit> <plan-body>
 assert() {
@@ -32,10 +31,9 @@ assert() {
     "$GUARD" "$f" >/dev/null 2>&1
     got=$?
     if [ "$got" -ne "$want" ]; then
-        echo "FAIL: $name — expected exit $want, got $got"
-        FAILED=1
+        h_fail "$name" "expected exit $want, got $got"
     else
-        echo "ok: $name (exit $got)"
+        h_pass "$name (exit $got)"
     fi
 }
 
@@ -226,9 +224,4 @@ assert "example-loose-no-suppress" 1 'See docs (example) and also `bin/yet-anoth
 # absent — it would trigger the pre-existing cue alternation and make the case vacuous.
 assert "example-rejected-design" 0 'Decisions: a separate `bin/test-plan-review-seam-contract` (example) was considered and an alternative path was chosen.'
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

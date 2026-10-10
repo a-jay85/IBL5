@@ -37,10 +37,25 @@ if (!defined('_GOTOHOME')) {
 
 class NewsController implements NewsControllerInterface
 {
+    public function __construct(
+        private readonly NewsPageConfig $config,
+        private readonly \Auth\Contracts\AuthServiceInterface $authService,
+        private readonly \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepository,
+        private readonly \LastSimRecap\Contracts\LastSimRecapServiceInterface $lastSimRecapService,
+        private readonly \LastSimRecap\Contracts\LastSimRecapViewInterface $lastSimRecapView,
+        private readonly \Topics\News\Contracts\NewsServiceInterface $newsService,
+        private readonly \Topics\News\Contracts\NewsViewInterface $newsView,
+    ) {}
+
     public function main(mixed $new_topic): void
     {
-        global $db, $storyhome, $topicname, $topicimage, $topictext, $user, $prefix, $multilingual, $currentlang, $articlecomm, $sitename, $user_news, $userinfo, $authService, $mysqli_db;
-        if (is_user($user)) {$userinfo = $authService->getUserInfo();}
+        $storyhome = $this->config->storyHome;
+        $multilingual = $this->config->multilingual;
+        $currentlang = $this->config->currentLang;
+        $articlecomm = $this->config->articleComm;
+        $sitename = $this->config->siteName;
+        $user_news = $this->config->userNews;
+        $userinfo = $this->authService->isAuthenticated() ? $this->authService->getUserInfo() : null;
         $new_topic = intval($new_topic);
         if ($multilingual == 1) {
             $querylang = "AND (alanguage='$currentlang' OR alanguage='')";
@@ -55,19 +70,16 @@ class NewsController implements NewsControllerInterface
             echo '<h1 class="ibl-title">News</h1>';
         }
 
-        if (is_user($user)) {
-            $teamRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
+        if ($this->authService->isAuthenticated()) {
+            $teamRepo = $this->teamIdentityRepository;
             $teamName = $teamRepo->getTeamnameFromUsername($userinfo['username'] ?? null);
             if ($teamName !== null && $teamName !== \League\League::FREE_AGENTS_TEAM_NAME) {
                 $tid = $teamRepo->getTidFromTeamname($teamName);
                 if ($tid !== null && \League\League::isRealFranchise($tid)) {
-                    $recapService = new \LastSimRecap\LastSimRecapService(
-                        new \LastSimRecap\LastSimRecapRepository($mysqli_db),
-                        new \Repositories\PlayerLookupRepository($mysqli_db),
-                    );
+                    $recapService = $this->lastSimRecapService;
                     $slate = $recapService->buildSlateForTeam($tid);
                     if ($slate !== null) {
-                        echo (new \LastSimRecap\LastSimRecapView())->render($slate);
+                        echo $this->lastSimRecapView->render($slate);
                     }
                 }
             }
@@ -83,7 +95,7 @@ class NewsController implements NewsControllerInterface
             $storynum = $storyhome;
         }
 
-        $newsService = new \Topics\News\NewsService($mysqli_db);
+        $newsService = $this->newsService;
 
         if ($new_topic !== 0) {
             $topicText = $newsService->getTopicText($new_topic);
@@ -166,7 +178,7 @@ class NewsController implements NewsControllerInterface
                 'topicimage' => $topicimage, 'topictext' => $topictext,
             ];
         }
-        (new \Topics\News\NewsView())->renderStories($viewModels);
+        $this->newsView->renderStories($viewModels);
         \PageLayout\PageLayout::footer();
     }
 }

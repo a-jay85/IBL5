@@ -19,16 +19,18 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WTNEW="$SCRIPT_DIR/wt-new"
 TMP="$(mktemp -d)"
 trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
 
-FAILED=0
 # Root resolution only: keep the sandbox off the warm pool and launchd (bin/test-wt-pool covers them).
 export WT_POOL=0 WT_POOL_KICK=none
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$@"; }
 
 # assert_absent <name> <regex> <haystack>
 assert_absent() {
@@ -52,7 +54,7 @@ assert_match() {
 
 # assert_eq <name> <expected> <actual>
 assert_eq() {
-    if [ "$2" = "$3" ]; then pass "$1"; else failcase "$1 — expected '$2', got '$3'"; fi
+    h_eq "$1" "$2" "$3"
 }
 
 git_q() { git -c user.email=t@t -c user.name=t -c init.defaultBranch=master "$@"; }
@@ -372,5 +374,4 @@ else
 fi
 
 echo "----"
-if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "FAILURES"; fi
-exit "$FAILED"
+h_done

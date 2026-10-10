@@ -125,7 +125,7 @@ class JsbExportRepositoryTest extends DatabaseTestCase
             static fn (array $row): bool => $row['tradeofferid'] === $offerId,
         );
 
-        self::assertNotEmpty($matching);
+        self::assertNotSame([], $matching);
         $item = array_values($matching)[0];
         self::assertSame($offerId, $item['tradeofferid']);
         self::assertSame(200000060, $item['itemid']);
@@ -146,7 +146,7 @@ class JsbExportRepositoryTest extends DatabaseTestCase
             static fn (array $row): bool => $row['tradeofferid'] === $offerId,
         );
 
-        self::assertEmpty($matching);
+        self::assertSame([], $matching);
     }
 
     public function testGetCompletedTradeItemsFiltersByDate(): void
@@ -162,7 +162,7 @@ class JsbExportRepositoryTest extends DatabaseTestCase
             static fn (array $row): bool => $row['tradeofferid'] === $offerId,
         );
 
-        self::assertEmpty($matching);
+        self::assertSame([], $matching);
     }
 
     public function testGetCompletedTradeItemsOrdersByOfferAndId(): void
@@ -185,7 +185,7 @@ class JsbExportRepositoryTest extends DatabaseTestCase
 
         // Should be ordered by tradeofferid, then by id
         // offerId1 < offerId2, so offerId1 items first
-        self::assertNotEmpty($offerIds);
+        self::assertNotSame([], $offerIds);
         if (count($offerIds) >= 2) {
             self::assertLessThanOrEqual($offerIds[1], $offerIds[0]);
         }

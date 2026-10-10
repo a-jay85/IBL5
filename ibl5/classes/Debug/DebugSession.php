@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Debug;
 
+use Clock\ClockInterface;
+use Clock\SystemClock;
 use Debug\Contracts\DebugSessionInterface;
 
 class DebugSession implements DebugSessionInterface
@@ -13,9 +15,11 @@ class DebugSession implements DebugSessionInterface
     private const COOKIE_EXPIRY_DAYS = 30;
 
     private bool $isAdmin;
+    private ClockInterface $clock;
 
-    public function __construct(?string $username, ?string $serverName, ?string $cookieValue = null, bool $isE2ETesting = false)
+    public function __construct(?string $username, ?string $serverName, ?string $cookieValue = null, bool $isE2ETesting = false, ?ClockInterface $clock = null)
     {
+        $this->clock = $clock ?? new SystemClock();
         $this->isAdmin = $username === 'A-Jay' && (self::isLocalhost($serverName) || $isE2ETesting);
 
         if ($this->isAdmin) {
@@ -50,19 +54,30 @@ class DebugSession implements DebugSessionInterface
 
         if ($newState) {
             setcookie(self::COOKIE_NAME, '1', [
-                'expires' => time() + 86400 * self::COOKIE_EXPIRY_DAYS,
+                'expires' => $this->cookieExpiry(true),
                 'path' => '/',
                 'httponly' => true,
                 'samesite' => 'Lax',
             ]);
         } else {
             setcookie(self::COOKIE_NAME, '', [
-                'expires' => time() - 3600,
+                'expires' => $this->cookieExpiry(false),
                 'path' => '/',
                 'httponly' => true,
                 'samesite' => 'Lax',
             ]);
         }
+    }
+
+    /**
+     * Unix expiry for the debug cookie: COOKIE_EXPIRY_DAYS ahead when enabling,
+     * one hour in the past when disabling (tells the browser to delete it).
+     */
+    public function cookieExpiry(bool $enable): int
+    {
+        $now = $this->clock->now();
+
+        return $enable ? $now + 86400 * self::COOKIE_EXPIRY_DAYS : $now - 3600;
     }
 
     private static function isLocalhost(?string $serverName): bool

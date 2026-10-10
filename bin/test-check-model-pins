@@ -1,0 +1,181 @@
+#!/bin/bash
+# <!-- no-adr: additive lint gate that pins model ids to one list; no new architectural boundary or constraint beyond the existing tiering rules -->
+# bin/test-check-model-pins — behavioural harness for bin/check-model-pins.
+#
+# Each case builds a throwaway git repo under a temp dir, copies the real gate
+# and the real current-models list into it, plants a fixture, and asserts on the
+# exit code and output. Retired ids are built by concatenation so this file
+# carries no literal stale id and needs no allowlist line.
+#
+# Run: bin/test-check-model-pins  (exit 0 = all pass, 1 = an assertion failed)
+
+set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TMPROOT="$(mktemp -d)"
+trap 'rm -rf "$TMPROOT"' EXIT
+
+ok() { h_pass "$1"; }
+fail() { h_fail "$@"; }
+
+want() { # label output token
+    if grep -qF -- "$3" <<< "$2"; then
+        ok "$1"
+    else
+        fail "$1 (missing token: $3)"
+        sed 's/^/      | /' <<< "$2"
+    fi
+}
+
+want_rc() { # label expected actual
+    if [ "$3" -eq "$2" ]; then
+        ok "$1 (exit $3)"
+    else
+        fail "$1 (expected exit $2, got $3)"
+    fi
+}
+
+want_absent() { # label output token
+    if grep -qF -- "$3" <<< "$2"; then
+        fail "$1 (unexpected token: $3)"
+        sed 's/^/      | /' <<< "$2"
+    else
+        ok "$1"
+    fi
+}
+
+OPUS=claude-opus; SONNET=claude-sonnet; HAIKU=claude-haiku
+CUR_SONNET="$SONNET-5-5"; CUR_OPUS="$OPUS-5-5"
+STALE_SONNET="$SONNET-4-6"
+BARE_OPUS="$OPUS-5"
+DATED_HAIKU="$HAIKU-4-5-20251001"
+
+N=0
+mkrepo() { # sets $d to a fresh fixture dir with the gate, list, and empty allowlist
+    N=$((N + 1))
+    d="$TMPROOT/case$N"
+    mkdir -p "$d/bin/lib"
+    cp "$ROOT/bin/check-model-pins" "$d/bin/check-model-pins"
+    cp "$ROOT/bin/lib/current-models" "$d/bin/lib/current-models"
+    : > "$d/bin/lib/model-pins-allowlist"
+}
+
+gitinit() { # dir: init and stage everything (the gate scans tracked files only)
+    git -C "$1" init -q
+    git -C "$1" add -A
+}
+
+# 1. Clean tree passes.
+mkrepo
+printf 'MODEL = "%s"\n' "$CUR_SONNET" > "$d/live.py"
+gitinit "$d"
+out=$("$d/bin/check-model-pins" 2>&1); rc=$?
+want_rc "1 clean tree" 0 "$rc"
+want "1 clean tree prints OK" "$out" "OK"
+
+# 2. Planted stale id fails.
+mkrepo
+printf 'x = 1\nMODEL = "%s"\n' "$STALE_SONNET" > "$d/live.py"
+gitinit "$d"
+out=$("$d/bin/check-model-pins" 2>&1); rc=$?
+want_rc "2 planted stale id" 1 "$rc"
+want "2 names file:line" "$out" "live.py:2:"
+want "2 names the id" "$out" "$STALE_SONNET"
+want "2 summary line" "$out" "stale model id(s)"
+D2="$d"
+
+# 3. Allowlisted path passes.
+mkrepo
+printf 'x = 1\nMODEL = "%s"\n' "$STALE_SONNET" > "$d/live.py"
+printf 'live.py   # test reason\n' > "$d/bin/lib/model-pins-allowlist"
+gitinit "$d"
+out=$("$d/bin/check-model-pins" 2>&1); rc=$?
+want_rc "3 allowlisted path" 0 "$rc"
+
+# 4. Bare id fails without masking its current sibling.
+mkrepo
+printf '"%s"\n%s\n' "$BARE_OPUS" "$CUR_OPUS" > "$d/live.py"
+gitinit "$d"
+out=$("$d/bin/check-model-pins" 2>&1); rc=$?
+want_rc "4 bare id" 1 "$rc"
+want "4 flags the bare id line" "$out" "live.py:1:"
+want_absent "4 current sibling not flagged" "$out" "live.py:2:"
+
+# 5. Dated id is one whole token.
+mkrepo
+printf 'M = "%s"\n' "$DATED_HAIKU" > "$d/live.py"
+gitinit "$d"
+out=$("$d/bin/check-model-pins" 2>&1); rc=$?
+want_rc "5 dated id" 1 "$rc"
+want "5 whole dated token" "$out" "$DATED_HAIKU"
+
+# 6. Directory prefix is bounded.
+mkrepo
+mkdir -p "$d/fx" "$d/fx-extra"
+printf '"%s"\n' "$STALE_SONNET" > "$d/fx/a.json"
+printf '"%s"\n' "$STALE_SONNET" > "$d/fx-extra/b.json"
+printf 'fx/   # fixtures\n' > "$d/bin/lib/model-pins-allowlist"
+gitinit "$d"
+out=$("$d/bin/check-model-pins" 2>&1); rc=$?
+want_rc "6 directory prefix bounded" 1 "$rc"
+want "6 sibling directory flagged" "$out" "fx-extra/b.json"
+want_absent "6 allowlisted directory not flagged" "$out" "fx/a.json"
+
+# 7. Stale allowlist entry warns, does not fail.
+mkrepo
+printf 'MODEL = "%s"\n' "$CUR_SONNET" > "$d/live.py"
+printf 'gone.txt   # removed\n' > "$d/bin/lib/model-pins-allowlist"
+gitinit "$d"
+out=$("$d/bin/check-model-pins" 2>&1); rc=$?
+want_rc "7 stale allowlist entry" 0 "$rc"
+want "7 warns" "$out" "WARN allowlist entry no longer exists: gone.txt"
+
+# 8. Slashless directory entry is rejected.
+mkrepo
+mkdir -p "$d/fx"
+printf 'x\n' > "$d/fx/a.txt"
+printf 'fx   # dir\n' > "$d/bin/lib/model-pins-allowlist"
+gitinit "$d"
+out=$("$d/bin/check-model-pins" 2>&1); rc=$?
+want_rc "8 slashless directory entry" 2 "$rc"
+want "8 says is a directory" "$out" "is a directory"
+
+# 9. Empty current list fails closed.
+mkrepo
+printf '# nothing listed\n' > "$d/bin/lib/current-models"
+printf 'MODEL = "%s"\n' "$CUR_SONNET" > "$d/live.py"
+gitinit "$d"
+out=$("$d/bin/check-model-pins" 2>&1); rc=$?
+want_rc "9 empty current list" 2 "$rc"
+want "9 says lists no ids" "$out" "lists no ids"
+
+# 10. Non-repo fails closed. The fixture has no git init, so git grep errors out.
+mkrepo
+printf 'MODEL = "%s"\n' "$CUR_SONNET" > "$d/live.py"
+out=$(GIT_CEILING_DIRECTORIES="$TMPROOT" "$d/bin/check-model-pins" 2>&1); rc=$?
+want_rc "10 non-repo" 2 "$rc"
+want "10 says git grep failed" "$out" "git grep failed"
+
+# 11. Empty env still catches a stale id (gate 17). Reuses case 2's tree.
+out=$(env -i /bin/bash "$D2/bin/check-model-pins" 2>&1); rc=$?
+want_rc "11 empty env" 1 "$rc"
+want "11 empty env names the id" "$out" "$STALE_SONNET"
+
+# 12. Unknown flag fails loudly.
+mkrepo
+printf 'MODEL = "%s"\n' "$CUR_SONNET" > "$d/live.py"
+gitinit "$d"
+out=$("$d/bin/check-model-pins" --bogus 2>&1); rc=$?
+want_rc "12 unknown flag" 2 "$rc"
+want "12 names the flag" "$out" "unknown argument: --bogus"
+
+# 13. Real tree is clean.
+out=$("$ROOT/bin/check-model-pins" 2>&1); rc=$?
+want_rc "13 real tree clean" 0 "$rc"
+if [ "$rc" -ne 0 ]; then
+    sed 's/^/      | /' <<< "$out"
+fi
+
+h_done

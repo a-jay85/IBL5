@@ -89,8 +89,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
                     $player2Data,
                     $result->player1Stats,
                     $result->player2Stats,
-                    true,
-                    $possession
+                    true
                 );
             } else {
                 $this->runPossession(
@@ -99,8 +98,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
                     $player1Data,
                     $result->player2Stats,
                     $result->player1Stats,
-                    false,
-                    $possession
+                    false
                 );
             }
 
@@ -134,8 +132,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
         array $defenseData,
         OneOnOneGamePlayerStats $offenseStats,
         OneOnOneGamePlayerStats $defenseStats,
-        bool $isPlayer1OnOffense,
-        int $possession
+        bool $isPlayer1OnOffense
     ): void {
         $offenseName = HtmlSanitizer::safeHtmlOutput($offenseData['name']);
         $defenseName = HtmlSanitizer::safeHtmlOutput($defenseData['name']);

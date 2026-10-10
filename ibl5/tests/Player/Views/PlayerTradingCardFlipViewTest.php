@@ -16,7 +16,7 @@ class PlayerTradingCardFlipViewTest extends TestCase
 
     /**
      * Build a Player stub with every getter called by both sub-views (FrontView + BackView)
-     * and CardBaseStyles::preparePlayerData() / getColorSchemeForTeam().
+     * and CardBaseStyles::preparePlayerData().
      *
      * FlipView delegates to both sub-views internally, so all FrontView getters
      * (the superset) must be configured.
@@ -28,7 +28,7 @@ class PlayerTradingCardFlipViewTest extends TestCase
         /** @var Player&\PHPUnit\Framework\MockObject\Stub $player */
         $player = self::createStub(Player::class);
 
-        // CardBaseStyles::preparePlayerData() and getColorSchemeForTeam() getters
+        // CardBaseStyles::preparePlayerData() getters
         $player->method('getTeamid')->willReturn(7);
         $player->method('getName')->willReturn('Test Player');
         $player->method('getNickname')->willReturn(null);
@@ -139,7 +139,7 @@ class PlayerTradingCardFlipViewTest extends TestCase
     {
         $result = PlayerTradingCardFlipView::getFlipStyles();
 
-        $this->assertNotEmpty($result);
+        $this->assertNotSame('', $result);
     }
 
     public function testRenderContainsBothFacesSnapshot(): void

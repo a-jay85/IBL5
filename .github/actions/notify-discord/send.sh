@@ -1,7 +1,7 @@
 #!/bin/bash
 # send.sh — the shell logic of the notify-discord composite action.
 #
-# POSTs the message file to the #dev channel webhook. Lives in its own file so
+# POSTs the message file to the channel webhook it is given (#dev or #merged). Lives in its own file so
 # bin/test-discord-dm can run the exact bytes CI runs. Inputs arrive only through
 # env (WEBHOOK_URL, MSG_FILE, PING, FAIL_ON_DELIVERY); NOTIFY_CURL_BIN is a test
 # seam that no workflow sets.
@@ -21,7 +21,7 @@ die_or_warn() {
 }
 
 if [ -z "$WEBHOOK_URL" ]; then
-    die_or_warn "webhook-url is empty (DISCORD_DEV_WEBHOOK_URL unset or fork PR)"
+    die_or_warn "webhook-url is empty (webhook secret unset or fork PR)"
 fi
 echo "::add-mask::$WEBHOOK_URL"
 

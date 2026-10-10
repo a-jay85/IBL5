@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# Tests for main_checkout_root in bin/lib/git-helpers.sh.
+#
+# The helper must print the main checkout path from the main checkout, a linked
+# worktree, or any subdirectory of either, and from any cwd when given a dir.
+# The oracle is a direct `git worktree list --porcelain` call, never the helper.
+#
+# Usage: bin/test-main-checkout-root
+
+set -uo pipefail
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# Hermetic: no user or system git config leaks in.
+export HOME="$TMP/home"
+export GIT_CONFIG_NOSYSTEM=1
+mkdir -p "$HOME"
+
+# shellcheck source=lib/git-helpers.sh
+source "$(cd "$(dirname "$0")" && pwd)/lib/git-helpers.sh"
+
+PASS=0
+FAIL=0
+
+# check <name> <want> <got> <rc> [want_rc]
+check() {
+    local name="$1" want="$2" got="$3" rc="$4" want_rc="${5:-0}"
+    if [ "$got" = "$want" ] && [ "$rc" = "$want_rc" ]; then
+        echo "PASS: $name"
+        PASS=$((PASS + 1))
+    else
+        echo "FAIL: $name: got '$got' rc=$rc, want '$want' rc=$want_rc"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+# Do NOT pwd -P TMP: on macOS it stays /var/folders/..., so every case
+# exercises the /var vs /private/var mismatch against the oracle.
+git init -q "$TMP/main"
+git -C "$TMP/main" -c user.name=t -c user.email=t@example.com \
+    commit -q --allow-empty -m init
+mkdir -p "$TMP/main/sub/deep"
+git -C "$TMP/main" worktree add -q "$TMP/wt" -b wt-branch
+mkdir -p "$TMP/wt/sub" "$TMP/plain"
+
+want="$(git -C "$TMP/main" worktree list --porcelain \
+    | awk '/^worktree / && !f {print $2; f=1}')"
+
+# run_cases: returns the number of failing cases.
+run_cases() {
+    local before="$FAIL" got rc
+    got="$(cd "$TMP/main" && main_checkout_root)"; rc=$?
+    check main-top "$want" "$got" "$rc"
+    got="$(cd "$TMP/main/sub/deep" && main_checkout_root)"; rc=$?
+    check main-subdir "$want" "$got" "$rc"
+    got="$(cd "$TMP/wt" && main_checkout_root)"; rc=$?
+    check wt-top "$want" "$got" "$rc"
+    got="$(cd "$TMP/wt/sub" && main_checkout_root)"; rc=$?
+    check wt-subdir "$want" "$got" "$rc"
+    got="$(cd / && main_checkout_root "$TMP/wt/sub")"; rc=$?
+    check explicit-dir-from-root "$want" "$got" "$rc"
+    got="$(cd "$TMP/wt" && main_checkout_root .)"; rc=$?
+    check explicit-dot "$want" "$got" "$rc"
+    return $((FAIL - before))
+}
+
+run_cases
+
+got="$(cd / && GIT_CEILING_DIRECTORIES="$TMP" main_checkout_root "$TMP/plain")"; rc=$?
+check non-git-dir "" "$got" "$rc" 1
+
+got="$(cd / && main_checkout_root "$TMP/does-not-exist")"; rc=$?
+check missing-dir "" "$got" "$rc" 1
+
+# Stub git that mimics git < 2.31: --path-format=absolute is dropped and
+# echoed back as its own output line, then the real git runs.
+REAL_GIT="$(command -v git)"
+mkdir -p "$TMP/stub"
+cat >"$TMP/stub/git" <<STUB
+#!/usr/bin/env bash
+args=()
+flag=0
+for a in "\$@"; do
+    if [ "\$a" = "--path-format=absolute" ]; then flag=1; else args+=("\$a"); fi
+done
+[ "\$flag" = 1 ] && echo "--path-format=absolute"
+exec "$REAL_GIT" "\${args[@]}"
+STUB
+chmod +x "$TMP/stub/git"
+
+got="$(cd "$TMP/wt/sub" && PATH="$TMP/stub:$PATH" main_checkout_root)"; rc=$?
+check old-git-fallback "$want" "$got" "$rc"
+
+got="$(cd / && GIT_CEILING_DIRECTORIES="$TMP" PATH="$TMP/stub:$PATH" \
+    main_checkout_root "$TMP/plain")"; rc=$?
+check old-git-fallback-non-git "" "$got" "$rc" 1
+
+# Mutation: a --show-toplevel helper returns the current tree, so the harness
+# must fail at least one case against it.
+mut_fail="$(
+    main_checkout_root() { git -C "${1:-.}" rev-parse --show-toplevel; }
+    run_cases >/dev/null
+    echo "$FAIL"
+)"
+mut_fail=$((mut_fail - FAIL))
+if [ "$mut_fail" -ge 1 ]; then
+    echo "PASS: mutation-show-toplevel caught ($mut_fail case failures)"
+    PASS=$((PASS + 1))
+else
+    echo "FAIL: mutation-show-toplevel not caught"
+    FAIL=$((FAIL + 1))
+fi
+
+echo "test-main-checkout-root: $PASS passed, $FAIL failed"
+exit $((FAIL > 0))

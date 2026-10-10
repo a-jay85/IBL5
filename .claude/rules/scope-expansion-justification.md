@@ -1,6 +1,6 @@
 ---
 description: A PR whose diff touches production module code must justify that scope expansion in the PR body — lazy-loaded on rule-doc edits; governs PR authorship.
-last_verified: 2026-09-04
+last_verified: 2026-10-09
 paths: ".claude/rules/*.md"
 ---
 
@@ -11,7 +11,7 @@ paths: ".claude/rules/*.md"
 When a PR's diff touches production module code under the `ibl5/modules/` tree, the PR
 body's `## Scope` prose must contain a sentence naming **why** each such file was touched.
 
-The machine-generated files-changed block records **what** changed; the `## Scope` prose is
+The diff records **what** changed; the `## Scope` prose is
 the only place **why** can live. A module file listed with no matching justification sentence
 is the defect this rule names.
 
@@ -34,7 +34,7 @@ Maintenance-backlog item 15.29 tracks this finding.
 
 | Diff touches | PR body `## Scope` must |
 |---|---|
-| No `ibl5/modules/` files | Nothing extra — the files-changed block is sufficient |
+| No `ibl5/modules/` files | Nothing extra |
 | `ibl5/modules/` files, and the PR title is `feat:` | Name why each module file changed (the feature already declares user-facing intent, so one sentence per group is enough) |
 | `ibl5/modules/` files, and the PR title is **not** `feat:` | Name why each module file changed **and** state explicitly that the production change is intended, not incidental — this is the undeclared-expansion shape |
 

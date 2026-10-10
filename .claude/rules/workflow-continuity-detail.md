@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-06
+last_verified: 2026-10-09
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -50,6 +50,17 @@ skill fallback is suppressed. `cd` into the target worktree and re-run.
 It exits **8** when it declines a repeat hold: the last run for this slug held on the same
 structural reasons, the repeat DM was already sent, and plan, diff and harness are unchanged
 (`harness/holdrepeat.py`). Nothing was fired. `--force` overrides.
+The harness also declines inside a run, after the conflict probe and before its first LLM
+call, when the diff changed but condition (3)'s `MISSING:` and `MISSING-FILE:` items equal
+the ones the last hold recorded. A diff that never adds the missing files cannot clear that
+hold, so a fresh review would only spend tokens. The run ends with terminal
+`hold-repeat-declined`, exits **0** so no skill fallback starts, and opens no PR.
+It prints `RESULT: post-plan DECLINED` with this phrase:
+`declined: same hold as last run (<reason>), no tokens spent`.
+It DMs once per recorded hold. A strict subset (some files added) or a new
+missing item runs normally, and so do holds on conditions (7), (8) and (13).
+`bin/post-plan-now --force` passes `POSTPLAN_FORCE=1` to the harness and skips this check
+too; every other launch passes `POSTPLAN_FORCE=0`.
 
 ## What `--auto` adds
 

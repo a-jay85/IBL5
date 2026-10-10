@@ -252,7 +252,7 @@ bpt_count       "r26: no wt-new for an unresumed row" 0 "$STUB/wt-new.log"
 bpt_reset
 R27_SLUG="bug-7-roster-page-throws-a-fatal-err"
 mkdir -p "$STUB/wt/$R27_SLUG/ibl5"
-git -C "$STUB/wt/$R27_SLUG" init -q; git -C "$STUB/wt/$R27_SLUG" config user.email t@t; git -C "$STUB/wt/$R27_SLUG" config user.name t
+h_git_repo "$STUB/wt/$R27_SLUG" --no-commit
 printf 'base\n' > "$STUB/wt/$R27_SLUG/ibl5/hunted.txt"
 git -C "$STUB/wt/$R27_SLUG" add -A; git -C "$STUB/wt/$R27_SLUG" commit -qm base
 bpt_set_actionable '[{"id":"7","status":"blocked","class":"bug","original_text":"roster page throws a fatal error"}]'
@@ -266,7 +266,7 @@ bpt_count "r27: existing worktree reused (no wt-new)" 0 "$STUB/wt-new.log"
 # LEGACY bug-<id> dir pre-exists → drive_hunt_row must reuse it, never fork a second worktree.
 bpt_reset
 mkdir -p "$STUB/wt/bug-7/ibl5"
-git -C "$STUB/wt/bug-7" init -q; git -C "$STUB/wt/bug-7" config user.email t@t; git -C "$STUB/wt/bug-7" config user.name t
+h_git_repo "$STUB/wt/bug-7" --no-commit
 printf 'base\n' > "$STUB/wt/bug-7/ibl5/hunted.txt"
 git -C "$STUB/wt/bug-7" add -A; git -C "$STUB/wt/bug-7" commit -qm base
 bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
@@ -569,8 +569,7 @@ unset BUG_PIPELINE_SCRIPTS_DIR
 export GIT_TERMINAL_PROMPT=0   # never hang on a username prompt; a missing cred fails fast
 # shellcheck disable=SC1090
 source "$DRIVER"               # tail-guard keeps main() from running when sourced
-R9="$(mktemp -d)"; git -C "$R9" init -q
-git -C "$R9" config user.email t@t; git -C "$R9" config user.name t
+R9="$(mktemp -d)"; h_git_repo "$R9" --no-commit
 printf 'x\n' > "$R9/f"; git -C "$R9" add -A; git -C "$R9" commit -qm x
 # credential.helper resolves BLANK (macOS-keychain path closed)
 helper="$(run_under_starved_env "$R9" git config --get credential.helper 2>/dev/null)"
@@ -733,4 +732,4 @@ fi
 
 echo "----"
 if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "SOME FAILED"; fi
-exit "$FAILED"
+h_done

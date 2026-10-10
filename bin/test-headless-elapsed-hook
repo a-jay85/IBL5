@@ -8,23 +8,17 @@
 # Run: bin/test-headless-elapsed-hook  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOOK="$SCRIPT_DIR/lib/headless-elapsed-hook.sh"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-FAILED=0
-
-ok()        { echo "ok: $1"; }
-fail()      { echo "FAIL: $1"; FAILED=1; }
-assert_eq() { local d="$1" g="$2" e="$3"
-              if [ "$g" = "$e" ]; then ok "$d"
-              else fail "$d — expected [$e], got [$g]"; fi; }
-want()      { local d="$1" h="$2" n="$3"
-              case "$h" in *"$n"*) ok "$d" ;;
-              *) fail "$d — missing token [$n]"; esac; }
-want_absent(){ local d="$1" h="$2" n="$3"
-               case "$h" in *"$n"*) fail "$d — unexpected token [$n]" ;;
-               *) ok "$d"; esac; }
+ok()        { h_pass "$1"; }
+fail()      { h_fail "$@"; }
+assert_eq() { h_eq "$1" "$3" "$2"; }
+want()      { h_contains "$1" "$2" "$3"; }
+want_absent(){ h_not_contains "$1" "$2" "$3"; }
 
 if [ ! -f "$HOOK" ]; then
     echo "FAIL: cannot find $HOOK"
@@ -36,7 +30,7 @@ echo ""
 echo "# C1: no env vars → empty output, exit 0"
 C1_OUT=$(IBL5_BUDGET_START_EPOCH="" IBL5_BUDGET_SECS="" \
     unset IBL5_BUDGET_START_EPOCH IBL5_BUDGET_SECS 2>/dev/null; \
-    env -i HOME="$HOME" PATH="$PATH" \
+    env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" HOME="$HOME" PATH="$PATH" \
     bash "$HOOK" < /dev/null 2>/dev/null)
 C1_RC=$?
 assert_eq "C1: exit 0"        "$C1_RC" "0"
@@ -45,7 +39,7 @@ assert_eq "C1: empty output"  "$C1_OUT" ""
 # ── C2: non-numeric env → empty output, exit 0 ───────────────────────────────
 echo ""
 echo "# C2: non-numeric env vars → empty output, exit 0"
-C2_OUT=$(env -i HOME="$HOME" PATH="$PATH" \
+C2_OUT=$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" HOME="$HOME" PATH="$PATH" \
     IBL5_BUDGET_START_EPOCH="notanumber" \
     IBL5_BUDGET_SECS="1000" \
     bash "$HOOK" < /dev/null 2>/dev/null)
@@ -53,7 +47,7 @@ C2_RC=$?
 assert_eq "C2: exit 0"        "$C2_RC" "0"
 assert_eq "C2: empty output"  "$C2_OUT" ""
 
-C2B_OUT=$(env -i HOME="$HOME" PATH="$PATH" \
+C2B_OUT=$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" HOME="$HOME" PATH="$PATH" \
     IBL5_BUDGET_START_EPOCH="$(date +%s)" \
     IBL5_BUDGET_SECS="notanumber" \
     bash "$HOOK" < /dev/null 2>/dev/null)
@@ -66,7 +60,7 @@ echo ""
 echo "# C3: start=now-100, budget=1000 → elapsed ~100s, valid JSON, PostToolUse"
 NOW=$(date +%s)
 START_C3=$(( NOW - 100 ))
-C3_OUT=$(env -i HOME="$HOME" PATH="$PATH" \
+C3_OUT=$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" HOME="$HOME" PATH="$PATH" \
     IBL5_BUDGET_START_EPOCH="$START_C3" \
     IBL5_BUDGET_SECS="1000" \
     bash "$HOOK" < /dev/null 2>/dev/null)
@@ -96,7 +90,7 @@ echo ""
 echo "# C4: start=now-950, budget=1000 → past 90% warning"
 NOW=$(date +%s)
 START_C4=$(( NOW - 950 ))
-C4_OUT=$(env -i HOME="$HOME" PATH="$PATH" \
+C4_OUT=$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" HOME="$HOME" PATH="$PATH" \
     IBL5_BUDGET_START_EPOCH="$START_C4" \
     IBL5_BUDGET_SECS="1000" \
     bash "$HOOK" < /dev/null 2>/dev/null)
@@ -133,11 +127,4 @@ else
     fi
 fi
 
-if [ "$FAILED" -ne 0 ]; then
-    echo ""
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo ""
-echo "RESULT: all passed"
-exit 0
+h_done

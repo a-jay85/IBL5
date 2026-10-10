@@ -1,7 +1,7 @@
 <?php
 
 if (!defined('BLOCK_FILE')) {
-    Header("Location: ./index.php");
+    header("Location: ./index.php");
     die();
 }
 
@@ -9,7 +9,12 @@ use Player\PlayerImageHelper;
 use UI\Components\TooltipLabel;
 use Security\HtmlSanitizer;
 
-global $mysqli_db, $leagueContext;
+$mysqli_db = $GLOBALS['mysqli_db'] ?? null;
+$leagueContext = $GLOBALS['leagueContext'] ?? null;
+if (!$mysqli_db instanceof \mysqli || !$leagueContext instanceof \League\LeagueContext) {
+    $content = '';
+    return;
+}
 
 $leagueConfig = $leagueContext->getConfig();
 $imagesPath = $leagueConfig['images_path'];
@@ -34,7 +39,7 @@ FROM (
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
     INNER JOIN ibl_team_info t ON players.teamid = t.teamid
-    WHERE boxes.game_date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    WHERE boxes.game_date BETWEEN ? AND ?
     GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 
     UNION ALL
@@ -50,7 +55,7 @@ FROM (
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
     INNER JOIN ibl_team_info t ON players.teamid = t.teamid
-    WHERE boxes.game_date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    WHERE boxes.game_date BETWEEN ? AND ?
     GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 
     UNION ALL
@@ -66,7 +71,7 @@ FROM (
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
     INNER JOIN ibl_team_info t ON players.teamid = t.teamid
-    WHERE boxes.game_date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    WHERE boxes.game_date BETWEEN ? AND ?
     GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 
     UNION ALL
@@ -82,7 +87,7 @@ FROM (
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
     INNER JOIN ibl_team_info t ON players.teamid = t.teamid
-    WHERE boxes.game_date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    WHERE boxes.game_date BETWEEN ? AND ?
     GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 
     UNION ALL
@@ -98,19 +103,53 @@ FROM (
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
     INNER JOIN ibl_team_info t ON players.teamid = t.teamid
-    WHERE boxes.game_date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    WHERE boxes.game_date BETWEEN ? AND ?
     GROUP BY players.name, boxes.pid, t.team_name, players.teamid
 ) t
 WHERE rn <= 5
 ORDER BY FIELD(stat_type, 'Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'), rn;";
-$resultSimStatLeaders = $mysqli_db->query($querySimStatLeaders);
+$stmtSimStatLeaders = $mysqli_db->prepare($querySimStatLeaders);
+if ($stmtSimStatLeaders === false) {
+    $content = '';
+    return;
+}
+$stmtSimStatLeaders->bind_param(
+    str_repeat('s', 10),
+    $lastSimStartDate, $lastSimEndDate,
+    $lastSimStartDate, $lastSimEndDate,
+    $lastSimStartDate, $lastSimEndDate,
+    $lastSimStartDate, $lastSimEndDate,
+    $lastSimStartDate, $lastSimEndDate
+);
+$stmtSimStatLeaders->execute();
+$resultSimStatLeaders = $stmtSimStatLeaders->get_result();
+$stmtSimStatLeaders->close();
+if ($resultSimStatLeaders === false) {
+    $content = '';
+    return;
+}
 
 $rows = $resultSimStatLeaders->fetch_all(MYSQLI_ASSOC);
 
 // Group rows by stat type
 $statCategories = [];
 foreach ($rows as $row) {
-    $statCategories[$row['stat_type']][] = $row;
+    $statType = $row['stat_type'] ?? null;
+    if (!is_string($statType)) {
+        continue;
+    }
+    $pidValue = $row['pid'] ?? null;
+    $teamidValue = $row['teamid'] ?? null;
+    $nameValue = $row['name'] ?? null;
+    $teamnameValue = $row['teamname'] ?? null;
+    $statValue = $row['stat_value'] ?? null;
+    $statCategories[$statType][] = [
+        'pid' => is_numeric($pidValue) ? (int) $pidValue : 0,
+        'teamid' => is_numeric($teamidValue) ? (int) $teamidValue : 0,
+        'name' => is_scalar($nameValue) ? (string) $nameValue : '',
+        'teamname' => is_scalar($teamnameValue) ? (string) $teamnameValue : '',
+        'stat_value' => is_scalar($statValue) ? (string) $statValue : '',
+    ];
 }
 
 // Tab labels
@@ -168,7 +207,7 @@ foreach ($categories as $index => $category) {
             <div class="leaders-tabbed__leader-images">
                 <img src="' . HtmlSanitizer::safeHtmlOutput($leaderImgUrl) . '" alt="' . $leaderName . '" class="leaders-tabbed__leader-img" loading="lazy">';
 
-    if ($leaderTid) {
+    if ($leaderTid !== 0) {
         $content .= '<img src="./' . HtmlSanitizer::safeHtmlOutput($imagesPath) . 'logo/new' . $leaderTid . '.png" alt="' . $leaderTeam . '" class="leaders-tabbed__leader-team-img" loading="lazy">';
     }
 
@@ -182,16 +221,15 @@ foreach ($categories as $index => $category) {
         <ul class="leaders-tabbed__runners">';
 
     // Runners-up (positions 2-5)
-    for ($i = 1; $i < count($players); $i++) {
-        $player = $players[$i];
+    foreach (array_slice($players, 1) as $runnerOffset => $player) {
         $pid = $player['pid'];
         $teamid = $player['teamid'];
         $name = HtmlSanitizer::safeHtmlOutput($player['name']);
         $team = HtmlSanitizer::safeHtmlOutput($player['teamname']);
         $value = HtmlSanitizer::safeHtmlOutput($player['stat_value']);
-        $rank = $i + 1;
+        $rank = $runnerOffset + 2;
 
-        $teamLogo = $teamid ? '<img src="./' . HtmlSanitizer::safeHtmlOutput($imagesPath) . 'logo/new' . $teamid . '.png" alt="' . $team . '" class="leaders-tabbed__runner-logo" loading="lazy">' : '';
+        $teamLogo = $teamid !== 0 ? '<img src="./' . HtmlSanitizer::safeHtmlOutput($imagesPath) . 'logo/new' . $teamid . '.png" alt="' . $team . '" class="leaders-tabbed__runner-logo" loading="lazy">' : '';
 
         $content .= '<li class="leaders-tabbed__runner">
             <span class="leaders-tabbed__runner-rank">#' . $rank . '</span>

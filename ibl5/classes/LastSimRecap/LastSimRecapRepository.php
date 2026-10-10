@@ -179,7 +179,7 @@ class LastSimRecapRepository extends \Database\BaseMysqliRepository implements L
                   AND t.injury_games_missed IS NOT NULL
                   AND " . $dateExpr . " <= ?
                   AND DATE_ADD(" . $dateExpr . ", INTERVAL t.injury_games_missed DAY) > ?
-                ORDER BY is_new DESC, injury_date DESC";
+                ORDER BY is_new DESC, injury_date DESC, t.id DESC";
 
         // Build types/params: ss (date for days_remaining + is_new), pids (i...), ss (date <= + date <)
         $types = 'ss' . str_repeat('i', count($playerIds)) . 'ss';

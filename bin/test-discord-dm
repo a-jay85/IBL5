@@ -16,18 +16,19 @@
 # Run: bin/test-discord-dm  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DM="$ROOT/bin/discord-dm"
 
-FAILS=0
-ok()   { printf '  ok   %s\n' "$1"; }
-fail() { printf '  FAIL %s\n' "$1"; FAILS=$(( FAILS + 1 )); }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 # A full template rather than -t <prefix>: GNU mktemp rejects a -t argument
 # with too few X's, so the BSD spelling would fail on the Linux CI runner.
-TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-discord-dm.XXXXXX")
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
 # Shim osascript so the fallback path does not fire a macOS notification banner
 # on every local run. A PATH shim is not enough: discord-dm prepends /usr/bin to
@@ -718,7 +719,7 @@ notify_scan() { # <wf-dir> <mode>
         awk -v file="$(basename "$f")" -v mode="$2" '
             function emit() {
                 if (active && mode == "sites")
-                    printf "%s#%d webhook=%d ping=%s\n", file, ord, wh, ping
+                    printf "%s#%d webhook=%s ping=%s\n", file, ord, wh, ping
                 active = 0
             }
             /uses: \.\/\.github\/actions\/notify-discord/ { emit(); ord++; wh = 0; ping = "-"; active = 1; next }
@@ -730,7 +731,8 @@ notify_scan() { # <wf-dir> <mode>
                 }
                 line = $0; sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
                 if (mode == "lines") printf "%s#%d\t%s\n", file, ord, line
-                if (line == "webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}") wh = 1
+                if (line == "webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}") wh = "dev"
+                if (line == "webhook-url: ${{ secrets.DISCORD_MERGED_WEBHOOK_URL }}") wh = "merged"
                 if (line ~ /^ping: /) ping = substr(line, 7)
             }
             END { emit() }' "$f"
@@ -739,22 +741,22 @@ notify_scan() { # <wf-dir> <mode>
 notify_sites() { notify_scan "$1" sites; }
 
 NOTIFY_SITES_WANT=$(cat <<'EXPECT_EOF'
-db-backup.yml#1 webhook=1 ping='true'
-db-backup.yml#2 webhook=1 ping='true'
-db-backup.yml#3 webhook=1 ping='true'
-db-backup.yml#4 webhook=1 ping='true'
-docfix-health.yml#1 webhook=1 ping=-
-docfix-health.yml#2 webhook=1 ping=-
-docs-refreshed-notify.yml#1 webhook=1 ping=-
-flake-report.yml#1 webhook=1 ping=-
-log-review.yml#1 webhook=1 ping=-
-main.yml#1 webhook=1 ping=-
-merge-digest-notify.yml#1 webhook=1 ping='true'
-mutation.yml#1 webhook=1 ping=-
-promote-to-production.yml#1 webhook=1 ping=${{ job.status == 'failure' }}
-promote-to-production.yml#2 webhook=1 ping=-
-smoke-prod.yml#1 webhook=1 ping='true'
-smoke-prod.yml#2 webhook=1 ping='true'
+db-backup.yml#1 webhook=dev ping='true'
+db-backup.yml#2 webhook=dev ping='true'
+db-backup.yml#3 webhook=dev ping='true'
+db-backup.yml#4 webhook=dev ping='true'
+docfix-health.yml#1 webhook=dev ping=-
+docfix-health.yml#2 webhook=dev ping=-
+docs-refreshed-notify.yml#1 webhook=dev ping=-
+flake-report.yml#1 webhook=dev ping=-
+log-review.yml#1 webhook=dev ping=-
+main.yml#1 webhook=dev ping=-
+merge-digest-notify.yml#1 webhook=merged ping='true'
+mutation.yml#1 webhook=dev ping=-
+promote-to-production.yml#1 webhook=dev ping=${{ job.status == 'failure' }}
+promote-to-production.yml#2 webhook=dev ping=-
+smoke-prod.yml#1 webhook=dev ping='true'
+smoke-prod.yml#2 webhook=dev ping='true'
 EXPECT_EOF
 )
 
@@ -763,7 +765,7 @@ printf '\n-- notify-discord call sites --\n'
 # G1: the live workflows match the table.
 G1_GOT=$(notify_sites "$ROOT/.github/workflows")
 if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
-    ok "G1: 16 sites pass webhook-url; ping only on the chosen sites"
+    ok "G1: 16 sites pass the expected webhook-url; ping only on the chosen sites"
 else
     fail "G1: call sites differ from the table"
     diff <(printf '%s\n' "$NOTIFY_SITES_WANT") <(printf '%s\n' "$G1_GOT") | sed 's/^/       /'
@@ -776,7 +778,7 @@ G2_GOT=$(notify_sites "$TMP/wf")
 [ "$G2_GOT" != "$NOTIFY_SITES_WANT" ] && ok "G2: an injected ping line changes the scan" \
     || fail "G2: an injected ping line went unnoticed"
 if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
-    want "G2: the injected ping is what differs" "$G2_GOT" "flake-report.yml#1 webhook=1 ping='true'"
+    want "G2: the injected ping is what differs" "$G2_GOT" "flake-report.yml#1 webhook=dev ping='true'"
 fi
 
 # G3: a deleted webhook-url line must show up in the scan.
@@ -824,21 +826,71 @@ grep -qF -- "main.yml::build-and-deploy" <<< "$G5_GOT" \
     && ok "G5: the flagged job is main.yml::build-and-deploy" \
     || fail "G5: expected main.yml::build-and-deploy, got: $(tr '\n' ' ' <<< "$G5_GOT")"
 
-# G6: --ping (the @-mention) is allowed only in the five PING host callers. Tests, the
+# G6: --ping (the @-mention), directly or through dm_ping, is allowed only in the five PING host callers and bin/lib/dm.sh. Tests, the
 # README and discord-dm itself mention it and are excluded; any other bin/ caller is QUIET.
-G6_GOT=$(grep -rlF -- '--ping' "$ROOT/bin" 2>/dev/null \
-    | grep -v -e '/bin/discord-dm$' -e '/bin/test-' -e '/bin/README.md$' \
+G6_GOT=$(grep -rlE -- '--ping|dm_ping' "$ROOT/bin" 2>/dev/null \
+    | grep -v -e '/bin/discord-dm$' -e '/bin/test-' -e '/bin/README.md$' -e '/bin/lib/README.md$' \
     | sed "s|^$ROOT/||" | sort || true)
-G6_WANT=$(printf '%s\n' bin/db-backups-pull bin/launchd-health-check bin/post-plan-fail-dm bin/pr-cycle bin/pr-cycle-tick)
+G6_WANT=$(printf '%s\n' bin/db-backups-pull bin/launchd-health-check bin/lib/dm.sh bin/post-plan-fail-dm bin/pr-cycle bin/pr-cycle-tick)
 [ "$G6_GOT" = "$G6_WANT" ] \
-    && ok "G6: only the five PING callers contain --ping" \
+    && ok "G6: only the six PING-allowed paths contain --ping" \
     || fail "G6: --ping callers differ from the PING set; got: $(tr '\n' ' ' <<< "$G6_GOT")"
 
+# G7: bin/lib/dm.sh (dm_bin / dm_ping). Each snippet runs under a bare strict bash.
+DMLIB="$ROOT/bin/lib/dm.sh"
+dmlib() {   # dmlib '<snippet>' [VAR=val ...]
+    local snip="$1"; shift
+    env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" PATH=/usr/bin:/bin "$@" bash -c 'set -euo pipefail; . "$1"; '"$snip" _ "$DMLIB"
+}
+DM_REC="$TMP/dm-rec"
+cat > "$DM_REC" <<REC_EOF
+#!/usr/bin/env bash
+: > "$TMP/dm-rec.argv"
+for a in "\$@"; do printf '%s\n' "\$a" >> "$TMP/dm-rec.argv"; done
+exit "\${DM_REC_RC:-0}"
+REC_EOF
+chmod +x "$DM_REC"
+
+out=$(dmlib 'dm_bin /x/bin FOO_DM'); rc=$?
+[ "$rc" -eq 0 ] && [ "$out" = "/x/bin/discord-dm" ] \
+    && ok "G7a unset seam falls back to <bin-dir>/discord-dm" || fail "G7a unset seam (rc=$rc out=$out)"
+# Mutation check: ${!name-} in place of ${!name:-} in dm_bin fails this case.
+out=$(dmlib 'dm_bin /x/bin FOO_DM' FOO_DM=)
+[ "$out" = "/x/bin/discord-dm" ] \
+    && ok "G7b empty seam falls back like :-" || fail "G7b empty seam (out=$out)"
+out=$(dmlib 'dm_bin /x/bin FOO_DM' FOO_DM=/s/dm)
+[ "$out" = "/s/dm" ] && ok "G7c set seam wins" || fail "G7c set seam (out=$out)"
+out=$(dmlib 'dm_bin /x A B' A= B=/b)
+[ "$out" = "/b" ] && ok "G7d first non-empty seam wins (A empty)" || fail "G7d A empty (out=$out)"
+out=$(dmlib 'dm_bin /x A B' A=/a B=/b)
+[ "$out" = "/a" ] && ok "G7d first non-empty seam wins (A set)" || fail "G7d A set (out=$out)"
+
+rm -f "$TMP/pwned"
+for g7_name in 'bad-name' '1X' "a[\$(touch $TMP/pwned)]"; do
+    err=$(dmlib 'dm_bin /x "$N"' "N=$g7_name" 2>&1 >/dev/null); rc=$?
+    [ "$rc" -eq 2 ] && [ ! -e "$TMP/pwned" ] && grep -qF 'dm_bin: invalid seam name' <<< "$err" \
+        && ok "G7e invalid seam name rejected: $g7_name" \
+        || fail "G7e invalid seam name '$g7_name' (rc=$rc err=$err pwned=$([ -e "$TMP/pwned" ] && echo yes || echo no))"
+done
+err=$(dmlib 'dm_bin' 2>&1 >/dev/null); rc=$?
+[ "$rc" -eq 2 ] && grep -qF 'dm_bin: missing <bin-dir>' <<< "$err" \
+    && ok "G7f missing bin-dir returns 2" || fail "G7f missing bin-dir (rc=$rc err=$err)"
+
+dmlib 'dm_ping "hello world" --quiet --attempts 2' DM_CMD="$DM_REC"
+[ "$(cat "$TMP/dm-rec.argv")" = "$(printf '%s\n' --ping --quiet --attempts 2 'hello world')" ] \
+    && ok "G7g dm_ping puts --ping first, flags next, message last" \
+    || fail "G7g dm_ping argv: $(tr '\n' '|' < "$TMP/dm-rec.argv")"
+dmlib 'dm_ping msg' DM_CMD="$DM_REC"
+[ "$(cat "$TMP/dm-rec.argv")" = "$(printf '%s\n' --ping msg)" ] \
+    && ok "G7h dm_ping with only a message" || fail "G7h argv: $(tr '\n' '|' < "$TMP/dm-rec.argv")"
+out=$(dmlib 'dm_ping m || echo "rc=$?"' DM_CMD="$DM_REC" DM_REC_RC=3)
+[ "$out" = "rc=3" ] && ok "G7i dm_ping propagates discord-dm's exit status" || fail "G7i (out=$out)"
+rm -f "$TMP/dm-rec.argv"
+out=$(dmlib 'dm_ping m || echo "rc=$?"' 2>"$TMP/g7j.err")
+[ "$out" = "rc=2" ] && grep -qF 'DM_CMD is not set' "$TMP/g7j.err" && [ ! -e "$TMP/dm-rec.argv" ] \
+    && ok "G7j unset DM_CMD returns 2 without calling the recorder" || fail "G7j (out=$out)"
+out=$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" PATH=/usr/bin:/bin bash -c 'set -euo pipefail; a=$(set +o); . "$1"; b=$(set +o); [ "$a" = "$b" ] && echo same' _ "$DMLIB")
+[ "$out" = "same" ] && ok "G7k sourcing leaves shell options unchanged" || fail "G7k (out=$out)"
+
 # ── Summary ───────────────────────────────────────────────────────────────────
-printf '\n'
-if [ "$FAILS" -eq 0 ]; then
-    echo "test-discord-dm: all cases passed"
-else
-    printf 'test-discord-dm: %d case(s) FAILED\n' "$FAILS"
-fi
-exit $(( FAILS > 0 ? 1 : 0 ))
+h_done

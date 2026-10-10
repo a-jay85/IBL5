@@ -3,6 +3,9 @@
 // sparse checkout with no node_modules. bin/vr-refresh-targets does the gh/git
 // glue; tests/ts-unit/vr-refresh.test.ts covers this module.
 export const GALLERY_SHA_RE = /github\.io\/IBL5\/([0-9a-f]{40})\/visual-review/g;
+// A gallery link of either shape: legacy `<sha>/visual-review` or PR-keyed
+// `pr/<N>/visual-review` (N a positive integer, no leading zero).
+export const GALLERY_DIR_RE = /github\.io\/IBL5\/(?:([0-9a-f]{40})|pr\/([1-9][0-9]*))\/visual-review/g;
 export const VISUAL_REVIEW_MARKER = '<!-- Sticky Pull Request Commentvisual-review -->';
 export const DEFAULT_STALE_DAYS = 7;
 export const DEFAULT_MAX_PRS = 10;
@@ -36,7 +39,7 @@ export type SkipReason =
 export interface RefreshTarget {
   pr: number;
   head_sha: string;
-  gallery_sha: string;
+  gallery_dir: string; // gh-pages-relative: `<sha>` or `pr/<N>/visual-review`
   age_days: number | null;
 }
 export interface Selection {
@@ -56,12 +59,24 @@ export function extractGalleryShas(text: string): string[] {
   return [...seen];
 }
 
+// Every gallery dir linked in text, relative to the gh-pages root: a lowercased
+// `<sha>` or `pr/<N>/visual-review`. De-duplicated, first-appearance order.
+// Not for the keep-list: prune-vr-galleries accepts 40-hex lines only.
+export function extractGalleryDirs(text: string): string[] {
+  const seen = new Set<string>();
+  for (const m of text.matchAll(new RegExp(GALLERY_DIR_RE.source, 'gi'))) {
+    const sha = m[1];
+    seen.add(sha !== undefined ? sha.toLowerCase() : `pr/${m[2] as string}/visual-review`);
+  }
+  return [...seen];
+}
+
 // The gallery dir the PR's latest visual-review sticky comment links to, or null.
-export function linkedGallerySha(pr: OpenPr): string | null {
+export function linkedGalleryDir(pr: OpenPr): string | null {
   const marked = pr.comments.filter((c) => c.includes(VISUAL_REVIEW_MARKER));
   const last = marked[marked.length - 1];
   if (last === undefined) return null;
-  return extractGalleryShas(last)[0] ?? null;
+  return extractGalleryDirs(last)[0] ?? null;
 }
 
 // Every gallery SHA any open PR still links, plus every head SHA. No base,
@@ -117,8 +132,8 @@ export function selectRefreshTargets(
       skip('draft');
       continue;
     }
-    const gallerySha = linkedGallerySha(pr);
-    if (gallerySha === null) {
+    const galleryDir = linkedGalleryDir(pr);
+    if (galleryDir === null) {
       skip('not-visual');
       continue;
     }
@@ -130,7 +145,7 @@ export function selectRefreshTargets(
       skip('behind-master');
       continue;
     }
-    const ts = galleryCommitTs[gallerySha] ?? null;
+    const ts = galleryCommitTs[galleryDir] ?? null;
     const ageDays = ts === null ? null : (nowSec - ts) / SECONDS_PER_DAY;
     if (mode.kind === 'stale' && ageDays !== null && !(ageDays > mode.staleDays)) {
       skip('fresh');
@@ -139,7 +154,7 @@ export function selectRefreshTargets(
     survivors.push({
       pr: pr.number,
       head_sha: pr.headRefOid,
-      gallery_sha: gallerySha,
+      gallery_dir: galleryDir,
       age_days: ageDays === null ? null : Math.floor(ageDays),
     });
   }

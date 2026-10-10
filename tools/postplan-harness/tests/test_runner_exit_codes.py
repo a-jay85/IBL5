@@ -46,7 +46,8 @@ _EXIT_CODE_TABLE = (
         "lostwork-unproved", "git", None)]
     + [(t, None, 0) for t in (
         TerminalState.SHIPPED_ARMED, TerminalState.SHIPPED_HELD,
-        TerminalState.NOTHING_TO_SHIP, TerminalState.DEGRADED)]
+        TerminalState.NOTHING_TO_SHIP, TerminalState.DEGRADED,
+        TerminalState.HOLD_REPEAT_DECLINED)]
 )
 
 
@@ -70,6 +71,15 @@ def test_success_and_nothing_to_ship_exit_0():
 
 def test_degraded_exits_zero():                 # no /post-plan skill fallback on a shipped+held PR
     assert runner.exit_code_for(_res(TerminalState.DEGRADED)) == 0
+
+def test_hold_repeat_declined_exits_zero():
+    assert runner.exit_code_for(_res(TerminalState.HOLD_REPEAT_DECLINED)) == 0
+
+
+def test_hold_repeat_declined_is_not_failed():
+    assert TerminalState.HOLD_REPEAT_DECLINED != TerminalState.FAILED
+    assert TerminalState.HOLD_REPEAT_DECLINED.value == "hold-repeat-declined"
+
 
 def test_degraded_does_not_shadow_rebase_sentinel():   # negative: ordering, not a duplicate
     assert runner.exit_code_for(_res(TerminalState.FAILED, "rebase-conflict")) == 3
@@ -228,7 +238,7 @@ def test_run_commits_through_the_remediation_wrapper():
                             "runner.py")).read()
     assert "_commit_with_gate_remediation(" in src
     assert "sha = git.commit_all(" not in src        # the old call site is gone
-    assert 'upsert_files_changed(copy["summary_md"]' in src   # PR body still unmutated
+    assert 'create_body = copy["summary_md"] or ""' in src   # PR body still unmutated at creation
 
 
 @pytest.mark.usefixtures("stub_ambient_git_show")
@@ -338,26 +348,6 @@ def test_emergency_abort_exists_on_live_git():
     assert callable(getattr(LiveGit, "emergency_abort", None)), (
         "LiveGit.emergency_abort() must be defined for SIGTERM cleanup"
     )
-
-
-def test_every_files_changed_upsert_is_paired_with_tests_changed():
-    """Every upsert_files_changed( call site in runner.py must be followed within two lines
-    by upsert_tests_changed(, so the tests block can never be left stale.
-
-    Mutation caught: deleting any one of the three wire lines from 2b, 2c, or 2d.
-    """
-    src_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                            "runner.py")
-    lines = open(src_path).readlines()
-    sites = [i for i, ln in enumerate(lines)
-             if "upsert_files_changed(" in ln and not ln.lstrip().startswith("#")]
-    assert len(sites) >= 3, f"Expected at least 3 upsert_files_changed( sites, found {len(sites)}"
-    for idx in sites:
-        window = lines[idx + 1: idx + 3]
-        assert any("upsert_tests_changed(" in ln for ln in window), (
-            f"Line {idx + 1}: upsert_files_changed( not followed by upsert_tests_changed( "
-            f"within two lines"
-        )
 
 
 # ---------------------------------------------------------------------------

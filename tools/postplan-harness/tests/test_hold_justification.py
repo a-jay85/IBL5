@@ -198,12 +198,6 @@ def test_post_plan_skill_contains_manual_confirmation():
     assert "Manual confirmation needed" in skill
 
 
-def test_post_plan_skill_files_changed_tripwire():
-    """Additive-only: the files-changed block anchor must survive this branch's edit."""
-    skill = (REPO_ROOT / ".claude/skills/post-plan/SKILL.md").read_text()
-    assert "<!-- files-changed:begin -->" in skill
-
-
 def test_phase4b_contains_diff_bounds():
     """_phase-4-review-audit.md must carry the Diff bounds block."""
     audit = (REPO_ROOT / ".claude/skills/post-plan/_phase-4-review-audit.md").read_text()

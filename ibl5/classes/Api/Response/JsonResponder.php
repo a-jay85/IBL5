@@ -5,9 +5,18 @@ declare(strict_types=1);
 namespace Api\Response;
 
 use Api\Contracts\JsonResponderInterface;
+use Clock\ClockInterface;
+use Clock\SystemClock;
 
 class JsonResponder implements JsonResponderInterface
 {
+    private ClockInterface $clock;
+
+    public function __construct(?ClockInterface $clock = null)
+    {
+        $this->clock = $clock ?? new SystemClock();
+    }
+
     /**
      * Send a success response with data and optional pagination metadata.
      *
@@ -22,7 +31,7 @@ class JsonResponder implements JsonResponderInterface
             'status' => 'success',
             'data' => $data,
             'meta' => array_merge([
-                'timestamp' => gmdate('Y-m-d\TH:i:s\Z'),
+                'timestamp' => gmdate('Y-m-d\TH:i:s\Z', $this->clock->now()),
                 'version' => 'v1',
             ], $meta),
         ];
@@ -47,7 +56,7 @@ class JsonResponder implements JsonResponderInterface
                 'message' => $message,
             ],
             'meta' => [
-                'timestamp' => gmdate('Y-m-d\TH:i:s\Z'),
+                'timestamp' => gmdate('Y-m-d\TH:i:s\Z', $this->clock->now()),
                 'version' => 'v1',
             ],
         ];

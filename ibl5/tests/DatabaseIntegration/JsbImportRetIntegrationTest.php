@@ -197,7 +197,6 @@ class JsbImportRetIntegrationTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200000203, 'First Player');
         $this->insertTestPlayer(200000204, 'Second Player');
-        $pid203 = 200000203;
         $pid204 = 200000204;
 
         $result = $this->service->processRetData("First Player 200000203\n", 2026);

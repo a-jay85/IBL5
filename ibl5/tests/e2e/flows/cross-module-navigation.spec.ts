@@ -3,6 +3,7 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Cross-module navigation — verify links between modules resolve correctly.
 // All read-only — no data mutation.
+// Player destinations assert `.plr-nav`, rendered by PlayerMenuView.php on every player page.
 
 test.describe('Cross-module navigation', () => {
   test.beforeEach(async ({ appState }) => {
@@ -21,8 +22,8 @@ test.describe('Cross-module navigation', () => {
 
     await page.goto(href!);
     await assertNoPhpErrors(page, 'on Team page from Standings');
-    // Team page should render content (table or heading)
-    await expect(page.locator('.ibl-data-table, .ibl-title, h2').first()).toBeVisible();
+    // Team page renders the roster via Ratings.php and Contracts.php, both of which carry `.team-table`.
+    await expect(page.locator('.team-table').first()).toBeVisible();
   });
 
   test('team page roster → click player → player page loads', async ({ page }) => {
@@ -43,7 +44,7 @@ test.describe('Cross-module navigation', () => {
     await page.goto(href!);
     await assertNoPhpErrors(page, 'on Player page from Team roster');
     // Player page should show player content
-    await expect(page.locator('h2, h3, .ibl-title').first()).toBeVisible();
+    await expect(page.locator('.plr-nav').first()).toBeVisible();
   });
 
   test('season leaderboard → click leader → player page loads', async ({ page }) => {
@@ -58,7 +59,7 @@ test.describe('Cross-module navigation', () => {
 
     await page.goto(href!);
     await assertNoPhpErrors(page, 'on Player page from Season Leaderboards');
-    await expect(page.locator('h2, h3').first()).toBeVisible();
+    await expect(page.locator('.plr-nav').first()).toBeVisible();
   });
 
   test('draft history → click player → player page loads', async ({ page }) => {
@@ -74,7 +75,7 @@ test.describe('Cross-module navigation', () => {
 
     await page.goto(href!);
     await assertNoPhpErrors(page, 'on Player page from Draft History');
-    await expect(page.locator('h2, h3').first()).toBeVisible();
+    await expect(page.locator('.plr-nav').first()).toBeVisible();
   });
 
   test('injuries → click player → player page loads', async ({ page }) => {
@@ -90,7 +91,7 @@ test.describe('Cross-module navigation', () => {
 
     await page.goto(href!);
     await assertNoPhpErrors(page, 'on Player page from Injuries');
-    await expect(page.locator('h2, h3').first()).toBeVisible();
+    await expect(page.locator('.plr-nav').first()).toBeVisible();
   });
 
   test('all-star appearances → click player → player page loads', async ({ page }) => {
@@ -106,7 +107,7 @@ test.describe('Cross-module navigation', () => {
 
     await page.goto(href!);
     await assertNoPhpErrors(page, 'on Player page from All-Star Appearances');
-    await expect(page.locator('h2, h3').first()).toBeVisible();
+    await expect(page.locator('.plr-nav').first()).toBeVisible();
   });
 
   test('no PHP errors across standings → team → player chain', async ({ page }) => {

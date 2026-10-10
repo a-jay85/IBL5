@@ -23,6 +23,8 @@ MANUAL_CONFIRMATION_BEGIN = "<!-- manual-confirmation:begin -->"
 MANUAL_CONFIRMATION_END = "<!-- manual-confirmation:end -->"
 REVIEWER_VERIFICATION_BEGIN = "<!-- reviewer-verification:begin -->"
 REVIEWER_VERIFICATION_END = "<!-- reviewer-verification:end -->"
+GATE_FIX_BEGIN = "<!-- gate-fix:begin -->"
+GATE_FIX_END = "<!-- gate-fix:end -->"
 
 STRIP_RE = re.compile(r"(migrations/|composer\.lock|package-lock\.json|bun\.lock|__snapshots__/|\.snap$)")
 _PHP = re.compile(r"\.php$")
@@ -251,94 +253,32 @@ def numstat_text(diff_text: str) -> str:
     return "\n".join(result)
 
 
-def render_files_changed(diff_text: str) -> str:
-    """Marker-delimited files-changed block derived from diff text.
+def strip_change_blocks(body: str) -> str:
+    """Remove the retired files-changed and tests-changed blocks from a PR body.
 
-    Returns a string bounded by FILES_CHANGED_BEGIN / FILES_CHANGED_END with one
-    ``- `<status>` `<path>``` bullet per file.  Empty diff yields the two markers
-    and the header line with no bullets and no trailing blank line inside the block.
-    """
-    pairs = name_status_from_diff(diff_text)
-    header = ("**Files changed** (generated from "
-              "`git diff --name-status origin/master...HEAD` — do not edit by hand):")
-    parts: list[str] = [FILES_CHANGED_BEGIN, header]
-    if pairs:
-        parts.append("")
-        for status, path in pairs:
-            parts.append(f"- `{status}` `{path}`")
-    parts.append(FILES_CHANGED_END)
-    return "\n".join(parts)
-
-
-def render_tests_changed(diff_text: str) -> str:
-    """Marker-delimited tests-changed block derived from diff text.
-
-    Same shape as render_files_changed, filtered through is_test_path. When the
-    diff touches no test file, the block states that explicitly, so a reviewer
-    reads a positive "none" and not a missing section.
-    """
-    pairs = [(s, p) for s, p in name_status_from_diff(diff_text) if is_test_path(p)]
-    header = ("**Tests changed** (generated from "
-              "`git diff --name-status origin/master...HEAD` — do not edit by hand):")
-    parts: list[str] = [TESTS_CHANGED_BEGIN, header, ""]
-    if pairs:
-        for status, path in pairs:
-            parts.append(f"- `{status}` `{path}`")
-    else:
-        parts.append("- _(no test files changed)_")
-    parts.append(TESTS_CHANGED_END)
-    return "\n".join(parts)
-
-
-def upsert_tests_changed(body: str, block: str) -> str:
-    """Insert or replace the tests-changed block in a PR body.
-
-    Contract identical to upsert_files_changed, keyed on TESTS_CHANGED_BEGIN /
-    TESTS_CHANGED_END. Both markers in order: replace BEGIN..END inclusive.
-    Neither, one, or END before BEGIN: append a fresh block and leave any orphan.
-    Empty/None body: return ``block`` alone.
+    Exists to clean bodies written before the harness stopped generating those blocks.
+    For each marker pair, when BEGIN and END are both present with BEGIN first, the span
+    BEGIN..END inclusive is removed and the whitespace left behind collapses so no run of
+    three or more newlines remains there. A body that ended with a block ends with a single
+    newline. An orphan or out-of-order marker leaves that pair untouched (never surgery on
+    a half-corrupt body). None or empty input returns "".
     """
     body = body or ""
-    if not body.strip():
-        return block
-
-    begin_idx = body.find(TESTS_CHANGED_BEGIN)
-    end_idx = body.find(TESTS_CHANGED_END)
-
-    if begin_idx != -1 and end_idx != -1 and begin_idx < end_idx:
-        after_end = end_idx + len(TESTS_CHANGED_END)
-        return body[:begin_idx] + block + body[after_end:]
-
-    return body.rstrip() + "\n\n" + block + "\n"
-
-
-def upsert_files_changed(body: str, block: str) -> str:
-    """Insert or replace the files-changed block in a PR body.
-
-    Both markers present, BEGIN before END:
-        Replace everything from BEGIN through END inclusive with ``block``;
-        surrounding text is left byte-identical.
-    Neither marker present:
-        Strip trailing whitespace from ``body``, then append ``"\\n\\n" + block + "\\n"``.
-    Exactly one marker, or END before BEGIN:
-        Do not attempt surgery on the body.  Append a fresh block exactly as in
-        the neither-present case, leaving the orphan marker untouched.
-    Empty/None body:
-        Return ``block`` alone.
-    """
-    body = body or ""
-    if not body.strip():
-        return block
-
-    begin_idx = body.find(FILES_CHANGED_BEGIN)
-    end_idx = body.find(FILES_CHANGED_END)
-
-    if begin_idx != -1 and end_idx != -1 and begin_idx < end_idx:
-        after_end = end_idx + len(FILES_CHANGED_END)
-        return body[:begin_idx] + block + body[after_end:]
-
-    # Neither both present and in order: append fresh, leave any orphan in place.
-    return body.rstrip() + "\n\n" + block + "\n"
+    for begin, end in ((FILES_CHANGED_BEGIN, FILES_CHANGED_END),
+                       (TESTS_CHANGED_BEGIN, TESTS_CHANGED_END)):
+        b = body.find(begin)
+        e = body.find(end)
+        if b == -1 or e == -1 or b > e:
+            continue
+        head = body[:b]
+        tail = body[e + len(end):]
+        if not tail.strip():
+            body = head.rstrip("\n") + "\n" if head.strip() else ""
+            continue
+        head = head.rstrip("\n")
+        tail = tail.lstrip("\n")
+        body = head + "\n\n" + tail if head.strip() else tail
+    return body
 
 
 def render_merge_digest(rows: list[str]) -> str:
@@ -359,7 +299,7 @@ def upsert_merge_digest(body: str, block: str) -> str:
         surrounding text is left byte-identical.
     Neither marker present:
         PREPEND ``block + "\\n\\n" + body.lstrip("\\n")`` (the digest sits at the TOP of
-        the body, unlike the files-changed block, which is appended).
+        the body, unlike the appended blocks).
     Exactly one marker, or END before BEGIN:
         Do not attempt surgery on the body.  Prepend a fresh block exactly as in
         the neither-present case, leaving the orphan marker untouched.
@@ -402,7 +342,7 @@ def render_residual_phases(items: list[str]) -> str:
 def upsert_residual_phases(body: str, block: str) -> str:
     """Insert, replace, or remove the residual-phases block in a PR body.
 
-    Same contract as upsert_files_changed for a non-empty block. An EMPTY block removes an
+    For a non-empty block: replace a well-formed pair in place, else append. An EMPTY block removes an
     existing well-formed marker pair (plus one surrounding blank line) so a re-run after the
     phases ship clears the notice; with no markers and an empty block the body is returned
     unchanged. An orphan or reversed marker pair is left untouched and a non-empty block is
@@ -450,7 +390,7 @@ def render_scope_notes(notes: list[str]) -> str:
 def upsert_scope_notes(body: str, block: str) -> str:
     """Insert, replace, or remove the scope-notes block in a PR body.
 
-    Same contract as upsert_files_changed for a non-empty block. An EMPTY block removes an
+    For a non-empty block: replace a well-formed pair in place, else append. An EMPTY block removes an
     existing well-formed marker pair (plus one surrounding blank line) so a re-run after the
     notes clear removes the notice; with no markers and an empty block the body is returned
     unchanged. An orphan or reversed marker pair is left untouched and a non-empty block is
@@ -462,6 +402,62 @@ def upsert_scope_notes(body: str, block: str) -> str:
     well_formed = begin_idx != -1 and end_idx != -1 and begin_idx < end_idx
     if well_formed:
         after_end = end_idx + len(SCOPE_NOTES_END)
+        if not block:
+            head = body[:begin_idx].rstrip("\n")
+            tail = body[after_end:].lstrip("\n")
+            return head + ("\n\n" + tail if tail else "\n") if head else tail
+        return body[:begin_idx] + block + body[after_end:]
+    if not block:
+        return body
+    if not body.strip():
+        return block
+    return body.rstrip() + "\n\n" + block + "\n"
+
+
+def render_gate_fix(rec: dict) -> str:
+    """The `## Local gate auto-fix` block for a PR body, or "" unless a fix shipped.
+
+    Rendered only for a `fixed` outcome whose retry passed. Any other record stays in
+    result.json and audit.log.
+    """
+    if not rec or rec.get("status") != "fixed" or rec.get("retry") != "passed":
+        return ""
+    cost = rec.get("cost_usd")
+    shown = "unknown" if cost is None else f"${cost:.2f}"
+    files = ", ".join(f"`{f}`" for f in rec.get("files") or [])
+    excerpt = (rec.get("gate_excerpt") or "").replace("~~~~", "~ ~ ~ ~")
+    return "\n".join([
+        GATE_FIX_BEGIN,
+        "## Local gate auto-fix",
+        "",
+        f"A local `{rec.get('failed_cmd', '')}` gate denied this branch. The harness ran "
+        "one headless fixer and the retry passed.",
+        "",
+        f"- Model: `{rec.get('model_id', '')}`, cost: {shown}",
+        f"- Gate class: `{rec.get('gate_class', '')}`",
+        f"- Files touched: {files}",
+        "",
+        "<details><summary>Gate output</summary>",
+        "",
+        "~~~~text",
+        excerpt,
+        "~~~~",
+        "</details>",
+        GATE_FIX_END,
+    ])
+
+
+def upsert_gate_fix(body: str, block: str) -> str:
+    """Insert, replace, or remove the gate-fix block in a PR body.
+
+    Same contract as upsert_scope_notes with the GATE_FIX markers.
+    """
+    body = body or ""
+    begin_idx = body.find(GATE_FIX_BEGIN)
+    end_idx = body.find(GATE_FIX_END)
+    well_formed = begin_idx != -1 and end_idx != -1 and begin_idx < end_idx
+    if well_formed:
+        after_end = end_idx + len(GATE_FIX_END)
         if not block:
             head = body[:begin_idx].rstrip("\n")
             tail = body[after_end:].lstrip("\n")
@@ -550,7 +546,7 @@ def upsert_manual_confirmation(body: str, block: str) -> str:
     before the first `^#{2,6}\\s*Manual\\s+Testing\\b` heading when one exists,
     else append at the end. Exactly one marker, or END before BEGIN: insert a
     fresh block by the same rule and leave the orphan (mirrors
-    upsert_files_changed — never silently rewrite a half-corrupt body).
+    the other upserts: never silently rewrite a half-corrupt body).
     Empty body: return `block`.
     """
     body = body or ""
@@ -799,6 +795,15 @@ MANUAL_TESTING_SENTINEL = (
 MANUAL_TESTING_SENTINEL_STATIC = (
     "No manual testing needed — verification is static; "
     "the plan's Verification Matrix has no executable rows.")
+
+# Written by manual_testing.run() after Phase 6.7 confirms every `- [ ]` row in the
+# gate window is ticked. Same `No manual testing needed` prefix, so armable.SENTINEL_RE,
+# bin/lib/pr-armable.sh and bin/check-pr-manual-testing all read it as CLEARED; the
+# tail names no e2e/playwright/unit/phpunit/integration class, so armable.TAIL_TYPE_RULES
+# demands no matching changed file. "covered by", never "verified by" (#2489).
+MANUAL_TESTING_SENTINEL_TICKED = (
+    "No manual testing needed — every row below was ticked by the harness in "
+    "Phase 6.7; each is covered by an automated check that passed.")
 
 
 def _manual_testing_span(body: str) -> tuple[int, int] | None:

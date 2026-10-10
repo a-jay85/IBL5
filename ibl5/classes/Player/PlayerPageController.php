@@ -13,7 +13,6 @@ use Player\Views\PlayerTradingCardFlipView;
 use Player\Views\PlayerStatsCardView;
 use Player\Views\PlayerStatsFlipCardView;
 use Player\Views\PlayerViewFactory;
-use Player\Views\TeamColorHelper;
 use Http\HttpRequest;
 use Player\Contracts\PlayerPageServiceInterface;
 use Player\Contracts\PlayerRepositoryInterface;
@@ -42,6 +41,13 @@ class PlayerPageController
      * Optional injected PlayerRepository. When null, showPage() falls back to new PlayerRepository($db).
      */
     private ?PlayerRepositoryInterface $playerRepository = null;
+    /**
+     * Optional player lookup override (receives the pid). When null, renderPage() calls Player::withPlayerID().
+     *
+     * @var (\Closure(int): Player)|null
+     */
+    private ?\Closure $playerLoader;
+    private int $responseStatus = 200;
 
     /**
      * @param \mysqli $mysqliDb MySQLi database connection
@@ -49,7 +55,7 @@ class PlayerPageController
      * @param PlayerPageServiceInterface $pageService Service for player page business logic
      * @param HttpRequest $request Immutable snapshot of this request's input arrays
      */
-    public function __construct(\mysqli $mysqliDb, TeamIdentityRepositoryInterface $commonRepo, PlayerPageServiceInterface $pageService, HttpRequest $request, ?Season $season = null, ?PlayerRepositoryInterface $playerRepository = null)
+    public function __construct(\mysqli $mysqliDb, TeamIdentityRepositoryInterface $commonRepo, PlayerPageServiceInterface $pageService, HttpRequest $request, ?Season $season = null, ?PlayerRepositoryInterface $playerRepository = null, ?\Closure $playerLoader = null)
     {
         $this->mysqliDb = $mysqliDb;
         $this->commonRepo = $commonRepo;
@@ -57,6 +63,16 @@ class PlayerPageController
         $this->request = $request;
         $this->season = $season;
         $this->playerRepository = $playerRepository;
+        $this->playerLoader = $playerLoader;
+    }
+
+    /**
+     * HTTP status the module entry point must send before PageLayout::header().
+     * 404 after renderPage() hit an unknown pid; 200 otherwise.
+     */
+    public function responseStatus(): int
+    {
+        return $this->responseStatus;
     }
 
     /**
@@ -111,7 +127,15 @@ class PlayerPageController
     {
         $season = $this->season ?? new Season($this->mysqliDb);
 
-        $player = Player::withPlayerID($this->mysqliDb, $playerID);
+        $this->responseStatus = 200;
+        try {
+            $player = $this->playerLoader !== null
+                ? ($this->playerLoader)($playerID)
+                : Player::withPlayerID($this->mysqliDb, $playerID);
+        } catch (PlayerNotFoundException) {
+            $this->responseStatus = 404;
+            return $this->renderNotFound();
+        }
         $playerStats = PlayerStats::withPlayerID($this->mysqliDb, $playerID);
         $pageService = $this->pageService;
 
@@ -130,8 +154,9 @@ class PlayerPageController
         }
 
         // Generate team color scheme
-        $teamColors = TeamColorHelper::getTeamColors($this->mysqliDb, $player->getTeamid() ?? 0);
-        $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
+        $playerTeamid = $player->getTeamid() ?? 0;
+        $colorScheme = TeamColorSchemeResolver::forTeam($this->commonRepo, $playerTeamid);
+        $tradingCardScheme = TeamColorSchemeResolver::forTradingCard($this->commonRepo, $playerTeamid);
 
         // Trading card
         $playerRepository = new PlayerRepository($this->mysqliDb);
@@ -155,7 +180,7 @@ class PlayerPageController
             $threepointcontests,
             $dunkcontests,
             $rooksoph,
-            $this->mysqliDb
+            $tradingCardScheme
         );
         $html .= '</td></tr>';
 
@@ -359,5 +384,19 @@ class PlayerPageController
                 $colorScheme
             )
             . '</td></tr>';
+    }
+
+    /**
+     * Render the not-found panel.
+     *
+     * Deliberately echoes back none of the request input. The requested pid
+     * is never reflected here.
+     */
+    private function renderNotFound(): string
+    {
+        return '<div class="ibl-card">'
+            . '<h1 class="ibl-title">Player Not Found</h1>'
+            . '<p>No player exists for the requested ID.</p>'
+            . '</div>';
     }
 }

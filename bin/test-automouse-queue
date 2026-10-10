@@ -9,17 +9,17 @@
 # Run: bin/test-automouse-queue  (exit 0 = all pass, 1 = any case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$SCRIPT_DIR/automouse/queue"
 # shellcheck source=bin/automouse/lib-queue-order
 source "$SCRIPT_DIR/automouse/lib-queue-order"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
 NDIR="$TMP/automouse"
 PDIR="$TMP/plans"
-FAILED=0
 
 setup() {
     rm -rf "$NDIR"
@@ -44,21 +44,18 @@ mkplan() {
 assert_present() {
     local desc="$1" path="$2"
     if [ ! -e "$path" ] && [ ! -L "$path" ]; then
-        echo "FAIL: $desc — expected present: $path"
-        FAILED=1
+        h_fail "$desc" "expected present: $path"
     fi
 }
 
 assert_absent() {
     local desc="$1" path="$2"
     if [ -e "$path" ]; then
-        echo "FAIL: $desc — expected absent (exists): $path"
-        FAILED=1
+        h_fail "$desc" "expected absent (exists): $path"
         return
     fi
     if [ -L "$path" ]; then
-        echo "FAIL: $desc — expected absent (dangling symlink): $path"
-        FAILED=1
+        h_fail "$desc" "expected absent (dangling symlink): $path"
     fi
 }
 
@@ -71,8 +68,7 @@ ln -s "$PDIR/plan-a.md" "$NDIR/skipped/plan-a.md"
 run_queue plan-a >/dev/null 2>&1
 assert_absent  "row1 skipped gone" "$NDIR/skipped/plan-a.md"
 assert_present "row1 queued"       "$NDIR/queue/plan-a.md"
-echo "ok: row1 — skipped-only eviction"
-
+h_pass "row1 — skipped-only eviction"
 # ---------------------------------------------------------------------------
 # Row 2 — plan in done/ only → evicted, lands in queue/
 # ---------------------------------------------------------------------------
@@ -82,8 +78,7 @@ ln -s "$PDIR/plan-b.md" "$NDIR/done/plan-b.md"
 run_queue plan-b >/dev/null 2>&1
 assert_absent  "row2 done gone" "$NDIR/done/plan-b.md"
 assert_present "row2 queued"    "$NDIR/queue/plan-b.md"
-echo "ok: row2 — done-only eviction"
-
+h_pass "row2 — done-only eviction"
 # ---------------------------------------------------------------------------
 # Row 3 — plan in BOTH skipped/ and done/ → evicted from both, lands in queue/
 # (the core bug; asserts exactly one disposition folder after queuing)
@@ -96,8 +91,7 @@ run_queue plan-c >/dev/null 2>&1
 assert_absent  "row3 skipped gone" "$NDIR/skipped/plan-c.md"
 assert_absent  "row3 done gone"    "$NDIR/done/plan-c.md"
 assert_present "row3 queued"       "$NDIR/queue/plan-c.md"
-echo "ok: row3 — both-dirs eviction (core bug)"
-
+h_pass "row3 — both-dirs eviction (core bug)"
 # ---------------------------------------------------------------------------
 # Row 4 — fresh plan in neither sibling → queues normally, no error
 # ---------------------------------------------------------------------------
@@ -107,8 +101,7 @@ run_queue plan-d >/dev/null 2>&1
 assert_absent  "row4 no skipped" "$NDIR/skipped/plan-d.md"
 assert_absent  "row4 no done"    "$NDIR/done/plan-d.md"
 assert_present "row4 queued"     "$NDIR/queue/plan-d.md"
-echo "ok: row4 — fresh plan no-op eviction"
-
+h_pass "row4 — fresh plan no-op eviction"
 # ---------------------------------------------------------------------------
 # Row 5 — requeue of a plan that also has a stale done/ entry → done evicted
 # (uses `requeue` subcommand — no impl_model check in that path)
@@ -121,8 +114,7 @@ run_queue requeue >/dev/null 2>&1
 assert_absent  "row5 done gone"    "$NDIR/done/plan-e.md"
 assert_absent  "row5 skipped gone" "$NDIR/skipped/plan-e.md"
 assert_present "row5 queued"       "$NDIR/queue/plan-e.md"
-echo "ok: row5 — requeue done-eviction"
-
+h_pass "row5 — requeue done-eviction"
 # ---------------------------------------------------------------------------
 # Row 6 — .attempts counter evicted alongside symlink
 # ---------------------------------------------------------------------------
@@ -138,8 +130,7 @@ assert_absent  "row6 skipped attempts gone" "$NDIR/skipped/plan-f.md.attempts"
 assert_absent  "row6 done symlink gone"     "$NDIR/done/plan-f.md"
 assert_absent  "row6 done attempts gone"    "$NDIR/done/plan-f.md.attempts"
 assert_present "row6 queued"                "$NDIR/queue/plan-f.md"
-echo "ok: row6 — .attempts eviction"
-
+h_pass "row6 — .attempts eviction"
 # ---------------------------------------------------------------------------
 # Row 7 — stale entry is a real (non-dangling) symlink; assert ! -e AND ! -L
 # after eviction so a dangling symlink left behind would also fail
@@ -148,14 +139,12 @@ setup
 mkplan plan-g.md
 ln -s "$PDIR/plan-g.md" "$NDIR/skipped/plan-g.md"
 if [ ! -e "$NDIR/skipped/plan-g.md" ]; then
-    echo "FAIL: row7 setup — symlink is dangling before eviction"
-    FAILED=1
+    h_fail "row7 setup" "symlink is dangling before eviction"
 fi
 run_queue plan-g >/dev/null 2>&1
 assert_absent  "row7 symlink gone"  "$NDIR/skipped/plan-g.md"
 assert_present "row7 queued"        "$NDIR/queue/plan-g.md"
-echo "ok: row7 — real-symlink eviction + dangling guard"
-
+h_pass "row7 — real-symlink eviction + dangling guard"
 # ---------------------------------------------------------------------------
 # Row 8 — idempotent re-queue of the same plan (same target): exit 0,
 # "Already queued (no change)", and skipped/ entry left untouched (eviction
@@ -175,17 +164,14 @@ exit_code=$?
 # early exit.
 set +e
 if [ "$exit_code" -ne 0 ]; then
-    echo "FAIL: row8 — expected exit 0 for same-target re-queue, got $exit_code"
-    FAILED=1
+    h_fail "row8" "expected exit 0 for same-target re-queue, got $exit_code"
 fi
 if ! echo "$out" | grep -q "Already queued (no change)"; then
-    echo "FAIL: row8 — expected 'Already queued (no change)' in output, got: $out"
-    FAILED=1
+    h_fail "row8" "expected 'Already queued (no change)' in output, got: $out"
 fi
 assert_present "row8 skipped untouched" "$NDIR/skipped/plan-h.md"
 assert_present "row8 queued untouched"  "$NDIR/queue/plan-h.md"
-echo "ok: row8 — same-target re-queue is idempotent (exit 0), skipped/ untouched"
-
+h_pass "row8 — same-target re-queue is idempotent (exit 0), skipped/ untouched"
 # ---------------------------------------------------------------------------
 # Row 8a — genuine conflict: same filename, different physical source → error,
 # queue entry unchanged.  Without the idempotent-check, a naïve `ln -s` would
@@ -202,24 +188,19 @@ out=$(NIGHTLY_DIR="$NDIR" PLANS_DIR="$TMP/altplans" "$SCRIPT" plan-h 2>&1)
 ec=$?
 set +e
 if [ "$ec" -eq 0 ]; then
-    echo "FAIL: row8a — expected non-zero exit for genuine conflict, got 0"
-    FAILED=1
+    h_fail "row8a" "expected non-zero exit for genuine conflict, got 0"
 fi
 if ! echo "$out" | grep -q "queued:"; then
-    echo "FAIL: row8a — expected 'queued:' in error output, got: $out"
-    FAILED=1
+    h_fail "row8a" "expected 'queued:' in error output, got: $out"
 fi
 if ! echo "$out" | grep -q "new:"; then
-    echo "FAIL: row8a — expected 'new:' in error output, got: $out"
-    FAILED=1
+    h_fail "row8a" "expected 'new:' in error output, got: $out"
 fi
 link_target=$(readlink "$NDIR/queue/plan-h.md")
 if [ "$link_target" != "$PDIR/plan-h.md" ]; then
-    echo "FAIL: row8a — readlink changed from original: $link_target"
-    FAILED=1
+    h_fail "row8a" "readlink changed from original: $link_target"
 fi
-echo "ok: row8a — genuine conflict exits 1 with clean error, queue unchanged"
-
+h_pass "row8a — genuine conflict exits 1 with clean error, queue unchanged"
 # ---------------------------------------------------------------------------
 # Row 8b — dangling symlink in queue/ gives a clean error, not a raw "ln: File
 # exists" crash.  Without the `[ -L "$f" ]` guard in the already-queued check,
@@ -236,19 +217,15 @@ out=$(run_queue plan-h 2>&1)
 ec=$?
 set +e
 if [ "$ec" -eq 0 ]; then
-    echo "FAIL: row8b — expected non-zero exit for dangling+different path, got 0"
-    FAILED=1
+    h_fail "row8b" "expected non-zero exit for dangling+different path, got 0"
 fi
 if echo "$out" | grep -qE '^ln:'; then
-    echo "FAIL: row8b — raw ln error leaked into output: $out"
-    FAILED=1
+    h_fail "row8b" "raw ln error leaked into output: $out"
 fi
 if ! echo "$out" | grep -q "queued:"; then
-    echo "FAIL: row8b — expected 'queued:' in error output, got: $out"
-    FAILED=1
+    h_fail "row8b" "expected 'queued:' in error output, got: $out"
 fi
-echo "ok: row8b — dangling symlink gives clean error, no raw ln crash"
-
+h_pass "row8b — dangling symlink gives clean error, no raw ln crash"
 # Helpers used by rows 8c, 8d, 10-14, and 17-20.  Defined here so they are
 # available to all callers regardless of which section they are in.
 
@@ -265,8 +242,7 @@ assert_order() {
     local desc="$1" expected="$2" actual
     actual="$(queue_order)"
     if [ "$actual" != "$expected" ]; then
-        echo "FAIL: $desc — expected order [$expected], got [$actual]"
-        FAILED=1
+        h_fail "$desc" "expected order [$expected], got [$actual]"
     fi
 }
 # epoch mtime of a queue entry's readlink target, portable: GNU (-c %Y) first
@@ -298,26 +274,21 @@ out=$(run_queue plan-a 2>&1)
 ec=$?
 set +e
 if [ "$ec" -ne 0 ]; then
-    echo "FAIL: row8c — expected exit 0 for idempotent re-queue, got $ec"
-    FAILED=1
+    h_fail "row8c" "expected exit 0 for idempotent re-queue, got $ec"
 fi
 if ! echo "$out" | grep -q "Already queued (no change)"; then
-    echo "FAIL: row8c — expected 'Already queued (no change)' in output, got: $out"
-    FAILED=1
+    h_fail "row8c" "expected 'Already queued (no change)' in output, got: $out"
 fi
 assert_order "row8c order preserved after re-queue" "plan-a.md plan-b.md plan-c.md"
 lm_after=$(link_mtime plan-a.md)
 tm_after=$(target_mtime plan-a.md)
 if [ "$lm_after" != "$lm_before" ]; then
-    echo "FAIL: row8c — link mtime changed on idempotent re-queue: $lm_before -> $lm_after"
-    FAILED=1
+    h_fail "row8c" "link mtime changed on idempotent re-queue: $lm_before -> $lm_after"
 fi
 if [ "$tm_after" != "$tm_before" ]; then
-    echo "FAIL: row8c — target mtime changed on idempotent re-queue: $tm_before -> $tm_after"
-    FAILED=1
+    h_fail "row8c" "target mtime changed on idempotent re-queue: $tm_before -> $tm_after"
 fi
-echo "ok: row8c — idempotent re-queue preserves position and mtimes"
-
+h_pass "row8c — idempotent re-queue preserves position and mtimes"
 # ---------------------------------------------------------------------------
 # Row 8d — a plan already queued with an ancient mtime that is re-queued via
 # the idempotent path stays in its ORIGINAL position (not stamped to the back).
@@ -338,16 +309,13 @@ out=$(run_queue plan-old 2>&1)
 ec=$?
 set +e
 if [ "$ec" -ne 0 ]; then
-    echo "FAIL: row8d — expected exit 0 for idempotent re-queue of ancient plan, got $ec"
-    FAILED=1
+    h_fail "row8d" "expected exit 0 for idempotent re-queue of ancient plan, got $ec"
 fi
 order_after="$(queue_order)"
 if [ "$order_after" != "$order_before" ]; then
-    echo "FAIL: row8d — order changed on idempotent re-queue: [$order_before] -> [$order_after]"
-    FAILED=1
+    h_fail "row8d" "order changed on idempotent re-queue: [$order_before] -> [$order_after]"
 fi
-echo "ok: row8d — idempotent re-queue of ancient-mtime plan keeps its position"
-
+h_pass "row8d — idempotent re-queue of ancient-mtime plan keeps its position"
 # ---------------------------------------------------------------------------
 # Row 9 — .staleness sidecar evicted alongside symlink on (re)queue
 # ---------------------------------------------------------------------------
@@ -359,8 +327,7 @@ run_queue plan-i >/dev/null 2>&1
 assert_absent  "row9 skipped symlink gone"   "$NDIR/skipped/plan-i.md"
 assert_absent  "row9 staleness marker gone"  "$NDIR/skipped/plan-i.md.staleness"
 assert_present "row9 queued"                  "$NDIR/queue/plan-i.md"
-echo "ok: row9 — .staleness eviction"
-
+h_pass "row9 — .staleness eviction"
 # ===========================================================================
 # impl_model <-> Verification Matrix consistency backstop (bin/lib/
 # plan-model-consistency). The plan archive predates bin/check-plan gate 13,
@@ -398,17 +365,14 @@ out=$(run_queue plan-j 2>&1)
 ec=$?
 set +e
 if [ "$ec" -eq 0 ]; then
-    echo "FAIL: row15 — expected non-zero exit for a plan missing impl_model"
-    FAILED=1
+    h_fail "row15" "expected non-zero exit for a plan missing impl_model"
 fi
 if ! echo "$out" | grep -q "impl_model: is missing or blank"; then
-    echo "FAIL: row15 — expected the impl_model PRESENCE error (which must fire before"
+    h_fail "row15" "expected the impl_model PRESENCE error (which must fire before"
     echo "      the matrix-consistency error), got: $out"
-    FAILED=1
 fi
 assert_absent "row15 not queued" "$NDIR/queue/plan-j.md"
-echo "ok: row15 — refuses to queue a plan missing impl_model"
-
+h_pass "row15 — refuses to queue a plan missing impl_model"
 # ---------------------------------------------------------------------------
 # Row 16 — the same clean matrix WITH a deliberate `impl_model: sonnet` marker
 # queues normally.
@@ -417,8 +381,7 @@ setup
 printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$CLEAN_MATRIX" > "$PDIR/plan-k.md"
 run_queue plan-k >/dev/null 2>&1
 assert_present "row16 queued" "$NDIR/queue/plan-k.md"
-echo "ok: row16 — queues a clean, correctly-marked plan"
-
+h_pass "row16 — queues a clean, correctly-marked plan"
 # ===========================================================================
 # reorder subcommand — permutation validation + spaced ascending-mtime touch.
 # Order is asserted via queue_entries_ordered (oldest-first by symlink lstat
@@ -435,8 +398,7 @@ run_queue plan-b >/dev/null 2>&1
 run_queue plan-c >/dev/null 2>&1
 run_queue reorder plan-c plan-a plan-b >/dev/null 2>&1
 assert_order "row10 reorder applies requested order" "plan-c.md plan-a.md plan-b.md"
-echo "ok: row10 — reorder happy path"
-
+h_pass "row10 — reorder happy path"
 # ---------------------------------------------------------------------------
 # Row 11 — ordering: mtimes end >=1 min apart, no same-second tie-scramble.
 # Start from an identical-mtime state and request a non-alphabetical order —
@@ -452,11 +414,9 @@ run_queue reorder plan-c plan-b plan-a >/dev/null 2>&1
 assert_order "row11 non-alpha order survives identical start" "plan-c.md plan-b.md plan-a.md"
 m1=$(target_mtime plan-c.md); m2=$(target_mtime plan-b.md); m3=$(target_mtime plan-a.md)
 if [ $((m2 - m1)) -lt 60 ] || [ $((m3 - m2)) -lt 60 ]; then
-    echo "FAIL: row11 — target mtimes not >=60s apart: $m1 $m2 $m3"
-    FAILED=1
+    h_fail "row11" "target mtimes not >=60s apart: $m1 $m2 $m3"
 fi
-echo "ok: row11 — spaced ascending mtimes, no tie-scramble"
-
+h_pass "row11 — spaced ascending mtimes, no tie-scramble"
 # ---------------------------------------------------------------------------
 # Row 12 — reject a slug not currently queued (non-zero exit, order unchanged)
 # ---------------------------------------------------------------------------
@@ -466,11 +426,10 @@ run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue pl
 run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
 before="$(queue_order)"
 set +e; out=$(run_queue reorder plan-a plan-b plan-z 2>&1); ec=$?; set +e
-[ "$ec" -eq 0 ] && { echo "FAIL: row12 — expected non-zero exit for unqueued slug"; FAILED=1; }
-echo "$out" | grep -q "not in the queue" || { echo "FAIL: row12 — missing not-in-queue error: $out"; FAILED=1; }
+[ "$ec" -eq 0 ] && { h_fail "row12" "expected non-zero exit for unqueued slug"; }
+echo "$out" | grep -q "not in the queue" || { h_fail "row12" "missing not-in-queue error: $out"; }
 assert_order "row12 order unchanged after reject" "$before"
-echo "ok: row12 — reject unqueued slug"
-
+h_pass "row12 — reject unqueued slug"
 # ---------------------------------------------------------------------------
 # Row 13 — reject a non-permutation: missing entry AND duplicate-as-extra
 # ---------------------------------------------------------------------------
@@ -481,14 +440,13 @@ run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
 before="$(queue_order)"
 # (a) missing entry -> count mismatch
 set +e; out=$(run_queue reorder plan-a plan-b 2>&1); ec=$?; set +e
-[ "$ec" -eq 0 ] && { echo "FAIL: row13a — expected non-zero for missing entry"; FAILED=1; }
+[ "$ec" -eq 0 ] && { h_fail "row13a" "expected non-zero for missing entry"; }
 assert_order "row13a order unchanged" "$before"
 # (b) duplicate-as-extra -> dup rejection
 set +e; out=$(run_queue reorder plan-a plan-b plan-b 2>&1); ec=$?; set +e
-[ "$ec" -eq 0 ] && { echo "FAIL: row13b — expected non-zero for duplicate entry"; FAILED=1; }
+[ "$ec" -eq 0 ] && { h_fail "row13b" "expected non-zero for duplicate entry"; }
 assert_order "row13b order unchanged" "$before"
-echo "ok: row13 — reject non-permutation (missing/extra)"
-
+h_pass "row13 — reject non-permutation (missing/extra)"
 # ---------------------------------------------------------------------------
 # Row 14 — touch-nothing-on-rejection: target mtimes unchanged after a reject
 # ---------------------------------------------------------------------------
@@ -500,11 +458,9 @@ a0=$(target_mtime plan-a.md); b0=$(target_mtime plan-b.md); c0=$(target_mtime pl
 set +e; run_queue reorder plan-c plan-a plan-z >/dev/null 2>&1; set +e   # rejected: plan-z not queued
 a1=$(target_mtime plan-a.md); b1=$(target_mtime plan-b.md); c1=$(target_mtime plan-c.md)
 if [ "$a0" != "$a1" ] || [ "$b0" != "$b1" ] || [ "$c0" != "$c1" ]; then
-    echo "FAIL: row14 — target mtimes changed on a rejected reorder"
-    FAILED=1
+    h_fail "row14" "target mtimes changed on a rejected reorder"
 fi
-echo "ok: row14 — touch-nothing on rejection"
-
+h_pass "row14 — touch-nothing on rejection"
 # ===========================================================================
 # Back-of-queue stamping on ENQUEUE. A bare `ln -s`/`mv` leaves the new entry
 # sorting by the plan's AUTHORING mtime, and `reorder` writes its ladder into
@@ -526,8 +482,7 @@ run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1   # ladder stamped into t
 run_queue plan-old >/dev/null 2>&1
 assert_order "row17 stale-mtime plan lands at the back" \
              "plan-a.md plan-b.md plan-c.md plan-old.md"
-echo "ok: row17 — enqueue of an old plan goes to the back (core bug)"
-
+h_pass "row17 — enqueue of an old plan goes to the back (core bug)"
 # ---------------------------------------------------------------------------
 # Row 18 — platform-agnostic: BOTH sort keys (symlink lstat for GNU ls, target
 # stat for BSD ls) of the new entry are strictly newer than every incumbent.
@@ -541,16 +496,13 @@ run_queue reorder plan-a plan-b >/dev/null 2>&1
 run_queue plan-old >/dev/null 2>&1
 for incumbent in plan-a.md plan-b.md; do
     if [ "$(link_mtime plan-old.md)" -le "$(link_mtime "$incumbent")" ]; then
-        echo "FAIL: row18 — new entry's symlink mtime not newer than $incumbent"
-        FAILED=1
+        h_fail "row18" "new entry's symlink mtime not newer than $incumbent"
     fi
     if [ "$(target_mtime plan-old.md)" -le "$(target_mtime "$incumbent")" ]; then
-        echo "FAIL: row18 — new entry's target mtime not newer than $incumbent"
-        FAILED=1
+        h_fail "row18" "new entry's target mtime not newer than $incumbent"
     fi
 done
-echo "ok: row18 — both symlink and target sort keys stamped"
-
+h_pass "row18 — both symlink and target sort keys stamped"
 # ---------------------------------------------------------------------------
 # Row 19 — `requeue` (mv out of skipped/) is the second enqueue path and must
 # stamp too; `mv` otherwise carries the old mtime straight across.
@@ -565,8 +517,7 @@ ln -s "$PDIR/plan-old.md" "$NDIR/skipped/plan-old.md"
 touch -h -t 202001010000.00 "$NDIR/skipped/plan-old.md"
 run_queue requeue >/dev/null 2>&1
 assert_order "row19 requeued plan lands at the back" "plan-a.md plan-b.md plan-old.md"
-echo "ok: row19 — requeue stamps to the back"
-
+h_pass "row19 — requeue stamps to the back"
 # ---------------------------------------------------------------------------
 # Row 20 — two successive enqueues of equally-ancient plans keep INSERTION
 # order and stay >=60s apart (no same-second tie -> no filename tie-scramble;
@@ -580,11 +531,9 @@ run_queue plan-y >/dev/null 2>&1
 run_queue plan-x >/dev/null 2>&1
 assert_order "row20 insertion order preserved" "plan-a.md plan-y.md plan-x.md"
 if [ "$(( $(target_mtime plan-x.md) - $(target_mtime plan-y.md) ))" -lt 60 ]; then
-    echo "FAIL: row20 — successive enqueues not >=60s apart"
-    FAILED=1
+    h_fail "row20" "successive enqueues not >=60s apart"
 fi
-echo "ok: row20 — successive enqueues stay spaced and ordered"
-
+h_pass "row20 — successive enqueues stay spaced and ordered"
 # ===========================================================================
 # impl_model presence/validity gate — enforced independently of whether the
 # plan carries a Verification Matrix (L46).  bin/lib/plan-model-consistency
@@ -599,13 +548,11 @@ expect_reject() {
     local out ec tok
     set +e; out=$(run_queue "$plan" 2>&1); ec=$?; set +e
     if [ "$ec" -eq 0 ]; then
-        echo "FAIL: $row — expected non-zero exit, got 0"
-        FAILED=1
+        h_fail "$row" "expected non-zero exit, got 0"
     fi
     for tok in "$@"; do
         if ! echo "$out" | grep -q "$tok"; then
-            echo "FAIL: $row — output missing '$tok', got: $out"
-            FAILED=1
+            h_fail "$row" "output missing '$tok', got: $out"
         fi
     done
     assert_absent "$row not queued" "$NDIR/queue/$plan.md"
@@ -618,39 +565,34 @@ setup
 printf -- '---\nimpl_model: sonnet\n---\n\n# no matrix here\n' > "$PDIR/plan-m.md"
 run_queue plan-m >/dev/null 2>&1
 assert_present "row21 queued" "$NDIR/queue/plan-m.md"
-echo "ok: row21 — matrix-less plan with a valid impl_model queues"
-
+h_pass "row21 — matrix-less plan with a valid impl_model queues"
 # Row 22 — NO matrix, NO impl_model → refused.  The exact L46 hole: before this
 # gate plan-model-consistency exited 0 and the plan queued unvalidated.
 setup
 printf -- '# no frontmatter, no matrix\n' > "$PDIR/plan-n.md"
 expect_reject row22 plan-n "impl_model: is missing or blank"
-echo "ok: row22 — matrix-less plan missing impl_model is refused"
-
+h_pass "row22 — matrix-less plan missing impl_model is refused"
 # Row 23 — NO matrix, `impl_model: fable` → refused, message NAMES the value.
 # plan-model-tier writes its rejection to STDOUT, so a dropped capture or a
 # stray `2>/dev/null` would silence it.
 setup
 printf -- '---\nimpl_model: fable\n---\n\n# no matrix here\n' > "$PDIR/plan-o.md"
 expect_reject row23 plan-o "fable" "not selectable"
-echo "ok: row23 — matrix-less plan with an unselectable impl_model is refused"
-
+h_pass "row23 — matrix-less plan with an unselectable impl_model is refused"
 # Row 24 — valid matrix + valid `impl_model: sonnet` → still queues.  Regression
 # guard: the presence check must not shadow the accepted path.
 setup
 printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$CLEAN_MATRIX" > "$PDIR/plan-p.md"
 run_queue plan-p >/dev/null 2>&1
 assert_present "row24 queued" "$NDIR/queue/plan-p.md"
-echo "ok: row24 — matrixed, correctly-marked plan still queues"
-
+h_pass "row24 — matrixed, correctly-marked plan still queues"
 # Row 26 — a Truly-manual matrix row under `impl_model: sonnet` is STILL refused
 # by bin/lib/plan-model-consistency.  Without this row the whole consistency call
 # could be deleted and rows 15/21/22/23/24 would all stay green.
 setup
 printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$MANUAL_MATRIX" > "$PDIR/plan-q.md"
 expect_reject row26 plan-q "Truly-manual row forbids impl_model: sonnet"
-echo "ok: row26 — consistency backstop still fires under the new gate"
-
+h_pass "row26 — consistency backstop still fires under the new gate"
 # ---------------------------------------------------------------------------
 # Row 27 — queue_entries_ordered is unaffected by editing a queued plan's TARGET.
 # queue_entries_ordered sorts by the SYMLINK's own lstat mtime (not the target's
@@ -670,16 +612,10 @@ touch -t 209912312359.59 "$PDIR/plan-lstat-a.md"
 # queue_entries_ordered must still return a then b (oldest symlink lstat first).
 _r27_order=$(queue_entries_ordered "$NDIR/queue" | xargs -n1 basename | tr '\n' ' ')
 if [ "$_r27_order" = "plan-lstat-a.md plan-lstat-b.md " ]; then
-    echo "ok: row27 — queue_entries_ordered unaffected by target edit"
+    h_pass "row27 — queue_entries_ordered unaffected by target edit"
 else
-    echo "FAIL: row27 — wrong order after target edit (got: $_r27_order)"
-    FAILED=1
+    h_fail "row27" "wrong order after target edit (got: $_r27_order)"
 fi
 
 # ---------------------------------------------------------------------------
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

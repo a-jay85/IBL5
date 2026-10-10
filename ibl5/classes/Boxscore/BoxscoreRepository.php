@@ -358,41 +358,4 @@ class BoxscoreRepository extends \Database\BaseMysqliRepository implements Boxsc
             $personalFouls,
         );
     }
-
-    /**
-     * Narrow a mixed fetchAll() column to int for use as an index key.
-     *
-     * The columns fed here are INT NOT NULL in the schema, so the fallback is
-     * defensive only; a non-numeric value yields 0, which simply never matches
-     * a real team id rather than producing a malformed key.
-     */
-    private static function scalarToInt(mixed $value): int
-    {
-        if (is_int($value)) {
-            return $value;
-        }
-        if (is_float($value)) {
-            return (int) $value;
-        }
-        if (is_string($value) && is_numeric($value)) {
-            return (int) $value;
-        }
-        return 0;
-    }
-
-    /**
-     * Narrow a mixed fetchAll() column to string for use as an index key.
-     *
-     * `game_date` is a DATE column, so the fallback is defensive only.
-     */
-    private static function scalarToString(mixed $value): string
-    {
-        if (is_string($value)) {
-            return $value;
-        }
-        if (is_int($value) || is_float($value)) {
-            return (string) $value;
-        }
-        return '';
-    }
 }

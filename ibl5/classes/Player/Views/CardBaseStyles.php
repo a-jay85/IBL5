@@ -162,20 +162,4 @@ HTML;
             'imageUrl' => PlayerImageHelper::getImageUrl($playerID),
         ];
     }
-
-    /**
-     * Get color scheme for a player's team
-     *
-     * @param \mysqli|null $db Database connection
-     * @param int $teamid Team ID
-     * @return array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string} Color scheme array
-     */
-    public static function getColorSchemeForTeam(?\mysqli $db, int $teamid): array
-    {
-        if ($db !== null && $teamid > 0) {
-            $teamColors = TeamColorHelper::getTeamColors($db, $teamid);
-            return TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
-        }
-        return TeamColorHelper::getDefaultColorScheme();
-    }
 }

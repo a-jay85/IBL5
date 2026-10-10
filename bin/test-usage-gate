@@ -61,7 +61,17 @@ new_env() {
     STUB="$T/stub"
     mkdir -p "$IBL5_USAGE_GATE_STATE_DIR/markers"
     ORIG_PATH="${ORIG_PATH:-$PATH}"
+    ORIG_HOME="${ORIG_HOME:-$HOME}"
+    export HOME="$ORIG_HOME"
+    unset IBL5_USAGE_GATE_TEST_MODE
 }
+
+# seed_home <account_uuid|"">: isolate HOME; seed ~/.claude.json with the account id.
+seed_home() {
+    mkdir -p "$T/home"; export HOME="$T/home"
+    if [ -n "$1" ]; then printf '{"oauthAccount":{"accountUuid":"%s"}}\n' "$1" > "$HOME/.claude.json"; fi
+}
+acct_hash() { printf '%s' "$1" | shasum -a 256 | cut -c1-16; }
 
 seed_cache() {  # <fetched_at> <body>
     printf '%s' "$2" | jq --argjson t "$1" '. + {fetched_at:$t}' > "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
@@ -114,6 +124,49 @@ test_fetch_bad_body_serves_stale() {
     assert_eq fetch_bad_body:stale 41.0 "$(printf '%s' "$out" | jq -r '.five_hour.utilization')"
     assert_contains fetch_bad_body:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "reason=bad-body"
     assert_eq fetch_bad_body:cache-unchanged "$before" "$(cat "$IBL5_USAGE_GATE_STATE_DIR/cache.json")"
+}
+
+# seed_cache_fp <fetched_at> <body> <cred_fp>: seed_cache plus a stamped cred_fp.
+seed_cache_fp() {
+    printf '%s' "$2" | jq --argjson t "$1" --arg fp "$3" '. + {fetched_at:$t, cred_fp:$fp}' \
+        > "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+}
+
+test_fetch_cred_switch_drops_cache() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"
+    seed_cache_fp "$(date +%s)" "$BODY_A" "0000000000000000"
+    local d="$IBL5_USAGE_GATE_STATE_DIR" out rc
+    printf '%s\n' "$(( $(date +%s) + 600 )) 1" > "$d/fetch-backoff"
+    out=$(PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq cred_switch:rc 0 "$rc"
+    assert_eq cred_switch:live-body 77.0 "$(printf '%s' "$out" | jq -r '.five_hour.utilization')"
+    assert_eq cred_switch:one-call 1 "$(curl_calls "$STUB")"
+    assert_eq cred_switch:backoff-cleared "" "$(ls "$d/fetch-backoff" 2>/dev/null)"
+    assert_eq cred_switch:no-fp-in-output "null" "$(printf '%s' "$out" | jq -r '.cred_fp')"
+    assert_eq cred_switch:fp-stamped "$(printf tok | shasum -a 256 | cut -c1-16)" "$(jq -r '.cred_fp' "$d/cache.json")"
+    assert_contains cred_switch:log "$(cat "$d/usage-gate.log")" "cred-switch cache-dropped"
+}
+
+test_fetch_same_cred_keeps_cache() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B" 1
+    seed_cache_fp "$(date +%s)" "$BODY_A" "$(printf tok | shasum -a 256 | cut -c1-16)"
+    local out
+    out=$(PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45")
+    assert_eq same_cred:cached 41.0 "$(printf '%s' "$out" | jq -r '.five_hour.utilization')"
+    assert_eq same_cred:no-curl 0 "$(curl_calls "$STUB")"
+}
+
+test_fetch_no_keychain_keeps_cache() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    seed_cache_fp "$(date +%s)" "$BODY_A" "0000000000000000"
+    local out rc
+    out=$(PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq no_keychain:rc 0 "$rc"
+    assert_eq no_keychain:cached 41.0 "$(printf '%s' "$out" | jq -r '.five_hour.utilization')"
+    assert_eq no_keychain:no-curl 0 "$(curl_calls "$STUB")"
 }
 
 # ---------------------------------------------------------------- fetch backoff / single-flight
@@ -965,6 +1018,26 @@ test_decide_run_sid_drain_holder_allows() {
     assert_eq run_sid_holder:no-marker 0 "$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -type f | wc -l | tr -d ' ')"
 }
 
+# A runner copy in a temp dir (a test harness) must not park a marker in the real
+# state dir. With IBL5_USAGE_GATE_STATE_DIR set, the same resume bin is accepted.
+test_marker_temp_bin_needs_own_state_dir() {
+    new_env
+    local h d rc tbin="$T/automouse/run"
+    mkdir -p "$T/automouse"; printf '#!/bin/sh\n' > "$tbin"; chmod +x "$tbin"
+    h=$(mktemp -d "$TMPROOT/home.XXXXXX")
+    d="$h/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate"
+    env -u IBL5_USAGE_GATE_STATE_DIR HOME="$h" bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; usage_marker_write $SID_A automouse '$tbin' usage-pause drain 95 seven_day 1790625600"; rc=$?
+    assert_eq temp_bin:default-dir-rejected 1 "$rc"
+    assert_no_file temp_bin:default-dir-no-marker "$d/markers/$SID_A.json"
+    assert_contains temp_bin:log "$(cat "$d/usage-gate.log")" "marker-rejected reason=temp-resume-bin"
+    env -u IBL5_USAGE_GATE_STATE_DIR HOME="$h" bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; usage_marker_write $SID_B automouse /bin/sh usage-pause drain 95 seven_day 1790625600"; rc=$?
+    assert_eq temp_bin:default-dir-real-bin-ok 0 "$rc"
+    assert_file temp_bin:default-dir-real-bin-marker "$d/markers/$SID_B.json"
+    gate_run "usage_marker_write $SID_A automouse '$tbin' usage-pause drain 95 seven_day 1790625600"; rc=$?
+    assert_eq temp_bin:own-dir-ok 0 "$rc"
+    assert_file temp_bin:own-dir-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
 # ---------------------------------------------------------------- Phase 4
 
 # coord_setup <pct>: env with a fresh cache at <pct>, failing curl stub, a DM stub
@@ -1123,7 +1196,7 @@ test_coord_limit_hit_backoff() {
 test_coord_runaway_stuck() {
     coord_setup 50
     coord_marker $SID_A plan-now
-    patch_marker $SID_A '.resume_count = 5'
+    patch_marker $SID_A ".resume_count = 5 | .resets_at = $(( $(date +%s) + 3600 ))"
     run_coord --once >/dev/null 2>&1
     sleep 0.3
     assert_no_file coord_runaway:not-launched "$T/launched.$SID_A"
@@ -1131,6 +1204,106 @@ test_coord_runaway_stuck() {
     assert_eq coord_runaway:one-dm 1 "$(dm_calls)"
     run_coord --once >/dev/null 2>&1
     assert_eq coord_runaway:no-second-dm 1 "$(dm_calls)"
+}
+
+# A marker left stuck in an earlier usage window gets a fresh count once that
+# window resets, and the coordinator resumes it without a manual --resume-paused.
+test_coord_runaway_window_reset() {
+    coord_setup 50
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A ".resume_count = 5 | .stuck = true | .stuck_reason = \"paused-5-times\" | .resets_at = $(( $(date +%s) - 60 ))"
+    local out
+    out=$(run_coord --dry-run --once 2>/dev/null)
+    assert_contains coord_window_reset:dry-action "$out" "ACTION unstick $SID_A window-reset"
+    assert_eq coord_window_reset:dry-keeps-stuck true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
+    assert_file coord_window_reset:launched "$T/launched.$SID_A"
+    assert_eq coord_window_reset:unstuck false "$(jq -r '.stuck // false' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_eq coord_window_reset:count-restarted 1 "$(jq -r .resume_count "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_contains coord_window_reset:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "runaway-reset sid=$SID_A reason=window-reset"
+    assert_contains coord_window_reset:dm "$(cat "$T/dm.txt")" "usage window reset"
+}
+
+# A marker left stuck under one account gets a fresh count after a login switch,
+# because the new account has its own limits. Its window has not reset yet.
+test_coord_runaway_account_switch() {
+    coord_setup 50
+    seed_home uuid-A
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A ".resume_count = 5 | .stuck = true | .stuck_reason = \"paused-5-times\" | .resets_at = $(( $(date +%s) + 86400 ))"
+    assert_eq coord_acct_switch:marker-acct "$(acct_hash uuid-A)" "$(jq -r .acct_fp "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    seed_home uuid-B
+    local out
+    out=$(run_coord --dry-run --once 2>/dev/null)
+    assert_contains coord_acct_switch:dry-action "$out" "ACTION unstick $SID_A account-switch"
+    assert_eq coord_acct_switch:dry-keeps-stuck true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
+    assert_file coord_acct_switch:launched "$T/launched.$SID_A"
+    assert_eq coord_acct_switch:unstuck false "$(jq -r '.stuck // false' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_eq coord_acct_switch:count-restarted 1 "$(jq -r .resume_count "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_contains coord_acct_switch:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "runaway-reset sid=$SID_A reason=account-switch"
+    assert_contains coord_acct_switch:dm "$(cat "$T/dm.txt")" "login switch detected"
+    assert_eq coord_acct_switch:reset-acct "$(acct_hash uuid-B)" "$(jq -r .reset_acct "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    # The resumed run exits without pausing; after 5 more tries it stays stuck.
+    rm -f "$T/launched.$SID_A"
+    patch_marker $SID_A ".resume_count = 5 | .stuck = true | .stuck_reason = \"paused-5-times\""
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    assert_no_file coord_acct_switch:no-second-reset "$T/launched.$SID_A"
+    assert_eq coord_acct_switch:stuck-again true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+}
+
+# Same account, window not reset: the stuck marker stays stuck.
+test_coord_runaway_same_account_stays_stuck() {
+    coord_setup 50
+    seed_home uuid-A
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A ".resume_count = 5 | .stuck = true | .stuck_reason = \"paused-5-times\" | .resets_at = $(( $(date +%s) + 86400 ))"
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    assert_no_file coord_same_acct:not-launched "$T/launched.$SID_A"
+    assert_eq coord_same_acct:still-stuck true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+}
+
+# A marker whose resets_at is unknown stays stuck: there is no window to wait out.
+test_coord_runaway_no_resets_stays_stuck() {
+    coord_setup 50
+    coord_marker $SID_A plan-now
+    patch_marker $SID_A '.resume_count = 5 | .stuck = true | .stuck_reason = "paused-5-times" | .resets_at = null'
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    assert_no_file coord_no_resets:not-launched "$T/launched.$SID_A"
+    assert_eq coord_no_resets:still-stuck true "$(jq -r .stuck "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+}
+
+# A resume binary removed after the pause (worktree reaped once its PR merged) gets
+# the marker cleared, so the runner's queue lock is no longer held by it.
+test_coord_missing_bin_retires() {
+    coord_setup 50
+    coord_marker $SID_A plan-now
+    rm -f "$RBIN"
+    local out
+    out=$(run_coord --dry-run --once 2>/dev/null)
+    assert_contains coord_missing_bin:dry-action "$out" "ACTION clear $SID_A resume-bin-missing"
+    assert_file coord_missing_bin:dry-keeps "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    run_coord --once >/dev/null 2>&1
+    assert_no_file coord_missing_bin:marker-gone "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_file coord_missing_bin:cleared-stamp "$IBL5_USAGE_GATE_STATE_DIR/cleared/$SID_A"
+    assert_eq coord_missing_bin:one-dm 1 "$(dm_calls)"
+    assert_contains coord_missing_bin:dm-text "$(cat "$T/dm.txt")" "marker cleared"
+}
+
+# A marker already left stuck by the old code is retired too, even in the stop zone.
+test_coord_missing_bin_retires_stuck_in_stop() {
+    coord_setup 99
+    coord_marker $SID_A post-plan-now
+    patch_marker $SID_A '.stuck = true | .stuck_reason = "resume-bin-not-executable"'
+    rm -f "$RBIN"
+    run_coord --once >/dev/null 2>&1
+    assert_no_file coord_missing_bin_stuck:marker-gone "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_eq coord_missing_bin_stuck:one-dm 1 "$(dm_calls)"
 }
 
 test_coord_in_flight_skip() {
@@ -1666,6 +1839,573 @@ test_runner_priority_burndown_loop() {
     in_env "usage_marker_write $SID_A burndown-loop '$REPO_ROOT/bin/burndown-loop' usage-pause drain 94 seven_day ''"
     assert_eq prio_burndown_loop:marker-rc 0 "$?"
     assert_eq prio_burndown_loop:runner burndown-loop "$(jq -r .runner "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json" 2>/dev/null)"
+}
+
+# ---------------------------------------------------------------- cred-switch resume
+
+FP_A=$(printf tokA | shasum -a 256 | cut -c1-16)
+
+# elig_run <token|""> <expr>: run <expr> with the keychain stub returning <token>.
+elig_run() {
+    make_stub_bin "$STUB" "$1" '{}' 1
+    PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; $2"
+}
+
+# elig_marker <reason> <paused_ago> <cred_fp|"">: seed a marker for SID_A.
+elig_marker() {
+    new_env
+    jq -n --arg sid "$SID_A" --arg reason "$1" --argjson at "$(( $(date +%s) - $2 ))" --arg fp "$3" \
+        '{session_id:$sid, reason:$reason, paused_at:$at, resume_count:0,
+          cred_fp:(if $fp == "" then null else $fp end)}' \
+        > "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_cred_switch_marker_records_fp() {
+    new_env
+    local rbin="$T/resume.sh"
+    printf '#!/bin/sh\n' > "$rbin"; chmod +x "$rbin"
+    elig_run tokA "usage_marker_write $SID_A plan-now '$rbin' limit-hit hit 100 five_hour 1790625600"
+    assert_eq cred_switch_write:fp "$FP_A" "$(jq -r '.cred_fp' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    elig_run "" "usage_marker_write $SID_A plan-now '$rbin' limit-hit hit 100 five_hour 1790625600"
+    assert_eq cred_switch_write:null-when-unreadable null "$(jq -r '.cred_fp' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+}
+
+test_cred_switch_same_login_held() {
+    elig_marker limit-hit 60 "$FP_A"
+    elig_run tokA "usage_marker_eligible $SID_A $(date +%s)"
+    assert_eq cred_switch_same:rc 1 "$?"
+}
+
+test_cred_switch_new_login_eligible() {
+    elig_marker limit-hit 60 "$FP_A"
+    elig_run tokB "usage_marker_eligible $SID_A $(date +%s)"
+    assert_eq cred_switch_new:rc 0 "$?"
+    assert_contains cred_switch_new:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "limit-hit-hold-skipped reason=cred-switch sid=$SID_A"
+}
+
+test_cred_switch_null_marker_fp_held() {
+    elig_marker limit-hit 60 ""
+    elig_run tokB "usage_marker_eligible $SID_A $(date +%s)"
+    assert_eq cred_switch_null_fp:rc 1 "$?"
+}
+
+test_cred_switch_unreadable_keychain_held() {
+    elig_marker limit-hit 60 "$FP_A"
+    elig_run "" "usage_marker_eligible $SID_A $(date +%s)"
+    assert_eq cred_switch_no_keychain:rc 1 "$?"
+}
+
+# ---------------------------------------------------------------- account-switch fast path
+
+FP_TOKB=$(printf tokB | shasum -a 256 | cut -c1-16)
+
+# switch_seed <acct_old_uuid|""> <acct_new_uuid|""> <backoff_secs>: old-account cache, new token.
+switch_seed() {
+    seed_home "$2"
+    local d="$IBL5_USAGE_GATE_STATE_DIR"
+    [ -n "$1" ] && acct_hash "$1" > "$d/acct-last"
+    seed_cache_fp "$(date +%s)" "$BODY_A" "$FP_A"
+    printf '%s\n' "$(( $(date +%s) + $3 )) 1" > "$d/fetch-backoff"
+    make_stub_http "$STUB" tokB 429 "$RL_BODY" 3598
+}
+
+test_fetch_switch_short_backoff() {
+    new_env
+    switch_seed uuid-A uuid-B 600
+    local d="$IBL5_USAGE_GATE_STATE_DIR" until step now
+    fetch_once 60 >/dev/null
+    assert_contains switch_short:dropped "$(fetch_log)" "cred-switch cache-dropped"
+    assert_contains switch_short:signal "$(fetch_log)" "cred-switch signal kind=account"
+    assert_contains switch_short:backoff "$(fetch_log)" "retry_after=3598 backoff=45 switch-retry=1/3"
+    read -r until step < "$d/fetch-backoff"
+    now=$(date +%s)
+    if [ $((until - now)) -le 45 ]; then pass switch_short:until; else fail switch_short:until "until-now=$((until - now))"; fi
+    assert_eq switch_short:count 1 "$(awk '{print $3}' "$d/cred-switch")"
+    assert_eq switch_short:no-secrets "" "$(grep -rl -e tokB -e uuid-B "$d" 2>/dev/null)"
+}
+
+test_fetch_switch_short_backoff_exhausts() {
+    new_env
+    seed_home ""
+    local d="$IBL5_USAGE_GATE_STATE_DIR"
+    make_stub_http "$STUB" tokB 429 "$RL_BODY" 3598
+    printf '%s %s 2 account\n' "$(date +%s)" "$FP_TOKB" > "$d/cred-switch"
+    fetch_once 60 >/dev/null
+    assert_contains switch_exhaust:third "$(fetch_log)" "backoff=45 switch-retry=3/3"
+    rm -f "$d/fetch-backoff"
+    : > "$d/usage-gate.log"
+    fetch_once 60 >/dev/null
+    assert_contains switch_exhaust:normal "$(fetch_log)" "retry_after=3598 backoff=900"
+    assert_eq switch_exhaust:no-retry-tag 0 "$(log_count switch-retry)"
+}
+
+test_fetch_switch_short_backoff_guards() {
+    new_env
+    seed_home ""
+    local d="$IBL5_USAGE_GATE_STATE_DIR"
+    make_stub_http "$STUB" tokB 429 "$RL_BODY" 3598
+    printf '%s %s 0 account\n' "$(date +%s)" "$FP_A" > "$d/cred-switch"
+    fetch_once 60 >/dev/null
+    assert_contains switch_guard:other-fp "$(fetch_log)" "retry_after=3598 backoff=900"
+    new_env
+    seed_home ""
+    d="$IBL5_USAGE_GATE_STATE_DIR"
+    make_stub_http "$STUB" tokB 429 "$RL_BODY" 3598
+    printf '%s %s 0 account\n' "$(( $(date +%s) - 1800 ))" "$FP_TOKB" > "$d/cred-switch"
+    fetch_once 60 >/dev/null
+    assert_contains switch_guard:expired "$(fetch_log)" "retry_after=3598 backoff=900"
+    assert_eq switch_guard:no-retry-tag 0 "$(log_count switch-retry)"
+}
+
+test_fetch_same_account_refresh_no_signal() {
+    new_env
+    switch_seed uuid-A uuid-A 600
+    fetch_once 60 >/dev/null
+    assert_contains same_acct:logged "$(fetch_log)" "cred-switch same-account"
+    assert_no_file same_acct:no-signal "$IBL5_USAGE_GATE_STATE_DIR/cred-switch"
+    assert_contains same_acct:backoff "$(fetch_log)" "retry_after=3598 backoff=900"
+}
+
+test_fetch_switch_unknown_account_signals_token() {
+    new_env
+    switch_seed "" "" 600
+    fetch_once 60 >/dev/null
+    assert_contains unknown_acct:signal "$(fetch_log)" "cred-switch signal kind=token"
+    assert_contains unknown_acct:backoff "$(fetch_log)" "backoff=45"
+}
+
+test_fetch_success_records_acct() {
+    new_env
+    seed_home uuid-A
+    local d="$IBL5_USAGE_GATE_STATE_DIR"
+    make_stub_http "$STUB" tokA 200 "$BODY_A"
+    fetch_once 0 >/dev/null
+    assert_eq acct_last:hash "$(acct_hash uuid-A)" "$(cat "$d/acct-last")"
+    rm "$HOME/.claude.json"
+    fetch_once 0 >/dev/null
+    assert_no_file acct_last:removed "$d/acct-last"
+}
+
+test_account_switch_check() {
+    new_env
+    seed_home uuid-B
+    local d="$IBL5_USAGE_GATE_STATE_DIR"
+    seed_cache "$(date +%s)" "$BODY_A"
+    acct_hash uuid-A > "$d/acct-last"
+    printf '%s 1\n' "$(( $(date +%s) + 600 ))" > "$d/fetch-backoff"
+    gate_run usage_account_switch_check
+    assert_no_file acct_check:cache "$d/cache.json"
+    assert_no_file acct_check:backoff "$d/fetch-backoff"
+    assert_contains acct_check:log "$(cat "$d/usage-gate.log")" "account-switch cache-dropped"
+    assert_eq acct_check:signal "- 0 account" "$(cut -d' ' -f2- "$d/cred-switch")"
+
+    new_env
+    seed_home uuid-A
+    d="$IBL5_USAGE_GATE_STATE_DIR"
+    seed_cache "$(date +%s)" "$BODY_A"
+    acct_hash uuid-A > "$d/acct-last"
+    gate_run usage_account_switch_check
+    assert_file acct_check:same-keeps-cache "$d/cache.json"
+    assert_no_file acct_check:same-no-signal "$d/cred-switch"
+
+    new_env
+    seed_home uuid-B
+    d="$IBL5_USAGE_GATE_STATE_DIR"
+    seed_cache "$(date +%s)" "$BODY_A"
+    gate_run usage_account_switch_check
+    assert_file acct_check:no-last-keeps-cache "$d/cache.json"
+    assert_no_file acct_check:no-last-no-signal "$d/cred-switch"
+}
+
+# ---------------------------------------------------------------- coordinator switch fast resume
+
+# sw_marker <sid> <acct_uuid|""> [paused_ago]: marker paused under that account, resets an hour ahead.
+sw_marker() {
+    ( export PATH="$STUB:$ORIG_PATH"; coord_marker "$1" plan-now )
+    patch_marker "$1" ".resets_at = $(( $(date +%s) + 3600 )) | .paused_at = $(( $(date +%s) - ${3:-600} ))"
+    if [ -n "$2" ]; then patch_marker "$1" ".acct_fp = \"$(acct_hash "$2")\""; else patch_marker "$1" 'del(.acct_fp, .cred_fp)'; fi
+}
+
+# sw_signal <age_secs> <fp|-> <count> <kind>: write a cred-switch signal.
+sw_signal() {
+    printf '%s %s %s %s\n' "$(( $(date +%s) - $1 ))" "$2" "$3" "$4" > "$IBL5_USAGE_GATE_STATE_DIR/cred-switch"
+}
+
+# sw_stale_setup: stale tick (no cache), fetch-backoff armed like the incident.
+sw_stale_setup() {
+    coord_setup 97
+    rm -f "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+    printf '%s 1\n' "$(( $(date +%s) + 3598 ))" > "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+}
+
+test_coord_switch_incident_resumes() {
+    sw_stale_setup
+    seed_home uuid-B
+    sw_marker "$SID_A" uuid-A
+    sw_marker "$SID_B" uuid-A
+    sw_signal 30 - 1 account
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"; assert_eq switch_incident:a-launched 0 "$?"
+    wait_file "$T/launched.$SID_B"; assert_eq switch_incident:b-launched 0 "$?"
+    assert_eq switch_incident:stamp "acct:$(acct_hash uuid-B)" \
+        "$(jq -r '.switch_resumed_for' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_contains switch_incident:log "$(fetch_log)" "switch-resume sid=$SID_A via=acct"
+}
+
+test_coord_switch_resume_once() {
+    sw_stale_setup
+    seed_home uuid-B
+    sw_marker "$SID_A" uuid-A
+    sw_signal 30 - 1 account
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"; assert_eq switch_once:first 0 "$?"
+    rm -f "$T/launched.$SID_A"
+    patch_marker "$SID_A" 'del(.resuming_pid)'
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_no_file switch_once:crashed-not-relaunched "$T/launched.$SID_A"
+    sw_marker "$SID_A" uuid-B
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_no_file switch_once:repaused-not-relaunched "$T/launched.$SID_A"
+}
+
+test_coord_same_account_no_fast_resume() {
+    sw_stale_setup
+    seed_home uuid-A
+    sw_marker "$SID_A" uuid-A
+    sw_signal 30 - 1 token
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_no_file same_acct_coord:no-launch "$T/launched.$SID_A"
+}
+
+test_coord_switch_respects_runaway_and_hold() {
+    sw_stale_setup
+    seed_home uuid-B
+    sw_marker "$SID_A" uuid-A
+    patch_marker "$SID_A" '.resume_count = 5'
+    ( export PATH="$STUB:$ORIG_PATH"; coord_marker "$SID_B" plan-now limit-hit )
+    patch_marker "$SID_B" ".resets_at = $(( $(date +%s) + 3600 )) | .acct_fp = \"$(acct_hash uuid-A)\""
+    sw_signal 30 - 1 account
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    # A known account switch clears the old account's pause count, so A resumes.
+    assert_eq switch_runaway:unstuck false "$(jq -r '.stuck // false' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
+    assert_file switch_runaway:launched "$T/launched.$SID_A"
+    assert_no_file switch_hold:limit-hit-waits "$T/launched.$SID_B"
+}
+
+test_coord_switch_fallback_signal() {
+    sw_stale_setup
+    seed_home ""
+    sw_marker "$SID_A" ""
+    sw_signal 60 "$FP_A" 0 token
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"; assert_eq switch_fallback:launched 0 "$?"
+    assert_contains switch_fallback:log "$(fetch_log)" "switch-resume sid=$SID_A via=sig"
+
+    sw_stale_setup
+    seed_home ""
+    sw_marker "$SID_A" "" 0
+    sw_signal 60 "$FP_A" 0 token
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_no_file switch_fallback:paused-after-signal "$T/launched.$SID_A"
+
+    sw_stale_setup
+    seed_home ""
+    sw_marker "$SID_A" ""
+    sw_signal 1800 "$FP_A" 0 token
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_no_file switch_fallback:expired-signal "$T/launched.$SID_A"
+}
+
+test_coord_switch_fallback_fp_mismatch() {
+    sw_stale_setup
+    seed_home ""
+    make_stub_bin "$STUB" tokB '{}' 1
+    sw_marker "$SID_A" ""
+    patch_marker "$SID_A" ".cred_fp = \"$FP_A\" | .paused_at = $(date +%s)"
+    sw_signal 60 - 0 token
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"; assert_eq switch_fp_mismatch:launched 0 "$?"
+
+    sw_stale_setup
+    seed_home ""
+    make_stub_bin "$STUB" tokB '{}' 1
+    sw_marker "$SID_A" ""
+    patch_marker "$SID_A" ".cred_fp = \"$FP_A\" | .paused_at = $(date +%s)"
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_no_file switch_fp_mismatch:no-signal "$T/launched.$SID_A"
+}
+
+test_coord_account_check_drops_old_cache() {
+    coord_setup 99
+    seed_home uuid-B
+    local d="$IBL5_USAGE_GATE_STATE_DIR" out
+    acct_hash uuid-A > "$d/acct-last"
+    sw_marker "$SID_A" uuid-A
+    out=$(run_coord --once --dry-run 2>&1)
+    assert_contains acct_coord:dry-zone "$out" "ZONE stop"
+    assert_file acct_coord:dry-keeps-cache "$d/cache.json"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"; assert_eq acct_coord:launched 0 "$?"
+    assert_no_file acct_coord:cache-dropped "$d/cache.json"
+    assert_contains acct_coord:log "$(fetch_log)" "account-switch cache-dropped"
+}
+
+# ---------------------------------------------------------------- stale / switch DMs
+
+dm_text() { cat "$T/dm.txt" 2>/dev/null; }
+
+test_coord_switch_dm_once() {
+    sw_stale_setup
+    seed_home uuid-B
+    sw_marker "$SID_A" uuid-A
+    sw_marker "$SID_B" uuid-A
+    sw_signal 30 - 1 account
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_B"
+    assert_contains switch_dm:text "$(dm_text)" \
+        "usage-gate: login switch detected; resumed 2 session(s) paused under the previous account"
+    patch_marker "$SID_A" 'del(.resuming_pid)'
+    patch_marker "$SID_B" 'del(.resuming_pid)'
+    run_coord --once >/dev/null 2>&1
+    sleep 1
+    assert_eq switch_dm:once 1 "$(grep -c 'login switch detected; resumed' "$T/dm.txt")"
+}
+
+test_coord_switch_dm_ignores_stale_throttle() {
+    sw_stale_setup
+    seed_home uuid-B
+    sw_marker "$SID_A" uuid-A
+    sw_signal 30 - 1 account
+    printf '%s\n' "$(( $(date +%s) - 60 ))" > "$IBL5_USAGE_GATE_STATE_DIR/dm-stale-at"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
+    assert_contains switch_dm_throttle:sent "$(dm_text)" "login switch detected; resumed 1 session(s)"
+}
+
+test_coord_stale_dm_backoff_armed() {
+    coord_setup 97
+    rm -f "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+    seed_home ""
+    sw_marker "$SID_A" ""
+    printf '%s 1\n' "$(( $(date +%s) + 600 ))" > "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+    run_coord --once >/dev/null 2>&1
+    assert_contains stale_dm_bo:text "$(dm_text)" \
+        "usage-gate: no usage reading; 1 session(s) waiting. Usage fetch is backing off after a 429 until"
+    case "$(dm_text)" in
+        *"Run any interactive"*) fail stale_dm_bo:no-prompt-advice "found prompt advice" ;;
+        *) pass stale_dm_bo:no-prompt-advice ;;
+    esac
+}
+
+test_coord_stale_dm_no_backoff() {
+    coord_setup 99
+    seed_home ""
+    seed_cache "$(( $(date +%s) - 400 ))" "$(usage_json 99 0)"
+    sw_marker "$SID_A" ""
+    run_coord --once >/dev/null 2>&1
+    assert_contains stale_dm_nobo:text "$(dm_text)" "s old; 1 session(s) waiting. Run any interactive claude prompt to refresh the cache."
+    case "$(dm_text)" in
+        *"-1s"*) fail stale_dm_nobo:no-minus-one "found -1s" ;;
+        *) pass stale_dm_nobo:no-minus-one ;;
+    esac
+}
+
+test_coord_stale_dm_names_switch() {
+    coord_setup 97
+    rm -f "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+    seed_home ""
+    sw_marker "$SID_A" "" 0
+    sw_signal 60 - 0 token
+    run_coord --once >/dev/null 2>&1
+    assert_contains stale_dm_switch:names "$(dm_text)" "login switch detected at"
+    assert_contains stale_dm_switch:count "$(dm_text)" "1 session(s) waiting"
+}
+
+test_coord_stale_dm_dry_run() {
+    coord_setup 97
+    rm -f "$IBL5_USAGE_GATE_STATE_DIR/cache.json"
+    seed_home ""
+    sw_marker "$SID_A" ""
+    printf '%s 1\n' "$(( $(date +%s) + 600 ))" > "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
+    local out
+    out=$(run_coord --once --dry-run 2>&1)
+    assert_contains stale_dm_dry:action "$out" "ACTION dm usage-gate: no usage reading;"
+    assert_no_file stale_dm_dry:no-throttle-write "$IBL5_USAGE_GATE_STATE_DIR/dm-stale-at"
+}
+
+# ---------------------------------------------------------------- marker fingerprints
+
+test_marker_records_cred_fp() {
+    new_env
+    seed_home uuid-A
+    local rbin="$T/resume.sh" f
+    printf '#!/bin/sh\n' > "$rbin"; chmod +x "$rbin"
+    f="$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    elig_run tokA "usage_marker_write $SID_A plan-now '$rbin' usage-pause drain 95 five_hour 1790625600"
+    assert_eq marker_fp:cred "$FP_A" "$(jq -r '.cred_fp' "$f")"
+    assert_eq marker_fp:acct "$(acct_hash uuid-A)" "$(jq -r '.acct_fp' "$f")"
+    assert_eq marker_fp:no-token 0 "$(grep -c -e tokA -e uuid-A "$f")"
+    rm "$HOME/.claude.json"
+    elig_run "" "usage_marker_write $SID_A plan-now '$rbin' usage-pause drain 95 five_hour 1790625600"
+    assert_eq marker_fp:cred-null null "$(jq -r '.cred_fp' "$f")"
+    assert_eq marker_fp:acct-null null "$(jq -r '.acct_fp' "$f")"
+}
+
+test_marker_cred_switched() {
+    elig_marker usage-pause 60 "$FP_A"
+    elig_run tokA "usage_marker_cred_switched $SID_A"
+    assert_eq marker_switched:same 1 "$?"
+    elig_run tokB "usage_marker_cred_switched $SID_A"
+    assert_eq marker_switched:differs 0 "$?"
+    elig_run tokB "usage_marker_cred_switched ../x"
+    assert_eq marker_switched:bad-sid 1 "$?"
+    elig_run "" "usage_marker_cred_switched $SID_A"
+    assert_eq marker_switched:no-keychain 1 "$?"
+}
+
+test_switch_never_stores_secrets() {
+    sw_stale_setup
+    seed_home uuid-B
+    make_stub_http "$STUB" tokB 429 "$RL_BODY" 3598
+    sw_marker "$SID_A" uuid-A
+    acct_hash uuid-A > "$IBL5_USAGE_GATE_STATE_DIR/acct-last"
+    seed_cache_fp "$(date +%s)" "$BODY_A" "$FP_A"
+    run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
+    assert_eq never_secrets:state "" "$(grep -rl -e tokB -e uuid-B -e uuid-A "$IBL5_USAGE_GATE_STATE_DIR" 2>/dev/null)"
+}
+
+# ---------------------------------------------------------------- test-mode seam
+
+# stub_security_recorder <stubdir>: `security` shim that counts calls in <stubdir>/security.calls.
+stub_security_recorder() {
+    mkdir -p "$1"
+    printf '#!/bin/sh\necho call >> "%s/security.calls"\necho '"'"'{"claudeAiOauth":{"accessToken":"tok"}}'"'"'\n' "$1" > "$1/security"
+    chmod +x "$1/security"
+}
+
+security_calls() {  # <stubdir>
+    if [ -f "$1/security.calls" ]; then wc -l < "$1/security.calls" | tr -d ' '; else echo 0; fi
+}
+
+# real_default_dir: the default state dir for the current (fake) HOME.
+real_default_dir() {
+    printf '%s\n' "$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate"
+}
+
+test_testmode_unset_is_legacy() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local out rc
+    out=$(unset IBL5_USAGE_GATE_TEST_MODE; PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_unset:rc 0 "$rc"
+    assert_eq testmode_unset:body 77.0 "$(printf '%s' "$out" | jq -r .five_hour.utilization)"
+    assert_eq testmode_unset:curl 1 "$(curl_calls "$STUB")"
+    [ "$(security_calls "$STUB")" -ge 1 ] && pass testmode_unset:security || fail testmode_unset:security "no keychain read"
+}
+
+test_testmode_empty_is_legacy() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local out rc
+    out=$(IBL5_USAGE_GATE_TEST_MODE='' PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_empty:rc 0 "$rc"
+    assert_eq testmode_empty:body 77.0 "$(printf '%s' "$out" | jq -r .five_hour.utilization)"
+    assert_eq testmode_empty:curl 1 "$(curl_calls "$STUB")"
+}
+
+test_testmode_stale_cache_no_live_fetch() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local before out rc
+    before=$(cat "$IBL5_USAGE_GATE_STATE_DIR/cache.json")
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_stale:rc 2 "$rc"
+    assert_eq testmode_stale:body 41.0 "$(printf '%s' "$out" | jq -r .five_hour.utilization)"
+    assert_eq testmode_stale:curl 0 "$(curl_calls "$STUB")"
+    assert_eq testmode_stale:security 0 "$(security_calls "$STUB")"
+    assert_contains testmode_stale:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log" 2>/dev/null)" "fetch-skipped reason=test-mode"
+    assert_eq testmode_stale:cache-unchanged "$before" "$(cat "$IBL5_USAGE_GATE_STATE_DIR/cache.json")"
+}
+
+test_testmode_no_cache_fail_open() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    local out rc
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_nocache:rc 1 "$rc"
+    assert_eq testmode_nocache:stdout "" "$out"
+    assert_eq testmode_nocache:curl 0 "$(curl_calls "$STUB")"
+    assert_eq testmode_nocache:security 0 "$(security_calls "$STUB")"
+}
+
+test_testmode_fresh_cache_served() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    seed_cache "$(date +%s)" "$BODY_A"
+    local out rc
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_fresh:rc 0 "$rc"
+    assert_eq testmode_fresh:body 41.0 "$(printf '%s' "$out" | jq -r .five_hour.utilization)"
+    assert_eq testmode_fresh:curl 0 "$(curl_calls "$STUB")"
+    assert_eq testmode_fresh:security 0 "$(security_calls "$STUB")"
+}
+
+test_testmode_explicit_dir_works() {
+    new_env
+    local out rc
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_state_dir"); rc=$?
+    assert_eq testmode_explicit:rc 0 "$rc"
+    assert_eq testmode_explicit:out "$IBL5_USAGE_GATE_STATE_DIR" "$out"
+    assert_file testmode_explicit:markers "$IBL5_USAGE_GATE_STATE_DIR/markers"
+}
+
+test_testmode_refuses_unset_dir() {
+    new_env
+    seed_home ""
+    unset IBL5_USAGE_GATE_STATE_DIR
+    local real; real=$(real_default_dir)
+    mkdir -p "$real"
+    printf '%s' "$(usage_json 95 0)" | jq --argjson t "$(date +%s)" '. + {fetched_at:$t}' > "$real/cache.json"
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    local err rc
+    err=$(IBL5_USAGE_GATE_TEST_MODE=1 PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; usage_prestart_gate automouse $SID_A /x/run" 2>&1 >/dev/null); rc=$?
+    assert_eq testmode_refuse_unset:rc 0 "$rc"
+    assert_contains testmode_refuse_unset:stderr "$err" "USAGE-GATE-TEST: refusing the real state dir"
+    assert_eq testmode_refuse_unset:files "$real/cache.json" "$(find "$real" -type f)"
+    assert_eq testmode_refuse_unset:markers "" "$(ls -A "$real/markers" 2>/dev/null)"
+}
+
+test_testmode_refuses_explicit_real_dir() {
+    new_env
+    seed_home ""
+    local real; real=$(real_default_dir)
+    local out rc
+    out=$(IBL5_USAGE_GATE_STATE_DIR="$real/" IBL5_USAGE_GATE_TEST_MODE=1 bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_state_dir" 2>/dev/null); rc=$?
+    assert_eq testmode_refuse_explicit:rc 1 "$rc"
+    assert_eq testmode_refuse_explicit:out /dev/null/usage-gate-refused "$out"
+    assert_no_file testmode_refuse_explicit:no-dir "$real"
+}
+
+test_prod_unset_dir_uses_default() {
+    new_env
+    seed_home ""
+    unset IBL5_USAGE_GATE_STATE_DIR IBL5_USAGE_GATE_TEST_MODE
+    local out rc
+    out=$(bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_state_dir"); rc=$?
+    assert_eq prod_default:rc 0 "$rc"
+    assert_eq prod_default:out "$(real_default_dir)" "$out"
+    assert_file prod_default:markers "$(real_default_dir)/markers"
 }
 
 # ---------------------------------------------------------------- runner

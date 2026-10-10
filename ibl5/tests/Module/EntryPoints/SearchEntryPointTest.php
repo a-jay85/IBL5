@@ -44,7 +44,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Search');
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         // No search query when no query param provided
         $this->assertQueryNotExecuted('LIKE');
     }
@@ -54,7 +54,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Search', ['qlen' => '1']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('3 characters', $output);
     }
 
@@ -63,7 +63,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Search', ['query' => 'test player']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('nuke_stories');
     }
 
@@ -72,7 +72,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Search', ['query' => '']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryNotExecuted('LIKE');
     }
 
@@ -85,7 +85,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
             'days' => 'abc',
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('nuke_stories');
     }
 
@@ -98,7 +98,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
             'topic' => 'invalid',
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('nuke_stories');
     }
 
@@ -110,7 +110,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
             'type' => 'users',
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('auth_users');
     }
 
@@ -123,7 +123,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
             'min' => 'abc',
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertQueryExecuted('nuke_stories');
     }
 
@@ -132,7 +132,7 @@ class SearchEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
         $output = $this->runModule('Search', ['query' => '<script>alert(1)</script>']);
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringNotContainsString('<script>', $output);
     }
 }

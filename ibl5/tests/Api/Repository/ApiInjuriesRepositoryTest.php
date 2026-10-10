@@ -56,4 +56,13 @@ class ApiInjuriesRepositoryTest extends WideUnitTestCase
 
         $this->assertQueryExecuted('ibl_team_info');
     }
+
+    public function testGetInjuredPlayersOrdersByInjuredThenPid(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->getInjuredPlayers();
+
+        $this->assertQueryExecuted('ORDER BY p.injured DESC, p.pid ASC');
+    }
 }

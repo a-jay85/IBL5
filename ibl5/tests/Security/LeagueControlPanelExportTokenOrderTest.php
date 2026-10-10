@@ -31,7 +31,7 @@ class LeagueControlPanelExportTokenOrderTest extends TestCase
     {
         $found = $this->locate($source);
         self::assertGreaterThanOrEqual(0, $found['guard'], 'isAdmin() guard missing');
-        self::assertNotEmpty($found['tokens'], 'no lcp_export_active_players token issue found');
+        self::assertNotSame([], $found['tokens'], 'no lcp_export_active_players token issue found');
         foreach ($found['tokens'] as $offset) {
             self::assertGreaterThan($found['guard'], $offset, 'token issued before the admin guard');
         }

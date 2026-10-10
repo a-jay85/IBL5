@@ -20,17 +20,19 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 PLAN_NOW="$ROOT/bin/plan-now"
 # Read the cap out of the script under test, so bumping RUN_TIMEOUT there cannot
 # leave this fixture asserting a retired number.
 RUN_TIMEOUT=$(sed -n 's/^RUN_TIMEOUT=\([0-9][0-9]*\)$/\1/p' "$PLAN_NOW" | head -1)
 [ -n "$RUN_TIMEOUT" ] || { echo "test-plan-now: could not read RUN_TIMEOUT from $PLAN_NOW" >&2; exit 1; }
-FAILS=0
 REPO_ROOT_GATE=$(cd "$(dirname "$PLAN_NOW")" && pwd)
 
-ok()   { printf '  ok   %s\n' "$1"; }
-fail() { printf '  FAIL %s\n' "$1"; FAILS=$((FAILS + 1)); }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 # A full template, not `mktemp -d -t <prefix>`: GNU mktemp rejects a -t argument
 # with too few X's, so the BSD spelling would fail on the Linux CI runner.
@@ -810,6 +812,8 @@ want    "--no-dm leaves the verdict alone" "$out" "RESULT ok"
 #     would be strictly worse than the tail -f this replaces.
 out=$(DM_FAIL=1 STUB_PLAN_SRC="$GOOD_PLAN" run_case "$P" "PLAN_FILE: $P")
 want "an undeliverable DM is reported in the log" "$out" "DM UNDELIVERED"
+want "an undeliverable DM prints the exact UNDELIVERED line" "$out" \
+    "plan-now: DM UNDELIVERED (spooled by discord-dm) — the verdict above stands."
 want "an undeliverable DM does not change the verdict" "$out" "RESULT ok"
 
 # 11. Every terminal branch sets a verdict. The fallback text exists so a seventh
@@ -1314,6 +1318,74 @@ echo "── the coda still tells the model where to put it ──"
 dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
           "$PLAN_NOW" --implement "$PROMPT" 2>&1)
 coda=$(cat "$(printf '%s\n' "$dry" | sed -n 's/^  prompt: //p')" 2>/dev/null)
+echo "── the generated plist (ljob_write_runner_plist layout) ──"
+
+gen_plist=$(printf '%s\n' "$dry" | sed -n 's/^  plist:  //p')
+gen_runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
+plist_report=$(python3 -I - "$gen_plist" "$gen_runner" "$HOME" <<'PLIST_PY'
+import os
+import plistlib
+import re
+import sys
+
+plist_path, runner, home = sys.argv[1:4]
+with open(plist_path, "rb") as fh:
+    d = plistlib.load(fh)
+
+
+def strings(v):
+    if isinstance(v, str):
+        yield v
+    elif isinstance(v, list):
+        for x in v:
+            yield from strings(x)
+    elif isinstance(v, dict):
+        for x in v.values():
+            yield from strings(x)
+
+
+def check(label, cond):
+    print(("ok   " if cond else "FAIL ") + label)
+
+
+path_dirs = d.get("EnvironmentVariables", {}).get("PATH", "").split(":")
+vals = list(strings(d))
+check("exec form is the helper's unquoted 'exec <runner>'",
+      d.get("ProgramArguments") == ["/bin/bash", "-lc", "exec " + runner])
+check("KeepAlive is False and RunAtLoad is True",
+      d.get("KeepAlive") is False and d.get("RunAtLoad") is True)
+check("EnvironmentVariables.PATH holds /usr/bin, /bin, /opt/homebrew/bin and ~/.local/bin",
+      all(p in path_dirs for p in ("/usr/bin", "/bin", "/opt/homebrew/bin", home + "/.local/bin")))
+check("no string value contains an unexpanded $", not any("$" in v for v in vals))
+check("no string value is empty", all(v != "" for v in vals))
+check("Label matches the plist filename",
+      d.get("Label", "") + ".plist" == os.path.basename(plist_path))
+check("stdout and stderr share the log path",
+      d.get("StandardOutPath") and d.get("StandardOutPath") == d.get("StandardErrorPath"))
+check("WorkingDirectory is an existing directory",
+      os.path.isdir(d.get("WorkingDirectory", "")))
+check("runner path is /tmp/plan-now-<ts>.sh with no whitespace (unquoted exec depends on it)",
+      re.match(r"^/tmp/plan-now-[0-9A-Za-z._-]+\.sh$", runner) is not None)
+PLIST_PY
+)
+while IFS= read -r line; do
+    case "$line" in
+        "ok   "*) ok "${line#ok   }" ;;
+        *) fail "${line#FAIL }" ;;
+    esac
+done <<< "$plist_report"
+if [ "$(grep -c '<string></string>' "$gen_plist")" = "0" ]; then
+    ok "raw plist has no empty <string></string>"
+else
+    fail "raw plist has an empty <string></string>"
+fi
+if command -v plutil >/dev/null 2>&1; then
+    if plutil -lint "$gen_plist" >/dev/null 2>&1; then
+        ok "plutil -lint accepts the generated plist"
+    else
+        fail "plutil -lint rejects the generated plist"
+    fi
+fi
 # This dry-run's runner is never executed, and the runner is what deletes the plist.
 # Without this, every test run leaves a RunAtLoad plist in ~/Library/LaunchAgents
 # pointing at a /tmp runner that no longer exists.
@@ -1630,10 +1702,50 @@ read -r g6_hs g6_hp g6_alive < "$g6_out" 2>/dev/null || true
     || fail "G-6 runner re-recorded a live holder pid (got pid '$g6_hp' alive=$g6_alive, dead launcher pid $g6_dead)"
 [ ! -d "$GATE_DIR/drain-token.d" ] && ok "G-6 runner releases the token at exit" || fail "G-6 runner releases the token at exit"
 
-echo
-if [ "$FAILS" -eq 0 ]; then
-    echo "test-plan-now: all cases passed"
+# 14. runner notify(): seam resolution, PAUSED silence, no-binary line
+dry14=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+            PLAN_NOW_DISCORD_DM='' PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+            "$PLAN_NOW" --implement "$PROMPT" 2>&1)
+runner14=$(printf '%s\n' "$dry14" | sed -n 's/^  runner: //p')
+if grep -qE '^DISCORD_DM=.*/bin/discord-dm$' "$runner14"; then
+    ok "14a empty PLAN_NOW_DISCORD_DM falls back to bin/discord-dm"
 else
-    echo "test-plan-now: $FAILS case(s) FAILED"
+    fail "14a empty PLAN_NOW_DISCORD_DM falls back to bin/discord-dm"
 fi
-exit $(( FAILS > 0 ? 1 : 0 ))
+rm -f "$runner14"
+dry14=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+            PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+            "$PLAN_NOW" --implement "$PROMPT" 2>&1)
+runner14=$(printf '%s\n' "$dry14" | sed -n 's/^  runner: //p')
+if grep -qxF "DISCORD_DM=$DM_STUB" "$runner14"; then
+    ok "14b seam path lands in the runner"
+else
+    fail "14b seam path lands in the runner"
+fi
+if [ "$(grep -c '^notify() {' "$runner14")" = 1 ]; then
+    ok "14c notify() anchor is unique in the runner"
+else
+    fail "14c notify() anchor is unique in the runner"
+fi
+fns14=$(awk '/^(notify|ljob_dm_ready|ljob_dm_send) ?\(\)/{f=1} f{print} f&&/^}$/{f=0}' "$runner14")
+o14=$(NOTIFY=1 PAUSED=1 DISCORD_DM="$TMP/no-such-dm" bash -c "$fns14"$'\n''notify' 2>&1); rc14=$?
+if [ "$rc14" -eq 0 ] && [ -z "$o14" ]; then
+    ok "14d PAUSED=1 with a missing binary stays silent"
+else
+    fail "14d PAUSED=1 with a missing binary stays silent (rc=$rc14 out=$o14)"
+fi
+o14=$(NOTIFY=1 PAUSED=0 DISCORD_DM="$TMP/no-such-dm" bash -c "$fns14"$'\n''notify' 2>&1); rc14=$?
+if [ "$rc14" -eq 0 ] && [ "$o14" = "plan-now: no executable discord-dm at $TMP/no-such-dm — not notifying." ]; then
+    ok "14e missing binary prints the exact not-notifying line"
+else
+    fail "14e missing binary prints the exact not-notifying line (rc=$rc14 out=$o14)"
+fi
+o14=$(NOTIFY=0 PAUSED=0 DISCORD_DM="$TMP/no-such-dm" bash -c "$fns14"$'\n''notify' 2>&1); rc14=$?
+if [ "$rc14" -eq 0 ] && [ -z "$o14" ]; then
+    ok "14f NOTIFY=0 stays silent"
+else
+    fail "14f NOTIFY=0 stays silent (rc=$rc14 out=$o14)"
+fi
+rm -f "$runner14"
+
+h_done

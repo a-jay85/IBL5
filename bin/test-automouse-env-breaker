@@ -28,35 +28,30 @@
 # Run: bin/test-automouse-env-breaker  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUNNER="$SCRIPT_DIR/automouse/run"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
 if [ ! -f "$RUNNER" ]; then
     echo "FAIL: cannot find $RUNNER"
     exit 1
 fi
 
-ok()            { echo "ok: $1"; }
-fail()          { echo "FAIL: $1"; FAILED=1; }
-assert_eq()     { local d="$1" g="$2" e="$3"
-                  if [ "$g" = "$e" ]; then ok "$d"
-                  else fail "$d — expected [$e], got [$g]"; fi; }
+ok()            { h_pass "$1"; }
+fail()          { h_fail "$@"; }
+assert_eq()     { h_eq "$1" "$3" "$2"; }  # desc got expected
 assert_present(){ local d="$1" p="$2"
                   if [ -e "$p" ] || [ -L "$p" ]; then ok "$d"
                   else fail "$d — missing: $p"; fi; }
 assert_absent() { local d="$1" p="$2"
                   if [ -e "$p" ] || [ -L "$p" ]; then fail "$d — unexpected: $p"
                   else ok "$d"; fi; }
-want()          { local d="$1" h="$2" n="$3"
-                  case "$h" in *"$n"*) ok "$d" ;;
-                  *) fail "$d — missing token [$n]"; esac; }
-want_absent()   { local d="$1" h="$2" n="$3"
-                  case "$h" in *"$n"*) fail "$d — unexpected token [$n]" ;;
-                  *) ok "$d"; esac; }
+want()          { h_contains "$1" "$2" "$3"; }
+want_absent()   { h_not_contains "$1" "$2" "$3"; }
 
 # Extract `should_impl_env_stop() { ... }` (from its definition line to the first
 # line that is a lone `}`) and define it in this shell.
@@ -72,8 +67,6 @@ if [ -z "$FN_SRC" ]; then
 fi
 eval "$FN_SRC"
 
-FAILED=0
-
 # assert <name> <handoff> <in_queue> <env_err> <stalled> <fast> <wt_fail> <expect: stop|continue>
 assert() {
     name="$1"; h="$2"; q="$3"; e="$4"; s="$5"; f="$6"; wf="$7"; want="$8"
@@ -83,10 +76,9 @@ assert() {
         got="continue"
     fi
     if [ "$got" != "$want" ]; then
-        echo "FAIL: $name — expected '$want', got '$got' (h=$h q=$q e=$e s=$s f=$f wf=$wf)"
-        FAILED=1
+        h_fail "$name" "expected '$want', got '$got' (h=$h q=$q e=$e s=$s f=$f wf=$wf)"
     else
-        echo "ok: $name ($got)"
+        h_pass "$name ($got)"
     fi
 }
 
@@ -122,28 +114,27 @@ assert "no-wt-fail-fast-control"  0 1 0 0 1 0 stop
 # --- Backward compatibility: a five-arg call defaults wt_fail=0 ---
 if should_impl_env_stop 0 1 0 0 1; then got="stop"; else got="continue"; fi
 if [ "$got" != "stop" ]; then
-    echo "FAIL: five-arg-default — expected 'stop', got '$got' (wt_fail default must be 0)"
-    FAILED=1
+    h_fail "five-arg-default" "expected 'stop', got '$got' (wt_fail default must be 0)"
 else
-    echo "ok: five-arg-default ($got)"
+    h_pass "five-arg-default ($got)"
 fi
 
 # --- Contract: prompt-impl and run agree on the sentinel, and wt-new failure no longer skips ---
 PROMPT="$SCRIPT_DIR/automouse/prompt-impl"
 if grep -qF 'touch "$NIGHTLY_DIR/queue/$PLAN_FILE.wt-fail"' "$PROMPT"; then
-    echo "ok: contract-prompt-writes-sentinel"
+    h_pass "contract-prompt-writes-sentinel"
 else
-    echo "FAIL: contract-prompt-writes-sentinel — prompt-impl no longer tells the agent to touch queue/\$PLAN_FILE.wt-fail"; FAILED=1
+    h_fail "contract-prompt-writes-sentinel" "prompt-impl no longer tells the agent to touch queue/\$PLAN_FILE.wt-fail"
 fi
 if grep -qF 'WT_FAIL_FILE="$QUEUE_DIR/${PLAN_NAME}.wt-fail"' "$RUNNER"; then
-    echo "ok: contract-runner-reads-sentinel"
+    h_pass "contract-runner-reads-sentinel"
 else
-    echo "FAIL: contract-runner-reads-sentinel — run no longer reads queue/\${PLAN_NAME}.wt-fail"; FAILED=1
+    h_fail "contract-runner-reads-sentinel" "run no longer reads queue/\${PLAN_NAME}.wt-fail"
 fi
 if grep -E 'If bin/wt-new fails' "$PROMPT" | grep -q 'skipped/'; then
-    echo "FAIL: contract-no-skip-on-wt-fail — prompt-impl's wt-new failure line still moves the plan to skipped/"; FAILED=1
+    h_fail "contract-no-skip-on-wt-fail" "prompt-impl's wt-new failure line still moves the plan to skipped/"
 else
-    echo "ok: contract-no-skip-on-wt-fail"
+    h_pass "contract-no-skip-on-wt-fail"
 fi
 
 # ── Section 2: run-loop wt-fail cases (macOS-only — requires caffeinate) ─────
@@ -153,8 +144,9 @@ if [ "$(uname)" != "Darwin" ]; then
     echo "# Section 2: skipping macOS-only run-loop cases (uname=$(uname))"
     echo "SKIP: run-loop cases skipped on non-Darwin"
     echo ""
-    echo "# Results: $FAILED failed"
-    exit "$FAILED"
+    echo "# Results: $H_FAIL failed"
+    [ "$H_FAIL" -eq 0 ]
+    exit
 fi
 
 echo ""
@@ -368,7 +360,7 @@ write_e2_plan "pausey"
 run_e2_mode marker
 P1_LOG="$(e2_logtxt)"
 P1_SID="$(stub_sid)"
-[ -n "$P1_SID" ] && echo "ok: P1: the impl was launched with --session-id $P1_SID" \
+[ -n "$P1_SID" ] && h_pass "P1: the impl was launched with --session-id $P1_SID" \
     || fail "P1: the impl call carried no --session-id <uuid>"
 want           "P1: log says the impl paused"            "$P1_LOG" "Impl paused (usage gate)"
 want_absent    "P1: no env-stop"                         "$P1_LOG" "Environmental failure"
@@ -427,7 +419,7 @@ printf '{"five_hour":{"utilization":95,"resets_at":null},"seven_day":{"utilizati
     "$(date +%s)" > "$E2_GATE/cache.json"
 run_e2
 P4B_SID="$(cat "$E2_NDIR/queue/pausey.md.lock/paused-held" 2>/dev/null)"
-[ -n "$P4B_SID" ] && echo "ok: P4b setup: prestart gate paused with sid $P4B_SID" \
+[ -n "$P4B_SID" ] && h_pass "P4b setup: prestart gate paused with sid $P4B_SID" \
     || fail "P4b setup: no paused-held after prestart pause"
 assert_present "P4b setup: prestart pause marker exists"   "$E2_GATE/markers/$P4B_SID.json"
 assert_eq      "P4b setup: resume_count starts at 0"       "$(jq -r .resume_count "$E2_GATE/markers/$P4B_SID.json" 2>/dev/null)" "0"
@@ -476,10 +468,125 @@ assert_eq      "P6: paused-held names the post-plan session" \
 assert_absent  "P6: attempt refunded"                    "$E2_NDIR/queue/ppausey.md.attempts"
 assert_present "P6: plan stays queued"                   "$E2_NDIR/queue/ppausey.md"
 assert_present "P6: post-plan marker survives"           "$E2_GATE/markers/$E2_PP_SID.json"
+assert_eq      "P6: lock branch breadcrumb names the handoff branch" \
+               "$(cat "$E2_NDIR/queue/ppausey.md.lock/branch" 2>/dev/null)" "stub"
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
+# HB: heartbeat watcher (run_heartbeat_watcher)
+#
+# Pins the watcher's two stall outcomes (STALL-KILL and "stalled, pid gone") and
+# its orphan-exit behavior. The function is extracted from the runner, like
+# should_impl_env_stop above, so the test cannot drift from the implementation.
+HB_FN_SRC="$(awk '
+    /^run_heartbeat_watcher\(\) \{/ { capture = 1 }
+    capture { print }
+    capture && /^\}/ { exit }
+' "$RUNNER")"
+[ -n "$HB_FN_SRC" ] || { fail "HB: could not extract run_heartbeat_watcher from $RUNNER"; h_done; }
+eval "$HB_FN_SRC"
+
+# Backgrounded subshells inherit shell functions, so the eval'd watcher calls this
+# shim instead of /bin/sleep. It records each requested duration and shortens the
+# 60s tick to 1s. It calls /bin/sleep: on macOS bash 3.2, `command sleep` inside
+# a function named sleep hangs when the function runs in a backgrounded subshell.
+HB_SLEEP_LOG="$TMP/hb-sleep-args"
+sleep() {
+    printf '%s\n' "$1" >> "$HB_SLEEP_LOG"
+    case "$1" in 60) /bin/sleep 1 ;; *) /bin/sleep "$1" ;; esac
+}
+# shellcheck disable=SC2034  # read by the eval'd run_heartbeat_watcher
+STALL_KILL_SECS=5
+# shellcheck disable=SC2034  # read by the eval'd run_heartbeat_watcher
+KILL_GRACE_SECS=1
+
+# hb_wait_gone <pid> <max_secs>: 0 once the pid is gone, 1 on timeout.
+hb_wait_gone() {
+    local pid=$1 max=$2 i=0 steps
+    steps=$(( max * 5 ))
+    while [ "$i" -lt "$steps" ]; do
+        kill -0 "$pid" 2>/dev/null || return 0
+        command sleep 0.2
+        i=$(( i + 1 ))
+    done
+    return 1
+}
+
+# HB1: stale heartbeat + live target => STALL-KILL, target terminated, watcher returns.
+mkdir -p "$TMP/hb1"
+echo $(( $(date +%s) - 1000 )) > "$TMP/hb1/hb"
+( command sleep 300 & echo $! > "$TMP/hb1/cmdpid" )
+HB1_TARGET="$(cat "$TMP/hb1/cmdpid")"
+run_heartbeat_watcher "$TMP/hb1/hb" "$TMP/hb1/log" impl "$TMP/hb1/cmdpid" hb1slug &
+HB1_W=$!
+if hb_wait_gone "$HB1_W" 10; then ok "HB1: watcher returns after STALL-KILL"
+else fail "HB1: watcher returns after STALL-KILL — still running"; fi
+want "HB1: log records STALL-KILL for the impl label" "$(cat "$TMP/hb1/log" 2>/dev/null)" "STALL-KILL: impl"
+want "HB1: log names the target pid" "$(cat "$TMP/hb1/log" 2>/dev/null)" "killing pid $HB1_TARGET"
+if hb_wait_gone "$HB1_TARGET" 3; then ok "HB1: target was terminated"
+else fail "HB1: target was terminated — still running"; fi
+kill "$HB1_W" "$HB1_TARGET" 2>/dev/null || true
+
+# HB2: stale heartbeat + no pid file => "stalled, pid gone" WARNING, watcher keeps looping.
+mkdir -p "$TMP/hb2"
+echo $(( $(date +%s) - 1000 )) > "$TMP/hb2/hb"
+run_heartbeat_watcher "$TMP/hb2/hb" "$TMP/hb2/log" impl "$TMP/hb2/cmdpid" hb2slug &
+HB2_W=$!
+command sleep 3
+if kill -0 "$HB2_W" 2>/dev/null; then ok "HB2: watcher keeps looping when the pid file is absent"
+else fail "HB2: watcher keeps looping when the pid file is absent — exited"; fi
+want        "HB2: log records stalled, pid gone"   "$(cat "$TMP/hb2/log" 2>/dev/null)" "(stalled, pid gone)"
+want_absent "HB2: no STALL-KILL without a target"  "$(cat "$TMP/hb2/log" 2>/dev/null)" "STALL-KILL"
+kill "$HB2_W" 2>/dev/null; wait "$HB2_W" 2>/dev/null || true
+
+# HB3/HB4: the watcher exits within one tick of its parent run dying, and only then.
+# A wrapper bash mirrors production: the watcher is backgrounded from the run's shell.
+# No hb file is written, so the watcher sits in the `continue` branch every tick, which
+# pins "the liveness check runs before the hb-file skip".
+mkdir -p "$TMP/hb3"
+HEARTBEAT_TICK_SECS=1 bash -c "$HB_FN_SRC"'
+STALL_KILL_SECS=5; KILL_GRACE_SECS=1
+run_heartbeat_watcher "$1" "$2" impl "$3" hb3slug &
+echo $! > "$4"
+wait' _ "$TMP/hb3/hb" "$TMP/hb3/log" "$TMP/hb3/cmdpid" "$TMP/hb3/wpid" &
+HB3_WRAP=$!
+HB3_W=""
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    HB3_W="$(cat "$TMP/hb3/wpid" 2>/dev/null || true)"
+    [ -n "$HB3_W" ] && break
+    command sleep 0.2
+done
+if [ -z "$HB3_W" ]; then
+    fail "HB3: watcher never started"
+    kill "$HB3_WRAP" 2>/dev/null || true
+else
+    command sleep 2.5
+    if kill -0 "$HB3_W" 2>/dev/null; then ok "HB4: watcher survives while parent run is alive"
+    else fail "HB4: watcher survives while parent run is alive — exited"; fi
+    # wait reaps the wrapper: an unreaped zombie still answers kill -0.
+    kill -9 "$HB3_WRAP"; wait "$HB3_WRAP" 2>/dev/null || true
+    if hb_wait_gone "$HB3_W" 2; then ok "HB3: orphaned watcher exits within one tick"
+    else fail "HB3: orphaned watcher exits within one tick — still running"; kill "$HB3_W" 2>/dev/null || true; fi
+    want "HB3: exit is logged with the parent pid" "$(cat "$TMP/hb3/log" 2>/dev/null)" \
+         "watcher exiting, parent run $HB3_WRAP is gone"
 fi
-echo "RESULT: all passed"
-exit 0
+
+# HB5: HEARTBEAT_TICK_SECS unset, empty, non-numeric, and zero all fall back to 60.
+# The sleep shim records the first requested duration.
+mkdir -p "$TMP/hb5"
+hb5_first_sleep() {  # <env-mode: unset|value> [value]
+    : > "$HB_SLEEP_LOG"
+    # shellcheck disable=SC2034  # read by the eval'd run_heartbeat_watcher
+    if [ "$1" = unset ]; then unset HEARTBEAT_TICK_SECS; else HEARTBEAT_TICK_SECS="$2"; fi
+    run_heartbeat_watcher "$TMP/hb5/hb" "$TMP/hb5/log" impl "$TMP/hb5/cmdpid" hb5slug >/dev/null 2>&1 &
+    local w=$!
+    command sleep 0.5
+    kill "$w" 2>/dev/null; wait "$w" 2>/dev/null || true
+    unset HEARTBEAT_TICK_SECS
+    head -n1 "$HB_SLEEP_LOG"
+}
+assert_eq "HB5: tick for unset defaults to 60"  "$(hb5_first_sleep unset)"       "60"
+assert_eq "HB5: tick for empty defaults to 60"  "$(hb5_first_sleep value '')"     "60"
+assert_eq "HB5: tick for abc defaults to 60"    "$(hb5_first_sleep value abc)"    "60"
+assert_eq "HB5: tick for 0 defaults to 60"      "$(hb5_first_sleep value 0)"      "60"
+assert_eq "HB5: tick override 7 is honored"     "$(hb5_first_sleep value 7)"      "7"
+
+h_done

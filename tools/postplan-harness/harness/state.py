@@ -24,6 +24,7 @@ class TerminalState(str, Enum):
     DEGRADED = "degraded"                    # PR open+held; >=1 review agent unparseable
     NOTHING_TO_SHIP = "nothing-to-ship"      # clean tree, empty diff vs master
     ALREADY_SHIPPED = "already-shipped"      # diff vs master went empty AND the branch's PR is already MERGED
+    HOLD_REPEAT_DECLINED = "hold-repeat-declined"  # condition-3 MISSING set equals the prior hold's; stopped before any LLM call
     FAILED = "failed"                        # typed failure aborted the run
 
 
@@ -294,6 +295,7 @@ class RunResult:
     adr_drafted: bool = False               # Phase 2 commit gate (or the 5.5 push backstop): harness drafted a missing ADR
     adr_path: Optional[str] = None          # repo-relative path of the drafted ADR; set even when the re-push was denied
     adr_draft_model: Optional[str] = None   # MODEL_MAP id the drafter ran on
+    gate_fix: dict = field(default_factory=dict)  # local-gate fixer record (harness/gatefix.py); omitted from result.json when empty
     # Phase 5.5 record: verdict_2 / reviewed_tree_2 / remediation_sha alias the last
     # remediation round; rounds (list of per-round dicts) / rounds_completed /
     # backlog_issue_numbers carry the full history.
@@ -306,11 +308,13 @@ class RunResult:
     manual_demotions: list[dict] = field(default_factory=list)
     manual_testing: dict = field(default_factory=dict)  # Phase 6.7 record; popped when empty
     hold_repeat: dict | None = None  # Phase 6.5 advisory record (action, key, repeat_count, reasons, dm); arming never reads it
+    pause_edit_sid: Optional[str] = None  # S of a recorded interrupted edit (ADR-0143 addendum 2026-10-10); omitted from result.json when unset
     audit: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:
         d = asdict(self)
-        for key in ("error_cmd", "error_output_tail", "block_cause"):   # unset → result.json byte-identical
+        for key in ("error_cmd", "error_output_tail", "block_cause", "gate_fix",
+                    "pause_edit_sid"):   # unset → result.json byte-identical
             if not d.get(key):
                 d.pop(key, None)
         if self.classification:

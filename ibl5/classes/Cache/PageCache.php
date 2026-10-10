@@ -26,15 +26,14 @@ final class PageCache
         'Team'                => self::TTL_LONG,
         'Standings'           => self::TTL_LONG,
         'CareerLeaderboards'  => self::TTL_LONG,
-        'RecordHolders'       => self::TTL_LONG,
         'SeasonLeaderboards'  => self::TTL_LONG,
         'DraftHistory'        => self::TTL_LONG,
         'AwardHistory'        => self::TTL_LONG,
         'FranchiseHistory'    => self::TTL_LONG,
-        'FranchiseRecordBook' => self::TTL_LONG,
-        'SeasonHighs'         => self::TTL_LONG,
         'Schedule'            => self::TTL_DEFAULT,
         'TransactionHistory'  => self::TTL_DEFAULT,
+        'Records'             => self::TTL_LONG,
+        'AllStarAppearances'  => self::TTL_LONG,
     ];
 
     private static ?string $testCacheDir = null;

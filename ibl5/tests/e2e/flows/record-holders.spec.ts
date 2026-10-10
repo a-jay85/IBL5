@@ -10,7 +10,7 @@ test.describe('Record Holders flow', () => {
   test.use({ navigationTimeout: 60_000, actionTimeout: 30_000 });
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=RecordHolders');
+    await page.goto('modules.php?name=Records&tab=alltime');
   });
 
   test('player links navigate to player page', async ({ page }) => {

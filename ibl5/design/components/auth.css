@@ -85,7 +85,7 @@
     justify-content: center;
     gap: var(--space-2);
     font-family: var(--font-sans);
-    font-size: 1rem;
+    font-size: var(--text-base);
 }
 
 .auth-links a {
@@ -228,12 +228,12 @@
     align-items: center;
     gap: var(--space-2);
     cursor: pointer;
-    font-size: 1rem;
+    font-size: var(--text-base);
     color: var(--gray-600);
 }
 
 .auth-info-text {
-    font-size: 1rem;
+    font-size: var(--text-base);
     color: var(--gray-500);
     line-height: 1.5;
     text-align: center;

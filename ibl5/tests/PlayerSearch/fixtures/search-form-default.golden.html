@@ -1,0 +1,225 @@
+<p class="text-center">Age is less than or equal to the age entered. All other fields are greater than or equal to the amount entered.</p>
+<p class="text-center">Partial matches on a name or college are okay and are <strong>not</strong> case sensitive<br>
+(e.g., entering "Dard" will match with "Darden" and "Bedard").</p>
+
+<form name="Search" method="post" action="modules.php?name=PlayerSearch" class="ibl-filter-form max-w-3xl mx-auto">
+    <fieldset class="ibl-filter-fieldset">
+        <legend>Basics</legend>
+        <div class="ibl-filter-form__row">
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="search_name">Name:</label>
+                <input id="search_name" type="text" name="search_name" class="w-40" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="pos">Position:</label>
+                <select id="pos" name="pos">
+                    <option value="">-</option>
+                                            <option value="PG">PG</option>
+                                            <option value="SG">SG</option>
+                                            <option value="SF">SF</option>
+                                            <option value="PF">PF</option>
+                                            <option value="C">C</option>
+                                    </select>
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="active">Retirees?</label>
+                <select id="active" name="active">
+                    <option value="1">Yes</option>
+                    <option value="0" selected>No</option>
+                </select>
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset class="ibl-filter-fieldset">
+        <legend>Years</legend>
+        <div class="ibl-filter-form__row">
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="age">Max Age:</label>
+                <input id="age" type="text" name="age" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="exp">Min Exp:</label>
+                <input id="exp" type="text" name="exp" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="exp_max">Max Exp:</label>
+                <input id="exp_max" type="text" name="exp_max" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="bird">Min Bird:</label>
+                <input id="bird" type="text" name="bird" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="bird_max">Max Bird:</label>
+                <input id="bird_max" type="text" name="bird_max" class="w-14" value="">
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset class="ibl-filter-fieldset">
+        <legend>Statistical Ratings</legend>
+        <div class="ibl-filter-form__row mb-2">
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="r_fga">2ga:</label>
+                <input id="r_fga" type="text" name="r_fga" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="r_fgp">2gp:</label>
+                <input id="r_fgp" type="text" name="r_fgp" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="r_fta">fta:</label>
+                <input id="r_fta" type="text" name="r_fta" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="r_ftp">ftp:</label>
+                <input id="r_ftp" type="text" name="r_ftp" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="r_3ga">3ga:</label>
+                <input id="r_3ga" type="text" name="r_3ga" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="r_3gp">3gp:</label>
+                <input id="r_3gp" type="text" name="r_3gp" class="w-14" value="">
+            </div>
+        </div>
+        <div class="ibl-filter-form__row">
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="r_orb">orb:</label>
+                <input id="r_orb" type="text" name="r_orb" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="r_drb">drb:</label>
+                <input id="r_drb" type="text" name="r_drb" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="r_ast">ast:</label>
+                <input id="r_ast" type="text" name="r_ast" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="r_stl">stl:</label>
+                <input id="r_stl" type="text" name="r_stl" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="r_blk">blk:</label>
+                <input id="r_blk" type="text" name="r_blk" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="r_to">tvr:</label>
+                <input id="r_to" type="text" name="r_to" class="w-14" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="r_foul">foul:</label>
+                <input id="r_foul" type="text" name="r_foul" class="w-14" value="">
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset class="ibl-filter-fieldset">
+        <legend>Offensive/Defensive Ratings</legend>
+        <div class="ibl-filter-form__row mb-2">
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="oo">oo:</label>
+                <input id="oo" type="text" name="oo" class="w-12" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="do">do:</label>
+                <input id="do" type="text" name="do" class="w-12" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="po">po:</label>
+                <input id="po" type="text" name="po" class="w-12" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="to">to:</label>
+                <input id="to" type="text" name="to" class="w-12" value="">
+            </div>
+        </div>
+        <div class="ibl-filter-form__row">
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="od">od:</label>
+                <input id="od" type="text" name="od" class="w-12" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="dd">dd:</label>
+                <input id="dd" type="text" name="dd" class="w-12" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="pd">pd:</label>
+                <input id="pd" type="text" name="pd" class="w-12" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="td">td:</label>
+                <input id="td" type="text" name="td" class="w-12" value="">
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset class="ibl-filter-fieldset">
+        <legend>Misc. Attributes</legend>
+        <div class="ibl-filter-form__row mb-2">
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="talent">Talent:</label>
+                <input id="talent" type="text" name="talent" class="w-12" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="skill">Skill:</label>
+                <input id="skill" type="text" name="skill" class="w-12" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="intangibles">Intangibles:</label>
+                <input id="intangibles" type="text" name="intangibles" class="w-12" value="">
+            </div>
+        </div>
+        <div class="ibl-filter-form__row">
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="Clutch">Clutch:</label>
+                <input id="Clutch" type="text" name="Clutch" class="w-12" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="Consistency">Consistency:</label>
+                <input id="Consistency" type="text" name="Consistency" class="w-12" value="">
+            </div>
+            <div class="ibl-filter-form__group">
+                <label class="ibl-filter-form__label" for="college">College:</label>
+                <input id="college" type="text" name="college" class="w-40" value="">
+            </div>
+        </div>
+    </fieldset>
+
+    <div class="ibl-filter-form__row gap-3">
+        <button type="button" class="ibl-btn ibl-btn--ghost" onclick="resetPlayerSearch();">Reset</button>
+        <button type="submit" class="ibl-filter-form__submit">Search for Player</button>
+    </div>
+</form>
+
+<script type="text/javascript">
+function resetPlayerSearch() {
+    var form = document.forms['Search'];
+    if (!form) {
+        return;
+    }
+
+    var inputs = form.getElementsByTagName('input');
+    var selects = form.getElementsByTagName('select');
+
+    // Clear all text input fields
+    for (var i = 0; i < inputs.length; i++) {
+        if (inputs[i].type === 'text') {
+            inputs[i].value = '';
+        }
+    }
+
+    // Clear all select fields except 'active'
+    for (var i = 0; i < selects.length; i++) {
+        if (selects[i].name !== 'active') {
+            selects[i].value = '';
+        }
+    }
+
+    return false;
+}
+</script>
+        

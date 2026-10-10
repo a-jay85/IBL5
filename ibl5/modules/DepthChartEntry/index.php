@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelf = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelf) ? $phpSelf : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -15,12 +16,16 @@ $op = is_string($_REQUEST['op'] ?? null) ? $_REQUEST['op'] : '';
 
 $pagetitle = " - Depth Chart Entry";
 
-global $mysqli_db, $commonRepo;
+global $mysqli_db, $commonRepo, $user;
+/** @var \mysqli $mysqli_db */
 $commonRepo = new Repositories\TeamIdentityRepository($mysqli_db);
 
-function userinfo($username)
+function userinfo(string $username): void
 {
     global $mysqli_db, $commonRepo, $leagueContext;
+    /** @var \mysqli $mysqli_db */
+    /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
+    /** @var \League\LeagueContext $leagueContext */
 
     $repository = new DepthChart\DepthChartRepository($mysqli_db);
     $service = new DepthChart\DepthChartService();
@@ -32,12 +37,13 @@ function userinfo($username)
     $controller->displayForm($username);
 }
 
-function main($user)
+function main(mixed $user): void
 {
     if (!is_user($user)) {
         loginbox();
     } else {
         global $authService;
+        /** @var \Auth\Contracts\AuthServiceInterface $authService */
         cookiedecode($user);
         userinfo($authService->getUsername() ?? '');
     }
@@ -50,9 +56,13 @@ function renderInlineSubmitError(): void
     PageLayout\PageLayout::footer();
 }
 
-function submit($user)
+function submit(mixed $user): void
 {
     global $mysqli_db, $commonRepo, $leagueContext, $authService;
+    /** @var \mysqli $mysqli_db */
+    /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
+    /** @var \League\LeagueContext $leagueContext */
+    /** @var \Auth\Contracts\AuthServiceInterface $authService */
 
     // Auth + ownership gate (IDOR fix D-09). The write target is derived from
     // the session team inside the handler, never from POST `Team_Name`, so an
@@ -86,29 +96,37 @@ function submit($user)
     $teamRepository = new Team\TeamRepository($mysqli_db);
     $teamTableService = new Team\TeamTableService($mysqli_db, $teamRepository);
     $submissionHandler = new DepthChart\DepthChartSubmissionHandler($mysqli_db, $commonRepo);
-    $controller = new DepthChart\DepthChartController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, \Http\HttpRequest::fromGlobals());
-    $controller->handleSubmit($_POST, $username);
+    $httpRequest = \Http\HttpRequest::fromGlobals();
+    $controller = new DepthChart\DepthChartController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, $httpRequest);
+    $controller->handleSubmit($httpRequest->allPost(), $username);
 }
 
-function tabApi()
+function tabApi(): void
 {
     global $mysqli_db, $commonRepo, $leagueContext;
+    /** @var \mysqli $mysqli_db */
+    /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
+    /** @var \League\LeagueContext $leagueContext */
 
     $handler = new DepthChart\DepthChartApiHandler($mysqli_db, $commonRepo, $leagueContext);
     $handler->handle();
 }
 
-function nextSimApi()
+function nextSimApi(): void
 {
     global $mysqli_db;
+    /** @var \mysqli $mysqli_db */
 
     $handler = new NextSim\NextSimTabApiHandler($mysqli_db);
     $handler->handle();
 }
 
-function api($user)
+function api(mixed $user): void
 {
     global $mysqli_db, $commonRepo, $authService;
+    /** @var \mysqli $mysqli_db */
+    /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
+    /** @var \Auth\Contracts\AuthServiceInterface $authService */
 
     if (!is_user($user)) {
         header('Content-Type: application/json; charset=utf-8');
@@ -136,17 +154,18 @@ function api($user)
         return;
     }
 
-    $action = $_GET['action'] ?? '';
+    $httpRequest = \Http\HttpRequest::fromGlobals();
+    $actionRaw = $httpRequest->get('action');
+    $action = is_string($actionRaw) ? $actionRaw : '';
 
     // For rename, use POST params; for list/load, use GET params
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $rawBody = file_get_contents('php://input');
-        $params = is_string($rawBody) && $rawBody !== '' ? (json_decode($rawBody, true) ?? []) : [];
-        if (!is_array($params)) {
-            $params = [];
-        }
+        $decoded = is_string($rawBody) && $rawBody !== '' ? (json_decode($rawBody, true) ?? []) : [];
+        /** @var array<string, mixed> $params */
+        $params = is_array($decoded) ? $decoded : [];
     } else {
-        $params = $_GET;
+        $params = $httpRequest->allGet();
     }
 
     $handler = new DepthChartSnapshot\DepthChartSnapshotApiHandler($mysqli_db);

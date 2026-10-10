@@ -623,6 +623,10 @@ span.nav-dropdown-item a:hover {
         border-color: var(--plr-nav-accent, var(--accent-500));
     }
 
+    .plr-nav__mobile-select:focus-visible {
+        box-shadow: var(--ring-accent);
+    }
+
     .plr-nav {
         padding: var(--space-3) var(--space-2);
     }

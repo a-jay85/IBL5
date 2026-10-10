@@ -12,16 +12,17 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TICK="$SCRIPT_DIR/wt-sync-tick"
 CRON_SETUP="$SCRIPT_DIR/wt-sync-cron-setup"
 TMP="$(mktemp -d)"
 trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
 
-FAILED=0
-
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$@"; }
 
 # assert_match <name> <ERE> <haystack>
 assert_match() {
@@ -45,11 +46,7 @@ assert_absent() {
 
 # assert_eq <name> <expected> <actual>
 assert_eq() {
-    if [ "$2" = "$3" ]; then
-        pass "$1"
-    else
-        failcase "$1 — expected '$2', got '$3'"
-    fi
+    h_eq "$1" "$2" "$3"
 }
 
 # ── Stub binaries ─────────────────────────────────────────────────────────────
@@ -1432,10 +1429,4 @@ fi
 
 # ── Final report ──────────────────────────────────────────────────────────────
 echo ""
-if [ "$FAILED" -eq 0 ]; then
-    echo "All tests passed."
-    exit 0
-else
-    echo "${FAILED} test(s) FAILED."
-    exit 1
-fi
+h_done

@@ -9,24 +9,21 @@
 # Run: bin/test-sim-recap-ssh-gate  (exit 0 = all pass, 1 = failures)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GATE="$SCRIPT_DIR/sim-recap-ssh-gate"
 
-FAILED=0
 GATE_RC=0
 
-srt_ok()   { echo "ok: $1"; }
-srt_fail() { echo "FAIL: $1"; FAILED=1; }
+srt_ok()   { h_pass "$1"; }
+srt_fail() { h_fail "$1"; }
 
 # srt_expect_eq <name> <want> <got>
-srt_expect_eq() {
-    if [ "$2" = "$3" ]; then srt_ok "$1"
-    else srt_fail "$1 — want [$2] got [$3]"; fi
-}
+srt_expect_eq() { h_eq "$1" "$2" "$3"; }
 
-STUB="$(mktemp -d)"
-trap 'rm -rf "$STUB"' EXIT
+h_tmp STUB
 
 cat > "$STUB/php" <<'SH'
 #!/usr/bin/env bash
@@ -157,4 +154,4 @@ printf 'PAYLOAD-SENTINEL' | SSH_ORIGINAL_COMMAND="php /srv/ibl/ibl5/scripts/upda
 if grep -qF PAYLOAD-SENTINEL "$STUB/err"; then srt_fail "denial never echoes stdin — sentinel leaked"
 else srt_ok "denial never echoes stdin"; fi
 
-exit "$FAILED"
+h_done

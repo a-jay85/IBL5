@@ -29,6 +29,9 @@ final class RecordAnnouncementRepositoryTest extends DatabaseTestCase
 
     // --- getLastAnnouncedDate ---
 
+    /**
+     * @see RecordAnnouncementRepository::getLastAnnouncedDate
+     */
     public function testGetLastAnnouncedDateReturnsNullWhenKeyAbsent(): void
     {
         $this->deleteAnnouncementKey();

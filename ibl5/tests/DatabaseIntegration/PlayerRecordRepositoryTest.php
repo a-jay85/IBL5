@@ -41,6 +41,9 @@ final class PlayerRecordRepositoryTest extends DatabaseTestCase
 
     // --- getQuadrupleDoubles ---
 
+    /**
+     * @see PlayerRecordRepository::getQuadrupleDoubles
+     */
     public function testGetQuadrupleDoublesReturnsExactQualifyingRowsOrderedByDate(): void
     {
         // (a) is inserted before (b) so only ORDER BY game_date fixes the order.

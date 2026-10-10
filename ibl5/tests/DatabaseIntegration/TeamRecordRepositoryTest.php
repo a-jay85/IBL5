@@ -37,6 +37,9 @@ final class TeamRecordRepositoryTest extends DatabaseTestCase
 
     // --- getTopTeamHalfScore ---
 
+    /**
+     * @see TeamRecordRepository::getTopTeamHalfScore
+     */
     public function testGetTopTeamHalfScoreFirstHalfDescReturnsTopFourExactRows(): void
     {
         $this->seedHalfScoreGames();

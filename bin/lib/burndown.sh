@@ -1333,7 +1333,7 @@ bd_live_state() {
     fi
 
     # Zero PRs
-    if [ "$route" = "plan" ] && [ -f "$BD_QUEUE_DIR/${slug}.md" ]; then
+    if [ "$route" = "plan" ] && bd_slug_queued "$slug"; then
         printf 'queued\t\n'
     else
         printf '%s\t\n' "$status"
@@ -1401,6 +1401,17 @@ bd_sweep_cutoff() {
     [ -n "$BD_SWEEP_CUTOFF" ] || bd_die 3 "cannot format sweep cutoff with date"
 }
 
+# bd_slug_queued <slug> — true when queue/ holds an entry for <slug>: the
+# NNN-<slug>.md name bin/automouse/queue writes, or a bare <slug>.md the runner
+# has not normalized yet.
+bd_slug_queued() {
+    local f
+    for f in "$BD_QUEUE_DIR/$1.md" "$BD_QUEUE_DIR"/[0-9][0-9][0-9]-"$1".md; do
+        if [ -L "$f" ] || [ -e "$f" ]; then return 0; fi
+    done
+    return 1
+}
+
 # bd_sweep_queued <ledger> <item> <issue_num> — flip a zombie queued plan item to skipped,
 # report a STALE-PLAN, or WAIT. Zombie: queued, slug set, no queue entry, ledger older than
 # 24h, no plan file (the caller has already seen zero PRs from a working gh).
@@ -1409,7 +1420,7 @@ bd_sweep_queued() {
     slug="$(jq -r '.slug // ""' <<< "$item")"
     status="$(jq -r '.status // ""' <<< "$item")"
     created="$(jq -r '.created // ""' "$ledger")"
-    if [ "$status" = "queued" ] && [ -n "$slug" ] && [ ! -e "$BD_QUEUE_DIR/$slug.md" ] \
+    if [ "$status" = "queued" ] && [ -n "$slug" ] && ! bd_slug_queued "$slug" \
         && [[ "$created" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] \
         && [[ "$created" < "$BD_SWEEP_CUTOFF" ]]; then
         if [ -e "$BD_PLANS_DIR/$slug.md" ]; then

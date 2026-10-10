@@ -54,6 +54,8 @@ ORPHAN_ARGV_RE_DEFAULT='^[^ ]*bash [^ ]*bin/automouse/run( |$)'
 : "${AUTOMOUSE_ORPHAN_PPID:=1}"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/../lib/plan-depends-on"
+# shellcheck source=../lib/automouse-queue-order.sh
+. "$SCRIPT_DIR/../lib/automouse-queue-order.sh"
 
 SKIPPED_DIR="$NIGHTLY_DIR/skipped"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
@@ -77,11 +79,16 @@ orphans_spared=0
 # Runs BEFORE the skipped/-empty guard below, because skipped/ is usually empty
 # and a hold scan placed after it would never execute.
 scan_depends_holds() {
-    local sc name plan status dep rest reason
+    local sc name entry plan status dep rest reason
     for sc in "$QUEUE_DIR"/*.md.depends-hold; do
         [ -e "$sc" ] || continue                      # no matches → literal glob
         name="$(basename "$sc" .depends-hold)"        # e.g. foo.md
-        plan="$QUEUE_DIR/$name"
+        # The sidecar is keyed on <slug>.md; the queue entry is NNN-<slug>.md.
+        if entry="$(queue_entry_for_slug "$QUEUE_DIR" "$name")"; then
+            plan="$QUEUE_DIR/$entry"
+        else
+            plan="$QUEUE_DIR/$name"
+        fi
 
         # Orphan reap: the plan left queue/ (a manual `queue remove`, or a
         # disposition move). bin/automouse/queue evicts .staleness/.attempts but

@@ -22,13 +22,18 @@ Read the plan file:
 
 ```bash
 PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
-PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_FILE"
-if [ ! -e "$PLAN_PATH" ]; then
-    echo "ERROR: plan file not found at $PLAN_PATH"
+# Queue entries are named NNN-<slug>.md (the prefix is run order), so resolve
+# the entry for this slug rather than building the path from PLAN_FILE.
+source /Users/ajaynicolas/GitHub/IBL5/bin/lib/automouse-queue-order.sh
+if PLAN_ENTRY=$(queue_entry_for_slug "$NIGHTLY_DIR/queue" "$PLAN_FILE"); then
+    PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_ENTRY"
+else
+    PLAN_PATH=""
+    echo "ERROR: no queue entry for $PLAN_FILE (no NNN-$PLAN_FILE in $NIGHTLY_DIR/queue; already in done/ or skipped/?)"
 fi
 ```
 
-If the plan file does not exist in the queue, write an error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-unknown.md and STOP.
+If `PLAN_PATH` is empty (the plan has no entry in the queue), write an error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-unknown.md and STOP.
 
 If it is a symlink, resolve it first so the reads below hit the real file:
 
@@ -112,7 +117,7 @@ IMPORTANT: Only check for THIS plan's handoff file. Ignore any other .json files
 
 ## Step 2.5: Staleness Guard (run BEFORE any worktree is created)
 
-This gate is DISTINCT from the Step 3 ambiguity skip. It catches plans that reference repo paths which have since been renamed, moved, or deleted on master — a stale plan would otherwise burn all three automouse attempts as a poison pill. Moving the symlink to `skipped/` here, before a worktree exists, is the entire purpose of this gate.
+This gate is DISTINCT from the Step 3 ambiguity skip. It catches plans that reference repo paths which have since been renamed, moved, or deleted on master — a stale plan would otherwise burn all three automouse attempts as a poison pill. Disposing the plan to `skipped/` here, before a worktree exists, is the entire purpose of this gate.
 
 First, freshen local master so the guard checks the freshly-pulled tree. Without this, a file deleted on origin still resolves against stale local master and the guard wrongly passes a plan that genuinely IS stale — the exact case this gate exists to catch. (This also pre-stages the same pull Step 5 "Fresh start" does, so it is not wasted work.)
 
@@ -131,8 +136,8 @@ Then run the staleness check against the queue symlink path. The guard resolves 
 If `bin/check-plan-staleness` exits non-zero, the plan is STALE. Take the skip-with-report path IMMEDIATELY — before any worktree is created, no partial work, no handoff:
 
 1. Capture the unresolved paths the helper printed (its `STALE: <token>` lines).
-2. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/skipped/"`
-3. `touch "$NIGHTLY_DIR/skipped/$PLAN_FILE.staleness"` — drop a sidecar marker that records this skip as a **staleness** skip (not ambiguity / already-merged / poison-pill). At the next run's top, `bin/automouse/self-heal` reads this marker and auto-requeues the plan **iff** `bin/check-plan-staleness` now passes against the freshly-pulled master; a skip without the marker is never auto-recovered.
+2. `bin/automouse/queue dispose "${PLAN_FILE%.md}" skipped --staleness` — never `mv` the queue entry yourself; the queue filename carries run-order state. This lands the plan in `skipped/` under its bare name.
+3. The `--staleness` flag drops the `skipped/$PLAN_FILE.staleness` sidecar marker, which records this skip as a **staleness** skip (not ambiguity / already-merged / poison-pill). At the next run's top, `bin/automouse/self-heal` reads this marker and auto-requeues the plan **iff** `bin/check-plan-staleness` now passes against the freshly-pulled master; a skip without the marker is never auto-recovered.
 4. Write a STALENESS-specific report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-<slug>.md` (derive `<slug>` from the plan title). The title and body must make it visibly a **staleness skip** — clearly distinct wording from the ambiguity skip — and must list the specific unresolved repo paths the helper emitted.
 5. STOP.
 
@@ -162,7 +167,7 @@ Read the candidate PRs and JUDGE: does a merged PR clearly implement THIS plan's
 
 If a merged PR clearly implements this plan, take the already-merged disposition (the plan's work shipped — it is DONE, not skipped, so it lands in `done/`):
 
-1. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/done/"`
+1. `bin/automouse/queue dispose "${PLAN_FILE%.md}" done` — never `mv` the queue entry yourself; the queue filename carries run-order state.
 2. Write an ALREADY-MERGED report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-done-<slug>.md` (derive `<slug>` from the plan title). Title and body must make it visibly an **already-merged completion** — wording clearly distinct from a normal post-plan completion and from the staleness/ambiguity skips — name the merged PR (number + title), and cite which plan deliverables you confirmed present on master.
 3. STOP — no worktree, no handoff.
 
@@ -177,7 +182,7 @@ The plan must have:
 Scope is NEVER grounds to skip. Large file counts, multi-module cascades, migrations, ADRs, doc updates, and visual verification are all in-bounds — attempt the full plan. If you run out of session budget, commit and push what you have; the post-plan agent will open a draft PR.
 
 Skip ONLY when the plan is genuinely ambiguous: unclear requirements, missing external context, or you cannot determine what specific code changes to make. In that case:
-1. Move the symlink to $NIGHTLY_DIR/skipped/ : mv $NIGHTLY_DIR/queue/<filename> $NIGHTLY_DIR/skipped/
+1. Dispose the plan with `bin/automouse/queue dispose "${PLAN_FILE%.md}" skipped` (no `--staleness`: an ambiguity skip must not be auto-requeued). Never `mv` the queue entry yourself; the queue filename carries run-order state.
 2. Write a report to $NIGHTLY_DIR/reports/YYYY-MM-DD-skipped-<slug>.md explaining exactly WHY the plan was skipped (must cite a specific ambiguity, not scope/size)
 3. Do NOT attempt partial work
 4. STOP
@@ -217,7 +222,8 @@ is never recovered. Instead:
 2. Run `git worktree prune` to drop any half-registered worktree entry, so the next attempt starts clean.
 3. Drop the retry sentinel, leaving the plan symlink where it is:
    ```bash
-   touch "$NIGHTLY_DIR/queue/$PLAN_FILE.wt-fail"
+   # Sidecars stay keyed on the bare <slug>.md name, never the NNN- entry.
+   touch "$NIGHTLY_DIR/queue/${PLAN_FILE}.wt-fail"
    ```
 4. STOP. The bash loop sees the sentinel, counts this as one attempt, and retries the plan on a later run. MAX_ATTEMPTS still retires a plan whose wt-new failure is permanent.
 
@@ -277,7 +283,7 @@ git commit -m "<type>: <what this checkpoint covers>"
 git push origin <slug>
 ```
 
-If implementation requires information you do not have — external resources, unclear requirements, missing context — do NOT guess. Move the plan to skipped/ with a report explaining what information is needed, and STOP.
+If implementation requires information you do not have — external resources, unclear requirements, missing context — do NOT guess. Dispose the plan with `bin/automouse/queue dispose "${PLAN_FILE%.md}" skipped` (never a raw `mv`) and write a report explaining what information is needed, and STOP.
 
 ## Step 6.5: Empty-Diff Backstop (run AFTER implementation, BEFORE the handoff)
 
@@ -294,7 +300,7 @@ If BOTH `$AHEAD` and `$DIRTY` are empty (no commits ahead of master, clean worki
 
 1. Delete the pushed remote branch if `bin/wt-new` created one: `git push origin --delete <slug> || true`
 2. `bin/wt-remove <slug>` to remove the empty worktree and local branch.
-3. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/done/"`
+3. `bin/automouse/queue dispose "${PLAN_FILE%.md}" done` — never `mv` the queue entry yourself.
 4. Write an ALREADY-MERGED report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-done-<slug>.md` — same already-merged wording as Step 2.6, and note that the **empty-diff backstop** caught it (the title cross-reference did not).
 5. Do NOT write a handoff file.
 6. STOP.
@@ -397,7 +403,7 @@ cat <<'HANDOFF_EOF' > "$NIGHTLY_DIR/handoff/<plan-filename>.json"
 HANDOFF_EOF
 ```
 
-Replace all `<placeholder>` values with actual values. The `plan_file` field must match the filename in $NIGHTLY_DIR/queue/ exactly (including .md extension).
+Replace all `<placeholder>` values with actual values. The `plan_file` field must be `$PLAN_FILE` exactly: the bare `<slug>.md` name, with no `NNN-` queue prefix.
 
 After writing the handoff file, verify it parses AND carries every field the bash loop reads. A syntactically valid file with the wrong keys is a failure: the loop cannot resolve the worktree or branch from it.
 
@@ -427,7 +433,7 @@ STOP after writing and verifying the handoff file. The bash loop will fire the p
 If ANY step fails after worktree creation (Step 5):
 1. Commit and push whatever work exists on the branch (incremental checkpoint — do not lose progress)
 2. Write a detailed error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md
-3. Move the plan symlink to $NIGHTLY_DIR/skipped/ (not done/)
+3. Dispose the plan with `bin/automouse/queue dispose "${PLAN_FILE%.md}" skipped` (not done/; never a raw `mv` of the queue entry)
 4. Do NOT delete the worktree — preserve it for morning debugging or resume
 5. Do NOT write a handoff file — this signals failure to the bash loop
 6. STOP

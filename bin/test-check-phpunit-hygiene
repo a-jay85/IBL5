@@ -35,26 +35,23 @@
 # Run: bin/test-check-phpunit-hygiene  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HYGIENE="$SCRIPT_DIR/check-phpunit-hygiene"
 E2E_HYGIENE="$SCRIPT_DIR/check-e2e-hygiene"
 HOT="$SCRIPT_DIR/check-hot-files"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+h_tmp TMP
 
-FAILED=0
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$@"; }
 
 # mk_repo — build a fresh git repo with an ibl5/tests dir; echo its path.
 mk_repo() {
     local d
     d="$(mktemp -d "$TMP/repo.XXXXXX")"
-    git init -q "$d" >/dev/null 2>&1
-    git -C "$d" config user.email t@example.com >/dev/null 2>&1
-    git -C "$d" config user.name tester >/dev/null 2>&1
-    git -C "$d" config commit.gpgsign false >/dev/null 2>&1
+    h_git_repo "$d" --no-commit
     mkdir -p "$d/ibl5/tests"
     echo "$d"
 }
@@ -439,9 +436,4 @@ else
     failcase "hot-wf-delete-only-on-false — delete condition or tee pipe regressed in $HOT_WF"
 fi
 
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

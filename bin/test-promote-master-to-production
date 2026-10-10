@@ -13,27 +13,27 @@
 #
 # Run: bin/test-promote-master-to-production  (exit 0 = all pass, 1 = a case failed)
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GREEN="$SCRIPT_DIR/check-master-ci-green"
 PROMOTE="$SCRIPT_DIR/promote-master-to-production"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-FAILED=0
+h_tmp TMP
 
 # --- helpers ---
 
 expect() { # label want got
-  if [ "$2" -eq "$3" ]; then echo "ok   $1"
-  else echo "FAIL $1 (want exit $2, got $3)"; FAILED=1; fi
+  if [ "$2" -eq "$3" ]; then h_pass "$1"
+  else h_fail "$1" "want exit $2, got $3"; fi
 }
 expect_out() { # label needle haystack
-  case "$3" in *"$2"*) echo "ok   $1" ;;
-  *) echo "FAIL $1 (missing: $2)"; FAILED=1 ;; esac
+  case "$3" in *"$2"*) h_pass "$1" ;;
+  *) h_fail "$1" "missing: $2" ;; esac
 }
 refuse_out() { # label needle haystack — needle must be ABSENT
-  case "$3" in *"$2"*) echo "FAIL $1 (unexpectedly present: $2)"; FAILED=1 ;;
-  *) echo "ok   $1" ;; esac
+  case "$3" in *"$2"*) h_fail "$1" "unexpectedly present: $2" ;;
+  *) h_pass "$1" ;; esac
 }
 
 # stub gh: auth succeeds, everything else fails (exit 1 → loud error rather than
@@ -163,13 +163,9 @@ mkfixture "$TMP/B-inprog.json" "Tests and Analysis:in_progress:null"
 mkrepo() {
   local base
   base="$(mktemp -d "$TMP/repo.XXXXXX")"
-  git init -q --bare "$base/origin.git" >/dev/null 2>&1
-  git clone -q "$base/origin.git" "$base/work" >/dev/null 2>&1
-  git -C "$base/work" config user.email t@example.com
-  git -C "$base/work" config user.name Tester
-  git -C "$base/work" config commit.gpgsign false
+  h_git_repo "$base/work" --bare-origin --no-commit
+  ORIGIN="$H_ORIGIN"
   ln -s "$SCRIPT_DIR" "$base/work/bin"
-  ORIGIN="$base/origin.git"
   WORK="$base/work"
 }
 
@@ -193,8 +189,8 @@ out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 
 expect     "promotes-when-green"         0 "$rc"
 expect_out "promotes-when-green-outcome" "outcome=promoted" "$out"
 prod_sha="$(prod_ref "$ORIGIN")"
-if [ "$prod_sha" = "$SHA" ]; then echo "ok   promotes-when-green-ref"
-else echo "FAIL promotes-when-green-ref (got $prod_sha, want $SHA)"; FAILED=1; fi
+if [ "$prod_sha" = "$SHA" ]; then h_pass "promotes-when-green-ref"
+else h_fail "promotes-when-green-ref (got $prod_sha, want $SHA)"; fi
 
 # ---- idempotent-already-current ---- (re-run on same repo, production already at SHA)
 out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 \
@@ -224,8 +220,8 @@ after="$(prod_ref "$ORIGIN")"
 expect     "diverged-is-rejected-and-ref-unchanged"      1 "$rc"
 expect_out "diverged-outcome"                            "outcome=diverged" "$out"
 refuse_out "diverged-nothing-forced"                     "outcome=promoted" "$out"
-if [ "$before" = "$after" ]; then echo "ok   diverged-ref-unchanged"
-else echo "FAIL diverged-ref-unchanged (before=$before after=$after)"; FAILED=1; fi
+if [ "$before" = "$after" ]; then h_pass "diverged-ref-unchanged"
+else h_fail "diverged-ref-unchanged (before=$before after=$after)"; fi
 
 # ---- not-green-no-push ----
 mkrepo
@@ -242,8 +238,8 @@ out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-red.json #" MIN_REQUIRED_CHECKS=1 \
 after="$(prod_ref "$ORIGIN")"
 expect     "not-green-no-push"             0 "$rc"
 expect_out "not-green-no-push-outcome"     "outcome=not-green" "$out"
-if [ "$before" = "$after" ]; then echo "ok   not-green-no-push-ref-unchanged"
-else echo "FAIL not-green-no-push-ref-unchanged"; FAILED=1; fi
+if [ "$before" = "$after" ]; then h_pass "not-green-no-push-ref-unchanged"
+else h_fail "not-green-no-push-ref-unchanged"; fi
 
 # ---- still-running-no-push ----
 mkrepo
@@ -260,8 +256,8 @@ out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-inprog.json #" MIN_REQUIRED_CHECKS=1
 after="$(prod_ref "$ORIGIN")"
 expect     "still-running-no-push"             0 "$rc"
 expect_out "still-running-no-push-outcome"     "outcome=not-green" "$out"
-if [ "$before" = "$after" ]; then echo "ok   still-running-no-push-ref-unchanged"
-else echo "FAIL still-running-no-push-ref-unchanged"; FAILED=1; fi
+if [ "$before" = "$after" ]; then h_pass "still-running-no-push-ref-unchanged"
+else h_fail "still-running-no-push-ref-unchanged"; fi
 
 # ---- not-ancestor-rejected ----
 mkrepo
@@ -281,8 +277,8 @@ out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 
 after="$(prod_ref "$ORIGIN")"
 expect     "not-ancestor-rejected"             1 "$rc"
 expect_out "not-ancestor-rejected-outcome"     "outcome=not-ancestor" "$out"
-if [ "$before" = "$after" ]; then echo "ok   not-ancestor-rejected-ref-unchanged"
-else echo "FAIL not-ancestor-rejected-ref-unchanged"; FAILED=1; fi
+if [ "$before" = "$after" ]; then h_pass "not-ancestor-rejected-ref-unchanged"
+else h_fail "not-ancestor-rejected-ref-unchanged"; fi
 
 # ---- invalid-sha cases — these die before any git fetch, so repo setup is minimal ----
 # (reuse $WORK from the last mkrepo above — we just need to be inside a git repo)
@@ -326,7 +322,7 @@ if [ "$is_shallow" = "true" ]; then
   expect     "shallow-rejected"         1 "$rc"
   expect_out "shallow-rejected-outcome" "outcome=shallow" "$out"
 else
-  echo "FAIL shallow-rejected (clone was not shallow: is-shallow=$is_shallow)"; FAILED=1
+  h_fail "shallow-rejected (clone was not shallow: is-shallow=$is_shallow)"
 fi
 
 # ---- superseded-no-push ----
@@ -348,8 +344,8 @@ out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 
 after="$(prod_ref "$ORIGIN")"
 expect     "superseded-no-push"             0 "$rc"
 expect_out "superseded-no-push-outcome"     "outcome=superseded" "$out"
-if [ "$before" = "$after" ]; then echo "ok   superseded-no-push-ref-unchanged"
-else echo "FAIL superseded-no-push-ref-unchanged"; FAILED=1; fi
+if [ "$before" = "$after" ]; then h_pass "superseded-no-push-ref-unchanged"
+else h_fail "superseded-no-push-ref-unchanged"; fi
 
 # ---- dry-run-writes-nothing ----
 mkrepo
@@ -366,8 +362,8 @@ out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 
 after="$(prod_ref "$ORIGIN")"
 expect     "dry-run-writes-nothing"             0 "$rc"
 expect_out "dry-run-writes-nothing-outcome"     "outcome=would-promote" "$out"
-if [ "$before" = "$after" ]; then echo "ok   dry-run-writes-nothing-ref-unchanged"
-else echo "FAIL dry-run-writes-nothing-ref-unchanged"; FAILED=1; fi
+if [ "$before" = "$after" ]; then h_pass "dry-run-writes-nothing-ref-unchanged"
+else h_fail "dry-run-writes-nothing-ref-unchanged"; fi
 
 # ---- stdout-is-key-value-only ----
 mkrepo
@@ -382,20 +378,14 @@ SHA="$(git -C "$WORK" rev-parse HEAD)"
 stdout_only="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 \
   "$PROMOTE" "$SHA" 2>/dev/null)"
 violators="$(printf '%s\n' "$stdout_only" | grep -vE '^(outcome|sha)=[0-9a-z-]+$' || true)"
-if [ -z "$violators" ]; then echo "ok   stdout-is-key-value-only"
-else echo "FAIL stdout-is-key-value-only (violating lines: $violators)"; FAILED=1; fi
+if [ -z "$violators" ]; then h_pass "stdout-is-key-value-only"
+else h_fail "stdout-is-key-value-only (violating lines: $violators)"; fi
 
 # ---- no-force-tokens grep invariant ----
 if grep -qE -- '--force|force-with-lease' "$PROMOTE"; then
-  echo "FAIL no-force-tokens (bin/promote-master-to-production must never force-push)"; FAILED=1
+  h_fail "no-force-tokens (bin/promote-master-to-production must never force-push)"
 else
-  echo "ok   no-force-tokens"
+  h_pass "no-force-tokens"
 fi
 
-# ============================================================
-if [ "$FAILED" -ne 0 ]; then
-  echo "RESULT: FAILED"
-  exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

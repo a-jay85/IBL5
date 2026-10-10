@@ -16,18 +16,18 @@
 # Run: bin/test-discord-dm  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DM="$ROOT/bin/discord-dm"
 
-FAILS=0
-ok()   { printf '  ok   %s\n' "$1"; }
-fail() { printf '  FAIL %s\n' "$1"; FAILS=$(( FAILS + 1 )); }
+ok()   { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
 # A full template rather than -t <prefix>: GNU mktemp rejects a -t argument
 # with too few X's, so the BSD spelling would fail on the Linux CI runner.
-TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-discord-dm.XXXXXX")
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
 # Shim osascript so the fallback path does not fire a macOS notification banner
@@ -893,10 +893,4 @@ out=$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_C
 [ "$out" = "same" ] && ok "G7k sourcing leaves shell options unchanged" || fail "G7k (out=$out)"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
-printf '\n'
-if [ "$FAILS" -eq 0 ]; then
-    echo "test-discord-dm: all cases passed"
-else
-    printf 'test-discord-dm: %d case(s) FAILED\n' "$FAILS"
-fi
-exit $(( FAILS > 0 ? 1 : 0 ))
+h_done

@@ -20,15 +20,28 @@ final class NewsFactory implements ModuleFactoryInterface
     }
 
     /**
-     * The page config is built from legacy globals by the entry point, so it is
-     * passed in rather than resolved here.
+     * The entry point reads the legacy config globals and passes them in, because
+     * a factory never reads globals.
      */
-    public function controller(\Topics\News\NewsPageConfig $config): \Topics\News\NewsController
-    {
+    public function controller(
+        int $storyHome,
+        int $userNews,
+        int $articleComm,
+        string $siteName,
+        int $multilingual,
+        string $currentLang,
+    ): \Topics\News\NewsController {
         $db = $this->services->db();
 
         return new \Topics\News\NewsController(
-            $config,
+            new \Topics\News\NewsPageConfig(
+                storyHome: $storyHome,
+                userNews: $userNews,
+                articleComm: $articleComm,
+                siteName: $siteName,
+                multilingual: $multilingual,
+                currentLang: $currentLang,
+            ),
             $this->services->auth(),
             $this->services->teamIdentity(),
             new \LastSimRecap\LastSimRecapService(

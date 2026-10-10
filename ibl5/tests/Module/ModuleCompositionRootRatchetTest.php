@@ -71,7 +71,7 @@ class ModuleCompositionRootRatchetTest extends TestCase
     {
         $files = glob(self::ibl5Root() . '/modules/*/index.php');
         self::assertNotFalse($files);
-        self::assertNotEmpty($files, 'No module entry points found; the scan path is wrong');
+        self::assertNotSame([], $files, 'No module entry points found; the scan path is wrong');
 
         $result = [];
         foreach ($files as $file) {

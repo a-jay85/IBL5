@@ -21,7 +21,7 @@ class HeadToHeadRecordsEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('HeadToHeadRecords', [], [], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('Head-to-Head Records', $output);
     }
 }

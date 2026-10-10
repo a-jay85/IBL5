@@ -24,7 +24,8 @@ if (!defined('INDEX_FILE')) {
 $module_name = basename(dirname(__FILE__));
 
 global $storyhome, $user_news, $articlecomm, $sitename, $multilingual, $currentlang;
-$newsPageConfig = new \Topics\News\NewsPageConfig(
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\NewsFactory::class);
+$controller = $factory->controller(
     storyHome: is_numeric($storyhome) ? (int) $storyhome : 0,
     userNews: is_numeric($user_news) ? (int) $user_news : 0,
     articleComm: is_numeric($articlecomm) ? (int) $articlecomm : 0,
@@ -32,9 +33,6 @@ $newsPageConfig = new \Topics\News\NewsPageConfig(
     multilingual: is_numeric($multilingual) ? (int) $multilingual : 0,
     currentLang: is_string($currentlang) ? $currentlang : '',
 );
-
-$factory = \Module\ModuleServices::current()->factory(\Module\Factories\NewsFactory::class);
-$controller = $factory->controller($newsPageConfig);
 
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
 // PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module

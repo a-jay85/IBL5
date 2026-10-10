@@ -23,7 +23,7 @@ class OneOnOneGameEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('OneOnOneGame', [], [], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('One-on-One Match', $output);
         $this->assertQueryExecuted('ibl_plr');
     }

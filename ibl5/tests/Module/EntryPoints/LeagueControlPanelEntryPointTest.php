@@ -29,7 +29,7 @@ class LeagueControlPanelEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('LeagueControlPanel', [], [], $this->dbGlobals());
 
-        $this->assertNotEmpty($output);
+        $this->assertNotSame('', $output);
         $this->assertStringContainsString('League Control Panel', $output);
         $this->assertQueryExecuted('ibl_settings');
     }

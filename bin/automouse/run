@@ -831,7 +831,20 @@ trap 'exit_on_signal 129' HUP
 
 run_heartbeat_watcher() {
     local hb_file=$1 log_file=$2 label=$3 pid_file=$4 slug=$5
-    while sleep 60; do
+    # Orphan exit: this function runs as a backgrounded subshell of the run, so
+    # $$ is the run's pid ($BASHPID would be our own, $PPID the run's parent).
+    # A SIGKILLed run skips cleanup_watcher's kill, so the watcher must notice
+    # on its own or it loops under PPID 1 forever. The tick stays `sleep 60` by
+    # default: the self-heal orphan sweep keys on that exact child argv.
+    local parent=$$ tick=${HEARTBEAT_TICK_SECS:-60}
+    case "$tick" in ''|*[!0-9]*) tick=60 ;; esac
+    [ "$tick" -ge 1 ] || tick=60
+    while sleep "$tick"; do
+        if ! kill -0 "$parent" 2>/dev/null; then
+            printf '[%s] %s heartbeat: %s watcher exiting, parent run %s is gone\n' \
+                "$(date +%H:%M:%S)" "$slug" "$label" "$parent" >> "$log_file" 2>/dev/null || true
+            return 0
+        fi
         if [ ! -f "$hb_file" ]; then
             continue
         fi

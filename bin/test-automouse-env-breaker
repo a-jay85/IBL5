@@ -521,4 +521,55 @@ want        "HB2: log records stalled, pid gone"   "$(cat "$TMP/hb2/log" 2>/dev/
 want_absent "HB2: no STALL-KILL without a target"  "$(cat "$TMP/hb2/log" 2>/dev/null)" "STALL-KILL"
 kill "$HB2_W" 2>/dev/null; wait "$HB2_W" 2>/dev/null || true
 
+# HB3/HB4: the watcher exits within one tick of its parent run dying, and only then.
+# A wrapper bash mirrors production: the watcher is backgrounded from the run's shell.
+# No hb file is written, so the watcher sits in the `continue` branch every tick, which
+# pins "the liveness check runs before the hb-file skip".
+mkdir -p "$TMP/hb3"
+HEARTBEAT_TICK_SECS=1 bash -c "$HB_FN_SRC"'
+STALL_KILL_SECS=5; KILL_GRACE_SECS=1
+run_heartbeat_watcher "$1" "$2" impl "$3" hb3slug &
+echo $! > "$4"
+wait' _ "$TMP/hb3/hb" "$TMP/hb3/log" "$TMP/hb3/cmdpid" "$TMP/hb3/wpid" &
+HB3_WRAP=$!
+HB3_W=""
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    HB3_W="$(cat "$TMP/hb3/wpid" 2>/dev/null || true)"
+    [ -n "$HB3_W" ] && break
+    command sleep 0.2
+done
+if [ -z "$HB3_W" ]; then
+    fail "HB3: watcher never started"
+    kill "$HB3_WRAP" 2>/dev/null || true
+else
+    command sleep 2.5
+    if kill -0 "$HB3_W" 2>/dev/null; then ok "HB4: watcher survives while parent run is alive"
+    else fail "HB4: watcher survives while parent run is alive — exited"; fi
+    # wait reaps the wrapper: an unreaped zombie still answers kill -0.
+    kill -9 "$HB3_WRAP"; wait "$HB3_WRAP" 2>/dev/null || true
+    if hb_wait_gone "$HB3_W" 2; then ok "HB3: orphaned watcher exits within one tick"
+    else fail "HB3: orphaned watcher exits within one tick — still running"; kill "$HB3_W" 2>/dev/null || true; fi
+    want "HB3: exit is logged with the parent pid" "$(cat "$TMP/hb3/log" 2>/dev/null)" \
+         "watcher exiting, parent run $HB3_WRAP is gone"
+fi
+
+# HB5: HEARTBEAT_TICK_SECS unset, empty, non-numeric, and zero all fall back to 60.
+# The sleep shim records the first requested duration.
+mkdir -p "$TMP/hb5"
+hb5_first_sleep() {  # <env-mode: unset|value> [value]
+    : > "$HB_SLEEP_LOG"
+    if [ "$1" = unset ]; then unset HEARTBEAT_TICK_SECS; else HEARTBEAT_TICK_SECS="$2"; fi
+    run_heartbeat_watcher "$TMP/hb5/hb" "$TMP/hb5/log" impl "$TMP/hb5/cmdpid" hb5slug >/dev/null 2>&1 &
+    local w=$!
+    command sleep 0.5
+    kill "$w" 2>/dev/null; wait "$w" 2>/dev/null || true
+    unset HEARTBEAT_TICK_SECS
+    head -n1 "$HB_SLEEP_LOG"
+}
+assert_eq "HB5: tick for unset defaults to 60"  "$(hb5_first_sleep unset)"       "60"
+assert_eq "HB5: tick for empty defaults to 60"  "$(hb5_first_sleep value '')"     "60"
+assert_eq "HB5: tick for abc defaults to 60"    "$(hb5_first_sleep value abc)"    "60"
+assert_eq "HB5: tick for 0 defaults to 60"      "$(hb5_first_sleep value 0)"      "60"
+assert_eq "HB5: tick override 7 is honored"     "$(hb5_first_sleep value 7)"      "7"
+
 h_done

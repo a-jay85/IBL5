@@ -140,7 +140,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         return match ($panelData['phase']) {
             'Preseason' => $this->renderPreseasonControls($currentLeague, $panelData),
-            'HEAT' => $this->renderHeatControls($currentLeague, $panelData),
+            'HEAT' => $this->renderHeatControls($panelData),
             'Regular Season' => $this->renderRegularSeasonControls($currentLeague, $panelData),
             'Playoffs' => $this->renderPlayoffsControls($currentLeague, $panelData),
             'Draft' => $this->renderDraftControls($currentLeague, $panelData),
@@ -200,7 +200,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     /**
      * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
-    private function renderHeatControls(string $currentLeague, array $panelData): string
+    private function renderHeatControls(array $panelData): string
     {
         ob_start();
         ?>

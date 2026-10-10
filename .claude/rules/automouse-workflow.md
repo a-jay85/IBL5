@@ -17,9 +17,10 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Queue a plan | `bin/automouse/queue <slug>` |
 | Show queue | `bin/automouse/queue` (no args) |
 | Remove a plan from queue | `bin/automouse/queue remove <slug>` |
+| Reorder / dispose | `queue reorder <slug>…` · `queue dispose <slug> <done\|skipped>` |
 | Check morning results | `ls ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/reports/` |
 | Cancel the next run | `rm ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/*.md` |
-| Schedule a one-shot run | `bin/automouse/run schedule "2026-05-28 20:00 PDT"` (self-cleaning; date defaults to today, or tomorrow if that time has passed; TZ to local) |
+| Schedule a one-shot run | `bin/automouse/run schedule "2026-05-28 20:00 PDT"` (self-cleaning; defaults to the next such time, local TZ) |
 | Run one plan (one-off, foreground) | `bin/automouse/run plan <slug>` (impl + post-plan for one plan, then stops; auto-queues if absent, rest of queue untouched) |
 | Pause tonight's run (auto re-enables) | `bin/automouse/run disarm-tonight` (re-arms ~1 h after the skipped run; a manual `launchctl unload` stays off until re-armed by hand) |
 | Pause until a given time | `bin/automouse/run disarm-until "2026-08-20 09:00 PDT"` (re-arms at the given time; a bare time already passed today means tomorrow; same caveat) |
@@ -41,18 +42,15 @@ Arm-before-disarm: `disarm-tonight` and `disarm-until` bootstrap the re-arm laun
 
 ```
 ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/
-  queue/    symlinks to ~/claude-plans/*.md (oldest mtime runs first; queuing and
-            requeuing stamp the new entry to the BACK — only `queue reorder`
-            changes relative order)
+  queue/    NNN-<slug>.md symlinks to ~/claude-plans/ (run order below)
   done/     symlinks moved here after successful execution, or when the impl agent
             detects the plan is already merged (its work shipped under a prior PR)
   skipped/  symlinks moved here when skipped (ambiguity/errors/poison-pill);
             a sibling <plan>.md.staleness marker tags a *staleness* skip (read by bin/automouse/self-heal)
   handoff/  JSON files bridging state from implementation to post-plan agent
-  reports/  per-run markdown reports (YYYY-MM-DD-{done|skipped|env-stop|no-queue|error}-<slug>.md
-            and YYYY-MM-DD-canary-park.md — no -<slug> suffix, written at plan boundaries when the
-            master health check fails; there is no current plan at a boundary so no slug applies);
-            plus YYYY-MM-DD-costs.md — per-phase token cost roll-up written by bin/automouse/run
+  reports/  per-run reports (YYYY-MM-DD-{done|skipped|env-stop|no-queue|error}-<slug>.md),
+            YYYY-MM-DD-canary-park.md (failed master check at a plan boundary, so no slug)
+            and YYYY-MM-DD-costs.md (per-phase token cost roll-up from bin/automouse/run)
   logs/     claude -p output logs + launchd stdout/stderr
   *.archive/  startup archival: logs/reports/done/skipped entries idle >7 days are
               moved here (logs.archive/, reports.archive/, …) at run launch
@@ -72,9 +70,13 @@ Each phase's cost is recorded in two places: the markdown row in `reports/YYYY-M
 
 At launch, `bin/automouse/run` moves any `logs/`, `reports/`, `done/`, or `skipped/` entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into `<dir>.archive/`. Symlinks are judged on their *own* mtime (the disposition date) and keep resolving after the move. `queue/` and `handoff/` are never touched. An archival error never aborts the run.
 
-**Run order is the queue symlink's mtime** (lstat, via `queue_entries_ordered` in
-`bin/automouse/lib-queue-order`) on macOS and Linux. Editing the plan file does not
-move it. `queue`/`queue reorder` stamp the link (`touch -h`).
+Archival mtimes never affect run order.
+
+**Run order is the entry's `NNN-` prefix** (`queue_entries`, `bin/lib/automouse-queue-order.sh`).
+Editing a plan never moves it. Enqueue appends +10; `reorder`/`renumber` rename to 010,
+020, …. `normalize_queue` prefixes legacy bare entries once (old mtime order). Move
+entries only with `queue dispose` (strips the prefix): `done/`, `skipped/`, locks and
+sidecars use `<slug>.md`.
 
 ### Self-heal
 

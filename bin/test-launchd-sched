@@ -451,10 +451,17 @@ fi
 
 # backups-sync install and uninstall (no-arg build path is never run).
 BSPLIST="$IHOME/Library/LaunchAgents/com.ibl5.backups-sync.plist"
-rm -f "$BSPLIST"
+rm -f "$BSPLIST" "$TMP/docker-called"
+# A docker stub on PATH: if the script falls through the schedule case into the
+# build path, the stub leaves a marker. Path is baked in; the stub runs under env -i.
+cat > "$ISTUB/docker" <<DOCKEREOF
+#!/bin/bash
+touch "$TMP/docker-called"
+DOCKEREOF
+chmod +x "$ISTUB/docker"
 run_install bin/backups-sync-setup --install-schedule
 norm_file "$BSPLIST" > "$TMP/bs.installed" 2>/dev/null
-if [ "$IRC" = "0" ] && log_order_ok && cmp -s "$TMP/bs.installed" "$FIXTURES/backups-sync.plist"; then
+if [ "$IRC" = "0" ] && log_order_ok && [ ! -e "$TMP/docker-called" ] && cmp -s "$TMP/bs.installed" "$FIXTURES/backups-sync.plist"; then
   pass "install-backups-sync-golden"
 else
   echo "  rc=$IRC err=$IERR" >&2

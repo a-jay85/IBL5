@@ -181,7 +181,8 @@ has "11: main out dir searched" "$PROMPT" "BLOCKMARK"
 
 # 12
 rm -f "$TMP/claude.prompt"
-env -i PATH="$STUB:/usr/bin:/bin" /bin/bash -c 'set -euo pipefail; "$1" "$2"' _ "$SUT" "$B_BLOCK" \
+env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" \
+    PATH="$STUB:/usr/bin:/bin" /bin/bash -c 'set -euo pipefail; "$1" "$2"' _ "$SUT" "$B_BLOCK" \
     >/dev/null 2>"$TMP/err"; RC=$?
 rc_is "12: env -i probe exits 0" "$RC" 0
 PROMPT=""; [ -f "$TMP/claude.prompt" ] && PROMPT=$(cat "$TMP/claude.prompt")

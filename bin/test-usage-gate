@@ -63,6 +63,7 @@ new_env() {
     ORIG_PATH="${ORIG_PATH:-$PATH}"
     ORIG_HOME="${ORIG_HOME:-$HOME}"
     export HOME="$ORIG_HOME"
+    unset IBL5_USAGE_GATE_TEST_MODE
 }
 
 # seed_home <account_uuid|"">: isolate HOME; seed ~/.claude.json with the account id.
@@ -2236,6 +2237,132 @@ test_switch_never_stores_secrets() {
     run_coord --once >/dev/null 2>&1
     wait_file "$T/launched.$SID_A"
     assert_eq never_secrets:state "" "$(grep -rl -e tokB -e uuid-B -e uuid-A "$IBL5_USAGE_GATE_STATE_DIR" 2>/dev/null)"
+}
+
+# ---------------------------------------------------------------- test-mode seam
+
+# stub_security_recorder <stubdir>: `security` shim that counts calls in <stubdir>/security.calls.
+stub_security_recorder() {
+    mkdir -p "$1"
+    printf '#!/bin/sh\necho call >> "%s/security.calls"\necho '"'"'{"claudeAiOauth":{"accessToken":"tok"}}'"'"'\n' "$1" > "$1/security"
+    chmod +x "$1/security"
+}
+
+security_calls() {  # <stubdir>
+    if [ -f "$1/security.calls" ]; then wc -l < "$1/security.calls" | tr -d ' '; else echo 0; fi
+}
+
+# real_default_dir: the default state dir for the current (fake) HOME.
+real_default_dir() {
+    printf '%s\n' "$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate"
+}
+
+test_testmode_unset_is_legacy() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local out rc
+    out=$(unset IBL5_USAGE_GATE_TEST_MODE; PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_unset:rc 0 "$rc"
+    assert_eq testmode_unset:body 77.0 "$(printf '%s' "$out" | jq -r .five_hour.utilization)"
+    assert_eq testmode_unset:curl 1 "$(curl_calls "$STUB")"
+    [ "$(security_calls "$STUB")" -ge 1 ] && pass testmode_unset:security || fail testmode_unset:security "no keychain read"
+}
+
+test_testmode_empty_is_legacy() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local out rc
+    out=$(IBL5_USAGE_GATE_TEST_MODE='' PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_empty:rc 0 "$rc"
+    assert_eq testmode_empty:body 77.0 "$(printf '%s' "$out" | jq -r .five_hour.utilization)"
+    assert_eq testmode_empty:curl 1 "$(curl_calls "$STUB")"
+}
+
+test_testmode_stale_cache_no_live_fetch() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
+    local before out rc
+    before=$(cat "$IBL5_USAGE_GATE_STATE_DIR/cache.json")
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_stale:rc 2 "$rc"
+    assert_eq testmode_stale:body 41.0 "$(printf '%s' "$out" | jq -r .five_hour.utilization)"
+    assert_eq testmode_stale:curl 0 "$(curl_calls "$STUB")"
+    assert_eq testmode_stale:security 0 "$(security_calls "$STUB")"
+    assert_contains testmode_stale:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log" 2>/dev/null)" "fetch-skipped reason=test-mode"
+    assert_eq testmode_stale:cache-unchanged "$before" "$(cat "$IBL5_USAGE_GATE_STATE_DIR/cache.json")"
+}
+
+test_testmode_no_cache_fail_open() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    local out rc
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_nocache:rc 1 "$rc"
+    assert_eq testmode_nocache:stdout "" "$out"
+    assert_eq testmode_nocache:curl 0 "$(curl_calls "$STUB")"
+    assert_eq testmode_nocache:security 0 "$(security_calls "$STUB")"
+}
+
+test_testmode_fresh_cache_served() {
+    new_env
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    seed_cache "$(date +%s)" "$BODY_A"
+    local out rc
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch 45"); rc=$?
+    assert_eq testmode_fresh:rc 0 "$rc"
+    assert_eq testmode_fresh:body 41.0 "$(printf '%s' "$out" | jq -r .five_hour.utilization)"
+    assert_eq testmode_fresh:curl 0 "$(curl_calls "$STUB")"
+    assert_eq testmode_fresh:security 0 "$(security_calls "$STUB")"
+}
+
+test_testmode_explicit_dir_works() {
+    new_env
+    local out rc
+    out=$(IBL5_USAGE_GATE_TEST_MODE=1 bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_state_dir"); rc=$?
+    assert_eq testmode_explicit:rc 0 "$rc"
+    assert_eq testmode_explicit:out "$IBL5_USAGE_GATE_STATE_DIR" "$out"
+    assert_file testmode_explicit:markers "$IBL5_USAGE_GATE_STATE_DIR/markers"
+}
+
+test_testmode_refuses_unset_dir() {
+    new_env
+    seed_home ""
+    unset IBL5_USAGE_GATE_STATE_DIR
+    local real; real=$(real_default_dir)
+    mkdir -p "$real"
+    printf '%s' "$(usage_json 95 0)" | jq --argjson t "$(date +%s)" '. + {fetched_at:$t}' > "$real/cache.json"
+    make_stub_bin "$STUB" tok "$BODY_B"; stub_security_recorder "$STUB"
+    local err rc
+    err=$(IBL5_USAGE_GATE_TEST_MODE=1 PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; usage_prestart_gate automouse $SID_A /x/run" 2>&1 >/dev/null); rc=$?
+    assert_eq testmode_refuse_unset:rc 0 "$rc"
+    assert_contains testmode_refuse_unset:stderr "$err" "USAGE-GATE-TEST: refusing the real state dir"
+    assert_eq testmode_refuse_unset:files "$real/cache.json" "$(find "$real" -type f)"
+    assert_eq testmode_refuse_unset:markers "" "$(ls -A "$real/markers" 2>/dev/null)"
+}
+
+test_testmode_refuses_explicit_real_dir() {
+    new_env
+    seed_home ""
+    local real; real=$(real_default_dir)
+    local out rc
+    out=$(IBL5_USAGE_GATE_STATE_DIR="$real/" IBL5_USAGE_GATE_TEST_MODE=1 bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_state_dir" 2>/dev/null); rc=$?
+    assert_eq testmode_refuse_explicit:rc 1 "$rc"
+    assert_eq testmode_refuse_explicit:out /dev/null/usage-gate-refused "$out"
+    assert_no_file testmode_refuse_explicit:no-dir "$real"
+}
+
+test_prod_unset_dir_uses_default() {
+    new_env
+    seed_home ""
+    unset IBL5_USAGE_GATE_STATE_DIR IBL5_USAGE_GATE_TEST_MODE
+    local out rc
+    out=$(bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_state_dir"); rc=$?
+    assert_eq prod_default:rc 0 "$rc"
+    assert_eq prod_default:out "$(real_default_dir)" "$out"
+    assert_file prod_default:markers "$(real_default_dir)/markers"
 }
 
 # ---------------------------------------------------------------- runner

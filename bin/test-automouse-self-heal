@@ -3,17 +3,17 @@
 # Regression harness for bin/automouse/self-heal.
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$SCRIPT_DIR/automouse/self-heal"
 
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+h_tmp TMP
 
 NDIR="$TMP/automouse"
 PDIR="$TMP/plans"
 
-FAILED=0
 
 setup() {
     rm -rf "$NDIR"
@@ -25,16 +25,14 @@ setup() {
 assert_present() {
     local label=$1 path=$2
     if [ ! -e "$path" ]; then
-        echo "FAIL: $label — expected present: $path"
-        FAILED=1
+        h_fail "$label" "expected present: $path"
     fi
 }
 
 assert_absent() {
     local label=$1 path=$2
     if [ -e "$path" ]; then
-        echo "FAIL: $label — expected absent: $path"
-        FAILED=1
+        h_fail "$label" "expected absent: $path"
     fi
 }
 
@@ -53,8 +51,7 @@ chmod +x "$TMP/stub-guard"
 assert_gone() {
     local label=$1 path=$2
     if [ -e "$path" ] || [ -L "$path" ]; then
-        echo "FAIL: $label — expected gone (incl. dangling symlink): $path"
-        FAILED=1
+        h_fail "$label" "expected gone (incl. dangling symlink): $path"
     fi
 }
 
@@ -82,8 +79,7 @@ run_heal >/dev/null 2>&1
 assert_absent  "row1 skipped symlink gone"  "$NDIR/skipped/plan-fresh.md"
 assert_present "row1 queued"                "$NDIR/queue/plan-fresh.md"
 assert_absent  "row1 staleness marker gone" "$NDIR/skipped/plan-fresh.md.staleness"
-echo "ok: row1 — POSITIVE healable"
-
+h_pass "row1 — POSITIVE healable"
 # ---------------------------------------------------------------------------
 # Row 2 — NEGATIVE (still-stale): marked plan fails guard → stays in skipped/
 # ---------------------------------------------------------------------------
@@ -95,8 +91,7 @@ run_heal >/dev/null 2>&1
 assert_present "row2 skipped stays"         "$NDIR/skipped/plan-stale.md"
 assert_absent  "row2 not queued"            "$NDIR/queue/plan-stale.md"
 assert_present "row2 marker retained"       "$NDIR/skipped/plan-stale.md.staleness"
-echo "ok: row2 — NEGATIVE still-stale"
-
+h_pass "row2 — NEGATIVE still-stale"
 # ---------------------------------------------------------------------------
 # Row 3 — NEGATIVE (core safety, no marker): guard would pass but NO marker → not requeued
 # ---------------------------------------------------------------------------
@@ -107,8 +102,7 @@ ln -s "$PDIR/plan-fresh-nomarker.md" "$NDIR/skipped/plan-fresh-nomarker.md"
 run_heal >/dev/null 2>&1
 assert_present "row3 skipped stays"   "$NDIR/skipped/plan-fresh-nomarker.md"
 assert_absent  "row3 not queued"      "$NDIR/queue/plan-fresh-nomarker.md"
-echo "ok: row3 — NEGATIVE core safety (no marker, not recovered)"
-
+h_pass "row3 — NEGATIVE core safety (no marker, not recovered)"
 # ---------------------------------------------------------------------------
 # Row 4 — DRY-RUN: healable plan listed but not moved, no report written
 # ---------------------------------------------------------------------------
@@ -121,15 +115,12 @@ assert_present "row4 skipped still present" "$NDIR/skipped/plan-fresh-dry.md"
 assert_absent  "row4 not queued"            "$NDIR/queue/plan-fresh-dry.md"
 assert_present "row4 marker still present"  "$NDIR/skipped/plan-fresh-dry.md.staleness"
 if ! echo "$out" | grep -q "would heal"; then
-    echo "FAIL: row4 — expected 'would heal' in dry-run output, got: $out"
-    FAILED=1
+    h_fail "row4" "expected 'would heal' in dry-run output, got: $out"
 fi
 if ls "$NDIR/reports/"*-self-heal.md >/dev/null 2>&1; then
-    echo "FAIL: row4 — report must not be written in dry-run mode"
-    FAILED=1
+    h_fail "row4" "report must not be written in dry-run mode"
 fi
-echo "ok: row4 — DRY-RUN"
-
+h_pass "row4 — DRY-RUN"
 # ---------------------------------------------------------------------------
 # Row 5 — EDGE (empty skipped/): no-op, exit 0
 # ---------------------------------------------------------------------------
@@ -137,11 +128,9 @@ setup
 rc=0
 run_heal >/dev/null 2>&1 || rc=$?
 if [ "$rc" -ne 0 ]; then
-    echo "FAIL: row5 — expected exit 0 on empty skipped/, got $rc"
-    FAILED=1
+    h_fail "row5" "expected exit 0 on empty skipped/, got $rc"
 fi
-echo "ok: row5 — EDGE empty skipped/"
-
+h_pass "row5 — EDGE empty skipped/"
 # ---------------------------------------------------------------------------
 # Row 6 — CLEANUP: .attempts + .staleness sidecars gone after requeue
 # ---------------------------------------------------------------------------
@@ -155,8 +144,7 @@ assert_absent  "row6 skipped symlink gone"  "$NDIR/skipped/plan-fresh-clean.md"
 assert_absent  "row6 attempts gone"         "$NDIR/skipped/plan-fresh-clean.md.attempts"
 assert_absent  "row6 staleness gone"        "$NDIR/skipped/plan-fresh-clean.md.staleness"
 assert_present "row6 queued"                "$NDIR/queue/plan-fresh-clean.md"
-echo "ok: row6 — CLEANUP sidecars evicted"
-
+h_pass "row6 — CLEANUP sidecars evicted"
 # ---------------------------------------------------------------------------
 # Row 7 — TOMBSTONE (real): plan deleted from PLANS_DIR leaves a dangling
 # symlink. Pre-fix, `[ -e "$f" ] || continue` skipped it silently forever.
@@ -171,15 +159,12 @@ assert_gone "row7 staleness reaped"        "$NDIR/skipped/plan-deleted.md.stalen
 assert_gone "row7 attempts reaped"         "$NDIR/skipped/plan-deleted.md.attempts"
 assert_gone   "row7 not requeued"          "$NDIR/queue/plan-deleted.md"
 if ! echo "$out" | grep -q "reaped tombstone: plan-deleted.md"; then
-    echo "FAIL: row7 — expected 'reaped tombstone' in output, got: $out"
-    FAILED=1
+    h_fail "row7" "expected 'reaped tombstone' in output, got: $out"
 fi
 if ! echo "$out" | grep -q "1 tombstone(s) reaped"; then
-    echo "FAIL: row7 — expected tombstone count in summary, got: $out"
-    FAILED=1
+    h_fail "row7" "expected tombstone count in summary, got: $out"
 fi
-echo "ok: row7 — TOMBSTONE reaped"
-
+h_pass "row7 — TOMBSTONE reaped"
 # ---------------------------------------------------------------------------
 # Row 8 — TOMBSTONE (dry-run): reported, nothing removed.
 # ---------------------------------------------------------------------------
@@ -188,20 +173,16 @@ ln -s "$PDIR/plan-deleted-dry.md" "$NDIR/skipped/plan-deleted-dry.md"
 touch "$NDIR/skipped/plan-deleted-dry.md.staleness"
 out=$(run_heal --dry-run 2>&1)
 if [ ! -L "$NDIR/skipped/plan-deleted-dry.md" ]; then
-    echo "FAIL: row8 — dry-run must leave the dangling symlink in place"
-    FAILED=1
+    h_fail "row8" "dry-run must leave the dangling symlink in place"
 fi
 assert_present "row8 marker still present" "$NDIR/skipped/plan-deleted-dry.md.staleness"
 if ! echo "$out" | grep -q "would reap tombstone: plan-deleted-dry.md"; then
-    echo "FAIL: row8 — expected 'would reap tombstone' in output, got: $out"
-    FAILED=1
+    h_fail "row8" "expected 'would reap tombstone' in output, got: $out"
 fi
 if ! echo "$out" | grep -q "1 tombstone(s) would be reaped"; then
-    echo "FAIL: row8 — expected tombstone count in dry-run summary, got: $out"
-    FAILED=1
+    h_fail "row8" "expected tombstone count in dry-run summary, got: $out"
 fi
-echo "ok: row8 — TOMBSTONE dry-run"
-
+h_pass "row8 — TOMBSTONE dry-run"
 # ---------------------------------------------------------------------------
 # Row 9 — TOMBSTONE (no staleness marker): a tombstone with no sidecar is
 # reaped regardless of skip reason — verifies the reap block fires before the
@@ -213,15 +194,8 @@ out=$(run_heal 2>&1)
 assert_gone "row9 dangling symlink reaped" "$NDIR/skipped/plan-no-marker.md"
 assert_absent "row9 not requeued"          "$NDIR/queue/plan-no-marker.md"
 if ! echo "$out" | grep -q "reaped tombstone: plan-no-marker.md"; then
-    echo "FAIL: row9 — expected 'reaped tombstone' in output, got: $out"
-    FAILED=1
+    h_fail "row9" "expected 'reaped tombstone' in output, got: $out"
 fi
-echo "ok: row9 — TOMBSTONE reaped regardless of skip reason"
-
+h_pass "row9 — TOMBSTONE reaped regardless of skip reason"
 # ---------------------------------------------------------------------------
-if [ "$FAILED" -ne 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-fi
-echo "RESULT: all passed"
-exit 0
+h_done

@@ -102,7 +102,7 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
         }
 
         // Fetch one extra to detect if there are more results
-        $sql .= " ORDER BY s.time DESC LIMIT ?, ?";
+        $sql .= " ORDER BY s.time DESC, s.sid DESC LIMIT ?, ?";
         $types .= 'ii';
         $params[] = $offset;
         $params[] = $limit + 1;
@@ -249,7 +249,7 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
         $sql = "SELECT id AS user_id, username
                 FROM auth_users
                 WHERE username LIKE ?
-                ORDER BY username ASC
+                ORDER BY username ASC, id ASC
                 LIMIT ?, ?";
 
         /** @var list<UserDbRow> $rows */
@@ -280,7 +280,7 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
     {
         /** @var list<TopicDbRow> $rows */
         $rows = $this->fetchAll(
-            "SELECT topicid, topictext FROM " . $this->prefix . "_topics ORDER BY topictext"
+            "SELECT topicid, topictext FROM " . $this->prefix . "_topics ORDER BY topictext, id ASC"
         );
 
         $topics = [];
@@ -302,7 +302,8 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
     {
         /** @var list<CategoryDbRow> $rows */
         $rows = $this->fetchAll(
-            "SELECT catid, title FROM " . $this->prefix . "_stories_cat ORDER BY title"
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (catid is the nuke_stories_cat primary key, absent from the rule allowlist)
+            "SELECT catid, title FROM " . $this->prefix . "_stories_cat ORDER BY title, catid ASC"
         );
 
         $categories = [];

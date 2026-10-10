@@ -42,6 +42,8 @@ A bare path OR a path you annotate with a change-description is still checked; o
 
 The gate is a hard fail. Every flagged plan holds deterministically whenever VR is green, and one marker clears it. The 2026-10-01 corpus scan flagged 3 of 1050 plans, all already shipped.
 
+**Glob entries.** To name a file family without listing each member, write one glob entry such as `` `bin/test-automouse-*` (conditional) ``. `bin/lib/plan-scope-conformance` counts every matching path as planned, except a `.claude/` path. Keep a glob entry `(conditional)`, because Phase 5.0's `MISSING-FILE:` check matches entries literally.
+
 ### Phase-count guard — HTML comment mechanism
 
 The orchestrator persists the turn-1 outline into the draft as an HTML comment. The numbered `Phase <N>` or `Step <N>` items in it **fix the plan's phase count for the remainder of the run**. A title that omits the `Phase <N>:`/`Step <N>:` prefix is not counted and silently disables the guard. There is no mid-run outline-revision escape hatch: the count is enforced mechanically by the orchestrator via `bin/check-plan --draft` before Step 5 finalize, and an excess heading is deleted or terminates the run.
@@ -206,6 +208,8 @@ Omit the field entirely when the phase needs nothing beyond the always-on set. A
 ## One-time-check tag shape
 
 The reason is 15 or more characters, free of `(`, `)`, `|` and backticks, so a reviewer can rerun the check by hand. `bin/lib/plan-matrix-assertions` skips a tagged row instead of reporting it unrealised; a malformed tag is ignored fail-closed and the row is checked. `bin/check-plan` gate `[Y]` rejects a bad shape, a tag on a non-`CLI-executable` row, and a matrix with tagged rows above one third of its rows.
+
+Out-of-repo and post-PR rows carry the tag at write time. A `CLI-executable` row whose location cell runs only `~/`, `$HOME`, or `/tmp` paths (a scratch script under `~/claude-plans/_scripts/`, a memory file, a hook) or queries the open PR with `gh run`, `gh pr`, or `gh api` has no footprint a diff can carry, so Step 6.7 would stop on its tokens. End its What-to-verify cell with `(one-time-check: <reason>)` as you write it; `bin/check-plan` gate `[Z]` fails the plan otherwise. A command that also runs a repo `bin/` script, a repo test, `composer`, `php`, `npx`, `docker`, or `curl` is in-repo and stays untagged. Tokens that sit only inside a `Mutation:` clause (from the label to its `⇒`, sentence end, or cell end) are excluded by `bin/lib/plan-matrix-assertions` and need no tag. A token also named outside the clause is still checked.
 
 ## Column-bound literal citations
 

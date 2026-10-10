@@ -9,7 +9,6 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
-use Trading\Contracts\TradeExecutionRepositoryInterface;
 use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 use Trading\TradeProcessor;
 use Season\Season;
@@ -63,7 +62,6 @@ class TradeProcessorTest extends TestCase
         $assetRepository = self::createStub(TradeAssetRepositoryInterface::class);
         $cashRepository = self::createStub(TradeCashRepositoryInterface::class);
         $cashConsiderationRepository = self::createStub(BuyoutLedgerRepositoryInterface::class);
-        $executionRepository = self::createStub(TradeExecutionRepositoryInterface::class);
         $season = self::createStub(Season::class);
 
         $processor = new TradeProcessor(
@@ -74,7 +72,6 @@ class TradeProcessorTest extends TestCase
             $assetRepository,
             $cashRepository,
             $cashConsiderationRepository,
-            $executionRepository,
             $season,
         );
 
@@ -111,7 +108,6 @@ class TradeProcessorTest extends TestCase
         $assetStub = self::createStub(TradeAssetRepositoryInterface::class);
         $cashStub = self::createStub(TradeCashRepositoryInterface::class);
         $buyoutStub = self::createStub(BuyoutLedgerRepositoryInterface::class);
-        $execStub = self::createStub(TradeExecutionRepositoryInterface::class);
         $seasonStub = self::createStub(Season::class);
 
         $processor = new class(
@@ -122,7 +118,6 @@ class TradeProcessorTest extends TestCase
             $assetStub,
             $cashStub,
             $buyoutStub,
-            $execStub,
             $seasonStub,
             auditLogger: $auditSpy,
             tradeLogger: $tradeSpy,
@@ -164,6 +159,19 @@ class TradeProcessorTest extends TestCase
     {
         $processor = new TradeProcessor($this->mockDb, $this->mockCommonRepo);
         $this->assertIsObject($processor);
+    }
+
+    public function testTradeProcessorHasNoQueueSurface(): void
+    {
+        $processor = new \ReflectionClass(TradeProcessor::class);
+        foreach (['shouldQueueTrades', 'queuePlayerTransfer', 'queuePickTransfer'] as $method) {
+            self::assertFalse($processor->hasMethod($method), "TradeProcessor::$method() must not exist");
+        }
+        self::assertFalse($processor->hasProperty('executionRepository'));
+
+        $interface = new \ReflectionClass(\Trading\Contracts\TradeExecutionRepositoryInterface::class);
+        $declared = array_map(static fn(\ReflectionMethod $m) => $m->getName(), $interface->getMethods());
+        self::assertSame(['clearTradeInfo'], $declared, 'TradeExecutionRepositoryInterface must expose only clearTradeInfo');
     }
 
     // ============================================

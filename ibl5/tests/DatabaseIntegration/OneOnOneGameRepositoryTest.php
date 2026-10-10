@@ -192,4 +192,24 @@ class OneOnOneGameRepositoryTest extends DatabaseTestCase
 
         self::assertNull($result);
     }
+
+    public function testGetActivePlayersBreaksNameTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200139382, 'Aaa Tie Player');
+        $this->insertTestPlayer(200139381, 'Aaa Tie Player');
+        $this->insertTestPlayer(200139383, 'Aaa Tie Lead');
+        $this->insertTestPlayer(200139384, 'Aaa Tie Player', ['retired' => 1]);
+
+        $players = $this->repo->getActivePlayers();
+
+        $kept = array_filter(
+            $players,
+            static fn (array $row): bool => str_starts_with($row['name'], 'Aaa Tie')
+        );
+
+        self::assertSame(
+            [200139383, 200139381, 200139382],
+            array_map('intval', array_column($kept, 'pid'))
+        );
+    }
 }

@@ -92,7 +92,7 @@ class TeamOffDefStatsRepository extends \Database\BaseMysqliRepository implement
             LEFT JOIN (" . self::buildOffenseSubquery('bst.season_year = ?', $gameTypes) . ") tos ON ti.teamid = tos.teamid
             LEFT JOIN (" . self::buildDefenseSubquery('my.season_year = ?', $gameTypes) . ") tds ON ti.teamid = tds.teamid
             WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-            ORDER BY ti.team_city
+            ORDER BY ti.team_city, ti.teamid ASC
         ";
 
         /** @var list<AllTeamStatsRow> */

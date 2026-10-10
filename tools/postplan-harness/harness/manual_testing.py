@@ -49,6 +49,7 @@ class ManualTestingResult:
     rows: list[dict] = field(default_factory=list)
     ticked: list[str] = field(default_factory=list)
     all_ticked: bool = False
+    sentinel: str = "not-attempted"
     probed_tree: str = ""
     errors: list[str] = field(default_factory=list)
 
@@ -295,6 +296,77 @@ def confirm(
     return confirmed, all_ticked_val
 
 
+def upsert_ticked_sentinel(body: str) -> tuple[str, bool]:
+    """Insert MANUAL_TESTING_SENTINEL_TICKED as the first line under `## Manual Testing`.
+
+    Pure. Returns (new_body, changed). The body is returned byte-identical with
+    changed=False unless ALL of: the gate window exists (classify._manual_testing_span),
+    the window carries at least one checkbox row, every row is ticked, and no line in
+    the window already matches armable.SENTINEL_RE. The shape is heading line, blank
+    line, sentinel, blank line, then the untouched remainder of the window.
+    """
+    from harness.armable import SENTINEL_RE
+    from harness.classify import MANUAL_TESTING_SENTINEL_TICKED, _manual_testing_span
+
+    span = _manual_testing_span(body)
+    if span is None:
+        return body, False
+    start, end = span
+    window = body[start:end]
+    if any(SENTINEL_RE.match(line) for line in window.splitlines()):
+        return body, False
+    rows = pending_rows(body)
+    if not rows or any(not is_ticked for _rid, _text, is_ticked in rows):
+        return body, False
+    heading_nl = body.find("\n", start)
+    if heading_nl == -1 or heading_nl >= end:
+        return body, False
+    insert_at = heading_nl + 1
+    return (body[:insert_at] + "\n" + MANUAL_TESTING_SENTINEL_TICKED + "\n"
+            + body[insert_at:]), True
+
+
+def write_ticked_sentinel(
+    gh: object,
+    pr: int,
+    head_tree: Callable[[], str],
+    probed_tree: str,
+    errors: list[str],
+) -> str:
+    """Upsert MANUAL_TESTING_SENTINEL_TICKED into the live PR body. Returns the
+    `ManualTestingResult.sentinel` value.
+
+    Every decision is made on a FRESH body (pr_body_fresh, never pr_body: see confirm()).
+    The writer cannot fabricate clearance: it inserts only when the fresh body already
+    shows every checkbox row ticked, and the ticks themselves come from tick-rows.sh
+    after PASS verdicts. It never adds, ticks, or removes a row.
+    """
+    fresh = gh.pr_body_fresh() or ""
+    if not fresh:
+        errors.append("sentinel-skipped:empty-body")
+        return "skipped:empty-body"
+    new_body, changed = upsert_ticked_sentinel(fresh)
+    if not changed:
+        rows = pending_rows(fresh)
+        if not rows or any(not is_ticked for _rid, _text, is_ticked in rows):
+            return "skipped:not-all-ticked"
+        return "skipped:already-present"
+    current_tree = head_tree()
+    if current_tree and probed_tree and current_tree != probed_tree:
+        errors.append("tree-moved-before-sentinel")
+        return "skipped:tree-moved"
+    gh.pr_edit_body(pr, new_body)
+    # Fresh re-read does two jobs: confirms the write landed, and refills the LiveGh
+    # cache so runner.py's later pr_body() callers (:585, :674) compose on top of the
+    # sentinel-bearing body instead of replaying the pre-sentinel copy.
+    refetched = gh.pr_body_fresh() or ""
+    _again, still_missing = upsert_ticked_sentinel(refetched)
+    if still_missing or not refetched:
+        errors.append("sentinel-unconfirmed")
+        return "unconfirmed"
+    return "written"
+
+
 def show_blob_for(worktree: str) -> Callable[[str], str]:
     """Pinned-blob reader for the dual-path script loader."""
     def _show(ref: str) -> str:
@@ -421,9 +493,12 @@ def run(
             confirmed, all_ticked_val = confirm(gh, pass_ids, result.errors)
             result.ticked = confirmed
             result.all_ticked = all_ticked_val
+            if all_ticked_val:
+                result.sentinel = write_ticked_sentinel(
+                    gh, pr, head_tree, result.probed_tree, result.errors)
             log(
                 f"phase6.7: rows={len(result.rows)} ticked={len(result.ticked)}"
-                f" all_ticked={result.all_ticked}"
+                f" all_ticked={result.all_ticked} sentinel={result.sentinel}"
             )
 
     except Exception as exc:  # noqa: BLE001
@@ -452,6 +527,12 @@ class _GhShim:
 
     def pr_body_fresh(self) -> str:
         return self.pr_body()
+
+    def pr_edit_body(self, pr: int, body: str) -> None:
+        subprocess.run(
+            ["gh", "pr", "edit", str(pr), "--body-file", "-"],
+            input=body, text=True, check=True,
+        )
 
 
 def main(argv: list[str] | None = None) -> int:

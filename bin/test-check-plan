@@ -2590,6 +2590,56 @@ assert_viol "gateY-all-tagged-fires" 1 '[Y]' "$FM$YHDR"'
 '
 
 # ---------------------------------------------------------------------------
+# Gate [Z] fixtures (8 cases)
+# ---------------------------------------------------------------------------
+# Untagged row whose command runs only an out-of-repo scratch script.
+assert_viol "gateZ-untagged-scratch-script-fires" 1 '[Z]' "$FM$YHDR"'
+| 1 | prints `FACTS-OK` | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/tables-css-201/facts.sh` |
+'"$YROW"'
+'
+# The same row with a well-formed tag: released.
+assert_viol "gateZ-tagged-scratch-script-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `FACTS-OK` (one-time-check: asserts an out-of-repo scratch script the diff cannot carry) | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/tables-css-201/facts.sh` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# A repo script run over out-of-repo inputs is in-repo evidence: exempt.
+assert_viol "gateZ-mixed-repo-script-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | prints `UNREALISED-ASSERTION` | CLI-executable | post-impl | `MATRIX_ASSERT_ROOT=/tmp/r bin/lib/plan-matrix-assertions ~/claude-plans/x.md -` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# /tmp/ and $HOME/ both open the out-of-repo signal; both rows fire.
+assert_viol "gateZ-tmp-and-home-fire" 1 '[Z]' "$FM$YHDR"'
+| 1 | prints `TRACE-OK` | CLI-executable | post-impl | `bash /tmp/negproof/run.sh` |
+| 5 | prints `HOOK-OK` | CLI-executable | post-impl | `bash "$HOME/.claude/hooks/x.sh"` |
+'"$YROW"'
+'
+# A post-PR CI query can never be realised by the diff.
+assert_viol "gateZ-gh-run-fires" 1 '[Z]' "$FM$YHDR"'
+| 1 | latest run concludes success; prints `PR-RUN-DONE` | CLI-executable | post-impl | `gh run list --workflow sim-recap.yml --limit 1 && echo PR-RUN-DONE` |
+'"$YROW"'
+'
+# A token-free row is never checked by the helper: silent.
+assert_viol "gateZ-no-token-row-silent" 0 '[Z]' "$FM$YHDR"'
+| 1 | the scratch run exits 0 | CLI-executable | post-impl | `bash ~/claude-plans/_scripts/x.sh` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# curl exercises the worktree stack and only writes its output under /tmp: exempt.
+assert_viol "gateZ-curl-tmp-output-ok" 0 '[Z]' "$FM$YHDR"'
+| 1 | page holds `Roster` | CLI-executable | post-impl | `curl -s -o /tmp/page.html http://slug.localhost/ibl5/modules.php?name=Team && grep -q Roster /tmp/page.html` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+# Not CLI-executable: the tag remedy does not apply, so gate Z never fires.
+assert_viol "gateZ-phpunit-row-silent" 0 '[Z]' "$FM$YHDR"'
+| 1 | `pinned_thing` works | PHPUnit | post-impl | `~/scratch/tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate Z props -->
+'
+
+# ---------------------------------------------------------------------------
 # Gate [ND] fixtures (4 cases)
 # ---------------------------------------------------------------------------
 # Marker with a 15+ character reason inside a phase body: the honored shape.
@@ -2895,15 +2945,17 @@ _corpus_guard_ok() {
 # conference-champions-playoff-semantics, bug-pipeline-survive-db-sync,
 # bug-pipeline-test-env, sim-recap-boxid-resolution (gate [A]: migration literals);
 # bug-hunter-escalation-discord-dm (gate [V]: main.localhost);
-# pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags).
+# pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags);
+# narrow-headless-marker-contract-paths, jsb-j7-param-recovery,
+# plan-gate-skill-inline (gate [Z]: untagged out-of-repo rows).
 _n_corpus_pass=1
 for _n_slug in \
     plan-architect-phase-drift-guard \
     automouse-cost-accounting-fix redact-credentials-from-error-logs \
     session-registry-dotclaude-freshness architect-explore-fanout \
-    narrow-headless-marker-contract-paths agent-tiering-detail-trim \
-    postplan-findings-schema-degrade jsb-j7-param-recovery wt-rebase-merge-not-rebase \
-    plan-gate-skill-inline sim-recap-floor-and-cold-open \
+    agent-tiering-detail-trim \
+    postplan-findings-schema-degrade wt-rebase-merge-not-rebase \
+    sim-recap-floor-and-cold-open \
     authz-verdict-refactor-1a-trading-pins authz-verdict-refactor-1b-trading-reject-service \
     authz-verdict-refactor-1c-trading-reject-shim authz-verdict-refactor-1d-trading-accept-service \
     authz-verdict-refactor-1e-trading-accept-shim \

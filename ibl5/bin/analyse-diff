@@ -36,7 +36,7 @@ CHANGED="$(
 )"
 
 # Classify into the two PHPStan configs by their neon `paths:`:
-#   phpstan.neon        -> classes/, phpstan-rules/, modules/   (production)
+#   phpstan.neon        -> classes/, phpstan-rules/, modules/, blocks/   (production)
 #   phpstan-tests.neon  -> tests/                               (test code)
 # Everything else (or deleted files) is skipped -- not in either scope. Note this
 # is a subset of phpstan.neon's paths:; themes/, scripts/ and the listed bin/
@@ -55,7 +55,7 @@ while IFS= read -r f; do
     [[ -f "$rel" ]] || continue
     case "$rel" in
         tests/*) tests+=("$rel") ;;
-        classes/*|phpstan-rules/*|modules/*) prod+=("$rel") ;;
+        classes/*|phpstan-rules/*|modules/*|blocks/*) prod+=("$rel") ;;
         *) : ;;  # outside both configs' paths -- nothing to analyse
     esac
 done <<< "$CHANGED"

@@ -104,7 +104,10 @@
 #   C  Context budget        — a marathon-sized plan (>= 500 lines OR >= 12
 #                              numbered Step/Phase headings) predicts an
 #                              implementation session that breaches the ~150K
-#                              context dumb-zone. Measured 2026-07-07 on the
+#                              context dumb-zone (degradation unmeasured on Opus 5.5
+#                              as of 2026-10-08; method: dz-extract.py drops
+#                              isSidechain lines, dz-score.py bands the rest).
+#                              Measured 2026-07-07 on the
 #                              automouse corpus: Opus implementation runs that
 #                              exceeded 150K peak context executed plans of
 #                              median ~566 lines / ~20 phases, while the runs
@@ -1312,6 +1315,31 @@ done < "$MATRIX_FILE"
 if [ "$_y_tagged" -gt 0 ] && [ $((_y_tagged * 3)) -gt "$_y_total" ]; then
     viol "[Y] ${_y_tagged} of ${_y_total} matrix rows carry (one-time-check: ...) — more than one third of the matrix is unpinned; a one-time check is for evidence no regression test can hold, so convert rows to tests or split the plan"
 fi
+
+# ---------------------------------------------------------------------------
+# Gate Z: an untagged CLI-executable row whose command runs only outside the repo
+# (~/, $HOME, /tmp) or against a post-PR CI run (gh run|pr|api). The diff cannot carry
+# such a row's tokens, so bin/lib/plan-matrix-assertions reports UNREALISED-ASSERTION
+# at Step 6.7 and the implementation never hands off. The (one-time-check: ...) tag is
+# the release; make the planner write it now. A row that also runs a repo path or a
+# repo-exercising command (composer, php, npx, docker, curl) is in-repo and exempt. Tag
+# shape, reason length, and type mismatches stay with gate Y above.
+# ---------------------------------------------------------------------------
+_z_b='(^|[^A-Za-z0-9_./~-])'
+_z_out="${_z_b}(~/|\\\$HOME/|\\\$\\{HOME\\}|/tmp/|/private/tmp/)"
+_z_gh="${_z_b}gh[[:space:]]+(run|pr|api)([[:space:]]|\$)"
+_z_in="${_z_b}(bin|ibl5|tools|\\.claude|\\.github|vendor|e2e|tests)/|(^|/)IBL5(-worktrees)?/|${_z_b}(composer|php|npx|docker|curl)([[:space:]]|\$)"
+while IFS= read -r row; do
+    matrix_split "$row" || continue
+    [ "$MC_NUM" != "#" ] || continue
+    [ "$MC_TYPE" = "CLI-executable" ] || continue
+    _z_what="${MC_WHAT//$MSEN/|}"
+    grep -qE '`[^`[:space:]]+`' <<< "$_z_what" || continue
+    grep -qE "$_z_out|$_z_gh" <<< "$MC_LOC" || continue
+    grep -qE "$_z_in" <<< "$MC_LOC" && continue
+    grep -qE "$_y_shape" <<< "$_z_what" && continue
+    viol "[Z] row runs only outside the repo (~/, \$HOME, /tmp) or against a post-PR CI run (gh run|pr|api) and carries no one-time-check tag; the diff cannot carry its tokens and Step 6.7 stops on it. End the What-to-verify cell with '(one-time-check: <what was run and what it printed>)', or make the command also run a repo bin/ script or test: ${row}"
+done < "$MATRIX_FILE"
 
 # ---------------------------------------------------------------------------
 # Gate ND: a `**No diff:** <reason>` phase marker. The post-plan harness reads it only

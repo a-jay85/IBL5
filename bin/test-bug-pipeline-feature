@@ -101,4 +101,4 @@ bpt_log_has   "$STUB" transition.log "awaiting_ajay --approval-message-id=" \
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
-exit "$FAILED"
+h_done

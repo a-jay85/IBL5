@@ -37,7 +37,7 @@ test.describe('All-Star Appearances flow', () => {
     // Navigate to the player page and verify it loads
     await page.goto(href!);
     await assertNoPhpErrors(page, 'on player page from All-Star Appearances');
-    await expect(page.locator('h2, h3').first()).toBeVisible();
+    await expect(page.locator('.plr-nav').first()).toBeVisible();
   });
 
   test('retired module URL answers 302 to the sub-view', async ({ page }) => {

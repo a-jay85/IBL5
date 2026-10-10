@@ -26,6 +26,11 @@
 #       (a trailing `/` on the token is dropped first)
 #       (a deleted binary has no body lines; the header is the footprint;
 #       quoted-path headers are skipped fail-closed)
+#   2c. a path-shaped token (holds `/` or `.` after a trailing `/` is dropped) that
+#       equals, or is a `/`-aligned suffix of, a `diff --git` header path or a
+#       `git ls-files` entry                                   -> realised
+#       (file names never appear in file contents; `Chunk_Leaders.php` does not
+#       match `block-Chunk_Leaders.php`, and a bare word never enters this arm)
 #   3. present in a tracked file via `git grep -F`            -> pre-existing, skip
 #   4. otherwise                                               -> missing
 #   A row is flagged UNREALISED-ASSERTION when any qualifying token is missing.
@@ -36,6 +41,11 @@
 #   qualifying tokens is skipped entirely.
 #   Scenario notation `name=value` (`current_tree=T2`, `VAR=1`) is cut at the
 #   first `=` and only `name` is checked; a token starting with `=` is dropped.
+#   Mutation clause: tokens whose every occurrence lies between a `Mutation:` label
+#   (also `mutation:`, `**Mutation:**`) and the first `⇒` `→` `=>` `->`, sentence-ending
+#   `.`, or cell end outside backticks are not checked; the clause names the wrong code
+#   a correct diff never contains. A token also present outside the clause, or after
+#   the arrow, is still checked.
 #
 #   Prefix fallbacks (same three arms, run on a prefix of the token):
 #   - call token `name(a)`    -> after arms 1-3 miss, retry with the trailing `)`
@@ -53,6 +63,9 @@
 # Any other mention of `one-time-check` in the cell is ignored fail-closed: the row is
 # checked as untagged and `ONE-TIME-CHECK-IGNORED: row <id> -- <why>` goes to stderr.
 # Neither line starts with `UNREALISED-ASSERTION:`, which every caller greps for.
+# bin/check-plan gate Z requires the tag at plan time on a CLI-executable row whose
+# location cell runs only outside the repo (~/, $HOME, /tmp) or against a post-PR CI
+# run (gh run|pr|api); such a row has no footprint a diff can carry.
 
 set -euo pipefail
 set -f
@@ -123,6 +136,24 @@ awk '
 { hdr = "" }
 ' "$TMP/diff" > "$TMP/deleted"
 
+# --- PATHS set: every `diff --git` header path, plus the index when a root is active ---
+# Same length-split as the DELETED set, without the `deleted file mode` pairing, so a
+# modified binary (a regenerated png baseline) whose diff has no body lines still names
+# its path. Quoted headers are skipped fail-closed. `ls-files` is appended after the
+# tree-grep root resolves (see below); a path listed there is pre-existing, like arm 3.
+awk '
+/^diff --git / {
+    r = substr($0, 12);
+    if (substr(r, 1, 1) == "\"" || substr(r, 1, 2) != "a/") next;
+    r = substr(r, 3);
+    n = length(r);
+    if (n < 4 || (n - 3) % 2 != 0) next;
+    len = (n - 3) / 2;
+    p = substr(r, 1, len);
+    if (substr(r, len + 1, 3) == " b/" && substr(r, len + 4) == p) print p;
+}
+' "$TMP/diff" > "$TMP/paths"
+
 # --- WAIVERS ---
 if [ -n "$BODY_ARG" ]; then
     grep -oE 'WAIVE-MATRIX-ROW:[[:space:]]*[0-9A-Za-z.-]+' "$BODY_ARG" \
@@ -138,6 +169,9 @@ if [ "${MATRIX_ASSERT_ROOT+set}" = "set" ]; then
 else
     # Variable unset: try to resolve from cwd
     ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || ROOT=""
+fi
+if [ -n "$ROOT" ]; then
+    git -C "$ROOT" -c core.quotePath=false ls-files >> "$TMP/paths" 2>/dev/null || true
 fi
 
 # --- extract rows from the Verification Matrix (awk, BSD-awk safe) ---
@@ -187,9 +221,30 @@ inm && /^[[:space:]]*\|/ {
             tag = "warn:malformed tag (expected trailing \"(one-time-check: <reason>)\"); row checked";
         }
     }
+    # Mutation clause: blank the text between a `Mutation:` label and its closing
+    # arrow / sentence end / cell end, outside backtick spans, so the wrong code the
+    # clause names is never a token the diff must carry. The label and the closer stay;
+    # text after the closer (the consequence) is still tokenized. Multibyte arrows are
+    # compared as bytes; LC_ALL=C above keeps substr() byte-wise on BSD and GNU awk.
+    chk = ""; rest = cell;
+    while (match(rest, /(^|[^A-Za-z])(\*\*)?[Mm]utation:(\*\*)?/)) {
+        chk = chk substr(rest, 1, RSTART + RLENGTH - 1) " ";
+        body = substr(rest, RSTART + RLENGTH);
+        L = length(body); tick = 0; stop = L;
+        for (k = 1; k <= L; k++) {
+            c = substr(body, k, 1);
+            if (c == "`") { tick = !tick; continue; }
+            if (tick) continue;
+            if (substr(body, k, 3) == "⇒" || substr(body, k, 3) == "→") { stop = k - 1; break; }
+            if (substr(body, k, 2) == "=>" || substr(body, k, 2) == "->") { stop = k - 1; break; }
+            if (c == "." && (k == L || substr(body, k + 1, 1) == " ")) { stop = k - 1; break; }
+        }
+        rest = substr(body, stop + 1);
+    }
+    chk = chk rest;
     # extract closed single-word backtick tokens
     toks = "";
-    n2 = split(cell, parts, "`");
+    n2 = split(chk, parts, "`");
     for (i = 2; i < n2; i += 2) {
         t = parts[i];
         if (t == "") continue;
@@ -234,6 +289,26 @@ _deleted_realised() {
             "$t" | */"$t" | "$t"/* | */"$t"/* ) return 0 ;;
         esac
     done < "$TMP/deleted"
+    return 1
+}
+
+# --- path arm (2c): a path-shaped token realised by the diff's file list or the index ---
+# Shape gate first: after one trailing `/` is dropped the token must hold `/` or `.`;
+# a bare word never enters. Match is `/`-aligned: equal, or `/`+tok at the end. No
+# tok+`/` prefix form (ls-files lists files, so a directory token stays unrealised).
+_path_realised() {
+    local t="${1%/}" p
+    [ -n "$t" ] || return 1
+    case "$t" in
+        */* | *.* ) ;;
+        * ) return 1 ;;
+    esac
+    [ -s "$TMP/paths" ] || return 1
+    while IFS= read -r p; do
+        case "$p" in
+            "$t" | */"$t" ) return 0 ;;
+        esac
+    done < "$TMP/paths"
     return 1
 }
 
@@ -284,6 +359,13 @@ while IFS=$'\t' read -r id tag cell toks; do
         # arm 2b: named by a `deleted file mode` header -> realised. A deleted
         # binary leaves no body lines, so the header is the only footprint.
         if _deleted_realised "$tok"; then
+            continue
+        fi
+
+        # arm 2c: a path-shaped token names a file in the diff's header list or
+        # the index. File names never appear in file contents, so arms 1-3 miss
+        # a png baseline or a tracked .php path cited by its path.
+        if _path_realised "$tok"; then
             continue
         fi
 

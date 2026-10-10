@@ -20,13 +20,17 @@
 # Diff to plan: a changed path is accounted for by a `## Critical Files` entry
 # under EITHER parse verdict, a Verification Matrix test path, or a PR-body
 # `## Declared scope` bullet (a two-segment `dir/sub/` token declares its
-# subtree). A path the diff ADDED that matches bin/lib/plan-scope-exempt.txt is
-# exempt, except under `.claude/`. An unaccounted `.claude/` path prints
-# UNPLANNED-FILE:. Any other unaccounted path prints SCOPE-NOTE: unplanned.
+# subtree). A Critical Files entry carrying `*` is a shell glob and accounts
+# for every path it matches, except a `.claude/` path. A path the diff ADDED
+# that matches bin/lib/plan-scope-exempt.txt is exempt, except under
+# `.claude/`. An unaccounted `.claude/` path prints UNPLANNED-FILE:. Any other
+# unaccounted path prints SCOPE-NOTE: unplanned, unless the plan names no file
+# at all.
 #
 # Plan to diff: a MUST_APPEAR Critical File absent from the changed list prints
-# SCOPE-NOTE: gap unless a PR-body `## Plan gaps` bullet names it. A
-# `## Plan gaps` bullet clears only that label, never MISSING-FILE:.
+# SCOPE-NOTE: gap unless a PR-body `## Plan gaps` bullet names it. A glob entry
+# counts as present when it matches any changed path. A `## Plan gaps` bullet
+# clears only that label, never MISSING-FILE:.
 #
 # Generated `<!-- name:begin -->` .. `<!-- name:end -->` spans are stripped from
 # the body before either section is read, so the files-changed block can never
@@ -97,6 +101,27 @@ cf_section_named "$PLAN_FILE" "Verification Matrix" \
             if (loc != "") print loc
         }' | strip_wt >> "$TMP/planned-raw"
 sort -u "$TMP/planned-raw" > "$TMP/planned"
+# A planned entry carrying `*` is a shell glob (`bin/test-automouse-*`), so a plan
+# can name a file family without listing every member.
+grep -F '*' "$TMP/planned" > "$TMP/globs" || true
+
+# glob_hit <path> <glob-file> -> 0 when any glob in the file matches the path.
+# `set -f` stops pathname expansion only; a `case` pattern still matches.
+glob_hit() {
+    local g
+    while IFS= read -r g; do
+        # shellcheck disable=SC2254  # the unquoted pattern is the point
+        case "$1" in $g) return 0 ;; esac
+    done < "$2"
+    return 1
+}
+
+# An empty planned set means the plan names no files (a runtime-seeded hold
+# plan, say), so every changed path would print as unplanned and the notes
+# would carry no signal. Advisory SCOPE-NOTE lines are skipped; the `.claude/`
+# UNPLANNED-FILE: hold still runs.
+HAS_CF=1
+[ -s "$TMP/planned" ] || HAS_CF=0
 
 # --- clean the body: drop every generated <!-- name:begin --> .. :end span ---
 : > "$TMP/body"
@@ -156,9 +181,13 @@ while IFS= read -r D; do
     [ "$covered" -eq 1 ] && continue
     case "$D" in
         .claude/*)
+            # A glob never covers a `.claude/` path: this branch holds, so it
+            # needs an exact entry.
             echo "UNPLANNED-FILE: $D (changed path that no plan Critical File, no matrix test path and no PR-body '## Declared scope' bullet accounts for)"
             ;;
         *)
+            [ "$HAS_CF" -eq 1 ] || continue
+            glob_hit "$D" "$TMP/globs" && continue
             if [ -s "$TMP/exempt" ] && grep -qxF -- "$D" "$TMP/added"; then
                 printf '%s\n' "$D" > "$TMP/probe"
                 grep -qEf "$TMP/exempt" "$TMP/probe" && continue
@@ -173,6 +202,16 @@ sed -n 's/^MUST_APPEAR://p' "$TMP/cf" | strip_wt > "$TMP/must"
 while IFS= read -r CF; do
     [ -z "$CF" ] && continue
     grep -qF -- "$CF" "$CHANGED_ARG" && continue
+    case "$CF" in
+        *'*'*)
+            printf '%s\n' "$CF" > "$TMP/one-glob"
+            hit=0
+            while IFS= read -r D; do
+                glob_hit "$D" "$TMP/one-glob" && { hit=1; break; }
+            done < "$TMP/changed"
+            [ "$hit" -eq 1 ] && continue
+            ;;
+    esac
     grep -qF -- "$CF" "$TMP/gaps" && continue
     echo "SCOPE-NOTE: gap $CF (must-appear plan Critical File absent from the diff, and no PR-body '## Plan gaps' bullet explains why)"
 done < "$TMP/must"

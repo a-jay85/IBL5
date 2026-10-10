@@ -99,20 +99,17 @@ cat > "$STUBBIN/gh" <<'SH'
 sub="${2:-}"
 case "$sub" in
     view)
-        br="${3:-}"; field="${5:-}"
-        case "$field" in
-            state)
-                case "$br" in
-                    wt-merged) echo MERGED ;;
-                    wt-open)   echo OPEN ;;
-                    *)         exit 1 ;;
-                esac ;;
-            number)
-                case "$br" in
-                    wt-merged|wt-open) echo 7 ;;
-                    *)                 exit 1 ;;
-                esac ;;
+        br="${3:-}"
+        case "$*" in
+            *"--json state,number,headRefOid"*) ;;
             *) exit 1 ;;
+        esac
+        # pr_info's combined TSV: state, number, headRefOid. headRefOid is
+        # left empty, as the old stub never answered a headRefOid query.
+        case "$br" in
+            wt-merged) printf 'MERGED\t7\t\n' ;;
+            wt-open)   printf 'OPEN\t7\t\n' ;;
+            *)         exit 1 ;;
         esac ;;
     list) : ;;
     *) exit 1 ;;

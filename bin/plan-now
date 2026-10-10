@@ -131,6 +131,10 @@ DISPOSITION_SET=0   # 1 when --queue/--implement was given explicitly
 PLAN_NOW_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib"
 # shellcheck source=bin/lib/usage-gate.sh
 . "$PLAN_NOW_LIB_DIR/usage-gate.sh"
+# shellcheck source=bin/lib/dm.sh
+. "$PLAN_NOW_LIB_DIR/dm.sh"
+# shellcheck source=bin/lib/launchd-job.sh
+. "$PLAN_NOW_LIB_DIR/launchd-job.sh"
 
 # --resume-paused <sid>: the coordinator's entry point. Replays the argv saved when the
 # run started (`--resume <TS>`), so the existing --resume pre-flight below does the rest.
@@ -208,9 +212,12 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
 # shellcheck source=bin/lib/session-id.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/session-id.sh"
 
+# shellcheck source=bin/lib/plan-resolve.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/plan-resolve.sh"
+
 # Overridable for the smoke test only — ~/claude-plans is the single source of truth
 # (workflow-continuity.md), same shape as bug-pipeline-tick's BUG_PIPELINE_PLANS_DIR.
-PLANS_DIR="${PLAN_NOW_PLANS_DIR:-$HOME/claude-plans}"
+PLANS_DIR="$(plans_dir PLAN_NOW_PLANS_DIR)"
 mkdir -p "$PLANS_DIR"
 
 # --- resume resolution (--resume only) ---
@@ -276,7 +283,7 @@ if [ -z "$RESUME_ID" ] && [ "$DISPOSITION" = "queue" ] && [ -n "$PROMPT_SRC" ] &
             echo "$DUP_OUT"
             echo "plan-now: declined before spending a model run (exit 3)."
             if [ "$NOTIFY" = 1 ]; then
-                DISCORD_DM="${PLAN_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
+                DISCORD_DM="$(dm_bin "$ROOT/bin" PLAN_NOW_DISCORD_DM)"
                 if [ -x "$DISCORD_DM" ]; then
                     printf '%s\n%s\n' "**plan-now DECLINED — duplicate**" "$DUP_OUT" \
                         | "$DISCORD_DM" - || true
@@ -327,7 +334,7 @@ if [ -z "$RESUME_ID" ] && [ -x "$TIER_HINT" ]; then
                                         printf 'plan-now: exiting 4 — recheck the tier or pass --tier-ok.\n'
                                     } >&2
                                     if [ "$NOTIFY" = 1 ]; then
-                                        DISCORD_DM="${PLAN_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
+                                        DISCORD_DM="$(dm_bin "$ROOT/bin" PLAN_NOW_DISCORD_DM)"
                                         if [ -x "$DISCORD_DM" ]; then
                                             printf '%s\ndeclared=%s hinted=%s\n%s\n' \
                                                 "**plan-now DECLINED — tier mismatch**" \
@@ -509,13 +516,14 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     # bug-pipeline-tick's $CLAUDE_BIN). All three are unset in real use — and the
     # queue seam is what lets bin/test-plan-now reach the queued-vs-not fork at all.
     printf 'AUTOMOUSE_QUEUE=%q\n' "${PLAN_NOW_AUTOMOUSE_QUEUE:-$ROOT/bin/automouse/queue}"
-    printf 'DISCORD_DM=%q\n' "${PLAN_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
+    printf 'DISCORD_DM=%q\n' "$(dm_bin "$ROOT/bin" PLAN_NOW_DISCORD_DM)"
     printf 'CLAUDE_BIN=%q\n' "${PLAN_NOW_CLAUDE:-claude}"
     printf 'PLAN_SLUG_RE=%q\n' "$PLAN_SLUG_RE"
     printf 'USAGE_GATE_LIB=%q\n' "$PLAN_NOW_LIB_DIR/usage-gate.sh"
     printf 'RESUME_BIN=%q\n' "$ROOT/bin/plan-now"
     printf 'RESUME_FRESH=%q\n' "$RESUME_FRESH"
     printf 'REVIEW_ROUTE=%q\n' "${PLAN_NOW_REVIEW_ROUTE:-$REVIEW_ROUTE_DEFAULT}"
+    declare -f ljob_dm_ready ljob_dm_send
     cat <<'RUNNER_EOF'
 # launchd runs with a minimal env — same PATH prelude bin/automouse/run uses.
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
@@ -1012,10 +1020,8 @@ notify() {
     [ "$NOTIFY" = 1 ] || return 0
     # The coordinator sends one DM per pause wave; a paused run stays quiet.
     [ "${PAUSED:-0}" != 1 ] || return 0
-    if [ ! -x "$DISCORD_DM" ]; then
-        echo "plan-now: no executable discord-dm at $DISCORD_DM — not notifying."
-        return 0
-    fi
+    # Keep the PAUSED return above this call: a paused run with no binary stays silent.
+    ljob_dm_ready plan-now || return 0
     local title msg slug review_body
     if [ -n "$DM_PLAN" ]; then
         title=$(basename "${DM_PLAN%.md}")
@@ -1072,11 +1078,9 @@ log: $LOG"
         echo "plan-now: review DM failed — falling back to plain DM."
     fi
 
-    if ! printf '%s' "$msg" | "$DISCORD_DM" -; then
-        # discord-dm already spooled it and raised a macOS notification. The
-        # verdict is in $LOG regardless, so an undeliverable DM is never fatal.
-        echo "plan-now: DM UNDELIVERED (spooled by discord-dm) — the verdict above stands."
-    fi
+    # discord-dm spools an undeliverable DM and raises a macOS notification. The
+    # verdict is in $LOG regardless, so ljob_dm_send only reports the failure.
+    ljob_dm_send plan-now "$msg"
 }
 notify
 
@@ -1090,30 +1094,7 @@ chmod +x "$RUNNER"
 # the Linux CI box, where bin/test-plan-now drives this script under PLAN_NOW_DRY_RUN
 # and `set -e` would otherwise abort here before the runner path is printed.
 mkdir -p "$(dirname "$PLIST")"
-cat > "$PLIST" <<PLIST_EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>$LABEL</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/bin/bash</string>
-		<string>-lc</string>
-		<string>exec "$RUNNER"</string>
-	</array>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>WorkingDirectory</key>
-	<string>$ROOT</string>
-	<key>StandardOutPath</key>
-	<string>$LOG</string>
-	<key>StandardErrorPath</key>
-	<string>$LOG</string>
-</dict>
-</plist>
-PLIST_EOF
+ljob_write_runner_plist "$PLIST" "$LABEL" "$RUNNER" "$ROOT" "$LOG"
 
 if [ "${PLAN_NOW_DRY_RUN:-0}" = "1" ]; then
     echo "plan-now: DRY RUN — plist and runner written, not bootstrapped."

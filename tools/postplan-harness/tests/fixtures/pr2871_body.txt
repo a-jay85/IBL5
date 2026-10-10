@@ -1,0 +1,60 @@
+<!-- merge-digest:begin -->
+## Merge digest
+
+**What changed:** When `/post-plan` verifies a manual-test step, it now ticks that step's box and keeps it in the PR description instead of deleting it.
+
+**Why:** Backlog item 691 wants a record of verified steps kept on the PR, and the manual-testing merge gate must still clear exactly the same PRs.
+
+**Watch:** The `## Manual Testing` section of PR [#2871](<https://github.com/a-jay85/IBL5/pull/2871>) has a ticked Row 5 and no `No manual testing needed` line, so `bin/lib/pr-armable.sh` holds the PR for a human.
+
+**Touches:** .claude/skills/post-plan/SKILL.md, .claude/skills/post-plan/_phase-6-manual-testing.md, .github/workflows/tests.yml, bin/test-postplan-arm-conditions
+
+**Machine-authored fixes:** A body-only Phase 6.5 edit rewrote the corpus bullet to cite the script's printed line, and it added the second body write and the delete paths to the Summary. (post-plan remediation: body-only)
+<!-- merge-digest:end -->
+
+## Summary
+- Phase 6 Step 3 item 4 now ticks verified rows (`- [x]`) and keeps them under the sentinel as audit trail instead of deleting them; closes [a-jay85/IBL5-backlog#691](https://github.com/a-jay85/IBL5-backlog/issues/691)
+- Step 1 extract anchors on `^## Manual Testing` (a quoted `> ## Manual Testing` before the heading no longer opens the window) and drops already-ticked rows on re-run so a second pass never re-classifies or re-ticks completed work; Phase 6 is skipped entirely when the only content left is the `No manual testing needed` sentinel
+- Mode A JSON contract gains a `row` field — a byte-for-byte copy of the bold id token — so the tick block knows which checkbox to flip without guessing
+- `TICK_MODE=legacy-delete` composition path preserved: two triggers — (a) when `gh pr view` cannot return a PR number and (b) when the body re-fetch after `tick-rows.sh` fails; in either case the tick block prints `TICK_MODE=legacy-delete` and the caller composes the body exactly as before this change; verified steps whose Mode A `row` is null are deleted by exact-line match from `$TICK_DELETE_FILE` on both the normal tick path and the legacy-delete path
+- Two writes on the normal path: `tick-rows.sh` flips checkboxes with its own `gh pr edit` first; the composed write starts from the `TICK_BODY=` file re-fetched after that write, so it keeps every tick and is always the last write
+- `bin/test-postplan-arm-conditions` gains: five characterization cases pinning the three clearance verdict shapes before and after the skill edit; ten tick-block scenarios (21 assertions) covering confirmed, fallback-delete, script-failure, stale-pass-truncation, and legacy-delete paths; two marker-uniqueness assertions (one per comment-marker in SKILL.md); a `pr-armable.sh has no ticked-only clear` grep guard; two Step 1 re-run extract cases; and a Mode A contract assertion
+- `tests.yml` adds `_phase-6-manual-testing.md` to trigger paths so a Mode A contract edit forces the harness job
+- Corpus validation (`~/claude-plans/_scripts/corpus-691.sh`): `bodies=200 with_section=199 shaped=3 tick_cleared=395 flips=0` — the 200 most recent PRs (any state); `flips=0` confirms the tick shape and the delete shape never produce different condition (1) verdicts; `with_section=199` confirms the extract window fires on real data
+
+<!-- files-changed:begin -->
+**Files changed** (generated from `git diff --name-status origin/master...HEAD` — do not edit by hand):
+
+- `M` `.claude/skills/post-plan/SKILL.md`
+- `M` `.claude/skills/post-plan/_phase-6-manual-testing.md`
+- `M` `.github/workflows/tests.yml`
+- `M` `bin/test-postplan-arm-conditions`
+<!-- files-changed:end -->
+
+<!-- tests-changed:begin -->
+**Tests changed** (generated from `git diff --name-status origin/master...HEAD` — do not edit by hand):
+
+- `M` `bin/test-postplan-arm-conditions`
+<!-- tests-changed:end -->
+
+
+
+## Manual Testing
+
+- [x] **Row 5** — CLI-executable — `test "$(bash bin/test-postplan-arm-conditions 2>&1 | grep -c '^ok: tick_truly_manual_left')" -eq 3` — verified 2026-10-06: count=3, harness exit 0
+
+<!-- gate-backtest:begin -->
+<!-- gate-backtest-state: NOT-APPLICABLE -->
+### Gate backtest
+
+**State:** NOT-APPLICABLE. only non-replayable gates changed
+
+Replayed against the newest 0 settled merged PRs (older than 48h). Repaired: a `fix` PR touching an overlapping file merged within 48h. Clean: older than 48h and not repaired. Unsettled: younger than 48h, never replayed.
+
+- Not replayable: `.github/workflows/tests.yml` (CI workflow: needs a GitHub runner event)
+<!-- gate-backtest:end -->
+
+<!-- backlog-closes:start -->
+Closes a-jay85/IBL5-backlog#691
+<!-- backlog-closes:end -->
+

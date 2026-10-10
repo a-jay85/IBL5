@@ -31,7 +31,7 @@ class ContractListRepository extends \Database\BaseMysqliRepository implements C
             FROM `ibl_plr` p
             " . $this->playerTeamLeftJoin() . "
             WHERE p.retired = 0
-            ORDER BY p.ordinal ASC";
+            ORDER BY p.ordinal ASC, p.pid ASC";
 
         /** @var list<array{name: string, pos: string, teamname: string, cy: int, cyt: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int, bird: string, pid: int, teamid: int, team_city: string|null, color1: string|null, color2: string|null}> */
         return $this->fetchAll($query);

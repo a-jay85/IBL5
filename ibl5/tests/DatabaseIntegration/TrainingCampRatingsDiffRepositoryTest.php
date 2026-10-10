@@ -249,4 +249,47 @@ class TrainingCampRatingsDiffRepositoryTest extends DatabaseTestCase
         self::assertContains(200_000_020, $pids, 'teamid=1 player should be included');
         self::assertNotContains(200_000_021, $pids, 'teamid=2 player should be excluded');
     }
+
+    private function insertNameTieFixture(): void
+    {
+        $this->insertTestPlayer(200139392, 'Aaa Tie Camp', ['teamid' => 4, 'retired' => 0]);
+        $this->insertTestPlayer(200139391, 'Aaa Tie Camp', ['teamid' => 4, 'retired' => 0]);
+        $this->insertTestPlayer(200139393, 'Aaa Tie Alpha', ['teamid' => 4, 'retired' => 0]);
+        $this->insertTestPlayer(200139394, 'Aaa Tie Camp', ['teamid' => 5, 'retired' => 0]);
+        $this->insertTestPlayer(200139395, 'Aaa Tie Camp', ['teamid' => 4, 'retired' => 1]);
+    }
+
+    public function test_it_breaks_name_ties_by_pid_when_filtered_by_team(): void
+    {
+        $this->insertNameTieFixture();
+
+        $rows = $this->repo->getDiffRows(2097, 'end-of-season', 4);
+
+        $kept = array_filter(
+            $rows,
+            static fn (array $row): bool => str_starts_with((string) $row['name'], 'Aaa Tie')
+        );
+
+        self::assertSame(
+            [200139393, 200139391, 200139392],
+            array_map('intval', array_column($kept, 'pid'))
+        );
+    }
+
+    public function test_it_breaks_name_ties_by_pid_without_team_filter(): void
+    {
+        $this->insertNameTieFixture();
+
+        $rows = $this->repo->getDiffRows(2097, 'end-of-season');
+
+        $kept = array_filter(
+            $rows,
+            static fn (array $row): bool => str_starts_with((string) $row['name'], 'Aaa Tie')
+        );
+
+        self::assertSame(
+            [200139393, 200139391, 200139392, 200139394],
+            array_map('intval', array_column($kept, 'pid'))
+        );
+    }
 }

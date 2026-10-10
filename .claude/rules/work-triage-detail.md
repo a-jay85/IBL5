@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for work-triage — NO auto-attach trigger (its `paths:` entries are all out-of-repo and never match); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, the numeric hard-trigger rule and gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the /plan-verdict routing rationale and gate properties, the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
-last_verified: 2026-10-06
+last_verified: 2026-10-08
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
   - "~/.claude/hooks/skill-gate.sh"
@@ -14,7 +14,7 @@ Read-on-demand companion to `work-triage.md` (always-loaded).
 
 ## Execution routing context
 
-The measured leak (2026-07-07): ~90% of Opus main-thread calls were mechanical; 44% of sessions breached 150K context — the dumb-zone delegation rules exist to prevent this. An ad-hoc verdict silently defaulting to "the Opus session implements inline" is exactly what the Sonnet-execution-routing rule guards against.
+The measured leak (2026-07-07): ~90% of Opus main-thread calls were mechanical; 44% of sessions breached 150K context. The dumb-zone delegation rules exist to prevent this (degradation unmeasured on Opus 5.5 as of 2026-10-08; the spend argument stands). An ad-hoc verdict silently defaulting to "the Opus session implements inline" is exactly what the Sonnet-execution-routing rule guards against.
 
 The user should never have to ask "is this big enough for a `/plan`?" — that judgment is yours to volunteer. This is the **gateway** of the deployment funnel (ADR-0067): everything downstream flows from this call.
 

@@ -210,6 +210,7 @@ jobs:
       VRCTX_PR: ${{ inputs.refresh_pr || github.event.pull_request.number }}
       VRCTX_BASE_SHA: ${{ inputs.refresh_base_sha || github.event.pull_request.base.sha }}
       VRCTX_KEY: ${{ inputs.refresh_head_sha || github.sha }}
+      VRCTX_HEAD_SHA: ${{ inputs.refresh_head_sha || github.event.pull_request.head.sha }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -312,7 +313,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           bin/vr-review-comment \
-            --manual-rows-from-pr=${{ env.VRCTX_PR }} \
+            --manual-rows-from-pr="$VRCTX_PR" \
             --out-json=ibl5/vr-manual-rows.json
 
       - name: Capture manual-row screenshots
@@ -396,7 +397,7 @@ jobs:
         id: vr-coverage
         if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         run: |
-          git diff --name-only "${{ env.VRCTX_BASE_SHA }}"...HEAD \
+          git diff --name-only "$VRCTX_BASE_SHA"...HEAD \
             | bin/vr-changed-coverage > coverage.json
           cat coverage.json
 
@@ -406,7 +407,7 @@ jobs:
         run: |
           bin/vr-build-gallery \
             --actuals=ibl5/vr-actuals \
-            --base-sha=${{ env.VRCTX_BASE_SHA }} \
+            --base-sha="$VRCTX_BASE_SHA" \
             --out-dir=ibl5/vr-gallery \
             --gallery-json=ibl5/vr-gallery.json
           cat ibl5/vr-gallery.json
@@ -538,8 +539,18 @@ jobs:
           # Over-suppressing costs one push a wait for the next deploy — and since every deploy
           # re-serves the WHOLE tree, that self-heals on the next PR. Under-suppressing just breaks
           # the debounce, invisibly.
-          queued=$(gh api "repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20" \
-            --jq '[.workflow_runs[] | select(.status != "completed" and .status != "in_progress")] | length' 2>/dev/null || echo "")
+          #
+          # A not-started run older than an hour is stuck, so it is cancelled and left out of the count.
+          # On 2026-10-01 a run sat in `waiting` for a week: this debounce counted it as queued, every
+          # later push skipped its dispatch, and no gallery was served. A real wait is under ~20 min.
+          runs_url="repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20"
+          not_started='.workflow_runs[] | select(.status != "completed" and .status != "in_progress")'
+          for id in $(gh api "$runs_url" --jq "$not_started | select(now - (.created_at | fromdateiso8601) > 3600) | .id" 2>/dev/null); do
+            echo "Cancelling stuck pages-deploy run ${id}."
+            gh run cancel "$id" --repo "${{ github.repository }}" || true
+          done
+          queued=$(gh api "$runs_url" \
+            --jq "[$not_started | select(now - (.created_at | fromdateiso8601) <= 3600)] | length" 2>/dev/null || echo "")
           if [[ "$queued" =~ ^[0-9]+$ ]] && [ "$queued" -gt 0 ]; then
             echo "${queued} pages-deploy run(s) already queued — one will publish this push. Skipping dispatch."
             exit 0
@@ -565,7 +576,7 @@ jobs:
           bin/vr-review-comment \
             --gallery=ibl5/vr-gallery.json \
             --coverage=coverage.json \
-            --pages-url=https://a-jay85.github.io/IBL5/${{ env.VRCTX_KEY }}/visual-review/ \
+            --pages-url="https://a-jay85.github.io/IBL5/$VRCTX_KEY/visual-review/" \
             --out=vr-review-comment.md
           cat vr-review-comment.md
 
@@ -575,7 +586,7 @@ jobs:
         run: |
           bin/vr-review-comment \
             --manual-gallery=ibl5/vr-manual-rows.json \
-            --pages-url=https://a-jay85.github.io/IBL5/${{ env.VRCTX_KEY }}/visual-review/ \
+            --pages-url="https://a-jay85.github.io/IBL5/$VRCTX_KEY/visual-review/" \
             --out=vr-manual-comment.md
 
       - name: Post sticky visual-review comment
@@ -605,10 +616,10 @@ jobs:
         run: |
           bin/vr-review-comment \
             --gallery=ibl5/vr-gallery.json \
-            --pages-url=https://a-jay85.github.io/IBL5/${{ env.VRCTX_KEY }}/visual-review/ \
-            --update-pr-body=${{ env.VRCTX_PR }} \
+            --pages-url="https://a-jay85.github.io/IBL5/$VRCTX_KEY/visual-review/" \
+            --update-pr-body="$VRCTX_PR" \
             --spots=ibl5/vr-gallery/changed/spots.json \
-            --head-sha=${{ inputs.refresh_head_sha || github.event.pull_request.head.sha }}
+            --head-sha="$VRCTX_HEAD_SHA"
 
       # --- Auto-update baselines when label is present ---
       - name: Regenerate visual regression baselines
@@ -1273,8 +1284,18 @@ jobs:
           # Over-suppressing costs one push a wait for the next deploy — and since every deploy
           # re-serves the WHOLE tree, that self-heals on the next PR. Under-suppressing just breaks
           # the debounce, invisibly.
-          queued=$(gh api "repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20" \
-            --jq '[.workflow_runs[] | select(.status != "completed" and .status != "in_progress")] | length' 2>/dev/null || echo "")
+          #
+          # A not-started run older than an hour is stuck, so it is cancelled and left out of the count.
+          # On 2026-10-01 a run sat in `waiting` for a week: this debounce counted it as queued, every
+          # later push skipped its dispatch, and no gallery was served. A real wait is under ~20 min.
+          runs_url="repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20"
+          not_started='.workflow_runs[] | select(.status != "completed" and .status != "in_progress")'
+          for id in $(gh api "$runs_url" --jq "$not_started | select(now - (.created_at | fromdateiso8601) > 3600) | .id" 2>/dev/null); do
+            echo "Cancelling stuck pages-deploy run ${id}."
+            gh run cancel "$id" --repo "${{ github.repository }}" || true
+          done
+          queued=$(gh api "$runs_url" \
+            --jq "[$not_started | select(now - (.created_at | fromdateiso8601) <= 3600)] | length" 2>/dev/null || echo "")
           if [[ "$queued" =~ ^[0-9]+$ ]] && [ "$queued" -gt 0 ]; then
             echo "${queued} pages-deploy run(s) already queued — one will publish this push. Skipping dispatch."
             exit 0

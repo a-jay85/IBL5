@@ -503,6 +503,164 @@ class TeamRepositoryTest extends DatabaseTestCase
         }
     }
 
+    public function testGetDivisionStandingsBreaksDivGbTieByTeamid(): void
+    {
+        $this->ensureStandingsAndPowerExist(2, 'B9TieDiv', 'B9TieConf');
+        $this->ensureStandingsAndPowerExist(1, 'B9TieDiv', 'B9TieConf');
+
+        self::assertSame([1, 2], array_column($this->repo->getDivisionStandings('B9TieDiv'), 'teamid'));
+    }
+
+    public function testGetConferenceStandingsBreaksConfGbTieByTeamid(): void
+    {
+        $this->ensureStandingsAndPowerExist(2, 'B9TieDiv', 'B9TieConf');
+        $this->ensureStandingsAndPowerExist(1, 'B9TieDiv', 'B9TieConf');
+
+        self::assertSame([1, 2], array_column($this->repo->getConferenceStandings('B9TieConf'), 'teamid'));
+    }
+
+    public function testGetChampionshipBannersBreaksYearTieById(): void
+    {
+        $firstId = $this->insertRow('ibl_banners', ['year' => 2099, 'currentname' => 'B9TieBanner', 'bannername' => 'B9TieBanner', 'bannertype' => 1]);
+        $secondId = $this->insertRow('ibl_banners', ['year' => 2099, 'currentname' => 'B9TieBanner', 'bannername' => 'B9TieBanner', 'bannertype' => 1]);
+
+        self::assertSame([$firstId, $secondId], array_column($this->repo->getChampionshipBanners('B9TieBanner'), 'id'));
+    }
+
+    public function testGetChampionshipBannersYearOrderDominatesIdTiebreaker(): void
+    {
+        $this->insertRow('ibl_banners', ['year' => 2099, 'currentname' => 'B9TieBanner', 'bannername' => 'B9TieBanner', 'bannertype' => 1]);
+        $this->insertRow('ibl_banners', ['year' => 2098, 'currentname' => 'B9TieBanner', 'bannername' => 'B9TieBanner', 'bannertype' => 1]);
+
+        self::assertSame([2098, 2099], array_column($this->repo->getChampionshipBanners('B9TieBanner'), 'year'));
+    }
+
+    public function testGetGMTenuresBreaksStartYearTieById(): void
+    {
+        $zetaId = $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => 1,
+            'gm_display_name' => 'b9_tie_gm_zeta',
+            'start_season_year' => 2098,
+            'end_season_year' => 2099,
+            'is_mid_season_start' => 0,
+            'is_mid_season_end' => 0,
+        ]);
+        $alphaId = $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => 1,
+            'gm_display_name' => 'b9_tie_gm_alpha',
+            'start_season_year' => 2098,
+            'end_season_year' => 2099,
+            'is_mid_season_start' => 0,
+            'is_mid_season_end' => 0,
+        ]);
+
+        $rows = array_values(array_filter(
+            $this->repo->getGMTenures(1),
+            static fn (array $r): bool => str_starts_with((string) $r['gm_display_name'], 'b9_tie_gm_')
+        ));
+
+        self::assertSame([$zetaId, $alphaId], array_column($rows, 'id'));
+    }
+
+    public function testGetRosterUnderContractBreaksNameTieByPid(): void
+    {
+        $this->insertTestPlayer(200100022, 'B9 Tie Twin', ['teamid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200100021, 'B9 Tie Twin', ['teamid' => 1, 'retired' => 0]);
+
+        $rows = array_values(array_filter(
+            $this->repo->getRosterUnderContract(1),
+            static fn (array $r): bool => $r['name'] === 'B9 Tie Twin'
+        ));
+
+        self::assertSame([200100021, 200100022], array_column($rows, 'pid'));
+    }
+
+    public function testGetFreeAgencyRosterBreaksNameTieByPid(): void
+    {
+        $this->insertTestPlayer(200100024, 'B9 FA Twin', ['teamid' => 1, 'retired' => 0, 'cy' => 1, 'cyt' => 3]);
+        $this->insertTestPlayer(200100023, 'B9 FA Twin', ['teamid' => 1, 'retired' => 0, 'cy' => 1, 'cyt' => 3]);
+
+        $rows = array_values(array_filter(
+            $this->repo->getFreeAgencyRoster(1),
+            static fn (array $r): bool => $r['name'] === 'B9 FA Twin'
+        ));
+
+        self::assertSame([200100023, 200100024], array_column($rows, 'pid'));
+    }
+
+    public function testGetFreeAgentsBreaksOrdinalTieByPid(): void
+    {
+        $this->insertTestPlayer(200100026, 'B9 Ordinal Twin', ['ordinal' => 990, 'retired' => 0, 'cy' => 1, 'cyt' => 3]);
+        $this->insertTestPlayer(200100025, 'B9 Ordinal Twin', ['ordinal' => 990, 'retired' => 0, 'cy' => 1, 'cyt' => 3]);
+
+        $isTwin = static fn (array $r): bool => $r['name'] === 'B9 Ordinal Twin';
+
+        $rows = array_values(array_filter($this->repo->getFreeAgents(), $isTwin));
+        self::assertSame([200100025, 200100026], array_column($rows, 'pid'));
+
+        $rows = array_values(array_filter($this->repo->getFreeAgents(true), $isTwin));
+        self::assertSame([200100025, 200100026], array_column($rows, 'pid'));
+    }
+
+    public function testGetEntireLeagueRosterBreaksOrdinalTieByPid(): void
+    {
+        $this->insertTestPlayer(200100028, 'B9 League Twin', ['ordinal' => 5, 'retired' => 0]);
+        $this->insertTestPlayer(200100027, 'B9 League Twin', ['ordinal' => 5, 'retired' => 0]);
+
+        $rows = array_values(array_filter(
+            $this->repo->getEntireLeagueRoster(),
+            static fn (array $r): bool => $r['name'] === 'B9 League Twin'
+        ));
+
+        self::assertSame([200100027, 200100028], array_column($rows, 'pid'));
+    }
+
+    public function testGetHistoricalRosterBreaksNameTieByPid(): void
+    {
+        $this->insertHistRow(200100030, 'B9 Hist Twin', 2098, ['teamid' => 1]);
+        $this->insertHistRow(200100029, 'B9 Hist Twin', 2098, ['teamid' => 1]);
+
+        $rows = array_values(array_filter(
+            $this->repo->getHistoricalRoster(1, '2098'),
+            static fn (array $r): bool => $r['name'] === 'B9 Hist Twin'
+        ));
+
+        self::assertSame([200100029, 200100030], array_column($rows, 'pid'));
+    }
+
+    public function testGetGMAwardsOrdersSameYearAwardsAlphabetically(): void
+    {
+        $this->insertRow('ibl_gm_awards', ['name' => 'b9_tie_gm', 'award' => 'B9 Zeta Award', 'year' => 2097]);
+        $this->insertRow('ibl_gm_awards', ['name' => 'b9_tie_gm', 'award' => 'B9 Alpha Award', 'year' => 2097]);
+        $this->insertRow('ibl_gm_awards', ['name' => 'b9_tie_gm', 'award' => 'B9 Zzz Award', 'year' => 2096]);
+
+        self::assertSame(
+            ['B9 Zzz Award', 'B9 Alpha Award', 'B9 Zeta Award'],
+            array_column($this->repo->getGMAwards('b9_tie_gm'), 'award')
+        );
+    }
+
+    public function testGetRegularSeasonHistoryBreaksYearTieByTeamId(): void
+    {
+        $this->insertTeamSeasonRecordRow(2, 9097, 1, 'B9TieHist', 'B9TieHistB', 40, 42);
+        $this->insertTeamSeasonRecordRow(1, 9097, 1, 'B9TieHist', 'B9TieHistA', 50, 32);
+        $this->insertTeamSeasonRecordRow(2, 9098, 1, 'B9TieHist', 'B9TieHistB', 45, 37);
+
+        self::assertSame([45, 50, 40], array_column($this->repo->getRegularSeasonHistory('B9TieHist'), 'wins'));
+    }
+
+    public function testGetPlayoffResultsOrdersSameYearSeriesByRound(): void
+    {
+        $this->insertPlayoffSeriesResultRow(9099, 2, 1, 3, 'B9PlayoffA', 'B9PlayoffC', 4, 2);
+        $this->insertPlayoffSeriesResultRow(9099, 1, 1, 2, 'B9PlayoffA', 'B9PlayoffB', 4, 1);
+        $this->insertPlayoffSeriesResultRow(9098, 1, 4, 1, 'B9PlayoffD', 'B9PlayoffA', 4, 3);
+
+        $result = $this->repo->getPlayoffResults('B9PlayoffA');
+
+        self::assertSame([1, 2, 1], array_column($result, 'round'));
+        self::assertSame([9099, 9099, 9098], array_column($result, 'year'));
+    }
+
     private function ensureStandingsAndPowerExist(int $teamid, string $division, string $conference): void
     {
         // Use REPLACE to ensure data exists within transaction regardless of DB state

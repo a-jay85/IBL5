@@ -5,38 +5,21 @@
 # Exits 0 (clean) or 1 (blocking violations found).
 set -euo pipefail
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    cat <<'EOF'
-Usage: bin/check-phpunit-hygiene [--pr] [--help|-h]
-
-Blocking checks on PHPUnit tests:
-  mark-test-skipped  markTestSkipped() silently disables a test — banned.
-  no-db-group        Concrete class extending DatabaseTestCase missing
-                     #[Group('database')] — attribute is NOT inherited.
-  set-accessible     Reflection setAccessible() — no-op since PHP 8.1,
-                     deprecated since 8.5 (fatal in PHP 9).
-
-Modes:
-  (no args)  Scan all ibl5/tests/**/*.php
-  --pr       Scan only files changed vs $PHPUNIT_HYGIENE_BASE_REF (default origin/master)
-  Env:       PHPUNIT_HYGIENE_BASE_REF  base ref for --pr (default: origin/master)
-
-Exceptions (inline allow markers, reason >= 20 chars):
-  // phpunit-hygiene-allow: <reason>
-  // phpunit-hygiene-allow-no-db-group: <reason>
-
-See .claude/rules/phpunit-tests.md.
-EOF
-    exit 0
+case "$0" in
+  */*) SCRIPT_DIR="${0%/*}" ;;
+  *) SCRIPT_DIR="." ;;
+esac
+if [ ! -f "$SCRIPT_DIR/lib/scan-scope.sh" ]; then
+  echo "check-phpunit-hygiene: missing $SCRIPT_DIR/lib/scan-scope.sh" >&2
+  exit 2
 fi
+# shellcheck source=bin/lib/scan-scope.sh disable=SC1091
+source "$SCRIPT_DIR/lib/scan-scope.sh"
 
-ROOT=$(git rev-parse --show-toplevel)
-BASE_REF=${PHPUNIT_HYGIENE_BASE_REF:-origin/master}
-TESTS_DIR="$ROOT/ibl5/tests"
-
+# shellcheck disable=SC2329  # invoked by scan_scope_parse_args
 usage() {
   cat <<'EOF'
-Usage: bin/check-phpunit-hygiene [--pr] [--help|-h]
+Usage: bin/check-phpunit-hygiene [--pr] [--base <ref>] [--help|-h]
 
 Blocking checks on PHPUnit tests:
   mark-test-skipped  markTestSkipped() silently disables a test — banned.
@@ -54,6 +37,7 @@ Modes:
   (no args)  Scan all ibl5/tests/**/*.php
   --pr       Scan only files changed vs $PHPUNIT_HYGIENE_BASE_REF (default origin/master)
   Env:       PHPUNIT_HYGIENE_BASE_REF  base ref for --pr (default: origin/master)
+  --base     <ref> base ref for --pr; overrides PHPUNIT_HYGIENE_BASE_REF
 
 Exceptions (inline allow markers, reason >= 20 chars):
   // phpunit-hygiene-allow: <reason>             (mark-test-skipped and
@@ -66,33 +50,16 @@ EOF
   exit 0
 }
 
-MODE="all"
-for arg in "$@"; do
-  case "$arg" in
-    --help|-h) usage ;;
-    --pr) MODE="pr" ;;
-    *) echo "Unknown argument: $arg" >&2; exit 2 ;;
-  esac
-done
+scan_scope_parse_args usage strict "$@"
 
-if [ "$MODE" = "pr" ] && [ -n "${PHPUNIT_HYGIENE_BASE_REF:-}" ] \
-  && ! git -C "$ROOT" rev-parse --verify --quiet "${BASE_REF}^{commit}" >/dev/null; then
-  echo "PHPUNIT_HYGIENE_BASE_REF=${PHPUNIT_HYGIENE_BASE_REF} does not resolve to a commit" >&2
-  exit 2
-fi
+ROOT=$(git rev-parse --show-toplevel)
+scan_scope_resolve_base PHPUNIT_HYGIENE_BASE_REF "${PHPUNIT_HYGIENE_BASE_REF:-}" 1 "$ROOT"
+TESTS_DIR="$ROOT/ibl5/tests"
 
 # --- Build file list ---
-if [ "$MODE" = "pr" ]; then
-  SCAN_FILES=()
-  while IFS= read -r f; do
-    [ -f "$ROOT/$f" ] && SCAN_FILES+=("$ROOT/$f")
-  done < <(git -C "$ROOT" diff "$BASE_REF" --name-only -- 'ibl5/tests/**/*.php')
-else
-  SCAN_FILES=()
-  while IFS= read -r f; do
-    SCAN_FILES+=("$f")
-  done < <(find "$TESTS_DIR" -name '*.php' -type f | sort)
-fi
+scan_scope_collect_files "$ROOT" 'ibl5/tests/**/*.php' "$TESTS_DIR" '*.php'
+# shellcheck disable=SC2206  # set -u-safe empty-array copy
+SCAN_FILES=(${SCAN_SCOPE_FILES[@]+"${SCAN_SCOPE_FILES[@]}"})
 
 if [ ${#SCAN_FILES[@]} -eq 0 ]; then
   echo "PASS: no PHPUnit files to scan."

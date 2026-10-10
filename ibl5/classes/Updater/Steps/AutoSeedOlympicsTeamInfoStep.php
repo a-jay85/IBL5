@@ -105,6 +105,7 @@ final class AutoSeedOlympicsTeamInfoStep implements PipelineStepInterface
     private function fetchLeagueConfigSlots(): array
     {
         $stmt = $this->db->prepare(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (uq_season_team (season_ending_year, team_slot) plus the season_ending_year filter makes team_slot unique in the result)
             'SELECT `team_slot`, `team_name`
              FROM `ibl_olympics_league_config`
              WHERE `season_ending_year` = ?

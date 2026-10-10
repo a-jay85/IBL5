@@ -280,6 +280,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
     try:
         # ---- Phase 2/3: ship + classify -------------------------------
         if mode != "replay":
+            _reconcile_paused_edit(state, res, worktree, log)
             git.stage_all()
             if live:
                 git.fetch_base()
@@ -909,7 +910,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             log(f"FAILED: {res.error}")
     except usage_pause.UsagePause as p:
         res.terminal = TerminalState.FAILED
-        res.error_kind = "usage-pause-dirty" if p.dirty else "usage-pause"
+        res.error_kind = _classify_pause(p, llm, res, log)
         res.error = f"{res.error_kind}: {p.purpose}"
         log(f"PAUSED: {res.error}")
     finally:
@@ -3271,6 +3272,67 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
             f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}"
             f"{_hold_reasons_note(res)}")
+
+
+def _classify_pause(p, llm, res: RunResult, log) -> str:
+    """ADR-0143 addendum 2026-10-10: a provable partial edit pauses (75); else dirty (3)."""
+    if not p.dirty:
+        return "usage-pause"
+    if p.prespawn is None or not p.cwd:
+        return "usage-pause-dirty"
+    ctx, _ = usage_pause.context_from_env()
+    if ctx is None:
+        return "usage-pause-dirty"
+    if not usage_pause.edit_since(p.cwd, p.prespawn):
+        log("pause: site cleanup already restored the pre-spawn tree")
+        return "usage-pause"
+    if getattr(llm, "write_overlap", False):
+        log("pause: partial edit not recordable (write-overlap)")
+        return "usage-pause-dirty"
+    reason = usage_pause.pause_record_write(ctx, p.purpose, p.prespawn, p.cwd)
+    if reason == "no-edit":
+        return "usage-pause"
+    if reason is not None:
+        log(f"pause: partial edit not recordable ({reason})")
+        return "usage-pause-dirty"
+    res.pause_edit_sid = ctx.session_id
+    _, rec = usage_pause.pause_record_load(ctx)
+    n = len(rec["changed"]) if rec else 0
+    log(f"pause: partial edit recorded ({n} paths) for discard on resume")
+    return "usage-pause"
+
+
+def _reconcile_paused_edit(state, res: RunResult, worktree, log) -> None:
+    """ADR-0143 addendum 2026-10-10: discard a recorded interrupted edit or fail closed.
+
+    Runs before the first `git add -A`, so an interrupted edit is never staged. Every
+    refusal raises usage-pause-dirty (exit 3) and leaves the worktree untouched.
+    """
+    witness = (state.previous or {}).get("pause_edit_sid")
+    if not witness:
+        return
+    ctx, _ = usage_pause.context_from_env()
+    if ctx is None:
+        raise HarnessError("usage-pause-dirty",
+                           f"resume: interrupted edit from session {witness} but no gate context")
+    if witness != ctx.session_id:
+        # Keep the witness while that session's record exists, so its own
+        # --resume-paused can still discard; with the record gone, drop it.
+        other = usage_pause._pause_record_path_for(ctx, witness)
+        if other is not None and os.path.exists(other):
+            res.pause_edit_sid = witness
+        raise HarnessError("usage-pause-dirty",
+                           f"resume: interrupted edit belongs to session {witness}; "
+                           f"run bin/post-plan-now --resume-paused {witness}")
+    status, rec = usage_pause.pause_record_load(ctx)
+    if status != "ok":
+        raise HarnessError("usage-pause-dirty", f"resume: pause record {status}")
+    reason = usage_pause.restore_from_record(worktree, rec, ctx.session_id)
+    if reason is not None:
+        raise HarnessError("usage-pause-dirty", f"resume: {reason}")
+    usage_pause.pause_record_clear(ctx)
+    log(f"resume: discarded interrupted edit from {rec['purpose']} "
+        f"({len(rec['changed'])} paths)")
 
 
 def _settle_pause_marker(res: RunResult, rc: int) -> int:

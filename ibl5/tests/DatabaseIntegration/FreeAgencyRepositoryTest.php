@@ -226,4 +226,16 @@ class FreeAgencyRepositoryTest extends DatabaseTestCase
         self::assertNotContains(200020007, $pids);
         self::assertContains(200020008, $pids);
     }
+
+    public function testGetAllPlayersExcludingTeamBreaksOrdinalTiesByPidAscending(): void
+    {
+        $this->insertTestPlayer(200139122, 'Tie 1391 B', ['ordinal' => 777, 'teamid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200139121, 'Tie 1391 A', ['ordinal' => 777, 'teamid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200139123, 'Tie 1391 C', ['ordinal' => 776, 'teamid' => 1, 'retired' => 0]);
+
+        $rows = $this->repo->getAllPlayersExcludingTeam(2);
+
+        $ordered = array_values(array_filter(array_column($rows, 'pid'), static fn ($p): bool => in_array($p, [200139121, 200139122, 200139123], true)));
+        self::assertSame([200139123, 200139121, 200139122], $ordered);
+    }
 }

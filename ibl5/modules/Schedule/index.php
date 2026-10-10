@@ -25,8 +25,11 @@ use TeamSchedule\TeamScheduleRepository;
 use LeagueSchedule\LeagueScheduleRepository;
 
 global $mysqli_db, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var \League\LeagueContext $leagueContext */
 
-$teamid = isset($_GET['teamid']) ? (int) $_GET['teamid'] : 0;
+$teamidParam = $_GET['teamid'] ?? null;
+$teamid = is_string($teamidParam) ? (int) $teamidParam : 0;
 $controller = new ScheduleController(
     $mysqli_db,
     $leagueContext,

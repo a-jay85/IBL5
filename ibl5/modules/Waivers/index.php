@@ -9,6 +9,8 @@ if (!defined('MODULE_FILE')) {
 $module_name = basename(dirname(__FILE__));
 
 global $mysqli_db, $user, $authService;
+/** @var \mysqli $mysqli_db */
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
 
 $pagetitle = "- Team Pages";
 

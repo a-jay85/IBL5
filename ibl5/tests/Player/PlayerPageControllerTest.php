@@ -587,7 +587,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
         );
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('connection lost');
+        $this->expectExceptionMessageIsOrContains('connection lost');
 
         $controller->renderPage(1, null, '');
     }

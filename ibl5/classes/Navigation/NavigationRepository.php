@@ -63,7 +63,7 @@ class NavigationRepository extends \Database\BaseMysqliRepository implements Nav
             "SELECT ti.teamid, ti.team_name, ti.team_city, s.division, s.conference
              FROM `ibl_team_info` ti
              JOIN `ibl_standings` s ON ti.team_name = s.team_name
-             ORDER BY s.conference, s.division, ti.team_city",
+             ORDER BY s.conference, s.division, ti.team_city, ti.teamid ASC",
             ''
         );
 

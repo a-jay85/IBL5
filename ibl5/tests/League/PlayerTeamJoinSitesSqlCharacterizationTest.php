@@ -96,7 +96,7 @@ class PlayerTeamJoinSitesSqlCharacterizationTest extends TestCase
                     (new \ContractList\ContractListRepository($db))->getActivePlayerContracts();
                 },
                 [
-                    'SELECT p.pid, p.name, p.pos, t.team_name AS teamname, p.teamid, p.cy, p.cyt, p.salary_yr1, p.salary_yr2, p.salary_yr3, p.salary_yr4, p.salary_yr5, p.salary_yr6, p.bird, t.team_city, t.color1, t.color2 FROM ibl_plr p LEFT JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.retired = 0 ORDER BY p.ordinal ASC',
+                    'SELECT p.pid, p.name, p.pos, t.team_name AS teamname, p.teamid, p.cy, p.cyt, p.salary_yr1, p.salary_yr2, p.salary_yr3, p.salary_yr4, p.salary_yr5, p.salary_yr6, p.bird, t.team_city, t.color1, t.color2 FROM ibl_plr p LEFT JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.retired = 0 ORDER BY p.ordinal ASC, p.pid ASC',
                 ],
             ],
             'ComparePlayers-getPlayerByName' => [
@@ -114,7 +114,7 @@ class PlayerTeamJoinSitesSqlCharacterizationTest extends TestCase
                     (new \FreeAgencyPreview\FreeAgencyPreviewRepository($db))->getActivePlayers();
                 },
                 [
-                    'SELECT p.pid, p.teamid, p.name, t.team_name AS teamname, p.pos, p.age, p.draftyear, p.exp, p.cy, p.cyt, p.salary_yr1, p.salary_yr2, p.salary_yr3, p.salary_yr4, p.salary_yr5, p.salary_yr6, p.r_fga, p.r_fgp, p.r_fta, p.r_ftp, p.r_3ga, p.r_3gp, p.r_orb, p.r_drb, p.r_ast, p.r_stl, p.r_blk, p.r_tvr, p.r_foul, p.oo, p.r_drive_off, p.po, p.r_trans_off, p.od, p.dd, p.pd, p.td, p.talent, p.skill, p.intangibles, p.loyalty, p.winner, p.playing_time, p.security, p.tradition, t.team_city, t.color1, t.color2 FROM ibl_plr p LEFT JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.retired = 0 ORDER BY p.ordinal ASC',
+                    'SELECT p.pid, p.teamid, p.name, t.team_name AS teamname, p.pos, p.age, p.draftyear, p.exp, p.cy, p.cyt, p.salary_yr1, p.salary_yr2, p.salary_yr3, p.salary_yr4, p.salary_yr5, p.salary_yr6, p.r_fga, p.r_fgp, p.r_fta, p.r_ftp, p.r_3ga, p.r_3gp, p.r_orb, p.r_drb, p.r_ast, p.r_stl, p.r_blk, p.r_tvr, p.r_foul, p.oo, p.r_drive_off, p.po, p.r_trans_off, p.od, p.dd, p.pd, p.td, p.talent, p.skill, p.intangibles, p.loyalty, p.winner, p.playing_time, p.security, p.tradition, t.team_city, t.color1, t.color2 FROM ibl_plr p LEFT JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.retired = 0 ORDER BY p.ordinal ASC, p.pid ASC',
                 ],
             ],
             'SeasonHighs-getSeasonHighs' => [
@@ -177,7 +177,7 @@ class PlayerTeamJoinSitesSqlCharacterizationTest extends TestCase
                     (new \Api\Repository\ApiInjuriesRepository($db))->getInjuredPlayers();
                 },
                 [
-                    'SELECT p.uuid AS player_uuid, p.pid, p.name, p.pos, p.injured, t.teamid, t.uuid AS team_uuid, t.team_city, t.team_name FROM ibl_plr p LEFT JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.injured > 0 AND p.dc_can_play_in_game = 1 ORDER BY p.injured DESC',
+                    'SELECT p.uuid AS player_uuid, p.pid, p.name, p.pos, p.injured, t.teamid, t.uuid AS team_uuid, t.team_city, t.team_name FROM ibl_plr p LEFT JOIN ibl_team_info t ON p.teamid = t.teamid WHERE p.injured > 0 AND p.dc_can_play_in_game = 1 ORDER BY p.injured DESC, p.pid ASC',
                 ],
             ],
             'TrainingCampRatingsDiff-getDiffRows' => [
@@ -186,7 +186,7 @@ class PlayerTeamJoinSitesSqlCharacterizationTest extends TestCase
                     (new \TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository($db))->getDiffRows(2024, 'end-of-season');
                 },
                 [
-                    'SELECT p.pid, p.name, p.pos, p.age, p.teamid, t.team_name, t.color1, t.color2, p.oo, p.od, p.r_drive_off, p.dd, p.po, p.pd, p.r_trans_off, p.td, p.r_fga, p.r_fgp, p.r_fta, p.r_ftp, p.r_3ga, p.r_3gp, p.r_orb, p.r_drb, p.r_ast, p.r_stl, p.r_tvr, p.r_blk, p.r_foul, s.oo AS s_oo, s.od AS s_od, s.r_drive_off AS s_r_drive_off, s.dd AS s_dd, s.po AS s_po, s.pd AS s_pd, s.r_trans_off AS s_r_trans_off, s.td AS s_td, s.r_fga AS s_r_fga, s.r_fgp AS s_r_fgp, s.r_fta AS s_r_fta, s.r_ftp AS s_r_ftp, s.r_3ga AS s_r_3ga, s.r_3gp AS s_r_3gp, s.r_orb AS s_r_orb, s.r_drb AS s_r_drb, s.r_ast AS s_r_ast, s.r_stl AS s_r_stl, s.r_tvr AS s_r_tvr, s.r_blk AS s_r_blk, s.r_foul AS s_r_foul FROM ibl_plr p LEFT JOIN ibl_team_info t ON p.teamid = t.teamid LEFT JOIN ibl_plr_snapshots s ON s.pid = p.pid AND s.season_year = 2024 AND s.snapshot_phase = \'end-of-season\' WHERE p.retired = 0 ORDER BY p.name',
+                    'SELECT p.pid, p.name, p.pos, p.age, p.teamid, t.team_name, t.color1, t.color2, p.oo, p.od, p.r_drive_off, p.dd, p.po, p.pd, p.r_trans_off, p.td, p.r_fga, p.r_fgp, p.r_fta, p.r_ftp, p.r_3ga, p.r_3gp, p.r_orb, p.r_drb, p.r_ast, p.r_stl, p.r_tvr, p.r_blk, p.r_foul, s.oo AS s_oo, s.od AS s_od, s.r_drive_off AS s_r_drive_off, s.dd AS s_dd, s.po AS s_po, s.pd AS s_pd, s.r_trans_off AS s_r_trans_off, s.td AS s_td, s.r_fga AS s_r_fga, s.r_fgp AS s_r_fgp, s.r_fta AS s_r_fta, s.r_ftp AS s_r_ftp, s.r_3ga AS s_r_3ga, s.r_3gp AS s_r_3gp, s.r_orb AS s_r_orb, s.r_drb AS s_r_drb, s.r_ast AS s_r_ast, s.r_stl AS s_r_stl, s.r_tvr AS s_r_tvr, s.r_blk AS s_r_blk, s.r_foul AS s_r_foul FROM ibl_plr p LEFT JOIN ibl_team_info t ON p.teamid = t.teamid LEFT JOIN ibl_plr_snapshots s ON s.pid = p.pid AND s.season_year = 2024 AND s.snapshot_phase = \'end-of-season\' WHERE p.retired = 0 ORDER BY p.name, p.pid',
                 ],
             ],
         ];

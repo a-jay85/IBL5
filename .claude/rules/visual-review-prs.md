@@ -54,19 +54,18 @@ Under that label the publish steps still run (ADR-0181): gallery build, crop, de
    source = GitHub Actions, no Jekyll), which is dispatched by the deploy step below once the
    gh-pages push lands (one deploy per real content change, not one per E2E run) and re-publishes the
    whole tree. That dispatch is **debounced**: it is skipped when a `pages-deploy` run exists that has
-   not started yet, because such a run checks out `gh-pages` *after* this push landed and therefore
-   already serves it. The status filter is a **denylist** (anything that is neither `completed` nor
-   `in_progress`), so a missed spelling over-suppresses one push
-   instead of silently no-opping. The debounce never fires on an
-   `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API
-   error dispatches. This is what stops a push fan-out (one master push → multiple open-PR
-   updates → N gh-pages pushes) from producing N deploys, most of which the `pages`
-   concurrency group would cancel. It collapses to roughly **two** deploys (one
-   in-flight plus one pending). Because every open PR's VR job pushes to the same `gh-pages` ref, concurrent runs
-   collide on the ref lock; the deploy is spelled out as **one attempt plus two retries** (the
-   action re-clones `gh-pages` each time, so a retry sees the ref that beat it). An **assert step**
-   fails the job if all three are exhausted — the retries absorb contention, they never soften the
-   gate.
+   not started yet, since that run checks out `gh-pages` *after* this push and already serves it. The
+   status filter is a **denylist** (neither `completed` nor `in_progress`), so a missed spelling
+   over-suppresses one push instead of silently no-opping. The debounce never fires on an
+   `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API error
+   dispatches. A not-started run older than an hour counts as stuck. The step cancels it and leaves it
+   out of the count, so one stuck run cannot block every later deploy. This stops a push fan-out (one
+   master push → multiple open-PR updates → N gh-pages pushes) from producing N deploys that the `pages`
+   concurrency group would mostly cancel. It collapses to roughly **two** deploys (one in-flight
+   plus one pending). Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
+   collide on the ref lock. The deploy runs **one attempt plus two retries** (each re-clones
+   `gh-pages`, so a retry sees the ref that beat it). An **assert step** fails the job if all three
+   fail. The retries absorb contention and never soften the gate.
 4. **Build comment** — `bin/vr-review-comment` consumes the pre-classified `gallery.json` and renders
    the sticky markdown.
 5. **Post sticky comment** — `marocchino/sticky-pull-request-comment@v3`, header `visual-review`.
@@ -143,8 +142,8 @@ steps run after "Deploy gallery to per-SHA Pages" and "Post sticky comment":
   `update-baselines`), so it never goes stale. `--dry-run` exercises the splice without mutating a
   real PR.
 
-Both steps are `continue-on-error: true` — a failure here degrades to "no inline image," it never
-fails the VR job or blocks the sticky comment. The pure splice/copy-plan logic lives in
+Both steps are `continue-on-error: true`. A failure here only means no inline image. The VR job
+and sticky comment still succeed. The pure splice/copy-plan logic lives in
 `ibl5/tests/e2e/vr-pr-body.ts` (unit-tested in `ibl5/tests/ts-unit/vr-pr-body.test.ts`); only `gh`/
 `fetch`/`fs` I/O lives in the `bin/vr-review-comment` glue layer.
 
@@ -180,12 +179,12 @@ vr: label=team-page-header; role=anon; url=modules.php?name=Team&op=view&teamID=
 
 `label=` is a kebab slug, `role=` is `anon|regular|admin`, `url=` is relative to the app root, and
 `anchor=` is the selector waited on before the shot. Zero or more `setup=<GET|POST|DELETE> <path>`
-clauses drive `ibl5/test-state.php` into the state the shot needs — an unknown `action=` there
-answers **400**, so a typo surfaces in the PR comment as a failed row instead of a silently wrong
-screenshot. Clauses are `;`-separated because `|` would break the matrix table. A row that genuinely
+clauses drive `ibl5/test-state.php` into the state the shot needs. An unknown `action=` there
+answers **400**, so a typo surfaces in the PR comment as a failed row instead of a wrong
+screenshot. Clauses are `;`-separated because `|` would break the matrix table. A row that
 cannot be shot (print CSS, an email render) uses `no-vr: <reason ≥ 15 chars>` instead.
 
-The pipeline is a **review aid, never a gate** — every step below is `continue-on-error: true` and
+The pipeline is a **review aid**. Every step below is `continue-on-error: true` and
 runs in its own config so a bad `vr:` cell can never turn the baseline-diff step red:
 
 | Stage | Where |

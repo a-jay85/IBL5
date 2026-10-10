@@ -29,6 +29,13 @@ class ComparePlayersRepositoryTest extends TestCase
         }
     }
 
+    public function testGetAllPlayerNamesOrdersByNameThenPid(): void
+    {
+        $this->repository->getAllPlayerNames();
+
+        self::assertStringContainsString('ORDER BY name ASC, pid ASC', implode("\n", $this->mockDb->getExecutedQueries()));
+    }
+
     public function testGetPlayerByNameReturnsPlayerData(): void
     {
         $playerName = 'Michael Jordan';

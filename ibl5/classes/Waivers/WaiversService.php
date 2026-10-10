@@ -30,6 +30,7 @@ class WaiversService implements WaiversServiceInterface
      * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
      */
     private ?Season $season = null;
+    private \Clock\ClockInterface $clock;
 
     public function __construct(
         \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepository,
@@ -37,7 +38,8 @@ class WaiversService implements WaiversServiceInterface
         WaiversViewInterface $view,
         TeamQueryRepositoryInterface $teamQueryRepo,
         \mysqli $db,
-        ?Season $season = null
+        ?Season $season = null,
+        ?\Clock\ClockInterface $clock = null
     ) {
         $this->commonRepository = $commonRepository;
         $this->processor = $processor;
@@ -45,6 +47,7 @@ class WaiversService implements WaiversServiceInterface
         $this->teamQueryRepo = $teamQueryRepo;
         $this->db = $db;
         $this->season = $season;
+        $this->clock = $clock ?? new \Clock\SystemClock();
     }
 
     /**
@@ -81,7 +84,7 @@ class WaiversService implements WaiversServiceInterface
      */
     private function buildPlayerOptions(array $result, string $action, Season $season): array
     {
-        $timeNow = time();
+        $timeNow = $this->clock->now();
         /** @var list<string> $players */
         $players = [];
 

@@ -112,7 +112,59 @@ class LeagueConfigRepositoryTest extends DatabaseTestCase
         self::assertSame([], $result);
     }
 
+    public function testGetConfigForSeasonOrdersBySlotAndRejectsDuplicateSlot(): void
+    {
+        foreach ([3, 1, 2] as $slot) {
+            $this->insertConfigRow(2097, $slot);
+        }
+
+        $slots = array_map('intval', array_column($this->repo->getConfigForSeason(2097), 'team_slot'));
+
+        self::assertSame([1, 2, 3], $slots);
+
+        $this->expectException(\mysqli_sql_exception::class);
+        $this->insertConfigRow(2097, 1);
+    }
+
+    public function testGetFranchiseTeamsBySeasonResolvesFranchiseTiesByHighestId(): void
+    {
+        $this->insertFranchiseRow(5, 2096, 2097, 'Zeta');
+        $this->insertFranchiseRow(5, 2095, 2097, 'Alpha');
+        $this->insertFranchiseRow(3, 2096, 2097, 'Lead');
+        $this->insertFranchiseRow(7, 2095, 2096, 'Elsewhere');
+
+        self::assertSame([3 => 'Lead', 5 => 'Alpha'], $this->repo->getFranchiseTeamsBySeason(2097));
+    }
+
     // ── Helpers ─────────────────────────────────────────────────
+
+    private function insertConfigRow(int $seasonEndingYear, int $teamSlot): void
+    {
+        $this->insertRow('ibl_league_config', [
+            'season_ending_year' => $seasonEndingYear,
+            'team_slot' => $teamSlot,
+            'team_name' => 'Metros',
+            'conference' => 'Eastern',
+            'division' => 'Atlantic',
+            'playoff_qualifiers_per_conf' => 8,
+            'playoff_round1_format' => 'bo7',
+            'playoff_round2_format' => 'bo7',
+            'playoff_round3_format' => 'bo7',
+            'playoff_round4_format' => 'bo7',
+            'team_count' => 28,
+        ]);
+    }
+
+    private function insertFranchiseRow(int $franchiseId, int $seasonYear, int $seasonEndingYear, string $teamName): void
+    {
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id' => $franchiseId,
+            'season_year' => $seasonYear,
+            'season_ending_year' => $seasonEndingYear,
+            'team_city' => 'Tie City',
+            'team_name' => $teamName,
+        ]);
+    }
 
     /**
      * Build a config row array for upsertSeasonConfig().

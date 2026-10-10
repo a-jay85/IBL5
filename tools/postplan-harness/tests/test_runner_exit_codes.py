@@ -46,7 +46,8 @@ _EXIT_CODE_TABLE = (
         "lostwork-unproved", "git", None)]
     + [(t, None, 0) for t in (
         TerminalState.SHIPPED_ARMED, TerminalState.SHIPPED_HELD,
-        TerminalState.NOTHING_TO_SHIP, TerminalState.DEGRADED)]
+        TerminalState.NOTHING_TO_SHIP, TerminalState.DEGRADED,
+        TerminalState.HOLD_REPEAT_DECLINED)]
 )
 
 
@@ -70,6 +71,15 @@ def test_success_and_nothing_to_ship_exit_0():
 
 def test_degraded_exits_zero():                 # no /post-plan skill fallback on a shipped+held PR
     assert runner.exit_code_for(_res(TerminalState.DEGRADED)) == 0
+
+def test_hold_repeat_declined_exits_zero():
+    assert runner.exit_code_for(_res(TerminalState.HOLD_REPEAT_DECLINED)) == 0
+
+
+def test_hold_repeat_declined_is_not_failed():
+    assert TerminalState.HOLD_REPEAT_DECLINED != TerminalState.FAILED
+    assert TerminalState.HOLD_REPEAT_DECLINED.value == "hold-repeat-declined"
+
 
 def test_degraded_does_not_shadow_rebase_sentinel():   # negative: ordering, not a duplicate
     assert runner.exit_code_for(_res(TerminalState.FAILED, "rebase-conflict")) == 3

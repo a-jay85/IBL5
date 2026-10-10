@@ -25,6 +25,9 @@ fi
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$(dirname "$0")/lib/wt-guards.sh"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"
+source "$REPO_ROOT/bin/lib/wt-compose.sh"
+# shellcheck source=bin/lib/gh-pr.sh
+source "$REPO_ROOT/bin/lib/gh-pr.sh"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 WORKTREE_NAME=""
 ALL=false
@@ -80,14 +83,7 @@ teardown_worktree() {
 
     # Detect the actual project name from the running container (may differ from convention)
     local project
-    project=$(docker inspect "ibl5-php-$slug" --format '{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || echo "ibl5-$slug")
-    [ -z "$project" ] && project="ibl5-$slug"
-
-    # --env-file ensures ${DB_USER}/${DB_PASS} resolve (same fix as wt-up)
-    local env_flag=""
-    if [ -f "$REPO_ROOT/.env" ]; then
-        env_flag="--env-file $REPO_ROOT/.env"
-    fi
+    project=$(wt_project_name "$slug")
 
     # Stop browser-sync if running
     local bs_pid_file="$wt_path/.bs-sync.pid"
@@ -100,13 +96,12 @@ teardown_worktree() {
     fi
 
     # Export vars so Docker Compose can interpolate the static compose file
-    local static_compose="$REPO_ROOT/docker/worktree-compose.yml"
-    export SLUG="$slug" WORKTREE_PATH="$wt_path" REPO_ROOT
+    wt_compose_export "$slug" "$wt_path"
 
     echo "Stopping environment: $slug (worktree: $wt_name, project: $project)..."
     # --rmi local removes images built by compose (php, browsersync) while
     # preserving pinned images like mariadb:10.11 shared across worktrees.
-    docker compose -f "$static_compose" $env_flag -p "$project" down -v --rmi local
+    wt_compose "$project" down -v --rmi local
 
     rm -f "$slug_file"
 
@@ -166,7 +161,8 @@ if [ ! -d "$WORKTREE_PATH" ]; then
     # Build list of slugs to check: the worktree name itself, plus its
     # PR-based slug (pr-NNN) if the branch has an open PR.
     slugs=("$WORKTREE_NAME")
-    pr_slug=$(gh pr view "$WORKTREE_NAME" --json number --jq '.number' 2>/dev/null || true)
+    pr_info "$WORKTREE_NAME" || true
+    pr_slug="$PR_NUM"
     if [ -n "$pr_slug" ]; then
         slugs+=("pr-$pr_slug")
     fi
@@ -179,8 +175,7 @@ if [ ! -d "$WORKTREE_PATH" ]; then
             found_orphan=true
             echo "Found orphaned containers for slug: $slug"
             # Get project name from container label
-            project=$(docker inspect "$php_container" --format '{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || echo "ibl5-$slug")
-            [ -z "$project" ] && project="ibl5-$slug"
+            project=$(wt_project_name "$slug")
             # Stop containers (no compose file, so use docker rm directly)
             for c in "$php_container" "$db_container"; do
                 if docker inspect "$c" &>/dev/null; then

@@ -27,7 +27,7 @@ class ApiInjuriesRepository extends \Database\BaseMysqliRepository
              FROM `ibl_plr` p
              ' . $this->playerTeamLeftJoin() . '
              WHERE p.injured > 0 AND p.dc_can_play_in_game = 1
-             ORDER BY p.injured DESC'
+             ORDER BY p.injured DESC, p.pid ASC'
         );
     }
 }

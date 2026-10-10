@@ -48,7 +48,7 @@ extract_fn() {
     ' "$RUNNER"
 }
 
-for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done \
+for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done claim_pr_terminal \
           postplan_cap_timeout should_hold_postplan_disposal notify_postplan_hold \
           postplan_newest_verdict postplan_no_worktree_dispose_if_merged; do
     FN_SRC="$(extract_fn "$fn")"
@@ -394,13 +394,33 @@ else
     FAILED=1
 fi
 
-# c2: guard contains handoff existence check
-if grep -qF '[ ! -f "$HANDOFF_DIR/${PLAN_NAME}.json" ]' "$RUNNER"; then
+# c2: the guard asks claim_pr_terminal, with the PR state it resolved
+if grep -qF 'claim_pr_terminal "$PLAN_NAME" "${CLAIM_PR%% *}"' "$RUNNER"; then
     echo "ok: c2-handoff-outer-gate"
 else
-    echo "FAIL: c2-handoff-outer-gate — missing handoff gate"
+    echo "FAIL: c2-handoff-outer-gate — guard does not call claim_pr_terminal"
     FAILED=1
 fi
+
+# c2b-c2e: claim_pr_terminal. Without a handoff, OPEN and MERGED both end the plan.
+# With one, only MERGED does: a resumed post-plan that merged leaves its handoff.
+C2D=$(mktemp -d); HANDOFF_DIR="$C2D"
+c2_case() {  # <label> <want rc> <plan> <state>
+    local rc=0
+    claim_pr_terminal "$3" "$4" || rc=$?
+    if [ "$rc" -eq "$2" ]; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — rc=$rc, want $2"
+        FAILED=1
+    fi
+}
+c2_case c2b-no-handoff-open-terminal 0 p.md OPEN
+c2_case c2c-no-handoff-merged-terminal 0 p.md MERGED
+printf '{"branch":"b"}\n' > "$C2D/p.md.json"
+c2_case c2d-handoff-open-resumes 1 p.md OPEN
+c2_case c2e-handoff-merged-terminal 0 p.md MERGED
+rm -rf "$C2D"
 
 # c3: guard contains lock release and continue
 if grep -qF 'rm -rf "$CURRENT_LOCK" 2>/dev/null || true' "$RUNNER" \
@@ -510,13 +530,22 @@ else
     FAILED=1
 fi
 
-# e8: discord-dm invoked via SELF_DIR, never hard-coded (postplan-hold DM + login preflight)
+# e8: discord-dm invoked via SELF_DIR, never hard-coded (postplan-hold DM + login preflight + stop DM)
 e8_self=$(grep -cF '"$SELF_DIR/../discord-dm"' "$RUNNER" || true)
 e8_hard=$(grep -cF 'bin/discord-dm' "$RUNNER" || true)
-if [ "$e8_self" -eq 2 ] && [ "$e8_hard" -eq 0 ]; then
+if [ "$e8_self" -eq 3 ] && [ "$e8_hard" -eq 0 ]; then
     echo "ok: e8-discord-dm-path-relative"
 else
     echo "FAIL: e8-discord-dm-path-relative — self_dir_count=$e8_self hard_count=$e8_hard"
+    FAILED=1
+fi
+
+# e8b: exactly one of those call sites lives in the anchored stop-DM sender
+e8b_count=$(awk '/^# Stop-DM sender:/,/^# End stop-DM sender\./' "$RUNNER" | grep -cF '"$SELF_DIR/../discord-dm"' || true)
+if [ "$e8b_count" -eq 1 ]; then
+    echo "ok: e8b-stop-dm-site-in-sender"
+else
+    echo "FAIL: e8b-stop-dm-site-in-sender — count=$e8b_count"
     FAILED=1
 fi
 

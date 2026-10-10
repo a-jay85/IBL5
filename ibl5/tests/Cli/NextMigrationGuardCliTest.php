@@ -18,10 +18,15 @@ final class NextMigrationGuardCliTest extends TestCase
 
         $scriptSrc = (string) realpath(__DIR__ . '/../../../bin/next-migration');
         $libSrc    = (string) realpath(__DIR__ . '/../../../bin/lib/git-helpers.sh');
+        $nextNumberSrc = (string) realpath(__DIR__ . '/../../../bin/next-number');
+        $numberingSrc  = (string) realpath(__DIR__ . '/../../../bin/lib/numbering.sh');
 
         copy($scriptSrc, $t . '/bin/next-migration');
         chmod($t . '/bin/next-migration', 0755);
         copy($libSrc, $t . '/bin/lib/git-helpers.sh');
+        copy($nextNumberSrc, $t . '/bin/next-number');
+        chmod($t . '/bin/next-number', 0755);
+        copy($numberingSrc, $t . '/bin/lib/numbering.sh');
 
         // Seed one migration so get_max would otherwise succeed
         file_put_contents($t . '/ibl5/migrations/001-initial.sql', '-- placeholder');

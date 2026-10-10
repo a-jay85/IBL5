@@ -16,15 +16,15 @@
 # Run: bin/test-automouse-login-preflight  (exit 0 = all pass, 1 = a case failed)
 
 set -euo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUN_SCRIPT="${LOGIN_PREFLIGHT_TEST_RUN:-$REPO/bin/automouse/run}"
 LIB="$REPO/bin/lib/login-preflight.sh"
 
-T="$(mktemp -d)"
-trap 'rm -rf "$T"' EXIT
-FAILED=0
+h_tmp T
 
 # jq is required by the real probe; link it into the sandbox PATH from wherever it lives.
 JQ="$(command -v jq || true)"
@@ -33,24 +33,22 @@ if [ -z "$JQ" ]; then
         if [ -x "$c" ]; then JQ="$c"; break; fi
     done
 fi
-if [ -z "$JQ" ]; then echo "FAIL: jq not found"; exit 1; fi
+if [ -z "$JQ" ]; then h_fail "jq not found"; exit 1; fi
 mkdir -p "$T/bin"
 ln -s "$JQ" "$T/bin/jq"
 PATH="$T/bin:$PATH"
 
 # --- helpers --------------------------------------------------------------
 
-pass() { echo "ok: $1"; }
-fail() { echo "FAIL: $1"; FAILED=1; }
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
 
-eq() { # label want got
-    if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 (want '$2', got '$3')"; fi
-}
+eq() { h_eq "$1" "$2" "$3"; }  # label want got
 has() { # label file fixed-string
     if [ -f "$2" ] && grep -qF -- "$3" "$2"; then pass "$1"; else fail "$1 (no '$3' in $2)"; fi
 }
-present() { if [ -e "$2" ]; then pass "$1"; else fail "$1 (missing $2)"; fi; }
-absent() { if [ ! -e "$2" ]; then pass "$1"; else fail "$1 (unexpected $2)"; fi; }
+present() { h_exists "$1" "$2"; }
+absent() { h_absent "$1" "$2"; }
 count() { # file fixed-string -> number of matching lines (0 when file absent)
     if [ -f "$1" ]; then grep -cF -- "$2" "$1" || true; else echo 0; fi
 }
@@ -132,7 +130,7 @@ REGION_OK=1
 if [ "$ANCHOR_COUNT" != "1" ] || [ -z "$REGION" ]; then REGION_OK=0; fi
 case "$REGION_LAST" in *'NEXT_PLAN=$(claim_next_plan)'*) ;; *) REGION_OK=0 ;; esac
 if [ "$REGION_OK" -ne 1 ]; then
-    echo "FAIL: loop-guard region not extractable from $RUN_SCRIPT (anchor count $ANCHOR_COUNT)"
+    h_fail "loop-guard region not extractable from $RUN_SCRIPT (anchor count $ANCHOR_COUNT)"
     exit 1
 fi
 
@@ -302,9 +300,4 @@ else
 fi
 
 echo
-if [ "$FAILED" -eq 0 ]; then
-    echo "RESULT: PASSED"
-    exit 0
-fi
-echo "RESULT: FAILED"
-exit 1
+h_done

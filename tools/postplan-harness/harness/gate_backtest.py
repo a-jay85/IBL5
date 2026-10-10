@@ -94,11 +94,13 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-digest-prose": _TREE,
     "bin/check-e2e-fa-offers-owner": _TREE,
     "bin/check-e2e-mutator-isolation": _TREE,
+    "bin/check-model-pins": _TREE,
     "bin/check-playwright-pinning": _TREE,
     "bin/check-registry-trigger-rows": _TREE,
     "bin/check-rules-byte-budget": _TREE,
     "bin/check-skill-arguments": _TREE,
     "bin/check-workflow-checkout": _TREE,
+    "bin/check-workflow-run-interpolation": _TREE,
     # Plan-file gates: the plan resolves from the historical PR's branch name.
     "bin/check-plan": _PLAN,
     "bin/check-plan-staleness": _PLAN,

@@ -719,7 +719,7 @@ notify_scan() { # <wf-dir> <mode>
         awk -v file="$(basename "$f")" -v mode="$2" '
             function emit() {
                 if (active && mode == "sites")
-                    printf "%s#%d webhook=%d ping=%s\n", file, ord, wh, ping
+                    printf "%s#%d webhook=%s ping=%s\n", file, ord, wh, ping
                 active = 0
             }
             /uses: \.\/\.github\/actions\/notify-discord/ { emit(); ord++; wh = 0; ping = "-"; active = 1; next }
@@ -731,7 +731,8 @@ notify_scan() { # <wf-dir> <mode>
                 }
                 line = $0; sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
                 if (mode == "lines") printf "%s#%d\t%s\n", file, ord, line
-                if (line == "webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}") wh = 1
+                if (line == "webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}") wh = "dev"
+                if (line == "webhook-url: ${{ secrets.DISCORD_MERGED_WEBHOOK_URL }}") wh = "merged"
                 if (line ~ /^ping: /) ping = substr(line, 7)
             }
             END { emit() }' "$f"
@@ -740,22 +741,22 @@ notify_scan() { # <wf-dir> <mode>
 notify_sites() { notify_scan "$1" sites; }
 
 NOTIFY_SITES_WANT=$(cat <<'EXPECT_EOF'
-db-backup.yml#1 webhook=1 ping='true'
-db-backup.yml#2 webhook=1 ping='true'
-db-backup.yml#3 webhook=1 ping='true'
-db-backup.yml#4 webhook=1 ping='true'
-docfix-health.yml#1 webhook=1 ping=-
-docfix-health.yml#2 webhook=1 ping=-
-docs-refreshed-notify.yml#1 webhook=1 ping=-
-flake-report.yml#1 webhook=1 ping=-
-log-review.yml#1 webhook=1 ping=-
-main.yml#1 webhook=1 ping=-
-merge-digest-notify.yml#1 webhook=1 ping='true'
-mutation.yml#1 webhook=1 ping=-
-promote-to-production.yml#1 webhook=1 ping=${{ job.status == 'failure' }}
-promote-to-production.yml#2 webhook=1 ping=-
-smoke-prod.yml#1 webhook=1 ping='true'
-smoke-prod.yml#2 webhook=1 ping='true'
+db-backup.yml#1 webhook=dev ping='true'
+db-backup.yml#2 webhook=dev ping='true'
+db-backup.yml#3 webhook=dev ping='true'
+db-backup.yml#4 webhook=dev ping='true'
+docfix-health.yml#1 webhook=dev ping=-
+docfix-health.yml#2 webhook=dev ping=-
+docs-refreshed-notify.yml#1 webhook=dev ping=-
+flake-report.yml#1 webhook=dev ping=-
+log-review.yml#1 webhook=dev ping=-
+main.yml#1 webhook=dev ping=-
+merge-digest-notify.yml#1 webhook=merged ping='true'
+mutation.yml#1 webhook=dev ping=-
+promote-to-production.yml#1 webhook=dev ping=${{ job.status == 'failure' }}
+promote-to-production.yml#2 webhook=dev ping=-
+smoke-prod.yml#1 webhook=dev ping='true'
+smoke-prod.yml#2 webhook=dev ping='true'
 EXPECT_EOF
 )
 
@@ -764,7 +765,7 @@ printf '\n-- notify-discord call sites --\n'
 # G1: the live workflows match the table.
 G1_GOT=$(notify_sites "$ROOT/.github/workflows")
 if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
-    ok "G1: 16 sites pass webhook-url; ping only on the chosen sites"
+    ok "G1: 16 sites pass the expected webhook-url; ping only on the chosen sites"
 else
     fail "G1: call sites differ from the table"
     diff <(printf '%s\n' "$NOTIFY_SITES_WANT") <(printf '%s\n' "$G1_GOT") | sed 's/^/       /'
@@ -777,7 +778,7 @@ G2_GOT=$(notify_sites "$TMP/wf")
 [ "$G2_GOT" != "$NOTIFY_SITES_WANT" ] && ok "G2: an injected ping line changes the scan" \
     || fail "G2: an injected ping line went unnoticed"
 if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
-    want "G2: the injected ping is what differs" "$G2_GOT" "flake-report.yml#1 webhook=1 ping='true'"
+    want "G2: the injected ping is what differs" "$G2_GOT" "flake-report.yml#1 webhook=dev ping='true'"
 fi
 
 # G3: a deleted webhook-url line must show up in the scan.

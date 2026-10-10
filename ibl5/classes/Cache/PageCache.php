@@ -120,6 +120,21 @@ final class PageCache
     }
 
     /**
+     * Store the page only when the response status is 200.
+     *
+     * The capture callback in modules.php passes http_response_code(). A 404 or
+     * 500 body must never be cached, because a cache HIT replays with status 200.
+     * false (no status set, CLI) is treated as not-200.
+     */
+    public static function setIfOk(string $key, string $html, int $ttl, int|false $status): void
+    {
+        if ($status !== 200) {
+            return;
+        }
+        self::set($key, $html, $ttl);
+    }
+
+    /**
      * Delete all cached page files.
      */
     public static function purge(): int

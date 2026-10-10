@@ -61,6 +61,8 @@ bug-pipeline|bin/bug-pipeline-cron-setup"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+# shellcheck source=bin/lib/usage-test-isolation.sh
+. "$REPO_ROOT/bin/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
 MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
 [ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"
@@ -78,6 +80,8 @@ normalise_stdout() {
 }
 
 # run_case <script> <args> <extra env> — prints normalised stdout, then a
+# Golden runs leave IBL5_USAGE_GATE_STATE_DIR unforwarded: the usage-gate setup
+# script bakes it into its plist, and --print/--help never touch gate state.
 # final "exit=<code>" line is NOT emitted; the exit code is stored in RC.
 RC=0
 run_case() {
@@ -249,7 +253,7 @@ mkdir -p "$T/bin/lib"
 cp "$REPO_ROOT/bin/wt-gc-cron-setup" "$T/bin/"
 cp "$REPO_ROOT/bin/lib/launchd-sched.sh" "$REPO_ROOT/bin/lib/launchd-job.sh" "$T/bin/lib/"
 rc=0
-got="$(env -i HOME="$GOLDEN_HOME" PATH=/usr/bin:/bin bash "$T/bin/wt-gc-cron-setup" --print-schedule 2>&1)" || rc=$?
+got="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" HOME="$GOLDEN_HOME" PATH=/usr/bin:/bin bash "$T/bin/wt-gc-cron-setup" --print-schedule 2>&1)" || rc=$?
 if [ "$rc" = "0" ] && grep -qF "$T/bin/wt-gc-tick" <<< "$got"; then
   pass "wt-gc-non-git-tree-prints-plist"
 else
@@ -361,7 +365,7 @@ run_install() {
   shift 2
   : > "$ILOG"
   # shellcheck disable=SC2086
-  env -i HOME="$IHOME" PATH="$ISTUB:/usr/bin:/bin" LSCHED_ISTUB_LOG="$ILOG" "$@" \
+  env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" HOME="$IHOME" PATH="$ISTUB:/usr/bin:/bin" LSCHED_ISTUB_LOG="$ILOG" "$@" \
     bash "$REPO_ROOT/$script" $args > "$TMP/iout" 2> "$TMP/ierr"
   IRC=$?
   IOUT="$(cat "$TMP/iout")"

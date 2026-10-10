@@ -15,7 +15,7 @@ $textcolor2 = "#000000";
  * Legacy PHP-Nuke table wrapper. Prefer modern CSS components.
  * Remaining callers: ~60 legacy PHP-Nuke module files (News, Your_Account, Trading, etc.)
  */
-function OpenTable()
+function OpenTable(): void
 {
     global $bgcolor1, $bgcolor2;
     echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$bgcolor2\"><tr><td>\n";
@@ -26,7 +26,7 @@ function OpenTable()
  * @deprecated Use CSS classes directly: <div class="ibl-card">
  * Legacy PHP-Nuke centered table wrapper. Prefer modern CSS components.
  */
-function OpenTable2()
+function OpenTable2(): void
 {
     global $bgcolor1, $bgcolor2;
     echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$bgcolor2\" align=\"center\"><tr><td>\n";
@@ -38,27 +38,32 @@ function OpenTable2()
  * Legacy PHP-Nuke table closer. Prefer modern CSS components.
  * Remaining callers: ~60 legacy PHP-Nuke module files (News, Your_Account, Trading, etc.)
  */
-function CloseTable()
+function CloseTable(): void
 {
     echo "</td></tr></table></td></tr></table>\n";
 }
 
-function themeheader()
+function themeheader(): void
 {
     global $user, $bgcolor1, $leagueContext, $mysqli_db, $authService;
 
-    $isLoggedIn = is_user($user);
+    $db = $mysqli_db instanceof \mysqli ? $mysqli_db : null;
+
+    $isLoggedIn = (bool) is_user($user);
     $username = null;
     $teamId = null;
     $teamsData = null;
 
     if ($isLoggedIn) {
         cookiedecode($user);
+        if (!$authService instanceof \Auth\Contracts\AuthServiceInterface) {
+            throw new \LogicException('themeheader() requires $authService for a logged-in user');
+        }
         $username = $authService->getUsername();
     }
 
-    if ($mysqli_db) {
-        $navRepo = new \Navigation\NavigationRepository($mysqli_db);
+    if ($db !== null) {
+        $navRepo = new \Navigation\NavigationRepository($db);
 
         if ($isLoggedIn && $username !== null) {
             $teamId = $navRepo->resolveTeamId($username);
@@ -67,15 +72,18 @@ function themeheader()
         $teamsData = $navRepo->getTeamsData();
     }
 
+    if (!$leagueContext instanceof \League\LeagueContext) {
+        throw new \LogicException('themeheader() requires $leagueContext');
+    }
     $currentLeague = $leagueContext->getCurrentLeague();
 
     $seasonPhase = '';
     $allowWaivers = '';
     $showDraftLink = '';
     $isDraftOrderFinalized = false;
-    if ($mysqli_db) {
+    if ($db !== null) {
         try {
-            $season = new \Season\Season($mysqli_db, $leagueContext);
+            $season = new \Season\Season($db, $leagueContext);
             $seasonPhase = $season->phase;
             $allowWaivers = $season->allowWaivers;
             $showDraftLink = $season->showDraftLink;
@@ -84,14 +92,21 @@ function themeheader()
             // window when column renames are in progress. Nav renders with defaults.
         }
 
-        $draftOrderRepo = new \ProjectedDraftOrder\ProjectedDraftOrderRepository($mysqli_db);
+        $draftOrderRepo = new \ProjectedDraftOrder\ProjectedDraftOrderRepository($db);
         $isDraftOrderFinalized = $draftOrderRepo->isDraftOrderFinalized();
     }
 
+    $rawServerName = $_SERVER['SERVER_NAME'] ?? null;
+    $serverName = is_string($rawServerName) ? $rawServerName : null;
+    $rawRequestUri = $_SERVER['REQUEST_URI'] ?? null;
+    $requestUri = is_string($rawRequestUri) ? $rawRequestUri : null;
+    $rawDebugCookie = $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null;
+    $debugCookie = is_string($rawDebugCookie) ? $rawDebugCookie : null;
+
     $debugSession = new \Debug\DebugSession(
         $username,
-        $_SERVER['SERVER_NAME'] ?? null,
-        $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null,
+        $serverName,
+        $debugCookie,
         getenv('E2E_TESTING') === '1',
     );
 
@@ -104,8 +119,8 @@ function themeheader()
         seasonPhase: $seasonPhase,
         allowWaivers: $allowWaivers,
         showDraftLink: $showDraftLink,
-        serverName: $_SERVER['SERVER_NAME'] ?? null,
-        requestUri: $_SERVER['REQUEST_URI'] ?? null,
+        serverName: $serverName,
+        requestUri: $requestUri,
         isDraftOrderFinalized: $isDraftOrderFinalized,
         isDebugAdmin: $debugSession->isDebugAdmin(),
         isAdmin: is_admin() === 1,
@@ -119,14 +134,14 @@ function themeheader()
     echo "<div class=\"site-content\" id=\"site-content\" role=\"main\" hx-boost=\"true\" hx-target=\"#site-content\" hx-swap=\"innerHTML show:window:top\" hx-indicator=\"#site-content\">\n";
 }
 
-function themefooter()
+function themefooter(): void
 {
     global $bgcolor1;
     echo "</div>"; // closes .site-content
     PageLayout\PageLayout::renderPageGenerationTime();
 }
 
-function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext)
+function themeindex(string $aid, string $informant, int|string $time, string $title, int $counter, int $topic, ?string $thetext, string $notes, string $morelink, string $topicname, string $topicimage, string $topictext): void
 {
     global $tipath;
     $ThemeSel = 'IBL';
@@ -143,7 +158,7 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
     $nukeCompat = new \Utilities\NukeCompat();
     $safeTime = $nukeCompat->formatLocalTime($time);
     $safeTopictext = \Security\HtmlSanitizer::safeHtmlOutput($topictext);
-    $safeCounter = (int)$counter;
+    $safeCounter = $counter;
 
     // Determine if this is a transaction/league news item (topic-based styling)
     $isTransaction = stripos($topictext, 'transaction') !== false ||
@@ -157,7 +172,7 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
 
     $topicIconHtml = '';
     if (!empty($t_image) && file_exists($t_image)) {
-        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__topic-icon-link" aria-label="' . $topicLinkLabel . '"><img src="' . \Security\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
+        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . $topic . '" class="news-article__topic-icon-link" aria-label="' . $topicLinkLabel . '"><img src="' . \Security\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
     }
 
     echo '<article class="' . $articleClass . '">
@@ -199,7 +214,7 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
     echo '</div>
         <footer class="news-article__footer">
             <div>' . $morelink . '</div>
-            <a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__link" aria-label="' . $topicLinkLabel . '">
+            <a href="modules.php?name=News&amp;new_topic=' . $topic . '" class="news-article__link" aria-label="' . $topicLinkLabel . '">
                 ' . $safeTopictext . '
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
             </a>
@@ -207,7 +222,7 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
     </article>';
 }
 
-function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $topicname, $topicimage, $topictext)
+function themearticle(string $aid, string $informant, int|string $datetime, string $title, ?string $thetext, int $topic, string $topicname, string $topicimage, string $topictext): void
 {
     global $tipath, $anonymous;
     $ThemeSel = 'IBL';
@@ -244,7 +259,7 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
 
     $topicIconHtml = '';
     if (!empty($t_image) && file_exists($t_image)) {
-        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__topic-icon-link" aria-label="' . $topicLinkLabel . '"><img src="' . \Security\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
+        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . $topic . '" class="news-article__topic-icon-link" aria-label="' . $topicLinkLabel . '"><img src="' . \Security\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
     }
 
     echo '<article class="news-article news-article--detail">
@@ -269,7 +284,7 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
 
     echo '</div>
         <footer class="news-article__footer">
-            <a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__link" aria-label="' . _TOPIC . ': ' . $topicLinkLabel . '">
+            <a href="modules.php?name=News&amp;new_topic=' . $topic . '" class="news-article__link" aria-label="' . _TOPIC . ': ' . $topicLinkLabel . '">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
                 ' . _TOPIC . ': ' . $safeTopictext . '
             </a>
@@ -286,7 +301,7 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
  * @param string|null $type Explicit block type: 'leaders', 'injury', or null to fall back to
  *                          content-sniffing for unmigrated callers (byte-identical output)
  */
-function themecenterbox($title, $content, ?string $type = null)
+function themecenterbox($title, $content, ?string $type = null): void
 {
     if ($type !== null) {
         // Explicit type: select branch directly without content inspection

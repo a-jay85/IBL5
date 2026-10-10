@@ -4,10 +4,27 @@ declare(strict_types=1);
 
 namespace PageLayout;
 
+use Clock\ClockInterface;
+use Clock\SystemClock;
 use Utilities\HtmxHelper;
 
 class PageLayout
 {
+    private static ?ClockInterface $clock = null;
+
+    /**
+     * Override the clock used by renderPageGenerationTime(). Pass null to restore SystemClock.
+     */
+    public static function setTestClock(?ClockInterface $clock): void
+    {
+        self::$clock = $clock;
+    }
+
+    private static function clock(): ClockInterface
+    {
+        return self::$clock ?? new SystemClock();
+    }
+
     public static function header(): void
     {
         if (HtmxHelper::isBoostedRequest()) {
@@ -249,9 +266,7 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
     {
         /** @var float $start_time */
         global $start_time;
-        $mtime = microtime();
-        $mtimeParts = explode(" ", $mtime);
-        $end_time = (float) $mtimeParts[1] + (float) $mtimeParts[0];
+        $end_time = self::clock()->microtime();
         $total_time = $end_time - $start_time;
         $pageGenLabel = defined('_PAGEGENERATION') ? \_PAGEGENERATION : 'Page Generation:';
         $secondsLabel = defined('_SECONDS') ? \_SECONDS : 'seconds';

@@ -7,6 +7,8 @@ namespace Api\Controller;
 use Api\Contracts\ControllerInterface;
 use Api\Repository\HealthRepository;
 use Api\Response\JsonResponder;
+use Clock\ClockInterface;
+use Clock\SystemClock;
 
 /**
  * Liveness/readiness probe for external uptime monitors.
@@ -21,10 +23,12 @@ use Api\Response\JsonResponder;
 class HealthController implements ControllerInterface
 {
     private HealthRepository $healthRepository;
+    private ClockInterface $clock;
 
-    public function __construct(HealthRepository $healthRepository)
+    public function __construct(HealthRepository $healthRepository, ?ClockInterface $clock = null)
     {
         $this->healthRepository = $healthRepository;
+        $this->clock = $clock ?? new SystemClock();
     }
 
     /**
@@ -38,7 +42,7 @@ class HealthController implements ControllerInterface
             [
                 'status' => $dbOk ? 'ok' : 'degraded',
                 'db' => $dbOk,
-                'checkedAt' => gmdate('Y-m-d\TH:i:s\Z'),
+                'checkedAt' => gmdate('Y-m-d\TH:i:s\Z', $this->clock->now()),
             ],
             $dbOk ? 200 : 503
         );

@@ -990,6 +990,7 @@ jobs:
             bin/test-sim-recap-ssh-gate \
             bin/test-discord-dm \
             bin/test-post-plan-fail-dm \
+            bin/test-postplan-fix \
             bin/test-automouse-escalation \
             bin/test-automouse-repeat-failure \
             bin/test-automouse-disarm \

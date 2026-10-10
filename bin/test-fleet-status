@@ -299,7 +299,7 @@ printf '%s\n' "$PP_PID" > "$AM/queue/pp-plan.md.lock/pid"
 USAGE_DIR="$TMP/usage-gate"; mkdir -p "$USAGE_DIR/markers"
 PAUSED_SID='aaaaaaaa-1111-2222-3333-444444444444'
 RESUMED_SID='bbbbbbbb-1111-2222-3333-444444444444'
-for p in paused-plan resumed-plan resumed-gone-plan stale-lock-plan; do
+for p in paused-plan resumed-plan resumed-gone-plan stale-lock-plan merged-plan; do
     printf '# %s\n' "$p" > "$AM/queue/$p.md"
     mkdir -p "$AM/queue/$p.md.lock"
     printf '%s\n' "$DEAD_PID" > "$AM/queue/$p.md.lock/pid"
@@ -314,6 +314,20 @@ printf '%s\n' "$RESUMED_SID" > "$AM/queue/resumed-gone-plan.md.lock/paused-held"
 # merged and only the lock is left.
 mkdir -p "$AM/handoff"
 printf '{"branch":"resumed-branch"}\n' > "$AM/handoff/resumed-plan.md.json"
+# merged-plan is resumed-gone-plan whose PR the gh stub reports merged. Its
+# handoff branch differs from the slug, so the lookup must read the handoff.
+printf '%s\n' "$RESUMED_SID" > "$AM/queue/merged-plan.md.lock/paused-held"
+printf '{"branch":"merged-branch"}\n' > "$AM/handoff/merged-plan.md.json"
+cat > "$STUBBIN/gh" <<'GH'
+#!/bin/bash
+# `gh pr list --head <branch> ...`: one merged PR for merged-branch only.
+while [ $# -gt 0 ]; do
+    [ "$1" = --head ] && { [ "$2" = merged-branch ] && echo 1 || echo 0; exit 0; }
+    shift
+done
+exit 1
+GH
+chmod +x "$STUBBIN/gh"
 sh -c "sleep 120; : POSTPLAN_LABEL='com.ibl5.postplan-now-resumed-branch-20260910-120000-1'" >/dev/null 2>&1 &
 RESUMED_RUN_PID=$!
 disown "$RESUMED_RUN_PID" 2>/dev/null
@@ -878,8 +892,10 @@ assert_has "queue: resumed hold with no live post-plan reads stale" \
     "$OUTPUT" '× resumed-gone-plan\.md +[^ ]+ +[^ ]+ +stale lock \(post-plan gone\)$'
 assert_has "queue: lock with a dead runner and no hold reads stale" \
     "$OUTPUT" '× stale-lock-plan\.md +[^ ]+ +[^ ]+ +stale lock \(runner gone\)$'
+assert_has "queue: dead lock on a merged PR says the runner clears it" \
+    "$OUTPUT" '× merged-plan\.md +[^ ]+ +[^ ]+ +PR merged \(runner clears it\)$'
 assert_lacks "queue: no dead-runner lock reads in progress" \
-    "$OUTPUT" '(paused|resumed|resumed-gone|stale-lock)-plan\.md .*in progress'
+    "$OUTPUT" '(paused|resumed|resumed-gone|stale-lock|merged)-plan\.md .*in progress'
 
 # 21 — MODEL / MERGE / TITLE. The bare plan gets bin/automouse/queue's defaults;
 # the frontmatter plan gets its own values and its H1.

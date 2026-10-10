@@ -309,6 +309,114 @@ h_done"
     fi
 }
 
+# _usage_fake_home DIR PCT: a fake HOME whose default usage-gate dir holds a
+# fresh cache at PCT five-hour utilization. Prints the default dir.
+_usage_fake_home() {
+    local sd="$1/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate"
+    mkdir -p "$sd/markers"
+    printf '{"five_hour":{"utilization":%s},"seven_day":{"utilization":10},"fetched_at":%s}\n' \
+        "$2" "$(date +%s)" >"$sd/cache.json"
+    printf '%s\n' "$sd"
+}
+
+# Sourcing the harness isolates the usage gate: a private state dir, a private
+# projects dir, and test mode on, none of them under the (fake) HOME.
+case_usage_isolation_env() {
+    local sd cp tm fake_default
+    fake_default="$WORK/home-env/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate"
+    run_scenario usage_env 'echo "SD=$IBL5_USAGE_GATE_STATE_DIR"
+echo "CP=$IBL5_USAGE_CLAUDE_PROJECTS"
+echo "TM=$IBL5_USAGE_GATE_TEST_MODE"
+[ -d "$IBL5_USAGE_GATE_STATE_DIR/markers" ] && [ -d "$IBL5_USAGE_CLAUDE_PROJECTS" ] && h_pass dirs
+h_done' HOME="$WORK/home-env"
+    sd=$(sed -n 's/^SD=//p' <<<"$OUT")
+    cp=$(sed -n 's/^CP=//p' <<<"$OUT")
+    tm=$(sed -n 's/^TM=//p' <<<"$OUT")
+    local parent=${sd%/state}
+    case "$sd" in
+        */state) ;;
+        *) t_bad "case_usage_isolation_env (sd=[$sd])"; return ;;
+    esac
+    if [ "$RC" -eq 0 ] && [ "$tm" = 1 ] && [ "$sd" != "$fake_default" ] &&
+        [[ "$(basename "$parent")" == h.* ]] && [[ "$cp" == */projects ]] &&
+        [ ! -e "$parent" ]; then
+        t_ok "case_usage_isolation_env"
+    else
+        t_bad "case_usage_isolation_env (rc=$RC sd=[$sd] cp=[$cp] tm=[$tm] err=[$ERR])"
+    fi
+}
+
+# Inherited real-looking values are overwritten, not honored.
+case_usage_isolation_overwrites() {
+    local sd cp tm fake_default
+    fake_default="$WORK/home-ow/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate"
+    run_scenario usage_overwrite 'echo "SD=$IBL5_USAGE_GATE_STATE_DIR"
+echo "CP=$IBL5_USAGE_CLAUDE_PROJECTS"
+echo "TM=$IBL5_USAGE_GATE_TEST_MODE"
+h_pass a
+h_done' HOME="$WORK/home-ow" IBL5_USAGE_GATE_STATE_DIR="$fake_default" \
+        IBL5_USAGE_CLAUDE_PROJECTS="$WORK/home-ow/.claude/projects" IBL5_USAGE_GATE_TEST_MODE=
+    sd=$(sed -n 's/^SD=//p' <<<"$OUT")
+    cp=$(sed -n 's/^CP=//p' <<<"$OUT")
+    tm=$(sed -n 's/^TM=//p' <<<"$OUT")
+    if [ "$RC" -eq 0 ] && [ "$tm" = 1 ] && [ "$sd" != "$fake_default" ] &&
+        [ "$cp" != "$WORK/home-ow/.claude/projects" ] && [ -n "$sd" ] && [ -n "$cp" ]; then
+        t_ok "case_usage_isolation_overwrites"
+    else
+        t_bad "case_usage_isolation_overwrites (rc=$RC sd=[$sd] cp=[$cp] tm=[$tm] err=[$ERR])"
+    fi
+}
+
+# A harness consumer under a fake HOME holding a fresh 95% cache at the default
+# path must not read it: prestart passes (fail open) and nothing is written
+# beside that cache.
+case_usage_isolation_prestart_fail_open() {
+    local sd files markers
+    sd=$(_usage_fake_home "$WORK/home-pre" 95)
+    run_scenario usage_prestart ". $(printf '%q' "$SELF_DIR/lib/usage-gate.sh")
+usage_prestart_gate automouse sid-x /x/run
+echo \"PRE=\$?\"
+h_pass ran
+h_done" HOME="$WORK/home-pre"
+    files=$(find "$sd" -type f)
+    markers=$(ls -A "$sd/markers")
+    if [ "$RC" -eq 0 ] && has "$OUT" "PRE=0" && [ "$files" = "$sd/cache.json" ] &&
+        [ -z "$markers" ] && ! has "$ERR" "USAGE-GATE-TEST: refusing"; then
+        t_ok "case_usage_isolation_prestart_fail_open"
+    else
+        t_bad "case_usage_isolation_prestart_fail_open (rc=$RC out=[$OUT] files=[$files] markers=[$markers] err=[$ERR])"
+    fi
+}
+
+# The harness and the isolation lib both source cleanly under a launchd-like
+# empty environment with set -euo pipefail.
+case_usage_isolation_lib_env_i() {
+    local rc1=0 rc2=0 out1 out2 err1 err2
+    {
+        printf 'set -euo pipefail\n'
+        printf '. %q\n' "$LIB"
+        printf 'echo "TM=$IBL5_USAGE_GATE_TEST_MODE"\nh_pass a\nh_done\n'
+    } >"$WORK/usage_env_i.sh"
+    {
+        printf 'set -euo pipefail\n'
+        printf '. %q\n' "$SELF_DIR/lib/usage-test-isolation.sh"
+        printf 'd=$(mktemp -d)\nusage_test_isolate "$d"\n'
+        printf 'echo "TM=$IBL5_USAGE_GATE_TEST_MODE"\necho "SD=$IBL5_USAGE_GATE_STATE_DIR"\nrm -rf "$d"\n'
+    } >"$WORK/usage_env_i2.sh"
+    env -i PATH=/usr/bin:/bin "$BASH_BIN" "$WORK/usage_env_i.sh" >"$WORK/usage_env_i.out" 2>"$WORK/usage_env_i.err" </dev/null || rc1=$?
+    env -i PATH=/usr/bin:/bin "$BASH_BIN" "$WORK/usage_env_i2.sh" >"$WORK/usage_env_i2.out" 2>"$WORK/usage_env_i2.err" </dev/null || rc2=$?
+    out1=$(cat "$WORK/usage_env_i.out")
+    out2=$(cat "$WORK/usage_env_i2.out")
+    err1=$(cat "$WORK/usage_env_i.err")
+    err2=$(cat "$WORK/usage_env_i2.err")
+    if [ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] && has "$out1" "TM=1" && has "$out2" "TM=1" &&
+        has "$out2" "/state" && ! has "$err1" "unbound variable" && ! has "$err2" "unbound variable"; then
+        t_ok "case_usage_isolation_lib_env_i"
+    else
+        t_bad "case_usage_isolation_lib_env_i (rc1=$rc1 rc2=$rc2 out1=[$out1] out2=[$out2] err1=[$err1] err2=[$err2])"
+    fi
+}
+
 # Every bin/test-* that sources harness.sh (directly or through the
 # bug-pipeline stubs lib) must end with exactly one `h_done` and keep no
 # legacy `exit "$FAILED"` tail. A harness that forgets h_done exits 0 even
@@ -334,6 +442,125 @@ case_consumers_end_with_h_done() {
     fi
 }
 
+# Usage-gate isolation scan. Entry points are the non-test scripts under bin/
+# that source the usage libs, so a new caller extends the list with no edit
+# here. A token matches only after a non-name character, so plan-now does not
+# match inside post-plan-now and pr-triage does not match inside test-pr-triage.
+_usage_entry_regex() {
+    local f first tok toks='usage-fetch\.sh' list
+    list=$(grep -rlE 'usage-(gate|fetch)\.sh' "$SELF_DIR" | grep -v '/test-' | sort)
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        first=""; IFS= read -r first <"$f" || true
+        case "$first" in '#!'*) ;; *) case "$f" in *.sh) ;; *) continue ;; esac ;; esac
+        tok=${f#"$SELF_DIR"/}; tok=${tok#lib/}
+        toks="$toks|$(sed 's/\./\\./g' <<<"$tok")"
+    done <<<"$list"
+    printf '(^|[^A-Za-z0-9_-])(%s)\n' "$toks"
+}
+
+# _usage_scan DIR REGEX: prints one line per violation in DIR/test-*, returns 1
+# on any. Excluded by name: test-harness-lib holds this scan and fixture text
+# naming every token; test-usage-gate is the usage libs' own suite, isolates
+# each case through new_env, and must run with test mode off to exercise the
+# live keychain/curl path.
+_usage_scan() {
+    local dir="$1" re="$2" f n nc bad=0
+    for f in "$dir"/test-*; do
+        [ -f "$f" ] || continue
+        n=${f##*/}
+        case "$n" in test-harness-lib | test-usage-gate) continue ;; esac
+        grep -qE "$re" "$f" || continue
+        nc=$(grep -vE '^[[:space:]]*#' "$f")
+        if ! grep -qE '^[[:space:]]*(\.|source)[[:space:]].*lib/(harness|bug-pipeline-test-stubs)\.sh' <<<"$nc" &&
+            ! { grep -qE '^[[:space:]]*(\.|source)[[:space:]].*lib/usage-test-isolation\.sh' <<<"$nc" &&
+                grep -qE '(^|[;&|[:space:]])usage_test_isolate[[:space:]]' <<<"$nc"; } &&
+            ! grep -qF IBL5_USAGE_GATE_STATE_DIR <<<"$nc"; then
+            printf 'USAGE-UNISOLATED: %s\n' "$n"
+            bad=1
+        fi
+        if grep -qE '(^|[^A-Za-z0-9_-])env[[:space:]]+-i([[:space:]]|$)' <<<"$nc" &&
+            ! grep -qF IBL5_USAGE_GATE_STATE_DIR <<<"$nc"; then
+            printf 'USAGE-ENV-I-UNFORWARDED: %s\n' "$n"
+            bad=1
+        fi
+    done
+    return "$bad"
+}
+
+# Every bin/test-* that names a usage-gated entry point must isolate the usage
+# gate (harness source, isolation lib call, or its own state dir), and a
+# `env -i` test must forward IBL5_USAGE_GATE_STATE_DIR. Four checks: the entry
+# regex derives, synthetic fixtures are flagged exactly, a real lib-route file
+# stripped of its call is flagged, and the real corpus is clean.
+case_usage_gate_isolated() {
+    local re fx="$WORK/usage-fx" got want rc ok=1 name canary f nc
+    re=$(_usage_entry_regex)
+    if ! grep -qF 'automouse/run' <<<"$re" || ! grep -qF 'plan-now' <<<"$re"; then
+        echo "USAGE-SCAN: entry-point derivation broke"
+        ok=0
+    fi
+
+    mkdir -p "$fx"
+    printf '%s\n' 'bin/automouse/run --once' >"$fx/test-fx-bare"
+    printf '%s\n' '# IBL5_USAGE_GATE_STATE_DIR is set elsewhere' 'bin/plan-now x' >"$fx/test-fx-comment-only"
+    printf '%s\n' '. "$D/lib/usage-test-isolation.sh"' 'bin/post-plan-now x' >"$fx/test-fx-src-no-call"
+    printf '%s\n' '. "$D/lib/harness.sh"' 'env -i PATH=/usr/bin:/bin bin/pr-triage' >"$fx/test-fx-envi"
+    printf '%s\n' '. "$D/lib/harness.sh"' 'env -i PATH=/usr/bin:/bin IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" bin/pr-triage' >"$fx/test-fx-envi-fwd"
+    printf '%s\n' '. "$D/lib/harness.sh"' 'bin/automouse/run' >"$fx/test-fx-harness"
+    printf '%s\n' '. "$D/lib/usage-test-isolation.sh"; usage_test_isolate "$T/usage"' 'bin/burndown-loop' >"$fx/test-fx-iso"
+    printf '%s\n' 'export IBL5_USAGE_GATE_STATE_DIR="$T/s"' 'bin/usage-gate-coordinator' >"$fx/test-fx-statedir"
+    printf '%s\n' 'echo bin/test-pr-triage' >"$fx/test-fx-left-boundary"
+    want=$(printf '%s\n' 'USAGE-ENV-I-UNFORWARDED: test-fx-envi' 'USAGE-UNISOLATED: test-fx-bare' \
+        'USAGE-UNISOLATED: test-fx-comment-only' 'USAGE-UNISOLATED: test-fx-src-no-call' | sort)
+    rc=0
+    got=$(_usage_scan "$fx" "$re" | sort) || true
+    _usage_scan "$fx" "$re" >/dev/null || rc=$?
+    if [ "$got" != "$want" ] || [ "$rc" -ne 1 ]; then
+        echo "USAGE-SCAN: fixtures flagged [$got] rc=$rc, wanted [$want] rc=1"
+        ok=0
+    fi
+
+    canary=""
+    for f in "$SELF_DIR"/test-*; do
+        [ -f "$f" ] || continue
+        nc=$(grep -vE '^[[:space:]]*#' "$f")
+        if grep -qE '^[[:space:]]*(\.|source)[[:space:]].*lib/usage-test-isolation\.sh' <<<"$nc" &&
+            ! grep -qF IBL5_USAGE_GATE_STATE_DIR <<<"$nc" && [ "${f##*/}" != test-harness-lib ]; then
+            canary=$f
+            break
+        fi
+    done
+    if [ -z "$canary" ]; then
+        echo "USAGE-SCAN: no lib-route file to mutate"
+        ok=0
+    else
+        name=${canary##*/}
+        mkdir -p "$WORK/usage-canary" "$WORK/usage-canary-ok"
+        grep -v 'usage_test_isolate' "$canary" >"$WORK/usage-canary/$name"
+        cp "$canary" "$WORK/usage-canary-ok/$name"
+        got=$(_usage_scan "$WORK/usage-canary" "$re") || true
+        if [ "$got" != "USAGE-UNISOLATED: $name" ]; then
+            echo "USAGE-SCAN: stripped canary $name flagged [$got]"
+            ok=0
+        fi
+        if ! _usage_scan "$WORK/usage-canary-ok" "$re" >/dev/null; then
+            echo "USAGE-SCAN: unmodified canary $name flagged"
+            ok=0
+        fi
+    fi
+
+    if ! _usage_scan "$SELF_DIR" "$re"; then
+        ok=0
+    fi
+
+    if [ "$ok" -eq 1 ]; then
+        t_ok "case_usage_gate_isolated"
+    else
+        t_bad "case_usage_gate_isolated"
+    fi
+}
+
 case_pass_summary
 case_fail_exits_nonzero
 case_zero_assertions
@@ -353,7 +580,12 @@ case_env_i
 case_double_source
 case_tmp_blank_tmpdir
 case_bpt_delegates
+case_usage_isolation_env
+case_usage_isolation_overwrites
+case_usage_isolation_prestart_fail_open
+case_usage_isolation_lib_env_i
 case_consumers_end_with_h_done
+case_usage_gate_isolated
 
 if [ "$T_FAIL" -eq 0 ]; then
     echo "test-harness-lib: all cases passed"

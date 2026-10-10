@@ -15,8 +15,15 @@
 # sleep guarantees the two runners' phases overlap in wall-clock time, so this
 # exercises real concurrent claiming, not accidental serialization.
 #
-# macOS-only: the automouse pipeline is built on macOS launchd + BSD coreutils
-# (the runner uses `caffeinate`, `stat -f`, BSD `date`). On Linux CI it skips.
+# Platform split: the log-isolation and day-reader blocks below are portable and
+# run on Linux CI (tests.yml job harness-tests). Everything after the
+# `uname != Darwin` check (paused-held locks, the two-runner concurrent run,
+# assertions 1-9) is macOS-only, because automouse-run uses `caffeinate`,
+# `stat -f` and BSD `date`. On Linux the script prints SKIP there and exits 0.
+#
+# Hermetic: the concurrent run exports AUTOMOUSE_SKIP_CANARY=1, so the runner's
+# between-plans canary never consults live master CI, gh auth or main.localhost.
+# Assertion 9 fails if that export is removed (IBL5-backlog#1375).
 #
 # Run: bin/test-automouse-concurrency  (exit 0 = pass/skip, 1 = a safety property failed)
 #
@@ -106,7 +113,7 @@ rm -rf "$ISO"
 if [ "$ISO_FAIL" -ne 0 ]; then echo "RESULT: FAILED (log isolation)"; exit 1; fi
 
 if [ "$(uname)" != "Darwin" ]; then
-    echo "SKIP: test-automouse-concurrency is macOS-only (automouse-run depends on launchd/BSD tools). On Linux CI only the portable log-isolation block below runs."
+    echo "SKIP: test-automouse-concurrency is macOS-only (automouse-run depends on launchd/BSD tools). On Linux CI only the portable log-isolation block above ran."
     exit 0
 fi
 
@@ -161,6 +168,11 @@ trap 'rm -rf "$ROOT"' EXIT
 # Never touch the real usage cache, keychain or markers: no token means fail-open.
 export IBL5_USAGE_GATE_STATE_DIR="$ROOT/usage-gate"
 mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
+# Never consult live master CI, gh auth or main.localhost: the between-plans
+# canary would otherwise park a runner after its first plan whenever master CI
+# is red or the main Docker stack is down (IBL5-backlog#1375). Assertion 9 below
+# fails if this export is removed.
+export AUTOMOUSE_SKIP_CANARY=1
 
 NDIR="$ROOT/automouse"
 PLANS="$ROOT/plans"
@@ -359,6 +371,17 @@ if [ "$both" -eq 0 ] && [ "$union" -eq "$N_PLANS" ]; then
     echo "PASS: runner logs are disjoint and cover all $N_PLANS plans."
 else
     echo "FAIL: log overlap=$both union=$union (want 0 / $N_PLANS)."; FAIL=1
+fi
+
+# 9. Hermeticity tripwire: the canary ran its skip path. The skip line exists
+#    only when AUTOMOUSE_SKIP_CANARY is set, so removing the export fails this
+#    even on a healthy network where the live canary would pass silently.
+#    The first plan to finish leaves at least two plans in queue/, so at least
+#    one runner always reaches the canary dispatch.
+if grep -qF 'canary: skipped (AUTOMOUSE_SKIP_CANARY=1)' "$LA" "$LB" 2>/dev/null; then
+    echo "PASS assertion 9: canary skipped via AUTOMOUSE_SKIP_CANARY (test is hermetic)."
+else
+    echo "FAIL assertion 9: no 'canary: skipped (AUTOMOUSE_SKIP_CANARY=1)' line in either runner log."; FAIL=1
 fi
 
 echo "==============================================================="

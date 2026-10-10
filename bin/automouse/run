@@ -647,6 +647,9 @@ WATCHER_PID=""
 CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
 COST_LOCK_HELD=0  # set to 1 while append_cost_row holds the cost-report mutex
 CAP_DEFERRED=" "  # space-wrapped basenames cap-refunded or wt-new-failed this run; claim_next_plan skips them
+WT_REFUSE_RETRIED=" "  # space-wrapped basenames whose worktree-refused impl resume was already retried this run
+WT_REFUSE_LOCK=""      # claim lock re-armed for a worktree-refusal retry and not yet re-claimed; released after the loop
+WT_REFUSE_RETRY_WT=""  # worktree path the retried resume prompt sends the agent back to; consumed once
 DEPENDS_HELD=" "  # space-wrapped basenames dependency-held this run; claim_next_plan skips them
 # Stop-file writer: records why this runner stopped, for bin/fleet-status.
 # Called only from cleanup_watcher, the EXIT trap. A clean finish already leaves
@@ -1362,12 +1365,22 @@ phase_stalled() {
 # With it, the exit falls through to the WT-NEW FAILURE branch in the main loop
 # as a counted attempt, bounded by MAX_ATTEMPTS.
 #
+# The wt_refused guard (7th arg, default 0) covers Claude Code's resume safety
+# check: `claude --resume <sid>` exits 1 within seconds with "Error: cannot
+# resume into worktree <wt>: Refusing to use <wt> as an isolation worktree"
+# when the session transcript recorded <wt> as its launch checkout. Claude Code
+# clears the binding before exiting, so the same resume succeeds on re-run.
+# The exit is deterministic, never environmental: the main loop retries it once
+# per plan per run (WT_REFUSE_RETRIED), and a second refusal falls through to
+# the genuine-failure branch as a counted attempt, bounded by MAX_ATTEMPTS.
+#
 # Safe under `set -e`: only ever called inside an `if` condition.
 should_impl_env_stop() {
-    local handoff=$1 in_queue=$2 env_err=$3 stalled=$4 fast=$5 wt_fail=${6:-0}
+    local handoff=$1 in_queue=$2 env_err=$3 stalled=$4 fast=$5 wt_fail=${6:-0} wt_refused=${7:-0}
     [ "$handoff" -eq 1 ] && return 1     # handoff written → impl succeeded
     [ "$in_queue" -eq 0 ] && return 1    # plan left queue/ → deliberate disposition, not environmental
     [ "$wt_fail" -eq 1 ] && return 1     # agent reported a bin/wt-new failure → counted attempt, not environmental
+    [ "$wt_refused" -eq 1 ] && return 1  # Claude Code refused the worktree resume → deterministic; caller retries once, else counted attempt
     [ "$env_err" -eq 1 ] || [ "$stalled" -eq 1 ] || [ "$fast" -eq 1 ]
 }
 
@@ -2071,6 +2084,10 @@ while true; do
     # Atomically claim the oldest queued plan not held by a live sibling runner.
     # If every queued plan is already claimed, there's nothing for us to do.
     NEXT_PLAN=$(claim_next_plan) || NEXT_PLAN=""
+    if [ -n "$WT_REFUSE_LOCK" ] && [ -n "$NEXT_PLAN" ] \
+       && [ "$QUEUE_DIR/$(basename "$NEXT_PLAN").lock" = "$WT_REFUSE_LOCK" ]; then
+        WT_REFUSE_LOCK=""   # re-claimed via the resume takeover; the normal lock lifecycle owns it again
+    fi
     if [ -z "$NEXT_PLAN" ]; then
         if [ -n "${SINGLE_PLAN:-}" ]; then
             echo "Plan ${SINGLE_PLAN%.md} is being processed by another runner — nothing to do." >> "$LOG"
@@ -2343,6 +2360,13 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             if usage_session_started "$IMPL_SID"; then
                 IMPL_PROMPT="Continue the implementation from where it stopped. The previous turn was paused by the usage gate."
                 IMPL_SESSION_ARGS=(--resume "$IMPL_SID")
+                if [ -n "$WT_REFUSE_RETRY_WT" ]; then
+                    # Worktree-refusal retry: Claude Code cleared the session's worktree
+                    # binding, so this resume runs in $REPO with no isolation. Send the
+                    # agent back to its worktree by absolute path before any edit.
+                    IMPL_PROMPT="Continue the implementation from where it stopped. The previous turn was paused by the usage gate. Claude Code then refused to resume this session into its worktree and cleared the worktree binding, so this session now runs in the main checkout $REPO without worktree isolation. The main checkout is read-only. Before ANY edit or git command, run: cd $WT_REFUSE_RETRY_WT && git -C $WT_REFUSE_RETRY_WT status. Make every edit under $WT_REFUSE_RETRY_WT. Never edit files under $REPO directly."
+                    WT_REFUSE_RETRY_WT=""
+                fi
             else
                 IMPL_SESSION_ARGS=(--session-id "$IMPL_SID")
             fi
@@ -2428,6 +2452,8 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # A bin/wt-new failure (the agent dropped $WT_FAIL_FILE, plan still in
         # queue/) is also NOT environmental: it falls through to the WT-NEW
         # FAILURE branch below as a counted, run-deferred attempt.
+        # A worktree-resume refusal (Claude Code's resume safety check) is also NOT
+        # environmental: it is retried once just below, then counted and deferred.
         # EXCEPTION, handled just below: a slow failure that was the wall-clock
         # cap itself is refunded by the bounded cap-timeout breaker, up to
         # CAP_REFUND_LIMIT times per plan.
@@ -2452,7 +2478,32 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         IMPL_STALLED=0;  phase_stalled "$IMPL_LOG_BEFORE"   && IMPL_STALLED=1
         IMPL_FAST=0;     [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ] && IMPL_FAST=1
         IMPL_WT_FAIL=0;  [ -f "$WT_FAIL_FILE" ]  && IMPL_WT_FAIL=1
-        if should_impl_env_stop "$IMPL_HANDOFF" "$IMPL_IN_QUEUE" "$IMPL_ENV_ERR" "$IMPL_STALLED" "$IMPL_FAST" "$IMPL_WT_FAIL"; then
+        IMPL_WT_REFUSED=0; usage_is_wt_resume_refused "$LOG" "$IMPL_LOG_BEFORE" && IMPL_WT_REFUSED=1
+        # Worktree-resume refusal retry guard: Claude Code's resume safety check
+        # refused `--resume` into the session's worktree and cleared the binding
+        # (deterministic, never environmental). Retry the same session ONCE per plan
+        # per run through the --resume-paused takeover; the retried prompt carries
+        # the absolute worktree path. A second refusal is a counted attempt.
+        WT_REFUSE_SEEN=0
+        case "$WT_REFUSE_RETRIED" in *" $PLAN_NAME "*) WT_REFUSE_SEEN=1 ;; esac
+        if [ "$IMPL_WT_REFUSED" -eq 1 ] && [ "$IMPL_HANDOFF" -eq 0 ] && [ "$IMPL_IN_QUEUE" -eq 1 ]; then
+            if [ "$WT_REFUSE_SEEN" -eq 0 ] && [ -n "$IMPL_SID" ] && [ -n "$IMPL_WT" ] && [ -d "$IMPL_WT" ]; then
+                echo "WORKTREE RESUME REFUSED — Claude Code would not resume session $IMPL_SID into $IMPL_WT and cleared the binding. Refunding attempt; retrying the resume once." >> "$LOG"
+                refund_attempt
+                PLANS_RUN=$(( PLANS_RUN - 1 ))
+                WT_REFUSE_RETRIED="$WT_REFUSE_RETRIED$PLAN_NAME "
+                printf '%s\n' "$IMPL_SID" > "$CURRENT_LOCK/paused-held"
+                WT_REFUSE_LOCK="$CURRENT_LOCK"
+                WT_REFUSE_RETRY_WT="$IMPL_WT"
+                RESUME_SID="$IMPL_SID"
+                RESUME_PLAN="$NEXT_PLAN"
+                CURRENT_LOCK=""
+                continue
+            fi
+            echo "WORKTREE RESUME REFUSED AGAIN — session ${IMPL_SID:-none} for $PLAN_NAME; counted as a genuine attempt ($(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS), deferred to the next run." >> "$LOG"
+            CAP_DEFERRED="$CAP_DEFERRED$PLAN_NAME "
+        fi
+        if should_impl_env_stop "$IMPL_HANDOFF" "$IMPL_IN_QUEUE" "$IMPL_ENV_ERR" "$IMPL_STALLED" "$IMPL_FAST" "$IMPL_WT_FAIL" "$IMPL_WT_REFUSED"; then
             REASON="usage/rate limit, auth error, or transient"
             if [ "$IMPL_STALLED" -eq 1 ]; then
                 REASON="phase stalled — no stream events for >$((STALL_KILL_SECS/60))min, force-killed"
@@ -2809,6 +2860,13 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         esac
     fi
 done
+
+# A worktree-refusal retry re-armed but never re-claimed (time guard or login
+# preflight broke the loop first): release its lock. No sibling can hold it,
+# because paused-held made every sibling skip it.
+if [ -n "$WT_REFUSE_LOCK" ]; then
+    rm -rf "$WT_REFUSE_LOCK" 2>/dev/null || true
+fi
 
 # Clean up any leftover attempt files for plans that completed
 for af in "$QUEUE_DIR"/*.attempts; do

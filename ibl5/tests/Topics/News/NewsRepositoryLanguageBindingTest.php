@@ -73,6 +73,9 @@ class NewsRepositoryLanguageBindingTest extends TestCase
         $this->assertStringContainsString("alanguage = '' OR alanguage = ''", $this->storiesExecuted());
     }
 
+    /**
+     * @see NewsService::getCategoryPageStories
+     */
     public function testServiceGetCategoryPageStoriesPassesLanguageThrough(): void
     {
         (new NewsService($this->mockDb))->getCategoryPageStories(15, 10, 'english');

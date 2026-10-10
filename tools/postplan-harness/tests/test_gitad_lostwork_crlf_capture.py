@@ -262,6 +262,8 @@ def test_reworded_lf_line_still_blocks():
 
 
 def test_stacked_rebase_capture_keeps_crlf_bytes():
+    # test_gitad_stacked_rebase.py:184 compares the PRE patch in text mode over an LF
+    # fixture; write_bytes of an LF diff reads back identical, so that test stays green.
     d, key, branch = _make_stacked_crlf_repo()
     try:
         g = LiveGit(d)
@@ -293,6 +295,7 @@ def test_rebase_onto_bad_base_writes_no_pre_patch():
     d, key, branch, _ = _make_crlf_repo(b"  x: y\r\n")
     try:
         g = LiveGit(d)
+        # The rev-parse at gitad.py:669 fails first, so no PRE patch is ever written.
         with pytest.raises(HarnessError):
             g._rebase_onto("no-such-ref-deadbeef")
         assert not os.path.exists(f"/tmp/pr-ready-diff-pre-{key}.patch")

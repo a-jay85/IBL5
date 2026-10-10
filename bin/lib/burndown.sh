@@ -998,7 +998,7 @@ bd_cmd_record() {
     jq -e --argjson n "$issue_num" 'any(.items[]; .issue_num == $n)' "$ledger" \
         >/dev/null 2>&1 || bd_die 2 "no item #$issue_num in $ledger"
 
-    local kv route="" slug="" status="" pr_url="" reason="" blocked_by="" applied_keys=""
+    local kv route="" slug="" status="" pr_url="" reason="" blocked_by="" why="" applied_keys=""
     while [ $# -gt 0 ]; do
         kv="$1"; shift
         local k="${kv%%=*}" v="${kv#*=}"
@@ -1031,12 +1031,18 @@ bd_cmd_record() {
                 [[ "$v" =~ ^[1-9][0-9]{0,6}$ ]] \
                     || bd_die 2 "blocked_by=$v rejected: must be a PR number"
                 blocked_by="$v" ;;
+            why)
+                { [ -n "$v" ] && [ "${#v}" -le 200 ] && [[ "$v" != *[[:cntrl:]]* ]]; } \
+                    || bd_die 2 "why= rejected: must be non-empty single-line text of at most 200 chars"
+                why="$v" ;;
             *)
                 bd_die 2 "$k=$v rejected: unknown key $k" ;;
         esac
         applied_keys="${applied_keys} ${kv}"
     done
     bd_validate_skip_args "$reason" "$blocked_by"
+    [ -z "$why" ] || [ -z "$reason" ] \
+        || bd_die 2 "why= and reason= are exclusive: reason= writes its own skip text"
 
     # Build patch object
     local patch="{}"
@@ -1046,6 +1052,15 @@ bd_cmd_record() {
     [ -z "$pr_url" ]  || patch="$(jq -n --argjson p "$patch" --arg v "$pr_url"  '$p+{pr_url:$v}')"
     [ -z "$reason" ]  || patch="$(jq -n --argjson p "$patch" --arg v "$reason"  '$p+{skip_label:$v}')"
     [ -z "$blocked_by" ] || patch="$(jq -n --argjson p "$patch" --argjson v "$blocked_by" '$p+{blocked_by:$v}')"
+    local reason_text=""
+    if [ "$reason" = "$BD_LABEL_BLOCKED" ]; then
+        reason_text="skip-label: blocked (PR #$blocked_by)"
+    elif [ -n "$reason" ]; then
+        reason_text="skip-label: $reason"
+    else
+        reason_text="$why"
+    fi
+    [ -z "$reason_text" ] || patch="$(jq -n --argjson p "$patch" --arg v "$reason_text" '$p+{reason:$v}')"
 
     # Cross-field rules (preview the patched item without writing)
     local preview_item new_status new_route
@@ -1058,6 +1073,11 @@ bd_cmd_record() {
     [ "$new_status" != "shipped" ] || [ "$new_route" = "ad-hoc" ] \
         || bd_die 2 "status=shipped requires route=ad-hoc"
     [ -z "$reason" ] || [ "$new_status" = "skipped" ] || bd_die 2 "reason requires status=skipped"
+    [ -z "$why" ] || [ "$new_status" = "skipped" ] || bd_die 2 "why requires status=skipped"
+    if [ "$status" = "skipped" ] \
+        && [ -z "$(jq -r '.reason // ""' <<< "$preview_item")" ]; then
+        bd_die 2 "status=skipped needs a reason: pass why=<text> (or reason=blocked|out-of-repo)"
+    fi
     if [ "$new_status" = "closed-fixed" ]; then
         patch="$(jq -n --argjson p "$patch" '$p+{cost:0}')"
     fi

@@ -2716,6 +2716,58 @@ want "SR4: ZOMBIE-PICK line wording" "$OUT" "$ZP_LINE"
     && ok "SR5: repo-relative cited paths kept, tracked or not" \
     || fail "SR5: repo-relative cited paths kept, tracked or not"
 
+# Rejected record calls: exit 2, ledger byte-identical, no gh call.
+sr_reject() {
+    local label="$1" issue="$2"; shift 2
+    cp "$SRL" "$T/sr/snap"; : > "$T/gh.log"
+    SR_OUT="$(bd burndown-record "$SRL" "$issue" "$@" 2>&1)"; local rc=$?
+    [ "$rc" -eq 2 ] && cmp -s "$SRL" "$T/sr/snap" && [ ! -s "$T/gh.log" ] \
+        && ok "SR: $label rejected, ledger unchanged, no gh call" \
+        || fail "SR: $label rejected, ledger unchanged, no gh call (got $rc: $SR_OUT)"
+}
+
+sr_reset
+sr_reject "plain skip without a reason (SR6)" 72 status=skipped
+want "SR6: message names why=" "$SR_OUT" "why="
+
+sr_reset
+OUT="$(bd burndown-record "$SRL" 72 status=skipped "why=needs a schema decision first" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ "$(sr_item 72 reason)" = "needs a schema decision first" ] \
+    && ok "SR7: why= stores the text as reason" \
+    || fail "SR7: why= stores the text as reason (got $RC: $OUT)"
+
+sr_reset
+SR_200="$(printf 'x%.0s' $(seq 200))"
+sr_reject "empty why (SR8)" 72 status=skipped "why="
+sr_reject "201-char why (SR8)" 72 status=skipped "why=${SR_200}x"
+sr_reject "newline in why (SR8)" 72 status=skipped $'why=two\nlines'
+OUT="$(bd burndown-record "$SRL" 72 status=skipped "why=$SR_200" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ "${#SR_200}" -eq 200 ] && [ "$(sr_item 72 reason | tr -d '\n' | wc -c | tr -d ' ')" = "200" ] \
+    && ok "SR8: 200-char why accepted" \
+    || fail "SR8: 200-char why accepted (got $RC: $OUT)"
+
+sr_reset
+sr_reject "why on a picked item (SR9)" 73 "why=x"
+want "SR9: message" "$SR_OUT" "why requires status=skipped"
+
+sr_reset
+sr_reject "why plus reason (SR10)" 73 status=skipped reason=out-of-repo "why=x"
+
+sr_reset
+bd burndown-record "$SRL" 72 status=skipped reason=blocked blocked_by=77 >/dev/null 2>&1
+bd burndown-record "$SRL" 73 status=skipped reason=out-of-repo >/dev/null 2>&1
+[ "$(sr_item 72 reason)" = "skip-label: blocked (PR #77)" ] \
+    && [ "$(sr_item 73 reason)" = "skip-label: out-of-repo" ] \
+    && [ "$(sr_item 73 skip_label)" = "out-of-repo" ] \
+    && ok "SR11: label forms store selection-time reason wording" \
+    || fail "SR11: label forms store selection-time reason wording"
+
+sr_reset
+jq '(.items[] | select(.issue_num==71)) |= (.status="skipped")' "$SRL" > "$T/sr/old" && mv "$T/sr/old" "$SRL"
+OUT="$(bd burndown-record "$SRL" 71 pr_url=https://github.com/a-jay85/IBL5/pull/12 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "SR12: old-shape skipped item stays recordable" \
+    || fail "SR12: old-shape skipped item stays recordable (got $RC: $OUT)"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

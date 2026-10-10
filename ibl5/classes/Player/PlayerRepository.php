@@ -61,7 +61,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         );
 
         if ($plrRow === null) {
-            throw new \RuntimeException("Player with ID $playerID not found");
+            throw new PlayerNotFoundException("Player with ID $playerID not found");
         }
 
         return $this->fillFromCurrentRow($plrRow);

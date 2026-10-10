@@ -127,7 +127,7 @@ Cli -> Module
 ComparePlayers -> BasketballStats Player Repositories Security UI
 ContractList -> Player Repositories Security UI
 Database -> League
-Debug -> Auth Security Utilities
+Debug -> Auth Clock Security Utilities
 DepthChart -> DepthChartSnapshot EventLog Http League NextSim Repositories Season Security Standings Team TeamSchedule UI Validation
 DepthChartSnapshot -> BasketballStats Season Security Team
 Discord -> Repositories
@@ -159,7 +159,7 @@ Navigation -> League Security
 Negotiation -> BasketballStats Database League Player Repositories Security Validation
 NextSim -> BasketballStats LeagueSchedule Player Season Security Standings Team TeamSchedule UI
 OneOnOneGame -> Database Discord Security
-PageLayout -> Utilities
+PageLayout -> Clock Utilities
 Player -> BasketballStats Database Http League Negotiation Repositories RookieOption Season Security Team
 PlayerSearch -> Database Player Security UI Validation
 PlrParser -> League Season

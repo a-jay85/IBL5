@@ -23,14 +23,15 @@
 
 set -u
 
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LIB="$REPO_ROOT/bin/lib/post-review-findings.sh"
 
-BASE_TMP="$(mktemp -d)"
-trap 'rm -rf "$BASE_TMP"' EXIT
+h_tmp BASE_TMP
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$BASE_TMP/usage"
-FAILED=0
 
 # ── gh shim ───────────────────────────────────────────────────────────────────
 SHIMD="$BASE_TMP/shim"
@@ -174,8 +175,8 @@ source "$LIB_ARM"
 reset_outputs() { rm -f "$REVIEW_OUT" "$COMMENT_OUT" "$REPLY_OUT" "$RESOLVE_OUT"; }
 
 # ── assertion helpers ─────────────────────────────────────────────────────────
-ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; FAILED=1; }
+ok()   { h_pass "$*"; }
+fail() { h_fail "$*"; }
 
 assert_jq() { # label jq-expr file
     local label="$1" expr="$2" file="$3"
@@ -959,10 +960,4 @@ run_p45_remediate() { # snapshot-ids-newline-separated
 [ "$(run_p45_remediate '' | tail -1)" = "0" ] && ok "p45-filter: empty snapshot acts on nothing" \
     || fail "p45-filter: expected 0 work items for an empty snapshot"
 
-# ── summary ───────────────────────────────────────────────────────────────────
-if [ "$FAILED" -eq 0 ]; then
-    echo "All post-review-findings checks passed."
-else
-    echo "Some post-review-findings checks FAILED."
-fi
-exit "$FAILED"
+h_done

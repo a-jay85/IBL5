@@ -10,4 +10,9 @@ class SystemClock implements ClockInterface
     {
         return time();
     }
+
+    public function microtime(): float
+    {
+        return microtime(true);
+    }
 }

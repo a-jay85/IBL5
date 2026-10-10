@@ -11,21 +11,19 @@
 #
 # Run: bin/test-check-e2e-fixture-drift  (exit 0 = all pass, 1 = a case failed)
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR/..")"
 CHECK="$SCRIPT_DIR/check-e2e-fixture-drift"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-
-FAILED=0
+h_tmp TMP
 
 expect() { # name want got
   if [ "$3" -eq "$2" ]; then
-    echo "ok: $1 (exit $3)"
+    h_pass "$1 (exit $3)"
   else
-    echo "FAIL: $1 — expected exit $2, got $3"
-    FAILED=1
+    h_fail "$1" "expected exit $2, got $3"
   fi
 }
 
@@ -109,9 +107,4 @@ else
 fi
 expect "curated manifest excludes PKs and *" 0 "$hygiene_rc"
 
-if [ "$FAILED" -eq 0 ]; then
-  echo "All test-check-e2e-fixture-drift cases passed."
-else
-  echo "test-check-e2e-fixture-drift: one or more cases FAILED." >&2
-fi
-exit "$FAILED"
+h_done

@@ -17,24 +17,21 @@
 # Run: bin/test-check-e2e-hygiene  (exit 0 = all pass, 1 = a case failed)
 
 set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GATE="$SCRIPT_DIR/check-e2e-hygiene"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+h_tmp TMP
 
-FAILED=0
-pass()     { echo "ok: $1"; }
-failcase() { echo "FAIL: $1"; FAILED=1; }
+pass()     { h_pass "$1"; }
+failcase() { h_fail "$@"; }
 
 # mk_repo — build a fresh git repo with an ibl5/tests/e2e dir; echo its path.
 mk_repo() {
     local d
     d="$(mktemp -d "$TMP/repo.XXXXXX")"
-    git init -q "$d" >/dev/null 2>&1
-    git -C "$d" config user.email t@example.com >/dev/null 2>&1
-    git -C "$d" config user.name tester >/dev/null 2>&1
-    git -C "$d" config commit.gpgsign false >/dev/null 2>&1
+    h_git_repo "$d" --no-commit
     mkdir -p "$d/ibl5/tests/e2e"
     echo "$d"
 }
@@ -378,5 +375,4 @@ else
     echo "SKIP: real-repo-deep-base-smoke (origin/master~200 not available)"
 fi
 
-[ "$FAILED" -eq 0 ] || exit 1
-echo "all cases passed"
+h_done

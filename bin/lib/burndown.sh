@@ -346,7 +346,8 @@ bd_paths_for() {
         || bd_die 3 "bd_paths_for called before bd_load_repo_files"
     local fl bare base tab
     tab="$(printf '\t')"
-    fl="$(grep -oE "$FILE_LINE_RE" <<< "$1" | sed 's/:[0-9]*$//')" || true
+    # Drop absolute candidates: "~/x.md:5" matches as "/x.md:5", never a repo path.
+    fl="$(grep -oE "$FILE_LINE_RE" <<< "$1" | sed 's/:[0-9]*$//' | grep -v '^/')" || true
     bare="$(grep -oE '[A-Za-z0-9_./-]*/[A-Za-z0-9_./-]*' <<< "$1" \
         | sed -e 's#^\./##' -e 's/[.,;]*$//' | LC_ALL=C sort -u \
         | LC_ALL=C comm -12 - "$BD_REPO_FILES")" || true
@@ -1081,6 +1082,9 @@ bd_cmd_record() {
     if [ "$new_status" = "closed-fixed" ]; then
         patch="$(jq -n --argjson p "$patch" '$p+{cost:0}')"
     fi
+    if [ "$new_status" = "skipped" ] && [ "$new_route" != "ad-hoc" ]; then
+        patch="$(jq -n --argjson p "$patch" '$p+{cost:0}')"
+    fi
 
     bd_record_apply "$ledger" "$issue_num" "$patch"
     printf 'recorded #%s:%s\n' "$issue_num" "$applied_keys"
@@ -1412,7 +1416,8 @@ bd_sweep_queued() {
             printf 'STALE-PLAN #%s %s (plan file, no queue entry, no PR; not flipped)\n' \
                 "$issue_num" "$slug"
         else
-            bd_record_apply "$ledger" "$issue_num" '{"status":"skipped"}'
+            bd_record_apply "$ledger" "$issue_num" \
+                '{"status":"skipped","cost":0,"reason":"sweep: zombie queued item (no plan, no queue entry, no PR)"}'
             printf 'ZOMBIE #%s %s -> skipped (no plan, no queue entry, no PR)\n' \
                 "$issue_num" "$slug"
         fi
@@ -1434,7 +1439,8 @@ bd_sweep_picked() {
     if [ "$status" = "picked" ] && [ -z "$route" ] && [ -z "$slug" ] \
         && [[ "$created" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] \
         && [[ "$created" < "$BD_SWEEP_CUTOFF" ]]; then
-        bd_record_apply "$ledger" "$issue_num" '{"status":"skipped"}'
+        bd_record_apply "$ledger" "$issue_num" \
+            '{"status":"skipped","cost":0,"reason":"sweep: zombie picked item (no route, no slug, ledger older than 24h)"}'
         printf 'ZOMBIE-PICK #%s -> skipped (no route, no slug, ledger older than 24h)\n' \
             "$issue_num"
         return 0

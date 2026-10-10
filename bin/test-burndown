@@ -2768,6 +2768,111 @@ OUT="$(bd burndown-record "$SRL" 71 pr_url=https://github.com/a-jay85/IBL5/pull/
 [ "$RC" -eq 0 ] && ok "SR12: old-shape skipped item stays recordable" \
     || fail "SR12: old-shape skipped item stays recordable (got $RC: $OUT)"
 
+sr_reset
+bd burndown-record "$SRL" 70 status=skipped "why=superseded" >/dev/null 2>&1
+[ "$(sr_item 70 cost)" = "0" ] && [ "$(jq -r .units_used "$SRL")" = "4" ] \
+    && ok "SR13: plan-route skip frees its unit" \
+    || fail "SR13: plan-route skip frees its unit"
+
+sr_reset
+bd burndown-record "$SRL" 71 route=ad-hoc slug=sr-71 status=skipped "why=verify failed; worktree held" >/dev/null 2>&1
+[ "$(sr_item 71 cost)" = "2" ] && [ "$(jq -r .units_used "$SRL")" = "5" ] \
+    && [ "$(sr_item 71 reason)" = "verify failed; worktree held" ] \
+    && ok "SR14: held ad-hoc skip keeps its unit and stores why" \
+    || fail "SR14: held ad-hoc skip keeps its unit and stores why"
+
+sr_reset
+bd burndown-record "$SRL" 73 status=skipped reason=out-of-repo >/dev/null 2>&1
+[ "$(sr_item 73 cost)" = "0" ] \
+    && ok "SR15: labelled skip on an unrouted item frees its unit" \
+    || fail "SR15: labelled skip on an unrouted item frees its unit"
+
+sw_reset
+BURNDOWN_NOW=$SW_NOW bd_home "$SW" burndown-sweep >/dev/null 2>&1
+[ "$(sw_item "$SW_OLD" 192 reason)" = "sweep: zombie queued item (no plan, no queue entry, no PR)" ] \
+    && [ "$(sw_item "$SW_OLD" 192 cost)" = "0" ] \
+    && [ "$(jq '.units_used == ([.items[].cost] | add)' "$SW_OLD")" = "true" ] \
+    && [ "$(sw_item "$SW_OLD" 193 cost)" = "1" ] \
+    && [ -z "$(jq -r '.items[] | select(.issue_num==193) | .reason // ""' "$SW_OLD")" ] \
+    && ok "SR16: queued-zombie flip stores a reason and frees the unit" \
+    || fail "SR16: queued-zombie flip stores a reason and frees the unit"
+
+zp_reset
+BURNDOWN_NOW=$SW_NOW bd_home "$ZP" burndown-sweep >/dev/null 2>&1
+[ "$(sw_item "$ZP_OLD" 201 reason)" = "sweep: zombie picked item (no route, no slug, ledger older than 24h)" ] \
+    && [ "$(sw_item "$ZP_OLD" 201 cost)" = "0" ] \
+    && [ -z "$(jq -r '.items[] | select(.issue_num==202) | .reason // ""' "$ZP_OLD")" ] \
+    && ok "SR17: picked-zombie flip stores a reason and frees the unit" \
+    || fail "SR17: picked-zombie flip stores a reason and frees the unit"
+
+[ -z "$(bd_paths_probe "see ~/claude-plans/x.md:546")" ] \
+    && ok "SR18: home-less plan path is dropped" \
+    || fail "SR18: home-less plan path is dropped"
+[ "$(bd_paths_probe "see ~/claude-plans/x.md:546 and bin/backlog:51")" = "bin/backlog" ] \
+    && ok "SR19: mixed body keeps the repo path" \
+    || fail "SR19: mixed body keeps the repo path"
+[ -z "$(bd_paths_probe "log at /tmp/run.sh:3")" ] \
+    && ok "SR20: any absolute path:N is dropped" \
+    || fail "SR20: any absolute path:N is dropped"
+
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":100,"title":"Hundred","body":"see ~/claude-plans/same-plan.md:10","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"Hundred-one","body":"see ~/claude-plans/same-plan.md:10","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"
+grep -qE '^PICK +#100' <<< "$OUT" && grep -qE '^PICK +#101' <<< "$OUT" \
+    && ! grep -qF 'overlap' <<< "$OUT" \
+    && ok "SR21: shared home-less citation no longer blocks a second item" \
+    || fail "SR21: shared home-less citation no longer blocks a second item (got: $OUT)"
+
+cat > "$T/lbl/fx/issues.json" <<'JSON'
+[
+  {"number":40,"title":"Forty","body":"bin/a.sh:1","url":"u40","updatedAt":"2026-09-20T00:00:00Z","labels":[{"name":"blocked"}]},
+  {"number":41,"title":"Forty-one","body":"bin/b.sh:1","url":"u41","updatedAt":"2026-09-20T00:00:00Z","labels":[{"name":"out-of-repo"}]},
+  {"number":42,"title":"Forty-two","body":"bin/c.sh:1","url":"u42","updatedAt":"2026-09-20T00:00:00Z","labels":[]},
+  {"number":43,"title":"Forty-three","body":"bin/d.sh:1","url":"u43","updatedAt":"2026-09-20T00:00:00Z","labels":[{"name":"blocked"}]},
+  {"number":44,"title":"Forty-four","body":"bin/e.sh:1","url":"u44","updatedAt":"2026-09-20T00:00:00Z","labels":[{"name":"out-of-repo"}]},
+  {"number":45,"title":"Forty-five","body":"bin/f.sh:1","url":"u45","updatedAt":"2026-09-28T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bdl_b 2>&1)"; RC=$?
+L="$(grep '^LEDGER: ' <<< "$OUT" | sed 's/^LEDGER: //')"
+want "SR22: #42 PICK" "$OUT" "PICK  #42"
+SR22_BAD=""
+for n in 40 41 43 44; do grep -qF "PICK  #$n" <<< "$OUT" && SR22_BAD="$SR22_BAD $n"; done
+want "SR22: #40 blocked row" "$OUT" "skip-label: blocked (PR unknown)"
+want "SR22: #41 out-of-repo row" "$OUT" "skip-label: out-of-repo"
+want "SR22: units 1/5" "$OUT" "units: 1/5"
+[ "$RC" -eq 0 ] && [ -z "$SR22_BAD" ] && [ "$(jq -c '[.items[].issue_num]' "$L")" = "[42]" ] \
+    && [ "$(jq '.units_used' "$L")" = "$(jq '[.items[] | select(.issue_num==42) | .cost] | add' "$L")" ] \
+    && ok "SR22: labelled issues are filtered before units are spent" \
+    || fail "SR22: labelled issues are filtered before units are spent (rc $RC, picked:$SR22_BAD)"
+
+[ "$(jq '[.skipped[] | select((.reason // "") == "")] | length' "$L")" = "0" ] \
+    && [ "$(jq -c '[.skipped[].issue_num] | sort' "$L")" = "[40,41,43,44,45]" ] \
+    && ok "SR23: every top-level skip row carries a reason" \
+    || fail "SR23: every top-level skip row carries a reason ($(jq -c '.skipped' "$L"))"
+
+cp "$L" "$T/sr/e2e.snap"; : > "$T/lbl/gh.log"
+OUT="$(bdl burndown-record "$L" 42 status=skipped 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && cmp -s "$L" "$T/sr/e2e.snap" && [ ! -s "$T/lbl/gh.log" ] \
+    && ok "SR24: plain skip on the normal item is rejected, ledger untouched" \
+    || fail "SR24: plain skip on the normal item is rejected, ledger untouched (got $RC: $OUT)"
+want "SR24: message names why=" "$OUT" "why="
+
+OUT="$(bdl burndown-record "$L" 42 status=skipped "why=duplicate of a merged fix" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ "$(jq -r '.items[] | select(.issue_num==42) | .reason' "$L")" = "duplicate of a merged fix" ] \
+    && [ "$(jq -r '.items[] | select(.issue_num==42) | .cost' "$L")" = "0" ] \
+    && [ "$(jq '.units_used' "$L")" = "0" ] \
+    && [ "$(jq '[.items[] | select(.status=="skipped" and ((.reason // "") == ""))] | length' "$L")" = "0" ] \
+    && ok "SR25: plain skip with why= frees the unit, no reasonless skips remain" \
+    || fail "SR25: plain skip with why= frees the unit, no reasonless skips remain (got $RC: $OUT)"
+
+OUT="$("$SCRIPT" --help 2>&1)"
+want "SR26: help lists why=" "$OUT" "blocked_by=, why= on ledger item"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 if [ "$FAIL" -gt 0 ]; then

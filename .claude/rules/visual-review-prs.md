@@ -16,7 +16,7 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-10-08
+last_verified: 2026-10-10
 ---
 
 # Visual-review PRs

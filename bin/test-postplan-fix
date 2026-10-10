@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-postplan-fix: cases for bin/postplan-fix (one-command fix entry for a blocked
+# post-plan run). claude and gh are stubs; the script runs from a copy inside a temp git
+# repo, so nothing in the real checkout or on the network is touched.
+#
+#   1. --help exits 0 and prints Usage; no tool is called.
+#   2. Unknown flag exits 2.
+#   3. Unset arg, empty arg, and two args each exit 2.
+#   4. Unknown PR exits 1.
+#   5. Unknown slug exits 1.
+#   6. A prefix of a real branch exits 1 (the worktree match is exact).
+#   7. PR path: claude gets cwd = the branch worktree, one argv element, and the newest
+#      run's blocked-ship text.
+#   8. Slug path: result.json under the worktree's own out dir; gh is not called.
+#   9. Worktree with no run dir still launches.
+#  10. A 5000-byte failure text is capped at 1500 bytes.
+#  11. Run from a linked worktree: the main checkout's out dir is still searched.
+#  12. env -i probe: no HOME, no Homebrew, bash with pipefail.
+#
+# Run: bin/test-postplan-fix  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+
+ok()   { h_pass "$1"; }
+fail() { h_fail "$@"; }
+
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-postplan-fix.XXXXXX")
+B_BLOCK="pfx$$-block"; B_JSON="pfx$$-json"; B_NORUN="pfx$$-norun"; B_BIG="pfx$$-big"
+B_PREFIX="pfx$$-bloc"
+PNLOG="/tmp/post-plan-now-$B_BLOCK-20261008-120001-9.log"
+trap 'rm -rf "$TMP"; rm -f "$PNLOG"' EXIT
+
+has()   { case "$2" in *"$3"*) ok "$1" ;; *) fail "$1" "missing '$3'" ;; esac; }
+hasnt() { case "$2" in *"$3"*) fail "$1" "unexpected '$3'" ;; *) ok "$1" ;; esac; }
+rc_is() { if [ "$2" = "$3" ]; then ok "$1"; else fail "$1" "rc $2, want $3"; fi; }
+
+# --- fixture: a temp repo holding a committed copy of the script and its libs ---
+MAIN="$TMP/main"
+git init -q "$MAIN"
+mkdir -p "$MAIN/bin"
+cp "$ROOT/bin/postplan-fix" "$MAIN/bin/postplan-fix"
+cp -R "$ROOT/bin/lib" "$MAIN/bin/lib"
+git -C "$MAIN" add -A
+git -C "$MAIN" -c user.name=t -c user.email=t@t commit -qm init
+for B in "$B_BLOCK" "$B_JSON" "$B_NORUN" "$B_BIG"; do
+    git -C "$MAIN" worktree add -q -b "$B" "$TMP/wt-$B"
+done
+
+OUT="$MAIN/tools/postplan-harness/out"
+JSON_OUT="$TMP/wt-$B_JSON/tools/postplan-harness/out"
+mkdir -p "$OUT/live-$B_BLOCK-20261007-090000-1" "$OUT/live-$B_BLOCK-20261008-120000-2" \
+    "$OUT/live-$B_BIG-20261008-120000-4" "$JSON_OUT/live-$B_JSON-20261008-120000-3"
+printf '{"terminal":"failed","error_kind":"x","error":"OLDRUN"}' \
+    > "$OUT/live-$B_BLOCK-20261007-090000-1/result.json"
+printf 'Why: required check failed\nBLOCKMARK\n' \
+    > "$OUT/live-$B_BLOCK-20261008-120000-2/blocked-ship.txt"
+printf '{"terminal":"failed","error_kind":"gh","error":"gh: gh pr create --title: JSONMARK"}' \
+    > "$JSON_OUT/live-$B_JSON-20261008-120000-3/result.json"
+{ head -c 5000 /dev/zero | tr '\0' 'x'; printf 'TAILMARK'; } \
+    > "$OUT/live-$B_BIG-20261008-120000-4/blocked-ship.txt"
+: > "$PNLOG"
+
+STUB="$TMP/stub"; mkdir -p "$STUB"
+cat > "$STUB/claude" <<STUBEOF
+#!/bin/bash
+pwd -P > "$TMP/claude.cwd"
+echo "\$#" > "$TMP/claude.argc"
+printf '%s' "\$1" > "$TMP/claude.prompt"
+exit 0
+STUBEOF
+cat > "$STUB/gh" <<STUBEOF
+#!/bin/bash
+: > "$TMP/gh.called"
+if [ "\$1 \$2 \$3" = "pr view 42" ]; then printf '%s\n' "$B_BLOCK"; exit 0; fi
+exit 1
+STUBEOF
+chmod +x "$STUB/claude" "$STUB/gh"
+
+# run_fix <script> <args...>: sets RC, ERR, STDOUT, PROMPT; clears the stub's records first.
+run_fix() {
+    local script="$1"; shift
+    rm -f "$TMP/claude.cwd" "$TMP/claude.argc" "$TMP/claude.prompt" "$TMP/gh.called"
+    STDOUT=$(PATH="$STUB:$PATH" bash "$script" "$@" 2>"$TMP/err"); RC=$?
+    ERR=$(cat "$TMP/err")
+    PROMPT=""; [ -f "$TMP/claude.prompt" ] && PROMPT=$(cat "$TMP/claude.prompt")
+}
+no_claude() { if [ -e "$TMP/claude.argc" ]; then fail "$1" "claude was called"; else ok "$1"; fi; }
+
+SUT="$MAIN/bin/postplan-fix"
+
+# 1
+run_fix "$SUT" --help
+rc_is "1: --help exits 0" "$RC" 0
+has "1: --help prints Usage" "$STDOUT" "Usage:"
+no_claude "1: --help calls no claude"
+if [ -e "$TMP/gh.called" ]; then fail "1: --help calls no gh"; else ok "1: --help calls no gh"; fi
+
+# 2
+run_fix "$SUT" --bogus
+rc_is "2: unknown flag exits 2" "$RC" 2
+has "2: unknown flag message" "$ERR" "unknown flag: --bogus"
+no_claude "2: unknown flag calls no claude"
+
+# 3
+run_fix "$SUT"
+rc_is "3: unset arg exits 2" "$RC" 2
+has "3: unset arg message" "$ERR" "expected exactly one"
+run_fix "$SUT" ""
+rc_is "3: empty arg exits 2" "$RC" 2
+has "3: empty arg message" "$ERR" "expected exactly one"
+run_fix "$SUT" a b
+rc_is "3: two args exit 2" "$RC" 2
+no_claude "3: bad arg count calls no claude"
+
+# 4
+run_fix "$SUT" 999
+rc_is "4: unknown PR exits 1" "$RC" 1
+has "4: unknown PR message" "$ERR" "PR #999 not found"
+no_claude "4: unknown PR calls no claude"
+
+# 5
+run_fix "$SUT" nosuch-branch
+rc_is "5: unknown slug exits 1" "$RC" 1
+has "5: unknown slug message" "$ERR" "no worktree has branch nosuch-branch"
+no_claude "5: unknown slug calls no claude"
+
+# 6
+run_fix "$SUT" "$B_PREFIX"
+rc_is "6: branch prefix exits 1" "$RC" 1
+has "6: branch prefix message" "$ERR" "no worktree has branch"
+no_claude "6: branch prefix calls no claude"
+
+# 7
+run_fix "$SUT" 42
+rc_is "7: PR path exits 0" "$RC" 0
+WANT_CWD=$(cd "$TMP/wt-$B_BLOCK" && pwd -P)
+GOT_CWD=""; [ -f "$TMP/claude.cwd" ] && GOT_CWD=$(cat "$TMP/claude.cwd")
+if [ "$GOT_CWD" = "$WANT_CWD" ]; then ok "7: claude runs in the branch worktree"; else fail "7: claude cwd" "got '$GOT_CWD'"; fi
+GOT_ARGC=""; [ -f "$TMP/claude.argc" ] && GOT_ARGC=$(cat "$TMP/claude.argc")
+if [ "$GOT_ARGC" = "1" ]; then ok "7: claude gets exactly one argv element"; else fail "7: claude argc" "got '$GOT_ARGC'"; fi
+for tok in BLOCKMARK "ship blocked (exit 3)" "PR #42" "live-$B_BLOCK-20261008-120000-2" audit.log \
+    blocked-ship.txt "/tmp/post-plan-now-$B_BLOCK-" "Do not ship" "untrusted program output"; do
+    has "7: prompt names '$tok'" "$PROMPT" "$tok"
+done
+hasnt "7: newest run wins (no OLDRUN)" "$PROMPT" "OLDRUN"
+
+# 8
+run_fix "$SUT" "$B_JSON"
+rc_is "8: slug path exits 0" "$RC" 0
+if [ -e "$TMP/gh.called" ]; then fail "8: gh not called for a slug"; else ok "8: gh not called for a slug"; fi
+has "8: prompt carries the stage" "$PROMPT" "failed / gh"
+has "8: prompt carries the error" "$PROMPT" "JSONMARK"
+hasnt "8: no blocked-ship.txt line" "$PROMPT" "blocked-ship.txt:"
+
+# 9
+run_fix "$SUT" "$B_NORUN"
+rc_is "9: no run dir still exits 0" "$RC" 0
+has "9: prompt says no run dir" "$PROMPT" "no harness run dir found"
+has "9: prompt says cause not recorded" "$PROMPT" "cause not recorded; read audit.log"
+
+# 10
+run_fix "$SUT" "$B_BIG"
+rc_is "10: big text exits 0" "$RC" 0
+hasnt "10: text is capped (no TAILMARK)" "$PROMPT" "TAILMARK"
+if [ "${#PROMPT}" -lt 3000 ]; then ok "10: prompt under 3000 bytes"; else fail "10: prompt size" "${#PROMPT}"; fi
+
+# 11
+run_fix "$TMP/wt-$B_JSON/bin/postplan-fix" "$B_JSON"
+rc_is "11: linked-worktree caller exits 0" "$RC" 0
+has "11: worktree's own out dir found" "$PROMPT" "JSONMARK"
+run_fix "$TMP/wt-$B_JSON/bin/postplan-fix" "$B_BLOCK"
+rc_is "11: main out dir reached from a worktree exits 0" "$RC" 0
+has "11: main out dir searched" "$PROMPT" "BLOCKMARK"
+
+# 12
+rm -f "$TMP/claude.prompt"
+env -i PATH="$STUB:/usr/bin:/bin" /bin/bash -c 'set -euo pipefail; "$1" "$2"' _ "$SUT" "$B_BLOCK" \
+    >/dev/null 2>"$TMP/err"; RC=$?
+rc_is "12: env -i probe exits 0" "$RC" 0
+PROMPT=""; [ -f "$TMP/claude.prompt" ] && PROMPT=$(cat "$TMP/claude.prompt")
+has "12: env -i probe reaches claude with the text" "$PROMPT" "BLOCKMARK"
+
+h_done

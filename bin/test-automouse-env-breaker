@@ -456,5 +456,7 @@ assert_eq      "P6: paused-held names the post-plan session" \
 assert_absent  "P6: attempt refunded"                    "$E2_NDIR/queue/ppausey.md.attempts"
 assert_present "P6: plan stays queued"                   "$E2_NDIR/queue/ppausey.md"
 assert_present "P6: post-plan marker survives"           "$E2_GATE/markers/$E2_PP_SID.json"
+assert_eq      "P6: lock branch breadcrumb names the handoff branch" \
+               "$(cat "$E2_NDIR/queue/ppausey.md.lock/branch" 2>/dev/null)" "stub"
 
 h_done

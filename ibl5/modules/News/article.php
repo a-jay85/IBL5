@@ -67,6 +67,7 @@ if ($row === null) {
 }
 
 $catid = (int) ($row['catid'] ?? 0);
+/** @var string $aaid nuke_stories.aid is NOT NULL varchar */
 $aaid = $row['aid'] ?? '';
 $time = $row['time'] ?? '';
 /** @var string $title */
@@ -74,6 +75,7 @@ $title = \Security\HtmlSanitizer::safeHtmlOutput($row['title'] ?? '');
 $hometext = $row['hometext'] ?? '';
 $bodytext = $row['bodytext'] ?? '';
 $topic = (int) ($row['topic'] ?? 0);
+/** @var string $informant nuke_stories.informant is NOT NULL varchar */
 $informant = $row['informant'] ?? '';
 /** @var string $notes */
 $notes = \Security\HtmlSanitizer::safeHtmlOutput($row['notes'] ?? '');
@@ -110,6 +112,7 @@ if (empty($bodytext)) {
 }
 
 if (empty($informant)) {
+    /** @var string $informant */
     $informant = $anonymous;
 }
 

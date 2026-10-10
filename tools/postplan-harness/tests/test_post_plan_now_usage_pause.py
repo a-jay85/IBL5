@@ -15,7 +15,7 @@ import types
 import pytest
 
 from test_post_plan_now_fallback import (  # noqa: F401  (the fixture import re-arms its autouse reaper here)
-    PPN, REPO, _fixture_repo, _generate_cmd, _reap_tmp_sidecars, _run_gate, _run_ppn,
+    PPN, REPO, _fixture_repo, _generate_cmd, _private_log_dir, _run_gate, _run_ppn,
 )
 
 # The exact text test_postrun_pause_limit_rc1 in bin/test-usage-gate feeds usage_postrun_pause.

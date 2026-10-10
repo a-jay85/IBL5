@@ -613,7 +613,10 @@ fi
 
 TS=$(date +%Y%m%d-%H%M%S)-$$
 STARTED=$(date '+%Y-%m-%d %H:%M:%S %Z')
-LOG="/tmp/post-plan-now-$SAFE_SLUG-$TS.log"
+# POSTPLAN_LOG_DIR is a test seam: the pytest suite points it at a per-test dir so two
+# concurrent suites never touch each other's logs. Production never sets it, and
+# bin/fleet-status and watch-run look for logs under /tmp.
+LOG="${POSTPLAN_LOG_DIR:-/tmp}/post-plan-now-$SAFE_SLUG-$TS.log"
 LABEL="com.ibl5.postplan-now-$SAFE_SLUG-$TS"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 # ONE session uuid for this run. $CMD below carries a single `claude -p` invocation

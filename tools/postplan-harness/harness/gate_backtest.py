@@ -101,8 +101,6 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-skill-arguments": _TREE,
     "bin/check-workflow-checkout": _TREE,
     "bin/check-workflow-run-interpolation": _TREE,
-    # Whole-tree scan whose default root is the script's own repo, so point it at the tree.
-    "bin/check-ci-image-registry": ReplaySpec(argv=("--root={tree}",)),
     # Plan-file gates: the plan resolves from the historical PR's branch name.
     "bin/check-plan": _PLAN,
     "bin/check-plan-staleness": _PLAN,

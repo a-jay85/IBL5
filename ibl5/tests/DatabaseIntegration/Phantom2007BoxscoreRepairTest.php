@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
-use Boxscore\Phantom2007BoxscoreRepair;
+use Boxscore\Legacy\Phantom2007BoxscoreRepair;
 use PHPUnit\Framework\Attributes\Group;
 
 /**

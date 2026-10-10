@@ -20,7 +20,7 @@ usage() {
 Usage: bin/check-e2e-hygiene [--pr] [--base <ref>] [--help|-h]
 
 Scans E2E specs for anti-patterns (silent passes, body.toBeVisible,
-test.skip, weak assertions). Comma-fallback locators are advisory.
+test.skip, weak assertions, comma-fallback locators). Every hit blocks.
 
 Modes:
   (no args)  Scan all ibl5/tests/e2e/**/*.ts
@@ -113,14 +113,16 @@ has_inline_allow() {
 # --- Pattern runners ---
 BLOCKING_HITS=()
 BLOCKING_TOTAL=0
-ADVISORY_HITS=()
-ADVISORY_TOTAL=0
 
 run_pattern() {
   local severity="$1"
   local label="$2"
   shift 2
   local grep_args=("$@")
+  if [ "$severity" != "blocking" ]; then
+    echo "check-e2e-hygiene: unknown severity '$severity' for [$label]" >&2
+    exit 2
+  fi
 
   for f in "${SCAN_FILES[@]}"; do
     while IFS=: read -r line_num matched_line; do
@@ -130,13 +132,8 @@ run_pattern() {
       fi
       local rel="${f#"$ROOT/"}"
       local entry="[$label] $rel:$line_num: $matched_line"
-      if [ "$severity" = "blocking" ]; then
-        BLOCKING_HITS+=("$entry")
-        BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
-      else
-        ADVISORY_HITS+=("$entry")
-        ADVISORY_TOTAL=$((ADVISORY_TOTAL + 1))
-      fi
+      BLOCKING_HITS+=("$entry")
+      BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
     done < <(grep -nE "${grep_args[@]}" "$f" 2>/dev/null || true)
   done
 }
@@ -146,6 +143,10 @@ run_pattern_pipe() {
   local label="$2"
   local pattern1="$3"
   local exclude="$4"
+  if [ "$severity" != "blocking" ]; then
+    echo "check-e2e-hygiene: unknown severity '$severity' for [$label]" >&2
+    exit 2
+  fi
 
   for f in "${SCAN_FILES[@]}"; do
     while IFS=: read -r line_num matched_line; do
@@ -155,13 +156,8 @@ run_pattern_pipe() {
       fi
       local rel="${f#"$ROOT/"}"
       local entry="[$label] $rel:$line_num: $matched_line"
-      if [ "$severity" = "blocking" ]; then
-        BLOCKING_HITS+=("$entry")
-        BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
-      else
-        ADVISORY_HITS+=("$entry")
-        ADVISORY_TOTAL=$((ADVISORY_TOTAL + 1))
-      fi
+      BLOCKING_HITS+=("$entry")
+      BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
     done < <(grep -nE "$pattern1" "$f" 2>/dev/null | grep -vE "$exclude" || true)
   done
 }
@@ -247,25 +243,13 @@ run_pattern blocking "weak-gt-neg1" \
 check_count_no_else
 check_visible_no_else
 
-# === ADVISORY patterns (reported but non-blocking) ===
-
-# TODO: tighten comma-fallback-locator to blocking after burn-down
-run_pattern_pipe advisory "comma-fallback-locator" \
+# Comma-fallback locator: a selector list inside locator('...') hides which
+# element the page actually renders. Commas inside [attr=...] are excluded.
+run_pattern_pipe blocking "comma-fallback-locator" \
   "locator\((['\"])[^'\"]*,[^'\"]*\1\)" \
   "locator\([^)]*\[[^]]*,[^]]*\][^)]*\)"
 
 # --- Report ---
-if [ "$ADVISORY_TOTAL" -gt 0 ]; then
-  echo "=== Advisory (non-blocking) ==="
-  echo ""
-  for hit in "${ADVISORY_HITS[@]}"; do
-    echo "  $hit"
-  done
-  echo ""
-  echo "Advisory: $ADVISORY_TOTAL comma-fallback locator hits (burn-down tracked)."
-  echo ""
-fi
-
 if [ "$BLOCKING_TOTAL" -eq 0 ]; then
   echo "PASS: 0 blocking hits"
   exit 0

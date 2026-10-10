@@ -226,4 +226,13 @@ class DraftHistoryViewTest extends TestCase
             'retired' => 0,
         ], $overrides);
     }
+
+    public function testYearSelectTargetsDraftInfoHistoryTab(): void
+    {
+        $html = $this->view->render(2024, 2020, 2024, []);
+
+        $this->assertStringContainsString('hx-get="modules.php?name=DraftInfo&amp;op=api"', $html);
+        $this->assertStringContainsString('name=DraftInfo&amp;tab=history&amp;year=', $html);
+        $this->assertStringNotContainsString('name=DraftHistory', $html);
+    }
 }

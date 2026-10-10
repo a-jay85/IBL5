@@ -12,7 +12,7 @@ const TEAM_LINK_SEL =
 
 test.describe('Projected Draft Order flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=ProjectedDraftOrder');
+    await page.goto('modules.php?name=DraftInfo&tab=order');
   });
 
   test('page loads with title containing year', async ({ page }) => {

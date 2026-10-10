@@ -20,6 +20,7 @@ final class ModuleRegistry
         'DepthChartEntry',
         'Draft',
         'DraftHistory',
+        'DraftInfo',
         'DraftPickLocator',
         'FranchiseHistory',
         'FranchiseRecordBook',

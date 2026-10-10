@@ -361,7 +361,7 @@ class NavigationMenuBuilderTest extends TestCase
         $seasonLinks = $menus['Season']['links'];
         $draftOrderLink = null;
         foreach ($seasonLinks as $link) {
-            if (str_contains($link['url'] ?? '', 'ProjectedDraftOrder')) {
+            if (str_contains($link['url'] ?? '', 'DraftInfo')) {
                 $draftOrderLink = $link;
                 break;
             }
@@ -380,7 +380,7 @@ class NavigationMenuBuilderTest extends TestCase
         $seasonLinks = $menus['Season']['links'];
         $draftOrderLink = null;
         foreach ($seasonLinks as $link) {
-            if (str_contains($link['url'] ?? '', 'ProjectedDraftOrder')) {
+            if (str_contains($link['url'] ?? '', 'DraftInfo')) {
                 $draftOrderLink = $link;
                 break;
             }
@@ -399,7 +399,7 @@ class NavigationMenuBuilderTest extends TestCase
         $seasonLinks = $menus['Season']['links'];
         $draftOrderLink = null;
         foreach ($seasonLinks as $link) {
-            if (str_contains($link['url'] ?? '', 'ProjectedDraftOrder')) {
+            if (str_contains($link['url'] ?? '', 'DraftInfo')) {
                 $draftOrderLink = $link;
                 break;
             }
@@ -464,5 +464,68 @@ class NavigationMenuBuilderTest extends TestCase
         $labels = array_column($menu, 'label');
         $this->assertContains('Sign Up', $labels);
         $this->assertContains('Forgot Password', $labels);
+    }
+
+    // --- DraftInfo Tab Link Tests ---
+
+    public function testDraftLinksTargetDraftInfoTabs(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'ibl', isLoggedIn: true, teamId: 1));
+        $menus = $builder->getMenuStructure();
+
+        $allLinks = array_merge(
+            $menus['Season']['links'] ?? [],
+            $menus['History']['links'] ?? []
+        );
+
+        $urls = array_column($allLinks, 'url');
+
+        $this->assertContains('modules.php?name=DraftInfo&tab=order', $urls);
+        $this->assertContains('modules.php?name=DraftInfo&tab=picks', $urls);
+        $this->assertContains('modules.php?name=DraftInfo&tab=history', $urls);
+
+        $teamMenu = $builder->getMyTeamMenu();
+        $this->assertNotNull($teamMenu);
+        $teamUrls = array_column($teamMenu['links'], 'url');
+        $this->assertContains('modules.php?name=DraftInfo&tab=history&teamid=1', $teamUrls);
+    }
+
+    public function testNoNavLinkTargetsLegacyDraftModule(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'ibl', isLoggedIn: true, teamId: 1));
+        $menus = $builder->getMenuStructure();
+        $teamMenu = $builder->getMyTeamMenu();
+
+        $allLinks = array_merge(...array_column(array_values($menus), 'links'));
+        if ($teamMenu !== null) {
+            $allLinks = array_merge($allLinks, $teamMenu['links']);
+        }
+
+        foreach ($allLinks as $link) {
+            $url = $link['url'] ?? '';
+            $this->assertDoesNotMatchRegularExpression(
+                '/name=(DraftHistory|DraftPickLocator|ProjectedDraftOrder)(&|$)/',
+                $url,
+                "Nav link '$url' targets a legacy draft module"
+            );
+        }
+    }
+
+    public function testOlympicsNavHidesDraftInfo(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'olympics'));
+        $menus = $builder->getMenuStructure();
+
+        $allLinks = [];
+        foreach ($menus as $menu) {
+            foreach ($menu['links'] as $link) {
+                $allLinks[] = $link;
+            }
+        }
+
+        foreach ($allLinks as $link) {
+            $url = $link['url'] ?? '';
+            $this->assertStringNotContainsString('name=DraftInfo', $url, "Olympics nav must not contain DraftInfo link");
+        }
     }
 }

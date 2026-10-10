@@ -187,6 +187,9 @@
         <testsuite name="DraftHistory Module Tests">
             <directory>tests/DraftHistory</directory>
         </testsuite>
+        <testsuite name="DraftInfo Module Tests">
+            <directory>tests/DraftInfo</directory>
+        </testsuite>
         <testsuite name="FreeAgencyPreview Module Tests">
             <directory>tests/FreeAgencyPreview</directory>
         </testsuite>

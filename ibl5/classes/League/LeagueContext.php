@@ -171,6 +171,7 @@ class LeagueContext
         if ($currentLeague === self::LEAGUE_OLYMPICS) {
             $iblOnlyModules = [
                 'Draft',
+                'DraftInfo',
                 'DraftPickLocator',
                 'FreeAgency',
                 'Waivers',
